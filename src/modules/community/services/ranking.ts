@@ -22,7 +22,7 @@ function communityBaseUrl(): string {
 	return `${base.replace(/\/$/, "")}/v1/custom`;
 }
 
-function authHeaders(sessionToken: string | null): Record<string, string> {
+export function authHeaders(sessionToken: string | null): Record<string, string> {
 	return sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {};
 }
 

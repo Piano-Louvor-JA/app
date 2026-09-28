@@ -8,6 +8,8 @@ export default {
       empty: 'Nenhuma coletânea criada ainda. Importe um .slja no editor.',
       newPlaceholder: 'Nome da nova coletânea...',
       create: 'Criar',
+      hide: 'Ocultar Minhas Coletâneas',
+      show: 'Mostrar Minhas Coletâneas',
     },
     playlists: {
       title: 'Playlists',

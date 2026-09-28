@@ -2,7 +2,25 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	type CommunityCollectionSummary,
 	listCommunityCollectionsPage,
+	saveCommunityCopy,
 } from "../community-catalog";
+import {
+	listLocalMusics,
+	listLocalCollections,
+} from "@modules/media/services/local-custom-store";
+
+// localStorage não existe no ambiente node — mock mínimo em memória
+const __store = new Map<string, string>();
+const __ls = {
+	getItem: (k: string) => __store.get(k) ?? null,
+	setItem: (k: string, v: string) => void __store.set(k, String(v)),
+	removeItem: (k: string) => void __store.delete(k),
+	clear: () => __store.clear(),
+};
+Object.defineProperty(globalThis, "localStorage", {
+	configurable: true,
+	get: () => __ls,
+});
 
 const PUBLIC_ROW = {
 	id_collection: 12,
@@ -263,5 +281,165 @@ describe("community-catalog — mata mutantes de !ok/meta/description", () => {
 		expect(result.page).toBe(3);
 		expect(result.lastPage).toBe(1);
 		expect(result.total).toBe(0);
+	});
+});
+
+describe("community-catalog — saveCommunityCopy (F0.4, mata mutantes 64-133)", () => {
+	beforeEach(() => {
+		vi.unstubAllGlobals();
+		vi.unstubAllEnvs();
+	});
+
+	const BASE = {
+		id: 77,
+		name: "Coletânea da Comunidade",
+		description: "desc original",
+		coverUrl: "https://api.example/c.jpg",
+		authorName: "Maria",
+		musicsCount: 2,
+		updatedAt: "2026-09-15 08:00:00",
+	};
+
+	it("caminho feliz: cria cópia local com faixas mapeadas e id oficial quando > 0", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () =>
+				jsonResponse({
+					data: [
+						{ name: "Hino 1", official_music_id: 42 },
+						{ name: "Hino 2", official_music_id: null },
+						{ name: "Hino 3", official_music_id: 0 },
+					],
+				}),
+			),
+		);
+		const localId = await saveCommunityCopy(BASE);
+		expect(localId).not.toBeNull();
+		// verifica faixas criadas: id oficial só nas válidas
+		const musics = listLocalMusics(localId as number);
+		expect(musics).toHaveLength(3);
+		expect(musics.map((m) => m.name)).toEqual(["Hino 1", "Hino 2", "Hino 3"]);
+	});
+
+	it("API !ok → null sem criar coletânea", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => jsonResponse({ data: [] }, false)),
+		);
+		expect(await saveCommunityCopy(BASE)).toBeNull();
+	});
+
+	it("payload sem data (não-array) → null", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => jsonResponse({ error: "x" })),
+		);
+		expect(await saveCommunityCopy(BASE)).toBeNull();
+	});
+
+	it("fetch lança (rede) → null sem propagar", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => {
+				throw new Error("offline");
+			}),
+		);
+		expect(await saveCommunityCopy(BASE)).toBeNull();
+	});
+
+	it("URL de musics usa o id da coletânea (mata mutante StringLiteral do path)", async () => {
+		let calledUrl = "";
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (url: string) => {
+				calledUrl = url;
+				return jsonResponse({ data: [] });
+			}),
+		);
+		await saveCommunityCopy(BASE);
+		expect(calledUrl).toBe(
+			"https://api.pianolouvorja.com.br/v1/custom/collections/77/musics",
+		);
+	});
+
+	it("descrição null da origem → cópia sem descrição (mata mutante L85)", async () => {
+		let capturedDescription: unknown;
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => jsonResponse({ data: [] })),
+		);
+		// espiar a coletânea criada
+		const spy = vi.spyOn(
+			await import("@modules/media/services/local-custom-store"),
+			"createLocalCollection",
+		);
+		await saveCommunityCopy({ ...BASE, description: null });
+		// createLocalCollection(name, description?) — chamada com undefined
+		expect(spy).toHaveBeenCalled();
+		capturedDescription = spy.mock.calls[0][1];
+		expect(capturedDescription).toBeUndefined();
+		spy.mockRestore();
+	});
+});
+
+describe("community-catalog — mata mutantes de guard (!Array.isArray) e ternário do id oficial", () => {
+	beforeEach(() => {
+		vi.unstubAllGlobals();
+		vi.unstubAllEnvs();
+		__store.clear();
+	});
+
+	it("saveCommunityCopy: data NÃO-array → null (mutante guard false criaria cópia vazia)", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => jsonResponse({ data: { foo: 1 } })),
+		);
+		const localId = await saveCommunityCopy({
+			id: 10,
+			name: "X",
+			description: null,
+			coverUrl: null,
+			authorName: null,
+			musicsCount: 1,
+			updatedAt: null,
+		});
+		expect(localId).toBeNull();
+		// e nenhuma coletânea local foi criada
+		expect(listLocalCollections().some((c) => c.name === "X")).toBe(false);
+	});
+
+	it("saveCommunityCopy: id oficial SEM o campo (undefined) NÃO vira propriedade (mutante ternário true quebraria spread)", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () =>
+				jsonResponse({
+					data: [{ name: "A", official_music_id: 5 }, { name: "B" }],
+				}),
+			),
+		);
+		const localId = await saveCommunityCopy({
+			id: 11,
+			name: "Y",
+			description: null,
+			coverUrl: null,
+			authorName: null,
+			musicsCount: 2,
+			updatedAt: null,
+		});
+		expect(localId).not.toBeNull();
+		const musics = listLocalMusics(localId as number);
+		expect(musics[0].officialMusicId).toBe(5);
+		// faixa sem id oficial na origem → null no destino (nunca 0/undefined)
+		expect(musics[1].officialMusicId).toBeNull();
+		expect(musics[1].officialMusicId).not.toBe(0);
+	});
+
+	it("listCommunity: data NÃO-array → empty (mutante guard false quebraria mapping)", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => jsonResponse({ data: "sou-string", meta: { total: 5 } })),
+		);
+		const result = await listCommunityCollectionsPage(1);
+		expect(result).toEqual({ items: [], page: 1, lastPage: 1, total: 0 });
 	});
 });

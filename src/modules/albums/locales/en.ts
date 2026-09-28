@@ -8,6 +8,8 @@ export default {
       empty: 'No collections yet. Import a .slja file in the editor.',
       newPlaceholder: 'New collection name...',
       create: 'Create',
+      hide: 'Hide My Collections',
+      show: 'Show My Collections',
     },
     playlists: {
       title: 'Playlists',

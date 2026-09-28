@@ -2,7 +2,6 @@ import type { RouteRecordRaw } from 'vue-router'
 
 import MediaView from './views/MediaView.vue'
 import MediaEditorView from './views/MediaEditorView.vue'
-import { SHOW_CUSTOM_COLLECTIONS } from '@modules/albums/constants'
 
 export const mediaRoutes: RouteRecordRaw[] = [
   {
@@ -13,16 +12,14 @@ export const mediaRoutes: RouteRecordRaw[] = [
       navKey: 'albums',
     },
   },
-  ...(SHOW_CUSTOM_COLLECTIONS
-    ? [
-        {
-          path: 'media/editor',
-          name: 'media-editor',
-          component: MediaEditorView,
-          meta: {
-            navKey: 'albums',
-          },
-        } satisfies RouteRecordRaw,
-      ]
-    : []),
+  // Rota do editor sempre registrada (a preferência de visibilidade é da
+  // UI de catálogo; o editor acessível por URL interna do módulo mídia).
+  {
+    path: 'media/editor',
+    name: 'media-editor',
+    component: MediaEditorView,
+    meta: {
+      navKey: 'albums',
+    },
+  },
 ]
