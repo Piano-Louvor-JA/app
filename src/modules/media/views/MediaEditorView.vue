@@ -1225,6 +1225,14 @@ onMounted(async () => {
             {{ t('media.visibility.public') }}
           </button>
         </div>
+        <button
+          type="button"
+          class="editor__btn editor__btn--rules"
+          @click="rulesOpen = true"
+        >
+          <i class="ti ti-info-circle" aria-hidden="true" />
+          {{ t('media.publishRules.linkLabel') }}
+        </button>
         <ul class="editor__list">
           <li
             v-for="collection in collections"

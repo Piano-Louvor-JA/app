@@ -24,19 +24,15 @@ export default defineConfig({
   test: {
     exclude: ['node_modules/**', 'dist/**', 'e2e/**'],
     coverage: {
-      provider: 'v8',
-      reporter: ['text', 'text-summary', 'lcov'],
-      thresholds: {
-        lines: 100,
-        functions: 100,
-        statements: 100,
-        branches: 100,
-      },
-      include: [
-        'src/shared/composables/useUpdateChecker.ts',
-        'src/shared/components/UpdateBanner.vue',
-        'src/plugins/i18n.ts',
-      ],
-    },
+          provider: 'v8',
+          reporter: ['text', 'text-summary', 'lcov'],
+          thresholds: {
+            lines: 100,
+            functions: 100,
+            statements: 100,
+            branches: 100,
+          },
+          include: ['src/**/*.ts', 'src/**/*.vue'],
+        },
   },
 })

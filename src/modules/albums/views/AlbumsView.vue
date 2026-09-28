@@ -576,6 +576,8 @@ async function runAction(
       </div>
     </Teleport>
 
+
+
     <!-- Modal: Minhas Coletâneas (oculto enquanto SHOW_CUSTOM_COLLECTIONS=false) -->
     <Teleport to="body">
       <div
@@ -606,35 +608,8 @@ async function runAction(
             </button>
           </header>
 
-          <div v-if="isLoadingCustomCollections" class="albums-view__state">
-            {{ t('albums.loading') }}
-          </div>
-
-          <div v-else-if="customCollections.length === 0" class="albums-view__state">
-            <i class="ti ti-music-plus" aria-hidden="true" />
-            {{ t('albums.custom.empty') }}
-          </div>
-
-          <div v-else class="albums-view__custom-grid">
-            <button
-              v-for="collection in customCollections"
-              :key="collection.id"
-              type="button"
-              class="albums-view__custom-card"
-              :aria-label="t('albums.custom.open', { name: collection.name })"
-              @click="openCustomCollection(collection.id)"
-            >
-              <span class="albums-view__custom-icon">
-                <i class="ti ti-disc" aria-hidden="true" />
-              </span>
-              <span class="albums-view__custom-info">
-                <strong>{{ collection.name }}</strong>
-                <small>{{ t('albums.custom.trackCount', { count: collection.musicsCount }) }}</small>
-              </span>
-              <i class="ti ti-chevron-right" aria-hidden="true" />
-            </button>
-          </div>
-
+          <!-- A lista de coletâneas vive na própria página (cards) — o modal
+               é só criação rápida + atalhos, sem duplicar a lista. -->
           <form class="albums-view__modal-form" @submit.prevent="onCreateCustomCollection">
             <input
               v-model="newCustomCollectionName"
@@ -1043,6 +1018,59 @@ async function runAction(
   justify-content: space-between;
   gap: 1rem;
   margin-bottom: 1rem;
+}
+
+.albums-view__modal-footer--split {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.albums-view__rules-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: none;
+  border: none;
+  padding: 0.25rem 0;
+  color: inherit;
+  opacity: 0.65;
+  font-size: 0.8rem;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.albums-view__rules-link:hover {
+  opacity: 1;
+}
+
+.albums-view__rules-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 420px;
+  width: 100%;
+}
+
+.albums-view__rules-ok {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.3));
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.albums-view__rules-ok:hover {
+  background: rgba(255, 255, 255, 0.18);
 }
 
 .albums-view__toolbar-btn {
