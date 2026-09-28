@@ -23,7 +23,7 @@ jobs:
           VERSION=8.28.0
           curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz" -o /tmp/gitleaks.tar.gz
           tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
-          /tmp/gitleaks detect --source . --verbose --redact
+          /tmp/gitleaks detect --source . --config .gitleaks.toml --verbose --redact
 
   dependencies:
     name: npm audit (relatório)
