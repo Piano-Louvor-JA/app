@@ -25,7 +25,8 @@
     "electron:dev": "concurrently -k \"vite --host 127.0.0.1 --port 5173\" \"wait-on http://127.0.0.1:5173 && env -u ELECTRON_RUN_AS_NODE cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron . --class=louvorja-piano\"",
     "electron:preview": "vite build --base=./ && env -u ELECTRON_RUN_AS_NODE electron . --class=louvorja-piano",
     "electron:build": "vite build --base=./ && node build/patch-nsis-templates.mjs && electron-builder",
-    "postinstall": "electron-builder install-app-deps"
+    "postinstall": "electron-builder install-app-deps",
+    "test:regression": "node scripts/test-regression.mjs"
   },
   "dependencies": {
     "@cliqz/adblocker-electron": "^1.34.0",

@@ -50,6 +50,37 @@ jobs:
       - run: npm ci
       - run: npm run build
 
+  regression-gate:
+    name: Regression Gate (suite completa + type-check + build)
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck, build]
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Baseline: código da base (staging/main). O script test:regression
+      # ainda não existe lá — preservamos a cópia deste PR e chamamos via node.
+      - name: Fetch baseline branch (main ou staging)
+        run: |
+          set -euo pipefail
+          BASE_BRANCH="${{ github.base_ref || 'staging' }}"
+          test -f scripts/test-regression.mjs
+          cp scripts/test-regression.mjs /tmp/test-regression.mjs
+          git fetch origin "$BASE_BRANCH" --depth=1
+          git read-tree -u --reset "origin/$BASE_BRANCH"
+          mkdir -p scripts
+          cp /tmp/test-regression.mjs scripts/test-regression.mjs
+      - name: Rodar baseline
+        run: node scripts/test-regression.mjs --baseline
+      - name: Restaurar código do PR
+        run: git read-tree -u --reset HEAD
+      - name: Comparar com baseline (falha se regressão)
+        run: node scripts/test-regression.mjs --compare
+
   electron-support-matrix:
     name: Resolve supported Electron versions
     runs-on: ubuntu-latest
@@ -97,7 +128,7 @@ jobs:
   quality-gate:
     name: Quality Gate
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, build, release-validation]
+    needs: [lint, typecheck, build, regression-gate, release-validation]
     if: always()
     steps:
       - name: Verifica se todos os gates passaram
@@ -105,8 +136,9 @@ jobs:
           echo "lint: ${{ needs.lint.result }}"
           echo "typecheck: ${{ needs.typecheck.result }}"
           echo "build: ${{ needs.build.result }}"
+          echo "regression-gate: ${{ needs.regression-gate.result }}"
           echo "release-validation: ${{ needs.release-validation.result }}"
-          if [[ "${{ needs.lint.result }}" != "success" || "${{ needs.typecheck.result }}" != "success" || "${{ needs.build.result }}" != "success" || "${{ needs.release-validation.result }}" != "success" ]]; then
+          if [[ "${{ needs.lint.result }}" != "success" || "${{ needs.typecheck.result }}" != "success" || "${{ needs.build.result }}" != "success" || "${{ needs.regression-gate.result }}" != "success" || "${{ needs.release-validation.result }}" != "success" ]]; then
             echo "::error::Quality Gate FALHOU — corrija os erros antes do merge"
             exit 1
           fi
