@@ -91,7 +91,7 @@ export function useLiturgy() {
   })
 
   onUnmounted(() => {
-    window.clearInterval(syncTimer)
+    if (syncTimer !== null) window.clearInterval(syncTimer)
     syncTimer = null
   })
 
