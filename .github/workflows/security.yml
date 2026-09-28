@@ -1,0 +1,36 @@
+# Security jobs — copiar para .github/workflows/security.yml do repo
+# Bloqueia PR com: segredo no diff, dependência vuln high+, [EXTRA] semgrep SAST
+name: security
+on:
+  pull_request:
+  push:
+    branches: [staging, main]
+
+jobs:
+  secrets:
+    name: gitleaks (segredos no diff/histórico)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }  # histórico completo pra scan
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  dependencies:
+    name: npm audit (high+ bloqueia)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci || npm install --no-save
+      - run: npm audit --audit-level=high
+
+  sast:
+    name: semgrep SAST
+    runs-on: ubuntu-latest
+    container: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@v4
+      - run: semgrep scan --config auto --error --exclude-rule generic.secrets.security.detected-generic-secret
