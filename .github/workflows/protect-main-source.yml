@@ -4,8 +4,8 @@ name: Protect main source branch
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review, edited]
+    branches: [main, staging]
 
 jobs:
   validate-source:
@@ -16,6 +16,12 @@ jobs:
         run: |
           echo "Source branch: ${{ github.head_ref }}"
           echo "Target branch: ${{ github.base_ref }}"
+
+          # Este gate só restringe PRs para main. Em staging, passa.
+          if [ "${{ github.base_ref }}" != "main" ]; then
+            echo "✅ PR não aponta para main (${{ github.base_ref }}). Gate ignorado."
+            exit 0
+          fi
 
           if [ "${{ github.head_ref }}" != "staging" ]; then
             echo "::error::PRs para main só podem vir da branch staging. Origem recebida: ${{ github.head_ref }}"

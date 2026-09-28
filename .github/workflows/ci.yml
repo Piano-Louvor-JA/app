@@ -62,22 +62,24 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      # Baseline: salva estado ANTES de qualquer mudança do PR
-      # (o checkout do PR já traz o código alterado; usamos main/staging como baseline)
+      # Baseline: código da base (staging/main). O script test:regression
+      # ainda não existe lá — preservamos a cópia deste PR e chamamos via node.
       - name: Fetch baseline branch (main ou staging)
         run: |
+          set -euo pipefail
           BASE_BRANCH="${{ github.base_ref || 'staging' }}"
+          test -f scripts/test-regression.mjs
+          cp scripts/test-regression.mjs /tmp/test-regression.mjs
           git fetch origin "$BASE_BRANCH" --depth=1
-          git stash push -u -m "pr-changes" || true
-          git checkout "origin/$BASE_BRANCH" -- .
+          git read-tree -u --reset "origin/$BASE_BRANCH"
+          mkdir -p scripts
+          cp /tmp/test-regression.mjs scripts/test-regression.mjs
       - name: Rodar baseline
-        run: npm run test:regression -- --baseline
+        run: node scripts/test-regression.mjs --baseline
       - name: Restaurar código do PR
-        run: |
-          git checkout -f HEAD
-          git stash pop || true
+        run: git read-tree -u --reset HEAD
       - name: Comparar com baseline (falha se regressão)
-        run: npm run test:regression -- --compare
+        run: node scripts/test-regression.mjs --compare
 
   electron-support-matrix:
     name: Resolve supported Electron versions
