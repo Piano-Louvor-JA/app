@@ -4,6 +4,7 @@ import type {
 } from '../types/media'
 
 import { authHeaders, getAuthSession } from './auth-client'
+import { enqueue, newClientUuid } from './outbox'
 import { loadMediaTrack } from './media-catalog'
 import { resolveRemoteFileUrl } from './media-audio'
 import {
@@ -596,7 +597,17 @@ export async function createCustomCollection(
     const json = (await response.json()) as { id_collection: number }
     return { id: json.id_collection }
   } catch {
-    return null
+    // Offline (autenticado): enfileira pro sync (B1/B2). O client_uuid dá
+    // identidade estável — o próximo flush cria/atualiza no servidor.
+    await enqueue({
+      entity: 'collection',
+      client_uuid: newClientUuid(),
+      action: 'upsert',
+      payload: { name, description: description ?? null, author_name: authorName ?? null, updated_at: Date.now() },
+      updated_at: Date.now(),
+      owner_email: getAuthSession()?.user?.email ?? null,
+    })
+    return { id: 0 }
   }
 }
 

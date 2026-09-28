@@ -58,41 +58,36 @@ export function sortByRecentFirst(
 export async function saveCommunityCopy(
 	collection: CommunityCollectionSummary,
 ): Promise<number | null> {
-	let musics: Array<{
-		name: string;
-		officialMusicId: number | null;
-	}> = [];
 	try {
 		const response = await fetch(
 			`${communityBaseUrl()}/collections/${collection.id}/musics`,
 		);
 		if (!response.ok) return null;
 		const json = (await response.json()) as { data?: unknown };
-		if (!Array.isArray(json.data)) return null;
-		musics = (json.data as Array<Record<string, unknown>>).map((row) => ({
-			name: asString(row.name) ?? "",
-			officialMusicId:
-				typeof row.official_music_id === "number" && row.official_music_id > 0
-					? row.official_music_id
-					: null,
-		}));
+		const musics = (json.data as Array<Record<string, unknown>>).map(
+			(row) => ({
+				name: asString(row.name) ?? "",
+				officialMusicId:
+					typeof row.official_music_id === "number" &&
+					row.official_music_id > 0
+						? row.official_music_id
+						: null,
+			}),
+		);
+		const copy = createLocalCollection(
+			collection.name,
+			collection.description ?? undefined,
+		);
+		for (const music of musics) {
+			createLocalMusic(copy.id, {
+				name: music.name,
+				officialMusicId: music.officialMusicId ?? undefined,
+			});
+		}
+		return copy.id;
 	} catch {
 		return null;
 	}
-
-	const copy = createLocalCollection(
-		collection.name,
-		collection.description ?? undefined,
-	);
-	for (const music of musics) {
-		createLocalMusic(copy.id, {
-			name: music.name,
-			...(music.officialMusicId !== null
-				? { officialMusicId: music.officialMusicId }
-				: {}),
-		});
-	}
-	return copy.id;
 }
 
 /**
@@ -112,8 +107,6 @@ export async function listCommunityCollectionsPage(
 	perPage = 24,
 ): Promise<CommunityPage> {
 	const empty: CommunityPage = { items: [], page, lastPage: 1, total: 0 };
-	let rows: Array<Record<string, unknown>> = [];
-	let meta = { page, last_page: 1, total: 0 };
 	try {
 		const response = await fetch(
 			`${communityBaseUrl()}/collections?page=${page}&per_page=${perPage}`,
@@ -123,33 +116,32 @@ export async function listCommunityCollectionsPage(
 			data?: unknown;
 			meta?: { total?: number; page?: number; last_page?: number };
 		};
-		if (!Array.isArray(json.data)) return empty;
-		rows = json.data as Array<Record<string, unknown>>;
-		meta = {
+		const rows = json.data as Array<Record<string, unknown>>;
+		const meta = {
 			page: Number(json.meta?.page ?? page),
 			last_page: Number(json.meta?.last_page ?? 1),
 			total: Number(json.meta?.total ?? 0),
 		};
+
+		const collections = rows.map((row) => ({
+			id: Number(row.id_collection),
+			name: asString(row.name) ?? "",
+			description: asString(row.description),
+			coverUrl: asString(row.cover_url),
+			authorName: asString(row.author_name),
+			musicsCount: Number.isFinite(Number(row.musics_count))
+				? Number(row.musics_count)
+				: 0,
+			updatedAt: asString(row.updated_at),
+		}));
+
+		return {
+			items: sortByRecentFirst(collections),
+			page: meta.page,
+			lastPage: meta.last_page,
+			total: meta.total,
+		};
 	} catch {
 		return empty;
 	}
-
-	const collections = rows.map((row) => ({
-		id: Number(row.id_collection),
-		name: asString(row.name) ?? "",
-		description: asString(row.description),
-		coverUrl: asString(row.cover_url),
-		authorName: asString(row.author_name),
-		musicsCount: Number.isFinite(Number(row.musics_count))
-			? Number(row.musics_count)
-			: 0,
-		updatedAt: asString(row.updated_at),
-	}));
-
-	return {
-		items: sortByRecentFirst(collections),
-		page: meta.page,
-		lastPage: meta.last_page,
-		total: meta.total,
-	};
 }

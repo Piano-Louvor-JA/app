@@ -6,6 +6,7 @@ import {
 	type RankingEntry,
 	registerUse,
 	reportCollection,
+	authHeaders,
 } from "../ranking";
 
 function jsonResponse(body: unknown, ok = true): Response {
@@ -371,10 +372,112 @@ describe("ranking service — mata mutantes de guardas (dado não pode vazar de 
 	});
 
 	it("reportCollection: !ok → false (mesmo com body)", async () => {
+			vi.stubGlobal(
+				"fetch",
+				vi.fn(async () => jsonResponse({ ok: true }, false)),
+			);
+			expect(await reportCollection(12, "m", "tok")).toBe(false);
+		});
+	});
+
+	describe("ranking service — authHeaders unit (branch null/else)", () => {
+		beforeEach(() => {
+			vi.unstubAllGlobals();
+		});
+
+		it("authHeaders com token → Bearer", () => {
+			expect(authHeaders("tok-abc")).toEqual({ Authorization: "Bearer tok-abc" });
+		});
+
+		it("authHeaders sem token (null) → objeto vazio — branch else", () => {
+			expect(authHeaders(null)).toEqual({});
+		});
+
+		it("authHeaders com string vazia → objeto vazio (falsy)", () => {
+				expect(authHeaders("")).toEqual({});
+			});
+	});
+
+describe("ranking service — mata mutantes de URL exata (path por endpoint)", () => {
+	beforeEach(() => {
+		vi.unstubAllGlobals();
+		vi.unstubAllEnvs();
+	});
+
+	it("getMyPosition: URL exata /ranking/me?window= (mata StringLiteral L54)", async () => {
+		vi.stubEnv("VITE_PALCO_API_URL", "https://api.pianolouvorja.com.br");
+		let calledUrl = "";
 		vi.stubGlobal(
 			"fetch",
-			vi.fn(async () => jsonResponse({ ok: true }, false)),
+			vi.fn(async (url: string) => {
+				calledUrl = url;
+				return jsonResponse({ position: 1, total: 2 });
+			}),
 		);
-		expect(await reportCollection(12, "m", "tok")).toBe(false);
+		await getMyPosition("week", "tok");
+		expect(calledUrl).toBe(
+			"https://api.pianolouvorja.com.br/v1/custom/ranking/me?window=week",
+		);
+	});
+
+	it("registerUse: URL exata /collections/:id/use (mata StringLiteral L75)", async () => {
+		vi.stubEnv("VITE_PALCO_API_URL", "https://api.pianolouvorja.com.br");
+		let calledUrl = "";
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (url: string) => {
+				calledUrl = url;
+				return jsonResponse({ first_use: true });
+			}),
+		);
+		await registerUse(55, "tok");
+		expect(calledUrl).toBe(
+			"https://api.pianolouvorja.com.br/v1/custom/collections/55/use",
+		);
+	});
+
+	it("reportCollection: URL exata /collections/:id/report (mata StringLiteral L101)", async () => {
+		vi.stubEnv("VITE_PALCO_API_URL", "https://api.pianolouvorja.com.br");
+		let calledUrl = "";
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (url: string) => {
+				calledUrl = url;
+				return jsonResponse({ ok: true });
+			}),
+		);
+		await reportCollection(66, "motivo", "tok");
+		expect(calledUrl).toBe(
+			"https://api.pianolouvorja.com.br/v1/custom/collections/66/report",
+		);
+	});
+});
+
+describe("ranking service — mata mutante guard !sessionToken (getMyPosition)", () => {
+	beforeEach(() => {
+		vi.unstubAllGlobals();
+		vi.unstubAllEnvs();
+	});
+
+	it("getMyPosition(null): se o guard for removido, fetch seria chamado e Authorization ausente → detectável", async () => {
+		const fetchMock = vi.fn(async () =>
+			jsonResponse({ position: 9, total: 9 }),
+		);
+		vi.stubGlobal("fetch", fetchMock);
+		// SEM sessão: deve retornar null ANTES de qualquer fetch
+		const result = await getMyPosition("week", null);
+		expect(result).toBeNull();
+		expect(fetchMock).not.toHaveBeenCalled();
+		// sanity: com sessão, fetch É chamado (garante que o mock funciona)
+		vi.unstubAllGlobals();
+		const fetchMock2 = vi.fn(async () =>
+			jsonResponse({ position: 1, total: 2 }),
+		);
+		vi.stubGlobal("fetch", fetchMock2);
+		expect(await getMyPosition("week", "tok")).toEqual({
+			position: 1,
+			total: 2,
+		});
+		expect(fetchMock2).toHaveBeenCalledTimes(1);
 	});
 });

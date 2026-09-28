@@ -272,3 +272,58 @@ describe("ReportDialog — fechamento de mutantes (limite exato, reset condicion
 		vi.unstubAllGlobals();
 	});
 });
+
+describe("ReportDialog — mata mutante ternário L27 (open true→false→true reseta)", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		document.body.innerHTML = "";
+	});
+
+	it("reabrir de verdade (false→true) reseta o reason visível no DOM", async () => {
+		const wrapper = await mountDialog({ open: true });
+		let textarea = document.body.querySelector(
+			"#report-reason",
+		) as HTMLTextAreaElement;
+		textarea.value = "rascunho antigo";
+		textarea.dispatchEvent(new Event("input", { bubbles: true }));
+		await wrapper.vm.$nextTick();
+
+		// fecha (v-if desmonta o painel)
+		await wrapper.setProps({ open: false });
+		await wrapper.vm.$nextTick();
+		// reabre: watch(true) DEVE zerar reason
+		await wrapper.setProps({ open: true });
+		await wrapper.vm.$nextTick();
+		textarea = document.body.querySelector(
+			"#report-reason",
+		) as HTMLTextAreaElement;
+		expect(textarea.value).toBe("");
+	});
+});
+
+describe("ReportDialog — mata mutante if(open) L27 (fechar NÃO reseta/foca)", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		document.body.innerHTML = "";
+	});
+
+	it("fechar (true→false) NÃO chama requestAnimationFrame (mutante if(true) chamaria)", async () => {
+		const rafSpy = vi.fn((cb: FrameRequestCallback) => {
+			cb(0);
+			return 0;
+		});
+		vi.stubGlobal("requestAnimationFrame", rafSpy);
+		const wrapper = await mountDialog({ open: false });
+		expect(rafSpy).not.toHaveBeenCalled();
+		await wrapper.setProps({ open: true });
+		await wrapper.vm.$nextTick();
+		const chamadasAoAbrir = rafSpy.mock.calls.length;
+		expect(chamadasAoAbrir).toBe(1);
+
+		await wrapper.setProps({ open: false });
+		await wrapper.vm.$nextTick();
+		// com if(open): nenhum rAF a mais no close. Com mutante if(true): +1.
+		expect(rafSpy.mock.calls.length).toBe(chamadasAoAbrir);
+		vi.unstubAllGlobals();
+	});
+});

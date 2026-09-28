@@ -9,7 +9,7 @@ import {
   loadAlbumCategories,
   loadCustomAlbumCategory,
 } from '../services/album-catalog'
-import { SHOW_CUSTOM_COLLECTIONS } from '../constants'
+import { getShowCustomCollections } from '../visibility'
 import {
   filterAlbumMusicIndex,
   loadAlbumMusicIndex,
@@ -74,7 +74,7 @@ export const useAlbumsStore = defineStore('albums', () => {
   }
 
   async function mergeCustomCollections() {
-    if (!SHOW_CUSTOM_COLLECTIONS) return
+    if (!getShowCustomCollections()) return
     try {
       const customCategory = await loadCustomAlbumCategory()
       if (!customCategory) return

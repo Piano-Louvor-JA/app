@@ -57,11 +57,16 @@ LicenseLangString LicenseFile ${LANG_SPANISH_ES} "${LICENSE_ES}"
   !endif
 !macroend
 
-; Caminhos padrão da pasta de instalação (todos os usuários).
+; Caminho canônico único: per-machine (HKLM).
+; O HKCU legado é removido para não sobrar uma segunda localização válida —
+; dois InstallLocation (HKLM + HKCU) faziam o updater desinstalar/reinstalar
+; em diretório diferente do atalho do desktop, que ficava apontando para
+; .exe inexistente ("ícone sumiu" após atualização).
 !macro preInit
   SetRegView 64
-  WriteRegExpandStr HKLM "${INSTALL_REGISTRY_KEY}" InstallLocation "$PROGRAMFILES64\\${INSTALL_FOLDER_NAME}"
-  WriteRegExpandStr HKCU "${INSTALL_REGISTRY_KEY}" InstallLocation "$LOCALAPPDATA\\Programs\\${INSTALL_FOLDER_NAME}"
+  WriteRegExpandStr HKLM "${INSTALL_REGISTRY_KEY}" InstallLocation "$PROGRAMFILES64\${INSTALL_FOLDER_NAME}"
+  DeleteRegValue HKCU "${INSTALL_REGISTRY_KEY}" "InstallLocation"
+  DeleteRegKey /ifempty HKCU "${INSTALL_REGISTRY_KEY}"
 !macroend
 
 ; Dados do app + mídia padrão em ProgramData, com ACL para Users (S-1-5-32-545).
@@ -78,5 +83,10 @@ LicenseLangString LicenseFile ${LANG_SPANISH_ES} "${LICENSE_ES}"
   CreateDirectory "$0\\${DATA_FOLDER_NAME}\\Media\\music"
   CreateDirectory "$0\\${DATA_FOLDER_NAME}\\Media\\images"
   ExecWait '"$WINDIR\System32\icacls.exe" "$0\\${DATA_FOLDER_NAME}" /grant *S-1-5-32-545:(OI)(CI)M /T /C' $1
+  ; Recria o atalho do desktop apontando para o .exe da instalação atual.
+  ; Sem isso, update que muda o caminho deixa .lnk órfão (ícone "sumido").
+  CreateShortCut "$DESKTOP\\${PRODUCT_NAME}.lnk" "$INSTDIR\\${APP_EXECUTABLE_FILENAME}" "" "$INSTDIR\\${APP_EXECUTABLE_FILENAME}" 0
+  CreateDirectory "$SMPROGRAMS"
+  CreateShortCut "$SMPROGRAMS\\${PRODUCT_NAME}.lnk" "$INSTDIR\\${APP_EXECUTABLE_FILENAME}" "" "$INSTDIR\\${APP_EXECUTABLE_FILENAME}" 0
   !endif
 !macroend

@@ -7,7 +7,7 @@ import { useMediaStore } from '@modules/media/stores/useMediaStore'
 import { GlassCard } from '@design-system/index'
 import PalcoRouteSelect from '@modules/settings/components/PalcoRouteSelect.vue'
 import type { LibraryAlbum } from '@modules/sync/types/library'
-
+import { getShowCustomCollections, setShowCustomCollections } from '../visibility'
 import AlbumCollectionCard from '../components/AlbumCollectionCard.vue'
 import {
   createCustomCollection,
@@ -30,14 +30,21 @@ import {
   type Playlist,
 } from '../services/playlist-storage'
 import { parsePlaylistsImport, serializePlaylists } from '../services/playlist-io'
-import { SHOW_CUSTOM_COLLECTIONS } from '../constants'
 
 const { t } = useI18n()
 const router = useRouter()
 const mediaStore = useMediaStore()
 const playlists = ref<Playlist[]>(listPlaylists())
 const newPlaylistName = ref('')
-const showCustomCollections = SHOW_CUSTOM_COLLECTIONS
+// Visibilidade de Minhas Coletâneas (preferência do usuário, persistida).
+const showCustomCollections = ref(getShowCustomCollections())
+
+function toggleCustomCollectionsVisibility(): void {
+  const next = !showCustomCollections.value
+  setShowCustomCollections(next)
+  showCustomCollections.value = next
+}
+
 
 const {
   categories,
@@ -335,6 +342,19 @@ async function runAction(
             v-if="customCollections.length > 0"
             class="albums-view__toolbar-count"
           >{{ customCollections.length }}</span>
+        </button>
+        <button
+          type="button"
+          class="albums-view__toolbar-btn"
+          :aria-label="showCustomCollections ? t('albums.custom.hide') : t('albums.custom.show')"
+          :title="showCustomCollections ? t('albums.custom.hide') : t('albums.custom.show')"
+          @click="toggleCustomCollectionsVisibility"
+        >
+          <i
+            class="ti"
+            :class="showCustomCollections ? 'ti-eye' : 'ti-eye-off'"
+            aria-hidden="true"
+          />
         </button>
         <button
           v-if="showDownloadControls && categories.length > 0 && !isDownloadingBatch"
