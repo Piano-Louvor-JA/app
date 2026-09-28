@@ -138,7 +138,9 @@ jobs:
           echo "build: ${{ needs.build.result }}"
           echo "regression-gate: ${{ needs.regression-gate.result }}"
           echo "release-validation: ${{ needs.release-validation.result }}"
-          if [[ "${{ needs.lint.result }}" != "success" || "${{ needs.typecheck.result }}" != "success" || "${{ needs.build.result }}" != "success" || "${{ needs.regression-gate.result }}" != "success" || "${{ needs.release-validation.result }}" != "success" ]]; then
+          # regression-gate só roda em pull_request; em push fica "skipped".
+          REG="${{ needs.regression-gate.result }}"
+          if [[ "${{ needs.lint.result }}" != "success" || "${{ needs.typecheck.result }}" != "success" || "${{ needs.build.result }}" != "success" || "${{ needs.release-validation.result }}" != "success" || ( "$REG" != "success" && "$REG" != "skipped" ) ]]; then
             echo "::error::Quality Gate FALHOU — corrija os erros antes do merge"
             exit 1
           fi
