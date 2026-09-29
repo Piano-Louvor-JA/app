@@ -134,6 +134,15 @@ describe('useLiturgy (orquestrador da view)', () => {
     vi.restoreAllMocks()
   })
 
+  it('unmount com syncTimer ativo → clearInterval chamado', async () => {
+    const clearSpy = vi.spyOn(window, 'clearInterval')
+    const wrapper = mountWith(() => useLiturgy())
+    await new Promise((r) => setTimeout(r, 0))
+    wrapper.unmount()
+    expect(clearSpy).toHaveBeenCalled()
+    clearSpy.mockRestore()
+  })
+
   it('hidrata no mount, expõe labels e labels de duração', async () => {
     const wrapper = mountWith(() => useLiturgy())
     const f = (wrapper.vm as unknown as { exposed: Exposed }).exposed

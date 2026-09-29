@@ -116,6 +116,14 @@ describe("receiver — conexão e reconexão", () => {
 		}
 	});
 
+	it("start após stop cria nova conexão", () => {
+		const { r } = makeReceiver();
+		r.stop();
+		r.start();
+		expect(FakeWebSocket.instances).toHaveLength(2);
+		r.stop();
+	});
+
 	it("onclose sem stop → reconnect agendado; stop cancela", () => {
 		vi.useFakeTimers();
 		try {
@@ -149,6 +157,21 @@ describe("receiver — conexão e reconexão", () => {
 		ws.onerror?.();
 		expect(closedSpy).toHaveBeenCalled();
 		r.stop();
+	});
+
+	it("não reconecta após stop e não duplica timer de reconnect", () => {
+		vi.useFakeTimers();
+		try {
+			const { r } = makeReceiver();
+			const ws = lastWs();
+			ws.close();
+			ws.onclose?.();
+			r.stop();
+			vi.advanceTimersByTime(3_100);
+			expect(FakeWebSocket.instances).toHaveLength(1);
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	it("mensagem não-JSON é ignorada", () => {

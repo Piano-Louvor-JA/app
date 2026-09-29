@@ -43,6 +43,16 @@ describe("MediaSlideStage", () => {
 		expect(w.text()).toContain("Santíssimo");
 	});
 
+	it("capa sem título: cai no fallback t('media.title')", () => {
+		const w = mountStage({ lyric: "", title: "", isCover: true });
+		expect(w.text()).toContain("Player");
+	});
+
+	it("sem letra e sem título (não-capa): não mostra fallback", () => {
+		const w = mountStage({ lyric: "", title: "" });
+		expect(w.find(".media-slide-stage__lyric").text()).toBe("");
+	});
+
 	it("capa: ignora a letra e mostra o título com estilo de capa", () => {
 		const w = mountStage({
 			lyric: "letra qualquer",

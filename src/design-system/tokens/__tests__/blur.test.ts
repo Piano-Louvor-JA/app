@@ -100,4 +100,8 @@ describe("intensityFromBlurToken", () => {
 	])("%s → %i", (token, expected) => {
 		expect(intensityFromBlurToken(token)).toBe(expected);
 	});
+
+	it("token desconhecido → DEFAULT_GLASS_INTENSITY (branch ??)", () => {
+		expect(intensityFromBlurToken("desconhecido" as never)).toBe(60);
+	});
 });
