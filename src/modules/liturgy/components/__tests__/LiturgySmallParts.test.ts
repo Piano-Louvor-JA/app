@@ -74,6 +74,21 @@ describe('LiturgyCloneDialog', () => {
     expect(w.emitted('close')).toBeTruthy()
     w.unmount()
   })
+
+  it('renderiza fonte customizada', () => {
+    const w = mountClone({ open: true, sources: [sources[1]], sourceKey: 'custom:c1' })
+    expect(document.querySelector('option')?.value).toBe('custom:c1')
+    expect(document.querySelector('option')?.textContent).toContain('Culto Extra')
+    w.unmount()
+  })
+
+  it('renderiza estado sem fontes', () => {
+    const w = mountClone({ open: true, sources: [], sourceKey: '' })
+    const option = document.querySelector('option')
+    expect(option?.disabled).toBe(true)
+    expect(option?.value).toBe('')
+    w.unmount()
+  })
 })
 
 describe('LiturgyCustomBar', () => {
