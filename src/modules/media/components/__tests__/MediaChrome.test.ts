@@ -86,10 +86,22 @@ describe("MediaChrome — ações", () => {
 		w.unmount();
 	});
 
-	it("botão play/pause chama togglePlay", async () => {
+	it("botão play idle mostra play e chama togglePlay", async () => {
 		const w = mountChrome();
-		await w.findAll(".media-chrome__icon-btn")[0].trigger("click");
+		const button = w.findAll(".media-chrome__icon-btn")[0];
+		expect(button.attributes("aria-label")).toBe("Reproduzir");
+		expect(button.find(".ti-player-play").exists()).toBe(true);
+		await button.trigger("click");
 		expect(storeState.togglePlay).toHaveBeenCalledOnce();
+		w.unmount();
+	});
+
+	it("botão play ativo mostra pause", () => {
+		storeState.isPlaying.value = true;
+		const w = mountChrome();
+		const button = w.findAll(".media-chrome__icon-btn")[0];
+		expect(button.attributes("aria-label")).toBe("Pausar");
+		expect(button.find(".ti-player-pause").exists()).toBe(true);
 		w.unmount();
 	});
 
