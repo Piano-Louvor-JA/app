@@ -127,6 +127,22 @@ describe("P2pRemoteHost", () => {
     );
   });
 
+  it("waitForIce ignora eventos enquanto ICE não está completo", async () => {
+    vi.stubGlobal("RTCPeerConnection", SlowIcePC);
+    const host = new P2pRemoteHost();
+
+    const pending = host.createOffer();
+    await Promise.resolve();
+    await Promise.resolve();
+    const pc = FakePC.last as SlowIcePC;
+    pc.fireIceChange();
+    expect(pc.removeEventListener).not.toHaveBeenCalled();
+    pc.iceGatheringState = "complete";
+    pc.fireIceChange();
+
+    await expect(pending).resolves.toBeTypeOf("string");
+  });
+
   it("waitForIce cai no timeout de 5s quando ICE nunca completa", async () => {
     vi.useFakeTimers();
     vi.stubGlobal("RTCPeerConnection", SlowIcePC);
