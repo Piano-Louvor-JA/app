@@ -177,6 +177,15 @@ describe("RandomHistoryPanel", () => {
 		expect(w.emitted("update:audio-volume")?.[0]).toEqual([0.25]);
 	});
 
+	it("slider cobre a guarda de valor não finito", async () => {
+		const w = mountPanel();
+		const slider = w.find('input[type="range"]');
+		Object.defineProperty(slider.element, "value", { value: "NaN" });
+		slider.element.dispatchEvent(new Event("input", { bubbles: true }));
+		await w.vm.$nextTick();
+		expect(w.emitted("update:audio-volume")).toBeUndefined();
+	});
+
 	it("slider sanitiza input: browser clamp 'abc'→'50', valor emitido 0.5", async () => {
 		// jsdom replica o sanitizar do browser para input[type=range]:
 		// valor inválido vira o default (50). A guarda NaN do componente é
