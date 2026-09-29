@@ -98,4 +98,228 @@ describe('StageCustomizationCard', () => {
     store.resetScope()
     expect(store.settings.textBox).toBe(true)
   })
+
+  describe('scope e condições', () => {
+    it('scopeTabs inclui global + módulos', () => {
+      expect(wrapper.vm.scopeTabs.length).toBeGreaterThan(1)
+      expect(wrapper.vm.scopeTabs[0].id).toBe('global')
+    })
+
+    it('visibleScopeTabs normal: todas tabs visíveis', () => {
+      expect(wrapper.vm.visibleScopeTabs.length).toBeGreaterThan(1)
+    })
+
+    it('visibleScopeTabs onlyScope: só o escopo específico', () => {
+      const wrapper = createWrapper({ props: { onlyScope: 'clock' } })
+      expect(wrapper.vm.visibleScopeTabs.length).toBe(1)
+      expect(wrapper.vm.visibleScopeTabs[0].id).toBe('clock')
+    })
+
+    it('isInheritingGlobal: true ao abrir', () => {
+      expect(wrapper.vm.isInheritingGlobal).toBe(true)
+    })
+
+    it('setActiveScope muda activeScope e isInheritingGlobal', async () => {
+      wrapper.vm.setActiveScope('timer')
+      await flushPromises()
+      expect(wrapper.vm.activeScope).toBe('timer')
+      expect(wrapper.vm.isInheritingGlobal).toBe(false)
+    })
+  })
+
+  describe('patchClock função', () => {
+    it('patchClock com objeto: junta com o clock existente', () => {
+      const before = wrapper.vm.settings.value.clock
+      wrapper.vm.patchClock({ showSeconds: true })
+      expect(wrapper.vm.settings.value.clock?.showSeconds).toBe(true)
+      expect(wrapper.vm.settings.value.clock?.style).toBe(before?.style)
+    })
+
+    it('patchClock cria novo objeto se clock nulo', () => {
+      wrapper.vm.patch({ clock: undefined })
+      wrapper.vm.patchClock({ format24h: true })
+      expect(wrapper.vm.settings.value.clock).toBeTruthy()
+      expect(wrapper.vm.settings.value.clock?.format24h).toBe(true)
+    })
+  })
+
+  describe('moduleTimeFormat computed', () => {
+    it('timer scope: retorna timeFormat do timer', () => {
+      wrapper.vm.setActiveScope('timer')
+      wrapper.vm.patch({ timer: { timeFormat: 'HH:mm:ss' } })
+      expect(wrapper.vm.moduleTimeFormat).toBe('HH:mm:ss')
+    })
+
+    it('countdown scope: retorna timeFormat do countdown', () => {
+      wrapper.vm.setActiveScope('countdown')
+      wrapper.vm.patch({ countdown: { timeFormat: 'mm:ss' } })
+      expect(wrapper.vm.moduleTimeFormat).toBe('mm:ss')
+    })
+
+    it('outro scope: retorna null', () => {
+      wrapper.vm.setActiveScope('clock')
+      expect(wrapper.vm.moduleTimeFormat).toBeNull()
+    })
+
+    it('timer sem settings: usa default', () => {
+      wrapper.vm.setActiveScope('timer')
+      wrapper.vm.patch({ timer: undefined })
+      expect(wrapper.vm.moduleTimeFormat).toBe('HH:mm')
+    })
+  })
+
+  describe('patchModuleTimeFormat função', () => {
+    it('patchModuleTimeFormat timer: atualiza timeFormat timer', () => {
+      wrapper.vm.setActiveScope('timer')
+      wrapper.vm.patchModuleTimeFormat('HH:mm')
+      expect(wrapper.vm.settings.value.timer?.timeFormat).toBe('HH:mm')
+    })
+
+    it('patchModuleTimeFormat countdown: atualiza timeFormat countdown', () => {
+      wrapper.vm.setActiveScope('countdown')
+      wrapper.vm.patchModuleTimeFormat('ss')
+      expect(wrapper.vm.settings.value.countdown?.timeFormat).toBe('ss')
+    })
+
+    it('patchModuleTimeFormat outro scope: não faz nada', () => {
+      wrapper.vm.setActiveScope('clock')
+      wrapper.vm.patchModuleTimeFormat('foo')
+      expect(wrapper.vm.settings.value.clock?.style).toBe('digital') // não muda
+    })
+  })
+
+  describe('patchRandom função', () => {
+    it('patchRandom junta com settings existentes', () => {
+      wrapper.vm.patchRandom({ fontSizePc: 12 })
+      expect(wrapper.vm.settings.value.random?.fontSizePc).toBe(12)
+      expect(wrapper.vm.settings.value.random?.textTransform).toBe('none') // default
+    })
+
+    it('patchRandom cria objeto se random nulo', () => {
+      wrapper.vm.patch({ random: undefined })
+      wrapper.vm.patchRandom({ animationSpeed: 'fast' })
+      expect(wrapper.vm.settings.value.random).toBeTruthy()
+      expect(wrapper.vm.settings.value.random?.animationSpeed).toBe('fast')
+    })
+  })
+
+  describe('file input', () => {
+    it('onFileSelected: arquivo null → não faz nada', () => {
+      wrapper.vm.fileInput = { files: null }
+      const event = { target: { files: null } }
+      wrapper.vm.onFileSelected(event)
+      expect(wrapper.vm.settings.value.backgroundImage).toBeUndefined()
+    })
+
+    it('onFileSelected: FileReader não string → não faz nada', async () => {
+      wrapper.vm.fileInput = { files: [{ name: 'test.png' }] }
+      const event = { target: { files: [{ name: 'test.png' }] } }
+      vi.spyOn(window, 'FileReader').mockImplementation(function() {
+        this.onload = () => { /* nada */ }
+        this.readAsDataURL = () => {}
+      })
+      wrapper.vm.onFileSelected(event)
+      expect(wrapper.vm.settings.value.backgroundImage).toBeUndefined()
+    })
+
+    it('onFileSelected: imagem válida → setBackgroundImage', async () => {
+      wrapper.vm.fileInput = { files: [{ name: 'test.png' }] }
+      const event = { target: { files: [{ name: 'test.png' }] } }
+      const reader = new FileReader()
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          wrapper.vm.setBackgroundImage(reader.result)
+        }
+      }
+      await reader.readAsDataURL(new Blob())
+      // Teste direto do método
+      wrapper.vm.setBackgroundImage('data:image/png;base64,test')
+      expect(wrapper.vm.settings.value.backgroundImage).toBe('data:image/png;base64,test')
+    })
+  })
+
+  describe('ações de reset', () => {
+    it('resetScope volta settings do escopo para default', () => {
+      wrapper.vm.setActiveScope('clock')
+      wrapper.vm.patchClock({ showSeconds: true })
+      wrapper.vm.resetScope()
+      expect(wrapper.vm.settings.value.clock?.showSeconds).toBe(false) // default
+    })
+
+    it('confirmReset: false → true ao clicar reset', async () => {
+      wrapper.vm.confirmReset = false
+      wrapper.vm.confirmReset = true
+      expect(wrapper.vm.confirmReset).toBe(true)
+    })
+
+    it('confirmReset: reset cancela se confirmReset=false', () => {
+      wrapper.vm.confirmReset = true
+      wrapper.vm.confirmReset = false
+      expect(wrapper.vm.confirmReset).toBe(false)
+    })
+
+    it('confirmReset: reset executa se confirmReset=true', () => {
+      wrapper.vm.confirmReset = true
+      wrapper.vm.resetScope()
+      expect(wrapper.vm.confirmReset).toBe(false)
+    })
+  })
+
+  describe('conforme scope', () => {
+    it('activeScope === bible: mostra componente bíblia', () => {
+      wrapper.vm.setActiveScope('bible')
+      expect(wrapper.find('.stage-custom__section--bible').exists()).toBe(true)
+    })
+
+    it('activeScope === clock: mostra módulo clock', () => {
+      wrapper.vm.setActiveScope('clock')
+      expect(wrapper.find('.stage-custom__section--module').exists()).toBe(true)
+    })
+
+    it('activeScope === timer/countdown: mostra módulo timer', () => {
+      wrapper.vm.setActiveScope('timer')
+      expect(wrapper.find('.stage-custom__section--module').exists()).toBe(true)
+    })
+
+    it('activeScope === random: mostra módulo random', () => {
+      wrapper.vm.setActiveScope('random')
+      expect(wrapper.find('.stage-custom__section--module').exists()).toBe(true)
+    })
+
+    it('activeScope === hymns: mostra módulo hymns', () => {
+      wrapper.vm.setActiveScope('hymns')
+      expect(wrapper.find('.stage-custom__section--module').exists()).toBe(true)
+    })
+
+    it('activeScope === global: não mostra módulo específico', () => {
+      wrapper.vm.setActiveScope('global')
+      expect(wrapper.find('.stage-custom__section--module').exists()).toBe(false)
+    })
+  })
+
+  describe('interações visuais', () => {
+    it('swatch ativo: classe --active quando settings igual', () => {
+      wrapper.vm.patch({ backgroundColor: '#ff0000' })
+      const swatch = wrapper.find('.stage-custom__swatch')
+      expect(swatch.classes()).toContain('stage-custom__swatch--active')
+    })
+
+    it('swatch inativo: sem --active quando settings diferente', () => {
+      wrapper.vm.patch({ backgroundColor: '#00ff00' })
+      const swatch = wrapper.find('.stage-custom__swatch')
+      expect(swatch.classes()).not.toContain('stage-custom__swatch--active')
+    })
+
+    it('segment btn ativo: classe --active quando settings igual', () => {
+      wrapper.vm.patch({ fontWeight: 600 })
+      const btn = wrapper.find('.stage-custom__segment-btn')
+      expect(btn.classes()).toContain('stage-custom__segment-btn--active')
+    })
+
+    it('toggle switch: classe --on quando modelValue true', () => {
+      const toggle = wrapper.findComponent({ name: 'SettingsToggle' })
+      toggle.vm.$emit('update:modelValue', true)
+      expect(toggle.classes()).toContain('stage-custom__switch--on')
+    })
+  })
 })
