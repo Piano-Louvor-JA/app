@@ -15,6 +15,7 @@ import {
 	getLocalMusic,
 	isLocalId,
 	listLocalCollections,
+	listLocalMusics,
 	updateLocalCollection,
 	updateLocalLyric,
 	updateLocalMusic,
@@ -118,6 +119,17 @@ describe("patches e removidos", () => {
 });
 
 describe("ramos restantes locais", () => {
+	it("payload com collections e musics válidos usa ambos os arrays (83-84)", () => {
+		localStorage.setItem(
+			KEY,
+			JSON.stringify({
+				collections: [{ id: -1, name: "C" }],
+				musics: [{ id: -1, collectionId: -1, name: "M", lyrics: [] }],
+			}),
+		);
+		expect(listLocalMusics(-1)).toHaveLength(1);
+	});
+
 	it("getLocalCollection encontrado (106 null guard)", () => {
 		const col = createLocalCollection("Existe");
 		expect(getLocalCollection(col.id)?.name).toBe("Existe");
