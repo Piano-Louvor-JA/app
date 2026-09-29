@@ -28,7 +28,7 @@ export default defineConfig({
     },
   },
   test: {
-    exclude: ['node_modules/**', 'dist/**', 'e2e/**'],
+    exclude: ['node_modules/**', 'dist/**', 'e2e/**', '.worktrees/**', 'coverage/**'],
     setupFiles: ['./vitest.setup.ts'],
     // Runs completos com coverage (istanbul) estouram 5s em testes que
     // mockam bridge/processamento pesado — transform 125s no run global.
