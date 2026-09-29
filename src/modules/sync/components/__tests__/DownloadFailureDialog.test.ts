@@ -56,6 +56,10 @@ describe("DownloadFailureDialog", () => {
   it("failure=null não renderiza nada", () => {
     active = mountDialog();
     expect(document.body.querySelector(".download-failure-dialog")).toBeNull();
+    // message com failure=null: v-if impede render, então acessa computed direto
+    const vm = active!.vm as unknown as { message: string; open: boolean };
+    expect(vm.open).toBe(false);
+    expect(vm.message).toBe("");
   });
 
   it("failure=offline mostra mensagem específica e título (Teleport)", () => {
