@@ -46,6 +46,20 @@ describe("MediaProjectFab", () => {
 		expect(w.emitted("project")).toBeUndefined();
 	});
 
+	it("disabled explícito como false permite projetar", async () => {
+		const w = mountFab({ disabled: false });
+		await w.find("button").trigger("click");
+		expect(w.emitted("project")).toHaveLength(1);
+	});
+
+	it("disabled sem projecting bloqueia no handler", async () => {
+		const w = mountFab();
+		await (w.vm as unknown as { onClick: (projecting: boolean, disabled: boolean) => void })
+			.onClick(false, true);
+		expect(w.emitted("project")).toBeUndefined();
+		expect(w.emitted("clear")).toBeUndefined();
+	});
+
 	it("projecting + disabled: NÃO bloqueia (precisa poder retirar)", async () => {
 		const w = mountFab({ disabled: true, projecting: true });
 		const btn = w.find("button");
