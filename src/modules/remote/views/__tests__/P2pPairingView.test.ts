@@ -6,15 +6,23 @@ import { createI18n } from 'vue-i18n'
 
 const { MockP2pRemoteHost } = vi.hoisted(() => {
   class MockP2pRemoteHostImpl {
+    static instances: any[] = []
     createOffer = vi.fn(async () => 'SDP-OFFER-STRING')
     acceptAnswer = vi.fn(async (_answer: string) => true)
     send = vi.fn()
     destroy = vi.fn()
     onOpen: (() => void) | null = null
     onMessage: ((data: unknown) => void) | null = null
+    constructor() {
+      MockP2pRemoteHostImpl.instances.push(this)
+    }
   }
   return { MockP2pRemoteHost: MockP2pRemoteHostImpl }
 })
+
+function componentHost(): InstanceType<typeof MockP2pRemoteHost> {
+  return MockP2pRemoteHost.instances[MockP2pRemoteHost.instances.length - 1]
+}
 
 vi.mock('../../services/p2p-remote-host', () => ({
   P2pRemoteHost: MockP2pRemoteHost,
@@ -69,13 +77,10 @@ const mediaDevices = {
   getUserMedia: vi.fn(async () => mockStream),
 }
 
-let mockHost: MockP2pRemoteHost
-
 describe('P2pPairingView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockHost = new MockP2pRemoteHost()
-    mockHost.acceptAnswer.mockResolvedValue(true)
+    MockP2pRemoteHost.instances.length = 0
     Object.defineProperty(window, 'navigator', {
       value: { mediaDevices },
       writable: true,
@@ -104,14 +109,14 @@ describe('P2pPairingView', () => {
     const wrapper = createWrapper()
     await wrapper.find('.p2p-pairing__btn').trigger('click')
     await flushPromises()
-    expect(mockHost.createOffer).toHaveBeenCalledOnce()
+    expect(componentHost().createOffer).toHaveBeenCalledOnce()
     expect(QRCode.toDataURL).toHaveBeenCalled()
     expect(wrapper.find('.p2p-pairing__qr').exists()).toBe(true)
     expect(wrapper.find('.p2p-pairing__cam').exists()).toBe(true)
   })
 
   it('startOffer com erro no createOffer: step error com mensagem', async () => {
-    mockHost.createOffer.mockRejectedValueOnce(new Error('webrtc fail'))
+    componentHost().createOffer.mockRejectedValueOnce(new Error('webrtc fail'))
     const wrapper = createWrapper()
     await wrapper.find('.p2p-pairing__btn').trigger('click')
     await flushPromises()
@@ -132,24 +137,24 @@ describe('P2pPairingView', () => {
     const wrapper = createWrapper()
     await wrapper.find('.p2p-pairing__btn').trigger('click')
     await flushPromises()
-    mockHost.acceptAnswer.mockClear()
+    componentHost().acceptAnswer.mockClear()
     await wrapper.find('.p2p-pairing__btn').trigger('click') // botão agora é "Aplicar" no step scan
     // no step scan o primeiro botão é "Aplicar" (p2pManualApply) — dispara submitManual
-    expect(mockHost.acceptAnswer).not.toHaveBeenCalledTimes(2)
+    expect(componentHost().acceptAnswer).not.toHaveBeenCalledTimes(2)
   })
 
   it('applyAnswer ok: para scan, loga answer ok, conecta via onOpen', async () => {
     const wrapper = createWrapper()
     await wrapper.find('.p2p-pairing__btn').trigger('click')
     await flushPromises()
-    mockHost.acceptAnswer.mockClear()
+    componentHost().acceptAnswer.mockClear()
     wrapper.vm.manualAnswer = 'ANSWER-DATA'
     await wrapper.find('.p2p-pairing__btn').trigger('click') // submitManual
     await flushPromises()
-    expect(mockHost.acceptAnswer).toHaveBeenCalledWith('ANSWER-DATA')
+    expect(componentHost().acceptAnswer).toHaveBeenCalledWith('ANSWER-DATA')
     expect(wrapper.text()).toContain('answer ok')
     // onOpen dispara connected
-    mockHost.onOpen!()
+    componentHost().onOpen!()
     await flushPromises()
     expect(wrapper.text()).toContain('conectado')
   })
@@ -158,8 +163,8 @@ describe('P2pPairingView', () => {
     const wrapper = createWrapper()
     await wrapper.find('.p2p-pairing__btn').trigger('click')
     await flushPromises()
-    mockHost.acceptAnswer.mockResolvedValueOnce(false)
-    mockHost.acceptAnswer.mockClear()
+    componentHost().acceptAnswer.mockResolvedValueOnce(false)
+    componentHost().acceptAnswer.mockClear()
     wrapper.vm.manualAnswer = 'BAD'
     await wrapper.find('.p2p-pairing__btn').trigger('click')
     await flushPromises
@@ -170,25 +175,25 @@ describe('P2pPairingView', () => {
     const wrapper = createWrapper()
     await wrapper.find('.p2p-pairing__btn').trigger('click')
     await flushPromises()
-    mockHost.onOpen!()
+    componentHost().onOpen!()
     await flushPromises()
-    mockHost.send.mockClear()
+    componentHost().send.mockClear()
     // botão de ping aparece no step connected
     const buttons = wrapper.findAll('.p2p-pairing__btn')
     const pingBtn = buttons.find((b) => b.text() === 'ping')
     await pingBtn!.trigger('click')
-    expect(mockHost.send).toHaveBeenCalledWith(expect.objectContaining({ action: 'remote.hello', device: 'web-test' }))
+    expect(componentHost().send).toHaveBeenCalledWith(expect.objectContaining({ action: 'remote.hello', device: 'web-test' }))
   })
 
   it('onMessage: loga payload JSON truncado', async () => {
     const wrapper = createWrapper()
     await wrapper.find('.p2p-pairing__btn').trigger('click')
     await flushPromises()
-    mockHost.acceptAnswer.mockClear()
+    componentHost().acceptAnswer.mockClear()
     wrapper.vm.manualAnswer = 'ANS'
     await wrapper.find('.p2p-pairing__btn').trigger('click')
     await flushPromises()
-    mockHost.onMessage!({ action: 'ping' })
+    componentHost().onMessage!({ action: 'ping' })
     await flushPromises()
     expect(wrapper.text()).toContain('ping')
     expect(wrapper.find('.p2p-pairing__log').exists()).toBe(true)
@@ -200,7 +205,7 @@ describe('P2pPairingView', () => {
     await flushPromises()
     wrapper.unmount()
     expect(mockTrack.stop).toHaveBeenCalled()
-    expect(mockHost.destroy).toHaveBeenCalledOnce()
+    expect(componentHost().destroy).toHaveBeenCalledOnce()
   })
 
   it('scanFrame com QR de answer: aplica answer automaticamente', async () => {
@@ -222,7 +227,7 @@ describe('P2pPairingView', () => {
       await flushPromises()
       expect(jsQR).toHaveBeenCalled()
       // answer do QR aplicado: acceptAnswer recebeu e log apareceu
-      expect(mockHost.acceptAnswer).toHaveBeenCalledWith('QR-ANSWER')
+      expect(componentHost().acceptAnswer).toHaveBeenCalledWith('QR-ANSWER')
       expect(wrapper.text()).toContain('answer ok')
     } finally {
       vi.useRealTimers()
