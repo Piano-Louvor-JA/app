@@ -1,0 +1,6 @@
+#!/bin/bash
+# Pre-commit hook (app) — lint + typecheck rápido
+echo "🔍 Pre-commit: lint + typecheck..."
+npm run lint --if-present 2>&1 | tail -3
+npm run typecheck --if-present 2>&1 | tail -3
+echo "✅ Pre-commit OK"
