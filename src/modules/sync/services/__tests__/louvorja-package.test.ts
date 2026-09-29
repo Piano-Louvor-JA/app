@@ -70,6 +70,18 @@ describe("decodeLouvorjaPackage", () => {
 		expect(decoded.entities.liturgy?.data).toEqual({});
 	});
 
+	it("ignora entidades nulas e usa a chave como tipo padrão", () => {
+		const decoded = decodeLouvorjaPackage(
+			JSON.stringify({
+				schema: 1,
+				entities: { ignored: null, timerPresets: { data: [] } },
+			}),
+		);
+		expect(decoded.entities).toEqual({
+			timerPresets: { type: "timerPresets", modified: "", data: {} },
+		});
+	});
+
 	it("tolera entities ausentes", () => {
 		const raw = JSON.stringify({ schema: 1 });
 		const decoded = decodeLouvorjaPackage(raw);
