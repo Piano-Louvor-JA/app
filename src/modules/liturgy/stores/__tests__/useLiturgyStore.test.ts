@@ -168,4 +168,105 @@ describe('useLiturgyStore', () => {
       expect(store.deletionLocked).toBe(!before)
     })
   })
+
+  describe('custom liturgies e clone (branches finais)', () => {
+    it('criar liturgia custom: dialog, nome, seleção e persist', async () => {
+      const store = useLiturgyStore()
+      await store.hydrate()
+      store.openCustomDialog()
+      expect(store.customDialogOpen).toBe(true)
+      store.newCustomName = 'Culto Extra'
+      store.createCustomLiturgy()
+      expect(store.customDialogOpen).toBe(false)
+      expect(store.selectedDay).toBe('custom')
+      expect(store.customLiturgies.length).toBeGreaterThan(0)
+      expect(store.currentCustomTitle).toBe('Culto Extra')
+    })
+
+    it('createCustomLiturgy com nome vazio: ignora', async () => {
+      const store = useLiturgyStore()
+      await store.hydrate()
+      store.openCustomDialog()
+      store.newCustomName = '   '
+      store.createCustomLiturgy()
+      expect(store.customLiturgies.length).toBe(0)
+    })
+
+    it('removeCustomLiturgy: remove e ajusta índice', async () => {
+      const store = useLiturgyStore()
+      await store.hydrate()
+      store.openCustomDialog()
+      store.newCustomName = 'A'
+      store.createCustomLiturgy()
+      store.openCustomDialog()
+      store.newCustomName = 'B'
+      store.createCustomLiturgy()
+      expect(store.customLiturgies.length).toBe(2)
+      store.removeCustomLiturgy(0)
+      expect(store.customLiturgies.length).toBe(1)
+      expect(store.customLiturgies[0].name).toBe('B')
+    })
+
+    it('currentItems/currentNotes/currentStartTime em custom', async () => {
+      const store = useLiturgyStore()
+      await store.hydrate()
+      store.openCustomDialog()
+      store.newCustomName = 'X'
+      store.createCustomLiturgy()
+      expect(store.currentItems).toEqual([])
+      store.currentNotes = 'nota da liturgia custom'
+      expect(store.currentNotes).toBe('nota da liturgia custom')
+    })
+
+    it('cloneSources: lista weekdays com itens e customs', async () => {
+      const store = useLiturgyStore()
+      await store.hydrate()
+      const day = LITURGY_DAY_TAB_ORDER[0]
+      store.weekdays[day] = [
+        { id: 'i1', type: 'music', name: 'Hino', durationMs: 1, categoryId: null, filePath: '', filePaths: [], musicId: 1, url: '', accentColor: '#000', startTime: null, endTime: null, done: false },
+      ] as never
+      const sources = store.cloneSources
+      expect(sources.length).toBeGreaterThan(0)
+      expect(store.canCloneLiturgy).toBe(true)
+    })
+
+    it('openCloneDialog + confirmClone copia itens', async () => {
+      const store = useLiturgyStore()
+      await store.hydrate()
+      const day = LITURGY_DAY_TAB_ORDER[0]
+      store.weekdays[day] = [
+        { id: 'i1', type: 'music', name: 'Hino', durationMs: 1, categoryId: null, filePath: '', filePaths: [], musicId: 1, url: '', accentColor: '#000', startTime: null, endTime: null, done: false },
+      ] as never
+      store.openCloneDialog()
+      expect(store.cloneDialogOpen).toBe(true)
+      expect(store.cloneSourceKey).not.toBe('')
+      store.cloneLiturgyFromSelected()
+      expect(store.currentItems.length).toBe(1)
+      expect(store.cloneDialogOpen).toBe(false)
+    })
+
+    it('setItemPlayer: set e remove playerId (682-692)', async () => {
+      const store = useLiturgyStore()
+      await store.hydrate()
+      store.currentItems = [
+        { id: 'i1', type: 'audio', name: 'Áudio', durationMs: 1, categoryId: null, filePath: '/a.mp3', filePaths: [], musicId: null, url: '', accentColor: '#000', startTime: null, endTime: null, done: false },
+      ] as never
+      store.setItemPlayer(0, 'vlc')
+      expect((store.currentItems[0] as any).playerId).toBe('vlc')
+      store.setItemPlayer(0, 'default')
+      expect((store.currentItems[0] as any).playerId).toBeUndefined()
+    })
+
+    it('countdown: start exige endTime (171)', async () => {
+      const store = useLiturgyStore()
+      await store.hydrate()
+      expect(store.canStartCountdown).toBe(false)
+      store.currentEndTime = '23:59'
+      expect(store.canStartCountdown).toBe(true)
+      store.startCountdown()
+      expect(store.countdownRunning).toBe(true)
+      store.stopCountdown()
+      expect(store.countdownRunning).toBe(false)
+    })
+  })
 })
