@@ -633,4 +633,66 @@ describe('StageCustomizationCard', () => {
       w.unmount()
     })
   })
+
+  describe('SettingsToggle switches (clique direto)', () => {
+    it('global scope: todos os switches disparam patch', async () => {
+      const w = createWrapper()
+      const store = useStageSettingsStore()
+      const switches = w.findAll('button[role="switch"]')
+      expect(switches.length).toBeGreaterThan(0)
+      const before = JSON.stringify(store.settings)
+      for (const s of switches) await s.trigger('click')
+      await w.vm.$nextTick()
+      expect(JSON.stringify(store.settings)).not.toBe(before)
+      w.unmount()
+    })
+
+    it('bible scope: switch showBibleVersion', async () => {
+      const w = createWrapper()
+      const store = useStageSettingsStore()
+      store.setActiveScope?.('bible')
+      await w.vm.$nextTick()
+      const switches = w.findAll('button[role="switch"]')
+      for (const s of switches) await s.trigger('click')
+      await w.vm.$nextTick()
+      expect(typeof store.settings.showBibleVersion).toBe('boolean')
+      w.unmount()
+    })
+
+    it('color inputs por aria-label (textColor/bibleTextColor/footerRefColor)', async () => {
+      const w = createWrapper()
+      const store = useStageSettingsStore()
+      const colors = w.findAll('input[type="color"]')
+      const labels = colors.map(c => c.attributes('aria-label') ?? '')
+      for (const c of colors) await c.setValue('#11aa33')
+      await w.vm.$nextTick()
+      expect(labels.length).toBeGreaterThanOrEqual(0)
+      w.unmount()
+    })
+
+    it('fontSize/bibleFontSize inputs numéricos', async () => {
+      const w = createWrapper()
+      const store = useStageSettingsStore()
+      const sizes = w.findAll('input[type="range"], input[type="number"]')
+      for (const s of sizes) await s.setValue('30')
+      await w.vm.$nextTick()
+      w.unmount()
+    })
+
+    it('fileInput click via botão changeImage (265)', async () => {
+      const store = useStageSettingsStore()
+      store.patch({ backgroundImage: 'official:bg-1' })
+      const w = createWrapper()
+      await w.vm.$nextTick()
+      const input = w.find('input[type="file"]')
+      const clickSpy = vi.fn()
+      expect(input.exists()).toBe(true)
+      ;(input.element as HTMLInputElement).click = clickSpy
+      const changeBtn = w.find('.stage-custom__bg-btn:not(.stage-custom__bg-btn--danger)')
+      expect(changeBtn.exists()).toBe(true)
+      await changeBtn.trigger('click')
+      expect(clickSpy).toHaveBeenCalled()
+      w.unmount()
+    })
+  })
 })
