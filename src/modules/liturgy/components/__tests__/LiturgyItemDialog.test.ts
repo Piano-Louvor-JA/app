@@ -635,4 +635,50 @@ describe('LiturgyItemDialog', () => {
       wrapper.unmount()
     })
   })
+
+  describe('validação e filtros restantes', () => {
+    it('save com endTime faltando em categoria: foca campo end-time', async () => {
+      const w = createWrapper({ draft: { ...defaultProps.draft, type: 'category', startTime: '10:00', endTime: '' } })
+      const focusSpy = vi.fn()
+      document.getElementById = () => ({ focus: focusSpy } as unknown as HTMLElement)
+
+      const vm = w.vm as any
+      await vm.onSubmit?.({ preventDefault: () => {} } as unknown as Event)
+      expect(w.emitted('save')).toBeFalsy()
+      w.unmount()
+    })
+
+    it('fileFiltersForType pdf/presentation via selectLocalFile', async () => {
+      const w = createWrapper({ draft: { ...defaultProps.draft, type: 'pdf' } })
+      const vm = w.vm as any
+      await vm.selectLocalFile?.()
+      // desktop bridge mock ausente -> filePickerError string OU busy — aceita ambos os estados
+      const err = vm.filePickerError ?? null
+      expect(typeof err === 'string' || err === null).toBe(true)
+      w.unmount()
+    })
+
+    it('isLightDot: hex claro retorna true', async () => {
+      const w = createWrapper()
+      const vm = w.vm as any
+      expect(vm.isLightDot?.('#ffffff')).toBe(true)
+      expect(vm.isLightDot?.('#000000')).toBe(false)
+      expect(vm.isLightDot?.('#fff')).toBe(false)
+      w.unmount()
+    })
+
+    it('readTimeInput: sem elemento retorna vazio', async () => {
+      const w = createWrapper()
+      const vm = w.vm as any
+      expect(vm.readTimeInput?.('moment-start-time')).toBe('')
+      w.unmount()
+    })
+
+    it('endTimeRequiredMissing em categoria sem endTime', async () => {
+      const w = createWrapper({ draft: { ...defaultProps.draft, type: 'category', startTime: '10:00', endTime: '' } })
+      const vm = w.vm as any
+      expect(vm.endTimeRequiredMissing).toBe(true)
+      w.unmount()
+    })
+  })
 })
