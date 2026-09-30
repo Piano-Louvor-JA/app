@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createI18n } from 'vue-i18n'
 import LiturgyItemDialog from '../LiturgyItemDialog.vue'
 import liturgyLocale from '../../locales/pt-BR'
+import { isDesktopApp, getDesktopBridge } from '@shared/services/desktop-bridge'
+import { probeMediaDurationMs } from '../../services/media-probe'
+const probeMediaDurationMsMock = vi.mocked(probeMediaDurationMs)
 
 // Mocks dos serviços/dependencies
 vi.mock('@shared/services/desktop-bridge', () => ({
@@ -11,7 +14,7 @@ vi.mock('@shared/services/desktop-bridge', () => ({
   isDesktopApp: vi.fn(() => false),
 }))
 
-vi.mock('../services/media-probe', () => ({
+vi.mock('../../services/media-probe', () => ({
   probeMediaDurationMs: vi.fn(() => Promise.resolve(0)),
 }))
 
@@ -526,6 +529,110 @@ describe('LiturgyItemDialog', () => {
       const wrapper = createWrapper()
       expect(wrapper.vm.isLightDot('#ffffff')).toBe(true)
       expect(wrapper.vm.isLightDot('#000000')).toBe(false)
+    })
+  })
+
+  describe('file picker + engines', () => {
+    it('selectLocalFile fora do desktop: filePickerError', async () => {
+      vi.mocked(isDesktopApp).mockReturnValue(false)
+      const wrapper = createWrapper({ open: true, draft: { ...defaultProps.draft, type: 'audio' } })
+      await flushPromises()
+      await (wrapper.vm as any).selectLocalFile()
+      await flushPromises()
+      expect((wrapper.vm as any).filePickerError).toBeTruthy()
+      wrapper.unmount()
+    })
+
+    it('selectLocalFile desktop com bridge: seleciona arquivo e patcha draft', async () => {
+      vi.mocked(isDesktopApp).mockReturnValue(true)
+      const openFile = vi.fn(async () => '/music/hino-01.mp3')
+      vi.mocked(getDesktopBridge).mockReturnValue({ dialog: { openFile } } as any)
+      const wrapper = createWrapper({ open: true, draft: { ...defaultProps.draft, type: 'audio', name: '' } })
+      await flushPromises()
+      await (wrapper.vm as any).selectLocalFile()
+      await flushPromises()
+      const emitted = wrapper.emitted('update:draft')
+      expect(emitted).toBeTruthy()
+      const last = emitted![emitted!.length - 1][0] as any
+      expect(last.filePath).toBe('/music/hino-01.mp3')
+      // nome vazio → preenchido do filename sem extensão
+      expect(last.name).toBe('hino-01')
+      wrapper.unmount()
+    })
+
+    it('selectLocalFile múltiplo (images): filePaths e nome com contagem', async () => {
+      vi.mocked(isDesktopApp).mockReturnValue(true)
+      const openFile = vi.fn(async () => ['/a.png', '/b.png'])
+      vi.mocked(getDesktopBridge).mockReturnValue({ dialog: { openFile } } as any)
+      const wrapper = createWrapper({ open: true, draft: { ...defaultProps.draft, type: 'images', name: '' } })
+      await flushPromises()
+      await (wrapper.vm as any).selectLocalFile()
+      await flushPromises()
+      const emitted = wrapper.emitted('update:draft')
+      const last = emitted![emitted!.length - 1][0] as any
+      expect(last.filePaths).toEqual(['/a.png', '/b.png'])
+      expect(last.name).toBeTruthy()
+      wrapper.unmount()
+    })
+
+    it('probeMediaDurationMs > 0: aplica durationMs no draft', async () => {
+      vi.mocked(isDesktopApp).mockReturnValue(true)
+      const openFile = vi.fn(async () => '/v/clip.mp4')
+      vi.mocked(getDesktopBridge).mockReturnValue({ dialog: { openFile } } as any)
+      probeMediaDurationMsMock.mockResolvedValue(95000)
+      const wrapper = createWrapper({ open: true, draft: { ...defaultProps.draft, type: 'video', name: 'Clip' } })
+      await flushPromises()
+      await (wrapper.vm as any).selectLocalFile()
+      await flushPromises()
+      const emitted = wrapper.emitted('update:draft')
+      const last = emitted![emitted!.length - 1][0] as any
+      expect(last.durationMs).toBe(95000)
+      // nome já preenchido → mantém
+      expect(last.name).toBe('Clip')
+      wrapper.unmount()
+    })
+
+    it('onEngineChange custom sem bridge: patch presentationEngine custom', async () => {
+      vi.mocked(isDesktopApp).mockReturnValue(true)
+      vi.mocked(getDesktopBridge).mockReturnValue(null)
+      const wrapper = createWrapper({ open: true, draft: { ...defaultProps.draft, type: 'presentation' } })
+      await flushPromises()
+      await (wrapper.vm as any).onEngineChange('custom')
+      await flushPromises()
+      const emitted = wrapper.emitted('update:draft')
+      const last = emitted![emitted!.length - 1][0] as any
+      expect(last.presentationEngine).toBe('custom')
+      wrapper.unmount()
+    })
+
+    it('onEngineChange custom com bridge ok: setCustomApp true → engine custom', async () => {
+      vi.mocked(isDesktopApp).mockReturnValue(true)
+      const openFile = vi.fn(async () => '/apps/custom.exe')
+      const setCustomApp = vi.fn(async () => true)
+      vi.mocked(getDesktopBridge).mockReturnValue({ dialog: { openFile }, presentation: { setCustomApp } } as any)
+      const wrapper = createWrapper({ open: true, draft: { ...defaultProps.draft, type: 'presentation' } })
+      await flushPromises()
+      await (wrapper.vm as any).onEngineChange('custom')
+      await flushPromises()
+      const emitted = wrapper.emitted('update:draft')
+      const last = emitted![emitted!.length - 1][0] as any
+      expect(last.presentationEngine).toBe('custom')
+      expect(setCustomApp).toHaveBeenCalledWith('/apps/custom.exe')
+      wrapper.unmount()
+    })
+
+    it('onEngineChange custom cancelado (undefined): sem patch', async () => {
+      vi.mocked(isDesktopApp).mockReturnValue(true)
+      const openFile = vi.fn(async () => undefined)
+      vi.mocked(getDesktopBridge).mockReturnValue({ dialog: { openFile }, presentation: { setCustomApp: vi.fn() } } as any)
+      const wrapper = createWrapper({ open: true, draft: { ...defaultProps.draft, type: 'presentation' } })
+      await flushPromises()
+      const before = wrapper.emitted('update:draft')?.length ?? 0
+      await (wrapper.vm as any).onEngineChange('custom')
+      await flushPromises()
+      const after = wrapper.emitted('update:draft')?.length ?? 0
+      expect(after).toBe(before)
+      wrapper.unmount()
     })
   })
 })
