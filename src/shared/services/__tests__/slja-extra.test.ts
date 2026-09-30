@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { strToU8, unzipSync, zipSync } from "fflate";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { SljaArchive, SljaSlide } from "../slja";
 /**
  * Complemento slja — buildSlja round-trip (INI gerado + ZIP + re-parse),
@@ -302,4 +302,4 @@ describe("slja — ramos residuais", () => {
 		new Uint8Array(fakeZip).set([9, 9, 9, 9, 9, 9, 9, 9]);
 		await expect(parseSljaFile(fakeZip, "a.slja.zip")).rejects.toThrow();
 	});
-});
+

@@ -85,4 +85,15 @@ describe("rename/delete/add — ids inexistentes e bordas", () => {
 		expect(listPlaylists()).toHaveLength(1);
 		expect(listPlaylists()[0]?.name).toBe("Importada");
 	});
+	it("read com localStorage quebrado: catch → [] (25)", () => {
+		const orig = localStorage.getItem;
+		localStorage.getItem = () => {
+			throw new Error("storage quebrado");
+		};
+		try {
+			expect(listPlaylists()).toEqual([]);
+		} finally {
+			localStorage.getItem = orig;
+		}
+	});
 });

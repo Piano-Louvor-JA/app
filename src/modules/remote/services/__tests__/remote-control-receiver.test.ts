@@ -273,4 +273,16 @@ describe('RemoteControlReceiver', () => {
     // recupera para o afterEach
     vi.stubGlobal('WebSocket', original)
   })
+
+	describe("connect pós-stop (74)", () => {
+		it("stop() seguido de connect manual: não reconecta", () => {
+			receiver.stop();
+			// acessar connect via re-entrada: scheduleReconnect após stop não agenda
+			// dispara erro de conexão após stop → scheduleReconnect não deve criar timer
+			const ws = receiver["ws"] as unknown as { onerror?: (e: unknown) => void; onclose?: (e: unknown) => void } | null;
+			// chamar connect() privado via cast
+			(receiver as unknown as { connect: () => void }).connect();
+			expect(receiver["reconnectTimer"]).toBeNull();
+		});
+	});
 })

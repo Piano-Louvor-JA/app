@@ -133,4 +133,18 @@ describe("fadeOut cancelado por fade concorrente", () => {
 			vi.useRealTimers();
 		}
 	});
-});
+
+	describe("Audio API ausente (78)", () => {
+		it("ensureSlotAudio lança Audio API unavailable", async () => {
+			const origAudio = globalThis.Audio;
+			// @ts-expect-error simula ambiente sem Audio
+			delete (globalThis as { Audio?: unknown }).Audio;
+			try {
+				const r = await fadeInMediaAudio({ volume: 0.5 } as unknown as HTMLAudioElement, 0.5);
+				expect(r).toBe(false);
+			} finally {
+				(globalThis as { Audio?: unknown }).Audio = origAudio;
+			}
+		});
+	});
+})
