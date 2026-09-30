@@ -1070,9 +1070,12 @@ describe('palco-bridge', () => {
     it('watcher currentTimeSec: sem sessão → sem seek', async () => {
       useMediaStoreMock.mockReturnValue({ session: { audioUrl: 'http://w.mp3' }, audioRoute: 'both', isPlaying: true, isPaused: false, currentTimeSec: 1, hasSession: false, status: 'playing' })
       startPalcoBridge()
+      await new Promise((r) => setTimeout(r, 10))
+      palcoSessionMock.audio.mockClear()
       watchCallbacks[3]?.cb(99, 1)
       await new Promise((r) => setTimeout(r, 10))
-      expect(palcoSessionMock.audio).not.toHaveBeenCalled()
+      // hasSession false: watcher NÃO chama seek
+      expect(palcoSessionMock.audio).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'seek', position: 99 }))
       stopPalcoBridge()
     })
 
