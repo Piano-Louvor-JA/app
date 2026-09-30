@@ -3,13 +3,7 @@
 import { mount } from '@vue/test-utils'
 import { describe, it, expect, vi } from 'vitest'
 
-vi.mock('../types/stage-settings', () => ({
-  resolveBackgroundImage: vi.fn(() => null),
-  stageFlexAlign: vi.fn(() => ({ alignItems: 'center', justifyContent: 'center' })),
-}))
-
 import StagePreview from '../StagePreview.vue'
-import { DEFAULT_STAGE_SETTINGS } from '../types/stage-settings'
 import type { StageSettings } from '../types/stage-settings'
 
 // DEFAULT real não é mockado — importar antes do mock estragaria; usar fixture:

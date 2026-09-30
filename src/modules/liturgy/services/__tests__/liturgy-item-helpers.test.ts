@@ -35,11 +35,6 @@ vi.mock('../liturgy-format', () => ({
   pad2: (n: number) => String(n).padStart(2, '0'),
 }))
 
-vi.mock('../../types/liturgy', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../types/liturgy')>()
-  return actual
-})
-
 function item(partial: Partial<LiturgyItem> & { id: string; type: LiturgyItem['type'] }): LiturgyItem {
   return {
     name: partial.id,
