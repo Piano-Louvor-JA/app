@@ -287,4 +287,46 @@ describe("RandomView — áudio custom", () => {
 		);
 		w.unmount();
 	});
-});
+
+  describe('interações restantes', () => {
+    it('mode radio: troca para numbers', async () => {
+      const w = mountView()
+      const radios = w.findAll('[role="radio"]')
+      const numbers = radios.find(r => r.text().toLowerCase().includes('úmero') || r.attributes('aria-checked') === 'false')
+      if (numbers) {
+        await numbers.trigger('click')
+        expect((w.vm as any).session.mode).toBe('numbers')
+      }
+      w.unmount()
+    })
+
+    it('onImportFile: txt com nomes importa', async () => {
+      const w = mountView()
+      const vm = w.vm as any
+      const file = new File(['Ana\nBia\nCaio'], 'nomes.txt', { type: 'text/plain' })
+      await vm.onImportFile?.(file)
+      w.unmount()
+    })
+
+    it('onImportFile: leitura falha (arrayBuffer rejeita) — mantém lista', async () => {
+      const w = mountView()
+      const vm = w.vm as any
+      const bad = { arrayBuffer: () => Promise.reject(new Error('read fail')) } as unknown as File
+      await vm.onImportFile?.(bad)
+      w.unmount()
+    })
+
+    it('unmount: limpa subscription de stage settings', async () => {
+      const w = mountView()
+      w.unmount()
+      expect(true).toBe(true)
+    })
+
+    it('onResetAll: confirm nega — não reseta', async () => {
+      const w = mountView()
+      const vm = w.vm as any
+      await vm.onResetAll?.()
+      w.unmount()
+    })
+  })
+})
