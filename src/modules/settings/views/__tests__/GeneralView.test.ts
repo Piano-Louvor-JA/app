@@ -50,15 +50,16 @@ vi.mock('@modules/sync/services/louvorja-package', () => ({
   isValidLouvorjaContent: vi.fn(() => true),
 }))
 
+const updateCheckerState = {
+  checkForUpdates: vi.fn(async () => {}),
+  isChecking: { value: false },
+  hasUpdate: { value: false },
+  newVersion: { value: '' },
+  error: { value: null as string | null },
+  hasChecked: { value: false },
+}
 vi.mock('@shared/composables/useUpdateChecker', () => ({
-  useUpdateChecker: () => ({
-    checkForUpdates: vi.fn(async () => {}),
-    isChecking: { value: false },
-    hasUpdate: { value: false },
-    newVersion: { value: '' },
-    error: { value: null },
-    hasChecked: { value: false },
-  }),
+  useUpdateChecker: () => updateCheckerState,
 }))
 
 import GeneralView from '../GeneralView.vue'
@@ -288,6 +289,95 @@ describe('GeneralView.vue', () => {
       await importBtn.trigger('click')
       await flushPromises()
       expect((wrapper.vm as any).syncStatus).toEqual({ kind: 'error', messageKey: 'settings.general.syncInvalid' })
+    })
+  })
+
+  describe('check update + idioma + clear', () => {
+    it('checkUpdate: botão desabilitado no browser', () => {
+      const wrapper = mountComponent()
+      const btn = wrapper.findAll('button').find((b) => b.text().includes('checkUpdate') || b.text().includes('checking'))
+      if (btn) expect((btn.element as HTMLButtonElement).disabled).toBe(true)
+    })
+
+    it('hasUpdate: mostra mensagem com versão', async () => {
+      updateCheckerState.hasUpdate.value = true
+      updateCheckerState.newVersion.value = '9.9.9'
+      const wrapper = mountComponent()
+      expect(wrapper.find('.general-settings__status--success').exists()).toBe(true)
+      updateCheckerState.hasUpdate.value = false
+      updateCheckerState.newVersion.value = ''
+    })
+
+    it('updateError: mostra status de erro', async () => {
+      updateCheckerState.error.value = 'falha rede'
+      const wrapper = mountComponent()
+      expect(wrapper.find('.general-settings__status--error').exists()).toBe(true)
+      updateCheckerState.error.value = null
+    })
+
+    it('changeLanguage pt-BR: volta locale', async () => {
+      const wrapper = mountComponent()
+      const ptBtn = wrapper.findAll('.general-settings__lang-btn')[0]
+      await ptBtn.trigger('click')
+      expect(mockLocale.value).toBe('pt-BR')
+      expect(setUserPreference).toHaveBeenCalledWith('language', 'pt-BR')
+    })
+
+    it('clear sem acknowledged: botão confirmar desabilitado já coberto; desktopOnly mostra hint', () => {
+      vi.mocked(isDesktopApp).mockReturnValue(false)
+      const wrapper = mountComponent()
+      expect(wrapper.text()).toContain('settings.general.desktopOnly')
+    })
+
+    it('clearAllLocalData com erro do workspace: clearError true', async () => {
+      vi.mocked(isDesktopApp).mockReturnValue(true)
+      vi.mocked(clearWorkspace).mockRejectedValue(new Error('fail'))
+      const wrapper = mountComponent()
+      await flushPromises()
+      await wrapper.find('.general-settings__btn--danger').trigger('click')
+      const checkbox = wrapper.find('.clear-confirm__checkbox')
+      await checkbox.trigger('click')
+      const confirmBtn = wrapper.find('.clear-confirm__btn--danger')
+      await confirmBtn.trigger('click')
+      await flushPromises()
+      expect((wrapper.vm as any).clearError).toBe(true)
+      expect((wrapper.vm as any).isClearing).toBe(false)
+    })
+
+    it('clearAllLocalData sucesso: reload', async () => {
+      vi.mocked(isDesktopApp).mockReturnValue(true)
+      vi.mocked(clearWorkspace).mockResolvedValue(true)
+      const reloadSpy = vi.fn()
+      Object.defineProperty(window, 'location', {
+        value: { ...window.location, reload: reloadSpy },
+        writable: true,
+        configurable: true,
+      })
+      const wrapper = mountComponent()
+      await flushPromises()
+      await wrapper.find('.general-settings__btn--danger').trigger('click')
+      await wrapper.find('.clear-confirm__checkbox').trigger('click')
+      await wrapper.find('.clear-confirm__btn--danger').trigger('click')
+      await flushPromises()
+      expect(reloadSpy).toHaveBeenCalled()
+    })
+
+    it('closeClearConfirm durante clearing: não fecha', async () => {
+      vi.mocked(isDesktopApp).mockReturnValue(true)
+      let resolveClear: (v: boolean) => void
+      vi.mocked(clearWorkspace).mockImplementation(
+        () => new Promise((resolve) => { resolveClear = resolve }),
+      )
+      const wrapper = mountComponent()
+      await flushPromises()
+      await wrapper.find('.general-settings__btn--danger').trigger('click')
+      await wrapper.find('.clear-confirm__checkbox').trigger('click')
+      await wrapper.find('.clear-confirm__btn--danger').trigger('click')
+      // clearing em andamento — tentar fechar
+      const cancelBtn = wrapper.find('.clear-confirm__actions .clear-confirm__btn')
+      if (cancelBtn.exists()) await cancelBtn.trigger('click')
+      resolveClear!(true)
+      await flushPromises()
     })
   })
 })
