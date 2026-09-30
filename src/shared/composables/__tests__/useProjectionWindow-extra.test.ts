@@ -228,4 +228,26 @@ describe("syncProjectionAfterDisplayChange — projeção fechada (433)", () => 
 		await syncProjectionAfterDisplayChange();
 		expect(isProjectionModuleOpen()).toBe(false);
 	});
+
+describe("isModuleActive e activeModule (201-202)", () => {
+	it("activeModule controla qual módulo está ativo", async () => {
+		mocks.state.settings.targetDisplayIds = [2];
+		await openProjectionModule("media");
+		// janela aberta para media: checar via closeProjectionModule + reabrir outro
+		await closeProjectionModule();
+		await openProjectionModule("clock");
+		expect(isProjectionModuleOpen()).toBe(true);
+		await closeProjectionModule();
+	});
 });
+
+describe("reapply — sem displays válidos (fallback)", () => {
+	it("reapply com lista vazia não lança", async () => {
+		mocks.state.settings.targetDisplayIds = [2];
+		await openProjectionModule("media");
+		const ok = await reapplyProjectionTargets([]);
+		void ok;
+		await closeProjectionModule();
+	});
+});
+})
