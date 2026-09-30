@@ -98,6 +98,8 @@ import { startPalcoBridge, stopPalcoBridge, palcoClockOn, palcoClockOff } from '
 describe('palco-bridge', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // clearAllMocks limpa mockResolvedValue — rearma o slot padrão
+    palcoSessionMock.slots.mockResolvedValue([{ id: 'slot1', label: 'TV', running: true, clients: 0, httpPort: 8080, wsPort: 8081 }])
     getDesktopBridgeMock.mockReturnValue(null)
   })
 
@@ -622,5 +624,112 @@ describe('palco-bridge', () => {
       stopPalcoBridge()
       vi.useRealTimers()
     })
+  })
+
+  describe('planos assigned/external e ramos de ownerInput', () => {
+    beforeEach(() => {
+      stopPalcoBridge()
+      localStorage.clear()
+      useMediaStoreMock.mockReturnValue(null)
+    })
+
+    it('plan assigned bible: renderModuleTo projeta no slot', async () => {
+      const { planForSlot } = await import('../output-plan')
+      ;(planForSlot as any).mockImplementation(() => ({ render: 'assigned', module: 'bible' }))
+      startPalcoBridge()
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'bible-key',
+        newValue: JSON.stringify({ projecting: true, active: true, text: 'Sl 91', reference: 'Sl 91' }),
+      }))
+      await new Promise((r) => setTimeout(r, 20))
+      expect(palcoSessionMock.projectTo).toHaveBeenCalledWith('slot1', 'bible', expect.objectContaining({ text: 'Sl 91' }))
+      stopPalcoBridge()
+      ;(planForSlot as any).mockImplementation(() => ({ render: 'owner', module: null }))
+    })
+
+    it('plan assigned bible sem conteúdo: idleTo', async () => {
+      const { planForSlot } = await import('../output-plan')
+      ;(planForSlot as any).mockImplementation(() => ({ render: 'assigned', module: 'bible' }))
+      // zera runtime persistido do teste anterior
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'bible-key',
+        newValue: JSON.stringify({ projecting: false, active: false, text: '', reference: '' }),
+      }))
+      startPalcoBridge()
+      await new Promise((r) => setTimeout(r, 20))
+      expect(palcoSessionMock.idleTo).toHaveBeenCalledWith('slot1')
+      stopPalcoBridge()
+      ;(planForSlot as any).mockImplementation(() => ({ render: 'owner', module: null }))
+    })
+
+    it('plan assigned media com title: projeta hymns', async () => {
+      const { planForSlot } = await import('../output-plan')
+      ;(planForSlot as any).mockImplementation(() => ({ render: 'assigned', module: 'media' }))
+      vi.useFakeTimers()
+      startPalcoBridge()
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'media-key',
+        newValue: JSON.stringify({ active: true, title: 'Hino X' }),
+      }))
+      await vi.advanceTimersByTimeAsync(100)
+      expect(palcoSessionMock.projectTo).toHaveBeenCalledWith('slot1', 'hymns', expect.objectContaining({ text: 'Hino X' }))
+      stopPalcoBridge()
+      vi.useRealTimers()
+      ;(planForSlot as any).mockImplementation(() => ({ render: 'owner', module: null }))
+    })
+
+    it('mídia externa viva: owner pulado', async () => {
+      getDesktopBridgeMock.mockReturnValue({ projection: { externalAlive: vi.fn(async () => true) } })
+      vi.useFakeTimers()
+      startPalcoBridge()
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'bible-key',
+        newValue: JSON.stringify({ projecting: true, active: true, text: 'Sl 23', reference: 'Sl 23' }),
+      }))
+      await vi.advanceTimersByTimeAsync(100)
+      // owner não renderizou por cima (externalAlive true)
+      expect(palcoSessionMock.projectTo).not.toHaveBeenCalledWith('slot1', 'bible', expect.anything())
+      stopPalcoBridge()
+      vi.useRealTimers()
+      getDesktopBridgeMock.mockReturnValue(null)
+    })
+
+    it('externalAlive lança: assume sem externa e renderiza', async () => {
+      getDesktopBridgeMock.mockReturnValue({ projection: { externalAlive: vi.fn(async () => { throw new Error('main antigo') }) } })
+      vi.useFakeTimers()
+      startPalcoBridge()
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'bible-key',
+        newValue: JSON.stringify({ projecting: true, active: true, text: 'Sl 23', reference: 'Sl 23' }),
+      }))
+      await vi.advanceTimersByTimeAsync(100)
+      expect(palcoSessionMock.projectTo).toHaveBeenCalledWith('slot1', 'bible', expect.anything())
+      stopPalcoBridge()
+      vi.useRealTimers()
+      getDesktopBridgeMock.mockReturnValue(null)
+    })
+
+    it('bible slot com \n: converte em <br>', async () => {
+      vi.useFakeTimers()
+      startPalcoBridge()
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'bible-key',
+        newValue: JSON.stringify({ projecting: true, active: true, text: 'linha1\nlinha2', reference: 'Ref' }),
+      }))
+      await vi.advanceTimersByTimeAsync(100)
+      expect(palcoSessionMock.projectTo).toHaveBeenCalledWith('slot1', 'bible', expect.objectContaining({ text: 'linha1<br>linha2' }))
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+  })
+
+  it('PROBE assigned bible vazio: idleTo chamado?', async () => {
+    const { planForSlot } = await import('../output-plan')
+    ;(planForSlot as any).mockImplementation(() => ({ render: 'assigned', module: 'bible' }))
+    startPalcoBridge()
+    await new Promise((r) => setTimeout(r, 50))
+    process.stdout.write('idleTo calls: ' + JSON.stringify(palcoSessionMock.idleTo.mock.calls) + '\n')
+    process.stdout.write('slots calls: ' + palcoSessionMock.slots.mock.calls.length + '\n')
+    ;(planForSlot as any).mockImplementation(() => ({ render: 'owner', module: null }))
   })
 })
