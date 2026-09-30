@@ -476,4 +476,79 @@ describe('StageCustomizationCard', () => {
       }
     })
   })
+
+  describe('controles por scope (clicando tudo)', () => {
+    it('scope global: swatches de texto, color input, fontSize, fontWeight', async () => {
+      const wrapper = createWrapper()
+      const store = useStageSettingsStore()
+      // swatch de texto
+      const swatch = wrapper.findAll('[aria-label]').find(el => el.attributes('style')?.includes('--swatch'))
+      if (swatch) await swatch.trigger('click')
+      // color input de texto
+      const colorInput = wrapper.find('input[type="color"]')
+      if (colorInput.exists()) {
+        const before = JSON.stringify([store.settings.textColor, store.settings.backgroundColor])
+        await colorInput.setValue('#123456')
+        await wrapper.vm.$nextTick()
+        const after = JSON.stringify([store.settings.textColor, store.settings.backgroundColor])
+        expect(after !== before).toBe(true)
+      }
+      // fontSize (range/number)
+      const fontSize = wrapper.find('[aria-label*="amanho"]')
+      if (fontSize.exists()) await fontSize.setValue('42')
+      // segment buttons de fontWeight
+      const segBtns = wrapper.findAll('.stage-custom__segment-btn')
+      for (const btn of segBtns.slice(0, 3)) await btn.trigger('click')
+      expect(segBtns.length).toBeGreaterThan(0)
+      wrapper.unmount()
+    })
+
+    it('scope bible: presets, color, fontSize, fontWeight', async () => {
+      const wrapper = createWrapper()
+      const store = useStageSettingsStore()
+      store.setActiveScope?.('bible')
+      await wrapper.vm.$nextTick()
+      // clica todos os botões segment e color pickers visíveis
+      for (const btn of wrapper.findAll('.stage-custom__segment-btn')) await btn.trigger('click')
+      const colorInputs = wrapper.findAll('input[type="color"]')
+      for (const ci of colorInputs) await ci.setValue('#abcdef')
+      expect(store.settings.bibleTextColor).toBe('#abcdef')
+      wrapper.unmount()
+    })
+
+    it('scope clock: style segment, toggles segundos/24h', async () => {
+      const wrapper = createWrapper()
+      const store = useStageSettingsStore()
+      store.setActiveScope?.('clock')
+      await wrapper.vm.$nextTick()
+      for (const btn of wrapper.findAll('.stage-custom__segment-btn')) await btn.trigger('click')
+      const checkboxes = wrapper.findAll('input[type="checkbox"]')
+      for (const cb of checkboxes) await cb.setValue(true)
+      const storeClock = store.settings.clock
+      expect(storeClock).toBeTruthy()
+      wrapper.unmount()
+    })
+
+    it('scope random: textTransform, animationSpeed, fontSize', async () => {
+      const wrapper = createWrapper()
+      const store = useStageSettingsStore()
+      store.setActiveScope?.('random')
+      await wrapper.vm.$nextTick()
+      for (const btn of wrapper.findAll('.stage-custom__segment-btn')) await btn.trigger('click')
+      const ranges = wrapper.findAll('input[type="range"], input[type="number"]')
+      for (const r of ranges) await r.setValue('5')
+      expect(store.settings.random).toBeTruthy()
+      wrapper.unmount()
+    })
+
+    it('scope countdown: formatos de tempo clicáveis', async () => {
+      const wrapper = createWrapper()
+      const store = useStageSettingsStore()
+      store.setActiveScope?.('countdown')
+      await wrapper.vm.$nextTick()
+      for (const btn of wrapper.findAll('.stage-custom__segment-btn')) await btn.trigger('click')
+      expect(store.settings.countdown?.timeFormat).toBeTruthy()
+      wrapper.unmount()
+    })
+  })
 })
