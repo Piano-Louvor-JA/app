@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import DOMPurify from 'dompurify'
 import { computed } from 'vue'
 import { useUpdateChecker } from '@shared/composables/useUpdateChecker'
 
@@ -17,6 +18,10 @@ const {
 
 const canInstall = computed(() => isDownloaded.value)
 const canDownload = computed(() => !isDownloading.value && !isDownloaded.value)
+
+const safeNotes = computed(() =>
+  releaseNotes.value ? DOMPurify.sanitize(releaseNotes.value) : null,
+)
 </script>
 
 <template>
@@ -49,10 +54,10 @@ const canDownload = computed(() => !isDownloading.value && !isDownloaded.value)
           </div>
 
           <div
-            v-if="releaseNotes"
+            v-if="safeNotes"
             class="release-notes"
             data-test="release-notes"
-            v-html="releaseNotes"
+            v-html="safeNotes"
           />
           <p
             v-else
