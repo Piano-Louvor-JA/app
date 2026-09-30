@@ -687,4 +687,65 @@ describe("MediaReturnProjectionView — transições", () => {
 			w.unmount();
 		});
 	});
+
+	describe("promoção completa (gen branches)", () => {
+		it("promoção animada completa com animate e rects falsos", async () => {
+			const origAnimate = Element.prototype.animate;
+			Element.prototype.animate = function () {
+				return { finished: Promise.resolve(), cancel: vi.fn() } as unknown as Animation;
+			} as any;
+			// rects não-zeros: jsdom retorna 0 — inject via spies nos elementos
+			localStorage.setItem(MEDIA_RUNTIME_STORAGE_KEY, JSON.stringify(runtimePayload()));
+			const w = await mountView();
+			const nextEl = w.find("[class*=next]").element as HTMLElement;
+			const lyricEl = w.find("[class*=lyric]").element as HTMLElement;
+			const flyerEl = w.find("[class*=flyer]").element as HTMLElement;
+			if (nextEl && lyricEl) {
+				nextEl.getBoundingClientRect = () => ({ x: 0, y: 0, top: 10, left: 0, bottom: 40, right: 100, width: 100, height: 30, toJSON: () => ({}) } as DOMRect);
+				lyricEl.getBoundingClientRect = () => ({ x: 0, y: 0, top: 50, left: 0, bottom: 90, right: 100, width: 100, height: 40, toJSON: () => ({}) } as DOMRect);
+				if (flyerEl) flyerEl.getBoundingClientRect = () => ({ x: 0, y: 0, top: 10, left: 0, bottom: 40, right: 100, width: 100, height: 30, toJSON: () => ({}) } as DOMRect);
+				window.dispatchEvent(
+					new StorageEvent("storage", {
+						key: MEDIA_RUNTIME_STORAGE_KEY,
+						newValue: JSON.stringify(runtimePayload({
+							slideIndex: 1,
+							currentLyric: "Digno é o Cordeiro",
+							nextLyric: "Terceira frase",
+						})),
+					}),
+				);
+				await new Promise((r) => setTimeout(r, 80));
+			}
+			Element.prototype.animate = origAnimate;
+			w.unmount();
+		});
+
+		it("durante exiting: incoming divergente → snapTo (274-275)", async () => {
+			const origAnimate = Element.prototype.animate;
+			Element.prototype.animate = function () {
+				return { finished: new Promise(() => {}), cancel: vi.fn() } as unknown as Animation;
+			} as any;
+			const nextEl0 = document.querySelector("[class*=next]") as HTMLElement | null;
+			localStorage.setItem(MEDIA_RUNTIME_STORAGE_KEY, JSON.stringify(runtimePayload()));
+			const w = await mountView();
+			const nextEl = w.find("[class*=next]").element as HTMLElement;
+			const lyricEl = w.find("[class*=lyric]").element as HTMLElement;
+			nextEl.getBoundingClientRect = () => ({ x: 0, y: 0, top: 10, left: 0, bottom: 40, right: 100, width: 100, height: 30, toJSON: () => ({}) } as DOMRect);
+			lyricEl.getBoundingClientRect = () => ({ x: 0, y: 0, top: 50, left: 0, bottom: 90, right: 100, width: 100, height: 40, toJSON: () => ({}) } as DOMRect);
+			// 1ª promoção trava no flyerAnim (finished pendente) → exiting=true
+			window.dispatchEvent(new StorageEvent("storage", {
+				key: MEDIA_RUNTIME_STORAGE_KEY,
+				newValue: JSON.stringify(runtimePayload({ slideIndex: 1, currentLyric: "Primeira promo", nextLyric: "Seguinte" })),
+			}));
+			await new Promise((r) => setTimeout(r, 30));
+			// 2ª atualização com texto DIFERENTE durante exiting → snapTo (274)
+			window.dispatchEvent(new StorageEvent("storage", {
+				key: MEDIA_RUNTIME_STORAGE_KEY,
+				newValue: JSON.stringify(runtimePayload({ slideIndex: 2, currentLyric: "Texto divergente", nextLyric: "Outro" })),
+			}));
+			await new Promise((r) => setTimeout(r, 30));
+			Element.prototype.animate = origAnimate;
+			w.unmount();
+		});
+	});
 })
