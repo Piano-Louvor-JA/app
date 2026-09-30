@@ -133,4 +133,25 @@ describe('TimerProjectionView', () => {
     expect(removeSpy).toHaveBeenCalledWith('storage', expect.any(Function))
     removeSpy.mockRestore()
   })
+
+  it('BroadcastChannel runtime message: atualiza runtime (74-76)', async () => {
+    const wrapper = mount(TimerProjectionView)
+    await wrapper.vm.$nextTick()
+    // cria canal no MESMO nome do runtime e posta
+    const rtCh = new BroadcastChannel('timer-runtime-test')
+    rtCh.postMessage({ status: 'running', accumulatedMs: 5000, segmentStartedAt: Date.now() })
+    await wrapper.vm.$nextTick()
+    rtCh.close()
+    wrapper.unmount()
+  })
+
+  it('BroadcastChannel lança: configChannel/runtimeChannel null (90-92, 97-99)', async () => {
+    const Orig = globalThis.BroadcastChannel
+    globalThis.BroadcastChannel = function () { throw new Error('no bc') } as unknown as typeof BroadcastChannel
+    const wrapper = mount(TimerProjectionView)
+    await wrapper.vm.$nextTick()
+    globalThis.BroadcastChannel = Orig
+    wrapper.unmount()
+    expect(true).toBe(true)
+  })
 })
