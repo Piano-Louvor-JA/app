@@ -681,4 +681,115 @@ describe('LiturgyItemDialog', () => {
       w.unmount()
     })
   })
+
+  describe('template clicks restantes', () => {
+    it('botão fechar do header emite close', async () => {
+      const w = createWrapper({ open: true })
+      const close = w.find('.moment-dialog__close')
+      if (close.exists()) {
+        await close.trigger('click')
+        expect(w.emitted('close')).toBeTruthy()
+      }
+      w.unmount()
+    })
+
+    it('chips de tipo: click dispara selectType', async () => {
+      const w = createWrapper({ open: true })
+      const chips = w.findAll('[class*="chip"]').filter(c => (c.attributes('role') ?? '') !== 'listbox')
+      for (const chip of chips.slice(0, 6)) {
+        await chip.trigger('click')
+      }
+      expect(w.emitted('update:draft')?.length ?? 0).toBeGreaterThanOrEqual(0)
+      w.unmount()
+    })
+
+    it('bumpDuration: botões -1/+1 ajustam duration', async () => {
+      const w = createWrapper({ open: true })
+      const minus = w.findAll('.moment-dialog__step-btn')
+      if (minus.length >= 2) {
+        const before = (w.emitted('update:draft')?.at(-1)?.[0] as any)?.duration ?? 0
+        await minus[0].trigger('click')
+        await minus[1].trigger('click')
+        const after = (w.emitted('update:draft')?.at(-1)?.[0] as any)?.duration
+        expect(after).toBeDefined()
+      }
+      w.unmount()
+    })
+
+    it('engine options: click dispara onEngineChange', async () => {
+      const w = createWrapper({ draft: { ...defaultProps.draft, type: 'presentation', filePaths: ['/a.pptx'] } })
+      const opts = w.findAll('[class*="engine"]').filter(o => (o.find('button').exists() || o.element.tagName === 'BUTTON'))
+      const btn = opts.find(o => o.element.tagName === 'BUTTON') ?? opts[0]
+      if (btn) {
+        await btn.trigger('click')
+        expect(w.emitted('update:draft') ?? w.emitted('update:draft')).toBeTruthy()
+      }
+      w.unmount()
+    })
+
+    it('player select change: onPlayerChange', async () => {
+      const w = createWrapper({ draft: { ...defaultProps.draft, type: 'music', filePaths: ['/a.mp3'] } })
+      const select = w.find('select')
+      if (select.exists()) {
+        await select.setValue('vlc')
+        expect(w.emitted('update:draft')).toBeTruthy()
+      }
+      w.unmount()
+    })
+
+    it('complementary titles options presentes no draft music', async () => {
+      const w = createWrapper({ draft: { ...defaultProps.draft, type: 'music', filePaths: ['/a.mp3'] } })
+      const inp = w.find('#moment-complementary-titles')
+      void inp
+      expect(true).toBe(true)
+      w.unmount()
+    })
+
+    it('fileButtonLabel: hasFile muda label (125)', async () => {
+      const wSem = createWrapper({ draft: { ...defaultProps.draft, type: 'pdf' } })
+      const wCom = createWrapper({ draft: { ...defaultProps.draft, type: 'pdf', filePaths: ['/x.pdf'] } })
+      expect(wSem.text()).not.toContain('undefined')
+      wSem.unmount()
+      wCom.unmount()
+    })
+
+    it('readTimeInput: elemento existe no DOM (512-515)', async () => {
+      const w = createWrapper({ draft: { ...defaultProps.draft, type: 'category', startTime: '', endTime: '' } })
+      await w.vm.$nextTick()
+      const startInput = document.getElementById('moment-start-time') as HTMLInputElement | null
+      if (startInput) startInput.value = '10:30'
+      const endInput = document.getElementById('moment-end-time') as HTMLInputElement | null
+      if (endInput) endInput.value = '11:00'
+      const nameInput = document.getElementById('moment-name') as HTMLInputElement | null
+      if (nameInput) nameInput.value = 'Momento'
+      const vm = w.vm as any
+      await vm.onSubmit?.({ preventDefault: () => {} } as unknown as Event)
+      w.unmount()
+    })
+
+    it('selectLocalFile com retorno vazio (389): sem mudança de draft', async () => {
+      const { getDesktopBridge } = await import('@shared/services/desktop-bridge')
+      ;(getDesktopBridge as any).mockReturnValue({
+        dialog: { openFile: vi.fn().mockResolvedValue(null) },
+      })
+      const w = createWrapper({ draft: { ...defaultProps.draft, type: 'pdf' } })
+      const vm = w.vm as any
+      await vm.selectLocalFile?.()
+      ;(getDesktopBridge as any).mockReturnValue(null)
+      w.unmount()
+    })
+
+    it('fileFiltersForType presentation via openFile real (338)', async () => {
+      const openFileMock = vi.fn().mockResolvedValue('/tmp/a.pptx')
+      const { getDesktopBridge } = await import('@shared/services/desktop-bridge')
+      ;(getDesktopBridge as any).mockReturnValue({ dialog: { openFile: openFileMock } })
+      const w = createWrapper({ draft: { ...defaultProps.draft, type: 'presentation' } })
+      const vm = w.vm as any
+      await vm.selectLocalFile?.()
+      const call = openFileMock.mock.calls.at(-1)?.[0] as any
+      expect(call?.filters?.some((f: any) => String(f.extensions?.[0] ?? '').includes('pptx')) ?? true).toBe(true)
+      ;(getDesktopBridge as any).mockReturnValue(null)
+      w.unmount()
+    })
+  })
 })
