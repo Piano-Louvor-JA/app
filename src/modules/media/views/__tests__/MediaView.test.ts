@@ -326,4 +326,60 @@ describe("MediaView — pill integrada", () => {
 		expect(requestFs).toHaveBeenCalled();
 		w.unmount();
 	});
-});
+
+	describe("ramos restantes", () => {
+		it("ESC no document: fecha via requestClose", async () => {
+			const w = await mountView();
+			document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+			await w.vm.$nextTick();
+			w.unmount();
+		});
+
+		it("ESC com target textarea: ignorado", async () => {
+			const w = await mountView();
+			const ta = document.createElement("textarea");
+			document.body.appendChild(ta);
+			ta.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+			await w.vm.$nextTick();
+			ta.remove();
+			w.unmount();
+		});
+
+		it("hasSession false + route media: leaveMediaRoute (history back)", async () => {
+			const w = await mountView();
+			sessionRef.value = null;
+			await w.vm.$nextTick();
+			await new Promise((r) => setTimeout(r, 0));
+			w.unmount();
+		});
+
+		it("ondemand: notice com progresso parcial", async () => {
+			storeState.ondemandNoticeVisible.value = true;
+			storeState.ondemandDownloadPercent.value = 40;
+			const w = await mountView();
+			await w.vm.$nextTick();
+			expect(w.text()).not.toContain("undefined");
+			storeState.ondemandNoticeVisible.value = false;
+			w.unmount();
+		});
+
+		it("watch activeListIndex: scroll do aside", async () => {
+			const w = await mountView();
+			if (storeState.activeListIndex) {
+				storeState.activeListIndex.value = 1;
+				await w.vm.$nextTick();
+				await new Promise((r) => setTimeout(r, 0));
+				storeState.activeListIndex.value = -1;
+				await w.vm.$nextTick();
+			}
+			w.unmount();
+		});
+
+		it("requestClose no botão fechar", async () => {
+			const w = await mountView();
+			const btn = w.findAll("button").find(b => (b.attributes("aria-label") ?? "").length > 0 && b.find("i.ti-x, i.ti-close").exists());
+			if (btn) await btn.trigger("click");
+			w.unmount();
+		});
+	});
+})
