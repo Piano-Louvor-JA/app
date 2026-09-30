@@ -558,4 +558,35 @@ describe('MusicTrackActions', () => {
       wrapper.unmount()
     })
   })
-})
+
+    it('onProgress com cancelRequested: pula aplicação (135) e shouldAbort (139)', async () => {
+      let captured: { onProgress?: (p: number) => void; shouldAbort?: () => boolean } | null = null
+      mockDownloadTrackMedia.mockImplementationOnce((_id, opts) => {
+        captured = opts
+        return new Promise((resolve) => setTimeout(() => resolve({ status: 'downloaded' }), 20))
+      })
+      const wrapper = mount(MusicTrackActions, {
+        props: { ...defaultProps, musicId: 55 },
+        global: { plugins: [i18n] },
+      })
+      await flushPromises()
+      await wrapper.find('.ti-download').trigger('click')
+      await flushPromises()
+      wrapper.vm.cancelRequested = true
+      captured!.onProgress?.(80)
+      await wrapper.vm.$nextTick()
+      // progresso não aplicado pois cancelRequested
+      expect(wrapper.vm.downloadProgress).toBe(0)
+      expect(captured!.shouldAbort?.()).toBe(true)
+      await flushPromises()
+    })
+
+    it('lyric button: SHOW_LYRIC_ACTION false → não renderiza (234)', async () => {
+      const wrapper = mount(MusicTrackActions, {
+        props: defaultProps,
+        global: { plugins: [i18n] },
+      })
+      const lyricBtn = wrapper.findAll('button').find(b => b.attributes('aria-label') === 'Letra')
+      expect(lyricBtn).toBeUndefined()
+    })
+  })
