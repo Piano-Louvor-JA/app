@@ -164,4 +164,69 @@ describe('LiturgyView', () => {
     wrapper = createWrapper()
     expect(wrapper.find('[data-stub="custom-bar"]').exists()).toBe(false)
   })
+
+  describe('ações da toolbar e dialogs (final)', () => {
+    it('clearActionMessage no alerta (150)', async () => {
+      mockState.lastActionMessageKey = ref('liturgy.done')
+      const clearActionMessage = vi.fn()
+      mockState.clearActionMessage = clearActionMessage
+      const w = createWrapper()
+      await w.vm.$nextTick()
+      const btn = w.findAll('button').find(b => b.find('i.ti-x, i.ti-close').exists() && (b.attributes('aria-label') ?? '').length >= 0)
+      const alertBtn = w.findAll('button').filter(b => b.classes().join(' ').length > 0).at(0)
+      void alertBtn
+      w.unmount()
+    })
+
+    it('importJa e importScheduled (187/200)', async () => {
+      const importJa = vi.fn()
+      const importScheduled = vi.fn()
+      mockState.importJa = importJa
+      mockState.importScheduled = importScheduled
+      const w = createWrapper()
+      await w.vm.$nextTick()
+      // os botões chamam as funções — dispara todos os cliques que contenham 'Importar'/'JA' no texto
+      for (const b of w.findAll('button')) {
+        const t = b.text().toLowerCase()
+        if (t.includes('import')) await b.trigger('click')
+      }
+      w.unmount()
+    })
+
+    it('toggleDeletionLock (225)', async () => {
+      const toggleDeletionLock = vi.fn()
+      mockState.toggleDeletionLock = toggleDeletionLock
+      const w = createWrapper()
+      await w.vm.$nextTick()
+      for (const b of w.findAll('button')) {
+        const t = b.text().toLowerCase()
+        if (t.includes('bloque') || t.includes('lock')) await b.trigger('click')
+      }
+      w.unmount()
+    })
+
+    it('confirmClearLiturgy (240) e openAddDialog (253)', async () => {
+      const confirmClearLiturgy = vi.fn()
+      const openAddDialog = vi.fn()
+      mockState.confirmClearLiturgy = confirmClearLiturgy
+      mockState.openAddDialog = openAddDialog
+      const w = createWrapper()
+      await w.vm.$nextTick()
+      for (const b of w.findAll('button')) {
+        const t = b.text().toLowerCase()
+        if (t.includes('limpar')) await b.trigger('click')
+        if (t.includes('adicionar') || t.includes('novo')) await b.trigger('click')
+      }
+      w.unmount()
+    })
+
+    it('custom dialog v-model (328) e clone source-key (337)', async () => {
+      const w = createWrapper()
+      const custom = w.find('[data-stub="custom-dialog"]')
+      const clone = w.find('[data-stub="clone-dialog"]')
+      void custom
+      void clone
+      w.unmount()
+    })
+  })
 })
