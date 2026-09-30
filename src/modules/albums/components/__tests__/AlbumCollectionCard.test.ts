@@ -123,4 +123,16 @@ describe('AlbumCollectionCard', () => {
     const wrapper = createWrapper({ showDownloadControls: false })
     expect(wrapper.find('.album-collection-card').classes()).not.toContain('album-collection-card--pending')
   })
+
+  describe('onRemove guard (canRemove)', () => {
+    it('canRemove false: remove não emite', async () => {
+      const w = createWrapper({ canRemove: false })
+      const btn = w.findAll('button').find(b => b.find('i.ti-trash').exists())
+      if (btn) {
+        await btn.trigger('click')
+        expect(w.emitted('remove')).toBeFalsy()
+      }
+      w.unmount()
+    })
+  })
 })

@@ -105,4 +105,27 @@ describe('UpdateDialog.vue', () => {
     await flushPromises()
     expect(updateState.downloadUpdate).toHaveBeenCalled()
   })
+
+  describe('fechamentos via model=false (36/102)', () => {
+    it('close-dialog e later-btn atualizam model', async () => {
+      document.body.innerHTML = ''
+      const updates: unknown[] = []
+      const w = mount(UpdateDialog, {
+        attachTo: document.body,
+        props: { modelValue: true, 'onUpdate:modelValue': (v: boolean) => updates.push(v) },
+      })
+      await w.vm.$nextTick()
+      const close = document.querySelector('[data-test="close-dialog"]') as HTMLElement
+      expect(close).not.toBeNull()
+      close.click()
+      await w.vm.$nextTick()
+      const later = document.querySelector('[data-test="later-btn"]') as HTMLElement
+      expect(later).not.toBeNull()
+      later.click()
+      await w.vm.$nextTick()
+      expect(updates.filter(v => v === false).length).toBeGreaterThanOrEqual(2)
+      w.unmount()
+      document.body.innerHTML = ''
+    })
+  })
 })

@@ -10,6 +10,7 @@ const pointerMocks = {
   onPointerMove: vi.fn(),
   onPointerUp: vi.fn(),
   onPointerCancel: vi.fn(),
+  hasCustomRef: null as unknown as { value: boolean },
 }
 
 vi.mock('@design-system/index', () => ({
@@ -27,8 +28,11 @@ vi.mock('../../composables/useProjectionSettings', async () => {
   }
 })
 
+// hasCustomArrangement controlável via pointerMocks (hoisted)
+
 vi.mock('../../composables/useMonitorArrangement', async () => {
   const { ref } = await import('vue')
+  pointerMocks.hasCustomRef = ref(false)
   return {
     useMonitorArrangement: () => ({
       tiles: ref([
@@ -36,7 +40,7 @@ vi.mock('../../composables/useMonitorArrangement', async () => {
         { id: 'm2', label: 'Monitor 2', isPrimary: false, x: 110, y: 0, w: 100, h: 80 },
       ]),
       draggingId: ref<string | null>(null),
-      hasCustomArrangement: ref(false),
+      hasCustomArrangement: pointerMocks.hasCustomRef,
       ...pointerMocks,
       resetLayout: resetMock,
     }),
@@ -54,6 +58,7 @@ function createWrapper() {
 describe('MonitorArrangementCard.vue', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    if (pointerMocks.hasCustomRef) pointerMocks.hasCustomRef.value = false
   })
 
   it('renderiza tiles de monitores', () => {
@@ -93,5 +98,19 @@ describe('MonitorArrangementCard.vue', () => {
     const tile = wrapper.find('.monitor-tile')
     await tile.trigger('pointerdown')
     expect(pointerMocks.onPointerDown).toHaveBeenCalled()
+  })
+
+  describe('resetLayout (48)', () => {
+    it('hasCustomArrangement true: botão restore dispara resetLayout', async () => {
+      pointerMocks.hasCustomRef.value = true
+      const w = createWrapper()
+      await w.vm.$nextTick()
+      const btn = w.find('.monitor-arrangement__reset')
+      expect(btn.exists()).toBe(true)
+      await btn.trigger('click')
+      expect(resetMock).toHaveBeenCalled()
+      pointerMocks.hasCustomRef.value = false
+      w.unmount()
+    })
   })
 })

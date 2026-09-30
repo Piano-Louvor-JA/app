@@ -339,4 +339,24 @@ describe('AlbumHymnalCard', () => {
       expect(wrapper.vm.subtitle).toBe('Subtitle')
     })
   })
+
+  describe('status downloaded/error: remove e retry (157/170)', () => {
+    it('downloaded: botão remove emite remove', async () => {
+      const w = createWrapper({ collection: mockAlbumCollection, libraryAlbum: { ...mockLibraryAlbum, status: 'downloaded' }, showDownloadControls: true })
+      const btn = w.find('.album-hymnal-card__action--remove')
+      expect(btn.exists()).toBe(true)
+      await btn.trigger('click')
+      expect(w.emitted('remove')).toBeTruthy()
+      w.unmount()
+    })
+
+    it('error: botão retry emite download', async () => {
+      const w = createWrapper({ collection: mockAlbumCollection, libraryAlbum: { ...mockLibraryAlbum, status: 'error' }, showDownloadControls: true })
+      const btn = w.find('.album-hymnal-card__action--retry')
+      expect(btn.exists()).toBe(true)
+      await btn.trigger('click')
+      expect(w.emitted('download')).toBeTruthy()
+      w.unmount()
+    })
+  })
 })

@@ -157,4 +157,24 @@ describe("MediaPlayerControls — minimizar", () => {
 		expect(w.emitted("minimize")).toHaveLength(1);
 		w.unmount();
 	});
-});
+
+  describe('nextSlide e close (92/172)', () => {
+    it('botão nextSlide emite', async () => {
+      const { w } = mountControls()
+      const btn = w.findAll('button').find(b => b.find('i.ti-player-skip-forward').exists())
+      expect(btn).toBeTruthy()
+      await btn!.trigger('click')
+      expect(w.emitted('nextSlide')).toBeTruthy()
+      w.unmount()
+    })
+
+    it('botão close emite close', async () => {
+      const { w } = mountControls()
+      const btn = w.findAll('button').find(b => b.find('i.ti-x').exists())
+      expect(btn).toBeTruthy()
+      await btn!.trigger('click')
+      expect(w.emitted('close')).toBeTruthy()
+      w.unmount()
+    })
+  })
+})
