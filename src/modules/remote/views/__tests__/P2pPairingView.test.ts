@@ -219,8 +219,7 @@ describe('P2pPairingView', () => {
   })
 
   it('scanFrame com QR de answer: aplica answer automaticamente', async () => {
-    vi.mocked(jsQR).mockReturnValueOnce({ data: 'QR-ANSWER' } as never)
-    vi.useFakeTimers()
+    vi.mocked(jsQR).mockReturnValue({ data: 'QR-ANSWER' } as never)
     Object.defineProperty(HTMLVideoElement.prototype, 'videoWidth', { value: 4, configurable: true })
     Object.defineProperty(HTMLVideoElement.prototype, 'videoHeight', { value: 4, configurable: true })
     const fakeCtx = {
@@ -228,20 +227,28 @@ describe('P2pPairingView', () => {
       getImageData: vi.fn(() => ({ data: new Uint8ClampedArray(64), width: 4, height: 4 })),
     }
     const ctxSpy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(fakeCtx as unknown as CanvasRenderingContext2D)
+    // stub do setInterval: dispara scanFrame imediatamente, sem fake timers
+    const realSetInterval = window.setInterval
+    let scanFrameCb: (() => void) | null = null
+    vi.stubGlobal('setInterval', ((cb: () => void) => {
+      scanFrameCb = cb
+      return 1
+    }) as unknown as typeof setInterval)
     try {
       const wrapper = createWrapper()
-      const clickPromise = wrapper.find('.p2p-pairing__btn').trigger('click')
-      await vi.advanceTimersByTimeAsync(250)
-      await clickPromise
-      await vi.advanceTimersByTimeAsync(300)
+      await wrapper.find('.p2p-pairing__btn').trigger('click')
+      // startScan: setTimeout(200) interno para montar vídeo — usar timer real curto
+      await new Promise((r) => setTimeout(r, 250))
+      scanFrameCb?.()
       await flushPromises()
       expect(jsQR).toHaveBeenCalled()
       // answer do QR aplicado: acceptAnswer recebeu e log apareceu
       expect(componentHost().acceptAnswer).toHaveBeenCalledWith('QR-ANSWER')
       expect(wrapper.text()).toContain('answer ok')
     } finally {
-      vi.useRealTimers()
+      vi.stubGlobal('setInterval', realSetInterval)
       ctxSpy.mockRestore()
+      vi.mocked(jsQR).mockReset()
       delete (HTMLVideoElement.prototype as { videoWidth?: number }).videoWidth
       delete (HTMLVideoElement.prototype as { videoHeight?: number }).videoHeight
     }
