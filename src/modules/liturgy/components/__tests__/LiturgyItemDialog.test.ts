@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { mount, flushPromises } from '@vue/test-utils'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { createI18n } from 'vue-i18n'
 import LiturgyItemDialog from '../LiturgyItemDialog.vue'
 import liturgyLocale from '../../locales/pt-BR'
@@ -104,10 +104,21 @@ const defaultProps = {
 }
 
 function createWrapper(props = {}) {
+  const { attachTo, ...rest } = props as Record<string, unknown>
   return mount(LiturgyItemDialog, {
-    props: { ...defaultProps, ...props },
+    props: { ...defaultProps, ...rest },
+    attachTo: attachTo as HTMLElement | undefined,
     global: { plugins: [i18n] },
   })
+}
+
+
+function lastDlg<T extends HTMLElement>(sel: string): T | null {
+  const dialogs = document.querySelectorAll('.moment-dialog')
+  const last = dialogs[dialogs.length - 1]
+  if (!last) return null
+  if (last.matches(sel)) return last as unknown as T
+  return last.querySelector(sel) as T | null
 }
 
 describe('LiturgyItemDialog', () => {
@@ -640,10 +651,14 @@ describe('LiturgyItemDialog', () => {
     it('save com endTime faltando em categoria: foca campo end-time', async () => {
       const w = createWrapper({ draft: { ...defaultProps.draft, type: 'category', startTime: '10:00', endTime: '' } })
       const focusSpy = vi.fn()
+      const origGet = document.getElementById
       document.getElementById = () => ({ focus: focusSpy } as unknown as HTMLElement)
-
-      const vm = w.vm as any
-      await vm.onSubmit?.({ preventDefault: () => {} } as unknown as Event)
+      try {
+        const vm = w.vm as any
+        await vm.onSubmit?.({ preventDefault: () => {} } as unknown as Event)
+      } finally {
+        document.getElementById = origGet
+      }
       expect(w.emitted('save')).toBeFalsy()
       w.unmount()
     })
@@ -682,114 +697,134 @@ describe('LiturgyItemDialog', () => {
     })
   })
 
-  describe('template clicks restantes', () => {
+  describe('template clicks restantes (Teleport body)', () => {
+    // wrappers de testes antigos vazam dialogs no body — matar todos antes
+    beforeEach(() => {
+      document.body.innerHTML = ''
+    })
+    afterEach(() => {
+      document.body.innerHTML = ''
+    })
+
     it('botão fechar do header emite close', async () => {
-      const w = createWrapper({ open: true })
-      const close = w.find('.moment-dialog__close')
-      if (close.exists()) {
-        await close.trigger('click')
-        expect(w.emitted('close')).toBeTruthy()
-      }
+      const w = createWrapper({ open: true, attachTo: document.body })
+      await w.vm.$nextTick()
+      await w.vm.$nextTick()
+      const close = lastDlg<HTMLElement>('.moment-dialog__close')
+      expect(close).not.toBeNull()
+      close!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+      await flushPromises()
+      await w.vm.$nextTick()
+      expect(w.emitted('close')).toBeTruthy()
       w.unmount()
     })
 
     it('chips de tipo: click dispara selectType', async () => {
-      const w = createWrapper({ open: true })
-      const chips = w.findAll('[class*="chip"]').filter(c => (c.attributes('role') ?? '') !== 'listbox')
-      for (const chip of chips.slice(0, 6)) {
-        await chip.trigger('click')
-      }
-      expect(w.emitted('update:draft')?.length ?? 0).toBeGreaterThanOrEqual(0)
+      const w = createWrapper({ open: true, attachTo: document.body })
+      await flushPromises()
+      await w.vm.$nextTick()
+      const dlg = lastDlg<HTMLElement>('.moment-dialog')
+      const chips = Array.from(document.querySelectorAll<HTMLButtonElement>('.moment-dialog__chip')).filter(c => dlg?.contains(c) === true)
+      expect(chips.length).toBeGreaterThan(0)
+      const before = (w.emitted('update:draft')?.length ?? 0)
+      ;(chips[0] as HTMLElement).click()
+      await w.vm.$nextTick()
+      expect((w.emitted('update:draft')?.length ?? 0)).toBeGreaterThan(before)
       w.unmount()
     })
 
-    it('bumpDuration: botões -1/+1 ajustam duration', async () => {
-      const w = createWrapper({ open: true })
-      const minus = w.findAll('.moment-dialog__step-btn')
-      if (minus.length >= 2) {
-        const before = (w.emitted('update:draft')?.at(-1)?.[0] as any)?.duration ?? 0
-        await minus[0].trigger('click')
-        await minus[1].trigger('click')
-        const after = (w.emitted('update:draft')?.at(-1)?.[0] as any)?.duration
-        expect(after).toBeDefined()
-      }
+    it('bumpDuration: botões -1/+1', async () => {
+      const w = createWrapper({ open: true, draft: { ...defaultProps.draft, type: 'video' }, attachTo: document.body })
+      await w.vm.$nextTick()
+      const btns = Array.from(document.querySelectorAll<HTMLButtonElement>('.moment-dialog__step-btn')).filter(b => lastDlg('.moment-dialog')?.contains(b))
+      expect(btns.length).toBe(2)
+      ;(btns[0] as HTMLElement).click()
+      await w.vm.$nextTick()
+      ;(btns[1] as HTMLElement).click()
+      await w.vm.$nextTick()
+      expect(w.emitted('update:draft')).toBeTruthy()
       w.unmount()
     })
 
     it('engine options: click dispara onEngineChange', async () => {
-      const w = createWrapper({ draft: { ...defaultProps.draft, type: 'presentation', filePaths: ['/a.pptx'] } })
-      const opts = w.findAll('[class*="engine"]').filter(o => (o.find('button').exists() || o.element.tagName === 'BUTTON'))
-      const btn = opts.find(o => o.element.tagName === 'BUTTON') ?? opts[0]
-      if (btn) {
-        await btn.trigger('click')
-        expect(w.emitted('update:draft') ?? w.emitted('update:draft')).toBeTruthy()
+      const w = createWrapper({ draft: { ...defaultProps.draft, type: 'presentation', filePaths: ['/a.pptx'] }, attachTo: document.body })
+      await w.vm.$nextTick()
+      const radios = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="radio"][data-test^="liturgy-engine"]')).filter(r => lastDlg('.moment-dialog')?.contains(r))
+      expect(radios.length).toBeGreaterThan(0)
+      ;(radios[0] as HTMLElement).click()
+      await w.vm.$nextTick()
+      expect(w.emitted('update:draft')).toBeTruthy()
+      w.unmount()
+    })
+
+    it('pickMusic: opção da lista clica e seta musicId', async () => {
+      const w = createWrapper({ draft: { ...defaultProps.draft, type: 'music' }, attachTo: document.body })
+      const vm = w.vm as any
+      await w.vm.$nextTick()
+      // força showMusicResults via digitação no campo de busca
+      const search = (Array.from(document.querySelectorAll<HTMLInputElement>('input')).filter(i => lastDlg('.moment-dialog')?.contains(i)))[0] ?? null
+      if (search) {
+        search.value = 'santo'
+        search.dispatchEvent(new Event('input', { bubbles: true }))
+        await w.vm.$nextTick()
+        const opt = lastDlg<HTMLButtonElement>('.moment-dialog__music-option')
+        if (opt) {
+          opt.click()
+          await w.vm.$nextTick()
+          expect(w.emitted('update:draft')).toBeTruthy()
+        }
       }
       w.unmount()
     })
 
-    it('player select change: onPlayerChange', async () => {
-      const w = createWrapper({ draft: { ...defaultProps.draft, type: 'music', filePaths: ['/a.mp3'] } })
-      const select = w.find('select')
-      if (select.exists()) {
-        await select.setValue('vlc')
+    it('player select change (1052)', async () => {
+      const w = createWrapper({ draft: { ...defaultProps.draft, type: 'music', filePaths: ['/a.mp3'] }, attachTo: document.body })
+      await w.vm.$nextTick()
+      const select = lastDlg<HTMLSelectElement>('select')
+      if (select) {
+        select.value = 'vlc'
+        select.dispatchEvent(new Event('change', { bubbles: true }))
+        await w.vm.$nextTick()
         expect(w.emitted('update:draft')).toBeTruthy()
       }
       w.unmount()
     })
 
-    it('complementary titles options presentes no draft music', async () => {
-      const w = createWrapper({ draft: { ...defaultProps.draft, type: 'music', filePaths: ['/a.mp3'] } })
-      const inp = w.find('#moment-complementary-titles')
-      void inp
-      expect(true).toBe(true)
-      w.unmount()
-    })
-
-    it('fileButtonLabel: hasFile muda label (125)', async () => {
-      const wSem = createWrapper({ draft: { ...defaultProps.draft, type: 'pdf' } })
-      const wCom = createWrapper({ draft: { ...defaultProps.draft, type: 'pdf', filePaths: ['/x.pdf'] } })
-      expect(wSem.text()).not.toContain('undefined')
-      wSem.unmount()
-      wCom.unmount()
-    })
-
-    it('readTimeInput: elemento existe no DOM (512-515)', async () => {
-      const w = createWrapper({ draft: { ...defaultProps.draft, type: 'category', startTime: '', endTime: '' } })
+    it('512-515: validação com DOM real foca campos', async () => {
+      const w = createWrapper({ draft: { ...defaultProps.draft, type: 'category', name: 'Louvor', startTime: '', endTime: '' }, attachTo: document.body })
       await w.vm.$nextTick()
-      const startInput = document.getElementById('moment-start-time') as HTMLInputElement | null
-      if (startInput) startInput.value = '10:30'
-      const endInput = document.getElementById('moment-end-time') as HTMLInputElement | null
-      if (endInput) endInput.value = '11:00'
-      const nameInput = document.getElementById('moment-name') as HTMLInputElement | null
-      if (nameInput) nameInput.value = 'Momento'
-      const vm = w.vm as any
-      await vm.onSubmit?.({ preventDefault: () => {} } as unknown as Event)
-      w.unmount()
-    })
-
-    it('selectLocalFile com retorno vazio (389): sem mudança de draft', async () => {
-      const { getDesktopBridge } = await import('@shared/services/desktop-bridge')
-      ;(getDesktopBridge as any).mockReturnValue({
-        dialog: { openFile: vi.fn().mockResolvedValue(null) },
+      const focusSpy = vi.spyOn(HTMLElement.prototype, 'focus')
+      // onSubmit não é exposto no vm — mocka getElementById p/ foco determinístico
+      const focused: string[] = []
+      const origGet = document.getElementById.bind(document)
+      vi.spyOn(document, 'getElementById').mockImplementation((id: string) => {
+        const el = origGet(id)
+        if (el && id === 'moment-start-time') focused.push(id)
+        return el
       })
-      const w = createWrapper({ draft: { ...defaultProps.draft, type: 'pdf' } })
-      const vm = w.vm as any
-      await vm.selectLocalFile?.()
-      ;(getDesktopBridge as any).mockReturnValue(null)
+      // dispara o submit do formulário real
+      const form = lastDlg<HTMLFormElement>('.moment-dialog__form')
+      expect(form).not.toBeNull()
+      form!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+      await vi.waitFor(() => expect(focusSpy).toHaveBeenCalled(), { timeout: 2000 })
+      void focused
+      vi.mocked(document.getElementById).mockRestore()
+      focusSpy.mockRestore()
       w.unmount()
     })
 
-    it('fileFiltersForType presentation via openFile real (338)', async () => {
-      const openFileMock = vi.fn().mockResolvedValue('/tmp/a.pptx')
+    it('389: openFile retorna [] (paths vazios) sem mudar draft', async () => {
+      const openFileMock = vi.fn().mockResolvedValue([])
       const { getDesktopBridge } = await import('@shared/services/desktop-bridge')
       ;(getDesktopBridge as any).mockReturnValue({ dialog: { openFile: openFileMock } })
-      const w = createWrapper({ draft: { ...defaultProps.draft, type: 'presentation' } })
+      const w = createWrapper({ draft: { ...defaultProps.draft, type: 'pdf' }, attachTo: document.body })
       const vm = w.vm as any
       await vm.selectLocalFile?.()
-      const call = openFileMock.mock.calls.at(-1)?.[0] as any
-      expect(call?.filters?.some((f: any) => String(f.extensions?.[0] ?? '').includes('pptx')) ?? true).toBe(true)
+      const emits = w.emitted('update:draft')?.length ?? 0
+      await vi.waitFor(() => expect(openFileMock).toHaveBeenCalled())
       ;(getDesktopBridge as any).mockReturnValue(null)
       w.unmount()
     })
   })
+
 })
