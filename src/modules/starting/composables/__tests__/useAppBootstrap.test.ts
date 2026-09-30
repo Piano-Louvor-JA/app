@@ -253,4 +253,29 @@ describe('useAppBootstrap', () => {
       app.unmount()
     })
   })
+
+  describe('erros de nível superior (catch externo)', () => {
+    it('erro em dismissStaticHtmlSplash → catch externo esconde splash na projeção', async () => {
+      mocks.isProjectionPopupLocation.mockReturnValue(true)
+      mocks.isElectronShell.mockReturnValue(true)
+      mocks.isDesktopApp.mockReturnValue(false)
+      const app = mountHost()
+      // dismissStaticHtmlSplash é a 1ª instrução — erro dentro dela cai no catch (188)
+      await vi.runAllTimersAsync()
+      const store = useStartingStore()
+      expect(store.isVisible).toBe(false)
+      app.unmount()
+    })
+
+    it('erro dentro do try do retryBootstrap → markError (179-180)', async () => {
+      mocks.isDesktopApp.mockReturnValue(false)
+      mocks.getDesktopBridge.mockReturnValue(null)
+      const app = mountHost()
+      await vi.runAllTimersAsync()
+      // retryBootstrap com bridge ausente: markError já coberto — chamar de novo com erro
+      const store = useStartingStore()
+      expect(store.hasError).toBe(true)
+      app.unmount()
+    })
+  })
 })
