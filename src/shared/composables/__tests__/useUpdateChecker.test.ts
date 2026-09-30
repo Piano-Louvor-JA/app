@@ -57,6 +57,22 @@ describe('useUpdateChecker', () => {
       expect(dismissed.value).toBe(true)
       expect(sessionStorage.getItem('update-dismissed')).toBe('true')
     })
+
+    it('dismiss não falha sem sessionStorage (branch typeof)', () => {
+      const original = Object.getOwnPropertyDescriptor(window, 'sessionStorage')
+      Object.defineProperty(window, 'sessionStorage', {
+        configurable: true,
+        get: () => undefined,
+      })
+      try {
+        const { dismissed, dismiss } = useUpdateChecker()
+        dismiss()
+        expect(dismissed.value).toBe(true)
+      } finally {
+        if (original) Object.defineProperty(window, 'sessionStorage', original)
+      }
+      expect(sessionStorage.getItem('update-dismissed')).toBeNull()
+    })
   })
 
   describe('checkForUpdates', () => {
