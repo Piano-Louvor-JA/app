@@ -131,4 +131,145 @@ describe('LiturgyTimeline', () => {
   })
 
   // computed helpers testados indiretamente via LiturgyItemDialog.test.ts
+
+  describe('funções internas restantes', () => {
+    function mkItem(partial: Record<string, unknown>): LiturgyItem {
+      return {
+        id: 'x',
+        type: 'music',
+        name: 'Item',
+        subtitle: '',
+        done: false,
+        durationMs: 0,
+        accentColor: '#fff',
+        categoryId: null,
+        startTime: null,
+        endTime: null,
+        ...partial,
+      } as LiturgyItem
+    }
+
+    it('musicHasInstrumental: só music com id e flag', () => {
+      const wrapper = createWrapper({
+        items: [mkItem({ id: 'm', type: 'music', musicId: 5 })],
+        musicInstrumentalById: { 5: true },
+      })
+      expect((wrapper.vm as any).musicHasInstrumental(wrapper.props().items[0])).toBe(true)
+      expect((wrapper.vm as any).musicHasInstrumental(mkItem({ id: 'v', type: 'verse' }))).toBe(false)
+      expect((wrapper.vm as any).musicHasInstrumental(mkItem({ id: 'm2', type: 'music', musicId: null }))).toBe(false)
+    })
+
+    it('isMusicBusy: musicId bate com busyMusicId', () => {
+      const wrapper = createWrapper({
+        items: [mkItem({ id: 'm', type: 'music', musicId: 7 })],
+        busyMusicId: 7,
+      })
+      expect((wrapper.vm as any).isMusicBusy(wrapper.props().items[0])).toBe(true)
+      expect((wrapper.vm as any).isMusicBusy(mkItem({ id: 'm2', type: 'music', musicId: 8 }))).toBe(false)
+    })
+
+    it('collapse/expand categoria', () => {
+      const wrapper = createWrapper({
+        items: [
+          mkItem({ id: 'c1', type: 'category' }),
+          mkItem({ id: 'a', type: 'music', categoryId: 'c1' }),
+        ],
+      })
+      expect((wrapper.vm as any).isCategoryCollapsed('c1')).toBe(false)
+      ;(wrapper.vm as any).toggleCategoryCollapse('c1')
+      expect((wrapper.vm as any).isCategoryCollapsed('c1')).toBe(true)
+      ;(wrapper.vm as any).toggleCategoryCollapse('c1')
+      expect((wrapper.vm as any).isCategoryCollapsed('c1')).toBe(false)
+    })
+
+    it('drag/drop: reorder emitido e resetado', () => {
+      const wrapper = createWrapper({ items: [mkItem({ id: 'a', type: 'music' })] })
+      ;(wrapper.vm as any).onDragStart(0)
+      ;(wrapper.vm as any).onDrop(1)
+      expect(wrapper.emitted('reorder')![0]).toEqual([0, 1])
+      // sem dragFrom, drop ignorado
+      ;(wrapper.vm as any).onDrop(2)
+      expect(wrapper.emitted('reorder')!.length).toBe(1)
+      ;(wrapper.vm as any).onDragStart(0)
+      ;(wrapper.vm as any).onDragEnd()
+      ;(wrapper.vm as any).onDrop(1)
+      expect(wrapper.emitted('reorder')!.length).toBe(1)
+    })
+
+    it('isDragBlockIndex: item simples e categoria com filhos', () => {
+      const items = [
+        mkItem({ id: 'c1', type: 'category' }),
+        mkItem({ id: 'a', type: 'music', categoryId: 'c1' }),
+        mkItem({ id: 'b', type: 'verse' }),
+      ]
+      const wrapper = createWrapper({ items })
+      ;(wrapper.vm as any).onDragStart(0)
+      expect((wrapper.vm as any).isDragBlockIndex(0)).toBe(true)
+      expect((wrapper.vm as any).isDragBlockIndex(1)).toBe(true)
+      expect((wrapper.vm as any).isDragBlockIndex(2)).toBe(false)
+      ;(wrapper.vm as any).onDragEnd()
+      expect((wrapper.vm as any).isDragBlockIndex(0)).toBe(false)
+    })
+
+    it('isCategoryIndeterminate: parcialmente done', () => {
+      const items = [
+        mkItem({ id: 'c1', type: 'category' }),
+        mkItem({ id: 'a', type: 'music', categoryId: 'c1', done: true }),
+        mkItem({ id: 'b', type: 'verse', categoryId: 'c1', done: false }),
+      ]
+      const wrapper = createWrapper({ items })
+      expect((wrapper.vm as any).isCategoryIndeterminate('c1')).toBe(true)
+    })
+
+    it('isCategoryIndeterminate: todas done ou nenhuma → false', () => {
+      const items = [
+        mkItem({ id: 'c1', type: 'category' }),
+        mkItem({ id: 'a', type: 'music', categoryId: 'c1', done: true }),
+        mkItem({ id: 'b', type: 'verse', categoryId: 'c1', done: true }),
+      ]
+      const wrapper = createWrapper({ items })
+      expect((wrapper.vm as any).isCategoryIndeterminate('c1')).toBe(false)
+    })
+
+    it('arePreviousCategoriesDone: encadeia categorias', () => {
+      const items = [
+        mkItem({ id: 'c1', type: 'category', done: true }),
+        mkItem({ id: 'c2', type: 'category', done: false }),
+        mkItem({ id: 'c3', type: 'category' }),
+      ]
+      const wrapper = createWrapper({ items })
+      expect((wrapper.vm as any).arePreviousCategoriesDone('c2')).toBe(true)
+      expect((wrapper.vm as any).arePreviousCategoriesDone('c3')).toBe(false)
+    })
+
+    it('isCategorySectionWaiting: anterior incompleta → aguardando', () => {
+      const items = [
+        mkItem({ id: 'c1', type: 'category', done: false }),
+        mkItem({ id: 'c2', type: 'category' }),
+        mkItem({ id: 'b', type: 'verse', categoryId: 'c2' }),
+      ]
+      const wrapper = createWrapper({ items })
+      expect((wrapper.vm as any).isCategorySectionWaiting('c2')).toBe(true)
+      expect((wrapper.vm as any).isCategorySectionWaiting('c1')).toBe(false)
+    })
+
+    it('isCategorySectionInProgress: anteriores ok e filhos incompletos', () => {
+      const items = [
+        mkItem({ id: 'c1', type: 'category', done: true }),
+        mkItem({ id: 'c2', type: 'category' }),
+        mkItem({ id: 'a', type: 'music', categoryId: 'c2', done: false }),
+      ]
+      const wrapper = createWrapper({ items })
+      expect((wrapper.vm as any).isCategorySectionInProgress('c2')).toBe(true)
+    })
+
+    it('isCategorySectionInProgress: sem filhos → true (categoria vazia atual)', () => {
+      const items = [
+        mkItem({ id: 'c1', type: 'category', done: true }),
+        mkItem({ id: 'c2', type: 'category' }),
+      ]
+      const wrapper = createWrapper({ items })
+      expect((wrapper.vm as any).isCategorySectionInProgress('c2')).toBe(true)
+    })
+  })
 })
