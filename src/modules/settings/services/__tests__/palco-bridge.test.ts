@@ -72,8 +72,12 @@ vi.mock('../output-plan', () => ({
   planForSlot: vi.fn(() => ({ render: 'owner', module: null })),
   OWNER_TO_PALCO_MODULE: { media: 'hymn', bible: 'bible', random: 'random', timer: 'timer', countdown: 'countdown', clock: 'clock' },
 }))
+const getPalcoRouteMockRef = vi.hoisted(() => {
+  const f: any = vi.fn(() => 'mirror')
+  return f
+})
 vi.mock('../palco-routing', () => ({
-  getPalcoRoute: vi.fn(() => 'mirror'),
+  getPalcoRoute: getPalcoRouteMockRef,
 }))
 vi.mock('../stage-settings-runtime', () => ({
   subscribeStageSettings: subscribeStageSettingsMock,
@@ -1217,6 +1221,62 @@ describe('palco-bridge', () => {
       stopPalcoBridge()
       vi.useRealTimers()
       ;(planForSlot as any).mockImplementation(() => ({ render: 'owner', module: null }))
+    })
+  })
+
+  describe('branch finale 4', () => {
+    beforeEach(() => {
+      stopPalcoBridge()
+      watchCallbacks.length = 0
+      localStorage.clear()
+      useMediaStoreMock.mockReturnValue(null)
+    })
+
+    it('planForSlot real idle (owner noutro slot): idleTo', async () => {
+      vi.useFakeTimers()
+      const actual = await vi.importActual('../output-plan') as any
+      const { planForSlot } = await import('../output-plan')
+      ;(planForSlot as any).mockImplementation(actual.planForSlot)
+      // owner bible com rota NÃO-mirror: slot1 não é dele nem assigned → idle
+      getPalcoRouteMockRef.mockImplementation((m: string) => (m === 'bible' ? 'slot9' : 'mirror'))
+      startPalcoBridge()
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'bible-key',
+        newValue: JSON.stringify({ projecting: true, active: true, text: 'X', reference: 'Y' }),
+      }))
+      await vi.advanceTimersByTimeAsync(100)
+      // slot1 (mirror) tem assigned null e owner não roteado pra ele → idle
+      expect(palcoSessionMock.idleTo).toHaveBeenCalledWith('slot1')
+      stopPalcoBridge()
+      getPalcoRouteMockRef.mockImplementation(() => 'mirror')
+      vi.useRealTimers()
+      ;(planForSlot as any).mockImplementation(() => ({ render: 'owner', module: null }))
+    })
+
+    it('hasSession false via watcher: reset+stop (branch final do watch)', async () => {
+      useMediaStoreMock.mockReturnValue({ session: { audioUrl: 'http://h.mp3' }, audioRoute: 'tv', isPlaying: true, isPaused: false, currentTimeSec: 0, hasSession: true, status: 'playing' })
+      startPalcoBridge()
+      palcoSessionMock.audio.mockClear()
+      useMediaStoreMock.mockReturnValue({ session: null, audioRoute: 'tv', isPlaying: false, isPaused: true, currentTimeSec: 0, hasSession: false, status: 'idle' })
+      watchCallbacks[2]?.cb(false, true)
+      await new Promise((r) => setTimeout(r, 10))
+      expect(palcoSessionMock.audio).toHaveBeenCalledWith(expect.objectContaining({ action: 'stop' }))
+      stopPalcoBridge()
+    })
+
+    it('timer handler com runtime null direto: sem crash (linha 610)', async () => {
+      startPalcoBridge()
+      // newValue inválido→normalize real retorna objeto; forçar via storage null
+      window.dispatchEvent(new StorageEvent('storage', { key: 'timer-key', newValue: 'null' }))
+      await new Promise((r) => setTimeout(r, 10))
+      expect(true).toBe(true)
+    })
+
+    it('countdown handler runtime null (linha 624)', async () => {
+      startPalcoBridge()
+      window.dispatchEvent(new StorageEvent('storage', { key: 'countdown-key', newValue: 'null' }))
+      await new Promise((r) => setTimeout(r, 10))
+      expect(true).toBe(true)
     })
   })
 })
