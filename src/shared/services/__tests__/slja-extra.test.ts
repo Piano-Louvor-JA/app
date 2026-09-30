@@ -303,3 +303,4 @@ describe("slja — ramos residuais", () => {
 		await expect(parseSljaFile(fakeZip, "a.slja.zip")).rejects.toThrow();
 	});
 
+})

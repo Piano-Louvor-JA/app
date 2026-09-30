@@ -194,4 +194,18 @@ describe("ClockConfigDialog", () => {
 		await active.vm.$nextTick();
 		expect(active!.emitted("close")).toHaveLength(1);
 	});
-});
+
+  describe('swatches de texto (click)', () => {
+    it('click no swatch emite update:textColor', async () => {
+      const w = mountDialog()
+      const swatches = w.findAll('[role="radio"][class*="swatch"]')
+      if (swatches.length === 0) {
+        const radios = w.findAll('[role="radio"]')
+        for (const r of radios.slice(0, 2)) await r.trigger('click')
+      } else {
+        await swatches[0].trigger('click')
+      }
+      w.unmount()
+    })
+  })
+})

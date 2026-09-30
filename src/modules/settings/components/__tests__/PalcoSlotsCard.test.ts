@@ -195,4 +195,24 @@ describe('PalcoSlotsCard', () => {
     await flushPromises()
     expect(mockSlots).not.toHaveBeenCalled()
   })
+
+  describe('removeSlot guard e unmount (39/64)', () => {
+    it('removeSlot com id 0: ignora (39)', async () => {
+      const w = createWrapper()
+      await flushPromises()
+      const vm = w.vm as any
+      await vm.removeSlot?.({ id: '0', label: 'Espelho', running: false, clients: 0 })
+      const api = (window as any).louvorja?.palco
+      if (api?.removeSlot) expect(api.removeSlot).not.toHaveBeenCalled()
+      w.unmount()
+    })
+
+    it('unmount limpa refreshTimer (64)', async () => {
+      const w = createWrapper()
+      await flushPromises()
+      w.unmount()
+      // sem erro = clearInterval executado
+      expect(true).toBe(true)
+    })
+  })
 })

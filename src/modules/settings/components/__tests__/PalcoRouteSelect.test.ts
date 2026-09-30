@@ -102,4 +102,27 @@ describe('PalcoRouteSelect', () => {
     expect(w.find('.palco-route').exists()).toBe(true)
     w.unmount()
   })
+
+  describe('catches de API (21/24)', () => {
+    it('status() rejeita: senderOn false (21)', async () => {
+      ;(window as any).louvorja = {
+        palco: { slots: vi.fn().mockResolvedValue([]), status: vi.fn().mockRejectedValue(new Error('boom')) },
+      }
+      const w = mountSelect()
+      await flushPromises()
+      expect(w.find('.palco-route').exists()).toBe(false)
+      w.unmount()
+    })
+
+    it('slots() rejeita: segue com [] (24)', async () => {
+      ;(window as any).louvorja = {
+        palco: { slots: vi.fn().mockRejectedValue(new Error('boom')), status: vi.fn().mockResolvedValue({ running: true }) },
+        displays: { list: vi.fn().mockRejectedValue(new Error('boom')) },
+      }
+      const w = mountSelect()
+      await flushPromises()
+      expect(w.find('.palco-route').exists()).toBe(true)
+      w.unmount()
+    })
+  })
 })

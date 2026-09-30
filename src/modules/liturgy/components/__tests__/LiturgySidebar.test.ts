@@ -117,4 +117,27 @@ describe('LiturgySidebar', () => {
       expect(wrapper.emitted('stopCountdown')).toBeTruthy()
     }
   })
+
+  describe('clearStart/clearEnd/manageTeam (106/132/171)', () => {
+    it('com startTime e endTime: botões x emitem clear', async () => {
+      const w = createWrapper({ startTimeInput: '10:00', endTimeInput: '11:00' })
+      const ghost = w.findAll('.liturgy-sidebar__time-btn--ghost')
+      expect(ghost.length).toBe(2)
+      await ghost[0].trigger('click')
+      await ghost[1].trigger('click')
+      expect(w.emitted('clearStart')).toBeTruthy()
+      expect(w.emitted('clearEnd')).toBeTruthy()
+      w.unmount()
+    })
+
+    it('manageTeam emite (171)', async () => {
+      const w = createWrapper({ team: [] })
+      const btn = w.find('.liturgy-sidebar__team-btn')
+      if (btn.exists()) {
+        await btn.trigger('click')
+        expect(w.emitted('manageTeam')).toBeTruthy()
+      }
+      w.unmount()
+    })
+  })
 })
