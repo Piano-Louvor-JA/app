@@ -18,8 +18,24 @@ vi.mock('../LiturgyTimelineItem.vue', () => ({
   default: {
     name: 'LiturgyTimelineItem',
     props: ['item', 'index', 'isSelected', 'hasInstrumental', 'isBusy', 'startLabel', 'durationLabel', 'canClone', 'deletionLocked', 'siteProjectionItemId', 'videoProjectionItemId'],
-    template: '<div data-testid="timeline-item" @click="$emit(\'click\')" />',
-    emits: ['click', 'edit', 'remove', 'toggleDone', 'reorder', 'clone', 'addSubItem', 'musicSung', 'musicInstrumental', 'musicSlides', 'musicLyric', 'setPlayer', 'videoFileSelected'],
+    template: `<div data-testid="timeline-item" class="timeline-item-stub">
+      <button class="stub-emit" @click="$emit('edit')"></button>
+      <button class="stub-select" @click="$emit('click')"></button>
+      <button class="stub-remove" @click="$emit('remove')"></button>
+      <button class="stub-toggle-done" @click="$emit('toggleDone')"></button>
+      <button class="stub-add-sub" @click="$emit('addSubItem')"></button>
+      <button class="stub-music-sung" @click="$emit('musicSung')"></button>
+      <button class="stub-music-inst" @click="$emit('musicInstrumental')"></button>
+      <button class="stub-music-slides" @click="$emit('musicSlides')"></button>
+      <button class="stub-music-lyric" @click="$emit('musicLyric')"></button>
+      <button class="stub-set-player" @click="$emit('setPlayer', 'vlc')"></button>
+      <button class="stub-play-screens" @click="$emit('playScreens')"></button>
+      <button class="stub-video-file" @click="$emit('videoFileSelected', 42)"></button>
+      <button class="stub-toggle-collapse" @click="$emit('toggleCollapse')"></button>
+      <button class="stub-drag-start" @click="$emit('dragStart', 0)"></button>
+      <button class="stub-drag-end" @click="$emit('dragEnd')"></button>
+    </div>`,
+    emits: ['click', 'edit', 'remove', 'toggleDone', 'reorder', 'clone', 'addSubItem', 'musicSung', 'musicInstrumental', 'musicSlides', 'musicLyric', 'setPlayer', 'videoFileSelected', 'playScreens', 'toggleCollapse', 'dragStart', 'dragEnd'],
   },
 }))
 
@@ -133,7 +149,7 @@ describe('LiturgyTimeline', () => {
   // computed helpers testados indiretamente via LiturgyItemDialog.test.ts
 
   describe('funções internas restantes', () => {
-    function mkItem(partial: Record<string, unknown>): LiturgyItem {
+    function createItem(partial: Record<string, unknown>): LiturgyItem {
       return {
         id: 'x',
         type: 'music',
@@ -151,28 +167,28 @@ describe('LiturgyTimeline', () => {
 
     it('musicHasInstrumental: só music com id e flag', () => {
       const wrapper = createWrapper({
-        items: [mkItem({ id: 'm', type: 'music', musicId: 5 })],
+        items: [createItem({ id: 'm', type: 'music', musicId: 5 })],
         musicInstrumentalById: { 5: true },
       })
       expect((wrapper.vm as any).musicHasInstrumental(wrapper.props().items[0])).toBe(true)
-      expect((wrapper.vm as any).musicHasInstrumental(mkItem({ id: 'v', type: 'verse' }))).toBe(false)
-      expect((wrapper.vm as any).musicHasInstrumental(mkItem({ id: 'm2', type: 'music', musicId: null }))).toBe(false)
+      expect((wrapper.vm as any).musicHasInstrumental(createItem({ id: 'v', type: 'verse' }))).toBe(false)
+      expect((wrapper.vm as any).musicHasInstrumental(createItem({ id: 'm2', type: 'music', musicId: null }))).toBe(false)
     })
 
     it('isMusicBusy: musicId bate com busyMusicId', () => {
       const wrapper = createWrapper({
-        items: [mkItem({ id: 'm', type: 'music', musicId: 7 })],
+        items: [createItem({ id: 'm', type: 'music', musicId: 7 })],
         busyMusicId: 7,
       })
       expect((wrapper.vm as any).isMusicBusy(wrapper.props().items[0])).toBe(true)
-      expect((wrapper.vm as any).isMusicBusy(mkItem({ id: 'm2', type: 'music', musicId: 8 }))).toBe(false)
+      expect((wrapper.vm as any).isMusicBusy(createItem({ id: 'm2', type: 'music', musicId: 8 }))).toBe(false)
     })
 
     it('collapse/expand categoria', () => {
       const wrapper = createWrapper({
         items: [
-          mkItem({ id: 'c1', type: 'category' }),
-          mkItem({ id: 'a', type: 'music', categoryId: 'c1' }),
+          createItem({ id: 'c1', type: 'category' }),
+          createItem({ id: 'a', type: 'music', categoryId: 'c1' }),
         ],
       })
       expect((wrapper.vm as any).isCategoryCollapsed('c1')).toBe(false)
@@ -183,7 +199,7 @@ describe('LiturgyTimeline', () => {
     })
 
     it('drag/drop: reorder emitido e resetado', () => {
-      const wrapper = createWrapper({ items: [mkItem({ id: 'a', type: 'music' })] })
+      const wrapper = createWrapper({ items: [createItem({ id: 'a', type: 'music' })] })
       ;(wrapper.vm as any).onDragStart(0)
       ;(wrapper.vm as any).onDrop(1)
       expect(wrapper.emitted('reorder')![0]).toEqual([0, 1])
@@ -198,9 +214,9 @@ describe('LiturgyTimeline', () => {
 
     it('isDragBlockIndex: item simples e categoria com filhos', () => {
       const items = [
-        mkItem({ id: 'c1', type: 'category' }),
-        mkItem({ id: 'a', type: 'music', categoryId: 'c1' }),
-        mkItem({ id: 'b', type: 'verse' }),
+        createItem({ id: 'c1', type: 'category' }),
+        createItem({ id: 'a', type: 'music', categoryId: 'c1' }),
+        createItem({ id: 'b', type: 'verse' }),
       ]
       const wrapper = createWrapper({ items })
       ;(wrapper.vm as any).onDragStart(0)
@@ -213,9 +229,9 @@ describe('LiturgyTimeline', () => {
 
     it('isCategoryIndeterminate: parcialmente done', () => {
       const items = [
-        mkItem({ id: 'c1', type: 'category' }),
-        mkItem({ id: 'a', type: 'music', categoryId: 'c1', done: true }),
-        mkItem({ id: 'b', type: 'verse', categoryId: 'c1', done: false }),
+        createItem({ id: 'c1', type: 'category' }),
+        createItem({ id: 'a', type: 'music', categoryId: 'c1', done: true }),
+        createItem({ id: 'b', type: 'verse', categoryId: 'c1', done: false }),
       ]
       const wrapper = createWrapper({ items })
       expect((wrapper.vm as any).isCategoryIndeterminate('c1')).toBe(true)
@@ -223,9 +239,9 @@ describe('LiturgyTimeline', () => {
 
     it('isCategoryIndeterminate: todas done ou nenhuma → false', () => {
       const items = [
-        mkItem({ id: 'c1', type: 'category' }),
-        mkItem({ id: 'a', type: 'music', categoryId: 'c1', done: true }),
-        mkItem({ id: 'b', type: 'verse', categoryId: 'c1', done: true }),
+        createItem({ id: 'c1', type: 'category' }),
+        createItem({ id: 'a', type: 'music', categoryId: 'c1', done: true }),
+        createItem({ id: 'b', type: 'verse', categoryId: 'c1', done: true }),
       ]
       const wrapper = createWrapper({ items })
       expect((wrapper.vm as any).isCategoryIndeterminate('c1')).toBe(false)
@@ -233,9 +249,9 @@ describe('LiturgyTimeline', () => {
 
     it('arePreviousCategoriesDone: encadeia categorias', () => {
       const items = [
-        mkItem({ id: 'c1', type: 'category', done: true }),
-        mkItem({ id: 'c2', type: 'category', done: false }),
-        mkItem({ id: 'c3', type: 'category' }),
+        createItem({ id: 'c1', type: 'category', done: true }),
+        createItem({ id: 'c2', type: 'category', done: false }),
+        createItem({ id: 'c3', type: 'category' }),
       ]
       const wrapper = createWrapper({ items })
       expect((wrapper.vm as any).arePreviousCategoriesDone('c2')).toBe(true)
@@ -244,9 +260,9 @@ describe('LiturgyTimeline', () => {
 
     it('isCategorySectionWaiting: anterior incompleta → aguardando', () => {
       const items = [
-        mkItem({ id: 'c1', type: 'category', done: false }),
-        mkItem({ id: 'c2', type: 'category' }),
-        mkItem({ id: 'b', type: 'verse', categoryId: 'c2' }),
+        createItem({ id: 'c1', type: 'category', done: false }),
+        createItem({ id: 'c2', type: 'category' }),
+        createItem({ id: 'b', type: 'verse', categoryId: 'c2' }),
       ]
       const wrapper = createWrapper({ items })
       expect((wrapper.vm as any).isCategorySectionWaiting('c2')).toBe(true)
@@ -255,9 +271,9 @@ describe('LiturgyTimeline', () => {
 
     it('isCategorySectionInProgress: anteriores ok e filhos incompletos', () => {
       const items = [
-        mkItem({ id: 'c1', type: 'category', done: true }),
-        mkItem({ id: 'c2', type: 'category' }),
-        mkItem({ id: 'a', type: 'music', categoryId: 'c2', done: false }),
+        createItem({ id: 'c1', type: 'category', done: true }),
+        createItem({ id: 'c2', type: 'category' }),
+        createItem({ id: 'a', type: 'music', categoryId: 'c2', done: false }),
       ]
       const wrapper = createWrapper({ items })
       expect((wrapper.vm as any).isCategorySectionInProgress('c2')).toBe(true)
@@ -265,11 +281,58 @@ describe('LiturgyTimeline', () => {
 
     it('isCategorySectionInProgress: sem filhos → true (categoria vazia atual)', () => {
       const items = [
-        mkItem({ id: 'c1', type: 'category', done: true }),
-        mkItem({ id: 'c2', type: 'category' }),
+        createItem({ id: 'c1', type: 'category', done: true }),
+        createItem({ id: 'c2', type: 'category' }),
       ]
       const wrapper = createWrapper({ items })
       expect((wrapper.vm as any).isCategorySectionInProgress('c2')).toBe(true)
+    })
+  })
+
+  describe('emits propagados do item', () => {
+    it('edit/remove/toggleDone/musicSung etc repassados', async () => {
+      const wrapper = createWrapper({ items: [createItem({ id: 'm1', type: 'music' })] })
+      const stub = wrapper.findComponent({ name: 'LiturgyTimelineItem' })
+      for (const evt of ['edit', 'remove', 'toggleDone', 'musicSung', 'musicInstrumental', 'musicSlides', 'musicLyric', 'select', 'playScreens']) {
+        stub.vm.$emit(evt, 0)
+      }
+      stub.vm.$emit('setPlayer', 0, 'vlc')
+      stub.vm.$emit('videoFileSelected', 'm1', 42)
+      await wrapper.vm.$nextTick()
+      for (const evt of ['edit', 'remove', 'toggleDone', 'musicSung', 'musicInstrumental', 'musicSlides', 'musicLyric', 'playScreens', 'setPlayer', 'videoFileSelected']) {
+        expect(wrapper.emitted(evt), evt).toBeTruthy()
+      }
+      wrapper.unmount()
+    })
+
+    it('item de categoria com filhos: emits do child propagam', async () => {
+      const wrapper = createWrapper({
+        items: [
+          createItem({ id: 'c1', type: 'category' }),
+          createItem({ id: 'a', type: 'music', categoryId: 'c1' }),
+        ],
+        collapsible: true,
+      })
+      const stubs = wrapper.findAllComponents({ name: 'LiturgyTimelineItem' })
+      expect(stubs.length).toBeGreaterThanOrEqual(2)
+      stubs[1].vm.$emit('edit', 1)
+      stubs[1].vm.$emit('remove', 1)
+      stubs[1].vm.$emit('musicSung', 1)
+      stubs[1].vm.$emit('setPlayer', 1, 'vlc')
+      await wrapper.vm.$nextTick()
+      expect(wrapper.emitted('edit')).toBeTruthy()
+      expect(wrapper.emitted('remove')).toBeTruthy()
+      expect(wrapper.emitted('musicSung')).toBeTruthy()
+      expect(wrapper.emitted('setPlayer')).toBeTruthy()
+      wrapper.unmount()
+    })
+
+    it('dragBlockRange com índice inválido: null', async () => {
+      const wrapper = createWrapper({ items: [createItem({ id: 'a', type: 'music' })] })
+      ;(wrapper.vm as any).onDragStart(99)
+      expect((wrapper.vm as any).dragBlockRange).toBeNull()
+      ;(wrapper.vm as any).onDragEnd()
+      wrapper.unmount()
     })
   })
 })

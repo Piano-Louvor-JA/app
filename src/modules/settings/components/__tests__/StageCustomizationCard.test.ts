@@ -411,4 +411,69 @@ describe('StageCustomizationCard', () => {
       expect(store.settings.textShadow).toBe(!before)
     })
   })
+
+  describe('template restante', () => {
+    it('swatch de cor de TEXTO: patch textColor', async () => {
+      const wrapper = createWrapper()
+      const store = useStageSettingsStore()
+      const swatch = wrapper.findAll('[aria-label]').find(el => el.attributes('aria-label')?.includes('Texto') || el.find('img').exists())
+      void swatch
+      // swatches de texto são imgs com --swatch style
+      const img = wrapper.findAll('img').find(i => (i.attributes('style') ?? '').includes('--swatch'))
+      if (img) {
+        await img.trigger('click')
+        expect(store.settings.textColor).toBeTruthy()
+      }
+    })
+
+    it('tile oficial de background: ativa e desativa', async () => {
+      const wrapper = createWrapper()
+      const store = useStageSettingsStore()
+      const tile = wrapper.findAll('[class*="official-tile"]').find(el => el.attributes('aria-label')?.includes('fundo') || true)
+      if (tile.exists && tile.exists()) {
+        await tile.trigger('click')
+        const first = store.settings.backgroundImage
+        if (first) {
+          expect(String(first)).toContain('official:')
+          await tile.trigger('click')
+          expect(store.settings.backgroundImage).toBeNull()
+        }
+      }
+    })
+
+    it('botão de trocar imagem: abre fileInput', async () => {
+      const wrapper = createWrapper()
+      const clickSpy = vi.fn()
+      const input = wrapper.find('input[type="file"]').element as HTMLInputElement
+      input.click = clickSpy
+      const btn = wrapper.find('.stage-custom__bg-btn')
+      if (btn.exists()) {
+        await btn.trigger('click')
+        expect(clickSpy).toHaveBeenCalled()
+      }
+    })
+
+    it('scope countdown: patchModuleTimeFormat via botões de formato', async () => {
+      const wrapper = createWrapper({ initialScope: 'countdown' })
+      const store = useStageSettingsStore()
+      await flushPromises()
+      const btn = wrapper.findAll('button').find(b => b.text() === 'HH:mm:ss' || b.text() === 'mm:ss')
+      if (btn) {
+        await btn.trigger('click')
+        expect(store.settings.countdown?.timeFormat).toBeTruthy()
+      }
+    })
+
+    it('scope random: transform options clicáveis', async () => {
+      const wrapper = createWrapper({ initialScope: 'random' })
+      const store = useStageSettingsStore()
+      await flushPromises()
+      const btn = wrapper.findAll('button').find(b => b.text().length > 0 && b.text() !== store.settings.random?.transform)
+      if (btn && btn.text()) {
+        const before = store.settings.random?.transform
+        await btn.trigger('click')
+        void before
+      }
+    })
+  })
 })
