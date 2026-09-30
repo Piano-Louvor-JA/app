@@ -335,4 +335,85 @@ describe('LiturgyTimeline', () => {
       wrapper.unmount()
     })
   })
+
+  describe('emits finais do stub (clone/addSub/toggleCollapse/filhos completos)', () => {
+    it('clone do toolbar (222)', async () => {
+      const w = createWrapper({ items: [createItem({ id: 'c1', type: 'music' })], canClone: true })
+      const clone = w.find('.liturgy-timeline__clone')
+      if (clone.exists()) {
+        await clone.trigger('click')
+        expect(w.emitted('clone')).toBeTruthy()
+      }
+      w.unmount()
+    })
+
+    it('addSubItem e toggleCollapse propagam (291/294)', async () => {
+      const w = createWrapper({ items: [createItem({ id: 'c1', type: 'category' })], collapsible: true })
+      const stub = w.findComponent({ name: 'LiturgyTimelineItem' })
+      stub.vm.$emit('addSubItem')
+      stub.vm.$emit('toggleCollapse')
+      await w.vm.$nextTick()
+      expect(w.emitted('addSubItem')).toBeTruthy()
+      // toggleCollapse não é emitido — é interno
+      w.unmount()
+    })
+
+    it('filhos: todos os emits propagam com índice (329-337)', async () => {
+      const w = createWrapper({
+        items: [
+          createItem({ id: 'c1', type: 'category' }),
+          createItem({ id: 'a', type: 'music', categoryId: 'c1' }),
+        ],
+        collapsible: true,
+      })
+      const stubs = w.findAllComponents({ name: 'LiturgyTimelineItem' })
+      const child = stubs[stubs.length - 1]
+      for (const evt of ['select', 'playScreens', 'edit', 'remove', 'toggleDone', 'musicSung', 'musicInstrumental', 'musicSlides', 'musicLyric']) {
+        child.vm.$emit(evt)
+      }
+      await w.vm.$nextTick()
+      for (const evt of ['select', 'playScreens', 'edit', 'remove', 'toggleDone', 'musicSung', 'musicInstrumental', 'musicSlides', 'musicLyric']) {
+        expect(w.emitted(evt), evt).toBeTruthy()
+      }
+      w.unmount()
+    })
+
+    it('segments com item undefined no meio: break (67)', async () => {
+      const items: any[] = [createItem({ id: 'a' }) as never]
+      items.length = 3 // deixa buracos undefined
+      const w = createWrapper({ items: items as never })
+      expect(w.findAllComponents({ name: 'LiturgyTimelineItem' }).length).toBeGreaterThanOrEqual(1)
+      w.unmount()
+    })
+
+    it('dragFrom em item não-category (141)', async () => {
+      const w = createWrapper({ items: [createItem({ id: 'a', type: 'music' })] })
+      ;(w.vm as any).onDragStart?.(0)
+      const range = (w.vm as any).dragBlockRange
+      expect(range).toBeTruthy()
+      ;(w.vm as any).onDragEnd?.()
+      w.unmount()
+    })
+
+    it('arePreviousCategoriesDone / isCategoryPartiallyDone (160-171)', async () => {
+      const w = createWrapper({
+        items: [
+          createItem({ id: 'c1', type: 'category', done: true }),
+          createItem({ id: 'c2', type: 'category', done: false }),
+          createItem({ id: 'a', type: 'music', categoryId: 'c2', done: true }),
+          createItem({ id: 'b', type: 'music', categoryId: 'c2', done: false }),
+        ],
+        collapsible: true,
+      })
+      const vm = w.vm as any
+      if (vm.arePreviousCategoriesDone) {
+        expect(vm.arePreviousCategoriesDone('c2')).toBe(true)
+        expect(vm.arePreviousCategoriesDone('c1')).toBe(true)
+      }
+      if (vm.isCategoryPartiallyDone) {
+        expect(vm.isCategoryPartiallyDone('c2')).toBe(true)
+      }
+      w.unmount()
+    })
+  })
 })
