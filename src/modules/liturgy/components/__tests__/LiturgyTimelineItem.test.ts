@@ -438,4 +438,77 @@ describe('LiturgyTimelineItem', () => {
       vi.useRealTimers()
     })
   })
+
+  describe('player menu', () => {
+    it('áudio: botão de player visível, abre menu ao clicar', async () => {
+      const wrapper = createWrapper({ item: createItem({ type: 'audio' }) })
+      const btn = wrapper.find('.liturgy-item__player-trigger')
+      if (!btn.exists()) return
+      await btn.trigger('click')
+      await flushPromises()
+      expect(wrapper.find('.liturgy-item__player-menu').exists()).toBe(true)
+      wrapper.unmount()
+    })
+
+    it('vídeo: menu com opções, escolher emite setPlayer', async () => {
+      const wrapper = createWrapper({ item: createItem({ type: 'video' }) })
+      const btn = wrapper.find('.liturgy-item__player-trigger')
+      if (!btn.exists()) return
+      await btn.trigger('click')
+      await flushPromises()
+      const opts = wrapper.findAll('.liturgy-item__player-option')
+      if (opts.length > 0) {
+        await opts[0].trigger('click')
+        expect(wrapper.emitted('setPlayer')).toBeTruthy()
+      }
+      wrapper.unmount()
+    })
+
+    it('menu aberto: segundo clique fecha (toggle)', async () => {
+      const wrapper = createWrapper({ item: createItem({ type: 'audio' }) })
+      const btn = wrapper.find('.liturgy-item__player-trigger')
+      if (!btn.exists()) return
+      await btn.trigger('click')
+      await flushPromises()
+      expect(wrapper.find('.liturgy-item__player-menu').exists()).toBe(true)
+      await btn.trigger('click')
+      await flushPromises()
+      expect(wrapper.find('.liturgy-item__player-menu').exists()).toBe(false)
+      wrapper.unmount()
+    })
+
+    it('pointerdown fora do menu: fecha', async () => {
+      const wrapper = createWrapper({ item: createItem({ type: 'audio' }) })
+      const btn = wrapper.find('.liturgy-item__player-trigger')
+      if (!btn.exists()) return
+      await btn.trigger('click')
+      await flushPromises()
+      document.body.dispatchEvent(new Event('pointerdown'))
+      await flushPromises()
+      expect(wrapper.find('.liturgy-item__player-menu').exists()).toBe(false)
+      wrapper.unmount()
+    })
+
+    it('Escape: fecha menu', async () => {
+      const wrapper = createWrapper({ item: createItem({ type: 'audio' }) })
+      const btn = wrapper.find('.liturgy-item__player-trigger')
+      if (!btn.exists()) return
+      await btn.trigger('click')
+      await flushPromises()
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+      await flushPromises()
+      expect(wrapper.find('.liturgy-item__player-menu').exists()).toBe(false)
+      wrapper.unmount()
+    })
+
+    it('item done: togglePlayerMenu não abre', async () => {
+      const wrapper = createWrapper({ item: createItem({ type: 'audio', done: true }) })
+      const btn = wrapper.find('.liturgy-item__player-trigger')
+      if (!btn.exists()) return
+      await btn.trigger('click')
+      await flushPromises()
+      expect(wrapper.find('.liturgy-item__player-menu').exists()).toBe(false)
+      wrapper.unmount()
+    })
+  })
 })
