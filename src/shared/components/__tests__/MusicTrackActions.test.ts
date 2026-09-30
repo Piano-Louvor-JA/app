@@ -393,4 +393,105 @@ describe('MusicTrackActions', () => {
       expect(wrapper.find('button:has(.ti-volume-off)').attributes('disabled')).toBeDefined()
     })
   })
+
+  describe('ramos restantes', () => {
+    it('refreshOfflineStatus: isTrackMediaDownloaded rejeita → idle', async () => {
+      mockIsTrackMediaDownloaded.mockRejectedValueOnce(new Error('x'))
+      const wrapper = mount(MusicTrackActions, {
+        props: { ...defaultProps, musicId: 55 },
+        global: { plugins: [i18n] },
+      })
+      await flushPromises()
+      expect(wrapper.vm.offlineStatus).toBe('idle')
+    })
+
+    it('confirmRemove sem musicId: não faz nada', async () => {
+      const wrapper = mount(MusicTrackActions, {
+        props: { ...defaultProps, musicId: null },
+        global: { plugins: [i18n] },
+      })
+      await flushPromises()
+      await wrapper.vm.confirmRemove()
+      expect(mockDeleteTrackMedia).not.toHaveBeenCalled()
+    })
+
+    it('onOfflineAction sem showOfflineControls: retorna cedo', async () => {
+      mockIsDesktopApp.mockReturnValue(false)
+      const wrapper = mount(MusicTrackActions, {
+        props: defaultProps,
+        global: { plugins: [i18n] },
+      })
+      await flushPromises()
+      await wrapper.vm.onOfflineAction()
+      expect(mockDownloadTrackMedia).not.toHaveBeenCalled()
+    })
+
+    it('download result idle (cancelado pelo lado do serviço): volta idle + refresh', async () => {
+      let resolveDownload: (v: unknown) => void
+      mockDownloadTrackMedia.mockImplementation(
+        () => new Promise((resolve) => { resolveDownload = resolve }),
+      )
+      const wrapper = mount(MusicTrackActions, {
+        props: { ...defaultProps, musicId: 42 },
+        global: { plugins: [i18n] },
+      })
+      await flushPromises()
+      await wrapper.find('button:has(.ti-download)').trigger('click')
+      await flushPromises()
+      resolveDownload({ status: 'idle', reason: 'removed' })
+      await flushPromises()
+      expect(wrapper.vm.offlineStatus).toBe('idle')
+    })
+
+    it('download result erro: volta idle', async () => {
+      mockDownloadTrackMedia.mockResolvedValueOnce({ status: 'error', reason: 'io' })
+      const wrapper = mount(MusicTrackActions, {
+        props: { ...defaultProps, musicId: 42 },
+        global: { plugins: [i18n] },
+      })
+      await flushPromises()
+      await wrapper.find('button:has(.ti-download)').trigger('click')
+      await flushPromises()
+      expect(wrapper.vm.offlineStatus).toBe('idle')
+    })
+
+    it('onProgress callback do download: aplica percent', async () => {
+      let onProgressCb: ((p: number) => void) | null = null
+      mockDownloadTrackMedia.mockImplementationOnce((_id, opts) => {
+        onProgressCb = opts.onProgress
+        return new Promise((resolve) => setTimeout(() => resolve({ status: 'downloaded' }), 5))
+      })
+      const wrapper = mount(MusicTrackActions, {
+        props: { ...defaultProps, musicId: 42 },
+        global: { plugins: [i18n] },
+      })
+      await flushPromises()
+      await wrapper.find('.ti-download').trigger('click')
+      await flushPromises()
+      onProgressCb?.(60)
+      await wrapper.vm.$nextTick()
+      expect(wrapper.vm.downloadProgress).toBe(60)
+      await flushPromises()
+    })
+
+    it('variant contained: aplica classe', () => {
+      const wrapper = mount(MusicTrackActions, {
+        props: { ...defaultProps, variant: 'contained' },
+        global: { plugins: [i18n] },
+      })
+      expect(wrapper.find('.music-track-actions--contained').exists()).toBe(true)
+    })
+
+    it('allowOfflineRemove false: botão remove não aparece quando downloaded', async () => {
+      mockIsTrackMediaDownloaded.mockResolvedValue(true)
+      const wrapper = mount(MusicTrackActions, {
+        props: { ...defaultProps, musicId: 789, allowOfflineRemove: false },
+        global: { plugins: [i18n] },
+      })
+      await flushPromises()
+      expect(wrapper.find('.music-track-actions__btn--remove').exists()).toBe(false)
+      // check continua visível
+      expect(wrapper.find('.music-track-actions__check').exists()).toBe(true)
+    })
+  })
 })
