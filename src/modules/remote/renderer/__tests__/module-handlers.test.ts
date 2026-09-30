@@ -195,4 +195,132 @@ describe('createModuleHandlers — execute por namespace', () => {
     expect(handlers.snapshot('timer')).toBeTruthy()
     expect(handlers.snapshot('countdown')).toBeTruthy()
   })
+
+  describe('clock, media, palco e readField aninhado', () => {
+    function makeClock() {
+      return {
+        isProjecting: ref(false),
+        config: ref({ style: 'digital', showSeconds: true, format24h: true }),
+        setStyle: vi.fn(),
+        setShowSeconds: vi.fn(),
+        setFormat24h: vi.fn(),
+        toggleProjection: vi.fn(),
+      }
+    }
+    function makeMedia() {
+      return {
+        isProjecting: ref(false),
+        session: ref(null),
+        searchMusic: vi.fn(async () => [{ id: 1, name: 'Hino' }]),
+        openMusicPlayer: vi.fn(async () => ({ ok: true })),
+      }
+    }
+    function makePalco(): NonNullable<ModuleHandlerDeps['palco']> {
+      return {
+        status: vi.fn(async () => ({ running: true, clients: 1, url: 'http://x', wsUrl: 'ws://x' })),
+        slots: vi.fn(async () => [{ id: 's1', label: 'TV', running: true, clients: 0, httpPort: 8080, wsPort: 8081 }]),
+        createSlot: vi.fn(async () => ({ id: 's2', label: 'Nova', httpPort: 1, wsPort: 2 })),
+        removeSlot: vi.fn(async () => true),
+        startSlot: vi.fn(async () => true),
+        stopSlot: vi.fn(async () => {}),
+        turnOn: vi.fn(async () => true),
+        turnOff: vi.fn(async () => {}),
+        project: vi.fn(),
+        idle: vi.fn(),
+      }
+    }
+
+    it('clock.setConfig com style/seconds/24h válidos', async () => {
+      const clock = makeClock()
+      const h = createModuleHandlers({ clock: clock as never })
+      expect(await h.execute('clock', 'clock.setConfig', { style: 'digital', showSeconds: false, format24h: false })).toBe(true)
+      expect(clock.setStyle).toHaveBeenCalledWith('digital')
+      expect(clock.setShowSeconds).toHaveBeenCalledWith(false)
+      expect(clock.setFormat24h).toHaveBeenCalledWith(false)
+    })
+
+    it('clock.setConfig com style inválido: false', async () => {
+      const h = createModuleHandlers({ clock: makeClock() as never })
+      expect(await h.execute('clock', 'clock.setConfig', { style: 'zzz' })).toBe(false)
+    })
+
+    it('clock.setConfig sem campos: applied false', async () => {
+      const h = createModuleHandlers({ clock: makeClock() as never })
+      expect(await h.execute('clock', 'clock.setConfig', {})).toBe(false)
+    })
+
+    it('clock.toggleProjection', async () => {
+      const clock = makeClock()
+      const h = createModuleHandlers({ clock: clock as never })
+      expect(await h.execute('clock', 'clock.toggleProjection', {})).toBe(true)
+      expect(clock.toggleProjection).toHaveBeenCalled()
+    })
+
+    it('snapshot clock e random', () => {
+      const h = createModuleHandlers({ clock: makeClock() as never, random: makeRandom() as never })
+      expect(h.snapshot('clock')).toBeTruthy()
+      expect(h.snapshot('random')).toBeTruthy()
+    })
+
+    it('media.search e media.open', async () => {
+      const media = makeMedia()
+      const h = createModuleHandlers({ media: media as never })
+      expect(await h.execute('media', 'media.search', { query: 'santo' })).toBe(true)
+      expect(await h.execute('media', 'media.search', { query: 123 })).toBe(false)
+      expect(await h.execute('media', 'media.open', { musicId: 1 })).toBe(true)
+      expect(await h.execute('media', 'media.open', { musicId: 0 })).toBe(false)
+    })
+
+    it('palco: on/off/status/slots/create/remove/start/stop/project/idle', async () => {
+      const palco = makePalco()
+      const h = createModuleHandlers({ palco })
+      expect(await h.execute('palco', 'palco.on', {})).toBe(true)
+      expect(await h.execute('palco', 'palco.off', {})).toBe(true)
+      const st = await h.execute('palco', 'palco.status', {})
+      expect((st as any).ok).toBe(true)
+      const sl = await h.execute('palco', 'palco.slots', {})
+      expect((sl as any).data).toHaveLength(1)
+      expect(await h.execute('palco', 'palco.slot-add', { label: 'Nova TV' })).toBeTruthy()
+      // label vazio cai no default 'TV' — cria mesmo assim
+      expect(await h.execute('palco', 'palco.slot-add', { label: '  ' }).then(r => (r as any).ok)).toBe(true)
+      expect(await h.execute('palco', 'palco.slot-remove', { slotId: 's1' })).toBeTruthy()
+      expect(await h.execute('palco', 'palco.slot-remove', { slotId: '0' })).toBe(false)
+      expect(await h.execute('palco', 'palco.slot-start', { slotId: 's1' })).toBe(true)
+      expect(await h.execute('palco', 'palco.slot-start', { slotId: '' })).toBe(false)
+      expect(await h.execute('palco', 'palco.slot-stop', { slotId: 's1' })).toBeTruthy()
+      expect(await h.execute('palco', 'palco.project', { text: 'Olá', scope: 'hymns' })).toBe(true)
+      expect(await h.execute('palco', 'palco.project', { text: '' })).toBe(false)
+      expect(await h.execute('palco', 'palco.idle', {})).toBe(true)
+      expect(await h.execute('palco', 'palco.nope', {})).toBe(false)
+    })
+
+    it('snapshot palco: available true', () => {
+      const h = createModuleHandlers({ palco: makePalco() })
+      expect(h.snapshot('palco')).toEqual({ available: true })
+    })
+
+    it('readField aninhado: store com runtime.value aninhado', async () => {
+      // bible com books já desembrulhado e verses como objeto
+      const bible = makeBible()
+      ;(bible as any).verses = { '2': { n: 2 } }
+      const h = createModuleHandlers({ bible: bible as never })
+      expect(await h.execute('bible', 'bible.open', { bookId: 1, chapter: 2, verse: 2, versionId: 1 })).toBe(true)
+      expect(bible.selectVersion).toHaveBeenCalledWith(1)
+    })
+
+    it('readField com refs aninhadas (outer.value.inner.value)', async () => {
+      // timer com runtime já desembrulhado — cobre caminho mid==object sem value
+      const timer = makeTimer()
+      ;(timer as any).runtime = { status: 'running', accumulatedMs: 5, savedTimesMs: [1, 2] }
+      const h = createModuleHandlers({ timer: timer as never })
+      const snap = h.snapshot('timer')
+      expect(snap).toBeTruthy()
+    })
+
+    it('snapshot de namespace sem deps: null', () => {
+      const h = createModuleHandlers({})
+      expect(h.snapshot('bible')).toBeNull()
+      expect(h.snapshot('palco')).toBeNull()
+    })
+  })
 })
