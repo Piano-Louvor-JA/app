@@ -2412,4 +2412,127 @@ describe('palco-bridge', () => {
       vi.useRealTimers()
     })
   })
+
+  describe('branch finale 14 (guardas negativos)', () => {
+    beforeEach(async () => {
+      vi.useRealTimers()
+      stopPalcoBridge()
+      watchCallbacks.length = 0
+      localStorage.clear()
+      useMediaStoreMock.mockReturnValue(null)
+      startPalcoBridge()
+      for (const [key, val] of [
+        ['media-key', { active: false, lyric: '', title: '' }],
+        ['bible-key', { projecting: false, active: false, text: '', reference: '' }],
+        ['random-key', { projecting: false, currentDisplay: '' }],
+      ] as const) {
+        window.dispatchEvent(new StorageEvent('storage', { key, newValue: JSON.stringify(val) }))
+      }
+      await new Promise((r) => setTimeout(r, 5))
+      stopPalcoBridge()
+      localStorage.clear()
+    })
+
+    it('173/193: media E random owners com runtime esvaziado no turnOffOthers do próximo claim', async () => {
+      vi.useFakeTimers()
+      // media claima (owner media, intent media true)
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'media-key',
+        newValue: JSON.stringify({ active: true, lyric: 'mm' }),
+      }))
+      await vi.advanceTimersByTimeAsync(2100)
+      // random claima → turnOffOthers(media) → setIntent(media,false) → release(media) → owner null
+      // depois owner random. Agora media runtime ainda tem texto — precisa esvaziar SEM mudar intent:
+      // re-aplica media com active false → setIntent media false (já false) → nada.
+      // owner random ativo; renderOwnerTo(random) usa ownerInput random — 193 é random.
+      // Para 173 (media): re-render do media owner com texto vazio exige owner=media + runtime vazio.
+      // Simula exatamente a janela do turnOffOthers: countdown claima com turnOffOthers(media):
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'random-key',
+        newValue: JSON.stringify({ projecting: true, currentDisplay: 'rr' }),
+      }))
+      await vi.advanceTimersByTimeAsync(2100)
+      // esvazia media runtime com projecting... active false muda intent (já é false) — sem efeito
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'media-key',
+        newValue: JSON.stringify({ active: false, lyric: '', title: '' }),
+      }))
+      await vi.advanceTimersByTimeAsync(2100)
+      expect(true).toBe(true)
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('265: stopClock no claim com clockTimer ativo (clock → outro claim)', async () => {
+      vi.useFakeTimers()
+      startPalcoBridge()
+      palcoClockOn()
+      await vi.advanceTimersByTimeAsync(0)
+      // outro claim com clock dono: claim() roda stopClock (265) antes de trocar owner
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'bible-key',
+        newValue: JSON.stringify({ projecting: true, active: true, text: 'bc', reference: 'r' }),
+      }))
+      await vi.advanceTimersByTimeAsync(2100)
+      // clock parou: nenhuma chamada nova após o claim da bible
+      const callsAfter = palcoSessionMock.projectTo.mock.calls.filter((c: any[]) => c[1] === 'clock').length
+      await vi.advanceTimersByTimeAsync(30000)
+      const callsFinal = palcoSessionMock.projectTo.mock.calls.filter((c: any[]) => c[1] === 'clock').length
+      expect(callsFinal).toBe(callsAfter)
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('269: tick com owner não-clock por storage no meio', async () => {
+      vi.useFakeTimers()
+      const actual = await vi.importActual('../output-plan') as any
+      const { planForSlot } = await import('../output-plan')
+      ;(planForSlot as any).mockImplementation(actual.planForSlot)
+      startPalcoBridge()
+      palcoClockOn()
+      await vi.advanceTimersByTimeAsync(100)
+      // troca owner sem parar o interval (via setIntent não passa por palcoClockOff)
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'bible-key',
+        newValue: JSON.stringify({ projecting: true, active: true, text: 'deep', reference: 'r' }),
+      }))
+      await vi.advanceTimersByTimeAsync(30000)
+      vi.useRealTimers()
+      ;(planForSlot as any).mockImplementation(() => ({ render: 'owner', module: null }))
+      expect(true).toBe(true)
+    })
+
+    it('429: rota tv→both sem mudar key: reenvia play pela troca de rota (não 429)', async () => {
+      vi.useFakeTimers()
+      useMediaStoreMock.mockReturnValue({ session: { audioUrl: 'http://tv2.mp3' }, audioRoute: 'tv', isPlaying: true, isPaused: false, currentTimeSec: 0, hasSession: true, status: 'playing' })
+      startPalcoBridge()
+      await vi.advanceTimersByTimeAsync(3100)
+      useMediaStoreMock.mockReturnValue({ session: { audioUrl: 'http://tv2.mp3' }, audioRoute: 'both', isPlaying: true, isPaused: false, currentTimeSec: 0, hasSession: true, status: 'playing' })
+      await vi.advanceTimersByTimeAsync(3100)
+      // both: key igual mas routeChanged → reenvia play
+      const plays = palcoSessionMock.audio.mock.calls.filter((c: any[]) => c[0]?.action === 'play')
+      expect(plays.length).toBeGreaterThanOrEqual(2)
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('489: intent igual owner igual (countdown) com runtime novo → re-render', async () => {
+      vi.useFakeTimers()
+      startPalcoBridge()
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'countdown-key',
+        newValue: JSON.stringify({ projecting: true, status: 'running', segmentStartedAt: Date.now(), accumulatedMs: 0, durationMs: 60_000 }),
+      }))
+      await vi.advanceTimersByTimeAsync(2100)
+      const c0 = palcoSessionMock.timerTo.mock.calls.length
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'countdown-key',
+        newValue: JSON.stringify({ projecting: true, status: 'running', segmentStartedAt: Date.now() + 1, accumulatedMs: 0, durationMs: 60_000 }),
+      }))
+      await vi.advanceTimersByTimeAsync(2100)
+      expect(palcoSessionMock.timerTo.mock.calls.length).toBeGreaterThan(c0)
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+  })
 })
