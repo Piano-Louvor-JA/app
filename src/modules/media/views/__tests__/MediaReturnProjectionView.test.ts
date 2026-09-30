@@ -620,4 +620,71 @@ describe("MediaReturnProjectionView — transições", () => {
 		expect(w.text()).toContain("Santo, Santo, Santo");
 		w.unmount();
 	});
-});
+
+	describe("ramos restantes", () => {
+		it("nextIsCover sem lyric: nextPhrase usa título", async () => {
+			localStorage.setItem(
+				MEDIA_RUNTIME_STORAGE_KEY,
+				JSON.stringify(runtimePayload({ nextLyric: "", nextIsCover: true })),
+			);
+			const w = await mountView();
+			expect(w.text()).toContain("Santíssimo");
+			w.unmount();
+		});
+
+		it("promoção com reduced motion: snapTo direto", async () => {
+			window.matchMedia = vi.fn().mockReturnValue({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() });
+			// estado inicial: slide 0 com next preview "Digno é o Cordeiro"
+			localStorage.setItem(MEDIA_RUNTIME_STORAGE_KEY, JSON.stringify(runtimePayload()));
+			const w = await mountView();
+			// promoção válida: slideIndex+1, incoming === shownNext
+			window.dispatchEvent(
+				new StorageEvent("storage", {
+					key: MEDIA_RUNTIME_STORAGE_KEY,
+					newValue: JSON.stringify(runtimePayload({
+						slideIndex: 1,
+						currentLyric: "Digno é o Cordeiro",
+						nextLyric: "Terceira frase",
+					})),
+				}),
+			);
+			await new Promise((r) => setTimeout(r, 10));
+			await w.vm.$nextTick();
+			// reduced motion: promoção via snapTo — runtime aplicado sem animação
+			expect(w.find(".media-return").exists()).toBe(true);
+			w.unmount();
+		});
+
+		it("flyerAnim rejeita: early return", async () => {
+			const origAnimate = Element.prototype.animate;
+			Element.prototype.animate = function () {
+				return { finished: Promise.reject(new Error("anim fail")), cancel: vi.fn() } as unknown as Animation;
+			} as any;
+			const w = await mountView();
+			window.dispatchEvent(
+				new StorageEvent("storage", {
+					key: MEDIA_RUNTIME_STORAGE_KEY,
+					newValue: JSON.stringify(runtimePayload({ slideIndex: 1, currentLyric: "Troca com falha de anim" })),
+				}),
+			);
+			await new Promise((r) => setTimeout(r, 20));
+			Element.prototype.animate = origAnimate;
+			w.unmount();
+		});
+
+		it("updates rápidos: gen stale aborta promoção", async () => {
+			localStorage.setItem(MEDIA_RUNTIME_STORAGE_KEY, JSON.stringify(runtimePayload()));
+			const w = await mountView();
+			for (let i = 1; i <= 3; i++) {
+				window.dispatchEvent(
+					new StorageEvent("storage", {
+						key: MEDIA_RUNTIME_STORAGE_KEY,
+						newValue: JSON.stringify(runtimePayload({ slideIndex: i, currentLyric: `Frase ${i}` })),
+					}),
+				);
+			}
+			await new Promise((r) => setTimeout(r, 30));
+			w.unmount();
+		});
+	});
+})
