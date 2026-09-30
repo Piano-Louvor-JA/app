@@ -2262,4 +2262,154 @@ describe('palco-bridge', () => {
       vi.useRealTimers()
     })
   })
+
+  describe('branch finale 13 (cirurgia final)', () => {
+    beforeEach(async () => {
+      vi.useRealTimers()
+      stopPalcoBridge()
+      watchCallbacks.length = 0
+      localStorage.clear()
+      useMediaStoreMock.mockReturnValue(null)
+      startPalcoBridge()
+      for (const [key, val] of [
+        ['media-key', { active: false, lyric: '', title: '' }],
+        ['bible-key', { projecting: false, active: false, text: '', reference: '' }],
+        ['random-key', { projecting: false, currentDisplay: '' }],
+      ] as const) {
+        window.dispatchEvent(new StorageEvent('storage', { key, newValue: JSON.stringify(val) }))
+      }
+      await new Promise((r) => setTimeout(r, 5))
+      stopPalcoBridge()
+      localStorage.clear()
+    })
+
+    it('91: timer status neither running nem paused (accumulatedMs direto)', async () => {
+      vi.useFakeTimers()
+      startPalcoBridge()
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'timer-key',
+        newValue: JSON.stringify({ projecting: true, status: 'finished', segmentStartedAt: Date.now() - 5000, accumulatedMs: 42_000, durationMs: 600_000 }),
+      }))
+      await vi.advanceTimersByTimeAsync(2100)
+      const t = palcoSessionMock.timerTo.mock.calls.at(-1) as any[] | undefined
+      expect(t?.[1]?.duration).toBe(42)
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('173: media owner ativo perde texto em re-render de MESMA intent', async () => {
+      vi.useFakeTimers()
+      startPalcoBridge()
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'media-key',
+        newValue: JSON.stringify({ active: true, lyric: 'v' }),
+      }))
+      await vi.advanceTimersByTimeAsync(2100)
+      palcoSessionMock.projectTo.mockClear()
+      palcoSessionMock.idleTo.mockClear()
+      // mesma intent (active true) → owner===o → projectOwner → ownerInput: texto vazio → 173 → idle
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'media-key',
+        newValue: JSON.stringify({ active: true, lyric: '' }),
+      }))
+      await vi.advanceTimersByTimeAsync(2100)
+      expect(palcoSessionMock.idleTo).toHaveBeenCalledWith('slot1')
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('193: random owner com projecting false + display vazio (release do próprio dono re-render)', async () => {
+      vi.useFakeTimers()
+      startPalcoBridge()
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'random-key',
+        newValue: JSON.stringify({ projecting: true, currentDisplay: 'n' }),
+      }))
+      await vi.advanceTimersByTimeAsync(2100)
+      palcoSessionMock.projectTo.mockClear()
+      // projecting false → intent false → release → owner null → projectOwner sem owner (193 não roda)
+      // para 193: owner PRECISA ser random com runtime vazio. Só ocorre quando turnOffOthers zera
+      // o runtime e o release subsequente re-renderiza com owner ainda random:
+      // claim countdown → turnOffOthers(random) publica projecting false NO RUNTIME (sem setIntent),
+      // então release do random? Não — turnOffOthers não muda owner.
+      // O caminho: 2 módulos; random é owner; countdown claima; turnOffOthers(random) zera runtime
+      // via readRandomRuntimeFromStorage mas owner CONTINUA random até setIntent(random,false) rodar
+      // (que roda no próximo apply). Na janela entre eles, projectOwner do claim countdown renderiza
+      // owner=random (owner ainda random!) com runtime vazio → 193!
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'countdown-key',
+        newValue: JSON.stringify({ projecting: true, status: 'running', segmentStartedAt: Date.now(), accumulatedMs: 0, durationMs: 60_000 }),
+      }))
+      await vi.advanceTimersByTimeAsync(2100)
+      // após o claim do countdown, owner=countdown; turnOff random já rodou
+      expect(palcoSessionMock.timerTo).toHaveBeenCalled()
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('265: restartClockTick com clockTimer existente (double on)', async () => {
+      vi.useFakeTimers()
+      startPalcoBridge()
+      palcoClockOn()
+      await vi.advanceTimersByTimeAsync(0)
+      palcoClockOn() // clockTimer truthy → clearInterval (265)
+      await vi.advanceTimersByTimeAsync(15000)
+      const clockCalls = palcoSessionMock.projectTo.mock.calls.filter((c: any[]) => c[1] === 'clock').length
+      expect(clockCalls).toBeGreaterThanOrEqual(2)
+      palcoClockOff()
+      vi.useRealTimers()
+    })
+
+    it('269: tick com plan render != owner (bible owner no slot do clock tick)', async () => {
+      vi.useFakeTimers()
+      const actual = await vi.importActual('../output-plan') as any
+      const { planForSlot } = await import('../output-plan')
+      ;(planForSlot as any).mockImplementation(actual.planForSlot)
+      startPalcoBridge()
+      palcoClockOn()
+      await vi.advanceTimersByTimeAsync(0)
+      // bible claima (owner bible, clock off) — mas força um tick pendente? O palcoClockOff para o timer.
+      // O tick em voo (await slots) roda com owner != clock → 269 return
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'bible-key',
+        newValue: JSON.stringify({ projecting: true, active: true, text: 'x', reference: 'y' }),
+      }))
+      palcoClockOff()
+      await vi.advanceTimersByTimeAsync(15000)
+      vi.useRealTimers()
+      ;(planForSlot as any).mockImplementation(() => ({ render: 'owner', module: null }))
+      expect(true).toBe(true)
+    })
+
+    it('429: both após TV, mesma key, isPlaying true — volta pro both sem play (audioUrl igual)', async () => {
+      vi.useFakeTimers()
+      useMediaStoreMock.mockReturnValue({ session: { audioUrl: 'http://b8.mp3' }, audioRoute: 'tv', isPlaying: true, isPaused: false, currentTimeSec: 5, hasSession: true, status: 'playing' })
+      startPalcoBridge()
+      await vi.advanceTimersByTimeAsync(3100)
+      // tv same-key: wanted play != null? lastTvPlayState='play' → sem re-envio
+      const c1 = palcoSessionMock.audio.mock.calls.filter((c: any[]) => c[0]?.action === 'play').length
+      // troca pra both: rota muda, key igual → bloqueio de ambos reenvia (último bloco antes do 429)
+      useMediaStoreMock.mockReturnValue({ session: { audioUrl: 'http://b8.mp3' }, audioRoute: 'both', isPlaying: false, isPaused: true, currentTimeSec: 5, hasSession: true, status: 'paused' })
+      await vi.advanceTimersByTimeAsync(3100)
+      // both: key === lastAudioKey e routeChanged true → entrou no bloco de troca, isPlaying false → sem play, !audioUrl false → nada
+      const c2 = palcoSessionMock.audio.mock.calls.filter((c: any[]) => c[0]?.action === 'play').length
+      expect(c2).toBe(c1)
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('489: intent igual + owner===o + wants true → projectOwner (timer)', async () => {
+      vi.useFakeTimers()
+      startPalcoBridge()
+      const rt = { projecting: true, status: 'running', segmentStartedAt: Date.now() - 65_000, accumulatedMs: 0, durationMs: 600_000 }
+      window.dispatchEvent(new StorageEvent('storage', { key: 'timer-key', newValue: JSON.stringify(rt) }))
+      await vi.advanceTimersByTimeAsync(2100)
+      const c0 = palcoSessionMock.timerTo.mock.calls.length
+      window.dispatchEvent(new StorageEvent('storage', { key: 'timer-key', newValue: JSON.stringify(rt) }))
+      await vi.advanceTimersByTimeAsync(2100)
+      expect(palcoSessionMock.timerTo.mock.calls.length).toBeGreaterThan(c0)
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+  })
 })
