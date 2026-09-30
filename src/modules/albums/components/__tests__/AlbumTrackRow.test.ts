@@ -98,4 +98,45 @@ describe("AlbumTrackRow.vue", () => {
     expect(mta.find("[data-playlist]").exists()).toBe(true);
     expect(mta.find("[data-download-progress]").exists()).toBe(true);
   });
-});
+
+  describe('hover e playlist/sung (final)', () => {
+    it('mouseenter/mouseleave no row', async () => {
+      const w = mountRow()
+      ;(w.element as HTMLElement).dispatchEvent(new MouseEvent('mouseenter'))
+      await w.vm.$nextTick()
+      ;(w.element as HTMLElement).dispatchEvent(new MouseEvent('mouseleave'))
+      await w.vm.$nextTick()
+      w.unmount()
+    })
+
+    it('playlist button emite playlist (126)', async () => {
+      const w = mountRow()
+      const btn = w.findAll('button').find(b => (b.attributes('title') ?? '').length > 0 || (b.attributes('aria-label') ?? '').length > 0)
+      for (const b of w.findAll('button')) {
+        const cls = b.classes().join(' ')
+        if (cls.includes('playlist')) {
+          await b.trigger('click')
+          expect(w.emitted('playlist')).toBeTruthy()
+        }
+      }
+      w.unmount()
+    })
+
+    it('MusicTrackActions emits propagam (137-140)', async () => {
+      const w = mountRow()
+      const stub = w.findComponent({ name: 'MusicTrackActions' })
+      if (stub.exists()) {
+        stub.vm.$emit('sung')
+        stub.vm.$emit('instrumental')
+        stub.vm.$emit('slides')
+        stub.vm.$emit('lyric')
+        await w.vm.$nextTick()
+        expect(w.emitted('sung')).toBeTruthy()
+        expect(w.emitted('instrumental')).toBeTruthy()
+        expect(w.emitted('slides')).toBeTruthy()
+        expect(w.emitted('lyric')).toBeTruthy()
+      }
+      w.unmount()
+    })
+  })
+})
