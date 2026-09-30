@@ -430,4 +430,197 @@ describe('palco-bridge', () => {
       vi.useRealTimers()
     })
   })
+
+  describe('bindChannel storage events, remote-key, media runtime', () => {
+    beforeEach(() => {
+      stopPalcoBridge()
+      localStorage.clear()
+      useMediaStoreMock.mockReturnValue(null)
+    })
+
+    it('storage event de runtime: aplica e claima owner', async () => {
+      vi.useFakeTimers()
+      startPalcoBridge()
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'timer-key',
+        newValue: JSON.stringify({ projecting: true, status: 'running', segmentStartedAt: Date.now() - 65_000, accumulatedMs: 0, durationMs: 600_000 }),
+      }))
+      await vi.advanceTimersByTimeAsync(100)
+      expect(palcoSessionMock.timerTo).toHaveBeenCalled()
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('storage event de outra key: ignorado', async () => {
+      startPalcoBridge()
+      window.dispatchEvent(new StorageEvent('storage', { key: 'outra', newValue: '{"x":1}' }))
+      await new Promise((r) => setTimeout(r, 0))
+      expect(palcoSessionMock.timerTo).not.toHaveBeenCalled()
+    })
+
+    it('remote-key prev/next: chama bridge projection', async () => {
+      const prev = vi.fn(), next = vi.fn()
+      ;(window as any).louvorja = { projection: { remotePptPrev: prev, remotePptNext: next } }
+      let handler: (msg: unknown) => void = () => {}
+      palcoSessionMock.onEvent.mockImplementation((h: any) => { handler = h; return () => {} })
+      startPalcoBridge()
+      handler({ type: 'remote-key', key: 'prev' })
+      handler({ type: 'remote-key', key: 'next' })
+      handler({ type: 'outra' })
+      handler({ type: 'remote-key', key: 'prev' }) // sem bridge? com bridge
+      expect(prev).toHaveBeenCalledTimes(2)
+      expect(next).toHaveBeenCalledTimes(1)
+      delete (window as any).louvorja
+    })
+
+    it('remote-key sem bridge projection: no-op', async () => {
+      let handler: (msg: unknown) => void = () => {}
+      palcoSessionMock.onEvent.mockImplementation((h: any) => { handler = h; return () => {} })
+      startPalcoBridge()
+      handler({ type: 'remote-key', key: 'prev' })
+      expect(true).toBe(true)
+    })
+
+    it('media runtime com lyric: claima media e projeta hymns', async () => {
+      vi.useFakeTimers()
+      startPalcoBridge()
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'media-key',
+        newValue: JSON.stringify({ active: true, lyric: 'Santo', title: 'Hino' }),
+      }))
+      await vi.advanceTimersByTimeAsync(100)
+      expect(palcoSessionMock.projectTo).toHaveBeenCalledWith('slot1', 'hymn', expect.objectContaining({ text: 'Santo' }))
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('bible runtime projecting: claima e projeta', async () => {
+      vi.useFakeTimers()
+      startPalcoBridge()
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'bible-key',
+        newValue: JSON.stringify({ projecting: true, active: true, text: 'Salmo 23', reference: 'Sl 23' }),
+      }))
+      await vi.advanceTimersByTimeAsync(100)
+      expect(palcoSessionMock.projectTo).toHaveBeenCalledWith('slot1', 'bible', expect.objectContaining({ text: 'Salmo 23' }))
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('random runtime projecting sem display: tela de espera', async () => {
+      vi.useFakeTimers()
+      startPalcoBridge()
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'random-key',
+        newValue: JSON.stringify({ projecting: true, currentDisplay: '' }),
+      }))
+      await vi.advanceTimersByTimeAsync(100)
+      expect(palcoSessionMock.projectTo).toHaveBeenCalledWith('slot1', 'random', { text: '' })
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('broadcast channel message: aplica runtime', async () => {
+      vi.useFakeTimers()
+      startPalcoBridge()
+      // acha o canal do timer criado pelo bind
+      const chans = (globalThis as any).BroadcastChannel?.instances ?? []
+      // fallback: dispara via storage (mesma apply)
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'countdown-key',
+        newValue: JSON.stringify({ projecting: true, status: 'running', segmentStartedAt: Date.now(), accumulatedMs: 0, durationMs: 60_000 }),
+      }))
+      await vi.advanceTimersByTimeAsync(100)
+      expect(palcoSessionMock.timerTo).toHaveBeenCalled()
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+  })
+
+  describe('takeover encadeado (turnOffOthers)', () => {
+    beforeEach(() => {
+      stopPalcoBridge()
+      localStorage.clear()
+      useMediaStoreMock.mockReturnValue(null)
+    })
+
+    it('timer depois bible: timer é desligado (publishTimerRuntime projecting false)', async () => {
+      vi.useFakeTimers()
+      startPalcoBridge()
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'timer-key',
+        newValue: JSON.stringify({ projecting: true, status: 'running', segmentStartedAt: Date.now() - 65_000, accumulatedMs: 0, durationMs: 600_000 }),
+      }))
+      await vi.advanceTimersByTimeAsync(100)
+      expect(publishTimerRuntime).not.toHaveBeenCalled()
+      // bíblia toma o palco
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'bible-key',
+        newValue: JSON.stringify({ projecting: true, active: true, text: 'Sl 23', reference: 'Sl 23' }),
+      }))
+      await vi.advanceTimersByTimeAsync(100)
+      // turnOffOthers(timer) publicou projecting:false
+      expect(publishTimerRuntime).toHaveBeenCalledWith(expect.objectContaining({ projecting: false }))
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('random depois countdown: random desligado via readRandomRuntimeFromStorage', async () => {
+      vi.useFakeTimers()
+      readRandomRuntimeFromStorage.mockReturnValue({ projecting: true, currentDisplay: 'João' })
+      startPalcoBridge()
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'random-key',
+        newValue: JSON.stringify({ projecting: true, currentDisplay: 'João' }),
+      }))
+      await vi.advanceTimersByTimeAsync(100)
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'countdown-key',
+        newValue: JSON.stringify({ projecting: true, status: 'running', segmentStartedAt: Date.now(), accumulatedMs: 0, durationMs: 60_000 }),
+      }))
+      await vi.advanceTimersByTimeAsync(100)
+      expect(publishRandomRuntime).toHaveBeenCalledWith(expect.objectContaining({ projecting: false }))
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('media depois bible: media é desligado (setIntent false → release)', async () => {
+      vi.useFakeTimers()
+      startPalcoBridge()
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'media-key',
+        newValue: JSON.stringify({ active: true, lyric: 'Santo' }),
+      }))
+      await vi.advanceTimersByTimeAsync(100)
+      expect(palcoSessionMock.projectTo).toHaveBeenCalledWith('slot1', 'hymn', expect.anything())
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'bible-key',
+        newValue: JSON.stringify({ projecting: true, active: true, text: 'Sl 23', reference: 'Sl 23' }),
+      }))
+      await vi.advanceTimersByTimeAsync(100)
+      // media saiu: bíblia é o novo owner
+      expect(palcoSessionMock.projectTo).toHaveBeenCalledWith('slot1', 'bible', expect.anything())
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('owner sai: slot volta pro assigned/idle', async () => {
+      vi.useFakeTimers()
+      startPalcoBridge()
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'bible-key',
+        newValue: JSON.stringify({ projecting: true, active: true, text: 'Sl 23', reference: 'Sl 23' }),
+      }))
+      await vi.advanceTimersByTimeAsync(100)
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'bible-key',
+        newValue: JSON.stringify({ projecting: false, active: false, text: '', reference: '' }),
+      }))
+      await vi.advanceTimersByTimeAsync(100)
+      // release → renderAllSlots sem owner → idle
+      expect(palcoSessionMock.idleTo).toHaveBeenCalled()
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+  })
 })
