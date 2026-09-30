@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createI18n } from 'vue-i18n'
 import LiturgyTimelineItem from '../LiturgyTimelineItem.vue'
@@ -11,17 +11,21 @@ vi.mock('@shared/services/desktop-bridge', () => ({
   getDesktopBridge: vi.fn(() => null),
 }))
 
-vi.mock('../composables/useExternalPlayerChoices', () => ({
-  useExternalPlayerChoices: () => ({
-    globalPlayer: { value: 'associated' },
-    playerOptions: { value: [
-      { id: 'associated', label: 'Associado' },
-      { id: 'vlc', label: 'VLC' },
-    ] },
-    loadPlayerChoices: vi.fn(async () => {}),
-    selectedPlayerId: vi.fn((id?: string) => id ?? 'associated'),
-  }),
-}))
+vi.mock('../../composables/useExternalPlayerChoices', async () => {
+  const { ref } = await import('vue')
+  const playerOptions = ref([
+    { id: 'associated', label: 'Associado' },
+    { id: 'vlc', label: 'VLC' },
+  ])
+  return {
+    useExternalPlayerChoices: () => ({
+      globalPlayer: ref('associated'),
+      playerOptions,
+      loadPlayerChoices: vi.fn(async () => {}),
+      selectedPlayerId: vi.fn((id?: string) => id ?? 'associated'),
+    }),
+  }
+})
 
 const localVideoMocks = vi.hoisted(() => ({
   setLiturgyVideoFile: vi.fn(() => 'blob:video'),
@@ -442,72 +446,72 @@ describe('LiturgyTimelineItem', () => {
   describe('player menu', () => {
     it('áudio: botão de player visível, abre menu ao clicar', async () => {
       const wrapper = createWrapper({ item: createItem({ type: 'audio' }) })
+      
       const btn = wrapper.find('.liturgy-item__player-trigger')
-      if (!btn.exists()) return
+      expect(btn.exists()).toBe(true)
       await btn.trigger('click')
       await flushPromises()
-      expect(wrapper.find('.liturgy-item__player-menu').exists()).toBe(true)
+      // menu é teleportado pro body
+      expect(document.querySelector('.liturgy-item__player-menu')).not.toBeNull()
       wrapper.unmount()
     })
 
     it('vídeo: menu com opções, escolher emite setPlayer', async () => {
       const wrapper = createWrapper({ item: createItem({ type: 'video' }) })
       const btn = wrapper.find('.liturgy-item__player-trigger')
-      if (!btn.exists()) return
+      expect(btn.exists()).toBe(true)
       await btn.trigger('click')
       await flushPromises()
-      const opts = wrapper.findAll('.liturgy-item__player-option')
-      if (opts.length > 0) {
-        await opts[0].trigger('click')
-        expect(wrapper.emitted('setPlayer')).toBeTruthy()
-      }
+      const opts = document.querySelectorAll('.liturgy-item__player-option')
+      expect(opts.length).toBeGreaterThan(0)
+      opts[0].dispatchEvent(new Event('click', { bubbles: true }))
+      await flushPromises()
+      expect(wrapper.emitted('setPlayer')).toBeTruthy()
       wrapper.unmount()
     })
 
     it('menu aberto: segundo clique fecha (toggle)', async () => {
       const wrapper = createWrapper({ item: createItem({ type: 'audio' }) })
       const btn = wrapper.find('.liturgy-item__player-trigger')
-      if (!btn.exists()) return
+      expect(btn.exists()).toBe(true)
       await btn.trigger('click')
       await flushPromises()
-      expect(wrapper.find('.liturgy-item__player-menu').exists()).toBe(true)
+      expect(document.querySelector('.liturgy-item__player-menu')).not.toBeNull()
       await btn.trigger('click')
       await flushPromises()
-      expect(wrapper.find('.liturgy-item__player-menu').exists()).toBe(false)
+      expect(document.querySelector('.liturgy-item__player-menu')).toBeNull()
       wrapper.unmount()
     })
 
     it('pointerdown fora do menu: fecha', async () => {
       const wrapper = createWrapper({ item: createItem({ type: 'audio' }) })
       const btn = wrapper.find('.liturgy-item__player-trigger')
-      if (!btn.exists()) return
+      expect(btn.exists()).toBe(true)
       await btn.trigger('click')
       await flushPromises()
-      document.body.dispatchEvent(new Event('pointerdown'))
+      document.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))
       await flushPromises()
-      expect(wrapper.find('.liturgy-item__player-menu').exists()).toBe(false)
+      expect(document.querySelector('.liturgy-item__player-menu')).toBeNull()
       wrapper.unmount()
     })
 
     it('Escape: fecha menu', async () => {
       const wrapper = createWrapper({ item: createItem({ type: 'audio' }) })
       const btn = wrapper.find('.liturgy-item__player-trigger')
-      if (!btn.exists()) return
+      expect(btn.exists()).toBe(true)
       await btn.trigger('click')
       await flushPromises()
-      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
       await flushPromises()
-      expect(wrapper.find('.liturgy-item__player-menu').exists()).toBe(false)
+      expect(document.querySelector('.liturgy-item__player-menu')).toBeNull()
       wrapper.unmount()
     })
 
-    it('item done: togglePlayerMenu não abre', async () => {
+    it('item done: botão disabled e menu não abre', async () => {
       const wrapper = createWrapper({ item: createItem({ type: 'audio', done: true }) })
       const btn = wrapper.find('.liturgy-item__player-trigger')
-      if (!btn.exists()) return
-      await btn.trigger('click')
-      await flushPromises()
-      expect(wrapper.find('.liturgy-item__player-menu').exists()).toBe(false)
+      expect(btn.exists()).toBe(true)
+      expect((btn.element as HTMLButtonElement).disabled).toBe(true)
       wrapper.unmount()
     })
   })
