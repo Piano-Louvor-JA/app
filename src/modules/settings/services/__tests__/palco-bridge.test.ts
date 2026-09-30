@@ -1571,4 +1571,73 @@ describe('palco-bridge', () => {
       ;(planForSlot as any).mockImplementation(() => ({ render: 'owner', module: null }))
     })
   })
+
+  describe('branch finale 7', () => {
+    beforeEach(async () => {
+      stopPalcoBridge()
+      watchCallbacks.length = 0
+      localStorage.clear()
+      useMediaStoreMock.mockReturnValue(null)
+      startPalcoBridge()
+      for (const [key, val] of [
+        ['media-key', { active: false, lyric: '', title: '' }],
+        ['bible-key', { projecting: false, active: false, text: '', reference: '' }],
+        ['random-key', { projecting: false, currentDisplay: '' }],
+      ] as const) {
+        window.dispatchEvent(new StorageEvent('storage', { key, newValue: JSON.stringify(val) }))
+      }
+      await new Promise((r) => setTimeout(r, 5))
+      stopPalcoBridge()
+      localStorage.clear()
+    })
+
+    it('media owner com texto: ownerInput media via projectTo (branch 173-174)', async () => {
+      vi.useFakeTimers()
+      startPalcoBridge()
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'media-key',
+        newValue: JSON.stringify({ active: true, lyric: 'v1\nv2', title: 'Título', imageUrl: 'http://img.png', isCover: true }),
+      }))
+      await vi.advanceTimersByTimeAsync(100)
+      expect(palcoSessionMock.projectTo).toHaveBeenCalledWith('slot1', 'hymn', expect.objectContaining({
+        text: 'v1<br>v2',
+        footerRef: '',
+        background: 'http://img.png',
+        isCover: true,
+      }))
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('clock tick pós-release: owner !== clock early return (265/269)', async () => {
+      vi.useFakeTimers()
+      startPalcoBridge()
+      palcoClockOn()
+      await vi.advanceTimersByTimeAsync(0)
+      palcoClockOff()
+      const c0 = palcoSessionMock.projectTo.mock.calls.length
+      await vi.advanceTimersByTimeAsync(46000)
+      expect(palcoSessionMock.projectTo.mock.calls.length).toBe(c0)
+      vi.useRealTimers()
+    })
+
+    it('takeover de media por timer: turnOffOthers media (setIntent false via storage)', async () => {
+      vi.useFakeTimers()
+      startPalcoBridge()
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'media-key',
+        newValue: JSON.stringify({ active: true, lyric: 'letra' }),
+      }))
+      await vi.advanceTimersByTimeAsync(100)
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'timer-key',
+        newValue: JSON.stringify({ projecting: true, status: 'running', segmentStartedAt: Date.now() - 65_000, accumulatedMs: 0, durationMs: 600_000 }),
+      }))
+      await vi.advanceTimersByTimeAsync(100)
+      // media saiu do owner; timer assumiu
+      expect(palcoSessionMock.timerTo).toHaveBeenCalled()
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+  })
 })
