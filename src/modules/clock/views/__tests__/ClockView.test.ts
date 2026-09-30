@@ -31,9 +31,13 @@ vi.mock('../../composables/useClock', () => ({
   }),
 }))
 
+const stageSubs = vi.hoisted(() => ({ cbs: [] as Array<() => void> }))
 vi.mock('../../../settings/services/stage-settings-runtime', () => ({
   readEffectiveStageSettings: () => ({ backgroundColor: '#123', backgroundImage: null, clock: { style: 'analog' } }),
-  subscribeStageSettings: vi.fn(() => vi.fn()),
+  subscribeStageSettings: vi.fn((cb: () => void) => {
+    stageSubs.cbs.push(cb)
+    return () => {}
+  }),
 }))
 
 vi.mock('../../../settings/components/PalcoRouteSelect.vue', () => ({
@@ -130,5 +134,16 @@ describe('ClockView.vue', () => {
     await flushPromises()
     wrapper.unmount()
     expect(true).toBe(true)
+  })
+
+  describe('subscribe stage callback (48)', () => {
+    it('callback do subscribe atualiza stage', async () => {
+      const w = createWrapper()
+      await w.vm.$nextTick()
+      expect(stageSubs.cbs.length).toBeGreaterThanOrEqual(1)
+      for (const cb of stageSubs.cbs) cb()
+      await w.vm.$nextTick()
+      w.unmount()
+    })
   })
 })
