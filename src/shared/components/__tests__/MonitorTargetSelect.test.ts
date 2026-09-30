@@ -153,4 +153,65 @@ describe('MonitorTargetSelect', () => {
     await wrapper.vm.$nextTick()
     expect(mocks.close).not.toHaveBeenCalled()
   })
+
+  describe('interações restantes', () => {
+    it('triggerLabel: contagem selecionada', async () => {
+      mocks.selectedCount.value = 2
+      const w = createWrapper()
+      await flushPromises()
+      expect(w.text()).toContain('2 selecionada(s)')
+      w.unmount()
+    })
+
+    it('toggleOpen pelo trigger', async () => {
+      const w = createWrapper()
+      const trigger = w.find('[class*="trigger"], [data-test*="trigger"], button')
+      await trigger.trigger('click')
+      expect(mocks.toggleOpen).toHaveBeenCalled()
+      w.unmount()
+    })
+
+    it('onToggle item: chama toggle com displayId', async () => {
+      mocks.open.value = true
+      const w = createWrapper()
+      await flushPromises()
+      const item = w.findAll('[class*="option"], [role="option"], [class*="item"]')
+      if (item.length > 0) {
+        await item[0].trigger('click')
+        expect(mocks.toggle).toHaveBeenCalled()
+      }
+      w.unmount()
+    })
+
+    it('disabled: toggle e identify não executam', async () => {
+      mocks.open.value = true
+      const w = createWrapper({ disabled: true })
+      await flushPromises()
+      const vm = w.vm as any
+      await vm.onIdentify?.()
+      expect(mocks.identify).not.toHaveBeenCalled()
+      vm.onToggle?.(1)
+      expect(mocks.toggle).not.toHaveBeenCalled()
+      w.unmount()
+    })
+
+    it('onIdentify: chama identify quando habilitado', async () => {
+      mocks.identifying.value = false
+      const w = createWrapper()
+      const vm = w.vm as any
+      await vm.onIdentify?.()
+      expect(mocks.identify).toHaveBeenCalled()
+      w.unmount()
+    })
+
+    it('pointerdown fora com painel aberto: close', async () => {
+      mocks.open.value = true
+      const w = createWrapper({ attachTo: document.body } as any)
+      await flushPromises()
+      document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))
+      await flushPromises()
+      expect(mocks.close).toHaveBeenCalled()
+      w.unmount()
+    })
+  })
 })

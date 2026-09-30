@@ -180,4 +180,37 @@ describe("ExternalPlayerCard", () => {
     await flushPromises();
     expect(extApi.set).not.toHaveBeenCalled();
   });
+
+  describe("ramos restantes", () => {
+    it("get inicial custom: lista vazia mantém o custom atual na lista", async () => {
+      extApi.get.mockResolvedValue("custom:/opt/meu-player");
+      extApi.listCustom.mockResolvedValue([]);
+      const wrapper = mountCard();
+      await flushPromises();
+      expect(wrapper.text()).toContain("meu-player");
+    });
+
+    it("set lança exceção: reverte player e sai do busy", async () => {
+      extApi.detect.mockResolvedValue([{ id: "vlc", label: "VLC" }]);
+      extApi.set.mockRejectedValue(new Error("ipc fail"));
+      const wrapper = mountCard();
+      await flushPromises();
+      await wrapper.find('[data-test="external-player-vlc"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.find('[data-test="external-player-associated"]').attributes("aria-checked")).toBe("true");
+    });
+
+    it("busy guard: segundo set durante busy é ignorado", async () => {
+      let resolveSet: (v: boolean) => void;
+      extApi.set.mockImplementation(() => new Promise((r) => { resolveSet = r; }));
+      extApi.detect.mockResolvedValue([{ id: "vlc", label: "VLC" }]);
+      const wrapper = mountCard();
+      await flushPromises();
+      await wrapper.find('[data-test="external-player-vlc"]').trigger("click");
+      await wrapper.find('[data-test="external-player-associated"]').trigger("click");
+      expect(extApi.set).toHaveBeenCalledTimes(1);
+      resolveSet!(true);
+      await flushPromises();
+    });
+  });
 });
