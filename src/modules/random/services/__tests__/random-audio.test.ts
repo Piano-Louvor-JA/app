@@ -332,4 +332,51 @@ describe("bridge helpers", () => {
 		stopRandomDrawAudio();
 		expect(events).toHaveLength(1); // apenas o chamado inicial
 	});
-});
+
+	describe("effect audio e toggle (final)", () => {
+		it("applyRandomAudioOutput com effectAudio ativo aplica nele (66)", async () => {
+			mocks.state.isDesktop = true;
+			playRandomWinnerEffect();
+			const effect = FakeAudio.instances[0];
+			applyRandomAudioOutput({ volume: 0.8, muted: false });
+			expect(effect.volume).toBe(0.8);
+			expect(effect.muted).toBe(false);
+			stopRandomDrawAudio();
+		});
+
+		it("efeito novo substitui anterior (stopRandomEffectAudio via 112-118)", async () => {
+			mocks.state.isDesktop = true;
+			playRandomWinnerEffect();
+			const first = FakeAudio.instances[0];
+			first.resolvePlay();
+			await new Promise((r) => setTimeout(r, 0));
+			// segundo efeito: para o primeiro (stopRandomEffectAudio) e cria outro
+			playRandomWinnerEffect();
+			expect(first.paused).toBe(true);
+			expect(first.currentTime).toBe(0);
+			expect(FakeAudio.instances.length).toBe(2);
+			FakeAudio.instances[1].resolvePlay();
+		});
+
+		it("toggle: toca quando pausado (205-210)", async () => {
+			mocks.state.isDesktop = true;
+			playRandomDrawAudio(config());
+			const audio = FakeAudio.instances[0];
+			stopRandomDrawAudio();
+			// agora sem áudio corrente: toggle cria novo e toca
+			toggleRandomDrawAudio(config());
+			const novo = FakeAudio.instances[FakeAudio.instances.length - 1];
+			novo.resolvePlay();
+			expect(FakeAudio.instances.length).toBeGreaterThanOrEqual(2);
+		});
+
+		it("toggle: pausa quando tocando (200-203)", async () => {
+			mocks.state.isDesktop = true;
+			playRandomDrawAudio(config());
+			const audio = FakeAudio.instances[0];
+			// paused=false (padrão do play) → toggle pausa
+			toggleRandomDrawAudio(config());
+			expect(audio.paused).toBe(true);
+		});
+	});
+})
