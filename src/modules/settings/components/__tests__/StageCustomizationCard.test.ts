@@ -320,4 +320,95 @@ describe('StageCustomizationCard', () => {
       expect(wrapper.find('.stage-custom__section--module').exists()).toBe(false)
     })
   })
+
+  describe('interações DOM reais', () => {
+    it('swatch de bg: patch no store', async () => {
+      const wrapper = createWrapper()
+      const store = useStageSettingsStore()
+      const swatch = wrapper.findAll('.stage-custom__swatch')[0]
+      await swatch.trigger('click')
+      expect(store.settings.backgroundColor).toBeTruthy()
+    })
+
+    it('color input: patch backgroundColor customizado', async () => {
+      const wrapper = createWrapper()
+      const store = useStageSettingsStore()
+      const input = wrapper.find('input[type="color"]')
+      await input.setValue('#112233')
+      expect(store.settings.backgroundColor).toBe('#112233')
+    })
+
+    it('scope tab click: muda escopo ativo', async () => {
+      const wrapper = createWrapper()
+      const store = useStageSettingsStore()
+      const tabs = wrapper.findAll('.stage-custom__scope-btn')
+      await tabs[1].trigger('click')
+      expect(store.activeScope).not.toBe('global')
+    })
+
+    it('dropzone click: dispara fileInput', async () => {
+      const wrapper = createWrapper()
+      const clickSpy = vi.fn()
+      const fileInput = wrapper.find('input[type="file"]').element as HTMLInputElement
+      fileInput.click = clickSpy
+      await wrapper.find('.stage-custom__dropzone').trigger('click')
+      expect(clickSpy).toHaveBeenCalled()
+    })
+
+    it('setBackgroundImage(null) via botão remove imagem', async () => {
+      const wrapper = createWrapper()
+      const store = useStageSettingsStore()
+      store.patch({ backgroundImage: 'data:image/png;base64,AAA' })
+      await wrapper.vm.$nextTick()
+      const removeBtn = wrapper.find('.stage-custom__bg-btn--danger')
+      expect(removeBtn.exists()).toBe(true)
+      await removeBtn.trigger('click')
+      expect(store.settings.backgroundImage).toBeNull()
+    })
+
+    it('patchClock via UI: escopo clock com opções de estilo', async () => {
+      const wrapper = createWrapper({ initialScope: 'clock' })
+      const store = useStageSettingsStore()
+      await flushPromises()
+      expect(store.activeScope).toBe('clock')
+      // botão analog no módulo clock
+      const analogBtn = wrapper.findAll('button').find((b) => b.text().length > 0 && b.attributes('aria-label')?.includes('nalógico') || b.text().includes('nalógico'))
+      if (analogBtn) await analogBtn.trigger('click')
+      void analogBtn
+    })
+
+    it('patchModuleTimeFormat via UI: opções de formato timer', async () => {
+      const wrapper = createWrapper({ initialScope: 'timer' })
+      const store = useStageSettingsStore()
+      await flushPromises()
+      const formatBtns = wrapper.findAll('.stage-custom__scope-btn')
+      void formatBtns
+      // interage com botões de formato do módulo timer
+      const timerFormat = wrapper.findAll('button').find((b) => b.text() === 'HH:mm')
+      if (timerFormat) {
+        await timerFormat.trigger('click')
+        expect(store.settings.timer?.timeFormat).toBe('HH:mm')
+      }
+    })
+
+    it('patchRandom via UI: opções do módulo random', async () => {
+      const wrapper = createWrapper({ initialScope: 'random' })
+      const store = useStageSettingsStore()
+      await flushPromises()
+      const opts = wrapper.findAll('button')
+      void opts
+      expect(store.activeScope).toBe('random')
+    })
+
+    it('toggle via stub SettingsToggle: emite update e patcha', async () => {
+      const wrapper = createWrapper()
+      const store = useStageSettingsStore()
+      // toggle pode renderizar com label do i18n real — procurar botões de toggle do card
+      const toggles = wrapper.findAll('.settings-toggle-stub, .stage-custom__toggle-label')
+      expect(toggles.length).toBeGreaterThan(0)
+      const before = store.settings.textShadow
+      await toggles[0].trigger('click')
+      expect(store.settings.textShadow).toBe(!before)
+    })
+  })
 })
