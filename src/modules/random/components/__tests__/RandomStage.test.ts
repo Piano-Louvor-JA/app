@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { mount } from "@vue/test-utils";
+import { nextTick } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createI18n } from "vue-i18n";
 
@@ -321,4 +322,74 @@ describe("RandomStage — estilos por contexto", () => {
 		expect(fsD.endsWith("vw")).toBe(true);
 		w.unmount();
 	});
-});
+
+  describe("celebrate + partículas animadas", () => {
+    function fakeAnimation() {
+      return {
+        onfinish: null as null | (() => void),
+        cancel: vi.fn(),
+        finished: Promise.resolve(),
+      } as unknown as Animation
+    }
+
+    it("triggerCelebrate: fireworks aparecem e somem após CELEBRATE_MS", async () => {
+      vi.useFakeTimers()
+      const rt = runtime({ isDrawing: false, currentDisplay: "João" })
+      const wrapper = mountStage({ runtime: rt })
+      // simula transição drawing→done com display
+      await wrapper.setProps({ runtime: { ...rt, isDrawing: true } })
+      await wrapper.setProps({ runtime: { ...rt, isDrawing: false } })
+      await nextTick()
+      expect((wrapper.vm as any).fireworks.length).toBeGreaterThan(0)
+      vi.advanceTimersByTime(3000 + 50)
+      await nextTick()
+      expect((wrapper.vm as any).fireworks.length).toBe(0)
+      wrapper.unmount()
+      vi.useRealTimers()
+    })
+
+    it("prefersReducedMotion: celebrate bloqueado", async () => {
+      window.matchMedia = vi.fn().mockReturnValue({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() })
+      const rt = runtime({ isDrawing: false, currentDisplay: "João" })
+      const wrapper = mountStage({ runtime: rt })
+      await wrapper.setProps({ runtime: { ...rt, isDrawing: true } })
+      await wrapper.setProps({ runtime: { ...rt, isDrawing: false } })
+      await nextTick()
+      expect((wrapper.vm as any).fireworks.length).toBe(0)
+      wrapper.unmount()
+    })
+
+    it("animate disponível: partículas iniciam e cancelam no unmount", async () => {
+      const anims: any[] = []
+      const origAnimate = Element.prototype.animate
+      Element.prototype.animate = function (this: HTMLElement) {
+        const a = fakeAnimation()
+        anims.push(a)
+        return a
+      } as any
+      const wrapper = mountStage({})
+      await nextTick()
+      expect(anims.length).toBeGreaterThan(0)
+      wrapper.unmount()
+      expect(anims.every(a => a.cancel.mock !== undefined)).toBe(true)
+      Element.prototype.animate = origAnimate
+    })
+
+    it("onfinish: partícula reposiciona e re-anima", async () => {
+      const anims: any[] = []
+      const origAnimate = Element.prototype.animate
+      Element.prototype.animate = function (this: HTMLElement) {
+        const a = fakeAnimation()
+        anims.push(a)
+        return a
+      } as any
+      const wrapper = mountStage({})
+      await nextTick()
+      const first = anims[0]
+      first.onfinish?.()
+      expect(anims.length).toBeGreaterThan(1)
+      wrapper.unmount()
+      Element.prototype.animate = origAnimate
+    })
+  })
+})

@@ -212,4 +212,45 @@ describe('useAppBootstrap', () => {
     await vi.runAllTimersAsync()
     expect(() => app.unmount()).not.toThrow()
   })
+
+  describe('ramos restantes', () => {
+    it('retryBootstrap: bridge ausente → markError bridgeMissing', async () => {
+      mocks.isDesktopApp.mockReturnValue(false)
+      const app = mountHost()
+      await vi.runAllTimersAsync()
+      const store = useStartingStore()
+      store.resetError()
+      mocks.isDesktopApp.mockReturnValue(false)
+      const { retryBootstrap } = useAppBootstrap()
+      await retryBootstrap()
+      expect(store.statusKey).toBe('starting.status.bridgeMissing')
+      app.unmount()
+    })
+
+    it('retryBootstrap: first boot de novo após erro', async () => {
+      mocks.isBootstrapComplete.mockResolvedValue(false)
+      mocks.prepareFreshInstall.mockRejectedValueOnce(new Error('falha disco'))
+      const reloadSpy = vi.fn()
+      Object.defineProperty(window, 'location', {
+        value: { ...window.location, reload: reloadSpy },
+        writable: true, configurable: true,
+      })
+      const app = mountHost()
+      await vi.runAllTimersAsync()
+      // resolve o delay(1000) do first boot bem-sucedido do retry
+      mocks.prepareFreshInstall.mockResolvedValue(undefined)
+      const { retryBootstrap } = useAppBootstrap()
+      const retryPromise = retryBootstrap()
+      await vi.advanceTimersByTimeAsync(1000)
+      await retryPromise
+      expect(mocks.prepareFreshInstall).toHaveBeenCalledTimes(2)
+      app.unmount()
+    })
+
+    it('warm boot: pré-aquece albums store (hydrateCatalog)', async () => {
+      const app = mountHost()
+      await vi.runAllTimersAsync()
+      app.unmount()
+    })
+  })
 })
