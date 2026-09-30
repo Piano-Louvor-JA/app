@@ -86,6 +86,8 @@ describe('P2pPairingView', () => {
       writable: true,
       configurable: true,
     })
+    // jsdom não implementa play()
+    HTMLVideoElement.prototype.play = vi.fn().mockResolvedValue(undefined)
   })
 
   afterEach(() => {
@@ -96,6 +98,11 @@ describe('P2pPairingView', () => {
     return mount(P2pPairingView, {
       global: { plugins: [i18n] },
     })
+  }
+
+  /** Botão "Aplicar" do step scan (2º .p2p-pairing__btn — o 1º é "Iniciar", sempre visível). */
+  function applyButton(wrapper: ReturnType<typeof createWrapper>) {
+    return wrapper.findAll('.p2p-pairing__btn').at(1)!
   }
 
   it('idle: mostra botão iniciar sem QR nem textarea', () => {
@@ -116,8 +123,8 @@ describe('P2pPairingView', () => {
   })
 
   it('startOffer com erro no createOffer: step error com mensagem', async () => {
-    componentHost().createOffer.mockRejectedValueOnce(new Error('webrtc fail'))
     const wrapper = createWrapper()
+    componentHost().createOffer.mockRejectedValueOnce(new Error('webrtc fail'))
     await wrapper.find('.p2p-pairing__btn').trigger('click')
     await flushPromises()
     expect(wrapper.find('.p2p-pairing__error').exists()).toBe(true)
@@ -138,9 +145,8 @@ describe('P2pPairingView', () => {
     await wrapper.find('.p2p-pairing__btn').trigger('click')
     await flushPromises()
     componentHost().acceptAnswer.mockClear()
-    await wrapper.find('.p2p-pairing__btn').trigger('click') // botão agora é "Aplicar" no step scan
-    // no step scan o primeiro botão é "Aplicar" (p2pManualApply) — dispara submitManual
-    expect(componentHost().acceptAnswer).not.toHaveBeenCalledTimes(2)
+    await applyButton(wrapper).trigger('click') // submitManual com campo vazio
+    expect(componentHost().acceptAnswer).not.toHaveBeenCalled()
   })
 
   it('applyAnswer ok: para scan, loga answer ok, conecta via onOpen', async () => {
@@ -149,7 +155,7 @@ describe('P2pPairingView', () => {
     await flushPromises()
     componentHost().acceptAnswer.mockClear()
     wrapper.vm.manualAnswer = 'ANSWER-DATA'
-    await wrapper.find('.p2p-pairing__btn').trigger('click') // submitManual
+    await applyButton(wrapper).trigger('click') // submitManual
     await flushPromises()
     expect(componentHost().acceptAnswer).toHaveBeenCalledWith('ANSWER-DATA')
     expect(wrapper.text()).toContain('answer ok')
@@ -166,14 +172,18 @@ describe('P2pPairingView', () => {
     componentHost().acceptAnswer.mockResolvedValueOnce(false)
     componentHost().acceptAnswer.mockClear()
     wrapper.vm.manualAnswer = 'BAD'
-    await wrapper.find('.p2p-pairing__btn').trigger('click')
-    await flushPromises
+    await applyButton(wrapper).trigger('click')
+    await flushPromises()
     expect(wrapper.text()).toContain('answer inválido')
   })
 
   it('sendPing: envia remote.hello pelo host', async () => {
     const wrapper = createWrapper()
     await wrapper.find('.p2p-pairing__btn').trigger('click')
+    await flushPromises()
+    // conectar primeiro (onOpen só existe após applyAnswer ok)
+    wrapper.vm.manualAnswer = 'ANSWER-DATA'
+    await applyButton(wrapper).trigger('click')
     await flushPromises()
     componentHost().onOpen!()
     await flushPromises()
@@ -191,7 +201,7 @@ describe('P2pPairingView', () => {
     await flushPromises()
     componentHost().acceptAnswer.mockClear()
     wrapper.vm.manualAnswer = 'ANS'
-    await wrapper.find('.p2p-pairing__btn').trigger('click')
+    await applyButton(wrapper).trigger('click')
     await flushPromises()
     componentHost().onMessage!({ action: 'ping' })
     await flushPromises()

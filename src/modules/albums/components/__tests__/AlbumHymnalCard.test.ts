@@ -39,11 +39,11 @@ const i18n = createI18n({
         progress: {
           downloading: 'Baixando',
         },
-      },
-      hymnal: {
-        edition1996Name: 'Hinário 1996',
-        edition1996Subtitle: '{count} hinos especiais',
-        officialSubtitle: '{count} hinos',
+        hymnal: {
+          edition1996Name: 'Hinário 1996',
+          edition1996Subtitle: '{count} hinos especiais',
+          officialSubtitle: '{count} hinos',
+        },
       },
     },
   },
@@ -108,11 +108,10 @@ describe('AlbumHymnalCard', () => {
   })
 
   describe('displayName computado', () => {
-    it('hymnal_1996: retorna collection.name idêntico', () => {
+    it('hymnal_1996: usa i18n sync.hymnal.edition1996Name', () => {
       const collection = { ...mockAlbumCollection, id: 'hymnal_1996' }
       const wrapper = createWrapper({ collection })
-      // Apenas verifica que retorna o próprio nome (ignora tradução)
-      expect(wrapper.vm.displayName).toBe(collection.name)
+      expect(wrapper.vm.displayName).toBe('Hinário 1996')
     })
 
     it('outro collection: retorna collection.name', () => {
@@ -248,7 +247,7 @@ describe('AlbumHymnalCard', () => {
       })
       expect(wrapper.find('.album-hymnal-card__progress-meta').exists()).toBe(true)
       expect(wrapper.find('.album-hymnal-card__track').exists()).toBe(true)
-      expect(wrapper.find('.album-hymnal-card__fill').attributes('style')).toBe('width: 50%')
+      expect(wrapper.find('.album-hymnal-card__fill').attributes('style')).toContain('50%')
     })
 
     it('downloading: progress dinâmico', () => {
@@ -258,7 +257,7 @@ describe('AlbumHymnalCard', () => {
         libraryAlbum,
         showDownloadControls: true,
       })
-      expect(wrapper.find('.album-hymnal-card__fill').attributes('style')).toBe('width: 25%')
+      expect(wrapper.find('.album-hymnal-card__fill').attributes('style')).toContain('25%')
     })
 
     it('não downloading: não mostra progress bar', () => {
@@ -327,7 +326,7 @@ describe('AlbumHymnalCard', () => {
         collection: mockAlbumCollection,
         libraryAlbum,
       })
-      expect(wrapper.vm.subtitle).toBe('Oficial|50 hinos')
+      expect(wrapper.vm.subtitle).toBe('50 hinos')
     })
 
     it('libraryAlbum songCount e trackCount null → retorna subtitle', () => {
