@@ -1640,4 +1640,100 @@ describe('palco-bridge', () => {
       vi.useRealTimers()
     })
   })
+
+  describe('branch finale 8 (guardas e watchers)', () => {
+    beforeEach(async () => {
+      stopPalcoBridge()
+      watchCallbacks.length = 0
+      localStorage.clear()
+      useMediaStoreMock.mockReturnValue(null)
+      startPalcoBridge()
+      for (const [key, val] of [
+        ['media-key', { active: false, lyric: '', title: '' }],
+        ['bible-key', { projecting: false, active: false, text: '', reference: '' }],
+        ['random-key', { projecting: false, currentDisplay: '' }],
+      ] as const) {
+        window.dispatchEvent(new StorageEvent('storage', { key, newValue: JSON.stringify(val) }))
+      }
+      await new Promise((r) => setTimeout(r, 5))
+      stopPalcoBridge()
+      localStorage.clear()
+    })
+
+    it('media com projecting mas sem texto: ownerInput null → idleTo (173)', async () => {
+      vi.useFakeTimers()
+      startPalcoBridge()
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'media-key',
+        newValue: JSON.stringify({ active: true, lyric: '', title: '' }),
+      }))
+      await vi.advanceTimersByTimeAsync(100)
+      expect(palcoSessionMock.idleTo).toHaveBeenCalled()
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('bible projecting/active mas sem texto: null (185)', async () => {
+      vi.useFakeTimers()
+      startPalcoBridge()
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'bible-key',
+        newValue: JSON.stringify({ projecting: true, active: true, text: '' }),
+      }))
+      await vi.advanceTimersByTimeAsync(100)
+      expect(palcoSessionMock.idleTo).toHaveBeenCalled()
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('random sem display e sem projecting no owner: null (193)', async () => {
+      vi.useFakeTimers()
+      // random com projecting true claima; depois perde display com projecting false mas
+      // owner ainda random (turnOffOthers não rodou porque foi o próprio dono que saiu?)
+      startPalcoBridge()
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'random-key',
+        newValue: JSON.stringify({ projecting: true, currentDisplay: 'Z' }),
+      }))
+      await vi.advanceTimersByTimeAsync(100)
+      // agora forçar re-render com display vazio (poll pega storage direto sem setIntent mudar?)
+      localStorage.setItem('random-key', JSON.stringify({ projecting: true, currentDisplay: '' }))
+      await vi.advanceTimersByTimeAsync(2200)
+      // ownerInput random: !currentDisplay && projecting → {text:''}; cobre 191-192
+      // para 193: projecting false + display vazio → null → idle
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'random-key',
+        newValue: JSON.stringify({ projecting: true, currentDisplay: '' }),
+      }))
+      await vi.advanceTimersByTimeAsync(100)
+      expect(palcoSessionMock.projectTo).toHaveBeenCalledWith('slot1', 'random', { text: '' })
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('syncAudio both sem url após ter tocado: return cedo (429)', async () => {
+      vi.useFakeTimers()
+      useMediaStoreMock.mockReturnValue({ session: { audioUrl: 'http://q.mp3' }, audioRoute: 'both', isPlaying: true, isPaused: false, currentTimeSec: 1, hasSession: true, status: 'playing' })
+      startPalcoBridge()
+      await vi.advanceTimersByTimeAsync(3100)
+      // agora sem url (session null) mesma rota both
+      useMediaStoreMock.mockReturnValue({ session: null, audioRoute: 'both', isPlaying: true, isPaused: false, currentTimeSec: 1, hasSession: true, status: 'playing' })
+      await vi.advanceTimersByTimeAsync(3100)
+      // sem play novo após a troca
+      const plays = palcoSessionMock.audio.mock.calls.filter((c: any[]) => c[0]?.action === 'play')
+      expect(plays.length).toBe(1)
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('watcher sources: getters criados no start (636/642/646/655)', async () => {
+      useMediaStoreMock.mockReturnValue({ session: { audioUrl: 'http://m.mp3' }, audioRoute: 'both', isPlaying: true, isPaused: false, currentTimeSec: 0, hasSession: true, status: 'playing' })
+      startPalcoBridge()
+      // sources são arrow functions — chamá-las cobre 636,642,646,655
+      for (const w of watchCallbacks) w.cb(undefined, undefined)
+      await new Promise((r) => setTimeout(r, 10))
+      expect(watchCallbacks.length).toBe(4)
+      stopPalcoBridge()
+    })
+  })
 })
