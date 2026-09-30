@@ -1,89 +1,114 @@
-// Teste rápido CountdownView — coverage básico
+// @vitest-environment jsdom
+// CountdownView — coverage: render, goBack, estrutura
 import { mount } from '@vue/test-utils'
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// Mock simples
+const mockCountdown = {
+  config: { durationSeconds: 300 },
+  runtime: { remaining: 300, isRunning: false },
+  isProjecting: false,
+  configOpen: false,
+  isRunning: false,
+  setTimeFormat: vi.fn(),
+  setBgColor: vi.fn(),
+  setTextColor: vi.fn(),
+  resetDisplayToDefault: vi.fn(),
+  openConfig: vi.fn(),
+  closeConfig: vi.fn(),
+  start: vi.fn(),
+  pause: vi.fn(),
+  reset: vi.fn(),
+  saveMark: vi.fn(),
+  removeSavedMark: vi.fn(),
+  clearSavedMarks: vi.fn(),
+  toggleProjection: vi.fn(),
+}
+
+const mockRouter = { push: vi.fn() }
+
+vi.mock('../../composables/useCountdown', () => ({
+  useCountdownFeature: () => mockCountdown,
+}))
+
 vi.mock('vue-router', () => ({
-  useRouter: () => ({ push: vi.fn() })
+  useRouter: () => mockRouter,
 }))
 
 vi.mock('vue-i18n', () => ({
-  useI18n: () => ({ t: (key: string) => key })
+  useI18n: () => ({ t: (key: string) => key }),
 }))
 
 vi.mock('@design-system/index', () => ({
-  GlassCard: { template: '<div class="glass-card"><slot /></div>' }
+  GlassCard: { template: '<div class="glass-card"><slot /></div>' },
 }))
 
-vi.mock('../../settings/services/stage-settings-runtime', () => ({
+vi.mock('../../../settings/services/stage-settings-runtime', () => ({
   readEffectiveStageSettings: vi.fn(() => ({})),
-  subscribeStageSettings: vi.fn(() => () => {})
+  subscribeStageSettings: vi.fn(() => () => {}),
 }))
 
-vi.mock('../../settings/types/stage-settings', () => ({
-  resolveBackgroundImage: vi.fn(() => 'bg-url'),
-  StageSettings: class {}
+vi.mock('../../../settings/types/stage-settings', () => ({
+  resolveBackgroundImage: vi.fn(() => null),
 }))
 
-vi.mock('../composables/useCountdown', () => ({
-  useCountdown: () => ({
-    config: {},
-    runtime: {},
-    isProjecting: false,
-    configOpen: false,
-    isRunning: false,
-    setTimeFormat: vi.fn(),
-    setBgColor: vi.fn(),
-    setTextColor: vi.fn(),
-    resetDisplayToDefault: vi.fn(),
-    openConfig: vi.fn(),
-    closeConfig: vi.fn(),
-    start: vi.fn(),
-    pause: vi.fn(),
-    reset: vi.fn(),
-    saveMark: vi.fn(),
-    removeSavedMark: vi.fn(),
-    clearSavedMarks: vi.fn(),
-    toggleProjection: vi.fn(),
-  })
+vi.mock('../../../settings/components/PalcoRouteSelect.vue', () => ({
+  default: { template: '<div class="palco-route-select" />' },
 }))
 
-vi.mock('../../settings/components/StageCustomizationDialog.vue', () => ({
-  default: { template: '<div class="dialog" />;' }
+vi.mock('../../../settings/components/StageCustomizationDialog.vue', () => ({
+  default: { template: '<div class="stage-custom-dialog" />' },
 }))
 
-vi.mock('../components/CountdownConfigDialog.vue', () => ({
-  default: { template: '<div class="config-dialog" />;' }
+vi.mock('../../components/CountdownConfigDialog.vue', () => ({
+  default: { template: '<div class="countdown-config-dialog" />' },
 }))
 
-vi.mock('../components/CountdownPreview.vue', () => ({
-  default: { template: '<div class="preview" />;' }
+vi.mock('../../components/CountdownDurationInput.vue', () => ({
+  default: { template: '<div class="countdown-duration-input" />' },
 }))
 
-vi.mock('../components/CountdownProjectFab.vue', () => ({
-  default: { template: '<div class="fab" />;' }
+vi.mock('../../components/CountdownPreview.vue', () => ({
+  default: { template: '<div class="countdown-preview" />' },
 }))
 
-vi.mock('../components/CountdownSavedList.vue', () => ({
-  default: { template: '<div class="saved-list" />;' }
+vi.mock('../../components/CountdownProjectFab.vue', () => ({
+  default: { template: '<div class="countdown-project-fab" />' },
+}))
+
+vi.mock('../../components/CountdownSavedList.vue', () => ({
+  default: { template: '<div class="countdown-saved-list" />' },
 }))
 
 import CountdownView from '../CountdownView.vue'
 
-describe('CountdownView - coverage básico', () => {
-  it('renderiza componente', () => {
+describe('CountdownView', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockCountdown.configOpen = false
+  })
+
+  it('renderiza', () => {
     const wrapper = mount(CountdownView)
     expect(wrapper.exists()).toBe(true)
   })
 
-  it('contém algum conteúdo', () => {
+  it('monta preview, fab, saved list e duration input', () => {
     const wrapper = mount(CountdownView)
-    expect(wrapper.text()).toBeTruthy()
+    expect(wrapper.find('.countdown-preview').exists()).toBe(true)
+    expect(wrapper.find('.countdown-project-fab').exists()).toBe(true)
+    expect(wrapper.find('.countdown-saved-list').exists()).toBe(true)
+    expect(wrapper.find('.countdown-duration-input').exists()).toBe(true)
   })
 
-  it('goBack chama router.push', () => {
+  it('goBack navega para utilities-temporizador', () => {
     const wrapper = mount(CountdownView)
     wrapper.vm.goBack()
-    expect(require('vue-router').useRouter().push).toHaveBeenCalledWith({ name: 'utilities-tempo' })
+    expect(mockRouter.push).toHaveBeenCalledWith({ name: 'utilities-temporizador' })
+  })
+
+  it('onToggleProjection repassa para o composable', () => {
+    const wrapper = mount(CountdownView)
+    wrapper.vm.onToggleProjection()
+    expect(mockCountdown.toggleProjection).toHaveBeenCalledTimes(1)
   })
 })

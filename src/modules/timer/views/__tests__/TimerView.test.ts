@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 // Teste rápido TimerView — coverage básico, sem complexidade
 import { mount } from '@vue/test-utils'
 import { describe, it, expect, vi } from 'vitest'
@@ -33,7 +34,7 @@ const mockI18n = {
 }
 
 // Setup vi.mock
-vi.mock('../composables/useTimer', () => ({
+vi.mock('../../composables/useTimer', () => ({
   useTimerFeature: () => mockTimerFeature
 }))
 
@@ -49,37 +50,37 @@ vi.mock('@design-system/index', () => ({
   GlassCard: { template: '<div class="glass-card"><slot /></div>' }
 }))
 
-vi.mock('../../settings/services/stage-settings-runtime', () => ({
+vi.mock('../../../settings/services/stage-settings-runtime', () => ({
   readEffectiveStageSettings: vi.fn(() => ({})),
   subscribeStageSettings: vi.fn(() => () => {})
 }))
 
-vi.mock('../../settings/types/stage-settings', () => ({
+vi.mock('../../../settings/types/stage-settings', () => ({
   resolveBackgroundImage: vi.fn(() => 'bg-url'),
   StageSettings: class {}
 }))
 
-vi.mock('../../settings/components/PalcoRouteSelect.vue', () => ({
+vi.mock('../../../settings/components/PalcoRouteSelect.vue', () => ({
   default: { template: '<div class="palco-route-select" />;' }
 }))
 
-vi.mock('../../settings/components/StageCustomizationDialog.vue', () => ({
+vi.mock('../../../settings/components/StageCustomizationDialog.vue', () => ({
   default: { template: '<div class="stage-custom-dialog" />;' }
 }))
 
-vi.mock('../components/TimerConfigDialog.vue', () => ({
+vi.mock('../../components/TimerConfigDialog.vue', () => ({
   default: { template: '<div class="timer-config-dialog" />;' }
 }))
 
-vi.mock('../components/TimerPreview.vue', () => ({
+vi.mock('../../components/TimerPreview.vue', () => ({
   default: { template: '<div class="timer-preview" />;' }
 }))
 
-vi.mock('../components/TimerProjectFab.vue', () => ({
+vi.mock('../../components/TimerProjectFab.vue', () => ({
   default: { template: '<div class="timer-project-fab" />;' }
 }))
 
-vi.mock('../components/TimerSavedList.vue', () => ({
+vi.mock('../../components/TimerSavedList.vue', () => ({
   default: { template: '<div class="timer-saved-list" />;' }
 }))
 
