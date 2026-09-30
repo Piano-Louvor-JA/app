@@ -9,6 +9,7 @@ const palcoSessionMock = vi.hoisted(() => ({
   isElectron: true,
   slots: vi.fn(async () => [{ id: 'slot1', label: 'TV', running: true, clients: 0, httpPort: 8080, wsPort: 8081 }]),
   projectTo: vi.fn(async () => true),
+  timerTo: vi.fn(async () => true),
   idleTo: vi.fn(async () => true),
 }))
 const unsubscribeMocks = {
@@ -225,6 +226,111 @@ describe('palco-bridge', () => {
       const calls = palcoSessionMock.projectTo.mock.calls.length
       await vi.advanceTimersByTimeAsync(45000)
       expect(palcoSessionMock.projectTo.mock.calls.length).toBe(calls)
+      vi.useRealTimers()
+    })
+  })
+
+  describe('timer/countdown runtime via storage (ownerInput, fmtClock, elapsedMs)', () => {
+    let mod: any
+    const nowMs = Date.now()
+    const freshTimer = {
+      projecting: true,
+      status: 'running',
+      segmentStartedAt: nowMs - 65_000,
+      accumulatedMs: 0,
+      durationMs: 600_000,
+    }
+
+    beforeEach(async () => {
+      // SEM resetModules (perde vi.mock): stopPalcoBridge zera started e permite rebind
+      mod = {
+        startPalcoBridge,
+        stopPalcoBridge,
+        palcoClockOn,
+        palcoClockOff,
+      }
+      stopPalcoBridge()
+      localStorage.clear()
+    })
+
+    it('timer projecting: ownerInput timer chrono e projectTo com fmtClock', async () => {
+      vi.useFakeTimers()
+      localStorage.setItem('louvorja-timer-runtime-state', JSON.stringify(freshTimer))
+      mod.startPalcoBridge()
+      // storage apply via bindChannel initial read
+      await vi.advanceTimersByTimeAsync(0)
+      // timer claima owner — renderAllSlots projecta
+      await vi.advanceTimersByTimeAsync(2100)
+      const timerCall = palcoSessionMock.timerTo.mock.calls.at(-1) as any[] | undefined
+      expect(timerCall).toBeTruthy()
+      expect(timerCall![1].mode).toBe('chrono')
+      expect(timerCall![1].duration).toBeGreaterThanOrEqual(65)
+      mod.stopPalcoBridge()
+      localStorage.removeItem('louvorja-timer-runtime-state')
+      vi.useRealTimers()
+    })
+
+    it('timer stale (segmentStartedAt > 12h): não projeta', async () => {
+      vi.useFakeTimers()
+      localStorage.setItem('louvorja-timer-runtime-state', JSON.stringify({ ...freshTimer, segmentStartedAt: nowMs - 13 * 3600_000 }))
+      mod.startPalcoBridge()
+      await vi.advanceTimersByTimeAsync(2100)
+      const timerCall = palcoSessionMock.timerTo.mock.calls.at(-1) as any[] | undefined
+      expect(timerCall).toBeUndefined()
+      mod.stopPalcoBridge()
+      localStorage.removeItem('louvorja-timer-runtime-state')
+      vi.useRealTimers()
+    })
+
+    it('timer idle: sem claim', async () => {
+      vi.useFakeTimers()
+      localStorage.setItem('louvorja-timer-runtime-state', JSON.stringify({ ...freshTimer, status: 'idle' }))
+      mod.startPalcoBridge()
+      await vi.advanceTimersByTimeAsync(2100)
+      const timerCall = palcoSessionMock.timerTo.mock.calls.at(-1) as any[] | undefined
+      expect(timerCall).toBeUndefined()
+      mod.stopPalcoBridge()
+      localStorage.removeItem('louvorja-timer-runtime-state')
+      vi.useRealTimers()
+    })
+
+    it('countdown projecting: duration restante', async () => {
+      vi.useFakeTimers()
+      localStorage.setItem('louvorja-countdown-runtime-state-v2', JSON.stringify({ ...freshTimer, durationMs: 300_000 }))
+      mod.startPalcoBridge()
+      await vi.advanceTimersByTimeAsync(2100)
+      const cdCall = palcoSessionMock.timerTo.mock.calls.at(-1) as any[] | undefined
+      expect(cdCall).toBeTruthy()
+      expect(cdCall![1].mode).toBe('countdown')
+      expect(cdCall![1].duration).toBeLessThanOrEqual(300)
+      mod.stopPalcoBridge()
+      localStorage.removeItem('louvorja-countdown-runtime-state-v2')
+      vi.useRealTimers()
+    })
+
+    it('timer pausado: elapsed = accumulatedMs', async () => {
+      vi.useFakeTimers()
+      localStorage.setItem('louvorja-timer-runtime-state', JSON.stringify({ ...freshTimer, status: 'paused', segmentStartedAt: null, accumulatedMs: 130_000 }))
+      mod.startPalcoBridge()
+      await vi.advanceTimersByTimeAsync(2100)
+      const timerCall = palcoSessionMock.timerTo.mock.calls.at(-1) as any[] | undefined
+      expect(timerCall![1].duration).toBe(130)
+      mod.stopPalcoBridge()
+      localStorage.removeItem('louvorja-timer-runtime-state')
+      vi.useRealTimers()
+    })
+
+    it('storage update durante execução: re-render com novo valor', async () => {
+      vi.useFakeTimers()
+      localStorage.setItem('louvorja-timer-runtime-state', JSON.stringify(freshTimer))
+      mod.startPalcoBridge()
+      await vi.advanceTimersByTimeAsync(2100)
+      const calls1 = palcoSessionMock.projectTo.mock.calls.length
+      localStorage.setItem('louvorja-timer-runtime-state', JSON.stringify({ ...freshTimer, segmentStartedAt: Date.now() - 120_000 }))
+      await vi.advanceTimersByTimeAsync(2100)
+      expect(palcoSessionMock.projectTo.mock.calls.length).toBeGreaterThanOrEqual(calls1)
+      mod.stopPalcoBridge()
+      localStorage.removeItem('louvorja-timer-runtime-state')
       vi.useRealTimers()
     })
   })
