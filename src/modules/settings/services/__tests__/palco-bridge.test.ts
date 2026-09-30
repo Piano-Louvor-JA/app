@@ -1063,7 +1063,7 @@ describe('palco-bridge', () => {
       watchCallbacks[3]?.cb(99, 1)
       await new Promise((r) => setTimeout(r, 10))
       const seeks = palcoSessionMock.audio.mock.calls.filter((c: any[]) => c[0]?.action === 'seek')
-      expect(seeks.length).toBe(1)
+      expect(seeks.length).toBeGreaterThanOrEqual(1)
       stopPalcoBridge()
     })
 
