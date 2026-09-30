@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 
 // Mock dependencies
 vi.mock('@shared/services/desktop-bridge', () => ({
@@ -16,6 +16,7 @@ vi.mock('@shared/services/browser-storage', () => ({
 }))
 vi.mock('@shared/constants/app', () => ({
   APP_USER_DATA_DIR: '/test/path',
+  APP_VERSION: '0.0.0-test',
 }))
 vi.mock('@design-system/index', () => ({
   GlassCard: {
@@ -31,6 +32,33 @@ vi.mock('../../components/MediaFolderCard.vue', () => ({
 }))
 vi.mock('../../components/AppBackupCard.vue', () => ({
   default: { name: 'AppBackupCard', template: '<div class="app-backup-card-mock" />' },
+}))
+
+vi.mock('@modules/sync/services/louvorja-file', () => ({
+  exportLouvorjaFile: vi.fn(async () => true),
+  importLouvorjaFile: vi.fn(async () => null),
+}))
+
+vi.mock('@modules/sync/services/louvorja-adapter', () => ({
+  exportLouvorjaFromBrowser: vi.fn(() => ({ version: 1 })),
+  importLouvorjaIntoBrowser: vi.fn(() => ({ applied: ['hinos'] })),
+}))
+
+vi.mock('@modules/sync/services/louvorja-package', () => ({
+  encodeLouvorjaPackage: vi.fn(() => 'encoded'),
+  decodeLouvorjaPackage: vi.fn(() => ({ decoded: true })),
+  isValidLouvorjaContent: vi.fn(() => true),
+}))
+
+vi.mock('@shared/composables/useUpdateChecker', () => ({
+  useUpdateChecker: () => ({
+    checkForUpdates: vi.fn(async () => {}),
+    isChecking: { value: false },
+    hasUpdate: { value: false },
+    newVersion: { value: '' },
+    error: { value: null },
+    hasChecked: { value: false },
+  }),
 }))
 
 import GeneralView from '../GeneralView.vue'
@@ -173,5 +201,93 @@ describe('GeneralView.vue', () => {
     await wrapper.find('.clear-confirm__actions .clear-confirm__btn').trigger('click')
     expect(wrapper.find('.clear-confirm').exists()).toBe(false)
     expect(clearWorkspace).not.toHaveBeenCalled()
+  })
+
+  describe('sync export/import', () => {
+    let exportLouvorjaFile: ReturnType<typeof vi.fn>
+    let importLouvorjaFile: ReturnType<typeof vi.fn>
+    let isValidLouvorjaContent: ReturnType<typeof vi.fn>
+
+    beforeEach(async () => {
+      const fileMod = await import('@modules/sync/services/louvorja-file')
+      const pkgMod = await import('@modules/sync/services/louvorja-package')
+      exportLouvorjaFile = fileMod.exportLouvorjaFile as ReturnType<typeof vi.fn>
+      importLouvorjaFile = fileMod.importLouvorjaFile as ReturnType<typeof vi.fn>
+      isValidLouvorjaContent = pkgMod.isValidLouvorjaContent as ReturnType<typeof vi.fn>
+      exportLouvorjaFile.mockResolvedValue(true)
+      importLouvorjaFile.mockResolvedValue(null)
+      isValidLouvorjaContent.mockReturnValue(true)
+    })
+
+    it('export ok: status success', async () => {
+      exportLouvorjaFile.mockResolvedValueOnce(true)
+      const wrapper = mountComponent()
+      await flushPromises()
+      const exportBtn = wrapper.findAll('.general-settings__sync-actions button')[0]
+      await exportBtn.trigger('click')
+      await flushPromises()
+      expect((wrapper.vm as any).syncStatus).toEqual({ kind: 'success', messageKey: 'settings.general.syncExported' })
+    })
+
+    it('export cancelado (false): syncCancelled', async () => {
+      exportLouvorjaFile.mockResolvedValueOnce(false)
+      const wrapper = mountComponent()
+      await flushPromises()
+      const exportBtn = wrapper.findAll('.general-settings__sync-actions button')[0]
+      await exportBtn.trigger('click')
+      await flushPromises()
+      expect((wrapper.vm as any).syncStatus).toEqual({ kind: 'error', messageKey: 'settings.general.syncCancelled' })
+    })
+
+    it('export throw: syncInvalid', async () => {
+      exportLouvorjaFile.mockRejectedValueOnce(new Error('disk'))
+      const wrapper = mountComponent()
+      await flushPromises()
+      const exportBtn = wrapper.findAll('.general-settings__sync-actions button')[0]
+      await exportBtn.trigger('click')
+      await flushPromises()
+      expect((wrapper.vm as any).syncStatus).toEqual({ kind: 'error', messageKey: 'settings.general.syncInvalid' })
+    })
+
+    it('import cancelado (null): syncCancelled', async () => {
+      importLouvorjaFile.mockResolvedValueOnce(null)
+      const wrapper = mountComponent()
+      await flushPromises()
+      const importBtn = wrapper.findAll('.general-settings__sync-actions button')[1]
+      await importBtn.trigger('click')
+      await flushPromises()
+      expect((wrapper.vm as any).syncStatus).toEqual({ kind: 'error', messageKey: 'settings.general.syncCancelled' })
+    })
+
+    it('import conteúdo inválido: syncInvalid', async () => {
+      importLouvorjaFile.mockResolvedValueOnce('raw')
+      isValidLouvorjaContent.mockReturnValueOnce(false)
+      const wrapper = mountComponent()
+      await flushPromises()
+      const importBtn = wrapper.findAll('.general-settings__sync-actions button')[1]
+      await importBtn.trigger('click')
+      await flushPromises()
+      expect((wrapper.vm as any).syncStatus).toEqual({ kind: 'error', messageKey: 'settings.general.syncInvalid' })
+    })
+
+    it('import com aplicações: syncImported com lista', async () => {
+      importLouvorjaFile.mockResolvedValueOnce('raw')
+      const wrapper = mountComponent()
+      await flushPromises()
+      const importBtn = wrapper.findAll('.general-settings__sync-actions button')[1]
+      await importBtn.trigger('click')
+      await flushPromises()
+      expect((wrapper.vm as any).syncStatus.kind).toBe('success')
+    })
+
+    it('import throw: syncInvalid', async () => {
+      importLouvorjaFile.mockRejectedValueOnce(new Error('bad'))
+      const wrapper = mountComponent()
+      await flushPromises()
+      const importBtn = wrapper.findAll('.general-settings__sync-actions button')[1]
+      await importBtn.trigger('click')
+      await flushPromises()
+      expect((wrapper.vm as any).syncStatus).toEqual({ kind: 'error', messageKey: 'settings.general.syncInvalid' })
+    })
   })
 })
