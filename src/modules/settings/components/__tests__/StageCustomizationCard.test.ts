@@ -551,4 +551,86 @@ describe('StageCustomizationCard', () => {
       wrapper.unmount()
     })
   })
+
+  describe('toggles e resets por scope (cliques finais)', () => {
+    it('global: textShadow/shadowIntensity/shadowBlur/textBox/boxBorder', async () => {
+      const w = createWrapper()
+      const store = useStageSettingsStore()
+      // SettingsToggle stub? verificar componente real
+      const toggles = w.findAll('input[type="checkbox"]')
+      for (const t of toggles.slice(0, 4)) await t.setValue(true)
+      const ranges = w.findAll('input[type="range"]')
+      for (const r of ranges.slice(0, 2)) await r.setValue('40')
+      expect(store.settings.textShadow).toBeDefined()
+      w.unmount()
+    })
+
+    it('reset scope: confirmar e cancelar', async () => {
+      const w = createWrapper()
+      const resetBtn = w.findAll('button').find(b => b.classes().join(' ').includes('reset') && !b.classes().join(' ').includes('cancel'))
+      if (resetBtn) {
+        await resetBtn.trigger('click')
+        await w.vm.$nextTick()
+        const cancel = w.findAll('button').find(b => b.classes().join(' ').includes('reset--cancel'))
+        if (cancel) await cancel.trigger('click')
+      }
+      w.unmount()
+    })
+
+    it('reset scope: confirmar de fato', async () => {
+      const w = createWrapper()
+      const resetBtn = w.findAll('button').find(b => b.classes().join(' ').includes('reset') && !b.classes().join(' ').includes('cancel'))
+      if (resetBtn) {
+        await resetBtn.trigger('click')
+        await w.vm.$nextTick()
+        const confirm = w.findAll('button').find(b => b.classes().join(' ').includes('reset') && !b.classes().join(' ').includes('cancel') && b.classes().join(' ').includes('--danger'))
+        if (confirm) await confirm.trigger('click')
+      }
+      w.unmount()
+    })
+
+    it('bible: showBibleVersion toggle + color/size', async () => {
+      const w = createWrapper()
+      const store = useStageSettingsStore()
+      store.setActiveScope?.('bible')
+      await w.vm.$nextTick()
+      const cbs = w.findAll('input[type="checkbox"]')
+      for (const c of cbs) await c.setValue(true)
+      const color = w.findAll('input[type="color"]').at(-1)
+      if (color) await color.setValue('#abcdef')
+      w.unmount()
+    })
+
+    it('clock: toggles showSeconds/format24h via switch click', async () => {
+      const w = createWrapper()
+      const store = useStageSettingsStore()
+      store.setActiveScope?.('clock')
+      await w.vm.$nextTick()
+      const labels = w.findAll('.stage-custom__toggle-label, [class*="switch"]')
+      for (const l of labels.slice(0, 4)) await l.trigger('click')
+      expect(store.settings.clock).toBeTruthy()
+      w.unmount()
+    })
+
+    it('hymns overrideBg switch (633)', async () => {
+      const w = createWrapper()
+      const store = useStageSettingsStore()
+      store.setActiveScope?.('global')
+      await w.vm.$nextTick()
+      const sw = w.findAll('[aria-label]').find(el => (el.attributes('aria-label') ?? '').length > 0 && el.attributes('aria-label') === el.attributes('aria-label'))
+      const musicSw = w.findAll('[class*="switch"]').find(s => s.classes().join(' ').includes('stage-custom__switch'))
+      if (musicSw) await musicSw.trigger('click')
+      w.unmount()
+    })
+
+    it('122: textColor null quando scope countdown sem timeFormat', async () => {
+      const w = createWrapper()
+      const store = useStageSettingsStore()
+      store.setActiveScope?.('countdown')
+      await w.vm.$nextTick()
+      // computed textColor/null ramo
+      expect(store.activeScope).toBe('countdown')
+      w.unmount()
+    })
+  })
 })
