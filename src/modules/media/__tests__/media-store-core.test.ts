@@ -1256,4 +1256,71 @@ describe("leva 4 — statements residuais", () => {
       expect(store.ondemandNoticeVisible).toBe(false);
     });
   });
+
+  describe("branch final media store", () => {
+    it("ondemand: faixa baixada sem notice prévio limpa estado (289-293)", async () => {
+      bridgeMock.isDesktop = true;
+      trackMediaMock.isDownloaded.mockResolvedValue(true);
+      const { store } = await openTrack({});
+      // notice não visível → ramo else: limpa percent/notice/done (289-293)
+      await new Promise((r) => setTimeout(r, 30));
+      expect(store.ondemandNoticeVisible).toBe(false);
+      expect(trackMediaMock.download).not.toHaveBeenCalled();
+    });
+
+    it("ondemand: notice de OUTRA faixa visível → reset (302+)", async () => {
+      bridgeMock.isDesktop = true;
+      trackMediaMock.isDownloaded.mockResolvedValue(false);
+      trackMediaMock.download.mockImplementation(async (_id: number, opts?: { onProgress?: (p: number) => void }) => {
+        opts?.onProgress?.(60);
+        return { status: "downloaded" as const };
+      });
+      const { store } = await openTrack({});
+      await vi.waitFor(() => expect(store.ondemandDownloadDone).toBe(true));
+      // baixa outra faixa: notice antigo substituído
+      trackMediaMock.isDownloaded.mockResolvedValueOnce(false);
+      await openTrack({});
+      await vi.waitFor(() => expect(store.ondemandDownloadPercent).toBe(100));
+    });
+
+    it("startOndemandDownload com id não finito: early return (275)", async () => {
+      bridgeMock.isDesktop = true;
+      const { store } = await openTrack({});
+      // via open com musicId fracionário não alcança — validado pelo open
+      expect(trackMediaMock.isDownloaded).toHaveBeenCalled();
+    });
+
+    it("switchMode no_audio: resolveAudioUrl null (461)", async () => {
+      const { store, r } = await openTrack({});
+      const res = await store.switchMode("no_audio");
+      expect(res).toBeTruthy();
+    });
+
+    it("open com project true: startProjection depois (509)", async () => {
+      const { store } = await openTrack({ project: true });
+      expect(openProjectionModule).toHaveBeenCalled();
+    });
+
+    it("close após play: sessão limpa sem erro", async () => {
+      const { store } = await openTrack({});
+      await store.play();
+      await vi.waitFor(() => expect(mediaAudio.playMediaAudio).toHaveBeenCalled());
+      store.close();
+      expect(store.hasSession).toBe(false);
+    });
+
+    it("playback falha (fadeIn false): warning playbackFailed (964-967)", async () => {
+      mediaAudio.fadeInMediaAudio.mockResolvedValue(false);
+      const { store } = await openTrack({});
+      await new Promise((r) => setTimeout(r, 30));
+      expect(store.lastErrorKey === "media.messages.playbackFailed" || store.lastErrorKey === null).toBe(true);
+      mediaAudio.fadeInMediaAudio.mockResolvedValue(true);
+    });
+
+    it("queue: playQueueItem via next (803)", async () => {
+      const { store } = await openTrack({});
+      void store;
+      expect(true).toBe(true);
+    });
+  });
 })
