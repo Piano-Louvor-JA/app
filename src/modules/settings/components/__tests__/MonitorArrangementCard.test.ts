@@ -5,13 +5,13 @@ import { createI18n } from 'vue-i18n'
 
 const identifyMock = vi.fn()
 const resetMock = vi.fn()
-const pointerMocks = {
+const pointerMocks = vi.hoisted(() => ({
   onPointerDown: vi.fn(),
   onPointerMove: vi.fn(),
   onPointerUp: vi.fn(),
   onPointerCancel: vi.fn(),
   hasCustomRef: null as unknown as { value: boolean },
-}
+}))
 
 vi.mock('@design-system/index', () => ({
   GlassCard: { name: 'GlassCard', template: '<div class="glass-stub"><slot /></div>' },
