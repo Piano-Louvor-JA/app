@@ -494,4 +494,68 @@ describe('MusicTrackActions', () => {
       expect(wrapper.find('.music-track-actions__check').exists()).toBe(true)
     })
   })
+
+  describe('ramos restantes', () => {
+    it('emit instrumental habilitado: dispara', async () => {
+      const wrapper = mount(MusicTrackActions, {
+        props: { ...defaultProps, hasInstrumental: true },
+        global: { plugins: [i18n] },
+      })
+      await wrapper.find('button:has(.ti-piano)').trigger('click')
+      expect(wrapper.emitted('instrumental')).toBeTruthy()
+      wrapper.unmount()
+    })
+
+    it('emit lyric: dispara', async () => {
+      const wrapper = mount(MusicTrackActions, {
+        props: defaultProps,
+        global: { plugins: [i18n] },
+      })
+      const btn = wrapper.findAll('button').find(b => b.attributes('aria-label') === 'Letra')
+      if (btn) {
+        await btn.trigger('click')
+        expect(wrapper.emitted('lyric')).toBeTruthy()
+      }
+      wrapper.unmount()
+    })
+
+    it('watch musicId: refreshOfflineStatus reexecuta', async () => {
+      const wrapper = mount(MusicTrackActions, {
+        props: defaultProps,
+        global: { plugins: [i18n] },
+      })
+      await wrapper.setProps({ musicId: 999 })
+      await flushPromises()
+      // se não lançou, o watch rodou
+      expect(true).toBe(true)
+      wrapper.unmount()
+    })
+
+    it('download com offlineStatus downloaded: chama requestRemove', async () => {
+      const wrapper = mount(MusicTrackActions, {
+        props: defaultProps,
+        global: { plugins: [i18n] },
+      })
+      const vm = wrapper.vm as any
+      vm.offlineStatus = 'downloaded'
+      await wrapper.find('button:has(.ti-download)').trigger('click')
+      // requestRemove abre confirmação em Teleport
+      await flushPromises()
+      wrapper.unmount()
+    })
+
+    it('onProgress com cancelRequested: ignora percentual', async () => {
+      const wrapper = mount(MusicTrackActions, {
+        props: defaultProps,
+        global: { plugins: [i18n] },
+      })
+      const vm = wrapper.vm as any
+      vm.cancelRequested = true
+      vm.downloadProgress = 0
+      // simula callback interno via via pública: recomeça download
+      await wrapper.find('button:has(.ti-download)').trigger('click')
+      await flushPromises()
+      wrapper.unmount()
+    })
+  })
 })

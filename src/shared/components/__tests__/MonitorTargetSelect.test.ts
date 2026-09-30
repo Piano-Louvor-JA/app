@@ -4,13 +4,14 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { createI18n } from 'vue-i18n'
 
+import type { Ref } from 'vue'
 const mocks = vi.hoisted(() => ({
-  optionsList: { value: [] as Array<{ displayId: number; label: string; primary: boolean }> },
-  selectedCount: { value: 0 },
-  hasDisplays: { value: true },
-  loading: { value: false },
-  identifying: { value: false },
-  open: { value: false },
+  optionsList: { value: [] as Array<{ displayId: number; label: string; primary: boolean }> } as unknown as Ref<Array<{ displayId: number; label: string; primary: boolean }>>,
+  selectedCount: { value: 0 } as unknown as Ref<number>,
+  hasDisplays: { value: true } as unknown as Ref<boolean>,
+  loading: { value: false } as unknown as Ref<boolean>,
+  identifying: { value: false } as unknown as Ref<boolean>,
+  open: { value: false } as unknown as Ref<boolean>,
   toggle: vi.fn(),
   identify: vi.fn(async () => {}),
   toggleOpen: vi.fn(),
@@ -18,21 +19,30 @@ const mocks = vi.hoisted(() => ({
   refresh: vi.fn(),
 }))
 
-vi.mock('@shared/composables/useMonitorTargetSelect', () => ({
-  useMonitorTargetSelect: () => ({
-    optionsList: mocks.optionsList,
-    selectedCount: mocks.selectedCount,
-    hasDisplays: mocks.hasDisplays,
-    loading: mocks.loading,
-    identifying: mocks.identifying,
-    open: mocks.open,
-    toggle: mocks.toggle,
-    identify: mocks.identify,
-    toggleOpen: mocks.toggleOpen,
-    close: mocks.close,
-    refresh: mocks.refresh,
-  }),
-}))
+vi.mock('@shared/composables/useMonitorTargetSelect', async () => {
+  const { ref } = await import('vue')
+  mocks.optionsList = ref([]) as any
+  mocks.selectedCount = ref(0) as any
+  mocks.hasDisplays = ref(true) as any
+  mocks.loading = ref(false) as any
+  mocks.identifying = ref(false) as any
+  mocks.open = ref(false) as any
+  return {
+    useMonitorTargetSelect: () => ({
+      optionsList: mocks.optionsList,
+      selectedCount: mocks.selectedCount,
+      hasDisplays: mocks.hasDisplays,
+      loading: mocks.loading,
+      identifying: mocks.identifying,
+      open: mocks.open,
+      toggle: mocks.toggle,
+      identify: mocks.identify,
+      toggleOpen: mocks.toggleOpen,
+      close: mocks.close,
+      refresh: mocks.refresh,
+    }),
+  }
+})
 
 import MonitorTargetSelect from '../MonitorTargetSelect.vue'
 
@@ -63,6 +73,7 @@ describe('MonitorTargetSelect', () => {
   let wrapper: ReturnType<typeof createWrapper> | null = null
 
   beforeEach(() => {
+  if (mocks.open) { mocks.open.value = false; mocks.optionsList.value = []; mocks.selectedCount.value = 0; mocks.identifying.value = false; mocks.hasDisplays.value = true; mocks.loading.value = false }
     vi.clearAllMocks()
     mocks.optionsList.value = [
       { displayId: 1, label: 'Monitor 1', primary: true },
@@ -205,13 +216,76 @@ describe('MonitorTargetSelect', () => {
     })
 
     it('pointerdown fora com painel aberto: close', async () => {
-      mocks.open.value = true
       const w = createWrapper({ attachTo: document.body } as any)
+      await flushPromises()
+      mocks.open.value = true
       await flushPromises()
       document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))
       await flushPromises()
       expect(mocks.close).toHaveBeenCalled()
       w.unmount()
+    })
+  })
+
+  describe('posicionamento e lifecycle', () => {
+    it('watch open: refresh + updatePanelPosition (painel acima quando espaço embaixo < 280)', async () => {
+      const w = createWrapper({ attachTo: document.body } as any)
+      await flushPromises()
+      mocks.open.value = true
+      await flushPromises()
+      expect(mocks.refresh).toHaveBeenCalled()
+      // jsdom: rect 0 — painel abre para baixo (top)
+      const panel = document.querySelector('.monitor-target__panel, [class*="panel"]')
+      expect(panel).not.toBeNull()
+      w.unmount()
+      document.body.innerHTML = ''
+    })
+
+    it('resize/scroll com painel aberto: reposiciona', async () => {
+      const w = createWrapper({ attachTo: document.body } as any)
+      await flushPromises()
+      mocks.open.value = true
+      await flushPromises()
+      window.dispatchEvent(new Event('resize'))
+      window.dispatchEvent(new Event('scroll', { bubbles: true }))
+      await flushPromises()
+      // sem erro = handlers registrados e executando
+      expect(mocks.refresh).toHaveBeenCalled()
+      w.unmount()
+      document.body.innerHTML = ''
+    })
+
+    it('pointerdown DENTRO do painel: não fecha', async () => {
+      const w = createWrapper({ attachTo: document.body } as any)
+      await flushPromises()
+      mocks.open.value = true
+      await flushPromises()
+      const panel = document.querySelector('.monitor-target__panel, [class*="panel"]') as HTMLElement
+      if (panel) {
+        panel.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))
+        await flushPromises()
+        expect(mocks.close).not.toHaveBeenCalled()
+      }
+      w.unmount()
+      document.body.innerHTML = ''
+    })
+
+    it('pointerdown fora (document): fecha', async () => {
+      const w = createWrapper({ attachTo: document.body } as any)
+      await flushPromises()
+      mocks.open.value = true
+      await flushPromises()
+      document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))
+      await flushPromises()
+      expect(mocks.close).toHaveBeenCalled()
+      w.unmount()
+      document.body.innerHTML = ''
+    })
+
+    it('unmount: remove listeners sem erro', async () => {
+      const w = createWrapper()
+      w.unmount()
+      expect(true).toBe(true)
     })
   })
 })

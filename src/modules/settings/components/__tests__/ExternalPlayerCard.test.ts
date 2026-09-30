@@ -213,4 +213,64 @@ describe("ExternalPlayerCard", () => {
       await flushPromises();
     });
   });
+
+  describe('ramos restantes 2', () => {
+    it('loadCustomPlayers: catch fallback mantém custom atual', async () => {
+      extApi.listCustom.mockRejectedValue(new Error('fail'));
+      extApi.get.mockResolvedValue('custom:/opt/player');
+      const wrapper = mountCard();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      expect(vm.customPlayers).toContain('/opt/player');
+    });
+
+    it('loadCustomPlayers: lista com vazios filtrados', async () => {
+      extApi.listCustom.mockResolvedValue(['/opt/a', '', '   ', '/opt/b']);
+      const wrapper = mountCard();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      expect(vm.customPlayers).toEqual(['/opt/a', '/opt/b']);
+    });
+
+    it('detect falha: installed [] e scanned true', async () => {
+      extApi.detect.mockRejectedValue(new Error('fail'));
+      const wrapper = mountCard();
+      await flushPromises();
+      expect((wrapper.vm as any).scanned).toBe(true);
+    });
+
+    it('removeCustom: result com player associado', async () => {
+      extApi.listCustom.mockResolvedValue(['/opt/a']);
+      extApi.removeCustom.mockResolvedValue({ player: 'associated', customPlayers: [] });
+      const wrapper = mountCard();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      await vm.removeCustom?.('/opt/a');
+      await flushPromises();
+      expect(extApi.removeCustom).toHaveBeenCalled();
+    });
+
+    it('removeCustom: sem result, remove da lista e reseta player', async () => {
+      extApi.get.mockResolvedValue('custom:/opt/a');
+      extApi.listCustom.mockResolvedValue(['/opt/a']);
+      extApi.removeCustom.mockResolvedValue(undefined);
+      extApi.set.mockResolvedValue(true);
+      const wrapper = mountCard();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      await vm.removeCustom?.('/opt/a');
+      await flushPromises();
+      expect(extApi.set).toHaveBeenCalledWith('associated');
+    });
+
+    it('pickCustomPlayer: file dialog cancelado', async () => {
+      extApi.openFile.mockResolvedValue(null);
+      const wrapper = mountCard();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      await vm.pickCustomPlayer?.();
+      await flushPromises();
+      expect(extApi.openFile).toHaveBeenCalled();
+    });
+  });
 });

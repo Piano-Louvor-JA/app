@@ -1228,4 +1228,32 @@ describe("leva 4 — statements residuais", () => {
 		const r = await store.switchMode("no_audio");
 		expect(r.ok).toBe(true);
 	});
-});
+
+  describe("ondemand: ramos restantes", () => {
+    it("gen stale no onProgress: ignora percentual", async () => {
+      bridgeMock.isDesktop = true;
+      trackMediaMock.isDownloaded.mockResolvedValue(false);
+      let onP: ((p: number) => void) | undefined;
+      trackMediaMock.download.mockImplementation(async (_id: number, opts?: { onProgress?: (p: number) => void }) => {
+        onP = opts?.onProgress;
+        return { status: "downloaded" as const };
+      });
+      const { store } = await openTrack({});
+      await new Promise((r) => setTimeout(r, 0));
+      // força nova geração e depois dispara progresso antigo
+      store.close();
+      onP?.(77);
+      await new Promise((r) => setTimeout(r, 0));
+      expect(store.ondemandDownloadPercent).toBeNull();
+    });
+
+    it("web: open não dispara download sob demanda", async () => {
+      bridgeMock.isDesktop = false;
+      trackMediaMock.isDownloaded.mockClear();
+      const { store } = await openTrack({});
+      await new Promise((r) => setTimeout(r, 0));
+      expect(trackMediaMock.download).not.toHaveBeenCalled();
+      expect(store.ondemandNoticeVisible).toBe(false);
+    });
+  });
+})
