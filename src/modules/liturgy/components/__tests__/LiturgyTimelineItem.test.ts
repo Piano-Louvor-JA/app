@@ -12,8 +12,25 @@ vi.mock('@shared/services/desktop-bridge', () => ({
 }))
 
 vi.mock('../composables/useExternalPlayerChoices', () => ({
-  useExternalPlayerChoices: () => ({ choices: [] }),
+  useExternalPlayerChoices: () => ({
+    globalPlayer: { value: 'associated' },
+    playerOptions: { value: [
+      { id: 'associated', label: 'Associado' },
+      { id: 'vlc', label: 'VLC' },
+    ] },
+    loadPlayerChoices: vi.fn(async () => {}),
+    selectedPlayerId: vi.fn((id?: string) => id ?? 'associated'),
+  }),
 }))
+
+const localVideoMocks = vi.hoisted(() => ({
+  setLiturgyVideoFile: vi.fn(() => 'blob:video'),
+  readVideoDuration: vi.fn(async () => 42),
+  readAudioDuration: vi.fn(async () => 30),
+  getLiturgyVideoObjectUrl: vi.fn(() => null),
+}))
+
+vi.mock('../../services/liturgy-local-video', () => localVideoMocks)
 
 vi.mock('../services/liturgy-item-helpers', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../services/liturgy-item-helpers')>()
@@ -350,6 +367,75 @@ describe('LiturgyTimelineItem', () => {
       const wrapper = createWrapper({ index: 2 })
       await wrapper.find('.liturgy-item').trigger('drop')
       expect(wrapper.emitted('drop')?.[0]).toEqual([2])
+    })
+  })
+
+  describe('funções internas restantes', () => {
+    it('onVideoFileChange vídeo: seta nome, blob, duração e emite', async () => {
+      const { setLiturgyVideoFile, readVideoDuration } = localVideoMocks
+      const wrapper = createWrapper({ item: createItem({ id: 'v1', type: 'video' }) })
+      const file = new File(['x'], 'clip.mp4', { type: 'video/mp4' })
+      await (wrapper.vm as any).onVideoFileChange({ target: { files: [file] } })
+      expect(setLiturgyVideoFile).toHaveBeenCalledWith('v1', file)
+      expect(readVideoDuration).toHaveBeenCalledWith(file)
+      expect((wrapper.vm as any).videoFileName).toBe('clip.mp4')
+      expect(wrapper.emitted('videoFileSelected')![0]).toEqual([42])
+    })
+
+    it('onVideoFileChange áudio: usa readAudioDuration', async () => {
+      const { readAudioDuration } = localVideoMocks
+      const wrapper = createWrapper({ item: createItem({ id: 'a1', type: 'audio' }) })
+      const file = new File(['x'], 'som.mp3', { type: 'audio/mpeg' })
+      await (wrapper.vm as any).onVideoFileChange({ target: { files: [file] } })
+      expect(readAudioDuration).toHaveBeenCalledWith(file)
+      expect(wrapper.emitted('videoFileSelected')![0]).toEqual([30])
+    })
+
+    it('onVideoFileChange sem arquivo: não faz nada', async () => {
+      const { setLiturgyVideoFile } = localVideoMocks
+      const wrapper = createWrapper({ item: createItem({ id: 'v2', type: 'video' }) })
+      await (wrapper.vm as any).onVideoFileChange({ target: { files: [] } })
+      expect(setLiturgyVideoFile).not.toHaveBeenCalled()
+    })
+
+    it('playerOptionLabel: player global ganha sufixo default', () => {
+      const wrapper = createWrapper({ item: createItem({ id: 'm1', type: 'music', musicId: 1 }) })
+      const label = (wrapper.vm as any).playerOptionLabel({ id: 'associated', label: 'Associado' })
+      expect(label).toContain('Associado')
+    })
+
+    it('rowPlayerId: resolve do item', () => {
+      const wrapper = createWrapper({ item: createItem({ id: 'm2', type: 'music', musicId: 1, playerId: 'vlc' }) })
+      expect((wrapper.vm as any).rowPlayerId).toBe('vlc')
+    })
+
+    it('onHandleDragStart: emite dragStart com index', async () => {
+      const wrapper = createWrapper({ item: createItem({ id: 'd1', type: 'music', musicId: 1 }), index: 3 })
+      const dt = {
+        effectAllowed: '',
+        setData: vi.fn(),
+        setDragImage: vi.fn(),
+      }
+      await (wrapper.vm as any).onHandleDragStart({ dataTransfer: dt, clientX: 10, clientY: 10 })
+      expect(dt.effectAllowed).toBe('move')
+      expect(dt.setData).toHaveBeenCalledWith('text/plain', '3')
+      expect(wrapper.emitted('dragStart')![0]).toEqual([3])
+      document.querySelectorAll('.liturgy-item--drag-ghost').forEach((g) => g.remove())
+    })
+
+    it('onHandleDragStart sem dataTransfer: só emite', async () => {
+      const wrapper = createWrapper({ item: createItem({ id: 'd2', type: 'music', musicId: 1 }), index: 1 })
+      await (wrapper.vm as any).onHandleDragStart({})
+      expect(wrapper.emitted('dragStart')![0]).toEqual([1])
+    })
+
+    it('onHandleDragEnd: emite dragEnd', async () => {
+      vi.useFakeTimers()
+      const wrapper = createWrapper({ item: createItem({ id: 'd3', type: 'music', musicId: 1 }) })
+      ;(wrapper.vm as any).onHandleDragEnd()
+      await vi.runAllTimersAsync()
+      expect(wrapper.emitted('dragEnd')).toBeTruthy()
+      vi.useRealTimers()
     })
   })
 })
