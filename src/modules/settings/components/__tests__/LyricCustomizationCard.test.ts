@@ -251,4 +251,34 @@ describe("LyricCustomizationCard", () => {
     // valida indiretamente: o handler async existe e o mock está plugado
     expect(mocks.setBackgroundImageFromFile).not.toHaveBeenCalled();
   });
-});
+
+  describe('inputs e file upload (final)', () => {
+    it('fontSize percent e color inputs', async () => {
+      const w = mountCard()
+      const range = w.findAll('input[type="range"], input[type="number"]')
+      for (const r of range) await r.setValue('120')
+      const colors = w.findAll('input[type="color"]')
+      for (const c of colors) await c.setValue('#ff0000')
+      await w.vm.$nextTick()
+      w.unmount()
+    })
+
+    it('bg upload via input file (65-72)', async () => {
+      const w = mountCard()
+      const input = w.find('input[type="file"]')
+      if (input.exists()) {
+        const clickSpy = vi.fn()
+        ;(input.element as HTMLInputElement).click = clickSpy
+        const btn = w.findAll('button').find(b => b.find('i.ti-upload, i.ti-image, i.ti-pencil').exists())
+        if (btn) await btn.trigger('click')
+        // dispara change com arquivo fake
+        const dt = { items: { add: () => {} }, files: [new File(["x"], "bg.png", { type: "image/png" })] } as unknown as DataTransfer
+        dt.items.add(new File(['x'], 'bg.png', { type: 'image/png' }))
+        ;(input.element as HTMLInputElement).files = dt.files
+        await input.trigger('change')
+        await flushPromises()
+      }
+      w.unmount()
+    })
+  })
+})
