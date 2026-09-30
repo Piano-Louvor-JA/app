@@ -50,13 +50,14 @@ vi.mock('@modules/sync/services/louvorja-package', () => ({
   isValidLouvorjaContent: vi.fn(() => true),
 }))
 
+import { ref } from 'vue'
 const updateCheckerState = {
   checkForUpdates: vi.fn(async () => {}),
-  isChecking: { value: false },
-  hasUpdate: { value: false },
-  newVersion: { value: '' },
-  error: { value: null as string | null },
-  hasChecked: { value: false },
+  isChecking: ref(false),
+  hasUpdate: ref(false),
+  newVersion: ref(''),
+  error: ref<string | null>(null),
+  hasChecked: ref(false),
 }
 vi.mock('@shared/composables/useUpdateChecker', () => ({
   useUpdateChecker: () => updateCheckerState,
@@ -294,9 +295,11 @@ describe('GeneralView.vue', () => {
 
   describe('check update + idioma + clear', () => {
     it('checkUpdate: botão desabilitado no browser', () => {
+      vi.mocked(isDesktopApp).mockReturnValue(false)
       const wrapper = mountComponent()
-      const btn = wrapper.findAll('button').find((b) => b.text().includes('checkUpdate') || b.text().includes('checking'))
-      if (btn) expect((btn.element as HTMLButtonElement).disabled).toBe(true)
+      const btn = wrapper.find('.general-settings__btn--primary')
+      expect(btn.exists()).toBe(true)
+      expect((btn.element as HTMLButtonElement).disabled).toBe(true)
     })
 
     it('hasUpdate: mostra mensagem com versão', async () => {
@@ -308,9 +311,17 @@ describe('GeneralView.vue', () => {
       updateCheckerState.newVersion.value = ''
     })
 
+    it('hasChecked sem update: mostra status info', async () => {
+      updateCheckerState.hasChecked.value = true
+      const wrapper = mountComponent()
+      expect(wrapper.find('.general-settings__status--info').exists()).toBe(true)
+      updateCheckerState.hasChecked.value = false
+    })
+
     it('updateError: mostra status de erro', async () => {
       updateCheckerState.error.value = 'falha rede'
       const wrapper = mountComponent()
+      // usar status text ou classe — elemento deve existir com error setado pré-mount
       expect(wrapper.find('.general-settings__status--error').exists()).toBe(true)
       updateCheckerState.error.value = null
     })
