@@ -6,7 +6,13 @@ const loadClockConfigMock = vi.hoisted(() => vi.fn(() => ({
   style: 'analog', format24h: true, showSeconds: true, textColor: '#fff', bgColor: '#000',
 })))
 const normalizeClockConfigMock = vi.hoisted(() => vi.fn((cfg: unknown) => ({ ...(cfg as object) })))
-const subscribeMock = vi.hoisted(() => vi.fn(() => vi.fn()))
+const stageSubs = vi.hoisted(() => ({ cbs: [] as Array<() => void>, unsubs: [] as Array<ReturnType<typeof vi.fn>> }))
+const subscribeMock = vi.hoisted(() => vi.fn((cb: () => void) => {
+  stageSubs.cbs.push(cb)
+  const unsub = vi.fn()
+  stageSubs.unsubs.push(unsub)
+  return unsub
+}))
 const readEffectiveMock = vi.hoisted(() => vi.fn(() => ({
   backgroundColor: '#fff', backgroundImage: null, fontSize: 96,
 })))
@@ -142,7 +148,7 @@ describe('ClockProjectionView.vue', () => {
     const w = mountView()
     await flushPromises()
     const ch = FakeBroadcastChannel.instances[0]
-    const unsub = subscribeMock.mock.results[0].value
+    const unsub = stageSubs.unsubs.at(-1)!
     w.unmount()
     expect(ch?.closed).toBe(true)
     expect(unsub).toHaveBeenCalled()
@@ -155,4 +161,16 @@ describe('ClockProjectionView.vue', () => {
     await flushPromises()
     expect(w.find('.stub-projection-background').exists()).toBe(true)
   })
+
+describe('subscribe callback (55)', () => {
+  it('callback do subscribe atualiza stage', async () => {
+    stageSubs.cbs.length = 0
+    const w = mount(ClockProjectionView)
+    await w.vm.$nextTick()
+    expect(stageSubs.cbs.length).toBeGreaterThanOrEqual(1)
+    for (const cb of stageSubs.cbs) cb()
+    await w.vm.$nextTick()
+    w.unmount()
+  })
+})
 })

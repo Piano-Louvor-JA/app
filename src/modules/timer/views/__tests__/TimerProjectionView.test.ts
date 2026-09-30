@@ -3,11 +3,15 @@
 import { mount, flushPromises } from '@vue/test-utils'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
+const stageSubs = vi.hoisted(() => ({ cbs: [] as Array<() => void> }))
 const { mockLoadConfig, mockReadRuntime, mockReadStage, mockSubscribeStage } = vi.hoisted(() => ({
   mockLoadConfig: vi.fn(),
   mockReadRuntime: vi.fn(),
   mockReadStage: vi.fn(),
-  mockSubscribeStage: vi.fn(),
+  mockSubscribeStage: vi.fn((cb: () => void) => {
+    stageSubs.cbs.push(cb)
+    return () => {}
+  }),
 }))
 
 vi.mock('@design-system/index', () => ({
@@ -58,7 +62,11 @@ describe('TimerProjectionView', () => {
     vi.clearAllMocks()
     storageListeners = []
     unsubSpy = vi.fn()
-    mockSubscribeStage.mockReturnValue(unsubSpy)
+    stageSubs.cbs.length = 0
+    mockSubscribeStage.mockImplementation((cb: () => void) => {
+      stageSubs.cbs.push(cb)
+      return unsubSpy
+    })
     mockReadStage.mockReturnValue({ ...stageBase })
     mockLoadConfig.mockReturnValue({ timeFormat: 'HH:mm:ss', bgColor: '#000', textColor: '#fff' })
     mockReadRuntime.mockReturnValue({ status: 'idle', remainingMs: 60000, savedTimesMs: [] })
@@ -153,5 +161,15 @@ describe('TimerProjectionView', () => {
     globalThis.BroadcastChannel = Orig
     wrapper.unmount()
     expect(true).toBe(true)
+  })
+
+  it('subscribe callback atualiza stage (84)', async () => {
+    stageSubs.cbs.length = 0
+    const wrapper = mount(TimerProjectionView)
+    await wrapper.vm.$nextTick()
+    expect(stageSubs.cbs.length).toBeGreaterThanOrEqual(1)
+    for (const cb of stageSubs.cbs) cb()
+    await wrapper.vm.$nextTick()
+    wrapper.unmount()
   })
 })
