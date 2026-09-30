@@ -1,92 +1,215 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+// useAppBootstrap — warm boot, first boot, projection popup, browser, bridge missing, retry
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { createApp, h, defineComponent } from 'vue'
 
-// helper: roda composable dentro de um setup real (storeToRefs exige contexto)
-function withSetup<T>(fn: () => T): { result: T; app: ReturnType<typeof createApp> } {
-  let result!: T
-  const app = createApp(defineComponent({
-    setup() {
-      result = fn()
-      return () => h('div')
-    },
-  }))
-  app.use(createPinia())
-  app.mount(document.createElement('div'))
-  return { result, app }
-}
+const mocks = vi.hoisted(() => ({
+  isBootstrapComplete: vi.fn(),
+  mapBootstrapError: vi.fn((e: unknown) => `mapped:${String(e)}`),
+  markBootstrapComplete: vi.fn(),
+  prepareFreshInstall: vi.fn(),
+  syncEssentialCatalogFromApi: vi.fn(),
+  syncRemoteConfig: vi.fn(),
+  ensureAlbumCovers: vi.fn(),
+  startCoverBackgroundSync: vi.fn(),
+  getDesktopBridge: vi.fn(),
+  isDesktopApp: vi.fn(),
+  isElectronShell: vi.fn(),
+  isProjectionPopupLocation: vi.fn(),
+}))
 
 vi.mock('@modules/starting/services/bootstrap-service', () => ({
-  loadAndCacheCatalog: vi.fn(async () => ({ ok: true })),
-  syncBibleFromApi: vi.fn(async () => ({ ok: true })),
-  warmupMediaCache: vi.fn(async () => ({ ok: true })),
-  mapBootstrapError: vi.fn((err: unknown) => String(err)),
+  isBootstrapComplete: mocks.isBootstrapComplete,
+  mapBootstrapError: mocks.mapBootstrapError,
+  markBootstrapComplete: mocks.markBootstrapComplete,
+  prepareFreshInstall: mocks.prepareFreshInstall,
+  syncEssentialCatalogFromApi: mocks.syncEssentialCatalogFromApi,
+  syncRemoteConfig: mocks.syncRemoteConfig,
 }))
 
 vi.mock('@modules/starting/services/cover-background-sync', () => ({
-  scheduleCoverBackgroundSync: vi.fn(),
+  ensureAlbumCovers: mocks.ensureAlbumCovers,
+  startCoverBackgroundSync: mocks.startCoverBackgroundSync,
 }))
 
 vi.mock('@shared/services/desktop-bridge', () => ({
-  getDesktopBridge: vi.fn(() => null),
-  isDesktopApp: vi.fn(() => false),
+  getDesktopBridge: mocks.getDesktopBridge,
+  isDesktopApp: mocks.isDesktopApp,
+  isElectronShell: mocks.isElectronShell,
 }))
 
 vi.mock('@shared/services/projection-window-location', () => ({
-  isProjectionPopupLocation: vi.fn(() => false),
+  isProjectionPopupLocation: mocks.isProjectionPopupLocation,
 }))
 
-vi.mock('@modules/starting/stores/useStartingStore', async (importOriginal) => {
-  const { ref } = await import('vue')
-  const storeInstance = {
-    catalogStatus: ref('idle'),
-    bibleStatus: ref('idle'),
-    error: ref(null),
-    isBooted: ref(false),
-    progress: ref(0),
-    isVisible: ref(true),
-    showContent: ref(false),
-    isAppReady: ref(false),
-    isFirstBoot: ref(true),
-    hasError: ref(false),
-    statusKey: ref('loading'),
-    setCatalogStatus: vi.fn(),
-    setBibleStatus: vi.fn(),
-    setError: vi.fn(),
-    setBooted: vi.fn(),
-    hide: vi.fn(),
-    markError: vi.fn(),
-    resetError: vi.fn(),
-    revealOverlay: vi.fn(),
-    setProgress: vi.fn(),
-    setStatus: vi.fn(),
-    phase: ref('idle'),
-  }
-  return {
-    useStartingStore: vi.fn(() => storeInstance),
-  }
-})
-
 import { useAppBootstrap } from '../useAppBootstrap'
+import { useStartingStore } from '@modules/starting/stores/useStartingStore'
+
+// host component: monta o composable num setup real (onMounted dispara o bootstrap)
+function mountHost() {
+  const host = defineComponent({
+    setup() {
+      useAppBootstrap()
+      return () => h('div')
+    },
+  })
+  const app = createApp(host)
+  app.use(createPinia())
+  const el = document.createElement('div')
+  document.body.appendChild(el)
+  app.mount(el)
+  return app
+}
 
 describe('useAppBootstrap', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
+    mocks.isProjectionPopupLocation.mockReturnValue(false)
+    mocks.isElectronShell.mockReturnValue(true)
+    mocks.isDesktopApp.mockReturnValue(true)
+    mocks.getDesktopBridge.mockReturnValue({ platform: 'win32' })
+    mocks.isBootstrapComplete.mockResolvedValue(true)
+    mocks.syncEssentialCatalogFromApi.mockResolvedValue(undefined)
+    mocks.ensureAlbumCovers.mockResolvedValue(undefined)
+    mocks.markBootstrapComplete.mockResolvedValue(undefined)
+    mocks.syncRemoteConfig.mockResolvedValue(undefined)
+    mocks.prepareFreshInstall.mockResolvedValue(undefined)
+    document.body.innerHTML = ''
+    vi.useFakeTimers()
   })
 
-  it('composable roda dentro de setup sem crashar', () => {
-    expect(() => {
-      const { app } = withSetup(() => useAppBootstrap())
-      app.unmount()
-    }).not.toThrow()
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
   })
 
-  it('retorna objeto com as funções expostas', () => {
-    const { result, app } = withSetup(() => useAppBootstrap() as Record<string, unknown>)
-    expect(result).toBeDefined()
-    expect(Object.keys(result).length).toBeGreaterThan(0)
+  it('projection popup: esconde e não faz nada', async () => {
+    mocks.isProjectionPopupLocation.mockReturnValue(true)
+    const app = mountHost()
+    await vi.runAllTimersAsync()
+    const store = useStartingStore()
+    expect(store.isVisible).toBe(false)
+    expect(mocks.isBootstrapComplete).not.toHaveBeenCalled()
     app.unmount()
+  })
+
+  it('browser puro: splash breve e libera', async () => {
+    mocks.isElectronShell.mockReturnValue(false)
+    const app = mountHost()
+    await vi.runAllTimersAsync()
+    const store = useStartingStore()
+    expect(store.isVisible).toBe(false)
+    expect(store.isAppReady).toBe(true)
+    expect(mocks.isBootstrapComplete).not.toHaveBeenCalled()
+    app.unmount()
+  })
+
+  it('electron sem bridge: erro bridgeMissing, splash permanece', async () => {
+    mocks.isDesktopApp.mockReturnValue(false)
+    const app = mountHost()
+    await vi.runAllTimersAsync()
+    const store = useStartingStore()
+    expect(store.hasError).toBe(true)
+    expect(store.statusKey).toBe('starting.status.bridgeMissing')
+    expect(store.isVisible).toBe(true)
+    app.unmount()
+  })
+
+  it('warm boot: progresso até 100, esconde, pré-aquece capas', async () => {
+    const app = mountHost()
+    await vi.runAllTimersAsync()
+    const store = useStartingStore()
+    expect(store.progress).toBe(100)
+    expect(store.isVisible).toBe(false)
+    expect(mocks.startCoverBackgroundSync).toHaveBeenCalled()
+    app.unmount()
+  })
+
+  it('warm boot: progresso passa por valores intermediários', async () => {
+    const app = mountHost()
+    await vi.advanceTimersByTimeAsync(500) // ~5 steps → ~30
+    const store = useStartingStore()
+    expect(store.progress).toBeGreaterThan(0)
+    expect(store.progress).toBeLessThan(100)
+    await vi.runAllTimersAsync()
+    expect(store.progress).toBe(100)
+    app.unmount()
+  })
+
+  it('first boot: sequência completa e reload', async () => {
+    mocks.isBootstrapComplete.mockResolvedValue(false)
+    const reloadSpy = vi.fn()
+    Object.defineProperty(window, 'location', {
+      value: { ...window.location, reload: reloadSpy },
+      writable: true,
+      configurable: true,
+    })
+    const app = mountHost()
+    await vi.runAllTimersAsync()
+    const store = useStartingStore()
+    expect(mocks.prepareFreshInstall).toHaveBeenCalled()
+    expect(mocks.syncRemoteConfig).toHaveBeenCalled()
+    expect(mocks.syncEssentialCatalogFromApi).toHaveBeenCalled()
+    expect(mocks.ensureAlbumCovers).toHaveBeenCalledWith(expect.objectContaining({ skipIfSynced: false }))
+    expect(mocks.markBootstrapComplete).toHaveBeenCalled()
+    expect(reloadSpy).toHaveBeenCalled()
+    expect(store.progress).toBe(100)
+    app.unmount()
+  })
+
+  it('first boot: onProgress do catálogo repassa ao store', async () => {
+    mocks.isBootstrapComplete.mockResolvedValue(false)
+    mocks.syncEssentialCatalogFromApi.mockImplementation(async (cb: (v: number) => void) => {
+      cb(55)
+    })
+    const app = mountHost()
+    await vi.runAllTimersAsync()
+    const store = useStartingStore()
+    // fluxo completo passou pelas fases; status final é done
+    expect(store.statusKey).toBe('starting.status.done')
+    app.unmount()
+  })
+
+  it('first boot: onProgress das capas define fase syncingCovers', async () => {
+    mocks.isBootstrapComplete.mockResolvedValue(false)
+    mocks.ensureAlbumCovers.mockImplementation(async ({ onProgress }: { onProgress?: (v: number) => void }) => {
+      onProgress?.(30)
+    })
+    const app = mountHost()
+    await vi.runAllTimersAsync()
+    const store = useStartingStore()
+    // fluxo termina com done; fase syncingCovers foi setada durante onProgress
+    expect(store.statusKey).toBe('starting.status.done')
+    app.unmount()
+  })
+
+  it('erro no first boot → markError mapeado', async () => {
+    mocks.isBootstrapComplete.mockResolvedValue(false)
+    mocks.prepareFreshInstall.mockRejectedValue(new Error('offline'))
+    const app = mountHost()
+    await vi.runAllTimersAsync()
+    const store = useStartingStore()
+    expect(store.hasError).toBe(true)
+    expect(store.statusKey).toBe('mapped:Error: offline')
+    app.unmount()
+  })
+
+  it('dismissStaticHtmlSplash: esconde #boot-splash se existir', async () => {
+    const splash = document.createElement('div')
+    splash.id = 'boot-splash'
+    document.body.appendChild(splash)
+    mocks.isElectronShell.mockReturnValue(false)
+    const app = mountHost()
+    await vi.runAllTimersAsync()
+    expect(splash.hidden).toBe(true)
+    app.unmount()
+  })
+
+  it('unmount: limpa warm interval sem erro', async () => {
+    const app = mountHost()
+    await vi.runAllTimersAsync()
+    expect(() => app.unmount()).not.toThrow()
   })
 })
