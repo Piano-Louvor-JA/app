@@ -1466,4 +1466,109 @@ describe('palco-bridge', () => {
       vi.useRealTimers()
     })
   })
+
+  describe('branch finale 6 (últimos 22)', () => {
+    beforeEach(async () => {
+      stopPalcoBridge()
+      watchCallbacks.length = 0
+      localStorage.clear()
+      useMediaStoreMock.mockReturnValue(null)
+      startPalcoBridge()
+      for (const [key, val] of [
+        ['media-key', { active: false, lyric: '', title: '' }],
+        ['bible-key', { projecting: false, active: false, text: '', reference: '' }],
+        ['random-key', { projecting: false, currentDisplay: '' }],
+      ] as const) {
+        window.dispatchEvent(new StorageEvent('storage', { key, newValue: JSON.stringify(val) }))
+      }
+      await new Promise((r) => setTimeout(r, 5))
+      stopPalcoBridge()
+      localStorage.clear()
+    })
+
+    it('planForSlot real: assigned a video/ppt (default true não-idle)', async () => {
+      vi.useFakeTimers()
+      const actual = await vi.importActual('../output-plan') as any
+      const { planForSlot } = await import('../output-plan')
+      ;(planForSlot as any).mockImplementation(actual.planForSlot)
+      useOutputRegistryMock.mockReturnValue({
+        outputs: [],
+        refresh: vi.fn(async () => {}),
+        moduleForSlot: vi.fn(() => 'video' as any),
+      })
+      getPalcoRouteMockRef.mockImplementation((m: string) => (m === 'random' ? 'slot9' : 'mirror'))
+      startPalcoBridge()
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'random-key',
+        newValue: JSON.stringify({ projecting: true, currentDisplay: 'S' }),
+      }))
+      await vi.advanceTimersByTimeAsync(100)
+      // assigned video vivo (default true) → render assigned, module video → bridge NÃO toca
+      const touched = palcoSessionMock.projectTo.mock.calls.filter((c: any[]) => c[0] === 'slot1')
+      expect(touched.length).toBe(0)
+      stopPalcoBridge()
+      getPalcoRouteMockRef.mockImplementation(() => 'mirror')
+      useOutputRegistryMock.mockReturnValue({
+        outputs: [{ id: 'mirror', module: 'mirror' }],
+        refresh: vi.fn(async () => {}),
+        moduleForSlot: vi.fn(() => null),
+      })
+      vi.useRealTimers()
+      ;(planForSlot as any).mockImplementation(() => ({ render: 'owner', module: null }))
+    })
+
+    it('setIntent owner===o: re-render (489)', async () => {
+      vi.useFakeTimers()
+      startPalcoBridge()
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'countdown-key',
+        newValue: JSON.stringify({ projecting: true, status: 'running', segmentStartedAt: Date.now(), accumulatedMs: 0, durationMs: 60_000 }),
+      }))
+      await vi.advanceTimersByTimeAsync(100)
+      const c1 = palcoSessionMock.timerTo.mock.calls.length
+      // mesmo valor de intent (true) com owner countdown → re-render
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'countdown-key',
+        newValue: JSON.stringify({ projecting: true, status: 'running', segmentStartedAt: Date.now(), accumulatedMs: 0, durationMs: 61_000 }),
+      }))
+      await vi.advanceTimersByTimeAsync(100)
+      expect(palcoSessionMock.timerTo.mock.calls.length).toBeGreaterThan(c1)
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('setIntent wants true owner null intent true: reassume (490)', async () => {
+      vi.useFakeTimers()
+      startPalcoBridge()
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'timer-key',
+        newValue: JSON.stringify({ projecting: true, status: 'running', segmentStartedAt: Date.now() - 65_000, accumulatedMs: 0, durationMs: 600_000 }),
+      }))
+      await vi.advanceTimersByTimeAsync(100)
+      // derruba SEM desligar (release via stopPalcoBridge? não...) — simulamos: stop bridge e re-start mantém runtimes mas zera owner
+      stopPalcoBridge()
+      startPalcoBridge()
+      // storage idêntico re-aplicado no bind inicial: intent true, owner null → claim reassume
+      localStorage.setItem('timer-key', JSON.stringify({ projecting: true, status: 'running', segmentStartedAt: Date.now() - 65_000, accumulatedMs: 0, durationMs: 600_000 }))
+      await vi.advanceTimersByTimeAsync(2200)
+      expect(palcoSessionMock.timerTo).toHaveBeenCalled()
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('clock tick com planForSlot real owner mirror: renderClockTo (linhas 276-278)', async () => {
+      vi.useFakeTimers()
+      const actual = await vi.importActual('../output-plan') as any
+      const { planForSlot } = await import('../output-plan')
+      ;(planForSlot as any).mockImplementation(actual.planForSlot)
+      startPalcoBridge()
+      palcoClockOn()
+      await vi.advanceTimersByTimeAsync(15001)
+      const clockCalls = palcoSessionMock.projectTo.mock.calls.filter((c: any[]) => c[1] === 'clock')
+      expect(clockCalls.length).toBeGreaterThanOrEqual(2)
+      palcoClockOff()
+      vi.useRealTimers()
+      ;(planForSlot as any).mockImplementation(() => ({ render: 'owner', module: null }))
+    })
+  })
 })
