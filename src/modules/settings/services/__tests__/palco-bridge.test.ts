@@ -11,6 +11,7 @@ const palcoSessionMock = vi.hoisted(() => ({
   projectTo: vi.fn(async () => true),
   timerTo: vi.fn(async () => true),
   idleTo: vi.fn(async () => true),
+  audio: vi.fn(async () => {}),
 }))
 const unsubscribeMocks = {
   bible: vi.fn(),
@@ -38,26 +39,26 @@ vi.mock('@shared/services/desktop-bridge', () => ({
   getDesktopBridge: getDesktopBridgeMock,
   isDesktopApp: vi.fn(() => false),
 }))
-vi.mock('../../bible/services/bible-runtime', () => ({
+vi.mock('../../../bible/services/bible-runtime', () => ({
   BIBLE_RUNTIME_CHANNEL: 'bible-ch',
   BIBLE_RUNTIME_STORAGE_KEY: 'bible-key',
   normalizeBibleRuntime: vi.fn((v: unknown) => v ?? {}),
   publishBibleRuntimeOff,
 }))
-vi.mock('../../random/services/random-runtime', () => ({
+vi.mock('../../../random/services/random-runtime', () => ({
   RANDOM_RUNTIME_CHANNEL: 'random-ch',
   RANDOM_RUNTIME_STORAGE_KEY: 'random-key',
   normalizeRandomRuntime: vi.fn((v: unknown) => v ?? {}),
   publishRandomRuntime,
   readRandomRuntimeFromStorage,
 }))
-vi.mock('../../timer/services/timer-runtime', () => ({
+vi.mock('../../../timer/services/timer-runtime', () => ({
   TIMER_RUNTIME_CHANNEL: 'timer-ch',
   TIMER_RUNTIME_STORAGE_KEY: 'timer-key',
   normalizeTimerRuntime: vi.fn((v: unknown) => v ?? {}),
   publishTimerRuntime,
 }))
-vi.mock('../../countdown/services/countdown-runtime', () => ({
+vi.mock('../../../countdown/services/countdown-runtime', () => ({
   COUNTDOWN_RUNTIME_CHANNEL: 'countdown-ch',
   COUNTDOWN_RUNTIME_STORAGE_KEY: 'countdown-key',
   normalizeCountdownRuntime: vi.fn((v: unknown) => v ?? {}),
@@ -73,16 +74,19 @@ vi.mock('../output-plan', () => ({
 vi.mock('../palco-routing', () => ({
   getPalcoRoute: vi.fn(() => 'mirror'),
 }))
-vi.mock('./stage-settings-runtime', () => ({
+vi.mock('../stage-settings-runtime', () => ({
   subscribeStageSettings: subscribeStageSettingsMock,
 }))
-vi.mock('../../media/services/media-runtime', () => ({
+vi.mock('../../../media/services/media-runtime', () => ({
   MEDIA_RUNTIME_CHANNEL: 'media-ch',
   MEDIA_RUNTIME_STORAGE_KEY: 'media-key',
   normalizeMediaRuntime: vi.fn((v: unknown) => v ?? {}),
 }))
-vi.mock('../../media/stores/useMediaStore', () => ({
-  useMediaStore: vi.fn(() => null),
+const useMediaStoreMock = vi.hoisted(() => {
+  return vi.fn<() => any>(() => null)
+})
+vi.mock('../../../media/stores/useMediaStore', () => ({
+  useMediaStore: useMediaStoreMock,
 }))
 vi.mock('vue', async (importOriginal) => {
   const actual = await importOriginal<typeof import('vue')>()
@@ -255,7 +259,7 @@ describe('palco-bridge', () => {
 
     it('timer projecting: ownerInput timer chrono e projectTo com fmtClock', async () => {
       vi.useFakeTimers()
-      localStorage.setItem('louvorja-timer-runtime-state', JSON.stringify(freshTimer))
+      localStorage.setItem('timer-key', JSON.stringify(freshTimer))
       mod.startPalcoBridge()
       // storage apply via bindChannel initial read
       await vi.advanceTimersByTimeAsync(0)
@@ -266,37 +270,37 @@ describe('palco-bridge', () => {
       expect(timerCall![1].mode).toBe('chrono')
       expect(timerCall![1].duration).toBeGreaterThanOrEqual(65)
       mod.stopPalcoBridge()
-      localStorage.removeItem('louvorja-timer-runtime-state')
+      localStorage.removeItem('timer-key')
       vi.useRealTimers()
     })
 
     it('timer stale (segmentStartedAt > 12h): não projeta', async () => {
       vi.useFakeTimers()
-      localStorage.setItem('louvorja-timer-runtime-state', JSON.stringify({ ...freshTimer, segmentStartedAt: nowMs - 13 * 3600_000 }))
+      localStorage.setItem('timer-key', JSON.stringify({ ...freshTimer, segmentStartedAt: nowMs - 13 * 3600_000 }))
       mod.startPalcoBridge()
       await vi.advanceTimersByTimeAsync(2100)
       const timerCall = palcoSessionMock.timerTo.mock.calls.at(-1) as any[] | undefined
       expect(timerCall).toBeUndefined()
       mod.stopPalcoBridge()
-      localStorage.removeItem('louvorja-timer-runtime-state')
+      localStorage.removeItem('timer-key')
       vi.useRealTimers()
     })
 
     it('timer idle: sem claim', async () => {
       vi.useFakeTimers()
-      localStorage.setItem('louvorja-timer-runtime-state', JSON.stringify({ ...freshTimer, status: 'idle' }))
+      localStorage.setItem('timer-key', JSON.stringify({ ...freshTimer, status: 'idle' }))
       mod.startPalcoBridge()
       await vi.advanceTimersByTimeAsync(2100)
       const timerCall = palcoSessionMock.timerTo.mock.calls.at(-1) as any[] | undefined
       expect(timerCall).toBeUndefined()
       mod.stopPalcoBridge()
-      localStorage.removeItem('louvorja-timer-runtime-state')
+      localStorage.removeItem('timer-key')
       vi.useRealTimers()
     })
 
     it('countdown projecting: duration restante', async () => {
       vi.useFakeTimers()
-      localStorage.setItem('louvorja-countdown-runtime-state-v2', JSON.stringify({ ...freshTimer, durationMs: 300_000 }))
+      localStorage.setItem('countdown-key', JSON.stringify({ ...freshTimer, durationMs: 300_000 }))
       mod.startPalcoBridge()
       await vi.advanceTimersByTimeAsync(2100)
       const cdCall = palcoSessionMock.timerTo.mock.calls.at(-1) as any[] | undefined
@@ -304,33 +308,125 @@ describe('palco-bridge', () => {
       expect(cdCall![1].mode).toBe('countdown')
       expect(cdCall![1].duration).toBeLessThanOrEqual(300)
       mod.stopPalcoBridge()
-      localStorage.removeItem('louvorja-countdown-runtime-state-v2')
+      localStorage.removeItem('countdown-key')
       vi.useRealTimers()
     })
 
     it('timer pausado: elapsed = accumulatedMs', async () => {
       vi.useFakeTimers()
-      localStorage.setItem('louvorja-timer-runtime-state', JSON.stringify({ ...freshTimer, status: 'paused', segmentStartedAt: null, accumulatedMs: 130_000 }))
+      localStorage.setItem('timer-key', JSON.stringify({ ...freshTimer, status: 'paused', segmentStartedAt: null, accumulatedMs: 130_000 }))
       mod.startPalcoBridge()
       await vi.advanceTimersByTimeAsync(2100)
       const timerCall = palcoSessionMock.timerTo.mock.calls.at(-1) as any[] | undefined
       expect(timerCall![1].duration).toBe(130)
       mod.stopPalcoBridge()
-      localStorage.removeItem('louvorja-timer-runtime-state')
+      localStorage.removeItem('timer-key')
       vi.useRealTimers()
     })
 
     it('storage update durante execução: re-render com novo valor', async () => {
       vi.useFakeTimers()
-      localStorage.setItem('louvorja-timer-runtime-state', JSON.stringify(freshTimer))
+      localStorage.setItem('timer-key', JSON.stringify(freshTimer))
       mod.startPalcoBridge()
       await vi.advanceTimersByTimeAsync(2100)
       const calls1 = palcoSessionMock.projectTo.mock.calls.length
-      localStorage.setItem('louvorja-timer-runtime-state', JSON.stringify({ ...freshTimer, segmentStartedAt: Date.now() - 120_000 }))
+      localStorage.setItem('timer-key', JSON.stringify({ ...freshTimer, segmentStartedAt: Date.now() - 120_000 }))
       await vi.advanceTimersByTimeAsync(2100)
       expect(palcoSessionMock.projectTo.mock.calls.length).toBeGreaterThanOrEqual(calls1)
       mod.stopPalcoBridge()
-      localStorage.removeItem('louvorja-timer-runtime-state')
+      localStorage.removeItem('timer-key')
+      vi.useRealTimers()
+    })
+  })
+
+  describe('syncAudio (rotas pc/tv/ambos)', () => {
+    function mediaStore(over: Record<string, unknown> = {}) {
+      return {
+        session: { audioUrl: 'http://audio/hino.mp3', title: 'Hino 1', subtitle: 'Harp', coverUrl: 'http://capa.jpg' },
+        audioRoute: 'tv',
+        isPlaying: true,
+        isPaused: false,
+        currentTimeSec: 42.5,
+        hasSession: true,
+        status: 'playing',
+        ...over,
+      }
+    }
+
+    beforeEach(() => {
+      stopPalcoBridge()
+      useMediaStoreMock.mockReturnValue(null)
+      localStorage.clear()
+    })
+
+    it('rota pc: stop na transição, depois silencioso', async () => {
+      useMediaStoreMock.mockReturnValue(mediaStore({ audioRoute: 'pc' }))
+      startPalcoBridge()
+      await new Promise((r) => setTimeout(r, 3200))
+      const stops = palcoSessionMock.audio.mock.calls.filter((c: any[]) => c[0]?.action === 'stop')
+      expect(stops.length).toBe(1)
+      palcoSessionMock.audio.mockClear()
+      await new Promise((r) => setTimeout(r, 3200))
+      expect(palcoSessionMock.audio).not.toHaveBeenCalled()
+    })
+
+    it('rota tv: play inicial com url/title/cover', async () => {
+      useMediaStoreMock.mockReturnValue(mediaStore())
+      startPalcoBridge()
+      await new Promise((r) => setTimeout(r, 3200))
+      const play = palcoSessionMock.audio.mock.calls.find((c: any[]) => c[0]?.action === 'play')
+      expect(play).toBeTruthy()
+      expect(play![0].url).toBe('http://audio/hino.mp3')
+      expect(play![0].title).toBe('Hino 1')
+      expect(play![0].cover).toBe('http://capa.jpg')
+    })
+
+    it('rota tv sem url: stop', async () => {
+      useMediaStoreMock.mockReturnValue(mediaStore({ session: null, audioRoute: 'tv' }))
+      startPalcoBridge()
+      await new Promise((r) => setTimeout(r, 3200))
+      const stop = palcoSessionMock.audio.mock.calls.find((c: any[]) => c[0]?.action === 'stop')
+      expect(stop).toBeTruthy()
+    })
+
+    it('rota tv mesma faixa: pause do operador comanda', async () => {
+      useMediaStoreMock.mockReturnValue(mediaStore())
+      startPalcoBridge()
+      await new Promise((r) => setTimeout(r, 3200))
+      palcoSessionMock.audio.mockClear()
+      useMediaStoreMock.mockReturnValue(mediaStore({ isPlaying: false, isPaused: true, status: 'paused' }))
+      await new Promise((r) => setTimeout(r, 3200))
+      const pause = palcoSessionMock.audio.mock.calls.find((c: any[]) => c[0]?.action === 'pause')
+      expect(pause).toBeTruthy()
+    })
+
+    it('rota ambos: play e depois seek periódico', async () => {
+      vi.useFakeTimers()
+      useMediaStoreMock.mockReturnValue(mediaStore({ audioRoute: 'both' }))
+      startPalcoBridge()
+      await vi.advanceTimersByTimeAsync(3200)
+      const play = palcoSessionMock.audio.mock.calls.find((c: any[]) => c[0]?.action === 'play')
+      expect(play).toBeTruthy()
+      palcoSessionMock.audio.mockClear()
+      // mesmo estado: sync periódico manda seek
+      await vi.advanceTimersByTimeAsync(3200)
+      const seek = palcoSessionMock.audio.mock.calls.find((c: any[]) => c[0]?.action === 'seek')
+      expect(seek).toBeTruthy()
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('hasSession false: stop e reset da key', async () => {
+      vi.useFakeTimers()
+      useMediaStoreMock.mockReturnValue(mediaStore())
+      startPalcoBridge()
+      await vi.advanceTimersByTimeAsync(3200)
+      useMediaStoreMock.mockReturnValue(mediaStore({ hasSession: false, session: null }))
+      palcoSessionMock.audio.mockClear()
+      await vi.advanceTimersByTimeAsync(3200)
+      const stop = palcoSessionMock.audio.mock.calls.find((c: any[]) => c[0]?.action === 'stop')
+      expect(stop).toBeTruthy()
+      stopPalcoBridge()
       vi.useRealTimers()
     })
   })
