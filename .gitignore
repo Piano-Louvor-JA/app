@@ -47,6 +47,8 @@ __screenshots__/
 .env
 .env.local
 .env.*.local
+.env.*
+!.env.example
 
 # SDD planning (internal)
 .planning/
