@@ -351,4 +351,38 @@ describe("useAlbums", () => {
     expect(api.openLyric).toBeTypeOf("function");
     expect(api.closeLyric).toBeTypeOf("function");
   });
-});
+
+  describe("branches finais (52-54/102)", () => {
+    it("onMounted com isDesktop true: hydrate + refreshCollections", async () => {
+      const { createPinia, setActivePinia } = await import("pinia");
+      setActivePinia(createPinia());
+      const libraryStore = useLocalLibraryStore();
+      const refreshSpy = vi.spyOn(libraryStore, "refreshCollections").mockResolvedValue(undefined);
+      const { defineComponent, h } = await import("vue");
+      const { createApp } = await import("vue");
+      const host = defineComponent({
+        setup() {
+          useAlbums();
+          return () => h("div");
+        },
+      });
+      const app = createApp(host);
+      const el = document.createElement("div");
+      document.body.appendChild(el);
+      app.mount(el);
+      await new Promise((r) => setTimeout(r, 0));
+      expect(refreshSpy).toHaveBeenCalled();
+      app.unmount();
+      el.remove();
+      refreshSpy.mockRestore();
+    });
+
+    it("playAllInActiveCollection com albumId não finito: false (102)", async () => {
+      const { api, scope } = await setup();
+      mediaMock.playAlbumQueue.mockClear();
+      scope.activeCollection = { id: "custom-abc", name: "X", kind: "custom", coverUrl: "" } as never;
+      const ok = await api.playAllInActiveCollection();
+      expect(ok).toBe(false);
+    });
+  });
+})
