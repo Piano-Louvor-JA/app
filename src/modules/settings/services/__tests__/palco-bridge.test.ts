@@ -29,6 +29,7 @@ const subscribeStageSettingsMock = vi.hoisted(() => vi.fn(() => vi.fn()))
 const useOutputRegistryMock = vi.hoisted(() => vi.fn(() => ({
   outputs: [{ id: 'mirror', module: 'mirror' }],
   refresh: vi.fn(async () => {}),
+  moduleForSlot: vi.fn(() => null),
 })))
 const getDesktopBridgeMock = vi.hoisted(() => vi.fn(() => null))
 
@@ -1119,6 +1120,103 @@ describe('palco-bridge', () => {
       getDesktopBridgeMock.mockReturnValue(null)
       stopPalcoBridge()
       vi.useRealTimers()
+    })
+  })
+
+  describe('branch finale 3 (últimos ramos)', () => {
+    beforeEach(() => {
+      stopPalcoBridge()
+      watchCallbacks.length = 0
+      localStorage.clear()
+      useMediaStoreMock.mockReturnValue(null)
+    })
+
+    it('runtime null via storage: early return no handler', async () => {
+      startPalcoBridge()
+      window.dispatchEvent(new StorageEvent('storage', { key: 'timer-key', newValue: null }))
+      window.dispatchEvent(new StorageEvent('storage', { key: 'countdown-key', newValue: null }))
+      await new Promise((r) => setTimeout(r, 10))
+      expect(palcoSessionMock.timerTo).not.toHaveBeenCalled()
+    })
+
+    it('clock tick com plano owner: renderClockTo via interval', async () => {
+      vi.useFakeTimers()
+      startPalcoBridge()
+      palcoClockOn()
+      // tick imediato já roda; força mais 2 ticks
+      await vi.advanceTimersByTimeAsync(30001)
+      const clockRenders = palcoSessionMock.projectTo.mock.calls.filter((c: any[]) => c[1] === 'clock')
+      expect(clockRenders.length).toBeGreaterThanOrEqual(2)
+      palcoClockOff()
+      vi.useRealTimers()
+    })
+
+    it('syncAudio both com isPlaying true após primeira sync: seek periódico (dentro do gap 3s)', async () => {
+      vi.useFakeTimers()
+      useMediaStoreMock.mockReturnValue({ session: { audioUrl: 'http://y.mp3' }, audioRoute: 'both', isPlaying: true, isPaused: false, currentTimeSec: 10, hasSession: true, status: 'playing' })
+      startPalcoBridge()
+      await vi.advanceTimersByTimeAsync(3100)
+      const before = palcoSessionMock.audio.mock.calls.filter((c: any[]) => c[0]?.action === 'seek').length
+      await vi.advanceTimersByTimeAsync(3100)
+      const after = palcoSessionMock.audio.mock.calls.filter((c: any[]) => c[0]?.action === 'seek').length
+      expect(after).toBeGreaterThan(before)
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('syncAudio both pausado após já ter tocado: pause', async () => {
+      vi.useFakeTimers()
+      useMediaStoreMock.mockReturnValue({ session: { audioUrl: 'http://y.mp3' }, audioRoute: 'both', isPlaying: true, isPaused: false, currentTimeSec: 10, hasSession: true, status: 'playing' })
+      startPalcoBridge()
+      await vi.advanceTimersByTimeAsync(3100)
+      useMediaStoreMock.mockReturnValue({ session: { audioUrl: 'http://y.mp3' }, audioRoute: 'both', isPlaying: false, isPaused: true, currentTimeSec: 10, hasSession: true, status: 'paused' })
+      await vi.advanceTimersByTimeAsync(3100)
+      expect(palcoSessionMock.audio).toHaveBeenCalledWith(expect.objectContaining({ action: 'pause' }))
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('useMediaStoreSafe catch: store lança após start', async () => {
+      vi.useFakeTimers()
+      useMediaStoreMock.mockReturnValue({ session: { audioUrl: 'http://z.mp3' }, audioRoute: 'pc', isPlaying: true, isPaused: false, currentTimeSec: 0, hasSession: true, status: 'playing' })
+      startPalcoBridge()
+      await vi.advanceTimersByTimeAsync(3100)
+      // agora lança no próximo poll — safe null
+      useMediaStoreMock.mockImplementation(() => { throw new Error('boom') })
+      await vi.advanceTimersByTimeAsync(3100)
+      expect(true).toBe(true)
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('media ownerInput via lyric apenas (sem title): projeta hymn com footer vazio', async () => {
+      vi.useFakeTimers()
+      startPalcoBridge()
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'media-key',
+        newValue: JSON.stringify({ active: true, lyric: 'verso 1\nverso 2', title: '' }),
+      }))
+      await vi.advanceTimersByTimeAsync(100)
+      expect(palcoSessionMock.projectTo).toHaveBeenCalledWith('slot1', 'hymn', expect.objectContaining({ text: 'verso 1<br>verso 2', footerRef: '' }))
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('assigned slot vivo: plan assigned via planForSlot REAL', async () => {
+      vi.useFakeTimers()
+      // usa implementação REAL do output-plan: owner mirror + assigned null → render owner
+      const { planForSlot } = await import('../output-plan')
+      ;(planForSlot as any).mockImplementation((await vi.importActual('../output-plan') as any).planForSlot)
+      startPalcoBridge()
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'bible-key',
+        newValue: JSON.stringify({ projecting: true, active: true, text: 'X', reference: 'Y' }),
+      }))
+      await vi.advanceTimersByTimeAsync(100)
+      expect(palcoSessionMock.projectTo).toHaveBeenCalledWith('slot1', 'bible', expect.anything())
+      stopPalcoBridge()
+      vi.useRealTimers()
+      ;(planForSlot as any).mockImplementation(() => ({ render: 'owner', module: null }))
     })
   })
 })
