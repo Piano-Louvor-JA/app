@@ -16,12 +16,19 @@ vi.mock('../services/media-probe', () => ({
 }))
 
 vi.mock('../composables/useExternalPlayerChoices', () => ({
-  useExternalPlayerChoices: () => ({ choices: [] }),
+  useExternalPlayerChoices: () => ({
+    globalPlayer: { value: 'associated' },
+    playerOptions: { value: [{ id: 'associated', label: 'Associado' }, { id: 'vlc', label: 'VLC' }] },
+    loadPlayerChoices: vi.fn(async () => {}),
+    selectedPlayerId: vi.fn((id?: string) => id ?? 'associated'),
+    storedPlayerId: vi.fn((v: string) => (v === 'associated' ? 'default' : v)),
+  }),
 }))
 
+const isLiturgyItemDraftValidMock = vi.fn(() => true)
 vi.mock('../services/liturgy-item-helpers', () => ({
   formatMomentDuration: vi.fn((ms: number) => `${ms}ms`),
-  isLiturgyItemDraftValid: vi.fn(() => true),
+  isLiturgyItemDraftValid: isLiturgyItemDraftValidMock,
   isValidLiturgyUrl: vi.fn((url: string) => url.startsWith('http')),
 }))
 
@@ -368,6 +375,157 @@ describe('LiturgyItemDialog', () => {
       wrapper.vm.showValidation = true
       await wrapper.setProps({ draft: { ...defaultProps.draft, type: 'images' } })
       expect(wrapper.vm.showValidation).toBe(false)
+    })
+  })
+
+  describe('interações restantes', () => {
+    it('bumpDuration: soma step e clampa no máximo', async () => {
+      const wrapper = createWrapper({ draft: { ...defaultProps.draft, type: 'verse', durationMs: 300000 } })
+      wrapper.vm.bumpDuration(1)
+      await wrapper.vm.$nextTick()
+      const emitted = wrapper.emitted('update:draft')!.at(-1)![0] as { durationMs: number }
+      expect(emitted.durationMs).toBe(360000)
+    })
+
+    it('bumpDuration: clampa no mínimo real', async () => {
+      const { MOMENT_DURATION_MIN_MS } = await import('../../types/liturgy')
+      const wrapper = createWrapper({ draft: { ...defaultProps.draft, type: 'verse', durationMs: 60000 } })
+      wrapper.vm.bumpDuration(-10)
+      await wrapper.vm.$nextTick()
+      const emitted = wrapper.emitted('update:draft')!.at(-1)![0] as { durationMs: number }
+      expect(emitted.durationMs).toBe(Math.max(MOMENT_DURATION_MIN_MS as number, 60000 - 10 * 60000))
+    })
+
+    it('onNameInput: patch com valor do input', async () => {
+      const wrapper = createWrapper()
+      wrapper.vm.onNameInput({ target: { value: 'Hino Novo' } })
+      await wrapper.vm.$nextTick()
+      const emitted = wrapper.emitted('update:draft')!.at(-1)![0] as { name: string }
+      expect(emitted.name).toBe('Hino Novo')
+    })
+
+    it('onStartTimeInput: normaliza HH:MM', async () => {
+      const wrapper = createWrapper({ draft: { ...defaultProps.draft, type: 'category', startTime: '', endTime: '' } })
+      wrapper.vm.onStartTimeInput({ target: { value: '9:05' } })
+      await wrapper.vm.$nextTick()
+      const emitted = wrapper.emitted('update:draft')!.at(-1)![0] as { startTime: string }
+      expect(emitted.startTime).toBe('09:05')
+    })
+
+    it('onEndTimeInput: patch endTime', async () => {
+      const wrapper = createWrapper({ draft: { ...defaultProps.draft, type: 'category', startTime: '', endTime: '' } })
+      wrapper.vm.onEndTimeInput({ target: { value: '10:30' } })
+      await wrapper.vm.$nextTick()
+      const emitted = wrapper.emitted('update:draft')!.at(-1)![0] as { endTime: string }
+      expect(emitted.endTime).toBe('10:30')
+    })
+
+    it('onDetailsInput: patch subtitle', async () => {
+      const wrapper = createWrapper()
+      wrapper.vm.onDetailsInput({ target: { value: 'Detalhes' } })
+      await wrapper.vm.$nextTick()
+      const emitted = wrapper.emitted('update:draft')!.at(-1)![0] as { subtitle: string }
+      expect(emitted.subtitle).toBe('Detalhes')
+    })
+
+    it('onUrlInput: patch url', async () => {
+      const wrapper = createWrapper({ draft: { ...defaultProps.draft, type: 'site' } })
+      wrapper.vm.onUrlInput({ target: { value: 'https://x.com' } })
+      await wrapper.vm.$nextTick()
+      const emitted = wrapper.emitted('update:draft')!.at(-1)![0] as { url: string }
+      expect(emitted.url).toBe('https://x.com')
+    })
+
+    it('onCategoryChange: valor vazio → null', async () => {
+      const wrapper = createWrapper({ draft: { ...defaultProps.draft, type: 'music', categoryId: 'cat1' } })
+      wrapper.vm.onCategoryChange({ target: { value: '' } })
+      await wrapper.vm.$nextTick()
+      const emitted = wrapper.emitted('update:draft')!.at(-1)![0] as { categoryId: string | null }
+      expect(emitted.categoryId).toBeNull()
+    })
+
+    it('onCategoryChange: valor escolhido', async () => {
+      const wrapper = createWrapper({ draft: { ...defaultProps.draft, type: 'music', categoryId: null } })
+      wrapper.vm.onCategoryChange({ target: { value: 'cat2' } })
+      await wrapper.vm.$nextTick()
+      const emitted = wrapper.emitted('update:draft')!.at(-1)![0] as { categoryId: string | null }
+      expect(emitted.categoryId).toBe('cat2')
+    })
+
+    it('onPlayerChange: igual ao global → default', async () => {
+      const wrapper = createWrapper({ draft: { ...defaultProps.draft, type: 'audio', playerId: null } })
+      wrapper.vm.onPlayerChange({ target: { value: 'associated' } })
+      await wrapper.vm.$nextTick()
+      const emitted = wrapper.emitted('update:draft')!.at(-1)![0] as { playerId: string }
+      expect(emitted.playerId).toBe('default')
+    })
+
+    it('onPlayerChange: diferente do global → mantém', async () => {
+      const wrapper = createWrapper({ draft: { ...defaultProps.draft, type: 'audio', playerId: null } })
+      wrapper.vm.onPlayerChange({ target: { value: 'vlc' } })
+      await wrapper.vm.$nextTick()
+      const emitted = wrapper.emitted('update:draft')!.at(-1)![0] as { playerId: string }
+      expect(emitted.playerId).toBe('vlc')
+    })
+
+    it('onEngineChange não-custom: patch direto', async () => {
+      const wrapper = createWrapper({ draft: { ...defaultProps.draft, type: 'presentation' } })
+      await wrapper.vm.onEngineChange('powerpoint')
+      await wrapper.vm.$nextTick()
+      const emitted = wrapper.emitted('update:draft')!.at(-1)![0] as { presentationEngine: string }
+      expect(emitted.presentationEngine).toBe('powerpoint')
+    })
+
+    it('onEngineChange custom sem bridge: patch custom direto', async () => {
+      const wrapper = createWrapper({ draft: { ...defaultProps.draft, type: 'presentation' } })
+      await wrapper.vm.onEngineChange('custom')
+      await wrapper.vm.$nextTick()
+      const emitted = wrapper.emitted('update:draft')!.at(-1)![0] as { presentationEngine: string }
+      expect(emitted.presentationEngine).toBe('custom')
+    })
+
+    it('onMusicQueryInput: emite update:musicQuery', async () => {
+      const wrapper = createWrapper()
+      wrapper.vm.onMusicQueryInput({ target: { value: 'hino' } })
+      await wrapper.vm.$nextTick()
+      expect(wrapper.emitted('update:musicQuery')!.at(-1)).toEqual(['hino'])
+    })
+
+    it('pickMusic: emite pick-music e limpa query', async () => {
+      const wrapper = createWrapper()
+      wrapper.vm.pickMusic(7)
+      await wrapper.vm.$nextTick()
+      expect(wrapper.emitted('pick-music')![0]).toEqual([7])
+      expect(wrapper.emitted('update:musicQuery')!.at(-1)).toEqual([''])
+    })
+
+    it('clearMusic: emite clear-music e limpa query', async () => {
+      const wrapper = createWrapper()
+      wrapper.vm.clearMusic()
+      await wrapper.vm.$nextTick()
+      expect(wrapper.emitted('clear-music')).toBeTruthy()
+      expect(wrapper.emitted('update:musicQuery')!.at(-1)).toEqual([''])
+    })
+
+    it('onSubmit válido: emite save', async () => {
+      const wrapper = createWrapper({ draft: { ...defaultProps.draft, type: 'music', name: 'X', musicId: 1, categoryId: 'cat1' } })
+      wrapper.vm.onSubmit(new Event('submit'))
+      await wrapper.vm.$nextTick()
+      expect(wrapper.emitted('save')).toBeTruthy()
+    })
+
+    it('onSubmit inválido: showValidation true, sem save', async () => {
+      const wrapper = createWrapper({ draft: { ...defaultProps.draft, type: 'music', name: '', musicId: null, categoryId: 'cat1' } })
+      wrapper.vm.onSubmit(new Event('submit'))
+      await wrapper.vm.$nextTick()
+      expect(wrapper.vm.showValidation).toBe(true)
+      expect(wrapper.emitted('save')).toBeFalsy()
+    })
+
+    it('isLightDot: hex claro e escuro', () => {
+      const wrapper = createWrapper()
+      expect(wrapper.vm.isLightDot('#ffffff')).toBe(true)
+      expect(wrapper.vm.isLightDot('#000000')).toBe(false)
     })
   })
 })
