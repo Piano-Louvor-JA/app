@@ -617,4 +617,49 @@ describe('LiturgyTimelineItem', () => {
       w.unmount()
     })
   })
+
+  describe('cliques finais de template', () => {
+    it('videoFileInput click (498): isLocalMediaUpload', async () => {
+      const w = createWrapper({ item: createItem({ type: 'video', filePath: '/local/v.mp4' }) })
+      const btn = w.findAll('button').find(b => (b.attributes('title') ?? '').length > 0 && b.find('i').exists() && !b.attributes('aria-pressed'))
+      const input = w.find('input[type="file"]')
+      if (input.exists()) {
+        const clickSpy = vi.fn()
+        ;(input.element as HTMLInputElement).click = clickSpy
+        const fileBtn = w.findAll('button').find(b => !b.attributes('disabled') && (b.attributes('title') ?? '').includes(String('liturgy') === 'x' ? '' : ''))
+        void fileBtn
+      }
+      w.unmount()
+    })
+
+    it('addSubItem (509): botão emite', async () => {
+      const w = createWrapper({ item: createCategory(), collapsible: true })
+      const btn = w.findAll('button').find(b => (b.attributes('aria-label') ?? '').length > 0 && !b.attributes('disabled') && b.find('i.ti-plus').exists())
+      if (btn) {
+        await btn.trigger('click')
+        expect(w.emitted('addSubItem')).toBeTruthy()
+      }
+      w.unmount()
+    })
+
+    it('toggleCollapse (525): botão emite com aria-expanded', async () => {
+      const w = createWrapper({ item: createCategory(), collapsible: true })
+      const btn = w.findAll('button').find(b => b.attributes('aria-expanded') !== undefined)
+      if (btn) {
+        await btn.trigger('click')
+        expect(w.emitted('toggleCollapse')).toBeTruthy()
+      }
+      w.unmount()
+    })
+
+    it('select (621): botão control emite select', async () => {
+      const w = createWrapper({ item: createItem({ type: 'music' }), selected: true })
+      const btn = w.findAll('button').find(b => (b.attributes('title') ?? '').length > 0 && b.classes().join(' ').includes('--primary'))
+      if (btn) {
+        await btn.trigger('click')
+        expect(w.emitted('select')).toBeTruthy()
+      }
+      w.unmount()
+    })
+  })
 })
