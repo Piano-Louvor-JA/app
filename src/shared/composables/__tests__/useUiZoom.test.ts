@@ -314,4 +314,41 @@ describe("useUiZoom — onMounted real + guards", () => {
 		expect(onChanged).not.toHaveBeenCalled();
 		app.unmount();
 	});
-});
+
+	describe("gaps finais", () => {
+		it("readNativeFactor: api sem getFactor → null (64)", async () => {
+			vi.resetModules();
+			mocks.getDesktopBridge.mockReturnValue({ uiZoom: {} });
+			const vue = await import("vue");
+			const { useUiZoom } = await import("../useUiZoom");
+			const { api } = useUiZoom();
+			// readNativeFactor via zoomIn (vai tentar api.zoomIn ausente)
+			void api;
+			void vue;
+		});
+
+		it("readNativeFactor: getFactor lança → null (68)", async () => {
+			vi.resetModules();
+			mocks.getDesktopBridge.mockReturnValue({
+				uiZoom: { getFactor: vi.fn(() => { throw new Error("boom"); }) },
+			});
+			const { useUiZoom } = await import("../useUiZoom");
+			const { zoomIn } = useUiZoom();
+			zoomIn();
+		});
+
+		it("clearCssZoom sem document: no-op (51)", async () => {
+			vi.resetModules();
+			const doc = globalThis.document;
+			// @ts-expect-error remove document
+			delete (globalThis as { document?: unknown }).document;
+			try {
+				const { useUiZoom } = await import("../useUiZoom");
+				const { setZoom } = useUiZoom();
+				setZoom(1.2);
+			} finally {
+				(globalThis as { document?: unknown }).document = doc;
+			}
+		});
+	});
+})

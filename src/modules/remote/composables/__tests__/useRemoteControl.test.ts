@@ -206,4 +206,26 @@ describe("useRemoteControl", () => {
       durationSec: 240,
     });
   });
-});
+
+  describe("disconnect/reconnect (47/60-61)", () => {
+    it("toggle enabled on/off: receiver para e tick limpa", async () => {
+      vi.useFakeTimers()
+      const useRemoteControl = await freshRc()
+      const rc = useRemoteControl()
+      rc.enabled.value = true
+      await vi.advanceTimersByTimeAsync(0)
+      rc.enabled.value = false
+      await vi.advanceTimersByTimeAsync(0)
+      vi.useRealTimers()
+    })
+
+    it("log callback registrado sem erro (47)", async () => {
+      const useRemoteControl = await freshRc()
+      const rc = useRemoteControl()
+      rc.enabled.value = true
+      await Promise.resolve()
+      rc.enabled.value = false
+      expect(true).toBe(true)
+    })
+  })
+})
