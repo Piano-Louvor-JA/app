@@ -828,3 +828,197 @@ describe('LiturgyItemDialog', () => {
   })
 
 })
+
+describe('LiturgyItemDialog — save category com inputs REAIS no DOM (attachTo)', () => {
+  it('end-time faltando: foca #moment-end-time (ramo 514-515)', async () => {
+    const el = document.createElement('div')
+    document.body.appendChild(el)
+    const focusSpy = vi.fn()
+    const origGet = document.getElementById
+    document.getElementById = (id: string) =>
+      id === 'moment-end-time' ? ({ focus: focusSpy } as unknown as HTMLElement) : null
+    try {
+      const w = createWrapper({
+        attachTo: el,
+        draft: { ...defaultProps.draft, type: 'category', name: 'Culto', startTime: '10:00', endTime: '' },
+      })
+      await flushPromises()
+      const vm = w.vm as any
+      await vm.onSubmit?.({ preventDefault: () => {} } as unknown as Event)
+      expect(focusSpy).toHaveBeenCalled()
+      expect(w.emitted('save')).toBeFalsy()
+      w.unmount()
+    } finally {
+      document.getElementById = origGet
+      el.remove()
+    }
+  })
+})
+describe('LiturgyItemDialog — stmts finais (125/332/338/372/676/689/825/1054/1134)', () => {
+  it('fileButtonLabel fallback: other_files COM arquivo → changeFileButton (125)', async () => {
+    const el = document.createElement('div')
+    document.body.appendChild(el)
+    try {
+      const w = createWrapper({
+        attachTo: el,
+        draft: { ...defaultProps.draft, type: 'other_files', filePath: '/x.pdf' },
+      })
+      await flushPromises()
+      const dlg = document.querySelector('.moment-dialog') as HTMLElement
+      expect(dlg?.innerHTML).toContain('Trocar Arquivo')
+      w.unmount()
+    } finally {
+      el.remove()
+    }
+  })
+
+  it('listbox música: opções renderizadas e click escolhe (676/689)', async () => {
+    const el = document.createElement('div')
+    document.body.appendChild(el)
+    try {
+      const w = createWrapper({
+        attachTo: el,
+        draft: { ...defaultProps.draft, type: 'music', musicId: null },
+        musicOptions: [{ id: 7, displayLabel: 'Hino 7', albumNames: 'Alb' } as any],
+        musicQuery: 'hino',
+      })
+      await flushPromises()
+      const dlg = document.querySelector('.moment-dialog') as HTMLElement
+      const option = dlg.querySelector('[role="option"]') as HTMLElement | null
+      console.log('OPT:', dlg.innerHTML.includes('Hino 7'), 'query len:', document.querySelector('#moment-music-search')?.getAttribute('value'))
+      expect(option).toBeTruthy()
+      option!.click()
+      await flushPromises()
+      expect(w.emitted('pick-music')).toBeTruthy()
+      expect(w.emitted('pick-music')![0]).toEqual([7])
+      w.unmount()
+    } finally {
+      el.remove()
+    }
+  })
+
+  it('complementaryTitleSuggestions renderiza options no select (825)', async () => {
+    const el = document.createElement('div')
+    document.body.appendChild(el)
+    try {
+      const w = createWrapper({
+        attachTo: el,
+        draft: { ...defaultProps.draft, type: 'music', musicId: 1 },
+        complementaryTitleSuggestions: ['Título A', 'Título B'],
+      })
+      await flushPromises()
+      const dlg = document.querySelector('.moment-dialog') as HTMLElement
+      const datalist = dlg.querySelector('#moment-complementary-titles') as HTMLElement | null
+      expect(datalist).toBeTruthy()
+      const optVals = Array.from(datalist!.querySelectorAll('option')).map((o) => o.getAttribute('value'))
+      expect(optVals).toContain('Título A')
+      expect(optVals).toContain('Título B')
+      w.unmount()
+    } finally {
+      el.remove()
+    }
+  })
+
+  it('botão discard emite close (1134)', async () => {
+    const el = document.createElement('div')
+    document.body.appendChild(el)
+    try {
+      const w = createWrapper({
+        attachTo: el,
+        draft: { ...defaultProps.draft, type: 'video', filePath: '/v.mp4' },
+      })
+      await flushPromises()
+      const dlg = document.querySelector('.moment-dialog') as HTMLElement
+      const discard = dlg.querySelector('.moment-dialog__discard') as HTMLButtonElement
+      expect(discard).toBeTruthy()
+      discard.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await flushPromises()
+      expect(w.emitted('close')).toBeTruthy()
+      w.unmount()
+    } finally {
+      el.remove()
+    }
+  })
+})
+
+describe('LiturgyItemDialog — stmts 332/338/372/1054', () => {
+  it('selectLocalFile presentation: fileFilters pptx (332) via openFile cancelado', async () => {
+    vi.mocked(isDesktopApp).mockReturnValue(true)
+    vi.mocked(getDesktopBridge).mockReturnValue({ dialog: { openFile: vi.fn(async () => null) } } as any)
+    const el = document.createElement('div')
+    document.body.appendChild(el)
+    try {
+      const w = createWrapper({ attachTo: el, draft: { ...defaultProps.draft, type: 'presentation' } })
+      await flushPromises()
+      const vm = w.vm as any
+      await vm.selectLocalFile?.()
+      await flushPromises()
+      // openFile cancelou (null): sem erro, sem patch
+      expect((w.vm as any).filePickerError).toBeNull()
+      w.unmount()
+    } finally {
+      el.remove()
+      vi.mocked(getDesktopBridge).mockReturnValue(null)
+    }
+  })
+
+  it('selectLocalFile other_files: fileFilters fallback (338) via openFile cancelado', async () => {
+    vi.mocked(isDesktopApp).mockReturnValue(true)
+    vi.mocked(getDesktopBridge).mockReturnValue({ dialog: { openFile: vi.fn(async () => null) } } as any)
+    const el = document.createElement('div')
+    document.body.appendChild(el)
+    try {
+      const w = createWrapper({ attachTo: el, draft: { ...defaultProps.draft, type: 'other_files', filePath: '' } })
+      await flushPromises()
+      const vm = w.vm as any
+      // other_files É INTERNAL: cai no default do fileFiltersForType (338)
+      await vm.selectLocalFile?.()
+      await flushPromises()
+      expect((w.vm as any).filePickerError).toBeNull()
+      w.unmount()
+    } finally {
+      el.remove()
+      vi.mocked(getDesktopBridge).mockReturnValue(null)
+    }
+  })
+
+it('selectLocalFile bridge SEM dialog.openFile: erro desktopOnly (372-373)', async () => {
+    vi.mocked(isDesktopApp).mockReturnValue(true)
+    vi.mocked(getDesktopBridge).mockReturnValue({} as any)
+    const w = createWrapper({ draft: { ...defaultProps.draft, type: 'pdf' } })
+    await flushPromises()
+    const vm = w.vm as any
+    await vm.selectLocalFile?.()
+    await flushPromises()
+    expect(String((w.vm as any).filePickerError)).toContain('desktop')
+    w.unmount()
+    vi.mocked(getDesktopBridge).mockReturnValue(null)
+  })
+
+  it('playerOptions com bridge externo: select de players renderiza options (1054)', async () => {
+    vi.mocked(getDesktopBridge).mockReturnValue({
+      externalPlayer: {
+        get: vi.fn(async () => 'vlc'),
+        detect: vi.fn(async () => [{ id: 'vlc', label: 'VLC Media Player' }]),
+        listCustom: vi.fn(async () => []),
+      },
+    } as any)
+    const el = document.createElement('div')
+    document.body.appendChild(el)
+    try {
+      const w = createWrapper({
+        attachTo: el,
+        draft: { ...defaultProps.draft, type: 'video', filePath: '/v.mp4' },
+      })
+      await flushPromises()
+      await new Promise((r) => setTimeout(r, 0))
+      await flushPromises()
+      const dlg = document.querySelector('.moment-dialog') as HTMLElement
+      expect(dlg.innerHTML).toContain('VLC')
+      w.unmount()
+    } finally {
+      el.remove()
+      vi.mocked(getDesktopBridge).mockReturnValue(null)
+    }
+  })
+})
