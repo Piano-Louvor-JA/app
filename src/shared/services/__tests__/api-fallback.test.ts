@@ -185,3 +185,100 @@ describe('fetchWithApiFallback', () => {
     expect(base).toBe('https://api.louvorja.com.br/json_db')
   })
 })
+
+describe('fetchWithRetry — ramos de retry (429/5xx/rede, backoff)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    fetchMock.mockReset()
+    vi.stubGlobal('fetch', fetchMock)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  it('429 na primária: retry na MESMA base com backoff, depois sucesso', async () => {
+    fetchMock
+      .mockResolvedValueOnce(new Response('', { status: 429 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: 1 }), { status: 200 }))
+    const promise = fetchWithApiFallback('database', 'x.json')
+    // backoff 1000ms
+    await vi.advanceTimersByTimeAsync(1000)
+    const result = await promise
+    expect(result.base).toBe(PROD.database)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    // ambas as chamadas na MESMA base (rate limit é por host)
+    const urls = fetchMock.mock.calls.map((c: unknown[]) => String(c[0]))
+    expect(urls[0]).toContain('pianolouvorja.com.br')
+    expect(urls[1]).toContain('pianolouvorja.com.br')
+  })
+
+  it('429 esgota retries na primária: migra pro fallback', async () => {
+    fetchMock.mockImplementation(async () => new Response('', { status: 429 }))
+    fetchMock.mockResolvedValueOnce(new Response('', { status: 429 }))
+    fetchMock.mockResolvedValueOnce(new Response('', { status: 429 }))
+    fetchMock.mockResolvedValueOnce(new Response('', { status: 429 }))
+    fetchMock.mockResolvedValueOnce(new Response('', { status: 429 }))
+    fetchMock.mockResolvedValueOnce(new Response('', { status: 429 }))
+    const ok = new Response(JSON.stringify({ ok: 1 }), { status: 200 })
+    fetchMock.mockResolvedValueOnce(ok)
+    const promise = fetchWithApiFallback('database', 'x.json', { retries: 5, delayMs: 10 })
+    // esgotar backoffs (5 tentativas * 10ms*1.5^n, folga)
+    for (let i = 0; i < 12; i++) await vi.advanceTimersByTimeAsync(1000)
+    const result = await promise
+    expect(result.base).toContain('louvorja.com.br')
+  })
+
+  it('5xx na primária: retry com backoff e sucesso', async () => {
+    fetchMock
+      .mockResolvedValueOnce(new Response('', { status: 503 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: 1 }), { status: 200 }))
+    const promise = fetchWithApiFallback('database', 'x.json')
+    await vi.advanceTimersByTimeAsync(1000)
+    const result = await promise
+    expect(result.data).toEqual({ ok: 1 })
+  })
+
+  it('5xx esgota: próxima base', async () => {
+    fetchMock
+      .mockResolvedValue(new Response('', { status: 500 }))
+    const promise = fetchWithApiFallback('database', 'x.json', { retries: 1, delayMs: 10 })
+    const catchPromise = promise.catch((e: Error) => e)
+    for (let i = 0; i < 15; i++) await vi.advanceTimersByTimeAsync(1000)
+    const err = await catchPromise
+    expect(String(err)).toContain('api-exhausted')
+  })
+
+  it('erro de rede na primária: retry e depois fallback', async () => {
+    fetchMock
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: 2 }), { status: 200 }))
+    const promise = fetchWithApiFallback('database', 'x.json')
+    await vi.advanceTimersByTimeAsync(1000)
+    const result = await promise
+    expect(result.data).toEqual({ ok: 2 })
+  })
+
+  it('erro de rede que NÃO é fetch/network error: propaga direto (sem retry)', async () => {
+    fetchMock.mockRejectedValue(new Error('abort')).mockRejectedValueOnce(new Error('abort'))
+    const catchPromise = fetchWithApiFallback('database', 'x.json').catch((e: Error) => e)
+    await vi.advanceTimersByTimeAsync(5000)
+    const err = await catchPromise
+    expect(String(err)).toContain('abort')
+  })
+
+  it('baseToHost com base inválida: usa a string crua (catch do URL)', async () => {
+    setEnv('VITE_URL_DATABASE', 'nao-e-url')
+    setEnv('VITE_API_FALLBACK_URLS', '')
+    const bases = apiCandidateBases('database')
+    expect(bases[0]).toBe('nao-e-url')
+  })
+
+  it('VITE_API_TOKEN presente: header Api-Token vai no fetch', async () => {
+    setEnv('VITE_API_TOKEN', 'tok-123')
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({}), { status: 200 }))
+    await fetchWithApiFallback('database', 'x.json')
+    expect(fetchMock.mock.calls[0]![1]).toEqual({ headers: { 'Api-Token': 'tok-123' } })
+  })
+})
