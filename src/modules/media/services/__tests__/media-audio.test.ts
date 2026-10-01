@@ -230,3 +230,30 @@ describe('play/pause/stop/listeners/clock', () => {
     expect(formatMediaClock(Number.POSITIVE_INFINITY)).toBe('00:00')
   })
 })
+
+describe('media-audio — stmts 79/172', () => {
+  it('ensureSlotAudio sem Audio global: throw "Audio API unavailable" (79)', async () => {
+    vi.resetModules()
+    const origAudio = globalThis.Audio
+    Object.defineProperty(globalThis, 'Audio', { value: undefined, configurable: true, writable: true })
+    try {
+      const mod = await import('../media-audio')
+      expect(() => mod.getMediaAudioElement()).toThrow('Audio API unavailable')
+    } finally {
+      ;(globalThis as { Audio?: unknown }).Audio = origAudio
+    }
+  })
+
+  it('fadeOut concluído com volume <= 0.01: pausa o elemento (172)', async () => {
+    const audio = getMediaAudioElement()
+    audio.volume = 0.5
+    const pauseSpy = vi.fn()
+    audio.pause = pauseSpy as never
+    Object.defineProperty(audio, 'paused', { value: false, configurable: true })
+    const p = fadeOutMediaAudio(audio, 100)
+    await vi.advanceTimersByTimeAsync(200)
+    await p
+    expect(audio.volume).toBeLessThanOrEqual(0.01)
+    expect(pauseSpy).toHaveBeenCalled()
+  })
+})
