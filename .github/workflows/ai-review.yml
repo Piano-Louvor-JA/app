@@ -26,8 +26,11 @@ jobs:
       - uses: Codium-ai/pr-agent@main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OPENAI_API_KEY: ${{ secrets.AI_REVIEW_API_KEY }}
+          OPENAI_KEY: ${{ secrets.AI_REVIEW_API_KEY }}
           OPENAI_API_BASE: ${{ secrets.AI_REVIEW_BASE_URL || 'https://api.z.ai/api/coding/paas/v4' }}
+          CONFIG.GIT_PROVIDER: github
+          CONFIG.LLM_MODEL: glm-4.6
+          CONFIG.FALLBACK_MODELS: 'glm-4.5-air,gpt-4o-mini'
           CONFIG.REVIEW_MAX_FILES: '40'
           PR_REVIEWER.EXTRA_INSTRUCTIONS: >-
             Projeto PIANO (hinos ao piano, Electron+Vue). Foque em:
