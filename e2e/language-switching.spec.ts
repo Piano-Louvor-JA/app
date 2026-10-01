@@ -46,7 +46,13 @@ async function openMediaHubAndAwaitPrefix(
   page: Page,
   prefix: string,
 ): Promise<void> {
-  await page.goto('/', { waitUntil: 'domcontentloaded' })
+  // Dev server compartilhado pode resetar a conexao no meio da navegacao
+  // (ERR_ABORTED em hot-transform) — retry una vez.
+  try {
+    await page.goto('/', { waitUntil: 'domcontentloaded' })
+  } catch {
+    await page.goto('/', { waitUntil: 'domcontentloaded' })
+  }
   // Sidebar so aparece depois do bootstrap (boot-splash some) — esperar pelo
   // item de menu (nav principal, botao Media Center/Central de Midia).
   const hubButton = page
