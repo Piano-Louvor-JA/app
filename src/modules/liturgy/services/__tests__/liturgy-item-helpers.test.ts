@@ -921,3 +921,65 @@ describe('mutação round 5 — reconcile + getSectionItemNumber + clamp', () =>
     expect(getItemTypeTone('verse')).toBeTruthy()
   })
 })
+
+describe('mutação round 6 — reorder quirúrgico (drop em filho/próprio bloco/direção)', () => {
+  const build = () => [
+    item({ id: 'catA', type: 'category' }),
+    item({ id: 'fa1', type: 'music', categoryId: 'catA' }),
+    item({ id: 'fa2', type: 'music', categoryId: 'catA' }),
+    item({ id: 'catB', type: 'category' }),
+    item({ id: 'fb1', type: 'music', categoryId: 'catB' }),
+    item({ id: 'fb2', type: 'music', categoryId: 'catB' }),
+  ]
+
+  it('categoria A drop em fa1 (PRÓPRIO filho): inalterado (mesma referência)', () => {
+    const items = build()
+    expect(reorderLiturgyItems(items, 0, 1)).toBe(items)
+  })
+
+  it('categoria A drop em fa2 (dentro do bloco A, toIndex<blockEnd): inalterado', () => {
+    const items = build()
+    const result = reorderLiturgyItems(items, 0, 2)
+    expect(result.map((i: LiturgyItem) => i.id)).toEqual(items.map((i: LiturgyItem) => i.id))
+  })
+
+  it('categoria A drop em fa1 de B (filho, pai depois): insere no FIM do bloco B', () => {
+    const result = reorderLiturgyItems(build(), 0, 4)
+    expect(result.map((i: LiturgyItem) => i.id)).toEqual(['catB', 'fb1', 'fb2', 'catA', 'fa1', 'fa2'])
+  })
+
+  it('categoria B drop em fa2 de A (filho, pai antes): insere no FIM do bloco A', () => {
+    const result = reorderLiturgyItems(build(), 3, 2)
+    expect(result.map((i: LiturgyItem) => i.id)).toEqual(['catB', 'fb1', 'fb2', 'catA', 'fa1', 'fa2'])
+  })
+
+  it('item simples DEPOIS de categoria: filho vira solto e entra no lugar', () => {
+    const items = build()
+    // fa1 (1) → toIndex 0 (dentro do próprio bloco!): fromIndex>toIndex, não-categoria → move simples
+    const result = reorderLiturgyItems(items, 1, 0)
+    expect(result.map((i: LiturgyItem) => i.id)).toEqual(['fa1', 'catA', 'fa2', 'catB', 'fb1', 'fb2'])
+  })
+
+  it('fromIndex==toIndex via caminho interno (bloco A → catA fim): inalterado', () => {
+    const items = build()
+    expect(reorderLiturgyItems(items, 0, 2)).toBe(items)
+  })
+
+  it('index == items.length-1 válido; == items.length inválido', () => {
+    const items = build()
+    expect(reorderLiturgyItems(items, 0, items.length)).toBe(items)
+    expect(reorderLiturgyItems(items, items.length, 0)).toBe(items)
+  })
+})
+
+describe('mutação round 7 — isValidLiturgyUrl quirúrgico', () => {
+  it('hosts especiais', () => {
+    expect(isValidLiturgyUrl('HTTPS://YouTube.COM/watch')).toBe(true)
+    expect(isValidLiturgyUrl('http://127.0.0.1:8080')).toBe(true)
+    expect(isValidLiturgyUrl('http://')).toBe(false)
+    expect(isValidLiturgyUrl('a.b')).toBe(true)
+    // URL nativo normaliza 'host..com' → host.com (dot vazio removido) → válido
+    expect(isValidLiturgyUrl('host..com')).toBe(true)
+    expect(isValidLiturgyUrl(':-)')).toBe(false)
+  })
+})
