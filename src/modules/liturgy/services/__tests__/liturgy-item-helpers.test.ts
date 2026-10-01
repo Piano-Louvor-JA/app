@@ -1113,3 +1113,57 @@ describe('mutação round 8 — build/draftFrom valor exato (ternários)', () =>
     expect(d.filePaths).not.toBe(src_item.filePaths)
   })
 })
+
+describe('mutação round 9 — NoCoverage (draftValid endTime, images ramo, reconcile)', () => {
+  const ctx = {
+    musicList: [{ id: 1, displayLabel: 'Hino 1', albumNames: 'Album A' }],
+    bibleBooks: [{ id: 'gn', name: 'Gênesis' }],
+  } as unknown as Parameters<typeof buildLiturgyItemFromDraft>[1]
+  const base: LiturgyItemDraft = {
+    type: 'other_files',
+    name: 'Item',
+    subtitle: '',
+    durationMs: 0,
+    accentColor: '#fff',
+    categoryId: 'c1',
+    startTime: '',
+    endTime: '',
+    musicId: null,
+    musicMode: 'audio',
+    verseBookId: null,
+    verseChapter: null,
+    verseNumbers: '',
+    filePath: '',
+    filePaths: [],
+    playerId: 'default',
+    url: '',
+    presentationEngine: 'auto',
+  }
+
+  it('draftValid category com endTime inválido', () => {
+    expect(isLiturgyItemDraftValid({ ...base, type: 'category', categoryId: null, startTime: '09:00', endTime: 'xx' } as unknown as LiturgyItemDraft)).toBe(false)
+  })
+
+  it('build images: filePaths vazio E filePath vazio → paths [] e filePath ""', () => {
+    const built = buildLiturgyItemFromDraft({ ...base, type: 'images', filePaths: [], filePath: '' }, ctx)
+    expect(built.filePath).toBe('')
+    expect(built.filePaths).toBeUndefined()
+  })
+
+  it('reconcile: item sem musicId → intacto (referência)', () => {
+    const items = [item({ id: 'm1', type: 'music' })]
+    expect(reconcileMusicItemTitles(items, [{ id: 1, displayLabel: 'X', albumNames: 'Y' }] as never)).toBe(items)
+  })
+
+  it('reconcile: nome já igual ao catálogo → sem mudança', () => {
+    const items = [item({ id: 'm1', type: 'music', name: 'Hino 1', musicId: 1 })]
+    const result = reconcileMusicItemTitles(items, [{ id: 1, displayLabel: 'Hino 1', albumNames: 'Alb' }] as never)
+    expect(result[0]!.complementaryTitle).toBeUndefined()
+  })
+
+  it('reconcile: id numérico vs string musicId — não encontra (sem crash)', () => {
+    const items = [item({ id: 'm1', type: 'music', name: 'Velho', musicId: 's1' })]
+    const result = reconcileMusicItemTitles(items, [{ id: 1, displayLabel: 'Novo', albumNames: 'A' }] as never)
+    expect(result[0]!.name).toBe('Velho')
+  })
+})
