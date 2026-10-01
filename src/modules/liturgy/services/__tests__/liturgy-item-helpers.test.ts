@@ -983,3 +983,133 @@ describe('mutação round 7 — isValidLiturgyUrl quirúrgico', () => {
     expect(isValidLiturgyUrl(':-)')).toBe(false)
   })
 })
+
+describe('mutação round 8 — build/draftFrom valor exato (ternários)', () => {
+  const ctx = {
+    musicList: [{ id: 1, displayLabel: 'Hino 1', albumNames: 'Album A' }],
+    bibleBooks: [{ id: 'gn', name: 'Gênesis' }],
+  } as unknown as Parameters<typeof buildLiturgyItemFromDraft>[1]
+  const base: LiturgyItemDraft = {
+    type: 'other_files',
+    name: 'Item',
+    subtitle: '',
+    durationMs: 0,
+    accentColor: '#fff',
+    categoryId: 'c1',
+    startTime: '',
+    endTime: '',
+    musicId: null,
+    musicMode: 'audio',
+    verseBookId: null,
+    verseChapter: null,
+    verseNumbers: '',
+    filePath: '',
+    filePaths: [],
+    playerId: 'default',
+    url: '',
+    presentationEngine: 'auto',
+  }
+
+  it('category: durationMs 0 exato, start/end normalizados, sem null-merge', () => {
+    const built = buildLiturgyItemFromDraft(
+      { ...base, type: 'category', categoryId: null, startTime: '9:05', endTime: '10:00', durationMs: 5000 },
+      ctx,
+    )
+    expect(built.durationMs).toBe(0)
+    expect(built.startTime).toBe('09:05')
+    expect(built.endTime).toBe('10:00')
+    expect(built.categoryId).toBeNull()
+  })
+
+  it('não-category: start/end NULOS exatos', () => {
+    const built = buildLiturgyItemFromDraft(
+      { ...base, type: 'video', filePath: '/v.mp4', startTime: '9:05', endTime: '10:00' },
+      ctx,
+    )
+    expect(built.startTime).toBeNull()
+    expect(built.endTime).toBeNull()
+  })
+
+  it('done default false; done explícito true preservado; existingId preservado', () => {
+    const d1 = buildLiturgyItemFromDraft({ ...base, type: 'video', filePath: '/v.mp4' }, ctx)
+    expect(d1.done).toBe(false)
+    const d2 = buildLiturgyItemFromDraft({ ...base, type: 'video', filePath: '/v.mp4' }, { ...ctx, done: true })
+    expect(d2.done).toBe(true)
+    const d3 = buildLiturgyItemFromDraft({ ...base, type: 'video', filePath: '/v.mp4' }, { ...ctx, existingId: 'keep-1' })
+    expect(d3.id).toBe('keep-1')
+  })
+
+  it('outro tipo (não music/category): clamp SEM floor de 0', () => {
+    const built = buildLiturgyItemFromDraft({ ...base, type: 'video', filePath: '/v.mp4', durationMs: -10 }, ctx)
+    expect(built.durationMs).toBe(0) // clampMomentDurationMs(-10) = 0
+    const b2 = buildLiturgyItemFromDraft({ ...base, type: 'video', filePath: '/v.mp4', durationMs: 1500 }, ctx)
+    expect(b2.durationMs).toBe(2000)
+  })
+
+  it('music musicMode preservado (não default audio)', () => {
+    const built = buildLiturgyItemFromDraft(
+      { ...base, type: 'music', musicId: 1, musicMode: 'instrumental' } as LiturgyItemDraft,
+      ctx,
+    )
+    expect(built.musicMode).toBe('instrumental')
+    expect(built.musicId).toBe(1)
+  })
+
+  it('music name preenchido: complementaryTitle = nome trimado', () => {
+    const built = buildLiturgyItemFromDraft(
+      { ...base, type: 'music', musicId: 1, name: ' Meu Hino ' } as LiturgyItemDraft,
+      ctx,
+    )
+    expect(built.name).toBe('Hino 1')
+    expect(built.complementaryTitle).toBe('Meu Hino')
+    expect(built.subtitle).toBe('Album A')
+  })
+
+  it('music sem match mas name preenchido: name = complementar (não Música)', () => {
+    const built = buildLiturgyItemFromDraft(
+      { ...base, type: 'music', musicId: 404, name: ' Cantado ' } as LiturgyItemDraft,
+      ctx,
+    )
+    expect(built.name).toBe('Cantado')
+  })
+
+  it('verse: capítulo 0/negativo e numbers com espaços', () => {
+    const built = buildLiturgyItemFromDraft(
+      { ...base, type: 'verse', verseBookId: 'gn', verseChapter: 0, verseNumbers: ' 4-5 ' } as LiturgyItemDraft,
+      ctx,
+    )
+    expect(built.verseChapter).toBe(0)
+    expect(built.verseNumbers).toBe('4-5') // trim no build
+    expect(built.subtitle).toBe('Gênesis 0:4-5')
+  })
+
+  it('verse com details: subtitle do draft PRESERVADO', () => {
+    const built = buildLiturgyItemFromDraft(
+      { ...base, type: 'verse', verseBookId: 'gn', verseChapter: 3, subtitle: 'Texto lido' } as LiturgyItemDraft,
+      ctx,
+    )
+    expect(built.subtitle).toBe('Texto lido')
+  })
+
+  it('draftFrom não-category: subtitle direto (não trim de notes)', () => {
+    const d = draftFromLiturgyItem(item({ id: 'v', type: 'video', filePath: '/v.mp4', subtitle: 'Sub', notes: 'Ignorado' }))
+    expect(d.subtitle).toBe('Sub')
+  })
+
+  it('draftFrom category: durationMs SEMPRE 0 mesmo com valor', () => {
+    const d = draftFromLiturgyItem(item({ id: 'c', type: 'category', durationMs: 8000 }))
+    expect(d.durationMs).toBe(0)
+  })
+
+  it('draftFrom category: categoryId null exato', () => {
+    const d = draftFromLiturgyItem(item({ id: 'c', type: 'category', categoryId: 'should-null' }))
+    expect(d.categoryId).toBeNull()
+  })
+
+  it('draftFrom: filePaths múltiplos copiados (referência diferente)', () => {
+    const src_item = item({ id: 'i', type: 'images', filePaths: ['/a.jpg', '/b.jpg'] })
+    const d = draftFromLiturgyItem(src_item)
+    expect(d.filePaths).toEqual(['/a.jpg', '/b.jpg'])
+    expect(d.filePaths).not.toBe(src_item.filePaths)
+  })
+})
