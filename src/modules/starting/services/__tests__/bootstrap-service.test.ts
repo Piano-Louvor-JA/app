@@ -163,7 +163,30 @@ describe("syncEssentialCatalogFromApi", () => {
 		mocks.state.remote.set("pt_categories", { ok: true });
 		mocks.state.savedOk = false;
 		await expect(syncEssentialCatalogFromApi(() => {})).rejects.toThrow(
-			"pt_categories",
-		);
-	});
-});
+				"pt_categories",
+			);
+		});
+		});
+
+		describe("downloadAndExtractCatalog", () => {
+		it("deprecada: delega para syncEssentialCatalogFromApi preservando progresso", async () => {
+			for (const f of [
+				"pt_categories",
+				"pt_hymnal",
+				"pt_hymnal_1996",
+				"pt_musics",
+				"pt_bible_book",
+				"pt_bible_version",
+			]) {
+				mocks.state.remote.set(f, { ok: true });
+			}
+			const { downloadAndExtractCatalog } = await import("../bootstrap-service");
+			const progress: number[] = [];
+			await downloadAndExtractCatalog(
+				(p) => progress.push(p),
+				() => {},
+			);
+			expect(progress).toEqual([17, 33, 50, 67, 83, 100]);
+			expect(mocks.state.catalog.get("pt_musics")).toEqual({ ok: true });
+		});
+		});
