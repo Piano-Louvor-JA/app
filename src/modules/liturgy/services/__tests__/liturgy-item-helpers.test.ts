@@ -509,3 +509,415 @@ describe('clearDoneFlags', () => {
     expect(next.every((i) => i.done === false)).toBe(true)
   })
 })
+
+describe('mutação round 1 — resolvePreferredCategoryId / findCategoryInsertIndex / blockEnd', () => {
+  it('selected null + lista vazia: null', () => {
+    expect(resolvePreferredCategoryId([], null)).toBeNull()
+  })
+
+  it('selected solto com categoryId: usa categoryId (não o id)', () => {
+    const child = item({ id: 'x1', type: 'music', categoryId: 'c9' })
+    expect(resolvePreferredCategoryId([], child)).toBe('c9')
+  })
+
+  it('varredura pega a ÚLTIMA categoria (loop reverso)', () => {
+    const items = [
+      item({ id: 'c1', type: 'category' }),
+      item({ id: 'm1', type: 'music' }),
+      item({ id: 'c2', type: 'category' }),
+    ]
+    expect(resolvePreferredCategoryId(items, null)).toBe('c2')
+  })
+
+  it('selected categoria cujo id não é string vazia: retorna id', () => {
+    const cat = item({ id: 'cat-x', type: 'category' })
+    expect(resolvePreferredCategoryId([], cat)).toBe('cat-x')
+  })
+
+  it('categoria inexistente: insert = items.length', () => {
+    expect(findCategoryInsertIndex([item({ id: 'm1', type: 'music' })], 'nope')).toBe(1)
+  })
+
+  it('filhos de OUTRA categoria param o scan (contiguidade)', () => {
+    const items = [
+      item({ id: 'c1', type: 'category' }),
+      item({ id: 'f1', type: 'music', categoryId: 'c1' }),
+      item({ id: 'f2', type: 'music', categoryId: 'c2' }),
+    ]
+    expect(findCategoryInsertIndex(items, 'c1')).toBe(2)
+  })
+
+  it('child undefined no meio: para (guard !child)', () => {
+    const items = [
+      item({ id: 'c1', type: 'category' }),
+      undefined as unknown as LiturgyItem,
+      item({ id: 'f1', type: 'music', categoryId: 'c1' }),
+    ]
+    expect(findCategoryInsertIndex(items, 'c1')).toBe(1)
+  })
+
+  it('blockEnd em índice não-categoria: index+1', () => {
+    const items = [item({ id: 'm1', type: 'music' }), item({ id: 'm2', type: 'music' })]
+    expect(getCategoryBlockEnd(items, 0)).toBe(1)
+  })
+
+  it('blockEnd índice fora: index+1 (guard !category)', () => {
+    expect(getCategoryBlockEnd([], 3)).toBe(4)
+  })
+
+  it('blockEnd categoria com filhos contíguos: fim do bloco', () => {
+    const items = [
+      item({ id: 'c1', type: 'category' }),
+      item({ id: 'f1', type: 'music', categoryId: 'c1' }),
+      item({ id: 'f2', type: 'music', categoryId: 'c1' }),
+      item({ id: 'm2', type: 'music' }),
+    ]
+    expect(getCategoryBlockEnd(items, 0)).toBe(3)
+  })
+})
+
+describe('mutação round 2 — reorderLiturgyItems', () => {
+  const flat = () => [
+    item({ id: 'a', type: 'music' }),
+    item({ id: 'b', type: 'music' }),
+    item({ id: 'c', type: 'music' }),
+  ]
+
+  it('same index: retorna a MESMA referência', () => {
+    const items = flat()
+    expect(reorderLiturgyItems(items, 1, 1)).toBe(items)
+  })
+
+  it('fromIndex fora (>= length): mesma referência', () => {
+    const items = flat()
+    expect(reorderLiturgyItems(items, 3, 0)).toBe(items)
+  })
+
+  it('toIndex fora: mesma referência', () => {
+    const items = flat()
+    expect(reorderLiturgyItems(items, 0, 5)).toBe(items)
+  })
+
+  it('índice negativo: mesma referência', () => {
+    const items = flat()
+    expect(reorderLiturgyItems(items, -1, 0)).toBe(items)
+  })
+
+  it('item simples move pra frente', () => {
+    expect(reorderLiturgyItems(flat(), 0, 2).map((i: LiturgyItem) => i.id)).toEqual(['b', 'c', 'a'])
+  })
+
+  it('item simples move pra trás', () => {
+    expect(reorderLiturgyItems(flat(), 2, 0).map((i: LiturgyItem) => i.id)).toEqual(['c', 'a', 'b'])
+  })
+
+  it('categoria com bloco move inteira pra trás', () => {
+    const items = [
+      item({ id: 'a', type: 'music' }),
+      item({ id: 'cat', type: 'category' }),
+      item({ id: 'f1', type: 'music', categoryId: 'cat' }),
+      item({ id: 'f2', type: 'music', categoryId: 'cat' }),
+    ]
+    const result = reorderLiturgyItems(items, 1, 0)
+    expect(result.map((i: LiturgyItem) => i.id)).toEqual(['cat', 'f1', 'f2', 'a'])
+  })
+
+  it('categoria com bloco move inteira pra frente', () => {
+    const items = [
+      item({ id: 'cat', type: 'category' }),
+      item({ id: 'f1', type: 'music', categoryId: 'cat' }),
+      item({ id: 'a', type: 'music' }),
+      item({ id: 'b', type: 'music' }),
+    ]
+    const result = reorderLiturgyItems(items, 0, 3)
+    expect(result.map((i: LiturgyItem) => i.id)).toEqual(['a', 'b', 'cat', 'f1'])
+  })
+
+  it('drop DENTRO do próprio bloco: inalterado', () => {
+    const items = [
+      item({ id: 'cat', type: 'category' }),
+      item({ id: 'f1', type: 'music', categoryId: 'cat' }),
+      item({ id: 'a', type: 'music' }),
+    ]
+    expect(reorderLiturgyItems(items, 0, 1)).toBe(items)
+  })
+
+  it('categoria solta sobre filho de OUTRA categoria: vai pro índice da categoria-alvo', () => {
+    const items = [
+      item({ id: 'catA', type: 'category' }),
+      item({ id: 'fa', type: 'music', categoryId: 'catA' }),
+      item({ id: 'catB', type: 'category' }),
+      item({ id: 'fb', type: 'music', categoryId: 'catB' }),
+    ]
+    // catA (0) drop em 3 (fb, filho de catB) → resolve pra categoria catB (2) → insere no fim do bloco B
+    const result = reorderLiturgyItems(items, 0, 3)
+    expect(result.map((i: LiturgyItem) => i.id)).toEqual(['catB', 'fb', 'catA', 'fa'])
+  })
+
+  it('categoria solta sobre item solto abaixo: toIndex+1', () => {
+    const items = [
+      item({ id: 'cat', type: 'category' }),
+      item({ id: 'f1', type: 'music', categoryId: 'cat' }),
+      item({ id: 'a', type: 'music' }),
+      item({ id: 'b', type: 'music' }),
+    ]
+    const result = reorderLiturgyItems(items, 0, 3)
+    expect(result.map((i: LiturgyItem) => i.id)).toEqual(['a', 'b', 'cat', 'f1'])
+  })
+
+  it('clone remapeia categoria mesmo quando filho vem antes do pai na lista', () => {
+    const items = [
+      item({ id: 'f1', type: 'music', categoryId: 'cat' }),
+      item({ id: 'cat', type: 'category' }),
+    ]
+    const result = cloneLiturgyItems(items)
+    expect(result[1]!.id).not.toBe('cat')
+    expect(result[0]!.categoryId).toBe(result[1]!.id)
+    expect(result.every((i: LiturgyItem) => i.done === false)).toBe(true)
+  })
+})
+
+describe('mutação round 3 — buildLiturgyItemFromDraft branch最深', () => {
+  const ctx = {
+    musicList: [{ id: 1, displayLabel: 'Hino 1', albumNames: 'Album A' }],
+    bibleBooks: [{ id: 'gn', name: 'Gênesis' }],
+  } as unknown as Parameters<typeof buildLiturgyItemFromDraft>[1]
+  const base: LiturgyItemDraft = {
+    type: 'other_files',
+    name: 'Item',
+    subtitle: '',
+    durationMs: 0,
+    accentColor: '#fff',
+    categoryId: 'c1',
+    startTime: '',
+    endTime: '',
+    musicId: null,
+    musicMode: 'audio',
+    verseBookId: null,
+    verseChapter: null,
+    verseNumbers: '',
+    filePath: '',
+    filePaths: [],
+    playerId: 'default',
+    url: '',
+    presentationEngine: 'auto',
+  }
+
+  it('music durationMs <= 0: duration 0 (não clamp)', () => {
+    const built = buildLiturgyItemFromDraft(
+      { ...base, type: 'music', musicId: 99, durationMs: -5 } as LiturgyItemDraft,
+      ctx,
+    )
+    expect(built.durationMs).toBe(0)
+  })
+
+  it('music durationMs > 0: clamp em steps de 1000', () => {
+    const built = buildLiturgyItemFromDraft(
+      { ...base, type: 'music', musicId: 99, durationMs: 1500 } as LiturgyItemDraft,
+      ctx,
+    )
+    expect(built.durationMs).toBe(2000)
+  })
+
+  it('music com match + notes: complementaryTitle só se name vazio→undefined', () => {
+    const built = buildLiturgyItemFromDraft(
+      { ...base, type: 'music', musicId: 1, name: '  ', subtitle: 'nota' } as LiturgyItemDraft,
+      ctx,
+    )
+    expect(built.name).toBe('Hino 1')
+    expect(built.complementaryTitle).toBeUndefined()
+    expect(built.notes).toBe('nota')
+  })
+
+  it('music sem match: subtitle vazio e name fallback Música', () => {
+    const built = buildLiturgyItemFromDraft(
+      { ...base, type: 'music', musicId: 404, name: '' } as unknown as LiturgyItemDraft,
+      ctx,
+    )
+    expect(built.name).toBe('Música')
+    expect(built.subtitle).toBe('')
+    expect(built.complementaryTitle).toBeUndefined()
+  })
+
+  it('verse com book + sem details: monta "Gênesis 3:4-5"', () => {
+    const built = buildLiturgyItemFromDraft(
+      { ...base, type: 'verse', verseBookId: 'gn', verseChapter: 3, verseNumbers: '4-5' } as LiturgyItemDraft,
+      ctx,
+    )
+    expect(built.subtitle).toBe('Gênesis 3:4-5')
+  })
+
+  it('verse sem numbers: só capítulo', () => {
+    const built = buildLiturgyItemFromDraft(
+      { ...base, type: 'verse', verseBookId: 'gn', verseChapter: 3 } as LiturgyItemDraft,
+      ctx,
+    )
+    expect(built.subtitle).toBe('Gênesis 3')
+  })
+
+  it('images com filePaths vazio + filePath preenchido: converte e filtra vazios', () => {
+    const built = buildLiturgyItemFromDraft(
+      { ...base, type: 'images', filePath: ' /tmp/a.jpg ', filePaths: [], name: 'x' } as LiturgyItemDraft,
+      ctx,
+    )
+    expect(built.filePaths).toEqual(['/tmp/a.jpg'])
+    expect(built.filePath).toBe('/tmp/a.jpg')
+  })
+
+  it('images múltiplos paths + sem details: subtitle "N imagens"', () => {
+    const built = buildLiturgyItemFromDraft(
+      { ...base, type: 'images', filePaths: ['/x/um.jpg', '/x/dois.jpg'] } as LiturgyItemDraft,
+      ctx,
+    )
+    expect(built.subtitle).toBe('2 imagens')
+  })
+
+  it('video playerId default: NÃO persiste', () => {
+    const built = buildLiturgyItemFromDraft(
+      { ...base, type: 'video', filePath: '/v.mp4', playerId: 'default' } as LiturgyItemDraft,
+      ctx,
+    )
+    expect(built.playerId).toBeUndefined()
+  })
+
+  it('audio playerId explícito: persiste', () => {
+    const built = buildLiturgyItemFromDraft(
+      { ...base, type: 'audio', filePath: '/a.mp3', playerId: 'vlc' } as unknown as LiturgyItemDraft,
+      ctx,
+    )
+    expect(built.playerId).toBe('vlc')
+  })
+
+  it('file não-images com filePath e sem details: subtitle filename', () => {
+    const built = buildLiturgyItemFromDraft(
+      { ...base, type: 'pdf', filePath: '/docs/manual.pdf' } as unknown as LiturgyItemDraft,
+      ctx,
+    )
+    expect(built.subtitle).toBe('manual.pdf')
+  })
+
+  it('online_video com url sem details: subtitle = url', () => {
+    const built = buildLiturgyItemFromDraft(
+      { ...base, type: 'online_video', url: ' https://v.com/x ' } as LiturgyItemDraft,
+      ctx,
+    )
+    expect(built.url).toBe('https://v.com/x')
+    expect(built.subtitle).toBe('https://v.com/x')
+  })
+})
+
+describe('mutação round 4 — draftFromLiturgyItem + isValidLiturgyUrl + draftValid', () => {
+  it('draftFrom music: name vem de complementaryTitle, subtitle de notes', () => {
+    const d = draftFromLiturgyItem(
+      item({ id: 'm', type: 'music', name: 'Nome', complementaryTitle: 'Comp', notes: 'Notas', durationMs: 90_000 }),
+    )
+    expect(d.name).toBe('Comp')
+    expect(d.subtitle).toBe('Notas')
+    expect(d.durationMs).toBe(90_000)
+  })
+
+  it('draftFrom music sem complementary: name vazio', () => {
+    const d = draftFromLiturgyItem(item({ id: 'm', type: 'music', name: 'Nome', complementaryTitle: null }))
+    expect(d.name).toBe('')
+  })
+
+  it('draftFrom category: times normalizados; music duration <=0: 0', () => {
+    const d = draftFromLiturgyItem(
+      item({ id: 'c', type: 'category', startTime: '9:05', endTime: '10:00', durationMs: 0 }),
+    )
+    expect(d.startTime).toBe('09:05')
+    expect(d.endTime).toBe('10:00')
+    expect(d.durationMs).toBe(0)
+  })
+
+  it('draftFrom: filePaths vazio + filePath presente → [filePath]', () => {
+    const d = draftFromLiturgyItem(item({ id: 'v', type: 'video', filePath: '/v.mp4' }))
+    expect(d.filePaths).toEqual(['/v.mp4'])
+  })
+
+  it('draftFrom: players/url/engine defaults', () => {
+    const d = draftFromLiturgyItem(item({ id: 's', type: 'site' }))
+    expect(d.playerId).toBe('default')
+    expect(d.url).toBe('')
+    expect(d.presentationEngine).toBe('auto')
+    expect(d.verseBookId).toBeNull()
+    expect(d.verseNumbers).toBe('')
+  })
+
+  it('isValidLiturgyUrl: casos', () => {
+    expect(isValidLiturgyUrl('')).toBe(false)
+    expect(isValidLiturgyUrl('   ')).toBe(false)
+    expect(isValidLiturgyUrl('http://localhost:3000/x')).toBe(true)
+    expect(isValidLiturgyUrl('192.168.0.10')).toBe(true)
+    expect(isValidLiturgyUrl('youtube.com/watch?v=1')).toBe(true)
+    expect(isValidLiturgyUrl('.invalid')).toBe(false)
+    expect(isValidLiturgyUrl('host.')).toBe(false)
+    expect(isValidLiturgyUrl('ht tp://x')).toBe(false)
+    expect(isValidLiturgyUrl('no host at all')).toBe(false)
+  })
+
+  it('isLiturgyItemDraftValid: category sem start/end inválido', () => {
+    expect(isLiturgyItemDraftValid({ type: 'category', name: 'X' } as LiturgyItemDraft)).toBe(false)
+  })
+
+  it('isLiturgyItemDraftValid: music sem musicId inválido', () => {
+    expect(isLiturgyItemDraftValid({ type: 'music', name: 'X', categoryId: 'c' } as LiturgyItemDraft)).toBe(false)
+  })
+
+  it('isLiturgyItemDraftValid: não-category sem categoryId inválido', () => {
+    expect(isLiturgyItemDraftValid({ type: 'video', name: 'X', filePath: '/v.mp4' } as LiturgyItemDraft)).toBe(false)
+  })
+
+  it('isLiturgyItemDraftValid: images com filePaths e sem filePaths/path inválido', () => {
+    expect(isLiturgyItemDraftValid({ type: 'images', name: 'X', categoryId: 'c', filePaths: ['/a.jpg'] } as unknown as LiturgyItemDraft)).toBe(true)
+    expect(isLiturgyItemDraftValid({ type: 'images', name: 'X', categoryId: 'c', filePaths: [], filePath: '' } as unknown as LiturgyItemDraft)).toBe(false)
+  })
+
+  it('isLiturgyItemDraftValid: site com url inválida', () => {
+    expect(isLiturgyItemDraftValid({ type: 'site', name: 'X', categoryId: 'c', url: 'nope nope' } as unknown as LiturgyItemDraft)).toBe(false)
+  })
+
+  it('isLiturgyItemDraftValid: name vazio', () => {
+    expect(isLiturgyItemDraftValid({ type: 'video', name: '  ', categoryId: 'c', filePath: '/v.mp4' } as unknown as LiturgyItemDraft)).toBe(false)
+  })
+})
+
+describe('mutação round 5 — reconcile + getSectionItemNumber + clamp', () => {
+  it('reconcile: título divergente → alinha e guarda complementaryTitle', () => {
+    const items = [item({ id: 'm1', type: 'music', name: 'Nome antigo', musicId: 1 })]
+    const result = reconcileMusicItemTitles(items, [{ id: 1, displayLabel: 'Novo Nome', albumNames: 'Alb' }] as never)
+    expect(result[0]!.name).toBe('Novo Nome')
+    expect(result[0]!.complementaryTitle).toBe('Nome antigo')
+  })
+
+  it('getSectionItemNumber: reinicia depois de categoria', () => {
+    const items = [
+      item({ id: 'c', type: 'category' }),
+      item({ id: 'a', type: 'music' }),
+      item({ id: 'b', type: 'music' }),
+    ]
+    expect(getSectionItemNumber(items, 0)).toBeNull()
+    expect(getSectionItemNumber(items, 1)).toBe(1)
+    expect(getSectionItemNumber(items, 2)).toBe(2)
+  })
+
+  it('clamp: negativo 0, acima do máx clampado', () => {
+    expect(clampMomentDurationMs(-1)).toBe(0)
+    expect(clampMomentDurationMs(999_999_999)).toBeLessThanOrEqual(999_999_999)
+  })
+
+  it('format: 0 → 00:00, 61s → 01:01', () => {
+    expect(formatMomentDuration(0)).toBe('00:00')
+    expect(formatMomentDuration(61_000)).toBe('01:01')
+  })
+
+  it('normalizeItemType: válido mantém, desconhecido null', () => {
+    expect(normalizeItemType('video')).toBe('video')
+    expect(normalizeItemType('outra-coisa' as never)).toBeNull()
+  })
+
+  it('getItemTypeIcon/Tone: retornam algo pra cada tipo', () => {
+    expect(getItemTypeIcon('music')).toBeTruthy()
+    expect(getItemTypeTone('verse')).toBeTruthy()
+  })
+})
