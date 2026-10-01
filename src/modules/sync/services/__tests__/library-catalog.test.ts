@@ -1291,3 +1291,61 @@ describe('mutantes round 5 - guard Array.isArray dos hinários', () => {
     expect(ids).not.toContain('hymnal_1996')
   })
 })
+
+describe('mutantes round 6 - constantes de módulo (EXCLUDED_ALBUM_IDS / CATEGORY_ORDER)', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    vi.clearAllMocks()
+    mockCoverDiskAsRemote()
+  })
+
+  it('MUTANT KILL: álbum em EXCLUDED_ALBUM_IDS (712) é filtrado do catálogo', async () => {
+    const mockCategories = [
+      {
+        id_category: 'cds',
+        name: 'CDs Oficiais/Ano',
+        albums: [
+          { id_album: 712, name: 'Excluído legado', url_image: null },
+          { id_album: 999, name: 'Normal', url_image: null },
+        ],
+      },
+    ]
+    vi.mocked(readCatalogRecord).mockImplementation(async (key: string) => {
+      if (key === 'pt_categories') return mockCategories
+      return null
+    })
+
+    const result = await loadLibraryCategories()
+    const cds = result.find((c: { id: string }) => c.id === 'cds')
+    expect(cds).toBeDefined()
+    const albumIds = cds!.albums.map((a: { id: number | string }) => a.id)
+    // Set([712, 629]) mutado pra Set([]): 712 apareceria — tem que estar FORA
+    expect(albumIds).toContain(999)
+    expect(albumIds).not.toContain(712)
+  })
+
+  it('MUTANT KILL: CATEGORY_ORDER vazio inverte ordem (Doxologia vem antes de unmapped)', async () => {
+    const mockCategories = [
+      {
+        id_category: 'aaa_unmapped',
+        name: 'aaa Unmapped',
+        albums: [{ id_album: 400, name: 'Album U', url_image: null }],
+      },
+      {
+        id_category: 'Doxologia',
+        name: 'zzz Doxologia',
+        albums: [{ id_album: 500, name: 'Album D', url_image: null }],
+      },
+    ]
+    vi.mocked(readCatalogRecord).mockImplementation(async (key: string) => {
+      if (key === 'pt_categories') return mockCategories
+      return null
+    })
+
+    const result = await loadLibraryCategories()
+    // Com CATEGORY_ORDER: Doxologia(4) antes de unmapped(50)
+    // Mutante {}: ambos 50 → localeCompare('zzz Doxologia','aaa Unmapped') → aaa primeiro
+    const ids = result.map((c: { id: string }) => c.id)
+    expect(ids).toEqual(['Doxologia', 'aaa_unmapped'])
+  })
+})

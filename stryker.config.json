@@ -8,6 +8,12 @@
     "src/modules/sync/services/library-catalog.ts",
     "src/modules/liturgy/services/**/*.ts"
   ],
+  "ignorePatterns": [
+    ".worktrees",
+    "reports",
+    "coverage",
+    "dist"
+  ],
   "thresholds": {
     "high": 80,
     "low": 60,
