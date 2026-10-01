@@ -253,3 +253,59 @@ describe("MediaAccountBar — logout", () => {
 		w.unmount();
 	});
 });
+
+describe("MediaAccountBar — forgot sem token e voltas de modo", () => {
+  it("forgot sem token (resposta neutra): notifica e volta pro login", async () => {
+    vi.mocked(auth.requestPasswordReset).mockResolvedValue(null);
+    const w = mountBar();
+    // abre o form
+    await w.findAll(".account__link")[0].trigger("click");
+    await w.findAll(".account__link")
+      .find((b) => b.text().trim() === "Esqueci minha senha")!
+      .trigger("click");
+    await w.find("input").setValue("irmao@iasd.org");
+    await w.find("form").trigger("submit");
+    await flushPromises();
+    expect(notify).toHaveBeenCalledWith(
+      "Se o e-mail existir, o suporte tem o token de reset",
+    );
+    // voltou pro modo login
+    expect(w.text()).toContain("Entrar");
+  });
+
+  it("register: link Já tenho conta volta pro login", async () => {
+    const w = mountBar();
+    // abre o form
+    await w.findAll(".account__link")
+      .find((b) => b.text().includes("Entrar / Criar conta"))!
+      .trigger("click");
+    // tab pra registrar
+    await w.findAll(".account__link")
+      .find((b) => b.text().trim() === "Criar conta")!
+      .trigger("click");
+    expect(w.find("form").exists()).toBe(true);
+    // volta pro login
+    const voltar = w
+      .findAll(".account__link")
+      .find((b) => b.text().trim() === "Já tenho conta");
+    await voltar?.trigger("click");
+    expect(w.text()).toContain("Esqueci minha senha");
+  });
+
+  it("reset: link Voltar volta pro login", async () => {
+    vi.mocked(auth.requestPasswordReset).mockResolvedValue("token-12345678");
+    const w = mountBar();
+    await w.findAll(".account__link")[0].trigger("click");
+    await w.findAll(".account__link")
+      .find((b) => b.text().trim() === "Esqueci minha senha")!
+      .trigger("click");
+    await w.find("input").setValue("irmao@iasd.org");
+    await w.find("form").trigger("submit");
+    await flushPromises();
+    const voltar = w
+      .findAll(".account__link")
+      .find((b) => b.text() === "Voltar");
+    await voltar?.trigger("click");
+    expect(w.text()).toContain("Entrar");
+  });
+});
