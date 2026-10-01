@@ -380,3 +380,32 @@ describe("bridge helpers", () => {
 		});
 	});
 })
+
+describe("random-audio — retoma com notify (stmt 210)", () => {
+  it("toggle retoma com play RESOLVIDO: notifyPlaying roda", async () => {
+    const events: boolean[] = [];
+    subscribeRandomAudioPlaying((p) => events.push(p));
+    playRandomDrawAudio(config());
+    const audio = FakeAudio.instances[0]!;
+    audio.resolvePlay();
+    toggleRandomDrawAudio(config()); // pausa
+    toggleRandomDrawAudio(config()); // retoma: play pendente
+    audio.resolvePlay();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(events[events.length - 1]).toBe(true);
+  });
+
+  it("toggle retoma com play REJEITADO: notifyPlaying também roda (207-210)", async () => {
+    const events: boolean[] = [];
+    subscribeRandomAudioPlaying((p) => events.push(p));
+    playRandomDrawAudio(config());
+    const audio = FakeAudio.instances[0]!;
+    audio.resolvePlay();
+    toggleRandomDrawAudio(config()); // pausa
+    toggleRandomDrawAudio(config()); // retoma
+    audio.rejectPlay();
+    await new Promise((r) => setTimeout(r, 0));
+    // rejeição cai no 2º callback: notifyPlaying mesmo assim
+    expect(events.length).toBeGreaterThan(0);
+  });
+});

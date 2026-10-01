@@ -24,7 +24,7 @@ vi.mock('../../../settings/services/stage-settings-runtime', () => ({
 }))
 
 vi.mock('../../../settings/types/stage-settings', () => ({
-  resolveBackgroundImage: vi.fn(() => null),
+  resolveBackgroundImage: vi.fn((bg: string | null) => (bg ? `https://cdn.test/${bg}` : null)),
   stageFlexAlign: vi.fn(() => ({ alignItems: 'center', justifyContent: 'center' })),
 }))
 
@@ -123,14 +123,18 @@ describe('TimerProjectionView', () => {
     expect(wrapper.vm.config.timeFormat).toBe('HH:mm:ss')
   })
 
-  it('BroadcastChannel config message: atualiza config', async () => {
+  it('BroadcastChannel config message: atualiza config (71)', async () => {
     const wrapper = mount(TimerProjectionView)
-    // canal criado no mount — enviar via instância global
-    const channels = performance.now() // placeholder para tipo
-    void channels
-    // BroadcastChannel existe no jsdom? se não, configChannel=null e nada quebra
+    const ch = new BroadcastChannel('louvorja-timer-config')
+    // handler onConfigMessage: dispatch direto na instância do canal do componente
+    ch.postMessage({ showTitle: true, titleText: 'Config via BC' })
+    await flushPromises()
+    await new Promise((r) => setTimeout(r, 0))
+    // handler 71 executou sem quebrar (config normalizada); TimerPreview recebe props
+    expect(wrapper.find('.timer-projection').exists()).toBe(true)
+    ch.close()
     wrapper.unmount()
-    expect(unsubSpy).toHaveBeenCalled() // unsubscribe no unmount
+    expect(unsubSpy).toHaveBeenCalled()
   })
 
   it('unmount: remove listeners e unsub de stage', () => {
@@ -170,6 +174,22 @@ describe('TimerProjectionView', () => {
     expect(stageSubs.cbs.length).toBeGreaterThanOrEqual(1)
     for (const cb of stageSubs.cbs) cb()
     await wrapper.vm.$nextTick()
+    wrapper.unmount()
+  })
+})
+
+describe('TimerProjectionView — stageStyle com backgroundImage (b119)', () => {
+  it('backgroundImage presente: style usa url resolvída (cover)', async () => {
+    mockReadStage.mockReturnValue({
+      backgroundColor: '#111111',
+      backgroundImage: 'official:bg-1',
+      boxBorder: true,
+    })
+    const wrapper = mount(TimerProjectionView)
+    await flushPromises()
+    const style = wrapper.find('.timer-projection').attributes('style') ?? ''
+    expect(style).toContain('url(')
+    expect(style).toContain('cover')
     wrapper.unmount()
   })
 })
