@@ -538,3 +538,25 @@ describe('AppShell', () => {
     w.unmount()
   })
 })
+
+describe('AppShell — meta.navKey ausente (fallbacks)', () => {
+  it('rota sem navKey: activeKey cai em home e viewKey usa route.name', async () => {
+    routeState.meta = {}
+    routeState.name = 'rota-qualquer'
+    const w = await mountShell()
+    // sem navKey: logo do header aparece (activeKey != home? não: fallback É home)
+    // viewKey cai pra String(route.name)
+    expect(w.find('.app-shell__header').exists()).toBe(true)
+    w.unmount()
+    routeState.meta = { navKey: 'media' }
+  })
+
+  it('rota com navKey não-string (número): viewKey usa String(name)', async () => {
+    routeState.meta = { navKey: 42 }
+    routeState.name = 'numerica'
+    const w = await mountShell()
+    expect(w.find('.app-shell__header').exists()).toBe(true)
+    w.unmount()
+    routeState.meta = { navKey: 'media' }
+  })
+})
