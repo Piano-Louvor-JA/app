@@ -9,7 +9,7 @@ import { createI18n } from "vue-i18n";
  * dispatchEvent e emissões lidas por wrapper.emitted().
  */
 import timerLocale from "../../locales/pt-BR";
-import { TIMER_TIME_FORMATS, type TimerDisplayConfig } from "../../types/timer";
+import { TIMER_TEXT_PRESETS, TIMER_TIME_FORMATS, type TimerDisplayConfig } from "../../types/timer";
 import TimerConfigDialog from "../TimerConfigDialog.vue";
 
 const i18n = createI18n({
@@ -178,13 +178,15 @@ describe("TimerConfigDialog", () => {
   describe('swatches de texto (click)', () => {
     it('click no swatch emite update:textColor', async () => {
       const w = mountDialog()
-      const swatches = w.findAll('[role="radio"][class*="swatch"]')
-      if (swatches.length === 0) {
-        const radios = w.findAll('[role="radio"]')
-        for (const r of radios.slice(0, 2)) await r.trigger('click')
-      } else {
-        await swatches[0].trigger('click')
-      }
+      const groups = qa('[role="radiogroup"]')
+      expect(groups.length).toBeGreaterThanOrEqual(2)
+      const textSwatches = Array.from(
+        groups[1]!.querySelectorAll<HTMLInputElement>('[role="radio"]'),
+      )
+      expect(textSwatches.length).toBe(TIMER_TEXT_PRESETS.length)
+      clickEl(textSwatches[1]!)
+      await w.vm.$nextTick()
+      expect(w.emitted('update:textColor')?.[0]).toEqual([TIMER_TEXT_PRESETS[1]])
       w.unmount()
     })
   })
