@@ -1167,3 +1167,97 @@ describe('mutação round 9 — NoCoverage (draftValid endTime, images ramo, rec
     expect(result[0]!.name).toBe('Velho')
   })
 })
+
+describe('mutação round 10 — trim/strings/métodos (StringLiteral/MethodExpression kills)', () => {
+  const ctx = {
+    musicList: [{ id: 1, displayLabel: 'Hino 1', albumNames: 'Album A' }],
+    bibleBooks: [{ id: 'gn', name: 'Gênesis' }],
+  } as unknown as Parameters<typeof buildLiturgyItemFromDraft>[1]
+  const base: LiturgyItemDraft = {
+    type: 'other_files',
+    name: 'Item',
+    subtitle: '',
+    durationMs: 0,
+    accentColor: '#fff',
+    categoryId: 'c1',
+    startTime: '',
+    endTime: '',
+    musicId: null,
+    musicMode: 'audio',
+    verseBookId: null,
+    verseChapter: null,
+    verseNumbers: '',
+    filePath: '',
+    filePaths: [],
+    playerId: 'default',
+    url: '',
+    presentationEngine: 'auto',
+  }
+
+  it('isValidLiturgyUrl: raw.trim é usado (string com espaços em volta)', () => {
+    // mutante raw.trim → raw: '  ' + 'x' viraria truthy
+    expect(isValidLiturgyUrl('   ')).toBe(false)
+    expect(isValidLiturgyUrl('  youtube.com  ')).toBe(true)
+  })
+
+  it('draftValid: filePath COM espaços só é válido se tiver conteúdo pós-trim', () => {
+    expect(isLiturgyItemDraftValid({ ...base, type: 'pdf', filePath: '   ' } as unknown as LiturgyItemDraft)).toBe(false)
+    expect(isLiturgyItemDraftValid({ ...base, type: 'pdf', filePath: ' /x.pdf ' } as unknown as LiturgyItemDraft)).toBe(true)
+  })
+
+  it('draftValid: presentation e video exige path pós-trim', () => {
+    expect(isLiturgyItemDraftValid({ ...base, type: 'presentation', filePath: ' ' } as unknown as LiturgyItemDraft)).toBe(false)
+    expect(isLiturgyItemDraftValid({ ...base, type: 'video', filePath: ' ' } as unknown as LiturgyItemDraft)).toBe(false)
+  })
+
+  it('draftValid: site url vazia/spaços → inválida; preenchida → válida', () => {
+    expect(isLiturgyItemDraftValid({ ...base, type: 'site', url: '   ' } as unknown as LiturgyItemDraft)).toBe(false)
+    expect(isLiturgyItemDraftValid({ ...base, type: 'site', url: 'x.com' } as unknown as LiturgyItemDraft)).toBe(true)
+  })
+
+  it('build: throw com mensagem específica', () => {
+    expect(() => buildLiturgyItemFromDraft({ ...base, type: null }, ctx)).toThrow('Liturgy item draft requires a type')
+  })
+
+  it('build: subtitle vem de draft.subtitle TRIMADO; name trimado', () => {
+    const built = buildLiturgyItemFromDraft({ ...base, name: '  Nome  ', subtitle: '  Det  ' }, ctx)
+    expect(built.name).toBe('Nome')
+    expect(built.subtitle).toBe('Det')
+  })
+
+  it('build images: entry.trim aplicado em cada path de filePaths (espaços removidos)', () => {
+    const built = buildLiturgyItemFromDraft(
+      { ...base, type: 'images', filePaths: [' /a.jpg ', 'b.jpg', '   '] } as LiturgyItemDraft,
+      ctx,
+    )
+    expect(built.filePaths).toEqual(['/a.jpg', 'b.jpg'])
+    expect(built.filePath).toBe('/a.jpg')
+  })
+
+  it('build images: filePath único com espaços → trimado pro array', () => {
+    const built = buildLiturgyItemFromDraft(
+      { ...base, type: 'images', filePaths: [], filePath: ' /sozinho.jpg ' } as LiturgyItemDraft,
+      ctx,
+    )
+    expect(built.filePaths).toEqual(['/sozinho.jpg'])
+  })
+
+  it('build audio/video: mutação de "video"→"" cai no ramo audio; playerId default apagado igual', () => {
+    const v = buildLiturgyItemFromDraft({ ...base, type: 'audio', filePath: '/a.mp3', playerId: 'default' } as unknown as LiturgyItemDraft, ctx)
+    expect(v.playerId).toBeUndefined()
+  })
+
+  it('draftValid: type video/pdf/presentation mutado pra "" — deixa de exigir path', () => {
+    // se draft.type === 'pdf' virar '' , um draft type 'video' com path vazio passaria
+    // asserção: TODOS os 3 tipos exigem path
+    for (const t of ['video', 'pdf', 'presentation'] as const) {
+      expect(isLiturgyItemDraftValid({ ...base, type: t, filePath: '' })).toBe(false)
+    }
+  })
+
+  it('draftValid: type site/online_video mutado pra "" — deixa de exigir url válida', () => {
+    for (const t of ['site', 'online_video'] as const) {
+      expect(isLiturgyItemDraftValid({ ...base, type: t, url: '' })).toBe(false)
+    }
+  })
+})
