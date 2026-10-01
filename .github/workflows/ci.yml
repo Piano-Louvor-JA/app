@@ -1,5 +1,7 @@
-# CI Pipeline - PIANO
-# Roda em todo PR e push para staging/main.
+# CI Pipeline - PIANO (autônomo)
+# PRs: gates rápidos (lint, types, TESTES, build) + regression-gate.
+# Release Validation (matrix 3 SOs) só em push staging/main — não segura fila de PR.
+# concurrency: cancela runs obsoletos da mesma PR/branch.
 name: CI
 
 on:
@@ -11,6 +13,10 @@ on:
 permissions:
   contents: read
   pull-requests: write
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   lint:
@@ -36,6 +42,21 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run type-check
+
+  test:
+    name: Unit Tests (vitest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Rodar suíte de testes
+        run: npm run test -- --reporter=dot
+        env:
+          CI: 'true'
 
   build:
     name: Build
@@ -83,6 +104,7 @@ jobs:
 
   electron-support-matrix:
     name: Resolve supported Electron versions
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.matrix.outputs.value }}
@@ -97,6 +119,7 @@ jobs:
   release-validation:
     name: Release Validation (${{ matrix.platform }} / Electron ${{ matrix.version }})
     needs: electron-support-matrix
+    if: github.event_name == 'push'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -128,19 +151,24 @@ jobs:
   quality-gate:
     name: Quality Gate
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, build, regression-gate, release-validation]
+    needs: [lint, typecheck, test, build, regression-gate, release-validation]
     if: always()
     steps:
       - name: Verifica se todos os gates passaram
         run: |
           echo "lint: ${{ needs.lint.result }}"
           echo "typecheck: ${{ needs.typecheck.result }}"
+          echo "test: ${{ needs.test.result }}"
           echo "build: ${{ needs.build.result }}"
           echo "regression-gate: ${{ needs.regression-gate.result }}"
           echo "release-validation: ${{ needs.release-validation.result }}"
-          # regression-gate só roda em pull_request; em push fica "skipped".
+          # regression-gate: só pull_request; release-validation: só push. skipped = ok no respectivo evento.
           REG="${{ needs.regression-gate.result }}"
-          if [[ "${{ needs.lint.result }}" != "success" || "${{ needs.typecheck.result }}" != "success" || "${{ needs.build.result }}" != "success" || "${{ needs.release-validation.result }}" != "success" || ( "$REG" != "success" && "$REG" != "skipped" ) ]]; then
+          REL="${{ needs.release-validation.result }}"
+          ok() { [[ "$1" == "success" || "$1" == "skipped" ]]; }
+          if ! ok "${{ needs.lint.result }}" || ! ok "${{ needs.typecheck.result }}" \
+             || ! ok "${{ needs.test.result }}" || ! ok "${{ needs.build.result }}" \
+             || ! ok "$REG" || ! ok "$REL"; then
             echo "::error::Quality Gate FALHOU — corrija os erros antes do merge"
             exit 1
           fi
