@@ -1263,3 +1263,31 @@ describe('mutantes sobreviventes - round 3', () => {
     expect(h1996!.songCount).toBe(3)
   })
 })
+
+describe('mutantes round 5 - guard Array.isArray dos hinários', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    vi.clearAllMocks()
+    mockCoverDiskAsRemote()
+  })
+
+  it('MUTANT KILL: catalog record objeto não-array NÃO vira hinário (guard Array.isArray)', async () => {
+    vi.mocked(readCatalogRecord).mockResolvedValue({ not: 'an array' } as never)
+    const result = await loadLibraryCategories()
+    // guard `hymnal && Array.isArray(hymnal) && length>0` rejeita objeto: nenhuma categoria
+    expect(result).toHaveLength(0)
+  })
+
+  it('MUTANT KILL: hymnal_1996 objeto não-array NÃO vira hinário (guard Array.isArray)', async () => {
+    vi.mocked(readCatalogRecord)
+      .mockResolvedValueOnce(null as never) // categories
+      .mockResolvedValueOnce([] as never) // downloaded
+      .mockResolvedValueOnce([{ id: 'm1' }] as never) // hymnal válido
+      .mockResolvedValueOnce({ broken: true } as never) // hymnal_1996 objeto
+    const result = await loadLibraryCategories()
+    expect(result).toHaveLength(1)
+    const ids = result[0]!.albums.map((a: { id: string }) => a.id)
+    expect(ids).toContain('hymnal')
+    expect(ids).not.toContain('hymnal_1996')
+  })
+})
