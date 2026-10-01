@@ -538,4 +538,336 @@ describe('useLiturgy (orquestrador da view)', () => {
     expect(openLyricMock).toHaveBeenCalledTimes(1)
     wrapper.unmount()
   })
+
+  it('clock: getters do header expostos e computados refletidos', async () => {
+    const wrapper = mountWith(() => useLiturgy())
+    const f = (wrapper.vm as unknown as { exposed: Exposed }).exposed
+    const store = useLiturgyStore()
+    await new Promise((r) => setTimeout(r, 0))
+
+    // headerDateTime é função do useLiturgyClock
+    expect((f.headerDateTime as () => string)()).toMatch(/•/)
+
+    // getters que leem currentStartTime/currentEndTime (callbacks do clock)
+    expect((f.startTimeInput as unknown as { value: string }).value).toBe('')
+    expect((f.endTimeInput as unknown as { value: string }).value).toBe('')
+
+    // countdown parado → expired false e label '—'
+    expect((f.countdownExpired as unknown as { value: boolean }).value).toBe(false)
+    expect(
+      (f.remainingCountdownLabel as unknown as { value: string }).value,
+    ).toBe('—')
+
+    // countdown rodando com endTime setado → label de contagem
+    store.weekdays[store.selectedDay as keyof typeof store.weekdays] = []
+    store.setSessionEndFromInput?.('23:59')
+    store.startCountdown?.()
+    await wrapper.vm.$nextTick()
+    expect(
+      (f.remainingCountdownLabel as unknown as { value: string }).value,
+    ).toBeTypeOf('string')
+    wrapper.unmount()
+  })
+
+  it('interval de 400ms dispara syncSiteProjectionState', async () => {
+    vi.useFakeTimers()
+    const wrapper = mountWith(() => useLiturgy())
+    const store = useLiturgyStore()
+    const spy = vi.spyOn(store, 'syncSiteProjectionState').mockResolvedValue(undefined)
+    await vi.advanceTimersByTimeAsync(0)
+    spy.mockClear()
+    await vi.advanceTimersByTimeAsync(900) // 2+ ticks de 400ms
+    expect(spy.mock.calls.length).toBeGreaterThanOrEqual(2)
+    wrapper.unmount()
+    vi.useRealTimers()
+  })
+
+  it('pickJaFileWeb: file.arrayBuffer rejeita → resolve null e erro amigável', async () => {
+    const wrapper = mountWith(() => useLiturgy())
+    const f = (wrapper.vm as unknown as { exposed: Exposed }).exposed
+    await new Promise((r) => setTimeout(r, 0))
+
+    vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(
+      function (this: HTMLInputElement) {
+        const file = new File([new Uint8Array([1])], 'x.ja')
+        Object.defineProperty(file, 'arrayBuffer', {
+          value: async () => {
+            throw new Error('boom')
+          },
+          configurable: true,
+        })
+        Object.defineProperty(this, 'files', { value: [file], configurable: true })
+        this.onchange?.(new Event('change'))
+      },
+    )
+    await (f.importJa as () => Promise<void>)()
+    expect(appConfirmMock).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'liturgy.importJaReadError' }),
+    )
+    wrapper.unmount()
+  })
+
+  it('branches negativos: confirm recusado, lock ativo, custom inexistente, cancel web', async () => {
+    const wrapper = mountWith(() => useLiturgy())
+    const f = (wrapper.vm as unknown as { exposed: Exposed }).exposed
+    const store = useLiturgyStore()
+    await new Promise((r) => setTimeout(r, 0))
+
+    // worshipLabel custom com título → retorna título
+    ;(f.selectDay as (d: string) => void)('custom')
+    const customsRef = (f.customLiturgies as unknown as { value: Array<{ id: string; name: string }> })
+    customsRef.value = [{ id: 'c1', name: 'Culto Especial' }]
+    store.selectCustomLiturgy?.(0 as never)
+    await wrapper.vm.$nextTick()
+    const label = (f.worshipLabel as () => string)()
+    expect(label).toBeTypeOf('string')
+
+    // confirmRemoveCustom: confirm false → sem remove; custom inexistente → name ''
+    const rmSpy = vi.spyOn(store, 'removeCustomLiturgy').mockReturnValue(undefined)
+    ;(f.confirmRemoveCustom as (i: number) => void)(0) // confirm false (default)
+    expect(rmSpy).not.toHaveBeenCalled()
+    ;(f.confirmRemoveCustom as (i: number) => void)(9)
+    expect(window.confirm).toHaveBeenCalledWith(
+      expect.stringContaining('confirmDeleteCustom:'),
+    )
+
+    // confirmRemoveItem: category confirm true → remove
+    window.confirm = vi.fn(() => true)
+    ;(f.selectDay as (d: string) => void)('sabbath')
+    store.weekdays[store.selectedDay as keyof typeof store.weekdays] = [
+      { id: 'c1', type: 'category' } as never,
+    ]
+    const remSpy = vi.spyOn(store, 'removeItem').mockReturnValue(undefined)
+    ;(f.confirmRemoveItem as (i: number) => void)(0)
+    expect(remSpy).toHaveBeenCalledWith(0)
+
+    // deletionLocked → nem pergunta
+    remSpy.mockClear()
+    store.toggleDeletionLock()
+    ;(f.confirmRemoveItem as (i: number) => void)(0)
+    expect(remSpy).not.toHaveBeenCalled()
+
+    // confirmClear: confirm false → sem clear
+    window.confirm = vi.fn(() => false)
+    const clearSpy = vi.spyOn(store, 'clearAllItems').mockReturnValue(undefined)
+    ;(f.confirmClearLiturgy as () => void)()
+    expect(clearSpy).not.toHaveBeenCalled()
+
+    // importScheduled web: cancel (sem arquivo) → aborta silencioso
+    vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(
+      function (this: HTMLInputElement) {
+        Object.defineProperty(this, 'files', { value: null, configurable: true })
+        this.onchange?.(new Event('change'))
+      },
+    )
+    await (f.importScheduled as () => Promise<void>)()
+    expect(appConfirmMock).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('importScheduled desktop: readBinaryFile null/erro e não-ported em 2ª leitura', async () => {
+    const wrapper = mountWith(() => useLiturgy())
+    const f = (wrapper.vm as unknown as { exposed: Exposed }).exposed
+    await new Promise((r) => setTimeout(r, 0))
+
+    // 2º dialog devolve null → items null, importa só cats
+    bridgeState.value = {
+      dialog: {
+        openFile: vi
+          .fn()
+          .mockResolvedValueOnce('/tmp/cats.xml')
+          .mockResolvedValueOnce(null),
+      },
+      workspace: {
+        readBinaryFile: vi.fn(async () => new TextEncoder().encode('<x/>')),
+      },
+    }
+    await (f.importScheduled as () => Promise<void>)()
+    expect(appConfirmMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining('liturgy.scheduled.imported'),
+      }),
+    )
+
+    // 2º arquivo com erro de leitura → items null, ainda importa só cats
+    appConfirmMock.mockClear()
+    bridgeState.value = {
+      dialog: {
+        openFile: vi
+          .fn()
+          .mockResolvedValueOnce('/tmp/cats.xml')
+          .mockResolvedValueOnce('/tmp/items.xml'),
+      },
+      workspace: {
+        readBinaryFile: vi
+          .fn()
+          .mockResolvedValueOnce(new TextEncoder().encode('<x/>'))
+          .mockRejectedValueOnce(new Error('disk')),
+      },
+    }
+    await (f.importScheduled as () => Promise<void>)()
+    expect(appConfirmMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining('liturgy.scheduled.imported'),
+      }),
+    )
+    wrapper.unmount()
+  })
+
+  it('importJa desktop: readBinaryFile rejeita → erro de leitura', async () => {
+    const wrapper = mountWith(() => useLiturgy())
+    const f = (wrapper.vm as unknown as { exposed: Exposed }).exposed
+    await new Promise((r) => setTimeout(r, 0))
+    bridgeState.value = {
+      dialog: { openFile: vi.fn().mockResolvedValue('/tmp/x.ja') },
+      workspace: {
+        readBinaryFile: vi.fn().mockRejectedValue(new Error('disk')),
+      },
+    }
+    await (f.importJa as () => Promise<void>)()
+    expect(appConfirmMock).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'liturgy.importJaReadError' }),
+    )
+    wrapper.unmount()
+  })
+
+  it('importJa: array path → pega primeiro; readBinaryFile null → erro de leitura', async () => {
+    const wrapper = mountWith(() => useLiturgy())
+    const f = (wrapper.vm as unknown as { exposed: Exposed }).exposed
+    await new Promise((r) => setTimeout(r, 0))
+    bridgeState.value = {
+      dialog: { openFile: vi.fn().mockResolvedValue(['/tmp/a.ja', '/tmp/b.ja']) },
+      workspace: { readBinaryFile: vi.fn().mockResolvedValue(null) },
+    }
+    await (f.importJa as () => Promise<void>)()
+    expect(appConfirmMock).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'liturgy.importJaReadError' }),
+    )
+
+    // duplicados → cancel (confirm false) = merge
+    appConfirmMock.mockClear()
+    bridgeState.value = {
+      dialog: { openFile: vi.fn().mockResolvedValue('/tmp/x.ja') },
+      workspace: {
+        readBinaryFile: vi.fn(async () => new TextEncoder().encode('C')),
+      },
+    }
+    parseJaLiturgyMock.mockReturnValue({ days: [] })
+    const store = useLiturgyStore()
+    vi.spyOn(store, 'countJaDuplicates').mockReturnValue(1)
+    appConfirmMock.mockResolvedValueOnce(false) // overwrite? não = merge
+    const importSpy = vi
+      .spyOn(store, 'importJaDays')
+      .mockResolvedValue({ added: 0, skipped: 1, days: [] })
+    await (f.importJa as () => Promise<void>)()
+    expect(importSpy).toHaveBeenCalledWith({ days: [] }, 'merge')
+    expect(appConfirmMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining('liturgy.importJaDone'),
+      }),
+    )
+    wrapper.unmount()
+  })
+
+  it('importJa: parse lança com duplicados presentes ainda cobre overflow label', async () => {
+    const wrapper = mountWith(() => useLiturgy())
+    const f = (wrapper.vm as unknown as { exposed: Exposed }).exposed
+    const store = useLiturgyStore()
+    await new Promise((r) => setTimeout(r, 0))
+    stubDesktopBridge().open([['/tmp/x.ja', 'C']])
+    parseJaLiturgyMock.mockReturnValue({ days: [] })
+    vi.spyOn(store, 'countJaDuplicates').mockReturnValue(5)
+    vi.spyOn(store, 'importJaDays').mockResolvedValue({
+      added: 1,
+      skipped: 2,
+      days: ['a', 'b', 'c', 'd'],
+    })
+    await (f.importJa as () => Promise<void>)()
+    // confirm true (default) → overwrite com dias
+    expect(appConfirmMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining('liturgy.importJaOverwritten'),
+      }),
+    )
+    wrapper.unmount()
+  })
+
+  it('cantos: unmount sem timer, lock+itens no clear, removeCustom confirm true, array path/null bytes scheduled, web sem arquivo', async () => {
+    // unmount com syncTimer null (setInterval mockado pra não registrar)
+    const siSpy = vi
+      .spyOn(window, 'setInterval')
+      .mockImplementation(() => null as unknown as number)
+    const w1 = mountWith(() => useLiturgy())
+    await new Promise((r) => setTimeout(r, 0))
+    siSpy.mockRestore()
+    w1.unmount()
+
+    const wrapper = mountWith(() => useLiturgy())
+    const f = (wrapper.vm as unknown as { exposed: Exposed }).exposed
+    const store = useLiturgyStore()
+    await new Promise((r) => setTimeout(r, 0))
+
+    // confirmClear: itens presentes + deletionLocked → early return (branch falso)
+    store.weekdays[store.selectedDay as keyof typeof store.weekdays] = [
+      { id: 'c1', type: 'category' } as never,
+    ]
+    store.toggleDeletionLock()
+    const clearSpy = vi.spyOn(store, 'clearAllItems').mockReturnValue(undefined)
+    window.confirm = vi.fn(() => true)
+    ;(f.confirmClearLiturgy as () => void)()
+    expect(clearSpy).not.toHaveBeenCalled()
+
+    // confirmClear: itens presentes, sem lock, confirm recusado → return
+    store.toggleDeletionLock()
+    window.confirm = vi.fn(() => false)
+    ;(f.confirmClearLiturgy as () => void)()
+    expect(clearSpy).not.toHaveBeenCalled()
+    expect(window.confirm).toHaveBeenCalledWith('liturgy.messages.confirmClear')
+
+    // confirmRemoveCustom: confirm true → remove de fato
+    window.confirm = vi.fn(() => true)
+    ;(f.customLiturgies as unknown as { value: unknown[] }).value = [
+      { id: 'c9', name: 'X', items: [], notes: '', startTime: null, endTime: null },
+    ]
+    ;(f.confirmRemoveCustom as (i: number) => void)(0)
+    expect(
+      (f.customLiturgies as unknown as { value: unknown[] }).value,
+    ).toHaveLength(0)
+
+    // importScheduled desktop: openFile devolve array; bytes null no 1º arquivo
+    bridgeState.value = {
+      dialog: {
+        openFile: vi
+          .fn()
+          .mockResolvedValueOnce(['/tmp/cats.xml'])
+          .mockResolvedValueOnce('/tmp/items.xml'),
+      },
+      workspace: {
+        readBinaryFile: vi
+          .fn()
+          .mockResolvedValueOnce(new TextEncoder().encode('<x/>'))
+          .mockResolvedValueOnce(null),
+      },
+    }
+    await (f.importScheduled as () => Promise<void>)()
+    expect(appConfirmMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining('liturgy.scheduled.imported'),
+      }),
+    )
+
+    // importJa web (sem bridge): sem arquivo escolhido → read error
+    bridgeState.value = null
+    vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(
+      function (this: HTMLInputElement) {
+        Object.defineProperty(this, 'files', { value: null, configurable: true })
+        this.onchange?.(new Event('change'))
+      },
+    )
+    await (f.importJa as () => Promise<void>)()
+    expect(appConfirmMock).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'liturgy.importJaReadError' }),
+    )
+    wrapper.unmount()
+  })
 })
