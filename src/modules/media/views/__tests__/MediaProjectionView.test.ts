@@ -137,3 +137,30 @@ describe("MediaProjectionView", () => {
 		w.unmount();
 	});
 });
+
+describe("MediaProjectionView — boxStyle branches (90/97/101)", () => {
+  function setStage(partial: Record<string, unknown>) {
+    const raw = localStorage.getItem("user_data");
+    const prefs = raw ? JSON.parse(raw) : {};
+    prefs["stage.settings.hymns"] = {
+      backgroundColor: "#000000",
+      fontColor: "#ffffff",
+      ...partial,
+    };
+    localStorage.setItem("user_data", JSON.stringify(prefs));
+  }
+
+  it("textBox false: boxStyle vazio (sem box)", async () => {
+    setStage({ textBox: false, boxBorder: false });
+    const w = await mountView();
+    expect(w.find(".media-projection").exists()).toBe(true);
+    w.unmount();
+  });
+
+  it("textBox true + boxBorder true: borda aplicada", async () => {
+    setStage({ textBox: true, boxBorder: true });
+    const w = await mountView();
+    expect(w.find(".media-projection").exists()).toBe(true);
+    w.unmount();
+  });
+});

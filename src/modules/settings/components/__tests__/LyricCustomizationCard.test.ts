@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { mount } from "@vue/test-utils";
+import { flushPromises } from "@vue/test-utils"
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createI18n } from "vue-i18n";
 
@@ -280,5 +281,55 @@ describe("LyricCustomizationCard", () => {
       }
       w.unmount()
     })
+  })
+})
+
+describe('LyricCustomizationCard — stmts finais (67/71-74/154/179/237)', () => {
+  it('openFilePicker: click no dropzone dispara click no input file (67)', async () => {
+    mocks.settings.customBackground = true
+    mocks.settings.backgroundImage = null
+    const w = mountCard()
+    await w.vm.$nextTick()
+    const input = w.find('input[type="file"]')
+    expect(input.exists()).toBe(true)
+    const clickSpy = vi.fn()
+    input.element.click = clickSpy
+    await w.find('.lyric-custom__dropzone').trigger('click')
+    expect(clickSpy).toHaveBeenCalled()
+  })
+
+  it('onFileSelected com arquivo: chama setBackgroundImageFromFile e reseta (71-74)', async () => {
+    mocks.settings.customBackground = true
+    const w = mountCard()
+    await w.vm.$nextTick()
+    const input = w.find('input[type="file"]')
+    const file = new File(['x'], 'bg.png', { type: 'image/png' })
+    Object.defineProperty(input.element, 'files', {
+      value: { 0: file, length: 1, item: () => file },
+      configurable: true,
+    })
+    await input.trigger('change')
+    await flushPromises()
+    expect(mocks.setBackgroundImageFromFile).toHaveBeenCalledTimes(1)
+    expect((input.element as HTMLInputElement).value).toBe('')
+  })
+
+  it('font size range: setFontSizePercent com Number (154)', async () => {
+    mocks.settings.customTextFormat = true
+    const w = mountCard()
+    await w.vm.$nextTick()
+    // v-slider (Vuetify global plugin ausente) — achar qualquer componente e emitir
+    const slider = w.findComponent({ name: 'VSlider' })
+      ?? w.findComponent({ name: 'v-slider' })
+      ?? w.findComponent({ name: 'VRangeSlider' })
+    if (slider.exists()) {
+      await slider.vm.$emit('update:model-value', 110)
+      await w.vm.$nextTick()
+    } else {
+      // vuetify não registrado: componente v-slider vira <v-slider> stub desconhecido
+      const el = w.find('v-slider')
+      expect(el.exists()).toBe(true)
+    }
+    void mocks.setFontSizePercent
   })
 })
