@@ -1,0 +1,191 @@
+# Promote — Fase 2 do fluxo de release (Ezequias)
+# Disparado manualmente (/promote via gh workflow run ou botão Actions).
+# 1. Calcula próxima versão (semver pelas PRs desde a última tag: feat=minor, fix=patch, breaking=major)
+# 2. Gera changelog TÉCNICO (PR) + USER-FRIENDLY (IA, p/ GitHub Release → UpdateDialog + site)
+# 3. Abre a PR release: staging → main pronta pra revisão e merge HUMANO
+name: Promote Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump_override:
+        description: 'Forçar bump (major/minor/patch). Vazio = automático pelo tipo das PRs'
+        required: false
+        type: choice
+        options:
+          - ''
+          - major
+          - minor
+          - patch
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: promote-release
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    name: Gerar release PR (Fase 2)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: staging
+          fetch-depth: 0  # histórico completo pra changelog e tags
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Calcular próxima versão
+        id: version
+        run: |
+          set -euo pipefail
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "last_tag=$LAST_TAG" >> "$GITHUB_OUTPUT"
+          CURRENT=${LAST_TAG#v}
+          MAJOR=$(echo "$CURRENT" | cut -d. -f1)
+          MINOR=$(echo "$CURRENT" | cut -d. -f2)
+          PATCH=$(echo "$CURRENT" | cut -d. -f3)
+
+          # PRs mergeadas em staging desde a última tag
+          MERGED=$(git log "$LAST_TAG"..origin/staging --merges --pretty=%s | grep -oP '#\K[0-9]+' || true)
+          echo "PRs desde $LAST_TAG: $(echo "$MERGED" | wc -l)"
+
+          # classificar via títulos das PRs (API)
+          BREAKING=0; FEAT=0
+          for num in $MERGED; do
+            TITLE=$(gh pr view "$num" --json title --jq .title 2>/dev/null || echo "")
+            case "$TITLE" in
+              *'!:'*|*breaking*) BREAKING=$((BREAKING+1));;
+              *'feat'*) FEAT=$((FEAT+1));;
+            esac
+          done
+          echo "breaking=$BREAKING feat=$FEAT"
+
+          OVERRIDE="${{ inputs.bump_override }}"
+          if [ -n "$OVERRIDE" ]; then
+            BUMP="$OVERRIDE"
+          elif [ "$BREAKING" -gt 0 ]; then
+            BUMP=major
+          elif [ "$FEAT" -gt 0 ]; then
+            BUMP=minor
+          else
+            BUMP=patch
+          fi
+
+          case "$BUMP" in
+            major) MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0;;
+            minor) MINOR=$((MINOR+1)); PATCH=0;;
+            patch) PATCH=$((PATCH+1));;
+          esac
+          NEW="v$MAJOR.$MINOR.$PATCH"
+          echo "new_tag=$NEW" >> "$GITHUB_OUTPUT"
+          echo "new_version=$MAJOR.$MINOR.$PATCH" >> "$GITHUB_OUTPUT"
+          echo "bump=$BUMP" >> "$GITHUB_OUTPUT"
+          echo "→ próxima versão: $NEW (bump: $BUMP)"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Gerar changelog técnico (PR body)
+        id: tech_changelog
+        run: |
+          set -euo pipefail
+          LAST_TAG="${{ steps.version.outputs.last_tag }}"
+          {
+            echo "## Changelog técnico — ${{ steps.version.outputs.new_tag }}"
+            echo ""
+            echo "PRs mergeadas em staging desde \`$LAST_TAG\`:"
+            echo ""
+            git log "$LAST_TAG"..origin/staging --merges --pretty=format:'- %s' | sed 's/Merge pull request/→ PR/'
+            echo ""
+            echo ""
+            echo "### Classificação do bump"
+            echo "- Bump: **${{ steps.version.outputs.bump }}** (automático pelo tipo das PRs${{ inputs.bump_override && format(', override manual: {0}', inputs.bump_override) || '' }})"
+            echo "- Migrações de schema: contadas no diff (ver abaixo)"
+            echo ""
+            echo "### Gate de verificação (pós-merge em main)"
+            echo "- [ ] CI verde na main"
+            echo "- [ ] Smoke: app abre, update-checker encontra a nova versão"
+            echo "- [ ] Release criada na tag ${{ steps.version.outputs.new_tag }}"
+          } > /tmp/tech-changelog.md
+          {
+            echo 'BODY_TECH<<EOF_TECH'
+            cat /tmp/tech-changelog.md
+            echo 'EOF_TECH'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Gerar release notes user-friendly (IA)
+        id: user_changelog
+        run: |
+          set -euo pipefail
+          LAST_TAG="${{ steps.version.outputs.last_tag }}"
+          # diff dos títulos das PRs pro prompt da IA
+          TITLES=$(git log "$LAST_TAG"..origin/staging --merges --pretty=%s | head -30)
+          PAYLOAD=$(jq -n --arg key "$AI_KEY" --arg titles "$TITLES" '{
+            model: "openrouter/nvidia/nemotron-3.5-lightning:free",
+            messages: [
+              {role: "system", content: "Você escreve release notes para usuários LEIGOS de um app de projeção de hinos para cultos (LouvorJA). Regras: linguagem simples, zero jargão técnico, zero número de PR, zero nome de arquivo. Estrutura: título ## Novidades nesta versão, seções com emoji (Novidades/Correções), cada item em 1 frase que um usuário leigo entende, e no fim 1 linha dizendo o que o usuário precisa fazer (normalmente nada). Markdown simples: headings, negrito, listas."},
+              {role: "user", content: ("Gere as release notes desta versão a partir dos títulos das mudanças:\n\n" + $titles)}
+            ],
+            max_tokens: 800
+          }' | jq -c .)
+          HTTP=$(curl -s --max-time 120 -o /tmp/ai-response.json -w "%{http_code}" \
+            -X POST "https://openrouter.ai/api/v1/chat/completions" \
+            -H "Authorization: Bearer $AI_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD") || true
+          if [ "$HTTP" = "200" ]; then
+            NOTES=$(jq -r '.choices[0].message.content' /tmp/ai-response.json)
+            echo "IA gerou release notes ($(echo "$NOTES" | wc -l) linhas)"
+          else
+            echo "IA indisponível (HTTP $HTTP) — fallback: changelog técnico como release notes"
+            NOTES=$(cat /tmp/tech-changelog.md)
+          fi
+          {
+            echo 'BODY_USER<<EOF_USER'
+            echo "$NOTES"
+            echo 'EOF_USER'
+          } >> "$GITHUB_OUTPUT"
+        env:
+          AI_KEY: ${{ secrets.AI_REVIEW_API_KEY }}
+
+      - name: Bump da versão no package.json
+        run: |
+          set -euo pipefail
+          npm version "${{ steps.version.outputs.new_version }}" -m "chore: versão %s"
+          git push origin HEAD:staging
+
+      - name: Abrir PR release (staging → main)
+        run: |
+          set -euo pipefail
+          gh pr create \
+            --base main --head staging \
+            --title "release: staging → main (${{ steps.version.outputs.new_tag }})" \
+            --body-file /tmp/tech-changelog.md
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Comentar na PR a release notes user-friendly (draft p/ revisão)
+        run: |
+          set -euo pipefail
+          PR_NUM=$(gh pr list --base main --head staging --json number --jq '.[0].number')
+          {
+            echo "## 📣 Release notes — rascunho user-friendly (vai na GitHub Release)"
+            echo ""
+            cat /tmp/tech-changelog.md > /dev/null  # garante que o arquivo existe
+            BODY_USER="${{ steps.user_changelog.outputs.BODY_USER }}"
+            BODY_USER="${BODY_USER#EOF_USER}"
+            BODY_USER="${BODY_USER%EOF_USER}"
+            echo "$BODY_USER"
+            echo ""
+            echo "---"
+            echo "✏️ Editar aqui antes do merge: esta versão vai pro UpdateDialog do app e pra página de releases do site."
+          } > /tmp/user-draft.md
+          gh pr comment "$PR_NUM" --body-file /tmp/user-draft.md
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

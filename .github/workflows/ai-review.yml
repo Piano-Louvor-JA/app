@@ -1,0 +1,47 @@
+# AI Review — pr-agent da Qodo (MIT, self-hosted via GitHub Action)
+# Primeira passada de review em TODO PR: resumo do diff, riscos, line comments.
+# Usa o LLM que a org já paga (z.ai) via secret AI_REVIEW_API_KEY.
+# O humano (Ezequias) é a SEGUNDA camada — chega com o trabalho de leitura reduzido.
+name: AI Review
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: ai-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: AI Review (pr-agent)
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'pull_request' && github.event.pull_request.draft == false) ||
+      (github.event_name == 'issue_comment' && startsWith(github.event.comment.body, '/review') && github.event.issue.pull_request)
+    steps:
+      - uses: Codium-ai/pr-agent@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_KEY: ${{ secrets.AI_REVIEW_API_KEY }}
+          OPENAI_API_BASE: ${{ secrets.AI_REVIEW_BASE_URL || 'https://api.z.ai/api/coding/paas/v4' }}
+          CONFIG.GIT_PROVIDER: github
+          CONFIG.LLM_MODEL: glm-4.6
+          CONFIG.FALLBACK_MODELS: 'glm-4.5-air,gpt-4o-mini'
+          CONFIG.REVIEW_MAX_FILES: '40'
+          PR_REVIEWER.EXTRA_INSTRUCTIONS: >-
+            Projeto PIANO (hinos ao piano, Electron+Vue). Foque em:
+            (1) offline-first — dado do usuário nunca pode se perder com reload/background/update;
+            (2) erros engolidos (catch vazio, promise sem reject tratado);
+            (3) segredos/PII no diff;
+            (4) breaking change de API ou de store compartilhada.
+            Responda em PT-BR. Seja específico: arquivo, linha, por quê.
+          PR_DESCRIPTION.PUBLISH: 'true'
+          PR_REVIEWER.REQUIRE_TESTS_REVIEW: 'true'
