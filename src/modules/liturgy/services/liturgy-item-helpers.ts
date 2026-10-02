@@ -259,7 +259,9 @@ export function isLiturgyItemDraftValid(draft: LiturgyItemDraft): boolean {
     if (!normalizeLiturgyTimeHHmm(draft.endTime)) return false
   }
   if (draft.type === 'music' && draft.musicId == null) return false
-  if (draft.type !== 'category' && !draft.categoryId) return false
+  // Categoria é OPCIONAL (paridade web ff8b481): item pode viver na raiz da
+  // timeline sem pai — quem porta a liturgia do classic não tem categoria
+  // obrigatória e sem isso não conseguia editar/salvar.
   if (draft.type === 'images') {
     const paths =
       draft.filePaths.length > 0
