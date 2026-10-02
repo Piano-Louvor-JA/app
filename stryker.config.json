@@ -6,13 +6,22 @@
   "mutate": [
     "src/plugins/i18n.ts",
     "src/modules/sync/services/library-catalog.ts",
-    "src/modules/liturgy/services/**/*.ts"
+    "src/modules/liturgy/services/**/*.ts",
+    "src/modules/community/services/notifications.ts",
+    "src/modules/community/components/NotificationsDropdown.vue",
+    "src/modules/community/components/NotificationsPanel.vue",
+    "src/modules/community/components/ReportDialog.vue",
+    "src/modules/community/services/ranking.ts",
+    "src/modules/community/services/weekly-tasks.ts",
+    "src/modules/community/services/seasonal-event.ts",
+    "src/modules/community/services/community-catalog.ts"
   ],
   "ignorePatterns": [
     ".worktrees",
     "reports",
     "coverage",
-    "dist"
+    "dist",
+    ".stryker-tmp"
   ],
   "thresholds": {
     "high": 80,

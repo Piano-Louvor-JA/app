@@ -1,5 +1,23 @@
 export default {
   media: {
+    publishRules: {
+      title: 'Reglas de la Comunidad',
+      visibleToAll: 'Las colecciones públicas aparecen para toda la red PIANO.',
+      displayName: 'Tu nombre de pantalla aparece como autor — tu email nunca se expone.',
+      readOnlyCopy: 'Otros usuarios pueden guardar una copia; tu original no se cambia.',
+      moderation: 'Antes de volverse pública, tu colección pasa por curaduría. El contenido inadecuado puede ser reportado y retirado después.',
+      ranking: 'Los +10 pts solo entran en el ranking tras la aprobación de la curaduría.',
+      showRules: 'Ver reglas de la comunidad',
+      gotIt: 'Entendido',
+      linkLabel: 'Reglas de la comunidad',
+    },
+    visibility: {
+      label: 'Privacidad',
+      private: 'Privada',
+      public: 'Pública',
+      privateHint: 'Solo tú ves esta colección.',
+      publicHint: 'Enviada a curaduría; visible en la red tras la aprobación.',
+    },
     title: 'Reproductor',
     empty: 'No hay ninguna canción en reproducción. Abra una pista desde álbumes o liturgia.',
     play: 'Reproducir',

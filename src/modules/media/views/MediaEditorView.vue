@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 
 import MediaSlideStage from '../components/MediaSlideStage.vue'
 import MediaAccountBar from '../components/MediaAccountBar.vue'
 import AppConfirm from '@shared/components/AppConfirm.vue'
 import { getAuthSession } from '../services/auth-client'
+import { startOutboxLoop } from '../services/outbox-loop'
 import {
   getLocalMusic as getLocalMusicById,
   isLocalId,
@@ -36,7 +38,12 @@ import {
   updateCustomMusic,
   uploadCustomFile,
 } from '../services/custom-catalog'
-import type { CustomCollectionSummary, CustomMusicSummary } from '../services/custom-catalog'
+import type {
+  CollectionVisibility,
+  CustomCollectionSummary,
+  CustomMusicSummary,
+} from '../services/custom-catalog'
+import PublicationRulesCard from '../components/PublicationRulesCard.vue'
 import { customApiUrl } from '../services/custom-catalog'
 import { buildSlja, parseSljaFile } from '../../../shared/services/slja'
 
@@ -64,7 +71,10 @@ type EditorMusic = {
 const router = useRouter()
 const route = useRoute()
 
+const { t } = useI18n()
 const collections = ref<CustomCollectionSummary[]>([])
+// Privacidade da NOVA coletânea (default PRIVADO — opt-in pra publicar).
+const newCollectionVisibility = ref<CollectionVisibility>('private')
 const selectedCollectionId = ref<number | null>(null)
 const musics = ref<CustomMusicSummary[]>([])
 const selectedMusicId = ref<number | null>(null)
@@ -149,13 +159,23 @@ async function onCreateCollection(): Promise<void> {
     // produto 12/09. Com auth sobe pra API. O roteamento é interno do
     // custom-catalog (createCustomCollection decide pelo getAuthSession).
     const localOnly = !getAuthSession()
-    const result = await createCustomCollection(name)
+    const result = await createCustomCollection(
+      name,
+      undefined,
+      undefined,
+      newCollectionVisibility.value,
+    )
     if (result) {
       newCollectionName.value = ''
       await refreshCollections()
       selectedCollectionId.value = result.id
       await onCollectionChange()
-      notify(localOnly ? 'Coletânea criada localmente (entre com sua conta para publicar)' : 'Coletânea criada')
+      notify(
+        localOnly
+          ? 'Coletânea criada localmente (entre com sua conta para publicar)'
+          : `Coletânea criada como ${newCollectionVisibility.value === 'public' ? 'pública' : 'privada'}`,
+      )
+      newCollectionVisibility.value = 'private'
     } else {
       notify('Falha ao criar coletânea (API indisponível?)', true)
     }
@@ -290,6 +310,65 @@ const coverInput = ref<HTMLInputElement | null>(null)
 const selectedCollection = computed(
   () => collections.value.find((c) => c.id === selectedCollectionId.value) ?? null,
 )
+
+/* ---------- Privacidade da coletânea selecionada (t_35e4d3ea) ---------- */
+
+const visibilityBusy = ref(false)
+// Modal de regras: abre sob demanda e automaticamente na 1a vez que publica
+const rulesOpen = ref(false)
+const RULES_SEEN_KEY = 'louvorja.publishRulesSeen'
+function onRulesModalClose(): void {
+  rulesOpen.value = false
+  try {
+    localStorage.setItem(RULES_SEEN_KEY, '1')
+  } catch {
+    /* storage cheio/indisponivel: modal só abre de novo na proxima vez */
+  }
+}
+
+function onChangeVisibilityWithRules(next: CollectionVisibility): Promise<void> {
+  const alreadySeen = (() => {
+    try {
+      return localStorage.getItem(RULES_SEEN_KEY) === '1'
+    } catch {
+      return false
+    }
+  })()
+  // 1a vez tornando publica: modal com as regras antes de persistir
+  if (next === 'public' && !alreadySeen) {
+    rulesOpen.value = true
+    return Promise.resolve()
+  }
+  return onChangeVisibility(next)
+}
+
+async function onChangeVisibility(next: CollectionVisibility): Promise<void> {
+  const current = selectedCollection.value
+  if (!current || visibilityBusy.value) return
+  if ((current.visibility ?? 'public') === next) return
+  if (isLocalId(current.id)) {
+    // Local (sem auth): só alterna o estado da UI (nada sobe pra rede).
+    current.visibility = next
+    notify(next === 'public'
+      ? 'Coletânea local marcada como pública — entre com sua conta para publicar na rede'
+      : 'Coletânea local marcada como privada')
+    return
+  }
+  visibilityBusy.value = true
+  try {
+    const updated = await updateCustomCollection(current.id, { visibility: next })
+    if (updated) {
+      current.visibility = next
+      notify(next === 'public'
+        ? 'Coletânea pública — visível para toda a rede PIANO'
+        : 'Coletânea privada — só você vê')
+    } else {
+      notify('Falha ao alterar privacidade (API indisponível?)', true)
+    }
+  } finally {
+    visibilityBusy.value = false
+  }
+}
 
 async function onCoverFile(event: Event): Promise<void> {
   const input = event.target as HTMLInputElement
@@ -927,6 +1006,8 @@ function bytesToBase64(bytes: Uint8Array): string {
 }
 
 onMounted(async () => {
+  // Outbox: sincroniza operações offline pendentes (login/boot) e liga o loop.
+  startOutboxLoop()
   // Query params vindos da Central de Mídia (?collection=ID&new=1|import=1)
   const collectionParam = route.query.collection
   if (collectionParam) {
@@ -1108,6 +1189,48 @@ onMounted(async () => {
             />
           </button>
         </div>
+        <div
+          class="editor__visibility"
+          role="radiogroup"
+          :aria-label="t('media.visibility.label')"
+        >
+          <button
+            type="button"
+            class="editor__visibility-btn"
+            :class="{ 'editor__visibility-btn--active': newCollectionVisibility === 'private' }"
+            :aria-pressed="newCollectionVisibility === 'private'"
+            :disabled="saving"
+            @click="newCollectionVisibility = 'private'"
+          >
+            <i
+              class="ti ti-lock"
+              aria-hidden="true"
+            />
+            {{ t('media.visibility.private') }}
+          </button>
+          <button
+            type="button"
+            class="editor__visibility-btn"
+            :class="{ 'editor__visibility-btn--active': newCollectionVisibility === 'public' }"
+            :aria-pressed="newCollectionVisibility === 'public'"
+            :disabled="saving"
+            @click="newCollectionVisibility = 'public'"
+          >
+            <i
+              class="ti ti-broadcast"
+              aria-hidden="true"
+            />
+            {{ t('media.visibility.public') }}
+          </button>
+        </div>
+        <button
+          type="button"
+          class="editor__btn editor__btn--rules"
+          @click="rulesOpen = true"
+        >
+          <i class="ti ti-info-circle" aria-hidden="true" />
+          {{ t('media.publishRules.linkLabel') }}
+        </button>
         <ul class="editor__list">
           <li
             v-for="collection in collections"
@@ -1124,6 +1247,60 @@ onMounted(async () => {
             </button>
           </li>
         </ul>
+        <template v-if="selectedCollection">
+          <div
+            class="editor__visibility"
+            role="radiogroup"
+            :aria-label="t('media.visibility.label')"
+          >
+            <button
+              type="button"
+              class="editor__visibility-btn"
+              :class="{ 'editor__visibility-btn--active': (selectedCollection.visibility ?? 'public') === 'private' }"
+              :aria-pressed="(selectedCollection.visibility ?? 'public') === 'private'"
+              :disabled="saving || visibilityBusy"
+              @click="onChangeVisibilityWithRules('private')"
+            >
+              <i
+                class="ti ti-lock"
+                aria-hidden="true"
+              />
+              {{ t('media.visibility.private') }}
+            </button>
+            <button
+              type="button"
+              class="editor__visibility-btn"
+              :class="{ 'editor__visibility-btn--active': (selectedCollection.visibility ?? 'public') === 'public' }"
+              :aria-pressed="(selectedCollection.visibility ?? 'public') === 'public'"
+              :disabled="saving || visibilityBusy"
+              @click="onChangeVisibilityWithRules('public')"
+            >
+              <i
+                class="ti ti-broadcast"
+                aria-hidden="true"
+              />
+              {{ t('media.visibility.public') }}
+            </button>
+          </div>
+          <p class="editor__hint">
+            {{ (selectedCollection.visibility ?? 'public') === 'public'
+              ? t('media.visibility.publicHint')
+              : t('media.visibility.privateHint') }}
+          </p>
+          <button
+            v-if="(selectedCollection.visibility ?? 'public') === 'public'"
+            type="button"
+            class="editor__btn editor__btn--rules"
+            :title="t('media.publishRules.title')"
+            @click="rulesOpen = true"
+          >
+            <i
+              class="ti ti-info-circle"
+              aria-hidden="true"
+            />
+            {{ t('media.publishRules.showRules') }}
+          </button>
+        </template>
         <button
           v-if="selectedCollectionId != null"
           type="button"
@@ -1593,10 +1770,116 @@ onMounted(async () => {
       @confirm="onConfirmDelete"
       @cancel="confirmOpen = false"
     />
+
+    <Teleport to="body">
+      <div
+        v-if="rulesOpen"
+        class="rules-dialog"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="t('media.publishRules.title')"
+      >
+        <div
+          class="rules-dialog__backdrop"
+          aria-hidden="true"
+          @click="onRulesModalClose"
+        />
+        <div class="rules-dialog__panel">
+          <PublicationRulesCard />
+          <button
+            type="button"
+            class="editor__btn editor__btn--save rules-dialog__ok"
+            @click="onRulesModalClose"
+          >
+            <i
+              class="ti ti-check"
+              aria-hidden="true"
+            />
+            {{ t('media.publishRules.gotIt') }}
+          </button>
+        </div>
+      </div>
+    </Teleport>
   </section>
 </template>
 
 <style scoped>
+
+.editor__visibility {
+  display: flex;
+  gap: 0.4rem;
+  margin: 0.4rem 0;
+}
+
+.editor__visibility-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.25));
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+  opacity: 0.75;
+}
+
+.editor__visibility-btn--active {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: var(--glass-border-strong, rgba(255, 255, 255, 0.55));
+  opacity: 1;
+  font-weight: 600;
+}
+
+.editor__visibility-btn:disabled {
+  opacity: 0.4;
+  cursor: wait;
+}
+
+.editor__btn--rules {
+  margin-top: 0.25rem;
+}
+
+.rules-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.rules-dialog__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
+}
+
+.rules-dialog__panel {
+  position: relative;
+  max-width: 420px;
+  width: 100%;
+  max-height: 80vh;
+  overflow: auto;
+  border-radius: 14px;
+  background: var(--surface-1, #1c1c24);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.2));
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+}
+
+.rules-dialog__panel .pub-rules {
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.rules-dialog__ok {
+  margin: 0.75rem;
+}
 /*
  * Tokens do design system (docs/stitch/home/DESIGN.md · docs/prd/DESIGN_SYSTEM.md)
  * Vars injetadas pelo useThemeManager: --ds-color-*, --ds-radius-*, --ds-blur-*, --ds-motion-*.

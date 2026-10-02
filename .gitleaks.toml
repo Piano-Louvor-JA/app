@@ -1,0 +1,12 @@
+title = "LouvorJA"
+
+[extend]
+useDefault = true
+
+# Chaves de catálogo (pt_hymnal_1996, catalogKey) batem em generic-api-key.
+# Não são credenciais. O histórico do git também entra no scan.
+[allowlist]
+paths = [
+  '''src/modules/sync/services/__tests__/library-catalog\.test\.ts''',
+  '''src/modules/albums/services/album-catalog\.ts''',
+]

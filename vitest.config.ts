@@ -34,13 +34,14 @@ export default defineConfig({
     // mockam bridge/processamento pesado — transform 125s no run global.
     testTimeout: 30_000,
     coverage: {
+
       provider: 'v8',
       reporter: ['text', 'text-summary', 'lcov'],
       thresholds: {
-        lines: 75,
-        functions: 70,
-        statements: 75,
-        branches: 70,
+        lines: 100,
+        functions: 100,
+        statements: 100,
+        branches: 100,
       },
       include: [
         'src/**/*.ts',

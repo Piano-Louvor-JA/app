@@ -7,6 +7,9 @@ import es from '@locales/es'
 import albumsPtBR from '@modules/albums/locales/pt-BR'
 import albumsEn from '@modules/albums/locales/en'
 import albumsEs from '@modules/albums/locales/es'
+import communityPtBR from '@modules/community/locales/pt-BR'
+import communityEn from '@modules/community/locales/en'
+import communityEs from '@modules/community/locales/es'
 
 import biblePtBR from '@modules/bible/locales/pt-BR'
 import bibleEn from '@modules/bible/locales/en'
@@ -92,6 +95,7 @@ export default createI18n({
     'pt-BR': {
       ...ptBR,
       ...albumsPtBR,
+      ...communityPtBR,
       ...biblePtBR,
       ...clockPtBR,
       ...countdownPtBR,
@@ -107,6 +111,7 @@ export default createI18n({
     en: {
       ...en,
       ...albumsEn,
+      ...communityEn,
       ...bibleEn,
       ...clockEn,
       ...countdownEn,
@@ -122,6 +127,7 @@ export default createI18n({
     es: {
       ...es,
       ...albumsEs,
+      ...communityEs,
       ...bibleEs,
       ...clockEs,
       ...countdownEs,

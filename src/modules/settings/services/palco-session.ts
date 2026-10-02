@@ -7,11 +7,11 @@
  */
 
 import { useOutputRegistry } from './output-registry'
-import { readEffectiveStageSettings } from '../../settings/services/stage-settings-runtime'
+import { readEffectiveStageSettings } from './stage-settings-runtime'
 import {
   resolveBackgroundImage,
   type StageSettings,
-} from '../../settings/types/stage-settings'
+} from '../types/stage-settings'
 import { getPalcoRoute, type PalcoModule } from './palco-routing'
 
 /** Envolve o HTML do texto em cor (receiver não lê textColor separado). */

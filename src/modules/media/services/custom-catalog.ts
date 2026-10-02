@@ -4,6 +4,7 @@ import type {
 } from '../types/media'
 
 import { authHeaders, getAuthSession } from './auth-client'
+import { enqueue, newClientUuid } from './outbox'
 import { loadMediaTrack } from './media-catalog'
 import { resolveRemoteFileUrl } from './media-audio'
 import {
@@ -262,6 +263,8 @@ export async function loadCustomMusicTrack(
 }
 
 /** Lista coletâneas customizadas (para a Central de Mídia). */
+export type CollectionVisibility = 'public' | 'private'
+
 export type CustomCollectionSummary = {
   id: number
   name: string
@@ -271,13 +274,20 @@ export type CustomCollectionSummary = {
   ownerId?: number | null
   /** Nome do criador exibido na listagem (opcional, informativo). */
   authorName?: string | null
+  /** Privacidade da coletânea na rede (padrão legado da API: 'public'). */
+  visibility?: CollectionVisibility
   musicsCount: number
 }
 
 /** Atualiza campos de uma coletânea custom (nome, descrição, cover). */
 export async function updateCustomCollection(
   collectionId: number,
-  patch: { name?: string; description?: string | null; cover_url?: string | null },
+  patch: {
+    name?: string
+    description?: string | null
+    cover_url?: string | null
+    visibility?: CollectionVisibility
+  },
 ): Promise<CustomCollectionSummary | null> {
   if (isLocalId(collectionId)) {
     const ok = updateLocalCollection(collectionId, {
@@ -306,6 +316,7 @@ export async function updateCustomCollection(
       name: string
       description: string | null
       cover_url?: string | null
+      visibility?: CollectionVisibility
       musics_count?: number
     }
     return {
@@ -313,6 +324,7 @@ export async function updateCustomCollection(
       name: row.name,
       description: row.description ?? null,
       coverUrl: row.cover_url ?? null,
+      visibility: row.visibility ?? patch.visibility,
       musicsCount: row.musics_count ?? 0,
     }
   } catch {
@@ -345,6 +357,7 @@ export async function listCustomCollections(): Promise<
         cover_url?: string | null
         owner_id?: number | null
         author_name?: string | null
+        visibility?: CollectionVisibility
         musics_count?: number
       }>
     }
@@ -355,6 +368,7 @@ export async function listCustomCollections(): Promise<
       coverUrl: row.cover_url ?? null,
       ownerId: row.owner_id ?? null,
       authorName: row.author_name ?? null,
+      visibility: row.visibility ?? 'public',
       musicsCount: row.musics_count ?? 0,
     }))
     return [...locals, ...remote]
@@ -559,6 +573,7 @@ export async function createCustomCollection(
   name: string,
   description?: string,
   authorName?: string,
+  visibility?: CollectionVisibility,
 ): Promise<{ id: number } | null> {
   // Sem auth: cria LOCAL (regra de produto 12/09 — sem identidade não sobe).
   if (!getAuthSession()) {
@@ -569,13 +584,30 @@ export async function createCustomCollection(
     const response = await fetch(`${customBaseUrl()}/collections`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ name, description, author_name: authorName }),
+      // SEMPRE envia visibility explícita (default PRIVADO no app — decisão
+      // t_35e4d3ea: usuário escolhe publicar; API-default 'public' é pegadinha).
+      body: JSON.stringify({
+        name,
+        description,
+        author_name: authorName,
+        visibility: visibility ?? 'private',
+      }),
     })
     if (!response.ok) return null
     const json = (await response.json()) as { id_collection: number }
     return { id: json.id_collection }
   } catch {
-    return null
+    // Offline (autenticado): enfileira pro sync (B1/B2). O client_uuid dá
+    // identidade estável — o próximo flush cria/atualiza no servidor.
+    await enqueue({
+      entity: 'collection',
+      client_uuid: newClientUuid(),
+      action: 'upsert',
+      payload: { name, description: description ?? null, author_name: authorName ?? null, updated_at: Date.now() },
+      updated_at: Date.now(),
+      owner_email: getAuthSession()?.user?.email ?? null,
+    })
+    return { id: 0 }
   }
 }
 

@@ -37,6 +37,7 @@ export default {
   nav: {
     home: 'Inicio',
     albums: 'Central de Medios',
+      community: 'Comunidad',
     liturgy: 'Liturgia',
     bible: 'Biblia',
     utilities: 'Utilidades',
