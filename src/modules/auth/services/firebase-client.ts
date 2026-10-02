@@ -71,9 +71,12 @@ async function persistSession(credential: UserCredential): Promise<AuthSession |
         method: 'POST',
         headers: { authorization: `Bearer ${idToken}` },
       })
-      console.debug('[auth] persistSession: API response status:', response.status)
+      // Log VISÍVEL (console.log, não debug): feedback Ezequias 02/10 — os 401
+      // em notifications/weekly-tasks com sessão salva indicam token que a API
+      // rejeita; sem este log em level default o diagnóstico fica cego.
+      console.log('[auth] persistSession: API response status:', response.status)
       const respText = await response.text()
-      console.debug('[auth] persistSession: API response body:', respText)
+      console.log('[auth] persistSession: API response body:', respText.slice(0, 300))
       if (response.ok) {
         const json = JSON.parse(respText) as AuthSession
         if (json?.token && json?.user?.id_user) {
