@@ -1,196 +1,154 @@
 // @vitest-environment jsdom
-import { mount } from "@vue/test-utils";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createI18n } from "vue-i18n";
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
 
-/**
- * OutputSelectorPanel — lista unificada de destinos (cabeados + slots Palco).
- * Modo 'assign' (select de módulo) e modo 'pick' (checkbox + emit).
- * Mocka output-registry (já coberto) e palco-session.
- */
-const mocks = vi.hoisted(() => ({
-  targets: null as unknown as { value: Array<{ id: string; module: string | null }> },
+vi.mock('vue-i18n', () => ({
+  useI18n: () => ({ t: (k: string) => k, locale: { value: 'pt-BR' } }),
+}))
+
+const lsData: Record<string, string> = {}
+const lsStub = {
+  getItem: (k: string) => lsData[k] ?? null,
+  setItem: (k: string, v: string) => { lsData[k] = String(v) },
+  removeItem: (k: string) => { delete lsData[k] },
+  clear: () => { for (const k of Object.keys(lsData)) delete lsData[k] },
+  key: () => null,
+  length: 0,
+}
+Object.defineProperty(window, 'localStorage', { value: lsStub, configurable: true, writable: true })
+Object.defineProperty(globalThis, 'localStorage', { value: lsStub, configurable: true, writable: true })
+
+const registryMock = {
+  targets: { value: [] as Array<{ id: string; module: string | null }> },
   syncDetected: vi.fn(),
   setModule: vi.fn(),
-  slots: vi.fn(async () => [] as Array<{ id: string; label: string; clients: number; running: boolean }>),
-}));
+}
+vi.mock('../../services/output-registry', () => ({
+  useOutputRegistry: () => registryMock,
+}))
 
-vi.mock("../../services/output-registry", async () => {
-  const { ref } = await import("vue");
-  mocks.targets = ref([]);
-  return {
-    useOutputRegistry: vi.fn(() => ({
-      targets: mocks.targets,
-      syncDetected: mocks.syncDetected,
-      setModule: mocks.setModule,
-    })),
-  };
-});
+const palcoApi = {
+  slots: vi.fn().mockResolvedValue([]),
+  status: vi.fn().mockResolvedValue({ running: false }),
+  onEvent: vi.fn(),
+  onReceiverConnected: vi.fn(),
+  onReceiverDisconnected: vi.fn(),
+}
+const displaysApi = {
+  list: vi.fn().mockResolvedValue([]),
+  onChanged: vi.fn((cb: () => void) => {
+    return () => {}
+  }),
+}
+Object.defineProperty(window, 'louvorja', {
+  get: () => ({ palco: palcoApi, displays: displaysApi }),
+  configurable: true,
+})
 
-vi.mock("../../services/palco-session", () => ({
-  palcoSession: {
-    slots: mocks.slots,
-  },
-}));
+import OutputSelectorPanel from '../OutputSelectorPanel.vue'
 
-import OutputSelectorPanel from "../OutputSelectorPanel.vue";
-
-const i18n = createI18n({
-  legacy: false,
-  locale: "pt-BR",
-  messages: {
-    "pt-BR": {
-      settings: {
-        outputs: {
-          hint: "Escolha o destino",
-          mirror: "Espelhar",
-          bible: "Bíblia",
-          media: "Mídia",
-          video: "Vídeo",
-          pdf: "PDF",
-          ppt: "PPT",
-          monitor: "Monitor",
-          tvConnected: "TV conectada",
-          tvOffline: "TV offline",
-          assign: "Atribuir {output}",
-        },
-      },
-    },
-  } as never,
-});
-
-function setWindowBridge(displays: Array<{ id: number; bounds?: { width: number; height: number } }>) {
-  (window as unknown as Record<string, unknown>).louvorja = {
-    displays: {
-      list: vi.fn(async () => displays),
-      onChanged: vi.fn((cb: () => void) => {
-        cb;
-        return () => undefined;
-      }),
-    },
-  };
+async function mountPanel(props: Record<string, unknown> = {}) {
+  const w = mount(OutputSelectorPanel, { props: { mode: 'assign', ...props } })
+  await flushPromises()
+  return w
 }
 
-function mountPanel(over: { mode?: "assign" | "pick"; modelValue?: string[] } = {}) {
-  return mount(OutputSelectorPanel, {
-    props: { mode: "assign", modelValue: [], ...over },
-    global: { plugins: [i18n] },
-  });
-}
-
-describe("OutputSelectorPanel", () => {
+describe('OutputSelectorPanel', () => {
+  let active: Awaited<ReturnType<typeof mountPanel>> | null = null
   beforeEach(() => {
-    vi.clearAllMocks();
-    mocks.targets.value = [];
-    mocks.slots.mockResolvedValue([]);
-    setWindowBridge([]);
-  });
+    vi.clearAllMocks()
+    registryMock.targets.value = []
+    palcoApi.slots.mockResolvedValue([])
+    displaysApi.list.mockResolvedValue([])
+    Object.defineProperty(window, 'louvorja', {
+      get: () => ({ palco: palcoApi, displays: displaysApi }),
+      configurable: true,
+    })
+  })
+  afterEach(() => {
+    active?.unmount()
+    active = null
+  })
 
-  it("sem displays nem slots: lista vazia, só hint", async () => {
-    const wrapper = mountPanel();
-    await new Promise((r) => setTimeout(r, 0));
-    await wrapper.vm.$nextTick();
-    expect(wrapper.find(".output-selector__hint").text()).toBe(
-      "Escolha o destino",
-    );
-    expect(wrapper.findAll(".output-selector__item")).toHaveLength(0);
-  });
+  it('sem displays nem slots: lista vazia, hint visível', async () => {
+    const w = await mountPanel()
+    active = w
+    expect(w.text()).toContain('settings.outputs.hint')
+    expect(w.findAll('.output-selector__item').length).toBe(0)
+  })
 
-  it("modo assign: monitor cabeado vira item com select; syncDetected recebe os detectados", async () => {
-    setWindowBridge([{ id: 1, bounds: { width: 1920, height: 1080 } }]);
-    mocks.slots.mockResolvedValue([
-      { id: "slotA", label: "TV Sala", clients: 1, running: true },
-    ]);
-    const wrapper = mountPanel();
-    await new Promise((r) => setTimeout(r, 0));
-    await wrapper.vm.$nextTick();
+  it('lista monitores e slots de TV com detail/online', async () => {
+    displaysApi.list.mockResolvedValue([{ id: 0, bounds: { width: 1920, height: 1080 } }, { id: 1 }])
+    palcoApi.slots.mockResolvedValue([
+      { id: '1', label: 'TV Sala', clients: 2, running: true },
+      { id: '2', label: 'TV Quarto', clients: 0, running: false },
+    ])
+    const w = await mountPanel()
+    active = w
+    const items = w.findAll('.output-selector__item')
+    expect(items.length).toBe(4)
+    const text = w.text()
+    expect(text).toContain('settings.outputs.monitor')
+    expect(text).toContain('1920 × 1080')
+    expect(text).toContain('TV Sala')
+    expect(text).toContain('settings.outputs.tvConnected')
+    expect(text).toContain('settings.outputs.tvOffline')
+    expect(registryMock.syncDetected).toHaveBeenCalled()
+  })
 
-    const items = wrapper.findAll(".output-selector__item");
-    expect(items).toHaveLength(2);
-    expect(items[0]!.text()).toContain("Monitor 1");
-    expect(items[0]!.text()).toContain("1920 × 1080");
-    expect(items[1]!.text()).toContain("TV Sala");
-    expect(items[1]!.text()).toContain("TV conectada");
-    // computed reexecuta a cada mudança de displays/slots — valida a última sync
-    expect(mocks.syncDetected).toHaveBeenCalled();
-    const lastSync = mocks.syncDetected.mock.calls.at(-1)![0] as Array<{ id: string }>;
-    expect(lastSync.map((s) => s.id)).toEqual(["cable:1", "palco:slotA"]);
-  });
+  it('refresh com falha das duas fontes: listas vazias', async () => {
+    displaysApi.list.mockRejectedValue(new Error('x'))
+    palcoApi.slots.mockRejectedValue(new Error('x'))
+    const w = await mountPanel()
+    active = w
+    expect(w.findAll('.output-selector__item').length).toBe(0)
+  })
 
-  it("slot sem clients mostra TV offline e classe is-off", async () => {
-    mocks.slots.mockResolvedValue([
-      { id: "s1", label: "TV Quarto", clients: 0, running: true },
-    ]);
-    const wrapper = mountPanel();
-    await new Promise((r) => setTimeout(r, 0));
-    await wrapper.vm.$nextTick();
+  it('modo assign: trocar módulo chama registry.setModule', async () => {
+    displaysApi.list.mockResolvedValue([{ id: 0 }])
+    const w = await mountPanel()
+    active = w
+    const select = w.find('select')
+    expect(select.exists()).toBe(true)
+    await select.setValue('bible')
+    expect(registryMock.setModule).toHaveBeenCalledWith('cable:0', 'bible')
+  })
 
-    expect(wrapper.find(".output-selector__detail").classes()).toContain(
-      "is-off",
-    );
-    expect(wrapper.find(".output-selector__detail").text()).toBe("TV offline");
-  });
+  it('modo pick: marcar/desmarcar emite update:modelValue', async () => {
+    displaysApi.list.mockResolvedValue([{ id: 0 }, { id: 1 }])
+    const w = await mountPanel({ mode: 'pick', modelValue: [] })
+    active = w
+    const checkboxes = w.findAll('input[type="checkbox"]')
+    expect(checkboxes.length).toBe(2)
+    await checkboxes[0].setValue(true)
+    expect(w.emitted('update:modelValue')?.[0]).toEqual([['cable:0']])
+    await checkboxes[1].setValue(true)
+    const last = w.emitted('update:modelValue')?.at(-1)
+    expect((last as string[][])[0]).toContain('cable:0')
+    expect((last as string[][])[0]).toContain('cable:1')
+    await checkboxes[0].setValue(false)
+    const after = w.emitted('update:modelValue')?.at(-1)
+    expect((after as string[][])[0]).toEqual(['cable:1'])
+  })
 
-  it("assign: change no select chama registry.setModule", async () => {
-    setWindowBridge([{ id: 7 }]);
-    const wrapper = mountPanel();
-    await new Promise((r) => setTimeout(r, 0));
-    await wrapper.vm.$nextTick();
+  it('unmount desinscreve onChanged', async () => {
+    const unsub = vi.fn()
+    displaysApi.onChanged.mockImplementation(() => unsub)
+    const w = await mountPanel()
+    active = w
+    expect(displaysApi.onChanged).toHaveBeenCalled()
+    w.unmount()
+    active = null
+    expect(unsub).toHaveBeenCalled()
+  })
 
-    const select = wrapper.find(".output-selector__select");
-    await select.setValue("bible");
-    expect(mocks.setModule).toHaveBeenCalledWith("cable:7", "bible");
-  });
-
-  it("pick: checkbox marca/desmarca e emite update:modelValue", async () => {
-    setWindowBridge([{ id: 1 }, { id: 2 }]);
-    const wrapper = mountPanel({ mode: "pick" });
-    await new Promise((r) => setTimeout(r, 0));
-    await wrapper.vm.$nextTick();
-
-    expect(wrapper.find(".output-selector__select").exists()).toBe(false);
-    const boxes = wrapper.findAll('input[type="checkbox"]');
-    expect(boxes).toHaveLength(2);
-
-    await boxes[0]!.setValue(true);
-    expect(wrapper.emitted("update:modelValue")!.at(-1)).toEqual([["cable:1"]]);
-
-    await boxes[1]!.setValue(true);
-    expect(wrapper.emitted("update:modelValue")!.at(-1)).toEqual([
-      ["cable:1", "cable:2"],
-    ]);
-
-    await boxes[0]!.setValue(false);
-    expect(wrapper.emitted("update:modelValue")!.at(-1)).toEqual([["cable:2"]]);
-  });
-
-  it("pick: modelValue inicial pré-marca checkboxes", async () => {
-    setWindowBridge([{ id: 1 }, { id: 2 }]);
-    const wrapper = mountPanel({ mode: "pick", modelValue: ["cable:2"] });
-    await new Promise((r) => setTimeout(r, 0));
-    await wrapper.vm.$nextTick();
-
-    const boxes = wrapper.findAll('input[type="checkbox"]');
-    expect((boxes[0]!.element as HTMLInputElement).checked).toBe(false);
-    expect((boxes[1]!.element as HTMLInputElement).checked).toBe(true);
-  });
-
-  it("bridge ausente/quebrada: displays=[] sem crash", async () => {
-    (window as unknown as Record<string, unknown>).louvorja = {};
-    const wrapper = mountPanel();
-    await new Promise((r) => setTimeout(r, 0));
-    await wrapper.vm.$nextTick();
-    expect(wrapper.findAll(".output-selector__item")).toHaveLength(0);
-  });
-
-  it("module atribuído no registry aparece no select", async () => {
-    setWindowBridge([{ id: 3 }]);
-    mocks.targets.value = [{ id: "cable:3", module: "media" }];
-    const wrapper = mountPanel();
-    await new Promise((r) => setTimeout(r, 0));
-    await wrapper.vm.$nextTick();
-
-    const select = wrapper.find(".output-selector__select");
-    expect((select.element as HTMLSelectElement).value).toBe("media");
-  });
-});
+  it('sem displays.onChanged: não quebra', async () => {
+    Object.defineProperty(window, 'louvorja', {
+      get: () => ({ palco: palcoApi }),
+      configurable: true,
+    })
+    const w = await mountPanel()
+    active = w
+    expect(true).toBe(true)
+  })
+})

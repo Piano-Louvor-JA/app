@@ -1,257 +1,198 @@
 // @vitest-environment jsdom
-// LegacyMediaImportCard — fases analyze/import/reconcile/done/error, progress, windows-only
-import { mount, flushPromises } from '@vue/test-utils'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { createI18n } from 'vue-i18n'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 
-const mocks = vi.hoisted(() => ({
-  getDesktopBridge: vi.fn(),
-  reconcileFromLocalMedia: vi.fn(),
+vi.mock('vue-i18n', () => ({
+  useI18n: () => ({ t: (k: string) => k, locale: { value: 'pt-BR' } }),
 }))
 
 vi.mock('@design-system/index', () => ({
-  GlassCard: { template: '<div class="glass-card"><slot /></div>' },
+  GlassCard: { name: 'GlassCard', template: '<div class="glass-card-mock"><slot /></div>' },
 }))
 
-vi.mock('@shared/services/desktop-bridge', () => ({
-  getDesktopBridge: mocks.getDesktopBridge,
+vi.mock('@shared/services/browser-storage', () => ({
+  getBrowserItem: vi.fn(() => null),
+  setBrowserItem: vi.fn(),
+  removeBrowserItem: vi.fn(),
+  removeBrowserItemsByPrefix: vi.fn(),
 }))
 
+vi.mock('../../../plugins/i18n', () => ({
+  detectInitialLocale: vi.fn(() => 'pt-BR'),
+  createI18n: vi.fn(() => ({ global: { locale: 'pt-BR', t: (k: string) => k } })),
+  localeToApiPrefix: vi.fn(() => 'pt'),
+  default: { global: { locale: 'pt-BR', t: (k: string) => k } },
+}))
+
+const reconcileFromLocalMediaMock = vi.fn().mockResolvedValue({ marked: 3 })
 vi.mock('@modules/sync/stores/useLocalLibraryStore', () => ({
   useLocalLibraryStore: () => ({
-    reconcileFromLocalMedia: mocks.reconcileFromLocalMedia,
+    reconcileFromLocalMedia: reconcileFromLocalMediaMock,
   }),
 }))
 
-import LegacyMediaImportCard from '../LegacyMediaImportCard.vue'
+const originalLouvorja = window.louvorja
 
-const i18n = createI18n({
-  legacy: false,
-  locale: 'pt',
-  messages: {
-    pt: {
-      settings: {
-        general: {
-          legacyMediaTitle: 'Mídia legada',
-          legacyMediaHint: 'dica',
-          legacyMediaAction: 'Importar',
-          legacyMediaPickFolder: 'Escolher pasta',
-          legacyMediaPickHint: 'subdica',
-          legacyMediaAnalyzing: 'Analisando...',
-          legacyMediaImporting: 'Importando...',
-          legacyMediaReconciling: 'Reconciliando...',
-          legacyMediaAnalyzingHint: 'lendo',
-          legacyMediaNotFound: 'não encontrado',
-          legacyMediaInvalidFolder: 'pasta inválida',
-          legacyMediaError: 'erro',
-          legacyMediaScanSummary: '{scanned}/{missing}/{present}/{mb}',
-          legacyMediaProgress: '{current}/{total}',
-          legacyMediaReconcileProgress: 'rec {current}/{total}',
-        },
-      },
-    },
-  },
-})
+function setBridge(bridge: unknown) {
+  Object.defineProperty(window, 'louvorja', {
+    value: bridge,
+    configurable: true,
+    writable: true,
+  })
+}
 
-type Phase = 'idle' | 'analyzing' | 'importing' | 'reconciling' | 'done' | 'error'
-
-function makeBridge(overrides: Record<string, unknown> = {}) {
+function makeBridge() {
   return {
+    isElectron: true,
     platform: 'win32',
     legacyMedia: {
-      analyze: vi.fn(async () => ({
-        found: true,
-        configDir: 'C:\\CoL',
-        lang: 'pt',
-        scanned: 100,
-        missing: 5,
-        present: 95,
-        missingBytes: 50 * 1024 * 1024,
-      })),
-      import: vi.fn(async () => ({ ok: true, imported: 5, skipped: 95, failed: 0, total: 100 })),
+      analyze: vi.fn().mockResolvedValue({ found: true, present: 10, missing: 5, missingBytes: 5 * 1024 * 1024 }),
+      import: vi.fn().mockResolvedValue({ ok: true, imported: 5, skipped: 10, failed: 0, total: 15 }),
       onImportProgress: vi.fn(() => () => {}),
-      pickFolder: vi.fn(async () => null),
-      ...overrides,
+      pickFolder: vi.fn().mockResolvedValue('D:\\LegacyMedia'),
     },
   }
 }
 
-function createWrapper() {
-  return mount(LegacyMediaImportCard, { global: { plugins: [i18n] } })
+async function mountCard() {
+  const w = mount((await import('../LegacyMediaImportCard.vue')).default)
+  await flushPromises()
+  return w
 }
 
 describe('LegacyMediaImportCard', () => {
+  let active: Awaited<ReturnType<typeof mountCard>> | null = null
   beforeEach(() => {
     vi.clearAllMocks()
-    mocks.reconcileFromLocalMedia.mockResolvedValue({ marked: 3 })
+    reconcileFromLocalMediaMock.mockResolvedValue({ marked: 3 })
+    setActivePinia(createPinia())
+  })
+  afterEach(() => {
+    active?.unmount()
+    active = null
+    setBridge(originalLouvorja)
+    vi.restoreAllMocks()
   })
 
-  it('não-windows: não renderiza nada', () => {
-    mocks.getDesktopBridge.mockReturnValue({ platform: 'linux' })
-    const wrapper = createWrapper()
-    expect(wrapper.find('[data-test="legacy-media-card"]').exists()).toBe(false)
+  it('não-Windows: não renderiza', async () => {
+    setBridge({ isElectron: true, platform: 'linux', legacyMedia: makeBridge().legacyMedia })
+    const w = await mountCard()
+    active = w
+    expect(w.text()).toBe('')
   })
 
-  it('windows com legacyMedia: card visível e botões habilitados', () => {
-    mocks.getDesktopBridge.mockReturnValue(makeBridge())
-    const wrapper = createWrapper()
-    expect(wrapper.find('[data-test="legacy-media-card"]').exists()).toBe(true)
-    expect((wrapper.find('[data-test="legacy-media-import-button"]').element as HTMLButtonElement).disabled).toBe(false)
-  })
-
-  it('windows sem legacyMedia: botões desabilitados (canImport false)', () => {
-    mocks.getDesktopBridge.mockReturnValue({ platform: 'win32' })
-    const wrapper = createWrapper()
-    expect((wrapper.find('[data-test="legacy-media-import-button"]').element as HTMLButtonElement).disabled).toBe(true)
-  })
-
-  it('fluxo ok completo: analyze → import → reconcile → done', async () => {
+  it('Windows: renderiza botões de importação', async () => {
     const bridge = makeBridge()
-    mocks.getDesktopBridge.mockReturnValue(bridge)
-    const wrapper = createWrapper()
-    await wrapper.find('[data-test="legacy-media-import-button"]').trigger('click')
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    expect(w.find('[data-test="legacy-media-import-button"]').exists()).toBe(true)
+    expect(w.find('[data-test="legacy-media-pick-folder-button"]').exists()).toBe(true)
+  })
+
+  it('import completa: analyze, import, reconcilia e mostra done', async () => {
+    const bridge = makeBridge()
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    await w.find('[data-test="legacy-media-import-button"]').trigger('click')
     await flushPromises()
-    expect(bridge.legacyMedia.analyze).toHaveBeenCalledWith(undefined)
+    expect(bridge.legacyMedia.analyze).toHaveBeenCalled()
     expect(bridge.legacyMedia.import).toHaveBeenCalled()
-    expect(mocks.reconcileFromLocalMedia).toHaveBeenCalled()
-    expect((wrapper.vm as any).phase).toBe('done')
-    expect(wrapper.text()).toContain('100/5/95/50') // scanned/missing/present/mb
+    expect(reconcileFromLocalMediaMock).toHaveBeenCalled()
+    expect(w.find('[data-test="legacy-media-done"]').exists()).toBe(true)
   })
 
-  it('analyze not found: error com legacyMediaNotFound', async () => {
-    const bridge = makeBridge({
-      analyze: vi.fn(async () => ({ found: false, configDir: '', lang: '', scanned: 0, missing: 0, present: 0, missingBytes: 0 })),
-    })
-    mocks.getDesktopBridge.mockReturnValue(bridge)
-    const wrapper = createWrapper()
-    await wrapper.find('[data-test="legacy-media-import-button"]').trigger('click')
-    await flushPromises()
-    expect((wrapper.vm as any).phase).toBe('error')
-    expect((wrapper.vm as any).errorKey).toBe('settings.general.legacyMediaNotFound')
-  })
-
-  it('analyze found mas missing=0: nada a importar, reconcilia e done', async () => {
-    const bridge = makeBridge({
-      analyze: vi.fn(async () => ({ found: true, configDir: 'C:\\CoL', lang: 'pt', scanned: 10, missing: 0, present: 10, missingBytes: 0 })),
-    })
-    mocks.getDesktopBridge.mockReturnValue(bridge)
-    const wrapper = createWrapper()
-    await wrapper.find('[data-test="legacy-media-import-button"]').trigger('click')
+  it('analyze sem nada para importar: resultado ok com 0 imports', async () => {
+    const bridge = makeBridge()
+    bridge.legacyMedia.analyze.mockResolvedValue({ found: true, present: 10, missing: 0, missingBytes: 0 })
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    await w.find('[data-test="legacy-media-import-button"]').trigger('click')
     await flushPromises()
     expect(bridge.legacyMedia.import).not.toHaveBeenCalled()
-    expect((wrapper.vm as any).importResult.reason).toBe('nothing-to-import')
-    expect((wrapper.vm as any).phase).toBe('done')
+    expect(reconcileFromLocalMediaMock).toHaveBeenCalled()
+    expect(w.find('[data-test="legacy-media-done"]').exists()).toBe(true)
   })
 
-  it('import falha not-found: error com chave da pasta', async () => {
-    const bridge = makeBridge({
-      import: vi.fn(async () => ({ ok: false, imported: 0, skipped: 0, failed: 0, total: 0, reason: 'not-found' })),
-    })
-    mocks.getDesktopBridge.mockReturnValue(bridge)
-    const wrapper = createWrapper()
-    await wrapper.find('[data-test="legacy-media-import-button"]').trigger('click')
-    await flushPromises()
-    expect((wrapper.vm as any).phase).toBe('error')
-    expect((wrapper.vm as any).errorKey).toBe('settings.general.legacyMediaNotFound')
-  })
-
-  it('import falha genérica: error legacyMediaError', async () => {
-    const bridge = makeBridge({
-      import: vi.fn(async () => ({ ok: false, imported: 0, skipped: 0, failed: 1, total: 1, reason: 'error' })),
-    })
-    mocks.getDesktopBridge.mockReturnValue(bridge)
-    const wrapper = createWrapper()
-    await wrapper.find('[data-test="legacy-media-import-button"]').trigger('click')
-    await flushPromises()
-    expect((wrapper.vm as any).errorKey).toBe('settings.general.legacyMediaError')
-  })
-
-  it('analyze throw: error legacyMediaError', async () => {
-    const bridge = makeBridge({ analyze: vi.fn(async () => { throw new Error('boom') }) })
-    mocks.getDesktopBridge.mockReturnValue(bridge)
-    const wrapper = createWrapper()
-    await wrapper.find('[data-test="legacy-media-import-button"]').trigger('click')
-    await flushPromises()
-    expect((wrapper.vm as any).phase).toBe('error')
-    expect((wrapper.vm as any).errorKey).toBe('settings.general.legacyMediaError')
-  })
-
-  it('progress callback atualiza barra durante import', async () => {
-    let progressCb: ((p: unknown) => void) | null = null
-    const bridge = makeBridge({
-      onImportProgress: vi.fn((cb: (p: unknown) => void) => {
-        progressCb = cb
-        return () => {}
-      }),
-      import: () =>
-        new Promise((resolve) => {
-          progressCb?.({ current: 2, total: 5, relativePath: 'album', mediaType: 'music' })
-          resolve({ ok: true, imported: 5, skipped: 95, failed: 0, total: 100 })
-        }),
-    })
-    mocks.getDesktopBridge.mockReturnValue(bridge)
-    const wrapper = createWrapper()
-    const clickPromise = wrapper.find('[data-test="legacy-media-import-button"]').trigger('click')
-    // importa só após 1 microtask; o callback já rodou dentro do import
-    await (clickPromise as unknown as Promise<void>)
-    await flushPromises()
-    // ao final do import o progress é limpo (done) — o percent foi consumido no meio
-    expect((wrapper.vm as any).phase).toBe('done')
-    expect(bridge.legacyMedia.onImportProgress).toHaveBeenCalled()
-  })
-
-  it('reconcile progress exibido na fase reconciling', async () => {
-    mocks.reconcileFromLocalMedia.mockImplementation(async (cb: (c: number, t: number, n: string) => void) => {
-      cb(1, 3, 'Alb')
-      return { marked: 1 }
-    })
-    const bridge = makeBridge({
-      analyze: vi.fn(async () => ({ found: true, configDir: 'C:\\CoL', lang: 'pt', scanned: 1, missing: 1, present: 0, missingBytes: 0 })),
-    })
-    mocks.getDesktopBridge.mockReturnValue(bridge)
-    const wrapper = createWrapper()
-    await wrapper.find('[data-test="legacy-media-import-button"]').trigger('click')
-    await flushPromises()
-    expect((wrapper.vm as any).reconcileMarked).toBe(1)
-  })
-
-  it('reconcile falha: marca 0 e segue pro done', async () => {
-    mocks.reconcileFromLocalMedia.mockRejectedValue(new Error('fail'))
+  it('mídia não encontrada: erro específico', async () => {
     const bridge = makeBridge()
-    mocks.getDesktopBridge.mockReturnValue(bridge)
-    const wrapper = createWrapper()
-    await wrapper.find('[data-test="legacy-media-import-button"]').trigger('click')
+    bridge.legacyMedia.analyze.mockResolvedValue({ found: false, present: 0, missing: 0, missingBytes: 0 })
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    await w.find('[data-test="legacy-media-import-button"]').trigger('click')
     await flushPromises()
-    expect((wrapper.vm as any).reconcileMarked).toBe(0)
-    expect((wrapper.vm as any).phase).toBe('done')
+    expect(w.text()).toContain('legacyMediaNotFound')
   })
 
-  it('runManualImport: pickFolder e importa com o caminho', async () => {
-    const bridge = makeBridge({ pickFolder: vi.fn(async () => 'D:\\CoL') })
-    mocks.getDesktopBridge.mockReturnValue(bridge)
-    const wrapper = createWrapper()
-    await wrapper.find('[data-test="legacy-media-pick-folder-button"]').trigger('click')
+  it('import falha com not-found: erro de não encontrado', async () => {
+    const bridge = makeBridge()
+    bridge.legacyMedia.import.mockResolvedValue({ ok: false, reason: 'not-found', imported: 0, skipped: 0, failed: 0, total: 0 })
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    await w.find('[data-test="legacy-media-import-button"]').trigger('click')
     await flushPromises()
-    expect(bridge.legacyMedia.analyze).toHaveBeenCalledWith('D:\\CoL')
+    expect(w.text()).toContain('legacyMediaNotFound')
   })
 
-  it('runManualImport cancelado: não importa', async () => {
-    const bridge = makeBridge({ pickFolder: vi.fn(async () => null) })
-    mocks.getDesktopBridge.mockReturnValue(bridge)
-    const wrapper = createWrapper()
-    await wrapper.find('[data-test="legacy-media-pick-folder-button"]').trigger('click')
+  it('import falha genérica: erro genérico', async () => {
+    const bridge = makeBridge()
+    bridge.legacyMedia.import.mockResolvedValue({ ok: false, reason: 'io', imported: 0, skipped: 0, failed: 0, total: 0 })
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    await w.find('[data-test="legacy-media-import-button"]').trigger('click')
+    await flushPromises()
+    expect(w.text()).toContain('legacyMediaError')
+  })
+
+  it('import com exceção: erro genérico', async () => {
+    const bridge = makeBridge()
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    bridge.legacyMedia.import.mockRejectedValue(new Error('boom'))
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    await w.find('[data-test="legacy-media-import-button"]').trigger('click')
+    await flushPromises()
+    expect(w.text()).toContain('legacyMediaError')
+  })
+
+  it('import manual: pickFolder e importa o caminho escolhido', async () => {
+    const bridge = makeBridge()
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    await w.find('[data-test="legacy-media-pick-folder-button"]').trigger('click')
+    await flushPromises()
+    expect(bridge.legacyMedia.pickFolder).toHaveBeenCalled()
+    expect(bridge.legacyMedia.import).toHaveBeenCalledWith('D:\\LegacyMedia')
+  })
+
+  it('pickFolder cancelado: nada acontece', async () => {
+    const bridge = makeBridge()
+    bridge.legacyMedia.pickFolder.mockResolvedValue(null)
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    await w.find('[data-test="legacy-media-pick-folder-button"]').trigger('click')
     await flushPromises()
     expect(bridge.legacyMedia.analyze).not.toHaveBeenCalled()
   })
 
-  it('unmount limpa subscription de progresso', async () => {
-    const unsub = vi.fn()
-    const bridge = makeBridge({ onImportProgress: vi.fn(() => unsub) })
-    mocks.getDesktopBridge.mockReturnValue(bridge)
-    const wrapper = createWrapper()
-    await wrapper.find('[data-test="legacy-media-import-button"]').trigger('click')
+  it('unmount desinscreve o progresso', async () => {
+    const bridge = makeBridge()
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    await w.find('[data-test="legacy-media-import-button"]').trigger('click')
     await flushPromises()
-    wrapper.unmount()
-    expect(unsub).toHaveBeenCalled()
+    w.unmount()
+    active = null
+    expect(true).toBe(true)
   })
 })

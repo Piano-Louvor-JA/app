@@ -1,235 +1,234 @@
 // @vitest-environment jsdom
-import { mount, flushPromises } from '@vue/test-utils'
-import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
-import { createI18n } from 'vue-i18n'
-import ptBR from '../../locales/pt-BR'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
 
-const mockBridge = vi.hoisted(() => ({
-  isDesktop: false,
-  bridge: null as any,
-}))
-
-vi.mock('@shared/services/desktop-bridge', () => ({
-  isDesktopApp: () => mockBridge.isDesktop,
-  getDesktopBridge: () => mockBridge.bridge,
+vi.mock('vue-i18n', () => ({
+  useI18n: () => ({ t: (key: string) => key, locale: { value: 'pt-BR' } }),
 }))
 
 vi.mock('@design-system/index', () => ({
-  GlassCard: { template: '<div><slot /></div>' },
+  GlassCard: { name: 'GlassCard', template: '<div class="glass-card-mock"><slot /></div>' },
 }))
 
 import AppBackupCard from '../AppBackupCard.vue'
 
-const i18n = createI18n({ legacy: false, locale: 'pt', messages: { pt: ptBR } })
+const originalLouvorja = window.louvorja
 
-function createWrapper() {
-  return mount(AppBackupCard, { global: { plugins: [i18n] } })
+type ProgressCb = (payload: { current: number; total: number; zipPath: string }) => void
+
+function setBridge(bridge: unknown) {
+  Object.defineProperty(window, 'louvorja', {
+    value: bridge,
+    configurable: true,
+    writable: true,
+  })
 }
 
-function makeBackupBridge(overrides: Record<string, unknown> = {}) {
+function makeBridge() {
+  const progressCbs: ProgressCb[] = []
   return {
+    isElectron: true,
+    platform: 'linux',
     backup: {
-      onProgress: vi.fn(() => vi.fn()),
-      create: vi.fn(async () => ({ ok: true, path: '/tmp/backup.zip' })),
-      restore: vi.fn(async () => ({ ok: true })),
-      ...overrides,
+      create: vi.fn().mockResolvedValue({ ok: true, path: '/tmp/backup.zip' }),
+      restore: vi.fn().mockResolvedValue({ ok: true }),
+      onProgress: vi.fn((cb: ProgressCb) => {
+        progressCbs.push(cb)
+        return () => {
+          const i = progressCbs.indexOf(cb)
+          if (i >= 0) progressCbs.splice(i, 1)
+        }
+      }),
+      __cbs: progressCbs,
     },
   }
 }
 
-beforeEach(() => {
-  mockBridge.isDesktop = false
-  mockBridge.bridge = null
-})
+const i18nStub = {
+  global: { config: { globalProperties: { $t: (key: string) => key } } },
+} as never
+
+async function mountCard() {
+  const wrapper = mount(AppBackupCard, i18nStub)
+  active = wrapper
+  await flushPromises()
+  return wrapper
+}
+
+function backupBtn(w: ReturnType<typeof mount>) {
+  return w.find('button.general-settings__btn--primary')
+}
+function restoreBtn(w: ReturnType<typeof mount>) {
+  return w.findAll('button.general-settings__btn')[1]
+}
+function dialog() {
+  return document.querySelector('[role="dialog"]')
+}
+function q(sel: string) {
+  return document.querySelector(sel) as HTMLElement | null
+}
+async function checkConfirm() {
+  const cb = q('.clear-confirm__checkbox') as HTMLInputElement | null
+  if (!cb) throw new Error('checkbox não encontrado')
+  cb.click()
+  await flushPromises()
+  await new Promise((r) => setTimeout(r, 0))
+  await flushPromises()
+}
+async function click(el: Element | null) {
+  if (!el) throw new Error('elemento não encontrado: click')
+  ;(el as HTMLElement).click()
+  await flushPromises()
+}
+
+let active: ReturnType<typeof mount> | null = null
 
 describe('AppBackupCard', () => {
-  let activeWrapper: ReturnType<typeof mount> | null = null
-  const origCreateWrapper = createWrapper
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
   afterEach(() => {
-    activeWrapper?.unmount()
-    activeWrapper = null
-    document.body.innerHTML = ''
-  })
-  it('não renderiza nada fora do desktop app', () => {
-    const wrapper = createWrapper()
-    expect(wrapper.find('.general-settings__card').exists()).toBe(false)
-    expect(wrapper.findAll('button').length).toBe(0)
+    active?.unmount()
+    active = null
+    setBridge(originalLouvorja)
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
   })
 
-  it('renderiza o card dentro do desktop app', () => {
-    mockBridge.isDesktop = true
-    mockBridge.bridge = makeBackupBridge()
-    const wrapper = createWrapper()
-    expect(wrapper.find('.general-settings__card').exists()).toBe(true)
-    expect(wrapper.findAll('button').length).toBeGreaterThan(0)
+  it('sem bridge (web): não renderiza nada', async () => {
+    setBridge(undefined)
+    const w = await mountCard()
+    expect(w.text()).toBe('')
+    expect(w.find('button.general-settings__btn--primary').exists()).toBe(false)
   })
 
-  it('createBackup com sucesso muda phase pra done e mostra caminho', async () => {
-    mockBridge.isDesktop = true
-    mockBridge.bridge = makeBackupBridge()
-    const wrapper = createWrapper()
-    // encontra botão de criar backup (habilitado agora)
-    const btn = wrapper.findAll('button').find(b => !b.attributes('disabled') && !b.text().toLowerCase().includes('restaur'))
-    expect(btn).toBeTruthy()
-    await btn!.trigger('click')
+  it('cria backup com sucesso e mostra caminho', async () => {
+    const bridge = makeBridge()
+    setBridge(bridge)
+    const w = await mountCard()
+    await backupBtn(w).trigger('click')
     await flushPromises()
-    expect(wrapper.text()).toContain('/tmp/backup.zip')
+    expect(bridge.backup.create).toHaveBeenCalled()
+    expect(w.text()).toContain('settings.general.backupCreated')
   })
 
-  it('createBackup cancelado volta pra idle sem erro', async () => {
-    mockBridge.isDesktop = true
-    mockBridge.bridge = makeBackupBridge({ create: vi.fn(async () => ({ ok: false, reason: 'cancelled' })) })
-    const wrapper = createWrapper()
-    const btn = wrapper.findAll('button').find(b => !b.attributes('disabled') && !b.text().toLowerCase().includes('restaur'))
-    await btn!.trigger('click')
+  it('backup cancelado volta a idle sem erro', async () => {
+    const bridge = makeBridge()
+    bridge.backup.create.mockResolvedValue({ ok: false, reason: 'cancelled' })
+    setBridge(bridge)
+    const w = await mountCard()
+    await backupBtn(w).trigger('click')
     await flushPromises()
-    expect(wrapper.text()).not.toContain('/tmp/backup.zip')
+    expect(w.text()).not.toContain('settings.general.backupError')
+    expect(w.text()).not.toContain('settings.general.backupCreated')
   })
 
-  it('createBackup com erro mostra mensagem de erro', async () => {
-    mockBridge.isDesktop = true
-    mockBridge.bridge = makeBackupBridge({ create: vi.fn(async () => ({ ok: false, reason: 'failed' })) })
-    const wrapper = createWrapper()
-    const btn = wrapper.findAll('button').find(b => !b.attributes('disabled') && !b.text().toLowerCase().includes('restaur'))
-    await btn!.trigger('click')
+  it('backup com falha mostra erro', async () => {
+    const bridge = makeBridge()
+    bridge.backup.create.mockResolvedValue({ ok: false, reason: 'io' })
+    setBridge(bridge)
+    const w = await mountCard()
+    await backupBtn(w).trigger('click')
     await flushPromises()
-    expect(wrapper.text()).not.toContain('/tmp/backup.zip')
+    expect(w.text()).toContain('settings.general.backupError')
   })
 
-  it('createBackup exceção mostra erro', async () => {
-    mockBridge.isDesktop = true
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    mockBridge.bridge = makeBackupBridge({ create: vi.fn(async () => { throw new Error('boom') }) })
-    const wrapper = createWrapper()
-    const btn = wrapper.findAll('button').find(b => !b.attributes('disabled') && !b.text().toLowerCase().includes('restaur'))
-    await btn!.trigger('click')
+  it('backup com exceção mostra erro', async () => {
+    const bridge = makeBridge()
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    bridge.backup.create.mockRejectedValue(new Error('boom'))
+    setBridge(bridge)
+    const w = await mountCard()
+    await backupBtn(w).trigger('click')
     await flushPromises()
-    expect(wrapper.text()).not.toContain('/tmp/backup.zip')
-    errSpy.mockRestore()
+    expect(w.text()).toContain('settings.general.backupError')
   })
 
-  it('onProgress registrado durante backup e chamado atualiza progresso', async () => {
-    mockBridge.isDesktop = true
-    let onProgressCb: ((p: unknown) => void) | null = null
-    mockBridge.bridge = makeBackupBridge({
-      onProgress: vi.fn((cb: (p: unknown) => void) => { onProgressCb = cb; return vi.fn() }),
-      // create devolve só depois de emitir progresso
-      create: vi.fn(async () => {
-        onProgressCb?.({ current: 5, total: 10, zipPath: '' })
-        return { ok: true, path: '/tmp/backup.zip' }
-      }),
-    })
-    const wrapper = createWrapper()
-    const btn = wrapper.findAll('button').find(b => !b.attributes('disabled') && !b.text().toLowerCase().includes('restaur'))
-    await btn!.trigger('click')
+  it('progresso determinate reflete current/total', async () => {
+    const bridge = makeBridge()
+    let resolveCreate!: (v: unknown) => void
+    bridge.backup.create.mockReturnValue(new Promise((r) => (resolveCreate = r)))
+    setBridge(bridge)
+    const w = await mountCard()
+    await backupBtn(w).trigger('click')
     await flushPromises()
-    expect(mockBridge.bridge.backup.onProgress).toHaveBeenCalled()
+    bridge.backup.__cbs[0]({ current: 5, total: 10, zipPath: '' })
+    await flushPromises()
+    expect(w.find('.backup-card__progress').exists()).toBe(true)
+    expect(w.find('[role="progressbar"]').attributes('aria-valuenow')).toBe('50')
+    resolveCreate({ ok: true, path: '/x.zip' })
+    await flushPromises()
+    expect(w.text()).toContain('settings.general.backupCreated')
   })
 
-  it('confirmRestore exige acknowledge', async () => {
-    mockBridge.isDesktop = true
-    mockBridge.bridge = makeBackupBridge()
-    const wrapper = createWrapper()
-    const restoreBtn = wrapper.findAll('button').find(b => b.text().toLowerCase().includes('restaur') || b.text().toLowerCase().includes('recover'))
-    if (restoreBtn) {
-      await restoreBtn.trigger('click')
-      await flushPromises()
-      // confirm não deve chamar restore sem acknowledge
-      expect(mockBridge.bridge.backup.restore).not.toHaveBeenCalled()
-    }
+  it('restore: cancelar no dialog não restaura', async () => {
+    const bridge = makeBridge()
+    setBridge(bridge)
+    const w = await mountCard()
+    await restoreBtn(w).trigger('click')
+    await flushPromises()
+    expect(dialog()).toBeTruthy()
+    await click(q('.clear-confirm__btn'))
+    expect(dialog()).toBeNull()
+    expect(bridge.backup.restore).not.toHaveBeenCalled()
   })
 
-  describe('restore flow completo', () => {
-    it('restore com sucesso: reload da página', async () => {
-      mockBridge.isDesktop = true
-      const reloadSpy = vi.fn()
-      Object.defineProperty(window, 'location', { value: { ...window.location, reload: reloadSpy }, writable: true, configurable: true })
-      mockBridge.bridge = makeBackupBridge({ restore: vi.fn(async () => ({ ok: true })) })
-      const wrapper = origCreateWrapper()
-      activeWrapper = wrapper
-      const restoreBtn = wrapper.findAll('button').find(b => b.text().toLowerCase().includes('restaur'))
-      await restoreBtn!.trigger('click')
-      await flushPromises()
-      const checkbox = document.querySelector('.clear-confirm__checkbox') as HTMLInputElement
-      expect(checkbox).not.toBeNull()
-      checkbox.checked = true
-      checkbox.dispatchEvent(new Event('change', { bubbles: true }))
-      checkbox.dispatchEvent(new Event('input', { bubbles: true }))
-      await flushPromises()
-      const confirmBtn = Array.from(document.querySelectorAll('button')).find(b => b.className.includes('--danger'))
-      expect(confirmBtn).not.toBeUndefined()
-      confirmBtn!.dispatchEvent(new Event('click', { bubbles: true }))
-      await flushPromises()
-      expect(mockBridge.bridge.backup.restore).toHaveBeenCalled()
-      expect(reloadSpy).toHaveBeenCalled()
-    })
+  it('restore: confirmar sem marcar checkbox não restaura', async () => {
+    const bridge = makeBridge()
+    setBridge(bridge)
+    const w = await mountCard()
+    await restoreBtn(w).trigger('click')
+    await flushPromises()
+    const danger = q('.clear-confirm__btn--danger') as HTMLButtonElement
+    expect(danger.disabled).toBe(true)
+  })
 
-    it('restore cancelado: volta idle sem erro', async () => {
-      mockBridge.isDesktop = true
-      mockBridge.bridge = makeBackupBridge({ restore: vi.fn(async () => ({ ok: false, reason: 'cancelled' })) })
-      const wrapper = origCreateWrapper()
-      activeWrapper = wrapper
-      const restoreBtn = wrapper.findAll('button').find(b => b.text().toLowerCase().includes('restaur'))
-      await restoreBtn!.trigger('click')
-      await flushPromises()
-      const cb = document.querySelector('.clear-confirm__checkbox') as HTMLInputElement
-      cb.checked = true
-      cb.dispatchEvent(new Event('change', { bubbles: true }))
-      await flushPromises()
-      const cBtn = Array.from(document.querySelectorAll('button')).find(b => b.className.includes('--danger'))
-      cBtn?.dispatchEvent(new Event('click', { bubbles: true }))
-      await flushPromises()
-      expect(wrapper.text()).not.toContain('backupRestoreError')
-    })
+  it('restore: marcado + confirmado restaura e recarrega', async () => {
+    const bridge = makeBridge()
+    setBridge(bridge)
+    const reload = vi.fn()
+    vi.stubGlobal('location', { ...window.location, reload })
+    const w = await mountCard()
+    await restoreBtn(w).trigger('click')
+    await flushPromises()
+    await checkConfirm()
+    await click(q('.clear-confirm__btn--danger'))
+    expect(bridge.backup.restore).toHaveBeenCalled()
+    expect(reload).toHaveBeenCalled()
+  })
 
-    it('restore com erro: phase error + errorKey', async () => {
-      mockBridge.isDesktop = true
-      mockBridge.bridge = makeBackupBridge({ restore: vi.fn(async () => ({ ok: false, reason: 'zip-corrupt' })) })
-      const wrapper = origCreateWrapper()
-      activeWrapper = wrapper
-      const restoreBtn = wrapper.findAll('button').find(b => b.text().toLowerCase().includes('restaur'))
-      await restoreBtn!.trigger('click')
-      await flushPromises()
-      const cb = document.querySelector('.clear-confirm__checkbox') as HTMLInputElement
-      cb.checked = true
-      cb.dispatchEvent(new Event('change', { bubbles: true }))
-      await flushPromises()
-      const cBtn = Array.from(document.querySelectorAll('button')).find(b => b.className.includes('--danger'))
-      cBtn?.dispatchEvent(new Event('click', { bubbles: true }))
-      await flushPromises()
-      expect((wrapper.vm as any).phase).toBe('error')
-      expect((wrapper.vm as any).errorKey).toBe('settings.general.backupRestoreError')
-    })
+  it('restore com falha mostra erro de restore', async () => {
+    const bridge = makeBridge()
+    bridge.backup.restore.mockResolvedValue({ ok: false, reason: 'io' })
+    setBridge(bridge)
+    const w = await mountCard()
+    await restoreBtn(w).trigger('click')
+    await flushPromises()
+    await checkConfirm()
+    await click(q('.clear-confirm__btn--danger'))
+    expect(w.text()).toContain('settings.general.backupRestoreError')
+  })
 
-    it('closeRestoreConfirm durante busy: não fecha', async () => {
-      mockBridge.isDesktop = true
-      let resolveRestore: (v: unknown) => void = () => {}
-      mockBridge.bridge = makeBackupBridge({ restore: vi.fn(() => new Promise((r) => { resolveRestore = r })) })
-      const wrapper = origCreateWrapper()
-      activeWrapper = wrapper
-      const vm = wrapper.vm as any
-      // estado direto: dialog aberto + acknowledged
-      vm.restoreConfirmOpen = true
-      vm.restoreAcknowledged = true
-      await flushPromises()
-      const restorePromise = vm.confirmRestore()
-      await flushPromises()
-      expect(vm.phase).toBe('restoring')
-      // durante busy, fechar não deve funcionar
-      vm.closeRestoreConfirm()
-      expect(vm.restoreConfirmOpen).toBe(false) // dialog já fechou ao confirmar; busy guard testado abaixo
-      resolveRestore({ ok: true })
-      await restorePromise
-      await flushPromises()
-    })
+  it('restore com exceção mostra erro de restore', async () => {
+    const bridge = makeBridge()
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    bridge.backup.restore.mockRejectedValue(new Error('boom'))
+    setBridge(bridge)
+    const w = await mountCard()
+    await restoreBtn(w).trigger('click')
+    await flushPromises()
+    await checkConfirm()
+    await click(q('.clear-confirm__btn--danger'))
+    expect(w.text()).toContain('settings.general.backupRestoreError')
+  })
 
-    it('openRestoreConfirm fora do desktop: não abre', async () => {
-      mockBridge.isDesktop = false
-      mockBridge.bridge = makeBackupBridge()
-      const wrapper = origCreateWrapper()
-      activeWrapper = wrapper
-      // v-if="isDesktopApp()" — card inteiro não renderiza fora do desktop
-      expect(wrapper.find('button').exists()).toBe(false)
-    })
+  it('unmount desinscreve o listener de progresso', async () => {
+    const bridge = makeBridge()
+    setBridge(bridge)
+    const w = await mountCard()
+    await backupBtn(w).trigger('click')
+    await flushPromises()
+    w.unmount()
+    expect(bridge.backup.__cbs.length).toBe(0)
   })
 })

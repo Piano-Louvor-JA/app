@@ -1,698 +1,312 @@
 // @vitest-environment jsdom
-import { mount, flushPromises } from '@vue/test-utils'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { createI18n } from 'vue-i18n'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import ptBR from '../../locales/pt-BR'
+
+vi.mock('vue-i18n', () => ({
+  useI18n: () => ({ t: (k: string) => k, locale: { value: 'pt-BR' } }),
+}))
+
+vi.mock('@design-system/index', () => ({
+  GlassCard: { name: 'GlassCard', template: '<div class="glass-card-mock"><slot /></div>' },
+}))
+
+vi.mock('@shared/services/browser-storage', () => ({
+  getBrowserItem: vi.fn(() => null),
+  setBrowserItem: vi.fn(),
+  removeBrowserItem: vi.fn(),
+  removeBrowserItemsByPrefix: vi.fn(),
+}))
+
+const lsData: Record<string, string> = {}
+const lsStub = {
+  getItem: (k: string) => lsData[k] ?? null,
+  setItem: (k: string, v: string) => { lsData[k] = String(v) },
+  removeItem: (k: string) => { delete lsData[k] },
+  clear: () => { for (const k of Object.keys(lsData)) delete lsData[k] },
+  key: () => null,
+  length: 0,
+}
+Object.defineProperty(window, 'localStorage', { value: lsStub, configurable: true })
+Object.defineProperty(globalThis, 'localStorage', { value: lsStub, configurable: true })
+Object.defineProperty(window, 'sessionStorage', { value: lsStub, configurable: true })
+Object.defineProperty(globalThis, 'sessionStorage', { value: lsStub, configurable: true })
+
 import StageCustomizationCard from '../StageCustomizationCard.vue'
 import { useStageSettingsStore } from '../../stores/useStageSettingsStore'
 
-vi.mock('@design-system/index', () => ({
-  GlassCard: { template: '<div><slot /></div>' },
-}))
-vi.mock('./SettingsToggle.vue', () => ({ default: {
-  props: ['modelValue', 'label', 'disabled'],
-  emits: ['update:modelValue'],
-  template: '<button class="settings-toggle-stub" :data-on="String(modelValue)" @click="$emit(\'update:modelValue\', !modelValue)">{{ label }}</button>',
-} }))
-vi.mock('./StagePreview.vue', () => ({ default: { template: '<div class="stage-preview-stub" />' } }))
-
-const i18n = createI18n({ legacy: false, locale: 'pt', messages: { pt: ptBR } })
-
-let pinia: ReturnType<typeof createPinia>
-
-function createWrapper(props: Record<string, unknown> = {}) {
-  return mount(StageCustomizationCard, {
-    props,
-    global: { plugins: [i18n, pinia] },
-  })
+async function mountCard(props: Record<string, unknown> = {}) {
+  const w = mount(StageCustomizationCard, { props })
+  await flushPromises()
+  return w
 }
 
-beforeEach(() => {
-  pinia = createPinia()
-  setActivePinia(pinia)
-})
-
 describe('StageCustomizationCard', () => {
-  it('renderiza o card', () => {
-    const wrapper = createWrapper()
-    expect(wrapper.find('.stage-custom').exists()).toBe(true)
+  let active: ReturnType<typeof mount> | null = null
+  beforeEach(() => {
+    vi.clearAllMocks()
+    lsStub.clear()
+    setActivePinia(createPinia())
+  })
+  afterEach(() => {
+    active?.unmount()
+    active = null
   })
 
-  it('usa o store real: patch reflete no settings', async () => {
-    const wrapper = createWrapper()
-    const store = useStageSettingsStore()
-    const antes = store.settings.textBox
-    store.patch({ textBox: !antes })
-    await wrapper.vm.$nextTick()
-    expect(store.settings.textBox).toBe(!antes)
+  it('renderiza tabs de escopo e preview com escopo global', async () => {
+    const w = await mountCard()
+    active = w
+    expect(w.find('[role="tablist"]').exists()).toBe(true)
+    expect(w.findAll('[role="tab"]').length).toBeGreaterThan(1)
+    expect(w.text()).toContain('settings.stage.backgroundColor')
   })
 
-  it('scope padrão é global', () => {
-    createWrapper()
-    const store = useStageSettingsStore()
-    expect(store.activeScope).toBe('global')
+  it('initialScope inválido é ignorado; válido seleciona a tab', async () => {
+    const w1 = await mountCard({ initialScope: 'nao-existe' })
+    active = w1
+    const store1 = useStageSettingsStore()
+    expect(store1.activeScope).toBe('global')
+    w1.unmount()
+
+    const w2 = await mountCard({ initialScope: 'bible' })
+    active = w2
+    const store2 = useStageSettingsStore()
+    expect(store2.activeScope).toBe('bible')
   })
 
-  it('initialScope válido muda a tab ativa', () => {
-    createWrapper({ initialScope: 'timer' })
+  it('onlyScope: sem tablist (tabs somem) e escopo ativo é o módulo', async () => {
+    const w = await mountCard({ onlyScope: 'timer' })
+    active = w
     const store = useStageSettingsStore()
     expect(store.activeScope).toBe('timer')
+    expect(w.find('[role="tablist"]').exists()).toBe(false)
   })
 
-  it('initialScope inválido não muda a tab', () => {
-    createWrapper({ initialScope: 'xpto' })
+  it('troca de escopo via tab chama setActiveScope', async () => {
+    const w = await mountCard()
+    active = w
     const store = useStageSettingsStore()
-    expect(store.activeScope).toBe('global')
+    const tabs = w.findAll('[role="tab"]')
+    const bibleTab = tabs.find((t) => t.text().includes('scope.bible'))
+    expect(bibleTab).toBeTruthy()
+    await bibleTab!.trigger('click')
+    expect(store.activeScope).toBe('bible')
   })
 
-  it('onlyScope muda escopo ativo', () => {
-    createWrapper({ onlyScope: 'clock' })
+  it('swatch de cor de fundo aplica patch', async () => {
+    const w = await mountCard()
+    active = w
     const store = useStageSettingsStore()
-    expect(store.activeScope).toBe('clock')
+    const before = store.settings.backgroundColor
+    const swatches = w.findAll('.stage-custom__swatch')
+    expect(swatches.length).toBeGreaterThan(0)
+    // swatches 4+ são os de COR DE TEXTO (mesma cor do bg ativo); usa um de bg (#000000)
+    await swatches[1].trigger('click')
+    expect(store.settings.backgroundColor).toBe('#000000')
   })
 
-  it('botão de toggle alterna setting via patch no store', async () => {
-    const wrapper = createWrapper()
-    const label = wrapper.find('.stage-custom__toggle-label')
-    expect(label.exists()).toBe(true)
+  it('seleção de background oficial: set e unset', async () => {
+    const w = await mountCard()
+    active = w
     const store = useStageSettingsStore()
-    const antes = store.settings.textShadow
-    await label.trigger('click')
-    expect(store.settings.textShadow).toBe(!antes)
+    const tiles = w.findAll('.stage-custom__official-tile')
+    expect(tiles.length).toBeGreaterThan(0)
+    await tiles[0].trigger('click')
+    expect(store.settings.backgroundImage).toBeTruthy()
+    await tiles[0].trigger('click')
+    expect(store.settings.backgroundImage).toBeNull()
   })
 
-  it('segundo toggle-label alterna textBox', async () => {
-    const wrapper = createWrapper()
-    const labels = wrapper.findAll('.stage-custom__toggle-label')
-    expect(labels.length).toBeGreaterThan(1)
+  it('remove imagem custom via botão de lixeira', async () => {
+    const w = await mountCard()
+    active = w
     const store = useStageSettingsStore()
-    const antes = store.settings.textBox
-    await labels[1].trigger('click')
-    expect(store.settings.textBox).toBe(!antes)
+    store.setBackgroundImage('data:image/png;base64,AAA')
+    await flushPromises()
+    expect(w.find('.stage-custom__bg-preview').exists()).toBe(true)
+    await w.find('.stage-custom__bg-btn--danger').trigger('click')
+    expect(store.settings.backgroundImage).toBeNull()
   })
 
-  it('resetScope volta defaults', () => {
+  it('onFileSelected sem arquivo não quebra; com arquivo lê como dataURL', async () => {
+    const w = await mountCard()
+    active = w
     const store = useStageSettingsStore()
-    store.patch({ textBox: false })
-    store.resetScope()
-    expect(store.settings.textBox).toBe(true)
+    const input = w.find('input[type="file"]')
+    // sem arquivo
+    await input.trigger('change')
+    expect(store.settings.backgroundImage).toBeNull()
+    // com arquivo
+    const fake = new File(['x'], 'bg.png', { type: 'image/png' })
+    Object.defineProperty(input.element, 'files', { value: [fake], configurable: true })
+    await input.trigger('change')
+    await new Promise((r) => setTimeout(r, 10))
+    await flushPromises()
+    expect(store.settings.backgroundImage).toContain('data:')
+    expect((input.element as HTMLInputElement).value).toBe('')
   })
 
-  describe('scope e condições', () => {
-    it('scopeTabs inclui global + módulos', () => {
-      const wrapper = createWrapper()
-      // componente renderiza tabs de escopo (global + módulos)
-      expect(wrapper.findAll('.stage-custom__scope-btn').length).toBeGreaterThan(1)
-    })
-
-    it('visibleScopeTabs normal: todas tabs visíveis', () => {
-      const wrapper = createWrapper()
-      const store = useStageSettingsStore()
-      const antes = wrapper.findAll('.stage-custom__scope-btn').length
-      expect(antes).toBeGreaterThan(1)
-      store.setActiveScope('timer')
-      expect(store.activeScope).toBe('timer')
-    })
-
-    it('visibleScopeTabs onlyScope: só o escopo específico', () => {
-      const wrapper = createWrapper({ onlyScope: 'clock' })
-      // onlyScope: tabs do card não aparecem (só o módulo)
-      expect(wrapper.findAll('.stage-custom__scope-btn').length).toBe(0)
-    })
-
-    it('isInheritingGlobal: true ao abrir timer sem override', () => {
-      createWrapper({ initialScope: 'timer' })
-      const store = useStageSettingsStore()
-      expect(store.isInheritingGlobal).toBe(true)
-    })
-
-    it('setActiveScope muda activeScope e isInheritingGlobal', async () => {
-      createWrapper()
-      const store = useStageSettingsStore()
-      expect(store.isInheritingGlobal).toBe(false) // global nunca "herda"
-      store.setActiveScope('timer')
-      await flushPromises()
-      expect(store.activeScope).toBe('timer')
-      expect(store.isInheritingGlobal).toBe(true)
-      store.patch({ textBox: false }) // cria override
-      expect(store.isInheritingGlobal).toBe(false)
-    })
+  it('fontSize via range aplica patch numérico', async () => {
+    const w = await mountCard()
+    active = w
+    const store = useStageSettingsStore()
+    const range = w.find('input[type="range"]')
+    await range.setValue('100')
+    expect(store.settings.fontSize).toBe(100)
   })
 
-  describe('patchClock função', () => {
-    it('patchClock com objeto: junta com o clock existente', () => {
-      const wrapper = createWrapper()
-      const store = useStageSettingsStore()
-      wrapper.vm.patchClock({ showSeconds: true })
-      // clock herdava default → showSeconds true preservando demais campos
-      expect(store.settings.clock?.showSeconds).toBe(true)
-      expect(store.settings.clock?.style).toBeTruthy()
-    })
-
-    it('patchClock preserva campos já definidos', () => {
-      const wrapper = createWrapper()
-      const store = useStageSettingsStore()
-      wrapper.vm.patchClock({ style: 'analog' })
-      wrapper.vm.patchClock({ showSeconds: true })
-      expect(store.settings.clock?.style).toBe('analog')
-      expect(store.settings.clock?.showSeconds).toBe(true)
-    })
-
-    it('patchClock cria novo objeto se clock nulo', () => {
-      const wrapper = createWrapper()
-      const store = useStageSettingsStore()
-      store.patch({ clock: undefined as never })
-      wrapper.vm.patchClock({ format24h: true })
-      expect(store.settings.clock).toBeTruthy()
-      expect(store.settings.clock?.format24h).toBe(true)
-    })
+  it('fontWeight segment aplica patch', async () => {
+    const w = await mountCard()
+    active = w
+    const store = useStageSettingsStore()
+    const before = store.settings.fontWeight
+    const group = w.findAll('[role="radiogroup"]')
+    const weightGroup = group.find((g) => g.findAll('[role="radio"]').length === 3)
+    const radios = weightGroup!.findAll('[role="radio"]')
+    await radios[2].trigger('click')
+    expect(store.settings.fontWeight).not.toBe(before)
   })
 
-  describe('moduleTimeFormat computed', () => {
-    it('timer scope: retorna timeFormat do timer', () => {
-      createWrapper()
-      const store = useStageSettingsStore()
-      store.setActiveScope('timer')
-      store.patch({ timer: { ...(store.settings.timer ?? {}), timeFormat: 'HH:mm:ss' } as never })
-      expect(store.settings.timer?.timeFormat).toBe('HH:mm:ss')
-    })
-
-    it('countdown scope: retorna timeFormat do countdown', () => {
-      createWrapper()
-      const store = useStageSettingsStore()
-      store.setActiveScope('countdown')
-      store.patch({ countdown: { ...(store.settings.countdown ?? {}), timeFormat: 'mm:ss' } as never })
-      expect(store.settings.countdown?.timeFormat).toBe('mm:ss')
-    })
-
-    it('outro scope: settings globais não têm timeFormat de módulo', () => {
-      createWrapper()
-      const store = useStageSettingsStore()
-      store.setActiveScope('clock')
-      expect(store.settings.timer?.timeFormat).toBeUndefined()
-    })
+  it('escopo bible: tipografia própria + toggle de versão', async () => {
+    const w = await mountCard({ onlyScope: 'bible' })
+    active = w
+    const store = useStageSettingsStore()
+    expect(w.text()).toContain('settings.stage.bibleAppearance')
+    const before = store.settings.bibleFontSize
+    const ranges = w.findAll('input[type="range"]')
+    expect(ranges.length).toBeGreaterThan(0)
+    await ranges[0].setValue('88')
+    expect(store.settings.bibleFontSize).not.toBe(before)
+    // toggle versão
+    const beforeVersion = store.settings.showBibleVersion
+    await w.find('.stage-custom__toggle-label').trigger('click')
+    expect(store.settings.showBibleVersion).toBe(!beforeVersion)
   })
 
-  describe('patchModuleTimeFormat função', () => {
-    it('patchModuleTimeFormat timer: atualiza timeFormat timer', () => {
-      const wrapper = createWrapper()
-      const store = useStageSettingsStore()
-      store.setActiveScope('timer')
-      wrapper.vm.patchModuleTimeFormat?.('HH:mm')
-      if (wrapper.vm.patchModuleTimeFormat) {
-        expect(store.settings.timer?.timeFormat).toBe('HH:mm')
-      }
-    })
-
-    it('patchModuleTimeFormat countdown: atualiza timeFormat countdown', () => {
-      const wrapper = createWrapper()
-      const store = useStageSettingsStore()
-      store.setActiveScope('countdown')
-      wrapper.vm.patchModuleTimeFormat?.('ss')
-      if (wrapper.vm.patchModuleTimeFormat) {
-        expect(store.settings.countdown?.timeFormat).toBe('ss')
-      }
-    })
-
-    it('patchModuleTimeFormat outro scope: não faz nada', () => {
-      const wrapper = createWrapper()
-      const store = useStageSettingsStore()
-      store.setActiveScope('clock')
-      const before = store.settings.clock?.style
-      wrapper.vm.patchModuleTimeFormat?.('foo')
-      if (wrapper.vm.patchModuleTimeFormat) {
-        expect(store.settings.clock?.style).toBe(before)
-      }
-    })
+  it('escopo clock: estilo e switches de segundos/24h', async () => {
+    const w = await mountCard({ onlyScope: 'clock' })
+    active = w
+    const store = useStageSettingsStore()
+    expect(w.text()).toContain('settings.stage.moduleFeatures')
+    // default do clock: showSeconds=true, format24h=true (override criado no 1º patch)
+    const secondsLabel = w.findAll('.stage-custom__toggle-label').find((t) => t.text().includes('clockShowSeconds'))!
+    await secondsLabel.trigger('click')
+    expect(store.settings.clock?.showSeconds).toBe(false)
+    const h24Label = w.findAll('.stage-custom__toggle-label').find((t) => t.text().includes('clockFormat24h'))!
+    await h24Label.trigger('click')
+    expect(store.settings.clock?.format24h).toBe(false)
   })
 
-  describe('patchRandom função', () => {
-    it('patchRandom junta com settings existentes', () => {
-      const wrapper = createWrapper()
-      const store = useStageSettingsStore()
-      wrapper.vm.patchRandom?.({ fontSizePc: 12 })
-      if (wrapper.vm.patchRandom) {
-        expect(store.settings.random?.fontSizePc).toBe(12)
-      }
-    })
-
-    it('patchRandom cria objeto se random nulo', () => {
-      const wrapper = createWrapper()
-      const store = useStageSettingsStore()
-      store.patch({ random: null as never })
-      wrapper.vm.patchRandom?.({ animationSpeed: 'fast' })
-      if (wrapper.vm.patchRandom) {
-        expect(store.settings.random).toBeTruthy()
-        expect(store.settings.random?.animationSpeed).toBe('fast')
-      }
-    })
+  it('escopo timer: formato de hora aplica patchModuleTimeFormat', async () => {
+    const w = await mountCard({ onlyScope: 'timer' })
+    active = w
+    const store = useStageSettingsStore()
+    const timeRadios = w.findAll('[role="radio"]').filter((r) => r.text().includes(':'))
+    expect(timeRadios.length).toBeGreaterThan(1)
+    await timeRadios[timeRadios.length - 1].trigger('click')
+    expect(store.settings.timer?.timeFormat).toBe(timeRadios[timeRadios.length - 1].text())
   })
 
-  describe('file input', () => {
-    it('onFileSelected: arquivo null → não faz nada', () => {
-      const wrapper = createWrapper()
-      const store = useStageSettingsStore()
-      const event = { target: { files: null } } as unknown as Event
-      wrapper.vm.onFileSelected(event)
-      expect(store.settings.backgroundImage).toBeNull()
-    })
-
-    it('onFileSelected: imagem válida → setBackgroundImage', async () => {
-      const wrapper = createWrapper()
-      const store = useStageSettingsStore()
-      const fakeFile = { name: 'test.png' } as File
-      const event = { target: { files: [fakeFile] } } as unknown as Event
-      const realFileReader = window.FileReader
-      class FakeReader {
-        onload: (() => void) | null = null
-        result: string | null = 'data:image/png;base64,AAAA'
-        readAsDataURL() {
-          this.onload?.()
-        }
-      }
-      vi.stubGlobal('FileReader', FakeReader)
-      wrapper.vm.onFileSelected(event)
-      await flushPromises()
-      expect(store.settings.backgroundImage).toBe('data:image/png;base64,AAAA')
-      vi.stubGlobal('FileReader', realFileReader)
-    })
+  it('escopo countdown: formato de hora aplica no módulo countdown', async () => {
+    const w = await mountCard({ onlyScope: 'countdown' })
+    active = w
+    const store = useStageSettingsStore()
+    const timeRadios = w.findAll('[role="radio"]').filter((r) => r.text().includes(':'))
+    await timeRadios[timeRadios.length - 1].trigger('click')
+    expect(store.settings.countdown?.timeFormat).toBe(timeRadios[timeRadios.length - 1].text())
   })
 
-  describe('ações de reset', () => {
-    it('resetScope global: volta settings para default', () => {
-      createWrapper()
-      const store = useStageSettingsStore()
-      store.patch({ textBox: false, clock: { style: 'digital', showSeconds: true, format24h: false } })
-      store.resetScope()
-      // reset global → DEFAULT_STAGE_SETTINGS puro (clock não existe no default)
-      expect(store.settings.textBox).toBe(true)
-      expect(store.settings.clock).toBeUndefined()
-    })
-
-    it('confirmReset: fluxo de botões reseta settings', async () => {
-      const wrapper = createWrapper()
-      const store = useStageSettingsStore()
-      store.patch({ textBox: false })
-      const resetBtn = wrapper.find('.stage-custom__reset')
-      expect(resetBtn.exists()).toBe(true)
-      await resetBtn.trigger('click') // confirmReset = true
-      const confirmBtn = wrapper.find('.stage-custom__reset--confirm')
-      expect(confirmBtn.exists()).toBe(true)
-      await confirmBtn.trigger('click') // confirmReset = false + resetScope()
-      expect(store.settings.textBox).toBe(true)
-    })
+  it('escopo random: fontSizePc, textTransform e animationSpeed', async () => {
+    const w = await mountCard({ onlyScope: 'random' })
+    active = w
+    const store = useStageSettingsStore()
+    // qualquer patch cria o override do módulo; os radios funcionam direto
+    const transformRadios = w.findAll('[role="radio"]').filter((r) => ['AA', 'aa'].includes(r.text()))
+    await transformRadios[0].trigger('click')
+    expect(store.settings.random?.textTransform).toBe('uppercase')
+    const speedRadios = w.findAll('[role="radio"]').filter((r) => ['settings.stage.speedSlow', 'settings.stage.speedNormal', 'settings.stage.speedFast'].includes(r.text()))
+    await speedRadios[2].trigger('click')
+    expect(store.settings.random?.animationSpeed).toBe('fast')
+    // com override existente, o range de fontSizePc aplica
+    const rangeEl = w.findAll('input[type="range"]')[1].element as HTMLInputElement
+    rangeEl.value = '10'
+    rangeEl.dispatchEvent(new Event('input'))
+    await flushPromises()
+    expect(store.settings.random?.fontSizePc).toBe(10)
   })
 
-  describe('conforme scope', () => {
-    it('activeScope === clock: mostra módulo clock', () => {
-      const wrapper = createWrapper({ initialScope: 'clock' })
-      expect(wrapper.find('.stage-custom__section--module').exists()).toBe(true)
-    })
-
-    it('activeScope === timer: mostra módulo', () => {
-      const wrapper = createWrapper({ initialScope: 'timer' })
-      expect(wrapper.find('.stage-custom__section--module').exists()).toBe(true)
-    })
-
-    it('activeScope === global: sem módulo específico', () => {
-      const wrapper = createWrapper()
-      expect(wrapper.find('.stage-custom__section--module').exists()).toBe(false)
-    })
+  it('escopo hymns: overrideBg toggle', async () => {
+    const w = await mountCard({ onlyScope: 'hymns' })
+    active = w
+    const store = useStageSettingsStore()
+    expect(w.text()).toContain('settings.stage.musicBg')
+    const sw = w.find('[role="switch"]')
+    await sw.trigger('click')
+    expect(store.settings.hymns?.overrideBg).toBe(true)
+    await sw.trigger('click')
+    expect(store.settings.hymns?.overrideBg).toBe(false)
   })
 
-  describe('interações DOM reais', () => {
-    it('swatch de bg: patch no store', async () => {
-      const wrapper = createWrapper()
-      const store = useStageSettingsStore()
-      const swatch = wrapper.findAll('.stage-custom__swatch')[0]
-      await swatch.trigger('click')
-      expect(store.settings.backgroundColor).toBeTruthy()
-    })
-
-    it('color input: patch backgroundColor customizado', async () => {
-      const wrapper = createWrapper()
-      const store = useStageSettingsStore()
-      const input = wrapper.find('input[type="color"]')
-      await input.setValue('#112233')
-      expect(store.settings.backgroundColor).toBe('#112233')
-    })
-
-    it('scope tab click: muda escopo ativo', async () => {
-      const wrapper = createWrapper()
-      const store = useStageSettingsStore()
-      const tabs = wrapper.findAll('.stage-custom__scope-btn')
-      await tabs[1].trigger('click')
-      expect(store.activeScope).not.toBe('global')
-    })
-
-    it('dropzone click: dispara fileInput', async () => {
-      const wrapper = createWrapper()
-      const clickSpy = vi.fn()
-      const fileInput = wrapper.find('input[type="file"]').element as HTMLInputElement
-      fileInput.click = clickSpy
-      await wrapper.find('.stage-custom__dropzone').trigger('click')
-      expect(clickSpy).toHaveBeenCalled()
-    })
-
-    it('setBackgroundImage(null) via botão remove imagem', async () => {
-      const wrapper = createWrapper()
-      const store = useStageSettingsStore()
-      store.patch({ backgroundImage: 'data:image/png;base64,AAA' })
-      await wrapper.vm.$nextTick()
-      const removeBtn = wrapper.find('.stage-custom__bg-btn--danger')
-      expect(removeBtn.exists()).toBe(true)
-      await removeBtn.trigger('click')
-      expect(store.settings.backgroundImage).toBeNull()
-    })
-
-    it('patchClock via UI: escopo clock com opções de estilo', async () => {
-      const wrapper = createWrapper({ initialScope: 'clock' })
-      const store = useStageSettingsStore()
-      await flushPromises()
-      expect(store.activeScope).toBe('clock')
-      // botão analog no módulo clock
-      const analogBtn = wrapper.findAll('button').find((b) => b.text().length > 0 && b.attributes('aria-label')?.includes('nalógico') || b.text().includes('nalógico'))
-      if (analogBtn) await analogBtn.trigger('click')
-      void analogBtn
-    })
-
-    it('patchModuleTimeFormat via UI: opções de formato timer', async () => {
-      const wrapper = createWrapper({ initialScope: 'timer' })
-      const store = useStageSettingsStore()
-      await flushPromises()
-      const formatBtns = wrapper.findAll('.stage-custom__scope-btn')
-      void formatBtns
-      // interage com botões de formato do módulo timer
-      const timerFormat = wrapper.findAll('button').find((b) => b.text() === 'HH:mm')
-      if (timerFormat) {
-        await timerFormat.trigger('click')
-        expect(store.settings.timer?.timeFormat).toBe('HH:mm')
-      }
-    })
-
-    it('patchRandom via UI: opções do módulo random', async () => {
-      const wrapper = createWrapper({ initialScope: 'random' })
-      const store = useStageSettingsStore()
-      await flushPromises()
-      const opts = wrapper.findAll('button')
-      void opts
-      expect(store.activeScope).toBe('random')
-    })
-
-    it('toggle via stub SettingsToggle: emite update e patcha', async () => {
-      const wrapper = createWrapper()
-      const store = useStageSettingsStore()
-      // toggle pode renderizar com label do i18n real — procurar botões de toggle do card
-      const toggles = wrapper.findAll('.settings-toggle-stub, .stage-custom__toggle-label')
-      expect(toggles.length).toBeGreaterThan(0)
-      const before = store.settings.textShadow
-      await toggles[0].trigger('click')
-      expect(store.settings.textShadow).toBe(!before)
-    })
+  it('sombra: intensidade e blur só quando textShadow ativo', async () => {
+    const w = await mountCard()
+    active = w
+    const store = useStageSettingsStore()
+    store.patch({ textShadow: true, textBox: true })
+    await flushPromises()
+    const ranges = w.findAll('input[type="range"]')
+    // fontSize + shadowIntensity + shadowBlur + boxOpacity
+    expect(ranges.length).toBe(4)
+    await ranges[1].setValue('0.5')
+    expect(store.settings.shadowIntensity).toBe(0.5)
+    await ranges[2].setValue('2.5')
+    expect(store.settings.shadowBlur).toBe(2.5)
+    await ranges[3].setValue('0.5')
+    expect(store.settings.boxOpacity).toBe(0.5)
   })
 
-  describe('template restante', () => {
-    it('swatch de cor de TEXTO: patch textColor', async () => {
-      const wrapper = createWrapper()
-      const store = useStageSettingsStore()
-      const swatch = wrapper.findAll('[aria-label]').find(el => el.attributes('aria-label')?.includes('Texto') || el.find('img').exists())
-      void swatch
-      // swatches de texto são imgs com --swatch style
-      const img = wrapper.findAll('img').find(i => (i.attributes('style') ?? '').includes('--swatch'))
-      if (img) {
-        await img.trigger('click')
-        expect(store.settings.textColor).toBeTruthy()
-      }
-    })
-
-    it('tile oficial de background: ativa e desativa', async () => {
-      const wrapper = createWrapper()
-      const store = useStageSettingsStore()
-      const tile = wrapper.findAll('[class*="official-tile"]').find(el => el.attributes('aria-label')?.includes('fundo') || true)
-      if (tile.exists && tile.exists()) {
-        await tile.trigger('click')
-        const first = store.settings.backgroundImage
-        if (first) {
-          expect(String(first)).toContain('official:')
-          await tile.trigger('click')
-          expect(store.settings.backgroundImage).toBeNull()
-        }
-      }
-    })
-
-    it('botão de trocar imagem: abre fileInput', async () => {
-      const wrapper = createWrapper()
-      const clickSpy = vi.fn()
-      const input = wrapper.find('input[type="file"]').element as HTMLInputElement
-      input.click = clickSpy
-      const btn = wrapper.find('.stage-custom__bg-btn')
-      if (btn.exists()) {
-        await btn.trigger('click')
-        expect(clickSpy).toHaveBeenCalled()
-      }
-    })
-
-    it('scope countdown: patchModuleTimeFormat via botões de formato', async () => {
-      const wrapper = createWrapper({ initialScope: 'countdown' })
-      const store = useStageSettingsStore()
-      await flushPromises()
-      const btn = wrapper.findAll('button').find(b => b.text() === 'HH:mm:ss' || b.text() === 'mm:ss')
-      if (btn) {
-        await btn.trigger('click')
-        expect(store.settings.countdown?.timeFormat).toBeTruthy()
-      }
-    })
-
-    it('scope random: transform options clicáveis', async () => {
-      const wrapper = createWrapper({ initialScope: 'random' })
-      const store = useStageSettingsStore()
-      await flushPromises()
-      const btn = wrapper.findAll('button').find(b => b.text().length > 0 && b.text() !== store.settings.random?.transform)
-      if (btn && btn.text()) {
-        const before = store.settings.random?.transform
-        await btn.trigger('click')
-        void before
-      }
-    })
+  it('boxBorder toggle dentro de textBox', async () => {
+    const w = await mountCard()
+    active = w
+    const store = useStageSettingsStore()
+    store.patch({ textBox: true })
+    await flushPromises()
+    const toggles = w.findAll('.stage-custom__toggle-label')
+    const borderToggle = toggles.find((t) => t.text().includes('boxBorder'))
+    expect(borderToggle).toBeTruthy()
+    const before = store.settings.boxBorder
+    await borderToggle!.trigger('click')
+    expect(store.settings.boxBorder).toBe(!before)
   })
 
-  describe('controles por scope (clicando tudo)', () => {
-    it('scope global: swatches de texto, color input, fontSize, fontWeight', async () => {
-      const wrapper = createWrapper()
-      const store = useStageSettingsStore()
-      // swatch de texto
-      const swatch = wrapper.findAll('[aria-label]').find(el => el.attributes('style')?.includes('--swatch'))
-      if (swatch) await swatch.trigger('click')
-      // color input de texto
-      const colorInput = wrapper.find('input[type="color"]')
-      if (colorInput.exists()) {
-        const before = JSON.stringify([store.settings.textColor, store.settings.backgroundColor])
-        await colorInput.setValue('#123456')
-        await wrapper.vm.$nextTick()
-        const after = JSON.stringify([store.settings.textColor, store.settings.backgroundColor])
-        expect(after !== before).toBe(true)
-      }
-      // fontSize (range/number)
-      const fontSize = wrapper.find('[aria-label*="amanho"]')
-      if (fontSize.exists()) await fontSize.setValue('42')
-      // segment buttons de fontWeight
-      const segBtns = wrapper.findAll('.stage-custom__segment-btn')
-      for (const btn of segBtns.slice(0, 3)) await btn.trigger('click')
-      expect(segBtns.length).toBeGreaterThan(0)
-      wrapper.unmount()
-    })
-
-    it('scope bible: presets, color, fontSize, fontWeight', async () => {
-      const wrapper = createWrapper()
-      const store = useStageSettingsStore()
-      store.setActiveScope?.('bible')
-      await wrapper.vm.$nextTick()
-      // clica todos os botões segment e color pickers visíveis
-      for (const btn of wrapper.findAll('.stage-custom__segment-btn')) await btn.trigger('click')
-      const colorInputs = wrapper.findAll('input[type="color"]')
-      for (const ci of colorInputs) await ci.setValue('#abcdef')
-      expect(store.settings.bibleTextColor).toBe('#abcdef')
-      wrapper.unmount()
-    })
-
-    it('scope clock: style segment, toggles segundos/24h', async () => {
-      const wrapper = createWrapper()
-      const store = useStageSettingsStore()
-      store.setActiveScope?.('clock')
-      await wrapper.vm.$nextTick()
-      for (const btn of wrapper.findAll('.stage-custom__segment-btn')) await btn.trigger('click')
-      const checkboxes = wrapper.findAll('input[type="checkbox"]')
-      for (const cb of checkboxes) await cb.setValue(true)
-      const storeClock = store.settings.clock
-      expect(storeClock).toBeTruthy()
-      wrapper.unmount()
-    })
-
-    it('scope random: textTransform, animationSpeed, fontSize', async () => {
-      const wrapper = createWrapper()
-      const store = useStageSettingsStore()
-      store.setActiveScope?.('random')
-      await wrapper.vm.$nextTick()
-      for (const btn of wrapper.findAll('.stage-custom__segment-btn')) await btn.trigger('click')
-      const ranges = wrapper.findAll('input[type="range"], input[type="number"]')
-      for (const r of ranges) await r.setValue('5')
-      expect(store.settings.random).toBeTruthy()
-      wrapper.unmount()
-    })
-
-    it('scope countdown: formatos de tempo clicáveis', async () => {
-      const wrapper = createWrapper()
-      const store = useStageSettingsStore()
-      store.setActiveScope?.('countdown')
-      await wrapper.vm.$nextTick()
-      for (const btn of wrapper.findAll('.stage-custom__segment-btn')) await btn.trigger('click')
-      expect(store.settings.countdown?.timeFormat).toBeTruthy()
-      wrapper.unmount()
-    })
+  it('alinhamentos horizontal e vertical', async () => {
+    const w = await mountCard()
+    active = w
+    const store = useStageSettingsStore()
+    const alignLabel = (key: string) => w.findAll('[role="radio"]').find((r) => r.text() === key)!
+    await alignLabel('settings.stage.alignRight').trigger('click')
+    expect(store.settings.textAlign).toBe('right')
+    await alignLabel('settings.stage.alignTop').trigger('click')
+    expect(store.settings.textVerticalAlign).toBe('top')
   })
 
-  describe('toggles e resets por scope (cliques finais)', () => {
-    it('global: textShadow/shadowIntensity/shadowBlur/textBox/boxBorder', async () => {
-      const w = createWrapper()
-      const store = useStageSettingsStore()
-      // SettingsToggle stub? verificar componente real
-      const toggles = w.findAll('input[type="checkbox"]')
-      for (const t of toggles.slice(0, 4)) await t.setValue(true)
-      const ranges = w.findAll('input[type="range"]')
-      for (const r of ranges.slice(0, 2)) await r.setValue('40')
-      expect(store.settings.textShadow).toBeDefined()
-      w.unmount()
-    })
-
-    it('reset scope: confirmar e cancelar', async () => {
-      const w = createWrapper()
-      const resetBtn = w.findAll('button').find(b => b.classes().join(' ').includes('reset') && !b.classes().join(' ').includes('cancel'))
-      if (resetBtn) {
-        await resetBtn.trigger('click')
-        await w.vm.$nextTick()
-        const cancel = w.findAll('button').find(b => b.classes().join(' ').includes('reset--cancel'))
-        if (cancel) await cancel.trigger('click')
-      }
-      w.unmount()
-    })
-
-    it('reset scope: confirmar de fato', async () => {
-      const w = createWrapper()
-      const resetBtn = w.findAll('button').find(b => b.classes().join(' ').includes('reset') && !b.classes().join(' ').includes('cancel'))
-      if (resetBtn) {
-        await resetBtn.trigger('click')
-        await w.vm.$nextTick()
-        const confirm = w.findAll('button').find(b => b.classes().join(' ').includes('reset') && !b.classes().join(' ').includes('cancel') && b.classes().join(' ').includes('--danger'))
-        if (confirm) await confirm.trigger('click')
-      }
-      w.unmount()
-    })
-
-    it('bible: showBibleVersion toggle + color/size', async () => {
-      const w = createWrapper()
-      const store = useStageSettingsStore()
-      store.setActiveScope?.('bible')
-      await w.vm.$nextTick()
-      const cbs = w.findAll('input[type="checkbox"]')
-      for (const c of cbs) await c.setValue(true)
-      const color = w.findAll('input[type="color"]').at(-1)
-      if (color) await color.setValue('#abcdef')
-      w.unmount()
-    })
-
-    it('clock: toggles showSeconds/format24h via switch click', async () => {
-      const w = createWrapper()
-      const store = useStageSettingsStore()
-      store.setActiveScope?.('clock')
-      await w.vm.$nextTick()
-      const labels = w.findAll('.stage-custom__toggle-label, [class*="switch"]')
-      for (const l of labels.slice(0, 4)) await l.trigger('click')
-      expect(store.settings.clock).toBeTruthy()
-      w.unmount()
-    })
-
-    it('hymns overrideBg switch (633)', async () => {
-      const w = createWrapper()
-      const store = useStageSettingsStore()
-      store.setActiveScope?.('global')
-      await w.vm.$nextTick()
-      const sw = w.findAll('[aria-label]').find(el => (el.attributes('aria-label') ?? '').length > 0 && el.attributes('aria-label') === el.attributes('aria-label'))
-      const musicSw = w.findAll('[class*="switch"]').find(s => s.classes().join(' ').includes('stage-custom__switch'))
-      if (musicSw) await musicSw.trigger('click')
-      w.unmount()
-    })
-
-    it('122: textColor null quando scope countdown sem timeFormat', async () => {
-      const w = createWrapper()
-      const store = useStageSettingsStore()
-      store.setActiveScope?.('countdown')
-      await w.vm.$nextTick()
-      // computed textColor/null ramo
-      expect(store.activeScope).toBe('countdown')
-      w.unmount()
-    })
-  })
-
-  describe('SettingsToggle switches (clique direto)', () => {
-    it('global scope: todos os switches disparam patch', async () => {
-      const w = createWrapper()
-      const store = useStageSettingsStore()
-      const switches = w.findAll('button[role="switch"]')
-      expect(switches.length).toBeGreaterThan(0)
-      const before = JSON.stringify(store.settings)
-      for (const s of switches) await s.trigger('click')
-      await w.vm.$nextTick()
-      expect(JSON.stringify(store.settings)).not.toBe(before)
-      w.unmount()
-    })
-
-    it('bible scope: switch showBibleVersion', async () => {
-      const w = createWrapper()
-      const store = useStageSettingsStore()
-      store.setActiveScope?.('bible')
-      await w.vm.$nextTick()
-      const switches = w.findAll('button[role="switch"]')
-      for (const s of switches) await s.trigger('click')
-      await w.vm.$nextTick()
-      expect(typeof store.settings.showBibleVersion).toBe('boolean')
-      w.unmount()
-    })
-
-    it('color inputs por aria-label (textColor/bibleTextColor/footerRefColor)', async () => {
-      const w = createWrapper()
-      const store = useStageSettingsStore()
-      const colors = w.findAll('input[type="color"]')
-      const labels = colors.map(c => c.attributes('aria-label') ?? '')
-      for (const c of colors) await c.setValue('#11aa33')
-      await w.vm.$nextTick()
-      expect(labels.length).toBeGreaterThanOrEqual(0)
-      w.unmount()
-    })
-
-    it('fontSize/bibleFontSize inputs numéricos', async () => {
-      const w = createWrapper()
-      const store = useStageSettingsStore()
-      const sizes = w.findAll('input[type="range"], input[type="number"]')
-      for (const s of sizes) await s.setValue('30')
-      await w.vm.$nextTick()
-      w.unmount()
-    })
-
-    it('fileInput click via botão changeImage (265)', async () => {
-      const store = useStageSettingsStore()
-      store.patch({ backgroundImage: 'official:bg-1' })
-      const w = createWrapper()
-      await w.vm.$nextTick()
-      const input = w.find('input[type="file"]')
-      const clickSpy = vi.fn()
-      expect(input.exists()).toBe(true)
-      ;(input.element as HTMLInputElement).click = clickSpy
-      const changeBtn = w.find('.stage-custom__bg-btn:not(.stage-custom__bg-btn--danger)')
-      expect(changeBtn.exists()).toBe(true)
-      await changeBtn.trigger('click')
-      expect(clickSpy).toHaveBeenCalled()
-      w.unmount()
-    })
+  it('reset: confirmar e cancelar fluxo', async () => {
+    const w = await mountCard()
+    active = w
+    const store = useStageSettingsStore()
+    store.patch({ fontSize: 120 })
+    await flushPromises()
+    // abre confirmação
+    await w.find('.stage-custom__reset').trigger('click')
+    expect(w.find('.stage-custom__reset-msg').exists()).toBe(true)
+    // cancelar não reseta
+    const cancel = w.find('.stage-custom__reset--cancel')
+    await cancel.trigger('click')
+    expect(w.find('.stage-custom__reset-msg').exists()).toBe(false)
+    expect(store.settings.fontSize).toBe(120)
+    // confirmar reseta para o default
+    await w.find('.stage-custom__reset').trigger('click')
+    await w.find('.stage-custom__reset--confirm').trigger('click')
+    await flushPromises()
+    expect(store.settings.fontSize).not.toBe(120)
   })
 })

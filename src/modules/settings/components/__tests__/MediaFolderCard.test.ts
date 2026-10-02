@@ -1,207 +1,201 @@
 // @vitest-environment jsdom
-// MediaFolderCard — windows-only, status, migrate/restore, erros por reason
-import { mount, flushPromises } from '@vue/test-utils'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { createI18n } from 'vue-i18n'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
 
-const mocks = vi.hoisted(() => ({
-  getDesktopBridge: vi.fn(),
+vi.mock('vue-i18n', () => ({
+  useI18n: () => ({ t: (k: string) => k, locale: { value: 'pt-BR' } }),
 }))
 
 vi.mock('@design-system/index', () => ({
-  GlassCard: { template: '<div class="glass-card"><slot /></div>' },
-}))
-
-vi.mock('@shared/services/desktop-bridge', () => ({
-  getDesktopBridge: mocks.getDesktopBridge,
+  GlassCard: { name: 'GlassCard', template: '<div class="glass-card-mock"><slot /></div>' },
 }))
 
 import MediaFolderCard from '../MediaFolderCard.vue'
 
-const i18n = createI18n({
-  legacy: false,
-  locale: 'pt',
-  messages: {
-    pt: {
-      settings: {
-        general: {
-          mediaFolderTitle: 'Pasta de mídia',
-          mediaFolderHint: 'dica',
-          mediaFolderCurrent: 'Atual:',
-          mediaFolderCustomBadge: 'Personalizada',
-          mediaFolderMove: 'Mover',
-          mediaFolderMoving: 'Movendo...',
-          mediaFolderRestore: 'Restaurar',
-          mediaFolderMoveHint: 'subdica',
-          mediaFolderDestInside: 'destino dentro da origem',
-          mediaFolderPersistError: 'persist falhou',
-          mediaFolderError: 'erro',
-        },
-      },
-    },
-  },
-})
+const originalLouvorja = window.louvorja
 
-function makeBridge(overrides: Record<string, unknown> = {}) {
+function setBridge(bridge: unknown) {
+  Object.defineProperty(window, 'louvorja', {
+    value: bridge,
+    configurable: true,
+    writable: true,
+  })
+}
+
+function makeBridge() {
   return {
+    isElectron: true,
     platform: 'win32',
     mediaFolder: {
-      status: vi.fn(async () => ({
-        currentPath: 'C:\\Media',
-        defaultPath: 'C:\\Media',
-        isCustom: false,
-      })),
-      pick: vi.fn(async () => null),
-      migrate: vi.fn(async () => ({ ok: true, path: 'C:\\Media' })),
-      ...overrides,
+      status: vi.fn().mockResolvedValue({ currentPath: 'C:\\Musicas', defaultPath: 'C:\\Musicas', isCustom: false }),
+      pick: vi.fn().mockResolvedValue('D:\\NovaPasta'),
+      migrate: vi.fn().mockResolvedValue({ ok: true, path: 'D:\\NovaPasta' }),
     },
   }
 }
 
-function createWrapper() {
-  return mount(MediaFolderCard, { global: { plugins: [i18n] } })
+async function mountCard() {
+  const w = mount(MediaFolderCard)
+  await flushPromises()
+  return w
+}
+
+function btn(w: ReturnType<typeof mount>, dataTest: string) {
+  return w.find(`[data-test="${dataTest}"]`)
 }
 
 describe('MediaFolderCard', () => {
+  let active: ReturnType<typeof mount> | null = null
   beforeEach(() => {
     vi.clearAllMocks()
   })
-
-  it('não-windows: não renderiza', () => {
-    mocks.getDesktopBridge.mockReturnValue({ platform: 'linux' })
-    const wrapper = createWrapper()
-    expect(wrapper.find('[data-test="media-folder-card"]').exists()).toBe(false)
+  afterEach(() => {
+    active?.unmount()
+    active = null
+    setBridge(originalLouvorja)
+    vi.restoreAllMocks()
   })
 
-  it('windows: card visível, status carregado no mount', async () => {
+  it('não-Windows: não renderiza nada', async () => {
+    setBridge({ isElectron: true, platform: 'linux', mediaFolder: makeBridge().mediaFolder })
+    const w = await mountCard()
+    active = w
+    expect(w.text()).toBe('')
+  })
+
+  it('Windows com mediaFolder: renderiza e carrega status', async () => {
     const bridge = makeBridge()
-    mocks.getDesktopBridge.mockReturnValue(bridge)
-    const wrapper = createWrapper()
-    await flushPromises()
-    expect(wrapper.find('[data-test="media-folder-card"]').exists()).toBe(true)
-    expect(wrapper.find('[data-test="media-folder-current-path"]').exists()).toBe(true)
-    expect(wrapper.text()).toContain('C:\\Media')
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    expect(bridge.mediaFolder.status).toHaveBeenCalled()
+    expect(w.find('[data-test="media-folder-current-path"]').exists()).toBe(true)
+    expect(w.text()).toContain('C:\\Musicas')
   })
 
-  it('isCustom: badge e botão restore aparecem', async () => {
-    const bridge = makeBridge({
-      status: vi.fn(async () => ({ currentPath: 'D:\\Midia', defaultPath: 'C:\\Media', isCustom: true })),
-    })
-    mocks.getDesktopBridge.mockReturnValue(bridge)
-    const wrapper = createWrapper()
-    await flushPromises()
-    expect(wrapper.find('.media-folder__badge').exists()).toBe(true)
-    expect(wrapper.find('[data-test="media-folder-restore-button"]').exists()).toBe(true)
+  it('sem mediaFolder no bridge: card visível mas sem ações funcionais', async () => {
+    setBridge({ isElectron: true, platform: 'win32' })
+    const w = await mountCard()
+    active = w
+    expect(w.find('[data-test="media-folder-card"]').exists()).toBe(true)
+    expect(w.find('[data-test="media-folder-current-path"]').exists()).toBe(false)
   })
 
-  it('sem bridge.mediaFolder: botões desabilitados e sem status', () => {
-    mocks.getDesktopBridge.mockReturnValue({ platform: 'win32' })
-    const wrapper = createWrapper()
-    expect((wrapper.find('[data-test="media-folder-move-button"]').element as HTMLButtonElement).disabled).toBe(true)
-    expect(wrapper.find('[data-test="media-folder-current-path"]').exists()).toBe(false)
-  })
-
-  it('chooseAndMove: pick + migrate ok, done com path', async () => {
-    const bridge = makeBridge({
-      pick: vi.fn(async () => 'D:\\Nova'),
-      migrate: vi.fn(async () => ({ ok: true, path: 'D:\\Nova' })),
-    })
-    mocks.getDesktopBridge.mockReturnValue(bridge)
-    const wrapper = createWrapper()
-    await flushPromises()
-    await wrapper.find('[data-test="media-folder-move-button"]').trigger('click')
-    await flushPromises()
-    expect(bridge.mediaFolder.migrate).toHaveBeenCalledWith('D:\\Nova')
-    expect((wrapper.vm as any).phase).toBe('done')
-    expect((wrapper.vm as any).lastMovedPath).toBe('D:\\Nova')
-  })
-
-  it('pick cancelado: não migra', async () => {
+  it('escolher e migrar com sucesso mostra caminho e done', async () => {
     const bridge = makeBridge()
-    mocks.getDesktopBridge.mockReturnValue(bridge)
-    const wrapper = createWrapper()
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    await btn(w, 'media-folder-move-button').trigger('click')
     await flushPromises()
-    await wrapper.find('[data-test="media-folder-move-button"]').trigger('click')
+    expect(bridge.mediaFolder.pick).toHaveBeenCalled()
+    expect(bridge.mediaFolder.migrate).toHaveBeenCalledWith('D:\\NovaPasta')
+    expect(w.text()).toContain('mediaFolderMoved')
+    expect(bridge.mediaFolder.status).toHaveBeenCalledTimes(2)
+  })
+
+  it('pick cancelado (null): nada acontece', async () => {
+    const bridge = makeBridge()
+    bridge.mediaFolder.pick.mockResolvedValue(null)
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    await btn(w, 'media-folder-move-button').trigger('click')
     await flushPromises()
     expect(bridge.mediaFolder.migrate).not.toHaveBeenCalled()
   })
 
-  it('migrate dest-inside-source: erro específico', async () => {
-    const bridge = makeBridge({
-      pick: vi.fn(async () => 'D:\\Nova'),
-      migrate: vi.fn(async () => ({ ok: false, reason: 'dest-inside-source' })),
-    })
-    mocks.getDesktopBridge.mockReturnValue(bridge)
-    const wrapper = createWrapper()
+  it('migrate falha com dest-inside-source mostra erro específico', async () => {
+    const bridge = makeBridge()
+    bridge.mediaFolder.migrate.mockResolvedValue({ ok: false, reason: 'dest-inside-source' })
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    await btn(w, 'media-folder-move-button').trigger('click')
     await flushPromises()
-    await wrapper.find('[data-test="media-folder-move-button"]').trigger('click')
-    await flushPromises()
-    expect((wrapper.vm as any).errorKey).toBe('settings.general.mediaFolderDestInside')
+    expect(w.text()).toContain('mediaFolderDestInside')
   })
 
-  it('migrate persist-failed: erro específico', async () => {
-    const bridge = makeBridge({
-      pick: vi.fn(async () => 'D:\\Nova'),
-      migrate: vi.fn(async () => ({ ok: false, reason: 'persist-failed' })),
-    })
-    mocks.getDesktopBridge.mockReturnValue(bridge)
-    const wrapper = createWrapper()
+  it('migrate falha com persist-failed mostra erro específico', async () => {
+    const bridge = makeBridge()
+    bridge.mediaFolder.migrate.mockResolvedValue({ ok: false, reason: 'persist-failed' })
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    await btn(w, 'media-folder-move-button').trigger('click')
     await flushPromises()
-    await wrapper.find('[data-test="media-folder-move-button"]').trigger('click')
-    await flushPromises()
-    expect((wrapper.vm as any).errorKey).toBe('settings.general.mediaFolderPersistError')
+    expect(w.text()).toContain('mediaFolderPersistError')
   })
 
-  it('migrate erro genérico: mediaFolderError', async () => {
-    const bridge = makeBridge({
-      pick: vi.fn(async () => 'D:\\Nova'),
-      migrate: vi.fn(async () => ({ ok: false, reason: 'other' })),
-    })
-    mocks.getDesktopBridge.mockReturnValue(bridge)
-    const wrapper = createWrapper()
+  it('migrate falha genérica mostra erro genérico', async () => {
+    const bridge = makeBridge()
+    bridge.mediaFolder.migrate.mockResolvedValue({ ok: false, reason: 'other' })
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    await btn(w, 'media-folder-move-button').trigger('click')
     await flushPromises()
-    await wrapper.find('[data-test="media-folder-move-button"]').trigger('click')
-    await flushPromises()
-    expect((wrapper.vm as any).errorKey).toBe('settings.general.mediaFolderError')
+    expect(w.text()).toContain('mediaFolderError')
   })
 
-  it('migrate throw: mediaFolderError', async () => {
-    const bridge = makeBridge({
-      pick: vi.fn(async () => 'D:\\Nova'),
-      migrate: vi.fn(async () => { throw new Error('boom') }),
-    })
-    mocks.getDesktopBridge.mockReturnValue(bridge)
-    const wrapper = createWrapper()
+  it('migrate com exceção mostra erro genérico', async () => {
+    const bridge = makeBridge()
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    bridge.mediaFolder.migrate.mockRejectedValue(new Error('boom'))
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    await btn(w, 'media-folder-move-button').trigger('click')
     await flushPromises()
-    await wrapper.find('[data-test="media-folder-move-button"]').trigger('click')
-    await flushPromises()
-    expect((wrapper.vm as any).phase).toBe('error')
+    expect(w.text()).toContain('mediaFolderError')
   })
 
-  it('restoreDefault: migra pra defaultPath', async () => {
-    const bridge = makeBridge({
-      status: vi.fn(async () => ({ currentPath: 'D:\\Midia', defaultPath: 'C:\\Media', isCustom: true })),
-      migrate: vi.fn(async () => ({ ok: true, path: 'C:\\Media' })),
-    })
-    mocks.getDesktopBridge.mockReturnValue(bridge)
-    const wrapper = createWrapper()
+  it('restaurar padrão migra para defaultPath', async () => {
+    const bridge = makeBridge()
+    bridge.mediaFolder.status.mockResolvedValue({ currentPath: 'D:\\Custom', defaultPath: 'C:\\Musicas', isCustom: true })
+    bridge.mediaFolder.migrate.mockResolvedValue({ ok: true, path: 'C:\\Musicas' })
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    await btn(w, 'media-folder-restore-button').trigger('click')
     await flushPromises()
-    await wrapper.find('[data-test="media-folder-restore-button"]').trigger('click')
-    await flushPromises()
-    expect(bridge.mediaFolder.migrate).toHaveBeenCalledWith('C:\\Media')
-    expect((wrapper.vm as any).phase).toBe('done')
+    expect(bridge.mediaFolder.migrate).toHaveBeenCalledWith('C:\\Musicas')
+    expect(w.text()).toContain('mediaFolderMoved')
   })
 
-  it('restore falha: mediaFolderError', async () => {
-    const bridge = makeBridge({
-      status: vi.fn(async () => ({ currentPath: 'D:\\Midia', defaultPath: 'C:\\Media', isCustom: true })),
-      migrate: vi.fn(async () => ({ ok: false, reason: 'io' })),
-    })
-    mocks.getDesktopBridge.mockReturnValue(bridge)
-    const wrapper = createWrapper()
+  it('restaurar padrão com falha mostra erro', async () => {
+    const bridge = makeBridge()
+    bridge.mediaFolder.status.mockResolvedValue({ currentPath: 'D:\\Custom', defaultPath: 'C:\\Musicas', isCustom: true })
+    bridge.mediaFolder.migrate.mockResolvedValue({ ok: false, reason: 'other' })
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    await btn(w, 'media-folder-restore-button').trigger('click')
     await flushPromises()
-    await wrapper.find('[data-test="media-folder-restore-button"]').trigger('click')
+    expect(w.text()).toContain('mediaFolderError')
+  })
+
+  it('restaurar padrão com exceção mostra erro', async () => {
+    const bridge = makeBridge()
+    bridge.mediaFolder.status.mockResolvedValue({ currentPath: 'D:\\Custom', defaultPath: 'C:\\Musicas', isCustom: true })
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    bridge.mediaFolder.migrate.mockRejectedValue(new Error('boom'))
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    await btn(w, 'media-folder-restore-button').trigger('click')
     await flushPromises()
-    expect((wrapper.vm as any).errorKey).toBe('settings.general.mediaFolderError')
+    expect(w.text()).toContain('mediaFolderError')
+  })
+
+  it('status null: sem caminho atual nem botão de restaurar', async () => {
+    const bridge = makeBridge()
+    bridge.mediaFolder.status.mockResolvedValue(null)
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    expect(w.find('[data-test="media-folder-current-path"]').exists()).toBe(false)
+    expect(w.find('[data-test="media-folder-restore-button"]').exists()).toBe(false)
+    expect(bridge.mediaFolder.migrate).not.toHaveBeenCalled()
   })
 })

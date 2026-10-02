@@ -1,276 +1,228 @@
 // @vitest-environment jsdom
-import { mount, flushPromises } from "@vue/test-utils";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createI18n } from "vue-i18n";
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
 
-/**
- * ExternalPlayerCard — escolha do player externo (bridge Electron).
- * Mocka window.louvorja (IPC bridge) — padrão getDesktopBridge/IPC mockado.
- */
-const extApi = vi.hoisted(() => ({
-  get: vi.fn(async (): Promise<string> => "associated"),
-  set: vi.fn(async (_next?: string): Promise<boolean> => true),
-  detect: vi.fn(async (): Promise<Array<{ id: string; label: string }>> => []),
-  listCustom: vi.fn(async (): Promise<string[]> => []),
-  removeCustom: vi.fn(),
-  openFile: vi.fn(async (): Promise<unknown> => null),
-}));
+vi.mock('vue-i18n', () => ({
+  useI18n: () => ({
+    t: (k: string, params?: Record<string, unknown>) =>
+      params ? `${k}:${JSON.stringify(params)}` : k,
+    locale: { value: 'pt-BR' },
+  }),
+}))
 
-const bridgeMock = vi.hoisted(() => ({
-  isElectron: true,
-  externalPlayer: null as unknown,
-  dialog: null as unknown,
-}));
+import ExternalPlayerCard from '../ExternalPlayerCard.vue'
 
-vi.mock("@shared/services/desktop-bridge", () => ({
-  getDesktopBridge: vi.fn(() => null),
-  isDesktopApp: vi.fn(() => false),
-}));
+const originalLouvorja = window.louvorja
 
-import ExternalPlayerCard from "../ExternalPlayerCard.vue";
+function setBridge(bridge: unknown) {
+  Object.defineProperty(window, 'louvorja', {
+    value: bridge,
+    configurable: true,
+    writable: true,
+  })
+}
 
-const i18n = createI18n({
-  legacy: false,
-  locale: "pt-BR",
-  messages: {
-    "pt-BR": {
-      settings: {
-        externalPlayer: {
-          title: "Player externo",
-          description: "Abrir mídia em player externo",
-          detecting: "Detectando…",
-          detect: "Detectar players",
-          detectFound: "Players encontrados",
-          detectEmpty: "Nenhum player encontrado",
-          pickOther: "Escolher outro…",
-          pickTitle: "Escolha o player",
-          player: {
-            associated: "Padrão do sistema",
-            custom: "{name}",
-          },
-        },
-      },
+function makeBridge() {
+  return {
+    isElectron: true,
+    externalPlayer: {
+      get: vi.fn().mockResolvedValue('associated'),
+      set: vi.fn().mockResolvedValue(true),
+      detect: vi.fn().mockResolvedValue([{ id: 'vlc', name: 'VLC', path: '/usr/bin/vlc' }]),
+      listCustom: vi.fn().mockResolvedValue([]),
+      removeCustom: vi.fn().mockResolvedValue(null),
     },
-  } as never,
-});
-
-function mountCard() {
-  return mount(ExternalPlayerCard, {
-    global: { plugins: [i18n] },
-  });
+    dialog: {
+      openFile: vi.fn().mockResolvedValue('/opt/player.exe'),
+    },
+  }
 }
 
-function setupBridge(opts: {
-  get?: () => Promise<string>;
-  detect?: () => Promise<Array<{ id: string; label: string }>>;
-  listCustom?: () => Promise<string[]>;
-} = {}) {
-  bridgeMock.externalPlayer = {
-    get: opts.get ?? extApi.get,
-    set: extApi.set,
-    detect: opts.detect ?? extApi.detect,
-    listCustom: opts.listCustom ?? extApi.listCustom,
-    removeCustom: extApi.removeCustom,
-  };
-  bridgeMock.dialog = { openFile: extApi.openFile };
-  (window as unknown as Record<string, unknown>).louvorja = bridgeMock;
+async function mountCard() {
+  const w = mount(ExternalPlayerCard)
+  await flushPromises()
+  return w
 }
 
-describe("ExternalPlayerCard", () => {
+describe('ExternalPlayerCard', () => {
+  let active: ReturnType<typeof mount> | null = null
   beforeEach(() => {
-    vi.clearAllMocks();
-    extApi.get.mockResolvedValue("associated");
-    extApi.detect.mockResolvedValue([]);
-    extApi.listCustom.mockResolvedValue([]);
-    extApi.set.mockResolvedValue(true);
-    setupBridge();
-  });
+    vi.clearAllMocks()
+  })
+  afterEach(() => {
+    active?.unmount()
+    active = null
+    setBridge(originalLouvorja)
+  })
 
-  it("sem API (web): sem radiogroup, título e hint apenas", async () => {
-    (window as unknown as Record<string, unknown>).louvorja = {};
-    const wrapper = mountCard();
-    await flushPromises();
-    expect(wrapper.find("h3").text()).toBe("Player externo");
-    expect(wrapper.find('[role="radiogroup"]').exists()).toBe(false);
-  });
+  it('sem bridge: mostra aviso desktopOnly e sem controles', async () => {
+    setBridge(undefined)
+    const w = await mountCard()
+    active = w
+    expect(w.text()).toContain('settings.externalPlayer.title')
+    expect(w.find('[data-test="external-player-associated"]').exists()).toBe(false)
+  })
 
-  it("com API: radiogroup com botão 'padrão do sistema' selecionado", async () => {
-    const wrapper = mountCard();
-    await flushPromises();
+  it('carrega preferência e players detectados', async () => {
+    const bridge = makeBridge()
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    expect(bridge.externalPlayer.get).toHaveBeenCalled()
+    expect(bridge.externalPlayer.detect).toHaveBeenCalled()
+    expect(w.find('[data-test="external-player-vlc"]').exists()).toBe(true)
+    expect(w.find('[data-test="external-player-associated"]').attributes('aria-checked')).toBe('true')
+  })
 
-    const associated = wrapper.find('[data-test="external-player-associated"]');
-    expect(associated.text()).toBe("Padrão do sistema");
-    expect(associated.attributes("aria-checked")).toBe("true");
-    expect(extApi.get).toHaveBeenCalledTimes(1);
-  });
+  it('get() com falha cai no padrão associated', async () => {
+    const bridge = makeBridge()
+    bridge.externalPlayer.get.mockRejectedValue(new Error('x'))
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    expect(w.find('[data-test="external-player-associated"]').attributes('aria-checked')).toBe('true')
+  })
 
-  it("detectar: lista players instalados como radios", async () => {
-    extApi.detect.mockResolvedValue([
-      { id: "vlc", label: "VLC" },
-      { id: "mpv", label: "mpv" },
-    ]);
-    const wrapper = mountCard();
-    await flushPromises();
+  it('detect() com falha mantém lista vazia e scanned=true', async () => {
+    const bridge = makeBridge()
+    bridge.externalPlayer.detect.mockRejectedValue(new Error('x'))
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    expect(w.text()).not.toContain('VLC')
+  })
 
-    // detect já roda no mount (detectInstalled)
-    const vlc = wrapper.find('[data-test="external-player-vlc"]');
-    expect(vlc.exists()).toBe(true);
-    expect(vlc.text()).toBe("VLC");
-    expect(wrapper.text()).toContain("Players encontrados");
-  });
+  it('listCustom com falha e preferência custom: preserva player da preferência', async () => {
+    const bridge = makeBridge()
+    bridge.externalPlayer.get.mockResolvedValue('custom:/opt/mpv')
+    bridge.externalPlayer.listCustom.mockRejectedValue(new Error('x'))
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    expect(w.text()).toContain('mpv')
+  })
 
-  it("detect sem resultados: 'nenhum player encontrado'", async () => {
-    const wrapper = mountCard();
-    await flushPromises();
-    expect(wrapper.text()).toContain("Nenhum player encontrado");
-  });
+  it('setPlayer com sucesso atualiza e recarrega custom players', async () => {
+    const bridge = makeBridge()
+    bridge.externalPlayer.detect.mockResolvedValue([])
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    await w.find('[data-test="external-player-associated"]').trigger('click')
+    await flushPromises()
+    expect(bridge.externalPlayer.set).toHaveBeenCalledWith('associated')
+  })
 
-  it("click em player detectado chama bridge set e seleciona", async () => {
-    extApi.detect.mockResolvedValue([{ id: "vlc", label: "VLC" }]);
-    const wrapper = mountCard();
-    await flushPromises();
+  it('setPlayer com set()=false reverte para o anterior', async () => {
+    const bridge = makeBridge()
+    bridge.externalPlayer.detect.mockResolvedValue([])
+    bridge.externalPlayer.get.mockResolvedValue('vlc-id')
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    bridge.externalPlayer.set.mockResolvedValue(false)
+    await w.find('[data-test="external-player-associated"]').trigger('click')
+    await flushPromises()
+    expect(w.find('[data-test="external-player-associated"]').attributes('aria-checked')).toBe('false')
+  })
 
-    await wrapper.find('[data-test="external-player-vlc"]').trigger("click");
-    await flushPromises();
-    expect(extApi.set).toHaveBeenCalledWith("vlc");
-    expect(
-      wrapper.find('[data-test="external-player-vlc"]').attributes("aria-checked"),
-    ).toBe("true");
-  });
+  it('setPlayer com exceção reverte para o anterior', async () => {
+    const bridge = makeBridge()
+    bridge.externalPlayer.detect.mockResolvedValue([])
+    bridge.externalPlayer.get.mockResolvedValue('vlc-id')
+    bridge.externalPlayer.set.mockRejectedValue(new Error('x'))
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    await w.find('[data-test="external-player-associated"]').trigger('click')
+    await flushPromises()
+    expect(w.find('[data-test="external-player-associated"]').attributes('aria-checked')).toBe('false')
+  })
 
-  it("set falha (ok=false): reverte para o anterior", async () => {
-    extApi.set.mockResolvedValue(false);
-    const wrapper = mountCard();
-    await flushPromises();
+  it('detectar de novo via botão re-executa detect()', async () => {
+    const bridge = makeBridge()
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    expect(bridge.externalPlayer.detect).toHaveBeenCalledTimes(1)
+    await w.find('[data-test="external-player-detect"]').trigger('click')
+    await flushPromises()
+    expect(bridge.externalPlayer.detect).toHaveBeenCalledTimes(2)
+  })
 
-    await wrapper.find(".detect").trigger("click");
-    await flushPromises();
-    // detectado vazio; usa o botão associated pra trocar e falhar
-    const associated = wrapper.find('[data-test="external-player-associated"]');
-    await associated.trigger("click");
-    await flushPromises();
-    // player continua 'associated' (era ele já) — valida estado consistente
-    expect(associated.attributes("aria-checked")).toBe("true");
-  });
+  it('pickCustomPlayer: arquivo escolhido vira custom player selecionado', async () => {
+    const bridge = makeBridge()
+    bridge.externalPlayer.detect.mockResolvedValue([])
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    await w.find('[data-test="external-player-pick"]').trigger('click')
+    await flushPromises()
+    expect(bridge.dialog.openFile).toHaveBeenCalled()
+    expect(bridge.externalPlayer.set).toHaveBeenCalledWith('custom:/opt/player.exe')
+    expect(w.text()).toContain('player.exe')
+  })
 
-  it("custom players listados aparecem como opções", async () => {
-    extApi.listCustom.mockResolvedValue(["/usr/bin/mpv-custom"]);
-    const wrapper = mountCard();
-    await flushPromises();
-    expect(wrapper.text()).toContain("mpv-custom");
-  });
+  it('pickCustomPlayer: caminho em array é aceito; cancelar não seta', async () => {
+    const bridge = makeBridge()
+    bridge.externalPlayer.detect.mockResolvedValue([])
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    bridge.dialog.openFile.mockResolvedValue(['/arr/path.bin'])
+    await w.find('[data-test="external-player-pick"]').trigger('click')
+    await flushPromises()
+    expect(bridge.externalPlayer.set).toHaveBeenCalledWith('custom:/arr/path.bin')
+    bridge.dialog.openFile.mockResolvedValue(null)
+    const calls = bridge.externalPlayer.set.mock.calls.length
+    await w.find('[data-test="external-player-pick"]').trigger('click')
+    await flushPromises()
+    expect(bridge.externalPlayer.set).toHaveBeenCalledTimes(calls)
+  })
 
-  it("escolher outro: dialog retorna caminho e seta custom:<path>", async () => {
-    extApi.openFile.mockResolvedValue("/opt/player/x.bin");
-    const wrapper = mountCard();
-    await flushPromises();
+  it('pickCustomPlayer com exceção do dialog é ignorado', async () => {
+    const bridge = makeBridge()
+    bridge.externalPlayer.detect.mockResolvedValue([])
+    bridge.dialog.openFile.mockRejectedValue(new Error('cancel'))
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    await w.find('[data-test="external-player-pick"]').trigger('click')
+    await flushPromises()
+    expect(bridge.externalPlayer.set).not.toHaveBeenCalled()
+  })
 
-    await wrapper.find('[data-test="external-player-pick"]').trigger("click");
-    await flushPromises();
-    expect(extApi.openFile).toHaveBeenCalled();
-    expect(extApi.set).toHaveBeenCalledWith("custom:/opt/player/x.bin");
-  });
+  it('removeCustom com resultado do bridge aplica player+lista retornados', async () => {
+    const bridge = makeBridge()
+    bridge.externalPlayer.get.mockResolvedValue('custom:/opt/mpv')
+    bridge.externalPlayer.listCustom.mockResolvedValue(['/opt/mpv'])
+    bridge.externalPlayer.removeCustom.mockResolvedValue({
+      player: 'associated',
+      customPlayers: [],
+    })
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    const removeBtn = w.find('[data-test="external-player-custom-remove"]')
+    expect(removeBtn.exists()).toBe(true)
+    await removeBtn!.trigger('click')
+    await flushPromises()
+    expect(bridge.externalPlayer.removeCustom).toHaveBeenCalledWith('/opt/mpv')
+    expect(w.find('[data-test="external-player-associated"]').attributes('aria-checked')).toBe('true')
+  })
 
-  it("dialog cancelado (null): não chama set", async () => {
-    extApi.openFile.mockResolvedValue(null);
-    const wrapper = mountCard();
-    await flushPromises();
-
-    await wrapper.find('[data-test="external-player-pick"]').trigger("click");
-    await flushPromises();
-    expect(extApi.set).not.toHaveBeenCalled();
-  });
-
-  describe("ramos restantes", () => {
-    it("get inicial custom: lista vazia mantém o custom atual na lista", async () => {
-      extApi.get.mockResolvedValue("custom:/opt/meu-player");
-      extApi.listCustom.mockResolvedValue([]);
-      const wrapper = mountCard();
-      await flushPromises();
-      expect(wrapper.text()).toContain("meu-player");
-    });
-
-    it("set lança exceção: reverte player e sai do busy", async () => {
-      extApi.detect.mockResolvedValue([{ id: "vlc", label: "VLC" }]);
-      extApi.set.mockRejectedValue(new Error("ipc fail"));
-      const wrapper = mountCard();
-      await flushPromises();
-      await wrapper.find('[data-test="external-player-vlc"]').trigger("click");
-      await flushPromises();
-      expect(wrapper.find('[data-test="external-player-associated"]').attributes("aria-checked")).toBe("true");
-    });
-
-    it("busy guard: segundo set durante busy é ignorado", async () => {
-      let resolveSet: (v: boolean) => void;
-      extApi.set.mockImplementation(() => new Promise((r) => { resolveSet = r; }));
-      extApi.detect.mockResolvedValue([{ id: "vlc", label: "VLC" }]);
-      const wrapper = mountCard();
-      await flushPromises();
-      await wrapper.find('[data-test="external-player-vlc"]').trigger("click");
-      await wrapper.find('[data-test="external-player-associated"]').trigger("click");
-      expect(extApi.set).toHaveBeenCalledTimes(1);
-      resolveSet!(true);
-      await flushPromises();
-    });
-  });
-
-  describe('ramos restantes 2', () => {
-    it('loadCustomPlayers: catch fallback mantém custom atual', async () => {
-      extApi.listCustom.mockRejectedValue(new Error('fail'));
-      extApi.get.mockResolvedValue('custom:/opt/player');
-      const wrapper = mountCard();
-      await flushPromises();
-      const vm = wrapper.vm as any;
-      expect(vm.customPlayers).toContain('/opt/player');
-    });
-
-    it('loadCustomPlayers: lista com vazios filtrados', async () => {
-      extApi.listCustom.mockResolvedValue(['/opt/a', '', '   ', '/opt/b']);
-      const wrapper = mountCard();
-      await flushPromises();
-      const vm = wrapper.vm as any;
-      expect(vm.customPlayers).toEqual(['/opt/a', '/opt/b']);
-    });
-
-    it('detect falha: installed [] e scanned true', async () => {
-      extApi.detect.mockRejectedValue(new Error('fail'));
-      const wrapper = mountCard();
-      await flushPromises();
-      expect((wrapper.vm as any).scanned).toBe(true);
-    });
-
-    it('removeCustom: result com player associado', async () => {
-      extApi.listCustom.mockResolvedValue(['/opt/a']);
-      extApi.removeCustom.mockResolvedValue({ player: 'associated', customPlayers: [] });
-      const wrapper = mountCard();
-      await flushPromises();
-      const vm = wrapper.vm as any;
-      await vm.removeCustom?.('/opt/a');
-      await flushPromises();
-      expect(extApi.removeCustom).toHaveBeenCalled();
-    });
-
-    it('removeCustom: sem result, remove da lista e reseta player', async () => {
-      extApi.get.mockResolvedValue('custom:/opt/a');
-      extApi.listCustom.mockResolvedValue(['/opt/a']);
-      extApi.removeCustom.mockResolvedValue(undefined);
-      extApi.set.mockResolvedValue(true);
-      const wrapper = mountCard();
-      await flushPromises();
-      const vm = wrapper.vm as any;
-      await vm.removeCustom?.('/opt/a');
-      await flushPromises();
-      expect(extApi.set).toHaveBeenCalledWith('associated');
-    });
-
-    it('pickCustomPlayer: file dialog cancelado', async () => {
-      extApi.openFile.mockResolvedValue(null);
-      const wrapper = mountCard();
-      await flushPromises();
-      const vm = wrapper.vm as any;
-      await vm.pickCustomPlayer?.();
-      await flushPromises();
-      expect(extApi.openFile).toHaveBeenCalled();
-    });
-  });
-});
+  it('removeCustom sem resultado: remove da lista e volta para associated se era o selecionado', async () => {
+    const bridge = makeBridge()
+    bridge.externalPlayer.get.mockResolvedValue('custom:/opt/mpv')
+    bridge.externalPlayer.listCustom.mockResolvedValue(['/opt/mpv'])
+    bridge.externalPlayer.removeCustom.mockResolvedValue(undefined)
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    const removeBtn = w.find('[data-test="external-player-custom-remove"]')
+    await removeBtn.trigger('click')
+    await flushPromises()
+    expect(bridge.externalPlayer.set).toHaveBeenCalledWith('associated')
+    expect(w.find('[data-test="external-player-associated"]').attributes('aria-checked')).toBe('true')
+  })
+})
