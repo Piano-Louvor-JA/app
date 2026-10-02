@@ -149,24 +149,21 @@ export async function importSljaAsLiturgyMusic(
 	}
 	const musicId = created.id;
 
-	let hasAudio = false;
-	if (archive.audio?.bytes?.length) {
-		const uploadedAudio = await uploadCustomFile(
-			archive.audio.bytes,
-			archive.audio.name,
-			"audio",
-		);
-		if (uploadedAudio) {
-			const linked = await updateCustomMusic(musicId, {
-				id_file_audio: uploadedAudio.idFile,
-			});
-			hasAudio = linked;
-		}
-	}
-
 	let uploadedImages = 0;
 	const uploadedAssets: Array<{ path: string; url: string; idFile: number }> =
 		[];
+	// Upload do ÁUDIO em paralelo com as imagens (são independentes — o
+	// link com o musicId vem depois via updateCustomMusic). Áudio é o
+	// maior arquivo: não pode esperar a fila de imagens.
+	const audioUpload: Promise<{ idFile: number } | null> | null =
+		archive.audio?.bytes?.length
+			? uploadCustomFile(
+					archive.audio.bytes,
+					archive.audio.name,
+					"audio",
+				)
+			: null;
+
 	if (archive.assets?.length) {
 		// Uploads EM PARALELO (batch de 4): cada request à API custa ~0.7s de
 		// RTT — em série, um .slja com 15 imagens levava 15×0.7s só de espera
@@ -194,30 +191,51 @@ export async function importSljaAsLiturgyMusic(
 			}
 		}
 	}
+	let hasAudio = false;
+	if (audioUpload) {
+		const uploadedAudio = await audioUpload;
+		if (uploadedAudio) {
+			const linked = await updateCustomMusic(musicId, {
+				id_file_audio: uploadedAudio.idFile,
+			});
+			hasAudio = linked;
+		}
+	}
+
 	const imageIdByUrl = new Map(uploadedAssets.map((a) => [a.url, a.idFile]));
 
+	// Lyrics em paralelo (batch de 5) com order EXPLÍCITO — a ordem é
+	// garantida pelo campo, não pela sequência de requests. 15 slides caem
+	// de 15 RTTs (~10s) para ~3.
 	let slideCount = 0;
-	for (const slide of slides) {
-		const text = slide.lyric.trim();
-		if (!text) continue;
-		// Background do slide: imagem upada com matching igual ao media editor
-		// (contains bidirecional, lowercase).
-		let imageUrl = "";
-		const imageName = slide.image?.name?.toLowerCase();
-		if (imageName && uploadedAssets.length) {
-			const match = uploadedAssets.find(
-				(a) =>
-					imageName.includes(a.path.toLowerCase()) ||
-					a.path.toLowerCase().includes(imageName),
-			);
-			if (match) imageUrl = match.url;
-		}
-		const createdLyric = await createCustomLyric(musicId, {
-			lyric: text,
-			time: formatSljaMsAsTime(slide.timeMs),
-			id_file_image: imageIdByUrl.get(imageUrl),
-		});
-		if (createdLyric) slideCount += 1;
+	const validSlides = slides.filter((slide) => slide.lyric.trim());
+	const LYRIC_BATCH = 5;
+	for (let i = 0; i < validSlides.length; i += LYRIC_BATCH) {
+		const batch = validSlides.slice(i, i + LYRIC_BATCH);
+		const created = await Promise.all(
+			batch.map((slide, j) => {
+				const text = slide.lyric.trim();
+				// Background do slide: imagem upada com matching igual ao media
+				// editor (contains bidirecional, lowercase).
+				let imageUrl = "";
+				const imageName = slide.image?.name?.toLowerCase();
+				if (imageName && uploadedAssets.length) {
+					const match = uploadedAssets.find(
+						(a) =>
+							imageName.includes(a.path.toLowerCase()) ||
+							a.path.toLowerCase().includes(imageName),
+					);
+					if (match) imageUrl = match.url;
+				}
+				return createCustomLyric(musicId, {
+					lyric: text,
+					time: formatSljaMsAsTime(slide.timeMs),
+					order: i + j + 1,
+					id_file_image: imageIdByUrl.get(imageUrl),
+				});
+			}),
+		);
+		slideCount += created.filter(Boolean).length;
 	}
 
 	return {
