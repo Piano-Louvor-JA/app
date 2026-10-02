@@ -828,6 +828,11 @@ export async function deleteCustomLyric(lyricId: number): Promise<boolean> {
 export async function resolveMediaTrack(
   musicId: number,
 ): Promise<MediaTrackRecord | null> {
+  // app#331: música LOCAL (sem auth, localStorage, id negativo) primeiro —
+  // o guard de custom (>= 1M) também engole negativos se rodar antes.
+  if (isLocalId(musicId)) {
+    return loadCustomMusicTrack(musicId)
+  }
   if (isCustomMusicId(musicId)) {
     return loadCustomMusicTrack(fromCustomMusicId(musicId))
   }

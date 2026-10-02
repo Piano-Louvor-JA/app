@@ -465,7 +465,9 @@ export const useMediaStore = defineStore('media', () => {
 
   async function open(params: MediaOpenParams): Promise<MediaOpenResult> {
     const musicId = params.musicId
-    if (!Number.isFinite(musicId) || musicId <= 0) {
+    // app#331: negativo = música LOCAL (import .slja sem login) — válido.
+    // Só 0/NaN (sem música) continua fora.
+    if (!Number.isFinite(musicId) || musicId === 0) {
       return { ok: false, messageKey: 'media.messages.trackMissing' }
     }
 
@@ -515,9 +517,13 @@ export const useMediaStore = defineStore('media', () => {
     lastErrorKey.value = null
 
     // Dispatcher custom vs oficial (mesmo contrato do web): id >= 1M é
-    // música custom de Minhas Coletâneas.
-    const track = isCustomMusicId(musicId)
-      ? await loadCustomMusicTrack(fromCustomMusicId(musicId))
+    // música custom de Minhas Coletâneas. app#331: negativo é música LOCAL
+    // (import .slja sem login) — vai pro MESMO loader custom, que lê o
+    // localStorage (isLocalId) e monta data: URL do áudio.
+    const track = isCustomMusicId(musicId) || musicId < 0
+      ? await loadCustomMusicTrack(
+          musicId < 0 ? musicId : fromCustomMusicId(musicId),
+        )
       : await loadMediaTrack(musicId)
     if (!track) {
       status.value = 'error'
