@@ -418,7 +418,12 @@ export function draftFromLiturgyItem(item: LiturgyItem): LiturgyItemDraft {
     type: item.type,
     name:
       item.type === 'music'
-        ? (item.complementaryTitle ?? '').trim()
+        ? // Cascata: título complementar → nome do item (import .slja grava
+          // o título da música em item.name) → vazio. Sem isso, itens
+          // importados abriam o editor com o campo obrigatório vazio
+          // (feedback Ezequias/Rafael 02/10).
+          ((item.complementaryTitle ?? '').trim() ||
+            item.name.trim())
         : item.name,
     subtitle:
       item.type === 'music' ? (item.notes ?? '').trim() : item.subtitle,
