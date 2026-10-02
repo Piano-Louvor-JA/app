@@ -261,6 +261,12 @@ export default {
       reorder: 'Drag to reorder',
     },
     messages: {
+      removeItemTitle: 'Remove item from liturgy',
+      removeLiturgyTitle: 'Remove custom liturgy',
+      clearTitle: 'Clear liturgy for this day',
+      removeAction: 'Remove',
+      cancelAction: 'Cancel',
+      confirmDeleteNamed: 'Do you want to remove "{name}" from the liturgy?',
       confirmDelete: 'Do you want to remove this item from the liturgy?',
       confirmDeleteCategory:
         'Do you want to remove this category/divider and all related items?',

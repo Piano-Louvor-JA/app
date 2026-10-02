@@ -261,6 +261,12 @@ export default {
       reorder: 'Arrastrar para reordenar',
     },
     messages: {
+      removeItemTitle: 'Eliminar elemento de la liturgia',
+      removeLiturgyTitle: 'Eliminar liturgia avulsa',
+      clearTitle: 'Borrar la liturgia de este día',
+      removeAction: 'Eliminar',
+      cancelAction: 'Cancelar',
+      confirmDeleteNamed: '¿Desea eliminar "{name}" de la liturgia?',
       confirmDelete: '¿Desea eliminar este elemento de la liturgia?',
       confirmDeleteCategory:
         '¿Desea eliminar esta categoría/separador y todos los elementos relacionados?',
