@@ -87,6 +87,13 @@ if (typeof process.getuid === "function" && process.getuid() === 0) {
 	app.commandLine.appendSwitch("no-sandbox");
 }
 
+/** GPU instável nesta máquina (crash do gpu process em loop, 02/10/2026) —
+ *  renderização por software é suficiente pro app e estabiliza o dev. */
+if (process.env.VITE_DEV_SERVER_URL) {
+	app.commandLine.appendSwitch("disable-gpu");
+	app.commandLine.appendSwitch("in-process-gpu");
+}
+
 /** Permite autoplay com áudio nas janelas de projeção (YouTube). */
 app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 
@@ -216,6 +223,37 @@ function isProjectionPopupUrl(url) {
 			typeof url === "string" &&
 			(url.includes("#/popup") || url.includes("/popup"))
 		);
+	}
+}
+
+/**
+ * Feedback Ezequias (02/10): "logar com o google com erro"
+ * ("The requested action is invalid" no __/auth/handler).
+ * Causa: o popup OAuth do Firebase (signInWithPopup → window.open) caía no
+ * `shell.openExternal` e o browser externo perdia o handshake com a janela
+ * app (eventid/session) — o handler respondia invalid.
+ * Fix: popups de auth (firebaseapp.com / accounts.google.com / google.com
+ * OAuth) abrem como BrowserWindow FILHA in-app — mantém o handshake vivo
+ * e o credential volta pro renderer via signInWithPopup normalmente.
+ */
+function isAuthPopupUrl(url) {
+	try {
+		const parsed = new URL(url);
+		const allowed = [
+			"firebaseapp.com",
+			"firebaseui.com",
+			"accounts.google.com",
+			"accounts.youtube.com",
+			"google.com",
+			"gstatic.com",
+			"apple.com",
+		];
+		const host = parsed.hostname.toLowerCase();
+		return allowed.some(
+			(d) => host === d || host.endsWith(`.${d}`),
+		);
+	} catch {
+		return false;
 	}
 }
 
@@ -400,6 +438,22 @@ function attachProjectionWindowHandlers(parentWindow) {
       return {
         action: 'allow',
         overrideBrowserWindowOptions: buildPopupWindowOptions(url, features),
+      }
+    }
+
+    // Feedback Ezequias (02/10): login Google — popup OAuth do Firebase
+    // abre IN-APP (BrowserWindow filha) pra manter o handshake com o
+    // renderer; abrir no browser externo quebra o auth ("invalid action").
+    if (isAuthPopupUrl(url)) {
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: {
+          width: 500,
+          height: 640,
+          autoHideMenuBar: true,
+          contextIsolation: true,
+          sandbox: true,
+        },
       }
     }
 

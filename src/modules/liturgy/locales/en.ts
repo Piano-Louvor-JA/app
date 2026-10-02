@@ -270,7 +270,7 @@ export default {
       liturgySaved: 'Liturgy saved successfully.',
       mediaDesktopOnly: 'Provide the media file path.',
       videoSelectFile: 'Select file',
-      catalogEmpty: 'No songs found in the local catalog.',
+      catalogEmpty: 'No songs in the local catalog. Import a .slja file in Media Center ("Import .slja" button) or add songs from the Community.',
       customRequired:
         'Create or select a custom liturgy before adding items.',
       booksEmpty: 'No Bible books available. Complete initialization.',
