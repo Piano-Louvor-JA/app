@@ -20,7 +20,7 @@ import type {
   CountdownRuntimeState,
 } from '../types/countdown'
 import { useCountdownStore } from '../stores/useCountdownStore'
-import { playAlertTone, setLiveVolume, stopAllAlerts } from '../services/alert-tone'
+import { clearAlertQueue, enqueueAlert, playAlertTone, setLiveVolume, stopAllAlerts } from '../services/alert-tone'
 import { getLibraryTone } from '../services/alert-tone-library'
 import {
   DEFAULT_ALERT_MARKERS,
@@ -155,17 +155,21 @@ export function useCountdownDisplay(
 
     function playMarkerPreset(preset: string, markerId: string): void {
       if (store.audioMuted) return // F2: operador silenciou
-      if (preset.startsWith('custom:')) {
-        const audio = getCustomAudioById(preset.slice('custom:'.length))
-        if (!audio) return
-        audio.volume = store.audioVolume
-        void audio.play().catch(() => {
-          // autoplay bloqueado — silencioso
-        })
-        return
-      }
-      void playAlertTone(preset as AlertPresetKey, undefined, undefined, {
-        volume: store.audioVolume,
+      // Fila (feedback Ezequias: "adiciona queue") — marcos que cruzam juntos
+      // (jump do rAF em janela em bg) tocam em sequência, nunca simultâneos.
+      enqueueAlert(() => {
+        if (preset.startsWith('custom:')) {
+          const audio = getCustomAudioById(preset.slice('custom:'.length))
+          if (!audio) return Promise.resolve()
+          audio.volume = store.audioVolume
+          return audio.play().then(
+            () => undefined,
+            () => undefined, // autoplay bloqueado — silencioso
+          )
+        }
+        return playAlertTone(preset as AlertPresetKey, undefined, undefined, {
+          volume: store.audioVolume,
+        }).then(() => undefined)
       })
     }
 
@@ -180,29 +184,90 @@ export function useCountdownDisplay(
     })
 
     if (isProjectionWindow) {
-      watch(remainingRawMs, (raw, prevRaw) => {
-        if (runtime.value.status !== 'running') return
-        // start: primeira observação com status running (offset 0)
-        const startMarker = activeMarkers.value.find((m) => m.offsetMs === 0)
-        if (
-          startMarker &&
-          prevStatus !== 'running' &&
-          !firedMarkers.has(startMarker.id) &&
-          startMarker.preset !== 'none'
-        ) {
-          firedMarkers.add(startMarker.id)
-          playMarkerPreset(startMarker.preset, startMarker.id)
+      // Marcos por DEADLINE ABSOLUTO (feedback Ezequias 02/10: "5min toca
+      // quando falta 1min"). O antigo watch(remainingRawMs) dependia do rAF
+      // — que CONGELA em janela em background (mesma raiz do app#337). Ao
+      // voltar o foco, raw saltava (ex.: 10min → 1min) e o cruzamento do
+      // 5min acontecia no salto, com minutos de atraso; 1min tocava junto.
+      // Agora: deadline = Date.now() + remaining no start/resume, checado por
+      // setInterval (timers de bg são throttled mas NUNCA congelados; e o
+      // catch-up dispara qualquer marco vencido — na ordem, pela fila).
+      let markerTimer: ReturnType<typeof setInterval> | null = null
+      let deadlines = new Map<string, number>()
+
+      function armMarkers(): void {
+        if (runtime.value.status !== 'running') {
+          deadlines = new Map()
+          if (markerTimer) {
+            clearInterval(markerTimer)
+            markerTimer = null
+          }
+          return
         }
-        prevStatus = runtime.value.status
-        // marcos por cruzamento (prevRaw >= marco > raw — contagem decrescente)
+        const base = Date.now()
+        deadlines = new Map(
+          activeMarkers.value
+            .filter((m) => m.offsetMs > 0 && m.preset !== 'none')
+            .map((m) => [m.id, base + (remainingRawMs.value - m.offsetMs)]),
+        )
+        if (!markerTimer) {
+          markerTimer = setInterval(fireDueMarkers, 1_000)
+        }
+      }
+
+      function fireDueMarkers(): void {
+        if (runtime.value.status !== 'running') return
+        const now = Date.now()
         for (const marker of activeMarkers.value) {
           if (marker.offsetMs === 0) continue
           if (firedMarkers.has(marker.id) || marker.preset === 'none') continue
-          if ((prevRaw ?? Infinity) >= marker.offsetMs && raw < marker.offsetMs) {
+          const deadline = deadlines.get(marker.id)
+          if (deadline !== undefined && now >= deadline) {
             firedMarkers.add(marker.id)
             playMarkerPreset(marker.preset, marker.id)
           }
         }
+      }
+
+      // start: primeira observação com status running (offset 0)
+      const startMarker = activeMarkers.value.find((m) => m.offsetMs === 0)
+      watch(
+        [() => runtime.value.status, remainingRawMs],
+        ([status]) => {
+          if (
+            startMarker &&
+            status === 'running' &&
+            prevStatus !== 'running' &&
+            !firedMarkers.has(startMarker.id) &&
+            startMarker.preset !== 'none'
+          ) {
+            firedMarkers.add(startMarker.id)
+            playMarkerPreset(startMarker.preset, startMarker.id)
+          }
+          prevStatus = status
+        },
+        { flush: 'sync' },
+      )
+
+      // (re)arma deadlines quando runtime muda (start/pausa/resume/ajuste)
+      watch(
+        () => [
+          runtime.value.status,
+          runtime.value.durationMs,
+          runtime.value.accumulatedMs,
+          runtime.value.segmentStartedAt,
+        ],
+        () => armMarkers(),
+        { immediate: true },
+      )
+
+      // Marcos vencidos: re-checa a cada tick do relógio (barato: Map lookup)
+      watch(remainingRawMs, () => fireDueMarkers())
+
+      // limpa o interval ao desmontar
+      onUnmounted(() => {
+        if (markerTimer) clearInterval(markerTimer)
+        markerTimer = null
       })
 
       // Reset dos marcos quando o countdown volta pro idle (reset)

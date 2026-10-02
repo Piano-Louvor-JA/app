@@ -30,6 +30,55 @@ export function getPresetDurationMs(preset: AlertPresetKey | 'none' | 'custom', 
   return preset === 'abertura_es' ? 30_400 : preset === '5min_es' ? 18_000 : 65_500
 }
 
+// ── Fila de alertas (feedback Ezequias 02/10: "adiciona queue") ──────────
+// Dois marcos cruzando no mesmo tick (ex.: rAF congelado em janela em bg
+// salta de 10min pra 1min de uma vez) tocavam SIMULTANEAMENTE. Agora:
+// os disparos entram numa fila serial — cada áudio espera o anterior acabar.
+let queueChain: Promise<void> = Promise.resolve()
+let queueDropped = 0
+let pendingCount = 0
+
+/** Enfileira um disparo de alerta na ordem. Se a fila crescer demais
+ *  (ex.: marcos acumulados por jump grande), descarta os excedentes
+ *  mais antigos pra não tocar "atrasado" um alerta que já perdeu a hora. */
+export function enqueueAlert(
+  play: () => Promise<void>,
+  opts: { maxPending?: number } = {},
+): void {
+  const maxPending = opts.maxPending ?? 2
+  // mede pendências pela cadeia atual (chain de promessas pendentes)
+  const pending = pendingCount
+  if (pending >= maxPending) {
+    queueDropped += 1
+    return
+  }
+  pendingCount += 1
+  queueChain = queueChain
+    .then(play)
+    .catch(() => {
+      // erro num alerta não derruba os seguintes
+    })
+    .finally(() => {
+      pendingCount -= 1
+    })
+}
+
+/** Quantidade de alertas enfileirados aguardando (testes/telemetria). */
+export function pendingAlertCount(): number {
+  return pendingCount
+}
+
+/** Alertas descartados por excesso de fila desde o boot do módulo. */
+export function droppedAlertCount(): number {
+  return queueDropped
+}
+
+/** Esvazia a fila (Stop do operador também corta o que está na fila). */
+export function clearAlertQueue(): void {
+  queueChain = Promise.resolve()
+  pendingCount = 0
+}
+
 // Cache de AudioContext e elementos de áudio pré-carregados
 let audioCtx: AudioContext | null = null
 const audioCache = new Map<string, HTMLAudioElement>()
