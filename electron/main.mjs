@@ -9,6 +9,7 @@ import {
 	resolveAppIconPath,
 } from "./app-icon.mjs";
 import { APP_PRODUCT_NAME } from "./constants.mjs";
+import { startRendererServer, rendererUrl } from "./renderer-server.mjs";
 import { configureUserDataPath } from "./user-data-path.mjs";
 import { checkEulaAcceptance } from "./eula.mjs";
 import { resolveAppLocale } from "./locale.mjs";
@@ -106,6 +107,7 @@ const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
 	app.quit();
 }
+
 
 let mainWindow = null;
 let splashWindow = null;
@@ -604,7 +606,12 @@ function createWindow(locale = 'pt-BR') {
 		const localeParam = `?lang=${locale}`;
 		void mainWindow.loadURL(VITE_DEV_SERVER_URL + localeParam);
 	} else {
-		void mainWindow.loadFile(path.join(__dirname, "../dist/index.html"), { query: { lang: locale } });
+		const rendererBase = globalThis.__rendererBaseUrl;
+			if (rendererBase) {
+				void mainWindow.loadURL(rendererUrl(rendererBase, locale));
+			} else {
+				void mainWindow.loadFile(path.join(__dirname, "../dist/index.html"), { query: { lang: locale } });
+			}
 	}
 
 	// Timeout de segurança: se ready-to-show não disparar em 15s, mostra erro
@@ -644,7 +651,12 @@ function createWindow(locale = 'pt-BR') {
 					if (isDev && VITE_DEV_SERVER_URL) {
 						void mainWindow.loadURL(`${VITE_DEV_SERVER_URL}/?lang=${locale}`);
 					} else {
-						void mainWindow.loadFile(path.join(__dirname, "../dist/index.html"), { query: { lang: locale } });
+						const rendererBase = globalThis.__rendererBaseUrl;
+			if (rendererBase) {
+				void mainWindow.loadURL(rendererUrl(rendererBase, locale));
+			} else {
+				void mainWindow.loadFile(path.join(__dirname, "../dist/index.html"), { query: { lang: locale } });
+			}
 					}
 				}
 			}, delay);
@@ -667,6 +679,21 @@ function createWindow(locale = 'pt-BR') {
 }
 
 app.whenReady().then(async () => {
+  // Origem http válida p/ Firebase Auth (popup Google) — ver renderer-server.mjs.
+  // file:// (loadFile) nunca estará nos authorizedDomains → popup abre e fecha na hora.
+  if (!isDev) {
+    try {
+      const renderer = await startRendererServer(
+        path.join(__dirname, "../dist"),
+      );
+      globalThis.__rendererBaseUrl = renderer.url;
+      renderer.server.on("close", () => console.log("[renderer-server] fechado"));
+    } catch (err) {
+      console.error("[renderer-server] indisponível — cai no loadFile:", err.message);
+      globalThis.__rendererBaseUrl = null;
+    }
+  }
+
 	bootMark("whenReady");
 	// Primeira coisa visível — checagens e servidores vêm depois.
 	createSplash();
