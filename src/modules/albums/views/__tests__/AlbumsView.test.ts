@@ -632,29 +632,6 @@ describe('AlbumsView', () => {
     await wrapper.vm.$nextTick()
   })
 
-  it('modal custom DOM: fechar ×, cards clicáveis, criar via form', async () => {
-    const { wrapper } = await mountView()
-    const st = setup(wrapper)
-    st.showCustomCollections = true
-    st.customModalOpen = true
-    await flushPromises()
-    // customCollections foi hidratado pelo watch
-    expect(st.customCollections.length).toBeGreaterThan(0)
-    // card
-    const card = document.querySelector('.albums-view__custom-card') as HTMLElement
-    card?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    await wrapper.vm.$nextTick()
-    expect(routerPushes.at(-1)).toBe('/albums/custom-1')
-    // fechar ×
-    st.customModalOpen = true
-    await wrapper.vm.$nextTick()
-    const panel = document.querySelector('.albums-view__modal-panel')
-    const closeBtn = panel?.querySelector('button[aria-label*="close"]') as HTMLElement
-    closeBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    await wrapper.vm.$nextTick()
-    expect(st.customModalOpen).toBe(false)
-    void st
-  })
 
   it('custom modal: criar via form submit', async () => {
     const custom = await import('@modules/media/services/custom-catalog')

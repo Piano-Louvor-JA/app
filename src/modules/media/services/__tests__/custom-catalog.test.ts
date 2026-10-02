@@ -11,6 +11,10 @@ const mocks = vi.hoisted(() => ({
   resolveRemoteFileUrlMock: vi.fn((p: string) => `https://files.example.com${p}`),
 }))
 
+vi.mock('../outbox', () => ({
+  enqueue: vi.fn(async () => undefined),
+  newClientUuid: vi.fn(() => 'uuid-teste'),
+}));
 vi.mock('../auth-client', () => ({
   authHeaders: () => mocks.authHeadersMock(),
   getAuthSession: () => mocks.getAuthSessionMock(),
@@ -331,7 +335,7 @@ describe('collections CRUD', () => {
   it('createCustomCollection: sem auth → local; com auth → API; !ok/throw → null', async () => {
     const local = await createCustomCollection('Nova Local', 'desc')
     expect(local).not.toBeNull()
-    expect(local!.id).toBeLessThan(0)
+    expect(local!.id).toBeLessThanOrEqual(0)
 
     mocks.getAuthSessionMock.mockReturnValue({ userId: 1 })
     routes = [{ match: () => true, body: { id_collection: 55 } }]
@@ -340,8 +344,9 @@ describe('collections CRUD', () => {
     routes = [{ match: () => true, status: 400 }]
     expect(await createCustomCollection('Ruim')).toBeNull()
 
+    // rede falhou com auth: enfileira no outbox e retorna id 0 (sync depois)
     routes = [{ match: () => true, throw: true }]
-    expect(await createCustomCollection('Ruim')).toBeNull()
+    expect(await createCustomCollection('Ruim')).toEqual({ id: 0 })
   })
 
   it('deleteCustomCollection: local, remoto ok, !ok, throw', async () => {
@@ -614,6 +619,9 @@ describe('urls, upload e resolveMediaTrack', () => {
 // ── enrichDurations / probeAudioDuration ────────────────────────────────────
 describe('enrichDurations e probeAudioDuration', () => {
   beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn(fetchStub))
+    // staging: customBaseUrl usa VITE_PALCO_API_URL — sem env, URL relativa throwa no node
+    ;(import.meta.env as Record<string, string>).VITE_PALCO_API_URL = 'https://api.test'
     vi.clearAllMocks()
     localStorage.clear()
   })

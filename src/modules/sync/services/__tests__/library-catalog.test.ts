@@ -1348,8 +1348,6 @@ describe('mutantes round 6 - constantes de módulo (EXCLUDED_ALBUM_IDS / CATEGOR
     expect(ids).toEqual(['Doxologia', 'aaa_unmapped'])
   })
 })
-||||||| 188c37f
-=======
 
 describe('mutantes sobreviventes - round 4 (fechamento 100%)', () => {
   beforeEach(() => {

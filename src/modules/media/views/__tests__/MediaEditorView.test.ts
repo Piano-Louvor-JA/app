@@ -152,7 +152,7 @@ describe("MediaEditorView — criação", () => {
 		await input.setValue("Nova");
 		await input.trigger("keyup.enter");
 		await flushPromises();
-		expect(createCustomCollection).toHaveBeenCalledWith("Nova");
+		expect(createCustomCollection).toHaveBeenCalledWith("Nova", undefined, undefined, "private");
 		w.unmount();
 	});
 
