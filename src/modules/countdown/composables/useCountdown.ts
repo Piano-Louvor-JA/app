@@ -205,11 +205,26 @@ export function useCountdownDisplay(
           return
         }
         const base = Date.now()
+        // Marco cujo deadline já passou NO ARM (operador iniciou o cronômetro
+        // quando já faltava menos que o offset — ex.: start faltando 4:30 e
+        // marco 5min): NÃO toca atrasado. Feedback Ezequias: "5min toca
+        // faltando 4" — o catch-up tocava o alerta fora de hora (no app E no
+        // web, mesmo comportamento). Alerta que perdeu a hora é pulado.
+        const remaining = remainingRawMs.value
         deadlines = new Map(
           activeMarkers.value
-            .filter((m) => m.offsetMs > 0 && m.preset !== 'none')
-            .map((m) => [m.id, base + (remainingRawMs.value - m.offsetMs)]),
+            .filter(
+              (m) =>
+                m.offsetMs > 0 &&
+                m.preset !== 'none' &&
+                m.offsetMs < remaining,
+            )
+            .map((m) => [m.id, base + (remaining - m.offsetMs)]),
         )
+        // os que já passaram ficam marcados como fired (não tocaram de propósito)
+        for (const m of activeMarkers.value) {
+          if (m.offsetMs > 0 && m.offsetMs >= remaining) firedMarkers.add(m.id)
+        }
         if (!markerTimer) {
           markerTimer = setInterval(fireDueMarkers, 1_000)
         }
