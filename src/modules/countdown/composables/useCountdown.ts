@@ -4,12 +4,15 @@ import {
   onUnmounted,
   ref,
   toValue,
+  watch,
   type MaybeRefOrGetter,
 } from 'vue'
 
 import {
-  computeCountdownRemainingMs,
+  computeRemainingMs,
+  computeRemainingRawMs,
   durationPartsFromMs,
+  formatCountdownWithSign,
   formatElapsedMs,
 } from '../services/countdown-format'
 import type {
@@ -17,6 +20,28 @@ import type {
   CountdownRuntimeState,
 } from '../types/countdown'
 import { useCountdownStore } from '../stores/useCountdownStore'
+import { playAlertTone, setLiveVolume, stopAllAlerts } from '../services/alert-tone'
+import { getLibraryTone } from '../services/alert-tone-library'
+import {
+  DEFAULT_ALERT_MARKERS,
+  type AlertMarkerPreset,
+} from '../types/countdown'
+import type { AlertPresetKey } from '../services/alert-tone'
+
+/** AudioElement de um tom da biblioteca (cacheado pelo data-URL). */
+const libraryAudioCache = new Map<string, HTMLAudioElement>()
+
+function getCustomAudioById(toneId: string): HTMLAudioElement | undefined {
+  const tone = getLibraryTone(toneId)
+  if (!tone) return undefined
+  let audio = libraryAudioCache.get(tone.dataUrl)
+  if (!audio) {
+    audio = new Audio(tone.dataUrl)
+    audio.preload = 'auto'
+    libraryAudioCache.set(tone.dataUrl, audio)
+  }
+  return audio
+}
 
 export function useCountdownTick(active: MaybeRefOrGetter<boolean> = true) {
   const now = ref(Date.now())
@@ -40,6 +65,17 @@ export function useCountdownTick(active: MaybeRefOrGetter<boolean> = true) {
   return { now }
 }
 
+export const DEFAULT_ALERT_TONE_PRESETS: NonNullable<
+  CountdownDisplayConfig['alertTonePresets']
+> = {
+  start: 'abertura_es',
+  '5min': '5min_es',
+  '1min': '1min_es',
+}
+
+/** Marcos em ms restantes que disparam alerta. */
+const ALERT_MARKERS_MS = { start: 0, '5min': 300_000, '1min': 60_000 } as const
+
 export function useCountdownDisplay(
   configSource?: MaybeRefOrGetter<CountdownDisplayConfig>,
   runtimeSource?: MaybeRefOrGetter<CountdownRuntimeState>,
@@ -47,51 +83,145 @@ export function useCountdownDisplay(
   const store = useCountdownStore()
   const config = computed(() => toValue(configSource) ?? store.config)
   const runtime = computed(() => toValue(runtimeSource) ?? store.runtime)
-  const { now } = useCountdownTick(
-    () => runtime.value.status === 'running' || runtime.value.mode === 'until',
+  const { now } = useCountdownTick(() => runtime.value.status === 'running')
+
+  const remainingRawMs = computed(() =>
+    computeRemainingRawMs(
+      runtime.value.durationMs,
+      runtime.value.accumulatedMs,
+      runtime.value.segmentStartedAt,
+      runtime.value.status,
+      now.value,
+    ),
   )
 
   const remainingMs = computed(() =>
-    computeCountdownRemainingMs(runtime.value, now.value),
+    computeRemainingMs(
+      runtime.value.durationMs,
+      runtime.value.accumulatedMs,
+      runtime.value.segmentStartedAt,
+      runtime.value.status,
+      now.value,
+    ),
   )
 
   const formattedTime = computed(() =>
     formatElapsedMs(remainingMs.value, config.value.timeFormat),
   )
 
+  const formattedTimeWithSign = computed(() =>
+    formatCountdownWithSign(remainingRawMs.value, config.value.timeFormat),
+  )
+
+  const isNegative = computed(() => remainingRawMs.value < 0)
+
   const isUrgent = computed(
     () =>
       remainingMs.value > 0 &&
       remainingMs.value <= 60_000 &&
-      (runtime.value.mode === 'until' ||
-        runtime.value.status === 'running' ||
-        runtime.value.status === 'paused'),
+      (runtime.value.status === 'running' || runtime.value.status === 'paused'),
   )
 
-  /** Zerou ou passou do tempo (overtime negativo). */
-  const isFinished = computed(() => {
-    if (runtime.value.mode === 'until') {
-      return remainingMs.value <= 0
-    }
-    if (runtime.value.durationMs <= 0) return false
-    if (runtime.value.finished) return true
-    return (
-      remainingMs.value <= 0 &&
-      (runtime.value.status === 'running' ||
-        runtime.value.status === 'paused' ||
-        runtime.value.accumulatedMs > 0)
+  const isFinished = computed(
+      () =>
+        runtime.value.finished ||
+        (remainingMs.value <= 0 &&
+          runtime.value.durationMs > 0 &&
+          runtime.value.accumulatedMs > 0),
     )
-  })
 
-  return {
-    now,
-    config,
-    runtime,
-    remainingMs,
-    formattedTime,
-    isUrgent,
-    isFinished,
-  }
+    // ── Disparo de alertas nos marcos (v2: marcos dinâmicos) ─────────────
+    // Marcos vêm da config (alertMarkers); fallback = seeds padrão.
+    // offset 0 ("start") dispara na transição pra running; demais por
+    // cruzamento decrescente. preset 'custom:{id}' toca da biblioteca local.
+    // F3 (web#175): firedMarkers vive NO STORE — reabrir a janela de projeção
+    // remonta o composable e NÃO repete alertas da mesma execução.
+    // web#175 F2-v5: o disparo acontece SÓ na janela de PROJEÇÃO (popup).
+    // Critério robusto (opener pode faltar com COOP/redirect): a rota do
+    // popup é /popup?module=countdown (buildPopupUrl) — checar CAMINHO +
+    // query, imutáveis pra cada janela.
+    const isProjectionWindow =
+      typeof window !== 'undefined' &&
+      (window.opener != null ||
+        (window.location.pathname.includes('/popup') &&
+          new URLSearchParams(window.location.search).get('module') === 'countdown'))
+    // O popup não roda hydrate() — inicia a escuta do canal de controle aqui
+    // (idempotente no store) pra receber mute/volume/stop do operador.
+    if (isProjectionWindow) store.startAudioControlSync()
+    const firedMarkers = store.firedMarkers
+    let prevStatus: CountdownRuntimeState['status'] = runtime.value.status
+
+    const activeMarkers = computed(() => config.value.alertMarkers ?? DEFAULT_ALERT_MARKERS)
+
+    function playMarkerPreset(preset: string, markerId: string): void {
+      if (store.audioMuted) return // F2: operador silenciou
+      if (preset.startsWith('custom:')) {
+        const audio = getCustomAudioById(preset.slice('custom:'.length))
+        if (!audio) return
+        audio.volume = store.audioVolume
+        void audio.play().catch(() => {
+          // autoplay bloqueado — silencioso
+        })
+        return
+      }
+      void playAlertTone(preset as AlertPresetKey, undefined, undefined, {
+        volume: store.audioVolume,
+      })
+    }
+
+    // F2: Stop do operador corta na hora o que estiver tocando
+    watch(() => store.audioStopTick, () => {
+      stopAllAlerts()
+    })
+
+    // F2: volume do operador aplica AO VIVO no que estiver tocando
+    watch(() => store.audioVolume, (volume) => {
+      setLiveVolume(volume)
+    })
+
+    if (isProjectionWindow) {
+      watch(remainingRawMs, (raw, prevRaw) => {
+        if (runtime.value.status !== 'running') return
+        // start: primeira observação com status running (offset 0)
+        const startMarker = activeMarkers.value.find((m) => m.offsetMs === 0)
+        if (
+          startMarker &&
+          prevStatus !== 'running' &&
+          !firedMarkers.has(startMarker.id) &&
+          startMarker.preset !== 'none'
+        ) {
+          firedMarkers.add(startMarker.id)
+          playMarkerPreset(startMarker.preset, startMarker.id)
+        }
+        prevStatus = runtime.value.status
+        // marcos por cruzamento (prevRaw >= marco > raw — contagem decrescente)
+        for (const marker of activeMarkers.value) {
+          if (marker.offsetMs === 0) continue
+          if (firedMarkers.has(marker.id) || marker.preset === 'none') continue
+          if ((prevRaw ?? Infinity) >= marker.offsetMs && raw < marker.offsetMs) {
+            firedMarkers.add(marker.id)
+            playMarkerPreset(marker.preset, marker.id)
+          }
+        }
+      })
+
+      // Reset dos marcos quando o countdown volta pro idle (reset)
+      watch(() => runtime.value.status, (status) => {
+        if (status === 'idle') firedMarkers.clear()
+      })
+    }
+
+    return {
+      now,
+      config,
+      runtime,
+      remainingMs,
+      formattedTime,
+      formattedTimeWithSign,
+      isUrgent,
+      isFinished,
+      isNegative,
+    }
 }
 
 export function useCountdownFeature() {
@@ -107,20 +237,32 @@ export function useCountdownFeature() {
     durationParts,
     isProjecting: computed(() => store.isProjecting),
     configOpen: computed(() => store.configOpen),
+    displayConfigOpen: computed(() => store.displayConfigOpen),
     isRunning: computed(() => store.isRunning),
     isPaused: computed(() => store.isPaused),
     canStart: computed(() => store.canStart),
-    isUntilMode: computed(() => store.isUntilMode),
     setTimeFormat: store.setTimeFormat,
     setBgColor: store.setBgColor,
     setTextColor: store.setTextColor,
     resetDisplayToDefault: store.resetDisplayToDefault,
     openConfig: store.openConfig,
-    closeConfig: store.closeConfig,
-    setDurationMs: store.setDurationMs,
-    setCountdownMode: store.setCountdownMode,
-    setUntilTime: store.setUntilTime,
-    start: store.start,
+        closeConfig: store.closeConfig,
+        openDisplayConfig: store.openDisplayConfig,
+        closeDisplayConfig: store.closeDisplayConfig,
+        setAllowNegative: store.setAllowNegative,
+        setAlertTonePreset: store.setAlertTonePreset,
+        audioMuted: computed(() => store.audioMuted),
+        audioVolume: computed(() => store.audioVolume),
+        audioPaused: computed(() => store.audioPaused),
+        setAudioMuted: store.setAudioMuted,
+        setAudioVolume: store.setAudioVolume,
+        setAudioPaused: store.setAudioPaused,
+        stopAudio: store.stopAudio,
+        setMode: store.setMode,
+        setSabbathConfig: store.setSabbathConfig,
+        setDurationMs: store.setDurationMs,
+        adjustTime: store.adjustTime,
+        start: store.start,
     pause: store.pause,
     reset: store.reset,
     saveMark: store.saveMark,
@@ -129,5 +271,6 @@ export function useCountdownFeature() {
     toggleProjection: store.toggleProjection,
     syncProjection: store.syncProjection,
     clearProjection: store.clearProjection,
+    refreshProjectionState: store.refreshProjectionState,
   }
 }

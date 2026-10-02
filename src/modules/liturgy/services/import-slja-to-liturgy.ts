@@ -269,6 +269,14 @@ async function importSljaLocal({
 		updateLocalMusic(musicId, { durationMs });
 	}
 
+	// Fundo compartilhado (padrão web#174): primeiro asset do .slja vira data:
+	// URL e cobre a capa + todos os slides (o .slja traz fundo único).
+	let coverDataUrl: string | null = null;
+	if (archive.assets?.length && archive.assets[0]?.bytes?.length) {
+		coverDataUrl = `data:image/png;base64,${bytesToBase64(archive.assets[0].bytes)}`;
+		updateLocalMusic(musicId, { image_url: coverDataUrl });
+	}
+
 	let slideCount = 0;
 	for (const slide of slides) {
 		const text = slide.lyric.trim();
@@ -276,6 +284,8 @@ async function importSljaLocal({
 		createLocalLyric(musicId, {
 			lyric: text,
 			time: formatSljaMsAsTime(slide.timeMs),
+			// capa única cobre todos os slides (mesma imagem do .slja)
+			image_url: coverDataUrl,
 		});
 		slideCount += 1;
 	}
