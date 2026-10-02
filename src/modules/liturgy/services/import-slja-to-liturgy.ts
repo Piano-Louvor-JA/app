@@ -168,15 +168,29 @@ export async function importSljaAsLiturgyMusic(
 	const uploadedAssets: Array<{ path: string; url: string; idFile: number }> =
 		[];
 	if (archive.assets?.length) {
-		for (const asset of archive.assets) {
-			const up = await uploadCustomFile(asset.bytes, asset.path, "imagens");
-			if (up) {
-				uploadedAssets.push({
-					path: asset.path,
-					url: up.url,
-					idFile: up.idFile,
-				});
-				uploadedImages += 1;
+		// Uploads EM PARALELO (batch de 4): cada request à API custa ~0.7s de
+		// RTT — em série, um .slja com 15 imagens levava 15×0.7s só de espera
+		// ("o import deveria demorar? no web era rápido"). Ordem preservada
+		// pelo map antes do all.
+		const BATCH = 4;
+		for (let i = 0; i < archive.assets.length; i += BATCH) {
+			const batch = archive.assets.slice(i, i + BATCH);
+			const results = await Promise.all(
+				batch.map((asset) =>
+					uploadCustomFile(asset.bytes, asset.path, "imagens").then(
+						(up) => ({ asset, up }),
+					),
+				),
+			);
+			for (const { asset, up } of results) {
+				if (up) {
+					uploadedAssets.push({
+						path: asset.path,
+						url: up.url,
+						idFile: up.idFile,
+					});
+					uploadedImages += 1;
+				}
 			}
 		}
 	}
