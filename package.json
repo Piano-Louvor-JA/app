@@ -210,7 +210,8 @@
     "publish": {
       "provider": "github",
       "owner": "pianolouvorja",
-      "repo": "app"
+      "repo": "app",
+      "releaseType": "release"
     },
     "fileAssociations": [
       {
