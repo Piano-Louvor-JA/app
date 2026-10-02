@@ -249,6 +249,16 @@ describe('createModuleHandlers — execute por namespace', () => {
       expect(await h.execute('clock', 'clock.setConfig', {})).toBe(false)
     })
 
+    it('clock.setConfig setShowSeconds e setFormat24h individuais aplicam (437-444)', async () => {
+      const clock = makeClock()
+      const h = createModuleHandlers({ clock: clock as never })
+      expect(await h.execute('clock', 'clock.setConfig', { showSeconds: false })).toBe(true)
+      expect(clock.setShowSeconds).toHaveBeenCalledWith(false)
+      expect(await h.execute('clock', 'clock.setConfig', { format24h: false })).toBe(true)
+      expect(clock.setFormat24h).toHaveBeenCalledWith(false)
+    })
+
+
     it('clock.toggleProjection', async () => {
       const clock = makeClock()
       const h = createModuleHandlers({ clock: clock as never })
@@ -270,6 +280,14 @@ describe('createModuleHandlers — execute por namespace', () => {
       expect(await h.execute('media', 'media.open', { musicId: 1 })).toBe(true)
       expect(await h.execute('media', 'media.open', { musicId: 0 })).toBe(false)
     })
+
+    it('media.open albumId inválido: false (408-409); válido: true', async () => {
+      const media = makeMedia()
+      const h = createModuleHandlers({ media: media as never })
+      expect(await h.execute('media', 'media.open', { musicId: 1, albumId: 'abc' })).toBe(false)
+      expect(await h.execute('media', 'media.open', { musicId: 1, albumId: 5 })).toBe(true)
+    })
+
 
     it('palco: on/off/status/slots/create/remove/start/stop/project/idle', async () => {
       const palco = makePalco()
