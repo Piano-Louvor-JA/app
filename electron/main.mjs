@@ -434,6 +434,7 @@ function attachProjectionWindowHandlers(parentWindow) {
   })
 
   parentWindow.webContents.setWindowOpenHandler(({ url, features }) => {
+    if (isDev) console.log("[window-open]", url.slice(0, 120));
     if (isProjectionPopupUrl(url)) {
       // Nasce popup de projeção → hotkey disponível
       ensureProjectionHotkey()
@@ -632,6 +633,10 @@ function createWindow(locale = 'pt-BR') {
 
 	mainWindow.once("ready-to-show", () => {
 		clearTimeout(loadTimeout);
+		if (isDev) {
+			const origin = globalThis.__rendererBaseUrl ?? (isDev ? VITE_DEV_SERVER_URL : "file://");
+			console.log("[main] renderer carregado via origem:", origin);
+		}
 	});
 
 	// Fallback: se a janela principal falhar ao carregar, mostra erro e fecha o splash
