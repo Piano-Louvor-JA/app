@@ -294,6 +294,10 @@ export default {
       importedLocal:
         'Importado en este dispositivo: {name} ({slides} estrofas) — guardado sin cuenta.',
       importFailed: 'Archivo .slja inválido.',
+      uploadTitle: '¿Subir "{name}" a tu cuenta?',
+      uploadMessage: 'El archivo se sube una sola vez a tu cuenta (nunca se duplica). O puedes dejarlo solo en este dispositivo.',
+      uploadConfirm: 'Subir a la cuenta',
+      uploadCancel: 'Solo en este dispositivo',
     },
     custom: {
       title: 'Liturgias personalizadas',

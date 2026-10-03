@@ -74,7 +74,10 @@ describe('dedup de import .slja (app#336 fase 3)', () => {
     mocks.createCustomMusic.mockResolvedValue({ id: 9, existed: false })
     mocks.uploadCustomFile.mockResolvedValue({ idFile: 5 })
 
-    await importSljaAsLiturgyMusic({ bytes: new ArrayBuffer(8), name: 'hino.slja' })
+    await importSljaAsLiturgyMusic(
+      { bytes: new ArrayBuffer(8), name: 'hino.slja' },
+      { confirmUpload: async () => true },
+    )
 
     expect(mocks.createCustomMusic).toHaveBeenCalledWith(
       77,
@@ -88,11 +91,37 @@ describe('dedup de import .slja (app#336 fase 3)', () => {
     mocks.sha256Hex.mockResolvedValue('b'.repeat(64))
     mocks.createCustomMusic.mockResolvedValue({ id: 9, existed: true })
 
-    const result = await importSljaAsLiturgyMusic({ bytes: new ArrayBuffer(8), name: 'hino.slja' })
+    const result = await importSljaAsLiturgyMusic(
+      { bytes: new ArrayBuffer(8), name: 'hino.slja' },
+      { confirmUpload: async () => true },
+    )
 
     expect(result.updatedExisting).toBe(true)
     expect(mocks.uploadCustomFile).not.toHaveBeenCalled()
     expect(mocks.updateCustomMusic).not.toHaveBeenCalled()
+  })
+
+  it('logado + confirmUpload=false → LOCAL (não toca a API)', async () => {
+    mocks.sha256Hex.mockResolvedValue('c'.repeat(64))
+    const result = await importSljaAsLiturgyMusic(
+      { bytes: new ArrayBuffer(8), name: 'hino.slja' },
+      { confirmUpload: async () => false },
+    )
+    expect(result.local).toBe(true)
+    expect(mocks.createCustomMusic).not.toHaveBeenCalled()
+    expect(mocks.uploadCustomFile).not.toHaveBeenCalled()
+  })
+
+  it('logado + confirmUpload=true → sobe pra API (dedup ativo)', async () => {
+    mocks.sha256Hex.mockResolvedValue('d'.repeat(64))
+    mocks.createCustomMusic.mockResolvedValue({ id: 9, existed: false })
+    mocks.uploadCustomFile.mockResolvedValue({ idFile: 5 })
+    const result = await importSljaAsLiturgyMusic(
+      { bytes: new ArrayBuffer(8), name: 'hino.slja' },
+      { confirmUpload: async () => true },
+    )
+    expect(result.local).toBeFalsy()
+    expect(mocks.createCustomMusic).toHaveBeenCalledTimes(1)
   })
 
   it('hashes diferentes → uuids diferentes (imports independentes)', async () => {
@@ -100,10 +129,16 @@ describe('dedup de import .slja (app#336 fase 3)', () => {
     mocks.uploadCustomFile.mockResolvedValue({ idFile: 5 })
 
     mocks.sha256Hex.mockResolvedValueOnce('1'.repeat(64))
-    await importSljaAsLiturgyMusic({ bytes: new ArrayBuffer(8), name: 'a.slja' })
+    await importSljaAsLiturgyMusic(
+      { bytes: new ArrayBuffer(8), name: 'a.slja' },
+      { confirmUpload: async () => true },
+    )
 
     mocks.sha256Hex.mockResolvedValueOnce('2'.repeat(64))
-    await importSljaAsLiturgyMusic({ bytes: new ArrayBuffer(8), name: 'b.slja' })
+    await importSljaAsLiturgyMusic(
+      { bytes: new ArrayBuffer(8), name: 'b.slja' },
+      { confirmUpload: async () => true },
+    )
 
     const first = mocks.createCustomMusic.mock.calls[0][1].client_uuid
     const second = mocks.createCustomMusic.mock.calls[1][1].client_uuid

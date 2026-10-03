@@ -82,10 +82,13 @@ describe("import .slja LOGADO → API custom (app#331)", () => {
 				{ lyric: "Verso dois", type: "LETRA", timeMs: 15_000, order: 2 },
 			],
 		};
-		const imported = await importSljaAsLiturgyMusic({
-			bytes: await buildSlja(archive),
-			name: "hino-autoral.slja",
-		});
+		const imported = await importSljaAsLiturgyMusic(
+			{
+				bytes: await buildSlja(archive),
+				name: "hino-autoral.slja",
+			},
+			{ confirmUpload: async () => true },
+		);
 
 		expect(imported.local).toBe(false);
 		expect(imported.musicId).toBe(7);
@@ -116,10 +119,13 @@ describe("import .slja LOGADO → API custom (app#331)", () => {
 			assets: [],
 			slides: [{ lyric: "Texto", type: "LETRA", timeMs: 0, order: 1 }],
 		};
-		const imported = await importSljaAsLiturgyMusic({
-			bytes: await buildSlja(archive),
-			name: "so-letra.slja",
-		});
+		const imported = await importSljaAsLiturgyMusic(
+			{
+				bytes: await buildSlja(archive),
+				name: "so-letra.slja",
+			},
+			{ confirmUpload: async () => true },
+		);
 
 		expect(imported.local).toBe(false);
 		expect(imported.hasAudio).toBe(false);

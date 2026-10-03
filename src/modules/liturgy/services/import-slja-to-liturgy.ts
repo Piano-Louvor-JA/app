@@ -127,8 +127,18 @@ export interface SljaImportSource {
 	name: string;
 }
 
+export interface SljaImportOptions {
+	/**
+	 * Aprovação do usuário pra subir pra conta (regra: banco só recebe
+	 * import com consentimento — local não precisa de aprovação e pode
+	 * ter quantas cópias o usuário quiser). Logado sem isso = LOCAL.
+	 */
+	confirmUpload?: () => Promise<boolean>;
+}
+
 export async function importSljaAsLiturgyMusic(
 	source: SljaImportSource,
+	options?: SljaImportOptions,
 ): Promise<ImportedSljaLiturgyMusic> {
 	const { bytes, name: fileName } = source;
 	// Aceita .slja direto OU .slja.zip (wrapper do WhatsApp) — parser pronto.
@@ -150,7 +160,18 @@ export async function importSljaAsLiturgyMusic(
 	// ── Deslogado: grava 100% LOCAL (regra de produto 12/09 — sem identidade
 	// não há escrita confiável na API). Uso local sem conta é requisito
 	// permanente (offline-first): áudio/estrofes ficam no localStorage.
-	if (!getAuthSession()) {
+	// Regra de produto (Rafael 03/10): o disco local pode ter quantas
+	// cópias o usuário quiser (tanto faz); pro BANCO o arquivo sobe UM
+	// (dedup) e SÓ após aprovação do usuário. Deslogado nem pergunta.
+	const session = getAuthSession();
+	if (!session) {
+		return importSljaLocal({ name, archive, slides, durationMs });
+	}
+
+	const approved = options?.confirmUpload
+		? await options.confirmUpload()
+		: false;
+	if (!approved) {
 		return importSljaLocal({ name, archive, slides, durationMs });
 	}
 
