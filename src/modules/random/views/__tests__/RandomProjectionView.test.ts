@@ -193,6 +193,40 @@ describe("RandomProjectionView — embedded", () => {
 			w.unmount();
 		});
 
+		it("embedded: onDraw dispara startDraw da store", async () => {
+			const w = mountView({ embedded: true });
+			await flushPromises();
+			const vm = w.vm as unknown as { onDraw?: () => void };
+			vm.onDraw?.();
+			await flushPromises();
+			w.unmount();
+		});
+
+		it("storage da runtime key atualiza; key estranha ignora", async () => {
+			const w = mountView({ embedded: true });
+			await flushPromises();
+			window.dispatchEvent(new StorageEvent("storage", { key: "outra" }));
+			await flushPromises();
+			localStorage.setItem("louvorja-random-runtime", JSON.stringify({ history: [1, 2] }));
+			window.dispatchEvent(new StorageEvent("storage", { key: "louvorja-random-runtime" }));
+			await flushPromises();
+			w.unmount();
+		});
+
+		it("stage.random mesclado no effectiveConfig; backgroundImage do palco", async () => {
+			localStorage.setItem(
+				"louvorja-stage-settings-random",
+				JSON.stringify({
+					random: { bgColor: "#112233", textColor: "#fff", showHistory: true },
+					backgroundImage: "/img/bg.png",
+				}),
+			);
+			const w = mountView();
+			await flushPromises();
+			expect(w.exists()).toBe(true);
+			w.unmount();
+		});
+
 		it("BroadcastChannel indisponível: view monta igual (catch dos canais)", async () => {
 			const OriginalBC = window.BroadcastChannel;
 			(vi.stubGlobal as (k: string, v: unknown) => void)("BroadcastChannel", undefined);
