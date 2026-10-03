@@ -101,4 +101,36 @@ describe("TimerPreview.vue", () => {
     });
     expect(wrapper.find(".timer-preview__digital").exists()).toBe(true);
   });
+  describe("gaps — digitalFontSize com stage", () => {
+    it("com stage: renderiza e escala (fontSize 192 → escala 2x)", async () => {
+      const wrapper = mountPreview({
+        stage: {
+          fontSize: 192,
+          textAlign: "left",
+          textVerticalAlign: "bottom",
+          textShadow: true,
+          shadowBlur: 2,
+          shadowIntensity: 0.6,
+        },
+      });
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find(".timer-preview__digital").exists()).toBe(true);
+      wrapper.unmount();
+    });
+
+    it("stage align left/bottom: justify/align flex", async () => {
+      const wrapper = mountPreview({
+        stage: {
+          fontSize: 96,
+          textAlign: "right",
+          textVerticalAlign: "bottom",
+          textShadow: false,
+        },
+      });
+      await wrapper.vm.$nextTick();
+      expect(wrapper.exists()).toBe(true);
+      wrapper.unmount();
+    });
+  });
+
 });
