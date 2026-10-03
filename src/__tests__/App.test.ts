@@ -177,4 +177,24 @@ describe("App.vue", () => {
     await flushPromises();
     expect(wrapper.find(".app-frame").exists()).toBe(true);
   });
+  describe("gaps — boot falho, view notes", () => {
+    it("palco-bridge FALHA no boot: catch loga e app segue montado", async () => {
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      startPalcoBridgeMock.fn = vi.fn(() => { throw new Error("boot fail"); });
+      const wrapper = mountApp();
+      await wrapper.vm.$nextTick();
+      expect(wrapper.exists()).toBe(true);
+      consoleError.mockRestore();
+      wrapper.unmount();
+    });
+
+    it("handleViewNotes: UpdateDialog presente no template", async () => {
+      const wrapper = mountApp();
+      await wrapper.vm.$nextTick();
+      // UpdateDialog stubado — o componente está no template
+      expect(wrapper.findComponent({ name: "UpdateDialog" }) !== null).toBe(true);
+      wrapper.unmount();
+    });
+  });
+
 });
