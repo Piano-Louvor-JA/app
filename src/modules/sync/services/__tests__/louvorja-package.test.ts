@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
 	decodeLouvorjaPackage,
+	mergeEntities,
 	encodeLouvorjaPackage,
 	LOUVORJA_SCHEMA_VERSION,
 	type LouvorjaSyncEntity,
@@ -177,4 +178,31 @@ describe("isValidLouvorjaContent", () => {
 		const { isValidLouvorjaContent } = await import("../louvorja-package");
 		expect(isValidLouvorjaContent("not json")).toBe(false);
 	});
+  describe("gaps — mergeEntities LWW", () => {
+    it("remote mais recente vence", () => {
+      const local = { id: "1", kind: "playlist" as const, modified: "2026-01-01T00:00:00Z", payload: { a: 1 } };
+      const remote = { id: "1", kind: "playlist" as const, modified: "2026-06-01T00:00:00Z", payload: { a: 2 } };
+      expect(mergeEntities(local as never, remote as never).payload).toEqual({ a: 2 });
+    });
+
+    it("local mais recente vence", () => {
+      const local = { id: "1", kind: "playlist" as const, modified: "2026-06-01T00:00:00Z", payload: { a: 1 } };
+      const remote = { id: "1", kind: "playlist" as const, modified: "2026-01-01T00:00:00Z", payload: { a: 2 } };
+      expect(mergeEntities(local as never, remote as never).payload).toEqual({ a: 1 });
+    });
+
+    it("empate: prefere remote", () => {
+      const ts = "2026-06-01T00:00:00Z";
+      const local = { id: "1", kind: "playlist" as const, modified: ts, payload: { a: 1 } };
+      const remote = { id: "1", kind: "playlist" as const, modified: ts, payload: { a: 2 } };
+      expect(mergeEntities(local as never, remote as never).payload).toEqual({ a: 2 });
+    });
+
+    it("timestamp inválido: prefere remote", () => {
+      const local = { id: "1", kind: "playlist" as const, modified: "não-é-data", payload: { a: 1 } };
+      const remote = { id: "1", kind: "playlist" as const, modified: "2026-06-01T00:00:00Z", payload: { a: 2 } };
+      expect(mergeEntities(local as never, remote as never).payload).toEqual({ a: 2 });
+    });
+  });
+
 });
