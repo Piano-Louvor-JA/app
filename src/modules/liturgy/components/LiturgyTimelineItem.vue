@@ -630,26 +630,30 @@ const rowHovered = ref(false)
             type="button"
             class="liturgy-item__action liturgy-item__action--site-control"
             :title="
-              isLocalPresentation
-                ? t('liturgy.actions.openPresentationControl')
-                : isLocalPdf
-                  ? t('liturgy.actions.openPdfControl')
-                  : isLocalImages
-                    ? t('liturgy.actions.openImageControl')
-                    : isVideoRemote
-                      ? t('liturgy.actions.openVideoControl')
-                      : t('liturgy.actions.openSiteControl')
+              isLocalVideo
+                ? t('liturgy.actions.playLocalInExternal', { player: rowPlayerLabel })
+                : isLocalPresentation
+                  ? t('liturgy.actions.openPresentationControl')
+                  : isLocalPdf
+                    ? t('liturgy.actions.openPdfControl')
+                    : isLocalImages
+                      ? t('liturgy.actions.openImageControl')
+                      : isVideoRemote
+                        ? t('liturgy.actions.openVideoControl')
+                        : t('liturgy.actions.openSiteControl')
             "
             :aria-label="
-              isLocalPresentation
-                ? t('liturgy.actions.openPresentationControl')
-                : isLocalPdf
-                  ? t('liturgy.actions.openPdfControl')
-                  : isLocalImages
-                    ? t('liturgy.actions.openImageControl')
-                    : isVideoRemote
-                      ? t('liturgy.actions.openVideoControl')
-                      : t('liturgy.actions.openSiteControl')
+              isLocalVideo
+                ? t('liturgy.actions.playLocalInExternal', { player: rowPlayerLabel })
+                : isLocalPresentation
+                  ? t('liturgy.actions.openPresentationControl')
+                  : isLocalPdf
+                    ? t('liturgy.actions.openPdfControl')
+                    : isLocalImages
+                      ? t('liturgy.actions.openImageControl')
+                      : isVideoRemote
+                        ? t('liturgy.actions.openVideoControl')
+                        : t('liturgy.actions.openSiteControl')
             "
             :disabled="item.done"
             @click.stop="emit('select')"

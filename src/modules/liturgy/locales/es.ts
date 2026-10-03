@@ -231,6 +231,7 @@ export default {
       project: 'Proyectar',
       play: 'Reproducir',
       openControl: 'Abrir control (popup)',
+      playLocalInExternal: 'Reproducir medio local en {player}',
       openSiteControl: 'Abrir control del sitio',
       openVideoControl: 'Abrir control de YouTube',
       openImageControl: 'Abrir control de imágenes',

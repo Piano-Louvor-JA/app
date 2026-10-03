@@ -231,6 +231,7 @@ export default {
       project: 'Project',
       play: 'Play',
       openControl: 'Open control (popup)',
+      playLocalInExternal: 'Play local media in {player}',
       openSiteControl: 'Open site control',
       openVideoControl: 'Open YouTube control',
       openImageControl: 'Open image control',
