@@ -112,8 +112,9 @@ export async function syncRemoteConfig(): Promise<void> {
  */
 export async function syncEssentialCatalogFromApi(
   onProgress: (progress: number) => void,
+  options?: { apiPrefix?: string },
 ): Promise<void> {
-  const lang = getCurrentApiPrefix()
+  const lang = options?.apiPrefix ?? getCurrentApiPrefix()
   const files = [
     `${lang}_categories`,
     `${lang}_hymnal`,
