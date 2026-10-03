@@ -32,48 +32,18 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Vitest passada 1 — suíte completa (istanbul)
-        # thresholds 0: o gate 100/100/100/100 roda DEPOIS do merge (step próprio)
+      - name: Vitest suíte completa (provider v8 — AST remap, sem phantom)
+        # thresholds 0: o gate 100/100/100/100 roda no step próprio abaixo
         run: >-
           npx vitest run
-          --coverage --coverage.provider=istanbul
+          --coverage --coverage.provider=v8
           --coverage.reporter=json
           --coverage.thresholds.statements=0
           --coverage.thresholds.branches=0
           --coverage.thresholds.functions=0
           --coverage.thresholds.lines=0
-          --coverage.reportsDirectory=coverage-istanbul
+          --coverage.reportsDirectory=coverage-merged
           --exclude='.stryker-tmp/**' --exclude='.worktrees/**'
-      - name: Vitest passada 2 — testes que montam .vue (istanbul)
-        run: >-
-          npx vitest run
-          src/__tests__ src/layouts
-          src/design-system/components
-          src/modules/albums/components src/modules/albums/views
-          src/modules/bible/components src/modules/bible/views
-          src/modules/clock/components src/modules/clock/views
-          src/modules/community/components src/modules/community/views
-          src/modules/countdown/components src/modules/countdown/views
-          src/modules/draw/components src/modules/draw/views
-          src/modules/home/components src/modules/home/views
-          src/modules/liturgy/components src/modules/liturgy/views
-          src/modules/media/components src/modules/media/views
-          src/modules/random/components src/modules/random/views
-          src/modules/remote/views
-          src/modules/settings/components src/modules/settings/views
-          src/modules/starting/components src/modules/sync/components
-          src/modules/timer/components src/modules/timer/views
-          src/shared/components
-          --coverage --coverage.provider=istanbul
-          --coverage.reporter=json
-          --coverage.thresholds.statements=0
-          --coverage.thresholds.branches=0
-          --coverage.thresholds.functions=0
-          --coverage.thresholds.lines=0
-          --coverage.reportsDirectory=coverage-istanbul-ui
-          --exclude='.stryker-tmp/**' --exclude='.worktrees/**'
-      - name: Merge das passadas (por posição)
-        run: node scripts/merge-coverage.mjs coverage-istanbul/coverage-final.json coverage-istanbul-ui/coverage-final.json coverage-merged/coverage-final.json
       - name: Publicar resumo no PR
         if: always() && github.event_name == 'pull_request'
         run: |
@@ -88,6 +58,10 @@ jobs:
               console.log(fmt('Lines', s.lines));
             " >> "$GITHUB_STEP_SUMMARY"
           fi
+      - name: Gerar summary (gate)
+        run: |
+          node scripts/merge-coverage.mjs coverage-merged/coverage-final.json coverage-merged/coverage-final.json coverage-merged/coverage-final-tmp.json
+          mv coverage-merged/coverage-final-tmp-summary.json coverage-merged/coverage-final-summary.json
       - name: Falha explícita se abaixo de 100
         run: |
           node -e "
