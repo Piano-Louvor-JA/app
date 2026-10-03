@@ -143,11 +143,15 @@ export async function executeLiturgyItem(
         return { ok: false, messageKey: 'liturgy.messages.videoSelectFile' }
       }
 
-      // Player externo SÓ para áudio (Ezequias 13/09: "mp3 blz, não é preciso
-      // projetar"). Vídeo PRECISA do player interno: é ele que projeta nas
-      // telas — VLC/mpv não comandam a projeção.
+      // Player externo: áudio E vídeo (Rafael 03/10: "essa funcionalidade é
+      // pra reproduzir vídeos externos" — vídeo ia sempre pro interno,
+      // ignorando a preferência do usuário). Cascata: playerId do item →
+      // preferência global → 'associated' (interno). Player não encontrado
+      // etc → cai no interno com snackbar padrão.
+      // NOTA: com player externo o vídeo não projeta nas telas (o VLC/mpv
+      // não alimenta a projeção) — quem quer projeção usa 'associated'.
       const bridge = getDesktopBridge()
-      if (item.type === 'audio' && filePath && !objectUrl) {
+      if (filePath && !objectUrl && (item.type === 'audio' || item.type === 'video')) {
         let pref: string | undefined = item.playerId
         if (!pref || pref === 'default') {
           pref = await bridge?.externalPlayer?.get?.()
