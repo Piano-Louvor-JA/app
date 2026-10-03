@@ -106,6 +106,25 @@ describe('playlist-io', () => {
     expect(result.discardedItems).toBe(3)
   })
 
+  it('item null/primitivo e playlist não-objeto são descartados', () => {
+    const raw = JSON.stringify({
+      version: 1,
+      kind: 'playlists',
+      playlists: [
+        { id: 'p1', name: 'Ok', items: [null, 42, 'x', { musicId: 1, albumId: null, title: 'Válida' }] },
+        null,
+        7,
+        'string',
+        { id: 'p2', name: 'Com lixo', items: [{ musicId: 'não-numérico', title: 'x' }] },
+      ],
+    })
+    const result = parsePlaylistsImport(raw)
+    expect(result.ok).toBe(true)
+    expect(result.playlists).toHaveLength(2)
+    expect(result.playlists[0]!.items).toHaveLength(1)
+    expect(result.discardedItems).toBe(4)
+  })
+
   it('createdAt/updatedAt não-string viram ISO atual', () => {
     const payload = {
       kind: 'playlists',
