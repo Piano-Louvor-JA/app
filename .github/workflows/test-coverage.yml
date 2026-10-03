@@ -3,6 +3,7 @@
 name: Test Coverage Gate
 
 on:
+  workflow_dispatch:
   pull_request:
     branches: [staging, main]
   push:
