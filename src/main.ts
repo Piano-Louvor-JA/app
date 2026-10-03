@@ -1,4 +1,5 @@
 import { createApp } from 'vue'
+import { installClientPlatformHeader } from '@shared/lib/client-platform'
 import { createPinia } from 'pinia'
 import App from './App.vue'
 import '@styles/tailwind.css'
@@ -10,6 +11,7 @@ import { initUiZoom } from '@shared/composables/useUiZoom'
 import { isProjectionPopupLocation } from '@shared/services/projection-window-location'
 import { installRemoteLiturgyBridge } from '@modules/remote/renderer/liturgy-bridge'
 
+installClientPlatformHeader()
 useThemeManager()
 initUiZoom()
 
