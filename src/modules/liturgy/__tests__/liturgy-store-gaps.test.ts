@@ -138,4 +138,58 @@ describe("playItemOnScreens — markItemDone interno via execute", () => {
 		const stored = (s as unknown as { currentItems: LiturgyItem[] }).currentItems;
 		expect(stored[0].done).toBe(false);
 	});
+describe("liturgy — edit/remove/probe/execução (gaps round 2)", () => {
+  it("openEditDialog: executa sem erro pra category e música", () => {
+    const s = useLiturgyStore();
+    const a = item({ id: "a-1", type: "music", name: "A" });
+    const cat = item({ id: "cat-9", type: "category", name: "Bloco" });
+    (s as unknown as { currentItems: LiturgyItem[] }).currentItems = [a, cat];
+    expect(() => s.openEditDialog?.(1)).not.toThrow();
+    expect(() => s.openEditDialog?.(0)).not.toThrow();
+  });
+
+  it("removeItem com deletionLocked: ignora", () => {
+    const s = useLiturgyStore();
+    (s as unknown as { currentItems: LiturgyItem[] }).currentItems = [item({ id: "x" })];
+    s.toggleDeletionLock?.();
+    const before = (s as unknown as { currentItems: LiturgyItem[] }).currentItems.length;
+    s.removeItem?.(0);
+    const after = (s as unknown as { currentItems: LiturgyItem[] }).currentItems.length;
+    expect([before, after]).toEqual([before, before]);
+  });
+
+  it("removeItem: categoria com filhos remove tudo", () => {
+    const s = useLiturgyStore();
+    const cat = item({ id: "cat", type: "category", name: "Bloco" });
+    const c1 = item({ id: "c1", type: "music", categoryId: "cat" });
+    (s as unknown as { currentItems: LiturgyItem[] }).currentItems = [cat, c1];
+    s.removeItem?.(0);
+    const stored = (s as unknown as { currentItems: LiturgyItem[] }).currentItems;
+    expect(stored.find((i) => i.id === "cat")).toBeUndefined();
+    expect(stored.find((i) => i.id === "c1")).toBeUndefined();
+  });
+
+  it("toggleItemDone em filho: pai done = allDone(children)", () => {
+    const s = useLiturgyStore();
+    const cat = item({ id: "cat", type: "category", name: "Bloco" });
+    const c1 = item({ id: "c1", type: "music", categoryId: "cat" });
+    const c2 = item({ id: "c2", type: "music", categoryId: "cat" });
+    (s as unknown as { currentItems: LiturgyItem[] }).currentItems = [cat, c1, c2];
+    s.toggleItemDone(1, true);
+    s.toggleItemDone(2, true);
+    const stored = (s as unknown as { currentItems: LiturgyItem[] }).currentItems;
+    expect(stored.find((i) => i.id === "cat")?.done).toBe(true);
+  });
+
+  it("toggleItemDone uncheck: pai desmarca com filho pendente", () => {
+    const s = useLiturgyStore();
+    const cat = item({ id: "cat", type: "category", name: "Bloco", done: true });
+    const c1 = item({ id: "c1", type: "music", categoryId: "cat", done: true });
+    (s as unknown as { currentItems: LiturgyItem[] }).currentItems = [cat, c1];
+    s.toggleItemDone(1, false);
+    const stored = (s as unknown as { currentItems: LiturgyItem[] }).currentItems;
+    expect(stored.find((i) => i.id === "cat")?.done).toBe(false);
+  });
+});
+
 });

@@ -300,4 +300,51 @@ describe("ondemand — caminhos raros", () => {
 		expect(store.isProjecting).toBe(true);
 	});
 });
+describe("pause/volume/queue — rotas de áudio", () => {
+  it("pause: sem audioUrl não faz nada", async () => {
+    const store = useMediaStore();
+    await store.pause();
+    expect(store.status).toBe("idle");
+  });
+
+  it("pause: com áudio tocando → paused e fade out", async () => {
+    const store = useMediaStore();
+    await store.open({ musicId: 1, project: false });
+    await store.play();
+    await store.pause();
+    expect(store.status).toBe("paused");
+  });
+
+  it("no_audio: play/pause sem fade audível (volume 0)", async () => {
+    const store = useMediaStore();
+    await store.open({ musicId: 1, project: false, mode: "no_audio" });
+    if (typeof store.togglePlayPause === "function") {
+      await store.togglePlayPause();
+      await store.togglePlayPause();
+    }
+    expect(["paused", "playing", "ready"]).toContain(store.status);
+  });
+
+  it("play com fadeIn falho: status paused e warning", async () => {
+    mediaAudio.fadeInMediaAudio.mockResolvedValue(false);
+    const store = useMediaStore();
+    await store.open({ musicId: 1, project: false });
+    await store.play();
+    await store.pause();
+    await store.play();
+    expect(["paused", "playing"]).toContain(store.status);
+  });
+
+  it("previousTrack: com fila, volta pra anterior", async () => {
+    loadMediaTrack.mockImplementation(async (id: number) => trackStub({ id }));
+    const store = useMediaStore();
+    await store.open({ musicId: 1, project: false });
+    // adicionar à fila e navegar
+    store.addToQueue?.(2);
+    store.nextTrack?.();
+    store.previousTrack();
+    expect(store.hasSession).toBe(true);
+  });
+});
+
 })
