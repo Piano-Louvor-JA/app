@@ -16,6 +16,7 @@ import randomLocale from "../../locales/pt-BR";
 import { __flushDraw } from "../../services/random-draw";
 import { useRandomStore } from "../../stores/useRandomStore";
 import RandomView from "../RandomView.vue";
+import RandomAvailablePanel from "../../components/RandomAvailablePanel.vue";
 
 const pushMock = vi.fn().mockResolvedValue(undefined);
 vi.mock("vue-router", () => ({
@@ -352,6 +353,11 @@ describe("RandomView — áudio custom", () => {
       const w = mountView()
       const vm = w.vm as any
       const file = new File(['Alice\nBob'], 'nomes.txt', { type: 'text/plain' })
+      // jsdom não implementa Blob.arrayBuffer — polui o protótipo p/ o try rodar
+      if (typeof (file as any).arrayBuffer !== 'function') {
+        (file as any).arrayBuffer = async () =>
+          new TextEncoder().encode('Alice\nBob').buffer as ArrayBuffer
+      }
       await vm.onImportFile?.(file)
       // caminho de sucesso: nomes entram na store
       const names = (currentStore as unknown as { availableNames: string[] } | null)?.availableNames
@@ -380,9 +386,9 @@ describe("RandomView — áudio custom", () => {
 
     it('import-file via emit do painel (template arrow)', async () => {
       const w = mountView()
-      const panel = w.findComponent({ name: 'RandomAvailablePanel' })
+      const panel = w.findComponent(RandomAvailablePanel)
       if (panel.exists()) {
-        panel.vm.$emit('import-file', new File(['Zeca'], 'z.txt', { type: 'text/plain' }))
+        panel.vm.$emit('importFile', new File(['Zeca'], 'z.txt', { type: 'text/plain' }))
         await flushPromises()
       }
       w.unmount()
@@ -390,7 +396,7 @@ describe("RandomView — áudio custom", () => {
 
     it('onImportFile via emit do painel de disponíveis', async () => {
       const w = mountView()
-      const panel = w.findComponent({ name: 'RandomAvailablePanel' })
+      const panel = w.findComponent(RandomAvailablePanel)
       if (panel.exists()) {
         panel.vm.$emit('import-file', new File(['Carol'], 'c.txt', { type: 'text/plain' }))
         await Promise.resolve()
