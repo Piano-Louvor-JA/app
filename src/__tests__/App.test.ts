@@ -197,4 +197,20 @@ describe("App.vue", () => {
     });
   });
 
+  describe("gaps — handleViewNotes", () => {
+    it("view-notes do banner abre o UpdateDialog (showUpdateDialog true)", async () => {
+      const wrapper = mountApp();
+      await wrapper.vm.$nextTick();
+      const banner = wrapper.findComponent({ name: "UpdateBanner" });
+      expect(banner.exists()).toBe(true);
+      banner.vm.$emit("view-notes");
+      await wrapper.vm.$nextTick();
+      // showUpdateDialog true → UpdateDialog recebe modelValue true
+      const dialog = wrapper.findComponent({ name: "UpdateDialog" });
+      expect(dialog.exists()).toBe(true);
+      expect(dialog.props("modelValue")).toBe(true);
+      wrapper.unmount();
+    });
+  });
+
 });
