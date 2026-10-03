@@ -19,6 +19,11 @@ const mocks = vi.hoisted(() => ({
   isProjectionPopupLocation: vi.fn(),
 }))
 
+const hydrateCatalogMock = vi.fn(async () => {})
+vi.mock('@modules/albums/stores/useAlbumsStore', () => ({
+  useAlbumsStore: () => ({ hydrateCatalog: hydrateCatalogMock }),
+}))
+
 vi.mock('@modules/starting/services/bootstrap-service', () => ({
   isBootstrapComplete: mocks.isBootstrapComplete,
   mapBootstrapError: mocks.mapBootstrapError,
@@ -275,6 +280,23 @@ describe('useAppBootstrap', () => {
       // retryBootstrap com bridge ausente: markError já coberto — chamar de novo com erro
       const store = useStartingStore()
       expect(store.hasError).toBe(true)
+      app.unmount()
+    })
+
+    it('projection popup: startBootstrap esconde e retorna cedo', async () => {
+      mocks.isProjectionPopupLocation.mockReturnValue(true)
+      const app = mountHost()
+      await vi.runAllTimersAsync()
+      // retornou cedo: sem erro, sem preparar fresh install
+      expect(mocks.prepareFreshInstall).not.toHaveBeenCalled()
+      app.unmount()
+    })
+
+    it('warm boot: hydrateCatalog pré-aquecido', async () => {
+      const app = mountHost()
+      await vi.runAllTimersAsync()
+      await Promise.resolve()
+      expect(hydrateCatalogMock).toHaveBeenCalled()
       app.unmount()
     })
   })
