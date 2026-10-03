@@ -341,4 +341,26 @@ describe('createModuleHandlers — execute por namespace', () => {
       expect(h.snapshot('palco')).toBeNull()
     })
   })
+  describe('readField/readPath: caminhos nulos e refs', () => {
+    it('execute bible com store null: retorna false sem lançar', async () => {
+      const h = createModuleHandlers({ bible: null as never })
+      const res = await h.execute('bible', 'bible.open', { bookId: 1, chapter: 1, verse: 1, versionId: 1 })
+      expect(res).toBe(false)
+    })
+
+    it('snapshot timer com runtime null (mid null do readPath)', () => {
+      const timer = makeTimer()
+      ;(timer as any).runtime = null
+      const h = createModuleHandlers({ timer: timer as never })
+      expect(h.snapshot('timer')).toBeTruthy()
+    })
+
+    it('readField: raw com .value (Ref) é desembrulhado no snapshot', () => {
+      const timer = makeTimer()
+      ;(timer as any).runtime = { status: { value: 'paused' }, accumulatedMs: { value: 9 } }
+      const h = createModuleHandlers({ timer: timer as never })
+      expect(h.snapshot('timer')).toBeTruthy()
+    })
+  })
+
 })

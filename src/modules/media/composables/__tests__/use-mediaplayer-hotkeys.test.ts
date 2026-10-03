@@ -232,6 +232,53 @@ describe('useMediaPlayerHotkeys', () => {
     })
   })
 
+  describe('gaps — isTypingTarget e IPC direcional', () => {
+    it('target null (não-HTMLElement): não bloqueia hotkey', async () => {
+      const w = mount(Host)
+      await w.vm.$nextTick()
+      fireKey(null, 'ArrowRight')
+      await new Promise((r) => setTimeout(r, 0))
+      expect(useMediaStore().slideIndex).toBe(1)
+      w.unmount()
+    })
+
+    it('contentEditable: bloqueia hotkey', async () => {
+      const w = mount(Host)
+      await w.vm.$nextTick()
+      const div = document.createElement('div')
+      Object.defineProperty(div, 'isContentEditable', { value: true })
+      fireKey(div, 'ArrowRight')
+      expect(store_slideIndex()).toBe(0)
+      w.unmount()
+    })
+
+    it('IPC direction desconhecido: ignora', async () => {
+      const w = mount(Host)
+      await w.vm.$nextTick()
+      bridge.onMediaNavigate?.('sideways')
+      expect(store_slideIndex()).toBe(0)
+      w.unmount()
+    })
+
+    it('janela de projeção: hotkey local e IPC ignorados', async () => {
+      const projectionHost = defineComponent({
+        setup() {
+          const store = useMediaStore()
+          store.open({ musicId: 1, mode: 'no_audio', project: false })
+          useMediaPlayerHotkeys(() => true)
+          return { store }
+        },
+        render() { return null },
+      })
+      const w = mount(projectionHost)
+      await w.vm.$nextTick()
+      fireKey(null, 'ArrowRight')
+      bridge.onMediaNavigate?.('next')
+      expect(store_slideIndex()).toBe(0)
+      w.unmount()
+    })
+  })
+
 })
 
 function store_slideIndex() {
