@@ -154,6 +154,22 @@ describe('useExternalPlayerChoices', () => {
     expect(result.playerOptions.value.map((o) => o.id)).toEqual(['associated'])
   })
 
+  it('detect/listCustom ausentes (undefined): ?? [] cobre (br 47/52)', async () => {
+    mocks.getDesktopBridge.mockReturnValue({
+      externalPlayer: {
+        get: vi.fn(async () => 'associated'),
+        // detect/listCustom ausentes
+      },
+    })
+    const { result } = setup({
+      externalPlayer: {
+        get: vi.fn(async () => 'associated'),
+      },
+    })
+    await result.loadPlayerChoices()
+    expect(result.playerOptions.value.map((o) => o.id)).toEqual(['associated'])
+  })
+
   it('extraIds entram como opções (default ignorado)', async () => {
     mocks.getDesktopBridge.mockReturnValue({
       externalPlayer: {
