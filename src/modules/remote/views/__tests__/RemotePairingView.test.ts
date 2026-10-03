@@ -140,7 +140,18 @@ describe('RemotePairingView', () => {
     w.unmount()
   })
 
-  it('copyUrl sem info: no-op (br 39); sem qr: img ausente (br 72)', async () => {
+  it('copyUrl sem info: no-op (br 39)', async () => {
+    mocks.getDesktopBridge.mockReturnValue(makeBridge({
+      pairingInfo: vi.fn(() => new Promise(() => {})), // pendente: info fica null
+    }))
+    const w = createWrapper()
+    await flushPromises()
+    const vm = w.vm as unknown as { copyUrl?: () => void }
+    expect(() => vm.copyUrl?.()).not.toThrow()
+    w.unmount()
+  })
+
+  it('copyUrl sem info pendente + sem qr: img ausente (br 72)', async () => {
     mocks.getDesktopBridge.mockReturnValue(makeBridge({
       pairingInfo: vi.fn(async () => ({
         host: 'h', port: 1, token: 't', connectUrl: 'http://h:1/?t', qrDataUrl: null, clientCount: 0, clientAddress: null,
