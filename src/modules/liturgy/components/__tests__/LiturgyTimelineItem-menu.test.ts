@@ -117,7 +117,7 @@ describe('LiturgyTimelineItem — menu do player (gaps 100)', () => {
 
   it('togglePlayerMenu: abre e fecha', async () => {
     const w = createWrapper()
-    const trigger = w.find('[data-testid="player-trigger"]')
+    const trigger = w.find('.liturgy-item__player-trigger')
     if (!trigger.exists()) {
       // botão pode não ter o testid — procurar por aria/rotulo do player
       const btns = w.findAll('button')
@@ -125,41 +125,41 @@ describe('LiturgyTimelineItem — menu do player (gaps 100)', () => {
       return
     }
     await trigger.trigger('click')
-    expect(w.find('[data-testid="player-menu"]').exists()).toBe(true)
+    expect(w.find('.liturgy-item__player--open').exists()).toBe(true)
     await trigger.trigger('click')
-    expect(w.find('[data-testid="player-menu"]').exists()).toBe(false)
+    expect(w.find('.liturgy-item__player--open').exists()).toBe(false)
   })
 
   it('togglePlayerMenu: item done não abre', async () => {
     const item = createItem()
     ;(item as Record<string, unknown>).done = true
     const w = createWrapper({ item })
-    const trigger = w.find('[data-testid="player-trigger"]')
+    const trigger = w.find('.liturgy-item__player-trigger')
     if (!trigger.exists()) return
     await trigger.trigger('click')
-    expect(w.find('[data-testid="player-menu"]').exists()).toBe(false)
+    expect(w.find('.liturgy-item__player--open').exists()).toBe(false)
   })
 
   it('Escape fecha o menu (onPlayerMenuKeydown)', async () => {
     const w = createWrapper()
-    const trigger = w.find('[data-testid="player-trigger"]')
+    const trigger = w.find('.liturgy-item__player-trigger')
     if (!trigger.exists()) return
     await trigger.trigger('click')
-    const menu = w.find('[data-testid="player-menu"]')
+    const menu = w.find('.liturgy-item__player--open')
     if (!menu.exists()) return
     await menu.trigger('keydown', { key: 'Escape' })
-    expect(w.find('[data-testid="player-menu"]').exists()).toBe(false)
+    expect(w.find('.liturgy-item__player--open').exists()).toBe(false)
   })
 
   it('click fora fecha o menu (onDocumentClick)', async () => {
     const w = createWrapper()
-    const trigger = w.find('[data-testid="player-trigger"]')
+    const trigger = w.find('.liturgy-item__player-trigger')
     if (!trigger.exists()) { w.unmount(); return }
     await trigger.trigger('click')
     // clicar fora (no body)
     document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))
     await w.vm.$nextTick()
-    expect(w.find('[data-testid="player-menu"]').exists()).toBe(false)
+    expect(w.find('.liturgy-item__player--open').exists()).toBe(false)
     w.unmount()
   })
 
