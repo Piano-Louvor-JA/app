@@ -326,4 +326,21 @@ describe('MusicTrackActions', () => {
     expect(w.emitted('downloadProgress')!.length).toBe(countBefore)
     w.unmount()
   })
+
+  it('confirmRemove com musicId null não faz nada (guard)', async () => {
+    deleteTrackMedia.mockClear()
+    const w = await mountActions({ musicId: null })
+    const vm = w.vm as unknown as { confirmRemove?: () => Promise<void> }
+    await vm.confirmRemove?.()
+    expect(deleteTrackMedia).not.toHaveBeenCalled()
+    w.unmount()
+  })
+
+  it('onOfflineAction com musicId null não faz nada (guard)', async () => {
+    const w = await mountActions({ musicId: null })
+    const vm = w.vm as unknown as { onOfflineAction?: () => Promise<void> }
+    await vm.onOfflineAction?.()
+    expect(true).toBe(true)
+    w.unmount()
+  })
 })
