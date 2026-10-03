@@ -228,4 +228,16 @@ describe("useRemoteControl", () => {
       expect(true).toBe(true)
     })
   })
+  it("log callback do receiver: console.info com prefixo [remote]", async () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    const useRemoteControl = await freshRc();
+    const rc = useRemoteControl();
+    rc.enabled.value = true;
+    await Promise.resolve();
+    const inst = receiverInstances.instances.at(-1) as unknown as { options: { log: (...a: unknown[]) => void } };
+    inst?.options?.log?.("teste", 1);
+    expect(info).toHaveBeenCalledWith("[remote]", "teste", 1);
+    info.mockRestore();
+  });
+
 })
