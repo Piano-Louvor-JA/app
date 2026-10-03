@@ -42,6 +42,7 @@ export default {
     bible: 'Bible',
     utilities: 'Utilities',
     settings: 'Settings',
+    },
   sync: {
     downloadQueue: {
       title: 'Downloads',
@@ -49,6 +50,5 @@ export default {
       retry: 'Retry',
       cancel: 'Cancel',
     },
-  },
   },
 }
