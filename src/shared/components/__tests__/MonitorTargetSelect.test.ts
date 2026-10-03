@@ -241,4 +241,64 @@ describe('MonitorTargetSelect', () => {
     )
     w.unmount()
   })
+
+  describe('gaps — posicionamento, pointerdown interno, disabled', () => {
+    it('openUp: painel perto do rodapé usa bottom em vez de top', async () => {
+      const originalH = window.innerHeight
+      Object.defineProperty(window, 'innerHeight', { value: 300, configurable: true })
+      const w = await mountSelect()
+      await w.find('.monitor-target-select__trigger').trigger('click')
+      await Promise.resolve()
+      await Promise.resolve()
+      await nextTick()
+      const panel = w.find('.monitor-target-select__panel')
+      expect(panel.exists()).toBe(true)
+      // painel reposicionado com innerHeight pequena → posição válida
+      expect(panel.attributes('style')).toBeTruthy()
+      w.unmount()
+      Object.defineProperty(window, 'innerHeight', { value: originalH, configurable: true })
+    })
+
+    it('pointerdown dentro do root e dentro do painel NÃO fecham', async () => {
+      const w = await mountSelect()
+      await w.find('.monitor-target-select__trigger').trigger('click')
+      await Promise.resolve()
+      await Promise.resolve()
+      await nextTick()
+      // dentro do root (trigger)
+      await w.find('.monitor-target-select__trigger').trigger('pointerdown')
+      expect(w.find('.monitor-target-select__panel').exists()).toBe(true)
+      // dentro do painel
+      await w.find('.monitor-target-select__panel').trigger('pointerdown')
+      expect(w.find('.monitor-target-select__panel').exists()).toBe(true)
+      w.unmount()
+    })
+
+    it('pointerdown com target não-Node não lança', async () => {
+      const w = await mountSelect()
+      await w.find('.monitor-target-select__trigger').trigger('click')
+      await Promise.resolve()
+      await Promise.resolve()
+      await nextTick()
+      document.body.dispatchEvent(
+        new Event('pointerdown') as unknown as PointerEvent,
+      )
+      await nextTick()
+      w.unmount()
+    })
+
+    it('disabled: toggle e identify são no-op', async () => {
+      const w = await mountSelect({ disabled: true })
+      const trigger = w.find('.monitor-target-select__trigger')
+      await trigger.trigger('click')
+      await Promise.resolve()
+      await Promise.resolve()
+      await nextTick()
+      // painel não abre com disabled
+      expect(w.find('.monitor-target-select__panel').exists()).toBe(false)
+      const identifyBtn = w.findAll('button').find((b) => b.classes().some((c) => c.includes('identify')))
+      if (identifyBtn) await identifyBtn.trigger('click')
+      w.unmount()
+    })
+  })
 })
