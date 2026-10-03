@@ -15,7 +15,8 @@ class FakeReq {
 class FakeStore {
   data = new Map<IDBValidKey, Rec>()
   index(_n: string) { return this }
-  createIndex(_n: string, _p: string) { /* noop */ }
+  indexes = new Set<string>()
+  createIndex(n: string, _p: string) { this.indexes.add(n) }
   add(op: Rec) {
     const key = (this._next++ ) as IDBValidKey
     this.data.set(key, { ...op, id: key })
@@ -220,4 +221,41 @@ describe('outbox — indexedDB real (fake IDB)', () => {
     const res = await flushOutbox('https://api.test/v1/custom', { authorization: 'x' })
     expect(res.ok).toBe(true)
   })
+  it('upgrade com db vazio: cria store e índices no onupgradeneeded', async () => {
+    // db SEM store: o harness pré-criaria; interceptar contains pra ele "ver" que
+    // já existe e o handler do módulo ENXERGAR o contrário → s43-48 executa.
+    currentDb = new FakeDB()
+    let fakeContains = true // harness vê true (não pré-cria); módulo vê false
+    const origContains = currentDb.objectStoreNames.contains
+    ;(currentDb.objectStoreNames as { contains: (n: string) => boolean }).contains = (n: string) =>
+      fakeContains ? origContains.call(currentDb.objectStoreNames, n) : fakeContains
+    // primeira checagem (harness): true-ish via origContains → stores vazio = false...
+    // simplificar: fakeContains controla a resposta crua
+    ;(currentDb.objectStoreNames as { contains: (n: string) => boolean }).contains = () => fakeContains
+    ;(globalThis as Record<string, unknown>).indexedDB = {
+      open: (_name: string, _v: number) => {
+        const req = new FakeOpenReq()
+        req.onupgradeneeded = null
+        setTimeout(() => {
+          const firstOpen = currentDb.stores.size === 0
+          fakeContains = !firstOpen // 1ª abertura: contains false → módulo cria store
+          req.result = currentDb
+          req.onupgradeneeded?.()
+          req.onsuccess?.()
+          fakeContains = true // aberturas seguintes: store já existe de verdade
+        }, 0)
+        return req
+      },
+    }
+    vi.resetModules()
+    const m = await import('../outbox')
+    await m.enqueue({ entity: 'lyric', payload: { music_uuid: 'm1' } } as never)
+    await new Promise((r) => setTimeout(r, 10))
+    expect(currentDb.stores.has('operations')).toBe(true)
+    const store = currentDb.stores.get('operations') as unknown as { indexes: Set<string> }
+    expect(store.indexes.has('client_uuid')).toBe(true)
+    expect(store.indexes.has('entity')).toBe(true)
+    expect(await m.countPending()).toBe(1)
+  })
+
 })
