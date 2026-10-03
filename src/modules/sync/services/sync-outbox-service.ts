@@ -83,6 +83,21 @@ export function enqueueOperatorState(
   writeOutbox(box)
 }
 
+let outboxFlushTimer: ReturnType<typeof setTimeout> | null = null
+
+/**
+ * Agenda o flush em bg (debounce 2s): agrupa mutações rápidas num único
+ * POST. Compartilhado por todos os produtores de outbox (liturgia,
+ * agendados, prefs...).
+ */
+export function scheduleOutboxFlush(delayMs = 2_000): void {
+  if (outboxFlushTimer) clearTimeout(outboxFlushTimer)
+  outboxFlushTimer = setTimeout(() => {
+    outboxFlushTimer = null
+    void flushOutbox().catch(() => {})
+  }, delayMs)
+}
+
 /** Sessão real = token presente (placeholder id_user=0 também tem token — a API rejeita 401). */
 function hasRealSession(): boolean {
   const session = getAuthSession()
