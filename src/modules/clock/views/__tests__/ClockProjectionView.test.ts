@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 
 const loadClockConfigMock = vi.hoisted(() => vi.fn(() => ({
   style: 'analog', format24h: true, showSeconds: true, textColor: '#fff', bgColor: '#000',
@@ -39,7 +40,7 @@ vi.mock('../../services/clock-preferences', () => ({
 vi.mock('@design-system/index', () => ({
   ProjectionBackground: {
     name: 'ProjectionBackground',
-    template: '<div class="stub-projection-background" />',
+    template: '<div class="stub-projection-background"><slot /></div>',
   },
 }))
 
@@ -75,6 +76,7 @@ describe('ClockProjectionView.vue', () => {
   }
 
   beforeEach(() => {
+    setActivePinia(createPinia())
     FakeBroadcastChannel.instances.length = 0
     ;(globalThis as any).BroadcastChannel = FakeBroadcastChannel
     storageListener = null
@@ -163,9 +165,29 @@ describe('ClockProjectionView.vue', () => {
   })
 
 describe('subscribe callback (55)', () => {
+  it('gaps: backgroundImage url, stage.clock merge e embedded', async () => {
+    readEffectiveMock.mockReturnValue({
+      backgroundColor: '#123456',
+      backgroundImage: '/img/bg.png',
+      fontSize: 96,
+      clock: { style: 'digital', format24h: false },
+    })
+    const { resolveBackgroundImage } = await import('../../../settings/types/stage-settings')
+    vi.mocked(resolveBackgroundImage, true)
+    const w = mount(ClockProjectionView, { props: { embedded: true }, global: { plugins: [createPinia()] } })
+    await flushPromises()
+    const bg = w.find('.stub-projection-background')
+    expect(bg.attributes('style')).toContain('background-image')
+    expect(bg.attributes('style')).toContain('/img/bg.png')
+    expect(bg.html()).toContain('clock-projection--embedded')
+    // stage.clock faz merge sobre config: stage montado com preview
+    expect(w.find('.clock-projection__stage').exists()).toBe(true)
+    w.unmount()
+  })
+
   it('callback do subscribe atualiza stage', async () => {
     stageSubs.cbs.length = 0
-    const w = mount(ClockProjectionView)
+    const w = mount(ClockProjectionView, { global: { plugins: [createPinia()] } })
     await w.vm.$nextTick()
     expect(stageSubs.cbs.length).toBeGreaterThanOrEqual(1)
     for (const cb of stageSubs.cbs) cb()

@@ -133,6 +133,37 @@ describe("AppTitlebar.vue", () => {
       removeSpy.mockRestore();
     });
 
+    it("mac: cliques nos botões chamam control; blur aplica unfocused", async () => {
+      bridgeState.platform = "darwin";
+      controlMock.mockClear();
+      const wrapper = await mountBar();
+      await wrapper.vm.$nextTick();
+      await wrapper.find(".app-titlebar__mac-btn--close").trigger("click");
+      await wrapper.find(".app-titlebar__mac-btn--minimize").trigger("click");
+      await wrapper.find(".app-titlebar__mac-btn--maximize").trigger("click");
+      expect(controlMock).toHaveBeenCalledWith("close");
+      expect(controlMock).toHaveBeenCalledWith("minimize");
+      expect(controlMock).toHaveBeenCalledWith("maximize");
+      window.dispatchEvent(new Event("blur"));
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find(".app-titlebar__mac-controls--unfocused").exists()).toBe(true);
+      window.dispatchEvent(new Event("focus"));
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find(".app-titlebar__mac-controls--unfocused").exists()).toBe(false);
+      wrapper.unmount();
+      bridgeState.platform = "win32";
+    });
+
+    it("rota projection: titlebar some e height zerada", async () => {
+      const wrapper = await mountBar({ name: "projection-popup" });
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find(".app-titlebar").exists()).toBe(false);
+      expect(
+        document.documentElement.style.getPropertyValue("--app-titlebar-height"),
+      ).toBe("0px");
+      wrapper.unmount();
+    });
+
     it("sem bridge.window: título estático, sem erros", async () => {
       bridgeState.hasWindow = false;
       const wrapper = await mountBar();
