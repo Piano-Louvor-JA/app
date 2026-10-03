@@ -478,7 +478,7 @@ describe('LiturgyTimelineItem — cobertura extra', () => {
       it(`${type} projetando: title de parar, aria-pressed e classe --site-projecting`, async () => {
         const wrapper = createWrapper({
           item: createItem({ type, musicId: undefined } as any),
-          videoProjecting: true,
+          ...(type === 'site' ? { siteProjecting: true } : { videoProjecting: true }),
         })
         const stopBtn = wrapper.find(`[title="${stop}"]`)
         expect(stopBtn.exists()).toBe(true)
