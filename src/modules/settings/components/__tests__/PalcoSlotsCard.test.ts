@@ -142,4 +142,30 @@ describe('PalcoSlotsCard', () => {
     w.unmount()
     expect(true).toBe(true)
   })
+
+  it('slots com receiverIps e clients 0: renderiza waiting e ips', async () => {
+    palcoApi.slots.mockResolvedValue([
+      { id: '2', label: 'TV Fundos', httpPort: 8081, clients: 0, receiverIps: ['192.168.0.10', '192.168.0.11'] },
+    ])
+    const w = await mountCard()
+    await flushPromises()
+    expect(w.text()).toContain('192.168.0.10, 192.168.0.11')
+    expect(w.text()).toContain('settings.palco.waiting')
+    w.unmount()
+    palcoApi.slots.mockResolvedValue([])
+  })
+
+  it('refresh fora do electron: não consulta a API', async () => {
+    Object.defineProperty(window, 'louvorja', {
+      get: () => undefined,
+      configurable: true,
+    })
+    palcoApi.slots.mockClear()
+    const w = await mountCard()
+    await flushPromises()
+    const vm = w.vm as unknown as { refresh?: () => Promise<void> }
+    await vm.refresh?.()
+    expect(palcoApi.slots).not.toHaveBeenCalled()
+    w.unmount()
+  })
 })
