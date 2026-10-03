@@ -284,6 +284,8 @@ export default {
       urlInvalid: 'The provided link is not valid for projection.',
       projectionFailed:
         'Could not open projection on the configured screens.',
+      fileMissingOnMachine:
+        'File not found on this machine — the path came from another computer (synced liturgy). Select the file again on this device.',
       presentationOfficeMissing:
         'To project PPT/PPTX, install LibreOffice (or set LIBREOFFICE_PATH).',
     },

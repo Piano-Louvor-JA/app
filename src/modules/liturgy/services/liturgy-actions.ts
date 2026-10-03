@@ -171,6 +171,13 @@ export async function executeLiturgyItem(
           if (result?.ok) {
             return { ok: true }
           }
+          // file-missing = path de OUTRA máquina (liturgia sincronizada do
+          // Windows da igreja etc): cair no interno aqui engana o usuário
+          // ("abriu no player errado") — o interno também não tem o arquivo.
+          // Retorna erro claro; playwright/web revisam mensagem no i18n.
+          if (result && 'error' in result && result.error === 'file-missing') {
+            return { ok: false, messageKey: 'liturgy.messages.fileMissingOnMachine' }
+          }
           // player não encontrado etc → cai no interno com snackbar padrão
         }
       }

@@ -102,3 +102,19 @@ describe('player externo na liturgia — vídeo (regressão 03/10)', () => {
     expect(mocks.openControl).not.toHaveBeenCalled()
   })
 })
+
+describe('player externo na liturgia — arquivo de outra máquina', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.openControl.mockResolvedValue(true)
+  })
+
+  it('file-missing → erro claro, SEM cair no controle interno (path de outra máquina)', async () => {
+    mocks.get.mockResolvedValue('vlc')
+    mocks.play.mockResolvedValue({ ok: false, player: 'none', error: 'file-missing' })
+    const result = await executeLiturgyItem(videoItem(), {} as never)
+    expect(result.ok).toBe(false)
+    expect(result.messageKey).toBe('liturgy.messages.fileMissingOnMachine')
+    expect(mocks.openControl).not.toHaveBeenCalled()
+  })
+})
