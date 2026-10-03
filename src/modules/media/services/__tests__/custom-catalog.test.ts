@@ -813,3 +813,40 @@ describe('local-custom-store CRUD (isolado)', () => {
     expect(await resolveMediaTrack(1_000_005)).toBeNull()
   })
 })
+
+describe('gaps — normalizeTime/mapCustomLyrics via loadCustomMusicTrack', () => {
+  it('lyrics da API em HH:MM normaliza para HH:MM:SS', async () => {
+    routes = [{ match: () => true, body: {
+      id: 1, name: 'M', artist: null, lyrics: [
+        { order: 0, lyric: 'L1', time: '01:30' },
+      ],
+    } }]
+    const track = await loadCustomMusicTrack(1)
+    expect(track).not.toBeNull()
+  })
+
+  it('lyrics não-array: mapeia para []', async () => {
+    routes = [{ match: () => true, body: {
+      id: 1, name: 'M', artist: null, lyrics: 'não-sou-array',
+    } }]
+    const track = await loadCustomMusicTrack(1)
+    expect(track).not.toBeNull()
+  })
+
+  it('formatDurationLabel: HH:MM:SS com hora 00 remove horas', () => {
+    expect(formatDurationLabel('00:03:45')).toBe('03:45')
+  })
+
+  it('formatDurationLabel: número de segundos formata m:ss', () => {
+    expect(formatDurationLabel(225)).toBe('3:45')
+  })
+
+  it('formatDurationLabel: null/undefined → 0:00', () => {
+    expect(formatDurationLabel(null)).toBe('0:00')
+    expect(formatDurationLabel(undefined)).toBe('0:00')
+  })
+
+  it('formatDurationLabel: string já formatada mantém', () => {
+    expect(formatDurationLabel('1:02:03')).toBe('1:02:03')
+  })
+})
