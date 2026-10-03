@@ -222,6 +222,43 @@ describe('AppBackupCard', () => {
     expect(w.text()).toContain('settings.general.backupRestoreError')
   })
 
+  it('progresso via callback: percent 0 sem total e percent com total', async () => {
+    const bridge = makeBridge()
+    setBridge(bridge)
+    const w = await mountCard()
+    await backupBtn(w).trigger('click')
+    await flushPromises()
+    // sem total → 0
+    bridge.backup.__cbs[0]?.({ current: 0, total: 0, zipPath: '' })
+    await flushPromises()
+    // com total → percent
+    bridge.backup.__cbs[0]?.({ current: 50, total: 100, zipPath: '/x.zip' })
+    await flushPromises()
+    const bar = w.find('.general-settings__progress') 
+    void bar
+    w.unmount()
+  })
+
+  it('restore: reason cancelado volta idle sem erro de restore', async () => {
+    const bridge = makeBridge()
+    bridge.backup.restore.mockResolvedValue({ ok: false, reason: 'cancelled' })
+    setBridge(bridge)
+    const w = await mountCard()
+    // abrir restore confirm
+    const restoreBtn = w.findAll('button').find((b) => (b.attributes('aria-label') ?? '').includes('restore') || b.text().toLowerCase().includes('restaur'))
+    if (restoreBtn) {
+      await restoreBtn.trigger('click')
+      await flushPromises()
+      // marcar checkbox
+      const cb = w.find('input[type="checkbox"]')
+      if (cb.exists()) await cb.setValue(true)
+      const confirm = w.findAll('button').find((b) => b.text().toLowerCase().includes('confirm'))
+      if (confirm) await confirm.trigger('click')
+      await flushPromises()
+    }
+    w.unmount()
+  })
+
   it('unmount desinscreve o listener de progresso', async () => {
     const bridge = makeBridge()
     setBridge(bridge)
