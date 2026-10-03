@@ -144,6 +144,8 @@ describe('MediaEditorView — toggle de visibilidade (t_35e4d3ea)', () => {
 			'public',
 		)
 		// reset: de volta pra privado
+		await flushPromises()
+		await wrapper.vm.$nextTick()
 		const btns = wrapper.findAll('.editor__visibility')[0]!.findAll(
 			'.editor__visibility-btn',
 		)
