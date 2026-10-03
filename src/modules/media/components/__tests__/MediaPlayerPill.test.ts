@@ -206,4 +206,34 @@ describe("MediaPlayerPill — áudio na TV, projeção, fullscreen, playlist", (
 		await plBtn?.trigger("click");
 		expect(w.emitted("togglePlaylist")).toHaveLength(1);
 	});
+	describe("gaps — selectMode sung/instrumental", () => {
+		it("selecionar sung emite update:mode audio", async () => {
+			const w = mountPill();
+			const modeBtn = w
+				.findAll(".media-player-pill__icon-btn")
+				.find((b) => b.attributes("aria-label") === mediaLocale.media.audioType);
+			await modeBtn?.trigger("click");
+			const sung = w
+				.findAll("button")
+				.find((b) => b.text().includes(mediaLocale.media.modes.sung));
+			await sung?.trigger("click");
+			expect(w.emitted("update:mode")?.[0]).toEqual(["audio"]);
+			w.unmount();
+		});
+
+		it("selecionar instrumental emite update:mode instrumental", async () => {
+			const w = mountPill(baseProps({ hasInstrumental: true }));
+			const modeBtn = w
+				.findAll(".media-player-pill__icon-btn")
+				.find((b) => b.attributes("aria-label") === mediaLocale.media.audioType);
+			await modeBtn?.trigger("click");
+			const inst = w
+				.findAll("button")
+				.find((b) => b.text().includes(mediaLocale.media.modes.instrumental));
+			await inst?.trigger("click");
+			expect(w.emitted("update:mode")?.[0]).toEqual(["instrumental"]);
+			w.unmount();
+		});
+	});
+
 });
