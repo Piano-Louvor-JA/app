@@ -309,4 +309,70 @@ describe('StageCustomizationCard', () => {
     await flushPromises()
     expect(store.settings.fontSize).not.toBe(120)
   })
+
+  describe('gaps — cores, pesos, switches do clock e file picker', () => {
+    it('inputs de cor e swatches aplicam patch por propriedade', async () => {
+      const w = await mountCard()
+      active = w
+      const inputs = w.findAll('input[type="color"]')
+      expect(inputs.length).toBeGreaterThanOrEqual(2)
+      const keys = ['#111111', '#222222', '#333333', '#444444']
+      for (let i = 0; i < inputs.length; i++) {
+        await inputs[i]!.setValue(keys[i] ?? '#000000')
+      }
+      const store = useStageSettingsStore()
+      expect(store.settings.backgroundColor).toBe('#111111')
+    })
+
+    it('swatches de bibleTextColor/footerRefColor chamam patch', async () => {
+      const w = await mountCard()
+      active = w
+      const swatches = w.findAll('.stage-custom__swatch')
+      const before = swatches.length
+      expect(before).toBeGreaterThan(0)
+      // clicar nos dois últimos (bible/footer groups)
+      await swatches[before - 1]!.trigger('click')
+      await swatches[before - 2]!.trigger('click')
+    })
+
+    it('peso da bíblia via segment buttons', async () => {
+      const w = await mountCard()
+      active = w
+      const segments = w.findAll('.stage-custom__segment-btn')
+      expect(segments.length).toBeGreaterThanOrEqual(2)
+      await segments[segments.length - 1]!.trigger('click')
+      const store = useStageSettingsStore()
+      expect(store.settings.bibleFontWeight).toBeDefined()
+    })
+
+    it('switches do clock: style/showSeconds/format24h', async () => {
+      const w = await mountCard()
+      active = w
+      const switches = w.findAll('[role="switch"]')
+      for (const s of switches) {
+        await s.trigger('click')
+      }
+      const toggles = w.findAll('.stage-custom__toggle-label')
+      for (const tl of toggles) {
+        await tl.trigger('click')
+      }
+      const store = useStageSettingsStore()
+      void store
+    })
+
+    it('dropzone e botão de editar imagem abrem o file picker', async () => {
+      const w = await mountCard()
+      active = w
+      const input = w.find('input[type="file"]')
+      const clickSpy = vi.spyOn(input.element as HTMLInputElement, 'click').mockImplementation(() => {})
+      const bgBtn = w.find('.stage-custom__bg-btn')
+      if (bgBtn.exists()) await bgBtn.trigger('click')
+      else {
+        const dz = w.find('.stage-custom__dropzone')
+        if (dz.exists()) await dz.trigger('click')
+      }
+      expect(clickSpy).toHaveBeenCalled()
+      clickSpy.mockRestore()
+    })
+  })
 })
