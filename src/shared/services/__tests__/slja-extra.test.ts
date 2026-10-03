@@ -304,3 +304,41 @@ describe("slja — ramos residuais", () => {
 	});
 
 })
+
+describe("slja — parse edge cases (roundtrip zip)", () => {
+  async function roundtrip(archive: Parameters<typeof import("../slja").buildSlja>[0]) {
+    const { buildSlja, parseSlja } = await import("../slja");
+    const buf = await buildSlja(archive);
+    return parseSlja(buf);
+  }
+
+  it("letra com pipes: preservada como newlines no parse", async () => {
+    const archive = {
+      slides: [{ lyric: "a|b|c", type: "LETRA", timeMs: 0 }],
+      audios: [],
+      assets: [],
+    } as never;
+    const parsed = await roundtrip(archive);
+    expect(parsed.slides[0]?.lyric).toContain("\n");
+  });
+
+  it("slide sem lyric: lyric vazia", async () => {
+    const archive = {
+      slides: [{ lyric: "", type: "LETRA", timeMs: 1000 }],
+      audios: [],
+      assets: [],
+    } as never;
+    const parsed = await roundtrip(archive);
+    expect(parsed.slides[0]?.lyric).toBe("");
+  });
+
+  it("tempo_hms tem prioridade sobre tempo bytes", async () => {
+    const archive = {
+      slides: [{ lyric: "L", type: "LETRA", timeMs: 5000, auxiliaryLyric: undefined }],
+      audios: [],
+      assets: [],
+    } as never;
+    const parsed = await roundtrip(archive);
+    expect(parsed.slides[0]?.timeMs).toBe(5000);
+  });
+});
