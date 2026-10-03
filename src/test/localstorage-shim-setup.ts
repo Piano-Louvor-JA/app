@@ -17,11 +17,11 @@
 const memoryStore = () => {
   const m = new Map();
   return {
-    getItem: (k) => (m.has(String(k)) ? m.get(String(k)) : null),
-    setItem: (k, v) => m.set(String(k), String(v)),
-    removeItem: (k) => m.delete(String(k)),
+    getItem: (k: string) => (m.has(String(k)) ? m.get(String(k)) : null),
+    setItem: (k: string, v: string) => m.set(String(k), String(v)),
+    removeItem: (k: string) => m.delete(String(k)),
     clear: () => m.clear(),
-    key: (i) => Array.from(m.keys())[i] ?? null,
+    key: (i: number) => Array.from(m.keys())[i] ?? null,
     get length() { return m.size; },
   };
 };
