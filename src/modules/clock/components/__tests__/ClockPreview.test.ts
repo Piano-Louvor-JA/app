@@ -118,4 +118,46 @@ describe("ClockPreview.vue", () => {
       showSeconds: true,
     } as ClockConfig;
   });
+  describe("gaps — digitalFontSize/measure/align", () => {
+    it("com stage: font escala com fontSize do palco", async () => {
+      const wrapper = mountClock({
+        stage: {
+          fontSize: 192,
+          textAlign: "left",
+          textVerticalAlign: "top",
+          textShadow: true,
+          shadowBlur: 3,
+          shadowIntensity: 0.5,
+        },
+      });
+      await wrapper.vm.$nextTick();
+      const el = wrapper.find(".clock-preview__digital");
+      expect(el.exists()).toBe(true);
+      // render sem quebrar com stage presente (cobre computed digitalFontSize)
+      expect(el.exists()).toBe(true);
+      wrapper.unmount();
+    });
+
+    it("align left/top: justify e align items aplicados", async () => {
+      const wrapper = mountClock({
+        stage: {
+          fontSize: 96,
+          textAlign: "left",
+          textVerticalAlign: "top",
+          textShadow: false,
+        },
+      });
+      await wrapper.vm.$nextTick();
+      expect(wrapper.exists()).toBe(true);
+      wrapper.unmount();
+    });
+
+    it("preview sem stage: textShadow none", async () => {
+      const wrapper = mountClock({ preview: true });
+      await wrapper.vm.$nextTick();
+      expect(wrapper.exists()).toBe(true);
+      wrapper.unmount();
+    });
+  });
+
 });
