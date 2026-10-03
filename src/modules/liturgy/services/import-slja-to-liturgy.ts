@@ -262,6 +262,24 @@ export async function importSljaAsLiturgyMusic(
 
 	const imageIdByUrl = new Map(uploadedAssets.map((a) => [a.url, a.idFile]));
 
+	// Background da MÚSICA: o .slja clássico põe a imagem de fundo na CAPA
+	// (Slide:1) e as estrofes herdam — mas a capa não vira estrofe no
+	// import, então o bg precisa ser vinculado à custom_musics (é o que o
+	// editor de letras usa como bg). Fallback: primeira imagem de estrofe.
+	const coverImageName =
+		archive.slides.find((sl) => sl.type === "CAPA")?.image?.name?.toLowerCase() ??
+		archive.slides.find((sl) => sl.image?.name)?.image?.name?.toLowerCase();
+	if (coverImageName && uploadedAssets.length) {
+		const coverMatch = uploadedAssets.find(
+			(a) =>
+				coverImageName.includes(a.path.toLowerCase()) ||
+				a.path.toLowerCase().includes(coverImageName),
+		);
+		if (coverMatch) {
+			await updateCustomMusic(musicId, { id_file_image: coverMatch.idFile });
+		}
+	}
+
 	// Lyrics em paralelo (batch de 5) com order EXPLÍCITO — a ordem é
 	// garantida pelo campo, não pela sequência de requests. 15 slides caem
 	// de 15 RTTs (~10s) para ~3.

@@ -101,6 +101,33 @@ describe('dedup de import .slja (app#336 fase 3)', () => {
     expect(mocks.updateCustomMusic).not.toHaveBeenCalled()
   })
 
+  it('bg da CAPA vira id_file_image da MÚSICA (editor de letras mostra o bg)', async () => {
+    mocks.sha256Hex.mockResolvedValue('e'.repeat(64))
+    mocks.createCustomMusic.mockResolvedValue({ id: 9, existed: false })
+    mocks.uploadCustomFile.mockResolvedValue({ idFile: 55 })
+    mocks.parseSljaFile.mockResolvedValue({
+      title: 'Hino BG',
+      audio: null,
+      assets: [{ path: 'fundo.jpg', bytes: new Uint8Array(3) }],
+      slides: [
+        { type: 'CAPA', lyric: '', order: 0, image: { name: 'imagens\\fundo.jpg', bytes: new Uint8Array(0) } },
+        { type: 'LETRA', lyric: 'verso', order: 1 },
+      ],
+    })
+
+    await importSljaAsLiturgyMusic(
+      { bytes: new ArrayBuffer(8), name: 'bg.slja' },
+      { confirmUpload: async () => true },
+    )
+
+    // upload das imagens aconteceu e a custom_music recebeu o bg
+    expect(mocks.uploadCustomFile).toHaveBeenCalled()
+    expect(mocks.updateCustomMusic).toHaveBeenCalledWith(
+      9,
+      expect.objectContaining({ id_file_image: expect.any(Number) }),
+    )
+  })
+
   it('logado + confirmUpload=false → LOCAL (não toca a API)', async () => {
     mocks.sha256Hex.mockResolvedValue('c'.repeat(64))
     const result = await importSljaAsLiturgyMusic(
