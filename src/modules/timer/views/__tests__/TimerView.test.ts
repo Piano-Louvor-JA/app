@@ -112,21 +112,18 @@ describe('TimerView - coverage básico', () => {
   describe('controles do timer (cliques finais)', () => {
     it('openConfig/start/pause/reset/saveMark disparam', async () => {
       const w = mount(TimerView)
-      const fns: Record<string, ReturnType<typeof vi.fn>> = {}
-      for (const name of ['openConfig', 'start', 'pause', 'reset', 'saveMark']) {
-        const fn = vi.fn()
-        fns[name] = fn
-      }
-      // os handlers vêm do composable mockado — achar e chamar via cliques nos botões
+      // i18n mockado: t(key)=key → aria-labels/textos contêm as chaves
       const btns = w.findAll('button')
       for (const b of btns) {
-        const t = b.text().toLowerCase()
-        if (t.includes('config') || t.includes('configur')) await b.trigger('click')
-        if (t.includes('iniciar') || t.includes('start')) await b.trigger('click')
-        if (t.includes('paus') || t.includes('pause')) await b.trigger('click')
-        if (t.includes('zerar') || t.includes('reset')) await b.trigger('click')
-        if (t.includes('marca') || t.includes('mark')) await b.trigger('click')
+        const attrs = (b.attributes('aria-label') || '') + ' ' + (b.attributes('title') || '') + ' ' + b.text()
+        const lower = attrs.toLowerCase()
+        if (lower.includes('config')) await b.trigger('click')
+        if (lower.includes('start') || lower.includes('timer.start')) await b.trigger('click')
+        if (lower.includes('pause')) await b.trigger('click')
+        if (lower.includes('reset')) await b.trigger('click')
+        if (lower.includes('mark')) await b.trigger('click')
       }
+      expect(mockTimerFeature.openConfig).toHaveBeenCalled()
       w.unmount()
     })
 
