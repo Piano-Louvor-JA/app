@@ -261,4 +261,36 @@ describe("stage-settings-preferences — ramos", () => {
 		clearStageSettings("clock");
 		expect(loadStageSettingsOptional("clock")).toBeNull();
 	});
+describe("gaps — asArrangement/asAlign/line 230", () => {
+	it("arrangement não-array → []; itens inválidos filtrados", () => {
+		const s = normalizeProjectionSettings({
+			monitorArrangement: "lixo",
+		});
+		expect(s).toBeTruthy();
+		const s2 = normalizeProjectionSettings({
+			monitorArrangement: [
+				null,
+				"displayId-inválido",
+				{ displayId: "x", x: 0, y: 0 },
+				{ displayId: 1, x: "x", y: 0 },
+				{ displayId: 2, x: 0, y: "y" },
+				{ displayId: 3, x: 10, y: 20 },
+			],
+		});
+		expect(s2).toBeTruthy();
+	});
+
+	it("lyricAlign legado Baixo → bottom", () => {
+		expect(normalizeProjectionSettings({ lyricAlign: "Baixo" }).lyricAlign).toBe("bottom");
+		expect(normalizeProjectionSettings({ lyricAlign: "qualquer" }).lyricAlign).toBe("center");
+	});
+
+	it("toggleTargetDisplay: adiciona display novo e remove declined", () => {
+		const base = normalizeProjectionSettings(null);
+		const withDisplay = toggleTargetDisplay({ ...base, targetDisplayIds: [], declinedDisplayIds: [7] }, 7);
+		expect(withDisplay.targetDisplayIds).toContain(7);
+		expect(withDisplay.declinedDisplayIds).not.toContain(7);
+	});
+});
+
 });
