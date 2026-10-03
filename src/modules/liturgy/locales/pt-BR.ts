@@ -281,6 +281,14 @@ export default {
       presentationOfficeMissing:
         'Para projetar PPT/PPTX, instale o LibreOffice (ou defina LIBREOFFICE_PATH).',
     },
+    slja: {
+      importButton: 'Importar .slja',
+      importing: 'Importando…',
+      imported: 'Importado: {name} ({slides} estrofes).',
+      importedLocal:
+        'Importado neste dispositivo: {name} ({slides} estrofes) — salvo sem conta.',
+      importFailed: 'Arquivo .slja inválido.',
+    },
     custom: {
       title: 'Liturgias avulsas',
       new: 'Nova liturgia avulsa',

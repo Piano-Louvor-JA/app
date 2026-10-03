@@ -281,6 +281,14 @@ export default {
       presentationOfficeMissing:
         'To project PPT/PPTX, install LibreOffice (or set LIBREOFFICE_PATH).',
     },
+    slja: {
+      importButton: 'Import .slja',
+      importing: 'Importing…',
+      imported: 'Imported: {name} ({slides} verses).',
+      importedLocal:
+        'Imported on this device: {name} ({slides} verses) — saved without an account.',
+      importFailed: 'Invalid .slja file.',
+    },
     custom: {
       title: 'Custom liturgies',
       new: 'New custom liturgy',
