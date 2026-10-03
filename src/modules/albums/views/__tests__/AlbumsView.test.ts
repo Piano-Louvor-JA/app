@@ -111,6 +111,11 @@ vi.mock('../../composables/useAlbums', () => ({
   useAlbums: () => useAlbumsMockFactory(),
 }))
 
+const playQueueMock = vi.fn(async () => {})
+vi.mock('@modules/media/stores/useMediaStore', () => ({
+  useMediaStore: () => ({ playQueue: playQueueMock }),
+}))
+
 vi.mock('@design-system/index', () => ({
   GlassCard: { template: '<div class="glass-card-stub"><slot /></div>' },
 }))
@@ -476,6 +481,38 @@ describe('AlbumsView', () => {
     await flushPromises()
     expect(customCatalogMock.createCustomCollection).toHaveBeenCalledWith('Jovem')
     expect(customCatalogMock.listCustomCollections).toHaveBeenCalledTimes(2)
+  })
+
+  it('playlist com faixas: play navega pro media, remove faixa e toggle colapsa', async () => {
+    savePlaylists([
+      {
+        id: 'pl-x',
+        name: 'Com faixas',
+        createdAt: '2026-01-01',
+        items: [{ musicId: 7, title: 'Santo', track: 1 }],
+      },
+    ])
+    const w = await mountView()
+    const btn = w.findAll('button').find((b) => b.attributes('aria-label') === 'albums.playlists.title')!
+    await btn.trigger('click')
+    await flushPromises()
+    // toggle expande
+    ;((body().querySelector('.albums-view__playlist') as HTMLElement).querySelector('.albums-view__playlist-toggle') as HTMLElement).click()
+    await flushPromises()
+    expect(body().querySelector('.albums-view__playlist-tracks')).not.toBeNull()
+    // play com itens → playQueue + push media
+    ;((body().querySelector('.albums-view__playlist') as HTMLElement).querySelector('.albums-view__playlist-play') as HTMLElement).click()
+    await flushPromises()
+    expect(pushMock).toHaveBeenCalledWith({ name: 'media' })
+    // remover faixa
+    ;((body().querySelector('.albums-view__playlist') as HTMLElement).querySelector('.albums-view__playlist-track-remove') as HTMLElement).click()
+    await flushPromises()
+    expect(listPlaylists()[0]!.items).toHaveLength(0)
+    // toggle de novo colapsa
+    ;((body().querySelector('.albums-view__playlist') as HTMLElement).querySelector('.albums-view__playlist-toggle') as HTMLElement).click()
+    await flushPromises()
+    expect(body().querySelector('.albums-view__playlist-tracks')).toBeNull()
+    w.unmount()
   })
 
   it('openCustomCollection navega pro id custom', async () => {
