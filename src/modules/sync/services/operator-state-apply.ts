@@ -18,6 +18,30 @@ import { USER_PREFERENCE_KEYS } from '@shared/constants/storage-keys'
 
 const LOCAL_META_KEY = 'pianolouvorja:sync:liturgy:week:updatedAt'
 const SCHEDULED_META_KEY = 'pianolouvorja:sync:scheduled:items:updatedAt'
+const PREFS_META_KEY = 'pianolouvorja:sync:prefs:updatedAt'
+
+/**
+ * Whitelist de preferências que SINCRONIZAM entre dispositivos (app#349).
+ * FORA desta lista NUNCA viaja — nem do servidor mais novo. Isso protege
+ * tokens/sessão, estado transitório (random.session) e namespaces próprias
+ * do sync (liturgy.state/scheduled.state têm operator_state dedicado).
+ */
+export const SYNCABLE_PREF_KEYS: ReadonlySet<string> = new Set([
+  USER_PREFERENCE_KEYS.theme,
+  USER_PREFERENCE_KEYS.blur,
+  USER_PREFERENCE_KEYS.accent,
+  USER_PREFERENCE_KEYS.interaction,
+  USER_PREFERENCE_KEYS.autoBrightness,
+  USER_PREFERENCE_KEYS.bibleSelectedVersion,
+  USER_PREFERENCE_KEYS.projectionSettings,
+  USER_PREFERENCE_KEYS.homeLocation,
+  USER_PREFERENCE_KEYS.uiZoom,
+  USER_PREFERENCE_KEYS.clockConfig,
+  USER_PREFERENCE_KEYS.timerConfig,
+  USER_PREFERENCE_KEYS.countdownConfig,
+  USER_PREFERENCE_KEYS.randomConfig,
+  USER_PREFERENCE_KEYS.language,
+])
 
 interface OperatorStateItem {
   client_uuid: string
@@ -87,6 +111,25 @@ export function applyOperatorState(items: OperatorStateItem[]): boolean {
       continue
     }
 
+    if (item.namespace === 'prefs' && item.key === 'values') {
+      if (typeof value !== 'object' || value === null) continue
+
+      const localUpdatedAt = Number(localStorage.getItem(PREFS_META_KEY) ?? '0')
+      if (item.updated_at_ms <= localUpdatedAt) continue // LWW: local vence
+
+      let prefApplied = false
+      for (const [key, prefValue] of Object.entries(value as Record<string, unknown>)) {
+        if (!SYNCABLE_PREF_KEYS.has(key)) continue // whitelist: fora nunca viaja
+        setUserPreference(key, prefValue)
+        prefApplied = true
+      }
+      if (prefApplied) {
+        localStorage.setItem(PREFS_META_KEY, String(item.updated_at_ms))
+        applied = true
+      }
+      continue
+    }
+
     // namespace desconhecida → ignorada sem quebrar
   }
 
@@ -96,6 +139,11 @@ export function applyOperatorState(items: OperatorStateItem[]): boolean {
 /** Registra o instante do push local (base do LWW no próximo pull). */
 export function markLocalLiturgyPushed(atMs: number = Date.now()): void {
   localStorage.setItem(LOCAL_META_KEY, String(atMs))
+}
+
+/** Registra o instante do push local das preferências (LWW da namespace prefs). */
+export function markLocalPrefsPushed(atMs: number = Date.now()): void {
+  localStorage.setItem(PREFS_META_KEY, String(atMs))
 }
 
 /** Registra o instante do push local dos agendados (LWW da namespace scheduled). */

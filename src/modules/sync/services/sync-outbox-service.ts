@@ -1,5 +1,12 @@
 import { getAuthSession } from '@modules/media/services/auth-client'
-import { applyOperatorState, markLocalLiturgyPushed } from './operator-state-apply'
+import { getUserPreference, registerPrefsChangedHook } from '@shared/services/user-preferences'
+import {
+  applyOperatorState,
+  markLocalLiturgyPushed,
+  markLocalPrefsPushed,
+  markLocalScheduledPushed,
+  SYNCABLE_PREF_KEYS,
+} from './operator-state-apply'
 
 /**
  * sync v2 fase 2 (app#336): outbox do estado do operador.
@@ -175,7 +182,11 @@ export async function flushOutbox(): Promise<OperatorStateItem[] | null> {
     (max, e) => Math.max(max, e.updated_at),
     Date.now(),
   )
-  markLocalLiturgyPushed(newestLocal)
+  // LWW por namespace: cada produtor marca o SEU relógio (se veio no batch)
+  const names = new Set(entries.map((e) => `${e.namespace}::${e.key}`))
+  if (names.has('liturgy::week')) markLocalLiturgyPushed(newestLocal)
+  if (names.has('scheduled::items')) markLocalScheduledPushed(newestLocal)
+  if (names.has('prefs::values')) markLocalPrefsPushed(newestLocal)
   const serverItems = json.operator_state ?? []
   applyOperatorState(serverItems)
 
@@ -188,6 +199,17 @@ export function startOutboxTriggers(): () => void {
     void flushOutbox().catch(() => {})
   }
   window.addEventListener('online', onOnline)
+
+  // app#349 peça 2: preferências do operador — hook global gravado pelo
+  // user-preferences; só keys da whitelist vão pro outbox (lote 'prefs::values').
+  registerPrefsChangedHook((key) => {
+    if (!SYNCABLE_PREF_KEYS.has(key)) return
+    enqueueOperatorState('prefs', 'values', {
+      [key]: getUserPreference(key),
+    })
+    scheduleOutboxFlush()
+  })
+
   // pull no boot (rede disponível): puxa o estado da conta
   onOnline()
   return () => window.removeEventListener('online', onOnline)
