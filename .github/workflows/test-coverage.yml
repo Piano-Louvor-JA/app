@@ -27,7 +27,7 @@ jobs:
         run: >-
           npx vitest run
           --coverage --coverage.provider=istanbul
-          --coverage.reporter=text-summary --coverage.reporter=json-summary
+          --coverage.reporter=text --coverage.reporter=text-summary --coverage.reporter=json-summary
           --coverage.reportsDirectory=coverage-istanbul
           --exclude='.stryker-tmp/**' --exclude='.worktrees/**'
       - name: Publicar resumo no PR
