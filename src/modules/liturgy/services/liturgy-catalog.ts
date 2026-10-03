@@ -9,6 +9,7 @@ import {
   listLocalCollections,
   listLocalMusics,
 } from '@modules/media/services/local-custom-store'
+import { matchesAllTerms } from "@shared/services/search-terms"
 
 import type {
   LiturgyBibleBookOption,
@@ -405,16 +406,17 @@ export function filterLiturgyMusicOptions(
   const numQuery = isNum ? Number(trimmed) : null
 
   let results = options.filter((entry) => {
-    const title = entry.name.toLowerCase()
-    const album = entry.albumNames.toLowerCase()
+    const title = entry.name
+    const album = entry.albumNames
     if (isNum && numQuery != null) {
       return (
-        title.includes(trimmed) ||
-        album.includes(trimmed) ||
+        matchesAllTerms(title, album, trimmed) ||
         entry.hymnalTrack === numQuery
       )
     }
-    return title.includes(trimmed) || album.includes(trimmed)
+    // Busca por termos (03/10): "jesus adoradores 5" acha a música "Jesus"
+    // do álbum "Adoradores 5" — substring contígua não existe em campo nenhum.
+    return matchesAllTerms(title, album, trimmed)
   })
 
   if (isNum && numQuery != null) {
