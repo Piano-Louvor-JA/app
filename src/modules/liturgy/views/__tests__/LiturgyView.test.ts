@@ -233,11 +233,25 @@ describe('LiturgyView', () => {
     })
 
     it('custom dialog v-model (328) e clone source-key (337)', async () => {
+      mockState.customDialogOpen = ref(true)
+      mockState.cloneDialogOpen = ref(true)
+      const createCustomLiturgy = vi.fn()
+      const cloneLiturgyFromSelected = vi.fn()
+      const closeCustomDialog = vi.fn()
+      const closeCloneDialog = vi.fn()
+      mockState.createCustomLiturgy = createCustomLiturgy
+      mockState.cloneLiturgyFromSelected = cloneLiturgyFromSelected
+      mockState.closeCustomDialog = closeCustomDialog
+      mockState.closeCloneDialog = closeCloneDialog
       const w = createWrapper()
+      await w.vm.$nextTick()
       const custom = w.find('[data-stub="custom-dialog"]')
       const clone = w.find('[data-stub="clone-dialog"]')
-      void custom
-      void clone
+      if (custom.exists()) await custom.trigger('click') // emite create
+      if (clone.exists()) await clone.trigger('click') // emite confirm
+      await w.vm.$nextTick()
+      expect(createCustomLiturgy).toHaveBeenCalled()
+      expect(cloneLiturgyFromSelected).toHaveBeenCalled()
       w.unmount()
     })
   })
