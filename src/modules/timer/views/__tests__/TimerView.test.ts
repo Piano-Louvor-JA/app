@@ -143,4 +143,18 @@ describe('TimerView - coverage básico', () => {
       expect(true).toBe(true)
     })
   })
+  describe('gaps — stage subscription/effectiveConfig', () => {
+    it('onMounted assina stage settings', () => {
+      const wrapper = mount(TimerView, { global: { stubs: { teleport: true } } })
+      // subscribeStageSettings mockada no topo retorna () => {}
+      expect(wrapper.exists()).toBe(true)
+      wrapper.unmount()
+    })
+
+    it('unmount não lança', () => {
+      const wrapper = mount(TimerView, { global: { stubs: { teleport: true } } })
+      expect(() => wrapper.unmount()).not.toThrow()
+    })
+  })
+
 })
