@@ -38,6 +38,10 @@ export type LocalMusic = {
 	/** bytes de áudio local (base64) — toca no browser, não sobe */
 	audioBase64?: string | null;
 	audioName?: string | null;
+	/** Duração conhecida/estimada (ms) — p.ex. import .slja (app#331). */
+	durationMs?: number | null;
+	/** SHA-256 do arquivo .slja de origem — dedupe de re-import (app#331). */
+	sljaHash?: string | null;
 };
 
 export type LocalCollection = {
@@ -157,6 +161,12 @@ export function getLocalMusic(id: number): LocalMusic | null {
 	return loadDb().musics.find((m) => m.id === id) ?? null;
 }
 
+/** Música local importada do mesmo arquivo .slja (dedupe por content hash). */
+export function findLocalMusicBySljaHash(hash: string): LocalMusic | null {
+	const db = loadDb();
+	return db.musics.find((m) => m.sljaHash === hash) ?? null;
+}
+
 export function createLocalMusic(
 	collectionId: number,
 	input: { name?: string; lyric?: string; officialMusicId?: number },
@@ -191,6 +201,9 @@ export function updateLocalMusic(
 		name?: string;
 		audioBase64?: string | null;
 		audioName?: string | null;
+		durationMs?: number | null;
+		/** Capa/cover da música — data: URL base64 (local, offline-first). */
+		image_url?: string | null;
 	},
 ): boolean {
 	const db = loadDb();
@@ -199,6 +212,8 @@ export function updateLocalMusic(
 	if (patch.name != null) music.name = patch.name;
 	if (patch.audioBase64 !== undefined) music.audioBase64 = patch.audioBase64;
 	if (patch.audioName !== undefined) music.audioName = patch.audioName;
+	if (patch.durationMs !== undefined) music.durationMs = patch.durationMs;
+	if (patch.image_url !== undefined) music.image_url = patch.image_url;
 	saveDb(db);
 	return true;
 }
@@ -215,7 +230,15 @@ export function deleteLocalMusic(id: number): boolean {
 
 export function createLocalLyric(
 	musicId: number,
-	input: { lyric: string; aux_lyric?: string; time?: string; order?: number },
+	input: {
+		lyric: string;
+		aux_lyric?: string;
+		time?: string;
+		order?: number;
+		/** Fundo do slide — data: URL base64 (import .slja local). */
+		image_url?: string | null;
+		image_position?: string | null;
+	},
 ): LocalLyric {
 	const db = loadDb();
 	const music = db.musics.find((m) => m.id === musicId);
@@ -228,6 +251,8 @@ export function createLocalLyric(
 		time: input.time ?? null,
 		order,
 		show_slide: true,
+		image_url: input.image_url ?? null,
+		image_position: input.image_position ?? null,
 	};
 	db.nextLyricId -= 1;
 	music.lyrics.push(lyric);
