@@ -94,16 +94,16 @@ function hasRealSession(): boolean {
  * (pull) quando houver, ou null se nada foi enviado (sem sessão / fila
  * vazia / falha — itens permanecem na fila).
  */
-export async function flushOutbox(): Promise<{
-  operator_state: Array<{
-    client_uuid: string
-    namespace: string
-    key: string
-    value_json: string
-    updated_at_ms: number
-    deleted_at: number | null
-  }>
-} | null> {
+export type OperatorStateItem = {
+  client_uuid: string
+  namespace: string
+  key: string
+  value_json: string
+  updated_at_ms: number
+  deleted_at: number | null
+}
+
+export async function flushOutbox(): Promise<OperatorStateItem[] | null> {
   const box = readOutbox()
   const entries = Object.values(box)
   if (entries.length === 0) return null

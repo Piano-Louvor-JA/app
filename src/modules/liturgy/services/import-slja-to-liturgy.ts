@@ -146,7 +146,7 @@ export async function importSljaAsLiturgyMusic(
 	// Identidade de conteúdo: re-import do mesmo arquivo atualiza em vez de
 	// duplicar (feedback Ezequias/Rafael: "itens importados não deveriam
 	// duplicar").
-	const sljaHash = await sha256Hex(bytes);
+	const sljaHash = await sha256Hex(new Uint8Array(bytes));
 	const innerName = (archive as { innerName?: string }).innerName;
 
 	const name = sljaDisplayName(archive, innerName ?? fileName);
@@ -165,14 +165,14 @@ export async function importSljaAsLiturgyMusic(
 	// (dedup) e SÓ após aprovação do usuário. Deslogado nem pergunta.
 	const session = getAuthSession();
 	if (!session) {
-		return importSljaLocal({ name, archive, slides, durationMs });
+		return importSljaLocal({ name, archive, slides, durationMs, sljaHash });
 	}
 
 	const approved = options?.confirmUpload
 		? await options.confirmUpload()
 		: false;
 	if (!approved) {
-		return importSljaLocal({ name, archive, slides, durationMs });
+		return importSljaLocal({ name, archive, slides, durationMs, sljaHash });
 	}
 
 	// ── Logado: sobe pra API (Minhas Coletâneas → "Importações .slja").
@@ -197,11 +197,15 @@ export async function importSljaAsLiturgyMusic(
 	// Já existia (re-import): mídias já estão vinculadas — pular uploads.
 	if (created.existed) {
 		return {
-			ok: true,
 			musicId,
+			displayMusicId: toCustomMusicId(musicId),
+			name,
+			collectionId,
+			slides: 0,
+			hasAudio: false,
 			uploadedImages: 0,
-			uploadedAssets: [],
-			uploadedAudio: false,
+			durationMs: 0,
+			local: false,
 			sljaHash,
 			updatedExisting: true,
 		};
@@ -324,6 +328,8 @@ export async function importSljaAsLiturgyMusic(
 		uploadedImages,
 		durationMs,
 		local: false,
+		sljaHash,
+		updatedExisting: false,
 	};
 }
 
@@ -337,11 +343,13 @@ async function importSljaLocal({
 	archive,
 	slides,
 	durationMs,
+	sljaHash,
 }: {
 	name: string;
 	archive: Awaited<ReturnType<typeof parseSljaFile>>;
 	slides: Array<{ lyric: string; timeMs: number; order?: number }>;
 	durationMs: number;
+	sljaHash: string;
 }): Promise<ImportedSljaLiturgyMusic> {
 	// Import dinâmico: mantém a API fora do caminho local (offline-first e
 	// testes sem rede nunca tocam fetch).
@@ -410,6 +418,8 @@ async function importSljaLocal({
 		uploadedImages: 0,
 		durationMs,
 		local: true,
+		sljaHash,
+		updatedExisting: false,
 	};
 }
 

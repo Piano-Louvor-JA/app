@@ -406,7 +406,7 @@ function localMusicToSummary(m: LocalMusic): CustomMusicSummary {
 export async function copyCustomMusic(
   collectionId: number,
   musicId: number,
-): Promise<{ id: number } | null> {
+): Promise<{ id: number; existed?: boolean } | null> {
   try {
     const response = await fetch(
       `${customBaseUrl()}/collections/${collectionId}/musics/${musicId}/copy`,
