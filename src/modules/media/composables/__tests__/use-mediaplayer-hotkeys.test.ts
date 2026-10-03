@@ -165,6 +165,73 @@ describe('useMediaPlayerHotkeys', () => {
     bridge.onMediaNavigate!('next')
     wrapper.unmount()
   })
+  describe('reclaimOperatorFocus — blur de button/range (gaps)', () => {
+    function mountWithLateOpen() {
+      const pinia = createPinia()
+      setActivePinia(pinia)
+      const HostLate = defineComponent({
+        setup() {
+          const store = useMediaStore()
+          useMediaPlayerHotkeys(() => false)
+          // abre DEPOIS de montado: dispara o watch → scheduleReclaims
+          setTimeout(() => store.open({ musicId: 1, mode: 'no_audio', project: false }), 0)
+          return {}
+        },
+        render: () => null,
+      })
+      return mount(HostLate, { global: { plugins: [pinia] } })
+    }
+
+    it('foco em button: blur chamado (timers 50/200/500)', async () => {
+      const btn = document.createElement('button')
+      document.body.appendChild(btn)
+      btn.focus()
+      Object.defineProperty(document, 'activeElement', { configurable: true, value: btn, writable: true })
+      const blurSpy = vi.spyOn(btn, 'blur')
+      const w = mountWithLateOpen()
+      await new Promise((r) => setTimeout(r, 600))
+      expect(blurSpy).toHaveBeenCalled()
+      w.unmount()
+      btn.remove()
+    })
+
+    it('foco em input[type=range]: blur chamado', async () => {
+      const input = document.createElement('input')
+      input.type = 'range'
+      document.body.appendChild(input)
+      input.focus()
+      Object.defineProperty(document, 'activeElement', { configurable: true, value: input, writable: true })
+      const blurSpy = vi.spyOn(input, 'blur')
+      const w = mountWithLateOpen()
+      await new Promise((r) => setTimeout(r, 600))
+      expect(blurSpy).toHaveBeenCalled()
+      w.unmount()
+      input.remove()
+    })
+
+    it('foco em input de texto: NÃO faz blur', async () => {
+      const input = document.createElement('input')
+      input.type = 'text'
+      document.body.appendChild(input)
+      input.focus()
+      Object.defineProperty(document, 'activeElement', { configurable: true, value: input, writable: true })
+      const blurSpy = vi.spyOn(input, 'blur')
+      const w = mountWithLateOpen()
+      await new Promise((r) => setTimeout(r, 600))
+      expect(blurSpy).not.toHaveBeenCalled()
+      w.unmount()
+      input.remove()
+    })
+
+    it('foco no body: sem elemento pra desfocar, não lança', async () => {
+      Object.defineProperty(document, 'activeElement', { configurable: true, value: document.body, writable: true })
+      const w = mountWithLateOpen()
+      await new Promise((r) => setTimeout(r, 600))
+      expect(document.activeElement).toBeTruthy()
+      w.unmount()
+    })
+  })
+
 })
 
 function store_slideIndex() {
