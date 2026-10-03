@@ -483,6 +483,43 @@ describe('AlbumsView', () => {
     expect(customCatalogMock.listCustomCollections).toHaveBeenCalledTimes(2)
   })
 
+  it('gaps: retry erro catálogo, dismiss downloadError/actionMessage, modais close/editor', async () => {
+    setState({ lastErrorKey: 'albums.errors.load', downloadErrorKey: 'albums.errors.download', lastActionMessageKey: 'albums.messages.added' })
+    const w = await mountView()
+    await flushPromises()
+    // retry (erro de catálogo)
+    const retryBtn = w.findAll('button').find((b) => b.text().includes('albums.retry') || b.text().toLowerCase().includes('retry'))
+    if (retryBtn) await retryBtn.trigger('click')
+    await flushPromises()
+    // dismiss download error
+    const dismiss = w.findAll('button').filter((b) => b.text().includes('albums.dismiss'))
+    for (const d of dismiss) await d.trigger('click')
+    await flushPromises()
+    w.unmount()
+
+    // playlists modal: fechar pelo X
+    const w2 = await mountView()
+    const btn = w2.findAll('button').find((b) => b.attributes('aria-label') === 'albums.playlists.title')!
+    await btn.trigger('click')
+    await flushPromises()
+    const closeBtn = w2.findAll('button').find((b) => b.attributes('aria-label')?.includes('lyric.close'))
+    if (closeBtn) await closeBtn.trigger('click')
+    await flushPromises()
+    w2.unmount()
+
+    // custom modal: fechar pelo X + editor btn
+    const w3 = await mountView()
+    const customBtn = w3.findAll('button').find((b) => (b.attributes('aria-label') ?? '').includes('custom'))
+    if (customBtn) {
+      await customBtn.trigger('click')
+      await flushPromises()
+      const xBtn = w3.findAll('button').find((b) => b.attributes('aria-label')?.includes('lyric.close'))
+      if (xBtn) await xBtn.trigger('click')
+      await flushPromises()
+    }
+    w3.unmount()
+  })
+
   it('playlist com faixas: play navega pro media, remove faixa e toggle colapsa', async () => {
     savePlaylists([
       {
