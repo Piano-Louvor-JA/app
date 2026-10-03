@@ -1,142 +1,114 @@
 // @vitest-environment jsdom
-import { mount } from "@vue/test-utils";
-import { describe, expect, it, vi } from "vitest";
-import { createI18n } from "vue-i18n";
+// Cobertura AlbumTrackRow: play button (stop propagation, guards), botão de
+// playlist, overlay de download e teclado (gaps_map3).
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { mount } from '@vue/test-utils'
 
-vi.mock("@shared/components/MusicTrackActions.vue", () => ({
+vi.mock('vue-i18n', () => ({
+  useI18n: () => ({ t: (k: string) => k, locale: { value: 'pt-BR' } }),
+}))
+
+vi.mock('@shared/components/MusicTrackActions.vue', () => ({
   default: {
-    name: "MusicTrackActions",
-    props: ["musicId", "trackName", "collectionName", "artworkUrl", "disabled"],
-    emits: ["download-progress", "sung", "instrumental", "slides", "lyric", "playlist"],
-    setup(_: Record<string, unknown>, { emit }: { emit: (e: string, v: unknown) => void }) {
-      return {
-        triggerProgress: () => emit("download-progress", 42),
-        triggerSung: () => emit("sung", null),
-      };
-    },
-    template: `<div class="mta-stub"><span data-instrumental>instrumental</span><span data-slides>slides</span><span data-lyric>lyric</span><span data-playlist>playlist</span><span data-download-progress>download-progress</span></div>`,
+    name: 'MusicTrackActions',
+    props: ['musicId', 'trackName', 'hasInstrumental', 'busy', 'rowHovered', 'variant'],
+    emits: ['sung', 'instrumental', 'slides', 'lyric', 'download-progress'],
+    template: `<div class="mta-stub">
+      <button class="mta-sung" @click.stop="$emit('sung')" />
+      <button class="mta-inst" @click.stop="$emit('instrumental')" />
+      <button class="mta-slides" @click.stop="$emit('slides')" />
+      <button class="mta-lyric" @click.stop="$emit('lyric')" />
+      <button class="mta-progress" @click.stop="$emit('download-progress', 80)" />
+    </div>`,
   },
-}));
+}))
 
-import AlbumTrackRow from "../AlbumTrackRow.vue";
+import AlbumTrackRow from '../AlbumTrackRow.vue'
+import type { AlbumTrack } from '../../types/albums'
 
-const i18n = createI18n({
-  legacy: false,
-  locale: "pt-BR",
-  messages: { "pt-BR": { media: { actions: { sung: "Cantar" } } } },
-});
-
-const track = {
-  id: "t1",
-  musicId: 11,
-  name: "Faixa 1",
-  track: 1,
-} as never;
-
-function mountRow(props: Record<string, unknown> = {}) {
-  return mount(AlbumTrackRow, {
-    global: { plugins: [i18n] },
-    props: { track, ...props },
-  });
+const track: AlbumTrack = {
+  musicId: 7,
+  name: 'Nova bênção',
+  track: 3,
+  durationLabel: '4:02',
+  hasInstrumental: false,
 }
 
-describe("AlbumTrackRow.vue", () => {
-  it("renderiza número e nome da faixa", () => {
-    const wrapper = mountRow();
-    expect(wrapper.find(".album-track-row__number").text()).toBe("1");
-    expect(wrapper.text()).toContain("Faixa 1");
-    expect(wrapper.find(".album-track-row__download-overlay").exists()).toBe(false);
-  });
+const mountRow = (over: Record<string, unknown> = {}) =>
+  mount(AlbumTrackRow, {
+    props: { track, collectionName: 'Hinário', artworkUrl: null, ...over },
+  })
 
-  it("track sem número: mostra —", () => {
-    const wrapper = mountRow({ track: { ...track, track: null } as never });
-    expect(wrapper.find(".album-track-row__number").text()).toBe("—");
-  });
+describe('AlbumTrackRow', () => {
+  beforeEach(() => vi.clearAllMocks())
 
-  it("download-progress ativa overlay e bloqueia play", async () => {
-    const wrapper = mountRow();
-    const mta = wrapper.findComponent({ name: "MusicTrackActions" });
-    await mta.trigger("click"); // triggerProgress → emit download-progress 42
-    // emitir diretamente para garantir
-    await mta.vm.$emit("download-progress", 42);
-    await wrapper.vm.$nextTick();
-    expect(wrapper.find(".album-track-row__download-overlay").exists()).toBe(true);
-    expect(wrapper.find(".album-track-row__download-percent").text()).toContain("42");
-    // busy durante download: click na row NÃO emite sung
-    wrapper.vm.$emit = wrapper.vm.$emit;
-    await wrapper.find(".album-track-row").trigger("click");
-    // sung não emitido pela row (guard isDownloading)
-  });
+  it('renderiza número, título, coletânea e duração; sem artwork mostra ícone', () => {
+    const w = mountRow()
+    expect(w.find('.album-track-row__number').text()).toBe('3')
+    expect(w.find('.album-track-row__title').text()).toContain('Nova bênção')
+    expect(w.find('.album-track-row__collection').text()).toContain('Hinário')
+    expect(w.find('.album-track-row__duration').text()).toBe('4:02')
+    expect(w.find('.album-track-row__artwork img').exists()).toBe(false)
+    expect(w.find('.album-track-row__artwork .ti-music').exists()).toBe(true)
+  })
 
-  it("click na row emite sung quando liberado", async () => {
-    const wrapper = mountRow();
-    await wrapper.find(".album-track-row").trigger("click");
-    expect(wrapper.emitted("sung")).toBeTruthy();
-  });
+  it('artwork presente renderiza img e some o ícone; track null mostra traço; sem collectionName omite', () => {
+    const w = mountRow({ artworkUrl: '/covers/x.jpg', track: { ...track, track: null }, collectionName: undefined })
+    expect(w.find('.album-track-row__artwork img').exists()).toBe(true)
+    expect(w.find('.album-track-row__number').text()).toBe('—')
+    expect(w.find('.album-track-row__collection').exists()).toBe(false)
+  })
 
-  it("busy=true: click na row não emite sung", async () => {
-    const wrapper = mountRow({ busy: true });
-    await wrapper.find(".album-track-row").trigger("click");
-    expect(wrapper.emitted("sung")).toBeFalsy();
-  });
+  it('botão play emite sung com stop propagation', async () => {
+    const w = mountRow()
+    await w.find('.album-track-row__play').trigger('click')
+    expect(w.emitted('sung')).toHaveLength(1)
+  })
 
-  it("keydown.enter emite sung; botão play emite sung com stop", async () => {
-    const wrapper = mountRow();
-    await wrapper.find(".album-track-row").trigger("keydown.enter");
-    expect(wrapper.emitted("sung")).toBeTruthy();
-    await wrapper.find(".album-track-row__play").trigger("click");
-    expect(wrapper.emitted("sung")).toHaveLength(2);
-  });
+  it('botão playlist emite playlist; desabilitado quando busy', async () => {
+    const w = mountRow()
+    await w.find('.album-track-row__playlist').trigger('click')
+    expect(w.emitted('playlist')).toHaveLength(1)
+    const busy = mountRow({ busy: true })
+    expect(busy.find('.album-track-row__play').attributes('disabled')).toBeDefined()
+    expect(busy.find('.album-track-row__playlist').attributes('disabled')).toBeDefined()
+  })
 
-  it("emit instrumental/slides/lyric/playlist via MusicTrackActions", async () => {
-    const wrapper = mountRow();
-    const mta = wrapper.findComponent({ name: "MusicTrackActions" });
-    // Tudo ocorre no template stub — cobrimos os listeners do AlbumTrackRow.vue
-    expect(mta.find("[data-instrumental]").exists()).toBe(true);
-    expect(mta.find("[data-slides]").exists()).toBe(true);
-    expect(mta.find("[data-lyric]").exists()).toBe(true);
-    expect(mta.find("[data-playlist]").exists()).toBe(true);
-    expect(mta.find("[data-download-progress]").exists()).toBe(true);
-  });
+  it('clique na linha (fora dos botões) emite sung; enter/espaço também', async () => {
+    const w = mountRow()
+    await w.find('.album-track-row').trigger('click')
+    await w.find('.album-track-row').trigger('keydown.enter')
+    await w.find('.album-track-row').trigger('keydown.space')
+    expect(w.emitted('sung')).toHaveLength(3)
+  })
 
-  describe('hover e playlist/sung (final)', () => {
-    it('mouseenter/mouseleave no row', async () => {
-      const w = mountRow()
-      ;(w.element as HTMLElement).dispatchEvent(new MouseEvent('mouseenter'))
-      await w.vm.$nextTick()
-      ;(w.element as HTMLElement).dispatchEvent(new MouseEvent('mouseleave'))
-      await w.vm.$nextTick()
-      w.unmount()
-    })
+  it('busy bloqueia clique da linha', async () => {
+    const w = mountRow({ busy: true })
+    await w.find('.album-track-row').trigger('click')
+    expect(w.emitted('sung')).toBeUndefined()
+  })
 
-    it('playlist button emite playlist (126)', async () => {
-      const w = mountRow()
-      const btn = w.findAll('button').find(b => (b.attributes('title') ?? '').length > 0 || (b.attributes('aria-label') ?? '').length > 0)
-      for (const b of w.findAll('button')) {
-        const cls = b.classes().join(' ')
-        if (cls.includes('playlist')) {
-          await b.trigger('click')
-          expect(w.emitted('playlist')).toBeTruthy()
-        }
-      }
-      w.unmount()
-    })
+  it('download em progresso: overlay visível, linha marcada e sung bloqueado', async () => {
+    const w = mountRow()
+    await w.find('.mta-progress').trigger('click')
+    expect(w.find('.album-track-row__download-overlay').exists()).toBe(true)
+    expect(w.find('.album-track-row__download-percent').text()).toContain('80')
+    expect(w.classes()).toContain('album-track-row--downloading')
+    await w.find('.album-track-row').trigger('click')
+    expect(w.emitted('sung')).toBeUndefined()
+    // play button desabilitado durante download
+    expect(w.find('.album-track-row__play').attributes('disabled')).toBeDefined()
+  })
 
-    it('MusicTrackActions emits propagam (137-140)', async () => {
-      const w = mountRow()
-      const stub = w.findComponent({ name: 'MusicTrackActions' })
-      if (stub.exists()) {
-        stub.vm.$emit('sung')
-        stub.vm.$emit('instrumental')
-        stub.vm.$emit('slides')
-        stub.vm.$emit('lyric')
-        await w.vm.$nextTick()
-        expect(w.emitted('sung')).toBeTruthy()
-        expect(w.emitted('instrumental')).toBeTruthy()
-        expect(w.emitted('slides')).toBeTruthy()
-        expect(w.emitted('lyric')).toBeTruthy()
-      }
-      w.unmount()
-    })
+  it('ações do MusicTrackActions repassam eventos', async () => {
+    const w = mountRow()
+    await w.find('.mta-inst').trigger('click')
+    await w.find('.mta-slides').trigger('click')
+    await w.find('.mta-lyric').trigger('click')
+    await w.find('.mta-sung').trigger('click')
+    expect(w.emitted('instrumental')).toHaveLength(1)
+    expect(w.emitted('slides')).toHaveLength(1)
+    expect(w.emitted('lyric')).toHaveLength(1)
+    expect(w.emitted('sung')).toHaveLength(1)
   })
 })
