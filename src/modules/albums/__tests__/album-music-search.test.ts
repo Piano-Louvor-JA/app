@@ -300,4 +300,70 @@ describe('filterAlbumMusicIndex', () => {
     expect(hits).toHaveLength(1)
     expect(hits[0]).toMatchObject({ track: 3, isHymnal: false })
   })
+  describe('gaps — instrumental/url, hymnal_1996, nome vazio, fetch fallback', () => {
+    it('hasInstrumental via url_instrumental_music string', async () => {
+      readCatalogRecord.mockResolvedValue([
+        { id_music: 7, name: 'Com URL', url_instrumental_music: 'https://x/y.mp3' },
+        { id_music: 8, name: 'Sem URL', url_instrumental_music: '   ' },
+      ])
+      const idx = await loadAlbumMusicIndex()
+      const com = idx.find((h) => h.musicId === 7)
+      const sem = idx.find((h) => h.musicId === 8)
+      expect(com?.hasInstrumental).toBe(true)
+      expect(sem?.hasInstrumental).toBe(false)
+    })
+
+    it('isHymnal via type hymnal_1996', async () => {
+      readCatalogRecord.mockResolvedValue([
+        { id_music: 9, name: 'X', albums: [{ id_album: 5, name: 'Coletânea', type: 'hymnal_1996', pivot: { track: 3 } }] },
+      ])
+      const idx = await loadAlbumMusicIndex()
+      expect(idx[0]?.isHymnal).toBe(true)
+    })
+
+    it('isHymnal via nome contendo Hinário Adventista', async () => {
+      readCatalogRecord.mockResolvedValue([
+        { id_music: 10, name: 'Y', albums: [{ id_album: 6, name: 'Hinário Adventista 2', pivot: { track: 4 } }] },
+      ])
+      const idx = await loadAlbumMusicIndex()
+      expect(idx[0]?.isHymnal).toBe(true)
+    })
+
+    it('row com nome vazio é descartada', async () => {
+      readCatalogRecord.mockResolvedValue([
+        { id_music: 11, name: '   ' },
+        { id_music: 12, name: 'Válida' },
+      ])
+      const idx = await loadAlbumMusicIndex()
+      expect(idx.find((h) => h.musicId === 11)).toBeUndefined()
+      expect(idx.find((h) => h.musicId === 12)).toBeTruthy()
+    })
+
+    it('local null → fetch remoto; erro no fetch → []', async () => {
+      readCatalogRecord.mockResolvedValue(null)
+      fetchRemoteCatalogJson.mockResolvedValue([
+        { id_music: 20, name: 'Remota' },
+      ])
+      let idx = await loadAlbumMusicIndex()
+      expect(idx.length).toBe(1)
+      fetchRemoteCatalogJson.mockRejectedValue(new Error('off'))
+      idx = await loadAlbumMusicIndex()
+      expect(idx).toEqual([])
+    })
+
+    it('filtro vazio → []', () => {
+      expect(filterAlbumMusicIndex([{ musicId: 1, name: 'A', albumNames: 'B', hymnalTracks: [], isHymnal: false, hasInstrumental: false } as never], '  ')).toEqual([])
+    })
+
+    it('merge de duplicados: albumNames combinados sem repetir', async () => {
+      readCatalogRecord.mockResolvedValue([
+        { id_music: 30, name: 'M', albums: [{ id_album: 1, name: 'CD A', pivot: { track: 1 } }] },
+        { id_music: 30, name: 'M', albums: [{ id_album: 1, name: 'CD A', pivot: { track: 1 } }] },
+      ])
+      const idx = await loadAlbumMusicIndex()
+      expect(idx.length).toBe(1)
+      expect(idx[0].albumNames).toBe('CD A')
+    })
+  })
+
 })
