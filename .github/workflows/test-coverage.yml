@@ -1,0 +1,56 @@
+# CI de Testes — cobertura rigorosa (istanbul) com thresholds 100/100/100/100.
+# Meta: nenhum PR entra sem toda a cobertura de testes passando.
+name: Test Coverage Gate
+
+on:
+  pull_request:
+    branches: [staging, main]
+  push:
+    branches: [staging, main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  unit-coverage:
+    name: Unit Tests + Coverage 100%
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Vitest (istanbul) com thresholds 100/100/100/100
+        run: npx vitest run \
+          --coverage \
+          --coverage.provider=istanbul \
+          --coverage.reporter=text-summary \
+          --coverage.reporter=json-summary \
+          --coverage.reportsDirectory=coverage-istanbul \
+          --exclude='.stryker-tmp/**' \
+          --exclude='.worktrees/**'
+      - name: Publicar resumo no PR
+        if: always() && github.event_name == 'pull_request'
+        run: |
+          if [ -f coverage-istanbul/coverage-summary.json ]; then
+            echo "## Coverage (istanbul)" >> "$GITHUB_STEP_SUMMARY"
+            node -e "
+              const s = require('./coverage-istanbul/coverage-summary.json').total;
+              const fmt = (l, v) => '| ' + l + ' | ' + v.pct + '% | ' + v.covered + '/' + v.total + ' |';
+              console.log(fmt('Statements', s.statements));
+              console.log(fmt('Branches', s.branches));
+              console.log(fmt('Functions', s.functions));
+              console.log(fmt('Lines', s.lines));
+            " >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Falha explícita se abaixo de 100
+        run: |
+          node -e "
+            const s = require('./coverage-istanbul/coverage-summary.json').total;
+            const bad = Object.entries(s).filter(([k, v]) => ['statements','branches','functions','lines'].includes(k) && v.pct < 100);
+            if (bad.length) { console.error('COBERTURA < 100:', bad.map(([k,v]) => k+'='+v.pct+'%').join(', ')); process.exit(1); }
+            console.log('100/100/100/100 OK');
+          "
