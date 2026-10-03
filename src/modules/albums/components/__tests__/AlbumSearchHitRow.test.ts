@@ -89,4 +89,27 @@ describe('AlbumSearchHitRow.vue', () => {
     await wrapper.find('.album-search-hit').trigger('mouseleave')
     expect(wrapper.exists()).toBe(true)
   })
+  it('download-progress do child: repassa pro pai', async () => {
+    const wrapper = createWrapper()
+    const stub = wrapper.findComponent({ name: 'MusicTrackActions' })
+    stub.vm.$emit('download-progress', 42)
+    await wrapper.vm.$nextTick()
+    expect(wrapper.emitted('download-progress')).toBeTruthy()
+    expect(wrapper.emitted('download-progress')![0]).toEqual([42])
+    wrapper.unmount()
+  })
+
+  it('emits instrumental/slides/lyric repassados', async () => {
+    const wrapper = createWrapper()
+    const stub = wrapper.findComponent({ name: 'MusicTrackActions' })
+    stub.vm.$emit('instrumental')
+    stub.vm.$emit('slides')
+    stub.vm.$emit('lyric')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.emitted('instrumental')).toBeTruthy()
+    expect(wrapper.emitted('slides')).toBeTruthy()
+    expect(wrapper.emitted('lyric')).toBeTruthy()
+    wrapper.unmount()
+  })
+
 })
