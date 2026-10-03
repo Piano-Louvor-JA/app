@@ -47,6 +47,7 @@ jobs:
       - name: Vitest passada 2 — testes que montam .vue (istanbul)
         run: >-
           npx vitest run
+          src/__tests__ src/layouts
           src/design-system/components
           src/modules/albums/components src/modules/albums/views
           src/modules/bible/components src/modules/bible/views
