@@ -112,4 +112,40 @@ describe('InAppProjectionOverlay', () => {
     expect(wrapper.find('.stage-content').text()).toBe('STAGE')
     wrapper.unmount()
   })
+  describe('gaps — input types no Escape', () => {
+    for (const type of ['button', 'checkbox', 'radio', 'range', 'file', 'reset', 'submit']) {
+      it(`input[type=${type}]: Escape passa (emite close)`, async () => {
+        const input = document.createElement('input')
+        input.type = type
+        document.body.appendChild(input)
+        const wrapper = (await import('../InAppProjectionOverlay.vue')).default
+        const { mount } = await import('@vue/test-utils')
+        const w = mount(wrapper, { attachTo: document.body })
+        const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+        Object.defineProperty(event, 'target', { value: input, configurable: true })
+        document.dispatchEvent(event)
+        await w.vm.$nextTick()
+        expect(w.emitted('close') ?? w.find('.inapp-projection').exists()).toBeTruthy()
+        w.unmount()
+        input.remove()
+      })
+    }
+
+    it('input[type=text]: Escape bloqueado (não emite close)', async () => {
+      const input = document.createElement('input')
+      input.type = 'text'
+      document.body.appendChild(input)
+      const component = (await import('../InAppProjectionOverlay.vue')).default
+      const { mount } = await import('@vue/test-utils')
+      const w = mount(component, { attachTo: document.body })
+      const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+      Object.defineProperty(event, 'target', { value: input, configurable: true })
+      document.dispatchEvent(event)
+      await w.vm.$nextTick()
+      expect(w.emitted('close')).toBeUndefined()
+      w.unmount()
+      input.remove()
+    })
+  })
+
 })
