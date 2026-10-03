@@ -1,6 +1,6 @@
-# Build Windows — instalador NSIS + ZIP portátil (x64).
-# Portable: pasta win-unpacked zipada — descompacta e roda, sem instalar.
-# (Electron 44+ não publica mais win32-ia32 — ver docs/DEPLOY.md)
+# Build Windows — instalador NSIS + Portable (exe único, estilo AppImage) x64.
+# Portable: UM .exe só — duplo clique e roda, sem instalar e sem pasta de
+# arquivos soltos pro usuário curioso mexer. (Electron 44+ não publica win32-ia32)
 # Roda manualmente (workflow_dispatch) ou em push de tags v*
 name: Build Windows
 
@@ -28,16 +28,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Vite + Electron NSIS (x64) + portable zip + publish
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm run electron:build -- --win --x64 --publish always
-          # Zip portátil a partir do win-unpacked (mesma build do instalador)
-          cd dist-electron/win-unpacked
-          7z a -tzip ../LouvorJA-PIANO-Windows-x64-portable.zip . > /dev/null
-          cd ..
-          sha256sum LouvorJA-PIANO-Windows-x64-portable.zip
+      # Target "portable" definido no package.json (win.target) — gera
+      # LouvorJA-PIANO-<ver>-portable.exe (arquivo único) junto com o Setup.
+      - name: Build Vite + Electron NSIS + Portable (x64) + publish
+        run: npm run electron:build -- --win --x64 --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -50,10 +44,9 @@ jobs:
           set -euo pipefail
           cd dist-electron
           find . -maxdepth 1 -type f -name '*.exe' -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS-win-x64
-          sha256sum LouvorJA-PIANO-Windows-x64-portable.zip >> SHA256SUMS-win-x64
           cat SHA256SUMS-win-x64
           if [ -n "$TAG" ]; then
-            gh release upload "$TAG" SHA256SUMS-win-x64 "LouvorJA-PIANO-Windows-x64-portable.zip" --clobber
+            gh release upload "$TAG" SHA256SUMS-win-x64 --clobber
           fi
 
       - name: Upload x64 installer + portable (artifact backup)
@@ -62,8 +55,7 @@ jobs:
           name: LouvorJA-PIANO-Windows-x64
           path: |
             dist-electron/*Setup*.exe
-            dist-electron/*.exe
-            dist-electron/LouvorJA-PIANO-Windows-x64-portable.zip
+            dist-electron/*portable*.exe
             dist-electron/SHA256SUMS-win-x64
           if-no-files-found: warn
           retention-days: 30
