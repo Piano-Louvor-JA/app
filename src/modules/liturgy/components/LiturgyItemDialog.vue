@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { getDesktopBridge, isDesktopApp } from '@shared/services/desktop-bridge'
+import { appConfirm } from '@shared/composables/useAppConfirm'
 import type {
   FileDialogFilter,
   PresentationEngine,
@@ -89,7 +90,17 @@ async function onImportSljaFile(event: Event): Promise<void> {
       bytes: await file.arrayBuffer(),
       name: file.name,
     }
-    const imported = await importSljaAsLiturgyMusic(source)
+    const imported = await importSljaAsLiturgyMusic(source, {
+      // Regra: banco só recebe com aprovação. Recusou = salva só no app
+      // (local) — sem fricção, sem erro.
+      confirmUpload: () =>
+        appConfirm({
+          title: t('liturgy.slja.uploadTitle', { name: file.name }),
+          message: t('liturgy.slja.uploadMessage'),
+          confirmLabel: t('liturgy.slja.uploadConfirm'),
+          cancelLabel: t('liturgy.slja.uploadCancel'),
+        }),
+    })
     // web#174 (referência): recarrega o catálogo ANTES da seleção valer —
     // sem isso o id novo não existe em musicList, selectedMusic fica null
     // e o submit é bloqueado (música "não toca").

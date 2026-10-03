@@ -32,7 +32,8 @@ function routeFetch(musicId: number, lyricId: number) {
 			return json({ id_collection: 55 });
 		}
 		if (u.includes("/collections/55/musics") && init?.method === "POST") {
-			return json({ id_music: musicId });
+			// 201 = criado (dedup: 200 seria "já existia" e pularia uploads)
+			return json({ id_music: musicId }, 201);
 		}
 		if (u.endsWith("/files") && init?.method === "POST") {
 			files.push({});
@@ -82,10 +83,10 @@ describe("import .slja LOGADO → API custom (app#331)", () => {
 				{ lyric: "Verso dois", type: "LETRA", timeMs: 15_000, order: 2 },
 			],
 		};
-		const imported = await importSljaAsLiturgyMusic({
-			bytes: await buildSlja(archive),
-			name: "hino-autoral.slja",
-		});
+		const imported = await importSljaAsLiturgyMusic(
+			{ bytes: await buildSlja(archive), name: "hino-autoral.slja" },
+			{ confirmUpload: async () => true },
+		);
 
 		expect(imported.local).toBe(false);
 		expect(imported.musicId).toBe(7);
@@ -101,10 +102,14 @@ describe("import .slja LOGADO → API custom (app#331)", () => {
 		routeFetch(8, 0);
 		fetchMock.mockImplementation(async (url: string, _init?: RequestInit) => {
 			const u = String(url);
+			console.log("FETCH", _init?.method ?? "GET", u);
 			const json = (body: unknown, status = 200) =>
 				new Response(JSON.stringify(body), { status });
 			if (u.endsWith("/collections")) return json({ id_collection: 55 });
-			if (u.includes("/collections/55/musics")) return json({ id_music: 8 });
+			if (u.includes("/collections/55/musics")) {
+				// dedup: 201 = criado agora; 200 = já existia (pula uploads)
+				return json({ id_music: 8 }, _init?.method === "POST" ? 201 : 200);
+			}
 			if (u.endsWith("/files")) return json({}, 500); // upload quebra
 			if (u.endsWith("/musics/8/lyrics")) return json({ id_lyric: 1 });
 			return json({ message: "nf" }, 404);
@@ -116,10 +121,10 @@ describe("import .slja LOGADO → API custom (app#331)", () => {
 			assets: [],
 			slides: [{ lyric: "Texto", type: "LETRA", timeMs: 0, order: 1 }],
 		};
-		const imported = await importSljaAsLiturgyMusic({
-			bytes: await buildSlja(archive),
-			name: "so-letra.slja",
-		});
+		const imported = await importSljaAsLiturgyMusic(
+			{ bytes: await buildSlja(archive), name: "so-letra.slja" },
+			{ confirmUpload: async () => true },
+		);
 
 		expect(imported.local).toBe(false);
 		expect(imported.hasAudio).toBe(false);

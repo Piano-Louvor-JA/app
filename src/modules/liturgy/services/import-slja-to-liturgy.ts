@@ -23,6 +23,10 @@ import {
 	updateCustomMusic,
 	uploadCustomFile,
 } from "@modules/media/services/custom-catalog";
+import {
+	sha256Hex,
+	sha256ToUuid,
+} from "@shared/services/content-hash";
 import { parseSljaFile } from "@shared/services/slja";
 
 export interface ImportedSljaLiturgyMusic {
@@ -48,6 +52,10 @@ export interface ImportedSljaLiturgyMusic {
 	durationMs: number;
 	/** true = gravado só local (sem login); sync pra conta é versão futura. */
 	local: boolean;
+	/** SHA-256 do arquivo de origem — dedupe de re-import/migração (app#336). */
+	sljaHash: string;
+	/** true = arquivo já importado antes; a música existente foi ATUALIZADA. */
+	updatedExisting: boolean;
 }
 
 /** Margem além do último slide (o MP3 real pode esticar). */
@@ -114,8 +122,18 @@ export interface SljaImportSource {
 	name: string;
 }
 
+export interface SljaImportOptions {
+	/**
+	 * Aprovação explícita pra subir pra conta (regra do Rafael: banco só
+	 * recebe após aprovação — import com consentimento). Logado sem isso
+	 * = LOCAL.
+	 */
+	confirmUpload?: () => Promise<boolean>;
+}
+
 export async function importSljaAsLiturgyMusic(
 	source: SljaImportSource,
+	options?: SljaImportOptions,
 ): Promise<ImportedSljaLiturgyMusic> {
 	const { bytes, name: fileName } = source;
 	// Aceita .slja direto OU .slja.zip (wrapper do WhatsApp) — parser pronto.
@@ -133,8 +151,22 @@ export async function importSljaAsLiturgyMusic(
 	// ── Deslogado: grava 100% LOCAL (regra de produto 12/09 — sem identidade
 	// não há escrita confiável na API). Uso local sem conta é requisito
 	// permanente (offline-first): áudio/estrofes ficam no localStorage.
+	// Dedup (app#336 fase 3): hash do arquivo ANTES de qualquer caminho —
+	// deslogado grava no local (dedupe de re-import), logado vira
+	// client_uuid determinístico (re-import vira no-op na API).
+	const sljaHash = await sha256Hex(new Uint8Array(bytes));
+
 	if (!getAuthSession()) {
-		return importSljaLocal({ name, archive, slides, durationMs });
+		return importSljaLocal({ name, archive, slides, durationMs, sljaHash });
+	}
+
+	// Gate de aprovação (regra do Rafael): logado SEM confirmUpload=true =
+	// grava local (sem erro, sem API).
+	const approved = options?.confirmUpload
+		? await options.confirmUpload()
+		: false;
+	if (!approved) {
+		return importSljaLocal({ name, archive, slides, durationMs, sljaHash });
 	}
 
 	// ── Logado: sobe pra API (Minhas Coletâneas → "Importações .slja").
@@ -143,11 +175,32 @@ export async function importSljaAsLiturgyMusic(
 		throw new Error("SLJA_IMPORT_COLLECTION_FAILED");
 	}
 
-	const created = await createCustomMusic(collectionId, { name });
+	const clientUuid = sha256ToUuid(sljaHash);
+	const created = await createCustomMusic(collectionId, {
+		name,
+		client_uuid: clientUuid,
+	});
 	if (!created) {
 		throw new Error("SLJA_IMPORT_MUSIC_FAILED");
 	}
 	const musicId = created.id;
+
+	// Já existia (re-import): mídias já estão vinculadas — pular uploads.
+	if (created.existed) {
+		return {
+			musicId,
+			displayMusicId: toCustomMusicId(musicId),
+			name,
+			collectionId,
+			slides: 0,
+			hasAudio: false,
+			uploadedImages: 0,
+			durationMs: 0,
+			local: false,
+			sljaHash,
+			updatedExisting: true,
+		};
+	}
 
 	let uploadedImages = 0;
 	const uploadedAssets: Array<{ path: string; url: string; idFile: number }> =
@@ -204,6 +257,24 @@ export async function importSljaAsLiturgyMusic(
 
 	const imageIdByUrl = new Map(uploadedAssets.map((a) => [a.url, a.idFile]));
 
+	// Background da MÚSICA: o .slja clássico põe a imagem de fundo na CAPA
+	// (Slide:1) e as estrofes herdam — mas a capa não vira estrofe no
+	// import, então o bg precisa ser vinculado à custom_musics (é o que o
+	// editor de letras usa como bg). Fallback: primeira imagem de estrofe.
+	const coverImageName =
+		archive.slides.find((sl) => sl.type === "CAPA")?.image?.name?.toLowerCase() ??
+		archive.slides.find((sl) => sl.image?.name)?.image?.name?.toLowerCase();
+	if (coverImageName && uploadedAssets.length) {
+		const coverMatch = uploadedAssets.find(
+			(a) =>
+				coverImageName.includes(a.path.toLowerCase()) ||
+				a.path.toLowerCase().includes(coverImageName),
+		);
+		if (coverMatch) {
+			await updateCustomMusic(musicId, { id_file_image: coverMatch.idFile });
+		}
+	}
+
 	// Lyrics em paralelo (batch de 5) com order EXPLÍCITO — a ordem é
 	// garantida pelo campo, não pela sequência de requests. 15 slides caem
 	// de 15 RTTs (~10s) para ~3.
@@ -248,6 +319,8 @@ export async function importSljaAsLiturgyMusic(
 		uploadedImages,
 		durationMs,
 		local: false,
+		sljaHash,
+		updatedExisting: false,
 	};
 }
 
@@ -261,11 +334,13 @@ async function importSljaLocal({
 	archive,
 	slides,
 	durationMs,
+	sljaHash,
 }: {
 	name: string;
 	archive: Awaited<ReturnType<typeof parseSljaFile>>;
 	slides: Array<{ lyric: string; timeMs: number; order?: number }>;
 	durationMs: number;
+	sljaHash: string;
 }): Promise<ImportedSljaLiturgyMusic> {
 	// Import dinâmico: mantém a API fora do caminho local (offline-first e
 	// testes sem rede nunca tocam fetch).
@@ -284,7 +359,7 @@ async function importSljaLocal({
 		collectionId = createLocalCollection(IMPORT_COLLECTION_NAME).id;
 	}
 
-	const created = createLocalMusic(collectionId, { name });
+	const created = createLocalMusic(collectionId, { name, sljaHash });
 	const musicId = created.id;
 
 	let hasAudio = false;
@@ -334,6 +409,8 @@ async function importSljaLocal({
 		uploadedImages: 0,
 		durationMs,
 		local: true,
+		sljaHash,
+		updatedExisting: false,
 	};
 }
 

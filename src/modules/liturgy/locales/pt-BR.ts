@@ -291,6 +291,10 @@ export default {
       importButton: 'Importar .slja',
       importing: 'Importando…',
       imported: 'Importado: {name} ({slides} estrofes).',
+      uploadTitle: 'Subir "{name}" pra sua conta?',
+      uploadMessage: 'O arquivo será enviado uma única vez (sem duplicar) e fica disponível em qualquer dispositivo.',
+      uploadConfirm: 'Subir pra conta',
+      uploadCancel: 'Ficar só neste dispositivo',
       importedLocal:
         'Importado neste dispositivo: {name} ({slides} estrofes) — salvo sem conta.',
       importFailed: 'Arquivo .slja inválido.',

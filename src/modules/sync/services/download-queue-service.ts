@@ -124,3 +124,32 @@ async function drain(): Promise<void> {
     draining = false
   }
 }
+
+/** app#338 UI: re-enfileira um item failed (ou done → re-download). */
+export function retryDownload(id: string): void {
+  const entry = queue.find((q) => q.item.id === id)
+  if (!entry || entry.item.status === 'running') return
+  entry.item.status = 'pending'
+  entry.item.error = undefined
+  notify()
+  void drain()
+}
+
+/** app#338 UI: cancela pending/failed (running não interrompe — avisa na UI). */
+export function cancelDownload(id: string): void {
+  const index = queue.findIndex((q) => q.item.id === id)
+  if (index === -1) return
+  const entry = queue[index]
+  if (entry.item.status === 'running') return
+  queue.splice(index, 1)
+  notify()
+}
+
+/** app#338 UI: limpa itens concluídos da lista (feedback limpo). */
+export function clearFinishedDownloads(): void {
+  const before = queue.length
+  for (let i = queue.length - 1; i >= 0; i--) {
+    if (queue[i].item.status === 'done') queue.splice(i, 1)
+  }
+  if (queue.length !== before) notify()
+}
