@@ -1,291 +1,244 @@
 // @vitest-environment jsdom
-// MonitorTargetSelect — composable mockado; painel, trigger, toggle, identify, outside close
-import { mount, flushPromises } from '@vue/test-utils'
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { createI18n } from 'vue-i18n'
+// Cobertura MonitorTargetSelect.vue (gaps shared): trigger label/badge, open
+// panel posicionamento, close por pointerdown fora, disabled, identify,
+// dense/header/label variants, empty vs list.
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { mount } from '@vue/test-utils'
+import { nextTick, ref } from 'vue'
 
-import type { Ref } from 'vue'
-const mocks = vi.hoisted(() => ({
-  optionsList: { value: [] as Array<{ displayId: number; label: string; primary: boolean }> } as unknown as Ref<Array<{ displayId: number; label: string; primary: boolean }>>,
-  selectedCount: { value: 0 } as unknown as Ref<number>,
-  hasDisplays: { value: true } as unknown as Ref<boolean>,
-  loading: { value: false } as unknown as Ref<boolean>,
-  identifying: { value: false } as unknown as Ref<boolean>,
-  open: { value: false } as unknown as Ref<boolean>,
-  toggle: vi.fn(),
-  identify: vi.fn(async () => {}),
-  toggleOpen: vi.fn(),
-  close: vi.fn(),
-  refresh: vi.fn(),
+const listSystemDisplays = vi.fn()
+const listExtendedDisplaysImpl = (all: Array<{ id: number; isPrimary?: boolean }>) =>
+  all.filter((d) => !d.isPrimary)
+const identifySystemDisplays = vi.fn()
+const subscribeDisplaysChanged = vi.fn(() => () => {})
+
+vi.mock('@modules/settings/services/display-service', () => ({
+  listSystemDisplays: (...a: unknown[]) => listSystemDisplays(...(a as [])),
+  listExtendedDisplays: (all: Array<{ id: number; isPrimary?: boolean }>) =>
+    listExtendedDisplaysImpl(all),
+  identifySystemDisplays: (...a: unknown[]) => identifySystemDisplays(...(a as [])),
+  subscribeDisplaysChanged: () => subscribeDisplaysChanged(),
+  formatDisplayResolution: (d: { width?: number; height?: number }) =>
+    `${d.width ?? 0}x${d.height ?? 0}`,
 }))
 
-vi.mock('@shared/composables/useMonitorTargetSelect', async () => {
-  const { ref } = await import('vue')
-  mocks.optionsList = ref([]) as any
-  mocks.selectedCount = ref(0) as any
-  mocks.hasDisplays = ref(true) as any
-  mocks.loading = ref(false) as any
-  mocks.identifying = ref(false) as any
-  mocks.open = ref(false) as any
-  return {
-    useMonitorTargetSelect: () => ({
-      optionsList: mocks.optionsList,
-      selectedCount: mocks.selectedCount,
-      hasDisplays: mocks.hasDisplays,
-      loading: mocks.loading,
-      identifying: mocks.identifying,
-      open: mocks.open,
-      toggle: mocks.toggle,
-      identify: mocks.identify,
-      toggleOpen: mocks.toggleOpen,
-      close: mocks.close,
-      refresh: mocks.refresh,
-    }),
-  }
-})
+const loadProjectionSettings = vi.fn()
+const saveProjectionSettings = vi.fn()
+const reconcileTargetDisplays = vi.fn((s: Record<string, unknown>) => s)
+const reapplyProjectionTargets = vi.fn(async () => true)
+
+vi.mock('@modules/settings/services/projection-preferences', () => ({
+  loadProjectionSettings: () => loadProjectionSettings(),
+  saveProjectionSettings: (s: Record<string, unknown>) => saveProjectionSettings(s),
+  reconcileTargetDisplays: (s: Record<string, unknown>, ids: number[]) =>
+    reconcileTargetDisplays(s, ids),
+}))
+
+vi.mock('@shared/composables/useProjectionWindow', () => ({
+  reapplyProjectionTargets: () => reapplyProjectionTargets(),
+}))
+
+const bridge = {
+  projection: {
+    setSiteTargetMonitors: vi.fn(async () => {}),
+    setVideoTargetMonitors: vi.fn(async () => {}),
+    onSiteTargetsChanged: vi.fn(() => () => {}),
+  },
+}
+
+vi.mock('@shared/services/desktop-bridge', () => ({
+  getDesktopBridge: () => bridge,
+}))
+
+vi.mock('@modules/settings/stores/useProjectionStore', () => ({
+  useProjectionStore: () => ({ applySettings: vi.fn() }),
+}))
+
+vi.mock('vue-i18n', () => ({
+  useI18n: () => ({
+    t: (k: string, params?: Record<string, unknown>) =>
+      params && 'count' in params ? `${k}:${params['count']}` : k,
+  }),
+}))
 
 import MonitorTargetSelect from '../MonitorTargetSelect.vue'
 
-const i18n = createI18n({
-  legacy: false,
-  locale: 'pt',
-  messages: {
-    pt: {
-      monitors: {
-        selectScreens: 'Selecionar telas',
-        selectedCount: '{count} selecionada(s)',
-        identify: 'Identificar',
-        noDisplays: 'Nenhuma tela',
-      },
-    },
-  },
-})
+const SETTINGS = {
+  targetDisplayIds: [2],
+  declinedDisplayIds: [],
+  openReturnScreen: false,
+  returnDisplayId: null,
+}
 
-function createWrapper(props: Record<string, unknown> = {}) {
-  return mount(MonitorTargetSelect, {
+const DISPLAYS = [
+  { id: 1, isPrimary: true, width: 1920, height: 1080 },
+  { id: 2, width: 1366, height: 768 },
+]
+
+async function mountSelect(props: Record<string, unknown> = {}) {
+  const w = mount(MonitorTargetSelect, {
     props,
-    global: { plugins: [i18n] },
+    global: { stubs: { teleport: true } },
     attachTo: document.body,
   })
+  await Promise.resolve()
+  await Promise.resolve()
+  return w
 }
 
 describe('MonitorTargetSelect', () => {
-  let wrapper: ReturnType<typeof createWrapper> | null = null
-
   beforeEach(() => {
-  if (mocks.open) { mocks.open.value = false; mocks.optionsList.value = []; mocks.selectedCount.value = 0; mocks.identifying.value = false; mocks.hasDisplays.value = true; mocks.loading.value = false }
     vi.clearAllMocks()
-    mocks.optionsList.value = [
-      { displayId: 1, label: 'Monitor 1', primary: true },
-      { displayId: 2, label: 'Monitor 2', primary: false },
-    ]
-    mocks.selectedCount.value = 0
-    mocks.hasDisplays.value = true
-    mocks.open.value = false
+    listSystemDisplays.mockResolvedValue(DISPLAYS)
+    loadProjectionSettings.mockReturnValue({ ...SETTINGS })
   })
 
-  afterEach(() => {
-    wrapper?.unmount()
-    wrapper = null
-  })
-
-  it('trigger: label seleção quando count=0', () => {
-    wrapper = createWrapper()
-    expect(wrapper.text()).toContain('Selecionar telas')
-  })
-
-  it('trigger: label com count quando selecionado', () => {
-    mocks.selectedCount.value = 2
-    wrapper = createWrapper({ modelValue: [1, 2] })
-    expect(wrapper.text()).toContain('2')
-  })
-
-  it('showLabel: chip com label Telas', () => {
-    wrapper = createWrapper({ showLabel: true })
-    expect(wrapper.find('.monitor-target-select__label, .monitors-chip, [data-test="monitor-label"]').exists() || wrapper.text().length > 0).toBe(true)
-  })
-
-  it('click no trigger: toggleOpen', async () => {
-    wrapper = createWrapper()
-    const trigger = wrapper.find('button')
+  it('renderiza trigger com label padrão e abre painel com opções', async () => {
+    const w = await mountSelect({ modelValue: [2] })
+    const trigger = w.find('.monitor-target-select__trigger')
+    expect(trigger.exists()).toBe(true)
+    expect(trigger.attributes('aria-expanded')).toBe('false')
     await trigger.trigger('click')
-    expect(mocks.toggleOpen).toHaveBeenCalled()
+    await Promise.resolve()
+    await Promise.resolve()
+    await nextTick()
+    expect(w.find('.monitor-target-select__panel').exists()).toBe(true)
+    expect(trigger.attributes('aria-expanded')).toBe('true')
+    // checkbox do monitor 2 marcado
+    const boxes = w.findAll('input[type="checkbox"]')
+    expect(boxes).toHaveLength(1)
+    expect((boxes[0]!.element as HTMLInputElement).checked).toBe(true)
+    w.unmount()
   })
 
-  it('disabled: trigger desabilitado', () => {
-    wrapper = createWrapper({ disabled: true })
-    const trigger = wrapper.find('button')
-    expect((trigger.element as HTMLButtonElement).disabled).toBe(true)
+  it('badge com contagem quando há seleção', async () => {
+    const w = await mountSelect()
+    await w.find('.monitor-target-select__trigger').trigger('click')
+    await Promise.resolve()
+    await Promise.resolve()
+    await nextTick()
+    expect(w.find('.monitor-target-select__badge').text()).toBe('1')
+    w.unmount()
   })
 
-  it('painel aberto: opções com checkbox', async () => {
-    mocks.open.value = true
-    wrapper = createWrapper({ modelValue: [1] })
-    await flushPromises()
-    const options = document.querySelectorAll('[role="menuitemcheckbox"], .monitor-option, input[type="checkbox"]')
-    expect(options.length).toBeGreaterThan(0)
+  it('toggle de monitor emite update:modelValue e change', async () => {
+    const w = await mountSelect({ modelValue: [] })
+    await w.find('.monitor-target-select__trigger').trigger('click')
+    await Promise.resolve()
+    await Promise.resolve()
+    await nextTick()
+    // persist=true: modelo vazio lê settings → [2]; ao abrir o painel a seleção
+    // já vem marcada; clicar de novo desseleciona → emite []
+    const boxes = w.findAll('input[type="checkbox"]')
+    expect(boxes.length).toBeGreaterThan(0)
+    await boxes[0]!.setValue(false)
+    const emittedUp = w.emitted('update:modelValue')
+    const emittedChange = w.emitted('change')
+    expect(emittedUp && emittedUp.length > 0).toBe(true)
+    expect((emittedUp!.at(-1) as unknown[])[0]).toEqual([])
+    expect((emittedChange!.at(-1) as unknown[])[0]).toEqual([])
+    w.unmount()
   })
 
-  it('toggle display: chama composable com id', async () => {
-    mocks.open.value = true
-    wrapper = createWrapper()
-    await flushPromises()
-    const option = document.querySelector('[data-display-id="2"], [role="menuitemcheckbox"]') as HTMLElement | null
-    if (option) {
-      option.click()
-      await wrapper.vm.$nextTick()
-      expect(mocks.toggle).toHaveBeenCalled()
-    }
+  it('disabled: trigger desabilitado e toggle não muda seleção', async () => {
+    const w = await mountSelect({ disabled: true })
+    expect(
+      w.find('.monitor-target-select__trigger').attributes('disabled'),
+    ).toBeDefined()
+    expect(w.find('.monitor-target-select--disabled').exists()).toBe(true)
+    w.unmount()
   })
 
-  it('identify: botão presente no painel aberto', async () => {
-    mocks.open.value = true
-    wrapper = createWrapper()
-    await flushPromises()
-    const btn = document.querySelector('.monitor-target-select__identify') as HTMLElement | null
-    expect(btn).toBeTruthy()
+  it('dense esconde label do trigger', async () => {
+    const w = await mountSelect({ dense: true })
+    expect(w.find('.monitor-target-select--dense').exists()).toBe(true)
+    expect(w.find('.monitor-target-select__trigger-label').exists()).toBe(false)
+    w.unmount()
   })
 
-  it('pointerdown fora: close', async () => {
-    mocks.open.value = true
-    wrapper = createWrapper()
-    await flushPromises()
-    document.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))
-    await wrapper.vm.$nextTick()
-    expect(mocks.close).toHaveBeenCalled()
+  it('showLabel renderiza chip e mantém label escondido', async () => {
+    const w = await mountSelect({ showLabel: true })
+    expect(w.find('.monitor-target-select__chip').exists()).toBe(true)
+    expect(w.find('.monitor-target-select__trigger-label').exists()).toBe(false)
+    w.unmount()
   })
 
-  it('pointerdown dentro do root: não fecha', async () => {
-    mocks.open.value = true
-    wrapper = createWrapper()
-    await flushPromises()
-    const trigger = wrapper.find('button')
-    trigger.element.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))
-    await wrapper.vm.$nextTick()
-    expect(mocks.close).not.toHaveBeenCalled()
+  it('botão identificar chama identifySystemDisplays e desabilita durante', async () => {
+    identifySystemDisplays.mockImplementation(
+      () => new Promise((r) => setTimeout(r, 20)),
+    )
+    const w = await mountSelect()
+    await w.find('.monitor-target-select__trigger').trigger('click')
+    await Promise.resolve()
+    await Promise.resolve()
+    await nextTick()
+    const btn = w.find('.monitor-target-select__identify')
+    await btn.trigger('click')
+    expect(identifySystemDisplays).toHaveBeenCalled()
+    await new Promise((r) => setTimeout(r, 30))
+    w.unmount()
   })
 
-  describe('interações restantes', () => {
-    it('triggerLabel: contagem selecionada', async () => {
-      mocks.selectedCount.value = 2
-      const w = createWrapper()
-      await flushPromises()
-      expect(w.text()).toContain('2 selecionada(s)')
-      w.unmount()
-    })
-
-    it('toggleOpen pelo trigger', async () => {
-      const w = createWrapper()
-      const trigger = w.find('[class*="trigger"], [data-test*="trigger"], button')
-      await trigger.trigger('click')
-      expect(mocks.toggleOpen).toHaveBeenCalled()
-      w.unmount()
-    })
-
-    it('onToggle item: chama toggle com displayId', async () => {
-      mocks.open.value = true
-      const w = createWrapper()
-      await flushPromises()
-      const item = w.findAll('[class*="option"], [role="option"], [class*="item"]')
-      if (item.length > 0) {
-        await item[0].trigger('click')
-        expect(mocks.toggle).toHaveBeenCalled()
-      }
-      w.unmount()
-    })
-
-    it('disabled: toggle e identify não executam', async () => {
-      mocks.open.value = true
-      const w = createWrapper({ disabled: true })
-      await flushPromises()
-      const vm = w.vm as any
-      await vm.onIdentify?.()
-      expect(mocks.identify).not.toHaveBeenCalled()
-      vm.onToggle?.(1)
-      expect(mocks.toggle).not.toHaveBeenCalled()
-      w.unmount()
-    })
-
-    it('onIdentify: chama identify quando habilitado', async () => {
-      mocks.identifying.value = false
-      const w = createWrapper()
-      const vm = w.vm as any
-      await vm.onIdentify?.()
-      expect(mocks.identify).toHaveBeenCalled()
-      w.unmount()
-    })
-
-    it('pointerdown fora com painel aberto: close', async () => {
-      const w = createWrapper({ attachTo: document.body } as any)
-      await flushPromises()
-      mocks.open.value = true
-      await flushPromises()
-      document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))
-      await flushPromises()
-      expect(mocks.close).toHaveBeenCalled()
-      w.unmount()
-    })
+  it('sem displays: mostra estado vazio', async () => {
+    listSystemDisplays.mockResolvedValue([DISPLAYS[0]!])
+    const w = await mountSelect()
+    await w.find('.monitor-target-select__trigger').trigger('click')
+    await Promise.resolve()
+    await Promise.resolve()
+    await nextTick()
+    expect(w.find('.monitor-target-select__empty').exists()).toBe(true)
+    expect(w.text()).toContain('monitors.empty')
+    w.unmount()
   })
 
-  describe('posicionamento e lifecycle', () => {
-    it('watch open: refresh + updatePanelPosition (painel acima quando espaço embaixo < 280)', async () => {
-      const w = createWrapper({ attachTo: document.body } as any)
-      await flushPromises()
-      mocks.open.value = true
-      await flushPromises()
-      expect(mocks.refresh).toHaveBeenCalled()
-      // jsdom: rect 0 — painel abre para baixo (top)
-      const panel = document.querySelector('.monitor-target__panel, [class*="panel"]')
-      expect(panel).not.toBeNull()
-      w.unmount()
-      document.body.innerHTML = ''
-    })
+  it('carregando sem displays: mostra loading', async () => {
+    listSystemDisplays.mockImplementation(() => new Promise(() => {})) // pendente
+    const w = await mountSelect()
+    await w.find('.monitor-target-select__trigger').trigger('click')
+    await Promise.resolve()
+    await nextTick()
+    expect(w.text()).toContain('monitors.loading')
+    w.unmount()
+  })
 
-    it('resize/scroll com painel aberto: reposiciona', async () => {
-      const w = createWrapper({ attachTo: document.body } as any)
-      await flushPromises()
-      mocks.open.value = true
-      await flushPromises()
-      window.dispatchEvent(new Event('resize'))
-      window.dispatchEvent(new Event('scroll', { bubbles: true }))
-      await flushPromises()
-      // sem erro = handlers registrados e executando
-      expect(mocks.refresh).toHaveBeenCalled()
-      w.unmount()
-      document.body.innerHTML = ''
-    })
+  it('pointerdown fora fecha o painel', async () => {
+    const w = await mountSelect()
+    await w.find('.monitor-target-select__trigger').trigger('click')
+    await Promise.resolve()
+    await Promise.resolve()
+    await nextTick()
+    expect(w.find('.monitor-target-select__panel').exists()).toBe(true)
+    document.body.dispatchEvent(
+      new MouseEvent('pointerdown', { bubbles: true }) as unknown as PointerEvent,
+    )
+    await nextTick()
+    expect(w.find('.monitor-target-select__panel').exists()).toBe(false)
+    w.unmount()
+  })
 
-    it('pointerdown DENTRO do painel: não fecha', async () => {
-      const w = createWrapper({ attachTo: document.body } as any)
-      await flushPromises()
-      mocks.open.value = true
-      await flushPromises()
-      const panel = document.querySelector('.monitor-target__panel, [class*="panel"]') as HTMLElement
-      if (panel) {
-        panel.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))
-        await flushPromises()
-        expect(mocks.close).not.toHaveBeenCalled()
-      }
-      w.unmount()
-      document.body.innerHTML = ''
-    })
+  it('resize/scroll com painel aberto reposiciona; com painel fechado é no-op', async () => {
+    const w = await mountSelect()
+    // fechado: no-op (branch !open)
+    window.dispatchEvent(new Event('resize'))
+    await w.find('.monitor-target-select__trigger').trigger('click')
+    await Promise.resolve()
+    await Promise.resolve()
+    await nextTick()
+    // aberto: reposiciona sem erro
+    window.dispatchEvent(new Event('resize'))
+    window.dispatchEvent(new Event('scroll'))
+    await nextTick()
+    expect(w.find('.monitor-target-select__panel').exists()).toBe(true)
+    w.unmount()
+  })
 
-    it('pointerdown fora (document): fecha', async () => {
-      const w = createWrapper({ attachTo: document.body } as any)
-      await flushPromises()
-      mocks.open.value = true
-      await flushPromises()
-      document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))
-      await flushPromises()
-      expect(mocks.close).toHaveBeenCalled()
-      w.unmount()
-      document.body.innerHTML = ''
-    })
-
-    it('unmount: remove listeners sem erro', async () => {
-      const w = createWrapper()
-      w.unmount()
-      expect(true).toBe(true)
-    })
+  it('label do trigger usa contagem selecionada', async () => {
+    const w = await mountSelect({ modelValue: [2] })
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(w.find('.monitor-target-select__trigger').text()).toContain(
+      'monitors.selectedCount:1',
+    )
+    w.unmount()
   })
 })

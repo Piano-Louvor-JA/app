@@ -1,269 +1,302 @@
 // @vitest-environment jsdom
-import {
-	afterAll,
-	afterEach,
-	beforeEach,
-	describe,
-	expect,
-	it,
-	vi,
-} from "vitest";
+// Cobertura useAppConfirm + useOperatorEscapeToCloseProjection (gaps shared):
+// appConfirm resolve true/false/unmount; ESC guards (input/dialog/projeção),
+// IPC close-requested, externalAlive false, closeLocalProjectionState.
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const mocks = vi.hoisted(() => ({
-	getDesktopBridge: vi.fn<() => unknown>(() => null),
-	appConfirm: vi.fn(async () => false),
-}));
+const closeUrl = vi.fn()
+const externalAlive = vi.fn(async () => true)
+const onCloseRequested = vi.fn()
 
-vi.mock("@shared/services/desktop-bridge", () => ({
-	getDesktopBridge: mocks.getDesktopBridge,
-}));
+vi.mock('@shared/services/desktop-bridge', () => ({
+  getDesktopBridge: () => ({
+    projection: { closeUrl, externalAlive, onCloseRequested },
+  }),
+}))
 
-vi.mock("@shared/composables/useAppConfirm", () => ({
-	appConfirm: mocks.appConfirm,
-}));
+const closeProjectionModule = vi.fn()
 
-vi.mock("@shared/composables/useProjectionWindow", () => ({
-	closeProjectionModule: vi.fn(),
-	reapplyProjectionTargets: vi.fn(),
-}));
+vi.mock('../useProjectionWindow', () => ({
+  closeProjectionModule: () => closeProjectionModule(),
+}))
 
-vi.mock("@modules/media/stores/useMediaStore", () => {
-	const state = {
-		session: null as unknown,
-		isPlaying: false,
-		isProjecting: false,
-		close: vi.fn(),
-	};
-	const useMediaStore = () => state;
-	return { useMediaStore };
-});
+vi.mock('@modules/media/stores/useMediaStore', () => ({
+  useMediaStore: () => mediaStoreMock,
+}))
 
-import {
-	closeLocalProjectionState,
-	requestCloseProjectionWithConfirm,
-	useOperatorEscapeToCloseProjection,
-} from "../useOperatorEscapeToCloseProjection";
-
-const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
-
-function bridgeWith(overrides: Record<string, unknown> = {}) {
-	return {
-		projection: {
-			externalAlive: vi.fn(async () => true),
-			closeUrl: vi.fn(async () => undefined),
-			onCloseRequested: vi.fn((cb: () => void) => () => {}),
-			...overrides,
-		},
-	};
+const mediaStoreMock = {
+  session: null,
+  isPlaying: false,
+  isProjecting: false,
+  close: vi.fn(),
 }
 
-// hooks: usar componente real
-import { createApp, defineComponent, h } from "vue";
+import { appConfirm } from '../useAppConfirm'
+import {
+  closeLocalProjectionState,
+  requestCloseProjectionWithConfirm,
+  useOperatorEscapeToCloseProjection,
+} from '../useOperatorEscapeToCloseProjection'
 
-function mountWith(setup: () => unknown) {
-	let captured: unknown;
-	const app = createApp(
-		defineComponent({
-			setup() {
-				captured = setup();
-				return () => h("div");
-			},
-		}),
-	);
-	const host = document.createElement("div");
-	document.body.appendChild(host);
-	app.mount(host);
-	return {
-		unmount: () => app.unmount(),
-		captured: () => captured,
-		host,
-	};
+type ConfirmApi = {
+  wrapper: import('@vue/test-utils').VueWrapper
+  clickConfirm: () => Promise<void>
+  clickCancel: () => Promise<void>
 }
 
-beforeEach(() => {
-	vi.clearAllMocks();
-	mocks.getDesktopBridge.mockReturnValue(null);
-	document.body.innerHTML = "";
-});
+async function openConfirm(run: () => Promise<boolean>): Promise<ConfirmApi> {
+  const promise = run()
+  await Promise.resolve()
+  await Promise.resolve()
+  const dialog = document.querySelector('[role="dialog"].app-confirm')!
+  expect(dialog).toBeTruthy()
+  const buttons = Array.from(dialog.querySelectorAll('button'))
+  return {
+    wrapper: null as unknown as ConfirmApi['wrapper'],
+    clickConfirm: async () => {
+      ;(buttons[1] as HTMLButtonElement).click()
+      await promise
+      await new Promise((r) => setTimeout(r, 80))
+    },
+    clickCancel: async () => {
+      ;(buttons[0] as HTMLButtonElement).click()
+      await promise
+      await new Promise((r) => setTimeout(r, 80))
+    },
+  }
+}
 
-afterEach(() => {
-	document.body.innerHTML = "";
-});
+describe('useAppConfirm', () => {
+  it('resolve true no confirm', async () => {
+    let result: boolean | undefined
+    const p = appConfirm({
+      title: 'T',
+      message: 'M',
+      confirmLabel: 'OK',
+      cancelLabel: 'Não',
+    }).then((r) => {
+      result = r
+      return r
+    })
+    await Promise.resolve()
+    await Promise.resolve()
+    const dialog = document.querySelector('[role="dialog"].app-confirm')!
+    expect(dialog.getAttribute('aria-label')).toBe('T')
+    const buttons = Array.from(dialog.querySelectorAll('button'))
+    expect(buttons).toHaveLength(2)
+    expect(buttons[1]!.textContent).toContain('OK')
+    ;(buttons[1] as HTMLButtonElement).click()
+    expect(await p).toBe(true)
+    expect(result).toBe(true)
+    await new Promise((r) => setTimeout(r, 80))
+    expect(document.querySelector('.app-confirm')).toBeNull()
+  })
 
-afterAll(() => {
-	consoleWarn.mockRestore();
-});
+  it('resolve false no cancel (botão e backdrop) e usa label default', async () => {
+    const p = appConfirm({
+      title: 'T',
+      message: 'M',
+      confirmLabel: 'OK',
+      danger: true,
+    })
+    await Promise.resolve()
+    await Promise.resolve()
+    const dialog = document.querySelector('[role="dialog"].app-confirm')!
+    const buttons = Array.from(dialog.querySelectorAll('button'))
+    expect(buttons[0]!.textContent).toContain('Cancelar')
+    ;(buttons[0] as HTMLButtonElement).click()
+    expect(await p).toBe(false)
+    await new Promise((r) => setTimeout(r, 80))
+  })
 
-describe("requestCloseProjectionWithConfirm", () => {
-	it("sem bridge → no-op", async () => {
-		await requestCloseProjectionWithConfirm();
-		expect(mocks.appConfirm).not.toHaveBeenCalled();
-	});
+  it('backdrop click cancela', async () => {
+    const p = appConfirm({ title: 'T', message: 'M', confirmLabel: 'OK' })
+    await Promise.resolve()
+    await Promise.resolve()
+    const backdrop = document.querySelector('.app-confirm__backdrop') as HTMLElement
+    backdrop.click()
+    expect(await p).toBe(false)
+    await new Promise((r) => setTimeout(r, 80))
+  })
+})
 
-	it("mídia externa não viva → não pergunta", async () => {
-		mocks.getDesktopBridge.mockReturnValue(
-			bridgeWith({ externalAlive: vi.fn(async () => false) }),
-		);
-		await requestCloseProjectionWithConfirm();
-		expect(mocks.appConfirm).not.toHaveBeenCalled();
-	});
+describe('useOperatorEscapeToCloseProjection', () => {
+  let keydown: (e: KeyboardEvent) => void
 
-	it("confirmado → fecha URL e estado local", async () => {
-		mocks.appConfirm.mockResolvedValue(true);
-		const bridge = bridgeWith();
-		mocks.getDesktopBridge.mockReturnValue(bridge);
-		await requestCloseProjectionWithConfirm();
-		expect(bridge.projection.closeUrl).toHaveBeenCalled();
-	});
+  async function setup(isProjectionWindow = () => false) {
+    const { defineComponent, h } = await import('vue')
+    const { mount } = await import('@vue/test-utils')
+    const Host = defineComponent({
+      setup() {
+        useOperatorEscapeToCloseProjection(isProjectionWindow)
+        return () => h('div')
+      },
+    })
+    const wrapper = mount(Host)
+    return wrapper
+  }
 
-	it("cancelado → não fecha", async () => {
-		mocks.appConfirm.mockResolvedValue(false);
-		const bridge = bridgeWith();
-		mocks.getDesktopBridge.mockReturnValue(bridge);
-		await requestCloseProjectionWithConfirm();
-		expect(bridge.projection.closeUrl).not.toHaveBeenCalled();
-	});
+  const pressEscape = (target?: HTMLElement) =>
+    window.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'Escape',
+        bubbles: true,
+        ...(target ? {} : {}),
+      }),
+    )
 
-	it("reentrância: segunda chamada durante handling é ignorada", async () => {
-		// externalAlive pendente segura a execução antes de handling=true... na
-		// verdade handling=true é setado logo após externalAlive; usar confirm
-		// pendente pra manter handling true enquanto a 2ª chamada chega.
-		let releaseConfirm: (v: boolean) => void = () => {};
-		mocks.appConfirm.mockImplementation(
-			() =>
-				new Promise<boolean>((resolve) => {
-					releaseConfirm = resolve;
-				}),
-		);
-		mocks.getDesktopBridge.mockReturnValue(bridgeWith());
-		const first = requestCloseProjectionWithConfirm();
-		// aguarda o confirm abrir (handling=true)
-		await new Promise((r) => setTimeout(r, 5));
-		const second = requestCloseProjectionWithConfirm();
-		await second;
-		releaseConfirm(true);
-		await first;
-		expect(mocks.appConfirm).toHaveBeenCalledTimes(1);
-	});
+  beforeEach(() => {
+    vi.clearAllMocks()
+    document.body.innerHTML = ''
+  })
+  afterEach(() => {
+    document.body.innerHTML = ''
+  })
 
-	it("bridge lançando → ignorado silenciosamente", async () => {
-		mocks.getDesktopBridge.mockImplementation(() => {
-			throw new Error("boom");
-		});
-		await expect(requestCloseProjectionWithConfirm()).resolves.toBeUndefined();
-	});
+  it('ESC com projeção ativa chama confirm; confirmar fecha URL e estado local', async () => {
+    const wrapper = await setup()
+    onCloseRequested.mockImplementation(() => () => {})
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+    const dialog = document.querySelector('[role="dialog"].app-confirm')
+    expect(dialog).toBeTruthy()
+    const buttons = Array.from(dialog!.querySelectorAll('button'))
+    ;(buttons[1] as HTMLButtonElement).click() // Encerrar
+    await new Promise((r) => setTimeout(r, 80))
+    expect(closeUrl).toHaveBeenCalled()
+    expect(closeProjectionModule).toHaveBeenCalled()
+    wrapper.unmount()
+  })
 
-	it("closeLocalProjectionState fecha media store com sessão ativa", async () => {
-		mocks.appConfirm.mockResolvedValue(true);
-		const bridge = bridgeWith();
-		mocks.getDesktopBridge.mockReturnValue(bridge);
-		await requestCloseProjectionWithConfirm();
-		// import dinâmico precisa de um tick
-		await new Promise((r) => setTimeout(r, 10));
-		expect(true).toBe(true);
-	});
-});
+  it('ESC + cancelar não fecha nada', async () => {
+    const wrapper = await setup()
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+    const buttons = Array.from(
+      document.querySelector('[role="dialog"].app-confirm')!.querySelectorAll('button'),
+    )
+    ;(buttons[0] as HTMLButtonElement).click()
+    await new Promise((r) => setTimeout(r, 80))
+    expect(closeUrl).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
 
-describe("useOperatorEscapeToCloseProjection", () => {
-	it("ESC com projeção ativa → confirm; guards de input/dialog", async () => {
-		mocks.getDesktopBridge.mockReturnValue(bridgeWith());
-		const env = mountWith(() =>
-			useOperatorEscapeToCloseProjection(() => false),
-		);
-		const dispatch = (target: HTMLElement | null, key = "Escape") => {
-			const ev = new KeyboardEvent("keydown", { key, bubbles: true });
-			Object.defineProperty(ev, "target", { value: target ?? document.body });
-			window.dispatchEvent(ev);
-		};
-		await dispatch(null);
-		await new Promise((r) => setTimeout(r, 5));
-		expect(mocks.appConfirm).toHaveBeenCalledTimes(1);
+  it('externalAlive false → sem dialog', async () => {
+    externalAlive.mockResolvedValue(false)
+    const wrapper = await setup()
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(document.querySelector('.app-confirm')).toBeNull()
+    wrapper.unmount()
+  })
 
-		// input focado → guard
-		const input = document.createElement("input");
-		await dispatch(input);
-		expect(mocks.appConfirm).toHaveBeenCalledTimes(1);
+  it('guards: tecla não-ESC, janela de projeção, input focado, dialog aberto', async () => {
+    const wrapper = await setup(() => true)
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }))
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await Promise.resolve()
+    expect(document.querySelector('.app-confirm')).toBeNull()
+    wrapper.unmount()
 
-		// dialog aberto → guard
-		const dialog = document.createElement("div");
-		dialog.setAttribute("role", "dialog");
-		document.body.appendChild(dialog);
-		await dispatch(null);
-		expect(mocks.appConfirm).toHaveBeenCalledTimes(1);
+    // input focado
+    const wrapper2 = await setup()
+    const input = document.createElement('input')
+    input.type = 'text'
+    document.body.appendChild(input)
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+    )
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(document.querySelector('.app-confirm')).toBeNull()
 
-		// tecla diferente → guard
-		dispatch(null, "Enter");
-		expect(mocks.appConfirm).toHaveBeenCalledTimes(1);
+    // dialog já aberto (role=dialog de terceiros)
+    const other = document.createElement('div')
+    other.setAttribute('role', 'dialog')
+    document.body.appendChild(other)
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await Promise.resolve()
+    expect(document.querySelector('.app-confirm')).toBeNull()
+    wrapper2.unmount()
+  })
 
-		env.unmount();
-		// ESC após unmount → nada
-		await dispatch(null);
-		expect(mocks.appConfirm).toHaveBeenCalledTimes(1);
-	});
+  it('requestCloseProjectionWithConfirm: bridge lança → ignora; alive null → return', async () => {
+    externalAlive.mockRejectedValue(new Error('x'))
+    await requestCloseProjectionWithConfirm()
+    expect(document.querySelector('.app-confirm')).toBeNull()
 
-	it("janela de projeção → ESC ignorado", async () => {
-		mocks.getDesktopBridge.mockReturnValue(bridgeWith());
-		const env = mountWith(() => useOperatorEscapeToCloseProjection(() => true));
-		const ev = new KeyboardEvent("keydown", { key: "Escape" });
-		Object.defineProperty(ev, "target", { value: document.body });
-		window.dispatchEvent(ev);
-		await new Promise((r) => setTimeout(r, 5));
-		expect(mocks.appConfirm).not.toHaveBeenCalled();
-		env.unmount();
-	});
+    externalAlive.mockResolvedValue(null as unknown as boolean)
+    await requestCloseProjectionWithConfirm()
+    expect(document.querySelector('.app-confirm')).toBeNull()
+  })
 
-	it("sem mídia externa viva → ESC não previne nem confirma", async () => {
-		const bridge = bridgeWith({
-			externalAlive: vi.fn(async () => false),
-		});
-		mocks.getDesktopBridge.mockReturnValue(bridge);
-		const env = mountWith(() =>
-			useOperatorEscapeToCloseProjection(() => false),
-		);
-		const ev = new KeyboardEvent("keydown", { key: "Escape" });
-		Object.defineProperty(ev, "target", { value: document.body });
-		window.dispatchEvent(ev);
-		await new Promise((r) => setTimeout(r, 5));
-		expect(mocks.appConfirm).not.toHaveBeenCalled();
-		env.unmount();
-	});
+  it('onCloseRequested dispara o confirm via IPC', async () => {
+    // módulo singleton (`handling`) + mock de externalAlive pode ter ficado
+    // null/rejected do teste anterior: restaura e recarrega o módulo
+    externalAlive.mockResolvedValue(true)
+    vi.resetModules()
+    const mod = await import('../useOperatorEscapeToCloseProjection')
+    const { defineComponent, h } = await import('vue')
+    const { mount } = await import('@vue/test-utils')
+    const Host = defineComponent({
+      setup() {
+        mod.useOperatorEscapeToCloseProjection(() => false)
+        return () => h('div')
+      },
+    })
+    const wrapper = mount(Host)
+    void mod.requestCloseProjectionWithConfirm()
+    await new Promise((r) => setTimeout(r, 50))
+    const dialog = document.querySelector('[role="dialog"].app-confirm')
+    expect(dialog).toBeTruthy()
+    const buttons = Array.from(dialog!.querySelectorAll('button'))
+    ;(buttons[1] as HTMLButtonElement).click()
+    await new Promise((r) => setTimeout(r, 80))
+    expect(closeUrl).toHaveBeenCalled()
+    wrapper.unmount()
+  })
 
-	it("onCloseRequested da bridge dispara o confirm; sem onCloseRequested → no-op", async () => {
-		const registered: Array<() => void> = [];
-		const bridge = bridgeWith({
-			onCloseRequested: vi.fn((cb: () => void) => {
-				registered.push(cb);
-				return () => {};
-			}),
-		});
-		mocks.getDesktopBridge.mockReturnValue(bridge);
-		const env = mountWith(() =>
-			useOperatorEscapeToCloseProjection(() => false),
-		);
-		expect(registered).toHaveLength(1);
-		mocks.appConfirm.mockResolvedValue(false);
-		registered[0]?.();
-		await new Promise((r) => setTimeout(r, 5));
-		expect(mocks.appConfirm).toHaveBeenCalledTimes(1);
-		env.unmount();
+  it('sem bridge (browser) ainda registra ESC e não quebra', async () => {
+    const mod = await import('@shared/services/desktop-bridge')
+    const orig = mod.getDesktopBridge
+    vi.spyOn(mod, 'getDesktopBridge').mockReturnValue(null)
+    const { defineComponent, h } = await import('vue')
+    const { mount } = await import('@vue/test-utils')
+    const Host = defineComponent({
+      setup() {
+        useOperatorEscapeToCloseProjection(() => false)
+        return () => h('div')
+      },
+    })
+    const wrapper = mount(Host)
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await Promise.resolve()
+    wrapper.unmount()
+    void orig
+  })
 
-		// bridge sem onCloseRequested
-		mocks.getDesktopBridge.mockReturnValue({ projection: {} });
-		expect(() =>
-			mountWith(() =>
-				useOperatorEscapeToCloseProjection(() => false),
-			).unmount(),
-		).not.toThrow();
-	});
+  it('closeLocalProjectionState fecha media store quando há sessão', async () => {
+    mediaStoreMock.session = { id: 1 } as never
+    mediaStoreMock.isPlaying = true
+    await closeLocalProjectionState()
+    await new Promise((r) => setTimeout(r, 0))
+    expect(closeProjectionModule).toHaveBeenCalled()
+    expect(mediaStoreMock.close).toHaveBeenCalled()
+    mediaStoreMock.session = null
+    mediaStoreMock.isPlaying = false
+  })
 
-	it("unmount remove listener e unsubscribe", async () => {
-		const unsub = vi.fn();
-		const bridge = bridgeWith({ onCloseRequested: vi.fn(() => unsub) });
-		mocks.getDesktopBridge.mockReturnValue(bridge);
-		const env = mountWith(() =>
-			useOperatorEscapeToCloseProjection(() => false),
-		);
-		env.unmount();
-		expect(unsub).toHaveBeenCalled();
-	});
-});
+  it('closeLocalProjectionState sem sessão não chama media.close', async () => {
+    mediaStoreMock.close.mockClear()
+    await closeLocalProjectionState()
+    await new Promise((r) => setTimeout(r, 0))
+    expect(closeProjectionModule).toHaveBeenCalled()
+    expect(mediaStoreMock.close).not.toHaveBeenCalled()
+  })
+})

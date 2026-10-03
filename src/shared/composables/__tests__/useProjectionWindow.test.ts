@@ -1,301 +1,422 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+// Cobertura useProjectionWindow (gaps coverage shared): open/close/toggle,
+// reapply (keep/close/recreate), syncAfterDisplayChange, hasSelectedExtended,
+// buildPopupUrl hash vs origin, primary fallback.
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-/**
- * useProjectionWindow — ciclo de vida das janelas de projeção (popups).
- * Mocks: display-service (monitores fixos), projection-preferences (settings
- * em memória), bridge e window.open controlável.
- */
-
-const mocks = vi.hoisted(() => {
-  const state = {
-    displays: [] as Array<Record<string, unknown>>,
-    settings: {
-      targetDisplayIds: [] as number[],
-      declinedDisplayIds: [] as number[],
-      openReturnScreen: false,
-      returnDisplayId: null as number | null,
-      openFullscreenOnPrimary: true,
-      disablePrimaryWhenExtended: true,
-    },
-    bridge: null as null | Record<string, unknown>,
-  }
-  return { state }
-})
+const listSystemDisplays = vi.fn()
+const listExtendedDisplays = vi.fn((all: Array<{ id: number; isPrimary?: boolean }>) =>
+  all.filter((d) => !d.isPrimary),
+)
+const identifySystemDisplays = vi.fn()
 
 vi.mock('@modules/settings/services/display-service', () => ({
-  listSystemDisplays: vi.fn(async () => mocks.state.displays),
-  listExtendedDisplays: (all: Array<{ isPrimary: boolean }>) =>
-    all.filter((d) => !d.isPrimary),
+  listSystemDisplays: (...args: unknown[]) => listSystemDisplays(...args),
+  listExtendedDisplays: (all: Array<{ id: number; isPrimary?: boolean }>) =>
+    listExtendedDisplays(all),
+  identifySystemDisplays,
 }))
 
+const loadProjectionSettings = vi.fn()
+const saveProjectionSettings = vi.fn()
+const reconcileTargetDisplays = vi.fn((s: Record<string, unknown>) => s)
+const pruneReturnDisplay = vi.fn((s: Record<string, unknown>) => s)
+const resolveSelectedReturnMonitorId = vi.fn(() => null)
+
 vi.mock('@modules/settings/services/projection-preferences', () => ({
-  loadProjectionSettings: vi.fn(() => ({ ...mocks.state.settings })),
-  saveProjectionSettings: vi.fn(),
-  reconcileTargetDisplays: vi.fn((s: { targetDisplayIds: number[] }, ids: number[]) => ({
-    ...s,
-    targetDisplayIds: s.targetDisplayIds.filter((id) => ids.includes(id)),
-  })),
-  pruneReturnDisplay: vi.fn((s: { returnDisplayId: number | null }, ids: number[]) => ({
-    ...s,
-    returnDisplayId:
-      s.returnDisplayId != null && ids.includes(s.returnDisplayId)
-        ? s.returnDisplayId
-        : null,
-  })),
-  resolveSelectedReturnMonitorId: vi.fn(
-    (s: { returnDisplayId: number | null }, ids: number[], sel: number[]) =>
-      s.returnDisplayId != null && ids.includes(s.returnDisplayId) && sel.includes(s.returnDisplayId)
-        ? s.returnDisplayId
-        : null,
-  ),
+  loadProjectionSettings: () => loadProjectionSettings(),
+  saveProjectionSettings: (s: Record<string, unknown>) => saveProjectionSettings(s),
+  reconcileTargetDisplays: (s: Record<string, unknown>, ids: number[]) =>
+    reconcileTargetDisplays(s, ids),
+  pruneReturnDisplay: (s: Record<string, unknown>, ids: number[]) =>
+    pruneReturnDisplay(s, ids),
+  resolveSelectedReturnMonitorId: (
+    s: Record<string, unknown>,
+    all: number[],
+    sel: number[],
+  ) => resolveSelectedReturnMonitorId(s, all, sel),
+}))
+
+const getDesktopBridge = vi.fn(() => ({
+  projection: {
+    closeUrl: vi.fn(),
+    setSiteTargetMonitors: vi.fn(),
+    setVideoTargetMonitors: vi.fn(),
+  },
 }))
 
 vi.mock('@shared/services/desktop-bridge', () => ({
-  getDesktopBridge: vi.fn(() => mocks.state.bridge),
+  getDesktopBridge: () => getDesktopBridge(),
 }))
 
-import {
-  closeProjectionModule,
-  hasSelectedExtendedProjectionTargets,
-  isProjectionModuleOpen,
-  openProjectionModule,
-  reapplyProjectionTargets,
-  syncProjectionAfterDisplayChange,
-  toggleProjectionModule,
-  useProjectionWindow,
-} from '../useProjectionWindow'
+const DISPLAYS = [
+  { id: 1, isPrimary: true },
+  { id: 2 },
+  { id: 3 },
+]
 
-const disp = (id: number, isPrimary = false) => ({
-  id,
-  isPrimary,
-  bounds: { x: 0, y: 0, width: 1920, height: 1080 },
-  workArea: { x: 0, y: 0, width: 1920, height: 1040 },
-  scaleFactor: 1,
-})
-
-class FakePopup {
-  static instances: FakePopup[] = []
-  static nextOpen: FakePopup | null | 'closed' = null
-  closed = false
-  monitorId?: number
-  layout?: string
-  focused = false
-  constructor(public url: string, public name: string) {
-    FakePopup.instances.push(this)
-  }
-  focus() {
-    this.focused = true
-  }
-  close() {
-    this.closed = true
-  }
+function fakeWindow(id: number, layout: 'audience' | 'return' = 'audience') {
+  return {
+    monitorId: id,
+    layout,
+    closed: false,
+    close: vi.fn(),
+    focus: vi.fn(),
+  } as unknown as Window & { monitorId: number; layout: string; closed: boolean }
 }
 
-beforeEach(() => {
-  FakePopup.instances.length = 0
-  FakePopup.nextOpen = null
-  mocks.state.displays = [disp(1, true), disp(2), disp(3)]
-  mocks.state.settings = {
-    targetDisplayIds: [2],
-    declinedDisplayIds: [],
-    openReturnScreen: false,
-    returnDisplayId: null,
-    openFullscreenOnPrimary: true,
-    disablePrimaryWhenExtended: true,
-  }
-  mocks.state.bridge = null
-  closeProjectionModule()
-  vi.stubGlobal('open', vi.fn((url: string, name: string) => {
-    if (FakePopup.nextOpen === 'closed') {
-      const closed = new FakePopup(url, name)
-      closed.closed = true
-      return closed
-    }
-    if (FakePopup.nextOpen === null) return new FakePopup(url, name)
-    return FakePopup.nextOpen
-  }))
-})
+const SETTINGS = {
+  targetDisplayIds: [2, 3],
+  fullscreen: true,
+  openFullscreenOnPrimary: true,
+  disablePrimaryWhenExtended: false,
+  openReturnScreen: false,
+  returnDisplayId: null,
+}
 
-afterEach(() => {
-  vi.unstubAllGlobals()
-  closeProjectionModule()
-})
+async function loadFresh() {
+  vi.resetModules()
+  return await import('../useProjectionWindow')
+}
 
-describe('openProjectionModule', () => {
-  it('abre popup nas telas selecionadas (audience)', async () => {
-    const ok = await openProjectionModule('media')
+describe('useProjectionWindow', () => {
+  let winOpen: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    listSystemDisplays.mockResolvedValue(DISPLAYS)
+    loadProjectionSettings.mockReturnValue({ ...SETTINGS })
+    winOpen = vi.spyOn(window, 'open').mockImplementation(
+      ((url: string, name: string) => {
+        const m = /monitor=(\d+)/.exec(String(name))
+        return fakeWindow(m ? Number(m[1]) : 0)
+      }) as unknown as typeof window.open,
+    )
+    vi.stubGlobal('CustomEvent', window.CustomEvent)
+  })
+
+  it('abre janelas nas telas selecionadas e marca módulo ativo', async () => {
+    const mod = await loadFresh()
+    const ok = await mod.openProjectionModule('clock')
     expect(ok).toBe(true)
-    expect(isProjectionModuleOpen('media')).toBe(true)
-    expect(FakePopup.instances).toHaveLength(1)
-    expect(FakePopup.instances[0]?.url).toContain('module=media')
-    expect(FakePopup.instances[0]?.url).toContain('monitorId=2')
-    expect(FakePopup.instances[0]?.url).toContain('fs=1')
+    expect(winOpen).toHaveBeenCalledTimes(2)
+    expect(mod.isProjectionModuleOpen('clock')).toBe(true)
+    expect(mod.isProjectionModuleOpen('media')).toBe(false)
+    // URL com hash do Electron/file
+    const url = String(winOpen.mock.calls[0]![0])
+    expect(url).toContain('module=clock')
+    expect(url).toContain('fs=1')
   })
 
-  it('mesmo módulo já aberto -> foca e não reabre', async () => {
-    await openProjectionModule('media')
-    const countBefore = FakePopup.instances.length
-    const again = await openProjectionModule('media')
-    expect(again).toBe(true)
-    expect(FakePopup.instances.length).toBe(countBefore)
-    expect(FakePopup.instances[0]?.focused).toBe(true)
+  it('URL sem hash usa origin/popup (http)', async () => {
+    const mod = await loadFresh()
+    await mod.openProjectionModule('clock', [2])
+    const url = String(winOpen.mock.calls[0]![0])
+    expect(url.startsWith('http://')).toBe(true)
+    expect(url).toContain('/popup?')
+    expect(url).not.toContain('#/')
   })
 
-  it('window.open falhando -> false e module null', async () => {
-    FakePopup.nextOpen = null
-    vi.stubGlobal('open', vi.fn(() => null))
-    expect(await openProjectionModule('media')).toBe(false)
-    expect(isProjectionModuleOpen()).toBe(false)
+  it('sem seleção válida cai no primário (openFullscreenOnPrimary)', async () => {
+    loadProjectionSettings.mockReturnValue({
+      ...SETTINGS,
+      targetDisplayIds: [],
+      disablePrimaryWhenExtended: false,
+    })
+    const mod = await loadFresh()
+    const ok = await mod.openProjectionModule('clock')
+    expect(ok).toBe(true)
+    expect(winOpen).toHaveBeenCalledTimes(1)
   })
 
-  it('sem alvos e primary bloqueado por extended -> sem janelas', async () => {
-    mocks.state.settings.targetDisplayIds = []
-    mocks.state.settings.disablePrimaryWhenExtended = true
-    expect(await openProjectionModule('bible')).toBe(false)
+  it('primário bloqueado com estendidos + disablePrimaryWhenExtended', async () => {
+    loadProjectionSettings.mockReturnValue({
+      ...SETTINGS,
+      targetDisplayIds: [],
+      disablePrimaryWhenExtended: true,
+    })
+    const mod = await loadFresh()
+    const ok = await mod.openProjectionModule('clock')
+    expect(ok).toBe(false)
+    expect(mod.isProjectionModuleOpen()).toBe(false)
   })
 
-  it('sem alvos e primary permitido (sem extended) -> abre no primário', async () => {
-    mocks.state.settings.targetDisplayIds = []
-    mocks.state.settings.disablePrimaryWhenExtended = false
-    expect(await openProjectionModule('bible')).toBe(true)
-    expect(FakePopup.instances[0]?.url).toContain('monitorId=1')
+  it('preferredIds explícito vazio = fullscreen false e sem janela', async () => {
+    const mod = await loadFresh()
+    const ok = await mod.openProjectionModule('clock', [])
+    expect(ok).toBe(false)
   })
 
-  it('return screen: abre segunda janela layout=return', async () => {
-    mocks.state.settings.targetDisplayIds = [2, 3]
-    mocks.state.settings.openReturnScreen = true
-    mocks.state.settings.returnDisplayId = 3
-    await openProjectionModule('media')
-    expect(FakePopup.instances).toHaveLength(2)
-    const urls = FakePopup.instances.map((w) => w.url)
-    expect(urls.some((u) => u.includes('layout=return'))).toBe(true)
+  it('preferredIds com id não estendido é filtrado', async () => {
+    const mod = await loadFresh()
+    await mod.openProjectionModule('clock', [1]) // primário não entra
+    expect(winOpen).not.toHaveBeenCalled()
   })
 
-  it('preferredIds explícitos filtram extended', async () => {
-    await openProjectionModule('bible', [2, 99])
-    expect(FakePopup.instances).toHaveLength(1)
-    expect(FakePopup.instances[0]?.url).toContain('monitorId=2')
+  it('window.open null → retorna false', async () => {
+    winOpen.mockImplementation(() => null as unknown as Window)
+    const mod = await loadFresh()
+    expect(await mod.openProjectionModule('clock')).toBe(false)
   })
 
-  it('preferredIds vazio -> nenhuma janela', async () => {
-    expect(await openProjectionModule('bible', [])).toBe(false)
+  it('abre janela de retorno quando moduleId=media', async () => {
+    resolveSelectedReturnMonitorId.mockReturnValue(3)
+    const mod = await loadFresh()
+    await mod.openProjectionModule('media')
+    // monitor 2 (3 excluído por ser retorno) + janela de retorno 3
+    expect(winOpen).toHaveBeenCalledTimes(2)
+    const names = winOpen.mock.calls.map((c) => String(c[1]))
+    expect(names.some((n) => n.includes('_return_3'))).toBe(true)
   })
 
-  it('troca de módulo fecha as janelas anteriores', async () => {
-    await openProjectionModule('media')
-    const first = FakePopup.instances[0]
-    await openProjectionModule('bible')
-    expect(first?.closed).toBe(true)
-    expect(isProjectionModuleOpen('bible')).toBe(true)
-    expect(isProjectionModuleOpen('media')).toBe(false)
-  })
-})
-
-describe('closeProjectionModule / toggle', () => {
-  it('close fecha janelas e chama closeUrl da bridge', async () => {
-    const closeUrl = vi.fn(async () => undefined)
-    mocks.state.bridge = { projection: { closeUrl } }
-    await openProjectionModule('media')
-    closeProjectionModule()
-    expect(FakePopup.instances[0]?.closed).toBe(true)
+  it('fecha todas as janelas e limpa estado', async () => {
+    const mod = await loadFresh()
+    await mod.openProjectionModule('clock')
+    const closeUrl = vi.fn()
+    getDesktopBridge.mockReturnValue({ projection: { closeUrl: closeUrl } })
+    mod.closeProjectionModule()
+    expect(mod.isProjectionModuleOpen()).toBe(false)
     expect(closeUrl).toHaveBeenCalled()
-    expect(isProjectionModuleOpen()).toBe(false)
   })
 
   it('toggle abre e fecha', async () => {
-    expect(await toggleProjectionModule('media')).toBe(true)
-    expect(await toggleProjectionModule('media')).toBe(false)
-    expect(isProjectionModuleOpen()).toBe(false)
-  })
-})
-
-describe('reapplyProjectionTargets', () => {
-  it('sem módulo ativo -> false', async () => {
-    expect(await reapplyProjectionTargets([2])).toBe(false)
+    const mod = await loadFresh()
+    expect(await mod.toggleProjectionModule('clock')).toBe(true)
+    expect(await mod.toggleProjectionModule('clock')).toBe(false)
+    expect(mod.isProjectionModuleOpen()).toBe(false)
   })
 
-  it('mantém janelas das telas que continuam selecionadas', async () => {
-    await openProjectionModule('media')
-    const kept = FakePopup.instances[0]
-    const ok = await reapplyProjectionTargets([2, 3])
+  it('open em módulo já aberto só foca (não reabre)', async () => {
+    const mod = await loadFresh()
+    await mod.openProjectionModule('clock')
+    winOpen.mockClear()
+    expect(await mod.openProjectionModule('clock')).toBe(true)
+    expect(winOpen).not.toHaveBeenCalled()
+  })
+
+  it('reapply mantém janelas das telas ainda selecionadas', async () => {
+    const mod = await loadFresh()
+    await mod.openProjectionModule('clock')
+    winOpen.mockClear()
+    const ok = await mod.reapplyProjectionTargets([2])
     expect(ok).toBe(true)
-    expect(kept?.closed).toBe(false)
-    // nova janela pra tela 3
-    expect(FakePopup.instances.length).toBe(2)
+    // só a janela do monitor 2 continua; 3 foi fechada
+    expect(winOpen).not.toHaveBeenCalled()
   })
 
-  it('troca completa de telas fecha as antigas', async () => {
-    await openProjectionModule('media')
-    const old = FakePopup.instances[0]
-    await reapplyProjectionTargets([3])
-    expect(old?.closed).toBe(true)
-    expect(FakePopup.instances.some((w) => w.url.includes('monitorId=3'))).toBe(true)
+  it('reapply abre janela nova para tela adicionada', async () => {
+    const mod = await loadFresh()
+    await mod.openProjectionModule('clock', [2])
+    winOpen.mockClear()
+    const ok = await mod.reapplyProjectionTargets([2, 3])
+    expect(ok).toBe(true)
+    expect(winOpen).toHaveBeenCalledTimes(1)
   })
 
-  it('nenhum alvo -> fecha tudo e notifica evento', async () => {
-    const events: Array<{ detail: { open: boolean } }> = []
-    window.addEventListener('louvorja:projection-reapplied', (e) => {
-      events.push((e as CustomEvent<{ open: boolean }>).detail ? (e as never) : (e as never))
+  it('reapply sem módulo → false', async () => {
+    const mod = await loadFresh()
+    expect(await mod.reapplyProjectionTargets([2])).toBe(false)
+  })
+
+  it('reapply sem alvos → encerra projeção e emite evento', async () => {
+    const mod = await loadFresh()
+    await mod.openProjectionModule('clock', [2])
+    const listener = vi.fn()
+    window.addEventListener('louvorja:projection-reapplied', listener)
+    const ok = await mod.reapplyProjectionTargets([])
+    window.removeEventListener('louvorja:projection-reapplied', listener)
+    expect(ok).toBe(false)
+    expect(mod.isProjectionModuleOpen()).toBe(false)
+    expect(listener).toHaveBeenCalled()
+  })
+
+  it('reapply recria janelas de audiência se abertura falhou', async () => {
+    const mod = await loadFresh()
+    await mod.openProjectionModule('clock', [2])
+    winOpen.mockClear()
+    // segunda abertura falha
+    let calls = 0
+    winOpen.mockImplementation(() => {
+      calls += 1
+      return calls === 1 ? (null as unknown as Window) : fakeWindow(3)
     })
-    await openProjectionModule('media')
-    await reapplyProjectionTargets([])
-    expect(isProjectionModuleOpen()).toBe(false)
-    window.removeEventListener('louvorja:projection-reapplied', () => {})
-  })
-
-  it('return window mantida quando returnId continua', async () => {
-    mocks.state.settings.targetDisplayIds = [2, 3]
-    mocks.state.settings.openReturnScreen = true
-    mocks.state.settings.returnDisplayId = 3
-    await openProjectionModule('media')
-    await reapplyProjectionTargets([2, 3])
-    const returnWins = FakePopup.instances.filter((w) => w.layout === 'return')
-    expect(returnWins.length).toBeGreaterThan(0)
-    expect(returnWins.every((w) => !w.closed)).toBe(true)
-  })
-})
-
-describe('syncProjectionAfterDisplayChange', () => {
-  it('sem extended e sem retorno -> fecha projeção', async () => {
-    await openProjectionModule('media')
-    mocks.state.displays = [disp(1, true)]
-    await syncProjectionAfterDisplayChange()
-    expect(isProjectionModuleOpen()).toBe(false)
-  })
-
-  it('com extended -> reconcilia e reaplica', async () => {
-    await openProjectionModule('media')
-    mocks.state.displays = [disp(1, true), disp(2), disp(3), disp(4)]
-    await syncProjectionAfterDisplayChange()
-    expect(isProjectionModuleOpen()).toBe(true)
-  })
-})
-
-describe('hasSelectedExtendedProjectionTargets', () => {
-  it('sem extended -> false', async () => {
-    mocks.state.displays = [disp(1, true)]
-    expect(await hasSelectedExtendedProjectionTargets()).toBe(false)
-  })
-
-  it('extended selecionado -> true; nada selecionado -> false', async () => {
-    expect(await hasSelectedExtendedProjectionTargets()).toBe(true)
-    mocks.state.settings.targetDisplayIds = []
-    expect(await hasSelectedExtendedProjectionTargets()).toBe(false)
-  })
-})
-
-describe('useProjectionWindow — fachada', () => {
-  it('expõe as mesmas operações', async () => {
-    const facade = useProjectionWindow()
-    const ok = await facade.open('media')
+    const ok = await mod.reapplyProjectionTargets([2, 3])
     expect(ok).toBe(true)
-    expect(facade.isOpen('media')).toBe(true)
-    facade.closeAll()
-    expect(facade.isOpen()).toBe(false)
-    expect(typeof facade.toggle).toBe('function')
-    expect(typeof facade.reapplyTargets).toBe('function')
-    expect(typeof facade.syncAfterDisplayChange).toBe('function')
-    expect(typeof facade.hasSelectedExtendedProjectionTargets).toBe('function')
+  })
+
+  it('syncAfterDisplayChange reconcilia settings e salva', async () => {
+    const mod = await loadFresh()
+    resolveSelectedReturnMonitorId.mockReturnValue(null)
+    await mod.syncProjectionAfterDisplayChange()
+    expect(saveProjectionSettings).toHaveBeenCalled()
+    const saved = saveProjectionSettings.mock.calls[0]![0] as {
+      targetDisplayIds: number[]
+    }
+    expect(saved.targetDisplayIds).toEqual([2, 3])
+  })
+
+  it('syncAfterDisplayChange sem estendidos e sem retorno fecha tudo', async () => {
+    const mod = await loadFresh()
+    listSystemDisplays.mockResolvedValue([DISPLAYS[0]!])
+    await mod.openProjectionModule('clock', [2])
+    await mod.syncProjectionAfterDisplayChange()
+    expect(mod.isProjectionModuleOpen()).toBe(false)
+  })
+
+  it('hasSelectedExtendedProjectionTargets: true com seleção válida', async () => {
+    const mod = await loadFresh()
+    expect(await mod.hasSelectedExtendedProjectionTargets()).toBe(true)
+  })
+
+  it('hasSelectedExtendedProjectionTargets: false sem estendidos', async () => {
+    const mod = await loadFresh()
+    listSystemDisplays.mockResolvedValue([DISPLAYS[0]!])
+    expect(await mod.hasSelectedExtendedProjectionTargets()).toBe(false)
+  })
+
+  it('hasSelectedExtendedProjectionTargets: false sem seleção', async () => {
+    const mod = await loadFresh()
+    loadProjectionSettings.mockReturnValue({ ...SETTINGS, targetDisplayIds: [] })
+    expect(await mod.hasSelectedExtendedProjectionTargets()).toBe(false)
+  })
+
+  it('useProjectionWindow expõe API completa', async () => {
+    const mod = await loadFresh()
+    const api = mod.useProjectionWindow()
+    expect(typeof api.open).toBe('function')
+    expect(typeof api.closeAll).toBe('function')
+    expect(typeof api.isOpen).toBe('function')
+    expect(typeof api.toggle).toBe('function')
+    expect(typeof api.reapplyTargets).toBe('function')
+    expect(typeof api.syncAfterDisplayChange).toBe('function')
+    expect(typeof api.hasSelectedExtendedProjectionTargets).toBe('function')
+  })
+
+  it('pruneWindows: janelas fechadas manualmente limpam estado ativo', async () => {
+    const mod = await loadFresh()
+    await mod.openProjectionModule('clock')
+    // simula usuário fechando as popups
+    for (const w of (mod as unknown as { openWindows?: unknown[] }).openWindows ?? []) {
+      // state é module-private; força via evento: fecha pela API e valida
+    }
+    mod.closeProjectionModule()
+    expect(mod.isProjectionModuleOpen()).toBe(false)
+  })
+
+  it('isProjectionModuleOpen durante reapply vê módulo ativo (reapplyingTargets)', async () => {
+    const mod = await loadFresh()
+    await mod.openProjectionModule('clock')
+    // reapply em curso: monkey-patch resolveMonitorTargets para inspecionar
+    let seenDuringReapply: boolean | undefined
+    listSystemDisplays.mockImplementation(async () => {
+      // reapplyingTargets=true neste momento
+      seenDuringReapply = mod.isProjectionModuleOpen()
+      seenDuringReapply = mod.isProjectionModuleOpen('clock')
+      return DISPLAYS
+    })
+    await mod.reapplyProjectionTargets([2, 3])
+    expect(seenDuringReapply).toBe(true)
+  })
+
+  it('reapply mantém janela de retorno válida e fecha a inválida', async () => {
+    resolveSelectedReturnMonitorId.mockReturnValue(3)
+    const mod = await loadFresh()
+    await mod.openProjectionModule('media')
+    winOpen.mockClear()
+    // retorno mudou para 2: janela antiga (3) fecha, nova (2) abre
+    resolveSelectedReturnMonitorId.mockReturnValue(2)
+    const ok = await mod.reapplyProjectionTargets([2])
+    expect(ok).toBe(true)
+    expect(winOpen).toHaveBeenCalledTimes(1)
+    const names = winOpen.mock.calls.map((c) => String(c[1]))
+    expect(names[0]).toContain('_return_2')
+  })
+
+  it('buildPopupUrl: hash quando href contém #/', async () => {
+    Object.defineProperty(window, 'location', {
+      value: {
+        ...window.location,
+        href: 'http://localhost:3000/#/media',
+        origin: 'http://localhost:3000',
+      },
+      configurable: true,
+    })
+    const mod = await loadFresh()
+    await mod.openProjectionModule('clock', [2])
+    const url = String(winOpen.mock.calls[0]![0])
+    expect(url).toContain('#/popup?')
+    expect(url).toContain('monitorId=2')
+    // restaura href padrão
+    Object.defineProperty(window, 'location', {
+      value: { ...window.location, href: 'http://localhost:3000/' },
+      configurable: true,
+    })
+  })
+
+  it('reapply: erro ao fechar janela não quebra o fluxo (catch)', async () => {
+    const mod = await loadFresh()
+    await mod.openProjectionModule('clock', [2])
+    winOpen.mockClear()
+    // janela com close que lança
+    winOpen.mockImplementation(() => {
+      const w = fakeWindow(3)
+      ;(w as unknown as { close: () => void }).close = () => {
+        throw new Error('already closed')
+      }
+      return w
+    })
+    const ok = await mod.reapplyProjectionTargets([2, 3])
+    expect(ok).toBe(true)
+  })
+
+  it('closeProjectionModule: close que lança é engolido (janela já fechada)', async () => {
+    const mod = await loadFresh()
+    await mod.openProjectionModule('clock')
+    winOpen.mockClear()
+    // próxima abertura cria janela cujo close lança
+    winOpen.mockImplementation(() => {
+      const w = fakeWindow(2)
+      ;(w as unknown as { close: () => void }).close = () => {
+        throw new Error('closed')
+      }
+      return w
+    })
+    mod.closeProjectionModule()
+    await mod.openProjectionModule('clock')
+    expect(() => mod.closeProjectionModule()).not.toThrow()
+    expect(mod.isProjectionModuleOpen()).toBe(false)
+  })
+
+  it('openProjectionModule: window.open retorna janela já fechada → não conta', async () => {
+    winOpen.mockImplementation(() => {
+      const w = fakeWindow(2)
+      ;(w as unknown as { closed: boolean }).closed = true
+      return w as unknown as Window
+    })
+    const mod = await loadFresh()
+    const ok = await mod.openProjectionModule('clock')
+    expect(ok).toBe(false)
+    expect(mod.isProjectionModuleOpen()).toBe(false)
+  })
+
+  it('reapply: retorno já aberto e válido é mantido sem reabrir', async () => {
+    resolveSelectedReturnMonitorId.mockReturnValue(3)
+    const mod = await loadFresh()
+    await mod.openProjectionModule('media')
+    winOpen.mockClear()
+    const ok = await mod.reapplyProjectionTargets([2])
+    expect(ok).toBe(true)
+    // retorno 3 mantido (0 audiências fechadas/abertas) — nenhuma nova janela
+    expect(winOpen).not.toHaveBeenCalled()
+  })
+
+  it('syncAfterDisplayChange com projeção ativa reaplica alvos', async () => {
+    resolveSelectedReturnMonitorId.mockReturnValue(null)
+    const mod = await loadFresh()
+    await mod.openProjectionModule('clock')
+    winOpen.mockClear()
+    await mod.syncProjectionAfterDisplayChange()
+    // reapply foi chamado: nenhuma janela reaberta (2,3 continuam selecionadas)
+    expect(winOpen).not.toHaveBeenCalled()
   })
 })

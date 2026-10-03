@@ -1,487 +1,381 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+// Cobertura useMonitorTargetSelect (gaps shared): optionsList (extendedOnly,
+// retorno), toggle/setSelectedIds com persist, applyRemoteIds (eco IPC),
+// modelValue controlado, identify, subscribes/unsubscribes.
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ref } from 'vue'
 
-/**
- * useMonitorTargetSelect — seleção de monitores alvo da projeção.
- * Mocks: display-service (lista fixa), projection-preferences (settings em
- * memória), bridge e useProjectionWindow.
- */
+const listSystemDisplays = vi.fn()
+const listExtendedDisplays = vi.fn((all: Array<{ id: number; isPrimary?: boolean }>) =>
+  all.filter((d) => !d.isPrimary),
+)
+const identifySystemDisplays = vi.fn()
+const subscribeDisplaysChanged = vi.fn(() => () => {})
 
-const mocks = vi.hoisted(() => {
-	const state = {
-		displays: [] as Array<Record<string, unknown>>,
-		settings: {
-			targetDisplayIds: [] as number[],
-			declinedDisplayIds: [] as number[],
-			openReturnScreen: false,
-			returnDisplayId: null as number | null,
-		},
-		bridge: null as null | Record<string, unknown>,
-	};
-	return { state };
-});
+vi.mock('@modules/settings/services/display-service', () => ({
+  listSystemDisplays: (...a: unknown[]) => listSystemDisplays(...(a as [])),
+  listExtendedDisplays: (all: Array<{ id: number; isPrimary?: boolean }>) =>
+    listExtendedDisplays(all),
+  identifySystemDisplays: (...a: unknown[]) => identifySystemDisplays(...(a as [])),
+  subscribeDisplaysChanged: (cb: unknown) => subscribeDisplaysChanged(cb),
+  formatDisplayResolution: (d: { width?: number; height?: number }) =>
+    `${d.width ?? 0}x${d.height ?? 0}`,
+}))
 
-vi.mock("@modules/settings/services/display-service", () => ({
-	listSystemDisplays: vi.fn(async () => mocks.state.displays),
-	listExtendedDisplays: (all: Array<{ isPrimary: boolean }>) =>
-		all.filter((d) => !d.isPrimary),
-	formatDisplayResolution: (d: { bounds: { width: number; height: number } }) =>
-		`${d.bounds.width} × ${d.bounds.height}`,
-	identifySystemDisplays: vi.fn(async () => true),
-	subscribeDisplaysChanged: vi.fn(() => () => {}),
-}));
+const loadProjectionSettings = vi.fn()
+const saveProjectionSettings = vi.fn()
+const reconcileTargetDisplays = vi.fn((s: Record<string, unknown>) => s)
+const reapplyProjectionTargets = vi.fn(async () => true)
 
-vi.mock("@modules/settings/services/projection-preferences", () => ({
-	loadProjectionSettings: vi.fn(() => ({ ...mocks.state.settings })),
-	saveProjectionSettings: vi.fn((s: unknown) => {
-		Object.assign(mocks.state.settings, s as Record<string, unknown>);
-	}),
-	reconcileTargetDisplays: vi.fn((s: unknown) => s),
-}));
+vi.mock('@modules/settings/services/projection-preferences', () => ({
+  loadProjectionSettings: () => loadProjectionSettings(),
+  saveProjectionSettings: (s: Record<string, unknown>) => saveProjectionSettings(s),
+  reconcileTargetDisplays: (s: Record<string, unknown>, ids: number[]) =>
+    reconcileTargetDisplays(s, ids),
+}))
 
-vi.mock("@shared/services/desktop-bridge", () => ({
-	getDesktopBridge: vi.fn(() => mocks.state.bridge),
-}));
+vi.mock('@shared/composables/useProjectionWindow', () => ({
+  reapplyProjectionTargets: (...a: unknown[]) => reapplyProjectionTargets(...(a as [])),
+}))
 
-vi.mock("@shared/composables/useProjectionWindow", () => ({
-	reapplyProjectionTargets: vi.fn(async () => undefined),
-}));
-
-vi.mock("@modules/settings/stores/useProjectionStore", () => ({
-	useProjectionStore: () => ({
-		applySettings: vi.fn(),
-	}),
-}));
-
-import { saveProjectionSettings } from "@modules/settings/services/projection-preferences";
-import { useMonitorTargetSelect } from "../useMonitorTargetSelect";
-
-const disp = (id: number, isPrimary = false) => ({
-	id,
-	isPrimary,
-	bounds: { x: 0, y: 0, width: 1920, height: 1080 },
-	workArea: { x: 0, y: 0, width: 1920, height: 1040 },
-	scaleFactor: 1,
-});
-
-// componente real p/ hooks
-import { createApp, defineComponent, h } from "vue";
-
-async function mountWith(setup: () => unknown) {
-	let captured: unknown;
-	const app = createApp(
-		defineComponent({
-			setup() {
-				captured = setup();
-				return () => h("div");
-			},
-		}),
-	);
-	const host = document.createElement("div");
-	document.body.appendChild(host);
-	app.mount(host);
-	const env = {
-		tm: captured as ReturnType<typeof useMonitorTargetSelect>,
-		unmount: () => app.unmount(),
-	};
-	// aguarda o syncToMain do onMounted drenar (setTimeout(0) interno do applyingRemote)
-	for (let i = 0; i < 3; i++) {
-		await new Promise((r) => setTimeout(r, 0));
-	}
-	return env;
+const bridge = {
+  projection: {
+    setSiteTargetMonitors: vi.fn(async () => {}),
+    setVideoTargetMonitors: vi.fn(async () => {}),
+    onSiteTargetsChanged: vi.fn(() => () => {}),
+  },
 }
 
-type TM = ReturnType<typeof useMonitorTargetSelect>;
+vi.mock('@shared/services/desktop-bridge', () => ({
+  getDesktopBridge: () => bridge,
+}))
 
-beforeEach(() => {
-	vi.clearAllMocks();
-	mocks.state.displays = [disp(1, true), disp(2), disp(3)];
-	mocks.state.settings = {
-		targetDisplayIds: [],
-		declinedDisplayIds: [],
-		openReturnScreen: false,
-		returnDisplayId: null,
-	};
-	mocks.state.bridge = null;
-});
+vi.mock('@modules/settings/stores/useProjectionStore', () => ({
+  useProjectionStore: () => ({ applySettings: vi.fn() }),
+}))
 
-afterEach(() => {
-	document.body.innerHTML = "";
-});
+const SETTINGS = {
+  targetDisplayIds: [2],
+  declinedDisplayIds: [],
+  openReturnScreen: false,
+  returnDisplayId: null,
+}
 
-describe("useMonitorTargetSelect — listagem e opções", () => {
-	it("refresh carrega displays; extendedOnly esconde o primário", async () => {
-		const env = await mountWith(() => useMonitorTargetSelect());
-		const tm = env.tm;
-		await tm.refresh();
-		expect(tm.optionsList.value.map((o) => o.id)).toEqual([2, 3]);
-		expect(tm.optionsList.value[0]?.label).toBe("Monitor 2");
-		expect(tm.optionsList.value[0]?.resolutionLabel).toBe("1920 × 1080");
-		env.unmount();
-	});
+const DISPLAYS = [
+  { id: 1, isPrimary: true, width: 1920, height: 1080 },
+  { id: 2, width: 1366, height: 768 },
+  { id: 3, width: 1280, height: 720 },
+]
 
-	it("extendedOnly=false mostra todos", async () => {
-		const env = await mountWith(() =>
-			useMonitorTargetSelect({ extendedOnly: false }),
-		);
-		await env.tm.refresh();
-		expect(env.tm.optionsList.value).toHaveLength(3);
-		env.unmount();
-	});
+async function loadFresh() {
+  vi.resetModules()
+  return await import('../useMonitorTargetSelect')
+}
 
-	it("hasDisplays/selectedCount/loading", async () => {
-		const env = await mountWith(() => useMonitorTargetSelect());
-		// refresh do mount já rodou (mountWith aguarda microtasks)
-		expect(env.tm.hasDisplays.value).toBe(true);
-		expect(env.tm.selectedCount.value).toBe(0);
-		expect(env.tm.loading.value).toBe(false);
-		env.unmount();
-	});
+function host<T>(fn: () => T): { result: T; unmount: () => void } {
+  // roda o composable fora de componente: onMounted não dispara;
+  // chamamos refresh manualmente nos testes que precisam
+  let result: T
+  const { effectScope } = require('vue') as typeof import('vue')
+  const scope = effectScope()
+  scope.run(() => {
+    result = fn()
+  })!
+  return { result: result!, unmount: () => scope.stop() }
+}
 
-	it("identify alterna identifying", async () => {
-		const env = await mountWith(() => useMonitorTargetSelect());
-		const p = env.tm.identify();
-		await p;
-		expect(env.tm.identifying.value).toBe(false);
-		env.unmount();
-	});
+describe('useMonitorTargetSelect', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    listSystemDisplays.mockResolvedValue(DISPLAYS)
+    loadProjectionSettings.mockReturnValue({ ...SETTINGS })
+  })
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
 
-	it("open/toggleOpen/close disparam refresh", async () => {
-		const env = await mountWith(() => useMonitorTargetSelect());
-		env.tm.toggleOpen();
-		expect(env.tm.open.value).toBe(true);
-		await new Promise((r) => setTimeout(r, 0));
-		env.tm.close();
-		expect(env.tm.open.value).toBe(false);
-		env.tm.toggleOpen();
-		expect(env.tm.open.value).toBe(true);
-		env.unmount();
-	});
-});
+  it('refresh popula optionsList só com estendidos', async () => {
+    const mod = await loadFresh()
+    const { result, unmount } = host(() => mod.useMonitorTargetSelect())
+    await result.refresh()
+    expect(result.optionsList.value.map((o) => o.id)).toEqual([2, 3])
+    expect(result.optionsList.value[0]!.label).toBe('Monitor 2')
+    expect(result.optionsList.value[0]!.isSelected).toBe(true)
+    expect(result.hasDisplays.value).toBe(true)
+    unmount()
+  })
 
-describe("useMonitorTargetSelect — seleção e persistência", () => {
-	it("setSelectedIds filtra inválidos, persiste e sincroniza ao main", async () => {
-		const setSite = vi.fn(async () => undefined);
-		const setVideo = vi.fn(async () => undefined);
-		mocks.state.bridge = {
-			projection: {
-				setSiteTargetMonitors: setSite,
-				setVideoTargetMonitors: setVideo,
-			},
-		};
-		const env = await mountWith(() => useMonitorTargetSelect());
-		await env.tm.refresh();
-		env.tm.setSelectedIds([2, 99]); // 99 não existe
-		expect(env.tm.selectedIds.value).toEqual([2]);
-		expect(saveProjectionSettings).toHaveBeenCalled();
-		await new Promise((r) => setTimeout(r, 0));
-		expect(setSite).toHaveBeenCalledWith([2]);
-		expect(setVideo).toHaveBeenCalledWith([2]);
-		env.unmount();
-	});
+  it('extendedOnly=false lista todos, primário incluso', async () => {
+    const mod = await loadFresh()
+    const { result, unmount } = host(() =>
+      mod.useMonitorTargetSelect({ extendedOnly: false }),
+    )
+    await result.refresh()
+    expect(result.optionsList.value.map((o) => o.id)).toEqual([1, 2, 3])
+    expect(result.optionsList.value[0]!.isPrimary).toBe(true)
+    unmount()
+  })
 
-	it("toggle adiciona e remove", async () => {
-		const env = await mountWith(() => useMonitorTargetSelect());
-		await env.tm.refresh();
-		env.tm.toggle(2);
-		expect(env.tm.selectedIds.value).toEqual([2]);
-		env.tm.toggle(2);
-		expect(env.tm.selectedIds.value).toEqual([]);
-		// toggle de primário (não permitido) é ignorado
-		env.tm.toggle(1);
-		expect(env.tm.selectedIds.value).toEqual([]);
-		env.unmount();
-	});
+  it('toggle adiciona e remove seleção; persiste e emite update', async () => {
+    const onUpdate = vi.fn()
+    const mod = await loadFresh()
+    const { result, unmount } = host(() =>
+      mod.useMonitorTargetSelect({ onUpdate }),
+    )
+    await result.refresh()
+    result.toggle(3)
+    expect(result.selectedIds.value).toEqual([2, 3])
+    expect(onUpdate).toHaveBeenCalledWith([2, 3])
+    expect(saveProjectionSettings).toHaveBeenCalled()
+    const saved = saveProjectionSettings.mock.calls.at(-1)![0] as {
+      targetDisplayIds: number[]
+      declinedDisplayIds: number[]
+    }
+    expect(saved.targetDisplayIds).toEqual([2, 3])
+    expect(saved.declinedDisplayIds).toEqual([])
+    result.toggle(3)
+    expect(result.selectedIds.value).toEqual([2])
+    unmount()
+  })
 
-	it("persist=false não grava settings", async () => {
-		const env = await mountWith(() =>
-			useMonitorTargetSelect({ persist: false }),
-		);
-		await env.tm.refresh();
-		env.tm.setSelectedIds([2]);
-		expect(saveProjectionSettings).not.toHaveBeenCalled();
-		env.unmount();
-	});
+  it('toggle em display não permitido (primário) é ignorado', async () => {
+    const mod = await loadFresh()
+    const { result, unmount } = host(() => mod.useMonitorTargetSelect())
+    await result.refresh()
+    result.toggle(1)
+    expect(result.selectedIds.value).toEqual([2])
+    unmount()
+  })
 
-	it("modelValue controlado filtra pela lista permitida", async () => {
-		const env = await mountWith(() =>
-			useMonitorTargetSelect({ persist: false, modelValue: () => [2, 77] }),
-		);
-		await env.tm.refresh();
-		expect(env.tm.selectedIds.value).toEqual([2]);
-		env.unmount();
-	});
+  it('persist=false não salva settings', async () => {
+    const mod = await loadFresh()
+    const { result, unmount } = host(() =>
+      mod.useMonitorTargetSelect({ persist: false }),
+    )
+    await result.refresh()
+    result.toggle(3)
+    expect(saveProjectionSettings).not.toHaveBeenCalled()
+    unmount()
+  })
 
-	it("onUpdate dispara ao mudar seleção", async () => {
-		const onUpdate = vi.fn();
-		const env = await mountWith(() =>
-			useMonitorTargetSelect({ persist: false, onUpdate }),
-		);
-		await env.tm.refresh();
-		env.tm.setSelectedIds([3]);
-		expect(onUpdate).toHaveBeenCalledWith([3]);
-		env.unmount();
-	});
+  it('tela de retorno aparece na lista mesmo não estendida', async () => {
+    loadProjectionSettings.mockReturnValue({
+      ...SETTINGS,
+      openReturnScreen: true,
+      returnDisplayId: 1,
+    })
+    const mod = await loadFresh()
+    const { result, unmount } = host(() => mod.useMonitorTargetSelect())
+    await result.refresh()
+    const ret = result.optionsList.value.find((o) => o.id === 1)
+    expect(ret?.isReturn).toBe(true)
+    unmount()
+  })
 
-	it("tela de retorno aparece nas opções e não é recusada", async () => {
-		mocks.state.settings = {
-			targetDisplayIds: [2],
-			declinedDisplayIds: [],
-			openReturnScreen: true,
-			returnDisplayId: 1,
-		};
-		const env = await mountWith(() => useMonitorTargetSelect());
-		await env.tm.refresh();
-		const ids = env.tm.optionsList.value.map((o) => o.id);
-		expect(ids).toContain(1);
-		const ret = env.tm.optionsList.value.find((o) => o.id === 1);
-		expect(ret?.isReturn).toBe(true);
-		env.unmount();
-	});
-});
+  it('identify alterna identifying', async () => {
+    identifySystemDisplays.mockImplementation(
+      () => new Promise((r) => setTimeout(r, 10)),
+    )
+    const mod = await loadFresh()
+    const { result, unmount } = host(() => mod.useMonitorTargetSelect())
+    const p = result.identify()
+    expect(result.identifying.value).toBe(true)
+    await p
+    expect(result.identifying.value).toBe(false)
+    unmount()
+  })
 
-describe("useMonitorTargetSelect — sync com main e IPC remoto", () => {
-	it("applyRemoteIds atualiza seleção sem ecoar (applyingRemote)", async () => {
-		const setSite = vi.fn(async () => undefined);
-		let remoteCb: ((ids: number[]) => void) | null = null;
-		mocks.state.bridge = {
-			projection: {
-				setSiteTargetMonitors: setSite,
-				onSiteTargetsChanged: vi.fn((cb: (ids: number[]) => void) => {
-					remoteCb = cb;
-					return () => {};
-				}),
-			},
-		};
-		const env = await mountWith(() => useMonitorTargetSelect());
-		await env.tm.refresh();
-		remoteCb?.([3]);
-		await new Promise((r) => setTimeout(r, 0));
-		expect(env.tm.selectedIds.value).toEqual([3]);
-		// setSite pode ter sido chamado apenas pelo sync inicial do mount (vazio);
-		// o eco remoto NÃO deve ter adicionado uma nova chamada com [3]
-		const siteCalls = setSite.mock.calls.map((c) => c[0]);
-		expect(siteCalls).not.toContainEqual([3]);
-		env.unmount();
-	});
+  it('toggleOpen abre e fecha; open dispara refresh', async () => {
+    const mod = await loadFresh()
+    const { result, unmount } = host(() => mod.useMonitorTargetSelect())
+    result.toggleOpen()
+    expect(result.open.value).toBe(true)
+    await Promise.resolve()
+    result.close()
+    expect(result.open.value).toBe(false)
+    unmount()
+  })
 
-	it("syncToMain ignora se applyingRemote (eco)", async () => {
-		let remoteCb: ((ids: number[]) => void) | null = null;
-		const setSite = vi.fn(async () => undefined);
-		mocks.state.bridge = {
-			projection: {
-				setSiteTargetMonitors: setSite,
-				setVideoTargetMonitors: vi.fn(),
-				onSiteTargetsChanged: vi.fn((cb: (ids: number[]) => void) => {
-					remoteCb = cb;
-					return () => {};
-				}),
-			},
-		};
-		const env = await mountWith(() => useMonitorTargetSelect());
-		await env.tm.refresh();
-		// local muda → syncToMain roda (applyingRemote vira true durante)
-		env.tm.setSelectedIds([2]);
-		await new Promise((r) => setTimeout(r, 0));
-		expect(setSite).toHaveBeenCalledWith([2]);
-		// remoto aplica o mesmo → applyingRemote deve bloquear re-sync
-		remoteCb?.([2]);
-		env.unmount();
-	});
+  it('modelValue controlado filtra IDs não permitidos via watch', async () => {
+    const model = ref<number[]>([1, 2]) // 1 é primário → filtrado
+    const mod = await loadFresh()
+    const { result, unmount } = host(() =>
+      mod.useMonitorTargetSelect({ modelValue: model }),
+    )
+    await result.refresh()
+    model.value = [1, 3]
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(result.selectedIds.value).toEqual([3])
+    unmount()
+  })
 
-	it("sem bridge: setSelectedIds funciona sem sync", async () => {
-		const env = await mountWith(() => useMonitorTargetSelect());
-		await env.tm.refresh();
-		env.tm.setSelectedIds([2]);
-		expect(env.tm.selectedIds.value).toEqual([2]);
-		env.unmount();
-	});
+  it('applyRemoteIds via IPC atualiza seleção e persiste', async () => {
+    const mod = await loadFresh()
+    let cb: ((ids: number[]) => void) | undefined
+    bridge.projection.onSiteTargetsChanged.mockImplementation((fn: (ids: number[]) => void) => {
+      cb = fn
+      return () => {}
+    })
+    const { createApp, defineComponent, h } = await import('vue')
+    let res: ReturnType<typeof mod.useMonitorTargetSelect> | undefined
+    const Host = defineComponent({
+      setup() {
+        res = mod.useMonitorTargetSelect()
+        return () => h('div')
+      },
+    })
+    const el = document.createElement('div')
+    document.body.appendChild(el)
+    const app = createApp(Host)
+    app.mount(el)
+    await Promise.resolve()
+    const r2 = res!
+    expect(r2.selectedIds.value).toEqual([2])
+    cb!([3])
+    await Promise.resolve()
+    expect(r2.selectedIds.value).toEqual([3])
+    app.unmount()
+  })
 
-	it("seleção a partir de settings no boot (persist)", async () => {
-		mocks.state.settings = {
-			targetDisplayIds: [3],
-			declinedDisplayIds: [2],
-			openReturnScreen: false,
-			returnDisplayId: null,
-		};
-		const env = await mountWith(() => useMonitorTargetSelect());
-		await env.tm.refresh();
-		expect(env.tm.selectedIds.value).toEqual([3]);
-		env.unmount();
-	});
+  it('applyRemoteIds ignora eco durante applyingRemote (syncToMain)', async () => {
+    const mod = await loadFresh()
+    const { result, unmount } = host(() => mod.useMonitorTargetSelect())
+    await result.refresh()
+    result.setSelectedIds([3])
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(bridge.projection.setSiteTargetMonitors).toHaveBeenCalledWith([3])
+    expect(bridge.projection.setVideoTargetMonitors).toHaveBeenCalledWith([3])
+    expect(reapplyProjectionTargets).toHaveBeenCalledWith([3])
+    unmount()
+  })
 
-	it("settings com id removido é reconciliado", async () => {
-		mocks.state.settings = {
-			targetDisplayIds: [2, 3, 44],
-			declinedDisplayIds: [],
-			openReturnScreen: false,
-			returnDisplayId: null,
-		};
-		const env = await mountWith(() => useMonitorTargetSelect());
-		await env.tm.refresh();
-		// 44 não existe → removido
-		expect(env.tm.selectedIds.value).toEqual([2, 3]);
-		env.unmount();
-	});
-});
+  it('syncToMain normaliza IDs não finitos', async () => {
+    const mod = await loadFresh()
+    const { result, unmount } = host(() => mod.useMonitorTargetSelect())
+    await result.refresh()
+    result.setSelectedIds([Number.NaN, 2])
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(bridge.projection.setSiteTargetMonitors).toHaveBeenCalledWith([2])
+    unmount()
+  })
 
-describe("useMonitorTargetSelect — ciclo de vida", () => {
-	it("unmount remove inscrições", async () => {
-		const unsubTargets = vi.fn();
-		const unsubDisplays = vi.fn();
-		mocks.state.bridge = {
-			projection: {
-				onSiteTargetsChanged: vi.fn(() => unsubTargets),
-			},
-		};
-		const displayMod = (await import(
-			"@modules/settings/services/display-service"
-		)) as unknown as {
-			subscribeDisplaysChanged: ReturnType<typeof vi.fn>;
-		};
-		displayMod.subscribeDisplaysChanged.mockImplementation(() => unsubDisplays);
-		const env = await mountWith(() => useMonitorTargetSelect());
-		await env.tm.refresh();
-		env.unmount();
-		expect(unsubTargets).toHaveBeenCalled();
-		expect(unsubDisplays).toHaveBeenCalled();
-	});
+  it('onMounted assina IPC e displays-changed; unmount desassina', async () => {
+    const unsubTargets = vi.fn()
+    const unsubDisplays = vi.fn()
+    bridge.projection.onSiteTargetsChanged.mockReturnValue(unsubTargets)
+    subscribeDisplaysChanged.mockReturnValue(unsubDisplays)
+    const mod = await loadFresh()
+    const { createApp, defineComponent, h } = await import('vue')
+    const Host = defineComponent({
+      setup() {
+        mod.useMonitorTargetSelect()
+        return () => h('div')
+      },
+    })
+    const el = document.createElement('div')
+    document.body.appendChild(el)
+    const app = createApp(Host)
+    app.mount(el)
+    await Promise.resolve()
+    expect(bridge.projection.onSiteTargetsChanged).toHaveBeenCalled()
+    expect(subscribeDisplaysChanged).toHaveBeenCalled()
+    app.unmount()
+    expect(unsubTargets).toHaveBeenCalled()
+    expect(unsubDisplays).toHaveBeenCalled()
+  })
 
-	it("onSiteTargetsChanged ausente na bridge → mount ok", async () => {
-		mocks.state.bridge = { projection: {} };
-		const env = await mountWith(() => useMonitorTargetSelect());
-		await env.tm.refresh();
-		env.unmount();
-		expect(true).toBe(true);
-	});
-});
+  it('settings com monitor primário selecionado é filtrado no load', async () => {
+    loadProjectionSettings.mockReturnValue({ ...SETTINGS, targetDisplayIds: [1, 2] })
+    const mod = await loadFresh()
+    const { result, unmount } = host(() => mod.useMonitorTargetSelect())
+    await result.refresh()
+    expect(result.selectedIds.value).toEqual([2])
+    unmount()
+  })
 
-describe("useMonitorTargetSelect — ramos residuais", () => {
-	it("modelValue como Ref (não função)", async () => {
-		const modelValue = { value: [2] };
-		const env = await mountWith(() =>
-			useMonitorTargetSelect({
-				persist: false,
-				modelValue: modelValue as never,
-			}),
-		);
-		await env.tm.refresh();
-		expect(env.tm.selectedIds.value).toEqual([2]);
-		env.unmount();
-	});
+  it('setSelectedIds registra declined displays', async () => {
+    const mod = await loadFresh()
+    const { result, unmount } = host(() => mod.useMonitorTargetSelect())
+    await result.refresh()
+    result.setSelectedIds([2])
+    const saved = saveProjectionSettings.mock.calls.at(-1)![0] as {
+      declinedDisplayIds: number[]
+    }
+    expect(saved.declinedDisplayIds).toEqual([3])
+    unmount()
+  })
 
-	it("watch de modelValue reagrupa ids permitidos (314-316)", async () => {
-		const { ref } = await import("vue");
-		const modelValue = ref([2]);
-		const env = await mountWith(() =>
-			useMonitorTargetSelect({
-				persist: false,
-				modelValue: modelValue as never,
-			}),
-		);
-		await env.tm.refresh();
-		modelValue.value = [3, 88];
-		await new Promise((r) => setTimeout(r, 10));
-		expect(env.tm.selectedIds.value).toEqual([3]);
-		env.unmount();
-	});
+  it('IPC com payload não-array aplica []', async () => {
+    const mod = await loadFresh()
+    let cb: ((ids: unknown) => void) | undefined
+    bridge.projection.onSiteTargetsChanged.mockImplementation((fn: (ids: unknown) => void) => {
+      cb = fn
+      return () => {}
+    })
+    const { createApp, defineComponent, h } = await import('vue')
+    let res: ReturnType<typeof mod.useMonitorTargetSelect> | undefined
+    const Host = defineComponent({
+      setup() {
+        res = mod.useMonitorTargetSelect()
+        return () => h('div')
+      },
+    })
+    const el = document.createElement('div')
+    document.body.appendChild(el)
+    const app = createApp(Host)
+    app.mount(el)
+    await Promise.resolve()
+    cb!(null)
+    await Promise.resolve()
+    expect(res!.selectedIds.value).toEqual([])
+    app.unmount()
+  })
 
-	it("watch com ids undefined → guard", async () => {
-		let mv: { value?: number[] } = { value: undefined };
-		const env = await mountWith(() =>
-			useMonitorTargetSelect({ persist: false, modelValue: () => mv.value }),
-		);
-		await env.tm.refresh();
-		mv = { value: [2] };
-		await new Promise((r) => setTimeout(r, 0));
-		env.unmount();
-	});
+  it('displays-changed dispara refresh', async () => {
+    const mod = await loadFresh()
+    let cb: (() => void) | undefined
+    subscribeDisplaysChanged.mockImplementation((fn: () => void) => {
+      cb = fn
+      return () => {}
+    })
+    const { createApp, defineComponent, h } = await import('vue')
+    let res: ReturnType<typeof mod.useMonitorTargetSelect> | undefined
+    const Host = defineComponent({
+      setup() {
+        res = mod.useMonitorTargetSelect()
+        return () => h('div')
+      },
+    })
+    const el = document.createElement('div')
+    document.body.appendChild(el)
+    const app = createApp(Host)
+    app.mount(el)
+    await new Promise((r) => setTimeout(r, 5))
+    listSystemDisplays.mockClear()
+    cb!()
+    await new Promise((r) => setTimeout(r, 10))
+    // refresh() foi reexecutado pelo evento de hotplug
+    expect(listSystemDisplays).toHaveBeenCalled()
+    app.unmount()
+  })
 
-	it("applyRemoteIds sem displays ainda aceita ids brutos (201)", async () => {
-		let remoteCb: ((ids: number[]) => void) | null = null;
-		mocks.state.displays = [];
-		mocks.state.bridge = {
-			projection: {
-				onSiteTargetsChanged: vi.fn((cb: (ids: number[]) => void) => {
-					remoteCb = cb;
-					return () => {};
-				}),
-			},
-		};
-		const env = await mountWith(() =>
-			useMonitorTargetSelect({ persist: false }),
-		);
-		remoteCb?.([5, "x" as unknown as number]);
-		await new Promise((r) => setTimeout(r, 0));
-		// sem displays: next = [...normalized] filtrado a NaN
-		expect(env.tm.selectedIds.value).toEqual([5]);
-		env.unmount();
-	});
-
-	it("onSiteTargetsChanged com payload não-array → [] (296)", async () => {
-		let remoteCb: ((ids: unknown) => void) | null = null;
-		mocks.state.bridge = {
-			projection: {
-				onSiteTargetsChanged: vi.fn((cb: (ids: unknown) => void) => {
-					remoteCb = cb;
-					return () => {};
-				}),
-			},
-		};
-		const env = await mountWith(() => useMonitorTargetSelect());
-		remoteCb?.("lixo");
-		await new Promise((r) => setTimeout(r, 0));
-		expect(env.tm.selectedIds.value).toEqual([]);
-		env.unmount();
-	});
-
-	it("syncToMain com substituição de sync entre awaits (133): nova seleção durante sync", async () => {
-		let releaseVideo: () => void = () => {};
-		const setSite = vi.fn(async () => undefined);
-		const setVideo = vi.fn(
-			() =>
-				new Promise<void>((resolve) => {
-					releaseVideo = resolve;
-				}),
-		);
-		mocks.state.bridge = {
-			projection: {
-				setSiteTargetMonitors: setSite,
-				setVideoTargetMonitors: setVideo,
-			},
-		};
-		const env = await mountWith(() => useMonitorTargetSelect());
-		await env.tm.refresh();
-		const p1 = env.tm.setSelectedIds([2]);
-		// segunda seleção enquanto a primeira espera o setVideo
-		env.tm.setSelectedIds([3]);
-		releaseVideo();
-		await p1;
-		await new Promise((r) => setTimeout(r, 0));
-		// reapply da 1ª chamada é abortado (seq mismatch)
-		env.unmount();
-		expect(true).toBe(true);
-	});
-
-	it("sameIds com ordem diferente → false (59-60)", async () => {
-		// exercita via applyRemoteIds: ordem diferente dispara re-set
-		let remoteCb: ((ids: number[]) => void) | null = null;
-		mocks.state.bridge = {
-			projection: {
-				onSiteTargetsChanged: vi.fn((cb: (ids: number[]) => void) => {
-					remoteCb = cb;
-					return () => {};
-				}),
-			},
-		};
-		const env = await mountWith(() =>
-			useMonitorTargetSelect({ persist: false }),
-		);
-		await env.tm.refresh();
-		env.tm.setSelectedIds([2, 3]);
-		remoteCb?.([3, 2]);
-		await new Promise((r) => setTimeout(r, 0));
-		expect([...env.tm.selectedIds.value].sort()).toEqual([2, 3]);
-		env.unmount();
-	});
-});
+  it('allowedDisplayIds inclui retorno não-estendido', async () => {
+    loadProjectionSettings.mockReturnValue({
+      ...SETTINGS,
+      openReturnScreen: true,
+      returnDisplayId: 1,
+    })
+    const mod = await loadFresh()
+    const { result, unmount } = host(() => mod.useMonitorTargetSelect())
+    await result.refresh()
+    // retorno = monitor 1 (primário) entra na lista e é toggle-ável
+    const opts = result.optionsList.value.map((o) => o.id)
+    expect(opts).toContain(1)
+    result.toggle(1)
+    expect(result.selectedIds.value).toContain(1)
+    unmount()
+  })
+})

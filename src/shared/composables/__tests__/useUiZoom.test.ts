@@ -1,354 +1,264 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+// Cobertura useUiZoom (gaps shared): snap/clamp, bridge nativo vs fallback CSS,
+// limites zoomIn/zoomOut, reset, initUiZoom popup, syncFromNative, onChanged.
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const mocks = vi.hoisted(() => ({
-	getUserPreference: vi.fn<() => unknown>(() => undefined),
-	setUserPreference: vi.fn(),
-	getDesktopBridge: vi.fn(),
-	isProjectionPopup: vi.fn(() => false),
-}));
+type Bridge = {
+  zoom?: {
+    getFactor?: () => number
+    setFactor?: (v: number) => number
+    zoomIn?: () => number
+    zoomOut?: () => number
+    onChanged?: (cb: (p: { factor: number }) => void) => () => void
+  }
+}
 
-vi.mock("@shared/services/user-preferences", () => ({
-	getUserPreference: mocks.getUserPreference,
-	setUserPreference: mocks.setUserPreference,
-}));
-vi.mock("@shared/services/desktop-bridge", () => ({
-	getDesktopBridge: mocks.getDesktopBridge,
-}));
-vi.mock("@shared/services/projection-window-location", () => ({
-	isProjectionPopupLocation: mocks.isProjectionPopup,
-}));
+const bridgeImpl: Bridge = {}
 
-// import dinâmico por teste (vi.resetModules no beforeEach) porque o zoom é
-// estado de módulo (ref singleton)
+vi.mock('@shared/services/desktop-bridge', () => ({
+  getDesktopBridge: () => bridgeImpl,
+}))
 
-const mountWith = async (fn: () => void) => {
-	// o vue precisa vir da MESMA cadeia de módulos resetada que o useUiZoom
-	const vue = await import("vue");
-	const { onMounted: _om, onUnmounted: _ou } = vue;
-	document.documentElement.style.zoom = "";
-	document.documentElement.style.removeProperty("--ui-zoom");
-	const host = document.createElement("div");
-	document.body.appendChild(host);
-	const app = vue.createApp(
-		vue.defineComponent({
-			setup() {
-				fn();
-				return () => vue.h("div");
-			},
-		}),
-	);
-	app.mount(host);
-	return () => app.unmount();
-};
+const isPopupRef = { value: false }
 
-let initUiZoom: typeof import("../useUiZoom").initUiZoom;
-let useUiZoom: typeof import("../useUiZoom").useUiZoom;
+vi.mock('@shared/services/projection-window-location', () => ({
+  isProjectionPopupLocation: () => isPopupRef.value,
+}))
 
-const loadModule = () =>
-	import("../useUiZoom").then((mod) => {
-		initUiZoom = mod.initUiZoom;
-		useUiZoom = mod.useUiZoom;
-	});
+const getUserPreference = vi.fn(() => undefined)
+const setUserPreference = vi.fn()
 
-describe("useUiZoom", () => {
-	beforeEach(() => {
-		vi.resetModules();
-		vi.resetAllMocks();
-		mocks.getUserPreference.mockReturnValue(undefined);
-		mocks.getDesktopBridge.mockReturnValue(null);
-		mocks.isProjectionPopup.mockReturnValue(false);
-		mocks.setUserPreference.mockReturnValue(undefined);
-		document.documentElement.style.zoom = "";
-		localStorage.clear();
-	});
+vi.mock('@shared/services/user-preferences', () => ({
+  getUserPreference: (...a: unknown[]) => getUserPreference(...(a as [])),
+  setUserPreference: (...a: unknown[]) => setUserPreference(...(a as [never, never])),
+}))
 
-	afterEach(() => {
-		vi.unstubAllGlobals();
-	});
+async function loadFresh() {
+  vi.resetModules()
+  return await import('../useUiZoom')
+}
 
-	it("sem preferência salva, zoom é 100%", async () => {
-		await loadModule();
-		const { zoom, zoomPercent, canZoomIn, canZoomOut } = useUiZoom();
-		expect(zoom.value).toBe(1);
-		expect(zoomPercent.value).toBe(100);
-		expect(canZoomIn.value).toBe(true);
-		expect(canZoomOut.value).toBe(true);
-	});
+async function withComponent(fn: () => unknown) {
+  const { defineComponent, h } = await import('vue')
+  const { mount } = await import('@vue/test-utils')
+  let result: unknown
+  const Host = defineComponent({
+    setup() {
+      result = fn()
+      return () => h('div')
+    },
+  })
+  const wrapper = mount(Host)
+  return { wrapper, result }
+}
 
-	it("setZoom aplica e persiste (fallback CSS sem bridge)", async () => {
-		await loadModule();
-		const { setZoom, zoom } = useUiZoom();
-		setZoom(1.2);
-		expect(zoom.value).toBe(1.2);
-		expect(document.documentElement.style.zoom).toBe("1.2");
-		expect(mocks.setUserPreference).toHaveBeenCalled();
-	});
+describe('useUiZoom', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    isPopupRef.value = false
+    delete bridgeImpl.zoom
+    document.documentElement.style.removeProperty('zoom')
+    document.documentElement.style.removeProperty('--ui-zoom')
+  })
+  afterEach(() => {
+    document.documentElement.style.removeProperty('zoom')
+    document.documentElement.style.removeProperty('--ui-zoom')
+  })
 
-	it("snap: 1.01 vira 1", async () => {
-		await loadModule();
-		const { setZoom, zoom } = useUiZoom();
-		setZoom(1.01);
-		expect(zoom.value).toBe(1);
-	});
+  it('clamp 70–150% e snap 99–101 → 100; NaN → default', async () => {
+    const mod = await loadFresh()
+    const api = mod.useUiZoom()
+    api.setZoom(2)
+    expect(api.zoom.value).toBe(1.5)
+    api.setZoom(0.1)
+    expect(api.zoom.value).toBe(0.7)
+    api.setZoom(1.01)
+    expect(api.zoom.value).toBe(1)
+    api.setZoom(Number.NaN)
+    expect(api.zoom.value).toBe(1)
+    expect(api.zoomPercent.value).toBe(100)
+  })
 
-	it("clamp: acima do máximo vira 1.5", async () => {
-		await loadModule();
-		const { setZoom, zoom, zoomPercent } = useUiZoom();
-		setZoom(3);
-		expect(zoom.value).toBe(1.5);
-		expect(zoomPercent.value).toBe(150);
-	});
+  it('zoomIn/zoomOut com bridge nativo', async () => {
+    const zoomInApi = vi.fn(() => 1.1)
+    const zoomOutApi = vi.fn(() => 0.9)
+    bridgeImpl.zoom = { zoomIn: zoomInApi, zoomOut: zoomOutApi, setFactor: (v) => v }
+    const mod = await loadFresh()
+    const api = mod.useUiZoom()
+    api.zoomIn()
+    expect(api.zoom.value).toBe(1.1)
+    api.zoomOut()
+    expect(api.zoom.value).toBe(0.9)
+    // raw fora do snap → reaplica via applyZoom
+    zoomInApi.mockReturnValue(1.014)
+    api.zoomIn()
+    expect(api.zoom.value).toBe(1) // 101.4% snapeia pra 100%
+  })
 
-	it("clamp: abaixo do mínimo vira 0.7", async () => {
-		await loadModule();
-		const { setZoom, zoom } = useUiZoom();
-		setZoom(0.1);
-		expect(zoom.value).toBe(0.7);
-	});
+  it('zoomIn/zoomOut sem setFactor nativo: fallback CSS ±0.1', async () => {
+    bridgeImpl.zoom = {}
+    const mod = await loadFresh()
+    const api = mod.useUiZoom()
+    api.zoomIn()
+    expect(api.zoom.value).toBe(1.1)
+    // jsdom ignora a propriedade CSS `zoom`; var custom é aplicada
+    expect(document.documentElement.style.getPropertyValue('--ui-zoom')).toBe('1.1')
+    api.zoomOut()
+    expect(api.zoom.value).toBe(1)
+  })
 
-	it("valor não finito vira default", async () => {
-		await loadModule();
-		const { setZoom, zoom } = useUiZoom();
-		setZoom(Number.NaN);
-		expect(zoom.value).toBe(1);
-	});
+  it('limites: zoomIn no máximo / zoomOut no mínimo são no-op', async () => {
+    bridgeImpl.zoom = { setFactor: (v) => v }
+    const mod = await loadFresh()
+    const api = mod.useUiZoom()
+    api.setZoom(1.5)
+    expect(api.canZoomIn.value).toBe(false)
+    api.zoomIn()
+    expect(api.zoom.value).toBe(1.5)
+    api.setZoom(0.7)
+    expect(api.canZoomOut.value).toBe(false)
+    api.zoomOut()
+    expect(api.zoom.value).toBe(0.7)
+  })
 
-	it("zoomIn/zoomOut sem bridge ajustam em 0.1", async () => {
-		await loadModule();
-		const { zoomIn, zoomOut, zoom } = useUiZoom();
-		zoomIn();
-		expect(zoom.value).toBeCloseTo(1.1);
-		zoomOut();
-		zoomOut();
-		expect(zoom.value).toBeCloseTo(0.9);
-	});
+  it('resetZoom volta a 100%', async () => {
+    bridgeImpl.zoom = { setFactor: (v) => v }
+    const mod = await loadFresh()
+    const api = mod.useUiZoom()
+    api.setZoom(1.3)
+    api.resetZoom()
+    expect(api.zoom.value).toBe(1)
+    expect(api.zoomPercent.value).toBe(100)
+    expect(api.min).toBe(0.7)
+    expect(api.max).toBe(1.5)
+  })
 
-	it("zoomIn no limite não passa do máximo", async () => {
-		await loadModule();
-		const { setZoom, zoomIn, zoom, canZoomIn } = useUiZoom();
-		setZoom(1.5);
-		expect(canZoomIn.value).toBe(false);
-		zoomIn();
-		expect(zoom.value).toBe(1.5);
-	});
+  it('setZoom persiste preferência (com localStorage disponível)', async () => {
+    vi.stubGlobal('localStorage', { setItem: vi.fn(), getItem: vi.fn(() => null) })
+    bridgeImpl.zoom = { setFactor: (v) => v }
+    const mod = await loadFresh()
+    const api = mod.useUiZoom()
+    api.setZoom(1.2)
+    expect(setUserPreference).toHaveBeenCalledWith('ui.zoom', 1.2)
+    vi.unstubAllGlobals()
+  })
 
-	it("zoomOut no mínimo não passa do mínimo", async () => {
-		await loadModule();
-		const { setZoom, zoomOut, zoom, canZoomOut } = useUiZoom();
-		setZoom(0.7);
-		expect(canZoomOut.value).toBe(false);
-		zoomOut();
-		expect(zoom.value).toBe(0.7);
-	});
+  it('initUiZoom na janela de projeção limpa CSS e não aplica', async () => {
+    isPopupRef.value = true
+    document.documentElement.style.zoom = '1.3'
+    const mod = await loadFresh()
+    mod.initUiZoom()
+    expect(document.documentElement.style.getPropertyValue('zoom')).toBe('')
+  })
 
-	it("resetZoom volta para 100%", async () => {
-		await loadModule();
-		const { setZoom, resetZoom, zoom } = useUiZoom();
-		setZoom(1.4);
-		resetZoom();
-		expect(zoom.value).toBe(1);
-	});
+  it('initUiZoom aplica zoom persistido (string no storage)', async () => {
+    const setFactor = vi.fn((v: number) => v)
+    bridgeImpl.zoom = { setFactor }
+    getUserPreference.mockReturnValue('1.2' as unknown as undefined)
+    const mod = await loadFresh()
+    mod.initUiZoom()
+    expect(setFactor).toHaveBeenCalledWith(1.2)
+  })
 
-	it("com bridge, usa setFactor nativo", async () => {
-		await loadModule();
-		const setFactor = vi.fn((v: number) => v);
-		mocks.getDesktopBridge.mockReturnValue({
-			zoom: { setFactor, getFactor: () => 1 },
-		});
-		const { setZoom, zoom } = useUiZoom();
-		setZoom(1.3);
-		expect(setFactor).toHaveBeenCalled();
-		expect(zoom.value).toBe(1.3);
-		expect(document.documentElement.style.zoom).toBe("");
-	});
+  it('zoom persistido inválido cai no default (100%)', async () => {
+    getUserPreference.mockReturnValue('abc' as unknown as undefined)
+    const setFactor = vi.fn((v: number) => v)
+    bridgeImpl.zoom = { setFactor }
+    const mod = await loadFresh()
+    mod.initUiZoom()
+    expect(setFactor).toHaveBeenCalledWith(1)
+  })
 
-	it("setFactor que lança cai no fallback CSS", async () => {
-		await loadModule();
-		const setFactor = vi.fn(() => {
-			throw new Error("boom");
-		});
-		mocks.getDesktopBridge.mockReturnValue({
-			zoom: { setFactor },
-		});
-		const { setZoom, zoom } = useUiZoom();
-		setZoom(1.3);
-		expect(zoom.value).toBe(1.3);
-		expect(document.documentElement.style.zoom).toBe("1.3");
-	});
+  it('bridge setFactor que lança → fallback CSS', async () => {
+    bridgeImpl.zoom = {
+      setFactor: () => {
+        throw new Error('boom')
+      },
+    }
+    const mod = await loadFresh()
+    const api = mod.useUiZoom()
+    api.setZoom(1.3)
+    expect(api.zoom.value).toBe(1.3)
+    expect(document.documentElement.style.getPropertyValue('--ui-zoom')).toBe('1.3')
+  })
 
-	it("zoomIn com api.zoomIn que snappa reaplica", async () => {
-		await loadModule();
-		const zoomInApi = vi.fn(() => 1.009);
-		const setFactor = vi.fn((v: number) => v);
-		mocks.getDesktopBridge.mockReturnValue({
-			zoom: { zoomIn: zoomInApi, setFactor },
-		});
-		const { zoomIn, zoom } = useUiZoom();
-		zoomIn();
-		expect(zoomInApi).toHaveBeenCalled();
-		expect(zoom.value).toBe(1);
-	});
+  it('onChanged: syncFromNative reaplica quando snapeia e trata NaN', async () => {
+    const setFactor = vi.fn((v: number) => v)
+    let changeCb: ((p: { factor: number }) => void) | undefined
+    bridgeImpl.zoom = {
+      getFactor: () => 1,
+      setFactor,
+      onChanged: (cb) => {
+        changeCb = cb
+        return () => {}
+      },
+    }
+    const mod = await loadFresh()
+    const { wrapper } = await withComponent(() => mod.useUiZoom())
+    expect(changeCb).toBeTruthy()
+    changeCb!({ factor: 1.01 }) // snap → reaplica 1
+    expect(setFactor).toHaveBeenLastCalledWith(1)
+    changeCb!({ factor: 1.25 }) // direto, só persiste
+    changeCb!({ factor: Number.NaN }) // readNativeFactor → 1 (getFactor)
+    wrapper.unmount()
+  })
 
-	it("zoomOut com api.zoomOut aplica direto", async () => {
-		await loadModule();
-		const zoomOutApi = vi.fn(() => 0.9);
-		mocks.getDesktopBridge.mockReturnValue({
-			zoom: { zoomOut: zoomOutApi },
-		});
-		const { zoomOut, zoom } = useUiZoom();
-		zoomOut();
-		expect(zoomOutApi).toHaveBeenCalled();
-		expect(zoom.value).toBe(0.9);
-	});
+  it('onChanged com payload sem factor usa readNativeFactor', async () => {
+    const setFactor = vi.fn((v: number) => v)
+    let changeCb: ((p: { factor?: number }) => void) | undefined
+    bridgeImpl.zoom = {
+      getFactor: () => 2, // fora do clamp → syncFromNative reaplica 1.5
+      setFactor,
+      onChanged: (cb: (p: { factor?: number }) => void) => {
+        changeCb = cb
+        return () => {}
+      },
+    }
+    const mod = await loadFresh()
+    const { wrapper } = await withComponent(() => mod.useUiZoom())
+    changeCb!({})
+    // payload sem factor → readNativeFactor=2 → clamp 1.5, guardado no ref
+    expect(setFactor).toHaveBeenLastCalledWith(1)
+    expect(mod.useUiZoom().zoom.value).toBe(1.5)
+    wrapper.unmount()
+  })
 
-	it("initUiZoom: popup de projeção não aplica zoom", async () => {
-		await loadModule();
-		mocks.isProjectionPopup.mockReturnValue(true);
-		initUiZoom();
-		expect(document.documentElement.style.zoom).toBe("");
-		expect(mocks.setUserPreference).not.toHaveBeenCalled();
-	});
+  it('readNativeFactor: bridge sem getFactor → null (syncFromNative ignorado)', async () => {
+    const setFactor = vi.fn((v: number) => v)
+    let changeCb: ((p: { factor?: number }) => void) | undefined
+    bridgeImpl.zoom = {
+      setFactor,
+      onChanged: (cb: (p: { factor?: number }) => void) => {
+        changeCb = cb
+        return () => {}
+      },
+    }
+    const mod = await loadFresh()
+    const { wrapper } = await withComponent(() => mod.useUiZoom())
+    setFactor.mockClear()
+    changeCb!({})
+    // factor null → return sem tocar nada
+    expect(setFactor).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
 
-	it("initUiZoom: fora do popup aplica o zoom salvo", async () => {
-		mocks.getUserPreference.mockReturnValue(1.25);
-		await loadModule();
-		initUiZoom();
-		expect(document.documentElement.style.zoom).toBe("1.25");
-	});
+  it('zoomOut nativo com raw fora do snap reaplica via applyZoom', async () => {
+    const setFactor = vi.fn((v: number) => v)
+    const zoomOutApi = vi.fn(() => 1.005)
+    bridgeImpl.zoom = { setFactor, zoomOut: zoomOutApi }
+    const mod = await loadFresh()
+    const api = mod.useUiZoom()
+    api.setZoom(1.1)
+    api.zoomOut()
+    // 100.5% snapeia pra 100
+    expect(api.zoom.value).toBe(1)
+  })
 
-	it("readStoredZoom: string numérica é parseada", async () => {
-		mocks.getUserPreference.mockReturnValue("1.1");
-		await loadModule();
-		const { zoom } = useUiZoom();
-		expect(zoom.value).toBeCloseTo(1.1);
-	});
-
-	it("readStoredZoom: string inválida vira default", async () => {
-		mocks.getUserPreference.mockReturnValue("abc");
-		await loadModule();
-		const { zoom } = useUiZoom();
-		expect(zoom.value).toBe(1);
-	});
-
-	it("syncFromNative do onChanged snappa e reaplica", async () => {
-		await loadModule();
-		let callback: ((payload: { factor: number }) => void) | undefined;
-		mocks.getDesktopBridge.mockReturnValue({
-			zoom: {
-				onChanged: (cb: typeof callback) => {
-					callback = cb;
-					return () => {};
-				},
-			},
-		});
-		await mountWith(() => useUiZoom());
-		callback?.({ factor: 1.005 });
-		// 1.005 snappa para 1 → reaplica via applyZoom (fallback CSS escreve "1")
-		expect(document.documentElement.style.zoom).toBe("1");
-	});
-
-	it("onChanged com payload sem factor usa readNativeFactor", async () => {
-		const getFactor = vi.fn(() => 1.2);
-		let callback: ((payload: unknown) => void) | undefined;
-		mocks.getDesktopBridge.mockReturnValue({
-			zoom: {
-				getFactor,
-				onChanged: (cb: typeof callback) => {
-					callback = cb;
-					return () => {};
-				},
-			},
-		});
-		await mountWith(() => useUiZoom());
-		callback?.({});
-		expect(getFactor).toHaveBeenCalled();
-	});
-
-	it("onChanged sem bridge (factor null) não faz nada", async () => {
-		let callback: ((payload: unknown) => void) | undefined;
-		mocks.getDesktopBridge.mockReturnValue({
-			zoom: {
-				onChanged: (cb: typeof callback) => {
-					callback = cb;
-					return () => {};
-				},
-			},
-		});
-		mocks.getDesktopBridge.mockReturnValue(null);
-		await mountWith(() => useUiZoom());
-		expect(() => callback?.({})).not.toThrow();
-	});
-
-	it("persistZoom sem localStorage não quebra", async () => {
-		await loadModule();
-		const original = globalThis.localStorage;
-		vi.stubGlobal("localStorage", undefined);
-		const { setZoom } = useUiZoom();
-		expect(() => setZoom(1.1)).not.toThrow();
-		vi.stubGlobal("localStorage", original);
-	});
-});
-
-describe("useUiZoom — onMounted real + guards", () => {
-	it("onMounted: popup não reaplica zoom nem registra onChanged", async () => {
-		mocks.isProjectionPopup.mockReturnValue(true);
-		const onChanged = vi.fn(() => () => {});
-		mocks.getDesktopBridge.mockReturnValue({ zoom: { onChanged } });
-		await loadModule();
-		let mounted = false;
-		const host = document.createElement("div");
-		document.body.appendChild(host);
-		const { createApp, defineComponent, h } = await import("vue");
-		const app = createApp(
-			defineComponent({
-				setup() {
-					useUiZoom();
-					mounted = true;
-					return () => h("div");
-				},
-			}),
-		);
-		app.mount(host);
-		expect(mounted).toBe(true);
-		expect(onChanged).not.toHaveBeenCalled();
-		app.unmount();
-	});
-
-	describe("gaps finais", () => {
-		it("readNativeFactor: api sem getFactor → null (64)", async () => {
-			vi.resetModules();
-			mocks.getDesktopBridge.mockReturnValue({ uiZoom: {} });
-			const vue = await import("vue");
-			const { useUiZoom } = await import("../useUiZoom");
-			const { api } = useUiZoom();
-			// readNativeFactor via zoomIn (vai tentar api.zoomIn ausente)
-			void api;
-			void vue;
-		});
-
-		it("readNativeFactor: getFactor lança → null (68)", async () => {
-			vi.resetModules();
-			mocks.getDesktopBridge.mockReturnValue({
-				uiZoom: { getFactor: vi.fn(() => { throw new Error("boom"); }) },
-			});
-			const { useUiZoom } = await import("../useUiZoom");
-			const { zoomIn } = useUiZoom();
-			zoomIn();
-		});
-
-		it("clearCssZoom sem document: no-op (51)", async () => {
-			vi.resetModules();
-			const doc = globalThis.document;
-			// @ts-expect-error remove document
-			delete (globalThis as { document?: unknown }).document;
-			try {
-				const { useUiZoom } = await import("../useUiZoom");
-				const { setZoom } = useUiZoom();
-				setZoom(1.2);
-			} finally {
-				(globalThis as { document?: unknown }).document = doc;
-			}
-		});
-	});
+  it('bridge zoomIn ausente → fallback setZoom', async () => {
+    bridgeImpl.zoom = { setFactor: (v) => v }
+    const mod = await loadFresh()
+    const api = mod.useUiZoom()
+    api.zoomIn()
+    expect(api.zoom.value).toBe(1.1)
+  })
 })

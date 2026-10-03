@@ -1,592 +1,329 @@
-// Testes MusicTrackActions — emit(), showOfflineControls, download/remove/cancel, Teleport
 // @vitest-environment jsdom
+// Cobertura MusicTrackActions.vue (gaps shared): 4 ações emitidas, guards
+// busy/hasInstrumental, offline desktop (downloaded/downloading/cancel/erro),
+// diálogo de remoção, variantes, downloadProgress emit.
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { createI18n } from 'vue-i18n'
+import { createPinia, setActivePinia } from 'pinia'
 
-// Mocks de serviços reais (mínimos)
-const { mockDownloadTrackMedia, mockIsTrackMediaDownloaded, mockDeleteTrackMedia } = vi.hoisted(() => ({
-  mockDownloadTrackMedia: vi.fn(),
-  mockIsTrackMediaDownloaded: vi.fn(),
-  mockDeleteTrackMedia: vi.fn(),
+vi.mock('vue-i18n', () => ({
+  useI18n: () => ({
+    t: (k: string, params?: Record<string, unknown>) =>
+      params && 'name' in params ? `${k}:${params['name']}` : k,
+  }),
 }))
 
-const { mockReconcileAlbumsForMusic } = vi.hoisted(() => ({
-  mockReconcileAlbumsForMusic: vi.fn(),
+const isDesktopApp = vi.fn(() => false)
+vi.mock('@shared/services/desktop-bridge', () => ({
+  isDesktopApp: () => isDesktopApp(),
 }))
 
-const { mockIsDesktopApp } = vi.hoisted(() => ({
-  mockIsDesktopApp: vi.fn(() => true),
-}))
-
-const { mockGetDesktopBridge } = vi.hoisted(() => ({
-  mockGetDesktopBridge: vi.fn(() => null),
-}))
+const isTrackMediaDownloaded = vi.fn(async () => false)
+const downloadTrackMedia = vi.fn(async () => ({ status: 'downloaded' }))
+const deleteTrackMedia = vi.fn(async () => {})
 
 vi.mock('@shared/services/track-media', () => ({
-  downloadTrackMedia: mockDownloadTrackMedia,
-  isTrackMediaDownloaded: mockIsTrackMediaDownloaded,
-  deleteTrackMedia: mockDeleteTrackMedia,
+  isTrackMediaDownloaded: (...a: unknown[]) => isTrackMediaDownloaded(...(a as [])),
+  downloadTrackMedia: (...a: unknown[]) => downloadTrackMedia(...(a as [])),
+  deleteTrackMedia: (...a: unknown[]) => deleteTrackMedia(...(a as [])),
 }))
 
-vi.mock('@shared/services/desktop-bridge', () => ({
-  isDesktopApp: mockIsDesktopApp,
-}))
-
+const reconcileAlbumsForMusic = vi.fn(async () => {})
 vi.mock('@modules/sync/stores/useLocalLibraryStore', () => ({
-  useLocalLibraryStore: vi.fn(() => ({
-    reconcileAlbumsForMusic: mockReconcileAlbumsForMusic,
-  })),
+  useLocalLibraryStore: () => ({ reconcileAlbumsForMusic }),
 }))
-
-const mockFetch = vi.fn()
-Object.defineProperty(window, 'fetch', { value: mockFetch })
 
 import MusicTrackActions from '../MusicTrackActions.vue'
-import { useLocalLibraryStore } from '@modules/sync/stores/useLocalLibraryStore'
 
-const i18n = createI18n({
-  legacy: false,
-  locale: 'pt',
-  messages: {
-    pt: {
-      media: {
-        actions: {
-          sung: 'Cantado',
-          instrumental: 'Instrumental',
-          slides: 'Slides',
-          lyric: 'Letra',
-          thisTrack: 'esta faixa',
-          downloaded: 'Baixado',
-          removeOffline: 'Remover offline',
-          cancelDownload: 'Cancelar',
-          downloadOffline: 'Baixar offline',
-          removeConfirmTitle: 'Confirmar',
-          removeConfirmText: 'Remover {name}?',
-          removeConfirmNo: 'Não',
-          removeConfirmYes: 'Sim',
-        },
-      },
-    },
-  },
-})
+type Props = Record<string, unknown>
 
-describe('MusicTrackActions', () => {
-  const defaultProps = {
+function makeProps(over: Props = {}): Props {
+  return {
     hasInstrumental: true,
     busy: false,
-    variant: 'plain',
-    musicId: 123,
-    trackName: 'Test Track',
-    rowHovered: false,
-    allowOfflineRemove: true,
+    ...over,
   }
+}
 
+async function mountActions(over: Props = {}) {
+  setActivePinia(createPinia())
+  const w = mount(MusicTrackActions, {
+    props: makeProps(over),
+    global: { stubs: { teleport: true } },
+  })
+  await flushPromises()
+  return w
+}
+
+describe('MusicTrackActions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockIsDesktopApp.mockReturnValue(true)
-    mockIsTrackMediaDownloaded.mockResolvedValue(false)
-    mockDownloadTrackMedia.mockResolvedValue({ status: 'downloaded' })
-    mockDeleteTrackMedia.mockResolvedValue(undefined)
-    mockReconcileAlbumsForMusic.mockResolvedValue(undefined)
-    ;(useLocalLibraryStore as any).mockReturnValue({
-      reconcileAlbumsForMusic: mockReconcileAlbumsForMusic,
-    })
+    isDesktopApp.mockReturnValue(false)
+    isTrackMediaDownloaded.mockResolvedValue(false)
+    downloadTrackMedia.mockResolvedValue({ status: 'downloaded' })
   })
 
-  afterEach(() => {
-    vi.restoreAllMocks()
+  it('emite sung/instrumental/slides nos botões de ação', async () => {
+    const w = await mountActions()
+    const btns = w.findAll('.music-track-actions__btn')
+    await btns[0]!.trigger('click')
+    await btns[1]!.trigger('click')
+    await btns[2]!.trigger('click')
+    expect(w.emitted('sung')).toHaveLength(1)
+    expect(w.emitted('instrumental')).toHaveLength(1)
+    expect(w.emitted('slides')).toHaveLength(1)
+    expect(w.emitted('lyric')).toBeUndefined() // SHOW_LYRIC_ACTION=false
   })
 
-  it('mostra botões padrão (sem offline)', async () => {
-    mockIsDesktopApp.mockReturnValue(false)
-    const wrapper = mount(MusicTrackActions, {
-      props: defaultProps,
-      global: { plugins: [i18n] },
-    })
-    expect(wrapper.find('.ti-player-play').exists()).toBe(true)
-    expect(wrapper.find('.ti-piano').exists()).toBe(true)
-    expect(wrapper.find('.ti-volume-off').exists()).toBe(true)
-    expect(wrapper.find('.ti-file-text').exists()).toBe(false) // SHOW_LYRIC_ACTION=false
+  it('busy desabilita todos os botões; sem instrumental desabilita o piano', async () => {
+    const w = await mountActions({ busy: true, hasInstrumental: false })
+    const btns = w.findAll('.music-track-actions__btn')
+    expect(btns[0]!.attributes('disabled')).toBeDefined()
+    expect(btns[1]!.attributes('disabled')).toBeDefined()
+    expect(btns[2]!.attributes('disabled')).toBeDefined()
   })
 
-  it('mostra botões com offline (desktop)', () => {
-    const wrapper = mount(MusicTrackActions, {
-      props: defaultProps,
-      global: { plugins: [i18n] },
-    })
-    expect(wrapper.find('.ti-player-play').exists()).toBe(true)
-    expect(wrapper.find('.music-track-actions__check').exists()).toBe(false)
-    expect(wrapper.find('.ti-trash').exists()).toBe(false)
+  it('sem instrumental: botão piano desabilitado, resto ativo', async () => {
+    const w = await mountActions({ hasInstrumental: false })
+    const btns = w.findAll('.music-track-actions__btn')
+    expect(btns[0]!.attributes('disabled')).toBeUndefined()
+    expect(btns[1]!.attributes('disabled')).toBeDefined()
   })
 
-  it('emit sung: disparado', () => {
-    const wrapper = mount(MusicTrackActions, {
-      props: defaultProps,
-      global: { plugins: [i18n] },
-    })
-    wrapper.find('.ti-player-play').trigger('click')
-    expect(wrapper.emitted('sung')).toBeTruthy()
+  it('variant applied como classe', async () => {
+    const w = await mountActions({ variant: 'contained' })
+    expect(w.find('.music-track-actions--contained').exists()).toBe(true)
   })
 
-  it('emit instrumental: desabilitado se !hasInstrumental', async () => {
-    const wrapper = mount(MusicTrackActions, {
-      props: { ...defaultProps, hasInstrumental: false },
-      global: { plugins: [i18n] },
-    })
-    const btn = wrapper.find('button:has(.ti-piano)')
-    expect(btn.attributes('disabled')).toBeDefined()
-    await btn.trigger('click')
-    expect(wrapper.emitted('instrumental')).toBeFalsy()
+  it('web (não desktop): sem controles offline', async () => {
+    const w = await mountActions({ musicId: 5 })
+    await flushPromises()
+    expect(w.find('.music-track-actions__check').exists()).toBe(false)
+    expect(isTrackMediaDownloaded).not.toHaveBeenCalled()
   })
 
-  it('emit slides: disparado', () => {
-    const wrapper = mount(MusicTrackActions, {
-      props: defaultProps,
-      global: { plugins: [i18n] },
-    })
-    wrapper.find('.ti-volume-off').trigger('click')
-    expect(wrapper.emitted('slides')).toBeTruthy()
+  it('desktop com musicId<=0: sem controles offline', async () => {
+    isDesktopApp.mockReturnValue(true)
+    const w = await mountActions({ musicId: 0 })
+    await flushPromises()
+    expect(w.find('.music-track-actions__check').exists()).toBe(false)
   })
 
-  it('LyricAction: escondido por default (SHOW_LYRIC_ACTION=false)', () => {
-    const wrapper = mount(MusicTrackActions, {
-      props: defaultProps,
-      global: { plugins: [i18n] },
-    })
-    expect(wrapper.find('.ti-file-text').exists()).toBe(false)
+  it('desktop baixado: check + botão remover abre confirm; confirmar apaga', async () => {
+    isDesktopApp.mockReturnValue(true)
+    isTrackMediaDownloaded.mockResolvedValue(true)
+    const w = await mountActions({ musicId: 7, trackName: 'Hino Sacra' })
+    await flushPromises()
+    expect(w.find('.music-track-actions__check').exists()).toBe(true)
+    const removeBtn = w.find('.music-track-actions__btn--remove')
+    expect(removeBtn.exists()).toBe(true)
+    // oculto sem hover
+    expect(removeBtn.classes()).not.toContain('music-track-actions__btn--remove-visible')
+    await w.setProps({ rowHovered: true })
+    expect(w.find('.music-track-actions__btn--remove').classes()).toContain(
+      'music-track-actions__btn--remove-visible',
+    )
+    await w.find('.music-track-actions__btn--remove').trigger('click')
+    await flushPromises()
+    // dialog teleported (stubado) mas no DOM do wrapper
+    const confirm = w.find('.music-track-confirm')
+    expect(confirm.exists()).toBe(true)
+    expect(confirm.text()).toContain('Hino Sacra')
+    // cancelar primeiro
+    const btns = confirm.findAll('button')
+    await btns[0]!.trigger('click')
+    await flushPromises()
+    expect(deleteTrackMedia).not.toHaveBeenCalled()
+    // reabre e confirma
+    await w.find('.music-track-actions__btn--remove').trigger('click')
+    await flushPromises()
+    await w.find('.music-track-confirm').findAll('button')[1]!.trigger('click')
+    await flushPromises()
+    expect(deleteTrackMedia).toHaveBeenCalledWith(7)
+    expect(reconcileAlbumsForMusic).toHaveBeenCalledWith(7)
+    expect(w.emitted('downloadProgress')!.at(-1)).toEqual([null])
   })
 
-  it('showOfflineControls: true com musicId positivo', () => {
-    const wrapper = mount(MusicTrackActions, {
-      props: { ...defaultProps, musicId: 456 },
-      global: { plugins: [i18n] },
-    })
-    expect(wrapper.vm.showOfflineControls).toBe(true)
+  it('allowOfflineRemove=false esconde botão remover mesmo baixado', async () => {
+    isDesktopApp.mockReturnValue(true)
+    isTrackMediaDownloaded.mockResolvedValue(true)
+    const w = await mountActions({ musicId: 7, allowOfflineRemove: false })
+    await flushPromises()
+    expect(w.find('.music-track-actions__check').exists()).toBe(true)
+    expect(w.find('.music-track-actions__btn--remove').exists()).toBe(false)
   })
 
-  it('showOfflineControls: false sem musicId', () => {
-    const wrapper = mount(MusicTrackActions, {
-      props: { ...defaultProps, musicId: null },
-      global: { plugins: [i18n] },
-    })
-    expect(wrapper.vm.showOfflineControls).toBe(false)
+  it('desktop não baixado: botão download inicia e emite progresso', async () => {
+    isDesktopApp.mockReturnValue(true)
+    downloadTrackMedia.mockImplementation(
+      async (_id: number, opts?: { onProgress?: (p: number) => void }) => {
+        opts?.onProgress?.(50)
+        return { status: 'downloaded' }
+      },
+    )
+    const w = await mountActions({ musicId: 9 })
+    await flushPromises()
+    const btns = w.findAll('.music-track-actions__btn')
+    const dlBtn = btns.at(-1)!
+    await dlBtn.trigger('click')
+    await flushPromises()
+    expect(downloadTrackMedia).toHaveBeenCalled()
+    expect(w.emitted('downloadProgress')).toBeTruthy()
+    expect(w.find('.music-track-actions__check').exists()).toBe(true)
   })
 
-  it('isOfflineBusy: downloading/loading', () => {
-    const wrapper = mount(MusicTrackActions, {
-      props: defaultProps,
-      global: { plugins: [i18n] },
-    })
-    wrapper.vm.offlineStatus = 'downloading'
-    expect(wrapper.vm.isOfflineBusy).toBe(true)
-    wrapper.vm.offlineStatus = 'checking'
-    expect(wrapper.vm.isOfflineBusy).toBe(true)
-    wrapper.vm.offlineStatus = 'idle'
-    expect(wrapper.vm.isOfflineBusy).toBe(false)
+  it('download em curso: botão vira cancelar; cancelar reseta estado', async () => {
+    isDesktopApp.mockReturnValue(true)
+    downloadTrackMedia.mockImplementation(
+      () => new Promise<{ status: string }>(() => {}), // pendente
+    )
+    const w = await mountActions({ musicId: 9 })
+    await flushPromises()
+    let dlBtn = w.findAll('.music-track-actions__btn').at(-1)!
+    await dlBtn.trigger('click')
+    await flushPromises()
+    dlBtn = w.findAll('.music-track-actions__btn').at(-1)!
+    expect(dlBtn.classes()).toContain('music-track-actions__btn--danger')
+    await dlBtn.trigger('click') // cancela
+    await flushPromises()
+    expect(w.emitted('downloadProgress')!.at(-1)).toEqual([null])
+    w.unmount()
   })
 
-  it('confirmTrackLabel: usa trackName, fallback t() se vazio', () => {
-    const wrapper = mount(MusicTrackActions, {
-      props: { ...defaultProps, trackName: '  ' },
-      global: { plugins: [i18n] },
-    })
-    expect(wrapper.vm.confirmTrackLabel).toBe('esta faixa')
+  it('download result idle sem cancel: refaz check', async () => {
+    isDesktopApp.mockReturnValue(true)
+    downloadTrackMedia.mockResolvedValue({ status: 'idle', reason: 'missing' })
+    const w = await mountActions({ musicId: 9 })
+    await flushPromises()
+    await w.findAll('.music-track-actions__btn').at(-1)!.trigger('click')
+    await flushPromises()
+    expect(isTrackMediaDownloaded).toHaveBeenCalledTimes(2) // mount + retry
+    w.unmount()
   })
 
-  describe('offline: downloaded state', () => {
-    beforeEach(async () => {
-      mockIsTrackMediaDownloaded.mockResolvedValue(true)
-    })
-
-    it('downloaded: mostra check icon', async () => {
-      expect(mockIsTrackMediaDownloaded).not.toHaveBeenCalled()
-      const wrapper = mount(MusicTrackActions, {
-        props: { ...defaultProps, musicId: 789 },
-        global: { plugins: [i18n] },
-      })
-      await flushPromises()
-      expect(mockIsTrackMediaDownloaded).toHaveBeenCalledWith(789)
-      expect(wrapper.find('.ti-check').exists()).toBe(true)
-    })
-
-    it('downloaded: remove button se allowOfflineRemove + rowHovered', async () => {
-      mockIsTrackMediaDownloaded.mockResolvedValue(true)
-      const wrapper = mount(MusicTrackActions, {
-        props: { ...defaultProps, allowOfflineRemove: true, musicId: 789, rowHovered: true },
-        global: { plugins: [i18n] },
-      })
-      await flushPromises()
-      expect(wrapper.find('.ti-trash').exists()).toBe(true)
-      await wrapper.find('.ti-trash').trigger('click')
-      expect(wrapper.vm.confirmRemoveOpen).toBe(true)
-    })
-
-    it('downloaded: remove button sem destaque se !rowHovered', async () => {
-      mockIsTrackMediaDownloaded.mockResolvedValue(true)
-      const wrapper = mount(MusicTrackActions, {
-        props: { ...defaultProps, allowOfflineRemove: true, musicId: 789, rowHovered: false },
-        global: { plugins: [i18n] },
-      })
-      await flushPromises()
-      // rowHovered controla classe de visibilidade, não a existência do botão
-      const btn = wrapper.find('.music-track-actions__btn--remove')
-      expect(btn.exists()).toBe(true)
-      expect(btn.classes()).not.toContain('music-track-actions__btn--remove-visible')
-    })
+  it('download result idle com cancel: não refaz check', async () => {
+    isDesktopApp.mockReturnValue(true)
+    let abortFn: (() => void) | undefined
+    downloadTrackMedia.mockImplementation(
+      (_id: number, opts?: { shouldAbort?: () => boolean }) =>
+        new Promise<{ status: string; reason?: string }>((resolve) => {
+          abortFn = () => resolve({ status: 'idle', reason: 'cancelled' })
+          setTimeout(() => abortFn?.(), 10)
+        }),
+    )
+    const w = await mountActions({ musicId: 9 })
+    await flushPromises()
+    await w.findAll('.music-track-actions__btn').at(-1)!.trigger('click')
+    // clica cancelar enquanto baixa
+    await w.findAll('.music-track-actions__btn').at(-1)!.trigger('click')
+    await flushPromises()
+    expect(isTrackMediaDownloaded).toHaveBeenCalledTimes(1)
+    w.unmount()
   })
 
-  describe('offline: idle state', () => {
-    it('idle: mostra download button', () => {
-      mockIsTrackMediaDownloaded.mockResolvedValue(false)
-      const wrapper = mount(MusicTrackActions, {
-        props: { ...defaultProps, musicId: 789 },
-        global: { plugins: [i18n] },
-      })
-      expect(wrapper.find('.ti-download').exists()).toBe(true)
-    })
-
-    it('idle: click download → downloading, emitProgress(0)', async () => {
-      mockIsTrackMediaDownloaded.mockResolvedValue(false)
-      // download pendente: status fica 'downloading' até a promise resolver
-      let resolveDownload: (v: any) => void
-      mockDownloadTrackMedia.mockImplementation(
-        () => new Promise((resolve) => { resolveDownload = resolve }),
-      )
-      const wrapper = mount(MusicTrackActions, {
-        props: { ...defaultProps, musicId: 789 },
-        global: { plugins: [i18n] },
-      })
-      await flushPromises()
-      await wrapper.find('.ti-download').trigger('click')
-      await flushPromises()
-      expect(wrapper.vm.offlineStatus).toBe('downloading')
-      expect(wrapper.vm.downloadProgress).toBe(0)
-      expect(wrapper.emitted('downloadProgress')[0]).toEqual([0])
-      resolveDownload!({ status: 'downloaded' })
-      await flushPromises()
-      expect(wrapper.vm.offlineStatus).toBe('downloaded')
-    })
+  it('erro no check inicial: estado volta a idle', async () => {
+    isDesktopApp.mockReturnValue(true)
+    isTrackMediaDownloaded.mockRejectedValue(new Error('x'))
+    const w = await mountActions({ musicId: 9 })
+    await flushPromises()
+    expect(w.find('.music-track-actions__check').exists()).toBe(false)
+    expect(w.findAll('.music-track-actions__btn').at(-1)!.attributes('disabled')).toBeUndefined()
   })
 
-  describe('offline: downloading state', () => {
-    let resolveDownload: (v: any) => void
-
-    beforeEach(() => {
-      mockIsTrackMediaDownloaded.mockResolvedValue(false)
-      mockDownloadTrackMedia.mockImplementation(
-        () => new Promise((resolve) => { resolveDownload = resolve }),
-      )
-    })
-
-    it('downloading: mostra cancel icon, cancelar volta idle e emite null', async () => {
-      const wrapper = mount(MusicTrackActions, {
-        props: { ...defaultProps, musicId: 789 },
-        global: { plugins: [i18n] },
-      })
-      await flushPromises()
-      await wrapper.find('.ti-download').trigger('click')
-      await flushPromises()
-      expect(wrapper.find('.ti-x').exists()).toBe(true)
-      await wrapper.find('.ti-x').trigger('click')
-      await flushPromises()
-      expect(wrapper.vm.offlineStatus).toBe('idle')
-      const emissions = wrapper.emitted('downloadProgress')!
-      expect(emissions[emissions.length - 1]).toEqual([null])
-    })
-
-    it('downloading: progress update → downloadProgress atualiza', async () => {
-      const wrapper = mount(MusicTrackActions, {
-        props: { ...defaultProps, musicId: 789 },
-        global: { plugins: [i18n] },
-      })
-      await flushPromises()
-      await wrapper.find('.ti-download').trigger('click')
-      await flushPromises()
-      wrapper.vm.offlineStatus = 'downloading'
-      wrapper.vm.downloadProgress = 50
-      wrapper.vm.emitDownloadProgress(75)
-      expect(wrapper.emitted('downloadProgress').at(-1)).toEqual([75])
-      expect(wrapper.vm.downloadProgress).toBe(50)
-    })
-
-    it('downloading: cancelRequested → callback não aplica progresso', async () => {
-      const wrapper = mount(MusicTrackActions, {
-        props: { ...defaultProps, musicId: 789 },
-        global: { plugins: [i18n] },
-      })
-      await flushPromises()
-      await wrapper.find('.ti-download').trigger('click')
-      await flushPromises()
-      wrapper.vm.cancelRequested = true
-      wrapper.vm.emitDownloadProgress(50)
-      expect(wrapper.vm.downloadProgress).toBe(0) // emit não atualiza ref interna
-    })
+  it('troca de musicId refaz o check', async () => {
+    isDesktopApp.mockReturnValue(true)
+    const w = await mountActions({ musicId: 9 })
+    await flushPromises()
+    expect(isTrackMediaDownloaded).toHaveBeenCalledTimes(1)
+    await w.setProps({ musicId: 10 })
+    await flushPromises()
+    expect(isTrackMediaDownloaded).toHaveBeenCalledTimes(2)
+    expect(isTrackMediaDownloaded).toHaveBeenLastCalledWith(10)
   })
 
-  describe('confirm dialog', () => {
-    it('requestRemove: abre Teleport', async () => {
-      mockIsTrackMediaDownloaded.mockResolvedValue(true)
-      const wrapper = mount(MusicTrackActions, {
-        props: { ...defaultProps, musicId: 123 },
-        global: { plugins: [i18n] },
-      })
-      await flushPromises()
-      wrapper.vm.requestRemove()
-      await wrapper.vm.$nextTick()
-      expect(wrapper.vm.confirmRemoveOpen).toBe(true)
-    })
-
-    it('dismissRemove: fecha Teleport', () => {
-      const wrapper = mount(MusicTrackActions, {
-        props: defaultProps,
-        global: { plugins: [i18n] },
-      })
-      wrapper.vm.confirmRemoveOpen = true
-      wrapper.vm.dismissRemove()
-      expect(wrapper.vm.confirmRemoveOpen).toBe(false)
-    })
-
-    it('confirmRemove: delete, libera status, reconcile', async () => {
-      mockIsTrackMediaDownloaded.mockResolvedValue(true)
-      const wrapper = mount(MusicTrackActions, {
-        props: { ...defaultProps, musicId: 999 },
-        global: { plugins: [i18n] },
-      })
-      await flushPromises()
-      wrapper.vm.confirmRemove()
-      await flushPromises()
-      expect(mockDeleteTrackMedia).toHaveBeenCalledWith(999)
-      expect(wrapper.vm.offlineStatus).toBe('idle')
-      expect(wrapper.vm.downloadProgress).toBe(0)
-      expect(wrapper.emitted('downloadProgress')).toBeTruthy()
-      expect(mockReconcileAlbumsForMusic).toHaveBeenCalledWith(999)
-    })
-
-    it('confirmTrackLabel: trim + fallback', () => {
-      const wrapper = mount(MusicTrackActions, {
-        props: { ...defaultProps, trackName: ' ' },
-        global: { plugins: [i18n] },
-      })
-      expect(wrapper.vm.confirmTrackLabel).toBe('esta faixa')
-    })
+  it('confirm label sem trackName usa fallback thisTrack', async () => {
+    isDesktopApp.mockReturnValue(true)
+    isTrackMediaDownloaded.mockResolvedValue(true)
+    const w = await mountActions({ musicId: 7, trackName: '  ' })
+    await flushPromises()
+    await w.find('.music-track-actions__btn--remove').trigger('click')
+    await flushPromises()
+    expect(w.find('.music-track-confirm').text()).toContain('media.actions.thisTrack')
   })
 
-  describe('contained variant', () => {
-    it('contained: background nos botões', () => {
-      const wrapper = mount(MusicTrackActions, {
-        props: { ...defaultProps, variant: 'contained' },
-        global: { plugins: [i18n] },
-      })
-      expect(wrapper.find('.music-track-actions--contained .music-track-actions__btn').exists()).toBe(true)
-    })
+  it('ação offline com status downloaded abre confirm direto', async () => {
+    isDesktopApp.mockReturnValue(true)
+    isTrackMediaDownloaded.mockResolvedValue(true)
+    const w = await mountActions({ musicId: 7 })
+    await flushPromises()
+    // status downloaded: o botão visível é o remove (--remove); clicar nele
+    // dispara requestRemove → confirm
+    const remove = w.find('.music-track-actions__btn--remove')
+    await remove.trigger('click')
+    await flushPromises()
+    expect(w.find('.music-track-confirm').exists()).toBe(true)
+    // dismiss remove dialog sem apagar
+    await w.find('.music-track-confirm').findAll('button')[0]!.trigger('click')
+    await flushPromises()
+    expect(deleteTrackMedia).not.toHaveBeenCalled()
   })
 
-  describe('busy prop', () => {
-    it('busy: desabilita todos os botões', () => {
-      const wrapper = mount(MusicTrackActions, {
-        props: { ...defaultProps, busy: true },
-        global: { plugins: [i18n] },
-      })
-      expect(wrapper.find('button:has(.ti-player-play)').attributes('disabled')).toBeDefined()
-      expect(wrapper.find('button:has(.ti-piano)').attributes('disabled')).toBeDefined()
-      expect(wrapper.find('button:has(.ti-volume-off)').attributes('disabled')).toBeDefined()
-    })
+  it('cancel durante download emite progresso null (linhas 124-125)', async () => {
+    isDesktopApp.mockReturnValue(true)
+    downloadTrackMedia.mockImplementation(
+      () => new Promise<{ status: string }>(() => {}), // nunca resolve
+    )
+    const w = await mountActions({ musicId: 9 })
+    await flushPromises()
+    const dl = () => w.findAll('.music-track-actions__btn').at(-1)!
+    await dl().trigger('click') // inicia download
+    await flushPromises()
+    // título do botão mostra cancelamento com %
+    expect(dl().attributes('title')).toContain('media.actions.cancelDownload')
+    await dl().trigger('click') // cancela → linhas 124-125
+    await flushPromises()
+    expect(w.emitted('downloadProgress')!.at(-1)).toEqual([null])
+    w.unmount()
   })
 
-  describe('ramos restantes', () => {
-    it('refreshOfflineStatus: isTrackMediaDownloaded rejeita → idle', async () => {
-      mockIsTrackMediaDownloaded.mockRejectedValueOnce(new Error('x'))
-      const wrapper = mount(MusicTrackActions, {
-        props: { ...defaultProps, musicId: 55 },
-        global: { plugins: [i18n] },
-      })
-      await flushPromises()
-      expect(wrapper.vm.offlineStatus).toBe('idle')
-    })
-
-    it('confirmRemove sem musicId: não faz nada', async () => {
-      const wrapper = mount(MusicTrackActions, {
-        props: { ...defaultProps, musicId: null },
-        global: { plugins: [i18n] },
-      })
-      await flushPromises()
-      await wrapper.vm.confirmRemove()
-      expect(mockDeleteTrackMedia).not.toHaveBeenCalled()
-    })
-
-    it('onOfflineAction sem showOfflineControls: retorna cedo', async () => {
-      mockIsDesktopApp.mockReturnValue(false)
-      const wrapper = mount(MusicTrackActions, {
-        props: defaultProps,
-        global: { plugins: [i18n] },
-      })
-      await flushPromises()
-      await wrapper.vm.onOfflineAction()
-      expect(mockDownloadTrackMedia).not.toHaveBeenCalled()
-    })
-
-    it('download result idle (cancelado pelo lado do serviço): volta idle + refresh', async () => {
-      let resolveDownload: (v: unknown) => void
-      mockDownloadTrackMedia.mockImplementation(
-        () => new Promise((resolve) => { resolveDownload = resolve }),
-      )
-      const wrapper = mount(MusicTrackActions, {
-        props: { ...defaultProps, musicId: 42 },
-        global: { plugins: [i18n] },
-      })
-      await flushPromises()
-      await wrapper.find('button:has(.ti-download)').trigger('click')
-      await flushPromises()
-      resolveDownload({ status: 'idle', reason: 'removed' })
-      await flushPromises()
-      expect(wrapper.vm.offlineStatus).toBe('idle')
-    })
-
-    it('download result erro: volta idle', async () => {
-      mockDownloadTrackMedia.mockResolvedValueOnce({ status: 'error', reason: 'io' })
-      const wrapper = mount(MusicTrackActions, {
-        props: { ...defaultProps, musicId: 42 },
-        global: { plugins: [i18n] },
-      })
-      await flushPromises()
-      await wrapper.find('button:has(.ti-download)').trigger('click')
-      await flushPromises()
-      expect(wrapper.vm.offlineStatus).toBe('idle')
-    })
-
-    it('onProgress callback do download: aplica percent', async () => {
-      let onProgressCb: ((p: number) => void) | null = null
-      mockDownloadTrackMedia.mockImplementationOnce((_id, opts) => {
-        onProgressCb = opts.onProgress
-        return new Promise((resolve) => setTimeout(() => resolve({ status: 'downloaded' }), 5))
-      })
-      const wrapper = mount(MusicTrackActions, {
-        props: { ...defaultProps, musicId: 42 },
-        global: { plugins: [i18n] },
-      })
-      await flushPromises()
-      await wrapper.find('.ti-download').trigger('click')
-      await flushPromises()
-      onProgressCb?.(60)
-      await wrapper.vm.$nextTick()
-      expect(wrapper.vm.downloadProgress).toBe(60)
-      await flushPromises()
-    })
-
-    it('variant contained: aplica classe', () => {
-      const wrapper = mount(MusicTrackActions, {
-        props: { ...defaultProps, variant: 'contained' },
-        global: { plugins: [i18n] },
-      })
-      expect(wrapper.find('.music-track-actions--contained').exists()).toBe(true)
-    })
-
-    it('allowOfflineRemove false: botão remove não aparece quando downloaded', async () => {
-      mockIsTrackMediaDownloaded.mockResolvedValue(true)
-      const wrapper = mount(MusicTrackActions, {
-        props: { ...defaultProps, musicId: 789, allowOfflineRemove: false },
-        global: { plugins: [i18n] },
-      })
-      await flushPromises()
-      expect(wrapper.find('.music-track-actions__btn--remove').exists()).toBe(false)
-      // check continua visível
-      expect(wrapper.find('.music-track-actions__check').exists()).toBe(true)
-    })
+  it('download concluído reconcilia álbuns', async () => {
+    isDesktopApp.mockReturnValue(true)
+    const w = await mountActions({ musicId: 9 })
+    await flushPromises()
+    await w.findAll('.music-track-actions__btn').at(-1)!.trigger('click')
+    await flushPromises()
+    expect(reconcileAlbumsForMusic).toHaveBeenCalledWith(9)
   })
 
-  describe('ramos restantes', () => {
-    it('emit instrumental habilitado: dispara', async () => {
-      const wrapper = mount(MusicTrackActions, {
-        props: { ...defaultProps, hasInstrumental: true },
-        global: { plugins: [i18n] },
-      })
-      await wrapper.find('button:has(.ti-piano)').trigger('click')
-      expect(wrapper.emitted('instrumental')).toBeTruthy()
-      wrapper.unmount()
-    })
-
-    it('emit lyric: dispara', async () => {
-      const wrapper = mount(MusicTrackActions, {
-        props: defaultProps,
-        global: { plugins: [i18n] },
-      })
-      const btn = wrapper.findAll('button').find(b => b.attributes('aria-label') === 'Letra')
-      if (btn) {
-        await btn.trigger('click')
-        expect(wrapper.emitted('lyric')).toBeTruthy()
-      }
-      wrapper.unmount()
-    })
-
-    it('watch musicId: refreshOfflineStatus reexecuta', async () => {
-      const wrapper = mount(MusicTrackActions, {
-        props: defaultProps,
-        global: { plugins: [i18n] },
-      })
-      await wrapper.setProps({ musicId: 999 })
-      await flushPromises()
-      // se não lançou, o watch rodou
-      expect(true).toBe(true)
-      wrapper.unmount()
-    })
-
-    it('download com offlineStatus downloaded: chama requestRemove', async () => {
-      const wrapper = mount(MusicTrackActions, {
-        props: defaultProps,
-        global: { plugins: [i18n] },
-      })
-      const vm = wrapper.vm as any
-      vm.offlineStatus = 'downloaded'
-      await wrapper.find('button:has(.ti-download)').trigger('click')
-      // requestRemove abre confirmação em Teleport
-      await flushPromises()
-      wrapper.unmount()
-    })
-
-    it('onProgress com cancelRequested: ignora percentual', async () => {
-      const wrapper = mount(MusicTrackActions, {
-        props: defaultProps,
-        global: { plugins: [i18n] },
-      })
-      const vm = wrapper.vm as any
-      vm.cancelRequested = true
-      vm.downloadProgress = 0
-      // simula callback interno via via pública: recomeça download
-      await wrapper.find('button:has(.ti-download)').trigger('click')
-      await flushPromises()
-      wrapper.unmount()
-    })
+  it('download com resultado falho (não downloaded/idle) reseta pra idle', async () => {
+    isDesktopApp.mockReturnValue(true)
+    downloadTrackMedia.mockResolvedValue({ status: 'error' } as never)
+    const w = await mountActions({ musicId: 9 })
+    await flushPromises()
+    await w.findAll('.music-track-actions__btn').at(-1)!.trigger('click')
+    await flushPromises()
+    expect(w.emitted('downloadProgress')!.at(-1)).toEqual([null])
+    expect(w.find('.music-track-actions__check').exists()).toBe(false)
   })
 
-    it('onProgress com cancelRequested: pula aplicação (135) e shouldAbort (139)', async () => {
-      let captured: { onProgress?: (p: number) => void; shouldAbort?: () => boolean } | null = null
-      mockDownloadTrackMedia.mockImplementationOnce((_id, opts) => {
-        captured = opts
-        return new Promise((resolve) => setTimeout(() => resolve({ status: 'downloaded' }), 20))
-      })
-      const wrapper = mount(MusicTrackActions, {
-        props: { ...defaultProps, musicId: 55 },
-        global: { plugins: [i18n] },
-      })
-      await flushPromises()
-      await wrapper.find('.ti-download').trigger('click')
-      await flushPromises()
-      wrapper.vm.cancelRequested = true
-      captured!.onProgress?.(80)
-      await wrapper.vm.$nextTick()
-      // progresso não aplicado pois cancelRequested
-      expect(wrapper.vm.downloadProgress).toBe(0)
-      expect(captured!.shouldAbort?.()).toBe(true)
-      await flushPromises()
-    })
-
-    it('lyric button: SHOW_LYRIC_ACTION false → não renderiza (234)', async () => {
-      const wrapper = mount(MusicTrackActions, {
-        props: defaultProps,
-        global: { plugins: [i18n] },
-      })
-      const lyricBtn = wrapper.findAll('button').find(b => b.attributes('aria-label') === 'Letra')
-      expect(lyricBtn).toBeUndefined()
-    })
+  it('progresso durante cancel não é emitido após cancelRequested', async () => {
+    isDesktopApp.mockReturnValue(true)
+    let onProgressCb: ((p: number) => void) | undefined
+    downloadTrackMedia.mockImplementation(
+      (_id: number, opts?: { onProgress?: (p: number) => void }) =>
+        new Promise<{ status: string }>((resolve) => {
+          onProgressCb = opts?.onProgress
+          setTimeout(() => resolve({ status: 'idle', reason: 'cancelled' }), 20)
+        }),
+    )
+    const w = await mountActions({ musicId: 9 })
+    await flushPromises()
+    await w.findAll('.music-track-actions__btn').at(-1)!.trigger('click')
+    await w.findAll('.music-track-actions__btn').at(-1)!.trigger('click') // cancel
+    const countBefore = w.emitted('downloadProgress')!.length
+    onProgressCb?.(80) // ignora (cancelRequested)
+    await flushPromises()
+    expect(w.emitted('downloadProgress')!.length).toBe(countBefore)
+    w.unmount()
   })
+})
