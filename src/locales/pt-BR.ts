@@ -123,4 +123,10 @@ export default {
       cancel: 'Cancelar',
     },
   },
+sljaMigration: {
+    title: 'Subir {count} hino(s) importado(s) pra sua conta?',
+    message: 'Você importou .slja sem estar logado. Eles podem ir pra sua conta (uma cópia única, sem duplicar) e ficar disponíveis em qualquer dispositivo.',
+    confirm: 'Subir pra conta',
+    cancel: 'Ficar só neste dispositivo',
+  },
 }

@@ -51,4 +51,10 @@ export default {
       cancel: 'Cancel',
     },
   },
+sljaMigration: {
+    title: 'Upload {count} imported hymn(s) to your account?',
+    message: 'You imported .slja files while logged out. They can go to your account (a single copy, never duplicated) and be available on any device.',
+    confirm: 'Upload to account',
+    cancel: 'Keep on this device only',
+  },
 }
