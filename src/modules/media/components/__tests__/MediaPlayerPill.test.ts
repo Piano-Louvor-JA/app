@@ -16,6 +16,8 @@ vi.mock("@shared/components/MonitorTargetSelect.vue", () => ({
 	default: { template: '<div class="monitor-target-select-stub" />' },
 }));
 
+
+
 const i18n = createI18n({
 	legacy: false,
 	locale: "pt-BR",
@@ -235,5 +237,38 @@ describe("MediaPlayerPill — áudio na TV, projeção, fullscreen, playlist", (
 			w.unmount();
 		});
 	});
+
+	describe("gaps — modeIcon e aria projetar", () => {
+		it("modeIcon reflete modo: instrumental/no_audio/audio", () => {
+			const inst = mountPill(baseProps({ mode: "instrumental" }));
+			expect(inst.find(".media-player-pill__icon-btn .ti-piano").exists()).toBe(true);
+			inst.unmount();
+			const noAudio = mountPill(baseProps({ mode: "no_audio" }));
+			expect(noAudio.find(".ti-device-desktop").exists()).toBe(true);
+			noAudio.unmount();
+			const audio = mountPill(baseProps({ mode: "audio" }));
+			expect(audio.find(".ti-microphone").exists()).toBe(true);
+			audio.unmount();
+		});
+
+		it("aria do projetar: pode projetar (targets selecionados) e não projetando → media.project", async () => {
+			const { useProjectionStore } = await import("@modules/settings/stores/useProjectionStore");
+			const { DEFAULT_PROJECTION_SETTINGS } = await import("@modules/settings/types/projection");
+			// pinia PRÓPRIA compartilhada entre store e mount
+			const pinia = createPinia();
+			setActivePinia(pinia);
+			const store = useProjectionStore();
+			await store.refreshDisplays();
+			store.applySettings({ ...DEFAULT_PROJECTION_SETTINGS, targetDisplayIds: [2] });
+			const w = mount(MediaPlayerPill, {
+				props: baseProps({ projecting: false }),
+				global: { plugins: [i18n, pinia] },
+			});
+			const btn = w.findAll("button").find((b) => b.attributes("aria-label") === mediaLocale.media.project);
+			expect(btn).toBeTruthy();
+			store.applySettings({ ...DEFAULT_PROJECTION_SETTINGS, targetDisplayIds: [] });
+			w.unmount();
+		});
+	})
 
 });

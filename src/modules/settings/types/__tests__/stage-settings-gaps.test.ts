@@ -12,6 +12,10 @@ import {
   resolveBackgroundImage,
   officialBgUrl,
   OFFICIAL_BG_PREFIX,
+  DEFAULT_TIMER_MODULE_SETTINGS,
+  DEFAULT_COUNTDOWN_MODULE_SETTINGS,
+  RANDOM_TEXT_TRANSFORM_OPTIONS,
+  RANDOM_ANIMATION_SPEED_OPTIONS,
 } from '../stage-settings'
 
 describe('stage-settings — parse/serialize gaps', () => {
@@ -72,4 +76,34 @@ describe('stage-settings — parse/serialize gaps', () => {
     expect(back.textAlign).toBe(s.textAlign)
     expect(back.backgroundColor).toBe(s.backgroundColor)
   })
+  it('nested timer/countdown/random com valores inválidos caem no default', () => {
+    const raw = {
+      timer: { timeFormat: 'semanas' },
+      countdown: { timeFormat: 'luas' },
+      random: { fontSizePc: 99, textTransform: 'gritando', animationSpeed: 'warp' },
+    }
+    const parsed = parseStageSettings(raw)
+    expect(parsed.timer?.timeFormat).toBe(DEFAULT_TIMER_MODULE_SETTINGS.timeFormat)
+    expect(parsed.countdown?.timeFormat).toBe(DEFAULT_COUNTDOWN_MODULE_SETTINGS.timeFormat)
+    expect(parsed.random?.fontSizePc).toBe(14)
+    expect(parsed.random?.textTransform).toBe('none')
+    expect(parsed.random?.animationSpeed).toBe('normal')
+  })
+
+  it('nested timer/countdown/random com valores VÁLIDOS preservam', () => {
+    const tf = DEFAULT_TIMER_MODULE_SETTINGS.timeFormat
+    const cf = DEFAULT_COUNTDOWN_MODULE_SETTINGS.timeFormat
+    const valid = RANDOM_TEXT_TRANSFORM_OPTIONS[0]
+    const speed = RANDOM_ANIMATION_SPEED_OPTIONS[0]
+    const parsed = parseStageSettings({
+      timer: { timeFormat: tf },
+      countdown: { timeFormat: cf },
+      random: { fontSizePc: 10, textTransform: valid, animationSpeed: speed },
+    })
+    expect(parsed.timer?.timeFormat).toBe(tf)
+    expect(parsed.countdown?.timeFormat).toBe(cf)
+    expect(parsed.random?.textTransform).toBe(valid)
+    expect(parsed.random?.animationSpeed).toBe(speed)
+  })
+
 })
