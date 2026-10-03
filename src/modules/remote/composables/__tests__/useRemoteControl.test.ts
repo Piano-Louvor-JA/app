@@ -234,8 +234,8 @@ describe("useRemoteControl", () => {
     const rc = useRemoteControl();
     rc.enabled.value = true;
     await Promise.resolve();
-    const inst = receiverInstances.instances.at(-1) as unknown as { options: { log: (...a: unknown[]) => void } };
-    inst?.options?.log?.("teste", 1);
+    const inst = receiverInstances.instances.at(-1) as unknown as { opts: { log: (...a: unknown[]) => void } };
+    inst?.opts?.log?.("teste", 1);
     expect(info).toHaveBeenCalledWith("[remote]", "teste", 1);
     info.mockRestore();
   });
