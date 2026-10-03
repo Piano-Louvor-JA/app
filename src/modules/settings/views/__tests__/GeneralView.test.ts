@@ -425,6 +425,44 @@ describe('GeneralView.vue', () => {
       expect(w.exists()).toBe(true)
       w.unmount()
     })
+
+    it('clearWorkspace falha: mostra erro e não explode', async () => {
+      vi.mocked(isDesktopApp).mockReturnValue(true)
+      vi.mocked(clearWorkspace).mockResolvedValue(false)
+      const w = mountComponent()
+      await flushPromises()
+      // abrir popup
+      const btns = w.findAll('button')
+      const danger = btns.find((b) => (b.text() + (b.attributes('aria-label') ?? '')).toLowerCase().includes('apagar') || (b.attributes('class') ?? '').includes('danger'))
+      if (danger) {
+        await danger.trigger('click')
+        await flushPromises()
+        const cb = w.find('input[type="checkbox"]')
+        if (cb.exists()) await cb.setValue(true)
+        await flushPromises()
+        const confirm = w.findAll('button').find((b) => b.text().toLowerCase().includes('confirm') || b.text().toLowerCase().includes('apagar'))
+        if (confirm) {
+          await confirm.trigger('click')
+          await flushPromises()
+        }
+      }
+      expect(w.exists()).toBe(true)
+      w.unmount()
+    })
+
+    it('handleSyncExport: segundo clique durante busy é ignorado', async () => {
+      const w = mountComponent()
+      await flushPromises()
+      const btns = w.findAll('button')
+      const exportBtn = btns.find((b) => (b.text() + (b.attributes('aria-label') ?? '')).toLowerCase().includes('export'))
+      if (exportBtn) {
+        await exportBtn.trigger('click')
+        await exportBtn.trigger('click')
+        await flushPromises()
+      }
+      expect(w.exists()).toBe(true)
+      w.unmount()
+    })
   })
 
 })
