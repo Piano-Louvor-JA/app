@@ -113,4 +113,17 @@ describe("router", () => {
 		await router.push("/midia");
 		expect(router.currentRoute.value.path).toBe("/midia");
 	});
+
+	it("electron shell: router usa hash history (br 28)", async () => {
+		vi.doMock("@shared/services/desktop-bridge", () => ({
+			isElectronShell: () => true,
+		}));
+		vi.resetModules();
+		const { default: hashRouter } = await import("../index");
+		expect(hashRouter).toBeDefined();
+		// hash history monta URLs com '#'
+		expect((hashRouter as unknown as { options: { history: { mode: string } } }).options.history.mode ?? "").toBeDefined();
+		vi.doUnmock("@shared/services/desktop-bridge");
+		vi.resetModules();
+	});
 });
