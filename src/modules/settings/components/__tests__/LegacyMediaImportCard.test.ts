@@ -195,20 +195,24 @@ describe('LegacyMediaImportCard', () => {
     active = null
     expect(true).toBe(true)
   })
-  it('onImportProgress: callback atualiza progresso e percentual', async () => {
+  it('onImportProgress: registrado durante o import', async () => {
     const bridge = makeBridge()
     let progressCb: ((p: unknown) => void) | null = null
     bridge.legacyMedia.onImportProgress = vi.fn((cb: (p: unknown) => void) => {
       progressCb = cb
       return () => {}
     })
+    // import lento pra manter phase=importing
+    bridge.legacyMedia.import = vi.fn(() => new Promise((res) => setTimeout(() => res({ ok: true, imported: 1, skipped: 0, failed: 0, total: 1 }), 50)))
     setBridge(bridge)
     const w = await mountCard()
+    await w.find('[data-test="legacy-media-import-button"]').trigger('click')
+    await flushPromises()
     expect(progressCb).not.toBeNull()
     progressCb?.({ current: 5, total: 10, relativePath: 'album', mediaType: 'music' })
     await flushPromises()
-    await w.vm.$nextTick()
-    // progress interno atualizado (render pode depender de width)
+    await new Promise((r) => setTimeout(r, 60))
+    await flushPromises()
     expect(w.exists()).toBe(true)
     w.unmount()
     active = null
