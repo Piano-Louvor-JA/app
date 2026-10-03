@@ -300,4 +300,14 @@ describe('fetchWithRetry — ramos de retry (429/5xx/rede, backoff)', () => {
     expect(result.data).toEqual({ ok: 4 })
   })
 
+  it('todos os hosts falhando com rede: lança lastError (105)', async () => {
+    fetchMock.mockRejectedValue(new TypeError('Failed to fetch'))
+    const promise = fetchWithApiFallback('database', 'x.json')
+    promise.catch(() => {}) // evita unhandled antes dos timers
+    await vi.advanceTimersByTimeAsync(60000)
+    await expect(promise).rejects.toThrow()
+  })
+
+
+
 })
