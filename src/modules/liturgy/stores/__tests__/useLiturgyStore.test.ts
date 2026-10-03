@@ -34,6 +34,7 @@ vi.mock('../../services/liturgy-web-runtime', () => ({
   clearLiturgyWebRuntime: vi.fn(),
 }))
 
+import { loadLiturgyMusicOptions } from '../../services/liturgy-catalog'
 import { useLiturgyStore } from '../useLiturgyStore'
 import { DEFAULT_LITURGY_ITEM_DRAFT, LITURGY_DAY_TAB_ORDER } from '../../types/liturgy'
 
@@ -111,6 +112,17 @@ describe('useLiturgyStore', () => {
       const store = useLiturgyStore()
       store.setMusicSearchQuery('hino')
       expect(store.musicSearchQuery).toBe('hino')
+    })
+
+    it('refreshMusicCatalog substitui o catálogo após importação .slja', async () => {
+      const store = useLiturgyStore()
+      vi.mocked(loadLiturgyMusicOptions).mockResolvedValueOnce([
+        { id: -3, title: 'Missão Para Todos', album: 'Local' },
+      ] as never)
+      await store.refreshMusicCatalog()
+      expect(store.musicList).toEqual([
+        { id: -3, title: 'Missão Para Todos', album: 'Local' },
+      ])
     })
   })
 
