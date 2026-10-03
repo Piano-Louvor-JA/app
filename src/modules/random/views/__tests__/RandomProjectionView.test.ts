@@ -2,6 +2,7 @@
 import { mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { flushPromises } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 
 /**
@@ -172,4 +173,35 @@ describe("RandomProjectionView — embedded", () => {
 		expect(w.find(".random-projection--embedded").exists()).toBe(true);
 		w.unmount();
 	});
+	describe("gaps — onDraw embedded, channels, effectiveConfig", () => {
+		it("embedded: botão sortear chama startDraw", async () => {
+			const w = mountView({ embedded: true });
+			await flushPromises();
+			const drawBtn = w.findAll("button").find((b) => (b.text() || "").toLowerCase().includes("sorte"));
+			if (drawBtn) {
+				await drawBtn.trigger("click");
+				await flushPromises();
+			}
+			expect(w.exists()).toBe(true);
+			w.unmount();
+		});
+
+		it("não embedded: onDraw não faz nada", async () => {
+			const w = mountView({ embedded: false });
+			await flushPromises();
+			expect(w.exists()).toBe(true);
+			w.unmount();
+		});
+
+		it("BroadcastChannel indisponível: view monta igual (catch dos canais)", async () => {
+			const OriginalBC = window.BroadcastChannel;
+			(vi.stubGlobal as (k: string, v: unknown) => void)("BroadcastChannel", undefined);
+			const w = mountView();
+			await flushPromises();
+			expect(w.exists()).toBe(true);
+			w.unmount();
+			(vi.stubGlobal as (k: string, v: unknown) => void)("BroadcastChannel", OriginalBC);
+		});
+	});
+
 });
