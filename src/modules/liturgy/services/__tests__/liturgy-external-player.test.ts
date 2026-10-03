@@ -41,6 +41,8 @@ vi.mock('@shared/services/desktop-bridge', () => ({
 
 vi.mock('../liturgy-web-projection', () => ({
   openLiturgyLocalVideoControl: mocks.openControl,
+  openLiturgyVideoControl: mocks.openControl,
+  openLiturgySiteControl: mocks.openControl,
 }))
 
 import { executeLiturgyItem } from '../liturgy-actions'
@@ -116,5 +118,43 @@ describe('player externo na liturgia — arquivo de outra máquina', () => {
     expect(result.ok).toBe(false)
     expect(result.messageKey).toBe('liturgy.messages.fileMissingOnMachine')
     expect(mocks.openControl).not.toHaveBeenCalled()
+  })
+})
+
+describe('isolamento — YouTube/site NUNCA vão pro player externo', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.play.mockResolvedValue({ ok: true })
+    mocks.openControl.mockResolvedValue(true)
+    mocks.get.mockResolvedValue('vlc')
+  })
+
+  it('online_video (YouTube) + VLC selecionado → controle interno, sem play externo', async () => {
+    const result = await executeLiturgyItem(
+      {
+        id: 'yt1',
+        type: 'online_video',
+        name: 'Vídeo YouTube',
+        url: 'https://youtube.com/watch?v=abc',
+      } as never,
+      {} as never,
+    )
+    expect(result.ok).toBe(true)
+    expect(mocks.play).not.toHaveBeenCalled()
+    expect(mocks.openControl).toHaveBeenCalled()
+  })
+
+  it('site + VLC selecionado → controle do site, sem play externo', async () => {
+    const result = await executeLiturgyItem(
+      {
+        id: 'site1',
+        type: 'site',
+        name: 'Site',
+        url: 'https://example.com',
+      } as never,
+      {} as never,
+    )
+    expect(result.ok).toBe(true)
+    expect(mocks.play).not.toHaveBeenCalled()
   })
 })

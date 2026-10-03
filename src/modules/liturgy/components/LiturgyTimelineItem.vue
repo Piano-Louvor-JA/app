@@ -615,13 +615,22 @@ const rowHovered = ref(false)
             type="button"
             class="liturgy-item__action"
             :class="{ 'liturgy-item__action--primary': selected }"
-            :title="t('liturgy.actions.openControl')"
-            :aria-label="t('liturgy.actions.openControl')"
+            :title="
+              isAudioItem
+                ? t('liturgy.actions.playLocalInExternal', { player: rowPlayerLabel })
+                : t('liturgy.actions.openControl')
+            "
+            :aria-label="
+              isAudioItem
+                ? t('liturgy.actions.playLocalInExternal', { player: rowPlayerLabel })
+                : t('liturgy.actions.openControl')
+            "
             :disabled="item.done"
             @click.stop="emit('select')"
           >
             <i
-              class="ti ti-player-play"
+              class="ti"
+              :class="isAudioItem ? 'ti-headphones' : 'ti-player-play'"
               aria-hidden="true"
             />
           </button>
@@ -660,7 +669,7 @@ const rowHovered = ref(false)
           >
             <i
               class="ti"
-              :class="isLocalVideo ? 'ti-device-tv' : 'ti-layout-dashboard'"
+              :class="isLocalVideo ? 'ti-player-play' : 'ti-layout-dashboard'"
               aria-hidden="true"
             />
           </button>
