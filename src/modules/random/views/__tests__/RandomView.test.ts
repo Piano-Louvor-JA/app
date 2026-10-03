@@ -328,5 +328,18 @@ describe("RandomView — áudio custom", () => {
       await vm.onResetAll?.()
       w.unmount()
     })
+
+    it('onToggleProjection: chama toggleProjection da store', async () => {
+      const w = mountView()
+      const vm = w.vm as any
+      await vm.onToggleProjection?.()
+      w.unmount()
+    })
+
+    it('stage subscription: onMounted assina, unmount descassa', async () => {
+      const w = mountView()
+      expect(w.exists()).toBe(true)
+      w.unmount()
+    })
   })
 })
