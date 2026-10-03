@@ -3,12 +3,16 @@ import { describe, expect, it, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 
+const lastErrorRef = vi.hoisted(() => ({ value: null as string | null }))
 vi.mock('../../composables/useProjectionSettings', async () => {
   const { ref } = await import('vue')
   return {
     useProjectionSettings: () => ({
-      hydrate: vi.fn().mockResolvedValue(undefined),
-      lastErrorKey: ref<string | null>(null),
+      hydrate: vi.fn().mockImplementation(async () => {
+        // espelha o valor atual do erro no teste
+        lastErrorRef.value = lastErrorRef.value
+      }),
+      lastErrorKey: ref(lastErrorRef.value),
     }),
   }
 })
@@ -38,6 +42,15 @@ describe('ProjectionView', () => {
     expect(w.find('.stub-slots').exists()).toBe(true)
     expect(w.find('.stub-stage').text()).toBe('global')
     expect(w.find('.projection-settings__error').exists()).toBe(false)
+    w.unmount()
+  })
+
+  it('com lastErrorKey: alerta de erro renderiza', async () => {
+    lastErrorRef.value = 'settings.projection.loadError'
+    const w = mount(ProjectionView, { global: { plugins: [i18n] } })
+    await flushPromises()
+    expect(w.find('.projection-settings__error').exists()).toBe(true)
+    expect(w.text()).toContain('settings.projection.loadError')
     w.unmount()
   })
 })

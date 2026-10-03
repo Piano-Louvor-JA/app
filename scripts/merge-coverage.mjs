@@ -171,6 +171,15 @@ function templateStartLine(filePath) {
   } catch { return null; }
 }
 
+/** Linha onde começa o <style> (branches de CSS são phantom do remap). */
+function styleStartLine(filePath) {
+  try {
+    const src = rf(filePath, 'utf8');
+    const m = src.match(/^<style[^>]*>/m);
+    return m ? src.slice(0, m.index).split('\n').length : null;
+  } catch { return null; }
+}
+
 for (const [path, cov] of Object.entries(merged)) {
   if (!path.endsWith('.vue')) continue;
   const hasOverlay = Boolean(B[path]);
@@ -191,6 +200,18 @@ for (const [path, cov] of Object.entries(merged)) {
       const templateAlive = Object.entries(cov.statementMap).some(([oid, oloc]) =>
         cov.s[oid] > 0 && oloc.start.line >= tmplStart);
       if (templateAlive) cov.s[id] = 1;
+    }
+  }
+  // Branches dentro do <style> de .vue são phantom do remap (CSS não executável).
+  const styleStart = styleStartLine(path);
+  if (styleStart != null && cov.b) {
+    for (const [id, loc] of Object.entries(cov.branchMap)) {
+      const counts = cov.b[id];
+      if (!Array.isArray(counts)) continue;
+      const startLine = loc.loc?.start?.line ?? loc.start?.line;
+      if (startLine != null && startLine >= styleStart) {
+        cov.b[id] = counts.map((c) => Math.max(c, 1));
+      }
     }
   }
 }
