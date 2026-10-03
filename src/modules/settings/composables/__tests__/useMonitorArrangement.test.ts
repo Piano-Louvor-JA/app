@@ -183,4 +183,24 @@ describe("useMonitorArrangement", () => {
     result.resetLayout();
     expect(result.hasCustomArrangement.value).toBe(false);
   });
+  it("mount com ResizeObserver: callback não lança", async () => {
+    let roCb: () => void = () => {};
+    const OriginalRO = (globalThis as Record<string, unknown>).ResizeObserver;
+    class ROCapture {
+      constructor(cb: () => void) { roCb = cb; }
+      observe(): void {}
+      disconnect(): void {}
+      unobserve(): void {}
+    }
+    (globalThis as Record<string, unknown>).ResizeObserver = ROCapture;
+    try {
+      const result = withSetup((stageRef) => useMonitorArrangement(stageRef));
+      expect(() => roCb()).not.toThrow();
+      await Promise.resolve();
+      expect(result.tiles).toBeTruthy();
+    } finally {
+      (globalThis as Record<string, unknown>).ResizeObserver = OriginalRO;
+    }
+  });
+
 });
