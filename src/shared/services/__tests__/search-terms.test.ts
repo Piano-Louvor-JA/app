@@ -48,3 +48,25 @@ describe('matchesAllTerms (busca por termos — bug 03/10)', () => {
     expect(matchesAllTerms('Jesus', '', 'adoradores')).toBe(false)
   })
 })
+
+describe('matchesAllTerms — busca por trecho da letra (03/10)', () => {
+  const title = 'Jesus'
+  const album = 'Adoradores 5'
+  const lyrics = 'cristo salvador do mundo, luz que ilumina'
+
+  it('substring contígua na letra casa', () => {
+    expect(matchesAllTerms(title, album, 'salvador do mundo', lyrics)).toBe(true)
+  })
+
+  it('termos espalhados na letra casam', () => {
+    expect(matchesAllTerms(title, album, 'luz ilumina', lyrics)).toBe(true)
+  })
+
+  it('sem letra, comportamento antigo (não casa)', () => {
+    expect(matchesAllTerms(title, album, 'salvador do mundo')).toBe(false)
+  })
+
+  it('título/álbum continuam casando com letra presente', () => {
+    expect(matchesAllTerms(title, album, 'jesus adoradores', lyrics)).toBe(true)
+  })
+})

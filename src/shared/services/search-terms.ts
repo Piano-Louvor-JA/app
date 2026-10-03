@@ -10,13 +10,17 @@ export function matchesAllTerms(
   title: string,
   searchable: string,
   query: string,
+  lyrics?: string,
 ): boolean {
   const t = title.toLowerCase()
   const s = searchable.toLowerCase()
+  const l = (lyrics ?? '').toLowerCase()
   const q = query.trim().toLowerCase()
   if (!q) return false
+  // Busca por trecho da letra (03/10): substring na letra casa direto.
+  if (l && l.includes(q)) return true
   if (t.includes(q) || s.includes(q)) return true
   const terms = q.split(/\s+/).filter(Boolean)
   if (terms.length <= 1) return false
-  return terms.every((term) => t.includes(term) || s.includes(term))
+  return terms.every((term) => t.includes(term) || s.includes(term) || (l && l.includes(term)))
 }
