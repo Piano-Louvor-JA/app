@@ -37,6 +37,21 @@ jobs:
       - run: npm ci
       - run: npm run type-check
 
+  coverage:
+    name: Coverage (relatório — gate depois de calibrar thresholds)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Roda com os thresholds do vitest.config (100%). continue-on-error até
+      # os thresholds serem calibrados pro valor real — aí vira gate duro.
+      - run: npm run test -- --coverage
+
   build:
     name: Build
     runs-on: ubuntu-latest
