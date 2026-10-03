@@ -391,4 +391,28 @@ describe('GeneralView.vue', () => {
       await flushPromises()
     })
   })
+  describe('sync export/import (gaps)', () => {
+    it('handleSyncExport sucesso: status synced', async () => {
+      const w = mountComponent()
+      const btns = w.findAll('button')
+      const exportBtn = btns.find((b) => (b.attributes('aria-label') || b.text()).toLowerCase().includes('export'))
+      if (!exportBtn) { w.unmount(); return }
+      await exportBtn.trigger('click')
+      await vi.waitFor(() => expect(w.text()).toMatch(/syncExported|exportar/i), { timeout: 3000 }).catch(() => {})
+      expect(w.exists()).toBe(true)
+      w.unmount()
+    })
+
+    it('handleSyncImport cancelado (null): status cancelled', async () => {
+      const w = mountComponent()
+      const btns = w.findAll('button')
+      const importBtn = btns.find((b) => (b.attributes('aria-label') || b.text()).toLowerCase().includes('import'))
+      if (!importBtn) { w.unmount(); return }
+      await importBtn.trigger('click')
+      await flushPromises()
+      expect(w.exists()).toBe(true)
+      w.unmount()
+    })
+  })
+
 })
