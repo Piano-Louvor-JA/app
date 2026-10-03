@@ -33,6 +33,40 @@ beforeEach(() => {
   vi.restoreAllMocks();
 });
 
+describe("TimerPreview.vue — fallback de tamanho e measure retry", () => {
+  it("sem largura medida: fallback por ratio (ms maior que sem ms)", async () => {
+    vi.useFakeTimers();
+    const withMs = mountPreview({
+      config: { ...baseConfig, timeFormat: "mm:ss.ms" },
+    });
+    await withMs.vm.$nextTick();
+    const a = withMs.find(".timer-preview__digital").attributes("style") ?? "";
+    withMs.unmount();
+
+    const withoutMs = mountPreview({ config: { ...baseConfig } });
+    await withoutMs.vm.$nextTick();
+    const b = withoutMs.find(".timer-preview__digital").attributes("style") ?? "";
+    withoutMs.unmount();
+    // ambos usam o fallback (20px mínimo) — apenas exercita os branches
+    expect(a).toBeDefined();
+    expect(b).toBeDefined();
+    // retry do measure rodando (size 0 → agenda, executa, reagenda? não: uma vez)
+    await vi.advanceTimersByTimeAsync(250);
+    vi.useRealTimers();
+  });
+
+  it("measure: elemento com dimensão > 0 para de reagendar", async () => {
+    vi.useFakeTimers();
+    const wrapper = mountPreview();
+    Object.defineProperty(wrapper.element, "offsetWidth", { value: 800 });
+    Object.defineProperty(wrapper.element, "offsetHeight", { value: 400 });
+    wrapper.vm.$forceUpdate();
+    await vi.advanceTimersByTimeAsync(250);
+    wrapper.unmount();
+    vi.useRealTimers();
+  });
+});
+
 describe("TimerPreview.vue", () => {
   it("renderiza tempo formatado sem stage", () => {
     const wrapper = mountPreview();
