@@ -655,7 +655,8 @@ const rowHovered = ref(false)
             @click.stop="emit('select')"
           >
             <i
-              class="ti ti-layout-dashboard"
+              class="ti"
+              :class="isLocalVideo ? 'ti-device-tv' : 'ti-layout-dashboard'"
               aria-hidden="true"
             />
           </button>
