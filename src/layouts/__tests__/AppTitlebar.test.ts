@@ -143,4 +143,20 @@ describe("AppTitlebar.vue", () => {
     });
   });
 
+  describe("gaps — SSR guard", () => {
+    it("document undefined: syncTitlebarHeight sai cedo", async () => {
+      const original = globalThis.document;
+      // @ts-expect-error simular SSR
+      delete (globalThis as Record<string, unknown>).document;
+      try {
+        const wrapper = await mountBar();
+        await wrapper.vm.$nextTick();
+        expect(wrapper.exists()).toBe(true);
+        wrapper.unmount();
+      } finally {
+        (globalThis as Record<string, unknown>).document = original;
+      }
+    });
+  });
+
 });
