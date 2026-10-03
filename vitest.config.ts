@@ -6,6 +6,12 @@ import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
   plugins: [vue()],
+  // __APP_VERSION__ é injetado pelo build (vite.config do app) — em teste usamos a versão do package.json
+  define: {
+    __APP_VERSION__: JSON.stringify(
+      JSON.parse(require('node:fs').readFileSync('./package.json', 'utf-8')).version,
+    ),
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
@@ -22,18 +28,30 @@ export default defineConfig({
     },
   },
   test: {
-    setupFiles: ['src/test/localstorage-shim-setup.ts'],
-    exclude: ['node_modules/**', 'dist/**', 'e2e/**'],
+    exclude: ['node_modules/**', 'dist/**', 'e2e/**', '.worktrees/**', 'coverage/**'],
+    setupFiles: ['./vitest.setup.ts'],
+    // Runs completos com coverage (istanbul) estouram 5s em testes que
+    // mockam bridge/processamento pesado — transform 125s no run global.
+    testTimeout: 30_000,
     coverage: {
-          provider: 'v8',
-          reporter: ['text', 'text-summary', 'lcov'],
-          thresholds: {
-            lines: 100,
-            functions: 100,
-            statements: 100,
-            branches: 100,
-          },
-          include: ['src/**/*.ts', 'src/**/*.vue'],
-        },
+
+      provider: 'v8',
+      reporter: ['text', 'text-summary', 'lcov'],
+      thresholds: {
+        lines: 100,
+        functions: 100,
+        statements: 100,
+        branches: 100,
+      },
+      include: [
+        'src/**/*.ts',
+        'src/**/*.vue',
+      ],
+      exclude: [
+        '**/__tests__/**',
+        'src/**/locales/*.ts',
+        'src/**/*.d.ts',
+      ],
+    },
   },
 })
