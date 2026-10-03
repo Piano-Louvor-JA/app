@@ -272,6 +272,18 @@ describe('GeneralView.vue', () => {
       expect((wrapper.vm as any).syncStatus).toEqual({ kind: 'error', messageKey: 'settings.general.syncInvalid' })
     })
 
+    it('import sem aplicações (applied vazio): syncNothingToApply', async () => {
+      const { importLouvorjaIntoBrowser } = await import('@modules/sync/services/louvorja-adapter')
+      ;(importLouvorjaIntoBrowser as ReturnType<typeof vi.fn>).mockReturnValueOnce({ applied: [], conflicts: [] })
+      importLouvorjaFile.mockResolvedValueOnce('raw')
+      const wrapper = mountComponent()
+      await flushPromises()
+      const importBtn = wrapper.findAll('.general-settings__sync-actions button')[1]
+      await importBtn.trigger('click')
+      await flushPromises()
+      expect((wrapper.vm as any).syncStatus).toEqual({ kind: 'success', messageKey: 'settings.general.syncNothingToApply' })
+    })
+
     it('import com aplicações: syncImported com lista', async () => {
       importLouvorjaFile.mockResolvedValueOnce('raw')
       const wrapper = mountComponent()
