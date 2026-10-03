@@ -3,13 +3,22 @@
 import { mount } from '@vue/test-utils'
 import { describe, it, expect, vi } from 'vitest'
 
-// Mock global
+// Mock global (refs p/ acionar v-ifs do template)
+import { ref as __ref } from 'vue'
+const isProjectingRef = __ref(false)
+const isRunningRef = __ref(false)
+const configOpenRef = __ref(false)
+const savedMarksRef = __ref<number[]>([])
 const mockTimerFeature = {
   config: {},
   runtime: {},
-  isProjecting: false,
-  configOpen: false,
-  isRunning: false,
+  get isProjecting() { return isProjectingRef.value },
+  set isProjecting(v: boolean) { isProjectingRef.value = v },
+  get configOpen() { return configOpenRef.value },
+  set configOpen(v: boolean) { configOpenRef.value = v },
+  get isRunning() { return isRunningRef.value },
+  set isRunning(v: boolean) { isRunningRef.value = v },
+  savedMarks: savedMarksRef,
   setTimeFormat: vi.fn(),
   setBgColor: vi.fn(),
   setTextColor: vi.fn(),
@@ -151,6 +160,27 @@ describe('TimerView - coverage básico', () => {
     it('unmount não lança', () => {
       const wrapper = mount(TimerView, { global: { stubs: { teleport: true } } })
       expect(() => wrapper.unmount()).not.toThrow()
+    })
+
+    it('isRunning true: pause/save renderizam e disparam; projecting aparece', async () => {
+      isRunningRef.value = true
+      isProjectingRef.value = true
+      mockTimerFeature.pause.mockClear()
+      mockTimerFeature.saveMark.mockClear()
+      const w = mount(TimerView, { global: { stubs: { teleport: true } } })
+      await w.vm.$nextTick()
+      expect(w.find('.timer-view__projecting').exists()).toBe(true)
+      const pauseBtn = w.find('.timer-view__ctrl--pause')
+      expect(pauseBtn.exists()).toBe(true)
+      await pauseBtn.trigger('click')
+      expect(mockTimerFeature.pause).toHaveBeenCalled()
+      const saveBtn = w.find('.timer-view__ctrl--save')
+      expect(saveBtn.exists()).toBe(true)
+      await saveBtn.trigger('click')
+      expect(mockTimerFeature.saveMark).toHaveBeenCalled()
+      w.unmount()
+      isRunningRef.value = false
+      isProjectingRef.value = false
     })
   })
 
