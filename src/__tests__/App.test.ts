@@ -34,12 +34,18 @@ vi.mock("@shared/services/projection-window-location", () => ({
   isProjectionPopupLocation: () => projectionState.isPopup,
 }));
 
+const escapeCb = vi.hoisted(() => ({ fn: null as null | (() => boolean) }));
+const hotkeysCb = vi.hoisted(() => ({ fn: null as null | (() => boolean) }));
 vi.mock("@shared/composables/useOperatorEscapeToCloseProjection", () => ({
-  useOperatorEscapeToCloseProjection: vi.fn(),
+  useOperatorEscapeToCloseProjection: (cb: () => boolean) => {
+    escapeCb.fn = cb;
+  },
 }));
 
 vi.mock("@modules/media/composables/useMediaPlayerHotkeys", () => ({
-  useMediaPlayerHotkeys: vi.fn(),
+  useMediaPlayerHotkeys: (cb: () => boolean) => {
+    hotkeysCb.fn = cb;
+  },
 }));
 
 vi.mock("@shared/components/UpdateBanner.vue", () => ({
@@ -65,7 +71,7 @@ vi.mock("@shared/composables/useUpdateChecker", () => ({
 }));
 
 vi.mock("@modules/settings/services/palco-bridge", () => ({
-  startPalcoBridge: startPalcoBridgeMock.fn,
+  startPalcoBridge: (...a: unknown[]) => startPalcoBridgeMock.fn(...(a as [])),
 }));
 
 // ---- estado mutável dos mocks ----
@@ -116,7 +122,27 @@ beforeEach(() => {
   startingStoreMock.hide = vi.fn();
   updateCheckerMock.mock.hasUpdate = ref(false);
   updateCheckerMock.mock.init = vi.fn();
-  startPalcoBridgeMock.fn = vi.fn();
+  startPalcoBridgeMock.fn.mockClear();
+});
+
+describe("App.vue — callbacks de composables", () => {
+  it("getter de projeção reflete a rota do mount", async () => {
+    routeState.route = { meta: {}, name: "home" };
+    mountApp();
+    await flushPromises();
+    expect(escapeCb.fn?.()).toBe(false);
+    expect(hotkeysCb.fn?.()).toBe(false);
+  });
+
+  it("getter em janela popup de projeção = true", async () => {
+    projectionState.isPopup = true;
+    routeState.route = { meta: {}, name: "home" };
+    mountApp();
+    await flushPromises();
+    expect(escapeCb.fn?.()).toBe(true);
+    expect(hotkeysCb.fn?.()).toBe(true);
+    projectionState.isPopup = false;
+  });
 });
 
 describe("App.vue", () => {

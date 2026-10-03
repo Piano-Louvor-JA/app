@@ -45,4 +45,11 @@ describe('main.ts', () => {
     expect(installRemoteLiturgyBridge).not.toHaveBeenCalled()
     expect(splash.hidden).toBe(true)
   })
+
+  it('popup sem splash no DOM: segue sem erros', async () => {
+    vi.mocked(isProjectionPopupLocation).mockReturnValue(true)
+    document.getElementById('boot-splash')?.remove()
+    await import('../main')
+    expect(createApp).toHaveBeenCalled()
+  })
 })
