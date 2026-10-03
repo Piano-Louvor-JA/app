@@ -95,7 +95,7 @@ jobs:
             const bad = Object.entries(s).filter(([k, v]) => ['statements','branches','functions','lines'].includes(k) && v.pct < 100);
             if (bad.length) {
               const gaps = Object.entries(files).filter(([p, v]) => p !== 'total' && (v.statements.pct < 100 || v.branches.pct < 100 || v.functions.pct < 100 || v.lines.pct < 100));
-              for (const [p, v] of gaps.slice(0, 40)) {
+              for (const [p, v] of gaps.slice(0, 250)) {
                 console.error('GAP:', p.replace('/home/runner/work/app/app/', ''), 's='+v.statements.pct.toFixed(1), 'b='+v.branches.pct.toFixed(1), 'f='+v.functions.pct.toFixed(1), 'l='+v.lines.pct.toFixed(1));
               }
               console.error('COBERTURA < 100:', bad.map(([k,v]) => k+'='+v.pct.toFixed(2)+'%').join(', '));
