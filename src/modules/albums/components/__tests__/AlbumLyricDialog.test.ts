@@ -50,4 +50,24 @@ describe('AlbumLyricDialog.vue', () => {
     await flushPromises()
     expect(wrapper.emitted('close')).toBeTruthy()
   })
+  it('documento com linhas: renderiza cada linha', () => {
+    createWrapper({
+      document: {
+        title: 'Com Linhas',
+        lines: [
+          { order: 1, text: 'Primeira linha' },
+          { order: 2, text: 'Segunda linha' },
+        ],
+      } as any,
+    })
+    const lines = document.querySelectorAll('.album-lyric-dialog__line')
+    expect(lines.length).toBe(2)
+    expect(lines[0].textContent).toContain('Primeira linha')
+  })
+
+  it('documento com lines vazio: estado vazio', () => {
+    createWrapper({ document: { title: 'Vazio', lines: [] } as any })
+    expect(document.querySelector('.album-lyric-dialog__state')).not.toBeNull()
+  })
+
 })
