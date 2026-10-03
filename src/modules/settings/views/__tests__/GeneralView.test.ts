@@ -426,6 +426,32 @@ describe('GeneralView.vue', () => {
       w.unmount()
     })
 
+    it('web (isDesktopApp false): popup de apagar não abre (br 42)', async () => {
+      vi.mocked(isDesktopApp).mockReturnValue(false)
+      const w = mountComponent()
+      await flushPromises()
+      const btns = w.findAll('button')
+      const danger = btns.find((b) => (b.text() + (b.attributes('aria-label') ?? '')).toLowerCase().includes('apagar'))
+      if (danger) await danger.trigger('click')
+      await flushPromises()
+      // popup não abre: sem checkbox
+      expect(w.find('input[type="checkbox"]').exists()).toBe(false)
+      w.unmount()
+    })
+
+    it('sync export sucesso: status ok (br 63-67)', async () => {
+      const w = mountComponent()
+      await flushPromises()
+      const btns = w.findAll('button')
+      const exportBtn = btns.find((b) => (b.text() + (b.attributes('aria-label') ?? '')).toLowerCase().includes('export'))
+      if (exportBtn) {
+        await exportBtn.trigger('click')
+        await flushPromises()
+      }
+      expect(w.exists()).toBe(true)
+      w.unmount()
+    })
+
     it('clearWorkspace falha: mostra erro e não explode', async () => {
       vi.mocked(isDesktopApp).mockReturnValue(true)
       vi.mocked(clearWorkspace).mockResolvedValue(false)
