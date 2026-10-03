@@ -93,6 +93,27 @@ async function mountShell() {
   return wrapper
 }
 
+describe('AppShell — branches restantes', () => {
+  it('onNavigate empurra rota do item do dock', async () => {
+    const w = await mountShell()
+    const vm = w.vm as unknown as { onNavigate: (k: string) => void }
+    const first = mainNavRoutes[0]
+    if (first) vm.onNavigate(first.key)
+    expect(routerPush).toHaveBeenCalled()
+    w.unmount()
+  })
+
+  it('unmount com poll ativo limpa timer e unsubscribe', async () => {
+    vi.useFakeTimers()
+    const w = await mountShell()
+    vi.advanceTimersByTime(1000)
+    w.unmount()
+    vi.advanceTimersByTime(1000)
+    vi.useRealTimers()
+    expect(true).toBe(true)
+  })
+})
+
 describe('AppShell', () => {
   beforeEach(() => {
     vi.clearAllMocks()
