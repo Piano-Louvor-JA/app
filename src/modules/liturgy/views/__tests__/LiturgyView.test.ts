@@ -87,7 +87,10 @@ vi.mock('../../components/LiturgyCloneDialog.vue', () => ({
   default: {
     props: ['open', 'sources', 'sourceKey'],
     emits: ['close', 'confirm', 'update:sourceKey'],
-    template: '<div data-stub="clone-dialog" @click="$emit(\'confirm\')" />',
+    template: `<div data-stub="clone-dialog">
+      <button class="clone-confirm" @click="$emit('confirm')" />
+      <button class="clone-key" @click="$emit('update:sourceKey', 'weekday:segunda')" />
+    </div>`,
   },
 }))
 vi.mock('../../components/LiturgyCustomBar.vue', () => ({ default: { template: '<div data-stub="custom-bar" />' } }))
@@ -95,7 +98,10 @@ vi.mock('../../components/LiturgyCustomDialog.vue', () => ({
   default: {
     props: ['open', 'name'],
     emits: ['close', 'create', 'update:name'],
-    template: '<div data-stub="custom-dialog" @click="$emit(\'create\')" />',
+    template: `<div data-stub="custom-dialog">
+      <button class="custom-create" @click="$emit('create')" />
+      <button class="custom-name" @click="$emit('update:name', 'Novo Nome')" />
+    </div>`,
   },
 }))
 vi.mock('../../components/LiturgyDayTabs.vue', () => ({ default: { template: '<div data-stub="day-tabs" />' } }))
@@ -243,15 +249,28 @@ describe('LiturgyView', () => {
       mockState.cloneLiturgyFromSelected = cloneLiturgyFromSelected
       mockState.closeCustomDialog = closeCustomDialog
       mockState.closeCloneDialog = closeCloneDialog
+      mockState.newCustomName = ref('')
+      mockState.cloneSourceKey = ref('')
       const w = createWrapper()
       await w.vm.$nextTick()
       const custom = w.find('[data-stub="custom-dialog"]')
       const clone = w.find('[data-stub="clone-dialog"]')
       if (custom.exists()) await custom.trigger('click') // emite create
       if (clone.exists()) await clone.trigger('click') // emite confirm
+      // arrows inline do template (328/337): update:name e update:source-key
+      await w.find('.custom-create').trigger('click') // create
+      await w.find('.clone-confirm').trigger('click') // confirm
       await w.vm.$nextTick()
       expect(createCustomLiturgy).toHaveBeenCalled()
       expect(cloneLiturgyFromSelected).toHaveBeenCalled()
+      await w.find('.custom-name').trigger('click') // update:name arrow (328)
+      await w.find('.clone-key').trigger('click') // update:source-key arrow (337)
+      await w.vm.$nextTick()
+      await w.vm.$nextTick()
+      expect(createCustomLiturgy).toHaveBeenCalled()
+      expect(cloneLiturgyFromSelected).toHaveBeenCalled()
+      expect(String(mockState.newCustomName?.value)).toContain('Novo Nome')
+      expect(String(mockState.cloneSourceKey?.value)).toContain('weekday:segunda')
       w.unmount()
     })
   })
@@ -262,8 +281,11 @@ describe('LiturgyView', () => {
       mockState.clearActionMessage = clearActionMessage
       const w = createWrapper()
       await w.vm.$nextTick()
-      const alertBtn = w.findAll('button').find(b => (b.text() + (b.attributes('aria-label') ?? '')).includes('discard') || b.find('.ti-x, .ti-close').exists())
-      if (alertBtn) await alertBtn.trigger('click')
+      const alertBtn = w.findAll('button').find(b => b.text().toLowerCase().includes('descartar'))
+      expect(alertBtn).toBeTruthy()
+      await alertBtn!.trigger('click')
+      await w.vm.$nextTick()
+      expect(clearActionMessage).toHaveBeenCalled()
       w.unmount()
     })
 
@@ -321,7 +343,7 @@ describe('LiturgyView', () => {
       await w.vm.$nextTick()
       const custom = w.find('[data-stub="custom-dialog"]')
       expect(custom.exists()).toBe(true)
-      await custom.trigger('click') // emite create
+      await w.find('.custom-create').trigger('click') // emite create
       expect(createCustomLiturgy).toHaveBeenCalled()
       w.unmount()
     })
@@ -339,7 +361,7 @@ describe('LiturgyView', () => {
       await w.vm.$nextTick()
       const clone = w.find('[data-stub="clone-dialog"]')
       expect(clone.exists()).toBe(true)
-      await clone.trigger('click') // emite confirm
+      await w.find('.clone-confirm').trigger('click') // emite confirm
       expect(cloneLiturgyFromSelected).toHaveBeenCalled()
       w.unmount()
     })
