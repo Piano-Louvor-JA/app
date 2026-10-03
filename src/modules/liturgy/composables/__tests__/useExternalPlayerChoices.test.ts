@@ -215,4 +215,31 @@ describe('useExternalPlayerChoices', () => {
     expect(result.storedPlayerId('vlc')).toBe('default')
     expect(result.storedPlayerId('mpv')).toBe('mpv')
   })
+  describe('gaps — fileName edge e get undefined', () => {
+    it('custom bin terminando em separador: label é o caminho cru', async () => {
+      const { result } = setup({
+        externalPlayer: {
+          get: vi.fn(async () => 'custom:/opt/wps/'),
+          detect: vi.fn(async () => []),
+          listCustom: vi.fn(async () => ['/opt/wps/']),
+        },
+      })
+      await result.loadPlayerChoices()
+      const custom = result.playerOptions.value.find((o) => o.id.startsWith('custom:'))
+      expect(custom!.label).toContain('/opt/wps/')
+    })
+
+    it('get ausente (undefined): globalPlayer vira associated', async () => {
+      const { result } = setup({
+        externalPlayer: {
+          get: vi.fn(async () => undefined),
+          detect: vi.fn(async () => []),
+          listCustom: vi.fn(async () => []),
+        },
+      })
+      await result.loadPlayerChoices()
+      expect(result.globalPlayer.value).toBe('associated')
+    })
+  })
+
 })

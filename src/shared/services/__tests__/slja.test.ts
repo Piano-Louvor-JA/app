@@ -47,4 +47,18 @@ describe('parseSljaFile — wrapper .slja.zip do WhatsApp', () => {
     const wrapper = await zipBuffers({ 'outro.txt': new TextEncoder().encode('nada') })
     await expect(parseSljaFile(wrapper, 'sem-slja.zip')).rejects.toThrow(/não encontrado/)
   })
+  describe('gaps — INI sem [Geral]', () => {
+    it('INI sem seção Geral: título default e 0 slides extras', async () => {
+      const ini = '[Outro]\nfoo=1\n'
+      const files: Record<string, Uint8Array> = {
+        'slides.lja': new TextEncoder().encode(ini),
+      }
+      const buffer = await zipBuffers(files)
+      const parsed = await parseSljaFile(buffer, 'musica.slja')
+      expect(parsed).toBeTruthy()
+      expect(parsed.title).toBe('Sem título')
+      expect(parsed.slides).toHaveLength(0)
+    })
+  })
+
 })

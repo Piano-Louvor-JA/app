@@ -281,4 +281,23 @@ describe('fetchWithRetry — ramos de retry (429/5xx/rede, backoff)', () => {
     await fetchWithApiFallback('database', 'x.json')
     expect(fetchMock.mock.calls[0]![1]).toEqual({ headers: { 'Api-Token': 'tok-123' } })
   })
+  it('file com barra inicial: URL montado sem duplicar barra', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ ok: 3 }), { status: 200 }))
+    const result = await fetchWithApiFallback<{ ok: number }>('database', '/pt_categories')
+    expect(result.data).toEqual({ ok: 3 })
+    const calledUrl = String(fetchMock.mock.calls[0]?.[0])
+    expect(calledUrl).toContain('/json_db/pt_categories')
+    expect(calledUrl).not.toContain('//pt_categories')
+  })
+
+  it('NetworkError (Safari): retry com backoff e depois sucesso', async () => {
+    fetchMock
+      .mockRejectedValueOnce(new TypeError('NetworkError when attempting to fetch resource.'))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: 4 }), { status: 200 }))
+    const promise = fetchWithApiFallback('database', 'x.json')
+    await vi.advanceTimersByTimeAsync(1000)
+    const result = await promise
+    expect(result.data).toEqual({ ok: 4 })
+  })
+
 })
