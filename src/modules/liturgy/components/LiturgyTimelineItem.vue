@@ -660,7 +660,14 @@ const rowHovered = ref(false)
             />
           </button>
           <button
-            v-if="!isCategory && (isSiteItem || isVideoRemote)"
+            v-if="
+              !isCategory &&
+                (isSiteItem ||
+                  // Player externo (VLC etc) não alimenta a projeção — o
+                  // botão de projetar só existe no player do sistema
+                  // (Rafael 03/10: esconde para não confundir).
+                  (isVideoRemote && rowPlayerId === 'associated'))
+            "
             type="button"
             class="liturgy-item__action liturgy-item__action--site-project"
             :class="{
