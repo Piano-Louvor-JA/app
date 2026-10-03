@@ -1,4 +1,5 @@
 import { getAuthSession } from '@modules/media/services/auth-client'
+import { applyOperatorState, markLocalLiturgyPushed } from './operator-state-apply'
 
 /**
  * sync v2 fase 2 (app#336): outbox do estado do operador.
@@ -154,5 +155,25 @@ export async function flushOutbox(): Promise<{
   }
   writeOutbox(rest)
 
-  return json.operator_state ?? []
+  // registra o instante do push (base do LWW) e aplica o pull do servidor
+  const newestLocal = entries.reduce(
+    (max, e) => Math.max(max, e.updated_at),
+    Date.now(),
+  )
+  markLocalLiturgyPushed(newestLocal)
+  const serverItems = json.operator_state ?? []
+  applyOperatorState(serverItems)
+
+  return serverItems
+}
+
+/** app#336 fase 2: flush quando a rede volta (offline-first — nada fica pra trás). */
+export function startOutboxTriggers(): () => void {
+  const onOnline = () => {
+    void flushOutbox().catch(() => {})
+  }
+  window.addEventListener('online', onOnline)
+  // pull no boot (rede disponível): puxa o estado da conta
+  onOnline()
+  return () => window.removeEventListener('online', onOnline)
 }

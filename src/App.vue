@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
 import { computed, watch, onMounted, ref } from 'vue'
+import { startOutboxTriggers } from '@modules/sync/services/sync-outbox-service'
 import { useRoute, RouterView } from 'vue-router'
 import { useTheme } from 'vuetify'
 
@@ -60,6 +61,8 @@ watch(
 )
 
 onMounted(() => {
+  // sync v2 fase 2 (app#336): flush on-online + pull no boot
+  startOutboxTriggers()
   updateChecker.init()
   // Palco (cast TV): a bridge sobe no BOOT da janela principal — não só
   // quando o PalcoCard monta. Sem isso, hino/bíblia/timer só espelhavam
