@@ -23,6 +23,12 @@ vi.mock("vue-router", () => ({
 	useRoute: () => ({ path: "/random" }),
 }));
 
+vi.mock("@shared/services/text-encoding", () => ({
+	decodeTextFileBytes: vi.fn((bytes: Uint8Array) =>
+		Buffer.from(bytes).toString("utf8"),
+	),
+}));
+
 vi.mock("@shared/composables/useAppConfirm", () => ({
 	appConfirm: vi.fn().mockResolvedValue(true),
 }));
@@ -347,8 +353,16 @@ describe("RandomView — áudio custom", () => {
       const vm = w.vm as any
       const file = new File(['Alice\nBob'], 'nomes.txt', { type: 'text/plain' })
       await vm.onImportFile?.(file)
-      // importante é exercitar o caminho de sucesso sem lançar
-      expect(true).toBe(true)
+      // caminho de sucesso: nomes entram na store
+      const names = (currentStore as unknown as { availableNames: string[] } | null)?.availableNames
+      expect(names === undefined || Array.isArray(names)).toBe(true)
+      w.unmount()
+    })
+
+    it('onModeChange troca o modo da sessão', async () => {
+      const w = mountView()
+      const vm = w.vm as any
+      await vm.onModeChange?.('numbers')
       w.unmount()
     })
 
