@@ -5,6 +5,11 @@ import { defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
+  define: {
+    // Paridade com vite.config: constante injetada a partir do package.json
+    // (usada por @shared/constants/app — AppShell/AppTitlebar importam).
+    __APP_VERSION__: JSON.stringify('0.0.0-test'),
+  },
   plugins: [vue()],
   resolve: {
     alias: {
