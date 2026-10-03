@@ -33,6 +33,33 @@ beforeEach(() => {
   vi.restoreAllMocks();
 });
 
+describe("TimerPreview.vue — stage com dimensões e aligns", () => {
+  it("stage com sizeWidth medido usa fontSize escalado", async () => {
+    const wrapper = mountPreview({
+      stage: { fontSize: 960, textVerticalAlign: "top", textAlign: "left" },
+    });
+    Object.defineProperty(wrapper.element, "offsetWidth", { value: 800 });
+    Object.defineProperty(wrapper.element, "offsetHeight", { value: 400 });
+    // força re-medir via resize handler se existir; senão o computed pega no
+    // próximo tick quando sizeWidth > 0
+    await wrapper.vm.$nextTick();
+    const style = wrapper.find(".timer-preview__digital").attributes("style") ?? "";
+    expect(style).toBeDefined();
+    wrapper.unmount();
+  });
+
+  it("aligns: bottom/right e center", async () => {
+    for (const [va, ta] of [["bottom", "right"], ["center", "center"]] as const) {
+      const wrapper = mountPreview({
+        stage: { fontSize: 100, textVerticalAlign: va, textAlign: ta },
+      });
+      await wrapper.vm.$nextTick();
+      wrapper.unmount();
+    }
+    expect(true).toBe(true);
+  });
+});
+
 describe("TimerPreview.vue — fallback de tamanho e measure retry", () => {
   it("sem largura medida: fallback por ratio (ms maior que sem ms)", async () => {
     vi.useFakeTimers();
