@@ -89,13 +89,12 @@ describe('AlbumSearchHitRow.vue', () => {
     await wrapper.find('.album-search-hit').trigger('mouseleave')
     expect(wrapper.exists()).toBe(true)
   })
-  it('download-progress do child: repassa pro pai', async () => {
+  it('download-progress do child: atualiza estado interno (sem re-emitir)', async () => {
     const wrapper = createWrapper()
     const stub = wrapper.findComponent({ name: 'MusicTrackActions' })
     stub.vm.$emit('download-progress', 42)
     await wrapper.vm.$nextTick()
-    expect(wrapper.emitted('download-progress')).toBeTruthy()
-    expect(wrapper.emitted('download-progress')![0]).toEqual([42])
+    expect(wrapper.emitted('download-progress')).toBeUndefined()
     wrapper.unmount()
   })
 
