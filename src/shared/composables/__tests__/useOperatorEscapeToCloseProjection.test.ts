@@ -31,6 +31,7 @@ const mediaStoreMock = {
   close: vi.fn(),
 }
 
+import * as bridgeMod from '@shared/services/desktop-bridge'
 import { appConfirm } from '../useAppConfirm'
 import {
   closeLocalProjectionState,
@@ -264,8 +265,7 @@ describe('useOperatorEscapeToCloseProjection', () => {
 
   it('sem bridge (browser) ainda registra ESC e não quebra', async () => {
     const mod = await import('@shared/services/desktop-bridge')
-    const orig = mod.getDesktopBridge
-    vi.spyOn(mod, 'getDesktopBridge').mockReturnValue(null)
+    const spy = vi.spyOn(mod, 'getDesktopBridge').mockReturnValue(null)
     const { defineComponent, h } = await import('vue')
     const { mount } = await import('@vue/test-utils')
     const Host = defineComponent({
@@ -278,7 +278,7 @@ describe('useOperatorEscapeToCloseProjection', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
     await Promise.resolve()
     wrapper.unmount()
-    void orig
+    spy.mockRestore()
   })
 
   it('closeLocalProjectionState fecha media store quando há sessão', async () => {
@@ -299,4 +299,71 @@ describe('useOperatorEscapeToCloseProjection', () => {
     expect(closeProjectionModule).toHaveBeenCalled()
     expect(mediaStoreMock.close).not.toHaveBeenCalled()
   })
+  describe('gaps — reentrância e subscribe', () => {
+    it('reentrância via IPC: onCloseRequested dispara 2x — 2º bate no guard handling', async () => {
+      // padrão do teste 'onCloseRequested dispara': módulo fresco (handling limpo)
+      externalAlive.mockResolvedValue(true)
+      onCloseRequested.mockImplementation(() => () => {})
+      vi.resetModules()
+      const mod = await import('../useOperatorEscapeToCloseProjection')
+      const { defineComponent, h } = await import('vue')
+      const { mount } = await import('@vue/test-utils')
+      const Host = defineComponent({
+        setup() {
+          mod.useOperatorEscapeToCloseProjection(() => false)
+          return () => h('div')
+        },
+      })
+      const wrapper = mount(Host)
+      const p1 = mod.requestCloseProjectionWithConfirm()
+      await new Promise((r) => setTimeout(r, 60))
+      const dialogs = document.querySelectorAll('[role="dialog"].app-confirm')
+      expect(dialogs.length).toBe(1)
+      // 2ª chamada com confirm aberto: guard [role=dialog]/handling barra
+      const p2 = mod.requestCloseProjectionWithConfirm()
+      await new Promise((r) => setTimeout(r, 20))
+      expect(document.querySelectorAll('[role="dialog"].app-confirm').length).toBe(1)
+      const buttons = Array.from(dialogs[0]!.querySelectorAll('button'))
+      ;(buttons[0] as HTMLButtonElement).click()
+      await Promise.all([p1, p2])
+      await new Promise((r) => setTimeout(r, 80))
+      expect(closeUrl).not.toHaveBeenCalled()
+      wrapper.unmount()
+    })
+
+    it('setup com onCloseRequested ausente: mount/unmount sem quebrar', async () => {
+      const spy = vi.spyOn(bridgeMod, 'getDesktopBridge').mockImplementation(() => ({
+        projection: { closeUrl, externalAlive }, // sem onCloseRequested
+      }) as never)
+      const { mount } = await import('@vue/test-utils')
+      const Host = (await import('vue')).defineComponent({
+        setup() {
+          useOperatorEscapeToCloseProjection(() => false)
+          return () => null
+        },
+      })
+      const w = mount(Host)
+      await w.vm.$nextTick()
+      expect(() => w.unmount()).not.toThrow()
+      spy.mockRestore()
+    })
+
+    it('getDesktopBridge lança no setup: catch engole', async () => {
+      const spy2 = vi.spyOn(bridgeMod, 'getDesktopBridge').mockImplementation(() => {
+        throw new Error('boom')
+      })
+      const { mount } = await import('@vue/test-utils')
+      const Host = (await import('vue')).defineComponent({
+        setup() {
+          useOperatorEscapeToCloseProjection(() => false)
+          return () => null
+        },
+      })
+      const w = mount(Host)
+      await w.vm.$nextTick()
+      expect(() => w.unmount()).not.toThrow()
+      spy2.mockRestore()
+    })
+  })
+
 })
