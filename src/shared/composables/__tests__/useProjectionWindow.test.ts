@@ -419,4 +419,20 @@ describe('useProjectionWindow', () => {
     // reapply foi chamado: nenhuma janela reaberta (2,3 continuam selecionadas)
     expect(winOpen).not.toHaveBeenCalled()
   })
+  it('reapply: close de janela antiga que lança não quebra o fluxo', async () => {
+    const mod = await loadFresh()
+    await mod.openProjectionModule('clock')
+    winOpen.mockClear()
+    // novas janelas cujo close lança (reapply vai fechar as antigas)
+    winOpen.mockImplementation(() => {
+      const w = fakeWindow(3)
+      ;(w as unknown as { close: () => void }).close = () => {
+        throw new Error('already dead')
+      }
+      return w
+    })
+    await mod.openProjectionModule('clock') // reabre → fecha as antigas (throw engolido)
+    expect(() => mod.isProjectionModuleOpen()).not.toThrow()
+  })
+
 })
