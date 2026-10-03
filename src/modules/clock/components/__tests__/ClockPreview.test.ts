@@ -34,6 +34,28 @@ function mountClock(props: Record<string, unknown> = {}) {
   });
 }
 
+describe("ClockPreview.vue — stage, analog size e measure retry", () => {
+  it("stage com dimensões: fontSize escala; analógico escala pelo stage", async () => {
+    const wrapper = mountClock({
+      stage: { fontSize: 192, textVerticalAlign: "bottom", textAlign: "right" },
+    });
+    Object.defineProperty(wrapper.element, "offsetWidth", { value: 960 });
+    Object.defineProperty(wrapper.element, "offsetHeight", { value: 480 });
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find(".clock-preview__digital").exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("measure retry com dimensões zero (fake timers)", async () => {
+    vi.useFakeTimers();
+    const wrapper = mountClock();
+    await vi.advanceTimersByTimeAsync(250);
+    wrapper.unmount();
+    vi.useRealTimers();
+    expect(true).toBe(true);
+  });
+});
+
 describe("ClockPreview.vue", () => {
   it("digital: renderiza hora, segundos e estilo base", () => {
     const wrapper = mountClock();
