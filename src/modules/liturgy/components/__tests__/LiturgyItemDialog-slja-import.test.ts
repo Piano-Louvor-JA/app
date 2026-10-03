@@ -174,6 +174,18 @@ describe("LiturgyItemDialog — importar .slja no item de música (app#331)", ()
 		expect(patch.musicId).toBe(-3);
 	});
 
+	it("botão de import aciona o input oculto", async () => {
+		const wrapper = mountDialog(makeDraft());
+		const input = sljaInputElement();
+		const click = vi.spyOn(input, "click");
+		const button = document.body.querySelector(
+			'[data-testid="slja-import-btn"]',
+		) as HTMLButtonElement;
+		button.click();
+		expect(click).toHaveBeenCalledOnce();
+		wrapper.unmount();
+	});
+
 	it("arquivo inválido → mensagem de erro, draft intacto", async () => {
 		const wrapper = mountDialog(makeDraft());
 		importMock.mockRejectedValueOnce(new Error("inválido"));

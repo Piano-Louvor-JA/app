@@ -22,6 +22,7 @@ export default defineConfig({
     },
   },
   test: {
+    setupFiles: ['src/test/localstorage-shim-setup.ts'],
     exclude: ['node_modules/**', 'dist/**', 'e2e/**'],
     coverage: {
           provider: 'v8',
