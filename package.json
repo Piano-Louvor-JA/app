@@ -27,7 +27,8 @@
     "electron:build": "vite build --base=./ && node build/patch-nsis-templates.mjs && electron-builder",
     "postinstall": "electron-builder install-app-deps",
     "test:regression": "node scripts/test-regression.mjs",
-    "electron:dev-log": "concurrently -k \"vite --host localhost --port 5173\" \"wait-on http://localhost:5173 && env -u ELECTRON_RUN_AS_NODE cross-env VITE_DEV_SERVER_URL=http://localhost:5173 ELECTRON_OPEN_DEVTOOLS=1 electron . --class=louvorja-piano 2>&1 | tee /tmp/louvorja-dev.log\""
+    "electron:dev-log": "concurrently -k \"vite --host localhost --port 5173\" \"wait-on http://localhost:5173 && env -u ELECTRON_RUN_AS_NODE cross-env VITE_DEV_SERVER_URL=http://localhost:5173 ELECTRON_OPEN_DEVTOOLS=1 electron . --class=louvorja-piano 2>&1 | tee /tmp/louvorja-dev.log\"",
+    "orval": "orval --config orval.config.ts"
   },
   "dependencies": {
     "@cliqz/adblocker-electron": "^1.34.0",
@@ -66,6 +67,7 @@
     "electron-builder": "^26.15.3",
     "jsdom": "^25.0.1",
     "npm-run-all2": "^9.0.2",
+    "orval": "^8.39.0",
     "sass": "^1.101.0",
     "tailwindcss": "^4.3.2",
     "typescript": "~6.0.0",
