@@ -72,6 +72,7 @@
     "vite-plugin-electron-renderer": "^1.0.0",
     "vite-plugin-vue-devtools": "^8.1.2",
     "vitest": "^4.1.10",
+    "@vitest/coverage-v8": "^4.1.11",
     "vue-tsc": "^3.3.5",
     "wait-on": "^9.0.10"
   },
