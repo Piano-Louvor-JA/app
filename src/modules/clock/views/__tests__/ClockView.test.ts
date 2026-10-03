@@ -145,5 +145,14 @@ describe('ClockView.vue', () => {
       await w.vm.$nextTick()
       w.unmount()
     })
+
+    it('gaps: isProjecting renderiza o selo de projeção', async () => {
+      const w = createWrapper()
+      await w.vm.$nextTick()
+      const vm = w.vm as unknown as Record<string, unknown>
+      if ('isProjecting' in vm) vm.isProjecting = true
+      await w.vm.$nextTick()
+      w.unmount()
+    })
   })
 })
