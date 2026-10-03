@@ -50,4 +50,16 @@ describe('playlist-storage', () => {
     expect(deletePlaylist(playlist.id)).toBe(true)
     expect(listPlaylists()).toEqual([])
   })
+  describe('gaps — storage corrompido', () => {
+    it('JSON não-array: retorna []', () => {
+      values.set('louvorja_playlists_v1', JSON.stringify({ foo: 1 }))
+      expect(listPlaylists()).toEqual([])
+    })
+
+    it('JSON inválido: retorna []', () => {
+      values.set('louvorja_playlists_v1', 'not-json{')
+      expect(listPlaylists()).toEqual([])
+    })
+  })
+
 })

@@ -113,4 +113,12 @@ describe("fetchRemoteCatalogJson", () => {
 		const data = await fetchRemoteCatalogJson("catalog");
 		expect(data).toEqual({ via: "fallback" });
 	});
+	it("NetworkError (Safari) também é retriable", async () => {
+		mocks.state.fetch.mockRejectedValueOnce(new Error("NetworkError when attempting to fetch resource."));
+		mocks.state.fetch.mockResolvedValueOnce(new Response(JSON.stringify({ ok: 1 }), { status: 200 }));
+		const data = await fetchRemoteCatalogJson("catalog", 1, 5);
+		expect(data).toEqual({ ok: 1 });
+		expect(mocks.state.fetch).toHaveBeenCalledTimes(2);
+	});
+
 });
