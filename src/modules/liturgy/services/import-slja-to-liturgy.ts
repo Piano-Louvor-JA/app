@@ -24,6 +24,7 @@ import {
 	uploadCustomFile,
 } from "@modules/media/services/custom-catalog";
 import { parseSljaFile } from "@shared/services/slja";
+import { sha256Hex } from "@shared/services/content-hash";
 
 export interface ImportedSljaLiturgyMusic {
 	/**
@@ -48,6 +49,10 @@ export interface ImportedSljaLiturgyMusic {
 	durationMs: number;
 	/** true = gravado só local (sem login); sync pra conta é versão futura. */
 	local: boolean;
+	/** SHA-256 do arquivo de origem — dedupe de re-import. */
+	sljaHash: string;
+	/** true = arquivo já importado antes; a música existente foi ATUALIZADA. */
+	updatedExisting: boolean;
 }
 
 /** Margem além do último slide (o MP3 real pode esticar). */
@@ -94,6 +99,14 @@ export function sljaDisplayName(
 	return title;
 }
 
+
+/** hex sha256 → formato uuid (determinístico; não precisa ser RFC v5 canônico,
+ *  só estável pro mesmo conteúdo). */
+async function sha256ToUuid(hex: string): Promise<string> {
+	const h = hex.replace(/-/g, "").padEnd(32, "0").slice(0, 32);
+	return [h.slice(0, 8), h.slice(8, 12), h.slice(12, 16), h.slice(16, 20), h.slice(20, 32)].join("-");
+}
+
 async function ensureImportCollectionId(): Promise<number | null> {
 	// Reaproveita a primeira "Importações .slja" existente (mesma regra do
 	// media editor); só cria se ainda não houver nenhuma.
@@ -120,6 +133,10 @@ export async function importSljaAsLiturgyMusic(
 	const { bytes, name: fileName } = source;
 	// Aceita .slja direto OU .slja.zip (wrapper do WhatsApp) — parser pronto.
 	const archive = await parseSljaFile(bytes, fileName);
+	// Identidade de conteúdo: re-import do mesmo arquivo atualiza em vez de
+	// duplicar (feedback Ezequias/Rafael: "itens importados não deveriam
+	// duplicar").
+	const sljaHash = await sha256Hex(bytes);
 	const innerName = (archive as { innerName?: string }).innerName;
 
 	const name = sljaDisplayName(archive, innerName ?? fileName);
@@ -143,11 +160,31 @@ export async function importSljaAsLiturgyMusic(
 		throw new Error("SLJA_IMPORT_COLLECTION_FAILED");
 	}
 
-	const created = await createCustomMusic(collectionId, { name });
+	// Dedup (app#336 fase 3): client_uuid determinístico do hash do arquivo —
+	// re-import do MESMO .slja (ou import nos 2 dispositivos) vira no-op na
+	// API (a rota retorna o registro existente) em vez de duplicar no banco.
+	const clientUuid = await sha256ToUuid(sljaHash);
+	const created = await createCustomMusic(collectionId, {
+		name,
+		client_uuid: clientUuid,
+	});
 	if (!created) {
 		throw new Error("SLJA_IMPORT_MUSIC_FAILED");
 	}
 	const musicId = created.id;
+
+	// Já existia (re-import): mídias já estão vinculadas — pular uploads.
+	if (created.existed) {
+		return {
+			ok: true,
+			musicId,
+			uploadedImages: 0,
+			uploadedAssets: [],
+			uploadedAudio: false,
+			sljaHash,
+			updatedExisting: true,
+		};
+	}
 
 	let uploadedImages = 0;
 	const uploadedAssets: Array<{ path: string; url: string; idFile: number }> =
