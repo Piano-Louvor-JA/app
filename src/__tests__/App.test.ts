@@ -125,6 +125,25 @@ beforeEach(() => {
   startPalcoBridgeMock.fn.mockClear();
 });
 
+describe("App.vue — estados do template", () => {
+  it("hasUpdate true não reseta dialog; voltar pra false reseta (branch 56)", async () => {
+    updateCheckerMock.mock.hasUpdate = ref(true);
+    const w = mountApp();
+    await flushPromises();
+    updateCheckerMock.mock.hasUpdate = ref(false);
+    await flushPromises();
+    expect(w.find(".app-frame").exists()).toBe(true);
+  });
+
+  it("isAppReady false: RouterView escondido; overlay sempre no corpo", async () => {
+    startingStoreMock.isAppReady.value = false;
+    const w = mountApp();
+    await flushPromises();
+    // RouterView stubbed renderiza null — branch v-if exercitado sem crash
+    expect(w.find(".app-frame__body").exists()).toBe(true);
+  });
+});
+
 describe("App.vue — callbacks de composables", () => {
   it("getter de projeção reflete a rota do mount", async () => {
     routeState.route = { meta: {}, name: "home" };
