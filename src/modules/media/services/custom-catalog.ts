@@ -613,8 +613,13 @@ export async function createCustomCollection(
 
 export async function createCustomMusic(
   collectionId: number,
-  input: { name?: string; lyric?: string; auxiliary_lyric?: string },
-): Promise<{ id: number } | null> {
+  input: {
+    name?: string
+    lyric?: string
+    auxiliary_lyric?: string
+    client_uuid?: string
+  },
+): Promise<{ id: number; existed?: boolean } | null> {
   if (isLocalId(collectionId)) {
     const local = createLocalMusic(collectionId, {
       name: input.name,
@@ -633,7 +638,8 @@ export async function createCustomMusic(
     )
     if (!response.ok) return null
     const json = (await response.json()) as { id_music: number }
-    return { id: json.id_music }
+    // Dedup (web#187 paridade): 200 = já existia (mesmo client_uuid)
+    return { id: json.id_music, existed: response.status === 200 }
   } catch {
     return null
   }
@@ -828,6 +834,11 @@ export async function deleteCustomLyric(lyricId: number): Promise<boolean> {
 export async function resolveMediaTrack(
   musicId: number,
 ): Promise<MediaTrackRecord | null> {
+  // app#331: música LOCAL (sem auth, localStorage, id negativo) primeiro —
+  // o guard de custom (>= 1M) também engole negativos se rodar antes.
+  if (isLocalId(musicId)) {
+    return loadCustomMusicTrack(musicId)
+  }
   if (isCustomMusicId(musicId)) {
     return loadCustomMusicTrack(fromCustomMusicId(musicId))
   }
