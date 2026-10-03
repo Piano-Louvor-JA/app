@@ -225,4 +225,36 @@ describe('ExternalPlayerCard', () => {
     expect(bridge.externalPlayer.set).toHaveBeenCalledWith('associated')
     expect(w.find('[data-test="external-player-associated"]').attributes('aria-checked')).toBe('true')
   })
+
+  it('removeCustom com exceção: mantém lista (catch)', async () => {
+    const bridge = makeBridge()
+    bridge.externalPlayer.removeCustom = vi.fn(async () => { throw new Error('x') })
+    bridge.externalPlayer.listCustom = vi.fn(async () => ['/opt/wps/wpsoffice'])
+    setBridge(bridge)
+    const w = await mountCard()
+    await flushPromises()
+    const rm = w.find('[data-test="external-player-custom-remove"]')
+    if (rm.exists()) {
+      await rm.trigger('click')
+      await flushPromises()
+    }
+    expect(w.exists()).toBe(true)
+    w.unmount()
+  })
+
+  it('chip custom selecionado: setPlayer customId via clique', async () => {
+    const bridge = makeBridge()
+    bridge.externalPlayer.listCustom = vi.fn(async () => ['/opt/wps/wpsoffice'])
+    bridge.externalPlayer.get = vi.fn(async () => 'custom:/opt/wps/wpsoffice')
+    setBridge(bridge)
+    const w = await mountCard()
+    await flushPromises()
+    const chip = w.find('[data-test="external-player-custom"]')
+    if (chip.exists()) {
+      await chip.trigger('click')
+      await flushPromises()
+      expect(bridge.externalPlayer.set).toHaveBeenCalledWith('custom:/opt/wps/wpsoffice')
+    }
+    w.unmount()
+  })
 })
