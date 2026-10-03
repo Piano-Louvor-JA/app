@@ -1,9 +1,8 @@
 import { getCurrentApiPrefix } from '@modules/sync/services/library-catalog'
 
-import {
-  essentialFilesForPrefix,
-  syncEssentialCatalogFromApi,
-} from './bootstrap-service'
+import { syncEssentialCatalogFromApi } from './bootstrap-service'
+
+export { essentialFilesForPrefix } from './bootstrap-service'
 
 /**
  * app#339: garante que o catálogo essencial do idioma alvo esteja em disco
@@ -24,17 +23,6 @@ export function localeToApiPrefix(locale: string): string {
     es: 'es',
   }
   return map[locale] ?? 'pt'
-}
-
-export function essentialFilesForPrefix(prefix: string): string[] {
-  return [
-    `${prefix}_categories`,
-    `${prefix}_hymnal`,
-    `${prefix}_hymnal_1996`,
-    `${prefix}_musics`,
-    `${prefix}_bible_book`,
-    `${prefix}_bible_version`,
-  ]
 }
 
 /**
