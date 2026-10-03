@@ -481,20 +481,7 @@ function onCategoryChange(event: Event) {
   patch({ categoryId: value || null })
 }
 
-const {
-  globalPlayer,
-  playerOptions,
-  loadPlayerChoices,
-  selectedPlayerId: resolvePlayerId,
-  storedPlayerId,
-} = useExternalPlayerChoices()
-
-const selectedPlayerId = computed(() => resolvePlayerId(props.draft.playerId))
-
-function onPlayerChange(event: Event) {
-  const value = (event.target as HTMLSelectElement).value
-  patch({ playerId: storedPlayerId(value) })
-}
+const { loadPlayerChoices } = useExternalPlayerChoices()
 
 watch(
   () => [props.open, props.draft.type] as const,
@@ -1133,38 +1120,7 @@ function isLightDot(hex: string): boolean {
               </p>
             </div>
 
-            <!-- Player de reprodução: só para itens de vídeo/áudio com arquivo local -->
-            <div
-              v-if="draft.type === 'video' || draft.type === 'audio'"
-              class="moment-dialog__engine"
-              data-test="liturgy-player-select"
-            >
-              <span class="moment-dialog__label">
-                {{ t('liturgy.fields.playerSelect') }}
-              </span>
-              <select
-                class="moment-dialog__input moment-dialog__select"
-                :value="selectedPlayerId"
-                :aria-label="t('liturgy.fields.playerSelect')"
-                data-test="liturgy-player-options"
-                @change="onPlayerChange"
-              >
-                <option
-                  v-for="player in playerOptions"
-                  :key="player.id"
-                  :value="player.id"
-                >
-                  {{
-                    player.id === globalPlayer
-                      ? t('liturgy.fields.playerDefaultNamed', { name: player.label })
-                      : player.label
-                  }}
-                </option>
-              </select>
-              <p class="moment-dialog__engine-hint">
-                {{ t('liturgy.fields.playerSelectHint') }}
-              </p>
-            </div>
+            <!-- Player: gerido pela linha (LiturgyTimelineItem) / Configurações → Mídia & Player. Select do modal removido (redundante). -->
           </div>
 
           <div

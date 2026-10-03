@@ -629,8 +629,7 @@ const rowHovered = ref(false)
             @click.stop="emit('select')"
           >
             <i
-              class="ti"
-              :class="isAudioItem ? 'ti-headphones' : 'ti-player-play'"
+              class="ti ti-player-play"
               aria-hidden="true"
             />
           </button>
