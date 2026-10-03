@@ -5,8 +5,11 @@ import en from '@locales/en'
 import es from '@locales/es'
 
 import albumsPtBR from '@modules/albums/locales/pt-BR'
+import authEn from '@modules/auth/locales/en'
 import albumsEn from '@modules/albums/locales/en'
+import authEs from '@modules/auth/locales/es'
 import albumsEs from '@modules/albums/locales/es'
+import authPtBR from '@modules/auth/locales/pt-BR'
 import communityPtBR from '@modules/community/locales/pt-BR'
 import communityEn from '@modules/community/locales/en'
 import communityEs from '@modules/community/locales/es'
@@ -94,6 +97,7 @@ export default createI18n({
   messages: {
     'pt-BR': {
       ...ptBR,
+      ...authPtBR,
       ...albumsPtBR,
       ...communityPtBR,
       ...biblePtBR,
@@ -110,6 +114,7 @@ export default createI18n({
     },
     en: {
       ...en,
+      ...authEn,
       ...albumsEn,
       ...communityEn,
       ...bibleEn,
@@ -126,6 +131,7 @@ export default createI18n({
     },
     es: {
       ...es,
+      ...authEs,
       ...albumsEs,
       ...communityEs,
       ...bibleEs,

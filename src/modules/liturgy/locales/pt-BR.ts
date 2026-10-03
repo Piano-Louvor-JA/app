@@ -231,6 +231,7 @@ export default {
       project: 'Projetar',
       play: 'Reproduzir',
       openControl: 'Abrir controle (popup)',
+      playLocalInExternal: 'Reproduzir mídia local no {player}',
       openSiteControl: 'Abrir controle do site',
       openVideoControl: 'Abrir controle do YouTube',
       openImageControl: 'Abrir controle das imagens',
@@ -261,6 +262,12 @@ export default {
       reorder: 'Arrastar para reordenar',
     },
     messages: {
+      removeItemTitle: 'Remover item da liturgia',
+      removeLiturgyTitle: 'Remover liturgia avulsa',
+      clearTitle: 'Apagar liturgia do dia',
+      removeAction: 'Remover',
+      cancelAction: 'Cancelar',
+      confirmDeleteNamed: 'Deseja remover “{name}” da liturgia?',
       confirmDelete: 'Deseja remover este item da liturgia?',
       confirmDeleteCategory:
         'Deseja remover esta categoria/separador e todos os itens relacionados?',
@@ -270,7 +277,7 @@ export default {
       liturgySaved: 'Liturgia salva com sucesso.',
       mediaDesktopOnly: 'Informe o caminho do arquivo de mídia.',
       videoSelectFile: 'Selecionar arquivo',
-      catalogEmpty: 'Nenhuma música encontrada no catálogo local.',
+      catalogEmpty: 'Nenhuma música no catálogo local. Importe um arquivo .slja na Central de Mídia (botão "Importar .slja") ou adicione músicas da Comunidade.',
       customRequired:
         'Crie ou selecione uma liturgia personalizada antes de adicionar itens.',
       booksEmpty: 'Nenhum livro bíblico disponível. Conclua a inicialização.',
@@ -278,8 +285,22 @@ export default {
       urlInvalid: 'O link informado não é válido para projeção.',
       projectionFailed:
         'Não foi possível abrir a projeção nas telas configuradas.',
+      fileMissingOnMachine:
+        'Arquivo não encontrado nesta máquina — o caminho veio de outro computador (liturgia sincronizada). Selecione o arquivo novamente neste dispositivo.',
       presentationOfficeMissing:
         'Para projetar PPT/PPTX, instale o LibreOffice (ou defina LIBREOFFICE_PATH).',
+    },
+    slja: {
+      importButton: 'Importar .slja',
+      importing: 'Importando…',
+      imported: 'Importado: {name} ({slides} estrofes).',
+      uploadTitle: 'Subir "{name}" pra sua conta?',
+      uploadMessage: 'O arquivo será enviado uma única vez (sem duplicar) e fica disponível em qualquer dispositivo.',
+      uploadConfirm: 'Subir pra conta',
+      uploadCancel: 'Ficar só neste dispositivo',
+      importedLocal:
+        'Importado neste dispositivo: {name} ({slides} estrofes) — salvo sem conta.',
+      importFailed: 'Arquivo .slja inválido.',
     },
     custom: {
       title: 'Liturgias avulsas',
