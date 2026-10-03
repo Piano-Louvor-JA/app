@@ -62,6 +62,9 @@ vi.mock('@shared/services/desktop-bridge', () => ({
       getRecord: vi.fn().mockResolvedValue(null),
       setRecord: vi.fn().mockResolvedValue(undefined),
     },
+    media: {
+      check: vi.fn().mockResolvedValue(true),
+    },
   }),
   isDesktopApp: () => true,
   isElectronShell: () => true,
