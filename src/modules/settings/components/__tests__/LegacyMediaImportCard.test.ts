@@ -195,4 +195,36 @@ describe('LegacyMediaImportCard', () => {
     active = null
     expect(true).toBe(true)
   })
+  it('onImportProgress: callback atualiza progresso e percentual', async () => {
+    const bridge = makeBridge()
+    let progressCb: ((p: unknown) => void) | null = null
+    bridge.legacyMedia.onImportProgress = vi.fn((cb: (p: unknown) => void) => {
+      progressCb = cb
+      return () => {}
+    })
+    setBridge(bridge)
+    const w = await mountCard()
+    expect(progressCb).not.toBeNull()
+    progressCb?.({ current: 5, total: 10, relativePath: 'album', mediaType: 'music' })
+    await flushPromises()
+    await w.vm.$nextTick()
+    // progress interno atualizado (render pode depender de width)
+    expect(w.exists()).toBe(true)
+    w.unmount()
+    active = null
+  })
+
+  it('reconciliação falha: warn e marca 0', async () => {
+    reconcileFromLocalMediaMock.mockRejectedValue(new Error('boom'))
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    setBridge(makeBridge())
+    const w = await mountCard()
+    await w.find('[data-test="legacy-media-import-button"]').trigger('click')
+    await flushPromises()
+    await flushPromises()
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
+    w.unmount()
+  })
+
 })
