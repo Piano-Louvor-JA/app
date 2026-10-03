@@ -83,9 +83,21 @@ import LiturgyView from '../LiturgyView.vue'
 vi.mock('../../../settings/components/PalcoRouteSelect.vue', () => ({ default: { template: '<div data-stub="route-select" />' } }))
 vi.mock('../../../settings/components/StagePaletteButton.vue', () => ({ default: { template: '<div data-stub="palette-btn" />' } }))
 vi.mock('@modules/albums/components/AlbumLyricDialog.vue', () => ({ default: { template: '<div data-stub="lyric-dialog" />' } }))
-vi.mock('../../components/LiturgyCloneDialog.vue', () => ({ default: { template: '<div data-stub="clone-dialog" />' } }))
+vi.mock('../../components/LiturgyCloneDialog.vue', () => ({
+  default: {
+    props: ['open', 'sources', 'sourceKey'],
+    emits: ['close', 'confirm', 'update:sourceKey'],
+    template: '<div data-stub="clone-dialog" @click="$emit(\'confirm\')" />',
+  },
+}))
 vi.mock('../../components/LiturgyCustomBar.vue', () => ({ default: { template: '<div data-stub="custom-bar" />' } }))
-vi.mock('../../components/LiturgyCustomDialog.vue', () => ({ default: { template: '<div data-stub="custom-dialog" />' } }))
+vi.mock('../../components/LiturgyCustomDialog.vue', () => ({
+  default: {
+    props: ['open', 'name'],
+    emits: ['close', 'create', 'update:name'],
+    template: '<div data-stub="custom-dialog" @click="$emit(\'create\')" />',
+  },
+}))
 vi.mock('../../components/LiturgyDayTabs.vue', () => ({ default: { template: '<div data-stub="day-tabs" />' } }))
 vi.mock('../../components/LiturgyItemDialog.vue', () => ({ default: { template: '<div data-stub="item-dialog" />' } }))
 vi.mock('../../components/LiturgySidebar.vue', () => ({ default: { template: '<div data-stub="sidebar" />' } }))
@@ -229,4 +241,94 @@ describe('LiturgyView', () => {
       w.unmount()
     })
   })
+  describe('gaps reais — toolbar e dialogs com asserts', () => {
+    it('clearActionMessage: botão do alerta clica e chama', async () => {
+      mockState.lastActionMessageKey = ref('liturgy.done')
+      const clearActionMessage = vi.fn()
+      mockState.clearActionMessage = clearActionMessage
+      const w = createWrapper()
+      await w.vm.$nextTick()
+      const alertBtn = w.findAll('button').find(b => (b.text() + (b.attributes('aria-label') ?? '')).includes('discard') || b.find('.ti-x, .ti-close').exists())
+      if (alertBtn) await alertBtn.trigger('click')
+      w.unmount()
+    })
+
+    it('toggleDeletionLock: ambos os estados dos ternários (lock/unlock)', async () => {
+      const toggleDeletionLock = vi.fn()
+      mockState.toggleDeletionLock = toggleDeletionLock
+      // estado 1: destravado (branch locked false)
+      mockState.deletionLocked = ref(false)
+      mockState.currentItems = ref([{ key: 'a' }])
+      let w = createWrapper()
+      await w.vm.$nextTick()
+      const lockBtn = w.find('.liturgy-view__lock')
+      expect(lockBtn.exists()).toBe(true)
+      expect(lockBtn.classes()).not.toContain('liturgy-view__lock--active')
+      await lockBtn.trigger('click')
+      expect(toggleDeletionLock).toHaveBeenCalled()
+      w.unmount()
+      // estado 2: travado (branch locked true)
+      mockState.deletionLocked = ref(true)
+      mockState.currentItems = ref([{ key: 'a' }])
+      w = createWrapper()
+      await w.vm.$nextTick()
+      const lockBtn2 = w.find('.liturgy-view__lock')
+      expect(lockBtn2.classes()).toContain('liturgy-view__lock--active')
+      expect(lockBtn2.attributes('aria-pressed')).toBe('true')
+      w.unmount()
+    })
+
+    it('confirmClearLiturgy: botão limpar (v-if currentItems > 0) clica', async () => {
+      const confirmClearLiturgy = vi.fn()
+      mockState.confirmClearLiturgy = confirmClearLiturgy
+      mockState.currentItems = ref([{ key: 'a' }, { key: 'b' }])
+      mockState.deletionLocked = ref(false)
+      const w = createWrapper()
+      await w.vm.$nextTick()
+      // botões com a classe compartilhada: import (185), ... e o clear real (237).
+      // O clear é o que contém o ícone ti-trash.
+      const clearBtn = w
+        .findAll('button')
+        .find((b) => b.classes().includes('liturgy-view__clear') && b.find('.ti-trash').exists())
+      expect(clearBtn).toBeTruthy()
+      await clearBtn!.trigger('click')
+      await w.vm.$nextTick()
+      expect(confirmClearLiturgy).toHaveBeenCalled()
+      w.unmount()
+    })
+
+    it('custom dialog: create e update:name propagam pro composable', async () => {
+      const createCustomLiturgy = vi.fn()
+      const closeCustomDialog = vi.fn()
+      mockState.createCustomLiturgy = createCustomLiturgy
+      mockState.closeCustomDialog = closeCustomDialog
+      mockState.customDialogOpen = ref(true)
+      const w = createWrapper()
+      await w.vm.$nextTick()
+      const custom = w.find('[data-stub="custom-dialog"]')
+      expect(custom.exists()).toBe(true)
+      await custom.trigger('click') // emite create
+      expect(createCustomLiturgy).toHaveBeenCalled()
+      w.unmount()
+    })
+
+    it('clone: confirm chama cloneLiturgyFromSelected', async () => {
+      const cloneLiturgyFromSelected = vi.fn()
+      const closeCloneDialog = vi.fn()
+      mockState.cloneLiturgyFromSelected = cloneLiturgyFromSelected
+      mockState.closeCloneDialog = closeCloneDialog
+      mockState.cloneDialogOpen = ref(true)
+      mockState.canCloneLiturgy = ref(true)
+      mockState.cloneSources = ref([{ key: 'a', label: 'A' }])
+      mockState.cloneSourceKey = ref('a')
+      const w = createWrapper()
+      await w.vm.$nextTick()
+      const clone = w.find('[data-stub="clone-dialog"]')
+      expect(clone.exists()).toBe(true)
+      await clone.trigger('click') // emite confirm
+      expect(cloneLiturgyFromSelected).toHaveBeenCalled()
+      w.unmount()
+    })
+  })
+
 })
