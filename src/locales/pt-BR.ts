@@ -115,4 +115,12 @@ export default {
         projection: 'Configurações de projeção e telas em breve.',
       },
     },
+  sync: {
+    downloadQueue: {
+      title: 'Downloads',
+      clearFinished: 'Limpar concluídos',
+      retry: 'Tentar de novo',
+      cancel: 'Cancelar',
+    },
+  },
   }
