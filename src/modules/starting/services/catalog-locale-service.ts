@@ -2,7 +2,6 @@ import { getCurrentApiPrefix } from '@modules/sync/services/library-catalog'
 
 import { syncEssentialCatalogFromApi } from './bootstrap-service'
 
-export { essentialFilesForPrefix } from './bootstrap-service'
 
 /**
  * app#339: garante que o catálogo essencial do idioma alvo esteja em disco
@@ -16,6 +15,17 @@ export { essentialFilesForPrefix } from './bootstrap-service'
  */
 
 /** Locale ("pt-BR") → prefixo de API ("pt"). Mesma tabela do i18n plugin. */
+export function essentialFilesForPrefix(prefix: string): string[] {
+  return [
+    `${prefix}_categories`,
+    `${prefix}_hymnal`,
+    `${prefix}_hymnal_1996`,
+    `${prefix}_musics`,
+    `${prefix}_bible_book`,
+    `${prefix}_bible_version`,
+  ]
+}
+
 export function localeToApiPrefix(locale: string): string {
   const map: Record<string, string> = {
     'pt-BR': 'pt',
