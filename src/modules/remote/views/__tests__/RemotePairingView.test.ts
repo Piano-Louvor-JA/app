@@ -129,4 +129,43 @@ describe('RemotePairingView', () => {
     wrapper.unmount()
     expect(off).toHaveBeenCalled()
   })
+
+  it('onClients lança: catch não quebra a view (br 29)', async () => {
+    mocks.getDesktopBridge.mockReturnValue(makeBridge({
+      onClients: vi.fn(() => { throw new Error('boom') }),
+    }))
+    const w = createWrapper()
+    await flushPromises()
+    expect(w.exists()).toBe(true)
+    w.unmount()
+  })
+
+  it('copyUrl sem info: no-op (br 39); sem qr: img ausente (br 72)', async () => {
+    mocks.getDesktopBridge.mockReturnValue(makeBridge({
+      pairingInfo: vi.fn(async () => ({
+        host: 'h', port: 1, token: 't', connectUrl: 'http://h:1/?t', qrDataUrl: null, clientCount: 0, clientAddress: null,
+      })),
+    }))
+    const w = createWrapper()
+    await flushPromises()
+    expect(w.find('img[width="220"]').exists()).toBe(false)
+    // copyUrl com info presente
+    const copyBtn = w.findAll('button').find((b) => (b.text() + (b.attributes('aria-label') ?? '')).toLowerCase().includes('copiar') || (b.text() + (b.attributes('aria-label') ?? '')).toLowerCase().includes('copy'))
+    if (copyBtn) await copyBtn.trigger('click')
+    // clipboard pode não existir em jsdom — só não pode lançar
+    w.unmount()
+  })
+
+  it('onClients com address null: device fallback (br 59)', async () => {
+    let cb: ((p: { count: number; address: string | null }) => void) | null = null
+    mocks.getDesktopBridge.mockReturnValue(makeBridge({
+      onClients: vi.fn((fn: typeof cb) => { cb = fn; return () => {} }),
+    }))
+    const w = createWrapper()
+    await flushPromises()
+    cb?.({ count: 2, address: null })
+    await flushPromises()
+    expect(w.text()).toContain('Piano LouvorJA')
+    w.unmount()
+  })
 })

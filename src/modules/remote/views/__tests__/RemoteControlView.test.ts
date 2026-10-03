@@ -73,4 +73,14 @@ describe('RemoteControlView', () => {
     expect(w.find('.v-alert').exists()).toBe(true)
     w.unmount()
   })
+
+  it('habilitado e conectando: alerta info com texto connecting (br 48)', async () => {
+    const refs = ((useRemoteControl() as any).__refs) || ({} as any)
+    const w = createWrapper()
+    if (refs.enabled) { refs.enabled.value = true; refs.connected.value = false }
+    await flushPromises()
+    expect(w.find('[data-testid="remote-status"]').exists()).toBe(true)
+    expect(w.text()).toContain('settings.remote.connecting')
+    w.unmount()
+  })
 })
