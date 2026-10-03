@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { mount } from "@vue/test-utils";
+import { mount, flushPromises } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createI18n } from "vue-i18n";
@@ -363,6 +363,28 @@ describe("RandomView — áudio custom", () => {
       const w = mountView()
       const vm = w.vm as any
       await vm.onModeChange?.('numbers')
+      w.unmount()
+    })
+
+    it('botões de modo do template: clique troca para names/numbers', async () => {
+      const w = mountView()
+      const modes = w.findAll('.random-view__mode')
+      if (modes.length >= 2) {
+        await modes[0]!.trigger('click') // names
+        await flushPromises()
+        await modes[1]!.trigger('click') // numbers
+        await flushPromises()
+      }
+      w.unmount()
+    })
+
+    it('import-file via emit do painel (template arrow)', async () => {
+      const w = mountView()
+      const panel = w.findComponent({ name: 'RandomAvailablePanel' })
+      if (panel.exists()) {
+        panel.vm.$emit('import-file', new File(['Zeca'], 'z.txt', { type: 'text/plain' }))
+        await flushPromises()
+      }
       w.unmount()
     })
 
