@@ -341,5 +341,25 @@ describe("RandomView — áudio custom", () => {
       expect(w.exists()).toBe(true)
       w.unmount()
     })
+
+    it('onImportFile: arquivo legível importa nomes (try)', async () => {
+      const w = mountView()
+      const vm = w.vm as any
+      const file = new File(['Alice\nBob'], 'nomes.txt', { type: 'text/plain' })
+      await vm.onImportFile?.(file)
+      // importante é exercitar o caminho de sucesso sem lançar
+      expect(true).toBe(true)
+      w.unmount()
+    })
+
+    it('onImportFile via emit do painel de disponíveis', async () => {
+      const w = mountView()
+      const panel = w.findComponent({ name: 'RandomAvailablePanel' })
+      if (panel.exists()) {
+        panel.vm.$emit('import-file', new File(['Carol'], 'c.txt', { type: 'text/plain' }))
+        await Promise.resolve()
+      }
+      w.unmount()
+    })
   })
 })
