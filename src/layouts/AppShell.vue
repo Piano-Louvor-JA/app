@@ -7,6 +7,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { usePageTransition } from '@design-system/composables'
 import { DockFooter, GradientBackground } from '@design-system/index'
 import type { DockNavItem } from '@design-system/types/navigation'
+import AuthAccountDialog from '@modules/auth/components/AuthAccountDialog.vue'
+import { useAuth, setNotify } from '@modules/auth/composables/useAuth'
 import { useBibleStore } from '@modules/bible/stores/useBibleStore'
 import BibleInAppProjection from '@modules/bible/components/BibleInAppProjection.vue'
 import ClockProjectionView from '@modules/clock/views/ClockProjectionView.vue'
@@ -97,8 +99,14 @@ const LITURGY_PROJECTABLE = new Set([
   'presentation',
 ])
 
-/** Login Google — reativar quando o fluxo de autenticação existir */
-const showAccountButton = false
+/** web#174: conta LouvorJA no header — mesmo padrão do web (AuthAccountDialog). */
+const showAccountButton = true
+const authDialogOpen = ref(false)
+const { isLoggedIn } = useAuth()
+setNotify((message: string, isError?: boolean) => {
+  // snackbar do app — usa o mesmo canal de avisos das janelas de projeção
+  window.dispatchEvent(new CustomEvent('app-notify', { detail: { message, isError } }))
+})
 
 const hasBibleContent = computed(
   () =>
@@ -397,10 +405,17 @@ function viewKey(viewRoute: typeof route) {
           v-if="showAccountButton"
           type="button"
           class="app-shell__account"
-          :aria-label="t('app.name')"
+          :aria-label="t('auth.title')"
+          :title="t('auth.title')"
+          @click="authDialogOpen = true"
         >
-          <i class="ti ti-user-circle" aria-hidden="true" />
+          <i
+            class="ti"
+            :class="isLoggedIn ? 'ti-user-check' : 'ti-user-circle'"
+            aria-hidden="true"
+          />
         </button>
+        <AuthAccountDialog v-model="authDialogOpen" />
       </div>
     </header>
 
