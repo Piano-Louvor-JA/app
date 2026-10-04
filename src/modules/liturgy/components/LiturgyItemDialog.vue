@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { getDesktopBridge, isDesktopApp } from '@shared/services/desktop-bridge'
+import { appConfirm } from '@shared/composables/useAppConfirm'
 import type {
   FileDialogFilter,
   PresentationEngine,
@@ -22,6 +23,10 @@ import {
 } from '../types/liturgy'
 import { probeMediaDurationMs } from '../services/media-probe'
 import { useExternalPlayerChoices } from '../composables/useExternalPlayerChoices'
+import {
+  importSljaAsLiturgyMusic,
+  type SljaImportSource,
+} from '../services/import-slja-to-liturgy'
 import {
   formatMomentDuration,
   isLiturgyItemDraftValid,
@@ -53,6 +58,8 @@ const emit = defineEmits<{
   'update:musicQuery': [query: string]
   'pick-music': [musicId: number]
   'clear-music': []
+  /** app#331: pós-import .slja — o pai recarrega o catálogo de músicas. */
+  'slja-imported': [musicId: number]
 }>()
 
 const { t } = useI18n()
@@ -64,6 +71,65 @@ const hasTypeSelection = computed(() => props.draft.type != null)
 const isCategory = computed(() => props.draft.type === 'category')
 const isMusic = computed(() => props.draft.type === 'music')
 
+// app#331 RF-1: importar .slja direto no item de música
+const sljaInputEl = ref<HTMLInputElement | null>(null)
+const sljaImporting = ref(false)
+const sljaMessage = ref('')
+const sljaError = ref(false)
+
+async function onImportSljaFile(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file || sljaImporting.value) return
+  sljaImporting.value = true
+  sljaMessage.value = ''
+  sljaError.value = false
+  try {
+    const source: SljaImportSource = {
+      bytes: await file.arrayBuffer(),
+      name: file.name,
+    }
+    const imported = await importSljaAsLiturgyMusic(source, {
+      // Regra: banco só recebe com aprovação. Recusou = salva só no app
+      // (local) — sem fricção, sem erro.
+      confirmUpload: () =>
+        appConfirm({
+          title: t('liturgy.slja.uploadTitle', { name: file.name }),
+          message: t('liturgy.slja.uploadMessage'),
+          confirmLabel: t('liturgy.slja.uploadConfirm'),
+          cancelLabel: t('liturgy.slja.uploadCancel'),
+        }),
+    })
+    // web#174 (referência): recarrega o catálogo ANTES da seleção valer —
+    // sem isso o id novo não existe em musicList, selectedMusic fica null
+    // e o submit é bloqueado (música "não toca").
+    emit('slja-imported', imported.displayMusicId)
+    // seleção + título + duração num ÚNICO patch: props.draft aqui ainda é
+    // stale — um segundo patch sobrescreveria o musicId do primeiro (race).
+    patch({
+      musicId: imported.displayMusicId,
+      durationMs:
+        imported.durationMs > 0 ? imported.durationMs : props.draft.durationMs,
+      ...(props.draft.name.trim() ? {} : { name: imported.name }),
+    })
+    sljaMessage.value = imported.local
+      ? t('liturgy.slja.importedLocal', {
+          name: imported.name,
+          slides: imported.slides,
+        })
+      : t('liturgy.slja.imported', {
+          name: imported.name,
+          slides: imported.slides,
+        })
+  } catch {
+    sljaError.value = true
+    sljaMessage.value = t('liturgy.slja.importFailed')
+  } finally {
+    sljaImporting.value = false
+  }
+}
+
 const musicRequiredMissing = computed(
   () => isMusic.value && props.draft.musicId == null,
 )
@@ -74,9 +140,8 @@ const startTimeRequiredMissing = computed(
 const endTimeRequiredMissing = computed(
   () => isCategory.value && !normalizeLiturgyTimeHHmm(props.draft.endTime),
 )
-const categoryRequiredMissing = computed(
-  () => hasTypeSelection.value && !isCategory.value && !props.draft.categoryId,
-)
+// Categoria OPCIONAL (paridade web ff8b481): sem erro de validação.
+const categoryRequiredMissing = computed(() => false)
 
 const durationLabel = computed(() => formatMomentDuration(props.draft.durationMs))
 
@@ -416,20 +481,7 @@ function onCategoryChange(event: Event) {
   patch({ categoryId: value || null })
 }
 
-const {
-  globalPlayer,
-  playerOptions,
-  loadPlayerChoices,
-  selectedPlayerId: resolvePlayerId,
-  storedPlayerId,
-} = useExternalPlayerChoices()
-
-const selectedPlayerId = computed(() => resolvePlayerId(props.draft.playerId))
-
-function onPlayerChange(event: Event) {
-  const value = (event.target as HTMLSelectElement).value
-  patch({ playerId: storedPlayerId(value) })
-}
+const { loadPlayerChoices } = useExternalPlayerChoices()
 
 watch(
   () => [props.open, props.draft.type] as const,
@@ -739,6 +791,43 @@ function isLightDot(hex: string): boolean {
                   />
                 </button>
               </div>
+
+              <!-- app#331 RF-1: importar .slja direto no item de música -->
+              <div class="moment-dialog__music-import">
+                <input
+                  ref="sljaInputEl"
+                  type="file"
+                  accept=".slja,.zip"
+                  class="moment-dialog__slja-input"
+                  data-testid="slja-file-input"
+                  @change="onImportSljaFile"
+                >
+                <button
+                  type="button"
+                  class="moment-dialog__slja-btn"
+                  data-testid="slja-import-btn"
+                  :disabled="sljaImporting"
+                  @click="sljaInputEl?.click()"
+                >
+                  <i
+                    class="ti ti-file-zip"
+                    aria-hidden="true"
+                  />
+                  {{ sljaImporting
+                    ? t('liturgy.slja.importing')
+                    : t('liturgy.slja.importButton') }}
+                </button>
+                <p
+                  v-if="sljaMessage"
+                  class="moment-dialog__slja-message"
+                  :class="{
+                    'moment-dialog__slja-message--error': sljaError,
+                  }"
+                  role="status"
+                >
+                  {{ sljaMessage }}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -911,10 +1000,6 @@ function isLightDot(hex: string): boolean {
                 for="moment-category"
               >
                 {{ t('liturgy.dialog.categoryField') }}
-                <span
-                  class="moment-dialog__required"
-                  aria-hidden="true"
-                >*</span>
               </label>
               <select
                 id="moment-category"
@@ -1035,38 +1120,7 @@ function isLightDot(hex: string): boolean {
               </p>
             </div>
 
-            <!-- Player de reprodução: só para itens de vídeo/áudio com arquivo local -->
-            <div
-              v-if="draft.type === 'video' || draft.type === 'audio'"
-              class="moment-dialog__engine"
-              data-test="liturgy-player-select"
-            >
-              <span class="moment-dialog__label">
-                {{ t('liturgy.fields.playerSelect') }}
-              </span>
-              <select
-                class="moment-dialog__input moment-dialog__select"
-                :value="selectedPlayerId"
-                :aria-label="t('liturgy.fields.playerSelect')"
-                data-test="liturgy-player-options"
-                @change="onPlayerChange"
-              >
-                <option
-                  v-for="player in playerOptions"
-                  :key="player.id"
-                  :value="player.id"
-                >
-                  {{
-                    player.id === globalPlayer
-                      ? t('liturgy.fields.playerDefaultNamed', { name: player.label })
-                      : player.label
-                  }}
-                </option>
-              </select>
-              <p class="moment-dialog__engine-hint">
-                {{ t('liturgy.fields.playerSelectHint') }}
-              </p>
-            </div>
+            <!-- Player: gerido pela linha (LiturgyTimelineItem) / Configurações → Mídia & Player. Select do modal removido (redundante). -->
           </div>
 
           <div
@@ -1885,5 +1939,51 @@ function isLightDot(hex: string): boolean {
 .moment-dialog__engine-hint {
   font-size: 0.75rem;
   opacity: 0.55;
+}
+
+/* app#331 RF-1: importar .slja direto no item */
+.moment-dialog__music-import {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.55rem;
+}
+
+.moment-dialog__slja-input {
+  display: none;
+}
+
+.moment-dialog__slja-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.85rem;
+  border: 1px dashed color-mix(in srgb, var(--ds-color-on-surface) 30%, transparent);
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--ds-color-on-surface-variant, var(--ds-color-on-surface));
+  font-size: 0.82rem;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    border-color: var(--ds-color-primary);
+    color: var(--ds-color-primary);
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: wait;
+  }
+}
+
+.moment-dialog__slja-message {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--ds-color-on-surface-variant, var(--ds-color-on-surface));
+
+  &--error {
+    color: var(--ds-color-error, #ff5252);
+  }
 }
 </style>

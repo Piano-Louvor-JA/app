@@ -1,6 +1,15 @@
 import { fetchRemoteCatalogJson } from '@shared/services/remote-catalog'
 import { readCatalogRecord } from '@shared/services/workspace-api'
 import { getCurrentApiPrefix } from '@modules/sync/services/library-catalog'
+import {
+  listAllCustomMusics,
+  toCustomMusicId,
+} from '@modules/media/services/custom-catalog'
+import {
+  listLocalCollections,
+  listLocalMusics,
+} from '@modules/media/services/local-custom-store'
+import { matchesAllTerms } from "@shared/services/search-terms"
 
 import type {
   LiturgyBibleBookOption,
@@ -282,18 +291,86 @@ function sortMusicOptions(options: LiturgyMusicOption[]): LiturgyMusicOption[] {
   })
 }
 
+/**
+ * app#331: músicas do OPERADOR entram nas opções da liturgia —
+ * - custom da API (Minhas Coletâneas / "Importações .slja" logadas): id com
+ *   offset 1M+ (namespace que resolveMediaTrack já resolve);
+ * - LOCAL (import .slja sem login, localStorage, id negativo): id cru —
+ *   offline-first, são as únicas garantidas sem rede.
+ * Oficiais NUNCA são sobrescritas (merge só em id livre).
+ */
+async function mergeOperatorMusicOptions(
+  byId: Map<number, LiturgyMusicOption>,
+): Promise<void> {
+  let customs: Array<{
+    id: number
+    name: string | null
+    duration: number | null
+    collectionName?: string
+  }> = []
+  try {
+    customs = await listAllCustomMusics()
+  } catch {
+    // offline/sem API: customs simplesmente não aparecem nesta carga
+  }
+  for (const custom of customs) {
+    const id = Number(custom.id)
+    if (!Number.isFinite(id) || id <= 0) continue
+    const offsetId = toCustomMusicId(id)
+    if (byId.has(offsetId)) continue
+    const name = String(custom.name ?? '').trim() || `Custom #${id}`
+    const album = String(custom.collectionName ?? '').trim() || 'Minhas coletâneas'
+    byId.set(offsetId, {
+      id: offsetId,
+      name,
+      hymnalTrack: null,
+      albumNames: album,
+      displayLabel: `${name} — ${album}`,
+      durationMs: typeof custom.duration === 'number' ? custom.duration : null,
+      hasInstrumental: false,
+    })
+  }
+
+  try {
+    const locals = listLocalCollections().flatMap((collection) =>
+      listLocalMusics(collection.id).map((music) => ({
+        music,
+        collectionName: collection.name,
+      })),
+    )
+    for (const { music, collectionName } of locals) {
+      if (byId.has(music.id)) continue
+      const name = String(music.name ?? '').trim() || `Local #${music.id}`
+      byId.set(music.id, {
+        id: music.id,
+        name,
+        hymnalTrack: null,
+        albumNames: collectionName,
+        displayLabel: `${name} — ${collectionName} (local)`,
+        durationMs:
+          typeof music.durationMs === 'number' ? music.durationMs : null,
+        hasInstrumental: false,
+      })
+    }
+  } catch {
+    // localStorage indisponível (raro) — segue sem locais
+  }
+}
+
 export async function loadLiturgyMusicOptions(): Promise<LiturgyMusicOption[]> {
   const fromIndex = await loadFromMusicIndex()
   if (fromIndex && fromIndex.length > 0) {
     const byId = new Map(fromIndex.map((entry) => [entry.id, entry]))
     // Índice pode omitir flags de instrumental; hinário completa o dado.
     await loadHymnalOptions(byId)
+    await mergeOperatorMusicOptions(byId)
     return sortMusicOptions([...byId.values()])
   }
 
   const byId = new Map<number, LiturgyMusicOption>()
   await loadHymnalOptions(byId)
   await loadCollectionOptions(byId)
+  await mergeOperatorMusicOptions(byId)
   return sortMusicOptions([...byId.values()])
 }
 
@@ -329,16 +406,17 @@ export function filterLiturgyMusicOptions(
   const numQuery = isNum ? Number(trimmed) : null
 
   let results = options.filter((entry) => {
-    const title = entry.name.toLowerCase()
-    const album = entry.albumNames.toLowerCase()
+    const title = entry.name
+    const album = entry.albumNames
     if (isNum && numQuery != null) {
       return (
-        title.includes(trimmed) ||
-        album.includes(trimmed) ||
+        matchesAllTerms(title, album, trimmed) ||
         entry.hymnalTrack === numQuery
       )
     }
-    return title.includes(trimmed) || album.includes(trimmed)
+    // Busca por termos (03/10): "jesus adoradores 5" acha a música "Jesus"
+    // do álbum "Adoradores 5" — substring contígua não existe em campo nenhum.
+    return matchesAllTerms(title, album, trimmed)
   })
 
   if (isNum && numQuery != null) {

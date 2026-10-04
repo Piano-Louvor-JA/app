@@ -231,6 +231,7 @@ export default {
       project: 'Project',
       play: 'Play',
       openControl: 'Open control (popup)',
+      playLocalInExternal: 'Play local media in {player}',
       openSiteControl: 'Open site control',
       openVideoControl: 'Open YouTube control',
       openImageControl: 'Open image control',
@@ -261,6 +262,12 @@ export default {
       reorder: 'Drag to reorder',
     },
     messages: {
+      removeItemTitle: 'Remove item from liturgy',
+      removeLiturgyTitle: 'Remove custom liturgy',
+      clearTitle: 'Clear liturgy for this day',
+      removeAction: 'Remove',
+      cancelAction: 'Cancel',
+      confirmDeleteNamed: 'Do you want to remove "{name}" from the liturgy?',
       confirmDelete: 'Do you want to remove this item from the liturgy?',
       confirmDeleteCategory:
         'Do you want to remove this category/divider and all related items?',
@@ -270,7 +277,7 @@ export default {
       liturgySaved: 'Liturgy saved successfully.',
       mediaDesktopOnly: 'Provide the media file path.',
       videoSelectFile: 'Select file',
-      catalogEmpty: 'No songs found in the local catalog.',
+      catalogEmpty: 'No songs in the local catalog. Import a .slja file in Media Center ("Import .slja" button) or add songs from the Community.',
       customRequired:
         'Create or select a custom liturgy before adding items.',
       booksEmpty: 'No Bible books available. Complete initialization.',
@@ -278,8 +285,22 @@ export default {
       urlInvalid: 'The provided link is not valid for projection.',
       projectionFailed:
         'Could not open projection on the configured screens.',
+      fileMissingOnMachine:
+        'File not found on this machine — the path came from another computer (synced liturgy). Select the file again on this device.',
       presentationOfficeMissing:
         'To project PPT/PPTX, install LibreOffice (or set LIBREOFFICE_PATH).',
+    },
+    slja: {
+      importButton: 'Import .slja',
+      importing: 'Importing…',
+      imported: 'Imported: {name} ({slides} verses).',
+      uploadTitle: 'Upload "{name}" to your account?',
+      uploadMessage: 'The file will be uploaded once (never duplicated) and becomes available on any device.',
+      uploadConfirm: 'Upload to account',
+      uploadCancel: 'Keep on this device',
+      importedLocal:
+        'Imported on this device: {name} ({slides} verses) — saved without an account.',
+      importFailed: 'Invalid .slja file.',
     },
     custom: {
       title: 'Custom liturgies',

@@ -4,7 +4,7 @@
  * Bônus: +15 por tarefa, 1x por usuário×tarefa×semana (idempotente no servidor).
  */
 
-import { getAuthSession } from "@modules/media/services/auth-client";
+import { getAuthSession, saveSession } from "@modules/media/services/auth-client";
 
 export type WeeklyTask = {
 	id: string;
@@ -31,6 +31,12 @@ export async function getWeeklyTasks(): Promise<WeeklyTask[] | null> {
 		const response = await fetch(`${communityBaseUrl()}/weekly-tasks`, {
 			headers: { Authorization: `Bearer ${t}` },
 		});
+		if (response.status === 401) {
+			// Token salvo rejeitado pela API (placeholder de fallback ou sessão
+			// expirada) — limpa pra forçar re-login em vez de 401 em silêncio.
+			saveSession(null);
+			return null;
+		}
 		if (!response.ok) return null;
 		const json = (await response.json()) as { data?: unknown };
 		return Array.isArray(json.data) ? (json.data as WeeklyTask[]) : null;
