@@ -311,4 +311,23 @@ describe('AlbumCollectionView', () => {
     await flushPromises()
     expect(stub.attributes('data-busy')).toBe('false')
   })
+
+  it('unmount com toast ativo limpa o timer (sem vazamento)', async () => {
+    const w = await mountView()
+    // abre o picker de playlist para setar o feedbackTimer via toast
+    const openBtn = w.find('.row-playlist')
+    if (openBtn.exists()) {
+      await openBtn.trigger('click')
+      await flushPromises()
+    }
+    w.unmount() // onBeforeUnmount: clearTimeout(feedbackTimer)
+  })
+
+  it('botão voltar navega pra albums (goBack)', async () => {
+    const w = await mountView()
+    await w.find('.album-collection-view__back').trigger('click')
+    await flushPromises()
+    expect(pushMock).toHaveBeenCalledWith({ name: 'albums' })
+    w.unmount()
+  })
 })

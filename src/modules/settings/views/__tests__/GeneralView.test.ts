@@ -18,6 +18,7 @@ vi.mock('@shared/constants/app', () => ({
   APP_USER_DATA_DIR: '/test/path',
   APP_VERSION: '0.0.0-test',
 }))
+
 vi.mock('@design-system/index', () => ({
   GlassCard: {
     name: 'GlassCard',
@@ -312,6 +313,18 @@ describe('GeneralView.vue', () => {
       const btn = wrapper.find('.general-settings__btn--primary')
       expect(btn.exists()).toBe(true)
       expect((btn.element as HTMLButtonElement).disabled).toBe(true)
+    })
+
+    it('checkUpdate: clique com desktop chama checkForUpdates', async () => {
+      vi.mocked(isDesktopApp).mockReturnValue(true)
+      const wrapper = mountComponent()
+      const btn = wrapper.find('.general-settings__btn--primary')
+      expect((btn.element as HTMLButtonElement).disabled).toBe(false)
+      updateCheckerState.checkForUpdates.mockClear()
+      await btn.trigger('click')
+      await flushPromises()
+      expect(updateCheckerState.checkForUpdates).toHaveBeenCalledTimes(1)
+      wrapper.unmount()
     })
 
     it('hasUpdate: mostra mensagem com versão', async () => {
