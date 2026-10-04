@@ -231,6 +231,7 @@ export default {
       project: 'Proyectar',
       play: 'Reproducir',
       openControl: 'Abrir control (popup)',
+      playLocalInExternal: 'Reproducir medio local en {player}',
       openSiteControl: 'Abrir control del sitio',
       openVideoControl: 'Abrir control de YouTube',
       openImageControl: 'Abrir control de imágenes',
@@ -261,6 +262,12 @@ export default {
       reorder: 'Arrastrar para reordenar',
     },
     messages: {
+      removeItemTitle: 'Eliminar elemento de la liturgia',
+      removeLiturgyTitle: 'Eliminar liturgia avulsa',
+      clearTitle: 'Borrar la liturgia de este día',
+      removeAction: 'Eliminar',
+      cancelAction: 'Cancelar',
+      confirmDeleteNamed: '¿Desea eliminar "{name}" de la liturgia?',
       confirmDelete: '¿Desea eliminar este elemento de la liturgia?',
       confirmDeleteCategory:
         '¿Desea eliminar esta categoría/separador y todos los elementos relacionados?',
@@ -270,7 +277,7 @@ export default {
       liturgySaved: 'Liturgia guardada con éxito.',
       mediaDesktopOnly: 'Proporcione la ruta del archivo de medios.',
       videoSelectFile: 'Seleccionar archivo',
-      catalogEmpty: 'No se encontraron canciones en el catálogo local.',
+      catalogEmpty: 'No hay canciones en el catálogo local. Importa un archivo .slja en la Central de Medios (botón "Importar .slja") o añade canciones de la Comunidad.',
       customRequired:
         'Cree o seleccione una liturgia personalizada antes de añadir elementos.',
       booksEmpty: 'No hay libros bíblicos disponibles. Complete la inicialización.',
@@ -278,8 +285,22 @@ export default {
       urlInvalid: 'El enlace proporcionado no es válido para proyección.',
       projectionFailed:
         'No se pudo abrir la proyección en las pantallas configuradas.',
+      fileMissingOnMachine:
+        'Archivo no encontrado en esta máquina: la ruta provino de otra computadora (liturgia sincronizada). Vuelva a seleccionar el archivo en este dispositivo.',
       presentationOfficeMissing:
         'Para proyectar PPT/PPTX, instale LibreOffice (o defina LIBREOFFICE_PATH).',
+    },
+    slja: {
+      importButton: 'Importar .slja',
+      importing: 'Importando…',
+      imported: 'Importado: {name} ({slides} estrofas).',
+      uploadTitle: '¿Subir "{name}" a tu cuenta?',
+      uploadMessage: 'El archivo se subirá una única vez (sin duplicar) y quedará disponible en cualquier dispositivo.',
+      uploadConfirm: 'Subir a la cuenta',
+      uploadCancel: 'Quedar solo en este dispositivo',
+      importedLocal:
+        'Importado en este dispositivo: {name} ({slides} estrofas) — guardado sin cuenta.',
+      importFailed: 'Archivo .slja inválido.',
     },
     custom: {
       title: 'Liturgias personalizadas',

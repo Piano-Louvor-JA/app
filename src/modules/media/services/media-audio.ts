@@ -8,6 +8,15 @@ function toRelativeMediaPath(urlPath: string): string {
   return urlPath.replace(/^\/(musics|images|covers)\//, '')
 }
 
+/**
+ * app#331: URLs autocontidas (data: do áudio local base64, blob: de mídia
+ * local) são usadas NA ÍNTEGRA — prefixar base da API produz src inválido
+ * (`https://api.../file/data:audio/...`) com NotSupportedError silencioso.
+ */
+function isSelfContainedUrl(urlPath: string): boolean {
+  return /^(data|blob):/i.test(urlPath)
+}
+
 export function resolveRemoteFileUrl(urlPath: string): string {
   // API oficial (14/09/2026): URLs absolutas (host Mayco ou R2) usadas na íntegra.
   if (/^https?:\/\//i.test(urlPath)) return urlPath
@@ -22,6 +31,11 @@ export async function resolveMusicAudioUrl(
 ): Promise<MediaUrlResolveResult> {
   if (!catalogPath?.trim()) {
     return { ok: false, reason: 'missing' }
+  }
+
+  // app#331: data:/blob: passam ANTES de qualquer branch (web e desktop).
+  if (isSelfContainedUrl(catalogPath)) {
+    return { ok: true, url: catalogPath, source: 'local' }
   }
 
   if (isDesktopApp()) {
@@ -43,6 +57,10 @@ export async function resolveSlideImageUrl(
   catalogPath: string | null,
 ): Promise<string | null> {
   if (!catalogPath?.trim()) return null
+
+  // app#331: data:/blob: (capa do .slja local) passam ANTES de qualquer
+  // branch — prefixar base remota quebra o protocolo (bg não carrega).
+  if (isSelfContainedUrl(catalogPath)) return catalogPath
 
   if (isDesktopApp()) {
     const bridge = getDesktopBridge()

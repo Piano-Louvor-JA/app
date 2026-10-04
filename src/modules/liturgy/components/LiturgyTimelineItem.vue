@@ -615,8 +615,16 @@ const rowHovered = ref(false)
             type="button"
             class="liturgy-item__action"
             :class="{ 'liturgy-item__action--primary': selected }"
-            :title="t('liturgy.actions.openControl')"
-            :aria-label="t('liturgy.actions.openControl')"
+            :title="
+              isAudioItem
+                ? t('liturgy.actions.playLocalInExternal', { player: rowPlayerLabel })
+                : t('liturgy.actions.openControl')
+            "
+            :aria-label="
+              isAudioItem
+                ? t('liturgy.actions.playLocalInExternal', { player: rowPlayerLabel })
+                : t('liturgy.actions.openControl')
+            "
             :disabled="item.done"
             @click.stop="emit('select')"
           >
@@ -630,37 +638,49 @@ const rowHovered = ref(false)
             type="button"
             class="liturgy-item__action liturgy-item__action--site-control"
             :title="
-              isLocalPresentation
-                ? t('liturgy.actions.openPresentationControl')
-                : isLocalPdf
-                  ? t('liturgy.actions.openPdfControl')
-                  : isLocalImages
-                    ? t('liturgy.actions.openImageControl')
-                    : isVideoRemote
-                      ? t('liturgy.actions.openVideoControl')
-                      : t('liturgy.actions.openSiteControl')
+              isLocalVideo
+                ? t('liturgy.actions.playLocalInExternal', { player: rowPlayerLabel })
+                : isLocalPresentation
+                  ? t('liturgy.actions.openPresentationControl')
+                  : isLocalPdf
+                    ? t('liturgy.actions.openPdfControl')
+                    : isLocalImages
+                      ? t('liturgy.actions.openImageControl')
+                      : isVideoRemote
+                        ? t('liturgy.actions.openVideoControl')
+                        : t('liturgy.actions.openSiteControl')
             "
             :aria-label="
-              isLocalPresentation
-                ? t('liturgy.actions.openPresentationControl')
-                : isLocalPdf
-                  ? t('liturgy.actions.openPdfControl')
-                  : isLocalImages
-                    ? t('liturgy.actions.openImageControl')
-                    : isVideoRemote
-                      ? t('liturgy.actions.openVideoControl')
-                      : t('liturgy.actions.openSiteControl')
+              isLocalVideo
+                ? t('liturgy.actions.playLocalInExternal', { player: rowPlayerLabel })
+                : isLocalPresentation
+                  ? t('liturgy.actions.openPresentationControl')
+                  : isLocalPdf
+                    ? t('liturgy.actions.openPdfControl')
+                    : isLocalImages
+                      ? t('liturgy.actions.openImageControl')
+                      : isVideoRemote
+                        ? t('liturgy.actions.openVideoControl')
+                        : t('liturgy.actions.openSiteControl')
             "
             :disabled="item.done"
             @click.stop="emit('select')"
           >
             <i
-              class="ti ti-layout-dashboard"
+              class="ti"
+              :class="isLocalVideo ? 'ti-player-play' : 'ti-layout-dashboard'"
               aria-hidden="true"
             />
           </button>
           <button
-            v-if="!isCategory && (isSiteItem || isVideoRemote)"
+            v-if="
+              !isCategory &&
+                (isSiteItem ||
+                  // Player externo (VLC etc) não alimenta a projeção — o
+                  // botão de projetar só existe no player do sistema
+                  // (Rafael 03/10: esconde para não confundir).
+                  (isVideoRemote && rowPlayerId === 'associated'))
+            "
             type="button"
             class="liturgy-item__action liturgy-item__action--site-project"
             :class="{
