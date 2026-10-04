@@ -191,14 +191,14 @@ for (const [path, cov] of Object.entries(merged)) {
     }
     const tmplStart = templateStartLine(path);
     if (tmplStart == null) continue;
+    // template executado? algum statement do arquivo no bloco template tem hits
+    const templateAlive = Object.entries(cov.statementMap).some(([oid, oloc]) =>
+      cov.s[oid] > 0 && oloc.start.line >= tmplStart);
     for (const [id, loc] of Object.entries(cov.statementMap)) {
       if (cov.s[id] > 0) continue;
       const key = spanKey(loc.start, loc.end);
       if (overlayPositions.has(key)) continue; // gap real medido também na UI
       if (loc.start.line < tmplStart) continue; // fora do template
-      // template executado? algum statement do arquivo no bloco template tem hits
-      const templateAlive = Object.entries(cov.statementMap).some(([oid, oloc]) =>
-        cov.s[oid] > 0 && oloc.start.line >= tmplStart);
       if (templateAlive) cov.s[id] = 1;
     }
     // Branches órfãos do template: overlay NÃO conhece a posição do branch
