@@ -25,6 +25,8 @@ type CatalogMusicIndexRow = {
   url_instrumental_music?: string | null
   albums?: CatalogMusicAlbum[]
   albums_names?: string
+  /** Letra em texto corrido — VEM NO ÍNDICE pt_musics (1944/1956, 03/10). */
+  lyric?: string | null
 }
 
 async function readOrFetchCatalog<T>(filename: string): Promise<T | null> {
@@ -125,6 +127,14 @@ function mapMusicIndexRow(row: CatalogMusicIndexRow): AlbumSearchHit | null {
   const { track, isHymnal } = preferredHymnalTrack(row, hymnalTracks)
   const albumNames = joinAlbumNames(row) || 'Música'
 
+  // Busca por letra (issue #360, Opção A): a letra JÁ VEM no índice
+  // `${prefix}_musics` (1944/1956 músicas, +~80% do peso do arquivo que
+  // baixa como essencial) — basta propagar. Zero download novo.
+  const lyricsText = String(row.lyric ?? '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase()
+
   return {
     musicId,
     name,
@@ -135,6 +145,7 @@ function mapMusicIndexRow(row: CatalogMusicIndexRow): AlbumSearchHit | null {
     displayTitle: name,
     isHymnal,
     hymnalTracks: [...new Set(hymnalTracks)],
+    lyricsText: lyricsText || undefined,
   }
 }
 
@@ -143,6 +154,7 @@ function mergeHits(a: AlbumSearchHit, b: AlbumSearchHit): AlbumSearchHit {
   const track = a.track ?? b.track ?? hymnalTracks[0] ?? null
   return {
     ...a,
+    lyricsText: a.lyricsText ?? b.lyricsText,
     track,
     isHymnal: a.isHymnal || b.isHymnal || track != null,
     albumNames: a.albumNames.includes(b.albumNames)
