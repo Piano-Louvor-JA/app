@@ -10,6 +10,8 @@ export default {
     clockDescription: 'Display the time on the projection screen',
     random: 'Draw',
     randomDescription: 'Animated draw of names and numbers',
+    obs: 'Stream via OBS',
+    obsDescription: 'Project via OBS Browser Source — coming soon',
     draw: 'Drawing',
     drawDescription: 'Annotate and highlight over the projection',
     timer: 'Stopwatch',

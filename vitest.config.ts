@@ -22,7 +22,15 @@ export default defineConfig({
     },
   },
   test: {
-    exclude: ['node_modules/**', 'dist/**', 'e2e/**'],
+    exclude: ['node_modules/**', 'dist/**', 'e2e/**', '.worktrees/**', '.stryker-tmp/**'],
+    setupFiles: ['./vitest.setup.ts'],
+    environmentOptions: {
+      jsdom: {
+        // Sem url o jsdom 25 desabilita localStorage/window.sessionStorage
+        // (usados por browser-storage, i18n e toda persistência offline-first).
+        url: 'http://localhost:5173',
+      },
+    },
     coverage: {
           provider: 'v8',
           reporter: ['text', 'text-summary', 'lcov'],
