@@ -111,6 +111,14 @@ describe('MonitorTargetSelect', () => {
     w.unmount()
   })
 
+  it('showLabel=true renderiza chip "Telas" no trigger (br 168)', async () => {
+    const w = await mountSelect({ showLabel: true })
+    const html = w.html()
+    expect(html).toContain('monitors.selectScreens')
+    expect(html).toContain('monitor-target-select__chip')
+    w.unmount()
+  })
+
   it('tags do painel: primary mostra tag; isReturn mostra tag de retorno (brs 272/278)', async () => {
     loadProjectionSettings.mockReturnValue({
       ...SETTINGS,
