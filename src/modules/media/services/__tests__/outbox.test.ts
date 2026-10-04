@@ -273,6 +273,47 @@ describe("flushOutbox", () => {
     };
     expect(body.collections[0].deleted_at).toBe(500);
   });
+  it("gaps: lyric orfa/pai presente, music sem collection_uuid, flush 500", async () => {
+    await enqueue({
+      entity: "music",
+      client_uuid: "mX",
+      action: "upsert",
+      payload: { collection_uuid: "cX", name: "M", updated_at: 1 },
+      updated_at: 1,
+      owner_email: "a@t.l",
+    })
+    await enqueue({
+      entity: "lyric",
+      client_uuid: "l1",
+      action: "upsert",
+      payload: { music_uuid: "ghost", text: "x", updated_at: 2 },
+      updated_at: 2,
+      owner_email: "a@t.l",
+    })
+    await enqueue({
+      entity: "music",
+      client_uuid: "mY",
+      action: "upsert",
+      payload: { name: "Sem Col", updated_at: 3 },
+      updated_at: 3,
+      owner_email: "a@t.l",
+    })
+    // lyric SEM music_uuid (?? falsos-arms) + flush 500 (res.ok false)
+    await enqueue({
+      entity: "lyric",
+      client_uuid: "l2",
+      action: "upsert",
+      payload: { text: "sem pai", updated_at: 4 },
+      updated_at: 4,
+      owner_email: "a@t.l",
+    })
+    const fetchMock = vi.fn(async () => new Response("err", { status: 500 }))
+    vi.stubGlobal("fetch", fetchMock)
+    const r = await flushOutbox("https://api.test/v1/custom", baseHeaders)
+    expect(r.ok).toBe(false)
+    expect(await countPending()).toBe(4)
+  })
+
 });
 
 describe("clearOutbox", () => {
