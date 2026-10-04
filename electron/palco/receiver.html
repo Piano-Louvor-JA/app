@@ -195,7 +195,10 @@ function proxyUrl(original){
   // de volta e falhava → receiver caía no bg-12 (caso real 26/08).
   if(original.startsWith('http://'+host+':'))return original;
   if(original.startsWith('http://')||original.startsWith('https://')){
-    return `http://${host}:7080/proxy?url=${encodeURIComponent(original)}`;
+    // Token no /proxy também: <img> não manda header; sem token a TV
+    // (LAN) tomava 403 no bg/cover (localhost bypass escondia o bug).
+    const tok=qs.get('token');
+    return `http://${host}:7080/proxy?url=${encodeURIComponent(original)}${tok?`&token=${encodeURIComponent(tok)}`:''}`;
   }
   return original;
 }
