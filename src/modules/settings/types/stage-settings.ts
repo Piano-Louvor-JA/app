@@ -82,7 +82,8 @@ export type StageSettings = {
   lyricFontWeight: StageFontWeight | null
   lyricTextColor: string | null
   lyricUpperCase: boolean
-  lyricTextShadow: boolean | null  showBibleVersion: boolean
+  lyricTextShadow: boolean | null
+  showBibleVersion: boolean
   bibleFontSize: number // px @1920 (50–140)
   bibleFontWeight: 400 | 500 | 700
   bibleTextColor: string
