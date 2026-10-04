@@ -239,3 +239,47 @@ describe("RandomProjectionView — embedded", () => {
 	});
 
 });
+
+describe("RandomProjectionView — palco visual", () => {
+	it("stage com bgImg: usa backgroundImage e cor do palco", () => {
+		localStorage.setItem(
+			"user_data",
+			JSON.stringify({
+				"stage.settings.global": {
+					bgImg: "data:image/png;base64,iVBORw0KGgo=",
+					tsOn: false,
+					random: { bgColor: "#101010", textColor: "#ffffff" },
+				},
+			}),
+		);
+		const w = mountView();
+		const el = w.find(".random-projection");
+		expect(el.exists()).toBe(true);
+		const style = el.attributes("style") ?? "";
+		expect(style).toContain("background-image");
+		w.unmount();
+		localStorage.clear();
+	});
+
+	it("stage sem random mod: effectiveConfig cai no liveConfig", async () => {
+		localStorage.setItem(
+			RANDOM_RUNTIME_STORAGE_KEY,
+			JSON.stringify({
+				mode: "names",
+				isDrawing: false,
+				currentDisplay: "Ana",
+				drawn: [],
+				projecting: true,
+			}),
+		);
+		localStorage.setItem(
+			"user_data",
+			JSON.stringify({ "stage.settings.global": {} }),
+		);
+		const w = mountView();
+		await w.vm.$nextTick();
+		expect(w.find(".random-projection__stage").exists()).toBe(true);
+		w.unmount();
+		localStorage.clear();
+	});
+});

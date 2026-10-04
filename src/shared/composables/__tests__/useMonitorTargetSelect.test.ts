@@ -262,6 +262,27 @@ describe('useMonitorTargetSelect', () => {
     unmount()
   })
 
+  it('race: mudança durante syncToMain aborta etapas seguintes (seq !== syncSeq)', async () => {
+    const mod = await loadFresh()
+    const { result, unmount } = host(() => mod.useMonitorTargetSelect())
+    await result.refresh()
+    bridge.projection.setSiteTargetMonitors.mockImplementationOnce(async (ids: number[]) => {
+      // durante o await do 1º passo, usuário muda a seleção → syncSeq muda
+      const { nextTick } = await import('vue')
+      await result.setSelectedIds([4])
+      await nextTick()
+      await Promise.resolve()
+      return ids
+    })
+    result.setSelectedIds([3])
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(bridge.projection.setVideoTargetMonitors).not.toHaveBeenCalledWith([3])
+    expect(reapplyProjectionTargets).not.toHaveBeenCalledWith([3])
+    unmount()
+  })
+
   it('onMounted assina IPC e displays-changed; unmount desassina', async () => {
     const unsubTargets = vi.fn()
     const unsubDisplays = vi.fn()
