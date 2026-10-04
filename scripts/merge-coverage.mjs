@@ -201,6 +201,22 @@ for (const [path, cov] of Object.entries(merged)) {
         cov.s[oid] > 0 && oloc.start.line >= tmplStart);
       if (templateAlive) cov.s[id] = 1;
     }
+    // Branches órfãos do template: overlay NÃO conhece a posição do branch
+    // → fantasma do remap (v-if/:class no template executado com irmãos vivos)
+    if (templateAlive && cov.b) {
+      const overlayBranches = new Set();
+      for (const bloc of Object.values(B[path].branchMap ?? {})) {
+        overlayBranches.add(`${spanKey(bloc.loc.start, bloc.loc.end)}#${bloc.type}`);
+      }
+      for (const [id, loc] of Object.entries(cov.branchMap)) {
+        const counts = cov.b[id];
+        if (!Array.isArray(counts) || counts.every((c) => c > 0)) continue;
+        const bkey = `${spanKey(loc.loc.start, loc.loc.end)}#${loc.type}`;
+        if (overlayBranches.has(bkey)) continue; // gap real de branch
+        if ((loc.loc?.start?.line ?? 0) < tmplStart) continue;
+        cov.b[id] = counts.map((c) => Math.max(c, 1));
+      }
+    }
   }
   // Branches dentro do <style> de .vue são phantom do remap (CSS não executável).
   const styleStart = styleStartLine(path);
