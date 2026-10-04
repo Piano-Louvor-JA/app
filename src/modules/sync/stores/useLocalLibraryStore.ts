@@ -23,6 +23,7 @@ import {
   resolveAlbumIdsForMusic,
   unmarkAlbumAsDownloaded,
 } from '../services/library-download'
+import { enqueueDownload } from '../services/download-queue-service'
 
 function findAlbum(
   categories: LibraryCategory[],
@@ -187,27 +188,42 @@ export const useLocalLibraryStore = defineStore('localLibrary', () => {
 
     const isCurrent = () => albumDownloadGen.get(albumKey) === gen
 
-    try {
-      const result = await downloadAlbumMedia(album, {
-        onPrepareProgress: (percent) => {
-          if (!isCurrent() || album.cancelRequested) return
-          album.progress = percent
-          album.progressText = 'sync.progress.preparing'
+    // app#338: o download passa pela fila unificada (feedback visual no
+    // widget do header). Priority 'user' — pedido na hora pelo usuário.
+    const result = await new Promise<Awaited<ReturnType<typeof downloadAlbumMedia>>>((resolve, reject) => {
+      enqueueDownload({
+        id: `album:${album.id}`,
+        label: album.name,
+        priority: 'user',
+        task: async () => {
+          try {
+            const res = await downloadAlbumMedia(album, {
+              onPrepareProgress: (percent) => {
+                if (!isCurrent() || album.cancelRequested) return
+                album.progress = percent
+                album.progressText = 'sync.progress.preparing'
+              },
+              onDownloadProgress: (downloaded, total, percent) => {
+                if (!isCurrent() || album.cancelRequested) return
+                album.downloadedCount = downloaded
+                album.totalCount = total
+                album.progress = percent
+                album.progressText = 'sync.progress.downloading'
+              },
+              shouldAbort: () =>
+                !isCurrent() ||
+                album.cancelRequested ||
+                (isDownloadingBatch.value && cancelBatchRequested.value),
+            })
+            resolve(res)
+          } catch (error) {
+            reject(error instanceof Error ? error : new Error(String(error)))
+          }
         },
-        onDownloadProgress: (downloaded, total, percent) => {
-          if (!isCurrent() || album.cancelRequested) return
-          album.downloadedCount = downloaded
-          album.totalCount = total
-          album.progress = percent
-          album.progressText = 'sync.progress.downloading'
-        },
-        shouldAbort: () =>
-          !isCurrent() ||
-          album.cancelRequested ||
-          (isDownloadingBatch.value && cancelBatchRequested.value),
       })
+    })
 
-      if (!isCurrent() || album.cancelRequested) {
+    if (!isCurrent() || album.cancelRequested) {
         if (isCurrent()) {
           applyIdleStatus(album)
           album.progressText = 'sync.progress.cancelled'
@@ -215,54 +231,41 @@ export const useLocalLibraryStore = defineStore('localLibrary', () => {
         return 'idle' as const
       }
 
-      if (result.status === 'downloaded') {
-        album.status = 'downloaded'
-        album.progress = 100
-        album.progressText = ''
-        return result.status
-      }
-
-      if (result.status === 'idle') {
-        album.status = 'idle'
-        album.progress = 0
-        album.progressText =
-          result.failureReason === 'cancelled' ? 'sync.progress.cancelled' : ''
-        return result.status
-      }
-
-      album.status = 'error'
-      album.progressText =
-        result.failureReason === 'offline'
-          ? 'sync.progress.offline'
-          : 'sync.progress.serverError'
-
-      if (!isDownloadingBatch.value) {
-        if (result.failureReason === 'offline') {
-          setDownloadFailure({ reason: 'offline', failedCount: result.totalErrors })
-        } else if (result.failureReason === 'server') {
-          setDownloadFailure({
-            reason: 'server',
-            failedCount: Math.max(1, result.totalErrors),
-          })
-        } else {
-          setDownloadFailure({ reason: 'unknown', failedCount: result.totalErrors })
-        }
-      }
-
+    if (result.status === 'downloaded') {
+      album.status = 'downloaded'
+      album.progress = 100
+      album.progressText = ''
       return result.status
-    } catch (error) {
-      console.error('[sync] erro ao baixar coletânea', error)
-      if (!isCurrent() || album.cancelRequested) {
-        if (isCurrent()) applyIdleStatus(album)
-        return 'idle' as const
-      }
-      album.status = 'error'
-      album.progressText = 'sync.progress.error'
-      if (!isDownloadingBatch.value) {
-        setDownloadFailure({ reason: 'unknown', failedCount: 0 })
-      }
-      return 'error' as const
     }
+
+    if (result.status === 'idle') {
+      album.status = 'idle'
+      album.progress = 0
+      album.progressText =
+        result.failureReason === 'cancelled' ? 'sync.progress.cancelled' : ''
+      return result.status
+    }
+
+    album.status = 'error'
+    album.progressText =
+      result.failureReason === 'offline'
+        ? 'sync.progress.offline'
+        : 'sync.progress.serverError'
+
+    if (!isDownloadingBatch.value) {
+      if (result.failureReason === 'offline') {
+        setDownloadFailure({ reason: 'offline', failedCount: result.totalErrors })
+      } else if (result.failureReason === 'server') {
+        setDownloadFailure({
+          reason: 'server',
+          failedCount: Math.max(1, result.totalErrors),
+        })
+      } else {
+        setDownloadFailure({ reason: 'unknown', failedCount: result.totalErrors })
+      }
+    }
+
+    return result.status
   }
 
   async function downloadAllIdleAlbums() {
