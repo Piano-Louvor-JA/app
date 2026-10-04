@@ -749,3 +749,24 @@ describe("MediaReturnProjectionView — transições", () => {
 		});
 	});
 })
+
+describe("MediaReturnProjectionView — stage visual", () => {
+	it("backgroundImage e textShadow do palco: renderiza bg e sombra", async () => {
+		localStorage.setItem(
+			"user_data",
+			JSON.stringify({
+				"stage.settings.hymns": {
+					hymns: { overrideBg: true },
+					bgImg: "data:image/png;base64,iVBORw0KGgo=",
+					tsOn: true,
+					tsBlur: 4,
+					tsInt: 0.9,
+				},
+			}),
+		);
+		const w = await mountView();
+		expect(w.find(".media-return__bg").exists()).toBe(true);
+		expect(w.find(".media-return__lyric").exists()).toBe(true);
+		w.unmount();
+	});
+});
