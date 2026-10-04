@@ -194,6 +194,10 @@ export async function loadAlbumMusicIndex(): Promise<AlbumSearchHit[]> {
       const lyricsText = local.lyrics
         .map((l) => l.lyric ?? '')
         .join(' ')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
         .toLowerCase()
       const hit: AlbumSearchHit = {
         musicId: local.id,
