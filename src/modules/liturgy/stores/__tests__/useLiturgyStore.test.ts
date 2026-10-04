@@ -221,7 +221,8 @@ describe('useLiturgyStore', () => {
     it('cloneSources: lista weekdays com itens e customs', async () => {
       const store = useLiturgyStore()
       await store.hydrate()
-      const day = LITURGY_DAY_TAB_ORDER[0]
+      // dia DIFERENTE do selecionado (default = hoje) p/ não ser filtrado
+      const day = LITURGY_DAY_TAB_ORDER.find((d) => d !== store.selectedDay)!
       store.weekdays[day] = [
         { id: 'i1', type: 'music', name: 'Hino', durationMs: 1, categoryId: null, filePath: '', filePaths: [], musicId: 1, url: '', accentColor: '#000', startTime: null, endTime: null, done: false },
       ] as never
@@ -233,7 +234,7 @@ describe('useLiturgyStore', () => {
     it('openCloneDialog + confirmClone copia itens', async () => {
       const store = useLiturgyStore()
       await store.hydrate()
-      const day = LITURGY_DAY_TAB_ORDER[0]
+      const day = LITURGY_DAY_TAB_ORDER.find((d) => d !== store.selectedDay)!
       store.weekdays[day] = [
         { id: 'i1', type: 'music', name: 'Hino', durationMs: 1, categoryId: null, filePath: '', filePaths: [], musicId: 1, url: '', accentColor: '#000', startTime: null, endTime: null, done: false },
       ] as never
