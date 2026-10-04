@@ -265,11 +265,17 @@ describe('MonitorTargetSelect', () => {
       await Promise.resolve()
       await Promise.resolve()
       await nextTick()
-      // dentro do root (trigger)
-      await w.find('.monitor-target-select__trigger').trigger('pointerdown')
+      // dentro do root (dispatch real com bubbles até document)
+      w.find('.monitor-target-select__trigger').element.dispatchEvent(
+        new MouseEvent('pointerdown', { bubbles: true }) as unknown as PointerEvent,
+      )
+      await nextTick()
       expect(w.find('.monitor-target-select__panel').exists()).toBe(true)
       // dentro do painel
-      await w.find('.monitor-target-select__panel').trigger('pointerdown')
+      w.find('.monitor-target-select__panel').element.dispatchEvent(
+        new MouseEvent('pointerdown', { bubbles: true }) as unknown as PointerEvent,
+      )
+      await nextTick()
       expect(w.find('.monitor-target-select__panel').exists()).toBe(true)
       w.unmount()
     })
