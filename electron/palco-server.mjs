@@ -249,7 +249,10 @@ class PalcoSlot {
     }
 
     // Assets do receiver
-    const assetMatch = p.match(/^\/([a-z0-9._-]+)$/i)
+    // Assets do receiver — nomes reservados de rotas (/proxy, /status…)
+    // fora: /proxy casava aqui e 404ava ANTES do handler real (L301),
+    // quebrando todo bg/cover externo (músicas da API) → fallback.
+    const assetMatch = /^(?!\/(proxy|status|bg|media)(\/|$))\/([a-z0-9._-]+)$/i.exec(p)
     if (assetMatch) {
       try {
         const file = path.join(__dirname, 'palco', assetMatch[1])
