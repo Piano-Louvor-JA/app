@@ -213,6 +213,11 @@ class PalcoSession {
       footerRef,
       footerColor: s.footerRefColor,
       footerWeight: s.footerRefWeight,
+      // Personalização completa da projeção local refletida no palco:
+      textAlign: s.textAlign,
+      textVerticalAlign: s.textVerticalAlign,
+      backgroundColor: s.backgroundColor,
+      margin: s.margin,
       // Versão já vem embutida em footerRef (formato desktop); não duplicar.
       footerVersion:
         isBible && !s.showBibleVersion ? undefined : input.footerVersion,
