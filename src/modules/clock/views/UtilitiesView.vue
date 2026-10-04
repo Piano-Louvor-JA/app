@@ -37,7 +37,7 @@ const items: UtilityHubItem[] = [
     key: 'obs',
     titleKey: 'utilities.obs',
     descriptionKey: 'utilities.obsDescription',
-    icon: 'ti-brand-windows',
+    icon: 'ti-broadcast',
     to: null,
     available: false,
   },
