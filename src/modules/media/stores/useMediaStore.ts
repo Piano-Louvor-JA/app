@@ -33,6 +33,7 @@ import {
   playMediaAudio,
   resolveMusicAudioUrl,
   resolveSlideImageUrl,
+  resolveRemoteFileUrl,
   stopAllMediaAudio,
   switchMediaAudioElement,
 } from '../services/media-audio'
@@ -234,7 +235,13 @@ export const useMediaStore = defineStore('media', () => {
       title: session.value.title,
       subtitle: session.value.subtitle,
       lyric: stripHtmlBreaks(slide.lyric),
-      imageUrl: resolvedSlideImageUrl.value ?? slide.imageUrl,
+      // Sem cru: enquanto o resolved async não chega, URL absoluta síncrona
+      // (mesma origem do resolved p/ não-baixado). Path cru chegava ao palco,
+      // virava bg undefined e o receiver caía no fallback a cada troca de
+      // slide (oscilação fallback↔imagem reportada 04/10).
+      imageUrl:
+        resolvedSlideImageUrl.value ??
+        (slide.imageUrl ? resolveRemoteFileUrl(slide.imageUrl) : null),
       imagePosition: slide.imagePosition,
       isCover: slide.isCover,
       slideIndex: slideIndex.value,
