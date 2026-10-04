@@ -627,6 +627,15 @@ function handle(m){
           t.style.setProperty('--box-border',
             m.boxBorder?`${m.boxBorder.width||0.4}vh solid ${m.boxBorder.color||'rgba(255,255,255,.25)'}`:'none')}
         else{t.classList.add('box-off')}
+          // Personalização local refletida: alinhamento H/V e cor de fundo
+          {const va=m.textVerticalAlign||'middle',ha=m.textAlign||'center';
+            t.style.top=va==='top'?'6vh':va==='bottom'?'':'50%';
+            t.style.bottom=va==='bottom'?'10vh':'';
+            t.style.transform=va==='middle'?'translate(-50%,-50%)':'translate(-50%,0)';
+            t.style.textAlign=ha;
+            const vei=$('veil');
+            if(typeof m.backgroundColor==='string'&&m.backgroundColor){vei.style.background=m.backgroundColor;vei.style.opacity='1'}
+            else{vei.style.background='rgba(0,0,0,.45)';vei.style.opacity=''}}
       }
       // F3.3m: footer com referência destacada + versão
       {const f=$('footer');
