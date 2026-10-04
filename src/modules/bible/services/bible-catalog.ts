@@ -1,5 +1,6 @@
 import { fetchRemoteCatalogJson } from '@shared/services/remote-catalog'
 import { readCatalogRecord } from '@shared/services/workspace-api'
+import { getCurrentApiPrefix } from '@modules/sync/services/library-catalog'
 
 import type {
   BibleBook,
@@ -11,8 +12,30 @@ import type {
   CatalogBibleVersionRow,
 } from '../types/bible'
 
-const BOOKS_FILE = 'pt_bible_book'
-const VERSIONS_FILE = 'pt_bible_version'
+const BOOKS_FILE_BY_PREFIX: Record<string, string> = {
+  pt: 'pt_bible_book',
+  en: 'pt_bible_book',
+  es: 'es_bible_book',
+}
+const VERSIONS_FILE_BY_PREFIX: Record<string, string> = {
+  pt: 'pt_bible_version',
+  en: 'pt_bible_version',
+  es: 'es_bible_version',
+}
+
+/**
+ * Idioma ativo para a Bíblia (issue: ao trocar idioma, hinário mudava mas a
+ * Bíblia ficava em pt). Reusa a mesma detecção do hinário (getCurrentApiPrefix:
+ * user_data.language → fallback pt). `en` não tem catálogo próprio na API —
+ * usa o pt (mesmo comportamento do hinário).
+ */
+function bibleApiPrefix(): string {
+  return getCurrentApiPrefix()
+}
+
+const BOOKS_FILE = BOOKS_FILE_BY_PREFIX[bibleApiPrefix()] ?? 'pt_bible_book'
+const VERSIONS_FILE =
+  VERSIONS_FILE_BY_PREFIX[bibleApiPrefix()] ?? 'pt_bible_version'
 
 /** Abreviações conhecidas quando o catálogo/API vem com abbreviation vazia/null. */
 const VERSION_ABBREVIATION_BY_NAME: Array<{ match: RegExp; abbr: string }> = [
