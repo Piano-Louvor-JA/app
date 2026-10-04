@@ -1,5 +1,16 @@
 // @vitest-environment jsdom
 import { mount } from "@vue/test-utils";
+
+// stage-settings mockado: cobre true/false-arm de effectiveConfig (random presente/ausente)
+const stageSettingsState = vi.hoisted(() => ({ value: null as Record<string, unknown> | null }));
+vi.mock("../../../settings/services/stage-settings-runtime", async (importOriginal) => {
+	const real = await importOriginal<typeof import("../../../settings/services/stage-settings-runtime")>();
+	return {
+		readEffectiveStageSettings: (scope: string) =>
+			stageSettingsState.value ?? real.readEffectiveStageSettings(scope),
+		subscribeStageSettings: (cb: () => void) => real.subscribeStageSettings(cb),
+	};
+});
 import { createPinia, setActivePinia } from "pinia";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises } from "@vue/test-utils";
@@ -281,5 +292,60 @@ describe("RandomProjectionView — palco visual", () => {
 		expect(w.find(".random-projection__stage").exists()).toBe(true);
 		w.unmount();
 		localStorage.clear();
+	});
+});
+
+
+// BroadcastChannel fake p/ cobrir listeners de config/runtime no mount
+class FakeBC extends EventTarget {
+	static instances: FakeBC[] = [];
+	constructor(public name: string) {
+		super();
+		FakeBC.instances.push(this);
+	}
+	postMessage() {}
+	close() {}
+}
+
+describe("gaps v8", () => {
+	it("embedded: onDraw chama store; canDraw true-arm; message canais", async () => {
+		const pinia = createPinia();
+		setActivePinia(pinia);
+		FakeBC.instances = [];
+		// stage COM módulo random → true-arm; sem (default) → false-arm já coberto
+		stageSettingsState.value = { random: { fontSizePc: 9, textTransform: "uppercase", animationSpeed: "fast" } } as Record<string, unknown>;
+		vi.stubGlobal("BroadcastChannel", FakeBC);
+		// palco visível p/ effectiveConfig avaliar (projecting true)
+		localStorage.setItem(
+			RANDOM_RUNTIME_STORAGE_KEY,
+			JSON.stringify({ mode: "names", isDrawing: false, currentDisplay: "Ana", drawn: [], projecting: true }),
+		);
+		const w = mount(RandomProjectionView, {
+			props: { embedded: true },
+			global: { plugins: [i18n, pinia] },
+		});
+		const store = useRandomStore();
+		const spy = vi.spyOn(store, "startDraw").mockImplementation(() => {});
+		const vm = w.vm as unknown as { onDraw?: () => void };
+		vm.onDraw?.();
+		expect(spy).toHaveBeenCalled();
+		// embedded=false → onDraw no-op (br 46)
+		const w2 = mount(RandomProjectionView, {
+			props: { embedded: false },
+			global: { plugins: [i18n, pinia] },
+		});
+		spy.mockClear();
+		(w2.vm as unknown as { onDraw?: () => void }).onDraw?.();
+		expect(spy).not.toHaveBeenCalled();
+		w2.unmount();
+		// dispara nos canais de config e runtime (listeners do mount)
+		const cfgCh = FakeBC.instances.find((c) => c.name.includes("config"));
+		const rtCh = FakeBC.instances.find((c) => c.name.includes("runtime"));
+		cfgCh?.dispatchEvent(new MessageEvent("message", { data: { mode: "numbers" } }));
+		rtCh?.dispatchEvent(new MessageEvent("message", { data: { drawing: true } }));
+		await w.vm.$nextTick();
+		w.unmount();
+		stageSettingsState.value = null;
+		vi.unstubAllGlobals();
 	});
 });
