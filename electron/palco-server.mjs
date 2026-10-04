@@ -169,6 +169,29 @@ class PalcoSlot {
       try { m = JSON.parse(m) } catch { return false }
     }
     if (!m || typeof m !== 'object' || !m.type) return false
+    // OBS S1: URL de mídia sai COM o token (a TV/browser recebe a URL já
+    // autenticada — o renderer não precisa saber do token).
+    const token = getPalcoToken()
+    if (token && typeof m.url === 'string' && m.url.includes('/media/')) {
+      try {
+        const u = new URL(m.url)
+        u.searchParams.set('token', token)
+        m = { ...m, url: u.toString() }
+      } catch { /* url malformada — segue como veio */ }
+    }
+    // Mesmo gate para o BG/cover da projection: <img> não manda header, e
+    // localhost bypass escondia o 403 — browser/OBS/TV buscavam
+    // http://<lan>:7080/media/... sem token → 403 → onerror → fallback FIXO.
+    const bgUrl = m.type === 'projection' ? (m.background ?? m.cover) : undefined
+    if (token && typeof bgUrl === 'string' && bgUrl.includes('/media/')) {
+      try {
+        const u = new URL(bgUrl)
+        u.searchParams.set('token', token)
+        const patched = u.toString()
+        if (m.background === bgUrl) m = { ...m, background: patched }
+        else m = { ...m, cover: patched }
+      } catch { /* url malformada — segue como veio */ }
+    }
     // Transientes: action sem url/conteúdo NÃO entra no replay.
     // audio stop GRAVA (fix 27/08): é estado terminal — como transient, o
     // replay ficava com o 'play' velho e o F5 na TV ressuscitava o MP3.
