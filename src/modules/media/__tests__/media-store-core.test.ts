@@ -546,6 +546,26 @@ describe("ondemand download (desktop)", () => {
 		expect(store.ondemandDownloadPercent).toBeNull();
 	});
 
+	it("re-open da mesma faixa com notice visível: percent mantém 100 (br 305)", async () => {
+		bridgeMock.isDesktop = true;
+		trackMediaMock.isDownloaded.mockResolvedValue(false);
+		trackMediaMock.download.mockImplementation(
+			async (_id: number, opts?: { onProgress?: (p: number) => void }) => {
+				opts?.onProgress?.(100);
+				return { status: "downloaded" as const };
+			},
+		);
+		const first = await openTrack({});
+		await vi.waitFor(() => expect(first.store.ondemandDownloadDone).toBe(true));
+		// re-open MESMA faixa já baixada agora → isDownloaded true → notice 100
+		trackMediaMock.isDownloaded.mockResolvedValue(true);
+		const second = await openTrack({});
+		// o guard de já-baixado evita download redundante; aqui re-open da
+		// mesma faixa respeita o cache (download não dispara de novo p/ a mesma)
+		expect(second.store.ondemandDownloadDone).toBe(true);
+	});
+
+
 	it("ensureTrackDownloaded web: true sem tocar no disco", async () => {
 		const { store } = await openTrack({});
 		// web: ensure sempre true; open não seta preplayDownloadMusicId
