@@ -1,4 +1,8 @@
 export default {
+  apiOffline: {
+    message: 'Sem conex\u00e3o com o servi\u00e7o \u2014 verifique sua internet',
+    retrying: 'Tentando reconectar...',
+  },
   projection: {
     confirmClose: 'A projeção está em andamento. Fechar a janela interrompe a música. Deseja realmente sair?',
   },
