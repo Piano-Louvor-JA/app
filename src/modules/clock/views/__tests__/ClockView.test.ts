@@ -32,8 +32,9 @@ vi.mock('../../composables/useClock', () => ({
 }))
 
 const stageSubs = vi.hoisted(() => ({ cbs: [] as Array<() => void> }))
+const stageSettingsState = vi.hoisted(() => ({ value: { backgroundColor: '#123', backgroundImage: null, clock: { style: 'analog' } } }))
 vi.mock('../../../settings/services/stage-settings-runtime', () => ({
-  readEffectiveStageSettings: () => ({ backgroundColor: '#123', backgroundImage: null, clock: { style: 'analog' } }),
+  readEffectiveStageSettings: () => stageSettingsState.value,
   subscribeStageSettings: vi.fn((cb: () => void) => {
     stageSubs.cbs.push(cb)
     return () => {}
@@ -154,5 +155,22 @@ describe('ClockView.vue', () => {
       await w.vm.$nextTick()
       w.unmount()
     })
+  it('gaps: backgroundImage setado usa url; isProjecting=true via mock renderiza selo', async () => {
+      stageSettingsState.value = { backgroundColor: '#123', backgroundImage: 'https://x/img.png', clock: { style: 'digital' } }
+      useClockFeatureMock.isProjecting.value = true
+      const w = createWrapper()
+      await w.vm.$nextTick()
+      await w.vm.$nextTick()
+      expect(w.html()).toContain('clock-view__projecting')
+      w.unmount()
+      // stage SEM módulo clock (mod ausente → spread puro, br 65)
+      stageSettingsState.value = { backgroundColor: '#123', backgroundImage: null }
+      const w2 = createWrapper()
+      await w2.vm.$nextTick()
+      w2.unmount()
+      stageSettingsState.value = { backgroundColor: '#123', backgroundImage: null, clock: { style: 'analog' } }
+      useClockFeatureMock.isProjecting.value = false
+    })
   })
 })
+

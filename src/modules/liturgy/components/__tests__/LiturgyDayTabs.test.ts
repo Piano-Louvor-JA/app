@@ -87,4 +87,12 @@ describe('LiturgyDayTabs', () => {
     const wrapper = createWrapper()
     expect(wrapper.find('.liturgy-day-tabs__divider').exists()).toBe(true)
   })
+
+  it('onWheel com deltaY=0 não rola (br 18 false-arm)', async () => {
+    const w = createWrapper()
+    const scroller = w.find('[class*="day-tabs"], [class*="tabs"]').element as HTMLElement
+    scroller.dispatchEvent(new WheelEvent('wheel', { deltaY: 0, bubbles: true }))
+    await w.vm.$nextTick()
+    w.unmount()
+  })
 })

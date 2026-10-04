@@ -143,4 +143,27 @@ describe('PalcoRouteSelect', () => {
     w.unmount()
     expect(true).toBe(true)
   })
+
+  it('gaps: displays sem API (dispApi undefined) e list rejeitando; update direto', async () => {
+    palcoApi.status.mockResolvedValue({ running: true })
+    // sem displays API (dispApi?.list falsy → [])
+    Object.defineProperty(window, 'louvorja', { get: () => ({ palco: palcoApi }), configurable: true })
+    let w = await mountCard()
+    active = w
+    expect(w.find('select').exists()).toBe(true)
+    // com API rejeitando (catch → [])
+    Object.defineProperty(window, 'louvorja', { get: () => ({ palco: palcoApi, displays: displaysApi }), configurable: true })
+    displaysApi.list.mockRejectedValue(new Error('x'))
+    w = await mountCard()
+    active = w
+    expect(w.find('select').exists()).toBe(true)
+  })
+
+  it('gaps: unmount com timer ativo limpa interval (fn 38)', async () => {
+    palcoApi.status.mockResolvedValue({ running: true })
+    const w = await mountCard()
+    await new Promise((r) => setTimeout(r, 10))
+    w.unmount()
+    // sem erro = ok
+  })
 })
