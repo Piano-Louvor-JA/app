@@ -54,7 +54,7 @@ export const ItemProjecaoAtiva: Story = {
 
 export const CategoriaEmAndamento: Story = {
   args: {
-    item: { ...baseItem, type: 'category', name: 'Louvor Inicial', childCount: 3 },
+    item: { ...baseItem, type: 'category', name: 'Louvor Inicial' },
     index: 0,
     selected: false,
     sectionInProgress: true,
@@ -65,7 +65,7 @@ export const CategoriaEmAndamento: Story = {
 
 export const CategoriaAguardando: Story = {
   args: {
-    item: { ...baseItem, type: 'category', name: 'Palavra', childCount: 2 },
+    item: { ...baseItem, type: 'category', name: 'Palavra' },
     index: 1,
     selected: false,
     sectionWaiting: true,
