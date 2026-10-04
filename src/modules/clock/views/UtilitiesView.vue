@@ -31,6 +31,16 @@ const items: UtilityHubItem[] = [
     to: null,
     available: false,
   },
+  {
+    // Issue app#361: card agora (UI nas 3 frentes); funcional liga quando a
+    // fase S1 do palco-server (#351) mergear — Browser Source com token.
+    key: 'obs',
+    titleKey: 'utilities.obs',
+    descriptionKey: 'utilities.obsDescription',
+    icon: 'ti-brand-windows',
+    to: null,
+    available: false,
+  },
 ]
 </script>
 
