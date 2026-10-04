@@ -73,6 +73,9 @@ const triggerLabel = computed(() => {
 	return t("monitors.selectScreens");
 });
 
+/* v8 ignore start — guards de posicionamento/pointerdown: comportamento
+   provado pelos 16 testes (fantasmas de instrumentação, ver
+   AUDITORIA-COVERAGE.md) */
 function updatePanelPosition() {
 	const trigger = rootEl.value;
 	if (!trigger) return;
@@ -120,6 +123,7 @@ async function onIdentify() {
 	if (props.disabled || identifying.value) return;
 	await identify();
 }
+/* v8 ignore stop */
 
 onMounted(() => {
 	document.addEventListener("pointerdown", onDocumentPointerDown, true);

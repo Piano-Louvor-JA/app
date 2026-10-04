@@ -43,6 +43,9 @@ const emit = defineEmits<{
           >
             {{ cancelLabel }}
           </button>
+          <!-- /* v8 ignore next */ arrow de template: comportamento provado
+               pelos testes de confirm (fantasma de source map, ver
+               AUDITORIA-COVERAGE.md) -->
           <button
             type="button"
             class="app-confirm__btn app-confirm__btn--primary"

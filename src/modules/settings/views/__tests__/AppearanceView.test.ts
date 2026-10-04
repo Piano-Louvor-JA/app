@@ -106,4 +106,13 @@ describe("AppearanceView", () => {
     expect(wrapper.find(".appearance-experience__lyrics").exists()).toBe(false);
     void nextTick;
   });
+
+  it("VITE_SHOW_LYRIC_CUSTOMIZATION=1: seção de letra renderiza (feature flag ligada)", () => {
+    vi.stubEnv("VITE_SHOW_LYRIC_CUSTOMIZATION", "1");
+    const wrapper = mountView();
+    expect(wrapper.find(".appearance-experience__lyrics").exists()).toBe(true);
+    expect(wrapper.find(".stub-lyr").exists()).toBe(true);
+    wrapper.unmount();
+    vi.unstubAllEnvs();
+  });
 });

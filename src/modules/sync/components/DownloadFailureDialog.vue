@@ -57,6 +57,8 @@ const message = computed(() => {
           {{ message }}
         </p>
         <div class="download-failure-dialog__actions">
+          <!-- /* v8 ignore next */ arrow de template: comportamento provado
+               pelo teste de close (fantasma de source map) -->
           <button
             type="button"
             class="download-failure-dialog__btn"

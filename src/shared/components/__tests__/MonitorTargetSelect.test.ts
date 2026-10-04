@@ -111,6 +111,33 @@ describe('MonitorTargetSelect', () => {
     w.unmount()
   })
 
+  it('tags do painel: primary mostra tag; isReturn mostra tag de retorno (brs 272/278)', async () => {
+    loadProjectionSettings.mockReturnValue({
+      ...SETTINGS,
+      openReturnScreen: true,
+      returnDisplayId: 1,
+    })
+    const w = mount(MonitorTargetSelect, {
+      props: { modelValue: [2], extendedOnly: false },
+      global: { stubs: { teleport: false } },
+      attachTo: document.body,
+    })
+    await Promise.resolve()
+    await Promise.resolve()
+    await w.find('.monitor-target-select__trigger').trigger('click')
+    await Promise.resolve()
+    await Promise.resolve()
+    const html = (document.body.innerHTML)
+    // display 1 é primary → tag primary; display 1 é return → tag retorno;
+    // display 2 sem isPrimary/isReturn → nenhuma tag
+    expect(html).toContain('monitors.primary')
+    expect(html).toContain('monitors.returnScreen')
+    const primaryTags = (html.match(/monitors\.primary/g) ?? []).length
+    expect(primaryTags).toBe(1)
+    w.unmount()
+    document.body.innerHTML = ''
+  })
+
   it('badge com contagem quando há seleção', async () => {
     const w = await mountSelect()
     await w.find('.monitor-target-select__trigger').trigger('click')
