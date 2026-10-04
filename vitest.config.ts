@@ -23,6 +23,15 @@ export default defineConfig({
   },
   test: {
     exclude: ['node_modules/**', 'dist/**', 'e2e/**'],
+    // ci/test-gates (PR #330): jsdom global + storage no globalThis
+    // (populateGlobal do vitest 4 não copia localStorage/sessionStorage).
+    environment: 'jsdom',
+    environmentOptions: {
+      jsdom: {
+        url: 'http://localhost/',
+      },
+    },
+    setupFiles: ['./vitest.setup.ts'],
     coverage: {
           provider: 'v8',
           reporter: ['text', 'text-summary', 'lcov'],
