@@ -28,6 +28,8 @@ type CatalogHymnalRow = {
 type CatalogMusicIndexRow = CatalogHymnalRow & {
   albums?: Array<{ id_album?: number | string; name?: string; track?: number | string | null }>
   albums_names?: string
+  /** Letra em texto corrido (presente em 1944/1956 músicas do índice). */
+  lyric?: string
 }
 
 type CatalogAlbumMusicRow = CatalogHymnalRow
@@ -199,6 +201,15 @@ function mapMusicIndexRow(row: CatalogMusicIndexRow): LiturgyMusicOption | null 
     albumNames.includes('Hinário Adventista') ||
     albumNames.includes('Hinário Adventista 1996')
 
+  // Issue #348 (item 2): letra já vem no índice `${prefix}_musics` — propaga
+  // normalizada (fold diacrítico) p/ a busca casar "nao temas" com "não temas".
+  const lyricsText = String(row.lyric ?? '')
+    .normalize('NFD')
+    .replace(/\u0300-\u036f/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase() || undefined
+
   return {
     id,
     name,
@@ -207,6 +218,7 @@ function mapMusicIndexRow(row: CatalogMusicIndexRow): LiturgyMusicOption | null 
     displayLabel: buildDisplayLabel(name, isHymnalAlbum ? hymnalTrack : null),
     durationMs: parseCatalogDurationMs(row.duration),
     hasInstrumental: hasInstrumentalFlag(row),
+    lyricsText,
   }
 }
 
@@ -405,18 +417,30 @@ export function filterLiturgyMusicOptions(
   const isNum = trimmed !== '' && !Number.isNaN(Number(trimmed))
   const numQuery = isNum ? Number(trimmed) : null
 
-  let results = options.filter((entry) => {
-    const title = entry.name
-    const album = entry.albumNames
-    if (isNum && numQuery != null) {
-      return (
-        matchesAllTerms(title, album, trimmed) ||
-        entry.hymnalTrack === numQuery
-      )
+  // Busca por termos + letra (issues #348 + #359): fold diacritico, trecho da
+  // letra e termos espalhados em nome/album/letra — uniao da PR-355
+  // (matchesAllTerms p/ termos fora de substring contigua) com a PR-373
+  // (letra do indice + fold, que ja cobre os casos da 355).
+  const fold = (v: string) => v.normalize('NFD').replace(/\u0300-\u036f/g, '')
+  const q = fold(trimmed)
+  const terms = q.split(/\s+/).filter(Boolean)
+
+  const matchText = (title: string, album: string, lyrics: string) => {
+    if (title.includes(q) || album.includes(q) || (lyrics && lyrics.includes(q))) {
+      return true
     }
-    // Busca por termos (03/10): "jesus adoradores 5" acha a música "Jesus"
-    // do álbum "Adoradores 5" — substring contígua não existe em campo nenhum.
-    return matchesAllTerms(title, album, trimmed)
+    if (terms.length <= 1) return false
+    return terms.every((t) => title.includes(t) || album.includes(t) || (lyrics && lyrics.includes(t)))
+  }
+
+  let results = options.filter((entry) => {
+    const title = fold(entry.name.toLowerCase())
+    const album = fold(entry.albumNames.toLowerCase())
+    const lyrics = entry.lyricsText ?? ''
+    if (isNum && numQuery != null) {
+      return entry.hymnalTrack === numQuery || matchText(title, album, lyrics)
+    }
+    return matchText(title, album, lyrics)
   })
 
   if (isNum && numQuery != null) {
