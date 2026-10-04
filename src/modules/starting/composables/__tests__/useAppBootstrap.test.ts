@@ -122,6 +122,16 @@ describe('useAppBootstrap', () => {
     app.unmount()
   })
 
+  it('erro na sincronização inicial (first boot): catch marca erro (br 134)', async () => {
+    mocks.isBootstrapComplete.mockResolvedValue(false)
+    mocks.syncEssentialCatalogFromApi.mockRejectedValue(new Error('api fora'))
+    mountHost()
+    await vi.runAllTimersAsync()
+    const store = useStartingStore()
+    await vi.runAllTimersAsync()
+    expect(store.hasError).toBe(true)
+  })
+
   it('warm boot: progresso até 100, esconde, pré-aquece capas', async () => {
     const app = mountHost()
     await vi.runAllTimersAsync()

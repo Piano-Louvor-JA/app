@@ -240,4 +240,17 @@ describe("useRemoteControl", () => {
     info.mockRestore();
   });
 
-})
+    it("tick após disable: connected cai via receiver?.connected ?? false (br 57)", async () => {
+      vi.useFakeTimers()
+      const useRemoteControl = await freshRc()
+      const rc = useRemoteControl()
+      rc.enabled.value = true
+      await vi.advanceTimersByTimeAsync(0)
+      rc.enabled.value = false
+      // tick do interval ainda vivo (só morre no beforeunload) roda sem
+      // receiver ativo → connected = false (?? false)
+      await vi.advanceTimersByTimeAsync(1000)
+      expect(rc.connected.value).toBe(false)
+      vi.useRealTimers()
+    })
+  })

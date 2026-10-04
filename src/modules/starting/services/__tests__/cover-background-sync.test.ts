@@ -273,4 +273,28 @@ describe("startCoverBackgroundSync", () => {
 		// delega: comportamento já coberto nos testes de ensureAlbumCovers
 		expect(true).toBe(true);
 	});
+
+	it("url sem marker do media path é ignorada nos dois loops (toRelativeMediaPath null)", async () => {
+		mocks.state.categories = [
+			{
+				albums: [
+					{ url_image: "http://api/covers/a.jpg" },
+					{ url_image: "http://sem-marker/x.jpg" }, // não casa /covers/
+				],
+			},
+		] as unknown;
+		mocks.state.catalog.clear();
+		seedCategories();
+		(
+			mocks.state.bridge as { media: { check: unknown; download: unknown } }
+		).media = {
+			check: vi.fn(async () => false),
+			download: vi.fn(async () => true),
+		};
+		const result = await ensureAlbumCovers({ skipIfSynced: false });
+		// x.jpg sem path relativo é exists:true no primeiro filter (nunca baixa)
+		expect(result.total).toBe(2);
+		expect(result.missing).toBe(1);
+		expect(result.downloaded).toBe(1);
+	});
 });
