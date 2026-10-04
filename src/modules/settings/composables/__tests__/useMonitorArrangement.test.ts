@@ -195,6 +195,8 @@ describe("useMonitorArrangement", () => {
     (globalThis as Record<string, unknown>).ResizeObserver = ROCapture;
     try {
       const result = withSetup((stageRef) => useMonitorArrangement(stageRef));
+      await Promise.resolve(); // nextTick do onMounted cria o RO
+      await new Promise((r) => setTimeout(r, 0));
       expect(() => roCb()).not.toThrow();
       await Promise.resolve();
       expect(result.tiles).toBeTruthy();
