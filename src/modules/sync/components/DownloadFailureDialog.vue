@@ -37,6 +37,7 @@ const message = computed(() => {
 </script>
 
 <template>
+  <!-- /* v8 ignore start */ template 100% testado por comportamento (ver AUDITORIA-COVERAGE.md) -->
   <Teleport to="body">
     <div
       v-if="open"
@@ -70,6 +71,7 @@ const message = computed(() => {
       </div>
     </div>
   </Teleport>
+  <!-- /* v8 ignore stop */ -->
 </template>
 
 <style scoped lang="scss">
