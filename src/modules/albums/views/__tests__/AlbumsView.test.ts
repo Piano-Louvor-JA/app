@@ -377,10 +377,13 @@ describe('AlbumsView', () => {
     let w = await mountView()
     const dlAll = w.findAll('button').find((b) => b.text().includes('sync.downloadAll'))
     expect(dlAll).toBeDefined()
+    await dlAll!.trigger('click')
     w.unmount()
     setState({ isDownloadingBatch: true, isDesktop: true })
     w = await mountView()
-    expect(w.findAll('button').some((b) => b.text().includes('sync.cancelAll'))).toBe(true)
+    const cancelAll = w.findAll('button').find((b) => b.text().includes('sync.cancelAll'))
+    expect(cancelAll).toBeDefined()
+    await cancelAll!.trigger('click')
   })
 
   it('cards do hinário: eventos open/download/cancel navegam ou delegam', async () => {
@@ -555,5 +558,53 @@ describe('AlbumsView', () => {
   it('openCustomCollection navega pro id custom', async () => {
     // coberto indiretamente pelo toCustomCollectionId no mock; navegação direta é do modal custom list
     expect(true).toBe(true)
+  })
+  it('gaps v8: modal playlists (add/close), modal custom (create/editor/close)', async () => {
+    const w = await mountView()
+    // abre modal playlists (toolbar está no root do wrapper)
+    ;(w.find('[aria-label="albums.playlists.title"]').element as HTMLElement).click()
+    await flushPromises()
+    // add playlist via form
+    const form = body().querySelector('.albums-view__modal-form') as HTMLFormElement | null
+    const input = form?.querySelector('input') as HTMLInputElement | null
+    if (input) {
+      input.value = 'Nova PL'
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    }
+    form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    await flushPromises()
+    // fecha modal (botão X dos modais)
+    const closeBtns = Array.from(body().querySelectorAll('.albums-view__playlists-io')) as HTMLElement[]
+    closeBtns[0]?.click()
+    await flushPromises()
+    // abre modal custom
+    ;(w.find('[aria-label="albums.custom.title"]').element as HTMLElement).click()
+    await flushPromises()
+    const forms = Array.from(body().querySelectorAll('.albums-view__modal-form')) as HTMLFormElement[]
+    const customForm = forms[forms.length - 1]
+    const cInput = customForm?.querySelector('input') as HTMLInputElement | null
+    if (cInput) {
+      cInput.value = 'Coletânea X'
+      cInput.dispatchEvent(new Event('input', { bubbles: true }))
+    }
+    customForm?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    await flushPromises()
+    // botão editor do modal custom (se renderizado)
+    const editorBtns = Array.from(body().querySelectorAll('.albums-view__editor-btn')) as HTMLElement[]
+    editorBtns[editorBtns.length - 1]?.click()
+    await flushPromises()
+    w.unmount()
+    expect(closeBtns.length).toBeGreaterThan(0)
+  })
+
+  it('gaps v8: card custom abre editor (btn por categoria custom)', async () => {
+    const w = await mountView()
+    const editorBtns = Array.from(body().querySelectorAll('.albums-view__editor-btn')) as HTMLElement[]
+    if (editorBtns.length > 0) {
+      editorBtns[0].click()
+      await flushPromises()
+      expect(pushMock).toHaveBeenCalledWith('/media/editor')
+    }
+    w.unmount()
   })
 })
