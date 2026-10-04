@@ -65,7 +65,24 @@ export type StageSettings = {
   textVerticalAlign: StageVerticalAlign
   footerRefColor: string
   footerRefWeight: number
-  showBibleVersion: boolean
+  /**
+   * Título (1º slide / capa): personalização própria. `null`/`undefined`
+   * = herda o estilo geral da letra (compatibilidade com salvos antigos).
+   */
+  titleFontSize: number | null // px @1920 (60–160); null = herda fontSize
+  titleFontWeight: StageFontWeight | null
+  titleTextColor: string | null
+  titleUpperCase: boolean
+  titleTextShadow: boolean | null
+  /**
+   * Estrofes (slides de letra): personalização própria. `null`/`undefined`
+   * = usa o estilo geral (que JÁ É o das estrofes) — espelha title*.
+   */
+  lyricFontSize: number | null // px @1920 (60–160); null = herda fontSize
+  lyricFontWeight: StageFontWeight | null
+  lyricTextColor: string | null
+  lyricUpperCase: boolean
+  lyricTextShadow: boolean | null  showBibleVersion: boolean
   bibleFontSize: number // px @1920 (50–140)
   bibleFontWeight: 400 | 500 | 700
   bibleTextColor: string
@@ -152,7 +169,16 @@ export const DEFAULT_STAGE_SETTINGS: StageSettings = {
   bibleFontSize: 84,
   bibleFontWeight: 500,
   bibleTextColor: '#FFFFFF',
-  backgroundImage: null,
+  titleFontSize: null,
+  titleFontWeight: null,
+  titleTextColor: null,
+  titleUpperCase: false,
+  titleTextShadow: null,
+  lyricFontSize: null,
+  lyricFontWeight: null,
+  lyricTextColor: null,
+  lyricUpperCase: false,
+  lyricTextShadow: null,  backgroundImage: null,
 }
 
 /**
@@ -296,7 +322,18 @@ export function parseStageSettings(raw: unknown): StageSettings {
     bibleFontSize: clamp(asNumber(s['bSize'], 84), 50, 140),
     bibleFontWeight: BIBLE_WEIGHTS.includes(bibleWeight) ? bibleWeight : 500,
     bibleTextColor: asColor(s['bFg'], DEFAULT_STAGE_SETTINGS.bibleTextColor),
-    backgroundImage:
+    titleFontSize:
+      s['tSize'] == null ? null : clamp(asNumber(s['tSize'], 96), 60, 160),
+    titleFontWeight: s['tWeight'] == null ? null : (WEIGHTS.includes(asNumber(s['tWeight'], 600) as StageFontWeight) ? (asNumber(s['tWeight'], 600) as StageFontWeight) : null),
+    titleTextColor: s['tFg'] == null ? null : asColor(s['tFg'], DEFAULT_STAGE_SETTINGS.textColor),
+    titleUpperCase: typeof s['tUpper'] === 'boolean' ? s['tUpper'] : false,
+    titleTextShadow: typeof s['tsOnT'] === 'boolean' ? s['tsOnT'] : null,
+    lyricFontSize:
+      s['lSize'] == null ? null : clamp(asNumber(s['lSize'], 84), 60, 160),
+    lyricFontWeight: s['lWeight'] == null ? null : (WEIGHTS.includes(asNumber(s['lWeight'], 600) as StageFontWeight) ? (asNumber(s['lWeight'], 600) as StageFontWeight) : null),
+    lyricTextColor: s['lFg'] == null ? null : asColor(s['lFg'], DEFAULT_STAGE_SETTINGS.textColor),
+    lyricUpperCase: typeof s['lUpper'] === 'boolean' ? s['lUpper'] : false,
+    lyricTextShadow: typeof s['tsOnL'] === 'boolean' ? s['tsOnL'] : null,    backgroundImage:
       typeof s['bgImg'] === 'string' &&
       (s['bgImg'].startsWith('data:') || s['bgImg'].startsWith(OFFICIAL_BG_PREFIX))
         ? s['bgImg']
@@ -387,7 +424,16 @@ export function serializeStageSettings(s: StageSettings): Record<string, unknown
     bSize: s.bibleFontSize,
     bWeight: s.bibleFontWeight,
     bFg: s.bibleTextColor,
-    bgImg: s.backgroundImage,
+    ...(s.titleFontSize != null ? { tSize: s.titleFontSize } : {}),
+    ...(s.titleFontWeight != null ? { tWeight: s.titleFontWeight } : {}),
+    ...(s.titleTextColor != null ? { tFg: s.titleTextColor } : {}),
+    ...(s.titleUpperCase ? { tUpper: true } : {}),
+    ...(s.titleTextShadow != null ? { tsOnT: s.titleTextShadow } : {}),
+    ...(s.lyricFontSize != null ? { lSize: s.lyricFontSize } : {}),
+    ...(s.lyricFontWeight != null ? { lWeight: s.lyricFontWeight } : {}),
+    ...(s.lyricTextColor != null ? { lFg: s.lyricTextColor } : {}),
+    ...(s.lyricUpperCase ? { lUpper: true } : {}),
+    ...(s.lyricTextShadow != null ? { tsOnL: s.lyricTextShadow } : {}),    bgImg: s.backgroundImage,
     ...(s.clock ? { clock: s.clock } : {}),
     ...(s.timer ? { timer: s.timer } : {}),
     ...(s.countdown ? { countdown: s.countdown } : {}),
