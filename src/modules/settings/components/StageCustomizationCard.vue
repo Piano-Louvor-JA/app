@@ -149,6 +149,16 @@ function clearTitleOverrides() {
   patch({ titleFontSize: null, titleFontWeight: null, titleTextColor: null, titleTextShadow: null, titleUpperCase: false })
 }
 
+function clearLyricOverrides() {
+  patch({ lyricFontSize: null, lyricFontWeight: null, lyricTextColor: null, lyricTextShadow: null, lyricUpperCase: false })
+}
+
+const lyricWeightOptions: { value: StageFontWeight | null; label: string }[] = [
+  { value: null, label: t('settings.stage.weightNormal') },
+  { value: 400, label: t('settings.stage.weightLightPlus') },
+  { value: 600, label: t('settings.stage.weightMedium') },
+]
+
 const bibleWeightOptions: { value: StageSettings['bibleFontWeight']; label: string }[] = [
   { value: 400, label: t('settings.stage.weightNormal') },
   { value: 500, label: t('settings.stage.weightLightPlus') },
@@ -486,6 +496,114 @@ const confirmReset = ref(false)
             :checked="settings.titleTextShadow ?? settings.textShadow"
             :aria-label="t('settings.stage.titleTextShadow')"
             @change="patch({ titleTextShadow: ($event.target as HTMLInputElement).checked })"
+          >
+        </div>
+      </div>
+    </template>
+
+    <!-- Hinos: estrofes com tipografia própria (espelha o título) -->
+    <template v-if="activeScope === 'hymns'">
+      <div class="stage-custom__section stage-custom__section--bible">
+        <p class="stage-custom__label">{{ t('settings.stage.lyricAppearance') }}</p>
+
+        <div class="stage-custom__toggle-row">
+          <button
+            type="button"
+            class="stage-custom__toggle-label"
+            @click="clearLyricOverrides"
+          >
+            {{ t('settings.stage.lyricReset') }}
+          </button>
+        </div>
+
+        <p class="stage-custom__label stage-custom__label--sub">
+          {{ t('settings.stage.lyricTextColor') }}
+        </p>
+        <div class="stage-custom__swatches">
+          <button
+            v-for="preset in STAGE_FG_PRESETS"
+            :key="preset.color"
+            type="button"
+            class="stage-custom__swatch"
+            :class="{ 'stage-custom__swatch--active': settings.lyricTextColor === preset.color }"
+            :style="{ '--swatch': preset.color }"
+            :aria-label="preset.label"
+            @click="patch({ lyricTextColor: preset.color })"
+          />
+          <label class="stage-custom__picker">
+            <i class="ti ti-color-picker" aria-hidden="true" />
+            <input
+              type="color"
+              :value="settings.lyricTextColor ?? settings.textColor"
+              :aria-label="t('settings.stage.lyricTextColor')"
+              @input="patch({ lyricTextColor: ($event.target as HTMLInputElement).value })"
+            >
+          </label>
+        </div>
+
+        <div class="stage-custom__row-head">
+          <span>{{ t('settings.stage.lyricFontSize') }}</span>
+          <span class="stage-custom__chip">{{ Math.round(settings.lyricFontSize ?? settings.fontSize) }}px</span>
+        </div>
+        <input
+          type="range"
+          min="60"
+          max="160"
+          step="2"
+          :value="settings.lyricFontSize ?? settings.fontSize"
+          :aria-label="t('settings.stage.lyricFontSize')"
+          @input="patch({ lyricFontSize: Number(($event.target as HTMLInputElement).value) })"
+        >
+
+        <p class="stage-custom__label stage-custom__label--sub">
+          {{ t('settings.stage.lyricFontWeight') }}
+        </p>
+        <div class="stage-custom__segment" role="radiogroup">
+          <button
+            v-for="opt in lyricWeightOptions"
+            :key="String(opt.value)"
+            type="button"
+            role="radio"
+            :aria-checked="(settings.lyricFontWeight ?? null) === opt.value"
+            class="stage-custom__segment-btn"
+            :class="{ 'stage-custom__segment-btn--active': (settings.lyricFontWeight ?? null) === opt.value }"
+            @click="patch({ lyricFontWeight: (settings.lyricFontWeight ?? null) === opt.value ? null : opt.value })"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
+
+        <div class="stage-custom__toggle-row">
+          <button
+            type="button"
+            class="stage-custom__toggle-label"
+            @click="patch({ lyricUpperCase: !settings.lyricUpperCase })"
+          >
+            {{ t('settings.stage.lyricUpperCase') }}
+          </button>
+          <input
+            type="checkbox"
+            class="stage-custom__toggle"
+            :checked="settings.lyricUpperCase"
+            :aria-label="t('settings.stage.lyricUpperCase')"
+            @change="patch({ lyricUpperCase: ($event.target as HTMLInputElement).checked })"
+          >
+        </div>
+
+        <div class="stage-custom__toggle-row">
+          <button
+            type="button"
+            class="stage-custom__toggle-label"
+            @click="patch({ lyricTextShadow: settings.lyricTextShadow === null ? !settings.textShadow : !settings.lyricTextShadow })"
+          >
+            {{ t('settings.stage.lyricTextShadow') }}
+          </button>
+          <input
+            type="checkbox"
+            class="stage-custom__toggle"
+            :checked="settings.lyricTextShadow ?? settings.textShadow"
+            :aria-label="t('settings.stage.lyricTextShadow')"
+            @change="patch({ lyricTextShadow: ($event.target as HTMLInputElement).checked })"
           >
         </div>
       </div>
