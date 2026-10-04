@@ -59,9 +59,9 @@ let refreshTimer: ReturnType<typeof setInterval> | null = null
 onMounted(() => {
   void refresh()
   // Receiver pode conectar após abrir esta tela; IP deve aparecer sem fechar.
-  refreshTimer = setInterval(() => void refresh(), 3000)
+  if (palcoSession.isElectron) refreshTimer = setInterval(() => void refresh(), 3000)
 })
-onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer) })
+onUnmounted(() => { if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null } })
 </script>
 
 <template>
