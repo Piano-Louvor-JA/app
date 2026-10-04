@@ -27,6 +27,12 @@ import {
   type AlertMarkerPreset,
 } from '../types/countdown'
 import type { AlertPresetKey } from '../services/alert-tone'
+import {
+  claimAudioHost,
+  isOperatorWindow,
+  releaseAudioHost,
+  renewAudioHost,
+} from '../services/audio-control'
 
 /** AudioElement de um tom da biblioteca (cacheado pelo data-URL). */
 const libraryAudioCache = new Map<string, HTMLAudioElement>()
@@ -148,12 +154,27 @@ export function useCountdownDisplay(
     // O popup não roda hydrate() — inicia a escuta do canal de controle aqui
     // (idempotente no store) pra receber mute/volume/stop do operador.
     if (isProjectionWindow) store.startAudioControlSync()
+    // Host de áudio (fix duplicidade 03/10 + cronômetro sem projeção):
+    // exatamente UMA janela toca. Popup eleita (menor monitorId) quando há
+    // projeção; OPERADOR quando não há popup viva — cronômetro roda e o
+    // alerta toca no PC mesmo sem projetar (feedback do irmão).
+    const isAudioHost = claimAudioHost()
+    // Heartbeat: host renova o claim a cada 1s; se a popup host fechar,
+    // claim expira (4s) e o OPERADOR assume (áudio sem projeção).
+    const hostHeartbeat = isAudioHost
+      ? window.setInterval(() => renewAudioHost(), 1_000)
+      : null
+    onUnmounted(() => {
+      if (hostHeartbeat) clearInterval(hostHeartbeat)
+      releaseAudioHost()
+    })
     const firedMarkers = store.firedMarkers
     let prevStatus: CountdownRuntimeState['status'] = runtime.value.status
 
     const activeMarkers = computed(() => config.value.alertMarkers ?? DEFAULT_ALERT_MARKERS)
 
     function playMarkerPreset(preset: string, markerId: string): void {
+      if (!isAudioHost) return // fix duplicidade: só a janela eleita toca
       if (store.audioMuted) return // F2: operador silenciou
       // Fila (feedback Ezequias: "adiciona queue") — marcos que cruzam juntos
       // (jump do rAF em janela em bg) tocam em sequência, nunca simultâneos.
