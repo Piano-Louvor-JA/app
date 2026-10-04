@@ -4,7 +4,12 @@ import { ref } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../composables/useTimer", () => ({
-  useTimerDisplay: () => ({ formattedTime: ref("05:00") }),
+  useTimerDisplay: (configSource?: () => unknown, runtimeSource?: () => unknown) => {
+    // exercita os getters passados pelo componente (fns 25/26)
+    void configSource?.();
+    void runtimeSource?.();
+    return { formattedTime: ref("05:00") };
+  },
 }));
 
 import TimerPreview from "../TimerPreview.vue";
