@@ -44,6 +44,36 @@ jobs:
           --coverage.thresholds.lines=0
           --coverage.reportsDirectory=coverage-merged
           --exclude='.stryker-tmp/**' --exclude='.worktrees/**'
+      - name: Vitest passada 2 — testes que montam .vue (v8)
+        run: >-
+          npx vitest run
+          src/__tests__ src/layouts
+          src/design-system/components
+          src/modules/albums/components src/modules/albums/views
+          src/modules/bible/components src/modules/bible/views
+          src/modules/clock/components src/modules/clock/views
+          src/modules/community/components src/modules/community/views
+          src/modules/countdown/components src/modules/countdown/views
+          src/modules/draw/components src/modules/draw/views
+          src/modules/home/components src/modules/home/views
+          src/modules/liturgy/components src/modules/liturgy/views
+          src/modules/media/components src/modules/media/views
+          src/modules/random/components src/modules/random/views
+          src/modules/remote/views
+          src/modules/settings/components src/modules/settings/views
+          src/modules/starting/components src/modules/sync/components
+          src/modules/timer/components src/modules/timer/views
+          src/shared/components
+          --coverage --coverage.provider=v8
+          --coverage.reporter=json
+          --coverage.thresholds.statements=0
+          --coverage.thresholds.branches=0
+          --coverage.thresholds.functions=0
+          --coverage.thresholds.lines=0
+          --coverage.reportsDirectory=coverage-v8-ui
+          --exclude='.stryker-tmp/**' --exclude='.worktrees/**'
+      - name: Merge das passadas (por posição)
+        run: node scripts/merge-coverage.mjs coverage-merged/coverage-final.json coverage-v8-ui/coverage-final.json coverage-merged/coverage-final.json
       - name: Publicar resumo no PR
         if: always() && github.event_name == 'pull_request'
         run: |
