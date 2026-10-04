@@ -32,14 +32,13 @@ const items: UtilityHubItem[] = [
     available: false,
   },
   {
-    // Issue app#361: card agora (UI nas 3 frentes); funcional liga quando a
-    // fase S1 do palco-server (#351) mergear — Browser Source com token.
+    // Issue app#361: funcional — palco-server (#351) como transporte, fachada OBS.
     key: 'obs',
     titleKey: 'utilities.obs',
     descriptionKey: 'utilities.obsDescription',
     icon: 'ti-broadcast',
-    to: null,
-    available: false,
+    to: '/utilities/obs',
+    available: true,
   },
 ]
 </script>
