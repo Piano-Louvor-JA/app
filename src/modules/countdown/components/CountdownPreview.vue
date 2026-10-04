@@ -104,14 +104,19 @@ function stageFlexColumn(st?: StageSettings): Record<string, string> {
   return { alignItems, justifyContent }
 }
 
+let measureTimer: ReturnType<typeof setTimeout> | null = null
+
 function measure() {
   const el = containerRef.value
   if (!el) return
   sizeWidth.value = el.offsetWidth
   sizeHeight.value = el.offsetHeight
 
-  if (sizeWidth.value <= 0 || sizeHeight.value <= 0) {
-    window.setTimeout(measure, 100)
+  if ((sizeWidth.value <= 0 || sizeHeight.value <= 0) && measureTimer === null) {
+    measureTimer = setTimeout(() => {
+      measureTimer = null
+      measure()
+    }, 100)
   }
 }
 
@@ -121,6 +126,10 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  if (measureTimer !== null) {
+    clearTimeout(measureTimer)
+    measureTimer = null
+  }
   window.removeEventListener('resize', measure)
 })
 </script>

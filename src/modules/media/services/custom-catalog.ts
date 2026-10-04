@@ -151,7 +151,7 @@ function customBaseUrl(): string {
  * Formata duração da API para m:ss.
  * API pode retornar: null, segundos (number), "mm:ss" ou "hh:mm:ss".
  */
-function formatDurationLabel(value: unknown): string {
+export function formatDurationLabel(value: unknown): string {
   const raw = asNullableString(value)
   if (raw) {
     // Já vem formatado ("3:45" / "00:03:45") — só limpar horas vazias
@@ -549,7 +549,7 @@ export function probeAudioDuration(
     const done = (value: number | null) => {
       clearTimeout(timer)
       audio.removeAttribute('src')
-      audio.load()
+      try { audio.load() } catch {}
       resolve(value)
     }
     const timer = setTimeout(() => done(null), timeoutMs)

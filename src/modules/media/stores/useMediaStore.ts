@@ -79,7 +79,6 @@ export const useMediaStore = defineStore('media', () => {
     get: () => isProjectingRaw.value,
     set: (v: boolean) => {
       if (v !== isProjectingRaw.value) {
-        console.info('[media-proj] isProjecting →', v, new Error().stack?.split('\n').slice(1, 4).join(' | '))
       }
       isProjectingRaw.value = v
     },
@@ -1100,7 +1099,6 @@ export const useMediaStore = defineStore('media', () => {
     // (decisão Rafael/Elias 27/08: mecanismo ligava só com múltiplas telas
     // FÍSICAS; TVs WS agora entram na conta).
     const hasTvs = await hasLivePalcoTvs()
-    console.info('[media-proj] startProjection route=', String(getPalcoRoute('hymns')), 'hasTvs=', hasTvs)
     // Rota individual de TV (spec multi-telas): só TV, sem janela no cabo
     // — paridade com Bíblia/Sorteio. Espelhar mantém cabo + TVs.
     if (isPalcoTvOnlyRoute('hymns')) {

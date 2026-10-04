@@ -41,7 +41,7 @@ export function formatElapsedMs(
   const effectiveFormat = resolveDisplayFormat(hours, timeFormat)
   const formatted = effectiveFormat.replace(
     /hh|mm|ss|ms/g,
-    (match) => tokens[match] ?? match,
+    (match) => tokens[match],
   )
   return negative ? `-${formatted}` : formatted
 }

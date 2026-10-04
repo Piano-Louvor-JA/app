@@ -1,17 +1,17 @@
 <script setup lang="ts">
 defineProps<{
-  open: boolean
-  title: string
-  message: string
-  confirmLabel: string
-  cancelLabel: string
-  danger?: boolean
-}>()
+	open: boolean;
+	title: string;
+	message: string;
+	confirmLabel: string;
+	cancelLabel: string;
+	danger?: boolean;
+}>();
 
 const emit = defineEmits<{
-  confirm: []
-  cancel: []
-}>()
+	confirm: [];
+	cancel: [];
+}>();
 </script>
 
 <template>

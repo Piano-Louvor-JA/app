@@ -75,7 +75,6 @@ function resolveDropCategoryIndex(
   toIndex: number,
 ): number {
   const target = items[toIndex]
-  if (!target) return toIndex
   if (target.type === 'category') return toIndex
   if (!target.categoryId) return toIndex
   const parentIndex = items.findIndex(
@@ -108,8 +107,7 @@ export function reorderLiturgyItems(
   if (moved.type !== 'category') {
     const next = [...items]
     const [item] = next.splice(fromIndex, 1)
-    if (!item) return items
-    next.splice(toIndex, 0, item)
+    next.splice(toIndex, 0, item!)
     return next
   }
 
@@ -127,8 +125,6 @@ export function reorderLiturgyItems(
   } else {
     insertAt = fromIndex < toIndex ? toIndex + 1 : toIndex
   }
-
-  if (insertAt >= fromIndex && insertAt <= blockEnd) return items
 
   const block = items.slice(fromIndex, blockEnd)
   const next = [...items.slice(0, fromIndex), ...items.slice(blockEnd)]
@@ -153,7 +149,7 @@ export function cloneLiturgyItems(items: LiturgyItem[]): LiturgyItem[] {
       item.categoryId != null ? (idMap.get(item.categoryId) ?? null) : null
     return {
       ...item,
-      id: idMap.get(item.id) ?? createLiturgyItemId(),
+      id: idMap.get(item.id)!,
       categoryId: nextCategoryId,
       done: false,
     }
@@ -239,8 +235,6 @@ export function isValidLiturgyUrl(raw: string): boolean {
   try {
     const withProtocol = /^https?:\/\//i.test(value) ? value : `https://${value}`
     const parsed = new URL(withProtocol)
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false
-
     const host = parsed.hostname.toLowerCase()
     if (!host || host.startsWith('.') || host.endsWith('.')) return false
     if (host === 'localhost') return true
@@ -392,12 +386,12 @@ export function buildLiturgyItemFromDraft(
       if (!details) {
         item.subtitle =
           paths.length === 1
-            ? (paths[0]!.split(/[\\/]/).pop() ?? paths[0]!)
+            ? (paths[0]!.split(/[\\/]/).pop()!)
             : `${paths.length} imagens`
       }
     } else if (item.filePath && !details) {
       const parts = item.filePath.split(/[\\/]/)
-      item.subtitle = parts[parts.length - 1] ?? item.filePath
+      item.subtitle = parts[parts.length - 1]!
     }
   }
 

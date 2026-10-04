@@ -659,9 +659,7 @@ async function onImportFile(event: Event): Promise<void> {
     // Pós-import: reflete tudo na UI — sidebar da coletânea, áudio no player,
     // estrofes com timing (já populadas acima).
     await refreshCollections()
-    if (selectedCollectionId.value !== collectionId) {
-      selectedCollectionId.value = collectionId
-    }
+    selectedCollectionId.value = collectionId
     musics.value = await listCustomMusics(collectionId)
     loadAudioForMusic(uploadedAudio?.url ?? null)
   } catch (error) {

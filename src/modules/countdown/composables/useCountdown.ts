@@ -18,7 +18,7 @@ import type {
 } from '../types/countdown'
 import { useCountdownStore } from '../stores/useCountdownStore'
 
-export function useCountdownTick(active: MaybeRefOrGetter<boolean> = true) {
+export function useCountdownTick(active: MaybeRefOrGetter<boolean>) {
   const now = ref(Date.now())
   let frameId = 0
 

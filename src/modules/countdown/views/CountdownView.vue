@@ -135,9 +135,9 @@ const effectiveConfig = computed(() => {
             <div class="countdown-view__duration">
               <CountdownDurationInput
                 :duration-ms="runtime.durationMs"
-                :mode="runtime.mode ?? 'duration'"
-                :until-hour="runtime.untilHour ?? 18"
-                :until-minute="runtime.untilMinute ?? 0"
+                :mode="runtime.mode"
+                :until-hour="runtime.untilHour"
+                :until-minute="runtime.untilMinute"
                 :disabled="isRunning"
                 compact
                 @update:duration-ms="setDurationMs"

@@ -288,4 +288,23 @@ describe("clearOutbox", () => {
     await clearOutbox();
     expect(await countPending()).toBe(0);
   });
+
+it("newClientUuid: fallback RFC4122 sem randomUUID", async () => {
+  const origCrypto = globalThis.crypto;
+  // sem randomUUID, com getRandomValues determinístico
+  vi.stubGlobal("crypto", {
+    getRandomValues: (b: Uint8Array) => {
+      for (let i = 0; i < b.length; i++) b[i] = i;
+      return b;
+    },
+  });
+  try {
+    const { newClientUuid } = await import("../outbox");
+    const u = newClientUuid();
+    expect(u).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(u).toBe("00010203-0405-4607-8809-0a0b0c0d0e0f");
+  } finally {
+    vi.stubGlobal("crypto", origCrypto);
+  }
+});
 });

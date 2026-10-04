@@ -1,47 +1,54 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
-
-import StagePaletteButton from '@modules/settings/components/StagePaletteButton.vue'
+import StagePaletteButton from "@modules/settings/components/StagePaletteButton.vue";
+import { onMounted, onUnmounted } from "vue";
 
 const props = defineProps<{
-  label: string
-  closeLabel: string
-  hint: string
-  scope: string
-}>()
+	label: string;
+	closeLabel: string;
+	hint: string;
+	scope: string;
+}>();
 
 const emit = defineEmits<{
-  close: []
-}>()
+	close: [];
+}>();
 
 function onGlobalKeydown(event: KeyboardEvent) {
-  if (event.key !== 'Escape') return
-  const target = event.target as HTMLElement | null
-  if (target?.isContentEditable || target?.tagName === 'TEXTAREA') return
-  if (target?.tagName === 'INPUT') {
-    const type = ((target as HTMLInputElement).type || 'text').toLowerCase()
-    if (
-      !['button', 'checkbox', 'radio', 'range', 'file', 'reset', 'submit', 'color', 'hidden'].includes(
-        type,
-      )
-    ) {
-      return
-    }
-  }
-  event.preventDefault()
-  event.stopPropagation()
-  emit('close')
+	if (event.key !== "Escape") return;
+	const target = event.target as HTMLElement | null;
+	if (target?.isContentEditable || target?.tagName === "TEXTAREA") return;
+	if (target?.tagName === "INPUT") {
+		const type = ((target as HTMLInputElement).type || "text").toLowerCase();
+		if (
+			![
+				"button",
+				"checkbox",
+				"radio",
+				"range",
+				"file",
+				"reset",
+				"submit",
+				"color",
+				"hidden",
+			].includes(type)
+		) {
+			return;
+		}
+	}
+	event.preventDefault();
+	event.stopPropagation();
+	emit("close");
 }
 
 onMounted(() => {
-  document.documentElement.classList.add('inapp-projection-open')
-  window.addEventListener('keydown', onGlobalKeydown, true)
-})
+	document.documentElement.classList.add("inapp-projection-open");
+	window.addEventListener("keydown", onGlobalKeydown, true);
+});
 
 onUnmounted(() => {
-  document.documentElement.classList.remove('inapp-projection-open')
-  window.removeEventListener('keydown', onGlobalKeydown, true)
-})
+	document.documentElement.classList.remove("inapp-projection-open");
+	window.removeEventListener("keydown", onGlobalKeydown, true);
+});
 </script>
 
 <template>

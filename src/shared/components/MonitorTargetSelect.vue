@@ -1,138 +1,144 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
-
-import { useMonitorTargetSelect } from '@shared/composables/useMonitorTargetSelect'
+import { useMonitorTargetSelect } from "@shared/composables/useMonitorTargetSelect";
+import {
+	computed,
+	nextTick,
+	onBeforeUnmount,
+	onMounted,
+	ref,
+	watch,
+} from "vue";
+import { useI18n } from "vue-i18n";
 
 const props = withDefaults(
-  defineProps<{
-    modelValue?: number[]
-    /** Persiste em projection.settings (default true). */
-    persist?: boolean
-    /** Só monitores estendidos (default true). */
-    extendedOnly?: boolean
-    disabled?: boolean
-    /** Layout compacto para barras de ação. */
-    dense?: boolean
-    /** Exibe chip "Telas" ao lado do botão (header global). */
-    showLabel?: boolean
-  }>(),
-  {
-    persist: true,
-    extendedOnly: true,
-    disabled: false,
-    dense: false,
-    showLabel: false,
-  },
-)
+	defineProps<{
+		modelValue?: number[];
+		/** Persiste em projection.settings (default true). */
+		persist?: boolean;
+		/** Só monitores estendidos (default true). */
+		extendedOnly?: boolean;
+		disabled?: boolean;
+		/** Layout compacto para barras de ação. */
+		dense?: boolean;
+		/** Exibe chip "Telas" ao lado do botão (header global). */
+		showLabel?: boolean;
+	}>(),
+	{
+		persist: true,
+		extendedOnly: true,
+		disabled: false,
+		dense: false,
+		showLabel: false,
+	},
+);
 
 const emit = defineEmits<{
-  'update:modelValue': [ids: number[]]
-  change: [ids: number[]]
-}>()
+	"update:modelValue": [ids: number[]];
+	change: [ids: number[]];
+}>();
 
-const { t } = useI18n()
-const rootEl = ref<HTMLElement | null>(null)
-const panelEl = ref<HTMLElement | null>(null)
-const panelStyle = ref<Record<string, string>>({})
+const { t } = useI18n();
+const rootEl = ref<HTMLElement | null>(null);
+const panelEl = ref<HTMLElement | null>(null);
+const panelStyle = ref<Record<string, string>>({});
 
-const modelRef = computed(() => props.modelValue)
+const modelRef = computed(() => props.modelValue);
 
 const {
-  optionsList,
-  selectedCount,
-  hasDisplays,
-  loading,
-  identifying,
-  open,
-  toggle,
-  identify,
-  toggleOpen,
-  close,
-  refresh,
+	optionsList,
+	selectedCount,
+	hasDisplays,
+	loading,
+	identifying,
+	open,
+	toggle,
+	identify,
+	toggleOpen,
+	close,
+	refresh,
 } = useMonitorTargetSelect({
-  persist: props.persist,
-  extendedOnly: props.extendedOnly,
-  modelValue: () => modelRef.value,
-  onUpdate: (ids) => {
-    emit('update:modelValue', ids)
-    emit('change', ids)
-  },
-})
+	persist: props.persist,
+	extendedOnly: props.extendedOnly,
+	modelValue: () => modelRef.value,
+	onUpdate: (ids) => {
+		emit("update:modelValue", ids);
+		emit("change", ids);
+	},
+});
 
 const triggerLabel = computed(() => {
-  if (selectedCount.value > 0) {
-    return t('monitors.selectedCount', { count: selectedCount.value })
-  }
-  return t('monitors.selectScreens')
-})
+	if (selectedCount.value > 0) {
+		return t("monitors.selectedCount", { count: selectedCount.value });
+	}
+	return t("monitors.selectScreens");
+});
 
 function updatePanelPosition() {
-  const trigger = rootEl.value
-  if (!trigger) return
+	const trigger = rootEl.value;
+	if (!trigger) return;
 
-  const rect = trigger.getBoundingClientRect()
-  const panelWidth = Math.min(296, window.innerWidth - 16)
-  const left = Math.min(
-    Math.max(8, rect.right - panelWidth),
-    window.innerWidth - panelWidth - 8,
-  )
-  const spaceBelow = window.innerHeight - rect.bottom
-  const openUp = spaceBelow < 280 && rect.top > spaceBelow
+	const rect = trigger.getBoundingClientRect();
+	const panelWidth = Math.min(296, window.innerWidth - 16);
+	const left = Math.min(
+		Math.max(8, rect.right - panelWidth),
+		window.innerWidth - panelWidth - 8,
+	);
+	const spaceBelow = window.innerHeight - rect.bottom;
+	const openUp = spaceBelow < 280 && rect.top > spaceBelow;
 
-  panelStyle.value = {
-    position: 'fixed',
-    width: `${panelWidth}px`,
-    left: `${left}px`,
-    zIndex: '80',
-    ...(openUp
-      ? { bottom: `${window.innerHeight - rect.top + 8}px`, top: 'auto' }
-      : { top: `${rect.bottom + 8}px`, bottom: 'auto' }),
-  }
+	panelStyle.value = {
+		position: "fixed",
+		width: `${panelWidth}px`,
+		left: `${left}px`,
+		zIndex: "80",
+		...(openUp
+			? { bottom: `${window.innerHeight - rect.top + 8}px`, top: "auto" }
+			: { top: `${rect.bottom + 8}px`, bottom: "auto" }),
+	};
 }
 
 function onDocumentPointerDown(event: PointerEvent) {
-  if (!open.value) return
-  const target = event.target
-  if (!(target instanceof Node)) return
-  if (rootEl.value?.contains(target)) return
-  if (panelEl.value?.contains(target)) return
-  close()
+	if (!open.value) return;
+	const target = event.target;
+	if (!(target instanceof Node)) return;
+	if (rootEl.value?.contains(target)) return;
+	if (panelEl.value?.contains(target)) return;
+	close();
 }
 
 function onWindowChange() {
-  if (!open.value) return
-  updatePanelPosition()
+	if (!open.value) return;
+	updatePanelPosition();
 }
 
 function onToggle(displayId: number) {
-  if (props.disabled) return
-  toggle(displayId)
+	if (props.disabled) return;
+	toggle(displayId);
 }
 
 async function onIdentify() {
-  if (props.disabled || identifying.value) return
-  await identify()
+	if (props.disabled || identifying.value) return;
+	await identify();
 }
 
 onMounted(() => {
-  document.addEventListener('pointerdown', onDocumentPointerDown, true)
-  window.addEventListener('resize', onWindowChange)
-  window.addEventListener('scroll', onWindowChange, true)
-})
+	document.addEventListener("pointerdown", onDocumentPointerDown, true);
+	window.addEventListener("resize", onWindowChange);
+	window.addEventListener("scroll", onWindowChange, true);
+});
 
 onBeforeUnmount(() => {
-  document.removeEventListener('pointerdown', onDocumentPointerDown, true)
-  window.removeEventListener('resize', onWindowChange)
-  window.removeEventListener('scroll', onWindowChange, true)
-})
+	document.removeEventListener("pointerdown", onDocumentPointerDown, true);
+	window.removeEventListener("resize", onWindowChange);
+	window.removeEventListener("scroll", onWindowChange, true);
+});
 
 watch(open, async (isOpen) => {
-  if (!isOpen) return
-  await refresh()
-  await nextTick()
-  updatePanelPosition()
-})
+	if (!isOpen) return;
+	await refresh();
+	await nextTick();
+	updatePanelPosition();
+});
 </script>
 
 <template>
