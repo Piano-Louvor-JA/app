@@ -301,7 +301,7 @@ function connect(){
   function directTry(){
     var opened=false;
     var t=setTimeout(function(){if(!opened){dlog('WS direto falhou — host stale');localStorage.removeItem('palcoHost');host='';connect()}},3000);
-    try{var w=new WebSocket('ws://'+host+':'+port+'/palco');
+    try{var w=new WebSocket('ws://'+host+':'+port+'/palco'+(qs.get('token')?'?token='+encodeURIComponent(qs.get('token')):''));
       w.onopen=function(){opened=true;clearTimeout(t);try{w.close()}catch(e){};doConnect()};
       w.onerror=function(){};
     }catch(e){clearTimeout(t);localStorage.removeItem('palcoHost');host='';connect()}
@@ -321,7 +321,7 @@ function stopMediaOnServerLoss(){
 function doConnect(){
   dlog('doConnect '+host+':'+port);
   setStatus('conectando '+host+':'+port+'…');
-  try{ws=new WebSocket('ws://'+host+':'+port+'/palco')}catch(e){retry();return}
+  try{ws=new WebSocket('ws://'+host+':'+port+'/palco'+(qs.get('token')?'?token='+encodeURIComponent(qs.get('token')):''))}catch(e){retry();return}
   ws.onopen=()=>{tries=0;dlog('WS OPEN '+host);setStatus('● '+host);
     if(window.__hideSplash)window.__hideSplash(); // F3.3j: splash sai no connect
     localStorage.setItem('palcoHost',host);
