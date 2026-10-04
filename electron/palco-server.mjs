@@ -20,6 +20,7 @@
 
 import { createServer } from 'node:http'
 import { networkInterfaces } from 'node:os'
+import { createHash } from 'node:crypto'
 import path from 'node:path'
 import { readFile } from 'node:fs/promises'
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
@@ -407,7 +408,18 @@ class PalcoSlot {
       const info = await stat(clean)
       if (!info.isFile() || info.size > 200 * 1024 * 1024) return null
       const base = path.basename(clean).replace(/[^A-Za-z0-9._-]/g, '_')
-      const name = `local_${Date.now()}_${base}`
+      // Nome DETERMINÍSTICO (hash do path resolved + mtime + size): a mesma
+      // imagem publicada N vezes gera a MESMA URL. Com nome por timestamp,
+      // cada republish (o onTimeUpdate republisha ~4x/s) trocava o src do
+      // <img> na TV e o Chromium recarregava a imagem a cada publish —
+      // flash = oscilação fallback↔imagem. URL estável = cache do browser,
+      // zero reload. mtime/size no hash: arquivo re-baixado (mesmo path,
+      // bytes novos) muda de URL → cache não serve imagem velha.
+      const h = createHash('sha1')
+        .update(`${path.resolve(clean)}|${info.mtimeMs}|${info.size}`)
+        .digest('hex')
+        .slice(0, 12)
+      const name = `local_${h}_${base}`
       const bytes = await rf(clean)
       const mime = /\.(mp3|m4a)$/i.test(base) ? 'audio/mpeg' : /\.mp4$/i.test(base) ? 'video/mp4' : 'image/png'
       this.#media.set(name, { mime, bytes })
