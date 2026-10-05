@@ -266,4 +266,40 @@ describe('WsPairingView', () => {
       delete (HTMLVideoElement.prototype as { videoHeight?: number }).videoHeight
     }
   })
+
+  it('gaps: onerror e onclose pós-connected → error com msg; message sem action', async () => {
+    const wrapper = createWrapper()
+    await wrapper.find('.ws-pairing__input').setValue('ws://x:1')
+    await wrapper.find('.ws-pairing__btn--ghost').trigger('click')
+    const ws = FakeWebSocket.instances[0]
+    ws.onopen!()
+    await flushPromises()
+    ws.onmessage!({ data: '{"x":1}' } as MessageEvent)
+    await flushPromises()
+    ws.onclose!()
+    await flushPromises()
+    ws.onerror!()
+    await flushPromises()
+    wrapper.unmount()
+  })
+
+  it('gaps: scanFrame com width 0 (ctx guard) e qr sem ws:// prefix', async () => {
+    vi.mocked(jsQR).mockClear()
+    vi.mocked(jsQR).mockReturnValue({ data: 'https://outro' } as ReturnType<typeof jsQR>)
+    const wrapper = createWrapper()
+    await wrapper.find('.ws-pairing__btn').trigger('click')
+    await flushPromises()
+    // videoWidth 0 → guard do canvas.width
+    Object.defineProperty(HTMLVideoElement.prototype, 'videoWidth', { value: 0, configurable: true })
+    const vm = wrapper.vm as unknown as { scanFrame?: () => void }
+    vm.scanFrame?.()
+    // com width real → jsQR chamado, data sem ws:// → ignora
+    Object.defineProperty(HTMLVideoElement.prototype, 'videoWidth', { value: 320, configurable: true })
+    Object.defineProperty(HTMLVideoElement.prototype, 'videoHeight', { value: 240, configurable: true })
+    vm.scanFrame?.()
+    await flushPromises()
+    wrapper.unmount()
+    delete (HTMLVideoElement.prototype as { videoWidth?: number }).videoWidth
+    delete (HTMLVideoElement.prototype as { videoHeight?: number }).videoHeight
+  })
 })
