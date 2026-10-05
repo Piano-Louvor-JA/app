@@ -571,6 +571,20 @@ describe('LiturgyItemDialog', () => {
       wrapper.unmount()
     })
 
+    it('selectLocalFile desktop: arquivo sem extensão mantém nome cru (405 arm1)', async () => {
+      vi.mocked(isDesktopApp).mockReturnValue(true)
+      const openFile = vi.fn(async () => '/music/semext')
+      vi.mocked(getDesktopBridge).mockReturnValue({ dialog: { openFile } } as any)
+      const wrapper = createWrapper({ open: true, draft: { ...defaultProps.draft, type: 'audio', name: '' } })
+      await flushPromises()
+      await (wrapper.vm as any).selectLocalFile()
+      await flushPromises()
+      const emitted = wrapper.emitted('update:draft')
+      const last = emitted![emitted!.length - 1][0] as any
+      expect(last.name).toBe('semext')
+      wrapper.unmount()
+    })
+
     it('selectLocalFile múltiplo (images): filePaths e nome com contagem', async () => {
       vi.mocked(isDesktopApp).mockReturnValue(true)
       const openFile = vi.fn(async () => ['/a.png', '/b.png'])

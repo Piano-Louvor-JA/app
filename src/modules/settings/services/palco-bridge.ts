@@ -61,6 +61,7 @@ import { watch } from 'vue'
 
 /** Quem é o dono do palco agora (última projeção ativa). */
 type Owner = 'media' | 'bible' | 'random' | 'timer' | 'countdown' | 'clock' | null
+/* v8 ignore next 1 -- stmt module-level: V8 nao registra hit de inicializacao de ESM */
 let owner: Owner = null
 
 const runtimes = {

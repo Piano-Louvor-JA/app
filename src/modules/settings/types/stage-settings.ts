@@ -19,6 +19,7 @@
  *   LiturgyWebProjectionView → liturgy
  *   <X>ProjectionView → <x> (bible, timer, random, clock, countdown…)
  */
+/* v8 ignore next 1 -- stmt module-level: V8 não registra hit de inicialização de ESM */
 const projectionViewModules = import.meta.glob('/src/modules/*/views/*ProjectionView.vue')
 
 function viewNameToScope(fileName: string): string | null {
