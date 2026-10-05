@@ -1965,4 +1965,76 @@ describe("MediaEditorView — último branch", () => {
 		expect(st.selectedCollectionId.value).toBe(1);
 		w.unmount();
 	});
+
+describe("MediaEditorView — visibilidade (gaps onda1)", () => {
+	function rawState(w: Awaited<ReturnType<typeof mountEditor>>) {
+		return w.vm.$.devtoolsRawSetupState as unknown as Record<string, unknown> & {
+			selectedCollectionId: { value: number | null };
+			rulesOpen: { value: boolean };
+			newCollectionVisibility: { value: string };
+			onChangeVisibilityWithRules: (next: "public" | "private") => Promise<void>;
+		};
+	}
+
+	it("1a vez public → abre regras e não persiste (338-340); depois private persiste (342+)", async () => {
+		localStorage.removeItem("mediaeditor.visibility.rules.seen.v1");
+		const w = await mountEditor();
+		const s = rawState(w);
+		s.selectedCollectionId.value = 1;
+		await flushPromises();
+		await s.onChangeVisibilityWithRules("public");
+		expect(s.rulesOpen.value).toBe(true);
+		// marca visto e muda pra private → persiste via API
+		const { updateCustomCollection } = await import("../../services/custom-catalog");
+		vi.mocked(updateCustomCollection).mockResolvedValue({ id: 1, name: "Coletânea Teste", visibility: "private", musicsCount: 2 } as never);
+		localStorage.setItem("mediaeditor.visibility.rules.seen.v1", "1");
+		await s.onChangeVisibilityWithRules("private");
+		expect(updateCustomCollection).toHaveBeenCalled();
+		w.unmount();
+	});
+
+	it("mesma visibilidade → sem chamada (348); local id → patch local (349)", async () => {
+		localStorage.setItem("mediaeditor.visibility.rules.seen.v1", "1");
+		const localStore = await import("../../services/local-custom-store");
+		const w = await mountEditor();
+		const s = rawState(w);
+		s.selectedCollectionId.value = 1;
+		await flushPromises();
+		const { updateCustomCollection } = await import("../../services/custom-catalog");
+		vi.mocked(updateCustomCollection).mockClear();
+		// privada → privada: current.visibility ?? public === private? coletânea 1 sem visibility → 'public'; mudar pra private persiste; de novo private → retorna cedo
+		vi.mocked(updateCustomCollection).mockResolvedValue({ id: 1, name: "x", visibility: "private", musicsCount: 2 } as never);
+		await s.onChangeVisibilityWithRules("private");
+		const calls = vi.mocked(updateCustomCollection).mock.calls.length;
+		await s.onChangeVisibilityWithRules("private");
+		expect(vi.mocked(updateCustomCollection).mock.calls.length).toBe(calls);
+		// local id: patch direto (349-355)
+		vi.mocked(localStore.isLocalId).mockReturnValue(true);
+		const localOnly = { id: -5, name: "Local", visibility: "public", musicsCount: 0 } as never;
+		vi.mocked(listCustomCollections).mockResolvedValue([localOnly]);
+		// re-mount pra recarregar listagem
+		w.unmount();
+		const w2 = await mountEditor();
+		const s2 = rawState(w2);
+		s2.selectedCollectionId.value = -5;
+		await flushPromises();
+		vi.mocked(updateCustomCollection).mockClear();
+		await s2.onChangeVisibilityWithRules("public");
+		expect(updateCustomCollection).not.toHaveBeenCalled();
+		w2.unmount();
+	});
+
+	it("update falha → notifica erro (366)", async () => {
+		localStorage.setItem("mediaeditor.visibility.rules.seen.v1", "1");
+		const w = await mountEditor();
+		const s = rawState(w);
+		s.selectedCollectionId.value = 1;
+		await flushPromises();
+		const { updateCustomCollection } = await import("../../services/custom-catalog");
+		vi.mocked(updateCustomCollection).mockResolvedValue(null as never);
+		await s.onChangeVisibilityWithRules("private");
+		expect((s as unknown as { statusMessage: { value: string } }).statusMessage.value).toContain("Falha");
+		w.unmount();
+	});
+});
 });
