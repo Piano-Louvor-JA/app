@@ -68,7 +68,9 @@ function unionFiles(filesA, filesB) {
       const index = new Map();
       const add = (cov) => {
         for (const [id, loc] of Object.entries(cov.fnMap)) {
-          const key = `${spanKey(loc.decl.start, loc.decl.end)}#${loc.name ?? ''}`;
+          // name excluído: workers remapeiam nomes anônimos de forma
+          // não-determinística → mesma fn virava 2 entradas (uma fantasma).
+          const key = spanKey(loc.decl.start, loc.decl.end);
           let newId = index.get(key);
           if (newId === undefined) {
             newId = String(index.size);
