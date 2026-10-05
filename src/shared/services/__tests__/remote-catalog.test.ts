@@ -121,4 +121,10 @@ describe("fetchRemoteCatalogJson", () => {
 		expect(mocks.state.fetch).toHaveBeenCalledTimes(2);
 	});
 
+  it("erro não-Error (string) cai no String(error) e não retenta", async () => {
+    mocks.state.fetch.mockRejectedValueOnce("boom string");
+    const res = await fetchRemoteCatalogJson("catalog", 1, 5);
+    expect(res).toEqual({ via: "fallback" });
+  });
+
 });
