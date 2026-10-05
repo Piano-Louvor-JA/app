@@ -261,4 +261,42 @@ describe('useUiZoom', () => {
     api.zoomIn()
     expect(api.zoom.value).toBe(1.1)
   })
+
+  it('gaps2: zoom persistido como número no storage (readStoredZoom number)', async () => {
+    getUserPreference.mockReturnValue(1.4 as unknown as undefined)
+    const mod = await loadFresh()
+    const api = mod.useUiZoom()
+    expect(api.zoom.value).toBe(1.4)
+  })
+
+  it('gaps2: onChanged sem factor + getFactor que lança → null (catch)', async () => {
+    getUserPreference.mockReturnValue(undefined) // reset do mock do teste anterior
+    let cb: ((p: unknown) => void) | undefined
+    bridgeImpl.zoom = {
+      getFactor: () => {
+        throw new Error('boom')
+      },
+      onChanged: (fn: never) => {
+        cb = fn as never
+        return () => {}
+      },
+    }
+    const mod = await loadFresh()
+    let api: ReturnType<typeof mod.useUiZoom> | undefined
+    const { wrapper } = await withComponent(() => {
+      api = mod.useUiZoom()
+      return api
+    })
+    cb?.({ factor: undefined })
+    expect(api!.zoom.value).toBe(1) // permanece default
+    wrapper.unmount()
+  })
+
+  it('gaps2: mount em popup de projeção não reaplica (L169)', async () => {
+    isPopupRef.value = true
+    const mod = await loadFresh()
+    const { wrapper } = await withComponent(() => mod.useUiZoom())
+    expect(document.documentElement.style.getPropertyValue('zoom')).toBe('')
+    wrapper.unmount()
+  })
 })
