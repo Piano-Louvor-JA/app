@@ -156,4 +156,25 @@ describe('LiturgyWebProjectionView', () => {
     expect(removeSpy).toHaveBeenCalledWith('storage', expect.any(Function))
     removeSpy.mockRestore()
   })
+
+  it('gaps10: message event do runtime atualiza via onRuntimeMessage (fn 82)', async () => {
+    let handler: ((ev: MessageEvent) => void) | null = null
+    class FakeChannel {
+      name = 'louvorja-liturgy-web-runtime'
+      addEventListener(_t: string, fn: (ev: MessageEvent) => void) {
+        handler = fn
+      }
+      removeEventListener() {}
+      postMessage() {}
+      close() {}
+    }
+    vi.stubGlobal('BroadcastChannel', FakeChannel)
+    const wrapper = createWrapper()
+    await flushPromises()
+    handler!(new MessageEvent('message', { data: { active: true, kind: 'site', url: 'https://via-mensagem.com' } }))
+    await flushPromises()
+    expect(mocks.normalizeLiturgyWebRuntime).toHaveBeenCalledWith({ active: true, kind: 'site', url: 'https://via-mensagem.com' })
+    vi.unstubAllGlobals()
+    wrapper.unmount()
+  })
 })
