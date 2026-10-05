@@ -86,4 +86,12 @@ describe('UtilitiesHubCard.vue', () => {
     await flushPromises()
     expect(router.currentRoute.value.path).toBe('/')
   })
+
+  it('outra tecla: sem navegação (26 arm1)', async () => {
+    const { wrapper, router } = createWrapper()
+    await wrapper.find('.utilities-hub-card').trigger('keydown', { key: 'Escape' })
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/')
+    wrapper.unmount()
+  })
 })
