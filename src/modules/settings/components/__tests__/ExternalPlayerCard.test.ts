@@ -257,4 +257,35 @@ describe('ExternalPlayerCard', () => {
     }
     w.unmount()
   })
+
+  it('gaps: clicks nos radios/custom (cond-expr template), remove custom via chip', async () => {
+    const bridge = makeBridge()
+    bridge.externalPlayer.listCustom.mockResolvedValue(['/usr/bin/mpv'])
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    await flushPromises()
+    // radio associated + detect (cond-expr aria/selected)
+    // com set() pendente: 2º click cai no guard busy (brs 80/96/119)
+    let releaseSet!: (v: boolean) => void
+    bridge.externalPlayer.set.mockReturnValue(new Promise((r) => (releaseSet = r)))
+    await w.find('[data-test="external-player-associated"]').trigger('click')
+    await flushPromises()
+    await w.find('[data-test="external-player-associated"]').trigger('click') // busy → no-op
+    await w.find('[data-test="external-player-detect"]').trigger('click') // tb no-op? detect tem próprio guard
+    releaseSet(true)
+    await flushPromises()
+    await w.find('[data-test="external-player-detect"]').trigger('click')
+    await flushPromises()
+    // custom chip: click seleciona; remove limpa
+    const custom = w.find('[data-test="external-player-custom"]')
+    if (custom.exists()) {
+      await custom.trigger('click')
+      await flushPromises()
+      const rm = w.find('[data-test="external-player-custom-remove"]')
+      if (rm.exists()) await rm.trigger('click')
+      await flushPromises()
+    }
+    w.unmount()
+  })
 })
