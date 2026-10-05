@@ -168,4 +168,26 @@ describe('PalcoSlotsCard', () => {
     expect(palcoApi.slots).not.toHaveBeenCalled()
     w.unmount()
   })
+
+  it('gaps9: polling de 3s dispara refresh (fn 62)', async () => {
+    Object.defineProperty(window, 'louvorja', {
+      get: () => ({ palco: palcoApi }),
+      configurable: true,
+    })
+    vi.useFakeTimers()
+    try {
+      const w = mount(PalcoSlotsCard)
+      await vi.advanceTimersByTimeAsync(0)
+      await Promise.resolve()
+      await flushPromises()
+      const calls0 = palcoApi.slots.mock.calls.length
+      expect(calls0).toBeGreaterThan(0)
+      await vi.advanceTimersByTimeAsync(3000)
+      await flushPromises()
+      expect(palcoApi.slots.mock.calls.length).toBeGreaterThan(calls0)
+      w.unmount()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
