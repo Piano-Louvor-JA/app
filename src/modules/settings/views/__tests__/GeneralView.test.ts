@@ -504,4 +504,20 @@ describe('GeneralView.vue', () => {
     })
   })
 
+
+    it('gaps: export/import durante busy são no-op; labels checking/clearing alternam', async () => {
+      let release!: (v: boolean) => void
+      const { exportLouvorjaFile: exportFn } = await import('@modules/sync/services/louvorja-file')
+      vi.mocked(exportFn).mockReturnValueOnce(new Promise((r) => (release = r)))
+      const wrapper = mountComponent()
+      await flushPromises()
+      const btns = wrapper.findAll('.general-settings__sync-actions button')
+      await btns[0]!.trigger('click') // inicia export (busy)
+      await btns[0]!.trigger('click') // guard: no-op
+      await btns[1]!.trigger('click') // guard import: no-op
+      await flushPromises()
+      release(true)
+      await flushPromises()
+      wrapper.unmount()
+    })
 })
