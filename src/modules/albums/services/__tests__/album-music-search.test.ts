@@ -23,6 +23,7 @@ vi.mock('../album-tracks', () => ({
 import {
   filterAlbumMusicIndex,
   loadAlbumMusicIndex,
+  type AlbumSearchHit,
 } from '../album-music-search'
 import { fetchRemoteCatalogJson } from '@shared/services/remote-catalog'
 import { readCatalogRecord } from '@shared/services/workspace-api'
@@ -253,4 +254,157 @@ describe('filterAlbumMusicIndex', () => {
     expect(results[0]!.track).toBeNull()
     expect(results[0]!.isHymnal).toBe(false)
   })
+
+describe('gaps onda1 — normalização de albums e ranking numérico', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+  afterEach(() => vi.restoreAllMocks())
+
+  it('type não-hinário com name null avalia o fallback de nome', async () => {
+    mockRead.mockResolvedValueOnce([
+      baseHit({ id_music: 5, name: 'Nome', albums: [{ name: null, type: 'cd', track: 2 }] }),
+    ])
+    const index = await loadAlbumMusicIndex()
+    expect(index[0]!.albumNames).toBe('Música')
+  })
+
+  it('row.name null descarta linha (fallback de String null)', async () => {
+    mockRead.mockResolvedValueOnce([baseHit({ id_music: 6, name: null })])
+    const index = await loadAlbumMusicIndex()
+    expect(index).toHaveLength(0)
+  })
+
+  it('albums com name null/undefined e tracks inválidos: normaliza sem lançar', async () => {
+    mockRead.mockResolvedValueOnce([
+      baseHit({
+        id_music: 7,
+        name: 'Fé',
+        albums: [
+          { name: null, type: 'hymnal', track: 0, pivot: { track: -1 } },
+          { name: undefined, type: 'hymnal_1996', track: null },
+          { name: 'CD', type: 'cd', track: 3 },
+        ],
+      }),
+    ])
+    const index = await loadAlbumMusicIndex()
+    expect(index).toHaveLength(1)
+    // hinário atual inválido → cai pro 1996 → track null → tracks do hinário vazios → fallback row.track ausente
+    expect(index[0]!.track).toBe(null)
+    expect(index[0]!.hymnalTracks).toEqual([])
+  })
+
+  it('sem hinário válido mas com hymnalTracks coletados: usa hymnalTracks[0]; merge une fallbacks', async () => {
+    mockRead.mockResolvedValueOnce([
+      baseHit({
+        id_music: 9,
+        name: 'Santo',
+        albums: [
+          { name: 'Hinário Adventista 1996', type: 'hymnal', track: 12 },
+          { name: 'Hinário Adventista', type: 'hymnal', track: 0 },
+        ],
+      }),
+    ])
+    const index = await loadAlbumMusicIndex()
+    // hinário atual track 0 → inválido; 1996 track 12 válido → preferido 2º loop
+    expect(index[0]!.track).toBe(12)
+    expect(index[0]!.isHymnal).toBe(true)
+    expect(index[0]!.hymnalTracks).toEqual([12])
+  })
+
+  it('merge: a null + b track (142 arm1)', async () => {
+    mockRead.mockResolvedValueOnce([
+      baseHit({ id_music: 11, name: 'Graça', albums: [{ name: 'A', type: 'cd', track: null }] }),
+      baseHit({ id_music: 11, name: 'Graça', albums: [{ name: 'B', type: 'hymnal', track: 5 }] }),
+    ])
+    const index = await loadAlbumMusicIndex()
+    expect(index[0]!.track).toBe(5)
+  })
+
+  it('merge: a/b null + hymnalTracks (arm2); tudo null (arm3); isHymnal via b (146 arm1); albumNames iguais (147 arm0)', async () => {
+    mockRead.mockResolvedValueOnce([
+      baseHit({ id_music: 12, name: 'Kyrie', albums: [{ name: 'Hinário Adventista', type: 'hymnal', track: 0 }] }),
+      baseHit({ id_music: 12, name: 'Kyrie', albums: [{ name: 'Hinário Adventista', type: 'hymnal', track: 0 }] }),
+    ])
+    const index = await loadAlbumMusicIndex()
+    expect(index).toHaveLength(1)
+  })
+
+  it('merge: ambos não-hinário track null → track null; isHymnal false|false', async () => {
+    mockRead.mockResolvedValueOnce([
+      baseHit({ id_music: 13, name: 'Doxo', albums: [{ name: 'CD P', type: 'cd', track: null }] }),
+      baseHit({ id_music: 13, name: 'Doxo', albums: [{ name: 'CD Q', type: 'cd', track: null }] }),
+    ])
+    const index = await loadAlbumMusicIndex()
+    expect(index[0]!.track).toBe(null)
+    expect(index[0]!.isHymnal).toBe(false)
+  })
+
+  it('merge: track via hymnalTracks[0], isHymnal por track, albumNames distintos', async () => {
+    mockRead.mockResolvedValueOnce([
+      baseHit({
+        id_music: 11,
+        name: 'Graça',
+        albums: [{ name: 'Hinário Adventista', type: 'hymnal', track: 5 }],
+      }),
+      baseHit({
+        id_music: 11,
+        name: 'Graça',
+        track: null,
+        albums: [{ name: 'CD Especial', type: 'cd', track: null }],
+        has_instrumental_music: 1,
+      }),
+    ])
+    const index = await loadAlbumMusicIndex()
+    expect(index).toHaveLength(1)
+    const hit = index[0]!
+    expect(hit.track).toBe(5)
+    expect(hit.isHymnal).toBe(true)
+    expect(hit.albumNames).toContain('CD Especial')
+    expect(hit.hasInstrumental).toBe(true)
+  })
+
+  it('busca numérica: sem match numérico score 0; match 1996 fica atrás do hinário atual', async () => {
+    const index = [
+      {
+        musicId: 21, name: 'Velho', track: null, durationLabel: '--:--', hasInstrumental: false,
+        albumNames: 'Hinário Adventista 1996', displayTitle: 'Velho', isHymnal: true, hymnalTracks: [40],
+      },
+      {
+        musicId: 22, name: 'Novo', track: 40, durationLabel: '--:--', hasInstrumental: false,
+        albumNames: 'Hinário Adventista', displayTitle: 'Novo', isHymnal: true, hymnalTracks: [40],
+      },
+      {
+        musicId: 23, name: 'Outro 40', track: 9, durationLabel: '--:--', hasInstrumental: false,
+        albumNames: 'CD X', displayTitle: 'Outro 40', isHymnal: false, hymnalTracks: [],
+      },
+      {
+        musicId: 24, name: 'CD 40', track: null, durationLabel: '--:--', hasInstrumental: false,
+        albumNames: 'Coletânea 40', displayTitle: 'CD 40', isHymnal: false, hymnalTracks: [40],
+      } as AlbumSearchHit,
+      {
+        musicId: 25, name: 'Só Texto 40', track: 41, durationLabel: '--:--', hasInstrumental: false,
+        albumNames: 'CD Z', displayTitle: 'Só Texto 40', isHymnal: false,
+      } as unknown as AlbumSearchHit,
+    ]
+    const results = filterAlbumMusicIndex(index, '40')
+    // 22: track direto (score 2); 21/24: hymnalTracks (atual vs 1996); 23: texto apenas (score 0)
+    expect(results.map((r) => r.musicId)).toEqual([22, 21, 23, 24, 25])
+    expect(results.find((r) => r.musicId === 24)!.track).toBe(40)
+    expect(results.find((r) => r.musicId === 23)!.track).toBe(9)
+  })
+
+  it('busca numérica que casa só por texto: entra sem promoção e score 0 (hasNumber false)', async () => {
+    const index = [
+      {
+        musicId: 31, name: 'Amafé 77', track: null, durationLabel: '--:--', hasInstrumental: false,
+        albumNames: 'CD Y', displayTitle: 'Amafé 77', isHymnal: false, hymnalTracks: [],
+      },
+    ]
+    const results = filterAlbumMusicIndex(index, '77')
+    expect(results.map((r) => r.musicId)).toEqual([31])
+    expect(results[0]!.track).toBe(null)
+    expect(results[0]!.isHymnal).toBe(false)
+  })
+})
 })
