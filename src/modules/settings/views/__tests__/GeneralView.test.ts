@@ -520,4 +520,65 @@ describe('GeneralView.vue', () => {
       await flushPromises()
       wrapper.unmount()
     })
+
+  it('guards defensivos: web no danger, cliques forçados durante busy, clear resolved false', async () => {
+    // web: botão disabled, mas handler com guard L42 (dispatch manual)
+    vi.mocked(isDesktopApp).mockReturnValue(false)
+    let w = mountComponent()
+    await flushPromises()
+    const danger = w.find('.general-settings__btn--danger')
+    ;(danger.element as HTMLElement).dispatchEvent(
+      new MouseEvent('click', { bubbles: true }),
+    )
+    await flushPromises()
+    expect(w.find('input[type="checkbox"]').exists()).toBe(false)
+    w.unmount()
+
+    // busy: export pendente, cliques forçados nos 2 botões → guards L63/L81
+    vi.mocked(isDesktopApp).mockReturnValue(true)
+    let release!: (v: boolean) => void
+    const { exportLouvorjaFile: exportFn } = await import('@modules/sync/services/louvorja-file')
+    vi.mocked(exportFn).mockReturnValueOnce(new Promise((r) => (release = r)))
+    w = mountComponent()
+    await flushPromises()
+    const syncBtns = w.findAll('.general-settings__sync-actions button')
+    ;(syncBtns[0]!.element as HTMLElement).dispatchEvent(
+      new MouseEvent('click', { bubbles: true }),
+    )
+    await flushPromises()
+    ;(syncBtns[0]!.element as HTMLElement).dispatchEvent(
+      new MouseEvent('click', { bubbles: true }),
+    )
+    ;(syncBtns[1]!.element as HTMLElement).dispatchEvent(
+      new MouseEvent('click', { bubbles: true }),
+    )
+    await flushPromises()
+    release(true)
+    await flushPromises()
+    w.unmount()
+
+    // clearWorkspace resolve false → throw L153 → clearError true
+    vi.mocked(clearWorkspace).mockResolvedValueOnce(false)
+    w = mountComponent()
+    await flushPromises()
+    await w.find('.general-settings__btn--danger').trigger('click')
+    await w.find('.clear-confirm__checkbox').trigger('click')
+    await w.find('.clear-confirm__btn--danger').trigger('click')
+    await flushPromises()
+    expect((w.vm as any).clearError).toBe(true)
+    w.unmount()
+    vi.mocked(isDesktopApp).mockReturnValue(false)
+  })
+
+  it('idioma salva como null cai no fallback pt-BR; label checking com isChecking true', async () => {
+    const { getUserPreference } = await import('@shared/services/user-preferences')
+    vi.mocked(getUserPreference).mockReturnValueOnce(null)
+    updateCheckerState.isChecking.value = true
+    const w = mountComponent()
+    await flushPromises()
+    expect(w.text()).toContain('settings.general.checking')
+    expect(w.text()).not.toContain('settings.general.checkUpdate')
+    updateCheckerState.isChecking.value = false
+    w.unmount()
+  })
 })
