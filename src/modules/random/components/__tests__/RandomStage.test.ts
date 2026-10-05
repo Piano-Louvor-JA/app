@@ -392,4 +392,31 @@ describe("RandomStage — estilos por contexto", () => {
       Element.prototype.animate = origAnimate
     })
   })
+
+  it('gaps onda1: drawn não-array normaliza vazio; idle→idle reseta wasDrawing; classe overlay', async () => {
+    const rt = runtime({ isDrawing: false, drawn: 'corrompido' as unknown as string[] })
+    const w = mountStage({ projection: true, showDraw: true, runtime: rt })
+    expect(w.find('.random-stage__draw').classes()).toContain('random-stage__draw--overlay')
+    expect(w.find('.random-stage__drawn-list').exists()).toBe(false)
+    await w.setProps({ runtime: { ...rt, isDrawing: false } })
+    await nextTick()
+    w.unmount()
+  })
+
+  it('gaps onda1: onfinish após unmount remove/ignora animation cancelada', async () => {
+    const anims: any[] = []
+    const origAnimate = Element.prototype.animate
+    Element.prototype.animate = function () {
+      const a = { onfinish: null as null | (() => void), cancel: vi.fn(), finished: Promise.resolve() } as unknown as Animation
+      anims.push(a)
+      return a
+    } as any
+    const w = mountStage({})
+    await nextTick()
+    const first = anims[0]
+    w.unmount()
+    first.onfinish?.()
+    expect(first.cancel).toHaveBeenCalled()
+    Element.prototype.animate = origAnimate
+  })
 })
