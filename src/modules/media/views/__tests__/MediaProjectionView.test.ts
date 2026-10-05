@@ -1,5 +1,16 @@
 // @vitest-environment jsdom
 import { mount } from "@vue/test-utils";
+
+// override stage-settings: true-arms de textShadow/boxStyle (fantasma de glob vazio em teste)
+const stageSettingsStateMPV = vi.hoisted(() => ({ value: null as Record<string, unknown> | null }))
+vi.mock("../../../settings/services/stage-settings-runtime", async (importOriginal) => {
+	const real = await importOriginal<typeof import("../../../settings/services/stage-settings-runtime")>()
+	return {
+		readEffectiveStageSettings: (scope: string) =>
+			stageSettingsStateMPV.value ?? real.readEffectiveStageSettings(scope),
+		subscribeStageSettings: (cb: () => void) => real.subscribeStageSettings(cb),
+	}
+})
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -164,3 +175,29 @@ describe("MediaProjectionView — boxStyle branches (90/97/101)", () => {
     w.unmount();
   });
 });
+  it("gaps: stage completo true-arms (textShadow/boxStyle/border)", async () => {
+    stageSettingsStateMPV.value = {
+      backgroundColor: "#000000",
+      textColor: "#ffffff",
+      fontSize: 96,
+      textAlign: "center",
+      textShadow: true,
+      shadowBlur: 3,
+      shadowIntensity: 0.8,
+      textBox: true,
+      boxOpacity: 0.5,
+      boxBorder: true,
+    } as Record<string, unknown>
+    try {
+      const w = await mountView()
+      await w.vm.$nextTick()
+      expect(w.find(".media-projection").exists()).toBe(true)
+      // fn47: callback do subscribeStageSettings via storage event
+      window.dispatchEvent(new StorageEvent("storage", { key: "user_data" }))
+      await w.vm.$nextTick()
+      w.unmount()
+    } finally {
+      stageSettingsStateMPV.value = null
+    }
+  })
+
