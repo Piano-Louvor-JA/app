@@ -344,3 +344,33 @@ describe('MediaView — sessão com conteúdo', () => {
     expect(w.find('.media-window__ondemand-fill').attributes('style')).toContain('scaleX(0.4)')
   })
 })
+  it('gaps: cover sem lyric usa fallback; slide com lyric vazia usa slideOf', async () => {
+    P().refs.hasSession.value = true
+    P().refs.session.value = { title: 'Hino X', subtitle: 'CC', slides: [
+      { lyric: '', isCover: true },
+      { lyric: ' ', isCover: false },
+    ] }
+    P().refs.currentSlide.value = { lyric: ' ', isCover: true }
+    const w = await mountView()
+    const items = w.findAll('.media-window__playlist-item')
+    expect(items.length).toBe(2)
+    expect(w.text()).toContain('media.coverSlide')
+    expect(w.text()).toContain('media.slideOf')
+    w.unmount()
+  })
+
+  it('gaps: ondemand percent/preplay/done states no pill', async () => {
+    P().refs.hasSession.value = true
+    P().refs.session.value = { title: 'H', subtitle: '', slides: [{ lyric: 'L', isCover: false }] }
+    P().refs.currentSlide.value = { lyric: 'L', isCover: false }
+    P().refs.ondemandNoticeVisible.value = true
+    P().refs.ondemandDownloadPercent.value = 55
+    P().refs.preplayDownloadMusicId.value = 42
+    const w = await mountView()
+    await w.vm.$nextTick()
+    // done true (preplay && !done false-arm)
+    P().refs.ondemandDownloadDone.value = true
+    await w.vm.$nextTick()
+    w.unmount()
+  })
+
