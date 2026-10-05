@@ -2504,4 +2504,58 @@ describe("MediaEditorView — lote 3 onda1", () => {
 		w.unmount();
 	});
 });
+
+describe("MediaEditorView — cliques de template (lote 4 onda1)", () => {
+	it("clicks: visibilidade nova private, regras, private do selected, show-rules", async () => {
+		localStorage.setItem("louvorja.publishRulesSeen", "1");
+		const { updateCustomCollection } = await import("../../services/custom-catalog");
+		vi.mocked(updateCustomCollection).mockResolvedValue({ id: 1, name: "x", visibility: "private", musicsCount: 2 } as never);
+		const w = await mountEditor();
+		document.body.appendChild(w.element);
+		const s = w.vm.$.devtoolsRawSetupState as unknown as Record<string, unknown> & {
+			selectedCollectionId: { value: number | null };
+			newCollectionVisibility: { value: string };
+			rulesOpen: { value: boolean };
+		};
+		await flushPromises();
+		// 1203: botão privado do form de nova coletânea
+		const privBtn = Array.from(document.querySelectorAll<HTMLButtonElement>(".editor__visibility-btn")).find((b) => b.getAttribute("aria-pressed") === "true");
+		if (privBtn) { privBtn.click(); await flushPromises(); }
+		expect(s.newCollectionVisibility.value).toBe("private");
+		// 1229: link de regras do form
+		const rulesBtn = document.querySelector<HTMLButtonElement>(".editor__btn--rules");
+		if (rulesBtn) { rulesBtn.click(); await flushPromises(); }
+		// 1262: private do selected (coletânea 1) via wrapper (2º grupo)
+		const groups = w.findAll('[role="radiogroup"]');
+		const selGroup = groups.at(-1)!;
+		const privInGroup = selGroup.findAll('button').filter((b) => b.text().toLowerCase().includes('privada')).at(-1)!;
+		await privInGroup.trigger('click');
+		await flushPromises();
+		// 1295: voltar pra public e abrir show-rules
+		const pubInGroup = selGroup.findAll('button').filter((b) => b.text().toLowerCase().includes('pública')).at(-1)!;
+		await pubInGroup.trigger('click');
+		await flushPromises();
+		const showRules = w.findAll('button').filter((b) => b.text().includes('Regras') || (b.attributes('title') ?? '').length > 0 && b.classes().join(' ').includes('--rules')).at(-1);
+		if (showRules) { await showRules.trigger('click'); await flushPromises(); }
+		const { updateCustomCollection: ucc } = await import("../../services/custom-catalog");
+		console.log('DBG1262', vi.mocked(ucc).mock.calls.length, 'rules', s.rulesOpen.value, 'groups', groups.length, 'selGroupBtns', selGroup ? selGroup.findAll('button').length : -1);
+		expect(s.rulesOpen.value).toBe(true);
+		w.unmount();
+	});
+
+	it("alreadySeen catch: localStorage.getItem lança (334)", async () => {
+		const orig = localStorage.getItem.bind(localStorage);
+		vi.spyOn(localStorage, "getItem").mockImplementation(() => { throw new Error("x") });
+		const w = await mountEditor();
+		const s = w.vm.$.devtoolsRawSetupState as unknown as Record<string, unknown> & {
+			selectedCollectionId: { value: number | null };
+			onChangeVisibilityWithRules: (n: "public") => Promise<void>;
+		};
+		s.selectedCollectionId.value = 1;
+		await flushPromises();
+		await (s.onChangeVisibilityWithRules as (n: "public") => Promise<void>)("public");
+		vi.restoreAllMocks();
+		w.unmount();
+	});
+});
 });

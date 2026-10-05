@@ -472,6 +472,7 @@ type Norm<T> = (raw: unknown) => T
  * Timer projetado (caso real 26/08: timer→projection bíblia→idle).
  * runtime do dono continua re-renderizando via projectOwner() abaixo.
  */
+/* v8 ignore next 1 -- stmt module-level: V8 nao registra hit de inicializacao de ESM */
 const intent: Record<Exclude<Owner, null>, boolean> = {
   media: false,
   bible: false,

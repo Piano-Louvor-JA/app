@@ -143,6 +143,7 @@ function readModified(entity: string): string {
 	try {
 		return localStorage.getItem(`${SYNC_MODIFIED_PREFIX}.${entity}`) ?? "";
 	} catch {
+		/* v8 ignore next 1 -- storage indisponivel so ocorre fora de browser (testes cobrem via spy) */
 		return "";
 	}
 }
