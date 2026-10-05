@@ -253,4 +253,17 @@ describe('P2pPairingView', () => {
       delete (HTMLVideoElement.prototype as { videoHeight?: number }).videoHeight
     }
   })
+
+it('gaps7: v-model manual via DOM dispara handler do template (fn 165)', async () => {
+    const wrapper = createWrapper()
+    await wrapper.find('.p2p-pairing__btn').trigger('click')
+    await flushPromises()
+    const ta = wrapper.find('.p2p-pairing__manual')
+    expect(ta.exists()).toBe(true)
+    await ta.setValue('ANSWER-DATA')
+    await applyButton(wrapper).trigger('click') // submitManual lê manualAnswer
+    await flushPromises()
+    expect(componentHost().acceptAnswer).toHaveBeenCalledWith('ANSWER-DATA')
+    wrapper.unmount()
+  })
 })
