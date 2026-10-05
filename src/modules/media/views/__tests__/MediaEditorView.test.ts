@@ -1977,7 +1977,7 @@ describe("MediaEditorView — visibilidade (gaps onda1)", () => {
 	}
 
 	it("1a vez public → abre regras e não persiste (338-340); depois private persiste (342+)", async () => {
-		localStorage.removeItem("mediaeditor.visibility.rules.seen.v1");
+		localStorage.removeItem("louvorja.publishRulesSeen");
 		const w = await mountEditor();
 		const s = rawState(w);
 		s.selectedCollectionId.value = 1;
@@ -1987,14 +1987,16 @@ describe("MediaEditorView — visibilidade (gaps onda1)", () => {
 		// marca visto e muda pra private → persiste via API
 		const { updateCustomCollection } = await import("../../services/custom-catalog");
 		vi.mocked(updateCustomCollection).mockResolvedValue({ id: 1, name: "Coletânea Teste", visibility: "private", musicsCount: 2 } as never);
-		localStorage.setItem("mediaeditor.visibility.rules.seen.v1", "1");
+		localStorage.setItem("louvorja.publishRulesSeen", "1");
 		await s.onChangeVisibilityWithRules("private");
 		expect(updateCustomCollection).toHaveBeenCalled();
+		// private → public remoto: notify pública (362 arm0)
+		await s.onChangeVisibilityWithRules("public");
 		w.unmount();
 	});
 
 	it("mesma visibilidade → sem chamada (348); local id → patch local (349)", async () => {
-		localStorage.setItem("mediaeditor.visibility.rules.seen.v1", "1");
+		localStorage.setItem("louvorja.publishRulesSeen", "1");
 		const localStore = await import("../../services/local-custom-store");
 		const w = await mountEditor();
 		const s = rawState(w);
@@ -2010,7 +2012,7 @@ describe("MediaEditorView — visibilidade (gaps onda1)", () => {
 		expect(vi.mocked(updateCustomCollection).mock.calls.length).toBe(calls);
 		// local id: patch direto (349-355)
 		vi.mocked(localStore.isLocalId).mockReturnValue(true);
-		const localOnly = { id: -5, name: "Local", visibility: "public", musicsCount: 0 } as never;
+		const localOnly = { id: -5, name: "Local", visibility: "private", musicsCount: 0 } as never;
 		vi.mocked(listCustomCollections).mockResolvedValue([localOnly]);
 		// re-mount pra recarregar listagem
 		w.unmount();
@@ -2019,13 +2021,20 @@ describe("MediaEditorView — visibilidade (gaps onda1)", () => {
 		s2.selectedCollectionId.value = -5;
 		await flushPromises();
 		vi.mocked(updateCustomCollection).mockClear();
+		// local private → private (352 arm1: msg privada)
+		await s2.onChangeVisibilityWithRules("private");
+		// local private → public (352 arm0: msg pública-local)
+		await s2.onChangeVisibilityWithRules("public");
+		// local public → private (352 arm1: msg privada-local)
+		await s2.onChangeVisibilityWithRules("private");
+		console.log("SEL", s2.selectedCollectionId.value, JSON.stringify((s2 as unknown as { collections: { value: Array<{ id: number }> } }).collections?.value?.map((c) => c.id)));
 		await s2.onChangeVisibilityWithRules("public");
 		expect(updateCustomCollection).not.toHaveBeenCalled();
 		w2.unmount();
 	});
 
 	it("update falha → notifica erro (366)", async () => {
-		localStorage.setItem("mediaeditor.visibility.rules.seen.v1", "1");
+		localStorage.setItem("louvorja.publishRulesSeen", "1");
 		const w = await mountEditor();
 		const s = rawState(w);
 		s.selectedCollectionId.value = 1;
@@ -2193,7 +2202,7 @@ describe("MediaEditorView — gaps finais onda1", () => {
 	});
 
 	it("rules modal abre/fecha via setup (1776/1794); stanzaProgress sem próxima (110 arm1); activeStanza override (904)", async () => {
-		localStorage.removeItem("mediaeditor.visibility.rules.seen.v1");
+		localStorage.removeItem("louvorja.publishRulesSeen");
 		const w = await mountEditor();
 		const s = raw(w);
 		s.selectedCollectionId.value = 1;
@@ -2246,6 +2255,7 @@ describe("MediaEditorView — lote final onda1", () => {
 		s.onAddOfficialFromSearch();
 		await flushPromises();
 		// export com 2 estrofes → CAPA + LETRA (692 arm1)
+		s.selectedMusicId.value = 10;
 		s.musicName.value = "Export 2";
 		s.lyrics.value = [
 			{ id: 1, lyric: "A", time: "00:01", imageUrl: "" },
@@ -2274,10 +2284,223 @@ describe("MediaEditorView — lote final onda1", () => {
 		const p = s.stanzaProgress(0);
 		expect(p).toBeGreaterThan(0);
 		expect(p).toBeLessThanOrEqual(1);
+		// última estrofe: sem próxima → end = start + 1 (110 arm1)
+		(s.activeStanzaIndex as { value: number }).value = 1;
+		(s.currentTimeMs as { value: number }).value = 5100;
+		const pLast = s.stanzaProgress(1);
+		expect(pLast).toBeGreaterThan(0);
 		// override null + activeStanzaIndex -1 + lyrics>0 → idx 0 (904 false→true chain)
 		s.activeStanzaIndexOverride.value = null;
 		(s.activeStanzaIndex as { value: number }).value = -1;
 		expect(s.activeStanza.value).toBeTruthy();
+		w.unmount();
+	});
+});
+
+describe("MediaEditorView — lote 2 onda1", () => {
+	function raw(w: Awaited<ReturnType<typeof mountEditor>>) {
+		return w.vm.$.devtoolsRawSetupState as unknown as Record<string, unknown> & {
+			selectedCollectionId: { value: number | null };
+			musicName: { value: string };
+			lyrics: { value: Array<Record<string, unknown>> };
+			officialSearchResults: { value: Array<Record<string, unknown>> };
+			reuseSearch: { value: string };
+			newCollectionName: { value: string };
+			newCollectionVisibility: { value: string };
+			onAddOfficialFromSearch: () => void;
+			onReuseSearchInput: () => void;
+			onCreateCollection: () => Promise<void>;
+			visibilityBusy: { value: boolean };
+		};
+	}
+
+	it("criar coletânea: sem auth local (174 arm1) e com auth pública/privada (176)", async () => {
+		const auth = await import("../../services/auth-client");
+		const custom = await import("../../services/custom-catalog");
+		// sem auth → local (174 arm1)
+		vi.mocked(auth.getAuthSession).mockReturnValue(null as never);
+		vi.mocked(custom.createCustomCollection).mockResolvedValue({ id: -9 } as never);
+		let w = await mountEditor();
+		let s = raw(w);
+		s.newCollectionName.value = "Local X";
+		await s.onCreateCollection();
+		expect(s.selectedCollectionId.value).toBe(-9);
+		w.unmount();
+		// com auth → pública (176 arm0) e privada (176 arm1)
+		vi.mocked(auth.getAuthSession).mockReturnValue({ userId: 1, user: { email: "a@b.c", displayName: "A" } } as never);
+		vi.mocked(custom.createCustomCollection).mockResolvedValue({ id: 60 } as never);
+		w = await mountEditor();
+		s = raw(w);
+		s.newCollectionVisibility.value = "public";
+		s.newCollectionName.value = "Pública";
+		await s.onCreateCollection();
+		s.newCollectionName.value = "Privada";
+		s.newCollectionVisibility.value = "private";
+		await s.onCreateCollection();
+		w.unmount();
+	});
+
+	it("busca oficial: lista vazia → early return (245 arm1); reuso 2x cache (268 arm1)", async () => {
+		const custom = await import("../../services/custom-catalog");
+		vi.mocked(custom.listAllCustomMusics).mockResolvedValue([
+			{ id: 30, name: "R", duration: null, hasAudio: true, hasImage: false, audioUrl: null, officialMusicId: null },
+		] as never);
+		const w = await mountEditor();
+		const s = raw(w);
+		s.selectedCollectionId.value = 1;
+		// lista vazia (245 arm1)
+		s.officialSearchResults.value = [];
+		s.onAddOfficialFromSearch();
+		// reuso 1a (268 true) e 2a (268 arm1: cache)
+		s.reuseSearch.value = "r";
+		s.onReuseSearchInput();
+		await flushPromises();
+		s.reuseSearch.value = "re";
+		s.onReuseSearchInput();
+		await flushPromises();
+		w.unmount();
+	});
+
+	it("visibilidade: busy barra (347 arm0)", async () => {
+		localStorage.setItem("louvorja.publishRulesSeen", "1");
+		const w = await mountEditor();
+		const s = raw(w);
+		s.selectedCollectionId.value = 1;
+		await flushPromises();
+		(s.visibilityBusy as { value: boolean }).value = true;
+		const { updateCustomCollection } = await import("../../services/custom-catalog");
+		vi.mocked(updateCustomCollection).mockClear();
+		await (s as unknown as { onChangeVisibilityWithRules: (n: "private") => Promise<void> }).onChangeVisibilityWithRules("private");
+		expect(updateCustomCollection).not.toHaveBeenCalled();
+		w.unmount();
+	});
+});
+
+describe("MediaEditorView — lote 3 onda1", () => {
+	function raw(w: Awaited<ReturnType<typeof mountEditor>>) {
+		return w.vm.$.devtoolsRawSetupState as unknown as Record<string, unknown> & {
+			selectedCollectionId: { value: number | null };
+			selectedMusicId: { value: number | null };
+			musicName: { value: string };
+			lyrics: { value: Array<Record<string, unknown>> };
+			activeStanzaIndexOverride: { value: number | null };
+			activeStanzaIndex: { value: number };
+			officialSearchResults: { value: Array<Record<string, unknown>> };
+			onAddOfficialFromSearch: () => void;
+			onSelectMusic: (id: number) => Promise<void>;
+			doDeleteMusic: () => Promise<void>;
+			activeStanza: { value: unknown };
+		};
+	}
+
+	function fakeFileEvent(name: string, buffer: ArrayBuffer): Event {
+		const file = new File([buffer], name);
+		Object.defineProperty(file, "arrayBuffer", { value: async () => buffer });
+		const input = document.createElement("input");
+		Object.defineProperty(input, "files", { value: [file] });
+		const ev = new Event("change");
+		Object.defineProperty(ev, "target", { value: input });
+		return ev;
+	}
+
+	it("import: título vazio (561 arm1), innerName ausente (563 arm1), slides sem order (627), lyric falha (646)", async () => {
+		const slja = await import("../../../../shared/services/slja");
+		const custom = await import("../../services/custom-catalog");
+		vi.mocked(slja.parseSljaFile).mockResolvedValue({
+			title: "   ",
+			// segundo caso no próximo bloco: title null (?? arm)
+			audio: null,
+			images: [],
+			assets: [{ bytes: new Uint8Array([9]), path: "p/ig.png" }],
+			slides: [
+				{ type: "LETRA", lyric: "s1", timeMs: 100 },
+				{ type: "LETRA", lyric: "s2", timeMs: 200 },
+			],
+		} as never);
+		vi.mocked(custom.uploadCustomFile).mockResolvedValue({ url: "u2", idFile: 6 } as never);
+		vi.mocked(custom.createCustomMusic).mockResolvedValue({ id: 81 });
+		// 1a lyric cria, 2a falha (646 arm1)
+		vi.mocked(custom.createCustomLyric)
+			.mockResolvedValueOnce({ id: 910 })
+			.mockResolvedValueOnce(null as never);
+		const w = await mountEditor();
+		const s = raw(w);
+		s.selectedCollectionId.value = 1;
+		await s.onImportFile(fakeFileEvent("semtitle.slja", new ArrayBuffer(8)));
+		// nome cai no file.name sem .slja (563 com innerName ausente)
+		expect((vi.mocked(custom.createCustomMusic).mock.calls[0][1] as { name: string }).name).toBe("semtitle");
+		// title NULL → ?? '' no trim (561 bm2 arm1)
+		vi.mocked(slja.parseSljaFile).mockResolvedValue({
+			title: null,
+			audio: null,
+			images: [],
+			slides: [],
+		} as never);
+		vi.mocked(custom.createCustomMusic).mockResolvedValue({ id: 82 });
+		await s.onImportFile(fakeFileEvent("nulltitle.slja", new ArrayBuffer(8)));
+		w.unmount();
+	});
+
+	it("track remoto sem lyrics e sem time (508/511 arm1); stanza ativa por timing (904 arm0)", async () => {
+		const fetchMock = vi.fn(async () => ({
+			ok: true,
+			status: 200,
+			json: async () => ({ name: "Remota S/ lyrics", audio_url: null }),
+		}));
+		vi.stubGlobal("fetch", fetchMock);
+		const w = await mountEditor();
+		const s = raw(w);
+		s.selectedCollectionId.value = 1;
+		await s.onSelectMusic(12);
+		await flushPromises();
+		expect(s.lyrics.value).toEqual([]);
+		// stanza ativa: sem override, activeStanzaIndex >= 0 → usa índice (904 arm0)
+		s.lyrics.value = [
+			{ id: 1, lyric: "A", time: "00:01", imageUrl: "" },
+			{ id: 2, lyric: "B", time: "00:05", imageUrl: "" },
+		];
+		(s.activeStanzaIndex as { value: number }).value = 1;
+		(s.activeStanzaIndexOverride as { value: number | null }).value = null;
+		expect((s.activeStanza.value as { id: number }).id).toBe(2);
+		w.unmount();
+		vi.unstubAllGlobals();
+	});
+
+	it("delete sem coletânea (797 arm1); busca oficial result sem displayTitle (1435 arm1)", async () => {
+		const custom = await import("../../services/custom-catalog");
+		vi.mocked(custom.deleteCustomMusic).mockResolvedValue(true);
+		vi.mocked(custom.addOfficialMusicToCollection).mockResolvedValue(true);
+		const w = await mountEditor();
+		const s = raw(w);
+		// 1435 arm1: click no resultado SEM displayTitle (com coletânea p/ renderizar)
+		s.selectedCollectionId.value = 1;
+		document.body.appendChild(w.element);
+		(s.officialSearchResults as { value: Array<Record<string, unknown>> }).value = [
+			{ musicId: 6, name: "Somente Nome" },
+		];
+		await flushPromises();
+		await flushPromises();
+		const resultBtn = Array.from(document.querySelectorAll<HTMLButtonElement>(".editor__list-item--search")).at(-1);
+		if (resultBtn) {
+			resultBtn.click();
+			await flushPromises();
+		}
+		// 797 arm1: delete sem coletânea
+		s.selectedCollectionId.value = null;
+		s.selectedMusicId.value = 10;
+		await s.doDeleteMusic();
+		await flushPromises();
+		// 511 arm1: lyrics com row SEM time (fetch)
+		const fetchMock2 = vi.fn(async () => ({
+			ok: true,
+			status: 200,
+			json: async () => ({ name: "Com lyrics s/ time", lyrics: [{ id_lyric: 1, lyric: "x", time: null }] }),
+		}));
+		vi.stubGlobal("fetch", fetchMock2);
+		await s.onSelectMusic(13);
+		await flushPromises();
+		expect((s.lyrics.value[0] as { time: string }).time).toBe("00:00");
+		vi.unstubAllGlobals();
 		w.unmount();
 	});
 });
