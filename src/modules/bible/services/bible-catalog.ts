@@ -99,13 +99,20 @@ export function resolveTestament(bookNumber: number): BibleTestament {
   return bookNumber <= 39 ? 'ot' : 'nt'
 }
 
-/** Tom visual do tile conforme faixas canônicas (Stitch). */
+/** Tom visual do tile conforme faixas canônicas (taxonomia compartilhada app/web). */
 export function resolveBookTone(bookNumber: number): BibleBookTone {
-  if (bookNumber <= 5) return 'law'
-  if (bookNumber <= 17) return 'history'
-  if (bookNumber <= 39) return 'prophets'
-  if (bookNumber <= 43) return 'gospels'
-  if (bookNumber <= 66) return 'letters'
+  // Antigo Testamento (1-39)
+  if (bookNumber <= 5) return 'law' // Gênesis–Deuteronômio (Lei)
+  if (bookNumber <= 17) return 'history' // Josué–Ester (Históricos)
+  if (bookNumber <= 22) return 'poetry' // Jó–Cânticos (Poéticos/Sapienciais)
+  if (bookNumber <= 27) return 'major-prophet' // Isaías–Daniel (Profetas Maiores)
+  if (bookNumber <= 39) return 'minor-prophet' // Oséias–Malaquias (Profetas Menores)
+  // Novo Testamento (40-66)
+  if (bookNumber <= 43) return 'gospels' // Mateus–João (Evangelhos)
+  if (bookNumber === 44) return 'acts' // Atos (Livro Histórico)
+  if (bookNumber <= 57) return 'pauline' // Romanos–Hebreus (Cartas Paulinas)
+  if (bookNumber <= 65) return 'general' // Tiago–Judas (Cartas Gerais)
+  if (bookNumber === 66) return 'apocalyptic' // Apocalipse (Profético)
   return 'neutral'
 }
 
