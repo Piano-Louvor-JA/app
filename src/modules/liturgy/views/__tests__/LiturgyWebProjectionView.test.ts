@@ -177,4 +177,19 @@ describe('LiturgyWebProjectionView', () => {
     vi.unstubAllGlobals()
     wrapper.unmount()
   })
+
+  it('gaps11: BroadcastChannel indisponível → runtimeChannel null sem quebrar mount', async () => {
+    const OriginalBC = global.BroadcastChannel
+    class BrokenChannel {
+      constructor() {
+        throw new Error('sem broadcast')
+      }
+    }
+    ;(global as { BroadcastChannel: unknown }).BroadcastChannel = BrokenChannel
+    const wrapper = createWrapper()
+    await flushPromises()
+    expect(wrapper.exists()).toBe(true)
+    ;(global as { BroadcastChannel: unknown }).BroadcastChannel = OriginalBC
+    wrapper.unmount()
+  })
 })
