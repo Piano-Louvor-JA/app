@@ -1,5 +1,16 @@
 // @vitest-environment jsdom
 import { mount, flushPromises } from "@vue/test-utils";
+
+// stage-settings override: true-arm de effectiveConfig (random presente)
+const stageSettingsStateRV = vi.hoisted(() => ({ value: null as Record<string, unknown> | null }))
+vi.mock("../../../settings/services/stage-settings-runtime", async (importOriginal) => {
+	const real = await importOriginal<typeof import("../../../settings/services/stage-settings-runtime")>()
+	return {
+		readEffectiveStageSettings: (scope: string) =>
+			stageSettingsStateRV.value ?? real.readEffectiveStageSettings(scope),
+		subscribeStageSettings: (cb: () => void) => real.subscribeStageSettings(cb),
+	}
+})
 import { createPinia, setActivePinia } from "pinia";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createI18n } from "vue-i18n";
@@ -388,7 +399,11 @@ describe("RandomView — áudio custom", () => {
       const w = mountView()
       const panel = w.findComponent(RandomAvailablePanel)
       if (panel.exists()) {
-        panel.vm.$emit('importFile', new File(['Zeca'], 'z.txt', { type: 'text/plain' }))
+        panel.vm.$emit('import-file', new File(['Zeca'], 'z.txt', { type: 'text/plain' }))
+        panel.vm.$emit('add', 'Novo Nome')
+        panel.vm.$emit('remove-custom-audio', 'fanfare.mp3')
+        panel.vm.$emit('toggle-projection')
+        panel.vm.$emit('mode-change', 'numbers')
         await flushPromises()
       }
       w.unmount()
@@ -404,4 +419,12 @@ describe("RandomView — áudio custom", () => {
       w.unmount()
     })
   })
+
+	it("gaps: stage com random presente (true-arm effectiveConfig)", async () => {
+		stageSettingsStateRV.value = { random: { fontSizePc: 9, textTransform: "uppercase", animationSpeed: "fast" } } as Record<string, unknown>
+		const w = mountView()
+		await flushPromises()
+		w.unmount()
+		stageSettingsStateRV.value = null
+	})
 })
