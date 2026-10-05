@@ -271,4 +271,27 @@ describe("MediaPlayerPill — áudio na TV, projeção, fullscreen, playlist", (
 		});
 	})
 
+	it("gaps: isPlaying troca aria/icone do play; botão projetar emite toggleProjection", async () => {
+		const w = mountPill(baseProps({ isPlaying: true }));
+		const play = w.find(".media-player-pill__play");
+		expect(play.attributes("aria-label")).toBe("Pausar");
+		expect(play.attributes("title")).toBe("Pausar");
+		expect(play.find("i").classes()).toContain("ti-player-pause");
+		w.unmount();
+
+		const { useProjectionStore } = await import("@modules/settings/stores/useProjectionStore");
+		const { DEFAULT_PROJECTION_SETTINGS } = await import("@modules/settings/types/projection");
+		const pinia = createPinia();
+		setActivePinia(pinia);
+		const store = useProjectionStore();
+		await store.refreshDisplays();
+		store.applySettings({ ...DEFAULT_PROJECTION_SETTINGS, targetDisplayIds: [2] });
+		const w2 = mount(MediaPlayerPill, { props: baseProps({ projecting: false }), global: { plugins: [i18n, pinia] } });
+		const proj = w2.findAll("button").find((b) => b.attributes("aria-label") === mediaLocale.media.project)!;
+		expect(proj).toBeTruthy();
+		await proj.trigger("click");
+		expect(w2.emitted("toggleProjection")).toBeTruthy();
+		w2.unmount();
+	});
+
 });
