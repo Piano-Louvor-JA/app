@@ -115,6 +115,21 @@ function unionFiles(filesA, filesB) {
       addBranches(a); addBranches(b);
     }
 
+    // Arms fantasma do remap v8 (if sem else): loc sem start/end nunca
+    // recebe hit — descarta do mapa e do total antes do summarize.
+    for (const [id, loc] of Object.entries(branchMap)) {
+      const keep = [];
+      const drop = [];
+      (loc.locations ?? []).forEach((armLoc, i) => {
+        const empty = !armLoc || !armLoc.start || armLoc.start.line == null;
+        (empty ? drop : keep).push(i);
+      });
+      if (drop.length > 0 && keep.length > 0) {
+        loc.locations = keep.map((i) => loc.locations[i]);
+        bHits[id] = keep.map((i) => bHits[id][i]);
+      }
+    }
+
     result[path] = { path, statementMap, s, fnMap, f, branchMap, b: bHits };
   }
   return result;

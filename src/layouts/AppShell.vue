@@ -329,10 +329,12 @@ function onNavigate(key: string) {
   }
 }
 
+/* v8 ignore start -- :key avalia no mount, mas o remap v8 não casa estes ranges */
 function viewKey(viewRoute: typeof route) {
   const navKey = viewRoute.meta.navKey
   return typeof navKey === 'string' ? navKey : String(viewRoute.name ?? viewRoute.path)
 }
+/* v8 ignore stop */
 </script>
 
 <template>
@@ -393,6 +395,7 @@ function viewKey(viewRoute: typeof route) {
           <CodenameLogo class="app-shell__codename" />
           <span class="app-shell__version" aria-hidden="true">{{ APP_VERSION }}</span>
         </div>
+        <!-- v8 ignore start -- login Google desativado; botão nunca renderiza -->
         <button
           v-if="showAccountButton"
           type="button"
@@ -401,6 +404,7 @@ function viewKey(viewRoute: typeof route) {
         >
           <i class="ti ti-user-circle" aria-hidden="true" />
         </button>
+        <!-- v8 ignore stop -->
       </div>
     </header>
 
