@@ -27,10 +27,13 @@ vi.mock('vue-i18n', () => ({
 
 const pushMock = vi.fn(async () => {})
 
+const routeMock = vi.hoisted(() => {
+  const { reactive } = require('vue') as typeof import('vue')
+  return reactive({ params: { collectionId: '10' } })
+})
+
 vi.mock('vue-router', () => ({
-  useRoute: () => ({
-    params: { collectionId: (globalThis as any).__collectionId ?? '10' },
-  }),
+  useRoute: () => routeMock,
   useRouter: () => ({ push: pushMock }),
 }))
 
@@ -107,8 +110,15 @@ vi.mock('../../composables/useAlbums', async () => {
 vi.mock('@design-system/index', () => ({
   MediaCollectionList: {
     name: 'MediaCollectionList',
-    props: ['searchPlaceholder', 'loading', 'empty', 'emptyLabel'],
-    template: '<div class="mcl-stub"><slot /></div>',
+    props: ['modelValue', 'searchPlaceholder', 'loading', 'empty', 'emptyLabel'],
+    emits: ['update:modelValue'],
+    methods: {
+      onInput(e: Event) {
+        this.$emit('update:modelValue', (e.target as HTMLInputElement).value)
+      },
+    },
+    template:
+      '<div class="mcl-stub"><input type="search" :value="modelValue" @input="onInput" /><slot /></div>',
   },
 }))
 
@@ -172,6 +182,7 @@ const mountView = async () => {
 describe('AlbumCollectionView', () => {
   beforeEach(() => {
     localStorage.clear()
+    document.body.innerHTML = ''
     pushMock.mockClear()
     setupMocks()
     savePlaylists([
@@ -338,16 +349,63 @@ describe('AlbumCollectionView', () => {
     expect(w.text()).toContain('albums.collectionFallback')
     // v-model da busca (fn 200)
     const search = w.find('input[type="search"]')
-    if (search.exists()) await search.setValue('Santo')
+    expect(search.exists()).toBe(true)
+    await search.setValue('Santo')
     // picker com playlist que some antes do click → target undefined (?? 'playlist')
     savePlaylists([{ id: 'ghost', name: 'Ghost', items: [] }])
     await w.findAll('.track-row-stub')[0]!.find('.row-playlist').trigger('click')
     const opt = document.body.querySelector('.playlist-picker__option') as HTMLElement | null
-    if (opt) {
-      savePlaylists([]) // playlist alvo some → target undefined
-      opt.click()
+    expect(opt).not.toBeNull()
+    savePlaylists([]) // alvo some → target undefined
+    opt!.click()
+    await flushPromises()
+    w.unmount()
+  })
+
+  it('troca de collectionId na rota recarrega a coleção; id ausente cai em string vazia', async () => {
+    const openCollection = vi.fn(async () => true)
+    setupMocks({ openCollection })
+    const w = await mountView()
+    expect(openCollection).toHaveBeenCalledWith('10')
+    routeMock.params.collectionId = '20'
+    await flushPromises()
+    await new Promise((r) => setTimeout(r, 0))
+    expect(openCollection).toHaveBeenCalledWith('20')
+    routeMock.params.collectionId = undefined as unknown as string
+    await flushPromises()
+    await new Promise((r) => setTimeout(r, 0))
+    expect(openCollection).toHaveBeenCalledWith('')
+    w.unmount()
+  })
+
+  it('toast de playlist some após 2600ms (timer)', async () => {
+    vi.useFakeTimers()
+    try {
+      const w = await mountView()
+      await w.findAll('.track-row-stub')[0]!.find('.row-playlist').trigger('click')
+      const opt = document.body.querySelector('.playlist-picker__option') as HTMLElement | null
+      expect(opt).not.toBeNull()
+      opt!.click()
       await flushPromises()
+      expect(document.body.querySelector('.playlist-toast')).not.toBeNull()
+      await vi.advanceTimersByTimeAsync(2600)
+      await flushPromises()
+      expect(document.body.querySelector('.playlist-toast')).toBeNull()
+      w.unmount()
+    } finally {
+      vi.useRealTimers()
     }
+  })
+
+  it('coleção com id não numérico: albumId do picker cai em null', async () => {
+    setupMocks({ activeCollection: { ...collection, id: 'cu-77' } })
+    const w = await mountView()
+    await w.findAll('.track-row-stub')[0]!.find('.row-playlist').trigger('click')
+    const opt = document.body.querySelector('.playlist-picker__option') as HTMLElement | null
+    expect(opt).not.toBeNull()
+    opt!.click()
+    await flushPromises()
+    expect(document.body.querySelector('.playlist-toast')).not.toBeNull()
     w.unmount()
   })
 })

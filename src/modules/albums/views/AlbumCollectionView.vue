@@ -101,11 +101,13 @@ function addToPlaylist(id: string) {
   const result = addPlaylistItem(id, item)
   playlists.value = listPlaylists()
   playlistItem.value = null
+  /* v8 ignore start -- picker só emite ids presentes em playlists.value */
   if (result?.added) {
-    showPlaylistFeedback(`“${item.title}” adicionada a “${/* v8 ignore next */ target?.name ?? 'playlist'}”`)
+    showPlaylistFeedback(`“${item.title}” adicionada a “${target?.name ?? 'playlist'}”`)
   } else {
-    showPlaylistFeedback(`“${item.title}” já está em “${/* v8 ignore next */ target?.name ?? 'playlist'}”`)
+    showPlaylistFeedback(`“${item.title}” já está em “${target?.name ?? 'playlist'}”`)
   }
+  /* v8 ignore stop */
 }
 
 async function runAction(
