@@ -43,8 +43,10 @@ vi.stubGlobal("indexedDB", {
       createObjectStore: () => ({
         createIndex: () => {},
       }),
-      transaction: () => ({
-        objectStore: () => ({
+      transaction: () => {
+        const tx = {
+          oncomplete: null as (() => void) | null,
+          objectStore: () => ({
           add: (op: Row) => {
             op.id = nextId++;
             store.push(op);
@@ -61,7 +63,10 @@ vi.stubGlobal("indexedDB", {
           },
           count: () => new MiniReq(store.length),
         }),
-      }),
+        };
+        queueMicrotask(() => tx.oncomplete?.());
+        return tx;
+      },
     });
     return req;
   },
@@ -347,5 +352,34 @@ it("newClientUuid: fallback RFC4122 sem randomUUID", async () => {
   } finally {
     vi.stubGlobal("crypto", origCrypto);
   }
+});
+
+describe("gaps onda1 — sort com id ausente, ops sem id, oncomplete", () => {
+  it("listPending com op sem id (?? 0) ordena sem lançar; oncomplete do tx dispara", async () => {
+    store = [
+      { entity: "collection", client_uuid: "x2", action: "upsert", payload: {} },
+      { id: 2, entity: "collection", client_uuid: "x1", action: "upsert", payload: {} },
+    ] as Row[];
+    const all = await listPending();
+    expect(all).toHaveLength(2);
+    expect(all[0]!.client_uuid).toBe("x2"); // id ausente ?? 0 → primeiro
+  });
+
+  it("flush 200 com op sem id: não chama removeOp pra ele", async () => {
+    await enqueue({ entity: "collection", client_uuid: "c9", action: "upsert", payload: { name: "A" } } as never);
+    // força op sem id direto no store
+    store.push({ entity: "collection", client_uuid: "ghost", action: "upsert", payload: {} });
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ applied: { created: 1, updated: 1 }, conflicts: [] }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const res = await flushOutbox();
+    expect(res.ok).toBe(true);
+    // apenas a op com id foi removida; a fantasma continua
+    const rest = await listPending();
+    expect(rest.some((o) => o.client_uuid === "ghost")).toBe(true);
+    vi.unstubAllGlobals();
+  });
 });
 });
