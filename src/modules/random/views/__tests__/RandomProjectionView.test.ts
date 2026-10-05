@@ -348,4 +348,41 @@ describe("gaps v8", () => {
 		stageSettingsState.value = null;
 		vi.unstubAllGlobals();
 	});
+
+	describe("gaps v8 cond-expr", () => {
+		it("stageSettingsState com random: effectiveConfig mescla (mod truthy)", async () => {
+			stageSettingsState.value = {
+				backgroundColor: "#202020",
+				backgroundImage: "",
+				random: { bgColor: "#334455", textColor: "#eee", showHistory: false },
+			} as never;
+						localStorage.setItem(
+				RANDOM_RUNTIME_STORAGE_KEY,
+				JSON.stringify({ mode: "names", isDrawing: false, currentDisplay: "Ana", drawn: [], projecting: true }),
+			);
+			const w = mountView();
+			await flushPromises();
+			const stageComp = w.findComponent({ name: "RandomStage" });
+			expect(stageComp.exists()).toBe(true);
+			const cfg = stageComp.props("config") as Record<string, unknown>;
+			// liveConfig sobrescreve o mod no spread — key exclusiva do mod prova o merge
+			expect(cfg.showHistory).toBe(false);
+			w.unmount();
+			stageSettingsState.value = null;
+		});
+
+		it("não-embedded: can-draw sempre false", async () => {
+						localStorage.setItem(
+				RANDOM_RUNTIME_STORAGE_KEY,
+				JSON.stringify({ mode: "names", isDrawing: false, currentDisplay: "Ana", drawn: [], projecting: true }),
+			);
+			const w = mountView();
+			await flushPromises();
+			const stageComp = w.findComponent({ name: "RandomStage" });
+			expect(stageComp.exists()).toBe(true);
+			expect(stageComp.props("canDraw")).toBe(false);
+			expect(stageComp.props("showDraw")).toBe(false);
+			w.unmount();
+		});
+	});
 });
