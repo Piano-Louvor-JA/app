@@ -144,4 +144,21 @@ describe("apiCandidateBases — ramos residuais (53)", () => {
 		const bases = apiCandidateBases("database");
 		expect(bases[0]).toBe("nao-e-url");
 	});
+
+describe('gaps onda1 — rejeição com não-Error', () => {
+  it('fetch rejeitando com string: message via String(error) e retry/throw', async () => {
+    vi.stubEnv('VITE_API_BASE', 'https://api.test')
+    const fetchMock = vi.fn()
+    fetchMock.mockRejectedValueOnce('boom-string') // não-Error
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ ok: 9 }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { fetchWithApiFallback } = await import('../api-fallback')
+    const res = await fetchWithApiFallback('hymnal', '/x', '2026-10-05', undefined, 2, 1)
+    expect(res.data).toEqual({ ok: 9 })
+    // agora sempre falha → propaga a string original
+    fetchMock.mockRejectedValue('falhou-de-novo')
+    await expect(fetchWithApiFallback('hymnal', '/x', '2026-10-05', undefined, 1, 1)).rejects.toBe('falhou-de-novo')
+    vi.unstubAllGlobals()
+  })
+})
 });
