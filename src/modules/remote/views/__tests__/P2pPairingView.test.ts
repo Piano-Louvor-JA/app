@@ -266,4 +266,44 @@ it('gaps7: v-model manual via DOM dispara handler do template (fn 165)', async (
     expect(componentHost().acceptAnswer).toHaveBeenCalledWith('ANSWER-DATA')
     wrapper.unmount()
   })
+
+  it('gaps8: scanFrame early-returns (video null / sem dims) e QR não lido', async () => {
+    const fakeCtx = {
+      drawImage: vi.fn(),
+      getImageData: vi.fn(() => ({ data: new Uint8ClampedArray(64), width: 4, height: 4 })),
+    }
+    const ctxSpy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(fakeCtx as unknown as CanvasRenderingContext2D)
+    const realSetInterval = window.setInterval
+    let scanFrameCb: (() => void) | null = null
+    vi.stubGlobal('setInterval', ((cb: () => void) => {
+      scanFrameCb = cb
+      return 1
+    }) as unknown as typeof setInterval)
+    try {
+      const wrapper = createWrapper()
+      await wrapper.find('.p2p-pairing__btn').trigger('click')
+      // (67,0): scanFrame antes do vídeo montar → video null
+      scanFrameCb?.()
+      await flushPromises()
+      expect(jsQR).not.toHaveBeenCalled()
+      // (72,0): vídeo montado mas videoWidth 0 → canvas.width 0 → return
+      await new Promise((r) => setTimeout(r, 250))
+      scanFrameCb?.()
+      await flushPromises()
+      expect(jsQR).not.toHaveBeenCalled()
+      // (76,1): dimensões ok mas jsQR null (default) → sem answer
+      Object.defineProperty(HTMLVideoElement.prototype, 'videoWidth', { value: 4, configurable: true })
+      Object.defineProperty(HTMLVideoElement.prototype, 'videoHeight', { value: 4, configurable: true })
+      scanFrameCb?.()
+      await flushPromises()
+      expect(jsQR).toHaveBeenCalled()
+      expect(componentHost().acceptAnswer).not.toHaveBeenCalled()
+      wrapper.unmount()
+    } finally {
+      vi.stubGlobal('setInterval', realSetInterval)
+      ctxSpy.mockRestore()
+      delete (HTMLVideoElement.prototype as { videoWidth?: number }).videoWidth
+      delete (HTMLVideoElement.prototype as { videoHeight?: number }).videoHeight
+    }
+  })
 })
