@@ -1,6 +1,15 @@
 import { fetchRemoteCatalogJson } from '@shared/services/remote-catalog'
 import { readCatalogRecord } from '@shared/services/workspace-api'
 import { getCurrentApiPrefix } from '@modules/sync/services/library-catalog'
+import {
+  listAllCustomMusics,
+  toCustomMusicId,
+} from '@modules/media/services/custom-catalog'
+import {
+  listLocalCollections,
+  listLocalMusics,
+} from '@modules/media/services/local-custom-store'
+import { matchesAllTerms } from "@shared/services/search-terms"
 
 import type {
   LiturgyBibleBookOption,
@@ -19,6 +28,8 @@ type CatalogHymnalRow = {
 type CatalogMusicIndexRow = CatalogHymnalRow & {
   albums?: Array<{ id_album?: number | string; name?: string; track?: number | string | null }>
   albums_names?: string
+  /** Letra em texto corrido (presente em 1944/1956 músicas do índice). */
+  lyric?: string
 }
 
 type CatalogAlbumMusicRow = CatalogHymnalRow
@@ -190,6 +201,15 @@ function mapMusicIndexRow(row: CatalogMusicIndexRow): LiturgyMusicOption | null 
     albumNames.includes('Hinário Adventista') ||
     albumNames.includes('Hinário Adventista 1996')
 
+  // Issue #348 (item 2): letra já vem no índice `${prefix}_musics` — propaga
+  // normalizada (fold diacrítico) p/ a busca casar "nao temas" com "não temas".
+  const lyricsText = String(row.lyric ?? '')
+    .normalize('NFD')
+    .replace(/\u0300-\u036f/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase() || undefined
+
   return {
     id,
     name,
@@ -198,6 +218,7 @@ function mapMusicIndexRow(row: CatalogMusicIndexRow): LiturgyMusicOption | null 
     displayLabel: buildDisplayLabel(name, isHymnalAlbum ? hymnalTrack : null),
     durationMs: parseCatalogDurationMs(row.duration),
     hasInstrumental: hasInstrumentalFlag(row),
+    lyricsText,
   }
 }
 
@@ -282,18 +303,86 @@ function sortMusicOptions(options: LiturgyMusicOption[]): LiturgyMusicOption[] {
   })
 }
 
+/**
+ * app#331: músicas do OPERADOR entram nas opções da liturgia —
+ * - custom da API (Minhas Coletâneas / "Importações .slja" logadas): id com
+ *   offset 1M+ (namespace que resolveMediaTrack já resolve);
+ * - LOCAL (import .slja sem login, localStorage, id negativo): id cru —
+ *   offline-first, são as únicas garantidas sem rede.
+ * Oficiais NUNCA são sobrescritas (merge só em id livre).
+ */
+async function mergeOperatorMusicOptions(
+  byId: Map<number, LiturgyMusicOption>,
+): Promise<void> {
+  let customs: Array<{
+    id: number
+    name: string | null
+    duration: number | null
+    collectionName?: string
+  }> = []
+  try {
+    customs = await listAllCustomMusics()
+  } catch {
+    // offline/sem API: customs simplesmente não aparecem nesta carga
+  }
+  for (const custom of customs) {
+    const id = Number(custom.id)
+    if (!Number.isFinite(id) || id <= 0) continue
+    const offsetId = toCustomMusicId(id)
+    if (byId.has(offsetId)) continue
+    const name = String(custom.name ?? '').trim() || `Custom #${id}`
+    const album = String(custom.collectionName ?? '').trim() || 'Minhas coletâneas'
+    byId.set(offsetId, {
+      id: offsetId,
+      name,
+      hymnalTrack: null,
+      albumNames: album,
+      displayLabel: `${name} — ${album}`,
+      durationMs: typeof custom.duration === 'number' ? custom.duration : null,
+      hasInstrumental: false,
+    })
+  }
+
+  try {
+    const locals = listLocalCollections().flatMap((collection) =>
+      listLocalMusics(collection.id).map((music) => ({
+        music,
+        collectionName: collection.name,
+      })),
+    )
+    for (const { music, collectionName } of locals) {
+      if (byId.has(music.id)) continue
+      const name = String(music.name ?? '').trim() || `Local #${music.id}`
+      byId.set(music.id, {
+        id: music.id,
+        name,
+        hymnalTrack: null,
+        albumNames: collectionName,
+        displayLabel: `${name} — ${collectionName} (local)`,
+        durationMs:
+          typeof music.durationMs === 'number' ? music.durationMs : null,
+        hasInstrumental: false,
+      })
+    }
+  } catch {
+    // localStorage indisponível (raro) — segue sem locais
+  }
+}
+
 export async function loadLiturgyMusicOptions(): Promise<LiturgyMusicOption[]> {
   const fromIndex = await loadFromMusicIndex()
   if (fromIndex && fromIndex.length > 0) {
     const byId = new Map(fromIndex.map((entry) => [entry.id, entry]))
     // Índice pode omitir flags de instrumental; hinário completa o dado.
     await loadHymnalOptions(byId)
+    await mergeOperatorMusicOptions(byId)
     return sortMusicOptions([...byId.values()])
   }
 
   const byId = new Map<number, LiturgyMusicOption>()
   await loadHymnalOptions(byId)
   await loadCollectionOptions(byId)
+  await mergeOperatorMusicOptions(byId)
   return sortMusicOptions([...byId.values()])
 }
 
@@ -328,17 +417,30 @@ export function filterLiturgyMusicOptions(
   const isNum = trimmed !== '' && !Number.isNaN(Number(trimmed))
   const numQuery = isNum ? Number(trimmed) : null
 
-  let results = options.filter((entry) => {
-    const title = entry.name.toLowerCase()
-    const album = entry.albumNames.toLowerCase()
-    if (isNum && numQuery != null) {
-      return (
-        title.includes(trimmed) ||
-        album.includes(trimmed) ||
-        entry.hymnalTrack === numQuery
-      )
+  // Busca por termos + letra (issues #348 + #359): fold diacritico, trecho da
+  // letra e termos espalhados em nome/album/letra — uniao da PR-355
+  // (matchesAllTerms p/ termos fora de substring contigua) com a PR-373
+  // (letra do indice + fold, que ja cobre os casos da 355).
+  const fold = (v: string) => v.normalize('NFD').replace(/\u0300-\u036f/g, '')
+  const q = fold(trimmed)
+  const terms = q.split(/\s+/).filter(Boolean)
+
+  const matchText = (title: string, album: string, lyrics: string) => {
+    if (title.includes(q) || album.includes(q) || (lyrics && lyrics.includes(q))) {
+      return true
     }
-    return title.includes(trimmed) || album.includes(trimmed)
+    if (terms.length <= 1) return false
+    return terms.every((t) => title.includes(t) || album.includes(t) || (lyrics && lyrics.includes(t)))
+  }
+
+  let results = options.filter((entry) => {
+    const title = fold(entry.name.toLowerCase())
+    const album = fold(entry.albumNames.toLowerCase())
+    const lyrics = entry.lyricsText ?? ''
+    if (isNum && numQuery != null) {
+      return entry.hymnalTrack === numQuery || matchText(title, album, lyrics)
+    }
+    return matchText(title, album, lyrics)
   })
 
   if (isNum && numQuery != null) {

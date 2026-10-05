@@ -195,7 +195,10 @@ function proxyUrl(original){
   // de volta e falhava → receiver caía no bg-12 (caso real 26/08).
   if(original.startsWith('http://'+host+':'))return original;
   if(original.startsWith('http://')||original.startsWith('https://')){
-    return `http://${host}:7080/proxy?url=${encodeURIComponent(original)}`;
+    // Token no /proxy também: <img> não manda header; sem token a TV
+    // (LAN) tomava 403 no bg/cover (localhost bypass escondia o bug).
+    const tok=qs.get('token');
+    return `http://${host}:7080/proxy?url=${encodeURIComponent(original)}${tok?`&token=${encodeURIComponent(tok)}`:''}`;
   }
   return original;
 }
@@ -301,7 +304,7 @@ function connect(){
   function directTry(){
     var opened=false;
     var t=setTimeout(function(){if(!opened){dlog('WS direto falhou — host stale');localStorage.removeItem('palcoHost');host='';connect()}},3000);
-    try{var w=new WebSocket('ws://'+host+':'+port+'/palco');
+    try{var w=new WebSocket('ws://'+host+':'+port+'/palco'+(qs.get('token')?'?token='+encodeURIComponent(qs.get('token')):''));
       w.onopen=function(){opened=true;clearTimeout(t);try{w.close()}catch(e){};doConnect()};
       w.onerror=function(){};
     }catch(e){clearTimeout(t);localStorage.removeItem('palcoHost');host='';connect()}
@@ -321,7 +324,7 @@ function stopMediaOnServerLoss(){
 function doConnect(){
   dlog('doConnect '+host+':'+port);
   setStatus('conectando '+host+':'+port+'…');
-  try{ws=new WebSocket('ws://'+host+':'+port+'/palco')}catch(e){retry();return}
+  try{ws=new WebSocket('ws://'+host+':'+port+'/palco'+(qs.get('token')?'?token='+encodeURIComponent(qs.get('token')):''))}catch(e){retry();return}
   ws.onopen=()=>{tries=0;dlog('WS OPEN '+host);setStatus('● '+host);
     if(window.__hideSplash)window.__hideSplash(); // F3.3j: splash sai no connect
     localStorage.setItem('palcoHost',host);
@@ -609,16 +612,22 @@ function handle(m){
       $('text').innerHTML=m.text||'';
       $('text').classList.toggle('cover-on',m.isCover===true);
       // F3.3o: fontSize/fontWeight dinâmicos (settings do operador).
+      // Estrofes (lyric*) vencem quando presentes; capa (isCover) mantém o
+      // estilo do operador — personalização de estrofe não pega na capa.
       {const t=$('text');
-        if(typeof m.fontSize==='number')
-          t.style.fontSize=(m.fontSize/10.8)+'vw'; // px@1080p -> vw (LARGURA): paridade com cqw do cabo
-        if(typeof m.fontWeight==='number')
-          t.style.fontWeight=m.fontWeight;
+        const fs=typeof m.lyricFontSize==='number'?m.lyricFontSize:m.fontSize;
+        const fw=typeof m.lyricFontWeight==='number'?m.lyricFontWeight:m.fontWeight;
+        if(typeof fs==='number')t.style.fontSize=(fs/10.8)+'vw'; // px@1080p -> vw (LARGURA): paridade com cqw do cabo
+        if(typeof fw==='number')t.style.fontWeight=fw;
+        if(typeof m.lyricTextColor==='string'&&m.lyricTextColor)t.style.color=m.lyricTextColor;
+        if(m.lyricUpperCase===true)t.style.textTransform='uppercase';
+        else if(m.lyricUpperCase===false)t.style.textTransform='none';
       }
       // F3.3m: estilos da letra — sombra (intensidade) + caixinha (borda)
       {const t=$('text');
         t.classList.remove('shadow-on','shadow-off','box-on','box-off');
-        if(m.textShadow===false){t.classList.add('shadow-off')}
+        const tsOn=(typeof m.lyricTextShadow==='boolean'?m.lyricTextShadow:m.textShadow!==false);
+        if(!tsOn){t.classList.add('shadow-off')}
         else{t.classList.add('shadow-on');
           if(typeof m.shadowBlur==='number')
             t.style.setProperty('--ts',`0 ${Math.max(1,m.shadowBlur/3)}vh ${m.shadowBlur}vh rgba(0,0,0,${m.shadowIntensity!=null?m.shadowIntensity:0.8})`)}
@@ -627,6 +636,15 @@ function handle(m){
           t.style.setProperty('--box-border',
             m.boxBorder?`${m.boxBorder.width||0.4}vh solid ${m.boxBorder.color||'rgba(255,255,255,.25)'}`:'none')}
         else{t.classList.add('box-off')}
+          // Personalização local refletida: alinhamento H/V e cor de fundo
+          {const va=m.textVerticalAlign||'middle',ha=m.textAlign||'center';
+            t.style.top=va==='top'?'6vh':va==='bottom'?'':'50%';
+            t.style.bottom=va==='bottom'?'10vh':'';
+            t.style.transform=va==='middle'?'translate(-50%,-50%)':'translate(-50%,0)';
+            t.style.textAlign=ha;
+            const vei=$('veil');
+            if(typeof m.backgroundColor==='string'&&m.backgroundColor){vei.style.background=m.backgroundColor;vei.style.opacity='1'}
+            else{vei.style.background='rgba(0,0,0,.45)';vei.style.opacity=''}}
       }
       // F3.3m: footer com referência destacada + versão
       {const f=$('footer');

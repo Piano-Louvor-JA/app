@@ -20,6 +20,7 @@
 
 import { createServer } from 'node:http'
 import { networkInterfaces } from 'node:os'
+import { createHash } from 'node:crypto'
 import path from 'node:path'
 import { readFile } from 'node:fs/promises'
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
@@ -27,6 +28,8 @@ import { fileURLToPath } from 'node:url'
 
 import { app, ipcMain } from 'electron'
 import { WebSocketServer } from 'ws'
+
+import { loadOrCreatePalcoToken, requestHasPalcoAccess } from './palco-token.mjs'
 
 const BASE_HTTP_PORT = 7080
 const BASE_WS_PORT = 7081
@@ -114,7 +117,19 @@ class PalcoSlot {
 
       this.#wss = new WebSocketServer({ port: this.#wsPort })
       this.#wss.on('connection', (ws, req) => {
-        if (req?.url && !req.url.startsWith('/palco')) { ws.close(); return }
+        if (req?.url && !req.url.split('?')[0].startsWith('/palco')) { ws.close(); return }
+        // OBS S1: token na LAN (localhost bypass) — feature off = comportamento atual
+        if (
+          !requestHasPalcoAccess({
+            remoteAddress: req?.socket?.remoteAddress,
+            url: req?.url,
+            headers: req?.headers,
+            expectedToken: getPalcoToken(),
+          })
+        ) {
+          try { ws.close() } catch { /* ignore */ }
+          return
+        }
         this.#clients.add(ws)
         const remoteIp = req?.socket?.remoteAddress?.replace('::ffff:', '')
         if (remoteIp) this.#receiverIps.set(ws, remoteIp)
@@ -168,6 +183,29 @@ class PalcoSlot {
       try { m = JSON.parse(m) } catch { return false }
     }
     if (!m || typeof m !== 'object' || !m.type) return false
+    // OBS S1: URL de mídia sai COM o token (a TV/browser recebe a URL já
+    // autenticada — o renderer não precisa saber do token).
+    const token = getPalcoToken()
+    if (token && typeof m.url === 'string' && m.url.includes('/media/')) {
+      try {
+        const u = new URL(m.url)
+        u.searchParams.set('token', token)
+        m = { ...m, url: u.toString() }
+      } catch { /* url malformada — segue como veio */ }
+    }
+    // Mesmo gate para o BG/cover da projection: <img> não manda header, e
+    // localhost bypass escondia o 403 — browser/OBS/TV buscavam
+    // http://<lan>:7080/media/... sem token → 403 → onerror → fallback FIXO.
+    const bgUrl = m.type === 'projection' ? (m.background ?? m.cover) : undefined
+    if (token && typeof bgUrl === 'string' && bgUrl.includes('/media/')) {
+      try {
+        const u = new URL(bgUrl)
+        u.searchParams.set('token', token)
+        const patched = u.toString()
+        if (m.background === bgUrl) m = { ...m, background: patched }
+        else m = { ...m, cover: patched }
+      } catch { /* url malformada — segue como veio */ }
+    }
     // Transientes: action sem url/conteúdo NÃO entra no replay.
     // audio stop GRAVA (fix 27/08): é estado terminal — como transient, o
     // replay ficava com o 'play' velho e o F5 na TV ressuscitava o MP3.
@@ -188,6 +226,10 @@ class PalcoSlot {
       receiverIps: Array.from(new Set(this.#receiverIps.values())),
       url: `http://${lanIp()}:${this.#httpPort}`,
       wsUrl: `ws://${lanIp()}:${this.#wsPort}/palco`,
+      // OBS S1: receiver URL pronta com token (UI copia/cola no OBS Browser Source)
+      receiverUrl: this.#running
+        ? `http://${lanIp()}:${this.#httpPort}/?token=${getPalcoToken()}`
+        : null,
     }
   }
 
@@ -221,7 +263,10 @@ class PalcoSlot {
     }
 
     // Assets do receiver
-    const assetMatch = p.match(/^\/([a-z0-9._-]+)$/i)
+    // Assets do receiver — nomes reservados de rotas (/proxy, /status…)
+    // fora: /proxy casava aqui e 404ava ANTES do handler real (L301),
+    // quebrando todo bg/cover externo (músicas da API) → fallback.
+    const assetMatch = /^(?!\/(proxy|status|bg|media)(\/|$))\/([a-z0-9._-]+)$/i.exec(p)
     if (assetMatch) {
       try {
         const file = path.join(__dirname, 'palco', assetMatch[1])
@@ -271,6 +316,18 @@ class PalcoSlot {
 
     // Proxy CORS p/ o receiver (origem file://)
     if (p === '/proxy') {
+      if (
+        !requestHasPalcoAccess({
+          remoteAddress: req.socket?.remoteAddress,
+          url: req.url,
+          headers: req.headers,
+          expectedToken: getPalcoToken(),
+        })
+      ) {
+        res.statusCode = 403
+        res.end('forbidden')
+        return
+      }
       const target = url.searchParams.get('url')
       if (!target || !/^https?:\/\//i.test(target)) { res.statusCode = 400; res.end('bad url'); return }
       try {
@@ -295,6 +352,18 @@ class PalcoSlot {
     // sem Range o <video> do receiver baixa o MP4 inteiro antes de tocar
     // fluido (stutter em 1080p) e seek não funciona.
     if (p.startsWith('/media/')) {
+      if (
+        !requestHasPalcoAccess({
+          remoteAddress: req.socket?.remoteAddress,
+          url: req.url,
+          headers: req.headers,
+          expectedToken: getPalcoToken(),
+        })
+      ) {
+        res.statusCode = 403
+        res.end('forbidden')
+        return
+      }
       const name = p.slice('/media/'.length)
       const entry = this.#media.get(name)
       if (!entry) { res.statusCode = 404; res.end(); return }
@@ -352,7 +421,18 @@ class PalcoSlot {
       const info = await stat(clean)
       if (!info.isFile() || info.size > 200 * 1024 * 1024) return null
       const base = path.basename(clean).replace(/[^A-Za-z0-9._-]/g, '_')
-      const name = `local_${Date.now()}_${base}`
+      // Nome DETERMINÍSTICO (hash do path resolved + mtime + size): a mesma
+      // imagem publicada N vezes gera a MESMA URL. Com nome por timestamp,
+      // cada republish (o onTimeUpdate republisha ~4x/s) trocava o src do
+      // <img> na TV e o Chromium recarregava a imagem a cada publish —
+      // flash = oscilação fallback↔imagem. URL estável = cache do browser,
+      // zero reload. mtime/size no hash: arquivo re-baixado (mesmo path,
+      // bytes novos) muda de URL → cache não serve imagem velha.
+      const h = createHash('sha1')
+        .update(`${path.resolve(clean)}|${info.mtimeMs}|${info.size}`)
+        .digest('hex')
+        .slice(0, 12)
+      const name = `local_${h}_${base}`
       const bytes = await rf(clean)
       const mime = /\.(mp3|m4a)$/i.test(base) ? 'audio/mpeg' : /\.mp4$/i.test(base) ? 'video/mp4' : 'image/png'
       this.#media.set(name, { mime, bytes })
@@ -366,6 +446,25 @@ class PalcoSlot {
 /** Gerenciador de slots (singleton no main process). */
 function slotsConfigPath() {
   return path.join(app.getPath('userData'), 'palco-slots.json')
+}
+
+/** Token de acesso (persistido no userData). Feature off = null. */
+let _palcoToken = null
+export function palcoTokenPath() {
+  return path.join(app.getPath('userData'), 'palco-token.txt')
+}
+export function getPalcoToken() {
+  return _palcoToken
+}
+export function enablePalcoToken() {
+  _palcoToken = loadOrCreatePalcoToken(palcoTokenPath())
+  return _palcoToken
+}
+export function resetPalcoToken() {
+  const tmp = palcoTokenPath() + '.reset'
+  _palcoToken = loadOrCreatePalcoToken(tmp) // path inexistente → regenera
+  try { renameSync(tmp, palcoTokenPath()) } catch { /* best effort */ }
+  return _palcoToken
 }
 
 function readPersistedSlots() {
@@ -477,6 +576,17 @@ let manager = null
 export function attachPalcoServer(getContents) {
   if (!manager) manager = new PalcoManager(getContents)
   manager.init()
+
+  // OBS S1: token de acesso carregado/criado 1x no boot (persistido no userData)
+  enablePalcoToken()
+
+  // IPC: token (UI mostra URL pronta p/ OBS + reset)
+  ipcMain.handle('palco:token', () => ({ token: getPalcoToken(), path: palcoTokenPath() }))
+  ipcMain.handle('palco:token-reset', () => {
+    const token = resetPalcoToken()
+    // receivers conectados com o token velho caem na reconexão — ok
+    return { token }
+  })
 
   // IPC: lista slots
   ipcMain.handle('palco:slots', () =>

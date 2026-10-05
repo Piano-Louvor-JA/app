@@ -139,10 +139,36 @@ function patchRandom(partial: Partial<NonNullable<StageSettings['random']>>) {
   patch({ random: { ...current, ...partial } })
 }
 
+const titleWeightOptions: { value: NonNullable<StageSettings['titleFontWeight']>; label: string }[] = [
+  { value: 400, label: t('settings.stage.weightNormal') },
+  { value: 600, label: t('settings.stage.weightLightPlus') },
+  { value: 800, label: t('settings.stage.weightStrong') },
+]
+
+function clearTitleOverrides() {
+  patch({ titleFontSize: null, titleFontWeight: null, titleTextColor: null, titleTextShadow: null, titleUpperCase: false })
+}
+
+function clearLyricOverrides() {
+  patch({ lyricFontSize: null, lyricFontWeight: null, lyricTextColor: null, lyricTextShadow: null, lyricUpperCase: false })
+}
+
+const lyricWeightOptions: { value: StageFontWeight | null; label: string }[] = [
+  { value: null, label: t('settings.stage.weightNormal') },
+  { value: 400, label: t('settings.stage.weightLightPlus') },
+  { value: 600, label: t('settings.stage.weightMedium') },
+]
+
 const bibleWeightOptions: { value: StageSettings['bibleFontWeight']; label: string }[] = [
   { value: 400, label: t('settings.stage.weightNormal') },
   { value: 500, label: t('settings.stage.weightLightPlus') },
   { value: 700, label: t('settings.stage.weightStrong') },
+]
+
+const bibleTransformOptions: { value: StageSettings['bibleTextTransform']; label: string }[] = [
+  { value: 'none', label: t('settings.stage.bibleTransformNone') },
+  { value: 'uppercase', label: t('settings.stage.bibleTransformUppercase') },
+  { value: 'capitalize', label: t('settings.stage.bibleTransformCapitalize') },
 ]
 
 const alignOptions = [
@@ -373,6 +399,222 @@ const confirmReset = ref(false)
       </div>
     </template>
 
+    <!-- Hinos: título (1º slide/capa) com tipografia própria -->
+    <template v-if="activeScope === 'hymns'">
+      <div class="stage-custom__section stage-custom__section--bible">
+        <p class="stage-custom__label">{{ t('settings.stage.titleAppearance') }}</p>
+
+        <div class="stage-custom__toggle-row">
+          <button
+            type="button"
+            class="stage-custom__toggle-label"
+            @click="clearTitleOverrides"
+          >
+            {{ t('settings.stage.titleReset') }}
+          </button>
+        </div>
+
+        <p class="stage-custom__label stage-custom__label--sub">
+          {{ t('settings.stage.titleTextColor') }}
+        </p>
+        <div class="stage-custom__swatches">
+          <button
+            v-for="preset in STAGE_FG_PRESETS"
+            :key="preset.color"
+            type="button"
+            class="stage-custom__swatch"
+            :class="{ 'stage-custom__swatch--active': settings.titleTextColor === preset.color }"
+            :style="{ '--swatch': preset.color }"
+            :aria-label="preset.label"
+            @click="patch({ titleTextColor: preset.color })"
+          />
+          <label class="stage-custom__picker">
+            <i class="ti ti-color-picker" aria-hidden="true" />
+            <input
+              type="color"
+              :value="settings.titleTextColor ?? settings.textColor"
+              :aria-label="t('settings.stage.titleTextColor')"
+              @input="patch({ titleTextColor: ($event.target as HTMLInputElement).value })"
+            >
+          </label>
+        </div>
+
+        <div class="stage-custom__row-head">
+          <span>{{ t('settings.stage.titleFontSize') }}</span>
+          <span class="stage-custom__chip">{{ Math.round(settings.titleFontSize ?? settings.fontSize) }}px</span>
+        </div>
+        <input
+          type="range"
+          min="60"
+          max="160"
+          step="2"
+          :value="settings.titleFontSize ?? settings.fontSize"
+          :aria-label="t('settings.stage.titleFontSize')"
+          @input="patch({ titleFontSize: Number(($event.target as HTMLInputElement).value) })"
+        >
+
+        <p class="stage-custom__label stage-custom__label--sub">
+          {{ t('settings.stage.titleFontWeight') }}
+        </p>
+        <div class="stage-custom__segment" role="radiogroup">
+          <button
+            v-for="opt in titleWeightOptions"
+            :key="opt.value"
+            type="button"
+            role="radio"
+            :aria-checked="settings.titleFontWeight === opt.value"
+            class="stage-custom__segment-btn"
+            :class="{ 'stage-custom__segment-btn--active': settings.titleFontWeight === opt.value }"
+            @click="patch({ titleFontWeight: settings.titleFontWeight === opt.value ? null : opt.value })"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
+
+        <div class="stage-custom__toggle-row">
+          <button
+            type="button"
+            class="stage-custom__toggle-label"
+            @click="patch({ titleUpperCase: !settings.titleUpperCase })"
+          >
+            {{ t('settings.stage.titleUpperCase') }}
+          </button>
+          <input
+            type="checkbox"
+            class="stage-custom__toggle"
+            :checked="settings.titleUpperCase"
+            :aria-label="t('settings.stage.titleUpperCase')"
+            @change="patch({ titleUpperCase: ($event.target as HTMLInputElement).checked })"
+          >
+        </div>
+
+        <div class="stage-custom__toggle-row">
+          <button
+            type="button"
+            class="stage-custom__toggle-label"
+            @click="patch({ titleTextShadow: settings.titleTextShadow === null ? !settings.textShadow : !settings.titleTextShadow })"
+          >
+            {{ t('settings.stage.titleTextShadow') }}
+          </button>
+          <input
+            type="checkbox"
+            class="stage-custom__toggle"
+            :checked="settings.titleTextShadow ?? settings.textShadow"
+            :aria-label="t('settings.stage.titleTextShadow')"
+            @change="patch({ titleTextShadow: ($event.target as HTMLInputElement).checked })"
+          >
+        </div>
+      </div>
+    </template>
+
+    <!-- Hinos: estrofes com tipografia própria (espelha o título) -->
+    <template v-if="activeScope === 'hymns'">
+      <div class="stage-custom__section stage-custom__section--bible">
+        <p class="stage-custom__label">{{ t('settings.stage.lyricAppearance') }}</p>
+
+        <div class="stage-custom__toggle-row">
+          <button
+            type="button"
+            class="stage-custom__toggle-label"
+            @click="clearLyricOverrides"
+          >
+            {{ t('settings.stage.lyricReset') }}
+          </button>
+        </div>
+
+        <p class="stage-custom__label stage-custom__label--sub">
+          {{ t('settings.stage.lyricTextColor') }}
+        </p>
+        <div class="stage-custom__swatches">
+          <button
+            v-for="preset in STAGE_FG_PRESETS"
+            :key="preset.color"
+            type="button"
+            class="stage-custom__swatch"
+            :class="{ 'stage-custom__swatch--active': settings.lyricTextColor === preset.color }"
+            :style="{ '--swatch': preset.color }"
+            :aria-label="preset.label"
+            @click="patch({ lyricTextColor: preset.color })"
+          />
+          <label class="stage-custom__picker">
+            <i class="ti ti-color-picker" aria-hidden="true" />
+            <input
+              type="color"
+              :value="settings.lyricTextColor ?? settings.textColor"
+              :aria-label="t('settings.stage.lyricTextColor')"
+              @input="patch({ lyricTextColor: ($event.target as HTMLInputElement).value })"
+            >
+          </label>
+        </div>
+
+        <div class="stage-custom__row-head">
+          <span>{{ t('settings.stage.lyricFontSize') }}</span>
+          <span class="stage-custom__chip">{{ Math.round(settings.lyricFontSize ?? settings.fontSize) }}px</span>
+        </div>
+        <input
+          type="range"
+          min="60"
+          max="160"
+          step="2"
+          :value="settings.lyricFontSize ?? settings.fontSize"
+          :aria-label="t('settings.stage.lyricFontSize')"
+          @input="patch({ lyricFontSize: Number(($event.target as HTMLInputElement).value) })"
+        >
+
+        <p class="stage-custom__label stage-custom__label--sub">
+          {{ t('settings.stage.lyricFontWeight') }}
+        </p>
+        <div class="stage-custom__segment" role="radiogroup">
+          <button
+            v-for="opt in lyricWeightOptions"
+            :key="String(opt.value)"
+            type="button"
+            role="radio"
+            :aria-checked="(settings.lyricFontWeight ?? null) === opt.value"
+            class="stage-custom__segment-btn"
+            :class="{ 'stage-custom__segment-btn--active': (settings.lyricFontWeight ?? null) === opt.value }"
+            @click="patch({ lyricFontWeight: (settings.lyricFontWeight ?? null) === opt.value ? null : opt.value })"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
+
+        <div class="stage-custom__toggle-row">
+          <button
+            type="button"
+            class="stage-custom__toggle-label"
+            @click="patch({ lyricUpperCase: !settings.lyricUpperCase })"
+          >
+            {{ t('settings.stage.lyricUpperCase') }}
+          </button>
+          <input
+            type="checkbox"
+            class="stage-custom__toggle"
+            :checked="settings.lyricUpperCase"
+            :aria-label="t('settings.stage.lyricUpperCase')"
+            @change="patch({ lyricUpperCase: ($event.target as HTMLInputElement).checked })"
+          >
+        </div>
+
+        <div class="stage-custom__toggle-row">
+          <button
+            type="button"
+            class="stage-custom__toggle-label"
+            @click="patch({ lyricTextShadow: settings.lyricTextShadow === null ? !settings.textShadow : !settings.lyricTextShadow })"
+          >
+            {{ t('settings.stage.lyricTextShadow') }}
+          </button>
+          <input
+            type="checkbox"
+            class="stage-custom__toggle"
+            :checked="settings.lyricTextShadow ?? settings.textShadow"
+            :aria-label="t('settings.stage.lyricTextShadow')"
+            @change="patch({ lyricTextShadow: ($event.target as HTMLInputElement).checked })"
+          >
+        </div>
+      </div>
+    </template>
+
     <!-- Bíblia: tipografia própria (F3.3o) -->
     <template v-if="activeScope === 'bible'">
       <div class="stage-custom__section stage-custom__section--bible">
@@ -430,6 +672,24 @@ const confirmReset = ref(false)
             class="stage-custom__segment-btn"
             :class="{ 'stage-custom__segment-btn--active': settings.bibleFontWeight === opt.value }"
             @click="patch({ bibleFontWeight: opt.value })"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
+
+        <p class="stage-custom__label stage-custom__label--sub">
+          {{ t('settings.stage.bibleTextTransform') }}
+        </p>
+        <div class="stage-custom__segment" role="radiogroup">
+          <button
+            v-for="opt in bibleTransformOptions"
+            :key="opt.value"
+            type="button"
+            role="radio"
+            :aria-checked="settings.bibleTextTransform === opt.value"
+            class="stage-custom__segment-btn"
+            :class="{ 'stage-custom__segment-btn--active': settings.bibleTextTransform === opt.value }"
+            @click="patch({ bibleTextTransform: opt.value })"
           >
             {{ opt.label }}
           </button>

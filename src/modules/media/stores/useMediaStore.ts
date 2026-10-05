@@ -33,6 +33,7 @@ import {
   playMediaAudio,
   resolveMusicAudioUrl,
   resolveSlideImageUrl,
+  resolveRemoteFileUrl,
   stopAllMediaAudio,
   switchMediaAudioElement,
 } from '../services/media-audio'
@@ -234,7 +235,13 @@ export const useMediaStore = defineStore('media', () => {
       title: session.value.title,
       subtitle: session.value.subtitle,
       lyric: stripHtmlBreaks(slide.lyric),
-      imageUrl: resolvedSlideImageUrl.value ?? slide.imageUrl,
+      // Sem cru: enquanto o resolved async não chega, URL absoluta síncrona
+      // (mesma origem do resolved p/ não-baixado). Path cru chegava ao palco,
+      // virava bg undefined e o receiver caía no fallback a cada troca de
+      // slide (oscilação fallback↔imagem reportada 04/10).
+      imageUrl:
+        resolvedSlideImageUrl.value ??
+        (slide.imageUrl ? resolveRemoteFileUrl(slide.imageUrl) : null),
       imagePosition: slide.imagePosition,
       isCover: slide.isCover,
       slideIndex: slideIndex.value,
@@ -465,7 +472,9 @@ export const useMediaStore = defineStore('media', () => {
 
   async function open(params: MediaOpenParams): Promise<MediaOpenResult> {
     const musicId = params.musicId
-    if (!Number.isFinite(musicId) || musicId <= 0) {
+    // app#331: negativo = música LOCAL (import .slja sem login) — válido.
+    // Só 0/NaN (sem música) continua fora.
+    if (!Number.isFinite(musicId) || musicId === 0) {
       return { ok: false, messageKey: 'media.messages.trackMissing' }
     }
 
@@ -515,9 +524,13 @@ export const useMediaStore = defineStore('media', () => {
     lastErrorKey.value = null
 
     // Dispatcher custom vs oficial (mesmo contrato do web): id >= 1M é
-    // música custom de Minhas Coletâneas.
-    const track = isCustomMusicId(musicId)
-      ? await loadCustomMusicTrack(fromCustomMusicId(musicId))
+    // música custom de Minhas Coletâneas. app#331: negativo é música LOCAL
+    // (import .slja sem login) — vai pro MESMO loader custom, que lê o
+    // localStorage (isLocalId) e monta data: URL do áudio.
+    const track = isCustomMusicId(musicId) || musicId < 0
+      ? await loadCustomMusicTrack(
+          musicId < 0 ? musicId : fromCustomMusicId(musicId),
+        )
       : await loadMediaTrack(musicId)
     if (!track) {
       status.value = 'error'
