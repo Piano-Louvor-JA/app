@@ -240,6 +240,22 @@ describe("useRemoteControl", () => {
     info.mockRestore();
   });
 
+  it("beforeunload cancela poll e para o receiver ativo", async () => {
+    vi.useFakeTimers();
+    try {
+      const useRemoteControl = await freshRc();
+      const rc = useRemoteControl();
+      rc.enabled.value = true;
+      await nextTick();
+
+      const receiver = receiverInstances.instances.at(-1)!;
+      window.dispatchEvent(new Event("beforeunload"));
+      expect(receiver.stop).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
     it("tick após disable: connected cai via receiver?.connected ?? false (br 57)", async () => {
       vi.useFakeTimers()
       const useRemoteControl = await freshRc()
