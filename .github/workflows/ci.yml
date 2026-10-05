@@ -50,6 +50,22 @@ jobs:
       - run: npm ci
       - run: npm run build
 
+  paridade:
+    name: Paridade app↔web (anti-deriva S1)
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Check paridade
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/check-paridade.mjs
+
   regression-gate:
     name: Regression Gate (suite completa + type-check + build)
     runs-on: ubuntu-latest
@@ -90,7 +106,7 @@ jobs:
       - id: matrix
         name: Resolve the latest three stable Electron majors
         run: |
-          MATRIX="$(node -e "const {execFileSync}=require('node:child_process'); const versions=JSON.parse(execFileSync('npm',['view','electron','versions','--json'],{encoding:'utf8'})); const stable=versions.filter(v=>/^\\d+\\.\\d+\\.\\d+$/.test(v)); const majors=[...new Set(stable.map(v=>Number(v.split('.')[0])))].sort((a,b)=>b-a).slice(0,3).sort((a,b)=>a-b); if(majors.length!==3) throw new Error('Não foi possível resolver as três majors estáveis do Electron'); const include=majors.flatMap(major=>{const version=stable.filter(item=>item.startsWith(major+'.')).at(-1); return [{os:'windows-latest',platform:'win',target:'--win',version},{os:'ubuntu-latest',platform:'linux',target:'--linux AppImage',version},{os:'macos-latest',platform:'mac',target:'--mac',version}]}); process.stdout.write(JSON.stringify({include}))")"
+          MATRIX="$(node -e "const {execFileSync}=require('node:child_process'); const versions=JSON.parse(execFileSync('npm',['view','electron','versions','--json'],{encoding:'utf8'})); const stable=versions.filter(v=>/^\d+\.\d+\.\d+$/.test(v)); const majors=[...new Set(stable.map(v=>Number(v.split('.')[0])))].sort((a,b)=>b-a).slice(0,3).sort((a,b)=>a-b); if(majors.length!==3) throw new Error('Não foi possível resolver as três majors estáveis do Electron'); const include=majors.flatMap(major=>{const version=stable.filter(item=>item.startsWith(major+'.')).at(-1); return [{os:'windows-latest',platform:'win',target:'--win',version},{os:'ubuntu-latest',platform:'linux',target:'--linux AppImage',version},{os:'macos-latest',platform:'mac',target:'--mac',version}]}); process.stdout.write(JSON.stringify({include}))")"
           echo "value=$MATRIX" >> "$GITHUB_OUTPUT"
           echo "$MATRIX"
 
@@ -103,7 +119,7 @@ jobs:
       matrix: ${{ fromJSON(needs.electron-support-matrix.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions.setup-node@v4
         with:
           node-version: 22
           cache: npm
@@ -128,7 +144,7 @@ jobs:
   quality-gate:
     name: Quality Gate
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, build, regression-gate, release-validation]
+    needs: [lint, typecheck, build, regression-gate, release-validation, paridade]
     if: always()
     steps:
       - name: Verifica se todos os gates passaram
@@ -138,9 +154,10 @@ jobs:
           echo "build: ${{ needs.build.result }}"
           echo "regression-gate: ${{ needs.regression-gate.result }}"
           echo "release-validation: ${{ needs.release-validation.result }}"
+          echo "paridade: ${{ needs.paridade.result }}"
           # regression-gate só roda em pull_request; em push fica "skipped".
           REG="${{ needs.regression-gate.result }}"
-          if [[ "${{ needs.lint.result }}" != "success" || "${{ needs.typecheck.result }}" != "success" || "${{ needs.build.result }}" != "success" || "${{ needs.release-validation.result }}" != "success" || ( "$REG" != "success" && "$REG" != "skipped" ) ]]; then
+          if [[ "${{ needs.lint.result }}" != "success" || "${{ needs.typecheck.result }}" != "success" || "${{ needs.build.result }}" != "success" || "${{ needs.release-validation.result }}" != "success" || "${{ needs.paridade.result }}" != "success" || ( "$REG" != "success" && "$REG" != "skipped" ) ]]; then
             echo "::error::Quality Gate FALHOU — corrija os erros antes do merge"
             exit 1
           fi
