@@ -288,4 +288,16 @@ describe('ExternalPlayerCard', () => {
     }
     w.unmount()
   })
+  it('gaps8: clique no radio vlc dispara setPlayer do template (fn 211)', async () => {
+    const bridge = makeBridge()
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    const vlc = w.find('[data-test="external-player-vlc"]')
+    expect(vlc.exists()).toBe(true)
+    await vlc.trigger('click')
+    await flushPromises()
+    expect(w.find('[data-test="external-player-vlc"]').attributes('aria-checked')).toBe('true')
+    w.unmount()
+  })
 })
