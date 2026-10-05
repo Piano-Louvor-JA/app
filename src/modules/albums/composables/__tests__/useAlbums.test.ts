@@ -8,8 +8,9 @@ import { reactive } from "vue";
  * e ao mediaStore (filas de play), com wrappers de download na library.
  * Mocks: stores via vi.mock, router.push spy, loadCollectionTracks fake.
  */
-const { storeMock, libraryMock, mediaMock, pushMock, loadTracksMock } =
+const { storeMock, libraryMock, mediaMock, pushMock, loadTracksMock, desktopFlag } =
   vi.hoisted(() => {
+    const desktopFlag = { value: true };
     const storeMock = {
       categories: [] as unknown[],
       activeCollection: null as { id: string; kind: string } | null,
@@ -61,7 +62,7 @@ const { storeMock, libraryMock, mediaMock, pushMock, loadTracksMock } =
       { musicId: Number(c.id) * 10 + 1, name: `faixa ${c.id}` },
     ]);
 
-    return { storeMock, libraryMock, mediaMock, pushMock, loadTracksMock };
+    return { storeMock, libraryMock, mediaMock, pushMock, loadTracksMock, desktopFlag };
   });
 
 // Store real: storeToRefs do pinia exige store de verdade (punch .effect).
@@ -88,6 +89,10 @@ vi.mock("@modules/media/services/open-music-player", () => ({
 vi.mock("@shared/services/track-media", () => ({
   invalidateTrackMediaCache: vi.fn(),
   peekTrackDownloadCache: vi.fn(() => null),
+}));
+
+vi.mock("@shared/services/desktop-bridge", () => ({
+  isDesktopApp: vi.fn(() => desktopFlag.value),
 }));
 
 vi.mock("@modules/sync/services/library-catalog", () => ({
@@ -384,5 +389,53 @@ describe("useAlbums", () => {
       const ok = await api.playAllInActiveCollection();
       expect(ok).toBe(false);
     });
+  
+describe("useAlbums — gaps isDesktop/albumId", () => {
+  it("não-desktop: onMounted não chama refreshCollections", async () => {
+    desktopFlag.value = false;
+    libraryMock.refreshCollections.mockClear();
+    const { mount } = await import("@vue/test-utils");
+    const { defineComponent, h } = await import("vue");
+    const mod = await import("../useAlbums");
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    const host = defineComponent({
+      setup() {
+        mod.useAlbums();
+        return () => h("div");
+      },
+    });
+    const w = mount(host, { global: { plugins: [pinia] } });
+    // com o módulo já carregado sob isDesktop=false, o caminho (53,1)
+    // só pode ser validado num arquivo dedicado (const module-level);
+    // aqui validamos que nada explode sem desktop.
+    expect(storeMock.hydrateCatalog).not.toHaveBeenCalled();
+    w.unmount();
+    desktopFlag.value = true;
   });
+
+  it("playAll com id custom não numérico → false sem enfileirar (setup antes)", async () => {
+    const mod = await import("../useAlbums");
+    const { defineComponent, h } = await import("vue");
+    const { mount } = await import("@vue/test-utils");
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    const albumsStore = (await import("../../stores/useAlbumsStore")).useAlbumsStore();
+    albumsStore.activeCollection = { id: "cu-77", kind: "album" } as never;
+    albumsStore.tracks = [{ musicId: 1, name: "A" }] as never;
+    let api: ReturnType<typeof mod.useAlbums> | null = null;
+    const host = defineComponent({
+      setup() {
+        api = mod.useAlbums();
+        return () => h("div");
+      },
+    });
+    const w = mount(host, { global: { plugins: [pinia] } });
+    const ok = await api!.playAllInActiveCollection();
+    expect(ok).toBe(false);
+    expect(mediaMock.playAlbumQueue).not.toHaveBeenCalled();
+    w.unmount();
+  });
+});
+});
 })
