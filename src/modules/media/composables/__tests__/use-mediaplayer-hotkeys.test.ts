@@ -282,6 +282,34 @@ describe('useMediaPlayerHotkeys', () => {
     })
   })
 
+
+  it('gaps onda1: input type vazio assume text; ArrowUp passa sem ação; reclaim lida type vazio', async () => {
+    const w = mount(Host)
+    await w.vm.$nextTick()
+    const input = document.createElement('input')
+    Object.defineProperty(input, 'type', { value: '', configurable: true })
+    fireKey(input, 'ArrowRight') // fallback text: bloqueia
+    expect(store_slideIndex()).toBe(0)
+    fireKey(document.body, 'ArrowUp') // passa pelos dois ifs sem navegar
+    expect(store_slideIndex()).toBe(0)
+    input.focus()
+    Object.defineProperty(document, 'activeElement', { configurable: true, value: input, writable: true })
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const Late = defineComponent({
+      setup() {
+        const store = useMediaStore()
+        useMediaPlayerHotkeys(() => false)
+        setTimeout(() => store.open({ musicId: 1, mode: 'no_audio', project: false }), 0)
+        return {}
+      },
+      render: () => null,
+    })
+    const late = mount(Late, { global: { plugins: [pinia] } })
+    await new Promise((r) => setTimeout(r, 20))
+    late.unmount()
+    w.unmount()
+  })
 })
 
 function store_slideIndex() {
