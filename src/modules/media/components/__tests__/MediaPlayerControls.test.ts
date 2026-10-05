@@ -177,4 +177,26 @@ describe("MediaPlayerControls — minimizar", () => {
       w.unmount()
     })
   })
+
+describe("MediaPlayerControls — gaps estados invertidos", () => {
+	it("projetando: label do botão vira limpar projeção", async () => {
+		const { w } = mountControls(baseProps({ projecting: true }));
+		const proj = w.findAll("button").find((b) => b.attributes("aria-label") === "Ocultar conteúdo");
+		expect(proj).toBeTruthy();
+		await proj!.trigger("click");
+		expect(w.emitted("toggleProjection")).toHaveLength(1);
+		w.unmount();
+	});
+
+	it("isPlaying true: botão play vira pause (aria/title/classe)", async () => {
+		const { w } = mountControls(baseProps({ isPlaying: true }));
+		const play = w.findAll(".media-player-controls__btn").find((b) => b.attributes("aria-label")?.includes("Pausar") || b.attributes("aria-label")?.includes("pausar"));
+		expect(play).toBeTruthy();
+		expect(play!.attributes("title")).toContain("ausar");
+		expect(play!.html()).toContain("ti-player-pause");
+		await play!.trigger("click");
+		expect(w.emitted("togglePlay")).toHaveLength(1);
+		w.unmount();
+	});
+});
 })
