@@ -6,8 +6,8 @@ import { createI18n } from 'vue-i18n'
 
 const useClockFeatureMock = vi.hoisted(() => ({
   config: { value: { style: 'digital', format24h: true, showSeconds: true, textColor: '#fff', bgColor: '#000' } },
-  isProjecting: { value: false },
-  configOpen: { value: false },
+  isProjecting: { __v_isRef: true, value: false },
+  configOpen: { __v_isRef: true, value: false },
   setStyle: vi.fn(),
   setShowSeconds: vi.fn(),
   setFormat24h: vi.fn(),
@@ -66,7 +66,7 @@ import ClockView from '../ClockView.vue'
 const i18n = createI18n({
   legacy: false,
   locale: 'pt-BR',
-  messages: { 'pt-BR': { clock: { backToUtilities: 'Voltar', title: 'Relógio', config: 'Config' } } },
+  messages: { 'pt-BR': { clock: { backToUtilities: 'Voltar', title: 'Relógio', config: 'Config', projecting: 'Projetando' } } },
 })
 
 function createWrapper() {
