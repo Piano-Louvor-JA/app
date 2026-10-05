@@ -129,6 +129,23 @@ describe('LyricCustomizationCard', () => {
     expect(setters.setFontColor).toHaveBeenLastCalledWith('#ff0000')
   })
 
+  it('callbacks dos componentes: toggle e slider atualizam preferências', async () => {
+    mockSettings.customTextFormat = true
+    const w = mount(LyricCustomizationCard, {
+      global: {
+        stubs: {
+          'v-slider': { emits: ['update:modelValue'], template: '<button class="slider-stub" @click="$emit(\'update:modelValue\', 125)" />' },
+        },
+      },
+    })
+    active = w
+    w.findAllComponents({ name: 'SettingsToggle' })[0]!.vm.$emit('update:modelValue', false)
+    await w.find('.slider-stub').trigger('click')
+    await flushPromises()
+    expect(setters.setShowSongTitle).toHaveBeenCalledWith(false)
+    expect(setters.setFontSizePercent).toHaveBeenCalledWith(125)
+  })
+
   it('seleção de imagem de fundo chama setBackgroundImageFromFile', async () => {
     mockSettings.customBackground = true
     const w = mount(LyricCustomizationCard)
