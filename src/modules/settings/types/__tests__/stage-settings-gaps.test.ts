@@ -9,6 +9,8 @@ vi.mock('@shared/services/desktop-bridge', () => ({
 import {
   parseStageSettings,
   serializeStageSettings,
+  stageFlexAlign,
+  STAGE_OFFICIAL_BACKGROUNDS,
   resolveBackgroundImage,
   officialBgUrl,
   OFFICIAL_BG_PREFIX,
@@ -105,5 +107,47 @@ describe('stage-settings — parse/serialize gaps', () => {
     expect(parsed.random?.textTransform).toBe(valid)
     expect(parsed.random?.animationSpeed).toBe(speed)
   })
+
+  it('gaps2: stageFlexAlign right/bottom; hymns parse; serialize com módulos; sort GALLERY', () => {
+    // right/bottom (170/176 arm1)
+    const right = stageFlexAlign({ textAlign: 'right', textVerticalAlign: 'bottom' } as never);
+    expect(right.alignItems).toBe('flex-end');
+    expect(right.justifyContent).toBe('flex-end');
+    // center/default (170/176 false side)
+    const center = stageFlexAlign({ textAlign: 'center', textVerticalAlign: 'middle' } as never);
+    expect(center.alignItems).toBe('center');
+    expect(center.justifyContent).toBe('center');
+    // row direction (179)
+    const row = stageFlexAlign({ textAlign: 'center', textVerticalAlign: 'middle' } as never, 'row');
+    expect(row.alignItems).toBe('center');
+
+    // hymns nested no parse (358) + clock style analog (307 arm0)
+    const parsed = parseStageSettings({ hymns: { overrideBg: true }, clock: { style: 'analog', showSeconds: false } });
+    expect(parsed.textAlign).toBe('center');
+
+    // serialize com módulos preenchidos (391-395 true sides)
+    const full = parseStageSettings({
+      clock: { style: 'digital', showSeconds: true },
+      timer: { timeFormat: 'HH:mm', bgColor: '#000000', textColor: '#ffffff' },
+      countdown: { timeFormat: 'HH:mm:ss', bgColor: '#000000', textColor: '#ffffff' },
+      random: { fontSizePc: 100, textTransform: 'none', animationSpeed: 'normal' },
+      hymns: { overrideBg: false },
+    });
+    const ser = serializeStageSettings(full as never);
+    expect(ser.clock).toBeTruthy();
+    expect(ser.timer).toBeTruthy();
+    expect(ser.countdown).toBeTruthy();
+    expect(ser.random).toBeTruthy();
+    expect(ser.hymns).toBeTruthy();
+
+    // serialize sem módulos (391-395 false sides)
+    const bare = serializeStageSettings(parseStageSettings({}) as never);
+    expect(bare.clock).toBeUndefined();
+
+    // galeria oficial: bg-11 primeiro (214 exercido pelo sort do módulo)
+    if (STAGE_OFFICIAL_BACKGROUNDS.length > 1) {
+      expect(STAGE_OFFICIAL_BACKGROUNDS[0]).toBe('bg-11');
+    }
+  });
 
 })
