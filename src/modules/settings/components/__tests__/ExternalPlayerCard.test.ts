@@ -300,4 +300,130 @@ describe('ExternalPlayerCard', () => {
     expect(w.find('[data-test="external-player-vlc"]').attributes('aria-checked')).toBe('true')
     w.unmount()
   })
+
+  it('gaps2: fileName fallback e listCustom ?? [] (L23/46)', async () => {
+    const bridge = makeBridge()
+    bridge.externalPlayer.get.mockResolvedValue('custom:mpv-sem-barra')
+    bridge.externalPlayer.listCustom.mockResolvedValue(undefined)
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    expect(w.text()).toContain('mpv-sem-barra')
+  })
+
+  it('gaps2: detect ?? [] com null (L65)', async () => {
+    const bridge = makeBridge()
+    bridge.externalPlayer.detect.mockResolvedValue(null)
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    expect(w.text()).not.toContain('VLC')
+  })
+
+  it('gaps2: guard busy em setPlayer/removeCustom/pickCustomPlayer (L80/96/119)', async () => {
+    const bridge = makeBridge()
+    bridge.externalPlayer.listCustom.mockResolvedValue(['/opt/mpv'])
+    let releaseSet: ((v: boolean) => void) | null = null
+    bridge.externalPlayer.set.mockImplementation(
+      () => new Promise<boolean>((resolve) => { releaseSet = resolve }),
+    )
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    const vlcBtn = w.find('[data-test="external-player-vlc"]')
+    const first = vlcBtn.trigger('click')
+    await flushPromises()
+    expect(bridge.externalPlayer.set).toHaveBeenCalledTimes(1)
+    // segunda chamada enquanto busy: guard retorna sem chamar set de novo
+    vlcBtn.element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await flushPromises()
+    expect(bridge.externalPlayer.set).toHaveBeenCalledTimes(1)
+    // removeCustom (L96) e pickCustomPlayer (L119) com busy true
+    const chip = w.get('[data-test="external-player-custom-remove"]')
+    chip.element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await flushPromises()
+    expect(bridge.externalPlayer.removeCustom).not.toHaveBeenCalled()
+    const pick = w.get('[data-test="external-player-pick"]')
+    pick.element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await flushPromises()
+    expect(bridge.dialog.openFile).not.toHaveBeenCalled()
+    releaseSet!(true)
+    await first
+    await flushPromises()
+  })
+
+  it('gaps2: removeCustom result.customPlayers ?? [] e player não-custom (L102/106)', async () => {
+    const bridge = makeBridge()
+    bridge.externalPlayer.get.mockResolvedValue('vlc-id')
+    bridge.externalPlayer.detect.mockResolvedValue([])
+    bridge.externalPlayer.listCustom.mockResolvedValue(['/opt/mpv'])
+    bridge.externalPlayer.removeCustom.mockResolvedValue({
+      player: 'vlc-id',
+      customPlayers: undefined,
+    })
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    const btn = w.findAll('[data-test="external-player-custom-remove"]')[0]
+    expect(btn.exists()).toBe(true)
+    await btn.trigger('click')
+    await flushPromises()
+    expect(bridge.externalPlayer.set).not.toHaveBeenCalled()
+  })
+
+  it('gaps2: removeCustom do player ativo com set()=false mantém custom (L108)', async () => {
+    const bridge = makeBridge()
+    bridge.externalPlayer.get.mockResolvedValue('custom:/opt/mpv')
+    bridge.externalPlayer.detect.mockResolvedValue([])
+    bridge.externalPlayer.listCustom.mockResolvedValue(['/opt/mpv'])
+    bridge.externalPlayer.removeCustom.mockResolvedValue(null)
+    bridge.externalPlayer.set.mockResolvedValue(false)
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    const btn = w.findAll('[data-test="external-player-custom-remove"]')[0]
+    expect(btn.exists()).toBe(true)
+    await btn.trigger('click')
+    await flushPromises()
+    expect(bridge.externalPlayer.set).toHaveBeenCalledWith('associated')
+  })
+
+  it('gaps2: pickCustomPlayer com caminho escolhido e com cancelamento (L119-128)', async () => {
+    const bridge = makeBridge()
+    bridge.externalPlayer.detect.mockResolvedValue([])
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    await w.find('[data-test="external-player-pick"]').trigger('click')
+    await flushPromises()
+    expect(bridge.externalPlayer.set).toHaveBeenCalledWith('custom:/opt/player.exe')
+    bridge.dialog.openFile.mockResolvedValue(null)
+    await w.find('[data-test="external-player-pick"]').trigger('click')
+    await flushPromises()
+    expect(bridge.externalPlayer.set).toHaveBeenCalledTimes(1)
+  })
+
+  it('gaps2b: listCustom falha sem preferência custom (L55 false)', async () => {
+    const bridge = makeBridge()
+    bridge.externalPlayer.listCustom.mockRejectedValue(new Error('x'))
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    expect(w.find('[data-test="external-player-detect"]').exists()).toBe(true)
+  })
+
+  it('gaps2b: removeCustom sem resultado e player não era o custom (L106 false)', async () => {
+    const bridge = makeBridge()
+    bridge.externalPlayer.get.mockResolvedValue('vlc-id')
+    bridge.externalPlayer.detect.mockResolvedValue([])
+    bridge.externalPlayer.listCustom.mockResolvedValue(['/opt/mpv'])
+    bridge.externalPlayer.removeCustom.mockResolvedValue(null)
+    setBridge(bridge)
+    const w = await mountCard()
+    active = w
+    const btn = w.findAll('[data-test="external-player-custom-remove"]')[0]
+    await btn.trigger('click')
+    await flushPromises()
+    expect(bridge.externalPlayer.set).not.toHaveBeenCalled()
+  })
 })
