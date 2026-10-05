@@ -39,6 +39,7 @@ class MiniReq<T> {
 vi.stubGlobal("indexedDB", {
   open: () => {
     const req = new MiniReq({
+      close: () => {},
       objectStoreNames: { contains: () => true },
       createObjectStore: () => ({
         createIndex: () => {},
