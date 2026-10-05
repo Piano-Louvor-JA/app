@@ -190,4 +190,14 @@ describe('PalcoSlotsCard', () => {
       vi.useRealTimers()
     }
   })
+
+  it('slots() null → lista vazia (24,1)', async () => {
+    palcoApi.slots.mockResolvedValue(null)
+    const w = await mountCard()
+    await flushPromises()
+    expect(w.findAll('.palco-slots-card__slot').length).toBe(0)
+    w.unmount()
+  })
+
+
 })

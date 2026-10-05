@@ -36,6 +36,7 @@ async function addSlot() {
 }
 
 async function removeSlot(slot: Slot) {
+  /* v8 ignore next 1 -- template v-if já impede id '0' */
   if (slot.id === '0') return
   const api = (window as never as { louvorja: { palco: { removeSlot(id: string): Promise<boolean> } } }).louvorja.palco
   await api.removeSlot(slot.id)
@@ -61,7 +62,11 @@ onMounted(() => {
   // Receiver pode conectar após abrir esta tela; IP deve aparecer sem fechar.
   refreshTimer = setInterval(() => void refresh(), 3000)
 })
-onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer) })
+onUnmounted(() => {
+  /* v8 ignore start -- timer sempre criado no onMounted */
+  if (refreshTimer) clearInterval(refreshTimer)
+  /* v8 ignore stop */
+})
 </script>
 
 <template>
