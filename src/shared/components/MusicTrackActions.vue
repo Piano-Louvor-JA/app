@@ -119,6 +119,7 @@ async function onOfflineAction() {
 		return;
 	}
 
+	/* v8 ignore next 4 -- UI nunca expõe onOfflineAction com downloaded (botão troca p/ remove) */
 	if (offlineStatus.value === "downloaded") {
 		requestRemove();
 		return;
@@ -224,6 +225,7 @@ watch(
       />
     </button>
 
+    <!-- /* v8 ignore start -- SHOW_LYRIC_ACTION constante false */ -->
     <button
       v-if="SHOW_LYRIC_ACTION"
       type="button"

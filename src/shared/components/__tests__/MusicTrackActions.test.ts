@@ -53,7 +53,9 @@ async function mountActions(over: Props = {}) {
   })
   await flushPromises()
   return w
+
 }
+
 
 describe('MusicTrackActions', () => {
   beforeEach(() => {
@@ -341,6 +343,39 @@ describe('MusicTrackActions', () => {
     const vm = w.vm as unknown as { onOfflineAction?: () => Promise<void> }
     await vm.onOfflineAction?.()
     expect(true).toBe(true)
+    w.unmount()
+  })
+  it('gaps6: shouldAbort durante download cancelado (fn 139) + title cancel %', async () => {
+    isDesktopApp.mockReturnValue(true)
+    let release!: (v: { status: string }) => void
+    downloadTrackMedia.mockImplementation(
+      (_id: number, opts?: { onProgress?: (p: number) => void; shouldAbort?: () => boolean }) =>
+        new Promise<{ status: string }>((resolve) => {
+          release = resolve
+          console.log('SHABORT tipo:', typeof opts?.shouldAbort, 'opts:', Object.keys(opts ?? {}))
+          opts?.shouldAbort?.() // fn 139 (chamada direta)
+        }),
+    )
+    const w = await mountActions({ musicId: 9 })
+    await flushPromises()
+    const dlBtn = w.findAll('.music-track-actions__btn').at(-1)!
+    console.log('DLBTN title:', dlBtn.attributes('title'), 'class:', dlBtn.attributes('class'))
+    await dlBtn.trigger('click') // vira downloading → title com %
+    await flushPromises()
+    expect(dlBtn.attributes('title')).toContain('cancelDownload')
+    await dlBtn.trigger('click') // cancelRequested = true (br 115)
+    await flushPromises()
+    release({ status: 'idle' }) // resolve depois do cancel → shouldAbort caminho
+    await flushPromises()
+    expect(w.find('.music-track-actions__check').exists()).toBe(false)
+    w.unmount()
+  })
+  it('gaps6: title download offline (não downloading) (brs 234/236)', async () => {
+    isDesktopApp.mockReturnValue(true)
+    const w = await mountActions({ musicId: 5 })
+    await flushPromises()
+    const dlBtn = w.findAll('.music-track-actions__btn').at(-1)!
+    expect(dlBtn.attributes('title')).toContain('downloadOffline')
     w.unmount()
   })
 })
