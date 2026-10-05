@@ -77,6 +77,23 @@ function withSetup<T>(fn: (stage: Ref<HTMLElement | null>) => T): T {
   return result;
 }
 
+function withSetupBare(fn: (stage: Ref<HTMLElement | null>) => unknown) {
+  let result: ReturnType<typeof useMonitorArrangement> | undefined;
+  const stage = ref<HTMLElement | null>(null); // nunca atribuído
+  const pinia = createPinia();
+  const app = createApp(
+    defineComponent({
+      setup() {
+        result = fn(stage);
+        return () => h("div");
+      },
+    }),
+  );
+  app.use(pinia);
+  app.mount(document.createElement("div"));
+  return { result: result!, unmount: () => app.unmount() };
+}
+
 function pointerEvent(over: Partial<PointerEvent> = {}): PointerEvent {
   return {
     button: 0,
@@ -205,4 +222,20 @@ describe("useMonitorArrangement", () => {
     }
   });
 
+
+  it("stage sem elemento: measureStage sai cedo, RO não é criado e unmount limpa", async () => {
+    const { result, unmount } = withSetupBare((stage) =>
+      useMonitorArrangement(stage),
+    );
+    await Promise.resolve();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(result.draggingId.value).toBeNull();
+    expect(() => unmount()).not.toThrow();
+  });
+
+  it("pointerCancel sem drag ativo ignora", () => {
+    const result = withSetup((stage) => useMonitorArrangement(stage));
+    expect(() => result.onPointerCancel(pointerEvent())).not.toThrow();
+    expect(result.draggingId.value).toBeNull();
+  });
 });
