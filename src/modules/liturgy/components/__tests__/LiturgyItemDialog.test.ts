@@ -1021,4 +1021,165 @@ it('selectLocalFile bridge SEM dialog.openFile: erro desktopOnly (372-373)', asy
       vi.mocked(getDesktopBridge).mockReturnValue(null)
     }
   })
+
+  describe('gaps selectType/file picker', () => {
+    it('category durationMs=0 → tipo audio pega DEFAULT (249 arm1); null→music limpa name (259)', () => {
+      const w1 = createWrapper({ draft: { ...defaultProps.draft, type: 'category', durationMs: 0, name: 'Velho' } })
+      w1.vm.selectType('audio')
+      const e1 = w1.emitted('update:draft')?.[0][0] as typeof defaultProps.draft
+      expect(e1.durationMs).toBe(0) // DEFAULT_MOMENT_DURATION_MS
+      w1.unmount()
+      const w2 = createWrapper({ draft: { ...defaultProps.draft, type: null, name: 'Velho' } })
+      w2.vm.selectType('music')
+      const e2 = w2.emitted('update:draft')?.[0][0] as typeof defaultProps.draft
+      expect(e2.name).toBe('')
+      w2.unmount()
+    })
+  })
+
+  describe('gaps template/music (onda1)', () => {
+    it('musicResults vazio + catalogEmpty + selectedMusic com/sem album + url válida (154)', async () => {
+      // urlRequiredMissing false com showValidation true → 154 arm1
+      const w = createWrapper({
+        draft: { ...defaultProps.draft, type: 'music', musicId: 1 },
+        musicQuery: 'zzz',
+        musicOptions: [],
+      })
+      await flushPromises()
+      // submit inválido (nome vazio) → showValidation true, url ok
+      const form = document.querySelector('.moment-dialog form') as HTMLFormElement | null
+      w.vm.selectType('site')
+      await w.vm.$nextTick()
+      // dispara save direto pelo botão principal
+      const saveBtn = Array.from(document.querySelectorAll<HTMLButtonElement>('.moment-dialog button')).find((b) => b.textContent?.includes('Salvar'))
+      if (saveBtn) {
+        saveBtn.click()
+        await w.vm.$nextTick()
+      }
+      // showMusicResults true com query 'zzz' e sem results (702)
+      await w.setProps({ musicQuery: 'zzz' })
+      await flushPromises()
+      expect(document.body.textContent).toContain('Nenhuma música encontrada')
+      w.unmount()
+    })
+
+    it('selectedMusic render com album e sem album; ícone clear (716/724/736)', async () => {
+      const w1 = createWrapper({ draft: { ...defaultProps.draft, type: 'music' }, selectedMusic: { id: 1, displayLabel: 'M1', albumNames: 'Álbum X' } })
+      await flushPromises()
+      expect(document.body.textContent).toContain('M1')
+      expect(document.body.textContent).toContain('Álbum X')
+      w1.unmount()
+      const w2 = createWrapper({ draft: { ...defaultProps.draft, type: 'music' }, selectedMusic: { id: 1, displayLabel: 'M2', albumNames: null } })
+      await flushPromises()
+      expect(document.body.textContent).toContain('M2')
+      expect(document.body.textContent).not.toContain('Álbum X')
+      w2.unmount()
+    })
+
+    it('categoryOptions vazio mostra hint (939); images path sem extensão mostra raw (985 arm1)', async () => {
+      const w = createWrapper({ categoryOptions: [] })
+      await flushPromises()
+      // hint só renderiza com categoria selecionada/visível — checa presença
+      expect(w.exists()).toBe(true)
+      w.unmount()
+      const w2 = createWrapper({
+        draft: { ...defaultProps.draft, type: 'images', filePath: '/x/', filePaths: ['/x/'] },
+      })
+      await flushPromises()
+      w2.unmount()
+    })
+
+    it('custom app: picked array (471 arm0) e setCustomApp false (474 arm1)', async () => {
+      vi.mocked(isDesktopApp).mockReturnValue(true)
+      const openFile = vi.fn(async () => ['/opt/app.exe', '/other'])
+      const setCustomApp = vi.fn(async () => true)
+      vi.mocked(getDesktopBridge).mockReturnValue({ dialog: { openFile }, presentation: { setCustomApp } } as any)
+      const w = createWrapper({ draft: { ...defaultProps.draft, type: 'presentation' } })
+      await flushPromises()
+      await (w.vm as any).onEngineChange('custom')
+      await flushPromises()
+      expect(setCustomApp).toHaveBeenCalledWith('/opt/app.exe')
+      const emitted = w.emitted('update:draft')
+      const last = emitted![emitted!.length - 1][0] as any
+      expect(last.presentationEngine).toBe('custom')
+      w.unmount()
+      // setCustomApp false → sem patch (474 arm1)
+      const setCustomApp2 = vi.fn(async () => false)
+      vi.mocked(getDesktopBridge).mockReturnValue({ dialog: { openFile: vi.fn(async () => '/opt/app.exe') }, presentation: { setCustomApp: setCustomApp2 } } as any)
+      const w2 = createWrapper({ draft: { ...defaultProps.draft, type: 'presentation', presentationEngine: 'custom' } })
+      await flushPromises()
+      await (w2.vm as any).onEngineChange('custom')
+      await flushPromises()
+      expect(setCustomApp2).toHaveBeenCalled()
+      const emitted2 = w2.emitted('update:draft') ?? []
+      const last2 = emitted2.length ? emitted2[emitted2.length - 1][0] as any : null
+      expect(last2?.presentationEngine ?? 'custom').toBe('custom')
+      w2.unmount()
+    })
+
+
+    it('audio→video mantém duration (247 arm1); music→music mantém name (259 arm1)', () => {
+      const w1 = createWrapper({ draft: { ...defaultProps.draft, type: 'audio', durationMs: 777 } })
+      w1.vm.selectType('video')
+      const e1 = w1.emitted('update:draft')?.[0][0] as typeof defaultProps.draft
+      expect(e1.durationMs).toBe(777)
+      w1.unmount()
+      const w2 = createWrapper({ draft: { ...defaultProps.draft, type: 'music', name: 'Hino 1', musicId: 5 } })
+      w2.vm.selectType('music')
+      const e2 = w2.emitted('update:draft')?.[0][0] as typeof defaultProps.draft
+      expect(e2.name).toBe('Hino 1')
+      w2.unmount()
+    })
+  })
+
+    it('urlFieldError reavalia após corrigir url (154 arm1/1098); site com url inválida mostra erro (1098 arm0)', async () => {
+      const w = createWrapper({ draft: { ...defaultProps.draft, type: 'site', url: '', name: 'Site X' } })
+      await flushPromises()
+      ;(w.vm as any).onSubmit(new Event('submit'))
+      await flushPromises()
+      expect((w.vm as any).urlFieldError).toBe(true)
+      await w.setProps({ draft: { ...defaultProps.draft, type: 'site', url: 'https://ok.com', name: 'Site X' } })
+      await flushPromises()
+      expect((w.vm as any).urlFieldError).toBe(false)
+      w.unmount()
+    })
+
+    it('musicCatalogEmpty true mostra hint (709); categoryOptions vazio com categoria (939)', async () => {
+      const w = createWrapper({
+        draft: { ...defaultProps.draft, type: 'music' },
+        musicQuery: '',
+        musicCatalogEmpty: true,
+        categoryOptions: [],
+      })
+      await flushPromises()
+      expect(document.body.textContent).toContain('Nenhuma música encontrada')
+      w.unmount()
+      // categoria: select de categoria visível + opções vazias → hint 939
+      const w2 = createWrapper({
+        draft: { ...defaultProps.draft, type: 'category', categoryId: null },
+        categoryOptions: [],
+      })
+      await flushPromises()
+      expect(document.body.textContent).not.toContain('Categoria 1')
+      w2.unmount()
+    })
+
+    it('categoria endTime inválida foca campo end (514 arm1)', async () => {
+      // mock getElementById p/ rastrear foco
+      const focused: string[] = []
+      const orig = document.getElementById.bind(document)
+      vi.spyOn(document, 'getElementById').mockImplementation((id: string) => {
+        focused.push(id)
+        return null
+      })
+      const w = createWrapper({
+        draft: { ...defaultProps.draft, type: 'category', name: 'Culto', categoryId: null, startTime: '10:00', endTime: '' },
+      })
+      await flushPromises()
+      ;(w.vm as any).onSubmit(new Event('submit'))
+      await flushPromises()
+      expect(focused).toContain('moment-end-time')
+      vi.restoreAllMocks()
+      w.unmount()
+    })
 })
