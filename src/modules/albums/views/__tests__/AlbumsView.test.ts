@@ -92,10 +92,10 @@ function useAlbumsMockFactory() {
       hydrateCatalog: vi.fn(async () => {}),
       hydrateMusicIndex: vi.fn(async () => {}),
       downloadCollection: vi.fn(),
-      cancelCollection: vi.fn(),
+      cancelCollection: ((globalThis as AnyObj).__albumsCancelMock ??= vi.fn()),
       downloadAll: vi.fn(),
       cancelAll: vi.fn(),
-      removeCollection: vi.fn(async () => {}),
+      removeCollection: ((globalThis as AnyObj).__albumsRemoveMock ??= vi.fn(async () => {})),
       playSung: vi.fn(async () => true),
       playInstrumental: vi.fn(async () => true),
       playSlides: vi.fn(async () => true),
@@ -154,6 +154,7 @@ vi.mock('../../components/AlbumCollectionCard.vue', () => ({
     template: `<div class="collection-card-stub" :data-id="collection.id">
       <button class="cc-open" @click="$emit('open')" />
       <button class="cc-download" @click="$emit('download')" />
+      <button class="cc-cancel" @click="$emit('cancel')" />
       <button class="cc-remove" @click="$emit('remove')" />
     </div>`,
   },
@@ -231,6 +232,8 @@ describe('AlbumsView', () => {
     customCatalogMock.listCustomCollections.mockClear()
     customCatalogMock.createCustomCollection.mockClear()
     setState()
+    ;(globalThis as AnyObj).__albumsRemoveMock?.mockClear()
+    ;(globalThis as AnyObj).__albumsCancelMock?.mockClear()
     savePlaylists([{ id: 'pl-1', name: 'Culto', items: [{ musicId: 5, albumId: null, title: 'Gratidão' }] }])
   })
 
@@ -557,10 +560,6 @@ describe('AlbumsView', () => {
     w.unmount()
   })
 
-  it('openCustomCollection navega pro id custom', async () => {
-    // coberto indiretamente pelo toCustomCollectionId no mock; navegação direta é do modal custom list
-    expect(true).toBe(true)
-  })
   it('gaps v8: modal playlists (add/close), modal custom (create/editor/close)', async () => {
     const w = await mountView()
     // abre modal playlists (toolbar está no root do wrapper)
@@ -774,5 +773,143 @@ describe('AlbumsView', () => {
     play?.click()
     await flushPromises()
     w.unmount()
+  })
+
+  it('gaps onda1: export vazio via dispatch (125); hydrate busy reentrante (147)', async () => {
+    savePlaylists([]) // playlists vazio
+    const w = await mountView()
+    await w.findAll('button').find((b) => b.attributes('aria-label') === 'albums.playlists.title')!.trigger('click')
+    await flushPromises()
+    // export btn desabilitado (playlists vazio) → dispatchEvent manual cobre o early-return
+    const exportBtn = Array.from(body().querySelectorAll('button')).find(
+      (b) => b.getAttribute('aria-label') === 'albums.playlists.export',
+    ) as HTMLElement
+    expect(exportBtn.hasAttribute('disabled')).toBe(true)
+    exportBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await flushPromises()
+    w.unmount()
+  })
+
+  it('gaps onda1: hydrateCustomCollections busy → 2ª chamada no-op (147)', async () => {
+    customCatalogMock.listCustomCollections.mockImplementationOnce(() => new Promise(() => {}))
+    const w = await mountView()
+    await w.findAll('button').find((b) => b.attributes('aria-label') === 'albums.custom.title')!.trigger('click')
+    await flushPromises()
+    expect(customCatalogMock.listCustomCollections).toHaveBeenCalledTimes(1)
+    w.unmount()
+  })
+
+  it('gaps onda1: import com faixa 5/7 nova e 5/null duplicada → feedback parcial (206-218)', async () => {
+    savePlaylists([{ id: 'pl-1', name: 'Culto', items: [{ musicId: 5, albumId: null, title: 'Gratidão' }] }])
+    const w = await mountView()
+    await w.findAll('button').find((b) => b.attributes('aria-label') === 'albums.playlists.title')!.trigger('click')
+    await flushPromises()
+    const input = body().querySelector('input[type="file"]') as HTMLInputElement
+    const payload = JSON.stringify({ version: 1, exported_at: '', kind: 'playlists', playlists: [
+      { id: 'imp-1', name: 'Culto', items: [
+        { musicId: 5, albumId: null, title: 'Gratidão' },
+        { musicId: 5, albumId: 7, title: 'Gratidão (CD)' },
+      ], createdAt: '', updatedAt: '' },
+    ] })
+    const file = { text: async () => payload } as unknown as File
+    Object.defineProperty(input, 'files', { value: [file], configurable: true })
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+    await flushPromises()
+    expect(body().querySelector('.albums-view__playlists-feedback')?.textContent).toContain('faixa(s) adicionada(s)')
+    const culto = listPlaylists().find((p) => p.name === 'Culto')!
+    expect(culto.items).toHaveLength(2)
+    w.unmount()
+  })
+
+  it('gaps onda1: import nada novo → Nada novo para importar (216-218 arm1)', async () => {
+    savePlaylists([{ id: 'pl-1', name: 'Culto', items: [{ musicId: 5, albumId: null, title: 'Gratidão' }] }])
+    const w = await mountView()
+    await w.findAll('button').find((b) => b.attributes('aria-label') === 'albums.playlists.title')!.trigger('click')
+    await flushPromises()
+    const input = body().querySelector('input[type="file"]') as HTMLInputElement
+    const payload = JSON.stringify({ version: 1, exported_at: '', kind: 'playlists', playlists: [
+      { id: 'imp-1', name: 'Culto', items: [{ musicId: 5, albumId: null, title: 'Gratidão' }], createdAt: '', updatedAt: '' },
+    ] })
+    const file = { text: async () => payload } as unknown as File
+    Object.defineProperty(input, 'files', { value: [file], configurable: true })
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+    await flushPromises()
+    expect(body().querySelector('.albums-view__playlists-feedback')?.textContent).toContain('Nada novo')
+    w.unmount()
+  })
+
+  it('gaps onda1: playPlaylist vazia via dispatch (223); confirm duplo-síncrono (273)', async () => {
+    vi.useRealTimers()
+    savePlaylists([{ id: 'empty', name: 'Vazia', items: [] }])
+    ;(globalThis as AnyObj).__libraryAlbums = [{ id: '10', name: 'CD Vocacional' }]
+    const w = await mountView()
+    await w.findAll('button').find((b) => b.attributes('aria-label') === 'albums.playlists.title')!.trigger('click')
+    await flushPromises()
+    const playBtn = Array.from(body().querySelectorAll('button')).find(
+      (b) => b.getAttribute('aria-label') === 'Tocar Vazia',
+    ) as HTMLElement
+    expect(playBtn.hasAttribute('disabled')).toBe(true)
+    playQueueMock.mockClear()
+    playBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await flushPromises()
+    expect(playQueueMock).not.toHaveBeenCalled()
+    w.unmount()
+    // confirm 2x síncrono: 2º roda com albumPendingRemoval null (273 arm0)
+    const w2 = await mountView()
+    await w2.find('.cc-remove').trigger('click')
+    await flushPromises()
+    const yes = Array.from(body().querySelectorAll('.albums-confirm__btn--danger'))[0] as HTMLElement
+    yes.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    yes.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await flushPromises()
+    expect((globalThis as AnyObj).__albumsRemoveMock).toHaveBeenCalledTimes(1)
+    delete (globalThis as AnyObj).__libraryAlbums
+  })
+
+  it('gaps onda1: template states — hub loading/empty, catalog loading, editor btn, card cancel', async () => {
+    setState({ isHubSearching: true, isLoadingMusicIndex: true })
+    const w = await mountView()
+    expect(w.text()).toContain('albums.loading')
+    w.unmount()
+    setState({ isHubSearching: true })
+    const w2 = await mountView()
+    expect(w2.text()).toContain('albums.messages.searchEmpty')
+    w2.unmount()
+    setState({ isLoadingCatalog: true, categories: [] })
+    const w3 = await mountView()
+    expect(w3.text()).toContain('albums.loading')
+    w3.unmount()
+    setState({ categories: [...categories, { id: 'custom', name: 'Minhas Coletâneas', collections: [] }] })
+    const w4 = await mountView()
+    await w4.find('.albums-view__editor-btn').trigger('click')
+    expect(pushMock).toHaveBeenCalledWith('/media/editor')
+    await w4.find('.hc-cancel').trigger('click')
+    expect((globalThis as AnyObj).__albumsCancelMock).toHaveBeenCalled()
+  })
+
+  it('gaps onda1 2: catálogo vazio sem loading → catalogEmpty (689); cc-cancel (762); hydrate reentrante real (147)', async () => {
+    setState({ categories: [], isLoadingCatalog: false })
+    const w0 = await mountView()
+    expect(w0.text()).toContain('albums.messages.catalogEmpty')
+    w0.unmount()
+    // cc-cancel → cancelCollection (762) com cards presentes
+    setState() // restaura categorias default (o w0 usou [])
+    const w = await mountView()
+    await w.find('.cc-cancel').trigger('click')
+    expect((globalThis as AnyObj).__albumsCancelMock).toHaveBeenCalled()
+    w.unmount()
+    // hydrate reentrante: 1ª pendente, fechar e reabrir → early-return no busy
+    customCatalogMock.listCustomCollections.mockImplementationOnce(() => new Promise(() => {}))
+    const w2 = await mountView()
+    await w2.findAll('button').find((b) => b.attributes('aria-label') === 'albums.custom.title')!.trigger('click')
+    await flushPromises()
+    // fecha (backdrop) e reabre enquanto a 1ª hydrate ainda está pendente
+    const backdrop = body().querySelector('.albums-view__modal-backdrop') as HTMLElement
+    backdrop.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await flushPromises()
+    await w2.findAll('button').find((b) => b.attributes('aria-label') === 'albums.custom.title')!.trigger('click')
+    await flushPromises()
+    expect(customCatalogMock.listCustomCollections).toHaveBeenCalledTimes(1)
+    w2.unmount()
   })
 })
