@@ -108,6 +108,7 @@ let measureTimer: ReturnType<typeof setTimeout> | null = null
 
 function measure() {
   const el = containerRef.value
+  /* v8 ignore next 1 -- measure só roda com o componente montado (mount/resize/timer) */
   if (!el) return
   sizeWidth.value = el.offsetWidth
   sizeHeight.value = el.offsetHeight

@@ -6,7 +6,12 @@ import { describe, it, expect, vi } from 'vitest'
 import { createI18n } from 'vue-i18n'
 
 vi.mock('../../composables/useCountdown', () => ({
-  useCountdownDisplay: () => display,
+  // chama os getters (28/29) como o composable real faria
+  useCountdownDisplay: (cfg: () => unknown, rt: () => unknown) => {
+    void cfg()
+    void rt()
+    return display
+  },
 }))
 
 import CountdownPreview from '../CountdownPreview.vue'
@@ -156,5 +161,64 @@ describe('CountdownPreview', () => {
     // fallback usa min(w,h)*0.28 — só garante que renderiza
     expect(wrapper.find('.countdown-preview__digital').exists()).toBe(true)
     display.formattedTime.value = '00:01:00'
+  })
+
+  it('gaps onda1: container medido escala fontSize; aligns bottom/right; resize remeasure; unmount sem timer', async () => {
+    // stage + container medido → fontSize proporcional (34 arm0)
+    const proto = HTMLElement.prototype as unknown as Record<string, unknown>
+    Object.defineProperty(proto, 'offsetWidth', { value: 960, configurable: true })
+    Object.defineProperty(proto, 'offsetHeight', { value: 540, configurable: true })
+    const stageBase = {
+      fontSize: 96,
+      fontWeight: 400,
+      textColor: '#FFFFFF',
+      textAlign: 'center' as const,
+      textVerticalAlign: 'middle' as const,
+      textShadow: false,
+      shadowBlur: 1,
+      shadowIntensity: 0.3,
+      textBox: false,
+      boxOpacity: 0.4,
+      boxBorder: false,
+    }
+    const w1 = createWrapper({ stage: { ...stageBase } })
+    await w1.vm.$nextTick()
+    const style1 = w1.find('.countdown-preview__digital').attributes('style') ?? ''
+    // 96/1920*960 = 48px
+    expect(style1).toContain('48px')
+    w1.unmount()
+    delete proto.offsetWidth
+    delete proto.offsetHeight
+
+    // aligns bottom/right via stageFlexColumn (95/101 arm1)
+    const w2 = createWrapper({
+      stage: { ...stageBase, textVerticalAlign: 'bottom', textAlign: 'right' },
+    })
+    const surface2 = w2.find('.countdown-preview').attributes('style') ?? ''
+    expect(surface2).toContain('align-items: flex-end')
+    expect(surface2).toContain('justify-content: flex-end')
+    w2.unmount()
+
+    // resize handler remeasure: dimensões 0 no mount → agenda re-measure
+    // (115 arm0); unmount com timer pendente limpa (129 arm0/130/131)
+    // fake timers: o re-measure de 100ms NUNCA dispara → no unmount o
+    // timer está pendente e o cleanup o limpa (130 arm0/131/132)
+    const proto2 = HTMLElement.prototype as unknown as Record<string, unknown>
+    Object.defineProperty(proto2, 'offsetWidth', { value: 0, configurable: true })
+    Object.defineProperty(proto2, 'offsetHeight', { value: 0, configurable: true })
+    vi.useFakeTimers()
+    const w3 = createWrapper({ stage: { ...stageBase } })
+    w3.unmount()
+    vi.useRealTimers()
+    delete proto2.offsetWidth
+    delete proto2.offsetHeight
+
+    // finished+preview: cor var(--ds-color-error) (45 arm0)
+    display.isFinished.value = true
+    const w4 = createWrapper({ preview: true, stage: { ...stageBase } })
+    const style4 = w4.find('.countdown-preview__digital').attributes('style') ?? ''
+    expect(style4).toContain('--ds-color-error')
+    w4.unmount()
+    display.isFinished.value = false
   })
 })
