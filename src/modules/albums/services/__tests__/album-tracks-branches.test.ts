@@ -252,4 +252,61 @@ describe('readOrFetchCatalog — remote fallback e erro', () => {
     expect(await mod.loadCollectionTracks({ id: 'r2', catalogKey: 'a.json', kind: 'album', isCustom: false, name: 'A' })).toEqual([])
     expect(await mod.loadCollectionTracks({ id: 'r3', catalogKey: 'b.json', kind: 'album', isCustom: false, name: 'B' })).toEqual([])
   })
+
+describe('album-tracks — gaps finais (durations string, sorts, nulls)', () => {
+  it('formatDurationLabel: string M:SS e inválida via custom', async () => {
+    const { listCustomMusics } = await import('@modules/media/services/custom-catalog')
+    vi.mocked(listCustomMusics).mockResolvedValueOnce([
+      { id: 1, officialMusicId: 61, name: 'S1', duration: '3:04' },
+      { id: 2, officialMusicId: 62, name: 'S2', duration: 'palavra' },
+    ] as never)
+    const mod = await import('../album-tracks')
+    const tracks = await mod.loadCollectionTracks({
+      id: 'cu-d', catalogKey: 'x', kind: 'album', isCustom: true, name: 'D',
+    })
+    expect(tracks[0].durationLabel).toBe('3:04')
+    expect(tracks[1].durationLabel).toBe('palavra')
+  })
+
+  it('sort com track null usa musicId (hymnal e album)', async () => {
+    const { readCatalogRecord } = await import('@shared/services/workspace-api')
+    const mod = await import('../album-tracks')
+    vi.mocked(readCatalogRecord).mockResolvedValueOnce([
+      { id_music: 9, name: 'I9' },
+      { id_music: 3, name: 'I3' },
+      { id_music: 5, name: 'I5', track: 1 },
+    ] as never)
+    const hy = await mod.loadCollectionTracks({
+      id: 'h-s', catalogKey: 's.json', kind: 'hymnal' as never, isCustom: false, name: 'S',
+    })
+    expect(hy.map((t2) => t2.name)).toEqual(['I5', 'I3', 'I9'])
+    vi.mocked(readCatalogRecord).mockResolvedValueOnce({
+      name: 'CD', musics: [
+        { id_music: 8, name: 'A8' },
+        { id_music: 2, name: 'A2', track: 1 },
+      ],
+    } as never)
+    const al = await mod.loadCollectionTracks({
+      id: 'a-s', catalogKey: 's2.json', kind: 'album', isCustom: false, name: 'S2',
+    })
+    expect(al.map((t2) => t2.name)).toEqual(['A2', 'A8'])
+  })
+
+  it('mapTrackRow sem name (undefined) → descartada; linha de lyric sem lyric → descartada', async () => {
+    const { readCatalogRecord } = await import('@shared/services/workspace-api')
+    const mod = await import('../album-tracks')
+    vi.mocked(readCatalogRecord).mockResolvedValueOnce({
+      name: 'CD', musics: [{ id_music: 11 }],
+    } as never)
+    const tracks = await mod.loadCollectionTracks({
+      id: 'a-n', catalogKey: 'n.json', kind: 'album', isCustom: false, name: 'N',
+    })
+    expect(tracks).toEqual([])
+    vi.mocked(readCatalogRecord).mockResolvedValueOnce({
+      id_music: 12, lyric: [{ order: 1 }, { order: 2, lyric: 'fica' }],
+    } as never)
+    const doc = await mod.loadAlbumLyric(12)
+    expect(doc?.lines.map((l) => l.text)).toEqual(['fica'])
+  })
+})
 })
