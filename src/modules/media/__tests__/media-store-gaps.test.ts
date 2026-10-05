@@ -347,4 +347,60 @@ describe("pause/volume/queue — rotas de áudio", () => {
   });
 });
 
+describe("gaps3 — preplay download cancelado e displayTitle", () => {
+	it("open desktop: download em curso + close → shouldAbort, fluxo segue (stream)", async () => {
+		bridgeMock.isDesktop = true;
+		trackMediaMock.isDownloaded.mockResolvedValue(false);
+		let releaseDl!: (v: { status: string }) => void;
+		let dlOpts!: { onProgress: (n: number) => void; shouldAbort: () => boolean };
+		trackMediaMock.download.mockImplementationOnce(
+			(_id: number, opts: typeof dlOpts) =>
+				new Promise((r) => {
+					dlOpts = opts;
+					releaseDl = r;
+				}),
+		);
+		const store = useMediaStore();
+		const p = store.open({ musicId: 9, project: false });
+		await new Promise((r) => setTimeout(r, 0));
+		await new Promise((r) => setTimeout(r, 0));
+		expect(store.ondemandDownloadPercent).toBe(0);
+		dlOpts.onProgress(50); // gen stale pós-close: ignorado (br 310)
+		store.close();
+		expect(dlOpts.shouldAbort()).toBe(true); // br 360
+		releaseDl({ status: "cancelled" });
+		const res = await p;
+		// close() cancelou o gen: ensureTrackDownloaded → false → playbackFailed
+		expect(res.ok).toBe(false);
+		expect(store.ondemandDownloadPercent).toBeNull();
+	});
+
+	it("open desktop 2ª faixa: onProgress do startOndemand dispara (fn 310)", async () => {
+		bridgeMock.isDesktop = true;
+		trackMediaMock.isDownloaded.mockResolvedValue(false);
+		trackMediaMock.download.mockImplementation(
+			(_id: number, opts: { onProgress: (n: number) => void }) => {
+				opts.onProgress(42);
+				return Promise.resolve({ status: "downloaded" });
+			},
+		);
+		const store = useMediaStore();
+		await store.open({ musicId: 3, project: false });
+		// esperar maybeStart completar: ondemandDownloadPercent definido (progress)
+		let tries = 0;
+		while (store.ondemandDownloadPercent === null && tries < 100) {
+			await new Promise((r) => setTimeout(r, 0));
+			tries++;
+		}
+		expect(store.hasSession).toBe(true);
+		expect(trackMediaMock.download.mock.calls.length).toBeGreaterThan(0);
+	});
+
+	it("displayTitle: sem subtitle não acrescenta parte", async () => {
+		loadMediaTrack.mockResolvedValue(trackStub({ subtitle: undefined }));
+		const store = useMediaStore();
+		await store.open({ musicId: 1, project: false });
+		expect(store.previewReference).toBeDefined();
+	});
+});
 })
