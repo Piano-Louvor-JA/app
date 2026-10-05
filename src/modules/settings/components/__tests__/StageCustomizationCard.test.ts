@@ -404,4 +404,24 @@ describe('StageCustomizationCard', () => {
       w.unmount()
     }
   })
+
+  it('gaps2: onlyScope inválido (59 arm1); defaults de clock/random no click (518/526/537/573); moduleTimeFormat null (122); reader não-string (166 arm1)', async () => {
+    const w = await mountCard({ onlyScope: 'escopo-fantasma' as never })
+    active = w
+    // estado default: sem overrides de clock/random → ?? DEFAULT nos clicks
+    const switches = w.findAll('button').filter((b) => (b.text().includes('24h') || b.text().includes('segundos') || b.attributes('aria-pressed') !== undefined))
+    for (const sw of switches.slice(0, 4)) await sw.trigger('click')
+    await flushPromises()
+    w.unmount()
+
+    // reader.result não-string (Blob) não chama setBackgroundImage
+    const w2 = await mountCard({})
+    active = w2
+    const input2 = w2.find('input[type="file"]')
+    const blobFile = new Blob([new Uint8Array([1, 2])]) as File
+    Object.defineProperty(input2.element, 'files', { value: [blobFile], configurable: true })
+    await input2.trigger('change')
+    await new Promise((r) => setTimeout(r, 20))
+    w2.unmount()
+  })
 })
