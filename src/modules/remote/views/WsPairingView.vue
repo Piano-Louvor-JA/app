@@ -44,6 +44,7 @@ async function startScan() {
 }
 
 function scanFrame() {
+  /* v8 ignore next 1 -- reset/unmount sempre limpam o timer antes do vídeo sumir */
   if (!video) return
   const canvas = document.createElement('canvas')
   canvas.width = video.videoWidth

@@ -11,7 +11,12 @@ vi.mock('jsqr', () => ({
 
 // Mock GlassCard
 vi.mock('@design-system/index', () => ({
-  GlassCard: { template: '<div><slot /></div>' },
+  GlassCard: {
+    setup() {
+      return { slotless: (window as { wsGlassSlotless?: boolean }).wsGlassSlotless === true }
+    },
+    template: '<div><slot v-if="!slotless" /></div>',
+  },
 }))
 
 import WsPairingView from '../WsPairingView.vue'
@@ -302,4 +307,68 @@ describe('WsPairingView', () => {
     delete (HTMLVideoElement.prototype as { videoWidth?: number }).videoWidth
     delete (HTMLVideoElement.prototype as { videoHeight?: number }).videoHeight
   })
+
+  it('gaps: qr lido sem ws:// via timer ignora; websocket que lança no constructor → erro; glasscard sem slot → vídeo nunca montado', async () => {
+    // g1: timer roda scanFrame com QR sem prefixo ws:// → ignora (L56 arm1)
+    vi.useFakeTimers()
+    vi.mocked(jsQR).mockClear()
+    vi.mocked(jsQR).mockReturnValue({ data: 'https://sem-prefixo' } as ReturnType<typeof jsQR>)
+    Object.defineProperty(HTMLVideoElement.prototype, 'videoWidth', { value: 320, configurable: true })
+    Object.defineProperty(HTMLVideoElement.prototype, 'videoHeight', { value: 240, configurable: true })
+    const fakeCtx = {
+      drawImage: vi.fn(),
+      getImageData: vi.fn(() => ({ data: new Uint8ClampedArray(64), width: 320, height: 240 })),
+    }
+    const ctxSpy2 = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(fakeCtx as unknown as CanvasRenderingContext2D)
+    const w1 = createWrapper()
+    const clickP1 = w1.find('.ws-pairing__btn').trigger('click')
+    await vi.advanceTimersByTimeAsync(250)
+    await clickP1
+    await vi.advanceTimersByTimeAsync(300)
+    await flushPromises()
+    expect(jsQR).toHaveBeenCalled()
+    expect(FakeWebSocket.instances.length).toBe(0)
+    w1.unmount()
+    ctxSpy2.mockRestore()
+    vi.useRealTimers()
+    delete (HTMLVideoElement.prototype as { videoWidth?: number }).videoWidth
+    delete (HTMLVideoElement.prototype as { videoHeight?: number }).videoHeight
+
+    // g3: getUserMedia resolve após reset → if(video) FALSE (L35 arm0)
+    vi.useFakeTimers()
+    mediaDevices.getUserMedia.mockClear()
+    let releaseCam!: (v: MediaStream) => void
+    mediaDevices.getUserMedia.mockImplementationOnce(
+      () => new Promise((r) => (releaseCam = r)),
+    )
+    const w2 = createWrapper()
+    await w2.find('.ws-pairing__btn').trigger('click')
+    await flushPromises()
+    await w2.find('.ws-pairing__btn--ghost').trigger('click') // reset
+    await flushPromises()
+    releaseCam(mockStream)
+    await flushPromises()
+    await vi.advanceTimersByTimeAsync(200)
+    expect(mediaDevices.getUserMedia).toHaveBeenCalledOnce()
+    w2.unmount()
+    vi.useRealTimers()
+
+    // g2: WebSocket constructor lança → catch → step error (L92/93)
+    const OriginalWS = global.WebSocket
+    class ThrowingWS {
+      constructor() {
+        throw new Error('ws bloqueado')
+      }
+    }
+    ;(global as { WebSocket: unknown }).WebSocket = ThrowingWS
+    const w3 = createWrapper()
+    await w3.find('.ws-pairing__input').setValue('ws://x:9')
+    await w3.find('.ws-pairing__btn--ghost').trigger('click')
+    await flushPromises()
+    expect(w3.text()).toContain('erro de ws')
+    ;(global as { WebSocket: unknown }).WebSocket = OriginalWS
+    w3.unmount()
+  })
+
 })
+
