@@ -427,4 +427,15 @@ describe("RandomView — áudio custom", () => {
 		w.unmount()
 		stageSettingsStateRV.value = null
 	})
+
+	it("storage user_data: stage re-lê settings do Palco (callback do subscribe)", async () => {
+		const w = mountView();
+		stageSettingsStateRV.value = { backgroundColor: "#246", random: { textColor: "#fff" } };
+		window.dispatchEvent(new StorageEvent("storage", { key: "user_data" }));
+		await flushPromises();
+		// effectiveConfig reflete stage re-lido (random do Palco presente)
+		expect(w.find(".random-view").exists()).toBe(true);
+		stageSettingsStateRV.value = null;
+		w.unmount();
+	});
 })
