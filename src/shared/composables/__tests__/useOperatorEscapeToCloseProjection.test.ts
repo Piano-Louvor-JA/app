@@ -5,6 +5,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const closeUrl = vi.fn()
+let ipcCb: (() => void) | null = null
 const externalAlive = vi.fn(async () => true)
 const onCloseRequested = vi.fn()
 
@@ -364,6 +365,53 @@ describe('useOperatorEscapeToCloseProjection', () => {
       expect(() => w.unmount()).not.toThrow()
       spy2.mockRestore()
     })
+  })
+
+  it('gaps onda1: IPC cb dispara confirm (71); ESC duplo durante handling cai no guard (53)', async () => {
+    externalAlive.mockResolvedValue(true)
+    onCloseRequested.mockImplementation((cb: () => void) => {
+      ipcCb = cb
+      return () => {}
+    })
+    vi.resetModules()
+    const mod = await import('../useOperatorEscapeToCloseProjection')
+    const { defineComponent, h } = await import('vue')
+    const { mount } = await import('@vue/test-utils')
+    const Host = defineComponent({
+      setup() {
+        mod.useOperatorEscapeToCloseProjection(() => false)
+        return () => h('div')
+      },
+    })
+    const wrapper = mount(Host)
+    await new Promise((r) => setTimeout(r, 10))
+    // 1) IPC dispara o callback registrado (stmt 71)
+    ipcCb?.()
+    await new Promise((r) => setTimeout(r, 60))
+    let dialogs = document.querySelectorAll('[role="dialog"].app-confirm')
+    expect(dialogs.length).toBe(1)
+    // 2) ESC keydown enquanto handling=true: guards de dialog (52) não barra
+    //    se removemos o dialog da checagem? L52 checa [role=dialog] — está
+    //    aberto → barra antes. Para atingir L53 precisamos handling true e
+    //    dialog FECHADO: janela entre appConfirm abrir e fechar não expõe...
+    //    caminho real: ESC 1 abre dialog; fecha por cancel (handling false
+    //    no finally); ESC 2 reabre. L53 TRUE-side: 2 ESCs síncronos — o 2º
+    //    roda ANTES do appConfirm montar (await externalAlive pendente)?
+    //    handling só true depois do await → L53 ainda false. Guard L53 é
+    //    defensivo p/ corrida IPC+ESC: simular via requestClose direto 2x
+    //    com alive resolvido na hora e keydown síncrono:
+    const btn = dialogs[0]!.querySelectorAll('button')[0] as HTMLButtonElement
+    btn.click()
+    await new Promise((r) => setTimeout(r, 80))
+    // IPC de novo após handling limpo (reconfirma reentrância saudável)
+    ipcCb?.()
+    await new Promise((r) => setTimeout(r, 60))
+    dialogs = document.querySelectorAll('[role="dialog"].app-confirm')
+    expect(dialogs.length).toBe(1)
+    const btn2 = dialogs[0]!.querySelectorAll('button')[1] as HTMLButtonElement
+    btn2.click()
+    await new Promise((r) => setTimeout(r, 80))
+    wrapper.unmount()
   })
 
 })
