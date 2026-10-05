@@ -87,6 +87,8 @@ export type StageSettings = {
   bibleFontSize: number // px @1920 (50–140)
   bibleFontWeight: 400 | 500 | 700
   bibleTextColor: string
+  /** Capitalização do versículo (paridade web — mesmo campo/serde `bTransform`). */
+  bibleTextTransform: 'none' | 'uppercase' | 'capitalize'
   /** Data URL da imagem de fundo do escopo (1 ativa por escopo). */
   backgroundImage: string | null
   /**
@@ -170,6 +172,7 @@ export const DEFAULT_STAGE_SETTINGS: StageSettings = {
   bibleFontSize: 84,
   bibleFontWeight: 500,
   bibleTextColor: '#FFFFFF',
+  bibleTextTransform: 'none',
   titleFontSize: null,
   titleFontWeight: null,
   titleTextColor: null,
@@ -278,6 +281,13 @@ export const STAGE_REF_PRESETS = [
 const WEIGHTS: StageFontWeight[] = [400, 600, 800]
 const BIBLE_WEIGHTS: StageSettings['bibleFontWeight'][] = [400, 500, 700]
 
+/** Opções de capitalização do versículo (bíblia) — paridade web. */
+export const BIBLE_TEXT_TRANSFORM_OPTIONS: StageSettings['bibleTextTransform'][] = [
+  'none',
+  'uppercase',
+  'capitalize',
+]
+
 function asColor(value: unknown, fallback: string): string {
   return typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value)
     ? value
@@ -324,6 +334,11 @@ export function parseStageSettings(raw: unknown): StageSettings {
     bibleFontSize: clamp(asNumber(s['bSize'], 84), 50, 140),
     bibleFontWeight: BIBLE_WEIGHTS.includes(bibleWeight) ? bibleWeight : 500,
     bibleTextColor: asColor(s['bFg'], DEFAULT_STAGE_SETTINGS.bibleTextColor),
+    bibleTextTransform: BIBLE_TEXT_TRANSFORM_OPTIONS.includes(
+      s['bTransform'] as StageSettings['bibleTextTransform'],
+    )
+      ? (s['bTransform'] as StageSettings['bibleTextTransform'])
+      : 'none',
     titleFontSize:
       s['tSize'] == null ? null : clamp(asNumber(s['tSize'], 96), 60, 160),
     titleFontWeight: s['tWeight'] == null ? null : (WEIGHTS.includes(asNumber(s['tWeight'], 600) as StageFontWeight) ? (asNumber(s['tWeight'], 600) as StageFontWeight) : null),
@@ -427,6 +442,7 @@ export function serializeStageSettings(s: StageSettings): Record<string, unknown
     bSize: s.bibleFontSize,
     bWeight: s.bibleFontWeight,
     bFg: s.bibleTextColor,
+    bTransform: s.bibleTextTransform,
     ...(s.titleFontSize != null ? { tSize: s.titleFontSize } : {}),
     ...(s.titleFontWeight != null ? { tWeight: s.titleFontWeight } : {}),
     ...(s.titleTextColor != null ? { tFg: s.titleTextColor } : {}),

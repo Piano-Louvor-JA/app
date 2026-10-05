@@ -165,6 +165,12 @@ const bibleWeightOptions: { value: StageSettings['bibleFontWeight']; label: stri
   { value: 700, label: t('settings.stage.weightStrong') },
 ]
 
+const bibleTransformOptions: { value: StageSettings['bibleTextTransform']; label: string }[] = [
+  { value: 'none', label: t('settings.stage.bibleTransformNone') },
+  { value: 'uppercase', label: t('settings.stage.bibleTransformUppercase') },
+  { value: 'capitalize', label: t('settings.stage.bibleTransformCapitalize') },
+]
+
 const alignOptions = [
   { value: 'left', label: t('settings.stage.alignLeft') },
   { value: 'center', label: t('settings.stage.alignCenter') },
@@ -666,6 +672,24 @@ const confirmReset = ref(false)
             class="stage-custom__segment-btn"
             :class="{ 'stage-custom__segment-btn--active': settings.bibleFontWeight === opt.value }"
             @click="patch({ bibleFontWeight: opt.value })"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
+
+        <p class="stage-custom__label stage-custom__label--sub">
+          {{ t('settings.stage.bibleTextTransform') }}
+        </p>
+        <div class="stage-custom__segment" role="radiogroup">
+          <button
+            v-for="opt in bibleTransformOptions"
+            :key="opt.value"
+            type="button"
+            role="radio"
+            :aria-checked="settings.bibleTextTransform === opt.value"
+            class="stage-custom__segment-btn"
+            :class="{ 'stage-custom__segment-btn--active': settings.bibleTextTransform === opt.value }"
+            @click="patch({ bibleTextTransform: opt.value })"
           >
             {{ opt.label }}
           </button>
