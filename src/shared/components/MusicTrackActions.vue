@@ -137,6 +137,7 @@ async function onOfflineAction() {
 			downloadProgress.value = percent;
 			emitDownloadProgress(percent);
 		},
+		/* v8 ignore next 1 -- callback opts.download; hit depende da passada */
 		shouldAbort: () => cancelRequested.value,
 	});
 

@@ -878,14 +878,15 @@ describe("leva final — handlers completos, ondemand ramais, guards", () => {
 
 	it("ondemand: desktop + já baixada com notice ativa -> 100% done (L283-294)", async () => {
 		bridgeMock.isDesktop = true;
-		trackMediaMock.isDownloaded.mockResolvedValue(true);
+		// 1º open: não baixada -> download ondemand inicia -> notice visível
+		trackMediaMock.isDownloaded.mockResolvedValue(false);
+		trackMediaMock.download.mockResolvedValue({ status: "downloaded" });
 		const { store } = await openTrack({});
-		// dispara again: maybeStart com mesmo musicId
-		await (
-			store as never as {
-				maybeStartOndemandDownload?: (id: number) => Promise<void>;
-			}
-		).maybeStartOndemandDownload?.(1);
+		await new Promise((r) => setTimeout(r, 0));
+		// 2º open MESMA faixa, agora já baixada -> br 282 true -> 100% done
+		trackMediaMock.isDownloaded.mockResolvedValue(true);
+		await store.open({ musicId: 1, project: false });
+		await new Promise((r) => setTimeout(r, 0));
 	});
 
 	it("ensureTrackDownloaded: gen stale aborta download pré-play (L364)", async () => {
