@@ -8,7 +8,12 @@ vi.mock('@shared/components/MusicTrackActions.vue', () => ({
     name: 'MusicTrackActions',
     props: ['musicId', 'variant', 'allowOfflineRemove', 'showOfflineControls'],
     emits: ['sung', 'instrumental', 'slides', 'lyric', 'download-progress'],
-    template: `<div class="mta-stub" @click="$emit('download-progress', 42)" />`,
+    template: `<div class="mta-stub" @click="$emit('download-progress', 42)">
+      <button class="mta-sung" @click="$emit('sung')" />
+      <button class="mta-instrumental" @click="$emit('instrumental')" />
+      <button class="mta-slides" @click="$emit('slides')" />
+      <button class="mta-lyric" @click="$emit('lyric')" />
+    </div>`,
   },
 }))
 
@@ -109,6 +114,26 @@ describe('AlbumSearchHitRow.vue', () => {
     expect(wrapper.emitted('slides')).toBeTruthy()
     expect(wrapper.emitted('lyric')).toBeTruthy()
     wrapper.unmount()
+  })
+
+  it('gaps: track null/não-hymnal esconde número; emits completos; progress width', async () => {
+    const w1 = createWrapper({ hit: makeHit({ isHymnal: true, track: null }) })
+    expect(w1.find('.album-search-hit__number').exists()).toBe(false)
+    w1.unmount()
+    // hymnal COM track → número visível (true-arm)
+    const w15 = createWrapper({ hit: makeHit({ isHymnal: true, track: 15 }) })
+    expect(w15.find('.album-search-hit__number').exists()).toBe(true)
+    w15.unmount()
+    const w2 = createWrapper({ hit: makeHit({ isHymnal: false }) })
+    expect(w2.find('.album-search-hit__number').exists()).toBe(false)
+    await w2.find('.mta-instrumental').trigger('click')
+    await w2.find('.mta-slides').trigger('click')
+    await w2.find('.mta-lyric').trigger('click')
+    await w2.find('.mta-stub').trigger('click') // download-progress 42
+    await flushPromises()
+    expect(w2.find('.album-search-hit__download-overlay').exists()).toBe(true)
+    expect(w2.find('.album-search-hit__download-fill').attributes('style')).toContain('42%')
+    await w2.find('.mta-sung').trigger('click')
   })
 
 })
