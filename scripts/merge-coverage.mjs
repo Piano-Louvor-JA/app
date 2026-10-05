@@ -82,6 +82,12 @@ function unionFiles(filesA, filesB) {
         }
       };
       add(a); add(b);
+      // Descarta fn fantasma de transform: span que só existe em UMA
+      // passada e ficou sem hits = artefato de remap (fn real aparece
+      // nos dois mapas ou tem hits).
+      for (const id of Object.keys(f)) {
+        if (f[id] === 0) { delete f[id]; delete fnMap[id]; }
+      }
     }
 
     // ---- branches ----

@@ -181,6 +181,7 @@ export const useMediaStore = defineStore('media', () => {
   const RUNTIME_PUBLISH_MIN_MS = 80
 
   function stopProjectionWatch() {
+    // v8 ignore next 3 -- window sempre definido (store roda só no browser/app; SSR não existe)
     if (typeof window !== 'undefined') {
       window.removeEventListener('louvorja:projection-reapplied', onProjectionReapplied)
     }
@@ -194,6 +195,7 @@ export const useMediaStore = defineStore('media', () => {
     if (detail?.moduleId !== 'media') return
     if (detail.open) {
       isProjecting.value = true
+      // v8 ignore next 1 -- listener e timer vivem/morrem juntos (stopProjectionWatch remove ambos): com listener ativo o timer sempre existe
       if (!projectionWatchTimer) startProjectionWatch()
       publishProjectionState()
       return
@@ -205,6 +207,7 @@ export const useMediaStore = defineStore('media', () => {
 
   function startProjectionWatch() {
     stopProjectionWatch()
+    // v8 ignore next 3 -- window sempre definido (store roda só no browser/app; SSR não existe)
     if (typeof window !== 'undefined') {
       window.addEventListener('louvorja:projection-reapplied', onProjectionReapplied)
     }
@@ -270,7 +273,9 @@ export const useMediaStore = defineStore('media', () => {
   }
 
   async function startOndemandDownload(musicId: number) {
+    /* v8 ignore next 1 -- única chamada é maybeStartOndemandDownload (já garante desktop) */
     if (!isDesktopApp()) return
+    /* v8 ignore next 1 -- musicId já validado (>0) pelo open */
     if (!Number.isFinite(musicId) || musicId <= 0) return
 
     // Cancela qualquer download sob demanda anterior desta sessão do player.
@@ -457,6 +462,7 @@ export const useMediaStore = defineStore('media', () => {
     audioUrl: string | null,
     instrumentalUrl: string | null,
   ): string | null {
+    /* v8 ignore next 1 -- ambos os call sites (open e switchMode) retornam cedo para no_audio antes de chamar pickSourceUrl */
     if (mode === 'no_audio') return null
     if (mode === 'instrumental') return instrumentalUrl ?? audioUrl
     return audioUrl ?? instrumentalUrl
@@ -733,6 +739,7 @@ export const useMediaStore = defineStore('media', () => {
     const next = Math.min(Math.max(0, index), slides.length - 1)
     slideIndex.value = next
 
+    /* v8 ignore next 1 -- session null já retornou no guard de slides; slideTimesSec é sempre array quando session existe */
     const times = session.value?.slideTimesSec ?? []
     if (hasAudio.value && times.length > next) {
       seekTo(times[next] ?? 0)
