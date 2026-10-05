@@ -179,4 +179,21 @@ describe('OutputSelectorPanel', () => {
     await flushPromises()
     expect(w.exists()).toBe(true)
   })
+
+  it('gaps onda1: registry targets exercitam callbacks find; select vazio envia null', async () => {
+    displaysApi.list.mockResolvedValue([{ id: 0 }])
+    palcoApi.slots.mockResolvedValue([{ id: 'tv-1', label: 'TV 1', clients: 1 }])
+    registryMock.targets.value = [
+      { id: 'cable:0', module: 'bible' },
+      { id: 'palco:tv-1', module: 'video' },
+    ]
+    const w = await mountPanel()
+    active = w
+    const selects = w.findAll('select')
+    expect(selects).toHaveLength(2)
+    expect((selects[0].element as HTMLSelectElement).value).toBe('bible')
+    expect((selects[1].element as HTMLSelectElement).value).toBe('video')
+    await selects[0].setValue('')
+    expect(registryMock.setModule).toHaveBeenCalledWith('cable:0', null)
+  })
 })
