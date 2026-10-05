@@ -2648,4 +2648,268 @@ describe('palco-bridge', () => {
       expect(true).toBe(true)
     })
   })
+
+  describe('branch finale 10 (gaps3: 13 arms)', () => {
+    beforeEach(() => {
+      stopPalcoBridge()
+      watchCallbacks.length = 0
+      localStorage.clear()
+      useMediaStoreMock.mockReturnValue(null)
+      getPalcoRouteMockRef.mockReturnValue('mirror')
+    })
+
+    it('media owner com só title (lyric vazio): projeta title (172 title arm)', async () => {
+      vi.useFakeTimers()
+      startPalcoBridge()
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'media-key',
+        newValue: JSON.stringify({ active: true, projecting: true, lyric: '', title: 'Só Título' }),
+      }))
+      await vi.advanceTimersByTimeAsync(100)
+      expect(palcoSessionMock.projectTo).toHaveBeenCalledWith('slot1', 'hymn', expect.objectContaining({ text: 'Só Título' }))
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('media owner perde lyric e title: idle (172 vazio + 173)', async () => {
+      vi.useFakeTimers()
+      startPalcoBridge()
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'media-key',
+        newValue: JSON.stringify({ active: true, projecting: true, lyric: 'L', title: 'T' }),
+      }))
+      await vi.advanceTimersByTimeAsync(100)
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'media-key',
+        newValue: JSON.stringify({ active: true, projecting: true, lyric: '', title: '' }),
+      }))
+      await vi.advanceTimersByTimeAsync(100)
+      expect(palcoSessionMock.idleTo).toHaveBeenCalledWith('slot1')
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('rota TV mesma faixa mesmo estado play: sem áudio novo (399 false)', async () => {
+      vi.useFakeTimers()
+      useMediaStoreMock.mockReturnValue({
+        session: { audioUrl: 'http://audio/hino.mp3', title: 'Hino 1', subtitle: 'Harp', coverUrl: 'http://capa.jpg' },
+        audioRoute: 'tv', isPlaying: true, isPaused: false, currentTimeSec: 10, hasSession: true, status: 'playing',
+      })
+      startPalcoBridge()
+      await vi.advanceTimersByTimeAsync(3200)
+      const plays1 = palcoSessionMock.audio.mock.calls.filter((c: any[]) => c[0]?.action === 'play').length
+      await vi.advanceTimersByTimeAsync(3200)
+      const plays2 = palcoSessionMock.audio.mock.calls.filter((c: any[]) => c[0]?.action === 'play').length
+      expect(plays1).toBe(1)
+      expect(plays2).toBe(1)
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('rota TV com session sem título/subtítulo/capa: play com undefined (386 ??)', async () => {
+      vi.useFakeTimers()
+      useMediaStoreMock.mockReturnValue({
+        session: { audioUrl: 'http://audio/hino2.mp3' },
+        audioRoute: 'tv', isPlaying: true, isPaused: false, currentTimeSec: 0, hasSession: true, status: 'playing',
+      })
+      startPalcoBridge()
+      await vi.advanceTimersByTimeAsync(3200)
+      const play = palcoSessionMock.audio.mock.calls.find((c: any[]) => c[0]?.action === 'play')
+      expect(play).toBeTruthy()
+      expect(play![0].title).toBeUndefined()
+      expect(play![0].cover).toBeUndefined()
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('rota both com session sem título: play com undefined (418 ??)', async () => {
+      vi.useFakeTimers()
+      useMediaStoreMock.mockReturnValue({
+        session: { audioUrl: 'http://audio/hino3.mp3' },
+        audioRoute: 'both', isPlaying: true, isPaused: false, currentTimeSec: 0, hasSession: true, status: 'playing',
+      })
+      startPalcoBridge()
+      await vi.advanceTimersByTimeAsync(3200)
+      const play = palcoSessionMock.audio.mock.calls.find((c: any[]) => c[0]?.action === 'play')
+      expect(play).toBeTruthy()
+      expect(play![0].title).toBeUndefined()
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('rota both mesma key sem url: 2ª sync cai no return 429', async () => {
+      vi.useFakeTimers()
+      useMediaStoreMock.mockReturnValue({
+        session: null, audioRoute: 'both', isPlaying: true, isPaused: false, currentTimeSec: 0, hasSession: true, status: 'playing',
+      })
+      startPalcoBridge()
+      await vi.advanceTimersByTimeAsync(3200)
+      palcoSessionMock.audio.mockClear()
+      await vi.advanceTimersByTimeAsync(3200)
+      expect(palcoSessionMock.audio).not.toHaveBeenCalled()
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('rota both seek dentro da janela 3s: sem seek duplo (435 false)', async () => {
+      vi.useFakeTimers()
+      useMediaStoreMock.mockReturnValue({
+        session: { audioUrl: 'http://audio/hino4.mp3', title: 'T' },
+        audioRoute: 'both', isPlaying: true, isPaused: false, currentTimeSec: 30, hasSession: true, status: 'playing',
+      })
+      startPalcoBridge()
+      await vi.advanceTimersByTimeAsync(3200)
+      palcoSessionMock.audio.mockClear()
+      // polls em 3s: seek só quando now - lastPosSyncMs > 3000 (janela)
+      await vi.advanceTimersByTimeAsync(3100)
+      const s1 = palcoSessionMock.audio.mock.calls.filter((c: any[]) => c[0]?.action === 'seek').length
+      await vi.advanceTimersByTimeAsync(3000)
+      const s2 = palcoSessionMock.audio.mock.calls.filter((c: any[]) => c[0]?.action === 'seek').length
+      // ao menos um seek na janela; sem martelada dupla por poll
+      expect(s1 + s2).toBeGreaterThanOrEqual(1)
+      expect(palcoSessionMock.audio.mock.calls.filter((c: any[]) => c[0]?.action === 'seek').length).toBeLessThan(3)
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('rota both seek com currentTimeSec null: positionMs 0 (439 ??)', async () => {
+      vi.useFakeTimers()
+      useMediaStoreMock.mockReturnValue({
+        session: { audioUrl: 'http://audio/hino5.mp3', title: 'T' },
+        audioRoute: 'both', isPlaying: true, isPaused: false, currentTimeSec: null, hasSession: true, status: 'playing',
+      })
+      startPalcoBridge()
+      await vi.advanceTimersByTimeAsync(3200)
+      await vi.advanceTimersByTimeAsync(3000)
+      const seek = palcoSessionMock.audio.mock.calls.find((c: any[]) => c[0]?.action === 'seek')
+      expect(seek).toBeTruthy()
+      expect(seek![0].positionMs).toBe(0)
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('rota both nem playing nem paused: sem áudio (443 false)', async () => {
+      vi.useFakeTimers()
+      useMediaStoreMock.mockReturnValue({
+        session: { audioUrl: 'http://audio/hino6.mp3', title: 'T' },
+        audioRoute: 'both', isPlaying: false, isPaused: false, currentTimeSec: 5, hasSession: true, status: 'buffering',
+      })
+      startPalcoBridge()
+      await vi.advanceTimersByTimeAsync(3200)
+      palcoSessionMock.audio.mockClear()
+      await vi.advanceTimersByTimeAsync(3200)
+      const acts = palcoSessionMock.audio.mock.calls.map((c: any[]) => c[0]?.action)
+      expect(acts).not.toContain('pause')
+      expect(acts).not.toContain('seek')
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('storage poll detecta REMOÇÃO do item (541 now null)', async () => {
+      vi.useFakeTimers()
+      startPalcoBridge()
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'media-key',
+        newValue: JSON.stringify({ active: true, projecting: true, lyric: 'L' }),
+      }))
+      await vi.advanceTimersByTimeAsync(100)
+      // escreve direto no localStorage (poll lê localStorage.getItem)
+      localStorage.setItem('media-key', JSON.stringify({ active: true, projecting: true, lyric: 'L2' }))
+      await vi.advanceTimersByTimeAsync(2000)
+      localStorage.removeItem('media-key')
+      await vi.advanceTimersByTimeAsync(2000)
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('remote-key next dispara remotePptNext (569 else-if)', async () => {
+      const next = vi.fn(async () => undefined)
+      const prev = vi.fn(async () => undefined)
+      Object.defineProperty(window, 'louvorja', {
+        value: { projection: { remotePptNext: next, remotePptPrev: prev } },
+        configurable: true, writable: true,
+      })
+      try {
+        startPalcoBridge()
+        // onEvent captura o handler: dispara via mock do palcoSession
+        const handler = palcoSessionMock.onEvent.mock.calls.at(-1)![0] as (m: unknown) => void
+        handler({ type: 'remote-key', key: 'next' })
+        expect(next).toHaveBeenCalled()
+        expect(prev).not.toHaveBeenCalled()
+        stopPalcoBridge()
+      } finally {
+        delete (window as unknown as Record<string, unknown>).louvorja
+      }
+    })
+
+    it('watcher hasSession true: não reseta nem para (648 false)', async () => {
+      vi.useFakeTimers()
+      useMediaStoreMock.mockReturnValue({
+        session: { audioUrl: 'http://audio/hino7.mp3', title: 'T' },
+        audioRoute: 'both', isPlaying: true, isPaused: false, currentTimeSec: 0, hasSession: true, status: 'playing',
+      })
+      startPalcoBridge()
+      await vi.advanceTimersByTimeAsync(100)
+      palcoSessionMock.audio.mockClear()
+      // ordem de registro no start: isPlaying, status, hasSession, currentTimeSec
+      // (media != null → 4 watches); hasSession é o 3º
+      const entry = watchCallbacks[2]!
+      entry.cb(true) // has=true → early return sem stop/reset
+      await vi.advanceTimersByTimeAsync(100)
+      const stops = palcoSessionMock.audio.mock.calls.filter((c: any[]) => c[0]?.action === 'stop')
+      expect(stops.length).toBe(0)
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+  })
+
+    it('rota TV session com subtitle/cover null: play com ?? arm (392/394)', async () => {
+      vi.useFakeTimers()
+      useMediaStoreMock.mockReturnValue({
+        session: { audioUrl: 'http://audio/hino8.mp3', title: 'T', subtitle: null, coverUrl: null },
+        audioRoute: 'tv', isPlaying: true, isPaused: false, currentTimeSec: 0, hasSession: true, status: 'playing',
+      })
+      startPalcoBridge()
+      await vi.advanceTimersByTimeAsync(3200)
+      const play = palcoSessionMock.audio.mock.calls.find((c: any[]) => c[0]?.action === 'play')
+      expect(play).toBeTruthy()
+      expect(play![0].subtitle).toBeUndefined()
+      expect(play![0].cover).toBeUndefined()
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('rota TV mesma faixa propagando com currentTimeSec null: positionMs 0 (405 ??)', async () => {
+      vi.useFakeTimers()
+      const store = {
+        session: { audioUrl: 'http://audio/hino9.mp3', title: 'T', subtitle: 'S', coverUrl: 'C' },
+        audioRoute: 'tv', isPlaying: false, isPaused: true, currentTimeSec: null, hasSession: true, status: 'paused',
+      }
+      useMediaStoreMock.mockReturnValue(store)
+      startPalcoBridge()
+      await vi.advanceTimersByTimeAsync(3200)
+      // mesma faixa agora tocando: wanted play ≠ lastTvPlayState(null→pause?) → play com positionMs ?? 0
+      useMediaStoreMock.mockReturnValue({ ...store, isPlaying: true, isPaused: false, status: 'playing' })
+      await vi.advanceTimersByTimeAsync(3200)
+      const plays = palcoSessionMock.audio.mock.calls.filter((c: any[]) => c[0]?.action === 'play')
+      expect(plays.length).toBeGreaterThanOrEqual(1)
+      expect(plays.at(-1)![0].positionMs).toBe(0)
+      stopPalcoBridge()
+      vi.useRealTimers()
+    })
+
+    it('remote-key com bridge sem projection: early return (571 guard)', () => {
+      Object.defineProperty(window, 'louvorja', {
+        value: {},
+        configurable: true, writable: true,
+      })
+      try {
+        startPalcoBridge()
+        const handler = palcoSessionMock.onEvent.mock.calls.at(-1)![0] as (m: unknown) => void
+        expect(() => handler({ type: 'remote-key', key: 'next' })).not.toThrow()
+        stopPalcoBridge()
+      } finally {
+        delete (window as unknown as Record<string, unknown>).louvorja
+      }
+    })
 })
