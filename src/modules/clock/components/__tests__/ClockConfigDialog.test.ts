@@ -198,13 +198,11 @@ describe("ClockConfigDialog", () => {
   describe('swatches de texto (click)', () => {
     it('click no swatch emite update:textColor', async () => {
       const w = mountDialog()
-      const swatches = w.findAll('[role="radio"][class*="swatch"]')
-      if (swatches.length === 0) {
-        const radios = w.findAll('[role="radio"]')
-        for (const r of radios.slice(0, 2)) await r.trigger('click')
-      } else {
-        await swatches[0].trigger('click')
-      }
+      // Teleport → body: buscar swatches no document; último grupo = TEXTO
+      const swatches = qa('[role="radio"].clock-config__swatch')
+      expect(swatches.length).toBeGreaterThan(0)
+      swatches[swatches.length - 1]!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      expect(w.emitted('update:textColor')).toBeTruthy()
       w.unmount()
     })
   })
