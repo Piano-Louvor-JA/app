@@ -18,7 +18,7 @@ function onGlobalKeydown(event: KeyboardEvent) {
 	const target = event.target as HTMLElement | null;
 	if (target?.isContentEditable || target?.tagName === "TEXTAREA") return;
 	if (target?.tagName === "INPUT") {
-		const type = ((target as HTMLInputElement).type || "text").toLowerCase();
+		const type = (target as HTMLInputElement).type.toLowerCase(); // HTMLInputElement.type defaults to "text".
 		if (
 			![
 				"button",
