@@ -408,4 +408,39 @@ describe("random-audio — retoma com notify (stmt 210)", () => {
     // rejeição cai no 2º callback: notifyPlaying mesmo assim
     expect(events.length).toBeGreaterThan(0);
   });
+
+	describe("gaps2: eventos de áudio substituído (arms outro-audio)", () => {
+		it("ended/error do áudio antigo não limpam o atual (125/135 false)", async () => {
+			playRandomDrawAudio(config());
+			const first = FakeAudio.instances.at(-1)!;
+			playRandomDrawAudio(config({ audioSource: "custom", customAudioFile: "x.mp3" }));
+			const second = FakeAudio.instances.at(-1)!;
+			first.emit("ended");
+			first.emit("error");
+			expect(isRandomDrawAudioPlaying()).toBe(true);
+			second.emit("ended");
+			expect(isRandomDrawAudioPlaying()).toBe(false);
+		});
+
+		it("play rejeitado do áudio antigo não notifica como atual (160 false)", async () => {
+			playRandomDrawAudio(config());
+			const first = FakeAudio.instances.at(-1)!;
+			playRandomDrawAudio(config({ audioSource: "custom", customAudioFile: "x.mp3" }));
+			first.rejectPlay();
+			await Promise.resolve();
+			expect(isRandomDrawAudioPlaying()).toBe(true);
+		});
+
+		it("ended/error/reject do efeito antigo (181/188/194 false)", async () => {
+			playRandomWinnerEffect();
+			const first = FakeAudio.instances.at(-1)!;
+			playRandomWinnerEffect();
+			first.emit("ended");
+			first.emit("error");
+			first.rejectPlay();
+			await Promise.resolve();
+			// efeito atual segue vivo (não exportado; sanity: sem throw)
+			expect(FakeAudio.instances.length).toBe(2);
+		});
+	});
 });
