@@ -374,3 +374,67 @@ describe('MediaView — sessão com conteúdo', () => {
     w.unmount()
   })
 
+describe('MediaView — gaps3 (watch aside, keydown types, fs sem palco)', () => {
+  it('watch activeListIndex: index<0 return; aside sem item ativo não revela', async () => {
+    P().refs.hasSession.value = true
+    P().refs.session.value = { title: 'H', subtitle: '', slides: [{ lyric: 'L', isCover: false }] }
+    P().refs.currentSlide.value = { lyric: 'L', isCover: false }
+    P().refs.slideIndex.value = -1
+    const w = await mountView()
+    // muda slideIndex pra disparar o watch com index<0 → early return (br 76)
+    P().refs.slideIndex.value = -2
+    await w.vm.$nextTick()
+    // agora index>=0 mas item ativo não existe (slideCount 1, índice 5) → br 80 else
+    P().refs.slideIndex.value = 5
+    await w.vm.$nextTick()
+    await w.vm.$nextTick()
+    w.unmount()
+  })
+
+  it('ondemand: percent null com notice visível → ratio 0 e aria 100 (brs 91/347)', async () => {
+    P().refs.hasSession.value = true
+    P().refs.session.value = { title: 'H', subtitle: '', slides: [{ lyric: 'L', isCover: false }] }
+    P().refs.currentSlide.value = { lyric: 'L', isCover: false }
+    P().refs.ondemandNoticeVisible.value = true
+    P().refs.ondemandDownloadPercent.value = null
+    const w = await mountView()
+    expect(w.find('.media-window__ondemand').exists()).toBe(true)
+    expect(w.find('.media-window__ondemand-fill').attributes('style')).toContain('scaleX(0)')
+    expect(w.find('.media-window__ondemand-track').attributes('aria-valuenow')).toBe('100')
+    w.unmount()
+  })
+
+  it('keydown: input sem type cai no fallback text (br 128) e type in-list processa else (br 129)', async () => {
+    const w = await mountView()
+    P().fns.requestClose.mockClear()
+    const inp = document.createElement('input')
+    Object.defineProperty(inp, 'type', { value: '' }) // sem type no DOM → || 'text' (br 128)
+    document.body.appendChild(inp)
+    const ev = new KeyboardEvent('keydown', { key: 'Escape' })
+    Object.defineProperty(ev, 'target', { value: inp })
+    window.dispatchEvent(ev)
+    await w.vm.$nextTick()
+    expect(P().fns.requestClose).not.toHaveBeenCalled()
+    const chk = document.createElement('input')
+    chk.type = 'checkbox' // NA lista de exclusão → else do includes (br 129)
+    document.body.appendChild(chk)
+    const ev2 = new KeyboardEvent('keydown', { key: 'Escape' })
+    Object.defineProperty(ev2, 'target', { value: chk })
+    window.dispatchEvent(ev2)
+    await w.vm.$nextTick()
+    expect(P().fns.requestClose).toHaveBeenCalled()
+    w.unmount()
+  })
+
+  it('toggle fullscreen sem palco montado: early return (br 176)', async () => {
+    P().refs.hasSession.value = false
+    const w = await mountView()
+    const pill = w.findComponent({ name: 'MediaPlayerPill' })
+    if (pill.exists()) {
+      pill.vm.$emit('toggle-fullscreen')
+      await w.vm.$nextTick()
+    }
+    w.unmount()
+  })
+}
+)
