@@ -1,5 +1,16 @@
 // @vitest-environment jsdom
 import { mount } from "@vue/test-utils";
+
+// override stage-settings: true-arms de barColor/textShadow/textBox (fantasma de glob vazio em teste)
+const stageSettingsStateMR = vi.hoisted(() => ({ value: null as Record<string, unknown> | null }))
+vi.mock("../../../settings/services/stage-settings-runtime", async (importOriginal) => {
+	const real = await importOriginal<typeof import("../../../settings/services/stage-settings-runtime")>()
+	return {
+		readEffectiveStageSettings: (scope: string) =>
+			stageSettingsStateMR.value ?? real.readEffectiveStageSettings(scope),
+		subscribeStageSettings: (cb: () => void) => real.subscribeStageSettings(cb),
+	}
+})
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createI18n } from "vue-i18n";
 import mediaLocale from "../../locales/pt-BR";
@@ -770,3 +781,41 @@ describe("MediaReturnProjectionView — stage visual", () => {
 		w.unmount();
 	});
 });
+	it("gaps: stage completo true-arms; snapTo com rect altura 0", async () => {
+		// stubs locais de motion
+		vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+			height: 0, width: 0, top: 0, left: 0, bottom: 0, right: 0, x: 0, y: 0, toJSON: () => ({}),
+		} as DOMRect)
+		vi.stubGlobal("requestAnimationFrame", vi.fn((cb: FrameRequestCallback) => { queueMicrotask(() => cb(performance.now())); return 1 }))
+		vi.stubGlobal("cancelAnimationFrame", vi.fn())
+		vi.stubGlobal("matchMedia", (q: string) => ({ matches: false, media: q }))
+		stageSettingsStateMR.value = {
+			backgroundColor: "#000000",
+			textColor: "#ffffff",
+			fontSize: 96,
+			textAlign: "center",
+			textShadow: true,
+			shadowBlur: 3,
+			shadowIntensity: 0.8,
+			textBox: true,
+			boxOpacity: 0.5,
+			boxBorder: true,
+			footerRefColor: "#FCCE02",
+		} as Record<string, unknown>
+		localStorage.setItem(MEDIA_RUNTIME_STORAGE_KEY, JSON.stringify(runtimePayload()))
+		const w = await mountView()
+		window.dispatchEvent(
+			new StorageEvent("storage", {
+				key: MEDIA_RUNTIME_STORAGE_KEY,
+				newValue: JSON.stringify(runtimePayload({ slideIndex: 1, lyric: "Snap", nextLyric: "" })),
+			}),
+		)
+		await w.vm.$nextTick()
+		await new Promise((r) => setTimeout(r, 20))
+		expect(w.text()).toContain("Snap")
+		w.unmount()
+		stageSettingsStateMR.value = null
+		vi.restoreAllMocks()
+		vi.unstubAllGlobals()
+	})
+
