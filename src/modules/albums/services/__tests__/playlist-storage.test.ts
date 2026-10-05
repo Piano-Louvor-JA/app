@@ -9,6 +9,7 @@ vi.stubGlobal('localStorage', {
 
 import {
   addPlaylistItem,
+  savePlaylists,
   createPlaylist,
   deletePlaylist,
   listPlaylists,
@@ -52,14 +53,29 @@ describe('playlist-storage', () => {
   })
   describe('gaps — storage corrompido', () => {
     it('JSON não-array: retorna []', () => {
-      values.set('louvorja_playlists_v1', JSON.stringify({ foo: 1 }))
+      values.set('louvorja-playlists-v1', JSON.stringify({ foo: 1 }))
       expect(listPlaylists()).toEqual([])
     })
 
     it('JSON inválido: retorna []', () => {
-      values.set('louvorja_playlists_v1', 'not-json{')
+      values.set('louvorja-playlists-v1', 'not-json{')
       expect(listPlaylists()).toEqual([])
     })
+  })
+
+  it('rename/delete/addItem/removeItem com id inexistente: null/false', () => {
+    expect(renamePlaylist('nope', 'X')).toBe(null)
+    expect(deletePlaylist('nope')).toBe(false)
+    expect(addPlaylistItem('nope', { musicId: 1, albumId: null, title: 'A' })).toBe(null)
+    expect(removePlaylistItem('nope', 0)).toBe(null)
+  })
+
+  it('savePlaylists persiste lista bruta; removeItem índices inválidos: null', () => {
+    savePlaylists([{ id: 'p1', name: 'A', items: [{ musicId: 1, albumId: null, title: 'T' }], createdAt: '', updatedAt: '' }])
+    expect(removePlaylistItem('p1', 5)).toBe(null)
+    expect(removePlaylistItem('p1', -1)).toBe(null)
+    const after = listPlaylists()
+    expect(after[0]!.items).toHaveLength(1)
   })
 
 })
