@@ -159,11 +159,17 @@ describe('PalcoRouteSelect', () => {
     expect(w.find('select').exists()).toBe(true)
   })
 
-  it('gaps: unmount com timer ativo limpa interval (fn 38)', async () => {
-    palcoApi.status.mockResolvedValue({ running: true })
-    const w = await mountCard()
-    await new Promise((r) => setTimeout(r, 10))
-    w.unmount()
-    // sem erro = ok
+  it('unmount limpa o interval ativo', async () => {
+    vi.useFakeTimers()
+    try {
+      palcoApi.status.mockResolvedValue({ running: true })
+      const clear = vi.spyOn(window, 'clearInterval')
+      const w = await mountCard()
+      await vi.advanceTimersByTimeAsync(4000)
+      w.unmount()
+      expect(clear).toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
