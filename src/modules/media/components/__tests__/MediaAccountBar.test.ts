@@ -304,8 +304,45 @@ describe("MediaAccountBar — forgot sem token e voltas de modo", () => {
     await flushPromises();
     const voltar = w
       .findAll(".account__link")
-      .find((b) => b.text() === "Voltar");
+      .find((b) => b.text().trim() === "Voltar");
     await voltar?.trigger("click");
     expect(w.text()).toContain("Entrar");
+  });
+
+  it("gaps: register nome curto bloqueia submit (41); guard do onSubmit (46)", async () => {
+    const w = mountBar();
+    await w.findAll(".account__link")[0].trigger("click");
+    await w.findAll(".account__link")
+      .find((b) => b.text() === "Criar conta")!
+      .trigger("click");
+    const byPh = (ph: string) => w.findAll("input").find((i) => i.attributes("placeholder") === ph)!;
+    // nome com 1 char → guard 41 → isValid false → botão disabled
+    await byPh("Seu nome").setValue("X");
+    await byPh("E-mail").setValue("irmao@iasd.org");
+    await byPh("Senha (mín. 6)").setValue("senha123");
+    await flushPromises();
+    const submitBtn = w.find("button[type=\"submit\"]");
+    expect(submitBtn.attributes("disabled")).toBeDefined();
+    // guard 46: submit manual não chama auth
+    const calls = vi.mocked(auth.login).mock.calls.length;
+    await w.find("form").trigger("submit");
+    await flushPromises();
+    expect(vi.mocked(auth.login).mock.calls.length).toBe(calls);
+  });
+
+  it("gaps: register link Voltar volta pro login (256)", async () => {
+    const w = mountBar();
+    await w.findAll(".account__link")[0].trigger("click");
+    await w.findAll(".account__link")
+      .find((b) => b.text().includes("Esqueci"))!
+      .trigger("click");
+    await flushPromises();
+    const voltar = w
+      .findAll(".account__link")
+      .find((b) => b.text().includes("Voltar"));
+    expect(voltar).toBeTruthy();
+    await voltar!.trigger("click");
+    await flushPromises();
+    expect(w.text()).toContain("Entra");
   });
 });
