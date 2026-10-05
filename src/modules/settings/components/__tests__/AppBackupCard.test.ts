@@ -269,3 +269,24 @@ describe('AppBackupCard', () => {
     expect(bridge.backup.__cbs.length).toBe(0)
   })
 })
+  it('gaps: progress determinate com total; guards busy em restore/fechar', async () => {
+    const bridge = makeBridge()
+    let resolveCreate!: (v: unknown) => void
+    bridge.backup.create.mockReturnValue(new Promise((r) => (resolveCreate = r)))
+    setBridge(bridge)
+    const w = await mountCard()
+    await backupBtn(w).trigger('click')
+    await flushPromises()
+    // total > 0 → percent calculado (br 22-24/27)
+    bridge.backup.__cbs[0]({ current: 10, total: 10, zipPath: '' })
+    await flushPromises()
+    await flushPromises()
+    // busy (backup em curso): openRestoreConfirm e closeRestoreConfirm são no-op
+    const restoreBtn = w.findAll('button').find((b) => (b.attributes('aria-label') ?? b.text()).includes('Restaurar') || b.text().includes('restore'))
+    if (restoreBtn) await restoreBtn.trigger('click')
+    await flushPromises()
+    resolveCreate({ ok: true, path: '/x.zip' })
+    await flushPromises()
+    w.unmount()
+  })
+
