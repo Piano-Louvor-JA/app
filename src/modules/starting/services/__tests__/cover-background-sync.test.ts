@@ -297,4 +297,34 @@ describe("startCoverBackgroundSync", () => {
 		expect(result.missing).toBe(1);
 		expect(result.downloaded).toBe(1);
 	});
+
+	describe("gaps2", () => {
+		it("skipIfSynced false ignora covers_synced e roda fluxo completo (L88)", async () => {
+			mocks.state.catalog.set(COVERS_KEY, { complete: true });
+			mocks.state.bridge = {
+				media: {
+					check: vi.fn(async () => false),
+					download: vi.fn(async () => true),
+				},
+			};
+			const progress: number[] = [];
+			const result = await ensureAlbumCovers({
+				skipIfSynced: false,
+				onProgress: (p) => progress.push(p),
+			});
+			expect(result).toEqual({ total: 2, missing: 2, downloaded: 2 });
+			expect(progress[0]).toBe(2);
+			expect(progress).toContain(100);
+		});
+
+		it("todas as capas existem sem skip → progresso 100 direto (L111 true)", async () => {
+			const progress: number[] = [];
+			const result = await ensureAlbumCovers({
+				onProgress: (p) => progress.push(p),
+			});
+			expect(result).toEqual({ total: 2, missing: 0, downloaded: 0 });
+			expect(progress).toEqual([2, 100]);
+			expect(mocks.state.catalog.get(COVERS_KEY)).toEqual({ complete: true });
+		});
+	});
 });
