@@ -268,7 +268,7 @@ describe('AppBackupCard', () => {
     w.unmount()
     expect(bridge.backup.__cbs.length).toBe(0)
   })
-})
+
   it('gaps: progress determinate com total; guards busy em restore/fechar', async () => {
     const bridge = makeBridge()
     let resolveCreate!: (v: unknown) => void
@@ -290,3 +290,134 @@ describe('AppBackupCard', () => {
     w.unmount()
   })
 
+  it('gaps2: restore cancelado via seletores sólidos (ternário idle + if cancelled)', async () => {
+    const bridge = makeBridge()
+    bridge.backup.restore.mockResolvedValue({ ok: false, reason: 'cancelled' })
+    setBridge(bridge)
+    const w = await mountCard()
+    await restoreBtn(w).trigger('click')
+    await flushPromises()
+    await checkConfirm()
+    await click(q('.clear-confirm__btn--danger'))
+    expect(w.text()).not.toContain('settings.general.backupRestoreError')
+  })
+
+  it('gaps2: createBackup guard sem backup na bridge (L58)', async () => {
+    setBridge({ isElectron: true })
+    const w = await mountCard()
+    await backupBtn(w).trigger('click')
+    await flushPromises()
+    expect(w.text()).not.toContain('settings.general.backupCreated')
+  })
+
+  it('gaps2: createBackup busy — 2º click é no-op (L58)', async () => {
+    const bridge = makeBridge()
+    let resolveCreate!: (v: unknown) => void
+    bridge.backup.create.mockReturnValue(new Promise((r) => (resolveCreate = r)))
+    setBridge(bridge)
+    const w = await mountCard()
+    await backupBtn(w).trigger('click')
+    await flushPromises()
+    const calls = bridge.backup.create.mock.calls.length
+    await backupBtn(w).trigger('click') // busy → return
+    expect(bridge.backup.create.mock.calls.length).toBe(calls)
+    resolveCreate({ ok: true, path: '/x.zip' })
+    await flushPromises()
+  })
+
+  it('gaps2: create resolve sem path → ?? null (L73)', async () => {
+    const bridge = makeBridge()
+    bridge.backup.create.mockResolvedValue({ ok: true } as never)
+    setBridge(bridge)
+    const w = await mountCard()
+    await backupBtn(w).trigger('click')
+    await flushPromises()
+    expect(w.text()).not.toContain('settings.general.backupCreated') // path null → sem status
+  })
+
+  it('gaps2: bindProgress sem onProgress → ?? null (L34)', async () => {
+    const bridge = makeBridge()
+    // onProgress existe mas retorna undefined (sem unsubscriber) → ?? null
+    bridge.backup.onProgress = vi.fn(() => undefined) as never
+    setBridge(bridge)
+    const w = await mountCard()
+    await backupBtn(w).trigger('click')
+    await flushPromises()
+    expect(bridge.backup.onProgress).toHaveBeenCalled()
+    expect(w.text()).toContain('settings.general.backupCreated')
+  })
+
+  it('gaps2: openRestoreConfirm/createBackup com isDesktopApp false pós-mount (L44)', async () => {
+    const bridge = makeBridge()
+    setBridge(bridge)
+    const w = await mountCard()
+    setBridge({ isElectron: false }) // card segue montado (v-if não-reactivo)
+    await restoreBtn(w).trigger('click') // openRestoreConfirm → guard return
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+    await backupBtn(w).trigger('click') // createBackup → guard return
+    expect(bridge.backup.create).not.toHaveBeenCalled()
+  })
+
+  it('gaps2: confirmRestore com bridge trocada pra null (L85)', async () => {
+    const bridge = makeBridge()
+    setBridge(bridge)
+    const w = await mountCard()
+    await restoreBtn(w).trigger('click')
+    await flushPromises()
+    await checkConfirm()
+    setBridge(null) // bridge sumiu antes do confirm
+    await click(q('.clear-confirm__btn--danger'))
+    expect(bridge.backup.restore).not.toHaveBeenCalled()
+  })
+
+  it('gaps3: classes working durante backup/restore pendentes', async () => {
+    const bridge = makeBridge()
+    let resolveCreate!: (v: unknown) => void
+    bridge.backup.create.mockReturnValue(new Promise((r) => (resolveCreate = r)))
+    let resolveRestore!: (v: unknown) => void
+    bridge.backup.restore.mockReturnValue(new Promise((r) => (resolveRestore = r)))
+    setBridge(bridge)
+    const w = await mountCard()
+    await backupBtn(w).trigger('click')
+    await flushPromises()
+    expect(backupBtn(w).classes()).toContain('general-settings__btn--working')
+    // progress determinate durante busy: barra com width %
+    bridge.backup.__cbs[0]?.({ current: 25, total: 100, zipPath: '' })
+    await flushPromises()
+    const bar = w.find('.backup-card__bar')
+    expect(bar.exists()).toBe(true)
+    resolveCreate({ ok: true, path: '/x.zip' })
+    await flushPromises()
+    // restore pendente: dialog some, botão com classe restoring
+    await restoreBtn(w).trigger('click')
+    await flushPromises()
+    await checkConfirm()
+    await click(q('.clear-confirm__btn--danger'))
+    await flushPromises()
+    expect(restoreBtn(w).classes()).toContain('general-settings__btn--working')
+    resolveRestore({ ok: true })
+    await flushPromises()
+  })
+
+  it('gaps4: cb com payload null e total 0 durante busy (computados)', async () => {
+    const bridge = makeBridge()
+    let resolveCreate!: (v: unknown) => void
+    bridge.backup.create.mockReturnValue(new Promise((r) => (resolveCreate = r)))
+    setBridge(bridge)
+    const w = await mountCard()
+    await backupBtn(w).trigger('click')
+    await flushPromises()
+    // payload null → progress null (computados com ?? )
+    bridge.backup.__cbs[0]?.(null as never)
+    await flushPromises()
+    // total 0 → indeterminado
+    bridge.backup.__cbs[0]?.({ current: 3, total: 0, zipPath: '' })
+    await flushPromises()
+    expect(w.find('.backup-card__bar').exists()).toBe(true)
+    // determinate de novo (texto com current/total — ?? não usados)
+    bridge.backup.__cbs[0]?.({ current: 4, total: 8, zipPath: '' })
+    await flushPromises()
+    resolveCreate({ ok: true, path: '/x.zip' })
+    await flushPromises()
+  })
+})
