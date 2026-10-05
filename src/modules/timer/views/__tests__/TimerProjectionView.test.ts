@@ -125,7 +125,7 @@ describe('TimerProjectionView', () => {
 
   it('BroadcastChannel config message: atualiza config (71)', async () => {
     const wrapper = mount(TimerProjectionView)
-    const ch = new BroadcastChannel('louvorja-timer-config')
+    const ch = new BroadcastChannel('timer-config-test')
     // handler onConfigMessage: dispatch direto na instância do canal do componente
     ch.postMessage({ showTitle: true, titleText: 'Config via BC' })
     await flushPromises()
