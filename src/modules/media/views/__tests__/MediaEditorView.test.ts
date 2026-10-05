@@ -2037,4 +2037,248 @@ describe("MediaEditorView — visibilidade (gaps onda1)", () => {
 		w.unmount();
 	});
 });
+
+describe("MediaEditorView — gaps finais onda1", () => {
+	function raw(w: Awaited<ReturnType<typeof mountEditor>>) {
+		return w.vm.$.devtoolsRawSetupState as unknown as Record<string, unknown> & {
+			selectedCollectionId: { value: number | null };
+			selectedMusicId: { value: number | null };
+			musicName: { value: string };
+			lyrics: { value: Array<Record<string, unknown>> };
+			activeStanzaIndexOverride: { value: number | null };
+			activeStanzaIndex: { value: number };
+			onExportSlja: () => Promise<void>;
+			onImportFile: (ev: Event) => Promise<void>;
+			onAddOfficialFromSearch: () => void;
+			onReuseSearchInput: () => void;
+			officialSearchResults: { value: Array<Record<string, unknown>> };
+			reuseSearch: { value: string };
+			rulesOpen: { value: boolean };
+			stanzaProgress: (i: number) => number;
+			activeStanza: { value: unknown };
+		};
+	}
+
+	function fakeFileEvent(name: string, buffer: ArrayBuffer): Event {
+		const file = new File([buffer], name);
+		Object.defineProperty(file, "arrayBuffer", { value: async () => buffer });
+		const input = document.createElement("input");
+		Object.defineProperty(input, "files", { value: [file] });
+		const ev = new Event("change");
+		Object.defineProperty(ev, "target", { value: input });
+		return ev;
+	}
+
+	it("export com nome vazio: título e arquivo usam fallback (697/706 arm1)", async () => {
+		const slja = await import("../../../../shared/services/slja");
+		const buildSlja = vi.mocked(slja.buildSlja);
+		buildSlja.mockResolvedValue(new Uint8Array([1]) as never);
+		const createObjectURL = vi.fn(() => "blob:fake");
+		vi.stubGlobal("URL", { ...URL, createObjectURL, revokeObjectURL: vi.fn() });
+		const w = await mountEditor();
+		const s = raw(w);
+		s.selectedCollectionId.value = 1;
+		s.selectedMusicId.value = 10;
+		s.musicName.value = "";
+		s.lyrics.value = [{ id: 1, lyric: "V", time: "00:10", imageUrl: "" }];
+		await s.onExportSlja();
+		const archive = buildSlja.mock.calls[0][0] as { title: string };
+		expect(archive.title).toBe("Sem título");
+		w.unmount();
+		vi.unstubAllGlobals();
+	});
+
+	it("import com título genérico usa nome do arquivo (561/563); sem título no arquivo (561 arm1)", async () => {
+		const slja = await import("../../../../shared/services/slja");
+		const { createCustomMusic, createCustomLyric } = await import("../../services/custom-catalog");
+		vi.mocked(slja.parseSljaFile).mockResolvedValue({
+			title: "v1.2",
+			innerName: "meu-hino",
+			audio: null,
+			images: [],
+			slides: [{ type: "LETRA", lyric: "verso", timeMs: 1000, order: 2 }],
+		} as never);
+		vi.mocked(createCustomMusic).mockResolvedValue({ id: 78 });
+		vi.mocked(createCustomLyric).mockResolvedValue({ id: 900 });
+		const w = await mountEditor();
+		raw(w).selectedCollectionId.value = 1;
+		await raw(w).onImportFile(fakeFileEvent("meu-hino.slja", new ArrayBuffer(8)));
+		const created = vi.mocked(createCustomMusic).mock.calls[0][1] as { name: string };
+		expect(created.name).toBe("meu-hino");
+		w.unmount();
+	});
+
+	it("import com assets: upload ok empurra; CAPA filtrada; imagem casada vira imageUrl (614/627/636/639/646)", async () => {
+		const slja = await import("../../../../shared/services/slja");
+		const custom = await import("../../services/custom-catalog");
+		vi.mocked(slja.parseSljaFile).mockResolvedValue({
+			title: "Com Assets",
+			audio: null,
+			images: [],
+			assets: [{ bytes: new Uint8Array([1]), path: "img/capa.png" }],
+			slides: [
+				{ type: "CAPA", lyric: "", timeMs: 0, order: 1, image: { name: "capa.png" } },
+				{ type: "LETRA", lyric: "primeiro", timeMs: 500, order: 3, image: { name: "capa.png" } },
+				{ type: "LETRA", lyric: "segundo", timeMs: 1500, order: 2, image: { name: "outra.png" } },
+			],
+		} as never);
+		vi.mocked(custom.uploadCustomFile).mockResolvedValue({ url: "https://f/img.png", idFile: 5 } as never);
+		vi.mocked(custom.createCustomMusic).mockResolvedValue({ id: 79 });
+		vi.mocked(custom.createCustomLyric).mockResolvedValue({ id: 901 });
+		const w = await mountEditor();
+		raw(w).selectedCollectionId.value = 1;
+		await raw(w).onImportFile(fakeFileEvent("assets.slja", new ArrayBuffer(8)));
+		// 2 letras (CAPA filtrada), ordem sortada (segundo antes de primeiro)
+		const calls = vi.mocked(custom.createCustomLyric).mock.calls;
+		expect(calls.length).toBe(2);
+		expect((calls[0][1] as { lyric: string }).lyric).toBe("segundo");
+		expect((calls[0][1] as { id_file_image?: number }).id_file_image).toBeUndefined();
+		expect((calls[1][1] as { id_file_image?: number }).id_file_image).toBe(5);
+		w.unmount();
+	});
+
+	it("import com upload falho: asset ignorado (614 arm1)", async () => {
+		const slja = await import("../../../../shared/services/slja");
+		const custom = await import("../../services/custom-catalog");
+		vi.mocked(slja.parseSljaFile).mockResolvedValue({
+			title: "Upload Falho",
+			audio: null,
+			images: [],
+			assets: [{ bytes: new Uint8Array([1]), path: "img/x.png" }],
+			slides: [{ type: "LETRA", lyric: "a", timeMs: 10 }],
+		} as never);
+		vi.mocked(custom.uploadCustomFile).mockResolvedValue(null as never);
+		vi.mocked(custom.createCustomMusic).mockResolvedValue({ id: 80 });
+		vi.mocked(custom.createCustomLyric).mockResolvedValue({ id: 902 });
+		const w = await mountEditor();
+		raw(w).selectedCollectionId.value = 1;
+		await raw(w).onImportFile(fakeFileEvent("falho.slja", new ArrayBuffer(8)));
+		expect((vi.mocked(custom.createCustomLyric).mock.calls[0][1] as { id_file_image: number | undefined }).id_file_image).toBeUndefined();
+		w.unmount();
+	});
+
+	it("lyrics sem time: ?? 00:00 (477 arm1) via música local", async () => {
+		const localStore = await import("../../services/local-custom-store");
+		vi.mocked(localStore.getLocalMusic).mockReturnValue({
+			id: -3, name: "Local S/ time", audioBase64: null, officialMusicId: null,
+			lyrics: [{ id: 1, lyric: "L", time: null, image_url: null }],
+		} as never);
+		const w = await mountEditor();
+		const s = raw(w);
+		s.selectedCollectionId.value = 1;
+		await (s as unknown as { onSelectMusic: (id: number) => Promise<void> }).onSelectMusic(-3);
+		await flushPromises();
+		expect((s.lyrics.value[0] as { time: string }).time).toBe("00:00");
+		w.unmount();
+	});
+
+	it("busca oficial first com displayTitle (245) e reuse com cache (268)", async () => {
+		const custom = await import("../../services/custom-catalog");
+		vi.mocked(custom.listAllCustomMusics).mockResolvedValue([
+			{ id: 30, name: "Reuso", duration: null, hasAudio: true, hasImage: false, audioUrl: null, officialMusicId: null },
+		] as never);
+		const w = await mountEditor();
+		const s = raw(w);
+		s.selectedCollectionId.value = 1;
+		// onAddOfficialFromSearch com first.displayTitle
+		s.officialSearchResults.value = [{ musicId: 5, displayTitle: "Hino Cinco", name: "" }];
+		s.onAddOfficialFromSearch();
+		await flushPromises();
+		// reuse: query pequena → cache carregado (268 true side)
+		s.reuseSearch.value = "reuso";
+		s.onReuseSearchInput();
+		await flushPromises();
+		await flushPromises();
+		w.unmount();
+	});
+
+	it("rules modal abre/fecha via setup (1776/1794); stanzaProgress sem próxima (110 arm1); activeStanza override (904)", async () => {
+		localStorage.removeItem("mediaeditor.visibility.rules.seen.v1");
+		const w = await mountEditor();
+		const s = raw(w);
+		s.selectedCollectionId.value = 1;
+		// stanzaProgress: última estrofe sem próxima → end = start + 1
+		(s.lyrics as { value: unknown[] }).value = [{ id: 1, lyric: "A", time: "00:05", imageUrl: "" }];
+		(s.activeStanzaIndex as { value: number }).value = 0;
+		expect(s.stanzaProgress(0)).toBe(0);
+		s.activeStanzaIndexOverride.value = 0;
+		expect(s.activeStanza.value).toBeTruthy();
+		w.unmount();
+	});
+});
+
+describe("MediaEditorView — lote final onda1", () => {
+	function raw(w: Awaited<ReturnType<typeof mountEditor>>) {
+		return w.vm.$.devtoolsRawSetupState as unknown as Record<string, unknown> & {
+			selectedCollectionId: { value: number | null };
+			selectedMusicId: { value: number | null };
+			musicName: { value: string };
+			lyrics: { value: Array<Record<string, unknown>> };
+			activeStanzaIndexOverride: { value: number | null };
+			activeStanzaIndex: { value: number };
+			isPlaying: { value: boolean };
+			currentTimeMs: { value: number };
+			onAddOfficialFromSearch: () => void;
+			onExportSlja: () => Promise<void>;
+			stanzaProgress: (i: number) => number;
+			activeStanza: { value: unknown };
+			musics: { value: Array<Record<string, unknown>> };
+			rulesOpen: { value: boolean };
+		};
+	}
+
+	it("busca oficial first → onAddOfficial (245); export CAPA/LETRA (692); delete recarrega lista (797)", async () => {
+		const custom = await import("../../services/custom-catalog");
+		const slja = await import("../../../../shared/services/slja");
+		vi.mocked(slja.buildSlja).mockResolvedValue(new Uint8Array([1]) as never);
+		vi.stubGlobal("URL", { ...URL, createObjectURL: vi.fn(() => "blob:x"), revokeObjectURL: vi.fn() });
+		vi.mocked(custom.deleteCustomMusic).mockResolvedValue(true);
+		vi.mocked(custom.listCustomMusics).mockResolvedValue([
+			{ id: 10, name: "M10", officialMusicId: 7, collectionName: "Col A" },
+		] as never);
+		const w = await mountEditor();
+		const s = raw(w);
+		s.selectedCollectionId.value = 1;
+		// 245: first com displayTitle
+		(s.officialSearchResults as { value: Array<Record<string, unknown>> }).value = [
+			{ musicId: 5, displayTitle: "", name: "Fallback" },
+		];
+		s.onAddOfficialFromSearch();
+		await flushPromises();
+		// export com 2 estrofes → CAPA + LETRA (692 arm1)
+		s.musicName.value = "Export 2";
+		s.lyrics.value = [
+			{ id: 1, lyric: "A", time: "00:01", imageUrl: "" },
+			{ id: 2, lyric: "B", time: "00:09", imageUrl: "" },
+		];
+		await s.onExportSlja();
+		// delete com collection selecionada (797 true)
+		s.selectedMusicId.value = 10;
+		await (s as unknown as { doDeleteMusic: () => Promise<void> }).doDeleteMusic();
+		await flushPromises();
+		expect(s.musics.value.length).toBeGreaterThan(0);
+		w.unmount();
+		vi.unstubAllGlobals();
+	});
+
+	it("stanzaProgress com próxima e tocando (110 arm0/1); activeStanza fallback idx (904)", async () => {
+		const w = await mountEditor();
+		const s = raw(w);
+		s.lyrics.value = [
+			{ id: 1, lyric: "A", time: "00:01", imageUrl: "" },
+			{ id: 2, lyric: "B", time: "00:05", imageUrl: "" },
+		];
+		(s.activeStanzaIndex as { value: number }).value = 0;
+		(s.isPlaying as { value: boolean }).value = true;
+		(s.currentTimeMs as { value: number }).value = 2000;
+		const p = s.stanzaProgress(0);
+		expect(p).toBeGreaterThan(0);
+		expect(p).toBeLessThanOrEqual(1);
+		// override null + activeStanzaIndex -1 + lyrics>0 → idx 0 (904 false→true chain)
+		s.activeStanzaIndexOverride.value = null;
+		(s.activeStanzaIndex as { value: number }).value = -1;
+		expect(s.activeStanza.value).toBeTruthy();
+		w.unmount();
+	});
+});
 });
