@@ -106,7 +106,7 @@ jobs:
       - id: matrix
         name: Resolve the latest three stable Electron majors
         run: |
-          MATRIX="$(node -e "const {execFileSync}=require('node:child_process'); const versions=JSON.parse(execFileSync('npm',['view','electron','versions','--json'],{encoding:'utf8'})); const stable=versions.filter(v=>/^\d+\.\d+\.\d+$/.test(v)); const majors=[...new Set(stable.map(v=>Number(v.split('.')[0])))].sort((a,b)=>b-a).slice(0,3).sort((a,b)=>a-b); if(majors.length!==3) throw new Error('Não foi possível resolver as três majors estáveis do Electron'); const include=majors.flatMap(major=>{const version=stable.filter(item=>item.startsWith(major+'.')).at(-1); return [{os:'windows-latest',platform:'win',target:'--win',version},{os:'ubuntu-latest',platform:'linux',target:'--linux AppImage',version},{os:'macos-latest',platform:'mac',target:'--mac',version}]}); process.stdout.write(JSON.stringify({include}))")"
+          MATRIX="$(node -e "const {execFileSync}=require('node:child_process'); const versions=JSON.parse(execFileSync('npm',['view','electron','versions','--json'],{encoding:'utf8'})); const stable=versions.filter(v=>/^\\d+\\.\\d+\\.\\d+$/.test(v)); const majors=[...new Set(stable.map(v=>Number(v.split('.')[0])))].sort((a,b)=>b-a).slice(0,3).sort((a,b)=>a-b); if(majors.length!==3) throw new Error('Não foi possível resolver as três majors estáveis do Electron'); const include=majors.flatMap(major=>{const version=stable.filter(item=>item.startsWith(major+'.')).at(-1); return [{os:'windows-latest',platform:'win',target:'--win',version},{os:'ubuntu-latest',platform:'linux',target:'--linux AppImage',version},{os:'macos-latest',platform:'mac',target:'--mac',version}]}); process.stdout.write(JSON.stringify({include}))")"
           echo "value=$MATRIX" >> "$GITHUB_OUTPUT"
           echo "$MATRIX"
 
@@ -119,7 +119,7 @@ jobs:
       matrix: ${{ fromJSON(needs.electron-support-matrix.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions.setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
