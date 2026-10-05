@@ -58,4 +58,15 @@ describe("MediaCollectionList", () => {
 		});
 		expect(wrapper.text()).toContain("Vazio");
 	});
+
+	it("gaps2: aria-label do clear cai em searchAriaLabel e no placeholder (L59)", () => {
+		const w1 = mount(MediaCollectionList, {
+			props: { ...baseProps, modelValue: "hino", searchAriaLabel: "buscar hinos" },
+		});
+		expect(w1.find(".ds-media-collection-list__clear").attributes("aria-label")).toBe("buscar hinos");
+		const w2 = mount(MediaCollectionList, {
+			props: { ...baseProps, modelValue: "hino" },
+		});
+		expect(w2.find(".ds-media-collection-list__clear").attributes("aria-label")).toBe("Buscar");
+	});
 });
