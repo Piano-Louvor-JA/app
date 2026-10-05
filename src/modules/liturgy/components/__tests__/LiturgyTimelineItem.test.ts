@@ -598,37 +598,41 @@ describe('LiturgyTimelineItem', () => {
       w.unmount()
     })
 
-    it('videoFileInput click (498)', async () => {
+    it('videoFileInput click (498): botão de arquivo dispara input.click', async () => {
       const w = createWrapper({ item: createItem({ type: 'video', filePath: '/v.mp4' }) })
-      const btn = w.findAll('button').find(b => b.find('i.ti-film, i.ti-video').exists() || (b.attributes('aria-pressed') !== undefined))
-      void btn
-      expect(true).toBe(true)
+      const input = w.find('input[type="file"]')
+      expect(input.exists()).toBe(true)
+      const clickSpy = vi.fn()
+      ;(input.element as HTMLInputElement).click = clickSpy
+      const fileBtn = w.findAll('button').find(b => (b.attributes('title') ?? '').includes('liturgy'))
+      expect(fileBtn).toBeTruthy()
+      await fileBtn!.trigger('click')
+      expect(clickSpy).toHaveBeenCalled()
       w.unmount()
     })
 
-    it('addSubItem e toggleCollapse (category)', async () => {
+    it('addSubItem e toggleCollapse (category): botões emitem', async () => {
       const w = createWrapper({ item: createCategory(), collapsible: true })
-      const addBtn = w.findAll('button').find(b => (b.attributes('title') ?? '').length > 0 && !b.attributes('disabled'))
-      void addBtn
-      // dispara emits direto do componente interno se existir
-      const child = w.findComponent({ name: 'LiturgyTimelineItem' })
-      void child
-      expect(true).toBe(true)
+      const addBtn = w.findAll('button').find(b => b.find('i.ti-plus').exists() && !b.attributes('disabled'))
+      expect(addBtn).toBeTruthy()
+      await addBtn!.trigger('click')
+      expect(w.emitted('addSubItem')).toBeTruthy()
+      const collapseBtn = w.findAll('button').find(b => b.attributes('aria-expanded') !== undefined)
+      expect(collapseBtn).toBeTruthy()
+      await collapseBtn!.trigger('click')
+      expect(w.emitted('toggleCollapse')).toBeTruthy()
       w.unmount()
     })
   })
 
   describe('cliques finais de template', () => {
-    it('videoFileInput click (498): isLocalMediaUpload', async () => {
-      const w = createWrapper({ item: createItem({ type: 'video', filePath: '/local/v.mp4' }) })
-      const btn = w.findAll('button').find(b => (b.attributes('title') ?? '').length > 0 && b.find('i').exists() && !b.attributes('aria-pressed'))
-      const input = w.find('input[type="file"]')
-      if (input.exists()) {
-        const clickSpy = vi.fn()
-        ;(input.element as HTMLInputElement).click = clickSpy
-        const fileBtn = w.findAll('button').find(b => !b.attributes('disabled') && (b.attributes('title') ?? '').includes(String('liturgy') === 'x' ? '' : ''))
-        void fileBtn
-      }
+    it('select (621): botão control primário emite select (pdf selecionado)', async () => {
+      const w = createWrapper({ item: createItem({ type: 'verse', musicId: null }), selected: true })
+      // 621: botão control "puro" (sem --site-control) para versículo selecionado
+      const btn = w.findAll('button').find(b => b.classes().join(' ') === 'liturgy-item__action liturgy-item__action--primary' && !b.attributes('disabled'))
+      expect(btn).toBeTruthy()
+      await btn!.trigger('click')
+      expect(w.emitted('select')).toBeTruthy()
       w.unmount()
     })
 
@@ -660,6 +664,119 @@ describe('LiturgyTimelineItem', () => {
         expect(w.emitted('select')).toBeTruthy()
       }
       w.unmount()
+    })
+  })
+
+  describe('menu do player: bordas (gaps onda1)', () => {
+    it('playerId invalido: label cai no fallback (128)', async () => {
+      const w = createWrapper({ item: createItem({ type: 'audio', playerId: 'player-inexistente' }) })
+      await flushPromises()
+      // label traduzido do fallback (128): player não está na lista
+      expect(w.text()).toContain('Reproduzir no player')
+      w.unmount()
+    })
+
+    it('pointerdown dentro do trigger nao fecha (196); keydown nao-Escape mantem (202); resize com menu aberto atualiza (206 arm0); resize com menu fechado inerte (206 arm1)', async () => {
+      const w = createWrapper({ item: createItem({ type: 'audio' }) })
+      const btn = w.find('.liturgy-item__player-trigger')
+      await btn.trigger('click')
+      await flushPromises()
+      expect(document.querySelector('.liturgy-item__player-menu')).not.toBeNull()
+      btn.element.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))
+      await flushPromises()
+      expect(document.querySelector('.liturgy-item__player-menu')).not.toBeNull()
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }))
+      await flushPromises()
+      expect(document.querySelector('.liturgy-item__player-menu')).not.toBeNull()
+      window.dispatchEvent(new Event('resize'))
+      await flushPromises()
+      expect(document.querySelector('.liturgy-item__player-menu')).not.toBeNull()
+      await btn.trigger('click')
+      await flushPromises()
+      expect(document.querySelector('.liturgy-item__player-menu')).toBeNull()
+      window.dispatchEvent(new Event('resize'))
+      w.unmount()
+    })
+
+    it('drag ghost: criado no dragstart com dataTransfer e removido no dragend (266/267)', async () => {
+      const w = createWrapper({ item: createItem({ type: 'music' }) })
+      const handle = w.find('.liturgy-item__drag')
+      expect(handle.exists()).toBe(true)
+      const dt = { effectAllowed: '', setData: vi.fn(), getData: vi.fn(() => '0'), setDragImage: vi.fn() }
+      const startEvt = new Event('dragstart', { bubbles: true, cancelable: true })
+      Object.defineProperty(startEvt, 'dataTransfer', { value: dt })
+      handle.element.dispatchEvent(startEvt)
+      await flushPromises()
+      expect(w.emitted('dragStart')).toBeTruthy()
+      handle.element.dispatchEvent(new Event('dragend', { bubbles: true }))
+      await flushPromises()
+      await new Promise((r) => setTimeout(r, 5)) // clearDragGhost roda no setTimeout(0)
+      expect(w.emitted('dragEnd')).toBeTruthy()
+      w.unmount()
+    })
+  })
+
+  describe('render de template: gaps onda1', () => {
+    it('colapsado: chevron right, label expandir, child count; indeterminate: minus', async () => {
+      const w = createWrapper({ item: createCategory(), collapsible: true, collapsed: true, childCount: 2, indeterminate: true })
+      expect(w.html()).toContain('ti-chevron-right')
+      expect(w.html()).toContain('liturgy-item__child-count')
+      expect(w.html()).toContain('ti-minus')
+      w.unmount()
+    })
+
+    it('complementaryTitle, subtitle e notes renderizam (420/439/445)', async () => {
+      const w = createWrapper({ item: createItem({ complementaryTitle: 'Complemento X', subtitle: 'Sub Y', notes: 'Nota Z' }) })
+      expect(w.text()).toContain('Complemento X')
+      expect(w.text()).toContain('Sub Y')
+      expect(w.text()).toContain('Nota Z')
+      w.unmount()
+    })
+
+    it('presentation: title/aria de controle de apresentação (676/697 arm0); prayer selecionado: botão control via selected (614 arm5)', async () => {
+      const w = createWrapper({ item: createItem({ type: 'presentation', musicId: null }) })
+      expect(w.html()).toContain('ti-file-type-ppt')
+      w.unmount()
+      const w2 = createWrapper({ item: createItem({ type: 'prayer', musicId: null }), selected: true })
+      const btn = w2.findAll('button').find(b => b.classes().join(' ').includes('--primary') && !b.attributes('disabled'))
+      expect(btn).toBeTruthy()
+      await btn!.trigger('click')
+      expect(w2.emitted('select')).toBeTruthy()
+      w2.unmount()
+    })
+
+    it('menu abre pra CIMA quando não cabe abaixo (148 arm1)', async () => {
+      const w = createWrapper({ item: createItem({ type: 'audio' }) })
+      const btn = w.find('.liturgy-item__player-trigger')
+      const rect = { width: 120, height: 28, top: 90, bottom: 118, left: 10, right: 130 } as DOMRect
+      btn.element.getBoundingClientRect = () => rect
+      const hDef = Object.defineProperty(window, 'innerHeight', { value: 105, configurable: true })
+      void hDef
+      await btn.trigger('click')
+      await flushPromises()
+      const menu = document.querySelector('.liturgy-item__player-menu') as HTMLElement | null
+      expect(menu).not.toBeNull()
+      window.dispatchEvent(new Event('resize'))
+      await flushPromises()
+      w.unmount()
+      delete (window as { innerHeight?: number }).innerHeight
+    })
+
+    it.each([
+      ['site', 'site'],
+      ['pdf', 'pdf', { filePath: '/d.pdf' }],
+      ['images', 'images', { filePath: '/i.png' }],
+      ['online_video', 'online_video'],
+      ['video', 'video', { filePath: '/v.mp4' }],
+      ['presentation', 'presentation', { filePath: '/a.pptx' }],
+    ])('%s: projecting true/false troca title/aria do playScreens (666-722)', async (_n, type, extra) => {
+      const wProj = createWrapper({ item: createItem({ type, musicId: null, ...extra }), siteProjecting: type === 'site', videoProjecting: type !== 'site' })
+      expect(wProj.html()).toContain('ti-player-stop')
+      expect(wProj.find('.liturgy-item__action--site-project').attributes('title')).toBeTruthy()
+      wProj.unmount()
+      const wIdle = createWrapper({ item: createItem({ type, musicId: null, ...extra }) })
+      expect(wIdle.html()).toContain('ti-arrow-up-right')
+      wIdle.unmount()
     })
   })
 })
