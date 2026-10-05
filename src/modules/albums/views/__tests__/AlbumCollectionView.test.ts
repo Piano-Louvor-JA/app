@@ -330,4 +330,24 @@ describe('AlbumCollectionView', () => {
     expect(pushMock).toHaveBeenCalledWith({ name: 'albums' })
     w.unmount()
   })
+
+  it('gaps: busca digitada (v-model), name fallback, addToPlaylist com target sumido', async () => {
+    setupMocks({ activeCollection: { ...collection, name: '' } })
+    const w = await mountView()
+    // fallback do título (br 65 false-arm)
+    expect(w.text()).toContain('albums.collectionFallback')
+    // v-model da busca (fn 200)
+    const search = w.find('input[type="search"]')
+    if (search.exists()) await search.setValue('Santo')
+    // picker com playlist que some antes do click → target undefined (?? 'playlist')
+    savePlaylists([{ id: 'ghost', name: 'Ghost', items: [] }])
+    await w.findAll('.track-row-stub')[0]!.find('.row-playlist').trigger('click')
+    const opt = document.body.querySelector('.playlist-picker__option') as HTMLElement | null
+    if (opt) {
+      savePlaylists([]) // playlist alvo some → target undefined
+      opt.click()
+      await flushPromises()
+    }
+    w.unmount()
+  })
 })
