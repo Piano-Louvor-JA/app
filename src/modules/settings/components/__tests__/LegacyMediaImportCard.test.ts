@@ -231,4 +231,55 @@ describe('LegacyMediaImportCard', () => {
     w.unmount()
   })
 
+  it('gaps: reconciling com progress no render, analyze com lang, cliques forçados durante busy', async () => {
+    // t1: reconcileFromLocalMedia pendente chamando cb → phase
+    // reconciling + progress no template (L256 arm0, cb L70/72)
+    let cbProgress!: (c: number, t2: number, a: string) => void
+    let releaseReconcile!: (v: { marked: number }) => void
+    reconcileFromLocalMediaMock.mockImplementationOnce(
+      (cb: typeof cbProgress) => {
+        cb(1, 10, 'Album X')
+        return new Promise((r) => (releaseReconcile = r))
+      },
+    )
+    const b1 = makeBridge()
+    setBridge(b1)
+    const { analyze } = b1.legacyMedia as { analyze: ReturnType<typeof vi.fn> }
+    analyze.mockResolvedValue({ found: true, present: 10, missing: 5, missingBytes: 5 * 1024 * 1024, lang: 'PT', configDir: 'D:\\x' })
+    const w1 = await mountCard()
+    await w1.find('[data-test="legacy-media-import-button"]').trigger('click')
+    await flushPromises()
+    expect(w1.text()).toContain('settings.general.legacyMediaReconcileProgress')
+    releaseReconcile({ marked: 3 })
+    await flushPromises()
+    // L287 arm0: lang presente no done
+    expect(w1.text()).toContain('PT')
+    w1.unmount()
+
+    // t2: busy: import pendente + dispatch manual nos 2 botões
+    let releaseImport!: (v: unknown) => void
+    const b2 = makeBridge()
+    ;(b2.legacyMedia as { import: ReturnType<typeof vi.fn> }).import
+      .mockImplementationOnce(() => new Promise((r) => (releaseImport = r)))
+    setBridge(b2)
+    const w2 = await mountCard()
+    const importBtn = w2.find('[data-test="legacy-media-import-button"]')
+    await importBtn.trigger('click')
+    await flushPromises()
+    ;(importBtn.element as HTMLElement).dispatchEvent(
+      new MouseEvent('click', { bubbles: true }),
+    )
+    const pickBtn = w2.find('[data-test="legacy-media-pick-folder-button"]')
+    ;(pickBtn.element as HTMLElement).dispatchEvent(
+      new MouseEvent('click', { bubbles: true }),
+    )
+    await flushPromises()
+    releaseImport({ ok: true, imported: 5, skipped: 10, failed: 0, total: 15 })
+    await flushPromises()
+    expect((b2.legacyMedia as { import: ReturnType<typeof vi.fn> }).import).toHaveBeenCalledTimes(1)
+    w2.unmount()
+    setBridge(originalLouvorja)
+  })
+
 })
+
