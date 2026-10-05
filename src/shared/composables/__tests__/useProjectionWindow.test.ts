@@ -435,4 +435,162 @@ describe('useProjectionWindow', () => {
     expect(() => mod.isProjectionModuleOpen()).not.toThrow()
   })
 
+
+describe('reapply — falhas de abertura e janela de retorno', () => {
+  it('sem primary nos displays: ?? null usado (96)', async () => {
+    listSystemDisplays.mockResolvedValue([{ id: 2 }])
+    const openMock = vi.fn(() => null) as unknown as typeof window.open
+    vi.stubGlobal('open', openMock)
+    Object.defineProperty(window, 'open', { value: openMock, configurable: true, writable: true })
+    const mod = await import('../useProjectionWindow')
+    const spy = vi.spyOn(window, 'open')
+    await mod.reapplyProjectionTargets([2])
+    expect(spy).not.toHaveBeenCalled()
+    vi.unstubAllGlobals()
+    listSystemDisplays.mockResolvedValue(DISPLAYS)
+  })
+
+  it('window.open null no primeiro open: win falsy nos pushes e módulo não ativa (266/272/276)', async () => {
+    const mod = await import('../useProjectionWindow')
+    await mod.closeProjectionModule('media')
+    await mod.closeProjectionModule('lyrics')
+    await mod.closeProjectionModule('site')
+    await mod.closeProjectionModule('youtube')
+    let call = 0
+    const openMock = ((...a: unknown[]) => {
+      call += 1
+      return null
+    }) as unknown as typeof window.open
+    Object.defineProperty(window, 'open', { value: openMock, configurable: true, writable: true })
+    const ok = await mod.openProjectionModule('media')
+    expect(ok).toBe(false)
+    expect(call).toBeGreaterThanOrEqual(1)
+    Object.defineProperty(window, 'open', { value: vi.fn(() => fakeWindow(2)), configurable: true, writable: true })
+  })
+
+  it('reapply: return window mantida e audiência falha → activeModule null', async () => {
+    const mod = await import('../useProjectionWindow')
+    await mod.closeProjectionModule('media')
+    await mod.closeProjectionModule('lyrics')
+    await mod.closeProjectionModule('site')
+    await mod.closeProjectionModule('youtube')
+    const made: Array<{ closed: boolean; layout: string; monitorId: number; close: ReturnType<typeof vi.fn> }> = []
+    const openOk = ((...a: unknown[]) => {
+      const w = {
+        closed: false,
+        layout: 'audience',
+        monitorId: 0,
+        close: vi.fn(),
+        focus: vi.fn(),
+      }
+      made.push(w)
+      return w
+    }) as unknown as typeof window.open
+    const prev = window.open
+    Object.defineProperty(window, 'open', { value: openOk, configurable: true, writable: true })
+    const ok1 = await mod.openProjectionModule('media')
+    expect(ok1).toBe(true)
+    const audience = made.find((w) => w.layout === 'audience')!
+    expect(audience).toBeTruthy()
+    audience.closed = true
+    let failed = 0
+    const openFail = ((...a: unknown[]) => {
+      failed += 1
+      return null
+    }) as unknown as typeof window.open
+    Object.defineProperty(window, 'open', { value: openFail, configurable: true, writable: true })
+    const ok2 = await mod.reapplyProjectionTargets([2, 3])
+    expect(ok2).toBe(false)
+    expect(failed).toBeGreaterThanOrEqual(1)
+    Object.defineProperty(window, 'open', { value: prev, configurable: true, writable: true })
+    await mod.closeProjectionModule('media')
+  })
+
+})
+
+  it('reapply com return viva: retry mantém return e pula no continue', async () => {
+    const mod = await import('../useProjectionWindow')
+    await mod.closeProjectionModule('media')
+    await mod.closeProjectionModule('lyrics')
+    await mod.closeProjectionModule('site')
+    await mod.closeProjectionModule('youtube')
+    loadProjectionSettings.mockReturnValue({ ...SETTINGS, openReturnScreen: true, returnDisplayId: 3 })
+    resolveSelectedReturnMonitorId.mockReturnValue(3)
+    const made: Array<{ closed: boolean; layout: string; close: ReturnType<typeof vi.fn> }> = []
+    const openOk = (() => {
+      const w = { closed: false, layout: 'audience', monitorId: 0, close: vi.fn(), focus: vi.fn() }
+      made.push(w)
+      return w
+    }) as unknown as typeof window.open
+    const prev = window.open
+    Object.defineProperty(window, 'open', { value: openOk, configurable: true, writable: true })
+    const ok1 = await mod.openProjectionModule('media')
+    expect(ok1).toBe(true)
+    expect(made.some((w) => w.layout === 'return')).toBe(true)
+    const audience = made.find((w) => w.layout === 'audience')!
+    audience.closed = true
+    let failed = 0
+    const openFail = (() => {
+      failed += 1
+      return null
+    }) as unknown as typeof window.open
+    Object.defineProperty(window, 'open', { value: openFail, configurable: true, writable: true })
+    const ok2 = await mod.reapplyProjectionTargets([2])
+    expect(ok2).toBe(true)
+    expect(failed).toBeGreaterThanOrEqual(1)
+    Object.defineProperty(window, 'open', { value: prev, configurable: true, writable: true })
+    await mod.closeProjectionModule('media')
+    loadProjectionSettings.mockReturnValue({ ...SETTINGS })
+  })
+
+  it('return window.open null: push skip na abertura e no reopen do reapply', async () => {
+    const mod = await import('../useProjectionWindow')
+    await mod.closeProjectionModule('media')
+    await mod.closeProjectionModule('lyrics')
+    await mod.closeProjectionModule('site')
+    await mod.closeProjectionModule('youtube')
+    loadProjectionSettings.mockReturnValue({ ...SETTINGS, openReturnScreen: true, returnDisplayId: 3 })
+    resolveSelectedReturnMonitorId.mockReturnValue(3)
+    const win = () => ({ closed: false, layout: 'audience', monitorId: 0, close: vi.fn(), focus: vi.fn() })
+    let call = 0
+    const openMixed = ((...a: unknown[]) => {
+      call += 1
+      if (call === 2) return null // return window falha na abertura (272 falsy)
+      return win()
+    }) as unknown as typeof window.open
+    const prev = window.open
+    Object.defineProperty(window, 'open', { value: openMixed, configurable: true, writable: true })
+    const ok1 = await mod.openProjectionModule('media')
+    expect(ok1).toBe(true)
+    await mod.closeProjectionModule('media')
+    const made: Array<{ closed: boolean; layout: string }> = []
+    Object.defineProperty(window, 'open', {
+      value: (() => {
+        const w = win()
+        made.push(w)
+        return w
+      }) as unknown as typeof window.open,
+      configurable: true,
+      writable: true,
+    })
+    const ok2 = await mod.openProjectionModule('media')
+    expect(ok2).toBe(true)
+    made.find((w) => w.layout === 'return')!.closed = true // return some
+    // reopen do reapply com return e audiência falhando (353/348 falsy)
+    Object.defineProperty(window, 'open', {
+      value: (() => null) as unknown as typeof window.open,
+      configurable: true,
+      writable: true,
+    })
+    const ok3 = await mod.reapplyProjectionTargets([2, 3])
+    expect(ok3).toBe(true) // audiência 2 segue viva; tentativa de return falhou
+    Object.defineProperty(window, 'open', { value: prev, configurable: true, writable: true })
+    loadProjectionSettings.mockReturnValue({ ...SETTINGS })
+    resolveSelectedReturnMonitorId.mockReturnValue(null)
+    // troca de módulo com janelas do anterior abertas: fecha na troca
+    const ok4 = await mod.openProjectionModule('youtube')
+    expect(ok4).toBe(true)
+    await mod.closeProjectionModule()
+  })
+
 })
