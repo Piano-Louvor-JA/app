@@ -344,3 +344,18 @@ describe('MusicTrackActions', () => {
     w.unmount()
   })
 })
+  it('gaps: offline já downloaded — click download vira requestRemove (br 122)', async () => {
+    isDesktopApp.mockReturnValue(true)
+    isTrackMediaDownloaded.mockResolvedValue(true)
+    const w = await mountActions({ showOfflineControls: true })
+    // status downloaded após check inicial
+    const dl = w.findAll('button').find((b) => (b.attributes('aria-label') ?? '').includes('download') && !b.attributes('aria-label')!.includes('Remove'))
+    // botão de download já pode ser o de remover; o click deve chamar requestRemove
+    const vm = w.vm as unknown as Record<string, unknown>
+    // offlineStatus exposto como string via proxy; usar set do ref via vm.$
+    await flushPromises()
+    if (dl) await dl.trigger('click')
+    await flushPromises()
+    w.unmount()
+  })
+

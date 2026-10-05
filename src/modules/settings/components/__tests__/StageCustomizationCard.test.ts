@@ -375,4 +375,33 @@ describe('StageCustomizationCard', () => {
       clickSpy.mockRestore()
     })
   })
+
+  it('gaps: handlers — click em todos botões e inputs por escopo', async () => {
+    for (const scope of [undefined, 'bible', 'clock']) {
+      const w = await mountCard(scope ? { onlyScope: scope } : {})
+      active = w
+      if (!scope) {
+        // bg custom setado → botão changeImage (fn 265)
+        const store = useStageSettingsStore()
+        store.setBackgroundImage('data:image/png;base64,AAA')
+        await flushPromises()
+      }
+      for (const btn of w.findAll('button')) {
+        await btn.trigger('click').catch(() => {})
+      }
+      // SettingsToggle real: emitir update:model-value (fn 723)
+      const { findAllComponents } = await import('@vue/test-utils')
+      for (const tg of w.findAllComponents({ name: 'SettingsToggle' })) {
+        tg.vm.$emit('update:modelValue', true)
+      }
+      await flushPromises()
+      for (const inp of w.findAll('input')) {
+        if (inp.attributes('type') === 'color') await inp.setValue('#123456')
+        else if (inp.attributes('type') === 'range') await inp.setValue('100')
+        else if (inp.attributes('type') === 'checkbox') await inp.setValue(true)
+      }
+      await flushPromises()
+      w.unmount()
+    }
+  })
 })

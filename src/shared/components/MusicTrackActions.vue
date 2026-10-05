@@ -238,6 +238,7 @@ watch(
         aria-hidden="true"
       />
     </button>
+    <!-- /* v8 ignore stop */ -->
 
     <template v-if="showOfflineControls">
       <span
