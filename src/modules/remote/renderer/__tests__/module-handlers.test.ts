@@ -363,4 +363,149 @@ describe('createModuleHandlers — execute por namespace', () => {
     })
   })
 
+  it('gaps onda1: readField/readPath guards, waitForVerse timeout, switches caem no default', async () => {
+    // readField/readPath guards (166/178/181) via snapshot com stores tortos
+    deps.bible = { books: null, versions: undefined, runtime: 'texto-plano' } as never
+    expect(handlers.snapshot('bible')).toBeTruthy()
+    deps.timer = { runtime: null } as never
+    expect(handlers.snapshot('timer')).toBeTruthy()
+    // readPath: mid não-objeto → undefined; raw não-objeto → raw
+    deps.countdown = { runtime: 42 } as never
+    expect(handlers.snapshot('countdown')).toBeTruthy()
+    deps = { bible: makeBible() as never, timer: makeTimer() as never, countdown: makeCountdown() as never, random: makeRandom() as never }
+    handlers = createModuleHandlers(deps)
+  })
+
+  it('gaps onda1: bible.open sem versículo carregado → false (timeout)', async () => {
+    vi.useFakeTimers()
+    const bible = makeBible()
+    bible.verses = ref({}) // nunca carrega
+    deps.bible = bible as never
+    handlers = createModuleHandlers(deps)
+    const p = handlers.execute('bible', 'bible.open', { bookId: 1, chapter: 1, verse: 2 })
+    const outcome = await Promise.race([p.then((v) => ({ done: true, v })), vi.waitFor(() => { throw new Error('tick') }).catch(() => ({ done: false }))])
+    // avança os 50×100ms do polling
+    for (let i = 0; i < 60; i++) await vi.advanceTimersByTimeAsync(100)
+    const res = await p
+    expect(res).toBe(false)
+    expect(bible.selectVerse).not.toHaveBeenCalled()
+    vi.useRealTimers()
+  })
+
+  it('gaps onda1: timer/countdown/random start já projetando não re-toggle; toggles com toggleProjection ausente', async () => {
+    deps.timer = { ...makeTimer(), isProjecting: ref(true) } as never
+    handlers = createModuleHandlers(deps)
+    await handlers.execute('timer', 'timer.start', {})
+    expect((deps.timer as { toggleProjection: ReturnType<typeof vi.fn> }).toggleProjection).not.toHaveBeenCalled()
+    deps.countdown = { ...makeCountdown(), isProjecting: ref(true) } as never
+    handlers = createModuleHandlers(deps)
+    await handlers.execute('countdown', 'countdown.start', {})
+    expect((deps.countdown as { toggleProjection: ReturnType<typeof vi.fn> }).toggleProjection).not.toHaveBeenCalled()
+    // toggleProjection ausente: if短路 sem lançar
+    const { toggleProjection: _omit, ...timerSemToggle } = makeTimer()
+    deps.timer = timerSemToggle as never
+    handlers = createModuleHandlers(deps)
+    await expect(handlers.execute('timer', 'timer.start', {})).resolves.toBe(true)
+    const { toggleProjection: _omit2, ...countdownSemToggle } = makeCountdown()
+    deps.countdown = countdownSemToggle as never
+    handlers = createModuleHandlers(deps)
+    await expect(handlers.execute('countdown', 'countdown.start', {})).resolves.toBe(true)
+    const { toggleProjection: _omit3, ...randomSemToggle } = makeRandom()
+    deps.random = randomSemToggle as never
+    handlers = createModuleHandlers(deps)
+    await expect(handlers.execute('random', 'random.startDraw', {})).resolves.toBe(true)
+  })
+
+  it('gaps onda1: media.open mode/albumId inválidos; clock showSeconds/format24h não-boolean; default switch; palco slots sem id e project com texto', async () => {
+    const media = { searchMusic: vi.fn(async () => []), openMusicPlayer: vi.fn(async () => ({ ok: true })) }
+    deps.media = media as never
+    await expect(handlers.execute('media', 'media.open', { musicId: 1, mode: 42 })).resolves.toBe(false)
+    await expect(handlers.execute('media', 'media.open', { musicId: 1, mode: 'naoexiste' })).resolves.toBe(false)
+    await expect(handlers.execute('media', 'media.open', { musicId: 1, mode: 'lyrics', albumId: 'x' })).resolves.toBe(false)
+    await expect(handlers.execute('media', 'media.outra', {})).resolves.toBe(false)
+    await expect(handlers.execute('clock', 'clock.outra', {})).resolves.toBe(false)
+    deps.clock = { config: { style: 'analog' } } as never
+    handlers = createModuleHandlers(deps)
+    const clk2 = handlers.snapshot('clock') as Record<string, unknown>
+    expect(clk2.style).toBe('analog')
+    await expect(handlers.execute('clock', 'clock.setConfig', { showSeconds: 'sim' })).resolves.toBe(false)
+    await expect(handlers.execute('clock', 'clock.setConfig', { format24h: 1 })).resolves.toBe(false)
+    await expect(handlers.execute('random', 'random.outra', {})).resolves.toBe(false)
+    await expect(handlers.execute('timer', 'timer.outra', {})).resolves.toBe(false)
+    await expect(handlers.execute('countdown', 'countdown.outra', {})).resolves.toBe(false)
+    await expect(handlers.execute('bible', 'bible.outra', {})).resolves.toBe(false)
+    // palco: slot-remove com id '0'; slot-stop/slot-start sem id; project sem texto; footerRef
+    deps.palco = {
+      available: ref(true), slots: ref([]), status: vi.fn(async () => ({})),
+      createSlot: vi.fn(async () => null), removeSlot: vi.fn(async () => {}),
+      startSlot: vi.fn(async () => ({ ok: true, data: null })), stopSlot: vi.fn(async () => {}),
+      project: vi.fn(), idle: vi.fn(),
+    } as never
+    handlers = createModuleHandlers(deps)
+    await expect(handlers.execute('palco', 'palco.slot-remove', { slotId: '0' })).resolves.toBe(false)
+    await expect(handlers.execute('palco', 'palco.slot-stop', {})).resolves.toBe(false)
+    await expect(handlers.execute('palco', 'palco.slot-start', {})).resolves.toBe(false)
+    await expect(handlers.execute('palco', 'palco.project', { text: '' })).resolves.toBe(false)
+    await expect(handlers.execute('palco', 'palco.slot-remove', { slotId: 42 })).resolves.toBe(false)
+    await expect(handlers.execute('palco', 'palco.project', { text: 'T', scope: 42 })).resolves.toBe(true)
+    await expect(handlers.execute('palco', 'palco.project', { text: 'T', scope: 'hymns', footerRef: 'f1' })).resolves.toBe(true)
+  })
+
+  it('gaps onda1: bible.gotoChapter fallbacks; importNames added undefined; execute lança → catch false', async () => {
+    ;(deps.bible as any).verses = { '1': { n: 1 } }
+    await expect(handlers.execute('bible', 'bible.open', { bookId: 1, chapter: 1, verse: 1 })).resolves.toBe(true)
+    deps.random = { ...makeRandom(), importNamesFromText: vi.fn(() => undefined) } as never
+    handlers = createModuleHandlers(deps)
+    await expect(handlers.execute('random', 'random.importNames', { namesText: 'A,B' })).resolves.toBe(false)
+    // execute com deps.que lança (bible.openProjection throw) → catch → false
+    deps.bible = { ...makeBible(), openProjection: vi.fn(async () => { throw new Error('boom') }) } as never
+    handlers = createModuleHandlers(deps)
+    await expect(handlers.execute('bible', 'bible.open', { bookId: 1, chapter: 1, verse: 1 })).resolves.toBe(false)
+  })
+
+  it('gaps onda1 2: readPath guards tortos, clock/random snapshots defaults, random.removeAvailable inválido, palco createSlot null e snapshot media/clock', async () => {
+    // snapshot com stores tortos: readField tolera campos ausentes
+    deps.timer = { runtime: null } as never
+    deps.countdown = { runtime: 'plano' } as never
+    deps.clock = { config: undefined, isProjecting: ref(true) } as never
+    deps.random = { mode: 'names', isProjecting: false, currentDisplay: '', drawnList: null } as never
+    handlers = createModuleHandlers(deps)
+    expect(handlers.snapshot('timer')).toBeTruthy()
+    expect(handlers.snapshot('countdown')).toBeTruthy()
+    const clk = handlers.snapshot('clock') as Record<string, unknown>
+    expect(clk.style).toBe('digital')
+    const rnd = handlers.snapshot('random') as Record<string, unknown>
+    expect(rnd).toBeTruthy()
+    // media snapshot (searchMusic presente)
+    deps.media = { searchMusic: vi.fn(async () => []), openMusicPlayer: vi.fn(async () => ({ ok: true })) } as never
+    handlers = createModuleHandlers(deps)
+    const mediaSnap = handlers.snapshot('media') as { query: unknown; searchResults: unknown[] }
+    expect(typeof mediaSnap.query).toBe('string')
+    expect(Array.isArray(mediaSnap.searchResults)).toBe(true)
+    // random.removeAvailable index inválido (506) e generateNumberRange (514/515)
+    deps.random = makeRandom() as never
+    handlers = createModuleHandlers(deps)
+    await expect(handlers.execute('random', 'random.removeAvailable', { index: -1 })).resolves.toBe(false)
+    await expect(handlers.execute('random', 'random.generateNumberRange', {})).resolves.toBe(true)
+    // bible.open com chapter/verse AUSENTES → fallbacks 1 (206/213 arm1)
+    ;(deps.bible as any).verses = { '1': { n: 1 } }
+    await expect(handlers.execute('bible', 'bible.open', { bookId: 1 })).resolves.toBe(true)
+    // palco.project sem text (589 arm1); bible sem books (189 arm1)
+    await expect(handlers.execute('palco', 'palco.project', {})).resolves.toBe(false)
+    deps.bible = { ...makeBible(), books: undefined } as never
+    handlers = createModuleHandlers(deps)
+    ;(deps.bible as any).verses = { '1': { n: 1 } }
+    await expect(handlers.execute('bible', 'bible.open', { bookId: 1, chapter: 1, verse: 1 })).resolves.toBe(false)
+    // palco createSlot null (580 arm1) e slot-add default label (578 cond)
+    deps.palco = {
+      available: ref(true), slots: ref([]), status: vi.fn(async () => ({})),
+      createSlot: vi.fn(async () => null), removeSlot: vi.fn(async () => {}),
+      startSlot: vi.fn(async () => ({ ok: true, data: null })), stopSlot: vi.fn(async () => {}),
+      project: vi.fn(), idle: vi.fn(),
+    } as never
+    handlers = createModuleHandlers(deps)
+    const addRes = await handlers.execute('palco', 'palco.slot-add', {}) as { ok: boolean }
+    expect(addRes).toEqual({ ok: false, data: null })
+  })
+
 })
