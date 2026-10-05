@@ -182,4 +182,50 @@ describe("ClockPreview.vue", () => {
     });
   });
 
+
+  it("gaps2: dimensões reais no prototype → sem retry, stage font/analog (L36/48/115/129)", async () => {
+    const descW = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "offsetWidth");
+    const descH = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "offsetHeight");
+    Object.defineProperty(HTMLElement.prototype, "offsetWidth", { value: 960, configurable: true });
+    Object.defineProperty(HTMLElement.prototype, "offsetHeight", { value: 480, configurable: true });
+    try {
+      // analógico com stage: analogSize avalia false-arm e stmt50
+      clockConfigState.cfg = { ...clockConfigState.cfg, style: "analog" } as unknown as ClockConfig;
+      const wa = mountClock({
+        stage: { fontSize: 192, textColor: "#fff", textShadow: true, shadowBlur: 4, shadowIntensity: 0.5 },
+      });
+      await wa.vm.$nextTick();
+      expect(wa.find(".clock-preview__analog").exists()).toBe(true);
+      wa.unmount(); // sem timer (dims > 0 desde o mount)
+      // digital 12h com stage: ampm span com fontWeight do stage (L162)
+      clockConfigState.cfg = { ...clockConfigState.cfg, style: "digital", format24h: false } as unknown as ClockConfig;
+      const wd = mountClock({
+        stage: { fontSize: 192, fontWeight: 800, textVerticalAlign: "bottom", textAlign: "right", textColor: "#fff" },
+      });
+      await wd.vm.$nextTick();
+      expect(wd.find(".clock-preview__ampm").exists()).toBe(true);
+      wd.unmount();
+    } finally {
+      delete (HTMLElement.prototype as unknown as Record<string, unknown>).offsetWidth;
+      if (descW) Object.defineProperty(HTMLElement.prototype, "offsetWidth", descW);
+      if (descH) Object.defineProperty(HTMLElement.prototype, "offsetHeight", descH);
+      clockConfigState.cfg = { ...clockConfigState.cfg, style: "digital", format24h: true } as unknown as ClockConfig;
+    }
+  });
+
+  it("gaps2: preview=true analog boxShadow none (L179 true-arm)", async () => {
+    Object.defineProperty(HTMLElement.prototype, "offsetWidth", { value: 960, configurable: true });
+    Object.defineProperty(HTMLElement.prototype, "offsetHeight", { value: 480, configurable: true });
+    try {
+      clockConfigState.cfg = { ...clockConfigState.cfg, style: "analog" } as unknown as ClockConfig;
+      const wrapper = mountClock({ preview: true });
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find(".clock-preview__analog").exists()).toBe(true);
+      wrapper.unmount();
+    } finally {
+      delete (HTMLElement.prototype as unknown as Record<string, unknown>).offsetWidth;
+      delete (HTMLElement.prototype as unknown as Record<string, unknown>).offsetHeight;
+      clockConfigState.cfg = { ...clockConfigState.cfg, style: "digital" } as unknown as ClockConfig;
+    }
+  });
 });
