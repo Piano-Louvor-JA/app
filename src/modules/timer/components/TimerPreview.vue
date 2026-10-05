@@ -96,6 +96,7 @@ let measureTimer: ReturnType<typeof setTimeout> | null = null
 
 function measure() {
   const el = containerRef.value
+  /* v8 ignore next 1 -- ref só é null fora do ciclo de vida do componente */
   if (!el) return
   sizeWidth.value = el.offsetWidth
   sizeHeight.value = el.offsetHeight

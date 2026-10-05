@@ -199,4 +199,19 @@ describe("TimerPreview.vue", () => {
     });
   });
 
+  it("gaps onda1: container medido antes do mount escala fontSize (L32) e unmount limpa timer (L117)", async () => {
+    const proto = HTMLElement.prototype as unknown as Record<string, unknown>;
+    Object.defineProperty(proto, "offsetWidth", { value: 800, configurable: true });
+    Object.defineProperty(proto, "offsetHeight", { value: 400, configurable: true });
+    const wrapper = mountPreview({
+      stage: { fontSize: 960, textVerticalAlign: "top", textAlign: "left" },
+    });
+    await wrapper.vm.$nextTick();
+    const style = wrapper.find(".timer-preview__digital").attributes("style") ?? "";
+    expect(style).toContain("400px"); // 960/1920*800
+    wrapper.unmount(); // measureTimer === null aqui → L117 FALSE side
+    delete proto.offsetWidth;
+    delete proto.offsetHeight;
+  });
+
 });
