@@ -310,4 +310,39 @@ describe('useAppBootstrap', () => {
       app.unmount()
     })
   })
+
+  it('startBootstrap popup (chamada tardia): hide e retorna sem boot', async () => {
+    // onMounted vê false (segue), startBootstrap vê true (hide cedo)
+    mocks.isProjectionPopupLocation.mockReturnValueOnce(false).mockReturnValueOnce(true)
+    const app = mountHost()
+    await vi.runAllTimersAsync()
+    expect(mocks.isBootstrapComplete).not.toHaveBeenCalled()
+    app.unmount()
+  })
+
+  it('checkAndBootstrap catch com popup (chamada tardia): hide sem erro visível', async () => {
+    mocks.isProjectionPopupLocation
+      .mockReturnValueOnce(false) // onMounted: segue
+      .mockReturnValueOnce(false) // startBootstrap: segue
+      .mockReturnValueOnce(true)  // catch: popup → hide
+    mocks.isBootstrapComplete.mockRejectedValue(new Error('boom'))
+    const app = mountHost()
+    await vi.runAllTimersAsync()
+    expect(mocks.isBootstrapComplete).toHaveBeenCalled()
+    app.unmount()
+  })
+
+  it('retryBootstrap: runFirstBoot rejeita → catch marca erro mapeado', async () => {
+    const app = mountHost()
+    await vi.runAllTimersAsync()
+    mocks.prepareFreshInstall.mockRejectedValue(new Error('disco cheio'))
+    const { retryBootstrap } = useAppBootstrap()
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    await retryBootstrap()
+    const store = useStartingStore()
+    expect(store.hasError).toBe(true)
+    expect(errSpy).toHaveBeenCalled()
+    errSpy.mockRestore()
+    app.unmount()
+  })
 })
