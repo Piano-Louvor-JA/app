@@ -174,7 +174,7 @@ describe("MediaProjectionView — boxStyle branches (90/97/101)", () => {
     expect(w.find(".media-projection").exists()).toBe(true);
     w.unmount();
   });
-});
+
   it("gaps: stage completo true-arms (textShadow/boxStyle/border)", async () => {
     stageSettingsStateMPV.value = {
       backgroundColor: "#000000",
@@ -189,6 +189,10 @@ describe("MediaProjectionView — boxStyle branches (90/97/101)", () => {
       boxBorder: true,
     } as Record<string, unknown>
     try {
+      localStorage.setItem(
+        MEDIA_RUNTIME_STORAGE_KEY,
+        JSON.stringify(runtimePayload({ isCover: true })),
+      );
       const w = await mountView()
       await w.vm.$nextTick()
       expect(w.find(".media-projection").exists()).toBe(true)
@@ -200,4 +204,39 @@ describe("MediaProjectionView — boxStyle branches (90/97/101)", () => {
       stageSettingsStateMPV.value = null
     }
   })
+
+  it("gaps2: false-arms (textShadow none / textBox off / sem borda)", async () => {
+    stageSettingsStateMPV.value = {
+      backgroundColor: "#000000",
+      textColor: "#ffffff",
+      fontSize: 96,
+      textAlign: "center",
+      textShadow: false,
+      shadowBlur: 3,
+      shadowIntensity: 0.8,
+      textBox: true,
+      boxOpacity: 0.5,
+      boxBorder: false,
+    } as Record<string, unknown>
+    try {
+      localStorage.setItem(MEDIA_RUNTIME_STORAGE_KEY, JSON.stringify(runtimePayload()));
+      const wBox = await mountView()
+      await wBox.vm.$nextTick()
+      expect(wBox.find(".media-projection__lyric").exists()).toBe(true)
+      wBox.unmount()
+      // textBox false: boxStyle → {} (L92 false-arm)
+      stageSettingsStateMPV.value = {
+        ...stageSettingsStateMPV.value,
+        textBox: false,
+      } as Record<string, unknown>
+      localStorage.setItem(MEDIA_RUNTIME_STORAGE_KEY, JSON.stringify(runtimePayload()));
+      const w = await mountView()
+      await w.vm.$nextTick()
+      expect(w.find(".media-projection__lyric").exists()).toBe(true)
+      w.unmount()
+    } finally {
+      stageSettingsStateMPV.value = null
+    }
+  })
+})
 
