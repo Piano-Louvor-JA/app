@@ -62,7 +62,7 @@ vi.mock("@shared/components/UpdateDialog.vue", () => ({
     name: "UpdateDialog",
     props: ["modelValue"],
     emits: ["update:modelValue"],
-    render: () => null,
+    template: "<div class=\"update-dialog-stub\" />",
   },
 }));
 
@@ -120,17 +120,17 @@ beforeEach(() => {
   projectionState.isPopup = false;
   startingStoreMock.isAppReady.value = true;
   startingStoreMock.hide = vi.fn();
-  updateCheckerMock.mock.hasUpdate = ref(false);
+  updateCheckerMock.mock.hasUpdate.value = false;
   updateCheckerMock.mock.init = vi.fn();
   startPalcoBridgeMock.fn.mockClear();
 });
 
 describe("App.vue — estados do template", () => {
   it("hasUpdate true não reseta dialog; voltar pra false reseta (branch 56)", async () => {
-    updateCheckerMock.mock.hasUpdate = ref(true);
+    updateCheckerMock.mock.hasUpdate.value = true;
     const w = mountApp();
     await flushPromises();
-    updateCheckerMock.mock.hasUpdate = ref(false);
+    updateCheckerMock.mock.hasUpdate.value = false;
     await flushPromises();
     expect(w.find(".app-frame").exists()).toBe(true);
   });
@@ -204,7 +204,7 @@ describe("App.vue", () => {
   });
 
   it("com update disponível → watcher reseta diálogo quando update some", async () => {
-    updateCheckerMock.mock.hasUpdate = ref(true);
+    updateCheckerMock.mock.hasUpdate.value = true;
     mountApp();
     await flushPromises();
 
@@ -254,6 +254,9 @@ describe("App.vue", () => {
       const dialog = wrapper.findComponent({ name: "UpdateDialog" });
       expect(dialog.exists()).toBe(true);
       expect(dialog.props("modelValue")).toBe(true);
+      dialog.vm.$emit("update:modelValue", false);
+      await wrapper.vm.$nextTick();
+      expect(dialog.props("modelValue")).toBe(false);
       wrapper.unmount();
     });
   });
