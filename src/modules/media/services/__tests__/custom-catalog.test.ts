@@ -292,6 +292,24 @@ describe('collections CRUD', () => {
     const up = await updateCustomCollection(5, { name: 'R' })
     expect(up?.musicsCount).toBe(3)
 
+    // row remota sem musics_count → ?? 0 (328 arm1)
+    routes = [
+      {
+        match: (u) => u.includes('/collections/5') && !u.includes('musics'),
+        body: { id_collection: 5, name: 'R2', description: null },
+      },
+    ]
+    expect((await updateCustomCollection(5, { name: 'R' }))?.musicsCount).toBe(0)
+
+    // row remota sem musics_count → ?? 0 (328 arm1)
+    routes = [
+      {
+        match: (u) => u.includes('/collections/5') && !u.includes('musics'),
+        body: { id_collection: 5, name: 'R2', description: null },
+      },
+    ]
+    expect((await updateCustomCollection(5, { name: 'R' }))?.musicsCount).toBe(0)
+
     routes = [{ match: () => true, status: 403 }]
     expect(await updateCustomCollection(5, { name: 'R' })).toBeNull()
 
@@ -384,6 +402,14 @@ describe('musics CRUD e listagem', () => {
     expect(rows).toHaveLength(1)
     expect(rows[0].name).toBe('M1')
     expect(rows[0].hasAudio).toBe(false)
+    // com audioBase64 → audioUrl data: e hasAudio true (400 arm0)
+    const db = JSON.parse(localStorage.getItem('louvorja.local-custom.v1')!)
+    const mm = (db.musics as Array<Record<string, unknown>>).find((m) => m.name === 'M1')!
+    mm.audioBase64 = 'WFla'
+    localStorage.setItem('louvorja.local-custom.v1', JSON.stringify(db))
+    const rows2 = await listCustomMusics(col.id)
+    expect(rows2[0].hasAudio).toBe(true)
+    expect((rows2[0] as unknown as { audioUrl: string }).audioUrl).toContain('data:audio/mpeg')
   })
 
   it('listCustomMusics remoto + enrich; !ok e throw → []', async () => {
@@ -424,6 +450,11 @@ describe('musics CRUD e listagem', () => {
 
     routes = [{ match: () => true, throw: true }]
     expect(await listCustomMusics(1)).toEqual([])
+  })
+
+  it('listAllCustomMusics: sem data → [] (442 arm1)', async () => {
+    routes = [{ match: () => true, body: {} }]
+    expect(await listAllCustomMusics()).toEqual([])
   })
 
   it('listAllCustomMusics: ok (string duration → null), !ok, throw', async () => {
@@ -661,6 +692,84 @@ describe('enrichDurations e probeAudioDuration', () => {
     expect(await enrichDurations(rows)).toBe(false)
   })
 
+  it('probeAudioDuration: /custom/ e externa; metadata ok e duration inválida (519/539/560)', async () => {
+    const instances: Array<Record<string, unknown>> = []
+    class AudioMock {
+      src = ''
+      preload = ''
+      duration = NaN
+      listeners: Record<string, () => void> = {}
+      constructor() { instances.push(this as unknown as Record<string, unknown>) }
+      addEventListener(type: string, cb: () => void) { this.listeners[type] = cb }
+      removeEventListener() {}
+      removeAttribute() {}
+      load() {}
+    }
+    const OriginalAudio = globalThis.Audio
+    ;(globalThis as unknown as { Audio: unknown }).Audio = AudioMock
+    try {
+      // caso 1: /custom/ → customFileUrl, metadata com duration válida
+      const p1 = probeAudioDuration('/custom/a.mp3', 100)
+      await Promise.resolve()
+      const a1 = instances[instances.length - 1] as unknown as { src: string; duration: number; listeners: Record<string, () => void> }
+      expect(a1.src).toContain('custom')
+      a1.duration = 12.5
+      a1.listeners['loadedmetadata']?.()
+      expect(await p1).toBe(12.5)
+
+      // caso 2: url externa → resolveRemoteFileUrl (539 arm1)
+      const p2 = probeAudioDuration('files/x.mp3', 100)
+      await Promise.resolve()
+      const a2 = instances[instances.length - 1] as unknown as { src: string; duration: number; listeners: Record<string, () => void> }
+      expect(a2.src).toContain('files.example.com')
+      a2.duration = NaN
+      a2.listeners['loadedmetadata']?.()
+      expect(await p2).toBeNull()
+
+      // caso 2b: erro no Audio → done(null) (error listener + .catch)
+      const p2b = probeAudioDuration('/custom/err.mp3', 100)
+      await Promise.resolve()
+      const a2b = instances[instances.length - 1] as unknown as { listeners: Record<string, () => void> }
+      a2b.listeners['error']?.()
+      expect(await p2b).toBeNull()
+
+      // caso 2c: Audio constructor lança → .catch(() => null) (516)
+      class BoomAudio {
+        constructor() { throw new Error('sem áudio') }
+      }
+      ;(globalThis as unknown as { Audio: unknown }).Audio = BoomAudio
+      await expect(probeAudioDuration('/custom/z.mp3', 100)).rejects.toThrow('sem áudio')
+      ;(globalThis as unknown as { Audio: unknown }).Audio = AudioMock
+
+      // caso 3: metadata com duration 0 → null
+      const p3 = probeAudioDuration('/custom/b.mp3', 100)
+      await Promise.resolve()
+      const a3 = instances[instances.length - 1] as unknown as { src: string; duration: number; listeners: Record<string, () => void> }
+      a3.duration = 0
+      a3.listeners['loadedmetadata']?.()
+      expect(await p3).toBeNull()
+
+      // enrichDurations com probe REJEITANDO → .catch(() => null) (516)
+      ;(globalThis as unknown as { Audio: unknown }).Audio = BoomAudio
+      const rowsErr = [{ duration: null, hasAudio: true, audioUrl: '/custom/e.mp3' }]
+      expect(await enrichDurations(rowsErr)).toBe(true)
+      expect(rowsErr[0].duration).toBeNull()
+      ;(globalThis as unknown as { Audio: unknown }).Audio = AudioMock
+
+      // enrichDurations preenche com probe ok (519 arm0)
+      const rows = [{ duration: null, hasAudio: true, audioUrl: '/custom/c.mp3' }]
+      const enrichPromise = enrichDurations(rows)
+      await Promise.resolve()
+      const a4 = instances[instances.length - 1] as unknown as { src: string; duration: number; listeners: Record<string, () => void> }
+      a4.duration = 33
+      a4.listeners['loadedmetadata']?.()
+      expect(await enrichPromise).toBe(true)
+      expect(rows[0].duration).toBe(33)
+    } finally {
+      ;(globalThis as unknown as { Audio: unknown }).Audio = OriginalAudio
+    }
+  })
+
   it('probeAudioDuration: mockado p/ não criar Audio/timers', async () => {
     // smoke test - probeAudioDuration é testado indiretamente via enrichDurations
     const { probeAudioDuration } = await import('../custom-catalog')
@@ -848,5 +957,94 @@ describe('gaps — normalizeTime/mapCustomLyrics via loadCustomMusicTrack', () =
 
   it('formatDurationLabel: string já formatada mantém', () => {
     expect(formatDurationLabel('1:02:03')).toBe('1:02:03')
+  })
+
+  it('gaps onda1: local oficial; row mínima; HH:MM; audioBase64; probe paths', async () => {
+    // local com officialMusicId injetado no storage (190/192)
+    const col = createLocalCollection('C2', null)
+    const music = createLocalMusic(col.id, { name: 'Com oficial' })
+    const db = JSON.parse(localStorage.getItem('louvorja.local-custom.v1')!)
+    ;(db.musics as Array<Record<string, unknown>>).find((m) => m.id === music.id)!.officialMusicId = 42
+    localStorage.setItem('louvorja.local-custom.v1', JSON.stringify(db))
+    mocks.loadMediaTrackMock.mockResolvedValueOnce({ id: 42, name: 'Oficial', durationLabel: '1:00' })
+    const track = await loadCustomMusicTrack(music.id)
+    expect(track?.name).toBe('Oficial')
+    // oficial sem track → null (193)
+    mocks.loadMediaTrackMock.mockResolvedValueOnce(null)
+    expect(await loadCustomMusicTrack(music.id)).toBeNull()
+
+    // row remota MÍNIMA: todos os ?? caem (129/237/241/255/442/479)
+    routes = [
+      {
+        match: (u) => u.includes('/v1/custom/musics/11'),
+        body: { id_music: 11, name: 'Mínima', image_position: 3 },
+      },
+    ]
+    const min = await loadCustomMusicTrack(11)
+    expect(min?.name).toBe('Mínima')
+    expect(min?.coverPosition).toBe('3')
+    expect(min?.lyrics).toEqual([])
+    expect(min?.audioUrl).toBeNull()
+
+    // lyric com lyric null (129) via row com lyrics parciais
+    routes = [
+      {
+        match: (u) => u.includes('/v1/custom/musics/12'),
+        body: { id_music: 12, name: 'Lyrics null', lyrics: [{ lyric: null, order: 1, time: '01:02:03' }] },
+      },
+    ]
+    const lyr = await loadCustomMusicTrack(12)
+    expect(lyr?.lyrics[0]?.lyric).toBe('')
+
+    // local COM audioBase64 (210) e lyric sem lyric (197)
+    const col2 = createLocalCollection('C3', null)
+    const music2 = createLocalMusic(col2.id, { name: 'Com áudio' })
+    const db2 = JSON.parse(localStorage.getItem('louvorja.local-custom.v1')!)
+    const m2 = (db2.musics as Array<Record<string, unknown>>).find((m) => m.id === music2.id)!
+    m2.audioBase64 = 'QUJD'
+    m2.lyrics = [{ order: 1, lyric: null, aux_lyric: null, show_slide: true, time: null, instrumental_time: null, image_url: null, image_position: null }]
+    localStorage.setItem('louvorja.local-custom.v1', JSON.stringify(db2))
+    const track2 = await loadCustomMusicTrack(music2.id)
+    expect(track2?.audioUrl).toContain('data:audio/mpeg;base64,QUJD')
+    expect(track2?.lyrics[0]?.lyric).toBe('')
+
+    // oficial remota sem id_music no body (237 arm1)
+    routes = [
+      {
+        match: (u) => u.includes('/v1/custom/musics/13'),
+        body: { name: 'Oficial s/ id', official_music_id: 42 },
+      },
+    ]
+    mocks.loadMediaTrackMock.mockResolvedValueOnce({ id: 42, name: 'Oficial 42' })
+    const of = await loadCustomMusicTrack(13)
+    expect(of?.id).toBe(13)
+
+    // updateCustomCollection com patch.name ausente (300)
+    const colU = createLocalCollection('Para update', null)
+    expect(await updateCustomCollection(colU.id, {})).not.toBeNull()
+
+    // listCustomCollections remota sem campos opcionais (369/370/372)
+    routes = [{ match: () => true, body: { data: [{ id_collection: 8, name: 'R8' }] } }]
+    const alls = await listCustomCollections()
+    const r8 = alls.find((c) => c.id === 8)
+    expect(r8?.ownerId).toBeNull()
+    expect(r8?.musicsCount).toBe(0)
+
+    // listCustomMusics remota sem musics_count (328) e sem data (442/479)
+    routes = [{ match: () => true, body: { data: [{ id_music: 3, name: 'S3' }] } }]
+    const sums = await listCustomMusics(8)
+    expect(sums.length).toBeGreaterThan(0)
+    routes = [{ match: () => true, body: {} }]
+    expect(await listCustomMusics(8)).toEqual([])
+
+    // customApiUrl base vazia (146 arm1) — env mockado vazio
+    // (o módulo já tem default; skip se import.meta não mockável)
+
+    // probeAudioDuration: url relativa não-/custom/ (539 arm1) e duration inválida (560)
+    // (mockado no teste específico — cobre resolveRemoteFileUrl path)
+
+    // enrichDurations com probe null → duration mantém null (519 false)
+    routes = [{ match: () => true, body: { data: [{ id_music: 3, name: 'S3', audio_url: '/custom/a.mp3' }] } }]
+    // (enrich já coberto por testes de pendentes)
   })
 })

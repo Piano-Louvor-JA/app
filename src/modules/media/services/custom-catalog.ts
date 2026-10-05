@@ -143,8 +143,7 @@ function customBaseUrl(): string {
   // (coletâneas não baixam). .env é gitignored / CI não injeta (hotfix 14/09).
   const base =
     import.meta.env.VITE_PALCO_API_URL ?? 'https://api.pianolouvorja.com.br'
-  if (base) return `${base.replace(/\/$/, '')}/v1/custom`
-  return '/v1/custom'
+  return `${base.replace(/\/$/, '')}/v1/custom`
 }
 
 /**
