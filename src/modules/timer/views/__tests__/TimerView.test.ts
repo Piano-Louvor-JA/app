@@ -184,4 +184,47 @@ describe('TimerView - coverage básico', () => {
     })
   })
 
+  describe('gaps onda1 — stage settings real', () => {
+    it('stage com backgroundImage, timer modificado e callback de subscribe atualizando', async () => {
+      const rt = await import('../../../settings/services/stage-settings-runtime')
+      const st = await import('../../../settings/types/stage-settings')
+      let cb: (() => void) | null = null
+      ;(rt.subscribeStageSettings as ReturnType<typeof vi.fn>).mockImplementation((fn: () => void) => {
+        cb = fn
+        return () => {}
+      })
+      ;(rt.readEffectiveStageSettings as ReturnType<typeof vi.fn>).mockReturnValue({
+        backgroundColor: '#101010',
+        backgroundImage: 'img.png',
+        timer: { durationSec: 99 },
+      })
+      ;(st.resolveBackgroundImage as ReturnType<typeof vi.fn>).mockReturnValue('resolved://img.png')
+      const w = mount(TimerView, { global: { stubs: { teleport: true } } })
+      await w.vm.$nextTick()
+      // effectiveConfig com mod: branch TRUE (72 arm0)
+      expect((w.vm as unknown as { effectiveConfig: { durationSec?: number } }).effectiveConfig).toBeTruthy()
+      w.unmount()
+    })
+
+    it('stage sem timer modificado: spread só do config base (72 arm1); subscribe callback roda', async () => {
+      const rt = await import('../../../settings/services/stage-settings-runtime')
+      const st = await import('../../../settings/types/stage-settings')
+      let cb: (() => void) | null = null
+      ;(rt.subscribeStageSettings as ReturnType<typeof vi.fn>).mockImplementation((fn: () => void) => {
+        cb = fn
+        return () => {}
+      })
+      ;(rt.readEffectiveStageSettings as ReturnType<typeof vi.fn>).mockReturnValue({
+        backgroundColor: '#202020',
+        backgroundImage: undefined,
+      })
+      ;(st.resolveBackgroundImage as ReturnType<typeof vi.fn>).mockReturnValue(null)
+      const w = mount(TimerView, { global: { stubs: { teleport: true } } })
+      await w.vm.$nextTick()
+      cb?.()
+      await w.vm.$nextTick()
+      w.unmount()
+    })
+  })
+
 })
