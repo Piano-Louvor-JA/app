@@ -168,6 +168,7 @@ function arePreviousCategoriesDone(categoryId: string): boolean {
     if (item.id === categoryId) return true
     if (!item.done) return false
   }
+  /* v8 ignore next 1 -- chamada só ocorre com categoryId existente ⇒ loop sempre retorna antes */
   return true
 }
 

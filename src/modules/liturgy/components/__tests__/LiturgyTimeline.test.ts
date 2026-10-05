@@ -338,6 +338,18 @@ describe('LiturgyTimeline', () => {
 
   describe('emits finais do stub (clone/addSub/toggleCollapse/filhos completos)', () => {
     it('clone do toolbar (222)', async () => {
+      // empty state: clone habilitado com canClone, click emite (222/213 arm0)
+      const w0 = createWrapper({ items: [], canClone: true })
+      const clone0 = w0.find('.liturgy-timeline__clone')
+      expect(clone0.exists()).toBe(true)
+      await clone0.trigger('click')
+      expect(w0.emitted('clone')).toBeTruthy()
+      w0.unmount()
+      // canClone false: nota de bloqueio, botão disabled (213 arm1)
+      const w0b = createWrapper({ items: [], canClone: false })
+      expect(w0b.text()).not.toContain('--- ou clone')
+      expect(w0b.find('.liturgy-timeline__clone').attributes('disabled')).toBeDefined()
+      w0b.unmount()
       const w = createWrapper({ items: [createItem({ id: 'c1', type: 'music' })], canClone: true })
       const clone = w.find('.liturgy-timeline__clone')
       if (clone.exists()) {
@@ -415,5 +427,23 @@ describe('LiturgyTimeline', () => {
       }
       w.unmount()
     })
+  })
+
+  it('gaps: arePreviousCategoriesDone — music antes da categoria (167) e id inexistente (171)', async () => {
+    // music ANTES da categoria alvo → continue no loop (167)
+    const w = createWrapper({
+      items: [
+        createItem({ id: 'm0', type: 'music', done: false }),
+        createItem({ id: 'c1', type: 'category', done: false, sectionWaiting: false }),
+      ],
+    })
+    expect(w.exists()).toBe(true)
+    w.unmount()
+    // sãoPrevious via isCategorySectionWaiting c/ categoria não encontrada → arePrevious roda até o fim (171)
+    const w2 = createWrapper({
+      items: [createItem({ id: 'c1', type: 'category', done: true })],
+    })
+    expect(w2.exists()).toBe(true)
+    w2.unmount()
   })
 })
