@@ -11,8 +11,8 @@ on:
   workflow_dispatch:
 
 concurrency:
-  # Edição só de texto não cancela a validação de código em andamento.
-  group: ci-${{ github.event.pull_request.number || github.ref }}-${{ github.event.action == 'edited' && github.event.changes.base == null && 'metadata' || 'code' }}
+  # Todo evento validado executa os gates completos, inclusive edições do PR.
+  group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -49,7 +49,6 @@ jobs:
           echo "Origem do PR permitida."
 
   lint:
-    if: github.event.action != 'edited' || github.event.changes.base != null
     name: Lint & Format
     runs-on: ubuntu-latest
     steps:
@@ -72,7 +71,6 @@ jobs:
           fi
 
   typecheck:
-    if: github.event.action != 'edited' || github.event.changes.base != null
     name: Type Check
     runs-on: ubuntu-latest
     steps:
@@ -85,7 +83,6 @@ jobs:
       - run: npm run type-check
 
   build:
-    if: github.event.action != 'edited' || github.event.changes.base != null
     name: Build
     runs-on: ubuntu-latest
     needs: [lint, typecheck]
@@ -103,7 +100,7 @@ jobs:
     name: Regression Gate (suite completa + type-check + build)
     runs-on: ubuntu-latest
     needs: [lint, typecheck, build]
-    if: (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && (github.event.action != 'edited' || github.event.changes.base != null)
+    if: (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch')
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -149,7 +146,7 @@ jobs:
   pr-pre-review:
     name: PR Pre-review
     needs: [lint, typecheck, build, regression-gate, validate-source]
-    if: always() && github.event_name == 'pull_request' && (github.event.action != 'edited' || github.event.changes.base != null)
+    if: always() && github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Verify pre-review results
@@ -159,7 +156,6 @@ jobs:
           node -e 'const results = JSON.parse(process.env.RESULTS); for (const [name, job] of Object.entries(results)) { if (job.result !== "success") { console.error(`${name}: ${job.result}`); process.exit(1); } } console.log("Pré-revisão aprovada: lint configurado, tipos, build, regressão e origem do PR.")'
 
   electron-support-matrix:
-    if: github.event.action != 'edited' || github.event.changes.base != null
     name: Resolve supported Electron versions
     runs-on: ubuntu-latest
     outputs:
@@ -216,7 +212,7 @@ jobs:
     name: Quality Gate
     runs-on: ubuntu-latest
     needs: [lint, typecheck, build, regression-gate, release-validation]
-    if: always() && (github.event.action != 'edited' || github.event.changes.base != null)
+    if: always()
     steps:
       - name: Verifica se todos os gates passaram
         run: |
