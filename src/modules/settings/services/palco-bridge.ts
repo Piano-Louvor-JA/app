@@ -64,6 +64,7 @@ type Owner = 'media' | 'bible' | 'random' | 'timer' | 'countdown' | 'clock' | nu
 /* v8 ignore next 1 -- stmt module-level: V8 nao registra hit de inicializacao de ESM */
 let owner: Owner = null
 
+/* v8 ignore next 1 -- stmt module-level */
 const runtimes = {
   media: { ...DEFAULT_MEDIA_PROJECTION },
   bible: { active: false, text: '', reference: '', projecting: false },
@@ -72,9 +73,13 @@ const runtimes = {
   countdown: null as CountdownRuntimeState | null,
 }
 
+/* v8 ignore next 1 -- stmt module-level */
 let started = false
+/* v8 ignore next 1 -- stmt module-level */
 let channels: BroadcastChannel[] = []
+/* v8 ignore next 1 -- stmt module-level */
 let unwatchers: Array<() => void> = []
+/* v8 ignore next 1 -- stmt module-level */
 let clockInterval: number | null = null
 
 // ===== helpers =====

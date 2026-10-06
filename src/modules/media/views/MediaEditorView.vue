@@ -316,6 +316,7 @@ const selectedCollection = computed(
 const visibilityBusy = ref(false)
 // Modal de regras: abre sob demanda e automaticamente na 1a vez que publica
 const rulesOpen = ref(false)
+/* v8 ignore next 1 -- stmt module-level do setup */
 const RULES_SEEN_KEY = 'louvorja.publishRulesSeen'
 function onRulesModalClose(): void {
   rulesOpen.value = false
