@@ -22,7 +22,14 @@ export default defineConfig({
     },
   },
   test: {
-    exclude: ['node_modules/**', 'dist/**', 'e2e/**'],
+      exclude: ['node_modules/**', 'dist/**', 'e2e/**'],
+      environment: 'jsdom',
+        environmentOptions: {
+          jsdom: {
+            url: 'http://localhost/',
+          },
+        },
+        setupFiles: ['./vitest.setup.ts'],
     coverage: {
           provider: 'v8',
           reporter: ['text', 'text-summary', 'lcov'],

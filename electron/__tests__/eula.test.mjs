@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock workspace.mjs — isEulaAccepted depende de readWorkspaceRecord

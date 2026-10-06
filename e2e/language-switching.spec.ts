@@ -1,6 +1,8 @@
 import { test, expect, type Page } from '@playwright/test'
 
-const API_BASE = 'https://api.louvorja.com.br/json_db'
+// Base correta desde o hotfix 14/09 (app#175): default público é
+// api.pianolouvorja.com.br (workspace-api.ts resolveDatabaseUrl).
+const API_BASE = 'https://api.pianolouvorja.com.br/json_db'
 
 /** Intercepta todas as chamadas para a API e registra os filenames buscados. */
 async function interceptApi(page: Page): Promise<Set<string>> {
@@ -15,6 +17,21 @@ async function interceptApi(page: Page): Promise<Set<string>> {
   return fetchedKeys
 }
 
+/**
+ * O fetch de catálogo (com prefixo de idioma) acontece ao abrir a Central de
+ * Mídia (/albums) — no boot o browser puro não busca catálogo (bootstrap
+ * Electron). O label de navegação é i18n: usar o botão pela rota alvo.
+ */
+async function openAlbumsAndSettle(page: Page): Promise<void> {
+  await page.goto('/')
+  await page.waitForTimeout(1500)
+  await page
+    .locator('nav.ds-dock button', { hasText: /Media|Central de M/ })
+    .first()
+    .click({ timeout: 10000 })
+  await page.waitForTimeout(4000)
+}
+
 test.describe('Language switching and API prefix', () => {
   test('app loads and shows Portuguese content by default', async ({ page }) => {
     await page.goto('/')
@@ -24,10 +41,7 @@ test.describe('Language switching and API prefix', () => {
 
   test('API fetches use pt_ prefix by default', async ({ page }) => {
     const keys = await interceptApi(page)
-    await page.goto('/')
-    // Wait for app to settle and make API calls
-    await page.waitForTimeout(3000)
-    // At least one pt_ prefixed call should have been made
+    await openAlbumsAndSettle(page)
     const ptKeys = [...keys].filter((k) => k.startsWith('pt_'))
     expect(ptKeys.length).toBeGreaterThan(0)
   })
@@ -39,8 +53,7 @@ test.describe('Language switching and API prefix', () => {
     })
 
     const keys = await interceptApi(page)
-    await page.goto('/')
-    await page.waitForTimeout(3000)
+    await openAlbumsAndSettle(page)
 
     const esKeys = [...keys].filter((k) => k.startsWith('es_'))
     expect(esKeys.length).toBeGreaterThan(0)
@@ -56,8 +69,7 @@ test.describe('Language switching and API prefix', () => {
     })
 
     const keys = await interceptApi(page)
-    await page.goto('/')
-    await page.waitForTimeout(3000)
+    await openAlbumsAndSettle(page)
 
     const enKeys = [...keys].filter((k) => k.startsWith('en_'))
     expect(enKeys.length).toBeGreaterThan(0)
@@ -85,8 +97,7 @@ test.describe('Language switching and API prefix', () => {
         await page.waitForTimeout(2000)
 
         keys.clear()
-        await page.reload()
-        await page.waitForTimeout(3000)
+        await openAlbumsAndSettle(page)
 
         const esKeys = [...keys].filter((k) => k.startsWith('es_'))
         expect(esKeys.length).toBeGreaterThan(0)
