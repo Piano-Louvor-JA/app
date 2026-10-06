@@ -9,6 +9,7 @@ import {
 import path from 'node:path'
 import { net } from 'electron'
 
+import { resolveMediaFetchUrl } from './api-base.mjs'
 import { API_BASE_URL } from './constants.mjs'
 import { obfuscateText, revealText } from './crypto.mjs'
 import {
@@ -136,22 +137,26 @@ function buildApiMediaUrl(mediaType, filename) {
 }
 
 /**
- * @param {string} _url
+ * @param {string} requestedUrl URL já montada pela tela (VITE_URL_FILES).
  * @param {'covers' | 'music' | 'slides'} mediaType
  * @param {string} filename
  */
-export async function downloadMediaFile(_url, mediaType, filename) {
+export async function downloadMediaFile(requestedUrl, mediaType, filename) {
   const TIMEOUT_MS = 20_000
 
   /** @returns {Promise<boolean>} */
   const run = async () => {
-    // Só HTTP na API Piano (`API_BASE_URL/file/...`). Sem FTP legado.
+    // HTTP no mesmo host do catálogo. Sem FTP legado.
     const destFolder = resolveMediaDirectory(mediaType)
     const decodedFilename = decodeURIComponent(filename)
     const filePath = path.join(destFolder, decodedFilename)
     mkdirSync(path.dirname(filePath), { recursive: true })
 
-    const apiUrl = buildApiMediaUrl(mediaType, decodedFilename)
+    const apiUrl = resolveMediaFetchUrl(
+      requestedUrl,
+      buildApiMediaUrl(mediaType, decodedFilename),
+      API_BASE_URL,
+    )
     const response = await net.fetch(apiUrl)
     if (!response.ok) return false
 

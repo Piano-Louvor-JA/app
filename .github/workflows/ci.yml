@@ -10,7 +10,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   lint:
@@ -23,7 +22,17 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx biome ci
+      - name: Check configured local Biome
+        run: |
+          if [[ -f biome.json || -f biome.jsonc ]]; then
+            if [[ ! -x node_modules/.bin/biome ]]; then
+              echo "::error::Biome está configurado, mas não está instalado pelo lockfile."
+              exit 1
+            fi
+            node_modules/.bin/biome ci
+          else
+            echo "::notice::Biome ainda não está configurado; lint será habilitado após configuração e validação local."
+          fi
 
   typecheck:
     name: Type Check
@@ -61,23 +70,29 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
-      # Baseline: código da base (staging/main). O script test:regression
-      # ainda não existe lá — preservamos a cópia deste PR e chamamos via node.
-      - name: Fetch baseline branch (main ou staging)
+      # Usar a revisão exata da base do PR e o mesmo script nas duas versões.
+      - name: Fetch baseline revision
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
-          BASE_BRANCH="${{ github.base_ref || 'staging' }}"
           test -f scripts/test-regression.mjs
           cp scripts/test-regression.mjs /tmp/test-regression.mjs
-          git fetch origin "$BASE_BRANCH" --depth=1
-          git read-tree -u --reset "origin/$BASE_BRANCH"
+          git fetch origin "$BASE_SHA" --depth=1
+          git read-tree -u --reset FETCH_HEAD
           mkdir -p scripts
           cp /tmp/test-regression.mjs scripts/test-regression.mjs
       - name: Rodar baseline
-        run: node scripts/test-regression.mjs --baseline
+        env:
+          REGRESSION_GIT_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          npm ci
+          node scripts/test-regression.mjs --baseline
       - name: Restaurar código do PR
-        run: git read-tree -u --reset HEAD
+        run: |
+          git read-tree -u --reset HEAD
+          cp /tmp/test-regression.mjs scripts/test-regression.mjs
+          npm ci
       - name: Comparar com baseline (falha se regressão)
         run: node scripts/test-regression.mjs --compare
 
@@ -121,7 +136,16 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: release-validation-${{ matrix.platform }}-electron-${{ matrix.version }}
-          path: dist-electron/
+          # Somente arquivos finais da raiz; exclui apps descompactados.
+          path: |
+            dist-electron/*.exe
+            dist-electron/*.dmg
+            dist-electron/*.AppImage
+            dist-electron/*.blockmap
+            dist-electron/latest*.yml
+            dist-electron/SHA256SUMS-*
+          # Instaladores já são comprimidos; evita recompressão no runner.
+          compression-level: 0
           if-no-files-found: error
           retention-days: 14
 

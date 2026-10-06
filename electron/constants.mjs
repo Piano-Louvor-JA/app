@@ -1,3 +1,7 @@
+import { loadProjectEnv, resolveApiBaseUrl } from './api-base.mjs'
+
+loadProjectEnv()
+
 /** Nome do produto no SO (janela, atalhos, productName do build). */
 export const APP_PRODUCT_NAME = 'LouvorJA - PIANO'
 
@@ -35,6 +39,6 @@ export const MEDIA_FOLDER_BY_TYPE = {
 }
 
 /** Base da API usada pelo main-process (download de mídia + fallback local://).
- * Default = nossa API Piano. Override via PIANO_API_BASE_URL p/ túnel/dev. */
-export const API_BASE_URL =
-  process.env.PIANO_API_BASE_URL ?? 'https://api.pianolouvorja.com.br'
+ * Mesmo host do catálogo: PIANO_API_BASE_URL, senão a origem de VITE_URL_FILES.
+ * Sem .env (app empacotado) permanece a API de produção. */
+export const API_BASE_URL = resolveApiBaseUrl()
