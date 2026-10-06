@@ -96,6 +96,22 @@ jobs:
       # O type-check já foi executado no job anterior.
       - run: npm run build-only
 
+  paridade:
+    name: Paridade app↔web (anti-deriva S1)
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Check paridade
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/check-paridade.mjs
+
   regression-gate:
     name: Regression Gate (suite completa + type-check + build)
     runs-on: ubuntu-latest
@@ -211,7 +227,7 @@ jobs:
   quality-gate:
     name: Quality Gate
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, build, regression-gate, release-validation]
+    needs: [lint, typecheck, build, regression-gate, release-validation, paridade]
     if: always()
     steps:
       - name: Verifica se todos os gates passaram
@@ -221,9 +237,10 @@ jobs:
           echo "build: ${{ needs.build.result }}"
           echo "regression-gate: ${{ needs.regression-gate.result }}"
           echo "release-validation: ${{ needs.release-validation.result }}"
+          echo "paridade: ${{ needs.paridade.result }}"
           # regression-gate só roda em pull_request; em push fica "skipped".
           REG="${{ needs.regression-gate.result }}"
-          if [[ "${{ needs.lint.result }}" != "success" || "${{ needs.typecheck.result }}" != "success" || "${{ needs.build.result }}" != "success" || "${{ needs.release-validation.result }}" != "success" || ( "$REG" != "success" && "$REG" != "skipped" ) ]]; then
+          if [[ "${{ needs.lint.result }}" != "success" || "${{ needs.typecheck.result }}" != "success" || "${{ needs.build.result }}" != "success" || "${{ needs.release-validation.result }}" != "success" || "${{ needs.paridade.result }}" != "success" || ( "$REG" != "success" && "$REG" != "skipped" ) ]]; then
             echo "::error::Quality Gate FALHOU — corrija os erros antes do merge"
             exit 1
           fi
