@@ -1,7 +1,6 @@
 # LouvorJA - PIANO (Desktop)
 
-![Tests](https://img.shields.io/github/actions/workflow/status/Piano-Louvor-JA/app/test-coverage.yml?branch=staging&label=tests%20100%25)
-![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
+![CI](https://img.shields.io/github/actions/workflow/status/Piano-Louvor-JA/app/ci.yml?branch=staging&label=CI)
 ![Security](https://img.shields.io/github/actions/workflow/status/Piano-Louvor-JA/app/security.yml?branch=staging&label=security)
 ![Release](https://img.shields.io/github/v/release/Piano-Louvor-JA/app?include_prereleases)
 ![License](https://img.shields.io/badge/license-MIT-blue)
@@ -32,14 +31,15 @@ Este README cobre apenas a **versão Electron**. A versão web é um projeto sep
 
 ## Qualidade
 
-O gate de cobertura exige **100% em statements, branches, functions e lines** — nenhum PR entra sem isso. Duas passadas de Vitest (suite completa + testes que montam componentes) com merge determinístico por posição.
+O CI verifica lint e formatação, TypeScript, testes, regressões, build e empacotamento Electron. As regras de `staging` e `main` também exigem as análises CodeQL, o pré-review e a revisão concluída do Codex para o commit atual. Os apontamentos precisam ser resolvidos; `main` exige uma aprovação humana.
 
-| Badge           | O que aponta                                          |
-| --------------- | ----------------------------------------------------- |
-| Tests 100%      | `test-coverage.yml` — gate 100/100/100/100 no staging |
-| Coverage 100%   | Mesmo gate (falha se qualquer arquivo cair de 100%)   |
-| Security        | `security.yml` — gitleaks + npm audit                 |
-| Release         | Última release publicada (instaladores + SHA256SUMS)  |
+A execução atual dos testes não comprova cobertura de 100%. Não publicamos um percentual de cobertura sem um relatório medido.
+
+- **CI:** workflow `ci.yml` na branch `staging`.
+- **Security:** workflow `security.yml`, com análise de segredos e relatórios de dependências e código.
+- **Release:** versão publicada no GitHub.
+
+Consulte [o fluxo de revisão](.github/PR_REVIEW_FLOW.md) para os detalhes.
 
 ---
 
@@ -61,7 +61,7 @@ O gate de cobertura exige **100% em statements, branches, functions e lines** �
 - Pinia · Vue Router · Vue I18n
 - Vuetify (componentes ricos) · Tailwind CSS (layout)
 - Design system próprio (`src/design-system/`)
-- Testes: Vitest (provider v8) — 6.500+ testes, cobertura 100%
+- Testes: Vitest — testes unitários e de componentes
 
 ---
 
@@ -193,7 +193,7 @@ Get-FileHash .\louvorja-piano-1.22.0-x64.exe -Algorithm SHA256
 
 ## Contribuir
 
-Branch de desenvolvimento: `staging` · PRs apontam para `staging`. Todo PR passa pelo gate de cobertura (100/100/100/100), lint e security scan antes do merge.
+Branch de desenvolvimento: `staging` · PRs apontam para `staging`. Todo PR precisa passar pelos checks obrigatórios de qualidade, segurança e revisão do Codex antes do merge.
 
 ### Versionamento
 
