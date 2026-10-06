@@ -56,6 +56,7 @@ import {
 } from '../../countdown/services/countdown-runtime'
 import type { TimerRuntimeState } from '../../timer/types/timer'
 import type { CountdownRuntimeState } from '../../countdown/types/countdown'
+import { resolveRemoteFileUrl } from '../../media/services/media-audio'
 import { useMediaStore } from '../../media/stores/useMediaStore'
 import { watch } from 'vue'
 
@@ -164,6 +165,17 @@ function assignedSlotHasContent(m: OutputModule): boolean {
   }
 }
 
+/**
+ * BG à prova de cru: path relativo da API vira URL absoluta síncrona.
+ * Sem isso, um cru escapa (runtime entre trocas) e o resolveBgUrl do
+ * session descarta → receiver cai no fallback (oscilação 04/10).
+ */
+function bgOrResolved(imageUrl: string | null | undefined): string | undefined {
+  if (!imageUrl) return undefined
+  if (/^(https?:|local:|data:|blob:|file:|official:)/i.test(imageUrl)) return imageUrl
+  return resolveRemoteFileUrl(imageUrl)
+}
+
 /** Input de projeção do owner (ou null → idle). */
 function ownerInput(): ProjectionInput | { timer: TimerOpts } | null {
   switch (owner) {
@@ -176,7 +188,7 @@ function ownerInput(): ProjectionInput | { timer: TimerOpts } | null {
         // Título NUNCA no rodapé dos slides de letra — o nome da música
         // aparece só na capa (decisão Rafael 26/08).
         footerRef: '',
-        background: r.imageUrl ?? undefined,
+        background: bgOrResolved(r.imageUrl),
         isCover: r.isCover === true,
       }
     }
@@ -238,7 +250,7 @@ async function renderModuleTo(m: 'bible' | 'media', slotId: string): Promise<voi
   await palcoSession.projectTo(slotId, 'hymns', {
     text: text.split('\n').join('<br>'),
     footerRef: '',
-    background: r.imageUrl ?? undefined,
+    background: bgOrResolved(r.imageUrl),
     isCover: r.isCover === true,
   })
 }

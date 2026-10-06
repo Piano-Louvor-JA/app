@@ -20,6 +20,7 @@
 
 import { createServer } from 'node:http'
 import { networkInterfaces } from 'node:os'
+import { createHash } from 'node:crypto'
 import path from 'node:path'
 import { readFile } from 'node:fs/promises'
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
@@ -168,6 +169,29 @@ class PalcoSlot {
       try { m = JSON.parse(m) } catch { return false }
     }
     if (!m || typeof m !== 'object' || !m.type) return false
+    // OBS S1: URL de mídia sai COM o token (a TV/browser recebe a URL já
+    // autenticada — o renderer não precisa saber do token).
+    const token = getPalcoToken()
+    if (token && typeof m.url === 'string' && m.url.includes('/media/')) {
+      try {
+        const u = new URL(m.url)
+        u.searchParams.set('token', token)
+        m = { ...m, url: u.toString() }
+      } catch { /* url malformada — segue como veio */ }
+    }
+    // Mesmo gate para o BG/cover da projection: <img> não manda header, e
+    // localhost bypass escondia o 403 — browser/OBS/TV buscavam
+    // http://<lan>:7080/media/... sem token → 403 → onerror → fallback FIXO.
+    const bgUrl = m.type === 'projection' ? (m.background ?? m.cover) : undefined
+    if (token && typeof bgUrl === 'string' && bgUrl.includes('/media/')) {
+      try {
+        const u = new URL(bgUrl)
+        u.searchParams.set('token', token)
+        const patched = u.toString()
+        if (m.background === bgUrl) m = { ...m, background: patched }
+        else m = { ...m, cover: patched }
+      } catch { /* url malformada — segue como veio */ }
+    }
     // Transientes: action sem url/conteúdo NÃO entra no replay.
     // audio stop GRAVA (fix 27/08): é estado terminal — como transient, o
     // replay ficava com o 'play' velho e o F5 na TV ressuscitava o MP3.
@@ -221,7 +245,10 @@ class PalcoSlot {
     }
 
     // Assets do receiver
-    const assetMatch = p.match(/^\/([a-z0-9._-]+)$/i)
+    // Assets do receiver — nomes reservados de rotas (/proxy, /status…)
+    // fora: /proxy casava aqui e 404ava ANTES do handler real (L301),
+    // quebrando todo bg/cover externo (músicas da API) → fallback.
+    const assetMatch = /^(?!\/(proxy|status|bg|media)(\/|$))\/([a-z0-9._-]+)$/i.exec(p)
     if (assetMatch) {
       try {
         const file = path.join(__dirname, 'palco', assetMatch[1])
@@ -352,7 +379,18 @@ class PalcoSlot {
       const info = await stat(clean)
       if (!info.isFile() || info.size > 200 * 1024 * 1024) return null
       const base = path.basename(clean).replace(/[^A-Za-z0-9._-]/g, '_')
-      const name = `local_${Date.now()}_${base}`
+      // Nome DETERMINÍSTICO (hash do path resolved + mtime + size): a mesma
+      // imagem publicada N vezes gera a MESMA URL. Com nome por timestamp,
+      // cada republish (o onTimeUpdate republisha ~4x/s) trocava o src do
+      // <img> na TV e o Chromium recarregava a imagem a cada publish —
+      // flash = oscilação fallback↔imagem. URL estável = cache do browser,
+      // zero reload. mtime/size no hash: arquivo re-baixado (mesmo path,
+      // bytes novos) muda de URL → cache não serve imagem velha.
+      const h = createHash('sha1')
+        .update(`${path.resolve(clean)}|${info.mtimeMs}|${info.size}`)
+        .digest('hex')
+        .slice(0, 12)
+      const name = `local_${h}_${base}`
       const bytes = await rf(clean)
       const mime = /\.(mp3|m4a)$/i.test(base) ? 'audio/mpeg' : /\.mp4$/i.test(base) ? 'video/mp4' : 'image/png'
       this.#media.set(name, { mime, bytes })
