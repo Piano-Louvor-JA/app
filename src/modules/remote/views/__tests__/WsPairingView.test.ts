@@ -372,3 +372,21 @@ describe('WsPairingView', () => {
 
 })
 
+describe('WsPairingView — geração do scan', () => {
+  it('unmount durante o getUserMedia: interval não é instalado (geração descartada)', async () => {
+    vi.useFakeTimers()
+    vi.mocked(jsQR).mockClear()
+    // getUserMedia resolve só depois de 300ms fake
+    mediaDevices.getUserMedia.mockImplementationOnce(() => new Promise((r) => setTimeout(() => r(mockStream), 300)))
+    const wrapper = mount(WsPairingView, { props: {}, global: { plugins: [i18n] } })
+    const clickPromise = wrapper.find('.ws-pairing__btn').trigger('click')
+    await vi.advanceTimersByTimeAsync(100)
+    await clickPromise
+    wrapper.unmount() // unmount ANTES do setTimeout(200) interno acordar
+    await vi.advanceTimersByTimeAsync(600) // getUserMedia e setTimeout acordam
+    await flushPromises()
+    expect(jsQR).not.toHaveBeenCalled() // interval pós-unmount não instalado
+    vi.useRealTimers()
+  })
+})
+
