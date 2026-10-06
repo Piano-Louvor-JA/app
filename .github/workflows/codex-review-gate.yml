@@ -6,6 +6,9 @@ on:
     types: [opened, synchronize, reopened, ready_for_review, edited]
   issue_comment:
     types: [created, edited]
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
   workflow_dispatch:
     inputs:
       pr:
@@ -20,15 +23,17 @@ permissions:
   checks: write
 
 concurrency:
-  group: codex-review-gate-${{ github.event.pull_request.number || github.event.issue.number || inputs.pr }}
+  group: codex-review-gate-${{ github.event.pull_request.number || github.event.issue.number || inputs.pr || github.event.workflow_run.head_sha }}
   cancel-in-progress: true
 
 jobs:
   verify:
     if: >-
-      github.event_name != 'issue_comment' ||
+      (github.event_name != 'pull_request_target' || github.actor != 'dependabot[bot]') &&
+      (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') &&
+      (github.event_name != 'issue_comment' ||
       (github.event.issue.pull_request &&
-      (github.event.comment.user.login == 'chatgpt-codex-connector[bot]' || github.event.comment.body == '@codex review'))
+      (github.event.comment.user.login == 'chatgpt-codex-connector[bot]' || github.event.comment.body == '@codex review')))
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
@@ -37,7 +42,16 @@ jobs:
         with:
           script: |
             const {owner, repo} = context.repo;
-            const number = context.payload.pull_request?.number || context.payload.issue?.number || Number(context.payload.inputs?.pr);
+            let number = context.payload.pull_request?.number || context.payload.issue?.number || Number(context.payload.inputs?.pr);
+            // workflow_run executa na branch padrão com token de escrita, inclusive
+            // após CI disparado pelo Dependabot. Nunca executa código/artifacts do run.
+            const ciRun = context.payload.workflow_run;
+            if (ciRun) {
+              if (ciRun.repository?.full_name !== `${owner}/${repo}`) return;
+              const candidates = await github.paginate(github.rest.pulls.list, {owner, repo, state: 'open', per_page: 100});
+              number = candidates.find(p => p.head.sha === ciRun.head_sha && ['main', 'staging'].includes(p.base.ref))?.number;
+            }
+            if (!number) return;
             const {data: pr} = await github.rest.pulls.get({owner, repo, pull_number: number});
             if (pr.state !== 'open' || !['main', 'staging'].includes(pr.base.ref)) return;
             const sha = pr.head.sha;
