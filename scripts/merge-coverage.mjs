@@ -43,9 +43,10 @@ function unionFiles(filesA, filesB) {
     // ---- statements ----
     const statementMap = {};
     const s = {};
+    const origin = {};
     {
       const index = new Map();
-      const add = (cov) => {
+      const add = (cov, side) => {
         for (const [id, loc] of Object.entries(cov.statementMap)) {
           const key = spanKey(loc.start, loc.end);
           let newId = index.get(key);
@@ -54,11 +55,21 @@ function unionFiles(filesA, filesB) {
             index.set(key, newId);
             statementMap[newId] = loc;
             s[newId] = 0;
+            origin[newId] = side;
+          } else if (origin[newId] !== side) {
+            origin[newId] = 'both';
           }
           s[newId] += cov.s[id] ?? 0;
         }
       };
-      add(a); add(b);
+      add(a, 'a'); add(b, 'b');
+      // Stmt fantasma de transform (mesma classe de fantasma já descartada
+      // para fns): span que só existe em UMA passada e ficou sem hits =
+      // artefato de remap — o stmt real (span igual ou com hits) aparece
+      // na outra. Descarta do mapa e do total antes do summarize.
+      for (const id of Object.keys(s)) {
+        if (s[id] === 0 && origin[id] !== 'both') { delete s[id]; delete statementMap[id]; }
+      }
     }
 
     // ---- functions ----
