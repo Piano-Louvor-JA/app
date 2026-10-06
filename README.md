@@ -31,7 +31,7 @@ Este README cobre apenas a **versão Electron**. A versão web é um projeto sep
 
 ## Qualidade
 
-O CI verifica lint e formatação, TypeScript, testes, regressões, build e empacotamento Electron. As regras de `staging` e `main` também exigem as análises CodeQL, o pré-review e a revisão concluída do Codex para o commit atual. Os apontamentos precisam ser resolvidos; `main` exige uma aprovação humana.
+O CI verifica TypeScript, testes, regressões, build e empacotamento Electron. O job de lint e formatação executa Biome quando há configuração local; atualmente o repositório não possui `biome.json` ou `biome.jsonc`, portanto esse job não verifica lint nem formatação. As regras de `staging` e `main` também exigem as análises CodeQL, o pré-review e a revisão concluída do Codex para o commit atual. Os apontamentos precisam ser resolvidos; `main` exige uma aprovação humana.
 
 A execução atual dos testes não comprova cobertura de 100%. Não publicamos um percentual de cobertura sem um relatório medido.
 
