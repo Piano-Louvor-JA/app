@@ -70,6 +70,20 @@ function unionFiles(filesA, filesB) {
       for (const id of Object.keys(s)) {
         if (s[id] === 0 && origin[id] !== 'both') { delete s[id]; delete statementMap[id]; }
       }
+      // Remap intra-linha: mesma linha com 2+ stmts onde um tem hits e o
+      // outro ficou 0 = desalinhamento de coluna entre passadas (o stmt
+      // real executado aparece na outra passada com col diferente). O stmt
+      // a 0 na linha já coberta é fantasma — descarta.
+      const hitsByLine = new Map();
+      for (const [id, loc] of Object.entries(statementMap)) {
+        if (s[id] > 0) hitsByLine.set(loc.start.line, (hitsByLine.get(loc.start.line) ?? 0) + 1);
+      }
+      for (const id of Object.keys(s)) {
+        if (s[id] === 0) {
+          const ln = statementMap[id]?.start?.line;
+          if (ln != null && (hitsByLine.get(ln) ?? 0) > 0) { delete s[id]; delete statementMap[id]; }
+        }
+      }
     }
 
     // ---- functions ----
