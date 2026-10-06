@@ -227,7 +227,8 @@ export default {
       syncImport: 'Import package',
       syncExported: 'Package exported successfully.',
       syncImported: 'Package imported: {applied}.',
-      syncNothingToApply: 'Nothing to import — local data is already up to date.',
+      syncNothingToApply:
+        'Nothing to import — local data is already up to date (local: {localModified}; package: {packageModified}).',
       syncInvalid: 'Invalid or incompatible .louvorja file.',
       syncCancelled: 'Operation cancelled.',
       legacyMediaTitle: 'Media import',

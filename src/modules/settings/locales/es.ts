@@ -229,7 +229,8 @@ export default {
       syncImport: 'Importar paquete',
       syncExported: 'Paquete exportado exitosamente.',
       syncImported: 'Paquete importado: {applied}.',
-      syncNothingToApply: 'Nada que importar — los datos locales ya están actualizados.',
+      syncNothingToApply:
+        'Nada que importar — los datos locales ya están actualizados (local: {localModified}; paquete: {packageModified}).',
       syncInvalid: 'Archivo .louvorja inválido o de versión incompatible.',
       syncCancelled: 'Operación cancelada.',
       legacyMediaTitle: 'Importación de medios',
