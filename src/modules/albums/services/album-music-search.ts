@@ -173,9 +173,22 @@ export async function loadAlbumMusicIndex(): Promise<AlbumSearchHit[]> {
 }
 
 /**
- * Busca estilo Home legado: nome, álbum ou número do hinário (máx. 50).
+ * Busca por hinos: título, álbum ou número do hinário (máx. 50).
  * Número prioriza Hinário Adventista atual, depois 1996.
+ *
+ * Relevância (apk#127 / SPEC 10): match de TÍTULO ou NÚMERO sempre
+ * precede match só de ÁLBUM — um termo que casa com o nome da coletânea
+ * NÃO pode retornar todas as faixas dela como se fossem resultado direto;
+ * os matches de álbum entram apenas como cauda, ordenados por relevância.
  */
+function relevanceScore(entry: AlbumSearchHit, trimmed: string): number {
+  const title = entry.name.toLowerCase()
+  if (title === trimmed) return 3 // título exato
+  if (title.startsWith(trimmed)) return 2 // título começa com o termo
+  if (title.includes(trimmed)) return 1 // título contém
+  return 0 // só álbum
+}
+
 export function filterAlbumMusicIndex(
   index: AlbumSearchHit[],
   query: string,
@@ -235,6 +248,12 @@ export function filterAlbumMusicIndex(
       }
       return score(b) - score(a)
     })
+  } else {
+    // Busca textual: título/número primeiro; match só de álbum vai pro fim
+    // (não some, mas não engole a lista — apk#127).
+    results = [...results].sort(
+      (a, b) => relevanceScore(b, trimmed) - relevanceScore(a, trimmed),
+    )
   }
 
   return results.slice(0, 50)
