@@ -6,7 +6,8 @@ import { useRouter } from 'vue-router'
 
 import { GlassCard } from '@design-system/index'
 import { readEffectiveStageSettings, subscribeStageSettings } from '../../settings/services/stage-settings-runtime'
-import { resolveBackgroundImage, type StageSettings } from '../../settings/types/stage-settings'
+import { resolveBackgroundImage, type StageSettings,
+  stageBgCss } from '../../settings/types/stage-settings'
 
 
 import StageCustomizationDialog from '../../settings/components/StageCustomizationDialog.vue'
@@ -58,7 +59,7 @@ onMounted(() => {
 onUnmounted(() => unsubStage?.())
 
 const stageBg = computed(() => ({
-  backgroundColor: stage.value.backgroundColor,
+  backgroundColor: stageBgCss(stage.value.backgroundColor),
   backgroundImage: resolveBackgroundImage(stage.value.backgroundImage)
     ? `url(${resolveBackgroundImage(stage.value.backgroundImage)})`
     : undefined,

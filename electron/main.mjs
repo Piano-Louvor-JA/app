@@ -790,10 +790,8 @@ app.on("will-quit", () => {
 });
 
 app.on("window-all-closed", () => {
-	// window-all-closed pode disparar quando o splash fecha mas a main
-	// ainda está carregando. Só saímos se mainWindow já existiu ou se
-	// não há intenção de criar janela (eula recusado, erro fatal, etc).
-	if (process.platform !== "darwin") {
-		app.quit();
-	}
+	// Fechar a splash pode disparar este evento durante o handoff para a
+	// main window. Não mata o processo se a principal ainda existe/carrega.
+	if (mainWindow && !mainWindow.isDestroyed()) return;
+	if (process.platform !== "darwin") app.quit();
 });

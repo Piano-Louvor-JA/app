@@ -50,7 +50,15 @@ export type StageVerticalAlign = 'top' | 'middle' | 'bottom'
 export type StageFontWeight = 400 | 600 | 800
 
 export type StageSettings = {
-  backgroundColor: string
+  /**
+   * Cor de fundo do palco. null = NÃO SETADO (padrão de fábrica):
+   * sem escolha explícita do usuário, a IMAGEM da projeção (capa/bg da
+   * música, asset oficial) vence — cor setada sufoca a imagem (05/10
+   * Rafael: "as fontes estão todas configuradas logo por padrão nem as
+   * cores vão vir setadas a não ser se o usuário selecione").
+   * Presets recebem a cor explícita ao serem clicados.
+   */
+  backgroundColor: string | null
   textColor: string
   fontSize: number // px @1920 (60–160)
   fontWeight: StageFontWeight
@@ -87,6 +95,8 @@ export type StageSettings = {
   bibleFontSize: number // px @1920 (50–140)
   bibleFontWeight: 400 | 500 | 700
   bibleTextColor: string
+  /** Capitalização do versículo (paridade web — mesmo campo/serde `bTransform`). */
+  bibleTextTransform: 'none' | 'uppercase' | 'capitalize'
   /** Data URL da imagem de fundo do escopo (1 ativa por escopo). */
   backgroundImage: string | null
   /**
@@ -151,7 +161,7 @@ export const COUNTDOWN_TIME_FORMAT_OPTIONS: NonNullable<StageSettings['countdown
 ]
 
 export const DEFAULT_STAGE_SETTINGS: StageSettings = {
-  backgroundColor: '#0A0E1A',
+  backgroundColor: null,
   textColor: '#FFFFFF',
   fontSize: 96,
   fontWeight: 600,
@@ -170,6 +180,7 @@ export const DEFAULT_STAGE_SETTINGS: StageSettings = {
   bibleFontSize: 84,
   bibleFontWeight: 500,
   bibleTextColor: '#FFFFFF',
+  bibleTextTransform: 'none',
   titleFontSize: null,
   titleFontWeight: null,
   titleTextColor: null,
@@ -210,7 +221,10 @@ export function stageFlexAlign(
   return { alignItems: horizontal, justifyContent: vertical }
 }
 
-/** Presets de fundo — mesmos do APK. */
+  /**
+   * Presets de fundo — mesmos do APK. Clicar SETA a cor explicitamente
+   * (entra no storage); nenhum é default (05/10 Rafael).
+   */
 export const STAGE_BG_PRESETS = [
   { color: '#0A0E1A', label: 'Azul-noite' },
   { color: '#000000', label: 'Preto' },
@@ -260,6 +274,17 @@ export function resolveBackgroundImage(backgroundImage: string | null): string |
   return backgroundImage
 }
 
+/**
+ * Cor de fundo pronta pra CSS (style binding). null (não setado) →
+ * 'transparent': a camada de IMAGEM (capa/bg da música) aparece por cima
+ * do preto do palco; onde não há imagem, preto puro (05/10 Rafael).
+ */
+export function stageBgCss(
+  backgroundColor: string | null,
+): string {
+  return backgroundColor ?? 'transparent'
+}
+
 /** Presets de cor do texto — mesmos do APK. */
 export const STAGE_FG_PRESETS = [
   { color: '#FFFFFF', label: 'Branco' },
@@ -277,6 +302,13 @@ export const STAGE_REF_PRESETS = [
 
 const WEIGHTS: StageFontWeight[] = [400, 600, 800]
 const BIBLE_WEIGHTS: StageSettings['bibleFontWeight'][] = [400, 500, 700]
+
+/** Opções de capitalização do versículo (bíblia) — paridade web. */
+export const BIBLE_TEXT_TRANSFORM_OPTIONS: StageSettings['bibleTextTransform'][] = [
+  'none',
+  'uppercase',
+  'capitalize',
+]
 
 function asColor(value: unknown, fallback: string): string {
   return typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value)
@@ -304,7 +336,10 @@ export function parseStageSettings(raw: unknown): StageSettings {
   const weight = asNumber(s['weight'], 600) as StageFontWeight
   const bibleWeight = asNumber(s['bWeight'], 500) as StageSettings['bibleFontWeight']
   return {
-    backgroundColor: asColor(s['bg'], DEFAULT_STAGE_SETTINGS.backgroundColor),
+    backgroundColor:
+      typeof s['bg'] === 'string' && /^#[0-9a-fA-F]{6}$/.test(s['bg'])
+        ? s['bg']
+        : null,
     textColor: asColor(s['fg'], DEFAULT_STAGE_SETTINGS.textColor),
     fontSize: clamp(asNumber(s['size'], 96), 60, 160),
     fontWeight: WEIGHTS.includes(weight) ? weight : 600,
@@ -324,6 +359,11 @@ export function parseStageSettings(raw: unknown): StageSettings {
     bibleFontSize: clamp(asNumber(s['bSize'], 84), 50, 140),
     bibleFontWeight: BIBLE_WEIGHTS.includes(bibleWeight) ? bibleWeight : 500,
     bibleTextColor: asColor(s['bFg'], DEFAULT_STAGE_SETTINGS.bibleTextColor),
+    bibleTextTransform: BIBLE_TEXT_TRANSFORM_OPTIONS.includes(
+      s['bTransform'] as StageSettings['bibleTextTransform'],
+    )
+      ? (s['bTransform'] as StageSettings['bibleTextTransform'])
+      : 'none',
     titleFontSize:
       s['tSize'] == null ? null : clamp(asNumber(s['tSize'], 96), 60, 160),
     titleFontWeight: s['tWeight'] == null ? null : (WEIGHTS.includes(asNumber(s['tWeight'], 600) as StageFontWeight) ? (asNumber(s['tWeight'], 600) as StageFontWeight) : null),
@@ -408,7 +448,9 @@ export function parseStageSettings(raw: unknown): StageSettings {
 /** Serializa no formato do APK (simétrico ao parse). */
 export function serializeStageSettings(s: StageSettings): Record<string, unknown> {
   return {
-    bg: s.backgroundColor,
+    // null = não setado: chave AUSENTE no storage (05/10 Rafael — cor só
+    // existe se o usuário escolher; parse trata ausente como null).
+    ...(s.backgroundColor ? { bg: s.backgroundColor } : {}),
     fg: s.textColor,
     size: s.fontSize,
     weight: s.fontWeight,
@@ -427,6 +469,7 @@ export function serializeStageSettings(s: StageSettings): Record<string, unknown
     bSize: s.bibleFontSize,
     bWeight: s.bibleFontWeight,
     bFg: s.bibleTextColor,
+    bTransform: s.bibleTextTransform,
     ...(s.titleFontSize != null ? { tSize: s.titleFontSize } : {}),
     ...(s.titleFontWeight != null ? { tWeight: s.titleFontWeight } : {}),
     ...(s.titleTextColor != null ? { tFg: s.titleTextColor } : {}),

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch, nextTick } from 'vue'
 
 import {
   MEDIA_RUNTIME_CHANNEL,
@@ -10,7 +10,8 @@ import {
 import { stripHtmlBreaks } from '../services/media-slides'
 import { readEffectiveStageSettings, subscribeStageSettings } from '../../settings/services/stage-settings-runtime'
 import type { StageSettings } from '../../settings/types/stage-settings'
-import { resolveBackgroundImage, stageFlexAlign } from '../../settings/types/stage-settings'
+import { resolveBackgroundImage, stageFlexAlign,
+  stageBgCss } from '../../settings/types/stage-settings'
 import type { MediaProjectionRuntime } from '../types/media'
 import { DEFAULT_MEDIA_PROJECTION } from '../types/media'
 
@@ -23,6 +24,9 @@ let unsubStage: (() => void) | null = null
 let channel: BroadcastChannel | null = null
 
 const lyric = computed(() => stripHtmlBreaks(runtime.value.lyric))
+// SOLUÇÃO EZEQUIAS (web, 3dc37df): SEM fit JS. white-space:pre-line no CSS
+// faz as quebras \n virarem linhas E o texto fluir até a max-width antes
+// de quebrar — quebra natural do browser, largura sempre aproveitada.
 // Título grande SÓ no slide de capa (cover) — slide de letra vazio não deve
 // renderizar o nome da música no meio do hino (slides de solfejo/pausa são
 // filtrados no buildMediaSlides, mas qualquer slide vazio residual não vira título).
@@ -68,7 +72,7 @@ onUnmounted(() => {
 })
 
 const stageStyle = computed(() => ({
-  backgroundColor: stage.value.backgroundColor,
+  backgroundColor: stageBgCss(stage.value.backgroundColor),
 }))
 
 // BG custom do Palco tem prioridade sobre a capa do álbum (como o APK).
@@ -159,9 +163,7 @@ const boxStyle = computed(() =>
         v-if="lyric && !runtime.isCover"
         class="media-projection__lyric"
         :style="[lyricStyle, boxStyle]"
-      >
-        {{ lyric }}
-      </p>
+      >{{ lyric }}</p>
     </div>
   </div>
 </template>
@@ -198,25 +200,21 @@ const boxStyle = computed(() =>
   text-align: center;
 }
 
+/* Reflexo das personalizações (05/10 Rafael): fonte/cor/sombra/caixa vêm
+   das settings via :style (lyricStyle/titleStyle/boxStyle) — o CSS aqui só
+   dá o esqueleto. NADA fixo de cor/borda/fundo que compita com o :style. */
 .media-projection__title,
 .media-projection__lyric {
   margin: 0;
-  max-width: 86vw;
-  padding: 2.5vmin 4vmin;
-  border: clamp(2px, 0.2vmin, 4px) solid rgb(255 255 255 / 0.85);
+  width: fit-content;
+  max-width: min(100%, 1600px);
+  padding: 1.6vmin 1.8vmin;
   border-radius: clamp(14px, 2.4vmin, 32px) 0
     clamp(14px, 2.4vmin, 32px) 0;
-  background: rgb(24 24 24 / 0.55);
-  box-shadow: 0 10px 30px rgb(0 0 0 / 0.4);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  color: #fff;
-  font-size: clamp(1.75rem, 7.5vmin, 8rem);
-  font-weight: 700;
   line-height: 1.4;
   letter-spacing: 0.03em;
   text-align: center;
-  text-transform: uppercase;
+  /* Ezequias/web: quebras \n viram linhas; o resto flui até a max-width */
   white-space: pre-line;
 }
 

@@ -7,7 +7,7 @@
  */
 import { computed } from 'vue'
 
-import { resolveBackgroundImage, stageFlexAlign, type StageSettings } from '../types/stage-settings'
+import { resolveBackgroundImage, stageBgCss, stageFlexAlign, type StageSettings } from '../types/stage-settings'
 
 const props = defineProps<{
   settings: StageSettings
@@ -27,7 +27,9 @@ const footer = computed(() =>
 const containerStyle = computed(() => {
   const s = props.settings
   return {
-    backgroundColor: s.backgroundColor,
+    // null (não setado) → transparent: o preview mostra o comportamento
+    // real (imagem da música vence / preto do palco por baixo).
+    backgroundColor: stageBgCss(s.backgroundColor),
     backgroundImage: resolveBackgroundImage(s.backgroundImage)
       ? `url(${resolveBackgroundImage(s.backgroundImage)})`
       : undefined,
@@ -46,6 +48,9 @@ const textStyle = computed(() => {
     fontSize: `${((isBible ? s.bibleFontSize : s.fontSize) / 1920) * 100}cqw`,
     fontWeight: String(isBible ? s.bibleFontWeight : s.fontWeight),
     textAlign: s.textAlign,
+    // Paridade web: capitalização do versículo no preview da Bíblia.
+    textTransform:
+      isBible && s.bibleTextTransform !== 'none' ? s.bibleTextTransform : 'none',
     textShadow: s.textShadow
       ? `0 0 ${(s.shadowBlur / 108) * 100}cqw rgba(0,0,0,${s.shadowIntensity})`
       : 'none',

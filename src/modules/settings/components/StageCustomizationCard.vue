@@ -165,6 +165,12 @@ const bibleWeightOptions: { value: StageSettings['bibleFontWeight']; label: stri
   { value: 700, label: t('settings.stage.weightStrong') },
 ]
 
+const bibleTransformOptions: { value: StageSettings['bibleTextTransform']; label: string }[] = [
+  { value: 'none', label: t('settings.stage.bibleTransformNone') },
+  { value: 'uppercase', label: t('settings.stage.bibleTransformUppercase') },
+  { value: 'capitalize', label: t('settings.stage.bibleTransformCapitalize') },
+]
+
 const alignOptions = [
   { value: 'left', label: t('settings.stage.alignLeft') },
   { value: 'center', label: t('settings.stage.alignCenter') },
@@ -225,15 +231,35 @@ const confirmReset = ref(false)
       {{ t('settings.stage.inheritingHint') }}
     </p>
 
-    <StagePreview
-      class="stage-custom__preview"
-      :settings="settings"
-      :module="activeScope === 'global' ? 'hymns' : activeScope"
-    />
+    <div class="stage-custom__body">
+      <!-- Preview FIXO à direita (DENTRO do body = coluna 2 do grid):
+           reflete ao vivo toda personalização aplicada à esquerda
+           (05/10 Rafael). Compacto — não precisa ser enorme. -->
+      <div class="stage-custom__preview-pane">
+        <StagePreview
+          class="stage-custom__preview"
+          :settings="settings"
+          :module="activeScope === 'global' ? 'hymns' : activeScope"
+        />
+      </div><!-- /preview-pane -->
 
-    <div class="stage-custom__section">
-      <p class="stage-custom__label">{{ t('settings.stage.backgroundColor') }}</p>
+      <div class="stage-custom__controls">
+      <div class="stage-custom__controls-inner">
+        <div class="stage-custom__section">
+          <p class="stage-custom__label">{{ t('settings.stage.backgroundColor') }}</p>
       <div class="stage-custom__swatches">
+        <!-- Auto (default): sem cor setada → a IMAGEM da projeção vence.
+             Clicar de volta aqui limpa a escolha (05/10 Rafael). -->
+        <button
+          type="button"
+          class="stage-custom__swatch stage-custom__swatch--auto"
+          :class="{ 'stage-custom__swatch--active': settings.backgroundColor == null }"
+          :aria-label="t('settings.stage.autoBg')"
+          :title="t('settings.stage.autoBg')"
+          @click="patch({ backgroundColor: null })"
+        >
+          <i class="ti ti-photo" aria-hidden="true" />
+        </button>
         <button
           v-for="preset in STAGE_BG_PRESETS"
           :key="preset.color"
@@ -248,7 +274,7 @@ const confirmReset = ref(false)
           <i class="ti ti-color-picker" aria-hidden="true" />
           <input
             type="color"
-            :value="settings.backgroundColor"
+            :value="settings.backgroundColor ?? '#000000'"
             :aria-label="t('settings.stage.backgroundColor')"
             @input="patch({ backgroundColor: ($event.target as HTMLInputElement).value })"
           >
@@ -671,6 +697,24 @@ const confirmReset = ref(false)
           </button>
         </div>
 
+        <p class="stage-custom__label stage-custom__label--sub">
+          {{ t('settings.stage.bibleTextTransform') }}
+        </p>
+        <div class="stage-custom__segment" role="radiogroup">
+          <button
+            v-for="opt in bibleTransformOptions"
+            :key="opt.value"
+            type="button"
+            role="radio"
+            :aria-checked="settings.bibleTextTransform === opt.value"
+            class="stage-custom__segment-btn"
+            :class="{ 'stage-custom__segment-btn--active': settings.bibleTextTransform === opt.value }"
+            @click="patch({ bibleTextTransform: opt.value })"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
+
         <div class="stage-custom__toggle-row">
           <button
             type="button"
@@ -1031,7 +1075,11 @@ const confirmReset = ref(false)
           {{ t('settings.stage.reset') }}
         </button>
       </template>
-    </div>
+      </div><!-- /controls-inner -->
+      </div><!-- /controls -->
+
+    </div><!-- /controls (ver /controls-inner acima) -->
+    </div><!-- /body (grid 2 colunas) -->
   </GlassCard>
 </template>
 
@@ -1039,13 +1087,61 @@ const confirmReset = ref(false)
 .stage-custom {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1.25rem;
   padding: 2rem;
 
   @media (max-width: 1280px) {
     gap: 1rem;
     padding: 1.15rem;
   }
+}
+
+.stage-custom__header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Preview ACIMA dos controles (ou abaixo — ambos ok, decide o fluxo),
+   compacto e SEMPRE VISÍVEL no abrir do modal; controles vêm depois.
+   Sem colunas, sem overlay: rolagem natural da página (Rafael 05/10). */
+.stage-custom__body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.stage-custom__controls {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  min-width: 0;
+}
+
+.stage-custom__controls-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  min-width: 0;
+}
+
+.stage-custom__preview-pane {
+  /* Sempre visível: cola no topo enquanto os controles rolam
+     (deixa de aparecer só quando o card inteiro sai da tela). */
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  padding: 0.6rem 0;
+  background: var(--ds-color-surface, rgb(16 18 24));
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--ds-color-outline) 60%, transparent);
+}
+
+/* Preview compacto: vê a personalização em tempo real sem dominar a tela. */
+.stage-custom__preview {
+  width: 100%;
+  max-width: 480px;
 }
 
 .stage-custom__header {
@@ -1176,6 +1272,19 @@ const confirmReset = ref(false)
   &--active {
     border-color: var(--ds-color-primary);
     box-shadow: 0 0 0 4px color-mix(in srgb, var(--ds-color-primary) 25%, transparent);
+  }
+}
+
+.stage-custom__swatch--auto {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ds-color-on-surface-variant);
+  background: color-mix(in srgb, var(--ds-color-surface-container-high) 70%, transparent);
+  border: 1px dashed var(--ds-color-outline);
+
+  .ti {
+    font-size: 18px;
   }
 }
 

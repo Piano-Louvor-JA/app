@@ -57,7 +57,8 @@ describe('useStageSettingsStore', () => {
 
   it('inicializa com defaults quando storage vazio', () => {
     expect(store.activeScope).toBe('global')
-    expect(store.settings.backgroundColor).toBe('#0A0E1A')
+    // 05/10 Rafael: default null (não setado)
+    expect(store.settings.backgroundColor).toBeNull()
     expect(store.settings.bibleFontSize).toBe(84)
   })
 
@@ -144,8 +145,9 @@ describe('useStageSettingsStore', () => {
 
     store.resetScope()
 
-    expect(mockPrefs[KEY_GLOBAL].bg).toBe('#0A0E1A') // default serializado
-    expect(store.settings.backgroundColor).toBe('#0A0E1A')
+    // 05/10 Rafael: default null não serializa bg (chave ausente = não setado)
+    expect(mockPrefs[KEY_GLOBAL].bg).toBeUndefined()
+    expect(store.settings.backgroundColor).toBeNull()
   })
 
   it('effective retorna override > global > defaults', () => {
@@ -165,7 +167,8 @@ describe('useStageSettingsStore', () => {
 
   it('effective sem nada storage → defaults', () => {
     const s = store.effective('bible')
-    expect(s.backgroundColor).toBe('#0A0E1A')
+    // 05/10 Rafael: default null (não setado) — imagem vence sem escolha
+    expect(s.backgroundColor).toBeNull()
     expect(s.bibleFontSize).toBe(84)
   })
 })

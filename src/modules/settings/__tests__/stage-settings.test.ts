@@ -11,7 +11,9 @@ import {
 
 describe('stage-settings (paridade APK)', () => {
   it('defaults idênticos ao APK', () => {
-    expect(DEFAULT_STAGE_SETTINGS.backgroundColor).toBe('#0A0E1A')
+    // 05/10 Rafael: backgroundColor default é NULL (não setado) — cor só
+    // existe se o usuário escolher; sem escolha, a imagem da projeção vence.
+    expect(DEFAULT_STAGE_SETTINGS.backgroundColor).toBeNull()
     expect(DEFAULT_STAGE_SETTINGS.textColor).toBe('#FFFFFF')
     expect(DEFAULT_STAGE_SETTINGS.fontSize).toBe(96)
     expect(DEFAULT_STAGE_SETTINGS.shadowBlur).toBeCloseTo(2.2)

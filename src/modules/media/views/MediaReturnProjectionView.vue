@@ -11,7 +11,8 @@ import {
 import { stripHtmlBreaks } from '../services/media-slides'
 import { readEffectiveStageSettings, subscribeStageSettings } from '../../settings/services/stage-settings-runtime'
 import type { StageSettings } from '../../settings/types/stage-settings'
-import { resolveBackgroundImage } from '../../settings/types/stage-settings'
+import { resolveBackgroundImage,
+  stageBgCss } from '../../settings/types/stage-settings'
 import type { MediaProjectionRuntime } from '../types/media'
 import { DEFAULT_MEDIA_PROJECTION } from '../types/media'
 
@@ -323,7 +324,7 @@ onUnmounted(() => {
 })
 
 const stageStyle = computed(() => ({
-  backgroundColor: stage.value.backgroundColor,
+  backgroundColor: stageBgCss(stage.value.backgroundColor),
 }))
 
 const bgImage = computed(

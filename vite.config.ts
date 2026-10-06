@@ -13,6 +13,13 @@ const pkg = JSON.parse(
 
 // https://vite.dev/config/
 export default defineConfig({
+  // LOCAL do worktree de teste: node_modules é symlink pra
+  // /media/.../Dados/repos/piano-app/node_modules — sem allow o /@fs/ dá 403 nas fontes.
+  server: {
+    fs: {
+      allow: ['.', '/media/rafaelejosi/Dados/repos/piano-app/node_modules'],
+    },
+  },
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
