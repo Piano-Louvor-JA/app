@@ -93,6 +93,9 @@ async function handleSyncImport() {
     }
     const result = importLouvorjaIntoBrowser(decodeLouvorjaPackage(raw))
     if (result.applied.length > 0) {
+      if (result.applied.includes("liturgy")) {
+        window.dispatchEvent(new CustomEvent("liturgy:imported"))
+      }
       syncStatus.value = {
         kind: 'success',
         messageKey: 'settings.general.syncImported',
@@ -102,6 +105,10 @@ async function handleSyncImport() {
       syncStatus.value = {
         kind: 'success',
         messageKey: 'settings.general.syncNothingToApply',
+        params: {
+          localModified: result.localModified ?? '—',
+          packageModified: result.packageModified ?? '—',
+        },
       }
     }
   } catch (error) {
