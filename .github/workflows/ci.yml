@@ -136,7 +136,16 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: release-validation-${{ matrix.platform }}-electron-${{ matrix.version }}
-          path: dist-electron/
+          # Somente arquivos finais da raiz; exclui apps descompactados.
+          path: |
+            dist-electron/*.exe
+            dist-electron/*.dmg
+            dist-electron/*.AppImage
+            dist-electron/*.blockmap
+            dist-electron/latest*.yml
+            dist-electron/SHA256SUMS-*
+          # Instaladores já são comprimidos; evita recompressão no runner.
+          compression-level: 0
           if-no-files-found: error
           retention-days: 14
 
