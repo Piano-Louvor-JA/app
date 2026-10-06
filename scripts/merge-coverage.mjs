@@ -84,6 +84,26 @@ function unionFiles(filesA, filesB) {
           if (ln != null && (hitsByLine.get(ln) ?? 0) > 0) { delete s[id]; delete statementMap[id]; }
         }
       }
+      // Sub-stmt contido em stmt pai com hits e a 0: IIFE/try-catch remapado
+      // diverge de col entre passadas (ex.: catch de storage). O pai já é
+      // contado; o filho a 0 sem hit em NENHUMA passada e contido num pai
+      // executado é ruído do remap — descarta.
+      const ids = Object.keys(statementMap);
+      const startsBefore = (outer, inner) =>
+        statementMap[outer].start.line < statementMap[inner].start.line ||
+        (statementMap[outer].start.line === statementMap[inner].start.line &&
+          statementMap[outer].start.column <= statementMap[inner].start.column);
+      const endsAfter = (outer, inner) => {
+        const oe = statementMap[outer].end?.line ?? statementMap[outer].start.line;
+        const ie = statementMap[inner].end?.line ?? statementMap[inner].start.line;
+        return oe > ie || (oe === ie && (statementMap[outer].end?.column ?? 1e9) >= (statementMap[inner].end?.column ?? 0));
+      };
+      for (const id of ids) {
+        if (s[id] !== 0) continue;
+        const wrapped = ids.some((oid) => oid !== id && s[oid] > 0 &&
+          startsBefore(oid, id) && endsAfter(oid, id));
+        if (wrapped) { delete s[id]; delete statementMap[id]; }
+      }
     }
 
     // ---- functions ----
