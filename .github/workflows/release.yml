@@ -177,7 +177,13 @@ jobs:
             echo "Faltam latest-linux.yml / latest-linux-arm64.yml (metadados do auto-update)" >&2
             exit 1
           fi
-          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "$TAG" --generate-notes
+          # O electron-builder (mac/win, em paralelo) pode ter criado um draft da mesma tag.
+          # `gh release view` encontra draft; publica esse draft em vez de criar outra release.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --draft=false --latest
+          else
+            gh release create "$TAG" --title "$TAG" --generate-notes --latest
+          fi
           gh release upload "$TAG" "${assets[@]}" --clobber
           echo "Publicados:"
           printf '  %s\n' "${assets[@]}"
