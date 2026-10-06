@@ -11,7 +11,8 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.ref }}
+  # Edição só de texto não cancela a validação de código em andamento.
+  group: ci-${{ github.event.pull_request.number || github.ref }}-${{ github.event.action == 'edited' && github.event.changes.base == null && 'metadata' || 'code' }}
   cancel-in-progress: true
 
 permissions:
