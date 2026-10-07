@@ -1,6 +1,14 @@
-// vitest.setup.ts — roda ANTES de qualquer teste/import
-// Só define localStorage/sessionStorage se NÃO existirem (testes que usam
-// vi.stubGlobal('localStorage') falham com "Cannot redefine" se definirmos sempre).
+// vitest.setup.ts — roda após o environment setup.
+//
+// 1) jsdom 27+: populateGlobal do vitest não copia localStorage/sessionStorage
+//    para o globalThis (não estão em KEYS). Injeta getters do jsdom.window —
+//    só se ainda não existirem (testes com vi.stubGlobal não são sobrescritos).
+// 2) Se NEM jsdom nem global têm storage (ambiente node puro), instala mock.
+// 3) window.louvorja: simula browser (não Electron) no jsdom.
+// 4) HTMLMediaElement.load/pause: não existem no jsdom — no-op.
+const dom = (globalThis as any).jsdom
+const win: any = dom?.window ?? globalThis.window
+
 const makeStorageMock = () => {
   const store = new Map<string, string>()
   return {
@@ -11,22 +19,31 @@ const makeStorageMock = () => {
   }
 }
 
-const g = globalThis as Record<string, unknown>
-if (typeof g.localStorage === 'undefined') {
-  Object.defineProperty(global, 'localStorage', { value: makeStorageMock(), writable: true, configurable: true })
+if (!globalThis.localStorage) {
+  const real = win?.localStorage
+  Object.defineProperty(globalThis, 'localStorage', {
+    get: () => ((globalThis as any).jsdom?.window ?? globalThis.window)?.localStorage ?? real,
+    ...(real ? {} : { value: makeStorageMock(), writable: true }),
+    configurable: true,
+    enumerable: true,
+  })
 }
-if (typeof g.sessionStorage === 'undefined') {
-  Object.defineProperty(global, 'sessionStorage', { value: makeStorageMock(), writable: true, configurable: true })
-}
-
-// Mock window.louvorja para simular browser (não Electron) — só em ambientes com window (jsdom)
-if (typeof globalThis.window !== 'undefined') {
-  Object.assign(globalThis.window, {
-    louvorja: { isElectron: false, platform: 'linux', version: '0.0.0-test' }
+if (!globalThis.sessionStorage) {
+  const real = win?.sessionStorage
+  Object.defineProperty(globalThis, 'sessionStorage', {
+    get: () => ((globalThis as any).jsdom?.window ?? globalThis.window)?.sessionStorage ?? real,
+    ...(real ? {} : { value: makeStorageMock(), writable: true }),
+    configurable: true,
+    enumerable: true,
   })
 }
 
-// JSDOM não implementa HTMLMediaElement.prototype.load/pause — mock global
+if (typeof globalThis.window !== 'undefined') {
+  Object.assign(globalThis.window, {
+    louvorja: { isElectron: false, platform: 'linux', version: '0.0.0-test' },
+  })
+}
+
 if (typeof globalThis.HTMLMediaElement !== 'undefined') {
   if (!HTMLMediaElement.prototype.load) {
     HTMLMediaElement.prototype.load = () => {}
