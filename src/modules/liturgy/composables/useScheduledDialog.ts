@@ -109,9 +109,14 @@ export function useScheduledDialog() {
     dateISO: string,
     entry: { musicId?: number; name: string; filePath?: string },
   ) {
+    const raw = entry.filePath ?? entry.name
+    // URL http(s) = vídeo online (YouTube/Vimeo/…); caminho/sem esquema = arquivo.
+    const isUrl = /^https?:\/\//i.test(raw)
     const content: ScheduledItemContent = entry.musicId
       ? { kind: 'music', musicId: entry.musicId }
-      : { kind: 'file', filePath: entry.filePath ?? entry.name }
+      : isUrl
+        ? { kind: 'online_video', url: raw }
+        : { kind: 'file', filePath: raw }
     store.upsertItem({
       id: `sch-${dateISO}-${categoryId}-${entry.musicId ?? Math.random().toString(36).slice(2, 6)}`,
       categoryId,
