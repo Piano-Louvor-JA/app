@@ -281,6 +281,21 @@ export default {
       presentationOfficeMissing:
         'Para proyectar PPT/PPTX, instale LibreOffice (o defina LIBREOFFICE_PATH).',
     },
+    slja: {
+      importButton: 'Importar .slja',
+      importing: 'Importando…',
+      imported: 'Importado: {name} ({slides} estrofas).',
+      importedLocal:
+        'Importado en este dispositivo: {name} ({slides} estrofas) — guardado sin cuenta.',
+      importedLocalNoImages:
+        'Importado en este dispositivo: {name} ({slides} estrofas). Las imágenes no se guardaron en este aparato.',
+      importFailed: 'Archivo .slja inválido.',
+      importStorageFailed:
+        'No se pudo guardar el audio en este aparato. Libere espacio e intente de nuevo.',
+      importRemoteFailed:
+        'No se pudo completar el envío. Verifique la conexión e intente de nuevo.',
+      importNoLyrics: 'El archivo no tiene estrofas de letra para importar.',
+    },
     custom: {
       title: 'Liturgias personalizadas',
       new: 'Nueva liturgia personalizada',

@@ -26,10 +26,17 @@ export type LiturgyActionResult =
   | { ok: true; messageKey?: string }
   | { ok: false; messageKey: string }
 
-function resolveMusicId(item: LiturgyItem): number | null {
+/**
+ * app#331: id de música do item → namespace único de mídia.
+ * - >= 1.000.000: música custom da API (Minhas Coletâneas / importações .slja logadas)
+ * - negativo: música LOCAL (import .slja sem login — localStorage)
+ * - positivo pequeno: hino oficial do catálogo
+ * 0/NaN/null (sem música) → null.
+ */
+export function resolveMusicId(item: LiturgyItem): number | null {
   if (item.type !== 'music') return null
   const musicId = Number(item.musicId)
-  if (!Number.isFinite(musicId) || musicId <= 0) return null
+  if (!Number.isFinite(musicId) || musicId === 0) return null
   return musicId
 }
 

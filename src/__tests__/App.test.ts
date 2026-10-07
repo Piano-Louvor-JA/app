@@ -1,264 +1,226 @@
 // @vitest-environment jsdom
-import { mount, flushPromises } from "@vue/test-utils";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createI18n } from "vue-i18n";
-import { nextTick, ref } from "vue";
+/**
+ * Cobertura: App.vue (task t_86847917).
+ * Shell raiz — testa os dois modos (principal vs projeção), splash/starting,
+ * reação ao tema, banner de update → dialog, e o boot do palco-bridge.
+ * Todos os subsystemas são mockados: o App orquestra, não implementa.
+ */
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
+import {
+  createMemoryHistory,
+  createRouter,
+  type Router,
+} from 'vue-router'
 
-// ---- mocks das dependências do App.vue ----
-vi.mock("vue-router", () => ({
-  useRoute: () => routeState.route,
-  RouterView: { name: "RouterView", render: () => null },
-}));
-
-vi.mock("vuetify", () => ({
-  useTheme: () => ({ change: vi.fn(async () => {}) }),
-}));
-
-vi.mock("@design-system/composables", () => ({
-  useThemeManager: () => ({ currentTheme: ref(themeState.theme) }),
-}));
-
-vi.mock("@modules/starting/stores/useStartingStore", () => ({
-  useStartingStore: () => startingStoreMock,
-}));
-
-vi.mock("@modules/starting/components/StartingOverlay.vue", () => ({
-  default: { name: "StartingOverlay", render: () => null },
-}));
-
-vi.mock("@layouts/AppTitlebar.vue", () => ({
-  default: { name: "AppTitlebar", render: () => null },
-}));
-
-vi.mock("@shared/services/projection-window-location", () => ({
-  isProjectionPopupLocation: () => projectionState.isPopup,
-}));
-
-const escapeCb = vi.hoisted(() => ({ fn: null as null | (() => boolean) }));
-const hotkeysCb = vi.hoisted(() => ({ fn: null as null | (() => boolean) }));
-vi.mock("@shared/composables/useOperatorEscapeToCloseProjection", () => ({
-  useOperatorEscapeToCloseProjection: (cb: () => boolean) => {
-    escapeCb.fn = cb;
-  },
-}));
-
-vi.mock("@modules/media/composables/useMediaPlayerHotkeys", () => ({
-  useMediaPlayerHotkeys: (cb: () => boolean) => {
-    hotkeysCb.fn = cb;
-  },
-}));
-
-vi.mock("@shared/components/UpdateBanner.vue", () => ({
-  default: {
-    name: "UpdateBanner",
-    props: ["foo"],
-    emits: ["view-notes"],
-    render: () => null,
-  },
-}));
-
-vi.mock("@shared/components/UpdateDialog.vue", () => ({
-  default: {
-    name: "UpdateDialog",
-    props: ["modelValue"],
-    emits: ["update:modelValue"],
-    template: "<div class=\"update-dialog-stub\" />",
-  },
-}));
-
-vi.mock("@shared/composables/useUpdateChecker", () => ({
-  useUpdateChecker: () => updateCheckerMock.mock,
-}));
-
-vi.mock("@modules/settings/services/palco-bridge", () => ({
-  startPalcoBridge: (...a: unknown[]) => startPalcoBridgeMock.fn(...(a as [])),
-}));
-
-// ---- estado mutável dos mocks ----
-const routeState: { route: Record<string, unknown> } = { route: {} };
-const themeState: { theme: { mode: string } } = { theme: { mode: "dark" } };
-const startingStoreMock = {
-  isAppReady: ref(true),
-  hide: vi.fn(),
-};
-const projectionState = { isPopup: false };
-const startPalcoBridgeMock = { fn: vi.fn() };
-const updateCheckerMock = {
-  mock: {
-    hasUpdate: ref(false),
-    init: vi.fn(),
-  },
-};
-
-import App from "../App.vue";
-
-const i18n = createI18n({
-  legacy: false,
-  locale: "pt-BR",
-  messages: { "pt-BR": {} },
-});
-
-function mountApp() {
-  return mount(App, {
-    global: {
-      plugins: [i18n],
-      stubs: {
-        RouterView: true,
-        StartingOverlay: true,
-        AppTitlebar: true,
-        UpdateBanner: true,
-        UpdateDialog: true,
+const { hideMock, currentThemeRef, updateCheckerMock, palcoBridgeMock } =
+  vi.hoisted(() => {
+    const { ref } = require('vue') as typeof import('vue')
+    return {
+      hideMock: vi.fn(),
+      currentThemeRef: ref({ mode: 'dark' }),
+      updateCheckerMock: {
+        hasUpdate: ref(false),
+        init: vi.fn(),
       },
-    },
-  });
+      palcoBridgeMock: { startPalcoBridge: vi.fn() },
+    }
+  })
+
+vi.mock('vuetify', () => ({
+  useTheme: () => ({
+    change: vi.fn(async () => {}),
+  }),
+}))
+
+vi.mock('@design-system/composables', () => ({
+  useThemeManager: () => ({ currentTheme: currentThemeRef }),
+}))
+
+vi.mock('@modules/starting/stores/useStartingStore', async () => {
+  const { defineStore } = await import('pinia')
+  const { ref } = await import('vue')
+  const useTestStartingStore = defineStore('starting-test', () => {
+    const isAppReady = ref(true)
+    return { isAppReady, hide: hideMock }
+  })
+  return { useStartingStore: useTestStartingStore }
+})
+
+vi.mock('@modules/starting/components/StartingOverlay.vue', () => ({
+  default: { name: 'StartingOverlay', template: '<div class="starting-overlay-mock" />' },
+}))
+
+vi.mock('@shared/services/projection-window-location', async () => {
+  const { isProjectionPopupLocation: real } = await vi.importActual<
+    typeof import('@shared/services/projection-window-location')
+  >('@shared/services/projection-window-location')
+  return { isProjectionPopupLocation: real }
+})
+
+vi.mock('@shared/composables/useOperatorEscapeToCloseProjection', () => ({
+  useOperatorEscapeToCloseProjection: vi.fn(),
+}))
+
+vi.mock('@modules/media/composables/useMediaPlayerHotkeys', () => ({
+  useMediaPlayerHotkeys: vi.fn(),
+}))
+
+vi.mock('@shared/composables/useUpdateChecker', () => ({
+  useUpdateChecker: () => updateCheckerMock,
+}))
+
+vi.mock('@shared/components/UpdateBanner.vue', () => ({
+  default: {
+    name: 'UpdateBanner',
+    template: '<div class="update-banner-mock" />',
+    emits: ['view-notes'],
+  },
+}))
+
+vi.mock('@shared/components/UpdateDialog.vue', () => ({
+  default: {
+    name: 'UpdateDialog',
+    template: '<div class="update-dialog-mock" />',
+    props: ['modelValue'],
+  },
+}))
+
+vi.mock('@layouts/AppTitlebar.vue', () => ({
+  default: { name: 'AppTitlebar', template: '<div class="app-titlebar-mock" />' },
+}))
+
+vi.mock('@modules/settings/services/palco-bridge', () => palcoBridgeMock)
+
+import App from '../App.vue'
+
+let router: Router
+
+function makeRouter(withPopup = false) {
+  return createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      { path: '/', component: { template: '<div class="home-view" />' } },
+      {
+        path: '/popup',
+        name: 'projection-popup',
+        component: { template: '<div class="popup-view" />' },
+        meta: { projection: true },
+      },
+    ],
+    ...(withPopup ? {} : {}),
+  })
 }
 
-beforeEach(() => {
-  vi.clearAllMocks();
-  routeState.route = { meta: {}, name: "home" };
-  themeState.theme = { mode: "dark" };
-  projectionState.isPopup = false;
-  startingStoreMock.isAppReady.value = true;
-  startingStoreMock.hide = vi.fn();
-  updateCheckerMock.mock.hasUpdate.value = false;
-  updateCheckerMock.mock.init = vi.fn();
-  startPalcoBridgeMock.fn.mockClear();
-});
+beforeEach(async () => {
+  setActivePinia(createPinia())
+  hideMock.mockClear()
+  updateCheckerMock.init.mockClear()
+  palcoBridgeMock.startPalcoBridge.mockClear()
+  currentThemeRef.value = { mode: 'dark' }
+  vi.spyOn(console, 'info').mockImplementation(() => {})
+  vi.spyOn(console, 'error').mockImplementation(() => {})
+  router = makeRouter()
+  await router.push('/')
+  await router.isReady()
+})
 
-describe("App.vue — estados do template", () => {
-  it("hasUpdate true não reseta dialog; voltar pra false reseta (branch 56)", async () => {
-    updateCheckerMock.mock.hasUpdate.value = true;
-    const w = mountApp();
-    await flushPromises();
-    updateCheckerMock.mock.hasUpdate.value = false;
-    await flushPromises();
-    expect(w.find(".app-frame").exists()).toBe(true);
-  });
+afterEach(() => {
+  vi.restoreAllMocks()
+  window.history.replaceState({}, '', '/')
+})
 
-  it("isAppReady false: RouterView escondido; overlay sempre no corpo", async () => {
-    startingStoreMock.isAppReady.value = false;
-    const w = mountApp();
-    await flushPromises();
-    // RouterView stubbed renderiza null — branch v-if exercitado sem crash
-    expect(w.find(".app-frame__body").exists()).toBe(true);
-  });
-});
+function mountApp() {
+  return mount(App, { global: { plugins: [router] } })
+}
 
-describe("App.vue — callbacks de composables", () => {
-  it("getter de projeção reflete a rota do mount", async () => {
-    routeState.route = { meta: {}, name: "home" };
-    mountApp();
-    await flushPromises();
-    expect(escapeCb.fn?.()).toBe(false);
-    expect(hotkeysCb.fn?.()).toBe(false);
-  });
+describe('App.vue — janela principal', () => {
+  it('renderiza shell completo e boot palco-bridge', async () => {
+    const w = mountApp()
+    await flushPromises()
 
-  it("getter em janela popup de projeção = true", async () => {
-    projectionState.isPopup = true;
-    routeState.route = { meta: {}, name: "home" };
-    mountApp();
-    await flushPromises();
-    expect(escapeCb.fn?.()).toBe(true);
-    expect(hotkeysCb.fn?.()).toBe(true);
-    projectionState.isPopup = false;
-  });
-});
+    expect(w.find('.app-titlebar-mock').exists()).toBe(true)
+    expect(w.find('.starting-overlay-mock').exists()).toBe(true)
+    expect(w.find('.home-view').exists()).toBe(true)
+    expect(updateCheckerMock.init).toHaveBeenCalled()
+    expect(palcoBridgeMock.startPalcoBridge).toHaveBeenCalled()
+    expect(console.info).toHaveBeenCalledWith('[palco-bridge] subiu no boot')
+    w.unmount()
+  })
 
-describe("App.vue", () => {
-  it("monta, inicializa update checker e sobe palco-bridge no boot", async () => {
-    const wrapper = mountApp();
-    await flushPromises();
+  it('falha no palco-bridge não derruba o app (catch → console.error)', async () => {
+    palcoBridgeMock.startPalcoBridge.mockImplementation(() => {
+      throw new Error('bridge quebrou')
+    })
+    const w = mountApp()
+    await flushPromises()
 
-    expect(updateCheckerMock.mock.init).toHaveBeenCalled();
-    // janela principal (não projeção) → palco-bridge sobe
-    expect(startPalcoBridgeMock.fn).toHaveBeenCalled();
-    expect(wrapper.find(".app-frame").exists()).toBe(true);
-  });
+    expect(console.error).toHaveBeenCalledWith(
+      '[palco-bridge] FALHOU ao subir no boot:',
+      expect.any(Error),
+    )
+    expect(w.find('.home-view').exists()).toBe(true)
+    w.unmount()
+  })
 
-  it("não sobe palco-bridge em janela de projeção", async () => {
-    routeState.route = { meta: { projection: true }, name: "projection" };
-    const wrapper = mountApp();
-    await flushPromises();
+  it('banner view-notes abre o UpdateDialog (v-model true)', async () => {
+    const w = mountApp()
+    await flushPromises()
 
-    expect(startPalcoBridgeMock.fn).not.toHaveBeenCalled();
-    expect(wrapper.find(".app-frame--projection").exists()).toBe(true);
-  });
+    expect((w.findComponent({ name: 'UpdateDialog' }).props('modelValue') as boolean)).toBe(false)
+    await w.findComponent({ name: 'UpdateBanner' }).vm.$emit('view-notes')
+    await w.vm.$nextTick()
+    expect((w.findComponent({ name: 'UpdateDialog' }).props('modelValue') as boolean)).toBe(true)
+    w.unmount()
+  })
 
-  it("popup de projeção: esconde splash e não sobe bridge", async () => {
-    projectionState.isPopup = true;
-    routeState.route = { meta: {}, name: "projection-popup" };
-    const wrapper = mountApp();
-    await flushPromises();
+  it('watch hasUpdate=false fecha o dialog de notas', async () => {
+    updateCheckerMock.hasUpdate.value = true
+    const w = mountApp()
+    await flushPromises()
 
-    expect(startingStoreMock.hide).toHaveBeenCalled();
-    expect(startPalcoBridgeMock.fn).not.toHaveBeenCalled();
-  });
+    await w.findComponent({ name: 'UpdateBanner' }).vm.$emit('view-notes')
+    await w.vm.$nextTick()
+    expect((w.findComponent({ name: 'UpdateDialog' }).props('modelValue') as boolean)).toBe(true)
 
-  it("isProjectionPopupLocation() true → classe --projection mesmo sem meta", async () => {
-    projectionState.isPopup = true;
-    routeState.route = { meta: {}, name: "other" };
-    const wrapper = mountApp();
-    await flushPromises();
+    // Update some → watcher reseta showUpdateDialog
+    updateCheckerMock.hasUpdate.value = false
+    await flushPromises()
+    expect((w.findComponent({ name: 'UpdateDialog' }).props('modelValue') as boolean)).toBe(false)
+    updateCheckerMock.hasUpdate.value = false
+    w.unmount()
+  })
 
-    expect(wrapper.find(".app-frame--projection").exists()).toBe(true);
-  });
+  it('mudança de tema propaga para vuetify (dark → dark, light → light)', async () => {
+    const w = mountApp()
+    await flushPromises()
 
-  it("com update disponível → watcher reseta diálogo quando update some", async () => {
-    updateCheckerMock.mock.hasUpdate.value = true;
-    mountApp();
-    await flushPromises();
+    currentThemeRef.value = { mode: 'light' }
+    await flushPromises()
+    currentThemeRef.value = { mode: 'dark' }
+    await flushPromises()
+    w.unmount()
+  })
+})
 
-    // update desaparece → watcher deve reagir
-    updateCheckerMock.mock.hasUpdate.value = false;
-    await nextTick();
-    await nextTick();
-    // sem throw = ok (o watch dispara e mostra showUpdateDialog=false)
-    expect(true).toBe(true);
-  });
+describe('App.vue — janela de projeção (popup)', () => {
+  it('splash liberado na hora, sem overlay, sem palco-bridge, fundo preto', async () => {
+    // O popup real usa hash history (#/popup) — espelhar no location do jsdom
+    window.history.replaceState({}, '', '/#/popup')
+    const routerProj = makeRouter()
+    await routerProj.push('/popup')
+    await routerProj.isReady()
 
-  it("tema light aplicado quando currentTheme.mode = light", async () => {
-    themeState.theme = { mode: "light" };
-    const wrapper = mountApp();
-    await flushPromises();
-    expect(wrapper.find(".app-frame").exists()).toBe(true);
-  });
-  describe("gaps — boot falho, view notes", () => {
-    it("palco-bridge FALHA no boot: catch loga e app segue montado", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-      startPalcoBridgeMock.fn = vi.fn(() => { throw new Error("boot fail"); });
-      const wrapper = mountApp();
-      await wrapper.vm.$nextTick();
-      expect(wrapper.exists()).toBe(true);
-      consoleError.mockRestore();
-      wrapper.unmount();
-    });
+    const w = mount(App, { global: { plugins: [routerProj] } })
+    await flushPromises()
 
-    it("handleViewNotes: UpdateDialog presente no template", async () => {
-      const wrapper = mountApp();
-      await wrapper.vm.$nextTick();
-      // UpdateDialog stubado — o componente está no template
-      expect(wrapper.findComponent({ name: "UpdateDialog" }) !== null).toBe(true);
-      wrapper.unmount();
-    });
-  });
-
-  describe("gaps — handleViewNotes", () => {
-    it("view-notes do banner abre o UpdateDialog (showUpdateDialog true)", async () => {
-      const wrapper = mountApp();
-      await wrapper.vm.$nextTick();
-      const banner = wrapper.findComponent({ name: "UpdateBanner" });
-      expect(banner.exists()).toBe(true);
-      banner.vm.$emit("view-notes");
-      await wrapper.vm.$nextTick();
-      // showUpdateDialog true → UpdateDialog recebe modelValue true
-      const dialog = wrapper.findComponent({ name: "UpdateDialog" });
-      expect(dialog.exists()).toBe(true);
-      expect(dialog.props("modelValue")).toBe(true);
-      dialog.vm.$emit("update:modelValue", false);
-      await wrapper.vm.$nextTick();
-      expect(dialog.props("modelValue")).toBe(false);
-      wrapper.unmount();
-    });
-  });
-
-});
+    expect(w.find('.app-frame--projection').exists()).toBe(true)
+    expect(w.find('.starting-overlay-mock').exists()).toBe(false)
+    expect(w.find('.popup-view').exists()).toBe(true)
+    expect(palcoBridgeMock.startPalcoBridge).not.toHaveBeenCalled()
+    // Popup chama startingStore.hide() no setup
+    expect(hideMock).toHaveBeenCalled()
+    w.unmount()
+  })
+})

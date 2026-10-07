@@ -5,13 +5,12 @@ import { defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
-  plugins: [vue()],
-  // __APP_VERSION__ é injetado pelo build (vite.config do app) — em teste usamos a versão do package.json
   define: {
-    __APP_VERSION__: JSON.stringify(
-      JSON.parse(require('node:fs').readFileSync('./package.json', 'utf-8')).version,
-    ),
+    // Paridade com vite.config: constante injetada a partir do package.json
+    // (usada por @shared/constants/app — AppShell/AppTitlebar importam).
+    __APP_VERSION__: JSON.stringify('0.0.0-test'),
   },
+  plugins: [vue()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
@@ -36,11 +35,9 @@ export default defineConfig({
       },
     },
     setupFiles: ['./vitest.setup.ts'],
-    // Runs completos com coverage (istanbul) estouram 5s em testes que
-    // mockam bridge/processamento pesado — transform 125s no run global.
+    // Runs completos estouram 5s em testes que mockam bridge/processamento pesado.
     testTimeout: 30_000,
     coverage: {
-
       provider: 'v8',
       reporter: ['text', 'text-summary', 'lcov'],
       thresholds: {
@@ -49,15 +46,7 @@ export default defineConfig({
         statements: 100,
         branches: 100,
       },
-      include: [
-        'src/**/*.ts',
-        'src/**/*.vue',
-      ],
-      exclude: [
-        '**/__tests__/**',
-        'src/**/locales/*.ts',
-        'src/**/*.d.ts',
-      ],
+      include: ['src/**/*.ts', 'src/**/*.vue'],
     },
   },
 })

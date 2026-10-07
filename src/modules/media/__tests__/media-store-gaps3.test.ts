@@ -98,6 +98,8 @@ vi.mock("../services/media-slides", () => ({
 		resolveSlideIndexForTime(...(a as [unknown[], number])),
 	stripHtmlBreaks: vi.fn((t: string) => t),
 	lyricPreviewSnippet: vi.fn((t: string) => t),
+	hasDistinctSlideTimes: (times: number[]) =>
+		times.length >= 2 && times.every((time, index) => index === 0 || time > (times[index - 1] ?? 0)),
 }));
 
 vi.mock("@modules/settings/services/projection-preferences", () => ({

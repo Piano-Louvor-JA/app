@@ -12,8 +12,11 @@ vi.mock('@shared/services/workspace-api', () => ({
 }))
 vi.mock('@modules/media/services/custom-catalog', () => ({
   listCustomMusics: vi.fn(() => []),
+  loadCustomMusicTrack: vi.fn(async () => null),
+  isCustomMusicId: (id: number) => Number.isFinite(id) && id >= 1_000_000,
+  fromCustomMusicId: (id: number) => id - 1_000_000,
   fromCustomCollectionId: vi.fn((id: unknown) => Number(String(id).replace(/\D/g, '')) || 0),
-  toCustomMusicId: vi.fn((id: number) => `cu-${id}`),
+  toCustomMusicId: vi.fn((id: number) => id + 1_000_000),
 }))
 
 import {
@@ -134,7 +137,7 @@ describe('loadCollectionTracks — custom/hymnal/fallbacks e loadAlbumLyric', ()
     })
     expect(tracks).toHaveLength(3)
     expect(tracks[0]).toMatchObject({ musicId: 55, name: 'Oficial', track: 1, durationLabel: '1:35' })
-    expect(tracks[1]).toMatchObject({ musicId: 'cu-2', name: 'Hino oficial #2', durationLabel: '—' })
+    expect(tracks[1]).toMatchObject({ musicId: 1_000_002, name: 'Hino oficial #2', durationLabel: '—' })
     expect(tracks[2]).toMatchObject({ durationLabel: '62:03' })
   })
 

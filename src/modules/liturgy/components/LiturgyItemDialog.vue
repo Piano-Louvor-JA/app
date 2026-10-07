@@ -23,6 +23,10 @@ import {
 import { probeMediaDurationMs } from '../services/media-probe'
 import { useExternalPlayerChoices } from '../composables/useExternalPlayerChoices'
 import {
+  importSljaAsLiturgyMusic,
+  type SljaImportSource,
+} from '../services/import-slja-to-liturgy'
+import {
   formatMomentDuration,
   isLiturgyItemDraftValid,
   isValidLiturgyUrl,
@@ -30,6 +34,7 @@ import {
 import { normalizeLiturgyTimeHHmm } from '../services/liturgy-format'
 
 const props = defineProps<{
+  refreshImportedCatalog?: () => Promise<void>
   open: boolean
   draft: LiturgyItemDraft
   isEditing: boolean
@@ -53,6 +58,8 @@ const emit = defineEmits<{
   'update:musicQuery': [query: string]
   'pick-music': [musicId: number]
   'clear-music': []
+  /** app#331: pós-import .slja — o pai recarrega o catálogo de músicas. */
+  'slja-imported': [musicId: number]
 }>()
 
 const { t } = useI18n()
@@ -63,6 +70,90 @@ const filePickerError = ref<string | null>(null)
 const hasTypeSelection = computed(() => props.draft.type != null)
 const isCategory = computed(() => props.draft.type === 'category')
 const isMusic = computed(() => props.draft.type === 'music')
+
+// app#331 RF-1: importar .slja direto no item de música
+const sljaInputEl = ref<HTMLInputElement | null>(null)
+const sljaImporting = ref(false)
+const sljaMessage = ref('')
+const sljaError = ref(false)
+const sljaRun = ref(0)
+
+watch(
+  () => props.open,
+  (isOpen) => {
+    if (!isOpen) {
+      sljaRun.value += 1
+      sljaImporting.value = false
+      sljaMessage.value = ''
+      sljaError.value = false
+    }
+  },
+)
+
+async function onImportSljaFile(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file || sljaImporting.value) return
+  const run = sljaRun.value
+  sljaImporting.value = true
+  sljaMessage.value = ''
+  sljaError.value = false
+  try {
+    const source: SljaImportSource = {
+      bytes: await file.arrayBuffer(),
+      name: file.name,
+    }
+    const imported = await importSljaAsLiturgyMusic(source)
+    if (run !== sljaRun.value) return
+    // web#174 (referência): recarrega o catálogo ANTES da seleção valer —
+    // sem isso o id novo não existe em musicList, selectedMusic fica null
+    // e o submit é bloqueado (música "não toca").
+    await props.refreshImportedCatalog?.()
+    if (run !== sljaRun.value) return
+    emit('slja-imported', imported.displayMusicId)
+    // seleção + título + duração num ÚNICO patch: props.draft aqui ainda é
+    // stale — um segundo patch sobrescreveria o musicId do primeiro (race).
+    patch({
+      musicId: imported.displayMusicId,
+      durationMs:
+        imported.durationMs > 0 ? imported.durationMs : props.draft.durationMs,
+      ...(props.draft.name.trim() ? {} : { name: imported.name }),
+    })
+    sljaMessage.value = imported.local
+      ? t(
+          imported.imagesOmitted
+            ? 'liturgy.slja.importedLocalNoImages'
+            : 'liturgy.slja.importedLocal',
+          {
+            name: imported.name,
+            slides: imported.slides,
+          },
+        )
+      : t('liturgy.slja.imported', {
+          name: imported.name,
+          slides: imported.slides,
+        })
+  } catch (error) {
+    if (run !== sljaRun.value) return
+    sljaError.value = true
+    const code = error instanceof Error ? error.message : ''
+    const key =
+      code === 'SLJA_LOCAL_AUDIO_PERSIST_FAILED' ||
+      code === 'SLJA_LOCAL_LYRIC_PERSIST_FAILED'
+        ? 'liturgy.slja.importStorageFailed'
+        : code === 'SLJA_IMPORT_COLLECTION_FAILED' ||
+            code === 'SLJA_IMPORT_MUSIC_FAILED' ||
+            code === 'SLJA_IMPORT_LYRICS_INCOMPLETE'
+          ? 'liturgy.slja.importRemoteFailed'
+          : code === 'SLJA_IMPORT_NO_LYRICS'
+            ? 'liturgy.slja.importNoLyrics'
+            : 'liturgy.slja.importFailed'
+    sljaMessage.value = t(key)
+  } finally {
+    if (run === sljaRun.value) sljaImporting.value = false
+  }
+}
 
 const musicRequiredMissing = computed(
   () => isMusic.value && props.draft.musicId == null,
@@ -233,6 +324,7 @@ function patch(partial: Partial<LiturgyItemDraft>) {
 }
 
 function selectType(type: LiturgyItemType) {
+  if (sljaImporting.value) return
   if (props.lockCategory && type === 'category') return
 
   const previousType = props.draft.type
@@ -493,6 +585,10 @@ function clearMusic() {
 }
 
 function onSubmit(event: Event) {
+  if (sljaImporting.value) {
+    event.preventDefault()
+    return
+  }
   event.preventDefault()
 
   const nextDraft = isCategory.value
@@ -560,7 +656,8 @@ function isLightDot(hex: string): boolean {
             type="button"
             class="moment-dialog__close"
             :aria-label="t('liturgy.actions.discard')"
-            @click="emit('close')"
+            :disabled="sljaImporting"
+              @click="!sljaImporting && emit('close')"
           >
             <i
               class="ti ti-x"
@@ -612,6 +709,7 @@ function isLightDot(hex: string): boolean {
                         hasTypeSelection && draft.type !== chip.value,
                     }"
                     :title="t(`liturgy.typeDescriptions.${chip.value}`)"
+                    :disabled="sljaImporting"
                     @click="selectType(chip.value)"
                   >
                     <span
@@ -738,6 +836,43 @@ function isLightDot(hex: string): boolean {
                     aria-hidden="true"
                   />
                 </button>
+              </div>
+
+              <!-- app#331 RF-1: importar .slja direto no item de música -->
+              <div class="moment-dialog__music-import">
+                <input
+                  ref="sljaInputEl"
+                  type="file"
+                  accept=".slja,.zip"
+                  class="moment-dialog__slja-input"
+                  data-testid="slja-file-input"
+                  @change="onImportSljaFile"
+                >
+                <button
+                  type="button"
+                  class="moment-dialog__slja-btn"
+                  data-testid="slja-import-btn"
+                  :disabled="sljaImporting"
+                  @click="sljaInputEl?.click()"
+                >
+                  <i
+                    class="ti ti-file-zip"
+                    aria-hidden="true"
+                  />
+                  {{ sljaImporting
+                    ? t('liturgy.slja.importing')
+                    : t('liturgy.slja.importButton') }}
+                </button>
+                <p
+                  v-if="sljaMessage"
+                  class="moment-dialog__slja-message"
+                  :class="{
+                    'moment-dialog__slja-message--error': sljaError,
+                  }"
+                  role="status"
+                >
+                  {{ sljaMessage }}
+                </p>
               </div>
             </div>
           </div>
@@ -1131,13 +1266,15 @@ function isLightDot(hex: string): boolean {
             <button
               type="button"
               class="moment-dialog__discard"
-              @click="emit('close')"
+              :disabled="sljaImporting"
+              @click="!sljaImporting && emit('close')"
             >
               {{ t('liturgy.actions.discard') }}
             </button>
             <button
               type="submit"
               class="moment-dialog__submit"
+              :disabled="sljaImporting"
             >
               <i
                 class="ti ti-check"
@@ -1885,5 +2022,51 @@ function isLightDot(hex: string): boolean {
 .moment-dialog__engine-hint {
   font-size: 0.75rem;
   opacity: 0.55;
+}
+
+/* app#331 RF-1: importar .slja direto no item */
+.moment-dialog__music-import {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.55rem;
+}
+
+.moment-dialog__slja-input {
+  display: none;
+}
+
+.moment-dialog__slja-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.85rem;
+  border: 1px dashed color-mix(in srgb, var(--ds-color-on-surface) 30%, transparent);
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--ds-color-on-surface-variant, var(--ds-color-on-surface));
+  font-size: 0.82rem;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    border-color: var(--ds-color-primary);
+    color: var(--ds-color-primary);
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: wait;
+  }
+}
+
+.moment-dialog__slja-message {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--ds-color-on-surface-variant, var(--ds-color-on-surface));
+
+  &--error {
+    color: var(--ds-color-error, #ff5252);
+  }
 }
 </style>

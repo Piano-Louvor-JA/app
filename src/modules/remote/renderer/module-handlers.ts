@@ -389,7 +389,8 @@ async function executeMedia(
     }
     case 'media.open': {
       const musicId = msg.musicId
-      if (!isNum(musicId) || musicId <= 0) return false
+      // app#331: negativo = música LOCAL (import .slja sem login) — válido.
+      if (!isNum(musicId) || musicId === 0) return false
       const mode = msg.mode
       if (mode !== undefined && (typeof mode !== 'string' || !MEDIA_MODES.has(mode))) {
         return false

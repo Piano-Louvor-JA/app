@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { isCustomMusicId } from "@modules/media/services/custom-catalog";
 import { useLocalLibraryStore } from "@modules/sync/stores/useLocalLibraryStore";
 import { isDesktopApp } from "@shared/services/desktop-bridge";
 import {
@@ -60,7 +61,11 @@ const cancelRequested = ref(false);
 const confirmRemoveOpen = ref(false);
 
 const showOfflineControls = computed(
-	() => isDesktopApp() && props.musicId != null && props.musicId > 0,
+	() =>
+		isDesktopApp() &&
+		props.musicId != null &&
+		props.musicId > 0 &&
+		!isCustomMusicId(props.musicId),
 );
 
 const isOfflineBusy = computed(

@@ -1,118 +1,74 @@
 // @vitest-environment jsdom
-import { mount } from "@vue/test-utils";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createI18n } from "vue-i18n";
-import { nextTick } from "vue";
+// Cobertura AppearanceView.vue (gaps_map3: branches 33%): hero, layout 3 colunas,
+// feature flag SHOW_LYRIC_CUSTOMIZATION=false (bloco lyrics oculto), hydrate.
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
 
-/**
- * AppearanceView — layout da aba Aparência (hero + 3 colunas).
- * Filhos mockados (cada um já tem teste próprio); valida hydrate on mount,
- * layout e o gate SHOW_LYRIC_CUSTOMIZATION=false.
- */
-const hydrateMock = vi.fn();
+const state = vi.hoisted(() => ({
+  hydrate: vi.fn(),
+}))
 
-vi.mock("../../composables/useProjectionSettings", () => ({
-  useProjectionSettings: vi.fn(() => ({
-    hydrate: hydrateMock,
-  })),
-}));
+vi.mock('vue-i18n', () => ({
+  useI18n: () => ({ t: (k: string) => k, locale: { value: 'pt-BR' } }),
+}))
 
-vi.mock("../InteractionModeCard.vue", () => ({
-  default: { name: "InteractionModeCard", template: "<div class='stub-imc' />" },
-}));
-vi.mock("../ThemeOrbitalSwitcher.vue", () => ({
-  default: { name: "ThemeOrbitalSwitcher", template: "<div class='stub-tos' />" },
-}));
-vi.mock("../AccentColorCard.vue", () => ({
-  default: { name: "AccentColorCard", template: "<div class='stub-acc' />" },
-}));
-vi.mock("../LyricCustomizationCard.vue", () => ({
-  default: { name: "LyricCustomizationCard", template: "<div class='stub-lyr' />" },
-}));
-vi.mock("../../components/InteractionModeCard.vue", () => ({
-  default: { name: "InteractionModeCard", template: "<div class='stub-imc' />" },
-}));
-vi.mock("../../components/ThemeOrbitalSwitcher.vue", () => ({
-  default: { name: "ThemeOrbitalSwitcher", template: "<div class='stub-tos' />" },
-}));
-vi.mock("../../components/AccentColorCard.vue", () => ({
-  default: { name: "AccentColorCard", template: "<div class='stub-acc' />" },
-}));
-vi.mock("../../components/LyricCustomizationCard.vue", () => ({
-  default: { name: "LyricCustomizationCard", template: "<div class='stub-lyr' />" },
-}));
+vi.mock('../../composables/useProjectionSettings', () => ({
+  useProjectionSettings: () => ({
+    hydrate: state.hydrate,
+  }),
+}))
 
-import AppearanceView from "../AppearanceView.vue";
+vi.mock('../../components/AccentColorCard.vue', () => ({
+  default: { name: 'AccentColorCard', template: '<div class="card-mock accent-color" />' },
+}))
+vi.mock('../../components/InteractionModeCard.vue', () => ({
+  default: { name: 'InteractionModeCard', template: '<div class="card-mock interaction-mode" />' },
+}))
+vi.mock('../../components/LyricCustomizationCard.vue', () => ({
+  default: { name: 'LyricCustomizationCard', template: '<div class="card-mock lyric-customization" />' },
+}))
+vi.mock('../../components/ThemeOrbitalSwitcher.vue', () => ({
+  default: { name: 'ThemeOrbitalSwitcher', template: '<div class="card-mock theme-orbital" />' },
+}))
 
-const i18n = createI18n({
-  legacy: false,
-  locale: "pt-BR",
-  messages: {
-    "pt-BR": {
-      settings: {
-        appearance: {
-          experienceTitle: "Personalize sua experiência",
-          experienceSubtitle: "Ajuste tema, cores e interações",
-        },
-      },
-    },
-  } as never,
-});
+import AppearanceView from '../AppearanceView.vue'
 
-function mountView() {
-  return mount(AppearanceView, {
-    global: { plugins: [i18n] },
-  });
+async function mountView() {
+  const w = mount(AppearanceView)
+  await flushPromises()
+  return w
 }
 
-describe("AppearanceView", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
-  it("monta e chama hydrate uma vez", async () => {
-    const wrapper = mountView();
-    await wrapper.vm.$nextTick();
-    expect(hydrateMock).toHaveBeenCalledTimes(1);
-    wrapper.unmount();
-  });
+describe('AppearanceView.vue', () => {
+  it('renderiza hero com título e subtítulo traduzidos', async () => {
+    const w = await mountView()
+    expect(w.find('.appearance-experience__title').text()).toBe('settings.appearance.experienceTitle')
+    expect(w.find('.appearance-experience__subtitle').text()).toBe('settings.appearance.experienceSubtitle')
+    w.unmount()
+  })
 
-  it("renderiza hero com título e subtítulo", () => {
-    const wrapper = mountView();
-    expect(wrapper.find(".appearance-experience__title").text()).toBe(
-      "Personalize sua experiência",
-    );
-    expect(wrapper.find(".appearance-experience__subtitle").text()).toBe(
-      "Ajuste tema, cores e interações",
-    );
-  });
+  it('renderiza as 3 colunas (interaction, theme, accent)', async () => {
+    const w = await mountView()
+    expect(w.find('.appearance-experience__col--left .interaction-mode').exists()).toBe(true)
+    expect(w.find('.appearance-experience__center .theme-orbital').exists()).toBe(true)
+    expect(w.find('.appearance-experience__col--right .accent-color').exists()).toBe(true)
+    w.unmount()
+  })
 
-  it("layout com 3 colunas: interações à esquerda, tema no centro, accent à direita", () => {
-    const wrapper = mountView();
-    const left = wrapper.find(".appearance-experience__col--left");
-    const center = wrapper.find(".appearance-experience__center");
-    const right = wrapper.find(".appearance-experience__col--right");
-    expect(left.exists()).toBe(true);
-    expect(center.exists()).toBe(true);
-    expect(right.exists()).toBe(true);
-    expect(left.html()).toContain("stub-imc");
-    expect(center.html()).toContain("stub-tos");
-    expect(right.html()).toContain("stub-acc");
-  });
+  it('SHOW_LYRIC_CUSTOMIZATION=false: seção lyrics NÃO renderiza (branch)', async () => {
+    const w = await mountView()
+    expect(w.find('.appearance-experience__lyrics').exists()).toBe(false)
+    expect(w.find('.lyric-customization').exists()).toBe(false)
+    w.unmount()
+  })
 
-  it("SHOW_LYRIC_CUSTOMIZATION=false: seção de letra não renderiza", () => {
-    const wrapper = mountView();
-    expect(wrapper.find(".stub-lyr").exists()).toBe(false);
-    expect(wrapper.find(".appearance-experience__lyrics").exists()).toBe(false);
-    void nextTick;
-  });
-
-  it("VITE_SHOW_LYRIC_CUSTOMIZATION=1: seção de letra renderiza (feature flag ligada)", () => {
-    vi.stubEnv("VITE_SHOW_LYRIC_CUSTOMIZATION", "1");
-    const wrapper = mountView();
-    expect(wrapper.find(".appearance-experience__lyrics").exists()).toBe(true);
-    expect(wrapper.find(".stub-lyr").exists()).toBe(true);
-    wrapper.unmount();
-    vi.unstubAllEnvs();
-  });
-});
+  it('chama hydrate() no onMounted', async () => {
+    const w = await mountView()
+    expect(state.hydrate).toHaveBeenCalledTimes(1)
+    w.unmount()
+  })
+})

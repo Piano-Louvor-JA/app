@@ -97,6 +97,8 @@ vi.mock("../services/media-slides", () => ({
 		resolveSlideIndexForTimeMock(...(a as [[], number])),
 	stripHtmlBreaks: vi.fn((t: string) => t),
 	lyricPreviewSnippet: vi.fn((t: string) => t),
+	hasDistinctSlideTimes: (times: number[]) =>
+		times.length >= 2 && times.every((time, index) => index === 0 || time > (times[index - 1] ?? 0)),
 }));
 
 const loadProjectionSettings = vi.fn(() => ({ autoMinimizePlayer: false }));

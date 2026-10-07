@@ -1,56 +1,112 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi } from 'vitest'
-import { mount, flushPromises } from '@vue/test-utils'
-import { createI18n } from 'vue-i18n'
+// Cobertura ProjectionView.vue (gaps_map3: branches 0%): render dos cards,
+// hydrate no mount, erro via lastErrorKey, stubs de todas as dependências.
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { computed } from 'vue'
+import { flushPromises, mount } from '@vue/test-utils'
 
-const lastErrorRef = vi.hoisted(() => ({ value: null as string | null }))
-vi.mock('../../composables/useProjectionSettings', async () => {
-  const { ref } = await import('vue')
-  return {
-    useProjectionSettings: () => ({
-      hydrate: vi.fn().mockImplementation(async () => {
-        // espelha o valor atual do erro no teste
-        lastErrorRef.value = lastErrorRef.value
-      }),
-      lastErrorKey: ref(lastErrorRef.value),
-    }),
-  }
-})
+const state = vi.hoisted(() => ({
+  hydrate: vi.fn(),
+  errorKeyValue: '' as string | null,
+}))
 
-// cards filhos como stubs leves
-vi.mock('../../components/MonitorArrangementCard.vue', () => ({ default: { name: 'MonitorArrangementCard', template: '<div class="stub-mon" />' } }))
-vi.mock('../../components/MultiScreenSelectCard.vue', () => ({ default: { name: 'MultiScreenSelectCard', template: '<div class="stub-multi" />' } }))
-vi.mock('../../components/MainScreenOptionsCard.vue', () => ({ default: { name: 'MainScreenOptionsCard', template: '<div class="stub-main" />' } }))
-vi.mock('../../components/ReturnScreenOptionsCard.vue', () => ({ default: { name: 'ReturnScreenOptionsCard', template: '<div class="stub-return" />' } }))
-vi.mock('../../components/PalcoCard.vue', () => ({ default: { name: 'PalcoCard', template: '<div class="stub-palco" />' } }))
-vi.mock('../../components/PalcoSlotsCard.vue', () => ({ default: { name: 'PalcoSlotsCard', template: '<div class="stub-slots" />' } }))
-vi.mock('../../components/StageCustomizationCard.vue', () => ({ default: { name: 'StageCustomizationCard', props: ['onlyScope'], template: '<div class="stub-stage">{{ onlyScope }}</div>' } }))
+vi.mock('vue-i18n', () => ({
+  useI18n: () => ({ t: (k: string) => k, locale: { value: 'pt-BR' } }),
+}))
+
+vi.mock('../../composables/useProjectionSettings', () => ({
+  useProjectionSettings: () => ({
+    hydrate: state.hydrate,
+    lastErrorKey: computed(() => state.errorKeyValue),
+  }),
+}))
+
+// Cards são mockados como elementos simples com classe identificável.
+vi.mock('../../components/MonitorArrangementCard.vue', () => ({
+  default: { name: 'MonitorArrangementCard', template: '<div class="card-mock monitor-arrangement" />' },
+}))
+vi.mock('../../components/MultiScreenSelectCard.vue', () => ({
+  default: { name: 'MultiScreenSelectCard', template: '<div class="card-mock multi-screen" />' },
+}))
+vi.mock('../../components/MainScreenOptionsCard.vue', () => ({
+  default: { name: 'MainScreenOptionsCard', template: '<div class="card-mock main-screen" />' },
+}))
+vi.mock('../../components/ReturnScreenOptionsCard.vue', () => ({
+  default: { name: 'ReturnScreenOptionsCard', template: '<div class="card-mock return-screen" />' },
+}))
+vi.mock('../../components/PalcoCard.vue', () => ({
+  default: { name: 'PalcoCard', template: '<div class="card-mock palco" />' },
+}))
+vi.mock('../../components/PalcoSlotsCard.vue', () => ({
+  default: { name: 'PalcoSlotsCard', template: '<div class="card-mock palco-slots" />' },
+}))
+vi.mock('../../components/StageCustomizationCard.vue', () => ({
+  default: {
+    name: 'StageCustomizationCard',
+    props: ['onlyScope'],
+    template: '<div class="card-mock stage-customization" :data-scope="onlyScope" />',
+  },
+}))
 
 import ProjectionView from '../ProjectionView.vue'
 
-const i18n = createI18n({ legacy: false, locale: 'pt-BR', messages: { 'pt-BR': {} } })
+async function mountView() {
+  const w = mount(ProjectionView)
+  await flushPromises()
+  return w
+}
 
-describe('ProjectionView', () => {
-  it('monta com todos os cards e sem erro', async () => {
-    const w = mount(ProjectionView, { global: { plugins: [i18n] } })
-    await flushPromises()
-    expect(w.find('.stub-mon').exists()).toBe(true)
-    expect(w.find('.stub-multi').exists()).toBe(true)
-    expect(w.find('.stub-main').exists()).toBe(true)
-    expect(w.find('.stub-return').exists()).toBe(true)
-    expect(w.find('.stub-palco').exists()).toBe(true)
-    expect(w.find('.stub-slots').exists()).toBe(true)
-    expect(w.find('.stub-stage').text()).toBe('global')
+beforeEach(() => {
+  vi.clearAllMocks()
+  state.errorKeyValue = ''
+})
+
+describe('ProjectionView.vue', () => {
+  it('renderiza todos os 7 cards do layout', async () => {
+    const w = await mountView()
+    expect(w.find('.monitor-arrangement').exists()).toBe(true)
+    expect(w.find('.multi-screen').exists()).toBe(true)
+    expect(w.find('.main-screen').exists()).toBe(true)
+    expect(w.find('.return-screen').exists()).toBe(true)
+    expect(w.find('.palco').exists()).toBe(true)
+    expect(w.find('.palco-slots').exists()).toBe(true)
+    expect(w.find('.stage-customization').exists()).toBe(true)
+    w.unmount()
+  })
+
+  it('chama hydrate() no onMounted', async () => {
+    const w = await mountView()
+    expect(state.hydrate).toHaveBeenCalledTimes(1)
+    w.unmount()
+  })
+
+  it('sem erro: mensagem de alerta NÃO renderiza (branch v-if falsa)', async () => {
+    const w = await mountView()
     expect(w.find('.projection-settings__error').exists()).toBe(false)
     w.unmount()
   })
 
-  it('com lastErrorKey: alerta de erro renderiza', async () => {
-    lastErrorRef.value = 'settings.projection.loadError'
-    const w = mount(ProjectionView, { global: { plugins: [i18n] } })
-    await flushPromises()
-    expect(w.find('.projection-settings__error').exists()).toBe(true)
-    expect(w.text()).toContain('settings.projection.loadError')
+  it('com lastErrorKey: mostra alerta com a chave traduzida (branch v-if verdadeira)', async () => {
+    state.errorKeyValue = 'settings.projection.errorHydrate'
+    const w = await mountView()
+    const alert = w.find('.projection-settings__error')
+    expect(alert.exists()).toBe(true)
+    expect(alert.attributes('role')).toBe('alert')
+    expect(alert.text()).toBe('settings.projection.errorHydrate')
+    w.unmount()
+  })
+
+  it('StageCustomizationCard recebe only-scope="global"', async () => {
+    const w = await mountView()
+    expect(w.find('.stage-customization').attributes('data-scope')).toBe('global')
+    w.unmount()
+  })
+
+  it('layout split contém MultiScreenSelectCard e a stack de opções', async () => {
+    const w = await mountView()
+    expect(w.find('.projection-settings__split .multi-screen').exists()).toBe(true)
+    expect(w.find('.projection-settings__stack .main-screen').exists()).toBe(true)
+    expect(w.find('.projection-settings__stack .return-screen').exists()).toBe(true)
     w.unmount()
   })
 })

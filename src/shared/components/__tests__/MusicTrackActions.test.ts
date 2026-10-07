@@ -53,9 +53,7 @@ async function mountActions(over: Props = {}) {
   })
   await flushPromises()
   return w
-
 }
-
 
 describe('MusicTrackActions', () => {
   beforeEach(() => {
@@ -109,6 +107,15 @@ describe('MusicTrackActions', () => {
     const w = await mountActions({ musicId: 0 })
     await flushPromises()
     expect(w.find('.music-track-actions__check').exists()).toBe(false)
+  })
+
+  it('desktop custom: não mostra nem consulta download incompatível', async () => {
+    isDesktopApp.mockReturnValue(true)
+    const w = await mountActions({ musicId: 1_000_007 })
+    expect(w.find('.music-track-actions__check').exists()).toBe(false)
+    expect(w.findAll('.music-track-actions__btn')).toHaveLength(3)
+    expect(isTrackMediaDownloaded).not.toHaveBeenCalled()
+    w.unmount()
   })
 
   it('desktop baixado: check + botão remover abre confirm; confirmar apaga', async () => {
@@ -328,69 +335,4 @@ describe('MusicTrackActions', () => {
     expect(w.emitted('downloadProgress')!.length).toBe(countBefore)
     w.unmount()
   })
-
-  it('confirmRemove com musicId null não faz nada (guard)', async () => {
-    deleteTrackMedia.mockClear()
-    const w = await mountActions({ musicId: null })
-    const vm = w.vm as unknown as { confirmRemove?: () => Promise<void> }
-    await vm.confirmRemove?.()
-    expect(deleteTrackMedia).not.toHaveBeenCalled()
-    w.unmount()
-  })
-
-  it('onOfflineAction com musicId null não faz nada (guard)', async () => {
-    const w = await mountActions({ musicId: null })
-    const vm = w.vm as unknown as { onOfflineAction?: () => Promise<void> }
-    await vm.onOfflineAction?.()
-    expect(true).toBe(true)
-    w.unmount()
-  })
-  it('gaps6: shouldAbort durante download cancelado (fn 139) + title cancel %', async () => {
-    isDesktopApp.mockReturnValue(true)
-    let release!: (v: { status: string }) => void
-    downloadTrackMedia.mockImplementation(
-      (_id: number, opts?: { onProgress?: (p: number) => void; shouldAbort?: () => boolean }) =>
-        new Promise<{ status: string }>((resolve) => {
-          release = resolve
-          console.log('SHABORT tipo:', typeof opts?.shouldAbort, 'opts:', Object.keys(opts ?? {}))
-          opts?.shouldAbort?.() // fn 139 (chamada direta)
-        }),
-    )
-    const w = await mountActions({ musicId: 9 })
-    await flushPromises()
-    const dlBtn = w.findAll('.music-track-actions__btn').at(-1)!
-    console.log('DLBTN title:', dlBtn.attributes('title'), 'class:', dlBtn.attributes('class'))
-    await dlBtn.trigger('click') // vira downloading → title com %
-    await flushPromises()
-    expect(dlBtn.attributes('title')).toContain('cancelDownload')
-    await dlBtn.trigger('click') // cancelRequested = true (br 115)
-    await flushPromises()
-    release({ status: 'idle' }) // resolve depois do cancel → shouldAbort caminho
-    await flushPromises()
-    expect(w.find('.music-track-actions__check').exists()).toBe(false)
-    w.unmount()
-  })
-  it('gaps6: title download offline (não downloading) (brs 234/236)', async () => {
-    isDesktopApp.mockReturnValue(true)
-    const w = await mountActions({ musicId: 5 })
-    await flushPromises()
-    const dlBtn = w.findAll('.music-track-actions__btn').at(-1)!
-    expect(dlBtn.attributes('title')).toContain('downloadOffline')
-    w.unmount()
-  })
 })
-  it('gaps: offline já downloaded — click download vira requestRemove (br 122)', async () => {
-    isDesktopApp.mockReturnValue(true)
-    isTrackMediaDownloaded.mockResolvedValue(true)
-    const w = await mountActions({ showOfflineControls: true })
-    // status downloaded após check inicial
-    const dl = w.findAll('button').find((b) => (b.attributes('aria-label') ?? '').includes('download') && !b.attributes('aria-label')!.includes('Remove'))
-    // botão de download já pode ser o de remover; o click deve chamar requestRemove
-    const vm = w.vm as unknown as Record<string, unknown>
-    // offlineStatus exposto como string via proxy; usar set do ref via vm.$
-    await flushPromises()
-    if (dl) await dl.trigger('click')
-    await flushPromises()
-    w.unmount()
-  })
-

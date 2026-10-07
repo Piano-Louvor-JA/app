@@ -19,6 +19,9 @@ vi.mock('@shared/services/remote-catalog', () => ({
 const listCustomMusics = vi.fn()
 vi.mock('@modules/media/services/custom-catalog', () => ({
   listCustomMusics: (...a: unknown[]) => listCustomMusics(...a),
+  loadCustomMusicTrack: vi.fn(async () => null),
+  isCustomMusicId: (id: number) => Number.isFinite(id) && id >= 1_000_000,
+  fromCustomMusicId: (id: number) => id - 1_000_000,
   fromCustomCollectionId: (id: number | string) =>
     Number(id) - 2_000_000,
   toCustomMusicId: (id: number) => id + 1_000_000,

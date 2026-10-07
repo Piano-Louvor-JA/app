@@ -1,198 +1,172 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import { mount, flushPromises } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
+// Cobertura ClockProjectionView.vue (gaps_map3: 88/62/70): storage events,
+// BroadcastChannel, stage settings subscribe/unmount, stageStyle com/sem bg,
+// effectiveConfig merge com stage.clock.
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
 
-const loadClockConfigMock = vi.hoisted(() => vi.fn(() => ({
-  style: 'analog', format24h: true, showSeconds: true, textColor: '#fff', bgColor: '#000',
-})))
-const normalizeClockConfigMock = vi.hoisted(() => vi.fn((cfg: unknown) => ({ ...(cfg as object) })))
-const stageSubs = vi.hoisted(() => ({ cbs: [] as Array<() => void>, unsubs: [] as Array<ReturnType<typeof vi.fn>> }))
-const subscribeMock = vi.hoisted(() => vi.fn((cb: () => void) => {
-  stageSubs.cbs.push(cb)
-  const unsub = vi.fn()
-  stageSubs.unsubs.push(unsub)
-  return unsub
-}))
-const readEffectiveMock = vi.hoisted(() => vi.fn(() => ({
-  backgroundColor: '#fff', backgroundImage: null, fontSize: 96,
-})))
-
-vi.mock('../../../settings/services/stage-settings-runtime', () => ({
-  readEffectiveStageSettings: readEffectiveMock,
-  subscribeStageSettings: subscribeMock,
+vi.mock('@design-system/index', () => ({
+  ProjectionBackground: { name: 'ProjectionBackground', template: '<div class="pb-mock"><slot /></div>' },
 }))
 
-vi.mock('@shared/constants/storage-keys', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@shared/constants/storage-keys')>()
+vi.mock('@shared/constants/storage-keys', () => ({
+  BROWSER_STORAGE_KEYS: { userPreferences: 'user_preferences' },
+  USER_PREFERENCE_KEYS: { clockConfig: 'clock_config' },
+}))
+
+const stageSettings = vi.hoisted(() => {
+  const listeners: Array<() => void> = []
   return {
-    ...actual,
-    BROWSER_STORAGE_KEYS: { userPreferences: 'user_preferences' },
+    listeners,
+    settings: {
+      backgroundColor: '#0a0a0a',
+      backgroundImage: null as string | null,
+      clock: null as Record<string, unknown> | null,
+    },
+    subscribe: (fn: () => void) => {
+      listeners.push(fn)
+      return () => { const i = listeners.indexOf(fn); if (i >= 0) listeners.splice(i, 1) }
+    },
   }
 })
 
-vi.mock('../../services/clock-preferences', () => ({
-  CLOCK_CONFIG_CHANNEL: 'clock-config',
-  loadClockConfig: loadClockConfigMock,
-  normalizeClockConfig: normalizeClockConfigMock,
+vi.mock('../../../settings/services/stage-settings-runtime', () => ({
+  readEffectiveStageSettings: () => JSON.parse(JSON.stringify(stageSettings.settings)),
+  subscribeStageSettings: stageSettings.subscribe,
 }))
 
-vi.mock('@design-system/index', () => ({
-  ProjectionBackground: {
-    name: 'ProjectionBackground',
-    template: '<div class="stub-projection-background"><slot /></div>',
+vi.mock('../../../settings/types/stage-settings', () => ({
+  resolveBackgroundImage: (bg: unknown) => (bg ? String(bg) : null),
+  stageFlexAlign: () => ({ alignItems: 'center', justifyContent: 'center' }),
+}))
+
+const configState = vi.hoisted(() => ({
+  stored: null as unknown,
+  broadcast: null as unknown,
+}))
+vi.mock('../../services/clock-preferences', () => ({
+  CLOCK_CONFIG_CHANNEL: 'louvorja-clock-config',
+  loadClockConfig: () => configState.stored ?? { style: 'digital', showSeconds: true, format24h: true, textColor: '#ffffff', bgColor: '#000000' },
+  normalizeClockConfig: (raw: unknown) => raw,
+}))
+
+vi.mock('../../components/ClockPreview.vue', () => ({
+  default: {
+    name: 'ClockPreview',
+    props: ['config', 'stage', 'preview'],
+    template: `<div class="clock-preview-mock" :data-style="config ? config.style : ''" :data-text="config ? config.textColor : ''" />`,
   },
 }))
 
-// ClockPreview real para coverage; sem deps externas
 import ClockProjectionView from '../ClockProjectionView.vue'
+import { createPinia } from 'pinia'
+
+function mountView() {
+  return mount(ClockProjectionView, { global: { plugins: [createPinia()] } })
+}
+
+beforeEach(() => {
+  window.localStorage?.clear?.()
+  vi.clearAllMocks()
+  stageSettings.listeners.length = 0
+  stageSettings.settings.clock = null
+  stageSettings.settings.backgroundImage = null
+  configState.stored = null
+  configState.broadcast = null
+})
 
 describe('ClockProjectionView.vue', () => {
-  let wrapper: ReturnType<typeof mount> | null = null
-  const channelListeners: { message: ((e: unknown) => void) | null } = { message: null }
-  let storageListener: ((e: StorageEvent) => void) | null = null
-  const originalBC = (globalThis as any).BroadcastChannel
-  const originalAddEventListener = window.addEventListener.bind(window)
-  const originalRemoveEventListener = window.removeEventListener.bind(window)
-
-  class FakeBroadcastChannel {
-    static instances: FakeBroadcastChannel[] = []
-    name: string
-    closed = false
-    listeners = new Map<string, Set<(e: unknown) => void>>()
-    constructor(name: string) {
-      this.name = name
-      FakeBroadcastChannel.instances.push(this)
-    }
-    addEventListener(type: string, cb: (e: unknown) => void) {
-      if (!this.listeners.has(type)) this.listeners.set(type, new Set())
-      this.listeners.get(type)!.add(cb)
-      if (type === 'message') channelListeners.message = cb
-    }
-    removeEventListener(type: string, cb: (e: unknown) => void) {
-      this.listeners.get(type)?.delete(cb)
-    }
-    close() { this.closed = true }
-  }
-
-  beforeEach(() => {
-    setActivePinia(createPinia())
-    FakeBroadcastChannel.instances.length = 0
-    ;(globalThis as any).BroadcastChannel = FakeBroadcastChannel
-    storageListener = null
-    window.addEventListener = ((type: string, cb: any, ...rest: any[]) => {
-      if (type === 'storage') storageListener = cb
-      return originalAddEventListener(type as any, cb, ...rest)
-    }) as any
-    window.removeEventListener = ((type: string, cb: any, ...rest: any[]) => {
-      if (type === 'storage' && storageListener === cb) storageListener = null
-      return originalRemoveEventListener(type as any, cb, ...rest)
-    }) as any
-  })
-
-  afterEach(() => {
-    wrapper?.unmount()
-    wrapper = null
-    ;(globalThis as any).BroadcastChannel = originalBC
-    window.addEventListener = originalAddEventListener
-    window.removeEventListener = originalRemoveEventListener
-    vi.clearAllMocks()
-  })
-
-  function mountView() {
-    wrapper = mount(ClockProjectionView, {
-      global: {
-        stubs: { ClockPreview: { template: '<div class="clock-preview-stub" />' } },
-      },
-    })
-    return wrapper
-  }
-
-  it('monta com config do loadClockConfig e stage do runtime', async () => {
+  it('renderiza ProjectionBackground com ClockPreview dentro', async () => {
     const w = mountView()
     await flushPromises()
-    expect(loadClockConfigMock).toHaveBeenCalled()
-    expect(readEffectiveMock).toHaveBeenCalledWith('clock')
-    expect(w.find('.stub-projection-background').exists()).toBe(true)
-  })
-
-  it('broadcast channel: evento normalizado e armazenado', async () => {
-    const w = mountView()
-    await flushPromises()
-    const ch = FakeBroadcastChannel.instances[0]
-    expect(ch?.name).toBe('clock-config')
-    const cb = channelListeners.message!
-    expect(cb).toBeTruthy()
-    cb({ data: { style: 'digital', format24h: false } })
-    await flushPromises()
-    expect(normalizeClockConfigMock).toHaveBeenCalledWith({ style: 'digital', format24h: false })
-    // config atualizada via v-if no template? setada no ref
-    expect((w.vm as any) === w.vm).toBe(true)
-  })
-
-  it('storage: recarrega config quando key=userPreferences; ignora outras keys', async () => {
-    mountView()
-    await flushPromises()
-    expect(loadClockConfigMock.mock.calls.length).toBeGreaterThanOrEqual(1)
-    const callsBefore = loadClockConfigMock.mock.calls.length
-    // key diferente → ignorado
-    storageListener?.({ key: 'outra_key' } as StorageEvent)
-    expect(loadClockConfigMock.mock.calls.length).toBe(callsBefore)
-    // key userPreferences → refresh
-    storageListener?.({ key: 'user_preferences' } as StorageEvent)
-    expect(loadClockConfigMock.mock.calls.length).toBe(callsBefore + 1)
-    // key null → refresh
-    storageListener?.({ key: null } as StorageEvent)
-    expect(loadClockConfigMock.mock.calls.length).toBe(callsBefore + 2)
-  })
-
-  it('unmount: remove listeners, unsub e fecha channel', async () => {
-    const w = mountView()
-    await flushPromises()
-    const ch = FakeBroadcastChannel.instances[0]
-    const unsub = stageSubs.unsubs.at(-1)!
-    w.unmount()
-    expect(ch?.closed).toBe(true)
-    expect(unsub).toHaveBeenCalled()
-    expect(storageListener).toBeNull()
-  })
-
-  it('BroadcastChannel ausente: falha silenciosa (catch)', async () => {
-    ;(globalThis as any).BroadcastChannel = undefined
-    const w = mountView()
-    await flushPromises()
-    expect(w.find('.stub-projection-background').exists()).toBe(true)
-  })
-
-describe('subscribe callback (55)', () => {
-  it('gaps: backgroundImage url, stage.clock merge e embedded', async () => {
-    readEffectiveMock.mockReturnValue({
-      backgroundColor: '#123456',
-      backgroundImage: '/img/bg.png',
-      fontSize: 96,
-      clock: { style: 'digital', format24h: false },
-    })
-    const { resolveBackgroundImage } = await import('../../../settings/types/stage-settings')
-    vi.mocked(resolveBackgroundImage, true)
-    const w = mount(ClockProjectionView, { props: { embedded: true }, global: { plugins: [createPinia()] } })
-    await flushPromises()
-    const bg = w.find('.stub-projection-background')
-    expect(bg.attributes('style')).toContain('background-image')
-    expect(bg.attributes('style')).toContain('/img/bg.png')
-    expect(bg.html()).toContain('clock-projection--embedded')
-    // stage.clock faz merge sobre config: stage montado com preview
-    expect(w.find('.clock-projection__stage').exists()).toBe(true)
+    expect(w.find('.pb-mock').exists()).toBe(true)
+    expect(w.find('.clock-preview-mock').exists()).toBe(true)
     w.unmount()
   })
 
-  it('callback do subscribe atualiza stage', async () => {
-    stageSubs.cbs.length = 0
-    const w = mount(ClockProjectionView, { global: { plugins: [createPinia()] } })
-    await w.vm.$nextTick()
-    expect(stageSubs.cbs.length).toBeGreaterThanOrEqual(1)
-    for (const cb of stageSubs.cbs) cb()
-    await w.vm.$nextTick()
+  it('config default do loadClockConfig chega ao preview', async () => {
+    const w = mountView()
+    await flushPromises()
+    expect(w.find('.clock-preview-mock').attributes('data-style')).toBe('digital')
     w.unmount()
   })
-})
+
+  it('storage event de userPreferences: recarrega config', async () => {
+    const w = mountView()
+    await flushPromises()
+    configState.stored = { style: 'analog', showSeconds: false, format24h: false, textColor: '#00ff00', bgColor: '#111111' }
+    window.dispatchEvent(new StorageEvent('storage', { key: 'user_preferences', newValue: '{}' }))
+    await flushPromises()
+    expect(w.find('.clock-preview-mock').attributes('data-style')).toBe('analog')
+    w.unmount()
+  })
+
+  it('storage event com key null: recarrega (branch !key)', async () => {
+    const w = mountView()
+    await flushPromises()
+    configState.stored = { style: 'analog', showSeconds: true, format24h: true, textColor: '#fff', bgColor: '#000' }
+    window.dispatchEvent(new StorageEvent('storage', { key: null as unknown as string, newValue: '{}' }))
+    await flushPromises()
+    expect(w.find('.clock-preview-mock').attributes('data-style')).toBe('analog')
+    w.unmount()
+  })
+
+  it('storage event de outra key: ignora (branch key !== userPreferences)', async () => {
+    const w = mountView()
+    await flushPromises()
+    window.dispatchEvent(new StorageEvent('storage', { key: 'outra', newValue: '{}' }))
+    await flushPromises()
+    expect(w.find('.clock-preview-mock').attributes('data-style')).toBe('digital')
+    w.unmount()
+  })
+
+  it('stage com backgroundImage: url aplicada no style do bg (branch)', async () => {
+    stageSettings.settings.backgroundImage = 'img://clock-bg.png'
+    const w = mountView()
+    await flushPromises()
+    expect(w.find('.pb-mock').attributes('style')).toContain('img://clock-bg.png')
+    w.unmount()
+  })
+
+  it('stage sem backgroundImage: só backgroundColor', async () => {
+    const w = mountView()
+    await flushPromises()
+    const style = w.find('.pb-mock').attributes('style') ?? ''
+    expect(style).toContain('rgb(10, 10, 10)')
+    expect(style).not.toContain('url(')
+    w.unmount()
+  })
+
+  it('stage.clock presente: effectiveConfig faz merge (stage < config)', async () => {
+    stageSettings.settings.clock = { style: 'analog', showSeconds: false }
+    configState.stored = { style: 'digital', showSeconds: true, format24h: true, textColor: '#ffffff', bgColor: '#000000' }
+    const w = mountView()
+    await flushPromises()
+    const mock = w.find('.clock-preview-mock')
+    // stage.clock sobrescreve o config do diálogo (fonte única do Palco)
+    expect(mock.attributes('data-style')).toBe('analog')
+    w.unmount()
+  })
+
+  it('subscribeStageSettings: update re-read; unmount desinscreve', async () => {
+    const w = mountView()
+    await flushPromises()
+    const before = stageSettings.listeners.length
+    expect(before).toBeGreaterThan(0)
+    stageSettings.settings.backgroundImage = 'img://novo.png'
+    stageSettings.listeners.forEach((fn) => fn())
+    await flushPromises()
+    expect(w.find('.pb-mock').attributes('style')).toContain('img://novo.png')
+    w.unmount()
+    expect(stageSettings.listeners.length).toBe(before - 1)
+  })
+
+  it('onUnmounted: remove storage listener', async () => {
+    const spy = vi.spyOn(window, 'removeEventListener')
+    const w = mountView()
+    await flushPromises()
+    w.unmount()
+    expect(spy).toHaveBeenCalledWith('storage', expect.any(Function))
+    spy.mockRestore()
+  })
 })

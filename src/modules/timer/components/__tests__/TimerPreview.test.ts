@@ -1,217 +1,196 @@
 // @vitest-environment jsdom
-import { mount } from "@vue/test-utils";
-import { ref } from "vue";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+// Cobertura TimerPreview.vue (gaps_map3): fontSize com/sem stage, textColor
+// (stage/preview/config), digitalStyle (shadow/box), stageFlexJustify, measure.
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { mount } from '@vue/test-utils'
+import { nextTick } from 'vue'
 
-vi.mock("../../composables/useTimer", () => ({
-  useTimerDisplay: (configSource?: () => unknown, runtimeSource?: () => unknown) => {
-    // exercita os getters passados pelo componente (fns 25/26)
-    void configSource?.();
-    void runtimeSource?.();
-    return { formattedTime: ref("05:00") };
-  },
-}));
+vi.mock('../../composables/useTimer', async () => {
+  const { computed } = await import('vue')
+  return {
+    useTimerDisplay: () => ({
+      formattedTime: computed(() => '01:23'),
+      now: computed(() => 0),
+      config: computed(() => ({})),
+      runtime: computed(() => ({})),
+      elapsedMs: computed(() => 0),
+    }),
+  }
+})
 
-import TimerPreview from "../TimerPreview.vue";
-import type { TimerDisplayConfig, TimerRuntimeState } from "../../types/timer";
+import TimerPreview from '../TimerPreview.vue'
+import type { StageSettings } from '../../../settings/types/stage-settings'
 
-const baseConfig: TimerDisplayConfig = {
-  timeFormat: "mm:ss",
-  textColor: "#ffffff",
-} as unknown as TimerDisplayConfig;
+const stage: StageSettings = {
+  backgroundColor: '#000',
+  backgroundImage: null,
+  textColor: '#ff0000',
+  fontSize: 96,
+  fontWeight: 600,
+  textAlign: 'center',
+  textVerticalAlign: 'middle',
+  textShadow: true,
+  shadowBlur: 3,
+  shadowIntensity: 0.5,
+  textBox: false,
+  boxOpacity: 0.4,
+  boxBorder: false,
+} as unknown as StageSettings
 
-const baseRuntime: TimerRuntimeState = {
-  remainingMs: 300000,
-} as unknown as TimerRuntimeState;
+const config = { timeFormat: 'mm:ss', bgColor: '#111', textColor: '#00ff00' } as never
 
-function mountPreview(props: Record<string, unknown> = {}) {
+function mountTimer(props: Record<string, unknown> = {}) {
   return mount(TimerPreview, {
-    props: {
-      config: baseConfig,
-      runtime: baseRuntime,
-      ...props,
-    },
-  });
+    props: { config, runtime: {}, ...props },
+    attachTo: document.body,
+  })
+}
+
+function setSize(w: ReturnType<typeof mount>, width: number, height: number) {
+  const el = w.find('.timer-preview').element as HTMLElement
+  Object.defineProperty(el, 'offsetWidth', { value: width, configurable: true })
+  Object.defineProperty(el, 'offsetHeight', { value: height, configurable: true })
+  window.dispatchEvent(new Event('resize'))
 }
 
 beforeEach(() => {
-  vi.restoreAllMocks();
-});
+  vi.clearAllMocks()
+})
 
-describe("TimerPreview.vue — stage com dimensões e aligns", () => {
-  it("stage com sizeWidth medido usa fontSize escalado", async () => {
-    const wrapper = mountPreview({
-      stage: { fontSize: 960, textVerticalAlign: "top", textAlign: "left" },
-    });
-    Object.defineProperty(wrapper.element, "offsetWidth", { value: 800 });
-    Object.defineProperty(wrapper.element, "offsetHeight", { value: 400 });
-    // força re-medir via resize handler se existir; senão o computed pega no
-    // próximo tick quando sizeWidth > 0
-    await wrapper.vm.$nextTick();
-    const style = wrapper.find(".timer-preview__digital").attributes("style") ?? "";
-    expect(style).toBeDefined();
-    wrapper.unmount();
-  });
+describe('TimerPreview.vue', () => {
+  it('renderiza o tempo formatado', () => {
+    const w = mountTimer()
+    expect(w.find('.timer-preview__digital').text()).toBe('01:23')
+    w.unmount()
+  })
 
-  it("aligns: bottom/right e center", async () => {
-    for (const [va, ta] of [["bottom", "right"], ["center", "center"]] as const) {
-      const wrapper = mountPreview({
-        stage: { fontSize: 100, textVerticalAlign: va, textAlign: ta },
-      });
-      await wrapper.vm.$nextTick();
-      wrapper.unmount();
-    }
-    expect(true).toBe(true);
-  });
-});
+  it('com stage + largura medida: fontSize escala pela largura (96/1920*400)', async () => {
+    const w = mountTimer({ stage })
+    setSize(w, 400, 300)
+    await nextTick()
+    const style = w.find('.timer-preview__digital').attributes('style') ?? ''
+    expect(style).toContain('font-size: 20px')
+    expect(style).toContain('rgb(255, 0, 0)')
+    w.unmount()
+  })
 
-describe("TimerPreview.vue — fallback de tamanho e measure retry", () => {
-  it("sem largura medida: fallback por ratio (ms maior que sem ms)", async () => {
-    vi.useFakeTimers();
-    const withMs = mountPreview({
-      config: { ...baseConfig, timeFormat: "mm:ss.ms" },
-    });
-    await withMs.vm.$nextTick();
-    const a = withMs.find(".timer-preview__digital").attributes("style") ?? "";
-    withMs.unmount();
+  it('sem stage: cor vem do config.textColor e peso 800', async () => {
+    const w = mountTimer()
+    setSize(w, 400, 300)
+    await nextTick()
+    const style = w.find('.timer-preview__digital').attributes('style') ?? ''
+    expect(style).toContain('rgb(0, 255, 0)')
+    expect(style).toContain('font-weight: 800')
+    w.unmount()
+  })
 
-    const withoutMs = mountPreview({ config: { ...baseConfig } });
-    await withoutMs.vm.$nextTick();
-    const b = withoutMs.find(".timer-preview__digital").attributes("style") ?? "";
-    withoutMs.unmount();
-    // ambos usam o fallback (20px mínimo) — apenas exercita os branches
-    expect(a).toBeDefined();
-    expect(b).toBeDefined();
-    // retry do measure rodando (size 0 → agenda, executa, reagenda? não: uma vez)
-    await vi.advanceTimersByTimeAsync(250);
-    vi.useRealTimers();
-  });
+  it('preview sem stage: textShadow none (branch)', async () => {
+    const w = mountTimer({ preview: true })
+    setSize(w, 400, 300)
+    await nextTick()
+    const style = w.find('.timer-preview__digital').attributes('style') ?? ''
+    expect(style).toContain('text-shadow: none')
+    w.unmount()
+  })
 
-  it("measure: elemento com dimensão > 0 para de reagendar", async () => {
-    vi.useFakeTimers();
-    const wrapper = mountPreview();
-    Object.defineProperty(wrapper.element, "offsetWidth", { value: 800 });
-    Object.defineProperty(wrapper.element, "offsetHeight", { value: 400 });
-    wrapper.vm.$forceUpdate();
-    await vi.advanceTimersByTimeAsync(250);
-    wrapper.unmount();
-    vi.useRealTimers();
-  });
-});
+  it('sem stage sem preview: textShadow glow default', async () => {
+    const w = mountTimer()
+    setSize(w, 400, 300)
+    await nextTick()
+    const style = w.find('.timer-preview__digital').attributes('style') ?? ''
+    expect(style).toContain('text-shadow: 0 4px 30px')
+    w.unmount()
+  })
 
-describe("TimerPreview.vue", () => {
-  it("renderiza tempo formatado sem stage", () => {
-    const wrapper = mountPreview();
-    expect(wrapper.find(".timer-preview__digital").text()).toBe("05:00");
-  });
+  it('stage com textShadow: shadow do Palco aplicado', async () => {
+    const w = mountTimer({ stage })
+    setSize(w, 400, 300)
+    await nextTick()
+    const style = w.find('.timer-preview__digital').attributes('style') ?? ''
+    expect(style).toContain('text-shadow: 0 0 3vh rgba(0,0,0,0.5)')
+    w.unmount()
+  })
 
-  it("preview=true usa cor de superfície e sem sombra", () => {
-    const wrapper = mountPreview({ preview: true });
-    const style = wrapper.find(".timer-preview__digital").attributes("style") ?? "";
-    expect(style).toContain("var(--ds-color-on-surface)");
-    expect(style).toContain("none"); // textShadow none
-  });
+  it('stage textBox: background/border/padding aplicados', async () => {
+    const st = { ...stage, textBox: true, boxOpacity: 0.6, boxBorder: true } as StageSettings
+    const w = mountTimer({ stage: st })
+    setSize(w, 400, 300)
+    await nextTick()
+    const style = w.find('.timer-preview__digital').attributes('style') ?? ''
+    expect(style).toContain('rgba(0, 0, 0, 0.6)')
+    expect(style).toContain('border: 1px solid')
+    w.unmount()
+  })
 
-  it("stage definido: escala fontSize pela largura e aplica textBox", () => {
-    const wrapper = mountPreview({
-      stage: {
-        fontSize: 96,
-        textColor: "#ffcc00",
-        fontWeight: 700,
-        textAlign: "left",
-        textVerticalAlign: "top",
-        textShadow: false,
-        textBox: true,
-        boxOpacity: 0.5,
-        boxBorder: true,
-      },
-    });
-    const style = wrapper.find(".timer-preview__digital").attributes("style") ?? "";
-    // sizeWidth=0 em jsdom → cai no min 16
-    expect(style).toContain("20px");
-    expect(style).toContain("rgb(255, 204, 0)");
-    expect(style).toContain("700");
-    // stage textBox → background rgba
-    expect(style.toLowerCase()).toContain("rgba(0, 0, 0, 0.5)");
-  });
+  it('preview:true sem stage → cor var(--ds-color-on-surface) (branch textColor)', () => {
+    const w = mountTimer({ preview: true })
+    const style = w.find('.timer-preview__digital').attributes('style') ?? ''
+    expect(style).toContain('--ds-color-on-surface')
+    w.unmount()
+  })
 
-  it("stage com textShadow: aplica sombra com blur/intensidade", () => {
-    const wrapper = mountPreview({
-      stage: {
-        fontSize: 120,
-        textColor: "#fff",
-        fontWeight: 400,
-        textAlign: "right",
-        textVerticalAlign: "bottom",
-        textShadow: true,
-        shadowBlur: 12,
-        shadowIntensity: 0.8,
-        textBox: false,
-        boxBorder: false,
-      },
-    });
-    const style = wrapper.find(".timer-preview__digital").attributes("style") ?? "";
-    expect(style).toContain("12vh");
-    expect(style).toContain("0.8");
-  });
+  it('surfaceStyle: center/center sem stage', () => {
+    const w = mountTimer()
+    const style = w.find('.timer-preview').attributes('style') ?? ''
+    expect(style).toContain('align-items: center')
+    expect(style).toContain('justify-content: center')
+    w.unmount()
+  })
 
-  it("sem stage: justifyContent/alignItems center no surface", () => {
-    const wrapper = mountPreview();
-    const style = wrapper.find(".timer-preview").attributes("style") ?? "";
-    expect(style).toContain("center");
-  });
+  it('surfaceStyle: alinhamentos do stage (top/left)', () => {
+    const st = { ...stage, textVerticalAlign: 'top', textAlign: 'left' } as StageSettings
+    const w = mountTimer({ stage: st })
+    const style = w.find('.timer-preview').attributes('style') ?? ''
+    expect(style).toContain('align-items: flex-start')
+    expect(style).toContain('justify-content: flex-start')
+    w.unmount()
+  })
 
-  it("timeFormat com ms: ratio menor (0.28) — cobre branch", () => {
-    const wrapper = mountPreview({
-      config: { ...baseConfig, timeFormat: "mm:ss.ms" },
-    });
-    expect(wrapper.find(".timer-preview__digital").exists()).toBe(true);
-  });
-  describe("gaps — digitalFontSize com stage", () => {
-    it("com stage: renderiza e escala (fontSize 192 → escala 2x)", async () => {
-      const wrapper = mountPreview({
-        stage: {
-          fontSize: 192,
-          textAlign: "left",
-          textVerticalAlign: "bottom",
-          textShadow: true,
-          shadowBlur: 2,
-          shadowIntensity: 0.6,
-        },
-      });
-      await wrapper.vm.$nextTick();
-      expect(wrapper.find(".timer-preview__digital").exists()).toBe(true);
-      wrapper.unmount();
-    });
+  it('stage bottom/right → flex-end/flex-end', () => {
+    const st = { ...stage, textVerticalAlign: 'bottom', textAlign: 'right' } as StageSettings
+    const w = mountTimer({ stage: st })
+    const style = w.find('.timer-preview').attributes('style') ?? ''
+    expect(style).toContain('align-items: flex-end')
+    expect(style).toContain('justify-content: flex-end')
+    w.unmount()
+  })
 
-    it("stage align left/bottom: justify/align flex", async () => {
-      const wrapper = mountPreview({
-        stage: {
-          fontSize: 96,
-          textAlign: "right",
-          textVerticalAlign: "bottom",
-          textShadow: false,
-        },
-      });
-      await wrapper.vm.$nextTick();
-      expect(wrapper.exists()).toBe(true);
-      wrapper.unmount();
-    });
-  });
+  it('sem stage: fontSize pelo min(w,h) com ratio 0.36 (sem ms) e clamp 20', async () => {
+    const w = mountTimer()
+    setSize(w, 200, 100)
+    await nextTick()
+    const style = w.find('.timer-preview__digital').attributes('style') ?? ''
+    expect(style).toContain('font-size: 36px')
+    w.unmount()
+  })
 
-  it("gaps onda1: container medido antes do mount escala fontSize (L32) e unmount limpa timer (L117)", async () => {
-    const proto = HTMLElement.prototype as unknown as Record<string, unknown>;
-    Object.defineProperty(proto, "offsetWidth", { value: 800, configurable: true });
-    Object.defineProperty(proto, "offsetHeight", { value: 400, configurable: true });
-    const wrapper = mountPreview({
-      stage: { fontSize: 960, textVerticalAlign: "top", textAlign: "left" },
-    });
-    await wrapper.vm.$nextTick();
-    const style = wrapper.find(".timer-preview__digital").attributes("style") ?? "";
-    expect(style).toContain("400px"); // 960/1920*800
-    wrapper.unmount(); // measureTimer === null aqui → L117 FALSE side
-    delete proto.offsetWidth;
-    delete proto.offsetHeight;
-  });
+  it('timeFormat com ms: ratio 0.28', async () => {
+    const w = mountTimer({ config: { ...config, timeFormat: 'mm:ss.ms' } as never })
+    setSize(w, 200, 100)
+    await nextTick()
+    const style = w.find('.timer-preview__digital').attributes('style') ?? ''
+    expect(style).toContain('font-size: 28')
+    w.unmount()
+  })
 
-});
+  it('onUnmounted: remove listener de resize', () => {
+    const spy = vi.spyOn(window, 'removeEventListener')
+    const w = mountTimer()
+    w.unmount()
+    expect(spy).toHaveBeenCalledWith('resize', expect.any(Function))
+    spy.mockRestore()
+  })
+
+  it('measure com dimensões 0: agenda retry via setTimeout', async () => {
+    const setTimeoutSpy = vi.spyOn(window, 'setTimeout')
+    const w = mountTimer()
+    const el = w.find('.timer-preview').element as HTMLElement
+    Object.defineProperty(el, 'offsetWidth', { value: 0, configurable: true })
+    Object.defineProperty(el, 'offsetHeight', { value: 0, configurable: true })
+    window.dispatchEvent(new Event('resize'))
+    await nextTick()
+    expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 100)
+    setTimeoutSpy.mockRestore()
+    w.unmount()
+  })
+})

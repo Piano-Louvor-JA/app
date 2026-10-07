@@ -3,6 +3,9 @@ import { readCatalogRecord } from '@shared/services/workspace-api'
 import {
   listCustomMusics,
   fromCustomCollectionId,
+  fromCustomMusicId,
+  isCustomMusicId,
+  loadCustomMusicTrack,
   toCustomMusicId,
 } from '@modules/media/services/custom-catalog'
 
@@ -222,7 +225,27 @@ function stripHtml(text: string): string {
 export async function loadAlbumLyric(
   musicId: number,
 ): Promise<AlbumLyricDocument | null> {
-  if (!Number.isFinite(musicId) || musicId <= 0) return null
+  if (!Number.isFinite(musicId) || musicId === 0) return null
+
+  // Custom (1M+) e local (id negativo) não existem como `music_<id>` oficial.
+  if (musicId < 0 || isCustomMusicId(musicId)) {
+    const rawId = musicId < 0 ? musicId : fromCustomMusicId(musicId)
+    const track = await loadCustomMusicTrack(rawId)
+    if (!track) return null
+    const lines: AlbumLyricLine[] = track.lyrics
+      .map((slide, index) => ({
+        order: slide.order ?? index + 1,
+        text: stripHtml(String(slide.lyric ?? '')),
+      }))
+      .filter((line) => line.text.length > 0)
+      .sort((a, b) => a.order - b.order)
+    if (lines.length === 0) return null
+    return {
+      musicId,
+      title: track.name.trim() || `music_${musicId}`,
+      lines,
+    }
+  }
 
   const record = await readOrFetchCatalog<CatalogMusicRecord>(`music_${musicId}`)
   if (!record) return null

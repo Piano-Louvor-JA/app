@@ -23,7 +23,7 @@ beforeEach(() => {
 })
 
 describe('openMusicPlayer', () => {
-  it('musicId inválido (0, NaN, negativo) -> trackMissing sem tocar no store', async () => {
+  it('musicId inválido (0, NaN) -> trackMissing sem tocar no store', async () => {
     expect(await openMusicPlayer({ musicId: 0, mode: 'audio' })).toMatchObject({
       ok: false,
       messageKey: 'media.messages.trackMissing',
@@ -31,10 +31,14 @@ describe('openMusicPlayer', () => {
     expect(await openMusicPlayer({ musicId: Number.NaN, mode: 'audio' })).toMatchObject({
       ok: false,
     })
-    expect(await openMusicPlayer({ musicId: -3, mode: 'audio' })).toMatchObject({
-      ok: false,
-    })
     expect(openMock).not.toHaveBeenCalled()
+  })
+
+  it('musicId local negativo abre o player', async () => {
+    openMock.mockResolvedValue({ ok: true })
+    const result = await openMusicPlayer({ musicId: -3, mode: 'audio' })
+    expect(openMock).toHaveBeenCalledWith(expect.objectContaining({ musicId: -3 }))
+    expect(result.ok).toBe(true)
   })
 
   it('ok: repassa project/albumId, maximiza e retorna resultado', async () => {

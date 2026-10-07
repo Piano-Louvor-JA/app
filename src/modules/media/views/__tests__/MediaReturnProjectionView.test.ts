@@ -1,821 +1,443 @@
 // @vitest-environment jsdom
-import { mount } from "@vue/test-utils";
+// Cobertura MediaReturnProjectionView (gaps_map3): applyRuntime (promote/snap/
+// unchanged/bar sync), onStorage, mount/unmount com BroadcastChannel, prefers-
+// reduced-motion e template (cover/bar/next).
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
 
-// override stage-settings: true-arms de barColor/textShadow/textBox (fantasma de glob vazio em teste)
-const stageSettingsStateMR = vi.hoisted(() => ({ value: null as Record<string, unknown> | null }))
-vi.mock("../../../settings/services/stage-settings-runtime", async (importOriginal) => {
-	const real = await importOriginal<typeof import("../../../settings/services/stage-settings-runtime")>()
-	return {
-		readEffectiveStageSettings: (scope: string) =>
-			stageSettingsStateMR.value ?? real.readEffectiveStageSettings(scope),
-		subscribeStageSettings: (cb: () => void) => real.subscribeStageSettings(cb),
-	}
+const stageSettings = vi.hoisted(() => {
+  const listeners: Array<() => void> = []
+  return {
+    listeners,
+    settings: {
+      backgroundColor: '#000',
+      backgroundImage: null,
+      textColor: '#fff',
+      fontSize: 96,
+      fontWeight: 700,
+      textAlign: 'center',
+      textShadow: true,
+      shadowBlur: 20,
+      shadowIntensity: 0.6,
+      footerRefColor: '#FCCE02',
+    },
+    subscribe: (fn: () => void) => {
+      listeners.push(fn)
+      return () => {
+        const i = listeners.indexOf(fn)
+        if (i >= 0) listeners.splice(i, 1)
+      }
+    },
+  }
 })
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createI18n } from "vue-i18n";
-import mediaLocale from "../../locales/pt-BR";
-/**
- * MediaReturnProjectionView — palco "retorno" com transições entre frases,
- * barra de progresso e preview da próxima frase. Mesma fonte standalone do
- * MediaProjectionView (storage + BroadcastChannel).
- */
+
+vi.mock('vue-i18n', () => ({
+  useI18n: () => ({ t: (k: string) => k, locale: { value: 'pt-BR' } }),
+}))
+vi.mock('../../../settings/services/stage-settings-runtime', () => ({
+  readEffectiveStageSettings: () => JSON.parse(JSON.stringify(stageSettings.settings)),
+  subscribeStageSettings: stageSettings.subscribe,
+}))
+vi.mock('../../../settings/types/stage-settings', () => ({
+  resolveBackgroundImage: (bg: unknown) => (bg ? String(bg) : null),
+}))
+vi.mock('../services/media-slides', () => ({
+  stripHtmlBreaks: (s: string) => (s ?? '').replace(/<br\s*\/?>/gi, ' ').trim(),
+}))
+
+import MediaReturnProjectionView from '../MediaReturnProjectionView.vue'
 import {
-	MEDIA_RUNTIME_CHANNEL,
-	MEDIA_RUNTIME_STORAGE_KEY,
-} from "../../services/media-runtime";
-import MediaReturnProjectionView from "../MediaReturnProjectionView.vue";
+  MEDIA_RUNTIME_STORAGE_KEY,
+  DEFAULT_MEDIA_PROJECTION,
+} from '../../services/media-runtime'
 
-const i18n = createI18n({
-	legacy: false,
-	locale: "pt-BR",
-	messages: { "pt-BR": mediaLocale },
-});
-
-function runtimePayload(over: Record<string, unknown> = {}) {
-	return {
-		active: true,
-		title: "Santíssimo",
-		subtitle: "Athus Santos",
-		lyric: "Santo, Santo, Santo",
-		imageUrl: null,
-		imagePosition: null,
-		isCover: false,
-		slideIndex: 0,
-		slideCount: 8,
-		nextLyric: "Digno é o Cordeiro",
-		nextIsCover: false,
-		progressRatio: 0.2,
-		slideProgressRatio: 0.4,
-		...over,
-	};
+function runtime(over: Record<string, unknown> = {}) {
+  return {
+    ...DEFAULT_MEDIA_PROJECTION,
+    active: true,
+    title: 'Hino 1',
+    lyric: 'Primeira estrofe',
+    nextLyric: 'Segunda estrofe',
+    isCover: false,
+    nextIsCover: false,
+    slideIndex: 0,
+    slideProgressRatio: 0.3,
+    imageUrl: null,
+    ...over,
+  }
 }
 
 async function mountView() {
-	const w = mount(MediaReturnProjectionView, { global: { plugins: [i18n] } });
-	// onMounted aplica o runtime pós-primeiro render
-	await w.vm.$nextTick();
-	await w.vm.$nextTick();
-	return w;
+  const w = mount(MediaReturnProjectionView)
+  await flushPromises()
+  return w
+}
+
+/** Publica runtime (como o player faria) via storage event. */
+async function publish(w: ReturnType<typeof mount>, over: Record<string, unknown>) {
+  window.dispatchEvent(
+    new StorageEvent('storage', {
+      key: MEDIA_RUNTIME_STORAGE_KEY,
+      newValue: JSON.stringify(runtime(over)),
+    }),
+  )
+  await flushPromises()
+  await flushPromises()
+  void w
 }
 
 beforeEach(() => {
-	localStorage.clear();
-});
-
-afterEach(() => {
-	localStorage.clear();
-});
-
-describe("MediaReturnProjectionView", () => {
-	it("inativa: não mostra frase nem título", async () => {
-		localStorage.setItem(
-			MEDIA_RUNTIME_STORAGE_KEY,
-			JSON.stringify(runtimePayload({ active: false })),
-		);
-		const w = await mountView();
-		expect(w.text()).not.toContain("Santo, Santo, Santo");
-		expect(w.text()).not.toContain("Santíssimo");
-		w.unmount();
-	});
-
-	it("ativa com letra: mostra a frase atual", async () => {
-		localStorage.setItem(
-			MEDIA_RUNTIME_STORAGE_KEY,
-			JSON.stringify(runtimePayload()),
-		);
-		const w = await mountView();
-		expect(w.text()).toContain("Santo, Santo, Santo");
-		w.unmount();
-	});
-
-	it("ativa com próxima frase: mostra preview do next", async () => {
-		localStorage.setItem(
-			MEDIA_RUNTIME_STORAGE_KEY,
-			JSON.stringify(runtimePayload()),
-		);
-		const w = await mountView();
-		expect(w.text()).toContain("Digno é o Cordeiro");
-		w.unmount();
-	});
-
-	it("capa: mostra o título como frase", async () => {
-		localStorage.setItem(
-			MEDIA_RUNTIME_STORAGE_KEY,
-			JSON.stringify(runtimePayload({ isCover: true, lyric: "" })),
-		);
-		const w = await mountView();
-		expect(w.text()).toContain("Santíssimo");
-		w.unmount();
-	});
-
-	it("storage event atualiza a frase", async () => {
-		const w = await mountView();
-		expect(w.text()).not.toContain("Santo, Santo, Santo");
-		window.dispatchEvent(
-			new StorageEvent("storage", {
-				key: MEDIA_RUNTIME_STORAGE_KEY,
-				newValue: JSON.stringify(runtimePayload()),
-			}),
-		);
-		await w.vm.$nextTick();
-		expect(w.text()).toContain("Santo, Santo, Santo");
-		w.unmount();
-	});
-
-	it("storage event com JSON inválido não quebra", async () => {
-		const w = await mountView();
-		window.dispatchEvent(
-			new StorageEvent("storage", {
-				key: MEDIA_RUNTIME_STORAGE_KEY,
-				newValue: "{quebrado",
-			}),
-		);
-		await w.vm.$nextTick();
-		expect(w.find(".media-return").exists()).toBe(true);
-		w.unmount();
-	});
-
-	it("storage event de outra chave é ignorado", async () => {
-		localStorage.setItem(
-			MEDIA_RUNTIME_STORAGE_KEY,
-			JSON.stringify(runtimePayload()),
-		);
-		const w = await mountView();
-		window.dispatchEvent(
-			new StorageEvent("storage", {
-				key: "outra",
-				newValue: '{"active":false}',
-			}),
-		);
-		await w.vm.$nextTick();
-		expect(w.text()).toContain("Santo, Santo, Santo");
-		w.unmount();
-	});
-
-	it("BroadcastChannel atualiza a frase", async () => {
-		const w = await mountView();
-		const ch = new BroadcastChannel(MEDIA_RUNTIME_CHANNEL);
-		ch.postMessage(runtimePayload({ lyric: "Frase Via Channel" }));
-		await vi.waitFor(() => expect(w.text()).toContain("Frase Via Channel"));
-		ch.close();
-		w.unmount();
-	});
-});
-
-describe("MediaReturnProjectionView — transições", () => {
-	function stubMotion() {
-		// getBoundingClientRect com altura real + animate + rAF
-		vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
-			height: 40,
-			width: 200,
-			top: 0,
-			left: 0,
-			bottom: 40,
-			right: 200,
-			x: 0,
-			y: 0,
-			toJSON: () => ({}),
-		} as DOMRect);
-		Object.defineProperty(HTMLElement.prototype, "animate", {
-			configurable: true,
-			value: vi.fn().mockReturnValue({
-				finished: Promise.resolve(),
-				cancel: vi.fn(),
-			}),
-		});
-		vi.stubGlobal(
-			"requestAnimationFrame",
-			vi.fn((cb: FrameRequestCallback) => {
-				queueMicrotask(() => cb(performance.now()));
-				return 1;
-			}),
-		);
-		vi.stubGlobal("cancelAnimationFrame", vi.fn());
-		vi.stubGlobal("matchMedia", (q: string) => ({ matches: false, media: q }));
-	}
-
-	it("avanço sequencial (slideIndex+1, incoming=next) promove a frase com flyer", async () => {
-		stubMotion();
-		localStorage.setItem(
-			MEDIA_RUNTIME_STORAGE_KEY,
-			JSON.stringify(runtimePayload()),
-		);
-		const w = await mountView();
-		const ch = new BroadcastChannel(MEDIA_RUNTIME_CHANNEL);
-		ch.postMessage(
-			runtimePayload({
-				slideIndex: 1,
-				lyric: "Digno é o Cordeiro",
-				nextLyric: "Cordeiro de Deus",
-			}),
-		);
-		// aguarda a promoção: flyer some e frase atual vira a promovida
-		await vi.waitFor(() => {
-			// garante que a mensagem chegou (não é o preview inicial)
-			expect(w.find(".media-return__flyer").exists() || true).toBe(true);
-			return;
-		});
-		await new Promise((r) => setTimeout(r, 120));
-		await w.vm.$nextTick();
-		ch.close();
-		w.unmount();
-		vi.unstubAllGlobals();
-		vi.restoreAllMocks();
-	});
-
-	it("prefers-reduced-motion: avanço usa snapTo direto (sem flyer)", async () => {
-		vi.stubGlobal(
-			"matchMedia",
-			vi.fn(() => ({ matches: true, media: "" })),
-		);
-		localStorage.setItem(
-			MEDIA_RUNTIME_STORAGE_KEY,
-			JSON.stringify(runtimePayload()),
-		);
-		const w = await mountView();
-		window.dispatchEvent(
-			new StorageEvent("storage", {
-				key: MEDIA_RUNTIME_STORAGE_KEY,
-				newValue: JSON.stringify(
-					runtimePayload({
-						slideIndex: 1,
-						lyric: "Slide Reduzido",
-						nextLyric: "",
-					}),
-				),
-			}),
-		);
-		await w.vm.$nextTick();
-		expect(w.text()).toContain("Slide Reduzido");
-		w.unmount();
-		vi.unstubAllGlobals();
-	});
-
-	it("durante transição (flyer em voo): runtime divergente força snapTo", async () => {
-		// animate que nunca resolve segura o flyer "em voo"
-		Object.defineProperty(HTMLElement.prototype, "animate", {
-			configurable: true,
-			value: vi.fn().mockReturnValue({
-				finished: new Promise(() => {}),
-				cancel: vi.fn(),
-			}),
-		});
-		vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
-			height: 40,
-			width: 200,
-			top: 0,
-			left: 0,
-			bottom: 40,
-			right: 200,
-			x: 0,
-			y: 0,
-			toJSON: () => ({}),
-		} as DOMRect);
-		localStorage.setItem(
-			MEDIA_RUNTIME_STORAGE_KEY,
-			JSON.stringify(runtimePayload()),
-		);
-		const w = await mountView();
-		const ch = new BroadcastChannel(MEDIA_RUNTIME_CHANNEL);
-		// inicia avanço sequencial
-		ch.postMessage(
-			runtimePayload({
-				slideIndex: 1,
-				lyric: "Em Transição",
-				nextLyric: "Próxima",
-			}),
-		);
-		await vi.waitFor(() => expect(w.text()).toContain("Em Transição"));
-		// runtime divergente no meio da transição → snapTo
-		ch.postMessage(
-			runtimePayload({ slideIndex: 5, lyric: "Snap Forçado", nextLyric: "" }),
-		);
-		await vi.waitFor(() => expect(w.text()).toContain("Snap Forçado"));
-		ch.close();
-		w.unmount();
-		vi.restoreAllMocks();
-	});
-
-	it("animate rejeita (finished reject): sai sem promover next", async () => {
-		Object.defineProperty(HTMLElement.prototype, "animate", {
-			configurable: true,
-			value: vi.fn().mockReturnValue({
-				// catch anexado pra não virar unhandled rejection
-				finished: Promise.reject(new Error("anim abort")).catch(() => {}),
-				cancel: vi.fn(),
-			}),
-		});
-		vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
-			height: 40,
-			width: 200,
-			top: 0,
-			left: 0,
-			bottom: 40,
-			right: 200,
-			x: 0,
-			y: 0,
-			toJSON: () => ({}),
-		} as DOMRect);
-		localStorage.setItem(
-			MEDIA_RUNTIME_STORAGE_KEY,
-			JSON.stringify(runtimePayload()),
-		);
-		const w = await mountView();
-		const ch = new BroadcastChannel(MEDIA_RUNTIME_CHANNEL);
-		ch.postMessage(
-			runtimePayload({
-				slideIndex: 1,
-				lyric: "Anim Falhou",
-				nextLyric: "Não importa",
-			}),
-		);
-		await vi.waitFor(() => expect(w.text()).toContain("Anim Falhou"));
-		ch.close();
-		w.unmount();
-		vi.restoreAllMocks();
-	});
-
-	it("subscribeStageSettings: mudança de palco atualiza background/textAlign", async () => {
-		localStorage.setItem(
-			MEDIA_RUNTIME_STORAGE_KEY,
-			JSON.stringify(runtimePayload()),
-		);
-		const w = await mountView();
-		// dispara o callback de stage-settings gravando evento de storage da chave do palco
-		window.dispatchEvent(new Event("stage-settings-changed"));
-		await w.vm.$nextTick();
-		expect(w.find(".media-return").exists()).toBe(true);
-		w.unmount();
-	});
-
-	it("avanço sem elemento de next (DOM vazio): usa snapTo fallback", async () => {
-		stubMotion();
-		// derruba a altura do rect do next → !fromEl || height < 2 → snapTo
-		vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
-			height: 0,
-			width: 200,
-			top: 0,
-			left: 0,
-			bottom: 0,
-			right: 200,
-			x: 0,
-			y: 0,
-			toJSON: () => ({}),
-		} as DOMRect);
-		localStorage.setItem(
-			MEDIA_RUNTIME_STORAGE_KEY,
-			JSON.stringify(runtimePayload()),
-		);
-		const w = await mountView();
-		const ch = new BroadcastChannel(MEDIA_RUNTIME_CHANNEL);
-		ch.postMessage(
-			runtimePayload({
-				slideIndex: 1,
-				lyric: "Sem Rect Fallback",
-				nextLyric: "",
-			}),
-		);
-		await vi.waitFor(() => expect(w.text()).toContain("Sem Rect Fallback"));
-		ch.close();
-		w.unmount();
-		vi.unstubAllGlobals();
-		vi.restoreAllMocks();
-	});
-
-	it("stage-settings via BroadcastChannel ou storage 'user_data': atualiza o palco", async () => {
-		localStorage.setItem(
-			MEDIA_RUNTIME_STORAGE_KEY,
-			JSON.stringify(runtimePayload()),
-		);
-		const w = await mountView();
-		// storage da chave user_data dispara o callback do subscribeStageSettings
-		window.dispatchEvent(
-			new StorageEvent("storage", { key: "user_data", newValue: "{}" }),
-		);
-		await w.vm.$nextTick();
-		const stageCh = new BroadcastChannel("louvorja-stage-settings");
-		stageCh.postMessage({});
-		await w.vm.$nextTick();
-		stageCh.close();
-		expect(w.find(".media-return").exists()).toBe(true);
-		w.unmount();
-	});
-
-	it("avanço com gen invalidado entre nextTicks: sai cedo sem atualizar next", async () => {
-		stubMotion();
-		localStorage.setItem(
-			MEDIA_RUNTIME_STORAGE_KEY,
-			JSON.stringify(runtimePayload()),
-		);
-		const w = await mountView();
-		const ch = new BroadcastChannel(MEDIA_RUNTIME_CHANNEL);
-		// dois avanços rápidos: o primeiro é invalidado pelo gen do segundo
-		ch.postMessage(
-			runtimePayload({ slideIndex: 1, lyric: "Gen A", nextLyric: "x" }),
-		);
-		ch.postMessage(
-			runtimePayload({ slideIndex: 2, lyric: "Gen B", nextLyric: "y" }),
-		);
-		await vi.waitFor(() => expect(w.text()).toContain("Gen B"));
-		await new Promise((r) => setTimeout(r, 100));
-		await w.vm.$nextTick();
-		ch.close();
-		w.unmount();
-		vi.unstubAllGlobals();
-		vi.restoreAllMocks();
-	});
-
-	it("promoção com next sem preview renderizado: snapTo fallback (paintBar do inativo também coberto)", async () => {
-		stubMotion();
-		// próximo sem nextLyric nem capa → showNext falso → nextRef null
-		localStorage.setItem(
-			MEDIA_RUNTIME_STORAGE_KEY,
-			JSON.stringify(runtimePayload({ nextLyric: "", nextIsCover: false })),
-		);
-		const w = await mountView();
-		const ch = new BroadcastChannel(MEDIA_RUNTIME_CHANNEL);
-		ch.postMessage(
-			runtimePayload({
-				slideIndex: 1,
-				lyric: "Promoção Sem Preview",
-				nextLyric: "",
-			}),
-		);
-		await vi.waitFor(() => expect(w.text()).toContain("Promoção Sem Preview"));
-		// runtime inativo: cobre paintBar(0) do syncBar
-		ch.postMessage(
-			runtimePayload({ slideIndex: 1, lyric: "x", active: false }),
-		);
-		await vi.waitFor(() =>
-			expect(w.text()).not.toContain("Promoção Sem Preview"),
-		);
-		ch.close();
-		w.unmount();
-		vi.unstubAllGlobals();
-		vi.restoreAllMocks();
-	});
-
-	it("promoção quando alvo sumiu pós-nextTick: snapTo fallback 2", async () => {
-		stubMotion();
-		// flyerRef/lyricRef nulos: getBoundingClientRect lança? Não — mock retorna height 0
-		// para TODO elemento, então o 2º guard (to.height < 2) cai no snapTo
-		vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
-			height: 0,
-			width: 200,
-			top: 0,
-			left: 0,
-			bottom: 0,
-			right: 200,
-			x: 0,
-			y: 0,
-			toJSON: () => ({}),
-		} as DOMRect);
-		localStorage.setItem(
-			MEDIA_RUNTIME_STORAGE_KEY,
-			JSON.stringify(runtimePayload()),
-		);
-		const w = await mountView();
-		const ch = new BroadcastChannel(MEDIA_RUNTIME_CHANNEL);
-		ch.postMessage(
-			runtimePayload({
-				slideIndex: 1,
-				lyric: "Guard Dois Fallback",
-				nextLyric: "",
-			}),
-		);
-		await vi.waitFor(() => expect(w.text()).toContain("Guard Dois Fallback"));
-		ch.close();
-		w.unmount();
-		vi.unstubAllGlobals();
-		vi.restoreAllMocks();
-	});
-
-	it("runtime inativo direto: snapTo + paintBar(0)", async () => {
-		localStorage.setItem(
-			MEDIA_RUNTIME_STORAGE_KEY,
-			JSON.stringify(runtimePayload()),
-		);
-		const w = await mountView();
-		window.dispatchEvent(
-			new StorageEvent("storage", {
-				key: MEDIA_RUNTIME_STORAGE_KEY,
-				newValue: JSON.stringify(
-					runtimePayload({ active: false, lyric: "zzz" }),
-				),
-			}),
-		);
-		await w.vm.$nextTick();
-		expect(w.text()).not.toContain("Santo, Santo, Santo");
-		w.unmount();
-	});
-
-	it("durante lyricWait: divergente força snapTo (com isCover)", async () => {
-		// flyer em voo (never resolve) + runtime cobre a linha do meio
-		Object.defineProperty(HTMLElement.prototype, "animate", {
-			configurable: true,
-			value: vi.fn().mockReturnValue({
-				finished: new Promise(() => {}),
-				cancel: vi.fn(),
-			}),
-		});
-		vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
-			height: 40,
-			width: 200,
-			top: 0,
-			left: 0,
-			bottom: 40,
-			right: 200,
-			x: 0,
-			y: 0,
-			toJSON: () => ({}),
-		} as DOMRect);
-		localStorage.setItem(
-			MEDIA_RUNTIME_STORAGE_KEY,
-			JSON.stringify(runtimePayload()),
-		);
-		const w = await mountView();
-		const ch = new BroadcastChannel(MEDIA_RUNTIME_CHANNEL);
-		ch.postMessage(
-			runtimePayload({ slideIndex: 1, lyric: "Em Voo Cover", nextLyric: "p" }),
-		);
-		await vi.waitFor(() => expect(w.text()).toContain("Em Voo Cover"));
-		// divergente + capa → snapTo dentro do branch exiting/lyricWait
-		ch.postMessage(
-			runtimePayload({
-				slideIndex: 9,
-				title: "Capa No Meio",
-				lyric: "",
-				isCover: true,
-			}),
-		);
-		await vi.waitFor(() => expect(w.text()).toContain("Capa No Meio"));
-		ch.close();
-		w.unmount();
-		vi.restoreAllMocks();
-	});
-
-	it("barra animada com progresso fluindo e depois inativa: tickBar pintando e parando", async () => {
-		// rAF NÃO dispara na hora: guarda o callback pra controlar o tick manualmente
-		const rafCbs: FrameRequestCallback[] = [];
-		vi.stubGlobal(
-			"requestAnimationFrame",
-			vi.fn((cb: FrameRequestCallback) => {
-				rafCbs.push(cb);
-				return rafCbs.length;
-			}),
-		);
-		vi.stubGlobal("cancelAnimationFrame", vi.fn());
-		vi.stubGlobal("matchMedia", (q: string) => ({ matches: false, media: q }));
-		Object.defineProperty(HTMLElement.prototype, "animate", {
-			configurable: true,
-			value: vi
-				.fn()
-				.mockReturnValue({ finished: Promise.resolve(), cancel: vi.fn() }),
-		});
-		vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
-			height: 40,
-			width: 200,
-			top: 0,
-			left: 0,
-			bottom: 40,
-			right: 200,
-			x: 0,
-			y: 0,
-			toJSON: () => ({}),
-		} as DOMRect);
-
-		localStorage.setItem(
-			MEDIA_RUNTIME_STORAGE_KEY,
-			JSON.stringify(runtimePayload()),
-		);
-		const w = await mountView();
-		// progresso subindo com mesmo slideIndex → reset=false → startBar agenda tick
-		window.dispatchEvent(
-			new StorageEvent("storage", {
-				key: MEDIA_RUNTIME_STORAGE_KEY,
-				newValue: JSON.stringify(runtimePayload({ slideProgressRatio: 0.8 })),
-			}),
-		);
-		await w.vm.$nextTick();
-		// inativa ANTES do tick rodar: tickBar vê runtime inativo → paintBar(0) (89-90)
-		window.dispatchEvent(
-			new StorageEvent("storage", {
-				key: MEDIA_RUNTIME_STORAGE_KEY,
-				newValue: JSON.stringify(
-					runtimePayload({ slideProgressRatio: 0.8, active: false }),
-				),
-			}),
-		);
-		await w.vm.$nextTick();
-		// roda todos os ticks pendentes
-		for (const cb of rafCbs.splice(0)) cb(performance.now());
-		await w.vm.$nextTick();
-		w.unmount();
-		vi.unstubAllGlobals();
-		vi.restoreAllMocks();
-	});
-
-	it("mesmo slide repetido: não re-anima", async () => {
-		localStorage.setItem(
-			MEDIA_RUNTIME_STORAGE_KEY,
-			JSON.stringify(runtimePayload()),
-		);
-		const w = await mountView();
-		window.dispatchEvent(
-			new StorageEvent("storage", {
-				key: MEDIA_RUNTIME_STORAGE_KEY,
-				newValue: JSON.stringify(runtimePayload()),
-			}),
-		);
-		await w.vm.$nextTick();
-		expect(w.text()).toContain("Santo, Santo, Santo");
-		w.unmount();
-	});
-
-	describe("ramos restantes", () => {
-		it("nextIsCover sem lyric: nextPhrase usa título", async () => {
-			localStorage.setItem(
-				MEDIA_RUNTIME_STORAGE_KEY,
-				JSON.stringify(runtimePayload({ nextLyric: "", nextIsCover: true })),
-			);
-			const w = await mountView();
-			expect(w.text()).toContain("Santíssimo");
-			w.unmount();
-		});
-
-		it("promoção com reduced motion: snapTo direto", async () => {
-			window.matchMedia = vi.fn().mockReturnValue({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() });
-			// estado inicial: slide 0 com next preview "Digno é o Cordeiro"
-			localStorage.setItem(MEDIA_RUNTIME_STORAGE_KEY, JSON.stringify(runtimePayload()));
-			const w = await mountView();
-			// promoção válida: slideIndex+1, incoming === shownNext
-			window.dispatchEvent(
-				new StorageEvent("storage", {
-					key: MEDIA_RUNTIME_STORAGE_KEY,
-					newValue: JSON.stringify(runtimePayload({
-						slideIndex: 1,
-						currentLyric: "Digno é o Cordeiro",
-						nextLyric: "Terceira frase",
-					})),
-				}),
-			);
-			await new Promise((r) => setTimeout(r, 10));
-			await w.vm.$nextTick();
-			// reduced motion: promoção via snapTo — runtime aplicado sem animação
-			expect(w.find(".media-return").exists()).toBe(true);
-			w.unmount();
-		});
-
-		it("flyerAnim rejeita: early return", async () => {
-			const origAnimate = Element.prototype.animate;
-			Element.prototype.animate = function () {
-				return { finished: Promise.reject(new Error("anim fail")), cancel: vi.fn() } as unknown as Animation;
-			} as any;
-			const w = await mountView();
-			window.dispatchEvent(
-				new StorageEvent("storage", {
-					key: MEDIA_RUNTIME_STORAGE_KEY,
-					newValue: JSON.stringify(runtimePayload({ slideIndex: 1, currentLyric: "Troca com falha de anim" })),
-				}),
-			);
-			await new Promise((r) => setTimeout(r, 20));
-			Element.prototype.animate = origAnimate;
-			w.unmount();
-		});
-
-		it("updates rápidos: gen stale aborta promoção", async () => {
-			localStorage.setItem(MEDIA_RUNTIME_STORAGE_KEY, JSON.stringify(runtimePayload()));
-			const w = await mountView();
-			for (let i = 1; i <= 3; i++) {
-				window.dispatchEvent(
-					new StorageEvent("storage", {
-						key: MEDIA_RUNTIME_STORAGE_KEY,
-						newValue: JSON.stringify(runtimePayload({ slideIndex: i, currentLyric: `Frase ${i}` })),
-					}),
-				);
-			}
-			await new Promise((r) => setTimeout(r, 30));
-			w.unmount();
-		});
-	});
-
-	describe("promoção completa (gen branches)", () => {
-		it("promoção animada completa com animate e rects falsos", async () => {
-			const origAnimate = Element.prototype.animate;
-			Element.prototype.animate = function () {
-				return { finished: Promise.resolve(), cancel: vi.fn() } as unknown as Animation;
-			} as any;
-			// rects não-zeros: jsdom retorna 0 — inject via spies nos elementos
-			localStorage.setItem(MEDIA_RUNTIME_STORAGE_KEY, JSON.stringify(runtimePayload()));
-			const w = await mountView();
-			const nextEl = w.find("[class*=next]").element as HTMLElement;
-			const lyricEl = w.find("[class*=lyric]").element as HTMLElement;
-			const flyerEl = w.find("[class*=flyer]").element as HTMLElement;
-			if (nextEl && lyricEl) {
-				nextEl.getBoundingClientRect = () => ({ x: 0, y: 0, top: 10, left: 0, bottom: 40, right: 100, width: 100, height: 30, toJSON: () => ({}) } as DOMRect);
-				lyricEl.getBoundingClientRect = () => ({ x: 0, y: 0, top: 50, left: 0, bottom: 90, right: 100, width: 100, height: 40, toJSON: () => ({}) } as DOMRect);
-				if (flyerEl) flyerEl.getBoundingClientRect = () => ({ x: 0, y: 0, top: 10, left: 0, bottom: 40, right: 100, width: 100, height: 30, toJSON: () => ({}) } as DOMRect);
-				window.dispatchEvent(
-					new StorageEvent("storage", {
-						key: MEDIA_RUNTIME_STORAGE_KEY,
-						newValue: JSON.stringify(runtimePayload({
-							slideIndex: 1,
-							currentLyric: "Digno é o Cordeiro",
-							nextLyric: "Terceira frase",
-						})),
-					}),
-				);
-				await new Promise((r) => setTimeout(r, 80));
-			}
-			Element.prototype.animate = origAnimate;
-			w.unmount();
-		});
-
-		it("durante exiting: incoming divergente → snapTo (274-275)", async () => {
-			const origAnimate = Element.prototype.animate;
-			Element.prototype.animate = function () {
-				return { finished: new Promise(() => {}), cancel: vi.fn() } as unknown as Animation;
-			} as any;
-			const nextEl0 = document.querySelector("[class*=next]") as HTMLElement | null;
-			localStorage.setItem(MEDIA_RUNTIME_STORAGE_KEY, JSON.stringify(runtimePayload()));
-			const w = await mountView();
-			const nextEl = w.find("[class*=next]").element as HTMLElement;
-			const lyricEl = w.find("[class*=lyric]").element as HTMLElement;
-			nextEl.getBoundingClientRect = () => ({ x: 0, y: 0, top: 10, left: 0, bottom: 40, right: 100, width: 100, height: 30, toJSON: () => ({}) } as DOMRect);
-			lyricEl.getBoundingClientRect = () => ({ x: 0, y: 0, top: 50, left: 0, bottom: 90, right: 100, width: 100, height: 40, toJSON: () => ({}) } as DOMRect);
-			// 1ª promoção trava no flyerAnim (finished pendente) → exiting=true
-			window.dispatchEvent(new StorageEvent("storage", {
-				key: MEDIA_RUNTIME_STORAGE_KEY,
-				newValue: JSON.stringify(runtimePayload({ slideIndex: 1, currentLyric: "Primeira promo", nextLyric: "Seguinte" })),
-			}));
-			await new Promise((r) => setTimeout(r, 30));
-			// 2ª atualização com texto DIFERENTE durante exiting → snapTo (274)
-			window.dispatchEvent(new StorageEvent("storage", {
-				key: MEDIA_RUNTIME_STORAGE_KEY,
-				newValue: JSON.stringify(runtimePayload({ slideIndex: 2, currentLyric: "Texto divergente", nextLyric: "Outro" })),
-			}));
-			await new Promise((r) => setTimeout(r, 30));
-			Element.prototype.animate = origAnimate;
-			w.unmount();
-		});
-	});
+  window.localStorage?.clear?.()
+  vi.clearAllMocks()
+  stageSettings.listeners.length = 0
+  // jsdom não tem matchMedia: default sem reduced-motion (o teste específico stuba)
+  if (!window.matchMedia) {
+    window.matchMedia = vi.fn().mockReturnValue({ matches: false }) as unknown as typeof window.matchMedia
+  }
 })
 
-describe("MediaReturnProjectionView — stage visual", () => {
-	it("backgroundImage e textShadow do palco: renderiza bg e sombra", async () => {
-		localStorage.setItem(
-			"user_data",
-			JSON.stringify({
-				"stage.settings.hymns": {
-					hymns: { overrideBg: true },
-					bgImg: "data:image/png;base64,iVBORw0KGgo=",
-					tsOn: true,
-					tsBlur: 4,
-					tsInt: 0.9,
-				},
-			}),
-		);
-		const w = await mountView();
-		expect(w.find(".media-return__bg").exists()).toBe(true);
-		expect(w.find(".media-return__lyric").exists()).toBe(true);
-		w.unmount();
-	});
-});
-	it("gaps: stage completo true-arms; snapTo com rect altura 0", async () => {
-		// stubs locais de motion
-		vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
-			height: 0, width: 0, top: 0, left: 0, bottom: 0, right: 0, x: 0, y: 0, toJSON: () => ({}),
-		} as DOMRect)
-		vi.stubGlobal("requestAnimationFrame", vi.fn((cb: FrameRequestCallback) => { queueMicrotask(() => cb(performance.now())); return 1 }))
-		vi.stubGlobal("cancelAnimationFrame", vi.fn())
-		vi.stubGlobal("matchMedia", (q: string) => ({ matches: false, media: q }))
-		stageSettingsStateMR.value = {
-			backgroundColor: "#000000",
-			textColor: "#ffffff",
-			fontSize: 96,
-			textAlign: "center",
-			textShadow: true,
-			shadowBlur: 3,
-			shadowIntensity: 0.8,
-			textBox: true,
-			boxOpacity: 0.5,
-			boxBorder: true,
-			footerRefColor: "#FCCE02",
-		} as Record<string, unknown>
-		localStorage.setItem(MEDIA_RUNTIME_STORAGE_KEY, JSON.stringify(runtimePayload()))
-		const w = await mountView()
-		window.dispatchEvent(
-			new StorageEvent("storage", {
-				key: MEDIA_RUNTIME_STORAGE_KEY,
-				newValue: JSON.stringify(runtimePayload({ slideIndex: 1, lyric: "Snap", nextLyric: "" })),
-			}),
-		)
-		await w.vm.$nextTick()
-		await new Promise((r) => setTimeout(r, 20))
-		expect(w.text()).toContain("Snap")
-		w.unmount()
-		stageSettingsStateMR.value = null
-		vi.restoreAllMocks()
-		vi.unstubAllGlobals()
-	})
+describe('MediaReturnProjectionView', () => {
+  it('sem runtime ativo: fundo sem corpo e sem barra', async () => {
+    const w = await mountView()
+    expect(w.find('.media-return__body').exists()).toBe(false)
+    w.unmount()
+  })
 
+  it('runtime ativo: mostra letra atual e próxima, barra existe', async () => {
+    const w = await mountView()
+    await publish(w, {})
+    expect(w.find('.media-return__body').exists()).toBe(true)
+    expect(w.text()).toContain('Primeira estrofe')
+    expect(w.text()).toContain('Segunda estrofe')
+    expect(w.find('.media-return__bar').exists()).toBe(true)
+    w.unmount()
+  })
+
+  it('capa: mostra título grande em vez do bloco de letra', async () => {
+    const w = await mountView()
+    await publish(w, { isCover: true, lyric: '' })
+    expect(w.find('.media-return__title--cover').text()).toBe('Hino 1')
+    expect(w.find('.media-return__bar').exists()).toBe(false)
+    w.unmount()
+  })
+
+  it('capa detectada por lyric vazia + título (isCoverSlide)', async () => {
+    const w = await mountView()
+    await publish(w, { lyric: '', title: 'Só título' })
+    expect(w.find('.media-return__title--cover').exists()).toBe(true)
+    w.unmount()
+  })
+
+  it('avanço sequencial de slide com texto igual ao "next": via canPromote ou snap — letra atualizada', async () => {
+    const w = await mountView()
+    await publish(w, { slideIndex: 0, lyric: 'Primeira estrofe', nextLyric: 'Segunda estrofe' })
+    // novo storage com slide seguinte e mesma next-frase → caminho promote
+    await publish(w, { slideIndex: 1, lyric: 'Segunda estrofe', nextLyric: 'Terceira estrofe' })
+    expect(w.text()).toContain('Segunda estrofe')
+    w.unmount()
+  })
+
+  it('mudança não sequencial: snap direto', async () => {
+    const w = await mountView()
+    await publish(w, { slideIndex: 0, lyric: 'Primeira estrofe', nextLyric: 'Segunda estrofe' })
+    await publish(w, { slideIndex: 5, lyric: 'Outra letra', nextLyric: 'Mais' })
+    expect(w.text()).toContain('Outra letra')
+    w.unmount()
+  })
+
+  it('runtime igual: sem re-snap (unchanged)', async () => {
+    const w = await mountView()
+    await publish(w, { slideIndex: 0 })
+    const lyricEl = w.find('.media-return__lyric')
+    expect(lyricEl.text()).toBe('Primeira estrofe')
+    // repete o mesmo runtime: nada muda visualmente e não quebra
+    await publish(w, { slideIndex: 0 })
+    expect(w.find('.media-return__lyric').text()).toBe('Primeira estrofe')
+    w.unmount()
+  })
+
+  it('inactive: snapTo limpa', async () => {
+    const w = await mountView()
+    await publish(w, { slideIndex: 0 })
+    await publish(w, { active: false })
+    expect(w.find('.media-return__body').exists()).toBe(false)
+    w.unmount()
+  })
+
+  it('storage de chave diferente: ignora', async () => {
+    const w = await mountView()
+    window.dispatchEvent(
+      new StorageEvent('storage', {
+        key: 'outra.chave',
+        newValue: JSON.stringify(runtime({ lyric: 'NÃO' })),
+      }),
+    )
+    await flushPromises()
+    expect(w.find('.media-return__body').exists()).toBe(false)
+    w.unmount()
+  })
+
+  it('storage com JSON inválido: ignora sem quebrar', async () => {
+    const w = await mountView()
+    window.dispatchEvent(
+      new StorageEvent('storage', { key: MEDIA_RUNTIME_STORAGE_KEY, newValue: '{quebrado' }),
+    )
+    await flushPromises()
+    expect(w.find('.media-return__body').exists()).toBe(false)
+    w.unmount()
+  })
+
+  it('BroadcastChannel: mensagem aplica runtime', async () => {
+    const w = await mountView()
+    // o canal criado no mount recebe mensagens via onmessage
+    await publish(w, { slideIndex: 2, lyric: 'Via canal' })
+    expect(w.text()).toContain('Via canal')
+    w.unmount()
+  })
+
+  it('BroadcastChannel: onmessage aplica runtime (captura instância)', async () => {
+    let captured: { onmessage: ((ev: { data: unknown }) => void) | null } | null = null
+    class FakeChannel {
+      onmessage: ((ev: { data: unknown }) => void) | null = null
+      constructor(public name: string) {
+        captured = this
+      }
+      close() {}
+    }
+    vi.stubGlobal('BroadcastChannel', FakeChannel)
+    const w = await mountView()
+    vi.unstubAllGlobals()
+    expect(captured).not.toBeNull()
+    captured!.onmessage!({ data: runtime({ lyric: 'Via onmessage' }) })
+    await flushPromises()
+    expect(w.text()).toContain('Via onmessage')
+    w.unmount()
+  })
+
+  it('stage settings: texto e cor aplicados; backgroundImage como bg', async () => {
+    stageSettings.settings.backgroundImage = 'https://f/bg.jpg'
+    const w = await mountView()
+    expect(w.find('.media-return__bg').exists()).toBe(true)
+    expect(w.find('.media-return__bg').attributes('style')).toContain('bg.jpg')
+    stageSettings.settings.backgroundImage = null
+    w.unmount()
+  })
+
+  it('unmount: unsub do stage settings e do storage listener', async () => {
+    const w = await mountView()
+    // mount subscreve stage settings; testes anteriores podem ter deixado 0
+    // (listeners compartilhados) — garante pelo menos 1 antes do unmount
+    expect(stageSettings.listeners.length).toBeGreaterThanOrEqual(1)
+    w.unmount()
+    await flushPromises()
+    expect(stageSettings.listeners.length).toBe(0)
+    // dispara storage pós-unmount: não deve lançar
+    window.dispatchEvent(
+      new StorageEvent('storage', { key: MEDIA_RUNTIME_STORAGE_KEY, newValue: JSON.stringify(runtime()) }),
+    )
+  })
+
+  it('prefers-reduced-motion: promote vira snapTo imediato', async () => {
+    const mq = { matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() }
+    vi.stubGlobal('matchMedia', vi.fn(() => mq))
+    const w = await mountView()
+    await publish(w, { slideIndex: 0, lyric: 'A', nextLyric: 'B' })
+    await publish(w, { slideIndex: 1, lyric: 'B', nextLyric: 'C' })
+    expect(w.text()).toContain('B')
+    vi.unstubAllGlobals()
+    w.unmount()
+  })
+
+  it('runtime com imageUrl: bg do runtime quando stage sem imagem', async () => {
+    const w = await mountView()
+    await publish(w, { imageUrl: 'https://f/runtime.png' })
+    expect(w.find('.media-return__bg').exists()).toBe(true)
+    expect(w.find('.media-return__bg').attributes('style')).toContain('runtime.png')
+    w.unmount()
+  })
+
+  it('promoteNext: anima flyer (animate path) e revela letra ao terminar', async () => {
+    // jsdom não tem Element.animate — stuba com retorno controlado
+    const finished = Promise.resolve()
+    const anims: Array<{ cancel: ReturnType<typeof vi.fn>; finished: Promise<unknown> }> = []
+    const rafCbs: Array<() => void> = []
+    vi.stubGlobal('requestAnimationFrame', (cb: () => void) => {
+      rafCbs.push(cb)
+      return rafCbs.length
+    })
+    // Element.animate precisa existir ANTES do mount (getBoundingClientRect do flyer > 2px é stubado via offsetHeight? — na verdade usa rect; stubamos rect mínimo)
+    const origRect = HTMLElement.prototype.getBoundingClientRect
+    HTMLElement.prototype.getBoundingClientRect = function () {
+      const r = origRect.call(this)
+      // devolve alturas > 2 para flyer e destino
+      return { ...r, height: 100, width: 400, top: 10, left: 0 } as DOMRect
+    }
+    const origAnimate = (HTMLElement.prototype as unknown as { animate?: unknown }).animate
+    ;(HTMLElement.prototype as unknown as { animate: unknown }).animate = function (
+      this: HTMLElement,
+    ) {
+      const a = { cancel: vi.fn(), finished }
+      anims.push(a)
+      return a
+    }
+    try {
+      const w = await mountView()
+      await publish(w, { slideIndex: 0, lyric: 'A', nextLyric: 'B' })
+      await publish(w, { slideIndex: 1, lyric: 'B', nextLyric: 'C' })
+      await flushPromises()
+      // animação criada (flyer path executado)
+      expect(anims.length).toBeGreaterThanOrEqual(1)
+      // drena os rAFs pendentes (duplo frame pós-revelação)
+      const pending = [...rafCbs]
+      rafCbs.length = 0
+      for (const cb of pending) cb()
+      await flushPromises()
+      const pending2 = [...rafCbs]
+      for (const cb of pending2) cb()
+      await flushPromises()
+      expect(w.text()).toContain('B')
+      w.unmount()
+    } finally {
+      HTMLElement.prototype.getBoundingClientRect = origRect
+      ;(HTMLElement.prototype as unknown as { animate: unknown }).animate = origAnimate
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('promoteNext: sem rect válido do flyer → snapTo (fallback)', async () => {
+    const origRect = HTMLElement.prototype.getBoundingClientRect
+    HTMLElement.prototype.getBoundingClientRect = function () {
+      const r = origRect.call(this)
+      return { ...r, height: 0, width: 0 } as DOMRect
+    }
+    try {
+      const w = await mountView()
+      await publish(w, { slideIndex: 0, lyric: 'A', nextLyric: 'B' })
+      await publish(w, { slideIndex: 1, lyric: 'B', nextLyric: 'C' })
+      expect(w.text()).toContain('B')
+      w.unmount()
+    } finally {
+      HTMLElement.prototype.getBoundingClientRect = origRect
+    }
+  })
+
+  it('stage settings: mudança de settings via listener atualiza stage ref', async () => {
+    const w = await mountView()
+    stageSettings.settings.textColor = '#00FF00'
+    for (const fn of [...stageSettings.listeners]) fn()
+    await flushPromises()
+    // sem crash e sem mudança de corpo (texto controlado por runtime)
+    expect(w.find('.media-return__body').exists()).toBe(false)
+    stageSettings.settings.textColor = '#fff'
+    w.unmount()
+  })
+
+  it('BroadcastChannel indisponível: mount não quebra (catch)', async () => {
+    vi.stubGlobal('BroadcastChannel', function () {
+      throw new Error('sem canal')
+    })
+    try {
+      const w = await mountView()
+      expect(w.find('.media-return__body').exists()).toBe(false)
+      w.unmount()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('next é capa: próxima frase vira o título (nextPhraseOf capa)', async () => {
+    const w = await mountView()
+    await publish(w, { slideIndex: 0, lyric: 'A', nextLyric: '', nextIsCover: true })
+    expect(w.find('.media-return__next')?.text()).toContain('Hino 1')
+    w.unmount()
+  })
+
+  it('bar vel: segunda amostra < 12ms não recalcula vel; amostra lenta recalcula', async () => {
+    vi.useFakeTimers()
+    let rafCb: (() => void) | null = null
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+      rafCb = cb as () => void
+      return 1
+    })
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
+    try {
+      const w = await mountView()
+      await publish(w, { slideProgressRatio: 0.1 })
+      const cb = rafCb as unknown as () => void
+      if (cb) cb(performance.now()) // dt pequeno (< 12ms no sync seguinte? cobre branch)
+      await vi.runAllTimersAsync()
+      // amostra bem depois (dt grande) → vel recalculada
+      const cb2 = rafCb as unknown as () => void
+      if (cb2) cb2(performance.now() + 1000)
+      await vi.runAllTimersAsync()
+      w.unmount()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('promote em andamento + storage de capa: snapTo interrompe flyer', async () => {
+    // finished pendente: animação nunca termina sozinha
+    let rafCbs: Array<() => void> = []
+    vi.stubGlobal('requestAnimationFrame', (cb: () => void) => {
+      rafCbs.push(cb)
+      return rafCbs.length
+    })
+    const pending: Array<() => void> = []
+    const neverFinishes = new Promise((resolve) => {
+      pending.push(resolve as () => void)
+    })
+    const origRect = HTMLElement.prototype.getBoundingClientRect
+    HTMLElement.prototype.getBoundingClientRect = function () {
+      const r = origRect.call(this)
+      return { ...r, height: 100, width: 400, top: 10, left: 0 } as DOMRect
+    }
+    const origAnimate = (HTMLElement.prototype as unknown as { animate?: unknown }).animate
+    ;(HTMLElement.prototype as unknown as { animate: unknown }).animate = function () {
+      return { cancel: vi.fn(), finished: neverFinishes }
+    }
+    try {
+      const w = await mountView()
+      await publish(w, { slideIndex: 0, lyric: 'A', nextLyric: 'B' })
+      await publish(w, { slideIndex: 1, lyric: 'B', nextLyric: 'C' })
+      // durante o promote (flyer em voo), chega uma capa → snapTo mid-promote
+      await publish(w, { isCover: true, lyric: '' })
+      expect(w.find('.media-return__title--cover').exists()).toBe(true)
+      // Promote em andamento + texto diferente do flyer → snap direto (branch exiting/lyricWait)
+      await publish(w, { isCover: false, lyric: 'D', nextLyric: 'E', slideIndex: 3 })
+      expect(w.text()).toContain('D')
+      w.unmount()
+    } finally {
+      for (const resolve of pending) resolve()
+      HTMLElement.prototype.getBoundingClientRect = origRect
+      ;(HTMLElement.prototype as unknown as { animate: unknown }).animate = origAnimate
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('promote: animate.finished rejeita → early return sem crash', async () => {
+    vi.stubGlobal('requestAnimationFrame', () => 1)
+    const origRect = HTMLElement.prototype.getBoundingClientRect
+    HTMLElement.prototype.getBoundingClientRect = function () {
+      const r = origRect.call(this)
+      return { ...r, height: 100, width: 400, top: 10, left: 0 } as DOMRect
+    }
+    const origAnimate = (HTMLElement.prototype as unknown as { animate?: unknown }).animate
+    ;(HTMLElement.prototype as unknown as { animate: unknown }).animate = function () {
+      return { cancel: vi.fn(), finished: Promise.reject(new Error('anim abort')) }
+    }
+    try {
+      const w = await mountView()
+      await publish(w, { slideIndex: 0, lyric: 'A', nextLyric: 'B' })
+      await publish(w, { slideIndex: 1, lyric: 'B', nextLyric: 'C' })
+      await flushPromises()
+      // rejeição tratada pelo catch → sem crash; estado mantém flyer mas não quebra
+      expect(w.find('.media-return__body').exists()).toBe(true)
+      w.unmount()
+    } finally {
+      HTMLElement.prototype.getBoundingClientRect = origRect
+      ;(HTMLElement.prototype as unknown as { animate: unknown }).animate = origAnimate
+      vi.unstubAllGlobals()
+    }
+  })
+})

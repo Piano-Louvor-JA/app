@@ -34,6 +34,7 @@ vi.mock('../../services/liturgy-web-runtime', () => ({
   clearLiturgyWebRuntime: vi.fn(),
 }))
 
+import { loadLiturgyMusicOptions } from '../../services/liturgy-catalog'
 import { useLiturgyStore } from '../useLiturgyStore'
 import { DEFAULT_LITURGY_ITEM_DRAFT, LITURGY_DAY_TAB_ORDER } from '../../types/liturgy'
 
@@ -111,6 +112,17 @@ describe('useLiturgyStore', () => {
       const store = useLiturgyStore()
       store.setMusicSearchQuery('hino')
       expect(store.musicSearchQuery).toBe('hino')
+    })
+
+    it('refreshMusicCatalog substitui o catálogo após importação .slja', async () => {
+      const store = useLiturgyStore()
+      vi.mocked(loadLiturgyMusicOptions).mockResolvedValueOnce([
+        { id: -3, title: 'Missão Para Todos', album: 'Local' },
+      ] as never)
+      await store.refreshMusicCatalog()
+      expect(store.musicList).toEqual([
+        { id: -3, title: 'Missão Para Todos', album: 'Local' },
+      ])
     })
   })
 
@@ -221,8 +233,7 @@ describe('useLiturgyStore', () => {
     it('cloneSources: lista weekdays com itens e customs', async () => {
       const store = useLiturgyStore()
       await store.hydrate()
-      // dia DIFERENTE do selecionado (default = hoje) p/ não ser filtrado
-      const day = LITURGY_DAY_TAB_ORDER.find((d) => d !== store.selectedDay)!
+      const day = LITURGY_DAY_TAB_ORDER[0]
       store.weekdays[day] = [
         { id: 'i1', type: 'music', name: 'Hino', durationMs: 1, categoryId: null, filePath: '', filePaths: [], musicId: 1, url: '', accentColor: '#000', startTime: null, endTime: null, done: false },
       ] as never
@@ -234,7 +245,7 @@ describe('useLiturgyStore', () => {
     it('openCloneDialog + confirmClone copia itens', async () => {
       const store = useLiturgyStore()
       await store.hydrate()
-      const day = LITURGY_DAY_TAB_ORDER.find((d) => d !== store.selectedDay)!
+      const day = LITURGY_DAY_TAB_ORDER[0]
       store.weekdays[day] = [
         { id: 'i1', type: 'music', name: 'Hino', durationMs: 1, categoryId: null, filePath: '', filePaths: [], musicId: 1, url: '', accentColor: '#000', startTime: null, endTime: null, done: false },
       ] as never

@@ -1,297 +1,185 @@
 // @vitest-environment jsdom
-import { mount } from "@vue/test-utils";
-import { createPinia, setActivePinia } from "pinia";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createI18n } from "vue-i18n";
+// Cobertura MediaPlayerPill: transport, seek/volume inputs, menus de modo/volume,
+// guards de projeção e toggles (gaps_map3: fns 205/218/268, brs de open/close).
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 
-/**
- * MediaPlayerPill — pill compacta do player: transport, timeline (v-if hasAudio),
- * popovers de volume/modo, áudio na TV, projetar (gated), fullscreen, playlist.
- * Store de projeção real (Pinia); MonitorTargetSelect stubado.
- */
-import mediaLocale from "../../locales/pt-BR";
-import MediaPlayerPill from "../MediaPlayerPill.vue";
+vi.mock('vue-i18n', () => ({
+  useI18n: () => ({
+    t: (k: string) => k,
+    locale: { value: 'pt-BR' },
+  }),
+}))
 
-vi.mock("@shared/components/MonitorTargetSelect.vue", () => ({
-	default: { template: '<div class="monitor-target-select-stub" />' },
-}));
+vi.mock('@shared/components/MonitorTargetSelect.vue', () => ({
+  default: { template: '<div class="mts-stub" />' },
+}))
 
+import MediaPlayerPill from '../MediaPlayerPill.vue'
 
-
-const i18n = createI18n({
-	legacy: false,
-	locale: "pt-BR",
-	messages: { "pt-BR": mediaLocale },
-});
-
-function baseProps(over: Record<string, unknown> = {}) {
-	return {
-		title: "Santíssimo",
-		subtitle: "Athus Santos",
-		isPlaying: false,
-		hasAudio: true,
-		hasInstrumental: true,
-		mode: "audio" as const,
-		currentTimeLabel: "0:12",
-		durationLabel: "3:45",
-		progressRatio: 0.25,
-		volume: 0.8,
-		projecting: false,
-		playlistOpen: false,
-		audioOnTv: false,
-		...over,
-	};
+function makeProps(over: Partial<Record<string, unknown>> = {}) {
+  return {
+    title: 'Hino 1',
+    subtitle: 'CC',
+    isPlaying: false,
+    hasAudio: true,
+    hasInstrumental: true,
+    mode: 'audio' as const,
+    currentTimeLabel: '00:10',
+    durationLabel: '03:00',
+    progressRatio: 0.5,
+    volume: 0.7,
+    projecting: false,
+    playlistOpen: true,
+    audioOnTv: false,
+    ...over,
+  }
 }
 
-function mountPill(props = baseProps()) {
-	const pinia = createPinia();
-	setActivePinia(pinia);
-	return mount(MediaPlayerPill, { props, global: { plugins: [i18n, pinia] } });
+async function mountPill(over: Partial<Record<string, unknown>> = {}) {
+  const w = mount(MediaPlayerPill, { props: makeProps(over) })
+  await flush()
+  return w
 }
+const flush = () => Promise.resolve()
 
-beforeEach(() => {
-	localStorage.clear();
-});
+describe('MediaPlayerPill', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+  })
+  afterEach(() => vi.restoreAllMocks())
 
-describe("MediaPlayerPill — render", () => {
-	it("mostra título, subtítulo e tempos", () => {
-		const w = mountPill();
-		expect(w.find(".media-player-pill__title").text()).toBe("Santíssimo");
-		expect(w.find(".media-player-pill__subtitle").text()).toBe("Athus Santos");
-		expect(w.text()).toContain("0:12");
-		expect(w.text()).toContain("3:45");
-	});
+  it('renderiza título/sublabel e botões de transport; play emite togglePlay', async () => {
+    const w = await mountPill()
+    expect(w.find('.media-player-pill__title').text()).toBe('Hino 1')
+    expect(w.find('.media-player-pill__subtitle').text()).toBe('CC')
+    const btns = w.findAll('button')
+    await btns[0]!.trigger('click')
+    expect(w.emitted('previousSlide')).toHaveLength(1)
+    // play (tem audio)
+    await w.find('.media-player-pill__play').trigger('click')
+    expect(w.emitted('togglePlay')).toHaveLength(1)
+  })
 
-	it("sem subtítulo: esconde a linha", () => {
-		const w = mountPill(baseProps({ subtitle: "" }));
-		expect(w.find(".media-player-pill__subtitle").exists()).toBe(false);
-	});
+  it('play desabilitado sem áudio; timeline some sem áudio', async () => {
+    const w = await mountPill({ hasAudio: false })
+    expect(w.find('.media-player-pill__play').attributes('disabled')).toBeDefined()
+    expect(w.find('.media-player-pill__timeline').exists()).toBe(false)
+  })
 
-	it("sem áudio: sem timeline e sem popover de volume", () => {
-		const w = mountPill(baseProps({ hasAudio: false }));
-		expect(w.find(".media-player-pill__timeline").exists()).toBe(false);
-	});
-});
+  it('next slide emite nextSlide', async () => {
+    const w = await mountPill()
+    const btns = w.findAll('.media-player-pill__icon-btn')
+    // primeiro icon-btn é "previous"; depois play; depois "next"
+    await w.findAll('button').filter((b) => b.attributes('aria-label') === 'media.nextSlide')[0]!.trigger('click')
+    expect(w.emitted('nextSlide')).toHaveLength(1)
+    void btns
+  })
 
-describe("MediaPlayerPill — transport", () => {
-	it("prev e next emitem", async () => {
-		const w = mountPill();
-		const btns = w.findAll(".media-player-pill__icon-btn");
-		await btns[0].trigger("click");
-		await btns[1].trigger("click");
-		expect(w.emitted("previousSlide")).toHaveLength(1);
-		expect(w.emitted("nextSlide")).toHaveLength(1);
-	});
+  it('seek input emite seekRatio com fração', async () => {
+    const w = await mountPill()
+    const seek = w.find('.media-player-pill__seek')
+    seek.element.value = '40'
+    await seek.trigger('input')
+    expect(w.emitted('seekRatio')![0]).toEqual([0.4])
+  })
 
-	it("play desabilitado sem áudio; com áudio emite togglePlay", async () => {
-		const noAudio = mountPill(baseProps({ hasAudio: false }));
-		expect(
-			noAudio.find(".media-player-pill__play").attributes("disabled"),
-		).toBeDefined();
-		noAudio.unmount();
+  it('menu de volume: abre/fecha e emite update:volume', async () => {
+    const w = await mountPill()
+    expect(w.find('.media-player-pill__volume-pop').exists()).toBe(false)
+    await w.findAll('button').filter((b) => b.attributes('aria-label') === 'media.volume')[0]!.trigger('click')
+    expect(w.find('.media-player-pill__volume-pop').exists()).toBe(true)
+    const range = w.find('.media-player-pill__volume-pop input[type=range]')
+    range.element.value = '30'
+    await range.trigger('input')
+    expect(w.emitted('update:volume')![0]).toEqual([0.3])
+    // fecha de novo
+    await w.findAll('button').filter((b) => b.attributes('aria-label') === 'media.volume')[0]!.trigger('click')
+    expect(w.find('.media-player-pill__volume-pop').exists()).toBe(false)
+  })
 
-		const w = mountPill();
-		await w.find(".media-player-pill__play").trigger("click");
-		expect(w.emitted("togglePlay")).toHaveLength(1);
-	});
-});
+  it('menu de modo: abre, emite update:mode por item e seleciona ativo', async () => {
+    const w = await mountPill()
+    await w
+      .findAll('button')
+      .filter((b) => b.attributes('aria-label') === 'media.audioType')[0]!
+      .trigger('click')
+    expect(w.find('.media-player-pill__mode-pop').exists()).toBe(true)
+    const items = w.findAll('[role=menuitem]')
+    expect(items.length).toBe(3)
+    await items[1]!.trigger('click')
+    expect(w.emitted('update:mode')![0]).toEqual(['instrumental'])
+    // menu fechou após seleção
+    expect(w.find('.media-player-pill__mode-pop').exists()).toBe(false)
+  })
 
-describe("MediaPlayerPill — seek e volume", () => {
-	it("seek emite ratio normalizado", async () => {
-		const w = mountPill();
-		await w.find(".media-player-pill__seek").setValue("25");
-		expect(w.emitted("seekRatio")?.[0]).toEqual([0.25]);
-	});
+  it('item instrumental desabilitado sem hasInstrumental', async () => {
+    const w = await mountPill({ hasInstrumental: false })
+    await w
+      .findAll('button')
+      .filter((b) => b.attributes('aria-label') === 'media.audioType')[0]!
+      .trigger('click')
+    const items = w.findAll('[role=menuitem]')
+    expect(items[1]!.attributes('disabled')).toBeDefined()
+  })
 
-	it("popover de volume abre e emite update:volume", async () => {
-		const w = mountPill();
-		expect(w.find(".media-player-pill__volume-pop").exists()).toBe(false);
-		const volBtn = w
-			.findAll(".media-player-pill__icon-btn")
-			.find((b) => b.attributes("aria-label") === mediaLocale.media.volume);
-		await volBtn?.trigger("click");
-		expect(w.find(".media-player-pill__volume-pop").exists()).toBe(true);
-		await w.find(".media-player-pill__volume-pop input").setValue("80");
-		expect(w.emitted("update:volume")?.[0]).toEqual([0.8]);
-	});
-});
+  it('toggleProjection bloqueado sem tela selecionada (disabled) e liberado projetando', async () => {
+    const w1 = await mountPill({ projecting: false })
+    const btn1 = w1
+      .findAll('button')
+      .filter((b) => (b.attributes('aria-label') ?? '').includes('monitors.projectNeedsScreens'))[0]!
+    expect(btn1.attributes('disabled')).toBeDefined()
+    const w2 = await mountPill({ projecting: true })
+    const btn2 = w2
+      .findAll('button')
+      .filter((b) => (b.attributes('aria-label') ?? '') === 'media.clearProjection')[0]!
+    expect(btn2.attributes('disabled')).toBeUndefined()
+    await btn2.trigger('click')
+    expect(w2.emitted('toggleProjection')).toHaveLength(1)
+  })
 
-describe("MediaPlayerPill — menu de modo", () => {
-	it("menu abre, mostra 3 opções; instrumental desabilitado sem pista", async () => {
-		const w = mountPill();
-		const modeBtn = w
-			.findAll(".media-player-pill__icon-btn")
-			.find((b) => b.attributes("aria-label") === mediaLocale.media.audioType);
-		await modeBtn?.trigger("click");
-		const pop = w.find(".media-player-pill__mode-pop");
-		expect(pop.exists()).toBe(true);
-		expect(pop.findAll("button").length).toBe(3);
-		const instrumental = pop
-			.findAll("button")
-			.find((b) => b.text().includes(mediaLocale.media.modes.instrumental));
-		expect(instrumental?.attributes("disabled")).toBeUndefined();
+  it('audioOnTv, fullscreen e playlist emitem seus eventos', async () => {
+    const w = await mountPill()
+    await w
+      .findAll('button')
+      .filter((b) => (b.attributes('aria-label') ?? '') === 'media.audioOnTv')[0]!
+      .trigger('click')
+    expect(w.emitted('toggleAudioOnTv')).toHaveLength(1)
+    await w
+      .findAll('button')
+      .filter((b) => (b.attributes('aria-label') ?? '') === 'media.fullscreen')[0]!
+      .trigger('click')
+    expect(w.emitted('toggleFullscreen')).toHaveLength(1)
+    await w
+      .findAll('button')
+      .filter((b) => (b.attributes('aria-label') ?? '') === 'media.playlist')[0]!
+      .trigger('click')
+    expect(w.emitted('togglePlaylist')).toHaveLength(1)
+  })
 
-		const semPista = mountPill(baseProps({ hasInstrumental: false }));
-		const modeBtn2 = semPista
-			.findAll(".media-player-pill__icon-btn")
-			.find((b) => b.attributes("aria-label") === mediaLocale.media.audioType);
-		await modeBtn2?.trigger("click");
-		const pop2 = semPista.find(".media-player-pill__mode-pop");
-		const instrumental2 = pop2
-			.findAll("button")
-			.find((b) => b.text().includes(mediaLocale.media.modes.instrumental));
-		expect(instrumental2?.attributes("disabled")).toBeDefined();
-	});
-
-	it("selecionar modo fecha menu e emite update:mode", async () => {
-		const w = mountPill();
-		const modeBtn = w
-			.findAll(".media-player-pill__icon-btn")
-			.find((b) => b.attributes("aria-label") === mediaLocale.media.audioType);
-		await modeBtn?.trigger("click");
-		const pop = w.find(".media-player-pill__mode-pop");
-		const noAudio = pop
-			.findAll("button")
-			.find((b) => (b.html() as string).includes("ti-device-desktop"));
-		await noAudio?.trigger("click");
-		expect(w.emitted("update:mode")?.[0]).toEqual(["no_audio"]);
-		expect(w.find(".media-player-pill__mode-pop").exists()).toBe(false);
-	});
-});
-
-describe("MediaPlayerPill — áudio na TV, projeção, fullscreen, playlist", () => {
-	it("toggleAudioOnTv emite e ícone reflete estado", async () => {
-		const w = mountPill(baseProps({ audioOnTv: true }));
-		const tvBtn = w
-			.findAll("button")
-			.find(
-				(b) => b.attributes("aria-label") === mediaLocale.media.audioOnTvOff,
-			);
-		expect(tvBtn).toBeDefined();
-		await tvBtn?.trigger("click");
-		expect(w.emitted("toggleAudioOnTv")).toHaveLength(1);
-	});
-
-	it("toggleFullscreen emite", async () => {
-		const w = mountPill();
-		const fsBtn = w
-			.findAll("button")
-			.find((b) => b.attributes("aria-label") === mediaLocale.media.fullscreen);
-		await fsBtn?.trigger("click");
-		expect(w.emitted("toggleFullscreen")).toHaveLength(1);
-	});
-
-	it("projetar sem targets: desabilitado com aria de aviso; projetando: liberado", () => {
-		const idle = mountPill();
-		const projBtn = idle
-			.findAll("button")
-			.find((b) =>
-				(b.attributes("aria-label") ?? "").includes("projectNeedsScreens"),
-			);
-		expect(projBtn?.attributes("disabled")).toBeDefined();
-		idle.unmount();
-
-		const proj = mountPill(baseProps({ projecting: true }));
-		const projBtn2 = proj
-			.findAll("button")
-			.find(
-				(b) => b.attributes("aria-label") === mediaLocale.media.clearProjection,
-			);
-		expect(projBtn2?.attributes("disabled")).toBeUndefined();
-	});
-
-	it("playlist: botão emite togglePlaylist", async () => {
-		const w = mountPill();
-		const plBtn = w
-			.findAll("button")
-			.find((b) => (b.html() as string).includes("ti-list"));
-		await plBtn?.trigger("click");
-		expect(w.emitted("togglePlaylist")).toHaveLength(1);
-	});
-	describe("gaps — selectMode sung/instrumental", () => {
-		it("selecionar sung emite update:mode audio", async () => {
-			const w = mountPill();
-			const modeBtn = w
-				.findAll(".media-player-pill__icon-btn")
-				.find((b) => b.attributes("aria-label") === mediaLocale.media.audioType);
-			await modeBtn?.trigger("click");
-			const sung = w
-				.findAll("button")
-				.find((b) => b.text().includes(mediaLocale.media.modes.sung));
-			await sung?.trigger("click");
-			expect(w.emitted("update:mode")?.[0]).toEqual(["audio"]);
-			w.unmount();
-		});
-
-		it("selecionar instrumental emite update:mode instrumental", async () => {
-			const w = mountPill(baseProps({ hasInstrumental: true }));
-			const modeBtn = w
-				.findAll(".media-player-pill__icon-btn")
-				.find((b) => b.attributes("aria-label") === mediaLocale.media.audioType);
-			await modeBtn?.trigger("click");
-			const inst = w
-				.findAll("button")
-				.find((b) => b.text().includes(mediaLocale.media.modes.instrumental));
-			await inst?.trigger("click");
-			expect(w.emitted("update:mode")?.[0]).toEqual(["instrumental"]);
-			w.unmount();
-		});
-	});
-
-	describe("gaps — modeIcon e aria projetar", () => {
-		it("modeIcon reflete modo: instrumental/no_audio/audio", () => {
-			const inst = mountPill(baseProps({ mode: "instrumental" }));
-			expect(inst.find(".media-player-pill__icon-btn .ti-piano").exists()).toBe(true);
-			inst.unmount();
-			const noAudio = mountPill(baseProps({ mode: "no_audio" }));
-			expect(noAudio.find(".ti-device-desktop").exists()).toBe(true);
-			noAudio.unmount();
-			const audio = mountPill(baseProps({ mode: "audio" }));
-			expect(audio.find(".ti-microphone").exists()).toBe(true);
-			audio.unmount();
-		});
-
-		it("aria do projetar: pode projetar (targets selecionados) e não projetando → media.project", async () => {
-			const { useProjectionStore } = await import("@modules/settings/stores/useProjectionStore");
-			const { DEFAULT_PROJECTION_SETTINGS } = await import("@modules/settings/types/projection");
-			// pinia PRÓPRIA compartilhada entre store e mount
-			const pinia = createPinia();
-			setActivePinia(pinia);
-			const store = useProjectionStore();
-			await store.refreshDisplays();
-			store.applySettings({ ...DEFAULT_PROJECTION_SETTINGS, targetDisplayIds: [2] });
-			const w = mount(MediaPlayerPill, {
-				props: baseProps({ projecting: false }),
-				global: { plugins: [i18n, pinia] },
-			});
-			const btn = w.findAll("button").find((b) => b.attributes("aria-label") === mediaLocale.media.project);
-			expect(btn).toBeTruthy();
-			store.applySettings({ ...DEFAULT_PROJECTION_SETTINGS, targetDisplayIds: [] });
-			w.unmount();
-		});
-	})
-
-	it("gaps: isPlaying troca aria/icone do play; botão projetar emite toggleProjection", async () => {
-		const w = mountPill(baseProps({ isPlaying: true }));
-		const play = w.find(".media-player-pill__play");
-		expect(play.attributes("aria-label")).toBe("Pausar");
-		expect(play.attributes("title")).toBe("Pausar");
-		expect(play.find("i").classes()).toContain("ti-player-pause");
-		w.unmount();
-
-		const { useProjectionStore } = await import("@modules/settings/stores/useProjectionStore");
-		const { DEFAULT_PROJECTION_SETTINGS } = await import("@modules/settings/types/projection");
-		const pinia = createPinia();
-		setActivePinia(pinia);
-		const store = useProjectionStore();
-		await store.refreshDisplays();
-		store.applySettings({ ...DEFAULT_PROJECTION_SETTINGS, targetDisplayIds: [2] });
-		const w2 = mount(MediaPlayerPill, { props: baseProps({ projecting: false }), global: { plugins: [i18n, pinia] } });
-		const proj = w2.findAll("button").find((b) => b.attributes("aria-label") === mediaLocale.media.project)!;
-		expect(proj).toBeTruthy();
-		await proj.trigger("click");
-		expect(w2.emitted("toggleProjection")).toBeTruthy();
-		w2.unmount();
-	});
-
-});
+  it('projeção liberada quando o store tem targets selecionados', async () => {
+    const displayMod = await import('@modules/settings/services/display-service')
+    vi.spyOn(displayMod, 'listSystemDisplays').mockResolvedValue([
+      {
+        id: 77,
+        label: 'Monitor 2',
+        isPrimary: false,
+        workArea: { x: 0, y: 0, width: 1920, height: 1080 },
+        scaleFactor: 1,
+      },
+    ])
+    const { useProjectionStore } = await import('@modules/settings/stores/useProjectionStore')
+    const store = useProjectionStore()
+    await store.refreshDisplays()
+    store.applySettings({ ...store.settings, targetDisplayIds: [77] } as never)
+    expect(store.hasSelectedAudienceTargets).toBe(true)
+    const w = await mountPill({ projecting: false })
+    const btn = w
+      .findAll('button')
+      .filter((b) => (b.attributes('aria-label') ?? '') === 'media.project')[0]!
+    expect(btn).toBeDefined()
+    expect(btn.attributes('disabled')).toBeUndefined()
+  })
+})

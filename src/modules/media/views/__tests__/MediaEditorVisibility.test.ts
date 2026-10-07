@@ -74,6 +74,7 @@ vi.mock('../../services/custom-catalog', async (importOriginal) => {
 		updateCustomCollection: mocks.updateCustomCollection,
 		listCustomCollections: mocks.listCustomCollections,
 		listCustomMusics: vi.fn(async () => []),
+		listAllCustomMusics: vi.fn(async () => []),
 		listCustomLyrics: vi.fn(async () => []),
 		deleteCustomCollection: vi.fn(),
 		deleteCustomMusic: vi.fn(),
@@ -143,17 +144,11 @@ describe('MediaEditorView — toggle de visibilidade (t_35e4d3ea)', () => {
 			undefined,
 			'public',
 		)
-		// reset: de volta pra privado (estado eventualmente async — polls)
-		await flushPromises()
-		await wrapper.vm.$nextTick()
+		// reset: de volta pra privado
 		const btns = wrapper.findAll('.editor__visibility')[0]!.findAll(
 			'.editor__visibility-btn',
 		)
-		// dependendo do timing do create, o reset pode aplicar após o unmount;
-		// o essencial (create chamado com 'public') já foi assertado acima.
-		if (btns[0]!.classes().includes('editor__visibility-btn--active')) {
-			// reset aplicado dentro do window do teste
-		}
+		await vi.waitFor(() => expect(btns[0]!.classes()).toContain('editor__visibility-btn--active'))
 	})
 })
 

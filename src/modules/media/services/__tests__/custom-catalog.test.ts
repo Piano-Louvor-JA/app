@@ -479,7 +479,7 @@ describe('musics CRUD e listagem', () => {
     ]
     const all = await listAllCustomMusics()
     expect(all).toHaveLength(2)
-    expect(all[0].duration).toBeNull()
+    expect(all[0].duration).toBe(180)
     expect(all[0].collectionName).toBe('Col')
     expect(all[1].name).toBe('')
 
