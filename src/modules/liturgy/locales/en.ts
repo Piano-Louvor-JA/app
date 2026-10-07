@@ -281,6 +281,21 @@ export default {
       presentationOfficeMissing:
         'To project PPT/PPTX, install LibreOffice (or set LIBREOFFICE_PATH).',
     },
+    slja: {
+      importButton: 'Import .slja',
+      importing: 'Importing…',
+      imported: 'Imported: {name} ({slides} verses).',
+      importedLocal:
+        'Imported on this device: {name} ({slides} verses) — saved without an account.',
+      importedLocalNoImages:
+        'Imported on this device: {name} ({slides} stanzas). Images were not saved on this device.',
+      importFailed: 'Invalid .slja file.',
+      importStorageFailed:
+        'Could not save the audio on this device. Free some space and try again.',
+      importRemoteFailed:
+        'Could not finish the upload. Check the connection and try again.',
+      importNoLyrics: 'The file has no lyric stanzas to import.',
+    },
     custom: {
       title: 'Custom liturgies',
       new: 'New custom liturgy',

@@ -77,6 +77,30 @@ describe("exportLouvorjaFromBrowser", () => {
 		});
 	});
 
+	it("não leva id local negativo para outro aparelho", () => {
+		mockGet.mockImplementation((key: string) => {
+			if (key === USER_PREFERENCE_KEYS.liturgyState) {
+				return {
+					...LITURGY_STATE,
+					weekdays: {
+						sunday: [
+							{
+								...LITURGY_STATE.weekdays.sunday[0],
+								musicId: -3,
+							},
+						],
+					},
+				};
+			}
+			return null;
+		});
+		const pkg = exportLouvorjaFromBrowser("1.17.5", "web");
+		const items = pkg.entities.liturgy?.data.sunday.items as Array<{
+			musicId: number | null;
+		}>;
+		expect(items[0]?.musicId).toBeNull();
+	});
+
 	it("não inclui liturgy quando estado vazio", () => {
 		mockGet.mockReturnValue(null);
 

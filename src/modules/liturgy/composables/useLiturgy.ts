@@ -448,6 +448,7 @@ export function useLiturgy() {
     onManageTeam,
     onMusicPick: store.onMusicPick,
     clearMusicPick: store.clearMusicPick,
+    refreshMusicCatalog: store.refreshMusicCatalog,
     onVideoFileSelected(itemId: string, durationSec: number) {
       store.setItemDurationMs(itemId, Math.round(durationSec * 1000))
     },

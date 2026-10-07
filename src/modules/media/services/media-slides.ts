@@ -74,6 +74,20 @@ export function buildSlideTimesSec(
   )
 }
 
+/** Vários slides no mesmo instante não têm progressão: o player não deve
+ * avançar sozinho (import .slja sem tempo_hms cai inteiro em 00:00:00). */
+export function hasDistinctSlideTimes(timesSec: number[], hasSyntheticCover = false): boolean {
+  if (hasSyntheticCover && timesSec.length === 2) {
+    return Number.isFinite(timesSec[1]) && (timesSec[1] ?? -1) >= 0
+  }
+  if (hasSyntheticCover) timesSec = timesSec.slice(1)
+  if (timesSec.length < 2) return false
+  for (let index = 1; index < timesSec.length; index += 1) {
+    if ((timesSec[index] ?? 0) <= (timesSec[index - 1] ?? 0)) return false
+  }
+  return true
+}
+
 export function resolveSlideIndexForTime(
   timesSec: number[],
   currentTimeSec: number,

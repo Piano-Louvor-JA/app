@@ -31,41 +31,72 @@ const {
   ampm,
 } = useClockDisplay(() => props.config)
 
-const digitalFontSize = computed(() => {
-  const st = props.stage
-  if (st && sizeWidth.value > 0) {
-    return Math.max(16, (st.fontSize / 1920) * sizeWidth.value)
-  }
-  const v = Math.min(sizeWidth.value, sizeHeight.value)
-  const ratio = config.value.showSeconds ? 0.35 : 0.4
-  return Math.max(v * ratio, 20)
-})
+const digitalFontSize = computed(() =>
+  computeDigitalFontSize(props.stage, sizeWidth.value, sizeHeight.value, config.value.showSeconds),
+)
 
-const analogSize = computed(() => {
-  const v = Math.min(sizeWidth.value, sizeHeight.value)
+const analogSize = computed(() => computeAnalogSize(props.stage, sizeWidth.value, sizeHeight.value))
+
+const accentColor = computed(() =>
+  computeAccentColor(props.stage, props.preview, config.value.textColor),
+)
+
+const digitalStyle = computed(() =>
+  computeDigitalStyle(props.stage, props.preview, accentColor.value, digitalFontSize.value),
+)
+
+const surfaceStyle = computed(() => computeSurfaceStyle(props.stage, accentColor.value))
+
+function computeDigitalFontSize(
+  st: StageSettings | undefined,
+  sizeWidth: number,
+  sizeHeight: number,
+  showSeconds: boolean,
+): number {
+  if (st && sizeWidth > 0) {
+    return Math.max(16, (st.fontSize / 1920) * sizeWidth)
+  }
+  const v = Math.min(sizeWidth, sizeHeight)
+  const ratio = showSeconds ? 0.35 : 0.4
+  return Math.max(v * ratio, 20)
+}
+
+function computeAnalogSize(
+  st: StageSettings | undefined,
+  sizeWidth: number,
+  sizeHeight: number,
+): number {
+  const v = Math.min(sizeWidth, sizeHeight)
   const base = Math.max(v * 0.8, 100)
-  const st = props.stage
-  if (!st || sizeWidth.value <= 0) return base
+  if (!st || sizeWidth <= 0) return base
   // Escala o analógico junto com o tamanho de fonte do Palco (96 = neutro).
   return Math.max(80, base * (st.fontSize / 96))
-})
+}
 
-const accentColor = computed(() => {
-  if (props.stage) return props.stage.textColor
-  if (props.preview) return 'var(--ds-color-on-surface)'
-  return config.value.textColor
-})
+function computeAccentColor(
+  st: StageSettings | undefined,
+  preview: boolean,
+  configTextColor: string,
+): string {
+  if (st) return st.textColor
+  if (preview) return 'var(--ds-color-on-surface)'
+  return configTextColor
+}
 
-const digitalStyle = computed(() => {
-  const st = props.stage
-  const color = accentColor.value
+function computeDigitalStyle(
+  st: StageSettings | undefined,
+  preview: boolean,
+  accentColor: string,
+  digitalFontSize: number,
+): Record<string, string> {
+  const color = accentColor
   return {
-    fontSize: `${digitalFontSize.value}px`,
+    fontSize: `${digitalFontSize}px`,
     fontWeight: st ? String(st.fontWeight) : '900',
     color,
     textAlign: st?.textAlign ?? 'center',
     textShadow:
-      props.preview && !st
+      preview && !st
         ? 'none'
         : st?.textShadow
           ? `0 0 ${st.shadowBlur}vh rgba(0,0,0,${st.shadowIntensity})`
@@ -77,13 +108,18 @@ const digitalStyle = computed(() => {
     borderRadius: st?.textBox ? '1.4cqw 0 1.4cqw 0' : '0',
     padding: st?.textBox ? '2.5vmin 1.8vmin' : '0',
   } as Record<string, string>
-})
+}
 
-const surfaceStyle = computed(() => ({
-  background: 'transparent',
-  color: accentColor.value,
-  ...stageFlexJustify(props.stage),
-}))
+function computeSurfaceStyle(
+  st: StageSettings | undefined,
+  accentColor: string,
+): Record<string, string> {
+  return {
+    background: 'transparent',
+    color: accentColor,
+    ...stageFlexJustify(st),
+  }
+}
 
 function stageFlexJustify(st?: StageSettings): Record<string, string> {
   if (!st) {
@@ -122,6 +158,17 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', measure)
+})
+
+defineExpose({
+  computeDigitalFontSize,
+  computeAnalogSize,
+  computeAccentColor,
+  computeDigitalStyle,
+  computeSurfaceStyle,
+  stageFlexJustify,
+  measure,
+  containerRef,
 })
 </script>
 
