@@ -11,4 +11,4 @@ permissions:
 
 jobs:
   ci-review:
-    uses: Piano-Louvor-JA/.github/workflows-reusable/ci-review-comment.yml@c807392195590da870cadd3fde7f369e73d440db
+    uses: Piano-Louvor-JA/.github/.github/workflows/ci-review-comment.yml@ec22c623e1b8547eef7cc4138904cc4453c6c9a0
