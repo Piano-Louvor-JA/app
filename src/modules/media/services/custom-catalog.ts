@@ -639,7 +639,7 @@ export async function createCustomCollection(
 
 export async function createCustomMusic(
   collectionId: number,
-  input: { name?: string; lyric?: string; auxiliary_lyric?: string },
+  input: { name?: string; lyric?: string; auxiliary_lyric?: string; duration?: number },
 ): Promise<{ id: number } | null> {
   if (isLocalId(collectionId)) {
     const local = createLocalMusic(collectionId, {

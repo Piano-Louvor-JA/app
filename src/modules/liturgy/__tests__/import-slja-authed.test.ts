@@ -332,3 +332,17 @@ describe("import .slja LOGADO → API custom (app#331)", () => {
      expect(fetchMock).toHaveBeenCalledTimes(1);
    } finally { timeout.mockRestore(); }
  });
+
+ it("persiste estimativa de duração na música remota em segundos", async () => {
+   authSessionMock.mockReturnValue({ token: "tok", user: { id_user: 1 } });
+   fetchMock.mockClear();
+   routeFetch(7, 0);
+   const archive: SljaArchive = { title: "Duração", assets: [], slides: [
+     { lyric: "Primeira", type: "LETRA", order: 1, timeMs: 0 },
+     { lyric: "Última", type: "LETRA", order: 2, timeMs: 30000 },
+   ] };
+   const imported = await importSljaAsLiturgyMusic({ bytes: await buildSlja(archive), name: "duration.slja" });
+   const call = fetchMock.mock.calls.find(([url, init]) => String(url).endsWith("/collections/55/musics") && init?.method === "POST");
+   expect(imported.durationMs).toBeGreaterThan(0);
+   expect(JSON.parse(String(call?.[1]?.body)).duration).toBe(imported.durationMs / 1000);
+ });

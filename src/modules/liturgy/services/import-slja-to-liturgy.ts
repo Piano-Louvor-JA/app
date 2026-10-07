@@ -176,7 +176,10 @@ export async function importSljaAsLiturgyMusic(
 		throw new Error("SLJA_IMPORT_COLLECTION_FAILED");
 	}
 
-	const created = await createCustomMusic(collectionId, { name });
+	const created = await createCustomMusic(collectionId, {
+		name,
+		...(durationMs > 0 ? { duration: durationMs / 1000 } : {}),
+	});
 	if (!created) {
 		throw new Error("SLJA_IMPORT_MUSIC_FAILED");
 	}
