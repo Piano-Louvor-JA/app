@@ -16,6 +16,7 @@ vi.mock('@modules/media/services/auth-client', () => ({
 import {
 	createCustomCollection,
  listAllCustomMusics,
+ createCustomLyric,
 	listCustomCollections,
 	updateCustomCollection,
 } from '../custom-catalog'
@@ -245,4 +246,16 @@ describe('custom-catalog — exceções de rede (catch)', () => {
    ] })))
    const rows = await listAllCustomMusics()
    expect(rows.map(row => row.duration)).toEqual([240, 240])
+ })
+
+ it('retorna null no contrato do editor quando letra local não persiste', async () => {
+   const { createLocalCollection, createLocalMusic } = await import('../local-custom-store')
+   const collection = createLocalCollection('Quota')
+   const music = createLocalMusic(collection.id, { name: 'Quota' })
+   const write = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+     throw new DOMException('Quota', 'QuotaExceededError')
+   })
+   try {
+     await expect(createCustomLyric(music.id, { lyric: 'Verso' })).resolves.toBeNull()
+   } finally { write.mockRestore() }
  })

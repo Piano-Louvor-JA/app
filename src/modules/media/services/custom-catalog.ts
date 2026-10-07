@@ -793,8 +793,12 @@ export async function createCustomLyric(
   },
 ): Promise<{ id: number } | null> {
   if (isLocalId(musicId)) {
-    const local = createLocalLyric(musicId, input)
-    return { id: local.id }
+    try {
+      const local = createLocalLyric(musicId, input)
+      return { id: local.id }
+    } catch {
+      return null
+    }
   }
   try {
     const response = await fetch(`${customBaseUrl()}/musics/${musicId}/lyrics`, {
