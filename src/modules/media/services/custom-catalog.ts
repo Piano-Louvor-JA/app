@@ -592,6 +592,7 @@ export async function createCustomCollection(
   description?: string,
   authorName?: string,
   visibility?: CollectionVisibility,
+  options?: { queueOffline?: boolean },
 ): Promise<{ id: number } | null> {
   // Sem auth: cria LOCAL (regra de produto 12/09 — sem identidade não sobe).
   if (!getAuthSession()) {
@@ -615,6 +616,9 @@ export async function createCustomCollection(
     const json = (await response.json()) as { id_collection: number }
     return { id: json.id_collection }
   } catch {
+    // O import .slja não pode deixar uma coletânea vazia na fila quando
+    // desiste do envio. O editor continua enfileirando.
+    if (options?.queueOffline === false) return null
     // Offline (autenticado): enfileira pro sync (B1/B2). O client_uuid dá
     // identidade estável — o próximo flush cria/atualiza no servidor.
     await enqueue({

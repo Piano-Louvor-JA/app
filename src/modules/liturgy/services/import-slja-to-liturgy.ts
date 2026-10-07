@@ -117,8 +117,15 @@ async function ensureImportCollectionId(): Promise<number | null> {
 	} catch {
 		// catálogo indisponível — tenta criar mesmo assim
 	}
-	const created = await createCustomCollection(IMPORT_COLLECTION_NAME);
-	return created?.id ?? null;
+	const created = await createCustomCollection(
+		IMPORT_COLLECTION_NAME,
+		undefined,
+		undefined,
+		"private",
+		{ queueOffline: false },
+	);
+	if (created == null || created.id <= 0) return null;
+	return created.id;
 }
 
 /** Entrada mínima que o dialog tem em mão (File do input atende). */

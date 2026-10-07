@@ -335,7 +335,9 @@ async function mergeOperatorMusicOptions(
       durationMs:
         typeof custom.duration === 'number' && custom.duration > 0
           ? Math.round(custom.duration * 1000)
-          : null,
+          : linkedOfficial?.durationMs && linkedOfficial.durationMs > 0
+            ? linkedOfficial.durationMs
+            : null,
       hasInstrumental:
         Boolean(custom.instrumentalUrl?.trim()) ||
         linkedOfficial?.hasInstrumental === true,

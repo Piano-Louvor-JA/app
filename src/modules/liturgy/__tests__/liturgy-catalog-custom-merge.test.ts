@@ -120,6 +120,7 @@ describe("catálogo da liturgia inclui custom + local (app#331)", () => {
 						id_music: 42,
 						name: "Hino Oficial Probe",
 						has_instrumental_music: 1,
+						duration: 180,
 						albums: [{ id_album: 1, name: "Album Oficial", track: 7 }],
 					},
 				];
@@ -150,6 +151,7 @@ describe("catálogo da liturgia inclui custom + local (app#331)", () => {
 			const options = await loadLiturgyMusicOptions();
 			const custom = options.find((entry) => entry.id === 1_000_009);
 			expect(custom?.hasInstrumental).toBe(true);
+			expect(custom?.durationMs).toBe(180_000);
 		} finally {
 			vi.unstubAllGlobals();
 		}
