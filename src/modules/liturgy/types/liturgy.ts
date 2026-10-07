@@ -82,6 +82,7 @@ export const LITURGY_TYPE_GROUPS: LiturgyTypeGroup[] = [
     types: [
       { value: 'category', dot: '#FFD600' }, // amarelo puro
       { value: 'music', dot: '#00E676' }, // verde neon
+      { value: 'scheduled', dot: '#7C4DFF' }, // roxo — agendado por data
       { value: 'annotation', dot: '#FF6D00' }, // laranja vivo
     ],
   },

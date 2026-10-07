@@ -148,6 +148,7 @@ export default {
       categoryTimeRequired: 'Informe o horário no formato HH:MM.',
       formInvalid: 'Preencha os campos obrigatórios para adicionar.',
       categoryField: 'Categoria',
+      rotationField: 'Programação agendada',
       categoryPlaceholder: 'Selecione uma categoria',
       categoryEmpty: 'Crie uma Categoria/Separador antes de adicionar outros itens.',
       notesTitle: 'Anotações e Detalhes',

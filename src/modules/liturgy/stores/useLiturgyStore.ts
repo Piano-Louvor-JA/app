@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, onScopeDispose, ref } from 'vue'
+import { useScheduledStore } from './useScheduledStore'
 import type { Router } from 'vue-router'
 
 import { getDesktopBridge } from '@shared/services/desktop-bridge'
@@ -318,11 +319,21 @@ export const useLiturgyStore = defineStore('liturgy', () => {
 
   const isDraftValid = computed(() => isLiturgyItemDraftValid(itemDraft.value))
 
-  const categoryOptions = computed(() =>
-    currentItems.value
+  const categoryOptions = computed(() => {
+    const base = currentItems.value
       .filter((item) => item.type === 'category')
-      .map((item) => ({ id: item.id, name: item.name })),
-  )
+      .map((item) => ({ id: item.id, name: item.name }))
+    // Placeholder agendado: o "categoria" dele é uma ROTAÇÃO do store agendado
+    // (ex.: Provai e Vede) — 1 click resolve a entrada da data no culto.
+    if (itemDraft.value.type === 'scheduled') {
+      const rotations = useScheduledStore()
+      return [
+        ...base,
+        ...rotations.categories.map((rot) => ({ id: rot.id, name: rot.name })),
+      ]
+    }
+    return base
+  })
 
   const complementaryTitleSuggestions = computed(() => {
     const titles = new Set<string>()
