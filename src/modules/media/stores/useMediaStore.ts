@@ -52,6 +52,7 @@ import {
 import {
   buildMediaSlides,
   buildSlideTimesSec,
+  hasDistinctSlideTimes,
   lyricPreviewSnippet,
   resolveSlideIndexForTime,
   stripHtmlBreaks,
@@ -408,7 +409,7 @@ export const useMediaStore = defineStore('media', () => {
       onTimeUpdate: () => {
         currentTimeSec.value = audio.currentTime
         const times = session.value?.slideTimesSec ?? []
-        if (times.length > 0 && hasAudio.value) {
+        if (times.length > 0 && hasAudio.value && hasDistinctSlideTimes(times)) {
           const nextIndex = resolveSlideIndexForTime(times, audio.currentTime)
           if (nextIndex !== slideIndex.value) {
             slideIndex.value = nextIndex
@@ -1046,7 +1047,9 @@ export const useMediaStore = defineStore('media', () => {
       )
       audio.currentTime = clamped
       currentTimeSec.value = clamped
-      slideIndex.value = resolveSlideIndexForTime(slideTimesSec, clamped)
+      slideIndex.value = hasDistinctSlideTimes(slideTimesSec)
+        ? resolveSlideIndexForTime(slideTimesSec, clamped)
+        : savedSlide
 
       if (wasPlaying) {
         const played = await fadeInMediaAudio(audio, volume.value)

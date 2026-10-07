@@ -170,6 +170,21 @@ describe("app#331 — import .slja → item de liturgia → player (offline)", (
 		});
 		const lyric = getLocalMusic(imported.musicId)?.lyrics[0];
 		expect(lyric?.aux_lyric).toBe("Translation");
+		expect(imported.imagesOmitted).toBe(false);
+	});
+
+	it("import local avisa quando o .slja tem imagem", async () => {
+		const archive: SljaArchive = {
+			title: "Com Imagem",
+			assets: [{ path: "fundo.png", bytes: new Uint8Array([1]) }],
+			slides: [{ lyric: "Estrofe", type: "LETRA", timeMs: 1_000, order: 1 }],
+		};
+		const imported = await importSljaAsLiturgyMusic({
+			bytes: await buildSlja(archive),
+			name: "img.slja",
+		});
+		expect(imported.local).toBe(true);
+		expect(imported.imagesOmitted).toBe(true);
 	});
 
 	it("áudio acima da quota do localStorage não finge sucesso", async () => {

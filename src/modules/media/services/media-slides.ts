@@ -74,6 +74,12 @@ export function buildSlideTimesSec(
   )
 }
 
+/** Vários slides no mesmo instante não têm progressão: o player não deve
+ * avançar sozinho (import .slja sem tempo_hms cai inteiro em 00:00:00). */
+export function hasDistinctSlideTimes(timesSec: number[]): boolean {
+  return timesSec.some((time, index) => index > 0 && time !== timesSec[0])
+}
+
 export function resolveSlideIndexForTime(
   timesSec: number[],
   currentTimeSec: number,

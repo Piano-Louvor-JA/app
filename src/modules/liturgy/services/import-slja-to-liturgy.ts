@@ -49,6 +49,8 @@ export interface ImportedSljaLiturgyMusic {
 	durationMs: number;
 	/** true = gravado só local (sem login); sync pra conta é versão futura. */
 	local: boolean;
+	/** Imagens do .slja não cabem no armazenamento local e foram omitidas. */
+	imagesOmitted: boolean;
 }
 
 /** Margem além do último slide (o MP3 real pode esticar). */
@@ -249,6 +251,7 @@ export async function importSljaAsLiturgyMusic(
 		uploadedImages,
 		durationMs,
 		local: false,
+		imagesOmitted: false,
 	};
 }
 
@@ -275,6 +278,7 @@ async function importSljaLocal({
 	archive,
 	slides,
 	durationMs,
+	coverImageName,
 }: {
 	name: string;
 	archive: Awaited<ReturnType<typeof parseSljaFile>>;
@@ -283,6 +287,7 @@ async function importSljaLocal({
 		timeMs: number;
 		order?: number;
 		auxiliaryLyric?: string;
+		image?: { name: string };
 	}>;
 	durationMs: number;
 	coverImageName?: string;
@@ -364,6 +369,10 @@ async function importSljaLocal({
 		uploadedImages: 0,
 		durationMs: persistedDurationMs,
 		local: true,
+		imagesOmitted:
+			Boolean(coverImageName) ||
+			(archive.assets?.length ?? 0) > 0 ||
+			slides.some((slide) => Boolean(slide.image?.name)),
 	};
 }
 
