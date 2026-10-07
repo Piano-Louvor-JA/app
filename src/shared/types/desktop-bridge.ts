@@ -10,6 +10,8 @@ export type WorkspaceApi = {
   readBinaryFile?: (path: string) => Promise<Uint8Array | null>
   /** Baixa url → Media/provai-e-vede/<fileName>. Retorna o caminho local ou null. */
   downloadToMedia?: (url: string, fileName: string) => Promise<string | null>
+  /** Fetch de página remota pelo main process (sem CORS). Retorna texto ou null. */
+  fetchText?: (url: string) => Promise<string | null>
   getRecord: <T = unknown>(filename: string) => Promise<T | null>
   saveRecord: (filename: string, data: unknown) => Promise<boolean>
   clear: (options?: { preserveMedia?: boolean }) => Promise<boolean>

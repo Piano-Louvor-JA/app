@@ -287,6 +287,7 @@ export default {
       scheduledSongName: 'Título (opcional)',
       scheduledMoreOptions: 'Mais opções',
       scheduledPvOneClick: 'Provai e Vede (baixar trimestre)',
+      scheduledPvUnavailable: 'Não consegui acessar a página do trimestre agora. Verifique a internet e tente de novo.',
       scheduledPvDownloading: 'Baixando {done}/{total}…',
       scheduledPvDone: 'Pronto: {created} agendados ({skipped} já existiam).',
       scheduledPvNothing: 'Nenhum episódio futuro publicado ainda.',

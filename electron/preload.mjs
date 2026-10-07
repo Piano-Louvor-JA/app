@@ -105,6 +105,7 @@ contextBridge.exposeInMainWorld('louvorja', {
 
   workspace: {
     readBinaryFile: (path) => ipcRenderer.invoke('dialog:read-binary-file', path),
+    fetchText: (url) => ipcRenderer.invoke('workspace:fetch-text', url),
     downloadToMedia: (url, fileName) =>
       ipcRenderer.invoke('workspace:download-to-media', url, fileName),
     getRecord: (filename) => ipcRenderer.invoke('workspace:get-record', filename),
