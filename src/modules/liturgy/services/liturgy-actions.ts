@@ -9,6 +9,7 @@ import type { LiturgyItem, LiturgyMusicMode } from '../types/liturgy'
 import { INTERNAL_FILE_TYPES } from '../types/liturgy'
 import { isExecutableItem } from './liturgy-item-helpers'
 import { useScheduledStore } from '../stores/useScheduledStore'
+import { activeDateISO } from './liturgy-preferences'
 import { getLiturgyVideoObjectUrl } from './liturgy-local-video'
 import {
   openLiturgyLocalImageControl,
@@ -199,13 +200,15 @@ function legacyContentFromFile(
 export async function executeLiturgyItem(
   item: LiturgyItem,
   router: Router,
-  options?: { dateISO?: string },
+  options?: { dateISO?: string; day?: import('../types/liturgy').LiturgyDayKey },
 ): Promise<LiturgyActionResult> {
   // scheduled = placeholder: resolve a entrada da data e EXECUTA como o tipo dela.
   // A liturgia inteira de um dia pode ser agendada (Rafael: "a programação toda
-  // com itens agendados") — cada posição resolve contra a mesma dataISO.
+  // com itens agendados") — cada posição resolve contra a data do dia ATIVO da
+  // liturgia (sábado selecionado = sábado da semana corrente; avulsa = hoje).
   if (item.type === 'scheduled') {
-    return executeScheduledRef(item, router, options?.dateISO ?? todayISO())
+    const dateISO = options?.dateISO ?? activeDateISO(options?.day ?? 'custom')
+    return executeScheduledRef(item, router, dateISO)
   }
 
   if (!isExecutableItem(item)) {

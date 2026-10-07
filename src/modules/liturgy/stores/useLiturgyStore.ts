@@ -903,7 +903,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     const item = markItemStarted(index)
     if (!item) return
 
-    const result = await executeLiturgyItem(item, router)
+    const result = await executeLiturgyItem(item, router, { day: selectedDay.value })
     if (item.type === 'site') {
       siteProjectionItemId.value = null
     } else if (
