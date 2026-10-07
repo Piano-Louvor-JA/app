@@ -521,7 +521,10 @@ export const useLiturgyStore = defineStore('liturgy', () => {
       let changed = false
       const nextWeekdays = { ...weekdays.value }
       for (const day of Object.keys(nextWeekdays) as LiturgyWeekday[]) {
-        const reconciled = reconcileMusicItemTitles(nextWeekdays[day], music)
+        // Catálogo chegou DEPOIS do import (.ja/.louvorja com durationMs: 0):
+        // mesma passada reconcilia títulos E preenche durações zeradas da API.
+        const enriched = await enrichItemsDurations(nextWeekdays[day], music)
+        const reconciled = reconcileMusicItemTitles(enriched, music)
         if (reconciled !== nextWeekdays[day]) {
           nextWeekdays[day] = reconciled
           changed = true
@@ -529,12 +532,15 @@ export const useLiturgyStore = defineStore('liturgy', () => {
       }
       weekdays.value = nextWeekdays
 
-      customLiturgies.value = customLiturgies.value.map((custom) => {
-        const reconciled = reconcileMusicItemTitles(custom.items, music)
-        if (reconciled === custom.items) return custom
-        changed = true
-        return { ...custom, items: reconciled }
-      })
+      customLiturgies.value = await Promise.all(
+        customLiturgies.value.map(async (custom) => {
+          const enriched = await enrichItemsDurations(custom.items, music)
+          const reconciled = reconcileMusicItemTitles(enriched, music)
+          if (reconciled === custom.items) return custom
+          changed = true
+          return { ...custom, items: reconciled }
+        }),
+      )
 
       if (changed) persist()
     } finally {
