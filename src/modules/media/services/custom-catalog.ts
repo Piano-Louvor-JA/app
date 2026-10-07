@@ -424,7 +424,13 @@ export async function copyCustomMusic(
 export async function listAllCustomMusics(options?: {
   timeoutMs?: number
 }): Promise<
-  Array<CustomMusicSummary & { collectionName?: string; collectionId?: number }>
+  Array<
+    CustomMusicSummary & {
+      collectionName?: string
+      collectionId?: number
+      instrumentalUrl?: string | null
+    }
+  >
 > {
   try {
     const response = await fetch(`${customBaseUrl()}/musics`, {
@@ -441,6 +447,7 @@ export async function listAllCustomMusics(options?: {
         official_music_id?: number | null
         duration?: number | string | null
         audio_url?: string | null
+        instrumental_url?: string | null
         image_url?: string | null
         id_collection?: number
         collection_name?: string
@@ -453,6 +460,7 @@ export async function listAllCustomMusics(options?: {
       hasAudio: Boolean(row.audio_url),
       hasImage: Boolean(row.image_url),
       audioUrl: row.audio_url ?? null,
+      instrumentalUrl: asNullableString(row.instrumental_url),
       officialMusicId: row.official_music_id ?? null,
       collectionId: row.id_collection,
       collectionName: row.collection_name,

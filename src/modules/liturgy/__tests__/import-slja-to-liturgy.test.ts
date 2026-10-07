@@ -26,6 +26,7 @@ vi.stubGlobal("fetch", fetchMock);
 
 import { resolveMediaTrack } from "@modules/media/services/custom-catalog";
 import {
+	getLocalMusic,
 	listLocalCollections,
 	listLocalMusics,
 } from "@modules/media/services/local-custom-store";
@@ -117,6 +118,28 @@ describe("app#331 — import .slja → item de liturgia → player (offline)", (
 		const trackAfter = await resolveMediaTrack(imported.displayMusicId);
 		expect(trackAfter?.name).toBe("Missao Para Todos");
 		expect(trackAfter?.audioUrl ?? "").toMatch(/^data:audio/);
+	});
+
+	it("guarda a letra auxiliar do .slja", async () => {
+		const archive: SljaArchive = {
+			title: "Com Auxiliar",
+			assets: [],
+			slides: [
+				{
+					lyric: "Estrofe",
+					auxiliaryLyric: "Translation",
+					type: "LETRA",
+					timeMs: 1_000,
+					order: 1,
+				},
+			],
+		};
+		const imported = await importSljaAsLiturgyMusic({
+			bytes: await buildSlja(archive),
+			name: "aux.slja",
+		});
+		const lyric = getLocalMusic(imported.musicId)?.lyrics[0];
+		expect(lyric?.aux_lyric).toBe("Translation");
 	});
 
 	it("áudio acima da quota do localStorage não finge sucesso", async () => {

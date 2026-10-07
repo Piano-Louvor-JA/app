@@ -112,6 +112,49 @@ describe("catálogo da liturgia inclui custom + local (app#331)", () => {
 		}
 	}, 8_000);
 
+	it("custom ligada a hino oficial herda o instrumental", async () => {
+		fetchRemoteCatalogJsonMock.mockImplementation(async (file: string) => {
+			if (file === "pt_musics") {
+				return [
+					{
+						id_music: 42,
+						name: "Hino Oficial Probe",
+						has_instrumental_music: 1,
+						albums: [{ id_album: 1, name: "Album Oficial", track: 7 }],
+					},
+				];
+			}
+			return null;
+		});
+		vi.stubGlobal(
+			"fetch",
+			async (url: string) => {
+				if (String(url).endsWith("/musics")) {
+					return new Response(
+						JSON.stringify({
+							data: [
+								{
+									id_music: 9,
+									name: "Link do 42",
+									official_music_id: 42,
+									collection_name: "Minhas coletâneas",
+								},
+							],
+						}),
+					);
+				}
+				return new Response("{}", { status: 404 });
+			},
+		);
+		try {
+			const options = await loadLiturgyMusicOptions();
+			const custom = options.find((entry) => entry.id === 1_000_009);
+			expect(custom?.hasInstrumental).toBe(true);
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
+
 	it("duração custom da API em segundos entra no catálogo em ms", async () => {
 		const fetchMock = vi.fn(async (url: string) => {
 			if (String(url).endsWith("/musics")) {

@@ -155,6 +155,56 @@ describe("import .slja LOGADO → API custom (app#331)", () => {
 		expect(imported.slides).toBe(1);
 	});
 
+	it("imagem da CAPA vira capa da música, sem virar estrofe", async () => {
+		let coverFileId: number | null = null;
+		fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+			const u = String(url);
+			const json = (body: unknown, status = 200) =>
+				new Response(JSON.stringify(body), { status });
+			if (u.endsWith("/collections") && init?.method === "POST") {
+				return json({ id_collection: 55 });
+			}
+			if (u.includes("/collections/55/musics") && init?.method === "POST") {
+				return json({ id_music: 7 });
+			}
+			if (u.endsWith("/files") && init?.method === "POST") {
+				return json({ id_file: 44, url: "/custom/capa.png" });
+			}
+			if (u.endsWith("/musics/7") && init?.method === "PUT") {
+				const body = JSON.parse(String(init?.body ?? "{}")) as {
+					id_file_image?: number;
+				};
+				if (body.id_file_image != null) coverFileId = body.id_file_image;
+				return json({});
+			}
+			if (u.endsWith("/musics/7/lyrics") && init?.method === "POST") {
+				return json({ id_lyric: 1 });
+			}
+			return json({ message: "nf" }, 404);
+		});
+
+		const archive: SljaArchive = {
+			title: "Com Capa",
+			assets: [{ path: "capa.png", bytes: new Uint8Array([1, 2]) }],
+			slides: [
+				{
+					lyric: "Capa",
+					type: "CAPA",
+					timeMs: 0,
+					order: 1,
+					image: { name: "capa.png", bytes: new Uint8Array([1, 2]) },
+				},
+				{ lyric: "Verso", type: "LETRA", timeMs: 1_000, order: 2 },
+			],
+		};
+		const imported = await importSljaAsLiturgyMusic({
+			bytes: await buildSlja(archive),
+			name: "capa.slja",
+		});
+		expect(imported.slides).toBe(1);
+		expect(coverFileId).toBe(44);
+	});
+
 	it("estrofe rejeitada desfaz a música e não reporta sucesso", async () => {
 		fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
 			const u = String(url);

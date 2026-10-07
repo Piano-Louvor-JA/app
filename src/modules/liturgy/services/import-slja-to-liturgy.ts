@@ -131,6 +131,8 @@ export async function importSljaAsLiturgyMusic(
 
 	const name = sljaDisplayName(archive, innerName ?? fileName);
 
+	const coverImageName = archive.slides.find((slide) => slide.type === "CAPA")
+		?.image?.name;
 	const slides = [...archive.slides]
 		.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
 		.filter((slide) => slide.type !== "CAPA" && slide.lyric.trim().length > 0);
@@ -141,7 +143,13 @@ export async function importSljaAsLiturgyMusic(
 	// não há escrita confiável na API). Uso local sem conta é requisito
 	// permanente (offline-first): áudio/estrofes ficam no localStorage.
 	if (!getAuthSession()) {
-		return importSljaLocal({ name, archive, slides, durationMs });
+		return importSljaLocal({
+			name,
+			archive,
+			slides,
+			durationMs,
+			coverImageName,
+		});
 	}
 
 	// ── Logado: sobe pra API (Minhas Coletâneas → "Importações .slja").
@@ -188,6 +196,10 @@ export async function importSljaAsLiturgyMusic(
 		}
 	}
 	const imageIdByUrl = new Map(uploadedAssets.map((a) => [a.url, a.idFile]));
+	const coverAsset = matchUploadedAsset(coverImageName, uploadedAssets);
+	if (coverAsset) {
+		await updateCustomMusic(musicId, { id_file_image: coverAsset.idFile });
+	}
 
 	let slideCount = 0;
 	for (const slide of slides) {
@@ -207,6 +219,7 @@ export async function importSljaAsLiturgyMusic(
 		}
 		const createdLyric = await createCustomLyric(musicId, {
 			lyric: text,
+			aux_lyric: slide.auxiliaryLyric?.trim() || undefined,
 			time: formatSljaMsAsTime(slide.timeMs),
 			id_file_image: imageIdByUrl.get(imageUrl),
 		});
@@ -237,6 +250,19 @@ export async function importSljaAsLiturgyMusic(
  * monta data: URL — loadCustomMusicTrack, branch isLocalId) e as estrofes
  * vão com timing (time HH:MM:SS). Nada sobe pra rede.
  */
+function matchUploadedAsset(
+	imageName: string | undefined,
+	assets: Array<{ path: string; url: string; idFile: number }>,
+) {
+	if (!imageName || assets.length === 0) return undefined;
+	const needle = imageName.toLowerCase();
+	return assets.find(
+		(asset) =>
+			needle.includes(asset.path.toLowerCase()) ||
+			asset.path.toLowerCase().includes(needle),
+	);
+}
+
 async function importSljaLocal({
 	name,
 	archive,
@@ -245,8 +271,14 @@ async function importSljaLocal({
 }: {
 	name: string;
 	archive: Awaited<ReturnType<typeof parseSljaFile>>;
-	slides: Array<{ lyric: string; timeMs: number; order?: number }>;
+	slides: Array<{
+		lyric: string;
+		timeMs: number;
+		order?: number;
+		auxiliaryLyric?: string;
+	}>;
 	durationMs: number;
+	coverImageName?: string;
 }): Promise<ImportedSljaLiturgyMusic> {
 	// Import dinâmico: mantém a API fora do caminho local (offline-first e
 	// testes sem rede nunca tocam fetch).
@@ -297,6 +329,7 @@ async function importSljaLocal({
 			if (!text) continue;
 			createLocalLyric(musicId, {
 				lyric: text,
+				aux_lyric: slide.auxiliaryLyric?.trim() || undefined,
 				time: formatSljaMsAsTime(slide.timeMs),
 			});
 			const persisted = getLocalMusic(musicId)?.lyrics.some(

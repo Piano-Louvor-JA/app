@@ -306,6 +306,8 @@ async function mergeOperatorMusicOptions(
     name: string | null
     duration: number | null
     collectionName?: string
+    officialMusicId?: number | null
+    instrumentalUrl?: string | null
   }> = []
   try {
     // Catálogo remoto é opcional. Sem timeout, um host mudo segura o hydrate
@@ -321,6 +323,7 @@ async function mergeOperatorMusicOptions(
     if (byId.has(offsetId)) continue
     const name = String(custom.name ?? '').trim() || `Custom #${id}`
     const album = String(custom.collectionName ?? '').trim() || 'Minhas coletâneas'
+    const linkedOfficial = byId.get(Number(custom.officialMusicId))
     byId.set(offsetId, {
       id: offsetId,
       name,
@@ -333,7 +336,9 @@ async function mergeOperatorMusicOptions(
         typeof custom.duration === 'number' && custom.duration > 0
           ? Math.round(custom.duration * 1000)
           : null,
-      hasInstrumental: false,
+      hasInstrumental:
+        Boolean(custom.instrumentalUrl?.trim()) ||
+        linkedOfficial?.hasInstrumental === true,
     })
   }
 
