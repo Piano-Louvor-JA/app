@@ -76,9 +76,25 @@ async function onProvaiEVedeOneClick() {
   try {
     const pageUrl =
       'https://downloads.adventistas.org/pt/mordomia-crista/video/provai-e-vede-2026-4o-trimestre'
-    const resp = await fetch(pageUrl)
-    const html = resp.ok ? await resp.text() : null
+    const bridge = getDesktopBridge()
+    // Electron: fetch pelo MAIN (sem CORS). Web: fetch direto (página tem CORS aberto;
+    // se falhar, mensagem amigável — não crasha).
+    let html: string | null = null
+    if (bridge?.workspace?.fetchText) {
+      html = await bridge.workspace.fetchText(pageUrl)
+    } else {
+      try {
+        const resp = await fetch(pageUrl)
+        html = resp.ok ? await resp.text() : null
+      } catch {
+        html = null
+      }
+    }
     const all = html ? extractProvaiEVedeEpisodes(html) : []
+    if (all.length === 0) {
+      pvOneClickProgress.value = t('liturgy.messages.scheduledPvUnavailable')
+      return
+    }
     const todayISO = new Date().toISOString().slice(0, 10)
     const upcoming = all.filter((e) => e.dateISO >= todayISO)
     if (upcoming.length === 0) {
@@ -86,7 +102,6 @@ async function onProvaiEVedeOneClick() {
       return
     }
 
-    const bridge = getDesktopBridge()
     const store = useScheduledStore()
     let done = 0
     const resolvePath = async (ep: ProvaiEpisode): Promise<string> => {

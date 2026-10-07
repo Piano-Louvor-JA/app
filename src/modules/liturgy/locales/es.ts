@@ -293,6 +293,7 @@ export default {
       scheduledSongName: 'Título (opcional)',
       scheduledMoreOptions: 'Más opciones',
       scheduledPvOneClick: 'Provad y Ved (descargar trimestre)',
+      scheduledPvUnavailable: 'No pude acceder a la página del trimestre ahora. Verifica tu internet e inténtalo de nuevo.',
       scheduledPvDownloading: 'Descargando {done}/{total}…',
       scheduledPvDone: 'Listo: {created} agendados ({skipped} ya existían).',
       scheduledPvNothing: 'Ningún episodio futuro publicado aún.',

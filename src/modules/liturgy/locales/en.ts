@@ -293,6 +293,7 @@ export default {
       scheduledSongName: 'Title (optional)',
       scheduledMoreOptions: 'More options',
       scheduledPvOneClick: 'Taste and See (download quarter)',
+      scheduledPvUnavailable: 'Could not reach the quarter page right now. Check your internet and try again.',
       scheduledPvDownloading: 'Downloading {done}/{total}…',
       scheduledPvDone: 'Done: {created} scheduled ({skipped} already existed).',
       scheduledPvNothing: 'No upcoming episode published yet.',

@@ -507,6 +507,19 @@ export function registerWorkspaceIpc() {
     }
   })
 
+  // Fetch de página remota pelo MAIN process (sem CORS do renderer).
+  // Retorna texto ou null em falha.
+  ipcMain.handle('workspace:fetch-text', async (_event, url) => {
+    try {
+      const response = await net.fetch(String(url))
+      if (!response.ok) return null
+      return await response.text()
+    } catch (error) {
+      console.error('[ipc] workspace:fetch-text', error)
+      return null
+    }
+  })
+
   // Download de arquivo remoto pra pasta Media/provai-e-vede/ (offline-first).
   // Retorna o caminho local absoluto ou null em falha.
   ipcMain.handle('workspace:download-to-media', async (_event, url, fileName) => {
