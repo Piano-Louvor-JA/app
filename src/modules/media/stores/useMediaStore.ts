@@ -409,7 +409,7 @@ export const useMediaStore = defineStore('media', () => {
       onTimeUpdate: () => {
         currentTimeSec.value = audio.currentTime
         const times = session.value?.slideTimesSec ?? []
-        if (times.length > 0 && hasAudio.value && hasDistinctSlideTimes(times)) {
+        if (times.length > 0 && hasAudio.value && hasDistinctSlideTimes(times, session.value?.slides[0]?.isCover === true)) {
           const nextIndex = resolveSlideIndexForTime(times, audio.currentTime)
           if (nextIndex !== slideIndex.value) {
             slideIndex.value = nextIndex
@@ -1047,7 +1047,7 @@ export const useMediaStore = defineStore('media', () => {
       )
       audio.currentTime = clamped
       currentTimeSec.value = clamped
-      slideIndex.value = hasDistinctSlideTimes(slideTimesSec)
+      slideIndex.value = hasDistinctSlideTimes(slideTimesSec, current.slides[0]?.isCover === true)
         ? resolveSlideIndexForTime(slideTimesSec, clamped)
         : savedSlide
 

@@ -15,6 +15,7 @@ vi.mock('@modules/media/services/auth-client', () => ({
 
 import {
 	createCustomCollection,
+ listAllCustomMusics,
 	listCustomCollections,
 	updateCustomCollection,
 } from '../custom-catalog'
@@ -235,3 +236,13 @@ describe('custom-catalog — exceções de rede (catch)', () => {
 		expect(all).toEqual([])
 	})
 })
+
+ it('normaliza duração numérica e HH:MM:SS da API em segundos', async () => {
+   mocks.getSession.mockReturnValue({ token: 'tok' } as never)
+   vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ data: [
+     { id_music: 1, name: 'A', duration: '240' },
+     { id_music: 2, name: 'B', duration: '00:04:00' },
+   ] })))
+   const rows = await listAllCustomMusics()
+   expect(rows.map(row => row.duration)).toEqual([240, 240])
+ })

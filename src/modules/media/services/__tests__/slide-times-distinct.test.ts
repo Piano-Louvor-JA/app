@@ -14,3 +14,10 @@ describe('hasDistinctSlideTimes', () => {
     expect(hasDistinctSlideTimes([0, 0, 30])).toBe(false)
   })
 })
+
+ it('capa sintética não invalida primeira letra em zero', () => {
+   expect(hasDistinctSlideTimes([0, 0, 30], true)).toBe(true)
+   expect(hasDistinctSlideTimes([0, 12], true)).toBe(true)
+   expect(hasDistinctSlideTimes([0, 0, 0, 30], true)).toBe(false)
+   expect(hasDistinctSlideTimes([0, 0, 0], true)).toBe(false)
+ })

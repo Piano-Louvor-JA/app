@@ -1,3 +1,4 @@
+import { parseSlideTimeToSeconds } from './media-slides'
 import type {
   MediaLyricSlide,
   MediaTrackRecord,
@@ -459,7 +460,9 @@ export async function listAllCustomMusics(options?: {
     return (json.data ?? []).map((row) => ({
       id: row.id_music,
       name: row.name ?? '',
-      duration: typeof row.duration === 'string' ? null : row.duration ?? null,
+      duration: typeof row.duration === 'string'
+        ? parseSlideTimeToSeconds(row.duration) || null
+        : row.duration ?? null,
       hasAudio: Boolean(row.audio_url),
       hasImage: Boolean(row.image_url),
       audioUrl: row.audio_url ?? null,
