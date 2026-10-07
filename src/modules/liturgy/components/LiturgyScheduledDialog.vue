@@ -397,6 +397,17 @@ const dateFmt = (iso: string) => {
 </template>
 
 <style scoped>
+.liturgy-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: color-mix(in srgb, #000 55%, transparent);
+  backdrop-filter: blur(6px);
+}
+
 .scheduled-dialog {
   width: min(860px, 92vw);
   max-height: 86vh;
