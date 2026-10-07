@@ -290,6 +290,7 @@ export default {
       scheduledDownloadSelected: 'Download selected',
       scheduledPasteQuarter: 'Paste quarter',
       scheduledPasteHint: 'Paste the quarter list (e.g. 10/03 — opening: 15 — Praise). Dates dd/mm, free slot names.',
+      scheduledPasteHintSimple: 'Paste the quarter list and click Import. Each position becomes an automatic rotation (e.g. 03/10, then "inicial: 15").',
       scheduledApplyPaste: 'Import',
       scheduledUnmapped: '{slots}: slots without a rotation — pick one for each.',
       scheduledDuplicateQuarter: 'Duplicate quarter (+4 weeks)',

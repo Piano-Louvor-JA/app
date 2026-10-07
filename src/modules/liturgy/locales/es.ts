@@ -290,6 +290,7 @@ export default {
       scheduledDownloadSelected: 'Descargar seleccionados',
       scheduledPasteQuarter: 'Pegar trimestre',
       scheduledPasteHint: 'Pega la lista del trimestre (ej. 03/10 — inicial: 15 — Adoración). Fechas dd/mm, posiciones libres.',
+      scheduledPasteHintSimple: 'Pega la lista del trimestre y haz clic en Importar. Cada posición se convierte en una programación automática (ej.: 03/10, luego "inicial: 15").',
       scheduledApplyPaste: 'Importar',
       scheduledUnmapped: '{slots}: posiciones sin programación — elige la programación de cada una.',
       scheduledDuplicateQuarter: 'Duplicar trimestre (+4 semanas)',
