@@ -102,7 +102,9 @@ async function ensureImportCollectionId(): Promise<number | null> {
 	// Reaproveita a primeira "Importações .slja" existente (mesma regra do
 	// media editor); só cria se ainda não houver nenhuma.
 	try {
-		const collections = await listCustomCollections();
+		const signal = AbortSignal.timeout(15_000);
+		const collections = await listCustomCollections({ signal });
+		if (signal.aborted) return null;
 		const ownerId = getAuthSession()?.user?.id_user;
 		// Id negativo é coletânea LOCAL. Coletânea pública de outro usuário
 		// com o mesmo nome também não serve: o POST seguinte seria recusado.

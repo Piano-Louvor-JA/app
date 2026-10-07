@@ -335,7 +335,7 @@ export async function updateCustomCollection(
   }
 }
 
-export async function listCustomCollections(): Promise<
+export async function listCustomCollections(options?: { signal?: AbortSignal }): Promise<
   CustomCollectionSummary[]
 > {
   // Locais (ids negativos, só desta máquina) entram primeiro na lista.
@@ -350,6 +350,7 @@ export async function listCustomCollections(): Promise<
   try {
     const response = await fetch(`${customBaseUrl()}/collections`, {
       headers: authHeaders(),
+      signal: options?.signal,
     })
     if (!response.ok) return locals
     const json = (await response.json()) as {

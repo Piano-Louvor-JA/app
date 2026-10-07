@@ -314,3 +314,21 @@ describe("import .slja LOGADO → API custom (app#331)", () => {
    const call = fetchMock.mock.calls.find(([url, init]) => String(url).endsWith("/musics/7/lyrics") && init?.method === "POST");
    expect(JSON.parse(String(call?.[1]?.body)).id_file_image).toBe(902);
  });
+
+ it("encerra importação quando consulta de coletâneas expira", async () => {
+   authSessionMock.mockReturnValue({ token: "tok", user: { id_user: 1 } });
+   const controller = new AbortController();
+   const timeout = vi.spyOn(AbortSignal, "timeout").mockReturnValue(controller.signal);
+   fetchMock.mockClear();
+   fetchMock.mockImplementation(async (_url, init) => {
+     expect(init.signal).toBe(controller.signal);
+     controller.abort();
+     throw new DOMException("Timeout", "AbortError");
+   });
+   try {
+     const archive: SljaArchive = { title: "Timeout", assets: [], slides: [{ lyric: "Verso", type: "LETRA", order: 1, timeMs: 0 }] };
+     await expect(importSljaAsLiturgyMusic({ bytes: await buildSlja(archive), name: "timeout.slja" })).rejects.toThrow("SLJA_IMPORT_COLLECTION_FAILED");
+     expect(timeout).toHaveBeenCalledWith(15_000);
+     expect(fetchMock).toHaveBeenCalledTimes(1);
+   } finally { timeout.mockRestore(); }
+ });
