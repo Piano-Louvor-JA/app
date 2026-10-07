@@ -24,9 +24,9 @@ describe('importar episódios P&V → auto-agendar na rotação', () => {
     { dateISO: '2026-10-10', title: 'O milagre entre os galhos secos', url: 'https://b2/10-10-26_b.mp4' },
   ]
 
-  it('B2: cria rotação (se falta) e agenda cada episódio como file com filePath local', () => {
+  it('B2: cria rotação (se falta) e agenda cada episódio como file com filePath local', async () => {
     const store = useScheduledStore()
-    const report = importProvaiEVedeEpisodes(store, episodes, (ep) => `/media/videos/${ep.dateISO}.mp4`)
+    const report = await importProvaiEVedeEpisodes(store, episodes, (ep) => `/media/videos/${ep.dateISO}.mp4`)
 
     expect(report.created).toBe(2)
     expect(report.rotationId).toBeTruthy()
@@ -41,10 +41,10 @@ describe('importar episódios P&V → auto-agendar na rotação', () => {
     })
   })
 
-  it('B3: rodar 2x NÃO duplica (idempotente por categoryId+date)', () => {
+  it('B3: rodar 2x NÃO duplica (idempotente por categoryId+date)', async () => {
     const store = useScheduledStore()
-    importProvaiEVedeEpisodes(store, episodes, (ep) => `/media/videos/${ep.dateISO}.mp4`)
-    const report2 = importProvaiEVedeEpisodes(store, episodes, (ep) => `/media/videos/${ep.dateISO}.mp4`)
+    await importProvaiEVedeEpisodes(store, episodes, (ep) => `/media/videos/${ep.dateISO}.mp4`)
+    const report2 = await importProvaiEVedeEpisodes(store, episodes, (ep) => `/media/videos/${ep.dateISO}.mp4`)
     expect(report2.created).toBe(0)
     expect(report2.skipped).toBe(2)
 
@@ -54,9 +54,34 @@ describe('importar episódios P&V → auto-agendar na rotação', () => {
     expect(store.items).toHaveLength(2)
   })
 
-  it('B4: aceita subconjunto (usuário escolhe só os próximos sábados)', () => {
+  it('B4: aceita subconjunto (usuário escolhe só os próximos sábados)', async () => {
     const store = useScheduledStore()
-    const report = importProvaiEVedeEpisodes(store, [episodes[0]!], () => '/v/a.mp4')
+    const report = await importProvaiEVedeEpisodes(store, [episodes[0]!], () => '/v/a.mp4')
     expect(report.created).toBe(1)
+  })
+})
+
+describe('1-click — só sábados por vir', () => {
+  it('episódios com data passada são ignorados', async () => {
+    const store = useScheduledStore()
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 9, 20)) // 20/10/2026
+    try {
+      const report = await importProvaiEVedeEpisodes(
+        store,
+        [
+          { dateISO: '2026-10-03', title: 'Passado 1', url: 'https://b2/a.mp4' },
+          { dateISO: '2026-10-10', title: 'Passado 2', url: 'https://b2/b.mp4' },
+          { dateISO: '2026-10-24', title: 'Futuro 1', url: 'https://b2/c.mp4' },
+          { dateISO: '2026-12-26', title: 'Futuro 2', url: 'https://b2/d.mp4' },
+        ],
+        () => '/media/x.mp4',
+        { onlyUpcoming: true },
+      )
+      expect(report.created).toBe(2)
+      expect(report.skippedPast).toBe(2)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
