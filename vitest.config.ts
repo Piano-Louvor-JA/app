@@ -27,18 +27,24 @@ export default defineConfig({
     },
   },
   test: {
-    setupFiles: ['src/test/localstorage-shim-setup.ts'],
     exclude: ['node_modules/**', 'dist/**', 'e2e/**'],
+    environment: 'jsdom',
+    environmentOptions: {
+      jsdom: {
+        url: 'http://localhost/',
+      },
+    },
+    setupFiles: ['./vitest.setup.ts'],
     coverage: {
-          provider: 'v8',
-          reporter: ['text', 'text-summary', 'lcov'],
-          thresholds: {
-            lines: 100,
-            functions: 100,
-            statements: 100,
-            branches: 100,
-          },
-          include: ['src/**/*.ts', 'src/**/*.vue'],
-        },
+      provider: 'v8',
+      reporter: ['text', 'text-summary', 'lcov'],
+      thresholds: {
+        lines: 100,
+        functions: 100,
+        statements: 100,
+        branches: 100,
+      },
+      include: ['src/**/*.ts', 'src/**/*.vue'],
+    },
   },
 })
