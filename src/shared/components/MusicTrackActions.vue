@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { isCustomMusicId } from '@modules/media/services/custom-catalog'
 import { useI18n } from 'vue-i18n'
 
 import { isDesktopApp } from '@shared/services/desktop-bridge'
@@ -61,7 +62,7 @@ const cancelRequested = ref(false)
 const confirmRemoveOpen = ref(false)
 
 const showOfflineControls = computed(
-  () => isDesktopApp() && props.musicId != null && props.musicId > 0,
+  () => isDesktopApp() && props.musicId != null && props.musicId > 0 && !isCustomMusicId(props.musicId),
 )
 
 const isOfflineBusy = computed(

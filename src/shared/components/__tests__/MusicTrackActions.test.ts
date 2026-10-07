@@ -109,6 +109,15 @@ describe('MusicTrackActions', () => {
     expect(w.find('.music-track-actions__check').exists()).toBe(false)
   })
 
+  it('desktop custom: não mostra nem consulta download incompatível', async () => {
+    isDesktopApp.mockReturnValue(true)
+    const w = await mountActions({ musicId: 1_000_007 })
+    expect(w.find('.music-track-actions__check').exists()).toBe(false)
+    expect(w.findAll('.music-track-actions__btn')).toHaveLength(3)
+    expect(isTrackMediaDownloaded).not.toHaveBeenCalled()
+    w.unmount()
+  })
+
   it('desktop baixado: check + botão remover abre confirm; confirmar apaga', async () => {
     isDesktopApp.mockReturnValue(true)
     isTrackMediaDownloaded.mockResolvedValue(true)
