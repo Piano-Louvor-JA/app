@@ -18,6 +18,10 @@ vi.mock("@modules/media/services/auth-client", () => ({
 }));
 
 import { resolveMediaTrack } from "@modules/media/services/custom-catalog";
+import {
+	createLocalCollection,
+	listLocalMusics,
+} from "@modules/media/services/local-custom-store";
 import { buildSlja, type SljaArchive } from "@shared/services/slja";
 import { importSljaAsLiturgyMusic } from "../services/import-slja-to-liturgy";
 
@@ -95,6 +99,31 @@ describe("import .slja LOGADO → API custom (app#331)", () => {
 		// ...e o id 1M+ resolve no player via API fake
 		const track = await resolveMediaTrack(imported.displayMusicId);
 		expect(track?.name).toBe("Hino Autoral Probe");
+	});
+
+	it("coletânea local homônima não é reusada depois do login", async () => {
+		const local = createLocalCollection("Importações .slja");
+		routeFetch(7, 0);
+		const archive: SljaArchive = {
+			title: "Hino Autoral Probe",
+			audio: { name: "autor.mp3", bytes: new Uint8Array([9, 9, 9]) },
+			assets: [],
+			slides: [{ lyric: "Verso um", type: "LETRA", timeMs: 5_000, order: 1 }],
+		};
+		const imported = await importSljaAsLiturgyMusic({
+			bytes: await buildSlja(archive),
+			name: "hino-autoral.slja",
+		});
+
+		expect(imported.local).toBe(false);
+		expect(imported.displayMusicId).toBe(1_000_007);
+		expect(listLocalMusics(local.id)).toHaveLength(0);
+		const musicPost = fetchMock.mock.calls.find(
+			(call) =>
+				String(call[0]).includes("/musics") &&
+				(call[1] as RequestInit | undefined)?.method === "POST",
+		);
+		expect(String(musicPost?.[0])).toContain("/collections/55/musics");
 	});
 
 	it("upload de áudio falhou → import segue (sem áudio), não aborta", async () => {

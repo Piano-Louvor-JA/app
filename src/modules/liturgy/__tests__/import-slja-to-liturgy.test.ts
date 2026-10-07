@@ -25,6 +25,10 @@ vi.mock("@modules/media/services/auth-client", () => ({
 vi.stubGlobal("fetch", fetchMock);
 
 import { resolveMediaTrack } from "@modules/media/services/custom-catalog";
+import {
+	listLocalCollections,
+	listLocalMusics,
+} from "@modules/media/services/local-custom-store";
 import { buildSlja, type SljaArchive } from "@shared/services/slja";
 import { importSljaAsLiturgyMusic } from "../services/import-slja-to-liturgy";
 import { resolveMusicId } from "../services/liturgy-actions";
@@ -113,6 +117,32 @@ describe("app#331 — import .slja → item de liturgia → player (offline)", (
 		const trackAfter = await resolveMediaTrack(imported.displayMusicId);
 		expect(trackAfter?.name).toBe("Missao Para Todos");
 		expect(trackAfter?.audioUrl ?? "").toMatch(/^data:audio/);
+	});
+
+	it("áudio acima da quota do localStorage não finge sucesso", async () => {
+		const original = Storage.prototype.setItem;
+		const spy = vi
+			.spyOn(Storage.prototype, "setItem")
+			.mockImplementation(function (this: Storage, key: string, value: string) {
+				if (value.includes("audioBase64")) {
+					throw new DOMException("quota", "QuotaExceededError");
+				}
+				return original.call(this, key, value);
+			});
+		try {
+			await expect(
+				importSljaAsLiturgyMusic({
+					bytes: await makeSljaBuffer(),
+					name: "missao.slja",
+				}),
+			).rejects.toThrow("SLJA_LOCAL_AUDIO_PERSIST_FAILED");
+			const leftover = listLocalCollections().flatMap((collection) =>
+				listLocalMusics(collection.id),
+			);
+			expect(leftover).toEqual([]);
+		} finally {
+			spy.mockRestore();
+		}
 	});
 
 	it("id negativo desconhecido → null sem consultar rede", async () => {

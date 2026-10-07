@@ -887,9 +887,12 @@ export const useMediaStore = defineStore('media', () => {
     status.value = 'loading'
     lastErrorKey.value = null
 
-    const track = isCustomMusicId(current.musicId)
-      ? await loadCustomMusicTrack(fromCustomMusicId(current.musicId))
-      : await loadMediaTrack(current.musicId)
+    const musicId = current.musicId
+    const track = isCustomMusicId(musicId) || musicId < 0
+      ? await loadCustomMusicTrack(
+          musicId < 0 ? musicId : fromCustomMusicId(musicId),
+        )
+      : await loadMediaTrack(musicId)
     if (!track) {
       status.value = 'error'
       lastErrorKey.value = 'media.messages.trackMissing'

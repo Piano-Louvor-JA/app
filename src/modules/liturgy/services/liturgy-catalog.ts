@@ -325,7 +325,12 @@ async function mergeOperatorMusicOptions(
       hymnalTrack: null,
       albumNames: album,
       displayLabel: `${name} — ${album}`,
-      durationMs: typeof custom.duration === 'number' ? custom.duration : null,
+      // CustomMusicSummary.duration é segundos (enrichDurations / API).
+      // O item da liturgia espera ms; abaixo de ~500 s o clamp zeraria a duração.
+      durationMs:
+        typeof custom.duration === 'number' && custom.duration > 0
+          ? Math.round(custom.duration * 1000)
+          : null,
       hasInstrumental: false,
     })
   }

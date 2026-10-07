@@ -84,4 +84,33 @@ describe("catálogo da liturgia inclui custom + local (app#331)", () => {
 		expect(offsetId).toBe(1_000_001);
 		expect(options.filter((o) => o.id === 42)).toHaveLength(1);
 	});
+
+	it("duração custom da API em segundos entra no catálogo em ms", async () => {
+		const fetchMock = vi.fn(async (url: string) => {
+			if (String(url).endsWith("/musics")) {
+				return new Response(
+					JSON.stringify({
+						data: [
+							{
+								id_music: 9,
+								name: "Custom Probe",
+								duration: 240,
+								collection_name: "Minhas coletâneas",
+							},
+						],
+					}),
+				);
+			}
+			return new Response("{}", { status: 404 });
+		});
+		vi.stubGlobal("fetch", fetchMock);
+		try {
+			const options = await loadLiturgyMusicOptions();
+			const custom = options.find((entry) => entry.name === "Custom Probe");
+			expect(custom?.id).toBe(1_000_009);
+			expect(custom?.durationMs).toBe(240_000);
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
 });

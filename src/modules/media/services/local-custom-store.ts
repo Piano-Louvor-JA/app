@@ -90,11 +90,13 @@ function loadDb(): LocalDb {
 	}
 }
 
-function saveDb(db: LocalDb): void {
+function saveDb(db: LocalDb): boolean {
 	try {
 		localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+		return true;
 	} catch {
-		// quota (áudio base64 grande) — falha silenciosa; dados ficam só em memória
+		// quota (áudio base64 grande) — o caller decide se o import falhou
+		return false;
 	}
 }
 
@@ -203,8 +205,7 @@ export function updateLocalMusic(
 	if (patch.audioBase64 !== undefined) music.audioBase64 = patch.audioBase64;
 	if (patch.audioName !== undefined) music.audioName = patch.audioName;
 	if (patch.durationMs !== undefined) music.durationMs = patch.durationMs;
-	saveDb(db);
-	return true;
+	return saveDb(db);
 }
 
 export function deleteLocalMusic(id: number): boolean {
@@ -236,7 +237,9 @@ export function createLocalLyric(
 	db.nextLyricId -= 1;
 	music.lyrics.push(lyric);
 	music.lyrics.sort((a, b) => a.order - b.order);
-	saveDb(db);
+	if (!saveDb(db)) {
+		throw new Error("local-persist-failed");
+	}
 	return lyric;
 }
 
