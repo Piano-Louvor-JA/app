@@ -37,3 +37,7 @@ describe('parseDataPacket', () => {
     expect(parseDataPacket(xml)).toEqual([])
   })
 })
+
+it('decodes nested escaped entities exactly once', () => {
+  expect(parseDataPacket('<ROWDATA><ROW TEXTO="&amp;lt;script&amp;gt; &amp;amp;"/></ROWDATA>')[0].TEXTO).toBe('&lt;script&gt; &amp;');
+});

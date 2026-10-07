@@ -127,10 +127,12 @@ jobs:
         run: |
           npm ci
           node scripts/test-regression.mjs --baseline
+          cp .regression-baseline.json /tmp/pr-regression-baseline.json
       - name: Restaurar código do PR
         if: github.event_name == 'pull_request'
         run: |
           git read-tree -u --reset HEAD
+          cp /tmp/pr-regression-baseline.json .regression-baseline.json
           cp /tmp/test-regression.mjs scripts/test-regression.mjs
           npm ci
       - name: Comparar com baseline (falha se regressão)

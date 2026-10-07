@@ -63,47 +63,10 @@ function unionFiles(filesA, filesB) {
         }
       };
       add(a, 'a'); add(b, 'b');
-      // Stmt fantasma de transform (mesma classe de fantasma já descartada
-      // para fns): span que só existe em UMA passada e ficou sem hits =
-      // artefato de remap — o stmt real (span igual ou com hits) aparece
-      // na outra. Descarta do mapa e do total antes do summarize.
-      for (const id of Object.keys(s)) {
-        if (s[id] === 0 && origin[id] !== 'both') { delete s[id]; delete statementMap[id]; }
-      }
-      // Remap intra-linha: mesma linha com 2+ stmts onde um tem hits e o
-      // outro ficou 0 = desalinhamento de coluna entre passadas (o stmt
-      // real executado aparece na outra passada com col diferente). O stmt
-      // a 0 na linha já coberta é fantasma — descarta.
-      const hitsByLine = new Map();
-      for (const [id, loc] of Object.entries(statementMap)) {
-        if (s[id] > 0) hitsByLine.set(loc.start.line, (hitsByLine.get(loc.start.line) ?? 0) + 1);
-      }
-      for (const id of Object.keys(s)) {
-        if (s[id] === 0) {
-          const ln = statementMap[id]?.start?.line;
-          if (ln != null && (hitsByLine.get(ln) ?? 0) > 0) { delete s[id]; delete statementMap[id]; }
-        }
-      }
-      // Sub-stmt contido em stmt pai com hits e a 0: IIFE/try-catch remapado
-      // diverge de col entre passadas (ex.: catch de storage). O pai já é
-      // contado; o filho a 0 sem hit em NENHUMA passada e contido num pai
-      // executado é ruído do remap — descarta.
-      const ids = Object.keys(statementMap);
-      const startsBefore = (outer, inner) =>
-        statementMap[outer].start.line < statementMap[inner].start.line ||
-        (statementMap[outer].start.line === statementMap[inner].start.line &&
-          statementMap[outer].start.column <= statementMap[inner].start.column);
-      const endsAfter = (outer, inner) => {
-        const oe = statementMap[outer].end?.line ?? statementMap[outer].start.line;
-        const ie = statementMap[inner].end?.line ?? statementMap[inner].start.line;
-        return oe > ie || (oe === ie && (statementMap[outer].end?.column ?? 1e9) >= (statementMap[inner].end?.column ?? 0));
-      };
-      for (const id of ids) {
-        if (s[id] !== 0) continue;
-        const wrapped = ids.some((oid) => oid !== id && s[oid] > 0 &&
-          startsBefore(oid, id) && endsAfter(oid, id));
-        if (wrapped) { delete s[id]; delete statementMap[id]; }
-      }
+      // Preserve every source span, including uncovered statements on
+      // covered lines or nested in covered statements. Hits alone do not
+      // prove that an entry is a remapping artifact.
+
     }
 
     // ---- functions ----
@@ -133,14 +96,7 @@ function unionFiles(filesA, filesB) {
         }
       };
       add(a); add(b);
-      // Fantasma de remap: span zerado que só existe numa passada.
-      // Função zerada nas duas passadas é lacuna real e permanece.
-      for (const id of Object.keys(f)) {
-        if (f[id] === 0 && (passCount[id] ?? 0) < 2) {
-          delete f[id];
-          delete fnMap[id];
-        }
-      }
+
     }
 
     // ---- branches ----

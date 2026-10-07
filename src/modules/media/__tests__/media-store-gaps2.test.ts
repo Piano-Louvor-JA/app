@@ -1143,3 +1143,11 @@ describe("gaps2d — últimos arms", () => {
 		vi.mocked(palcoSessionSlots).mockResolvedValue([]);
 	});
 });
+
+it('seeks to zero for a missing initial marker when later timing is distinct', async () => {
+  const { store } = await openTrack({});
+  store.session!.slides = [{ order: 0 }, { order: 1 }] as never;
+  store.session!.slideTimesSec = [undefined as unknown as number, 10];
+  await store.goToSlide(0);
+  expect(store.currentTimeSec).toBe(0);
+});

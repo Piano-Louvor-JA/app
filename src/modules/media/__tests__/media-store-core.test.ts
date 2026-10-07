@@ -1347,3 +1347,14 @@ describe("leva 4 — statements residuais", () => {
     });
   });
 })
+
+it('plays local songs on desktop without consulting the official download catalog', async () => {
+  loadCustomMusicTrack.mockResolvedValue({ ...trackStub(), id: -2, audioUrl: 'data:audio/mpeg;base64,AQID' });
+  bridgeMock.isDesktop = true;
+  trackMediaMock.isDownloaded.mockClear();
+  const { store, r } = await openTrack({ musicId: -2, mode: 'audio' });
+  expect(r.ok).toBe(true);
+  expect(trackMediaMock.isDownloaded).not.toHaveBeenCalled();
+  expect(store.session?.musicId).toBe(-2);
+  store.close();
+});

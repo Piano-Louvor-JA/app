@@ -78,7 +78,8 @@ export function buildSlideTimesSec(
  * avançar sozinho (import .slja sem tempo_hms cai inteiro em 00:00:00). */
 export function hasDistinctSlideTimes(timesSec: number[], hasSyntheticCover = false): boolean {
   if (hasSyntheticCover && timesSec.length === 2) {
-    return Number.isFinite(timesSec[1]) && (timesSec[1] ?? -1) >= 0
+    const lyricTime = timesSec[1]
+    return typeof lyricTime === 'number' && Number.isFinite(lyricTime) && lyricTime >= 0
   }
   if (hasSyntheticCover) timesSec = timesSec.slice(1)
   if (timesSec.length < 2) return false

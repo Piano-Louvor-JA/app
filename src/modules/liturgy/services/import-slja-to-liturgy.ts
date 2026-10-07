@@ -225,7 +225,7 @@ export async function importSljaAsLiturgyMusic(
 	let slideCount = 0;
 	for (const slide of slides) {
 		const text = slide.lyric.trim();
-		if (!text) continue;
+		// Empty lyrics were removed before any asynchronous import work.
 		const imageUrl = matchUploadedAsset(slide.image?.name, uploadedAssets)?.url ?? "";
 		const createdLyric = await createCustomLyric(musicId, {
 			lyric: text,
@@ -344,7 +344,7 @@ async function importSljaLocal({
 	try {
 		for (const slide of slides) {
 			const text = slide.lyric.trim();
-			if (!text) continue;
+			// Empty lyrics were removed before any asynchronous import work.
 			createLocalLyric(musicId, {
 				lyric: text,
 				aux_lyric: slide.auxiliaryLyric?.trim() || undefined,

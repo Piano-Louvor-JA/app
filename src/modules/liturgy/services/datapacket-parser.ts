@@ -28,8 +28,8 @@ export function parseDataPacket(xml: string): DataPacketRow[] {
 
 function unescapeXml(v: string): string {
   return v
-    .replaceAll('&amp;', '&')
     .replaceAll('&lt;', '<')
     .replaceAll('&gt;', '>')
     .replaceAll('&quot;', '"')
+    .replaceAll('&amp;', '&')
 }

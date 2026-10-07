@@ -183,3 +183,20 @@ describe('ramais defensivos (?? em parts e lyric null)', () => {
 function lyric2(order: number, text: string) {
   return { order, lyric: text, showSlide: true, time: '00:10', instrumentalTime: '00:05', imageUrl: null, imagePosition: null, isCover: false }
 }
+
+it('detects timed progress only with enough strictly increasing markers', async () => {
+  const { hasDistinctSlideTimes } = await import('../media-slides');
+  expect(hasDistinctSlideTimes([0, 1], true)).toBe(true);
+  expect(hasDistinctSlideTimes([0], true)).toBe(false);
+  expect(hasDistinctSlideTimes([0, 0, 5], true)).toBe(true);
+  expect(hasDistinctSlideTimes([0, 5, 5])).toBe(false);
+  expect(hasDistinctSlideTimes([0, undefined as never])).toBe(false);
+  expect(hasDistinctSlideTimes([undefined as never, 5])).toBe(true);
+});
+
+it('rejects invalid synthetic-cover lyric timings', async () => {
+  const { hasDistinctSlideTimes } = await import('../media-slides');
+  expect(hasDistinctSlideTimes([0, undefined as never], true)).toBe(false);
+  expect(hasDistinctSlideTimes([0, NaN], true)).toBe(false);
+  expect(hasDistinctSlideTimes([0, -1], true)).toBe(false);
+});

@@ -1048,3 +1048,8 @@ describe('gaps — normalizeTime/mapCustomLyrics via loadCustomMusicTrack', () =
     // (enrich já coberto por testes de pendentes)
   })
 })
+
+it('normalizes a zero duration string to an unknown duration', async () => {
+  routes = [{ match: () => true, body: { data: [{ id_music: 1, name: 'Untimed', duration: '00:00' }] } }];
+  expect((await listAllCustomMusics())[0].duration).toBeNull();
+});

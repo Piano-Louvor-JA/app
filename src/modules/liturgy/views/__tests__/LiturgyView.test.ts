@@ -105,7 +105,7 @@ vi.mock('../../components/LiturgyCustomDialog.vue', () => ({
   },
 }))
 vi.mock('../../components/LiturgyDayTabs.vue', () => ({ default: { template: '<div data-stub="day-tabs" />' } }))
-vi.mock('../../components/LiturgyItemDialog.vue', () => ({ default: { template: '<div data-stub="item-dialog" />' } }))
+vi.mock('../../components/LiturgyItemDialog.vue', () => ({ default: { name: 'SljaDialogStub', props: ['refreshImportedCatalog'], template: '<div data-stub="item-dialog" />' } }))
 vi.mock('../../components/LiturgySidebar.vue', () => ({ default: { template: '<div data-stub="sidebar" />' } }))
 vi.mock('../../components/LiturgyTimeline.vue', () => ({ default: { template: '<div data-stub="timeline" />' } }))
 
@@ -368,3 +368,11 @@ describe('LiturgyView', () => {
   })
 
 })
+it('refreshes the music catalog after SLJA import', async () => {
+  const wrapper = createWrapper();
+  const component = wrapper.findComponent({ name: 'SljaDialogStub' });
+  expect(component).toBeDefined();
+  await component.props('refreshImportedCatalog')();
+  expect(mockState.refreshMusicCatalog).toHaveBeenCalledOnce();
+  wrapper.unmount();
+});

@@ -2463,7 +2463,7 @@ var qrcode = function() {
 
 </script>
 <script>
-function dlog(m1,m2,m3){try{console.log('[P]',m1,m2!==undefined?String(m2):'',m3!==undefined?String(m3):'')}catch(e){}}
+function dlog(m1,m2,m3){try{const clean=value=>String(value===undefined?'':value).replace(/[\x00-\x1f\x7f]/g,' ');console.log('[P]',clean(m1),clean(m2),clean(m3))}catch(e){}}
 // window.onerror → visível no DevTools e reportado ao sender (debug remoto)
 window.onerror=function(msg,src,line,col){
   try{sendEvent({v:2,type:'error',code:'receiver_js',message:String(msg).slice(0,200),line:line,col:col})}catch(e){}
@@ -2489,11 +2489,46 @@ let ws,tries=0;
 let unlocked=true;
 let bgPalco='';  // BG personalizado do palco (idle) — persiste entre músicas
 
+// Received projection text is untrusted HTML. Rebuild only basic formatting;
+// never copy attributes, executable elements, links, or resource URLs.
+function renderProjectionText(target, value){
+  const parsed=new DOMParser().parseFromString(String(value||''),'text/html');
+  const allowed=new Set(['BR','B','STRONG','I','EM','U','S','SPAN','P','DIV','SMALL']);
+  const blocked=new Set(['SCRIPT','STYLE','IFRAME','OBJECT','EMBED','SVG','MATH','TEMPLATE']);
+  function copy(source,parent){
+    if(source.nodeType===3){parent.appendChild(document.createTextNode(source.nodeValue||''));return}
+    if(source.nodeType!==1||blocked.has(source.tagName))return;
+    let destination=parent;
+    if(allowed.has(source.tagName)){
+      destination=document.createElement(source.tagName.toLowerCase());
+      // CSSOM accepts color values, not executable HTML or URL attributes.
+      destination.style.color=source.style.color;
+      destination.style.backgroundColor=source.style.backgroundColor;
+      const weight=source.style.fontWeight;
+      if(/^(normal|bold|bolder|lighter|[1-9]00)$/.test(weight))destination.style.fontWeight=weight;
+      if(['normal','italic','oblique'].includes(source.style.fontStyle))destination.style.fontStyle=source.style.fontStyle;
+      if(['none','underline','line-through'].includes(source.style.textDecorationLine))destination.style.textDecorationLine=source.style.textDecorationLine;
+      if(['left','center','right','justify'].includes(source.style.textAlign))destination.style.textAlign=source.style.textAlign;
+      parent.appendChild(destination);
+    }
+    for(const child of Array.from(source.childNodes))copy(child,destination);
+  }
+  while(target.firstChild)target.removeChild(target.firstChild);
+  for(const child of Array.from(parsed.body.childNodes))copy(child,target);
+}
+
 function proxyUrl(original){
   if(!original)return original;
   // Sender/popup legado pode mandar barra codificada (%2F) — decodifica
   // caminho antes de qualquer comparação/use (404 silencioso caso contrário).
-  try{ original=decodeURIComponent(original) }catch(e){}
+  try{ original=decodeURIComponent(String(original)) }catch(e){original=String(original)}
+  // Media may be remote, local or an offline data/blob resource, never code.
+  try{
+    const parsed=new URL(original,location.href);
+    if(!['http:','https:','blob:','file:','data:'].includes(parsed.protocol))return '';
+    if(parsed.protocol==='file:'&&location.protocol!=='file:')return '';
+    if(parsed.protocol==='data:'&&!/^data:(image|audio|video)\/[a-z0-9.+-]+;base64,/i.test(original))return '';
+  }catch(e){return ''}
   // WT-5f cloud: no modo relay a TV carrega DIRETO da rede do operador web
   // (a URL vem absoluta, ex. http://192.168.x.x:5173/...). O proxy :7080 é
   // do sender APK — se não está rodando, 502 e bg nunca carrega.
@@ -2657,7 +2692,19 @@ var PALCO_API_WS_DEFAULT='wss://api.louvorja.com.br/v1/palco';
 // alcançável pelasessão de dev — aponta pro piano-api local. Em produção
 // (IPK instalado) mantém a API oficial.
 var PALCO_API_WS_DEV='ws://localhost:3100/v1/palco';
-var cloudApi=(qs.get('api')||((location.protocol==='file:'||/^(localhost|127\.)/.test(location.hostname))&&(location.protocol==='file:'||location.port==='5173'||location.port==='3100')?PALCO_API_WS_DEV:PALCO_API_WS_DEFAULT)).replace(/\/$/,'');
+function trustedCloudApi(value){
+  try{
+    const url=new URL(String(value));
+    if(url.username||url.password||url.search||url.hash)return null;
+    const local=url.hostname==='localhost';
+    if(!local&&url.hostname!=='api.louvorja.com.br'&&url.hostname!=='api-stg.louvorja.com.br')return null;
+    if(local){if(url.protocol!=='ws:'&&url.protocol!=='wss:')return null}
+    else if(url.protocol!=='wss:'||(url.port&&url.port!=='443'))return null;
+    if(url.pathname.replace(/\/$/,'')!=='/v1/palco')return null;
+    return url.origin+'/v1/palco';
+  }catch(e){return null}
+}
+var cloudApi=trustedCloudApi(qs.get('api'))||((location.protocol==='file:'||/^(localhost|127\.)/.test(location.hostname))&&(location.protocol==='file:'||location.port==='5173'||location.port==='3100')?PALCO_API_WS_DEV:PALCO_API_WS_DEFAULT);
 var cloudCode='';
 var cloudMode=false;
 var cloudTimer=null;
@@ -3048,7 +3095,7 @@ function handle(m){
       // Slide/PDF/PPT (text vazio) é mídia visual pura: sem véu de leitura,
       // preserva a tonalidade original do canvas do operador.
       $('veil').style.display=m.text?'':'none';
-      $('text').innerHTML=m.text||'';
+      renderProjectionText($('text'),m.text);
       $('text').classList.toggle('cover-on',m.isCover===true);
       // F3.3o: fontSize/fontWeight dinâmicos (settings do operador).
       {const t=$('text');
@@ -3145,8 +3192,14 @@ function handle(m){
         f.style.top='auto';
         f.style.bottom=(m.footerRef?'8vh':'4vh');
         if(m.footerRef){
-          f.innerHTML=`<span class="ref" style="--ref-color:${m.footerColor||'#FCCE02'};--ref-weight:${m.footerWeight||600}">${m.footerRef}</span>`+
-            (m.footerVersion?`<span class="ver">${m.footerVersion}</span>`:'');
+          f.textContent='';
+          const ref=document.createElement('span');ref.className='ref';ref.textContent=String(m.footerRef);
+          const color=document.createElement('span');color.style.color=String(m.footerColor||'#FCCE02');
+          ref.style.setProperty('--ref-color',color.style.color||'#FCCE02');
+          const weight=Number(m.footerWeight);
+          ref.style.setProperty('--ref-weight',String(Number.isFinite(weight)&&weight>=100&&weight<=900?weight:600));
+          f.appendChild(ref);
+          if(m.footerVersion){const version=document.createElement('span');version.className='ver';version.textContent=String(m.footerVersion);f.appendChild(version)}
         }else{
           f.textContent=m.footer||'';
         }
@@ -3307,7 +3360,8 @@ function handle(m){
         return hh>0?`${hh}:${mm}:${ss}`:`${mm}:${ss}`};
       const render=()=>{
         const val=mode==='chrono'?elapsed:rem;
-        t.innerHTML=fmt(val)+(m.label?`<small>${m.label}</small>`:'');
+        t.textContent=fmt(val);
+        if(m.label){const label=document.createElement('small');label.textContent=String(m.label);t.appendChild(label)}
       };
       render();
       t._iv=setInterval(()=>{rem-=1000;elapsed+=1000;render();
