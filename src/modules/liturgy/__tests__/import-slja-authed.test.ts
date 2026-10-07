@@ -333,7 +333,23 @@ describe("import .slja LOGADO → API custom (app#331)", () => {
    } finally { timeout.mockRestore(); }
  });
 
- it("persiste estimativa de duração na música remota em segundos", async () => {
+ it("preserva a posição da imagem do slide importada do .slja", async () => {
+   authSessionMock.mockReturnValue({ token: "tok", user: { id_user: 1 } });
+   fetchMock.mockClear();
+   routeFetch(7, 0);
+   const archive: SljaArchive = { title: "Posição", assets: [], slides: [
+     { lyric: "Slide com posição", type: "LETRA", order: 1, timeMs: 0, imagePosition: 2 },
+     { lyric: "Slide default", type: "LETRA", order: 2, timeMs: 5000 },
+   ] };
+   await importSljaAsLiturgyMusic({ bytes: await buildSlja(archive), name: "posicao.slja" });
+   const lyricCalls = fetchMock.mock.calls.filter(([url, init]) => String(url).endsWith("/lyrics") && init?.method === "POST");
+   expect(lyricCalls.length).toBe(2);
+   const bodies = lyricCalls.map(([, init]) => JSON.parse(String(init?.body)));
+   expect(bodies[0].image_position).toBe(2);
+   expect(bodies[1].image_position).toBeUndefined();
+ });
+
+it("persiste estimativa de duração na música remota em segundos", async () => {
    authSessionMock.mockReturnValue({ token: "tok", user: { id_user: 1 } });
    fetchMock.mockClear();
    routeFetch(7, 0);

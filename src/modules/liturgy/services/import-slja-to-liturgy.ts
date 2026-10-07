@@ -232,6 +232,7 @@ export async function importSljaAsLiturgyMusic(
 			aux_lyric: slide.auxiliaryLyric?.trim() || undefined,
 			time: formatSljaMsAsTime(slide.timeMs),
 			id_file_image: imageIdByUrl.get(imageUrl),
+			image_position: slide.imagePosition ?? undefined,
 		});
 		if (createdLyric) slideCount += 1;
 	}

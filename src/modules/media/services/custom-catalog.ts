@@ -791,6 +791,7 @@ export async function createCustomLyric(
     time?: string
     order?: number
     id_file_image?: number
+    image_position?: string | number
   },
 ): Promise<{ id: number } | null> {
   if (isLocalId(musicId)) {
