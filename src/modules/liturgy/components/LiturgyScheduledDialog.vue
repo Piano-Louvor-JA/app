@@ -117,9 +117,19 @@ const dateFmt = (iso: string) => {
         class="liturgy-dialog scheduled-dialog"
         elevated
       >
-        <h2 class="liturgy-dialog__title">
-          {{ t('liturgy.messages.scheduledTitle') }}
-        </h2>
+        <div class="scheduled-dialog__header">
+          <h2 class="liturgy-dialog__title">
+            {{ t('liturgy.messages.scheduledTitle') }}
+          </h2>
+          <button
+            type="button"
+            class="scheduled-dialog__close"
+            :aria-label="t('common.close')"
+            @click="emit('close')"
+          >
+            ×
+          </button>
+        </div>
         <p class="liturgy-dialog__hint">
           {{ t('liturgy.messages.scheduledHint') }}
         </p>
@@ -408,41 +418,70 @@ const dateFmt = (iso: string) => {
   backdrop-filter: blur(6px);
 }
 
-.scheduled-dialog {
-  width: min(860px, 92vw);
-  max-height: 86vh;
+/* Cabeçalho do dialog: título + fechar, sem hint solto ocupando linha */
+.scheduled-dialog__header {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
 }
 
+.scheduled-dialog__header .liturgy-dialog__title {
+  margin: 0;
+}
+
+.scheduled-dialog__close {
+  min-width: 2.25rem;
+  min-height: 2.25rem;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ds-color-on-surface) 10%, transparent);
+  color: var(--ds-color-on-surface);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.scheduled-dialog__close:hover {
+  background: color-mix(in srgb, var(--ds-color-on-surface) 18%, transparent);
+}
+
+/* Tabs pill no estilo do design system (não botões quadrados cinza) */
 .scheduled-dialog__tabs {
-  display: flex;
-  gap: 4px;
-  margin: 12px 0;
+  display: inline-flex;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0.25rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ds-color-on-surface) 8%, transparent);
+  width: fit-content;
 }
 
 .scheduled-dialog__tab {
-  border: 1px solid transparent;
+  border: 0;
   background: transparent;
-  color: inherit;
+  color: var(--ds-color-on-surface);
   opacity: 0.65;
-  padding: 6px 14px;
-  border-radius: 8px;
+  padding: 0.45rem 1rem;
+  border-radius: 999px;
   cursor: pointer;
   font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
 }
 
 .scheduled-dialog__tab.is-active {
   opacity: 1;
-  border-color: var(--ds-border, rgba(128, 128, 128, 0.35));
-  background: rgba(128, 128, 128, 0.12);
+  background: var(--ds-color-primary);
+  color: var(--ds-color-on-primary, #003258);
 }
 
+/* Painel: laterais com superfície sutil, sem "gaiola" de bordas duras */
 .scheduled-dialog__panes {
   display: flex;
-  gap: 14px;
+  gap: 0.9rem;
   min-height: 320px;
-  max-height: 54vh;
+  max-height: 56vh;
 }
 
 .scheduled-dialog__left {
@@ -450,7 +489,10 @@ const dateFmt = (iso: string) => {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 0.65rem;
+  padding: 0.75rem;
+  border-radius: var(--ds-radius-md, 0.75rem 0 0.75rem 0);
+  background: color-mix(in srgb, var(--ds-color-surface, #fff) 45%, transparent);
 }
 
 .scheduled-dialog__rots {
@@ -461,25 +503,27 @@ const dateFmt = (iso: string) => {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 0.25rem;
 }
 
 .scheduled-dialog__rot {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 7px 10px;
-  border-radius: 8px;
+  gap: 0.4rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 999px;
   cursor: pointer;
-  font-size: 0.92em;
+  font-size: 0.9em;
 }
 
 .scheduled-dialog__rot:hover {
-  background: rgba(128, 128, 128, 0.14);
+  background: color-mix(in srgb, var(--ds-color-on-surface) 10%, transparent);
 }
 
 .scheduled-dialog__rot.is-active {
-  background: rgba(128, 128, 128, 0.22);
+  background: color-mix(in srgb, var(--ds-color-primary) 30%, transparent);
+  font-weight: 700;
 }
 
 .scheduled-dialog__rot-del {
@@ -490,40 +534,55 @@ const dateFmt = (iso: string) => {
   cursor: pointer;
   font-size: 1em;
   line-height: 1;
-  padding: 2px 4px;
+  padding: 2px 5px;
+  border-radius: 999px;
 }
 
 .scheduled-dialog__rot-del:hover {
   opacity: 1;
   color: #ff6b6b;
+  background: color-mix(in srgb, #ff6b6b 18%, transparent);
 }
 
 .scheduled-dialog__new-rot {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0.4rem;
 }
 
 .scheduled-dialog__input {
   width: 100%;
-  border: 1px solid var(--ds-border, rgba(128, 128, 128, 0.35));
-  background: transparent;
-  color: inherit;
-  border-radius: 8px;
-  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, var(--ds-color-on-surface) 12%, transparent);
+  background: color-mix(in srgb, var(--ds-color-surface, #fff) 55%, transparent);
+  color: var(--ds-color-on-surface);
+  border-radius: 999px;
+  padding: 0.55rem 0.9rem;
   font: inherit;
-  font-size: 0.9em;
+  font-size: 0.875rem;
+  color-scheme: dark;
 }
 
+.scheduled-dialog__input:focus {
+  outline: 2px solid color-mix(in srgb, var(--ds-color-primary) 55%, transparent);
+  outline-offset: 1px;
+}
+
+/* Botões pill iguais aos demais dialogs */
 .scheduled-dialog__btn {
-  border: 1px solid var(--ds-border, rgba(128, 128, 128, 0.35));
-  background: transparent;
-  color: inherit;
-  border-radius: 8px;
-  padding: 7px 12px;
+  border: 0;
+  background: var(--ds-color-primary);
+  color: var(--ds-color-on-primary, #003258);
+  border-radius: 999px;
+  padding: 0.5rem 1.05rem;
   cursor: pointer;
   font: inherit;
-  font-size: 0.9em;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  min-height: 2.25rem;
+}
+
+.scheduled-dialog__btn:hover {
+  filter: brightness(1.08);
 }
 
 .scheduled-dialog__btn:disabled {
@@ -532,30 +591,140 @@ const dateFmt = (iso: string) => {
 }
 
 .scheduled-dialog__btn--ghost {
-  border-color: transparent;
-  opacity: 0.75;
+  background: transparent;
+  color: var(--ds-color-on-surface);
+  border: 1px solid color-mix(in srgb, var(--ds-color-on-surface) 18%, transparent);
 }
 
+/* Grade do culto à direita: linhas com separador suave, datas tabulares */
 .scheduled-dialog__right {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0.55rem;
 }
 
 .scheduled-dialog__right-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 0.5rem;
+}
+
+.scheduled-dialog__right-head strong {
+  font-size: 1rem;
 }
 
 .scheduled-dialog__quick-add {
   display: grid;
-  grid-template-columns: 132px 120px 1fr auto auto;
-  gap: 6px;
+  grid-template-columns: 140px 110px 1fr auto auto;
+  gap: 0.4rem;
   align-items: center;
+  padding: 0.6rem;
+  border-radius: var(--ds-radius-md, 0.75rem 0 0.75rem 0);
+  background: color-mix(in srgb, var(--ds-color-surface, #fff) 40%, transparent);
+}
+
+.scheduled-dialog__entries {
+  flex: 1;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.scheduled-dialog__entry {
+  display: grid;
+  grid-template-columns: 96px 1fr auto auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 0.6rem;
+  font-size: 0.9em;
+}
+
+.scheduled-dialog__entry + .scheduled-dialog__entry {
+  border-top: 1px solid color-mix(in srgb, var(--ds-color-on-surface) 7%, transparent);
+}
+
+.scheduled-dialog__entry:hover {
+  background: color-mix(in srgb, var(--ds-color-on-surface) 7%, transparent);
+}
+
+.scheduled-dialog__entry-date {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+
+.scheduled-dialog__entry-kind {
+  opacity: 0.55;
+  font-size: 0.82em;
+}
+
+.scheduled-dialog__empty {
+  opacity: 0.55;
+  padding: 1.5rem 0.75rem;
+  text-align: center;
+}
+
+.scheduled-dialog__empty--pad {
+  padding: 3rem 0.75rem;
+}
+
+/* Aba colar: textarea com superfície própria, ações à direita */
+.scheduled-dialog__paste {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.scheduled-dialog__textarea {
+  width: 100%;
+  border: 1px solid color-mix(in srgb, var(--ds-color-on-surface) 12%, transparent);
+  background: color-mix(in srgb, var(--ds-color-surface, #fff) 55%, transparent);
+  color: var(--ds-color-on-surface);
+  border-radius: var(--ds-radius-md, 0.75rem 0 0.75rem 0);
+  padding: 0.75rem 0.9rem;
+  font: ui-monospace, monospace;
+  font-size: 0.85em;
+  resize: vertical;
+  color-scheme: dark;
+}
+
+.scheduled-dialog__paste-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.scheduled-dialog__unmapped {
+  border: 1px dashed color-mix(in srgb, var(--ds-color-on-surface) 25%, transparent);
+  border-radius: var(--ds-radius-md, 0.75rem 0 0.75rem 0);
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.scheduled-dialog__unmapped-hint {
+  margin: 0;
+  font-size: 0.85em;
+  opacity: 0.8;
+}
+
+.scheduled-dialog__slot-row {
+  display: grid;
+  grid-template-columns: 130px 1fr auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.scheduled-dialog__report {
+  margin: 0;
+  font-size: 0.85em;
+  opacity: 0.8;
 }
 
 .scheduled-dialog__advanced {
@@ -570,101 +739,5 @@ const dateFmt = (iso: string) => {
 
 .scheduled-dialog__advanced .scheduled-dialog__btn {
   margin-top: 6px;
-}
-
-.scheduled-dialog__entries {
-  flex: 1;
-  overflow-y: auto;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.scheduled-dialog__entry {
-  display: grid;
-  grid-template-columns: 92px 1fr auto auto;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  border-radius: 8px;
-  font-size: 0.9em;
-}
-
-.scheduled-dialog__entry:hover {
-  background: rgba(128, 128, 128, 0.1);
-}
-
-.scheduled-dialog__entry-date {
-  font-variant-numeric: tabular-nums;
-  opacity: 0.75;
-}
-
-.scheduled-dialog__entry-kind {
-  opacity: 0.55;
-  font-size: 0.85em;
-}
-
-.scheduled-dialog__empty {
-  opacity: 0.55;
-  padding: 10px;
-  text-align: center;
-}
-
-.scheduled-dialog__empty--pad {
-  padding: 40px 10px;
-}
-
-.scheduled-dialog__paste {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.scheduled-dialog__textarea {
-  width: 100%;
-  border: 1px solid var(--ds-border, rgba(128, 128, 128, 0.35));
-  background: transparent;
-  color: inherit;
-  border-radius: 8px;
-  padding: 10px;
-  font: ui-monospace, monospace;
-  font-size: 0.85em;
-  resize: vertical;
-}
-
-.scheduled-dialog__paste-actions {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.scheduled-dialog__unmapped {
-  border: 1px dashed var(--ds-border, rgba(128, 128, 128, 0.4));
-  border-radius: 10px;
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.scheduled-dialog__unmapped-hint {
-  margin: 0;
-  font-size: 0.88em;
-  opacity: 0.8;
-}
-
-.scheduled-dialog__slot-row {
-  display: grid;
-  grid-template-columns: 130px 1fr auto;
-  gap: 8px;
-  align-items: center;
-}
-
-.scheduled-dialog__report {
-  margin: 0;
-  font-size: 0.88em;
-  opacity: 0.8;
 }
 </style>
