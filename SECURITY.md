@@ -1,44 +1,43 @@
 # Security Policy
 
-## Versões Suportadas
+## Versões suportadas
 
-| Versão | Suportada          |
-|--------|--------------------|
-| 1.x    | :white_check_mark: |
+| Versão | Suportada |
+|--------|-----------|
+| 1.x    | sim       |
 
-## Reportando uma Vulnerabilidade
+## Reportando uma vulnerabilidade
 
-Se você descobrir uma vulnerabilidade de segurança, **NÃO** abra uma issue pública.
+Se você descobrir uma vulnerabilidade, não abra uma issue pública.
 
-Reporte privativamente para rafael.zendron22@gmail.com com:
+Reporte em privado para rafael.zendron22@gmail.com com:
 
-1. Descrição da vulnerabilidade
+1. Descrição
 2. Passos para reproduzir
 3. Impacto possível
-4. Sugestão de correção (se houver)
+4. Sugestão de correção, se houver
 
-### Tempo de Resposta
+### Tempo de resposta
 
 - Confirmação de recebimento: até 48h
 - Avaliação inicial: até 7 dias
-- Correção ou mitigação: depende da severidade (Crítico: 7 dias, Alto: 30 dias, Médio: 90 dias)
+- Correção ou mitigação: depende da severidade (crítico: 7 dias, alto: 30 dias, médio: 90 dias)
 
 ### Escopo
 
-- Vulnerabilidades no código da API
-- Problemas de autenticação/autorização
-- Exposição de dados sensíveis
-- Injeção de SQL ou outros ataques no banco
+Este repositório é o aplicativo desktop Electron.
 
-### Fora de Escopo
+- Ponte preload/IPC (`contextBridge`) entre a interface e o processo principal
+- Atualização automática (`electron-updater`) e artefatos de release
+- Arquivos locais do workspace e da mídia
+- Servidores locais de controle remoto e do palco
 
-- Vulnerabilidades em dependências de terceiros sem PoC no nosso código
-- Ataques de força bruta ou DoS sem bypass de rate limiting
-- Reports de scanners automatizados sem análise manual
+### Fora de escopo
 
-## Práticas de Segurança
+- Vulnerabilidades em dependências de terceiros sem demonstração neste app
+- Relatórios de scanner sem análise manual
 
-- Nunca commite secrets, tokens ou credenciais
-- Use variáveis de ambiente para configuração sensível
-- Valide sempre input do usuário com Zod schemas
-- Parâmetros de query com parametrização (better-sqlite3 previne SQL injection)
+## Práticas
+
+- Não commitar secrets, tokens ou credenciais
+- Usar variáveis de ambiente para configuração sensível
