@@ -52,6 +52,7 @@ import {
 import {
   buildMediaSlides,
   buildSlideTimesSec,
+  hasDistinctSlideTimes,
   lyricPreviewSnippet,
   resolveSlideIndexForTime,
   stripHtmlBreaks,
@@ -339,6 +340,9 @@ export const useMediaStore = defineStore('media', () => {
    */
   async function ensureTrackDownloaded(musicId: number): Promise<boolean> {
     if (!isDesktopApp()) return true // web: sempre stream remoto
+    // Música local (id negativo): o áudio já está no data: URL. O download
+    // oficial consultaria `music_-N` no catálogo remoto antes de tocar.
+    if (musicId < 0) return true
     try {
       if (await isTrackMediaDownloaded(musicId)) return true
     } catch {
@@ -405,7 +409,7 @@ export const useMediaStore = defineStore('media', () => {
       onTimeUpdate: () => {
         currentTimeSec.value = audio.currentTime
         const times = session.value?.slideTimesSec ?? []
-        if (times.length > 0 && hasAudio.value) {
+        if (times.length > 0 && hasAudio.value && hasDistinctSlideTimes(times, session.value?.slides[0]?.isCover === true)) {
           const nextIndex = resolveSlideIndexForTime(times, audio.currentTime)
           if (nextIndex !== slideIndex.value) {
             slideIndex.value = nextIndex
@@ -465,7 +469,9 @@ export const useMediaStore = defineStore('media', () => {
 
   async function open(params: MediaOpenParams): Promise<MediaOpenResult> {
     const musicId = params.musicId
-    if (!Number.isFinite(musicId) || musicId <= 0) {
+    // app#331: negativo = música LOCAL (import .slja sem login) — válido.
+    // Só 0/NaN (sem música) continua fora.
+    if (!Number.isFinite(musicId) || musicId === 0) {
       return { ok: false, messageKey: 'media.messages.trackMissing' }
     }
 
@@ -515,9 +521,13 @@ export const useMediaStore = defineStore('media', () => {
     lastErrorKey.value = null
 
     // Dispatcher custom vs oficial (mesmo contrato do web): id >= 1M é
-    // música custom de Minhas Coletâneas.
-    const track = isCustomMusicId(musicId)
-      ? await loadCustomMusicTrack(fromCustomMusicId(musicId))
+    // música custom de Minhas Coletâneas. app#331: negativo é música LOCAL
+    // (import .slja sem login) — vai pro MESMO loader custom, que lê o
+    // localStorage (isLocalId) e monta data: URL do áudio.
+    const track = isCustomMusicId(musicId) || musicId < 0
+      ? await loadCustomMusicTrack(
+          musicId < 0 ? musicId : fromCustomMusicId(musicId),
+        )
       : await loadMediaTrack(musicId)
     if (!track) {
       status.value = 'error'
@@ -735,7 +745,7 @@ export const useMediaStore = defineStore('media', () => {
     slideIndex.value = next
 
     const times = session.value?.slideTimesSec ?? []
-    if (hasAudio.value && times.length > next) {
+    if (hasAudio.value && times.length > next && hasDistinctSlideTimes(times, slides[0]?.isCover === true)) {
       seekTo(times[next] ?? 0)
     }
 
@@ -881,9 +891,12 @@ export const useMediaStore = defineStore('media', () => {
     status.value = 'loading'
     lastErrorKey.value = null
 
-    const track = isCustomMusicId(current.musicId)
-      ? await loadCustomMusicTrack(fromCustomMusicId(current.musicId))
-      : await loadMediaTrack(current.musicId)
+    const musicId = current.musicId
+    const track = isCustomMusicId(musicId) || musicId < 0
+      ? await loadCustomMusicTrack(
+          musicId < 0 ? musicId : fromCustomMusicId(musicId),
+        )
+      : await loadMediaTrack(musicId)
     if (!track) {
       status.value = 'error'
       lastErrorKey.value = 'media.messages.trackMissing'
@@ -1034,7 +1047,9 @@ export const useMediaStore = defineStore('media', () => {
       )
       audio.currentTime = clamped
       currentTimeSec.value = clamped
-      slideIndex.value = resolveSlideIndexForTime(slideTimesSec, clamped)
+      slideIndex.value = hasDistinctSlideTimes(slideTimesSec, current.slides[0]?.isCover === true)
+        ? resolveSlideIndexForTime(slideTimesSec, clamped)
+        : savedSlide
 
       if (wasPlaying) {
         const played = await fadeInMediaAudio(audio, volume.value)

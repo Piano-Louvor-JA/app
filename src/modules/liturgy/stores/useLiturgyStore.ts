@@ -1201,6 +1201,14 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     closeCloneDialog()
   }
 
+  /**
+   * app#331: recarrega SÓ o catálogo de músicas (pós-import .slja) —
+   * sem hydrate completo, a música nova aparece na busca do dialog.
+   */
+  async function refreshMusicCatalog() {
+    musicList.value = await loadLiturgyMusicOptions()
+  }
+
   function onMusicPick(musicId: number) {
     const music = musicList.value.find((entry) => entry.id === musicId)
     if (!music) {
@@ -1339,6 +1347,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     closeCloneDialog,
     cloneLiturgyFromSelected,
     onMusicPick,
+    refreshMusicCatalog,
     clearMusicPick,
     onBookPick,
     clearActionMessage,
