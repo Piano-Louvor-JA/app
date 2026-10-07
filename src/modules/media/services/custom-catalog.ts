@@ -421,11 +421,18 @@ export async function copyCustomMusic(
 }
 
 /** Todas as músicas custom (qualquer coletânea) — p/ reutilizar no editor. */
-export async function listAllCustomMusics(): Promise<
+export async function listAllCustomMusics(options?: {
+  timeoutMs?: number
+}): Promise<
   Array<CustomMusicSummary & { collectionName?: string; collectionId?: number }>
 > {
   try {
-    const response = await fetch(`${customBaseUrl()}/musics`)
+    const response = await fetch(`${customBaseUrl()}/musics`, {
+      signal:
+        options?.timeoutMs != null
+          ? AbortSignal.timeout(options.timeoutMs)
+          : undefined,
+    })
     if (!response.ok) return []
     const json = (await response.json()) as {
       data?: Array<{

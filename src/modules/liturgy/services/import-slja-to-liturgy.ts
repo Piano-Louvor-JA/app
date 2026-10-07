@@ -18,6 +18,7 @@ import {
 	createCustomCollection,
 	createCustomLyric,
 	createCustomMusic,
+	deleteCustomMusic,
 	listCustomCollections,
 	toCustomMusicId,
 	updateCustomMusic,
@@ -210,6 +211,12 @@ export async function importSljaAsLiturgyMusic(
 			id_file_image: imageIdByUrl.get(imageUrl),
 		});
 		if (createdLyric) slideCount += 1;
+	}
+	// Upload de mídia pode falhar e o import segue só com texto. Estrofe
+	// incompleta não: a projeção ficaria truncada e o dialog trataria como sucesso.
+	if (slideCount < slides.length) {
+		await deleteCustomMusic(musicId);
+		throw new Error("SLJA_IMPORT_LYRICS_INCOMPLETE");
 	}
 
 	return {

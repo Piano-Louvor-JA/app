@@ -308,7 +308,9 @@ async function mergeOperatorMusicOptions(
     collectionName?: string
   }> = []
   try {
-    customs = await listAllCustomMusics()
+    // Catálogo remoto é opcional. Sem timeout, um host mudo segura o hydrate
+    // da liturgia mesmo com hinário e imports locais já disponíveis.
+    customs = await listAllCustomMusics({ timeoutMs: 4_000 })
   } catch {
     // offline/sem API: customs simplesmente não aparecem nesta carga
   }

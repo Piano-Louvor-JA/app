@@ -154,4 +154,47 @@ describe("import .slja LOGADO → API custom (app#331)", () => {
 		expect(imported.hasAudio).toBe(false);
 		expect(imported.slides).toBe(1);
 	});
+
+	it("estrofe rejeitada desfaz a música e não reporta sucesso", async () => {
+		fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+			const u = String(url);
+			const json = (body: unknown, status = 200) =>
+				new Response(JSON.stringify(body), { status });
+			if (u.endsWith("/collections") && init?.method === "POST") {
+				return json({ id_collection: 55 });
+			}
+			if (u.includes("/collections/55/musics") && init?.method === "POST") {
+				return json({ id_music: 7 });
+			}
+			if (u.endsWith("/files") && init?.method === "POST") {
+				return json({ id_file: 1, url: "/custom/f1.mp3" });
+			}
+			if (u.endsWith("/musics/7") && init?.method === "PUT") return json({});
+			if (u.endsWith("/musics/7/lyrics") && init?.method === "POST") {
+				return json({ message: "fail" }, 500);
+			}
+			if (u.endsWith("/musics/7") && init?.method === "DELETE") return json({});
+			return json({ message: "nf" }, 404);
+		});
+
+		const archive: SljaArchive = {
+			title: "Letra Quebrada",
+			audio: { name: "a.mp3", bytes: new Uint8Array([1]) },
+			assets: [],
+			slides: [{ lyric: "Verso", type: "LETRA", timeMs: 1_000, order: 1 }],
+		};
+		await expect(
+			importSljaAsLiturgyMusic({
+				bytes: await buildSlja(archive),
+				name: "quebrada.slja",
+			}),
+		).rejects.toThrow("SLJA_IMPORT_LYRICS_INCOMPLETE");
+		expect(
+			fetchMock.mock.calls.some(
+				(call) =>
+					String(call[0]).endsWith("/musics/7") &&
+					(call[1] as RequestInit | undefined)?.method === "DELETE",
+			),
+		).toBe(true);
+	});
 });
