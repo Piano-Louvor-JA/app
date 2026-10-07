@@ -16,6 +16,7 @@ npm run type-check
 npm test
 npm run test:regression
 npm run build
+npx playwright install --with-deps chromium
 npx playwright test
 ```
 
