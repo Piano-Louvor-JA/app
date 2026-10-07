@@ -14,6 +14,7 @@ import {
   getTypeDotColor,
   LITURGY_WEEKDAYS,
   type CustomLiturgy,
+  type LiturgyDayKey,
   type LiturgyItem,
   type LiturgyPersistedState,
   type LiturgySessionTimes,
@@ -22,6 +23,7 @@ import {
   type WeekdayNotes,
   type WeekdaySessionTimes,
 } from '../types/liturgy'
+import { todayISO } from './liturgy-actions'
 import { normalizeLiturgyTimeHHmm } from './liturgy-format'
 import {
   clearDoneFlags,
@@ -236,4 +238,21 @@ export function saveLiturgyState(state: LiturgyPersistedState): void {
 
 export function todayWeekday(): LiturgyWeekday {
   return LITURGY_WEEKDAYS[new Date().getDay()] ?? 'sunday'
+}
+
+/**
+ * Data (ISO local) do culto para um dia de liturgia: o dia escolhido DENTRO da
+ * semana corrente (modelo do trimestre — Rafael). Avulsa (`custom`) = hoje.
+ * Fuso local sempre: a data do culto nunca é UTC.
+ */
+export function activeDateISO(day: LiturgyDayKey): string {
+  if (day === 'custom') return todayISO()
+  const targetIndex = LITURGY_WEEKDAYS.indexOf(day as LiturgyWeekday)
+  const today = new Date()
+  const diff = targetIndex - today.getDay()
+  const target = new Date(today)
+  target.setDate(today.getDate() + diff)
+  const mm = String(target.getMonth() + 1).padStart(2, '0')
+  const dd = String(target.getDate()).padStart(2, '0')
+  return `${target.getFullYear()}-${mm}-${dd}`
 }

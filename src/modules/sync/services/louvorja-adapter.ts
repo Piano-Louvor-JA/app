@@ -18,6 +18,10 @@ import {
 	type LiturgyPersistedState,
 	type LiturgyWeekday,
 } from "@modules/liturgy/types/liturgy";
+import type {
+	ScheduledCategory,
+	ScheduledItem,
+} from "@modules/liturgy/stores/useScheduledStore";
 import { USER_PREFERENCE_KEYS } from "@shared/constants/storage-keys";
 import {
 	getUserPreference,
@@ -36,6 +40,47 @@ export type LouvorjaImportResult = {
 	applied: string[];
 	skipped: string[];
 };
+
+type ScheduledState = {
+	categories: ScheduledCategory[];
+	items: ScheduledItem[];
+};
+
+function isScheduledState(data: Record<string, unknown>): data is ScheduledState {
+	if (!Array.isArray(data.categories) || !Array.isArray(data.items)) return false;
+	const categories = data.categories.filter(
+		(value): value is ScheduledCategory =>
+			value != null &&
+			typeof value === "object" &&
+			typeof (value as Record<string, unknown>).id === "string" &&
+			typeof (value as Record<string, unknown>).name === "string",
+	);
+	const categoryIds = new Set(categories.map((category) => category.id));
+	const items = data.items.filter(
+		(value): value is ScheduledItem => {
+			if (value == null || typeof value !== "object") return false;
+			const item = value as Record<string, unknown>;
+			if (
+				typeof item.id !== "string" ||
+				typeof item.categoryId !== "string" ||
+				!categoryIds.has(item.categoryId) ||
+				!/^\d{4}-\d{2}-\d{2}$/.test(String(item.date)) ||
+				typeof item.name !== "string" ||
+				typeof item.filePath !== "string" ||
+				typeof item.isRelativePath !== "boolean" ||
+				typeof item.notes !== "string"
+			) return false;
+			if (item.content == null) return true;
+			if (typeof item.content !== "object") return false;
+			return ["music", "file", "verse", "annotation", "online_video"].includes(
+				String((item.content as Record<string, unknown>).kind),
+			);
+		},
+	);
+	(data as ScheduledState).categories = categories;
+	(data as ScheduledState).items = items;
+	return true;
+}
 
 export function exportLouvorjaFromBrowser(
 	appVersion: string,
@@ -63,6 +108,18 @@ export function exportLouvorjaFromBrowser(
 				data: days,
 			};
 		}
+	}
+
+	const scheduled = getUserPreference<ScheduledState>(
+		USER_PREFERENCE_KEYS.scheduledState,
+		null,
+	);
+	if (scheduled != null && (scheduled.categories.length > 0 || scheduled.items.length > 0)) {
+		entities.scheduled = {
+			type: "scheduled",
+			modified: readModified("scheduled"),
+			data: scheduled,
+		};
 	}
 
 	return {
@@ -123,8 +180,25 @@ export function importLouvorjaIntoBrowser(
 					skipped.push("liturgy");
 				}
 				break;
-			}
-			default:
+				}
+				case "scheduled": {
+				if (toEpoch(entity.modified) <= toEpoch(readModified("scheduled"))) {
+					skipped.push("scheduled");
+					break;
+				}
+				if (!isScheduledState(entity.data)) {
+					skipped.push("scheduled");
+					break;
+				}
+				setUserPreference(USER_PREFERENCE_KEYS.scheduledState, entity.data);
+				localStorage.setItem(
+					`${SYNC_MODIFIED_PREFIX}.scheduled`,
+					entity.modified,
+				);
+				applied.push("scheduled");
+				break;
+				}
+				default:
 				// Entidade ainda não suportada nesta ponta — preservada no pacote,
 				// ignorada na aplicação (forward-compatible).
 				break;

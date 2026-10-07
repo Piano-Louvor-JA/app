@@ -8,6 +8,7 @@ export default {
     nameJa: 'JA',
   },
   common: {
+    close: 'Cerrar',
     comingSoon: 'Próximamente',
     cancel: 'Cancelar',
   },
