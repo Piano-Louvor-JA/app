@@ -18,6 +18,10 @@ const tab = ref<TabId>('rotations')
 // ── Rotações ───────────────────────────────────────────────
 const activeRotationId = ref<string | null>(null)
 const newRotationName = ref('')
+const addEntryOpen = ref(false)
+const entryDate = ref(new Date().toISOString().slice(0, 10))
+const entryMusicId = ref('')
+const entryName = ref('')
 
 const activeRotation = computed(
   () => dlg.rotations.value.find((r) => r.id === activeRotationId.value) ?? null,
@@ -33,6 +37,20 @@ function onCreateRotation() {
   newRotationName.value = ''
   activeRotationId.value = id
   tab.value = 'rotations'
+}
+
+/** Caminho simples: data + número. Listas longas continuam na aba Colar trimestre. */
+function onAddSong() {
+  const musicId = Number(entryMusicId.value)
+  if (!activeRotationId.value || !entryDate.value || !Number.isInteger(musicId) || musicId < 1) return
+  dlg.addEntry(activeRotationId.value, {
+    dateISO: entryDate.value,
+    content: { kind: 'music', musicId },
+    name: entryName.value.trim() || `Hino ${musicId}`,
+  })
+  entryMusicId.value = ''
+  entryName.value = ''
+  addEntryOpen.value = false
 }
 
 // ── Colar trimestre ────────────────────────────────────────
@@ -183,12 +201,62 @@ const dateFmt = (iso: string) => {
                 <strong>{{ activeRotation.name }}</strong>
                 <button
                   type="button"
+                  class="scheduled-dialog__btn"
+                  @click="addEntryOpen = !addEntryOpen"
+                >
+                  + {{ t('liturgy.messages.scheduledAddSong') }}
+                </button>
+              </div>
+              <form
+                v-if="addEntryOpen"
+                class="scheduled-dialog__quick-add"
+                @submit.prevent="onAddSong"
+              >
+                <input
+                  v-model="entryDate"
+                  type="date"
+                  class="scheduled-dialog__input"
+                  required
+                >
+                <input
+                  v-model="entryMusicId"
+                  type="number"
+                  min="1"
+                  inputmode="numeric"
+                  class="scheduled-dialog__input"
+                  :placeholder="t('liturgy.messages.scheduledSongNumber')"
+                  required
+                >
+                <input
+                  v-model="entryName"
+                  type="text"
+                  class="scheduled-dialog__input"
+                  :placeholder="t('liturgy.messages.scheduledSongName')"
+                >
+                <button
+                  type="submit"
+                  class="scheduled-dialog__btn"
+                >
+                  {{ t('liturgy.actions.save') }}
+                </button>
+                <button
+                  type="button"
+                  class="scheduled-dialog__btn scheduled-dialog__btn--ghost"
+                  @click="addEntryOpen = false"
+                >
+                  {{ t('liturgy.actions.cancel') }}
+                </button>
+              </form>
+              <details class="scheduled-dialog__advanced">
+                <summary>{{ t('liturgy.messages.scheduledMoreOptions') }}</summary>
+                <button
+                  type="button"
                   class="scheduled-dialog__btn scheduled-dialog__btn--ghost"
                   @click="onDuplicateQuarter"
                 >
                   {{ t('liturgy.messages.scheduledDuplicateQuarter') }}
                 </button>
-              </div>
+              </details>
               <ul class="scheduled-dialog__entries">
                 <li
                   v-for="entry in activeEntries"
@@ -470,6 +538,27 @@ const dateFmt = (iso: string) => {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+
+.scheduled-dialog__quick-add {
+  display: grid;
+  grid-template-columns: 132px 120px 1fr auto auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.scheduled-dialog__advanced {
+  font-size: 0.85em;
+  opacity: 0.78;
+}
+
+.scheduled-dialog__advanced summary {
+  cursor: pointer;
+  width: fit-content;
+}
+
+.scheduled-dialog__advanced .scheduled-dialog__btn {
+  margin-top: 6px;
 }
 
 .scheduled-dialog__entries {
