@@ -30,6 +30,21 @@ describe('useScheduledDialog — lógica do dialog de rotações', () => {
     expect(items[0]!.content?.kind).toBe('music')
   })
 
+  it('RED: cadastro manual mínimo aceita data + número do hino sem título', () => {
+    const dlg = useScheduledDialog()
+    const rotation = dlg.createRotation('Hino Inicial')
+
+    dlg.addEntry(rotation, {
+      dateISO: '2026-10-03',
+      content: { kind: 'music', musicId: 15 },
+      name: 'Hino 15',
+    })
+
+    expect(dlg.entriesOf(rotation)).toMatchObject([
+      { date: '2026-10-03', name: 'Hino 15', content: { kind: 'music', musicId: 15 } },
+    ])
+  })
+
   it('RED: colar trimestre gera entradas mapeadas por slot→rotação', () => {
     const dlg = useScheduledDialog()
     const rot1 = dlg.createRotation('Hino Inicial ES')
