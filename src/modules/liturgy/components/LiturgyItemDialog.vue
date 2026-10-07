@@ -581,6 +581,10 @@ function clearMusic() {
 }
 
 function onSubmit(event: Event) {
+  if (sljaImporting.value) {
+    event.preventDefault()
+    return
+  }
   event.preventDefault()
 
   const nextDraft = isCategory.value
@@ -648,7 +652,8 @@ function isLightDot(hex: string): boolean {
             type="button"
             class="moment-dialog__close"
             :aria-label="t('liturgy.actions.discard')"
-            @click="emit('close')"
+            :disabled="sljaImporting"
+              @click="!sljaImporting && emit('close')"
           >
             <i
               class="ti ti-x"
@@ -1256,13 +1261,15 @@ function isLightDot(hex: string): boolean {
             <button
               type="button"
               class="moment-dialog__discard"
-              @click="emit('close')"
+              :disabled="sljaImporting"
+              @click="!sljaImporting && emit('close')"
             >
               {{ t('liturgy.actions.discard') }}
             </button>
             <button
               type="submit"
               class="moment-dialog__submit"
+              :disabled="sljaImporting"
             >
               <i
                 class="ti ti-check"
