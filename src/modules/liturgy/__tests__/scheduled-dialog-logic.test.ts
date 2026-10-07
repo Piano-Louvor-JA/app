@@ -118,3 +118,17 @@ describe('agendar qualquer item (vídeo online)', () => {
     expect(items[0]!.content?.url).toContain('youtube.com')
   })
 })
+
+describe('colar link de vídeo', () => {
+  it('URL http(s) colada vira online_video (não file)', () => {
+    const dlg = useScheduledDialog()
+    const rot = dlg.createRotation('Vídeos')
+    dlg.applyQuarterPaste('10/10\nvideo: https://youtube.com/watch?v=abc123', {
+      year: 2026,
+      slotMapping: { video: rot },
+    })
+    const items = dlg.entriesOf(rot)
+    expect(items[0]!.content?.kind).toBe('online_video')
+    expect(items[0]!.content?.url).toBe('https://youtube.com/watch?v=abc123')
+  })
+})
