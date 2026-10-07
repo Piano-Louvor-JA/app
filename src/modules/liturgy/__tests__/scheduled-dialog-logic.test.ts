@@ -132,3 +132,67 @@ describe('colar link de vídeo', () => {
     expect(items[0]!.content?.url).toBe('https://youtube.com/watch?v=abc123')
   })
 })
+
+describe('modo newbie — slot desconhecido cria rotação sozinho', () => {
+  it('slot "inicial es" não mapeado vira rotação "Inicial Es" com todas as entradas', () => {
+    const dlg = useScheduledDialog()
+    const report = dlg.applyQuarterPaste(
+      '03/10\ninicial es: 278\nfinal es: 435\n\n10/10\ninicial es: 123\nfinal es: 307',
+      { year: 2026, slotMapping: {}, autoCreateSlots: true },
+    )
+    // 4 entradas criadas, ZERO pendentes
+    expect(report.created).toBe(4)
+    expect(report.unmappedSlots).toHaveLength(0)
+
+    // rotações criadas com o nome do slot (bonitinho) — só as novas deste paste
+    const names = dlg.rotations.value
+      .filter((r) => ['Inicial Es', 'Final Es'].includes(r.name))
+      .map((r) => r.name)
+      .sort()
+    expect(names).toEqual(['Final Es', 'Inicial Es'])
+
+    // entradas na rotação certa
+    const rot = dlg.rotations.value.find((r) => r.name === 'Inicial Es')!
+    expect(dlg.entriesOf(rot.id).map((e) => e.date)).toEqual(['2026-10-03', '2026-10-10'])
+  })
+
+  it('mapping explícito ainda vence quando fornecido (backward-compat)', () => {
+    const dlg = useScheduledDialog()
+    const manual = dlg.createRotation('Minha Rotação')
+    dlg.applyQuarterPaste('03/10\nslotx: 55', { year: 2026, slotMapping: { slotx: manual }, autoCreateSlots: true })
+    const rotNames = dlg.rotations.value.map((r) => r.name)
+    expect(rotNames).toContain('Minha Rotação')
+    expect(rotNames).not.toContain('Slotx')
+    expect(dlg.entriesOf(manual)).toHaveLength(1)
+  })
+})
+
+describe('modo form — adicionar por data sem escolher rotação antes', () => {
+  it('adiciona na rotação default criada sob demanda (Provai e Vede)', () => {
+    const dlg = useScheduledDialog()
+    const rotId = dlg.ensureDefaultRotation()
+    expect(dlg.rotations.value.some((r) => r.id === rotId)).toBe(true)
+    expect(dlg.rotations.value.find((r) => r.id === rotId)!.name).toBe('Provai e Vede')
+
+    // segunda chamada REUSA a mesma rotação (não duplica)
+    const rotId2 = dlg.ensureDefaultRotation()
+    expect(rotId2).toBe(rotId)
+
+    dlg.addEntry(rotId, { dateISO: '2026-10-10', content: { kind: 'music', musicId: 55 }, name: 'Hino 55' })
+    expect(dlg.entriesOf(rotId)).toHaveLength(1)
+  })
+
+  it('todasAsEntradasPorData: lista plana de todas as rotações ordenada por data', () => {
+    const dlg = useScheduledDialog()
+    const a = dlg.createRotation('A')
+    const b = dlg.createRotation('B')
+    dlg.addEntry(b, { dateISO: '2026-10-03', content: { kind: 'music', musicId: 1 }, name: 'X' })
+    dlg.addEntry(a, { dateISO: '2026-10-10', content: { kind: 'music', musicId: 2 }, name: 'Y' })
+    dlg.addEntry(a, { dateISO: '2026-09-26', content: { kind: 'music', musicId: 3 }, name: 'Z' })
+
+    const all = dlg.entriesByDate.value.filter((e) => ['X', 'Y', 'Z'].includes(e.name))
+    expect(all.map((e) => e.date)).toEqual(['2026-09-26', '2026-10-03', '2026-10-10'])
+    // o nome da rotação vem junto na grade (sem precisar saber o id)
+    expect(all.map((e) => e.rotationName)).toEqual(expect.arrayContaining(['A', 'B']))
+  })
+})

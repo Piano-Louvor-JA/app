@@ -123,13 +123,15 @@ function onCreateRotation() {
   tab.value = 'rotations'
 }
 
-/** Caminho simples: data + conteúdo (hino do catálogo ou vídeo online). */
+/** Caminho do FORM: usuário só preenche data + conteúdo. Rotação é opcional —
+ * se não escolheu, vai pra "Provai e Vede" criada sob demanda. */
 function onAddSong() {
-  if (!activeRotationId.value || !entryDate.value) return
+  if (!entryDate.value) return
+  const rotationId = activeRotationId.value ?? dlg.ensureDefaultRotation()
   if (entryKind.value === 'music') {
     const musicId = Number(entryMusicId.value)
     if (!Number.isInteger(musicId) || musicId < 1) return
-    dlg.addEntry(activeRotationId.value, {
+    dlg.addEntry(rotationId, {
       dateISO: entryDate.value,
       content: { kind: 'music', musicId },
       name: entryName.value.trim() || `Hino ${musicId}`,
@@ -138,7 +140,7 @@ function onAddSong() {
   } else {
     const url = entryUrl.value.trim()
     if (!url) return
-    dlg.addEntry(activeRotationId.value, {
+    dlg.addEntry(rotationId, {
       dateISO: entryDate.value,
       content: { kind: 'online_video', url },
       name: entryName.value.trim() || 'Vídeo',
@@ -146,7 +148,7 @@ function onAddSong() {
     entryUrl.value = ''
   }
   entryName.value = ''
-  addEntryOpen.value = false
+  // form fica aberto pra digitar a próxima data em sequência
 }
 
 // ── Colar trimestre ────────────────────────────────────────
@@ -170,13 +172,19 @@ function onApplyPaste() {
     if (rotId) mapping[slot] = rotId
   }
   const year = new Date().getFullYear()
-  const report = dlg.applyQuarterPaste(pasteText.value, { year, slotMapping: mapping })
+  // Modo newbie: slot desconhecido cria a rotação com o nome do slot —
+  // ninguém precisa saber o que é "mapear" pra importar um trimestre.
+  const report = dlg.applyQuarterPaste(pasteText.value, {
+    year,
+    slotMapping: mapping,
+    autoCreateSlots: true,
+  })
   pasteReport.value = {
     created: report.created,
     unmapped: Array.from(new Set(report.unmappedSlots)),
     errors: report.errors.length,
   }
-  if (report.created > 0 && report.unmappedSlots.length === 0) {
+  if (report.created > 0) {
     pasteText.value = ''
     tab.value = 'rotations'
   }
@@ -302,22 +310,10 @@ const dateFmt = (iso: string) => {
           </aside>
 
           <section class="scheduled-dialog__right">
-            <template v-if="activeRotation">
-              <div class="scheduled-dialog__right-head">
-                <strong>{{ activeRotation.name }}</strong>
-                <button
-                  type="button"
-                  class="scheduled-dialog__btn"
-                  @click="addEntryOpen = !addEntryOpen"
-                >
-                  + {{ t('liturgy.messages.scheduledAddSong') }}
-                </button>
-              </div>
-              <form
-                v-if="addEntryOpen"
-                class="scheduled-dialog__quick-add"
-                @submit.prevent="onAddSong"
-              >
+            <form
+              class="scheduled-dialog__quick-add"
+              @submit.prevent="onAddSong"
+            >
                 <input
                   v-model="entryDate"
                   type="date"
@@ -368,11 +364,16 @@ const dateFmt = (iso: string) => {
                 <button
                   type="button"
                   class="scheduled-dialog__btn scheduled-dialog__btn--ghost"
-                  @click="addEntryOpen = false"
+                  v-if="activeRotation"
+                  @click="activeRotationId = null"
                 >
                   {{ t('liturgy.actions.cancel') }}
                 </button>
               </form>
+              <template v-if="activeRotation">
+              <div class="scheduled-dialog__right-head">
+                <strong>{{ activeRotation.name }}</strong>
+              </div>
               <details class="scheduled-dialog__advanced">
                 <summary>{{ t('liturgy.messages.scheduledMoreOptions') }}</summary>
                 <button
@@ -422,45 +423,34 @@ const dateFmt = (iso: string) => {
               >
                 {{ pvProgress }}
               </p>
-              <ul class="scheduled-dialog__entries">
-                <li
-                  v-for="entry in activeEntries"
-                  :key="entry.id"
-                  class="scheduled-dialog__entry"
-                >
-                  <span class="scheduled-dialog__entry-date">{{ dateFmt(entry.date) }}</span>
-                  <span class="scheduled-dialog__entry-name">
-                    {{ entry.name || `#${entry.content?.musicId ?? '?'}` }}
-                  </span>
-                  <span
-                    v-if="entry.content?.kind"
-                    class="scheduled-dialog__entry-kind"
-                  >
-                    {{ t(entryKindKey(entry.content.kind)) }}
-                  </span>
-                  <button
-                    type="button"
-                    class="scheduled-dialog__rot-del"
-                    :aria-label="t('liturgy.remove')"
-                    @click="dlg.removeEntry(entry.id)"
-                  >
-                    ×
-                  </button>
-                </li>
-                <li
-                  v-if="activeEntries.length === 0"
-                  class="scheduled-dialog__empty"
-                >
-                  {{ t('liturgy.messages.scheduledEmptyDate') }}
-                </li>
-              </ul>
             </template>
-            <p
-              v-else
-              class="scheduled-dialog__empty scheduled-dialog__empty--pad"
-            >
-              {{ t('liturgy.messages.scheduledRotationName') }}
-            </p>
+            <ul class="scheduled-dialog__entries">
+              <li
+                v-for="entry in dlg.entriesByDate.value"
+                :key="entry.id"
+                class="scheduled-dialog__entry"
+              >
+                <span class="scheduled-dialog__entry-date">{{ dateFmt(entry.date) }}</span>
+                <span class="scheduled-dialog__entry-name">
+                  {{ entry.name || `#${entry.content?.musicId ?? '?'}` }}
+                </span>
+                <span class="scheduled-dialog__entry-kind">{{ entry.rotationName }}</span>
+                <button
+                  type="button"
+                  class="scheduled-dialog__rot-del"
+                  :aria-label="t('liturgy.remove')"
+                  @click="dlg.removeEntry(entry.id)"
+                >
+                  ×
+                </button>
+              </li>
+              <li
+                v-if="dlg.entriesByDate.value.length === 0"
+                class="scheduled-dialog__empty"
+              >
+                {{ t('liturgy.messages.scheduledEmptyDate') }}
+              </li>
+            </ul>
           </section>
         </div>
 
@@ -470,7 +460,7 @@ const dateFmt = (iso: string) => {
           class="scheduled-dialog__paste"
         >
           <p class="liturgy-dialog__hint">
-            {{ t('liturgy.messages.scheduledPasteHint') }}
+            {{ t('liturgy.messages.scheduledPasteHintSimple') }}
           </p>
           <textarea
             v-model="pasteText"
@@ -489,51 +479,6 @@ const dateFmt = (iso: string) => {
             </button>
           </div>
 
-          <div
-            v-if="unmappedSlots.length > 0"
-            class="scheduled-dialog__unmapped"
-          >
-            <p class="scheduled-dialog__unmapped-hint">
-              {{
-                t('liturgy.messages.scheduledUnmapped', {
-                  slots: unmappedSlots.join(', '),
-                })
-              }}
-            </p>
-            <div
-              v-for="slot in unmappedSlots"
-              :key="slot"
-              class="scheduled-dialog__slot-row"
-            >
-              <code>{{ slot }}</code>
-              <select
-                v-model="slotChoices[slot]"
-                class="scheduled-dialog__input"
-              >
-                <option
-                  value=""
-                  disabled
-                >
-                  —
-                </option>
-                <option
-                  v-for="rot in dlg.rotations.value"
-                  :key="rot.id"
-                  :value="rot.id"
-                >
-                  {{ rot.name }}
-                </option>
-              </select>
-              <button
-                type="button"
-                class="scheduled-dialog__btn"
-                :disabled="!slotChoices[slot]"
-                @click="onResolveSlot(slot)"
-              >
-                ✓
-              </button>
-            </div>
-          </div>
 
           <p
             v-if="pasteReport"

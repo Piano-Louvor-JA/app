@@ -33,6 +33,26 @@ export function useScheduledDialog() {
     return store.items.filter((i) => i.categoryId === categoryId)
   }
 
+  /**
+   * Rotação "Provai e Vede" criada sob demanda — modo form: o usuário só preenche
+   * data + conteúdo; a rotação existe sem ele precisar saber o que é rotação.
+   */
+  function ensureDefaultRotation(): string {
+    const existing = store.categories.find((c) => c.name === 'Provai e Vede')
+    if (existing) return existing.id
+    return createRotation('Provai e Vede')
+  }
+
+  /** Todas as entradas de todas as rotações, ordenadas por data (grade única do dialog). */
+  const entriesByDate = computed(() =>
+    store.items
+      .map((item) => ({
+        ...item,
+        rotationName: store.categoryName(item.categoryId) ?? '—',
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date)),
+  )
+
   function createRotation(name: string): string {
     const id = `rot-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
     store.upsertCategory({ id, name: name.trim() })
@@ -81,15 +101,35 @@ export function useScheduledDialog() {
     context: {
       year: number
       slotMapping: Record<string, string | undefined>
+      /** Modo newbie: slot desconhecido cria rotação nova com o nome do slot. */
+      autoCreateSlots?: boolean
     },
   ): QuarterPasteReport {
     const { groups, errors } = parseQuarterPaste(text, { year: context.year })
     const report: QuarterPasteReport = { created: 0, errors, unmappedSlots: [] }
+    // Rotações auto-criadas nesta colagem (slotKey normalizado → id), pra não
+    // criar duas vezes quando o mesmo slot aparece em várias semanas.
+    const autoCreated = new Map<string, string>()
 
     for (const group of groups) {
       for (const entry of group.entries) {
         const key = normalizeSlotKey(entry.slotKey)
-        const categoryId = context.slotMapping[key]
+        let categoryId = context.slotMapping[key]
+        if (!categoryId && context.autoCreateSlots) {
+          const cached = autoCreated.get(key)
+          if (cached) {
+            categoryId = cached
+          } else {
+            // Nome legível: "inicial es" → "Inicial Es"
+            const label = entry.slotKey
+              .trim()
+              .split(/\s+/)
+              .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+              .join(' ')
+            categoryId = createRotation(label)
+            autoCreated.set(key, categoryId)
+          }
+        }
         if (!categoryId) {
           report.unmappedSlots.push(entry.slotKey)
           const pending = pendingSlots.value.get(key) ?? []
@@ -177,6 +217,8 @@ export function useScheduledDialog() {
   return {
     rotations,
     entriesOf,
+    entriesByDate,
+    ensureDefaultRotation,
     createRotation,
     renameRotation,
     removeRotation,
