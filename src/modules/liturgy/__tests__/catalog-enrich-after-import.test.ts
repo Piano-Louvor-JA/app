@@ -21,8 +21,9 @@ vi.mock('@shared/services/user-preferences', () => {
 
 import { useLiturgyStore } from '../stores/useLiturgyStore'
 
+const mockMusicOptions = vi.fn(async () => [])
 vi.mock('../services/liturgy-catalog', () => ({
-  loadLiturgyMusicOptions: vi.fn(async () => []),
+  loadLiturgyMusicOptions: (...args: unknown[]) => mockMusicOptions(...args),
   loadLiturgyBibleBooks: vi.fn(async () => []),
 }))
 
@@ -50,10 +51,15 @@ describe('duração da liturgia importada (.louvorja durationMs: 0)', () => {
     expect(store.weekdays.saturday[0]!.durationMs).toBe(0)
 
     // Catálogo chega DEPOIS (timing real: import/dismiss antes da API responder)
-    ;(store as unknown as { musicList: { value: unknown } }).musicList.value = [
+    mockMusicOptions.mockImplementation(async () => [
       { id: 2000, title: 'Hino inicial', durationMs: 240_000 },
-    ]
-    await store.refreshMusicCatalog()
+    ] as never)
+    // Novo boot (novo pinia, MESMO storage): liturgia importada persistida + catálogo presente
+    setActivePinia(createPinia())
+    const store2 = useLiturgyStore()
+    await store2.hydrate()
+    expect(store2.weekdays.saturday[0]!.durationMs).toBe(240_000)
+    return
 
     expect(store.weekdays.saturday[0]!.durationMs).toBe(240_000)
   })
