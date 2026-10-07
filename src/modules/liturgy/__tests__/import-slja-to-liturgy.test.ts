@@ -187,6 +187,22 @@ describe("app#331 — import .slja → item de liturgia → player (offline)", (
 		expect(imported.imagesOmitted).toBe(true);
 	});
 
+	it("localStorage cheio antes da música não finge arquivo inválido", async () => {
+		const spy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+			throw new DOMException("quota", "QuotaExceededError");
+		});
+		try {
+			await expect(
+				importSljaAsLiturgyMusic({
+					bytes: await makeSljaBuffer(),
+					name: "missao.slja",
+				}),
+			).rejects.toThrow("SLJA_LOCAL_LYRIC_PERSIST_FAILED");
+		} finally {
+			spy.mockRestore();
+		}
+	});
+
 	it("áudio acima da quota do localStorage não finge sucesso", async () => {
 		const original = Storage.prototype.setItem;
 		const spy = vi

@@ -320,6 +320,9 @@ async function importSljaLocal({
 
 	const created = createLocalMusic(collectionId, { name });
 	const musicId = created.id;
+	if (!getLocalMusic(musicId)) {
+		throw new Error("SLJA_LOCAL_LYRIC_PERSIST_FAILED");
+	}
 
 	let hasAudio = false;
 	if (archive.audio?.bytes?.length) {

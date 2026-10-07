@@ -75,12 +75,21 @@ const sljaInputEl = ref<HTMLInputElement | null>(null)
 const sljaImporting = ref(false)
 const sljaMessage = ref('')
 const sljaError = ref(false)
+const sljaRun = ref(0)
+
+watch(
+  () => props.open,
+  (isOpen) => {
+    if (!isOpen) sljaRun.value += 1
+  },
+)
 
 async function onImportSljaFile(event: Event): Promise<void> {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = ''
   if (!file || sljaImporting.value) return
+  const run = sljaRun.value
   sljaImporting.value = true
   sljaMessage.value = ''
   sljaError.value = false
@@ -90,6 +99,7 @@ async function onImportSljaFile(event: Event): Promise<void> {
       name: file.name,
     }
     const imported = await importSljaAsLiturgyMusic(source)
+    if (run !== sljaRun.value) return
     // web#174 (referência): recarrega o catálogo ANTES da seleção valer —
     // sem isso o id novo não existe em musicList, selectedMusic fica null
     // e o submit é bloqueado (música "não toca").
@@ -130,9 +140,10 @@ async function onImportSljaFile(event: Event): Promise<void> {
           : code === 'SLJA_IMPORT_NO_LYRICS'
             ? 'liturgy.slja.importNoLyrics'
             : 'liturgy.slja.importFailed'
+    if (run !== sljaRun.value) return
     sljaMessage.value = t(key)
   } finally {
-    sljaImporting.value = false
+    if (run === sljaRun.value) sljaImporting.value = false
   }
 }
 
