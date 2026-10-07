@@ -910,7 +910,11 @@ function isLightDot(hex: string): boolean {
                 :class="{ 'moment-dialog__label--error': categoryFieldError }"
                 for="moment-category"
               >
-                {{ t('liturgy.dialog.categoryField') }}
+                {{
+                  draft.type === 'scheduled'
+                    ? t('liturgy.dialog.rotationField')
+                    : t('liturgy.dialog.categoryField')
+                }}
                 <span
                   class="moment-dialog__required"
                   aria-hidden="true"

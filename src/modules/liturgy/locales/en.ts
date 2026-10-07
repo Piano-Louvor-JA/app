@@ -148,6 +148,7 @@ export default {
       categoryTimeRequired: 'Enter the time as HH:MM.',
       formInvalid: 'Fill in the required fields to add this item.',
       categoryField: 'Category',
+      rotationField: 'Scheduled rotation',
       categoryPlaceholder: 'Select a category',
       categoryEmpty: 'Create a Category/Divider before adding other items.',
       notesTitle: 'Notes and Details',
