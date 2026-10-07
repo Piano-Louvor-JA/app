@@ -339,6 +339,9 @@ export const useMediaStore = defineStore('media', () => {
    */
   async function ensureTrackDownloaded(musicId: number): Promise<boolean> {
     if (!isDesktopApp()) return true // web: sempre stream remoto
+    // Música local (id negativo): o áudio já está no data: URL. O download
+    // oficial consultaria `music_-N` no catálogo remoto antes de tocar.
+    if (musicId < 0) return true
     try {
       if (await isTrackMediaDownloaded(musicId)) return true
     } catch {
