@@ -318,7 +318,7 @@ test.describe('Liturgia — CRUD com integridade offline-first', () => {
     })
     expect(categoryAfter?.id).toBe(categoryBefore?.id)
 
-    // Música: musicId, duração do catálogo e complementary title intactos.
+    // Música: musicId, duração do catálogo, complementary title e vínculo intactos.
     expect(byName(itemsAfter, MUSIC_NAME)).toMatchObject({
       type: 'music',
       musicId: MUSIC_ID,
@@ -326,21 +326,30 @@ test.describe('Liturgia — CRUD com integridade offline-first', () => {
       complementaryTitle: MUSIC_COMPLEMENTARY,
       subtitle: MUSIC_SUBTITLE,
       notes: 'Observações da música E2E',
+      categoryId,
     })
 
-    // Vídeo: filePath da bridge mockada intacto.
+    // Vídeo: filePath da bridge mockada e vínculo intactos.
     expect(byName(itemsAfter, VIDEO_NAME)).toMatchObject({
       type: 'video',
       filePath: VIDEO_PATH,
       name: VIDEO_NAME,
+      categoryId,
     })
 
-    // Site: URL intacta.
+    // Site: URL e vínculo intactos.
     expect(byName(itemsAfter, SITE_NAME)).toMatchObject({
       type: 'site',
       url: SITE_URL,
       name: SITE_NAME,
+      categoryId,
     })
+
+    // O reload não pode soltar os sub-itens da categoria.
+    for (const needle of [MUSIC_NAME, VIDEO_NAME, SITE_NAME]) {
+      expect(byName(itemsBefore, needle)?.categoryId).toBe(categoryId)
+      expect(byName(itemsAfter, needle)?.categoryId).toBe(categoryId)
+    }
 
     // Ordem preservada (categoria → música → vídeo → site).
     expect(itemsAfter.map((entry) => entry.type)).toEqual([
