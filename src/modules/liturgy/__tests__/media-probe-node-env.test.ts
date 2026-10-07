@@ -1,3 +1,4 @@
+// @vitest-environment node
 // Ambiente NODE (sem window) — mata mutantes do guard `typeof window === 'undefined'`
 // (falsos-sobreviventes em jsdom: lá o `||` seguinte domina e o guard nunca difere)
 import { describe, expect, it, vi } from 'vitest'

@@ -182,6 +182,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+/* v8 ignore next -- invariante: onMounted seta o poll timer incondicionalmente; no unmount ele nunca é null */
   if (screensPollTimer) clearInterval(screensPollTimer)
   unsubscribeDisplaysChanged?.()
 })
@@ -274,6 +275,7 @@ async function onToggleProjection() {
   // Preferência: módulo atual; senão o que tiver conteúdo.
   if (isOnLiturgyRoute.value && hasLiturgyProjectableSelection.value) {
     const index = selectedItemIndex.value
+/* v8 ignore next -- invariante: selectedItemIndex null implica selectedItem null implica hasLiturgyProjectableSelection false; este if só avalia com index != null */
     if (index != null) await liturgyStore.playItemOnScreens(index)
     return
   }
@@ -301,6 +303,7 @@ async function onToggleProjection() {
     await toggleMediaProjection()
     return
   }
+/* v8 ignore next -- invariante: rota bible sem conteúdo não satisfaz canToggleProjection (hasProjectableContent não inclui a rota), então onToggleProjection retorna antes deste if */
   if (hasBibleContent.value) {
     await bibleStore.toggleProjection()
   }

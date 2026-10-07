@@ -154,3 +154,22 @@ describe('palco-bridge — turnOffOthers e clock tick (gaps)', () => {
     expect(() => stopPalcoBridge()).not.toThrow()
   })
 })
+
+describe('palco-bridge — bindChannel storage polling com storage quebrado (S549)', () => {
+  it('localStorage.getItem lançando → raw_snapshot null, sem crash e sem onMsg', async () => {
+    localStorage.setItem('louvorja:bible-runtime', JSON.stringify({ projecting: true }))
+    const orig = Storage.prototype.getItem
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('storage bloqueado')
+    })
+    try {
+      startPalcoBridge()
+      await new Promise((r) => setTimeout(r, 60))
+      // nenhum crash; nenhum processamento de msg (storage inacessível)
+      expect(palcoSessionMock.projectTo).not.toHaveBeenCalled()
+    } finally {
+      Storage.prototype.getItem = orig
+      stopPalcoBridge()
+    }
+  })
+})

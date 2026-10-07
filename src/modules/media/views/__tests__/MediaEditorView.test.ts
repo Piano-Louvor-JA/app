@@ -1966,7 +1966,7 @@ describe("MediaEditorView — último branch", () => {
 		w.unmount();
 	});
 
-describe("MediaEditorView — visibilidade (gaps onda1)", () => {
+	describe("MediaEditorView — visibilidade (gaps onda1)", () => {
 	function rawState(w: Awaited<ReturnType<typeof mountEditor>>) {
 		return w.vm.$.devtoolsRawSetupState as unknown as Record<string, unknown> & {
 			selectedCollectionId: { value: number | null };
@@ -1975,6 +1975,24 @@ describe("MediaEditorView — visibilidade (gaps onda1)", () => {
 			onChangeVisibilityWithRules: (next: "public" | "private") => Promise<void>;
 		};
 	}
+
+	it("localStorage.getItem lançando → alreadySeen false (catch 333-335)", async () => {
+		const orig = Storage.prototype.getItem;
+		vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+			throw new Error("storage bloqueado");
+		});
+		try {
+			const w = await mountEditor();
+			const s = rawState(w);
+			s.selectedCollectionId.value = 1;
+			await flushPromises();
+			await s.onChangeVisibilityWithRules("public");
+			expect(s.rulesOpen.value).toBe(true);
+			w.unmount();
+		} finally {
+			Storage.prototype.getItem = orig;
+		}
+	});
 
 	it("1a vez public → abre regras e não persiste (338-340); depois private persiste (342+)", async () => {
 		localStorage.removeItem("louvorja.publishRulesSeen");

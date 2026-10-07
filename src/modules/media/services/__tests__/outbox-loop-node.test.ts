@@ -1,3 +1,4 @@
+// @vitest-environment node
 // ambiente node (sem jsdom): exercita o guard typeof window === 'undefined'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 

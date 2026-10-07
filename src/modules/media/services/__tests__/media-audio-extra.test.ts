@@ -148,3 +148,13 @@ describe("fadeOut cancelado por fade concorrente", () => {
 		});
 	});
 })
+
+describe("media-audio — attach sem handlers opcionais (B245)", () => {
+	it("attachMediaAudioListeners com objeto vazio: nenhum addEventListener", async () => {
+		const { attachMediaAudioListeners } = await import("../media-audio");
+		const audio = document.createElement("audio");
+		const spy = vi.spyOn(audio, "addEventListener");
+		attachMediaAudioListeners(audio, {});
+		expect(spy).not.toHaveBeenCalled();
+	});
+});

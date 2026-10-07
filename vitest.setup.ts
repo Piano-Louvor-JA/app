@@ -19,24 +19,28 @@ const makeStorageMock = () => {
   }
 }
 
-if (!globalThis.localStorage) {
-  const real = win?.localStorage
-  Object.defineProperty(globalThis, 'localStorage', {
-    get: () => ((globalThis as any).jsdom?.window ?? globalThis.window)?.localStorage ?? real,
-    ...(real ? {} : { value: makeStorageMock(), writable: true }),
-    configurable: true,
-    enumerable: true,
-  })
+function defineStorage(name: 'localStorage' | 'sessionStorage') {
+  if (globalThis[name]) return
+  const real = win?.[name]
+  if (real) {
+    // jsdom: getter dinâmico (a referência do window pode ser recriada)
+    Object.defineProperty(globalThis, name, {
+      get: () => ((globalThis as any).jsdom?.window ?? globalThis.window)?.[name] ?? real,
+      configurable: true,
+      enumerable: true,
+    })
+  } else {
+    // ambiente sem jsdom: mock in-memory
+    Object.defineProperty(globalThis, name, {
+      value: makeStorageMock(),
+      writable: true,
+      configurable: true,
+      enumerable: true,
+    })
+  }
 }
-if (!globalThis.sessionStorage) {
-  const real = win?.sessionStorage
-  Object.defineProperty(globalThis, 'sessionStorage', {
-    get: () => ((globalThis as any).jsdom?.window ?? globalThis.window)?.sessionStorage ?? real,
-    ...(real ? {} : { value: makeStorageMock(), writable: true }),
-    configurable: true,
-    enumerable: true,
-  })
-}
+defineStorage('localStorage')
+defineStorage('sessionStorage')
 
 if (typeof globalThis.window !== 'undefined') {
   Object.assign(globalThis.window, {
