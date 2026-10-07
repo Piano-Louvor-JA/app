@@ -8,6 +8,8 @@ export type ProgressPayload = {
 export type WorkspaceApi = {
   /** Lê bytes de arquivo escolhido via openFile (decode fica no caller). */
   readBinaryFile?: (path: string) => Promise<Uint8Array | null>
+  /** Baixa url → Media/provai-e-vede/<fileName>. Retorna o caminho local ou null. */
+  downloadToMedia?: (url: string, fileName: string) => Promise<string | null>
   getRecord: <T = unknown>(filename: string) => Promise<T | null>
   saveRecord: (filename: string, data: unknown) => Promise<boolean>
   clear: (options?: { preserveMedia?: boolean }) => Promise<boolean>

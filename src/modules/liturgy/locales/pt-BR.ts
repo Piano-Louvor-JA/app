@@ -292,6 +292,8 @@ export default {
       scheduledSongNumber: 'Número do hino',
       scheduledSongName: 'Título (opcional)',
       scheduledMoreOptions: 'Mais opções',
+      scheduledFetchProvai: 'Buscar Provai e Vede (trimestre)',
+      scheduledDownloadSelected: 'Baixar selecionados',
       scheduledPasteQuarter: 'Colar trimestre',
       scheduledPasteHint: 'Cole a lista do trimestre (ex.: 03/10 — inicial: 15 — Adoração). Datas dd/mm, posições livres.',
       scheduledApplyPaste: 'Importar',

@@ -4,7 +4,15 @@ import { useI18n } from 'vue-i18n'
 
 import { GlassCard } from '@design-system/index'
 
+import { getDesktopBridge } from '@shared/services/desktop-bridge'
+
 import { useScheduledDialog } from '../composables/useScheduledDialog'
+import {
+  extractProvaiEVedeEpisodes,
+  type ProvaiEpisode,
+} from '../services/provai-e-vede-source'
+import { importProvaiEVedeEpisodes } from '../services/provai-e-vede-import'
+import { useScheduledStore } from '../stores/useScheduledStore'
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ close: [] }>()
@@ -24,6 +32,80 @@ const entryMusicId = ref('')
 const entryName = ref('')
 const entryKind = ref<'music' | 'online_video'>('music')
 const entryUrl = ref('')
+
+// ── Baixar Provai e Vede ───────────────────────────────────
+const pvEpisodes = ref<ProvaiEpisode[]>([])
+const pvSelected = ref<Set<string>>(new Set())
+const pvBusy = ref(false)
+const pvProgress = ref('')
+
+async function onFetchProvaiEVede() {
+  if (pvBusy.value) return
+  pvBusy.value = true
+  pvProgress.value = ''
+  try {
+    // Desktop: fetch pelo main (sem CORS). Web: direto (a página envia CORS aberto).
+    const bridge = getDesktopBridge()
+    const pageUrl =
+      'https://downloads.adventistas.org/pt/mordomia-crista/video/provai-e-vede-2026-4o-trimestre'
+    let html: string | null = null
+    if (bridge?.workspace?.downloadToMedia) {
+      // usa o mesmo canal IPC: baixa a página como "arquivo" temporário não funciona
+      // para HTML — fazer fetch direto do renderer (downloads.adventistas.org envia
+      // Access-Control-Allow-Origin: * para os assets; testado manualmente).
+    }
+    const resp = await fetch(pageUrl)
+    html = resp.ok ? await resp.text() : null
+    const eps = html ? extractProvaiEVedeEpisodes(html) : []
+    pvEpisodes.value = eps
+    pvSelected.value = new Set(eps.map((e) => e.dateISO))
+    if (eps.length === 0) pvProgress.value = '—'
+  } finally {
+    pvBusy.value = false
+  }
+}
+
+async function onDownloadSelected() {
+  if (pvBusy.value || pvSelected.value.size === 0) return
+  pvBusy.value = true
+  try {
+    const bridge = getDesktopBridge()
+    const store = useScheduledStore()
+    const chosen = pvEpisodes.value.filter((e) => pvSelected.value.has(e.dateISO))
+    let done = 0
+    for (const ep of chosen) {
+      pvProgress.value = `${done + 1}/${chosen.length}`
+      let localPath: string | null = null
+      if (bridge?.workspace?.downloadToMedia) {
+        const fileName = ep.url.split('/').pop() ?? `${ep.dateISO}.mp4`
+        localPath = await bridge.workspace.downloadToMedia(ep.url, fileName)
+      }
+      // Importa com o caminho local (desktop) — sem download disponível (web),
+      // agenda como online_video com a URL original (fallback).
+      importProvaiEVedeEpisodes(store, [ep], () => localPath ?? '')
+      if (!localPath) {
+        // web/sem bridge: guarda a URL como online_video em vez de file vazio
+        const rotation = store.categories.find((c) => c.name === 'Provai e Vede')
+        const entry = rotation ? store.findOn(rotation.id, ep.dateISO) : undefined
+        if (entry) {
+          store.upsertItem({
+            id: entry.id,
+            categoryId: entry.categoryId,
+            date: entry.date,
+            name: entry.name,
+            content: { kind: 'online_video', url: ep.url },
+          })
+        }
+      }
+      done++
+    }
+    pvProgress.value = `${done} ✓`
+    pvEpisodes.value = []
+    pvSelected.value = new Set()
+  } finally {
+    pvBusy.value = false
+  }
+}
 
 const activeRotation = computed(
   () => dlg.rotations.value.find((r) => r.id === activeRotationId.value) ?? null,
@@ -300,7 +382,46 @@ const dateFmt = (iso: string) => {
                 >
                   {{ t('liturgy.messages.scheduledDuplicateQuarter') }}
                 </button>
+                <button
+                  type="button"
+                  class="scheduled-dialog__btn scheduled-dialog__btn--ghost"
+                  :disabled="pvBusy"
+                  @click="onFetchProvaiEVede"
+                >
+                  {{ t('liturgy.messages.scheduledFetchProvai') }}
+                </button>
               </details>
+              <div
+                v-if="pvEpisodes.length > 0"
+                class="scheduled-dialog__pv"
+              >
+                <label
+                  v-for="ep in pvEpisodes"
+                  :key="ep.dateISO"
+                  class="scheduled-dialog__pv-row"
+                >
+                  <input
+                    v-model="pvSelected"
+                    type="checkbox"
+                    :value="ep.dateISO"
+                  >
+                  <span>{{ dateFmt(ep.dateISO) }} — {{ ep.title }}</span>
+                </label>
+                <button
+                  type="button"
+                  class="scheduled-dialog__btn"
+                  :disabled="pvBusy || pvSelected.size === 0"
+                  @click="onDownloadSelected"
+                >
+                  {{ t('liturgy.messages.scheduledDownloadSelected') }}
+                </button>
+              </div>
+              <p
+                v-if="pvProgress"
+                class="scheduled-dialog__report"
+              >
+                {{ pvProgress }}
+              </p>
               <ul class="scheduled-dialog__entries">
                 <li
                   v-for="entry in activeEntries"
@@ -751,6 +872,25 @@ const dateFmt = (iso: string) => {
   margin: 0;
   font-size: 0.85em;
   opacity: 0.8;
+}
+
+.scheduled-dialog__pv {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 0.5rem;
+  border-radius: var(--ds-radius-md, 0.75rem 0 0.75rem 0);
+  background: color-mix(in srgb, var(--ds-color-surface, #fff) 40%, transparent);
+}
+
+.scheduled-dialog__pv-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85em;
+  cursor: pointer;
 }
 
 .scheduled-dialog__advanced {
