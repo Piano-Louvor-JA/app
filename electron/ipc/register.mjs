@@ -1,5 +1,6 @@
 import path from 'node:path'
-import { app, BrowserWindow, dialog, ipcMain } from 'electron'
+import { existsSync, mkdirSync, writeFile } from 'node:fs'
+import { app, BrowserWindow, dialog, ipcMain, net } from 'electron'
 
 import { detectClassoInstallation, probeClassoRegistry } from '../classo-detect.mjs'
 import {
@@ -503,6 +504,26 @@ export function registerWorkspaceIpc() {
     } catch (error) {
       console.error('[ipc] workspace:clear', error)
       return false
+    }
+  })
+
+  // Download de arquivo remoto pra pasta Media/provai-e-vede/ (offline-first).
+  // Retorna o caminho local absoluto ou null em falha.
+  ipcMain.handle('workspace:download-to-media', async (_event, url, fileName) => {
+    try {
+      const { media } = getWorkspacePaths()
+      const targetDir = path.join(media, 'provai-e-vede')
+      if (!existsSync(targetDir)) mkdirSync(targetDir, { recursive: true })
+      const safeName = String(fileName).replace(/[\\/:*?"<>|]/g, '_')
+      const destPath = path.join(targetDir, safeName)
+      const response = await net.fetch(String(url))
+      if (!response.ok) return null
+      const buffer = Buffer.from(await response.arrayBuffer())
+      await writeFile(destPath, buffer)
+      return destPath
+    } catch (error) {
+      console.error('[ipc] workspace:download-to-media', error)
+      return null
     }
   })
 

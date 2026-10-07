@@ -286,6 +286,8 @@ export default {
       scheduledSongNumber: 'Número del himno',
       scheduledSongName: 'Título (opcional)',
       scheduledMoreOptions: 'Más opciones',
+      scheduledFetchProvai: 'Buscar Provad y Ved (trimestre)',
+      scheduledDownloadSelected: 'Descargar seleccionados',
       scheduledPasteQuarter: 'Pegar trimestre',
       scheduledPasteHint: 'Pega la lista del trimestre (ej. 03/10 — inicial: 15 — Adoración). Fechas dd/mm, posiciones libres.',
       scheduledApplyPaste: 'Importar',

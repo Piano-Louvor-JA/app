@@ -286,6 +286,8 @@ export default {
       scheduledSongNumber: 'Hymn number',
       scheduledSongName: 'Title (optional)',
       scheduledMoreOptions: 'More options',
+      scheduledFetchProvai: 'Fetch Taste and See (quarter)',
+      scheduledDownloadSelected: 'Download selected',
       scheduledPasteQuarter: 'Paste quarter',
       scheduledPasteHint: 'Paste the quarter list (e.g. 10/03 — opening: 15 — Praise). Dates dd/mm, free slot names.',
       scheduledApplyPaste: 'Import',
