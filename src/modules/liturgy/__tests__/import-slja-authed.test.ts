@@ -297,3 +297,20 @@ describe("import .slja LOGADO → API custom (app#331)", () => {
 		).toBe(true);
 	});
 });
+
+ it("prefere imagem exata quando nomes de assets se sobrepõem", async () => {
+   authSessionMock.mockReturnValue({ token: "tok", user: { id_user: 1 } });
+   fetchMock.mockClear();
+   routeFetch(7, 0);
+   const archive: SljaArchive = {
+     title: "Assets", assets: [
+       { path: "special-bg.png", bytes: new Uint8Array([1]) },
+       { path: "bg.png", bytes: new Uint8Array([2]) },
+     ],
+     slides: [{ lyric: "Verso", type: "LETRA", order: 1, timeMs: 1000,
+       image: { name: "bg.png", bytes: new Uint8Array([2]) } }],
+   };
+   await importSljaAsLiturgyMusic({ bytes: await buildSlja(archive), name: "assets.slja" });
+   const call = fetchMock.mock.calls.find(([url, init]) => String(url).endsWith("/musics/7/lyrics") && init?.method === "POST");
+   expect(JSON.parse(String(call?.[1]?.body)).id_file_image).toBe(902);
+ });

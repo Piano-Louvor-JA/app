@@ -221,18 +221,7 @@ export async function importSljaAsLiturgyMusic(
 	for (const slide of slides) {
 		const text = slide.lyric.trim();
 		if (!text) continue;
-		// Background do slide: imagem upada com matching igual ao media editor
-		// (contains bidirecional, lowercase).
-		let imageUrl = "";
-		const imageName = slide.image?.name?.toLowerCase();
-		if (imageName && uploadedAssets.length) {
-			const match = uploadedAssets.find(
-				(a) =>
-					imageName.includes(a.path.toLowerCase()) ||
-					a.path.toLowerCase().includes(imageName),
-			);
-			if (match) imageUrl = match.url;
-		}
+		const imageUrl = matchUploadedAsset(slide.image?.name, uploadedAssets)?.url ?? "";
 		const createdLyric = await createCustomLyric(musicId, {
 			lyric: text,
 			aux_lyric: slide.auxiliaryLyric?.trim() || undefined,
@@ -272,12 +261,13 @@ function matchUploadedAsset(
 	assets: Array<{ path: string; url: string; idFile: number }>,
 ) {
 	if (!imageName || assets.length === 0) return undefined;
-	const needle = imageName.toLowerCase();
-	return assets.find(
-		(asset) =>
-			needle.includes(asset.path.toLowerCase()) ||
-			asset.path.toLowerCase().includes(needle),
-	);
+	const normalize = (path: string) => path.replace(/\\/g, "/").replace(/^\.\//, "").toLowerCase();
+	const needle = normalize(imageName);
+	const exact = assets.find(asset => normalize(asset.path) === needle);
+	if (exact) return exact;
+	const basename = needle.split("/").pop();
+	const candidates = assets.filter(asset => normalize(asset.path).split("/").pop() === basename);
+	return candidates.length === 1 ? candidates[0] : undefined;
 }
 
 async function importSljaLocal({
