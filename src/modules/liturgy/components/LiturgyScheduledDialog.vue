@@ -22,6 +22,8 @@ const addEntryOpen = ref(false)
 const entryDate = ref(new Date().toISOString().slice(0, 10))
 const entryMusicId = ref('')
 const entryName = ref('')
+const entryKind = ref<'music' | 'online_video'>('music')
+const entryUrl = ref('')
 
 const activeRotation = computed(
   () => dlg.rotations.value.find((r) => r.id === activeRotationId.value) ?? null,
@@ -39,16 +41,28 @@ function onCreateRotation() {
   tab.value = 'rotations'
 }
 
-/** Caminho simples: data + número. Listas longas continuam na aba Colar trimestre. */
+/** Caminho simples: data + conteúdo (hino do catálogo ou vídeo online). */
 function onAddSong() {
-  const musicId = Number(entryMusicId.value)
-  if (!activeRotationId.value || !entryDate.value || !Number.isInteger(musicId) || musicId < 1) return
-  dlg.addEntry(activeRotationId.value, {
-    dateISO: entryDate.value,
-    content: { kind: 'music', musicId },
-    name: entryName.value.trim() || `Hino ${musicId}`,
-  })
-  entryMusicId.value = ''
+  if (!activeRotationId.value || !entryDate.value) return
+  if (entryKind.value === 'music') {
+    const musicId = Number(entryMusicId.value)
+    if (!Number.isInteger(musicId) || musicId < 1) return
+    dlg.addEntry(activeRotationId.value, {
+      dateISO: entryDate.value,
+      content: { kind: 'music', musicId },
+      name: entryName.value.trim() || `Hino ${musicId}`,
+    })
+    entryMusicId.value = ''
+  } else {
+    const url = entryUrl.value.trim()
+    if (!url) return
+    dlg.addEntry(activeRotationId.value, {
+      dateISO: entryDate.value,
+      content: { kind: 'online_video', url },
+      name: entryName.value.trim() || 'Vídeo',
+    })
+    entryUrl.value = ''
+  }
   entryName.value = ''
   addEntryOpen.value = false
 }
@@ -228,13 +242,33 @@ const dateFmt = (iso: string) => {
                   class="scheduled-dialog__input"
                   required
                 >
+                <select
+                  v-model="entryKind"
+                  class="scheduled-dialog__input"
+                >
+                  <option value="music">
+                    {{ t('liturgy.types.music') }}
+                  </option>
+                  <option value="online_video">
+                    {{ t('liturgy.types.online_video') }}
+                  </option>
+                </select>
                 <input
+                  v-if="entryKind === 'music'"
                   v-model="entryMusicId"
                   type="number"
                   min="1"
                   inputmode="numeric"
                   class="scheduled-dialog__input"
                   :placeholder="t('liturgy.messages.scheduledSongNumber')"
+                  required
+                >
+                <input
+                  v-else
+                  v-model="entryUrl"
+                  type="url"
+                  class="scheduled-dialog__input"
+                  placeholder="https://…"
                   required
                 >
                 <input
@@ -392,15 +426,7 @@ const dateFmt = (iso: string) => {
           </p>
         </div>
 
-        <div class="liturgy-dialog__actions">
-          <button
-            type="button"
-            class="liturgy-dialog__btn liturgy-dialog__btn--primary"
-            @click="emit('close')"
-          >
-            {{ t('common.close') }}
-          </button>
-        </div>
+
       </GlassCard>
     </div>
   </Teleport>
@@ -618,7 +644,7 @@ const dateFmt = (iso: string) => {
 
 .scheduled-dialog__quick-add {
   display: grid;
-  grid-template-columns: 140px 110px 1fr auto auto;
+  grid-template-columns: 140px 150px 1fr auto auto;
   gap: 0.4rem;
   align-items: center;
   padding: 0.6rem;

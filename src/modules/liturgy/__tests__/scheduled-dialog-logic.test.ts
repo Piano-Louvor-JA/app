@@ -103,3 +103,18 @@ ML: 31
     expect(all.map((e) => e.date)).toContain('2026-11-07')
   })
 })
+
+describe('agendar qualquer item (vídeo online)', () => {
+  it('aceita vídeo online (YouTube/Vimeo) como conteúdo agendado', () => {
+    const dlg = useScheduledDialog()
+    const rot = dlg.createRotation('Vídeos do culto')
+    dlg.addEntry(rot, {
+      dateISO: '2026-10-10',
+      content: { kind: 'online_video', url: 'https://youtube.com/watch?v=abc', name: 'Clipe' },
+      name: 'Clipe',
+    })
+    const items = dlg.entriesOf(rot)
+    expect(items[0]!.content?.kind).toBe('online_video')
+    expect(items[0]!.content?.url).toContain('youtube.com')
+  })
+})
