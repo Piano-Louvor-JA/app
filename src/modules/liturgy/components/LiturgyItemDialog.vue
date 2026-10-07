@@ -34,6 +34,7 @@ import {
 import { normalizeLiturgyTimeHHmm } from '../services/liturgy-format'
 
 const props = defineProps<{
+  refreshImportedCatalog?: () => Promise<void>
   open: boolean
   draft: LiturgyItemDraft
   isEditing: boolean
@@ -108,6 +109,8 @@ async function onImportSljaFile(event: Event): Promise<void> {
     // web#174 (referência): recarrega o catálogo ANTES da seleção valer —
     // sem isso o id novo não existe em musicList, selectedMusic fica null
     // e o submit é bloqueado (música "não toca").
+    await props.refreshImportedCatalog?.()
+    if (run !== sljaRun.value) return
     emit('slja-imported', imported.displayMusicId)
     // seleção + título + duração num ÚNICO patch: props.draft aqui ainda é
     // stale — um segundo patch sobrescreveria o musicId do primeiro (race).
