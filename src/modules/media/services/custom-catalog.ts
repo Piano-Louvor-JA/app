@@ -434,6 +434,7 @@ export async function listAllCustomMusics(options?: {
 > {
   try {
     const response = await fetch(`${customBaseUrl()}/musics`, {
+      headers: authHeaders(),
       signal:
         options?.timeoutMs != null
           ? AbortSignal.timeout(options.timeoutMs)

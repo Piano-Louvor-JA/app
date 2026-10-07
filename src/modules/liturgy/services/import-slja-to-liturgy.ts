@@ -85,7 +85,8 @@ export function sljaDisplayName(
 	fallback: string,
 ): string {
 	const title = archive.title?.trim() ?? "";
-	const generic = /^v[\d.]+$/.test(title) || title.length === 0;
+	const generic =
+		/^v[\d.]+$/.test(title) || title.length === 0 || title === "Sem título";
 	if (generic) {
 		return fallback
 			.replace(/\.slja(\.zip)?$/i, "")

@@ -74,6 +74,7 @@ vi.mock('../../services/custom-catalog', async (importOriginal) => {
 		updateCustomCollection: mocks.updateCustomCollection,
 		listCustomCollections: mocks.listCustomCollections,
 		listCustomMusics: vi.fn(async () => []),
+		listAllCustomMusics: vi.fn(async () => []),
 		listCustomLyrics: vi.fn(async () => []),
 		deleteCustomCollection: vi.fn(),
 		deleteCustomMusic: vi.fn(),

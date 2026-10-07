@@ -31,7 +31,10 @@ import {
 	listLocalMusics,
 } from "@modules/media/services/local-custom-store";
 import { buildSlja, type SljaArchive } from "@shared/services/slja";
-import { importSljaAsLiturgyMusic } from "../services/import-slja-to-liturgy";
+import {
+	importSljaAsLiturgyMusic,
+	sljaDisplayName,
+} from "../services/import-slja-to-liturgy";
 import { resolveMusicId } from "../services/liturgy-actions";
 
 async function makeSljaBuffer(): Promise<ArrayBuffer> {
@@ -118,6 +121,12 @@ describe("app#331 — import .slja → item de liturgia → player (offline)", (
 		const trackAfter = await resolveMediaTrack(imported.displayMusicId);
 		expect(trackAfter?.name).toBe("Missao Para Todos");
 		expect(trackAfter?.audioUrl ?? "").toMatch(/^data:audio/);
+	});
+
+	it("título sentinela Sem título usa o nome do arquivo", () => {
+		expect(sljaDisplayName({ title: "Sem título" }, "missao.slja")).toBe(
+			"missao",
+		);
 	});
 
 	it("guarda a letra auxiliar do .slja", async () => {

@@ -155,6 +155,30 @@ describe("catálogo da liturgia inclui custom + local (app#331)", () => {
 		}
 	});
 
+	it("listagem custom da liturgia envia o token quando há sessão", async () => {
+		localStorage.setItem(
+			"louvorja.custom.auth",
+			JSON.stringify({
+				token: "tok-privado",
+				user: { id_user: 1, email: "a@b.c", displayName: "A" },
+			}),
+		);
+		const fetchMock = vi.fn(async () => new Response(JSON.stringify({ data: [] })));
+		vi.stubGlobal("fetch", fetchMock);
+		try {
+			await loadLiturgyMusicOptions();
+			const musicsCall = fetchMock.mock.calls.find((call) =>
+				String(call[0]).endsWith("/musics"),
+			);
+			const headers = (musicsCall?.[1] as RequestInit | undefined)?.headers as
+				| Record<string, string>
+				| undefined;
+			expect(headers?.authorization).toBe("Bearer tok-privado");
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
+
 	it("duração custom da API em segundos entra no catálogo em ms", async () => {
 		const fetchMock = vi.fn(async (url: string) => {
 			if (String(url).endsWith("/musics")) {
