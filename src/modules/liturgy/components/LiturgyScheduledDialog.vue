@@ -65,6 +65,68 @@ async function onFetchProvaiEVede() {
   }
 }
 
+/** 1-CLICK: busca → ignora sábados passados → baixa os futuros → agenda. */
+const pvOneClickBusy = ref(false)
+const pvOneClickProgress = ref('')
+
+async function onProvaiEVedeOneClick() {
+  if (pvOneClickBusy.value) return
+  pvOneClickBusy.value = true
+  pvOneClickProgress.value = ''
+  try {
+    const pageUrl =
+      'https://downloads.adventistas.org/pt/mordomia-crista/video/provai-e-vede-2026-4o-trimestre'
+    const resp = await fetch(pageUrl)
+    const html = resp.ok ? await resp.text() : null
+    const all = html ? extractProvaiEVedeEpisodes(html) : []
+    const todayISO = new Date().toISOString().slice(0, 10)
+    const upcoming = all.filter((e) => e.dateISO >= todayISO)
+    if (upcoming.length === 0) {
+      pvOneClickProgress.value = t('liturgy.messages.scheduledPvNothing')
+      return
+    }
+
+    const bridge = getDesktopBridge()
+    const store = useScheduledStore()
+    let done = 0
+    const resolvePath = async (ep: ProvaiEpisode): Promise<string> => {
+      pvOneClickProgress.value = t('liturgy.messages.scheduledPvDownloading', {
+        done: done + 1,
+        total: upcoming.length,
+      })
+      if (bridge?.workspace?.downloadToMedia) {
+        const fileName = ep.url.split('/').pop() ?? `${ep.dateISO}.mp4`
+        const local = await bridge.workspace.downloadToMedia(ep.url, fileName)
+        done++
+        return local ?? ''
+      }
+      done++
+      return ''
+    }
+    const report = await importProvaiEVedeEpisodes(store, upcoming, resolvePath, {
+      onlyUpcoming: true,
+    })
+
+    // Sem disco (web): converter as entradas pra online_video com a URL original.
+    if (!bridge?.workspace?.downloadToMedia) {
+      for (const ep of upcoming) {
+        const entry = store.findOn(report.rotationId, ep.dateISO)
+        if (entry && !entry.content?.filePath) {
+          store.upsertItem({
+            id: entry.id, categoryId: entry.categoryId, date: entry.date,
+            name: entry.name, content: { kind: 'online_video', url: ep.url },
+          })
+        }
+      }
+    }
+    pvOneClickProgress.value = t('liturgy.messages.scheduledPvDone', {
+      created: report.created, skipped: report.skipped,
+    })
+  } finally {
+    pvOneClickBusy.value = false
+  }
+}
+
 async function onDownloadSelected() {
   if (pvBusy.value || pvSelected.value.size === 0) return
   pvBusy.value = true
@@ -225,6 +287,15 @@ const dateFmt = (iso: string) => {
           <h2 class="liturgy-dialog__title">
             {{ t('liturgy.messages.scheduledTitle') }}
           </h2>
+          <button
+            type="button"
+            class="scheduled-dialog__btn"
+            :disabled="pvOneClickBusy"
+            style="flex-shrink: 0"
+            @click="onProvaiEVedeOneClick"
+          >
+            {{ t('liturgy.messages.scheduledPvOneClick') }}
+          </button>
           <button
             type="button"
             class="scheduled-dialog__close"

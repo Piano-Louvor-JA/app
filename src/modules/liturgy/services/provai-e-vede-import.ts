@@ -17,13 +17,16 @@ export interface ProvaiImportReport {
   rotationId: string
   created: number
   skipped: number
+  /** Episódios ignorados por serem de sábados já passados (onlyUpcoming). */
+  skippedPast: number
 }
 
-export function importProvaiEVedeEpisodes(
+export async function importProvaiEVedeEpisodes(
   store: ReturnType<typeof useScheduledStore>,
   episodes: ProvaiEpisode[],
-  resolveLocalPath: (ep: ProvaiEpisode) => string,
-): ProvaiImportReport {
+  resolveLocalPath: (ep: ProvaiEpisode) => string | Promise<string>,
+  options?: { onlyUpcoming?: boolean },
+): Promise<ProvaiImportReport> {
   // Rotação: reusa se já existe (nome exato), senão cria.
   let rotation = store.categories.find((c) => c.name === PROVAI_E_VEDE_ROTATION_NAME)
   if (!rotation) {
@@ -33,23 +36,31 @@ export function importProvaiEVedeEpisodes(
   }
   const rotationId = rotation.id
 
+  const todayISO = new Date().toISOString().slice(0, 10)
   let created = 0
   let skipped = 0
+  let skippedPast = 0
   for (const ep of episodes) {
+    // 1-click: doQuarter inteiro, mas só interessa o que ainda vem.
+    if (options?.onlyUpcoming && ep.dateISO < todayISO) {
+      skippedPast++
+      continue
+    }
     const existing = store.findOn(rotationId, ep.dateISO)
     if (existing) {
       skipped++
       continue
     }
+    const localPath = await resolveLocalPath(ep)
     store.upsertItem({
       id: `sch-${rotationId}-${ep.dateISO}`,
       categoryId: rotationId,
       date: ep.dateISO,
       name: ep.title,
-      content: { kind: 'file', filePath: resolveLocalPath(ep) },
+      content: { kind: 'file', filePath: localPath },
     })
     created++
   }
 
-  return { rotationId, created, skipped }
+  return { rotationId, created, skipped, skippedPast }
 }
