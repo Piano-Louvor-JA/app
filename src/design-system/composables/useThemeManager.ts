@@ -85,7 +85,7 @@ function persistAppearance() {
 
 function applyCssVars(target: HTMLElement = document.documentElement) {
   const theme = themes[themeKey.value]
-  const accent = accents[accentKey.value]
+  const accent = accents[accentKey.value] ?? accents[defaultAccent]
   const interaction = interactions[interactionKey.value]
   const intensity = glassIntensity.value
 
