@@ -170,3 +170,45 @@ describe('scheduledRef — placeholder resolve a entrada da data e executa como 
     expect(result.resolved?.kind).toBe('file')
   })
 })
+
+
+describe('activeDateISO — data do culto a partir do dia selecionado (modelo trimestre)', () => {
+  beforeEach(() => {
+    globalThis.__TEST_PREFS__ = {}
+    setActivePinia(createPinia())
+  })
+
+  it('RED: dia saturday selecionado → data do sábado da semana corrente (ISO local)', async () => {
+    const { activeDateISO } = await import('../services/liturgy-preferences')
+    const { LITURGY_WEEKDAYS } = await import('../types/liturgy')
+    const iso = activeDateISO('saturday')
+    // sábado ISO sempre termina em '6' (dia de semana 6), e é local
+    const d = new Date(iso + 'T12:00:00')
+    expect(d.getDay()).toBe(6)
+    expect(LITURGY_WEEKDAYS[d.getDay()]).toBe('saturday')
+  })
+
+  it('RED: dia custom (avulsa) → hoje', async () => {
+    const { activeDateISO } = await import('../services/liturgy-preferences')
+    const { todayISO } = await import('../services/liturgy-actions')
+    expect(activeDateISO('custom')).toBe(todayISO())
+  })
+
+  it('RED: executeLiturgyItem sem dateISO usa o dia ATIVO da liturgia, não sempre hoje', async () => {
+    const { activeDateISO } = await import('../services/liturgy-preferences')
+    const store = useScheduledStore()
+    store.upsertCategory({ id: 'c1', name: 'Provai e Vede' })
+    store.upsertItem({
+      id: 's9',
+      categoryId: 'c1',
+      date: activeDateISO('saturday'),
+      name: 'Provai do sábado',
+      content: { kind: 'music', musicId: 1717 },
+    })
+    const item = scheduledRef('lit-9', 'c1')
+    // sem options: o execute tem que resolver contra o sábado da semana (data ativa)
+    const result = await executeLiturgyItem(item, router, { day: 'saturday' })
+    expect(result.ok).toBe(true)
+    expect(result.resolved?.kind).toBe('music')
+  })
+})

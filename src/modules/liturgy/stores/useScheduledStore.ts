@@ -137,6 +137,19 @@ export const useScheduledStore = defineStore('scheduled', {
       return this.items.find((i) => i.categoryId === categoryId && i.date === isoDate)
     },
 
+    /** Remove rotação (categoria) e suas entradas. */
+    deleteCategory(categoryId: string) {
+      this.categories = this.categories.filter((c) => c.id !== categoryId)
+      this.items = this.items.filter((i) => i.categoryId !== categoryId)
+      this.persist()
+    },
+
+    /** Remove uma entrada agendada. */
+    deleteItem(entryId: string) {
+      this.items = this.items.filter((i) => i.id !== entryId)
+      this.persist()
+    },
+
     persist() {
       setUserPreference(USER_PREFERENCE_KEYS.scheduledState, {
         categories: this.categories,

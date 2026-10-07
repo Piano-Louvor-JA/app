@@ -18,6 +18,8 @@ const props = defineProps<{
   /** musicId → tem instrumental no catálogo. */
   musicInstrumentalById?: Record<number, boolean>
   busyMusicId?: number | null
+  /** Placeholder agendado: id do item → entrada resolvida pra data do culto. */
+  scheduledResolvedByItemId?: Record<string, { entryName: string; kindLabel: string }>
 }>()
 
 const emit = defineEmits<{
@@ -282,6 +284,7 @@ function isCategorySectionInProgress(categoryId: string): boolean {
           :deletion-locked="deletionLocked"
           :has-instrumental="musicHasInstrumental(segment.entry.item)"
           :music-busy="isMusicBusy(segment.entry.item)"
+          :resolved-schedule="scheduledResolvedByItemId?.[segment.entry.item.id] ?? null"
           @select="emit('select', segment.entry.index)"
           @video-file-selected="
             emit('videoFileSelected', segment.entry.item.id, $event)
