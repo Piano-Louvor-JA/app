@@ -148,7 +148,7 @@ describe('MediaEditorView — toggle de visibilidade (t_35e4d3ea)', () => {
 		const btns = wrapper.findAll('.editor__visibility')[0]!.findAll(
 			'.editor__visibility-btn',
 		)
-		expect(btns[0]!.classes()).toContain('editor__visibility-btn--active')
+		await vi.waitFor(() => expect(btns[0]!.classes()).toContain('editor__visibility-btn--active'))
 	})
 })
 

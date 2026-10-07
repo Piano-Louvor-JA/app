@@ -324,6 +324,7 @@ function patch(partial: Partial<LiturgyItemDraft>) {
 }
 
 function selectType(type: LiturgyItemType) {
+  if (sljaImporting.value) return
   if (props.lockCategory && type === 'category') return
 
   const previousType = props.draft.type
@@ -708,6 +709,7 @@ function isLightDot(hex: string): boolean {
                         hasTypeSelection && draft.type !== chip.value,
                     }"
                     :title="t(`liturgy.typeDescriptions.${chip.value}`)"
+                    :disabled="sljaImporting"
                     @click="selectType(chip.value)"
                   >
                     <span

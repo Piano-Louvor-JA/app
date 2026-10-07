@@ -24,6 +24,7 @@ describe('importação após fechar o diálogo', () => {
     await flushPromises()
     expect(wrapper.get('[data-testid="slja-import-btn"]').attributes('disabled')).toBeDefined()
     expect(wrapper.get('.moment-dialog__close').attributes('disabled')).toBeDefined()
+    for (const chip of wrapper.findAll('.moment-dialog__chip')) expect(chip.attributes('disabled')).toBeDefined()
     expect(wrapper.get('.moment-dialog__discard').attributes('disabled')).toBeDefined()
     expect(wrapper.get('.moment-dialog__submit').attributes('disabled')).toBeDefined()
     await wrapper.get('.moment-dialog__discard').trigger('click')

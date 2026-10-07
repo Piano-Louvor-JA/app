@@ -486,6 +486,7 @@ export async function listCustomMusics(
   try {
     const response = await fetch(
       `${customBaseUrl()}/collections/${collectionId}/musics`,
+      { headers: authHeaders() },
     )
     if (!response.ok) return []
     const json = (await response.json()) as {
