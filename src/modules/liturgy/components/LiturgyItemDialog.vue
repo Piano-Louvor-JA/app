@@ -80,7 +80,12 @@ const sljaRun = ref(0)
 watch(
   () => props.open,
   (isOpen) => {
-    if (!isOpen) sljaRun.value += 1
+    if (!isOpen) {
+      sljaRun.value += 1
+      sljaImporting.value = false
+      sljaMessage.value = ''
+      sljaError.value = false
+    }
   },
 )
 
@@ -127,6 +132,7 @@ async function onImportSljaFile(event: Event): Promise<void> {
           slides: imported.slides,
         })
   } catch (error) {
+    if (run !== sljaRun.value) return
     sljaError.value = true
     const code = error instanceof Error ? error.message : ''
     const key =
@@ -140,7 +146,6 @@ async function onImportSljaFile(event: Event): Promise<void> {
           : code === 'SLJA_IMPORT_NO_LYRICS'
             ? 'liturgy.slja.importNoLyrics'
             : 'liturgy.slja.importFailed'
-    if (run !== sljaRun.value) return
     sljaMessage.value = t(key)
   } finally {
     if (run === sljaRun.value) sljaImporting.value = false
