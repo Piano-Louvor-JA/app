@@ -200,4 +200,41 @@ describe('PalcoCard', () => {
     expect(w.find('.palco-card__switch').attributes('aria-checked')).toBe('false')
     expect(startBridgeMock).not.toHaveBeenCalled()
   })
+
+  it('indisponível (sem electron): mensagem desktopOnly visível (172,0)', async () => {
+    Object.defineProperty(window, 'louvorja', { get: () => ({}), configurable: true })
+    const w = await mountCard()
+    expect(w.find('.palco-card__unavailable').exists()).toBe(true)
+    w.unmount()
+    Object.defineProperty(window, 'louvorja', {
+      get: () => ({ palco: palcoApiStub }),
+      configurable: true,
+    })
+  })
+
+  it('toggle reentrante: 2ª chamada com busy true retorna cedo (50,0)', async () => {
+    const w = await mountCard()
+    let release!: (v?: unknown) => void
+    turnOnMock.mockImplementationOnce(() => new Promise((res) => { release = res }))
+    const p1 = (w.find('.palco-card__switch').trigger('click'))
+    const p2 = (w.find('.palco-card__switch').trigger('click'))
+    release(true)
+    await Promise.all([p1, p2])
+    await flushPromises()
+    expect(turnOnMock).toHaveBeenCalledTimes(1)
+    w.unmount()
+  })
+
+  it('copyUrl sem URL (status off): clipboard não chamado (68,1)', async () => {
+    const w = await mountCard()
+    const writeText = vi.fn()
+    Object.assign(navigator, { clipboard: { writeText } })
+    // running com url null: botão visível (isOn) mas copyUrl sem URL
+    statusMock.mockResolvedValue({ running: true, clients: 0, url: null, wsUrl: null })
+    const w2 = await mountCard()
+    await w2.find('.palco-card__url').trigger('click')
+    expect(writeText).not.toHaveBeenCalled()
+    w2.unmount()
+    w.unmount()
+  })
 })

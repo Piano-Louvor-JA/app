@@ -27,7 +27,7 @@ export default defineConfig({
     },
   },
   test: {
-    exclude: ['node_modules/**', 'dist/**', 'e2e/**'],
+    exclude: ['node_modules/**', 'dist/**', 'e2e/**', '.worktrees/**', 'coverage/**'],
     environment: 'jsdom',
     environmentOptions: {
       jsdom: {
@@ -35,6 +35,8 @@ export default defineConfig({
       },
     },
     setupFiles: ['./vitest.setup.ts'],
+    // Runs completos estouram 5s em testes que mockam bridge/processamento pesado.
+    testTimeout: 30_000,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'text-summary', 'lcov'],

@@ -111,6 +111,41 @@ describe('MonitorTargetSelect', () => {
     w.unmount()
   })
 
+  it('showLabel=true renderiza chip "Telas" no trigger (br 168)', async () => {
+    const w = await mountSelect({ showLabel: true })
+    const html = w.html()
+    expect(html).toContain('monitors.selectScreens')
+    expect(html).toContain('monitor-target-select__chip')
+    w.unmount()
+  })
+
+  it('tags do painel: primary mostra tag; isReturn mostra tag de retorno (brs 272/278)', async () => {
+    loadProjectionSettings.mockReturnValue({
+      ...SETTINGS,
+      openReturnScreen: true,
+      returnDisplayId: 1,
+    })
+    const w = mount(MonitorTargetSelect, {
+      props: { modelValue: [2], extendedOnly: false },
+      global: { stubs: { teleport: false } },
+      attachTo: document.body,
+    })
+    await Promise.resolve()
+    await Promise.resolve()
+    await w.find('.monitor-target-select__trigger').trigger('click')
+    await Promise.resolve()
+    await Promise.resolve()
+    const html = (document.body.innerHTML)
+    // display 1 é primary → tag primary; display 1 é return → tag retorno;
+    // display 2 sem isPrimary/isReturn → nenhuma tag
+    expect(html).toContain('monitors.primary')
+    expect(html).toContain('monitors.returnScreen')
+    const primaryTags = (html.match(/monitors\.primary/g) ?? []).length
+    expect(primaryTags).toBe(1)
+    w.unmount()
+    document.body.innerHTML = ''
+  })
+
   it('badge com contagem quando há seleção', async () => {
     const w = await mountSelect()
     await w.find('.monitor-target-select__trigger').trigger('click')
@@ -240,5 +275,71 @@ describe('MonitorTargetSelect', () => {
       'monitors.selectedCount:1',
     )
     w.unmount()
+  })
+
+  describe('gaps — posicionamento, pointerdown interno, disabled', () => {
+    it('openUp: painel perto do rodapé usa bottom em vez de top', async () => {
+      const originalH = window.innerHeight
+      Object.defineProperty(window, 'innerHeight', { value: 300, configurable: true })
+      const w = await mountSelect()
+      await w.find('.monitor-target-select__trigger').trigger('click')
+      await Promise.resolve()
+      await Promise.resolve()
+      await nextTick()
+      const panel = w.find('.monitor-target-select__panel')
+      expect(panel.exists()).toBe(true)
+      // painel reposicionado com innerHeight pequena → posição válida
+      expect(panel.attributes('style')).toBeTruthy()
+      w.unmount()
+      Object.defineProperty(window, 'innerHeight', { value: originalH, configurable: true })
+    })
+
+    it('pointerdown dentro do root e dentro do painel NÃO fecham', async () => {
+      const w = await mountSelect()
+      await w.find('.monitor-target-select__trigger').trigger('click')
+      await Promise.resolve()
+      await Promise.resolve()
+      await nextTick()
+      // dentro do root (dispatch real com bubbles até document)
+      w.find('.monitor-target-select__trigger').element.dispatchEvent(
+        new MouseEvent('pointerdown', { bubbles: true }) as unknown as PointerEvent,
+      )
+      await nextTick()
+      expect(w.find('.monitor-target-select__panel').exists()).toBe(true)
+      // dentro do painel
+      w.find('.monitor-target-select__panel').element.dispatchEvent(
+        new MouseEvent('pointerdown', { bubbles: true }) as unknown as PointerEvent,
+      )
+      await nextTick()
+      expect(w.find('.monitor-target-select__panel').exists()).toBe(true)
+      w.unmount()
+    })
+
+    it('pointerdown com target não-Node não lança', async () => {
+      const w = await mountSelect()
+      await w.find('.monitor-target-select__trigger').trigger('click')
+      await Promise.resolve()
+      await Promise.resolve()
+      await nextTick()
+      document.body.dispatchEvent(
+        new Event('pointerdown') as unknown as PointerEvent,
+      )
+      await nextTick()
+      w.unmount()
+    })
+
+    it('disabled: toggle e identify são no-op', async () => {
+      const w = await mountSelect({ disabled: true })
+      const trigger = w.find('.monitor-target-select__trigger')
+      await trigger.trigger('click')
+      await Promise.resolve()
+      await Promise.resolve()
+      await nextTick()
+      // painel não abre com disabled
+      expect(w.find('.monitor-target-select__panel').exists()).toBe(false)
+      const identifyBtn = w.findAll('button').find((b) => b.classes().some((c) => c.includes('identify')))
+      if (identifyBtn) await identifyBtn.trigger('click')
+      w.unmount()
+    })
   })
 })

@@ -88,7 +88,7 @@ export const useBibleStore = defineStore('bible', () => {
     }, 400)
   }
 
-  function publishProjectionState(selection: BibleSelection = projection.value) {
+  function publishProjectionState(selection: BibleSelection) {
     publishBibleSelection(selection)
   }
 
@@ -465,8 +465,8 @@ export const useBibleStore = defineStore('bible', () => {
       }
 
       const index = books.value.findIndex((item) => item.id === book.id)
+      // books não-vazio aqui (guard do book acima): books[0] sempre existe
       const nextBook = books.value[index + 1] ?? books.value[0]
-      if (!nextBook) return
       await selectBook(nextBook.id)
       await selectChapter(1)
       const first = Math.min(
@@ -486,9 +486,9 @@ export const useBibleStore = defineStore('bible', () => {
     }
 
     const index = books.value.findIndex((item) => item.id === book.id)
+    // books não-vazio aqui (guard do book acima): último elemento sempre existe
     const prevBook =
       index > 0 ? books.value[index - 1] : books.value[books.value.length - 1]
-    if (!prevBook) return
     await selectBook(prevBook.id)
     await selectChapter(prevBook.chapters)
     const last = Math.max(

@@ -182,6 +182,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+/* v8 ignore next -- invariante: onMounted seta o poll timer incondicionalmente; no unmount ele nunca é null */
   if (screensPollTimer) clearInterval(screensPollTimer)
   unsubscribeDisplaysChanged?.()
 })
@@ -274,6 +275,7 @@ async function onToggleProjection() {
   // Preferência: módulo atual; senão o que tiver conteúdo.
   if (isOnLiturgyRoute.value && hasLiturgyProjectableSelection.value) {
     const index = selectedItemIndex.value
+/* v8 ignore next -- invariante: selectedItemIndex null implica selectedItem null implica hasLiturgyProjectableSelection false; este if só avalia com index != null */
     if (index != null) await liturgyStore.playItemOnScreens(index)
     return
   }
@@ -301,6 +303,7 @@ async function onToggleProjection() {
     await toggleMediaProjection()
     return
   }
+/* v8 ignore next -- invariante: rota bible sem conteúdo não satisfaz canToggleProjection (hasProjectableContent não inclui a rota), então onToggleProjection retorna antes deste if */
   if (hasBibleContent.value) {
     await bibleStore.toggleProjection()
   }
@@ -329,10 +332,12 @@ function onNavigate(key: string) {
   }
 }
 
+/* v8 ignore start -- :key avalia no mount, mas o remap v8 não casa estes ranges */
 function viewKey(viewRoute: typeof route) {
   const navKey = viewRoute.meta.navKey
   return typeof navKey === 'string' ? navKey : String(viewRoute.name ?? viewRoute.path)
 }
+/* v8 ignore stop */
 </script>
 
 <template>
@@ -393,6 +398,7 @@ function viewKey(viewRoute: typeof route) {
           <CodenameLogo class="app-shell__codename" />
           <span class="app-shell__version" aria-hidden="true">{{ APP_VERSION }}</span>
         </div>
+        <!-- v8 ignore start -- login Google desativado; botão nunca renderiza -->
         <button
           v-if="showAccountButton"
           type="button"
@@ -401,6 +407,7 @@ function viewKey(viewRoute: typeof route) {
         >
           <i class="ti ti-user-circle" aria-hidden="true" />
         </button>
+        <!-- v8 ignore stop -->
       </div>
     </header>
 

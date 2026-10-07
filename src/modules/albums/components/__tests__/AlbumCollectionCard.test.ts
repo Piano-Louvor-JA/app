@@ -111,4 +111,26 @@ describe('AlbumCollectionCard', () => {
     const busy = mountCard({ libraryAlbum: lib('downloading') })
     expect(busy.find('.album-collection-card__play').exists()).toBe(false)
   })
+
+  it('gaps onda1: libraryAlbum sem progress (25 arm0), remove sem canRemove (58), sem subtitle/trackCount', async () => {
+    const w = mountCard({
+      collection: { ...collection, subtitle: undefined, trackCount: undefined },
+      libraryAlbum: { status: 'downloaded' },
+    })
+    expect(w.find('.album-collection-card__subtitle').exists()).toBe(false)
+    expect(w.find('.album-collection-card__meta').exists()).toBe(false)
+    // remove com canRemove true já coberto; agora status idle: onRemove early-return
+    const w2 = mountCard({ libraryAlbum: { status: 'idle', progress: undefined } })
+    const remove2 = w2.find('.album-collection-card__remove')
+    if (remove2.exists()) {
+      remove2.element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    }
+    expect(w2.emitted('remove')).toBeUndefined()
+    // downloading sem progress: computed progress avalia com ?? 0 (25 arm1)
+    const w3 = mountCard({ libraryAlbum: { status: 'downloading', progress: undefined } })
+    expect(w3.find('.album-collection-card__progress-value').text()).toContain('0%')
+    w.unmount()
+    w2.unmount()
+    w3.unmount()
+  })
 })

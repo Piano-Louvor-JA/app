@@ -82,6 +82,55 @@ function host<T>(fn: () => T): { result: T; unmount: () => void } {
     result = fn()
   })!
   return { result: result!, unmount: () => scope.stop() }
+  it('gaps5: toggleOpen duas vezes executa branch else (br 280)', async () => {
+    const mod = await loadFresh()
+    const { result, unmount } = host(() => mod.useMonitorTargetSelect())
+    result.toggleOpen() // abre
+    expect(result.open.value).toBe(true)
+    await Promise.resolve()
+    result.toggleOpen() // fecha - branch else do if (open.value)
+    expect(result.open.value).toBe(false)
+    unmount()
+  })
+
+  it('gaps5: sameIds early return (br 202)', async () => {
+    const mod = await loadFresh()
+    let cb: ((ids: number[]) => void) | undefined
+    bridge.projection.onSiteTargetsChanged.mockImplementation((fn: (ids: number[]) => void) => {
+      cb = fn
+      return () => {}
+    })
+    const { createApp, defineComponent, h } = await import('vue')
+    let res: ReturnType<typeof mod.useMonitorTargetSelect> | undefined
+    const Host = defineComponent({
+      setup() {
+        res = mod.useMonitorTargetSelect()
+        return () => h('div')
+      },
+    })
+    const el = document.createElement('div')
+    document.body.appendChild(el)
+    const app = createApp(Host)
+    app.mount(el)
+    await Promise.resolve()
+    cb!([5])
+    await Promise.resolve()
+    cb!([5]) // mesmo array → sameIds true → early return
+    await Promise.resolve()
+    expect(res!.selectedIds.value).toEqual([5])
+    app.unmount()
+  })
+
+  it('gaps5: watch modelValue null ignorado (br 314)', async () => {
+    const model = ref<number[] | null>(null)
+    const mod = await loadFresh()
+    const { result, unmount } = host(() => mod.useMonitorTargetSelect({ modelValue: model }))
+    model.value = null
+    await Promise.resolve()
+    expect(result.selectedIds.value).toEqual([])
+    unmount()
+  })
+
 }
 
 describe('useMonitorTargetSelect', () => {
@@ -262,6 +311,27 @@ describe('useMonitorTargetSelect', () => {
     unmount()
   })
 
+  it('race: mudança durante syncToMain aborta etapas seguintes (seq !== syncSeq)', async () => {
+    const mod = await loadFresh()
+    const { result, unmount } = host(() => mod.useMonitorTargetSelect())
+    await result.refresh()
+    bridge.projection.setSiteTargetMonitors.mockImplementationOnce(async (ids: number[]) => {
+      // durante o await do 1º passo, usuário muda a seleção → syncSeq muda
+      const { nextTick } = await import('vue')
+      await result.setSelectedIds([4])
+      await nextTick()
+      await Promise.resolve()
+      return ids
+    })
+    result.setSelectedIds([3])
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(bridge.projection.setVideoTargetMonitors).not.toHaveBeenCalledWith([3])
+    expect(reapplyProjectionTargets).not.toHaveBeenCalledWith([3])
+    unmount()
+  })
+
   it('onMounted assina IPC e displays-changed; unmount desassina', async () => {
     const unsubTargets = vi.fn()
     const unsubDisplays = vi.fn()
@@ -376,6 +446,63 @@ describe('useMonitorTargetSelect', () => {
     expect(opts).toContain(1)
     result.toggle(1)
     expect(result.selectedIds.value).toContain(1)
+    unmount()
+  })
+
+  it('gaps4: sync stale (seq!==syncSeq) e finally seq check', async () => {
+    const mod = await loadFresh()
+    const { result, unmount } = host(() => mod.useMonitorTargetSelect())
+    await result.refresh()
+    let release1!: () => void
+    bridge.projection.setSiteTargetMonitors.mockImplementationOnce(
+      () => new Promise((r) => (release1 = r)),
+    )
+    const p1 = result.setSelectedIds([3])
+    await Promise.resolve()
+    const p2 = result.setSelectedIds([2]) // muda seq → 1ª fica stale
+    release1()
+    await Promise.all([p1, p2])
+    await Promise.resolve()
+    unmount()
+  })
+
+  it('gaps4: applyRemoteIds displays vazio, sameIds igual (brs 199/202)', async () => {
+    const mod = await loadFresh()
+    let cb: ((ids: number[]) => void) | undefined
+    bridge.projection.onSiteTargetsChanged.mockImplementation((fn: (ids: number[]) => void) => {
+      cb = fn
+      return () => {}
+    })
+    const { createApp, defineComponent, h } = await import('vue')
+    let res: ReturnType<typeof mod.useMonitorTargetSelect> | undefined
+    const Host = defineComponent({
+      setup() {
+        res = mod.useMonitorTargetSelect()
+        return () => h('div')
+      },
+    })
+    const el = document.createElement('div')
+    document.body.appendChild(el)
+    const app = createApp(Host)
+    app.mount(el)
+    await Promise.resolve()
+    const r2 = res!
+    ;(r2.displays as unknown as { value: unknown[] }).value = [] // vazio → [...normalized]
+    cb!([7])
+    await Promise.resolve()
+    expect(r2.selectedIds.value).toEqual([7])
+    cb!([7]) // sameIds → early return
+    expect(r2.selectedIds.value).toEqual([7])
+    app.unmount()
+  })
+
+  it('gaps4: watch modelValue com ids null é ignorado (br 314)', async () => {
+    const mod = await loadFresh()
+    const model = ref<number[] | null>(null)
+    const { result, unmount } = host(() => mod.useMonitorTargetSelect({ modelValue: model }))
+    model.value = null
+    await Promise.resolve()
+    expect(result.selectedIds.value).toEqual([])
     unmount()
   })
 })

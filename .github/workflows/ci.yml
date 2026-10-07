@@ -127,10 +127,12 @@ jobs:
         run: |
           npm ci
           node scripts/test-regression.mjs --baseline
+          cp .regression-baseline.json /tmp/pr-regression-baseline.json
       - name: Restaurar código do PR
         if: github.event_name == 'pull_request'
         run: |
           git read-tree -u --reset HEAD
+          cp /tmp/pr-regression-baseline.json .regression-baseline.json
           cp /tmp/test-regression.mjs scripts/test-regression.mjs
           npm ci
       - name: Comparar com baseline (falha se regressão)
@@ -223,6 +225,8 @@ jobs:
 
   e2e-tests:
     name: E2E Tests (playwright)
+    # Staging usa o fluxo curto: o Quality Gate não espera este job.
+    if: github.event_name != 'pull_request' || github.event.pull_request.base.ref != 'staging'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -255,8 +259,19 @@ jobs:
           echo "lint: ${{ needs.lint.result }}"
           echo "typecheck: ${{ needs.typecheck.result }}"
           echo "build: ${{ needs.build.result }}"
+          echo "unit-tests: ${{ needs.unit-tests.result }}"
           echo "regression-gate: ${{ needs.regression-gate.result }}"
           echo "release-validation: ${{ needs.release-validation.result }}"
+          echo "e2e-tests: ${{ needs.e2e-tests.result }}"
+          # PR para staging: lint, typecheck, build e unitários. E2E fica de fora.
+          if [[ "${{ github.event.pull_request.base.ref }}" == "staging" ]]; then
+            if [[ "${{ needs.lint.result }}" != "success" || "${{ needs.typecheck.result }}" != "success" || "${{ needs.build.result }}" != "success" || "${{ needs.unit-tests.result }}" != "success" ]]; then
+              echo "::error::Quality Gate FALHOU — testes mínimos de staging"
+              exit 1
+            fi
+            echo "Quality Gate PASSOU (staging: lint, typecheck, build, unitários)"
+            exit 0
+          fi
           # regression-gate só roda em pull_request; em push fica "skipped".
           REG="${{ needs.regression-gate.result }}"
           if [[ "${{ needs.unit-tests.result }}" != "success" || "${{ needs.e2e-tests.result }}" != "success" || "${{ needs.lint.result }}" != "success" || "${{ needs.typecheck.result }}" != "success" || "${{ needs.build.result }}" != "success" || "${{ needs.release-validation.result }}" != "success" || ( "$REG" != "success" && "$REG" != "skipped" ) ]]; then

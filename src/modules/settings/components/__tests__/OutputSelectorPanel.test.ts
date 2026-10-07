@@ -45,6 +45,7 @@ Object.defineProperty(window, 'louvorja', {
   configurable: true,
 })
 
+const __cbs: Array<() => void> = []
 import OutputSelectorPanel from '../OutputSelectorPanel.vue'
 
 async function mountPanel(props: Record<string, unknown> = {}) {
@@ -150,5 +151,49 @@ describe('OutputSelectorPanel', () => {
     const w = await mountPanel()
     active = w
     expect(true).toBe(true)
+  })
+
+  it('gaps: monitor sem bounds, slot sem label usa id, onChanged dispara refresh', async () => {
+    const displaysApi = {
+      list: vi.fn(async () => [{ id: 'm1', bounds: null }]),
+      onChanged: vi.fn((cb: () => void) => {
+        __cbs.push(cb)
+        return () => {}
+      }),
+    }
+    const palcoApi2 = {
+      slots: vi.fn(async () => [{ id: 'tv-9', label: '', clients: 0 }]),
+    }
+    ;(globalThis as Record<string, unknown>).__cbs = __cbs
+    Object.defineProperty(window, 'louvorja', {
+      value: { displays: displaysApi, palco: palcoApi2 },
+      configurable: true,
+    })
+    const w = await mountPanel()
+    active = w
+    const text = w.text()
+    expect(text).toContain('tv-9') // label fallback = id
+    expect(text).toContain('settings.outputs.tvOffline')
+    // onChanged → refresh
+    for (const cb of __cbs.splice(0)) cb()
+    await flushPromises()
+    expect(w.exists()).toBe(true)
+  })
+
+  it('gaps onda1: registry targets exercitam callbacks find; select vazio envia null', async () => {
+    displaysApi.list.mockResolvedValue([{ id: 0 }])
+    palcoApi.slots.mockResolvedValue([{ id: 'tv-1', label: 'TV 1', clients: 1 }])
+    registryMock.targets.value = [
+      { id: 'cable:0', module: 'bible' },
+      { id: 'palco:tv-1', module: 'video' },
+    ]
+    const w = await mountPanel()
+    active = w
+    const selects = w.findAll('select')
+    expect(selects).toHaveLength(2)
+    expect((selects[0].element as HTMLSelectElement).value).toBe('bible')
+    expect((selects[1].element as HTMLSelectElement).value).toBe('video')
+    await selects[0].setValue('')
+    expect(registryMock.setModule).toHaveBeenCalledWith('cable:0', null)
   })
 })

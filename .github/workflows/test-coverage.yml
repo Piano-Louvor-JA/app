@@ -1,0 +1,117 @@
+# CI de Testes — cobertura rigorosa (istanbul) com thresholds 100/100/100/100.
+# Meta: nenhum PR entra sem toda a cobertura de testes passando.
+#
+# Duas passadas + merge determinístico:
+#   PASS 1 — suíte completa (statements/branches/functions de tudo).
+#   PASS 2 — só os testes que montam componentes .vue (components/views/shared).
+# O remap do provider istanbul desalinha keys de .vue quando o mesmo arquivo é
+# instrumentado em processos diferentes (import sem montagem gera mapa "podado"),
+# e o merge nativo do vitest descarta contadores reais. O merge por POSIÇÃO
+# (line/col) em scripts/merge-coverage.mjs une as duas passadas sem perder hits.
+name: Test Coverage Gate
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [staging, main]
+  push:
+    branches: [staging, main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  unit-coverage:
+    name: Unit Tests + Coverage 100%
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Vitest suíte completa (provider v8 — AST remap, sem phantom)
+        # thresholds 0: o gate 100/100/100/100 roda no step próprio abaixo
+        run: >-
+          npx vitest run
+          --coverage --coverage.provider=v8
+          --coverage.reporter=json
+          --coverage.thresholds.statements=0
+          --coverage.thresholds.branches=0
+          --coverage.thresholds.functions=0
+          --coverage.thresholds.lines=0
+          --coverage.reportsDirectory=coverage-merged
+          --exclude='.stryker-tmp/**' --exclude='.worktrees/**'
+      - name: Vitest passada 2 — testes que montam .vue (v8)
+        run: >-
+          npx vitest run
+          src/__tests__ src/layouts
+          src/design-system/components
+          src/modules/albums/components src/modules/albums/views
+          src/modules/bible/components src/modules/bible/views
+          src/modules/clock/components src/modules/clock/views
+          src/modules/community/components src/modules/community/views
+          src/modules/countdown/components src/modules/countdown/views
+          src/modules/draw/components src/modules/draw/views
+          src/modules/home/components src/modules/home/views
+          src/modules/liturgy/components src/modules/liturgy/views
+          src/modules/media/components src/modules/media/views
+          src/modules/random/components src/modules/random/views
+          src/modules/remote/views
+          src/modules/settings/components src/modules/settings/views
+          src/modules/starting/components src/modules/sync/components
+          src/modules/timer/components src/modules/timer/views
+          src/shared/components
+          --coverage --coverage.provider=v8
+          --coverage.reporter=json
+          --coverage.thresholds.statements=0
+          --coverage.thresholds.branches=0
+          --coverage.thresholds.functions=0
+          --coverage.thresholds.lines=0
+          --coverage.reportsDirectory=coverage-v8-ui
+          --exclude='.stryker-tmp/**' --exclude='.worktrees/**'
+      - name: Merge das passadas (por posição)
+        run: node scripts/merge-coverage.mjs coverage-merged/coverage-final.json coverage-v8-ui/coverage-final.json coverage-merged/coverage-final.json
+      - name: Upload coverage p/ diagnóstico
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-merged
+          path: coverage-merged/coverage-final.json
+          retention-days: 7
+      - name: Publicar resumo no PR
+        if: always() && github.event_name == 'pull_request'
+        run: |
+          if [ -f coverage-merged/coverage-final-summary.json ]; then
+            echo "## Coverage (istanbul, merge 2 passadas)" >> "$GITHUB_STEP_SUMMARY"
+            node -e "
+              const s = require('./coverage-merged/coverage-final-summary.json').total;
+              const fmt = (l, v) => '| ' + l + ' | ' + v.pct.toFixed(2) + '% | ' + v.covered + '/' + v.total + ' |';
+              console.log(fmt('Statements', s.statements));
+              console.log(fmt('Branches', s.branches));
+              console.log(fmt('Functions', s.functions));
+              console.log(fmt('Lines', s.lines));
+            " >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Gerar summary (gate)
+        run: |
+          node scripts/merge-coverage.mjs coverage-merged/coverage-final.json coverage-merged/coverage-final.json coverage-merged/coverage-final-tmp.json
+          mv coverage-merged/coverage-final-tmp-summary.json coverage-merged/coverage-final-summary.json
+      - name: Falha explícita se abaixo de 100
+        run: |
+          node -e "
+            const files = require('./coverage-merged/coverage-final-summary.json');
+            const s = files.total;
+            const bad = Object.entries(s).filter(([k, v]) => ['statements','branches','functions','lines'].includes(k) && v.pct < 100);
+            if (bad.length) {
+              const gaps = Object.entries(files).filter(([p, v]) => p !== 'total' && (v.statements.pct < 100 || v.branches.pct < 100 || v.functions.pct < 100 || v.lines.pct < 100));
+              for (const [p, v] of gaps.slice(0, 250)) {
+                console.error('GAP:', p.replace('/home/runner/work/app/app/', ''), 's='+v.statements.pct.toFixed(1), 'b='+v.branches.pct.toFixed(1), 'f='+v.functions.pct.toFixed(1), 'l='+v.lines.pct.toFixed(1));
+              }
+              console.error('COBERTURA < 100:', bad.map(([k,v]) => k+'='+v.pct.toFixed(2)+'%').join(', '));
+              process.exit(1);
+            }
+            console.log('100/100/100/100 OK');
+          "

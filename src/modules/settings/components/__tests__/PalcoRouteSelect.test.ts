@@ -117,9 +117,59 @@ describe('PalcoRouteSelect', () => {
     expect(w.find('label').classes()).toContain('palco-route--compact')
   })
 
+  it('gaps: display sem bounds, slot sem clients, update via vm', async () => {
+    palcoApi.status.mockResolvedValue({ running: true })
+    palcoApi.slots.mockResolvedValue([
+      { id: '2', label: 'TV Cozinha', running: false, clients: 0, httpPort: 7082, wsPort: 7083 },
+    ])
+    displaysApi.list.mockResolvedValue([{ id: 5 }]) // sem bounds
+    const w = await mountCard()
+    active = w
+    const select = w.find('select')
+    expect(select.exists()).toBe(true)
+    const texts = select.findAll('option').map((o) => o.text())
+    expect(texts.some((tx) => tx.includes('monitor'))).toBe(true) // sem bounds → sem detalhe
+    expect(texts.some((tx) => !tx.includes('connectedShort'))).toBe(true) // slot sem clients
+    // update via vm (linha 28)
+    const vm = w.vm as unknown as { update?: (v: string) => void }
+    vm.update?.('cable:5')
+    await flushPromises()
+    expect(setPalcoRoute).toHaveBeenCalledWith('hymns', 'cable:5')
+    w.unmount()
+  })
+
   it('unmount limpa o interval sem erro', async () => {
     const w = await mountCard()
     w.unmount()
     expect(true).toBe(true)
+  })
+
+  it('gaps: displays sem API (dispApi undefined) e list rejeitando; update direto', async () => {
+    palcoApi.status.mockResolvedValue({ running: true })
+    // sem displays API (dispApi?.list falsy → [])
+    Object.defineProperty(window, 'louvorja', { get: () => ({ palco: palcoApi }), configurable: true })
+    let w = await mountCard()
+    active = w
+    expect(w.find('select').exists()).toBe(true)
+    // com API rejeitando (catch → [])
+    Object.defineProperty(window, 'louvorja', { get: () => ({ palco: palcoApi, displays: displaysApi }), configurable: true })
+    displaysApi.list.mockRejectedValue(new Error('x'))
+    w = await mountCard()
+    active = w
+    expect(w.find('select').exists()).toBe(true)
+  })
+
+  it('unmount limpa o interval ativo', async () => {
+    vi.useFakeTimers()
+    try {
+      palcoApi.status.mockResolvedValue({ running: true })
+      const clear = vi.spyOn(window, 'clearInterval')
+      const w = await mountCard()
+      await vi.advanceTimersByTimeAsync(4000)
+      w.unmount()
+      expect(clear).toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

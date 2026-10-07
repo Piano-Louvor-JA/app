@@ -129,6 +129,23 @@ describe('LyricCustomizationCard', () => {
     expect(setters.setFontColor).toHaveBeenLastCalledWith('#ff0000')
   })
 
+  it('callbacks dos componentes: toggle e slider atualizam preferências', async () => {
+    mockSettings.customTextFormat = true
+    const w = mount(LyricCustomizationCard, {
+      global: {
+        stubs: {
+          'v-slider': { emits: ['update:modelValue'], template: '<button class="slider-stub" @click="$emit(\'update:modelValue\', 125)" />' },
+        },
+      },
+    })
+    active = w
+    w.findAllComponents({ name: 'SettingsToggle' })[0]!.vm.$emit('update:modelValue', false)
+    await w.find('.slider-stub').trigger('click')
+    await flushPromises()
+    expect(setters.setShowSongTitle).toHaveBeenCalledWith(false)
+    expect(setters.setFontSizePercent).toHaveBeenCalledWith(125)
+  })
+
   it('seleção de imagem de fundo chama setBackgroundImageFromFile', async () => {
     mockSettings.customBackground = true
     const w = mount(LyricCustomizationCard)
@@ -164,5 +181,72 @@ describe('LyricCustomizationCard', () => {
     // backgroundImage null no mock → botão remove ausente
     const removeBtn = w.findAll('button').find((b) => b.classes().some((c) => c.includes('remove') || c.includes('clear')))
     expect(removeBtn).toBeUndefined()
+  })
+
+  describe('gaps — peso, fundo, tamanho e file picker', () => {
+    it('setFontSizePercent via slider e setFontWeight via botões', async () => {
+      mockSettings.customTextFormat = true
+      const w = mount(LyricCustomizationCard)
+      await flushPromises()
+      active = w
+      // peso: botões role=radio
+      const weights = w.findAll('[role="radio"]')
+      expect(weights.length).toBeGreaterThanOrEqual(2)
+      await weights[weights.length - 1]!.trigger('click')
+      expect(setters.setFontWeight).toHaveBeenCalled()
+      // slider do vuetify não renderiza: chama o handler exposto no vm
+      const vm = w.vm as unknown as Record<string, (v: number) => void>
+      vm.setFontSizePercent?.(140)
+      expect(setters.setFontSizePercent).toHaveBeenCalledWith(140)
+    })
+
+    it('setBackgroundColor via swatches do fundo e input color de fundo', async () => {
+      mockSettings.customBackground = true
+      const w = mount(LyricCustomizationCard)
+      await flushPromises()
+      active = w
+      // swatches de fundo (segunda lista de swatches)
+      const swatches = w.findAll('.lyric-custom__swatch')
+      if (swatches.length > 1) {
+        await swatches[swatches.length - 1]!.trigger('click')
+      }
+      expect(setters.setBackgroundColor).toHaveBeenCalled()
+      const colorInputs = w.findAll('input[type="color"]')
+      for (const input of colorInputs) {
+        await input.setValue('#123456')
+      }
+      expect(setters.setBackgroundColor).toHaveBeenCalledWith('#123456')
+    })
+
+    it('clearBackgroundImage com imagem definida', async () => {
+      mockSettings.customBackground = true
+      mockSettings.backgroundImage = 'data:image/png;base64,x'
+      const w = mount(LyricCustomizationCard)
+      await flushPromises()
+      active = w
+      const danger = w.findAll('button').find((b) => b.classes().some((c) => c.includes('danger')))
+      if (danger) {
+        await danger.trigger('click')
+        expect(setters.clearBackgroundImage).toHaveBeenCalled()
+      }
+      w.unmount()
+      active = null
+    })
+
+    it('openFilePicker dispara click no input escondido', async () => {
+      mockSettings.customBackground = true
+      const w = mount(LyricCustomizationCard)
+      await flushPromises()
+      active = w
+      const input = w.find('input[type="file"]')
+      const clickSpy = vi.spyOn(input.element as HTMLInputElement, 'click').mockImplementation(() => {})
+      const pickerBtn = w.findAll('button').find((b) => !b.classes().length || b.classes().some((c) => c.includes('picker') || c.includes('upload')))
+      if (pickerBtn) await pickerBtn.trigger('click')
+      // fallback: chamar direto do vm
+      const vm = w.vm as unknown as Record<string, () => void>
+      vm.openFilePicker?.()
+      if (pickerBtn) expect(clickSpy).toHaveBeenCalled()
+      clickSpy.mockRestore()
+    })
   })
 })

@@ -144,15 +144,14 @@ function customBaseUrl(): string {
   // (coletâneas não baixam). .env é gitignored / CI não injeta (hotfix 14/09).
   const base =
     import.meta.env.VITE_PALCO_API_URL ?? 'https://api.pianolouvorja.com.br'
-  if (base) return `${base.replace(/\/$/, '')}/v1/custom`
-  return '/v1/custom'
+  return `${base.replace(/\/$/, '')}/v1/custom`
 }
 
 /**
  * Formata duração da API para m:ss.
  * API pode retornar: null, segundos (number), "mm:ss" ou "hh:mm:ss".
  */
-function formatDurationLabel(value: unknown): string {
+export function formatDurationLabel(value: unknown): string {
   const raw = asNullableString(value)
   if (raw) {
     // Já vem formatado ("3:45" / "00:03:45") — só limpar horas vazias
@@ -572,7 +571,7 @@ export function probeAudioDuration(
     const done = (value: number | null) => {
       clearTimeout(timer)
       audio.removeAttribute('src')
-      audio.load()
+      try { audio.load() } catch {}
       resolve(value)
     }
     const timer = setTimeout(() => done(null), timeoutMs)

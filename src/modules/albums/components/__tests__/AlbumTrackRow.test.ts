@@ -111,4 +111,29 @@ describe('AlbumTrackRow', () => {
     expect(w.emitted('lyric')).toHaveLength(1)
     expect(w.emitted('sung')).toHaveLength(1)
   })
+
+  it('hover: mouseenter/mouseleave alternam ações', async () => {
+    const w = await mountRow()
+    const row = w.find('[role="button"]')
+    await row.trigger('mouseenter')
+    await w.vm.$nextTick()
+    expect(w.find('.mta-sung').exists()).toBe(true)
+    await row.trigger('mouseleave')
+    await w.vm.$nextTick()
+    w.unmount()
+  })
+
+  it('evento download-progress do MTA: overlay com width do progresso', async () => {
+    const w = await mountRow()
+    const mta = w.findComponent({ name: 'MusicTrackActions' })
+    mta.vm.$emit('download-progress', 45)
+    await w.vm.$nextTick()
+    expect(w.find('.album-track-row__download-overlay').exists()).toBe(true)
+    expect(w.find('.album-track-row__download-fill').attributes('style')).toContain('45%')
+    // null reseta e esconde overlay
+    mta.vm.$emit('download-progress', null)
+    await w.vm.$nextTick()
+    expect(w.find('.album-track-row__download-overlay').exists()).toBe(false)
+    w.unmount()
+  })
 })

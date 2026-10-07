@@ -481,20 +481,20 @@ async function selectLocalFile() {
     if (paths.length === 0) return
 
     const next: Partial<LiturgyItemDraft> = {
-      filePath: paths[0] ?? '',
+      filePath: paths[0]! /* length check acima garante índice 0 */,
       filePaths: multiple ? paths : [],
     }
     // Duração automática de mídia local (vídeo/áudio) via ffprobe.
     if (!multiple && paths[0]) {
-      const probed = await probeMediaDurationMs(paths[0]!)
+      const probed = await probeMediaDurationMs(paths[0])
       if (probed > 0) next.durationMs = probed
     }
     if (!props.draft.name.trim()) {
       if (multiple && paths.length > 1) {
         next.name = t('liturgy.fields.filesSelected', { count: paths.length })
       } else {
-        const fileName = paths[0]!.split(/[\\/]/).pop() ?? ''
-        next.name = fileName.replace(/\.[^.]+$/, '') || fileName
+        const fileName = paths[0]!.split(/[\\/]/).pop()! /* pop de path não-vazio é non-empty */
+        next.name = fileName.includes('.') ? fileName.replace(/\.[^.]+$/, '') : fileName
       }
     }
     patch(next)
