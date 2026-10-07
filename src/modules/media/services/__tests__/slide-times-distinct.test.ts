@@ -21,3 +21,8 @@ describe('hasDistinctSlideTimes', () => {
    expect(hasDistinctSlideTimes([0, 0, 0, 30], true)).toBe(false)
    expect(hasDistinctSlideTimes([0, 0, 0], true)).toBe(false)
  })
+
+ it('letra única em zero avança além da capa sintética', () => {
+   expect(hasDistinctSlideTimes([0, 0], true)).toBe(true)
+   expect(hasDistinctSlideTimes([0, 0])).toBe(false)
+ })

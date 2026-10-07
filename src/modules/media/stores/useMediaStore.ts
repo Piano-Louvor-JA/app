@@ -745,7 +745,7 @@ export const useMediaStore = defineStore('media', () => {
     slideIndex.value = next
 
     const times = session.value?.slideTimesSec ?? []
-    if (hasAudio.value && times.length > next) {
+    if (hasAudio.value && times.length > next && hasDistinctSlideTimes(times, slides[0]?.isCover === true)) {
       seekTo(times[next] ?? 0)
     }
 
