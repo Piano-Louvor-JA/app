@@ -361,6 +361,9 @@ async function importSljaLocal({
 		}
 	} catch (error) {
 		deleteLocalMusic(musicId);
+		if (error instanceof Error && error.message === "local-persist-failed") {
+			throw new Error("SLJA_LOCAL_LYRIC_PERSIST_FAILED");
+		}
 		throw error;
 	}
 

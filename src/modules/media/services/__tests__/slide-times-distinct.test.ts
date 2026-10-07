@@ -9,4 +9,8 @@ describe('hasDistinctSlideTimes', () => {
   it('tempos diferentes seguem a reprodução', () => {
     expect(hasDistinctSlideTimes([0, 12, 40])).toBe(true)
   })
+
+  it('zeros iniciais com um tempo depois não sincronizam', () => {
+    expect(hasDistinctSlideTimes([0, 0, 30])).toBe(false)
+  })
 })
