@@ -111,7 +111,9 @@ function unionFiles(filesA, filesB) {
     const f = {};
     {
       const index = new Map();
+      const passCount = {};
       const add = (cov) => {
+        const seen = new Set();
         for (const [id, loc] of Object.entries(cov.fnMap)) {
           // name excluído: workers remapeiam nomes anônimos de forma
           // não-determinística → mesma fn virava 2 entradas (uma fantasma).
@@ -123,15 +125,21 @@ function unionFiles(filesA, filesB) {
             fnMap[newId] = loc;
             f[newId] = 0;
           }
+          if (!seen.has(newId)) {
+            seen.add(newId);
+            passCount[newId] = (passCount[newId] ?? 0) + 1;
+          }
           f[newId] += cov.f[id] ?? 0;
         }
       };
       add(a); add(b);
-      // Descarta fn fantasma de transform: span que só existe em UMA
-      // passada e ficou sem hits = artefato de remap (fn real aparece
-      // nos dois mapas ou tem hits).
+      // Fantasma de remap: span zerado que só existe numa passada.
+      // Função zerada nas duas passadas é lacuna real e permanece.
       for (const id of Object.keys(f)) {
-        if (f[id] === 0) { delete f[id]; delete fnMap[id]; }
+        if (f[id] === 0 && (passCount[id] ?? 0) < 2) {
+          delete f[id];
+          delete fnMap[id];
+        }
       }
     }
 
