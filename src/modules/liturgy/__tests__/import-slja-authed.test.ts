@@ -205,6 +205,55 @@ describe("import .slja LOGADO → API custom (app#331)", () => {
 		expect(coverFileId).toBe(44);
 	});
 
+	it("não reusa a coletânea pública de outro usuário", async () => {
+		authSessionMock.mockReturnValue({
+			token: "tok",
+			user: { id_user: 1, email: "op@igreja.org" },
+		});
+		fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+			const u = String(url);
+			const json = (body: unknown, status = 200) =>
+				new Response(JSON.stringify(body), { status });
+			if (u.endsWith("/collections") && init?.method !== "POST") {
+				return json({
+					data: [
+						{
+							id_collection: 99,
+							name: "Importações .slja",
+							owner_id: 999,
+							visibility: "public",
+						},
+					],
+				});
+			}
+			if (u.endsWith("/collections") && init?.method === "POST") {
+				return json({ id_collection: 55 });
+			}
+			if (u.includes("/collections/55/musics") && init?.method === "POST") {
+				return json({ id_music: 7 });
+			}
+			if (u.endsWith("/musics/7/lyrics") && init?.method === "POST") {
+				return json({ id_lyric: 1 });
+			}
+			return json({ message: "nf" }, 404);
+		});
+		const archive: SljaArchive = {
+			title: "Minha",
+			assets: [],
+			slides: [{ lyric: "Verso", type: "LETRA", timeMs: 1_000, order: 1 }],
+		};
+		const imported = await importSljaAsLiturgyMusic({
+			bytes: await buildSlja(archive),
+			name: "minha.slja",
+		});
+		expect(imported.collectionId).toBe(55);
+		expect(
+			fetchMock.mock.calls.some((call) =>
+				String(call[0]).includes("/collections/99/"),
+			),
+		).toBe(false);
+	});
+
 	it("estrofe rejeitada desfaz a música e não reporta sucesso", async () => {
 		fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
 			const u = String(url);

@@ -101,12 +101,15 @@ async function ensureImportCollectionId(): Promise<number | null> {
 	// media editor); só cria se ainda não houver nenhuma.
 	try {
 		const collections = await listCustomCollections();
-		// Id negativo é coletânea LOCAL (import deslogado). Reusar esse id
-		// depois do login faz createCustomMusic gravar de novo no localStorage
-		// e toCustomMusicId transformar o id num positivo abaixo de 1M, que o
-		// player trata como hino oficial.
+		const ownerId = getAuthSession()?.user?.id_user;
+		// Id negativo é coletânea LOCAL. Coletânea pública de outro usuário
+		// com o mesmo nome também não serve: o POST seguinte seria recusado.
 		const existing = collections.find(
-			(c) => c.name === IMPORT_COLLECTION_NAME && c.id > 0,
+			(c) =>
+				c.name === IMPORT_COLLECTION_NAME &&
+				c.id > 0 &&
+				ownerId != null &&
+				c.ownerId === ownerId,
 		);
 		if (existing) return existing.id;
 	} catch {
@@ -139,6 +142,9 @@ export async function importSljaAsLiturgyMusic(
 		.filter((slide) => slide.type !== "CAPA" && slide.lyric.trim().length > 0);
 
 	const durationMs = estimateSljaDurationMs(slides);
+	if (slides.length === 0) {
+		throw new Error("SLJA_IMPORT_NO_LYRICS");
+	}
 
 	// ── Deslogado: grava 100% LOCAL (regra de produto 12/09 — sem identidade
 	// não há escrita confiável na API). Uso local sem conta é requisito

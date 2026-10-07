@@ -34,6 +34,13 @@ describe('loadAlbumLyric — custom e local (app#331)', () => {
   })
 
   it('id custom 1M+ lê a letra da API, não music_<id>', async () => {
+    localStorage.setItem(
+      'louvorja.custom.auth',
+      JSON.stringify({
+        token: 'tok-privado',
+        user: { id_user: 1, email: 'a@b.c', displayName: 'A' },
+      }),
+    )
     const fetchMock = vi.fn(async (url: string) => {
       if (String(url).endsWith('/musics/7')) {
         return new Response(
@@ -51,6 +58,13 @@ describe('loadAlbumLyric — custom e local (app#331)', () => {
       const doc = await loadAlbumLyric(toCustomMusicId(7))
       expect(doc?.title).toBe('Hino Autoral')
       expect(doc?.lines[0]?.text).toBe('Verso um')
+      const lyricCall = fetchMock.mock.calls.find((call) =>
+        String(call[0]).endsWith('/musics/7'),
+      )
+      const headers = (lyricCall?.[1] as RequestInit | undefined)?.headers as
+        | Record<string, string>
+        | undefined
+      expect(headers?.authorization).toBe('Bearer tok-privado')
       expect(fetchMock.mock.calls.some((call) => String(call[0]).includes('music_'))).toBe(
         false,
       )

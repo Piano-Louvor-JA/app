@@ -123,6 +123,27 @@ describe("app#331 — import .slja → item de liturgia → player (offline)", (
 		expect(trackAfter?.audioUrl ?? "").toMatch(/^data:audio/);
 	});
 
+	it("arquivo só com capa não cria música vazia", async () => {
+		const archive: SljaArchive = {
+			title: "Só Capa",
+			assets: [],
+			slides: [
+				{ lyric: "Capa", type: "CAPA", timeMs: 0, order: 1 },
+			],
+		};
+		await expect(
+			importSljaAsLiturgyMusic({
+				bytes: await buildSlja(archive),
+				name: "so-capa.slja",
+			}),
+		).rejects.toThrow("SLJA_IMPORT_NO_LYRICS");
+		expect(
+			listLocalCollections().flatMap((collection) =>
+				listLocalMusics(collection.id),
+			),
+		).toEqual([]);
+	});
+
 	it("título sentinela Sem título usa o nome do arquivo", () => {
 		expect(sljaDisplayName({ title: "Sem título" }, "missao.slja")).toBe(
 			"missao",

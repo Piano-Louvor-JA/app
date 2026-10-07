@@ -221,7 +221,9 @@ export async function loadCustomMusicTrack(
   if (!Number.isFinite(musicId) || musicId <= 0) return null
 
   try {
-    const response = await fetch(`${customBaseUrl()}/musics/${musicId}`)
+    const response = await fetch(`${customBaseUrl()}/musics/${musicId}`, {
+      headers: authHeaders(),
+    })
     if (!response.ok) return null
     const row = (await response.json()) as CustomMusicRow
     if (!row || !row.name) return null
