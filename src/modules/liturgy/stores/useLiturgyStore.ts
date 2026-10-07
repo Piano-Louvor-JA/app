@@ -43,6 +43,10 @@ import {
   reorderLiturgyItems,
 } from '../services/liturgy-item-helpers'
 import {
+  deriveSessionTimesFromCategories,
+  enrichItemsDurations,
+} from '../services/liturgy-duration-enrich'
+import {
   loadLiturgyState,
   saveLiturgyState,
   todayWeekday,
@@ -545,24 +549,50 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     deletionLocks.value = state.deletionLocks
     if (selectedItemIndex.value != null) selectedItemIndex.value = null
 
+    // t_b1a9deae: Resumo do Evento pré-preenchido pelas categorias importadas
+    // (só quando a sessão do dia está vazia — nunca sobrescreve ajuste manual).
+    const nextSessionTimes = { ...daySessionTimes.value }
+    let sessionChanged = false
+    for (const day of Object.keys(nextSessionTimes) as LiturgyWeekday[]) {
+      const derived = deriveSessionTimesFromCategories(
+        weekdays.value[day] ?? [],
+        nextSessionTimes[day],
+      )
+      if (derived !== nextSessionTimes[day]) {
+        nextSessionTimes[day] = derived
+        sessionChanged = true
+      }
+    }
+    if (sessionChanged) {
+      daySessionTimes.value = nextSessionTimes
+      state.daySessionTimes = nextSessionTimes
+      saveLiturgyState(state)
+    }
+
     const music = musicList.value
     if (music.length === 0) return
     const nextWeekdays = { ...weekdays.value }
     let changed = false
     for (const day of Object.keys(nextWeekdays) as LiturgyWeekday[]) {
-      const reconciled = reconcileMusicItemTitles(nextWeekdays[day], music)
+      // t_14d066ea: duração da API para músicas zeradas (mesmo contrato do .ja).
+      const enriched = await enrichItemsDurations(nextWeekdays[day], music)
+      const reconciled = reconcileMusicItemTitles(enriched, music)
       if (reconciled !== nextWeekdays[day]) {
         nextWeekdays[day] = reconciled
         changed = true
       }
     }
     weekdays.value = nextWeekdays
-    customLiturgies.value = customLiturgies.value.map((custom) => {
-      const reconciled = reconcileMusicItemTitles(custom.items, music)
-      if (reconciled === custom.items) return custom
-      changed = true
-      return { ...custom, items: reconciled }
-    })
+    const nextCustoms = await Promise.all(
+      customLiturgies.value.map(async (custom) => {
+        const enriched = await enrichItemsDurations(custom.items, music)
+        const reconciled = reconcileMusicItemTitles(enriched, music)
+        if (reconciled === custom.items) return custom
+        changed = true
+        return { ...custom, items: reconciled }
+      }),
+    )
+    customLiturgies.value = nextCustoms
     if (changed) persist()
   }
 
