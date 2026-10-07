@@ -8,10 +8,29 @@ import { USER_PREFERENCE_KEYS } from '@shared/constants/storage-keys'
 import { getUserPreference, setUserPreference } from '@shared/services/user-preferences'
 
 import { parseDataPacket, type DataPacketRow } from '../services/datapacket-parser'
+import type { LiturgyMusicMode } from '../types/liturgy'
 
 export interface ScheduledCategory {
   id: string
   name: string
+}
+
+export interface ScheduledItemContent {
+  kind: 'music' | 'file' | 'verse' | 'annotation' | 'online_video'
+  /** kind=music */
+  musicId?: number
+  musicMode?: LiturgyMusicMode
+  /** kind=file */
+  filePath?: string
+  /** kind=verse */
+  verseBookId?: number
+  verseChapter?: number
+  verseNumbers?: string
+  /** kind=annotation */
+  text?: string
+  /** kind=online_video */
+  url?: string
+  name?: string
 }
 
 export interface ScheduledItem {
@@ -25,6 +44,12 @@ export interface ScheduledItem {
   isRelativePath: boolean
   /** Extensão NOSSA — o Delphi não tem o campo. */
   notes: string
+  /**
+   * Conteúdo polimórfico (qualquer tipo de item da liturgia pode ser agendado —
+   * Rafael 07/10: "a programação toda com itens agendados"). Ausente = item
+   * legado do port Delphi: o conteúdo é o próprio filePath (arquivo).
+   */
+  content?: ScheduledItemContent
 }
 
 interface State {
@@ -72,6 +97,46 @@ export const useScheduledStore = defineStore('scheduled', {
   },
 
   actions: {
+    /** Categoria da rotação (upsert por id) — placeholder da liturgia aponta pra cá. */
+    upsertCategory(cat: { id: string; name: string }) {
+      const i = this.categories.findIndex((c) => c.id === cat.id)
+      if (i >= 0) this.categories[i] = { ...this.categories[i], ...cat }
+      else this.categories.push({ ...cat })
+      this.persist()
+    },
+
+    /** Entrada agendada (upsert por id): data + conteúdo de QUALQUER tipo. */
+    upsertItem(
+      item: {
+        id: string
+        categoryId: string
+        date: string
+        name: string
+        content?: ScheduledItemContent
+        filePath?: string
+      },
+    ) {
+      const normalized: ScheduledItem = {
+        id: item.id,
+        categoryId: item.categoryId,
+        date: item.date,
+        name: item.name,
+        filePath: item.filePath ?? item.content?.filePath ?? '',
+        isRelativePath: false,
+        notes: '',
+        ...(item.content ? { content: item.content } : {}),
+      }
+      const i = this.items.findIndex((x) => x.id === item.id)
+      if (i >= 0) this.items[i] = normalized
+      else this.items.push(normalized)
+      this.persist()
+    },
+
+    /** A entrada da categoria para a data (o dia D resolve contra ela). */
+    findOn(categoryId: string, isoDate: string): ScheduledItem | undefined {
+      return this.items.find((i) => i.categoryId === categoryId && i.date === isoDate)
+    },
+
     persist() {
       setUserPreference(USER_PREFERENCE_KEYS.scheduledState, {
         categories: this.categories,
