@@ -177,14 +177,15 @@ jobs:
             echo "Faltam latest-linux.yml / latest-linux-arm64.yml (metadados do auto-update)" >&2
             exit 1
           fi
-          # O electron-builder (mac/win, paralelo) pode ter criado DRAFT da mesma tag;
-          # `gh release view` acha draft => publica ele em vez de criar release nova.
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release edit "$TAG" --draft=false --latest
-          else
-            gh release create "$TAG" --title "$TAG" --generate-notes --latest
+          # Cria ou reutiliza um draft, envia os assets e só então publica.
+          # Publicar antes deixaria uma release incompleta se o upload falhar.
+          # Sem --latest: o GitHub escolhe a latest pela data e pela versão,
+          # então uma tag antiga disparada manualmente não substitui a atual.
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --title "$TAG" --generate-notes --draft
           fi
           gh release upload "$TAG" "${assets[@]}" --clobber
+          gh release edit "$TAG" --draft=false
           echo "Publicados:"
           printf '  %s\n' "${assets[@]}"
 
