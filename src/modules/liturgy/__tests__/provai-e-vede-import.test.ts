@@ -48,10 +48,32 @@ describe('importar episódios P&V → auto-agendar na rotação', () => {
     expect(report2.created).toBe(0)
     expect(report2.skipped).toBe(2)
 
-    // Rotação reusada (não criou segunda "Provai e Vede")
     const rotations = store.categories.filter((c) => c.name === 'Provai e Vede')
     expect(rotations).toHaveLength(1)
     expect(store.items).toHaveLength(2)
+  })
+
+  it('recupera entrada antiga sem arquivo em vez de pulá-la para sempre', async () => {
+    const store = useScheduledStore()
+    const rotationId = 'rot-pv-antigo'
+    store.upsertCategory({ id: rotationId, name: 'Provai e Vede' })
+    store.upsertItem({
+      id: 'sch-antigo',
+      categoryId: rotationId,
+      date: '2026-10-10',
+      name: 'O milagre entre os galhos secos',
+      content: { kind: 'file', filePath: '' },
+    })
+
+    const resolvePath = vi.fn(() => '/media/provai-e-vede/10-10-26.mp4')
+    const report = await importProvaiEVedeEpisodes(store, [episodes[1]!], resolvePath)
+
+    expect(resolvePath).toHaveBeenCalledOnce()
+    expect(report.created).toBe(0)
+    expect(store.findOn(rotationId, '2026-10-10')?.content).toMatchObject({
+      kind: 'file',
+      filePath: '/media/provai-e-vede/10-10-26.mp4',
+    })
   })
 
   it('B4: aceita subconjunto (usuário escolhe só os próximos sábados)', async () => {
@@ -65,7 +87,7 @@ describe('1-click — só sábados por vir', () => {
   it('episódios com data passada são ignorados', async () => {
     const store = useScheduledStore()
     vi.useFakeTimers()
-    vi.setSystemTime(new Date(2026, 9, 20)) // 20/10/2026
+    vi.setSystemTime(new Date(2026, 9, 20))
     try {
       const report = await importProvaiEVedeEpisodes(
         store,

@@ -47,19 +47,22 @@ export async function importProvaiEVedeEpisodes(
       continue
     }
     const existing = store.findOn(rotationId, ep.dateISO)
-    if (existing) {
+    // Entrada criada numa tentativa anterior sem download não é "pronta":
+    // baixa agora e substitui o filePath vazio. Entradas completas continuam idempotentes.
+    if (existing?.content?.filePath) {
       skipped++
       continue
     }
     const localPath = await resolveLocalPath(ep)
     store.upsertItem({
-      id: `sch-${rotationId}-${ep.dateISO}`,
+      id: existing?.id ?? `sch-${rotationId}-${ep.dateISO}`,
       categoryId: rotationId,
       date: ep.dateISO,
       name: ep.title,
       content: { kind: 'file', filePath: localPath },
     })
-    created++
+    if (existing) skipped++
+    else created++
   }
 
   return { rotationId, created, skipped, skippedPast }
