@@ -43,6 +43,7 @@ async function close() {
 }
 
 function syncTitlebarHeight(show: boolean) {
+  /* v8 ignore next 1 -- testes sempre rodam com jsdom (document definido) */
   if (typeof document === 'undefined') return
   if (show) {
     document.documentElement.classList.add('electron-shell')

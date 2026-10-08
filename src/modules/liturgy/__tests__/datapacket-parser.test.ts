@@ -28,4 +28,13 @@ describe('parseDataPacket', () => {
   it('sem ROWDATA → vazio, sem crash', () => {
     expect(parseDataPacket('<DATAPACKET><METADATA/></DATAPACKET>')).toEqual([])
   })
+
+  it('ROW sem atributos (com espaço): row vazia entra na lista', () => {
+    const rows = parseDataPacket(
+      '<ROWDATA><ROW /><ROW ID="x"/></ROWDATA>',
+    )
+    expect(rows).toHaveLength(2)
+    expect(rows[0]).toEqual({})
+    expect(rows[1]).toEqual({ ID: 'x' })
+  })
 })

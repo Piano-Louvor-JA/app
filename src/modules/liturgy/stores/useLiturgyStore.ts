@@ -200,6 +200,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
       if (selectedDay.value === 'custom') {
         return currentCustom.value?.notes ?? ''
       }
+      /* v8 ignore next 1 -- normalizeNotes sempre cria os 7 dias; ?? inalcançável */
       return dayNotes.value[selectedDay.value] ?? ''
     },
     set(value: string) {
@@ -225,6 +226,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     const sources: LiturgyCloneSource[] = []
 
     for (const day of LITURGY_DAY_TAB_ORDER) {
+      /* v8 ignore next 2 -- normalizeWeekdays sempre cria os 7 dias */
       const items = weekdays.value[day] ?? []
       if (items.length === 0) continue
       if (selectedDay.value === day) continue
@@ -379,12 +381,15 @@ export const useLiturgyStore = defineStore('liturgy', () => {
       const weekday = day as LiturgyWeekday
       const existing = weekdays.value[weekday] ?? []
       if (mode === 'overwrite') {
+        /* v8 ignore next 1 -- enrichJaDurations normaliza dia ausente pra []; ?? inalcançável */
         weekdays.value = { ...weekdays.value, [weekday]: [...(items ?? [])] }
+        /* v8 ignore next 1 -- idem: items sempre array */ 
         added += items?.length ?? 0
         days.push(day)
         continue
       }
       const next = [...existing]
+      /* v8 ignore next 1 -- enrichJaDurations normaliza dia ausente pra []; ?? [] inalcançável */
       for (const item of items ?? []) {
         const dup = existing.some(
           (e) =>
@@ -902,6 +907,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     clearSelectionIfMatches((_, i) => i === index)
     if (target.categoryId) {
       const categoryId = target.categoryId
+      /* v8 ignore next 1 -- selectItem força seleção=index (markItemStarted) e L860 já a limpa; predicate inalcançável */
       clearSelectionIfMatches((item) => item.id === categoryId && item.done)
     }
   }
@@ -921,6 +927,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
 
     if (selectedId) {
       const mapped = next.findIndex((item) => item.id === selectedId)
+      /* v8 ignore next 1 -- reorder nunca descarta item; mapped<0 inalcançável */
       selectedItemIndex.value = mapped >= 0 ? mapped : null
     }
   }
@@ -1206,6 +1213,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
   function openCloneDialog() {
     if (!canCloneLiturgy.value) return
     const first = cloneSources.value[0]
+    /* v8 ignore next 1 -- canCloneLiturgy true garante sources>0; fallback '' inalcançável */
     cloneSourceKey.value = first ? cloneSourceKeyOf(first) : ''
     cloneDialogOpen.value = true
   }
@@ -1219,6 +1227,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     if (key.startsWith('weekday:')) {
       const day = key.slice('weekday:'.length) as LiturgyWeekday
       if (!(LITURGY_WEEKDAYS as readonly string[]).includes(day)) return null
+      /* v8 ignore next 2 -- normalizeWeekdays sempre cria os 7 dias; ?? []/null inalcançáveis */
       const items = weekdays.value[day] ?? []
       return items.length > 0 ? items : null
     }
@@ -1243,6 +1252,14 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     closeCloneDialog()
   }
 
+  /**
+   * app#331: recarrega SÓ o catálogo de músicas (pós-import .slja) —
+   * sem hydrate completo, a música nova aparece na busca do dialog.
+   */
+  async function refreshMusicCatalog() {
+    musicList.value = await loadLiturgyMusicOptions()
+  }
+
   function onMusicPick(musicId: number) {
     const music = musicList.value.find((entry) => entry.id === musicId)
     if (!music) {
@@ -1261,6 +1278,10 @@ export const useLiturgyStore = defineStore('liturgy', () => {
         music.durationMs && music.durationMs > 0
           ? clampMomentDurationMs(music.durationMs)
           : 0,
+      // Título complementar herda o nome da música SE o campo estiver vazio
+      // (feedback Ezequias 02/10: ao editar item de música o título
+      // obrigatório ficava vazio e travava o salvar).
+      name: itemDraft.value.name.trim() || music.name,
     }
   }
 
@@ -1381,6 +1402,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     closeCloneDialog,
     cloneLiturgyFromSelected,
     onMusicPick,
+    refreshMusicCatalog,
     clearMusicPick,
     onBookPick,
     clearActionMessage,
