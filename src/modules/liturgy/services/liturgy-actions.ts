@@ -6,7 +6,6 @@ import type { ExternalPlayerPreference } from '@shared/types/desktop-bridge'
 import type { Router } from 'vue-router'
 
 import type { LiturgyItem } from '../types/liturgy'
-import { INTERNAL_FILE_TYPES } from '../types/liturgy'
 import { isExecutableItem } from './liturgy-item-helpers'
 import { getLiturgyVideoObjectUrl } from './liturgy-local-video'
 import {
@@ -27,15 +26,21 @@ export type LiturgyActionResult =
   | { ok: true; messageKey?: string }
   | { ok: false; messageKey: string }
 
-function resolveMusicId(item: LiturgyItem): number | null {
+/**
+ * app#331: id de música do item → namespace único de mídia.
+ * - >= 1.000.000: música custom da API (Minhas Coletâneas / importações .slja logadas)
+ * - negativo: música LOCAL (import .slja sem login — localStorage)
+ * - positivo pequeno: hino oficial do catálogo
+ * 0/NaN/null (sem música) → null.
+ */
+export function resolveMusicId(item: LiturgyItem): number | null {
   if (item.type !== 'music') return null
   const musicId = Number(item.musicId)
-  if (!Number.isFinite(musicId) || musicId <= 0) return null
+  if (!Number.isFinite(musicId) || musicId === 0) return null
   return musicId
 }
 
 function resolveImagePaths(item: LiturgyItem): string[] {
-  if (item.type !== 'images') return []
   if (item.filePaths && item.filePaths.length > 0) {
     return item.filePaths.map((entry) => entry.trim()).filter(Boolean)
   }
@@ -143,11 +148,15 @@ export async function executeLiturgyItem(
         return { ok: false, messageKey: 'liturgy.messages.videoSelectFile' }
       }
 
-      // Player externo SÓ para áudio (Ezequias 13/09: "mp3 blz, não é preciso
-      // projetar"). Vídeo PRECISA do player interno: é ele que projeta nas
-      // telas — VLC/mpv não comandam a projeção.
+      // Player externo: áudio E vídeo (Rafael 03/10: "essa funcionalidade é
+      // pra reproduzir vídeos externos" — vídeo ia sempre pro interno,
+      // ignorando a preferência do usuário). Cascata: playerId do item →
+      // preferência global → 'associated' (interno). Player não encontrado
+      // etc → cai no interno com snackbar padrão.
+      // NOTA: com player externo o vídeo não projeta nas telas (o VLC/mpv
+      // não alimenta a projeção) — quem quer projeção usa 'associated'.
       const bridge = getDesktopBridge()
-      if (item.type === 'audio' && filePath && !objectUrl) {
+      if (filePath && !objectUrl && (item.type === 'audio' || item.type === 'video')) {
         let pref: string | undefined = item.playerId
         if (!pref || pref === 'default') {
           pref = await bridge?.externalPlayer?.get?.()
@@ -184,7 +193,7 @@ export async function executeLiturgyItem(
 
       const opened = await openLiturgyLocalImageControl(
         paths,
-        item.name?.trim() || paths[0] || 'Imagens',
+        item.name?.trim() || paths[0],
       )
       if (!opened) {
         return { ok: false, messageKey: 'liturgy.messages.projectionFailed' }
@@ -221,21 +230,25 @@ export async function executeLiturgyItem(
       // modo slideshow (fidelidade total). 'auto' = conversão interna do app
       // (projeção multi-tela).
       let engine = item.presentationEngine
-      if (!engine) {
-        engine = (await bridge?.presentation?.getEngine?.()) ?? 'auto'
+      if (!engine && bridge && bridge.presentation && bridge.presentation.getEngine) {
+        engine = await bridge.presentation.getEngine()
       }
-      if (engine && engine !== 'auto') {
-        const result = await bridge?.presentation?.openExternal?.(
-          filePath,
-          engine,
-        )
+      engine ||= 'auto'
+      if (engine !== 'auto') {
+        const result =
+          bridge && bridge.presentation && bridge.presentation.openExternal
+            ? await bridge.presentation.openExternal(filePath, engine)
+            : undefined
         if (!result?.ok) {
           return { ok: false, messageKey: 'liturgy.messages.projectionFailed' }
         }
         return { ok: true }
       }
 
-      const hasOffice = await bridge?.presentation?.detectOffice?.()
+      const hasOffice =
+        bridge && bridge.presentation && bridge.presentation.detectOffice
+          ? await bridge.presentation.detectOffice()
+          : undefined
       if (hasOffice === false) {
         return {
           ok: false,
@@ -271,13 +284,8 @@ export async function executeLiturgyItem(
     }
 
     default: {
-      if (INTERNAL_FILE_TYPES.includes(item.type)) {
-        if (!item.filePath?.trim()) {
-          return { ok: false, messageKey: 'liturgy.messages.mediaDesktopOnly' }
-        }
-        return { ok: false, messageKey: 'liturgy.messages.mediaDesktopOnly' }
-      }
-      return { ok: true }
+      // Único tipo executável que chega aqui é other_files (interno, desktop-only).
+      return { ok: false, messageKey: 'liturgy.messages.mediaDesktopOnly' }
     }
   }
 }
@@ -312,7 +320,7 @@ export async function playLiturgyItemOnScreens(
     }
     const ok = await playLiturgyLocalImageOnScreens(
       paths,
-      item.name?.trim() || paths[0] || 'Imagens',
+      item.name?.trim() || paths[0],
     )
     if (!ok) {
       return { ok: false, messageKey: 'liturgy.messages.projectionFailed' }
@@ -344,21 +352,25 @@ export async function playLiturgyItemOnScreens(
 
     // Engine efetivo: override do item > global (ver executeLiturgyItem).
     let engine = item.presentationEngine
-    if (!engine) {
-      engine = (await bridge?.presentation?.getEngine?.()) ?? 'auto'
+    if (!engine && bridge && bridge.presentation && bridge.presentation.getEngine) {
+      engine = await bridge.presentation.getEngine()
     }
-    if (engine && engine !== 'auto') {
-      const result = await bridge?.presentation?.openExternal?.(
-        filePath,
-        engine,
-      )
+    engine ||= 'auto'
+    if (engine !== 'auto') {
+      const result =
+        bridge && bridge.presentation && bridge.presentation.openExternal
+          ? await bridge.presentation.openExternal(filePath, engine)
+          : undefined
       if (!result?.ok) {
         return { ok: false, messageKey: 'liturgy.messages.projectionFailed' }
       }
       return { ok: true }
     }
 
-    const hasOffice = await bridge?.presentation?.detectOffice?.()
+    const hasOffice =
+      bridge && bridge.presentation && bridge.presentation.detectOffice
+        ? await bridge.presentation.detectOffice()
+        : undefined
     if (hasOffice === false) {
       return {
         ok: false,

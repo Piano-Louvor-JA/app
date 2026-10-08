@@ -119,6 +119,7 @@ export function useMonitorArrangement(stageRef: Ref<HTMLElement | null>) {
   }
 
   function commitDrag() {
+    /* v8 ignore next 4 -- onPointerUp/Cancel só chamam commitDrag com drag ativo */
     if (!drag) {
       draggingId.value = null
       dragOffset.value = { x: 0, y: 0 }
