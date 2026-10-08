@@ -3,7 +3,7 @@
  * Lista não lidas + marcar todas como lidas.
  */
 
-import { getAuthSession } from "@modules/media/services/auth-client";
+import { getAuthSession, saveSession } from "@modules/media/services/auth-client";
 
 export type AppNotification = {
 	id: number;
@@ -31,6 +31,12 @@ export async function getNotifications(): Promise<AppNotification[]> {
 		const response = await fetch(`${communityBaseUrl()}/notifications`, {
 			headers: { Authorization: `Bearer ${t}` },
 		});
+		if (response.status === 401) {
+			// Token salvo rejeitado pela API (placeholder de fallback ou sessão
+			// expirada) — limpa pra forçar re-login em vez de 401 em silêncio.
+			saveSession(null);
+			return [];
+		}
 		if (!response.ok) return [];
 		const json = (await response.json()) as { data?: unknown };
 		return Array.isArray(json.data)

@@ -55,6 +55,7 @@ function onDownload(event: MouseEvent) {
 
 function onRemove(event: MouseEvent) {
   event.stopPropagation()
+  /* v8 ignore next 1 -- botão só renderiza com canRemove true */
   if (!canRemove.value) return
   emit('remove')
 }

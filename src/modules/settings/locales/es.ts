@@ -337,6 +337,8 @@ export default {
       moduleHint: 'En cada módulo, elija Espejar (todas) o una TV individual.',
       route: 'Destino del palco',
       mirror: 'Espejar todas',
+      obsCopy: 'Copiar URL de OBS',
+      obsHint: 'En OBS: Fuentes → + → Navegador → pega esta URL (1920x1080).',
       connectedShort: 'TV online',
     },
     stage: {

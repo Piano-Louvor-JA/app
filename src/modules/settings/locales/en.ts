@@ -335,6 +335,8 @@ export default {
       moduleHint: 'In each module, choose Mirror (all) or one individual TV.',
       route: 'Stage destination',
       mirror: 'Mirror all',
+      obsCopy: 'Copy OBS URL',
+      obsHint: 'In OBS: Sources → + → Browser → paste this URL (1920x1080).',
       connectedShort: 'TV online',
     },
     stage: {
