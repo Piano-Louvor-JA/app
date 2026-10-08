@@ -1,5 +1,6 @@
 import path from 'node:path'
-import { existsSync, mkdirSync, writeFile } from 'node:fs'
+import { existsSync, mkdirSync } from 'node:fs'
+import { writeFile } from 'node:fs/promises'
 import { app, BrowserWindow, dialog, ipcMain, net } from 'electron'
 
 import { detectClassoInstallation, probeClassoRegistry } from '../classo-detect.mjs'
