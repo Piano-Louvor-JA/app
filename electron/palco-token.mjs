@@ -9,6 +9,7 @@
  * Funções PURAS (sem import do electron) pra testar sem mock pesado.
  */
 
+import { randomInt } from 'node:crypto'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 
@@ -19,7 +20,7 @@ const TOKEN_LENGTH = 5
 export function generatePalcoToken() {
   let out = ''
   for (let i = 0; i < TOKEN_LENGTH; i++) {
-    out += TOKEN_CHARS[Math.floor(Math.random() * TOKEN_CHARS.length)]
+    out += TOKEN_CHARS[randomInt(TOKEN_CHARS.length)]
   }
   return out
 }
