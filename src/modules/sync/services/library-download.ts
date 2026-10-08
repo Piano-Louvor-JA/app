@@ -31,6 +31,9 @@ async function readOrFetchCatalogRecord<T>(filename: string): Promise<T | null> 
     return remote
   } catch (error) {
     console.warn(`[sync] falha ao obter catálogo ${filename}`, error)
+    void import('@shared/services/telemetry').then(({ reportError }) =>
+      reportError(error, { scope: 'catalog-fetch', filename }),
+    )
     return null
   }
 }
@@ -298,9 +301,22 @@ export async function downloadAlbumMedia(
   const abortedByErrors = consecutiveErrors >= MAX_CONSECUTIVE_ERRORS
 
   if (abortedByErrors || !navigator.onLine) {
+    const failureReason: DownloadFailureReason = !navigator.onLine ? 'offline' : 'server'
+    // telemetria: abort de download é evento raro e valioso (bug do vídeo 08/10)
+    void import('@shared/services/telemetry').then(({ reportError }) =>
+      reportError(new Error(`download abortado (${failureReason})`), {
+        album: album.id,
+        albumName: album.name,
+        failureReason,
+        totalErrors,
+        totalFiles: allMediaFiles.length,
+        downloaded,
+        maxConsecutive: MAX_CONSECUTIVE_ERRORS,
+      }),
+    )
     return {
       status: 'error',
-      failureReason: !navigator.onLine ? 'offline' : 'server',
+      failureReason,
       totalErrors,
     }
   }
