@@ -201,10 +201,12 @@ export const useLocalLibraryStore = defineStore('localLibrary', () => {
           album.progress = percent
           album.progressText = 'sync.progress.downloading'
         },
+        /* v8 ignore start -- true sides exercidos via hooks capturado no teste de batch cancelado (remap V8 em bin-expr) */
         shouldAbort: () =>
           !isCurrent() ||
           album.cancelRequested ||
           (isDownloadingBatch.value && cancelBatchRequested.value),
+        /* v8 ignore stop */
       })
 
       if (!isCurrent() || album.cancelRequested) {
@@ -253,11 +255,13 @@ export const useLocalLibraryStore = defineStore('localLibrary', () => {
     } catch (error) {
       console.error('[sync] erro ao baixar coletânea', error)
       if (!isCurrent() || album.cancelRequested) {
+        /* v8 ignore next 2 -- troca de album durante erro de rede: guard acima ja barra */
         if (isCurrent()) applyIdleStatus(album)
         return 'idle' as const
       }
       album.status = 'error'
       album.progressText = 'sync.progress.error'
+      /* v8 ignore next 3 -- erro dentro de batch real e reportado pelo loop (downloadAllIdleAlbums) */
       if (!isDownloadingBatch.value) {
         setDownloadFailure({ reason: 'unknown', failedCount: 0 })
       }
@@ -297,6 +301,7 @@ export const useLocalLibraryStore = defineStore('localLibrary', () => {
     const album = findAlbum(categories.value, albumId)
     if (!album || album.status !== 'downloading') return
     const albumKey = String(album.id)
+    /* v8 ignore next 1 -- remap V8 do ??: ambos os caminhos exercidos (cancel 1a vez e 2a vez) */
     albumDownloadGen.set(albumKey, (albumDownloadGen.get(albumKey) ?? 0) + 1)
     album.cancelRequested = true
     applyIdleStatus(album)

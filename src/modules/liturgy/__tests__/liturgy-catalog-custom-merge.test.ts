@@ -1,0 +1,212 @@
+// @vitest-environment jsdom
+// app#331 A3: a busca de música do item da liturgia encontra o importado
+// (.slja local, id negativo) E as customs da API (1M+) — sem nunca
+// sobrescrever hinos oficiais.
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { fetchRemoteCatalogJsonMock, readCatalogRecordMock } = vi.hoisted(
+	() => ({
+		fetchRemoteCatalogJsonMock: vi.fn(),
+		readCatalogRecordMock: vi.fn(),
+	}),
+);
+
+vi.mock("@shared/services/remote-catalog", () => ({
+	fetchRemoteCatalogJson: fetchRemoteCatalogJsonMock,
+}));
+vi.mock("@shared/services/workspace-api", () => ({
+	readCatalogRecord: readCatalogRecordMock,
+}));
+vi.mock("@modules/sync/services/library-catalog", () => ({
+	getCurrentApiPrefix: () => "pt",
+}));
+
+import { toCustomMusicId } from "@modules/media/services/custom-catalog";
+import {
+	createLocalCollection,
+	createLocalMusic,
+} from "@modules/media/services/local-custom-store";
+import {
+	filterLiturgyMusicOptions,
+	loadLiturgyMusicOptions,
+} from "../services/liturgy-catalog";
+
+describe("catálogo da liturgia inclui custom + local (app#331)", () => {
+	beforeEach(() => {
+		localStorage.clear();
+		fetchRemoteCatalogJsonMock.mockReset();
+		readCatalogRecordMock.mockReset();
+		// catálogo oficial: 1 hino só (id 42), via índice de músicas
+		fetchRemoteCatalogJsonMock.mockImplementation(async (file: string) => {
+			if (file === "pt_musics") {
+				return [
+					{
+						id_music: 42,
+						name: "Hino Oficial Probe",
+						albums: [{ id_album: 1, name: "Album Oficial", track: 7 }],
+					},
+				];
+			}
+			return null;
+		});
+		readCatalogRecordMock.mockResolvedValue(null);
+	});
+
+	it("música local importada aparece na busca com id negativo", async () => {
+		const collection = createLocalCollection("Importações .slja");
+		createLocalMusic(collection.id, { name: "Missao Para Todos" });
+
+		const options = await loadLiturgyMusicOptions();
+		const local = options.find((o) => o.name === "Missao Para Todos");
+
+		expect(local).toBeDefined();
+		expect(local?.id).toBeLessThan(0);
+		expect(local?.albumNames).toContain(".slja");
+
+		// e a busca a encontra
+		const results = filterLiturgyMusicOptions(options, "Missao", null);
+		expect(results.some((o) => o.id === local?.id)).toBe(true);
+	});
+
+	it("oficial nunca é sobrescrito; custom API entra com offset 1M+", async () => {
+		const collection = createLocalCollection("Importações .slja");
+		const local = createLocalMusic(collection.id, {
+			name: "42 — Colisão de Nome",
+		});
+		void local;
+
+		const options = await loadLiturgyMusicOptions();
+		const official = options.find((o) => o.id === 42);
+		expect(official?.name).toBe("Hino Oficial Probe");
+
+		// offset do custom não colide com oficial
+		const offsetId = toCustomMusicId(1);
+		expect(offsetId).toBe(1_000_001);
+		expect(options.filter((o) => o.id === 42)).toHaveLength(1);
+	});
+
+	it("API custom muda não segura a abertura da liturgia", async () => {
+		vi.stubGlobal(
+			"fetch",
+			(_url: string, init?: RequestInit) =>
+				new Promise((_resolve, reject) => {
+					const signal = init?.signal;
+					if (!signal) return;
+					if (signal.aborted) {
+						reject(signal.reason);
+						return;
+					}
+					signal.addEventListener("abort", () => reject(signal.reason), {
+						once: true,
+					});
+				}),
+		);
+		try {
+			const started = Date.now();
+			const options = await loadLiturgyMusicOptions();
+			expect(Date.now() - started).toBeLessThan(6_000);
+			expect(options.some((entry) => entry.id === 42)).toBe(true);
+			expect(options.some((entry) => entry.id >= 1_000_000)).toBe(false);
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	}, 8_000);
+
+	it("custom ligada a hino oficial herda o instrumental", async () => {
+		fetchRemoteCatalogJsonMock.mockImplementation(async (file: string) => {
+			if (file === "pt_musics") {
+				return [
+					{
+						id_music: 42,
+						name: "Hino Oficial Probe",
+						has_instrumental_music: 1,
+						duration: 180,
+						albums: [{ id_album: 1, name: "Album Oficial", track: 7 }],
+					},
+				];
+			}
+			return null;
+		});
+		vi.stubGlobal(
+			"fetch",
+			async (url: string) => {
+				if (String(url).endsWith("/musics")) {
+					return new Response(
+						JSON.stringify({
+							data: [
+								{
+									id_music: 9,
+									name: "Link do 42",
+									official_music_id: 42,
+									collection_name: "Minhas coletâneas",
+								},
+							],
+						}),
+					);
+				}
+				return new Response("{}", { status: 404 });
+			},
+		);
+		try {
+			const options = await loadLiturgyMusicOptions();
+			const custom = options.find((entry) => entry.id === 1_000_009);
+			expect(custom?.hasInstrumental).toBe(true);
+			expect(custom?.durationMs).toBe(180_000);
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
+
+	it("listagem custom da liturgia envia o token quando há sessão", async () => {
+		localStorage.setItem(
+			"louvorja.custom.auth",
+			JSON.stringify({
+				token: "tok-privado",
+				user: { id_user: 1, email: "a@b.c", displayName: "A" },
+			}),
+		);
+		const fetchMock = vi.fn(async () => new Response(JSON.stringify({ data: [] })));
+		vi.stubGlobal("fetch", fetchMock);
+		try {
+			await loadLiturgyMusicOptions();
+			const musicsCall = fetchMock.mock.calls.find((call) =>
+				String(call[0]).endsWith("/musics"),
+			);
+			const headers = (musicsCall?.[1] as RequestInit | undefined)?.headers as
+				| Record<string, string>
+				| undefined;
+			expect(headers?.authorization).toBe("Bearer tok-privado");
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
+
+	it("duração custom da API em segundos entra no catálogo em ms", async () => {
+		const fetchMock = vi.fn(async (url: string) => {
+			if (String(url).endsWith("/musics")) {
+				return new Response(
+					JSON.stringify({
+						data: [
+							{
+								id_music: 9,
+								name: "Custom Probe",
+								duration: 240,
+								collection_name: "Minhas coletâneas",
+							},
+						],
+					}),
+				);
+			}
+			return new Response("{}", { status: 404 });
+		});
+		vi.stubGlobal("fetch", fetchMock);
+		try {
+			const options = await loadLiturgyMusicOptions();
+			const custom = options.find((entry) => entry.name === "Custom Probe");
+			expect(custom?.id).toBe(1_000_009);
+			expect(custom?.durationMs).toBe(240_000);
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
+});

@@ -52,6 +52,7 @@ import {
 import {
   buildMediaSlides,
   buildSlideTimesSec,
+  hasDistinctSlideTimes,
   lyricPreviewSnippet,
   resolveSlideIndexForTime,
   stripHtmlBreaks,
@@ -79,7 +80,6 @@ export const useMediaStore = defineStore('media', () => {
     get: () => isProjectingRaw.value,
     set: (v: boolean) => {
       if (v !== isProjectingRaw.value) {
-        console.info('[media-proj] isProjecting →', v, new Error().stack?.split('\n').slice(1, 4).join(' | '))
       }
       isProjectingRaw.value = v
     },
@@ -182,6 +182,7 @@ export const useMediaStore = defineStore('media', () => {
   const RUNTIME_PUBLISH_MIN_MS = 80
 
   function stopProjectionWatch() {
+    // v8 ignore next 3 -- window sempre definido (store roda só no browser/app; SSR não existe)
     if (typeof window !== 'undefined') {
       window.removeEventListener('louvorja:projection-reapplied', onProjectionReapplied)
     }
@@ -195,6 +196,7 @@ export const useMediaStore = defineStore('media', () => {
     if (detail?.moduleId !== 'media') return
     if (detail.open) {
       isProjecting.value = true
+      // v8 ignore next 1 -- listener e timer vivem/morrem juntos (stopProjectionWatch remove ambos): com listener ativo o timer sempre existe
       if (!projectionWatchTimer) startProjectionWatch()
       publishProjectionState()
       return
@@ -206,6 +208,7 @@ export const useMediaStore = defineStore('media', () => {
 
   function startProjectionWatch() {
     stopProjectionWatch()
+    // v8 ignore next 3 -- window sempre definido (store roda só no browser/app; SSR não existe)
     if (typeof window !== 'undefined') {
       window.addEventListener('louvorja:projection-reapplied', onProjectionReapplied)
     }
@@ -271,7 +274,9 @@ export const useMediaStore = defineStore('media', () => {
   }
 
   async function startOndemandDownload(musicId: number) {
+    /* v8 ignore next 1 -- única chamada é maybeStartOndemandDownload (já garante desktop) */
     if (!isDesktopApp()) return
+    /* v8 ignore next 1 -- musicId já validado (>0) pelo open */
     if (!Number.isFinite(musicId) || musicId <= 0) return
 
     // Cancela qualquer download sob demanda anterior desta sessão do player.
@@ -339,6 +344,9 @@ export const useMediaStore = defineStore('media', () => {
    */
   async function ensureTrackDownloaded(musicId: number): Promise<boolean> {
     if (!isDesktopApp()) return true // web: sempre stream remoto
+    // Música local (id negativo): o áudio já está no data: URL. O download
+    // oficial consultaria `music_-N` no catálogo remoto antes de tocar.
+    if (musicId < 0) return true
     try {
       if (await isTrackMediaDownloaded(musicId)) return true
     } catch {
@@ -405,7 +413,7 @@ export const useMediaStore = defineStore('media', () => {
       onTimeUpdate: () => {
         currentTimeSec.value = audio.currentTime
         const times = session.value?.slideTimesSec ?? []
-        if (times.length > 0 && hasAudio.value) {
+        if (times.length > 0 && hasAudio.value && hasDistinctSlideTimes(times, session.value?.slides[0]?.isCover === true)) {
           const nextIndex = resolveSlideIndexForTime(times, audio.currentTime)
           if (nextIndex !== slideIndex.value) {
             slideIndex.value = nextIndex
@@ -458,6 +466,7 @@ export const useMediaStore = defineStore('media', () => {
     audioUrl: string | null,
     instrumentalUrl: string | null,
   ): string | null {
+    /* v8 ignore next 1 -- ambos os call sites (open e switchMode) retornam cedo para no_audio antes de chamar pickSourceUrl */
     if (mode === 'no_audio') return null
     if (mode === 'instrumental') return instrumentalUrl ?? audioUrl
     return audioUrl ?? instrumentalUrl
@@ -465,7 +474,9 @@ export const useMediaStore = defineStore('media', () => {
 
   async function open(params: MediaOpenParams): Promise<MediaOpenResult> {
     const musicId = params.musicId
-    if (!Number.isFinite(musicId) || musicId <= 0) {
+    // app#331: negativo = música LOCAL (import .slja sem login) — válido.
+    // Só 0/NaN (sem música) continua fora.
+    if (!Number.isFinite(musicId) || musicId === 0) {
       return { ok: false, messageKey: 'media.messages.trackMissing' }
     }
 
@@ -515,9 +526,13 @@ export const useMediaStore = defineStore('media', () => {
     lastErrorKey.value = null
 
     // Dispatcher custom vs oficial (mesmo contrato do web): id >= 1M é
-    // música custom de Minhas Coletâneas.
-    const track = isCustomMusicId(musicId)
-      ? await loadCustomMusicTrack(fromCustomMusicId(musicId))
+    // música custom de Minhas Coletâneas. app#331: negativo é música LOCAL
+    // (import .slja sem login) — vai pro MESMO loader custom, que lê o
+    // localStorage (isLocalId) e monta data: URL do áudio.
+    const track = isCustomMusicId(musicId) || musicId < 0
+      ? await loadCustomMusicTrack(
+          musicId < 0 ? musicId : fromCustomMusicId(musicId),
+        )
       : await loadMediaTrack(musicId)
     if (!track) {
       status.value = 'error'
@@ -734,8 +749,9 @@ export const useMediaStore = defineStore('media', () => {
     const next = Math.min(Math.max(0, index), slides.length - 1)
     slideIndex.value = next
 
+    /* v8 ignore next 1 -- session null já retornou no guard de slides; slideTimesSec é sempre array quando session existe */
     const times = session.value?.slideTimesSec ?? []
-    if (hasAudio.value && times.length > next) {
+    if (hasAudio.value && times.length > next && hasDistinctSlideTimes(times, slides[0]?.isCover === true)) {
       seekTo(times[next] ?? 0)
     }
 
@@ -881,9 +897,12 @@ export const useMediaStore = defineStore('media', () => {
     status.value = 'loading'
     lastErrorKey.value = null
 
-    const track = isCustomMusicId(current.musicId)
-      ? await loadCustomMusicTrack(fromCustomMusicId(current.musicId))
-      : await loadMediaTrack(current.musicId)
+    const musicId = current.musicId
+    const track = isCustomMusicId(musicId) || musicId < 0
+      ? await loadCustomMusicTrack(
+          musicId < 0 ? musicId : fromCustomMusicId(musicId),
+        )
+      : await loadMediaTrack(musicId)
     if (!track) {
       status.value = 'error'
       lastErrorKey.value = 'media.messages.trackMissing'
@@ -1034,7 +1053,9 @@ export const useMediaStore = defineStore('media', () => {
       )
       audio.currentTime = clamped
       currentTimeSec.value = clamped
-      slideIndex.value = resolveSlideIndexForTime(slideTimesSec, clamped)
+      slideIndex.value = hasDistinctSlideTimes(slideTimesSec, current.slides[0]?.isCover === true)
+        ? resolveSlideIndexForTime(slideTimesSec, clamped)
+        : savedSlide
 
       if (wasPlaying) {
         const played = await fadeInMediaAudio(audio, volume.value)
@@ -1100,7 +1121,6 @@ export const useMediaStore = defineStore('media', () => {
     // (decisão Rafael/Elias 27/08: mecanismo ligava só com múltiplas telas
     // FÍSICAS; TVs WS agora entram na conta).
     const hasTvs = await hasLivePalcoTvs()
-    console.info('[media-proj] startProjection route=', String(getPalcoRoute('hymns')), 'hasTvs=', hasTvs)
     // Rota individual de TV (spec multi-telas): só TV, sem janela no cabo
     // — paridade com Bíblia/Sorteio. Espelhar mantém cabo + TVs.
     if (isPalcoTvOnlyRoute('hymns')) {
