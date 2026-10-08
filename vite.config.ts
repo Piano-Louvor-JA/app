@@ -16,6 +16,23 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
+  server: {
+    watch: {
+      // Worktrees de kanban geram milhares de arquivos — watcher satura e o
+      // dev server para de responder (ENOSPC inotify / startup travado).
+      // Worktrees de kanban vivem em symlink p/ volume NTFS
+      // (/media/.../gauntlet-worktrees) — o glob '**/.worktrees/**' NÃO pega o
+      // caminho real resolvido, e o watcher lê ~1.4GB até travar o server.
+      ignored: [
+        '**/.worktrees/**',
+        '/media/rafaelejosi/NovoVolume/gauntlet-worktrees/**',
+        '**/dist/**',
+        '**/node_modules/**',
+        '**/test-results/**',
+        '**/coverage/**',
+      ],
+    },
+  },
   plugins: [
     vue(),
     vueDevTools(),

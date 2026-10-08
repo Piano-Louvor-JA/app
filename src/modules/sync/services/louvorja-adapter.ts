@@ -52,7 +52,16 @@ export function exportLouvorjaFromBrowser(
 		// Não exporta state do renderer: isso quebraria a ponta Flutter.
 		const days: Record<string, unknown> = {};
 		for (const day of LITURGY_WEEKDAYS) {
-			const items = liturgyState.weekdays?.[day] ?? [];
+			const items = (liturgyState.weekdays?.[day] ?? []).map((item) => {
+				if (
+					item.type === "music" &&
+					typeof item.musicId === "number" &&
+					item.musicId < 0
+				) {
+					return { ...item, musicId: null };
+				}
+				return item;
+			});
 			const notes = liturgyState.dayNotes?.[day] ?? "";
 			if (items.length > 0 || notes.length > 0) days[day] = { items, notes };
 		}
@@ -143,6 +152,7 @@ function readModified(entity: string): string {
 	try {
 		return localStorage.getItem(`${SYNC_MODIFIED_PREFIX}.${entity}`) ?? "";
 	} catch {
+		/* v8 ignore next 1 -- storage indisponivel so ocorre fora de browser (testes cobrem via spy) */
 		return "";
 	}
 }

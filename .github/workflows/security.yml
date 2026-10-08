@@ -8,6 +8,10 @@ on:
   push:
     branches: [staging, main]
 
+concurrency:
+  group: security-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   secrets:
     name: gitleaks (segredos no diff/histórico)
@@ -23,7 +27,10 @@ jobs:
           VERSION=8.28.0
           curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz" -o /tmp/gitleaks.tar.gz
           tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
-          /tmp/gitleaks detect --source . --config .gitleaks.toml --verbose --redact
+          # Sem --log-opts o gitleaks 8.28 usa `git log --all`. Com fetch-depth 0
+          # isso inclui outros branches e faz o PR falhar por histórico que não
+          # será integrado. HEAD cobre o histórico do ref em teste.
+          /tmp/gitleaks detect --source . --config .gitleaks.toml --verbose --redact --log-opts=HEAD
 
   dependencies:
     name: npm audit (relatório)
