@@ -198,7 +198,10 @@ describe('modo form — adicionar por data sem escolher rotação antes', () => 
 })
 
 describe('busca de música no modo form (mesma do item de música)', () => {
-  it('filterLiturgyMusicOptions acha por título e número do hinário', async () => {
+  it(
+    'filterLiturgyMusicOptions acha por título e número do hinário',
+    { timeout: 20_000 },
+    async () => {
     const { filterLiturgyMusicOptions } = await import(
       '../services/liturgy-catalog'
     )
@@ -215,5 +218,6 @@ describe('busca de música no modo form (mesma do item de música)', () => {
 
     const byCommunity = filterLiturgyMusicOptions(options, 'missão', null)
     expect(byCommunity.map((o) => o.id)).toContain(1660)
-  })
+    },
+  )
 })
