@@ -78,6 +78,58 @@ describe("app#331 — import .slja → item de liturgia → player (offline)", (
 		expect(imported.durationMs).toBe(20_000 + 30_000);
 	});
 
+	it("1ª importação deslogada cria a coletânea de importações e reuso não duplica", async () => {
+
+		const a = await importSljaAsLiturgyMusic({ bytes: await makeSljaBuffer(), name: "missao.slja" });
+		const b = await importSljaAsLiturgyMusic({ bytes: await makeSljaBuffer(), name: "missao-2.slja" });
+		// duas músicas na MESMA coletânea local (reuso do collectionId)
+		const raw = localStorage.getItem("louvorja.local-custom.v1");
+		expect(raw).toBeTruthy();
+		const db = JSON.parse(raw as string);
+		const importacoes = db.collections.filter((c: { name: string }) => c.name === "Importações .slja");
+		expect(importacoes).toHaveLength(1);
+		expect(a.collectionId).toBe(b.collectionId);
+	});
+
+	it("erro genérico de gravação local propaga o erro original (não engole)", async () => {
+		const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+			throw new Error("local-persist-failed");
+		});
+		await expect(
+			importSljaAsLiturgyMusic({ bytes: await makeSljaBuffer(), name: "erro.slja" }),
+		).rejects.toThrow("SLJA_LOCAL_LYRIC_PERSIST_FAILED");
+		setItem.mockRestore();
+	});
+
+	it("gravação da lyric falha no meio → SLJA_LOCAL_LYRIC_PERSIST_FAILED e rollback", async () => {
+		// 1ª escrita (música) passa; lyric falha — cobre o path persisted===false/catch
+		let calls = 0;
+		const original = Storage.prototype.setItem;
+		const spy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (this: Storage, k: string, v: string) {
+			calls += 1;
+			if (calls >= 2) throw new DOMException("quota no meio", "QuotaExceededError");
+			return original.call(this, k, v);
+		});
+		await expect(
+			importSljaAsLiturgyMusic({ bytes: await makeSljaBuffer(), name: "meio.slja" }),
+		).rejects.toThrow("SLJA_LOCAL_LYRIC_PERSIST_FAILED");
+		spy.mockRestore();
+	});
+
+	it("quota do localStorage estourada → SLJA_LOCAL_LYRIC_PERSIST_FAILED e música removida", async () => {
+		const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+			throw new DOMException("quota", "QuotaExceededError");
+		});
+		await expect(
+			importSljaAsLiturgyMusic({ bytes: await makeSljaBuffer(), name: "cheia.slja" }),
+		).rejects.toThrow("SLJA_LOCAL_LYRIC_PERSIST_FAILED");
+		setItem.mockRestore();
+		// música parcial NÃO fica órfã no localStorage
+		const raw = localStorage.getItem("louvorja.local-custom.v1");
+		const db = raw ? JSON.parse(raw) : { musics: [] };
+		expect((db.musics ?? []).filter((m: { name: string }) => m.name === "Cheia Para Todos")).toHaveLength(0);
+	});
+
 	it("música importada resolve no player COM áudio data: e letra com timing", async () => {
 		const imported = await importSljaAsLiturgyMusic({
 			bytes: await makeSljaBuffer(),

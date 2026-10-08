@@ -44,6 +44,7 @@ jobs:
           --coverage.thresholds.lines=0
           --coverage.reportsDirectory=coverage-merged
           --exclude='.stryker-tmp/**' --exclude='.worktrees/**'
+          --exclude='**/__tests__/**' --exclude='src/test/**'
       - name: Vitest passada 2 — testes que montam .vue (v8)
         run: >-
           npx vitest run
@@ -72,6 +73,7 @@ jobs:
           --coverage.thresholds.lines=0
           --coverage.reportsDirectory=coverage-v8-ui
           --exclude='.stryker-tmp/**' --exclude='.worktrees/**'
+          --exclude='**/__tests__/**' --exclude='src/test/**'
       - name: Merge das passadas (por posição)
         run: node scripts/merge-coverage.mjs coverage-merged/coverage-final.json coverage-v8-ui/coverage-final.json coverage-merged/coverage-final.json
       - name: Upload coverage p/ diagnóstico
