@@ -333,7 +333,7 @@ async function runDiagnostics() {
     reproduction.push(hit ?? { passo: endpoint, base: null, ok: false, ms: elapsed(start), erroBruto: apis[0]?.http.find((h) => h.url.includes(`/${endpoint}?`))?.erro?.classe ?? 'OTHER', erroMapeado: 'starting.status.errorDownload' })
   }
   const report = {
-    meta: { campanha: 'SrCaldeira', versao: app.getVersion(), dataISO: new Date().toISOString(), dataLocal: new Date().toLocaleString('pt-BR', { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone }), duracaoMs: elapsed(started), tokenMascarado: maskToken(token) },
+    meta: { campanha: `${process.env.LOUVORJA_CAMPAIGN ?? 'SrCaldeira'}-v2`, versao: app.getVersion(), dataISO: new Date().toISOString(), dataLocal: new Date().toLocaleString('pt-BR', { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone }), duracaoMs: elapsed(started), tokenMascarado: maskToken(token) },
     ambiente: { os: process.platform, osRelease: os.release(), arch: process.arch, electron: process.versions.electron, chrome: process.versions.chrome, locale: app.getLocale(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, online: general['1.1.1.1:443'].ok || general['google.com:443'].ok },
     rede: { proxy: { resolveProxyPorOrigem: proxy, envHttpProxy: process.env.HTTP_PROXY ?? null, envHttpsProxy: process.env.HTTPS_PROXY ?? null }, hostsOverrides, conectividadeGeral: general, apis, reproducaoBootstrap: reproduction, mediaReal: mediaProbe, dnsSuspeito },
     instalacaoReal: installation,
@@ -359,7 +359,7 @@ export function registerDiagnosticsIpc() {
     const dsn = process.env.DIAGNOSTICS_GLITCHTIP_DSN
     if (!dsn) return { ok: false, reason: 'DSN de diagnóstico não configurado; compartilhe o arquivo salvo.' }
     try {
-      const response = await fetch(dsn, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-LouvorJA-Campanha': 'SrCaldeira' }, body: JSON.stringify({ campanha: 'SrCaldeira', report }) })
+      const response = await fetch(dsn, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-LouvorJA-Campanha': report?.meta?.campanha ?? 'SrCaldeira-v2' }, body: JSON.stringify({ campanha: report?.meta?.campanha ?? 'SrCaldeira-v2', report }) })
       return response.ok ? { ok: true } : { ok: false, reason: `HTTP ${response.status}` }
     } catch (error) { return { ok: false, reason: rawError(error).classe } }
   })
