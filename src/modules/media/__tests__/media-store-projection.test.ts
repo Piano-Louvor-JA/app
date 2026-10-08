@@ -314,4 +314,20 @@ describe('useMediaStore — controle de projeção e ocultação de conteúdo', 
     expect(runtime.slideProgressRatio).toBeCloseTo(0.5)
     expect(runtime.progressRatio).toBeCloseTo(0.25)
   })
+  it('troca manual de letras sem cues preserva posição do áudio', async () => {
+    const store = useMediaStore()
+    store.session = {
+      musicId: -1, albumId: null, mode: 'audio', title: 'Import', subtitle: '',
+      coverUrl: null, audioUrl: 'https://example.com/audio.mp3', hasInstrumental: false,
+      slides: [0, 1, 2].map(order => ({ order, lyric: `Linha ${order}`, showSlide: true,
+        time: '00:00', instrumentalTime: '00:00', imageUrl: null, imagePosition: null,
+        isCover: order === 0 })),
+      slideTimesSec: [0, 0, 0],
+    }
+    store.currentTimeSec = 42
+    await store.goToSlide(2)
+    expect(store.slideIndex).toBe(2)
+    expect(store.currentTimeSec).toBe(42)
+  })
+
 })
