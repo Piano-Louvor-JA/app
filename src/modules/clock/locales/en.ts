@@ -1,5 +1,7 @@
 export default {
   utilities: {
+    diagnostics: 'Network diagnostics',
+    diagnosticsDescription: 'Tests the catalog connection and generates a technical report',
     title: 'Utilities',
     subtitle: 'Projection tools for the service',
     temporizador: 'Timer',
