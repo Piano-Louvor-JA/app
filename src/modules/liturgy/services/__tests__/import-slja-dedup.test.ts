@@ -26,10 +26,11 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@modules/media/services/custom-catalog', () => ({
   createCustomCollection: mocks.createCustomCollection,
-  createCustomLyric: vi.fn(),
+  createCustomLyric: vi.fn(async () => ({ id_lyric: 1 })),
   createCustomMusic: mocks.createCustomMusic,
+  deleteCustomMusic: vi.fn(async () => true),
   listCustomCollections: mocks.listCustomCollections,
-  toCustomMusicId: vi.fn(),
+  toCustomMusicId: (id: number) => id + 1_000_000,
   updateCustomMusic: mocks.updateCustomMusic,
   uploadCustomFile: mocks.uploadCustomFile,
   ensureImportCollectionId: mocks.ensureImportCollectionId,
@@ -60,7 +61,7 @@ describe('dedup de import .slja (app#336 fase 3)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.listCustomCollections.mockResolvedValue([
-      { id: 77, name: 'Importações .slja' },
+      { id: 77, name: 'Importações .slja', ownerId: 42 },
     ])
     mocks.parseSljaFile.mockResolvedValue(ARCHIVE)
     mocks.getAuthSession.mockReturnValue({
