@@ -221,6 +221,7 @@ onUnmounted(() => {
   margin-right: 6px;
   align-items: center;
   display: inline-flex;
+  -webkit-app-region: no-drag;
 }
 
 .app-titlebar__controls {
