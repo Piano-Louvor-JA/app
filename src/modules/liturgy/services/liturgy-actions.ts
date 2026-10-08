@@ -160,8 +160,16 @@ async function executeScheduledRef(
       } else if (['ppt', 'pptx'].includes(ext)) {
         opened = await playLiturgyLocalPresentationOnScreens(filePath, title)
       } else {
-        // áudio e vídeo (e desconhecidos) seguem o fluxo de mídia local
-        opened = await playLiturgyLocalVideoOnScreens(filePath, title)
+        // Arquivo agendado herda o player escolhido no placeholder.
+        // Assim vídeo/áudio agendado segue a mesma cascata externo → interno.
+        const mediaType = ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac'].includes(ext)
+          ? 'audio'
+          : 'video'
+        const result = await executeLiturgyItem(
+          { ...item, type: mediaType, filePath, name: title },
+          router,
+        )
+        return { ...result, resolved: content }
       }
       return opened
         ? { ok: true, resolved: content }

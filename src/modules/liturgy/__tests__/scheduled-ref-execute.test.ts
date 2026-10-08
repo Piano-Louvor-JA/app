@@ -36,6 +36,7 @@ vi.mock('../services/liturgy-web-projection', () => ({
     return true
   }),
   playLiturgyLocalVideoControl: vi.fn(async () => true),
+  openLiturgyLocalVideoControl: vi.fn(async () => true),
   playLiturgyLocalImageOnScreens: vi.fn(async (filePaths: string[], title: string) => {
     projectionCalls.push({ fn: 'image', args: [filePaths, title] })
     return true
