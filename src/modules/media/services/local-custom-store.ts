@@ -40,6 +40,8 @@ export type LocalMusic = {
 	audioName?: string | null;
 	/** Duração conhecida/estimada (ms) — p.ex. import .slja (app#331). */
 	durationMs?: number | null;
+	/** SHA-256 do arquivo .slja de origem — dedupe de re-import (app#331). */
+	sljaHash?: string | null;
 };
 
 export type LocalCollection = {
@@ -159,6 +161,12 @@ export function listLocalMusics(collectionId: number): LocalMusic[] {
 
 export function getLocalMusic(id: number): LocalMusic | null {
 	return loadDb().musics.find((m) => m.id === id) ?? null;
+}
+
+/** Música local importada do mesmo arquivo .slja (dedupe por content hash). */
+export function findLocalMusicBySljaHash(hash: string): LocalMusic | null {
+	const db = loadDb();
+	return db.musics.find((m) => m.sljaHash === hash) ?? null;
 }
 
 export function createLocalMusic(

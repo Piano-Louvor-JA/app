@@ -296,6 +296,10 @@ export default {
       importedLocalNoImages:
         'Importado neste dispositivo: {name} ({slides} estrofes). As imagens não foram salvas neste aparelho.',
       importFailed: 'Arquivo .slja inválido.',
+      uploadTitle: 'Subir "{name}" pra sua conta?',
+      uploadMessage: 'O arquivo sobe uma única vez pra sua conta (nunca duplica). Se preferir, fica salvo só neste dispositivo.',
+      uploadConfirm: 'Subir pra conta',
+      uploadCancel: 'Só neste dispositivo',
       importStorageFailed:
         'Não foi possível salvar o áudio neste aparelho. Libere espaço e tente de novo.',
       importRemoteFailed:
