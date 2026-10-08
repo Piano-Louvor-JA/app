@@ -52,8 +52,9 @@ const addEntryOpen = ref(false)
 const entryDate = ref(new Date().toISOString().slice(0, 10))
 const entryMusicId = ref('')
 const entryName = ref('')
-const entryKind = ref<'music' | 'online_video'>('music')
+const entryKind = ref<'music' | 'online_video' | 'file'>('music')
 const entryUrl = ref('')
+const entryFilePath = ref('')
 
 // Busca de música — mesmo catálogo do item de música (API + comunidade + .slja local)
 const musicCatalog = ref<LiturgyMusicOption[]>([])
@@ -66,6 +67,26 @@ const musicResults = computed(() =>
 function onPickMusic(option: LiturgyMusicOption) {
   pickedMusic.value = option
   musicQuery.value = option.name
+}
+
+/** Seleciona vídeo local; o caminho é salvo na programação, nunca no item da liturgia. */
+async function onPickLocalVideo() {
+  const bridge = getDesktopBridge()
+  if (!bridge?.dialog?.openFile) return
+  const picked = await bridge.dialog.openFile({
+    title: t('liturgy.fields.selectVideoButton'),
+    filters: [
+      { name: 'Vídeos', extensions: ['mp4', 'mkv', 'avi', 'mov', 'wmv', 'webm'] },
+      { name: 'Todos', extensions: ['*'] },
+    ],
+    multiple: false,
+  })
+  const path = Array.isArray(picked) ? picked[0] : picked
+  if (!path) return
+  entryFilePath.value = String(path)
+  if (!entryName.value.trim()) {
+    entryName.value = entryFilePath.value.split(/[\\/]/).pop()?.replace(/\.[^.]+$/, '') ?? ''
+  }
 }
 
 watch(
@@ -242,6 +263,15 @@ function onAddSong() {
     })
     pickedMusic.value = null
     musicQuery.value = ''
+  } else if (entryKind.value === 'file') {
+    const filePath = entryFilePath.value.trim()
+    if (!filePath) return
+    dlg.addEntry(rotationId, {
+      dateISO: entryDate.value,
+      content: { kind: 'file', filePath },
+      name: entryName.value.trim() || filePath.split(/[\\/]/).pop() || 'Vídeo',
+    })
+    entryFilePath.value = ''
   } else {
     const url = entryUrl.value.trim()
     if (!url) return
@@ -444,6 +474,9 @@ const dateFmt = (iso: string) => {
                   <option value="online_video">
                     {{ t('liturgy.types.online_video') }}
                   </option>
+                  <option value="file">
+                    {{ t('liturgy.types.video') }}
+                  </option>
                 </select>
                 <div
                   v-if="entryKind === 'music'"
@@ -474,6 +507,19 @@ const dateFmt = (iso: string) => {
                       </button>
                     </li>
                   </ul>
+                </div>
+                <div
+                  v-else-if="entryKind === 'file'"
+                  class="scheduled-dialog__local-video"
+                >
+                  <button
+                    type="button"
+                    class="scheduled-dialog__btn scheduled-dialog__btn--ghost"
+                    @click="onPickLocalVideo"
+                  >
+                    {{ t('liturgy.fields.selectVideoButton') }}
+                  </button>
+                  <small v-if="entryFilePath">{{ entryFilePath.split(/[\\/]/).pop() }}</small>
                 </div>
                 <input
                   v-else
@@ -885,6 +931,20 @@ const dateFmt = (iso: string) => {
 .scheduled-dialog__music-option small {
   opacity: 0.6;
   font-size: 0.85em;
+}
+
+.scheduled-dialog__local-video {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 0.5rem;
+}
+
+.scheduled-dialog__local-video small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.65;
 }
 
 .scheduled-dialog__quick-add {
