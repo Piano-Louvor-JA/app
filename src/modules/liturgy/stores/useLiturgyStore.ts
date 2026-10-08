@@ -1236,6 +1236,10 @@ export const useLiturgyStore = defineStore('liturgy', () => {
         music.durationMs && music.durationMs > 0
           ? clampMomentDurationMs(music.durationMs)
           : 0,
+      // Título complementar herda o nome da música SE o campo estiver vazio
+      // (feedback Ezequias 02/10: ao editar item de música o título
+      // obrigatório ficava vazio e travava o salvar).
+      name: itemDraft.value.name.trim() || music.name,
     }
   }
 

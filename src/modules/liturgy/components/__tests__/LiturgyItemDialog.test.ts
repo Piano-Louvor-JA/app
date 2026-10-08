@@ -223,11 +223,11 @@ describe('LiturgyItemDialog', () => {
       expect(wrapper.vm.startTimeRequiredMissing).toBe(false)
     })
 
-    it('categoryRequiredMissing: true quando tem tipo mas sem categoryId', () => {
+    it('categoryRequiredMissing: false pois categoria é opcional', () => {
       const wrapper = createWrapper({
         draft: { ...defaultProps.draft, type: 'music', categoryId: null },
       })
-      expect(wrapper.vm.categoryRequiredMissing).toBe(true)
+      expect(wrapper.vm.categoryRequiredMissing).toBe(false)
     })
 
     it('categoryRequiredMissing: false quando categoryId setado', () => {
@@ -1073,7 +1073,7 @@ it('selectLocalFile bridge SEM dialog.openFile: erro desktopOnly (372-373)', asy
       // showMusicResults true com query 'zzz' e sem results (702)
       await w.setProps({ musicQuery: 'zzz' })
       await flushPromises()
-      expect(document.body.textContent).toContain('Nenhuma música encontrada')
+      expect(document.body.textContent).toContain('Nenhuma música no catálogo local.')
       w.unmount()
     })
 
@@ -1166,7 +1166,7 @@ it('selectLocalFile bridge SEM dialog.openFile: erro desktopOnly (372-373)', asy
         categoryOptions: [],
       })
       await flushPromises()
-      expect(document.body.textContent).toContain('Nenhuma música encontrada')
+      expect(document.body.textContent).toContain('Nenhuma música no catálogo local.')
       w.unmount()
       // categoria: select de categoria visível + opções vazias → hint 939
       const w2 = createWrapper({

@@ -185,13 +185,51 @@ export async function importSljaAsLiturgyMusic(
 	}
 	const musicId = created.id;
 
+	let uploadedImages = 0;
+	const uploadedAssets: Array<{ path: string; url: string; idFile: number }> =
+		[];
+	// Upload do ÁUDIO em paralelo com as imagens (são independentes — o
+	// link com o musicId vem depois via updateCustomMusic). Áudio é o
+	// maior arquivo: não pode esperar a fila de imagens.
+	const audioUpload: Promise<{ idFile: number } | null> | null =
+		archive.audio?.bytes?.length
+			? uploadCustomFile(
+					archive.audio.bytes,
+					archive.audio.name,
+					"audio",
+				)
+			: null;
+
+	if (archive.assets?.length) {
+		// Uploads EM PARALELO (batch de 4): cada request à API custa ~0.7s de
+		// RTT — em série, um .slja com 15 imagens levava 15×0.7s só de espera
+		// ("o import deveria demorar? no web era rápido"). Ordem preservada
+		// pelo map antes do all.
+		const BATCH = 4;
+		for (let i = 0; i < archive.assets.length; i += BATCH) {
+			const batch = archive.assets.slice(i, i + BATCH);
+			const results = await Promise.all(
+				batch.map((asset) =>
+					uploadCustomFile(asset.bytes, asset.path, "imagens").then(
+						(up) => ({ asset, up }),
+					),
+				),
+			);
+			for (const { asset, up } of results) {
+				if (up) {
+					uploadedAssets.push({
+						path: asset.path,
+						url: up.url,
+						idFile: up.idFile,
+					});
+					uploadedImages += 1;
+				}
+			}
+		}
+	}
 	let hasAudio = false;
-	if (archive.audio?.bytes?.length) {
-		const uploadedAudio = await uploadCustomFile(
-			archive.audio.bytes,
-			archive.audio.name,
-			"audio",
-		);
+	if (audioUpload) {
+		const uploadedAudio = await audioUpload;
 		if (uploadedAudio) {
 			const linked = await updateCustomMusic(musicId, {
 				id_file_audio: uploadedAudio.idFile,
@@ -200,41 +238,30 @@ export async function importSljaAsLiturgyMusic(
 		}
 	}
 
-	let uploadedImages = 0;
-	const uploadedAssets: Array<{ path: string; url: string; idFile: number }> =
-		[];
-	if (archive.assets?.length) {
-		for (const asset of archive.assets) {
-			const up = await uploadCustomFile(asset.bytes, asset.path, "imagens");
-			if (up) {
-				uploadedAssets.push({
-					path: asset.path,
-					url: up.url,
-					idFile: up.idFile,
-				});
-				uploadedImages += 1;
-			}
-		}
-	}
 	const imageIdByUrl = new Map(uploadedAssets.map((a) => [a.url, a.idFile]));
 	const coverAsset = matchUploadedAsset(coverImageName, uploadedAssets);
 	if (coverAsset) {
 		await updateCustomMusic(musicId, { id_file_image: coverAsset.idFile });
 	}
 
+	// Lyrics em paralelo (batch de 5) com order EXPLÍCITO — a ordem é
+	// garantida pelo campo, não pela sequência de requests. 15 slides caem
+	// de 15 RTTs (~10s) para ~3.
 	let slideCount = 0;
-	for (const slide of slides) {
-		const text = slide.lyric.trim();
-		// Empty lyrics were removed before any asynchronous import work.
-		const imageUrl = matchUploadedAsset(slide.image?.name, uploadedAssets)?.url ?? "";
-		const createdLyric = await createCustomLyric(musicId, {
-			lyric: text,
-			aux_lyric: slide.auxiliaryLyric?.trim() || undefined,
-			time: formatSljaMsAsTime(slide.timeMs),
-			id_file_image: imageIdByUrl.get(imageUrl),
-			image_position: slide.imagePosition ?? undefined,
-		});
-		if (createdLyric) slideCount += 1;
+	const LYRIC_BATCH = 5;
+	for (let i = 0; i < slides.length; i += LYRIC_BATCH) {
+		const created = await Promise.all(slides.slice(i, i + LYRIC_BATCH).map((slide, j) => {
+			const imageUrl = matchUploadedAsset(slide.image?.name, uploadedAssets)?.url ?? "";
+			return createCustomLyric(musicId, {
+				lyric: slide.lyric.trim(),
+				aux_lyric: slide.auxiliaryLyric?.trim() || undefined,
+				time: formatSljaMsAsTime(slide.timeMs),
+				order: i + j + 1,
+				id_file_image: imageIdByUrl.get(imageUrl),
+				image_position: slide.imagePosition ?? undefined,
+			});
+		}));
+		slideCount += created.filter(Boolean).length;
 	}
 	// Upload de mídia pode falhar e o import segue só com texto. Estrofe
 	// incompleta não: a projeção ficaria truncada e o dialog trataria como sucesso.
@@ -340,6 +367,14 @@ async function importSljaLocal({
 		persistedDurationMs = getLocalMusic(musicId)?.durationMs ?? 0;
 	}
 
+	// Fundo compartilhado (padrão web#174): primeiro asset do .slja vira data:
+	// URL e cobre a capa + todos os slides (o .slja traz fundo único).
+	let coverDataUrl: string | null = null;
+	if (archive.assets?.length && archive.assets[0]?.bytes?.length) {
+		coverDataUrl = `data:image/png;base64,${bytesToBase64(archive.assets[0].bytes)}`;
+		updateLocalMusic(musicId, { image_url: coverDataUrl });
+	}
+
 	let slideCount = 0;
 	try {
 		for (const slide of slides) {
@@ -348,6 +383,7 @@ async function importSljaLocal({
 			createLocalLyric(musicId, {
 				lyric: text,
 				aux_lyric: slide.auxiliaryLyric?.trim() || undefined,
+				image_url: coverDataUrl,
 				time: formatSljaMsAsTime(slide.timeMs),
 			});
 			const persisted = getLocalMusic(musicId)?.lyrics.some(

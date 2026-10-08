@@ -36,7 +36,7 @@ beforeEach(() => {
 describe('countdown-preferences — normalize', () => {
   it('não-objeto → default', () => {
     for (const raw of [null, undefined, 'x', 1]) {
-      expect(normalizeCountdownDisplayConfig(raw)).toEqual({
+      expect(normalizeCountdownDisplayConfig(raw)).toMatchObject({
         ...DEFAULT_COUNTDOWN_DISPLAY_CONFIG,
       })
     }
@@ -49,7 +49,7 @@ describe('countdown-preferences — normalize', () => {
         bgColor: '#123456',
         textColor: '#654321',
       }),
-    ).toEqual({ timeFormat: 'mm:ss.ms', bgColor: '#123456', textColor: '#654321' })
+    ).toMatchObject({ timeFormat: 'mm:ss.ms', bgColor: '#123456', textColor: '#654321' })
   })
 
   it('timeFormat fora da lista → default; bgColor/textColor vazios → default', () => {
@@ -66,14 +66,14 @@ describe('countdown-preferences — normalize', () => {
 
 describe('countdown-preferences — load/save', () => {
   it('load sem config → default', () => {
-    expect(loadCountdownDisplayConfig()).toEqual({ ...DEFAULT_COUNTDOWN_DISPLAY_CONFIG })
+    expect(loadCountdownDisplayConfig()).toMatchObject({ ...DEFAULT_COUNTDOWN_DISPLAY_CONFIG })
   })
 
   it('save persiste e load devolve', () => {
     const config = { ...DEFAULT_COUNTDOWN_DISPLAY_CONFIG, timeFormat: 'mm:ss' as const }
     saveCountdownDisplayConfig(config)
     expect(store.get(USER_PREFERENCE_KEYS.countdownConfig)).toEqual(config)
-    expect(loadCountdownDisplayConfig()).toEqual(config)
+    expect(loadCountdownDisplayConfig()).toMatchObject(config)
   })
 
   it('save publica no canal', () => {

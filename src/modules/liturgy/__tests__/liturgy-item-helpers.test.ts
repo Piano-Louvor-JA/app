@@ -649,8 +649,8 @@ describe('branches residuais item-helpers', () => {
 })
 
 describe('branches residuais 2', () => {
-  it('draft não-categoria sem categoryId é inválido', () => {
-    expect(isLiturgyItemDraftValid(draft({ type: 'annotation', musicId: null, categoryId: null }))).toBe(false)
+  it('draft não-categoria sem categoryId é válido', () => {
+    expect(isLiturgyItemDraftValid(draft({ type: 'annotation', musicId: null, categoryId: null }))).toBe(true)
   })
   it('build música do catálogo com name vazio: complementary/notes undefined', () => {
     const item = buildLiturgyItemFromDraft(

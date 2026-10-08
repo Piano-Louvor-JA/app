@@ -181,8 +181,8 @@ describe('liturgy-item-helpers mutation kill — complement (12 conditionals)', 
     it('music precisa musicId', () => {
       expect(isLiturgyItemDraftValid({ ...baseDraft, musicId: null })).toBe(false)
     })
-    it('non-category precisa categoryId', () => {
-      expect(isLiturgyItemDraftValid({ ...baseDraft, categoryId: null })).toBe(false)
+    it('non-category aceita categoria opcional', () => {
+      expect(isLiturgyItemDraftValid({ ...baseDraft, categoryId: null })).toBe(true)
     })
     it('images precisa filePaths ou filePath', () => {
       expect(isLiturgyItemDraftValid({ ...baseDraft, type: 'images', filePaths: ['a.jpg'] })).toBe(true)
@@ -276,10 +276,10 @@ describe('liturgy-item-helpers mutation kill — complement (12 conditionals)', 
       expect(draft.subtitle).toBe('nota')
     })
 
-    it('music — sem complementaryTitle → name vazio (comportamento real)', () => {
+    it('music — sem complementaryTitle → preserva título', () => {
       const item: LiturgyItem = { id: '1', type: 'music', name: 'Hino 1', subtitle: 'Hinário', done: false, durationMs: 0, accentColor: '', categoryId: 'cat1', startTime: null, endTime: null, complementaryTitle: undefined, notes: '', musicId: 1, musicMode: 'audio', verseBookId: null, verseChapter: null, verseNumbers: '', filePath: '', filePaths: [], playerId: 'default', url: '', presentationEngine: 'auto' }
       const draft = draftFromLiturgyItem(item)
-      expect(draft.name).toBe('')
+      expect(draft.name).toBe(item.name)
     })
 
     it('non-music — name/subtitle/notes pass-through', () => {

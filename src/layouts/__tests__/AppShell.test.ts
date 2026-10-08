@@ -1,3 +1,4 @@
+vi.mock('@modules/auth/components/AuthAccountDialog.vue', () => ({ default: { props: ['modelValue'], template: '<div v-if="modelValue" class="auth-account-dialog-stub" />' } }))
 // @vitest-environment jsdom
 /**
  * Cobertura: AppShell.vue (task t_86847917).
