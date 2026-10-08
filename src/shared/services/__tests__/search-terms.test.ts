@@ -1,0 +1,50 @@
+import { describe, expect, it } from 'vitest'
+
+import { matchesAllTerms } from '../search-terms'
+
+describe('matchesAllTerms (busca por termos — bug 03/10)', () => {
+  const title = 'Jesus'
+  const album = 'Adoradores 5'
+
+  it('substring contígua no título continua casando', () => {
+    expect(matchesAllTerms(title, album, 'jesus')).toBe(true)
+    expect(matchesAllTerms(title, album, 'Je')).toBe(true)
+  })
+
+  it('substring contígua no álbum continua casando', () => {
+    expect(matchesAllTerms(title, album, 'adoradores 5')).toBe(true)
+    expect(matchesAllTerms(title, album, 'adoradores')).toBe(true)
+  })
+
+  it('termos espalhados entre título e álbum casam (o bug)', () => {
+    expect(matchesAllTerms(title, album, 'jesus adoradores')).toBe(true)
+    expect(matchesAllTerms(title, album, 'jesus adoradores 5')).toBe(true)
+    expect(matchesAllTerms(title, album, 'Jesus do Adoradores 5')).toBe(true)
+    expect(matchesAllTerms(title, album, 'adoradores 5 jesus')).toBe(true)
+  })
+
+  it('termo inexistente falha', () => {
+    expect(matchesAllTerms(title, album, 'jesus inexistente')).toBe(false)
+    expect(matchesAllTerms(title, album, 'por do sol')).toBe(false)
+  })
+
+  it('termo de 1 letra só casa se existir', () => {
+    expect(matchesAllTerms(title, album, 'j 5')).toBe(true)
+    expect(matchesAllTerms(title, album, 'z 9')).toBe(false)
+  })
+
+  it('query vazia/só espaços = falso', () => {
+    expect(matchesAllTerms(title, album, '')).toBe(false)
+    expect(matchesAllTerms(title, album, '   ')).toBe(false)
+  })
+
+  it('case-insensitive com acentos (comportamento pré-exervado)', () => {
+    expect(matchesAllTerms('Graça', 'Adoradores', 'graça')).toBe(true)
+    expect(matchesAllTerms('Graça', 'Adoradores', 'graca')).toBe(false) // NFD é outra issue (#346)
+  })
+
+  it('música sem álbum (searchable vazio) casa por título', () => {
+    expect(matchesAllTerms('Jesus', '', 'jesus')).toBe(true)
+    expect(matchesAllTerms('Jesus', '', 'adoradores')).toBe(false)
+  })
+})
