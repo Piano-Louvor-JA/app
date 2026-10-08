@@ -26,7 +26,8 @@ const scheduledStore = useScheduledStore()
 const scheduledResolvedByItemId = computed(() => {
   const map: Record<
     string,
-    { entryName: string; kindLabel: string; kind: string } | { empty: string }
+    | { entryName: string; kindLabel: string; kind: string; filePath?: string }
+    | { empty: string }
   > = {}
   const day = selectedDay.value as import('../types/liturgy').LiturgyDayKey
   const dateISO = activeDateISO(day)
@@ -47,6 +48,10 @@ const scheduledResolvedByItemId = computed(() => {
         entryName: `${rotationName}: ${resolved.entryName}`,
         kindLabel: t(`liturgy.messages.scheduledKind.${resolved.kind}`),
         kind: resolved.kind,
+        filePath:
+          resolved.content?.kind === 'file'
+            ? resolved.content.filePath
+            : undefined,
       }
     } else {
       // Sem entrada na data: dizer QUAL data e QUAL rotação — ponteiro cego não.
