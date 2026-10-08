@@ -142,13 +142,13 @@ describe('liturgy-actions — mata mutantes OptionalChaining/MethodExpression/re
       })
     })
 
-    it('video type NUNCA usa externalPlayer mesmo com playerId (L148 item.type === audio)', async () => {
+    it('video local com preferência externa usa externalPlayer (L148 audio ou video)', async () => {
       const bridge = baseMock()
       await withBridge(bridge, async () => {
         const { executeLiturgyItem } = await import('../services/liturgy-actions')
         const result = await executeLiturgyItem(audioItem({ type: 'video' }))
         expect(result.ok).toBe(true)
-        expect(bridge.externalPlayer.play).not.toHaveBeenCalled()
+        expect(bridge.externalPlayer.play).toHaveBeenCalledWith('/tmp/a.mp3', 'vlc')
       })
     })
   })
