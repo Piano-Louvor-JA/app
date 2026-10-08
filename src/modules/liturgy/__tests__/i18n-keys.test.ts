@@ -79,3 +79,15 @@ describe('guarda i18n — nenhuma chave com leak', () => {
     }
   })
 })
+
+describe('chaves dinâmicas por kind do store (snake_case da API)', () => {
+  it('scheduledKind.<kind do store> existe para TODOS os kinds conhecidos', () => {
+    const kinds = ['music', 'file', 'verse', 'annotation', 'online_video'] as const
+    for (const kind of kinds) {
+      const key = `liturgy.messages.scheduledKind.${kind}`
+      expect(liturgyPt.has(key), `pt faltando ${key} (cru do store)`).toBe(true)
+      expect(liturgyEn.has(key), `en faltando ${key} (cru do store)`).toBe(true)
+      expect(liturgyEs.has(key), `es faltando ${key} (cru do store)`).toBe(true)
+    }
+  })
+})

@@ -30,7 +30,7 @@ const props = defineProps<{
   sectionInProgress?: boolean
   /** Placeholder agendado: entrada resolvida OU estado vazio (rotação/data). */
   resolvedSchedule?:
-    | { entryName: string; kindLabel: string }
+    | { entryName: string; kindLabel: string; kind?: string }
     | { empty: string }
     | null
   /** Categoria abaixo de outra incompleta → status Aguardando. */
@@ -74,6 +74,30 @@ const rootEl = ref<HTMLElement | null>(null)
 let dragGhostEl: HTMLElement | null = null
 
 const isCategory = computed(() => props.item.type === 'category')
+
+/** Placeholder agendado: duração própria não existe (vem do conteúdo do dia). */
+const isScheduledPlaceholder = computed(() => props.item.type === 'scheduled')
+
+/** Ícone efetivo: agendado com conteúdo do dia mostra o ícone do TIPO resolvido. */
+const effectiveIcon = computed(() => {
+  if (
+    isScheduledPlaceholder.value &&
+    props.resolvedSchedule &&
+    'kind' in props.resolvedSchedule &&
+    props.resolvedSchedule.kind
+  ) {
+    const icons: Record<string, string> = {
+      music: 'ti-music',
+      file: 'ti-movie',
+      video: 'ti-movie',
+      online_video: 'ti-movie',
+      verse: 'ti-book',
+      annotation: 'ti-note',
+    }
+    return icons[props.resolvedSchedule.kind] ?? 'ti-calendar-time'
+  }
+  return null
+})
 const isLinked = computed(() => Boolean(props.linked))
 const executable = computed(() => isExecutableItem(props.item))
 const isMusicItem = computed(
@@ -400,7 +424,7 @@ const rowHovered = ref(false)
         >
           <i
             class="ti"
-            :class="getItemTypeIcon(item.type)"
+            :class="effectiveIcon ?? getItemTypeIcon(item.type)"
             aria-hidden="true"
           />
         </div>
@@ -481,7 +505,10 @@ const rowHovered = ref(false)
           <p class="liturgy-item__clock">
             {{ startLabel }}
           </p>
-          <p class="liturgy-item__duration">
+          <p
+            v-if="!isScheduledPlaceholder || resolvedSchedule"
+            class="liturgy-item__duration"
+          >
             {{ t('liturgy.duration', { time: durationLabel }) }}
           </p>
         </div>

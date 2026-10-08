@@ -312,6 +312,7 @@ export default {
       'scheduledKind.verse': 'Versículo',
       'scheduledKind.annotation': 'Nota',
       'scheduledKind.onlineVideo': 'Video online',
+      'scheduledKind.online_video': 'Video online',
       booksEmpty: 'No hay libros bíblicos disponibles. Complete la inicialización.',
       urlMissing: 'Proporcione un enlace válido en este elemento.',
       urlInvalid: 'El enlace proporcionado no es válido para proyección.',
