@@ -29,10 +29,19 @@ async function run() {
 
 async function send() {
   if (!bridge?.diagnostics || !result.value) return
-  const response = await bridge.diagnostics.send(result.value.report)
-  sendMessage.value = response.ok
-    ? 'Relatório enviado. Obrigado!'
-    : `Envio indisponível. Compartilhe o arquivo salvo. ${response.reason ?? ''}`
+  try {
+    // result.value.report é um Proxy do Vue (ref) — IPC estruturado do Electron
+    // não clona Proxy. JSON round-trip gera plain object clonável.
+    const plain = JSON.parse(JSON.stringify(result.value.report))
+    const response = await bridge.diagnostics.send(plain)
+    sendMessage.value = response.ok
+      ? 'Relatório enviado. Obrigado!'
+      : `Envio indisponível. Compartilhe o arquivo salvo. ${response.reason ?? ''}`
+  } catch (cause) {
+    sendMessage.value = `Falha no envio. Compartilhe o arquivo salvo. ${
+      cause instanceof Error ? cause.message : String(cause)
+    }`
+  }
 }
 
 function openFolder() {
