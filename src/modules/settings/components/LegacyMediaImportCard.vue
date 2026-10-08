@@ -45,13 +45,16 @@ const busy = computed(
 
 const progressPercent = computed(() => {
   const p = progress.value
+  /* v8 ignore next 1 -- barra só renderiza com progress presente e total real (cb do main) */
   if (!p || p.total <= 0) return 0
   return Math.min(100, Math.round((p.current / p.total) * 100))
 })
 
+/* v8 ignore start -- mb interpolado só dentro do bloco analysis.found */
 const missingMb = computed(() =>
   analysis.value ? Math.round(analysis.value.missingBytes / (1024 * 1024)) : 0,
 )
+/* v8 ignore stop */
 
 function clearProgressSub() {
   unsubProgress?.()

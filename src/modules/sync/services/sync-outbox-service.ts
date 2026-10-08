@@ -64,10 +64,7 @@ function coalesceKey(namespace: string, key: string): string {
 }
 
 function uuid(): string {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-    return crypto.randomUUID()
-  }
-  return `op-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+  return crypto.randomUUID()
 }
 
 /** Enfileira uma mutação do estado do operador. NUNCA toca rede. */

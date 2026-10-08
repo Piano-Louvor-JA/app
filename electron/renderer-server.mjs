@@ -86,7 +86,8 @@ export function startRendererServer(distDir, logger = console) {
         });
         res.end(data);
       } catch (err) {
-        logger.error?.("[renderer-server] erro servindo", req.url, err);
+        // Request URLs and parser errors may contain attacker-controlled text.
+        logger.error?.("[renderer-server] erro ao servir arquivo");
         res.writeHead(500, { "content-type": "text/plain" });
         res.end("erro interno");
       }
