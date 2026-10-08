@@ -6,6 +6,7 @@
   "mutate": [
     "src/plugins/i18n.ts",
     "src/modules/sync/services/library-catalog.ts",
+    "src/modules/liturgy/services/**/*.ts",
     "src/modules/community/services/notifications.ts",
     "src/modules/community/components/NotificationsDropdown.vue",
     "src/modules/community/components/NotificationsPanel.vue",
@@ -15,6 +16,13 @@
     "src/modules/community/services/seasonal-event.ts",
     "src/modules/community/services/community-catalog.ts"
   ],
+  "ignorePatterns": [
+    ".worktrees",
+    "reports",
+    "coverage",
+    "dist",
+    ".stryker-tmp"
+  ],
   "thresholds": {
     "high": 80,
     "low": 60,
@@ -22,9 +30,13 @@
   },
   "reporters": [
     "html",
+    "json",
     "clear-text",
     "progress"
   ],
+  "jsonReporter": {
+    "fileName": "reports/mutation/mutation.json"
+  },
   "htmlReporter": {
     "fileName": "reports/mutation/mutation.html"
   },
@@ -32,6 +44,6 @@
     "configFile": "vitest.config.ts"
   },
   "timeoutMS": 30000,
-  "concurrency": 2,
+  "concurrency": 1,
   "warnings": false
 }

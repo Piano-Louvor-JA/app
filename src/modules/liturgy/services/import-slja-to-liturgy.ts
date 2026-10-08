@@ -18,6 +18,7 @@ import {
 	createCustomCollection,
 	createCustomLyric,
 	createCustomMusic,
+	deleteCustomMusic,
 	listCustomCollections,
 	toCustomMusicId,
 	updateCustomMusic,
@@ -48,6 +49,8 @@ export interface ImportedSljaLiturgyMusic {
 	durationMs: number;
 	/** true = gravado só local (sem login); sync pra conta é versão futura. */
 	local: boolean;
+	/** Imagens do .slja não cabem no armazenamento local e foram omitidas. */
+	imagesOmitted: boolean;
 }
 
 /** Margem além do último slide (o MP3 real pode esticar). */
@@ -84,7 +87,8 @@ export function sljaDisplayName(
 	fallback: string,
 ): string {
 	const title = archive.title?.trim() ?? "";
-	const generic = /^v[\d.]+$/.test(title) || title.length === 0;
+	const generic =
+		/^v[\d.]+$/.test(title) || title.length === 0 || title === "Sem título";
 	if (generic) {
 		return fallback
 			.replace(/\.slja(\.zip)?$/i, "")
@@ -98,14 +102,32 @@ async function ensureImportCollectionId(): Promise<number | null> {
 	// Reaproveita a primeira "Importações .slja" existente (mesma regra do
 	// media editor); só cria se ainda não houver nenhuma.
 	try {
-		const collections = await listCustomCollections();
-		const existing = collections.find((c) => c.name === IMPORT_COLLECTION_NAME);
+		const signal = AbortSignal.timeout(15_000);
+		const collections = await listCustomCollections({ signal });
+		if (signal.aborted) return null;
+		const ownerId = getAuthSession()?.user?.id_user;
+		// Id negativo é coletânea LOCAL. Coletânea pública de outro usuário
+		// com o mesmo nome também não serve: o POST seguinte seria recusado.
+		const existing = collections.find(
+			(c) =>
+				c.name === IMPORT_COLLECTION_NAME &&
+				c.id > 0 &&
+				ownerId != null &&
+				c.ownerId === ownerId,
+		);
 		if (existing) return existing.id;
 	} catch {
 		// catálogo indisponível — tenta criar mesmo assim
 	}
-	const created = await createCustomCollection(IMPORT_COLLECTION_NAME);
-	return created?.id ?? null;
+	const created = await createCustomCollection(
+		IMPORT_COLLECTION_NAME,
+		undefined,
+		undefined,
+		"private",
+		{ queueOffline: false },
+	);
+	if (created == null || created.id <= 0) return null;
+	return created.id;
 }
 
 /** Entrada mínima que o dialog tem em mão (File do input atende). */
@@ -124,26 +146,40 @@ export async function importSljaAsLiturgyMusic(
 
 	const name = sljaDisplayName(archive, innerName ?? fileName);
 
+	const coverImageName = archive.slides.find((slide) => slide.type === "CAPA")
+		?.image?.name;
 	const slides = [...archive.slides]
 		.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
 		.filter((slide) => slide.type !== "CAPA" && slide.lyric.trim().length > 0);
 
 	const durationMs = estimateSljaDurationMs(slides);
+	if (slides.length === 0) {
+		throw new Error("SLJA_IMPORT_NO_LYRICS");
+	}
 
 	// ── Deslogado: grava 100% LOCAL (regra de produto 12/09 — sem identidade
 	// não há escrita confiável na API). Uso local sem conta é requisito
 	// permanente (offline-first): áudio/estrofes ficam no localStorage.
 	if (!getAuthSession()) {
-		return importSljaLocal({ name, archive, slides, durationMs });
+		return importSljaLocal({
+			name,
+			archive,
+			slides,
+			durationMs,
+			coverImageName,
+		});
 	}
 
 	// ── Logado: sobe pra API (Minhas Coletâneas → "Importações .slja").
 	const collectionId = await ensureImportCollectionId();
-	if (collectionId == null) {
+	if (collectionId == null || collectionId <= 0) {
 		throw new Error("SLJA_IMPORT_COLLECTION_FAILED");
 	}
 
-	const created = await createCustomMusic(collectionId, { name });
+	const created = await createCustomMusic(collectionId, {
+		name,
+		...(durationMs > 0 ? { duration: durationMs / 1000 } : {}),
+	});
 	if (!created) {
 		throw new Error("SLJA_IMPORT_MUSIC_FAILED");
 	}
@@ -203,39 +239,35 @@ export async function importSljaAsLiturgyMusic(
 	}
 
 	const imageIdByUrl = new Map(uploadedAssets.map((a) => [a.url, a.idFile]));
+	const coverAsset = matchUploadedAsset(coverImageName, uploadedAssets);
+	if (coverAsset) {
+		await updateCustomMusic(musicId, { id_file_image: coverAsset.idFile });
+	}
 
 	// Lyrics em paralelo (batch de 5) com order EXPLÍCITO — a ordem é
 	// garantida pelo campo, não pela sequência de requests. 15 slides caem
 	// de 15 RTTs (~10s) para ~3.
 	let slideCount = 0;
-	const validSlides = slides.filter((slide) => slide.lyric.trim());
 	const LYRIC_BATCH = 5;
-	for (let i = 0; i < validSlides.length; i += LYRIC_BATCH) {
-		const batch = validSlides.slice(i, i + LYRIC_BATCH);
-		const created = await Promise.all(
-			batch.map((slide, j) => {
-				const text = slide.lyric.trim();
-				// Background do slide: imagem upada com matching igual ao media
-				// editor (contains bidirecional, lowercase).
-				let imageUrl = "";
-				const imageName = slide.image?.name?.toLowerCase();
-				if (imageName && uploadedAssets.length) {
-					const match = uploadedAssets.find(
-						(a) =>
-							imageName.includes(a.path.toLowerCase()) ||
-							a.path.toLowerCase().includes(imageName),
-					);
-					if (match) imageUrl = match.url;
-				}
-				return createCustomLyric(musicId, {
-					lyric: text,
-					time: formatSljaMsAsTime(slide.timeMs),
-					order: i + j + 1,
-					id_file_image: imageIdByUrl.get(imageUrl),
-				});
-			}),
-		);
+	for (let i = 0; i < slides.length; i += LYRIC_BATCH) {
+		const created = await Promise.all(slides.slice(i, i + LYRIC_BATCH).map((slide, j) => {
+			const imageUrl = matchUploadedAsset(slide.image?.name, uploadedAssets)?.url ?? "";
+			return createCustomLyric(musicId, {
+				lyric: slide.lyric.trim(),
+				aux_lyric: slide.auxiliaryLyric?.trim() || undefined,
+				time: formatSljaMsAsTime(slide.timeMs),
+				order: i + j + 1,
+				id_file_image: imageIdByUrl.get(imageUrl),
+				image_position: slide.imagePosition ?? undefined,
+			});
+		}));
 		slideCount += created.filter(Boolean).length;
+	}
+	// Upload de mídia pode falhar e o import segue só com texto. Estrofe
+	// incompleta não: a projeção ficaria truncada e o dialog trataria como sucesso.
+	if (slideCount < slides.length) {
+		await deleteCustomMusic(musicId);
+		throw new Error("SLJA_IMPORT_LYRICS_INCOMPLETE");
 	}
 
 	return {
@@ -248,6 +280,7 @@ export async function importSljaAsLiturgyMusic(
 		uploadedImages,
 		durationMs,
 		local: false,
+		imagesOmitted: false,
 	};
 }
 
@@ -256,16 +289,38 @@ export async function importSljaAsLiturgyMusic(
  * monta data: URL — loadCustomMusicTrack, branch isLocalId) e as estrofes
  * vão com timing (time HH:MM:SS). Nada sobe pra rede.
  */
+function matchUploadedAsset(
+	imageName: string | undefined,
+	assets: Array<{ path: string; url: string; idFile: number }>,
+) {
+	if (!imageName || assets.length === 0) return undefined;
+	const normalize = (path: string) => path.replace(/\\/g, "/").replace(/^\.\//, "").toLowerCase();
+	const needle = normalize(imageName);
+	const exact = assets.find(asset => normalize(asset.path) === needle);
+	if (exact) return exact;
+	const basename = needle.split("/").pop();
+	const candidates = assets.filter(asset => normalize(asset.path).split("/").pop() === basename);
+	return candidates.length === 1 ? candidates[0] : undefined;
+}
+
 async function importSljaLocal({
 	name,
 	archive,
 	slides,
 	durationMs,
+	coverImageName,
 }: {
 	name: string;
 	archive: Awaited<ReturnType<typeof parseSljaFile>>;
-	slides: Array<{ lyric: string; timeMs: number; order?: number }>;
+	slides: Array<{
+		lyric: string;
+		timeMs: number;
+		order?: number;
+		auxiliaryLyric?: string;
+		image?: { name: string };
+	}>;
 	durationMs: number;
+	coverImageName?: string;
 }): Promise<ImportedSljaLiturgyMusic> {
 	// Import dinâmico: mantém a API fora do caminho local (offline-first e
 	// testes sem rede nunca tocam fetch).
@@ -274,6 +329,8 @@ async function importSljaLocal({
 		createLocalMusic,
 		createLocalLyric,
 		updateLocalMusic,
+		getLocalMusic,
+		deleteLocalMusic,
 		listLocalCollections,
 	} = await import("@modules/media/services/local-custom-store");
 
@@ -286,19 +343,28 @@ async function importSljaLocal({
 
 	const created = createLocalMusic(collectionId, { name });
 	const musicId = created.id;
+	if (!getLocalMusic(musicId)) {
+		throw new Error("SLJA_LOCAL_LYRIC_PERSIST_FAILED");
+	}
 
 	let hasAudio = false;
 	if (archive.audio?.bytes?.length) {
-		updateLocalMusic(musicId, {
+		const saved = updateLocalMusic(musicId, {
 			audioBase64: bytesToBase64(archive.audio.bytes),
 			audioName: archive.audio.name,
 		});
-		hasAudio = true;
+		const storedAudio = getLocalMusic(musicId)?.audioBase64;
+		hasAudio = saved && Boolean(storedAudio);
+		if (!hasAudio) {
+			deleteLocalMusic(musicId);
+			throw new Error("SLJA_LOCAL_AUDIO_PERSIST_FAILED");
+		}
 	}
 	// Duração estimada do item (último tempo_hms + margem) — o dialog aplica
 	// no draft e o catálogo da liturgia expõe; 0 = desconhecida.
-	if (durationMs > 0) {
-		updateLocalMusic(musicId, { durationMs });
+	let persistedDurationMs = 0;
+	if (durationMs > 0 && updateLocalMusic(musicId, { durationMs })) {
+		persistedDurationMs = getLocalMusic(musicId)?.durationMs ?? 0;
 	}
 
 	// Fundo compartilhado (padrão web#174): primeiro asset do .slja vira data:
@@ -310,16 +376,30 @@ async function importSljaLocal({
 	}
 
 	let slideCount = 0;
-	for (const slide of slides) {
-		const text = slide.lyric.trim();
-		if (!text) continue;
-		createLocalLyric(musicId, {
-			lyric: text,
-			time: formatSljaMsAsTime(slide.timeMs),
-			// capa única cobre todos os slides (mesma imagem do .slja)
-			image_url: coverDataUrl,
-		});
-		slideCount += 1;
+	try {
+		for (const slide of slides) {
+			const text = slide.lyric.trim();
+			// Empty lyrics were removed before any asynchronous import work.
+			createLocalLyric(musicId, {
+				lyric: text,
+				aux_lyric: slide.auxiliaryLyric?.trim() || undefined,
+				image_url: coverDataUrl,
+				time: formatSljaMsAsTime(slide.timeMs),
+			});
+			const persisted = getLocalMusic(musicId)?.lyrics.some(
+				(lyric) => lyric.lyric === text,
+			);
+			if (!persisted) {
+				throw new Error("SLJA_LOCAL_LYRIC_PERSIST_FAILED");
+			}
+			slideCount += 1;
+		}
+	} catch (error) {
+		deleteLocalMusic(musicId);
+		if (error instanceof Error && error.message === "local-persist-failed") {
+			throw new Error("SLJA_LOCAL_LYRIC_PERSIST_FAILED");
+		}
+		throw error;
 	}
 
 	return {
@@ -332,8 +412,12 @@ async function importSljaLocal({
 		slides: slideCount,
 		hasAudio,
 		uploadedImages: 0,
-		durationMs,
+		durationMs: persistedDurationMs,
 		local: true,
+		imagesOmitted:
+			Boolean(coverImageName) ||
+			(archive.assets?.length ?? 0) > 0 ||
+			slides.some((slide) => Boolean(slide.image?.name)),
 	};
 }
 

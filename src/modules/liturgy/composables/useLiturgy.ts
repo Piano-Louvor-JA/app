@@ -91,10 +91,8 @@ export function useLiturgy() {
   })
 
   onUnmounted(() => {
-    if (syncTimer != null) {
-      window.clearInterval(syncTimer)
-      syncTimer = null
-    }
+    if (syncTimer !== null) window.clearInterval(syncTimer)
+    syncTimer = null
   })
 
   function worshipLabel(): string {
@@ -130,13 +128,14 @@ export function useLiturgy() {
   async function confirmRemoveItem(index: number) {
     if (deletionLocked.value) return
     const item = currentItems.value[index]
+    if (!item) return
     const itemLabel = String(
       (item as { label?: string; title?: string } | undefined)?.label ??
         (item as { title?: string } | undefined)?.title ??
         '',
     ).trim()
     const message =
-      item?.type === 'category'
+      item.type === 'category'
         ? t('liturgy.messages.confirmDeleteCategory')
         : itemLabel
           ? t('liturgy.messages.confirmDeleteNamed', { name: itemLabel })

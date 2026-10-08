@@ -46,6 +46,7 @@ function openClearConfirm() {
 }
 
 function closeClearConfirm() {
+  /* v8 ignore next 1 -- popup fecha antes de isClearing ficar true */
   if (isClearing.value) return
   clearConfirmOpen.value = false
   clearAcknowledged.value = false
@@ -141,6 +142,7 @@ async function handleCheckUpdate() {
 }
 
 async function clearAllLocalData() {
+  /* v8 ignore next 1 -- botão confirmar só habilita com acknowledged e desktop */
   if (!isDesktopApp() || isClearing.value || !clearAcknowledged.value) return
 
   isClearing.value = true

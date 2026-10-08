@@ -90,11 +90,13 @@ function loadDb(): LocalDb {
 	}
 }
 
-function saveDb(db: LocalDb): void {
+function saveDb(db: LocalDb): boolean {
 	try {
 		localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+		return true;
 	} catch {
-		// quota (áudio base64 grande) — falha silenciosa; dados ficam só em memória
+		// quota (áudio base64 grande) — o caller decide se o import falhou
+		return false;
 	}
 }
 
@@ -206,8 +208,7 @@ export function updateLocalMusic(
 	if (patch.audioName !== undefined) music.audioName = patch.audioName;
 	if (patch.durationMs !== undefined) music.durationMs = patch.durationMs;
 	if (patch.image_url !== undefined) music.image_url = patch.image_url;
-	saveDb(db);
-	return true;
+	return saveDb(db);
 }
 
 export function deleteLocalMusic(id: number): boolean {
@@ -229,7 +230,7 @@ export function createLocalLyric(
 		order?: number;
 		/** Fundo do slide — data: URL base64 (import .slja local). */
 		image_url?: string | null;
-		image_position?: string | null;
+		image_position?: string | number | null;
 	},
 ): LocalLyric {
 	const db = loadDb();
@@ -244,12 +245,14 @@ export function createLocalLyric(
 		order,
 		show_slide: true,
 		image_url: input.image_url ?? null,
-		image_position: input.image_position ?? null,
+		image_position: input.image_position == null ? null : String(input.image_position),
 	};
 	db.nextLyricId -= 1;
 	music.lyrics.push(lyric);
 	music.lyrics.sort((a, b) => a.order - b.order);
-	saveDb(db);
+	if (!saveDb(db)) {
+		throw new Error("local-persist-failed");
+	}
 	return lyric;
 }
 

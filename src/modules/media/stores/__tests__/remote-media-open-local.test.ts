@@ -53,4 +53,20 @@ describe('TV Palco → media.open com música local (app#331)', () => {
     expect(store.session?.title).toBe('Local da TV')
     store.close()
   })
+
+  it('switchMode de música local não cai no catálogo oficial', async () => {
+    const collection = createLocalCollection('Importações .slja')
+    const music = createLocalMusic(collection.id, { name: 'Local da TV' })
+    createLocalLyric(music.id, { lyric: 'Verso', time: '00:00:03', order: 1 })
+    updateLocalMusic(music.id, { audioBase64: 'AQID', audioName: 'a.mp3' })
+
+    const store = useMediaStore()
+    const opened = await store.open({ musicId: music.id, mode: 'audio' })
+    expect(opened.ok).toBe(true)
+
+    const switched = await store.switchMode('no_audio')
+    expect(switched.ok).toBe(true)
+    expect(loadMediaTrackMock).not.toHaveBeenCalled()
+    store.close()
+  })
 })

@@ -1,3 +1,4 @@
+import { parseSlideTimeToSeconds } from './media-slides'
 import type {
   MediaLyricSlide,
   MediaTrackRecord,
@@ -143,15 +144,14 @@ function customBaseUrl(): string {
   // (coletâneas não baixam). .env é gitignored / CI não injeta (hotfix 14/09).
   const base =
     import.meta.env.VITE_PALCO_API_URL ?? 'https://api.pianolouvorja.com.br'
-  if (base) return `${base.replace(/\/$/, '')}/v1/custom`
-  return '/v1/custom'
+  return `${base.replace(/\/$/, '')}/v1/custom`
 }
 
 /**
  * Formata duração da API para m:ss.
  * API pode retornar: null, segundos (number), "mm:ss" ou "hh:mm:ss".
  */
-function formatDurationLabel(value: unknown): string {
+export function formatDurationLabel(value: unknown): string {
   const raw = asNullableString(value)
   if (raw) {
     // Já vem formatado ("3:45" / "00:03:45") — só limpar horas vazias
@@ -221,7 +221,9 @@ export async function loadCustomMusicTrack(
   if (!Number.isFinite(musicId) || musicId <= 0) return null
 
   try {
-    const response = await fetch(`${customBaseUrl()}/musics/${musicId}`)
+    const response = await fetch(`${customBaseUrl()}/musics/${musicId}`, {
+      headers: authHeaders(),
+    })
     if (!response.ok) return null
     const row = (await response.json()) as CustomMusicRow
     if (!row || !row.name) return null
@@ -332,7 +334,7 @@ export async function updateCustomCollection(
   }
 }
 
-export async function listCustomCollections(): Promise<
+export async function listCustomCollections(options?: { signal?: AbortSignal }): Promise<
   CustomCollectionSummary[]
 > {
   // Locais (ids negativos, só desta máquina) entram primeiro na lista.
@@ -347,6 +349,7 @@ export async function listCustomCollections(): Promise<
   try {
     const response = await fetch(`${customBaseUrl()}/collections`, {
       headers: authHeaders(),
+      signal: options?.signal,
     })
     if (!response.ok) return locals
     const json = (await response.json()) as {
@@ -421,11 +424,25 @@ export async function copyCustomMusic(
 }
 
 /** Todas as músicas custom (qualquer coletânea) — p/ reutilizar no editor. */
-export async function listAllCustomMusics(): Promise<
-  Array<CustomMusicSummary & { collectionName?: string; collectionId?: number }>
+export async function listAllCustomMusics(options?: {
+  timeoutMs?: number
+}): Promise<
+  Array<
+    CustomMusicSummary & {
+      collectionName?: string
+      collectionId?: number
+      instrumentalUrl?: string | null
+    }
+  >
 > {
   try {
-    const response = await fetch(`${customBaseUrl()}/musics`)
+    const response = await fetch(`${customBaseUrl()}/musics`, {
+      headers: authHeaders(),
+      signal:
+        options?.timeoutMs != null
+          ? AbortSignal.timeout(options.timeoutMs)
+          : undefined,
+    })
     if (!response.ok) return []
     const json = (await response.json()) as {
       data?: Array<{
@@ -434,6 +451,7 @@ export async function listAllCustomMusics(): Promise<
         official_music_id?: number | null
         duration?: number | string | null
         audio_url?: string | null
+        instrumental_url?: string | null
         image_url?: string | null
         id_collection?: number
         collection_name?: string
@@ -442,10 +460,13 @@ export async function listAllCustomMusics(): Promise<
     return (json.data ?? []).map((row) => ({
       id: row.id_music,
       name: row.name ?? '',
-      duration: typeof row.duration === 'string' ? null : row.duration ?? null,
+      duration: typeof row.duration === 'string'
+        ? parseSlideTimeToSeconds(row.duration) || null
+        : row.duration ?? null,
       hasAudio: Boolean(row.audio_url),
       hasImage: Boolean(row.image_url),
       audioUrl: row.audio_url ?? null,
+      instrumentalUrl: asNullableString(row.instrumental_url),
       officialMusicId: row.official_music_id ?? null,
       collectionId: row.id_collection,
       collectionName: row.collection_name,
@@ -464,6 +485,7 @@ export async function listCustomMusics(
   try {
     const response = await fetch(
       `${customBaseUrl()}/collections/${collectionId}/musics`,
+      { headers: authHeaders() },
     )
     if (!response.ok) return []
     const json = (await response.json()) as {
@@ -549,7 +571,7 @@ export function probeAudioDuration(
     const done = (value: number | null) => {
       clearTimeout(timer)
       audio.removeAttribute('src')
-      audio.load()
+      try { audio.load() } catch {}
       resolve(value)
     }
     const timer = setTimeout(() => done(null), timeoutMs)
@@ -574,6 +596,7 @@ export async function createCustomCollection(
   description?: string,
   authorName?: string,
   visibility?: CollectionVisibility,
+  options?: { queueOffline?: boolean },
 ): Promise<{ id: number } | null> {
   // Sem auth: cria LOCAL (regra de produto 12/09 — sem identidade não sobe).
   if (!getAuthSession()) {
@@ -597,6 +620,9 @@ export async function createCustomCollection(
     const json = (await response.json()) as { id_collection: number }
     return { id: json.id_collection }
   } catch {
+    // O import .slja não pode deixar uma coletânea vazia na fila quando
+    // desiste do envio. O editor continua enfileirando.
+    if (options?.queueOffline === false) return null
     // Offline (autenticado): enfileira pro sync (B1/B2). O client_uuid dá
     // identidade estável — o próximo flush cria/atualiza no servidor.
     await enqueue({
@@ -613,7 +639,7 @@ export async function createCustomCollection(
 
 export async function createCustomMusic(
   collectionId: number,
-  input: { name?: string; lyric?: string; auxiliary_lyric?: string },
+  input: { name?: string; lyric?: string; auxiliary_lyric?: string; duration?: number },
 ): Promise<{ id: number } | null> {
   if (isLocalId(collectionId)) {
     const local = createLocalMusic(collectionId, {
@@ -764,11 +790,16 @@ export async function createCustomLyric(
     time?: string
     order?: number
     id_file_image?: number
+    image_position?: string | number
   },
 ): Promise<{ id: number } | null> {
   if (isLocalId(musicId)) {
-    const local = createLocalLyric(musicId, input)
-    return { id: local.id }
+    try {
+      const local = createLocalLyric(musicId, input)
+      return { id: local.id }
+    } catch {
+      return null
+    }
   }
   try {
     const response = await fetch(`${customBaseUrl()}/musics/${musicId}/lyrics`, {

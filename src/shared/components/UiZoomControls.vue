@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { useI18n } from 'vue-i18n'
+import { useUiZoom } from "@shared/composables/useUiZoom";
+import { useI18n } from "vue-i18n";
 
-import { useUiZoom } from '@shared/composables/useUiZoom'
-
-const { t } = useI18n()
-const { zoomPercent, canZoomIn, canZoomOut, zoomIn, zoomOut } = useUiZoom()
+const { t } = useI18n();
+const { zoomPercent, canZoomIn, canZoomOut, zoomIn, zoomOut } = useUiZoom();
 </script>
 
 <template>
