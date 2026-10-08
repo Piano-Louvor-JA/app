@@ -24,11 +24,15 @@ const scheduledDialogOpen = ref(false)
 // Placeholder agendado → entrada do dia (badge na timeline).
 const scheduledStore = useScheduledStore()
 const scheduledResolvedByItemId = computed(() => {
-  const map: Record<string, { entryName: string; kindLabel: string }> = {}
+  const map: Record<
+    string,
+    { entryName: string; kindLabel: string } | { empty: string }
+  > = {}
   const day = selectedDay.value as import('../types/liturgy').LiturgyDayKey
   const dateISO = activeDateISO(day)
   for (const item of currentItems.value) {
     if (item.type !== 'scheduled' || !item.categoryId) continue
+    const rotationName = scheduledStore.categoryName(item.categoryId)
     const resolved = resolveScheduledEntry(
       item.categoryId,
       dateISO,
@@ -37,10 +41,18 @@ const scheduledResolvedByItemId = computed(() => {
     )
     if (resolved) {
       map[item.id] = {
-        entryName: resolved.entryName,
+        entryName: `${rotationName}: ${resolved.entryName}`,
         kindLabel: t(
           `liturgy.messages.scheduledKind.${resolved.kind}`,
         ),
+      }
+    } else {
+      // Sem entrada na data: dizer QUAL data e QUAL rotação — ponteiro cego não.
+      map[item.id] = {
+        empty: t('liturgy.messages.scheduledEmptyForDate', {
+          date: dateISO.split('-').reverse().join('/'),
+          rotation: rotationName ?? '—',
+        }),
       }
     }
   }

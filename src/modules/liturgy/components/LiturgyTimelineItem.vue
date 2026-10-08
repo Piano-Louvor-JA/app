@@ -28,8 +28,11 @@ const props = defineProps<{
   indeterminate?: boolean
   /** Categoria com filhos ainda não todos concluídos → status Em andamento. */
   sectionInProgress?: boolean
-  /** Placeholder agendado: entrada resolvida pra data do culto (badge informativo). */
-  resolvedSchedule?: { entryName: string; kindLabel: string } | null
+  /** Placeholder agendado: entrada resolvida OU estado vazio (rotação/data). */
+  resolvedSchedule?:
+    | { entryName: string; kindLabel: string }
+    | { empty: string }
+    | null
   /** Categoria abaixo de outra incompleta → status Aguardando. */
   sectionWaiting?: boolean
   collapsible?: boolean
@@ -438,10 +441,16 @@ const rowHovered = ref(false)
             </span>
           </div>
           <p
-            v-if="resolvedSchedule"
+            v-if="resolvedSchedule && 'entryName' in resolvedSchedule"
             class="liturgy-item__subtitle liturgy-item__subtitle--scheduled"
           >
             {{ resolvedSchedule.entryName }} · {{ resolvedSchedule.kindLabel }}
+          </p>
+          <p
+            v-else-if="resolvedSchedule && 'empty' in resolvedSchedule"
+            class="liturgy-item__subtitle liturgy-item__subtitle--scheduled"
+          >
+            {{ resolvedSchedule.empty }}
           </p>
           <p
             v-else-if="item.type === 'scheduled'"

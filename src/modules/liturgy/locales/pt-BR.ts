@@ -283,6 +283,7 @@ export default {
       customRequired:
         'Crie ou selecione uma liturgia personalizada antes de adicionar itens.',
       scheduledEmpty: 'Nenhum item agendado para a data deste culto nesta programação.',
+      scheduledEmptyForDate: 'Sem item para {date} em "{rotation}" — cadastre no dialog de Itens Agendados.',
       scheduledTitle: 'Itens Agendados',
       scheduledHint: 'Programações por data — a liturgia do dia resolve automaticamente o conteúdo de cada data (ex.: Provai e Vede do trimestre).',
       scheduledNewRotation: 'Nova programação',

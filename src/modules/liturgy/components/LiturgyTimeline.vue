@@ -18,8 +18,11 @@ const props = defineProps<{
   /** musicId → tem instrumental no catálogo. */
   musicInstrumentalById?: Record<number, boolean>
   busyMusicId?: number | null
-  /** Placeholder agendado: id do item → entrada resolvida pra data do culto. */
-  scheduledResolvedByItemId?: Record<string, { entryName: string; kindLabel: string }>
+  /** Placeholder agendado: id do item → entrada resolvida OU estado vazio (rotação/data). */
+  scheduledResolvedByItemId?: Record<
+    string,
+    { entryName: string; kindLabel: string } | { empty: string }
+  >
 }>()
 
 const emit = defineEmits<{
