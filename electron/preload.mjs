@@ -103,6 +103,12 @@ contextBridge.exposeInMainWorld('louvorja', {
     onChanged: (callback) => subscribe('zoom:changed', callback),
   },
 
+  diagnostics: {
+    run: () => ipcRenderer.invoke('diagnostics:run'),
+    send: (report) => ipcRenderer.invoke('diagnostics:send', report),
+    openFolder: (filePath) => ipcRenderer.invoke('diagnostics:open-folder', filePath),
+  },
+
   workspace: {
     readBinaryFile: (path) => ipcRenderer.invoke('dialog:read-binary-file', path),
     fetchText: (url) => ipcRenderer.invoke('workspace:fetch-text', url),
