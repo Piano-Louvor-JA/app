@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { nextTick } from 'vue'
 
-import DiagnosticsView from '../DiagnosticsView.vue'
+import DiagnosticsView from '../views/DiagnosticsView.vue'
 
 type BridgeShape = {
   isElectron: boolean
@@ -74,7 +75,8 @@ describe('DiagnosticsView (dev — SrCaldeira)', () => {
     const vmResult = w.vm as unknown as { result: unknown }
     expect(vmResult.result).toBeNull()
     // produz result sem passar pelo botão (run já testado):
-    ;(w.vm as unknown as { result: { value?: unknown } }).result = { value: runResult }
+    ;(w.vm as unknown as { result: typeof runResult | null }).result = runResult
+    await nextTick()
     await w.find('button.secondary').trigger('click')
     await flushPromises()
     expect(sendOk).toHaveBeenCalledWith(runResult.report)
@@ -84,7 +86,8 @@ describe('DiagnosticsView (dev — SrCaldeira)', () => {
     const sendFail = vi.fn().mockResolvedValue({ ok: false, reason: 'DSN não configurado' })
     setBridge({ isElectron: true, diagnostics: { run: vi.fn().mockResolvedValue(runResult), send: sendFail, openFolder: vi.fn() } })
     w = mount(DiagnosticsView)
-    ;(w.vm as unknown as { result: { value?: unknown } }).result = { value: runResult }
+    ;(w.vm as unknown as { result: typeof runResult | null }).result = runResult
+    await nextTick()
     await w.find('button.secondary').trigger('click')
     await flushPromises()
     expect(w.find('.progress').text()).toContain('Compartilhe o arquivo')
@@ -95,7 +98,8 @@ describe('DiagnosticsView (dev — SrCaldeira)', () => {
     const openFolder = vi.fn()
     setBridge({ isElectron: true, diagnostics: { run: vi.fn().mockResolvedValue(runResult), send: vi.fn(), openFolder } })
     const w = mount(DiagnosticsView)
-    ;(w.vm as unknown as { result: { value?: unknown } }).result = { value: runResult }
+    ;(w.vm as unknown as { result: typeof runResult | null }).result = runResult
+    await nextTick()
     const buttons = w.findAll('button.secondary')
     await buttons[1].trigger('click')
     expect(openFolder).toHaveBeenCalledWith(runResult.jsonPath)
