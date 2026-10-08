@@ -18,6 +18,7 @@ beforeAll(async () => {
   await writeFile(join(dist, 'assets/app.js'), 'console.log("renderer-fixture")')
 })
 
+const errorLogs = []
 let serverHandle
 
 afterAll(async () => {
@@ -27,7 +28,7 @@ afterAll(async () => {
 
 describe('renderer-server — origem http válida para o Firebase Auth', () => {
   it('sobe em 127.0.0.1 com porta efêmera (nunca 0.0.0.0)', async () => {
-    serverHandle = await startRendererServer(dist)
+    serverHandle = await startRendererServer(dist, { error: (...args) => errorLogs.push(args) })
     // hostname 'localhost' = authorizedDomain já presente no projeto Firebase
     expect(serverHandle.url).toMatch(/^http:\/\/localhost:\d+$/)
   })
@@ -54,6 +55,12 @@ describe('renderer-server — origem http válida para o Firebase Auth', () => {
     const res = await fetch(serverHandle.url + '/qualquer/deep/link')
     expect(res.status).toBe(200)
     expect(await res.text()).toContain('id="app"')
+  })
+
+  it('URL malformada responde 500 sem registrar dados recebidos', async () => {
+    const response = await fetch(serverHandle.url + '/%E0%A4%A')
+    expect(response.status).toBe(500)
+    expect(errorLogs.at(-1)).toEqual(['[renderer-server] erro ao servir arquivo'])
   })
 
   it('path traversal não vaza arquivo fora do dist', async () => {
