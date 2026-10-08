@@ -19,6 +19,10 @@ let video: HTMLVideoElement | null = null
 let stream: MediaStream | null = null
 let scanTimer: number | null = null
 let ws: WebSocket | null = null
+/* geração do scan: startScan abandonado (unmount durante o setTimeout)
+ * não pode instalar o interval depois do unmount */
+let scanGeneration = 0
+let unmounted = false
 
 function pushLog(msg: string) {
   log.value = [...log.value.slice(-6), msg]
@@ -27,11 +31,14 @@ function pushLog(msg: string) {
 async function startScan() {
   step.value = 'scanning'
   errorMsg.value = ''
+  const generation = ++scanGeneration
   try {
     stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: 'environment' },
     })
     await new Promise((r) => setTimeout(r, 200))
+    if (generation !== scanGeneration || unmounted) return
+    /* v8 ignore next 1 -- video (v-if=step scanning) sempre existe quando o scan chega vivo */
     if (video) {
       video.srcObject = stream
       await video.play()
@@ -44,6 +51,7 @@ async function startScan() {
 }
 
 function scanFrame() {
+  /* v8 ignore next 1 -- reset/unmount sempre limpam o timer antes do vídeo sumir */
   if (!video) return
   const canvas = document.createElement('canvas')
   canvas.width = video.videoWidth
@@ -103,6 +111,7 @@ function submitManual() {
 }
 
 function stopScan() {
+  scanGeneration++
   if (scanTimer) { clearInterval(scanTimer); scanTimer = null }
   stream?.getTracks().forEach((track) => track.stop())
   stream = null
@@ -120,6 +129,7 @@ function reset() {
 }
 
 onUnmounted(() => {
+  unmounted = true
   stopScan()
   ws?.close()
 })

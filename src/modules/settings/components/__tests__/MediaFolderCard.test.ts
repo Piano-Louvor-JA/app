@@ -198,4 +198,22 @@ describe('MediaFolderCard', () => {
     expect(w.find('[data-test="media-folder-restore-button"]').exists()).toBe(false)
     expect(bridge.mediaFolder.migrate).not.toHaveBeenCalled()
   })
+
+  it('gaps: duplo clique durante migração é ignorado (40 busy)', async () => {
+    const bridge = makeBridge()
+    let resolveMigrate: (r: unknown) => void = () => {}
+    bridge.mediaFolder.migrate.mockImplementation(() => new Promise((res) => { resolveMigrate = res }))
+    setBridge({ isElectron: true, platform: 'win32', mediaFolder: bridge.mediaFolder })
+    const w = mount(MediaFolderCard)
+    await flushPromises()
+    active = w
+    const choose = btn(w, 'media-folder-move-button')
+    await choose.trigger('click')
+    // 2º clique enquanto busy (migrate pendente) → guard 40 barra
+    await choose.trigger('click')
+    expect(bridge.mediaFolder.pick).toHaveBeenCalledTimes(1)
+    resolveMigrate({ ok: true, path: '/novo' })
+    await flushPromises()
+    expect(w.text()).toContain('mediaFolderMoved')
+  })
 })

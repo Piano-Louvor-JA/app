@@ -204,3 +204,99 @@ describe("LiturgyItemDialog — importar .slja no item de música (app#331)", ()
 		wrapper.unmount();
 	});
 });
+
+async function selectFile() {
+  const input = sljaInputElement();
+  Object.defineProperty(input, 'files', { value: [makeFakeFile()], configurable: true });
+  input.dispatchEvent(new Event('change'));
+  await flushPromises();
+}
+describe('import lifecycle and errors', () => {
+  beforeEach(() => { importMock.mockReset(); authSessionMock.mockReturnValue(null); document.body.innerHTML = ''; });
+  afterEach(() => { document.body.innerHTML = ''; });
+it.each(['SLJA_LOCAL_AUDIO_PERSIST_FAILED', 'SLJA_IMPORT_COLLECTION_FAILED', 'SLJA_IMPORT_NO_LYRICS'])('reports import failure %s without updating the draft', async (code) => {
+  const wrapper = mountDialog(makeDraft());
+  importMock.mockRejectedValueOnce(new Error(code));
+  await selectFile();
+  expect(wrapper.emitted('update:draft')).toBeUndefined();
+  expect(document.body.querySelector('.moment-dialog__slja-message--error')).not.toBeNull();
+  wrapper.unmount();
+});
+it('reports a non-Error rejection as a generic import failure', async () => {
+  const wrapper = mountDialog(makeDraft());
+  importMock.mockRejectedValueOnce('failed');
+  await selectFile();
+  expect(wrapper.emitted('update:draft')).toBeUndefined();
+  expect(document.body.textContent).toContain('liturgy.slja.importFailed');
+  wrapper.unmount();
+});
+it('reports omitted local images while preserving the imported song', async () => {
+  const wrapper = mountDialog(makeDraft());
+  importMock.mockResolvedValueOnce({ displayMusicId: -3, name: 'Local', durationMs: 0, local: true, imagesOmitted: true, slides: 1 });
+  await selectFile();
+  expect(document.body.textContent).toContain('liturgy.slja.importedLocalNoImages');
+  expect(wrapper.emitted('slja-imported')).toEqual([[-3]]);
+  wrapper.unmount();
+});
+it('ignores an empty file selection', async () => {
+  const wrapper = mountDialog(makeDraft());
+  const input = sljaInputElement();
+  Object.defineProperty(input, 'files', { value: [], configurable: true });
+  input.dispatchEvent(new Event('change'));
+  await flushPromises();
+  expect(importMock).not.toHaveBeenCalled();
+  wrapper.unmount();
+});
+it('ignores an import result after the dialog is closed', async () => {
+  const wrapper = mountDialog(makeDraft());
+  let finish!: (value: unknown) => void;
+  importMock.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+  await selectFile();
+  await wrapper.setProps({ open: false });
+  finish({ displayMusicId: -1, name: 'Stale', durationMs: 0, local: true });
+  await flushPromises();
+  expect(wrapper.emitted('slja-imported')).toBeUndefined();
+  wrapper.unmount();
+});
+it('ignores a late catalog refresh after the dialog is closed', async () => {
+  const wrapper = mountDialog(makeDraft());
+  let finish!: () => void;
+  await wrapper.setProps({ refreshImportedCatalog: () => new Promise<void>(resolve => { finish = resolve; }) });
+  importMock.mockResolvedValueOnce({ displayMusicId: -1, name: 'Stale', durationMs: 0, local: true });
+  await selectFile();
+  await wrapper.setProps({ open: false });
+  finish();
+  await flushPromises();
+  expect(wrapper.emitted('slja-imported')).toBeUndefined();
+  wrapper.unmount();
+});
+it('ignores a rejected import after the dialog is closed', async () => {
+  const wrapper = mountDialog(makeDraft());
+  let reject!: (error: Error) => void;
+  importMock.mockReturnValueOnce(new Promise((_resolve, fail) => { reject = fail; }));
+  await selectFile();
+  await wrapper.setProps({ open: false });
+  reject(new Error('late'));
+  await flushPromises();
+  expect(wrapper.emitted('update:draft')).toBeUndefined();
+  wrapper.unmount();
+});
+
+
+it('blocks programmatic submit and type changes while an import is pending', async () => {
+  const wrapper = mountDialog(makeDraft());
+  let finish!: (value: unknown) => void;
+  importMock.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+  await selectFile();
+  const form = document.body.querySelector('form')!;
+  const event = new Event('submit', { cancelable: true });
+  form.dispatchEvent(event);
+  document.body.querySelector('.moment-dialog__chip')!.dispatchEvent(new Event('click'));
+  expect(event.defaultPrevented).toBe(true);
+  expect(wrapper.emitted('submit')).toBeUndefined();
+  expect(wrapper.emitted('update:draft')).toBeUndefined();
+  finish({ displayMusicId: -1, name: 'Song', durationMs: 0, local: true });
+  await flushPromises();
+  wrapper.unmount();
+});
+});

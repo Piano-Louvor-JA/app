@@ -1129,3 +1129,30 @@ describe('LiturgyTimelineItem — cobertura extra', () => {
     })
   })
 })
+
+describe('LiturgyTimelineItem — handlers de template (F360/F372/F407)', () => {
+  it('dragover na raiz é preventDefault (F360) e drop emite drop com index', async () => {
+    const w = createWrapper({ index: 3 })
+    const root = w.find('.liturgy-item')
+    const evt = new Event('dragover', { bubbles: true, cancelable: true })
+    root.element.dispatchEvent(evt)
+    expect(evt.defaultPrevented).toBe(true)
+    const dropEvt = new Event('drop', { bubbles: true, cancelable: true })
+    root.element.dispatchEvent(dropEvt)
+    await nextTick()
+    expect(w.emitted('drop')?.[0]).toEqual([3])
+  })
+
+  it('click no label do check e no handle de drag não propaga (F372/F407 stop)', async () => {
+    const w = createWrapper({})
+    const label = w.find('.liturgy-item__check')
+    await label.trigger('click')
+    // click do label não altera done (só o input change emite toggleDone) —
+    // se emitido, é click no input interno propagando; aqui o .stop segura
+    const handle = w.find('.liturgy-item__drag')
+    await handle.trigger('click')
+    // handle com @click.stop: nenhum handler de click do pai roda — sem emits
+    // extras além dos já vistos; o contrato é não crashar e não emitir drop
+    expect(w.emitted('drop')).toBeUndefined()
+  })
+})

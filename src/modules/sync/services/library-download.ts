@@ -265,6 +265,7 @@ export async function downloadAlbumMedia(
 
     await Promise.all(
       batch.map(async (media) => {
+        /* v8 ignore next 1 -- callbacks do Promise.all rodam o guard antes de qualquer await: consecutiveErrors é 0 no lote (documentado no teste) */
         if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) return
 
         const relativePath = toRelativeMediaPath(media.url)

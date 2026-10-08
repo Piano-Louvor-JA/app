@@ -12,18 +12,20 @@ vi.mock('@design-system/index', () => ({
 
 
 const setThemeModeMock = vi.fn()
-vi.mock('../../composables/useAppearanceSettings', () => ({
-  useAppearanceSettings: () => {
-    let isDark = true
-    return {
-      get isDark() { return isDark },
+vi.mock('../../composables/useAppearanceSettings', async () => {
+  const { ref } = await import('vue')
+  const isDark = ref(true)
+  return {
+    __isDark: isDark,
+    useAppearanceSettings: () => ({
+      isDark,
       setThemeMode: (m: string) => {
-        isDark = m === 'dark'
+        isDark.value = m === 'dark'
         setThemeModeMock(m)
       },
-    }
-  },
-}))
+    }),
+  }
+})
 
 const lsData: Record<string, string> = {}
 const lsStub = {
@@ -69,5 +71,32 @@ describe('ThemeOrbitalSwitcher', () => {
       // só existem os 2 botões de modo — setThemeMode cobre preferLight/preferDark
       expect(setThemeModeMock).toHaveBeenCalledTimes(2)
     }
+  })
+
+  it('toggle switch: isDark false → toggle chama dark; classes reagem', async () => {
+    const w = mount(ThemeOrbitalSwitcher)
+    active = w
+    // começa dark (isDark=true) → vai pra light
+    const toggle = w.find('button[role="switch"]')
+    expect(toggle.exists()).toBe(true)
+    await toggle.trigger('click')
+    expect(setThemeModeMock).toHaveBeenLastCalledWith('light')
+    await w.vm.$nextTick()
+    await w.vm.$nextTick()
+    // agora light → toggle chama dark
+    const vm2 = w.vm as unknown as { toggleTheme?: () => void }
+    vm2.toggleTheme?.()
+    await w.vm.$nextTick()
+    expect(setThemeModeMock).toHaveBeenLastCalledWith('dark')
+    await w.vm.$nextTick()
+    // classes condicionais (dark ativo)
+    expect(w.find('.theme-orbital__sphere--dark').exists()).toBe(true)
+    expect(w.find('.theme-orbital__glow--light').exists()).toBe(false)
+    expect(w.find('.theme-orbital__switch-track--on').exists()).toBe(true)
+    // modo claro: glow light e esfera sem dark
+    await w.findAll('button.theme-orbital__mode-btn')[0]!.trigger('click')
+    await w.vm.$nextTick()
+    expect(w.find('.theme-orbital__glow--light').exists()).toBe(true)
+    expect(w.find('.theme-orbital__sphere--dark').exists()).toBe(false)
   })
 })

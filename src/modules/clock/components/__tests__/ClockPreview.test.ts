@@ -916,16 +916,17 @@ describe("ClockPreview.vue - Exposed Function Coverage", () => {
     wrapper.unmount()
     expect(() => exposed.measure()).not.toThrow()
 
-    // setTimeout when dimensions <= 0
+    // setTimeout when dimensions <= 0. O retry único arma no mount se o
+    // container ainda não tem tamanho; o espião precisa existir antes disso.
+    const setTimeoutSpy = vi.spyOn(window, "setTimeout")
     const wrapper2 = mountClock({ attachTo: document.body })
+    const container = wrapper2.find(".clock-preview").element as HTMLElement
+    Object.defineProperty(container, "offsetWidth", { value: 0, configurable: true })
+    Object.defineProperty(container, "offsetHeight", { value: 0, configurable: true })
     const exposed2 = wrapper2.vm as unknown as {
       measure: () => void
       containerRef: { value: HTMLElement | null }
     }
-    const container = wrapper2.find(".clock-preview").element as HTMLElement
-    Object.defineProperty(container, "offsetWidth", { value: 0, configurable: true })
-    Object.defineProperty(container, "offsetHeight", { value: 0, configurable: true })
-    const setTimeoutSpy = vi.spyOn(window, "setTimeout")
     exposed2.measure()
     expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 100)
     setTimeoutSpy.mockRestore()

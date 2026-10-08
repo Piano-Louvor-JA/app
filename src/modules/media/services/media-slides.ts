@@ -10,10 +10,10 @@ export function parseSlideTimeToSeconds(raw: string | null | undefined): number 
     const parts = trimmed.split(':').map((part) => Number(part))
     if (parts.some((part) => !Number.isFinite(part))) return 0
     if (parts.length === 3) {
-      return (parts[0] ?? 0) * 3600 + (parts[1] ?? 0) * 60 + (parts[2] ?? 0)
+      return (parts[0] as number) * 3600 + (parts[1] as number) * 60 + (parts[2] as number)
     }
     if (parts.length === 2) {
-      return (parts[0] ?? 0) * 60 + (parts[1] ?? 0)
+      return (parts[0] as number) * 60 + (parts[1] as number)
     }
     return 0
   }
@@ -78,7 +78,8 @@ export function buildSlideTimesSec(
  * avançar sozinho (import .slja sem tempo_hms cai inteiro em 00:00:00). */
 export function hasDistinctSlideTimes(timesSec: number[], hasSyntheticCover = false): boolean {
   if (hasSyntheticCover && timesSec.length === 2) {
-    return Number.isFinite(timesSec[1]) && (timesSec[1] ?? -1) >= 0
+    const lyricTime = timesSec[1]
+    return typeof lyricTime === 'number' && Number.isFinite(lyricTime) && lyricTime >= 0
   }
   if (hasSyntheticCover) timesSec = timesSec.slice(1)
   if (timesSec.length < 2) return false
@@ -96,7 +97,7 @@ export function resolveSlideIndexForTime(
 
   let index = 0
   for (let i = 0; i < timesSec.length; i += 1) {
-    if (currentTimeSec >= (timesSec[i] ?? 0)) {
+    if (currentTimeSec >= (timesSec[i] as number)) {
       index = i
     } else {
       break

@@ -125,4 +125,26 @@ describe('MonitorArrangementCard', () => {
     await stage.trigger('pointercancel')
     expect(true).toBe(true)
   })
+
+  it('gaps onda1: arrangement custom (btn reset), tile com pointerdown e zIndex dragging', async () => {
+    mockDisplays.value = [
+      { id: 1, bounds: { x: 0, y: 0, width: 800, height: 600 }, workArea: { x: 0, y: 0, width: 800, height: 580 }, scaleFactor: 1, isPrimary: true },
+      { id: 2, bounds: { x: 800, y: 0, width: 640, height: 480 }, workArea: { x: 800, y: 0, width: 640, height: 460 }, scaleFactor: 1, isPrimary: false },
+    ]
+    mockSettings.value = { monitorArrangement: [{ id: 1, left: 10, top: 5 }] }
+    const w = await mountCard()
+    active = w
+    expect(w.find('.monitor-arrangement__reset').exists()).toBe(true)
+    const tile = w.find('.monitor-tile')
+    expect(tile.exists()).toBe(true)
+    await tile.trigger('pointerdown', { button: 0, clientX: 0, clientY: 0 })
+    await flushPromises()
+    const resetBtn = w.find('.monitor-arrangement__reset')
+    expect(resetBtn.text()).toContain('settings.projection.monitors.resetLayout')
+    await resetBtn.trigger('click')
+    await flushPromises()
+    expect(resetMonitorArrangementMock).toHaveBeenCalled()
+    w.unmount()
+    active = null
+  })
 })

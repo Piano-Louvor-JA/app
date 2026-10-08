@@ -73,3 +73,19 @@ describe('loadAlbumLyric — custom e local (app#331)', () => {
     }
   })
 })
+
+it('sorts custom lyrics, filters blank text, and falls back to an unnamed title', async () => {
+  localStorage.setItem('louvorja.custom.auth', JSON.stringify({ token: 'test', user: { id_user: 1 } }));
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ id_music: 7, name: ' ', lyrics: [{ order: 2, lyric: 'Second' }, { order: 1, lyric: 'First' }, { order: 3, lyric: null }] }))));
+  try {
+    const result = await loadAlbumLyric(toCustomMusicId(7));
+    expect(result?.title).toBe('music_1000007');
+    expect(result?.lines.map(line => line.text)).toEqual(['First', 'Second']);
+  } finally { vi.unstubAllGlobals(); }
+});
+it('returns null for a custom song without usable lyrics', async () => {
+  localStorage.setItem('louvorja.custom.auth', JSON.stringify({ token: 'test', user: { id_user: 1 } }));
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ id_music: 7, name: 'Blank', lyrics: [] }))));
+  try { expect(await loadAlbumLyric(toCustomMusicId(7))).toBeNull(); }
+  finally { vi.unstubAllGlobals(); }
+});

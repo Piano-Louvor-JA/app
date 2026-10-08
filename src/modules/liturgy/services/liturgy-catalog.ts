@@ -89,9 +89,9 @@ export function parseCatalogDurationMs(raw: unknown): number | null {
     if (parts.some((part) => !Number.isFinite(part))) return null
     let seconds = 0
     if (parts.length === 3) {
-      seconds = (parts[0] ?? 0) * 3600 + (parts[1] ?? 0) * 60 + (parts[2] ?? 0)
+      seconds = parts[0]! * 3600 + parts[1]! * 60 + parts[2]!
     } else if (parts.length === 2) {
-      seconds = (parts[0] ?? 0) * 60 + (parts[1] ?? 0)
+      seconds = parts[0]! * 60 + parts[1]!
     } else {
       return null
     }
@@ -281,7 +281,7 @@ async function loadCollectionOptions(
   }
 }
 
-function sortMusicOptions(options: LiturgyMusicOption[]): LiturgyMusicOption[] {
+export function sortMusicOptions(options: LiturgyMusicOption[]): LiturgyMusicOption[] {
   return [...options].sort((a, b) => {
     const trackA = a.hymnalTrack ?? Number.POSITIVE_INFINITY
     const trackB = b.hymnalTrack ?? Number.POSITIVE_INFINITY

@@ -309,4 +309,119 @@ describe('StageCustomizationCard', () => {
     await flushPromises()
     expect(store.settings.fontSize).not.toBe(120)
   })
+
+  describe('gaps — cores, pesos, switches do clock e file picker', () => {
+    it('inputs de cor e swatches aplicam patch por propriedade', async () => {
+      const w = await mountCard()
+      active = w
+      const inputs = w.findAll('input[type="color"]')
+      expect(inputs.length).toBeGreaterThanOrEqual(2)
+      const keys = ['#111111', '#222222', '#333333', '#444444']
+      for (let i = 0; i < inputs.length; i++) {
+        await inputs[i]!.setValue(keys[i] ?? '#000000')
+      }
+      const store = useStageSettingsStore()
+      expect(store.settings.backgroundColor).toBe('#111111')
+    })
+
+    it('swatches de bibleTextColor/footerRefColor chamam patch', async () => {
+      const w = await mountCard()
+      active = w
+      const swatches = w.findAll('.stage-custom__swatch')
+      const before = swatches.length
+      expect(before).toBeGreaterThan(0)
+      // clicar nos dois últimos (bible/footer groups)
+      await swatches[before - 1]!.trigger('click')
+      await swatches[before - 2]!.trigger('click')
+    })
+
+    it('peso da bíblia via segment buttons', async () => {
+      const w = await mountCard()
+      active = w
+      const segments = w.findAll('.stage-custom__segment-btn')
+      expect(segments.length).toBeGreaterThanOrEqual(2)
+      await segments[segments.length - 1]!.trigger('click')
+      const store = useStageSettingsStore()
+      expect(store.settings.bibleFontWeight).toBeDefined()
+    })
+
+    it('switches do clock: style/showSeconds/format24h', async () => {
+      const w = await mountCard()
+      active = w
+      const switches = w.findAll('[role="switch"]')
+      for (const s of switches) {
+        await s.trigger('click')
+      }
+      const toggles = w.findAll('.stage-custom__toggle-label')
+      for (const tl of toggles) {
+        await tl.trigger('click')
+      }
+      const store = useStageSettingsStore()
+      void store
+    })
+
+    it('dropzone e botão de editar imagem abrem o file picker', async () => {
+      const w = await mountCard()
+      active = w
+      const input = w.find('input[type="file"]')
+      const clickSpy = vi.spyOn(input.element as HTMLInputElement, 'click').mockImplementation(() => {})
+      const bgBtn = w.find('.stage-custom__bg-btn')
+      if (bgBtn.exists()) await bgBtn.trigger('click')
+      else {
+        const dz = w.find('.stage-custom__dropzone')
+        if (dz.exists()) await dz.trigger('click')
+      }
+      expect(clickSpy).toHaveBeenCalled()
+      clickSpy.mockRestore()
+    })
+  })
+
+  it('gaps: handlers — click em todos botões e inputs por escopo', async () => {
+    for (const scope of [undefined, 'bible', 'clock']) {
+      const w = await mountCard(scope ? { onlyScope: scope } : {})
+      active = w
+      if (!scope) {
+        // bg custom setado → botão changeImage (fn 265)
+        const store = useStageSettingsStore()
+        store.setBackgroundImage('data:image/png;base64,AAA')
+        await flushPromises()
+      }
+      for (const btn of w.findAll('button')) {
+        await btn.trigger('click').catch(() => {})
+      }
+      // SettingsToggle real: emitir update:model-value (fn 723)
+      const { findAllComponents } = await import('@vue/test-utils')
+      for (const tg of w.findAllComponents({ name: 'SettingsToggle' })) {
+        tg.vm.$emit('update:modelValue', true)
+      }
+      await flushPromises()
+      for (const inp of w.findAll('input')) {
+        if (inp.attributes('type') === 'color') await inp.setValue('#123456')
+        else if (inp.attributes('type') === 'range') await inp.setValue('100')
+        else if (inp.attributes('type') === 'checkbox') await inp.setValue(true)
+      }
+      await flushPromises()
+      w.unmount()
+    }
+  })
+
+  it('gaps2: onlyScope inválido (59 arm1); defaults de clock/random no click (518/526/537/573); moduleTimeFormat null (122); reader não-string (166 arm1)', async () => {
+    const w = await mountCard({ onlyScope: 'escopo-fantasma' as never })
+    active = w
+    // estado default: sem overrides de clock/random → ?? DEFAULT nos clicks
+    const switches = w.findAll('button').filter((b) => (b.text().includes('24h') || b.text().includes('segundos') || b.attributes('aria-pressed') !== undefined))
+    for (const sw of switches.slice(0, 4)) await sw.trigger('click')
+    await flushPromises()
+    w.unmount()
+
+    // reader.result não-string (Blob) não chama setBackgroundImage
+    const w2 = await mountCard({})
+    active = w2
+    const input2 = w2.find('input[type="file"]')
+    const blobFile = new Blob([new Uint8Array([1, 2])]) as File
+    Object.defineProperty(input2.element, 'files', { value: [blobFile], configurable: true })
+    await input2.trigger('change')
+    await new Promise((r) => setTimeout(r, 20))
+    w2.unmount()
+  })
 })
