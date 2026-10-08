@@ -248,7 +248,8 @@ function computeVerdict({ general, apis, proxy, hosts, installation, extra }) {
 function reportText(report) {
   const lines = [
     'LouvorJA Diagnóstico — SrCaldeira',
-    `Data: ${report.meta.dataISO}`,
+    `Data (local): ${report.meta.dataLocal} (${report.ambiente.timezone})`,
+    `Data (ISO): ${report.meta.dataISO}`,
     `Duração: ${report.meta.duracaoMs} ms`,
     `Veredito heurístico: ${report.vereditoHeuristico}`,
     '',
@@ -332,7 +333,7 @@ async function runDiagnostics() {
     reproduction.push(hit ?? { passo: endpoint, base: null, ok: false, ms: elapsed(start), erroBruto: apis[0]?.http.find((h) => h.url.includes(`/${endpoint}?`))?.erro?.classe ?? 'OTHER', erroMapeado: 'starting.status.errorDownload' })
   }
   const report = {
-    meta: { campanha: 'SrCaldeira', versao: app.getVersion(), dataISO: new Date().toISOString(), duracaoMs: elapsed(started), tokenMascarado: maskToken(token) },
+    meta: { campanha: 'SrCaldeira', versao: app.getVersion(), dataISO: new Date().toISOString(), dataLocal: new Date().toLocaleString('pt-BR', { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone }), duracaoMs: elapsed(started), tokenMascarado: maskToken(token) },
     ambiente: { os: process.platform, osRelease: os.release(), arch: process.arch, electron: process.versions.electron, chrome: process.versions.chrome, locale: app.getLocale(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, online: general['1.1.1.1:443'].ok || general['google.com:443'].ok },
     rede: { proxy: { resolveProxyPorOrigem: proxy, envHttpProxy: process.env.HTTP_PROXY ?? null, envHttpsProxy: process.env.HTTPS_PROXY ?? null }, hostsOverrides, conectividadeGeral: general, apis, reproducaoBootstrap: reproduction, mediaReal: mediaProbe, dnsSuspeito },
     instalacaoReal: installation,
