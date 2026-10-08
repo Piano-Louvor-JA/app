@@ -21,7 +21,8 @@ const props = defineProps<{
   /** Placeholder agendado: id do item → entrada resolvida OU estado vazio (rotação/data). */
   scheduledResolvedByItemId?: Record<
     string,
-    { entryName: string; kindLabel: string; kind?: string } | { empty: string }
+    | { entryName: string; kindLabel: string; kind?: string; filePath?: string }
+    | { empty: string }
   >
 }>()
 
@@ -326,6 +327,7 @@ function isCategorySectionInProgress(categoryId: string): boolean {
             :video-projecting="videoProjectionItemId === child.item.id"
             :start-label="startLabels[child.index] ?? '—'"
             :duration-label="durationLabels[child.index] ?? '—'"
+            :resolved-schedule="scheduledResolvedByItemId?.[child.item.id] ?? null"
             linked
             :reorder-active="dragFrom != null"
             :is-drag-source="isDragBlockIndex(child.index)"

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { isElectronShell } from '@shared/services/desktop-bridge'
@@ -12,7 +12,9 @@ import {
 
 import MusicTrackActions from '@shared/components/MusicTrackActions.vue'
 
+import { formatDurationLabel } from '../services/liturgy-format'
 import { getItemTypeIcon, isExecutableItem } from '../services/liturgy-item-helpers'
+import { probeMediaDurationMs } from '../services/media-probe'
 import type { LiturgyItem } from '../types/liturgy'
 
 const props = defineProps<{
@@ -30,7 +32,7 @@ const props = defineProps<{
   sectionInProgress?: boolean
   /** Placeholder agendado: entrada resolvida OU estado vazio (rotação/data). */
   resolvedSchedule?:
-    | { entryName: string; kindLabel: string; kind?: string }
+    | { entryName: string; kindLabel: string; kind?: string; filePath?: string }
     | { empty: string }
     | null
   /** Categoria abaixo de outra incompleta → status Aguardando. */
@@ -75,8 +77,28 @@ let dragGhostEl: HTMLElement | null = null
 
 const isCategory = computed(() => props.item.type === 'category')
 
-/** Placeholder agendado: duração própria não existe (vem do conteúdo do dia). */
+/** Placeholder agendado: duração própria vem do conteúdo resolvido do dia. */
 const isScheduledPlaceholder = computed(() => props.item.type === 'scheduled')
+const scheduledDurationMs = ref(0)
+let scheduledProbeId = 0
+
+watch(
+  () => props.resolvedSchedule,
+  async (resolved) => {
+    const probeId = ++scheduledProbeId
+    const filePath =
+      resolved && 'filePath' in resolved ? resolved.filePath?.trim() : undefined
+    scheduledDurationMs.value = 0
+    if (!filePath) return
+    const durationMs = await probeMediaDurationMs(filePath)
+    if (probeId === scheduledProbeId) scheduledDurationMs.value = durationMs
+  },
+  { immediate: true },
+)
+
+const scheduledDurationLabel = computed(() =>
+  formatDurationLabel(scheduledDurationMs.value),
+)
 
 /** Ícone efetivo: agendado com conteúdo do dia mostra o ícone do TIPO resolvido. */
 const effectiveIcon = computed(() => {
@@ -506,10 +528,19 @@ const rowHovered = ref(false)
             {{ startLabel }}
           </p>
           <p
-            v-if="!isScheduledPlaceholder || resolvedSchedule"
+            v-if="
+              !isScheduledPlaceholder ||
+              scheduledDurationLabel !== '—'
+            "
             class="liturgy-item__duration"
           >
-            {{ t('liturgy.duration', { time: durationLabel }) }}
+            {{
+              t('liturgy.duration', {
+                time: isScheduledPlaceholder
+                  ? scheduledDurationLabel
+                  : durationLabel,
+              })
+            }}
           </p>
         </div>
 
