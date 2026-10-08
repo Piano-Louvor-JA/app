@@ -77,16 +77,17 @@ function openFolder() {
 </template>
 
 <style scoped>
-.diagnostics-page { min-height: 100%; display: grid; place-items: center; padding: 32px; background: #101720; color: #eff6ff; }
-.diagnostics-card { width: min(620px, 100%); padding: 38px; border: 1px solid #2c3b4d; border-radius: 18px; background: #172230; box-shadow: 0 20px 60px #0006; }
-.eyebrow { margin: 0; color: #82c7ff; font-size: .75rem; font-weight: 800; letter-spacing: .12em; }
+.diagnostics-page { min-height: 100%; display: grid; place-items: center; padding: var(--ds-spacing-page, 32px); background: var(--ds-color-background); color: var(--ds-color-on-surface); }
+.diagnostics-card { width: min(620px, 100%); padding: 38px; border: 1px solid var(--ds-color-outline-strong); border-radius: var(--ds-radius-lg); background: var(--ds-color-surface-card); box-shadow: 0 20px 60px rgb(0 0 0 / 40%); }
+.eyebrow { margin: 0; color: var(--ds-color-primary-soft); font-size: .75rem; font-weight: 800; letter-spacing: .12em; }
 h1 { margin: 8px 0 10px; font-size: 2rem; }
-.intro, .progress { color: #c4d1df; line-height: 1.5; }
-.run { width: 100%; min-height: 62px; border: 0; border-radius: 12px; background: #1d8fe1; color: white; font-size: 1.2rem; font-weight: 800; cursor: pointer; }
+.intro, .progress { color: var(--ds-color-on-surface-variant); line-height: 1.5; }
+.run { width: 100%; min-height: 62px; border: 0; border-radius: var(--ds-radius-md); background: var(--ds-color-primary); color: var(--ds-color-on-primary); font-size: 1.2rem; font-weight: 800; cursor: pointer; }
 .run:disabled { opacity: .55; cursor: wait; }
-.warning { margin-top: 18px; color: #ffc46b; }
-.success { display: grid; gap: 6px; margin-top: 24px; padding: 18px; border-radius: 10px; background: #153a2c; color: #d7fae8; }
-code { overflow-wrap: anywhere; font-size: .78rem; }
+.warning { margin-top: 18px; color: var(--ds-color-brand-yellow, #f8c800); }
+.success { display: grid; gap: 6px; margin-top: 24px; padding: 18px; border-radius: var(--ds-radius-sm); background: var(--ds-color-surface-container); color: var(--ds-color-on-surface); }
+code { overflow-wrap: anywhere; font-size: .78rem; color: var(--ds-color-on-surface-variant); }
 .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
-.secondary { padding: 11px 16px; border: 1px solid #52708e; border-radius: 9px; background: transparent; color: #eff6ff; font-weight: 700; cursor: pointer; }
+.secondary { padding: 11px 16px; border: 1px solid var(--ds-color-outline-strong); border-radius: var(--ds-radius-sm); background: transparent; color: var(--ds-color-on-surface); font-weight: 700; cursor: pointer; }
+.secondary:hover { background: color-mix(in srgb, var(--ds-color-on-surface) 10%, transparent); }
 </style>
