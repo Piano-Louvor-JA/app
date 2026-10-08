@@ -196,3 +196,24 @@ describe('modo form — adicionar por data sem escolher rotação antes', () => 
     expect(all.map((e) => e.rotationName)).toEqual(expect.arrayContaining(['A', 'B']))
   })
 })
+
+describe('busca de música no modo form (mesma do item de música)', () => {
+  it('filterLiturgyMusicOptions acha por título e número do hinário', async () => {
+    const { filterLiturgyMusicOptions } = await import(
+      '../services/liturgy-catalog'
+    )
+    const options = [
+      { id: 278, name: 'A Voz de Deus', albumNames: 'Hinario Adventista', hymnalTrack: 278, durationMs: 180_000 },
+      { id: 1660, name: 'Missão', albumNames: 'Adoradores 4', hymnalTrack: null, durationMs: 194_000 },
+    ] as never
+
+    const byTitle = filterLiturgyMusicOptions(options, 'voz', null)
+    expect(byTitle.map((o) => o.id)).toContain(278)
+
+    const byTrack = filterLiturgyMusicOptions(options, '278', null)
+    expect(byTrack.map((o) => o.id)).toContain(278)
+
+    const byCommunity = filterLiturgyMusicOptions(options, 'missão', null)
+    expect(byCommunity.map((o) => o.id)).toContain(1660)
+  })
+})
