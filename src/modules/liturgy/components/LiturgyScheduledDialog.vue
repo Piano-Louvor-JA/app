@@ -17,6 +17,23 @@ import { useScheduledStore } from '../stores/useScheduledStore'
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 
+const PAGE_URL =
+  'https://downloads.adventistas.org/pt/mordomia-crista/video/provai-e-vede-2026-4o-trimestre'
+
+/** HTML da página do trimestre: main process (sem CORS) no Electron, fetch direto na web. */
+async function fetchQuarterHtml(): Promise<string | null> {
+  const bridge = getDesktopBridge()
+  if (bridge?.workspace?.fetchText) {
+    return bridge.workspace.fetchText(PAGE_URL)
+  }
+  try {
+    const resp = await fetch(PAGE_URL)
+    return resp.ok ? await resp.text() : null
+  } catch {
+    return null
+  }
+}
+
 const { t } = useI18n()
 const dlg = useScheduledDialog()
 
@@ -44,22 +61,13 @@ async function onFetchProvaiEVede() {
   pvBusy.value = true
   pvProgress.value = ''
   try {
-    // Desktop: fetch pelo main (sem CORS). Web: direto (a página envia CORS aberto).
-    const bridge = getDesktopBridge()
-    const pageUrl =
-      'https://downloads.adventistas.org/pt/mordomia-crista/video/provai-e-vede-2026-4o-trimestre'
-    let html: string | null = null
-    if (bridge?.workspace?.downloadToMedia) {
-      // usa o mesmo canal IPC: baixa a página como "arquivo" temporário não funciona
-      // para HTML — fazer fetch direto do renderer (downloads.adventistas.org envia
-      // Access-Control-Allow-Origin: * para os assets; testado manualmente).
-    }
-    const resp = await fetch(pageUrl)
-    html = resp.ok ? await resp.text() : null
+    const html = await fetchQuarterHtml()
     const eps = html ? extractProvaiEVedeEpisodes(html) : []
     pvEpisodes.value = eps
     pvSelected.value = new Set(eps.map((e) => e.dateISO))
-    if (eps.length === 0) pvProgress.value = '—'
+    if (eps.length === 0) {
+      pvProgress.value = t('liturgy.messages.scheduledPvUnavailable')
+    }
   } finally {
     pvBusy.value = false
   }
@@ -74,22 +82,7 @@ async function onProvaiEVedeOneClick() {
   pvOneClickBusy.value = true
   pvOneClickProgress.value = ''
   try {
-    const pageUrl =
-      'https://downloads.adventistas.org/pt/mordomia-crista/video/provai-e-vede-2026-4o-trimestre'
-    const bridge = getDesktopBridge()
-    // Electron: fetch pelo MAIN (sem CORS). Web: fetch direto (página tem CORS aberto;
-    // se falhar, mensagem amigável — não crasha).
-    let html: string | null = null
-    if (bridge?.workspace?.fetchText) {
-      html = await bridge.workspace.fetchText(pageUrl)
-    } else {
-      try {
-        const resp = await fetch(pageUrl)
-        html = resp.ok ? await resp.text() : null
-      } catch {
-        html = null
-      }
-    }
+    const html = await fetchQuarterHtml()
     const all = html ? extractProvaiEVedeEpisodes(html) : []
     if (all.length === 0) {
       pvOneClickProgress.value = t('liturgy.messages.scheduledPvUnavailable')
@@ -103,6 +96,7 @@ async function onProvaiEVedeOneClick() {
     }
 
     const store = useScheduledStore()
+    const bridge = getDesktopBridge()
     let done = 0
     const resolvePath = async (ep: ProvaiEpisode): Promise<string> => {
       pvOneClickProgress.value = t('liturgy.messages.scheduledPvDownloading', {
