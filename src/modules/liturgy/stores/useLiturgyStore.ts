@@ -69,7 +69,10 @@ import {
   type WeekdaySessionTimes,
 } from '../types/liturgy'
 import { pad2 } from '../services/liturgy-format'
-import { enqueueOperatorState, flushOutbox } from '@modules/sync/services/sync-outbox-service'
+import {
+  enqueueOperatorState,
+  scheduleOutboxFlush,
+} from '@modules/sync/services/sync-outbox-service'
 
 export const useLiturgyStore = defineStore('liturgy', () => {
   const initialState = loadLiturgyState()
@@ -503,15 +506,6 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     } catch {
       // outbox nunca bloqueia o fluxo local
     }
-  }
-
-  let outboxFlushTimer: ReturnType<typeof setTimeout> | null = null
-  function scheduleOutboxFlush() {
-    if (outboxFlushTimer) clearTimeout(outboxFlushTimer)
-    outboxFlushTimer = setTimeout(() => {
-      outboxFlushTimer = null
-      void flushOutbox().catch(() => {})
-    }, 2_000)
   }
 
   async function hydrate() {
