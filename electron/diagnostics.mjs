@@ -9,6 +9,25 @@ import os from 'node:os'
 import path from 'node:path'
 import tls from 'node:tls'
 import { app, ipcMain, session, shell } from 'electron'
+import {
+  collectLogs,
+  crashHistory,
+  diskFreeMb,
+  dnsSanity,
+  essentialHeaders,
+  memorySnapshot,
+  storageHealth,
+  userDataWriteProbe,
+  windowsAntivirus,
+} from './diagnostics-v2-collectors.mjs'
+
+// screen via electron — monitores/resolução pra problemas de projeção em 2ª tela.
+function monitoresAbertos() {
+  try {
+    const { screen } = require('electron')
+    return screen.getAllDisplays().length
+  } catch { return null }
+}
 
 const TIMEOUT_MS = 8_000
 const API_HOSTS = [
@@ -166,6 +185,37 @@ function inspectRealInstallation() {
     mediaMb: Math.round((folderSize(path.join(root, 'Media')) / 1024 / 1024) * 100) / 100,
     escritaTempOk,
     diskFreeMb: null,
+    headersEssenciais: essentialHeaders(sysdata, ESSENTIAL_FILES),
+    escritaUserData: userDataWriteProbe(root),
+  }
+}
+
+/**
+ * GET de mídia REAL (endpoint /file/, host de arquivos): primeiros ~64KB de um
+ * arquivo conhecido, buffer em memória — nada é salvo no disco do usuário.
+ * Diferencia "API JSON ok mas CDN de arquivos bloqueada".
+ */
+async function mediaFileProbe(host, token) {
+  const url = `https://${host}/file/pt_categories`
+  const start = Date.now()
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
+  try {
+    const response = await fetch(url, {
+      headers: token ? { 'Api-Token': token, Range: 'bytes=0-65535' } : { Range: 'bytes=0-65535' },
+      signal: controller.signal,
+    })
+    const body = await response.arrayBuffer()
+    const result = { url, status: response.status, ok: response.ok, bytes: body.byteLength, ms: elapsed(start), erro: null }
+    if (!response.ok) {
+      const classe = response.status === 403 ? 'HTTP_403' : response.status === 404 ? 'HTTP_404' : response.status === 429 ? 'HTTP_429' : response.status >= 500 ? 'HTTP_5XX' : 'OTHER'
+      result.erro = { classe, bruto: `HTTP ${response.status}` }
+    }
+    return result
+  } catch (error) {
+    return { url, status: null, ok: false, bytes: 0, ms: elapsed(start), erro: rawError(error, controller.signal.aborted) }
+  } finally {
+    clearTimeout(timer)
   }
 }
 
@@ -173,7 +223,7 @@ function maskToken(token) {
   return token ? `${token.slice(0, 4)}…(${token.length} chars)` : null
 }
 
-function computeVerdict({ general, apis, proxy, hosts, installation }) {
+function computeVerdict({ general, apis, proxy, hosts, installation, extra }) {
   if (!general['1.1.1.1:443']?.ok && !general['google.com:443']?.ok) return 'sem-internet'
   const errors = apis.flatMap((api) => [api.dns?.erro, api.tcp?.erro, api.tls?.erro, ...api.http.map((h) => h.erro)].filter(Boolean))
   const classes = errors.map((e) => e.classe)
@@ -183,6 +233,13 @@ function computeVerdict({ general, apis, proxy, hosts, installation }) {
   if (classes.some((c) => ['ECONNREFUSED', 'EHOSTUNREACH', 'ETIMEDOUT', 'TIMEOUT_LOCAL'].includes(c)) || hosts.length) return 'firewall-seletivo'
   if (Object.values(proxy).some((value) => value && !String(value).startsWith('DIRECT'))) return 'proxy'
   if (installation.existe && Object.values(installation.sysdata).some((value) => value === null)) return 'estado-app'
+  // v2 — classes novas de triage geral (ordem de severidade).
+  if (extra?.escritaUserData?.ok === false) return 'sem-permissao-escrita'
+  if (extra?.storage?.lockOrfao) return 'storage-corrompido'
+  if (extra?.storage?.ldbVazio || extra?.storage?.localStorageSuspeito) return 'storage-corrompido'
+  if (extra?.crashes && extra.crashes.total >= 3) return 'crash-loop'
+  if (extra?.headersTruncados) return 'arquivo-truncado'
+  if (extra?.gpuBloqueada) return 'gpu-bloqueada'
   return 'ok'
 }
 
@@ -232,6 +289,36 @@ async function runDiagnostics() {
   }
   const hostsOverrides = readHostsOverrides()
   const installation = inspectRealInstallation()
+  // v2 — probe de mídia real no host de arquivos (mesmo host do primeiro API ok).
+  const mediaHost = API_HOSTS[0]
+  const mediaProbe = await mediaFileProbe(mediaHost, token)
+  // v2 — triage geral: storage, crashes, RAM, disco, AV, logs, DNS sanity, GPU.
+  const storage = storageHealth(installation.userData)
+  const crashes = crashHistory(installation.userData)
+  const memoria = memorySnapshot()
+  const discoLivreMb = installation.existe ? await diskFreeMb(installation.userData) : await diskFreeMb(app.getPath('temp'))
+  const antivirus = await windowsAntivirus()
+  const logs = collectLogs(installation.userData, token)
+  const dnsSuspeito = dnsSanity(apis)
+  let gpuFeatures = null
+  try { gpuFeatures = app.getGPUFeatureStatus() } catch { /* fora do Electron rodando: null */ }
+  let versaoInstalacaoReal = null
+  // Windows: registry uninstall (leitura); outros SOs: markers conhecidos.
+  if (process.platform === 'win32') {
+    try {
+      const { execFile } = await import('node:child_process')
+      const { promisify } = await import('node:util')
+      const run = promisify(execFile)
+      const ps = "Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*','HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*' -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -like '*LouvorJA*' } | Select-Object -First 1 DisplayName,DisplayVersion | ConvertTo-Json"
+      const { stdout } = await run('powershell.exe', ['-NoProfile', '-Command', ps], { timeout: 8_000 })
+      const parsed = JSON.parse(stdout)
+      versaoInstalacaoReal = parsed?.DisplayVersion ?? null
+    } catch { versaoInstalacaoReal = null }
+  }
+  // headers truncados: essencial existe mas < 512 bytes (página de bloqueio/HTML ou truncado).
+  const headersTruncados = Object.entries(installation.headersEssenciais).some(([, v]) => v && typeof v === 'object' && 'bytes' in v && v.bytes < 512)
+  const gpuBloqueada = Boolean(gpuFeatures && Object.values(gpuFeatures).some((s) => typeof s === 'string' && ['disabled', 'blocked', 'error'].includes(s.toLowerCase())))
+  const extra = { storage, crashes, memoria, antivirus, dnsSuspeito, escritaUserData: installation.escritaUserData, headersTruncados, gpuBloqueada }
   const reproduction = []
   for (const endpoint of ENDPOINTS) {
     const start = Date.now()
@@ -245,10 +332,11 @@ async function runDiagnostics() {
   const report = {
     meta: { campanha: 'SrCaldeira', versao: app.getVersion(), dataISO: new Date().toISOString(), duracaoMs: elapsed(started), tokenMascarado: maskToken(token) },
     ambiente: { os: process.platform, osRelease: os.release(), arch: process.arch, electron: process.versions.electron, chrome: process.versions.chrome, locale: app.getLocale(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, online: general['1.1.1.1:443'].ok || general['google.com:443'].ok },
-    rede: { proxy: { resolveProxyPorOrigem: proxy, envHttpProxy: process.env.HTTP_PROXY ?? null, envHttpsProxy: process.env.HTTPS_PROXY ?? null }, hostsOverrides, conectividadeGeral: general, apis, reproducaoBootstrap: reproduction },
+    rede: { proxy: { resolveProxyPorOrigem: proxy, envHttpProxy: process.env.HTTP_PROXY ?? null, envHttpsProxy: process.env.HTTPS_PROXY ?? null }, hostsOverrides, conectividadeGeral: general, apis, reproducaoBootstrap: reproduction, mediaReal: mediaProbe, dnsSuspeito },
     instalacaoReal: installation,
+    triage: { storage, crashes, memoria, discoLivreMb, antivirus, logs, gpuFeatures, monitores: monitoresAbertos(), versaoInstalacaoReal },
   }
-  report.vereditoHeuristico = computeVerdict({ general, apis, proxy, hosts: hostsOverrides, installation })
+  report.vereditoHeuristico = computeVerdict({ general, apis, proxy, hosts: hostsOverrides, installation, extra })
   const timestamp = report.meta.dataISO.replace(/[:.]/g, '-').replace('T', '_').replace('Z', '')
   const dir = outputDirectory()
   const jsonPath = path.join(dir, `louvorja-diagnostico-${timestamp}.json`)
