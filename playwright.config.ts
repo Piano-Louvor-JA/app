@@ -9,7 +9,7 @@ export default defineConfig({
   reporter: 'list',
   timeout: 30000,
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: 'http://localhost:5273',
     trace: 'on-first-retry',
   },
   projects: [
@@ -19,8 +19,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:5173',
+    command: 'npm run dev -- --port 5273 --strictPort',
+    url: 'http://localhost:5273',
     reuseExistingServer: !process.env.CI,
     timeout: 60000,
   },

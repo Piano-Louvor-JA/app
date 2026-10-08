@@ -30,11 +30,11 @@ export default {
     closeAll: 'Fechar todas as telas',
   },
   uiZoom: {
-      label: 'Zoom da página',
-      zoomIn: 'Aumentar zoom',
-      zoomOut: 'Diminuir zoom',
-    },
-    nav: {
+    label: 'Zoom da página',
+    zoomIn: 'Aumentar zoom',
+    zoomOut: 'Diminuir zoom',
+  },
+  nav: {
       home: 'Início',
       albums: 'Central de Mídia',
       community: 'Comunidade',
@@ -115,4 +115,18 @@ export default {
         projection: 'Configurações de projeção e telas em breve.',
       },
     },
-  }
+  sync: {
+    downloadQueue: {
+      title: 'Downloads',
+      clearFinished: 'Limpar concluídos',
+      retry: 'Tentar de novo',
+      cancel: 'Cancelar',
+    },
+  },
+sljaMigration: {
+    title: 'Subir {count} hino(s) importado(s) pra sua conta?',
+    message: 'Você importou .slja sem estar logado. Eles podem ir pra sua conta (uma cópia única, sem duplicar) e ficar disponíveis em qualquer dispositivo.',
+    confirm: 'Subir pra conta',
+    cancel: 'Ficar só neste dispositivo',
+  },
+}

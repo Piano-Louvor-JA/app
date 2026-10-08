@@ -11,8 +11,11 @@ import { useProjectionSettings } from '../composables/useProjectionSettings'
 const { t } = useI18n()
 const { hydrate } = useProjectionSettings()
 
-/** Oculto por enquanto — reative para voltar a Personalização da Letra. */
-const SHOW_LYRIC_CUSTOMIZATION = false
+/** Oculto por enquanto — reative para voltar a Personalização da Letra.
+ * Configurável via VITE_SHOW_LYRIC_CUSTOMIZATION=1 (permite testar os dois
+ * lados do v-if e ativar a feature em staging sem redeploy). */
+const SHOW_LYRIC_CUSTOMIZATION =
+  import.meta.env.VITE_SHOW_LYRIC_CUSTOMIZATION === '1'
 
 onMounted(() => {
   void hydrate()
