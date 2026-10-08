@@ -261,6 +261,12 @@ export default {
       reorder: 'Arrastar para reordenar',
     },
     messages: {
+      removeItemTitle: 'Remover item da liturgia',
+      removeLiturgyTitle: 'Remover liturgia avulsa',
+      clearTitle: 'Apagar liturgia do dia',
+      removeAction: 'Remover',
+      cancelAction: 'Cancelar',
+      confirmDeleteNamed: 'Deseja remover “{name}” da liturgia?',
       confirmDelete: 'Deseja remover este item da liturgia?',
       confirmDeleteCategory:
         'Deseja remover esta categoria/separador e todos os itens relacionados?',
@@ -270,7 +276,7 @@ export default {
       liturgySaved: 'Liturgia salva com sucesso.',
       mediaDesktopOnly: 'Informe o caminho do arquivo de mídia.',
       videoSelectFile: 'Selecionar arquivo',
-      catalogEmpty: 'Nenhuma música encontrada no catálogo local.',
+      catalogEmpty: 'Nenhuma música no catálogo local. Importe um arquivo .slja na Central de Mídia (botão "Importar .slja") ou adicione músicas da Comunidade.',
       customRequired:
         'Crie ou selecione uma liturgia personalizada antes de adicionar itens.',
       booksEmpty: 'Nenhum livro bíblico disponível. Conclua a inicialização.',
@@ -290,6 +296,10 @@ export default {
       importedLocalNoImages:
         'Importado neste dispositivo: {name} ({slides} estrofes). As imagens não foram salvas neste aparelho.',
       importFailed: 'Arquivo .slja inválido.',
+      uploadTitle: 'Subir "{name}" pra sua conta?',
+      uploadMessage: 'O arquivo sobe uma única vez pra sua conta (nunca duplica). Se preferir, fica salvo só neste dispositivo.',
+      uploadConfirm: 'Subir pra conta',
+      uploadCancel: 'Só neste dispositivo',
       importStorageFailed:
         'Não foi possível salvar o áudio neste aparelho. Libere espaço e tente de novo.',
       importRemoteFailed:

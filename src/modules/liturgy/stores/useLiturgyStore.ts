@@ -69,6 +69,7 @@ import {
   type WeekdaySessionTimes,
 } from '../types/liturgy'
 import { pad2 } from '../services/liturgy-format'
+import { enqueueOperatorState, flushOutbox } from '@modules/sync/services/sync-outbox-service'
 
 export const useLiturgyStore = defineStore('liturgy', () => {
   const initialState = loadLiturgyState()
@@ -488,6 +489,29 @@ export const useLiturgyStore = defineStore('liturgy', () => {
       customLiturgies: customLiturgies.value,
       deletionLocks: deletionLocks.value,
     })
+    // sync v2 (app#336): toda mutação enfileira no outbox (local-first) e
+    // agenda flush em bg — sem rede o item fica na fila (nada se perde).
+    try {
+      enqueueOperatorState('liturgy', 'week', {
+        weekdays: weekdays.value,
+        dayNotes: dayNotes.value,
+        daySessionTimes: daySessionTimes.value,
+        customLiturgies: customLiturgies.value,
+        deletionLocks: deletionLocks.value,
+      })
+      scheduleOutboxFlush()
+    } catch {
+      // outbox nunca bloqueia o fluxo local
+    }
+  }
+
+  let outboxFlushTimer: ReturnType<typeof setTimeout> | null = null
+  function scheduleOutboxFlush() {
+    if (outboxFlushTimer) clearTimeout(outboxFlushTimer)
+    outboxFlushTimer = setTimeout(() => {
+      outboxFlushTimer = null
+      void flushOutbox().catch(() => {})
+    }, 2_000)
   }
 
   async function hydrate() {
@@ -1236,6 +1260,10 @@ export const useLiturgyStore = defineStore('liturgy', () => {
         music.durationMs && music.durationMs > 0
           ? clampMomentDurationMs(music.durationMs)
           : 0,
+      // Título complementar herda o nome da música SE o campo estiver vazio
+      // (feedback Ezequias 02/10: ao editar item de música o título
+      // obrigatório ficava vazio e travava o salvar).
+      name: itemDraft.value.name.trim() || music.name,
     }
   }
 

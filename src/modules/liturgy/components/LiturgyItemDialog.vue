@@ -21,6 +21,7 @@ import {
   type LiturgyMusicOption,
 } from '../types/liturgy'
 import { probeMediaDurationMs } from '../services/media-probe'
+import { appConfirm } from '@shared/composables/useAppConfirm'
 import { useExternalPlayerChoices } from '../composables/useExternalPlayerChoices'
 import {
   importSljaAsLiturgyMusic,
@@ -104,7 +105,17 @@ async function onImportSljaFile(event: Event): Promise<void> {
       bytes: await file.arrayBuffer(),
       name: file.name,
     }
-    const imported = await importSljaAsLiturgyMusic(source)
+    const imported = await importSljaAsLiturgyMusic(source, {
+      // Regra: banco só recebe com aprovação. Recusou = salva só no app
+      // (local, pode ter quantas cópias quiser) — sem fricção, sem erro.
+      confirmUpload: () =>
+        appConfirm({
+          title: t('liturgy.slja.uploadTitle', { name: file.name }),
+          message: t('liturgy.slja.uploadMessage'),
+          confirmLabel: t('liturgy.slja.uploadConfirm'),
+          cancelLabel: t('liturgy.slja.uploadCancel'),
+        }),
+    })
     if (run !== sljaRun.value) return
     // web#174 (referência): recarrega o catálogo ANTES da seleção valer —
     // sem isso o id novo não existe em musicList, selectedMusic fica null
@@ -165,9 +176,8 @@ const startTimeRequiredMissing = computed(
 const endTimeRequiredMissing = computed(
   () => isCategory.value && !normalizeLiturgyTimeHHmm(props.draft.endTime),
 )
-const categoryRequiredMissing = computed(
-  () => hasTypeSelection.value && !isCategory.value && !props.draft.categoryId,
-)
+// Categoria OPCIONAL (paridade web ff8b481): sem erro de validação.
+const categoryRequiredMissing = computed(() => false)
 
 const durationLabel = computed(() => formatMomentDuration(props.draft.durationMs))
 
@@ -1046,10 +1056,6 @@ function isLightDot(hex: string): boolean {
                 for="moment-category"
               >
                 {{ t('liturgy.dialog.categoryField') }}
-                <span
-                  class="moment-dialog__required"
-                  aria-hidden="true"
-                >*</span>
               </label>
               <select
                 id="moment-category"

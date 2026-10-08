@@ -1,3 +1,6 @@
+import { createPinia, setActivePinia } from 'pinia'
+import { beforeEach as initializePinia } from 'vitest'
+initializePinia(() => setActivePinia(createPinia()))
 // @vitest-environment jsdom
 // CountdownConfigDialog — open/close, swatches, formats, custom colors, reset
 import { mount } from '@vue/test-utils'

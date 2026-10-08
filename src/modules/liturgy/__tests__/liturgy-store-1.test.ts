@@ -302,6 +302,7 @@ describe('useLiturgyStore — parte 1: estado, computed, sessão, custom, clone'
     expect(s.itemDraft.durationMs).toBe(0)
 
     // onBookPick: preenche nome do livro se vazio
+    s.setItemDraft({ ...s.itemDraft, name: '' })
     s.onBookPick(1)
     expect(s.itemDraft.verseBookId).toBe(1)
     expect(s.itemDraft.verseChapter).toBe(1)

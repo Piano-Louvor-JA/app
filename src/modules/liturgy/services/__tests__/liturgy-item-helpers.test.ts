@@ -291,8 +291,8 @@ describe('isLiturgyItemDraftValid', () => {
     expect(isLiturgyItemDraftValid({ ...validBase, musicId: null })).toBe(false)
   })
 
-  it('não-category exige categoryId', () => {
-    expect(isLiturgyItemDraftValid({ ...validBase, categoryId: null })).toBe(false)
+  it('não-category aceita categoryId opcional', () => {
+    expect(isLiturgyItemDraftValid({ ...validBase, categoryId: null })).toBe(true)
   })
 
   it('images exige filePaths ou filePath', () => {
@@ -816,9 +816,9 @@ describe('mutação round 4 — draftFromLiturgyItem + isValidLiturgyUrl + draft
     expect(d.durationMs).toBe(90_000)
   })
 
-  it('draftFrom music sem complementary: name vazio', () => {
+  it('draftFrom music sem complementary: preserva nome', () => {
     const d = draftFromLiturgyItem(item({ id: 'm', type: 'music', name: 'Nome', complementaryTitle: null }))
-    expect(d.name).toBe('')
+    expect(d.name).toBe('Nome')
   })
 
   it('draftFrom category: times normalizados; music duration <=0: 0', () => {
@@ -864,8 +864,8 @@ describe('mutação round 4 — draftFromLiturgyItem + isValidLiturgyUrl + draft
     expect(isLiturgyItemDraftValid({ type: 'music', name: 'X', categoryId: 'c' } as LiturgyItemDraft)).toBe(false)
   })
 
-  it('isLiturgyItemDraftValid: não-category sem categoryId inválido', () => {
-    expect(isLiturgyItemDraftValid({ type: 'video', name: 'X', filePath: '/v.mp4' } as LiturgyItemDraft)).toBe(false)
+  it('isLiturgyItemDraftValid: não-category sem categoryId válido', () => {
+    expect(isLiturgyItemDraftValid({ type: 'video', name: 'X', filePath: '/v.mp4' } as LiturgyItemDraft)).toBe(true)
   })
 
   it('isLiturgyItemDraftValid: images com filePaths e sem filePaths/path inválido', () => {
