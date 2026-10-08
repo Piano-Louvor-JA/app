@@ -164,7 +164,9 @@ function folderSize(dir) {
 }
 
 function inspectRealInstallation() {
-  const appData = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming')
+  // getPath('appData') é o AppData real em qualquer SO (%APPDATA% no Windows,
+  // ~/.config no Linux) — independe do userData do app rodando (portable/dev).
+  const appData = app.getPath('appData')
   const root = path.join(appData, 'LouvorJA-PIANO')
   const sysdata = path.join(root, '.sysdata')
   const records = {}

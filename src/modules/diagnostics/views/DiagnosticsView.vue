@@ -119,9 +119,9 @@ function openFolder() {
   <main class="diagnostics-page">
     <section class="diagnostics-card">
       <p class="eyebrow">LOUVORJA PIANO</p>
-      <h1>Diagnóstico de download</h1>
+      <h1>Diagnóstico do aplicativo</h1>
       <p class="intro">
-        Este teste verifica a conexão com o catálogo. Ele não altera a instalação do LouvorJA.
+        Verifica conexão, armazenamento, memória e integridade dos dados. Não altera a instalação do LouvorJA.
       </p>
 
       <p v-if="!available" class="warning">
