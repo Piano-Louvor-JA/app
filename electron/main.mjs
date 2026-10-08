@@ -14,7 +14,7 @@ import { configureUserDataPath } from "./user-data-path.mjs";
 import { checkEulaAcceptance } from "./eula.mjs";
 import { resolveAppLocale } from "./locale.mjs";
 import { registerWorkspaceIpc } from "./ipc/register.mjs";
-import { registerDiagnosticsIpc } from "./diagnostics.mjs";
+import { registerDiagnosticsIpc, setDiagnosticsToken } from "./diagnostics.mjs";
 import { attachWindowStateEvents, registerWindowIpc } from "./ipc/window.mjs";
 import { attachRemoteServer } from "./remote-server.mjs";
 import { attachPalcoServer } from "./palco-server.mjs";
@@ -721,6 +721,9 @@ app.whenReady().then(async () => {
 		bootMark("eula");
 
 		registerWorkspaceIpc();
+		// Token de diagnóstico: LOUVORJA_DIAGNOSTICS_TOKEN (variável do MAIN, não
+		// VITE_* — config de build do renderer não existe no processo principal).
+		setDiagnosticsToken(process.env.LOUVORJA_DIAGNOSTICS_TOKEN ?? "");
 		registerDiagnosticsIpc(); // diagnostics:* — SrCaldeira, rede no main
 		registerWindowIpc(() => mainWindow);
 		registerLocalFileProtocol();
