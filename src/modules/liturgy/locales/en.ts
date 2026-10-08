@@ -277,6 +277,7 @@ export default {
       customRequired:
         'Create or select a custom liturgy before adding items.',
       scheduledEmpty: 'No scheduled item for this service date in this rotation.',
+      scheduledEmptyForDate: 'No item for {date} in "{rotation}" — add it in the Scheduled Items dialog.',
       scheduledTitle: 'Scheduled Items',
       scheduledHint: "Date-based rotations — the liturgy of the day automatically resolves each date's content (e.g. quarterly Provai and Vede).",
       scheduledNewRotation: 'New rotation',
