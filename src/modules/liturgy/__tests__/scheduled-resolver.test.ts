@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { resolveScheduledEntry } from '../services/scheduled-resolver'
+import {
+  resolveLegacyScheduledRotationId,
+  resolveScheduledEntry,
+} from '../services/scheduled-resolver'
 import type { ScheduledCategory, ScheduledItem } from '../stores/useScheduledStore'
 
 const cats: ScheduledCategory[] = [{ id: 'c1', name: 'Provai e Vede' }]
@@ -38,6 +41,15 @@ describe('resolveScheduledEntry — o placeholder mostra o que toca no dia', () 
     const r = resolveScheduledEntry('c1', '2026-10-10', cats, items)
     expect(r!.kind).toBe('file')
     expect(r!.entryName).toBe('Sermão')
+  })
+
+  it('migra placeholder legado pelo nome da rotação sem mover sua categoria', () => {
+    expect(
+      resolveLegacyScheduledRotationId(
+        { type: 'scheduled', name: 'Provai e vede', categoryId: 'lit-cat' },
+        cats,
+      ),
+    ).toBe('c1')
   })
 
   it('RED: categoria inexistente → null (sem crash)', () => {

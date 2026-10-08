@@ -157,8 +157,18 @@ async function onVideoFileChange(event: Event) {
 }
 const isAudioItem = computed(() => props.item.type === 'audio')
 const isLocalVideo = computed(() => props.item.type === 'video')
+/** Arquivo resolvido de qualquer programação: controles de vídeo normais. */
+const isScheduledLocalMedia = computed(
+  () =>
+    isScheduledPlaceholder.value &&
+    props.resolvedSchedule &&
+    'kind' in props.resolvedSchedule &&
+    props.resolvedSchedule.kind === 'file' &&
+    Boolean(props.resolvedSchedule.filePath?.trim()),
+)
 const showPlayerSelect = computed(
-  () => isAudioItem.value || isLocalVideo.value,
+  () =>
+    isAudioItem.value || isLocalVideo.value || isScheduledLocalMedia.value,
 )
 
 const {
@@ -263,6 +273,11 @@ onMounted(() => {
   }
 })
 
+// Conteúdo agendado resolve depois do mount; então carrega opções também aqui.
+watch(showPlayerSelect, (visible) => {
+  if (visible) void loadPlayerChoices([props.item.playerId])
+})
+
 onUnmounted(() => {
   closePlayerMenu()
 })
@@ -273,6 +288,7 @@ const isVideoRemote = computed(
   () =>
     isStreamVideo.value ||
     isLocalVideo.value ||
+    isScheduledLocalMedia.value ||
     isLocalImages.value ||
     isLocalPdf.value ||
     isLocalPresentation.value,
@@ -719,7 +735,7 @@ const rowHovered = ref(false)
             type="button"
             class="liturgy-item__action liturgy-item__action--site-control"
             :title="
-              isLocalVideo
+              isLocalVideo || isScheduledLocalMedia
                 ? t('liturgy.actions.playLocalInExternal', { player: rowPlayerLabel })
                 : isLocalPresentation
                   ? t('liturgy.actions.openPresentationControl')
@@ -732,7 +748,7 @@ const rowHovered = ref(false)
                         : t('liturgy.actions.openSiteControl')
             "
             :aria-label="
-              isLocalVideo
+              isLocalVideo || isScheduledLocalMedia
                 ? t('liturgy.actions.playLocalInExternal', { player: rowPlayerLabel })
                 : isLocalPresentation
                   ? t('liturgy.actions.openPresentationControl')
@@ -749,7 +765,11 @@ const rowHovered = ref(false)
           >
             <i
               class="ti"
-              :class="isLocalVideo ? 'ti-player-play' : 'ti-layout-dashboard'"
+              :class="
+                isLocalVideo || isScheduledLocalMedia
+                  ? 'ti-player-play'
+                  : 'ti-layout-dashboard'
+              "
               aria-hidden="true"
             />
           </button>
