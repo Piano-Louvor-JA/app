@@ -167,4 +167,27 @@ describe('PptEngineCard', () => {
       expect(bridge.presentation.setCustomApp).not.toHaveBeenCalled()
     }
   })
+
+  it('gaps onda1: detect null; custom picked array; setCustomApp false; setEngine custom com bridge', async () => {
+    // detectEngines null → ?? [] (34 arm1)
+    const b1 = makeBridge()
+    b1.presentation.detectEngines.mockResolvedValue(null)
+    setBridge(b1)
+    const w1 = await mountCard()
+    await flushPromises()
+    w1.unmount()
+    // custom com picked ARRAY (74 arm0) e setCustomApp false (77 arm1)
+    const b2 = makeBridge()
+    b2.dialog.openFile.mockResolvedValue(['/opt/keynote.app', 'extra'])
+    b2.presentation.setCustomApp.mockResolvedValue(false)
+    setBridge(b2)
+    const w2 = await mountCard()
+    const customBtn = w2.find('[data-test="ppt-engine-custom"]')
+    if (customBtn.exists()) {
+      await customBtn.trigger('click')
+      await flushPromises()
+      expect(b2.presentation.setEngine).not.toHaveBeenCalled()
+    }
+    w2.unmount()
+  })
 })

@@ -9,6 +9,7 @@ import {
   listLocalCollections,
   listLocalMusics,
 } from '@modules/media/services/local-custom-store'
+import { matchesAllTerms } from '@shared/services/search-terms'
 
 import type {
   LiturgyBibleBookOption,
@@ -89,9 +90,9 @@ export function parseCatalogDurationMs(raw: unknown): number | null {
     if (parts.some((part) => !Number.isFinite(part))) return null
     let seconds = 0
     if (parts.length === 3) {
-      seconds = (parts[0] ?? 0) * 3600 + (parts[1] ?? 0) * 60 + (parts[2] ?? 0)
+      seconds = parts[0]! * 3600 + parts[1]! * 60 + parts[2]!
     } else if (parts.length === 2) {
-      seconds = (parts[0] ?? 0) * 60 + (parts[1] ?? 0)
+      seconds = parts[0]! * 60 + parts[1]!
     } else {
       return null
     }
@@ -281,7 +282,7 @@ async function loadCollectionOptions(
   }
 }
 
-function sortMusicOptions(options: LiturgyMusicOption[]): LiturgyMusicOption[] {
+export function sortMusicOptions(options: LiturgyMusicOption[]): LiturgyMusicOption[] {
   return [...options].sort((a, b) => {
     const trackA = a.hymnalTrack ?? Number.POSITIVE_INFINITY
     const trackB = b.hymnalTrack ?? Number.POSITIVE_INFINITY
@@ -419,16 +420,17 @@ export function filterLiturgyMusicOptions(
   const numQuery = isNum ? Number(trimmed) : null
 
   let results = options.filter((entry) => {
-    const title = entry.name.toLowerCase()
-    const album = entry.albumNames.toLowerCase()
+    const title = entry.name
+    const album = entry.albumNames
     if (isNum && numQuery != null) {
       return (
-        title.includes(trimmed) ||
-        album.includes(trimmed) ||
+        matchesAllTerms(title, album, trimmed) ||
         entry.hymnalTrack === numQuery
       )
     }
-    return title.includes(trimmed) || album.includes(trimmed)
+    // Busca por termos (03/10): "jesus adoradores 5" acha a música "Jesus"
+    // do álbum "Adoradores 5" — substring contígua não existe em campo nenhum.
+    return matchesAllTerms(title, album, trimmed)
   })
 
   if (isNum && numQuery != null) {

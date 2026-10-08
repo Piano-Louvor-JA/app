@@ -261,6 +261,12 @@ export default {
       reorder: 'Drag to reorder',
     },
     messages: {
+      removeItemTitle: 'Remove item from liturgy',
+      removeLiturgyTitle: 'Remove custom liturgy',
+      clearTitle: 'Clear liturgy for this day',
+      removeAction: 'Remove',
+      cancelAction: 'Cancel',
+      confirmDeleteNamed: 'Do you want to remove "{name}" from the liturgy?',
       confirmDelete: 'Do you want to remove this item from the liturgy?',
       confirmDeleteCategory:
         'Do you want to remove this category/divider and all related items?',
@@ -270,7 +276,7 @@ export default {
       liturgySaved: 'Liturgy saved successfully.',
       mediaDesktopOnly: 'Provide the media file path.',
       videoSelectFile: 'Select file',
-      catalogEmpty: 'No songs found in the local catalog.',
+      catalogEmpty: 'No songs in the local catalog. Import a .slja file in Media Center ("Import .slja" button) or add songs from the Community.',
       customRequired:
         'Create or select a custom liturgy before adding items.',
       booksEmpty: 'No Bible books available. Complete initialization.',
@@ -290,6 +296,10 @@ export default {
       importedLocalNoImages:
         'Imported on this device: {name} ({slides} stanzas). Images were not saved on this device.',
       importFailed: 'Invalid .slja file.',
+      uploadTitle: 'Upload "{name}" to your account?',
+      uploadMessage: 'The file is uploaded once to your account (never duplicated). Or keep it saved on this device only.',
+      uploadConfirm: 'Upload to account',
+      uploadCancel: 'This device only',
       importStorageFailed:
         'Could not save the audio on this device. Free some space and try again.',
       importRemoteFailed:

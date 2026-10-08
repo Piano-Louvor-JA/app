@@ -160,16 +160,20 @@ describe('MediaPlayerPill', () => {
   })
 
   it('projeção liberada quando o store tem targets selecionados', async () => {
+    const displayMod = await import('@modules/settings/services/display-service')
+    vi.spyOn(displayMod, 'listSystemDisplays').mockResolvedValue([
+      {
+        id: 77,
+        label: 'Monitor 2',
+        isPrimary: false,
+        workArea: { x: 0, y: 0, width: 1920, height: 1080 },
+        scaleFactor: 1,
+      },
+    ])
     const { useProjectionStore } = await import('@modules/settings/stores/useProjectionStore')
     const store = useProjectionStore()
-    store.applySettings({ targetDisplayIds: [77] } as never)
-    // displays estendidos: escreve direto no state do pinia (storeToRefs read-only no setup, mas o state raw aceita)
-    store.$patch({
-      // @ts-expect-error estado interno do store: displays é ref; $patch aceita via state
-      displays: [
-        { id: 77, label: 'Monitor 2', isPrimary: false, workArea: { x: 0, y: 0, width: 1920, height: 1080 }, scaleFactor: 1 },
-      ],
-    } as never)
+    await store.refreshDisplays()
+    store.applySettings({ ...store.settings, targetDisplayIds: [77] } as never)
     expect(store.hasSelectedAudienceTargets).toBe(true)
     const w = await mountPill({ projecting: false })
     const btn = w

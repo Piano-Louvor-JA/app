@@ -100,4 +100,38 @@ describe('AlbumHymnalCard', () => {
     await w.find('.album-hymnal-card__open').trigger('click')
     expect(w.emitted('open')).toHaveLength(1)
   })
+
+  it('gaps: sem library/trackCount/subtitle — fallbacks do progress e subtitle', () => {
+    const w = mountCard({
+      libraryAlbum: null,
+      collection: { ...collection, trackCount: undefined, subtitle: undefined },
+    })
+    expect(w.find('.album-hymnal-card__subtitle').exists()).toBe(false)
+    w.unmount()
+    const w2 = mountCard({
+      libraryAlbum: null,
+      collection: { ...collection, trackCount: undefined, subtitle: 'Edição especial' },
+    })
+    expect(w2.find('.album-hymnal-card__subtitle').text()).toContain('Edição especial')
+    w2.unmount()
+    // progress undefined → ?? 0 (br 26) + status undefined → ?? idle (br 25)
+    const w3 = mountCard({ libraryAlbum: lib({ status: undefined, progress: undefined }) })
+    expect(w3.find('.album-hymnal-card__action--download').exists()).toBe(true)
+    w3.unmount()
+  })
+
+  it('gaps2: idle com library clica baixar (144); error retry cobre 167; progress null (26)', () => {
+    const w = mountCard({ libraryAlbum: lib({ status: 'idle', progress: 0 }) })
+    const dl = w.find('.album-hymnal-card__action--download')
+    expect(dl.exists()).toBe(true)
+    dl.trigger('click')
+    expect(w.emitted('download')).toBeTruthy()
+    w.unmount()
+    const w2 = mountCard({ libraryAlbum: lib({ status: 'error', progress: 0 }) })
+    expect(w2.find('.album-hymnal-card__action--retry').exists()).toBe(true)
+    w2.unmount()
+    const w3 = mountCard({ libraryAlbum: lib({ status: 'idle', progress: null }) })
+    expect(w3.find('.album-hymnal-card__action--download').exists()).toBe(true)
+    w3.unmount()
+  })
 })
