@@ -10,10 +10,14 @@ import { useThemeManager } from '@design-system/composables'
 import { initUiZoom } from '@shared/composables/useUiZoom'
 import { isProjectionPopupLocation } from '@shared/services/projection-window-location'
 import { installRemoteLiturgyBridge } from '@modules/remote/renderer/liturgy-bridge'
+import { startRendererTelemetry } from '@shared/services/telemetry'
 
 installClientPlatformHeader()
 useThemeManager()
 initUiZoom()
+
+// telemetria de erros (Glitchtip) — no-op sem VITE_TELEMETRIA_DSN
+void startRendererTelemetry()
 
 // Remove splash HTML antes do mount na janela de projeção (evita tela de boot).
 if (isProjectionPopupLocation()) {
