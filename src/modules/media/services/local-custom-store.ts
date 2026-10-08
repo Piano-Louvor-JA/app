@@ -38,6 +38,8 @@ export type LocalMusic = {
 	/** bytes de áudio local (base64) — toca no browser, não sobe */
 	audioBase64?: string | null;
 	audioName?: string | null;
+	/** Duração conhecida/estimada (ms) — p.ex. import .slja (app#331). */
+	durationMs?: number | null;
 };
 
 export type LocalCollection = {
@@ -88,11 +90,13 @@ function loadDb(): LocalDb {
 	}
 }
 
-function saveDb(db: LocalDb): void {
+function saveDb(db: LocalDb): boolean {
 	try {
 		localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+		return true;
 	} catch {
-		// quota (áudio base64 grande) — falha silenciosa; dados ficam só em memória
+		// quota (áudio base64 grande) — o caller decide se o import falhou
+		return false;
 	}
 }
 
@@ -191,6 +195,9 @@ export function updateLocalMusic(
 		name?: string;
 		audioBase64?: string | null;
 		audioName?: string | null;
+		durationMs?: number | null;
+		/** Capa/cover da música — data: URL base64 (local, offline-first). */
+		image_url?: string | null;
 	},
 ): boolean {
 	const db = loadDb();
@@ -199,8 +206,9 @@ export function updateLocalMusic(
 	if (patch.name != null) music.name = patch.name;
 	if (patch.audioBase64 !== undefined) music.audioBase64 = patch.audioBase64;
 	if (patch.audioName !== undefined) music.audioName = patch.audioName;
-	saveDb(db);
-	return true;
+	if (patch.durationMs !== undefined) music.durationMs = patch.durationMs;
+	if (patch.image_url !== undefined) music.image_url = patch.image_url;
+	return saveDb(db);
 }
 
 export function deleteLocalMusic(id: number): boolean {
@@ -215,7 +223,15 @@ export function deleteLocalMusic(id: number): boolean {
 
 export function createLocalLyric(
 	musicId: number,
-	input: { lyric: string; aux_lyric?: string; time?: string; order?: number },
+	input: {
+		lyric: string;
+		aux_lyric?: string;
+		time?: string;
+		order?: number;
+		/** Fundo do slide — data: URL base64 (import .slja local). */
+		image_url?: string | null;
+		image_position?: string | number | null;
+	},
 ): LocalLyric {
 	const db = loadDb();
 	const music = db.musics.find((m) => m.id === musicId);
@@ -228,11 +244,15 @@ export function createLocalLyric(
 		time: input.time ?? null,
 		order,
 		show_slide: true,
+		image_url: input.image_url ?? null,
+		image_position: input.image_position == null ? null : String(input.image_position),
 	};
 	db.nextLyricId -= 1;
 	music.lyrics.push(lyric);
 	music.lyrics.sort((a, b) => a.order - b.order);
-	saveDb(db);
+	if (!saveDb(db)) {
+		throw new Error("local-persist-failed");
+	}
 	return lyric;
 }
 
