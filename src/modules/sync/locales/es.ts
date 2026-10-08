@@ -46,4 +46,11 @@ export default {
         'La descarga por lotes se canceló porque no hay conexión a internet.',
     },
   },
+
+  downloadQueue: {
+    title: 'Descargas',
+    clearFinished: 'Limpiar completados',
+    retry: 'Intentar de nuevo',
+    cancel: 'Cancelar',
+  },
 }

@@ -47,13 +47,5 @@ export default {
     bible: 'Bible',
     utilities: 'Utilities',
     settings: 'Settings',
-  sync: {
-    downloadQueue: {
-      title: 'Downloads',
-      clearFinished: 'Clear finished',
-      retry: 'Try again',
-      cancel: 'Cancel',
-    },
-  },
   },
 }

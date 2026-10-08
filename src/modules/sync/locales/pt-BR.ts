@@ -46,4 +46,11 @@ export default {
         'O download em lote foi cancelado porque não há conexão com a internet.',
     },
   },
+
+  downloadQueue: {
+    title: 'Downloads',
+    clearFinished: 'Limpar concluídos',
+    retry: 'Tentar de novo',
+    cancel: 'Cancelar',
+  },
 }
