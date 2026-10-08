@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { GlassCard } from '@design-system/index'
@@ -13,6 +13,11 @@ import {
 } from '../services/provai-e-vede-source'
 import { importProvaiEVedeEpisodes } from '../services/provai-e-vede-import'
 import { useScheduledStore } from '../stores/useScheduledStore'
+import {
+  loadLiturgyMusicOptions,
+  filterLiturgyMusicOptions,
+} from '../services/liturgy-catalog'
+import type { LiturgyMusicOption } from '../types/liturgy'
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ close: [] }>()
@@ -49,6 +54,31 @@ const entryMusicId = ref('')
 const entryName = ref('')
 const entryKind = ref<'music' | 'online_video'>('music')
 const entryUrl = ref('')
+
+// Busca de música — mesmo catálogo do item de música (API + comunidade + .slja local)
+const musicCatalog = ref<LiturgyMusicOption[]>([])
+const musicQuery = ref('')
+const pickedMusic = ref<LiturgyMusicOption | null>(null)
+const musicResults = computed(() =>
+  filterLiturgyMusicOptions(musicCatalog.value, musicQuery.value, null).slice(0, 8),
+)
+
+function onPickMusic(option: LiturgyMusicOption) {
+  pickedMusic.value = option
+  musicQuery.value = option.name
+}
+
+watch(
+  () => props.open,
+  (open) => {
+    if (open && musicCatalog.value.length === 0) {
+      void loadLiturgyMusicOptions().then((options) => {
+        musicCatalog.value = options
+      })
+    }
+  },
+  { immediate: true },
+)
 
 // ── Baixar Provai e Vede ───────────────────────────────────
 const pvEpisodes = ref<ProvaiEpisode[]>([])
@@ -200,14 +230,18 @@ function onAddSong() {
   if (!entryDate.value) return
   const rotationId = activeRotationId.value ?? dlg.ensureDefaultRotation()
   if (entryKind.value === 'music') {
-    const musicId = Number(entryMusicId.value)
-    if (!Number.isInteger(musicId) || musicId < 1) return
+    if (!pickedMusic.value) return
     dlg.addEntry(rotationId, {
       dateISO: entryDate.value,
-      content: { kind: 'music', musicId },
-      name: entryName.value.trim() || `Hino ${musicId}`,
+      content: {
+        kind: 'music',
+        musicId: pickedMusic.value.id,
+        musicMode: 'audio',
+      },
+      name: pickedMusic.value.name,
     })
-    entryMusicId.value = ''
+    pickedMusic.value = null
+    musicQuery.value = ''
   } else {
     const url = entryUrl.value.trim()
     if (!url) return
@@ -411,16 +445,36 @@ const dateFmt = (iso: string) => {
                     {{ t('liturgy.types.online_video') }}
                   </option>
                 </select>
-                <input
+                <div
                   v-if="entryKind === 'music'"
-                  v-model="entryMusicId"
-                  type="number"
-                  min="1"
-                  inputmode="numeric"
-                  class="scheduled-dialog__input"
-                  :placeholder="t('liturgy.messages.scheduledSongNumber')"
-                  required
+                  class="scheduled-dialog__music"
                 >
+                  <input
+                    v-model="musicQuery"
+                    type="search"
+                    class="scheduled-dialog__input"
+                    :placeholder="t('liturgy.fields.searchMusic')"
+                    autocomplete="off"
+                  >
+                  <ul
+                    v-if="musicQuery.trim() && musicResults.length > 0"
+                    class="scheduled-dialog__music-results"
+                  >
+                    <li
+                      v-for="option in musicResults"
+                      :key="option.id"
+                    >
+                      <button
+                        type="button"
+                        class="scheduled-dialog__music-option"
+                        @click="onPickMusic(option)"
+                      >
+                        {{ option.name }}
+                        <small>{{ option.albumNames }}</small>
+                      </button>
+                    </li>
+                  </ul>
+                </div>
                 <input
                   v-else
                   v-model="entryUrl"
@@ -786,6 +840,51 @@ const dateFmt = (iso: string) => {
 
 .scheduled-dialog__right-head strong {
   font-size: 1rem;
+}
+
+.scheduled-dialog__music {
+  position: relative;
+  min-width: 0;
+}
+
+.scheduled-dialog__music-results {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 10;
+  list-style: none;
+  margin: 0;
+  padding: 0.35rem;
+  border-radius: 0.6rem;
+  background: var(--ds-color-surface, #16202c);
+  border: 1px solid color-mix(in srgb, var(--ds-color-on-surface) 15%, transparent);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.scheduled-dialog__music-option {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  color: var(--ds-color-on-surface);
+  padding: 0.45rem 0.6rem;
+  border-radius: 0.45rem;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.85em;
+}
+
+.scheduled-dialog__music-option:hover {
+  background: color-mix(in srgb, var(--ds-color-primary) 25%, transparent);
+}
+
+.scheduled-dialog__music-option small {
+  opacity: 0.6;
+  font-size: 0.85em;
 }
 
 .scheduled-dialog__quick-add {
