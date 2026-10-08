@@ -700,6 +700,10 @@ app.whenReady().then(async () => {
   }
 
 	bootMark("whenReady");
+	// telemetria de erros (Glitchtip) — não-bloqueante, silenciosa sem DSN
+	import("./telemetry.mjs")
+		.then((t) => t.startTelemetry())
+		.catch(() => {});
 	// Primeira coisa visível — checagens e servidores vêm depois.
 	createSplash();
 	bootMark("splash");
