@@ -157,6 +157,8 @@ export interface LiturgyItem {
    * Configurações; senão associated|<known-id>|custom:<path>.
    */
   playerId?: string
+  /** Rotação agendada (scheduled): id em useScheduledStore.categories. */
+  scheduledRotationId?: string | null
   url?: string
 }
 
@@ -213,6 +215,8 @@ export interface LiturgyItemDraft {
   /** Player do item; 'default' = herda o global das Configurações. */
   playerId: string
   url: string
+  /** Rotação agendada (scheduled) — não interfere na posição na liturgia. */
+  scheduledRotationId: string | null
 }
 
 export interface LiturgyMusicOption {
@@ -243,6 +247,7 @@ export interface LiturgyItemTypeMeta {
 
 export const DEFAULT_LITURGY_ITEM_DRAFT: LiturgyItemDraft = {
   type: null,
+  scheduledRotationId: null,
   name: '',
   subtitle: '',
   durationMs: 0,

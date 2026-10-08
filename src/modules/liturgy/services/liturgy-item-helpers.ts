@@ -319,6 +319,7 @@ export function buildLiturgyItemFromDraft(
           : clampMomentDurationMs(draft.durationMs),
     accentColor: getTypeDotColor(type),
     categoryId: type === 'category' ? null : draft.categoryId,
+    scheduledRotationId: type === 'scheduled' ? draft.scheduledRotationId : null,
     startTime:
       type === 'category' ? normalizeLiturgyTimeHHmm(draft.startTime) : null,
     endTime:
@@ -437,6 +438,8 @@ export function draftFromLiturgyItem(item: LiturgyItem): LiturgyItemDraft {
           : clampMomentDurationMs(item.durationMs),
     accentColor: getTypeDotColor(item.type),
     categoryId: item.type === 'category' ? null : (item.categoryId ?? null),
+    scheduledRotationId:
+      item.type === 'scheduled' ? (item.scheduledRotationId ?? null) : null,
     startTime:
       item.type === 'category'
         ? (normalizeLiturgyTimeHHmm(item.startTime) ?? '')

@@ -112,7 +112,10 @@ async function executeScheduledRef(
   router: Router,
   dateISO: string,
 ): Promise<LiturgyActionResult> {
-  const categoryId = item.categoryId?.trim()
+  // Rotação mora em scheduledRotationId (campo próprio). Fallback categoryId =
+  // itens criados antes do campo existir (compat com estado já salvo).
+  const categoryId =
+    item.scheduledRotationId?.trim() || item.categoryId?.trim()
   if (!categoryId) {
     return { ok: false, messageKey: 'liturgy.messages.scheduledEmpty' }
   }

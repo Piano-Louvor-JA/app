@@ -31,10 +31,13 @@ const scheduledResolvedByItemId = computed(() => {
   const day = selectedDay.value as import('../types/liturgy').LiturgyDayKey
   const dateISO = activeDateISO(day)
   for (const item of currentItems.value) {
-    if (item.type !== 'scheduled' || !item.categoryId) continue
-    const rotationName = scheduledStore.categoryName(item.categoryId)
+    if (item.type !== 'scheduled') continue
+    const rotationId =
+      item.scheduledRotationId?.trim() || item.categoryId?.trim()
+    if (!rotationId) continue
+    const rotationName = scheduledStore.categoryName(rotationId)
     const resolved = resolveScheduledEntry(
-      item.categoryId,
+      rotationId,
       dateISO,
       scheduledStore.categories,
       scheduledStore.items,
