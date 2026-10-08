@@ -45,12 +45,11 @@ export default {
       batchOffline:
         'La descarga por lotes se canceló porque no hay conexión a internet.',
     },
-  },
-
-  downloadQueue: {
-    title: 'Descargas',
-    clearFinished: 'Limpiar completados',
-    retry: 'Intentar de nuevo',
-    cancel: 'Cancelar',
+    downloadQueue: {
+      title: 'Descargas',
+      clearFinished: 'Limpiar completados',
+      retry: 'Intentar de nuevo',
+      cancel: 'Cancelar',
+    },
   },
 }
