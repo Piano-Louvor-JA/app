@@ -21,7 +21,7 @@ const props = defineProps<{
   /** Placeholder agendado: id do item → entrada resolvida OU estado vazio (rotação/data). */
   scheduledResolvedByItemId?: Record<
     string,
-    { entryName: string; kindLabel: string } | { empty: string }
+    { entryName: string; kindLabel: string; kind?: string } | { empty: string }
   >
 }>()
 

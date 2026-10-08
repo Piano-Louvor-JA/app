@@ -306,6 +306,7 @@ export default {
       'scheduledKind.verse': 'Versículo',
       'scheduledKind.annotation': 'Anotação',
       'scheduledKind.onlineVideo': 'Vídeo online',
+      'scheduledKind.online_video': 'Vídeo online',
       booksEmpty: 'Nenhum livro bíblico disponível. Conclua a inicialização.',
       urlMissing: 'Informe um link válido neste item.',
       urlInvalid: 'O link informado não é válido para projeção.',
