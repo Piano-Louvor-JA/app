@@ -27,6 +27,15 @@ const missing = REQUIRED_ENV.filter((k) => !process.env[k]);
 const storeEnabled = missing.length === 0;
 
 if (storeEnabled) {
+  // electron-builder não expande ${env.*} nas opções appx. Injeta os valores
+  // apenas na cópia temporária usada pelo processo de build.
+  const pkg = JSON.parse(original);
+  Object.assign(pkg.build.appx, {
+    identityName: process.env.MS_STORE_IDENTITY_NAME,
+    publisher: process.env.MS_STORE_PUBLISHER_CN,
+    publisherDisplayName: process.env.MS_STORE_PUBLISHER_DISPLAY,
+  });
+  writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
   console.log("[build-electron] MS Store env ok — target appx ATIVO");
 } else {
   console.log(

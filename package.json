@@ -204,16 +204,9 @@
     },
     "appx": {
       "applicationId": "PianoLouvorJA",
-      "identityName": "${env.MS_STORE_IDENTITY_NAME}",
-      "publisher": "${env.MS_STORE_PUBLISHER_CN}",
-      "publisherDisplayName": "${env.MS_STORE_PUBLISHER_DISPLAY}",
       "languages": [
         "pt-BR"
       ],
-      "logo": "build/appx/150x150.png",
-      "storeLogo": "build/appx/50x50.png",
-      "square44x44Logo": "build/appx/44x44.png",
-      "wide310x150Logo": "build/appx/310x150.png",
       "showNameOnTiles": true
     },
     "mac": {
