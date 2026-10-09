@@ -33,9 +33,12 @@ function bibleApiPrefix(): string {
   return getCurrentApiPrefix()
 }
 
-const BOOKS_FILE = BOOKS_FILE_BY_PREFIX[bibleApiPrefix()] ?? 'pt_bible_book'
-const VERSIONS_FILE =
-  VERSIONS_FILE_BY_PREFIX[bibleApiPrefix()] ?? 'pt_bible_version'
+/** Lido a cada carga: o idioma pode mudar na mesma sessão, sem recarregar o módulo. */
+function bibleCatalogFile(kind: 'book' | 'version'): string {
+  const prefix = bibleApiPrefix()
+  if (kind === 'book') return BOOKS_FILE_BY_PREFIX[prefix] ?? 'pt_bible_book'
+  return VERSIONS_FILE_BY_PREFIX[prefix] ?? 'pt_bible_version'
+}
 
 /** Abreviações conhecidas quando o catálogo/API vem com abbreviation vazia/null. */
 const VERSION_ABBREVIATION_BY_NAME: Array<{ match: RegExp; abbr: string }> = [
@@ -141,13 +144,15 @@ export function chapterRecordKey(
 }
 
 export async function loadBibleBooks(): Promise<BibleBook[]> {
-  const rows = await readOrFetchCatalog<CatalogBibleBookRow[]>(BOOKS_FILE)
+  const rows = await readOrFetchCatalog<CatalogBibleBookRow[]>(bibleCatalogFile('book'))
   if (!rows || !Array.isArray(rows)) return []
   return rows.map(mapBook)
 }
 
 export async function loadBibleVersions(): Promise<BibleVersion[]> {
-  const rows = await readOrFetchCatalog<CatalogBibleVersionRow[]>(VERSIONS_FILE)
+  const rows = await readOrFetchCatalog<CatalogBibleVersionRow[]>(
+    bibleCatalogFile('version'),
+  )
   if (!rows || !Array.isArray(rows)) return []
   return rows.map(mapVersion)
 }
