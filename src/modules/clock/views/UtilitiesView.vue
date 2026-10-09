@@ -8,19 +8,16 @@ const { t } = useI18n()
 
 /**
  * app#423 dev follow-up: card do diagnóstico de rede (SrCaldeira).
- * Visível somente em build dev — a rota /diagnostics só existe quando
- * import.meta.env.DEV (ver modules/diagnostics/routes.ts).
+ * Ativo também em produção portable (release sob medida campanha SrCaldeira).
  */
-const diagnosticsItem: UtilityHubItem | null = import.meta.env.DEV
-  ? {
-      key: 'diagnostics',
-      titleKey: 'utilities.diagnostics',
-      descriptionKey: 'utilities.diagnosticsDescription',
-      icon: 'ti-stethoscope',
-      to: '/diagnostics',
-      available: true,
-    }
-  : null
+const diagnosticsItem: UtilityHubItem | null = {
+  key: 'diagnostics',
+  titleKey: 'utilities.diagnostics',
+  descriptionKey: 'utilities.diagnosticsDescription',
+  icon: 'ti-stethoscope',
+  to: '/diagnostics',
+  available: true,
+}
 
 const items: UtilityHubItem[] = [
   {

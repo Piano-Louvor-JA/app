@@ -1,17 +1,15 @@
 import type { RouteRecordRaw } from 'vue-router'
 
 /**
- * Não navegado no app normal. A rota existe somente no Vite dev para Rafael
- * validar a mesma bridge diagnostics:* antes do portable.
+ * Não navegado no app normal. Rota de diagnóstico (release sob medida para
+ * campanha SrCaldeira) — ativa também em produção portable.
  * A URL é /#/diagnostics quando Electron usa hash router.
  */
-export const diagnosticsRoutes: RouteRecordRaw[] = import.meta.env.DEV
-  ? [
-      {
-        path: 'diagnostics',
-        name: 'diagnostics',
-        component: () => import('./views/DiagnosticsView.vue'),
-        meta: { navKey: 'diagnostics' },
-      },
-    ]
-  : []
+export const diagnosticsRoutes: RouteRecordRaw[] = [
+  {
+    path: 'diagnostics',
+    name: 'diagnostics',
+    component: () => import('./views/DiagnosticsView.vue'),
+    meta: { navKey: 'diagnostics' },
+  },
+]
