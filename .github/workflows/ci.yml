@@ -131,10 +131,23 @@ jobs:
           set -euo pipefail
           test -f scripts/test-regression.mjs
           cp scripts/test-regression.mjs /tmp/test-regression.mjs
+          # A staging ainda lê o catálogo custom ao vivo. Estes testes da PR
+          # isolam essa chamada; o baseline precisa deles para não falhar
+          # por causa de uma música remota fora do fixture.
+          mkdir -p /tmp/pr-liturgy-tests
+          cp \
+            src/modules/liturgy/__tests__/liturgy-catalog.test.ts \
+            src/modules/liturgy/__tests__/liturgy-catalog-branches.test.ts \
+            src/modules/liturgy/__tests__/liturgy-catalog-killplane.test.ts \
+            src/modules/liturgy/__tests__/liturgy-catalog-killplane9.test.ts \
+            src/modules/liturgy/__tests__/liturgy-catalog-mutation.test.ts \
+            src/modules/liturgy/__tests__/liturgy-integration.test.ts \
+            /tmp/pr-liturgy-tests/
           git fetch origin "$BASE_SHA" --depth=1
           git read-tree -u --reset FETCH_HEAD
-          mkdir -p scripts
+          mkdir -p scripts src/modules/liturgy/__tests__
           cp /tmp/test-regression.mjs scripts/test-regression.mjs
+          cp /tmp/pr-liturgy-tests/*.test.ts src/modules/liturgy/__tests__/
       - name: Rodar baseline
         if: github.event_name == 'pull_request'
         env:
