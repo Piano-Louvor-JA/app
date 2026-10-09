@@ -1,6 +1,8 @@
-# Build Windows — instalador NSIS + Portable (exe único, estilo AppImage) x64.
+# Build Windows — instalador NSIS + Portable (exe único) + Microsoft Store APPX x64.
 # Portable: UM .exe só — duplo clique e roda, sem instalar e sem pasta de
 # arquivos soltos pro usuário curioso mexer. (Electron 44+ não publica win32-ia32)
+# APPX: só empacota quando os secrets MS_STORE_* estão configurados; caso
+# contrário o wrapper remove o target appx e o build gera apenas NSIS/portable.
 # Roda manualmente (workflow_dispatch) ou em push de tags v*
 name: Build Windows
 
@@ -15,8 +17,12 @@ permissions:
 
 jobs:
   build-windows:
-    name: Build Windows NSIS + Portable x64
+    name: Build Windows x64 (NSIS + Portable + Store APPX)
     runs-on: windows-latest
+    env:
+      MS_STORE_IDENTITY_NAME: ${{ secrets.MS_STORE_IDENTITY_NAME }}
+      MS_STORE_PUBLISHER_CN: ${{ secrets.MS_STORE_PUBLISHER_CN }}
+      MS_STORE_PUBLISHER_DISPLAY: ${{ secrets.MS_STORE_PUBLISHER_DISPLAY }}
     steps:
       - uses: actions/checkout@v4
 
@@ -28,12 +34,35 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Target "portable" definido no package.json (win.target) — gera
-      # LouvorJA-PIANO-<ver>-portable.exe (arquivo único) junto com o Setup.
+      - name: Check MS Store secrets
+        id: store
+        shell: bash
+        run: |
+          if [ -n "$MS_STORE_IDENTITY_NAME" ] && [ -n "$MS_STORE_PUBLISHER_CN" ] && [ -n "$MS_STORE_PUBLISHER_DISPLAY" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "MS_STORE_* secrets ausentes — build NSIS/portable apenas (appx pulado)"
+          fi
+
+      # O wrapper scripts/build-electron.mjs remove o target appx do
+      # package.json quando as env MS_STORE_* estão ausentes e restaura
+      # o arquivo ao final — mesmo comportamento local e no CI.
       - name: Build Vite + Electron NSIS + Portable (x64) + publish
         run: npm run electron:build -- --win --x64 --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Microsoft Store .appxupload
+        if: steps.store.outputs.enabled == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: LouvorJA-PIANO-MicrosoftStore-appxupload
+          path: |
+            dist-electron/*.appxupload
+            dist-electron/*.appxsym
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Generate SHA256SUMS and upload to release
         shell: bash

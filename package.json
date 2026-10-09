@@ -24,7 +24,7 @@
     "git:publish": "git push -u origin HEAD --follow-tags",
     "electron:dev": "concurrently -k \"vite --host localhost --port 5173\" \"wait-on http://localhost:5173 && env -u ELECTRON_RUN_AS_NODE cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron . --class=louvorja-piano\"",
     "electron:preview": "vite build --base=./ && env -u ELECTRON_RUN_AS_NODE electron . --class=louvorja-piano",
-    "electron:build": "vite build --base=./ && node build/patch-nsis-templates.mjs && electron-builder",
+    "electron:build": "vite build --base=./ && node build/patch-nsis-templates.mjs && node scripts/build-electron.mjs --",
     "postinstall": "electron-builder install-app-deps",
     "test:regression": "node scripts/test-regression.mjs",
     "electron:dev-log": "concurrently -k \"vite --host localhost --port 5173\" \"wait-on http://localhost:5173 && env -u ELECTRON_RUN_AS_NODE cross-env VITE_DEV_SERVER_URL=http://localhost:5173 ELECTRON_OPEN_DEVTOOLS=1 electron . --class=louvorja-piano 2>&1 | tee /tmp/louvorja-dev.log\"",
@@ -192,9 +192,29 @@
           "arch": [
             "x64"
           ]
+        },
+        {
+          "target": "appx",
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "build/icon.ico"
+    },
+    "appx": {
+      "applicationId": "PianoLouvorJA",
+      "identityName": "${env.MS_STORE_IDENTITY_NAME}",
+      "publisher": "${env.MS_STORE_PUBLISHER_CN}",
+      "publisherDisplayName": "${env.MS_STORE_PUBLISHER_DISPLAY}",
+      "languages": [
+        "pt-BR"
+      ],
+      "logo": "build/appx/150x150.png",
+      "storeLogo": "build/appx/50x50.png",
+      "square44x44Logo": "build/appx/44x44.png",
+      "wide310x150Logo": "build/appx/310x150.png",
+      "showNameOnTiles": true
     },
     "mac": {
       "target": [
