@@ -26,7 +26,7 @@ import { buildSlja, type SljaArchive } from "@shared/services/slja";
 import { importSljaAsLiturgyMusic } from "../services/import-slja-to-liturgy";
 
 /** fetch roteado por URL (API fake em memória). */
-function routeFetch(musicId: number, lyricId: number) {
+function routeFetch(musicId: number, lyricId: number, fileStatus = 200) {
 	const files: Array<Record<string, unknown>> = [];
 	fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
 		const u = String(url);
@@ -40,10 +40,9 @@ function routeFetch(musicId: number, lyricId: number) {
 		}
 		if (u.endsWith("/files") && init?.method === "POST") {
 			files.push({});
-			return json({
-				id_file: 900 + files.length,
-				url: `/custom/f${files.length}.mp3`,
-			});
+			return fileStatus === 200
+				? json({ id_file: 900 + files.length, url: `/custom/f${files.length}.mp3` })
+				: json({ message: "upload failed" }, fileStatus);
 		}
 		if (u.endsWith(`/musics/${musicId}`) && init?.method === "PUT") {
 			return json({});
@@ -367,7 +366,21 @@ describe("import .slja LOGADO → API custom (app#331)", () => {
    expect(JSON.parse(String(call?.[1]?.body)).id_file_image).toBe(901);
  });
 
- it("encerra importação quando consulta de coletâneas expira", async () => {
+ it("continua sem imagem quando upload de asset remoto falha", async () => {
+  authSessionMock.mockReturnValue({ token: "tok", user: { id_user: 1 } });
+  routeFetch(7, 0, 500);
+  const archive: SljaArchive = {
+    title: "Asset ausente",
+    assets: [{ path: "bg.png", bytes: new Uint8Array([2]) }],
+    slides: [{ lyric: "Verso", type: "LETRA", order: 1, timeMs: 0,
+      image: { name: "bg.png", bytes: new Uint8Array([2]) } }],
+  };
+
+  await expect(importSljaAsLiturgyMusic({ bytes: await buildSlja(archive), name: "asset-fail.slja" }))
+    .resolves.toMatchObject({ uploadedImages: 0, slides: 1 });
+});
+
+it("encerra importação quando consulta de coletâneas expira", async () => {
    authSessionMock.mockReturnValue({ token: "tok", user: { id_user: 1 } });
    const controller = new AbortController();
    const timeout = vi.spyOn(AbortSignal, "timeout").mockReturnValue(controller.signal);
