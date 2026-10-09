@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { useUpdateChecker } from '@shared/composables/useUpdateChecker'
+import { useUpdateChecker } from "@shared/composables/useUpdateChecker";
 
-const { hasUpdate, newVersion, dismissed, dismiss } = useUpdateChecker()
+const { hasUpdate, newVersion, dismissed, dismiss } = useUpdateChecker();
 
 const emit = defineEmits<{
-  viewNotes: [version: string | null]
-}>()
+	viewNotes: [version: string | null];
+}>();
 
 function handleViewNotes() {
-  emit('viewNotes', newVersion.value)
+	emit("viewNotes", newVersion.value);
 }
 </script>
 

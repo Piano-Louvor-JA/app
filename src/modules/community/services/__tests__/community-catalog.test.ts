@@ -348,6 +348,7 @@ describe("community-catalog — saveCommunityCopy (F0.4, mata mutantes 64-133)",
 	});
 
 	it("URL de musics usa o id da coletânea (mata mutante StringLiteral do path)", async () => {
+		vi.stubEnv("VITE_PALCO_API_URL", undefined as unknown as string);
 		let calledUrl = "";
 		vi.stubGlobal(
 			"fetch",

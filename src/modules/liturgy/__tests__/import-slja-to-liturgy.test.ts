@@ -25,8 +25,16 @@ vi.mock("@modules/media/services/auth-client", () => ({
 vi.stubGlobal("fetch", fetchMock);
 
 import { resolveMediaTrack } from "@modules/media/services/custom-catalog";
+import {
+	getLocalMusic,
+	listLocalCollections,
+	listLocalMusics,
+} from "@modules/media/services/local-custom-store";
 import { buildSlja, type SljaArchive } from "@shared/services/slja";
-import { importSljaAsLiturgyMusic } from "../services/import-slja-to-liturgy";
+import {
+	importSljaAsLiturgyMusic,
+	sljaDisplayName,
+} from "../services/import-slja-to-liturgy";
 import { resolveMusicId } from "../services/liturgy-actions";
 
 async function makeSljaBuffer(): Promise<ArrayBuffer> {
@@ -113,6 +121,112 @@ describe("app#331 — import .slja → item de liturgia → player (offline)", (
 		const trackAfter = await resolveMediaTrack(imported.displayMusicId);
 		expect(trackAfter?.name).toBe("Missao Para Todos");
 		expect(trackAfter?.audioUrl ?? "").toMatch(/^data:audio/);
+	});
+
+	it("arquivo só com capa não cria música vazia", async () => {
+		const archive: SljaArchive = {
+			title: "Só Capa",
+			assets: [],
+			slides: [
+				{ lyric: "Capa", type: "CAPA", timeMs: 0, order: 1 },
+			],
+		};
+		await expect(
+			importSljaAsLiturgyMusic({
+				bytes: await buildSlja(archive),
+				name: "so-capa.slja",
+			}),
+		).rejects.toThrow("SLJA_IMPORT_NO_LYRICS");
+		expect(
+			listLocalCollections().flatMap((collection) =>
+				listLocalMusics(collection.id),
+			),
+		).toEqual([]);
+	});
+
+	it("título sentinela Sem título usa o nome do arquivo", () => {
+		expect(sljaDisplayName({ title: "Sem título" }, "missao.slja")).toBe(
+			"missao",
+		);
+	});
+
+	it("guarda a letra auxiliar do .slja", async () => {
+		const archive: SljaArchive = {
+			title: "Com Auxiliar",
+			assets: [],
+			slides: [
+				{
+					lyric: "Estrofe",
+					auxiliaryLyric: "Translation",
+					type: "LETRA",
+					timeMs: 1_000,
+					order: 1,
+				},
+			],
+		};
+		const imported = await importSljaAsLiturgyMusic({
+			bytes: await buildSlja(archive),
+			name: "aux.slja",
+		});
+		const lyric = getLocalMusic(imported.musicId)?.lyrics[0];
+		expect(lyric?.aux_lyric).toBe("Translation");
+		expect(imported.imagesOmitted).toBe(false);
+	});
+
+	it("import local avisa quando o .slja tem imagem", async () => {
+		const archive: SljaArchive = {
+			title: "Com Imagem",
+			assets: [{ path: "fundo.png", bytes: new Uint8Array([1]) }],
+			slides: [{ lyric: "Estrofe", type: "LETRA", timeMs: 1_000, order: 1 }],
+		};
+		const imported = await importSljaAsLiturgyMusic({
+			bytes: await buildSlja(archive),
+			name: "img.slja",
+		});
+		expect(imported.local).toBe(true);
+		expect(imported.imagesOmitted).toBe(true);
+	});
+
+	it("localStorage cheio antes da música não finge arquivo inválido", async () => {
+		const spy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+			throw new DOMException("quota", "QuotaExceededError");
+		});
+		try {
+			await expect(
+				importSljaAsLiturgyMusic({
+					bytes: await makeSljaBuffer(),
+					name: "missao.slja",
+				}),
+			).rejects.toThrow("SLJA_LOCAL_LYRIC_PERSIST_FAILED");
+		} finally {
+			spy.mockRestore();
+		}
+	});
+
+	it("áudio acima da quota do localStorage não finge sucesso", async () => {
+		const original = Storage.prototype.setItem;
+		const spy = vi
+			.spyOn(Storage.prototype, "setItem")
+			.mockImplementation(function (this: Storage, key: string, value: string) {
+				if (value.includes("audioBase64")) {
+					throw new DOMException("quota", "QuotaExceededError");
+				}
+				return original.call(this, key, value);
+			});
+		try {
+			await expect(
+				importSljaAsLiturgyMusic({
+					bytes: await makeSljaBuffer(),
+					name: "missao.slja",
+				}),
+			).rejects.toThrow("SLJA_LOCAL_AUDIO_PERSIST_FAILED");
+			const leftover = listLocalCollections().flatMap((collection) =>
+				listLocalMusics(collection.id),
+			);
+			expect(leftover).toEqual([]);
+		} finally {
+			spy.mockRestore();
+		}
 	});
 
 	it("id negativo desconhecido → null sem consultar rede", async () => {
