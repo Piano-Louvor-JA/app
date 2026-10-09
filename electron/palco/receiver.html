@@ -2768,15 +2768,27 @@ var cloudCode='';
 var cloudMode=false;
 var cloudTimer=null;
 
+function cloudHttpBase(){
+  if(cloudApi==='wss://api-stg.louvorja.com.br/v1/palco')return 'https://api-stg.louvorja.com.br/v1/palco';
+  if(cloudApi==='ws://localhost:3100/v1/palco')return 'http://localhost:3100/v1/palco';
+  if(cloudApi==='wss://localhost:3100/v1/palco')return 'https://localhost:3100/v1/palco';
+  return 'https://api.louvorja.com.br/v1/palco';
+}
+function cloudWsBase(){
+  if(cloudApi==='wss://api-stg.louvorja.com.br/v1/palco')return 'wss://api-stg.louvorja.com.br/v1/palco';
+  if(cloudApi==='ws://localhost:3100/v1/palco')return 'ws://localhost:3100/v1/palco';
+  if(cloudApi==='wss://localhost:3100/v1/palco')return 'wss://localhost:3100/v1/palco';
+  return 'wss://api.louvorja.com.br/v1/palco';
+}
 function cloudConnect(code){
   var session=/^[A-Z0-9]{6}$/.exec(String(code||'').toUpperCase());
   if(!session)return;
   session=session[0];
   cloudMode=true;cloudCode=session;
   dlog('cloudConnect',session,cloudApi);
-  var base=cloudApi.replace(/^ws/,'http');
+  var base=cloudHttpBase();
   setStatus('nuvem: buscando sessão '+session+'…');
-  fetch(base+'/sessions/'+session+'/token')
+  fetch(base+'/sessions/'+encodeURIComponent(session)+'/token')
     .then(function(r){if(!r.ok)throw Error('sessão não encontrada');return r.json()})
     .then(function(j){cloudOpen(session,j.token)})
     .catch(function(e){setStatus('nuvem: '+e.message,true);cloudRetry()});
@@ -2789,7 +2801,7 @@ function cloudOpen(code,token){
   var cid='';
   try{cid=localStorage.getItem('palcoCloudCid')||''}catch(e){}
   if(!cid){cid='tv-'+Math.random().toString(36).slice(2,10);try{localStorage.setItem('palcoCloudCid',cid)}catch(e){}}
-  try{ws=new WebSocket(cloudApi+'/relay/'+session+'?token='+encodeURIComponent(String(token||''))+'&role=receiver&cid='+encodeURIComponent(cid))}
+  try{ws=new WebSocket(cloudWsBase()+'/relay/'+encodeURIComponent(session)+'?token='+encodeURIComponent(String(token||''))+'&role=receiver&cid='+encodeURIComponent(cid))}
   catch(e){cloudRetry();return}
   ws.onopen=function(){tries=0;dlog('CLOUD WS OPEN',session);
     setStatus('● nuvem '+session);
@@ -2818,7 +2830,7 @@ function cloudRetry(){
 // código (ou escaneia) e projeta. Padrão YouTube/Netflix.
 function cloudCreate(){
   cloudMode=true;cloudCode='';
-  var base=cloudApi.replace(/^ws/,'http');
+  var base=cloudHttpBase();
   setStatus('nuvem: criando sessão…');
   fetch(base+'/sessions',{method:'POST'})
     .then(function(r){if(!r.ok)throw Error('falha ao criar sessão');return r.json()})
