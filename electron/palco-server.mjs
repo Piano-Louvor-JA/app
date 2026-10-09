@@ -245,6 +245,27 @@ class PalcoSlot {
       return
     }
 
+    // Controle do pregador: página LAN sem CDN, preview passivo + remote WS.
+    if (p === '/speaker') {
+      const page = `<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pregador · LouvorJA</title>
+<style>body{margin:0;background:#111;color:#fff;font:16px system-ui;padding:16px}main{max-width:420px;margin:auto}.preview{aspect-ratio:16/9;background:#000;border:1px solid #444;display:grid;place-items:center;text-align:center;padding:12px}button{min-height:64px;width:48%;font-size:28px;border-radius:12px;border:0;background:#2867d8;color:#fff}nav{display:flex;justify-content:space-between;gap:12px;margin-top:18px}#count{font-size:22px;text-align:center;margin:16px}.changed{outline:4px solid #64d99b}</style></head>
+<body><main><h1>Pregador</h1><div class="preview" id="preview">Conectando preview…</div><div id="count">—/—</div><nav><button id="prev" aria-label="Voltar">◀</button><button id="next" aria-label="Avançar">▶</button></nav></main>
+<script>
+const q=new URLSearchParams(location.search),token=q.get('token')||localStorage.getItem('speaker.token'),remotePort=q.get('remotePort')||localStorage.getItem('speaker.remotePort')||'7071';if(token){localStorage.setItem('speaker.token',token);localStorage.setItem('speaker.remotePort',remotePort)}
+let preview,remote,queued=[],state={index:0,total:0},seq=0;const text=document.querySelector('#preview'),count=document.querySelector('#count');
+function host(port,path){return 'ws://'+location.hostname+':'+port+path}function render(){count.textContent=(state.total?state.index+1:'—')+'/'+(state.total||'—')}function pulse(){count.classList.add('changed');setTimeout(()=>count.classList.remove('changed'),350)}
+function openPreview(){preview=new WebSocket(host(q.get('palcoPort')||'7081','/palco'));preview.onmessage=e=>{try{const m=JSON.parse(e.data);if(m.type==='projection')text.textContent=m.text||m.title||'Projeção ativa'}catch{}};preview.onclose=()=>setTimeout(openPreview,800)}
+function send(action){const m={v:1,type:'command',id:'s'+(++seq),action,token};if(remote?.readyState===1)remote.send(JSON.stringify(m));else queued.push(m)}
+function openRemote(){remote=new WebSocket(host(remotePort,''));remote.onopen=()=>{remote.send(JSON.stringify({v:1,type:'hello',role:'speaker',token}));queued.splice(0).forEach(m=>remote.send(JSON.stringify(m)))};remote.onmessage=e=>{try{const m=JSON.parse(e.data);if(m.type==='state'&&m.slide){const old=state.index;state=m.slide;render();if(old!==state.index)pulse()}}catch{}};remote.onclose=()=>setTimeout(openRemote,800)}
+document.querySelector('#prev').onclick=()=>send('slide:prev');document.querySelector('#next').onclick=()=>send('slide:next');async function lock(){try{await navigator.wakeLock?.request('screen')}catch{}}document.addEventListener('visibilitychange',()=>{if(!document.hidden)lock()});lock();openPreview();openRemote();render();
+</script></body></html>`
+      res.setHeader('Content-Type', 'text/html; charset=utf-8')
+      res.setHeader('Cache-Control', 'no-store')
+      res.end(page)
+      return
+    }
+
     // Receiver embutido (mesma página do palco-receiver)
     if (p === '/' || p === '/receiver.html' || p === '/index.html') {
       try {

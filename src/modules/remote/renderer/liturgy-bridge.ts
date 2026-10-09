@@ -61,6 +61,7 @@ const V2_NAMESPACES = new Set(['media', 'bible', 'timer', 'countdown', 'clock', 
 export function installRemoteLiturgyBridge({ router }: { router: Router }) {
   const liturgy = useLiturgyStore()
   const player = useMediaPlayer()
+  const mediaStore = useMediaPlayer()
   const remoteApi = getDesktopBridge()?.remote
   const projection = getDesktopBridge()?.projection
   if (!remoteApi) return () => {}
@@ -173,6 +174,10 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
           done: item.done === true,
         })),
       },
+      slide: {
+        index: mediaStore.slideIndex.value ?? 0,
+        total: mediaStore.session.value?.slides?.length ?? 0,
+      },
       player: {
         ...media,
         canPrevious: (liturgy.selectedItemIndex ?? 0) > 0,
@@ -208,6 +213,14 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
     const { action, value } = msg
     const items = liturgy.currentItems ?? []
     const current = liturgy.selectedItemIndex ?? -1
+
+    // Pregador: única superfície autorizada pelo servidor.
+    if (action === 'slide:next') { await mediaStore.nextSlide(); return true }
+    if (action === 'slide:prev') { await mediaStore.previousSlide(); return true }
+    if (action === 'slide:goto') {
+      if (typeof msg.index !== 'number') return false
+      await mediaStore.goToSlide(msg.index); return true
+    }
 
     // 0) Namespaces v2 (bible/timer/countdown) — spec controle remoto total.
     const namespace = action.split('.')[0]
