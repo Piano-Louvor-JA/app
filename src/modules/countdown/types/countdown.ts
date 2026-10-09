@@ -9,6 +9,7 @@ import type { AlertPresetKey } from '../services/alert-tone'
 export type CountdownStatus = 'idle' | 'running' | 'paused'
 
 export type CountdownMode = 'standard' | 'sabbath'
+export type CountdownRuntimeMode = 'duration' | 'until'
 
 export interface SabbathModeConfig {
   /** 'start' = usuário define horário início + fim; 'endOnly' = só fim */
@@ -60,6 +61,10 @@ export interface CountdownDisplayConfig {
 }
 
 export interface CountdownRuntimeState {
+  mode?: CountdownRuntimeMode
+  untilHour?: number
+  untilMinute?: number
+  pausedRemainingMs?: number | null
   status: CountdownStatus
   /** Epoch ms when the current running segment started. */
   segmentStartedAt: number | null
@@ -95,6 +100,7 @@ export const DEFAULT_COUNTDOWN_DISPLAY_CONFIG: CountdownDisplayConfig = {
   timeFormat: 'hh:mm:ss',
   bgColor: '#000000',
   textColor: '#FFFFFF',
+  allowNegative: true,
 }
 
 export const DEFAULT_COUNTDOWN_RUNTIME: CountdownRuntimeState = {
@@ -104,6 +110,10 @@ export const DEFAULT_COUNTDOWN_RUNTIME: CountdownRuntimeState = {
   durationMs: DEFAULT_COUNTDOWN_DURATION_MS,
   savedTimesMs: [],
   finished: false,
+  mode: 'duration',
+  untilHour: 18,
+  untilMinute: 0,
+  pausedRemainingMs: null,
 }
 
 export const COUNTDOWN_TIME_FORMATS: CountdownTimeFormat[] = [

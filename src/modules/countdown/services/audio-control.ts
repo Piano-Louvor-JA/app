@@ -18,6 +18,110 @@ export interface CountdownAudioControl {
 export const COUNTDOWN_AUDIO_CHANNEL = 'louvorja-countdown-audio'
 export const COUNTDOWN_AUDIO_STORAGE_KEY = 'pianolouvorja:countdown:audioControl'
 
+/**
+ * Host de áudio (fix duplicidade 03/10): o alerta deve tocar em UMA janela só.
+ * - Sem projeção: o OPERADOR toca (feedback do irmão: "executar o cronômetro
+ *   mesmo sem projeção, com áudio funcional").
+ * - Com projeção (N popups, um por monitor): só a popup ELEITA toca — antes,
+ *   cada popup rodava o composable com seu próprio firedMarkers e o marco
+ *   dos 5min tocava uma vez POR TELA (áudio duplicado audível no PC).
+ * Eleição determinística sem coordenação: menor monitorId vence; layout
+ * 'return' (janela de retorno do operador) nunca toca. Fallback: sem
+ * monitorId na URL, menor lexicográfico entre as que se anunciam.
+ */
+export const COUNTDOWN_AUDIO_HOST_KEY = 'pianolouvorja:countdown:audioHost'
+
+export type AudioHostClaim = { id: string; ts: number }
+
+let fallbackHostId: string | null = null
+
+/** id único desta janela candidata (monitorId quando existir). */
+export function myAudioHostId(): string {
+  if (typeof window === 'undefined') return 'op'
+  const monitorId = new URLSearchParams(window.location.search).get('monitorId')
+  if (monitorId != null) return `m${monitorId}`
+  if (window.name) return `w${window.name}`
+  if (!fallbackHostId) fallbackHostId = `w${crypto.randomUUID()}`
+  return fallbackHostId
+}
+
+export function isReturnWindow(): boolean {
+  if (typeof window === 'undefined') return false
+  return new URLSearchParams(window.location.search).get('layout') === 'return'
+}
+
+/** Janela do OPERADOR (não-popup): rota principal, sem ?module=countdown. */
+export function isOperatorWindow(): boolean {
+  if (typeof window === 'undefined') return true
+  const params = new URLSearchParams(window.location.search)
+  return !(
+    window.location.pathname.includes('/popup') &&
+    params.get('module') === 'countdown'
+  ) && window.opener == null
+}
+
+function readHostClaim(): AudioHostClaim | null {
+  try {
+    const raw = JSON.parse(
+      localStorage.getItem(COUNTDOWN_AUDIO_HOST_KEY) ?? 'null',
+    ) as AudioHostClaim | null
+    if (raw && typeof raw.id === 'string' && typeof raw.ts === 'number') return raw
+  } catch {
+    // corrompido — trata como vago
+  }
+  return null
+}
+
+/**
+ * Decide se ESTA janela é a host do áudio. Regras:
+ * - Janela de retorno ('layout=return'): nunca.
+ * - Operador: host quando NENHUMA popup viva estiver eleita (claim com
+ *   heartbeat < 4s). Projeção fechou → operador assume (áudio sem projeção).
+ * - Popup: host se seu id for o menor id vivo (heartbeat < 4s) entre
+ *   os claims; empate resolvido por ordem de chegada (ts menor).
+ */
+export function claimAudioHost(now = Date.now()): boolean {
+  if (typeof window === 'undefined') return false
+  if (isReturnWindow()) return false
+  const myId = myAudioHostId()
+  const STALE_MS = 4000
+  const current = readHostClaim()
+  const alive = current != null && now - current.ts < STALE_MS
+  if (isOperatorWindow()) {
+    // Operador é host só quando a eleição de popups está vazia/expirada.
+    if (alive && current!.id !== myId) return false
+  } else if (alive && current!.id !== myId && myId > current!.id) {
+    // Popup com monitorId maior não rouba de um id menor já vivo.
+    return false
+  }
+  try {
+    localStorage.setItem(COUNTDOWN_AUDIO_HOST_KEY, JSON.stringify({ id: myId, ts: now }))
+  } catch { /* ignore */ }
+  return true
+}
+
+/** Renova o heartbeat se esta janela for a host. Chamar a cada tick de 1s. */
+export function renewAudioHost(now = Date.now()): void {
+  if (typeof window === 'undefined') return
+  const current = readHostClaim()
+  if (current != null && current.id === myAudioHostId()) {
+    try {
+      localStorage.setItem(COUNTDOWN_AUDIO_HOST_KEY, JSON.stringify({ id: current.id, ts: now }))
+    } catch { /* ignore */ }
+  }
+}
+
+/** Libera o claim ao desmontar (popup fechou → operador assume). */
+export function releaseAudioHost(): void {
+  if (typeof window === 'undefined') return
+  const current = readHostClaim()
+  if (current != null && current.id === myAudioHostId()) {
+    try {
+      localStorage.removeItem(COUNTDOWN_AUDIO_HOST_KEY)
+    } catch { /* ignore */ }
+  }
+}
+
 export function publishAudioControl(control: CountdownAudioControl): void {
   try {
     localStorage.setItem(COUNTDOWN_AUDIO_STORAGE_KEY, JSON.stringify(control))

@@ -123,6 +123,7 @@ export async function ensureAlbumCovers(
       await Promise.all(
         batch.map(async (urlImage) => {
           const relativePath = toRelativeMediaPath(urlImage)
+          /* v8 ignore next 1 -- missing só contém paths com relativePath válido */
           if (!relativePath) return
           const fullUrl = resolveMediaUrl(urlImage)
           const ok = await bridge.media.download(fullUrl, 'covers', relativePath)
@@ -136,6 +137,7 @@ export async function ensureAlbumCovers(
 
     const stillMissing = await mapInBatches(missing, CHECK_BATCH, async (urlImage) => {
       const relativePath = toRelativeMediaPath(urlImage)
+      /* v8 ignore next 1 -- missing só contém paths com relativePath válido */
       if (!relativePath) return false
       return !(await bridge.media.check('covers', relativePath))
     })

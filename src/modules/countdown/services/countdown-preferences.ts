@@ -37,7 +37,7 @@ export function normalizeCountdownDisplayConfig(raw: unknown): CountdownDisplayC
     timeFormat: asTimeFormat(source.timeFormat),
     bgColor: asString(source.bgColor, DEFAULT_COUNTDOWN_DISPLAY_CONFIG.bgColor),
     textColor: asString(source.textColor, DEFAULT_COUNTDOWN_DISPLAY_CONFIG.textColor),
-    allowNegative: source.allowNegative === true,
+    allowNegative: typeof source.allowNegative === 'boolean' ? source.allowNegative : DEFAULT_COUNTDOWN_DISPLAY_CONFIG.allowNegative,
     mode: source.mode === 'sabbath' ? 'sabbath' : 'standard',
     sabbathConfig: asSabbathConfig(source.sabbathConfig),
     alertTonePresets: asAlertTonePresets(source.alertTonePresets),

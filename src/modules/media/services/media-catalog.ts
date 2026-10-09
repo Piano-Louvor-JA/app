@@ -37,7 +37,7 @@ type CatalogMusicRow = {
   lyric?: CatalogLyricRow[] | Record<string, CatalogLyricRow>
 }
 
-function asNumber(value: unknown, fallback = 0): number {
+function asNumber(value: unknown, fallback: number): number {
   const n = Number(value)
   return Number.isFinite(n) ? n : fallback
 }

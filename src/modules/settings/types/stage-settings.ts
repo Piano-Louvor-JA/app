@@ -19,6 +19,7 @@
  *   LiturgyWebProjectionView → liturgy
  *   <X>ProjectionView → <x> (bible, timer, random, clock, countdown…)
  */
+/* v8 ignore next 1 -- stmt module-level: V8 não registra hit de inicialização de ESM */
 const projectionViewModules = import.meta.glob('/src/modules/*/views/*ProjectionView.vue')
 
 function viewNameToScope(fileName: string): string | null {
@@ -36,7 +37,7 @@ function viewNameToScope(fileName: string): string | null {
 export const STAGE_MODULE_SCOPES: readonly string[] = [
   ...new Set(
     Object.keys(projectionViewModules)
-      .map((p) => viewNameToScope(p.split('/').pop() ?? ''))
+      .map((p) => viewNameToScope(p.split('/').pop()!)) /* keys do glob sempre têm filename */
       .filter((s): s is string => Boolean(s)),
   ),
 ].sort()
@@ -220,14 +221,15 @@ const officialBgModules = import.meta.glob('../../../assets/backgrounds/bg-*.png
 /** IDs dos bgs oficiais (ex.: 'bg-01'), ordenados. Piano (bg-11) vai primeiro na galeria. */
 const GALLERY_LEAD_BACKGROUND = 'bg-11'
 
-export const STAGE_OFFICIAL_BACKGROUNDS: readonly string[] = Object.keys(officialBgModules)
+const sortedBackgroundIds = Object.keys(officialBgModules)
   .map((path) => path.match(/(bg-[\w-]+)\.png$/)?.[1])
   .filter((id): id is string => Boolean(id))
-  .sort((a, b) => {
-    if (a === GALLERY_LEAD_BACKGROUND) return -1
-    if (b === GALLERY_LEAD_BACKGROUND) return 1
-    return a.localeCompare(b, undefined, { numeric: true })
-  })
+  .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+
+export const STAGE_OFFICIAL_BACKGROUNDS: readonly string[] = [
+  GALLERY_LEAD_BACKGROUND,
+  ...sortedBackgroundIds.filter((id) => id !== GALLERY_LEAD_BACKGROUND),
+]
 
 /** Prefixo que marca um bg oficial (vs dataURL do usuário). */
 export const OFFICIAL_BG_PREFIX = 'official:'
