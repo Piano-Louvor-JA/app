@@ -33,11 +33,16 @@ export const COUNTDOWN_AUDIO_HOST_KEY = 'pianolouvorja:countdown:audioHost'
 
 export type AudioHostClaim = { id: string; ts: number }
 
+let fallbackHostId: string | null = null
+
 /** id único desta janela candidata (monitorId quando existir). */
 export function myAudioHostId(): string {
   if (typeof window === 'undefined') return 'op'
   const monitorId = new URLSearchParams(window.location.search).get('monitorId')
-  return monitorId != null ? `m${monitorId}` : `w${window.name || Math.random().toString(36).slice(2)}`
+  if (monitorId != null) return `m${monitorId}`
+  if (window.name) return `w${window.name}`
+  if (!fallbackHostId) fallbackHostId = `w${crypto.randomUUID()}`
+  return fallbackHostId
 }
 
 export function isReturnWindow(): boolean {
@@ -84,21 +89,11 @@ export function claimAudioHost(now = Date.now()): boolean {
   const alive = current != null && now - current.ts < STALE_MS
   if (isOperatorWindow()) {
     // Operador é host só quando a eleição de popups está vazia/expirada.
-    return !alive || current!.id === myId
+    if (alive && current!.id !== myId) return false
+  } else if (alive && current!.id !== myId && myId > current!.id) {
+    // Popup com monitorId maior não rouba de um id menor já vivo.
+    return false
   }
-  if (alive && current!.id === myId) {
-    // renova heartbeat
-    try {
-      localStorage.setItem(COUNTDOWN_AUDIO_HOST_KEY, JSON.stringify({ id: myId, ts: now }))
-    } catch { /* ignore */ }
-    return true
-  }
-  if (alive) {
-    // Outra viva: eu venço só se meu id for menor (menor monitorId) e a
-    // atual não for menor ainda. Não rouba de id menor (evita flap).
-    return myId < current!.id
-  }
-  // vago: assumo
   try {
     localStorage.setItem(COUNTDOWN_AUDIO_HOST_KEY, JSON.stringify({ id: myId, ts: now }))
   } catch { /* ignore */ }

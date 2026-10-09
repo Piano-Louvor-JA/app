@@ -32,7 +32,6 @@ import {
   claimAudioHost,
   isOperatorWindow,
   releaseAudioHost,
-  renewAudioHost,
 } from '../services/audio-control'
 
 /** AudioElement de um tom da biblioteca (cacheado pelo data-URL). */
@@ -141,14 +140,14 @@ export function useCountdownDisplay(
     // exatamente UMA janela toca. Popup eleita (menor monitorId) quando há
     // projeção; OPERADOR quando não há popup viva — cronômetro roda e o
     // alerta toca no PC mesmo sem projetar (feedback do irmão).
-    const isAudioHost = claimAudioHost()
-    // Heartbeat: host renova o claim a cada 1s; se a popup host fechar,
-    // claim expira (4s) e o OPERADOR assume (áudio sem projeção).
-    const hostHeartbeat = isAudioHost
-      ? window.setInterval(() => renewAudioHost(), 1_000)
-      : null
+    // Heartbeat em toda janela: o claim é reavaliado (não fica preso no
+    // primeiro mount). Popup menor assume; se ela fechar, o claim expira
+    // em 4s e o operador passa a tocar.
+    const hostHeartbeat = window.setInterval(() => {
+      claimAudioHost()
+    }, 1_000)
     onUnmounted(() => {
-      if (hostHeartbeat) clearInterval(hostHeartbeat)
+      clearInterval(hostHeartbeat)
       releaseAudioHost()
     })
     const firedMarkers = store.firedMarkers
@@ -157,7 +156,7 @@ export function useCountdownDisplay(
     const activeMarkers = computed(() => config.value.alertMarkers ?? DEFAULT_ALERT_MARKERS)
 
     function playMarkerPreset(preset: string, markerId: string): void {
-      if (!isAudioHost) return // fix duplicidade: só a janela eleita toca
+      if (!claimAudioHost()) return // só a janela eleita neste instante toca
       if (store.audioMuted) return // F2: operador silenciou
       // Fila (feedback Ezequias: "adiciona queue") — marcos que cruzam juntos
       // (jump do rAF em janela em bg) tocam em sequência, nunca simultâneos.
@@ -187,7 +186,7 @@ export function useCountdownDisplay(
       setLiveVolume(volume)
     })
 
-    if (isProjectionWindow) {
+    if (isProjectionWindow || isOperatorWindow()) {
       // Marcos por DEADLINE ABSOLUTO (feedback Ezequias 02/10: "5min toca
       // quando falta 1min"). O antigo watch(remainingRawMs) dependia do rAF
       // — que CONGELA em janela em background (mesma raiz do app#337). Ao
