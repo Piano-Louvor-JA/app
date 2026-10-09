@@ -22,6 +22,14 @@ vi.mock('@shared/services/workspace-api', () => ({
 vi.mock('@modules/sync/services/library-catalog', () => ({
   getCurrentApiPrefix: mockGetCurrentApiPrefix,
 }))
+vi.mock('@modules/media/services/custom-catalog', () => ({
+  listAllCustomMusics: async () => [],
+  toCustomMusicId: (id: number) => 1_000_000 + id,
+}))
+vi.mock('@modules/media/services/local-custom-store', () => ({
+  listLocalCollections: () => [],
+  listLocalMusics: () => [],
+}))
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { loadLiturgyMusicOptions, loadLiturgyBibleBooks, filterLiturgyMusicOptions, parseCatalogDurationMs, sortMusicOptions } from '../services/liturgy-catalog'
