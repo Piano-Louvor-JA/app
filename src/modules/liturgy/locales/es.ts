@@ -231,6 +231,7 @@ export default {
       project: 'Proyectar',
       play: 'Reproducir',
       openControl: 'Abrir control (popup)',
+      playLocalInExternal: 'Reproducir medio local en {player}',
       openSiteControl: 'Abrir control del sitio',
       openVideoControl: 'Abrir control de YouTube',
       openImageControl: 'Abrir control de imágenes',
@@ -284,6 +285,8 @@ export default {
       urlInvalid: 'El enlace proporcionado no es válido para proyección.',
       projectionFailed:
         'No se pudo abrir la proyección en las pantallas configuradas.',
+      fileMissingOnMachine:
+        'Archivo no encontrado en esta máquina: la ruta provino de otra computadora (liturgia sincronizada). Vuelva a seleccionar el archivo en este dispositivo.',
       presentationOfficeMissing:
         'Para proyectar PPT/PPTX, instale LibreOffice (o defina LIBREOFFICE_PATH).',
     },
@@ -293,11 +296,18 @@ export default {
       imported: 'Importado: {name} ({slides} estrofas).',
       importedLocal:
         'Importado en este dispositivo: {name} ({slides} estrofas) — guardado sin cuenta.',
+      importedLocalNoImages:
+        'Importado en este dispositivo: {name} ({slides} estrofas). Las imágenes no se guardaron en este aparato.',
       importFailed: 'Archivo .slja inválido.',
       uploadTitle: '¿Subir "{name}" a tu cuenta?',
       uploadMessage: 'El archivo se sube una sola vez a tu cuenta (nunca se duplica). O puedes dejarlo solo en este dispositivo.',
       uploadConfirm: 'Subir a la cuenta',
       uploadCancel: 'Solo en este dispositivo',
+      importStorageFailed:
+        'No se pudo guardar el audio en este aparato. Libere espacio e intente de nuevo.',
+      importRemoteFailed:
+        'No se pudo completar el envío. Verifique la conexión e intente de nuevo.',
+      importNoLyrics: 'El archivo no tiene estrofas de letra para importar.',
     },
     custom: {
       title: 'Liturgias personalizadas',

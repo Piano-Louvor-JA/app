@@ -1,5 +1,6 @@
-# Build Windows NSIS — gera instalador .exe x64
-# (Electron 44+ não publica mais win32-ia32 — ver docs/DEPLOY.md)
+# Build Windows — instalador NSIS + Portable (exe único, estilo AppImage) x64.
+# Portable: UM .exe só — duplo clique e roda, sem instalar e sem pasta de
+# arquivos soltos pro usuário curioso mexer. (Electron 44+ não publica win32-ia32)
 # Roda manualmente (workflow_dispatch) ou em push de tags v*
 name: Build Windows
 
@@ -14,7 +15,7 @@ permissions:
 
 jobs:
   build-windows:
-    name: Build Windows NSIS x64
+    name: Build Windows NSIS + Portable x64
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,7 +28,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Vite + Electron NSIS (x64) + publish
+      # Target "portable" definido no package.json (win.target) — gera
+      # LouvorJA-PIANO-<ver>-portable.exe (arquivo único) junto com o Setup.
+      - name: Build Vite + Electron NSIS + Portable (x64) + publish
         run: npm run electron:build -- --win --x64 --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -46,13 +49,13 @@ jobs:
             gh release upload "$TAG" SHA256SUMS-win-x64 --clobber
           fi
 
-      - name: Upload x64 installer (artifact backup)
+      - name: Upload x64 installer + portable (artifact backup)
         uses: actions/upload-artifact@v4
         with:
-          name: LouvorJA-PIANO-Windows-x64-Setup
+          name: LouvorJA-PIANO-Windows-x64
           path: |
             dist-electron/*Setup*.exe
-            dist-electron/*.exe
+            dist-electron/*portable*.exe
             dist-electron/SHA256SUMS-win-x64
           if-no-files-found: warn
           retention-days: 30

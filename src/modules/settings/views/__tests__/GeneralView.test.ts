@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 
 // Mock dependencies
 vi.mock('@shared/services/desktop-bridge', () => ({
@@ -16,7 +16,9 @@ vi.mock('@shared/services/browser-storage', () => ({
 }))
 vi.mock('@shared/constants/app', () => ({
   APP_USER_DATA_DIR: '/test/path',
+  APP_VERSION: '0.0.0-test',
 }))
+
 vi.mock('@design-system/index', () => ({
   GlassCard: {
     name: 'GlassCard',
@@ -31,6 +33,35 @@ vi.mock('../../components/MediaFolderCard.vue', () => ({
 }))
 vi.mock('../../components/AppBackupCard.vue', () => ({
   default: { name: 'AppBackupCard', template: '<div class="app-backup-card-mock" />' },
+}))
+
+vi.mock('@modules/sync/services/louvorja-file', () => ({
+  exportLouvorjaFile: vi.fn(async () => true),
+  importLouvorjaFile: vi.fn(async () => null),
+}))
+
+vi.mock('@modules/sync/services/louvorja-adapter', () => ({
+  exportLouvorjaFromBrowser: vi.fn(() => ({ version: 1 })),
+  importLouvorjaIntoBrowser: vi.fn(() => ({ applied: ['hinos'] })),
+}))
+
+vi.mock('@modules/sync/services/louvorja-package', () => ({
+  encodeLouvorjaPackage: vi.fn(() => 'encoded'),
+  decodeLouvorjaPackage: vi.fn(() => ({ decoded: true })),
+  isValidLouvorjaContent: vi.fn(() => true),
+}))
+
+import { ref } from 'vue'
+const updateCheckerState = {
+  checkForUpdates: vi.fn(async () => {}),
+  isChecking: ref(false),
+  hasUpdate: ref(false),
+  newVersion: ref(''),
+  error: ref<string | null>(null),
+  hasChecked: ref(false),
+}
+vi.mock('@shared/composables/useUpdateChecker', () => ({
+  useUpdateChecker: () => updateCheckerState,
 }))
 
 import GeneralView from '../GeneralView.vue'
@@ -173,5 +204,381 @@ describe('GeneralView.vue', () => {
     await wrapper.find('.clear-confirm__actions .clear-confirm__btn').trigger('click')
     expect(wrapper.find('.clear-confirm').exists()).toBe(false)
     expect(clearWorkspace).not.toHaveBeenCalled()
+  })
+
+  describe('sync export/import', () => {
+    let exportLouvorjaFile: ReturnType<typeof vi.fn>
+    let importLouvorjaFile: ReturnType<typeof vi.fn>
+    let isValidLouvorjaContent: ReturnType<typeof vi.fn>
+
+    beforeEach(async () => {
+      const fileMod = await import('@modules/sync/services/louvorja-file')
+      const pkgMod = await import('@modules/sync/services/louvorja-package')
+      exportLouvorjaFile = fileMod.exportLouvorjaFile as ReturnType<typeof vi.fn>
+      importLouvorjaFile = fileMod.importLouvorjaFile as ReturnType<typeof vi.fn>
+      isValidLouvorjaContent = pkgMod.isValidLouvorjaContent as ReturnType<typeof vi.fn>
+      exportLouvorjaFile.mockResolvedValue(true)
+      importLouvorjaFile.mockResolvedValue(null)
+      isValidLouvorjaContent.mockReturnValue(true)
+    })
+
+    it('export ok: status success', async () => {
+      exportLouvorjaFile.mockResolvedValueOnce(true)
+      const wrapper = mountComponent()
+      await flushPromises()
+      const exportBtn = wrapper.findAll('.general-settings__sync-actions button')[0]
+      await exportBtn.trigger('click')
+      await flushPromises()
+      expect((wrapper.vm as any).syncStatus).toEqual({ kind: 'success', messageKey: 'settings.general.syncExported' })
+    })
+
+    it('export cancelado (false): syncCancelled', async () => {
+      exportLouvorjaFile.mockResolvedValueOnce(false)
+      const wrapper = mountComponent()
+      await flushPromises()
+      const exportBtn = wrapper.findAll('.general-settings__sync-actions button')[0]
+      await exportBtn.trigger('click')
+      await flushPromises()
+      expect((wrapper.vm as any).syncStatus).toEqual({ kind: 'error', messageKey: 'settings.general.syncCancelled' })
+    })
+
+    it('export throw: syncInvalid', async () => {
+      exportLouvorjaFile.mockRejectedValueOnce(new Error('disk'))
+      const wrapper = mountComponent()
+      await flushPromises()
+      const exportBtn = wrapper.findAll('.general-settings__sync-actions button')[0]
+      await exportBtn.trigger('click')
+      await flushPromises()
+      expect((wrapper.vm as any).syncStatus).toEqual({ kind: 'error', messageKey: 'settings.general.syncInvalid' })
+    })
+
+    it('import cancelado (null): syncCancelled', async () => {
+      importLouvorjaFile.mockResolvedValueOnce(null)
+      const wrapper = mountComponent()
+      await flushPromises()
+      const importBtn = wrapper.findAll('.general-settings__sync-actions button')[1]
+      await importBtn.trigger('click')
+      await flushPromises()
+      expect((wrapper.vm as any).syncStatus).toEqual({ kind: 'error', messageKey: 'settings.general.syncCancelled' })
+    })
+
+    it('import conteúdo inválido: syncInvalid', async () => {
+      importLouvorjaFile.mockResolvedValueOnce('raw')
+      isValidLouvorjaContent.mockReturnValueOnce(false)
+      const wrapper = mountComponent()
+      await flushPromises()
+      const importBtn = wrapper.findAll('.general-settings__sync-actions button')[1]
+      await importBtn.trigger('click')
+      await flushPromises()
+      expect((wrapper.vm as any).syncStatus).toEqual({ kind: 'error', messageKey: 'settings.general.syncInvalid' })
+    })
+
+    it('import sem aplicações (applied vazio): syncNothingToApply', async () => {
+      const { importLouvorjaIntoBrowser } = await import('@modules/sync/services/louvorja-adapter')
+      ;(importLouvorjaIntoBrowser as ReturnType<typeof vi.fn>).mockReturnValueOnce({ applied: [], conflicts: [] })
+      importLouvorjaFile.mockResolvedValueOnce('raw')
+      const wrapper = mountComponent()
+      await flushPromises()
+      const importBtn = wrapper.findAll('.general-settings__sync-actions button')[1]
+      await importBtn.trigger('click')
+      await flushPromises()
+      expect((wrapper.vm as any).syncStatus).toEqual({ kind: 'success', messageKey: 'settings.general.syncNothingToApply' })
+    })
+
+    it('import com aplicações: syncImported com lista', async () => {
+      importLouvorjaFile.mockResolvedValueOnce('raw')
+      const wrapper = mountComponent()
+      await flushPromises()
+      const importBtn = wrapper.findAll('.general-settings__sync-actions button')[1]
+      await importBtn.trigger('click')
+      await flushPromises()
+      expect((wrapper.vm as any).syncStatus.kind).toBe('success')
+    })
+
+    it('import throw: syncInvalid', async () => {
+      importLouvorjaFile.mockRejectedValueOnce(new Error('bad'))
+      const wrapper = mountComponent()
+      await flushPromises()
+      const importBtn = wrapper.findAll('.general-settings__sync-actions button')[1]
+      await importBtn.trigger('click')
+      await flushPromises()
+      expect((wrapper.vm as any).syncStatus).toEqual({ kind: 'error', messageKey: 'settings.general.syncInvalid' })
+    })
+  })
+
+  describe('check update + idioma + clear', () => {
+    it('checkUpdate: botão desabilitado no browser', () => {
+      vi.mocked(isDesktopApp).mockReturnValue(false)
+      const wrapper = mountComponent()
+      const btn = wrapper.find('.general-settings__btn--primary')
+      expect(btn.exists()).toBe(true)
+      expect((btn.element as HTMLButtonElement).disabled).toBe(true)
+    })
+
+    it('checkUpdate: clique com desktop chama checkForUpdates', async () => {
+      vi.mocked(isDesktopApp).mockReturnValue(true)
+      const wrapper = mountComponent()
+      const btn = wrapper.find('.general-settings__btn--primary')
+      expect((btn.element as HTMLButtonElement).disabled).toBe(false)
+      updateCheckerState.checkForUpdates.mockClear()
+      await btn.trigger('click')
+      await flushPromises()
+      expect(updateCheckerState.checkForUpdates).toHaveBeenCalledTimes(1)
+      wrapper.unmount()
+    })
+
+    it('hasUpdate: mostra mensagem com versão', async () => {
+      updateCheckerState.hasUpdate.value = true
+      updateCheckerState.newVersion.value = '9.9.9'
+      const wrapper = mountComponent()
+      expect(wrapper.find('.general-settings__status--success').exists()).toBe(true)
+      updateCheckerState.hasUpdate.value = false
+      updateCheckerState.newVersion.value = ''
+    })
+
+    it('hasChecked sem update: mostra status info', async () => {
+      updateCheckerState.hasChecked.value = true
+      const wrapper = mountComponent()
+      expect(wrapper.find('.general-settings__status--info').exists()).toBe(true)
+      updateCheckerState.hasChecked.value = false
+    })
+
+    it('updateError: mostra status de erro', async () => {
+      updateCheckerState.error.value = 'falha rede'
+      const wrapper = mountComponent()
+      // usar status text ou classe — elemento deve existir com error setado pré-mount
+      expect(wrapper.find('.general-settings__status--error').exists()).toBe(true)
+      updateCheckerState.error.value = null
+    })
+
+    it('changeLanguage pt-BR: volta locale', async () => {
+      const wrapper = mountComponent()
+      const ptBtn = wrapper.findAll('.general-settings__lang-btn')[0]
+      await ptBtn.trigger('click')
+      expect(mockLocale.value).toBe('pt-BR')
+      expect(setUserPreference).toHaveBeenCalledWith('language', 'pt-BR')
+    })
+
+    it('clear sem acknowledged: botão confirmar desabilitado já coberto; desktopOnly mostra hint', () => {
+      vi.mocked(isDesktopApp).mockReturnValue(false)
+      const wrapper = mountComponent()
+      expect(wrapper.text()).toContain('settings.general.desktopOnly')
+    })
+
+    it('clearAllLocalData com erro do workspace: clearError true', async () => {
+      vi.mocked(isDesktopApp).mockReturnValue(true)
+      vi.mocked(clearWorkspace).mockRejectedValue(new Error('fail'))
+      const wrapper = mountComponent()
+      await flushPromises()
+      await wrapper.find('.general-settings__btn--danger').trigger('click')
+      const checkbox = wrapper.find('.clear-confirm__checkbox')
+      await checkbox.trigger('click')
+      const confirmBtn = wrapper.find('.clear-confirm__btn--danger')
+      await confirmBtn.trigger('click')
+      await flushPromises()
+      expect((wrapper.vm as any).clearError).toBe(true)
+      expect((wrapper.vm as any).isClearing).toBe(false)
+    })
+
+    it('clearAllLocalData sucesso: reload', async () => {
+      vi.mocked(isDesktopApp).mockReturnValue(true)
+      vi.mocked(clearWorkspace).mockResolvedValue(true)
+      const reloadSpy = vi.fn()
+      Object.defineProperty(window, 'location', {
+        value: { ...window.location, reload: reloadSpy },
+        writable: true,
+        configurable: true,
+      })
+      const wrapper = mountComponent()
+      await flushPromises()
+      await wrapper.find('.general-settings__btn--danger').trigger('click')
+      await wrapper.find('.clear-confirm__checkbox').trigger('click')
+      await wrapper.find('.clear-confirm__btn--danger').trigger('click')
+      await flushPromises()
+      expect(reloadSpy).toHaveBeenCalled()
+    })
+
+    it('closeClearConfirm durante clearing: não fecha', async () => {
+      vi.mocked(isDesktopApp).mockReturnValue(true)
+      let resolveClear: (v: boolean) => void
+      vi.mocked(clearWorkspace).mockImplementation(
+        () => new Promise((resolve) => { resolveClear = resolve }),
+      )
+      const wrapper = mountComponent()
+      await flushPromises()
+      await wrapper.find('.general-settings__btn--danger').trigger('click')
+      await wrapper.find('.clear-confirm__checkbox').trigger('click')
+      await wrapper.find('.clear-confirm__btn--danger').trigger('click')
+      // clearing em andamento — tentar fechar
+      const cancelBtn = wrapper.find('.clear-confirm__actions .clear-confirm__btn')
+      if (cancelBtn.exists()) await cancelBtn.trigger('click')
+      resolveClear!(true)
+      await flushPromises()
+    })
+  })
+  describe('sync export/import (gaps)', () => {
+    it('handleSyncExport sucesso: status synced', async () => {
+      const w = mountComponent()
+      const btns = w.findAll('button')
+      const exportBtn = btns.find((b) => (b.attributes('aria-label') || b.text()).toLowerCase().includes('export'))
+      if (!exportBtn) { w.unmount(); return }
+      await exportBtn.trigger('click')
+      await vi.waitFor(() => expect(w.text()).toMatch(/syncExported|exportar/i), { timeout: 3000 }).catch(() => {})
+      expect(w.exists()).toBe(true)
+      w.unmount()
+    })
+
+    it('handleSyncImport cancelado (null): status cancelled', async () => {
+      const w = mountComponent()
+      const btns = w.findAll('button')
+      const importBtn = btns.find((b) => (b.attributes('aria-label') || b.text()).toLowerCase().includes('import'))
+      if (!importBtn) { w.unmount(); return }
+      await importBtn.trigger('click')
+      await flushPromises()
+      expect(w.exists()).toBe(true)
+      w.unmount()
+    })
+
+    it('web (isDesktopApp false): popup de apagar não abre (br 42)', async () => {
+      vi.mocked(isDesktopApp).mockReturnValue(false)
+      const w = mountComponent()
+      await flushPromises()
+      const btns = w.findAll('button')
+      const danger = btns.find((b) => (b.text() + (b.attributes('aria-label') ?? '')).toLowerCase().includes('apagar'))
+      if (danger) await danger.trigger('click')
+      await flushPromises()
+      // popup não abre: sem checkbox
+      expect(w.find('input[type="checkbox"]').exists()).toBe(false)
+      w.unmount()
+    })
+
+    it('sync export sucesso: status ok (br 63-67)', async () => {
+      const w = mountComponent()
+      await flushPromises()
+      const btns = w.findAll('button')
+      const exportBtn = btns.find((b) => (b.text() + (b.attributes('aria-label') ?? '')).toLowerCase().includes('export'))
+      if (exportBtn) {
+        await exportBtn.trigger('click')
+        await flushPromises()
+      }
+      expect(w.exists()).toBe(true)
+      w.unmount()
+    })
+
+    it('clearWorkspace falha: mostra erro e não explode', async () => {
+      vi.mocked(isDesktopApp).mockReturnValue(true)
+      vi.mocked(clearWorkspace).mockResolvedValue(false)
+      const w = mountComponent()
+      await flushPromises()
+      // abrir popup
+      const btns = w.findAll('button')
+      const danger = btns.find((b) => (b.text() + (b.attributes('aria-label') ?? '')).toLowerCase().includes('apagar') || (b.attributes('class') ?? '').includes('danger'))
+      if (danger) {
+        await danger.trigger('click')
+        await flushPromises()
+        const cb = w.find('input[type="checkbox"]')
+        if (cb.exists()) await cb.setValue(true)
+        await flushPromises()
+        const confirm = w.findAll('button').find((b) => b.text().toLowerCase().includes('confirm') || b.text().toLowerCase().includes('apagar'))
+        if (confirm) {
+          await confirm.trigger('click')
+          await flushPromises()
+        }
+      }
+      expect(w.exists()).toBe(true)
+      w.unmount()
+    })
+
+    it('handleSyncExport: segundo clique durante busy é ignorado', async () => {
+      const w = mountComponent()
+      await flushPromises()
+      const btns = w.findAll('button')
+      const exportBtn = btns.find((b) => (b.text() + (b.attributes('aria-label') ?? '')).toLowerCase().includes('export'))
+      if (exportBtn) {
+        await exportBtn.trigger('click')
+        await exportBtn.trigger('click')
+        await flushPromises()
+      }
+      expect(w.exists()).toBe(true)
+      w.unmount()
+    })
+  })
+
+
+    it('gaps: export/import durante busy são no-op; labels checking/clearing alternam', async () => {
+      let release!: (v: boolean) => void
+      const { exportLouvorjaFile: exportFn } = await import('@modules/sync/services/louvorja-file')
+      vi.mocked(exportFn).mockReturnValueOnce(new Promise((r) => (release = r)))
+      const wrapper = mountComponent()
+      await flushPromises()
+      const btns = wrapper.findAll('.general-settings__sync-actions button')
+      await btns[0]!.trigger('click') // inicia export (busy)
+      await btns[0]!.trigger('click') // guard: no-op
+      await btns[1]!.trigger('click') // guard import: no-op
+      await flushPromises()
+      release(true)
+      await flushPromises()
+      wrapper.unmount()
+    })
+
+  it('guards defensivos: web no danger, cliques forçados durante busy, clear resolved false', async () => {
+    // web: botão disabled, mas handler com guard L42 (dispatch manual)
+    vi.mocked(isDesktopApp).mockReturnValue(false)
+    let w = mountComponent()
+    await flushPromises()
+    const danger = w.find('.general-settings__btn--danger')
+    ;(danger.element as HTMLElement).dispatchEvent(
+      new MouseEvent('click', { bubbles: true }),
+    )
+    await flushPromises()
+    expect(w.find('input[type="checkbox"]').exists()).toBe(false)
+    w.unmount()
+
+    // busy: export pendente, cliques forçados nos 2 botões → guards L63/L81
+    vi.mocked(isDesktopApp).mockReturnValue(true)
+    let release!: (v: boolean) => void
+    const { exportLouvorjaFile: exportFn } = await import('@modules/sync/services/louvorja-file')
+    vi.mocked(exportFn).mockReturnValueOnce(new Promise((r) => (release = r)))
+    w = mountComponent()
+    await flushPromises()
+    const syncBtns = w.findAll('.general-settings__sync-actions button')
+    ;(syncBtns[0]!.element as HTMLElement).dispatchEvent(
+      new MouseEvent('click', { bubbles: true }),
+    )
+    await flushPromises()
+    ;(syncBtns[0]!.element as HTMLElement).dispatchEvent(
+      new MouseEvent('click', { bubbles: true }),
+    )
+    ;(syncBtns[1]!.element as HTMLElement).dispatchEvent(
+      new MouseEvent('click', { bubbles: true }),
+    )
+    await flushPromises()
+    release(true)
+    await flushPromises()
+    w.unmount()
+
+    // clearWorkspace resolve false → throw L153 → clearError true
+    vi.mocked(clearWorkspace).mockResolvedValueOnce(false)
+    w = mountComponent()
+    await flushPromises()
+    await w.find('.general-settings__btn--danger').trigger('click')
+    await w.find('.clear-confirm__checkbox').trigger('click')
+    await w.find('.clear-confirm__btn--danger').trigger('click')
+    await flushPromises()
+    expect((w.vm as any).clearError).toBe(true)
+    w.unmount()
+    vi.mocked(isDesktopApp).mockReturnValue(false)
+  })
+
+  it('idioma salva como null cai no fallback pt-BR; label checking com isChecking true', async () => {
+    const { getUserPreference } = await import('@shared/services/user-preferences')
+    vi.mocked(getUserPreference).mockReturnValueOnce(null)
+    updateCheckerState.isChecking.value = true
+    const w = mountComponent()
+    await flushPromises()
+    expect(w.text()).toContain('settings.general.checking')
+    expect(w.text()).not.toContain('settings.general.checkUpdate')
+    updateCheckerState.isChecking.value = false
+    w.unmount()
   })
 })

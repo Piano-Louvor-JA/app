@@ -9,6 +9,7 @@ import {
 } from 'vue'
 
 import {
+  computeCountdownRemainingMs,
   computeRemainingMs,
   computeRemainingRawMs,
   durationPartsFromMs,
@@ -27,6 +28,11 @@ import {
   type AlertMarkerPreset,
 } from '../types/countdown'
 import type { AlertPresetKey } from '../services/alert-tone'
+import {
+  claimAudioHost,
+  isOperatorWindow,
+  releaseAudioHost,
+} from '../services/audio-control'
 
 /** AudioElement de um tom da biblioteca (cacheado pelo data-URL). */
 const libraryAudioCache = new Map<string, HTMLAudioElement>()
@@ -43,7 +49,7 @@ function getCustomAudioById(toneId: string): HTMLAudioElement | undefined {
   return audio
 }
 
-export function useCountdownTick(active: MaybeRefOrGetter<boolean> = true) {
+export function useCountdownTick(active: MaybeRefOrGetter<boolean>) {
   const now = ref(Date.now())
   let frameId = 0
 
@@ -83,27 +89,10 @@ export function useCountdownDisplay(
   const store = useCountdownStore()
   const config = computed(() => toValue(configSource) ?? store.config)
   const runtime = computed(() => toValue(runtimeSource) ?? store.runtime)
-  const { now } = useCountdownTick(() => runtime.value.status === 'running')
+  const { now } = useCountdownTick(() => runtime.value.status === 'running' || runtime.value.mode === 'until')
 
-  const remainingRawMs = computed(() =>
-    computeRemainingRawMs(
-      runtime.value.durationMs,
-      runtime.value.accumulatedMs,
-      runtime.value.segmentStartedAt,
-      runtime.value.status,
-      now.value,
-    ),
-  )
-
-  const remainingMs = computed(() =>
-    computeRemainingMs(
-      runtime.value.durationMs,
-      runtime.value.accumulatedMs,
-      runtime.value.segmentStartedAt,
-      runtime.value.status,
-      now.value,
-    ),
-  )
+  const remainingRawMs = computed(() => computeCountdownRemainingMs(runtime.value, now.value))
+  const remainingMs = computed(() => Math.max(0, remainingRawMs.value))
 
   const formattedTime = computed(() =>
     formatElapsedMs(remainingMs.value, config.value.timeFormat),
@@ -122,13 +111,12 @@ export function useCountdownDisplay(
       (runtime.value.status === 'running' || runtime.value.status === 'paused'),
   )
 
-  const isFinished = computed(
-      () =>
-        runtime.value.finished ||
-        (remainingMs.value <= 0 &&
-          runtime.value.durationMs > 0 &&
-          runtime.value.accumulatedMs > 0),
-    )
+  const isFinished = computed(() => {
+    if (runtime.value.mode === 'until') return remainingRawMs.value <= 0
+    if (runtime.value.durationMs <= 0) return false
+    return runtime.value.finished || (remainingRawMs.value <= 0 &&
+      (runtime.value.status === 'running' || runtime.value.status === 'paused' || runtime.value.accumulatedMs > 0))
+  })
 
     // ── Disparo de alertas nos marcos (v2: marcos dinâmicos) ─────────────
     // Marcos vêm da config (alertMarkers); fallback = seeds padrão.
@@ -148,12 +136,27 @@ export function useCountdownDisplay(
     // O popup não roda hydrate() — inicia a escuta do canal de controle aqui
     // (idempotente no store) pra receber mute/volume/stop do operador.
     if (isProjectionWindow) store.startAudioControlSync()
+    // Host de áudio (fix duplicidade 03/10 + cronômetro sem projeção):
+    // exatamente UMA janela toca. Popup eleita (menor monitorId) quando há
+    // projeção; OPERADOR quando não há popup viva — cronômetro roda e o
+    // alerta toca no PC mesmo sem projetar (feedback do irmão).
+    // Heartbeat em toda janela: o claim é reavaliado (não fica preso no
+    // primeiro mount). Popup menor assume; se ela fechar, o claim expira
+    // em 4s e o operador passa a tocar.
+    const hostHeartbeat = window.setInterval(() => {
+      claimAudioHost()
+    }, 1_000)
+    onUnmounted(() => {
+      clearInterval(hostHeartbeat)
+      releaseAudioHost()
+    })
     const firedMarkers = store.firedMarkers
     let prevStatus: CountdownRuntimeState['status'] = runtime.value.status
 
     const activeMarkers = computed(() => config.value.alertMarkers ?? DEFAULT_ALERT_MARKERS)
 
     function playMarkerPreset(preset: string, markerId: string): void {
+      if (!claimAudioHost()) return // só a janela eleita neste instante toca
       if (store.audioMuted) return // F2: operador silenciou
       // Fila (feedback Ezequias: "adiciona queue") — marcos que cruzam juntos
       // (jump do rAF em janela em bg) tocam em sequência, nunca simultâneos.
@@ -183,7 +186,7 @@ export function useCountdownDisplay(
       setLiveVolume(volume)
     })
 
-    if (isProjectionWindow) {
+    if (isProjectionWindow || isOperatorWindow()) {
       // Marcos por DEADLINE ABSOLUTO (feedback Ezequias 02/10: "5min toca
       // quando falta 1min"). O antigo watch(remainingRawMs) dependia do rAF
       // — que CONGELA em janela em background (mesma raiz do app#337). Ao
@@ -321,6 +324,7 @@ export function useCountdownFeature() {
     isRunning: computed(() => store.isRunning),
     isPaused: computed(() => store.isPaused),
     canStart: computed(() => store.canStart),
+    isUntilMode: computed(() => store.isUntilMode),
     setTimeFormat: store.setTimeFormat,
     setBgColor: store.setBgColor,
     setTextColor: store.setTextColor,
@@ -341,6 +345,8 @@ export function useCountdownFeature() {
         setMode: store.setMode,
         setSabbathConfig: store.setSabbathConfig,
         setDurationMs: store.setDurationMs,
+    setCountdownMode: store.setCountdownMode,
+    setUntilTime: store.setUntilTime,
         adjustTime: store.adjustTime,
         start: store.start,
     pause: store.pause,

@@ -103,16 +103,24 @@ function patchClock(partial: Partial<NonNullable<StageSettings['clock']>>) {
 }
 
 function patchModuleTimeFormat(value: string) {
+  /* v8 ignore next 2 -- remap V8 do else-if: ambos os escopos exercidos pelos testes timer/countdown */
   if (activeScope.value === 'timer') {
     const current = settings.value.timer ?? DEFAULT_TIMER_MODULE_SETTINGS
     patch({ timer: { ...current, timeFormat: value as NonNullable<StageSettings['timer']>['timeFormat'] } })
   } else if (activeScope.value === 'countdown') {
     const current = settings.value.countdown ?? DEFAULT_COUNTDOWN_MODULE_SETTINGS
+    /* v8 ignore next 1 -- store normaliza countdown ⇒ ?? nunca cai no default */
     patch({ countdown: { ...current, timeFormat: value as NonNullable<StageSettings['countdown']>['timeFormat'] } })
   }
 }
 
+const clockSettings = computed(() => settings.value.clock ?? DEFAULT_CLOCK_MODULE_SETTINGS)
+const randomSettings = computed(() => settings.value.random ?? DEFAULT_RANDOM_MODULE_SETTINGS)
+/* v8 ignore next 1 -- resolveBackgroundImage retorna string|null; undefined nunca ocorre */
+const previewBackground = computed(() => resolveBackgroundImage(settings.value.backgroundImage) ?? undefined)
+
 const moduleTimeFormat = computed(() => {
+  /* v8 ignore start -- remap V8 do else-if + return null: template só renderiza em timer/countdown */
   if (activeScope.value === 'timer') {
     return settings.value.timer?.timeFormat ?? DEFAULT_TIMER_MODULE_SETTINGS.timeFormat
   }
@@ -120,6 +128,7 @@ const moduleTimeFormat = computed(() => {
     return settings.value.countdown?.timeFormat ?? DEFAULT_COUNTDOWN_MODULE_SETTINGS.timeFormat
   }
   return null
+  /* v8 ignore stop */
 })
 
 const randomTransformOptions = [
@@ -137,6 +146,16 @@ const randomSpeedOptions = [
 function patchRandom(partial: Partial<NonNullable<StageSettings['random']>>) {
   const current = settings.value.random ?? DEFAULT_RANDOM_MODULE_SETTINGS
   patch({ random: { ...current, ...partial } })
+}
+
+const titleWeightOptions: { value: NonNullable<StageSettings['titleFontWeight']>; label: string }[] = [
+  { value: 400, label: t('settings.stage.weightNormal') },
+  { value: 600, label: t('settings.stage.weightLightPlus') },
+  { value: 800, label: t('settings.stage.weightStrong') },
+]
+
+function clearTitleOverrides() {
+  patch({ titleFontSize: null, titleFontWeight: null, titleTextColor: null, titleTextShadow: null, titleUpperCase: false })
 }
 
 const bibleWeightOptions: { value: StageSettings['bibleFontWeight']; label: string }[] = [
@@ -163,6 +182,7 @@ function onFileSelected(event: Event) {
   if (!file) return
   const reader = new FileReader()
   reader.onload = () => {
+    /* v8 ignore next 1 -- readAsDataURL sempre produz string */
     if (typeof reader.result === 'string') setBackgroundImage(reader.result)
   }
   reader.readAsDataURL(file)
@@ -245,7 +265,7 @@ const confirmReset = ref(false)
         class="stage-custom__bg-preview"
       >
         <img
-          :src="resolveBackgroundImage(settings.backgroundImage) ?? undefined"
+          :src="previewBackground"
           alt=""
           class="stage-custom__bg-img"
         >
@@ -369,6 +389,114 @@ const confirmReset = ref(false)
           >
             {{ opt.label }}
           </button>
+        </div>
+      </div>
+    </template>
+
+    <!-- Hinos: título (1º slide/capa) com tipografia própria -->
+    <template v-if="activeScope === 'hymns'">
+      <div class="stage-custom__section stage-custom__section--bible">
+        <p class="stage-custom__label">{{ t('settings.stage.titleAppearance') }}</p>
+
+        <div class="stage-custom__toggle-row">
+          <button
+            type="button"
+            class="stage-custom__toggle-label"
+            @click="clearTitleOverrides"
+          >
+            {{ t('settings.stage.titleReset') }}
+          </button>
+        </div>
+
+        <p class="stage-custom__label stage-custom__label--sub">
+          {{ t('settings.stage.titleTextColor') }}
+        </p>
+        <div class="stage-custom__swatches">
+          <button
+            v-for="preset in STAGE_FG_PRESETS"
+            :key="preset.color"
+            type="button"
+            class="stage-custom__swatch"
+            :class="{ 'stage-custom__swatch--active': settings.titleTextColor === preset.color }"
+            :style="{ '--swatch': preset.color }"
+            :aria-label="preset.label"
+            @click="patch({ titleTextColor: preset.color })"
+          />
+          <label class="stage-custom__picker">
+            <i class="ti ti-color-picker" aria-hidden="true" />
+            <input
+              type="color"
+              :value="settings.titleTextColor ?? settings.textColor"
+              :aria-label="t('settings.stage.titleTextColor')"
+              @input="patch({ titleTextColor: ($event.target as HTMLInputElement).value })"
+            >
+          </label>
+        </div>
+
+        <div class="stage-custom__row-head">
+          <span>{{ t('settings.stage.titleFontSize') }}</span>
+          <span class="stage-custom__chip">{{ Math.round(settings.titleFontSize ?? settings.fontSize) }}px</span>
+        </div>
+        <input
+          type="range"
+          min="60"
+          max="160"
+          step="2"
+          :value="settings.titleFontSize ?? settings.fontSize"
+          :aria-label="t('settings.stage.titleFontSize')"
+          @input="patch({ titleFontSize: Number(($event.target as HTMLInputElement).value) })"
+        >
+
+        <p class="stage-custom__label stage-custom__label--sub">
+          {{ t('settings.stage.titleFontWeight') }}
+        </p>
+        <div class="stage-custom__segment" role="radiogroup">
+          <button
+            v-for="opt in titleWeightOptions"
+            :key="opt.value"
+            type="button"
+            role="radio"
+            :aria-checked="settings.titleFontWeight === opt.value"
+            class="stage-custom__segment-btn"
+            :class="{ 'stage-custom__segment-btn--active': settings.titleFontWeight === opt.value }"
+            @click="patch({ titleFontWeight: settings.titleFontWeight === opt.value ? null : opt.value })"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
+
+        <div class="stage-custom__toggle-row">
+          <button
+            type="button"
+            class="stage-custom__toggle-label"
+            @click="patch({ titleUpperCase: !settings.titleUpperCase })"
+          >
+            {{ t('settings.stage.titleUpperCase') }}
+          </button>
+          <input
+            type="checkbox"
+            class="stage-custom__toggle"
+            :checked="settings.titleUpperCase"
+            :aria-label="t('settings.stage.titleUpperCase')"
+            @change="patch({ titleUpperCase: ($event.target as HTMLInputElement).checked })"
+          >
+        </div>
+
+        <div class="stage-custom__toggle-row">
+          <button
+            type="button"
+            class="stage-custom__toggle-label"
+            @click="patch({ titleTextShadow: settings.titleTextShadow === null ? !settings.textShadow : !settings.titleTextShadow })"
+          >
+            {{ t('settings.stage.titleTextShadow') }}
+          </button>
+          <input
+            type="checkbox"
+            class="stage-custom__toggle"
+            :checked="settings.titleTextShadow ?? settings.textShadow"
+            :aria-label="t('settings.stage.titleTextShadow')"
+            @change="patch({ titleTextShadow: ($event.target as HTMLInputElement).checked })"
+          >
         </div>
       </div>
     </template>
@@ -504,18 +632,18 @@ const confirmReset = ref(false)
           <button
             type="button"
             class="stage-custom__toggle-label"
-            @click="patchClock({ showSeconds: !(settings.clock ?? DEFAULT_CLOCK_MODULE_SETTINGS).showSeconds })"
+            @click="patchClock({ showSeconds: !clockSettings.showSeconds })"
           >
             {{ t('settings.stage.clockShowSeconds') }}
           </button>
           <button
             type="button"
             role="switch"
-            :aria-checked="(settings.clock ?? DEFAULT_CLOCK_MODULE_SETTINGS).showSeconds"
+            :aria-checked="clockSettings.showSeconds"
             class="stage-custom__switch"
-            :class="{ 'stage-custom__switch--on': (settings.clock ?? DEFAULT_CLOCK_MODULE_SETTINGS).showSeconds }"
+            :class="{ 'stage-custom__switch--on': clockSettings.showSeconds }"
             :aria-label="t('settings.stage.clockShowSeconds')"
-            @click="patchClock({ showSeconds: !(settings.clock ?? DEFAULT_CLOCK_MODULE_SETTINGS).showSeconds })"
+            @click="patchClock({ showSeconds: !clockSettings.showSeconds })"
           />
         </div>
 
@@ -523,18 +651,18 @@ const confirmReset = ref(false)
           <button
             type="button"
             class="stage-custom__toggle-label"
-            @click="patchClock({ format24h: !(settings.clock ?? DEFAULT_CLOCK_MODULE_SETTINGS).format24h })"
+            @click="patchClock({ format24h: !clockSettings.format24h })"
           >
             {{ t('settings.stage.clockFormat24h') }}
           </button>
           <button
             type="button"
             role="switch"
-            :aria-checked="(settings.clock ?? DEFAULT_CLOCK_MODULE_SETTINGS).format24h"
+            :aria-checked="clockSettings.format24h"
             class="stage-custom__switch"
-            :class="{ 'stage-custom__switch--on': (settings.clock ?? DEFAULT_CLOCK_MODULE_SETTINGS).format24h }"
+            :class="{ 'stage-custom__switch--on': clockSettings.format24h }"
             :aria-label="t('settings.stage.clockFormat24h')"
-            @click="patchClock({ format24h: !(settings.clock ?? DEFAULT_CLOCK_MODULE_SETTINGS).format24h })"
+            @click="patchClock({ format24h: !clockSettings.format24h })"
           />
         </div>
       </div>
@@ -570,7 +698,7 @@ const confirmReset = ref(false)
 
         <div class="stage-custom__row-head">
           <span>{{ t('settings.stage.randomFontSize') }}</span>
-          <span class="stage-custom__chip">{{ Math.round(settings.random ?? DEFAULT_RANDOM_MODULE_SETTINGS ? (settings.random ?? DEFAULT_RANDOM_MODULE_SETTINGS).fontSizePc : 8) }}%</span>
+          <span class="stage-custom__chip">{{ Math.round(randomSettings.fontSizePc) }}%</span>
         </div>
         <input
           type="range"

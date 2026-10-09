@@ -1,5 +1,12 @@
 import { getAuthSession } from '@modules/media/services/auth-client'
-import { applyOperatorState, markLocalLiturgyPushed } from './operator-state-apply'
+import { getUserPreference, registerPrefsChangedHook } from '@shared/services/user-preferences'
+import {
+  applyOperatorState,
+  markLocalLiturgyPushed,
+  markLocalPrefsPushed,
+  markLocalScheduledPushed,
+  SYNCABLE_PREF_KEYS,
+} from './operator-state-apply'
 
 /**
  * sync v2 fase 2 (app#336): outbox do estado do operador.
@@ -57,10 +64,7 @@ function coalesceKey(namespace: string, key: string): string {
 }
 
 function uuid(): string {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-    return crypto.randomUUID()
-  }
-  return `op-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+  return crypto.randomUUID()
 }
 
 /** Enfileira uma mutação do estado do operador. NUNCA toca rede. */
@@ -81,6 +85,21 @@ export function enqueueOperatorState(
     deleted_at: null,
   }
   writeOutbox(box)
+}
+
+let outboxFlushTimer: ReturnType<typeof setTimeout> | null = null
+
+/**
+ * Agenda o flush em bg (debounce 2s): agrupa mutações rápidas num único
+ * POST. Compartilhado por todos os produtores de outbox (liturgia,
+ * agendados, prefs...).
+ */
+export function scheduleOutboxFlush(delayMs = 2_000): void {
+  if (outboxFlushTimer) clearTimeout(outboxFlushTimer)
+  outboxFlushTimer = setTimeout(() => {
+    outboxFlushTimer = null
+    void flushOutbox().catch(() => {})
+  }, delayMs)
 }
 
 /** Sessão real = token presente (placeholder id_user=0 também tem token — a API rejeita 401). */
@@ -160,7 +179,11 @@ export async function flushOutbox(): Promise<OperatorStateItem[] | null> {
     (max, e) => Math.max(max, e.updated_at),
     Date.now(),
   )
-  markLocalLiturgyPushed(newestLocal)
+  // LWW por namespace: cada produtor marca o SEU relógio (se veio no batch)
+  const names = new Set(entries.map((e) => `${e.namespace}::${e.key}`))
+  if (names.has('liturgy::week')) markLocalLiturgyPushed(newestLocal)
+  if (names.has('scheduled::items')) markLocalScheduledPushed(newestLocal)
+  if (names.has('prefs::values')) markLocalPrefsPushed(newestLocal)
   const serverItems = json.operator_state ?? []
   applyOperatorState(serverItems)
 
@@ -173,6 +196,17 @@ export function startOutboxTriggers(): () => void {
     void flushOutbox().catch(() => {})
   }
   window.addEventListener('online', onOnline)
+
+  // app#349 peça 2: preferências do operador — hook global gravado pelo
+  // user-preferences; só keys da whitelist vão pro outbox (lote 'prefs::values').
+  registerPrefsChangedHook((key) => {
+    if (!SYNCABLE_PREF_KEYS.has(key)) return
+    enqueueOperatorState('prefs', 'values', {
+      [key]: getUserPreference(key),
+    })
+    scheduleOutboxFlush()
+  })
+
   // pull no boot (rede disponível): puxa o estado da conta
   onOnline()
   return () => window.removeEventListener('online', onOnline)

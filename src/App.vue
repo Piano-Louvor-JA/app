@@ -13,6 +13,7 @@ import AppTitlebar from '@layouts/AppTitlebar.vue'
 import { isProjectionPopupLocation } from '@shared/services/projection-window-location'
 import { useOperatorEscapeToCloseProjection } from '@shared/composables/useOperatorEscapeToCloseProjection'
 import { useMediaPlayerHotkeys } from '@modules/media/composables/useMediaPlayerHotkeys'
+import ApiStatusBanner from '@shared/components/ApiStatusBanner.vue'
 import UpdateBanner from '@shared/components/UpdateBanner.vue'
 import UpdateDialog from '@shared/components/UpdateDialog.vue'
 import { useUpdateChecker } from '@shared/composables/useUpdateChecker'
@@ -90,6 +91,7 @@ function handleViewNotes() {
     class="app-frame"
     :class="{ 'app-frame--projection': isProjectionWindow }"
   >
+    <ApiStatusBanner v-if="!isProjectionWindow" />
     <UpdateBanner @view-notes="handleViewNotes" />
     <AppTitlebar />
     <div class="app-frame__body">
