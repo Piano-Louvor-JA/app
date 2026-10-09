@@ -16,12 +16,49 @@ permissions:
   contents: write
 
 jobs:
+  decide:
+    name: Decide publication
+    runs-on: ubuntu-24.04
+    outputs:
+      publish: ${{ steps.decision.outputs.publish }}
+      reason: ${{ steps.decision.outputs.reason }}
+    steps:
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Decide publication
+        id: decision
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_REF: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version || github.event.workflow_run.head_branch }}
+          WORKFLOW_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          echo "Publicação avaliada para ${TARGET_REF}."
+          script="$(mktemp)"
+          gh api "repos/${GITHUB_REPOSITORY}/contents/scripts/release-publish-decision.mjs?ref=${WORKFLOW_SHA}" --jq .content \
+            | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{let t=s.trim();if(t.startsWith(String.fromCharCode(34)))t=JSON.parse(t);process.stdout.write(Buffer.from(String(t).replace(/\s/g,""),"base64"))})' \
+            > "$script"
+          node "$script" --fetch --repo "$GITHUB_REPOSITORY" --ref "$TARGET_REF"
+
+      - name: Omit publication
+        if: steps.decision.outputs.publish != 'true'
+        run: |
+          echo "Publicação omitida (${{ steps.decision.outputs.reason }})."
+          echo "Nenhum Flatpak foi enviado à GitHub Release."
+
   flatpak:
-    # Só segue se o Linux publicou com sucesso numa tag v*, ou se foi disparo manual.
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       startsWith(github.event.workflow_run.head_branch, 'v'))
+    needs: decide
+    # Só empacota se a decisão autorizar publicação e o Linux tiver concluído numa tag, ou no disparo manual.
+    if: >-
+      needs.decide.result == 'success' &&
+      needs.decide.outputs.publish == 'true' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event.workflow_run.conclusion == 'success' &&
+        startsWith(github.event.workflow_run.head_branch, 'v')))
     runs-on: ubuntu-24.04
     container:
       image: bilelmoussaoui/flatpak-github-actions:gnome-46

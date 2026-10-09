@@ -239,6 +239,8 @@ jobs:
       - run: npm ci
       # Excludes consagrados: worktrees do Stryker e dirs temporárias locais.
       - run: npx vitest run --exclude='.stryker-tmp/**' --exclude='.worktrees/**'
+      - name: Release publish decision
+        run: node --test scripts/release-publish-decision.test.mjs
 
   e2e-tests:
     name: E2E Tests (playwright)

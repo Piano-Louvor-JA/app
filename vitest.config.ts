@@ -27,7 +27,7 @@ export default defineConfig({
     },
   },
   test: {
-    exclude: ['node_modules/**', 'dist/**', 'e2e/**', '.worktrees/**', 'coverage/**'],
+    exclude: ['node_modules/**', 'dist/**', 'e2e/**', '.worktrees/**', 'coverage/**', 'scripts/**/*.test.mjs'],
     environment: 'jsdom',
     environmentOptions: {
       jsdom: {
