@@ -2465,7 +2465,7 @@ var qrcode = function() {
 <script>
 (function(){
 window.handle=handle;
-window.proxyUrl=proxyUrl;
+window.proxyUrl=palcoMediaUrl;
 window.trustedCloudApi=trustedCloudApi;
 function dlog(m1,m2,m3){try{const clean=value=>String(value===undefined?'':value).replace(/[\x00-\x1f\x7f]/g,' ');console.log('[P]',clean(m1),clean(m2),clean(m3))}catch(e){}}
 // window.onerror → visível no DevTools e reportado ao sender (debug remoto)
@@ -2584,7 +2584,7 @@ function lanSenderHost(){
   const match=/^(?:localhost|127\.0\.0\.1|(?:\d{1,3}\.){3}\d{1,3})$/.exec(String(host||'').trim());
   return match?match[0]:'';
 }
-function proxyUrl(original){
+function palcoMediaUrl(original){
   if(!original)return '';
   let decoded;
   try{decoded=decodeURIComponent(String(original))}catch(e){decoded=String(original)}
@@ -2598,7 +2598,8 @@ function proxyUrl(original){
   if(parsed.protocol==='blob:'||parsed.protocol==='file:'||parsed.protocol==='data:'||cloudMode)return safe;
   const sender=lanSenderHost();
   if(sender&&parsed.protocol==='http:'&&parsed.hostname===sender)return safe;
-  if(sender&&(parsed.protocol==='http:'||parsed.protocol==='https:'))return 'http://'+sender+':7080/proxy?url='+encodeURIComponent(safe);
+  // URL externa segue o próprio endereço já filtrado. O proxy com o IP da
+  // query reabria o alerta de redirecionamento no src da imagem.
   if(parsed.protocol==='http:'||parsed.protocol==='https:')return safe;
   return '';
 }
@@ -2904,11 +2905,12 @@ function hideIdle(){$('idle').classList.add('hidden')}
 // Cover relativo (images/... ou covers/...) resolve contra / do sender.
 function coverUrl(cover){
   if(!cover) return null;
-  if(/^https?:\/\//i.test(cover))return proxyUrl(cover);
-  const sender=lanSenderHost();
-  if(!sender)return null;
+  if(/^https?:\/\//i.test(cover))return palcoMediaUrl(cover);
   const path=encodeURI(String(cover).replace(/^\/+/, '')).split(/[?#]/)[0];
-  return proxyUrl('http://'+sender+':7080/'+path);
+  if(!path)return null;
+  const sender=lanSenderHost();
+  if(location.protocol==='file:'&&sender)return palcoMediaUrl('http://'+sender+':7080/'+path);
+  return '/'+path;
 }
 function showNp(title,sub,cover){
   hideIdle();$('text').style.display='none';
@@ -3163,7 +3165,7 @@ function handle(m){
         t.style.display='none';$('text').style.display='';}}
       const bgEl=$('bg');
       bgEl.onerror=()=>{bgEl.onerror=null;bgEl.src='bg-fallback.png'};
-      if(m.background){var nextBg=proxyUrl(m.background);if(nextBg){bgEl.src=nextBg;bgEl.style.opacity='';document.body.style.background=''}else bgEl.src='bg-fallback.png'}
+      if(m.background){var nextBg=palcoMediaUrl(m.background);if(nextBg){bgEl.src=nextBg;bgEl.style.opacity='';document.body.style.background=''}else bgEl.src='bg-fallback.png'}
       // Sem bg na mensagem: usa o BG configurado no app (bgPalco — enviado
       // ao ligar o palco). Só se NÃO houver bg configurado cai no fallback
       // fixo. Vale pra qualquer módulo (26/08 Rafael).
@@ -3171,7 +3173,7 @@ function handle(m){
       // como bg válido — pinta o body e esconde o img (hino sem capa e sem
       // bg custom usa a cor do palco; fallback é só MP3 sem nada, 01/09).
       else if(m.backgroundColor){var nextColor=projectionColor(m.backgroundColor);if(nextColor){bgEl.removeAttribute('src');document.body.style.backgroundColor=nextColor}else bgEl.src='bg-fallback.png'}
-      else if(bgPalco){var nextPalco=proxyUrl(bgPalco);if(nextPalco){bgEl.src=nextPalco;bgEl.style.opacity='';document.body.style.background=''}else bgEl.src='bg-fallback.png'}
+      else if(bgPalco){var nextPalco=palcoMediaUrl(bgPalco);if(nextPalco){bgEl.src=nextPalco;bgEl.style.opacity='';document.body.style.background=''}else bgEl.src='bg-fallback.png'}
       else{bgEl.src='bg-fallback.png'}
       // Slide/PDF/PPT (text vazio) é mídia visual pura: sem véu de leitura,
       // preserva a tonalidade original do canvas do operador.
@@ -3293,7 +3295,7 @@ function handle(m){
       // BG permanente do palco (idle) — personalização, não da música
       bgPalco=m.url||'';
       if(bgPalco){
-        $('bgPalco').src=proxyUrl(bgPalco);
+        $('bgPalco').src=palcoMediaUrl(bgPalco);
       }else{
         $('bgPalco').removeAttribute('src');
       }
@@ -3303,7 +3305,7 @@ function handle(m){
       if(m.url){
         // F3.3-sync: só recarrega o src se a URL MUDOU — reenvio da mesma
         // faixa com action:play não pode reiniciar o áudio (loop 3s).
-        const next=proxyUrl(m.url);
+        const next=palcoMediaUrl(m.url);
         if(a.src!==next){
           a.src=next;
           if(typeof m.positionMs==='number'&&m.positionMs>0){
@@ -3319,7 +3321,7 @@ function handle(m){
           }else{
             showNp('Reproduzindo áudio', m.subtitle||'', m.cover||'');
           }
-          $('bg').src=m.background?proxyUrl(m.background):'bg-fallback.png';
+          $('bg').src=m.background?palcoMediaUrl(m.background):'bg-fallback.png';
         }
       }
       // BG garantido em TODA mensagem de áudio (load, play, pause, seek):
@@ -3364,12 +3366,12 @@ function handle(m){
         // Vídeo anterior pode estar fullscreen (z-index alto) e esconder o
         // now-playing. MP3 é áudio: mata a camada de vídeo antes do cartão.
         v.pause();v.removeAttribute('src');v.style.display='none';v.load();
-        const av=$('audio');const next=proxyUrl(m.url);
+        const av=$('audio');const next=palcoMediaUrl(m.url);
         window.__videoAudioActive=true;
         if(av.src!==next){av.src=next;
           av.onended=()=>{hideNp();showIdle('Aguardando conteúdo…')};
           showNp(m.title||'Reproduzindo áudio', m.subtitle||'', m.cover||'');
-          $('bg').src=m.background?proxyUrl(m.background):'bg-fallback.png';}
+          $('bg').src=m.background?palcoMediaUrl(m.background):'bg-fallback.png';}
         if(m.action!=='pause'&&m.action!=='stop'&&av.paused)playWithFallback();
         if(m.action==='pause'&&!av.paused)av.pause();
         if(typeof m.positionMs==='number'&&m.positionMs>0){
@@ -3385,7 +3387,7 @@ function handle(m){
       if(m.action==='stop'){v.pause();v.removeAttribute('src');v.style.display='none';
         v.load();showIdle('Aguardando conteúdo…');
         sendEvent({v:2,type:'ended',media:'video'});break}
-      if(m.url){v.src=proxyUrl(m.url);v.style.display='';
+      if(m.url){v.src=palcoMediaUrl(m.url);v.style.display='';
         // Sync inicial (padrão F3.3g do áudio): positionMs aplicado antes
         // do play — seguro p/ metadata não carregada (loadedmetadata once).
         if(typeof m.positionMs==='number'&&m.positionMs>0){
