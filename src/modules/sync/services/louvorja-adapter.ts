@@ -18,6 +18,7 @@ import {
 	type LiturgyPersistedState,
 	type LiturgyWeekday,
 } from "@modules/liturgy/types/liturgy";
+import { deriveSessionTimesFromCategories } from "@modules/liturgy/services/liturgy-duration-enrich";
 import { USER_PREFERENCE_KEYS } from "@shared/constants/storage-keys";
 import {
 	getUserPreference,
@@ -109,9 +110,22 @@ export function importLouvorjaIntoBrowser(
 						const payload = entity.data[day];
 						if (payload == null || typeof payload !== "object") continue;
 						const source = payload as Record<string, unknown>;
-						if (Array.isArray(source.items))
+						if (Array.isArray(source.items)) {
 							next.weekdays[day] =
 								source.items as LiturgyPersistedState["weekdays"][LiturgyWeekday];
+							const currentSession = next.daySessionTimes?.[day] ?? {
+								startTime: null,
+								endTime: null,
+							};
+							const derivedSession = deriveSessionTimesFromCategories(
+								next.weekdays[day],
+								currentSession,
+							);
+							if (next.daySessionTimes || derivedSession !== currentSession) {
+								next.daySessionTimes ??= {} as LiturgyPersistedState["daySessionTimes"];
+								next.daySessionTimes[day] = derivedSession;
+							}
+						}
 						if (typeof source.notes === "string")
 							next.dayNotes[day] = source.notes;
 						hasDay = true;

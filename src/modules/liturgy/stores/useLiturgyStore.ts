@@ -42,10 +42,7 @@ import {
   reconcileMusicItemTitles,
   reorderLiturgyItems,
 } from '../services/liturgy-item-helpers'
-import {
-  deriveSessionTimesFromCategories,
-  enrichItemsDurations,
-} from '../services/liturgy-duration-enrich'
+import { enrichItemsDurations } from '../services/liturgy-duration-enrich'
 import {
   loadLiturgyState,
   saveLiturgyState,
@@ -545,29 +542,10 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     const state = loadLiturgyState()
     weekdays.value = state.weekdays
     dayNotes.value = state.dayNotes
+    daySessionTimes.value = state.daySessionTimes
     customLiturgies.value = state.customLiturgies
     deletionLocks.value = state.deletionLocks
     if (selectedItemIndex.value != null) selectedItemIndex.value = null
-
-    // t_b1a9deae: Resumo do Evento pré-preenchido pelas categorias importadas
-    // (só quando a sessão do dia está vazia — nunca sobrescreve ajuste manual).
-    const nextSessionTimes = { ...daySessionTimes.value }
-    let sessionChanged = false
-    for (const day of Object.keys(nextSessionTimes) as LiturgyWeekday[]) {
-      const derived = deriveSessionTimesFromCategories(
-        weekdays.value[day] ?? [],
-        nextSessionTimes[day],
-      )
-      if (derived !== nextSessionTimes[day]) {
-        nextSessionTimes[day] = derived
-        sessionChanged = true
-      }
-    }
-    if (sessionChanged) {
-      daySessionTimes.value = nextSessionTimes
-      state.daySessionTimes = nextSessionTimes
-      saveLiturgyState(state)
-    }
 
     const music = musicList.value
     if (music.length === 0) return
