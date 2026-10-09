@@ -1,3 +1,5 @@
+> Revisor: aplique o método e as severidades de [`.github/REVIEW-RUBRIC.md`](.github/REVIEW-RUBRIC.md).
+
 ## Resumo
 <!-- O que mudou e por quê? (2-3 frases, sem clichê de LLM) -->
 

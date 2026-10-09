@@ -1,0 +1,151 @@
+name: Board Sync (Projects v2)
+# Sincroniza os boards Roadmap/Portfolio com o ciclo de vida das issues e PRs:
+# - Issue assigned / PR vinculada -> In Progress (no repo board + Portfolio)
+# - PR merged (com "Closes #N") -> Done + fecha a issue
+# - Issue closed sem PR -> Done
+# Roda em cada repo e edita os DOIS boards (repo + Portfolio). Zero dependência humana.
+
+on:
+  issues:
+    types: [assigned, closed]
+  pull_request:
+    types: [opened, reopened, ready_for_review, closed]
+  push:
+    branches: [staging, main]
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+  # Projects v2 edita com GITHUB_TOKEN quando o project pertence à org e o app tem acesso:
+  # (Actions com GITHUB_TOKEN conseguem item-edit via GraphQL se o project é da org e o
+  #  workflow roda no repo com org access habilitado; senão usa PROJECT_TOKEN secret)
+
+concurrency:
+  group: board-sync-${{ github.event.number || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Sync boards
+        uses: actions/github-script@v7
+        env:
+          PORTFOLIO_ID: PVT_kwDOE_gVsM4BlArD
+          PORTFOLIO_STATUS: PVTSSF_lADOE_gVsM4BlArDzhjvIPA
+          STATUS_TODO: f75ad846
+          STATUS_INPROGRESS: 47fc9ee4
+          STATUS_DONE: 98236657
+        with:
+          github-token: ${{ secrets.PROJECT_TOKEN || github.token }}
+          script: |
+            const {owner, repo} = context.repo;
+            const PORTFOLIO = process.env.PORTFOLIO_ID;
+            const FIELD = process.env.PORTFOLIO_STATUS;
+            const OPT = {todo: process.env.STATUS_TODO, progress: process.env.STATUS_INPROGRESS, done: process.env.STATUS_DONE};
+
+            // Boards Roadmap por repo (ids estáveis da org):
+            const ROADMAPS = {
+              app: 'PVT_kwDOE_gVsM4Bk-VC', api: 'PVT_kwDOE_gVsM4Bk-UY', web: 'PVT_kwDOE_gVsM4Bk-VF',
+              apk: 'PVT_kwDOE_gVsM4Bk-VN', site: 'PVT_kwDOE_gVsM4Bk-VT',
+              'palco-receiver': 'PVT_kwDOE_gVsM4Bk-VZ', 'palco-updates': 'PVT_kwDOE_gVsM4Bk-Vd',
+              docs: 'PVT_kwDOE_gVsM4Bk-Vi',
+            };
+            const roadmap = ROADMAPS[repo];
+            if (!roadmap) return;
+
+            const gql = async (query, variables) => {
+              const res = await github.graphql(query, variables);
+              return res;
+            };
+
+            // Acha o field Status do board (ids por board podem divergir):
+            async function statusField(projectId) {
+              const q = `query($id: ID!) { node(id: $id) { ... on ProjectV2 { fields(first:20) { nodes {
+                ... on ProjectV2SingleSelectField { id name options { id name } } } } } } }`;
+              const d = await gql(q, {id: projectId});
+              const f = d.node.fields.nodes.find(f => f.name === 'Status');
+              return f ? {id: f.id, opt: Object.fromEntries(f.options.map(o => [o.name, o.id]))} : null;
+            }
+
+            // Acha o item do board para uma issue:
+            async function findItem(projectId, issueNumber) {
+              const q = `query($owner: String!, $repo: String!, $n: Int!) {
+                repository(owner: $owner, name: $repo) { issue(number: $n) {
+                  projectItems(first: 10) { nodes { id project { id } } } } } }`;
+              const d = await gql(q, {owner, repo, n: issueNumber});
+              const issue = d.repository?.issue;
+              if (!issue) return null;
+              return issue.projectItems.nodes.find(i => i.project.id === projectId) || null;
+            }
+
+            async function setStatus(projectId, itemId, optionId, fieldOverride) {
+              const sf = fieldOverride || await statusField(projectId);
+              if (!sf) return;
+              const m = `mutation($project: ID!, $item: ID!, $field: ID!, $option: String!) {
+                updateProjectV2ItemFieldValue(input: { projectId: $project, itemId: $item,
+                  fieldId: $field, value: { singleSelectOptionId: $option } }) { projectV2Item { id } } }`;
+              await gql(m, {project: projectId, item: itemId, field: sf.id, option: optionId});
+            }
+
+            async function addToProject(projectId, contentId) {
+              const m = `mutation($project: ID!, $content: ID!) {
+                addProjectV2ItemById(input: { projectId: $project, contentId: $content }) { item { id } } }`;
+              const d = await gql(m, {project: projectId, content: contentId});
+              return d.addProjectV2ItemById.item.id;
+            }
+
+            try {
+              // ---------- ISSUE ASSIGNED -> In Progress ----------
+              if (context.eventName === 'issues' && context.payload.action === 'assigned') {
+                const n = context.payload.issue.number;
+                const q = `query($owner: String!, $repo: String!, $n: Int!) {
+                  repository(owner: $owner, name: $repo) { issue(number: $n) { id projectItems(first:10) { nodes { id project { id } } } } } }`;
+                const d = await gql(q, {owner, repo, n});
+                const issue = d.repository.issue;
+                let item = issue.projectItems.nodes.find(i => i.project.id === roadmap);
+                if (!item) item = {id: await addToProject(roadmap, issue.id)};
+                await setStatus(roadmap, item.id, OPT.progress);
+                core.info(`issue #${n} -> In Progress (roadmap)`);
+              }
+
+              // ---------- ISSUE CLOSED -> Done ----------
+              if (context.eventName === 'issues' && context.payload.action === 'closed') {
+                const n = context.payload.issue.number;
+                const item = await findItem(roadmap, n);
+                if (item) { await setStatus(roadmap, item.id, OPT.done); core.info(`issue #${n} -> Done`); }
+              }
+
+              // ---------- PR: aberta/ready -> issue vinculada vai pra In Progress ----------
+              if (context.eventName === 'pull_request' && ['opened','reopened','ready_for_review'].includes(context.payload.action)) {
+                const pr = context.payload.pull_request;
+                const q = `query($owner: String!, $repo: String!, $n: Int!) {
+                  repository(owner: $owner, name: $repo) { pullRequest(number: $n) {
+                    closingIssuesReferences(first: 10) { nodes { id number } } } } }`;
+                const d = await gql(q, {owner, repo, n: pr.number});
+                for (const issue of d.repository.pullRequest.closingIssuesReferences.nodes) {
+                  let item = await findItem(roadmap, issue.number);
+                  if (!item) item = {id: await addToProject(roadmap, issue.id)};
+                  await setStatus(roadmap, item.id, OPT.progress);
+                  core.info(`PR #${pr.number} aberta -> issue #${issue.number} In Progress`);
+                }
+              }
+
+              // ---------- PR merged -> Done nas issues fechadas ----------
+              if (context.eventName === 'pull_request' && context.payload.action === 'closed' && context.payload.pull_request.merged) {
+                const pr = context.payload.pull_request;
+                const q = `query($owner: String!, $repo: String!, $n: Int!) {
+                  repository(owner: $owner, name: $repo) { pullRequest(number: $n) {
+                    closingIssuesReferences(first: 10) { nodes { id number state } } } } }`;
+                const d = await gql(q, {owner, repo, n: pr.number});
+                for (const issue of d.repository.pullRequest.closingIssuesReferences.nodes) {
+                  const item = await findItem(roadmap, issue.number);
+                  if (item) { await setStatus(roadmap, item.id, OPT.done); core.info(`merge -> issue #${issue.number} Done`); }
+                }
+              }
+            } catch (e) {
+              core.warning(`board-sync parcial: ${e.message}`);
+              // Não falha o job: sync de board é best-effort, CI técnico não pode depender dele.
+            }

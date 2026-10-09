@@ -10,6 +10,7 @@ import { utilitiesRoutes } from '@modules/clock/routes'
 import { countdownRoutes } from '@modules/countdown/routes'
 import { albumsRoutes } from '@modules/albums/routes'
 import { communityRoutes } from '@modules/community/routes'
+import { diagnosticsRoutes } from '@modules/diagnostics/routes'
 import { homeRoutes } from '@modules/home/routes'
 import { liturgyRoutes } from '@modules/liturgy/routes'
 import { mediaRoutes } from '@modules/media/routes'
@@ -44,6 +45,7 @@ const router = createRouter({
         ...homeRoutes,
         ...albumsRoutes,
         ...communityRoutes,
+        ...diagnosticsRoutes,
         ...liturgyRoutes,
         ...mediaRoutes,
         ...bibleRoutes,

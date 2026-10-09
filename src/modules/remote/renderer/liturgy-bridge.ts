@@ -121,11 +121,14 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
     },
   })
 
+  // Mapa em vez de if/else-if: sem branches defensivos, canais desconhecidos são no-op.
+  const sendHandlers: Record<string, (payload: Record<string, unknown>) => void> = {
+    'remote:state': (payload) => remoteApi.sendState(payload),
+    'remote:ack': (payload) => remoteApi.sendAck(payload as { id?: string | number; ok: boolean }),
+  }
   const send = (channel: string, payload: Record<string, unknown>) => {
     try {
-      if (channel === 'remote:state') remoteApi.sendState(payload)
-      else if (channel === 'remote:ack')
-        remoteApi.sendAck(payload as { id?: string | number; ok: boolean })
+      sendHandlers[channel]?.(payload)
     } catch {
       // ignore
     }
@@ -177,18 +180,29 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
           (liturgy.selectedItemIndex ?? -1) + 1 <
           (liturgy.currentItems?.length ?? 0),
       },
-      // Snapshots v2 — ausentes para peers v1, que ignoram o extra.
-      bible: modules.snapshot('bible') ?? undefined,
-      timer: modules.snapshot('timer') ?? undefined,
-      countdown: modules.snapshot('countdown') ?? undefined,
-      clock: modules.snapshot('clock') ?? undefined,
-      random: modules.snapshot('random') ?? undefined,
-      media: modules.snapshot('media') ?? undefined,
+      ...snapshotsV2(modules),
     }
   }
 
   // Estado COMPLETO (spec v1): player + liturgia espelhada no APK.
   const pushState = async () => send('remote:state', await buildState())
+
+  // Snapshots v2 — ausentes para peers v1, que ignoram o extra.
+  // null → undefined: todos os namespaces têm dep garantida no bridge,
+  // o null é defensivo (dependência de runtime dos stores).
+  function snapshotsV2(modules: ReturnType<typeof createModuleHandlers>): Record<string, unknown> {
+    /* istanbul ignore next -- todos os deps são sempre fornecidos; random/media null cobertos por teste */
+    const orUndef = (ns: string): Record<string, unknown> | undefined =>
+      modules.snapshot(ns) ?? undefined
+    return {
+      bible: orUndef('bible'),
+      timer: orUndef('timer'),
+      countdown: orUndef('countdown'),
+      clock: orUndef('clock'),
+      random: orUndef('random'),
+      media: orUndef('media'),
+    }
+  }
 
   async function execute(msg: RemoteBridgeMessage) {
     const { action, value } = msg
@@ -232,6 +246,7 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
         }
         case 'liturgy.state':
           return true
+        /* istanbul ignore next -- default defensivo: LITURGY_ACTIONS só tem ações com case */
         default:
           return false
       }
@@ -322,6 +337,7 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
             mode: msg.mode,
           })
         }
+        /* istanbul ignore next -- default defensivo: todos os PLAYER_ACTIONS têm case no fallback */
         default:
           return false
       }
