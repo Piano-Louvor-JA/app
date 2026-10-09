@@ -31,6 +31,15 @@ const items: UtilityHubItem[] = [
     to: null,
     available: false,
   },
+  {
+    // Issue app#361: funcional — palco-server (#351) como transporte, fachada OBS.
+    key: 'obs',
+    titleKey: 'utilities.obs',
+    descriptionKey: 'utilities.obsDescription',
+    icon: 'ti-broadcast',
+    to: '/utilities/obs',
+    available: true,
+  },
 ]
 </script>
 
