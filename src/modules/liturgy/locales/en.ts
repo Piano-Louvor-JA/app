@@ -231,6 +231,7 @@ export default {
       project: 'Project',
       play: 'Play',
       openControl: 'Open control (popup)',
+      playLocalInExternal: 'Play local media in {player}',
       openSiteControl: 'Open site control',
       openVideoControl: 'Open YouTube control',
       openImageControl: 'Open image control',
@@ -284,6 +285,8 @@ export default {
       urlInvalid: 'The provided link is not valid for projection.',
       projectionFailed:
         'Could not open projection on the configured screens.',
+      fileMissingOnMachine:
+        'File not found on this machine — the path came from another computer (synced liturgy). Select the file again on this device.',
       presentationOfficeMissing:
         'To project PPT/PPTX, install LibreOffice (or set LIBREOFFICE_PATH).',
     },

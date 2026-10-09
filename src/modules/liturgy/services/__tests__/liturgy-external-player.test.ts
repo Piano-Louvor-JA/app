@@ -41,6 +41,8 @@ vi.mock('@shared/services/desktop-bridge', () => ({
 
 vi.mock('../liturgy-web-projection', () => ({
   openLiturgyLocalVideoControl: mocks.openControl,
+  openLiturgyVideoControl: mocks.openControl,
+  openLiturgySiteControl: mocks.openControl,
 }))
 
 import { executeLiturgyItem } from '../liturgy-actions'
@@ -100,5 +102,59 @@ describe('player externo na liturgia — vídeo (regressão 03/10)', () => {
     expect(result.ok).toBe(true)
     expect(mocks.play).toHaveBeenCalled()
     expect(mocks.openControl).not.toHaveBeenCalled()
+  })
+})
+
+describe('player externo na liturgia — arquivo de outra máquina', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.openControl.mockResolvedValue(true)
+  })
+
+  it('file-missing → erro claro, SEM cair no controle interno (path de outra máquina)', async () => {
+    mocks.get.mockResolvedValue('vlc')
+    mocks.play.mockResolvedValue({ ok: false, player: 'none', error: 'file-missing' })
+    const result = await executeLiturgyItem(videoItem(), {} as never)
+    expect(result.ok).toBe(false)
+    expect(result.messageKey).toBe('liturgy.messages.fileMissingOnMachine')
+    expect(mocks.openControl).not.toHaveBeenCalled()
+  })
+})
+
+describe('isolamento — YouTube/site NUNCA vão pro player externo', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.play.mockResolvedValue({ ok: true })
+    mocks.openControl.mockResolvedValue(true)
+    mocks.get.mockResolvedValue('vlc')
+  })
+
+  it('online_video (YouTube) + VLC selecionado → controle interno, sem play externo', async () => {
+    const result = await executeLiturgyItem(
+      {
+        id: 'yt1',
+        type: 'online_video',
+        name: 'Vídeo YouTube',
+        url: 'https://youtube.com/watch?v=abc',
+      } as never,
+      {} as never,
+    )
+    expect(result.ok).toBe(true)
+    expect(mocks.play).not.toHaveBeenCalled()
+    expect(mocks.openControl).toHaveBeenCalled()
+  })
+
+  it('site + VLC selecionado → controle do site, sem play externo', async () => {
+    const result = await executeLiturgyItem(
+      {
+        id: 'site1',
+        type: 'site',
+        name: 'Site',
+        url: 'https://example.com',
+      } as never,
+      {} as never,
+    )
+    expect(result.ok).toBe(true)
+    expect(mocks.play).not.toHaveBeenCalled()
   })
 })

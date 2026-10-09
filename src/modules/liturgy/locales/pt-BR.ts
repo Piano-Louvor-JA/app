@@ -231,6 +231,7 @@ export default {
       project: 'Projetar',
       play: 'Reproduzir',
       openControl: 'Abrir controle (popup)',
+      playLocalInExternal: 'Reproduzir mídia local no {player}',
       openSiteControl: 'Abrir controle do site',
       openVideoControl: 'Abrir controle do YouTube',
       openImageControl: 'Abrir controle das imagens',
@@ -284,6 +285,8 @@ export default {
       urlInvalid: 'O link informado não é válido para projeção.',
       projectionFailed:
         'Não foi possível abrir a projeção nas telas configuradas.',
+      fileMissingOnMachine:
+        'Arquivo não encontrado nesta máquina — o caminho veio de outro computador (liturgia sincronizada). Selecione o arquivo novamente neste dispositivo.',
       presentationOfficeMissing:
         'Para projetar PPT/PPTX, instale o LibreOffice (ou defina LIBREOFFICE_PATH).',
     },

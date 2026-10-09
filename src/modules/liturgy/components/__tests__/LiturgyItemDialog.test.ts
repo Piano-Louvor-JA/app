@@ -466,20 +466,11 @@ describe('LiturgyItemDialog', () => {
       expect(emitted.categoryId).toBe('cat2')
     })
 
-    it('onPlayerChange: igual ao global → default', async () => {
+    it('modal não expõe seletor de player (controle fica na linha)', () => {
       const wrapper = createWrapper({ draft: { ...defaultProps.draft, type: 'audio', playerId: null } })
-      wrapper.vm.onPlayerChange({ target: { value: 'associated' } })
-      await wrapper.vm.$nextTick()
-      const emitted = wrapper.emitted('update:draft')!.at(-1)![0] as { playerId: string }
-      expect(emitted.playerId).toBe('default')
-    })
-
-    it('onPlayerChange: diferente do global → mantém', async () => {
-      const wrapper = createWrapper({ draft: { ...defaultProps.draft, type: 'audio', playerId: null } })
-      wrapper.vm.onPlayerChange({ target: { value: 'vlc' } })
-      await wrapper.vm.$nextTick()
-      const emitted = wrapper.emitted('update:draft')!.at(-1)![0] as { playerId: string }
-      expect(emitted.playerId).toBe('vlc')
+      expect(wrapper.vm.onPlayerChange).toBeUndefined()
+      expect(wrapper.html()).not.toContain('VLC')
+      wrapper.unmount()
     })
 
     it('onEngineChange não-custom: patch direto', async () => {
@@ -1009,7 +1000,7 @@ it('selectLocalFile bridge SEM dialog.openFile: erro desktopOnly (372-373)', asy
     vi.mocked(getDesktopBridge).mockReturnValue(null)
   })
 
-  it('playerOptions com bridge externo: select de players renderiza options (1054)', async () => {
+  it('modal de vídeo não renderiza select de player externo', async () => {
     vi.mocked(getDesktopBridge).mockReturnValue({
       externalPlayer: {
         get: vi.fn(async () => 'vlc'),
@@ -1028,7 +1019,7 @@ it('selectLocalFile bridge SEM dialog.openFile: erro desktopOnly (372-373)', asy
       await new Promise((r) => setTimeout(r, 0))
       await flushPromises()
       const dlg = document.querySelector('.moment-dialog') as HTMLElement
-      expect(dlg.innerHTML).toContain('VLC')
+      expect(dlg.innerHTML).not.toContain('VLC')
       w.unmount()
     } finally {
       el.remove()
