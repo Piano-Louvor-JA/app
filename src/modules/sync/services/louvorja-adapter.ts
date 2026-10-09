@@ -35,6 +35,10 @@ export const SYNC_MODIFIED_PREFIX = "sync.modified.v1";
 export type LouvorjaImportResult = {
 	applied: string[];
 	skipped: string[];
+	/** Timestamp LWW local da entidade liturgy (diagnóstico de skip — t_8bdaf97b). */
+	localModified?: string;
+	/** Timestamp `modified` declarado pelo pacote (diagnóstico de skip). */
+	packageModified?: string;
 };
 
 export function exportLouvorjaFromBrowser(
@@ -88,13 +92,16 @@ export function importLouvorjaIntoBrowser(
 ): LouvorjaImportResult {
 	const applied: string[] = [];
 	const skipped: string[] = [];
+	let localModified: string | undefined;
+	let packageModified: string | undefined;
 
 	for (const [name, entity] of Object.entries(pkg.entities)) {
 		switch (name) {
 			case "liturgy": {
-				const localTs = readModified("liturgy");
+				localModified = readModified("liturgy");
+				packageModified = entity.modified;
 				const remoteEpoch = toEpoch(entity.modified);
-				if (remoteEpoch > toEpoch(localTs)) {
+				if (remoteEpoch > toEpoch(localModified)) {
 					const current = getUserPreference<LiturgyPersistedState>(
 						USER_PREFERENCE_KEYS.liturgyState,
 						null,
@@ -140,7 +147,7 @@ export function importLouvorjaIntoBrowser(
 		}
 	}
 
-	return { applied, skipped };
+	return { applied, skipped, localModified, packageModified };
 }
 
 function toEpoch(iso: string): number {
