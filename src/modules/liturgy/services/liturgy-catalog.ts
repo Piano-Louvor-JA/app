@@ -28,6 +28,8 @@ type CatalogHymnalRow = {
 type CatalogMusicIndexRow = CatalogHymnalRow & {
   albums?: Array<{ id_album?: number | string; name?: string; track?: number | string | null }>
   albums_names?: string
+  /** Letra em texto corrido (presente em 1944/1956 músicas do índice). */
+  lyric?: string
 }
 
 type CatalogAlbumMusicRow = CatalogHymnalRow
@@ -199,6 +201,15 @@ function mapMusicIndexRow(row: CatalogMusicIndexRow): LiturgyMusicOption | null 
     albumNames.includes('Hinário Adventista') ||
     albumNames.includes('Hinário Adventista 1996')
 
+  // Issue #348 (item 2): letra já vem no índice `${prefix}_musics` — propaga
+  // normalizada (fold diacrítico) p/ a busca casar "nao temas" com "não temas".
+  const lyricsText = String(row.lyric ?? '')
+    .normalize('NFD')
+    .replace(/\u0300-\u036f/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase() || undefined
+
   return {
     id,
     name,
@@ -207,6 +218,7 @@ function mapMusicIndexRow(row: CatalogMusicIndexRow): LiturgyMusicOption | null 
     displayLabel: buildDisplayLabel(name, isHymnalAlbum ? hymnalTrack : null),
     durationMs: parseCatalogDurationMs(row.duration),
     hasInstrumental: hasInstrumentalFlag(row),
+    lyricsText,
   }
 }
 
@@ -422,15 +434,15 @@ export function filterLiturgyMusicOptions(
   let results = options.filter((entry) => {
     const title = entry.name
     const album = entry.albumNames
+    const lyrics = entry.lyricsText ?? ''
     if (isNum && numQuery != null) {
       return (
-        matchesAllTerms(title, album, trimmed) ||
+        matchesAllTerms(title, album, trimmed, lyrics) ||
         entry.hymnalTrack === numQuery
       )
     }
-    // Busca por termos (03/10): "jesus adoradores 5" acha a música "Jesus"
-    // do álbum "Adoradores 5" — substring contígua não existe em campo nenhum.
-    return matchesAllTerms(title, album, trimmed)
+    // Termos em título, álbum ou letra, com fold de acento (issue #348).
+    return matchesAllTerms(title, album, trimmed, lyrics)
   })
 
   if (isNum && numQuery != null) {
