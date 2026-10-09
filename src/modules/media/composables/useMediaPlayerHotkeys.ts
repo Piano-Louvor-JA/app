@@ -47,6 +47,7 @@ export function useMediaPlayerHotkeys(isProjectionWindow: () => boolean) {
     } catch {
       /* ignore */
     }
+    if (typeof document === 'undefined') return
     const active = document.activeElement
     if (active instanceof HTMLElement && active !== document.body) {
       const tag = active.tagName
@@ -95,10 +96,23 @@ export function useMediaPlayerHotkeys(isProjectionWindow: () => boolean) {
       getDesktopBridge()?.projection?.onMediaNavigate?.(onProjectionNavigate) ?? null
   })
 
+  // Timers de reclaim pendentes — cancelados no unmount pra não dispararem
+  // com o ambiente (document) já derrubado.
+  let reclaimTimers: number[] = []
+
+  function scheduleReclaims() {
+    // Projeção / transição de rota podem roubar o foco logo em seguida.
+    reclaimTimers.push(window.setTimeout(reclaimOperatorFocus, 50))
+    reclaimTimers.push(window.setTimeout(reclaimOperatorFocus, 200))
+    reclaimTimers.push(window.setTimeout(reclaimOperatorFocus, 500))
+  }
+
   onUnmounted(() => {
     window.removeEventListener('keydown', onKeyDown, true)
     unsubscribeIpc?.()
     unsubscribeIpc = null
+    for (const t of reclaimTimers) window.clearTimeout(t)
+    reclaimTimers = []
   })
 
   watch(
@@ -106,10 +120,7 @@ export function useMediaPlayerHotkeys(isProjectionWindow: () => boolean) {
     ([session, isMinimized]) => {
       if (session && !isMinimized && !isProjectionWindow()) {
         reclaimOperatorFocus()
-        // Projeção / transição de rota podem roubar o foco logo em seguida.
-        window.setTimeout(reclaimOperatorFocus, 50)
-        window.setTimeout(reclaimOperatorFocus, 200)
-        window.setTimeout(reclaimOperatorFocus, 500)
+        scheduleReclaims()
       }
     },
     { flush: 'post' },
