@@ -66,6 +66,15 @@ export type StageSettings = {
   textVerticalAlign: StageVerticalAlign
   footerRefColor: string
   footerRefWeight: number
+  /**
+   * Título (1º slide / capa): personalização própria. `null`/`undefined`
+   * = herda o estilo geral da letra (compatibilidade com salvos antigos).
+   */
+  titleFontSize: number | null // px @1920 (60–160); null = herda fontSize
+  titleFontWeight: StageFontWeight | null
+  titleTextColor: string | null
+  titleUpperCase: boolean
+  titleTextShadow: boolean | null
   showBibleVersion: boolean
   bibleFontSize: number // px @1920 (50–140)
   bibleFontWeight: 400 | 500 | 700
@@ -153,6 +162,11 @@ export const DEFAULT_STAGE_SETTINGS: StageSettings = {
   bibleFontSize: 84,
   bibleFontWeight: 500,
   bibleTextColor: '#FFFFFF',
+  titleFontSize: null,
+  titleFontWeight: null,
+  titleTextColor: null,
+  titleUpperCase: false,
+  titleTextShadow: null,
   backgroundImage: null,
 }
 
@@ -298,6 +312,12 @@ export function parseStageSettings(raw: unknown): StageSettings {
     bibleFontSize: clamp(asNumber(s['bSize'], 84), 50, 140),
     bibleFontWeight: BIBLE_WEIGHTS.includes(bibleWeight) ? bibleWeight : 500,
     bibleTextColor: asColor(s['bFg'], DEFAULT_STAGE_SETTINGS.bibleTextColor),
+    titleFontSize:
+      s['tSize'] == null ? null : clamp(asNumber(s['tSize'], 96), 60, 160),
+    titleFontWeight: s['tWeight'] == null ? null : (WEIGHTS.includes(asNumber(s['tWeight'], 600) as StageFontWeight) ? (asNumber(s['tWeight'], 600) as StageFontWeight) : null),
+    titleTextColor: s['tFg'] == null ? null : asColor(s['tFg'], DEFAULT_STAGE_SETTINGS.textColor),
+    titleUpperCase: typeof s['tUpper'] === 'boolean' ? s['tUpper'] : false,
+    titleTextShadow: typeof s['tsOnT'] === 'boolean' ? s['tsOnT'] : null,
     backgroundImage:
       typeof s['bgImg'] === 'string' &&
       (s['bgImg'].startsWith('data:') || s['bgImg'].startsWith(OFFICIAL_BG_PREFIX))
@@ -389,6 +409,11 @@ export function serializeStageSettings(s: StageSettings): Record<string, unknown
     bSize: s.bibleFontSize,
     bWeight: s.bibleFontWeight,
     bFg: s.bibleTextColor,
+    ...(s.titleFontSize != null ? { tSize: s.titleFontSize } : {}),
+    ...(s.titleFontWeight != null ? { tWeight: s.titleFontWeight } : {}),
+    ...(s.titleTextColor != null ? { tFg: s.titleTextColor } : {}),
+    ...(s.titleUpperCase ? { tUpper: true } : {}),
+    ...(s.titleTextShadow != null ? { tsOnT: s.titleTextShadow } : {}),
     bgImg: s.backgroundImage,
     ...(s.clock ? { clock: s.clock } : {}),
     ...(s.timer ? { timer: s.timer } : {}),
