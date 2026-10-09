@@ -9,7 +9,7 @@ import {
   listLocalCollections,
   listLocalMusics,
 } from '@modules/media/services/local-custom-store'
-import { matchesAllTerms } from "@shared/services/search-terms"
+import { matchesAllTerms } from '@shared/services/search-terms'
 
 import type {
   LiturgyBibleBookOption,
@@ -90,9 +90,9 @@ export function parseCatalogDurationMs(raw: unknown): number | null {
     if (parts.some((part) => !Number.isFinite(part))) return null
     let seconds = 0
     if (parts.length === 3) {
-      seconds = (parts[0] ?? 0) * 3600 + (parts[1] ?? 0) * 60 + (parts[2] ?? 0)
+      seconds = parts[0]! * 3600 + parts[1]! * 60 + parts[2]!
     } else if (parts.length === 2) {
-      seconds = (parts[0] ?? 0) * 60 + (parts[1] ?? 0)
+      seconds = parts[0]! * 60 + parts[1]!
     } else {
       return null
     }
@@ -282,7 +282,7 @@ async function loadCollectionOptions(
   }
 }
 
-function sortMusicOptions(options: LiturgyMusicOption[]): LiturgyMusicOption[] {
+export function sortMusicOptions(options: LiturgyMusicOption[]): LiturgyMusicOption[] {
   return [...options].sort((a, b) => {
     const trackA = a.hymnalTrack ?? Number.POSITIVE_INFINITY
     const trackB = b.hymnalTrack ?? Number.POSITIVE_INFINITY
@@ -307,9 +307,13 @@ async function mergeOperatorMusicOptions(
     name: string | null
     duration: number | null
     collectionName?: string
+    officialMusicId?: number | null
+    instrumentalUrl?: string | null
   }> = []
   try {
-    customs = await listAllCustomMusics()
+    // Catálogo remoto é opcional. Sem timeout, um host mudo segura o hydrate
+    // da liturgia mesmo com hinário e imports locais já disponíveis.
+    customs = await listAllCustomMusics({ timeoutMs: 4_000 })
   } catch {
     // offline/sem API: customs simplesmente não aparecem nesta carga
   }
@@ -320,14 +324,24 @@ async function mergeOperatorMusicOptions(
     if (byId.has(offsetId)) continue
     const name = String(custom.name ?? '').trim() || `Custom #${id}`
     const album = String(custom.collectionName ?? '').trim() || 'Minhas coletâneas'
+    const linkedOfficial = byId.get(Number(custom.officialMusicId))
     byId.set(offsetId, {
       id: offsetId,
       name,
       hymnalTrack: null,
       albumNames: album,
       displayLabel: `${name} — ${album}`,
-      durationMs: typeof custom.duration === 'number' ? custom.duration : null,
-      hasInstrumental: false,
+      // CustomMusicSummary.duration é segundos (enrichDurations / API).
+      // O item da liturgia espera ms; abaixo de ~500 s o clamp zeraria a duração.
+      durationMs:
+        typeof custom.duration === 'number' && custom.duration > 0
+          ? Math.round(custom.duration * 1000)
+          : linkedOfficial?.durationMs && linkedOfficial.durationMs > 0
+            ? linkedOfficial.durationMs
+            : null,
+      hasInstrumental:
+        Boolean(custom.instrumentalUrl?.trim()) ||
+        linkedOfficial?.hasInstrumental === true,
     })
   }
 

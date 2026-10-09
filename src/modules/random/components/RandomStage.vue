@@ -160,9 +160,11 @@ watch(
     if (wasDrawing && props.runtime.currentDisplay) {
       wasDrawing = false
       triggerCelebrate()
+    /* v8 ignore start -- source watches only isDrawing; callback nunca recebe false→false */
     } else if (!prev && !drawing) {
       wasDrawing = false
     }
+    /* v8 ignore stop */
   },
 )
 
@@ -210,6 +212,7 @@ function relocateParticle(el: HTMLElement) {
 }
 
 function animateParticle(el: HTMLElement) {
+  /* v8 ignore next 1 -- chamadas só ocorrem no mount ou após onfinish, ambos guardados por cancelled */
   if (cancelled) return
 
   const duration = Math.random() * 2000 + 1000

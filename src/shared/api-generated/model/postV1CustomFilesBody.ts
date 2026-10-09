@@ -13,7 +13,7 @@ import type { PostV1CustomFilesBodyKind } from './postV1CustomFilesBodyKind';
 
 export type PostV1CustomFilesBody = {
   /** Arquivo (mp3, png, jpg, bmp...) */
-  file: Blob | File;
+  file?: Blob | File;
   /** Subpasta de destino */
   kind?: PostV1CustomFilesBodyKind;
 };

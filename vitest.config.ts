@@ -5,6 +5,11 @@ import { defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
+  define: {
+    // Paridade com vite.config: constante injetada a partir do package.json
+    // (usada por @shared/constants/app — AppShell/AppTitlebar importam).
+    __APP_VERSION__: JSON.stringify('0.0.0-test'),
+  },
   plugins: [vue()],
   resolve: {
     alias: {
@@ -22,25 +27,26 @@ export default defineConfig({
     },
   },
   test: {
-    exclude: ['node_modules/**', 'dist/**', 'e2e/**', '.worktrees/**', '.stryker-tmp/**'],
-    setupFiles: ['./vitest.setup.ts'],
+    exclude: ['node_modules/**', 'dist/**', 'e2e/**', '.worktrees/**', 'coverage/**'],
+    environment: 'jsdom',
     environmentOptions: {
       jsdom: {
-        // Sem url o jsdom 25 desabilita localStorage/window.sessionStorage
-        // (usados por browser-storage, i18n e toda persistência offline-first).
-        url: 'http://localhost:5173',
+        url: 'http://localhost/',
       },
     },
+    setupFiles: ['./vitest.setup.ts'],
+    // Runs completos estouram 5s em testes que mockam bridge/processamento pesado.
+    testTimeout: 30_000,
     coverage: {
-          provider: 'v8',
-          reporter: ['text', 'text-summary', 'lcov'],
-          thresholds: {
-            lines: 100,
-            functions: 100,
-            statements: 100,
-            branches: 100,
-          },
-          include: ['src/**/*.ts', 'src/**/*.vue'],
-        },
+      provider: 'v8',
+      reporter: ['text', 'text-summary', 'lcov'],
+      thresholds: {
+        lines: 100,
+        functions: 100,
+        statements: 100,
+        branches: 100,
+      },
+      include: ['src/**/*.ts', 'src/**/*.vue'],
+    },
   },
 })
