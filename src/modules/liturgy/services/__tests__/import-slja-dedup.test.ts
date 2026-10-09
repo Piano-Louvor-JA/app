@@ -21,7 +21,6 @@ const mocks = vi.hoisted(() => ({
   updateCustomMusic: vi.fn(),
   parseSljaFile: vi.fn(),
   sha256Hex: vi.fn(),
-  sha256ToUuid: vi.fn(),
   getAuthSession: vi.fn(),
 }))
 
@@ -41,8 +40,7 @@ vi.mock('@shared/services/slja', () => ({
   parseSljaFile: mocks.parseSljaFile,
 }))
 
-vi.mock('@shared/services/content-hash', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@shared/services/content-hash')>()),
+vi.mock('@shared/services/content-hash', () => ({
   sha256Hex: mocks.sha256Hex,
 }))
 
