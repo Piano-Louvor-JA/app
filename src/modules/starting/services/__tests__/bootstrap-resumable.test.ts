@@ -42,9 +42,11 @@ vi.mock('@modules/sync/services/library-catalog', () => ({
 
 import {
   isBootstrapComplete,
+  prepareFreshInstall,
   syncEssentialCatalogFromApi,
 } from '../bootstrap-service'
 import { fetchRemoteCatalogJson } from '@shared/services/remote-catalog'
+import { clearWorkspace } from '@shared/services/workspace-api'
 
 const FILES = [
   'pt_categories',
@@ -59,6 +61,26 @@ describe('bootstrap retomável por arquivo (app#337)', () => {
   beforeEach(() => {
     store.clear()
     vi.mocked(fetchRemoteCatalogJson).mockClear()
+  })
+
+  it('B1: instalação parcial sem marcador não é apagada no retry', async () => {
+    // Evidência SrCaldeira: 5 catálogos presentes, mas bootstrapComplete.files ausente.
+    store.set('pt_categories', { saved: true })
+
+    await prepareFreshInstall()
+
+    expect(clearWorkspace).not.toHaveBeenCalled()
+  })
+
+  it('B1: instalação parcial sem marcador retoma só o arquivo ausente', async () => {
+    for (const file of FILES.filter((file) => file !== 'pt_musics')) {
+      store.set(file, { saved: true })
+    }
+
+    await syncEssentialCatalogFromApi(() => {})
+
+    expect(fetchRemoteCatalogJson).toHaveBeenCalledTimes(1)
+    expect(fetchRemoteCatalogJson).toHaveBeenCalledWith('pt_musics')
   })
 
   it('B3: bootstrap completo grava a lista de arquivos concluídos', async () => {
@@ -102,11 +124,23 @@ describe('bootstrap retomável por arquivo (app#337)', () => {
     ).toBe(0)
   })
 
+  it('B3: flag legada sem marcador não aceita instalação parcial', async () => {
+    store.set('bootstrapComplete', { complete: true })
+    for (const file of FILES.filter((file) => file !== 'pt_musics')) {
+      store.set(file, { saved: true })
+    }
+
+    expect(await isBootstrapComplete()).toBe(false)
+  })
+
   it('B3: isBootstrapComplete só true com TODOS os arquivos', async () => {
     store.set('bootstrapComplete', { complete: true })
     store.set('bootstrapComplete.files', { files: FILES.slice(0, 2) })
     expect(await isBootstrapComplete()).toBe(false)
     store.set('bootstrapComplete.files', { files: FILES })
+    for (const file of FILES) {
+      store.set(file, { saved: true })
+    }
     expect(await isBootstrapComplete()).toBe(true)
   })
 })
