@@ -278,27 +278,76 @@ const { t } = useI18n()
     box-shadow: 0 10px 20px rgb(0 0 0 / 0.3);
   }
 
+  // ═══════════════════════════════════════════════════
+  //  ANTIGO TESTAMENTO
+  //  Base: azul (Lei), verde (História), marrom-âmbar (Profetas)
+  // ═══════════════════════════════════════════════════
+
+  // Lei — azul
   &--law {
     background: color-mix(in srgb, #3b82f6 18%, transparent);
     color: #93c5fd;
   }
 
+  // História — verde
   &--history {
     background: color-mix(in srgb, #22c55e 12%, transparent);
     color: color-mix(in srgb, #86efac 85%, transparent);
   }
 
-  &--prophets {
+  // Poesia — âmbar-clara
+  &--poetry {
+    background: color-mix(in srgb, #d97706 14%, transparent);
+    color: color-mix(in srgb, #fef3c7 85%, transparent);
+  }
+
+  // Profetas Maiores — âmbar
+  &--major-prophet {
     background: color-mix(in srgb, #ca8a04 14%, transparent);
     color: color-mix(in srgb, #fde68a 85%, transparent);
   }
 
+  // Profetas Menores — âmbar-escura
+  &--minor-prophet {
+    background: color-mix(in srgb, #b45309 14%, transparent);
+    color: color-mix(in srgb, #fcd34d 85%, transparent);
+  }
+
+  // ═══════════════════════════════════════════════════
+  //  NOVO TESTAMENTO
+  //  Base: roxo (Evangelhos) com variações na família púrpura/violeta
+  // ═══════════════════════════════════════════════════
+
+  // Evangelhos — roxo
   &--gospels {
     background: color-mix(in srgb, #a855f7 12%, transparent);
     color: color-mix(in srgb, #d8b4fe 85%, transparent);
   }
 
-  &--letters,
+  // Atos — roxo-azulada (transição Evangelhos → Cartas)
+  &--acts {
+    background: color-mix(in srgb, #6366f1 12%, transparent);
+    color: color-mix(in srgb, #c7d2fe 85%, transparent);
+  }
+
+  // Cartas Paulinas — violeta
+  &--pauline {
+    background: color-mix(in srgb, #8b5cf6 12%, transparent);
+    color: color-mix(in srgb, #ddd6fe 85%, transparent);
+  }
+
+  // Cartas Gerais — índigo
+  &--general {
+    background: color-mix(in srgb, #7c3aed 12%, transparent);
+    color: color-mix(in srgb, #d0bcfe 85%, transparent);
+  }
+
+  // Apocalipse — púrpura-profundo (escatológico)
+  &--apocalyptic {
+    background: color-mix(in srgb, #c026d3 12%, transparent);
+    color: color-mix(in srgb, #f3e8ff 85%, transparent);
+  }
+
   &--neutral {
     background: color-mix(in srgb, white 5%, transparent);
     color: var(--ds-color-on-surface-variant);
@@ -365,16 +414,53 @@ const { t } = useI18n()
   border-color: #4ade80;
 }
 
-[data-mode='light'] .bible-books__tile--prophets {
+[data-mode='light'] .bible-books__tile--prophets,
+[data-mode='light'] .bible-books__tile--major-prophet {
   background: #fecaca;
   color: #991b1b;
   border-color: #f87171;
+}
+
+[data-mode='light'] .bible-books__tile--poetry {
+  background: #fef3c7;
+  color: #78350f;
+  border-color: #d97706;
+}
+
+[data-mode='light'] .bible-books__tile--minor-prophet {
+  background: #fed7aa;
+  color: #9a3412;
+  border-color: #fb923c;
 }
 
 [data-mode='light'] .bible-books__tile--gospels {
   background: #e9d5ff;
   color: #6b21a8;
   border-color: #c084fc;
+}
+
+[data-mode='light'] .bible-books__tile--acts {
+  background: #c7d2fe;
+  color: #3730a3;
+  border-color: #818cf8;
+}
+
+[data-mode='light'] .bible-books__tile--pauline {
+  background: #ddd6fe;
+  color: #5b21b6;
+  border-color: #a78bfa;
+}
+
+[data-mode='light'] .bible-books__tile--general {
+  background: #e9d5ff;
+  color: #6b21a8;
+  border-color: #c084fc;
+}
+
+[data-mode='light'] .bible-books__tile--apocalyptic {
+  background: #f3e8ff;
+  color: #86198f;
+  border-color: #d946ef;
 }
 
 [data-mode='light'] .bible-books__tile--letters,
