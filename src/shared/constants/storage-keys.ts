@@ -34,6 +34,7 @@ export const USER_PREFERENCE_KEYS = {
 /** Registros do workspace em disco (`.sysdata/*.bin`). */
 export const WORKSPACE_RECORD_KEYS = {
   bootstrapComplete: 'bootstrap_complete',
+  downloadQueue: 'download_queue',
   coversSynced: 'covers_synced',
   downloadedAlbums: 'downloaded_albums',
   config: 'config',

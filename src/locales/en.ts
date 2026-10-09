@@ -1,4 +1,8 @@
 export default {
+  apiOffline: {
+    message: 'No connection to the service \u2014 check your internet',
+    retrying: 'Trying to reconnect...',
+  },
   projection: {
     confirmClose: 'Projection is in progress. Closing this window stops the music. Really leave?',
   },
@@ -42,5 +46,19 @@ export default {
     bible: 'Bible',
     utilities: 'Utilities',
     settings: 'Settings',
+    },
+  sync: {
+    downloadQueue: {
+      title: 'Downloads',
+      clearFinished: 'Clear finished',
+      retry: 'Retry',
+      cancel: 'Cancel',
+    },
+  },
+sljaMigration: {
+    title: 'Upload {count} imported hymn(s) to your account?',
+    message: 'You imported .slja files while logged out. They can go to your account (a single copy, never duplicated) and be available on any device.',
+    confirm: 'Upload to account',
+    cancel: 'Keep on this device only',
   },
 }

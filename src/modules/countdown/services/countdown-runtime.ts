@@ -1,7 +1,6 @@
 import {
   DEFAULT_COUNTDOWN_DURATION_MS,
   DEFAULT_COUNTDOWN_RUNTIME,
-  type CountdownMode,
   type CountdownRuntimeState,
   type CountdownStatus,
 } from '../types/countdown'
@@ -27,10 +26,6 @@ function asNumberArray(value: unknown): number[] {
   return value.filter((item): item is number => typeof item === 'number' && Number.isFinite(item))
 }
 
-function asMode(value: unknown): CountdownMode {
-  return value === 'until' ? 'until' : 'duration'
-}
-
 function asHour(value: unknown, fallback: number): number {
   const n = asNumber(value, fallback)
   return Math.min(23, Math.max(0, Math.floor(n)))
@@ -54,19 +49,20 @@ export function normalizeCountdownRuntime(raw: unknown): CountdownRuntimeState {
 
   return {
     status: asStatus(source.status),
-    projecting: source.projecting === true,
     segmentStartedAt: asNumberOrNull(source.segmentStartedAt),
     accumulatedMs: asNumber(source.accumulatedMs, 0),
     durationMs: Math.max(0, asNumber(source.durationMs, DEFAULT_COUNTDOWN_DURATION_MS)),
     savedTimesMs: asNumberArray(source.savedTimesMs),
     finished: source.finished === true,
-    mode: asMode(source.mode),
-    untilHour: asHour(source.untilHour, DEFAULT_COUNTDOWN_RUNTIME.untilHour ?? 18),
-    untilMinute: asMinute(
-      source.untilMinute,
-      DEFAULT_COUNTDOWN_RUNTIME.untilMinute ?? 0,
-    ),
+    mode: source.mode === 'until' ? 'until' : 'duration',
+    untilHour: asHour(source.untilHour, 18),
+    untilMinute: asMinute(source.untilMinute, 0),
     pausedRemainingMs: asNumberOrNull(source.pausedRemainingMs),
+    // app desktop: CountdownProjectionView consome a flag de janela viva.
+    // Ausente = true (sem info assume viva); inválido = false (o seguro).
+    ...(source.projecting === undefined
+      ? {}
+      : { projecting: source.projecting === true }),
   }
 }
 
