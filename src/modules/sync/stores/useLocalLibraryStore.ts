@@ -23,6 +23,11 @@ import {
   resolveAlbumIdsForMusic,
   unmarkAlbumAsDownloaded,
 } from '../services/library-download'
+import {
+  cancelDownload,
+  downloadQueueSnapshot,
+  enqueueDownload,
+} from '../services/download-queue-service'
 
 function findAlbum(
   categories: LibraryCategory[],
@@ -187,27 +192,57 @@ export const useLocalLibraryStore = defineStore('localLibrary', () => {
 
     const isCurrent = () => albumDownloadGen.get(albumKey) === gen
 
+    // app#338: o download passa pela fila unificada (feedback visual no
+    // widget do header). Priority 'user' — pedido na hora pelo usuário.
     try {
-      const result = await downloadAlbumMedia(album, {
-        onPrepareProgress: (percent) => {
-          if (!isCurrent() || album.cancelRequested) return
-          album.progress = percent
-          album.progressText = 'sync.progress.preparing'
-        },
-        onDownloadProgress: (downloaded, total, percent) => {
-          if (!isCurrent() || album.cancelRequested) return
-          album.downloadedCount = downloaded
-          album.totalCount = total
-          album.progress = percent
-          album.progressText = 'sync.progress.downloading'
-        },
-        /* v8 ignore start -- true sides exercidos via hooks capturado no teste de batch cancelado (remap V8 em bin-expr) */
-        shouldAbort: () =>
-          !isCurrent() ||
-          album.cancelRequested ||
-          (isDownloadingBatch.value && cancelBatchRequested.value),
-        /* v8 ignore stop */
-      })
+      const queueId = `album:${album.id}`
+      const execute = () =>
+        downloadAlbumMedia(album, {
+          onPrepareProgress: (percent) => {
+            if (!isCurrent() || album.cancelRequested) return
+            album.progress = percent
+            album.progressText = 'sync.progress.preparing'
+          },
+          onDownloadProgress: (downloaded, total, percent) => {
+            if (!isCurrent() || album.cancelRequested) return
+            album.downloadedCount = downloaded
+            album.totalCount = total
+            album.progress = percent
+            album.progressText = 'sync.progress.downloading'
+          },
+          /* v8 ignore start -- true sides exercidos via hooks capturado no teste de batch cancelado (remap V8 em bin-expr) */
+          shouldAbort: () =>
+            !isCurrent() ||
+            album.cancelRequested ||
+            (isDownloadingBatch.value && cancelBatchRequested.value),
+          /* v8 ignore stop */
+        })
+
+      const existing = downloadQueueSnapshot().find((item) => item.id === queueId)
+      const slotBusy = existing?.status === 'pending' || existing?.status === 'running'
+
+      // A fila espera 50ms antes de pegar o item. O download em si começa já,
+      // para um segundo pedido no mesmo turno enxergar o primeiro em voo e
+      // invalidar a geração. Slot ocupado corre em paralelo, sem pendurar.
+      const result = slotBusy
+        ? await execute()
+        : await new Promise<Awaited<ReturnType<typeof downloadAlbumMedia>>>((resolve, reject) => {
+            if (existing) cancelDownload(queueId)
+            const job = execute()
+            enqueueDownload({
+              id: queueId,
+              label: album.name,
+              priority: 'user',
+              task: async () => {
+                try {
+                  resolve(await job)
+                } catch (error) {
+                  reject(error instanceof Error ? error : new Error(String(error)))
+                  throw error
+                }
+              },
+            })
+          })
 
       if (!isCurrent() || album.cancelRequested) {
         if (isCurrent()) {
