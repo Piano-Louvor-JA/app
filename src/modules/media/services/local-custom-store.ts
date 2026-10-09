@@ -51,7 +51,7 @@ export type LocalCollection = {
 	createdAt: string;
 };
 
-type LocalDb = {
+export type LocalDb = {
 	nextCollectionId: number; // negativo, decrementa
 	nextMusicId: number;
 	nextLyricId: number;
@@ -59,7 +59,7 @@ type LocalDb = {
 	musics: LocalMusic[];
 };
 
-function emptyDb(): LocalDb {
+export function emptyDb(): LocalDb {
 	return {
 		nextCollectionId: -1,
 		nextMusicId: -1,
@@ -72,6 +72,17 @@ function emptyDb(): LocalDb {
 export function isLocalId(id: number | string | null | undefined): boolean {
 	const n = Number(id);
 	return Number.isFinite(n) && n < 0;
+}
+
+
+/** Lê o db completo (uso do sync `.louvorja`). */
+export function loadLocalDb(): LocalDb {
+	return loadDb();
+}
+
+/** Substituição TOTAL do db local (sync `.louvorja`). false = quota/storage falhou. */
+export function replaceLocalDb(next: LocalDb): boolean {
+	return saveDb(next);
 }
 
 function loadDb(): LocalDb {
