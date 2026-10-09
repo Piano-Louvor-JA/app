@@ -22,7 +22,7 @@ function isProjectionContext(): boolean {
   if (typeof window === 'undefined') return false
   if (new URLSearchParams(window.location.search).has('projection')) return true
   try {
-    return window.opener !== null && window.opener !== window
+    return window.opener != null && window.opener !== window
   } catch {
     return false
   }

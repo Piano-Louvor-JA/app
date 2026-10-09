@@ -12,9 +12,10 @@ describe('useApiConnectivity (issue 321)', () => {
     fetchMock.mockReset()
     vi.useFakeTimers()
   })
-  afterEach(() => {
+  afterEach(async () => {
+    const mod = await import('../useApiConnectivity')
+    mod.useApiConnectivity().stop()
     vi.useRealTimers()
-    vi.resetModules()
   })
 
   async function load() {
