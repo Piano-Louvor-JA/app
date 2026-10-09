@@ -163,6 +163,11 @@ export function getLocalMusic(id: number): LocalMusic | null {
 	return loadDb().musics.find((m) => m.id === id) ?? null;
 }
 
+/** Todas as músicas locais de todas as coletâneas (busca por letra, 03/10). */
+export function listAllLocalMusicsWithLyrics(): LocalMusic[] {
+	return loadDb().musics;
+}
+
 /** Música local importada do mesmo arquivo .slja (dedupe por content hash). */
 export function findLocalMusicBySljaHash(hash: string): LocalMusic | null {
 	const db = loadDb();
