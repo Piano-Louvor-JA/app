@@ -34,6 +34,16 @@ vi.mock('@shared/services/remote-catalog', () => ({
   fetchRemoteCatalogJson: fetchRemoteCatalogJsonMock,
 }))
 
+vi.mock('@modules/media/services/custom-catalog', () => ({
+  listAllCustomMusics: async () => [],
+  toCustomMusicId: (id: number) => 1_000_000 + id,
+}))
+
+vi.mock('@modules/media/services/local-custom-store', () => ({
+  listLocalCollections: () => [],
+  listLocalMusics: () => [],
+}))
+
 function setEnv(key: string, value: string | undefined) {
   if (value === undefined) {
     delete (import.meta.env as Record<string, unknown>)[key]
