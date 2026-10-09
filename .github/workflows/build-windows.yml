@@ -53,14 +53,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload Microsoft Store .appxupload
+      # electron-builder gera .appx; Partner Center aceita esse pacote diretamente.
+      - name: Upload Microsoft Store .appx
         if: steps.store.outputs.enabled == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: LouvorJA-PIANO-MicrosoftStore-appxupload
-          path: |
-            dist-electron/*.appxupload
-            dist-electron/*.appxsym
+          name: LouvorJA-PIANO-MicrosoftStore-appx
+          path: dist-electron/*.appx
           if-no-files-found: error
           retention-days: 30
 
