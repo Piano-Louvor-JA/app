@@ -16,10 +16,12 @@ import UtilitiesView from '../UtilitiesView.vue'
 const i18n = createI18n({ legacy: false, locale: 'pt-BR', messages: { 'pt-BR': { utilities: { title: 'Utilitários', subtitle: 'Ferramentas' } } } })
 
 describe('UtilitiesView', () => {
-  it('renderiza header e 3 cards', () => {
+  it('renderiza header e o card desabilitado do OBS', () => {
     const w = mount(UtilitiesView, { global: { plugins: [i18n] } })
     expect(w.find('.utilities-view__title').text()).toBe('Utilitários')
-    expect(w.findAll('.hub-stub')).toHaveLength(3)
+    const cards = w.findAll('.hub-stub')
+    expect(cards).toHaveLength(4)
+    expect(cards.map((card) => card.text())).toContain('utilities.obs')
     w.unmount()
   })
 })
