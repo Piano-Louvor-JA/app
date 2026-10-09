@@ -9,12 +9,15 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@modules/media/services/auth-client', () => ({
 	getAuthSession: mocks.getSession,
-	authHeaders: (token?: string | null) =>
+	authHeaders: (token: string | null | undefined = mocks.getSession()?.token) =>
 		token ? { Authorization: `Bearer ${token}` } : {},
 }))
 
 import {
 	createCustomCollection,
+ listAllCustomMusics,
+ listCustomMusics,
+ createCustomLyric,
 	listCustomCollections,
 	updateCustomCollection,
 } from '../custom-catalog'
@@ -235,3 +238,33 @@ describe('custom-catalog — exceções de rede (catch)', () => {
 		expect(all).toEqual([])
 	})
 })
+
+ it('normaliza duração numérica e HH:MM:SS da API em segundos', async () => {
+   mocks.getSession.mockReturnValue({ token: 'tok' } as never)
+   vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ data: [
+     { id_music: 1, name: 'A', duration: '240' },
+     { id_music: 2, name: 'B', duration: '00:04:00' },
+   ] })))
+   const rows = await listAllCustomMusics()
+   expect(rows.map(row => row.duration)).toEqual([240, 240])
+ })
+
+ it('retorna null no contrato do editor quando letra local não persiste', async () => {
+   const { createLocalCollection, createLocalMusic } = await import('../local-custom-store')
+   const collection = createLocalCollection('Quota')
+   const music = createLocalMusic(collection.id, { name: 'Quota' })
+   const write = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+     throw new DOMException('Quota', 'QuotaExceededError')
+   })
+   try {
+     await expect(createCustomLyric(music.id, { lyric: 'Verso' })).resolves.toBeNull()
+   } finally { write.mockRestore() }
+ })
+
+ it('consulta músicas da coletânea privada com credenciais', async () => {
+   mocks.getSession.mockReturnValue({ token: 'tok' } as never)
+   const fetcher = vi.fn(async () => jsonResponse({ data: [] }))
+   vi.stubGlobal('fetch', fetcher)
+   await listCustomMusics(55)
+   expect(fetcher).toHaveBeenCalledWith(expect.stringContaining('/collections/55/musics'), { headers: { Authorization: 'Bearer tok' } })
+ })

@@ -1,0 +1,15 @@
+name: CI review comment
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+
+permissions:
+  checks: read
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  ci-review:
+    uses: Piano-Louvor-JA/.github/.github/workflows/ci-review-comment.yml@d6d57765ac0e36c7bdcdf1cf0f9782ec51dfab20
