@@ -100,6 +100,7 @@ function preferredHymnalTrack(
     if (track != null && track > 0) return { track, isHymnal: true }
   }
 
+  /* v8 ignore next 3 -- se algum hinário tem track>0 os loops acima já retornaram */
   if (hymnalTracks[0] != null) {
     return { track: hymnalTracks[0], isHymnal: true }
   }

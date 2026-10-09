@@ -38,6 +38,8 @@ const {
   openDisplayConfig,
   closeDisplayConfig,
   setDurationMs,
+  setCountdownMode,
+  setUntilTime,
   setAllowNegative,
   setAlertTonePreset: _setAlertTonePreset,
   audioMuted,
@@ -385,7 +387,7 @@ const effectiveConfig = computed(() => {
                                 <span>{{ t('countdown.scheduleStartEnd') }}</span>
                               </label>
                             </div>
-                            
+
 </div>
                         </Transition>
 
@@ -421,14 +423,20 @@ const effectiveConfig = computed(() => {
                           <CountdownDurationInput
                             v-else
                             :duration-ms="runtime.durationMs"
+:mode="runtime.mode"
+:until-hour="runtime.untilHour"
+:until-minute="runtime.untilMinute"
                             :disabled="isRunning"
                             compact
                             @update:duration-ms="setDurationMs"
+@update:mode="setCountdownMode"
+@update:until="setUntilTime"
                           />
                         </div>
             <CountdownPreview
               :config="effectiveConfig"
               :runtime="sabbathIdlePreviewRuntime ?? runtime"
+:stage="stage"
               preview
             />
           </div>
@@ -641,6 +649,8 @@ const effectiveConfig = computed(() => {
           :config="effectiveConfig"
           @close="closeDisplayConfig"
           @update:time-format="setTimeFormat"
+@update:bg-color="setBgColor"
+@update:text-color="setTextColor"
           @update:allow-negative="setAllowNegative"
           @update:mode="patchMode"
           @update:sabbath-config="patchSabbathConfig"
