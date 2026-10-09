@@ -226,5 +226,5 @@ test('workflows preservam a publicação padrão e omitem só a promoção marca
   assert.match(workflows['build-windows.yml'], /gh release upload/)
   assert.match(workflows['build-windows.yml'], /if: steps\.decision\.outputs\.publish == 'true'/)
   assert.match(workflows['build-flatpak.yml'], /needs: decide/)
-  assert.ok(workflows['build-flatpak.yml'].includes('uploads.github.com'))
+  assert.ok(workflows['build-flatpak.yml'].includes('name=louvorja-piano.flatpak'))
 })
