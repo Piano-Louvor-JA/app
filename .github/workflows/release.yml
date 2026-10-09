@@ -208,8 +208,6 @@ jobs:
       # Required future secrets: AUR_SSH_PRIVATE_KEY, SNAPCRAFT_STORE_CREDENTIALS,
       # COPR_CONFIG, OBS_API_TOKEN, GPG_PRIVATE_KEY.
 
-  # Flatpak must be submitted to Flathub first. Flathub builds it from its own repo.
-  # Do not upload a locally built Flatpak as a substitute for the Flathub submission.
   # Snap stays disabled until core/base compatibility passes on both architectures.
   # PPA stays disabled until Debian source packaging exists.
   # VoidBR merge remains maintainer-controlled.
