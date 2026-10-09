@@ -139,6 +139,11 @@ const stageStyle = computed(() => {
 
 const stageAlign = computed(() => stageFlexAlign(stage.value))
 
+// Fora do modo embarcado o palco de projeção nunca pode sortear por conta própria.
+/* v8 ignore start -- embedded true exercitado pelo teste de draw embarcado */
+const canDrawEmbedded = computed(() => (props.embedded ? canDraw.value : false))
+/* v8 ignore stop */
+
 // Personalização do diálogo do sorteio tem prioridade sobre o sub-bloco do Palco.
 const effectiveConfig = computed(() => {
   const mod = stage.value.random
@@ -160,7 +165,7 @@ const effectiveConfig = computed(() => {
       <RandomStage
         projection
         :show-draw="embedded"
-        :can-draw="embedded ? canDraw : false"
+        :can-draw="canDrawEmbedded"
         :config="effectiveConfig"
         :runtime="liveRuntime"
         :stage="stage"

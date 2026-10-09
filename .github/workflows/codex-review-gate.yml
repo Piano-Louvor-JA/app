@@ -1,0 +1,96 @@
+name: Codex Review Gate
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review, edited]
+  issue_comment:
+    types: [created, edited]
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: Número do PR a conferir
+        required: true
+        type: number
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+  checks: write
+
+jobs:
+  verify:
+    if: >-
+      (github.event_name != 'pull_request_target' || (github.event.pull_request.base.ref == 'main' && github.actor != 'dependabot[bot]')) &&
+      (github.event_name != 'issue_comment' ||
+      (github.event.issue.pull_request &&
+      (github.event.comment.user.login == 'chatgpt-codex-connector[bot]' || (github.event.comment.body == '@codex review' && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)))))
+    # Comentários sem vínculo com o repositório não iniciam a verificação.
+    # Uma execução ativa termina seu check antes da próxima execução do grupo.
+    concurrency:
+      group: codex-review-gate-${{ github.event.pull_request.number || github.event.issue.number || inputs.pr || github.event.workflow_run.head_sha }}
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      # Sem checkout: nunca executa código ou dependências do PR com token de escrita.
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner, repo} = context.repo;
+            let number = context.payload.pull_request?.number || context.payload.issue?.number || Number(context.payload.inputs?.pr);
+            // workflow_run executa na branch padrão com token de escrita, inclusive
+            // após CI disparado pelo Dependabot. Nunca executa código/artifacts do run.
+            const ciRun = context.payload.workflow_run;
+            if (ciRun) {
+              if (ciRun.repository?.full_name !== `${owner}/${repo}`) return;
+              const candidates = await github.paginate(github.rest.pulls.list, {owner, repo, state: 'open', per_page: 100});
+              number = candidates.find(p => p.head.sha === ciRun.head_sha && p.base.ref === 'main')?.number;
+            }
+            if (!number) return;
+            const {data: pr} = await github.rest.pulls.get({owner, repo, pull_number: number});
+            // Todos os gatilhos, inclusive comentários e execução manual, respeitam a base.
+            if (pr.state !== 'open' || pr.base.ref !== 'main') return;
+            const sha = pr.head.sha;
+            const name = 'Codex Review Complete';
+            const {data: check} = await github.rest.checks.create({
+              owner, repo, name, head_sha: sha, status: 'in_progress',
+              output: {title: 'Aguardando revisão do Codex', summary: 'O Codex precisa concluir a revisão deste commit. Use @codex review no PR se necessário.'}
+            });
+            async function finish(conclusion, title, summary) {
+              await github.rest.checks.update({owner, repo, check_run_id: check.id, status: 'completed', conclusion, output: {title, summary}});
+            }
+            try {
+              if (pr.draft) {
+                await finish('failure', 'PR em rascunho', 'Marque o PR como pronto para revisão e aguarde o Codex.');
+                return;
+              }
+              for (let attempt = 0; attempt < 30; attempt++) {
+                const {data: current} = await github.rest.pulls.get({owner, repo, pull_number: number});
+                if (current.head.sha !== sha || current.state !== 'open' || current.base.ref !== 'main') {
+                  await finish('cancelled', 'PR alterado', 'Uma nova execução deve validar o commit atual.');
+                  return;
+                }
+                const comments = await github.paginate(github.rest.issues.listComments, {owner, repo, issue_number: number, per_page: 100});
+                const summary = comments.filter(c => c.user?.login === 'chatgpt-codex-connector[bot]' && c.user?.type === 'Bot' && c.body?.includes('<!-- codex-pull-request-review-summary -->')).sort((a,b) => b.id - a.id)[0];
+                const row = summary?.body?.split('\n').find(line => /^\|.*\*\*Code Review\*\*/.test(line));
+                const reviewed = row?.match(/`([a-f0-9]{7,40})`/)?.[1];
+                if (row?.includes('**Completed**') && reviewed && sha.startsWith(reviewed)) {
+                  // Resolve também o hash abreviado; prefixo sozinho não comprova identidade.
+                  const {data: commit} = await github.rest.repos.getCommit({owner, repo, ref: reviewed});
+                  if (commit.sha === sha) {
+                    await finish('success', 'Revisão do Codex concluída', `O Codex concluiu a revisão do commit ${sha}. A resolução dos apontamentos e a aprovação humana são exigidas pelas regras da branch.`);
+                    return;
+                  }
+                }
+                if (attempt < 29) await new Promise(resolve => setTimeout(resolve, 20000));
+              }
+              await finish('failure', 'Revisão ainda não confirmada', 'Não foi encontrada revisão concluída do Codex para este commit no prazo de 10 minutos. Solicite @codex review; a atualização do resumo dispara nova verificação.');
+            } catch (error) {
+              await finish('failure', 'Não foi possível confirmar a revisão', 'Falha ao consultar a revisão. Execute novamente este workflow após conferir a integração.');
+              throw error;
+            }

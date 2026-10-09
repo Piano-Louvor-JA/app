@@ -1,6 +1,7 @@
 import { fetchRemoteCatalogJson } from '@shared/services/remote-catalog'
 import { readCatalogRecord } from '@shared/services/workspace-api'
 import { getCurrentApiPrefix } from '@modules/sync/services/library-catalog'
+import { matchesAllTerms } from "@shared/services/search-terms"
 
 import type { AlbumSearchHit } from '../types/albums'
 import { formatCatalogDuration } from './album-tracks'
@@ -99,6 +100,7 @@ function preferredHymnalTrack(
     if (track != null && track > 0) return { track, isHymnal: true }
   }
 
+  /* v8 ignore next 3 -- se algum hinário tem track>0 os loops acima já retornaram */
   if (hymnalTracks[0] != null) {
     return { track: hymnalTracks[0], isHymnal: true }
   }
@@ -187,17 +189,18 @@ export function filterAlbumMusicIndex(
   const numQuery = isNum ? Number(trimmed) : null
 
   let results = index.filter((entry) => {
-    const title = entry.name.toLowerCase()
-    const album = entry.albumNames.toLowerCase()
+    const title = entry.name
+    const album = entry.albumNames
     if (isNum && numQuery != null) {
       return (
         entry.track === numQuery ||
         (entry.hymnalTracks ?? []).includes(numQuery) ||
-        title.includes(trimmed) ||
-        album.includes(trimmed)
+        matchesAllTerms(title, album, trimmed)
       )
     }
-    return title.includes(trimmed) || album.includes(trimmed)
+    // Busca por termos (03/10): "jesus adoradores 5" acha a música "Jesus"
+    // do álbum "Adoradores 5" — substring contígua não existe em campo nenhum.
+    return matchesAllTerms(title, album, trimmed)
   })
 
   if (isNum && numQuery != null) {
