@@ -49,7 +49,7 @@ jobs:
       # package.json quando as env MS_STORE_* estão ausentes e restaura
       # o arquivo ao final — mesmo comportamento local e no CI.
       - name: Build Vite + Electron NSIS + Portable (x64) + publish
-        run: npm run electron:build -- --win --x64 --publish always
+        run: npm run electron:build -- --win --x64 --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
