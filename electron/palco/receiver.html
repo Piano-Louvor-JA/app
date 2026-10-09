@@ -2463,6 +2463,10 @@ var qrcode = function() {
 
 </script>
 <script>
+(function(){
+window.handle=handle;
+window.proxyUrl=palcoMediaUrl;
+window.trustedCloudApi=trustedCloudApi;
 function dlog(m1,m2,m3){try{const clean=value=>String(value===undefined?'':value).replace(/[\x00-\x1f\x7f]/g,' ');console.log('[P]',clean(m1),clean(m2),clean(m3))}catch(e){}}
 // window.onerror → visível no DevTools e reportado ao sender (debug remoto)
 window.onerror=function(msg,src,line,col){
@@ -2491,56 +2495,113 @@ let bgPalco='';  // BG personalizado do palco (idle) — persiste entre músicas
 
 // Received projection text is untrusted HTML. Rebuild only basic formatting;
 // never copy attributes, executable elements, links, or resource URLs.
-function renderProjectionText(target, value){
-  const parsed=new DOMParser().parseFromString(String(value||''),'text/html');
-  const allowed=new Set(['BR','B','STRONG','I','EM','U','S','SPAN','P','DIV','SMALL']);
-  const blocked=new Set(['SCRIPT','STYLE','IFRAME','OBJECT','EMBED','SVG','MATH','TEMPLATE']);
-  function copy(source,parent){
-    if(source.nodeType===3){parent.appendChild(document.createTextNode(source.nodeValue||''));return}
-    if(source.nodeType!==1||blocked.has(source.tagName))return;
-    let destination=parent;
-    if(allowed.has(source.tagName)){
-      destination=document.createElement(source.tagName.toLowerCase());
-      // CSSOM accepts color values, not executable HTML or URL attributes.
-      destination.style.color=source.style.color;
-      destination.style.backgroundColor=source.style.backgroundColor;
-      const weight=source.style.fontWeight;
-      if(/^(normal|bold|bolder|lighter|[1-9]00)$/.test(weight))destination.style.fontWeight=weight;
-      if(['normal','italic','oblique'].includes(source.style.fontStyle))destination.style.fontStyle=source.style.fontStyle;
-      if(['none','underline','line-through'].includes(source.style.textDecorationLine))destination.style.textDecorationLine=source.style.textDecorationLine;
-      if(['left','center','right','justify'].includes(source.style.textAlign))destination.style.textAlign=source.style.textAlign;
-      parent.appendChild(destination);
-    }
-    for(const child of Array.from(source.childNodes))copy(child,destination);
+function projectionColor(value){
+  const match=/^\s*(#[0-9a-fA-F]{3,8}|rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*(?:,\s*(?:0|1|0?\.\d+)\s*)?\)|hsla?\(\s*\d{1,3}\s*,\s*\d{1,3}%\s*,\s*\d{1,3}%\s*(?:,\s*(?:0|1|0?\.\d+)\s*)?\)|[a-zA-Z]{1,20})\s*$/.exec(String(value||''));
+  return match?match[1]:'';
+}
+function projectionElement(name){
+  switch(name){
+    case 'br': return document.createElement('br');
+    case 'b': return document.createElement('b');
+    case 'strong': return document.createElement('strong');
+    case 'i': return document.createElement('i');
+    case 'em': return document.createElement('em');
+    case 'u': return document.createElement('u');
+    case 's': return document.createElement('s');
+    case 'span': return document.createElement('span');
+    case 'p': return document.createElement('p');
+    case 'div': return document.createElement('div');
+    case 'small': return document.createElement('small');
+    default: return null;
   }
+}
+function applyProjectionStyle(el, rawAttrs){
+  const styleMatch=/\bstyle\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(rawAttrs||'');
+  const style=(styleMatch&&(styleMatch[1]||styleMatch[2]))||'';
+  const color=projectionColor((/(?:^|;)\s*color\s*:\s*([^;]+)/i.exec(style)||[])[1]);
+  if(color)el.style.color=color;
+  const background=projectionColor((/(?:^|;)\s*background-color\s*:\s*([^;]+)/i.exec(style)||[])[1]);
+  if(background)el.style.backgroundColor=background;
+  const weight=((/(?:^|;)\s*font-weight\s*:\s*([^;]+)/i.exec(style)||[])[1]||'').trim();
+  if(/^(normal|bold|bolder|lighter|[1-9]00)$/.test(weight))el.style.fontWeight=weight;
+  const fontStyle=((/(?:^|;)\s*font-style\s*:\s*([^;]+)/i.exec(style)||[])[1]||'').trim();
+  if(fontStyle==='normal'||fontStyle==='italic'||fontStyle==='oblique')el.style.fontStyle=fontStyle;
+  const deco=((/(?:^|;)\s*text-decoration-line\s*:\s*([^;]+)/i.exec(style)||[])[1]||'').trim();
+  if(deco==='none'||deco==='underline'||deco==='line-through')el.style.textDecorationLine=deco;
+  const align=((/(?:^|;)\s*text-align\s*:\s*([^;]+)/i.exec(style)||[])[1]||'').trim();
+  if(align==='left'||align==='center'||align==='right'||align==='justify')el.style.textAlign=align;
+}
+function decodeProjectionText(value){
+  return String(value||'').replace(/&(#x[0-9a-fA-F]+|#\d+|amp|lt|gt|quot|apos|nbsp);/g, function(entity, body){
+    if(body==='amp')return '&';
+    if(body==='lt')return '<';
+    if(body==='gt')return '>';
+    if(body==='quot')return '"';
+    if(body==='apos')return "'";
+    if(body==='nbsp')return ' ';
+    const code=body[1]==='x'?parseInt(body.slice(2),16):parseInt(body.slice(1),10);
+    if(!Number.isFinite(code)||code<32||code===127||code>0x10ffff)return '';
+    try{return String.fromCodePoint(code)}catch(e){return ''}
+  });
+}
+// HTML da projeção é do operador, mas só a formatação básica entra no DOM.
+// Tags e cores saem de uma lista fechada; o texto vira nó de texto.
+function renderProjectionText(target, value){
   while(target.firstChild)target.removeChild(target.firstChild);
-  for(const child of Array.from(parsed.body.childNodes))copy(child,target);
+  const blocked={script:1,style:1,iframe:1,object:1,embed:1,svg:1,math:1,template:1};
+  const stack=[target];
+  let skip=0;
+  const re=/<!--[\s\S]*?-->|<\/([a-zA-Z0-9]+)\s*>|<([a-zA-Z0-9]+)([^>]*?)\/?>|([^<]+)/g;
+  const raw=String(value||'');
+  let match;
+  while((match=re.exec(raw))){
+    if(match[0].indexOf('<!--')===0)continue;
+    if(match[1]){
+      const name=match[1].toLowerCase();
+      if(skip){if(blocked[name])skip--;continue}
+      for(let i=stack.length-1;i>0;i--){
+        if(stack[i].tagName.toLowerCase()===name){stack.length=i;break}
+      }
+      continue;
+    }
+    if(match[2]){
+      const name=match[2].toLowerCase();
+      const selfClose=/\/\s*>$/.test(match[0])||name==='br';
+      if(blocked[name]){if(!selfClose)skip++;continue}
+      if(skip)continue;
+      const el=projectionElement(name);
+      if(!el)continue;
+      applyProjectionStyle(el, match[3]||'');
+      stack[stack.length-1].appendChild(el);
+      if(!selfClose)stack.push(el);
+      continue;
+    }
+    if(match[4]&&!skip)stack[stack.length-1].appendChild(document.createTextNode(decodeProjectionText(match[4])));
+  }
 }
 
-function proxyUrl(original){
-  if(!original)return original;
-  // Sender/popup legado pode mandar barra codificada (%2F) — decodifica
-  // caminho antes de qualquer comparação/use (404 silencioso caso contrário).
-  try{ original=decodeURIComponent(String(original)) }catch(e){original=String(original)}
-  // Media may be remote, local or an offline data/blob resource, never code.
-  try{
-    const parsed=new URL(original,location.href);
-    if(!['http:','https:','blob:','file:','data:'].includes(parsed.protocol))return '';
-    if(parsed.protocol==='file:'&&location.protocol!=='file:')return '';
-    if(parsed.protocol==='data:'&&!/^data:(image|audio|video)\/[a-z0-9.+-]+;base64,/i.test(original))return '';
-  }catch(e){return ''}
-  // WT-5f cloud: no modo relay a TV carrega DIRETO da rede do operador web
-  // (a URL vem absoluta, ex. http://192.168.x.x:5173/...). O proxy :7080 é
-  // do sender APK — se não está rodando, 502 e bg nunca carrega.
-  if(cloudMode)return original;
-  // Qualquer porta do MESMO sender é local: 7080 (Principal), 7082 (TV 2),
-  // 7084... Antes só aceitava :7080; bg vindo de slot :7082 era proxyado
-  // de volta e falhava → receiver caía no bg-12 (caso real 26/08).
-  if(original.startsWith('http://'+host+':'))return original;
-  if(original.startsWith('http://')||original.startsWith('https://')){
-    return `http://${host}:7080/proxy?url=${encodeURIComponent(original)}`;
-  }
-  return original;
+function lanSenderHost(){
+  const match=/^(?:localhost|127\.0\.0\.1|(?:\d{1,3}\.){3}\d{1,3})$/.exec(String(host||'').trim());
+  return match?match[0]:'';
+}
+function palcoMediaUrl(original){
+  if(!original)return '';
+  let decoded;
+  try{decoded=decodeURIComponent(String(original))}catch(e){decoded=String(original)}
+  let parsed;
+  try{parsed=new URL(decoded)}catch(e){return ''}
+  if(parsed.username||parsed.password)return '';
+  if(parsed.protocol!=='http:'&&parsed.protocol!=='https:'&&parsed.protocol!=='blob:'&&parsed.protocol!=='file:'&&parsed.protocol!=='data:')return '';
+  if(parsed.protocol==='file:'&&location.protocol!=='file:')return '';
+  if(parsed.protocol==='data:'&&!/^data:(image|audio|video)\/[a-z0-9.+-]+;base64,/i.test(parsed.href))return '';
+  const safe=parsed.href;
+  if(parsed.protocol==='blob:'||parsed.protocol==='file:'||parsed.protocol==='data:'||cloudMode)return safe;
+  const sender=lanSenderHost();
+  if(sender&&parsed.protocol==='http:'&&parsed.hostname===sender)return safe;
+  // URL externa segue o próprio endereço já filtrado. O proxy com o IP da
+  // query reabria o alerta de redirecionamento no src da imagem.
+  if(parsed.protocol==='http:'||parsed.protocol==='https:')return safe;
+  return '';
 }
 
 function setStatus(t,err){const s=$('status');s.textContent=t;
@@ -2693,43 +2754,60 @@ var PALCO_API_WS_DEFAULT='wss://api.louvorja.com.br/v1/palco';
 // (IPK instalado) mantém a API oficial.
 var PALCO_API_WS_DEV='ws://localhost:3100/v1/palco';
 function trustedCloudApi(value){
-  try{
-    const url=new URL(String(value));
-    if(url.username||url.password||url.search||url.hash)return null;
-    const local=url.hostname==='localhost';
-    if(!local&&url.hostname!=='api.louvorja.com.br'&&url.hostname!=='api-stg.louvorja.com.br')return null;
-    if(local){if(url.protocol!=='ws:'&&url.protocol!=='wss:')return null}
-    else if(url.protocol!=='wss:'||(url.port&&url.port!=='443'))return null;
-    if(url.pathname.replace(/\/$/,'')!=='/v1/palco')return null;
-    return url.origin+'/v1/palco';
-  }catch(e){return null}
+  let url;
+  try{url=new URL(String(value))}catch(e){return null}
+  if(url.username||url.password||url.search||url.hash)return null;
+  if(url.pathname.replace(/\/$/,'')!=='/v1/palco')return null;
+  if(url.hostname==='api.louvorja.com.br'&&url.protocol==='wss:'&&(!url.port||url.port==='443'))return 'wss://api.louvorja.com.br/v1/palco';
+  if(url.hostname==='api-stg.louvorja.com.br'&&url.protocol==='wss:'&&(!url.port||url.port==='443'))return 'wss://api-stg.louvorja.com.br/v1/palco';
+  if(url.hostname==='localhost'&&url.port==='3100'&&url.protocol==='ws:')return 'ws://localhost:3100/v1/palco';
+  if(url.hostname==='localhost'&&url.port==='3100'&&url.protocol==='wss:')return 'wss://localhost:3100/v1/palco';
+  return null;
 }
 var cloudApi=trustedCloudApi(qs.get('api'))||((location.protocol==='file:'||/^(localhost|127\.)/.test(location.hostname))&&(location.protocol==='file:'||location.port==='5173'||location.port==='3100')?PALCO_API_WS_DEV:PALCO_API_WS_DEFAULT);
 var cloudCode='';
 var cloudMode=false;
 var cloudTimer=null;
 
+function cloudHttpBase(){
+  if(cloudApi==='wss://api-stg.louvorja.com.br/v1/palco')return 'https://api-stg.louvorja.com.br/v1/palco';
+  if(cloudApi==='ws://localhost:3100/v1/palco')return 'http://localhost:3100/v1/palco';
+  if(cloudApi==='wss://localhost:3100/v1/palco')return 'https://localhost:3100/v1/palco';
+  return 'https://api.louvorja.com.br/v1/palco';
+}
+function cloudWsBase(){
+  if(cloudApi==='wss://api-stg.louvorja.com.br/v1/palco')return 'wss://api-stg.louvorja.com.br/v1/palco';
+  if(cloudApi==='ws://localhost:3100/v1/palco')return 'ws://localhost:3100/v1/palco';
+  if(cloudApi==='wss://localhost:3100/v1/palco')return 'wss://localhost:3100/v1/palco';
+  return 'wss://api.louvorja.com.br/v1/palco';
+}
 function cloudConnect(code){
-  cloudMode=true;cloudCode=code;
-  dlog('cloudConnect',code,cloudApi);
-  var base=cloudApi.replace(/^ws/,'http');
-  setStatus('nuvem: buscando sessão '+code+'…');
-  fetch(base+'/sessions/'+code+'/token')
+  var session=/^[A-Z0-9]{6}$/.exec(String(code||'').toUpperCase());
+  if(!session)return;
+  session=session[0];
+  cloudMode=true;cloudCode=session;
+  dlog('cloudConnect',session,cloudApi);
+  var base=cloudHttpBase();
+  setStatus('nuvem: buscando sessão '+session+'…');
+  fetch(base+'/sessions/'+encodeURIComponent(session)+'/token')
     .then(function(r){if(!r.ok)throw Error('sessão não encontrada');return r.json()})
-    .then(function(j){cloudOpen(code,j.token)})
+    .then(function(j){cloudOpen(session,j.token)})
     .catch(function(e){setStatus('nuvem: '+e.message,true);cloudRetry()});
 }
 function cloudOpen(code,token){
+  var session=/^[A-Z0-9]{6}$/.exec(String(code||'').toUpperCase());
+  if(!session){cloudRetry();return}
+  session=session[0];
   setStatus('nuvem: conectando…');
   var cid='';
   try{cid=localStorage.getItem('palcoCloudCid')||''}catch(e){}
   if(!cid){cid='tv-'+Math.random().toString(36).slice(2,10);try{localStorage.setItem('palcoCloudCid',cid)}catch(e){}}
-  try{ws=new WebSocket(cloudApi+'/relay/'+code+'?token='+encodeURIComponent(token)+'&role=receiver&cid='+encodeURIComponent(cid))}
+  try{ws=new WebSocket(cloudWsBase()+'/relay/'+encodeURIComponent(session)+'?token='+encodeURIComponent(String(token||''))+'&role=receiver&cid='+encodeURIComponent(cid))}
   catch(e){cloudRetry();return}
-  ws.onopen=function(){tries=0;dlog('CLOUD WS OPEN',code);
-    setStatus('● nuvem '+code);
+  ws.onopen=function(){tries=0;dlog('CLOUD WS OPEN',session);
+    setStatus('● nuvem '+session);
     if(window.__hideSplash)window.__hideSplash();
-    try{localStorage.setItem('palcoCloudCode',code)}catch(e){}};
+    try{localStorage.setItem('palcoCloudCode',session)}catch(e){}};
   ws.onmessage=function(ev){try{handle(JSON.parse(ev.data))}catch(e){}};
   ws.onclose=function(ev){
     dlog('CLOUD WS CLOSE',ev&&ev.code);
@@ -2753,13 +2831,14 @@ function cloudRetry(){
 // código (ou escaneia) e projeta. Padrão YouTube/Netflix.
 function cloudCreate(){
   cloudMode=true;cloudCode='';
-  var base=cloudApi.replace(/^ws/,'http');
+  var base=cloudHttpBase();
   setStatus('nuvem: criando sessão…');
   fetch(base+'/sessions',{method:'POST'})
     .then(function(r){if(!r.ok)throw Error('falha ao criar sessão');return r.json()})
     .then(function(j){
-      cloudCode=String(j.code||'').toUpperCase();
-      if(!cloudCode)throw Error('sessão inválida');
+      var created=/^[A-Z0-9]{6}$/.exec(String(j.code||'').toUpperCase());
+      if(!created)throw Error('sessão inválida');
+      cloudCode=created[0];
       try{localStorage.setItem('palcoCloudCode',cloudCode)}catch(e){}
       showCloudPair(cloudCode);
       cloudOpen(cloudCode,j.token);
@@ -2826,8 +2905,12 @@ function hideIdle(){$('idle').classList.add('hidden')}
 // Cover relativo (images/... ou covers/...) resolve contra / do sender.
 function coverUrl(cover){
   if(!cover) return null;
-  if(cover.startsWith('http://')||cover.startsWith('https://'))return proxyUrl(cover);
-  return proxyUrl('http://'+(host||location.hostname)+':7080/'+cover.replace(/^\/+/,''));
+  if(/^https?:\/\//i.test(cover))return palcoMediaUrl(cover);
+  const path=encodeURI(String(cover).replace(/^\/+/, '')).split(/[?#]/)[0];
+  if(!path)return null;
+  const sender=lanSenderHost();
+  if(location.protocol==='file:'&&sender)return palcoMediaUrl('http://'+sender+':7080/'+path);
+  return '/'+path;
 }
 function showNp(title,sub,cover){
   hideIdle();$('text').style.display='none';
@@ -3082,15 +3165,15 @@ function handle(m){
         t.style.display='none';$('text').style.display='';}}
       const bgEl=$('bg');
       bgEl.onerror=()=>{bgEl.onerror=null;bgEl.src='bg-fallback.png'};
-      if(m.background){bgEl.src=proxyUrl(m.background);bgEl.style.opacity='';document.body.style.background=''}
+      if(m.background){var nextBg=palcoMediaUrl(m.background);if(nextBg){bgEl.src=nextBg;bgEl.style.opacity='';document.body.style.background=''}else bgEl.src='bg-fallback.png'}
       // Sem bg na mensagem: usa o BG configurado no app (bgPalco — enviado
       // ao ligar o palco). Só se NÃO houver bg configurado cai no fallback
       // fixo. Vale pra qualquer módulo (26/08 Rafael).
       // WT-5 web: backgroundColor do palco (paridade popup) também conta
       // como bg válido — pinta o body e esconde o img (hino sem capa e sem
       // bg custom usa a cor do palco; fallback é só MP3 sem nada, 01/09).
-      else if(m.backgroundColor){bgEl.removeAttribute('src');document.body.style.background=m.backgroundColor}
-      else if(bgPalco){bgEl.src=proxyUrl(bgPalco);bgEl.style.opacity='';document.body.style.background=''}
+      else if(m.backgroundColor){var nextColor=projectionColor(m.backgroundColor);if(nextColor){bgEl.removeAttribute('src');document.body.style.backgroundColor=nextColor}else bgEl.src='bg-fallback.png'}
+      else if(bgPalco){var nextPalco=palcoMediaUrl(bgPalco);if(nextPalco){bgEl.src=nextPalco;bgEl.style.opacity='';document.body.style.background=''}else bgEl.src='bg-fallback.png'}
       else{bgEl.src='bg-fallback.png'}
       // Slide/PDF/PPT (text vazio) é mídia visual pura: sem véu de leitura,
       // preserva a tonalidade original do canvas do operador.
@@ -3104,7 +3187,7 @@ function handle(m){
         if(typeof m.fontWeight==='number')
           t.style.fontWeight=m.fontWeight;
         // WT-5 web: cor do texto do operador (paridade popup)
-        if(m.textColor){t.style.color=m.textColor}
+        if(m.textColor){var nextText=projectionColor(m.textColor);if(nextText)t.style.color=nextText}
         // Auto-fit: reduz a fonte até o texto caber na altura útil (76vh) —
         // mesma passagem de linhas do popup (frase em 2 linhas lá, 2 aqui).
         t.style.transform='translate(-50%,-50%)';
@@ -3212,7 +3295,7 @@ function handle(m){
       // BG permanente do palco (idle) — personalização, não da música
       bgPalco=m.url||'';
       if(bgPalco){
-        $('bgPalco').src=proxyUrl(bgPalco);
+        $('bgPalco').src=palcoMediaUrl(bgPalco);
       }else{
         $('bgPalco').removeAttribute('src');
       }
@@ -3222,7 +3305,7 @@ function handle(m){
       if(m.url){
         // F3.3-sync: só recarrega o src se a URL MUDOU — reenvio da mesma
         // faixa com action:play não pode reiniciar o áudio (loop 3s).
-        const next=proxyUrl(m.url);
+        const next=palcoMediaUrl(m.url);
         if(a.src!==next){
           a.src=next;
           if(typeof m.positionMs==='number'&&m.positionMs>0){
@@ -3238,7 +3321,7 @@ function handle(m){
           }else{
             showNp('Reproduzindo áudio', m.subtitle||'', m.cover||'');
           }
-          $('bg').src=m.background?proxyUrl(m.background):'bg-fallback.png';
+          $('bg').src=m.background?palcoMediaUrl(m.background):'bg-fallback.png';
         }
       }
       // BG garantido em TODA mensagem de áudio (load, play, pause, seek):
@@ -3283,12 +3366,12 @@ function handle(m){
         // Vídeo anterior pode estar fullscreen (z-index alto) e esconder o
         // now-playing. MP3 é áudio: mata a camada de vídeo antes do cartão.
         v.pause();v.removeAttribute('src');v.style.display='none';v.load();
-        const av=$('audio');const next=proxyUrl(m.url);
+        const av=$('audio');const next=palcoMediaUrl(m.url);
         window.__videoAudioActive=true;
         if(av.src!==next){av.src=next;
           av.onended=()=>{hideNp();showIdle('Aguardando conteúdo…')};
           showNp(m.title||'Reproduzindo áudio', m.subtitle||'', m.cover||'');
-          $('bg').src=m.background?proxyUrl(m.background):'bg-fallback.png';}
+          $('bg').src=m.background?palcoMediaUrl(m.background):'bg-fallback.png';}
         if(m.action!=='pause'&&m.action!=='stop'&&av.paused)playWithFallback();
         if(m.action==='pause'&&!av.paused)av.pause();
         if(typeof m.positionMs==='number'&&m.positionMs>0){
@@ -3304,7 +3387,7 @@ function handle(m){
       if(m.action==='stop'){v.pause();v.removeAttribute('src');v.style.display='none';
         v.load();showIdle('Aguardando conteúdo…');
         sendEvent({v:2,type:'ended',media:'video'});break}
-      if(m.url){v.src=proxyUrl(m.url);v.style.display='';
+      if(m.url){v.src=palcoMediaUrl(m.url);v.style.display='';
         // Sync inicial (padrão F3.3g do áudio): positionMs aplicado antes
         // do play — seguro p/ metadata não carregada (loadedmetadata once).
         if(typeof m.positionMs==='number'&&m.positionMs>0){
@@ -3429,6 +3512,7 @@ function handle(m){
       dlog('AUTO-RELAUNCH cancelado (voltou ao foreground)');
     }
   });
+})();
 })();
 </script>
 </body>
