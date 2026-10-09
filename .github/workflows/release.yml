@@ -182,14 +182,14 @@ jobs:
 
       - name: Download x64 artifacts
         if: needs.decide.outputs.publish == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: linux-x64
           path: dist-electron
 
       - name: Download arm64 artifacts
         if: needs.decide.outputs.publish == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: linux-arm64
           path: dist-electron
