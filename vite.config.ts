@@ -22,6 +22,7 @@ export default defineConfig({
   },
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
+    __DIAGNOSTICS_DSN__: JSON.stringify(process.env.DIAGNOSTICS_GLITCHTIP_DSN ?? ''),
   },
   plugins: [
     vue(),

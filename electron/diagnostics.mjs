@@ -357,7 +357,7 @@ export function registerDiagnosticsIpc() {
   // DSN não existe no código/repo. No dev e sem DSN público, falha deliberadamente
   // com fallback local; o botão nunca bloqueia o arquivo já salvo.
   ipcMain.handle('diagnostics:send', async (_event, report) => {
-    const dsn = process.env.DIAGNOSTICS_GLITCHTIP_DSN
+    const dsn = process.env.DIAGNOSTICS_GLITCHTIP_DSN || __DIAGNOSTICS_DSN__
     if (!dsn) return { ok: false, reason: 'DSN de diagnóstico não configurado; compartilhe o arquivo salvo.' }
     try {
       // Protocolo Sentry/GlitchTip: parse do DSN https://<key>@<host>/<project>
