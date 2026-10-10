@@ -336,6 +336,8 @@ export default {
       importedLocal:
         'Importado neste dispositivo: {name} ({slides} estrofes) — salvo sem conta.',
       importFailed: 'Arquivo .slja inválido.',
+      importStorageFull:
+        'Armazenamento local cheio — libere espaço (exclua músicas locais antigas) e tente de novo.',
     },
     custom: {
       title: 'Liturgias avulsas',

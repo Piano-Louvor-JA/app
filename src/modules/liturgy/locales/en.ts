@@ -336,6 +336,8 @@ export default {
       importedLocal:
         'Imported on this device: {name} ({slides} verses) — saved without an account.',
       importFailed: 'Invalid .slja file.',
+      importStorageFull:
+        'Local storage is full — free up space (delete old local songs) and try again.',
     },
     custom: {
       title: 'Custom liturgies',
