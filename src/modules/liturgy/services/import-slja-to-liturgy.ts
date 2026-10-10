@@ -351,6 +351,7 @@ async function importSljaLocal({
 		createLocalMusic,
 		createLocalLyric,
 		updateLocalMusic,
+		deleteLocalMusic,
 		listLocalCollections,
 		findLocalMusicBySljaHash,
 	} = await import("@modules/media/services/local-custom-store");
@@ -359,9 +360,13 @@ async function importSljaLocal({
 	);
 
 	// Dedupe (app#336): mesmo arquivo já importado → no-op (retorna a música
-	// existente sem regravar mídia/estrofes).
+	// existente sem regravar mídia/estrofes). EXCETO se a música existente
+	// estiver PARCIAL (import anterior interrompido por QuotaExceededError —
+	// achado M1 do QA): nesse caso deleta e refaz o import completo (blobs
+	// em IndexedDB são idempotentes por hash — putMedia sobrescreve).
+	const expectedSlides = slides.filter((s) => s.lyric.trim().length > 0).length;
 	const existing = findLocalMusicBySljaHash(sljaHash);
-	if (existing) {
+	if (existing && existing.lyrics.length >= expectedSlides) {
 		return {
 			musicId: existing.id,
 			displayMusicId: existing.id,
@@ -375,6 +380,12 @@ async function importSljaLocal({
 			sljaHash,
 			updatedExisting: true,
 		};
+	}
+	if (existing) {
+		// Parcial (import interrompido por quota): recomeça do zero — sem
+		// estrofes/mídia órfãs (o saveDb que estourou já não persistiu o
+		// excedente; a música com sljaHash sim, senão nem cairia aqui).
+		deleteLocalMusic(existing.id);
 	}
 
 	let collectionId = listLocalCollections().find(

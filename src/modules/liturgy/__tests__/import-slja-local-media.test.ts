@@ -145,6 +145,52 @@ describe("import .slja local — blobs em IndexedDB (não localStorage)", () => 
 		}
 	});
 
+	it("re-import após import parcial por quota COMPLETA a música (33/33, sem duplicar)", async () => {
+		const bytes = await makeSljaBuffer();
+
+		// 1ª tentativa: quota estoura no MEIO do import (música+áudio gravados,
+		// estrofes não) — simula saveDb falhando a partir da estrofe N.
+		const original = localStorage.setItem.bind(localStorage);
+		let sets = 0;
+		localStorage.setItem = (k: string, v: string) => {
+			// deixa passar a gravação da música; explode nas estrofes
+			if ((sets += 1) > 2) throw new DOMException("quota", "QuotaExceededError");
+			original(k, v);
+		};
+		try {
+			await expect(
+				importSljaAsLiturgyMusic({ bytes, name: "encontro.slja" }),
+			).rejects.toThrow();
+		} finally {
+			localStorage.setItem = original;
+		}
+		const importCollection = listLocalCollections().find(
+			(c) => c.name === "Importações .slja",
+		)!;
+		const partial = listLocalMusics(importCollection.id);
+		expect(partial).toHaveLength(1);
+		expect(partial[0].lyrics.length).toBeLessThan(32); // parcial
+
+		// 2ª tentativa (espaço liberado): mesmo arquivo → deve REFAZER completo
+		const second = await importSljaAsLiturgyMusic({
+			bytes: await makeSljaBuffer(),
+			name: "encontro.slja",
+		});
+		expect(second.local).toBe(true);
+		expect(second.slides).toBe(32);
+		expect(second.updatedExisting).toBe(false); // regravou, não no-op
+
+		const music = getLocalMusic(second.musicId);
+		expect(music?.lyrics).toHaveLength(32);
+		expect(music?.audioMediaId).toMatch(/-audio$/);
+		expect(music?.coverMediaId).toMatch(/-cover$/);
+
+		// sem duplicar música nem blobs
+		expect(listLocalMusics(importCollection.id)).toHaveLength(1);
+		const blobIds = mocks.putMedia.mock.calls.map((c) => c[0]);
+		expect(new Set(blobIds).size).toBe(2); // 1 áudio + 1 capa (mesmos ids)
+	});
+
 	it("legacy: música com audioBase64 inline continua legível (compat)", async () => {
 		// grava uma música "pré-fix" direto no formato antigo
 		const { createLocalCollection, createLocalMusic, updateLocalMusic } =
