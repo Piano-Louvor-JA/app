@@ -1,7 +1,14 @@
 import { fetchRemoteCatalogJson } from '@shared/services/remote-catalog'
 import { readCatalogRecord } from '@shared/services/workspace-api'
 import { getCurrentApiPrefix } from '@modules/sync/services/library-catalog'
-
+import {
+  listAllCustomMusics,
+  toCustomMusicId,
+} from '@modules/media/services/custom-catalog'
+import {
+  listLocalCollections,
+  listLocalMusics,
+} from '@modules/media/services/local-custom-store'
 import type {
   LiturgyBibleBookOption,
   LiturgyMusicOption,
@@ -23,7 +30,7 @@ type CatalogHymnalRow = {
 type CatalogMusicIndexRow = CatalogHymnalRow & {
   albums?: Array<{ id_album?: number | string; name?: string; track?: number | string | null }>
   albums_names?: string
-  /** app#346: letra da música no índice pt_musics (busca por trecho). */
+  /** Letra em texto corrido (presente em 1944/1956 músicas do índice). */
   lyric?: string | null
 }
 
@@ -87,9 +94,9 @@ export function parseCatalogDurationMs(raw: unknown): number | null {
     if (parts.some((part) => !Number.isFinite(part))) return null
     let seconds = 0
     if (parts.length === 3) {
-      seconds = (parts[0] ?? 0) * 3600 + (parts[1] ?? 0) * 60 + (parts[2] ?? 0)
+      seconds = parts[0]! * 3600 + parts[1]! * 60 + parts[2]!
     } else if (parts.length === 2) {
-      seconds = (parts[0] ?? 0) * 60 + (parts[1] ?? 0)
+      seconds = parts[0]! * 60 + parts[1]!
     } else {
       return null
     }
@@ -196,15 +203,14 @@ function mapMusicIndexRow(row: CatalogMusicIndexRow): LiturgyMusicOption | null 
     albumNames.includes('Hinário Adventista') ||
     albumNames.includes('Hinário Adventista 1996')
 
-  // app#346/#348: letra normalizada (fold diacrítico) entra no índice
-  // para busca por trecho offline — mesmo formato do PR feat/search-fuzzy.
-  const lyricsText =
-    String(row.lyric ?? '')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .toLowerCase() || undefined
+  // Issue #348: letra já vem no índice `${prefix}_musics` — propaga
+  // normalizada (fold diacrítico) p/ a busca casar "nao temas" com "não temas".
+  const lyricsText = String(row.lyric ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase() || undefined
 
   return {
     id,
@@ -290,7 +296,7 @@ async function loadCollectionOptions(
   }
 }
 
-function sortMusicOptions(options: LiturgyMusicOption[]): LiturgyMusicOption[] {
+export function sortMusicOptions(options: LiturgyMusicOption[]): LiturgyMusicOption[] {
   return [...options].sort((a, b) => {
     const trackA = a.hymnalTrack ?? Number.POSITIVE_INFINITY
     const trackB = b.hymnalTrack ?? Number.POSITIVE_INFINITY
@@ -299,18 +305,100 @@ function sortMusicOptions(options: LiturgyMusicOption[]): LiturgyMusicOption[] {
   })
 }
 
+/**
+ * app#331: músicas do OPERADOR entram nas opções da liturgia —
+ * - custom da API (Minhas Coletâneas / "Importações .slja" logadas): id com
+ *   offset 1M+ (namespace que resolveMediaTrack já resolve);
+ * - LOCAL (import .slja sem login, localStorage, id negativo): id cru —
+ *   offline-first, são as únicas garantidas sem rede.
+ * Oficiais NUNCA são sobrescritas (merge só em id livre).
+ */
+async function mergeOperatorMusicOptions(
+  byId: Map<number, LiturgyMusicOption>,
+): Promise<void> {
+  let customs: Array<{
+    id: number
+    name: string | null
+    duration: number | null
+    collectionName?: string
+    officialMusicId?: number | null
+    instrumentalUrl?: string | null
+  }> = []
+  try {
+    // Catálogo remoto é opcional. Sem timeout, um host mudo segura o hydrate
+    // da liturgia mesmo com hinário e imports locais já disponíveis.
+    customs = await listAllCustomMusics({ timeoutMs: 4_000 })
+  } catch {
+    // offline/sem API: customs simplesmente não aparecem nesta carga
+  }
+  for (const custom of customs) {
+    const id = Number(custom.id)
+    if (!Number.isFinite(id) || id <= 0) continue
+    const offsetId = toCustomMusicId(id)
+    if (byId.has(offsetId)) continue
+    const name = String(custom.name ?? '').trim() || `Custom #${id}`
+    const album = String(custom.collectionName ?? '').trim() || 'Minhas coletâneas'
+    const linkedOfficial = byId.get(Number(custom.officialMusicId))
+    byId.set(offsetId, {
+      id: offsetId,
+      name,
+      hymnalTrack: null,
+      albumNames: album,
+      displayLabel: `${name} — ${album}`,
+      // CustomMusicSummary.duration é segundos (enrichDurations / API).
+      // O item da liturgia espera ms; abaixo de ~500 s o clamp zeraria a duração.
+      durationMs:
+        typeof custom.duration === 'number' && custom.duration > 0
+          ? Math.round(custom.duration * 1000)
+          : linkedOfficial?.durationMs && linkedOfficial.durationMs > 0
+            ? linkedOfficial.durationMs
+            : null,
+      hasInstrumental:
+        Boolean(custom.instrumentalUrl?.trim()) ||
+        linkedOfficial?.hasInstrumental === true,
+    })
+  }
+
+  try {
+    const locals = listLocalCollections().flatMap((collection) =>
+      listLocalMusics(collection.id).map((music) => ({
+        music,
+        collectionName: collection.name,
+      })),
+    )
+    for (const { music, collectionName } of locals) {
+      if (byId.has(music.id)) continue
+      const name = String(music.name ?? '').trim() || `Local #${music.id}`
+      byId.set(music.id, {
+        id: music.id,
+        name,
+        hymnalTrack: null,
+        albumNames: collectionName,
+        displayLabel: `${name} — ${collectionName} (local)`,
+        durationMs:
+          typeof music.durationMs === 'number' ? music.durationMs : null,
+        hasInstrumental: false,
+      })
+    }
+  } catch {
+    // localStorage indisponível (raro) — segue sem locais
+  }
+}
+
 export async function loadLiturgyMusicOptions(): Promise<LiturgyMusicOption[]> {
   const fromIndex = await loadFromMusicIndex()
   if (fromIndex && fromIndex.length > 0) {
     const byId = new Map(fromIndex.map((entry) => [entry.id, entry]))
     // Índice pode omitir flags de instrumental; hinário completa o dado.
     await loadHymnalOptions(byId)
+    await mergeOperatorMusicOptions(byId)
     return sortMusicOptions([...byId.values()])
   }
 
   const byId = new Map<number, LiturgyMusicOption>()
   await loadHymnalOptions(byId)
   await loadCollectionOptions(byId)
+  await mergeOperatorMusicOptions(byId)
   return sortMusicOptions([...byId.values()])
 }
 

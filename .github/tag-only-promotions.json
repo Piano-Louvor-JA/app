@@ -1,0 +1,12 @@
+{
+  "promotions": [
+    {
+      "repo": "Piano-Louvor-JA/app",
+      "version": "1.30.0",
+      "mode": "tag_only",
+      "promotionPr": 431,
+      "authorizedCommit": "6b6fdf14fbe29303459621848579709ecd7ff0e5",
+      "authorizeContainingTree": true
+    }
+  ]
+}

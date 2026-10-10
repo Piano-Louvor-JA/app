@@ -1,5 +1,17 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { JSDOM } from 'jsdom'
+
+vi.mock('../types/countdown', async () => {
+  const actual = await vi.importActual<typeof import('../types/countdown')>('../types/countdown')
+  return {
+    ...actual,
+    DEFAULT_COUNTDOWN_RUNTIME: {
+      ...actual.DEFAULT_COUNTDOWN_RUNTIME,
+      untilHour: undefined,
+      untilMinute: undefined,
+    },
+  }
+})
 
 const dom = new JSDOM('', { url: 'http://localhost/' })
 const g = globalThis as unknown as Record<string, unknown>
@@ -22,13 +34,21 @@ import {
 
 const EMPTY = {
   ...DEFAULT_COUNTDOWN_RUNTIME,
+  untilHour: 18,
+  untilMinute: 0,
   savedTimesMs: [],
   durationMs: DEFAULT_COUNTDOWN_DURATION_MS,
 }
 
 describe('countdown-runtime — normalize', () => {
   it('não-objeto → default completo', () => {
-    for (const raw of [null, undefined, 'x', 1]) expect(normalizeCountdownRuntime(raw)).toEqual(EMPTY)
+    for (const raw of [null, undefined, 'x', 1]) {
+      expect(normalizeCountdownRuntime(raw)).toEqual({
+        ...EMPTY,
+        untilHour: undefined,
+        untilMinute: undefined,
+      })
+    }
   })
 
   it('aceita estado válido e filtra savedTimes não-numéricos', () => {
@@ -49,15 +69,30 @@ describe('countdown-runtime — normalize', () => {
     })
     expect(state).toEqual({ ...EMPTY, projecting: false, durationMs: 0 })
   })
+
+  it('mode until: branch true e fallbacks de untilHour/untilMinute do DEFAULT', () => {
+    const state = normalizeCountdownRuntime({ mode: 'until' })
+    expect(state.mode).toBe('until')
+    expect(state.untilHour).toBe(18)
+    expect(state.untilMinute).toBe(0)
+  })
 })
 
 describe('countdown-runtime — storage', () => {
   beforeEach(() => localStorage.clear())
 
   it('sem storage ou JSON inválido → default', () => {
-    expect(readCountdownRuntimeFromStorage()).toEqual(EMPTY)
+    expect(readCountdownRuntimeFromStorage()).toEqual({
+      ...EMPTY,
+      untilHour: undefined,
+      untilMinute: undefined,
+    })
     localStorage.setItem(COUNTDOWN_RUNTIME_STORAGE_KEY, '{bad')
-    expect(readCountdownRuntimeFromStorage()).toEqual(EMPTY)
+    expect(readCountdownRuntimeFromStorage()).toEqual({
+      ...EMPTY,
+      untilHour: undefined,
+      untilMinute: undefined,
+    })
   })
 
   it('write/read faz roundtrip', () => {

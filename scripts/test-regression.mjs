@@ -15,7 +15,8 @@
  */
 
 import { execSync } from 'node:child_process'
-import { readFileSync, writeFileSync, existsSync } from 'node:fs'
+import { readFileSync, writeFileSync, existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 
 const REPO_ROOT = resolve(import.meta.dirname, '..')
@@ -23,33 +24,51 @@ const BASELINE_FILE = resolve(REPO_ROOT, '.regression-baseline.json')
 
 function run(cmd, { silent = false } = {}) {
   try {
-    const out = execSync(cmd, { cwd: REPO_ROOT, encoding: 'utf8', stdio: silent ? 'pipe' : 'inherit' })
-    return { ok: true, out: out.trim() }
+    const out = execSync(cmd, { cwd: REPO_ROOT, encoding: 'utf8', stdio: silent ? 'pipe' : 'inherit', maxBuffer: 16 * 1024 * 1024 })
+    return { ok: true, out: out?.trim() ?? '' }
   } catch (e) {
-    return { ok: false, out: e.stdout?.toString()?.trim() ?? e.message }
+    const out = [e.stdout?.toString(), e.stderr?.toString(), e.message].filter(Boolean).join('\n')
+    console.error(`Falha em ${cmd}:\n${out}`)
+    return { ok: false, out }
   }
 }
 
-function parseTestOutput(output) {
-  // vitest: "Test Files  123 passed (123) | 456 tests passed (456)"
-  const m = output.match(/(\d+)\s+tests?\s+passed/i)
-  const passed = m ? parseInt(m[1], 10) : null
-  const m2 = output.match(/(\d+)\s+tests?\s+failed/i)
-  const failed = m2 ? parseInt(m2[1], 10) : null
-  return { passed, failed }
+function runTests() {
+  // JSON evita depender do formato e das cores do resumo textual do Vitest.
+  const directory = mkdtempSync(resolve(tmpdir(), 'piano-regression-'))
+  const report = resolve(directory, 'tests.json')
+  const quotedReport = "'" + report.replaceAll("'", "'\\''") + "'"
+  try {
+    const result = run(`npm run test -- --reporter=json --outputFile=${quotedReport}`, { silent: true })
+    const data = existsSync(report) ? JSON.parse(readFileSync(report, 'utf8')) : null
+    const passed = data?.numPassedTests
+    const failed = data?.numFailedTests
+    const total = data?.numTotalTests
+    const valid = [passed, failed, total].every(value => Number.isInteger(value) && value >= 0)
+      && total > 0 && passed + failed <= total
+    if (!valid) console.error('Relatório de testes ausente ou inválido; a regressão não pode ser aprovada.')
+    return {
+      ok: result.ok && valid && data.success === true && failed === 0,
+      tests: valid ? { passed, failed, total } : { passed: null, failed: null, total: null },
+    }
+  } catch (error) {
+    console.error(`Falha ao ler relatório de testes: ${error.message}`)
+    return { ok: false, tests: { passed: null, failed: null, total: null } }
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
 }
 
 function cmdBaseline() {
   console.log('=== BASELINE: rodando suite completa ===')
-  const test = run('npm run test -- --reporter=verbose', { silent: true })
+  const test = runTests()
   const typecheck = run('npm run type-check', { silent: true })
-  const build = run('npm run build', { silent: true })
+  const build = run('npm run build-only', { silent: true })
 
-  const { passed, failed } = parseTestOutput(test.out)
   const baseline = {
     timestamp: new Date().toISOString(),
-    gitSha: run('git rev-parse HEAD', { silent: true }).out,
-    tests: { passed, failed, total: passed != null && failed != null ? passed + failed : null },
+    gitSha: process.env.REGRESSION_GIT_SHA || run('git rev-parse HEAD', { silent: true }).out,
+    tests: test.tests,
     typecheck: typecheck.ok,
     build: build.ok,
   }
@@ -69,17 +88,23 @@ function cmdCompare() {
   }
 
   const baseline = JSON.parse(readFileSync(BASELINE_FILE, 'utf8'))
+  if (!Number.isInteger(baseline.tests?.passed) || baseline.tests.passed < 0
+      || baseline.tests.failed !== 0 || !Number.isInteger(baseline.tests.total)
+      || baseline.tests.total <= 0 || baseline.tests.passed > baseline.tests.total
+      || baseline.typecheck !== true || baseline.build !== true) {
+    console.error('Baseline inválido ou com falhas. Gere novamente com --baseline.')
+    process.exit(1)
+  }
   console.log('=== COMPARAÇÃO: baseline salvo ===')
   console.log(JSON.stringify(baseline, null, 2))
 
   console.log('\n=== Rodando suite atual ===')
-  const test = run('npm run test -- --reporter=verbose', { silent: true })
+  const test = runTests()
   const typecheck = run('npm run type-check', { silent: true })
-  const build = run('npm run build', { silent: true })
+  const build = run('npm run build-only', { silent: true })
 
-  const { passed, failed } = parseTestOutput(test.out)
   const current = {
-    tests: { passed, failed, total: passed != null && failed != null ? passed + failed : null },
+    tests: test.tests,
     typecheck: typecheck.ok,
     build: build.ok,
   }
@@ -88,8 +113,9 @@ function cmdCompare() {
   console.log(JSON.stringify(current, null, 2))
 
   // Verificações de regressão
-  let regressao = false
+  let regressao = !test.ok || !current.typecheck || !current.build
   let msgs = []
+  if (!test.ok) msgs.push('REGRESSÃO: testes falharam ou não produziram um relatório válido')
 
   if (baseline.tests.passed != null && current.tests.passed != null) {
     if (current.tests.passed < baseline.tests.passed) {

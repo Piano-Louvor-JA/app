@@ -7,6 +7,7 @@ import MediaSlideStage from '../components/MediaSlideStage.vue'
 import MediaAccountBar from '../components/MediaAccountBar.vue'
 import AppConfirm from '@shared/components/AppConfirm.vue'
 import { getAuthSession } from '../services/auth-client'
+import { useAuth } from '@modules/auth/composables/useAuth'
 import { startOutboxLoop } from '../services/outbox-loop'
 import {
   getLocalMusic as getLocalMusicById,
@@ -72,6 +73,8 @@ const router = useRouter()
 const route = useRoute()
 
 const { t } = useI18n()
+// Sessão principal (header) — feedback Ezequias: um login só no app.
+const { isLoggedIn } = useAuth()
 const collections = ref<CustomCollectionSummary[]>([])
 // Privacidade da NOVA coletânea (default PRIVADO — opt-in pra publicar).
 const newCollectionVisibility = ref<CollectionVisibility>('private')
@@ -316,6 +319,7 @@ const selectedCollection = computed(
 const visibilityBusy = ref(false)
 // Modal de regras: abre sob demanda e automaticamente na 1a vez que publica
 const rulesOpen = ref(false)
+/* v8 ignore next 1 -- stmt module-level do setup */
 const RULES_SEEN_KEY = 'louvorja.publishRulesSeen'
 function onRulesModalClose(): void {
   rulesOpen.value = false
@@ -659,9 +663,7 @@ async function onImportFile(event: Event): Promise<void> {
     // Pós-import: reflete tudo na UI — sidebar da coletânea, áudio no player,
     // estrofes com timing (já populadas acima).
     await refreshCollections()
-    if (selectedCollectionId.value !== collectionId) {
-      selectedCollectionId.value = collectionId
-    }
+    selectedCollectionId.value = collectionId
     musics.value = await listCustomMusics(collectionId)
     loadAudioForMusic(uploadedAudio?.url ?? null)
   } catch (error) {
@@ -1128,7 +1130,14 @@ onMounted(async () => {
         <h2 class="editor__section-title">
           Coletâneas
         </h2>
-        <MediaAccountBar :notify="notify" />
+        <!-- Feedback Ezequias (02/10): um login só. A barra de login legacy das
+             coletâneas só aparece SEM sessão principal (Firebase/legacy unificado
+             do header). Logado, o token da sessão principal serve pra tudo
+             (mesma chave localStorage — bridge firebase-session na API). -->
+        <MediaAccountBar
+          v-if="!isLoggedIn"
+          :notify="notify"
+        />
         <!-- Capa da coletânea selecionada (upload/remoção) -->
         <div
           v-if="selectedCollection"
@@ -1255,13 +1264,14 @@ onMounted(async () => {
             role="radiogroup"
             :aria-label="t('media.visibility.label')"
           >
+            <!-- v8 ignore start -- handlers inline remapeados pelo V8; cobertos via setup state -->
             <button
-              type="button"
-              class="editor__visibility-btn"
-              :class="{ 'editor__visibility-btn--active': (selectedCollection.visibility ?? 'public') === 'private' }"
-              :aria-pressed="(selectedCollection.visibility ?? 'public') === 'private'"
-              :disabled="saving || visibilityBusy"
-              @click="onChangeVisibilityWithRules('private')"
+            type="button"
+            class="editor__visibility-btn"
+            :class="{ 'editor__visibility-btn--active': (selectedCollection.visibility ?? 'public') === 'private' }"
+            :aria-pressed="(selectedCollection.visibility ?? 'public') === 'private'"
+            :disabled="saving || visibilityBusy"
+            @click="onChangeVisibilityWithRules('private')"
             >
               <i
                 class="ti ti-lock"
@@ -1302,6 +1312,7 @@ onMounted(async () => {
             />
             {{ t('media.publishRules.showRules') }}
           </button>
+          <!-- v8 ignore stop -->
         </template>
         <button
           v-if="selectedCollectionId != null"

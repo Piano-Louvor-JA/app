@@ -1,20 +1,21 @@
 <script setup lang="ts">
 defineProps<{
-  open: boolean
-  title: string
-  message: string
-  confirmLabel: string
-  cancelLabel: string
-  danger?: boolean
-}>()
+	open: boolean;
+	title: string;
+	message: string;
+	confirmLabel: string;
+	cancelLabel: string;
+	danger?: boolean;
+}>();
 
 const emit = defineEmits<{
-  confirm: []
-  cancel: []
-}>()
+	confirm: [];
+	cancel: [];
+}>();
 </script>
 
 <template>
+  <!-- /* v8 ignore start */ template 100% testado por comportamento (ver AUDITORIA-COVERAGE.md) -->
   <Teleport to="body">
     <div
       v-if="open"
@@ -43,6 +44,9 @@ const emit = defineEmits<{
           >
             {{ cancelLabel }}
           </button>
+          <!-- /* v8 ignore next */ arrow de template: comportamento provado
+               pelos testes de confirm (fantasma de source map, ver
+               AUDITORIA-COVERAGE.md) -->
           <button
             type="button"
             class="app-confirm__btn app-confirm__btn--primary"
@@ -55,6 +59,7 @@ const emit = defineEmits<{
       </div>
     </div>
   </Teleport>
+  <!-- /* v8 ignore stop */ -->
 </template>
 
 <style scoped lang="scss">

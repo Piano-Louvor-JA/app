@@ -1,0 +1,7 @@
+#!/bin/bash
+set -euo pipefail
+# Preserve npm failures through output filtering; use actual project script.
+echo "🔍 Pre-commit: lint + typecheck..."
+npm run lint --if-present 2>&1 | tail -3
+npm run type-check 2>&1 | tail -3
+echo "✅ Pre-commit OK"

@@ -77,6 +77,11 @@ function parseTrackQuery(normalizedQuery: string): number | null {
  * Levenshtein quando |Δlen| > k — o early-exit interno de levenshteinWithin
  * não evita a chamada, então filtramos aqui.
  */
+function titleTokenMatches(titleWord: string, queryWord: string): boolean {
+  if (/^\d+$/.test(queryWord)) return titleWord === queryWord
+  return titleWord.includes(queryWord)
+}
+
 function queryWordsMatchTarget(
   queryWords: string[],
   targetWords: string[],
@@ -102,6 +107,15 @@ function queryWordsMatchTarget(
 
 type SearchScore = 0 | 1 | 2 | 3
 
+/** Hinário clássico antes do de 1996 quando o número da query casa o track. */
+function hymnalPreference(entry: MusicSearchEntry, trackQuery: number | null): number {
+  if (trackQuery == null || entry.hymnalTrack !== trackQuery) return 2
+  const album = entry.albumNames
+  if (album.includes('Hinário Adventista') && !album.includes('1996')) return 0
+  if (album.includes('Hinário Adventista 1996')) return 1
+  return 2
+}
+
 function scoreEntry(
   entry: MusicSearchEntry,
   context: { words: string[]; normalizedQuery: string; trackQuery: number | null },
@@ -110,8 +124,9 @@ function scoreEntry(
   const titleWords = title.split(' ').filter(Boolean)
   const album = normalizeSearchText(entry.albumNames)
 
-  // 0 — título: todas as palavras da query presentes (ordem livre)
-  if (context.words.every((word) => titleWords.some((tw) => tw.includes(word)))) {
+  // 0 — título: todas as palavras da query presentes (ordem livre).
+  // Número exige token exato: "1" não pode casar o "1996" do hinário novo.
+  if (context.words.every((word) => titleWords.some((tw) => titleTokenMatches(tw, word)))) {
     return 0
   }
   // 1 — número do hinário ou match em álbum
@@ -136,7 +151,7 @@ function scoreEntry(
   // 3 — trecho da letra (lyricsText já vem normalizado do índice; fallback
   // normaliza na hora para options construídas fora do catálogo)
   const lyric = entry.lyricsText ?? normalizeSearchText(entry.lyric ?? '')
-  if (lyric.includes(context.normalizedQuery)) {
+  if (context.words.every((word) => lyric.includes(word))) {
     return 3
   }
   return null
@@ -173,6 +188,9 @@ export function searchLiturgyMusic(
 
   scored.sort((a, b) => {
     if (a.score !== b.score) return a.score - b.score
+    const hymnA = hymnalPreference(a.entry, trackQuery)
+    const hymnB = hymnalPreference(b.entry, trackQuery)
+    if (hymnA !== hymnB) return hymnA - hymnB
     const trackA = a.entry.hymnalTrack ?? Number.POSITIVE_INFINITY
     const trackB = b.entry.hymnalTrack ?? Number.POSITIVE_INFINITY
     if (trackA !== trackB) return trackA - trackB

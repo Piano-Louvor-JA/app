@@ -123,11 +123,16 @@ function collectLyricImageUrls(music: CatalogMusicRecord): string[] {
 async function readMusicRecord(
   musicId: number,
 ): Promise<CatalogMusicRecord | null> {
-  // Faixa custom (Minhas Coletâneas, id >= 1M): não existe no catálogo
-  // oficial — evita 404 no json_db/túnel.
-  if (musicId >= CUSTOM_MUSIC_ID_OFFSET) return null
+  // Fora do catálogo oficial: custom (id >= 1M) e local (id negativo do
+  // import .slja). Sem isso o fallback remoto tenta `music_-N` duas vezes
+  // antes do áudio data: tocar.
+  if (musicId >= CUSTOM_MUSIC_ID_OFFSET || musicId < 0) return null
   const local = await readCatalogRecord<CatalogMusicRecord>(`music_${musicId}`)
   if (local != null) return local
+  // Faixa LOCAL do import .slja deslogado (id negativo): nunca existe no
+  // json_db remoto — tentar buscar gerava 404 em cascata nas 3 APIs
+  // (feedback Ezequias/Rafael 02/10).
+  if (musicId < 0) return null
 
   try {
     return await fetchRemoteCatalogJson<CatalogMusicRecord>(`music_${musicId}`)

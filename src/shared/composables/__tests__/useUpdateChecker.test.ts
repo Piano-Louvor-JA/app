@@ -57,6 +57,22 @@ describe('useUpdateChecker', () => {
       expect(dismissed.value).toBe(true)
       expect(sessionStorage.getItem('update-dismissed')).toBe('true')
     })
+
+    it('dismiss não falha sem sessionStorage (branch typeof)', () => {
+      const original = Object.getOwnPropertyDescriptor(window, 'sessionStorage')
+      Object.defineProperty(window, 'sessionStorage', {
+        configurable: true,
+        get: () => undefined,
+      })
+      try {
+        const { dismissed, dismiss } = useUpdateChecker()
+        dismiss()
+        expect(dismissed.value).toBe(true)
+      } finally {
+        if (original) Object.defineProperty(window, 'sessionStorage', original)
+      }
+      expect(sessionStorage.getItem('update-dismissed')).toBeNull()
+    })
   })
 
   describe('checkForUpdates', () => {
@@ -160,6 +176,22 @@ describe('useUpdateChecker', () => {
       expect(error.value).toBe('Não foi possível baixar a atualização. Tente novamente mais tarde.')
     })
 
+    it('esconde update (dismissed) quando download falha com 404', async () => {
+      mockUpdater.check.mockResolvedValue({
+        available: true,
+        version: '2.0.0',
+        releaseNotes: '',
+      })
+      mockUpdater.download.mockResolvedValue({ success: false, error: 'Request failed: 404' })
+      const { checkForUpdates, downloadUpdate, hasUpdate, dismissed, newVersion, error } = useUpdateChecker()
+      await checkForUpdates()
+      await downloadUpdate()
+      expect(hasUpdate.value).toBe(false)
+      expect(newVersion.value).toBeNull()
+      expect(dismissed.value).toBe(true)
+      expect(error.value).toBeNull()
+    })
+
     it('seta error quando download throw exception', async () => {
       mockUpdater.check.mockResolvedValue({
         available: true,
@@ -248,6 +280,46 @@ describe('useUpdateChecker', () => {
       expect(isDownloaded.value).toBe(true)
       expect(isDownloading.value).toBe(false)
       expect(downloadProgress.value).toBe(100)
+    })
+
+    it('traduz erro de rede do electron-updater (Cannot download)', () => {
+      const { init, error } = useUpdateChecker()
+      init()
+      const cb = mockUpdater.onError.mock.calls[0][0]
+      cb(null, { message: 'Cannot download update from https://...' })
+      expect(error.value).toBe('Não foi possível baixar a atualização. Verifique sua conexão com a internet.')
+    })
+
+    it('traduz erro net::ERR do electron-updater', () => {
+      const { init, error } = useUpdateChecker()
+      init()
+      const cb = mockUpdater.onError.mock.calls[0][0]
+      cb(null, { message: 'net::ERR_INTERNET_DISCONNECTED' })
+      expect(error.value).toBe('Não foi possível baixar a atualização. Verifique sua conexão com a internet.')
+    })
+
+    it('traduz erro de assinatura/verificação do electron-updater', () => {
+      const { init, error } = useUpdateChecker()
+      init()
+      const cb = mockUpdater.onError.mock.calls[0][0]
+      cb(null, { message: 'signature verification failed' })
+      expect(error.value).toBe('A atualização não pôde ser verificada. Tente novamente mais tarde.')
+    })
+
+    it('traduz erro de permissão do electron-updater', () => {
+      const { init, error } = useUpdateChecker()
+      init()
+      const cb = mockUpdater.onError.mock.calls[0][0]
+      cb(null, { message: 'EACCES: permission denied' })
+      expect(error.value).toBe('Permissão negada. Execute o aplicativo como administrador.')
+    })
+
+    it('onError com data.message undefined usa fallback vazio (erro genérico)', () => {
+      const { init, error } = useUpdateChecker()
+      init()
+      const cb = mockUpdater.onError.mock.calls[0][0]
+      cb(null, {})
+      expect(error.value).toBe('Falha na atualização. Tente novamente mais tarde.')
     })
 
     it('onError callback seta error traduzido e isDownloading=false', () => {
