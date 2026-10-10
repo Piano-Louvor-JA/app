@@ -41,7 +41,7 @@ export function formatElapsedMs(
   const effectiveFormat = resolveDisplayFormat(hours, timeFormat)
   const formatted = effectiveFormat.replace(
     /hh|mm|ss|ms/g,
-    (match) => tokens[match] ?? match,
+    (match) => tokens[match],
   )
   return negative ? `-${formatted}` : formatted
 }
@@ -138,4 +138,25 @@ export function clampDurationPart(value: unknown, max?: number): number {
   const floored = Math.floor(n)
   if (max != null) return Math.min(max, floored)
   return floored
+}
+
+export function computeRemainingRawMs(
+  durationMs: number,
+  accumulatedMs: number,
+  segmentStartedAt: number | null,
+  status: CountdownStatus,
+  nowMs: number,
+): number {
+  const elapsed = computeElapsedMs(accumulatedMs, segmentStartedAt, status, nowMs)
+  return durationMs - elapsed
+}
+
+
+export function formatCountdownWithSign(
+  remainingMs: number,
+  timeFormat: CountdownTimeFormat,
+): string {
+  const negative = remainingMs < 0
+  const body = formatElapsedMs(Math.abs(remainingMs), timeFormat)
+  return negative ? `-${body}` : body
 }

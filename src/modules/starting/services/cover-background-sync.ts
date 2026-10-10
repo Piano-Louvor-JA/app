@@ -7,6 +7,11 @@ import {
 } from '@shared/services/workspace-api'
 import { getCurrentApiPrefix } from '@modules/sync/services/library-catalog'
 import { toRelativeMediaPath } from '@modules/sync/services/media-paths'
+import {
+  downloadQueueSnapshot,
+  enqueueDownload,
+  subscribeDownloadQueue,
+} from '@modules/sync/services/download-queue-service'
 
 type CategoryAlbum = {
   url_image?: string | null
@@ -123,6 +128,7 @@ export async function ensureAlbumCovers(
       await Promise.all(
         batch.map(async (urlImage) => {
           const relativePath = toRelativeMediaPath(urlImage)
+          /* v8 ignore next 1 -- missing só contém paths com relativePath válido */
           if (!relativePath) return
           const fullUrl = resolveMediaUrl(urlImage)
           const ok = await bridge.media.download(fullUrl, 'covers', relativePath)
@@ -136,6 +142,7 @@ export async function ensureAlbumCovers(
 
     const stillMissing = await mapInBatches(missing, CHECK_BATCH, async (urlImage) => {
       const relativePath = toRelativeMediaPath(urlImage)
+      /* v8 ignore next 1 -- missing só contém paths com relativePath válido */
       if (!relativePath) return false
       return !(await bridge.media.check('covers', relativePath))
     })
@@ -156,7 +163,31 @@ export async function ensureAlbumCovers(
 /**
  * Após o warm boot, completa capas ausentes em background (não bloqueia a UI).
  * Sempre faz verificação rápida no disco e baixa só o que faltar.
+ *
+ * app#338: passa pela fila unificada (item `bg`) — fica visível no widget
+ * do header e um download pedido pelo usuário (`user`) fura na frente.
  */
-export async function startCoverBackgroundSync(): Promise<void> {
-  await ensureAlbumCovers({ skipIfSynced: false })
+export async function startCoverBackgroundSync(
+  syncFn: typeof ensureAlbumCovers = ensureAlbumCovers,
+): Promise<void> {
+  await new Promise<void>((resolve) => {
+    enqueueDownload({
+      id: 'covers:bg-sync',
+      label: 'Capas do catálogo',
+      priority: 'bg',
+      task: async () => {
+        await syncFn({ skipIfSynced: false })
+      },
+    })
+    // resolve quando o item sai da fila de pendentes
+    const check = () => {
+      const item = downloadQueueSnapshot().find((q) => q.id === 'covers:bg-sync')
+      if (item && item.status !== 'pending' && item.status !== 'running') {
+        unsub()
+        resolve()
+      }
+    }
+    const unsub = subscribeDownloadQueue(() => check())
+    check()
+  })
 }

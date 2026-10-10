@@ -196,11 +196,13 @@ export function useThemeManager() {
   }
 
   function setAccent(key: AccentKey) {
+    if (!isAccentKey(key)) return
     accentKey.value = key
     persistAppearance()
   }
 
   function setInteraction(key: InteractionKey) {
+    if (!isInteractionKey(key)) return
     interactionKey.value = key
     persistAppearance()
   }

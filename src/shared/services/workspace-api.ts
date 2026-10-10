@@ -56,6 +56,7 @@ export function resolveDatabaseUrl(relativePath: string): string {
   // sem default aqui a build de release fica sem catálogo (hotfix 14/09).
   const base =
     import.meta.env.VITE_URL_DATABASE ?? 'https://api.pianolouvorja.com.br/json_db'
+  const normalizedBase = base.endsWith('/') ? base.slice(0, -1) : base
   const path = relativePath.startsWith('/') ? relativePath : `/${relativePath}`
-  return `${base}${path}`
+  return `${normalizedBase}${path}`
 }

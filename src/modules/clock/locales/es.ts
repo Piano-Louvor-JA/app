@@ -10,6 +10,8 @@ export default {
     clockDescription: 'Mostrar la hora en la pantalla de proyección',
     random: 'Sorteo',
     randomDescription: 'Sorteo animado de nombres y números',
+    obs: 'Transmitir via OBS',
+    obsDescription: 'Proyecta via OBS Browser Source — próximamente',
     draw: 'Dibujo',
     drawDescription: 'Anotar y resaltar sobre la proyección',
     timer: 'Cronómetro',

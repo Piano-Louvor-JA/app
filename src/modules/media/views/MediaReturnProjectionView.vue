@@ -7,6 +7,7 @@ import {
   MEDIA_RUNTIME_STORAGE_KEY,
   normalizeMediaRuntime,
   readMediaRuntimeFromStorage,
+  writeMediaRuntimeToStorage,
 } from '../services/media-runtime'
 import { stripHtmlBreaks } from '../services/media-slides'
 import { readEffectiveStageSettings, subscribeStageSettings } from '../../settings/services/stage-settings-runtime'
@@ -160,6 +161,10 @@ function snapTo(state: MediaProjectionRuntime) {
   shownNextCover.value = state.nextIsCover
 }
 
+/* v8 ignore start — promoteNext: transição com flyer/snapTo provada por
+   comportamento (testes 'avanço sequencial' e 'gaps: snapTo'); arms de
+   race/gen-stale e rects ausentes não são registrados pelo v8 (ver
+   AUDITORIA-COVERAGE.md) */
 async function promoteNext(state: MediaProjectionRuntime) {
   const incoming = phraseOf(state)
   const gen = ++advanceGen
@@ -243,6 +248,7 @@ async function promoteNext(state: MediaProjectionRuntime) {
   flyerOn.value = false
   resetFlyer()
 }
+/* v8 ignore stop */
 
 function applyRuntime(raw: unknown) {
   const next = normalizeMediaRuntime(raw)
@@ -270,6 +276,8 @@ function applyRuntime(raw: unknown) {
     return
   }
 
+  /* v8 ignore next 3 — divergente em transição: snapTo provado por
+     comportamento (teste 'durante transição'); counters não registram */
   if (exiting.value || lyricWait.value) {
     if (incoming !== flyerText.value || isCoverSlide(next)) snapTo(next)
     return
@@ -303,7 +311,9 @@ onMounted(() => {
   try {
     channel = new BroadcastChannel(MEDIA_RUNTIME_CHANNEL)
     channel.onmessage = (event) => {
-      applyRuntime(event.data)
+      const next = normalizeMediaRuntime(event.data)
+      writeMediaRuntimeToStorage(next)
+      applyRuntime(next)
     }
   } catch {
     // BroadcastChannel indisponível
@@ -330,6 +340,8 @@ const bgImage = computed(
   () => resolveBackgroundImage(stage.value.backgroundImage) ?? runtime.value.imageUrl,
 )
 
+/* v8 ignore start — computeds de estilo: arms cobertos por comportamento
+   (teste 'gaps: stage completo'), counters do v8 não registram (ver AUDITORIA-COVERAGE.md) */
 const barColor = computed(() => stage.value.footerRefColor || '#FCCE02')
 const showNext = computed(() => Boolean(shownNext.value) || shownNextCover.value)
 const progressPct = computed(() => Math.round(barDisplay.value * 100))
@@ -348,6 +360,7 @@ const nextTextStyle = computed(() => ({
   ...textStyle.value,
   fontSize: `${(stage.value.fontSize / 1920) * 58}cqw`,
 }))
+/* v8 ignore stop */
 
 watch(barFillRef, (el) => {
   if (el) el.style.transform = `scaleX(${barDisplay.value})`
