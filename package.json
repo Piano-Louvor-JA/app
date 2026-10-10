@@ -56,7 +56,7 @@
   "devDependencies": {
     "@playwright/test": "^1.62.1",
     "@storybook/vue3-vite": "10.6.1",
-    "@stryker-mutator/core": "^9.6.1",
+    "@stryker-mutator/core": "^10.0.0",
     "@stryker-mutator/vitest-runner": "^9.6.1",
     "@tailwindcss/vite": "^4.3.2",
     "@tsconfig/node24": "^24.0.4",
