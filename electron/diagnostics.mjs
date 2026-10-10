@@ -355,7 +355,7 @@ export function registerDiagnosticsIpc() {
   // electron-builder copia arquivos sem passar pelo Vite; injeta DSN em build-time
   // via resource opcional. process.env mantém a sobreposição para dev/CI.
   const bundledDsn = (() => {
-    try { return fs.readFileSync(path.join(process.resourcesPath, 'diagnostics-dsn.txt'), 'utf8').trim() } catch { return '' }
+    try { return readFileSync(path.join(process.resourcesPath, 'diagnostics-dsn.txt'), 'utf8').trim() } catch { return '' }
   })()
   ipcMain.handle('diagnostics:run', () => runDiagnostics())
   ipcMain.handle('diagnostics:open-folder', async (_event, filePath) => shell.showItemInFolder(String(filePath ?? '')))
