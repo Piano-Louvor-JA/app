@@ -180,11 +180,11 @@ export function searchLiturgyMusic(
   const trackQuery = parseTrackQuery(normalizedQuery)
   const context = { words, normalizedQuery, trackQuery }
 
-  const scored: Array<{ entry: MusicSearchEntry; score: SearchScore }> = []
-  for (const entry of options) {
+  const scored: Array<{ entry: MusicSearchEntry; score: SearchScore; index: number }> = []
+  options.forEach((entry, index) => {
     const score = scoreEntry(entry, context)
-    if (score != null) scored.push({ entry, score })
-  }
+    if (score != null) scored.push({ entry, score, index })
+  })
 
   scored.sort((a, b) => {
     if (a.score !== b.score) return a.score - b.score
@@ -194,7 +194,7 @@ export function searchLiturgyMusic(
     const trackA = a.entry.hymnalTrack ?? Number.POSITIVE_INFINITY
     const trackB = b.entry.hymnalTrack ?? Number.POSITIVE_INFINITY
     if (trackA !== trackB) return trackA - trackB
-    return a.entry.name.localeCompare(b.entry.name)
+    return a.index - b.index
   })
 
   return scored.slice(0, MAX_RESULTS).map((hit) => hit.entry)
