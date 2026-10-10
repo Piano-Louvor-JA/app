@@ -352,12 +352,17 @@ async function runDiagnostics() {
 }
 
 export function registerDiagnosticsIpc() {
+  // electron-builder copia arquivos sem passar pelo Vite; injeta DSN em build-time
+  // via resource opcional. process.env mantém a sobreposição para dev/CI.
+  const bundledDsn = (() => {
+    try { return fs.readFileSync(path.join(process.resourcesPath, 'diagnostics-dsn.txt'), 'utf8').trim() } catch { return '' }
+  })()
   ipcMain.handle('diagnostics:run', () => runDiagnostics())
   ipcMain.handle('diagnostics:open-folder', async (_event, filePath) => shell.showItemInFolder(String(filePath ?? '')))
   // DSN não existe no código/repo. No dev e sem DSN público, falha deliberadamente
   // com fallback local; o botão nunca bloqueia o arquivo já salvo.
   ipcMain.handle('diagnostics:send', async (_event, report) => {
-    const dsn = process.env.DIAGNOSTICS_GLITCHTIP_DSN || __DIAGNOSTICS_DSN__
+    const dsn = process.env.DIAGNOSTICS_GLITCHTIP_DSN || bundledDsn
     if (!dsn) return { ok: false, reason: 'DSN de diagnóstico não configurado; compartilhe o arquivo salvo.' }
     try {
       // Protocolo Sentry/GlitchTip: parse do DSN https://<key>@<host>/<project>
