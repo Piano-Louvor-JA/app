@@ -77,7 +77,7 @@ describe('app#331 — caminho REAL: openLiturgyMusicPlayer com item importado', 
     const session = useMediaStore().session
     expect(session).not.toBeNull()
     expect(session?.title).toBe('Missao Para Todos')
-    expect(session?.audioUrl).toMatch(/^data:audio/)
+    expect(session?.audioUrl).toMatch(/^(data:audio|blob:)/)
     useMediaStore().close()
   })
 

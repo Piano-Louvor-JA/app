@@ -181,8 +181,9 @@ function formatSeconds(total: number): string {
 export async function loadCustomMusicTrack(
   musicId: number,
 ): Promise<MediaTrackRecord | null> {
-  // Música LOCAL (sem auth): monta o record do localStorage. O áudio vai
-  // como data: URL (base64) — o browser toca direto, sem servidor.
+  // Música LOCAL (sem auth): monta o record do localStorage. Áudio/capa em
+  // IndexedDB (audioMediaId/coverMediaId) resolvem como blob: objectURL;
+  // LEGACY pré-fix (audioBase64/image_url data: inline) segue funcionando.
   if (isLocalId(musicId)) {
     const local = getLocalMusic(musicId)
     if (!local) return null
@@ -192,6 +193,21 @@ export async function loadCustomMusicTrack(
       if (official) return { ...official, id: musicId }
       return null
     }
+    const { getMedia } = await import('./local-media-store')
+    const audioBlob = local.audioMediaId
+      ? await getMedia(local.audioMediaId)
+      : null
+    const coverBlob = local.coverMediaId
+      ? await getMedia(local.coverMediaId)
+      : null
+    const audioUrl = audioBlob
+      ? URL.createObjectURL(audioBlob)
+      : local.audioBase64
+        ? `data:audio/mpeg;base64,${local.audioBase64}`
+        : null
+    const coverUrl = coverBlob
+      ? URL.createObjectURL(coverBlob)
+      : (local.image_url ?? null)
     const lyrics = local.lyrics.map((l) => ({
       order: l.order,
       lyric: l.lyric ?? '',
@@ -207,11 +223,9 @@ export async function loadCustomMusicTrack(
       id: musicId,
       name: local.name,
       durationLabel: '0:00',
-      audioUrl: local.audioBase64
-        ? `data:audio/mpeg;base64,${local.audioBase64}`
-        : null,
+      audioUrl,
       instrumentalUrl: null,
-      coverUrl: local.image_url ?? null,
+      coverUrl,
       coverPosition: null,
       albums: [],
       categories: ['Minhas Coletâneas'],
@@ -395,8 +409,11 @@ function localMusicToSummary(m: LocalMusic): CustomMusicSummary {
     id: m.id,
     name: m.name,
     duration: null,
-    hasAudio: Boolean(m.audioBase64) || Boolean(m.officialMusicId),
-    hasImage: Boolean(m.image_url),
+    hasAudio:
+      Boolean(m.audioBase64) ||
+      Boolean(m.audioMediaId) ||
+      Boolean(m.officialMusicId),
+    hasImage: Boolean(m.image_url) || Boolean(m.coverMediaId),
     audioUrl: m.audioBase64 ? `data:audio/mpeg;base64,${m.audioBase64}` : null,
     officialMusicId: m.officialMusicId ?? null,
   }
