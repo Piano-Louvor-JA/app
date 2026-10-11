@@ -32,19 +32,19 @@ describe('assertNoProdApiUrl', () => {
   test('lança para URL de produção com host e fonte na mensagem', () => {
     expect(() =>
       assertNoProdApiUrl(['https://api.pianolouvorja.com.br/json_db'], 'process.env'),
-    ).toThrowError(/api\.pianolouvorja\.com\.br.*process\.env/s)
+    ).toThrowError(/^E2E apontando para PRODUÇÃO \(api\.pianolouvorja\.com\.br em process\.env\)/)
   })
 
   test('hostname é comparado case-insensitive', () => {
     expect(() =>
       assertNoProdApiUrl(['https://API.PianoLouvorJA.com.br'], 'process.env'),
-    ).toThrowError(/E2E apontando para PRODUÇÃO \(api\.pianolouvorja\.com\.br/)
+    ).toThrowError(/^E2E apontando para PRODUÇÃO \(api\.pianolouvorja\.com\.br em process\.env\) — /)
   })
 
   test('lança para URL de produção com porta', () => {
     expect(() =>
       assertNoProdApiUrl(['https://api.pianolouvorja.com.br:8443/v1'], '.env'),
-    ).toThrowError(/api\.pianolouvorja\.com\.br/)
+    ).toThrowError(/com\.br:8443/)
   })
 
   test('aceita localhost com porta', () => {
@@ -77,7 +77,7 @@ describe('assertNoProdApiUrl', () => {
         splitCsvUrls('https://api.louvorja.com.br,https://api.pianolouvorja.com.br'),
         'process.env',
       ),
-    ).toThrowError(/URL ofensora: https:\/\/api\.pianolouvorja\.com\.br/)
+    ).toThrowError(/URL ofensora: https:\/\/api\.pianolouvorja\.com\.br$/)
   })
 
   test('subdomínio diferente NÃO é bloqueado (comparação de hostname exato)', () => {
@@ -89,7 +89,7 @@ describe('assertNoProdApiUrl', () => {
   test('URL com userinfo não burla o hostname', () => {
     expect(() =>
       assertNoProdApiUrl(['https://user@api.pianolouvorja.com.br'], '.env.local'),
-    ).toThrowError(/api\.pianolouvorja\.com\.br/)
+    ).toThrowError(/em \.env\.local/)
   })
 })
 
