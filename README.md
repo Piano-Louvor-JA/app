@@ -8,8 +8,10 @@ O **LouvorJA - PIANO**, além de incluir os recursos do App Louvor JA, vai incor
 
 Pacote: `louvorja-piano` · Plataformas: Windows, macOS e Linux.
 
----
+[![Instalar na Snap Store](https://snapcraft.io/louvorja-piano/badge.svg)](https://snapcraft.io/louvorja-piano)
+[![Disponível na Microsoft Store](https://img.shields.io/badge/Microsoft%20Store-9N1WPDQKFLR9-0078D4?logo=windows11&logoColor=white)](https://apps.microsoft.com/detail/9N1WPDQKFLR9)
 
+---
 
 
 ## Versões do produto

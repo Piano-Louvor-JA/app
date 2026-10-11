@@ -38,7 +38,7 @@ jobs:
         run: |
           set -euo pipefail
           echo "Publicação avaliada para ${TARGET_REF}."
-          script="$(mktemp)"
+          script="$(mktemp).mjs"
           gh api "repos/${GITHUB_REPOSITORY}/contents/scripts/release-publish-decision.mjs?ref=${WORKFLOW_SHA}" --jq .content \
             | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{let t=s.trim();if(t.startsWith(String.fromCharCode(34)))t=JSON.parse(t);process.stdout.write(Buffer.from(String(t).replace(/\s/g,""),"base64"))})' \
             > "$script"
