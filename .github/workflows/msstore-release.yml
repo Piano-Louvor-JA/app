@@ -1,0 +1,88 @@
+# Microsoft Store — publica o .appx da GitHub Release via MSStore Developer CLI.
+# Pré-requisitos (ver skill electron-app-store-publishing):
+#   - Secrets: AZURE_AD_TENANT_ID, AZURE_AD_APPLICATION_CLIENT_ID,
+#     AZURE_AD_APPLICATION_SECRET, SELLER_ID, MS_STORE_PRODUCT_ID
+#   - App Entra com papel Manager no Partner Center (Gerenciamento de usuários)
+#   - App já publicado/live na Store (submissões de atualização só funcionam após a primeira certificação)
+# Documentação: https://learn.microsoft.com/windows/apps/publish/msstore-dev-cli/github-actions
+name: MS Store Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Versão da release (ex: 1.29.1)'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  msstore:
+    name: Publish .appx to Partner Center
+    runs-on: windows-latest
+    steps:
+      - name: Check MS Store secrets
+        id: store
+        shell: bash
+        env:
+          TENANT: ${{ secrets.AZURE_AD_TENANT_ID }}
+          CLIENT: ${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }}
+          SECRET: ${{ secrets.AZURE_AD_APPLICATION_SECRET }}
+          SELLER: ${{ secrets.SELLER_ID }}
+          PRODUCT: ${{ secrets.MS_STORE_PRODUCT_ID }}
+        run: |
+          if [ -n "$TENANT" ] && [ -n "$CLIENT" ] && [ -n "$SECRET" ] && [ -n "$SELLER" ] && [ -n "$PRODUCT" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "Secrets MS Store ausentes — publicação na Store pulada."
+          fi
+
+      - name: Resolve version
+        if: steps.store.outputs.enabled == 'true'
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          V="${INPUT_VERSION:-${RELEASE_TAG#v}}"
+          [ -n "$V" ] || { echo "Sem versão (tag v* ou input version obrigatório)."; exit 1; }
+          echo "VERSION=$V" >> "$GITHUB_ENV"
+
+      - name: Download .appx from release
+        if: steps.store.outputs.enabled == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ env.VERSION }}
+        run: |
+          set -euo pipefail
+          mkdir -p msstore
+          gh release download "v${VERSION}" --pattern '*.appx' --dir msstore --clobber
+          APPX="$(find msstore -name '*.appx' | head -1)"
+          [ -n "$APPX" ] || { echo "Nenhum .appx na release v${VERSION}."; exit 1; }
+          echo "APPX=$APPX" >> "$GITHUB_ENV"
+          echo "Pacote: $APPX"
+
+      - uses: microsoft/microsoft-store-apppublisher@v1.1
+        if: steps.store.outputs.enabled == 'true'
+
+      - name: Configure MSStore CLI
+        if: steps.store.outputs.enabled == 'true'
+        shell: bash
+        run: |
+          msstore reconfigure \
+            --tenantId "${{ secrets.AZURE_AD_TENANT_ID }}" \
+            --sellerId "${{ secrets.SELLER_ID }}" \
+            --clientId "${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }}" \
+            --clientSecret "${{ secrets.AZURE_AD_APPLICATION_SECRET }}"
+
+      - name: Publish package to Store
+        if: steps.store.outputs.enabled == 'true'
+        shell: bash
+        env:
+          PRODUCT_ID: ${{ secrets.MS_STORE_PRODUCT_ID }}
+        run: msstore publish "$APPX" -id "$PRODUCT_ID"
