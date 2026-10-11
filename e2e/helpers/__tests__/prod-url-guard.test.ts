@@ -67,8 +67,29 @@ describe('assertNoProdApiUrl', () => {
     ).not.toThrow()
   })
 
-  test('pula entradas vazias, ausentes e URLs inválidas', () => {
+  test('pula entradas vazias, ausentes e strings inválidas SEM host de prod', () => {
     expect(() => assertNoProdApiUrl(['', undefined, '   ', 'not-a-url'], 'process.env')).not.toThrow()
+  })
+
+  test('P2-1 fail-closed: host de prod SEM protocolo bloqueia', () => {
+    expect(() =>
+      assertNoProdApiUrl(['api.pianolouvorja.com.br'], 'VITE_API_FALLBACK_URLS'),
+    ).toThrowError(/api\.pianolouvorja\.com\.br/)
+  })
+
+  test('P2-1 fail-closed: URL de prod com aspas envolventes (CSV malformado) bloqueia', () => {
+    expect(() =>
+      assertNoProdApiUrl(['"https://api.pianolouvorja.com.br"'], 'process.env'),
+    ).toThrowError(/api\.pianolouvorja\.com\.br/)
+  })
+
+  test('P2-1: host sem protocolo de NÃO-prod (staging/localhost) NÃO bloqueia', () => {
+    expect(() =>
+      assertNoProdApiUrl(
+        ['api-stg.pianolouvorja.com.br', 'localhost', 'my-api.internal'],
+        'process.env',
+      ),
+    ).not.toThrow()
   })
 
   test('CSV de fallbacks com UMA entrada de produção lança apontando a entrada', () => {

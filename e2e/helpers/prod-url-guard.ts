@@ -37,7 +37,14 @@ export interface EnvLayer {
   vars: Record<string, string>
 }
 
-/** Extrai o hostname de uma URL, ou null se inválida/vazia. */
+/**
+ * Extrai o hostname de uma URL; null se vazia.
+ *
+ * FAIL-CLOSED: se a string não parseia como URL mas CONTÉ um host de
+ * produção (ex.: "api.pianolouvorja.com.br" sem protocolo, ou com aspas
+ * envolventes de CSV malformado), retorna o host de produção para o guard
+ * bloquear — nunca deixar passar por falha de parsing.
+ */
 function hostnameOf(url: string | undefined): string | null {
   if (!url) return null
   const trimmed = url.trim()
@@ -45,6 +52,10 @@ function hostnameOf(url: string | undefined): string | null {
   try {
     return new URL(trimmed).hostname.toLowerCase()
   } catch {
+    const lowered = trimmed.toLowerCase()
+    for (const host of PROD_HOSTS) {
+      if (lowered.includes(host)) return host
+    }
     return null
   }
 }

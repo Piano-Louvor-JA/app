@@ -14,7 +14,21 @@
 import { assertNoProdApiUrl, repoRootEnvLayers, resolveEffectiveApiUrls } from './helpers/prod-url-guard'
 
 export default function globalSetup(): void {
-  for (const { key, url, source } of resolveEffectiveApiUrls(process.env, repoRootEnvLayers())) {
+  const effective = resolveEffectiveApiUrls(process.env, repoRootEnvLayers())
+
+  // P1-2 (rework): sem NENHUMA env de API explícita, services do app usam
+  // defaults hardcoded https://api.pianolouvorja.com.br e requests E2E reais
+  // sairiam para PRODUÇÃO. Exigir env explícita (staging/localhost) em E2E.
+  if (effective.length === 0) {
+    throw new Error(
+      'E2E sem env de API explícita — defaults hardcoded dos services apontam para ' +
+        'PRODUÇÃO (api.pianolouvorja.com.br). Exporte VITE_URL_DATABASE/VITE_PALCO_API_URL ' +
+        'com staging (api-stg.pianolouvorja.com.br) ou localhost (via .env.local, ' +
+        'process.env ou CI env), ou use mock (page.route).',
+    )
+  }
+
+  for (const { key, url, source } of effective) {
     assertNoProdApiUrl([url], `${source} (${key})`)
   }
 }
