@@ -11,6 +11,10 @@ vi.mock('../../services/liturgy-preferences', async (importOriginal) => {
     ...actual,
     loadLiturgyState: vi.fn(() => actual.normalizeLiturgyState({})),
     saveLiturgyState: vi.fn((state: unknown) => { prefsState.liturgy = state }),
+    // Fixture determinística: sem isso, o teste do clone depende do dia da
+    // semana real (hydrate() seleciona hoje; domingo real exclui o weekday[0]
+    // populado do cloneSources — flake só aos domingos, visto 2026-10-11).
+    todayWeekday: vi.fn(() => 'friday' as const),
   }
 })
 
