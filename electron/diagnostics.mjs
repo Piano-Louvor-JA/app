@@ -210,20 +210,33 @@ function inspectRealInstallation() {
  * arquivo conhecido, buffer em memória — nada é salvo no disco do usuário.
  * Diferencia "API JSON ok mas CDN de arquivos bloqueada".
  */
-async function mediaFileProbe(host, token) {
-  const url = `https://${host}/file/pt_categories`
+export async function mediaFileProbe(host, token) {
+  const url = `https://${host}/file/musics/pt/90141.mp3`
   const start = Date.now()
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
   try {
     const response = await fetch(url, {
       headers: token ? { 'Api-Token': token, Range: 'bytes=0-65535' } : { Range: 'bytes=0-65535' },
+      redirect: 'manual',
       signal: controller.signal,
     })
     const body = await response.arrayBuffer()
     const result = { url, status: response.status, ok: response.ok, bytes: body.byteLength, ms: elapsed(start), erro: null }
     if (!response.ok) {
-      const classe = response.status === 403 ? 'HTTP_403' : response.status === 404 ? 'HTTP_404' : response.status === 429 ? 'HTTP_429' : response.status >= 500 ? 'HTTP_5XX' : 'OTHER'
+      // v1.3 — 3xx é explícito: /file/ redireciona upstream quando não espelhado.
+      // ok exige 2xx; o probe avalia a própria CDN, nunca segue redirect.
+      const classe = response.status >= 300 && response.status < 400
+        ? 'HTTP_302_REDIRECT'
+        : response.status === 403
+          ? 'HTTP_403'
+          : response.status === 404
+            ? 'HTTP_404'
+            : response.status === 429
+              ? 'HTTP_429'
+              : response.status >= 500
+                ? 'HTTP_5XX'
+                : 'OTHER'
       result.erro = { classe, bruto: `HTTP ${response.status}` }
     }
     return result
