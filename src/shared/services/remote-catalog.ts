@@ -24,16 +24,19 @@ export async function fetchRemoteCatalogJson<T = unknown>(
     }
 
     if (!response.ok) {
-      if (retries > 0 && response.status >= 500) {
+      if (retries > 0 && (response.status === 429 || response.status >= 500)) {
         await delay(delayMs)
         return fetchRemoteCatalogJson(file, retries - 1, delayMs * 1.5)
       }
+      // 4xx (exceto 429) = recurso/credencial inválido neste catálogo.
+      // Não cascatear: o mesmo arquivo ausente nos fallbacks gera storm/CORS.
       throw new Error(`Servidor retornou erro ${response.status}`)
     }
 
     return (await response.json()) as T
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
+    if (message.startsWith('Servidor retornou erro 4')) throw error
     if (
       retries > 0 &&
       (message.includes('Failed to fetch') || message.includes('NetworkError'))
@@ -42,8 +45,7 @@ export async function fetchRemoteCatalogJson<T = unknown>(
       return fetchRemoteCatalogJson(file, retries - 1, delayMs * 1.5)
     }
 
-    // Primária esgotada → cascata: api.pianolouvorja → api.louvorja → workers.dev
-    // (mesma semântica do ApiConfig do APK — paridade entre clientes).
+    // Só falha transitória esgotada (rede/5xx/429) tenta hosts alternativos.
     const { data } = await fetchWithApiFallback<T>('database', file, { retries, delayMs })
     return data
   }

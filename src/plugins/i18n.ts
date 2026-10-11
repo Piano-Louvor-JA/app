@@ -110,6 +110,7 @@ export default createI18n({
       ...settingsPtBR,
       ...startingPtBR,
       ...syncPtBR,
+      sync: { ...ptBR.sync, ...syncPtBR.sync },
       ...timerPtBR,
     },
     en: {
@@ -127,6 +128,7 @@ export default createI18n({
       ...settingsEn,
       ...startingEn,
       ...syncEn,
+      sync: { ...en.sync, ...syncEn.sync },
       ...timerEn,
     },
     es: {
@@ -144,6 +146,7 @@ export default createI18n({
       ...settingsEs,
       ...startingEs,
       ...syncEs,
+      sync: { ...es.sync, ...syncEs.sync },
       ...timerEs,
     },
   },

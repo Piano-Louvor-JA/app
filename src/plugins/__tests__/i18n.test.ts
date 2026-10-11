@@ -14,6 +14,13 @@ import {
   SUPPORTED_LOCALES,
   DEFAULT_LOCALE,
 } from '@plugins/i18n'
+import i18n from '@plugins/i18n'
+
+describe('i18n message merge', () => {
+  it('preserva sync.downloadQueue.title no locale es após carregar syncEs', () => {
+    expect(i18n.global.t('sync.downloadQueue.title', {}, { locale: 'es' })).toBe('Descargas')
+  })
+})
 
 describe('SUPPORTED_LOCALES', () => {
   it('contem pt-BR, en e es', () => {

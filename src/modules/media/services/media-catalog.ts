@@ -125,10 +125,15 @@ export async function loadMediaTrack(
   const local = await readCatalogRecord<CatalogMusicRow>(`music_${musicId}`)
   // Fallback remoto: faixa nova (ex: Infantis/Doxologia 90xxx) pode não estar
   // no cache local ainda — busca do backend antes de desistir (trackMissing).
-  const row =
-    local ?? (await fetchRemoteCatalogJson<CatalogMusicRow>(`music_${musicId}`))
-  if (!row) return null
-  return mapTrack(row, musicId)
+  try {
+    const row =
+      local ?? (await fetchRemoteCatalogJson<CatalogMusicRow>(`music_${musicId}`))
+    return row ? mapTrack(row, musicId) : null
+  } catch {
+    // Registro remoto ausente/indisponível é apresentado pelo store como
+    // trackMissing; nunca deixar rejeição escapar do handler do player.
+    return null
+  }
 }
 
 export function resolveAlbumSubtitle(
