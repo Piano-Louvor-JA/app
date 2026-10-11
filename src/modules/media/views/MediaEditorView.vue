@@ -14,6 +14,7 @@ import {
   isLocalId,
   updateLocalMusic,
 } from '../services/local-custom-store'
+import { getMedia, putMedia } from '../services/local-media-store'
 import {
   addOfficialMusicToCollection,
   copyCustomMusic,
@@ -480,7 +481,7 @@ async function onSelectMusic(id: number): Promise<void> {
         time: row.time ?? '00:00',
         imageUrl: row.image_url ?? '',
       }))
-      loadAudioForMusic(local.audioBase64 ? `local:${local.id}` : null)
+      loadAudioForMusic(local.audioBase64 || local.audioMediaId ? `local:${local.id}` : null)
       if (local.officialMusicId != null) {
         notify('Hino oficial vinculado — a letra/áudio são gerenciados no catálogo oficial')
       }
@@ -915,12 +916,17 @@ const activeStanza = computed(() => {
 })
 
 /** Carrega o áudio vinculado à música (audio_url da API ou local:<id>) */
-function loadAudioForMusic(audioPath: string | null): void {
+async function loadAudioForMusic(audioPath: string | null): Promise<void> {
   if (audioPath?.startsWith('local:')) {
     const local = getLocalMusicById(Number(audioPath.slice('local:'.length)))
-    audioSrc.value = local?.audioBase64
-      ? `data:audio/mpeg;base64,${local.audioBase64}`
-      : null
+    if (local?.audioMediaId) {
+      const blob = await getMedia(local.audioMediaId)
+      audioSrc.value = blob ? URL.createObjectURL(blob) : null
+    } else {
+      audioSrc.value = local?.audioBase64
+        ? `data:audio/mpeg;base64,${local.audioBase64}`
+        : null
+    }
   } else {
     audioSrc.value = audioPath ? customFileUrl(audioPath) : null
   }
@@ -953,8 +959,13 @@ async function onAudioFile(event: Event): Promise<void> {
     const bytes = new Uint8Array(await file.arrayBuffer())
 
     if (isLocalId(musicId)) {
+      // slja-storage: áudio local agora é blob em IndexedDB (não base64 no
+      // localStorage — quota). Id derivado da música p/ ficar estável.
+      const mediaId = `local-music-${musicId}-audio`
+      await putMedia(mediaId, bytes)
       updateLocalMusic(musicId, {
-        audioBase64: bytesToBase64(bytes),
+        audioMediaId: mediaId,
+        audioBase64: null,
         audioName: file.name,
       })
       loadAudioForMusic(`local:${musicId}`)
