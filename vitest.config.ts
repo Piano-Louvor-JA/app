@@ -27,7 +27,9 @@ export default defineConfig({
     },
   },
   test: {
-    exclude: ['node_modules/**', 'dist/**', 'e2e/**', '.worktrees/**', 'coverage/**', 'scripts/release-publish-decision.test.mjs'],
+    // e2e/helpers/__tests__ roda no vitest (unit do guard de produção); as
+    // specs de e2e/ continuam sendo Playwright, não vitest.
+    exclude: ['node_modules/**', 'dist/**', 'e2e/*.spec.ts', '.worktrees/**', 'coverage/**', 'scripts/release-publish-decision.test.mjs'],
     environment: 'jsdom',
     environmentOptions: {
       jsdom: {
