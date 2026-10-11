@@ -7,7 +7,7 @@
 
 import { readFileSync } from 'node:fs'
 
-import { checkBuildGuard, guardError } from './build-guard.mjs'
+import { checkBuildGuard, guardError } from '../build-guard.mjs'
 
 function loadRendererConfig(argIndex) {
   const flag = process.argv[argIndex]
