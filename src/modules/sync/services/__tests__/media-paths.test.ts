@@ -76,7 +76,7 @@ describe('resolveCoverDisplayUrl', () => {
     vi.stubEnv('VITE_URL_FILES', undefined as never)
     isElectronShell.mockReturnValue(false)
     const r = resolveCoverDisplayUrl('arquivo2.png')
-    expect(r).toBe('https://api.pianolouvorja.com.br/file/arquivo2.png')
+    expect(r).toBe('https://api-stg.pianolouvorja.com.br/file/arquivo2.png')
     vi.unstubAllEnvs()
   })
 

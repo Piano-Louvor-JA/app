@@ -22,9 +22,9 @@ describe('resolveApiBaseUrl', () => {
     expect(resolveApiBaseUrl({ VITE_URL_FILES: `${STG}/file` })).toBe(STG)
   })
 
-  it('cai em VITE_PALCO_API_URL e, por último, na produção', () => {
+  it('cai em VITE_PALCO_API_URL e, por último, no default do perfil (STG)', () => {
     expect(resolveApiBaseUrl({ VITE_PALCO_API_URL: STG })).toBe(STG)
-    expect(resolveApiBaseUrl({})).toBe(PROD)
+    expect(resolveApiBaseUrl({})).toBe(STG)
   })
 })
 

@@ -158,7 +158,7 @@ describe("weekly-tasks — URL base e default", () => {
 			}),
 		);
 		await getWeeklyTasks();
-		expect(calledUrl).toBe("https://api.pianolouvorja.com.br/v1/custom/weekly-tasks");
+		expect(calledUrl).toBe("https://api-stg.pianolouvorja.com.br/v1/custom/weekly-tasks");
 	});
 
 	it("completeWeeklyTask: default de produção quando env ausente", async () => {
@@ -173,7 +173,7 @@ describe("weekly-tasks — URL base e default", () => {
 		);
 		await completeWeeklyTask("publish_theme");
 		expect(calledUrl).toBe(
-			"https://api.pianolouvorja.com.br/v1/custom/weekly-tasks/publish_theme/complete",
+			"https://api-stg.pianolouvorja.com.br/v1/custom/weekly-tasks/publish_theme/complete",
 		);
 	});
 });

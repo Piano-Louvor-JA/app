@@ -1,4 +1,5 @@
 import { getDesktopBridge, isDesktopApp } from '@shared/services/desktop-bridge'
+import { defaultFilesBase } from './api-env'
 import { fetchRemoteCatalogJson } from '@shared/services/remote-catalog'
 import { readCatalogRecord } from '@shared/services/workspace-api'
 import { CUSTOM_MUSIC_ID_OFFSET } from '@modules/media/services/custom-catalog'
@@ -223,7 +224,7 @@ export type TrackMediaDownloadResult =
 function resolveRemoteFileUrl(urlPath: string): string {
   if (/^https?:\/\//i.test(urlPath)) return urlPath
   const cleanPath = urlPath.startsWith('/') ? urlPath.slice(1) : urlPath
-  const base = import.meta.env.VITE_URL_FILES ?? 'https://api.pianolouvorja.com.br/file'
+  const base = import.meta.env.VITE_URL_FILES ?? defaultFilesBase()
   return `${base}/${cleanPath}`
 }
 

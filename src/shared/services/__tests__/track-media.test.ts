@@ -313,7 +313,7 @@ describe('downloadTrackMedia', () => {
     } as never)
     await downloadTrackMedia(43)
     expect(download).toHaveBeenCalledWith(
-      'https://api.pianolouvorja.com.br/file/musics/pt/43.mp3',
+      'https://api-stg.pianolouvorja.com.br/file/musics/pt/43.mp3',
       'music',
       'pt/43.mp3',
     )

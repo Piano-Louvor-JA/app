@@ -9,11 +9,23 @@ import os from 'node:os'
 import path from 'node:path'
 import tls from 'node:tls'
 
+import { diagnosticApiHosts } from './profile.mjs'
+
 export const TIMEOUT_MS = 8_000
-export const API_HOSTS = [
-  'api.pianolouvorja.com.br',
-  'api.louvorja.com.br',
-  'api.louvorja.workers.dev',
+/**
+ * Hosts SONDAIS da cascata de diagnóstico (bootstrap real) — derivados do
+ * CONTRATO DE PERFIL (SPEC piano-api-env-guard RF-02): non-release sonda STG,
+ * nunca produção.
+ */
+export const API_HOSTS = diagnosticApiHosts(process.env)
+
+/**
+ * Domínios vigiados na LEITURA do /etc/hosts — TODOS (STG + produção +
+ * legados), independente do perfil: sequestro de `api.pianolouvorja.com.br`
+ * é sintoma relevante mesmo em build STG (mesma máquina pode rodar produção).
+ */
+export const HOSTS_WATCH_DOMAINS = [
+  ...new Set([...API_HOSTS, 'api.pianolouvorja.com.br']),
 ]
 export const ENDPOINTS = ['config', 'pt_categories']
 export const ESSENTIAL_FILES = [
@@ -156,7 +168,7 @@ export function readHostsOverrides(hostsPath = defaultHostsPath()) {
       const [ip, ...names] = fields
       for (const hostname of names) {
         const h = hostname.toLowerCase()
-        if (API_HOSTS.some((domain) => h === domain || h.endsWith(`.${domain}`))) out.push({ ip, hostname: h })
+        if (HOSTS_WATCH_DOMAINS.some((domain) => h === domain || h.endsWith(`.${domain}`))) out.push({ ip, hostname: h })
       }
     }
     return out

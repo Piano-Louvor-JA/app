@@ -78,6 +78,22 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Perfil de ambiente API (SPEC piano-api-env-guard): este workflow é o
+      # pipeline OFICIAL de tag/release — único caminho autorizado a produzir
+      # artefatos com a API de produção. O gate (PIANO_RELEASE_AUTHORIZED +
+      # GITHUB_REF_TYPE=tag) é verificado fail-closed pelo build guard.
+      - name: Resolve API build profile (release sob gate)
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "PIANO_BUILD_PROFILE=release" >> "$GITHUB_ENV"
+            echo "PIANO_RELEASE_AUTHORIZED=true" >> "$GITHUB_ENV"
+            echo "GITHUB_REF_TYPE=tag" >> "$GITHUB_ENV"
+            echo "Perfil: release (tag push oficial)"
+          else
+            echo "PIANO_BUILD_PROFILE=homologation" >> "$GITHUB_ENV"
+            echo "Perfil: homologation (dispatch manual — STG, sem produção)"
+          fi
+
       - name: Build Vite
         run: npm run build-only -- --base=./
 
