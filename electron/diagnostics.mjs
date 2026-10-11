@@ -21,6 +21,18 @@ import {
   userDataWriteProbe,
   windowsAntivirus,
 } from './diagnostics-v2-collectors.mjs'
+import {
+  analyzeInterfaces,
+  computeRemoteVerdict,
+  listenersOnPort,
+  probeExcludedPorts,
+  probeFirewall,
+  probeListeners,
+  probeNetworkCategory,
+  selfProbe,
+} from './remote-diagnostics.mjs'
+import { networkInterfaces } from 'node:os'
+import { getRemoteStatus } from './remote-server.mjs'
 
 // screen via electron — monitores/resolução pra problemas de projeção em 2ª tela.
 function monitoresAbertos() {
@@ -226,7 +238,19 @@ function maskToken(token) {
   return token ? `${token.slice(0, 4)}…(${token.length} chars)` : null
 }
 
-function computeVerdict({ general, apis, proxy, hosts, installation, extra }) {
+function computeVerdict({ general, apis, proxy, hosts, installation, extra, controleRemoto }) {
+  // RF5 — vereditos remote-* ANTES dos existentes quando controle remoto não ok
+  const remoteVerdict = computeRemoteVerdict({
+    status: controleRemoto?.status,
+    portaAtiva: controleRemoto?.portaAtiva,
+    janelasPortasExcluidas: controleRemoto?.janelasPortasExcluidas ?? [],
+    selfProbe: controleRemoto?.selfProbe,
+    ipSuspeito: controleRemoto?.ipSuspeito,
+    portaRoubada: controleRemoto?.caos?.portaRoubada,
+    redePublica: controleRemoto?.caos?.redePublica,
+    regraInbound: Boolean(controleRemoto?.regraFirewall?.allow7071 ?? controleRemoto?.evidenciaFirewall?.allow?.length),
+  })
+  if (remoteVerdict && remoteVerdict !== 'remote-ok') return remoteVerdict
   if (!general['1.1.1.1:443']?.ok && !general['google.com:443']?.ok) return 'sem-internet'
   const errors = apis.flatMap((api) => [api.dns?.erro, api.tcp?.erro, api.tls?.erro, ...api.http.map((h) => h.erro)].filter(Boolean))
   const classes = errors.map((e) => e.classe)
@@ -246,13 +270,34 @@ function computeVerdict({ general, apis, proxy, hosts, installation, extra }) {
   return 'ok'
 }
 
+const REMOTE_TIPS = {
+  'remote-porta-excluida': 'Windows reservou a porta 7071 (Hyper-V/WSL). Reinicie o PC ou peça suporte para liberar a faixa.',
+  'remote-porta-roubada': 'Outro programa usa a porta 7071. Feche-o ou reinicie o PC e abra o LouvorJA primeiro.',
+  'remote-ip-adaptador-errado': 'O QR aponta para um IP de rede virtual (WSL/Docker/VPN). Desative VPN/WSL ou conecte o cabo de rede.',
+  'remote-firewall': 'Windows Defender está bloqueando. Permita o LouvorJA no firewall (rede privada) ou mude a rede para Privada.',
+  'remote-ok': 'Controle remoto: tudo certo na rede.',
+}
+
 function reportText(report) {
+  const cr = report.controleRemoto
+  const crLines = []
+  if (cr) {
+    crLines.push('', 'Controle remoto:')
+    crLines.push(`Servidor: ${cr.status ?? 'não iniciado'}${cr.portaAtiva ? ` (porta ${cr.portaAtiva})` : ''}; IP do QR: ${cr.ipEscolhido}${cr.ipSuspeito ? ' (SUSPEITO)' : ''}`)
+    if (cr.selfProbe) crLines.push(`Teste de conexão local: ${cr.selfProbe.ok ? 'OK' : `FALHOU (${cr.selfProbe.erro})`}`)
+    if (cr.janelasPortasExcluidas?.length) crLines.push(`Portas reservadas pelo sistema: ${cr.janelasPortasExcluidas.map((j) => `${j.start}-${j.end}`).join(', ')}`)
+    if (cr.caos?.portaRoubada) crLines.push(`Porta em uso por outro programa: ${cr.caos.donoPorta}`)
+    if (cr.caos?.redePublica) crLines.push('Rede marcada como PÚBLICA no Windows.')
+    if (cr.caos?.vpnAtiva) crLines.push('VPN/adapter virtual ativo detectado.')
+    if (report.vereditoHeuristico?.startsWith('remote-')) crLines.push(`Dica: ${REMOTE_TIPS[report.vereditoHeuristico] ?? ''}`)
+  }
   const lines = [
     'LouvorJA Diagnóstico — SrCaldeira',
     `Data (local): ${report.meta.dataLocal} (${report.ambiente.timezone})`,
     `Data (ISO): ${report.meta.dataISO}`,
     `Duração: ${report.meta.duracaoMs} ms`,
     `Veredito heurístico: ${report.vereditoHeuristico}`,
+    ...crLines,
     '',
     'APIs:',
     ...report.rede.apis.map((api) => `${api.host}: DNS ${api.dns.ok ? 'OK' : api.dns.erro?.classe}; TCP ${api.tcp.ok ? 'OK' : api.tcp.erro?.classe}; TLS ${api.tls.ok ? 'OK' : api.tls.erro?.classe}; HTTP ${api.http.map((item) => item.status ?? item.erro?.classe).join(', ')}`),
@@ -269,6 +314,47 @@ function outputDirectory() {
     try { if (existsSync(dir)) return dir } catch { /* next */ }
   }
   return app.getPath('temp')
+}
+
+async function collectControleRemoto() {
+  // RF1..RF6 — seção do controle remoto (SPEC v1.2). Tudo null-safe.
+  const picked = analyzeInterfaces(networkInterfaces())
+  const rs = getRemoteStatus()
+  const status = rs.status // ok | fallback | desligado | null (nunca subiu)
+  const portaAtiva = rs.port
+  const self = portaAtiva ? await selfProbe(picked.ipEscolhido, portaAtiva) : null
+  const [excluded, firewall, listeners, redePublica] = await Promise.all([
+    probeExcludedPorts(),
+    probeFirewall(),
+    probeListeners(),
+    probeNetworkCategory(),
+  ])
+  const janelasPortasExcluidas = (excluded ?? []).filter(({ start, end }) => end >= 7071 && start <= 7075)
+  const { portaRoubada, dono } = listenersOnPort(listeners ?? [], portaAtiva ?? 7071, process.pid)
+  const regraFirewall = firewall && 'allow7071' in firewall
+    ? { allow7071: firewall.allow7071 }
+    : firewall?.allow?.length
+      ? { allow7071: true }
+      : { allow7071: null }
+  return {
+    status,
+    portaAtiva,
+    interfaces: picked.interfaces,
+    ipEscolhido: picked.ipEscolhido,
+    ipSuspeito: picked.ipSuspeito,
+    selfProbe: self,
+    janelasPortasExcluidas,
+    regraFirewall,
+    evidenciaFirewall: firewall,
+    caos: {
+      portaRoubada,
+      donoPorta: dono,
+      redePublica,
+      vpnAtiva: picked.vpnAtiva,
+      subnetsDiferentes: picked.subnetsDiferentes,
+      listeners: listeners ?? [],
+    },
+  }
 }
 
 async function runDiagnostics() {
@@ -293,6 +379,8 @@ async function runDiagnostics() {
   }
   const hostsOverrides = readHostsOverrides()
   const installation = inspectRealInstallation()
+  // SPEC v1.2 — sondas do controle remoto (rede local/WS)
+  const controleRemoto = await collectControleRemoto()
   // v2 — probe de mídia real no host de arquivos (mesmo host do primeiro API ok).
   const mediaHost = API_HOSTS[0]
   const mediaProbe = await mediaFileProbe(mediaHost, token)
@@ -339,8 +427,9 @@ async function runDiagnostics() {
     rede: { proxy: { resolveProxyPorOrigem: proxy, envHttpProxy: process.env.HTTP_PROXY ?? null, envHttpsProxy: process.env.HTTPS_PROXY ?? null }, hostsOverrides, conectividadeGeral: general, apis, reproducaoBootstrap: reproduction, mediaReal: mediaProbe, dnsSuspeito },
     instalacaoReal: installation,
     triage: { storage, crashes, memoria, discoLivreMb, antivirus, logs, gpuFeatures, monitores: monitoresAbertos(), versaoInstalacaoReal },
+    controleRemoto,
   }
-  report.vereditoHeuristico = computeVerdict({ general, apis, proxy, hosts: hostsOverrides, installation, extra })
+  report.vereditoHeuristico = computeVerdict({ general, apis, proxy, hosts: hostsOverrides, installation, extra, controleRemoto })
   const timestamp = report.meta.dataISO.replace(/[:.]/g, '-').replace('T', '_').replace('Z', '')
   const dir = outputDirectory()
   const jsonPath = path.join(dir, `louvorja-diagnostico-${timestamp}.json`)
