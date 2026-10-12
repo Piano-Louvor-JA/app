@@ -93,9 +93,17 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      # Roda com os thresholds do vitest.config (100%). continue-on-error até
-      # os thresholds serem calibrados pro valor real — aí vira gate duro.
-      - run: npm run test -- --coverage
+      # PR para staging: 50% em cada métrica. Main, push e demais destinos: 100%.
+      - name: Cobertura com limite da base do PR
+        env:
+          COVERAGE_MIN: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && '50' || '100' }}
+        run: |
+          echo "Limite de cobertura deste evento: ${COVERAGE_MIN}%"
+          npm run test -- --coverage \
+            --coverage.thresholds.statements="$COVERAGE_MIN" \
+            --coverage.thresholds.branches="$COVERAGE_MIN" \
+            --coverage.thresholds.functions="$COVERAGE_MIN" \
+            --coverage.thresholds.lines="$COVERAGE_MIN"
 
   build:
     name: Build
@@ -254,6 +262,8 @@ jobs:
       - run: npx vitest run --exclude='.stryker-tmp/**' --exclude='.worktrees/**'
       - name: Release publish decision
         run: node --test scripts/release-publish-decision.test.mjs
+      - name: Limite de cobertura por destino
+        run: node --test scripts/coverage-gate-limit.test.mjs
 
   e2e-tests:
     name: E2E Tests (playwright)
