@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -100,19 +100,8 @@ jobs:
         run: |
           node scripts/merge-coverage.mjs coverage-merged/coverage-final.json coverage-merged/coverage-final.json coverage-merged/coverage-final-tmp.json
           mv coverage-merged/coverage-final-tmp-summary.json coverage-merged/coverage-final-summary.json
-      - name: Falha explícita se abaixo de 100
-        run: |
-          node -e "
-            const files = require('./coverage-merged/coverage-final-summary.json');
-            const s = files.total;
-            const bad = Object.entries(s).filter(([k, v]) => ['statements','branches','functions','lines'].includes(k) && v.pct < 100);
-            if (bad.length) {
-              const gaps = Object.entries(files).filter(([p, v]) => p !== 'total' && (v.statements.pct < 100 || v.branches.pct < 100 || v.functions.pct < 100 || v.lines.pct < 100));
-              for (const [p, v] of gaps.slice(0, 250)) {
-                console.error('GAP:', p.replace('/home/runner/work/app/app/', ''), 's='+v.statements.pct.toFixed(1), 'b='+v.branches.pct.toFixed(1), 'f='+v.functions.pct.toFixed(1), 'l='+v.lines.pct.toFixed(1));
-              }
-              console.error('COBERTURA < 100:', bad.map(([k,v]) => k+'='+v.pct.toFixed(2)+'%').join(', '));
-              process.exit(1);
-            }
-            console.log('100/100/100/100 OK');
-          "
+      - name: Falha explícita se abaixo do limite da base
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: node scripts/coverage-gate-limit.mjs coverage-merged/coverage-final-summary.json

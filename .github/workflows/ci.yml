@@ -53,7 +53,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -75,7 +75,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -88,14 +88,22 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      # Roda com os thresholds do vitest.config (100%). continue-on-error até
-      # os thresholds serem calibrados pro valor real — aí vira gate duro.
-      - run: npm run test -- --coverage
+      # PR para staging: 50% em cada métrica. Main, push e demais destinos: 100%.
+      - name: Cobertura com limite da base do PR
+        env:
+          COVERAGE_MIN: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && '50' || '100' }}
+        run: |
+          echo "Limite de cobertura deste evento: ${COVERAGE_MIN}%"
+          npm run test -- --coverage \
+            --coverage.thresholds.statements="$COVERAGE_MIN" \
+            --coverage.thresholds.branches="$COVERAGE_MIN" \
+            --coverage.thresholds.functions="$COVERAGE_MIN" \
+            --coverage.thresholds.lines="$COVERAGE_MIN"
 
   build:
     name: Build
@@ -103,13 +111,29 @@ jobs:
     needs: [lint, typecheck]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
       - run: npm ci
       # O type-check já foi executado no job anterior.
       - run: npm run build-only
+
+  paridade:
+    name: Paridade app↔web (anti-deriva S1)
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Check paridade
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/check-paridade.mjs
 
   regression-gate:
     name: Regression Gate (suite completa + type-check + build)
@@ -118,7 +142,7 @@ jobs:
     if: (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && !(github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && github.event.pull_request.number == 341)
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -209,7 +233,7 @@ jobs:
       matrix: ${{ fromJSON(needs.electron-support-matrix.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -245,7 +269,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -254,6 +278,8 @@ jobs:
       - run: npx vitest run --exclude='.stryker-tmp/**' --exclude='.worktrees/**'
       - name: Release publish decision
         run: node --test scripts/release-publish-decision.test.mjs
+      - name: Limite de cobertura por destino
+        run: node --test scripts/coverage-gate-limit.test.mjs
 
   e2e-tests:
     name: E2E Tests (playwright)
@@ -263,7 +289,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -283,7 +309,7 @@ jobs:
   quality-gate:
     name: Quality Gate
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, build, regression-gate, release-validation, unit-tests, e2e-tests]
+    needs: [lint, typecheck, build, regression-gate, release-validation, unit-tests, e2e-tests, paridade]
     if: always()
     steps:
       - name: Verifica se todos os gates passaram
@@ -295,18 +321,19 @@ jobs:
           echo "regression-gate: ${{ needs.regression-gate.result }}"
           echo "release-validation: ${{ needs.release-validation.result }}"
           echo "e2e-tests: ${{ needs.e2e-tests.result }}"
-          # PR para staging: lint, typecheck, build e unitários. E2E fica de fora.
+          echo "paridade: ${{ needs.paridade.result }}"
+          # PR para staging: lint, typecheck, build, unitários e paridade. E2E fica de fora.
           if [[ "${{ github.event.pull_request.base.ref }}" == "staging" ]]; then
-            if [[ "${{ needs.lint.result }}" != "success" || "${{ needs.typecheck.result }}" != "success" || "${{ needs.build.result }}" != "success" || "${{ needs.unit-tests.result }}" != "success" ]]; then
+            if [[ "${{ needs.lint.result }}" != "success" || "${{ needs.typecheck.result }}" != "success" || "${{ needs.build.result }}" != "success" || "${{ needs.unit-tests.result }}" != "success" || "${{ needs.paridade.result }}" != "success" ]]; then
               echo "::error::Quality Gate FALHOU — testes mínimos de staging"
               exit 1
             fi
-            echo "Quality Gate PASSOU (staging: lint, typecheck, build, unitários)"
+            echo "Quality Gate PASSOU (staging: lint, typecheck, build, unitários, paridade)"
             exit 0
           fi
           # regression-gate só roda em pull_request; em push fica "skipped".
           REG="${{ needs.regression-gate.result }}"
-          if [[ "${{ needs.unit-tests.result }}" != "success" || "${{ needs.e2e-tests.result }}" != "success" || "${{ needs.lint.result }}" != "success" || "${{ needs.typecheck.result }}" != "success" || "${{ needs.build.result }}" != "success" || "${{ needs.release-validation.result }}" != "success" || ( "$REG" != "success" && "$REG" != "skipped" ) ]]; then
+          if [[ "${{ needs.unit-tests.result }}" != "success" || "${{ needs.e2e-tests.result }}" != "success" || "${{ needs.lint.result }}" != "success" || "${{ needs.typecheck.result }}" != "success" || "${{ needs.build.result }}" != "success" || "${{ needs.release-validation.result }}" != "success" || "${{ needs.paridade.result }}" != "success" || ( "$REG" != "success" && "$REG" != "skipped" ) ]]; then
             echo "::error::Quality Gate FALHOU — corrija os erros antes do merge"
             exit 1
           fi

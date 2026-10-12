@@ -2584,6 +2584,17 @@ function lanSenderHost(){
   const match=/^(?:localhost|127\.0\.0\.1|(?:\d{1,3}\.){3}\d{1,3})$/.exec(String(host||'').trim());
   return match?match[0]:'';
 }
+function palcoSocketUrl(){
+  // CodeQL trata location.search como entrada. O teste da regex é a barreira:
+  // host só IP de LAN/localhost, porta numérica, token só A-Z0-9 de 5 chars.
+  if(typeof host!=='string'||!/^(?:localhost|127\.0\.0\.1|(?:\d{1,3}\.){3}\d{1,3})$/.test(host))return '';
+  if(typeof port!=='string'||!/^\d{1,5}$/.test(port))return '';
+  const portNum=Number(port);
+  if(portNum<1||portNum>65535)return '';
+  const rawToken=qs.get('token');
+  const token=typeof rawToken==='string'&&/^[A-Z0-9]{5}$/.test(rawToken)?rawToken:'';
+  return 'ws://'+host+':'+port+'/palco'+(token?'?token='+token:'');
+}
 function palcoMediaUrl(original){
   if(!original)return '';
   let decoded;
@@ -2705,7 +2716,7 @@ function connect(){
   function directTry(){
     var opened=false;
     var t=setTimeout(function(){if(!opened){dlog('WS direto falhou — host stale');localStorage.removeItem('palcoHost');host='';connect()}},3000);
-    try{var w=new WebSocket('ws://'+host+':'+port+'/palco');
+    try{var socketUrl=palcoSocketUrl();if(!socketUrl)throw new Error('host');var w=new WebSocket(socketUrl);
       w.onopen=function(){opened=true;clearTimeout(t);try{w.close()}catch(e){};doConnect()};
       w.onerror=function(){};
     }catch(e){clearTimeout(t);localStorage.removeItem('palcoHost');host='';connect()}
@@ -2725,7 +2736,7 @@ function stopMediaOnServerLoss(){
 function doConnect(){
   dlog('doConnect '+host+':'+port);
   setStatus('conectando '+host+':'+port+'…');
-  try{ws=new WebSocket('ws://'+host+':'+port+'/palco')}catch(e){retry();return}
+  try{var socketUrl=palcoSocketUrl();if(!socketUrl){retry();return}ws=new WebSocket(socketUrl)}catch(e){retry();return}
   ws.onopen=()=>{tries=0;dlog('WS OPEN '+host);setStatus('● '+host);
     if(window.__hideSplash)window.__hideSplash(); // F3.3j: splash sai no connect
     localStorage.setItem('palcoHost',host);
@@ -3181,13 +3192,19 @@ function handle(m){
       renderProjectionText($('text'),m.text);
       $('text').classList.toggle('cover-on',m.isCover===true);
       // F3.3o: fontSize/fontWeight dinâmicos (settings do operador).
+      // Estrofes (lyric*) vencem quando presentes; capa (isCover) mantém o
+      // estilo do operador — personalização de estrofe não pega na capa.
       {const t=$('text');
-        if(typeof m.fontSize==='number')
-          t.style.fontSize=(m.fontSize/19.2)+'vw'; // px@1920 → vw: paridade com cqw dos popups (era 10.8 — fonte ~78% maior)
-        if(typeof m.fontWeight==='number')
-          t.style.fontWeight=m.fontWeight;
-        // WT-5 web: cor do texto do operador (paridade popup)
-        if(m.textColor){var nextText=projectionColor(m.textColor);if(nextText)t.style.color=nextText}
+        // Estrofes (lyric*) vencem fora da capa; a capa mantém o estilo geral.
+        const useLyric=m.isCover!==true;
+        const fs=useLyric&&typeof m.lyricFontSize==='number'?m.lyricFontSize:m.fontSize;
+        const fw=useLyric&&typeof m.lyricFontWeight==='number'?m.lyricFontWeight:m.fontWeight;
+        if(typeof fs==='number')
+          t.style.fontSize=(fs/19.2)+'vw'; // px@1920 → vw: paridade com cqw dos popups (era 10.8 — fonte ~78% maior)
+        if(typeof fw==='number')
+          t.style.fontWeight=fw;
+        const rawColor=useLyric&&typeof m.lyricTextColor==='string'&&m.lyricTextColor?m.lyricTextColor:m.textColor;
+        if(rawColor){var nextText=projectionColor(rawColor);if(nextText)t.style.color=nextText}
         // Auto-fit: reduz a fonte até o texto caber na altura útil (76vh) —
         // mesma passagem de linhas do popup (frase em 2 linhas lá, 2 aqui).
         t.style.transform='translate(-50%,-50%)';
@@ -3213,8 +3230,10 @@ function handle(m){
           // diferente. Só aplica quando há referência bíblica.
           if(m.footerRef){t.style.lineHeight='1.45';t.style.letterSpacing='0'}
           else{t.style.lineHeight='';t.style.letterSpacing=''}
-          // WT-5f: capitalização do versículo (paridade popup)
-          if(m.textTransform){t.style.textTransform=m.textTransform}
+          // WT-5f: capitalização do versículo (paridade popup).
+          // Estrofe em maiúsculas só fora da capa.
+          if(useLyric&&m.lyricUpperCase===true)t.style.textTransform='uppercase';
+          else if(m.textTransform){t.style.textTransform=m.textTransform}
           else{t.style.textTransform='none'}
           var padV=(pad/10.8)+'vh';
           // Rodapé (referência) fica em bottom:4vh (~7vh de altura): o texto
@@ -3252,7 +3271,8 @@ function handle(m){
       // F3.3m: estilos da letra — sombra (intensidade) + caixinha (borda)
       {const t=$('text');
         t.classList.remove('shadow-on','shadow-off','box-on','box-off');
-        if(m.textShadow===false){t.classList.add('shadow-off')}
+        const tsOn=(typeof m.lyricTextShadow==='boolean'?m.lyricTextShadow:m.textShadow!==false);
+        if(!tsOn){t.classList.add('shadow-off')}
         else{t.classList.add('shadow-on');
           if(typeof m.shadowBlur==='number')
             t.style.setProperty('--ts',`0 ${Math.max(1,m.shadowBlur/3)}vh ${m.shadowBlur}vh rgba(0,0,0,${m.shadowIntensity!=null?m.shadowIntensity:0.8})`)}

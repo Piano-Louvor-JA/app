@@ -55,6 +55,9 @@ vi.mock('../services/media-catalog', () => ({
 }))
 
 vi.mock('../services/media-audio', () => ({
+  resolveRemoteFileUrl: vi.fn((p: string) =>
+    /^https?:\/\//i.test(p) ? p : `https://files.test/${p.replace(/^\//, '')}`,
+  ),
   attachMediaAudioListeners: vi.fn(),
   detachMediaAudioListeners: vi.fn(),
   fadeInMediaAudio: vi.fn().mockResolvedValue(true),
