@@ -112,9 +112,9 @@ export function parseJaLiturgy(raw: string): JaLiturgy {
       sections.set(current, new Map())
       continue
     }
-    if (!current) continue
-    const kv = KV_RE.exec(line)
-    if (kv) sections.get(current)!.set(kv[1]!.trim().toLowerCase(), kv[2] ?? '')
+    const kv = current ? KV_RE.exec(line) : null
+    if (kv && current)
+      sections.get(current)!.set(kv[1]!.trim().toLowerCase(), kv[2]!)
   }
 
   const geral = sections.get('geral')

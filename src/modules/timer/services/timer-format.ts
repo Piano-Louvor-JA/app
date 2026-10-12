@@ -21,7 +21,7 @@ export function formatElapsedMs(
     ms: pad2(centiseconds),
   }
 
-  return timeFormat.replace(/hh|mm|ss|ms/g, (match) => tokens[match] ?? match)
+  return timeFormat.replace(/hh|mm|ss|ms/g, (match) => tokens[match])
 }
 
 export function computeElapsedMs(

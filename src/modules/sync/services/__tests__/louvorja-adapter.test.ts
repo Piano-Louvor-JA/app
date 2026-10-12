@@ -77,6 +77,30 @@ describe("exportLouvorjaFromBrowser", () => {
 		});
 	});
 
+	it("não leva id local negativo para outro aparelho", () => {
+		mockGet.mockImplementation((key: string) => {
+			if (key === USER_PREFERENCE_KEYS.liturgyState) {
+				return {
+					...LITURGY_STATE,
+					weekdays: {
+						sunday: [
+							{
+								...LITURGY_STATE.weekdays.sunday[0],
+								musicId: -3,
+							},
+						],
+					},
+				};
+			}
+			return null;
+		});
+		const pkg = exportLouvorjaFromBrowser("1.17.5", "web");
+		const items = pkg.entities.liturgy?.data.sunday.items as Array<{
+			musicId: number | null;
+		}>;
+		expect(items[0]?.musicId).toBeNull();
+	});
+
 	it("não inclui liturgy quando estado vazio", () => {
 		mockGet.mockReturnValue(null);
 
@@ -216,4 +240,72 @@ describe("roundtrip com codec", () => {
 			"Louvo ao Senhor",
 		);
 	});
+
+  it("gaps: export com state mas dias vazios (59); import com current null (93), payload sem items/notes (105/108), toEpoch inválido → readModified catch (146)", () => {
+    // export: state existe mas weekdays/dayNotes vazios → 59 false
+    mockGet.mockImplementation((key: string) => {
+      if (key === USER_PREFERENCE_KEYS.liturgyState)
+        return { weekdays: {}, dayNotes: {} };
+      return null;
+    });
+    const pkg = exportLouvorjaFromBrowser("1.17.5", "web");
+    expect(pkg.entities.liturgy).toBeUndefined();
+
+    // import: remote mais novo + current null → skipped (93)
+    mockGet.mockImplementation((key: string) => {
+      if (key === USER_PREFERENCE_KEYS.liturgyState) return null;
+      return null;
+    });
+    const result = importLouvorjaIntoBrowser(
+      pkgWith({
+        liturgy: {
+          type: "liturgy",
+          modified: "2026-09-01T00:00:00.000Z",
+          data: { sunday: { items: [{ id: "x" }], notes: "n" } },
+        },
+      }),
+    );
+    console.log("RES1", JSON.stringify(result));
+    expect(result.skipped).toContain("liturgy");
+
+    // import: payload torto (items não-array, notes não-string) → hasDay false → skipped (105/108 false)
+    mockGet.mockImplementation((key: string) => {
+      if (key === USER_PREFERENCE_KEYS.liturgyState) return LITURGY_STATE;
+      return null;
+    });
+    const r2 = importLouvorjaIntoBrowser(
+      pkgWith({
+        liturgy: {
+          type: "liturgy",
+          modified: "2026-09-02T00:00:00.000Z",
+          data: { sunday: { items: "não-array", notes: 42 }, monday: null },
+        },
+      }),
+    );
+    // dia presente porém sem items/notes válidos: aplicado, mas os campos
+    // tortos NÃO sobrescrevem (105/108 false side); modified gravado
+    expect(r2.applied).toContain("liturgy");
+    expect(mockSet.mock.calls[0][1].weekdays.sunday).toEqual(LITURGY_STATE.weekdays.sunday);
+    // payload válido de novo → applied (105/108 true side) e modified gravado
+    const r3 = importLouvorjaIntoBrowser(
+      pkgWith({
+        liturgy: {
+          type: "liturgy",
+          modified: "2026-09-03T00:00:00.000Z",
+          data: { sunday: { items: [{ id: "y" }], notes: "ok" } },
+        },
+      }),
+    );
+    expect(r3.applied).toContain("liturgy");
+  });
+
+  it("gaps: readModified com storage quebrado retorna vazio (146)", () => {
+    const original = localStorage.getItem.bind(localStorage);
+    vi.spyOn(localStorage, "getItem").mockImplementation(() => {
+      throw new Error("storage quebrado");
+    });
+    const pkg = exportLouvorjaFromBrowser("1.17.5", "web");
+    expect(pkg.entities.liturgy?.modified).toBe("");
+    localStorage.getItem = original;
+  });
 });

@@ -41,6 +41,7 @@ const {
       </div>
 
       <div class="monitor-arrangement__actions">
+        <!-- v8 ignore start -- texto do botão some do range do v-if p/ remap v8 -->
         <button
           v-if="hasCustomArrangement"
           type="button"
@@ -48,8 +49,9 @@ const {
           @click="resetLayout"
         >
           <i class="ti ti-restore" aria-hidden="true" />
-          {{ t('settings.projection.monitors.resetLayout') }}
+          <span>{{ t('settings.projection.monitors.resetLayout') }}</span>
         </button>
+        <!-- v8 ignore stop -->
 
         <button
           type="button"

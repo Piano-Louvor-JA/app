@@ -8,7 +8,17 @@ import { session } from 'electron'
  */
 export function registerTunnelCorpBypass() {
   const filter = {
-    urls: ['*://*.trycloudflare.com/*'],
+    urls: [
+      '*://*.trycloudflare.com/*',
+      // Fluxo OAuth do Firebase/Google (feedback Ezequias: popup "abre e
+      // fecha"). accounts.google.com responde COOP: same-origin — com COOP
+      // ativa o Chromium isola o par pai/popup e o SDK do Firebase perde o
+      // handshake (window.closed bloqueado → "popup-closed-by-user").
+      // Sem COOP o postMessage do signInWithPopup volta normal.
+      'https://*.firebaseapp.com/*',
+      'https://*.google.com/*',
+      'https://*.gstatic.com/*',
+    ],
   }
 
   session.defaultSession.webRequest.onHeadersReceived(filter, (details, callback) => {
