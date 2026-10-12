@@ -9,4 +9,6 @@ useDefault = true
 paths = [
   '''src/modules/sync/services/__tests__/library-catalog\.test\.ts''',
   '''src/modules/albums/services/album-catalog\.ts''',
+  '''src/modules/sync/services/__tests__/api-prefix\.integration\.test\.ts''',
+  '''src/modules/albums/services/__tests__/album-catalog-order-es\.test\.ts''',
 ]
