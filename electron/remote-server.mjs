@@ -52,9 +52,6 @@ export function getRemoteStatus() {
   return { ...remoteStatus }
 }
 
-export async function startRemoteServer(wss, contents) {
-  const token = randomBytes(4).toString('hex').toUpperCase()
-
 /**
  * @param {any} wss WebSocketServer (ou fake)
  * @param {any} contents BrowserWindow.webContents (ou fake)

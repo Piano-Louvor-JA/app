@@ -4,7 +4,6 @@
 
 import crypto from 'node:crypto'
 import dns from 'node:dns/promises'
-import crypto from 'node:crypto'
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync, unlinkSync } from 'node:fs'
 import net from 'node:net'
 import os from 'node:os'
