@@ -1,4 +1,5 @@
 import { getDesktopBridge, isElectronShell } from '@shared/services/desktop-bridge'
+import { defaultFilesBase } from '@shared/services/api-env'
 
 /** Remove prefix de pasta pública (`/musics/`, `/images/`, `/covers/`, etc.). */
 export function toRelativeMediaPath(urlPath: string): string {
@@ -17,7 +18,7 @@ export function resolveRemoteFileUrl(urlPath: string): string {
   // (host próprio do Mayco ou R2/Cloudflare) — usar na íntegra, sem remontar.
   if (/^https?:\/\//i.test(urlPath)) return urlPath
   const cleanPath = urlPath.startsWith('/') ? urlPath.slice(1) : urlPath
-  const base = import.meta.env.VITE_URL_FILES ?? 'https://api.pianolouvorja.com.br/file'
+  const base = import.meta.env.VITE_URL_FILES ?? defaultFilesBase()
   return `${base}/${cleanPath}`
 }
 

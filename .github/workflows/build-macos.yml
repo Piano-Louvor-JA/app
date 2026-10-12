@@ -48,6 +48,17 @@ jobs:
         if: steps.decision.outputs.publish == 'true'
         run: npm ci
 
+      - name: Resolve API build profile
+        shell: bash
+        run: |
+          # Tag oficial => release/produção sob gate do guard; manual => STG.
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "PIANO_BUILD_PROFILE=release" >> "$GITHUB_ENV"
+            echo "PIANO_RELEASE_AUTHORIZED=true" >> "$GITHUB_ENV"
+          else
+            echo "PIANO_BUILD_PROFILE=homologation" >> "$GITHUB_ENV"
+          fi
+
       - name: Build Vite + Electron DMG (x64 + arm64) + publish
         if: steps.decision.outputs.publish == 'true'
         run: npm run electron:build -- --mac --publish always

@@ -51,6 +51,21 @@ jobs:
         if: steps.decision.outputs.publish == 'true'
         run: npm ci
 
+      # Perfil de ambiente API (SPEC piano-api-env-guard): tag oficial =>
+      # release/produção sob gate do guard; dispatch manual => homologation/STG.
+      - name: Resolve API build profile
+        id: profile
+        shell: bash
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "profile=release" >> "$GITHUB_OUTPUT"
+            echo "PIANO_BUILD_PROFILE=release" >> "$GITHUB_ENV"
+            echo "PIANO_RELEASE_AUTHORIZED=true" >> "$GITHUB_ENV"
+          else
+            echo "profile=homologation" >> "$GITHUB_OUTPUT"
+            echo "PIANO_BUILD_PROFILE=homologation" >> "$GITHUB_ENV"
+          fi
+
       # Target "portable" definido no package.json (win.target) — gera
       # LouvorJA-PIANO-<ver>-portable.exe (arquivo único) junto com o Setup.
       - name: Build Vite + Electron NSIS + Portable (x64) + publish

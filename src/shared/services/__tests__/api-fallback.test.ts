@@ -46,12 +46,12 @@ describe('apiCandidateBases', () => {
     setEnv('VITE_URL_FILES', undefined)
     setEnv('VITE_API_FALLBACK_URLS', undefined)
     expect(apiCandidateBases('database')).toEqual([
-      'https://api.pianolouvorja.com.br/json_db',
+      'https://api-stg.pianolouvorja.com.br/json_db',
       'https://api.louvorja.com.br/json_db',
       'https://api.louvorja.workers.dev/json_db',
     ])
     expect(apiCandidateBases('files')).toEqual([
-      'https://api.pianolouvorja.com.br/file',
+      'https://api-stg.pianolouvorja.com.br/file',
       'https://api.louvorja.com.br/file',
       'https://api.louvorja.workers.dev/file',
     ])
@@ -89,7 +89,7 @@ describe('apiCandidateBases', () => {
     setEnv('VITE_URL_DATABASE', undefined)
     const bases = apiCandidateBases('database')
     expect(bases).toEqual([
-      'https://api.pianolouvorja.com.br/json_db',
+      'https://api-stg.pianolouvorja.com.br/json_db',
       'https://api.louvorja.com.br/json_db',
       'https://api.louvorja.workers.dev/json_db',
     ])

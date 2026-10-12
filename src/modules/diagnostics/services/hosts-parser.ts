@@ -9,12 +9,30 @@ export type HostsOverride = {
   hostname: string
 }
 
-/** Domínios da cascata real (api-fallback.ts), sem esquema. */
-export const API_DOMAINS = [
+/**
+ * Domínios da cascata real (api-fallback.ts), sem esquema — derivados do
+ * CONTRATO DE PERFIL (SPEC piano-api-env-guard): non-release acompanha STG,
+ * nunca produção. Export como função para testes; constante preservada com o
+ * valor efetivo do perfil do build.
+ */
+import { rendererApiHosts } from '@shared/services/api-env'
+
+/** Diagnóstico de rede vigia TODOS os domínios da API (STG + produção +
+ * legados), independente do perfil: o /etc/hosts é leitura pura e um
+ * sequestro de `api.pianolouvorja.com.br` é sintoma relevante mesmo em
+ * build STG (mesma máquina pode rodar o app de produção). */
+const DIAGNOSTIC_DOMAINS = [
+  'api-stg.pianolouvorja.com.br',
   'api.pianolouvorja.com.br',
   'api.louvorja.com.br',
   'api.louvorja.workers.dev',
 ] as const
+
+export function apiDomains(): string[] {
+  return [...new Set([...rendererApiHosts(), ...DIAGNOSTIC_DOMAINS])]
+}
+
+export const API_DOMAINS = apiDomains()
 
 /**
  * Filtra linhas do hosts: entradas cujo hostname cita algum domínio da API

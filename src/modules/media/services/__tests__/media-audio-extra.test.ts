@@ -43,7 +43,7 @@ describe("resolveRemoteFileUrl — VITE_URL_FILES custom", () => {
 	it("sem env → base oficial", () => {
 		vi.stubEnv("VITE_URL_FILES", undefined as never);
 		const url = resolveRemoteFileUrl("musics/1.mp3");
-		expect(url).toContain("api.pianolouvorja.com.br");
+		expect(url).toContain("api-stg.pianolouvorja.com.br");
 	});
 });
 
