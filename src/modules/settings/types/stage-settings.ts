@@ -19,7 +19,6 @@
  *   LiturgyWebProjectionView → liturgy
  *   <X>ProjectionView → <x> (bible, timer, random, clock, countdown…)
  */
-/* v8 ignore next 1 -- stmt module-level: V8 não registra hit de inicialização de ESM */
 const projectionViewModules = import.meta.glob('/src/modules/*/views/*ProjectionView.vue')
 
 function viewNameToScope(fileName: string): string | null {
@@ -37,7 +36,7 @@ function viewNameToScope(fileName: string): string | null {
 export const STAGE_MODULE_SCOPES: readonly string[] = [
   ...new Set(
     Object.keys(projectionViewModules)
-      .map((p) => viewNameToScope(p.split('/').pop()!)) /* keys do glob sempre têm filename */
+      .map((p) => viewNameToScope(p.split('/').pop() ?? ''))
       .filter((s): s is string => Boolean(s)),
   ),
 ].sort()
@@ -98,8 +97,12 @@ export type StageSettings = {
    */
   clock?: { style: 'digital' | 'analog'; showSeconds: boolean; format24h: boolean }
   timer?: { timeFormat: 'hh:mm:ss.ms' | 'hh:mm:ss' | 'mm:ss.ms' | 'mm:ss' }
-  countdown?: { timeFormat: 'hh:mm:ss' | 'mm:ss' }
-  random?: { fontSizePc: number; textTransform: 'none' | 'uppercase' | 'lowercase'; animationSpeed: 'slow' | 'normal' | 'fast' }
+  countdown?: { timeFormat: 'hh:mm:ss' | 'mm:ss'; allowNegative?: boolean }
+  random?: {
+    fontSizePc: number
+    textTransform: 'none' | 'uppercase' | 'lowercase'
+    animationSpeed: 'slow' | 'normal' | 'fast'
+  }
   /**
    * Hinos: por padrão o bg da projeção é o ASSET da música (capa/slide).
    * override=true → o backgroundImage configurado aqui vence o asset
@@ -121,6 +124,7 @@ export const DEFAULT_TIMER_MODULE_SETTINGS: NonNullable<StageSettings['timer']> 
 
 export const DEFAULT_COUNTDOWN_MODULE_SETTINGS: NonNullable<StageSettings['countdown']> = {
   timeFormat: 'hh:mm:ss',
+  allowNegative: false,
 }
 
 export const DEFAULT_RANDOM_MODULE_SETTINGS: NonNullable<StageSettings['random']> = {
@@ -238,15 +242,14 @@ const officialBgModules = import.meta.glob('../../../assets/backgrounds/bg-*.png
 /** IDs dos bgs oficiais (ex.: 'bg-01'), ordenados. Piano (bg-11) vai primeiro na galeria. */
 const GALLERY_LEAD_BACKGROUND = 'bg-11'
 
-const sortedBackgroundIds = Object.keys(officialBgModules)
+export const STAGE_OFFICIAL_BACKGROUNDS: readonly string[] = Object.keys(officialBgModules)
   .map((path) => path.match(/(bg-[\w-]+)\.png$/)?.[1])
   .filter((id): id is string => Boolean(id))
-  .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
-
-export const STAGE_OFFICIAL_BACKGROUNDS: readonly string[] = [
-  GALLERY_LEAD_BACKGROUND,
-  ...sortedBackgroundIds.filter((id) => id !== GALLERY_LEAD_BACKGROUND),
-]
+  .sort((a, b) => {
+    if (a === GALLERY_LEAD_BACKGROUND) return -1
+    if (b === GALLERY_LEAD_BACKGROUND) return 1
+    return a.localeCompare(b, undefined, { numeric: true })
+  })
 
 /** Prefixo que marca um bg oficial (vs dataURL do usuário). */
 export const OFFICIAL_BG_PREFIX = 'official:'
@@ -397,7 +400,7 @@ export function parseStageSettings(raw: unknown): StageSettings {
             fontSizePc: clamp(
               asNumber((s['random'] as Record<string, unknown>)['fontSizePc'], 8),
               4,
-              14,
+              50,
             ),
             textTransform: RANDOM_TEXT_TRANSFORM_OPTIONS.includes(
               (s['random'] as Record<string, unknown>)['textTransform'] as NonNullable<StageSettings['random']>['textTransform'],
