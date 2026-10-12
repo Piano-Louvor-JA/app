@@ -294,13 +294,20 @@ export default {
       importButton: 'Importar .slja',
       importing: 'Importando…',
       imported: 'Importado: {name} ({slides} estrofas).',
-      uploadTitle: '¿Subir "{name}" a tu cuenta?',
-      uploadMessage: 'El archivo se subirá una única vez (sin duplicar) y quedará disponible en cualquier dispositivo.',
-      uploadConfirm: 'Subir a la cuenta',
-      uploadCancel: 'Quedar solo en este dispositivo',
       importedLocal:
         'Importado en este dispositivo: {name} ({slides} estrofas) — guardado sin cuenta.',
+      importedLocalNoImages:
+        'Importado en este dispositivo: {name} ({slides} estrofas). Las imágenes no se guardaron en este aparato.',
       importFailed: 'Archivo .slja inválido.',
+      uploadTitle: '¿Subir "{name}" a tu cuenta?',
+      uploadMessage: 'El archivo se sube una sola vez a tu cuenta (nunca se duplica). O puedes dejarlo solo en este dispositivo.',
+      uploadConfirm: 'Subir a la cuenta',
+      uploadCancel: 'Solo en este dispositivo',
+      importStorageFailed:
+        'No se pudo guardar el audio en este aparato. Libere espacio e intente de nuevo.',
+      importRemoteFailed:
+        'No se pudo completar el envío. Verifique la conexión e intente de nuevo.',
+      importNoLyrics: 'El archivo no tiene estrofas de letra para importar.',
     },
     custom: {
       title: 'Liturgias personalizadas',

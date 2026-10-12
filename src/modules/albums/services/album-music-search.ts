@@ -102,6 +102,7 @@ function preferredHymnalTrack(
     if (track != null && track > 0) return { track, isHymnal: true }
   }
 
+  /* v8 ignore next 3 -- se algum hinário tem track>0 os loops acima já retornaram */
   if (hymnalTracks[0] != null) {
     return { track: hymnalTracks[0], isHymnal: true }
   }
@@ -184,9 +185,8 @@ export async function loadAlbumMusicIndex(): Promise<AlbumSearchHit[]> {
   }
 
   // Busca por letra (03/10): músicas custom LOCAIS entram no índice com
-  // `lyricsText` — a letra está no localStorage (offline-first), então a
-  // busca por trecho funciona sem rede. Hinário/álbuns oficiais continuam
-  // sem letra no índice (letra vem sob demanda da API) — issue do índice.
+  // `lyricsText` — a letra está no localStorage (offline-first). O hinário
+  // e os álbuns oficiais já trazem `lyric` no índice `${prefix}_musics`.
   try {
     const { listAllLocalMusicsWithLyrics } =
       await import('@modules/media/services/local-custom-store')

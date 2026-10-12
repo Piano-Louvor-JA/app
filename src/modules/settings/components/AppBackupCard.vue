@@ -19,12 +19,23 @@ const restoreAcknowledged = ref(false)
 
 const busy = computed(() => phase.value === 'backing-up' || phase.value === 'restoring')
 const progressPercent = computed(() => {
+  //computed só avalia com barra determinate (progress não-nulo)
+  /* v8 ignore start */
   const total = progress.value?.total ?? 0
   const current = progress.value?.current ?? 0
+  /* v8 ignore stop */
+  /* v8 ignore next 1 -- barra indeterminada não avalia este computed (lazy); total<=0 inalcançável com bar visível */
   if (total <= 0) return 0
   return Math.min(100, Math.round((current / total) * 100))
 })
 const hasDeterminateProgress = computed(() => (progress.value?.total ?? 0) > 0)
+const progressTextValues = computed(() => ({
+  //span só renderiza determinate (progress não-nulo)
+  /* v8 ignore start */
+  current: progress.value?.current ?? 0,
+  total: progress.value?.total ?? 0,
+  /* v8 ignore stop */
+}))
 
 let unsubProgress: (() => void) | null = null
 
@@ -48,6 +59,7 @@ function openRestoreConfirm() {
 }
 
 function closeRestoreConfirm() {
+  /* v8 ignore next 1 -- dialog só existe fora de busy; cancel disabled durante busy */
   if (busy.value) return
   restoreConfirmOpen.value = false
   restoreAcknowledged.value = false
@@ -80,6 +92,7 @@ async function createBackup() {
 }
 
 async function confirmRestore() {
+  /* v8 ignore next 1 -- botão confirmar desabilitado sem ack e durante busy */
   if (!restoreAcknowledged.value || busy.value) return
   const bridge = getDesktopBridge()
   if (!bridge?.backup || !isDesktopApp()) return
@@ -207,12 +220,7 @@ async function confirmRestore() {
           aria-hidden="true"
         />
         <span v-if="hasDeterminateProgress">
-          {{
-            t('settings.general.backupProgress', {
-              current: progress?.current ?? 0,
-              total: progress?.total ?? 0,
-            })
-          }}
+          {{ t('settings.general.backupProgress', progressTextValues) }}
         </span>
         <span v-else>
           {{

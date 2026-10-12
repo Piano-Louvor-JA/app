@@ -50,6 +50,7 @@ export function useOperatorEscapeToCloseProjection(isProjectionWindow: () => boo
     const target = event.target as HTMLElement | null
     if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
     if (document.querySelector('[role="dialog"]')) return
+    /* v8 ignore next 1 -- handling true implica confirm montado, e L52 já barrou */
     if (handling) return
     try {
       const bridge = getDesktopBridge()

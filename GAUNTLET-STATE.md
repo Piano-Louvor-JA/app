@@ -36,3 +36,8 @@
 
 ### Log
 - 03/10: task claimed, workspace t_7f36710d. GAUNTLET-STATE criado.
+
+## Decisão 03/10 (Rafael)
+- Sync v2 fases 2-3 (outbox/migração app + réplicas) → AMANHÃ (04/10)
+- Agora: apk#106 (título vazio + categoria opcional no Flutter) — desbloquear needs_device
+  (auditoria estática ok: código tolerante; falta validar em device A15 via adb Wi-Fi)

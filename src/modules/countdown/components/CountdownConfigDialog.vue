@@ -5,6 +5,8 @@ import { useI18n } from 'vue-i18n'
 import { GlassCard } from '@design-system/index'
 
 import {
+  COUNTDOWN_BG_PRESETS,
+  COUNTDOWN_TEXT_PRESETS,
   COUNTDOWN_TIME_FORMATS,
   type CountdownDisplayConfig,
   type CountdownMode,
@@ -32,6 +34,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: []
+  'update:bgColor': [value: string]
+  'update:textColor': [value: string]
   'update:timeFormat': [value: CountdownTimeFormat]
   'update:allowNegative': [value: boolean]
   'update:mode': [value: CountdownMode]
@@ -39,6 +43,8 @@ const emit = defineEmits<{
   reset: []
 }>()
 
+function onBgInput(event: Event) { emit('update:bgColor', (event.target as HTMLInputElement).value) }
+function onTextInput(event: Event) { emit('update:textColor', (event.target as HTMLInputElement).value) }
 const { t } = useI18n()
 const store = useCountdownStore()
 
@@ -230,6 +236,93 @@ function onRemoveTone(tone: CustomTone): void {
           </header>
 
           <div class="countdown-config__body">
+            <section class="countdown-config__section">
+              <div class="countdown-config__section-head">
+                <i
+                  class="ti ti-paint"
+                  aria-hidden="true"
+                />
+                <div>
+                  <h3>{{ t('countdown.bgColor') }}</h3>
+                  <p>{{ t('countdown.bgColorHint') }}</p>
+                </div>
+              </div>
+              <div
+                class="countdown-config__swatches"
+                role="radiogroup"
+                :aria-label="t('countdown.bgColor')"
+              >
+                <button
+                  v-for="color in COUNTDOWN_BG_PRESETS"
+                  :key="`bg-${color}`"
+                  type="button"
+                  class="countdown-config__swatch"
+                  :class="{ 'countdown-config__swatch--active': config.bgColor === color }"
+                  :style="{ background: color }"
+                  role="radio"
+                  :aria-checked="config.bgColor === color"
+                  :aria-label="color"
+                  @click="emit('update:bgColor', color)"
+                />
+                <label class="countdown-config__custom">
+                  <input
+                    type="color"
+                    :value="config.bgColor"
+                    :aria-label="t('countdown.customColor')"
+                    @input="onBgInput"
+                  >
+                  <i
+                    class="ti ti-color-picker"
+                    aria-hidden="true"
+                  />
+                </label>
+              </div>
+            </section>
+
+            <section class="countdown-config__section">
+              <div class="countdown-config__section-head">
+                <i
+                  class="ti ti-typography"
+                  aria-hidden="true"
+                />
+                <div>
+                  <h3>{{ t('countdown.textColor') }}</h3>
+                  <p>{{ t('countdown.textColorHint') }}</p>
+                </div>
+              </div>
+              <div
+                class="countdown-config__swatches"
+                role="radiogroup"
+                :aria-label="t('countdown.textColor')"
+              >
+                <button
+                  v-for="color in COUNTDOWN_TEXT_PRESETS"
+                  :key="`text-${color}`"
+                  type="button"
+                  class="countdown-config__swatch"
+                  :class="{ 'countdown-config__swatch--active': config.textColor === color }"
+                  :style="{ background: color }"
+                  role="radio"
+                  :aria-checked="config.textColor === color"
+                  :aria-label="color"
+                  @click="emit('update:textColor', color)"
+                />
+                <label class="countdown-config__custom">
+                  <input
+                    type="color"
+                    :value="config.textColor"
+                    :aria-label="t('countdown.customColor')"
+                    @input="onTextInput"
+                  >
+                  <i
+                    class="ti ti-color-picker"
+                    aria-hidden="true"
+                  />
+                </label>
+              </div>
+            </section>
+
+
             <section class="countdown-config__section">
               <div class="countdown-config__section-head">
                 <i

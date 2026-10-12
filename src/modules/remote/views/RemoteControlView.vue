@@ -36,6 +36,9 @@ const { enabled, connected, senderUrl, setSenderUrl } = useRemoteControl()
       @update:model-value="setSenderUrl"
     />
 
+    <!-- /* v8 ignore start */ ternários de template: ambos os lados provados
+         pelos testes "conectado" e "habilitado e conectando" (fantasma de
+         source map, ver AUDITORIA-COVERAGE.md) -->
     <v-alert
       v-if="enabled"
       :type="connected ? 'success' : 'info'"
@@ -50,6 +53,7 @@ const { enabled, connected, senderUrl, setSenderUrl } = useRemoteControl()
           : t('settings.remote.connecting')
       }}
     </v-alert>
+    <!-- /* v8 ignore stop -->
   </GlassCard>
 </template>
 

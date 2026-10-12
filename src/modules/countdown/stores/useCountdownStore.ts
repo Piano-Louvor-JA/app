@@ -1,8 +1,10 @@
+import type { CountdownRuntimeMode } from '../types/countdown'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
 import {
   closeProjectionModule,
+  hasSelectedExtendedProjectionTargets,
   isProjectionModuleOpen,
   openProjectionModule,
 } from '@shared/composables/useProjectionWindow'
@@ -10,6 +12,7 @@ import { isPalcoTvOnlyRoute } from '../../settings/services/palco-routing'
 
 import {
   computeElapsedMs,
+  computeCountdownRemainingMs,
   computeRemainingMs,
   formatElapsedMs,
 } from '../services/countdown-format'
@@ -116,6 +119,7 @@ export const useCountdownStore = defineStore('countdown', () => {
     durationMs: DEFAULT_COUNTDOWN_DURATION_MS,
   })
   const isProjecting = ref(false)
+  const projectingTvsOnly = ref(false)
   // app desktop: preview da projeção dentro da janela (InAppProjectionOverlay
   // no AppShell) — alternativa a abrir a popup, mantida do store anterior.
   const inAppPreview = ref(false)
@@ -128,13 +132,13 @@ export const useCountdownStore = defineStore('countdown', () => {
 
   const isRunning = computed(() => runtime.value.status === 'running')
   const isPaused = computed(() => runtime.value.status === 'paused')
-  const canStart = computed(
-    () =>
-      runtime.value.durationMs > 0 &&
-      !runtime.value.finished &&
-      // não deixa iniciar com menos tempo que a soma dos áudios habilitados (modo ES)
-      (config.value.mode !== 'sabbath' || runtime.value.durationMs >= minDurationMs()),
-  )
+  const isUntilMode = computed(() => runtime.value.mode === 'until')
+  const canStart = computed(() => {
+    if (runtime.value.status === 'running') return false
+    if (isUntilMode.value) return true
+    return runtime.value.durationMs > 0 &&
+      (config.value.mode !== 'sabbath' || runtime.value.durationMs >= minDurationMs())
+  })
 
   function stopProjectionWatch() {
     if (!projectionWatchTimer) return
@@ -145,9 +149,8 @@ export const useCountdownStore = defineStore('countdown', () => {
   function startProjectionWatch() {
     stopProjectionWatch()
     projectionWatchTimer = setInterval(() => {
+      if (projectingTvsOnly.value || inAppPreview.value) return
       if (!isProjectionModuleOpen('countdown')) {
-        // WT-5/WT-6A: 'Só TV' (receiver) não tem janela local — não é 'parado'
-        if (isPalcoTvOnlyRoute('countdown')) return
         isProjecting.value = false
         stopProjectionWatch()
       }
@@ -161,38 +164,24 @@ export const useCountdownStore = defineStore('countdown', () => {
   }
 
   function checkFinished() {
-      if (runtime.value.status !== 'running' || runtime.value.finished) return
+    if (runtime.value.status !== 'running' || runtime.value.finished) return
 
-      const remaining = computeRemainingMs(
-        runtime.value.durationMs,
-        runtime.value.accumulatedMs,
-        runtime.value.segmentStartedAt,
-        'running',
-        Date.now(),
-      )
+    const remaining = computeCountdownRemainingMs(runtime.value, Date.now())
 
-      // Se allowNegative=true, não pausa no zero — continua rodando (tempo negativo)
-      if (config.value.allowNegative) return
+    if (remaining > 0) return
 
-      if (remaining > 0) return
-
-      const elapsed = computeElapsedMs(
-        runtime.value.accumulatedMs,
-        runtime.value.segmentStartedAt,
-        'running',
-        Date.now(),
-      )
-
-      runtime.value = {
-        ...runtime.value,
-        status: 'paused',
+    runtime.value = {
+      ...runtime.value,
+      finished: true,
+      ...(config.value.allowNegative === false ? {
+        status: 'paused' as const,
+        accumulatedMs: runtime.value.durationMs,
         segmentStartedAt: null,
-        accumulatedMs: Math.min(elapsed, runtime.value.durationMs),
-        finished: true,
-      }
-      syncRuntime()
-      stopFinishWatch()
+        pausedRemainingMs: 0,
+      } : {}),
     }
+    syncRuntime()
+  }
 
   function startFinishWatch() {
     stopFinishWatch()
@@ -200,7 +189,7 @@ export const useCountdownStore = defineStore('countdown', () => {
   }
 
   function syncRuntime() {
-    publishCountdownRuntime(runtime.value)
+    publishCountdownRuntime({ ...runtime.value, projecting: isProjecting.value })
   }
 
   function hydrate() {
@@ -440,6 +429,38 @@ export const useCountdownStore = defineStore('countdown', () => {
     syncRuntime()
   }
 
+  function setCountdownMode(mode: CountdownRuntimeMode) {
+    if (runtime.value.status === 'running') return
+    runtime.value = {
+      ...runtime.value,
+      mode,
+      accumulatedMs: 0,
+      segmentStartedAt: null,
+      status: 'idle',
+      finished: false,
+      pausedRemainingMs: null,
+    }
+    syncRuntime()
+  }
+
+  function setUntilTime(untilHour: number, untilMinute: number) {
+    if (runtime.value.status === 'running') return
+    const hour = Math.min(23, Math.max(0, Math.floor(untilHour) || 0))
+    const minute = Math.min(59, Math.max(0, Math.floor(untilMinute) || 0))
+    runtime.value = {
+      ...runtime.value,
+      mode: 'until',
+      untilHour: hour,
+      untilMinute: minute,
+      accumulatedMs: 0,
+      segmentStartedAt: null,
+      status: 'idle',
+      finished: false,
+      pausedRemainingMs: null,
+    }
+    syncRuntime()
+  }
+
   function start() {
     if (runtime.value.status === 'running') return
 
@@ -474,16 +495,9 @@ export const useCountdownStore = defineStore('countdown', () => {
       return
     }
 
-    if (runtime.value.durationMs <= 0 || runtime.value.finished) return
-
-    const remaining = computeRemainingMs(
-      runtime.value.durationMs,
-      runtime.value.accumulatedMs,
-      null,
-      'paused',
-      Date.now(),
-    )
-    if (remaining <= 0) {
+    if (runtime.value.mode !== 'until' && (runtime.value.durationMs <= 0 || runtime.value.finished)) return
+    const remaining = computeCountdownRemainingMs(runtime.value, Date.now())
+    if (remaining <= 0 && runtime.value.mode !== 'until') {
       runtime.value = { ...runtime.value, finished: true, status: 'idle' }
       syncRuntime()
       return
@@ -493,6 +507,7 @@ export const useCountdownStore = defineStore('countdown', () => {
       ...runtime.value,
       status: 'running',
       segmentStartedAt: Date.now(),
+      pausedRemainingMs: null,
       finished: false,
     }
     syncRuntime()
@@ -508,6 +523,15 @@ export const useCountdownStore = defineStore('countdown', () => {
       return
     }
 
+    if (runtime.value.mode === 'until') {
+      const remaining = computeCountdownRemainingMs(runtime.value, Date.now())
+      runtime.value = { ...runtime.value, status: 'paused', segmentStartedAt: null, pausedRemainingMs: remaining }
+      syncRuntime()
+      stopFinishWatch()
+      setAudioPaused(true)
+      pauseAllAlerts()
+      return
+    }
     const elapsed = computeElapsedMs(
       runtime.value.accumulatedMs,
       runtime.value.segmentStartedAt,
@@ -519,7 +543,7 @@ export const useCountdownStore = defineStore('countdown', () => {
       ...runtime.value,
       status: 'paused',
       segmentStartedAt: null,
-      accumulatedMs: Math.min(elapsed, runtime.value.durationMs),
+      accumulatedMs: elapsed,
     }
     syncRuntime()
     stopFinishWatch()
@@ -545,13 +569,7 @@ export const useCountdownStore = defineStore('countdown', () => {
   }
 
   function saveMark() {
-    const remaining = computeRemainingMs(
-      runtime.value.durationMs,
-      runtime.value.accumulatedMs,
-      runtime.value.segmentStartedAt,
-      runtime.value.status,
-      Date.now(),
-    )
+    const remaining = computeCountdownRemainingMs(runtime.value, Date.now())
 
     runtime.value = {
       ...runtime.value,
@@ -578,22 +596,39 @@ export const useCountdownStore = defineStore('countdown', () => {
 
   async function syncProjection() {
     syncRuntime()
+    if (isPalcoTvOnlyRoute('countdown')) {
+      isProjecting.value = true
+      projectingTvsOnly.value = true
+      inAppPreview.value = false
+      syncRuntime()
+      startProjectionWatch()
+      return
+    }
+    projectingTvsOnly.value = false
+    const hasExternal = await hasSelectedExtendedProjectionTargets()
+    if (!hasExternal) {
+      closeProjectionModule()
+      isProjecting.value = true
+      inAppPreview.value = true
+      syncRuntime()
+      startProjectionWatch()
+      return
+    }
+    inAppPreview.value = false
     const opened = await openProjectionModule('countdown')
     isProjecting.value = opened
+    syncRuntime()
     if (opened) startProjectionWatch()
     else stopProjectionWatch()
   }
 
-  async function clearProjection() {
-    closeProjectionModule()
+  function clearProjection() {
     isProjecting.value = false
-    stopFinishWatch()
-    // Feedback Ezequias (02/10): parar a projeção corta o áudio NA HORA —
-    // não deixar alerta (abertura/marcos) tocando depois de sair da projeção.
-    stopAudio()
-    // WT-5: TV é destino independente — parar manda idle pro relay
-    runtime.value = { ...DEFAULT_COUNTDOWN_RUNTIME, savedTimesMs: runtime.value.savedTimesMs }
+    projectingTvsOnly.value = false
+    inAppPreview.value = false
     syncRuntime()
+    stopProjectionWatch()
+    closeProjectionModule()
   }
 
   function refreshProjectionState() {
@@ -604,9 +639,8 @@ export const useCountdownStore = defineStore('countdown', () => {
   }
 
   async function toggleProjection() {
-    // WT-5: rota 'Só TV' não tem popup — desligar pelo estado, não pelo popup
-    if (isProjecting.value) {
-      await clearProjection()
+    if (isProjecting.value && (isProjectionModuleOpen('countdown') || projectingTvsOnly.value || inAppPreview.value)) {
+      clearProjection()
       return
     }
     await syncProjection()
@@ -622,6 +656,7 @@ export const useCountdownStore = defineStore('countdown', () => {
     isRunning,
     isPaused,
     canStart,
+    isUntilMode,
     hydrate,
     setTimeFormat,
     setBgColor,
@@ -652,6 +687,8 @@ export const useCountdownStore = defineStore('countdown', () => {
     openDisplayConfig,
     closeDisplayConfig,
     setDurationMs,
+    setCountdownMode,
+    setUntilTime,
         minDurationMs,
     adjustTime,
     start,

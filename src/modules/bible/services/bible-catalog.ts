@@ -1,6 +1,5 @@
 import { fetchRemoteCatalogJson } from '@shared/services/remote-catalog'
 import { readCatalogRecord } from '@shared/services/workspace-api'
-import { getCurrentApiPrefix } from '@modules/sync/services/library-catalog'
 
 import type {
   BibleBook,
@@ -28,14 +27,18 @@ const VERSIONS_FILE_BY_PREFIX: Record<string, string> = {
  * Bíblia ficava em pt). Reusa a mesma detecção do hinário (getCurrentApiPrefix:
  * user_data.language → fallback pt). `en` não tem catálogo próprio na API —
  * usa o pt (mesmo comportamento do hinário).
+ *
+ * Import dinâmico: resolveBookTone e os demais helpers não devem carregar o
+ * i18n só porque o módulo foi importado.
  */
-function bibleApiPrefix(): string {
-  return getCurrentApiPrefix()
+async function bibleCatalogFile(kind: 'book' | 'version'): Promise<string> {
+  const { getCurrentApiPrefix } = await import(
+    '@modules/sync/services/library-catalog'
+  )
+  const prefix = getCurrentApiPrefix()
+  if (kind === 'book') return BOOKS_FILE_BY_PREFIX[prefix] ?? 'pt_bible_book'
+  return VERSIONS_FILE_BY_PREFIX[prefix] ?? 'pt_bible_version'
 }
-
-const BOOKS_FILE = BOOKS_FILE_BY_PREFIX[bibleApiPrefix()] ?? 'pt_bible_book'
-const VERSIONS_FILE =
-  VERSIONS_FILE_BY_PREFIX[bibleApiPrefix()] ?? 'pt_bible_version'
 
 /** Abreviações conhecidas quando o catálogo/API vem com abbreviation vazia/null. */
 const VERSION_ABBREVIATION_BY_NAME: Array<{ match: RegExp; abbr: string }> = [
@@ -141,13 +144,17 @@ export function chapterRecordKey(
 }
 
 export async function loadBibleBooks(): Promise<BibleBook[]> {
-  const rows = await readOrFetchCatalog<CatalogBibleBookRow[]>(BOOKS_FILE)
+  const rows = await readOrFetchCatalog<CatalogBibleBookRow[]>(
+    await bibleCatalogFile('book'),
+  )
   if (!rows || !Array.isArray(rows)) return []
   return rows.map(mapBook)
 }
 
 export async function loadBibleVersions(): Promise<BibleVersion[]> {
-  const rows = await readOrFetchCatalog<CatalogBibleVersionRow[]>(VERSIONS_FILE)
+  const rows = await readOrFetchCatalog<CatalogBibleVersionRow[]>(
+    await bibleCatalogFile('version'),
+  )
   if (!rows || !Array.isArray(rows)) return []
   return rows.map(mapVersion)
 }

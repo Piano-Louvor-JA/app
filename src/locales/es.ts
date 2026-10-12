@@ -46,5 +46,19 @@ export default {
     bible: 'Biblia',
     utilities: 'Utilidades',
     settings: 'Configuraciones',
+    },
+  sync: {
+    downloadQueue: {
+      title: 'Descargas',
+      clearFinished: 'Limpiar completados',
+      retry: 'Reintentar',
+      cancel: 'Cancelar',
+    },
+  },
+sljaMigration: {
+    title: '¿Subir {count} himno(s) importado(s) a tu cuenta?',
+    message: 'Importaste archivos .slja sin sesión. Pueden ir a tu cuenta (una copia única, sin duplicar) y estar disponibles en cualquier dispositivo.',
+    confirm: 'Subir a la cuenta',
+    cancel: 'Quedar solo en este dispositivo',
   },
 }

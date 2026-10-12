@@ -35,6 +35,7 @@ import {
 import { normalizeLiturgyTimeHHmm } from '../services/liturgy-format'
 
 const props = defineProps<{
+  refreshImportedCatalog?: () => Promise<void>
   open: boolean
   draft: LiturgyItemDraft
   isEditing: boolean
@@ -76,12 +77,26 @@ const sljaInputEl = ref<HTMLInputElement | null>(null)
 const sljaImporting = ref(false)
 const sljaMessage = ref('')
 const sljaError = ref(false)
+const sljaRun = ref(0)
+
+watch(
+  () => props.open,
+  (isOpen) => {
+    if (!isOpen) {
+      sljaRun.value += 1
+      sljaImporting.value = false
+      sljaMessage.value = ''
+      sljaError.value = false
+    }
+  },
+)
 
 async function onImportSljaFile(event: Event): Promise<void> {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = ''
   if (!file || sljaImporting.value) return
+  const run = sljaRun.value
   sljaImporting.value = true
   sljaMessage.value = ''
   sljaError.value = false
@@ -101,9 +116,12 @@ async function onImportSljaFile(event: Event): Promise<void> {
           cancelLabel: t('liturgy.slja.uploadCancel'),
         }),
     })
+    if (run !== sljaRun.value) return
     // web#174 (referência): recarrega o catálogo ANTES da seleção valer —
     // sem isso o id novo não existe em musicList, selectedMusic fica null
     // e o submit é bloqueado (música "não toca").
+    await props.refreshImportedCatalog?.()
+    if (run !== sljaRun.value) return
     emit('slja-imported', imported.displayMusicId)
     // seleção + título + duração num ÚNICO patch: props.draft aqui ainda é
     // stale — um segundo patch sobrescreveria o musicId do primeiro (race).
@@ -114,19 +132,37 @@ async function onImportSljaFile(event: Event): Promise<void> {
       ...(props.draft.name.trim() ? {} : { name: imported.name }),
     })
     sljaMessage.value = imported.local
-      ? t('liturgy.slja.importedLocal', {
-          name: imported.name,
-          slides: imported.slides,
-        })
+      ? t(
+          imported.imagesOmitted
+            ? 'liturgy.slja.importedLocalNoImages'
+            : 'liturgy.slja.importedLocal',
+          {
+            name: imported.name,
+            slides: imported.slides,
+          },
+        )
       : t('liturgy.slja.imported', {
           name: imported.name,
           slides: imported.slides,
         })
-  } catch {
+  } catch (error) {
+    if (run !== sljaRun.value) return
     sljaError.value = true
-    sljaMessage.value = t('liturgy.slja.importFailed')
+    const code = error instanceof Error ? error.message : ''
+    const key =
+      code === 'SLJA_LOCAL_AUDIO_PERSIST_FAILED' ||
+      code === 'SLJA_LOCAL_LYRIC_PERSIST_FAILED'
+        ? 'liturgy.slja.importStorageFailed'
+        : code === 'SLJA_IMPORT_COLLECTION_FAILED' ||
+            code === 'SLJA_IMPORT_MUSIC_FAILED' ||
+            code === 'SLJA_IMPORT_LYRICS_INCOMPLETE'
+          ? 'liturgy.slja.importRemoteFailed'
+          : code === 'SLJA_IMPORT_NO_LYRICS'
+            ? 'liturgy.slja.importNoLyrics'
+            : 'liturgy.slja.importFailed'
+    sljaMessage.value = t(key)
   } finally {
-    sljaImporting.value = false
+    if (run === sljaRun.value) sljaImporting.value = false
   }
 }
 
@@ -298,6 +334,7 @@ function patch(partial: Partial<LiturgyItemDraft>) {
 }
 
 function selectType(type: LiturgyItemType) {
+  if (sljaImporting.value) return
   if (props.lockCategory && type === 'category') return
 
   const previousType = props.draft.type
@@ -454,20 +491,20 @@ async function selectLocalFile() {
     if (paths.length === 0) return
 
     const next: Partial<LiturgyItemDraft> = {
-      filePath: paths[0] ?? '',
+      filePath: paths[0]! /* length check acima garante índice 0 */,
       filePaths: multiple ? paths : [],
     }
     // Duração automática de mídia local (vídeo/áudio) via ffprobe.
     if (!multiple && paths[0]) {
-      const probed = await probeMediaDurationMs(paths[0]!)
+      const probed = await probeMediaDurationMs(paths[0])
       if (probed > 0) next.durationMs = probed
     }
     if (!props.draft.name.trim()) {
       if (multiple && paths.length > 1) {
         next.name = t('liturgy.fields.filesSelected', { count: paths.length })
       } else {
-        const fileName = paths[0]!.split(/[\\/]/).pop() ?? ''
-        next.name = fileName.replace(/\.[^.]+$/, '') || fileName
+        const fileName = paths[0]!.split(/[\\/]/).pop()! /* pop de path não-vazio é non-empty */
+        next.name = fileName.includes('.') ? fileName.replace(/\.[^.]+$/, '') : fileName
       }
     }
     patch(next)
@@ -545,6 +582,10 @@ function clearMusic() {
 }
 
 function onSubmit(event: Event) {
+  if (sljaImporting.value) {
+    event.preventDefault()
+    return
+  }
   event.preventDefault()
 
   const nextDraft = isCategory.value
@@ -612,7 +653,8 @@ function isLightDot(hex: string): boolean {
             type="button"
             class="moment-dialog__close"
             :aria-label="t('liturgy.actions.discard')"
-            @click="emit('close')"
+            :disabled="sljaImporting"
+              @click="!sljaImporting && emit('close')"
           >
             <i
               class="ti ti-x"
@@ -664,6 +706,7 @@ function isLightDot(hex: string): boolean {
                         hasTypeSelection && draft.type !== chip.value,
                     }"
                     :title="t(`liturgy.typeDescriptions.${chip.value}`)"
+                    :disabled="sljaImporting"
                     @click="selectType(chip.value)"
                   >
                     <span
@@ -1185,13 +1228,15 @@ function isLightDot(hex: string): boolean {
             <button
               type="button"
               class="moment-dialog__discard"
-              @click="emit('close')"
+              :disabled="sljaImporting"
+              @click="!sljaImporting && emit('close')"
             >
               {{ t('liturgy.actions.discard') }}
             </button>
             <button
               type="submit"
               class="moment-dialog__submit"
+              :disabled="sljaImporting"
             >
               <i
                 class="ti ti-check"

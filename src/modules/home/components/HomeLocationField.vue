@@ -1,72 +1,72 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { computed, nextTick, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 
 const props = withDefaults(
-  defineProps<{
-    value: string
-    label: string
-    placeholder: string
-    size?: 'lg' | 'md'
-  }>(),
-  {
-    size: 'lg',
-  },
-)
+	defineProps<{
+		value: string;
+		label: string;
+		placeholder: string;
+		size?: "lg" | "md";
+	}>(),
+	{
+		size: "lg",
+	},
+);
 
 const emit = defineEmits<{
-  save: [value: string]
-}>()
+	save: [value: string];
+}>();
 
-const { t } = useI18n()
+const { t } = useI18n();
 
-const editing = ref(props.value.trim().length === 0)
-const draft = ref(props.value)
-const inputRef = ref<HTMLInputElement | null>(null)
-const isFilled = computed(() => props.value.trim().length > 0)
+const editing = ref(props.value.trim().length === 0);
+const draft = ref(props.value);
+const inputRef = ref<HTMLInputElement | null>(null);
+const isFilled = computed(() => props.value.trim().length > 0);
 
 watch(
-  () => props.value,
-  (next) => {
-    if (!editing.value) {
-      draft.value = next
-    }
-    if (next.trim().length === 0) {
-      editing.value = true
-      draft.value = ''
-    }
-  },
-)
+	() => props.value,
+	(next) => {
+		if (!editing.value) {
+			draft.value = next;
+		}
+		if (next.trim().length === 0) {
+			editing.value = true;
+			draft.value = "";
+		}
+	},
+);
 
 async function startEdit() {
-  draft.value = props.value
-  editing.value = true
-  await nextTick()
-  inputRef.value?.focus()
-  inputRef.value?.select()
+	draft.value = props.value;
+	editing.value = true;
+	await nextTick();
+	inputRef.value?.focus();
+	inputRef.value?.select();
 }
 
 function commit() {
-  const next = draft.value.trim()
-  editing.value = next.length === 0
-  draft.value = next
-  if (next !== props.value.trim()) {
-    emit('save', next)
-  }
+	const next = draft.value.trim();
+	editing.value = next.length === 0;
+	draft.value = next;
+	if (next !== props.value.trim()) {
+		emit("save", next);
+	}
 }
 
 function onKeydown(event: KeyboardEvent) {
-  if (event.key === 'Enter') {
-    event.preventDefault()
-    commit()
-    inputRef.value?.blur()
-  }
-  if (event.key === 'Escape') {
-    event.preventDefault()
-    draft.value = props.value
-    editing.value = props.value.trim().length === 0
-    inputRef.value?.blur()
-  }
+	if (event.key === "Enter") {
+		event.preventDefault();
+		commit();
+		inputRef.value?.blur();
+	}
+	if (event.key === "Escape") {
+		event.preventDefault();
+		draft.value = props.value;
+		editing.value = props.value.trim().length === 0;
+		inputRef.value?.blur();
+	}
 }
 </script>
 

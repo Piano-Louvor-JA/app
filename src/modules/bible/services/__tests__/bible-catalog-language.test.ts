@@ -5,7 +5,8 @@ const state = vi.hoisted(() => ({ language: 'pt-BR' }))
 vi.mock('@modules/sync/services/library-catalog', () => ({
   getCurrentApiPrefix: () => {
     const prefix = state.language.slice(0, 2).toLowerCase()
-    return prefix === 'es' ? 'es' : 'pt'
+    if (prefix === 'es' || prefix === 'en') return prefix
+    return 'pt'
   },
 }))
 vi.mock('@shared/services/remote-catalog', () => ({
@@ -35,24 +36,21 @@ import { loadBibleBooks, loadBibleVersions } from '../bible-catalog'
 
 describe('bible-catalog — idioma ativo (hinário muda, Bíblia não)', () => {
   beforeEach(() => {
-    vi.resetModules()
     state.language = 'pt-BR'
   })
 
   it('pt: carrega livros/versões pt (Gênesis id 1, ARA)', async () => {
-    const mod = await import('../bible-catalog')
-    const books = await mod.loadBibleBooks()
-    const versions = await mod.loadBibleVersions()
+    const books = await loadBibleBooks()
+    const versions = await loadBibleVersions()
     expect(books[0]?.name).toBe('Gênesis')
     expect(books[0]?.id).toBe(1)
     expect(versions[0]?.abbreviation).toBe('ARA')
   })
 
-  it('es: carrega livros/versões es (Génesis id 67, Reina-Valera)', async () => {
+  it('es: o mesmo módulo passa a carregar livros/versões es', async () => {
     state.language = 'es-ES'
-    const mod = await import('../bible-catalog')
-    const books = await mod.loadBibleBooks()
-    const versions = await mod.loadBibleVersions()
+    const books = await loadBibleBooks()
+    const versions = await loadBibleVersions()
     expect(books[0]?.name).toBe('Génesis')
     expect(books[0]?.id).toBe(67)
     expect(versions[0]?.abbreviation).toBe('RV')
@@ -60,8 +58,7 @@ describe('bible-catalog — idioma ativo (hinário muda, Bíblia não)', () => {
 
   it('en: sem catálogo próprio — herda pt (mesma regra do hinário)', async () => {
     state.language = 'en-US'
-    const mod = await import('../bible-catalog')
-    const books = await mod.loadBibleBooks()
+    const books = await loadBibleBooks()
     expect(books[0]?.id).toBe(1)
   })
 })

@@ -3682,10 +3682,7 @@
                     ],
                     "description": "Subpasta de destino"
                   }
-                },
-                "required": [
-                  "file"
-                ]
+                }
               }
             }
           }

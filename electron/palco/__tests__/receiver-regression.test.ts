@@ -149,3 +149,42 @@ describe('receiver do palco — regressão', () => {
     }
   })
 })
+
+it('preserves basic projection formatting while stripping executable HTML', () => {
+  w.handle({ ...PROJECTION, text: '<b>Bold</b><br><span style="color: red; font-weight: 700" onclick="alert(1)">Color</span><script>alert(1)</script><img src=x onerror="alert(1)"><svg onload="alert(1)"></svg><a href="javascript:alert(1)">Text</a>' });
+  expect(el('text').querySelector('b')?.textContent).toBe('Bold');
+  expect(el('text').querySelector('br')).not.toBeNull();
+  expect(el('text').querySelector('span')?.style.color).toBe('red');
+  expect(el('text').querySelector('span')?.style.fontWeight).toBe('700');
+  expect(el('text').querySelector('script,img,svg,a,[onclick],[onerror],[onload]')).toBeNull();
+  expect(el('text').textContent).toBe('BoldColorText');
+});
+it('treats footer references and versions as text, preventing HTML injection', () => {
+  w.handle({ ...PROJECTION, footerRef: '<img src=x onerror=alert(1)>', footerVersion: '<script>bad()</script>' });
+  const footer = w.document.querySelector('.ref')!;
+  expect(footer.textContent).toBe('<img src=x onerror=alert(1)>');
+  expect(footer.querySelector('img')).toBeNull();
+});
+it('treats timer labels as text', () => {
+  w.handle({ v: 2, type: 'timer', duration: 1, label: '<img src=x onerror=alert(1)>' });
+  expect(el('timer').querySelector('img')).toBeNull();
+  expect(el('timer').querySelector('small')?.textContent).toBe('<img src=x onerror=alert(1)>');
+});
+
+it('rejects executable media URLs including encoded schemes', () => {
+  const proxy = (w as unknown as { proxyUrl: (url: string) => string }).proxyUrl;
+  expect(proxy('javascript:alert(1)')).toBe('');
+  expect(proxy('java%0Ascript:alert(1)')).toBe('');
+  expect(proxy('data:text/html;base64,PHNjcmlwdD4=')).toBe('');
+  expect(proxy('file:///etc/passwd')).toBe('');
+  expect(proxy('data:audio/mpeg;base64,AQID')).toBe('data:audio/mpeg;base64,AQID');
+  expect(proxy('http://127.0.0.1:7080/bg.png')).toMatch(/^http:\/\//);
+});
+
+it('restricts the cloud API to production, staging and localhost', () => {
+  const trusted = (w as unknown as { trustedCloudApi: (url: string) => string | null }).trustedCloudApi;
+  expect(trusted('wss://api.louvorja.com.br/v1/palco')).toBe('wss://api.louvorja.com.br/v1/palco');
+  expect(trusted('wss://api-stg.louvorja.com.br/v1/palco/')).toBe('wss://api-stg.louvorja.com.br/v1/palco');
+  expect(trusted('ws://localhost:3100/v1/palco')).toBe('ws://localhost:3100/v1/palco');
+  for(const url of ['wss://evil.example/v1/palco','wss://api.louvorja.com.br.evil.example/v1/palco','wss://api.louvorja.com.br@evil.example/v1/palco','ws://api.louvorja.com.br/v1/palco','wss://api-stg.louvorja.com.br:8443/v1/palco','wss://api.louvorja.com.br/other','wss://api.louvorja.com.br/v1/palco?redirect=evil','javascript:alert(1)'])expect(trusted(url)).toBeNull();
+});

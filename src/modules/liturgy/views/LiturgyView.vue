@@ -111,9 +111,9 @@ const {
 const liturgyAlertKey = computed(() => lastActionMessageKey.value || null)
 
 /** app#331 RF-1: pós-import .slja — recarrega o catálogo pra música aparecer
- * na busca (o draft já foi selecionado pelo próprio dialog via patch). */
-function onSljaImported(): void {
-  void refreshMusicCatalog()
+ * na busca antes de o diálogo selecionar o novo ID. */
+async function onSljaImported(): Promise<void> {
+  await refreshMusicCatalog()
 }
 </script>
 
@@ -325,7 +325,7 @@ function onSljaImported(): void {
       @update:music-query="setMusicSearchQuery"
       @pick-music="onMusicPick"
       @clear-music="clearMusicPick"
-      @slja-imported="onSljaImported"
+      :refresh-imported-catalog="onSljaImported"
     />
 
     <LiturgyCustomDialog

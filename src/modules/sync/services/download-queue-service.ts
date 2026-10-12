@@ -153,3 +153,12 @@ export function clearFinishedDownloads(): void {
   }
   if (queue.length !== before) notify()
 }
+
+/** Testes: esvazia a fila entre casos (estado é module-level). */
+export function _resetDownloadQueueForTests(): void {
+  queue.length = 0
+  if (persistTimer) {
+    clearTimeout(persistTimer)
+    persistTimer = null
+  }
+}
