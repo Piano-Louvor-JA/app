@@ -2,6 +2,7 @@ import { getDesktopBridge, isDesktopApp } from '@shared/services/desktop-bridge'
 import { defaultFilesBase } from './api-env'
 import { fetchRemoteCatalogJson } from '@shared/services/remote-catalog'
 import { readCatalogRecord } from '@shared/services/workspace-api'
+import { getCurrentApiPrefix } from '@modules/sync/services/library-catalog'
 import { CUSTOM_MUSIC_ID_OFFSET } from '@modules/media/services/custom-catalog'
 
 export type TrackMediaKind = 'music' | 'slides' | 'covers'
@@ -27,7 +28,17 @@ type CatalogMusicRecord = {
   lyric?: CatalogLyricRow[] | Record<string, CatalogLyricRow>
 }
 
-const downloadedCache = new Map<number, boolean>()
+const downloadedCache = new Map<string, boolean>()
+
+function trackCacheKey(musicId: number): string {
+  return `${getCurrentApiPrefix()}:${musicId}`
+}
+
+function catalogMusicKey(musicId: number): string {
+  // Contrato compat.ts: records individuais NÃO levam prefixo de idioma —
+  // o ID é global (music_2643, music_90168). Só LISTAS têm prefixo.
+  return `music_${musicId}`
+}
 
 /** Semáforo: evita N linhas abrirem dezenas de media:check juntos. */
 let offlineCheckActive = 0
@@ -52,8 +63,9 @@ async function withOfflineCheckSlot<T>(fn: () => Promise<T>): Promise<T> {
 
 /** Lê o cache em memória sem tocar no disco/IPC. */
 export function peekTrackDownloadCache(musicId: number): boolean | undefined {
-  if (!downloadedCache.has(musicId)) return undefined
-  return downloadedCache.get(musicId) === true
+  const key = trackCacheKey(musicId)
+  if (!downloadedCache.has(key)) return undefined
+  return downloadedCache.get(key) === true
 }
 
 /** Normaliza path do catálogo para o filename relativo usado no bridge. */
@@ -128,7 +140,8 @@ async function readMusicRecord(
   // import .slja). Sem isso o fallback remoto tenta `music_-N` duas vezes
   // antes do áudio data: tocar.
   if (musicId >= CUSTOM_MUSIC_ID_OFFSET || musicId < 0) return null
-  const local = await readCatalogRecord<CatalogMusicRecord>(`music_${musicId}`)
+  const filename = catalogMusicKey(musicId)
+  const local = await readCatalogRecord<CatalogMusicRecord>(filename)
   if (local != null) return local
   // Faixa LOCAL do import .slja deslogado (id negativo): nunca existe no
   // json_db remoto — tentar buscar gerava 404 em cascata nas 3 APIs
@@ -136,7 +149,7 @@ async function readMusicRecord(
   if (musicId < 0) return null
 
   try {
-    return await fetchRemoteCatalogJson<CatalogMusicRecord>(`music_${musicId}`)
+    return await fetchRemoteCatalogJson<CatalogMusicRecord>(filename)
   } catch {
     return null
   }
@@ -176,7 +189,7 @@ export function invalidateTrackMediaCache(musicId?: number): void {
     downloadedCache.clear()
     return
   }
-  downloadedCache.delete(musicId)
+  downloadedCache.delete(trackCacheKey(musicId))
 }
 
 /**
@@ -187,8 +200,9 @@ export async function isTrackMediaDownloaded(musicId: number): Promise<boolean> 
   return withOfflineCheckSlot(async () => {
     if (!isDesktopApp()) return false
 
-    if (downloadedCache.has(musicId)) {
-      return downloadedCache.get(musicId) === true
+    const cacheKey = trackCacheKey(musicId)
+    if (downloadedCache.has(cacheKey)) {
+      return downloadedCache.get(cacheKey) === true
     }
 
     const bridge = getDesktopBridge()
@@ -196,7 +210,7 @@ export async function isTrackMediaDownloaded(musicId: number): Promise<boolean> 
 
     const items = await collectTrackMediaItems(musicId)
     if (items.length === 0) {
-      downloadedCache.set(musicId, false)
+      downloadedCache.set(cacheKey, false)
       return false
     }
 
@@ -206,12 +220,12 @@ export async function isTrackMediaDownloaded(musicId: number): Promise<boolean> 
         toRelativeMediaPath(item.url),
       )
       if (!local) {
-        downloadedCache.set(musicId, false)
+        downloadedCache.set(cacheKey, false)
         return false
       }
     }
 
-    downloadedCache.set(musicId, true)
+    downloadedCache.set(cacheKey, true)
     return true
   })
 }
@@ -224,7 +238,7 @@ export type TrackMediaDownloadResult =
 function resolveRemoteFileUrl(urlPath: string): string {
   if (/^https?:\/\//i.test(urlPath)) return urlPath
   const cleanPath = urlPath.startsWith('/') ? urlPath.slice(1) : urlPath
-  const base = import.meta.env.VITE_URL_FILES ?? defaultFilesBase()
+  const base = import.meta.env.VITE_URL_FILES ?? 'https://api-stg.pianolouvorja.com.br/file'
   return `${base}/${cleanPath}`
 }
 
@@ -289,7 +303,7 @@ export async function downloadTrackMedia(
     return { status: 'error', reason: 'server' }
   }
 
-  downloadedCache.set(musicId, true)
+  downloadedCache.set(trackCacheKey(musicId), true)
   return { status: 'downloaded' }
 }
 
@@ -304,5 +318,5 @@ export async function deleteTrackMedia(musicId: number): Promise<void> {
     await bridge.media.delete(item.type, toRelativeMediaPath(item.url))
   }
 
-  downloadedCache.set(musicId, false)
+  downloadedCache.set(trackCacheKey(musicId), false)
 }

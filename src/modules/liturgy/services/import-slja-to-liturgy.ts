@@ -373,9 +373,11 @@ export async function importSljaAsLiturgyMusic(
 }
 
 /**
- * Import local (deslogado): áudio vira base64 no LocalMusic (o player já
- * monta data: URL — loadCustomMusicTrack, branch isLocalId) e as estrofes
- * vão com timing (time HH:MM:SS). Nada sobe pra rede.
+ * Import local (deslogado): áudio e capa viram BLOBS em IndexedDB
+ * (local-media-store) — localStorage guarda só metadados (ids da mídia,
+ * duração, nome). Bug slja-storage: base64 no localStorage estourava a
+ * quota (~10 MB) e o saveDb silencioso descartava as estrofes 2..N.
+ * Re-import do mesmo arquivo (dedupe por sljaHash) → no-op.
  */
 function matchUploadedAsset(
 	imageName: string | undefined,
@@ -419,10 +421,42 @@ async function importSljaLocal({
 		createLocalMusic,
 		createLocalLyric,
 		updateLocalMusic,
-		getLocalMusic,
 		deleteLocalMusic,
 		listLocalCollections,
+		findLocalMusicBySljaHash,
 	} = await import("@modules/media/services/local-custom-store");
+	const { putMedia } = await import(
+		"@modules/media/services/local-media-store"
+	);
+
+	// Dedupe (app#336): mesmo arquivo já importado → no-op (retorna a música
+	// existente sem regravar mídia/estrofes). EXCETO se a música existente
+	// estiver PARCIAL (import anterior interrompido por QuotaExceededError —
+	// achado M1 do QA): nesse caso deleta e refaz o import completo (blobs
+	// em IndexedDB são idempotentes por hash — putMedia sobrescreve).
+	const expectedSlides = slides.filter((s) => s.lyric.trim().length > 0).length;
+	const existing = findLocalMusicBySljaHash(sljaHash);
+	if (existing && existing.lyrics.length >= expectedSlides) {
+		return {
+			musicId: existing.id,
+			displayMusicId: existing.id,
+			name: existing.name || name,
+			collectionId: existing.collectionId,
+			slides: existing.lyrics.length,
+			hasAudio: Boolean(existing.audioMediaId || existing.audioBase64),
+			uploadedImages: 0,
+			durationMs: existing.durationMs ?? durationMs,
+			local: true,
+			sljaHash,
+			updatedExisting: true,
+		};
+	}
+	if (existing) {
+		// Parcial (import interrompido por quota): recomeça do zero — sem
+		// estrofes/mídia órfãs (o saveDb que estourou já não persistiu o
+		// excedente; a música com sljaHash sim, senão nem cairia aqui).
+		deleteLocalMusic(existing.id);
+	}
 
 	let collectionId = listLocalCollections().find(
 		(c) => c.name === IMPORT_COLLECTION_NAME,
@@ -437,10 +471,13 @@ async function importSljaLocal({
 		throw new Error("SLJA_LOCAL_LYRIC_PERSIST_FAILED");
 	}
 
+	// Áudio → 1 blob em IndexedDB (id estável derivado do hash). localStorage
+	// fica só com o id do blob (metadado).
 	let hasAudio = false;
 	if (archive.audio?.bytes?.length) {
-		const saved = updateLocalMusic(musicId, {
-			audioBase64: bytesToBase64(archive.audio.bytes),
+		await putMedia(`slja-${sljaHash}-audio`, archive.audio.bytes);
+		updateLocalMusic(musicId, {
+			audioMediaId: `slja-${sljaHash}-audio`,
 			audioName: archive.audio.name,
 		});
 		const storedAudio = getLocalMusic(musicId)?.audioBase64;
@@ -457,39 +494,28 @@ async function importSljaLocal({
 		persistedDurationMs = getLocalMusic(musicId)?.durationMs ?? 0;
 	}
 
-	// Fundo compartilhado (padrão web#174): primeiro asset do .slja vira data:
-	// URL e cobre a capa + todos os slides (o .slja traz fundo único).
-	let coverDataUrl: string | null = null;
+	// Capa → 1 blob em IndexedDB, VINCULADA À MÚSICA (não por estrofe — o
+	// agravante do bug era a mesma data: URL de 4 MB repetida 33×). O .slja
+	// clássico traz fundo único: primeiro asset cobre capa + todos os slides
+	// (padrão web#174), resolvido na leitura via getMedia.
 	if (archive.assets?.length && archive.assets[0]?.bytes?.length) {
-		coverDataUrl = `data:image/png;base64,${bytesToBase64(archive.assets[0].bytes)}`;
-		updateLocalMusic(musicId, { image_url: coverDataUrl });
+		await putMedia(`slja-${sljaHash}-cover`, archive.assets[0].bytes);
+		updateLocalMusic(musicId, {
+			coverMediaId: `slja-${sljaHash}-cover`,
+		});
 	}
 
 	let slideCount = 0;
-	try {
-		for (const slide of slides) {
-			const text = slide.lyric.trim();
-			// Empty lyrics were removed before any asynchronous import work.
-			createLocalLyric(musicId, {
-				lyric: text,
-				aux_lyric: slide.auxiliaryLyric?.trim() || undefined,
-				image_url: coverDataUrl,
-				time: formatSljaMsAsTime(slide.timeMs),
-			});
-			const persisted = getLocalMusic(musicId)?.lyrics.some(
-				(lyric) => lyric.lyric === text,
-			);
-			if (!persisted) {
-				throw new Error("SLJA_LOCAL_LYRIC_PERSIST_FAILED");
-			}
-			slideCount += 1;
-		}
-	} catch (error) {
-		deleteLocalMusic(musicId);
-		if (error instanceof Error && error.message === "local-persist-failed") {
-			throw new Error("SLJA_LOCAL_LYRIC_PERSIST_FAILED");
-		}
-		throw error;
+	for (const slide of slides) {
+		const text = slide.lyric.trim();
+		if (!text) continue;
+		createLocalLyric(musicId, {
+			lyric: text,
+			time: formatSljaMsAsTime(slide.timeMs),
+			// SEM image_url por estrofe — a capa compartilhada vive 1× na
+			// música (coverMediaId) e o player herda (media-slides fallback).
+		});
+		slideCount += 1;
 	}
 
 	return {
@@ -511,14 +537,4 @@ async function importSljaLocal({
 			(archive.assets?.length ?? 0) > 0 ||
 			slides.some((slide) => Boolean(slide.image?.name)),
 	};
-}
-
-/** bytes → base64 (sem any; chunks grandes em passos de 0x8000). */
-function bytesToBase64(bytes: Uint8Array): string {
-	let binary = "";
-	const chunk = 0x8000;
-	for (let i = 0; i < bytes.length; i += chunk) {
-		binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
-	}
-	return btoa(binary);
 }

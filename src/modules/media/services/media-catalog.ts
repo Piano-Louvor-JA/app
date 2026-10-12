@@ -122,13 +122,19 @@ export async function loadMediaTrack(
 ): Promise<MediaTrackRecord | null> {
   if (!Number.isFinite(musicId) || musicId <= 0) return null
 
-  const local = await readCatalogRecord<CatalogMusicRow>(`music_${musicId}`)
+  // Contrato compat.ts: record individual sem prefixo de idioma (music_{id}).
+  const filename = `music_${musicId}`
+  const local = await readCatalogRecord<CatalogMusicRow>(filename)
   // Fallback remoto: faixa nova (ex: Infantis/Doxologia 90xxx) pode não estar
   // no cache local ainda — busca do backend antes de desistir (trackMissing).
-  const row =
-    local ?? (await fetchRemoteCatalogJson<CatalogMusicRow>(`music_${musicId}`))
-  if (!row) return null
-  return mapTrack(row, musicId)
+  try {
+    const row = local ?? (await fetchRemoteCatalogJson<CatalogMusicRow>(filename))
+    return row ? mapTrack(row, musicId) : null
+  } catch {
+    // Registro remoto ausente/indisponível é apresentado pelo store como
+    // trackMissing; nunca deixar rejeição escapar do handler do player.
+    return null
+  }
 }
 
 export function resolveAlbumSubtitle(

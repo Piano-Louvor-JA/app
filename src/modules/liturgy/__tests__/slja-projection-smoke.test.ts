@@ -96,7 +96,7 @@ describe("app#331 B2 — projeção do item importado", () => {
 		expect(result.ok).toBe(true);
 		expect(store.session?.slides.length).toBe(2); // capa + estrofe
 		expect(store.session?.slides[0]?.lyric).toContain("Missao Para Todos");
-		expect(store.session?.audioUrl).toMatch(/^data:audio/);
+		expect(store.session?.audioUrl).toMatch(/^(data:audio|blob:)/);
 		// estado de projeção: título e slides prontos (mesmo contrato dos nativos)
 		expect(store.session?.title).toBe("Missao Para Todos");
 		store.close();

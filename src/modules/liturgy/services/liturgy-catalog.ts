@@ -258,7 +258,8 @@ async function loadHymnalOptions(
 async function loadCollectionOptions(
   byId: Map<number, LiturgyMusicOption>,
 ): Promise<void> {
-  const categories = await readOrFetchCatalog<CatalogCategory[]>('pt_categories')
+  const langPrefix = getCurrentApiPrefix()
+  const categories = await readOrFetchCatalog<CatalogCategory[]>(`${langPrefix}_categories`)
   if (!categories || !Array.isArray(categories)) return
 
   const albums = new Map<number, string>()
@@ -280,6 +281,7 @@ async function loadCollectionOptions(
     await Promise.all(
       batch.map(async ([albumId, albumName]) => {
         const record = await readOrFetchCatalog<CatalogAlbumRecord>(
+          // Contrato compat.ts: record individual sem prefixo (album_{id}).
           `album_${albumId}`,
         )
         if (!record?.musics || !Array.isArray(record.musics)) return

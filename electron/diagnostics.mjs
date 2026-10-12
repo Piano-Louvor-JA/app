@@ -2,6 +2,7 @@
 // Rede fica no main process: Chromium/Electron fornece proxy do sistema; renderer
 // recebe apenas dados serializáveis. O serviço nunca escreve em LouvorJA-PIANO.
 
+import crypto from 'node:crypto'
 import dns from 'node:dns/promises'
 import crypto from 'node:crypto'
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync, unlinkSync } from 'node:fs'
@@ -21,6 +22,18 @@ import {
   userDataWriteProbe,
   windowsAntivirus,
 } from './diagnostics-v2-collectors.mjs'
+import {
+  analyzeInterfaces,
+  computeRemoteVerdict,
+  listenersOnPort,
+  probeExcludedPorts,
+  probeFirewall,
+  probeListeners,
+  probeNetworkCategory,
+  selfProbe,
+} from './remote-diagnostics.mjs'
+import { networkInterfaces } from 'node:os'
+import { getRemoteStatus } from './remote-server.mjs'
 
 // screen via electron — monitores/resolução pra problemas de projeção em 2ª tela.
 function monitoresAbertos() {
@@ -198,20 +211,33 @@ function inspectRealInstallation() {
  * arquivo conhecido, buffer em memória — nada é salvo no disco do usuário.
  * Diferencia "API JSON ok mas CDN de arquivos bloqueada".
  */
-async function mediaFileProbe(host, token) {
-  const url = `https://${host}/file/pt_categories`
+export async function mediaFileProbe(host, token) {
+  const url = `https://${host}/file/musics/pt/90141.mp3`
   const start = Date.now()
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
   try {
     const response = await fetch(url, {
       headers: token ? { 'Api-Token': token, Range: 'bytes=0-65535' } : { Range: 'bytes=0-65535' },
+      redirect: 'manual',
       signal: controller.signal,
     })
     const body = await response.arrayBuffer()
     const result = { url, status: response.status, ok: response.ok, bytes: body.byteLength, ms: elapsed(start), erro: null }
     if (!response.ok) {
-      const classe = response.status === 403 ? 'HTTP_403' : response.status === 404 ? 'HTTP_404' : response.status === 429 ? 'HTTP_429' : response.status >= 500 ? 'HTTP_5XX' : 'OTHER'
+      // v1.3 — 3xx é explícito: /file/ redireciona upstream quando não espelhado.
+      // ok exige 2xx; o probe avalia a própria CDN, nunca segue redirect.
+      const classe = response.status >= 300 && response.status < 400
+        ? 'HTTP_302_REDIRECT'
+        : response.status === 403
+          ? 'HTTP_403'
+          : response.status === 404
+            ? 'HTTP_404'
+            : response.status === 429
+              ? 'HTTP_429'
+              : response.status >= 500
+                ? 'HTTP_5XX'
+                : 'OTHER'
       result.erro = { classe, bruto: `HTTP ${response.status}` }
     }
     return result
@@ -226,7 +252,19 @@ function maskToken(token) {
   return token ? `${token.slice(0, 4)}…(${token.length} chars)` : null
 }
 
-function computeVerdict({ general, apis, proxy, hosts, installation, extra }) {
+function computeVerdict({ general, apis, proxy, hosts, installation, extra, controleRemoto }) {
+  // RF5 — vereditos remote-* ANTES dos existentes quando controle remoto não ok
+  const remoteVerdict = computeRemoteVerdict({
+    status: controleRemoto?.status,
+    portaAtiva: controleRemoto?.portaAtiva,
+    janelasPortasExcluidas: controleRemoto?.janelasPortasExcluidas ?? [],
+    selfProbe: controleRemoto?.selfProbe,
+    ipSuspeito: controleRemoto?.ipSuspeito,
+    portaRoubada: controleRemoto?.caos?.portaRoubada,
+    redePublica: controleRemoto?.caos?.redePublica,
+    regraInbound: Boolean(controleRemoto?.regraFirewall?.allow7071 ?? controleRemoto?.evidenciaFirewall?.allow?.length),
+  })
+  if (remoteVerdict && remoteVerdict !== 'remote-ok') return remoteVerdict
   if (!general['1.1.1.1:443']?.ok && !general['google.com:443']?.ok) return 'sem-internet'
   const errors = apis.flatMap((api) => [api.dns?.erro, api.tcp?.erro, api.tls?.erro, ...api.http.map((h) => h.erro)].filter(Boolean))
   const classes = errors.map((e) => e.classe)
@@ -246,13 +284,34 @@ function computeVerdict({ general, apis, proxy, hosts, installation, extra }) {
   return 'ok'
 }
 
+const REMOTE_TIPS = {
+  'remote-porta-excluida': 'Windows reservou a porta 7071 (Hyper-V/WSL). Reinicie o PC ou peça suporte para liberar a faixa.',
+  'remote-porta-roubada': 'Outro programa usa a porta 7071. Feche-o ou reinicie o PC e abra o LouvorJA primeiro.',
+  'remote-ip-adaptador-errado': 'O QR aponta para um IP de rede virtual (WSL/Docker/VPN). Desative VPN/WSL ou conecte o cabo de rede.',
+  'remote-firewall': 'Windows Defender está bloqueando. Permita o LouvorJA no firewall (rede privada) ou mude a rede para Privada.',
+  'remote-ok': 'Controle remoto: tudo certo na rede.',
+}
+
 function reportText(report) {
+  const cr = report.controleRemoto
+  const crLines = []
+  if (cr) {
+    crLines.push('', 'Controle remoto:')
+    crLines.push(`Servidor: ${cr.status ?? 'não iniciado'}${cr.portaAtiva ? ` (porta ${cr.portaAtiva})` : ''}; IP do QR: ${cr.ipEscolhido}${cr.ipSuspeito ? ' (SUSPEITO)' : ''}`)
+    if (cr.selfProbe) crLines.push(`Teste de conexão local: ${cr.selfProbe.ok ? 'OK' : `FALHOU (${cr.selfProbe.erro})`}`)
+    if (cr.janelasPortasExcluidas?.length) crLines.push(`Portas reservadas pelo sistema: ${cr.janelasPortasExcluidas.map((j) => `${j.start}-${j.end}`).join(', ')}`)
+    if (cr.caos?.portaRoubada) crLines.push(`Porta em uso por outro programa: ${cr.caos.donoPorta}`)
+    if (cr.caos?.redePublica) crLines.push('Rede marcada como PÚBLICA no Windows.')
+    if (cr.caos?.vpnAtiva) crLines.push('VPN/adapter virtual ativo detectado.')
+    if (report.vereditoHeuristico?.startsWith('remote-')) crLines.push(`Dica: ${REMOTE_TIPS[report.vereditoHeuristico] ?? ''}`)
+  }
   const lines = [
     'LouvorJA Diagnóstico — SrCaldeira',
     `Data (local): ${report.meta.dataLocal} (${report.ambiente.timezone})`,
     `Data (ISO): ${report.meta.dataISO}`,
     `Duração: ${report.meta.duracaoMs} ms`,
     `Veredito heurístico: ${report.vereditoHeuristico}`,
+    ...crLines,
     '',
     'APIs:',
     ...report.rede.apis.map((api) => `${api.host}: DNS ${api.dns.ok ? 'OK' : api.dns.erro?.classe}; TCP ${api.tcp.ok ? 'OK' : api.tcp.erro?.classe}; TLS ${api.tls.ok ? 'OK' : api.tls.erro?.classe}; HTTP ${api.http.map((item) => item.status ?? item.erro?.classe).join(', ')}`),
@@ -269,6 +328,47 @@ function outputDirectory() {
     try { if (existsSync(dir)) return dir } catch { /* next */ }
   }
   return app.getPath('temp')
+}
+
+async function collectControleRemoto() {
+  // RF1..RF6 — seção do controle remoto (SPEC v1.2). Tudo null-safe.
+  const picked = analyzeInterfaces(networkInterfaces())
+  const rs = getRemoteStatus()
+  const status = rs.status // ok | fallback | desligado | null (nunca subiu)
+  const portaAtiva = rs.port
+  const self = portaAtiva ? await selfProbe(picked.ipEscolhido, portaAtiva) : null
+  const [excluded, firewall, listeners, redePublica] = await Promise.all([
+    probeExcludedPorts(),
+    probeFirewall(),
+    probeListeners(),
+    probeNetworkCategory(),
+  ])
+  const janelasPortasExcluidas = (excluded ?? []).filter(({ start, end }) => end >= 7071 && start <= 7075)
+  const { portaRoubada, dono } = listenersOnPort(listeners ?? [], portaAtiva ?? 7071, process.pid)
+  const regraFirewall = firewall && 'allow7071' in firewall
+    ? { allow7071: firewall.allow7071 }
+    : firewall?.allow?.length
+      ? { allow7071: true }
+      : { allow7071: null }
+  return {
+    status,
+    portaAtiva,
+    interfaces: picked.interfaces,
+    ipEscolhido: picked.ipEscolhido,
+    ipSuspeito: picked.ipSuspeito,
+    selfProbe: self,
+    janelasPortasExcluidas,
+    regraFirewall,
+    evidenciaFirewall: firewall,
+    caos: {
+      portaRoubada,
+      donoPorta: dono,
+      redePublica,
+      vpnAtiva: picked.vpnAtiva,
+      subnetsDiferentes: picked.subnetsDiferentes,
+      listeners: listeners ?? [],
+    },
+  }
 }
 
 async function runDiagnostics() {
@@ -293,6 +393,8 @@ async function runDiagnostics() {
   }
   const hostsOverrides = readHostsOverrides()
   const installation = inspectRealInstallation()
+  // SPEC v1.2 — sondas do controle remoto (rede local/WS)
+  const controleRemoto = await collectControleRemoto()
   // v2 — probe de mídia real no host de arquivos (mesmo host do primeiro API ok).
   const mediaHost = API_HOSTS[0]
   const mediaProbe = await mediaFileProbe(mediaHost, token)
@@ -339,8 +441,9 @@ async function runDiagnostics() {
     rede: { proxy: { resolveProxyPorOrigem: proxy, envHttpProxy: process.env.HTTP_PROXY ?? null, envHttpsProxy: process.env.HTTPS_PROXY ?? null }, hostsOverrides, conectividadeGeral: general, apis, reproducaoBootstrap: reproduction, mediaReal: mediaProbe, dnsSuspeito },
     instalacaoReal: installation,
     triage: { storage, crashes, memoria, discoLivreMb, antivirus, logs, gpuFeatures, monitores: monitoresAbertos(), versaoInstalacaoReal },
+    controleRemoto,
   }
-  report.vereditoHeuristico = computeVerdict({ general, apis, proxy, hosts: hostsOverrides, installation, extra })
+  report.vereditoHeuristico = computeVerdict({ general, apis, proxy, hosts: hostsOverrides, installation, extra, controleRemoto })
   const timestamp = report.meta.dataISO.replace(/[:.]/g, '-').replace('T', '_').replace('Z', '')
   const dir = outputDirectory()
   const jsonPath = path.join(dir, `louvorja-diagnostico-${timestamp}.json`)
@@ -352,34 +455,42 @@ async function runDiagnostics() {
 }
 
 export function registerDiagnosticsIpc() {
+  // electron-builder copia arquivos sem passar pelo Vite; injeta DSN em build-time
+  // via resource opcional. process.env mantém a sobreposição para dev/CI.
+  const bundledDsn = (() => {
+    try { return readFileSync(path.join(process.resourcesPath, 'diagnostics-dsn.txt'), 'utf8').trim() } catch { return '' }
+  })()
   ipcMain.handle('diagnostics:run', () => runDiagnostics())
   ipcMain.handle('diagnostics:open-folder', async (_event, filePath) => shell.showItemInFolder(String(filePath ?? '')))
   // DSN Sentry/Glitchtip via build secret. Sem DSN, falha deliberada com
   // fallback local; o botão nunca bloqueia o arquivo já salvo.
   ipcMain.handle('diagnostics:send', async (_event, report) => {
-    const dsn = process.env.DIAGNOSTICS_GLITCHTIP_DSN
+    const dsn = process.env.DIAGNOSTICS_GLITCHTIP_DSN || bundledDsn
     if (!dsn) return { ok: false, reason: 'DSN de diagnóstico não configurado; compartilhe o arquivo salvo.' }
     try {
-      // DSN Sentry: https://<public_key>@<host>/<project_id>
-      const parsed = new URL(dsn)
-      const publicKey = decodeURIComponent(parsed.username)
-      const projectId = parsed.pathname.replace(/\//g, '')
-      if (!publicKey || !projectId) return { ok: false, reason: 'DSN malformado; compartilhe o arquivo salvo.' }
-      const storeUrl = `${parsed.protocol}//${parsed.host}/api/${projectId}/store/`
+      // Protocolo Sentry/GlitchTip: parse do DSN https://<key>@<host>/<project>
+      const url = new URL(dsn)
+      const key = decodeURIComponent(url.username)
+      const projectId = url.pathname.replace(/^\//, '').replace(/\/$/, '')
+      if (!key || !projectId || url.protocol !== 'https:') {
+        return { ok: false, reason: 'DSN malformado; compartilhe o arquivo salvo.' }
+      }
+      const endpoint = `${url.origin}/api/${projectId}/store/`
       const event = {
         event_id: crypto.randomUUID().replace(/-/g, ''),
         timestamp: new Date().toISOString(),
         platform: 'javascript',
         environment: 'diagnostico',
-        message: `Diagnóstico LouvorJA PIANO — campanha ${report?.meta?.campanha ?? 'indefinida'}`,
-        tags: { campanha: String(report?.meta?.campanha ?? 'indefinida'), versao: String(report?.meta?.versao ?? '') },
+        logger: 'louvorja-diagnostics',
+        message: `Diagnóstico LouvorJA PIANO — campanha SrCaldeira`,
+        tags: { campanha: 'SrCaldeira', versao: app.getVersion() },
         extra: { report },
       }
-      const response = await fetch(storeUrl, {
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Sentry-Auth': `Sentry sentry_version=7, sentry_key=${publicKey}, sentry_client=louvorja-diagnostics/1.0`,
+          'X-Sentry-Auth': `Sentry sentry_version=7, sentry_key=${key}, sentry_client=louvorja-diagnostics/1.0`,
         },
         body: JSON.stringify(event),
       })

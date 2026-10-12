@@ -11,6 +11,12 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify('0.0.0-test'),
   },
   plugins: [vue()],
+  // __APP_VERSION__ é injetado pelo build (vite.config do app) — em teste usamos a versão do package.json
+  define: {
+    __APP_VERSION__: JSON.stringify(
+      JSON.parse(require('node:fs').readFileSync('./package.json', 'utf-8')).version,
+    ),
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

@@ -42,8 +42,18 @@ function lanIp() {
   return '127.0.0.1'
 }
 
-/** Ações permitidas ao pregador (escopo speaker mínimo) — nada de play/stop/eject. */
-export const SPEAKER_ALLOWED = new Set(['slide:next', 'slide:prev', 'slide:goto'])
+/**
+ * RF2 (SPEC remote-diagnostics) — getter de status p/ o diagnóstico.
+ * Module-scope: attachRemoteServer alimenta; startRemoteServer publica.
+ */
+const remoteStatus = { status: null, port: null, token: null }
+
+export function getRemoteStatus() {
+  return { ...remoteStatus }
+}
+
+export async function startRemoteServer(wss, contents) {
+  const token = randomBytes(4).toString('hex').toUpperCase()
 
 /**
  * @param {any} wss WebSocketServer (ou fake)
@@ -239,6 +249,10 @@ export async function startRemoteServer(wss, contents, opts = {}) {
   // Porta real em uso (pode ser fallback 7072-7075)
   const activePort = wss.address().port
   console.info(`[remote] servidor WS na porta ${activePort} — token ${token}`)
+  // RF2 — publica status p/ getRemoteStatus()
+  remoteStatus.status = activePort === PORT ? 'ok' : 'fallback'
+  remoteStatus.port = activePort
+  remoteStatus.token = token
 
   // Pairing: renderer pergunta host+token+QR (Configurações > Controle Remoto)
   const host = lanIp()
@@ -305,6 +319,7 @@ export function attachRemoteServer(getContents) {
 
     let wss = null
     let activePort = PORT
+    let lastError = null
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       try {
         wss = await tryListen(activePort)
@@ -316,11 +331,16 @@ export function attachRemoteServer(getContents) {
         const code = err?.code ?? ''
         if (code !== 'EADDRINUSE' && code !== 'EACCES') throw err
         console.warn(`[remote] porta ${activePort} falhou (${code}) — tentando próxima`)
+        lastError = code
         activePort = PORT + attempt + 1
       }
     }
     if (!wss) {
       console.error(`[remote] nenhuma porta disponível (${PORT}..${PORT + MAX_ATTEMPTS}) — controle remoto DESLIGADO. O app segue sem ele.`)
+      // RF2 — publica desligado p/ diagnóstico
+      remoteStatus.status = 'desligado'
+      remoteStatus.port = null
+      remoteStatus.erro = lastError
       return
     }
 

@@ -9,6 +9,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const readCatalogRecord = vi.fn()
 const fetchRemoteCatalogJson = vi.fn()
+const getCurrentApiPrefix = vi.fn(() => 'pt')
+vi.mock('@modules/sync/services/library-catalog', () => ({
+  getCurrentApiPrefix: () => getCurrentApiPrefix(),
+}))
 vi.mock('@shared/services/workspace-api', () => ({
   readCatalogRecord: (...a: unknown[]) => readCatalogRecord(...a),
 }))
@@ -54,6 +58,7 @@ const custom = (localId: number): AlbumCollection =>
 
 beforeEach(() => {
   vi.clearAllMocks()
+  getCurrentApiPrefix.mockReturnValue('pt')
 })
 
 describe('formatCatalogDuration', () => {
@@ -258,6 +263,19 @@ describe('loadAlbumLyric', () => {
     const doc = await loadAlbumLyric(9)
     expect(doc?.title).toBe('music_9')
     expect(doc?.lines.map((l) => l.text)).toEqual(['um', 'dois'])
+  })
+
+  it('es lê letra no record isolado', async () => {
+    getCurrentApiPrefix.mockReturnValue('es')
+    readCatalogRecord.mockResolvedValue({
+      name: 'Cantad alegres al Senor',
+      lyric: [{ order: 1, lyric: 'Cantad alegres al Señor' }],
+    })
+
+    const doc = await loadAlbumLyric(2643)
+
+    expect(readCatalogRecord).toHaveBeenCalledWith('music_2643')
+    expect(doc).toMatchObject({ title: 'Cantad alegres al Senor' })
   })
 })
 

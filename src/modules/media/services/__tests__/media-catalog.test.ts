@@ -7,6 +7,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const readCatalogRecord = vi.fn()
 const fetchRemoteCatalogJson = vi.fn()
+const getCurrentApiPrefix = vi.fn(() => 'pt')
+vi.mock('@modules/sync/services/library-catalog', () => ({
+  getCurrentApiPrefix: () => getCurrentApiPrefix(),
+}))
 vi.mock('@shared/services/workspace-api', () => ({
   readCatalogRecord: (...a: unknown[]) => readCatalogRecord(...(a as [])),
 }))
@@ -21,6 +25,7 @@ import {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  getCurrentApiPrefix.mockReturnValue('pt')
 })
 
 describe('loadMediaTrack', () => {
@@ -50,8 +55,10 @@ describe('loadMediaTrack', () => {
     const t2 = await loadMediaTrack(6)
     expect(t2?.name).toBe('Remota')
 
+    // Falha remota (404/rede): player recebe null e exibe trackMissing;
+    // rejeição nunca escapa do handler de play.
     fetchRemoteCatalogJson.mockRejectedValue(new Error('off'))
-    await expect(loadMediaTrack(7)).rejects.toThrow('off')
+    await expect(loadMediaTrack(7)).resolves.toBeNull()
   })
 
   it('mapTrack completo: álbums, categorias, letra array e objeto', async () => {
@@ -103,6 +110,24 @@ describe('loadMediaTrack', () => {
     expect(t?.lyrics).toHaveLength(1)
     readCatalogRecord.mockResolvedValue({ id_music: 3, name: '   ' })
     expect(await loadMediaTrack(3)).toBeNull()
+  })
+
+  it('es lê record isolado e preserva url_music retornada', async () => {
+    getCurrentApiPrefix.mockReturnValue('es')
+    readCatalogRecord.mockResolvedValue({
+      id_music: 2643,
+      name: 'Cantad alegres al Senor',
+      url_music: '/musics/es/Himnario Adventista/Cantad alegres al Senor.mp3',
+      url_image: '/covers/es/2003.jpg',
+    })
+
+    const track = await loadMediaTrack(2643)
+
+    expect(readCatalogRecord).toHaveBeenCalledWith('music_2643')
+    expect(track).toMatchObject({
+      audioUrl: '/musics/es/Himnario Adventista/Cantad alegres al Senor.mp3',
+      coverUrl: '/covers/es/2003.jpg',
+    })
   })
 })
 

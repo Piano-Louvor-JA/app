@@ -20,6 +20,16 @@ import { toRelativeMediaPath } from './media-paths'
 const DOWNLOAD_BATCH_SIZE = 5
 const MAX_CONSECUTIVE_ERRORS = 3
 
+function catalogAlbumKey(albumId: string | number): string {
+  // Contrato compat.ts: record individual sem prefixo (album_{id}).
+  return `album_${albumId}`
+}
+
+function catalogMusicKey(musicId: string | number): string {
+  // Contrato compat.ts: record individual sem prefixo (music_{id}).
+  return `music_${musicId}`
+}
+
 /** Lê registro local; se faltar, busca na API Piano e cacheia em .sysdata. */
 async function readOrFetchCatalogRecord<T>(filename: string): Promise<T | null> {
   const local = await readCatalogRecord<T>(filename)
@@ -87,7 +97,7 @@ async function collectMediaForAlbum(
     songRefs = hymnalData
   } else {
     const albumData = await readOrFetchCatalogRecord<CatalogAlbumRecord>(
-      `album_${album.id}`,
+      catalogAlbumKey(album.id),
     )
     if (!albumData?.musics || !Array.isArray(albumData.musics)) {
       return { items: [], found: false }
@@ -103,7 +113,7 @@ async function collectMediaForAlbum(
     onSongFetched?.(fetched, total)
 
     const musicData = await readOrFetchCatalogRecord<CatalogMusicRecord>(
-      `music_${song.id_music}`,
+      catalogMusicKey(song.id_music),
     )
     if (!musicData) continue
 
@@ -144,7 +154,7 @@ export async function listAlbumMusicIds(
     songRefs = hymnalData
   } else {
     const albumData = await readOrFetchCatalogRecord<CatalogAlbumRecord>(
-      `album_${album.id}`,
+      catalogAlbumKey(album.id),
     )
     if (!albumData?.musics || !Array.isArray(albumData.musics)) return []
     songRefs = albumData.musics
@@ -168,7 +178,7 @@ export async function resolveAlbumIdsForMusic(
     albums?: Array<{ id_album?: number | string }>
   }
 
-  const music = await readOrFetchCatalogRecord<MusicAlbumsRow>(`music_${musicId}`)
+  const music = await readOrFetchCatalogRecord<MusicAlbumsRow>(catalogMusicKey(musicId))
   if (!music?.albums || !Array.isArray(music.albums)) return []
 
   const ids: Array<string | number> = []
