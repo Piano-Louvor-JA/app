@@ -11,8 +11,34 @@ import type {
   CatalogBibleVersionRow,
 } from '../types/bible'
 
-const BOOKS_FILE = 'pt_bible_book'
-const VERSIONS_FILE = 'pt_bible_version'
+const BOOKS_FILE_BY_PREFIX: Record<string, string> = {
+  pt: 'pt_bible_book',
+  en: 'pt_bible_book',
+  es: 'es_bible_book',
+}
+const VERSIONS_FILE_BY_PREFIX: Record<string, string> = {
+  pt: 'pt_bible_version',
+  en: 'pt_bible_version',
+  es: 'es_bible_version',
+}
+
+/**
+ * Idioma ativo para a Bíblia (issue: ao trocar idioma, hinário mudava mas a
+ * Bíblia ficava em pt). Reusa a mesma detecção do hinário (getCurrentApiPrefix:
+ * user_data.language → fallback pt). `en` não tem catálogo próprio na API —
+ * usa o pt (mesmo comportamento do hinário).
+ *
+ * Import dinâmico: resolveBookTone e os demais helpers não devem carregar o
+ * i18n só porque o módulo foi importado.
+ */
+async function bibleCatalogFile(kind: 'book' | 'version'): Promise<string> {
+  const { getCurrentApiPrefix } = await import(
+    '@modules/sync/services/library-catalog'
+  )
+  const prefix = getCurrentApiPrefix()
+  if (kind === 'book') return BOOKS_FILE_BY_PREFIX[prefix] ?? 'pt_bible_book'
+  return VERSIONS_FILE_BY_PREFIX[prefix] ?? 'pt_bible_version'
+}
 
 /** Abreviações conhecidas quando o catálogo/API vem com abbreviation vazia/null. */
 const VERSION_ABBREVIATION_BY_NAME: Array<{ match: RegExp; abbr: string }> = [
@@ -118,13 +144,17 @@ export function chapterRecordKey(
 }
 
 export async function loadBibleBooks(): Promise<BibleBook[]> {
-  const rows = await readOrFetchCatalog<CatalogBibleBookRow[]>(BOOKS_FILE)
+  const rows = await readOrFetchCatalog<CatalogBibleBookRow[]>(
+    await bibleCatalogFile('book'),
+  )
   if (!rows || !Array.isArray(rows)) return []
   return rows.map(mapBook)
 }
 
 export async function loadBibleVersions(): Promise<BibleVersion[]> {
-  const rows = await readOrFetchCatalog<CatalogBibleVersionRow[]>(VERSIONS_FILE)
+  const rows = await readOrFetchCatalog<CatalogBibleVersionRow[]>(
+    await bibleCatalogFile('version'),
+  )
   if (!rows || !Array.isArray(rows)) return []
   return rows.map(mapVersion)
 }

@@ -19,6 +19,7 @@
  *   LiturgyWebProjectionView → liturgy
  *   <X>ProjectionView → <x> (bible, timer, random, clock, countdown…)
  */
+/* v8 ignore next 1 -- stmt module-level: V8 não registra hit de inicialização de ESM */
 const projectionViewModules = import.meta.glob('/src/modules/*/views/*ProjectionView.vue')
 
 function viewNameToScope(fileName: string): string | null {
@@ -36,7 +37,7 @@ function viewNameToScope(fileName: string): string | null {
 export const STAGE_MODULE_SCOPES: readonly string[] = [
   ...new Set(
     Object.keys(projectionViewModules)
-      .map((p) => viewNameToScope(p.split('/').pop() ?? ''))
+      .map((p) => viewNameToScope(p.split('/').pop()!)) /* keys do glob sempre têm filename */
       .filter((s): s is string => Boolean(s)),
   ),
 ].sort()
@@ -65,6 +66,15 @@ export type StageSettings = {
   textVerticalAlign: StageVerticalAlign
   footerRefColor: string
   footerRefWeight: number
+  /**
+   * Título (1º slide / capa): personalização própria. `null`/`undefined`
+   * = herda o estilo geral da letra (compatibilidade com salvos antigos).
+   */
+  titleFontSize: number | null // px @1920 (60–160); null = herda fontSize
+  titleFontWeight: StageFontWeight | null
+  titleTextColor: string | null
+  titleUpperCase: boolean
+  titleTextShadow: boolean | null
   showBibleVersion: boolean
   bibleFontSize: number // px @1920 (50–140)
   bibleFontWeight: 400 | 500 | 700
@@ -152,6 +162,11 @@ export const DEFAULT_STAGE_SETTINGS: StageSettings = {
   bibleFontSize: 84,
   bibleFontWeight: 500,
   bibleTextColor: '#FFFFFF',
+  titleFontSize: null,
+  titleFontWeight: null,
+  titleTextColor: null,
+  titleUpperCase: false,
+  titleTextShadow: null,
   backgroundImage: null,
 }
 
@@ -206,14 +221,15 @@ const officialBgModules = import.meta.glob('../../../assets/backgrounds/bg-*.png
 /** IDs dos bgs oficiais (ex.: 'bg-01'), ordenados. Piano (bg-11) vai primeiro na galeria. */
 const GALLERY_LEAD_BACKGROUND = 'bg-11'
 
-export const STAGE_OFFICIAL_BACKGROUNDS: readonly string[] = Object.keys(officialBgModules)
+const sortedBackgroundIds = Object.keys(officialBgModules)
   .map((path) => path.match(/(bg-[\w-]+)\.png$/)?.[1])
   .filter((id): id is string => Boolean(id))
-  .sort((a, b) => {
-    if (a === GALLERY_LEAD_BACKGROUND) return -1
-    if (b === GALLERY_LEAD_BACKGROUND) return 1
-    return a.localeCompare(b, undefined, { numeric: true })
-  })
+  .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+
+export const STAGE_OFFICIAL_BACKGROUNDS: readonly string[] = [
+  GALLERY_LEAD_BACKGROUND,
+  ...sortedBackgroundIds.filter((id) => id !== GALLERY_LEAD_BACKGROUND),
+]
 
 /** Prefixo que marca um bg oficial (vs dataURL do usuário). */
 export const OFFICIAL_BG_PREFIX = 'official:'
@@ -296,6 +312,12 @@ export function parseStageSettings(raw: unknown): StageSettings {
     bibleFontSize: clamp(asNumber(s['bSize'], 84), 50, 140),
     bibleFontWeight: BIBLE_WEIGHTS.includes(bibleWeight) ? bibleWeight : 500,
     bibleTextColor: asColor(s['bFg'], DEFAULT_STAGE_SETTINGS.bibleTextColor),
+    titleFontSize:
+      s['tSize'] == null ? null : clamp(asNumber(s['tSize'], 96), 60, 160),
+    titleFontWeight: s['tWeight'] == null ? null : (WEIGHTS.includes(asNumber(s['tWeight'], 600) as StageFontWeight) ? (asNumber(s['tWeight'], 600) as StageFontWeight) : null),
+    titleTextColor: s['tFg'] == null ? null : asColor(s['tFg'], DEFAULT_STAGE_SETTINGS.textColor),
+    titleUpperCase: typeof s['tUpper'] === 'boolean' ? s['tUpper'] : false,
+    titleTextShadow: typeof s['tsOnT'] === 'boolean' ? s['tsOnT'] : null,
     backgroundImage:
       typeof s['bgImg'] === 'string' &&
       (s['bgImg'].startsWith('data:') || s['bgImg'].startsWith(OFFICIAL_BG_PREFIX))
@@ -387,6 +409,11 @@ export function serializeStageSettings(s: StageSettings): Record<string, unknown
     bSize: s.bibleFontSize,
     bWeight: s.bibleFontWeight,
     bFg: s.bibleTextColor,
+    ...(s.titleFontSize != null ? { tSize: s.titleFontSize } : {}),
+    ...(s.titleFontWeight != null ? { tWeight: s.titleFontWeight } : {}),
+    ...(s.titleTextColor != null ? { tFg: s.titleTextColor } : {}),
+    ...(s.titleUpperCase ? { tUpper: true } : {}),
+    ...(s.titleTextShadow != null ? { tsOnT: s.titleTextShadow } : {}),
     bgImg: s.backgroundImage,
     ...(s.clock ? { clock: s.clock } : {}),
     ...(s.timer ? { timer: s.timer } : {}),

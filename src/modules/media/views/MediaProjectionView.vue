@@ -6,6 +6,7 @@ import {
   MEDIA_RUNTIME_STORAGE_KEY,
   normalizeMediaRuntime,
   readMediaRuntimeFromStorage,
+  writeMediaRuntimeToStorage,
 } from '../services/media-runtime'
 import { stripHtmlBreaks } from '../services/media-slides'
 import { readEffectiveStageSettings, subscribeStageSettings } from '../../settings/services/stage-settings-runtime'
@@ -51,7 +52,9 @@ onMounted(() => {
   try {
     channel = new BroadcastChannel(MEDIA_RUNTIME_CHANNEL)
     channel.onmessage = (event) => {
-      applyRuntime(event.data)
+      const next = normalizeMediaRuntime(event.data)
+      writeMediaRuntimeToStorage(next)
+      applyRuntime(next)
     }
   } catch {
     // BroadcastChannel indisponível
@@ -88,6 +91,21 @@ const textStyle = computed(() => ({
     : 'none',
 }))
 
+// Título (capa) com personalização própria; fallback = estilo geral da letra.
+const titleStyle = computed(() => {
+  const st = stage.value
+  return {
+    ...textStyle.value,
+    fontSize: `${((st.titleFontSize ?? st.fontSize) / 1920) * 100}cqw`,
+    fontWeight: String(st.titleFontWeight ?? st.fontWeight),
+    color: st.titleTextColor ?? st.textColor,
+    textShadow: (st.titleTextShadow ?? st.textShadow)
+      ? `0 0 ${(st.shadowBlur / 108) * 100}cqw rgba(0,0,0,${st.shadowIntensity})`
+      : 'none',
+    textTransform: st.titleUpperCase ? 'uppercase' : 'none',
+  }
+})
+
 const boxStyle = computed(() =>
   stage.value.textBox
     ? {
@@ -121,7 +139,7 @@ const boxStyle = computed(() =>
         v-if="showTitle"
         class="media-projection__title"
         :class="{ 'media-projection__title--cover': runtime.isCover }"
-        :style="textStyle"
+        :style="titleStyle"
       >
         {{ runtime.title }}
       </p>

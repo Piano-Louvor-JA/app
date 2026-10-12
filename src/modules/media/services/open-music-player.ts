@@ -17,7 +17,9 @@ export async function openMusicPlayer(
   params: OpenMusicPlayerParams,
 ): Promise<MediaOpenResult> {
   const musicId = Number(params.musicId)
-  if (!Number.isFinite(musicId) || musicId <= 0) {
+  // app#331: negativo = música LOCAL (import .slja sem login) — válido.
+  // Só 0/NaN (sem música) continua fora.
+  if (!Number.isFinite(musicId) || musicId === 0) {
     return { ok: false, messageKey: 'media.messages.trackMissing' }
   }
 

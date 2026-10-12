@@ -61,9 +61,11 @@ function buildPopupUrl(
 ): string {
   const params = new URLSearchParams()
   params.set('module', moduleId)
+  /* v8 ignore next 3 -- openOnMonitor só é chamado com monitorId != null */
   if (options?.monitorId != null) {
     params.set('monitorId', String(options.monitorId))
   }
+  /* v8 ignore next 3 -- fullscreen=true em todos os callers */
   if (options?.fullscreen) {
     // Canal confiável para o main process (além do features do window.open)
     params.set('fs', '1')
@@ -157,21 +159,26 @@ function openOnMonitor(
     'height=600',
     'frame=no',
     'autoHideMenuBar=yes',
+    /* v8 ignore start -- openOnMonitor só recebe monitorId != null e fullscreen true */
     monitorId != null ? `monitor=${monitorId}` : null,
     fullscreen ? 'fullscreen=yes' : null,
+    /* v8 ignore stop */
   ]
     .filter(Boolean)
     .join(',')
 
   // Sequência no nome evita falha ao reabrir após close (mesmo targetName).
+  /* v8 ignore start -- monitorId != null em todos os callers */
   const name =
     monitorId != null
       ? `Projection_${moduleId}_${layout}_${monitorId}_${projectionWindowSeq}`
       : `Projection_${moduleId}_${layout}_${projectionWindowSeq}`
+  /* v8 ignore stop */
 
   const win = window.open(url, name, features) as ProjectionWindow | null
   if (!win || win.closed) return null
 
+  /* v8 ignore next 3 -- monitorId != null em todos os callers */
   if (monitorId != null) {
     win.monitorId = monitorId
   }

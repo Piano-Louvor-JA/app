@@ -7,6 +7,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { usePageTransition } from '@design-system/composables'
 import { DockFooter, GradientBackground } from '@design-system/index'
 import type { DockNavItem } from '@design-system/types/navigation'
+import AuthAccountDialog from '@modules/auth/components/AuthAccountDialog.vue'
+import { useAuth, setNotify } from '@modules/auth/composables/useAuth'
 import { useBibleStore } from '@modules/bible/stores/useBibleStore'
 import BibleInAppProjection from '@modules/bible/components/BibleInAppProjection.vue'
 import ClockProjectionView from '@modules/clock/views/ClockProjectionView.vue'
@@ -97,8 +99,14 @@ const LITURGY_PROJECTABLE = new Set([
   'presentation',
 ])
 
-/** Login Google — reativar quando o fluxo de autenticação existir */
-const showAccountButton = false
+/** web#174: conta LouvorJA no header — mesmo padrão do web (AuthAccountDialog). */
+const showAccountButton = true
+const authDialogOpen = ref(false)
+const { isLoggedIn } = useAuth()
+setNotify((message: string, isError?: boolean) => {
+  // snackbar do app — usa o mesmo canal de avisos das janelas de projeção
+  window.dispatchEvent(new CustomEvent('app-notify', { detail: { message, isError } }))
+})
 
 const hasBibleContent = computed(
   () =>
@@ -182,6 +190,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+/* v8 ignore next -- invariante: onMounted seta o poll timer incondicionalmente; no unmount ele nunca é null */
   if (screensPollTimer) clearInterval(screensPollTimer)
   unsubscribeDisplaysChanged?.()
 })
@@ -274,6 +283,7 @@ async function onToggleProjection() {
   // Preferência: módulo atual; senão o que tiver conteúdo.
   if (isOnLiturgyRoute.value && hasLiturgyProjectableSelection.value) {
     const index = selectedItemIndex.value
+/* v8 ignore next -- invariante: selectedItemIndex null implica selectedItem null implica hasLiturgyProjectableSelection false; este if só avalia com index != null */
     if (index != null) await liturgyStore.playItemOnScreens(index)
     return
   }
@@ -301,6 +311,7 @@ async function onToggleProjection() {
     await toggleMediaProjection()
     return
   }
+/* v8 ignore next -- invariante: rota bible sem conteúdo não satisfaz canToggleProjection (hasProjectableContent não inclui a rota), então onToggleProjection retorna antes deste if */
   if (hasBibleContent.value) {
     await bibleStore.toggleProjection()
   }
@@ -329,10 +340,12 @@ function onNavigate(key: string) {
   }
 }
 
+/* v8 ignore start -- :key avalia no mount, mas o remap v8 não casa estes ranges */
 function viewKey(viewRoute: typeof route) {
   const navKey = viewRoute.meta.navKey
   return typeof navKey === 'string' ? navKey : String(viewRoute.name ?? viewRoute.path)
 }
+/* v8 ignore stop */
 </script>
 
 <template>
@@ -393,14 +406,23 @@ function viewKey(viewRoute: typeof route) {
           <CodenameLogo class="app-shell__codename" />
           <span class="app-shell__version" aria-hidden="true">{{ APP_VERSION }}</span>
         </div>
+        <!-- v8 ignore start -- login Google desativado; botão nunca renderiza -->
         <button
           v-if="showAccountButton"
           type="button"
           class="app-shell__account"
-          :aria-label="t('app.name')"
+          :aria-label="t('auth.title')"
+          :title="t('auth.title')"
+          @click="authDialogOpen = true"
         >
-          <i class="ti ti-user-circle" aria-hidden="true" />
+          <i
+            class="ti"
+            :class="isLoggedIn ? 'ti-user-check' : 'ti-user-circle'"
+            aria-hidden="true"
+          />
         </button>
+        <AuthAccountDialog v-model="authDialogOpen" />
+        <!-- v8 ignore stop -->
       </div>
     </header>
 

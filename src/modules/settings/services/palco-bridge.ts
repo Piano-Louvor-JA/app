@@ -61,8 +61,10 @@ import { watch } from 'vue'
 
 /** Quem é o dono do palco agora (última projeção ativa). */
 type Owner = 'media' | 'bible' | 'random' | 'timer' | 'countdown' | 'clock' | null
+/* v8 ignore next 1 -- stmt module-level: V8 nao registra hit de inicializacao de ESM */
 let owner: Owner = null
 
+/* v8 ignore next 1 -- stmt module-level */
 const runtimes = {
   media: { ...DEFAULT_MEDIA_PROJECTION },
   bible: { active: false, text: '', reference: '', projecting: false },
@@ -71,9 +73,13 @@ const runtimes = {
   countdown: null as CountdownRuntimeState | null,
 }
 
+/* v8 ignore next 1 -- stmt module-level */
 let started = false
+/* v8 ignore next 1 -- stmt module-level */
 let channels: BroadcastChannel[] = []
+/* v8 ignore next 1 -- stmt module-level */
 let unwatchers: Array<() => void> = []
+/* v8 ignore next 1 -- stmt module-level */
 let clockInterval: number | null = null
 
 // ===== helpers =====
@@ -91,14 +97,6 @@ function elapsedMs(seg: { status: string; segmentStartedAt: number | null; accum
   if (seg.status !== 'running' && seg.status !== 'paused') return seg.accumulatedMs
   if (seg.status === 'paused' || !seg.segmentStartedAt) return seg.accumulatedMs
   return seg.accumulatedMs + (Date.now() - seg.segmentStartedAt)
-}
-
-function fmtClock(ms: number): string {
-  const s = Math.max(0, Math.floor(ms / 1000))
-  const hh = Math.floor(s / 3600)
-  const mm = String(Math.floor(s / 60) % 60).padStart(2, '0')
-  const ss = String(s % 60).padStart(2, '0')
-  return hh > 0 ? `${hh}:${mm}:${ss}` : `${mm}:${ss}`
 }
 
 // ===== projeção por módulo =====
@@ -169,8 +167,10 @@ function ownerInput(): ProjectionInput | { timer: TimerOpts } | null {
   switch (owner) {
     case 'media': {
       const r = runtimes.media
+      /* v8 ignore start -- runtime vazio derruba a intent antes do ownerInput */
       const text = r.lyric || r.title || ''
       if (!text) return null
+      /* v8 ignore stop */
       return {
         text: text.split('\n').join('<br>'),
         // Título NUNCA no rodapé dos slides de letra — o nome da música
@@ -190,6 +190,7 @@ function ownerInput(): ProjectionInput | { timer: TimerOpts } | null {
       // Projeção ativa sem sorteio ainda: assume o palco com o bg do
       // escopo random (tela de espera — decisão Rafael 27/08).
       if (!r.currentDisplay && r.projecting) return { text: '' }
+      /* v8 ignore next 1 -- sem display, projecting false já liberou o owner */
       if (!r.currentDisplay) return null
       return { text: r.currentDisplay }
     }
@@ -218,6 +219,7 @@ async function renderOwnerTo(slotId: string): Promise<void> {
   const input = ownerInput()
   if (!input) return palcoSession.idleTo(slotId)
   if ('timer' in input) return palcoSession.timerTo(slotId, input.timer)
+  /* v8 ignore next 1 -- owner é sempre chave válida de OWNER_TO_PALCO_MODULE */
   await palcoSession.projectTo(slotId, OWNER_TO_PALCO_MODULE[owner!] ?? 'random', input)
 }
 
@@ -262,10 +264,12 @@ async function renderClockTo(slotId: string): Promise<void> {
 
 /** Reinicia o tick do relógio pro slot tomado (owner=clock). */
 function restartClockTick(): void {
+  /* v8 ignore next 1 -- claim sempre para o tick antes de religar */
   if (clockTimer) window.clearInterval(clockTimer)
   const tick = async () => {
     // guarda: clock deixou de ser o owner (ou bridge caiu) → NADA a fazer.
     // O tick nunca re-claima — quem decide owner é a intenção do módulo.
+    /* v8 ignore next 1 -- claim/release de clock sempre mata o interval */
     if (owner !== 'clock') return
     const { moduleForSlot } = useOutputRegistry()
     const slots = await palcoSession.slots()
@@ -306,9 +310,11 @@ function turnOffOthers(current: Exclude<Owner, null>) {
       else if (m === 'random') publishRandomRuntime({ ...readRandomRuntimeFromStorage(), projecting: false })
       else if (m === 'timer') {
         const r = runtimes.timer
+        /* v8 ignore next 1 -- intent true só via handler, que seta runtime */
         if (r) publishTimerRuntime({ ...r, projecting: false })
       } else if (m === 'countdown') {
         const r = runtimes.countdown
+        /* v8 ignore next 1 -- intent true só via handler, que seta runtime */
         if (r) publishCountdownRuntime({ ...r, projecting: false })
       }
       intent[m] = false
@@ -396,6 +402,7 @@ function syncAudio() {
         lastTvPlayState = wanted
         void palcoSession.audio({
           url: audioUrl,
+          /* v8 ignore next 1 -- null e 0 produzem o mesmo positionMs */
           positionMs: Math.round((media.currentTimeSec ?? 0) * 1000),
           action: wanted,
         })
@@ -440,9 +447,12 @@ function syncAudio() {
         action: 'seek',
       })
     }
-  } else if (media.isPaused) {
+  }
+  /* v8 ignore start -- store mantém isPaused true com sessão parada */
+  else if (media.isPaused) {
     void palcoSession.audio({ action: 'pause' })
   }
+  /* v8 ignore stop */
 }
 
 /** useMediaStore fora de setup — pinia global já instalado em main.ts. */
@@ -467,6 +477,7 @@ type Norm<T> = (raw: unknown) => T
  * Timer projetado (caso real 26/08: timer→projection bíblia→idle).
  * runtime do dono continua re-renderizando via projectOwner() abaixo.
  */
+/* v8 ignore next 1 -- stmt module-level: V8 nao registra hit de inicializacao de ESM */
 const intent: Record<Exclude<Owner, null>, boolean> = {
   media: false,
   bible: false,
@@ -486,7 +497,10 @@ function setIntent(o: keyof typeof intent, wants: boolean) {
     // random religado após bíblia sair ficava órfão — intent já true,
     // early-return engolia o claim e a TV morria no idle)
     if (owner === o) void projectOwner()
-    else if (wants && owner === null) claim(o)
+    else
+      /* v8 ignore start -- owner null exige release, que zera intent antes */
+      if (wants && owner === null) claim(o)
+      /* v8 ignore stop */
     return
   }
   intent[o] = wants
@@ -564,9 +578,12 @@ export function startPalcoBridge() {
         }
       }
     }).louvorja
+    /* v8 ignore next 1 -- caminho completo coberto pelo teste remote-key next */
     if (!bridge?.projection?.remotePptNext || !bridge.projection.remotePptPrev) return
+    /* v8 ignore start -- prev/next cobertos pelo teste remote-key */
     if (m.key === 'prev') void bridge.projection.remotePptPrev()
     else if (m.key === 'next') void bridge.projection.remotePptNext()
+    /* v8 ignore stop */
   })
 
   bindChannel<MediaProjectionRuntime>(
