@@ -72,16 +72,21 @@ function copySpeakerUrl() {
       {{ t('settings.remote.unavailable') }}
     </div>
 
-    <div v-else-if="info" class="d-flex align-center">
-      <img
-        v-if="info.qrDataUrl"
-        :src="info.qrDataUrl"
-        width="220"
-        height="220"
-        class="qr"
-        alt="QR"
-        data-testid="remote-qr"
-      />
+    <div v-else-if="info" class="d-flex align-stretch mt-2">
+      <div class="qr-col">
+        <img
+          v-if="info.qrDataUrl"
+          :src="info.qrDataUrl"
+          width="180"
+          height="180"
+          class="qr"
+          alt="QR"
+          data-testid="remote-qr"
+        />
+        <div class="text-caption text-medium-emphasis mt-1 text-center">
+          {{ t('settings.remote.title') }}
+        </div>
+      </div>
       <div class="ml-6 flex-grow-1">
         <div class="text-caption text-medium-emphasis">
           {{ t('settings.remote.address') }}
@@ -111,13 +116,10 @@ function copySpeakerUrl() {
     <!-- Pregador: QR da página /speaker (browser do celular, sem app) -->
     <div
       v-if="info && info.speakerQrDataUrl"
-      class="speaker-block mt-6"
+      class="d-flex align-stretch mt-6"
       data-testid="remote-speaker-block"
     >
-      <div class="text-subtitle-2 mb-1">
-        {{ t('settings.remote.speakerTitle') }}
-      </div>
-      <div class="d-flex align-center">
+      <div class="qr-col">
         <img
           :src="info.speakerQrDataUrl"
           width="180"
@@ -126,28 +128,37 @@ function copySpeakerUrl() {
           alt="QR Pregador"
           data-testid="remote-speaker-qr"
         >
-        <div class="ml-6 flex-grow-1">
-          <p class="text-caption text-medium-emphasis">
-            {{ t('settings.remote.speakerHint') }}
-          </p>
-          <div class="text-body-2 mono speaker-url" data-testid="remote-speaker-url">
-            {{ info.speakerUrl }}
-          </div>
-          <button
-            type="button"
-            class="copy-btn mt-3"
-            data-testid="remote-speaker-copy"
-            @click="copySpeakerUrl"
-          >
-            {{ t('settings.remote.speakerCopy') }}
-          </button>
+        <div class="text-caption text-medium-emphasis mt-1 text-center">
+          {{ t('settings.remote.speakerTitle') }}
         </div>
+      </div>
+      <div class="ml-6 flex-grow-1">
+        <div class="text-subtitle-2 mb-1">
+          {{ t('settings.remote.speakerTitle') }}
+        </div>
+        <p class="text-caption text-medium-emphasis">
+          {{ t('settings.remote.speakerHint') }}
+        </p>
+        <div class="text-body-2 mono speaker-url" data-testid="remote-speaker-url">
+          {{ info.speakerUrl }}
+        </div>
+        <button
+          type="button"
+          class="copy-btn mt-3"
+          data-testid="remote-speaker-copy"
+          @click="copySpeakerUrl"
+        >
+          {{ t('settings.remote.speakerCopy') }}
+        </button>
       </div>
     </div>
   </GlassCard>
 </template>
 
 <style scoped>
+.qr-col {
+  flex-shrink: 0;
+}
 .pairing-card {
   max-width: 560px;
 }
