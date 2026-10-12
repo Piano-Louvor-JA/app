@@ -27,16 +27,13 @@ export default defineConfig({
     },
   },
   test: {
-    exclude: ['node_modules/**', 'dist/**', 'e2e/**', '.worktrees/**', 'coverage/**', 'scripts/release-publish-decision.test.mjs', 'scripts/coverage-gate-limit.test.mjs'],
-    environment: 'jsdom',
+    exclude: ['node_modules/**', 'dist/**', 'e2e/**', '.worktrees/**', '.stryker-tmp/**'],
+    setupFiles: ['./vitest.setup.ts'],
     environmentOptions: {
       jsdom: {
         url: 'http://localhost/',
       },
     },
-    setupFiles: ['./vitest.setup.ts'],
-    // Runs completos estouram 5s em testes que mockam bridge/processamento pesado.
-    testTimeout: 30_000,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'text-summary', 'lcov'],

@@ -6,7 +6,8 @@ import { GlassCard } from '@design-system/index'
 
 import type { BibleSelection } from '../types/bible'
 import { readEffectiveStageSettings } from '../../settings/services/stage-settings-runtime'
-import { resolveBackgroundImage } from '../../settings/types/stage-settings'
+import { resolveBackgroundImage,
+  stageBgCss } from '../../settings/types/stage-settings'
 
 const props = defineProps<{
   chapterTitle: string
@@ -38,7 +39,7 @@ const previewStyle = computed(() => {
   const st = readEffectiveStageSettings('bible')
   const bg = resolveBackgroundImage(st.backgroundImage)
   return {
-    backgroundColor: st.backgroundColor,
+    backgroundColor: stageBgCss(st.backgroundColor),
     backgroundImage: bg ? `url(${bg})` : undefined,
     backgroundSize: 'cover',
     backgroundPosition: 'center',

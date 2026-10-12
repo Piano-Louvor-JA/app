@@ -14,7 +14,7 @@ import { configureUserDataPath } from "./user-data-path.mjs";
 import { checkEulaAcceptance } from "./eula.mjs";
 import { resolveAppLocale } from "./locale.mjs";
 import { registerWorkspaceIpc } from "./ipc/register.mjs";
-import { registerDiagnosticsIpc, setDiagnosticsToken } from "./diagnostics.mjs";
+import { registerDiagnosticsIpc } from "./diagnostics.mjs";
 import { attachWindowStateEvents, registerWindowIpc } from "./ipc/window.mjs";
 import { attachRemoteServer } from "./remote-server.mjs";
 import { attachPalcoServer } from "./palco-server.mjs";
@@ -93,7 +93,8 @@ if (typeof process.getuid === "function" && process.getuid() === 0) {
  *  renderização por software é suficiente pro app e estabiliza o dev. */
 if (process.env.VITE_DEV_SERVER_URL) {
 	app.commandLine.appendSwitch("disable-gpu");
-	app.commandLine.appendSwitch("in-process-gpu");
+	// in-process-gpu removido (07/10): SIGTRAP do electron em dev ~35s pós-boot
+	// (crash no processo GPU in-process; com gpu em software separado estabiliza).
 }
 
 /** Permite autoplay com áudio nas janelas de projeção (YouTube). */
@@ -725,9 +726,6 @@ app.whenReady().then(async () => {
 		bootMark("eula");
 
 		registerWorkspaceIpc();
-		// Token de diagnóstico: LOUVORJA_DIAGNOSTICS_TOKEN (variável do MAIN, não
-		// VITE_* — config de build do renderer não existe no processo principal).
-		setDiagnosticsToken(process.env.LOUVORJA_DIAGNOSTICS_TOKEN ?? "");
 		registerDiagnosticsIpc(); // diagnostics:* — SrCaldeira, rede no main
 		registerWindowIpc(() => mainWindow);
 		registerLocalFileProtocol();
@@ -799,10 +797,8 @@ app.on("will-quit", () => {
 });
 
 app.on("window-all-closed", () => {
-	// window-all-closed pode disparar quando o splash fecha mas a main
-	// ainda está carregando. Só saímos se mainWindow já existiu ou se
-	// não há intenção de criar janela (eula recusado, erro fatal, etc).
-	if (process.platform !== "darwin") {
-		app.quit();
-	}
+	// Fechar a splash pode disparar este evento durante o handoff para a
+	// main window. Não mata o processo se a principal ainda existe/carrega.
+	if (mainWindow && !mainWindow.isDestroyed()) return;
+	if (process.platform !== "darwin") app.quit();
 });

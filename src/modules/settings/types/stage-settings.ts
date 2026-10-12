@@ -51,7 +51,15 @@ export type StageVerticalAlign = 'top' | 'middle' | 'bottom'
 export type StageFontWeight = 400 | 600 | 800
 
 export type StageSettings = {
-  backgroundColor: string
+  /**
+   * Cor de fundo do palco. null = NÃO SETADO (padrão de fábrica):
+   * sem escolha explícita do usuário, a IMAGEM da projeção (capa/bg da
+   * música, asset oficial) vence — cor setada sufoca a imagem (05/10
+   * Rafael: "as fontes estão todas configuradas logo por padrão nem as
+   * cores vão vir setadas a não ser se o usuário selecione").
+   * Presets recebem a cor explícita ao serem clicados.
+   */
+  backgroundColor: string | null
   textColor: string
   fontSize: number // px @1920 (60–160)
   fontWeight: StageFontWeight
@@ -159,7 +167,7 @@ export const COUNTDOWN_TIME_FORMAT_OPTIONS: NonNullable<StageSettings['countdown
 ]
 
 export const DEFAULT_STAGE_SETTINGS: StageSettings = {
-  backgroundColor: '#0A0E1A',
+  backgroundColor: null,
   textColor: '#FFFFFF',
   fontSize: 96,
   fontWeight: 600,
@@ -219,7 +227,10 @@ export function stageFlexAlign(
   return { alignItems: horizontal, justifyContent: vertical }
 }
 
-/** Presets de fundo — mesmos do APK. */
+  /**
+   * Presets de fundo — mesmos do APK. Clicar SETA a cor explicitamente
+   * (entra no storage); nenhum é default (05/10 Rafael).
+   */
 export const STAGE_BG_PRESETS = [
   { color: '#0A0E1A', label: 'Azul-noite' },
   { color: '#000000', label: 'Preto' },
@@ -268,6 +279,17 @@ export function resolveBackgroundImage(backgroundImage: string | null): string |
     return officialBgUrl(backgroundImage.slice(OFFICIAL_BG_PREFIX.length))
   }
   return backgroundImage
+}
+
+/**
+ * Cor de fundo pronta pra CSS (style binding). null (não setado) →
+ * 'transparent': a camada de IMAGEM (capa/bg da música) aparece por cima
+ * do preto do palco; onde não há imagem, preto puro (05/10 Rafael).
+ */
+export function stageBgCss(
+  backgroundColor: string | null,
+): string {
+  return backgroundColor ?? 'transparent'
 }
 
 /** Presets de cor do texto — mesmos do APK. */
@@ -321,7 +343,10 @@ export function parseStageSettings(raw: unknown): StageSettings {
   const weight = asNumber(s['weight'], 600) as StageFontWeight
   const bibleWeight = asNumber(s['bWeight'], 500) as StageSettings['bibleFontWeight']
   return {
-    backgroundColor: asColor(s['bg'], DEFAULT_STAGE_SETTINGS.backgroundColor),
+    backgroundColor:
+      typeof s['bg'] === 'string' && /^#[0-9a-fA-F]{6}$/.test(s['bg'])
+        ? s['bg']
+        : null,
     textColor: asColor(s['fg'], DEFAULT_STAGE_SETTINGS.textColor),
     fontSize: clamp(asNumber(s['size'], 96), 60, 160),
     fontWeight: WEIGHTS.includes(weight) ? weight : 600,
@@ -430,7 +455,9 @@ export function parseStageSettings(raw: unknown): StageSettings {
 /** Serializa no formato do APK (simétrico ao parse). */
 export function serializeStageSettings(s: StageSettings): Record<string, unknown> {
   return {
-    bg: s.backgroundColor,
+    // null = não setado: chave AUSENTE no storage (05/10 Rafael — cor só
+    // existe se o usuário escolher; parse trata ausente como null).
+    ...(s.backgroundColor ? { bg: s.backgroundColor } : {}),
     fg: s.textColor,
     size: s.fontSize,
     weight: s.fontWeight,

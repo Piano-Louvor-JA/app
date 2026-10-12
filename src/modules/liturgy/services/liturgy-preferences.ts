@@ -76,6 +76,10 @@ function normalizeItem(raw: unknown): LiturgyItem | null {
     accentColor: getTypeDotColor(type),
     categoryId:
       type === 'category' ? null : asString(source.categoryId) || null,
+    scheduledRotationId:
+      type === 'scheduled'
+        ? asString(source.scheduledRotationId).trim() || null
+        : null,
     startTime:
       type === 'category'
         ? normalizeLiturgyTimeHHmm(source.startTime)

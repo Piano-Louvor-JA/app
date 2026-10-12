@@ -8,6 +8,8 @@ import { getDesktopBridge, isDesktopApp } from '@shared/services/desktop-bridge'
 import { isProjectionPopupLocation } from '@shared/services/projection-window-location'
 import DownloadQueueIndicator from '@modules/sync/components/DownloadQueueIndicator.vue'
 
+import DownloadQueueIndicator from '@modules/sync/components/DownloadQueueIndicator.vue'
+
 const route = useRoute()
 const isMaximized = ref(false)
 const isFocused = ref(true)
@@ -221,6 +223,7 @@ onUnmounted(() => {
   margin-right: 6px;
   align-items: center;
   display: inline-flex;
+  -webkit-app-region: no-drag;
 }
 
 .app-titlebar__controls {

@@ -5,13 +5,14 @@ import type { RouteRecordRaw } from 'vue-router'
  * validar a mesma bridge diagnostics:* antes do portable.
  * A URL é /#/diagnostics quando Electron usa hash router.
  */
-export const diagnosticsRoutes: RouteRecordRaw[] = import.meta.env.DEV
-  ? [
-      {
-        path: 'diagnostics',
-        name: 'diagnostics',
-        component: () => import('./views/DiagnosticsView.vue'),
-        meta: { navKey: 'diagnostics' },
-      },
-    ]
-  : []
+export const diagnosticsRoutes: RouteRecordRaw[] =
+  import.meta.env.DEV || import.meta.env.VITE_DIAGNOSTICS_CAMPAIGN === '1'
+    ? [
+        {
+          path: 'diagnostics',
+          name: 'diagnostics',
+          component: () => import('./views/DiagnosticsView.vue'),
+          meta: { navKey: 'diagnostics' },
+        },
+      ]
+    : []

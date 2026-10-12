@@ -279,8 +279,7 @@ export default {
       itemAdded: 'Elemento añadido con éxito.',
       liturgySaved: 'Liturgia guardada con éxito.',
       mediaDesktopOnly: 'Proporcione la ruta del archivo de medios.',
-
-      catalogEmpty: 'No se encontraron canciones en el catálogo local.',
+      catalogEmpty: 'No hay canciones en el catálogo local. Importa un archivo .slja en la Central de Medios (botón "Importar .slja") o añade canciones de la Comunidad.',
       customRequired:
         'Cree o seleccione una liturgia personalizada antes de añadir elementos.',
       scheduledEmpty: 'Ningún elemento agendado para la fecha de este culto en esta programación.',
