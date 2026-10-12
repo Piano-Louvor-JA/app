@@ -17,7 +17,7 @@ jobs:
     name: gitleaks (segredos no diff/histórico)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       # CLI aberto. A action gitleaks-action@v2 exige licença paga (GITLEAKS_LICENSE).
@@ -36,7 +36,7 @@ jobs:
     name: npm audit (relatório)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci || npm install --no-save
@@ -48,5 +48,5 @@ jobs:
     runs-on: ubuntu-latest
     container: semgrep/semgrep
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: semgrep scan --config auto --exclude-rule generic.secrets.security.detected-generic-secret
