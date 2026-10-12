@@ -3,6 +3,7 @@
 // recebe apenas dados serializáveis. O serviço nunca escreve em LouvorJA-PIANO.
 // Lógica pura/testável em electron/diagnostics-core.mjs.
 
+import crypto from 'node:crypto'
 import net from 'node:net'
 import { existsSync, statSync, writeFileSync, unlinkSync } from 'node:fs'
 import os from 'node:os'
@@ -121,7 +122,30 @@ export function registerDiagnosticsIpc() {
     const dsn = process.env.DIAGNOSTICS_GLITCHTIP_DSN
     if (!dsn) return { ok: false, reason: 'DSN de diagnóstico não configurado; compartilhe o arquivo salvo.' }
     try {
-      const response = await fetch(dsn, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-LouvorJA-Campanha': 'SrCaldeira' }, body: JSON.stringify({ campanha: 'SrCaldeira', report }) })
+      // DSN Sentry: https://<public_key>@<host>/<project_id> — NÃO é URL de POST.
+      // Endpoint real de ingest: <origin>/api/<project>/store/ com X-Sentry-Auth.
+      const parsed = new URL(dsn)
+      const publicKey = decodeURIComponent(parsed.username)
+      const projectId = parsed.pathname.replace(/\//g, '')
+      if (!publicKey || !projectId) return { ok: false, reason: 'DSN malformado; compartilhe o arquivo salvo.' }
+      const storeUrl = `${parsed.protocol}//${parsed.host}/api/${projectId}/store/`
+      const event = {
+        event_id: crypto.randomUUID().replace(/-/g, ''),
+        timestamp: new Date().toISOString(),
+        platform: 'javascript',
+        environment: 'diagnostico',
+        message: `Diagnóstico LouvorJA PIANO — campanha ${report?.meta?.campanha ?? 'indefinida'}`,
+        tags: { campanha: String(report?.meta?.campanha ?? 'indefinida'), versao: String(report?.meta?.versao ?? '') },
+        extra: { report },
+      }
+      const response = await fetch(storeUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Sentry-Auth': `Sentry sentry_version=7, sentry_key=${publicKey}, sentry_client=louvorja-diagnostics/1.0`,
+        },
+        body: JSON.stringify(event),
+      })
       return response.ok ? { ok: true } : { ok: false, reason: `HTTP ${response.status}` }
     } catch (error) { return { ok: false, reason: rawError(error).classe } }
   })
