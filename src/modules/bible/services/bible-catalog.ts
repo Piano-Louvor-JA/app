@@ -11,8 +11,34 @@ import type {
   CatalogBibleVersionRow,
 } from '../types/bible'
 
-const BOOKS_FILE = 'pt_bible_book'
-const VERSIONS_FILE = 'pt_bible_version'
+const BOOKS_FILE_BY_PREFIX: Record<string, string> = {
+  pt: 'pt_bible_book',
+  en: 'pt_bible_book',
+  es: 'es_bible_book',
+}
+const VERSIONS_FILE_BY_PREFIX: Record<string, string> = {
+  pt: 'pt_bible_version',
+  en: 'pt_bible_version',
+  es: 'es_bible_version',
+}
+
+/**
+ * Idioma ativo para a Bíblia (issue: ao trocar idioma, hinário mudava mas a
+ * Bíblia ficava em pt). Reusa a mesma detecção do hinário (getCurrentApiPrefix:
+ * user_data.language → fallback pt). `en` não tem catálogo próprio na API —
+ * usa o pt (mesmo comportamento do hinário).
+ *
+ * Import dinâmico: resolveBookTone e os demais helpers não devem carregar o
+ * i18n só porque o módulo foi importado.
+ */
+async function bibleCatalogFile(kind: 'book' | 'version'): Promise<string> {
+  const { getCurrentApiPrefix } = await import(
+    '@modules/sync/services/library-catalog'
+  )
+  const prefix = getCurrentApiPrefix()
+  if (kind === 'book') return BOOKS_FILE_BY_PREFIX[prefix] ?? 'pt_bible_book'
+  return VERSIONS_FILE_BY_PREFIX[prefix] ?? 'pt_bible_version'
+}
 
 /** Abreviações conhecidas quando o catálogo/API vem com abbreviation vazia/null. */
 const VERSION_ABBREVIATION_BY_NAME: Array<{ match: RegExp; abbr: string }> = [
@@ -99,20 +125,18 @@ export function resolveTestament(bookNumber: number): BibleTestament {
   return bookNumber <= 39 ? 'ot' : 'nt'
 }
 
-/** Tom visual do tile conforme faixas canônicas (taxonomia compartilhada app/web). */
+/** Tom visual do tile conforme faixas canônicas. */
 export function resolveBookTone(bookNumber: number): BibleBookTone {
-  // Antigo Testamento (1-39)
-  if (bookNumber <= 5) return 'law' // Gênesis–Deuteronômio (Lei)
-  if (bookNumber <= 17) return 'history' // Josué–Ester (Históricos)
-  if (bookNumber <= 22) return 'poetry' // Jó–Cânticos (Poéticos/Sapienciais)
-  if (bookNumber <= 27) return 'major-prophet' // Isaías–Daniel (Profetas Maiores)
-  if (bookNumber <= 39) return 'minor-prophet' // Oséias–Malaquias (Profetas Menores)
-  // Novo Testamento (40-66)
-  if (bookNumber <= 43) return 'gospels' // Mateus–João (Evangelhos)
-  if (bookNumber === 44) return 'acts' // Atos (Livro Histórico)
-  if (bookNumber <= 57) return 'pauline' // Romanos–Hebreus (Cartas Paulinas)
-  if (bookNumber <= 65) return 'general' // Tiago–Judas (Cartas Gerais)
-  if (bookNumber === 66) return 'apocalyptic' // Apocalipse (Profético)
+  if (bookNumber <= 5) return 'law'
+  if (bookNumber <= 17) return 'history'
+  if (bookNumber <= 22) return 'poetry'
+  if (bookNumber <= 27) return 'major-prophet'
+  if (bookNumber <= 39) return 'minor-prophet'
+  if (bookNumber <= 43) return 'gospels'
+  if (bookNumber === 44) return 'acts'
+  if (bookNumber <= 57) return 'pauline'
+  if (bookNumber <= 65) return 'general'
+  if (bookNumber === 66) return 'apocalyptic'
   return 'neutral'
 }
 
@@ -125,13 +149,17 @@ export function chapterRecordKey(
 }
 
 export async function loadBibleBooks(): Promise<BibleBook[]> {
-  const rows = await readOrFetchCatalog<CatalogBibleBookRow[]>(BOOKS_FILE)
+  const rows = await readOrFetchCatalog<CatalogBibleBookRow[]>(
+    await bibleCatalogFile('book'),
+  )
   if (!rows || !Array.isArray(rows)) return []
   return rows.map(mapBook)
 }
 
 export async function loadBibleVersions(): Promise<BibleVersion[]> {
-  const rows = await readOrFetchCatalog<CatalogBibleVersionRow[]>(VERSIONS_FILE)
+  const rows = await readOrFetchCatalog<CatalogBibleVersionRow[]>(
+    await bibleCatalogFile('version'),
+  )
   if (!rows || !Array.isArray(rows)) return []
   return rows.map(mapVersion)
 }

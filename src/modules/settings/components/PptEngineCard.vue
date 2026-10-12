@@ -46,6 +46,7 @@ onMounted(async () => {
 })
 
 async function setEngine(next: PresentationEngine) {
+  /* v8 ignore next 1 -- controles só renderizam com hasApi; busy bloqueia no template */
   if (!hasApi || busy.value) return
   if (next === 'custom') {
     await pickCustomApp()

@@ -418,9 +418,16 @@ export type RandomAudioApi = {
   }>
 }
 
+export type DiagnosticsApi = {
+  run: () => Promise<{ report: unknown; jsonPath: string; txtPath: string }>
+  send: (report: unknown) => Promise<{ ok: boolean; reason?: string }>
+  openFolder: (filePath: string) => Promise<void>
+}
+
 export type LouvorJaBridge = {
   platform: string
   isElectron: boolean
+  diagnostics?: DiagnosticsApi
   window?: WindowApi
   zoom?: ZoomApi
   workspace: WorkspaceApi

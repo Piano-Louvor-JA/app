@@ -1,5 +1,6 @@
-# Build Windows NSIS — gera instalador .exe x64
-# (Electron 44+ não publica mais win32-ia32 — ver docs/DEPLOY.md)
+# Build Windows — instalador NSIS + Portable (exe único, estilo AppImage) x64.
+# Portable: UM .exe só — duplo clique e roda, sem instalar e sem pasta de
+# arquivos soltos pro usuário curioso mexer. (Electron 44+ não publica win32-ia32)
 # Roda manualmente (workflow_dispatch) ou em push de tags v*
 name: Build Windows
 
@@ -14,7 +15,7 @@ permissions:
 
 jobs:
   build-windows:
-    name: Build Windows NSIS x64
+    name: Build Windows NSIS + Portable x64
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,15 +25,42 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Decide publication
+        id: decision
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_REF: ${{ github.ref_type == 'tag' && github.ref_name || github.sha }}
+          WORKFLOW_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          script="$(mktemp)"
+          gh api "repos/${GITHUB_REPOSITORY}/contents/scripts/release-publish-decision.mjs?ref=${WORKFLOW_SHA}" --jq .content \
+            | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{let t=s.trim();if(t.startsWith(String.fromCharCode(34)))t=JSON.parse(t);process.stdout.write(Buffer.from(String(t).replace(/\s/g,""),"base64"))})' \
+            > "$script"
+          node "$script" --fetch --repo "$GITHUB_REPOSITORY" --ref "$TARGET_REF"
+
+      - name: Omit publication
+        if: steps.decision.outputs.publish != 'true'
+        shell: bash
+        run: |
+          echo "Publicação omitida (${{ steps.decision.outputs.reason }})."
+          echo "Nenhum pacote Windows foi enviado a registry ou GitHub Release."
+
       - name: Install dependencies
+        if: steps.decision.outputs.publish == 'true'
         run: npm ci
 
-      - name: Build Vite + Electron NSIS (x64) + publish
+      # Target "portable" definido no package.json (win.target) — gera
+      # LouvorJA-PIANO-<ver>-portable.exe (arquivo único) junto com o Setup.
+      - name: Build Vite + Electron NSIS + Portable (x64) + publish
+        if: steps.decision.outputs.publish == 'true'
         run: npm run electron:build -- --win --x64 --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Generate SHA256SUMS and upload to release
+        if: steps.decision.outputs.publish == 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -46,13 +74,14 @@ jobs:
             gh release upload "$TAG" SHA256SUMS-win-x64 --clobber
           fi
 
-      - name: Upload x64 installer (artifact backup)
+      - name: Upload x64 installer + portable (artifact backup)
+        if: steps.decision.outputs.publish == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: LouvorJA-PIANO-Windows-x64-Setup
+          name: LouvorJA-PIANO-Windows-x64
           path: |
             dist-electron/*Setup*.exe
-            dist-electron/*.exe
+            dist-electron/*portable*.exe
             dist-electron/SHA256SUMS-win-x64
           if-no-files-found: warn
           retention-days: 30

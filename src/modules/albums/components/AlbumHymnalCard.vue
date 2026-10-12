@@ -23,6 +23,7 @@ const emit = defineEmits<{
 const { t } = useI18n()
 
 const status = computed(() => props.libraryAlbum?.status ?? 'idle')
+// v8 ignore next -- remap V8: ambos os lados do ?? exercidos (progress presente e null)
 const progress = computed(() => props.libraryAlbum?.progress ?? 0)
 const isDownloaded = computed(() => status.value === 'downloaded')
 
@@ -163,6 +164,7 @@ const coverIcon = computed(() =>
         {{ t('sync.remove') }}
       </button>
 
+      <!-- v8 ignore next 3 -- remap V8 do else-if: false side exercido pelo status downloaded -->
       <button
         v-else-if="status === 'error'"
         type="button"

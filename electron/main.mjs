@@ -9,10 +9,12 @@ import {
 	resolveAppIconPath,
 } from "./app-icon.mjs";
 import { APP_PRODUCT_NAME } from "./constants.mjs";
+import { startRendererServer, rendererUrl } from "./renderer-server.mjs";
 import { configureUserDataPath } from "./user-data-path.mjs";
 import { checkEulaAcceptance } from "./eula.mjs";
 import { resolveAppLocale } from "./locale.mjs";
 import { registerWorkspaceIpc } from "./ipc/register.mjs";
+import { registerDiagnosticsIpc, setDiagnosticsToken } from "./diagnostics.mjs";
 import { attachWindowStateEvents, registerWindowIpc } from "./ipc/window.mjs";
 import { attachRemoteServer } from "./remote-server.mjs";
 import { attachPalcoServer } from "./palco-server.mjs";
@@ -87,6 +89,13 @@ if (typeof process.getuid === "function" && process.getuid() === 0) {
 	app.commandLine.appendSwitch("no-sandbox");
 }
 
+/** GPU instável nesta máquina (crash do gpu process em loop, 02/10/2026) —
+ *  renderização por software é suficiente pro app e estabiliza o dev. */
+if (process.env.VITE_DEV_SERVER_URL) {
+	app.commandLine.appendSwitch("disable-gpu");
+	app.commandLine.appendSwitch("in-process-gpu");
+}
+
 /** Permite autoplay com áudio nas janelas de projeção (YouTube). */
 app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 
@@ -99,6 +108,7 @@ const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
 	app.quit();
 }
+
 
 let mainWindow = null;
 let splashWindow = null;
@@ -216,6 +226,37 @@ function isProjectionPopupUrl(url) {
 			typeof url === "string" &&
 			(url.includes("#/popup") || url.includes("/popup"))
 		);
+	}
+}
+
+/**
+ * Feedback Ezequias (02/10): "logar com o google com erro"
+ * ("The requested action is invalid" no __/auth/handler).
+ * Causa: o popup OAuth do Firebase (signInWithPopup → window.open) caía no
+ * `shell.openExternal` e o browser externo perdia o handshake com a janela
+ * app (eventid/session) — o handler respondia invalid.
+ * Fix: popups de auth (firebaseapp.com / accounts.google.com / google.com
+ * OAuth) abrem como BrowserWindow FILHA in-app — mantém o handshake vivo
+ * e o credential volta pro renderer via signInWithPopup normalmente.
+ */
+function isAuthPopupUrl(url) {
+	try {
+		const parsed = new URL(url);
+		const allowed = [
+			"firebaseapp.com",
+			"firebaseui.com",
+			"accounts.google.com",
+			"accounts.youtube.com",
+			"google.com",
+			"gstatic.com",
+			"apple.com",
+		];
+		const host = parsed.hostname.toLowerCase();
+		return allowed.some(
+			(d) => host === d || host.endsWith(`.${d}`),
+		);
+	} catch {
+		return false;
 	}
 }
 
@@ -394,12 +435,29 @@ function attachProjectionWindowHandlers(parentWindow) {
   })
 
   parentWindow.webContents.setWindowOpenHandler(({ url, features }) => {
+    if (isDev) console.log("[window-open]", url.slice(0, 120));
     if (isProjectionPopupUrl(url)) {
       // Nasce popup de projeção → hotkey disponível
       ensureProjectionHotkey()
       return {
         action: 'allow',
         overrideBrowserWindowOptions: buildPopupWindowOptions(url, features),
+      }
+    }
+
+    // Feedback Ezequias (02/10): login Google — popup OAuth do Firebase
+    // abre IN-APP (BrowserWindow filha) pra manter o handshake com o
+    // renderer; abrir no browser externo quebra o auth ("invalid action").
+    if (isAuthPopupUrl(url)) {
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: {
+          width: 500,
+          height: 640,
+          autoHideMenuBar: true,
+          contextIsolation: true,
+          sandbox: true,
+        },
       }
     }
 
@@ -550,7 +608,12 @@ function createWindow(locale = 'pt-BR') {
 		const localeParam = `?lang=${locale}`;
 		void mainWindow.loadURL(VITE_DEV_SERVER_URL + localeParam);
 	} else {
-		void mainWindow.loadFile(path.join(__dirname, "../dist/index.html"), { query: { lang: locale } });
+		const rendererBase = globalThis.__rendererBaseUrl;
+			if (rendererBase) {
+				void mainWindow.loadURL(rendererUrl(rendererBase, locale));
+			} else {
+				void mainWindow.loadFile(path.join(__dirname, "../dist/index.html"), { query: { lang: locale } });
+			}
 	}
 
 	// Timeout de segurança: se ready-to-show não disparar em 15s, mostra erro
@@ -571,6 +634,10 @@ function createWindow(locale = 'pt-BR') {
 
 	mainWindow.once("ready-to-show", () => {
 		clearTimeout(loadTimeout);
+		if (isDev) {
+			const origin = globalThis.__rendererBaseUrl ?? (isDev ? VITE_DEV_SERVER_URL : "file://");
+			console.log("[main] renderer carregado via origem:", origin);
+		}
 	});
 
 	// Fallback: se a janela principal falhar ao carregar, mostra erro e fecha o splash
@@ -590,7 +657,12 @@ function createWindow(locale = 'pt-BR') {
 					if (isDev && VITE_DEV_SERVER_URL) {
 						void mainWindow.loadURL(`${VITE_DEV_SERVER_URL}/?lang=${locale}`);
 					} else {
-						void mainWindow.loadFile(path.join(__dirname, "../dist/index.html"), { query: { lang: locale } });
+						const rendererBase = globalThis.__rendererBaseUrl;
+			if (rendererBase) {
+				void mainWindow.loadURL(rendererUrl(rendererBase, locale));
+			} else {
+				void mainWindow.loadFile(path.join(__dirname, "../dist/index.html"), { query: { lang: locale } });
+			}
 					}
 				}
 			}, delay);
@@ -613,7 +685,26 @@ function createWindow(locale = 'pt-BR') {
 }
 
 app.whenReady().then(async () => {
+  // Origem http válida p/ Firebase Auth (popup Google) — ver renderer-server.mjs.
+  // file:// (loadFile) nunca estará nos authorizedDomains → popup abre e fecha na hora.
+  if (!isDev) {
+    try {
+      const renderer = await startRendererServer(
+        path.join(__dirname, "../dist"),
+      );
+      globalThis.__rendererBaseUrl = renderer.url;
+      renderer.server.on("close", () => console.log("[renderer-server] fechado"));
+    } catch (err) {
+      console.error("[renderer-server] indisponível — cai no loadFile:", err.message);
+      globalThis.__rendererBaseUrl = null;
+    }
+  }
+
 	bootMark("whenReady");
+	// telemetria de erros (Glitchtip) — não-bloqueante, silenciosa sem DSN
+	import("./telemetry.mjs")
+		.then((t) => t.startTelemetry())
+		.catch(() => {});
 	// Primeira coisa visível — checagens e servidores vêm depois.
 	createSplash();
 	bootMark("splash");
@@ -634,6 +725,10 @@ app.whenReady().then(async () => {
 		bootMark("eula");
 
 		registerWorkspaceIpc();
+		// Token de diagnóstico: LOUVORJA_DIAGNOSTICS_TOKEN (variável do MAIN, não
+		// VITE_* — config de build do renderer não existe no processo principal).
+		setDiagnosticsToken(process.env.LOUVORJA_DIAGNOSTICS_TOKEN ?? "");
+		registerDiagnosticsIpc(); // diagnostics:* — SrCaldeira, rede no main
 		registerWindowIpc(() => mainWindow);
 		registerLocalFileProtocol();
 		registerYoutubeEmbedHeaders();

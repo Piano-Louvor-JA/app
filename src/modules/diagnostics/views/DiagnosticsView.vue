@@ -1,0 +1,92 @@
+<script setup lang="ts">
+import { computed, ref } from 'vue'
+
+import { getDesktopBridge } from '@shared/services/desktop-bridge'
+
+type RunResult = { report: unknown; jsonPath: string; txtPath: string }
+
+const running = ref(false)
+const result = ref<RunResult | null>(null)
+const error = ref('')
+const sendMessage = ref('')
+const bridge = getDesktopBridge()
+const available = computed(() => Boolean(bridge?.diagnostics))
+
+async function run() {
+  if (!bridge?.diagnostics) return
+  running.value = true
+  result.value = null
+  error.value = ''
+  sendMessage.value = ''
+  try {
+    result.value = await bridge.diagnostics.run()
+  } catch (cause) {
+    error.value = cause instanceof Error ? cause.message : 'Não foi possível executar o diagnóstico.'
+  } finally {
+    running.value = false
+  }
+}
+
+async function send() {
+  if (!bridge?.diagnostics || !result.value) return
+  const response = await bridge.diagnostics.send(result.value.report)
+  sendMessage.value = response.ok
+    ? 'Relatório enviado. Obrigado!'
+    : `Envio indisponível. Compartilhe o arquivo salvo. ${response.reason ?? ''}`
+}
+
+function openFolder() {
+  if (result.value) void bridge?.diagnostics?.openFolder(result.value.jsonPath)
+}
+</script>
+
+<template>
+  <main class="diagnostics-page">
+    <section class="diagnostics-card">
+      <p class="eyebrow">LOUVORJA PIANO</p>
+      <h1>Diagnóstico de download</h1>
+      <p class="intro">
+        Este teste verifica a conexão com o catálogo. Ele não altera a instalação do LouvorJA.
+      </p>
+
+      <p v-if="!available" class="warning">
+        Abra pelo Electron. O diagnóstico precisa do processo principal para testar a rede.
+      </p>
+
+      <button class="run" :disabled="running || !available" @click="run">
+        {{ running ? 'Executando diagnóstico…' : 'Executar diagnóstico' }}
+      </button>
+      <p v-if="running" class="progress">Testando DNS, rede, proxy, certificado e catálogo. Pode levar até 90 segundos.</p>
+      <p v-if="error" class="warning">{{ error }}</p>
+
+      <template v-if="result">
+        <div class="success">
+          <strong>Diagnóstico concluído.</strong>
+          <span>Relatórios salvos em:</span>
+          <code>{{ result.jsonPath }}</code>
+          <code>{{ result.txtPath }}</code>
+        </div>
+        <div class="actions">
+          <button class="secondary" @click="send">Enviar relatório</button>
+          <button class="secondary" @click="openFolder">Abrir pasta</button>
+        </div>
+        <p v-if="sendMessage" class="progress">{{ sendMessage }}</p>
+      </template>
+    </section>
+  </main>
+</template>
+
+<style scoped>
+.diagnostics-page { min-height: 100%; display: grid; place-items: center; padding: 32px; background: #101720; color: #eff6ff; }
+.diagnostics-card { width: min(620px, 100%); padding: 38px; border: 1px solid #2c3b4d; border-radius: 18px; background: #172230; box-shadow: 0 20px 60px #0006; }
+.eyebrow { margin: 0; color: #82c7ff; font-size: .75rem; font-weight: 800; letter-spacing: .12em; }
+h1 { margin: 8px 0 10px; font-size: 2rem; }
+.intro, .progress { color: #c4d1df; line-height: 1.5; }
+.run { width: 100%; min-height: 62px; border: 0; border-radius: 12px; background: #1d8fe1; color: white; font-size: 1.2rem; font-weight: 800; cursor: pointer; }
+.run:disabled { opacity: .55; cursor: wait; }
+.warning { margin-top: 18px; color: #ffc46b; }
+.success { display: grid; gap: 6px; margin-top: 24px; padding: 18px; border-radius: 10px; background: #153a2c; color: #d7fae8; }
+code { overflow-wrap: anywhere; font-size: .78rem; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.secondary { padding: 11px 16px; border: 1px solid #52708e; border-radius: 9px; background: transparent; color: #eff6ff; font-weight: 700; cursor: pointer; }
+</style>
