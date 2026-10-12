@@ -17,7 +17,7 @@ export function parseDataPacket(xml: string): DataPacketRow[] {
   while ((m = rowRe.exec(afterRowdata))) {
     const row: DataPacketRow = {}
     let a: RegExpExecArray | null
-    const attrs = m[1] ?? ''
+    const attrs = m[1]!
     while ((a = attrRe.exec(attrs))) {
       row[a[1]!.toUpperCase()] = unescapeXml(a[2]!)
     }
@@ -28,8 +28,8 @@ export function parseDataPacket(xml: string): DataPacketRow[] {
 
 function unescapeXml(v: string): string {
   return v
-    .replaceAll('&amp;', '&')
     .replaceAll('&lt;', '<')
     .replaceAll('&gt;', '>')
     .replaceAll('&quot;', '"')
+    .replaceAll('&amp;', '&')
 }

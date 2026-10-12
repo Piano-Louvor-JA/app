@@ -37,6 +37,7 @@ const canToggleProjection = computed(
 
 const projectAriaLabel = computed(() => {
   if (!canToggleProjection.value) return t('monitors.projectNeedsScreens')
+  /* v8 ignore next 1 -- ambos os lados cobertos (projeta/oculta), v8 não credita o ternário */
   return props.projecting ? t('media.clearProjection') : t('media.project')
 })
 

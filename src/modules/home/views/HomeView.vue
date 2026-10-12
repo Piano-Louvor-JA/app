@@ -1,15 +1,14 @@
 <script setup lang="ts">
-import { useI18n } from 'vue-i18n'
+import logoUrl from "@assets/brand/logo-louvor-ja.svg";
+import { useI18n } from "vue-i18n";
 
-import logoUrl from '@assets/brand/logo-louvor-ja.svg'
+import HomeLocationField from "../components/HomeLocationField.vue";
+import { useHomeClock } from "../composables/useHomeClock";
+import { useHomeLocation } from "../composables/useHomeLocation";
 
-import HomeLocationField from '../components/HomeLocationField.vue'
-import { useHomeClock } from '../composables/useHomeClock'
-import { useHomeLocation } from '../composables/useHomeLocation'
-
-const { t } = useI18n()
-const { profile, setDistrict, setChurch } = useHomeLocation()
-const { formattedTime } = useHomeClock()
+const { t } = useI18n();
+const { profile, setDistrict, setChurch } = useHomeLocation();
+const { formattedTime } = useHomeClock();
 </script>
 
 <template>

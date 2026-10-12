@@ -1,19 +1,19 @@
 <script setup lang="ts">
-import { useBlurSystem } from '@design-system/composables'
+import { useBlurSystem } from "@design-system/composables";
 
 withDefaults(
-  defineProps<{
-    padding?: boolean
-    elevated?: boolean
-  }>(),
-  {
-    padding: true,
-    elevated: false,
-  },
-)
+	defineProps<{
+		padding?: boolean;
+		elevated?: boolean;
+	}>(),
+	{
+		padding: true,
+		elevated: false,
+	},
+);
 
 /** Garante ThemeManager aplicado (vars --ds-blur-active / --ds-glass-fill). */
-useBlurSystem()
+useBlurSystem();
 </script>
 
 <template>

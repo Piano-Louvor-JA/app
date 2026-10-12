@@ -1,6 +1,7 @@
 import { fetchRemoteCatalogJson } from '@shared/services/remote-catalog'
 import { readCatalogRecord } from '@shared/services/workspace-api'
 import { getCurrentApiPrefix } from '@modules/sync/services/library-catalog'
+import { matchesAllTerms } from "@shared/services/search-terms"
 
 import type { AlbumSearchHit } from '../types/albums'
 import { formatCatalogDuration } from './album-tracks'
@@ -24,6 +25,8 @@ type CatalogMusicIndexRow = {
   url_instrumental_music?: string | null
   albums?: CatalogMusicAlbum[]
   albums_names?: string
+  /** Letra em texto corrido — VEM NO ÍNDICE pt_musics (1944/1956, 03/10). */
+  lyric?: string | null
 }
 
 async function readOrFetchCatalog<T>(filename: string): Promise<T | null> {
@@ -99,6 +102,7 @@ function preferredHymnalTrack(
     if (track != null && track > 0) return { track, isHymnal: true }
   }
 
+  /* v8 ignore next 3 -- se algum hinário tem track>0 os loops acima já retornaram */
   if (hymnalTracks[0] != null) {
     return { track: hymnalTracks[0], isHymnal: true }
   }
@@ -124,6 +128,14 @@ function mapMusicIndexRow(row: CatalogMusicIndexRow): AlbumSearchHit | null {
   const { track, isHymnal } = preferredHymnalTrack(row, hymnalTracks)
   const albumNames = joinAlbumNames(row) || 'Música'
 
+  // Busca por letra (issue #360, Opção A): a letra JÁ VEM no índice
+  // `${prefix}_musics` (1944/1956 músicas, +~80% do peso do arquivo que
+  // baixa como essencial) — basta propagar. Zero download novo.
+  const lyricsText = String(row.lyric ?? '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase()
+
   return {
     musicId,
     name,
@@ -134,6 +146,7 @@ function mapMusicIndexRow(row: CatalogMusicIndexRow): AlbumSearchHit | null {
     displayTitle: name,
     isHymnal,
     hymnalTracks: [...new Set(hymnalTracks)],
+    lyricsText: lyricsText || undefined,
   }
 }
 
@@ -142,6 +155,7 @@ function mergeHits(a: AlbumSearchHit, b: AlbumSearchHit): AlbumSearchHit {
   const track = a.track ?? b.track ?? hymnalTracks[0] ?? null
   return {
     ...a,
+    lyricsText: a.lyricsText ?? b.lyricsText,
     track,
     isHymnal: a.isHymnal || b.isHymnal || track != null,
     albumNames: a.albumNames.includes(b.albumNames)
@@ -156,17 +170,52 @@ function mergeHits(a: AlbumSearchHit, b: AlbumSearchHit): AlbumSearchHit {
 export async function loadAlbumMusicIndex(): Promise<AlbumSearchHit[]> {
   const langPrefix = getCurrentApiPrefix()
   const rows = await readOrFetchCatalog<CatalogMusicIndexRow[]>(`${langPrefix}_musics`)
-  if (!Array.isArray(rows) || rows.length === 0) return []
 
   const byId = new Map<number, AlbumSearchHit>()
-  for (const row of rows) {
-    const mapped = mapMusicIndexRow(row)
-    if (!mapped) continue
-    const existing = byId.get(mapped.musicId)
-    byId.set(
-      mapped.musicId,
-      existing ? mergeHits(existing, mapped) : mapped,
-    )
+  if (Array.isArray(rows)) {
+    for (const row of rows) {
+      const mapped = mapMusicIndexRow(row)
+      if (!mapped) continue
+      const existing = byId.get(mapped.musicId)
+      byId.set(
+        mapped.musicId,
+        existing ? mergeHits(existing, mapped) : mapped,
+      )
+    }
+  }
+
+  // Busca por letra (03/10): músicas custom LOCAIS entram no índice com
+  // `lyricsText` — a letra está no localStorage (offline-first). O hinário
+  // e os álbuns oficiais já trazem `lyric` no índice `${prefix}_musics`.
+  try {
+    const { listAllLocalMusicsWithLyrics } =
+      await import('@modules/media/services/local-custom-store')
+    for (const local of await listAllLocalMusicsWithLyrics()) {
+      const lyricsText = local.lyrics
+        .map((l) => l.lyric ?? '')
+        .join(' ')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase()
+      const hit: AlbumSearchHit = {
+        musicId: local.id,
+        name: local.name,
+        track: null,
+        durationLabel: '0:00',
+        hasInstrumental: false,
+        albumNames: 'Minhas Coletâneas',
+        displayTitle: local.name,
+        isHymnal: false,
+        hymnalTracks: [],
+        lyricsText,
+      }
+      const existing = byId.get(local.id)
+      byId.set(local.id, existing ? { ...existing, lyricsText } : hit)
+    }
+  } catch {
+    // storage indisponível — índice segue só com o catálogo
   }
 
   return [...byId.values()]
@@ -176,17 +225,23 @@ export async function loadAlbumMusicIndex(): Promise<AlbumSearchHit[]> {
  * Busca por hinos: título, álbum ou número do hinário (máx. 50).
  * Número prioriza Hinário Adventista atual, depois 1996.
  *
- * Relevância (apk#127 / SPEC 10): match de TÍTULO ou NÚMERO sempre
- * precede match só de ÁLBUM — um termo que casa com o nome da coletânea
- * NÃO pode retornar todas as faixas dela como se fossem resultado direto;
- * os matches de álbum entram apenas como cauda, ordenados por relevância.
+ * Relevância (apk#127 / SPEC 10): na busca textual, match de título
+ * precede match só de álbum ou de letra. Um termo que casa com o nome
+ * da coletânea não pode devolver todas as faixas dela na frente.
+ * O fold é o mesmo da busca por termos, para título acentuado não cair
+ * na cauda.
  */
+function foldSearchText(value: string): string {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+}
+
 function relevanceScore(entry: AlbumSearchHit, trimmed: string): number {
-  const title = entry.name.toLowerCase()
-  if (title === trimmed) return 3 // título exato
-  if (title.startsWith(trimmed)) return 2 // título começa com o termo
-  if (title.includes(trimmed)) return 1 // título contém
-  return 0 // só álbum
+  const title = foldSearchText(entry.name)
+  const query = foldSearchText(trimmed)
+  if (title === query) return 3
+  if (title.startsWith(query)) return 2
+  if (title.includes(query)) return 1
+  return 0
 }
 
 export function filterAlbumMusicIndex(
@@ -200,17 +255,20 @@ export function filterAlbumMusicIndex(
   const numQuery = isNum ? Number(trimmed) : null
 
   let results = index.filter((entry) => {
-    const title = entry.name.toLowerCase()
-    const album = entry.albumNames.toLowerCase()
+    const title = entry.name
+    const album = entry.albumNames
+    const lyrics = entry.lyricsText ?? ''
     if (isNum && numQuery != null) {
       return (
         entry.track === numQuery ||
         (entry.hymnalTracks ?? []).includes(numQuery) ||
-        title.includes(trimmed) ||
-        album.includes(trimmed)
+        matchesAllTerms(title, album, trimmed, lyrics)
       )
     }
-    return title.includes(trimmed) || album.includes(trimmed)
+    // Busca por termos (03/10): "jesus adoradores 5" acha a música "Jesus"
+    // do álbum "Adoradores 5" — substring contígua não existe em campo nenhum.
+    // Busca por letra (03/10): `lyricsText` (quando presente) casa trecho/termos.
+    return matchesAllTerms(title, album, trimmed, lyrics)
   })
 
   if (isNum && numQuery != null) {

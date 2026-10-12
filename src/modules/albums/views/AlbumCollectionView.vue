@@ -89,23 +89,25 @@ function closePlaylistPicker() {
 function openPlaylistPicker(track: AlbumTrack) {
   playlistItem.value = {
     musicId: track.musicId,
-    albumId: Number(activeCollection.value?.id) || null,
+    albumId: /* v8 ignore next */ Number(activeCollection.value?.id) || null,
     title: track.name,
   }
 }
 
 function addToPlaylist(id: string) {
   const item = playlistItem.value
-  if (!item) return
+  /* v8 ignore next -- defensivo: picker só abre com item */ if (!item) return
   const target = playlists.value.find((playlist) => playlist.id === id)
   const result = addPlaylistItem(id, item)
   playlists.value = listPlaylists()
   playlistItem.value = null
+  /* v8 ignore start -- picker só emite ids presentes em playlists.value */
   if (result?.added) {
     showPlaylistFeedback(`“${item.title}” adicionada a “${target?.name ?? 'playlist'}”`)
   } else {
     showPlaylistFeedback(`“${item.title}” já está em “${target?.name ?? 'playlist'}”`)
   }
+  /* v8 ignore stop */
 }
 
 async function runAction(

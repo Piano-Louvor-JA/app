@@ -39,12 +39,15 @@ class MiniReq<T> {
 vi.stubGlobal("indexedDB", {
   open: () => {
     const req = new MiniReq({
+      close: () => {},
       objectStoreNames: { contains: () => true },
       createObjectStore: () => ({
         createIndex: () => {},
       }),
-      transaction: () => ({
-        objectStore: () => ({
+      transaction: () => {
+        const tx = {
+          oncomplete: null as (() => void) | null,
+          objectStore: () => ({
           add: (op: Row) => {
             op.id = nextId++;
             store.push(op);
@@ -61,7 +64,10 @@ vi.stubGlobal("indexedDB", {
           },
           count: () => new MiniReq(store.length),
         }),
-      }),
+        };
+        queueMicrotask(() => tx.oncomplete?.());
+        return tx;
+      },
     });
     return req;
   },
@@ -273,6 +279,47 @@ describe("flushOutbox", () => {
     };
     expect(body.collections[0].deleted_at).toBe(500);
   });
+  it("gaps: lyric orfa/pai presente, music sem collection_uuid, flush 500", async () => {
+    await enqueue({
+      entity: "music",
+      client_uuid: "mX",
+      action: "upsert",
+      payload: { collection_uuid: "cX", name: "M", updated_at: 1 },
+      updated_at: 1,
+      owner_email: "a@t.l",
+    })
+    await enqueue({
+      entity: "lyric",
+      client_uuid: "l1",
+      action: "upsert",
+      payload: { music_uuid: "ghost", text: "x", updated_at: 2 },
+      updated_at: 2,
+      owner_email: "a@t.l",
+    })
+    await enqueue({
+      entity: "music",
+      client_uuid: "mY",
+      action: "upsert",
+      payload: { name: "Sem Col", updated_at: 3 },
+      updated_at: 3,
+      owner_email: "a@t.l",
+    })
+    // lyric SEM music_uuid (?? falsos-arms) + flush 500 (res.ok false)
+    await enqueue({
+      entity: "lyric",
+      client_uuid: "l2",
+      action: "upsert",
+      payload: { text: "sem pai", updated_at: 4 },
+      updated_at: 4,
+      owner_email: "a@t.l",
+    })
+    const fetchMock = vi.fn(async () => new Response("err", { status: 500 }))
+    vi.stubGlobal("fetch", fetchMock)
+    const r = await flushOutbox("https://api.test/v1/custom", baseHeaders)
+    expect(r.ok).toBe(false)
+    expect(await countPending()).toBe(4)
+  })
+
 });
 
 describe("clearOutbox", () => {
@@ -288,4 +335,52 @@ describe("clearOutbox", () => {
     await clearOutbox();
     expect(await countPending()).toBe(0);
   });
+
+it("newClientUuid: fallback RFC4122 sem randomUUID", async () => {
+  const origCrypto = globalThis.crypto;
+  // sem randomUUID, com getRandomValues determinístico
+  vi.stubGlobal("crypto", {
+    getRandomValues: (b: Uint8Array) => {
+      for (let i = 0; i < b.length; i++) b[i] = i;
+      return b;
+    },
+  });
+  try {
+    const { newClientUuid } = await import("../outbox");
+    const u = newClientUuid();
+    expect(u).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(u).toBe("00010203-0405-4607-8809-0a0b0c0d0e0f");
+  } finally {
+    vi.stubGlobal("crypto", origCrypto);
+  }
+});
+
+describe("gaps onda1 — sort com id ausente, ops sem id, oncomplete", () => {
+  it("listPending com op sem id (?? 0) ordena sem lançar; oncomplete do tx dispara", async () => {
+    store = [
+      { entity: "collection", client_uuid: "x2", action: "upsert", payload: {} },
+      { id: 2, entity: "collection", client_uuid: "x1", action: "upsert", payload: {} },
+    ] as Row[];
+    const all = await listPending();
+    expect(all).toHaveLength(2);
+    expect(all[0]!.client_uuid).toBe("x2"); // id ausente ?? 0 → primeiro
+  });
+
+  it("flush 200 com op sem id: não chama removeOp pra ele", async () => {
+    await enqueue({ entity: "collection", client_uuid: "c9", action: "upsert", payload: { name: "A" } } as never);
+    // força op sem id direto no store
+    store.push({ entity: "collection", client_uuid: "ghost", action: "upsert", payload: {} });
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ applied: { created: 1, updated: 1 }, conflicts: [] }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const res = await flushOutbox();
+    expect(res.ok).toBe(true);
+    // apenas a op com id foi removida; a fantasma continua
+    const rest = await listPending();
+    expect(rest.some((o) => o.client_uuid === "ghost")).toBe(true);
+    vi.unstubAllGlobals();
+  });
+});
 });

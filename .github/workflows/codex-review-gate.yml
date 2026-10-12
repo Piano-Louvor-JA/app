@@ -2,7 +2,7 @@ name: Codex Review Gate
 
 on:
   pull_request_target:
-    branches: [main, staging]
+    branches: [main]
     types: [opened, synchronize, reopened, ready_for_review, edited]
   issue_comment:
     types: [created, edited]
@@ -25,7 +25,7 @@ permissions:
 jobs:
   verify:
     if: >-
-      (github.event_name != 'pull_request_target' || github.actor != 'dependabot[bot]') &&
+      (github.event_name != 'pull_request_target' || (github.event.pull_request.base.ref == 'main' && github.actor != 'dependabot[bot]')) &&
       (github.event_name != 'issue_comment' ||
       (github.event.issue.pull_request &&
       (github.event.comment.user.login == 'chatgpt-codex-connector[bot]' || (github.event.comment.body == '@codex review' && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)))))
@@ -49,11 +49,12 @@ jobs:
             if (ciRun) {
               if (ciRun.repository?.full_name !== `${owner}/${repo}`) return;
               const candidates = await github.paginate(github.rest.pulls.list, {owner, repo, state: 'open', per_page: 100});
-              number = candidates.find(p => p.head.sha === ciRun.head_sha && ['main', 'staging'].includes(p.base.ref))?.number;
+              number = candidates.find(p => p.head.sha === ciRun.head_sha && p.base.ref === 'main')?.number;
             }
             if (!number) return;
             const {data: pr} = await github.rest.pulls.get({owner, repo, pull_number: number});
-            if (pr.state !== 'open' || !['main', 'staging'].includes(pr.base.ref)) return;
+            // Todos os gatilhos, inclusive comentários e execução manual, respeitam a base.
+            if (pr.state !== 'open' || pr.base.ref !== 'main') return;
             const sha = pr.head.sha;
             const name = 'Codex Review Complete';
             const {data: check} = await github.rest.checks.create({
@@ -70,7 +71,7 @@ jobs:
               }
               for (let attempt = 0; attempt < 30; attempt++) {
                 const {data: current} = await github.rest.pulls.get({owner, repo, pull_number: number});
-                if (current.head.sha !== sha || current.state !== 'open') {
+                if (current.head.sha !== sha || current.state !== 'open' || current.base.ref !== 'main') {
                   await finish('cancelled', 'PR alterado', 'Uma nova execução deve validar o commit atual.');
                   return;
                 }

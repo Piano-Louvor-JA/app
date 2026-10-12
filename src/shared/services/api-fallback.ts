@@ -68,6 +68,7 @@ export function apiCandidateBases(kind: ApiKind): string[] {
   const primaryHost = baseToHost(primary)
   const path = kindToPath(kind)
   const candidates: string[] = []
+  /* v8 ignore next 1 -- primary deriva de env ou default, sempre truthy */
   if (primary) candidates.push(primary)
   for (const host of fallbackHosts()) {
     if (host !== primaryHost) candidates.push(`${host}${path}`)
@@ -102,6 +103,7 @@ export async function fetchWithApiFallback<T = unknown>(
       continue
     }
   }
+  /* v8 ignore next 1 -- sempre há ao menos o candidato primário */
   throw lastError ?? new Error('api-fallback-exhausted')
 }
 

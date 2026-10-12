@@ -1,4 +1,8 @@
 export default {
+  apiOffline: {
+    message: 'Sin conexi\u00f3n con el servicio \u2014 verifica tu internet',
+    retrying: 'Intentando reconectar...',
+  },
   projection: {
     confirmClose: 'La proyección está en curso. Cerrar esta ventana detiene la música. ¿Realmente desea salir?',
   },
@@ -42,5 +46,19 @@ export default {
     bible: 'Biblia',
     utilities: 'Utilidades',
     settings: 'Configuraciones',
+    },
+  sync: {
+    downloadQueue: {
+      title: 'Descargas',
+      clearFinished: 'Limpiar completados',
+      retry: 'Reintentar',
+      cancel: 'Cancelar',
+    },
+  },
+sljaMigration: {
+    title: '¿Subir {count} himno(s) importado(s) a tu cuenta?',
+    message: 'Importaste archivos .slja sin sesión. Pueden ir a tu cuenta (una copia única, sin duplicar) y estar disponibles en cualquier dispositivo.',
+    confirm: 'Subir a la cuenta',
+    cancel: 'Quedar solo en este dispositivo',
   },
 }
