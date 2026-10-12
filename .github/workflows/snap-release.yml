@@ -1,0 +1,55 @@
+name: Snap Store Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  snap:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Build app (linux-unpacked)
+        run: |
+          npm ci
+          npx electron-builder --linux dir --x64
+
+      - name: Sync snap version with tag
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          sed -i "s/^version:.*/version: \"$TAG\"/" snap/snapcraft.yaml
+          grep '^version:' snap/snapcraft.yaml
+
+      - name: Build snap
+        uses: snapcore/action-build@v1
+        id: snapcraft
+        with:
+          snapcraft-args: '--destructive-mode'
+
+      - name: Upload snap artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: snap-package
+          path: ${{ steps.snapcraft.outputs.snap }}
+
+      - name: Attach snap to GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "$GITHUB_REF_NAME" "${{ steps.snapcraft.outputs.snap }}" --clobber
+
+      - name: Publish to Snap Store (beta)
+        uses: snapcore/action-publish@v1
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+        with:
+          snap: ${{ steps.snapcraft.outputs.snap }}
+          release: beta

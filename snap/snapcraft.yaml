@@ -1,25 +1,34 @@
 name: louvorja-piano
-version: 0.0.0
-summary: LouvorJA - PIANO — aplicativo desktop para gerenciamento de culto
+title: LouvorJA PIANO
+version: "1.29.1"
+summary: Projeção de louvor, hinários e mídia para cultos
 description: |
-  LouvorJA - PIANO é um aplicativo desktop para gerenciamento de culto.
-  Com hinos, coletâneas, projeção de slides, e integração com dispositivos de palco.
+  LouvorJA - PIANO é um aplicativo desktop para projeção de louvor em
+  cultos: hinários completos, letras sincronizadas, bíblia, liturgia e
+  utilitários (temporizador, sorteio).
+
+  Projeção multi-monitor: controle em uma tela, saída fullscreen na outra.
+  Funciona offline após baixar o conteúdo.
+icon: snap/gui/icon.png
+license: MIT
+contact: pianolouvorja@gmail.com
+website: https://pianolouvorja.com.br
+source-code: https://github.com/Piano-Louvor-JA/app
+issues: https://github.com/Piano-Louvor-JA/app/issues
 grade: stable
 confinement: strict
-base: core24
+base: core22
 plugs:
-  - desktop
-  - desktop-legacy
-  - wayland
-  - x11
-  - opengl
-  - audio-playback
-  - network
-  - home
-  - removable-media
+  wayland:
+  x11:
+  opengl:
+  audio-playback:
+  network:
+  home:
+  removable-media:
 apps:
   louvorja-piano:
-    command: louvorja-piano --no-sandbox
+    command: louvorja-piano/louvorja-piano --no-sandbox
     extensions: [gnome]
     plugs:
       - desktop
@@ -31,3 +40,37 @@ apps:
       - network
       - home
       - removable-media
+      - screen-inhibit-control
+      - pulseaudio
+    environment:
+      ELECTRON_DISABLE_SANDBOX: "1"
+
+parts:
+  louvorja-piano:
+    plugin: dump
+    source: .
+    override-build: |
+      set -e
+      if [ ! -d dist-electron/linux-unpacked ]; then
+        echo "ERRO: gere dist-electron/linux-unpacked antes (npm run build:linux || electron-builder --linux dir)" >&2
+        exit 1
+      fi
+      mkdir -p "$SNAPCRAFT_PART_INSTALL/louvorja-piano"
+      cp -r dist-electron/linux-unpacked/. "$SNAPCRAFT_PART_INSTALL/louvorja-piano/"
+      chmod +x "$SNAPCRAFT_PART_INSTALL/louvorja-piano/louvorja-piano"
+    stage-packages:
+      - libnss3
+      - libnspr4
+      - libatk1.0-0
+      - libatk-bridge2.0-0
+      - libcups2
+      - libdrm2
+      - libxkbcommon0
+      - libxcomposite1
+      - libxdamage1
+      - libxfixes3
+      - libxrandr2
+      - libgbm1
+      - libasound2
+      - libatspi2.0-0
+      - libgtk-3-0

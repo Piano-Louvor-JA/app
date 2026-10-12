@@ -1,7 +1,12 @@
 import { app, ipcMain } from "electron";
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
-const { autoUpdater } = require("electron-updater");
+// electron-updater é carregado com preguiça: em testes (vitest), o mock pode
+// ser injetado via globalThis.__LOUVORJA_AUTOUPDATER_MOCK__ antes do import.
+const { autoUpdater } =
+	globalThis.__LOUVORJA_AUTOUPDATER_MOCK__ !== undefined
+		? { autoUpdater: globalThis.__LOUVORJA_AUTOUPDATER_MOCK__ }
+		: require("electron-updater");
 
 /**
  * Configura o autoUpdater do electron-updater.
@@ -18,12 +23,33 @@ let updaterState = {
 };
 
 /**
+ * Detecta execução via pacote Microsoft Store (MSIX/APPX).
+ * A Store REPROVA apps com self-updater embutido (política 10.8.x — updates
+ * devem ser entregues pela própria Store), então o canal electron-updater
+ * precisa ficar completamente desligado nesse ambiente.
+ */
+export function isWindowsStorePackage() {
+	// Electron expõe a flag nativamente em builds MSIX/APPX.
+	if (process.windowsStore === true) return true;
+	// Fallback robusto: caminho de instalação de pacote assinado pela Store
+	// (WindowsApps) ou execution alias do identity RDZDev.PianoLouvorJa.
+	const exe = String(process.execPath || "").toLowerCase();
+	return exe.includes("\\windowsapps\\") || exe.includes("pianolouvorja_");
+}
+
+/**
  * Inicializa o electron-updater e registra IPC handlers.
  * Deve ser chamado após app.whenReady().
  *
- * @param {import('electron').BrowserWindow} mainWindow - Janela principal para enviar eventos.
+ * @param {import('electron').BrowserWindow} mainWindowGetter - Janela principal para enviar eventos.
  */
 export function initUpdater(mainWindowGetter) {
+	// Microsoft Store: self-update é bloqueador de certificação — canal OFF.
+	if (isWindowsStorePackage()) {
+		console.log("[updater] pacote Microsoft Store — auto-update desabilitado (updates via Store)");
+		registerIpc(mainWindowGetter);
+		return;
+	}
 	// Não verificar em dev
 	if (!isPackaged()) {
 		console.log("[updater] dev mode — auto-update desabilitado");
@@ -83,6 +109,10 @@ export function initUpdater(mainWindowGetter) {
 function registerIpc(mainWindowGetter) {
 	ipcMain.handle("updater:check", async () => {
 		if (!isPackaged()) return { available: false };
+		// Pacote Store: atualizações vêm pela Store, nunca pelo electron-updater.
+		if (isWindowsStorePackage()) {
+			return { available: false, storeManaged: true };
+		}
 		try {
 			const result = await autoUpdater.checkForUpdates();
 			return {
@@ -97,6 +127,9 @@ function registerIpc(mainWindowGetter) {
 	});
 
 	ipcMain.handle("updater:download", async () => {
+		if (isWindowsStorePackage()) {
+			return { success: false, error: "Updates gerenciados pela Microsoft Store" };
+		}
 		try {
 			await autoUpdater.downloadUpdate();
 			return { success: true };
@@ -107,6 +140,9 @@ function registerIpc(mainWindowGetter) {
 	});
 
 	ipcMain.handle("updater:install", () => {
+		if (isWindowsStorePackage()) {
+			return { success: false, error: "Updates gerenciados pela Microsoft Store" };
+		}
 		if (updaterState.downloaded) {
 			autoUpdater.quitAndInstall(false, true);
 			return { success: true };
