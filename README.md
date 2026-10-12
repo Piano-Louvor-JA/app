@@ -31,9 +31,9 @@ Este README cobre apenas a **versão Electron**. A versão web é um projeto sep
 
 ## Qualidade
 
-O CI verifica TypeScript, testes, regressões, build e empacotamento Electron. O job de lint e formatação executa Biome quando há configuração local; atualmente o repositório não possui `biome.json` ou `biome.jsonc`, portanto esse job não verifica lint nem formatação. As regras de `staging` e `main` também exigem as análises CodeQL, o pré-review e a revisão concluída do Codex para o commit atual. Os apontamentos precisam ser resolvidos; `main` exige uma aprovação humana.
+O CI verifica TypeScript, testes e build. O job de lint executa Biome quando há configuração local; o repositório não possui `biome.json` nem `biome.jsonc`, então esse job não verifica lint nem formatação. Em `staging`, as regras exigem Quality Gate, PR Pre-review e as duas análises CodeQL, sem aprovação humana. Em `main`, as regras exigem as duas análises CodeQL e a proteção da branch exige uma aprovação humana. Discussões de revisão precisam ser resolvidas.
 
-A execução atual dos testes não comprova cobertura de 100%. Não publicamos um percentual de cobertura sem um relatório medido.
+PRs para `staging` exigem 50% em cada métrica de cobertura. Push e promoção para `main` permanecem em 100%. O README não publica um percentual sem um relatório medido.
 
 - **CI:** workflow `ci.yml` na branch `staging`.
 - **Security:** workflow `security.yml`, com análise de segredos e relatórios de dependências e código.
@@ -193,7 +193,7 @@ Get-FileHash .\louvorja-piano-1.22.0-x64.exe -Algorithm SHA256
 
 ## Contribuir
 
-Branch de desenvolvimento: `staging` · PRs apontam para `staging`. Todo PR precisa passar pelos checks obrigatórios de qualidade, segurança e revisão do Codex antes do merge.
+Branch de desenvolvimento: `staging` · PRs apontam para `staging`. Todo PR precisa passar pelos checks obrigatórios da base antes do merge.
 
 ### Versionamento
 

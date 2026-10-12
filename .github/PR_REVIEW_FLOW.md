@@ -13,7 +13,7 @@ O Codex segue as preferências pessoais e os limites do plano. Quando não houve
 
 ## Check de conclusão do Codex
 
-O workflow `Codex Review Gate` foi promovido para a branch padrão e validado com a integração real em 6 de outubro de 2026. O check `Codex Review Complete` é obrigatório em `staging` e `main`, junto de `Quality Gate`, `PR Pre-review` e das duas análises CodeQL. `staging` não exige aprovação humana; `main` exige uma aprovação humana válida.
+O workflow `Codex Review Gate` publica o check `Codex Review Complete`. Ele não entra nas regras obrigatórias atuais. Em `staging`, as regras exigem `Quality Gate`, `PR Pre-review` e as duas análises CodeQL, sem aprovação humana. Em `main`, as regras exigem as duas análises CodeQL e a proteção da branch exige uma aprovação humana.
 
 `Codex Review Complete` comprova que o bot concluiu a revisão do commit atual. Não significa ausência de problemas: resolução das discussões e aprovação humana são condições separadas.
 
