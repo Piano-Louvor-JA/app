@@ -288,7 +288,10 @@ const { t } = useI18n()
     color: color-mix(in srgb, #86efac 85%, transparent);
   }
 
-  &--prophets {
+  &--prophets,
+  &--poetry,
+  &--major-prophet,
+  &--minor-prophet {
     background: color-mix(in srgb, #ca8a04 14%, transparent);
     color: color-mix(in srgb, #fde68a 85%, transparent);
   }
@@ -299,6 +302,10 @@ const { t } = useI18n()
   }
 
   &--letters,
+  &--acts,
+  &--pauline,
+  &--general,
+  &--apocalyptic,
   &--neutral {
     background: color-mix(in srgb, white 5%, transparent);
     color: var(--ds-color-on-surface-variant);
@@ -365,7 +372,10 @@ const { t } = useI18n()
   border-color: #4ade80;
 }
 
-[data-mode='light'] .bible-books__tile--prophets {
+[data-mode='light'] .bible-books__tile--prophets,
+[data-mode='light'] .bible-books__tile--poetry,
+[data-mode='light'] .bible-books__tile--major-prophet,
+[data-mode='light'] .bible-books__tile--minor-prophet {
   background: #fecaca;
   color: #991b1b;
   border-color: #f87171;
@@ -378,6 +388,10 @@ const { t } = useI18n()
 }
 
 [data-mode='light'] .bible-books__tile--letters,
+[data-mode='light'] .bible-books__tile--acts,
+[data-mode='light'] .bible-books__tile--pauline,
+[data-mode='light'] .bible-books__tile--general,
+[data-mode='light'] .bible-books__tile--apocalyptic,
 [data-mode='light'] .bible-books__tile--neutral {
   background: #f1f3f7;
   color: #475569;

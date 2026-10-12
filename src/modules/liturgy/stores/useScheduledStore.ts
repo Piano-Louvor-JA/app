@@ -7,6 +7,10 @@ import { defineStore } from 'pinia'
 import { USER_PREFERENCE_KEYS } from '@shared/constants/storage-keys'
 import { getUserPreference, setUserPreference } from '@shared/services/user-preferences'
 
+import {
+  enqueueOperatorState,
+  scheduleOutboxFlush,
+} from '@modules/sync/services/sync-outbox-service'
 import { parseDataPacket, type DataPacketRow } from '../services/datapacket-parser'
 
 export interface ScheduledCategory {
@@ -73,10 +77,19 @@ export const useScheduledStore = defineStore('scheduled', {
 
   actions: {
     persist() {
-      setUserPreference(USER_PREFERENCE_KEYS.scheduledState, {
+      const state = {
         categories: this.categories,
         items: this.items,
-      })
+      }
+      setUserPreference(USER_PREFERENCE_KEYS.scheduledState, state)
+      // sync v2 (app#349): toda mutação enfileira no outbox (local-first) e
+      // agenda flush em bg — sem rede o item fica na fila (nada se perde).
+      try {
+        enqueueOperatorState('scheduled', 'items', state)
+        scheduleOutboxFlush()
+      } catch {
+        // outbox nunca bloqueia o fluxo local
+      }
     },
 
     /** Importa DATAPACKETs já em texto XML. Retorna nº de itens importados. */

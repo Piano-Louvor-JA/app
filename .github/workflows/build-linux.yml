@@ -31,13 +31,21 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload AppImage + updater metadata (artifact backup)
+      - name: Zip portátil linux-unpacked
+        run: |
+          cd dist-electron/linux-unpacked
+          zip -qr ../LouvorJA-PIANO-Linux-x64-portable.zip .
+          cd ..
+          sha256sum LouvorJA-PIANO-Linux-x64-portable.zip
+
+      - name: Upload AppImage + portable + updater metadata (artifact backup)
         uses: actions/upload-artifact@v4
         with:
-          name: LouvorJA-PIANO-Linux-x64-AppImage
+          name: LouvorJA-PIANO-Linux-x64
           path: |
             dist-electron/*.AppImage
             dist-electron/*.AppImage.blockmap
+            dist-electron/LouvorJA-PIANO-Linux-x64-portable.zip
             dist-electron/latest*.yml
           if-no-files-found: warn
           retention-days: 30

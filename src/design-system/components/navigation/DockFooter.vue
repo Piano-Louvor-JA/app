@@ -1,26 +1,26 @@
 <script setup lang="ts">
-import type { DockNavItem } from '@design-system/types/navigation'
+import type { DockNavItem } from "@design-system/types/navigation";
 
 const props = withDefaults(
-  defineProps<{
-    items: DockNavItem[]
-    activeKey?: string
-  }>(),
-  {
-    activeKey: undefined,
-  },
-)
+	defineProps<{
+		items: DockNavItem[];
+		activeKey?: string;
+	}>(),
+	{
+		activeKey: undefined,
+	},
+);
 
 const emit = defineEmits<{
-  select: [key: string]
-}>()
+	select: [key: string];
+}>();
 
 function isActive(key: string) {
-  return props.activeKey === key
+	return props.activeKey === key;
 }
 
 function onSelect(key: string) {
-  emit('select', key)
+	emit("select", key);
 }
 </script>
 

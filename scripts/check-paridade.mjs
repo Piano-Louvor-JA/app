@@ -80,9 +80,20 @@ function sha256(content) {
   return createHash('sha256').update(content).digest('hex')
 }
 
-/** Normaliza EOL: repos commitam LF, checkouts Windows/autocrlf viram CRLF. */
-function normalize(content) {
-  return content.replace(/\r\n/g, '\n')
+/**
+ * Normaliza EOL e a diferença de plataforma autorizada.
+ * O app mantém a caixinha ligada por padrão (`textBox: true`); o web usa
+ * `false`. Só esse default entra na exceção — o restante do arquivo segue
+ * idêntico.
+ */
+function normalize(content, file) {
+  let text = content.replace(/\r\n/g, '\n')
+  if (file !== 'src/modules/settings/types/stage-settings.ts') return text
+  const next = text.replace(
+    /(shadowIntensity:\s*[\d.]+,\n\s*)textBox:\s*(?:true|false),/,
+    '$1textBox: PARITY_PLATFORM,',
+  )
+  return next
 }
 
 function fetchRemote(path) {
@@ -117,13 +128,24 @@ for (const file of CANONICAL_FILES) {
     continue
   }
 
-  const same = sha256(normalize(local)) === sha256(normalize(remote))
+  const localNorm = normalize(local, file)
+  const remoteNorm = normalize(remote, file)
+  if (
+    file === 'src/modules/settings/types/stage-settings.ts' &&
+    (!localNorm.includes('textBox: PARITY_PLATFORM,') ||
+      !remoteNorm.includes('textBox: PARITY_PLATFORM,'))
+  ) {
+    console.error(`✗ ${file} — default textBox não encontrado; critério de paridade desatualizado`)
+    diverged += 1
+    continue
+  }
+  const same = sha256(localNorm) === sha256(remoteNorm)
   if (same) {
     console.log(`✓ ${file}`)
   } else {
     console.error(`✗ ${file} — DIVERGIU app↔web`)
-    const localLines = local.split('\n')
-    const remoteLines = remote.split('\n')
+    const localLines = localNorm.split('\n')
+    const remoteLines = remoteNorm.split('\n')
     // diff resumido: primeira linha divergente + totais
     let first = -1
     const max = Math.max(localLines.length, remoteLines.length)

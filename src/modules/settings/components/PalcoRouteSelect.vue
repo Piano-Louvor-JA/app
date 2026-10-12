@@ -37,7 +37,7 @@ onMounted(() => {
   // re-check leve: status muda quando o toggle liga/desliga em outra tela
   timer = setInterval(() => void refresh(), 4000)
 })
-onUnmounted(() => { if (timer) clearInterval(timer) })
+onUnmounted(() => clearInterval(timer!)) // onUnmounted sempre ocorre após onMounted.
 </script>
 
 <template>

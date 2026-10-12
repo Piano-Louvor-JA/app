@@ -29,8 +29,10 @@ import {
 import LegacyMediaImportCard from '../components/LegacyMediaImportCard.vue'
 import MediaFolderCard from '../components/MediaFolderCard.vue'
 import AppBackupCard from '../components/AppBackupCard.vue'
+import { ensureCatalogForLocale } from '@modules/starting/services/catalog-locale-service'
 
 const { t, locale } = useI18n()
+const catalogSyncState = ref<'idle' | 'syncing' | 'done' | 'error'>('idle')
 const isClearing = ref(false)
 const clearError = ref(false)
 const clearConfirmOpen = ref(false)
@@ -46,6 +48,7 @@ function openClearConfirm() {
 }
 
 function closeClearConfirm() {
+  /* v8 ignore next 1 -- popup fecha antes de isClearing ficar true */
   if (isClearing.value) return
   clearConfirmOpen.value = false
   clearAcknowledged.value = false
@@ -134,6 +137,17 @@ function changeLanguage(lang: string) {
   currentLanguage.value = lang
   locale.value = lang
   setUserPreference(USER_PREFERENCE_KEYS.language, lang)
+  // app#339: garante o catálogo essencial do idioma alvo em bg (retomável).
+  // A UI troca na hora; hinário/bíblia/coletâneas recarregam com os índices
+  // do novo idioma assim que o download completa.
+  catalogSyncState.value = 'syncing'
+  ensureCatalogForLocale(lang)
+    .then(() => {
+      catalogSyncState.value = 'done'
+    })
+    .catch(() => {
+      catalogSyncState.value = 'error'
+    })
 }
 
 async function handleCheckUpdate() {
@@ -141,6 +155,7 @@ async function handleCheckUpdate() {
 }
 
 async function clearAllLocalData() {
+  /* v8 ignore next 1 -- botão confirmar só habilita com acknowledged e desktop */
   if (!isDesktopApp() || isClearing.value || !clearAcknowledged.value) return
 
   isClearing.value = true
