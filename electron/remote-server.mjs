@@ -42,9 +42,16 @@ function lanIp() {
   return '127.0.0.1'
 }
 
-export async function startRemoteServer(wss, contents) {
-  const token = randomBytes(4).toString('hex').toUpperCase()
+/** Ações permitidas ao pregador (escopo speaker mínimo) — nada de play/stop/eject. */
+export const SPEAKER_ALLOWED = new Set(['slide:next', 'slide:prev', 'slide:goto'])
 
+/**
+ * @param {any} wss WebSocketServer (ou fake)
+ * @param {any} contents BrowserWindow.webContents (ou fake)
+ * @param {{ token?: string }} [opts] token fixo p/ testes (default: random)
+ */
+export async function startRemoteServer(wss, contents, opts = {}) {
+  const token = opts.token ?? randomBytes(4).toString('hex').toUpperCase()
   /** @type {Map<import('ws').WebSocket, {aliveAt: number, authed: boolean, timer: NodeJS.Timeout}>} */
   const clients = new Map()
 
@@ -149,7 +156,7 @@ export async function startRemoteServer(wss, contents) {
             return
           }
           entry.authed = true
-          if (entry.speaker && !['slide:next', 'slide:prev', 'slide:goto'].includes(action)) {
+          if (entry.speaker && !SPEAKER_ALLOWED.has(action)) {
             send(ws, { v: 1, type: 'error', id, code: 'forbidden' })
             return
           }
@@ -236,7 +243,7 @@ export async function startRemoteServer(wss, contents) {
   // Pairing: renderer pergunta host+token+QR (Configurações > Controle Remoto)
   const host = lanIp()
   const connectUrl = `louvorja://connect?host=${host}:${activePort}&token=${token}`
-  const speakerUrl = `http://${host}:7080/speaker?remotePort=${activePort}&token=${token}`
+  const speakerUrl = `http://${host}:7080/speaker?remotePort=${activePort}&palcoPort=7081&token=${token}`
   const qrDataUrl = await QRCode.toDataURL(connectUrl, { margin: 1, width: 220 })
   const speakerQrDataUrl = await QRCode.toDataURL(speakerUrl, { margin: 1, width: 220 })
   ipcMain.handle('remote:pairing-info', () => ({

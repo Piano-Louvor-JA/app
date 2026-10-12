@@ -313,6 +313,9 @@ export default {
       copyLink: 'Copiar link',
       waitingClient: 'Aguardando controle remoto…',
       clientConnected: '{device} conectado',
+      speakerTitle: 'Pregador',
+      speakerHint: 'O pregador escaneia este QR com a câmera do celular (ou copia o link) — abre a página de navegação de slides no browser, sem instalar nada.',
+      speakerCopy: 'Copiar link do pregador',
     },
     palco: {
       cableGroup: 'Monitores (cabo)',
