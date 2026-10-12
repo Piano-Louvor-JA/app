@@ -26,6 +26,13 @@ const PORT = 7071
 const HEARTBEAT_MS = 15_000
 const HEARTBEAT_TIMEOUT_MS = 10_000
 
+/**
+ * Escopo do pregador (/speaker): SOMENTE navegação de slides. Qualquer outra
+ * ação vinda de um cliente speaker → `forbidden` sem tocar o renderer.
+ * Fonte única da regra (ver __tests__/speaker-scope.test.mjs).
+ */
+export const SPEAKER_ALLOWED = new Set(['slide:prev', 'slide:next', 'slide:goto'])
+
 /** @typedef {import('electron').WebContents} WebContents */
 
 /**
