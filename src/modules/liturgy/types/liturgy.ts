@@ -224,6 +224,8 @@ export interface LiturgyMusicOption {
   durationMs: number | null
   /** True quando há faixa instrumental no catálogo. */
   hasInstrumental: boolean
+  /** Letra normalizada (fold diacrítico) p/ busca por trecho (issue #348). */
+  lyricsText?: string
 }
 
 export interface LiturgyBibleBookOption {
