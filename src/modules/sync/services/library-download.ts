@@ -20,6 +20,16 @@ import { toRelativeMediaPath } from './media-paths'
 const DOWNLOAD_BATCH_SIZE = 5
 const MAX_CONSECUTIVE_ERRORS = 3
 
+function catalogAlbumKey(albumId: string | number): string {
+  // Contrato compat.ts: record individual sem prefixo (album_{id}).
+  return `album_${albumId}`
+}
+
+function catalogMusicKey(musicId: string | number): string {
+  // Contrato compat.ts: record individual sem prefixo (music_{id}).
+  return `music_${musicId}`
+}
+
 /** Lê registro local; se faltar, busca na API Piano e cacheia em .sysdata. */
 async function readOrFetchCatalogRecord<T>(filename: string): Promise<T | null> {
   const local = await readCatalogRecord<T>(filename)
@@ -31,6 +41,9 @@ async function readOrFetchCatalogRecord<T>(filename: string): Promise<T | null> 
     return remote
   } catch (error) {
     console.warn(`[sync] falha ao obter catálogo ${filename}`, error)
+    void import('@shared/services/telemetry').then(({ reportError }) =>
+      reportError(error, { scope: 'catalog-fetch', filename }),
+    )
     return null
   }
 }
@@ -84,7 +97,7 @@ async function collectMediaForAlbum(
     songRefs = hymnalData
   } else {
     const albumData = await readOrFetchCatalogRecord<CatalogAlbumRecord>(
-      `album_${album.id}`,
+      catalogAlbumKey(album.id),
     )
     if (!albumData?.musics || !Array.isArray(albumData.musics)) {
       return { items: [], found: false }
@@ -100,7 +113,7 @@ async function collectMediaForAlbum(
     onSongFetched?.(fetched, total)
 
     const musicData = await readOrFetchCatalogRecord<CatalogMusicRecord>(
-      `music_${song.id_music}`,
+      catalogMusicKey(song.id_music),
     )
     if (!musicData) continue
 
@@ -141,7 +154,7 @@ export async function listAlbumMusicIds(
     songRefs = hymnalData
   } else {
     const albumData = await readOrFetchCatalogRecord<CatalogAlbumRecord>(
-      `album_${album.id}`,
+      catalogAlbumKey(album.id),
     )
     if (!albumData?.musics || !Array.isArray(albumData.musics)) return []
     songRefs = albumData.musics
@@ -165,7 +178,7 @@ export async function resolveAlbumIdsForMusic(
     albums?: Array<{ id_album?: number | string }>
   }
 
-  const music = await readOrFetchCatalogRecord<MusicAlbumsRow>(`music_${musicId}`)
+  const music = await readOrFetchCatalogRecord<MusicAlbumsRow>(catalogMusicKey(musicId))
   if (!music?.albums || !Array.isArray(music.albums)) return []
 
   const ids: Array<string | number> = []
@@ -265,6 +278,7 @@ export async function downloadAlbumMedia(
 
     await Promise.all(
       batch.map(async (media) => {
+        /* v8 ignore next 1 -- callbacks do Promise.all rodam o guard antes de qualquer await: consecutiveErrors é 0 no lote (documentado no teste) */
         if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) return
 
         const relativePath = toRelativeMediaPath(media.url)
@@ -297,9 +311,22 @@ export async function downloadAlbumMedia(
   const abortedByErrors = consecutiveErrors >= MAX_CONSECUTIVE_ERRORS
 
   if (abortedByErrors || !navigator.onLine) {
+    const failureReason: DownloadFailureReason = !navigator.onLine ? 'offline' : 'server'
+    // telemetria: abort de download é evento raro e valioso (bug do vídeo 08/10)
+    void import('@shared/services/telemetry').then(({ reportError }) =>
+      reportError(new Error(`download abortado (${failureReason})`), {
+        album: album.id,
+        albumName: album.name,
+        failureReason,
+        totalErrors,
+        totalFiles: allMediaFiles.length,
+        downloaded,
+        maxConsecutive: MAX_CONSECUTIVE_ERRORS,
+      }),
+    )
     return {
       status: 'error',
-      failureReason: !navigator.onLine ? 'offline' : 'server',
+      failureReason,
       totalErrors,
     }
   }

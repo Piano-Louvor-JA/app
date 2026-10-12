@@ -37,7 +37,7 @@ type CatalogMusicRow = {
   lyric?: CatalogLyricRow[] | Record<string, CatalogLyricRow>
 }
 
-function asNumber(value: unknown, fallback = 0): number {
+function asNumber(value: unknown, fallback: number): number {
   const n = Number(value)
   return Number.isFinite(n) ? n : fallback
 }
@@ -122,12 +122,13 @@ export async function loadMediaTrack(
 ): Promise<MediaTrackRecord | null> {
   if (!Number.isFinite(musicId) || musicId <= 0) return null
 
-  const local = await readCatalogRecord<CatalogMusicRow>(`music_${musicId}`)
+  // Contrato compat.ts: record individual sem prefixo de idioma (music_{id}).
+  const filename = `music_${musicId}`
+  const local = await readCatalogRecord<CatalogMusicRow>(filename)
   // Fallback remoto: faixa nova (ex: Infantis/Doxologia 90xxx) pode não estar
   // no cache local ainda — busca do backend antes de desistir (trackMissing).
   try {
-    const row =
-      local ?? (await fetchRemoteCatalogJson<CatalogMusicRow>(`music_${musicId}`))
+    const row = local ?? (await fetchRemoteCatalogJson<CatalogMusicRow>(filename))
     return row ? mapTrack(row, musicId) : null
   } catch {
     // Registro remoto ausente/indisponível é apresentado pelo store como

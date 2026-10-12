@@ -123,7 +123,7 @@ describe('loadMediaTrack', () => {
 
     const track = await loadMediaTrack(2643)
 
-    expect(readCatalogRecord).toHaveBeenCalledWith('es_music_2643')
+    expect(readCatalogRecord).toHaveBeenCalledWith('music_2643')
     expect(track).toMatchObject({
       audioUrl: '/musics/es/Himnario Adventista/Cantad alegres al Senor.mp3',
       coverUrl: '/covers/es/2003.jpg',
