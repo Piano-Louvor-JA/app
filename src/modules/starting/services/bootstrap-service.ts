@@ -25,9 +25,38 @@ export type BootstrapFilesFlag = {
 
 const BOOTSTRAP_FILES_KEY = 'bootstrapComplete.files' as const
 
+function essentialFiles(lang: string): string[] {
+  return [
+    `${lang}_categories`,
+    `${lang}_hymnal`,
+    `${lang}_hymnal_1996`,
+    `${lang}_musics`,
+    `${lang}_bible_book`,
+    `${lang}_bible_version`,
+  ]
+}
+
 async function readBootstrapFiles(): Promise<Set<string>> {
   const flag = await readCatalogRecord<BootstrapFilesFlag>(BOOTSTRAP_FILES_KEY)
   return new Set(Array.isArray(flag?.files) ? flag.files : [])
+}
+
+/** Reconstitui o marcador em instalações interrompidas de versões antigas. */
+async function readStoredEssentialFiles(lang: string): Promise<Set<string>> {
+  const entries = await Promise.all(
+    essentialFiles(lang).map(async (file) => [file, await readCatalogRecord(file)] as const),
+  )
+  return new Set(entries.filter(([, data]) => data !== null).map(([file]) => file))
+}
+
+async function resumableBootstrapFiles(lang: string): Promise<Set<string>> {
+  const marked = await readBootstrapFiles()
+  const stored = await readStoredEssentialFiles(lang)
+  // O disco é a fonte de verdade: marcador sem arquivo nunca pode pular download.
+  if (stored.size > 0 && (stored.size !== marked.size || [...stored].some((file) => !marked.has(file)))) {
+    await writeCatalogRecord(BOOTSTRAP_FILES_KEY, { files: [...stored] })
+  }
+  return stored
 }
 
 async function addBootstrapFile(file: string): Promise<void> {
@@ -75,20 +104,10 @@ export async function isBootstrapComplete(): Promise<boolean> {
     WORKSPACE_RECORD_KEYS.bootstrapComplete,
   )
   if (!flag?.complete) return false
-  // Flag legada pode existir sem a lista por arquivo (instalação antiga):
-  // mantém válida. Instalações novas exigem a lista completa do idioma.
-  const files = await readBootstrapFiles()
-  if (files.size === 0) return true
   const lang = getCurrentApiPrefix()
-  const required = [
-    `${lang}_categories`,
-    `${lang}_hymnal`,
-    `${lang}_hymnal_1996`,
-    `${lang}_musics`,
-    `${lang}_bible_book`,
-    `${lang}_bible_version`,
-  ]
-  return required.every((f) => files.has(f))
+  // Flag antiga sem marcador não prova integridade: valida os arquivos reais.
+  const files = await resumableBootstrapFiles(lang)
+  return essentialFiles(lang).every((file) => files.has(file))
 }
 
 export async function markBootstrapComplete(): Promise<void> {
@@ -96,6 +115,8 @@ export async function markBootstrapComplete(): Promise<void> {
 }
 
 export async function prepareFreshInstall(): Promise<void> {
+  // Não apaga uma instalação que já baixou algo: retoma no arquivo pendente.
+  if ((await resumableBootstrapFiles(getCurrentApiPrefix())).size > 0) return
   // Preserva Media (capas/músicas) se já existir de outra instalação no mesmo path.
   await clearWorkspace({ preserveMedia: true })
 }
@@ -115,18 +136,11 @@ export async function syncEssentialCatalogFromApi(
   options?: { apiPrefix?: string },
 ): Promise<void> {
   const lang = options?.apiPrefix ?? getCurrentApiPrefix()
-  const files = [
-    `${lang}_categories`,
-    `${lang}_hymnal`,
-    `${lang}_hymnal_1996`,
-    `${lang}_musics`,
-    `${lang}_bible_book`,
-    `${lang}_bible_version`,
-  ]
+  const files = essentialFiles(lang)
 
   // app#337: retomada — pula os arquivos já persistidos em boot anterior
   // (perda de foco/rede no meio não joga o trabalho fora).
-  const done = await readBootstrapFiles()
+  const done = await resumableBootstrapFiles(lang)
   const pending = files.filter((f) => !done.has(f))
   const alreadyDone = files.length - pending.length
   if (pending.length === 0) {
