@@ -21,6 +21,10 @@ const hoisted = vi.hoisted(() => {
     playerStub: {
       isPlaying: { value: false },
       session: { value: { title: 'Faixa X' } },
+      slideIndex: { value: 0 },
+      nextSlide: vi.fn(async () => {}),
+      previousSlide: vi.fn(async () => {}),
+      goToSlide: vi.fn(async (_i: number) => {}),
       volume: { value: 0.7 },
       currentTimeSec: { value: 0 },
       durationSec: { value: 0 },
@@ -581,6 +585,46 @@ describe('installRemoteLiturgyBridge', () => {
     const { command } = await installBridge()
     await command({ action: 'liturgy.state', id: 80 })
     expect(hoisted.remoteApiStub.sendAck.mock.calls.at(-1)?.[0].ok).toBe(true)
+  })
+
+  it('slide:next/prev/goto controlam o player (superfície do pregador)', async () => {
+    const { command } = await installBridge()
+    await command({ action: 'slide:next', id: 91 })
+    await command({ action: 'slide:prev', id: 92 })
+    await command({ action: 'slide:goto', id: 93, index: 2 })
+    expect(hoisted.playerStub.nextSlide).toHaveBeenCalledTimes(1)
+    expect(hoisted.playerStub.previousSlide).toHaveBeenCalledTimes(1)
+    expect(hoisted.playerStub.goToSlide).toHaveBeenCalledWith(2)
+    // goto sem index numérico → false
+    await command({ action: 'slide:goto', id: 94, index: 'x' as unknown as number })
+    const ack = hoisted.remoteApiStub.sendAck.mock.calls.at(-1)?.[0]
+    expect(ack.ok).toBe(false)
+  })
+
+  it('estado inclui slide {index,total} do player', async () => {
+    hoisted.playerStub.slideIndex.value = 3
+    hoisted.playerStub.session.value = { title: 'Faixa X', slides: new Array(7) }
+    const { command } = await installBridge()
+    await command({ action: 'liturgy.state', id: 95 })
+    await vi.waitFor(() => {
+      const st = hoisted.remoteApiStub.sendState.mock.calls.at(-1)?.[0]
+      expect(st.slide).toEqual({ index: 3, total: 7 })
+    })
+    // sem session/slides → fallback 0
+    hoisted.playerStub.session.value = { title: 'Faixa X' }
+    hoisted.playerStub.slideIndex.value = 0
+    await command({ action: 'liturgy.state', id: 96 })
+    await vi.waitFor(() => {
+      const st = hoisted.remoteApiStub.sendState.mock.calls.at(-1)?.[0]
+      expect(st.slide).toEqual({ index: 0, total: 0 })
+    })
+    // session inteira indefinida → fallback 0
+    hoisted.playerStub.session.value = undefined
+    await command({ action: 'liturgy.state', id: 97 })
+    await vi.waitFor(() => {
+      const st = hoisted.remoteApiStub.sendState.mock.calls.at(-1)?.[0]
+      expect(st.slide).toEqual({ index: 0, total: 0 })
+    })
   })
 
   it('ação totalmente desconhecida → false (return final)', async () => {

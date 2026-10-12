@@ -48,6 +48,8 @@ function makeBridge(overrides: Record<string, unknown> = {}) {
         token: 'TOKEN123',
         connectUrl: 'http://192.168.0.10:8787/?token=TOKEN123',
         qrDataUrl: 'data:image/png;base64,QR',
+        speakerUrl: 'http://192.168.0.10:7080/speaker?remotePort=8787&palcoPort=7081&token=TOKEN123',
+        speakerQrDataUrl: 'data:image/png;base64,QRSPK',
         clientCount: 0,
         clientAddress: null,
       })),
@@ -82,6 +84,17 @@ describe('RemotePairingView', () => {
     expect(wrapper.text()).toContain('192.168.0.10:8787')
     expect(wrapper.find('[data-testid="remote-token"]').text()).toBe('TOKEN123')
     expect(wrapper.text()).toContain('Aguardando')
+    // Bloco do pregador: QR + URL
+    expect(wrapper.find('[data-testid="remote-speaker-block"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="remote-speaker-qr"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="remote-speaker-url"]').text()).toBe('http://192.168.0.10:7080/speaker?remotePort=8787&palcoPort=7081&token=TOKEN123')
+    expect(wrapper.find('[data-testid="remote-speaker-copy"]').exists()).toBe(true)
+    const writeText = vi.fn()
+    Object.assign(navigator, { clipboard: { writeText } })
+    // 1º clique com clipboard ausente (branch opcional) — jsdom default
+    await wrapper.find('[data-testid="remote-speaker-copy"]').trigger('click')
+    await flushPromises()
+    expect(writeText).toHaveBeenCalledWith('http://192.168.0.10:7080/speaker?remotePort=8787&palcoPort=7081&token=TOKEN123')
   })
 
   it('pairingInfo rejeita: failed', async () => {
@@ -117,6 +130,25 @@ describe('RemotePairingView', () => {
     await flushPromises()
     await wrapper.find('[data-testid="remote-copy"]').trigger('click')
     expect(writeText).toHaveBeenCalledWith('http://192.168.0.10:8787/?token=TOKEN123')
+  })
+
+  it('copySpeakerUrl sem speakerUrl: early return sem clipboard', async () => {
+    const writeText = vi.fn()
+    Object.assign(navigator, { clipboard: { writeText } })
+    mocks.getDesktopBridge.mockReturnValue(makeBridge({
+      pairingInfo: vi.fn(async () => ({
+        host: '192.168.0.10', port: 8787, token: 'TOKEN123',
+        connectUrl: 'http://192.168.0.10:8787/?token=TOKEN123',
+        qrDataUrl: 'data:image/png;base64,QR',
+        clientCount: 0, clientAddress: null,
+      })),
+    }))
+    const wrapper = createWrapper()
+    await flushPromises()
+    expect(wrapper.find('[data-testid="remote-speaker-block"]').exists()).toBe(false)
+    const vm = wrapper.vm as unknown as { copySpeakerUrl?: () => void }
+    expect(() => vm.copySpeakerUrl?.()).not.toThrow()
+    expect(writeText).not.toHaveBeenCalled()
   })
 
   it('unmount: desinscreve onClients', async () => {

@@ -61,7 +61,6 @@ const V2_NAMESPACES = new Set(['media', 'bible', 'timer', 'countdown', 'clock', 
 export function installRemoteLiturgyBridge({ router }: { router: Router }) {
   const liturgy = useLiturgyStore()
   const player = useMediaPlayer()
-  const mediaStore = useMediaPlayer()
   const remoteApi = getDesktopBridge()?.remote
   const projection = getDesktopBridge()?.projection
   if (!remoteApi) return () => {}
@@ -175,8 +174,8 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
         })),
       },
       slide: {
-        index: mediaStore.slideIndex.value ?? 0,
-        total: mediaStore.session.value?.slides?.length ?? 0,
+        index: player.slideIndex.value,
+        total: player.session.value?.slides?.length ?? 0,
       },
       player: {
         ...media,
@@ -215,11 +214,11 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
     const current = liturgy.selectedItemIndex ?? -1
 
     // Pregador: única superfície autorizada pelo servidor.
-    if (action === 'slide:next') { await mediaStore.nextSlide(); return true }
-    if (action === 'slide:prev') { await mediaStore.previousSlide(); return true }
+    if (action === 'slide:next') { await player.nextSlide?.(); return true }
+    if (action === 'slide:prev') { await player.previousSlide?.(); return true }
     if (action === 'slide:goto') {
       if (typeof msg.index !== 'number') return false
-      await mediaStore.goToSlide(msg.index); return true
+      await player.goToSlide?.(msg.index); return true
     }
 
     // 0) Namespaces v2 (bible/timer/countdown) — spec controle remoto total.
