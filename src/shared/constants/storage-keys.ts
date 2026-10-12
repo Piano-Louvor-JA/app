@@ -38,4 +38,5 @@ export const WORKSPACE_RECORD_KEYS = {
   coversSynced: 'covers_synced',
   downloadedAlbums: 'downloaded_albums',
   config: 'config',
+  catalogRefreshCheckedAt: 'catalog_refresh_checked_at',
 } as const

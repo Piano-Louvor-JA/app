@@ -31,6 +31,8 @@ type CatalogCategoryAlbum = {
 type CatalogCategory = {
   id_category?: number | string
   name?: string
+  /** Slug estável entre idiomas (aym, kids, ...) — chave de ordenação. */
+  slug?: string
   albums?: CatalogCategoryAlbum[]
 }
 
@@ -180,6 +182,7 @@ export async function loadAlbumCategories(): Promise<AlbumCategory[]> {
       result.push({
         id: category.id_category ?? category.name ?? collections[0]!.id,
         name: String(category.name ?? '').trim() || 'Coletâneas',
+        slug: category.slug,
         collections: sortCollectionsRecentFirst(collections),
       })
     }
@@ -208,16 +211,26 @@ function sortAlbumCategories(categories: AlbumCategory[]): AlbumCategory[] {
     Hinários: 1,
     hymnals: 1,
     'CDs Oficiais/Ano': 2,
+    aym: 2,
+    'CDs Oficiales/año': 2,
     Infantis: 3,
+    kids: 3,
     Doxologia: 4,
+    doxology: 4,
     Adoradores: 10,
+    worshipers: 10,
     Cantores: 11,
+    singers: 11,
     'Celebra SP': 12,
+    celebrate_sp: 12,
     Diversas: 13,
+    misc: 13,
   }
   return [...categories].sort((a, b) => {
-    const orderA = CATEGORY_ORDER[String(a.id)] ?? CATEGORY_ORDER[a.name] ?? 50
-    const orderB = CATEGORY_ORDER[String(b.id)] ?? CATEGORY_ORDER[b.name] ?? 50
+    const orderA =
+      CATEGORY_ORDER[String(a.id)] ?? CATEGORY_ORDER[a.slug ?? ''] ?? CATEGORY_ORDER[a.name] ?? 50
+    const orderB =
+      CATEGORY_ORDER[String(b.id)] ?? CATEGORY_ORDER[b.slug ?? ''] ?? CATEGORY_ORDER[b.name] ?? 50
     if (orderA !== orderB) return orderA - orderB
     return a.name.localeCompare(b.name)
   })

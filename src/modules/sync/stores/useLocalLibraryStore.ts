@@ -157,6 +157,11 @@ export const useLocalLibraryStore = defineStore('localLibrary', () => {
     }
   }
 
+  // Store Pinia é singleton por app; listener vive até fechar a janela.
+  window.addEventListener('louvorja:catalog-refreshed', () => {
+    if (categories.value.length > 0) void refreshCollections()
+  })
+
   /**
    * Marca no manifesto as coletâneas já presentes no disco (import legado)
    * e recarrega a listagem da Central de Mídia.

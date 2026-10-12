@@ -9,6 +9,8 @@ useDefault = true
 paths = [
   '''src/modules/sync/services/__tests__/library-catalog\.test\.ts''',
   '''src/modules/albums/services/album-catalog\.ts''',
+  '''src/modules/sync/services/__tests__/api-prefix\.integration\.test\.ts''',
+  '''src/modules/albums/services/__tests__/album-catalog-order-es\.test\.ts''',
   # localStorage keys tipo 'stage.bg-migrated-0510' (não são credenciais;
   # gitleaks v8 generic-api-key bate pela entropia do sufixo de data).
   '''src/modules/settings/services/stage-settings-preferences\.ts''',

@@ -20,6 +20,8 @@ export type AlbumCollection = {
 export type AlbumCategory = {
   id: string | number
   name: string
+  /** Slug estável entre idiomas (aym, kids, ...) — chave de ordenação. */
+  slug?: string
   collections: AlbumCollection[]
 }
 
