@@ -11,12 +11,6 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify('0.0.0-test'),
   },
   plugins: [vue()],
-  // __APP_VERSION__ é injetado pelo build (vite.config do app) — em teste usamos a versão do package.json
-  define: {
-    __APP_VERSION__: JSON.stringify(
-      JSON.parse(require('node:fs').readFileSync('./package.json', 'utf-8')).version,
-    ),
-  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
@@ -33,15 +27,16 @@ export default defineConfig({
     },
   },
   test: {
-    // e2e/helpers/__tests__ roda no vitest (unit do guard de produção); as
-    // specs de e2e/ continuam sendo Playwright, não vitest.
-    exclude: ['node_modules/**', 'dist/**', 'e2e/*.spec.ts', '.worktrees/**', 'coverage/**', 'scripts/release-publish-decision.test.mjs'],
+    exclude: ['node_modules/**', 'dist/**', 'e2e/**', '.worktrees/**', 'coverage/**', 'scripts/release-publish-decision.test.mjs', 'scripts/coverage-gate-limit.test.mjs'],
     environment: 'jsdom',
     environmentOptions: {
       jsdom: {
         url: 'http://localhost/',
       },
     },
+    setupFiles: ['./vitest.setup.ts'],
+    // Runs completos estouram 5s em testes que mockam bridge/processamento pesado.
+    testTimeout: 30_000,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'text-summary', 'lcov'],

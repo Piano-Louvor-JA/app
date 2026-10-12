@@ -45,7 +45,7 @@ export type LocalMusic = {
 	coverMediaId?: string | null;
 	/** Duração conhecida/estimada (ms) — p.ex. import .slja (app#331). */
 	durationMs?: number | null;
-	/** SHA-256 do arquivo .slja de origem — dedupe de re-import (app#331). */
+	/** SHA-256 do arquivo de origem — dedupe de re-import/migração (app#336). */
 	sljaHash?: string | null;
 };
 
@@ -79,17 +79,6 @@ export function isLocalId(id: number | string | null | undefined): boolean {
 	return Number.isFinite(n) && n < 0;
 }
 
-
-/** Lê o db completo (uso do sync `.louvorja`). */
-export function loadLocalDb(): LocalDb {
-	return loadDb();
-}
-
-/** Substituição TOTAL do db local (sync `.louvorja`). false = quota/storage falhou. */
-export function replaceLocalDb(next: LocalDb): boolean {
-	return saveDb(next);
-}
-
 function loadDb(): LocalDb {
 	try {
 		const raw = localStorage.getItem(STORAGE_KEY);
@@ -108,11 +97,21 @@ function loadDb(): LocalDb {
 	}
 }
 
-function saveDb(db: LocalDb): void {
-	// Quota NÃO é mais engolida (bug slja-storage): falha silenciosa fazia o
-	// import reportar sucesso com só a 1ª estrofe persistida. Callers do
-	// import tratam e mostram "armazenamento cheio" na UI.
-	localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+export function loadLocalDb(): LocalDb {
+	return loadDb();
+}
+
+export function replaceLocalDb(next: LocalDb): boolean {
+	return saveDb(next);
+}
+
+function saveDb(db: LocalDb): boolean {
+	try {
+		localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+		return true;
+	} catch {
+		return false;
+	}
 }
 
 /* ---------- Coletâneas ---------- */
@@ -168,6 +167,11 @@ export function deleteLocalCollection(id: number): boolean {
 
 /* ---------- Músicas ---------- */
 
+/** Encontra música local pelo hash do arquivo de origem (dedupe app#336). */
+export function findLocalMusicBySljaHash(hash: string): LocalMusic | null {
+	return loadDb().musics.find((m) => m.sljaHash === hash) ?? null;
+}
+
 export function listLocalMusics(collectionId: number): LocalMusic[] {
 	return loadDb().musics.filter((m) => m.collectionId === collectionId);
 }
@@ -181,15 +185,14 @@ export function listAllLocalMusicsWithLyrics(): LocalMusic[] {
 	return loadDb().musics;
 }
 
-/** Música local importada do mesmo arquivo .slja (dedupe por content hash). */
-export function findLocalMusicBySljaHash(hash: string): LocalMusic | null {
-	const db = loadDb();
-	return db.musics.find((m) => m.sljaHash === hash) ?? null;
-}
-
 export function createLocalMusic(
 	collectionId: number,
-	input: { name?: string; lyric?: string; officialMusicId?: number },
+	input: {
+		name?: string;
+		lyric?: string;
+		officialMusicId?: number;
+		sljaHash?: string | null;
+	},
 ): LocalMusic {
 	const db = loadDb();
 	const music: LocalMusic = {
@@ -197,6 +200,7 @@ export function createLocalMusic(
 		collectionId,
 		name: input.name ?? "",
 		officialMusicId: input.officialMusicId ?? null,
+		sljaHash: input.sljaHash ?? null,
 		lyrics: [],
 	};
 	db.nextMusicId -= 1;
@@ -262,7 +266,7 @@ export function createLocalLyric(
 		order?: number;
 		/** Fundo do slide — data: URL base64 (import .slja local). */
 		image_url?: string | null;
-		image_position?: string | number | null;
+		image_position?: string | null;
 	},
 ): LocalLyric {
 	const db = loadDb();
@@ -277,14 +281,12 @@ export function createLocalLyric(
 		order,
 		show_slide: true,
 		image_url: input.image_url ?? null,
-		image_position: input.image_position == null ? null : String(input.image_position),
+		image_position: input.image_position ?? null,
 	};
 	db.nextLyricId -= 1;
 	music.lyrics.push(lyric);
 	music.lyrics.sort((a, b) => a.order - b.order);
-	if (!saveDb(db)) {
-		throw new Error("local-persist-failed");
-	}
+	saveDb(db);
 	return lyric;
 }
 

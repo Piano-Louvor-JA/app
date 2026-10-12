@@ -23,6 +23,7 @@ import type {
 	ScheduledItem,
 } from "@modules/liturgy/stores/useScheduledStore";
 import { USER_PREFERENCE_KEYS } from "@shared/constants/storage-keys";
+import { deriveSessionTimesFromCategories } from "@modules/liturgy/services/liturgy-duration-enrich";
 import {
 	getUserPreference,
 	setUserPreference,

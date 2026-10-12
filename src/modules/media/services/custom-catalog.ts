@@ -1,6 +1,3 @@
-import { defaultApiOrigin } from '@shared/services/api-env'
-
-import { parseSlideTimeToSeconds } from './media-slides'
 import type {
   MediaLyricSlide,
   MediaTrackRecord,
@@ -145,15 +142,16 @@ function customBaseUrl(): string {
   // Default da nossa API — sem env, '/v1/custom' relativo dá 404 no desktop
   // (coletâneas não baixam). .env é gitignored / CI não injeta (hotfix 14/09).
   const base =
-    import.meta.env.VITE_PALCO_API_URL ?? defaultApiOrigin()
-  return `${base.replace(/\/$/, '')}/v1/custom`
+    import.meta.env.VITE_PALCO_API_URL ?? 'https://api.pianolouvorja.com.br'
+  if (base) return `${base.replace(/\/$/, '')}/v1/custom`
+  return '/v1/custom'
 }
 
 /**
  * Formata duração da API para m:ss.
  * API pode retornar: null, segundos (number), "mm:ss" ou "hh:mm:ss".
  */
-export function formatDurationLabel(value: unknown): string {
+function formatDurationLabel(value: unknown): string {
   const raw = asNullableString(value)
   if (raw) {
     // Já vem formatado ("3:45" / "00:03:45") — só limpar horas vazias
@@ -237,9 +235,7 @@ export async function loadCustomMusicTrack(
   if (!Number.isFinite(musicId) || musicId <= 0) return null
 
   try {
-    const response = await fetch(`${customBaseUrl()}/musics/${musicId}`, {
-      headers: authHeaders(),
-    })
+    const response = await fetch(`${customBaseUrl()}/musics/${musicId}`)
     if (!response.ok) return null
     const row = (await response.json()) as CustomMusicRow
     if (!row || !row.name) return null
@@ -350,7 +346,7 @@ export async function updateCustomCollection(
   }
 }
 
-export async function listCustomCollections(options?: { signal?: AbortSignal }): Promise<
+export async function listCustomCollections(): Promise<
   CustomCollectionSummary[]
 > {
   // Locais (ids negativos, só desta máquina) entram primeiro na lista.
@@ -365,7 +361,6 @@ export async function listCustomCollections(options?: { signal?: AbortSignal }):
   try {
     const response = await fetch(`${customBaseUrl()}/collections`, {
       headers: authHeaders(),
-      signal: options?.signal,
     })
     if (!response.ok) return locals
     const json = (await response.json()) as {
@@ -428,7 +423,7 @@ function localMusicToSummary(m: LocalMusic): CustomMusicSummary {
 export async function copyCustomMusic(
   collectionId: number,
   musicId: number,
-): Promise<{ id: number; existed?: boolean } | null> {
+): Promise<{ id: number } | null> {
   try {
     const response = await fetch(
       `${customBaseUrl()}/collections/${collectionId}/musics/${musicId}/copy`,
@@ -436,9 +431,7 @@ export async function copyCustomMusic(
     )
     if (!response.ok) return null
     const json = (await response.json()) as { id_music: number }
-    // Dedup de imports (app#336 fase 3): 200 = já existia (mesmo client_uuid)
-    // e a API retornou o registro existente; 201 = criado agora.
-    return { id: json.id_music, existed: response.status === 200 }
+    return { id: json.id_music }
   } catch {
     return null
   }
@@ -481,9 +474,10 @@ export async function listAllCustomMusics(options?: {
     return (json.data ?? []).map((row) => ({
       id: row.id_music,
       name: row.name ?? '',
-      duration: typeof row.duration === 'string'
-        ? parseSlideTimeToSeconds(row.duration) || null
-        : row.duration ?? null,
+      duration:
+        typeof row.duration === 'string'
+          ? Number(row.duration.split(':').reduce((acc, part) => acc * 60 + Number(part), 0)) || null
+          : row.duration ?? null,
       hasAudio: Boolean(row.audio_url),
       hasImage: Boolean(row.image_url),
       audioUrl: row.audio_url ?? null,
@@ -506,7 +500,6 @@ export async function listCustomMusics(
   try {
     const response = await fetch(
       `${customBaseUrl()}/collections/${collectionId}/musics`,
-      { headers: authHeaders() },
     )
     if (!response.ok) return []
     const json = (await response.json()) as {
@@ -592,7 +585,7 @@ export function probeAudioDuration(
     const done = (value: number | null) => {
       clearTimeout(timer)
       audio.removeAttribute('src')
-      try { audio.load() } catch {}
+      audio.load()
       resolve(value)
     }
     const timer = setTimeout(() => done(null), timeoutMs)
@@ -617,7 +610,6 @@ export async function createCustomCollection(
   description?: string,
   authorName?: string,
   visibility?: CollectionVisibility,
-  options?: { queueOffline?: boolean },
 ): Promise<{ id: number } | null> {
   // Sem auth: cria LOCAL (regra de produto 12/09 — sem identidade não sobe).
   if (!getAuthSession()) {
@@ -641,9 +633,6 @@ export async function createCustomCollection(
     const json = (await response.json()) as { id_collection: number }
     return { id: json.id_collection }
   } catch {
-    // O import .slja não pode deixar uma coletânea vazia na fila quando
-    // desiste do envio. O editor continua enfileirando.
-    if (options?.queueOffline === false) return null
     // Offline (autenticado): enfileira pro sync (B1/B2). O client_uuid dá
     // identidade estável — o próximo flush cria/atualiza no servidor.
     await enqueue({
@@ -665,7 +654,6 @@ export async function createCustomMusic(
     lyric?: string
     auxiliary_lyric?: string
     client_uuid?: string
-    duration?: number
   },
 ): Promise<{ id: number; existed?: boolean } | null> {
   if (isLocalId(collectionId)) {
@@ -686,7 +674,7 @@ export async function createCustomMusic(
     )
     if (!response.ok) return null
     const json = (await response.json()) as { id_music: number }
-    // 200 = mesmo client_uuid já existia; 201 = criada agora.
+    // Dedup (web#187 paridade): 200 = já existia (mesmo client_uuid)
     return { id: json.id_music, existed: response.status === 200 }
   } catch {
     return null
@@ -818,16 +806,11 @@ export async function createCustomLyric(
     time?: string
     order?: number
     id_file_image?: number
-    image_position?: string | number
   },
 ): Promise<{ id: number } | null> {
   if (isLocalId(musicId)) {
-    try {
-      const local = createLocalLyric(musicId, input)
-      return { id: local.id }
-    } catch {
-      return null
-    }
+    const local = createLocalLyric(musicId, input)
+    return { id: local.id }
   }
   try {
     const response = await fetch(`${customBaseUrl()}/musics/${musicId}/lyrics`, {
