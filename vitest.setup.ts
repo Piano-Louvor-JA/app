@@ -1,3 +1,6 @@
+import { createRequire } from 'node:module'
+import { Blob as NodeBlob } from 'node:buffer'
+
 // vitest.setup.ts — roda após o environment setup.
 //
 // 1) jsdom 27+: populateGlobal do vitest não copia localStorage/sessionStorage
@@ -54,5 +57,34 @@ if (typeof globalThis.HTMLMediaElement !== 'undefined') {
   }
   if (!HTMLMediaElement.prototype.pause) {
     HTMLMediaElement.prototype.pause = () => {}
+  }
+}
+
+// jsdom 30 guarda os bytes do Blob num campo privado. O Vitest 4.1.11 ainda
+// procura um símbolo interno com `_buffer` e quebra URL.createObjectURL.
+installJsdomBlobUrl()
+
+function installJsdomBlobUrl() {
+  const require = createRequire(import.meta.url)
+  let implForWrapper: (wrapper: object) => { _bytes?: Uint8Array } | null
+  try {
+    implForWrapper = require('jsdom/lib/generated/idl/utils.js').implForWrapper
+  } catch {
+    return
+  }
+
+  const patch = (urlCtor: typeof URL) => {
+    const original = urlCtor.createObjectURL.bind(urlCtor)
+    urlCtor.createObjectURL = (blob: Blob) => {
+      const bytes = implForWrapper(blob)?._bytes
+      if (bytes) return original(new NodeBlob([bytes], { type: blob.type }))
+      return original(blob)
+    }
+  }
+
+  patch(globalThis.URL)
+  const windowUrl = (globalThis as { window?: { URL?: typeof URL } }).window?.URL
+  if (windowUrl && windowUrl.createObjectURL !== globalThis.URL.createObjectURL) {
+    patch(windowUrl)
   }
 }
