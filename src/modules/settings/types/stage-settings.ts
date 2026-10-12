@@ -98,8 +98,12 @@ export type StageSettings = {
    */
   clock?: { style: 'digital' | 'analog'; showSeconds: boolean; format24h: boolean }
   timer?: { timeFormat: 'hh:mm:ss.ms' | 'hh:mm:ss' | 'mm:ss.ms' | 'mm:ss' }
-  countdown?: { timeFormat: 'hh:mm:ss' | 'mm:ss' }
-  random?: { fontSizePc: number; textTransform: 'none' | 'uppercase' | 'lowercase'; animationSpeed: 'slow' | 'normal' | 'fast' }
+  countdown?: { timeFormat: 'hh:mm:ss' | 'mm:ss'; allowNegative?: boolean }
+  random?: {
+    fontSizePc: number
+    textTransform: 'none' | 'uppercase' | 'lowercase'
+    animationSpeed: 'slow' | 'normal' | 'fast'
+  }
   /**
    * Hinos: por padrão o bg da projeção é o ASSET da música (capa/slide).
    * override=true → o backgroundImage configurado aqui vence o asset
@@ -121,6 +125,7 @@ export const DEFAULT_TIMER_MODULE_SETTINGS: NonNullable<StageSettings['timer']> 
 
 export const DEFAULT_COUNTDOWN_MODULE_SETTINGS: NonNullable<StageSettings['countdown']> = {
   timeFormat: 'hh:mm:ss',
+  allowNegative: false,
 }
 
 export const DEFAULT_RANDOM_MODULE_SETTINGS: NonNullable<StageSettings['random']> = {
@@ -397,7 +402,7 @@ export function parseStageSettings(raw: unknown): StageSettings {
             fontSizePc: clamp(
               asNumber((s['random'] as Record<string, unknown>)['fontSizePc'], 8),
               4,
-              14,
+              50,
             ),
             textTransform: RANDOM_TEXT_TRANSFORM_OPTIONS.includes(
               (s['random'] as Record<string, unknown>)['textTransform'] as NonNullable<StageSettings['random']>['textTransform'],
