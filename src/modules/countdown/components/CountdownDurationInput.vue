@@ -7,15 +7,16 @@ import {
   durationMsFromParts,
   durationPartsFromMs,
 } from '../services/countdown-format'
-import type { CountdownMode } from '../types/countdown'
+import type { CountdownRuntimeMode } from '../types/countdown'
 
 const props = withDefaults(
   defineProps<{
     durationMs: number
     disabled?: boolean
     /** Modo compacto: só os campos HH:MM:SS inline, sem cabeçalho (usado no card do grupo de tempo). */
+    noSeconds?: boolean
     compact?: boolean
-    mode?: CountdownMode
+    mode?: CountdownRuntimeMode
     untilHour?: number
     untilMinute?: number
   }>(),
@@ -29,7 +30,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   'update:durationMs': [value: number]
-  'update:mode': [value: CountdownMode]
+  'update:mode': [value: CountdownRuntimeMode]
   'update:until': [hour: number, minute: number]
 }>()
 
@@ -61,7 +62,7 @@ function onSeconds(event: Event) {
   commit({ seconds: clampDurationPart(target.value, 59) })
 }
 
-function onMode(next: CountdownMode) {
+function onMode(next: CountdownRuntimeMode) {
   if (props.disabled || next === props.mode) return
   emit('update:mode', next)
 }
@@ -100,6 +101,7 @@ function onUntilMinute(event: Event) {
     </div>
 
     <div
+      v-if="!noSeconds"
       class="countdown-duration__modes"
       role="group"
       :aria-label="t('countdown.mode')"
@@ -199,10 +201,11 @@ function onUntilMinute(event: Event) {
         >
       </label>
       <span
+        v-if="!noSeconds"
         class="countdown-duration__sep"
         aria-hidden="true"
       >:</span>
-      <label class="countdown-duration__field">
+      <label v-if="!noSeconds" class="countdown-duration__field">
         <span>{{ t('countdown.seconds') }}</span>
         <input
           type="number"

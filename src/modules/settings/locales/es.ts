@@ -337,6 +337,8 @@ export default {
       moduleHint: 'En cada módulo, elija Espejar (todas) o una TV individual.',
       route: 'Destino del palco',
       mirror: 'Espejar todas',
+      obsCopy: 'Copiar URL de OBS',
+      obsHint: 'En OBS: Fuentes → + → Navegador → pega esta URL (1920x1080).',
       connectedShort: 'TV online',
     },
     stage: {
@@ -380,7 +382,8 @@ export default {
       lyricFontSize: 'Tamaño de fuente de las estrofas',
       lyricFontWeight: 'Peso de fuente de las estrofas',
       lyricUpperCase: 'Estrofas en MAYÚSCULAS',
-      lyricTextShadow: 'Sombra en las estrofas',      bibleAppearance: 'Biblia — apariencia propia',
+      lyricTextShadow: 'Sombra en las estrofas',
+      bibleAppearance: 'Biblia — apariencia propia',
       bibleTextColor: 'Color del texto (Biblia)',
       bibleFontSize: 'Tamaño de fuente (Biblia)',
       bibleFontWeight: 'Peso (Biblia)',

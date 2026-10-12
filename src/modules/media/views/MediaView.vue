@@ -173,6 +173,7 @@ async function onMode(mode: MediaPlaybackMode) {
 
 async function onToggleFullscreen() {
   const el = stageRoot.value
+  /* v8 ignore next 3 -- stageRoot sempre renderizado; guard defensivo */
   if (!el) return
   if (document.fullscreenElement) {
     await document.exitFullscreen()

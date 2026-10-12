@@ -29,6 +29,8 @@ import { fileURLToPath } from 'node:url'
 import { app, ipcMain } from 'electron'
 import { WebSocketServer } from 'ws'
 
+import { loadOrCreatePalcoToken, requestHasPalcoAccess } from './palco-token.mjs'
+
 const BASE_HTTP_PORT = 7080
 const BASE_WS_PORT = 7081
 const MAX_SLOTS = 8 // slot 0-7
@@ -115,7 +117,19 @@ class PalcoSlot {
 
       this.#wss = new WebSocketServer({ port: this.#wsPort })
       this.#wss.on('connection', (ws, req) => {
-        if (req?.url && !req.url.startsWith('/palco')) { ws.close(); return }
+        if (req?.url && !req.url.split('?')[0].startsWith('/palco')) { ws.close(); return }
+        // OBS S1: token na LAN (localhost bypass) — feature off = comportamento atual
+        if (
+          !requestHasPalcoAccess({
+            remoteAddress: req?.socket?.remoteAddress,
+            url: req?.url,
+            headers: req?.headers,
+            expectedToken: getPalcoToken(),
+          })
+        ) {
+          try { ws.close() } catch { /* ignore */ }
+          return
+        }
         this.#clients.add(ws)
         const remoteIp = req?.socket?.remoteAddress?.replace('::ffff:', '')
         if (remoteIp) this.#receiverIps.set(ws, remoteIp)
@@ -212,6 +226,10 @@ class PalcoSlot {
       receiverIps: Array.from(new Set(this.#receiverIps.values())),
       url: `http://${lanIp()}:${this.#httpPort}`,
       wsUrl: `ws://${lanIp()}:${this.#wsPort}/palco`,
+      // OBS S1: receiver URL pronta com token (UI copia/cola no OBS Browser Source)
+      receiverUrl: this.#running
+        ? `http://${lanIp()}:${this.#httpPort}/?token=${getPalcoToken()}`
+        : null,
     }
   }
 
@@ -298,6 +316,18 @@ class PalcoSlot {
 
     // Proxy CORS p/ o receiver (origem file://)
     if (p === '/proxy') {
+      if (
+        !requestHasPalcoAccess({
+          remoteAddress: req.socket?.remoteAddress,
+          url: req.url,
+          headers: req.headers,
+          expectedToken: getPalcoToken(),
+        })
+      ) {
+        res.statusCode = 403
+        res.end('forbidden')
+        return
+      }
       const target = url.searchParams.get('url')
       if (!target || !/^https?:\/\//i.test(target)) { res.statusCode = 400; res.end('bad url'); return }
       try {
@@ -322,6 +352,18 @@ class PalcoSlot {
     // sem Range o <video> do receiver baixa o MP4 inteiro antes de tocar
     // fluido (stutter em 1080p) e seek não funciona.
     if (p.startsWith('/media/')) {
+      if (
+        !requestHasPalcoAccess({
+          remoteAddress: req.socket?.remoteAddress,
+          url: req.url,
+          headers: req.headers,
+          expectedToken: getPalcoToken(),
+        })
+      ) {
+        res.statusCode = 403
+        res.end('forbidden')
+        return
+      }
       const name = p.slice('/media/'.length)
       const entry = this.#media.get(name)
       if (!entry) { res.statusCode = 404; res.end(); return }
@@ -404,6 +446,25 @@ class PalcoSlot {
 /** Gerenciador de slots (singleton no main process). */
 function slotsConfigPath() {
   return path.join(app.getPath('userData'), 'palco-slots.json')
+}
+
+/** Token de acesso (persistido no userData). Feature off = null. */
+let _palcoToken = null
+export function palcoTokenPath() {
+  return path.join(app.getPath('userData'), 'palco-token.txt')
+}
+export function getPalcoToken() {
+  return _palcoToken
+}
+export function enablePalcoToken() {
+  _palcoToken = loadOrCreatePalcoToken(palcoTokenPath())
+  return _palcoToken
+}
+export function resetPalcoToken() {
+  const tmp = palcoTokenPath() + '.reset'
+  _palcoToken = loadOrCreatePalcoToken(tmp) // path inexistente → regenera
+  try { renameSync(tmp, palcoTokenPath()) } catch { /* best effort */ }
+  return _palcoToken
 }
 
 function readPersistedSlots() {
@@ -515,6 +576,17 @@ let manager = null
 export function attachPalcoServer(getContents) {
   if (!manager) manager = new PalcoManager(getContents)
   manager.init()
+
+  // OBS S1: token de acesso carregado/criado 1x no boot (persistido no userData)
+  enablePalcoToken()
+
+  // IPC: token (UI mostra URL pronta p/ OBS + reset)
+  ipcMain.handle('palco:token', () => ({ token: getPalcoToken(), path: palcoTokenPath() }))
+  ipcMain.handle('palco:token-reset', () => {
+    const token = resetPalcoToken()
+    // receivers conectados com o token velho caem na reconexão — ok
+    return { token }
+  })
 
   // IPC: lista slots
   ipcMain.handle('palco:slots', () =>

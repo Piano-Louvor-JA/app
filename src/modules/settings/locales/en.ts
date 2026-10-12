@@ -335,6 +335,8 @@ export default {
       moduleHint: 'In each module, choose Mirror (all) or one individual TV.',
       route: 'Stage destination',
       mirror: 'Mirror all',
+      obsCopy: 'Copy OBS URL',
+      obsHint: 'In OBS: Sources → + → Browser → paste this URL (1920x1080).',
       connectedShort: 'TV online',
     },
     stage: {
@@ -378,7 +380,8 @@ export default {
       lyricFontSize: 'Verse font size',
       lyricFontWeight: 'Verse font weight',
       lyricUpperCase: 'Verses in UPPERCASE',
-      lyricTextShadow: 'Verse shadow',      bibleAppearance: 'Bible — own appearance',
+      lyricTextShadow: 'Verse shadow',
+      bibleAppearance: 'Bible — own appearance',
       bibleTextColor: 'Text color (Bible)',
       bibleFontSize: 'Font size (Bible)',
       bibleFontWeight: 'Weight (Bible)',

@@ -20,6 +20,15 @@ const { t } = useI18n()
 const isOn = ref(false)
 const receivers = ref(0)
 const url = ref<string | null>(null)
+// OBS S1: URL do Browser Source (receiver + ?token=) — copiar/colar no OBS
+const obsUrl = ref('')
+const obsCopied = ref(false)
+function copyObsUrl() {
+  if (!obsUrl.value) return
+  void navigator.clipboard?.writeText(obsUrl.value)
+  obsCopied.value = true
+  setTimeout(() => (obsCopied.value = false), 2000)
+}
 const busy = ref(false)
 const available = palcoSession.isElectron
 
@@ -40,6 +49,11 @@ async function refreshStatus() {
     isOn.value = st.running
     receivers.value = st.clients
     url.value = st.url
+    // OBS S1: receiverUrl = URL completa com token (Browser Source do OBS)
+    obsUrl.value =
+      'receiverUrl' in st
+        ? String((st as { receiverUrl?: string | null }).receiverUrl ?? '')
+        : ''
     // Sender já rodando (ligado em sessão anterior ou via remote/APK):
     // sobe a bridge na hora — sem ela nada espelha na TV.
     if (st.running && wasOff) startPalcoBridge()
@@ -148,6 +162,29 @@ onUnmounted(() => {
       <p class="palco-card__hint">
         {{ t('settings.palco.hint') }}
       </p>
+
+      <!-- OBS S1: Browser Source — a URL já vai com o token de acesso -->
+      <div
+        v-if="obsUrl"
+        class="palco-card__obs"
+      >
+        <button
+          type="button"
+          class="palco-card__url palco-card__url--obs"
+          :title="t('settings.palco.obsCopy')"
+          @click="copyObsUrl"
+        >
+          <i
+            class="ti"
+            :class="obsCopied ? 'ti-circle-check' : 'ti-brand-obs'"
+            aria-hidden="true"
+          />
+          <span class="palco-card__obs-url">{{ obsUrl }}</span>
+        </button>
+        <p class="palco-card__hint">
+          {{ t('settings.palco.obsHint') }}
+        </p>
+      </div>
 
       <!-- Rota de áudio: escolha PRÉVIA do operador (PC / TV / Ambos).
            Não interfere na projeção via cabo — só no Palco (cast). -->
@@ -277,6 +314,21 @@ onUnmounted(() => {
   .ti {
     font-size: 0.95rem;
   }
+}
+
+.palco-card__obs {
+  margin-top: 8px;
+}
+
+.palco-card__url--obs {
+  width: 100%;
+  text-align: left;
+}
+
+.palco-card__obs-url {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .palco-card__url {

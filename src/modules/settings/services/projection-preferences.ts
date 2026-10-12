@@ -244,6 +244,7 @@ export function pickDefaultReturnDisplayId(
   if (extended[0]) return extended[0].id
 
   const primary = displays.find((display) => display.isPrimary)
+  /* v8 ignore next 1 -- length===0 já retornou acima; displays[0] sempre existe aqui */
   return primary?.id ?? displays[0]?.id ?? null
 }
 
