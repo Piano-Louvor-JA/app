@@ -617,10 +617,13 @@ function createWindow(locale = 'pt-BR') {
 			}
 	}
 
-	// Timeout de segurança: se ready-to-show não disparar em 15s, mostra erro
+	// Timeout de segurança: se ready-to-show não disparar, mostra erro.
+	// Dev: 90s (cold-optimize do Vite pode levar minutos neste disco);
+	// release mantém 15s (build pronto, sem depender de dev server).
+	const bootTimeoutMs = isDev ? 90_000 : 15_000;
 	const loadTimeout = setTimeout(() => {
 		if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
-			console.error("[main] timeout: janela principal não carregou em 15s");
+			console.error(`[main] timeout: janela principal não carregou em ${bootTimeoutMs / 1000}s`);
 			closeSplash();
 			dialog.showMessageBoxSync(mainWindow, {
 				type: "error",
@@ -631,7 +634,7 @@ function createWindow(locale = 'pt-BR') {
 			mainWindow.destroy();
 			mainWindow = null;
 		}
-	}, 15_000);
+	}, bootTimeoutMs);
 
 	mainWindow.once("ready-to-show", () => {
 		clearTimeout(loadTimeout);
