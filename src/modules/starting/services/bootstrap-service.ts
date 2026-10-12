@@ -12,6 +12,30 @@ export type BootstrapCompleteFlag = {
   complete: boolean
 }
 
+/**
+ * app#337: progresso POR ARQUIVO do first-boot. O bootstrap antigo era
+ * all-or-nothing — perder o foco da janela (throttle de timers em bg)
+ * abortava no meio e o próximo boot re-baixava tudo. Com a lista de
+ * arquivos concluídos persistida, o loop pula o que já está em disco e
+ * retoma de onde parou.
+ */
+export type BootstrapFilesFlag = {
+  files: string[]
+}
+
+const BOOTSTRAP_FILES_KEY = 'bootstrapComplete.files' as const
+
+async function readBootstrapFiles(): Promise<Set<string>> {
+  const flag = await readCatalogRecord<BootstrapFilesFlag>(BOOTSTRAP_FILES_KEY)
+  return new Set(Array.isArray(flag?.files) ? flag.files : [])
+}
+
+async function addBootstrapFile(file: string): Promise<void> {
+  const done = await readBootstrapFiles()
+  done.add(file)
+  await writeCatalogRecord(BOOTSTRAP_FILES_KEY, { files: [...done] })
+}
+
 export function mapBootstrapError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error)
 
@@ -50,7 +74,21 @@ export async function isBootstrapComplete(): Promise<boolean> {
   const flag = await readCatalogRecord<BootstrapCompleteFlag>(
     WORKSPACE_RECORD_KEYS.bootstrapComplete,
   )
-  return Boolean(flag?.complete)
+  if (!flag?.complete) return false
+  // Flag legada pode existir sem a lista por arquivo (instalação antiga):
+  // mantém válida. Instalações novas exigem a lista completa do idioma.
+  const files = await readBootstrapFiles()
+  if (files.size === 0) return true
+  const lang = getCurrentApiPrefix()
+  const required = [
+    `${lang}_categories`,
+    `${lang}_hymnal`,
+    `${lang}_hymnal_1996`,
+    `${lang}_musics`,
+    `${lang}_bible_book`,
+    `${lang}_bible_version`,
+  ]
+  return required.every((f) => files.has(f))
 }
 
 export async function markBootstrapComplete(): Promise<void> {
@@ -74,8 +112,9 @@ export async function syncRemoteConfig(): Promise<void> {
  */
 export async function syncEssentialCatalogFromApi(
   onProgress: (progress: number) => void,
+  options?: { apiPrefix?: string },
 ): Promise<void> {
-  const lang = getCurrentApiPrefix()
+  const lang = options?.apiPrefix ?? getCurrentApiPrefix()
   const files = [
     `${lang}_categories`,
     `${lang}_hymnal`,
@@ -85,8 +124,18 @@ export async function syncEssentialCatalogFromApi(
     `${lang}_bible_version`,
   ]
 
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i]
+  // app#337: retomada — pula os arquivos já persistidos em boot anterior
+  // (perda de foco/rede no meio não joga o trabalho fora).
+  const done = await readBootstrapFiles()
+  const pending = files.filter((f) => !done.has(f))
+  const alreadyDone = files.length - pending.length
+  if (pending.length === 0) {
+    onProgress(100)
+    return
+  }
+
+  for (let i = 0; i < pending.length; i++) {
+    const file = pending[i]
     const data = await fetchRemoteCatalogJson(file)
     const saved = await writeCatalogRecord(file, data)
     if (!saved && !getDesktopBridge()) {
@@ -95,7 +144,12 @@ export async function syncEssentialCatalogFromApi(
     if (!saved) {
       throw new Error(`Falha ao gravar catálogo local: ${file}`)
     }
-    onProgress(Math.round(((i + 1) / files.length) * 100))
+    // Persiste ANTES do próximo download (a falha no meio não perde o que
+    // já gravou) — é o que permite a retomada por arquivo.
+    await addBootstrapFile(file)
+    onProgress(
+      Math.round(((alreadyDone + i + 1) / files.length) * 100),
+    )
   }
 }
 

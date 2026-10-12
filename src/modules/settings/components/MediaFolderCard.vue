@@ -37,6 +37,7 @@ onMounted(() => {
 
 async function chooseAndMove() {
   const bridge = getDesktopBridge()
+  /* v8 ignore next 1 -- remap V8 do short-circuit: busy true exercido pelo duplo clique */
   if (!bridge?.mediaFolder || !canManage.value || busy.value) return
 
   errorKey.value = null
@@ -70,6 +71,7 @@ async function chooseAndMove() {
 
 async function restoreDefault() {
   const bridge = getDesktopBridge()
+  /* v8 ignore next 3 -- botão só renderiza com status/canManage; guard é defesa */
   if (!bridge?.mediaFolder || !canManage.value || busy.value || !status.value) {
     return
   }

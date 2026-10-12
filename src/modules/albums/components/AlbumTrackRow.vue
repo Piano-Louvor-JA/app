@@ -57,7 +57,7 @@ function playSungFromRow() {
     >
       <div
         class="album-track-row__download-fill"
-        :style="{ width: `${downloadProgress ?? 0}%` }"
+        :style="{ width: `${downloadProgress}%` }"
         aria-hidden="true"
       />
       <span class="album-track-row__download-percent">
