@@ -15,7 +15,10 @@ import {
 	encodeLouvorjaPackage,
 	decodeLouvorjaPackage,
 } from "../louvorja-package";
-import { replaceLocalDb, loadLocalDb } from "../../media/services/local-custom-store";
+import {
+	replaceLocalDb,
+	loadLocalDb,
+} from "@modules/media/services/local-custom-store";
 import { USER_PREFERENCE_KEYS } from "@shared/constants/storage-keys";
 import { getUserPreference, setUserPreference } from "@shared/services/user-preferences";
 
@@ -248,6 +251,10 @@ describe("round-trip desktop → desktop", () => {
 		const exported = exportLouvorjaFromBrowser("1.0", "desktop");
 		const raw = encodeLouvorjaPackage(exported);
 		const decoded = decodeLouvorjaPackage(raw);
+		// Simula chegada posterior do pacote: modified da entidade precisa ser
+		// ESTRITAMENTE maior que o LWW local para o import aplicar.
+		decoded.entities.mediaCustomCatalog.modified = TS_REMOTE;
+		decoded.entities.preferences.modified = TS_REMOTE;
 
 		replaceLocalDb({
 			nextCollectionId: -1,

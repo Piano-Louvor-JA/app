@@ -74,6 +74,11 @@ export function resolveStageSettings(scope: StageModuleScope): StageSettings {
   )
 }
 
+/** Raw (não parseado) do override do escopo — uso do sync `.louvorja`. */
+export function loadStageSettingsOptionalRaw(scope: StageScope): unknown {
+	return getUserPreference<unknown>(keyFor(scope), null)
+}
+
 export function saveStageSettings(scope: StageScope, settings: StageSettings): void {
   setUserPreference(keyFor(scope), serializeStageSettings(settings))
 }
