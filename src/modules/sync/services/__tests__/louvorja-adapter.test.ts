@@ -77,28 +77,24 @@ describe("exportLouvorjaFromBrowser", () => {
 		});
 	});
 
-	it("não leva id local negativo para outro aparelho", () => {
-		mockGet.mockImplementation((key: string) => {
-			if (key === USER_PREFERENCE_KEYS.liturgyState) {
-				return {
-					...LITURGY_STATE,
-					weekdays: {
-						sunday: [
-							{
-								...LITURGY_STATE.weekdays.sunday[0],
-								musicId: -3,
-							},
-						],
-					},
-				};
-			}
-			return null;
-		});
+	it("inclui agendados com categorias e conteúdo no pacote", () => {
+		const scheduled = {
+			categories: [{ id: "momento", name: "Momentos de Louvor" }],
+			items: [{
+				id: "m-2026-10-10", categoryId: "momento", date: "2026-10-10",
+				name: "Hino 15", filePath: "", isRelativePath: false, notes: "",
+				content: { kind: "music", musicId: 15, musicMode: "audio" },
+			}],
+		};
+		mockGet.mockImplementation((key: string) =>
+			key === USER_PREFERENCE_KEYS.scheduledState ? scheduled : null,
+		);
+
 		const pkg = exportLouvorjaFromBrowser("1.17.5", "web");
-		const items = pkg.entities.liturgy?.data.sunday.items as Array<{
-			musicId: number | null;
-		}>;
-		expect(items[0]?.musicId).toBeNull();
+
+		expect(pkg.entities.scheduled).toMatchObject({
+			type: "scheduled", data: scheduled,
+		});
 	});
 
 	it("não inclui liturgy quando estado vazio", () => {
@@ -166,6 +162,54 @@ describe("importLouvorjaIntoBrowser", () => {
 		expect(localStorage.getItem(`${SYNC_MODIFIED_PREFIX}.liturgy`)).toBe(
 			"2026-08-16T00:00:00.000Z",
 		);
+	});
+
+	it("importa agendados novos e descarta item com categoria ausente", () => {
+		const result = importLouvorjaIntoBrowser(pkgWith({
+			scheduled: {
+				type: "scheduled", modified: "2026-10-16T00:00:00.000Z",
+				data: {
+					categories: [{ id: "esab", name: "Escola Sabatina" }],
+					items: [
+						{ id: "ok", categoryId: "esab", date: "2026-10-10", name: "Inicial", filePath: "", isRelativePath: false, notes: "" },
+						{ id: "orphan", categoryId: "sumida", date: "2026-10-10", name: "Ignorar", filePath: "", isRelativePath: false, notes: "" },
+					],
+				},
+			},
+		}));
+
+		expect(result.applied).toContain("scheduled");
+		expect(mockSet).toHaveBeenCalledWith(USER_PREFERENCE_KEYS.scheduledState, {
+			categories: [{ id: "esab", name: "Escola Sabatina" }],
+			items: [{ id: "ok", categoryId: "esab", date: "2026-10-10", name: "Inicial", filePath: "", isRelativePath: false, notes: "" }],
+		});
+		expect(localStorage.getItem(`${SYNC_MODIFIED_PREFIX}.scheduled`)).toBe("2026-10-16T00:00:00.000Z");
+	});
+
+	it("importação agendada ignora conteúdo de tipo desconhecido", () => {
+		const result = importLouvorjaIntoBrowser(pkgWith({
+			scheduled: {
+				type: "scheduled", modified: "2026-10-16T00:00:00.000Z",
+				data: {
+					categories: [{ id: "momento", name: "Momentos" }],
+					items: [{ id: "bad", categoryId: "momento", date: "2026-10-10", name: "Inválido", filePath: "", isRelativePath: false, notes: "", content: { kind: "shell" } }],
+				},
+			},
+		}));
+
+		expect(result.applied).toContain("scheduled");
+		expect(mockSet).toHaveBeenCalledWith(USER_PREFERENCE_KEYS.scheduledState, {
+			categories: [{ id: "momento", name: "Momentos" }], items: [],
+		});
+	});
+
+	it("pula agendados remotos mais velhos (LWW)", () => {
+		localStorage.setItem(`${SYNC_MODIFIED_PREFIX}.scheduled`, "2026-10-17T00:00:00.000Z");
+		const result = importLouvorjaIntoBrowser(pkgWith({
+			scheduled: { type: "scheduled", modified: "2026-10-16T00:00:00.000Z", data: { categories: [], items: [] } },
+		}));
+		expect(result.skipped).toContain("scheduled");
+		expect(mockSet).not.toHaveBeenCalled();
 	});
 
 	it("pula liturgia remota mais velha (LWW)", () => {

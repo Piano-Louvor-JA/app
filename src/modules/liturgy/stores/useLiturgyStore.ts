@@ -1,4 +1,6 @@
 import { defineStore } from 'pinia'
+
+import { useScheduledStore } from './useScheduledStore'
 import { computed, onScopeDispose, ref } from 'vue'
 import type { Router } from 'vue-router'
 
@@ -43,6 +45,10 @@ import {
   reorderLiturgyItems,
 } from '../services/liturgy-item-helpers'
 import { enrichItemsDurations } from '../services/liturgy-duration-enrich'
+import {
+  deriveSessionTimesFromCategories,
+  enrichItemsDurations,
+} from '../services/liturgy-duration-enrich'
 import {
   loadLiturgyState,
   saveLiturgyState,
@@ -321,11 +327,21 @@ export const useLiturgyStore = defineStore('liturgy', () => {
 
   const isDraftValid = computed(() => isLiturgyItemDraftValid(itemDraft.value))
 
-  const categoryOptions = computed(() =>
-    currentItems.value
+  const categoryOptions = computed(() => {
+    const base = currentItems.value
       .filter((item) => item.type === 'category')
-      .map((item) => ({ id: item.id, name: item.name })),
-  )
+      .map((item) => ({ id: item.id, name: item.name }))
+    // Placeholder agendado: o "categoria" dele é uma ROTAÇÃO do store agendado
+    // (ex.: Provai e Vede) — 1 click resolve a entrada da data no culto.
+    if (itemDraft.value.type === 'scheduled') {
+      const rotations = useScheduledStore()
+      return [
+        ...base,
+        ...rotations.categories.map((rot) => ({ id: rot.id, name: rot.name })),
+      ]
+    }
+    return base
+  })
 
   const complementaryTitleSuggestions = computed(() => {
     const titles = new Set<string>()
@@ -533,7 +549,10 @@ export const useLiturgyStore = defineStore('liturgy', () => {
       let changed = false
       const nextWeekdays = { ...weekdays.value }
       for (const day of Object.keys(nextWeekdays) as LiturgyWeekday[]) {
-        const reconciled = reconcileMusicItemTitles(nextWeekdays[day], music)
+        // Catálogo chegou DEPOIS do import (.ja/.louvorja com durationMs: 0):
+        // mesma passada reconcilia títulos E preenche durações zeradas da API.
+        const enriched = await enrichItemsDurations(nextWeekdays[day], music)
+        const reconciled = reconcileMusicItemTitles(enriched, music)
         if (reconciled !== nextWeekdays[day]) {
           nextWeekdays[day] = reconciled
           changed = true
@@ -541,12 +560,15 @@ export const useLiturgyStore = defineStore('liturgy', () => {
       }
       weekdays.value = nextWeekdays
 
-      customLiturgies.value = customLiturgies.value.map((custom) => {
-        const reconciled = reconcileMusicItemTitles(custom.items, music)
-        if (reconciled === custom.items) return custom
-        changed = true
-        return { ...custom, items: reconciled }
-      })
+      customLiturgies.value = await Promise.all(
+        customLiturgies.value.map(async (custom) => {
+          const enriched = await enrichItemsDurations(custom.items, music)
+          const reconciled = reconcileMusicItemTitles(enriched, music)
+          if (reconciled === custom.items) return custom
+          changed = true
+          return { ...custom, items: reconciled }
+        }),
+      )
 
       if (changed) persist()
     } finally {
@@ -565,10 +587,29 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     const state = loadLiturgyState()
     weekdays.value = state.weekdays
     dayNotes.value = state.dayNotes
-    daySessionTimes.value = state.daySessionTimes
     customLiturgies.value = state.customLiturgies
     deletionLocks.value = state.deletionLocks
     if (selectedItemIndex.value != null) selectedItemIndex.value = null
+
+    // t_b1a9deae: Resumo do Evento pré-preenchido pelas categorias importadas
+    // (só quando a sessão do dia está vazia — nunca sobrescreve ajuste manual).
+    const nextSessionTimes = { ...daySessionTimes.value }
+    let sessionChanged = false
+    for (const day of Object.keys(nextSessionTimes) as LiturgyWeekday[]) {
+      const derived = deriveSessionTimesFromCategories(
+        weekdays.value[day] ?? [],
+        nextSessionTimes[day],
+      )
+      if (derived !== nextSessionTimes[day]) {
+        nextSessionTimes[day] = derived
+        sessionChanged = true
+      }
+    }
+    if (sessionChanged) {
+      daySessionTimes.value = nextSessionTimes
+      state.daySessionTimes = nextSessionTimes
+      saveLiturgyState(state)
+    }
 
     const music = musicList.value
     if (music.length === 0) return
@@ -978,7 +1019,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     const item = markItemStarted(index)
     if (!item) return
 
-    const result = await executeLiturgyItem(item, router)
+    const result = await executeLiturgyItem(item, router, { day: selectedDay.value })
     if (item.type === 'site') {
       siteProjectionItemId.value = null
     } else if (
