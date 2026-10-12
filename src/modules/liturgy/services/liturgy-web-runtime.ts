@@ -96,11 +96,8 @@ export function parseLiturgyWebTarget(raw: string): LiturgyWebTarget | null {
       }
     }
 
-    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-      return { kind: 'site', videoId: '', url: withProtocol }
-    }
-
-    return null
+    // Prefixo https?:// garantido acima — protocolo parseado é sempre http(s).
+    return { kind: 'site', videoId: '', url: withProtocol }
   } catch {
     return null
   }
@@ -137,7 +134,7 @@ export function normalizeLiturgyWebRuntime(
     title: asString(source.title).trim(),
     kind,
     videoId: asString(source.videoId).trim(),
-    startedAt: asNumber(source.startedAt, 0),
+    startedAt: asNumber(source.startedAt),
   }
 }
 

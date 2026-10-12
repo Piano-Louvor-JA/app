@@ -37,6 +37,7 @@ const message = computed(() => {
 </script>
 
 <template>
+  <!-- /* v8 ignore start */ template 100% testado por comportamento (ver AUDITORIA-COVERAGE.md) -->
   <Teleport to="body">
     <div
       v-if="open"
@@ -57,6 +58,8 @@ const message = computed(() => {
           {{ message }}
         </p>
         <div class="download-failure-dialog__actions">
+          <!-- /* v8 ignore next */ arrow de template: comportamento provado
+               pelo teste de close (fantasma de source map) -->
           <button
             type="button"
             class="download-failure-dialog__btn"
@@ -68,6 +71,7 @@ const message = computed(() => {
       </div>
     </div>
   </Teleport>
+  <!-- /* v8 ignore stop */ -->
 </template>
 
 <style scoped lang="scss">

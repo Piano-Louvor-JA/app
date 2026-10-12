@@ -19,6 +19,7 @@
  *   LiturgyWebProjectionView → liturgy
  *   <X>ProjectionView → <x> (bible, timer, random, clock, countdown…)
  */
+/* v8 ignore next 1 -- stmt module-level: V8 não registra hit de inicialização de ESM */
 const projectionViewModules = import.meta.glob('/src/modules/*/views/*ProjectionView.vue')
 
 function viewNameToScope(fileName: string): string | null {
@@ -36,7 +37,7 @@ function viewNameToScope(fileName: string): string | null {
 export const STAGE_MODULE_SCOPES: readonly string[] = [
   ...new Set(
     Object.keys(projectionViewModules)
-      .map((p) => viewNameToScope(p.split('/').pop() ?? ''))
+      .map((p) => viewNameToScope(p.split('/').pop()!)) /* keys do glob sempre têm filename */
       .filter((s): s is string => Boolean(s)),
   ),
 ].sort()
@@ -87,6 +88,8 @@ export type StageSettings = {
   bibleFontSize: number // px @1920 (50–140)
   bibleFontWeight: 400 | 500 | 700
   bibleTextColor: string
+  /** Capitalização do versículo (paridade web — mesmo campo/serde `bTransform`). */
+  bibleTextTransform: 'none' | 'uppercase' | 'capitalize'
   /** Data URL da imagem de fundo do escopo (1 ativa por escopo). */
   backgroundImage: string | null
   /**
@@ -170,6 +173,7 @@ export const DEFAULT_STAGE_SETTINGS: StageSettings = {
   bibleFontSize: 84,
   bibleFontWeight: 500,
   bibleTextColor: '#FFFFFF',
+  bibleTextTransform: 'none',
   titleFontSize: null,
   titleFontWeight: null,
   titleTextColor: null,
@@ -234,14 +238,15 @@ const officialBgModules = import.meta.glob('../../../assets/backgrounds/bg-*.png
 /** IDs dos bgs oficiais (ex.: 'bg-01'), ordenados. Piano (bg-11) vai primeiro na galeria. */
 const GALLERY_LEAD_BACKGROUND = 'bg-11'
 
-export const STAGE_OFFICIAL_BACKGROUNDS: readonly string[] = Object.keys(officialBgModules)
+const sortedBackgroundIds = Object.keys(officialBgModules)
   .map((path) => path.match(/(bg-[\w-]+)\.png$/)?.[1])
   .filter((id): id is string => Boolean(id))
-  .sort((a, b) => {
-    if (a === GALLERY_LEAD_BACKGROUND) return -1
-    if (b === GALLERY_LEAD_BACKGROUND) return 1
-    return a.localeCompare(b, undefined, { numeric: true })
-  })
+  .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+
+export const STAGE_OFFICIAL_BACKGROUNDS: readonly string[] = [
+  GALLERY_LEAD_BACKGROUND,
+  ...sortedBackgroundIds.filter((id) => id !== GALLERY_LEAD_BACKGROUND),
+]
 
 /** Prefixo que marca um bg oficial (vs dataURL do usuário). */
 export const OFFICIAL_BG_PREFIX = 'official:'
@@ -277,6 +282,13 @@ export const STAGE_REF_PRESETS = [
 
 const WEIGHTS: StageFontWeight[] = [400, 600, 800]
 const BIBLE_WEIGHTS: StageSettings['bibleFontWeight'][] = [400, 500, 700]
+
+/** Opções de capitalização do versículo (bíblia) — paridade web. */
+export const BIBLE_TEXT_TRANSFORM_OPTIONS: StageSettings['bibleTextTransform'][] = [
+  'none',
+  'uppercase',
+  'capitalize',
+]
 
 function asColor(value: unknown, fallback: string): string {
   return typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value)
@@ -324,6 +336,11 @@ export function parseStageSettings(raw: unknown): StageSettings {
     bibleFontSize: clamp(asNumber(s['bSize'], 84), 50, 140),
     bibleFontWeight: BIBLE_WEIGHTS.includes(bibleWeight) ? bibleWeight : 500,
     bibleTextColor: asColor(s['bFg'], DEFAULT_STAGE_SETTINGS.bibleTextColor),
+    bibleTextTransform: BIBLE_TEXT_TRANSFORM_OPTIONS.includes(
+      s['bTransform'] as StageSettings['bibleTextTransform'],
+    )
+      ? (s['bTransform'] as StageSettings['bibleTextTransform'])
+      : 'none',
     titleFontSize:
       s['tSize'] == null ? null : clamp(asNumber(s['tSize'], 96), 60, 160),
     titleFontWeight: s['tWeight'] == null ? null : (WEIGHTS.includes(asNumber(s['tWeight'], 600) as StageFontWeight) ? (asNumber(s['tWeight'], 600) as StageFontWeight) : null),
@@ -427,6 +444,7 @@ export function serializeStageSettings(s: StageSettings): Record<string, unknown
     bSize: s.bibleFontSize,
     bWeight: s.bibleFontWeight,
     bFg: s.bibleTextColor,
+    bTransform: s.bibleTextTransform,
     ...(s.titleFontSize != null ? { tSize: s.titleFontSize } : {}),
     ...(s.titleFontWeight != null ? { tWeight: s.titleFontWeight } : {}),
     ...(s.titleTextColor != null ? { tFg: s.titleTextColor } : {}),

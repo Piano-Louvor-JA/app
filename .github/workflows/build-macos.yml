@@ -23,15 +23,39 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Decide publication
+        id: decision
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_REF: ${{ github.ref_type == 'tag' && github.ref_name || github.sha }}
+          WORKFLOW_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          script="$(mktemp)"
+          gh api "repos/${GITHUB_REPOSITORY}/contents/scripts/release-publish-decision.mjs?ref=${WORKFLOW_SHA}" --jq .content \
+            | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{let t=s.trim();if(t.startsWith(String.fromCharCode(34)))t=JSON.parse(t);process.stdout.write(Buffer.from(String(t).replace(/\s/g,""),"base64"))})' \
+            > "$script"
+          node "$script" --fetch --repo "$GITHUB_REPOSITORY" --ref "$TARGET_REF"
+
+      - name: Omit publication
+        if: steps.decision.outputs.publish != 'true'
+        run: |
+          echo "Publicação omitida (${{ steps.decision.outputs.reason }})."
+          echo "Nenhum pacote macOS foi enviado a registry ou GitHub Release."
+
       - name: Install dependencies
+        if: steps.decision.outputs.publish == 'true'
         run: npm ci
 
       - name: Build Vite + Electron DMG (x64 + arm64) + publish
+        if: steps.decision.outputs.publish == 'true'
         run: npm run electron:build -- --mac --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload x64 DMG (artifact backup)
+        if: steps.decision.outputs.publish == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: LouvorJA-PIANO-macOS-x64-DMG
@@ -40,6 +64,7 @@ jobs:
           retention-days: 30
 
       - name: Upload arm64 DMG (artifact backup)
+        if: steps.decision.outputs.publish == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: LouvorJA-PIANO-macOS-arm64-DMG

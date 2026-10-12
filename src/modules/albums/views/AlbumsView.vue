@@ -12,7 +12,6 @@ import AlbumCollectionCard from '../components/AlbumCollectionCard.vue'
 import {
   createCustomCollection,
   listCustomCollections,
-  toCustomCollectionId,
   type CustomCollectionSummary,
 } from '@modules/media/services/custom-catalog'
 import AlbumHymnalCard from '../components/AlbumHymnalCard.vue'
@@ -169,11 +168,6 @@ async function onCreateCustomCollection(): Promise<void> {
     await hydrateCatalog()
     await hydrateCustomCollections()
   }
-}
-
-function openCustomCollection(collectionId: number): void {
-  customModalOpen.value = false
-  void router.push(`/albums/${toCustomCollectionId(collectionId)}`)
 }
 
 function showImportFeedback(message: string) {
