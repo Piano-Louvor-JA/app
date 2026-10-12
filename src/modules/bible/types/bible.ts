@@ -21,21 +21,21 @@ export type BibleChapterVerses = Record<string, string>
 
 export type BibleTestament = 'ot' | 'nt'
 
-/** Tom visual do tile do livro — categorias canônicas. */
+/** Tom visual do tile do livro — taxonomia canônica compartilhada app/web. */
 export type BibleBookTone =
   // AT — Pentateuco, Históricos, Poéticos, Profetas Maiores/Menores
-  | 'law'          // Pentateuco (1-5)
-  | 'history'      // Históricos AT (6-17)
-  | 'poetry'       // Poéticos/Sapienciais (18-22)
-  | 'major-prophet'// Profetas Maiores (23-27)
-  | 'minor-prophet'// Profetas Menores (28-39)
+  | 'law' // Pentateuco (1-5)
+  | 'history' // Históricos AT (6-17)
+  | 'poetry' // Poéticos/Sapienciais (18-22)
+  | 'major-prophet' // Profetas Maiores (23-27)
+  | 'minor-prophet' // Profetas Menores (28-39)
   // NT — Evangelhos, Atos, Cartas Paulinas, Cartas Gerais, Apocalipse
-  | 'gospels'      // Evangelhos (40-43)
-  | 'acts'         // Atos (44)
-  | 'pauline'      // Cartas Paulinas (45-57)
-  | 'general'      // Cartas Gerais (58-65)
-  | 'apocalyptic'  // Apocalipse (66)
-  | 'neutral'      // fallback
+  | 'gospels' // Evangelhos (40-43)
+  | 'acts' // Atos (44)
+  | 'pauline' // Cartas Paulinas (45-57)
+  | 'general' // Cartas Gerais (58-65)
+  | 'apocalyptic' // Apocalipse (66)
+  | 'neutral' // fallback
 
 /** Seleção ativa para leitura e projeção. */
 export interface BibleSelection {
