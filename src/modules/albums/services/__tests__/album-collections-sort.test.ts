@@ -42,6 +42,11 @@ describe('Central de Mídia — coletâneas da mais recente pra mais antiga', ()
     expect(sorted).toEqual(['Meu Lugar no Mundo', 'Maranata', 'Nosso Sol é Jesus'])
   })
 
+  it('mistura: id numérico antes de id custom (fallback map de capa es/pt)', () => {
+    const sorted = sortCollectionsRecentFirst([col('custom', 'Custom'), col(9036, 'JA 2026'), col(9015, 'JA 2003')])
+    expect(sorted.map((c) => c.name)).toEqual(['JA 2026', 'JA 2003', 'Custom'])
+  })
+
   it('ids não numéricos caem no fim, alfabético', () => {
     const mixed = [col(9015, 'JA 2003'), col('beta', 'Beta'), col('alfa', 'Alfa')]
     const sorted = sortCollectionsRecentFirst(mixed).map((c) => String(c.id))

@@ -69,6 +69,18 @@ describe('loadAlbumCategories', () => {
     expect(cats[0]?.collections[1]?.trackCount).toBe(2)
   })
 
+  it('hinário: capa por idioma — map pt coberto; prefix fora do map (en) cai no fallback', async () => {
+    stubCatalogs({ pt_hymnal: [{ id_music: 1 }], en_hymnal: [{ id_music: 1 }], pt_categories: [] })
+    getCurrentApiPrefix.mockReturnValue('en')
+    try {
+      const catsEn = await loadAlbumCategories()
+      expect(catsEn[0]?.collections[0]?.coverUrl).toBeTypeOf('string')
+      expect(catsEn[0]?.collections[0]?.coverUrl).toBe('/src/assets/library/hymnal.jpeg')
+    } finally {
+      getCurrentApiPrefix.mockReturnValue('pt')
+    }
+  })
+
   it('hinário vazio não gera categoria; categorias ausentes -> só hinários', async () => {
     stubCatalogs({ pt_hymnal: [], pt_hymnal_1996: null })
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
