@@ -283,3 +283,36 @@ describe('useAlbumsStore', () => {
     expect(store.filteredTracks).toHaveLength(2)
   })
 })
+
+describe('useAlbumsStore — evento louvorja:catalog-refreshed', () => {
+  const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
+
+  it('catálogo que abriu vazio recarrega quando o cache é curado', async () => {
+    const store = useAlbumsStore()
+    await store.hydrateCatalog()
+    expect(store.categories).toEqual([])
+
+    h.loadAlbumCategories.mockResolvedValue([{ id: 12, name: 'CDs', albums: [] }])
+    window.dispatchEvent(new CustomEvent('louvorja:catalog-refreshed'))
+    await flush()
+    await flush()
+
+    expect(store.categories.map((c) => String(c.id))).toEqual(['12'])
+  })
+
+  it('recarga pelo evento mantém Minhas Coletâneas', async () => {
+    h.getShowCustomCollections.mockReturnValue(true)
+    h.loadCustomAlbumCategory.mockResolvedValue({ id: 'custom', name: 'Minhas', albums: [] })
+    h.loadAlbumCategories.mockResolvedValue([{ id: 12, name: 'CDs', albums: [] }])
+    const store = useAlbumsStore()
+    await store.hydrateCatalog()
+    await flush()
+    expect(store.categories.map((c) => String(c.id))).toEqual(['custom', '12'])
+
+    window.dispatchEvent(new CustomEvent('louvorja:catalog-refreshed'))
+    await flush()
+    await flush()
+
+    expect(store.categories.map((c) => String(c.id))).toEqual(['custom', '12'])
+  })
+})

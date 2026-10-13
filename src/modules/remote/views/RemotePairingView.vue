@@ -39,6 +39,11 @@ function copyUrl() {
   if (!info.value) return
   void navigator.clipboard?.writeText(info.value.connectUrl)
 }
+
+function copySpeakerUrl() {
+  if (!info.value?.speakerUrl) return
+  void navigator.clipboard?.writeText(info.value.speakerUrl)
+}
 </script>
 
 <template>
@@ -100,6 +105,43 @@ function copyUrl() {
         >
           {{ t('settings.remote.copyLink') }}
         </button>
+      </div>
+    </div>
+
+    <!-- Pregador: QR da página /speaker (browser do celular, sem app) -->
+    <div
+      v-if="info && info.speakerQrDataUrl"
+      class="speaker-block mt-6"
+      data-testid="remote-speaker-block"
+    >
+      <div class="text-subtitle-2 mb-1">
+        {{ t('settings.remote.speakerTitle') }}
+      </div>
+      <div class="d-flex align-center">
+        <img
+          :src="info.speakerQrDataUrl"
+          width="180"
+          height="180"
+          class="qr"
+          alt="QR Pregador"
+          data-testid="remote-speaker-qr"
+        >
+        <div class="ml-6 flex-grow-1">
+          <p class="text-caption text-medium-emphasis">
+            {{ t('settings.remote.speakerHint') }}
+          </p>
+          <div class="text-body-2 mono speaker-url" data-testid="remote-speaker-url">
+            {{ info.speakerUrl }}
+          </div>
+          <button
+            type="button"
+            class="copy-btn mt-3"
+            data-testid="remote-speaker-copy"
+            @click="copySpeakerUrl"
+          >
+            {{ t('settings.remote.speakerCopy') }}
+          </button>
+        </div>
       </div>
     </div>
   </GlassCard>
@@ -176,4 +218,16 @@ function copyUrl() {
 .copy-btn:hover {
   background: rgba(255, 255, 255, 0.08);
 }
+
+.speaker-block {
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  padding-top: 16px;
+}
+
+.speaker-url {
+  word-break: break-all;
+  opacity: 0.8;
+  margin-bottom: 8px;
+}
+
 </style>
