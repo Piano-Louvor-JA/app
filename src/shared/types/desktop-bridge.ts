@@ -172,6 +172,8 @@ export type RemotePairingInfo = {
   token: string
   connectUrl: string
   qrDataUrl: string
+  speakerUrl?: string
+  speakerQrDataUrl?: string
   clientCount: number
   clientAddress?: string | null
 }

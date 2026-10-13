@@ -88,8 +88,7 @@ export const useAlbumsStore = defineStore('albums', () => {
     }
   }
 
-  async function hydrateCatalog() {
-    if (categories.value.length > 0) return
+  async function refreshCatalog() {
     isLoadingCatalog.value = true
     lastErrorKey.value = null
     try {
@@ -98,6 +97,13 @@ export const useAlbumsStore = defineStore('albums', () => {
       if (categories.value.length === 0) {
         lastErrorKey.value = 'albums.messages.catalogEmpty'
       }
+      if (
+        activeCollection.value &&
+        !findCollectionById(categories.value, String(activeCollection.value.id))
+      ) {
+        activeCollection.value = null
+        tracks.value = []
+      }
     } catch (error) {
       console.error('[albums] falha ao carregar catálogo', error)
       lastErrorKey.value = 'albums.messages.catalogFailed'
@@ -105,10 +111,26 @@ export const useAlbumsStore = defineStore('albums', () => {
     } finally {
       isLoadingCatalog.value = false
     }
+  }
 
+  // Marca a primeira hidratação: o catálogo pode ter aberto vazio e é
+  // justamente esse caso que o evento de cache curado precisa atualizar.
+  let catalogHydrated = false
+
+  async function hydrateCatalog() {
+    if (categories.value.length > 0) return
+    catalogHydrated = true
+    await refreshCatalog()
     void hydrateMusicIndex()
     void mergeCustomCollections()
   }
+
+  // Store Pinia é singleton por app; listener vive até fechar a janela.
+  window.addEventListener('louvorja:catalog-refreshed', () => {
+    if (!catalogHydrated) return
+    // refreshCatalog troca as categorias; Minhas Coletâneas volta logo depois.
+    void refreshCatalog().then(() => mergeCustomCollections())
+  })
 
   async function openCollection(collectionId: string) {
     isLoadingTracks.value = true

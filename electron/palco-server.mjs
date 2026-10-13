@@ -245,6 +245,77 @@ class PalcoSlot {
       return
     }
 
+    // Controle do pregador: página LAN sem CDN, preview passivo + remote WS.
+    // Preview = iframe escalado do PRÓPRIO receiver.html — mesmo renderizador
+    // da TV (bg, letra, caixinha, footer), zero divergência visual.
+    if (p === '/speaker') {
+      const page = `<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pregador · LouvorJA</title>
+<style>body{margin:0;background:#111;color:#fff;font:16px system-ui;padding:14px}main{max-width:430px;margin:auto}
+.preview{aspect-ratio:16/9;background:#000;border:1px solid #444;border-radius:8px;overflow:hidden;position:relative}
+.preview iframe{width:1280px;height:720px;border:0;transform-origin:0 0;position:absolute;top:0;left:0;background:#000}
+#msg{position:absolute;inset:0;display:grid;place-items:center;color:#888;font-size:14px}
+button{min-height:64px;width:48%;font-size:28px;border-radius:12px;border:0;background:#2867d8;color:#fff}
+button:active{filter:brightness(1.3)}
+nav{display:flex;justify-content:space-between;gap:12px;margin-top:16px}
+#count{font-size:24px;text-align:center;margin:14px;font-weight:700}
+.changed{outline:4px solid #64d99b}
+#pair{position:fixed;inset:0;background:#111;z-index:10;display:none;flex-direction:column;justify-content:center;padding:24px;gap:12px}
+#pair input{padding:12px;border-radius:8px;border:1px solid #555;background:#1c1c1c;color:#fff;font-size:14px}
+.small{min-height:44px;width:100%;font-size:16px;background:#333}
+.hint{color:#999;font-size:13px;line-height:1.4}</style></head>
+<body><main><h1 style="font-size:20px;margin:0 0 10px">Pregador</h1>
+<div class="preview"><iframe id="frame" title="Preview da projeção" style="display:none"></iframe><div id="msg">Conectando preview…</div></div>
+<div id="count">—/—</div>
+<nav><button id="prev" aria-label="Voltar">◀</button><button id="next" aria-label="Avançar">▶</button></nav>
+<button id="repair" class="small" style="margin-top:12px" aria-label="Reemparelhar">Reemparelhar</button></main>
+<div id="pair"><p class="hint">Pareamento perdido. Cole abaixo o link do QR exibido no app do desktop (começa com http://…/speaker?token=…):</p>
+<input id="pairUrl" placeholder="http://192.168.x.x:7080/speaker?remotePort=7071&token=abcd1234">
+<button id="pairGo" class="small">Conectar</button><button id="pairCancel" class="small">Cancelar</button></div>
+<script>
+const q=new URLSearchParams(location.search);
+let token=q.get('token')||localStorage.getItem('speaker.token');
+let remotePort=q.get('remotePort')||localStorage.getItem('speaker.remotePort')||'7071';
+let palcoPort=q.get('palcoPort')||localStorage.getItem('speaker.palcoPort')||'7081';
+if(token){localStorage.setItem('speaker.token',token);localStorage.setItem('speaker.remotePort',remotePort);localStorage.setItem('speaker.palcoPort',palcoPort)}
+let preview,remote,queued=[],state={index:0,total:0},seq=0,lastSend=0;
+const frame=document.querySelector('#frame'),msg=document.querySelector('#msg'),count=document.querySelector('#count');
+function host(port,path){return 'ws://'+location.hostname+':'+port+path}
+function fitFrame(){const box=frame.parentElement,s=box.clientWidth/1280;frame.style.transform='scale('+s+')';frame.style.height=(720*s)+'px';box.style.height=(720*s)+'px'}
+addEventListener('resize',fitFrame);
+function render(){count.textContent=(state.total?state.index+1:'—')+'/'+(state.total||'—')}
+function pulse(){count.classList.add('changed');setTimeout(()=>count.classList.remove('changed'),350)}
+// Preview: receiver.html real (mesmo renderizador da TV) apontando pro palco.
+function openPreview(){try{preview&&preview.close()}catch{}
+  frame.src='receiver.html?host='+encodeURIComponent(location.hostname)+'&port='+palcoPort;
+  frame.style.display='';msg.style.display='none';fitFrame()}
+function send(action){const now=Date.now();if(now-lastSend<250)return;lastSend=now;
+  const m={v:1,type:'command',id:'s'+(++seq),action,token};
+  if(remote&&remote.readyState===1)remote.send(JSON.stringify(m));else queued.push(m)}
+function openRemote(){remote=new WebSocket(host(remotePort,''));
+  remote.onopen=()=>{remote.send(JSON.stringify({v:1,type:'hello',role:'speaker',token}));queued.splice(0).forEach(m=>remote.send(JSON.stringify(m)))};
+  remote.onmessage=e=>{try{const m=JSON.parse(e.data);if(m.type==='state'&&m.slide){const old=state.index;state=m.slide;render();if(old!==state.index)pulse()}}catch{}};
+  remote.onclose=()=>setTimeout(openRemote,800)}
+document.querySelector('#prev').onclick=()=>send('slide:prev');
+document.querySelector('#next').onclick=()=>send('slide:next');
+// Reemparelhar: limpa pareamento e abre overlay pra colar o link do QR de novo.
+const pair=document.querySelector('#pair');
+document.querySelector('#repair').onclick=()=>{localStorage.removeItem('speaker.token');localStorage.removeItem('speaker.remotePort');localStorage.removeItem('speaker.palcoPort');pair.style.display='flex'};
+document.querySelector('#pairCancel').onclick=()=>{pair.style.display='none';location.reload()};
+document.querySelector('#pairGo').onclick=()=>{const u=new URL(document.querySelector('#pairUrl').value.trim());location.href=u.toString()};
+// Wake Lock: tela acesa durante o culto; re-adquire ao voltar pro foreground.
+async function lock(){try{await navigator.wakeLock&&navigator.wakeLock.request('screen')}catch{}}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)lock()});
+if(token){lock();openPreview();openRemote()}
+else{pair.style.display='flex';msg.textContent='Sem pareamento — cole o link do QR'}
+render();
+</script></body></html>`
+      res.setHeader('Content-Type', 'text/html; charset=utf-8')
+      res.setHeader('Cache-Control', 'no-store')
+      res.end(page)
+      return
+    }
+
     // Receiver embutido (mesma página do palco-receiver)
     if (p === '/' || p === '/receiver.html' || p === '/index.html') {
       try {

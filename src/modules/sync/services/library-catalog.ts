@@ -22,8 +22,12 @@ const CATEGORY_ORDER: Record<string, number> = {
   hymnals: 1,
   Hinários: 1,
   'CDs Oficiais/Ano': 2,
+  aym: 2,
+  'CDs Oficiales/año': 2,
   Infantis: 3,
+  kids: 3,
   Doxologia: 4,
+  doxology: 4,
 }
 
 /**
@@ -94,8 +98,10 @@ function createAlbumBase(
 
 export function sortCategories(categories: LibraryCategory[]): LibraryCategory[] {
   return [...categories].sort((a, b) => {
-    const orderA = CATEGORY_ORDER[String(a.id)] ?? CATEGORY_ORDER[a.name] ?? 50
-    const orderB = CATEGORY_ORDER[String(b.id)] ?? CATEGORY_ORDER[b.name] ?? 50
+    const orderA =
+      CATEGORY_ORDER[String(a.id)] ?? CATEGORY_ORDER[a.slug ?? ''] ?? CATEGORY_ORDER[a.name] ?? 50
+    const orderB =
+      CATEGORY_ORDER[String(b.id)] ?? CATEGORY_ORDER[b.slug ?? ''] ?? CATEGORY_ORDER[b.name] ?? 50
     if (orderA !== orderB) return orderA - orderB
     return a.name.localeCompare(b.name)
   })
@@ -203,6 +209,7 @@ export async function loadLibraryCategories(): Promise<LibraryCategory[]> {
       result.push({
         id: category.id_category,
         name: category.name,
+        slug: category.slug,
         albums,
       })
     }
