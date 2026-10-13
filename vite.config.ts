@@ -7,14 +7,46 @@ import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import tailwindcss from '@tailwindcss/vite'
 
+import { profileApiConfig, resolveBuildProfile } from './electron/profile.mjs'
+
 const pkg = JSON.parse(
-  readFileSync(new URL('./package.json', import.meta.url), 'utf-8'),
+  readFileSync(new URL('./package.json', import.meta.url), 'utf8'),
 ) as { version: string }
+
+// Contrato de perfil (SPEC piano-api-env-guard): o perfil efetivo é definido
+// AQUI, uma única vez, a partir de PIANO_BUILD_PROFILE — nunca de .env local.
+// O renderer recebe o perfil e os hosts derivados via import.meta.env.
+const buildProfile = resolveBuildProfile(process.env)
+const profileConfig = profileApiConfig(buildProfile)
+const rendererEnv = {
+  VITE_PIANO_PROFILE: buildProfile,
+  VITE_URL_DATABASE: process.env.VITE_URL_DATABASE ?? `${profileConfig.primary}/json_db`,
+  VITE_URL_FILES: process.env.VITE_URL_FILES ?? `${profileConfig.primary}/file`,
+  VITE_PALCO_API_URL: process.env.VITE_PALCO_API_URL ?? profileConfig.primary,
+  ...(process.env.VITE_API_FALLBACK_URLS || profileConfig.fallbackHosts.length
+    ? {
+        VITE_API_FALLBACK_URLS:
+          process.env.VITE_API_FALLBACK_URLS ?? profileConfig.fallbackHosts.join(','),
+      }
+    : {}),
+}
 
 // https://vite.dev/config/
 export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
+    // Injeta o contrato efetivo (auditoria RF-01 + paridade renderer/main).
+    'import.meta.env.VITE_PIANO_PROFILE': JSON.stringify(rendererEnv.VITE_PIANO_PROFILE),
+    'import.meta.env.VITE_URL_DATABASE': JSON.stringify(rendererEnv.VITE_URL_DATABASE),
+    'import.meta.env.VITE_URL_FILES': JSON.stringify(rendererEnv.VITE_URL_FILES),
+    'import.meta.env.VITE_PALCO_API_URL': JSON.stringify(rendererEnv.VITE_PALCO_API_URL),
+    ...(rendererEnv.VITE_API_FALLBACK_URLS !== undefined
+      ? {
+          'import.meta.env.VITE_API_FALLBACK_URLS': JSON.stringify(
+            rendererEnv.VITE_API_FALLBACK_URLS,
+          ),
+        }
+      : {}),
   },
   server: {
     fs: { allow: ['.', '/media/rafaelejosi/Dados/repos/piano-app/node_modules'] },

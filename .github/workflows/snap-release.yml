@@ -76,6 +76,22 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
+      # Perfil de ambiente API (SPEC piano-api-env-guard): o Snap recompila o app
+      # e vai direto para a loja, então só sai com a API de produção, sob o gate
+      # do build guard (PIANO_RELEASE_AUTHORIZED + GITHUB_REF_TYPE=tag). Fora de
+      # tag o perfil seria homologation (STG): falha antes de empacotar.
+      - name: Resolve API build profile (release sob gate)
+        shell: bash
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "PIANO_BUILD_PROFILE=release" >> "$GITHUB_ENV"
+            echo "PIANO_RELEASE_AUTHORIZED=true" >> "$GITHUB_ENV"
+            echo "Perfil: release (${{ github.event_name }} em tag)"
+          else
+            echo "::error::Snap Store só publica build de produção. Dispare o workflow a partir da tag (Use workflow from → tag); ref atual: ${{ github.ref }}."
+            exit 1
+          fi
+
       - name: Build app (linux-unpacked)
         run: |
           npm ci

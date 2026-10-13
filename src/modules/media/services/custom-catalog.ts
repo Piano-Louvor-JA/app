@@ -1,3 +1,5 @@
+import { defaultApiOrigin } from '@shared/services/api-env'
+
 import { parseSlideTimeToSeconds } from './media-slides'
 import type {
   MediaLyricSlide,
@@ -143,7 +145,7 @@ function customBaseUrl(): string {
   // Default da nossa API — sem env, '/v1/custom' relativo dá 404 no desktop
   // (coletâneas não baixam). .env é gitignored / CI não injeta (hotfix 14/09).
   const base =
-    import.meta.env.VITE_PALCO_API_URL ?? 'https://api.pianolouvorja.com.br'
+    import.meta.env.VITE_PALCO_API_URL ?? defaultApiOrigin()
   return `${base.replace(/\/$/, '')}/v1/custom`
 }
 

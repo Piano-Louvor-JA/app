@@ -5,6 +5,8 @@
  * registerUse exige sessão: uso 1x/user×collection é credita +5 ao DONO (F1).
  */
 
+import { defaultApiOrigin } from '@shared/services/api-env'
+
 export type RankingEntry = {
 	position: number;
 	user_id: number;
@@ -18,7 +20,7 @@ export type RankingWindow = "week" | "all";
 
 function communityBaseUrl(): string {
 	const base =
-		import.meta.env.VITE_PALCO_API_URL ?? "https://api.pianolouvorja.com.br";
+		import.meta.env.VITE_PALCO_API_URL ?? defaultApiOrigin();
 	return `${base.replace(/\/$/, "")}/v1/custom`;
 }
 
