@@ -152,3 +152,22 @@ describe("L255-257: catch com cancelRequested -> idle", () => {
 		spy.mockRestore();
 	});
 });
+
+describe("evento louvorja:catalog-refreshed", () => {
+	const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+	it("Central que abriu vazia recarrega quando o cache é curado", async () => {
+		loadLibraryCategories.mockResolvedValue([]);
+		const store = useLocalLibraryStore();
+		await store.refreshCollections();
+		expect(store.categories).toEqual([]);
+
+		loadLibraryCategories.mockResolvedValue([
+			{ id: "c1", name: "CDs", albums: [album(1)] },
+		]);
+		window.dispatchEvent(new CustomEvent("louvorja:catalog-refreshed"));
+		await flush();
+
+		expect(store.categories.map((c) => c.id)).toEqual(["c1"]);
+	});
+});
