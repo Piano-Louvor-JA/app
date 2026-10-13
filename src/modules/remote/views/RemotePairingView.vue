@@ -81,7 +81,7 @@ function copyOperatorUrl() {
           {{ t('settings.remote.unavailable') }}
         </div>
 
-        <div v-else-if="info">
+        <div v-else-if="info" class="pairing-body">
           <div class="qr-col">
             <img
               v-if="info.qrDataUrl"
@@ -126,7 +126,7 @@ function copyOperatorUrl() {
       <!-- Coluna direita: Predicador + Operador -->
       <div
         v-if="info && (info.speakerQrDataUrl || info.operatorQrDataUrl)"
-        class="pairing-item"
+        class="pairing-item pairing-item--stack"
       >
         <!-- Predicador: título + status + explicação ANTES do QR -->
         <div
@@ -153,13 +153,13 @@ function copyOperatorUrl() {
             data-testid="remote-speaker-qr"
           >
         </div>
-        <div class="mt-4">
+        <div class="mt-auto pt-4">
           <div class="text-body-2 mono speaker-url" data-testid="remote-speaker-url">
             {{ info.speakerUrl }}
           </div>
           <button
             type="button"
-            class="copy-btn mt-3"
+            class="copy-btn"
             data-testid="remote-speaker-copy"
             @click="copySpeakerUrl"
           >
@@ -193,13 +193,13 @@ function copyOperatorUrl() {
               data-testid="remote-operator-qr"
             >
           </div>
-          <div class="mt-4">
+          <div class="mt-auto pt-4">
             <div class="text-body-2 mono operator-url" data-testid="remote-operator-url">
               {{ info.operatorUrl }}
             </div>
             <button
               type="button"
-              class="copy-btn mt-3"
+              class="copy-btn"
               data-testid="remote-operator-copy"
               @click="copyOperatorUrl"
             >
@@ -228,6 +228,34 @@ function copyOperatorUrl() {
 .pairing-item {
   flex: 1 1 240px;
   min-width: 0;
+}
+
+.pairing-item--stack {
+  flex: 1.2 1 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.pairing-item--stack > [data-testid^='remote-'] {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.pairing-item--stack .qr-col {
+  flex: 1;
+  justify-content: center;
+}
+
+.pairing-body {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.pairing-body .qr-col {
+  flex: 0 0 auto;
 }
 
 .pairing-card {
