@@ -69,7 +69,7 @@ describe("seasonal-event — fechamento de cobertura (URL + mapeamento)", () => 
 		);
 		await getSeasonalEvent();
 		expect(calledUrl).toBe(
-			"https://api.pianolouvorja.com.br/v1/custom/seasonal-event",
+			"https://api-stg.pianolouvorja.com.br/v1/custom/seasonal-event",
 		);
 	});
 

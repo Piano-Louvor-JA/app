@@ -173,6 +173,10 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
           done: item.done === true,
         })),
       },
+      slide: {
+        index: player.slideIndex.value,
+        total: player.session.value?.slides?.length ?? 0,
+      },
       player: {
         ...media,
         canPrevious: (liturgy.selectedItemIndex ?? 0) > 0,
@@ -208,6 +212,14 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
     const { action, value } = msg
     const items = liturgy.currentItems ?? []
     const current = liturgy.selectedItemIndex ?? -1
+
+    // Pregador: única superfície autorizada pelo servidor.
+    if (action === 'slide:next') { await player.nextSlide?.(); return true }
+    if (action === 'slide:prev') { await player.previousSlide?.(); return true }
+    if (action === 'slide:goto') {
+      if (typeof msg.index !== 'number') return false
+      await player.goToSlide?.(msg.index); return true
+    }
 
     // 0) Namespaces v2 (bible/timer/countdown) — spec controle remoto total.
     const namespace = action.split('.')[0]

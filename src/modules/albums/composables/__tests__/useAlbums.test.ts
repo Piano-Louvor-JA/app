@@ -389,7 +389,7 @@ describe("useAlbums", () => {
       const ok = await api.playAllInActiveCollection();
       expect(ok).toBe(false);
     });
-  
+
 describe("useAlbums — gaps isDesktop/albumId", () => {
   it("não-desktop: onMounted não chama refreshCollections", async () => {
     desktopFlag.value = false;

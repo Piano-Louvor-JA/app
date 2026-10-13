@@ -11,6 +11,10 @@ vi.mock('../../services/liturgy-preferences', async (importOriginal) => {
     ...actual,
     loadLiturgyState: vi.fn(() => actual.normalizeLiturgyState({})),
     saveLiturgyState: vi.fn((state: unknown) => { prefsState.liturgy = state }),
+    // Fixture determinística: sem isso, o teste do clone depende do dia da
+    // semana real (hydrate() seleciona hoje; domingo real exclui o weekday[0]
+    // populado do cloneSources — flake só aos domingos, visto 2026-10-11).
+    todayWeekday: vi.fn(() => 'friday' as const),
   }
 })
 
@@ -234,6 +238,9 @@ describe('useLiturgyStore', () => {
       const store = useLiturgyStore()
       await store.hydrate()
       const day = LITURGY_DAY_TAB_ORDER[0]
+      // fixa selectedDay ≠ day populado: cloneSources exclui o dia selecionado
+      // e selectedDay inicia em todayWeekday() (falhava todo domingo)
+      store.selectDay(LITURGY_DAY_TAB_ORDER[1])
       store.weekdays[day] = [
         { id: 'i1', type: 'music', name: 'Hino', durationMs: 1, categoryId: null, filePath: '', filePaths: [], musicId: 1, url: '', accentColor: '#000', startTime: null, endTime: null, done: false },
       ] as never
@@ -246,6 +253,7 @@ describe('useLiturgyStore', () => {
       const store = useLiturgyStore()
       await store.hydrate()
       const day = LITURGY_DAY_TAB_ORDER[0]
+      store.selectDay(LITURGY_DAY_TAB_ORDER[1])
       store.weekdays[day] = [
         { id: 'i1', type: 'music', name: 'Hino', durationMs: 1, categoryId: null, filePath: '', filePaths: [], musicId: 1, url: '', accentColor: '#000', startTime: null, endTime: null, done: false },
       ] as never

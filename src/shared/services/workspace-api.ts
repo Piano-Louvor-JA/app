@@ -1,4 +1,5 @@
 import { BROWSER_STORAGE_KEYS } from '@shared/constants/storage-keys'
+import { defaultDatabaseBase, defaultFilesBase } from './api-env'
 import { getBrowserItem, setBrowserItem } from '@shared/services/browser-storage'
 import { getDesktopBridge, isDesktopApp } from '@shared/services/desktop-bridge'
 
@@ -47,7 +48,7 @@ export function resolveMediaUrl(relativePath: string): string {
   }
 
   const base =
-    import.meta.env.VITE_URL_FILES ?? 'https://api.pianolouvorja.com.br/file'
+    import.meta.env.VITE_URL_FILES ?? defaultFilesBase()
   return `${base}/${cleanPath}`
 }
 
@@ -55,7 +56,7 @@ export function resolveDatabaseUrl(relativePath: string): string {
   // Default da nossa API — .env é gitignored e o CI não injeta VITE_*:
   // sem default aqui a build de release fica sem catálogo (hotfix 14/09).
   const base =
-    import.meta.env.VITE_URL_DATABASE ?? 'https://api.pianolouvorja.com.br/json_db'
+    import.meta.env.VITE_URL_DATABASE ?? defaultDatabaseBase()
   const normalizedBase = base.endsWith('/') ? base.slice(0, -1) : base
   const path = relativePath.startsWith('/') ? relativePath : `/${relativePath}`
   return `${normalizedBase}${path}`

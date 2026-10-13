@@ -239,4 +239,3 @@ describe("MediaProjectionView — boxStyle branches (90/97/101)", () => {
     }
   })
 })
-

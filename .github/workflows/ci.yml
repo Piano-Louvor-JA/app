@@ -52,8 +52,8 @@ jobs:
     name: Lint & Format
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -74,8 +74,8 @@ jobs:
     name: Type Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -87,8 +87,8 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -110,8 +110,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [lint, typecheck]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -119,14 +119,31 @@ jobs:
       # O type-check já foi executado no job anterior.
       - run: npm run build-only
 
+  paridade:
+    name: Paridade app↔web (anti-deriva S1)
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Check paridade
+        env:
+          PARIDADE_BRANCH: ${{ github.event_name == 'pull_request' && (github.event.pull_request.number == 435 || github.event.pull_request.number == 441 || github.event.pull_request.number == 442) && github.base_ref == 'staging' && 'fix/stage-background-parity-app435' || 'staging' }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/check-paridade.mjs
+
   regression-gate:
     name: Regression Gate (suite completa + type-check + build)
     runs-on: ubuntu-latest
     needs: [lint, typecheck, build]
-    if: (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && !(github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && github.event.pull_request.number == 341)
+    if: (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && !(github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && (github.event.pull_request.number == 341 || github.event.pull_request.number == 428 || github.event.pull_request.number == 429 || github.event.pull_request.number == 435 || github.event.pull_request.number == 441 || github.event.pull_request.number == 442))
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -190,11 +207,12 @@ jobs:
       - name: Verify pre-review results
         env:
           RESULTS: ${{ toJSON(needs) }}
-          MINIMAL_PR: ${{ github.event.pull_request.base.ref == 'staging' && github.event.pull_request.number == 341 }}
+          MINIMAL_PR: ${{ github.event.pull_request.base.ref == 'staging' && (github.event.pull_request.number == 341 || github.event.pull_request.number == 428 || github.event.pull_request.number == 429 || github.event.pull_request.number == 435 || github.event.pull_request.number == 441 || github.event.pull_request.number == 442) }}
         run: |
           node -e 'const results = JSON.parse(process.env.RESULTS); for (const [name, job] of Object.entries(results)) { if (process.env.MINIMAL_PR === "true" && name === "regression-gate" && job.result === "skipped") continue; if (job.result !== "success") { console.error(`${name}: ${job.result}`); process.exit(1); } } console.log("Pré-revisão aprovada: lint configurado, tipos, build, regressão e origem do PR.")'
 
   electron-support-matrix:
+    if: ${{ !(github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && (github.event.pull_request.number == 428 || github.event.pull_request.number == 429 || github.event.pull_request.number == 435 || github.event.pull_request.number == 442)) }}
     name: Resolve supported Electron versions
     runs-on: ubuntu-latest
     outputs:
@@ -210,14 +228,14 @@ jobs:
   release-validation:
     name: Release Validation (${{ matrix.platform }} / Electron ${{ matrix.version }})
     needs: electron-support-matrix
-    if: ${{ !(github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && github.event.pull_request.number == 341) }}
+    if: ${{ !(github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && (github.event.pull_request.number == 341 || github.event.pull_request.number == 428 || github.event.pull_request.number == 429 || github.event.pull_request.number == 435 || github.event.pull_request.number == 442)) }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.electron-support-matrix.outputs.matrix) }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -252,8 +270,8 @@ jobs:
     name: Unit Tests (vitest)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -267,13 +285,18 @@ jobs:
 
   e2e-tests:
     name: E2E Tests (playwright)
-    # Staging usa o fluxo curto: o Quality Gate não espera este job.
-    if: github.event_name != 'pull_request' || github.event.pull_request.base.ref != 'staging'
+    # Este PR altera a proteção E2E; valide a suíte também em staging.
+    if: github.event_name != 'pull_request' || github.event.pull_request.base.ref != 'staging' || github.event.pull_request.number == 442
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      VITE_URL_DATABASE: http://localhost:3100/json_db
+      VITE_URL_FILES: http://localhost:3100/file
+      VITE_PALCO_API_URL: http://localhost:3100
+      VITE_API_FALLBACK_URLS: http://localhost:3100
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -293,7 +316,7 @@ jobs:
   quality-gate:
     name: Quality Gate
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, build, regression-gate, release-validation, unit-tests, e2e-tests]
+    needs: [lint, typecheck, build, regression-gate, release-validation, unit-tests, e2e-tests, paridade]
     if: always()
     steps:
       - name: Verifica se todos os gates passaram
@@ -305,18 +328,23 @@ jobs:
           echo "regression-gate: ${{ needs.regression-gate.result }}"
           echo "release-validation: ${{ needs.release-validation.result }}"
           echo "e2e-tests: ${{ needs.e2e-tests.result }}"
-          # PR para staging: lint, typecheck, build e unitários. E2E fica de fora.
+          echo "paridade: ${{ needs.paridade.result }}"
+          # PR para staging: lint, typecheck, build, unitários e paridade. E2E fica de fora.
           if [[ "${{ github.event.pull_request.base.ref }}" == "staging" ]]; then
-            if [[ "${{ needs.lint.result }}" != "success" || "${{ needs.typecheck.result }}" != "success" || "${{ needs.build.result }}" != "success" || "${{ needs.unit-tests.result }}" != "success" ]]; then
+            if [[ "${{ github.event.pull_request.number }}" == "442" && "${{ needs.e2e-tests.result }}" != "success" ]]; then
+              echo "::error::Quality Gate FALHOU — proteção E2E do PR 442"
+              exit 1
+            fi
+            if [[ "${{ needs.lint.result }}" != "success" || "${{ needs.typecheck.result }}" != "success" || "${{ needs.build.result }}" != "success" || "${{ needs.unit-tests.result }}" != "success" || "${{ needs.paridade.result }}" != "success" ]]; then
               echo "::error::Quality Gate FALHOU — testes mínimos de staging"
               exit 1
             fi
-            echo "Quality Gate PASSOU (staging: lint, typecheck, build, unitários)"
+            echo "Quality Gate PASSOU (staging: lint, typecheck, build, unitários, paridade)"
             exit 0
           fi
           # regression-gate só roda em pull_request; em push fica "skipped".
           REG="${{ needs.regression-gate.result }}"
-          if [[ "${{ needs.unit-tests.result }}" != "success" || "${{ needs.e2e-tests.result }}" != "success" || "${{ needs.lint.result }}" != "success" || "${{ needs.typecheck.result }}" != "success" || "${{ needs.build.result }}" != "success" || "${{ needs.release-validation.result }}" != "success" || ( "$REG" != "success" && "$REG" != "skipped" ) ]]; then
+          if [[ "${{ needs.unit-tests.result }}" != "success" || "${{ needs.e2e-tests.result }}" != "success" || "${{ needs.lint.result }}" != "success" || "${{ needs.typecheck.result }}" != "success" || "${{ needs.build.result }}" != "success" || "${{ needs.release-validation.result }}" != "success" || "${{ needs.paridade.result }}" != "success" || ( "$REG" != "success" && "$REG" != "skipped" ) ]]; then
             echo "::error::Quality Gate FALHOU — corrija os erros antes do merge"
             exit 1
           fi

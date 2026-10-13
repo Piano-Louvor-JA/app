@@ -446,7 +446,7 @@ describe('LiturgyTimelineItem', () => {
   describe('player menu', () => {
     it('áudio: botão de player visível, abre menu ao clicar', async () => {
       const wrapper = createWrapper({ item: createItem({ type: 'audio' }) })
-      
+
       const btn = wrapper.find('.liturgy-item__player-trigger')
       expect(btn.exists()).toBe(true)
       await btn.trigger('click')
@@ -604,7 +604,7 @@ describe('LiturgyTimelineItem', () => {
       expect(input.exists()).toBe(true)
       const clickSpy = vi.fn()
       ;(input.element as HTMLInputElement).click = clickSpy
-      const fileBtn = w.findAll('button').find(b => (b.attributes('title') ?? '').includes('liturgy'))
+      const fileBtn = w.findAll('button').find(b => (b.attributes('title') ?? '') === 'Selecionar arquivo')
       expect(fileBtn).toBeTruthy()
       await fileBtn!.trigger('click')
       expect(clickSpy).toHaveBeenCalled()

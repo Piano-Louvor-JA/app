@@ -1,35 +1,29 @@
 /**
  * Fallback em cascata de APIs do ecossistema LouvorJA.
  *
- * Ordem (RF: app sempre com onde fazer requisicao):
- *   1. Primária: VITE_URL_DATABASE / VITE_URL_FILES
- *      (default: api.pianolouvorja.com.br — nossa API)
- *   2. Fallbacks: VITE_API_FALLBACK_URLS (lista separada por vírgula;
- *      default: api.louvorja.com.br, api.louvorja.workers.dev)
+ * Contrato de perfil (SPEC piano-api-env-guard v1.0): defaults derivam do
+ * perfil de build (VITE_PIANO_PROFILE, injetado pelo vite.config a partir de
+ * PIANO_BUILD_PROFILE). Non-release (dev/teste/homologação) => primária STG
+ * e fallbacks SEM produção. Release => produção + fallbacks públicos
+ * aprovados. Env sobrepõe, exceto: produção nunca entra em non-release
+ * (descartada dos fallbacks — o build guard bloqueia a primária).
  *
- * DEFAULTS RESTAURADOS (app#177, hotfix 14/09): o refactor 'zero default'
- * (7c66a46) quebrou TODA build de release — .env é gitignored e o CI não
- * injeta VITE_*, então a lista saía vazia e o catálogo não baixava
- * (Ezequias 13/09: 'api não respondeu nada, mídias baixaram'). As defaults
- * são URLs públicas, não segredo; env sobrepõe quando presente.
- *
- * Mesma semantica do ApiConfig do APK (Flutter) — paridade entre clientes.
+ * Mesma semântica do ApiConfig do APK (Flutter) — paridade entre clientes.
  */
 
-/** Fallbacks default, em ordem de prioridade. A primária NÃO está aqui. */
-const DEFAULT_FALLBACK_HOSTS = [
-  'https://api.louvorja.com.br',
-  'https://api.louvorja.workers.dev',
-]
+import { isProductionHost, rendererApiEnv } from './api-env'
 
-/** Fallbacks: env sobrepõe; sem env = lista default. */
+/** Fallbacks: env sobrepõe; sem env = contrato do perfil. Produção é
+ * descartada em perfil não-release (RF-02/RF-05.6). */
 function fallbackHosts(): string[] {
+  const apiEnv = rendererApiEnv()
   const env = import.meta.env.VITE_API_FALLBACK_URLS
-  if (typeof env !== 'string' || !env.trim()) return [...DEFAULT_FALLBACK_HOSTS]
+  if (typeof env !== 'string' || !env.trim()) return apiEnv.fallbackHosts()
   return env
     .split(',')
     .map((h) => h.trim().replace(/\/+$/, ''))
     .filter(Boolean)
+    .filter((h) => apiEnv.isRelease || !isProductionHost(h))
 }
 
 type ApiKind = 'database' | 'files'
@@ -39,10 +33,25 @@ const ENV_KEYS: Record<ApiKind, string> = {
   files: 'VITE_URL_FILES',
 }
 
-// Primária: env sobrepõe; sem env = default da nossa API (URL pública).
-const DEFAULT_PRIMARY_BASES: Record<ApiKind, string> = {
-  database: 'https://api.pianolouvorja.com.br/json_db',
-  files: 'https://api.pianolouvorja.com.br/file',
+// Primária: env sobrepõe; sem env = contrato do perfil (STG em non-release,
+// produção SOMENTE em release — SPEC piano-api-env-guard RF-01/RF-02).
+/**
+ * Lista de bases candidatas em ordem: primária + fallbacks (sem duplicar).
+ */
+export function apiCandidateBases(kind: ApiKind): string[] {
+  const apiEnv = rendererApiEnv()
+  const env = import.meta.env[ENV_KEYS[kind]]
+  const primary =
+    typeof env === 'string' && env.trim() ? env.trim() : apiEnv.primary(kind)
+  const primaryHost = baseToHost(primary)
+  const path = kindToPath(kind)
+  const candidates: string[] = []
+  /* v8 ignore next 1 -- primary deriva de env ou contrato, sempre truthy */
+  if (primary) candidates.push(primary)
+  for (const host of fallbackHosts()) {
+    if (host !== primaryHost) candidates.push(`${host}${path}`)
+  }
+  return candidates
 }
 
 /** Extrai o host (origem) de uma base tipo https://host/json_db */
@@ -56,24 +65,6 @@ function baseToHost(base: string): string {
 
 function kindToPath(kind: ApiKind): string {
   return kind === 'database' ? '/json_db' : '/file'
-}
-
-/**
- * Lista de bases candidatas em ordem: primária + fallbacks (sem duplicar).
- */
-export function apiCandidateBases(kind: ApiKind): string[] {
-  const env = import.meta.env[ENV_KEYS[kind]]
-  const primary =
-    typeof env === 'string' && env.trim() ? env.trim() : DEFAULT_PRIMARY_BASES[kind]
-  const primaryHost = baseToHost(primary)
-  const path = kindToPath(kind)
-  const candidates: string[] = []
-  /* v8 ignore next 1 -- primary deriva de env ou default, sempre truthy */
-  if (primary) candidates.push(primary)
-  for (const host of fallbackHosts()) {
-    if (host !== primaryHost) candidates.push(`${host}${path}`)
-  }
-  return candidates
 }
 
 /**

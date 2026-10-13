@@ -16,15 +16,20 @@ jobs:
     name: Build Linux AppImage x64
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
 
       - name: Install dependencies
         run: npm ci
+
+      # Manual/dispatch => homologation/STG (SPEC piano-api-env-guard): build
+      # de teste NUNCA fala com produção, mesmo se .env local vazar env.
+      - name: Resolve API build profile
+        run: echo "PIANO_BUILD_PROFILE=homologation" >> "$GITHUB_ENV"
 
       - name: Build Vite + Electron AppImage (x64)
         run: npm run electron:build -- --linux AppImage --publish never

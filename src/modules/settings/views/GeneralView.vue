@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { appConfirm } from '@shared/composables/useAppConfirm'
+import { hasMediaCustomCatalogBackup, restoreMediaCustomCatalogBackup } from '@modules/sync/services/media-custom-backup'
 
 import { GlassCard } from '@design-system/index'
 import { isDesktopApp } from '@shared/services/desktop-bridge'
@@ -61,6 +63,7 @@ type SyncStatus =
 
 const syncStatus = ref<SyncStatus>({ kind: 'idle' })
 const isSyncBusy = ref(false)
+const hasCatalogBackup = ref(hasMediaCustomCatalogBackup())
 
 async function handleSyncExport() {
   if (isSyncBusy.value) return
@@ -94,8 +97,27 @@ async function handleSyncImport() {
       syncStatus.value = { kind: 'error', messageKey: 'settings.general.syncInvalid' }
       return
     }
-    const result = importLouvorjaIntoBrowser(decodeLouvorjaPackage(raw))
+    const pkg = decodeLouvorjaPackage(raw)
+    let catalogReplacementConfirmed = false
+    if (pkg.entities.mediaCustomCatalog) {
+      catalogReplacementConfirmed = await appConfirm({
+        title: t('settings.general.catalogReplaceTitle'),
+        message: t('settings.general.catalogReplaceMessage'),
+        confirmLabel: t('settings.general.catalogReplaceConfirm'),
+        cancelLabel: t('settings.general.catalogCancel'),
+        danger: true,
+      })
+      if (!catalogReplacementConfirmed) {
+        syncStatus.value = { kind: 'error', messageKey: 'settings.general.syncCancelled' }
+        return
+      }
+    }
+    const result = importLouvorjaIntoBrowser(pkg, { catalogReplacementConfirmed })
+    hasCatalogBackup.value = hasMediaCustomCatalogBackup()
     if (result.applied.length > 0) {
+      if (result.applied.includes("liturgy")) {
+        window.dispatchEvent(new CustomEvent("liturgy:imported"))
+      }
       syncStatus.value = {
         kind: 'success',
         messageKey: 'settings.general.syncImported',
@@ -105,11 +127,31 @@ async function handleSyncImport() {
       syncStatus.value = {
         kind: 'success',
         messageKey: 'settings.general.syncNothingToApply',
+        params: {
+          localModified: result.localModified ?? '—',
+          packageModified: result.packageModified ?? '—',
+        },
       }
     }
   } catch (error) {
     console.error('[settings] falha ao importar pacote', error)
-    syncStatus.value = { kind: 'error', messageKey: 'settings.general.syncInvalid' }
+    syncStatus.value = { kind: 'error', messageKey: 'settings.general.catalogImportFailed' }
+  } finally {
+    isSyncBusy.value = false
+  }
+}
+
+async function handleCatalogRestore() {
+  if (isSyncBusy.value) return
+  isSyncBusy.value = true
+  try {
+    const confirmed = await appConfirm({ title: t('settings.general.catalogRestore'), message: t('settings.general.catalogRestoreMessage'), confirmLabel: t('settings.general.catalogRestore'), cancelLabel: t('settings.general.catalogCancel'), danger: true })
+    if (!confirmed) return
+    syncStatus.value = restoreMediaCustomCatalogBackup()
+      ? { kind: 'success', messageKey: 'settings.general.catalogRestored' }
+      : { kind: 'error', messageKey: 'settings.general.catalogImportFailed' }
+  } catch {
+    syncStatus.value = { kind: 'error', messageKey: 'settings.general.catalogImportFailed' }
   } finally {
     isSyncBusy.value = false
   }
@@ -308,6 +350,9 @@ async function clearAllLocalData() {
         >
           <i class="ti ti-file-import" aria-hidden="true" />
           {{ t('settings.general.syncImport') }}
+        </button>
+        <button v-if="hasCatalogBackup" type="button" class="general-settings__btn" :disabled="isSyncBusy" @click="handleCatalogRestore">
+          {{ t('settings.general.catalogRestore') }}
         </button>
       </div>
 

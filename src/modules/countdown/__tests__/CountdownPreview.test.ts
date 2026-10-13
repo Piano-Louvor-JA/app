@@ -296,4 +296,3 @@ describe('CountdownPreview', () => {
     wrapper.unmount()
   })
 })
-
