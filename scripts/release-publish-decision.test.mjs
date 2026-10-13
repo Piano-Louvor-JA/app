@@ -235,7 +235,7 @@ test('Flatpak e lojas preservam tag_only e usam a versão exata', () => {
     assert.match(text, /scripts\/release-publish-decision\.mjs/, name)
     assert.match(text, /needs\.decide\.outputs\.publish == 'true'/, name)
     assert.match(text, /mktemp --suffix=\.mjs/, name)
-    assert.match(text, /workflow_run:/, name)
+    assert.match(text, /workflow_dispatch:/, name)
   }
   const snap = readFileSync(join(repoRoot, '.github/workflows/snap-release.yml'), 'utf8')
   assert.match(snap, /ref: \$\{\{ needs\.decide\.outputs\.tag \}\}/)

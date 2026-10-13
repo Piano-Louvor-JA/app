@@ -1,11 +1,8 @@
 name: Build Flatpak
 
-# Roda depois do Release Linux (não em paralelo na tag) para o tarball já existir.
+# Disparado pelo Release Linux após publicação, usando a tag exata.
 # workflow_dispatch cobre reexecução manual (ex.: v1.26.0 após o fix).
 on:
-  workflow_run:
-    workflows: ['Release Linux']
-    types: [completed]
   workflow_dispatch:
     inputs:
       version:
@@ -33,7 +30,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TARGET_REF: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version || github.event.workflow_run.head_branch }}
+          TARGET_REF: ${{ inputs.version }}
           WORKFLOW_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
@@ -56,9 +53,7 @@ jobs:
     if: >-
       needs.decide.result == 'success' &&
       needs.decide.outputs.publish == 'true' &&
-      (github.event_name == 'workflow_dispatch' ||
-       (github.event.workflow_run.conclusion == 'success' &&
-        startsWith(github.event.workflow_run.head_branch, 'v')))
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     container:
       image: bilelmoussaoui/flatpak-github-actions:gnome-46
@@ -68,14 +63,9 @@ jobs:
         id: meta
         env:
           INPUT_VERSION: ${{ github.event.inputs.version }}
-          RUN_BRANCH: ${{ github.event.workflow_run.head_branch }}
         run: |
           set -euo pipefail
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION="${INPUT_VERSION#v}"
-          else
-            VERSION="${RUN_BRANCH#v}"
-          fi
+          VERSION="${INPUT_VERSION#v}"
           [ -n "$VERSION" ] || { echo "no version"; exit 1; }
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"

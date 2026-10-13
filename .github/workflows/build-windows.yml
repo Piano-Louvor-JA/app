@@ -18,6 +18,9 @@ permissions:
 jobs:
   build-windows:
     name: Build Windows x64 (NSIS + Portable + Store APPX)
+    permissions:
+      contents: write
+      actions: write
     runs-on: windows-latest
     env:
       MS_STORE_IDENTITY_NAME: ${{ secrets.MS_STORE_IDENTITY_NAME }}
@@ -116,3 +119,15 @@ jobs:
             dist-electron/SHA256SUMS-win-x64
           if-no-files-found: warn
           retention-days: 30
+
+      - name: Dispatch Microsoft Store after APPX upload
+        if: steps.decision.outputs.publish == 'true' && steps.store.outputs.enabled == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+        run: |
+          set -euo pipefail
+          # Manual builds resolve package version from their checked-out commit.
+          if [ -z "$TAG" ]; then TAG="v$(node -p "require('./package.json').version")"; fi
+          gh workflow run msstore-release.yml --ref main -f "version=$TAG"

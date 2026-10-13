@@ -3,9 +3,6 @@ name: Snap Store Release
 on:
   release:
     types: [published]
-  workflow_run:
-    workflows: ['Release Linux']
-    types: [completed]
   workflow_dispatch:
     inputs:
       version:
@@ -14,13 +11,12 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: snap-${{ github.event.release.tag_name || inputs.version || github.event.workflow_run.head_branch }}
+  group: snap-${{ github.event.release.tag_name || inputs.version }}
   cancel-in-progress: false
 
 jobs:
   decide:
     runs-on: ubuntu-latest
-    if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && startsWith(github.event.workflow_run.head_branch, 'v') && github.event.workflow_run.head_repository.full_name == github.repository)
     outputs:
       publish: ${{ steps.decision.outputs.publish }}
       tag: ${{ steps.tag.outputs.value }}
@@ -34,10 +30,9 @@ jobs:
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
           INPUT_VERSION: ${{ inputs.version }}
-          RUN_TAG: ${{ github.event.workflow_run.head_branch }}
         run: |
           set -euo pipefail
-          TAG="${RELEASE_TAG:-${INPUT_VERSION:-$RUN_TAG}}"
+          TAG="${RELEASE_TAG:-$INPUT_VERSION}"
           TAG="v${TAG#v}"
           [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Tag inválida'; exit 1; }
           echo "value=$TAG" >> "$GITHUB_OUTPUT"
