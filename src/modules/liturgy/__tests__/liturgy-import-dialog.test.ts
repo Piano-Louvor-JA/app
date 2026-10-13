@@ -1,4 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia } from 'pinia'
 import { createI18n } from 'vue-i18n'
 import { describe, expect, it, vi } from 'vitest'
 import LiturgyItemDialog from '../components/LiturgyItemDialog.vue'
@@ -16,7 +17,7 @@ describe('importação após fechar o diálogo', () => {
         draft: { type: 'music', name: '', subtitle: '', durationMs: 0, accentColor: '', categoryId: null, startTime: '', endTime: '', musicId: null, musicMode: 'audio', verseBookId: null, verseChapter: null, verseNumbers: '', filePath: '', filePaths: [], presentationEngine: 'auto', playerId: 'default', url: '' },
         categoryOptions: [], complementaryTitleSuggestions: [], musicOptions: [], musicQuery: '', musicCatalogEmpty: true, selectedMusic: null,
       },
-      global: { stubs: { teleport: true }, plugins: [createI18n({ legacy: false, locale: 'pt', missingWarn: false, fallbackWarn: false, messages: { pt: {} } })] },
+      global: { stubs: { teleport: true }, plugins: [createPinia(), createI18n({ legacy: false, locale: 'pt', missingWarn: false, fallbackWarn: false, messages: { pt: {} } })] },
     })
     const input = wrapper.get('[data-testid="slja-file-input"]')
     Object.defineProperty(input.element, 'files', { value: [{ name: 'test.slja', arrayBuffer: async () => new ArrayBuffer(0) }], configurable: true })
@@ -47,7 +48,7 @@ describe('importação após fechar o diálogo', () => {
         draft: { type: 'music', name: '', subtitle: '', durationMs: 0, accentColor: '', categoryId: null, startTime: '', endTime: '', musicId: null, musicMode: 'audio', verseBookId: null, verseChapter: null, verseNumbers: '', filePath: '', filePaths: [], presentationEngine: 'auto', playerId: 'default', url: '' },
         categoryOptions: [], complementaryTitleSuggestions: [], musicOptions: [], musicQuery: '', musicCatalogEmpty: true, selectedMusic: null,
       },
-      global: { stubs: { teleport: true }, plugins: [createI18n({ legacy: false, locale: 'pt', missingWarn: false, fallbackWarn: false, messages: { pt: {} } })] },
+      global: { stubs: { teleport: true }, plugins: [createPinia(), createI18n({ legacy: false, locale: 'pt', missingWarn: false, fallbackWarn: false, messages: { pt: {} } })] },
     })
     const input = wrapper.get('[data-testid="slja-file-input"]')
     Object.defineProperty(input.element, 'files', { value: [{ name: 'test.slja', arrayBuffer: async () => new ArrayBuffer(0) }], configurable: true })

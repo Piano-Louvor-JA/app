@@ -157,6 +157,19 @@ export function exportLouvorjaFromBrowser(
 		};
 	}
 
+	// Rotações agendadas (#414 P3).
+	const scheduled = getUserPreference<ScheduledState>(
+		USER_PREFERENCE_KEYS.scheduledState,
+		null,
+	);
+	if (scheduled != null && (scheduled.categories.length > 0 || scheduled.items.length > 0)) {
+		entities.scheduled = {
+			type: "scheduled",
+			modified: readModified("scheduled"),
+			data: scheduled,
+		};
+	}
+
 	return {
 		schema: LOUVORJA_SCHEMA_VERSION,
 		appVersion,
@@ -280,6 +293,23 @@ export function importLouvorjaIntoBrowser(
 				} else {
 					skipped.push(PREFERENCES_ENTITY);
 				}
+				break;
+			}
+			case "scheduled": {
+				if (toEpoch(entity.modified) <= toEpoch(readModified("scheduled"))) {
+					skipped.push("scheduled");
+					break;
+				}
+				if (!isScheduledState(entity.data)) {
+					skipped.push("scheduled");
+					break;
+				}
+				setUserPreference(USER_PREFERENCE_KEYS.scheduledState, entity.data);
+				localStorage.setItem(
+					`${SYNC_MODIFIED_PREFIX}.scheduled`,
+					entity.modified,
+				);
+				applied.push("scheduled");
 				break;
 			}
 			default:

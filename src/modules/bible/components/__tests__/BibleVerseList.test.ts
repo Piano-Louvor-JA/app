@@ -17,6 +17,7 @@ vi.mock('../../../settings/services/stage-settings-runtime', () => ({
 
 vi.mock('../../../settings/types/stage-settings', () => ({
   resolveBackgroundImage: vi.fn(() => null),
+  stageBgCss: () => '#0A0E1A',
 }))
 
 import BibleVerseList from '../BibleVerseList.vue'

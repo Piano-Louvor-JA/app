@@ -221,6 +221,8 @@ onUnmounted(() => {
   margin-right: 6px;
   align-items: center;
   display: inline-flex;
+  /* app#423: titlebar é drag region — o widget precisa ser clicável. */
+  -webkit-app-region: no-drag;
 }
 
 .app-titlebar__controls {

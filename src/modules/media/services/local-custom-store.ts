@@ -266,7 +266,7 @@ export function createLocalLyric(
 		order?: number;
 		/** Fundo do slide — data: URL base64 (import .slja local). */
 		image_url?: string | null;
-		image_position?: string | null;
+		image_position?: string | number | null;
 	},
 ): LocalLyric {
 	const db = loadDb();
@@ -281,12 +281,14 @@ export function createLocalLyric(
 		order,
 		show_slide: true,
 		image_url: input.image_url ?? null,
-		image_position: input.image_position ?? null,
+		image_position: input.image_position == null ? null : String(input.image_position),
 	};
 	db.nextLyricId -= 1;
 	music.lyrics.push(lyric);
 	music.lyrics.sort((a, b) => a.order - b.order);
-	saveDb(db);
+	if (!saveDb(db)) {
+		throw new Error("local-persist-failed");
+	}
 	return lyric;
 }
 

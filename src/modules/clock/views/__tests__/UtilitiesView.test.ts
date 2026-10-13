@@ -21,7 +21,8 @@ describe('UtilitiesView', () => {
     const w = mount(UtilitiesView, { global: { plugins: [i18n] } })
     expect(w.find('.utilities-view__title').text()).toBe('Utilitários')
     const cards = w.findAll('.hub-stub')
-    expect(cards).toHaveLength(4)
+    // 5 cards: temporizador, random, draw, obs + diagnóstico (app#423/SrCaldeira).
+    expect(cards).toHaveLength(5)
     const obs = cards.find((card) => card.text() === 'utilities.obs')
     expect(obs?.attributes('data-available')).toBe('true')
     expect(obs?.attributes('data-to')).toBe('/utilities/obs')

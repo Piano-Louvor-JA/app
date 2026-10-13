@@ -151,7 +151,7 @@ function customBaseUrl(): string {
  * Formata duração da API para m:ss.
  * API pode retornar: null, segundos (number), "mm:ss" ou "hh:mm:ss".
  */
-function formatDurationLabel(value: unknown): string {
+export function formatDurationLabel(value: unknown): string {
   const raw = asNullableString(value)
   if (raw) {
     // Já vem formatado ("3:45" / "00:03:45") — só limpar horas vazias
@@ -235,7 +235,9 @@ export async function loadCustomMusicTrack(
   if (!Number.isFinite(musicId) || musicId <= 0) return null
 
   try {
-    const response = await fetch(`${customBaseUrl()}/musics/${musicId}`)
+    const response = await fetch(`${customBaseUrl()}/musics/${musicId}`, {
+      headers: authHeaders(),
+    })
     if (!response.ok) return null
     const row = (await response.json()) as CustomMusicRow
     if (!row || !row.name) return null
@@ -424,7 +426,7 @@ function localMusicToSummary(m: LocalMusic): CustomMusicSummary {
 export async function copyCustomMusic(
   collectionId: number,
   musicId: number,
-): Promise<{ id: number } | null> {
+): Promise<{ id: number; existed?: boolean } | null> {
   try {
     const response = await fetch(
       `${customBaseUrl()}/collections/${collectionId}/musics/${musicId}/copy`,
@@ -432,7 +434,9 @@ export async function copyCustomMusic(
     )
     if (!response.ok) return null
     const json = (await response.json()) as { id_music: number }
-    return { id: json.id_music }
+    // Dedup de imports (app#336 fase 3): 200 = já existia (mesmo client_uuid)
+    // e a API retornou o registro existente; 201 = criado agora.
+    return { id: json.id_music, existed: response.status === 200 }
   } catch {
     return null
   }
@@ -501,6 +505,7 @@ export async function listCustomMusics(
   try {
     const response = await fetch(
       `${customBaseUrl()}/collections/${collectionId}/musics`,
+      { headers: authHeaders() },
     )
     if (!response.ok) return []
     const json = (await response.json()) as {
@@ -611,6 +616,7 @@ export async function createCustomCollection(
   description?: string,
   authorName?: string,
   visibility?: CollectionVisibility,
+  options?: { queueOffline?: boolean },
 ): Promise<{ id: number } | null> {
   // Sem auth: cria LOCAL (regra de produto 12/09 — sem identidade não sobe).
   if (!getAuthSession()) {
@@ -634,6 +640,9 @@ export async function createCustomCollection(
     const json = (await response.json()) as { id_collection: number }
     return { id: json.id_collection }
   } catch {
+    // O import .slja não pode deixar uma coletânea vazia na fila quando
+    // desiste do envio. O editor continua enfileirando.
+    if (options?.queueOffline === false) return null
     // Offline (autenticado): enfileira pro sync (B1/B2). O client_uuid dá
     // identidade estável — o próximo flush cria/atualiza no servidor.
     await enqueue({
@@ -808,19 +817,16 @@ export async function createCustomLyric(
     time?: string
     order?: number
     id_file_image?: number
-    image_position?: number
+    image_position?: string | number
   },
 ): Promise<{ id: number } | null> {
   if (isLocalId(musicId)) {
-    const local = createLocalLyric(musicId, {
-      lyric: input.lyric,
-      aux_lyric: input.aux_lyric,
-      time: input.time,
-      order: input.order,
-      image_url: null,
-      image_position: input.image_position != null ? String(input.image_position) : null,
-    })
-    return { id: local.id }
+    try {
+      const local = createLocalLyric(musicId, input)
+      return { id: local.id }
+    } catch {
+      return null
+    }
   }
   try {
     const response = await fetch(`${customBaseUrl()}/musics/${musicId}/lyrics`, {

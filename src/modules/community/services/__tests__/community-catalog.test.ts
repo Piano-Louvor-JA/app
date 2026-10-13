@@ -357,10 +357,10 @@ describe("community-catalog — saveCommunityCopy (F0.4, mata mutantes 64-133)",
 			}),
 		);
 		await saveCommunityCopy(BASE);
-		// Base vem do env (VITE_PALCO_API_URL) — em dev/homologação é STG.
-		// O contrato real é o path: /v1/custom/collections/{id}/musics.
+		// Base vem do env (VITE_PALCO_API_URL) — em dev/homologação pode ser
+		// localhost (STG local). O contrato real é o path: /v1/custom/collections/{id}/musics.
 		expect(calledUrl).toMatch(
-			/https:\/\/api(-stg)?\.pianolouvorja\.com\.br\/v1\/custom\/collections\/77\/musics$/,
+			/\/v1\/custom\/collections\/77\/musics$/,
 		);
 	});
 
