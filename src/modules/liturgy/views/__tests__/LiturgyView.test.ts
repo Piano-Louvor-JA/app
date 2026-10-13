@@ -2,6 +2,7 @@
 import { mount } from '@vue/test-utils'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref, computed } from 'vue'
+import { createPinia, setActivePinia } from 'pinia'
 import { createI18n } from 'vue-i18n'
 import ptBR from '../../locales/pt-BR'
 
@@ -116,6 +117,7 @@ function createWrapper() {
 }
 
 beforeEach(() => {
+  setActivePinia(createPinia())
   for (const k of Object.keys(mockState)) delete mockState[k]
 })
 

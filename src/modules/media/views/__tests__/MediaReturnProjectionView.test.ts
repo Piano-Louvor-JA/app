@@ -40,6 +40,7 @@ vi.mock('../../../settings/services/stage-settings-runtime', () => ({
 }))
 vi.mock('../../../settings/types/stage-settings', () => ({
   resolveBackgroundImage: (bg: unknown) => (bg ? String(bg) : null),
+  stageBgCss: (c: unknown) => (c ? String(c) : 'transparent'),
 }))
 vi.mock('../services/media-slides', () => ({
   stripHtmlBreaks: (s: string) => (s ?? '').replace(/<br\s*\/?>/gi, ' ').trim(),
