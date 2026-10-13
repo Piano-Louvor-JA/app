@@ -15,6 +15,7 @@ export default {
     close: 'Fechar',
     comingSoon: 'Em breve',
     cancel: 'Cancelar',
+    copied: 'Copiado!',
   },
   monitors: {
     selectScreens: 'Selecionar telas',

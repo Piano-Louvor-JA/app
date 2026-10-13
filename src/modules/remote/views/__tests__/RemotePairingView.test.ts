@@ -81,6 +81,8 @@ describe('RemotePairingView', () => {
     const wrapper = createWrapper()
     await flushPromises()
     expect(wrapper.find('[data-testid="remote-qr"]').attributes('src')).toBe('data:image/png;base64,QR')
+    // host:port + token vivem no painel recolhível — abre antes de afirmar
+    await wrapper.find('.details-toggle').trigger('click')
     expect(wrapper.text()).toContain('192.168.0.10:8787')
     expect(wrapper.find('[data-testid="remote-token"]').text()).toBe('TOKEN123')
     expect(wrapper.text()).toContain('Aguardando')
@@ -118,7 +120,7 @@ describe('RemotePairingView', () => {
     await flushPromises()
     clientsCb!({ count: 1, address: '192.168.0.50' })
     await wrapper.vm.$nextTick()
-    expect(wrapper.find('[data-testid="remote-client-status"]').classes()).toContain('connected')
+    expect(wrapper.find('[data-testid="remote-client-status"]').classes()).toContain('pairing-status--on')
     expect(wrapper.text()).toContain('192.168.0.50')
   })
 
