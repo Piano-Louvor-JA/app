@@ -317,6 +317,9 @@ export default {
       copyLink: 'Copy link',
       waitingClient: 'Waiting for remote control…',
       clientConnected: '{device} connected',
+      speakerTitle: 'Speaker',
+      speakerHint: 'The speaker scans this QR with the phone camera (or copies the link) — it opens the slide navigation page in the browser, no app install needed.',
+      speakerCopy: 'Copy speaker link',
     },
     palco: {
       cableGroup: 'Monitors (cable)',
