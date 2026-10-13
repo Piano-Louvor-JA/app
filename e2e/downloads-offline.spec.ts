@@ -59,7 +59,7 @@ async function mockExternalApis(page: Page): Promise<void> {
     }
     void route.fulfill({ json: [] })
   })
-  await page.route('**://api.pianolouvorja.com.br/**', (route) => {
+  await page.route('**://localhost:3100/**', (route) => {
     const url = route.request().url()
     const filename = url.split('/json_db/')[1]?.split('?')[0]
     if (filename && filename in CATALOG) {
