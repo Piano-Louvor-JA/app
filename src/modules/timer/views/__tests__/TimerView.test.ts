@@ -66,6 +66,7 @@ vi.mock('../../../settings/services/stage-settings-runtime', () => ({
 
 vi.mock('../../../settings/types/stage-settings', () => ({
   resolveBackgroundImage: (bg: unknown) => (bg ? String(bg) : null),
+  stageBgCss: (bg: unknown) => (bg ? String(bg) : 'transparent'),
 }))
 
 vi.mock('../../../settings/components/StageCustomizationDialog.vue', () => ({
