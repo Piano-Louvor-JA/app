@@ -102,6 +102,7 @@ function preferredHymnalTrack(
     if (track != null && track > 0) return { track, isHymnal: true }
   }
 
+  /* v8 ignore next 3 -- se algum hinário tem track>0 os loops acima já retornaram */
   if (hymnalTracks[0] != null) {
     return { track: hymnalTracks[0], isHymnal: true }
   }
@@ -184,9 +185,8 @@ export async function loadAlbumMusicIndex(): Promise<AlbumSearchHit[]> {
   }
 
   // Busca por letra (03/10): músicas custom LOCAIS entram no índice com
-  // `lyricsText` — a letra está no localStorage (offline-first), então a
-  // busca por trecho funciona sem rede. Hinário/álbuns oficiais continuam
-  // sem letra no índice (letra vem sob demanda da API) — issue do índice.
+  // `lyricsText` — a letra está no localStorage (offline-first). O hinário
+  // e os álbuns oficiais já trazem `lyric` no índice `${prefix}_musics`.
   try {
     const { listAllLocalMusicsWithLyrics } =
       await import('@modules/media/services/local-custom-store')
@@ -222,9 +222,28 @@ export async function loadAlbumMusicIndex(): Promise<AlbumSearchHit[]> {
 }
 
 /**
- * Busca estilo Home legado: nome, álbum ou número do hinário (máx. 50).
+ * Busca por hinos: título, álbum ou número do hinário (máx. 50).
  * Número prioriza Hinário Adventista atual, depois 1996.
+ *
+ * Relevância (apk#127 / SPEC 10): na busca textual, match de título
+ * precede match só de álbum ou de letra. Um termo que casa com o nome
+ * da coletânea não pode devolver todas as faixas dela na frente.
+ * O fold é o mesmo da busca por termos, para título acentuado não cair
+ * na cauda.
  */
+function foldSearchText(value: string): string {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+}
+
+function relevanceScore(entry: AlbumSearchHit, trimmed: string): number {
+  const title = foldSearchText(entry.name)
+  const query = foldSearchText(trimmed)
+  if (title === query) return 3
+  if (title.startsWith(query)) return 2
+  if (title.includes(query)) return 1
+  return 0
+}
+
 export function filterAlbumMusicIndex(
   index: AlbumSearchHit[],
   query: string,
@@ -287,6 +306,12 @@ export function filterAlbumMusicIndex(
       }
       return score(b) - score(a)
     })
+  } else {
+    // Busca textual: título/número primeiro; match só de álbum vai pro fim
+    // (não some, mas não engole a lista — apk#127).
+    results = [...results].sort(
+      (a, b) => relevanceScore(b, trimmed) - relevanceScore(a, trimmed),
+    )
   }
 
   return results.slice(0, 50)

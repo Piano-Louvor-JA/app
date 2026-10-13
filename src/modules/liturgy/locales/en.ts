@@ -279,6 +279,7 @@ export default {
       itemAdded: 'Item added successfully.',
       liturgySaved: 'Liturgy saved successfully.',
       mediaDesktopOnly: 'Provide the media file path.',
+      videoSelectFile: 'Select file',
       catalogEmpty: 'No songs in the local catalog. Import a .slja file in Media Center ("Import .slja" button) or add songs from the Community.',
       customRequired:
         'Create or select a custom liturgy before adding items.',
@@ -329,13 +330,20 @@ export default {
       importButton: 'Import .slja',
       importing: 'Importing…',
       imported: 'Imported: {name} ({slides} verses).',
-      uploadTitle: 'Upload "{name}" to your account?',
-      uploadMessage: 'The file will be uploaded once (never duplicated) and becomes available on any device.',
-      uploadConfirm: 'Upload to account',
-      uploadCancel: 'Keep on this device',
       importedLocal:
         'Imported on this device: {name} ({slides} verses) — saved without an account.',
+      importedLocalNoImages:
+        'Imported on this device: {name} ({slides} stanzas). Images were not saved on this device.',
       importFailed: 'Invalid .slja file.',
+      uploadTitle: 'Upload "{name}" to your account?',
+      uploadMessage: 'The file is uploaded once to your account (never duplicated). Or keep it saved on this device only.',
+      uploadConfirm: 'Upload to account',
+      uploadCancel: 'This device only',
+      importStorageFailed:
+        'Could not save the audio on this device. Free some space and try again.',
+      importRemoteFailed:
+        'Could not finish the upload. Check the connection and try again.',
+      importNoLyrics: 'The file has no lyric stanzas to import.',
     },
     custom: {
       title: 'Custom liturgies',

@@ -6,6 +6,7 @@ import {
   MEDIA_RUNTIME_STORAGE_KEY,
   normalizeMediaRuntime,
   readMediaRuntimeFromStorage,
+  writeMediaRuntimeToStorage,
 } from '../services/media-runtime'
 import { stripHtmlBreaks } from '../services/media-slides'
 import { readEffectiveStageSettings, subscribeStageSettings } from '../../settings/services/stage-settings-runtime'
@@ -55,7 +56,9 @@ onMounted(() => {
   try {
     channel = new BroadcastChannel(MEDIA_RUNTIME_CHANNEL)
     channel.onmessage = (event) => {
-      applyRuntime(event.data)
+      const next = normalizeMediaRuntime(event.data)
+      writeMediaRuntimeToStorage(next)
+      applyRuntime(next)
     }
   } catch {
     // BroadcastChannel indisponível
@@ -121,7 +124,6 @@ const lyricStyle = computed(() => {
     textTransform: st.lyricUpperCase ? 'uppercase' : 'none',
   }
 })
-
 const boxStyle = computed(() =>
   stage.value.textBox
     ? {

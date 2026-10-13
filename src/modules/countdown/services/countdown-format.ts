@@ -1,5 +1,6 @@
 import type {
   CountdownDurationParts,
+  CountdownRuntimeState,
   CountdownStatus,
   CountdownTimeFormat,
 } from '../types/countdown'
@@ -23,7 +24,8 @@ export function formatElapsedMs(
   elapsedMs: number,
   timeFormat: CountdownTimeFormat,
 ): string {
-  const safe = Math.max(0, Math.floor(elapsedMs))
+  const negative = elapsedMs < 0
+  const safe = Math.floor(Math.abs(elapsedMs))
   const hours = Math.floor(safe / 3_600_000)
   const minutes = Math.floor((safe % 3_600_000) / 60_000)
   const seconds = Math.floor((safe % 60_000) / 1000)
@@ -37,7 +39,11 @@ export function formatElapsedMs(
   }
 
   const effectiveFormat = resolveDisplayFormat(hours, timeFormat)
-  return effectiveFormat.replace(/hh|mm|ss|ms/g, (match) => tokens[match] ?? match)
+  const formatted = effectiveFormat.replace(
+    /hh|mm|ss|ms/g,
+    (match) => tokens[match],
+  )
+  return negative ? `-${formatted}` : formatted
 }
 
 export function computeElapsedMs(
@@ -60,27 +66,8 @@ export function computeRemainingMs(
   nowMs: number,
 ): number {
   const elapsed = computeElapsedMs(accumulatedMs, segmentStartedAt, status, nowMs)
-  return Math.max(0, durationMs - elapsed)
-}
-
-export function computeRemainingRawMs(
-  durationMs: number,
-  accumulatedMs: number,
-  segmentStartedAt: number | null,
-  status: CountdownStatus,
-  nowMs: number,
-): number {
-  const elapsed = computeElapsedMs(accumulatedMs, segmentStartedAt, status, nowMs)
+  // Permite negativo após zerar (tempo ultrapassado / overtime).
   return durationMs - elapsed
-}
-
-export function formatCountdownWithSign(
-  remainingMs: number,
-  timeFormat: CountdownTimeFormat,
-): string {
-  const negative = remainingMs < 0
-  const body = formatElapsedMs(Math.abs(remainingMs), timeFormat)
-  return negative ? `-${body}` : body
 }
 
 export function durationPartsFromMs(ms: number): CountdownDurationParts {
@@ -99,10 +86,77 @@ export function durationMsFromParts(parts: CountdownDurationParts): number {
   return hours * 3_600_000 + minutes * 60_000 + seconds * 1000
 }
 
+/** Remaining até HH:MM de hoje (negativo se o horário já passou). */
+export function wallClockUntilRemainingMs(
+  untilHour: number,
+  untilMinute: number,
+  nowMs: number,
+): number {
+  const hour = Math.min(23, Math.max(0, Math.floor(untilHour) || 0))
+  const minute = Math.min(59, Math.max(0, Math.floor(untilMinute) || 0))
+  const target = new Date(nowMs)
+  target.setHours(hour, minute, 0, 0)
+  return target.getTime() - nowMs
+}
+
+export function computeCountdownRemainingMs(
+  runtime: Pick<
+    CountdownRuntimeState,
+    | 'mode'
+    | 'untilHour'
+    | 'untilMinute'
+    | 'pausedRemainingMs'
+    | 'durationMs'
+    | 'accumulatedMs'
+    | 'segmentStartedAt'
+    | 'status'
+  >,
+  nowMs: number,
+): number {
+  if (runtime.mode === 'until') {
+    if (runtime.status === 'paused' && runtime.pausedRemainingMs != null) {
+      return runtime.pausedRemainingMs
+    }
+    return wallClockUntilRemainingMs(
+      runtime.untilHour ?? 18,
+      runtime.untilMinute ?? 0,
+      nowMs,
+    )
+  }
+  return computeRemainingMs(
+    runtime.durationMs,
+    runtime.accumulatedMs,
+    runtime.segmentStartedAt,
+    runtime.status,
+    nowMs,
+  )
+}
+
 export function clampDurationPart(value: unknown, max?: number): number {
   const n = typeof value === 'number' ? value : Number(value)
   if (!Number.isFinite(n) || n < 0) return 0
   const floored = Math.floor(n)
   if (max != null) return Math.min(max, floored)
   return floored
+}
+
+export function computeRemainingRawMs(
+  durationMs: number,
+  accumulatedMs: number,
+  segmentStartedAt: number | null,
+  status: CountdownStatus,
+  nowMs: number,
+): number {
+  const elapsed = computeElapsedMs(accumulatedMs, segmentStartedAt, status, nowMs)
+  return durationMs - elapsed
+}
+
+
+export function formatCountdownWithSign(
+  remainingMs: number,
+  timeFormat: CountdownTimeFormat,
+): string {
+  const negative = remainingMs < 0
+  const body = formatElapsedMs(Math.abs(remainingMs), timeFormat)
+  return negative ? `-${body}` : body
 }

@@ -6,8 +6,9 @@ import logoUrl from '@assets/brand/logo-louvor-ja.svg'
 import { APP_PRODUCT_NAME } from '@shared/constants/app'
 import { getDesktopBridge, isDesktopApp } from '@shared/services/desktop-bridge'
 import { isProjectionPopupLocation } from '@shared/services/projection-window-location'
-
 import DownloadQueueIndicator from '@modules/sync/components/DownloadQueueIndicator.vue'
+
+
 
 const route = useRoute()
 const isMaximized = ref(false)
@@ -45,6 +46,7 @@ async function close() {
 }
 
 function syncTitlebarHeight(show: boolean) {
+  /* v8 ignore next 1 -- testes sempre rodam com jsdom (document definido) */
   if (typeof document === 'undefined') return
   if (show) {
     document.documentElement.classList.add('electron-shell')

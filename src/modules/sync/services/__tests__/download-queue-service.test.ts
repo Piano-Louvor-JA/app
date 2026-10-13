@@ -24,6 +24,9 @@ import {
   enqueueDownload,
   pendingCount,
   subscribeDownloadQueue,
+  cancelDownload,
+  clearFinishedDownloads,
+  retryDownload,
 } from '../download-queue-service'
 
 describe('fila de downloads (app#338 core)', () => {
@@ -73,5 +76,65 @@ describe('fila de downloads (app#338 core)', () => {
     const snap = downloadQueueSnapshot()
     expect(snap.find((i) => i.id === 'bad:1')?.status).toBe('failed')
     expect(snap.find((i) => i.id === 'ok:1')?.status).toBe('done')
+  })
+
+  it('retryDownload: failed volta a pending e processa de novo', async () => {
+    let attempts = 0
+    const run = vi.fn().mockImplementation(async () => {
+      attempts += 1
+      if (attempts === 1) throw new Error('net')
+    })
+    enqueueDownload({ id: 'r1', label: 'R1', priority: 'user', task: run })
+    await vi.waitFor(() => {
+      expect(downloadQueueSnapshot().find((q) => q.id === 'r1')?.status).toBe('failed')
+    })
+    retryDownload('r1')
+    await vi.waitFor(() => {
+      expect(downloadQueueSnapshot().find((q) => q.id === 'r1')?.status).toBe('done')
+    })
+    expect(attempts).toBe(2)
+  })
+
+  it('cancelDownload: remove pending; running não é interrompido', async () => {
+    let release: (() => void) | null = null
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    enqueueDownload({
+      id: 'c1',
+      label: 'running',
+      priority: 'user',
+      task: () => gate,
+    })
+    enqueueDownload({ id: 'c2', label: 'pending', priority: 'bg', task: async () => {} })
+    cancelDownload('c2')
+    expect(downloadQueueSnapshot().find((q) => q.id === 'c2')).toBeUndefined()
+    // espera c1 chegar a running (janela de coalescing de 50ms) antes de tentar
+    await vi.waitFor(() => {
+      expect(downloadQueueSnapshot().find((q) => q.id === 'c1')?.status).toBe('running')
+    })
+    cancelDownload('c1') // running → ignorado
+    expect(downloadQueueSnapshot().find((q) => q.id === 'c1')).toBeDefined()
+    release?.()
+    await vi.waitFor(() => {
+      expect(downloadQueueSnapshot().find((q) => q.id === 'c1')?.status).toBe('done')
+    })
+  })
+
+  it('clearFinishedDownloads: limpa done, mantém pendentes', async () => {
+    enqueueDownload({ id: 'f1', label: 'ok', priority: 'user', task: async () => {} })
+    enqueueDownload({
+      id: 'f2',
+      label: 'fica',
+      priority: 'bg',
+      task: () => new Promise<void>(() => {}), // nunca termina = segue na fila
+    })
+    await vi.waitFor(() => {
+      expect(downloadQueueSnapshot().find((q) => q.id === 'f1')?.status).toBe('done')
+    })
+    clearFinishedDownloads()
+    const snap = downloadQueueSnapshot()
+    expect(snap.find((q) => q.id === 'f1')).toBeUndefined()
+    expect(snap.find((q) => q.id === 'f2')).toBeDefined()
   })
 })

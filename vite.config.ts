@@ -13,15 +13,26 @@ const pkg = JSON.parse(
 
 // https://vite.dev/config/
 export default defineConfig({
-  // LOCAL do worktree de teste: node_modules é symlink pra
-  // /media/.../Dados/repos/piano-app/node_modules — sem allow o /@fs/ dá 403 nas fontes.
-  server: {
-    fs: {
-      allow: ['.', '/media/rafaelejosi/Dados/repos/piano-app/node_modules'],
-    },
-  },
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
+  },
+  server: {
+    fs: { allow: ['.', '/media/rafaelejosi/Dados/repos/piano-app/node_modules'] },
+    watch: {
+      // Worktrees de kanban geram milhares de arquivos — watcher satura e o
+      // dev server para de responder (ENOSPC inotify / startup travado).
+      // Worktrees de kanban vivem em symlink p/ volume NTFS
+      // (/media/.../gauntlet-worktrees) — o glob '**/.worktrees/**' NÃO pega o
+      // caminho real resolvido, e o watcher lê ~1.4GB até travar o server.
+      ignored: [
+        '**/.worktrees/**',
+        '/media/rafaelejosi/NovoVolume/gauntlet-worktrees/**',
+        '**/dist/**',
+        '**/node_modules/**',
+        '**/test-results/**',
+        '**/coverage/**',
+      ],
+    },
   },
   plugins: [
     vue(),

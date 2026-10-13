@@ -12,9 +12,10 @@ describe('useApiConnectivity (issue 321)', () => {
     fetchMock.mockReset()
     vi.useFakeTimers()
   })
-  afterEach(() => {
+  afterEach(async () => {
+    const mod = await import('../useApiConnectivity')
+    mod.useApiConnectivity().stop()
     vi.useRealTimers()
-    vi.resetModules()
   })
 
   async function load() {
@@ -56,6 +57,17 @@ describe('useApiConnectivity (issue 321)', () => {
     expect(state.value).toBe('offline')
     await vi.advanceTimersByTimeAsync(15_000)
     expect(state.value).toBe('ok')
+  })
+
+  it('sonda o índice do idioma ativo', async () => {
+    localStorage.setItem('user_data', JSON.stringify({ language: 'es' }))
+    fetchMock.mockResolvedValue(new Response(null, { status: 200 }))
+    const { start } = await load()
+    start()
+    await vi.advanceTimersByTimeAsync(10)
+    const urls = fetchMock.mock.calls.map((call) => String(call[0]))
+    expect(urls.some((url) => url.includes('/es_musics'))).toBe(true)
+    expect(urls.some((url) => url.includes('/pt_musics'))).toBe(false)
   })
 
   it('usa fallbacks em cascata antes de declarar offline', async () => {

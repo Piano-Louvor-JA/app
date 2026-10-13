@@ -92,7 +92,7 @@ function createAlbumBase(
   }
 }
 
-function sortCategories(categories: LibraryCategory[]): LibraryCategory[] {
+export function sortCategories(categories: LibraryCategory[]): LibraryCategory[] {
   return [...categories].sort((a, b) => {
     const orderA = CATEGORY_ORDER[String(a.id)] ?? CATEGORY_ORDER[a.name] ?? 50
     const orderB = CATEGORY_ORDER[String(b.id)] ?? CATEGORY_ORDER[b.name] ?? 50

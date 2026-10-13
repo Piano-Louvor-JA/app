@@ -279,6 +279,7 @@ export default {
       itemAdded: 'Item adicionado com sucesso.',
       liturgySaved: 'Liturgia salva com sucesso.',
       mediaDesktopOnly: 'Informe o caminho do arquivo de mídia.',
+      videoSelectFile: 'Selecionar arquivo',
       catalogEmpty: 'Nenhuma música no catálogo local. Importe um arquivo .slja na Central de Mídia (botão "Importar .slja") ou adicione músicas da Comunidade.',
       customRequired:
         'Crie ou selecione uma liturgia personalizada antes de adicionar itens.',
@@ -329,13 +330,20 @@ export default {
       importButton: 'Importar .slja',
       importing: 'Importando…',
       imported: 'Importado: {name} ({slides} estrofes).',
-      uploadTitle: 'Subir "{name}" pra sua conta?',
-      uploadMessage: 'O arquivo será enviado uma única vez (sem duplicar) e fica disponível em qualquer dispositivo.',
-      uploadConfirm: 'Subir pra conta',
-      uploadCancel: 'Ficar só neste dispositivo',
       importedLocal:
         'Importado neste dispositivo: {name} ({slides} estrofes) — salvo sem conta.',
+      importedLocalNoImages:
+        'Importado neste dispositivo: {name} ({slides} estrofes). As imagens não foram salvas neste aparelho.',
       importFailed: 'Arquivo .slja inválido.',
+      uploadTitle: 'Subir "{name}" pra sua conta?',
+      uploadMessage: 'O arquivo sobe uma única vez pra sua conta (nunca duplica). Se preferir, fica salvo só neste dispositivo.',
+      uploadConfirm: 'Subir pra conta',
+      uploadCancel: 'Só neste dispositivo',
+      importStorageFailed:
+        'Não foi possível salvar o áudio neste aparelho. Libere espaço e tente de novo.',
+      importRemoteFailed:
+        'Não foi possível concluir o envio. Verifique a conexão e tente de novo.',
+      importNoLyrics: 'O arquivo não tem estrofes de letra para importar.',
     },
     custom: {
       title: 'Liturgias avulsas',

@@ -26,6 +26,16 @@ function asNumberArray(value: unknown): number[] {
   return value.filter((item): item is number => typeof item === 'number' && Number.isFinite(item))
 }
 
+function asHour(value: unknown, fallback: number): number {
+  const n = asNumber(value, fallback)
+  return Math.min(23, Math.max(0, Math.floor(n)))
+}
+
+function asMinute(value: unknown, fallback: number): number {
+  const n = asNumber(value, fallback)
+  return Math.min(59, Math.max(0, Math.floor(n)))
+}
+
 export function normalizeCountdownRuntime(raw: unknown): CountdownRuntimeState {
   if (!raw || typeof raw !== 'object') {
     return {
@@ -44,6 +54,10 @@ export function normalizeCountdownRuntime(raw: unknown): CountdownRuntimeState {
     durationMs: Math.max(0, asNumber(source.durationMs, DEFAULT_COUNTDOWN_DURATION_MS)),
     savedTimesMs: asNumberArray(source.savedTimesMs),
     finished: source.finished === true,
+    mode: source.mode === 'until' ? 'until' : 'duration',
+    untilHour: asHour(source.untilHour, 18),
+    untilMinute: asMinute(source.untilMinute, 0),
+    pausedRemainingMs: asNumberOrNull(source.pausedRemainingMs),
     // app desktop: CountdownProjectionView consome a flag de janela viva.
     // Ausente = true (sem info assume viva); inválido = false (o seguro).
     ...(source.projecting === undefined

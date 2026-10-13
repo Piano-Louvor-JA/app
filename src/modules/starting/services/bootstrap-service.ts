@@ -46,7 +46,7 @@ async function readStoredEssentialFiles(lang: string): Promise<Set<string>> {
   const entries = await Promise.all(
     essentialFiles(lang).map(async (file) => [file, await readCatalogRecord(file)] as const),
   )
-  return new Set(entries.filter(([, data]) => data !== null).map(([file]) => file))
+  return new Set(entries.filter(([, data]) => data != null).map(([file]) => file))
 }
 
 async function resumableBootstrapFiles(lang: string): Promise<Set<string>> {

@@ -13,8 +13,9 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
-function onClick(projecting: boolean, disabled: boolean) {
-  if (disabled) return
+function onClick(projecting: boolean) {
+  // O DOM bloqueia via :disabled quando parado sem seleção; durante projeção
+  // o botão fica clicável (para poder parar) mesmo sem seleção ativa.
   if (projecting) emit('clear')
   else emit('project')
 }
@@ -29,7 +30,7 @@ function onClick(projecting: boolean, disabled: boolean) {
       :disabled="disabled && !projecting"
       :aria-label="projecting ? t('bible.clearProjection') : t('bible.project')"
       :title="projecting ? t('bible.clearProjection') : t('bible.project')"
-      @click="onClick(Boolean(projecting), Boolean(disabled))"
+      @click="onClick(Boolean(projecting))"
     >
       <i
         class="ti"

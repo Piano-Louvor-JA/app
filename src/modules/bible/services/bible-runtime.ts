@@ -1,6 +1,19 @@
 import { emptySelection } from './scripture-format'
 import type { BibleSelection } from '../types/bible'
 
+/**
+ * Hook de pós-publicação, injetado pela frente (anti-deriva sem acoplamento):
+ * o web registra o espelho do relay cloud (WT-5) em bootstrap; o app não
+ * registra nada. Nenhum dos dois lados importa módulo próprio daqui dentro.
+ */
+type BibleRuntimeSink = (state: BibleProjectionRuntime) => void
+const sinks: BibleRuntimeSink[] = []
+
+/** Registro o uso no bootstrap da frente (uma vez). Idempotente. */
+export function registerBibleRuntimeSink(sink: BibleRuntimeSink): void {
+  if (!sinks.includes(sink)) sinks.push(sink)
+}
+
 export const BIBLE_RUNTIME_CHANNEL = 'louvorja-bible-runtime'
 export const BIBLE_RUNTIME_STORAGE_KEY = 'louvorja-bible-runtime-state'
 
@@ -80,6 +93,14 @@ export function publishBibleRuntime(state: BibleProjectionRuntime): void {
     channel.close()
   } catch {
     // BroadcastChannel pode não existir em ambientes antigos
+  }
+
+  for (const sink of sinks) {
+    try {
+      sink(state)
+    } catch {
+      // sink da frente falhou — publicação local permanece válida
+    }
   }
 }
 

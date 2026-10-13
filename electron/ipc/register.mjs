@@ -523,17 +523,32 @@ export function registerWorkspaceIpc() {
 
   // Download de arquivo remoto pra pasta Media/provai-e-vede/ (offline-first).
   // Retorna o caminho local absoluto ou null em falha.
+  // Gravação exclusiva (`wx`): não sobrescreve arquivo existente e evita
+  // corrida de criação (CWE-377 / CodeQL js/insecure-temporary-file).
   ipcMain.handle('workspace:download-to-media', async (_event, url, fileName) => {
     try {
       const { media } = getWorkspacePaths()
       const targetDir = path.join(media, 'provai-e-vede')
-      if (!existsSync(targetDir)) mkdirSync(targetDir, { recursive: true })
-      const safeName = String(fileName).replace(/[\\/:*?"<>|]/g, '_')
+      if (!existsSync(targetDir)) mkdirSync(targetDir, { recursive: true, mode: 0o700 })
+      const safeName = path
+        .basename(String(fileName || 'download.bin'))
+        .replace(/[\\/:*?"<>|]/g, '_')
+      if (!safeName || safeName === '.' || safeName === '..') return null
       const destPath = path.join(targetDir, safeName)
+      if (!destPath.startsWith(targetDir + path.sep)) return null
       const response = await net.fetch(String(url))
       if (!response.ok) return null
       const buffer = Buffer.from(await response.arrayBuffer())
-      await writeFile(destPath, buffer)
+      // Só `wx`: criação atômica. Se o arquivo já existe, reutiliza o caminho
+      // (offline-first) sem checar existsSync antes (evita TOCTOU / CWE-367).
+      try {
+        await writeFile(destPath, buffer, { flag: 'wx', mode: 0o600 })
+      } catch (error) {
+        if (error && typeof error === 'object' && 'code' in error && error.code === 'EEXIST') {
+          return destPath
+        }
+        throw error
+      }
       return destPath
     } catch (error) {
       console.error('[ipc] workspace:download-to-media', error)

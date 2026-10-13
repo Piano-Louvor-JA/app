@@ -17,7 +17,7 @@ jobs:
     name: gitleaks (segredos no diff/histórico)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       # CLI aberto. A action gitleaks-action@v2 exige licença paga (GITLEAKS_LICENSE).
@@ -27,14 +27,17 @@ jobs:
           VERSION=8.28.0
           curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz" -o /tmp/gitleaks.tar.gz
           tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
-          /tmp/gitleaks detect --source . --config .gitleaks.toml --verbose --redact
+          # Sem --log-opts o gitleaks 8.28 usa `git log --all`. Com fetch-depth 0
+          # isso inclui outros branches e faz o PR falhar por histórico que não
+          # será integrado. HEAD cobre o histórico do ref em teste.
+          /tmp/gitleaks detect --source . --config .gitleaks.toml --verbose --redact --log-opts=HEAD
 
   dependencies:
     name: npm audit (relatório)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with: { node-version: 22, cache: npm }
       - run: npm ci || npm install --no-save
       - run: npm audit --audit-level=high
@@ -45,5 +48,5 @@ jobs:
     runs-on: ubuntu-latest
     container: semgrep/semgrep
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: semgrep scan --config auto --exclude-rule generic.secrets.security.detected-generic-secret

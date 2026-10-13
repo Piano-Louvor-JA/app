@@ -239,6 +239,11 @@ class PalcoSession {
       // padrão e a IMAGEM vence; cor só vai se for escolha explícita.
       backgroundColor: s.backgroundColor ?? undefined,
       margin: s.margin,
+      // Capitalização do versículo (receiver aplica CSS text-transform).
+      ...(isBible &&
+      (s.bibleTextTransform === 'uppercase' || s.bibleTextTransform === 'capitalize')
+        ? { textTransform: s.bibleTextTransform }
+        : {}),
       // Versão já vem embutida em footerRef (formato desktop); não duplicar.
       footerVersion:
         isBible && !s.showBibleVersion ? undefined : input.footerVersion,

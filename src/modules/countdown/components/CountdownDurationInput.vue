@@ -7,18 +7,31 @@ import {
   durationMsFromParts,
   durationPartsFromMs,
 } from '../services/countdown-format'
+import type { CountdownRuntimeMode } from '../types/countdown'
 
-const props = defineProps<{
-  durationMs: number
-  disabled?: boolean
-  /** Modo compacto: só os campos HH:MM:SS inline, sem cabeçalho (usado no card do grupo de tempo). */
-  compact?: boolean
-  /** Esconde o campo de segundos (ex.: agendamento Escola Sabatina HH:MM). */
-  noSeconds?: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    durationMs: number
+    disabled?: boolean
+    /** Modo compacto: só os campos HH:MM:SS inline, sem cabeçalho (usado no card do grupo de tempo). */
+    noSeconds?: boolean
+    compact?: boolean
+    mode?: CountdownRuntimeMode
+    untilHour?: number
+    untilMinute?: number
+  }>(),
+  {
+    compact: false,
+    mode: 'duration',
+    untilHour: 18,
+    untilMinute: 0,
+  },
+)
 
 const emit = defineEmits<{
   'update:durationMs': [value: number]
+  'update:mode': [value: CountdownRuntimeMode]
+  'update:until': [hour: number, minute: number]
 }>()
 
 const { t } = useI18n()
@@ -48,6 +61,21 @@ function onSeconds(event: Event) {
   const target = event.target as HTMLInputElement
   commit({ seconds: clampDurationPart(target.value, 59) })
 }
+
+function onMode(next: CountdownRuntimeMode) {
+  if (props.disabled || next === props.mode) return
+  emit('update:mode', next)
+}
+
+function onUntilHour(event: Event) {
+  const target = event.target as HTMLInputElement
+  emit('update:until', clampDurationPart(target.value, 23), props.untilMinute)
+}
+
+function onUntilMinute(event: Event) {
+  const target = event.target as HTMLInputElement
+  emit('update:until', props.untilHour, clampDurationPart(target.value, 59))
+}
 </script>
 
 <template>
@@ -73,6 +101,71 @@ function onSeconds(event: Event) {
     </div>
 
     <div
+      v-if="!noSeconds"
+      class="countdown-duration__modes"
+      role="group"
+      :aria-label="t('countdown.mode')"
+    >
+      <button
+        type="button"
+        class="countdown-duration__mode"
+        :class="{ 'countdown-duration__mode--on': mode === 'duration' }"
+        :disabled="disabled"
+        @click="onMode('duration')"
+      >
+        {{ t('countdown.modeDuration') }}
+      </button>
+      <button
+        type="button"
+        class="countdown-duration__mode"
+        :class="{ 'countdown-duration__mode--on': mode === 'until' }"
+        :disabled="disabled"
+        @click="onMode('until')"
+      >
+        {{ t('countdown.modeUntil') }}
+      </button>
+    </div>
+
+    <div
+      v-if="mode === 'until'"
+      class="countdown-duration__fields"
+      role="group"
+      :aria-label="t('countdown.until')"
+    >
+      <label class="countdown-duration__field">
+        <span>{{ t('countdown.untilHour') }}</span>
+        <input
+          type="number"
+          min="0"
+          max="23"
+          inputmode="numeric"
+          :value="untilHour"
+          :disabled="disabled"
+          :aria-label="t('countdown.untilHour')"
+          @change="onUntilHour"
+        >
+      </label>
+      <span
+        class="countdown-duration__sep"
+        aria-hidden="true"
+      >:</span>
+      <label class="countdown-duration__field">
+        <span>{{ t('countdown.untilMinute') }}</span>
+        <input
+          type="number"
+          min="0"
+          max="59"
+          inputmode="numeric"
+          :value="untilMinute"
+          :disabled="disabled"
+          :aria-label="t('countdown.untilMinute')"
+          @change="onUntilMinute"
+        >
+      </label>
+    </div>
+
+    <div
+      v-else
       class="countdown-duration__fields"
       role="group"
       :aria-label="t('countdown.duration')"
@@ -107,25 +200,24 @@ function onSeconds(event: Event) {
           @change="onMinutes"
         >
       </label>
-      <template v-if="!noSeconds">
-        <span
-          class="countdown-duration__sep"
-          aria-hidden="true"
-        >:</span>
-        <label class="countdown-duration__field">
-          <span>{{ t('countdown.seconds') }}</span>
-          <input
-            type="number"
-            min="0"
-            max="59"
-            inputmode="numeric"
-            :value="parts.seconds"
-            :disabled="disabled"
-            :aria-label="t('countdown.seconds')"
-            @change="onSeconds"
-          >
-        </label>
-      </template>
+      <span
+        v-if="!noSeconds"
+        class="countdown-duration__sep"
+        aria-hidden="true"
+      >:</span>
+      <label v-if="!noSeconds" class="countdown-duration__field">
+        <span>{{ t('countdown.seconds') }}</span>
+        <input
+          type="number"
+          min="0"
+          max="59"
+          inputmode="numeric"
+          :value="parts.seconds"
+          :disabled="disabled"
+          :aria-label="t('countdown.seconds')"
+          @change="onSeconds"
+        >
+      </label>
     </div>
   </div>
 </template>
@@ -144,12 +236,25 @@ function onSeconds(event: Event) {
     pointer-events: none;
   }
 
-  /* Modo compacto: faixa inline dentro do card do grupo de tempo */
+  /* Modo compacto: seletor à esquerda (Duração / Até empilhados) + campos */
   &--compact {
-    gap: 0;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 0.55rem;
     padding: 0.5rem 0.75rem;
     background: color-mix(in srgb, var(--ds-color-on-surface) 8%, transparent);
     backdrop-filter: blur(4px);
+
+    .countdown-duration__modes {
+      order: 0;
+      margin-right: 0.15rem;
+    }
+
+    .countdown-duration__mode {
+      width: 100%;
+      padding: 0.2rem 0.55rem;
+    }
 
     .countdown-duration__fields {
       gap: 0.3rem;
@@ -200,6 +305,38 @@ function onSeconds(event: Event) {
     color: var(--ds-color-on-surface-variant);
     font-size: 0.72rem;
     line-height: 1.3;
+  }
+}
+
+.countdown-duration__modes {
+  display: inline-flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  align-items: stretch;
+  gap: 0.12rem;
+  padding: 0.15rem;
+  border-radius: var(--ds-radius-md, 0.5rem 0 0.5rem 0);
+  background: color-mix(in srgb, var(--ds-color-on-surface) 8%, transparent);
+}
+
+.countdown-duration__mode {
+  border: 0;
+  border-radius: var(--ds-radius-sm, 0.35rem 0 0.35rem 0);
+  padding: 0.28rem 0.65rem;
+  background: transparent;
+  color: var(--ds-color-on-surface-variant);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+
+  &--on {
+    background: color-mix(in srgb, var(--ds-color-primary) 22%, transparent);
+    color: var(--ds-color-primary);
+  }
+
+  &:disabled {
+    cursor: default;
   }
 }
 
