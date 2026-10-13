@@ -50,6 +50,10 @@ __screenshots__/
 .env.*
 !.env.example
 
+# Playwright (artefatos de execução E2E)
+test-results/
+playwright-report/
+
 # SDD planning (internal)
 .planning/
 dist-windows/

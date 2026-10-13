@@ -70,7 +70,7 @@ async function mockExternalApis(page: Page): Promise<void> {
     })
   }
   await page.route('**://api.louvorja.com.br/**', fulfillCatalog)
-  await page.route('**://api.pianolouvorja.com.br/**', fulfillCatalog)
+  await page.route('**://localhost:3100/**', fulfillCatalog)
 }
 
 /**
