@@ -2300,6 +2300,11 @@ export async function captureSourceFrameBase64() {
       true,
     )
     if (typeof canvasPng === 'string' && canvasPng.length > 32) return canvasPng
+    // Modos pdf/presentation: o player sempre expõe __liturgyPdf. Canvas
+    // vazio = PDF.js ainda renderizando — capturePage aqui devolve o frame
+    // CINZA de loading (regressão "TV cinza" 13/10). Sem fallback: quem
+    // chama (syncPptToTvs) retenta até o canvas ficar pronto.
+    if (isPdfDocumentMode()) return null
     const image = await sourceWindow.webContents.capturePage()
     const png = image.toPNG()
     if (!png?.length) return null

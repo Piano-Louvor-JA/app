@@ -300,19 +300,41 @@
           tvList.innerHTML = html
         }
 
+        var syncBusy = false
         async function syncPptToTvs() {
-          if (!window.louvorja || !window.louvorja.palco || !window.louvorja.projection || !window.louvorja.projection.captureSourceFrame) return
-          var png = await window.louvorja.projection.captureSourceFrame()
-          if (!png) return
-          tvSlots = await window.louvorja.palco.slots().catch(function () { return [] })
-          renderTvs()
-          for (var i = 0; i < tvSlots.length; i++) {
-            var slot = tvSlots[i]
-            if (slot.clients > 0 && tvChecked[slot.id] !== false) {
-              var url = await window.louvorja.palco.serveMedia('ppt-slide-' + Date.now() + '-' + i + '.png', 'image/png', png, slot.id)
-              if (url) await window.louvorja.palco.send({ v: 2, type: 'projection', background: url, text: '', footerRef: '' }, slot.id)
+          if (!window.louvorja || !window.louvorja.palco || !window.louvorja.projection || !window.louvorja.projection.captureSourceFrame) return false
+          if (syncBusy) return false
+          syncBusy = true
+          try {
+            var png = await window.louvorja.projection.captureSourceFrame()
+            if (!png) return false
+            tvSlots = await window.louvorja.palco.slots().catch(function () { return [] })
+            renderTvs()
+            var served = false
+            for (var i = 0; i < tvSlots.length; i++) {
+              var slot = tvSlots[i]
+              if (slot.clients > 0 && tvChecked[slot.id] !== false) {
+                var url = await window.louvorja.palco.serveMedia('ppt-slide-' + Date.now() + '-' + i + '.png', 'image/png', png, slot.id)
+                if (url) {
+                  await window.louvorja.palco.send({ v: 2, type: 'projection', background: url, text: '', footerRef: '' }, slot.id)
+                  served = true
+                }
+              }
             }
+            return served
+          } finally {
+            syncBusy = false
           }
+        }
+
+        // Canvas PDF.js pode demorar além dos syncs do boot (PDF grande,
+        // LibreOffice). Retenta com backoff até a captura sair — sem isso a
+        // TV ficava com o frame cinza de loading pra sempre (13/10).
+        function syncPptWithRetry(attempt) {
+          void syncPptToTvs().then(function (served) {
+            if (served || attempt >= 8) return
+            setTimeout(function () { syncPptWithRetry(attempt + 1) }, Math.min(500 * Math.pow(1.6, attempt), 5000))
+          })
         }
 
         async function loadMonitors() {
@@ -448,10 +470,12 @@
 
         void loadMonitors()
         // PDF.js renderiza de forma assíncrona; primeira captura pode pegar
-        // canvas vazio/loading. Tenta após render inicial sem duplicar estado.
-        void syncPptToTvs()
-        setTimeout(function () { void syncPptToTvs() }, 700)
-        setTimeout(function () { void syncPptToTvs() }, 1800)
+        // canvas vazio/loading. Retry com backoff cobre PDF grande (LibreOffice)
+        // e re-sincroniza quando a TV conecta depois do boot (13/10).
+        syncPptWithRetry(0)
+        if (window.louvorja && window.louvorja.palco && window.louvorja.palco.onReceiverConnected) {
+          window.louvorja.palco.onReceiverConnected(function () { void syncPptWithRetry(0) })
+        }
         void refresh()
         setInterval(function () { void refresh() }, 500)
       })()
