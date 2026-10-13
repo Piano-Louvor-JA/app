@@ -18,6 +18,7 @@ import {
 	type LiturgyPersistedState,
 	type LiturgyWeekday,
 } from "@modules/liturgy/types/liturgy";
+import { deriveSessionTimesFromCategories } from "@modules/liturgy/services/liturgy-duration-enrich";
 import type {
 	ScheduledCategory,
 	ScheduledItem,
@@ -39,6 +40,10 @@ export const SYNC_MODIFIED_PREFIX = "sync.modified.v1";
 export type LouvorjaImportResult = {
 	applied: string[];
 	skipped: string[];
+	/** Timestamp LWW local da entidade liturgy (diagnóstico de skip — t_8bdaf97b). */
+	localModified?: string;
+	/** Timestamp `modified` declarado pelo pacote (diagnóstico de skip). */
+	packageModified?: string;
 };
 
 type ScheduledState = {
@@ -97,7 +102,16 @@ export function exportLouvorjaFromBrowser(
 		// Não exporta state do renderer: isso quebraria a ponta Flutter.
 		const days: Record<string, unknown> = {};
 		for (const day of LITURGY_WEEKDAYS) {
-			const items = liturgyState.weekdays?.[day] ?? [];
+			const items = (liturgyState.weekdays?.[day] ?? []).map((item) => {
+				if (
+					item.type === "music" &&
+					typeof item.musicId === "number" &&
+					item.musicId < 0
+				) {
+					return { ...item, musicId: null };
+				}
+				return item;
+			});
 			const notes = liturgyState.dayNotes?.[day] ?? "";
 			if (items.length > 0 || notes.length > 0) days[day] = { items, notes };
 		}
@@ -136,13 +150,16 @@ export function importLouvorjaIntoBrowser(
 ): LouvorjaImportResult {
 	const applied: string[] = [];
 	const skipped: string[] = [];
+	let localModified: string | undefined;
+	let packageModified: string | undefined;
 
 	for (const [name, entity] of Object.entries(pkg.entities)) {
 		switch (name) {
 			case "liturgy": {
-				const localTs = readModified("liturgy");
+				localModified = readModified("liturgy");
+				packageModified = entity.modified;
 				const remoteEpoch = toEpoch(entity.modified);
-				if (remoteEpoch > toEpoch(localTs)) {
+				if (remoteEpoch > toEpoch(localModified)) {
 					const current = getUserPreference<LiturgyPersistedState>(
 						USER_PREFERENCE_KEYS.liturgyState,
 						null,
@@ -159,9 +176,22 @@ export function importLouvorjaIntoBrowser(
 						const payload = entity.data[day];
 						if (payload == null || typeof payload !== "object") continue;
 						const source = payload as Record<string, unknown>;
-						if (Array.isArray(source.items))
+						if (Array.isArray(source.items)) {
 							next.weekdays[day] =
 								source.items as LiturgyPersistedState["weekdays"][LiturgyWeekday];
+							const currentSession = next.daySessionTimes?.[day] ?? {
+								startTime: null,
+								endTime: null,
+							};
+							const derivedSession = deriveSessionTimesFromCategories(
+								next.weekdays[day],
+								currentSession,
+							);
+							if (next.daySessionTimes || derivedSession !== currentSession) {
+								next.daySessionTimes ??= {} as LiturgyPersistedState["daySessionTimes"];
+								next.daySessionTimes[day] = derivedSession;
+							}
+						}
 						if (typeof source.notes === "string")
 							next.dayNotes[day] = source.notes;
 						hasDay = true;
@@ -205,7 +235,7 @@ export function importLouvorjaIntoBrowser(
 		}
 	}
 
-	return { applied, skipped };
+	return { applied, skipped, localModified, packageModified };
 }
 
 function toEpoch(iso: string): number {
@@ -217,6 +247,7 @@ function readModified(entity: string): string {
 	try {
 		return localStorage.getItem(`${SYNC_MODIFIED_PREFIX}.${entity}`) ?? "";
 	} catch {
+		/* v8 ignore next 1 -- storage indisponivel so ocorre fora de browser (testes cobrem via spy) */
 		return "";
 	}
 }

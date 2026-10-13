@@ -126,6 +126,17 @@ describe("import .louvorja: enriquecimentos pós-import (t_14d066ea + t_b1a9deae
   });
 
   it("resumo do evento do DIA importado pré-preenchido com 1ª/última categoria", async () => {
+    stored.weekdays.tuesday = [{
+      id: "local-category",
+      type: "category",
+      name: "Local",
+      subtitle: "",
+      done: false,
+      durationMs: 0,
+      accentColor: "#FFD600",
+      startTime: "18:00",
+      endTime: "19:00",
+    }];
     const store = useLiturgyStore();
     await store.hydrate();
 
@@ -136,7 +147,7 @@ describe("import .louvorja: enriquecimentos pós-import (t_14d066ea + t_b1a9deae
       expect(store.daySessionTimes.saturday.startTime).toBe("09:00");
       expect(store.daySessionTimes.saturday.endTime).toBe("12:00");
     });
-    // Dias sem categorias horadas no pacote permanecem intocados.
+    // Dia local com categoria horada não veio no pacote: permanece intocado.
     expect(store.daySessionTimes.tuesday.startTime).toBeNull();
   });
 

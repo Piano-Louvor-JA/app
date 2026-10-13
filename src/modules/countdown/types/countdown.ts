@@ -4,21 +4,68 @@ export type CountdownTimeFormat =
   | 'mm:ss.ms'
   | 'mm:ss'
 
+import type { AlertPresetKey } from '../services/alert-tone'
+
 export type CountdownStatus = 'idle' | 'running' | 'paused'
 
-/** Duração fixa ou relógio de parede (parar às HH:MM). */
-export type CountdownMode = 'duration' | 'until'
+export type CountdownMode = 'standard' | 'sabbath'
+export type CountdownRuntimeMode = 'duration' | 'until'
+
+export interface SabbathModeConfig {
+  /** 'start' = usuário define horário início + fim; 'endOnly' = só fim */
+  scheduleMode: 'start' | 'endOnly'
+  /** Horário de fim (ex: "10:15") — obrigatório. */
+  endTime: string
+  /** Horário de início (ex: "09:00") — opcional, só se scheduleMode === 'start'. */
+  startTime?: string
+}
+
+export type AlertMarkerPreset = AlertPresetKey | 'none' | 'legacy-custom' | `custom:${string}`
+
+/** Marco de alerta do cronômetro (v2): dispara quando faltam `offsetMs`. */
+export interface AlertMarker {
+  /** ID estável entre reloads. Padrões: 'start', '5min', '1min'. */
+  id: string
+  /** Tempo restante (ms) em que o alerta dispara. 'start' = 0. */
+  offsetMs: number
+  /** Som tocado: preset fixo, 'none' ou 'custom:{libraryId}'. */
+  preset: AlertMarkerPreset
+}
+
+/** Marcos padrão — paridade exata com o comportamento atual (start/5min/1min). */
+export const DEFAULT_ALERT_MARKERS: AlertMarker[] = [
+  { id: 'start', offsetMs: 0, preset: 'abertura_es' },
+  { id: '5min', offsetMs: 300_000, preset: '5min_es' },
+  { id: '1min', offsetMs: 60_000, preset: '1min_es' },
+]
 
 export interface CountdownDisplayConfig {
   timeFormat: CountdownTimeFormat
   bgColor: string
   textColor: string
+  /** Se true, o cronômetro continua rodando após zerar (tempo negativo).
+   *  Se false (padrão), trava em zero e pausa automaticamente. */
+  allowNegative?: boolean
+  /** Mapeia marco → preset de áudio. Chaves: 'start', '5min', '1min'.
+   *  Valor: key de ALERT_PRESETS, 'none' (desabilitado) ou 'custom' (áudio do usuário).
+   *  @deprecated v1 — migrado para `alertMarkers` no boot; mantido só para ler configs antigas. */
+  alertTonePresets?: Partial<Record<'start' | '5min' | '1min', AlertPresetKey | 'none'>>
+  /** Versão do formato da config. Ausente = v1 (legado) → migrado no load. */
+  configVersion?: 2
+  /** v2: marcos dinâmicos de alerta — fonte única de verdade. */
+  alertMarkers?: AlertMarker[]
+  /** Modo de operação. 'sabbath' carrega todas as funcionalidades da Escola Sabatina. */
+  mode?: CountdownMode
+  /** Configuração extra quando mode === 'sabbath'. */
+  sabbathConfig?: SabbathModeConfig
 }
 
 export interface CountdownRuntimeState {
+  mode?: CountdownRuntimeMode
+  untilHour?: number
+  untilMinute?: number
+  pausedRemainingMs?: number | null
   status: CountdownStatus
-  /** Owner explícito da projeção; countdown parado ainda pode estar no Palco. */
-  projecting?: boolean
   /** Epoch ms when the current running segment started. */
   segmentStartedAt: number | null
   /** Milliseconds already counted down before the current segment. */
@@ -27,13 +74,8 @@ export interface CountdownRuntimeState {
   durationMs: number
   savedTimesMs: number[]
   finished: boolean
-  mode?: CountdownMode
-  /** Hora-alvo 0–23 no modo "until". */
-  untilHour?: number
-  /** Minuto-alvo 0–59 no modo "until". */
-  untilMinute?: number
-  /** Remaining congelado ao pausar no modo "until". */
-  pausedRemainingMs?: number | null
+  /** app desktop: janela de projeção viva (CountdownProjectionView). */
+  projecting?: boolean
 }
 
 export interface CountdownDurationParts {
@@ -58,6 +100,7 @@ export const DEFAULT_COUNTDOWN_DISPLAY_CONFIG: CountdownDisplayConfig = {
   timeFormat: 'hh:mm:ss',
   bgColor: '#000000',
   textColor: '#FFFFFF',
+  allowNegative: true,
 }
 
 export const DEFAULT_COUNTDOWN_RUNTIME: CountdownRuntimeState = {

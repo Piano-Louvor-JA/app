@@ -22,8 +22,37 @@ env:
   NODE_VERSION: 22
 
 jobs:
+  decide:
+    name: Decide publication
+    runs-on: ubuntu-24.04
+    outputs:
+      publish: ${{ steps.decision.outputs.publish }}
+      reason: ${{ steps.decision.outputs.reason }}
+    steps:
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Decide publication
+        id: decision
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_REF: ${{ inputs.tag || github.ref_name }}
+          WORKFLOW_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          script="$(mktemp)"
+          gh api "repos/${GITHUB_REPOSITORY}/contents/scripts/release-publish-decision.mjs?ref=${WORKFLOW_SHA}" --jq .content \
+            | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{let t=s.trim();if(t.startsWith(String.fromCharCode(34)))t=JSON.parse(t);process.stdout.write(Buffer.from(String(t).replace(/\s/g,""),"base64"))})' \
+            > "$script"
+          node "$script" --fetch --repo "$GITHUB_REPOSITORY" --ref "$TARGET_REF"
+
   package:
     name: Package ${{ matrix.arch }}
+    needs: decide
+    if: needs.decide.result == 'success' && needs.decide.outputs.publish == 'true'
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -35,13 +64,13 @@ jobs:
             runner: ubuntu-24.04-arm
     steps:
       - name: Checkout tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 1
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -129,32 +158,49 @@ jobs:
 
   release:
     name: Publish GitHub Release
-    needs: package
+    needs: [decide, package]
+    if: >-
+      always() &&
+      needs.decide.result == 'success' &&
+      (needs.decide.outputs.publish != 'true' || needs.package.result == 'success')
     runs-on: ubuntu-24.04
+    outputs:
+      publish: ${{ needs.decide.outputs.publish }}
     steps:
+      - name: Omit GitHub Release
+        if: needs.decide.outputs.publish != 'true'
+        run: |
+          echo "Publicação omitida (${{ needs.decide.outputs.reason }})."
+          echo "Nenhuma GitHub Release foi criada e nenhum pacote foi enviado a registry."
+
       - name: Checkout tag
-        uses: actions/checkout@v4
+        if: needs.decide.outputs.publish == 'true'
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 1
 
       - name: Download x64 artifacts
-        uses: actions/download-artifact@v4
+        if: needs.decide.outputs.publish == 'true'
+        uses: actions/download-artifact@v8
         with:
           name: linux-x64
           path: dist-electron
 
       - name: Download arm64 artifacts
-        uses: actions/download-artifact@v4
+        if: needs.decide.outputs.publish == 'true'
+        uses: actions/download-artifact@v8
         with:
           name: linux-arm64
           path: dist-electron
 
       - name: Resolve tag
         id: tag
+        if: needs.decide.outputs.publish == 'true'
         run: echo "value=${{ inputs.tag || github.ref_name }}" >> "$GITHUB_OUTPUT"
 
       - name: Publish release and assets
+        if: needs.decide.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.tag.outputs.value }}
@@ -191,8 +237,8 @@ jobs:
 
   downstream:
     name: Trigger downstream package updates
-    needs: release
-    if: success()
+    needs: [decide, release]
+    if: needs.decide.outputs.publish == 'true' && needs.release.result == 'success'
     runs-on: ubuntu-24.04
     steps:
       - name: Dispatch optional store workflows
@@ -208,8 +254,6 @@ jobs:
       # Required future secrets: AUR_SSH_PRIVATE_KEY, SNAPCRAFT_STORE_CREDENTIALS,
       # COPR_CONFIG, OBS_API_TOKEN, GPG_PRIVATE_KEY.
 
-  # Flatpak must be submitted to Flathub first. Flathub builds it from its own repo.
-  # Do not upload a locally built Flatpak as a substitute for the Flathub submission.
   # Snap stays disabled until core/base compatibility passes on both architectures.
   # PPA stays disabled until Debian source packaging exists.
   # VoidBR merge remains maintainer-controlled.
@@ -217,11 +261,12 @@ jobs:
 
   verify:
     name: Verify central release
-    needs: release
+    needs: [decide, release]
+    if: needs.decide.outputs.publish == 'true' && needs.release.result == 'success'
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 1
@@ -244,7 +289,11 @@ jobs:
   # External stores must be monitored separately; they cannot block GitHub Release.
   release-health:
     name: Release Health
-    needs: [release, verify]
+    needs: [decide, release, verify]
+    if: >-
+      needs.decide.outputs.publish == 'true' &&
+      needs.release.result == 'success' &&
+      needs.verify.result == 'success'
     runs-on: ubuntu-24.04
     steps:
       - run: echo 'Release pipeline passed.'

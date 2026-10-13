@@ -1,4 +1,4 @@
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, type Ref } from 'vue'
 
 import {
   formatClock,
@@ -28,6 +28,20 @@ function timestampFromHHmm(
   return date.getTime()
 }
 
+/** Atualiza `now` a cada segundo; retorna o id do interval. */
+export function startLiturgyClockTick(now: Ref<Date>): ReturnType<typeof setInterval> {
+  return setInterval(() => {
+    now.value = new Date()
+  }, 1000)
+}
+
+/** Limpa o interval se houver (null-safe pro caminho sem mount). */
+export function stopLiturgyClockTick(timer: ReturnType<typeof setInterval> | null): void {
+  if (timer !== null) {
+    clearInterval(timer)
+  }
+}
+
 /** Relógio ao vivo e contador regressivo (após play). */
 export function useLiturgyClock(
   startTime: () => string | null,
@@ -36,16 +50,16 @@ export function useLiturgyClock(
   countdownStartedAt: () => number | null,
 ) {
   const now = ref(new Date())
+  // setTimeout/setInterval ids no Node tipam como Timeout; jsdom devolve number.
   let timer: ReturnType<typeof setInterval> | null = null
 
   onMounted(() => {
-    timer = setInterval(() => {
-      now.value = new Date()
-    }, 1000)
+    timer = startLiturgyClockTick(now)
   })
 
   onUnmounted(() => {
-    if (timer) clearInterval(timer)
+    stopLiturgyClockTick(timer)
+    timer = null
   })
 
   function headerDateTime(): string {

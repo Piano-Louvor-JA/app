@@ -48,6 +48,7 @@ function readStoredZoom(): number {
 const zoom = ref(readStoredZoom())
 
 function clearCssZoom() {
+  /* v8 ignore next 1 -- guard SSR; testes rodam em jsdom (document sempre definido) */
   if (typeof document === 'undefined') return
   const root = document.documentElement
   root.style.removeProperty('zoom')
@@ -55,6 +56,7 @@ function clearCssZoom() {
 }
 
 function persistZoom(value: number): void {
+  /* v8 ignore next 1 -- guard SSR; jsdom sempre tem localStorage */
   if (typeof localStorage === 'undefined') return
   setUserPreference(USER_PREFERENCE_KEYS.uiZoom, value)
 }
@@ -85,6 +87,7 @@ function applyZoom(value: number): number {
     }
   }
 
+  /* v8 ignore next 4 -- fallback CSS só em browser; guard SSR inalcançável em jsdom */
   if (typeof document !== 'undefined') {
     document.documentElement.style.zoom = String(next)
     document.documentElement.style.setProperty('--ui-zoom', String(next))
