@@ -154,7 +154,7 @@ function onCancel(item: DownloadQueueItem) {
   width: 2rem;
   height: 2rem;
   border: none;
-  border-radius: 999px;
+  border-radius: var(--ds-radius-full, 999px);
   background: color-mix(in srgb, var(--ds-color-on-surface) 8%, transparent);
   color: var(--ds-color-on-surface);
   font-size: 1.05rem;
@@ -176,7 +176,7 @@ function onCancel(item: DownloadQueueItem) {
   min-width: 0.9rem;
   height: 0.9rem;
   padding: 0 3px;
-  border-radius: 999px;
+  border-radius: var(--ds-radius-full, 999px);
   background: var(--ds-color-primary);
   color: var(--ds-color-on-primary, #fff);
   font-size: 0.62rem;
@@ -193,10 +193,10 @@ function onCancel(item: DownloadQueueItem) {
   width: 280px;
   max-height: 320px;
   overflow: auto;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--card);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
+  border: 1px solid var(--ds-color-outline-strong);
+  border-radius: var(--ds-radius-md, 12px);
+  background: var(--ds-color-surface-card);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 25%);
 }
 
 .download-queue-indicator__header {
@@ -204,14 +204,15 @@ function onCancel(item: DownloadQueueItem) {
   align-items: center;
   justify-content: space-between;
   padding: 8px 10px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--ds-color-outline);
   font-size: 0.82rem;
+  color: var(--ds-color-on-surface);
 }
 
 .download-queue-indicator__clear {
   border: none;
   background: none;
-  color: var(--muted-foreground);
+  color: var(--ds-color-on-surface-variant);
   font-size: 0.72rem;
   cursor: pointer;
 
@@ -231,8 +232,9 @@ function onCancel(item: DownloadQueueItem) {
   align-items: center;
   gap: 8px;
   padding: 6px 8px;
-  border-radius: 6px;
+  border-radius: var(--ds-radius-sm, 8px);
   font-size: 0.78rem;
+  color: var(--ds-color-on-surface);
 
   &[data-status='failed'] {
     color: var(--ds-color-error);
@@ -258,15 +260,15 @@ function onCancel(item: DownloadQueueItem) {
 .download-queue-indicator__action {
   flex: none;
   padding: 2px 8px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
+  border: 1px solid var(--ds-color-outline-strong);
+  border-radius: var(--ds-radius-full, 999px);
   background: none;
-  color: var(--foreground);
+  color: var(--ds-color-on-surface);
   font-size: 0.68rem;
   cursor: pointer;
 
   &:hover {
-    background: color-mix(in srgb, var(--accent) 18%, transparent);
+    background: color-mix(in srgb, var(--ds-color-primary) 18%, transparent);
   }
 }
 </style>

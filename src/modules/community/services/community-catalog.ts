@@ -1,3 +1,4 @@
+import { defaultApiOrigin } from '@shared/services/api-env'
 import {
 	createLocalCollection,
 	createLocalMusic,
@@ -27,7 +28,7 @@ function communityBaseUrl(): string {
 	// Mesma regra do custom-catalog.ts: default é a API de produção
 	// (sem env, caminho relativo dá 404 no desktop).
 	const base =
-		import.meta.env.VITE_PALCO_API_URL ?? "https://api.pianolouvorja.com.br";
+		import.meta.env.VITE_PALCO_API_URL ?? defaultApiOrigin();
 	return `${base.replace(/\/$/, "")}/v1/custom`;
 }
 

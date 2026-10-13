@@ -33,7 +33,7 @@ test.describe('Projeção de mídia cross-window', () => {
   test('runtime semeado no storage renderiza na janela /popup?module=media', async ({ page }) => {
     await page.addInitScript(EULA_INIT)
     await page.route('**/api.louvorja.com.br/**', (route) => route.fulfill({ json: [] }))
-    await page.route('**/api.pianolouvorja.com.br/**', (route) => route.fulfill({ json: [] }))
+    await page.route('**/localhost:3100/**', (route) => route.fulfill({ json: [] }))
     await page.addInitScript(
       `localStorage.setItem('${MEDIA_STORAGE_KEY}', JSON.stringify(${JSON.stringify(runtimePayload({ lyric: 'Letra E2E Cross-Window' }))}))`,
     )
@@ -44,7 +44,7 @@ test.describe('Projeção de mídia cross-window', () => {
   test('BroadcastChannel atualiza a projeção em tempo real', async ({ page }) => {
     await page.addInitScript(EULA_INIT)
     await page.route('**/api.louvorja.com.br/**', (route) => route.fulfill({ json: [] }))
-    await page.route('**/api.pianolouvorja.com.br/**', (route) => route.fulfill({ json: [] }))
+    await page.route('**/localhost:3100/**', (route) => route.fulfill({ json: [] }))
     await page.addInitScript(
       `localStorage.setItem('${MEDIA_STORAGE_KEY}', JSON.stringify(${JSON.stringify(runtimePayload({ lyric: 'Inicial' }))}))`,
     )
@@ -66,7 +66,7 @@ test.describe('Projeção de mídia cross-window', () => {
   test('runtime inativo: projeção sem conteúdo, sem quebrar', async ({ page }) => {
     await page.addInitScript(EULA_INIT)
     await page.route('**/api.louvorja.com.br/**', (route) => route.fulfill({ json: [] }))
-    await page.route('**/api.pianolouvorja.com.br/**', (route) => route.fulfill({ json: [] }))
+    await page.route('**/localhost:3100/**', (route) => route.fulfill({ json: [] }))
     await page.addInitScript(
       `localStorage.setItem('${MEDIA_STORAGE_KEY}', JSON.stringify(${JSON.stringify(runtimePayload({ active: false, lyric: '' }))}))`,
     )

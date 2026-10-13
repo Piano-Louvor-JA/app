@@ -7,7 +7,7 @@
  */
 import { computed } from 'vue'
 
-import { resolveBackgroundImage, stageFlexAlign, type StageSettings } from '../types/stage-settings'
+import { resolveBackgroundImage, stageBgCss, stageFlexAlign, type StageSettings } from '../types/stage-settings'
 
 const props = defineProps<{
   settings: StageSettings
@@ -27,7 +27,9 @@ const footer = computed(() =>
 const containerStyle = computed(() => {
   const s = props.settings
   return {
-    backgroundColor: s.backgroundColor,
+    // null (não setado) → transparent: o preview mostra o comportamento
+    // real (imagem da música vence / preto do palco por baixo).
+    backgroundColor: stageBgCss(s.backgroundColor),
     backgroundImage: resolveBackgroundImage(s.backgroundImage)
       ? `url(${resolveBackgroundImage(s.backgroundImage)})`
       : undefined,

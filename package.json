@@ -16,15 +16,18 @@
     "dev": "vite",
     "preview": "vite preview",
     "host": "vite --host",
+    "guard": "node electron/guard/cli.mjs",
     "build": "run-p type-check \"build-only {@}\" --",
-    "build-only": "vite build --base=./",
+    "build-only": "npm run guard && vite build --base=./",
     "type-check": "vue-tsc --build",
+    "build:stg": "cross-env PIANO_BUILD_PROFILE=homologation npm run build-only",
+    "build:release": "cross-env PIANO_BUILD_PROFILE=release npm run build-only",
     "test": "vitest run",
     "git:tag": "git tag -a \"v$npm_package_version\" -m \"Versão $npm_package_version\" && git push origin \"v$npm_package_version\"",
     "git:publish": "git push -u origin HEAD --follow-tags",
-    "electron:dev": "concurrently -k \"vite --host localhost --port 5173\" \"wait-on http://localhost:5173 && env -u ELECTRON_RUN_AS_NODE cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron . --class=louvorja-piano\"",
-    "electron:preview": "vite build --base=./ && env -u ELECTRON_RUN_AS_NODE electron . --class=louvorja-piano",
-    "electron:build": "vite build --base=./ && node build/patch-nsis-templates.mjs && electron-builder",
+    "electron:dev": "concurrently -k \"vite --host localhost --port 5173\" \"wait-on http://localhost:5173 && env -u ELECTRON_RUN_AS_NODE cross-env VITE_DEV_SERVER_URL=http://localhost:5173 PIANO_BUILD_PROFILE=development electron . --class=louvorja-piano\"",
+    "electron:preview": "PIANO_BUILD_PROFILE=homologation npm run build-only && env -u ELECTRON_RUN_AS_NODE electron . --class=louvorja-piano",
+    "electron:build": "npm run build-only && node build/patch-nsis-templates.mjs && npm run guard && node scripts/build-electron.mjs --",
     "postinstall": "electron-builder install-app-deps",
     "test:regression": "node scripts/test-regression.mjs",
     "storybook": "storybook dev -p 6006",
@@ -45,6 +48,7 @@
     "jsqr": "^1.4.0",
     "pinia": "^3.0.4",
     "qrcode": "^1.5.4",
+    "tldts-experimental": "6.1.86",
     "vue": "^3.5.38",
     "vue-i18n": "^11.4.6",
     "vue-router": "^5.3.1",
@@ -56,8 +60,8 @@
   "devDependencies": {
     "@playwright/test": "^1.62.1",
     "@storybook/vue3-vite": "10.6.1",
-    "@stryker-mutator/core": "^9.6.1",
-    "@stryker-mutator/vitest-runner": "^9.6.1",
+    "@stryker-mutator/core": "^10.0.0",
+    "@stryker-mutator/vitest-runner": "^10.0.0",
     "@tailwindcss/vite": "^4.3.2",
     "@tsconfig/node24": "^24.0.4",
     "@types/node": "^24.13.2",
@@ -71,13 +75,13 @@
     "cross-env": "^10.1.0",
     "electron": "^43.1.0",
     "electron-builder": "^26.15.3",
-    "jsdom": "^25.0.1",
+    "jsdom": "^30.1.2",
     "npm-run-all2": "^9.0.2",
     "orval": "^8.39.0",
     "sass": "^1.101.0",
     "storybook": "10.6.1",
     "tailwindcss": "^4.3.2",
-    "typescript": "~6.0.0",
+    "typescript": "npm:typescript-native-bridge@6.0.3-bridge.18.tsgo.7.0.2",
     "vite": "^8.0.16",
     "vite-plugin-electron": "^1.1.0",
     "vite-plugin-electron-renderer": "^1.0.0",
@@ -90,6 +94,7 @@
     "node": "^22.18.0 || >=24.12.0"
   },
   "overrides": {
+    "typescript": "$typescript",
     "@tabler/icons-webfont": {
       "svgtofont": "npm:noop2@2.0.0",
       "svg-path-commander": "npm:noop2@2.0.0",
@@ -196,9 +201,22 @@
           "arch": [
             "x64"
           ]
+        },
+        {
+          "target": "appx",
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "build/icon.ico"
+    },
+    "appx": {
+      "applicationId": "PianoLouvorJA",
+      "languages": [
+        "pt-BR"
+      ],
+      "showNameOnTiles": true
     },
     "mac": {
       "target": [

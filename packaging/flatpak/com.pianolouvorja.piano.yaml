@@ -1,19 +1,21 @@
 app-id: com.pianolouvorja.piano
 runtime: org.freedesktop.Platform
-runtime-version: '24.08'
+runtime-version: '25.08'
 sdk: org.freedesktop.Sdk
 command: louvorja-piano
 rename-icon: louvorja-piano
 finish-args:
   - --share=ipc
-  - --socket=x11
+  - --socket=fallback-x11
+  - --socket=wayland
   - --socket=pulseaudio
   - --device=dri
   - --share=network
-  - --filesystem=home:ro
-  - --filesystem=/var/lib/LouvorJA-PIANO:create
   - --talk-name=org.freedesktop.Notifications
   - --talk-name=org.kde.StatusNotifierWatcher
+  - --own-name=org.mpris.MediaPlayer2.*
+  - --env=ELECTRON_OZONE_PLATFORM_HINT=auto
+  - --filesystem=xdg-config/louvorja-piano:create
 modules:
   - name: louvorja-piano
     buildsystem: simple
@@ -30,9 +32,11 @@ modules:
       - install -Dm644 com.pianolouvorja.piano.metainfo.xml ${FLATPAK_DEST}/share/metainfo/com.pianolouvorja.piano.metainfo.xml
     sources:
       - type: archive
-        url: https://github.com/pianolouvorja/app/releases/download/v1.22.1/LouvorJA-PIANO-1.22.1-x64.tar.gz
-        sha256: 5ef0b456b697bb801d4c5bb7ed088391e621c74c40ce50f57c702e6a94ed9f89
-        # sha256 obtido de: gh release view v1.22.1 -R pianolouvorja/app --json assets
+        url: https://github.com/Piano-Louvor-JA/app/releases/download/v1.29.1/LouvorJA-PIANO-1.29.1-x64.tar.gz
+        sha256: 58649c15be5f74a411a828e44dfdb056148acd45d7269b5418303275289326f5
+        # sha256 verificado via download + sha256sum em 2026-10-11
+        only-arches:
+          - x86_64
       - type: file
         path: com.pianolouvorja.piano.desktop
       - type: file

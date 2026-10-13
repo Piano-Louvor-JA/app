@@ -78,6 +78,69 @@ describe("app#331 — import .slja → item de liturgia → player (offline)", (
 		expect(imported.durationMs).toBe(20_000 + 30_000);
 	});
 
+	it("1ª importação deslogada cria a coletânea de importações e reuso não duplica", async () => {
+
+		const a = await importSljaAsLiturgyMusic({ bytes: await makeSljaBuffer(), name: "missao.slja" });
+		const b = await importSljaAsLiturgyMusic({ bytes: await makeSljaBuffer(), name: "missao-2.slja" });
+		// duas músicas na MESMA coletânea local (reuso do collectionId)
+		const raw = localStorage.getItem("louvorja.local-custom.v1");
+		expect(raw).toBeTruthy();
+		const db = JSON.parse(raw as string);
+		const importacoes = db.collections.filter((c: { name: string }) => c.name === "Importações .slja");
+		expect(importacoes).toHaveLength(1);
+		expect(a.collectionId).toBe(b.collectionId);
+	});
+
+	it("erro genérico de gravação local propaga o erro original (não engole)", async () => {
+		const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+			throw new Error("local-persist-failed");
+		});
+		await expect(
+			importSljaAsLiturgyMusic({ bytes: await makeSljaBuffer(), name: "erro.slja" }),
+		).rejects.toThrow("SLJA_LOCAL_LYRIC_PERSIST_FAILED");
+		setItem.mockRestore();
+	});
+
+	it("gravação da lyric falha no meio → SLJA_LOCAL_LYRIC_PERSIST_FAILED e rollback", async () => {
+		const original = Storage.prototype.setItem;
+		let failedLyricWrite = false;
+		const spy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (this: Storage, k: string, v: string) {
+			if (k === "louvorja.local-custom.v1") {
+				const db = JSON.parse(v) as { musics: Array<{ lyrics: unknown[] }> };
+				if (!failedLyricWrite && db.musics.some((music) => music.lyrics.length > 0)) {
+					failedLyricWrite = true;
+					throw new DOMException("quota no meio", "QuotaExceededError");
+				}
+			}
+			return original.call(this, k, v);
+		});
+		try {
+			await expect(
+				importSljaAsLiturgyMusic({ bytes: await makeSljaBuffer(), name: "meio.slja" }),
+			).rejects.toThrow("SLJA_LOCAL_LYRIC_PERSIST_FAILED");
+			expect(failedLyricWrite).toBe(true);
+		} finally {
+			spy.mockRestore();
+		}
+		const collections = listLocalCollections();
+		expect(collections).toHaveLength(1);
+		expect(listLocalMusics(collections[0].id)).toEqual([]);
+	});
+
+	it("quota do localStorage estourada → SLJA_LOCAL_LYRIC_PERSIST_FAILED e música removida", async () => {
+		const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+			throw new DOMException("quota", "QuotaExceededError");
+		});
+		await expect(
+			importSljaAsLiturgyMusic({ bytes: await makeSljaBuffer(), name: "cheia.slja" }),
+		).rejects.toThrow("SLJA_LOCAL_LYRIC_PERSIST_FAILED");
+		setItem.mockRestore();
+		// música parcial NÃO fica órfã no localStorage
+		const raw = localStorage.getItem("louvorja.local-custom.v1");
+		const db = raw ? JSON.parse(raw) : { musics: [] };
+		expect((db.musics ?? []).filter((m: { name: string }) => m.name === "Missao Para Todos")).toHaveLength(0);
+	});
+
 	it("música importada resolve no player COM áudio data: e letra com timing", async () => {
 		const imported = await importSljaAsLiturgyMusic({
 			bytes: await makeSljaBuffer(),

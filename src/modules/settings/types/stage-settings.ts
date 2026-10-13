@@ -19,7 +19,6 @@
  *   LiturgyWebProjectionView → liturgy
  *   <X>ProjectionView → <x> (bible, timer, random, clock, countdown…)
  */
-/* v8 ignore next 1 -- stmt module-level: V8 não registra hit de inicialização de ESM */
 const projectionViewModules = import.meta.glob('/src/modules/*/views/*ProjectionView.vue')
 
 function viewNameToScope(fileName: string): string | null {
@@ -37,7 +36,7 @@ function viewNameToScope(fileName: string): string | null {
 export const STAGE_MODULE_SCOPES: readonly string[] = [
   ...new Set(
     Object.keys(projectionViewModules)
-      .map((p) => viewNameToScope(p.split('/').pop()!)) /* keys do glob sempre têm filename */
+      .map((p) => viewNameToScope(p.split('/').pop() ?? ''))
       .filter((s): s is string => Boolean(s)),
   ),
 ].sort()
@@ -51,7 +50,15 @@ export type StageVerticalAlign = 'top' | 'middle' | 'bottom'
 export type StageFontWeight = 400 | 600 | 800
 
 export type StageSettings = {
-  backgroundColor: string
+  /**
+   * Cor de fundo do palco. null = NÃO SETADO (padrão de fábrica):
+   * sem escolha explícita do usuário, a IMAGEM da projeção (capa/bg da
+   * música, asset oficial) vence — cor setada sufoca a imagem (05/10
+   * Rafael: "as fontes estão todas configuradas logo por padrão nem as
+   * cores vão vir setadas a não ser se o usuário selecione").
+   * Presets recebem a cor explícita ao serem clicados.
+   */
+  backgroundColor: string | null
   textColor: string
   fontSize: number // px @1920 (60–160)
   fontWeight: StageFontWeight
@@ -98,8 +105,12 @@ export type StageSettings = {
    */
   clock?: { style: 'digital' | 'analog'; showSeconds: boolean; format24h: boolean }
   timer?: { timeFormat: 'hh:mm:ss.ms' | 'hh:mm:ss' | 'mm:ss.ms' | 'mm:ss' }
-  countdown?: { timeFormat: 'hh:mm:ss' | 'mm:ss' }
-  random?: { fontSizePc: number; textTransform: 'none' | 'uppercase' | 'lowercase'; animationSpeed: 'slow' | 'normal' | 'fast' }
+  countdown?: { timeFormat: 'hh:mm:ss' | 'mm:ss'; allowNegative?: boolean }
+  random?: {
+    fontSizePc: number
+    textTransform: 'none' | 'uppercase' | 'lowercase'
+    animationSpeed: 'slow' | 'normal' | 'fast'
+  }
   /**
    * Hinos: por padrão o bg da projeção é o ASSET da música (capa/slide).
    * override=true → o backgroundImage configurado aqui vence o asset
@@ -121,6 +132,7 @@ export const DEFAULT_TIMER_MODULE_SETTINGS: NonNullable<StageSettings['timer']> 
 
 export const DEFAULT_COUNTDOWN_MODULE_SETTINGS: NonNullable<StageSettings['countdown']> = {
   timeFormat: 'hh:mm:ss',
+  allowNegative: false,
 }
 
 export const DEFAULT_RANDOM_MODULE_SETTINGS: NonNullable<StageSettings['random']> = {
@@ -154,7 +166,7 @@ export const COUNTDOWN_TIME_FORMAT_OPTIONS: NonNullable<StageSettings['countdown
 ]
 
 export const DEFAULT_STAGE_SETTINGS: StageSettings = {
-  backgroundColor: '#0A0E1A',
+  backgroundColor: null,
   textColor: '#FFFFFF',
   fontSize: 96,
   fontWeight: 600,
@@ -214,7 +226,10 @@ export function stageFlexAlign(
   return { alignItems: horizontal, justifyContent: vertical }
 }
 
-/** Presets de fundo — mesmos do APK. */
+  /**
+   * Presets de fundo — mesmos do APK. Clicar SETA a cor explicitamente
+   * (entra no storage); nenhum é default (05/10 Rafael).
+   */
 export const STAGE_BG_PRESETS = [
   { color: '#0A0E1A', label: 'Azul-noite' },
   { color: '#000000', label: 'Preto' },
@@ -238,15 +253,14 @@ const officialBgModules = import.meta.glob('../../../assets/backgrounds/bg-*.png
 /** IDs dos bgs oficiais (ex.: 'bg-01'), ordenados. Piano (bg-11) vai primeiro na galeria. */
 const GALLERY_LEAD_BACKGROUND = 'bg-11'
 
-const sortedBackgroundIds = Object.keys(officialBgModules)
+export const STAGE_OFFICIAL_BACKGROUNDS: readonly string[] = Object.keys(officialBgModules)
   .map((path) => path.match(/(bg-[\w-]+)\.png$/)?.[1])
   .filter((id): id is string => Boolean(id))
-  .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
-
-export const STAGE_OFFICIAL_BACKGROUNDS: readonly string[] = [
-  GALLERY_LEAD_BACKGROUND,
-  ...sortedBackgroundIds.filter((id) => id !== GALLERY_LEAD_BACKGROUND),
-]
+  .sort((a, b) => {
+    if (a === GALLERY_LEAD_BACKGROUND) return -1
+    if (b === GALLERY_LEAD_BACKGROUND) return 1
+    return a.localeCompare(b, undefined, { numeric: true })
+  })
 
 /** Prefixo que marca um bg oficial (vs dataURL do usuário). */
 export const OFFICIAL_BG_PREFIX = 'official:'
@@ -263,6 +277,17 @@ export function resolveBackgroundImage(backgroundImage: string | null): string |
     return officialBgUrl(backgroundImage.slice(OFFICIAL_BG_PREFIX.length))
   }
   return backgroundImage
+}
+
+/**
+ * Cor de fundo pronta pra CSS (style binding). null (não setado) →
+ * 'transparent': a camada de IMAGEM (capa/bg da música) aparece por cima
+ * do preto do palco; onde não há imagem, preto puro (05/10 Rafael).
+ */
+export function stageBgCss(
+  backgroundColor: string | null,
+): string {
+  return backgroundColor ?? 'transparent'
 }
 
 /** Presets de cor do texto — mesmos do APK. */
@@ -316,7 +341,10 @@ export function parseStageSettings(raw: unknown): StageSettings {
   const weight = asNumber(s['weight'], 600) as StageFontWeight
   const bibleWeight = asNumber(s['bWeight'], 500) as StageSettings['bibleFontWeight']
   return {
-    backgroundColor: asColor(s['bg'], DEFAULT_STAGE_SETTINGS.backgroundColor),
+    backgroundColor:
+      typeof s['bg'] === 'string' && /^#[0-9a-fA-F]{6}$/.test(s['bg'])
+        ? s['bg']
+        : null,
     textColor: asColor(s['fg'], DEFAULT_STAGE_SETTINGS.textColor),
     fontSize: clamp(asNumber(s['size'], 96), 60, 160),
     fontWeight: WEIGHTS.includes(weight) ? weight : 600,
@@ -397,7 +425,7 @@ export function parseStageSettings(raw: unknown): StageSettings {
             fontSizePc: clamp(
               asNumber((s['random'] as Record<string, unknown>)['fontSizePc'], 8),
               4,
-              14,
+              50,
             ),
             textTransform: RANDOM_TEXT_TRANSFORM_OPTIONS.includes(
               (s['random'] as Record<string, unknown>)['textTransform'] as NonNullable<StageSettings['random']>['textTransform'],
@@ -425,7 +453,9 @@ export function parseStageSettings(raw: unknown): StageSettings {
 /** Serializa no formato do APK (simétrico ao parse). */
 export function serializeStageSettings(s: StageSettings): Record<string, unknown> {
   return {
-    bg: s.backgroundColor,
+    // null = não setado: chave AUSENTE no storage (05/10 Rafael — cor só
+    // existe se o usuário escolher; parse trata ausente como null).
+    ...(s.backgroundColor ? { bg: s.backgroundColor } : {}),
     fg: s.textColor,
     size: s.fontSize,
     weight: s.fontWeight,

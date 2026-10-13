@@ -9,11 +9,23 @@ import os from 'node:os'
 import path from 'node:path'
 import tls from 'node:tls'
 
+import { diagnosticApiHosts } from './profile.mjs'
+
 export const TIMEOUT_MS = 8_000
-export const API_HOSTS = [
-  'api.pianolouvorja.com.br',
-  'api.louvorja.com.br',
-  'api.louvorja.workers.dev',
+/**
+ * Hosts SONDAIS da cascata de diagnóstico (bootstrap real) — derivados do
+ * CONTRATO DE PERFIL (SPEC piano-api-env-guard RF-02): non-release sonda STG,
+ * nunca produção.
+ */
+export const API_HOSTS = diagnosticApiHosts(process.env)
+
+/**
+ * Domínios vigiados na LEITURA do /etc/hosts — TODOS (STG + produção +
+ * legados), independente do perfil: sequestro de `api.pianolouvorja.com.br`
+ * é sintoma relevante mesmo em build STG (mesma máquina pode rodar produção).
+ */
+export const HOSTS_WATCH_DOMAINS = [
+  ...new Set([...API_HOSTS, 'api.pianolouvorja.com.br']),
 ]
 export const ENDPOINTS = ['config', 'pt_categories']
 export const ESSENTIAL_FILES = [
@@ -156,7 +168,7 @@ export function readHostsOverrides(hostsPath = defaultHostsPath()) {
       const [ip, ...names] = fields
       for (const hostname of names) {
         const h = hostname.toLowerCase()
-        if (API_HOSTS.some((domain) => h === domain || h.endsWith(`.${domain}`))) out.push({ ip, hostname: h })
+        if (HOSTS_WATCH_DOMAINS.some((domain) => h === domain || h.endsWith(`.${domain}`))) out.push({ ip, hostname: h })
       }
     }
     return out
@@ -220,7 +232,7 @@ export function maskToken(token) {
   return token ? `${token.slice(0, 4)}…(${token.length} chars)` : null
 }
 
-export function computeVerdict({ general, apis, proxy, hosts, installation }) {
+export function computeVerdict({ general, apis, proxy, hosts, installation, extra }) {
   if (!general['1.1.1.1:443']?.ok && !general['google.com:443']?.ok) return 'sem-internet'
   const errors = apis.flatMap((api) => [api.dns?.erro, api.tcp?.erro, api.tls?.erro, ...api.http.map((h) => h.erro)].filter(Boolean))
   const classes = errors.map((e) => e.classe)
@@ -232,6 +244,11 @@ export function computeVerdict({ general, apis, proxy, hosts, installation }) {
   if (classes.some((c) => ['ECONNREFUSED', 'EHOSTUNREACH', 'ETIMEDOUT', 'TIMEOUT_LOCAL'].includes(c)) || hosts.length) return 'firewall-seletivo'
   if (proxyDetectado) return 'proxy'
   if (installation.existe && Object.values(installation.sysdata).some((value) => value === null)) return 'estado-app'
+  if (extra?.escritaUserData?.ok === false) return 'sem-permissao-escrita'
+  if (extra?.storage?.lockOrfao || extra?.storage?.ldbVazio || extra?.storage?.localStorageSuspeito) return 'storage-corrompido'
+  if (extra?.crashes?.total >= 3) return 'crash-loop'
+  if (extra?.headersTruncados) return 'arquivo-truncado'
+  if (extra?.gpuBloqueada) return 'gpu-bloqueada'
   return 'ok'
 }
 
@@ -249,6 +266,7 @@ export function folderSize(dir) {
 export function reportText(report) {
   const lines = [
     'LouvorJA Diagnóstico — SrCaldeira',
+    ...(report.meta.dataLocal ? [`Data (local): ${report.meta.dataLocal} (${report.ambiente.timezone})`] : []),
     `Data: ${report.meta.dataISO}`,
     `Duração: ${report.meta.duracaoMs} ms`,
     `Veredito heurístico: ${report.vereditoHeuristico}`,
@@ -264,9 +282,10 @@ export function reportText(report) {
   return lines.join('\n')
 }
 
-export function generalProbes() {
-  return {
-    '1.1.1.1:443': socketProbe(() => net.connect({ host: '1.1.1.1', port: 443 })),
-    'google.com:443': socketProbe(() => tls.connect({ host: 'google.com', port: 443, servername: 'google.com' })),
-  }
+export async function generalProbes() {
+  const [ip, google] = await Promise.all([
+    socketProbe(() => net.connect({ host: '1.1.1.1', port: 443 })),
+    socketProbe(() => tls.connect({ host: 'google.com', port: 443, servername: 'google.com' })),
+  ])
+  return { '1.1.1.1:443': ip, 'google.com:443': google }
 }
