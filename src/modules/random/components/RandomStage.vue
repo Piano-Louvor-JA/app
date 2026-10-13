@@ -16,6 +16,20 @@ const PARTICLE_COUNT = 20
 const FIREWORK_COUNT = 56
 const CELEBRATE_MS = 2800
 
+/**
+ * Faces do dado 3D — "UV mapping" manual do cubo: cada face declara quais
+ * das 9 células da grade 3x3 (p1..p9) recebem pip, contagem clássica 1–6.
+ * Layout das células: p1 p2 p3 / p4 p5 p6 / p7 p8 p9.
+ */
+const DICE_FACES: ReadonlyArray<{ n: number; pips: number[] }> = [
+  { n: 1, pips: [5] },
+  { n: 2, pips: [1, 9] },
+  { n: 3, pips: [1, 5, 9] },
+  { n: 4, pips: [1, 3, 7, 9] },
+  { n: 5, pips: [1, 3, 5, 7, 9] },
+  { n: 6, pips: [1, 3, 4, 6, 7, 9] },
+]
+
 interface OrbParticle {
   id: number
   size: number
@@ -393,10 +407,22 @@ onUnmounted(() => {
       @click="emit('draw')"
     >
       <span class="random-stage__draw-circle">
-        <i
-          class="ti ti-dice"
-          aria-hidden="true"
-        />
+        <!-- Dado 3D: 6 faces com pips corretos (1-6), sem glifo de fonte -->
+        <span class="random-stage__dice" aria-hidden="true">
+          <span
+            v-for="face in DICE_FACES"
+            :key="face.n"
+            class="random-stage__dice-face"
+            :data-face="face.n"
+          >
+            <span
+              v-for="pip in face.pips"
+              :key="pip"
+              class="random-stage__dice-pip"
+              :style="{ gridArea: `p${pip}` }"
+            />
+          </span>
+        </span>
       </span>
       <span class="random-stage__draw-label">
         {{ t('random.drawButton') }}
@@ -829,8 +855,8 @@ onUnmounted(() => {
     opacity: 0.45;
   }
 
-  &--spinning .random-stage__draw-circle .ti {
-    animation: random-dice-spin 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  &--spinning .random-stage__dice {
+    animation: random-dice-roll 0.6s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   &:not(:disabled):hover .random-stage__draw-circle {
@@ -863,10 +889,73 @@ onUnmounted(() => {
   color: var(--ds-color-on-primary-container, #002c4f);
   box-shadow: 0 0 40px color-mix(in srgb, #2196f3 40%, transparent);
   transition: transform 180ms ease;
+}
 
-  .ti {
-    font-size: 2.25rem;
-  }
+/* ===== Dado 3D (substitui glifo ti-dice — pips não conferiam) ===== */
+.random-stage__dice {
+  --dice-size: 2.1rem;
+  --dice-half: calc(var(--dice-size) / 2);
+  display: block;
+  width: var(--dice-size);
+  height: var(--dice-size);
+  perspective: 26rem;
+}
+
+.random-stage__dice-face {
+  display: grid;
+  grid-template-areas:
+    'p1 p2 p3'
+    'p4 p5 p6'
+    'p7 p8 p9';
+  position: absolute;
+  inset: 0;
+  padding: calc(var(--dice-size) * 0.14);
+  gap: calc(var(--dice-size) * 0.08);
+  border-radius: calc(var(--dice-size) * 0.18);
+  background: #f6f7f9;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+  backface-visibility: hidden;
+}
+
+.random-stage__dice-pip {
+  width: 100%;
+  height: 100%;
+  border-radius: 9999px;
+  background: currentColor;
+  align-self: center;
+  justify-self: center;
+  aspect-ratio: 1;
+}
+
+/* Projeção do cubo: uma face frontal + levemente topo/direita visíveis. */
+.random-stage__dice-face[data-face='1'] {
+  transform: translateZ(var(--dice-half));
+}
+
+.random-stage__dice-face[data-face='2'] {
+  transform: rotateY(90deg) translateZ(var(--dice-half));
+}
+
+.random-stage__dice-face[data-face='3'] {
+  transform: rotateY(180deg) translateZ(var(--dice-half));
+}
+
+.random-stage__dice-face[data-face='4'] {
+  transform: rotateY(-90deg) translateZ(var(--dice-half));
+}
+
+.random-stage__dice-face[data-face='5'] {
+  transform: rotateX(90deg) translateZ(var(--dice-half));
+}
+
+.random-stage__dice-face[data-face='6'] {
+  transform: rotateX(-90deg) translateZ(var(--dice-half));
+}
+
+.random-stage__dice {
+  transform-style: preserve-3d;
+  /* isométrico suave: mostra 1 (frente), 2 (topo como face 2 girada) e 3 */
+  transform: rotateX(-22deg) rotateY(-16deg);
 }
 
 .random-stage__draw-label {
@@ -1018,13 +1107,13 @@ onUnmounted(() => {
   }
 }
 
-@keyframes random-dice-spin {
+@keyframes random-dice-roll {
   from {
-    transform: rotate(0deg) scale(0.9);
+    transform: rotateX(-22deg) rotateY(-16deg) scale(0.9);
   }
 
   to {
-    transform: rotate(360deg) scale(1);
+    transform: rotateX(338deg) rotateY(704deg) scale(1);
   }
 }
 
