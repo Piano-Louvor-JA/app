@@ -65,6 +65,7 @@ vi.mock('../../services/output-registry', () => ({
 // Bridge desktop: externalAlive controlável por teste.
 const bridgeState = vi.hoisted(() => ({
   externalAlive: false as boolean | undefined,
+  externalMediaAlive: false as boolean | undefined,
   throwOnExternal: false,
 }))
 vi.mock('@shared/services/desktop-bridge', () => ({
@@ -75,6 +76,13 @@ vi.mock('@shared/services/desktop-bridge', () => ({
       externalAlive: async () => {
         if (bridgeState.throwOnExternal) throw new Error('main antigo')
         return bridgeState.externalAlive
+      },
+      // Novo handler (main novo): SÓ mídia externa de verdade (vídeo/pdf/ppt
+      // do web-projection). Popup de hino aberto NÃO conta mais — regressão
+      // "projeção de hino parada no 1º slide na TV" (13/10).
+      externalMediaAlive: async () => {
+        if (bridgeState.throwOnExternal) throw new Error('main antigo')
+        return bridgeState.externalMediaAlive
       },
     },
   }),
@@ -473,11 +481,37 @@ describe('palco-bridge — takeover e turnOffOthers', () => {
 describe('palco-bridge — mídia externa e slots', () => {
   it('mídia externa viva: owner é PULADO no slot (sem projection por cima)', async () => {
     startPalcoBridge()
-    bridgeState.externalAlive = true
+    bridgeState.externalMediaAlive = true
     publish(RANDOM_CH, { currentDisplay: 'a', projecting: true })
     await settle()
     const slot0 = sendBuf.buf.filter((s) => s.slot === '0' && s.msg.type === 'projection')
     expect(slot0.length).toBe(0)
+  })
+
+  it('regressão 13/10: popup de hino aberto NÃO bloqueia a bridge (TV deve seguir os slides)', async () => {
+    startPalcoBridge()
+    // externalAlive=true representa o popup de hino aberto (28df66ab passou
+    // a contar popups); a bridge deve consultar externalMediaAlive — só
+    // mídia externa de verdade (vídeo/pdf/ppt) pula o render.
+    bridgeState.externalAlive = true
+    bridgeState.externalMediaAlive = false
+    publish(MEDIA_CH, { active: true, title: 'Mi Lugar en el Mundo', lyric: 'l1' })
+    await settle()
+    const slot0 = sendBuf.buf.filter((s) => s.slot === '0' && s.msg.type === 'projection')
+    expect(slot0.length).toBeGreaterThan(0)
+    expect(slot0[0]!.msg.scope).toBe('hymns')
+  })
+
+  it('troca de slide do hino re-projeta no mesmo slot (TV acompanha)', async () => {
+    startPalcoBridge()
+    bridgeState.externalAlive = true // popup do hino aberto
+    publish(MEDIA_CH, { active: true, title: 'Hino', lyric: 'verso 1' })
+    await settle()
+    const first = sendBuf.buf.filter((s) => s.slot === '0' && s.msg.type === 'projection').length
+    publish(MEDIA_CH, { active: true, title: 'Hino', lyric: 'verso 2' })
+    await settle()
+    const second = sendBuf.buf.filter((s) => s.slot === '0' && s.msg.type === 'projection').length
+    expect(second).toBeGreaterThan(first)
   })
 
   it('bridge desktop com erro no externalAlive: fallback sem externa (projeta)', async () => {

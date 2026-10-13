@@ -214,6 +214,17 @@ export function registerWorkspaceIpc() {
     }
   })
 
+  // SÓ mídia externa (vídeo/pdf/ppt do web-projection). Popups de
+  // hinos/bíblia NÃO contam: a palco-bridge usa este handler — consultar o
+  // antigo com popup do hino aberto congelava a TV no 1º slide (13/10).
+  ipcMain.handle('projection:external-media-alive', () => {
+    try {
+      return Boolean(isExternalProjectionAlive())
+    } catch {
+      return false
+    }
+  })
+
   ipcMain.handle('projection:get-source-media-id', (event) => {
     try {
       return getSourceMediaIdFor(event.sender)

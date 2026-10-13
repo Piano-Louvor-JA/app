@@ -337,6 +337,8 @@ export type ProjectionApi = {
   closeUrl: () => Promise<boolean>
   /** Há projeção externa (video/pdf/ppt/site) com janela viva no main? */
   externalAlive: () => Promise<boolean>
+  /** SÓ mídia externa de verdade (vídeo/pdf/ppt do web-projection) — sem popups. */
+  externalMediaAlive: () => Promise<boolean>
   getSourceMediaId?: () => Promise<string | null>
   publishPlaybackSync?: (payload: PlaybackSyncPayload) => void
   onPlaybackSync?: (callback: (payload: PlaybackSyncPayload) => void) => () => void

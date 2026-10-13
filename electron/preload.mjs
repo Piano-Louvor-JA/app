@@ -221,6 +221,7 @@ contextBridge.exposeInMainWorld('louvorja', {
     },
     closeUrl: () => ipcRenderer.invoke('projection:close-url'),
     externalAlive: () => ipcRenderer.invoke('projection:external-alive'),
+    externalMediaAlive: () => ipcRenderer.invoke('projection:external-media-alive'),
     getSourceMediaId: () => ipcRenderer.invoke('projection:get-source-media-id'),
     publishPlaybackSync: (payload) => {
       ipcRenderer.send('projection:playback-sync', payload)
