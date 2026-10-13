@@ -190,6 +190,7 @@ class PalcoSession {
     )
     // Bíblia tem tipografia própria (paridade APK StageSession / PalcoOrchestrator).
     const isBible = scope === 'bible'
+    const isHymns = scope === 'hymns'
     const sizeAt1920 = isBible ? s.bibleFontSize : s.fontSize
     const fontWeight = isBible ? s.bibleFontWeight : s.fontWeight
     const textColor = isBible ? s.bibleTextColor : s.textColor
@@ -213,6 +214,22 @@ class PalcoSession {
       footerRef,
       footerColor: s.footerRefColor,
       footerWeight: s.footerRefWeight,
+      // Estrofes com aparência própria (paridade do title*):
+      lyricFontSize: (isHymns && s.lyricFontSize != null ? s.lyricFontSize : sizeAt1920) / 1920 * 1080,
+      lyricFontWeight: isHymns && s.lyricFontWeight != null ? s.lyricFontWeight : fontWeight,
+      lyricTextColor: (isHymns && s.lyricTextColor != null ? s.lyricTextColor : textColor),
+      lyricUpperCase: isHymns ? s.lyricUpperCase : false,
+      lyricTextShadow: isHymns && s.lyricTextShadow != null ? s.lyricTextShadow : s.textShadow,
+      // Personalização completa da projeção local refletida no palco:
+      textAlign: s.textAlign,
+      textVerticalAlign: s.textVerticalAlign,
+      backgroundColor: s.backgroundColor,
+      margin: s.margin,
+      // Capitalização do versículo (receiver aplica CSS text-transform).
+      ...(isBible &&
+      (s.bibleTextTransform === 'uppercase' || s.bibleTextTransform === 'capitalize')
+        ? { textTransform: s.bibleTextTransform }
+        : {}),
       // Versão já vem embutida em footerRef (formato desktop); não duplicar.
       footerVersion:
         isBible && !s.showBibleVersion ? undefined : input.footerVersion,

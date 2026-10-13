@@ -148,11 +148,15 @@ export async function executeLiturgyItem(
         return { ok: false, messageKey: 'liturgy.messages.videoSelectFile' }
       }
 
-      // Player externo SÓ para áudio (Ezequias 13/09: "mp3 blz, não é preciso
-      // projetar"). Vídeo PRECISA do player interno: é ele que projeta nas
-      // telas — VLC/mpv não comandam a projeção.
+      // Player externo: áudio E vídeo (Rafael 03/10: "essa funcionalidade é
+      // pra reproduzir vídeos externos" — vídeo ia sempre pro interno,
+      // ignorando a preferência do usuário). Cascata: playerId do item →
+      // preferência global → 'associated' (interno). Player não encontrado
+      // etc → cai no interno com snackbar padrão.
+      // NOTA: com player externo o vídeo não projeta nas telas (o VLC/mpv
+      // não alimenta a projeção) — quem quer projeção usa 'associated'.
       const bridge = getDesktopBridge()
-      if (item.type === 'audio' && filePath && !objectUrl) {
+      if (filePath && !objectUrl && (item.type === 'audio' || item.type === 'video')) {
         let pref: string | undefined = item.playerId
         if (!pref || pref === 'default') {
           pref = await bridge?.externalPlayer?.get?.()
@@ -164,6 +168,13 @@ export async function executeLiturgyItem(
           )
           if (result?.ok) {
             return { ok: true }
+          }
+          // file-missing = path de OUTRA máquina (liturgia sincronizada do
+          // Windows da igreja etc): cair no interno aqui engana o usuário
+          // ("abriu no player errado") — o interno também não tem o arquivo.
+          // Retorna erro claro; playwright/web revisam mensagem no i18n.
+          if (result && 'error' in result && result.error === 'file-missing') {
+            return { ok: false, messageKey: 'liturgy.messages.fileMissingOnMachine' }
           }
           // player não encontrado etc → cai no interno com snackbar padrão
         }

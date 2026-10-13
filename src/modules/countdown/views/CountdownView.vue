@@ -46,6 +46,8 @@ const {
   audioVolume,
   setAudioMuted,
   setAudioVolume,
+  audioPaused,
+  setAudioPaused,
   stopAudio,
   setMode,
   setSabbathConfig,
@@ -599,15 +601,18 @@ const effectiveConfig = computed(() => {
               :aria-label="t('countdown.audioVolume')"
               @input="setAudioVolume(Number(($event.target as HTMLInputElement).value))"
             >
+            <!-- Feedback Ezequias: botão único funciona como TOGGLE —
+                 tocando = pausa (retoma de onde parou); pausado = retoma -->
             <button
               type="button"
-              class="countdown-view__audio-btn countdown-view__audio-btn--stop"
-              :aria-label="t('countdown.stopAudio')"
-              :title="t('countdown.stopAudio')"
-              @click="stopAudio()"
+              class="countdown-view__audio-btn countdown-view__audio-btn--toggle"
+              :class="{ 'countdown-view__audio-btn--toggle-playing': !audioPaused }"
+              :aria-label="audioPaused ? t('countdown.playAudio') : t('countdown.pauseAudio')"
+              :title="audioPaused ? t('countdown.playAudio') : t('countdown.pauseAudio')"
+              @click="setAudioPaused(!audioPaused)"
             >
               <i
-                class="ti ti-player-stop"
+                :class="audioPaused ? 'ti ti-player-play' : 'ti ti-player-pause'"
                 aria-hidden="true"
               />
             </button>
@@ -826,6 +831,10 @@ const effectiveConfig = computed(() => {
 
   &--muted {
     color: var(--ds-color-primary);
+  }
+
+  &--toggle-playing {
+    background: color-mix(in srgb, var(--ds-color-primary) 25%, transparent);
   }
 
   &--stop:hover {

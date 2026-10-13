@@ -27,7 +27,7 @@ export function formatVerseIntervals(verses: number[]): string {
 /** Monta a referência bíblica exibida/projetada. */
 export function formatScripturalReference(selection: {
   bookName: string
-  chapter: number
+  chapter: number | null
   verses: number[]
   versionAbbreviation?: string
 }): string {
@@ -55,42 +55,53 @@ export function buildProjectionText(
     .join(' ')
 }
 
+/** Adiciona ao conjunto os versículos existentes do intervalo (ordem livre). */
+function addVerseRange(
+  selected: Set<number>,
+  from: number,
+  to: number,
+  verses: BibleChapterVerses,
+): void {
+  const lo = Math.min(from, to)
+  const hi = Math.max(from, to)
+  for (let i = lo; i <= hi; i += 1) {
+    if (verses[String(i)]) selected.add(i)
+  }
+}
+
+/** Interpreta UM item da query (`1`, `1-3`). Retorna apenas versículos existentes. */
+function parseSinglePart(part: string, verses: BibleChapterVerses): number[] {
+  const trimmed = part.trim()
+  if (!trimmed) return []
+
+  if (!trimmed.includes('-')) {
+    const num = Number(trimmed)
+    return !Number.isNaN(num) && verses[String(num)] ? [num] : []
+  }
+
+  const [startStr, endStr] = trimmed.split('-')
+  const start = Number(startStr?.trim())
+  const end = Number(endStr?.trim())
+  if (Number.isNaN(start) || Number.isNaN(end)) return []
+
+  const selected = new Set<number>()
+  addVerseRange(selected, start, end, verses)
+  return Array.from(selected)
+}
+
 /**
  * Interpreta busca por números/intervalos (`1`, `1-3`, `1,3-5`).
- * Retorna apenas versículos existentes no capítulo.
+ * Retorna apenas versículos existentes no capítulo, ordenados.
  */
 export function parseVerseQuery(
   query: string,
   verses: BibleChapterVerses,
 ): number[] {
-  const selected = new Set<number>()
-  const parts = query.split(',')
-
-  for (const part of parts) {
-    const trimmed = part.trim()
-    if (!trimmed) continue
-
-    if (trimmed.includes('-')) {
-      const [startStr, endStr] = trimmed.split('-')
-      const start = Number(startStr?.trim())
-      const end = Number(endStr?.trim())
-      if (Number.isNaN(start) || Number.isNaN(end)) continue
-
-      const from = Math.min(start, end)
-      const to = Math.max(start, end)
-      for (let i = from; i <= to; i += 1) {
-        if (verses[String(i)]) selected.add(i)
-      }
-      continue
-    }
-
-    const num = Number(trimmed)
-    if (!Number.isNaN(num) && verses[String(num)]) {
-      selected.add(num)
-    }
+  const all = new Set<number>()
+  for (const part of query.split(',')) {
+    for (const v of parseSinglePart(part, verses)) all.add(v)
   }
-
-  return Array.from(selected).sort((a, b) => a - b)
+  return Array.from(all).sort((a, b) => a - b)
 }
 
 export function emptySelection(): BibleSelection {

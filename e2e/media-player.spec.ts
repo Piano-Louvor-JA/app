@@ -5,7 +5,11 @@ const MEDIA_CHANNEL = 'louvorja-media-runtime'
 const MEDIA_STORAGE_KEY = 'louvorja-media-runtime-state'
 
 const EULA_AND_RUNTIME = (payload) => `localStorage.setItem('eula_accepted_v1', 'true');
-  localStorage.setItem('${MEDIA_STORAGE_KEY}', JSON.stringify(${JSON.stringify(payload)}));
+  // Só semeia o runtime na primeira carga. No reload o valor gravado pelo
+  // BroadcastChannel precisa permanecer.
+  if (!localStorage.getItem('${MEDIA_STORAGE_KEY}')) {
+    localStorage.setItem('${MEDIA_STORAGE_KEY}', JSON.stringify(${JSON.stringify(payload)}));
+  }
   const rs = () => document.getElementById('boot-splash')?.remove();
   rs();
   document.addEventListener('DOMContentLoaded', rs);`

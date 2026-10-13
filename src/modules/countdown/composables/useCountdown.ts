@@ -28,6 +28,11 @@ import {
   type AlertMarkerPreset,
 } from '../types/countdown'
 import type { AlertPresetKey } from '../services/alert-tone'
+import {
+  claimAudioHost,
+  isOperatorWindow,
+  releaseAudioHost,
+} from '../services/audio-control'
 
 /** AudioElement de um tom da biblioteca (cacheado pelo data-URL). */
 const libraryAudioCache = new Map<string, HTMLAudioElement>()
@@ -131,12 +136,27 @@ export function useCountdownDisplay(
     // O popup não roda hydrate() — inicia a escuta do canal de controle aqui
     // (idempotente no store) pra receber mute/volume/stop do operador.
     if (isProjectionWindow) store.startAudioControlSync()
+    // Host de áudio (fix duplicidade 03/10 + cronômetro sem projeção):
+    // exatamente UMA janela toca. Popup eleita (menor monitorId) quando há
+    // projeção; OPERADOR quando não há popup viva — cronômetro roda e o
+    // alerta toca no PC mesmo sem projetar (feedback do irmão).
+    // Heartbeat em toda janela: o claim é reavaliado (não fica preso no
+    // primeiro mount). Popup menor assume; se ela fechar, o claim expira
+    // em 4s e o operador passa a tocar.
+    const hostHeartbeat = window.setInterval(() => {
+      claimAudioHost()
+    }, 1_000)
+    onUnmounted(() => {
+      clearInterval(hostHeartbeat)
+      releaseAudioHost()
+    })
     const firedMarkers = store.firedMarkers
     let prevStatus: CountdownRuntimeState['status'] = runtime.value.status
 
     const activeMarkers = computed(() => config.value.alertMarkers ?? DEFAULT_ALERT_MARKERS)
 
     function playMarkerPreset(preset: string, markerId: string): void {
+      if (!claimAudioHost()) return // só a janela eleita neste instante toca
       if (store.audioMuted) return // F2: operador silenciou
       // Fila (feedback Ezequias: "adiciona queue") — marcos que cruzam juntos
       // (jump do rAF em janela em bg) tocam em sequência, nunca simultâneos.
@@ -166,7 +186,7 @@ export function useCountdownDisplay(
       setLiveVolume(volume)
     })
 
-    if (isProjectionWindow) {
+    if (isProjectionWindow || isOperatorWindow()) {
       // Marcos por DEADLINE ABSOLUTO (feedback Ezequias 02/10: "5min toca
       // quando falta 1min"). O antigo watch(remainingRawMs) dependia do rAF
       // — que CONGELA em janela em background (mesma raiz do app#337). Ao

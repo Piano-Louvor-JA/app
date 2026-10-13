@@ -383,7 +383,7 @@ describe('collections CRUD', () => {
 
   it('copyCustomMusic: ok, !ok, throw', async () => {
     routes = [{ match: () => true, body: { id_music: 99 } }]
-    expect(await copyCustomMusic(1, 2)).toEqual({ id: 99 })
+    expect(await copyCustomMusic(1, 2)).toEqual({ id: 99, existed: true })
 
     routes = [{ match: () => true, status: 409 }]
     expect(await copyCustomMusic(1, 2)).toBeNull()
@@ -495,8 +495,11 @@ describe('musics CRUD e listagem', () => {
     const local = await createCustomMusic(col.id, { name: 'Nova' })
     expect(local).not.toBeNull()
 
-    routes = [{ match: () => true, body: { id_music: 31 } }]
-    expect(await createCustomMusic(1, { name: 'R' })).toEqual({ id: 31 })
+    routes = [{ match: () => true, status: 201, body: { id_music: 31 } }]
+    expect(await createCustomMusic(1, { name: 'R' })).toEqual({ id: 31, existed: false })
+
+    routes = [{ match: () => true, status: 200, body: { id_music: 9 } }]
+    expect(await createCustomMusic(1, { client_uuid: 'abc' })).toEqual({ id: 9, existed: true })
 
     routes = [{ match: () => true, status: 500 }]
     expect(await createCustomMusic(1, {})).toBeNull()

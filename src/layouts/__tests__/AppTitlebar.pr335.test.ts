@@ -53,7 +53,7 @@ async function mountBar(route: { name?: string; projection?: boolean } = {}) {
   const wrapper = mount(AppTitlebar, {
     global: {
       plugins: [router],
-      stubs: { teleport: true },
+      stubs: { teleport: true, DownloadQueueIndicator: true },
     },
   });
   if (route.name || route.projection !== undefined) {

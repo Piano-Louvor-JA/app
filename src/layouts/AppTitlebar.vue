@@ -6,6 +6,7 @@ import logoUrl from '@assets/brand/logo-louvor-ja.svg'
 import { APP_PRODUCT_NAME } from '@shared/constants/app'
 import { getDesktopBridge, isDesktopApp } from '@shared/services/desktop-bridge'
 import { isProjectionPopupLocation } from '@shared/services/projection-window-location'
+import DownloadQueueIndicator from '@modules/sync/components/DownloadQueueIndicator.vue'
 
 const route = useRoute()
 const isMaximized = ref(false)
@@ -134,6 +135,8 @@ onUnmounted(() => {
         >
         <span class="app-titlebar__title">{{ APP_PRODUCT_NAME }}</span>
       </div>
+      <DownloadQueueIndicator class="app-titlebar__queue" />
+
       <div class="app-titlebar__controls">
         <button
           type="button"
@@ -212,6 +215,12 @@ onUnmounted(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.app-titlebar__queue {
+  margin-right: 6px;
+  align-items: center;
+  display: inline-flex;
 }
 
 .app-titlebar__controls {

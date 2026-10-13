@@ -31,6 +31,16 @@ vi.mock('@modules/sync/services/library-catalog', () => ({
   getCurrentApiPrefix: () => 'pt',
 }))
 
+vi.mock('@modules/media/services/custom-catalog', () => ({
+  listAllCustomMusics: async () => [],
+  toCustomMusicId: (id: number) => 1_000_000 + id,
+}))
+
+vi.mock('@modules/media/services/local-custom-store', () => ({
+  listLocalCollections: () => [],
+  listLocalMusics: () => [],
+}))
+
 beforeEach(() => {
   catalogFiles.clear()
   remoteFiles.clear()

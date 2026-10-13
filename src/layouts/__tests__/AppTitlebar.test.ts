@@ -61,6 +61,7 @@ function mountBar() {
   return mount(AppTitlebar, {
     global: {
       plugins: [router],
+      stubs: { DownloadQueueIndicator: true },
     },
   })
 }

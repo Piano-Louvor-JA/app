@@ -10,6 +10,7 @@ const {
 	toRelativeMediaPathMock,
 	getDesktopBridgeMock,
 	loadLibraryCategoriesMock,
+	reportErrorMock,
 } = vi.hoisted(() => ({
 	readCatalogRecordMock: vi.fn(),
 	writeCatalogRecordMock: vi.fn(),
@@ -20,6 +21,7 @@ const {
 	toRelativeMediaPathMock: vi.fn(),
 	getDesktopBridgeMock: vi.fn(),
 	loadLibraryCategoriesMock: vi.fn(),
+	reportErrorMock: vi.fn(),
 }));
 
 vi.mock("@shared/services/workspace-api", () => ({
@@ -31,6 +33,9 @@ vi.mock("@shared/services/remote-catalog", () => ({
 }));
 vi.mock("@shared/services/desktop-bridge", () => ({
 	getDesktopBridge: getDesktopBridgeMock,
+}));
+vi.mock("@shared/services/telemetry", () => ({
+	reportError: reportErrorMock,
 }));
 vi.mock("../library-catalog", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("../library-catalog")>();
@@ -156,11 +161,18 @@ describe("readOrFetchCatalogRecord (via coletânea)", () => {
 		);
 	});
 
-	it("retorna null silenciosamente quando a API falha", async () => {
-		fetchRemoteCatalogJsonMock.mockRejectedValueOnce(new Error("offline"));
+	it("reporta falha de catálogo sem impedir o fallback local", async () => {
+		const error = new Error("offline");
+		fetchRemoteCatalogJsonMock.mockRejectedValueOnce(error);
 		const result = await listAlbumMusicIds(albumBase());
 		expect(result).toEqual([]);
 		expect(writeCatalogRecordMock).not.toHaveBeenCalled();
+		await vi.waitFor(() =>
+			expect(reportErrorMock).toHaveBeenCalledWith(error, {
+				scope: "catalog-fetch",
+				filename: "album_1",
+			}),
+		);
 	});
 });
 
@@ -293,6 +305,16 @@ describe("collectMediaForAlbum", () => {
 		expect(result.status).toBe("error");
 		expect(result.failureReason).toBe("server");
 		expect(result.totalErrors).toBeGreaterThan(0);
+		await vi.waitFor(() =>
+			expect(reportErrorMock).toHaveBeenCalledWith(
+			expect.objectContaining({ message: "download abortado (server)" }),
+			expect.objectContaining({
+				album: "1",
+				failureReason: "server",
+				maxConsecutive: 3,
+			}),
+		),
+		);
 	});
 
 	it("aborta por shouldAbort antes do download", async () => {

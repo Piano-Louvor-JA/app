@@ -145,4 +145,36 @@ describe('BibleProjectionView.vue', () => {
     expect(w.html()).toContain('bible-projection--embedded')
     w.unmount()
   })
+
+  it('B1 (paridade web): verseStyle aplica textTransform do Palco (uppercase)', async () => {
+    stageValue.value.bibleTextTransform = 'uppercase'
+    const w = mount(BibleProjectionView)
+    await flushPromises()
+    const style = w.find('.bible-projection__text').attributes('style')
+    expect(style).toContain('text-transform: uppercase')
+    w.unmount()
+  })
+
+  it('B1 (paridade web): bibleTextTransform capitalize aplica capitalização', async () => {
+    stageValue.value.bibleTextTransform = 'capitalize'
+    const w = mount(BibleProjectionView)
+    await flushPromises()
+    expect(w.find('.bible-projection__text').attributes('style')).toContain(
+      'text-transform: capitalize',
+    )
+    w.unmount()
+  })
+
+  it('B1 (paridade web): bibleTextTransform none NÃO aplica transform', async () => {
+    stageValue.value.bibleTextTransform = 'none'
+    const w = mount(BibleProjectionView)
+    await flushPromises()
+    expect(w.find('.bible-projection__text').attributes('style')).not.toContain(
+      'text-transform: uppercase',
+    )
+    expect(w.find('.bible-projection__text').attributes('style')).not.toContain(
+      'text-transform: capitalize',
+    )
+    w.unmount()
+  })
 })

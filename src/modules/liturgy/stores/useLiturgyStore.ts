@@ -69,6 +69,10 @@ import {
   type WeekdaySessionTimes,
 } from '../types/liturgy'
 import { pad2 } from '../services/liturgy-format'
+import {
+  enqueueOperatorState,
+  scheduleOutboxFlush,
+} from '@modules/sync/services/sync-outbox-service'
 
 export const useLiturgyStore = defineStore('liturgy', () => {
   const initialState = loadLiturgyState()
@@ -488,6 +492,20 @@ export const useLiturgyStore = defineStore('liturgy', () => {
       customLiturgies: customLiturgies.value,
       deletionLocks: deletionLocks.value,
     })
+    // sync v2 (app#336): toda mutação enfileira no outbox (local-first) e
+    // agenda flush em bg — sem rede o item fica na fila (nada se perde).
+    try {
+      enqueueOperatorState('liturgy', 'week', {
+        weekdays: weekdays.value,
+        dayNotes: dayNotes.value,
+        daySessionTimes: daySessionTimes.value,
+        customLiturgies: customLiturgies.value,
+        deletionLocks: deletionLocks.value,
+      })
+      scheduleOutboxFlush()
+    } catch {
+      // outbox nunca bloqueia o fluxo local
+    }
   }
 
   async function hydrate() {

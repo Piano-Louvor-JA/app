@@ -3,6 +3,29 @@ import { mount, flushPromises } from "@vue/test-utils"
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest"
 import { ref, nextTick } from "vue"
 
+/** jsdom 30 descarta box-shadow com cor de 8 dígitos; o vnode guarda o valor real. */
+function boundStyle(wrapper: { vm: object }, className: string): Record<string, string> | undefined {
+  const walk = (vnode: any): Record<string, string> | undefined => {
+    if (!vnode || typeof vnode !== "object") return
+    const cls = vnode.props?.class
+    if (typeof cls === "string" && cls.split(/\s+/).includes(className) && vnode.props?.style) {
+      return vnode.props.style
+    }
+    const kids = vnode.children
+    if (Array.isArray(kids)) {
+      for (const kid of kids) {
+        const found = walk(kid)
+        if (found) return found
+      }
+    } else if (kids && typeof kids === "object") {
+      const found = walk(kids)
+      if (found) return found
+    }
+    if (vnode.component?.subTree) return walk(vnode.component.subTree)
+  }
+  return walk((wrapper.vm as { $: { subTree: unknown } }).$.subTree)
+}
+
 const useClockMockState = {
   /** Quando true, o mock delega ao useClockDisplay real (testes de integração). */
   useReal: false,
@@ -652,9 +675,9 @@ describe("ClockPreview.vue - Component Integration Tests", () => {
         boxBorder: false,
       } as StageSettings,
     })
-    const style = wrapper.find(".clock-preview__analog").attributes("style") ?? ""
-    expect(style).toContain("inset 0 0 40px rgba(0,0,0,0.2)")
-    expect(style).toContain("rgba(0,0,0,0.6)")
+    const shadow = (wrapper.find(".clock-preview__analog").element as HTMLElement).style.boxShadow
+    expect(shadow).toContain("inset 0 0 40px rgba(0,0,0,0.2)")
+    expect(shadow).toContain("rgba(0,0,0,0.6)")
     clockConfigState.cfg = { ...clockConfigState.cfg, style: "digital" } as ClockConfig
   })
 
@@ -678,9 +701,9 @@ describe("ClockPreview.vue - Component Integration Tests", () => {
         boxBorder: false,
       } as StageSettings,
     })
-    const style = wrapper.find(".clock-preview__analog").attributes("style") ?? ""
-    expect(style).toContain("inset 0 0 40px")
-    expect(style).toContain("0 10px 40px")
+    const shadow = boundStyle(wrapper, "clock-preview__analog")?.boxShadow ?? ""
+    expect(shadow).toContain("inset 0 0 40px")
+    expect(shadow).toContain("0 10px 40px")
     clockConfigState.cfg = { ...clockConfigState.cfg, style: "digital" } as ClockConfig
   })
 
