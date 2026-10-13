@@ -181,3 +181,25 @@ describe('refreshCatalogIfStale — SPEC es-catalog-stale AC1–AC5', () => {
     }
   })
 })
+
+describe('refreshCatalogIfStale — marcador por idioma', () => {
+  beforeEach(() => {
+    store.clear()
+    fetchRemoteCatalogJson.mockReset()
+    vi.clearAllMocks()
+  })
+
+  it('marcador fresco de OUTRO idioma não segura a revalidação do idioma atual', async () => {
+    store.set('es_categories', esPayload(22))
+    store.set(WORKSPACE_RECORD_KEYS.catalogRefreshCheckedAt, {
+      at: Date.now() - 1 * 3600_000,
+      lang: 'pt',
+    })
+    fetchRemoteCatalogJson.mockResolvedValue(esPayload(22))
+
+    await refreshCatalogIfStale()
+
+    expect(fetchRemoteCatalogJson).toHaveBeenCalledTimes(1)
+    expect(fetchRemoteCatalogJson).toHaveBeenCalledWith('es_categories')
+  })
+})

@@ -58,8 +58,12 @@ export async function refreshCatalogIfStale(): Promise<void> {
   const marker = await readCatalogRecord<RefreshMarker>(
     WORKSPACE_RECORD_KEYS.catalogRefreshCheckedAt,
   )
+  // TTL vale por idioma: revalidar pt não adia a revalidação de es.
   const ttlFresh =
-    marker != null && typeof marker.at === 'number' && Date.now() - marker.at < TTL_MS
+    marker != null &&
+    marker.lang === lang &&
+    typeof marker.at === 'number' &&
+    Date.now() - marker.at < TTL_MS
 
   // Cache saudável + TTL fresco → nada a fazer.
   if (cachedTotal > 0 && ttlFresh) return
