@@ -16,7 +16,7 @@ export async function enrichItemsDurations(
   if (items.length === 0) return items;
   const byId = new Map(musicList.map((m) => [m.id, m]));
   const probeCache = new Map<string, number>();
-  return Promise.all(
+  const next = await Promise.all(
     items.map(async (item) => {
       if (item.type === "music" && item.musicId != null) {
         if (item.durationMs && item.durationMs > 0) return item;
@@ -40,6 +40,7 @@ export async function enrichItemsDurations(
       return item;
     }),
   );
+  return next.every((item, index) => item === items[index]) ? items : next;
 }
 
 /**
