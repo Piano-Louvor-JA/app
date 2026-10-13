@@ -136,13 +136,13 @@ function copyOperatorUrl() {
         <div class="text-subtitle-1 mb-1">
           {{ t('settings.remote.speakerTitle') }}
         </div>
+        <p class="text-caption text-medium-emphasis pairing-hint">
+          {{ t('settings.remote.speakerHint') }}
+        </p>
         <div class="status-badge status-badge-block" data-testid="remote-speaker-status">
           <span class="status-dot" :class="{ active: info.speakerUrl }" />
           {{ info.speakerUrl ? t('settings.remote.speakerReady') : t('settings.remote.speakerWaiting') }}
         </div>
-        <p class="text-caption text-medium-emphasis pairing-hint">
-          {{ t('settings.remote.speakerHint') }}
-        </p>
         <div class="qr-col">
           <img
             :src="info.speakerQrDataUrl"
@@ -176,13 +176,13 @@ function copyOperatorUrl() {
           <div class="text-subtitle-1 mb-1">
             {{ t('settings.remote.operatorTitle') }}
           </div>
+          <p class="text-caption text-medium-emphasis pairing-hint">
+            {{ t('settings.remote.operatorHint') }}
+          </p>
           <div class="status-badge status-badge-block" data-testid="remote-operator-status">
             <span class="status-dot" :class="{ active: info.operatorUrl }" />
             {{ info.operatorUrl ? t('settings.remote.operatorReady') : t('settings.remote.operatorWaiting') }}
           </div>
-          <p class="text-caption text-medium-emphasis pairing-hint">
-            {{ t('settings.remote.operatorHint') }}
-          </p>
           <div class="qr-col">
             <img
               :src="info.operatorQrDataUrl"
