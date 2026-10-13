@@ -536,10 +536,11 @@ export function registerWorkspaceIpc() {
       if (!safeName || safeName === '.' || safeName === '..') return null
       const destPath = path.join(targetDir, safeName)
       if (!destPath.startsWith(targetDir + path.sep)) return null
-      if (existsSync(destPath)) return destPath
       const response = await net.fetch(String(url))
       if (!response.ok) return null
       const buffer = Buffer.from(await response.arrayBuffer())
+      // Só `wx`: criação atômica. Se o arquivo já existe, reutiliza o caminho
+      // (offline-first) sem checar existsSync antes (evita TOCTOU / CWE-367).
       try {
         await writeFile(destPath, buffer, { flag: 'wx', mode: 0o600 })
       } catch (error) {
