@@ -276,10 +276,10 @@ class PalcoSlot {
     // Assets do receiver — nomes reservados de rotas (/proxy, /status…)
     // fora: /proxy casava aqui e 404ava ANTES do handler real (L301),
     // quebrando todo bg/cover externo (músicas da API) → fallback.
-    const assetMatch = /^(?!\/(proxy|status|bg|media)(\/|$))\/([a-z0-9._-]+)$/i.exec(p)
+    const assetMatch = /^(?!\/(?:proxy|status|bg|media)(?:\/|$))\/([a-z0-9._-]+)$/i.exec(p)
     if (assetMatch) {
       try {
-        const file = path.join(__dirname, 'palco', assetMatch[1])
+        const file = path.join(__dirname, 'palco', String(assetMatch[1]))
         const buf = await readFile(file)
         const ext = path.extname(file).toLowerCase()
         res.setHeader('Content-Type', ext === '.svg' ? 'image/svg+xml' : ext === '.png' ? 'image/png' : 'application/octet-stream')
@@ -653,6 +653,9 @@ export function attachPalcoServer(getContents) {
 }
 
 export function getPalcoManager() { return manager }
+
+// Testes de handleHttp (node puro, electron mockado) — see palco-assets.test.ts
+export { PalcoSlot }
 
 // ── Página do Pregador (/speaker) ─────────────────────────────────────────────
 // HTML standalone (sem build) servido pelo slot HTTP. Preview full-area (flex,
