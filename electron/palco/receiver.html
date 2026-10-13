@@ -7,7 +7,7 @@
 <meta http-equiv="Expires" content="0">
 <title>LouvorJA Palco</title>
 <style>
-  html,body{margin:0;height:100%;overflow:hidden;background:#0A0E1A;
+  html,body{margin:0;height:100%;overflow:hidden;background:#000;
     font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#fff}
   #bg{position:fixed;top:0;left:0;width:100%;height:100%;object-fit:cover;
     filter:brightness(.55);transition:opacity .8s}
@@ -17,12 +17,13 @@
   #content{position:fixed;top:0;left:0;right:0;bottom:0;padding:3vh 4vw;
     box-sizing:border-box}
   #text{position:absolute;top:50%;left:50%;
-    /* Caixa encolhe até o texto como via cabo. display:table = shrink-to-fit
-       compatível com Chromium antigo (webOS/Tizen) — fit-content em
-       position:absolute colapsava no simulador (26/08). margin auto centra. */
-    display:table;max-width:92vw;max-height:76vh;transform:translate(-50%,-50%);
-    overflow-wrap:break-word;
-    text-align:center;font-size:3.65vw;font-weight:700;line-height:1.25;
+    /* ÁREA ÚTIL do slide: teto 1600px (05/10 Rafael — 100% da área ficou
+       DEMAIS). SOLUÇÃO EZEQUIAS (web 3dc37df): pre-line + quebra natural —
+       as quebras \n do autor viram linhas e o texto flui até a max-width
+       antes de quebrar. SEM fit JS: fonte configurada aplicada direta. */
+    display:block;width:min(86vw,1600px);max-height:72vh;transform:translate(-50%,-50%);
+    overflow-wrap:break-word;white-space:pre-line;
+    text-align:center;font-size:calc(var(--fit-size,3.65vw));font-weight:700;line-height:1.4;
     letter-spacing:.03em;text-transform:uppercase;
     text-shadow:0 2px 12px rgba(0,0,0,.8)}
   /* F3.3m: estilos dinâmicos da letra (sombra/caixinha) */
@@ -32,9 +33,14 @@
      justo ao texto (2cqw ≈ 3.8vh lateral, 2vh vertical). */
   #text.box-on{background:rgba(0,0,0,var(--box-bg,.45));
     /* Player: radius folha clamp(14px,2.4vmin,32px) 0, borda 0.2vmin e
-       sombra suave. Padding apertado — caixa abraça o texto (vmin);
-       WT-5f: menor ainda (Rafael 02/09) p/ versículo curto caber em linha. */
-    padding:.9vmin 1.2vmin;
+       sombra suave. Padding mínimo — caixa abraça o texto (vmin).
+       WIDTH (05/10 Rafael: "coloca ela mais perto do texto"): fit-content
+       abraça o texto com padding justo — sem faixa full-bleed; o teto
+       continua sendo a área útil (max-width 100% do #content). */
+    /* PARIDADE WEB (MediaSlideStage): caixa com respiro — max-width 86%
+       e padding 2.5vmin 4vmin, igual MediaSlideStage.vue do web. */
+    max-width:86vw;margin-inline:auto;
+    padding:2.5vmin 4vmin;
     border-radius:2.4vmin 0 2.4vmin 0;
     border:var(--box-border,.2vmin solid rgba(255,255,255,.25));
     box-shadow:0 10px 30px rgba(0,0,0,.4)}
@@ -96,7 +102,7 @@
 </head>
 <body>
 <!-- F3.3j: splash screen — some no WS OPEN ou 2.5s -->
-<div id="splash" style="position:fixed;inset:0;z-index:200;background:#0A0E1A;
+<div id="splash" style="position:fixed;inset:0;z-index:200;background:#000;
   display:flex;align-items:center;justify-content:center;transition:opacity .6s">
   <img src="splash.jpg" alt="Palco Piano LouvorJA" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">
 </div>
@@ -2540,72 +2546,9 @@ function proxyUrl(original){
   if(original.startsWith('http://')||original.startsWith('https://')){
     return `http://${host}:7080/proxy?url=${encodeURIComponent(original)}`;
   }
+  // data:/blob:/file: relativos já validados acima — passam direto.
+  return original;
 }
-function applyProjectionStyle(el, rawAttrs){
-  const styleMatch=/\bstyle\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(rawAttrs||'');
-  const style=(styleMatch&&(styleMatch[1]||styleMatch[2]))||'';
-  const color=projectionColor((/(?:^|;)\s*color\s*:\s*([^;]+)/i.exec(style)||[])[1]);
-  if(color)el.style.color=color;
-  const background=projectionColor((/(?:^|;)\s*background-color\s*:\s*([^;]+)/i.exec(style)||[])[1]);
-  if(background)el.style.backgroundColor=background;
-  const weight=((/(?:^|;)\s*font-weight\s*:\s*([^;]+)/i.exec(style)||[])[1]||'').trim();
-  if(/^(normal|bold|bolder|lighter|[1-9]00)$/.test(weight))el.style.fontWeight=weight;
-  const fontStyle=((/(?:^|;)\s*font-style\s*:\s*([^;]+)/i.exec(style)||[])[1]||'').trim();
-  if(fontStyle==='normal'||fontStyle==='italic'||fontStyle==='oblique')el.style.fontStyle=fontStyle;
-  const deco=((/(?:^|;)\s*text-decoration-line\s*:\s*([^;]+)/i.exec(style)||[])[1]||'').trim();
-  if(deco==='none'||deco==='underline'||deco==='line-through')el.style.textDecorationLine=deco;
-  const align=((/(?:^|;)\s*text-align\s*:\s*([^;]+)/i.exec(style)||[])[1]||'').trim();
-  if(align==='left'||align==='center'||align==='right'||align==='justify')el.style.textAlign=align;
-}
-function decodeProjectionText(value){
-  return String(value||'').replace(/&(#x[0-9a-fA-F]+|#\d+|amp|lt|gt|quot|apos|nbsp);/g, function(entity, body){
-    if(body==='amp')return '&';
-    if(body==='lt')return '<';
-    if(body==='gt')return '>';
-    if(body==='quot')return '"';
-    if(body==='apos')return "'";
-    if(body==='nbsp')return ' ';
-    const code=body[1]==='x'?parseInt(body.slice(2),16):parseInt(body.slice(1),10);
-    if(!Number.isFinite(code)||code<32||code===127||code>0x10ffff)return '';
-    try{return String.fromCodePoint(code)}catch(e){return ''}
-  });
-}
-// HTML da projeção é do operador, mas só a formatação básica entra no DOM.
-// Tags e cores saem de uma lista fechada; o texto vira nó de texto.
-function renderProjectionText(target, value){
-  while(target.firstChild)target.removeChild(target.firstChild);
-  const blocked={script:1,style:1,iframe:1,object:1,embed:1,svg:1,math:1,template:1};
-  const stack=[target];
-  let skip=0;
-  const re=/<!--[\s\S]*?-->|<\/([a-zA-Z0-9]+)\s*>|<([a-zA-Z0-9]+)([^>]*?)\/?>|([^<]+)/g;
-  const raw=String(value||'');
-  let match;
-  while((match=re.exec(raw))){
-    if(match[0].indexOf('<!--')===0)continue;
-    if(match[1]){
-      const name=match[1].toLowerCase();
-      if(skip){if(blocked[name])skip--;continue}
-      for(let i=stack.length-1;i>0;i--){
-        if(stack[i].tagName.toLowerCase()===name){stack.length=i;break}
-      }
-      continue;
-    }
-    if(match[2]){
-      const name=match[2].toLowerCase();
-      const selfClose=/\/\s*>$/.test(match[0])||name==='br';
-      if(blocked[name]){if(!selfClose)skip++;continue}
-      if(skip)continue;
-      const el=projectionElement(name);
-      if(!el)continue;
-      applyProjectionStyle(el, match[3]||'');
-      stack[stack.length-1].appendChild(el);
-      if(!selfClose)stack.push(el);
-      continue;
-    }
-    if(match[4]&&!skip)stack[stack.length-1].appendChild(document.createTextNode(decodeProjectionText(match[4])));
-  }
-}
-
 function lanSenderHost(){
   const match=/^(?:localhost|127\.0\.0\.1|(?:\d{1,3}\.){3}\d{1,3})$/.exec(String(host||'').trim());
   return match?match[0]:'';
@@ -3200,13 +3143,27 @@ function handle(m){
       renderProjectionText($('text'),m.text);
       $('text').classList.toggle('cover-on',m.isCover===true);
       // F3.3o: fontSize/fontWeight dinâmicos (settings do operador).
+      // Estrofes (lyric*) vencem quando presentes; capa (isCover) mantém o
+      // tamanho do título.
       {const t=$('text');
-        if(typeof m.fontSize==='number')
-          t.style.fontSize=(m.fontSize/19.2)+'vw'; // px@1920 → vw: paridade com cqw dos popups (era 10.8 — fonte ~78% maior)
+        const fs=typeof m.lyricFontSize==='number'?m.lyricFontSize:m.fontSize;
+        // px@1920 → vw; font-size consome via calc(var(--fit-size)) — setar
+        // font-size inline MATARIA o fit (inline > stylesheet)
+        if(typeof fs==='number')t.style.setProperty('--fit-size',(fs/19.2)+'vw');
         if(typeof m.fontWeight==='number')
           t.style.fontWeight=m.fontWeight;
-        // WT-5 web: cor do texto do operador (paridade popup)
-        if(m.textColor){t.style.color=m.textColor}
+        // Capa (isCover): o AMARELO do .cover-on (CSS) é o visual do título.
+        // inline style.color (no #text OU no <span> interno vindo do sender)
+        // venceria a classe — capa remove cor inline de ambos os níveis
+        // (05/10: capa nascia branca).
+        if(m.isCover===true){
+          t.style.removeProperty('color');
+          t.querySelectorAll('span[style*="color"]').forEach(function(sp){sp.style.removeProperty('color')});
+        }
+        else if(m.textColor){t.style.color=m.textColor}
+        // SOLUÇÃO EZEQUIAS (web 3dc37df, 05/10): sem fit JS p/ letra. pre-line
+        // quebra onde o autor mandou (\n) e flui até a max-width antes de
+        // quebrar de novo — fonte configurada aplicada direta.
         // Auto-fit: reduz a fonte até o texto caber na altura útil (76vh) —
         // mesma passagem de linhas do popup (frase em 2 linhas lá, 2 aqui).
         t.style.transform='translate(-50%,-50%)';
@@ -3490,7 +3447,6 @@ function handle(m){
   }
 }
 
-
 // WT-5d: boot — código cloud na query (?code=XXXXXX) ou salvo em localStorage
 // tem prioridade; sem código, segue o fluxo local (scan do sender na LAN).
 (function(){
@@ -3531,7 +3487,6 @@ function handle(m){
       dlog('AUTO-RELAUNCH cancelado (voltou ao foreground)');
     }
   });
-})();
 })();
 </script>
 </body>
