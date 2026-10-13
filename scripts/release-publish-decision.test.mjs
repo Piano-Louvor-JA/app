@@ -224,6 +224,23 @@ test('workflows preservam a publicação padrão e omitem só a promoção marca
   assert.match(workflows['build-macos.yml'], /if: steps\.decision\.outputs\.publish == 'true'/)
   assert.match(workflows['build-windows.yml'], /gh release upload/)
   assert.match(workflows['build-windows.yml'], /if: steps\.decision\.outputs\.publish == 'true'/)
-  assert.equal(existsSync(join(repoRoot, '.github/workflows/build-flatpak.yml')), false)
-  assert.equal(existsSync(join(repoRoot, 'packaging/flatpak')), false)
+  assert.equal(existsSync(join(repoRoot, '.github/workflows/build-flatpak.yml')), true)
+  assert.equal(existsSync(join(repoRoot, 'packaging/flatpak')), true)
+})
+
+// All downstream publishers use the same exact-tag, fail-closed policy.
+test('Flatpak e lojas preservam tag_only e usam a versão exata', () => {
+  for (const name of ['build-flatpak.yml', 'snap-release.yml', 'msstore-release.yml']) {
+    const text = readFileSync(join(repoRoot, '.github/workflows', name), 'utf8')
+    assert.match(text, /scripts\/release-publish-decision\.mjs/, name)
+    assert.match(text, /needs\.decide\.outputs\.publish == 'true'/, name)
+    assert.match(text, /mktemp --suffix=\.mjs/, name)
+    assert.match(text, /workflow_dispatch:/, name)
+  }
+  const snap = readFileSync(join(repoRoot, '.github/workflows/snap-release.yml'), 'utf8')
+  assert.match(snap, /ref: \$\{\{ needs\.decide\.outputs\.tag \}\}/)
+  assert.match(snap, /npm run build/)
+  const flatpak = readFileSync(join(repoRoot, '.github/workflows/build-flatpak.yml'), 'utf8')
+  assert.match(flatpak, /path: release\.tar\.gz/)
+  assert.equal(existsSync(join(repoRoot, 'packaging/flatpak/com.pianolouvorja.piano.desktop')), true)
 })
