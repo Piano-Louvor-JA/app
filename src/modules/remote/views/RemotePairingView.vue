@@ -118,12 +118,17 @@ function copyOperatorUrl() {
       </div>
     </div>
 
-    <!-- Pregador: QR da página /speaker (browser do celular, sem app) -->
+    <!-- Predicador + Operador: lado a lado -->
     <div
-      v-if="info && info.speakerQrDataUrl"
-      class="pairing-col mt-6"
-      data-testid="remote-speaker-block"
+      v-if="info && (info.speakerQrDataUrl || info.operatorQrDataUrl)"
+      class="pairing-row mt-6"
     >
+      <!-- Pregador: QR da página /speaker (browser do celular, sem app) -->
+      <div
+        v-if="info && info.speakerQrDataUrl"
+        class="pairing-item"
+        data-testid="remote-speaker-block"
+      >
       <div class="qr-col">
         <img
           :src="info.speakerQrDataUrl"
@@ -161,7 +166,7 @@ function copyOperatorUrl() {
     <!-- Operador: QR da página /operator (app remoto Piano LouvorJA) -->
     <div
       v-if="info && info.operatorQrDataUrl"
-      class="pairing-col mt-6"
+      class="pairing-item"
       data-testid="remote-operator-block"
     >
       <div class="qr-col">
@@ -197,6 +202,7 @@ function copyOperatorUrl() {
         </button>
       </div>
     </div>
+    </div>
 
     <!-- Status duplo: Speaker (pregador) + Operator (app remoto) -->
     <div class="mt-6 d-flex flex-wrap gap-4" data-testid="remote-dual-status">
@@ -222,6 +228,15 @@ function copyOperatorUrl() {
 .pairing-col {
   display: flex;
   flex-direction: column;
+}
+.pairing-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+.pairing-item {
+  flex: 1 1 240px;
+  min-width: 0;
 }
 .pairing-card {
   max-width: 560px;
