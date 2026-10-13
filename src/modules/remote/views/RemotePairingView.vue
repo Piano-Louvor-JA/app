@@ -121,7 +121,7 @@ function copyOperatorUrl() {
     <!-- Pregador: QR da página /speaker (browser do celular, sem app) -->
     <div
       v-if="info && info.speakerQrDataUrl"
-      class="d-flex align-stretch mt-6"
+      class="pairing-col mt-6"
       data-testid="remote-speaker-block"
     >
       <div class="qr-col">
@@ -137,7 +137,7 @@ function copyOperatorUrl() {
           {{ t('settings.remote.speakerTitle') }}
         </div>
       </div>
-      <div class="ml-6 flex-grow-1">
+      <div class="mt-4">
         <div class="text-subtitle-2 mb-1">
           {{ t('settings.remote.speakerTitle') }}
         </div>
@@ -161,7 +161,7 @@ function copyOperatorUrl() {
     <!-- Operador: QR da página /operator (app remoto Piano LouvorJA) -->
     <div
       v-if="info && info.operatorQrDataUrl"
-      class="d-flex align-stretch mt-6"
+      class="pairing-col mt-6"
       data-testid="remote-operator-block"
     >
       <div class="qr-col">
@@ -177,7 +177,7 @@ function copyOperatorUrl() {
           {{ t('settings.remote.operatorTitle') }}
         </div>
       </div>
-      <div class="ml-6 flex-grow-1">
+      <div class="mt-4">
         <div class="text-subtitle-2 mb-1">
           {{ t('settings.remote.operatorTitle') }}
         </div>
@@ -214,7 +214,14 @@ function copyOperatorUrl() {
 
 <style scoped>
 .qr-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   flex-shrink: 0;
+}
+.pairing-col {
+  display: flex;
+  flex-direction: column;
 }
 .pairing-card {
   max-width: 560px;
