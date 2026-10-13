@@ -7,17 +7,22 @@ import type { UtilityHubItem } from '../types/clock'
 const { t } = useI18n()
 
 /**
- * app#423 dev follow-up: card do diagnóstico de rede (SrCaldeira).
- * Ativo também em produção portable (release sob medida campanha SrCaldeira).
+ * app#423 dev follow-up + build de campanha (SrCaldeira/Ezequias):
+ * card do diagnóstico de rede visível em dev e quando VITE_DIAGNOSTICS_CAMPAIGN=1
+ * (mesma condição da rota — ver modules/diagnostics/routes.ts). Fora disso,
+ * staging/prod normais não exibem o card.
  */
-const diagnosticsItem: UtilityHubItem | null = {
-  key: 'diagnostics',
-  titleKey: 'utilities.diagnostics',
-  descriptionKey: 'utilities.diagnosticsDescription',
-  icon: 'ti-stethoscope',
-  to: '/diagnostics',
-  available: true,
-}
+const diagnosticsItem: UtilityHubItem | null =
+  import.meta.env.DEV || import.meta.env.VITE_DIAGNOSTICS_CAMPAIGN === '1'
+    ? {
+        key: 'diagnostics',
+        titleKey: 'utilities.diagnostics',
+        descriptionKey: 'utilities.diagnosticsDescription',
+        icon: 'ti-stethoscope',
+        to: '/diagnostics',
+        available: true,
+      }
+    : null
 
 const items: UtilityHubItem[] = [
   {

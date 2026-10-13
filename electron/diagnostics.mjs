@@ -435,7 +435,7 @@ async function runDiagnostics() {
     reproduction.push(hit ?? { passo: endpoint, base: null, ok: false, ms: elapsed(start), erroBruto: apis[0]?.http.find((h) => h.url.includes(`/${endpoint}?`))?.erro?.classe ?? 'OTHER', erroMapeado: 'starting.status.errorDownload' })
   }
   const report = {
-    meta: { campanha: 'SrCaldeira', versao: app.getVersion(), dataISO: new Date().toISOString(), dataLocal: new Date().toLocaleString('pt-BR', { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone }), duracaoMs: elapsed(started), tokenMascarado: maskToken(token) },
+    meta: { campanha: `${process.env.LOUVORJA_CAMPAIGN ?? 'SrCaldeira'}-v2`, versao: app.getVersion(), dataISO: new Date().toISOString(), dataLocal: new Date().toLocaleString('pt-BR', { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone }), duracaoMs: elapsed(started), tokenMascarado: maskToken(token) },
     ambiente: { os: process.platform, osRelease: os.release(), arch: process.arch, electron: process.versions.electron, chrome: process.versions.chrome, locale: app.getLocale(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, online: general['1.1.1.1:443'].ok || general['google.com:443'].ok },
     rede: { proxy: { resolveProxyPorOrigem: proxy, envHttpProxy: process.env.HTTP_PROXY ?? null, envHttpsProxy: process.env.HTTPS_PROXY ?? null }, hostsOverrides, conectividadeGeral: general, apis, reproducaoBootstrap: reproduction, mediaReal: mediaProbe, dnsSuspeito },
     instalacaoReal: installation,
@@ -475,14 +475,15 @@ export function registerDiagnosticsIpc() {
         return { ok: false, reason: 'DSN malformado; compartilhe o arquivo salvo.' }
       }
       const endpoint = `${url.origin}/api/${projectId}/store/`
+      const campanha = report?.meta?.campanha ?? `${process.env.LOUVORJA_CAMPAIGN ?? 'SrCaldeira'}-v2`
       const event = {
         event_id: crypto.randomUUID().replace(/-/g, ''),
         timestamp: new Date().toISOString(),
         platform: 'javascript',
         environment: 'diagnostico',
         logger: 'louvorja-diagnostics',
-        message: `Diagnóstico LouvorJA PIANO — campanha SrCaldeira`,
-        tags: { campanha: 'SrCaldeira', versao: app.getVersion() },
+        message: `Diagnóstico LouvorJA PIANO — campanha ${campanha}`,
+        tags: { campanha, versao: app.getVersion() },
         extra: { report },
       }
       const response = await fetch(endpoint, {
