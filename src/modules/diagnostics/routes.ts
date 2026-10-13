@@ -1,8 +1,8 @@
 import type { RouteRecordRaw } from 'vue-router'
 
 /**
- * Não navegado no app normal. A rota existe somente no Vite dev para Rafael
- * validar a mesma bridge diagnostics:* antes do portable.
+ * Disponível em desenvolvimento e nos builds com VITE_DIAGNOSTICS_CAMPAIGN=1.
+ * Builds normais de produção não registram a rota.
  * A URL é /#/diagnostics quando Electron usa hash router.
  */
 export const diagnosticsRoutes: RouteRecordRaw[] =

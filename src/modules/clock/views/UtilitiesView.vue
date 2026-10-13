@@ -15,14 +15,14 @@ const { t } = useI18n()
 const diagnosticsItem: UtilityHubItem | null =
   import.meta.env.DEV || import.meta.env.VITE_DIAGNOSTICS_CAMPAIGN === '1'
     ? {
-      key: 'diagnostics',
-      titleKey: 'utilities.diagnostics',
-      descriptionKey: 'utilities.diagnosticsDescription',
-      icon: 'ti-stethoscope',
-      to: '/diagnostics',
-      available: true,
-    }
-  : null
+        key: 'diagnostics',
+        titleKey: 'utilities.diagnostics',
+        descriptionKey: 'utilities.diagnosticsDescription',
+        icon: 'ti-stethoscope',
+        to: '/diagnostics',
+        available: true,
+      }
+    : null
 
 const items: UtilityHubItem[] = [
   {

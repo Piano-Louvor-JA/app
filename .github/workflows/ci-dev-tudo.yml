@@ -1,0 +1,67 @@
+# dev-tudo mantém o mínimo do app; CI de staging/main permanece em ci.yml.
+name: CI dev-tudo
+on:
+  pull_request:
+    branches: [dev-tudo]
+    types: [opened, synchronize, reopened, ready_for_review, edited]
+permissions:
+  contents: read
+concurrency:
+  group: ci-dev-tudo-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  validate:
+    name: Lint, types, unit tests and build (dev-tudo)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Lint configured Biome or check Electron syntax
+        run: |
+          set -euo pipefail
+          if [[ -f biome.json || -f biome.jsonc ]]; then
+            test -x node_modules/.bin/biome
+            node_modules/.bin/biome ci
+          else
+            while IFS= read -r -d '' file; do
+              node --check "$file"
+            done < <(find electron -name '*.mjs' -print0)
+          fi
+          git diff --check
+      - run: npm run type-check
+      - run: npm test
+      - name: Build normal production
+        run: |
+          npm run build-only
+          test -z "$(find dist/assets -name 'DiagnosticsView-*.js' -print -quit)"
+      - name: Build diagnostics campaign
+        env:
+          VITE_DIAGNOSTICS_CAMPAIGN: '1'
+        run: |
+          npm run build-only
+          test -n "$(find dist/assets -name 'DiagnosticsView-*.js' -print -quit)"
+  pr-pre-review:
+    name: PR Pre-review
+    needs: validate
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify validation
+        env:
+          RESULT: ${{ needs.validate.result }}
+        run: test "$RESULT" = success
+  quality-gate:
+    name: Quality Gate
+    needs: [validate, pr-pre-review]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify all gates
+        env:
+          VALIDATE: ${{ needs.validate.result }}
+          PRE_REVIEW: ${{ needs.pr-pre-review.result }}
+        run: test "$VALIDATE" = success && test "$PRE_REVIEW" = success

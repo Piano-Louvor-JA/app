@@ -108,6 +108,10 @@
     ],
     "extraResources": [
       {
+        "from": "build/diagnostics-dsn.txt",
+        "to": "diagnostics-dsn.txt"
+      },
+      {
         "from": "build/icon.png",
         "to": "icon.png"
       },
