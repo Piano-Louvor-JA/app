@@ -529,7 +529,6 @@ function onRotationChange(event: Event) {
 }
 
 const { loadPlayerChoices } = useExternalPlayerChoices()
-
 watch(
   () => [props.open, props.draft.type] as const,
   ([open, type]) => {
@@ -1095,6 +1094,10 @@ function isLightDot(hex: string): boolean {
                 for="moment-category"
               >
                 {{ t('liturgy.dialog.categoryField') }}
+                <span
+                  class="moment-dialog__required"
+                  aria-hidden="true"
+                >*</span>
               </label>
               <select
                 id="moment-category"

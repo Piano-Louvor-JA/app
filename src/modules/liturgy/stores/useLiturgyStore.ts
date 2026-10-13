@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia'
-
-import { useScheduledStore } from './useScheduledStore'
 import { computed, onScopeDispose, ref } from 'vue'
+import { useScheduledStore } from './useScheduledStore'
 import type { Router } from 'vue-router'
 
 import { getDesktopBridge } from '@shared/services/desktop-bridge'
@@ -52,6 +51,7 @@ import {
 } from '../services/liturgy-preferences'
 import { clearLiturgyWebRuntime } from '../services/liturgy-web-runtime'
 import { parseJaLiturgy } from '../services/liturgy-ja-import'
+import { resolveLegacyScheduledRotationId } from '../services/scheduled-resolver'
 import {
   DEFAULT_LITURGY_ITEM_DRAFT,
   DEFAULT_MOMENT_DURATION_MS,
@@ -400,7 +400,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
       if (mode === 'overwrite') {
         /* v8 ignore next 1 -- enrichJaDurations normaliza dia ausente pra []; ?? inalcançável */
         weekdays.value = { ...weekdays.value, [weekday]: [...(items ?? [])] }
-        /* v8 ignore next 1 -- idem: items sempre array */ 
+        /* v8 ignore next 1 -- idem: items sempre array */
         added += items?.length ?? 0
         days.push(day)
         continue
@@ -497,6 +497,18 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     return result
   }
 
+  function migrateLegacyScheduledPlaceholders(items: LiturgyItem[]): LiturgyItem[] {
+    const categories = useScheduledStore().categories
+    let changed = false
+    const migrated = items.map((item) => {
+      const scheduledRotationId = resolveLegacyScheduledRotationId(item, categories)
+      if (!scheduledRotationId) return item
+      changed = true
+      return { ...item, scheduledRotationId }
+    })
+    return changed ? migrated : items
+  }
+
   function persist() {
     saveLiturgyState({
       weekdays: weekdays.value,
@@ -530,6 +542,27 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     daySessionTimes.value = state.daySessionTimes
     customLiturgies.value = state.customLiturgies
     deletionLocks.value = state.deletionLocks
+
+    // Persistência anterior guardou a rotação em `categoryId`, que agora é
+    // exclusivamente a posição na liturgia. Migra só nomes inequivocamente iguais.
+    let migratedLegacyScheduled = false
+    const migratedWeekdays = { ...weekdays.value }
+    for (const day of LITURGY_WEEKDAYS) {
+      const items = migrateLegacyScheduledPlaceholders(migratedWeekdays[day])
+      if (items !== migratedWeekdays[day]) {
+        migratedWeekdays[day] = items
+        migratedLegacyScheduled = true
+      }
+    }
+    weekdays.value = migratedWeekdays
+    customLiturgies.value = customLiturgies.value.map((custom) => {
+      const items = migrateLegacyScheduledPlaceholders(custom.items)
+      if (items === custom.items) return custom
+      migratedLegacyScheduled = true
+      return { ...custom, items }
+    })
+    if (migratedLegacyScheduled) persist()
+
     selectedDay.value = todayWeekday()
     countdownRunning.value = false
 

@@ -163,6 +163,7 @@ export default {
         weight700: 'Bold',
         weight900: 'Extra',
         backgroundColor: 'Background color',
+        autoBg: 'Auto (image)',
         backgroundImage: 'Background image',
         selectImage: 'Click to select an image',
         removeImage: 'Remove image',

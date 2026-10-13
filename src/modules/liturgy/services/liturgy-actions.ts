@@ -44,6 +44,7 @@ export type LiturgyActionResult =
  * - negativo: música LOCAL (import .slja sem login — localStorage)
  * - positivo pequeno: hino oficial do catálogo
  * 0/NaN/null (sem música) → null.
+ * scheduled também resolve (placeholder delega pro tipo música — PR #416).
  */
 export function resolveMusicId(item: LiturgyItem): number | null {
   if (item.type !== 'music' && item.type !== 'scheduled') return null
@@ -152,8 +153,16 @@ async function executeScheduledRef(
       } else if (['ppt', 'pptx'].includes(ext)) {
         opened = await playLiturgyLocalPresentationOnScreens(filePath, title)
       } else {
-        // áudio e vídeo (e desconhecidos) seguem o fluxo de mídia local
-        opened = await playLiturgyLocalVideoOnScreens(filePath, title)
+        // Arquivo agendado herda o player escolhido no placeholder.
+        // Assim vídeo/áudio agendado segue a mesma cascata externo → interno.
+        const mediaType = ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac'].includes(ext)
+          ? 'audio'
+          : 'video'
+        const result = await executeLiturgyItem(
+          { ...item, type: mediaType, filePath, name: title },
+          router,
+        )
+        return { ...result, resolved: content }
       }
       return opened
         ? { ok: true, resolved: content }

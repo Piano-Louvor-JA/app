@@ -69,19 +69,18 @@ const displayText = computed(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 4vh 1.2vw;
+  padding: 8vh 6vw;
   text-align: center;
 
   &--cover {
-    padding: 4vh 1.2vw;
+    padding: 8vh 6vw;
   }
 }
 
 .media-slide-stage__lyric {
   margin: 0;
-  width: min(100%, 98%);
-  max-width: 98%;
-  padding: 2vmin 2.5vmin;
+  max-width: 86%;
+  padding: 2.5vmin 4vmin;
   border: clamp(2px, 0.2vmin, 4px) solid rgb(255 255 255 / 0.85);
   border-radius: clamp(14px, 2.4vmin, 32px) 0
     clamp(14px, 2.4vmin, 32px) 0;
@@ -90,9 +89,9 @@ const displayText = computed(() => {
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   color: #fff;
-  font-size: clamp(1.15rem, 3.35vw, 2.45rem);
+  font-size: clamp(1.5rem, 4.8vw, 3.4rem);
   font-weight: 700;
-  line-height: 1.32;
+  line-height: 1.4;
   letter-spacing: 0.03em;
   text-align: center;
   text-transform: uppercase;
@@ -105,7 +104,7 @@ const displayText = computed(() => {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
     color: #f6c32a;
-    font-size: clamp(1.35rem, 3.9vw, 2.85rem);
+    font-size: clamp(1.8rem, 5.2vw, 3.8rem);
     font-weight: 900;
     line-height: 1.1;
     letter-spacing: -0.01em;

@@ -16,6 +16,37 @@ export interface ResolvedScheduledEntry {
   content: ScheduledItemContent | null
 }
 
+/**
+ * Migração segura: placeholders legados não tinham `scheduledRotationId`.
+ * Só associa quando o nome do placeholder identifica UMA rotação existente;
+ * `categoryId` litúrgico nunca é alterado.
+ */
+export function resolveLegacyScheduledRotationId(
+  item: {
+    type?: string
+    name?: string
+    scheduledRotationId?: string | null
+  },
+  categories: ScheduledCategory[],
+): string | null {
+  if (item.type !== 'scheduled' || item.scheduledRotationId?.trim()) return null
+  const normalizedName = item.name
+    ?.normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .trim()
+    .toLocaleLowerCase('pt-BR')
+  if (!normalizedName) return null
+  const matches = categories.filter(
+    (category) =>
+      category.name
+        .normalize('NFD')
+        .replace(/\p{Diacritic}/gu, '')
+        .trim()
+        .toLocaleLowerCase('pt-BR') === normalizedName,
+  )
+  return matches.length === 1 ? matches[0]!.id : null
+}
+
 /** Item legado (port Delphi): sem `content`, o filePath É o conteúdo. */
 function legacyContent(item: ScheduledItem): ScheduledItemContent | null {
   const filePath = item.filePath?.trim()

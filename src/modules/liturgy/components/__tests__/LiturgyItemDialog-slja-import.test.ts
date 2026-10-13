@@ -24,6 +24,10 @@ vi.mock("../../services/import-slja-to-liturgy", () => ({
 	importSljaAsLiturgyMusic: importMock,
 }));
 
+vi.mock("../../stores/useScheduledStore", () => ({
+  useScheduledStore: () => ({ categories: [], items: [] }),
+}))
+
 vi.mock("@modules/media/services/auth-client", () => ({
 	getAuthSession: authSessionMock,
 	authHeaders: () => ({}),

@@ -106,7 +106,9 @@ describe("import .louvorja hidrata o store de liturgia sem F5 (t_8bdaf97b)", () 
 			key === USER_PREFERENCE_KEYS.liturgyState ? stored : null,
 		);
 		setUserPreferenceMock.mockImplementation((_key: string, value: unknown) => {
-			stored = value;
+			// Serialização real do user-preferences passa por localStorage (JSON):
+			// round-trip aqui simula isso — sem guardar a referência reativa do store.
+			stored = JSON.parse(JSON.stringify(value));
 		});
 	});
 
