@@ -234,7 +234,7 @@ describe('AppBackupCard', () => {
     // com total → percent
     bridge.backup.__cbs[0]?.({ current: 50, total: 100, zipPath: '/x.zip' })
     await flushPromises()
-    const bar = w.find('.general-settings__progress') 
+    const bar = w.find('.general-settings__progress')
     void bar
     w.unmount()
   })

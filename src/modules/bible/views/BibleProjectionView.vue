@@ -108,6 +108,9 @@ const verseStyle = computed(() => {
     fontSize: `${cqw}cqw`,
     fontWeight: String(stage.value.bibleFontWeight),
     textAlign: stage.value.textAlign,
+    // Paridade web: capitalização do versículo configurável no Palco.
+    textTransform:
+      stage.value.bibleTextTransform === 'none' ? 'none' : stage.value.bibleTextTransform,
     textShadow: stage.value.textShadow
       ? `0 0 ${(stage.value.shadowBlur / 108) * 100}cqw rgba(0,0,0,${stage.value.shadowIntensity})`
       : 'none',

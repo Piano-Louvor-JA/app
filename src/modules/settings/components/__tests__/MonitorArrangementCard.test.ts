@@ -137,7 +137,13 @@ describe('MonitorArrangementCard', () => {
     expect(w.find('.monitor-arrangement__reset').exists()).toBe(true)
     const tile = w.find('.monitor-tile')
     expect(tile.exists()).toBe(true)
-    await tile.trigger('pointerdown', { button: 0, clientX: 0, clientY: 0 })
+    tile.element.dispatchEvent(new PointerEvent('pointerdown', {
+      button: 0,
+      clientX: 0,
+      clientY: 0,
+      bubbles: true,
+      cancelable: true,
+    }))
     await flushPromises()
     const resetBtn = w.find('.monitor-arrangement__reset')
     expect(resetBtn.text()).toContain('settings.projection.monitors.resetLayout')

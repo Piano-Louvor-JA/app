@@ -1,24 +1,11 @@
-// Guard de URL de produção para testes E2E (G2 do guardrail pianolouvorja).
-//
-// Contexto: em 07/10/2026, execuções E2E/manuais criaram fixtures (usuários
-// e2e_*, coletâneas "E2E <ms>") na API de PRODUÇÃO (api.pianolouvorja.com.br),
-// poluindo "Minhas Coletâneas" e o ranking público. Este helper é a barreira
-// client-side: qualquer URL de API apontando para produção aborta a suíte no
-// globalSetup, ANTES de qualquer request.
-//
-// Regra (SPEC guardrail-e2e §2): E2E roda contra staging, localhost ou mock
-// (page.route — nunca sai pela rede). Produção é proibida por padrão.
-//
-// Diferença vs web: o dev server do Playwright carrega .env/.env.local do repo
-// (o .env.example deste repo defaulta PRODUÇÃO), então o guard também resolve
-// e valida as URLs EFETIVAS desses arquivos (process.env > .env.local > .env,
-// mesma precedência do Vite).
-//
-// Hosts não-listados passam: o upstream api.louvorja.com.br é fallback
-// read-only do catálogo e não aceita writes.
+// Proteção E2E contra a API de produção. O carregador real do Vite
+// resolve arquivos do modo development, expansão e ambiente do processo.
+// O upstream read-only do catálogo continua permitido; as specs deste
+// repositório usam APIs locais interceptadas pelo Playwright.
 
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { loadEnv } from 'vite'
 
 /** Hosts cujo acesso por E2E é PROIBIDO (API de produção). */
 export const PROD_HOSTS = ['api.pianolouvorja.com.br'] as const
@@ -50,7 +37,7 @@ function hostnameOf(url: string | undefined): string | null {
   const trimmed = url.trim()
   if (!trimmed) return null
   try {
-    return new URL(trimmed).hostname.toLowerCase()
+    return new URL(trimmed).hostname.toLowerCase().replace(/\.$/, '')
   } catch {
     const lowered = trimmed.toLowerCase()
     for (const host of PROD_HOSTS) {
@@ -61,7 +48,7 @@ function hostnameOf(url: string | undefined): string | null {
 }
 
 /**
- * Lana erro se alguma das URLs apontar para um host de PRODUÇÃO.
+ * Lança erro se alguma das URLs apontar para um host de PRODUÇÃO.
  *
  * @param urls   URLs candidatas (env vazias/ausentes são puladas)
  * @param source origem das URLs para a mensagem de erro (ex.: "process.env",
@@ -76,9 +63,23 @@ export function assertNoProdApiUrl(urls: Array<string | undefined>, source: stri
       throw new Error(
         `E2E apontando para PRODUÇÃO (${host} em ${source}) — use staging ` +
           `(api-stg.pianolouvorja.com.br), localhost ou mock (page.route). ` +
-          `URL ofensora: ${url}`,
+          `URL ofensora: ${safeUrlForMessage(url ?? '')}`,
       )
     }
+  }
+}
+
+/** Erros não devem imprimir userinfo, query ou fragmentos com credenciais. */
+function safeUrlForMessage(value: string): string {
+  try {
+    const url = new URL(value)
+    url.username = ''
+    url.password = ''
+    url.search = ''
+    url.hash = ''
+    return url.toString()
+  } catch {
+    return '[URL inválida contendo host de produção]'
   }
 }
 
@@ -119,8 +120,9 @@ export function parseDotenv(content: string): Record<string, string> {
 export function readDotenvLayer(path: string, source: string): EnvLayer {
   try {
     return { source, vars: parseDotenv(readFileSync(path, 'utf8')) }
-  } catch {
-    return { source, vars: {} }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { source, vars: {} }
+    throw error
   }
 }
 
@@ -131,13 +133,13 @@ function lookupEffective(
   layers: EnvLayer[],
 ): { url: string; source: string } | null {
   const fromProcess = processEnv[key]
-  if (fromProcess !== undefined && fromProcess !== '') {
-    return { url: fromProcess, source: 'process.env' }
+  if (fromProcess !== undefined) {
+    return fromProcess ? { url: fromProcess, source: 'process.env' } : null
   }
   for (let i = layers.length - 1; i >= 0; i--) {
     const value = layers[i].vars[key]
-    if (value !== undefined && value !== '') {
-      return { url: value, source: layers[i].source }
+    if (value !== undefined) {
+      return value ? { url: value, source: layers[i].source } : null
     }
   }
   return null
@@ -170,7 +172,7 @@ export function resolveEffectiveApiUrls(
 }
 
 /**
- * Camadas .env/.env.local do raiz do repo.
+ * Arquivos de ambiente do modo development, em ordem de precedência.
  *
  * Usa process.cwd(): o Playwright roda a suíte a partir do raiz do projeto
  * (mesma base que o Vite usa para carregar .env), independente de onde o
@@ -180,5 +182,17 @@ export function repoRootEnvLayers(): EnvLayer[] {
   return [
     readDotenvLayer(join(process.cwd(), '.env'), '.env'),
     readDotenvLayer(join(process.cwd(), '.env.local'), '.env.local'),
+    readDotenvLayer(join(process.cwd(), '.env.development'), '.env.development'),
+    readDotenvLayer(join(process.cwd(), '.env.development.local'), '.env.development.local'),
   ]
+}
+
+/** Usa o próprio carregador do Vite: modo, precedência e expansão reais. */
+export function resolveViteApiUrls(): Array<{ key: string; url: string; source: string }> {
+  const layers = repoRootEnvLayers()
+  const raw = resolveEffectiveApiUrls(process.env, layers)
+  const expanded = loadEnv('development', process.cwd(), ['VITE_', 'PIANO_'])
+  return resolveEffectiveApiUrls({}, [{ source: 'Vite (development)', vars: expanded }]).map(item => ({
+    ...item, source: raw.find(candidate => candidate.key === item.key)?.source ?? item.source,
+  }))
 }

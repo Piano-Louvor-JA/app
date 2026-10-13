@@ -190,15 +190,23 @@ class PalcoSession {
     )
     // Bíblia tem tipografia própria (paridade APK StageSession / PalcoOrchestrator).
     const isBible = scope === 'bible'
+    const isHymns = scope === 'hymns'
     const sizeAt1920 = isBible ? s.bibleFontSize : s.fontSize
     const fontWeight = isBible ? s.bibleFontWeight : s.fontWeight
     const textColor = isBible ? s.bibleTextColor : s.textColor
+    // Capa (isCover): o span colorido INLINE venceria o amarelo do
+    // .cover-on no receiver (inline > classe) — título nascia branco.
+    // Capa não leva colorize; estrofes sim (05/10).
+    const colorized =
+      input.isCover === true
+        ? input.text
+        : colorizeProjectionText(input.text, textColor)
     const footerRef = resolveProjectionFooterRef(scope, s, input.footerRef)
     await palcoApi().send({
       v: 2,
       type: 'projection',
       background: bg,
-      text: colorizeProjectionText(input.text, textColor),
+      text: colorized,
       // px@1920 → o receiver divide por 10.8 (px@1080p → vw)
       fontSize: (sizeAt1920 / 1920) * 1080,
       fontWeight,
@@ -213,6 +221,29 @@ class PalcoSession {
       footerRef,
       footerColor: s.footerRefColor,
       footerWeight: s.footerRefWeight,
+      // Estrofes com aparência própria (paridade do title*):
+      lyricFontSize: (isHymns && s.lyricFontSize != null ? s.lyricFontSize : sizeAt1920) / 1920 * 1080,
+      lyricFontWeight: isHymns && s.lyricFontWeight != null ? s.lyricFontWeight : fontWeight,
+      // Capa (isCover): null = deixa o .cover-on amarelo do receiver mandar —
+      // NÃO cai pro textColor global (inline branco vencia a classe, 05/10).
+      lyricTextColor:
+        input.isCover === true
+          ? (isHymns && s.lyricTextColor != null ? s.lyricTextColor : undefined)
+          : (isHymns && s.lyricTextColor != null ? s.lyricTextColor : textColor),
+      lyricUpperCase: isHymns ? s.lyricUpperCase : false,
+      lyricTextShadow: isHymns && s.lyricTextShadow != null ? s.lyricTextShadow : s.textShadow,
+      // Personalização completa da projeção local refletida no palco:
+      textAlign: s.textAlign,
+      textVerticalAlign: s.textVerticalAlign,
+      // null = usuário NÃO escolheu cor → não seta: receiver mantém o véu
+      // padrão e a IMAGEM vence; cor só vai se for escolha explícita.
+      backgroundColor: s.backgroundColor ?? undefined,
+      margin: s.margin,
+      // Capitalização do versículo (receiver aplica CSS text-transform).
+      ...(isBible &&
+      (s.bibleTextTransform === 'uppercase' || s.bibleTextTransform === 'capitalize')
+        ? { textTransform: s.bibleTextTransform }
+        : {}),
       // Versão já vem embutida em footerRef (formato desktop); não duplicar.
       footerVersion:
         isBible && !s.showBibleVersion ? undefined : input.footerVersion,

@@ -1,6 +1,9 @@
 // Teste de integração do globalSetup (P1-2): sem NENHUMA env de API, aborta
 // (defaults hardcoded dos services apontam produção); com staging, passa.
 import { expect, test } from 'vitest'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import globalSetup from '../../global-setup'
 import { APP_API_ENV_KEYS } from '../prod-url-guard'
 
@@ -23,15 +26,16 @@ test('P1-2: globalSetup ABORTA quando nenhuma env de API está definida', () => 
   const snap = snapshotEnv()
   const envBackup: Record<string, string | undefined> = { ...snap }
   const origCwdLayers = process.cwd
+  const scratch = mkdtempSync(join(tmpdir(), 'no-api-env-'))
   try {
     for (const k of API_KEYS) delete process.env[k]
     // executa em cwd sem .env/.env.local (scratch) para simular worktree sem envs
-    process.chdir('/tmp')
-    process.cwd = origCwdLayers
+    process.cwd = () => scratch
     expect(() => globalSetup()).toThrowError(/E2E sem env de API explícita/)
   } finally {
     restoreEnv(envBackup)
     process.cwd = origCwdLayers
+    rmSync(scratch, { recursive: true, force: true })
   }
 })
 
@@ -39,9 +43,9 @@ test('P1-2: globalSetup PASSA com env de staging explícita', () => {
   const snap = snapshotEnv()
   try {
     process.env.VITE_URL_DATABASE = 'https://api-stg.pianolouvorja.com.br/json_db'
-    delete process.env.VITE_PALCO_API_URL
+    process.env.VITE_PALCO_API_URL = 'https://api-stg.pianolouvorja.com.br'
     delete process.env.PIANO_API_BASE_URL
-    delete process.env.VITE_URL_FILES
+    process.env.VITE_URL_FILES = 'https://api-stg.pianolouvorja.com.br/file'
     delete process.env.VITE_API_FALLBACK_URLS
     expect(() => globalSetup()).not.toThrow()
   } finally {
@@ -53,9 +57,9 @@ test('P1-2: globalSetup PASSA com env de localhost explícita', () => {
   const snap = snapshotEnv()
   try {
     process.env.VITE_PALCO_API_URL = 'http://localhost:3100'
-    delete process.env.VITE_URL_DATABASE
+    process.env.VITE_URL_DATABASE = 'http://localhost:3100/json_db'
     delete process.env.PIANO_API_BASE_URL
-    delete process.env.VITE_URL_FILES
+    process.env.VITE_URL_FILES = 'http://localhost:3100/file'
     delete process.env.VITE_API_FALLBACK_URLS
     expect(() => globalSetup()).not.toThrow()
   } finally {

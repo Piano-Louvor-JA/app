@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { mount } from '@vue/test-utils'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
 import { ref, computed } from 'vue'
 import { createI18n } from 'vue-i18n'
 import ptBR from '../../locales/pt-BR'
@@ -106,13 +107,16 @@ vi.mock('../../components/LiturgyCustomDialog.vue', () => ({
 }))
 vi.mock('../../components/LiturgyDayTabs.vue', () => ({ default: { template: '<div data-stub="day-tabs" />' } }))
 vi.mock('../../components/LiturgyItemDialog.vue', () => ({ default: { name: 'SljaDialogStub', props: ['refreshImportedCatalog'], template: '<div data-stub="item-dialog" />' } }))
+vi.mock('../../components/LiturgyScheduledDialog.vue', () => ({ default: { template: '<div data-stub="scheduled-dialog" />' } }))
 vi.mock('../../components/LiturgySidebar.vue', () => ({ default: { template: '<div data-stub="sidebar" />' } }))
 vi.mock('../../components/LiturgyTimeline.vue', () => ({ default: { template: '<div data-stub="timeline" />' } }))
 
 const i18n = createI18n({ legacy: false, locale: 'pt', messages: { pt: ptBR } })
 
 function createWrapper() {
-  return mount(LiturgyView, { global: { plugins: [i18n] } })
+  const pinia = createPinia()
+  setActivePinia(pinia)
+  return mount(LiturgyView, { global: { plugins: [i18n, pinia] } })
 }
 
 beforeEach(() => {

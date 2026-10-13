@@ -125,13 +125,18 @@ export function resolveTestament(bookNumber: number): BibleTestament {
   return bookNumber <= 39 ? 'ot' : 'nt'
 }
 
-/** Tom visual do tile conforme faixas canônicas (Stitch). */
+/** Tom visual do tile conforme faixas canônicas. */
 export function resolveBookTone(bookNumber: number): BibleBookTone {
   if (bookNumber <= 5) return 'law'
   if (bookNumber <= 17) return 'history'
-  if (bookNumber <= 39) return 'prophets'
+  if (bookNumber <= 22) return 'poetry'
+  if (bookNumber <= 27) return 'major-prophet'
+  if (bookNumber <= 39) return 'minor-prophet'
   if (bookNumber <= 43) return 'gospels'
-  if (bookNumber <= 66) return 'letters'
+  if (bookNumber === 44) return 'acts'
+  if (bookNumber <= 57) return 'pauline'
+  if (bookNumber <= 65) return 'general'
+  if (bookNumber === 66) return 'apocalyptic'
   return 'neutral'
 }
 

@@ -45,5 +45,11 @@ export default {
       batchOffline:
         'Batch download was cancelled because there is no internet connection.',
     },
+    downloadQueue: {
+      title: 'Downloads',
+      clearFinished: 'Clear finished',
+      retry: 'Try again',
+      cancel: 'Cancel',
+    },
   },
 }

@@ -112,7 +112,7 @@ describe('kill plane 5 — OptionalChaining do meio da cadeia', () => {
   })
 
   it('#277/278 presentation + engine explícito + bridge SEM presentation: interno', async () => {
-    // original: openExternal?.() -> undefined -> !result?.ok -> projectionFailed... 
+    // original: openExternal?.() -> undefined -> !result?.ok -> projectionFailed...
     // NÃO: result undefined -> !result?.ok = true -> retorna projectionFailed
     await withBridge({}, async () => {
       const { executeLiturgyItem } = await import('../services/liturgy-actions')
