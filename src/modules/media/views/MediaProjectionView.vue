@@ -6,6 +6,7 @@ import {
   MEDIA_RUNTIME_STORAGE_KEY,
   normalizeMediaRuntime,
   readMediaRuntimeFromStorage,
+  writeMediaRuntimeToStorage,
 } from '../services/media-runtime'
 import { stripHtmlBreaks } from '../services/media-slides'
 import { readEffectiveStageSettings, subscribeStageSettings } from '../../settings/services/stage-settings-runtime'
@@ -51,7 +52,9 @@ onMounted(() => {
   try {
     channel = new BroadcastChannel(MEDIA_RUNTIME_CHANNEL)
     channel.onmessage = (event) => {
-      applyRuntime(event.data)
+      const next = normalizeMediaRuntime(event.data)
+      writeMediaRuntimeToStorage(next)
+      applyRuntime(next)
     }
   } catch {
     // BroadcastChannel indisponível
@@ -103,6 +106,20 @@ const titleStyle = computed(() => {
   }
 })
 
+// Estrofes com personalização própria; fallback = estilo geral.
+const lyricStyle = computed(() => {
+  const st = stage.value
+  return {
+    ...textStyle.value,
+    fontSize: `${((st.lyricFontSize ?? st.fontSize) / 1920) * 100}cqw`,
+    fontWeight: String(st.lyricFontWeight ?? st.fontWeight),
+    color: st.lyricTextColor ?? st.textColor,
+    textShadow: (st.lyricTextShadow ?? st.textShadow)
+      ? `0 0 ${(st.shadowBlur / 108) * 100}cqw rgba(0,0,0,${st.shadowIntensity})`
+      : 'none',
+    textTransform: st.lyricUpperCase ? 'uppercase' : 'none',
+  }
+})
 const boxStyle = computed(() =>
   stage.value.textBox
     ? {
@@ -143,7 +160,7 @@ const boxStyle = computed(() =>
       <p
         v-if="lyric && !runtime.isCover"
         class="media-projection__lyric"
-        :style="[textStyle, boxStyle]"
+        :style="[lyricStyle, boxStyle]"
       >
         {{ lyric }}
       </p>

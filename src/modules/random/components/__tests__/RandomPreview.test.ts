@@ -36,6 +36,11 @@ const stage = (over: Partial<StageSettings> = {}): StageSettings =>
 		...over,
 	}) as StageSettings;
 
+/** jsdom 25 omitia border:none; o 30 devolve a largura inicial "medium". */
+function isClearedBorder(border: string) {
+	return border === "none" || border === "" || border === "medium";
+}
+
 function mountPreview(
 	r: RandomRuntimeState,
 	stageSettings?: StageSettings,
@@ -152,8 +157,7 @@ describe("RandomPreview", () => {
 		);
 		const s2 = (w2.find(".random-preview__text").element as HTMLElement).style;
 		expect(s2.background).toBe("transparent");
-		// jsdom retorna '' para border:none (shorthand não resolvido)
-		expect(s2.border === "none" || s2.border === "").toBe(true);
+		expect(isClearedBorder(s2.border)).toBe(true);
 	});
 
 	it("stage textBox sem border: borda none", () => {
@@ -163,8 +167,7 @@ describe("RandomPreview", () => {
 		);
 		const border = (w.find(".random-preview__text").element as HTMLElement)
 			.style.border;
-		// jsdom pode retornar '' para border:none (shorthand não resolvido)
-		expect(border === "none" || border === "").toBe(true);
+		expect(isClearedBorder(border)).toBe(true);
 	});
 
 	it("stage textColor override vence config", () => {

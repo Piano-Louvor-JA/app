@@ -676,9 +676,7 @@ describe('LiturgyTimelineItem — cobertura extra', () => {
       })
       const upload = wrapper.find('.liturgy-item__action-btn')
       expect(upload.exists()).toBe(true)
-      // Nota: liturgy.videoSelectFile não existe no locale (existe em
-      // liturgy.messages.*) — o t() resolve para a própria chave.
-      expect(upload.text()).toBe('liturgy.videoSelectFile')
+      expect(upload.text()).toBe('Selecionar arquivo')
       expect(wrapper.find('input[type="file"]').attributes('accept')).toBe('video/*')
       await upload.trigger('click')
       expect(clickSpy).toHaveBeenCalled()

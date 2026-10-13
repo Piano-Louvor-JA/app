@@ -61,6 +61,9 @@ const mediaAudioHoisted = vi.hoisted(() => {
 			getMediaAudioElement: vi.fn(() => state.audio),
 			pauseMediaAudio: vi.fn(),
 			playMediaAudio: vi.fn().mockResolvedValue(true),
+			resolveRemoteFileUrl: vi.fn((p: string) =>
+				/^https?:\/\//i.test(p) ? p : `https://files.test/${p.replace(/^\//, "")}`,
+			),
 			resolveMusicAudioUrl: vi
 				.fn()
 				.mockResolvedValue({ ok: true, url: "audio://x", source: "remote" }),

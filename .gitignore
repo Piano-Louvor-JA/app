@@ -55,5 +55,4 @@ __screenshots__/
 dist-windows/
 reports/mutation/
 .stryker-tmp/
-packaging/flatpak/.flatpak-builder/
 voidbr/

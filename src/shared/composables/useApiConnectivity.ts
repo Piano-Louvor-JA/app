@@ -12,6 +12,8 @@
  */
 import { onMounted, onUnmounted, ref } from 'vue'
 
+import { getCurrentApiPrefix } from '@modules/sync/services/library-catalog'
+
 import { apiCandidateBases } from '../services/api-fallback'
 
 /**
@@ -46,7 +48,7 @@ async function probe(): Promise<boolean> {
     try {
       const controller = new AbortController()
       const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
-      const res = await fetch(`${base}/pt_musics`, {
+      const res = await fetch(`${base}/${getCurrentApiPrefix()}_musics`, {
         method: 'HEAD',
         signal: controller.signal,
         cache: 'no-store',

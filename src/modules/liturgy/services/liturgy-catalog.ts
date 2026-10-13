@@ -9,12 +9,14 @@ import {
   listLocalCollections,
   listLocalMusics,
 } from '@modules/media/services/local-custom-store'
-import { matchesAllTerms } from '@shared/services/search-terms'
-
 import type {
   LiturgyBibleBookOption,
   LiturgyMusicOption,
 } from '../types/liturgy'
+import {
+  searchLiturgyMusic,
+  type MusicSearchEntry,
+} from './liturgy-music-search'
 
 type CatalogHymnalRow = {
   id_music?: number | string
@@ -29,7 +31,7 @@ type CatalogMusicIndexRow = CatalogHymnalRow & {
   albums?: Array<{ id_album?: number | string; name?: string; track?: number | string | null }>
   albums_names?: string
   /** Letra em texto corrido (presente em 1944/1956 músicas do índice). */
-  lyric?: string
+  lyric?: string | null
 }
 
 type CatalogAlbumMusicRow = CatalogHymnalRow
@@ -201,11 +203,11 @@ function mapMusicIndexRow(row: CatalogMusicIndexRow): LiturgyMusicOption | null 
     albumNames.includes('Hinário Adventista') ||
     albumNames.includes('Hinário Adventista 1996')
 
-  // Issue #348 (item 2): letra já vem no índice `${prefix}_musics` — propaga
+  // Issue #348: letra já vem no índice `${prefix}_musics` — propaga
   // normalizada (fold diacrítico) p/ a busca casar "nao temas" com "não temas".
   const lyricsText = String(row.lyric ?? '')
     .normalize('NFD')
-    .replace(/\u0300-\u036f/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase() || undefined
@@ -415,57 +417,21 @@ export async function loadLiturgyBibleBooks(): Promise<LiturgyBibleBookOption[]>
     .filter((entry): entry is LiturgyBibleBookOption => entry != null)
 }
 
-/** Busca músicas por título, álbum ou número do hinário (máx. 50). */
+/**
+ * app#346: delega ao motor de busca fuzzy+letra (liturgy-music-search).
+ * Ranking: título > número/álbum > fuzzy título > letra. Máx. 50.
+ */
 export function filterLiturgyMusicOptions(
-  options: LiturgyMusicOption[],
+  options: Array<LiturgyMusicOption | MusicSearchEntry>,
   query: string,
   selectedId: number | null,
-): LiturgyMusicOption[] {
-  const selected = options.find((entry) => entry.id === selectedId) ?? null
-  const trimmed = query.trim().toLowerCase()
+): MusicSearchEntry[] {
+  const selected =
+    options.find((entry) => entry.id === selectedId) ?? null
 
-  if (!trimmed) {
-    return selected ? [selected] : []
+  if (!query.trim()) {
+    return selected ? [selected as MusicSearchEntry] : []
   }
 
-  const isNum = trimmed !== '' && !Number.isNaN(Number(trimmed))
-  const numQuery = isNum ? Number(trimmed) : null
-
-  let results = options.filter((entry) => {
-    const title = entry.name
-    const album = entry.albumNames
-    const lyrics = entry.lyricsText ?? ''
-    if (isNum && numQuery != null) {
-      return (
-        matchesAllTerms(title, album, trimmed, lyrics) ||
-        entry.hymnalTrack === numQuery
-      )
-    }
-    // Termos em título, álbum ou letra, com fold de acento (issue #348).
-    return matchesAllTerms(title, album, trimmed, lyrics)
-  })
-
-  if (isNum && numQuery != null) {
-    results = [...results].sort((a, b) => {
-      const score = (entry: LiturgyMusicOption) => {
-        if (
-          entry.hymnalTrack === numQuery &&
-          entry.albumNames.includes('Hinário Adventista') &&
-          !entry.albumNames.includes('1996')
-        ) {
-          return 2
-        }
-        if (
-          entry.hymnalTrack === numQuery &&
-          entry.albumNames.includes('Hinário Adventista 1996')
-        ) {
-          return 1
-        }
-        return 0
-      }
-      return score(b) - score(a)
-    })
-  }
-
-  return results.slice(0, 50)
+  return searchLiturgyMusic(options, query)
 }

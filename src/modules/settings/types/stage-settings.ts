@@ -19,7 +19,6 @@
  *   LiturgyWebProjectionView → liturgy
  *   <X>ProjectionView → <x> (bible, timer, random, clock, countdown…)
  */
-/* v8 ignore next 1 -- stmt module-level: V8 não registra hit de inicialização de ESM */
 const projectionViewModules = import.meta.glob('/src/modules/*/views/*ProjectionView.vue')
 
 function viewNameToScope(fileName: string): string | null {
@@ -37,7 +36,7 @@ function viewNameToScope(fileName: string): string | null {
 export const STAGE_MODULE_SCOPES: readonly string[] = [
   ...new Set(
     Object.keys(projectionViewModules)
-      .map((p) => viewNameToScope(p.split('/').pop()!)) /* keys do glob sempre têm filename */
+      .map((p) => viewNameToScope(p.split('/').pop() ?? ''))
       .filter((s): s is string => Boolean(s)),
   ),
 ].sort()
@@ -75,10 +74,21 @@ export type StageSettings = {
   titleTextColor: string | null
   titleUpperCase: boolean
   titleTextShadow: boolean | null
+  /**
+   * Estrofes (slides de letra): personalização própria. `null`/`undefined`
+   * = usa o estilo geral (que JÁ É o das estrofes) — espelha title*.
+   */
+  lyricFontSize: number | null // px @1920 (60–160); null = herda fontSize
+  lyricFontWeight: StageFontWeight | null
+  lyricTextColor: string | null
+  lyricUpperCase: boolean
+  lyricTextShadow: boolean | null
   showBibleVersion: boolean
   bibleFontSize: number // px @1920 (50–140)
   bibleFontWeight: 400 | 500 | 700
   bibleTextColor: string
+  /** Capitalização do versículo (paridade web — mesmo campo/serde `bTransform`). */
+  bibleTextTransform: 'none' | 'uppercase' | 'capitalize'
   /** Data URL da imagem de fundo do escopo (1 ativa por escopo). */
   backgroundImage: string | null
   /**
@@ -87,8 +97,12 @@ export type StageSettings = {
    */
   clock?: { style: 'digital' | 'analog'; showSeconds: boolean; format24h: boolean }
   timer?: { timeFormat: 'hh:mm:ss.ms' | 'hh:mm:ss' | 'mm:ss.ms' | 'mm:ss' }
-  countdown?: { timeFormat: 'hh:mm:ss' | 'mm:ss' }
-  random?: { fontSizePc: number; textTransform: 'none' | 'uppercase' | 'lowercase'; animationSpeed: 'slow' | 'normal' | 'fast' }
+  countdown?: { timeFormat: 'hh:mm:ss' | 'mm:ss'; allowNegative?: boolean }
+  random?: {
+    fontSizePc: number
+    textTransform: 'none' | 'uppercase' | 'lowercase'
+    animationSpeed: 'slow' | 'normal' | 'fast'
+  }
   /**
    * Hinos: por padrão o bg da projeção é o ASSET da música (capa/slide).
    * override=true → o backgroundImage configurado aqui vence o asset
@@ -110,6 +124,7 @@ export const DEFAULT_TIMER_MODULE_SETTINGS: NonNullable<StageSettings['timer']> 
 
 export const DEFAULT_COUNTDOWN_MODULE_SETTINGS: NonNullable<StageSettings['countdown']> = {
   timeFormat: 'hh:mm:ss',
+  allowNegative: false,
 }
 
 export const DEFAULT_RANDOM_MODULE_SETTINGS: NonNullable<StageSettings['random']> = {
@@ -162,11 +177,17 @@ export const DEFAULT_STAGE_SETTINGS: StageSettings = {
   bibleFontSize: 84,
   bibleFontWeight: 500,
   bibleTextColor: '#FFFFFF',
+  bibleTextTransform: 'none',
   titleFontSize: null,
   titleFontWeight: null,
   titleTextColor: null,
   titleUpperCase: false,
   titleTextShadow: null,
+  lyricFontSize: null,
+  lyricFontWeight: null,
+  lyricTextColor: null,
+  lyricUpperCase: false,
+  lyricTextShadow: null,
   backgroundImage: null,
 }
 
@@ -221,15 +242,14 @@ const officialBgModules = import.meta.glob('../../../assets/backgrounds/bg-*.png
 /** IDs dos bgs oficiais (ex.: 'bg-01'), ordenados. Piano (bg-11) vai primeiro na galeria. */
 const GALLERY_LEAD_BACKGROUND = 'bg-11'
 
-const sortedBackgroundIds = Object.keys(officialBgModules)
+export const STAGE_OFFICIAL_BACKGROUNDS: readonly string[] = Object.keys(officialBgModules)
   .map((path) => path.match(/(bg-[\w-]+)\.png$/)?.[1])
   .filter((id): id is string => Boolean(id))
-  .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
-
-export const STAGE_OFFICIAL_BACKGROUNDS: readonly string[] = [
-  GALLERY_LEAD_BACKGROUND,
-  ...sortedBackgroundIds.filter((id) => id !== GALLERY_LEAD_BACKGROUND),
-]
+  .sort((a, b) => {
+    if (a === GALLERY_LEAD_BACKGROUND) return -1
+    if (b === GALLERY_LEAD_BACKGROUND) return 1
+    return a.localeCompare(b, undefined, { numeric: true })
+  })
 
 /** Prefixo que marca um bg oficial (vs dataURL do usuário). */
 export const OFFICIAL_BG_PREFIX = 'official:'
@@ -265,6 +285,13 @@ export const STAGE_REF_PRESETS = [
 
 const WEIGHTS: StageFontWeight[] = [400, 600, 800]
 const BIBLE_WEIGHTS: StageSettings['bibleFontWeight'][] = [400, 500, 700]
+
+/** Opções de capitalização do versículo (bíblia) — paridade web. */
+export const BIBLE_TEXT_TRANSFORM_OPTIONS: StageSettings['bibleTextTransform'][] = [
+  'none',
+  'uppercase',
+  'capitalize',
+]
 
 function asColor(value: unknown, fallback: string): string {
   return typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value)
@@ -312,12 +339,23 @@ export function parseStageSettings(raw: unknown): StageSettings {
     bibleFontSize: clamp(asNumber(s['bSize'], 84), 50, 140),
     bibleFontWeight: BIBLE_WEIGHTS.includes(bibleWeight) ? bibleWeight : 500,
     bibleTextColor: asColor(s['bFg'], DEFAULT_STAGE_SETTINGS.bibleTextColor),
+    bibleTextTransform: BIBLE_TEXT_TRANSFORM_OPTIONS.includes(
+      s['bTransform'] as StageSettings['bibleTextTransform'],
+    )
+      ? (s['bTransform'] as StageSettings['bibleTextTransform'])
+      : 'none',
     titleFontSize:
       s['tSize'] == null ? null : clamp(asNumber(s['tSize'], 96), 60, 160),
     titleFontWeight: s['tWeight'] == null ? null : (WEIGHTS.includes(asNumber(s['tWeight'], 600) as StageFontWeight) ? (asNumber(s['tWeight'], 600) as StageFontWeight) : null),
     titleTextColor: s['tFg'] == null ? null : asColor(s['tFg'], DEFAULT_STAGE_SETTINGS.textColor),
     titleUpperCase: typeof s['tUpper'] === 'boolean' ? s['tUpper'] : false,
     titleTextShadow: typeof s['tsOnT'] === 'boolean' ? s['tsOnT'] : null,
+    lyricFontSize:
+      s['lSize'] == null ? null : clamp(asNumber(s['lSize'], 84), 60, 160),
+    lyricFontWeight: s['lWeight'] == null ? null : (WEIGHTS.includes(asNumber(s['lWeight'], 600) as StageFontWeight) ? (asNumber(s['lWeight'], 600) as StageFontWeight) : null),
+    lyricTextColor: s['lFg'] == null ? null : asColor(s['lFg'], DEFAULT_STAGE_SETTINGS.textColor),
+    lyricUpperCase: typeof s['lUpper'] === 'boolean' ? s['lUpper'] : false,
+    lyricTextShadow: typeof s['tsOnL'] === 'boolean' ? s['tsOnL'] : null,
     backgroundImage:
       typeof s['bgImg'] === 'string' &&
       (s['bgImg'].startsWith('data:') || s['bgImg'].startsWith(OFFICIAL_BG_PREFIX))
@@ -362,7 +400,7 @@ export function parseStageSettings(raw: unknown): StageSettings {
             fontSizePc: clamp(
               asNumber((s['random'] as Record<string, unknown>)['fontSizePc'], 8),
               4,
-              14,
+              50,
             ),
             textTransform: RANDOM_TEXT_TRANSFORM_OPTIONS.includes(
               (s['random'] as Record<string, unknown>)['textTransform'] as NonNullable<StageSettings['random']>['textTransform'],
@@ -409,11 +447,17 @@ export function serializeStageSettings(s: StageSettings): Record<string, unknown
     bSize: s.bibleFontSize,
     bWeight: s.bibleFontWeight,
     bFg: s.bibleTextColor,
+    bTransform: s.bibleTextTransform,
     ...(s.titleFontSize != null ? { tSize: s.titleFontSize } : {}),
     ...(s.titleFontWeight != null ? { tWeight: s.titleFontWeight } : {}),
     ...(s.titleTextColor != null ? { tFg: s.titleTextColor } : {}),
     ...(s.titleUpperCase ? { tUpper: true } : {}),
     ...(s.titleTextShadow != null ? { tsOnT: s.titleTextShadow } : {}),
+    ...(s.lyricFontSize != null ? { lSize: s.lyricFontSize } : {}),
+    ...(s.lyricFontWeight != null ? { lWeight: s.lyricFontWeight } : {}),
+    ...(s.lyricTextColor != null ? { lFg: s.lyricTextColor } : {}),
+    ...(s.lyricUpperCase ? { lUpper: true } : {}),
+    ...(s.lyricTextShadow != null ? { tsOnL: s.lyricTextShadow } : {}),
     bgImg: s.backgroundImage,
     ...(s.clock ? { clock: s.clock } : {}),
     ...(s.timer ? { timer: s.timer } : {}),

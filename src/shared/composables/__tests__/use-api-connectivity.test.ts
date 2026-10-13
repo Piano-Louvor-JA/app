@@ -59,6 +59,17 @@ describe('useApiConnectivity (issue 321)', () => {
     expect(state.value).toBe('ok')
   })
 
+  it('sonda o índice do idioma ativo', async () => {
+    localStorage.setItem('user_data', JSON.stringify({ language: 'es' }))
+    fetchMock.mockResolvedValue(new Response(null, { status: 200 }))
+    const { start } = await load()
+    start()
+    await vi.advanceTimersByTimeAsync(10)
+    const urls = fetchMock.mock.calls.map((call) => String(call[0]))
+    expect(urls.some((url) => url.includes('/es_musics'))).toBe(true)
+    expect(urls.some((url) => url.includes('/pt_musics'))).toBe(false)
+  })
+
   it('usa fallbacks em cascata antes de declarar offline', async () => {
     fetchMock.mockImplementation(async (url: string) => {
       if (String(url).includes('pianolouvorja')) throw new TypeError('down')

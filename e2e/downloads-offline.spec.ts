@@ -12,6 +12,8 @@ import { test, expect, type Page } from '@playwright/test'
  *
  * Sem isso os controles de download nem aparecem: AlbumsView só renderiza
  * `showDownloadControls` quando `isDesktopApp()` (bridge.isElectron).
+ * A bridge também liga o router em hash (`isElectronShell`), então a rota
+ * é `/#/albums`.
  *
  * Serial: o fluxo é stateful (download → reload → verificação).
  */
@@ -160,7 +162,7 @@ test.describe('Downloads offline — download → progresso → reload → persi
   test('hino baixa com progresso visível e o estado persiste após reload', async ({
     page,
   }) => {
-    await page.goto('/albums')
+    await page.goto('/#/albums')
     await expect(page.locator('body')).toBeVisible({ timeout: 15000 })
 
     // Catálogo mockado: hinário aparece com botão "Baixar Offline".
@@ -211,7 +213,7 @@ test.describe('Downloads offline — download → progresso → reload → persi
   test('sem download prévio, reload mantém coletânea disponível para baixar', async ({
     page,
   }) => {
-    await page.goto('/albums')
+    await page.goto('/#/albums')
 
     const downloadBtn = page
       .locator('.album-hymnal-card__action--download')
