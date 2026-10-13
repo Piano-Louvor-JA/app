@@ -10,6 +10,9 @@ name: MS Store Release
 on:
   release:
     types: [published]
+  workflow_run:
+    workflows: ['Build Windows']
+    types: [completed]
   workflow_dispatch:
     inputs:
       version:
@@ -19,11 +22,56 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: msstore-${{ github.event.release.tag_name || inputs.version || github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
 jobs:
+  decide:
+    runs-on: windows-latest
+    if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && startsWith(github.event.workflow_run.head_branch, 'v') && github.event.workflow_run.head_repository.full_name == github.repository)
+    outputs:
+      publish: ${{ steps.decision.outputs.publish }}
+      tag: ${{ steps.tag.outputs.value }}
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Resolve exact tag
+        id: tag
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+          RUN_TAG: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          set -euo pipefail
+          TAG="${RELEASE_TAG:-${INPUT_VERSION:-$RUN_TAG}}"
+          TAG="v${TAG#v}"
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Tag inválida'; exit 1; }
+          echo "value=$TAG" >> "$GITHUB_OUTPUT"
+      - name: Decide publication
+        id: decision
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_REF: ${{ steps.tag.outputs.value }}
+          WORKFLOW_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          script="$(mktemp --suffix=.mjs)"
+          gh api "repos/${GITHUB_REPOSITORY}/contents/scripts/release-publish-decision.mjs?ref=${WORKFLOW_SHA}" -H 'Accept: application/vnd.github.raw' > "$script"
+          node "$script" --fetch --repo "$GITHUB_REPOSITORY" --ref "$TARGET_REF"
+          rm -f "$script"
   msstore:
+    needs: decide
+    if: needs.decide.outputs.publish == 'true'
     name: Publish .appx to Partner Center
     runs-on: windows-latest
     steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.decide.outputs.tag }}
       - name: Check MS Store secrets
         id: store
         shell: bash
@@ -45,10 +93,10 @@ jobs:
         if: steps.store.outputs.enabled == 'true'
         shell: bash
         env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ needs.decide.outputs.tag }}
           INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
-          V="${INPUT_VERSION:-${RELEASE_TAG#v}}"
+          V="${RELEASE_TAG#v}"
           [ -n "$V" ] || { echo "Sem versão (tag v* ou input version obrigatório)."; exit 1; }
           echo "VERSION=$V" >> "$GITHUB_ENV"
 
@@ -67,18 +115,23 @@ jobs:
           echo "APPX=$APPX" >> "$GITHUB_ENV"
           echo "Pacote: $APPX"
 
-      - uses: microsoft/microsoft-store-apppublisher@v1.1
+      - uses: microsoft/microsoft-store-apppublisher@15abd1c50fcc164b19cb240fb04ef3c49bf715a2 # v1.1
         if: steps.store.outputs.enabled == 'true'
 
       - name: Configure MSStore CLI
         if: steps.store.outputs.enabled == 'true'
         shell: bash
+        env:
+          TENANT_ID: ${{ secrets.AZURE_AD_TENANT_ID }}
+          SELLER_ID: ${{ secrets.SELLER_ID }}
+          CLIENT_ID: ${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.AZURE_AD_APPLICATION_SECRET }}
         run: |
           msstore reconfigure \
-            --tenantId "${{ secrets.AZURE_AD_TENANT_ID }}" \
-            --sellerId "${{ secrets.SELLER_ID }}" \
-            --clientId "${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }}" \
-            --clientSecret "${{ secrets.AZURE_AD_APPLICATION_SECRET }}"
+            --tenantId "$TENANT_ID" \
+            --sellerId "$SELLER_ID" \
+            --clientId "$CLIENT_ID" \
+            --clientSecret "$CLIENT_SECRET"
 
       - name: Publish package to Store
         if: steps.store.outputs.enabled == 'true'

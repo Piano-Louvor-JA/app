@@ -38,7 +38,7 @@ jobs:
         run: |
           set -euo pipefail
           echo "Publicação avaliada para ${TARGET_REF}."
-          script="$(mktemp).mjs"
+          script="$(mktemp --suffix=.mjs)"
           gh api "repos/${GITHUB_REPOSITORY}/contents/scripts/release-publish-decision.mjs?ref=${WORKFLOW_SHA}" --jq .content \
             | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{let t=s.trim();if(t.startsWith(String.fromCharCode(34)))t=JSON.parse(t);process.stdout.write(Buffer.from(String(t).replace(/\s/g,""),"base64"))})' \
             > "$script"
@@ -132,11 +132,12 @@ jobs:
           [ -n "$SHA" ] || { echo "Asset não encontrado via API: ${ASSET}"; exit 1; }
           echo "version=$VERSION sha256=$SHA"
           MANIFEST=packaging/flatpak/com.pianolouvorja.piano.yaml
-          sed -i "s|url: .*/releases/download/.*|url: https://github.com/pianolouvorja/app/releases/download/v$VERSION/${ASSET}|" "$MANIFEST"
+          cp /tmp/src.tar.gz packaging/flatpak/release.tar.gz
+          sed -i "s|url: .*/releases/download/.*|path: release.tar.gz|" "$MANIFEST"
           sed -i "s|sha256: [a-f0-9]\{64\}|sha256: $SHA|" "$MANIFEST"
           grep -E 'url:|sha256:' "$MANIFEST"
 
-      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@79327416609af08178ad73b352877e51450790b3 # v6
         with:
           bundle: louvorja-piano.flatpak
           manifest-path: packaging/flatpak/com.pianolouvorja.piano.yaml

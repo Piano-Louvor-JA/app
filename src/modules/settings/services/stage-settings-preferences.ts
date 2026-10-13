@@ -24,12 +24,43 @@ import {
 
 type StageScope = StageModuleScope | 'global'
 
+/**
+ * Migração one-shot (05/10): o default ANTIGO (#0A0E1A) foi persistido pelo
+ * código velho — default gravado não é escolha. Na 1ª leitura pós-update,
+ * bg de fábrica sai de TODOS os escopos (vira null = imagem vence).
+ */
+const LEGACY_FACTORY_BG = '#0A0E1A'
+const STAGE_BG_MIGRATED_KEY = 'stage.bg-migrated-0510'
+
+function migrateFactoryBg(): void {
+  try {
+    if (getUserPreference<string>(STAGE_BG_MIGRATED_KEY, '') === '1') return
+    const prefs = loadUserPreferences()
+    let changed = false
+    for (const key of Object.keys(prefs)) {
+      if (!key.startsWith(USER_PREFERENCE_KEYS.stageSettingsPrefix)) continue
+      const stored = prefs[key]
+      if (!stored || typeof stored !== 'object') continue
+      const rec = stored as Record<string, unknown>
+      if (rec['bg'] === LEGACY_FACTORY_BG) {
+        delete rec['bg']
+        setUserPreference(key, rec)
+        changed = true
+      }
+    }
+    setUserPreference(STAGE_BG_MIGRATED_KEY, '1')
+  } catch {
+    // storage indisponível: tenta de novo na próxima leitura
+  }
+}
+
 function keyFor(scope: StageScope): string {
   return `${USER_PREFERENCE_KEYS.stageSettingsPrefix}${scope}`
 }
 
 /** Override do escopo; null = herda o global (igual loadOptional do APK). */
 export function loadStageSettingsOptional(scope: StageScope): StageSettings | null {
+  migrateFactoryBg()
   const stored = getUserPreference<unknown>(keyFor(scope), null)
   if (!stored || typeof stored !== 'object') return null
   return parseStageSettings(stored)
@@ -43,8 +74,14 @@ export function resolveStageSettings(scope: StageModuleScope): StageSettings {
   )
 }
 
+/** Raw (não parseado) do override do escopo — uso do sync `.louvorja`. */
+export function loadStageSettingsOptionalRaw(scope: StageScope): unknown {
+	return getUserPreference<unknown>(keyFor(scope), null)
+}
+
 export function saveStageSettings(scope: StageScope, settings: StageSettings): void {
   setUserPreference(keyFor(scope), serializeStageSettings(settings))
+  localStorage.setItem("sync.modified.v1.preferences", new Date().toISOString())
 }
 
 /** Remove o override do escopo (volta a herdar o global). */
@@ -54,4 +91,5 @@ export function clearStageSettings(scope: StageScope): void {
   if (!(key in prefs)) return
   delete prefs[key]
   saveUserPreferences(prefs)
+  localStorage.setItem("sync.modified.v1.preferences", new Date().toISOString())
 }

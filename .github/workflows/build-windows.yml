@@ -24,9 +24,9 @@ jobs:
       MS_STORE_PUBLISHER_CN: ${{ secrets.MS_STORE_PUBLISHER_CN }}
       MS_STORE_PUBLISHER_DISPLAY: ${{ secrets.MS_STORE_PUBLISHER_DISPLAY }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -40,7 +40,7 @@ jobs:
           WORKFLOW_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          script="$(mktemp).mjs"
+          script="$(mktemp --suffix=.mjs)"
           gh api "repos/${GITHUB_REPOSITORY}/contents/scripts/release-publish-decision.mjs?ref=${WORKFLOW_SHA}" --jq .content \
             | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{let t=s.trim();if(t.startsWith(String.fromCharCode(34)))t=JSON.parse(t);process.stdout.write(Buffer.from(String(t).replace(/\s/g,""),"base64"))})' \
             > "$script"

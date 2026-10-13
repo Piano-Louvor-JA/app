@@ -18,6 +18,12 @@ const props = defineProps<{
   /** musicId → tem instrumental no catálogo. */
   musicInstrumentalById?: Record<number, boolean>
   busyMusicId?: number | null
+  /** Placeholder agendado: id do item → entrada resolvida OU estado vazio (rotação/data). */
+  scheduledResolvedByItemId?: Record<
+    string,
+    | { entryName: string; kindLabel: string; kind?: string; filePath?: string }
+    | { empty: string }
+  >
 }>()
 
 const emit = defineEmits<{
@@ -283,6 +289,7 @@ function isCategorySectionInProgress(categoryId: string): boolean {
           :deletion-locked="deletionLocked"
           :has-instrumental="musicHasInstrumental(segment.entry.item)"
           :music-busy="isMusicBusy(segment.entry.item)"
+          :resolved-schedule="scheduledResolvedByItemId?.[segment.entry.item.id] ?? null"
           @select="emit('select', segment.entry.index)"
           @video-file-selected="
             emit('videoFileSelected', segment.entry.item.id, $event)
@@ -321,6 +328,7 @@ function isCategorySectionInProgress(categoryId: string): boolean {
             :video-projecting="videoProjectionItemId === child.item.id"
             :start-label="startLabels[child.index] ?? '—'"
             :duration-label="durationLabels[child.index] ?? '—'"
+            :resolved-schedule="scheduledResolvedByItemId?.[child.item.id] ?? null"
             linked
             :reorder-active="dragFrom != null"
             :is-drag-source="isDragBlockIndex(child.index)"

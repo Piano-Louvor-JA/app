@@ -3,14 +3,78 @@ name: Snap Store Release
 on:
   release:
     types: [published]
+  workflow_run:
+    workflows: ['Release Linux']
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Tag ou versão existente'
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: snap-${{ github.event.release.tag_name || inputs.version || github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
 
 jobs:
+  decide:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && startsWith(github.event.workflow_run.head_branch, 'v') && github.event.workflow_run.head_repository.full_name == github.repository)
+    outputs:
+      publish: ${{ steps.decision.outputs.publish }}
+      tag: ${{ steps.tag.outputs.value }}
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Resolve exact tag
+        id: tag
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+          RUN_TAG: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          set -euo pipefail
+          TAG="${RELEASE_TAG:-${INPUT_VERSION:-$RUN_TAG}}"
+          TAG="v${TAG#v}"
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Tag inválida'; exit 1; }
+          echo "value=$TAG" >> "$GITHUB_OUTPUT"
+      - name: Decide publication
+        id: decision
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_REF: ${{ steps.tag.outputs.value }}
+          WORKFLOW_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          script="$(mktemp --suffix=.mjs)"
+          gh api "repos/${GITHUB_REPOSITORY}/contents/scripts/release-publish-decision.mjs?ref=${WORKFLOW_SHA}" -H 'Accept: application/vnd.github.raw' > "$script"
+          node "$script" --fetch --repo "$GITHUB_REPOSITORY" --ref "$TARGET_REF"
+          rm -f "$script"
   snap:
+    needs: decide
+    if: needs.decide.outputs.publish == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.decide.outputs.tag }}
+      - name: Check Snap Store credentials
+        id: store
+        env:
+          STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+        run: |
+          if [ -n "$STORE_CREDENTIALS" ]; then
+            echo 'enabled=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'enabled=false' >> "$GITHUB_OUTPUT"
+            echo 'Credenciais ausentes; pacote será preservado sem publicação na Snap Store.'
+          fi
 
       - uses: actions/setup-node@v4
         with:
@@ -20,16 +84,19 @@ jobs:
       - name: Build app (linux-unpacked)
         run: |
           npm ci
-          npx electron-builder --linux dir --x64
+          npm run build
+          npx electron-builder --linux dir --x64 --publish never
 
       - name: Sync snap version with tag
+        env:
+          RELEASE_TAG: ${{ needs.decide.outputs.tag }}
         run: |
-          TAG="${GITHUB_REF_NAME#v}"
+          TAG="${RELEASE_TAG#v}"
           sed -i "s/^version:.*/version: \"$TAG\"/" snap/snapcraft.yaml
           grep '^version:' snap/snapcraft.yaml
 
       - name: Build snap
-        uses: snapcore/action-build@v1
+        uses: snapcore/action-build@3bdaa03e1ba6bf59a65f84a751d943d549a54e79 # v1
         id: snapcraft
         with:
           snapcraft-args: '--destructive-mode'
@@ -43,11 +110,13 @@ jobs:
       - name: Attach snap to GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.decide.outputs.tag }}
         run: |
-          gh release upload "$GITHUB_REF_NAME" "${{ steps.snapcraft.outputs.snap }}" --clobber
+          gh release upload "$RELEASE_TAG" "${{ steps.snapcraft.outputs.snap }}" --clobber
 
       - name: Publish to Snap Store (beta)
-        uses: snapcore/action-publish@v1
+        if: steps.store.outputs.enabled == 'true'
+        uses: snapcore/action-publish@214b86e5ca036ead1668c79afb81e550e6c54d40 # v1
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         with:

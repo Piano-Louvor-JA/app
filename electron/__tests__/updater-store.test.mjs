@@ -7,16 +7,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * (bloqueador de certificação). Cobre initUpdater e os handlers IPC.
  */
 
-const mockAutoUpdater = {
+const mockAutoUpdater = vi.hoisted(() => ({
   autoDownload: false,
   autoInstallOnAppQuit: false,
   checkForUpdates: vi.fn(async () => ({})),
   downloadUpdate: vi.fn(async () => ({})),
   quitAndInstall: vi.fn(),
   on: vi.fn(),
-};
+}));
 
-globalThis.__LOUVORJA_AUTOUPDATER_MOCK__ = mockAutoUpdater;
+vi.mock("module", () => ({
+  createRequire: () => () => ({ autoUpdater: mockAutoUpdater }),
+}));
 
 // Mock do electron: isPackaged=true (produção) + ipcMain com handlers gravados.
 vi.mock("electron", () => ({

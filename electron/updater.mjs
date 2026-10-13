@@ -1,12 +1,7 @@
 import { app, ipcMain } from "electron";
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
-// electron-updater é carregado com preguiça: em testes (vitest), o mock pode
-// ser injetado via globalThis.__LOUVORJA_AUTOUPDATER_MOCK__ antes do import.
-const { autoUpdater } =
-	globalThis.__LOUVORJA_AUTOUPDATER_MOCK__ !== undefined
-		? { autoUpdater: globalThis.__LOUVORJA_AUTOUPDATER_MOCK__ }
-		: require("electron-updater");
+const { autoUpdater } = require("electron-updater");
 
 /**
  * Configura o autoUpdater do electron-updater.

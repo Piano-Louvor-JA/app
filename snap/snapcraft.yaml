@@ -18,6 +18,9 @@ issues: https://github.com/Piano-Louvor-JA/app/issues
 grade: stable
 confinement: strict
 base: core22
+architectures:
+  - build-on: amd64
+    build-for: amd64
 plugs:
   wayland:
   x11:

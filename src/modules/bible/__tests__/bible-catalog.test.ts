@@ -87,12 +87,12 @@ describe('resolveBookTone', () => {
     expect(resolveBookTone(5)).toBe('law')
     expect(resolveBookTone(6)).toBe('history')
     expect(resolveBookTone(17)).toBe('history')
-    expect(resolveBookTone(18)).toBe('prophets')
-    expect(resolveBookTone(39)).toBe('prophets')
+    expect(resolveBookTone(18)).toBe('poetry')
+    expect(resolveBookTone(39)).toBe('minor-prophet')
     expect(resolveBookTone(40)).toBe('gospels')
     expect(resolveBookTone(43)).toBe('gospels')
-    expect(resolveBookTone(44)).toBe('letters')
-    expect(resolveBookTone(66)).toBe('letters')
+    expect(resolveBookTone(44)).toBe('acts')
+    expect(resolveBookTone(66)).toBe('apocalyptic')
   })
 
   it('número fora do cânon é neutral', () => {

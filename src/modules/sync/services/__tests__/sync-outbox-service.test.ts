@@ -101,3 +101,16 @@ describe('outbox do estado do operador (sync v2 fase 2)', () => {
     expect(outboxCount()).toBe(1)
   })
 })
+
+it('gera UUID criptográfico mesmo sem randomUUID em contexto HTTP', () => {
+ const originalCrypto = globalThis.crypto
+ const random = vi.fn((bytes: Uint8Array) => { originalCrypto.getRandomValues(bytes); return bytes })
+ vi.stubGlobal('crypto', { getRandomValues: random })
+ try {
+  clearOutbox()
+  enqueueOperatorState('liturgy', 'week', { offline: true })
+  const [entry] = Object.values(JSON.parse(lsStore.get('pianolouvorja:sync:outbox')!)) as Array<{client_uuid:string}>
+  expect(random).toHaveBeenCalledOnce()
+  expect(entry.client_uuid).toMatch(/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/)
+ } finally { vi.stubGlobal('crypto', originalCrypto) }
+})
