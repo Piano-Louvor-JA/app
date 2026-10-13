@@ -604,7 +604,7 @@ describe('LiturgyTimelineItem', () => {
       expect(input.exists()).toBe(true)
       const clickSpy = vi.fn()
       ;(input.element as HTMLInputElement).click = clickSpy
-      const fileBtn = w.findAll('button').find(b => (b.attributes('title') ?? '').includes('liturgy'))
+      const fileBtn = w.findAll('button').find(b => (b.attributes('title') ?? '') === 'Selecionar arquivo')
       expect(fileBtn).toBeTruthy()
       await fileBtn!.trigger('click')
       expect(clickSpy).toHaveBeenCalled()

@@ -23,7 +23,6 @@ import {
   type WeekdayNotes,
   type WeekdaySessionTimes,
 } from '../types/liturgy'
-import { todayISO } from './liturgy-actions'
 import { normalizeLiturgyTimeHHmm } from './liturgy-format'
 import {
   clearDoneFlags,
@@ -238,6 +237,14 @@ export function saveLiturgyState(state: LiturgyPersistedState): void {
 
 export function todayWeekday(): LiturgyWeekday {
   return LITURGY_WEEKDAYS[new Date().getDay()] ?? 'sunday'
+}
+
+/** ISO yyyy-mm-dd de hoje no fuso local (a data do culto é local, nunca UTC). */
+export function todayISO(): string {
+  const d = new Date()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${mm}-${dd}`
 }
 
 /**
