@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { isElectronShell } from '@shared/services/desktop-bridge'
@@ -12,7 +12,9 @@ import {
 
 import MusicTrackActions from '@shared/components/MusicTrackActions.vue'
 
+import { formatDurationLabel } from '../services/liturgy-format'
 import { getItemTypeIcon, isExecutableItem } from '../services/liturgy-item-helpers'
+import { probeMediaDurationMs } from '../services/media-probe'
 import type { LiturgyItem } from '../types/liturgy'
 
 const props = defineProps<{
@@ -28,6 +30,11 @@ const props = defineProps<{
   indeterminate?: boolean
   /** Categoria com filhos ainda não todos concluídos → status Em andamento. */
   sectionInProgress?: boolean
+  /** Placeholder agendado: entrada resolvida OU estado vazio (rotação/data). */
+  resolvedSchedule?:
+    | { entryName: string; kindLabel: string; kind?: string; filePath?: string }
+    | { empty: string }
+    | null
   /** Categoria abaixo de outra incompleta → status Aguardando. */
   sectionWaiting?: boolean
   collapsible?: boolean
@@ -69,6 +76,50 @@ const rootEl = ref<HTMLElement | null>(null)
 let dragGhostEl: HTMLElement | null = null
 
 const isCategory = computed(() => props.item.type === 'category')
+
+/** Placeholder agendado: duração própria vem do conteúdo resolvido do dia. */
+const isScheduledPlaceholder = computed(() => props.item.type === 'scheduled')
+const scheduledDurationMs = ref(0)
+let scheduledProbeId = 0
+
+watch(
+  () => props.resolvedSchedule,
+  async (resolved) => {
+    const probeId = ++scheduledProbeId
+    const filePath =
+      resolved && 'filePath' in resolved ? resolved.filePath?.trim() : undefined
+    scheduledDurationMs.value = 0
+    if (!filePath) return
+    const durationMs = await probeMediaDurationMs(filePath)
+    if (probeId === scheduledProbeId) scheduledDurationMs.value = durationMs
+  },
+  { immediate: true },
+)
+
+const scheduledDurationLabel = computed(() =>
+  formatDurationLabel(scheduledDurationMs.value),
+)
+
+/** Ícone efetivo: agendado com conteúdo do dia mostra o ícone do TIPO resolvido. */
+const effectiveIcon = computed(() => {
+  if (
+    isScheduledPlaceholder.value &&
+    props.resolvedSchedule &&
+    'kind' in props.resolvedSchedule &&
+    props.resolvedSchedule.kind
+  ) {
+    const icons: Record<string, string> = {
+      music: 'ti-music',
+      file: 'ti-movie',
+      video: 'ti-movie',
+      online_video: 'ti-movie',
+      verse: 'ti-book',
+      annotation: 'ti-note',
+    }
+    return icons[props.resolvedSchedule.kind] ?? 'ti-calendar-time'
+  }
+  return null
+})
 const isLinked = computed(() => Boolean(props.linked))
 const executable = computed(() => isExecutableItem(props.item))
 const isMusicItem = computed(
@@ -428,7 +479,7 @@ const projectActionTitle = computed(() => {
         >
           <i
             class="ti"
-            :class="getItemTypeIcon(item.type)"
+            :class="effectiveIcon ?? getItemTypeIcon(item.type)"
             aria-hidden="true"
           />
         </div>
@@ -469,6 +520,24 @@ const projectActionTitle = computed(() => {
             </span>
           </div>
           <p
+            v-if="resolvedSchedule && 'entryName' in resolvedSchedule"
+            class="liturgy-item__subtitle liturgy-item__subtitle--scheduled"
+          >
+            {{ resolvedSchedule.entryName }} · {{ resolvedSchedule.kindLabel }}
+          </p>
+          <p
+            v-else-if="resolvedSchedule && 'empty' in resolvedSchedule"
+            class="liturgy-item__subtitle liturgy-item__subtitle--scheduled"
+          >
+            {{ resolvedSchedule.empty }}
+          </p>
+          <p
+            v-else-if="item.type === 'scheduled'"
+            class="liturgy-item__subtitle liturgy-item__subtitle--scheduled"
+          >
+            —
+          </p>
+          <p
             v-if="item.subtitle"
             class="liturgy-item__subtitle"
           >
@@ -491,8 +560,20 @@ const projectActionTitle = computed(() => {
           <p class="liturgy-item__clock">
             {{ startLabel }}
           </p>
-          <p class="liturgy-item__duration">
-            {{ t('liturgy.duration', { time: durationLabel }) }}
+          <p
+            v-if="
+              !isScheduledPlaceholder ||
+              scheduledDurationLabel !== '—'
+            "
+            class="liturgy-item__duration"
+          >
+            {{
+              t('liturgy.duration', {
+                time: isScheduledPlaceholder
+                  ? scheduledDurationLabel
+                  : durationLabel,
+              })
+            }}
           </p>
         </div>
 
@@ -648,8 +729,16 @@ const projectActionTitle = computed(() => {
             type="button"
             class="liturgy-item__action"
             :class="{ 'liturgy-item__action--primary': selected }"
-            :title="t('liturgy.actions.openControl')"
-            :aria-label="t('liturgy.actions.openControl')"
+            :title="
+              isAudioItem
+                ? t('liturgy.actions.playLocalInExternal', { player: rowPlayerLabel })
+                : t('liturgy.actions.openControl')
+            "
+            :aria-label="
+              isAudioItem
+                ? t('liturgy.actions.playLocalInExternal', { player: rowPlayerLabel })
+                : t('liturgy.actions.openControl')
+            "
             :disabled="item.done"
             @click.stop="emit('select')"
           >
@@ -663,37 +752,49 @@ const projectActionTitle = computed(() => {
             type="button"
             class="liturgy-item__action liturgy-item__action--site-control"
             :title="
-              isLocalPresentation
-                ? t('liturgy.actions.openPresentationControl')
-                : isLocalPdf
-                  ? t('liturgy.actions.openPdfControl')
-                  : isLocalImages
-                    ? t('liturgy.actions.openImageControl')
-                    : isVideoRemote
-                      ? t('liturgy.actions.openVideoControl')
-                      : t('liturgy.actions.openSiteControl')
+              isLocalVideo
+                ? t('liturgy.actions.playLocalInExternal', { player: rowPlayerLabel })
+                : isLocalPresentation
+                  ? t('liturgy.actions.openPresentationControl')
+                  : isLocalPdf
+                    ? t('liturgy.actions.openPdfControl')
+                    : isLocalImages
+                      ? t('liturgy.actions.openImageControl')
+                      : isVideoRemote
+                        ? t('liturgy.actions.openVideoControl')
+                        : t('liturgy.actions.openSiteControl')
             "
             :aria-label="
-              isLocalPresentation
-                ? t('liturgy.actions.openPresentationControl')
-                : isLocalPdf
-                  ? t('liturgy.actions.openPdfControl')
-                  : isLocalImages
-                    ? t('liturgy.actions.openImageControl')
-                    : isVideoRemote
-                      ? t('liturgy.actions.openVideoControl')
-                      : t('liturgy.actions.openSiteControl')
+              isLocalVideo
+                ? t('liturgy.actions.playLocalInExternal', { player: rowPlayerLabel })
+                : isLocalPresentation
+                  ? t('liturgy.actions.openPresentationControl')
+                  : isLocalPdf
+                    ? t('liturgy.actions.openPdfControl')
+                    : isLocalImages
+                      ? t('liturgy.actions.openImageControl')
+                      : isVideoRemote
+                        ? t('liturgy.actions.openVideoControl')
+                        : t('liturgy.actions.openSiteControl')
             "
             :disabled="item.done"
             @click.stop="emit('select')"
           >
             <i
-              class="ti ti-layout-dashboard"
+              class="ti"
+              :class="isLocalVideo ? 'ti-player-play' : 'ti-layout-dashboard'"
               aria-hidden="true"
             />
           </button>
           <button
-            v-if="!isCategory && (isSiteItem || isVideoRemote)"
+            v-if="
+              !isCategory &&
+                (isSiteItem ||
+                  // Player externo (VLC etc) não alimenta a projeção — o
+                  // botão de projetar só existe no player do sistema
+                  // (Rafael 03/10: esconde para não confundir).
+                  (isVideoRemote && rowPlayerId === 'associated'))
+            "
             type="button"
             class="liturgy-item__action liturgy-item__action--site-project"
             :class="{

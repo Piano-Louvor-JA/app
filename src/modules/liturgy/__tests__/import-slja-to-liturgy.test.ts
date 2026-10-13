@@ -102,18 +102,29 @@ describe("app#331 — import .slja → item de liturgia → player (offline)", (
 	});
 
 	it("gravação da lyric falha no meio → SLJA_LOCAL_LYRIC_PERSIST_FAILED e rollback", async () => {
-		// 1ª escrita (música) passa; lyric falha — cobre o path persisted===false/catch
-		let calls = 0;
 		const original = Storage.prototype.setItem;
+		let failedLyricWrite = false;
 		const spy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (this: Storage, k: string, v: string) {
-			calls += 1;
-			if (calls >= 2) throw new DOMException("quota no meio", "QuotaExceededError");
+			if (k === "louvorja.local-custom.v1") {
+				const db = JSON.parse(v) as { musics: Array<{ lyrics: unknown[] }> };
+				if (!failedLyricWrite && db.musics.some((music) => music.lyrics.length > 0)) {
+					failedLyricWrite = true;
+					throw new DOMException("quota no meio", "QuotaExceededError");
+				}
+			}
 			return original.call(this, k, v);
 		});
-		await expect(
-			importSljaAsLiturgyMusic({ bytes: await makeSljaBuffer(), name: "meio.slja" }),
-		).rejects.toThrow("SLJA_LOCAL_LYRIC_PERSIST_FAILED");
-		spy.mockRestore();
+		try {
+			await expect(
+				importSljaAsLiturgyMusic({ bytes: await makeSljaBuffer(), name: "meio.slja" }),
+			).rejects.toThrow("SLJA_LOCAL_LYRIC_PERSIST_FAILED");
+			expect(failedLyricWrite).toBe(true);
+		} finally {
+			spy.mockRestore();
+		}
+		const collections = listLocalCollections();
+		expect(collections).toHaveLength(1);
+		expect(listLocalMusics(collections[0].id)).toEqual([]);
 	});
 
 	it("quota do localStorage estourada → SLJA_LOCAL_LYRIC_PERSIST_FAILED e música removida", async () => {
@@ -127,7 +138,7 @@ describe("app#331 — import .slja → item de liturgia → player (offline)", (
 		// música parcial NÃO fica órfã no localStorage
 		const raw = localStorage.getItem("louvorja.local-custom.v1");
 		const db = raw ? JSON.parse(raw) : { musics: [] };
-		expect((db.musics ?? []).filter((m: { name: string }) => m.name === "Cheia Para Todos")).toHaveLength(0);
+		expect((db.musics ?? []).filter((m: { name: string }) => m.name === "Missao Para Todos")).toHaveLength(0);
 	});
 
 	it("música importada resolve no player COM áudio data: e letra com timing", async () => {

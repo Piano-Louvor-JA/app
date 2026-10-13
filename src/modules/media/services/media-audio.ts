@@ -58,6 +58,10 @@ export async function resolveSlideImageUrl(
 ): Promise<string | null> {
   if (!catalogPath?.trim()) return null
 
+  // app#331: data:/blob: (capa do .slja local) passam ANTES de qualquer
+  // branch — prefixar base remota quebra o protocolo (bg não carrega).
+  if (isSelfContainedUrl(catalogPath)) return catalogPath
+
   if (isDesktopApp()) {
     const bridge = getDesktopBridge()
     if (!bridge) return null

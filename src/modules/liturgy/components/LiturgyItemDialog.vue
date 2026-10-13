@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { getDesktopBridge, isDesktopApp } from '@shared/services/desktop-bridge'
+import { appConfirm } from '@shared/composables/useAppConfirm'
 import type {
   FileDialogFilter,
   PresentationEngine,
@@ -21,6 +22,7 @@ import {
   type LiturgyMusicOption,
 } from '../types/liturgy'
 import { probeMediaDurationMs } from '../services/media-probe'
+import { useScheduledStore } from '../stores/useScheduledStore'
 import { useExternalPlayerChoices } from '../composables/useExternalPlayerChoices'
 import {
   importSljaAsLiturgyMusic,
@@ -104,7 +106,17 @@ async function onImportSljaFile(event: Event): Promise<void> {
       bytes: await file.arrayBuffer(),
       name: file.name,
     }
-    const imported = await importSljaAsLiturgyMusic(source)
+    const imported = await importSljaAsLiturgyMusic(source, {
+      // Regra: banco só recebe com aprovação. Recusou = salva só no app
+      // (local) — sem fricção, sem erro.
+      confirmUpload: () =>
+        appConfirm({
+          title: t('liturgy.slja.uploadTitle', { name: file.name }),
+          message: t('liturgy.slja.uploadMessage'),
+          confirmLabel: t('liturgy.slja.uploadConfirm'),
+          cancelLabel: t('liturgy.slja.uploadCancel'),
+        }),
+    })
     if (run !== sljaRun.value) return
     // web#174 (referência): recarrega o catálogo ANTES da seleção valer —
     // sem isso o id novo não existe em musicList, selectedMusic fica null
@@ -165,9 +177,8 @@ const startTimeRequiredMissing = computed(
 const endTimeRequiredMissing = computed(
   () => isCategory.value && !normalizeLiturgyTimeHHmm(props.draft.endTime),
 )
-const categoryRequiredMissing = computed(
-  () => hasTypeSelection.value && !isCategory.value && !props.draft.categoryId,
-)
+// Categoria OPCIONAL (paridade web ff8b481): sem erro de validação.
+const categoryRequiredMissing = computed(() => false)
 
 const durationLabel = computed(() => formatMomentDuration(props.draft.durationMs))
 
@@ -270,6 +281,9 @@ const dialogTitle = computed(() => {
   if (props.hideTypePicker) return t('liturgy.dialog.addCategoryTitle')
   return t('liturgy.dialog.title')
 })
+
+const scheduledStore = useScheduledStore()
+const rotationOptions = computed(() => scheduledStore.categories)
 
 const typeGroups = computed(() => {
   const groups = LITURGY_TYPE_GROUPS.map((group) => ({
@@ -508,20 +522,13 @@ function onCategoryChange(event: Event) {
   patch({ categoryId: value || null })
 }
 
-const {
-  globalPlayer,
-  playerOptions,
-  loadPlayerChoices,
-  selectedPlayerId: resolvePlayerId,
-  storedPlayerId,
-} = useExternalPlayerChoices()
-
-const selectedPlayerId = computed(() => resolvePlayerId(props.draft.playerId))
-
-function onPlayerChange(event: Event) {
+/** Rotação agendada: campo PRÓPRIO — nunca move o item na árvore da liturgia. */
+function onRotationChange(event: Event) {
   const value = (event.target as HTMLSelectElement).value
-  patch({ playerId: storedPlayerId(value) })
+  patch({ scheduledRotationId: value || null })
 }
+
+const { loadPlayerChoices } = useExternalPlayerChoices()
 
 watch(
   () => [props.open, props.draft.type] as const,
@@ -1037,7 +1044,49 @@ function isLightDot(hex: string): boolean {
             </div>
 
             <div
-              v-if="showCategoryField"
+              v-if="draft.type === 'scheduled'"
+              class="moment-dialog__section"
+            >
+              <label
+                class="moment-dialog__label"
+                :class="{ 'moment-dialog__label--error': categoryFieldError }"
+                for="moment-rotation"
+              >
+                {{
+                  t('liturgy.dialog.rotationField')
+                }}
+                <span
+                  class="moment-dialog__required"
+                  aria-hidden="true"
+                >*</span>
+              </label>
+              <select
+                id="moment-rotation"
+                class="moment-dialog__input moment-dialog__select"
+                :value="draft.scheduledRotationId ?? ''"
+                :aria-invalid="categoryFieldError"
+                @change="onRotationChange"
+              >
+                <option value="">
+                  {{ t('liturgy.dialog.categoryPlaceholder') }}
+                </option>
+                <option
+                  v-for="option in rotationOptions"
+                  :key="option.id"
+                  :value="option.id"
+                >
+                  {{ option.name }}
+                </option>
+              </select>
+              <p
+                v-if="categoryFieldError"
+                class="moment-dialog__error"
+              >
+                {{ t('liturgy.dialog.categoryRequired') }}
+              </p>
+            </div>
+            <div
+              v-if="showCategoryField && draft.type !== 'scheduled'"
               class="moment-dialog__section"
             >
               <label
@@ -1046,10 +1095,6 @@ function isLightDot(hex: string): boolean {
                 for="moment-category"
               >
                 {{ t('liturgy.dialog.categoryField') }}
-                <span
-                  class="moment-dialog__required"
-                  aria-hidden="true"
-                >*</span>
               </label>
               <select
                 id="moment-category"
@@ -1170,38 +1215,7 @@ function isLightDot(hex: string): boolean {
               </p>
             </div>
 
-            <!-- Player de reprodução: só para itens de vídeo/áudio com arquivo local -->
-            <div
-              v-if="draft.type === 'video' || draft.type === 'audio'"
-              class="moment-dialog__engine"
-              data-test="liturgy-player-select"
-            >
-              <span class="moment-dialog__label">
-                {{ t('liturgy.fields.playerSelect') }}
-              </span>
-              <select
-                class="moment-dialog__input moment-dialog__select"
-                :value="selectedPlayerId"
-                :aria-label="t('liturgy.fields.playerSelect')"
-                data-test="liturgy-player-options"
-                @change="onPlayerChange"
-              >
-                <option
-                  v-for="player in playerOptions"
-                  :key="player.id"
-                  :value="player.id"
-                >
-                  {{
-                    player.id === globalPlayer
-                      ? t('liturgy.fields.playerDefaultNamed', { name: player.label })
-                      : player.label
-                  }}
-                </option>
-              </select>
-              <p class="moment-dialog__engine-hint">
-                {{ t('liturgy.fields.playerSelectHint') }}
-              </p>
-            </div>
+            <!-- Player: gerido pela linha (LiturgyTimelineItem) / Configurações → Mídia & Player. Select do modal removido (redundante). -->
           </div>
 
           <div

@@ -282,7 +282,11 @@ describe('GeneralView.vue', () => {
       const importBtn = wrapper.findAll('.general-settings__sync-actions button')[1]
       await importBtn.trigger('click')
       await flushPromises()
-      expect((wrapper.vm as any).syncStatus).toEqual({ kind: 'success', messageKey: 'settings.general.syncNothingToApply' })
+      expect((wrapper.vm as any).syncStatus).toEqual({
+        kind: 'success',
+        messageKey: 'settings.general.syncNothingToApply',
+        params: { localModified: '—', packageModified: '—' },
+      })
     })
 
     it('import com aplicações: syncImported com lista', async () => {

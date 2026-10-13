@@ -1,3 +1,6 @@
+import { createPinia, setActivePinia } from 'pinia'
+import { beforeEach as initializePinia } from 'vitest'
+initializePinia(() => setActivePinia(createPinia()))
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'

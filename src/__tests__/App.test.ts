@@ -71,6 +71,10 @@ vi.mock('@shared/composables/useUpdateChecker', () => ({
   useUpdateChecker: () => updateCheckerMock,
 }))
 
+vi.mock('@shared/components/ApiStatusBanner.vue', () => ({
+  default: { name: 'ApiStatusBanner', template: '<div class="api-status-banner-mock" />' },
+}))
+
 vi.mock('@shared/components/UpdateBanner.vue', () => ({
   default: {
     name: 'UpdateBanner',

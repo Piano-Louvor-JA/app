@@ -139,3 +139,24 @@ export function clampDurationPart(value: unknown, max?: number): number {
   if (max != null) return Math.min(max, floored)
   return floored
 }
+
+export function computeRemainingRawMs(
+  durationMs: number,
+  accumulatedMs: number,
+  segmentStartedAt: number | null,
+  status: CountdownStatus,
+  nowMs: number,
+): number {
+  const elapsed = computeElapsedMs(accumulatedMs, segmentStartedAt, status, nowMs)
+  return durationMs - elapsed
+}
+
+
+export function formatCountdownWithSign(
+  remainingMs: number,
+  timeFormat: CountdownTimeFormat,
+): string {
+  const negative = remainingMs < 0
+  const body = formatElapsedMs(Math.abs(remainingMs), timeFormat)
+  return negative ? `-${body}` : body
+}

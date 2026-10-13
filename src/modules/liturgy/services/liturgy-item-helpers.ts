@@ -253,7 +253,9 @@ export function isLiturgyItemDraftValid(draft: LiturgyItemDraft): boolean {
     if (!normalizeLiturgyTimeHHmm(draft.endTime)) return false
   }
   if (draft.type === 'music' && draft.musicId == null) return false
-  if (draft.type !== 'category' && !draft.categoryId) return false
+  // Categoria é OPCIONAL (paridade web ff8b481): item pode viver na raiz da
+  // timeline sem pai — quem porta a liturgia do classic não tem categoria
+  // obrigatória e sem isso não conseguia editar/salvar.
   if (draft.type === 'images') {
     const paths =
       draft.filePaths.length > 0
@@ -311,6 +313,7 @@ export function buildLiturgyItemFromDraft(
           : clampMomentDurationMs(draft.durationMs),
     accentColor: getTypeDotColor(type),
     categoryId: type === 'category' ? null : draft.categoryId,
+    scheduledRotationId: type === 'scheduled' ? draft.scheduledRotationId : null,
     startTime:
       type === 'category' ? normalizeLiturgyTimeHHmm(draft.startTime) : null,
     endTime:
@@ -410,7 +413,12 @@ export function draftFromLiturgyItem(item: LiturgyItem): LiturgyItemDraft {
     type: item.type,
     name:
       item.type === 'music'
-        ? (item.complementaryTitle ?? '').trim()
+        ? // Cascata: título complementar → nome do item (import .slja grava
+          // o título da música em item.name) → vazio. Sem isso, itens
+          // importados abriam o editor com o campo obrigatório vazio
+          // (feedback Ezequias/Rafael 02/10).
+          ((item.complementaryTitle ?? '').trim() ||
+            item.name.trim())
         : item.name,
     subtitle:
       item.type === 'music' ? (item.notes ?? '').trim() : item.subtitle,
@@ -424,6 +432,8 @@ export function draftFromLiturgyItem(item: LiturgyItem): LiturgyItemDraft {
           : clampMomentDurationMs(item.durationMs),
     accentColor: getTypeDotColor(item.type),
     categoryId: item.type === 'category' ? null : (item.categoryId ?? null),
+    scheduledRotationId:
+      item.type === 'scheduled' ? (item.scheduledRotationId ?? null) : null,
     startTime:
       item.type === 'category'
         ? (normalizeLiturgyTimeHHmm(item.startTime) ?? '')

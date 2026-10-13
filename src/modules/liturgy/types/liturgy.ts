@@ -82,6 +82,7 @@ export const LITURGY_TYPE_GROUPS: LiturgyTypeGroup[] = [
     types: [
       { value: 'category', dot: '#FFD600' }, // amarelo puro
       { value: 'music', dot: '#00E676' }, // verde neon
+      { value: 'scheduled', dot: '#7C4DFF' }, // roxo — agendado por data
       { value: 'annotation', dot: '#FF6D00' }, // laranja vivo
     ],
   },
@@ -156,6 +157,8 @@ export interface LiturgyItem {
    * Configurações; senão associated|<known-id>|custom:<path>.
    */
   playerId?: string
+  /** Rotação agendada (scheduled): id em useScheduledStore.categories. */
+  scheduledRotationId?: string | null
   url?: string
 }
 
@@ -212,6 +215,8 @@ export interface LiturgyItemDraft {
   /** Player do item; 'default' = herda o global das Configurações. */
   playerId: string
   url: string
+  /** Rotação agendada (scheduled) — não interfere na posição na liturgia. */
+  scheduledRotationId: string | null
 }
 
 export interface LiturgyMusicOption {
@@ -224,6 +229,8 @@ export interface LiturgyMusicOption {
   durationMs: number | null
   /** True quando há faixa instrumental no catálogo. */
   hasInstrumental: boolean
+  /** Letra normalizada (fold diacrítico) p/ busca por trecho (issue #348). */
+  lyricsText?: string
 }
 
 export interface LiturgyBibleBookOption {
@@ -240,6 +247,7 @@ export interface LiturgyItemTypeMeta {
 
 export const DEFAULT_LITURGY_ITEM_DRAFT: LiturgyItemDraft = {
   type: null,
+  scheduledRotationId: null,
   name: '',
   subtitle: '',
   durationMs: 0,

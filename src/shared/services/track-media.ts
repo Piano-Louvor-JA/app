@@ -129,6 +129,10 @@ async function readMusicRecord(
   if (musicId >= CUSTOM_MUSIC_ID_OFFSET || musicId < 0) return null
   const local = await readCatalogRecord<CatalogMusicRecord>(`music_${musicId}`)
   if (local != null) return local
+  // Faixa LOCAL do import .slja deslogado (id negativo): nunca existe no
+  // json_db remoto — tentar buscar gerava 404 em cascata nas 3 APIs
+  // (feedback Ezequias/Rafael 02/10).
+  if (musicId < 0) return null
 
   try {
     return await fetchRemoteCatalogJson<CatalogMusicRecord>(`music_${musicId}`)

@@ -29,8 +29,10 @@ import {
 import LegacyMediaImportCard from '../components/LegacyMediaImportCard.vue'
 import MediaFolderCard from '../components/MediaFolderCard.vue'
 import AppBackupCard from '../components/AppBackupCard.vue'
+import { ensureCatalogForLocale } from '@modules/starting/services/catalog-locale-service'
 
 const { t, locale } = useI18n()
+const catalogSyncState = ref<'idle' | 'syncing' | 'done' | 'error'>('idle')
 const isClearing = ref(false)
 const clearError = ref(false)
 const clearConfirmOpen = ref(false)
@@ -94,6 +96,9 @@ async function handleSyncImport() {
     }
     const result = importLouvorjaIntoBrowser(decodeLouvorjaPackage(raw))
     if (result.applied.length > 0) {
+      if (result.applied.includes("liturgy")) {
+        window.dispatchEvent(new CustomEvent("liturgy:imported"))
+      }
       syncStatus.value = {
         kind: 'success',
         messageKey: 'settings.general.syncImported',
@@ -103,6 +108,10 @@ async function handleSyncImport() {
       syncStatus.value = {
         kind: 'success',
         messageKey: 'settings.general.syncNothingToApply',
+        params: {
+          localModified: result.localModified ?? '—',
+          packageModified: result.packageModified ?? '—',
+        },
       }
     }
   } catch (error) {
@@ -135,6 +144,17 @@ function changeLanguage(lang: string) {
   currentLanguage.value = lang
   locale.value = lang
   setUserPreference(USER_PREFERENCE_KEYS.language, lang)
+  // app#339: garante o catálogo essencial do idioma alvo em bg (retomável).
+  // A UI troca na hora; hinário/bíblia/coletâneas recarregam com os índices
+  // do novo idioma assim que o download completa.
+  catalogSyncState.value = 'syncing'
+  ensureCatalogForLocale(lang)
+    .then(() => {
+      catalogSyncState.value = 'done'
+    })
+    .catch(() => {
+      catalogSyncState.value = 'error'
+    })
 }
 
 async function handleCheckUpdate() {

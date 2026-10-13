@@ -36,7 +36,7 @@ function routeFetch(musicId: number, lyricId: number, fileStatus = 200) {
 			return json({ id_collection: 55 });
 		}
 		if (u.includes("/collections/55/musics") && init?.method === "POST") {
-			return json({ id_music: musicId });
+			return json({ id_music: musicId }, 201);
 		}
 		if (u.endsWith("/files") && init?.method === "POST") {
 			files.push({});
@@ -85,10 +85,13 @@ describe("import .slja LOGADO → API custom (app#331)", () => {
 				{ lyric: "Verso dois", type: "LETRA", timeMs: 15_000, order: 2 },
 			],
 		};
-		const imported = await importSljaAsLiturgyMusic({
-			bytes: await buildSlja(archive),
-			name: "hino-autoral.slja",
-		});
+		const imported = await importSljaAsLiturgyMusic(
+			{
+				bytes: await buildSlja(archive),
+				name: "hino-autoral.slja",
+			},
+			{ confirmUpload: async () => true },
+		);
 
 		expect(imported.local).toBe(false);
 		expect(imported.musicId).toBe(7);
@@ -132,7 +135,7 @@ describe("import .slja LOGADO → API custom (app#331)", () => {
 			const json = (body: unknown, status = 200) =>
 				new Response(JSON.stringify(body), { status });
 			if (u.endsWith("/collections")) return json({ id_collection: 55 });
-			if (u.includes("/collections/55/musics")) return json({ id_music: 8 });
+			if (u.includes("/collections/55/musics")) return json({ id_music: 8 }, 201);
 			if (u.endsWith("/files")) return json({}, 500); // upload quebra
 			if (u.endsWith("/musics/8/lyrics")) return json({ id_lyric: 1 });
 			return json({ message: "nf" }, 404);
@@ -144,10 +147,13 @@ describe("import .slja LOGADO → API custom (app#331)", () => {
 			assets: [],
 			slides: [{ lyric: "Texto", type: "LETRA", timeMs: 0, order: 1 }],
 		};
-		const imported = await importSljaAsLiturgyMusic({
-			bytes: await buildSlja(archive),
-			name: "so-letra.slja",
-		});
+		const imported = await importSljaAsLiturgyMusic(
+			{
+				bytes: await buildSlja(archive),
+				name: "so-letra.slja",
+			},
+			{ confirmUpload: async () => true },
+		);
 
 		expect(imported.local).toBe(false);
 		expect(imported.hasAudio).toBe(false);
@@ -164,7 +170,7 @@ describe("import .slja LOGADO → API custom (app#331)", () => {
 				return json({ id_collection: 55 });
 			}
 			if (u.includes("/collections/55/musics") && init?.method === "POST") {
-				return json({ id_music: 7 });
+				return json({ id_music: 7 }, 201);
 			}
 			if (u.endsWith("/files") && init?.method === "POST") {
 				return json({ id_file: 44, url: "/custom/capa.png" });
@@ -229,7 +235,7 @@ describe("import .slja LOGADO → API custom (app#331)", () => {
 				return json({ id_collection: 55 });
 			}
 			if (u.includes("/collections/55/musics") && init?.method === "POST") {
-				return json({ id_music: 7 });
+				return json({ id_music: 7 }, 201);
 			}
 			if (u.endsWith("/musics/7/lyrics") && init?.method === "POST") {
 				return json({ id_lyric: 1 });
@@ -262,7 +268,7 @@ describe("import .slja LOGADO → API custom (app#331)", () => {
 				return json({ id_collection: 55 });
 			}
 			if (u.includes("/collections/55/musics") && init?.method === "POST") {
-				return json({ id_music: 7 });
+				return json({ id_music: 7 }, 201);
 			}
 			if (u.endsWith("/files") && init?.method === "POST") {
 				return json({ id_file: 1, url: "/custom/f1.mp3" });
@@ -322,7 +328,8 @@ describe("import .slja LOGADO → API custom (app#331)", () => {
      const u = String(url);
      const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
      if (u.endsWith("/collections") && init?.method === "POST") return json({ id_collection: 55 });
-     if (u.includes("/collections/55/musics") && init?.method === "POST") return json({ id_music: 7 });
+     if (u.includes("/collections/55/musics") && init?.method === "POST") return json({ id_music: 7 }, 201);
+     if (u.endsWith("/musics/7/lyrics") && init?.method === "POST") return json({ message: "persist failed" }, 500);
      if (u.endsWith("/musics/7") && init?.method === "DELETE") return json({});
      if (u.endsWith("/files") && init?.method === "POST") return json({ id_file: 901, url: "/custom/f1.png" });
      return json({ message: "not found" }, 404);
@@ -333,6 +340,7 @@ describe("import .slja LOGADO → API custom (app#331)", () => {
    };
    await expect(importSljaAsLiturgyMusic({ bytes: await buildSlja(archive), name: "lyricfail.slja" }))
      .rejects.toThrow("SLJA_IMPORT_LYRICS_INCOMPLETE");
+   expect(fetchMock.mock.calls.some(([url, init]) => String(url).endsWith("/musics/7") && init?.method === "DELETE")).toBe(true);
  });
 
  it("falha ao criar a música remota → SLJA_IMPORT_MUSIC_FAILED", async () => {

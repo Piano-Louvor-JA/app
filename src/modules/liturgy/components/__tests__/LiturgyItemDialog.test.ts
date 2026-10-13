@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { mount, flushPromises } from '@vue/test-utils'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
 import { createI18n } from 'vue-i18n'
 import LiturgyItemDialog from '../LiturgyItemDialog.vue'
 import liturgyLocale from '../../locales/pt-BR'
@@ -105,10 +106,12 @@ const defaultProps = {
 
 function createWrapper(props = {}) {
   const { attachTo, ...rest } = props as Record<string, unknown>
+  const pinia = createPinia()
+  setActivePinia(pinia)
   return mount(LiturgyItemDialog, {
     props: { ...defaultProps, ...rest },
     attachTo: attachTo as HTMLElement | undefined,
-    global: { plugins: [i18n] },
+    global: { plugins: [i18n, pinia] },
   })
 }
 
@@ -223,11 +226,11 @@ describe('LiturgyItemDialog', () => {
       expect(wrapper.vm.startTimeRequiredMissing).toBe(false)
     })
 
-    it('categoryRequiredMissing: true quando tem tipo mas sem categoryId', () => {
+    it('categoryRequiredMissing: false pois categoria é opcional', () => {
       const wrapper = createWrapper({
         draft: { ...defaultProps.draft, type: 'music', categoryId: null },
       })
-      expect(wrapper.vm.categoryRequiredMissing).toBe(true)
+      expect(wrapper.vm.categoryRequiredMissing).toBe(false)
     })
 
     it('categoryRequiredMissing: false quando categoryId setado', () => {
@@ -466,20 +469,11 @@ describe('LiturgyItemDialog', () => {
       expect(emitted.categoryId).toBe('cat2')
     })
 
-    it('onPlayerChange: igual ao global → default', async () => {
+    it('modal não expõe seletor de player (controle fica na linha)', () => {
       const wrapper = createWrapper({ draft: { ...defaultProps.draft, type: 'audio', playerId: null } })
-      wrapper.vm.onPlayerChange({ target: { value: 'associated' } })
-      await wrapper.vm.$nextTick()
-      const emitted = wrapper.emitted('update:draft')!.at(-1)![0] as { playerId: string }
-      expect(emitted.playerId).toBe('default')
-    })
-
-    it('onPlayerChange: diferente do global → mantém', async () => {
-      const wrapper = createWrapper({ draft: { ...defaultProps.draft, type: 'audio', playerId: null } })
-      wrapper.vm.onPlayerChange({ target: { value: 'vlc' } })
-      await wrapper.vm.$nextTick()
-      const emitted = wrapper.emitted('update:draft')!.at(-1)![0] as { playerId: string }
-      expect(emitted.playerId).toBe('vlc')
+      expect(wrapper.vm.onPlayerChange).toBeUndefined()
+      expect(wrapper.html()).not.toContain('VLC')
+      wrapper.unmount()
     })
 
     it('onEngineChange não-custom: patch direto', async () => {
@@ -1009,7 +1003,7 @@ it('selectLocalFile bridge SEM dialog.openFile: erro desktopOnly (372-373)', asy
     vi.mocked(getDesktopBridge).mockReturnValue(null)
   })
 
-  it('playerOptions com bridge externo: select de players renderiza options (1054)', async () => {
+  it('modal de vídeo não renderiza select de player externo', async () => {
     vi.mocked(getDesktopBridge).mockReturnValue({
       externalPlayer: {
         get: vi.fn(async () => 'vlc'),
@@ -1028,7 +1022,7 @@ it('selectLocalFile bridge SEM dialog.openFile: erro desktopOnly (372-373)', asy
       await new Promise((r) => setTimeout(r, 0))
       await flushPromises()
       const dlg = document.querySelector('.moment-dialog') as HTMLElement
-      expect(dlg.innerHTML).toContain('VLC')
+      expect(dlg.innerHTML).not.toContain('VLC')
       w.unmount()
     } finally {
       el.remove()
@@ -1073,7 +1067,7 @@ it('selectLocalFile bridge SEM dialog.openFile: erro desktopOnly (372-373)', asy
       // showMusicResults true com query 'zzz' e sem results (702)
       await w.setProps({ musicQuery: 'zzz' })
       await flushPromises()
-      expect(document.body.textContent).toContain('Nenhuma música encontrada')
+      expect(document.body.textContent).toContain('Nenhuma música no catálogo local.')
       w.unmount()
     })
 
@@ -1166,7 +1160,7 @@ it('selectLocalFile bridge SEM dialog.openFile: erro desktopOnly (372-373)', asy
         categoryOptions: [],
       })
       await flushPromises()
-      expect(document.body.textContent).toContain('Nenhuma música encontrada')
+      expect(document.body.textContent).toContain('Nenhuma música no catálogo local.')
       w.unmount()
       // categoria: select de categoria visível + opções vazias → hint 939
       const w2 = createWrapper({

@@ -165,11 +165,11 @@ describe('useLiturgy (orquestrador da view)', () => {
     const f = (wrapper.vm as unknown as { exposed: Exposed }).exposed
     await new Promise((r) => setTimeout(r, 0))
 
-    ;(f.confirmClearLiturgy as () => void)()
-    ;(f.confirmRemoveItem as (i: number) => void)(0)
-    ;(f.confirmRemoveCustom as (i: number) => void)(0)
+    await (f.confirmClearLiturgy as () => void)()
+    await (f.confirmRemoveItem as (i: number) => void)(0)
+    await (f.confirmRemoveCustom as (i: number) => void)(0)
     ;(f.onManageTeam as () => void)()
-    expect(window.alert).toHaveBeenCalled()
+    expect(appConfirmMock).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining('liturgy.messages') }))
     wrapper.unmount()
   })
 
@@ -357,21 +357,22 @@ describe('useLiturgy (orquestrador da view)', () => {
     const f = (wrapper.vm as unknown as { exposed: Exposed }).exposed
     const store = useLiturgyStore()
     await new Promise((r) => setTimeout(r, 0))
+    appConfirmMock.mockResolvedValue(true)
     window.confirm = vi.fn(() => true)
     const clearSpy = vi.spyOn(store, 'clearAllItems').mockReturnValue(undefined)
     // sem itens não chama
-    ;(f.confirmClearLiturgy as () => void)()
+    await (f.confirmClearLiturgy as () => void)()
     expect(clearSpy).not.toHaveBeenCalled()
     // com item do dia atual → chama
     store.weekdays[store.selectedDay as keyof typeof store.weekdays] = [
       { id: 'i1', type: 'category' } as never,
     ]
-    ;(f.confirmClearLiturgy as () => void)()
+    await (f.confirmClearLiturgy as () => void)()
     expect(clearSpy).toHaveBeenCalled()
     // lock ativo → nem pergunta
     vi.mocked(clearSpy).mockClear()
     store.toggleDeletionLock()
-    ;(f.confirmClearLiturgy as () => void)()
+    await (f.confirmClearLiturgy as () => void)()
     expect(clearSpy).not.toHaveBeenCalled()
     wrapper.unmount()
   })
@@ -513,12 +514,13 @@ describe('useLiturgy (orquestrador da view)', () => {
       { id: 'c1', type: 'category' } as never,
       { id: 'm1', type: 'music', musicId: 7 } as never,
     ]
+    appConfirmMock.mockResolvedValue(false)
     window.confirm = vi.fn(() => false)
-    ;(f.confirmRemoveItem as (i: number) => void)(0) // category branch
-    ;(f.confirmRemoveItem as (i: number) => void)(1) // music branch
+    await (f.confirmRemoveItem as (i: number) => void)(0) // category branch
+    await (f.confirmRemoveItem as (i: number) => void)(1) // music branch
     // índice fora → item undefined → early return sem confirm
     window.confirm = vi.fn()
-    ;(f.confirmRemoveItem as (i: number) => void)(9)
+    await (f.confirmRemoveItem as (i: number) => void)(9)
     expect(window.confirm).not.toHaveBeenCalled()
     wrapper.unmount()
   })
@@ -623,36 +625,38 @@ describe('useLiturgy (orquestrador da view)', () => {
     expect(label).toBeTypeOf('string')
 
     // confirmRemoveCustom: confirm false → sem remove; custom inexistente → name ''
+    appConfirmMock.mockResolvedValue(false)
     const rmSpy = vi.spyOn(store, 'removeCustomLiturgy').mockReturnValue(undefined)
-    ;(f.confirmRemoveCustom as (i: number) => void)(0) // confirm false (default)
+    await (f.confirmRemoveCustom as (i: number) => void)(0) // confirm false (default)
     expect(rmSpy).not.toHaveBeenCalled()
-    ;(f.confirmRemoveCustom as (i: number) => void)(9)
-    expect(window.confirm).toHaveBeenCalledWith(
-      expect.stringContaining('confirmDeleteCustom:'),
-    )
+    await (f.confirmRemoveCustom as (i: number) => void)(9)
+    expect(appConfirmMock).toHaveBeenCalledWith(expect.objectContaining({message: expect.stringContaining('confirmDeleteCustom:')}))
 
     // confirmRemoveItem: category confirm true → remove
+    appConfirmMock.mockResolvedValue(true)
     window.confirm = vi.fn(() => true)
     ;(f.selectDay as (d: string) => void)('sabbath')
     store.weekdays[store.selectedDay as keyof typeof store.weekdays] = [
       { id: 'c1', type: 'category' } as never,
     ]
     const remSpy = vi.spyOn(store, 'removeItem').mockReturnValue(undefined)
-    ;(f.confirmRemoveItem as (i: number) => void)(0)
+    await (f.confirmRemoveItem as (i: number) => void)(0)
     expect(remSpy).toHaveBeenCalledWith(0)
 
     // deletionLocked → nem pergunta
     remSpy.mockClear()
     store.toggleDeletionLock()
-    ;(f.confirmRemoveItem as (i: number) => void)(0)
+    await (f.confirmRemoveItem as (i: number) => void)(0)
     expect(remSpy).not.toHaveBeenCalled()
 
     // confirmClear: confirm false → sem clear
+    appConfirmMock.mockResolvedValue(false)
     window.confirm = vi.fn(() => false)
     const clearSpy = vi.spyOn(store, 'clearAllItems').mockReturnValue(undefined)
-    ;(f.confirmClearLiturgy as () => void)()
+    await (f.confirmClearLiturgy as () => void)()
     expect(clearSpy).not.toHaveBeenCalled()
 
+    appConfirmMock.mockClear()
     // importScheduled web: cancel (sem arquivo) → aborta silencioso
     vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(
       function (this: HTMLInputElement) {
@@ -813,23 +817,26 @@ describe('useLiturgy (orquestrador da view)', () => {
     ]
     store.toggleDeletionLock()
     const clearSpy = vi.spyOn(store, 'clearAllItems').mockReturnValue(undefined)
+    appConfirmMock.mockResolvedValue(true)
     window.confirm = vi.fn(() => true)
-    ;(f.confirmClearLiturgy as () => void)()
+    await (f.confirmClearLiturgy as () => void)()
     expect(clearSpy).not.toHaveBeenCalled()
 
     // confirmClear: itens presentes, sem lock, confirm recusado → return
     store.toggleDeletionLock()
+    appConfirmMock.mockResolvedValue(false)
     window.confirm = vi.fn(() => false)
-    ;(f.confirmClearLiturgy as () => void)()
+    await (f.confirmClearLiturgy as () => void)()
     expect(clearSpy).not.toHaveBeenCalled()
-    expect(window.confirm).toHaveBeenCalledWith('liturgy.messages.confirmClear')
+    expect(appConfirmMock).toHaveBeenCalledWith(expect.objectContaining({ message: 'liturgy.messages.confirmClear' }))
 
     // confirmRemoveCustom: confirm true → remove de fato
+    appConfirmMock.mockResolvedValue(true)
     window.confirm = vi.fn(() => true)
     ;(f.customLiturgies as unknown as { value: unknown[] }).value = [
       { id: 'c9', name: 'X', items: [], notes: '', startTime: null, endTime: null },
     ]
-    ;(f.confirmRemoveCustom as (i: number) => void)(0)
+    await (f.confirmRemoveCustom as (i: number) => void)(0)
     expect(
       (f.customLiturgies as unknown as { value: unknown[] }).value,
     ).toHaveLength(0)

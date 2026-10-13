@@ -8,6 +8,10 @@ export type ProgressPayload = {
 export type WorkspaceApi = {
   /** Lê bytes de arquivo escolhido via openFile (decode fica no caller). */
   readBinaryFile?: (path: string) => Promise<Uint8Array | null>
+  /** Baixa url → Media/provai-e-vede/<fileName>. Retorna o caminho local ou null. */
+  downloadToMedia?: (url: string, fileName: string) => Promise<string | null>
+  /** Fetch de página remota pelo main process (sem CORS). Retorna texto ou null. */
+  fetchText?: (url: string) => Promise<string | null>
   getRecord: <T = unknown>(filename: string) => Promise<T | null>
   saveRecord: (filename: string, data: unknown) => Promise<boolean>
   clear: (options?: { preserveMedia?: boolean }) => Promise<boolean>
@@ -418,9 +422,16 @@ export type RandomAudioApi = {
   }>
 }
 
+export type DiagnosticsApi = {
+  run: () => Promise<{ report: unknown; jsonPath: string; txtPath: string }>
+  send: (report: unknown) => Promise<{ ok: boolean; reason?: string }>
+  openFolder: (filePath: string) => Promise<void>
+}
+
 export type LouvorJaBridge = {
   platform: string
   isElectron: boolean
+  diagnostics?: DiagnosticsApi
   window?: WindowApi
   zoom?: ZoomApi
   workspace: WorkspaceApi

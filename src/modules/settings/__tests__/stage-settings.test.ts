@@ -57,6 +57,16 @@ describe('stage-settings (paridade APK)', () => {
     expect(s.bibleTextColor).toBe('#B8E0FF')
   })
 
+  it('bTransform aceita a allowlist e cai em none se for legado', () => {
+    expect(parseStageSettings({ bTransform: 'uppercase' }).bibleTextTransform).toBe('uppercase')
+    expect(parseStageSettings({ bTransform: 'capitalize' }).bibleTextTransform).toBe('capitalize')
+    expect(parseStageSettings({ bTransform: 'lowercase' }).bibleTextTransform).toBe('none')
+    expect(parseStageSettings({}).bibleTextTransform).toBe('none')
+    const s = { ...DEFAULT_STAGE_SETTINGS, bibleTextTransform: 'uppercase' as const }
+    expect(serializeStageSettings(s).bTransform).toBe('uppercase')
+    expect(parseStageSettings(serializeStageSettings(s)).bibleTextTransform).toBe('uppercase')
+  })
+
   it('parse clampa valores fora de faixa (como o APK)', () => {
     const s = parseStageSettings({ size: 999, tsBlur: 99, boxBg: 5 })
     expect(s.fontSize).toBe(160)
