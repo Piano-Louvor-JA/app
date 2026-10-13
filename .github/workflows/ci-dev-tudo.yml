@@ -33,11 +33,12 @@ jobs:
           fi
           git diff --check
       - run: npm run type-check
-      - run: npm test
       - name: Build normal production
         run: |
           npm run build-only
           test -z "$(find dist/assets -name 'DiagnosticsView-*.js' -print -quit)"
+      # renderer-server testa os assets reais de dist; build deve preceder a suíte.
+      - run: npm test
       - name: Build diagnostics campaign
         env:
           VITE_DIAGNOSTICS_CAMPAIGN: '1'
