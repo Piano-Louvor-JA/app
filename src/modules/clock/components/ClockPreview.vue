@@ -78,7 +78,7 @@ function computeAccentColor(
   preview: boolean,
   configTextColor: string,
 ): string {
-  if (st) return st.textColor
+  if (st) return st.textColor ?? '#FFFFFF'
   if (preview) return 'var(--ds-color-on-surface)'
   return configTextColor
 }

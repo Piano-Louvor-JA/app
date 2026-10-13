@@ -164,6 +164,7 @@ export default {
         weight900: 'Extra',
         backgroundColor: 'Color de fondo',
         autoBg: 'Auto (imagen)',
+        autoText: 'Auto (predeterminado)',
         backgroundImage: 'Imagen de fondo',
         selectImage: 'Haga clic para seleccionar una imagen',
         removeImage: 'Eliminar imagen',

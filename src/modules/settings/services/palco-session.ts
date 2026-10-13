@@ -15,7 +15,7 @@ import {
 import { getPalcoRoute, type PalcoModule } from './palco-routing'
 
 /** Envolve o HTML do texto em cor (receiver não lê textColor separado). */
-function colorizeProjectionText(text: string, color: string): string {
+function colorizeProjectionText(text: string, color: string | null): string {
   if (!text || !color) return text
   // Já colorizado (reprojeção / caller explícito): não aninha.
   if (/^<span\s+style=["']color:/i.test(text.trim())) return text

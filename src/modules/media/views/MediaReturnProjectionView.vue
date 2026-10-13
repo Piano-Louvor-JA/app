@@ -348,7 +348,7 @@ const showNext = computed(() => Boolean(shownNext.value) || shownNextCover.value
 const progressPct = computed(() => Math.round(barDisplay.value * 100))
 
 const textStyle = computed(() => ({
-  color: stage.value.textColor,
+  color: stage.value.textColor ?? undefined,
   fontSize: `${(stage.value.fontSize / 1920) * 100}cqw`,
   fontWeight: String(stage.value.fontWeight),
   textAlign: stage.value.textAlign,

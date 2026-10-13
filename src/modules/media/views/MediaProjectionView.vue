@@ -86,7 +86,7 @@ const bgImage = computed(
 const contentStyle = computed(() => stageFlexAlign(stage.value))
 
 const textStyle = computed(() => ({
-  color: stage.value.textColor,
+  color: stage.value.textColor ?? undefined,
   fontSize: `${(stage.value.fontSize / 1920) * 100}cqw`,
   fontWeight: String(stage.value.fontWeight),
   textAlign: stage.value.textAlign,
@@ -102,7 +102,7 @@ const titleStyle = computed(() => {
     ...textStyle.value,
     fontSize: `${((st.titleFontSize ?? st.fontSize) / 1920) * 100}cqw`,
     fontWeight: String(st.titleFontWeight ?? st.fontWeight),
-    color: st.titleTextColor ?? st.textColor,
+    color: st.titleTextColor ?? st.textColor ?? undefined,
     textShadow: (st.titleTextShadow ?? st.textShadow)
       ? `0 0 ${(st.shadowBlur / 108) * 100}cqw rgba(0,0,0,${st.shadowIntensity})`
       : 'none',
@@ -117,7 +117,7 @@ const lyricStyle = computed(() => {
     ...textStyle.value,
     fontSize: `${((st.lyricFontSize ?? st.fontSize) / 1920) * 100}cqw`,
     fontWeight: String(st.lyricFontWeight ?? st.fontWeight),
-    color: st.lyricTextColor ?? st.textColor,
+    color: st.lyricTextColor ?? st.textColor ?? undefined,
     textShadow: (st.lyricTextShadow ?? st.textShadow)
       ? `0 0 ${(st.shadowBlur / 108) * 100}cqw rgba(0,0,0,${st.shadowIntensity})`
       : 'none',

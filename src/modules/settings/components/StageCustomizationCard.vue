@@ -371,6 +371,18 @@ const confirmReset = ref(false)
       <div class="stage-custom__section">
         <p class="stage-custom__label">{{ t('settings.stage.textColor') }}</p>
         <div class="stage-custom__swatches">
+          <!-- Auto (default null): sem cor setada → render usa o padrão dele.
+               Clicar aqui limpa a escolha (13/10 Rafael). -->
+          <button
+            type="button"
+            class="stage-custom__swatch stage-custom__swatch--auto"
+            :class="{ 'stage-custom__swatch--active': settings.textColor == null }"
+            :aria-label="t('settings.stage.autoText')"
+            :title="t('settings.stage.autoText')"
+            @click="patch({ textColor: null })"
+          >
+            <i class="ti ti-eraser" aria-hidden="true" />
+          </button>
           <button
             v-for="preset in STAGE_FG_PRESETS"
             :key="preset.color"
@@ -385,7 +397,7 @@ const confirmReset = ref(false)
             <i class="ti ti-color-picker" aria-hidden="true" />
             <input
               type="color"
-              :value="settings.textColor"
+              :value="settings.textColor ?? '#FFFFFF'"
               :aria-label="t('settings.stage.textColor')"
               @input="patch({ textColor: ($event.target as HTMLInputElement).value })"
             >
@@ -448,6 +460,16 @@ const confirmReset = ref(false)
         </p>
         <div class="stage-custom__swatches">
           <button
+            type="button"
+            class="stage-custom__swatch stage-custom__swatch--auto"
+            :class="{ 'stage-custom__swatch--active': settings.titleTextColor == null }"
+            :aria-label="t('settings.stage.autoText')"
+            :title="t('settings.stage.autoText')"
+            @click="patch({ titleTextColor: null })"
+          >
+            <i class="ti ti-eraser" aria-hidden="true" />
+          </button>
+          <button
             v-for="preset in STAGE_FG_PRESETS"
             :key="preset.color"
             type="button"
@@ -461,7 +483,7 @@ const confirmReset = ref(false)
             <i class="ti ti-color-picker" aria-hidden="true" />
             <input
               type="color"
-              :value="settings.titleTextColor ?? settings.textColor"
+              :value="settings.titleTextColor ?? settings.textColor ?? '#FFFFFF'"
               :aria-label="t('settings.stage.titleTextColor')"
               @input="patch({ titleTextColor: ($event.target as HTMLInputElement).value })"
             >
@@ -556,6 +578,16 @@ const confirmReset = ref(false)
         </p>
         <div class="stage-custom__swatches">
           <button
+            type="button"
+            class="stage-custom__swatch stage-custom__swatch--auto"
+            :class="{ 'stage-custom__swatch--active': settings.lyricTextColor == null }"
+            :aria-label="t('settings.stage.autoText')"
+            :title="t('settings.stage.autoText')"
+            @click="patch({ lyricTextColor: null })"
+          >
+            <i class="ti ti-eraser" aria-hidden="true" />
+          </button>
+          <button
             v-for="preset in STAGE_FG_PRESETS"
             :key="preset.color"
             type="button"
@@ -569,7 +601,7 @@ const confirmReset = ref(false)
             <i class="ti ti-color-picker" aria-hidden="true" />
             <input
               type="color"
-              :value="settings.lyricTextColor ?? settings.textColor"
+              :value="settings.lyricTextColor ?? settings.textColor ?? '#FFFFFF'"
               :aria-label="t('settings.stage.lyricTextColor')"
               @input="patch({ lyricTextColor: ($event.target as HTMLInputElement).value })"
             >
@@ -654,6 +686,16 @@ const confirmReset = ref(false)
         </p>
         <div class="stage-custom__swatches">
           <button
+            type="button"
+            class="stage-custom__swatch stage-custom__swatch--auto"
+            :class="{ 'stage-custom__swatch--active': settings.bibleTextColor == null }"
+            :aria-label="t('settings.stage.autoText')"
+            :title="t('settings.stage.autoText')"
+            @click="patch({ bibleTextColor: null })"
+          >
+            <i class="ti ti-eraser" aria-hidden="true" />
+          </button>
+          <button
             v-for="preset in STAGE_FG_PRESETS"
             :key="preset.color"
             type="button"
@@ -667,7 +709,7 @@ const confirmReset = ref(false)
             <i class="ti ti-color-picker" aria-hidden="true" />
             <input
               type="color"
-              :value="settings.bibleTextColor"
+              :value="settings.bibleTextColor ?? '#FFFFFF'"
               :aria-label="t('settings.stage.bibleTextColor')"
               @input="patch({ bibleTextColor: ($event.target as HTMLInputElement).value })"
             >
@@ -744,6 +786,16 @@ const confirmReset = ref(false)
         </p>
         <div class="stage-custom__swatches">
           <button
+            type="button"
+            class="stage-custom__swatch stage-custom__swatch--auto"
+            :class="{ 'stage-custom__swatch--active': settings.footerRefColor == null }"
+            :aria-label="t('settings.stage.autoText')"
+            :title="t('settings.stage.autoText')"
+            @click="patch({ footerRefColor: null })"
+          >
+            <i class="ti ti-eraser" aria-hidden="true" />
+          </button>
+          <button
             v-for="preset in STAGE_REF_PRESETS"
             :key="preset.color"
             type="button"
@@ -757,7 +809,7 @@ const confirmReset = ref(false)
             <i class="ti ti-color-picker" aria-hidden="true" />
             <input
               type="color"
-              :value="settings.footerRefColor"
+              :value="settings.footerRefColor ?? '#FCCE02'"
               :aria-label="t('settings.stage.footerRefColor')"
               @input="patch({ footerRefColor: ($event.target as HTMLInputElement).value })"
             >

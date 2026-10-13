@@ -45,7 +45,7 @@ const baseTextColor = computed(() => {
     return props.preview ? 'var(--ds-color-error, #ff5252)' : '#ff3b30'
   }
   if (isUrgent.value) return '#ffa726'
-  if (props.stage) return props.stage.textColor
+  if (props.stage) return props.stage.textColor ?? '#FFFFFF'
   if (props.preview) return 'var(--ds-color-on-surface)'
   return props.config.textColor
 })

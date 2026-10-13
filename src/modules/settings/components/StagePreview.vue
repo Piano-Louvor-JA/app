@@ -43,7 +43,7 @@ const textStyle = computed(() => {
   const s = props.settings
   const isBible = props.module === 'bible'
   return {
-    color: isBible ? s.bibleTextColor : s.textColor,
+    color: (isBible ? s.bibleTextColor : s.textColor) ?? undefined,
     // 96px @1920 → 5% da largura do preview (font-size em cqw)
     fontSize: `${((isBible ? s.bibleFontSize : s.fontSize) / 1920) * 100}cqw`,
     fontWeight: String(isBible ? s.bibleFontWeight : s.fontWeight),
@@ -69,7 +69,7 @@ const boxStyle = computed(() => {
 })
 
 const footerStyle = computed(() => ({
-  color: props.settings.footerRefColor,
+  color: props.settings.footerRefColor ?? undefined,
   fontWeight: String(props.settings.footerRefWeight),
 }))
 </script>

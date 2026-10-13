@@ -104,7 +104,7 @@ const verseStyle = computed(() => {
   const cqw =
     (stage.value.bibleFontSize / 1920) * 100 * adaptiveBibleFontScale.value
   return {
-    color: stage.value.bibleTextColor,
+    color: stage.value.bibleTextColor ?? undefined,
     fontSize: `${cqw}cqw`,
     fontWeight: String(stage.value.bibleFontWeight),
     textAlign: stage.value.textAlign,
@@ -142,7 +142,7 @@ const verseBoxStyle = computed(() => {
 })
 
 const referenceStyle = computed(() => ({
-  color: stage.value.footerRefColor,
+  color: stage.value.footerRefColor ?? undefined,
   fontWeight: String(stage.value.footerRefWeight),
 }))
 </script>
