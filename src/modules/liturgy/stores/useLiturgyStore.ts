@@ -1,4 +1,6 @@
 import { defineStore } from 'pinia'
+
+import { useScheduledStore } from './useScheduledStore'
 import { computed, onScopeDispose, ref } from 'vue'
 import type { Router } from 'vue-router'
 
@@ -321,11 +323,21 @@ export const useLiturgyStore = defineStore('liturgy', () => {
 
   const isDraftValid = computed(() => isLiturgyItemDraftValid(itemDraft.value))
 
-  const categoryOptions = computed(() =>
-    currentItems.value
+  const categoryOptions = computed(() => {
+    const base = currentItems.value
       .filter((item) => item.type === 'category')
-      .map((item) => ({ id: item.id, name: item.name })),
-  )
+      .map((item) => ({ id: item.id, name: item.name }))
+    // Placeholder agendado: o "categoria" dele é uma ROTAÇÃO do store agendado
+    // (ex.: Provai e Vede) — 1 click resolve a entrada da data no culto.
+    if (itemDraft.value.type === 'scheduled') {
+      const rotations = useScheduledStore()
+      return [
+        ...base,
+        ...rotations.categories.map((rot) => ({ id: rot.id, name: rot.name })),
+      ]
+    }
+    return base
+  })
 
   const complementaryTitleSuggestions = computed(() => {
     const titles = new Set<string>()
@@ -533,7 +545,10 @@ export const useLiturgyStore = defineStore('liturgy', () => {
       let changed = false
       const nextWeekdays = { ...weekdays.value }
       for (const day of Object.keys(nextWeekdays) as LiturgyWeekday[]) {
-        const reconciled = reconcileMusicItemTitles(nextWeekdays[day], music)
+        // Catálogo chegou DEPOIS do import (.ja/.louvorja com durationMs: 0):
+        // mesma passada reconcilia títulos E preenche durações zeradas da API.
+        const enriched = await enrichItemsDurations(nextWeekdays[day], music)
+        const reconciled = reconcileMusicItemTitles(enriched, music)
         if (reconciled !== nextWeekdays[day]) {
           nextWeekdays[day] = reconciled
           changed = true
@@ -541,12 +556,15 @@ export const useLiturgyStore = defineStore('liturgy', () => {
       }
       weekdays.value = nextWeekdays
 
-      customLiturgies.value = customLiturgies.value.map((custom) => {
-        const reconciled = reconcileMusicItemTitles(custom.items, music)
-        if (reconciled === custom.items) return custom
-        changed = true
-        return { ...custom, items: reconciled }
-      })
+      customLiturgies.value = await Promise.all(
+        customLiturgies.value.map(async (custom) => {
+          const enriched = await enrichItemsDurations(custom.items, music)
+          const reconciled = reconcileMusicItemTitles(enriched, music)
+          if (reconciled === custom.items) return custom
+          changed = true
+          return { ...custom, items: reconciled }
+        }),
+      )
 
       if (changed) persist()
     } finally {
@@ -978,7 +996,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     const item = markItemStarted(index)
     if (!item) return
 
-    const result = await executeLiturgyItem(item, router)
+    const result = await executeLiturgyItem(item, router, { day: selectedDay.value })
     if (item.type === 'site') {
       siteProjectionItemId.value = null
     } else if (

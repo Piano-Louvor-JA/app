@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import PalcoRouteSelect from '../../settings/components/PalcoRouteSelect.vue'
@@ -7,6 +7,10 @@ import StagePaletteButton from '../../settings/components/StagePaletteButton.vue
 import AlbumLyricDialog from '@modules/albums/components/AlbumLyricDialog.vue'
 
 import LiturgyCloneDialog from '../components/LiturgyCloneDialog.vue'
+import LiturgyScheduledDialog from '../components/LiturgyScheduledDialog.vue'
+import { useScheduledStore } from '../stores/useScheduledStore'
+import { resolveScheduledEntry } from '../services/scheduled-resolver'
+import { activeDateISO } from '../services/liturgy-preferences'
 import LiturgyCustomBar from '../components/LiturgyCustomBar.vue'
 import LiturgyCustomDialog from '../components/LiturgyCustomDialog.vue'
 import LiturgyDayTabs from '../components/LiturgyDayTabs.vue'
@@ -14,6 +18,53 @@ import LiturgyItemDialog from '../components/LiturgyItemDialog.vue'
 import LiturgySidebar from '../components/LiturgySidebar.vue'
 import LiturgyTimeline from '../components/LiturgyTimeline.vue'
 import { useLiturgy } from '../composables/useLiturgy'
+
+const scheduledDialogOpen = ref(false)
+
+// Placeholder agendado → entrada do dia (badge na timeline).
+const scheduledStore = useScheduledStore()
+const scheduledResolvedByItemId = computed(() => {
+  const map: Record<
+    string,
+    | { entryName: string; kindLabel: string; kind: string; filePath?: string }
+    | { empty: string }
+  > = {}
+  const day = selectedDay.value as import('../types/liturgy').LiturgyDayKey
+  const dateISO = activeDateISO(day)
+  for (const item of currentItems.value) {
+    if (item.type !== 'scheduled') continue
+    const rotationId =
+      item.scheduledRotationId?.trim() || item.categoryId?.trim()
+    if (!rotationId) continue
+    const rotationName = scheduledStore.categoryName(rotationId)
+    const resolved = resolveScheduledEntry(
+      rotationId,
+      dateISO,
+      scheduledStore.categories,
+      scheduledStore.items,
+    )
+    if (resolved) {
+      map[item.id] = {
+        entryName: `${rotationName}: ${resolved.entryName}`,
+        kindLabel: t(`liturgy.messages.scheduledKind.${resolved.kind}`),
+        kind: resolved.kind,
+        filePath:
+          resolved.content?.kind === 'file'
+            ? resolved.content.filePath
+            : undefined,
+      }
+    } else {
+      // Sem entrada na data: dizer QUAL data e QUAL rotação — ponteiro cego não.
+      map[item.id] = {
+        empty: t('liturgy.messages.scheduledEmptyForDate', {
+          date: dateISO.split('-').reverse().join('/'),
+          rotation: rotationName ?? '—',
+        }),
+      }
+    }
+  }
+  return map
+})
 
 const { t } = useI18n()
 
@@ -214,6 +265,19 @@ async function onSljaImported(): Promise<void> {
             </button>
 
             <button
+              type="button"
+              class="liturgy-view__clear"
+              :title="t('liturgy.messages.scheduledTitle')"
+              @click="scheduledDialogOpen = true"
+            >
+              <i
+                class="ti ti-calendar-time"
+                aria-hidden="true"
+              />
+              <span>{{ t('liturgy.messages.scheduledTitle') }}</span>
+            </button>
+
+            <button
               v-if="currentItems.length > 0"
               type="button"
               class="liturgy-view__lock"
@@ -285,6 +349,7 @@ async function onSljaImported(): Promise<void> {
           :start-labels="startLabels"
           :duration-labels="durationLabels"
           :can-clone="canCloneLiturgy"
+          :scheduled-resolved-by-item-id="scheduledResolvedByItemId"
           :deletion-locked="deletionLocked"
           :music-instrumental-by-id="musicInstrumentalById"
           :busy-music-id="busyMusicId"
@@ -343,6 +408,11 @@ async function onSljaImported(): Promise<void> {
       @close="closeCloneDialog"
       @confirm="cloneLiturgyFromSelected"
       @update:source-key="cloneSourceKey = $event"
+    />
+
+    <LiturgyScheduledDialog
+      :open="scheduledDialogOpen"
+      @close="scheduledDialogOpen = false"
     />
 
     <AlbumLyricDialog

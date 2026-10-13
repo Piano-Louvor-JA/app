@@ -22,6 +22,7 @@ import {
   type LiturgyMusicOption,
 } from '../types/liturgy'
 import { probeMediaDurationMs } from '../services/media-probe'
+import { useScheduledStore } from '../stores/useScheduledStore'
 import { useExternalPlayerChoices } from '../composables/useExternalPlayerChoices'
 import {
   importSljaAsLiturgyMusic,
@@ -281,6 +282,9 @@ const dialogTitle = computed(() => {
   return t('liturgy.dialog.title')
 })
 
+const scheduledStore = useScheduledStore()
+const rotationOptions = computed(() => scheduledStore.categories)
+
 const typeGroups = computed(() => {
   const groups = LITURGY_TYPE_GROUPS.map((group) => ({
     ...group,
@@ -516,6 +520,12 @@ async function selectLocalFile() {
 function onCategoryChange(event: Event) {
   const value = (event.target as HTMLSelectElement).value
   patch({ categoryId: value || null })
+}
+
+/** Rotação agendada: campo PRÓPRIO — nunca move o item na árvore da liturgia. */
+function onRotationChange(event: Event) {
+  const value = (event.target as HTMLSelectElement).value
+  patch({ scheduledRotationId: value || null })
 }
 
 const { loadPlayerChoices } = useExternalPlayerChoices()
@@ -1034,7 +1044,49 @@ function isLightDot(hex: string): boolean {
             </div>
 
             <div
-              v-if="showCategoryField"
+              v-if="draft.type === 'scheduled'"
+              class="moment-dialog__section"
+            >
+              <label
+                class="moment-dialog__label"
+                :class="{ 'moment-dialog__label--error': categoryFieldError }"
+                for="moment-rotation"
+              >
+                {{
+                  t('liturgy.dialog.rotationField')
+                }}
+                <span
+                  class="moment-dialog__required"
+                  aria-hidden="true"
+                >*</span>
+              </label>
+              <select
+                id="moment-rotation"
+                class="moment-dialog__input moment-dialog__select"
+                :value="draft.scheduledRotationId ?? ''"
+                :aria-invalid="categoryFieldError"
+                @change="onRotationChange"
+              >
+                <option value="">
+                  {{ t('liturgy.dialog.categoryPlaceholder') }}
+                </option>
+                <option
+                  v-for="option in rotationOptions"
+                  :key="option.id"
+                  :value="option.id"
+                >
+                  {{ option.name }}
+                </option>
+              </select>
+              <p
+                v-if="categoryFieldError"
+                class="moment-dialog__error"
+              >
+                {{ t('liturgy.dialog.categoryRequired') }}
+              </p>
+            </div>
+            <div
+              v-if="showCategoryField && draft.type !== 'scheduled'"
               class="moment-dialog__section"
             >
               <label
