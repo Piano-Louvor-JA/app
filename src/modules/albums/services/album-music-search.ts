@@ -225,17 +225,23 @@ export async function loadAlbumMusicIndex(): Promise<AlbumSearchHit[]> {
  * Busca por hinos: título, álbum ou número do hinário (máx. 50).
  * Número prioriza Hinário Adventista atual, depois 1996.
  *
- * Relevância (apk#127 / SPEC 10): match de TÍTULO ou NÚMERO sempre
- * precede match só de ÁLBUM — um termo que casa com o nome da coletânea
- * NÃO pode retornar todas as faixas dela como se fossem resultado direto;
- * os matches de álbum entram apenas como cauda, ordenados por relevância.
+ * Relevância (apk#127 / SPEC 10): na busca textual, match de título
+ * precede match só de álbum ou de letra. Um termo que casa com o nome
+ * da coletânea não pode devolver todas as faixas dela na frente.
+ * O fold é o mesmo da busca por termos, para título acentuado não cair
+ * na cauda.
  */
+function foldSearchText(value: string): string {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+}
+
 function relevanceScore(entry: AlbumSearchHit, trimmed: string): number {
-  const title = entry.name.toLowerCase()
-  if (title === trimmed) return 3 // título exato
-  if (title.startsWith(trimmed)) return 2 // título começa com o termo
-  if (title.includes(trimmed)) return 1 // título contém
-  return 0 // só álbum
+  const title = foldSearchText(entry.name)
+  const query = foldSearchText(trimmed)
+  if (title === query) return 3
+  if (title.startsWith(query)) return 2
+  if (title.includes(query)) return 1
+  return 0
 }
 
 export function filterAlbumMusicIndex(

@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { test } from 'node:test'
@@ -209,7 +209,6 @@ test('workflows preservam a publicação padrão e omitem só a promoção marca
     'release.yml': readFileSync(join(repoRoot, '.github/workflows/release.yml'), 'utf8'),
     'build-macos.yml': readFileSync(join(repoRoot, '.github/workflows/build-macos.yml'), 'utf8'),
     'build-windows.yml': readFileSync(join(repoRoot, '.github/workflows/build-windows.yml'), 'utf8'),
-    'build-flatpak.yml': readFileSync(join(repoRoot, '.github/workflows/build-flatpak.yml'), 'utf8'),
   }
   for (const [name, text] of Object.entries(workflows)) {
     assert.match(text, /^on:/m, name)
@@ -225,6 +224,6 @@ test('workflows preservam a publicação padrão e omitem só a promoção marca
   assert.match(workflows['build-macos.yml'], /if: steps\.decision\.outputs\.publish == 'true'/)
   assert.match(workflows['build-windows.yml'], /gh release upload/)
   assert.match(workflows['build-windows.yml'], /if: steps\.decision\.outputs\.publish == 'true'/)
-  assert.match(workflows['build-flatpak.yml'], /needs: decide/)
-  assert.ok(workflows['build-flatpak.yml'].includes('name=louvorja-piano.flatpak'))
+  assert.equal(existsSync(join(repoRoot, '.github/workflows/build-flatpak.yml')), false)
+  assert.equal(existsSync(join(repoRoot, 'packaging/flatpak')), false)
 })
