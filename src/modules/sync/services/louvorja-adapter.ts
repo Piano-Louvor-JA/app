@@ -33,6 +33,21 @@ import {
 	LOUVORJA_SCHEMA_VERSION,
 	type LouvorjaSyncPackage,
 } from "./louvorja-package";
+import {
+	loadLocalDb,
+	replaceLocalDb,
+} from "@modules/media/services/local-custom-store";
+import {
+	MEDIA_CUSTOM_CATALOG_ENTITY,
+	PREFERENCES_ENTITY,
+	applyPreferencesData,
+	exportMediaCustomCatalogDb,
+	exportPreferencesData,
+	parseMediaCustomCatalogData,
+	preserveLocalAudio,
+} from "./louvorja-entities";
+
+import { backupMediaCustomCatalog } from './media-custom-backup';
 
 /** Mesmo prefixo do APK (`sync_timestamps.dart`). */
 export const SYNC_MODIFIED_PREFIX = "sync.modified.v1";
@@ -124,6 +139,26 @@ export function exportLouvorjaFromBrowser(
 		}
 	}
 
+	// Coletâneas custom locais (Minhas Coletâneas modo sem-auth).
+	const customDb = exportMediaCustomCatalogDb();
+	if (customDb.collections.length > 0 || customDb.musics.length > 0) {
+		entities[MEDIA_CUSTOM_CATALOG_ENTITY] = {
+			type: MEDIA_CUSTOM_CATALOG_ENTITY,
+			modified: readModified(MEDIA_CUSTOM_CATALOG_ENTITY) || new Date().toISOString(),
+			data: { db: customDb },
+		};
+	}
+
+	// Preferências de palco/letra (allowlist — nunca blob opaco).
+	const prefData = exportPreferencesData();
+	if (Object.keys(prefData).length > 0) {
+		entities[PREFERENCES_ENTITY] = {
+			type: PREFERENCES_ENTITY,
+			modified: readModified(PREFERENCES_ENTITY) || new Date().toISOString(),
+			data: prefData,
+		};
+	}
+
 	const scheduled = getUserPreference<ScheduledState>(
 		USER_PREFERENCE_KEYS.scheduledState,
 		null,
@@ -147,6 +182,7 @@ export function exportLouvorjaFromBrowser(
 
 export function importLouvorjaIntoBrowser(
 	pkg: LouvorjaSyncPackage,
+	options: { catalogReplacementConfirmed?: boolean } = {},
 ): LouvorjaImportResult {
 	const applied: string[] = [];
 	const skipped: string[] = [];
@@ -210,8 +246,63 @@ export function importLouvorjaIntoBrowser(
 					skipped.push("liturgy");
 				}
 				break;
+			}
+			case MEDIA_CUSTOM_CATALOG_ENTITY: {
+				const localTs = readModified(MEDIA_CUSTOM_CATALOG_ENTITY);
+				if (toEpoch(entity.modified) > toEpoch(localTs)) {
+					const next = parseMediaCustomCatalogData(entity.data);
+					if (next == null) {
+						skipped.push(MEDIA_CUSTOM_CATALOG_ENTITY);
+						break;
+					}
+					if (!options.catalogReplacementConfirmed) {
+						skipped.push(MEDIA_CUSTOM_CATALOG_ENTITY);
+						break;
+					}
+					backupMediaCustomCatalog();
+					// Substituição total SÓ desta entidade (offline-first:
+					// liturgia/preferências não são tocados; áudio local existente
+					// com o mesmo id é preservado).
+					const merged = preserveLocalAudio(
+						next,
+						loadLocalDb(),
+					);
+					if (replaceLocalDb(merged)) {
+						localStorage.setItem(
+							`${SYNC_MODIFIED_PREFIX}.${MEDIA_CUSTOM_CATALOG_ENTITY}`,
+							entity.modified,
+						);
+						applied.push(MEDIA_CUSTOM_CATALOG_ENTITY);
+					} else {
+						skipped.push(MEDIA_CUSTOM_CATALOG_ENTITY);
+					}
+				} else {
+					skipped.push(MEDIA_CUSTOM_CATALOG_ENTITY);
 				}
-				case "scheduled": {
+				break;
+			}
+			case PREFERENCES_ENTITY: {
+				const localTs = readModified(PREFERENCES_ENTITY);
+				if (toEpoch(entity.modified) > toEpoch(localTs)) {
+					const count = applyPreferencesData(
+						entity.data,
+						(key, value) => setUserPreference(key, value),
+					);
+					if (count > 0) {
+						localStorage.setItem(
+							`${SYNC_MODIFIED_PREFIX}.${PREFERENCES_ENTITY}`,
+							entity.modified,
+						);
+						applied.push(PREFERENCES_ENTITY);
+					} else {
+						skipped.push(PREFERENCES_ENTITY);
+					}
+				} else {
+					skipped.push(PREFERENCES_ENTITY);
+				}
+				break;
+			}
+			case "scheduled": {
 				if (toEpoch(entity.modified) <= toEpoch(readModified("scheduled"))) {
 					skipped.push("scheduled");
 					break;
@@ -227,8 +318,8 @@ export function importLouvorjaIntoBrowser(
 				);
 				applied.push("scheduled");
 				break;
-				}
-				default:
+			}
+			default:
 				// Entidade ainda não suportada nesta ponta — preservada no pacote,
 				// ignorada na aplicação (forward-compatible).
 				break;
