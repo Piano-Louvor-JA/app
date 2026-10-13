@@ -2,7 +2,7 @@
 Name=LouvorJA - PIANO
 Comment=Aplicativo desktop para gerenciamento de culto
 Exec=louvorja-piano %U
-Icon=com.pianolouvorja.piano
+Icon=louvorja-piano
 Type=Application
 Categories=AudioVideo;Audio;Player;
 MimeType=x-scheme-handler/louvorja-piano;

@@ -30,7 +30,7 @@ jobs:
       reason: ${{ steps.decision.outputs.reason }}
     steps:
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -43,7 +43,7 @@ jobs:
           WORKFLOW_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          script="$(mktemp)"
+          script="$(mktemp --suffix=.mjs)"
           gh api "repos/${GITHUB_REPOSITORY}/contents/scripts/release-publish-decision.mjs?ref=${WORKFLOW_SHA}" --jq .content \
             | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{let t=s.trim();if(t.startsWith(String.fromCharCode(34)))t=JSON.parse(t);process.stdout.write(Buffer.from(String(t).replace(/\s/g,""),"base64"))})' \
             > "$script"
@@ -64,13 +64,13 @@ jobs:
             runner: ubuntu-24.04-arm
     steps:
       - name: Checkout tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 1
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -191,21 +191,21 @@ jobs:
 
       - name: Checkout tag
         if: needs.decide.outputs.publish == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 1
 
       - name: Download x64 artifacts
         if: needs.decide.outputs.publish == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: linux-x64
           path: dist-electron
 
       - name: Download arm64 artifacts
         if: needs.decide.outputs.publish == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: linux-arm64
           path: dist-electron
@@ -253,29 +253,22 @@ jobs:
 
   downstream:
     name: Trigger downstream package updates
+    permissions:
+      contents: read
+      actions: write
     needs: [decide, release]
     if: needs.decide.outputs.publish == 'true' && needs.release.result == 'success'
     runs-on: ubuntu-24.04
     steps:
-      - name: Dispatch optional store workflows
+      - name: Dispatch Flatpak and Snap for the exact release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag || github.ref_name }}
         run: |
-          echo 'GitHub Release published.'
-          echo 'Flathub, AUR, COPR, OBS, VoidBR and Snap update jobs remain opt-in until their credentials and repository IDs exist.'
-          echo 'No external store is allowed to fail or delete the central release.'
-
-      # Add repository_dispatch calls only after each store account is configured.
-      # Never put store tokens in this workflow or source repository.
-      # Required future secrets: AUR_SSH_PRIVATE_KEY, SNAPCRAFT_STORE_CREDENTIALS,
-      # COPR_CONFIG, OBS_API_TOKEN, GPG_PRIVATE_KEY.
-
-  # Flatpak must be submitted to Flathub first. Flathub builds it from its own repo.
-  # Do not upload a locally built Flatpak as a substitute for the Flathub submission.
-  # Snap stays disabled until core/base compatibility passes on both architectures.
-  # PPA stays disabled until Debian source packaging exists.
-  # VoidBR merge remains maintainer-controlled.
-  # OBS/COPR can consume the GitHub source/release after account setup.
+          set -euo pipefail
+          for workflow in build-flatpak.yml snap-release.yml; do
+            gh workflow run "$workflow" --ref main -f "version=$TAG"
+          done
 
   verify:
     name: Verify central release
@@ -284,7 +277,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 1

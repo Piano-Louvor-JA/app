@@ -238,6 +238,9 @@ describe('useLiturgyStore', () => {
       const store = useLiturgyStore()
       await store.hydrate()
       const day = LITURGY_DAY_TAB_ORDER[0]
+      // fixa selectedDay ≠ day populado: cloneSources exclui o dia selecionado
+      // e selectedDay inicia em todayWeekday() (falhava todo domingo)
+      store.selectDay(LITURGY_DAY_TAB_ORDER[1])
       store.weekdays[day] = [
         { id: 'i1', type: 'music', name: 'Hino', durationMs: 1, categoryId: null, filePath: '', filePaths: [], musicId: 1, url: '', accentColor: '#000', startTime: null, endTime: null, done: false },
       ] as never
@@ -250,6 +253,7 @@ describe('useLiturgyStore', () => {
       const store = useLiturgyStore()
       await store.hydrate()
       const day = LITURGY_DAY_TAB_ORDER[0]
+      store.selectDay(LITURGY_DAY_TAB_ORDER[1])
       store.weekdays[day] = [
         { id: 'i1', type: 'music', name: 'Hino', durationMs: 1, categoryId: null, filePath: '', filePaths: [], musicId: 1, url: '', accentColor: '#000', startTime: null, endTime: null, done: false },
       ] as never

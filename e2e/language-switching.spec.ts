@@ -4,7 +4,7 @@ import { test, expect, type Page } from '@playwright/test'
 // (resolveDatabaseUrl em workspace-api.ts). O mock global do beforeEach cobre
 // os dois domínios; este interceptor (registrado depois = prioridade LIFO no
 // Playwright) registra os filenames buscados.
-const API_BASE = 'https://api.pianolouvorja.com.br/json_db'
+const API_BASE = 'http://localhost:3100/json_db'
 
 /**
  * Mock GLOBAL de API: aplicado em test.beforeEach para TODOS os testes.
@@ -15,7 +15,7 @@ test.beforeEach(async ({ page }) => {
   await page.route('**/api.louvorja.com.br/**', (route) =>
     route.fulfill({ json: [] }),
   )
-  await page.route('**/api.pianolouvorja.com.br/**', (route) =>
+  await page.route('**/localhost:3100/**', (route) =>
     route.fulfill({ json: [] }),
   )
   // NOTA: NAO usar addInitScript p/ desabilitar serviceWorker aqui — o

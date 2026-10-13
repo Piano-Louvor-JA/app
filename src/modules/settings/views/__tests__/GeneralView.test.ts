@@ -2,6 +2,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 
+vi.mock('@shared/composables/useAppConfirm', () => ({ appConfirm: vi.fn(async () => false) }))
+import { appConfirm } from '@shared/composables/useAppConfirm'
+
 // Mock dependencies
 vi.mock('@shared/services/desktop-bridge', () => ({
   isDesktopApp: vi.fn(() => false),
@@ -47,7 +50,7 @@ vi.mock('@modules/sync/services/louvorja-adapter', () => ({
 
 vi.mock('@modules/sync/services/louvorja-package', () => ({
   encodeLouvorjaPackage: vi.fn(() => 'encoded'),
-  decodeLouvorjaPackage: vi.fn(() => ({ decoded: true })),
+  decodeLouvorjaPackage: vi.fn(() => ({ decoded: true, entities: {} })),
   isValidLouvorjaContent: vi.fn(() => true),
 }))
 
@@ -282,7 +285,11 @@ describe('GeneralView.vue', () => {
       const importBtn = wrapper.findAll('.general-settings__sync-actions button')[1]
       await importBtn.trigger('click')
       await flushPromises()
-      expect((wrapper.vm as any).syncStatus).toEqual({ kind: 'success', messageKey: 'settings.general.syncNothingToApply' })
+      expect((wrapper.vm as any).syncStatus).toEqual({
+        kind: 'success',
+        messageKey: 'settings.general.syncNothingToApply',
+        params: { localModified: '—', packageModified: '—' },
+      })
     })
 
     it('import com aplicações: syncImported com lista', async () => {
@@ -295,6 +302,32 @@ describe('GeneralView.vue', () => {
       expect((wrapper.vm as any).syncStatus.kind).toBe('success')
     })
 
+    it('cancelar a substituição impede a importação inteira', async () => {
+      const { decodeLouvorjaPackage } = await import('@modules/sync/services/louvorja-package')
+      const { importLouvorjaIntoBrowser } = await import('@modules/sync/services/louvorja-adapter')
+      vi.mocked(decodeLouvorjaPackage).mockReturnValueOnce({ entities: { mediaCustomCatalog: {} } } as any)
+      importLouvorjaFile.mockResolvedValueOnce('raw')
+      const wrapper = mountComponent()
+      await wrapper.findAll('.general-settings__sync-actions button')[1].trigger('click')
+      await flushPromises()
+      expect(appConfirm).toHaveBeenCalled()
+      expect(importLouvorjaIntoBrowser).not.toHaveBeenCalled()
+      expect((wrapper.vm as any).syncStatus.messageKey).toBe('settings.general.syncCancelled')
+    })
+
+    it('confirmar autoriza a substituição protegida pelo backup', async () => {
+      const { decodeLouvorjaPackage } = await import('@modules/sync/services/louvorja-package')
+      const { importLouvorjaIntoBrowser } = await import('@modules/sync/services/louvorja-adapter')
+      const pkg = { entities: { mediaCustomCatalog: {} } }
+      vi.mocked(decodeLouvorjaPackage).mockReturnValueOnce(pkg as any)
+      vi.mocked(appConfirm).mockResolvedValueOnce(true)
+      importLouvorjaFile.mockResolvedValueOnce('raw')
+      const wrapper = mountComponent()
+      await wrapper.findAll('.general-settings__sync-actions button')[1].trigger('click')
+      await flushPromises()
+      expect(importLouvorjaIntoBrowser).toHaveBeenCalledWith(pkg, { catalogReplacementConfirmed: true })
+    })
+
     it('import throw: syncInvalid', async () => {
       importLouvorjaFile.mockRejectedValueOnce(new Error('bad'))
       const wrapper = mountComponent()
@@ -302,7 +335,7 @@ describe('GeneralView.vue', () => {
       const importBtn = wrapper.findAll('.general-settings__sync-actions button')[1]
       await importBtn.trigger('click')
       await flushPromises()
-      expect((wrapper.vm as any).syncStatus).toEqual({ kind: 'error', messageKey: 'settings.general.syncInvalid' })
+      expect((wrapper.vm as any).syncStatus).toEqual({ kind: 'error', messageKey: 'settings.general.catalogImportFailed' })
     })
   })
 

@@ -93,7 +93,8 @@ if (typeof process.getuid === "function" && process.getuid() === 0) {
  *  renderização por software é suficiente pro app e estabiliza o dev. */
 if (process.env.VITE_DEV_SERVER_URL) {
 	app.commandLine.appendSwitch("disable-gpu");
-	app.commandLine.appendSwitch("in-process-gpu");
+	// in-process-gpu removido (07/10): SIGTRAP do electron em dev ~35s pós-boot
+	// (crash no processo GPU in-process; com gpu em software separado estabiliza).
 }
 
 /** Permite autoplay com áudio nas janelas de projeção (YouTube). */
@@ -799,10 +800,8 @@ app.on("will-quit", () => {
 });
 
 app.on("window-all-closed", () => {
-	// window-all-closed pode disparar quando o splash fecha mas a main
-	// ainda está carregando. Só saímos se mainWindow já existiu ou se
-	// não há intenção de criar janela (eula recusado, erro fatal, etc).
-	if (process.platform !== "darwin") {
-		app.quit();
-	}
+	// Fechar a splash pode disparar este evento durante o handoff para a
+	// main window. Não mata o processo se a principal ainda existe/carrega.
+	if (mainWindow && !mainWindow.isDestroyed()) return;
+	if (process.platform !== "darwin") app.quit();
 });

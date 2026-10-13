@@ -225,6 +225,26 @@ describe('com electron', () => {
     expect(payload.footerVersion).toBeUndefined()
   })
 
+  it('project bible: envia textTransform só quando não é none', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    readEffectiveStageSettings.mockReturnValue({
+      ...readEffectiveStageSettings(),
+      bibleTextTransform: 'uppercase',
+    })
+    await palcoSession.project('bible', { text: 'No princípio', footerRef: 'João 1:1' })
+    let payload = palco.send.mock.calls[0]?.[0] as Record<string, unknown>
+    expect(payload.textTransform).toBe('uppercase')
+
+    readEffectiveStageSettings.mockReturnValue({
+      ...readEffectiveStageSettings(),
+      bibleTextTransform: 'none',
+    })
+    await palcoSession.project('bible', { text: 'No princípio', footerRef: 'João 1:1' })
+    payload = palco.send.mock.calls[1]?.[0] as Record<string, unknown>
+    expect(payload.textTransform).toBeUndefined()
+  })
+
   it('hymns overrideBg: bg do escopo vence o input', async () => {
     const palco = fullMock()
     setBridge(palco)

@@ -49,6 +49,7 @@ export default defineConfig({
       : {}),
   },
   server: {
+    fs: { allow: ['.', '/media/rafaelejosi/Dados/repos/piano-app/node_modules'] },
     watch: {
       // Worktrees de kanban geram milhares de arquivos — watcher satura e o
       // dev server para de responder (ENOSPC inotify / startup travado).

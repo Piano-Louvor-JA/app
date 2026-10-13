@@ -20,7 +20,7 @@ Node via nvm; `npm ci` (nunca misturar com `npm install` em CI).
 ## Regras do app
 
 1. **Offline-first é requisito permanente**: dado do usuário (liturgia, downloads, progresso, preferências) sobrevive a reload, fechar app e update. Persistência nova entra com teste de roundtrip save→reload no MESMO commit.
-2. **Zero `window.confirm`/`window.alert`** — usar o AppConfirm do design system.
+2. **Zero `window.confirm`/`window.alert`** — usar o `AppConfirm` (`src/shared/components/AppConfirm.vue`).
 3. **Multi-janela**: cada popup do Electron é renderer SEPARADO (Pinia não compartilha). Estado entre janelas = eleição de host (localStorage) ou evento via main — nunca pressupor memória compartilhada.
 4. **Timer por deadline ABSOLUTO** (`Date.now()`), nunca decremento de frames — rAF congela com janela em background.
 5. **Player externo** (VLC/mpv) é preferência cross-feature: consumidor novo de mídia lê a MESMA preferência no mesmo commit; falha do externo NUNCA cai em silêncio no interno (`file-missing` tem tratamento próprio).

@@ -6,6 +6,22 @@ import type { UtilityHubItem } from '../types/clock'
 
 const { t } = useI18n()
 
+/**
+ * app#423 dev follow-up: card do diagnóstico de rede (SrCaldeira).
+ * Visível somente em build dev — a rota /diagnostics só existe quando
+ * import.meta.env.DEV (ver modules/diagnostics/routes.ts).
+ */
+const diagnosticsItem: UtilityHubItem | null = import.meta.env.DEV
+  ? {
+      key: 'diagnostics',
+      titleKey: 'utilities.diagnostics',
+      descriptionKey: 'utilities.diagnosticsDescription',
+      icon: 'ti-stethoscope',
+      to: '/diagnostics',
+      available: true,
+    }
+  : null
+
 const items: UtilityHubItem[] = [
   {
     key: 'temporizador',
@@ -32,15 +48,15 @@ const items: UtilityHubItem[] = [
     available: false,
   },
   {
-    // Issue app#361: card agora (UI nas 3 frentes); funcional liga quando a
-    // fase S1 do palco-server (#351) mergear — Browser Source com token.
+    // Issue app#361: funcional — palco-server (#351) como transporte, fachada OBS.
     key: 'obs',
     titleKey: 'utilities.obs',
     descriptionKey: 'utilities.obsDescription',
     icon: 'ti-broadcast',
-    to: null,
-    available: false,
+    to: '/utilities/obs',
+    available: true,
   },
+  ...(diagnosticsItem ? [diagnosticsItem] : []),
 ]
 </script>
 
