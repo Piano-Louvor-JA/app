@@ -77,7 +77,7 @@ function copyOperatorUrl() {
       {{ t('settings.remote.unavailable') }}
     </div>
 
-    <div v-else-if="info" class="d-flex align-stretch mt-2">
+    <div v-else-if="info" class="pairing-col mt-2">
       <div class="qr-col">
         <img
           v-if="info.qrDataUrl"
@@ -92,7 +92,7 @@ function copyOperatorUrl() {
           {{ t('settings.remote.title') }}
         </div>
       </div>
-      <div class="ml-6 flex-grow-1">
+      <div class="mt-4">
         <div class="text-caption text-medium-emphasis">
           {{ t('settings.remote.address') }}
         </div>
