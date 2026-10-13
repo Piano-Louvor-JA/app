@@ -346,9 +346,9 @@ export async function updateCustomCollection(
   }
 }
 
-export async function listCustomCollections(): Promise<
-  CustomCollectionSummary[]
-> {
+export async function listCustomCollections(opts?: {
+  signal?: AbortSignal
+}): Promise<CustomCollectionSummary[]> {
   // Locais (ids negativos, só desta máquina) entram primeiro na lista.
   const locals: CustomCollectionSummary[] = listLocalCollections().map((c) => ({
     id: c.id,
@@ -361,6 +361,7 @@ export async function listCustomCollections(): Promise<
   try {
     const response = await fetch(`${customBaseUrl()}/collections`, {
       headers: authHeaders(),
+      signal: opts?.signal,
     })
     if (!response.ok) return locals
     const json = (await response.json()) as {
@@ -654,6 +655,7 @@ export async function createCustomMusic(
     lyric?: string
     auxiliary_lyric?: string
     client_uuid?: string
+    duration?: number
   },
 ): Promise<{ id: number; existed?: boolean } | null> {
   if (isLocalId(collectionId)) {
@@ -806,10 +808,18 @@ export async function createCustomLyric(
     time?: string
     order?: number
     id_file_image?: number
+    image_position?: number
   },
 ): Promise<{ id: number } | null> {
   if (isLocalId(musicId)) {
-    const local = createLocalLyric(musicId, input)
+    const local = createLocalLyric(musicId, {
+      lyric: input.lyric,
+      aux_lyric: input.aux_lyric,
+      time: input.time,
+      order: input.order,
+      image_url: null,
+      image_position: input.image_position != null ? String(input.image_position) : null,
+    })
     return { id: local.id }
   }
   try {

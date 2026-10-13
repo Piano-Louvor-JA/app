@@ -261,7 +261,7 @@ describe("app#331 — import .slja → item de liturgia → player (offline)", (
 		const spy = vi
 			.spyOn(Storage.prototype, "setItem")
 			.mockImplementation(function (this: Storage, key: string, value: string) {
-				if (value.includes("audioBase64")) {
+				if (value.includes("audioBase64") || value.includes("audioMediaId")) {
 					throw new DOMException("quota", "QuotaExceededError");
 				}
 				return original.call(this, key, value);

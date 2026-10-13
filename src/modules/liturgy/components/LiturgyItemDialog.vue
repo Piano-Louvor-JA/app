@@ -532,10 +532,6 @@ const {
 
 const selectedPlayerId = computed(() => resolvePlayerId(props.draft.playerId))
 
-function onPlayerChange(event: Event) {
-  const value = (event.target as HTMLSelectElement).value
-  patch({ playerId: storedPlayerId(value) })
-}
 watch(
   () => [props.open, props.draft.type] as const,
   ([open, type]) => {

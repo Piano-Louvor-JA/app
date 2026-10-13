@@ -18,6 +18,7 @@ import {
 	createCustomCollection,
 	createCustomLyric,
 	createCustomMusic,
+	deleteCustomMusic,
 	listCustomCollections,
 	toCustomMusicId,
 	updateCustomMusic,
@@ -94,7 +95,10 @@ export function sljaDisplayName(
 	fallback: string,
 ): string {
 	const title = archive.title?.trim() ?? "";
-	const generic = /^v[\d.]+$/.test(title) || title.length === 0;
+	const generic =
+		/^v[\d.]+$/.test(title) ||
+		title.length === 0 ||
+		title === "Sem título";
 	if (generic) {
 		return fallback
 			.replace(/\.slja(\.zip)?$/i, "")
@@ -108,14 +112,31 @@ async function ensureImportCollectionId(): Promise<number | null> {
 	// Reaproveita a primeira "Importações .slja" existente (mesma regra do
 	// media editor); só cria se ainda não houver nenhuma.
 	try {
-		const collections = await listCustomCollections();
-		const existing = collections.find((c) => c.name === IMPORT_COLLECTION_NAME);
+		const signal = AbortSignal.timeout(15_000);
+		const collections = await listCustomCollections({ signal });
+		if (signal.aborted) return null;
+		const ownerId = getAuthSession()?.user?.id_user;
+		// Id negativo é coletânea LOCAL. Coletânea pública de outro usuário
+		// com o mesmo nome também não serve: o POST seguinte seria recusado.
+		const existing = collections.find(
+			(c) =>
+				c.name === IMPORT_COLLECTION_NAME &&
+				c.id > 0 &&
+				ownerId != null &&
+				c.ownerId === ownerId,
+		);
 		if (existing) return existing.id;
 	} catch {
 		// catálogo indisponível — tenta criar mesmo assim
 	}
-	const created = await createCustomCollection(IMPORT_COLLECTION_NAME);
-	return created?.id ?? null;
+	const created = await createCustomCollection(
+		IMPORT_COLLECTION_NAME,
+		undefined,
+		undefined,
+		"private",
+	);
+	if (created == null || created.id <= 0) return null;
+	return created.id;
 }
 
 /** Entrada mínima que o dialog tem em mão (File do input atende). */
@@ -147,6 +168,10 @@ export async function importSljaAsLiturgyMusic(
 	const slides = [...archive.slides]
 		.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
 		.filter((slide) => slide.type !== "CAPA" && slide.lyric.trim().length > 0);
+
+	if (slides.length === 0) {
+		throw new Error("SLJA_IMPORT_NO_LYRICS");
+	}
 
 	const durationMs = estimateSljaDurationMs(slides);
 
@@ -181,6 +206,9 @@ export async function importSljaAsLiturgyMusic(
 	const created = await createCustomMusic(collectionId, {
 		name,
 		client_uuid: clientUuid,
+		// Duração estimada (s) na criação: catálogo mostra e player usa como
+		// fallback. No-update: PUT posterior sobrescreveria campos editáveis.
+		...(durationMs > 0 ? { duration: durationMs / 1000 } : {}),
 	});
 	if (!created) {
 		throw new Error("SLJA_IMPORT_MUSIC_FAILED");
@@ -288,28 +316,26 @@ export async function importSljaAsLiturgyMusic(
 		const batch = validSlides.slice(i, i + LYRIC_BATCH);
 		const created = await Promise.all(
 			batch.map((slide, j) => {
-				const text = slide.lyric.trim();
-				// Background do slide: imagem upada com matching igual ao media
-				// editor (contains bidirecional, lowercase).
-				let imageUrl = "";
-				const imageName = slide.image?.name?.toLowerCase();
-				if (imageName && uploadedAssets.length) {
-					const match = uploadedAssets.find(
-						(a) =>
-							imageName.includes(a.path.toLowerCase()) ||
-							a.path.toLowerCase().includes(imageName),
-					);
-					if (match) imageUrl = match.url;
-				}
+				const imageUrl =
+					matchUploadedAsset(slide.image?.name, uploadedAssets)?.url ?? "";
 				return createCustomLyric(musicId, {
-					lyric: text,
+					lyric: slide.lyric.trim(),
+					aux_lyric: (slide as { auxiliaryLyric?: string }).auxiliaryLyric
+						?.trim() || undefined,
 					time: formatSljaMsAsTime(slide.timeMs),
 					order: i + j + 1,
 					id_file_image: imageIdByUrl.get(imageUrl),
+					image_position: (slide as { imagePosition?: number }).imagePosition,
 				});
 			}),
 		);
 		slideCount += created.filter(Boolean).length;
+	}
+	// Upload de mídia pode falhar e o import segue só com texto. Estrofe
+	// incompleta não: a projeção ficaria truncada e o dialog trataria como sucesso.
+	if (slideCount < validSlides.length) {
+		await deleteCustomMusic(musicId);
+		throw new Error("SLJA_IMPORT_LYRICS_INCOMPLETE");
 	}
 
 	return {
@@ -335,6 +361,25 @@ export async function importSljaAsLiturgyMusic(
  * quota (~10 MB) e o saveDb silencioso descartava as estrofes 2..N.
  * Re-import do mesmo arquivo (dedupe por sljaHash) → no-op.
  */
+/** Match de asset p/ background do slide: exato > basename único (evita
+ * ambiguidade quando dois assets compartilham sufixo/prefixo). */
+function matchUploadedAsset(
+	imageName: string | undefined,
+	assets: Array<{ path: string; url: string; idFile: number }>,
+) {
+	if (!imageName || assets.length === 0) return undefined;
+	const normalize = (path: string) =>
+		path.replace(/\\/g, "/").replace(/^\.\//, "").toLowerCase();
+	const needle = normalize(imageName);
+	const exact = assets.find((asset) => normalize(asset.path) === needle);
+	if (exact) return exact;
+	const basename = needle.split("/").pop();
+	const candidates = assets.filter(
+		(asset) => normalize(asset.path).split("/").pop() === basename,
+	);
+	return candidates.length === 1 ? candidates[0] : undefined;
+}
+
 async function importSljaLocal({
 	name,
 	archive,
@@ -358,6 +403,7 @@ async function importSljaLocal({
 		deleteLocalMusic,
 		listLocalCollections,
 		findLocalMusicBySljaHash,
+		getLocalMusic,
 	} = await import("@modules/media/services/local-custom-store");
 	const { putMedia } = await import(
 		"@modules/media/services/local-media-store"
@@ -402,6 +448,9 @@ async function importSljaLocal({
 
 	const created = createLocalMusic(collectionId, { name, sljaHash });
 	const musicId = created.id;
+	if (!getLocalMusic(musicId)) {
+		throw new Error("SLJA_LOCAL_LYRIC_PERSIST_FAILED");
+	}
 
 	// Áudio → 1 blob em IndexedDB (id estável derivado do hash). localStorage
 	// fica só com o id do blob (metadado).
@@ -412,6 +461,14 @@ async function importSljaLocal({
 			audioMediaId: `slja-${sljaHash}-audio`,
 			audioName: archive.audio.name,
 		});
+		// Verificar persistência: updateLocalMusic grava via setItem (pode
+		// jogar QuotaExceededError). Se o campo audioBase64/audioMediaId não
+		// apareceu, significa que o write falhou silenciosamente.
+		const savedAudio = getLocalMusic(musicId);
+		if (!savedAudio?.audioBase64 && !savedAudio?.audioMediaId) {
+			deleteLocalMusic(musicId);
+			throw new Error("SLJA_LOCAL_AUDIO_PERSIST_FAILED");
+		}
 		hasAudio = true;
 	}
 	// Duração estimada do item (último tempo_hms + margem) — o dialog aplica
@@ -435,14 +492,43 @@ async function importSljaLocal({
 	for (const slide of slides) {
 		const text = slide.lyric.trim();
 		if (!text) continue;
-		createLocalLyric(musicId, {
-			lyric: text,
-			time: formatSljaMsAsTime(slide.timeMs),
-			// SEM image_url por estrofe — a capa compartilhada vive 1× na
-			// música (coverMediaId) e o player herda (media-slides fallback).
-		});
+		try {
+			createLocalLyric(musicId, {
+				lyric: text,
+				aux_lyric: (slide as { auxiliaryLyric?: string }).auxiliaryLyric?.trim() || undefined,
+				time: formatSljaMsAsTime(slide.timeMs),
+				// SEM image_url por estrofe — a capa compartilhada vive 1× na
+				// música (coverMediaId) e o player herda (media-slides fallback).
+			});
+		} catch (err) {
+			deleteLocalMusic(musicId);
+			if (err instanceof Error && err.message === 'local-persist-failed') {
+				throw new Error("SLJA_LOCAL_LYRIC_PERSIST_FAILED");
+			}
+			throw err;
+		}
 		slideCount += 1;
 	}
+	const validSlideCount = slides.filter(s => s.lyric.trim()).length;
+	if (slideCount < validSlideCount) {
+		deleteLocalMusic(musicId);
+		throw new Error("SLJA_LOCAL_LYRIC_PERSIST_FAILED");
+	}
+
+	// Consistência: se localStorage não persistiu as letras (quota, IndexedDB,
+	// etc.), slides count = 0 apesar de createLocalLyric não ter jogado.
+	const persistedMusic = getLocalMusic(musicId);
+	if (
+		slideCount > 0 &&
+		(persistedMusic?.lyrics?.length ?? 0) < slideCount
+	) {
+		deleteLocalMusic(musicId);
+		throw new Error("SLJA_LOCAL_LYRIC_PERSIST_FAILED");
+	}
+
+	// Duração real: lida de volta do store (updateLocalMusic pode falhar sem
+	// throw; se falhou durationMs permanece 0 no storage).
+	const persistedDurationMs = persistedMusic?.durationMs ?? 0;
 
 	return {
 		musicId,
@@ -454,10 +540,12 @@ async function importSljaLocal({
 		slides: slideCount,
 		hasAudio,
 		uploadedImages: 0,
-		durationMs,
+		durationMs: persistedDurationMs,
 		local: true,
 		sljaHash,
 		updatedExisting: false,
-		imagesOmitted: false,
+		imagesOmitted:
+			Boolean((slides as Array<{ image?: { name?: string } }>).find(s => s.image?.name)) ||
+			(archive.assets?.length ?? 0) > 0,
 	};
 }

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { mount, flushPromises } from '@vue/test-utils'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
 import { createI18n } from 'vue-i18n'
 import LiturgyItemDialog from '../LiturgyItemDialog.vue'
 import liturgyLocale from '../../locales/pt-BR'
@@ -117,6 +118,7 @@ describe('LiturgyItemDialog — gaps (url/type/pick)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     document.body.innerHTML = ''
+    setActivePinia(createPinia())
   })
 
   it('urlRequiredMissing: site sem URL mostra erro de validação', async () => {
