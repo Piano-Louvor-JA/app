@@ -53,80 +53,86 @@ function copyOperatorUrl() {
 
 <template>
   <GlassCard class="pairing-card">
-    <h3 class="text-h6 mb-2">
-      {{ t('settings.remote.title') }}
-    </h3>
-    <p class="text-body-2 text-medium-emphasis mb-4">
-      {{ t('settings.remote.pairingDescription') }}
-    </p>
-
-    <div
-      class="connection-status"
-      :class="{ connected: clientCount > 0 }"
-      data-testid="remote-client-status"
-    >
-      <span class="status-dot" />
-      {{ clientCount > 0
-        ? t('settings.remote.clientConnected', {
-            device: clientAddress ?? 'Piano LouvorJA',
-          })
-        : t('settings.remote.waitingClient') }}
-    </div>
-
-    <div v-if="failed" class="pairing-warning" data-testid="remote-unavailable">
-      {{ t('settings.remote.unavailable') }}
-    </div>
-
-    <!-- 3 blocos lado a lado: Controle remoto + Predicador + Operador -->
-    <div v-else-if="info" class="pairing-row mt-2">
-      <!-- Controle remoto (app): QR + dirección/token -->
+    <!-- Divisão no nível mais alto: Control Remoto | Predicador/Operador -->
+    <div class="pairing-row">
+      <!-- Controle remoto (app): título + descrição + status + QR + dirección/token -->
       <div class="pairing-item">
-        <div class="qr-col">
-          <img
-            v-if="info.qrDataUrl"
-            :src="info.qrDataUrl"
-            width="180"
-            height="180"
-            class="qr"
-            alt="QR"
-            data-testid="remote-qr"
-          >
-          <div class="text-caption text-medium-emphasis mt-1 text-center">
-            {{ t('settings.remote.title') }}
-          </div>
+        <h3 class="text-h6 mb-2">
+          {{ t('settings.remote.title') }}
+        </h3>
+        <p class="text-body-2 text-medium-emphasis mb-4">
+          {{ t('settings.remote.pairingDescription') }}
+        </p>
+
+        <div
+          class="connection-status"
+          :class="{ connected: clientCount > 0 }"
+          data-testid="remote-client-status"
+        >
+          <span class="status-dot" />
+          {{ clientCount > 0
+            ? t('settings.remote.clientConnected', {
+                device: clientAddress ?? 'Piano LouvorJA',
+              })
+            : t('settings.remote.waitingClient') }}
         </div>
-        <div class="mt-4">
-          <div class="text-caption text-medium-emphasis">
-            {{ t('settings.remote.address') }}
-          </div>
-          <div class="text-body-1 font-weight-bold mono">
-            {{ info.host }}:{{ info.port }}
-          </div>
 
-          <div class="text-caption text-medium-emphasis mt-4">
-            {{ t('settings.remote.token') }}
-          </div>
-          <div class="token mono" data-testid="remote-token">
-            {{ info.token }}
-          </div>
+        <div v-if="failed" class="pairing-warning" data-testid="remote-unavailable">
+          {{ t('settings.remote.unavailable') }}
+        </div>
 
-          <button
-            type="button"
-            class="copy-btn mt-4"
-            data-testid="remote-copy"
-            @click="copyUrl"
-          >
-            {{ t('settings.remote.copyLink') }}
-          </button>
+        <div v-else-if="info">
+          <div class="qr-col">
+            <img
+              v-if="info.qrDataUrl"
+              :src="info.qrDataUrl"
+              width="180"
+              height="180"
+              class="qr"
+              alt="QR"
+              data-testid="remote-qr"
+            >
+            <div class="text-caption text-medium-emphasis mt-1 text-center">
+              {{ t('settings.remote.title') }}
+            </div>
+          </div>
+          <div class="mt-4">
+            <div class="text-caption text-medium-emphasis">
+              {{ t('settings.remote.address') }}
+            </div>
+            <div class="text-body-1 font-weight-bold mono">
+              {{ info.host }}:{{ info.port }}
+            </div>
+
+            <div class="text-caption text-medium-emphasis mt-4">
+              {{ t('settings.remote.token') }}
+            </div>
+            <div class="token mono" data-testid="remote-token">
+              {{ info.token }}
+            </div>
+
+            <button
+              type="button"
+              class="copy-btn mt-4"
+              data-testid="remote-copy"
+              @click="copyUrl"
+            >
+              {{ t('settings.remote.copyLink') }}
+            </button>
+          </div>
         </div>
       </div>
 
-      <!-- Predicador: título + status + explicação ANTES do QR -->
+      <!-- Coluna direita: Predicador + Operador -->
       <div
-        v-if="info.speakerQrDataUrl"
+        v-if="info && (info.speakerQrDataUrl || info.operatorQrDataUrl)"
         class="pairing-item"
-        data-testid="remote-speaker-block"
       >
+        <!-- Predicador: título + status + explicação ANTES do QR -->
+        <div
+          v-if="info.speakerQrDataUrl"
+          data-testid="remote-speaker-block"
+        >
         <div class="text-subtitle-1 mb-1">
           {{ t('settings.remote.speakerTitle') }}
         </div>
@@ -160,46 +166,46 @@ function copyOperatorUrl() {
             {{ t('settings.remote.speakerCopy') }}
           </button>
         </div>
-      </div>
+        </div>
 
-      <!-- Operador: título + status + explicação ANTES do QR -->
-      <div
-        v-if="info.operatorQrDataUrl"
-        class="pairing-item"
-        data-testid="remote-operator-block"
-      >
-        <div class="text-subtitle-1 mb-1">
-          {{ t('settings.remote.operatorTitle') }}
-        </div>
-        <div class="status-badge status-badge-block" data-testid="remote-operator-status">
-          <span class="status-dot" :class="{ active: info.operatorUrl }" />
-          {{ info.operatorUrl ? t('settings.remote.operatorReady') : t('settings.remote.operatorWaiting') }}
-        </div>
-        <p class="text-caption text-medium-emphasis pairing-hint">
-          {{ t('settings.remote.operatorHint') }}
-        </p>
-        <div class="qr-col">
-          <img
-            :src="info.operatorQrDataUrl"
-            width="180"
-            height="180"
-            class="qr"
-            alt="QR Operador"
-            data-testid="remote-operator-qr"
-          >
-        </div>
-        <div class="mt-4">
-          <div class="text-body-2 mono operator-url" data-testid="remote-operator-url">
-            {{ info.operatorUrl }}
+        <!-- Operador: título + status + explicação ANTES do QR -->
+        <div
+          v-if="info.operatorQrDataUrl"
+          data-testid="remote-operator-block"
+        >
+          <div class="text-subtitle-1 mb-1">
+            {{ t('settings.remote.operatorTitle') }}
           </div>
-          <button
-            type="button"
-            class="copy-btn mt-3"
-            data-testid="remote-operator-copy"
-            @click="copyOperatorUrl"
-          >
-            {{ t('settings.remote.operatorCopy') }}
-          </button>
+          <div class="status-badge status-badge-block" data-testid="remote-operator-status">
+            <span class="status-dot" :class="{ active: info.operatorUrl }" />
+            {{ info.operatorUrl ? t('settings.remote.operatorReady') : t('settings.remote.operatorWaiting') }}
+          </div>
+          <p class="text-caption text-medium-emphasis pairing-hint">
+            {{ t('settings.remote.operatorHint') }}
+          </p>
+          <div class="qr-col">
+            <img
+              :src="info.operatorQrDataUrl"
+              width="180"
+              height="180"
+              class="qr"
+              alt="QR Operador"
+              data-testid="remote-operator-qr"
+            >
+          </div>
+          <div class="mt-4">
+            <div class="text-body-2 mono operator-url" data-testid="remote-operator-url">
+              {{ info.operatorUrl }}
+            </div>
+            <button
+              type="button"
+              class="copy-btn mt-3"
+              data-testid="remote-operator-copy"
+              @click="copyOperatorUrl"
+            >
+              {{ t('settings.remote.operatorCopy') }}
+            </button>
+          </div>
         </div>
       </div>
     </div>
