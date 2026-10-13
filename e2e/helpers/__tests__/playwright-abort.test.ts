@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { expect, it } from 'vitest'
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -12,9 +12,10 @@ it.each(['process.env', '.env.development.local'])('Playwright aborta antes da s
     const repo = resolve(import.meta.dirname, '../../..')
     const marker = join(root, 'spec-started')
     const config = join(root, 'playwright.config.mjs')
-    writeFileSync(config, `export default {testDir:${JSON.stringify(root)},testMatch:'probe.spec.ts',globalSetup:${JSON.stringify(join(repo, 'e2e/global-setup.ts'))},reporter:'line'};`)
-    writeFileSync(join(root, 'probe.spec.ts'), `import {test} from ${JSON.stringify(join(repo, 'node_modules/@playwright/test/index.mjs'))}; import {writeFileSync} from 'node:fs';test('sentinel',()=>{writeFileSync(${JSON.stringify(marker)},'started')});`)
-    const env = { ...process.env }
+    symlinkSync(join(repo, 'node_modules'), join(root, 'node_modules'), 'dir')
+    writeFileSync(config, "export default {testDir:'.',testMatch:'probe.spec.ts',globalSetup:process.env.GUARD_PROBE_SETUP,reporter:'line'};")
+    writeFileSync(join(root, 'probe.spec.ts'), "import {test} from '@playwright/test'; import {writeFileSync} from 'node:fs';test('sentinel',()=>{writeFileSync(process.env.GUARD_PROBE_MARKER!,'started')});")
+    const env = { ...process.env, GUARD_PROBE_SETUP: join(repo, 'e2e/global-setup.ts'), GUARD_PROBE_MARKER: marker }
     for (const key of [...APP_API_ENV_KEYS, 'VITE_API_FALLBACK_URLS']) delete env[key]
     Object.assign(env, { VITE_URL_DATABASE:'http://localhost:3100/json_db',VITE_URL_FILES:'http://localhost:3100/file',VITE_PALCO_API_URL:'http://localhost:3100' })
     if (source === 'process.env') env.VITE_URL_FILES = 'https://api.pianolouvorja.com.br/file'
