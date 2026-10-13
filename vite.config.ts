@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { readFileSync } from 'node:fs'
+import { readFileSync, realpathSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
 
 import { defineConfig } from 'vite'
@@ -13,16 +13,36 @@ const pkg = JSON.parse(
 
 // https://vite.dev/config/
 export default defineConfig({
-  // LOCAL do worktree de teste: node_modules é symlink pra
-  // /media/.../Dados/repos/piano-app/node_modules — sem allow o /@fs/ dá 403 nas fontes.
-  server: {
-    fs: {
-      allow: ['.', '/media/rafaelejosi/Dados/repos/piano-app/node_modules'],
-    },
-  },
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
     __DIAGNOSTICS_DSN__: JSON.stringify(process.env.DIAGNOSTICS_GLITCHTIP_DSN ?? ''),
+  },
+  server: {
+    // node_modules é symlink p/ outro worktree (api-env-wt) — fora do root,
+    // o Vite nega /@fs/ dele (403 em fontes tabler/fontsource). Autorizar o
+    // caminho real resolvido mantém o bloqueio para todo o resto.
+    fs: {
+      // Root do projeto + realpath do node_modules (symlink p/ outro worktree).
+      allow: [
+        fileURLToPath(new URL('.', import.meta.url)),
+        path.dirname(realpathSync('node_modules')),
+      ],
+    },
+    watch: {
+      // Worktrees de kanban geram milhares de arquivos — watcher satura e o
+      // dev server para de responder (ENOSPC inotify / startup travado).
+      // Worktrees de kanban vivem em symlink p/ volume NTFS
+      // (/media/.../gauntlet-worktrees) — o glob '**/.worktrees/**' NÃO pega o
+      // caminho real resolvido, e o watcher lê ~1.4GB até travar o server.
+      ignored: [
+        '**/.worktrees/**',
+        '/media/rafaelejosi/NovoVolume/gauntlet-worktrees/**',
+        '**/dist/**',
+        '**/node_modules/**',
+        '**/test-results/**',
+        '**/coverage/**',
+      ],
+    },
   },
   plugins: [
     vue(),

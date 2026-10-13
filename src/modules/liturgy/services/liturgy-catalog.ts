@@ -9,12 +9,14 @@ import {
   listLocalCollections,
   listLocalMusics,
 } from '@modules/media/services/local-custom-store'
-import { matchesAllTerms } from "@shared/services/search-terms"
-
 import type {
   LiturgyBibleBookOption,
   LiturgyMusicOption,
 } from '../types/liturgy'
+import {
+  searchLiturgyMusic,
+  type MusicSearchEntry,
+} from './liturgy-music-search'
 
 type CatalogHymnalRow = {
   id_music?: number | string
@@ -29,7 +31,7 @@ type CatalogMusicIndexRow = CatalogHymnalRow & {
   albums?: Array<{ id_album?: number | string; name?: string; track?: number | string | null }>
   albums_names?: string
   /** Letra em texto corrido (presente em 1944/1956 músicas do índice). */
-  lyric?: string
+  lyric?: string | null
 }
 
 type CatalogAlbumMusicRow = CatalogHymnalRow
@@ -92,9 +94,9 @@ export function parseCatalogDurationMs(raw: unknown): number | null {
     if (parts.some((part) => !Number.isFinite(part))) return null
     let seconds = 0
     if (parts.length === 3) {
-      seconds = (parts[0] ?? 0) * 3600 + (parts[1] ?? 0) * 60 + (parts[2] ?? 0)
+      seconds = parts[0]! * 3600 + parts[1]! * 60 + parts[2]!
     } else if (parts.length === 2) {
-      seconds = (parts[0] ?? 0) * 60 + (parts[1] ?? 0)
+      seconds = parts[0]! * 60 + parts[1]!
     } else {
       return null
     }
@@ -201,11 +203,11 @@ function mapMusicIndexRow(row: CatalogMusicIndexRow): LiturgyMusicOption | null 
     albumNames.includes('Hinário Adventista') ||
     albumNames.includes('Hinário Adventista 1996')
 
-  // Issue #348 (item 2): letra já vem no índice `${prefix}_musics` — propaga
+  // Issue #348: letra já vem no índice `${prefix}_musics` — propaga
   // normalizada (fold diacrítico) p/ a busca casar "nao temas" com "não temas".
   const lyricsText = String(row.lyric ?? '')
     .normalize('NFD')
-    .replace(/\u0300-\u036f/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase() || undefined
@@ -256,7 +258,8 @@ async function loadHymnalOptions(
 async function loadCollectionOptions(
   byId: Map<number, LiturgyMusicOption>,
 ): Promise<void> {
-  const categories = await readOrFetchCatalog<CatalogCategory[]>('pt_categories')
+  const langPrefix = getCurrentApiPrefix()
+  const categories = await readOrFetchCatalog<CatalogCategory[]>(`${langPrefix}_categories`)
   if (!categories || !Array.isArray(categories)) return
 
   const albums = new Map<number, string>()
@@ -278,6 +281,7 @@ async function loadCollectionOptions(
     await Promise.all(
       batch.map(async ([albumId, albumName]) => {
         const record = await readOrFetchCatalog<CatalogAlbumRecord>(
+          // Contrato compat.ts: record individual sem prefixo (album_{id}).
           `album_${albumId}`,
         )
         if (!record?.musics || !Array.isArray(record.musics)) return
@@ -294,7 +298,7 @@ async function loadCollectionOptions(
   }
 }
 
-function sortMusicOptions(options: LiturgyMusicOption[]): LiturgyMusicOption[] {
+export function sortMusicOptions(options: LiturgyMusicOption[]): LiturgyMusicOption[] {
   return [...options].sort((a, b) => {
     const trackA = a.hymnalTrack ?? Number.POSITIVE_INFINITY
     const trackB = b.hymnalTrack ?? Number.POSITIVE_INFINITY
@@ -319,9 +323,13 @@ async function mergeOperatorMusicOptions(
     name: string | null
     duration: number | null
     collectionName?: string
+    officialMusicId?: number | null
+    instrumentalUrl?: string | null
   }> = []
   try {
-    customs = await listAllCustomMusics()
+    // Catálogo remoto é opcional. Sem timeout, um host mudo segura o hydrate
+    // da liturgia mesmo com hinário e imports locais já disponíveis.
+    customs = await listAllCustomMusics({ timeoutMs: 4_000 })
   } catch {
     // offline/sem API: customs simplesmente não aparecem nesta carga
   }
@@ -332,14 +340,24 @@ async function mergeOperatorMusicOptions(
     if (byId.has(offsetId)) continue
     const name = String(custom.name ?? '').trim() || `Custom #${id}`
     const album = String(custom.collectionName ?? '').trim() || 'Minhas coletâneas'
+    const linkedOfficial = byId.get(Number(custom.officialMusicId))
     byId.set(offsetId, {
       id: offsetId,
       name,
       hymnalTrack: null,
       albumNames: album,
       displayLabel: `${name} — ${album}`,
-      durationMs: typeof custom.duration === 'number' ? custom.duration : null,
-      hasInstrumental: false,
+      // CustomMusicSummary.duration é segundos (enrichDurations / API).
+      // O item da liturgia espera ms; abaixo de ~500 s o clamp zeraria a duração.
+      durationMs:
+        typeof custom.duration === 'number' && custom.duration > 0
+          ? Math.round(custom.duration * 1000)
+          : linkedOfficial?.durationMs && linkedOfficial.durationMs > 0
+            ? linkedOfficial.durationMs
+            : null,
+      hasInstrumental:
+        Boolean(custom.instrumentalUrl?.trim()) ||
+        linkedOfficial?.hasInstrumental === true,
     })
   }
 
@@ -401,69 +419,21 @@ export async function loadLiturgyBibleBooks(): Promise<LiturgyBibleBookOption[]>
     .filter((entry): entry is LiturgyBibleBookOption => entry != null)
 }
 
-/** Busca músicas por título, álbum ou número do hinário (máx. 50). */
+/**
+ * app#346: delega ao motor de busca fuzzy+letra (liturgy-music-search).
+ * Ranking: título > número/álbum > fuzzy título > letra. Máx. 50.
+ */
 export function filterLiturgyMusicOptions(
-  options: LiturgyMusicOption[],
+  options: Array<LiturgyMusicOption | MusicSearchEntry>,
   query: string,
   selectedId: number | null,
-): LiturgyMusicOption[] {
-  const selected = options.find((entry) => entry.id === selectedId) ?? null
-  const trimmed = query.trim().toLowerCase()
+): MusicSearchEntry[] {
+  const selected =
+    options.find((entry) => entry.id === selectedId) ?? null
 
-  if (!trimmed) {
-    return selected ? [selected] : []
+  if (!query.trim()) {
+    return selected ? [selected as MusicSearchEntry] : []
   }
 
-  const isNum = trimmed !== '' && !Number.isNaN(Number(trimmed))
-  const numQuery = isNum ? Number(trimmed) : null
-
-  // Busca por termos + letra (issues #348 + #359): fold diacritico, trecho da
-  // letra e termos espalhados em nome/album/letra — uniao da PR-355
-  // (matchesAllTerms p/ termos fora de substring contigua) com a PR-373
-  // (letra do indice + fold, que ja cobre os casos da 355).
-  const fold = (v: string) => v.normalize('NFD').replace(/\u0300-\u036f/g, '')
-  const q = fold(trimmed)
-  const terms = q.split(/\s+/).filter(Boolean)
-
-  const matchText = (title: string, album: string, lyrics: string) => {
-    if (title.includes(q) || album.includes(q) || (lyrics && lyrics.includes(q))) {
-      return true
-    }
-    if (terms.length <= 1) return false
-    return terms.every((t) => title.includes(t) || album.includes(t) || (lyrics && lyrics.includes(t)))
-  }
-
-  let results = options.filter((entry) => {
-    const title = fold(entry.name.toLowerCase())
-    const album = fold(entry.albumNames.toLowerCase())
-    const lyrics = entry.lyricsText ?? ''
-    if (isNum && numQuery != null) {
-      return entry.hymnalTrack === numQuery || matchText(title, album, lyrics)
-    }
-    return matchText(title, album, lyrics)
-  })
-
-  if (isNum && numQuery != null) {
-    results = [...results].sort((a, b) => {
-      const score = (entry: LiturgyMusicOption) => {
-        if (
-          entry.hymnalTrack === numQuery &&
-          entry.albumNames.includes('Hinário Adventista') &&
-          !entry.albumNames.includes('1996')
-        ) {
-          return 2
-        }
-        if (
-          entry.hymnalTrack === numQuery &&
-          entry.albumNames.includes('Hinário Adventista 1996')
-        ) {
-          return 1
-        }
-        return 0
-      }
-      return score(b) - score(a)
-    })
-  }
-
-  return results.slice(0, 50)
+  return searchLiturgyMusic(options, query)
 }

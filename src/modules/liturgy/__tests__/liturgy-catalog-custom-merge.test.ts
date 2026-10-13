@@ -84,4 +84,31 @@ describe("catálogo da liturgia inclui custom + local (app#331)", () => {
 		expect(offsetId).toBe(1_000_001);
 		expect(options.filter((o) => o.id === 42)).toHaveLength(1);
 	});
+
+	it("API custom muda não segura a abertura da liturgia", async () => {
+		vi.stubGlobal(
+			"fetch",
+			(_url: string, init?: RequestInit) =>
+				new Promise((_resolve, reject) => {
+					const signal = init?.signal;
+					if (!signal) return;
+					if (signal.aborted) {
+						reject(signal.reason);
+						return;
+					}
+					signal.addEventListener("abort", () => reject(signal.reason), {
+						once: true,
+					});
+				}),
+		);
+		try {
+			const started = Date.now();
+			const options = await loadLiturgyMusicOptions();
+			expect(Date.now() - started).toBeLessThan(6_000);
+			expect(options.some((entry) => entry.id === 42)).toBe(true);
+			expect(options.some((entry) => entry.id >= 1_000_000)).toBe(false);
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	}, 8_000);
 });
