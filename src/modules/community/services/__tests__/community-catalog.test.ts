@@ -348,6 +348,7 @@ describe("community-catalog — saveCommunityCopy (F0.4, mata mutantes 64-133)",
 	});
 
 	it("URL de musics usa o id da coletânea (mata mutante StringLiteral do path)", async () => {
+		vi.stubEnv("VITE_PALCO_API_URL", "https://api.test.local/");
 		let calledUrl = "";
 		vi.stubGlobal(
 			"fetch",
@@ -357,10 +358,10 @@ describe("community-catalog — saveCommunityCopy (F0.4, mata mutantes 64-133)",
 			}),
 		);
 		await saveCommunityCopy(BASE);
-		// Base vem do env (VITE_PALCO_API_URL) — em dev/homologação pode ser
-		// localhost (STG local). O contrato real é o path: /v1/custom/collections/{id}/musics.
-		expect(calledUrl).toMatch(
-			/\/v1\/custom\/collections\/77\/musics$/,
+		// Host stubado explícito: origem contratada junto com o path — não
+		// aceita host arbitrário do .env.local da máquina do dev.
+		expect(calledUrl).toBe(
+			"https://api.test.local/v1/custom/collections/77/musics",
 		);
 	});
 
