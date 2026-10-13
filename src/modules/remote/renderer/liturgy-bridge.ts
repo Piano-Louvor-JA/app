@@ -58,6 +58,47 @@ const LITURGY_ACTIONS = new Set([
 /** Namespaces v2 (controle remoto total — spec Obsidian v2). */
 const V2_NAMESPACES = new Set(['media', 'bible', 'timer', 'countdown', 'clock', 'random', 'palco'])
 
+interface ProjectionSlideApi {
+  getPdfPageState?: () => Promise<{ index: number; total: number; projecting?: boolean } | null>
+  getPptSlideState?: () => Promise<{ index: number; total: number; projecting?: boolean } | null>
+  getImageSlideState?: () => Promise<{ index: number; total: number; projecting?: boolean } | null>
+  remotePdfNext?: () => Promise<{ index: number; total: number } | null>
+  remotePdfPrev?: () => Promise<{ index: number; total: number } | null>
+  remotePptNext?: () => Promise<{ index: number; total: number } | null>
+  remotePptPrev?: () => Promise<{ index: number; total: number } | null>
+  remoteImageNext?: () => Promise<{ index: number; total: number } | null>
+  remoteImagePrev?: () => Promise<{ index: number; total: number } | null>
+}
+
+/**
+ * Roteia slide:next/prev/goto do pregador para a superfície ATIVA
+ * (PDF/PPT/imagens na janela de projeção via cabo OU palco — mesmo IPC).
+ * Retorna true se consumiu; false → chamador cai no player de hinos.
+ */
+async function routeSlideCommand(
+  projection: ProjectionSlideApi | null | undefined,
+  kind: 'next' | 'prev',
+): Promise<boolean> {
+  if (!projection) return false
+  try {
+    if (await projection.getPdfPageState?.()) {
+      const r = kind === 'next' ? await projection.remotePdfNext?.() : await projection.remotePdfPrev?.()
+      return r != null
+    }
+    if (await projection.getPptSlideState?.()) {
+      const r = kind === 'next' ? await projection.remotePptNext?.() : await projection.remotePptPrev?.()
+      return r != null
+    }
+    if (await projection.getImageSlideState?.()) {
+      const r = kind === 'next' ? await projection.remoteImageNext?.() : await projection.remoteImagePrev?.()
+      return r != null
+    }
+  } catch {
+    return false
+  }
+  return false
+}
+
 export function installRemoteLiturgyBridge({ router }: { router: Router }) {
   const liturgy = useLiturgyStore()
   const player = useMediaPlayer()
@@ -214,8 +255,19 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
     const current = liturgy.selectedItemIndex ?? -1
 
     // Pregador: única superfície autorizada pelo servidor.
-    if (action === 'slide:next') { await player.nextSlide?.(); return true }
-    if (action === 'slide:prev') { await player.previousSlide?.(); return true }
+    // PDF/PPT/imagens rodam na janela de projeção (cabo) OU no palco —
+    // as duas superfícies compartilham a mesma API projection.remote*,
+    // então o roteamento vale para ambas. Hinos continuam no player.
+    if (action === 'slide:next' || action === 'slide:prev') {
+      const routed = await routeSlideCommand(
+        projection,
+        action === 'slide:next' ? 'next' : 'prev',
+      )
+      if (routed) return true
+      if (action === 'slide:next') await player.nextSlide?.()
+      else await player.previousSlide?.()
+      return true
+    }
     if (action === 'slide:goto') {
       if (typeof msg.index !== 'number') return false
       await player.goToSlide?.(msg.index); return true

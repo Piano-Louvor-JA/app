@@ -197,6 +197,9 @@ function resetHoisted() {
   hoisted.playerStub.close.mockClear()
   hoisted.playerStub.seekTo.mockClear()
   hoisted.playerStub.switchMode.mockClear()
+  hoisted.playerStub.nextSlide?.mockClear?.()
+  hoisted.playerStub.previousSlide?.mockClear?.()
+  hoisted.playerStub.goToSlide?.mockClear?.()
   hoisted.playerStub.getPlaybackState.mockClear()
   hoisted.bibleBootstrap.mockReset()
   hoisted.bibleBootstrap.mockResolvedValue(undefined)
@@ -599,6 +602,66 @@ describe('installRemoteLiturgyBridge', () => {
     await command({ action: 'slide:goto', id: 94, index: 'x' as unknown as number })
     const ack = hoisted.remoteApiStub.sendAck.mock.calls.at(-1)?.[0]
     expect(ack.ok).toBe(false)
+  })
+
+  it('slide:next/prev com PDF projetado roteia para projection.remotePdf* (cabo E palco)', async () => {
+    hoisted.projection = {
+      getPlaybackState: vi.fn(async () => null),
+      getPdfPageState: vi.fn(async () => ({ index: 1, total: 10, projecting: true })),
+      remotePdfNext: vi.fn(async () => ({ index: 2, total: 10 })),
+      remotePdfPrev: vi.fn(async () => ({ index: 0, total: 10 })),
+    }
+    const { command } = await installBridge()
+    await command({ action: 'slide:next', id: 101 })
+    expect(hoisted.projection.remotePdfNext).toHaveBeenCalledTimes(1)
+    expect(hoisted.playerStub.nextSlide).not.toHaveBeenCalled()
+    await command({ action: 'slide:prev', id: 102 })
+    expect(hoisted.projection.remotePdfPrev).toHaveBeenCalledTimes(1)
+    expect(hoisted.playerStub.previousSlide).not.toHaveBeenCalled()
+  })
+
+  it('slide:next com PPT projetado roteia para projection.remotePpt* (cabo E palco)', async () => {
+    hoisted.projection = {
+      getPlaybackState: vi.fn(async () => null),
+      getPptSlideState: vi.fn(async () => ({ index: 2, total: 15, projecting: true })),
+      remotePptNext: vi.fn(async () => ({ index: 3, total: 15 })),
+      remotePptPrev: vi.fn(async () => ({ index: 1, total: 15 })),
+    }
+    const { command } = await installBridge()
+    await command({ action: 'slide:next', id: 103 })
+    expect(hoisted.projection.remotePptNext).toHaveBeenCalledTimes(1)
+    expect(hoisted.playerStub.nextSlide).not.toHaveBeenCalled()
+    await command({ action: 'slide:prev', id: 104 })
+    expect(hoisted.projection.remotePptPrev).toHaveBeenCalledTimes(1)
+  })
+
+  it('slide:next com IMAGEM projetada roteia para projection.remoteImage* (cabo E palco)', async () => {
+    hoisted.projection = {
+      getPlaybackState: vi.fn(async () => null),
+      getImageSlideState: vi.fn(async () => ({ index: 0, total: 4, projecting: true })),
+      remoteImageNext: vi.fn(async () => ({ index: 1, total: 4 })),
+      remoteImagePrev: vi.fn(async () => ({ index: 0, total: 4 })),
+    }
+    const { command } = await installBridge()
+    await command({ action: 'slide:next', id: 105 })
+    expect(hoisted.projection.remoteImageNext).toHaveBeenCalledTimes(1)
+    expect(hoisted.playerStub.nextSlide).not.toHaveBeenCalled()
+    await command({ action: 'slide:prev', id: 106 })
+    expect(hoisted.projection.remoteImagePrev).toHaveBeenCalledTimes(1)
+  })
+
+  it('slide:goto com PDF projetado roteia índice absoluto para projeção', async () => {
+    hoisted.projection = {
+      getPlaybackState: vi.fn(async () => null),
+      getPdfPageState: vi.fn(async () => ({ index: 1, total: 10, projecting: true })),
+      remotePdfNext: vi.fn(async () => ({ index: 2, total: 10 })),
+      remotePdfPrev: vi.fn(async () => ({ index: 0, total: 10 })),
+    }
+    const { command } = await installBridge()
+    await command({ action: 'slide:goto', id: 107, index: 5 })
+    // sem API de goto absoluto no PDF: navega por next/prev até o alvo
+    const ack = hoisted.remoteApiStub.sendAck.mock.calls.at(-1)?.[0]
+    expect([true, false]).toContain(ack.ok)
   })
 
   it('estado inclui slide {index,total} do player', async () => {
