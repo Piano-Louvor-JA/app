@@ -121,16 +121,22 @@ function copyOperatorUrl() {
         </div>
       </div>
 
-      <!-- Predicador: QR + status próprio -->
+      <!-- Predicador: título + status + explicação ANTES do QR -->
       <div
         v-if="info.speakerQrDataUrl"
         class="pairing-item"
         data-testid="remote-speaker-block"
       >
+        <div class="text-subtitle-1 mb-1">
+          {{ t('settings.remote.speakerTitle') }}
+        </div>
         <div class="status-badge status-badge-block" data-testid="remote-speaker-status">
           <span class="status-dot" :class="{ active: info.speakerUrl }" />
           {{ info.speakerUrl ? t('settings.remote.speakerReady') : t('settings.remote.speakerWaiting') }}
         </div>
+        <p class="text-caption text-medium-emphasis pairing-hint">
+          {{ t('settings.remote.speakerHint') }}
+        </p>
         <div class="qr-col">
           <img
             :src="info.speakerQrDataUrl"
@@ -140,17 +146,8 @@ function copyOperatorUrl() {
             alt="QR Pregador"
             data-testid="remote-speaker-qr"
           >
-          <div class="text-caption text-medium-emphasis mt-1 text-center">
-            {{ t('settings.remote.speakerTitle') }}
-          </div>
         </div>
         <div class="mt-4">
-          <div class="text-subtitle-2 mb-1">
-            {{ t('settings.remote.speakerTitle') }}
-          </div>
-          <p class="text-caption text-medium-emphasis">
-            {{ t('settings.remote.speakerHint') }}
-          </p>
           <div class="text-body-2 mono speaker-url" data-testid="remote-speaker-url">
             {{ info.speakerUrl }}
           </div>
@@ -165,16 +162,22 @@ function copyOperatorUrl() {
         </div>
       </div>
 
-      <!-- Operador: QR da página /operator (app remoto Piano LouvorJA) -->
+      <!-- Operador: título + status + explicação ANTES do QR -->
       <div
         v-if="info.operatorQrDataUrl"
         class="pairing-item"
         data-testid="remote-operator-block"
       >
+        <div class="text-subtitle-1 mb-1">
+          {{ t('settings.remote.operatorTitle') }}
+        </div>
         <div class="status-badge status-badge-block" data-testid="remote-operator-status">
           <span class="status-dot" :class="{ active: info.operatorUrl }" />
           {{ info.operatorUrl ? t('settings.remote.operatorReady') : t('settings.remote.operatorWaiting') }}
         </div>
+        <p class="text-caption text-medium-emphasis pairing-hint">
+          {{ t('settings.remote.operatorHint') }}
+        </p>
         <div class="qr-col">
           <img
             :src="info.operatorQrDataUrl"
@@ -184,17 +187,8 @@ function copyOperatorUrl() {
             alt="QR Operador"
             data-testid="remote-operator-qr"
           >
-          <div class="text-caption text-medium-emphasis mt-1 text-center">
-            {{ t('settings.remote.operatorTitle') }}
-          </div>
         </div>
         <div class="mt-4">
-          <div class="text-subtitle-2 mb-1">
-            {{ t('settings.remote.operatorTitle') }}
-          </div>
-          <p class="text-caption text-medium-emphasis">
-            {{ t('settings.remote.operatorHint') }}
-          </p>
           <div class="text-body-2 mono operator-url" data-testid="remote-operator-url">
             {{ info.operatorUrl }}
           </div>
@@ -232,6 +226,11 @@ function copyOperatorUrl() {
 
 .pairing-card {
   max-width: 860px;
+}
+
+.pairing-hint {
+  min-height: 2.6em;
+  margin-bottom: 12px;
 }
 
 .qr {
