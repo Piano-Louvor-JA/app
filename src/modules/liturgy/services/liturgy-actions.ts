@@ -24,6 +24,8 @@ import {
   playLiturgyLocalPresentationOnScreens,
   playLiturgyLocalVideoOnScreens,
   playLiturgyWebOnConfiguredScreens,
+  getPalcoRoute,
+  parseLiturgyWebTarget,
 } from './liturgy-web-projection'
 export type LiturgyScheduledContent =
   | { kind: 'music'; musicId: number; musicMode?: LiturgyMusicMode }
@@ -546,11 +548,36 @@ export async function playLiturgyItemOnScreens(
     return { ok: false, messageKey: 'liturgy.messages.urlMissing' }
   }
 
+  const target = parseLiturgyWebTarget(rawUrl)
+  if (!target) {
+    return { ok: false, messageKey: 'liturgy.messages.urlMissing' }
+  }
+
   const label = item.name?.trim() || rawUrl
-  const ok =
-    item.type === 'site'
+  const route = getPalcoRoute(target)
+
+  let ok: boolean
+  if (route === 'slot') {
+    // TV/Receivers via Palco (7080/7081)
+    const { palcoSession } = await import('../../settings/services/palco-session')
+    await palcoSession.turnOn()
+    const { publishLiturgyWebRuntime } = await import('./liturgy-web-runtime')
+    publishLiturgyWebRuntime({
+      active: true,
+      url: target.url,
+      title: label,
+      kind: target.kind,
+      videoId: target.videoId,
+      startedAt: Date.now(),
+    })
+    ok = true
+  } else {
+    // Mirror: cabeada fullscreen popup
+    ok = item.type === 'site'
       ? await openLiturgySiteOnScreens(rawUrl, label)
       : await playLiturgyWebOnConfiguredScreens(rawUrl, label)
+  }
+
   if (!ok) {
     return { ok: false, messageKey: 'liturgy.messages.projectionFailed' }
   }

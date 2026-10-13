@@ -314,6 +314,13 @@ export default {
       speakerTitle: 'Predicador',
       speakerHint: 'El predicador escanea este QR con la cámara del celular (o copia el enlace) — abre la página de navegación de diapositivas en el navegador, sin instalar nada.',
       speakerCopy: 'Copiar enlace del predicador',
+      speakerReady: 'Predicador listo',
+      speakerWaiting: 'Esperando enlace del predicador',
+      operatorTitle: 'Operador',
+      operatorHint: 'El operador escanea este QR con la app Piano LouvorJA (Configuración → Control Remoto) — control total de la liturgia desde la app.',
+      operatorCopy: 'Copiar enlace del operador',
+      operatorReady: 'Operador listo',
+      operatorWaiting: 'Esperando enlace del operador',
     },
     palco: {
       cableGroup: 'Monitores (cable)',

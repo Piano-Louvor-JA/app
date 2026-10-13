@@ -185,3 +185,22 @@ export function publishLiturgyYtSync(payload: LiturgyYtSyncPayload): void {
     // BroadcastChannel indisponível
   }
 }
+
+/**
+ * RF2: Determina a rota de projeção para o conteúdo de liturgia web.
+ * 
+ * - 'mirror': Cabeada (monitor físico conectado) — abre BrowserWindow fullscreen
+ *   sem chrome/overlays. Usa popup Electron nativo (YouTube/Vimeo com controles).
+ * - 'slot': TV/Receivers via Palco (ports 7080 HTTP + 7081 WS) — publica no
+ *   palco-session para receivers conectados.
+ * 
+ * Regra: YouTube, Vimeo, site genérico → mirror (cabeada).
+ *         local-video (arquivo local mp4/webm) → slot (TV).
+ */
+export function getPalcoRoute(target: LiturgyWebTarget): 'mirror' | 'slot' {
+  // local-video explícito → slot (TV/receivers)
+  if (target.kind === 'local-video') return 'slot'
+  
+  // YouTube, Vimeo, site genérico → mirror (cabeada fullscreen popup)
+  return 'mirror'
+}

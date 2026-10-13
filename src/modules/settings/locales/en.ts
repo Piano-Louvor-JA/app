@@ -312,6 +312,13 @@ export default {
       speakerTitle: 'Speaker',
       speakerHint: 'The speaker scans this QR with the phone camera (or copies the link) — it opens the slide navigation page in the browser, no app install needed.',
       speakerCopy: 'Copy speaker link',
+      speakerReady: 'Speaker ready',
+      speakerWaiting: 'Waiting for speaker link',
+      operatorTitle: 'Operator',
+      operatorHint: 'The operator scans this QR with the Piano LouvorJA app (Settings → Remote Control) — full liturgy control from the app.',
+      operatorCopy: 'Copy operator link',
+      operatorReady: 'Operator ready',
+      operatorWaiting: 'Waiting for operator link',
     },
     palco: {
       cableGroup: 'Monitors (cable)',

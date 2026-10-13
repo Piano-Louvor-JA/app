@@ -44,6 +44,11 @@ function copySpeakerUrl() {
   if (!info.value?.speakerUrl) return
   void navigator.clipboard?.writeText(info.value.speakerUrl)
 }
+
+function copyOperatorUrl() {
+  if (!info.value?.operatorUrl) return
+  void navigator.clipboard?.writeText(info.value.operatorUrl)
+}
 </script>
 
 <template>
@@ -150,6 +155,58 @@ function copySpeakerUrl() {
         >
           {{ t('settings.remote.speakerCopy') }}
         </button>
+      </div>
+    </div>
+
+    <!-- Operador: QR da página /operator (app remoto Piano LouvorJA) -->
+    <div
+      v-if="info && info.operatorQrDataUrl"
+      class="d-flex align-stretch mt-6"
+      data-testid="remote-operator-block"
+    >
+      <div class="qr-col">
+        <img
+          :src="info.operatorQrDataUrl"
+          width="180"
+          height="180"
+          class="qr"
+          alt="QR Operador"
+          data-testid="remote-operator-qr"
+        >
+        <div class="text-caption text-medium-emphasis mt-1 text-center">
+          {{ t('settings.remote.operatorTitle') }}
+        </div>
+      </div>
+      <div class="ml-6 flex-grow-1">
+        <div class="text-subtitle-2 mb-1">
+          {{ t('settings.remote.operatorTitle') }}
+        </div>
+        <p class="text-caption text-medium-emphasis">
+          {{ t('settings.remote.operatorHint') }}
+        </p>
+        <div class="text-body-2 mono operator-url" data-testid="remote-operator-url">
+          {{ info.operatorUrl }}
+        </div>
+        <button
+          type="button"
+          class="copy-btn mt-3"
+          data-testid="remote-operator-copy"
+          @click="copyOperatorUrl"
+        >
+          {{ t('settings.remote.operatorCopy') }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Status duplo: Speaker (pregador) + Operator (app remoto) -->
+    <div class="mt-6 d-flex flex-wrap gap-4" data-testid="remote-dual-status">
+      <div class="status-badge" data-testid="remote-speaker-status">
+        <span class="status-dot" :class="{ active: info?.speakerUrl }" />
+        {{ info?.speakerUrl ? t('settings.remote.speakerReady') : t('settings.remote.speakerWaiting') }}
+      </div>
+      <div class="status-badge" data-testid="remote-operator-status">
+        <span class="status-dot" :class="{ active: info?.operatorUrl }" />
+        {{ info?.operatorUrl ? t('settings.remote.operatorReady') : t('settings.remote.operatorWaiting') }}
       </div>
     </div>
   </GlassCard>

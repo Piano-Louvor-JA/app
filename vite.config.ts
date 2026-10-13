@@ -63,6 +63,8 @@ export default defineConfig({
         '**/coverage/**',
       ],
     },
+    strictPort: true,
+    port: 5173,
   },
   plugins: [
     vue(),
