@@ -5,6 +5,5 @@ Exec=louvorja-piano %U
 Icon=louvorja-piano
 Type=Application
 Categories=AudioVideo;Audio;Player;
-MimeType=x-scheme-handler/louvorja-piano;
 StartupNotify=true
 StartupWMClass=LouvorJA - PIANO
