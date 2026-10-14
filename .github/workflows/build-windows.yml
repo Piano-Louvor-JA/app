@@ -101,7 +101,7 @@ jobs:
       # electron-builder gera .appx; Partner Center aceita esse pacote diretamente.
       - name: Upload Microsoft Store .appx
         if: steps.store.outputs.enabled == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: LouvorJA-PIANO-MicrosoftStore-appx
           path: dist-electron/*.appx
@@ -125,7 +125,7 @@ jobs:
 
       - name: Upload x64 installer + portable (artifact backup)
         if: steps.decision.outputs.publish == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: LouvorJA-PIANO-Windows-x64
           path: |
