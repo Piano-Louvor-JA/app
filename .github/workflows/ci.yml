@@ -250,7 +250,7 @@ jobs:
       - name: Validate updater artifacts and metadata
         run: node scripts/validate-release-artifacts.mjs ${{ matrix.platform }} "$(node -p "require('./package.json').version")"
       - name: Preserve artifacts for inspection
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-validation-${{ matrix.platform }}-electron-${{ matrix.version }}
           # Somente arquivos finais da raiz; exclui apps descompactados.
@@ -306,7 +306,7 @@ jobs:
       - run: npx playwright test
       - name: Preserve trace/report on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: test-results/
