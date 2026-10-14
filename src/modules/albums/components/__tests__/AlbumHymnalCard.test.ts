@@ -65,6 +65,20 @@ describe('AlbumHymnalCard', () => {
     expect(w.find('.album-hymnal-card__fallback-icon').classes()).toContain('ti-history')
   })
 
+  it('capa: coverUrl presente renderiza <img>, erro de load volta ao ícone', async () => {
+    const w = mountCard({
+      collection: { ...collection, coverUrl: 'https://example.test/hymnal.jpeg' },
+    })
+    const img = w.find('.album-hymnal-card__cover-img')
+    expect(img.exists()).toBe(true)
+    expect(img.attributes('src')).toBe('https://example.test/hymnal.jpeg')
+    expect(w.find('.album-hymnal-card__fallback-icon').exists()).toBe(false)
+    // @error → fallback ícone
+    await img.trigger('error')
+    expect(w.find('.album-hymnal-card__cover-img').exists()).toBe(false)
+    expect(w.find('.album-hymnal-card__fallback-icon').exists()).toBe(true)
+  })
+
   it('downloading: progresso + % visíveis, cancel disponível e emite cancel', async () => {
     const w = mountCard({ libraryAlbum: lib({ status: 'downloading', progress: 30 }) })
     expect(w.find('.album-hymnal-card__progress-meta').exists()).toBe(true)
