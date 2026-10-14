@@ -132,7 +132,7 @@ jobs:
       - run: npm ci
       - name: Check paridade
         env:
-          PARIDADE_BRANCH: ${{ github.event_name == 'pull_request' && (github.event.pull_request.number == 435 || github.event.pull_request.number == 441 || github.event.pull_request.number == 442) && github.base_ref == 'staging' && 'fix/stage-background-parity-app435' || 'staging' }}
+          PARIDADE_BRANCH: ${{ github.event_name == 'pull_request' && github.base_ref == 'staging' && (github.event.pull_request.number == 458 && 'feat/stage-settings-parity-app458' || (github.event.pull_request.number == 435 || github.event.pull_request.number == 441 || github.event.pull_request.number == 442) && 'fix/stage-background-parity-app435') || 'staging' }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node scripts/check-paridade.mjs
 

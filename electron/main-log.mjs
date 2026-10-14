@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, mkdirSync, renameSync, rmSync, statSync } from 'node:fs'
+import { closeSync, fstatSync, mkdirSync, openSync, renameSync, rmSync, writeSync } from 'node:fs'
 import path from 'node:path'
 
 export const MAX_MAIN_LOG_BYTES = 1024 * 1024
@@ -25,18 +25,29 @@ export function createMainLogger(getUserData) {
   const pending = []
 
   function writeNow(level, message) {
+    let fd
     try {
       const logs = path.join(getUserData(), 'logs')
       const current = path.join(logs, 'main.log')
       const previous = `${current}.1`
       const line = `${new Date().toISOString()} ${level} ${sanitizeMainLog(message)}\n`
       mkdirSync(logs, { recursive: true })
-      if (existsSync(current) && statSync(current).size + Buffer.byteLength(line) > MAX_MAIN_LOG_BYTES) {
+      // Tamanho lido no descritor aberto, sem exists/stat no caminho (TOCTOU).
+      fd = openSync(current, 'a')
+      if (fstatSync(fd).size + Buffer.byteLength(line) > MAX_MAIN_LOG_BYTES) {
+        closeSync(fd)
+        fd = undefined
         rmSync(previous, { force: true })
         renameSync(current, previous)
+        fd = openSync(current, 'a')
       }
-      appendFileSync(current, line, 'utf8')
+      writeSync(fd, line)
     } catch { /* diagnostics logging nunca derruba o main */ }
+    finally {
+      if (fd !== undefined) {
+        try { closeSync(fd) } catch { /* fd já fechado na rotação */ }
+      }
+    }
   }
 
   function write(level, message) {
