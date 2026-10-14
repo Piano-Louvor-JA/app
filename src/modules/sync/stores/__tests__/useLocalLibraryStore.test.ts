@@ -7,6 +7,7 @@ vi.mock('@shared/services/desktop-bridge', () => ({
 }))
 vi.mock('@shared/services/track-media', () => ({
   invalidateTrackMediaCache: vi.fn(),
+  onTrackMediaChanged: vi.fn(),
   peekTrackDownloadCache: vi.fn(() => new Set<number>()),
 }))
 vi.mock('../../services/library-catalog', () => ({
