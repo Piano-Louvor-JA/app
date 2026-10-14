@@ -33,6 +33,9 @@ import {
 } from './remote-diagnostics.mjs'
 import { networkInterfaces } from 'node:os'
 import { getRemoteStatus } from './remote-server.mjs'
+import { sanitizeRendererErrors } from './renderer-errors.mjs'
+
+let rendererErrors = []
 
 // screen via electron — monitores/resolução pra problemas de projeção em 2ª tela.
 function monitoresAbertos() {
@@ -439,7 +442,7 @@ async function runDiagnostics() {
     ambiente: { os: process.platform, osRelease: os.release(), arch: process.arch, electron: process.versions.electron, chrome: process.versions.chrome, locale: app.getLocale(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, online: general['1.1.1.1:443'].ok || general['google.com:443'].ok },
     rede: { proxy: { resolveProxyPorOrigem: proxy, envHttpProxy: process.env.HTTP_PROXY ?? null, envHttpsProxy: process.env.HTTPS_PROXY ?? null }, hostsOverrides, conectividadeGeral: general, apis, reproducaoBootstrap: reproduction, mediaReal: mediaProbe, dnsSuspeito },
     instalacaoReal: installation,
-    triage: { storage, crashes, memoria, discoLivreMb, antivirus, logs, gpuFeatures, monitores: monitoresAbertos(), versaoInstalacaoReal },
+    triage: { storage, crashes, memoria, discoLivreMb, antivirus, logs, gpuFeatures, monitores: monitoresAbertos(), versaoInstalacaoReal, rendererErrors },
     controleRemoto,
   }
   report.vereditoHeuristico = computeVerdict({ general, apis, proxy, hosts: hostsOverrides, installation, extra, controleRemoto })
@@ -475,6 +478,9 @@ export function registerDiagnosticsIpc() {
     resourcesPath: process.resourcesPath,
     appPath: app.getAppPath(),
     isPackaged: app.isPackaged,
+  })
+  ipcMain.on('diagnostics:renderer-errors', (_event, snapshot) => {
+    rendererErrors = sanitizeRendererErrors(snapshot)
   })
   ipcMain.handle('diagnostics:run', () => runDiagnostics())
   ipcMain.handle('diagnostics:open-folder', async (_event, filePath) => shell.showItemInFolder(String(filePath ?? '')))

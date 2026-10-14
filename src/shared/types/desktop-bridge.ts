@@ -432,6 +432,7 @@ export type DiagnosticsApi = {
   run: () => Promise<{ report: unknown; jsonPath: string; txtPath: string }>
   send: (report: unknown) => Promise<{ ok: boolean; reason?: string }>
   openFolder: (filePath: string) => Promise<void>
+  reportRendererErrors?: (errors: unknown) => void
 }
 
 export type LouvorJaBridge = {
