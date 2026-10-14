@@ -58,7 +58,7 @@ function stepZoomLevel(delta) {
 
 async function downloadDiagnosticsJson() {
   const result = await ipcRenderer.invoke('diagnostics:run')
-  const json = JSON.stringify(result.report, null, 2)
+  const json = result.json
   const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }))
   const link = document.createElement('a')
   link.href = url

@@ -22,15 +22,18 @@ describe('DevTools diagnostics bridge', () => {
       body: { appendChild, removeChild },
       createElement: vi.fn(() => ({ click })),
     }
-    invoke.mockResolvedValue({ report: { meta: {} }, jsonPath: '/tmp/diagnostico.json', txtPath: '/tmp/diagnostico.txt' })
+    const json = '{"meta":{"budgetado":true}}'
+    invoke.mockResolvedValue({ report: { meta: {} }, json, jsonPath: '/tmp/diagnostico.json', txtPath: '/tmp/diagnostico.txt' })
 
     await import('../preload.mjs')
     const bridge = exposeInMainWorld.mock.calls.find(([name]) => name === '__louvorjaDiag')[1]
     const result = await bridge()
 
     expect(invoke).toHaveBeenCalledExactlyOnceWith('diagnostics:run')
-    expect(result).toEqual({ report: { meta: {} }, jsonPath: '/tmp/diagnostico.json', txtPath: '/tmp/diagnostico.txt' })
+    expect(result).toEqual({ report: { meta: {} }, json, jsonPath: '/tmp/diagnostico.json', txtPath: '/tmp/diagnostico.txt' })
     expect(createObjectURL).toHaveBeenCalledOnce()
+    const blob = createObjectURL.mock.calls[0][0]
+    expect(await blob.text()).toBe(json)
     expect(click).toHaveBeenCalledOnce()
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:diagnostics')
   })

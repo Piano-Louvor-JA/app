@@ -518,9 +518,10 @@ async function runDiagnostics() {
   const jsonPath = path.join(dir, `louvorja-diagnostico-${timestamp}.json`)
   const txtPath = path.join(dir, `louvorja-diagnostico-${timestamp}.txt`)
   report.meta.arquivoJson = jsonPath
-  writeFileSync(jsonPath, serializeReportWithinBudget(report), 'utf8')
+  const json = serializeReportWithinBudget(report)
+  writeFileSync(jsonPath, json, 'utf8')
   writeFileSync(txtPath, reportText(report), 'utf8')
-  return { report, jsonPath, txtPath }
+  return { report, json, jsonPath, txtPath }
 }
 
 // DSN dev: electron:dev não tem resourcesPath válido; lê do build/ do repo.
