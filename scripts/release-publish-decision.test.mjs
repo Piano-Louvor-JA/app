@@ -242,5 +242,9 @@ test('Flatpak e lojas preservam tag_only e usam a versão exata', () => {
   assert.match(snap, /npm run build/)
   const flatpak = readFileSync(join(repoRoot, '.github/workflows/build-flatpak.yml'), 'utf8')
   assert.match(flatpak, /path: release\.tar\.gz/)
-  assert.equal(existsSync(join(repoRoot, 'packaging/flatpak/com.pianolouvorja.piano.desktop')), true)
+  assert.equal(existsSync(join(repoRoot, 'packaging/flatpak/br.com.pianolouvorja.piano.desktop')), true)
+  // o workflow de release precisa apontar para o manifesto que existe no repo
+  const manifests = [...flatpak.matchAll(/packaging\/flatpak\/[\w.-]+\.ya?ml/g)].map((m) => m[0])
+  assert.ok(manifests.length >= 2, 'build-flatpak.yml deve referenciar o manifesto')
+  for (const manifest of manifests) assert.equal(existsSync(join(repoRoot, manifest)), true, manifest)
 })

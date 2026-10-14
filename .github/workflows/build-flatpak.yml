@@ -121,7 +121,7 @@ jobs:
 
           [ -n "$SHA" ] || { echo "Asset não encontrado via API: ${ASSET}"; exit 1; }
           echo "version=$VERSION sha256=$SHA"
-          MANIFEST=packaging/flatpak/com.pianolouvorja.piano.yaml
+          MANIFEST=packaging/flatpak/br.com.pianolouvorja.piano.yml
           cp /tmp/src.tar.gz packaging/flatpak/release.tar.gz
           sed -i "s|url: .*/releases/download/.*|path: release.tar.gz|" "$MANIFEST"
           sed -i "s|sha256: [a-f0-9]\{64\}|sha256: $SHA|" "$MANIFEST"
@@ -130,7 +130,7 @@ jobs:
       - uses: flatpak/flatpak-github-actions/flatpak-builder@79327416609af08178ad73b352877e51450790b3 # v6
         with:
           bundle: louvorja-piano.flatpak
-          manifest-path: packaging/flatpak/com.pianolouvorja.piano.yaml
+          manifest-path: packaging/flatpak/br.com.pianolouvorja.piano.yml
           cache-key: flatpak-builder-${{ github.sha }}
 
       - name: Upload to release
