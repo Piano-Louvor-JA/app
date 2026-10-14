@@ -47,42 +47,61 @@ export function serializeReportWithinBudget(report, budget = DIAGNOSTICS_MAX_JSO
       .replace(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, '[redacted-jwt]')
       .replace(/[A-Za-z0-9+/_-]{41,}/g, '[redacted-blob]')
     : value
-  const size = () => Buffer.byteLength(json(report), 'utf8')
+  const count = (value) => Array.isArray(value) ? value.length : value && typeof value === 'object' ? Object.keys(value).length : 0
+  let structurallyTruncated = false
+  const sanitize = (value, depth = 0) => {
+    if (typeof value === 'string') return redact(value).slice(0, 512)
+    if (!value || typeof value !== 'object') return value
+    if (depth >= 8) {
+      structurallyTruncated = true
+      return `[truncated-${Array.isArray(value) ? 'array' : 'object'}]`
+    }
+    if (Array.isArray(value)) {
+      const limit = 20
+      if (value.length > limit) structurallyTruncated = true
+      return value.slice(0, limit).map((item) => sanitize(item, depth + 1)).concat(value.length > limit ? [`[${value.length - limit} omitted]`] : [])
+    }
+    const entries = Object.entries(value)
+    if (entries.length > 100) structurallyTruncated = true
+    return Object.fromEntries(entries.slice(0, 100).map(([key, item]) => [key, sanitize(item, depth + 1)]))
+  }
+  const sanitized = sanitize(report)
+  if (structurallyTruncated) return json({
+    app: typeof report?.app === 'string' ? redact(report.app).slice(0, 512) : null,
+    version: typeof report?.version === 'string' ? redact(report.version).slice(0, 512) : null,
+    generatedAt: typeof report?.generatedAt === 'string' ? report.generatedAt.slice(0, 512) : null,
+    timestamps: { generatedAt: typeof report?.generatedAt === 'string' ? report.generatedAt.slice(0, 512) : null },
+    counts: { logs: count(report?.triage?.logs), rendererErrors: count(report?.triage?.rendererErrors), downloadFailures: count(report?.triage?.downloadFailures), meta: count(report?.meta) },
+    truncated: 'structural',
+  })
+  const size = () => Buffer.byteLength(json(sanitized), 'utf8')
   const removeOldest = (items, clear) => {
     while (size() >= budget && items.length) clear(items.shift())
   }
-  const logs = report.triage?.logs
+  const logs = sanitized.triage?.logs
   if (Array.isArray(logs)) removeOldest(logs, () => {})
-  const errors = report.triage?.rendererErrors
+  const errors = sanitized.triage?.rendererErrors
   if (Array.isArray(errors)) {
     removeOldest(errors, (event) => { event.stack = null })
     removeOldest(errors, () => {})
   }
-  const downloads = report.triage?.downloadFailures
+  const downloads = sanitized.triage?.downloadFailures
   if (Array.isArray(downloads)) removeOldest(downloads, () => {})
-  const sanitizeText = (value) => {
-    if (typeof value === 'string') return redact(value)
-    if (!value || typeof value !== 'object') return value
-    if (Array.isArray(value)) return value.map(sanitizeText)
-    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, sanitizeText(item)]))
-  }
-  const sanitized = sanitizeText(report)
-  if (Buffer.byteLength(json(sanitized), 'utf8') < budget) return json(sanitized)
+  if (size() < budget) return json(sanitized)
 
-  const compactText = (value) => {
-    if (typeof value === 'string') return redact(value).slice(0, 512)
-    if (!value || typeof value !== 'object') return value
-    if (Array.isArray(value)) return value.map(compactText)
-    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, compactText(item)]))
-  }
-  const compact = compactText(report)
-  if (Buffer.byteLength(json(compact), 'utf8') < budget) return json(compact)
-
-  const meta = report.meta && typeof report.meta === 'object'
-    ? Object.fromEntries(Object.entries(report.meta).filter(([, value]) => typeof value !== 'string' || value.length <= 512))
-    : {}
-  const fallback = { meta, truncated: 'reason:budget' }
-  return json(fallback).slice(0, budget - 1)
+  return json({
+    app: typeof report?.app === 'string' ? redact(report.app).slice(0, 512) : null,
+    version: typeof report?.version === 'string' ? redact(report.version).slice(0, 512) : null,
+    generatedAt: typeof report?.generatedAt === 'string' ? report.generatedAt.slice(0, 512) : null,
+    timestamps: { generatedAt: typeof report?.generatedAt === 'string' ? report.generatedAt.slice(0, 512) : null },
+    counts: {
+      logs: count(report?.triage?.logs),
+      rendererErrors: count(report?.triage?.rendererErrors),
+      downloadFailures: count(report?.triage?.downloadFailures),
+      meta: count(report?.meta),
+    },
+    truncated: 'structural',
+  })
 }
 
 // screen via electron — monitores/resolução pra problemas de projeção em 2ª tela.

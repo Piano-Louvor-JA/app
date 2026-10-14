@@ -145,8 +145,16 @@ export type BackupApi = {
   onProgress: (callback: (progress: BackupProgress) => void) => () => void
 }
 
+export type MediaDownloadFailure = {
+  ok: false
+  url: string
+  status: number | null
+  bytes: number
+  error: string
+}
+
 export type MediaApi = {
-  download: (url: string, mediaType: MediaFolderType, filename: string) => Promise<boolean>
+  download: (url: string, mediaType: MediaFolderType, filename: string) => Promise<boolean | MediaDownloadFailure>
   check: (mediaType: MediaFolderType, filename: string) => Promise<string | false>
   /** Checagem em lote no main process (um IPC). */
   checkMany?: (

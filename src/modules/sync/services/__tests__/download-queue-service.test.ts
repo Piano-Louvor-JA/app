@@ -136,6 +136,21 @@ describe('fila de downloads (app#338 core)', () => {
     }))
   })
 
+  it('recebe metadados do IPC no fluxo bridge.media.download', async () => {
+    const ipcFailure = { ok: false as const, url: 'https://cdn.test/final.mp3?token=secret', status: 404, bytes: 12, error: 'HTTP 404' }
+    enqueueDownload({
+      id: 'ipc-real',
+      label: 'Faixa real',
+      priority: 'user',
+      task: async () => { throw Object.assign(new Error(ipcFailure.error), ipcFailure) },
+    })
+
+    await vi.waitFor(() => expect(downloadFailureSnapshot()).toHaveLength(1))
+    expect(downloadFailureSnapshot()[0]).toEqual(expect.objectContaining({
+      url: 'https://cdn.test/final.mp3', status: 404, bytes: 12,
+    }))
+  })
+
   it('cancelDownload: remove pending; running não é interrompido', async () => {
     let release: (() => void) | null = null
     const gate = new Promise<void>((resolve) => {

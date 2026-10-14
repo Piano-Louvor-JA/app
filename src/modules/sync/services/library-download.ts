@@ -290,7 +290,8 @@ export async function downloadAlbumMedia(
             media.type,
             relativePath,
           )
-          if (!success) {
+          if (success !== true) {
+            if (typeof success === 'object') throw Object.assign(new Error(success.error), success)
             consecutiveErrors += 1
             totalErrors += 1
             console.warn(

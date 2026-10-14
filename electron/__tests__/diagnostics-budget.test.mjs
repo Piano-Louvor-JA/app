@@ -23,14 +23,19 @@ describe('serializeReportWithinBudget', () => {
     expect(Buffer.byteLength(firstJson)).toBeLessThan(DIAGNOSTICS_MAX_JSON_BYTES)
     expect(firstJson).toBe(secondJson)
     expect(first.meta.keep).toBe('scalar')
-    expect(first.triage.logs).toEqual([])
-    expect(first.triage.rendererErrors).toEqual([])
-    expect(first.triage.downloadFailures).not.toEqual([])
+    const parsed = JSON.parse(firstJson)
+    expect(parsed.meta.keep).toBe('scalar')
+    expect(parsed.triage.logs).toHaveLength(4)
+    expect(parsed.triage.rendererErrors).toHaveLength(4)
+    expect(parsed.triage.downloadFailures).toHaveLength(4)
   })
 
-  it('nunca excede o budget quando meta sozinha excede 300 KiB', () => {
+  it('nunca excede o budget nem devolve JSON inválido com meta estrutural gigante', () => {
     const oversized = {
-      meta: { versao: '1.0.0', keep: 'scalar', huge: 'x'.repeat(400 * 1024) },
+      app: 'PIANO',
+      version: '1.0.0',
+      generatedAt: '2026-10-13T00:00:00.000Z',
+      meta: { versao: '1.0.0', keep: 'scalar', huge: Array(400_000).fill(0) },
       triage: { logs: [], rendererErrors: [], downloadFailures: [] },
     }
 
@@ -38,8 +43,21 @@ describe('serializeReportWithinBudget', () => {
     const parsed = JSON.parse(json)
 
     expect(Buffer.byteLength(json)).toBeLessThan(DIAGNOSTICS_MAX_JSON_BYTES)
-    expect(parsed.meta).toEqual(expect.objectContaining({ versao: '1.0.0', keep: 'scalar' }))
-    expect(parsed.meta.huge).toBe('[redacted-blob]')
+    expect(parsed).toEqual(expect.objectContaining({
+      app: 'PIANO',
+      version: '1.0.0',
+      generatedAt: '2026-10-13T00:00:00.000Z',
+      truncated: 'structural',
+    }))
+  })
+
+  it('sempre devolve JSON parseável', () => {
+    for (const value of [
+      { meta: { nested: Array(400_000).fill({ value: 'x'.repeat(1024) }) } },
+      { triage: { logs: Array(100).fill({ content: 'x'.repeat(10_000) }) } },
+    ]) {
+      expect(() => JSON.parse(serializeReportWithinBudget(value))).not.toThrow()
+    }
   })
 
   it('mascara JWT e blob base64 longo sem tocar em URL ou base64 curto', () => {
