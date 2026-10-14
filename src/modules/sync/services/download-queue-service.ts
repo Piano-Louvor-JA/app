@@ -1,5 +1,6 @@
 import { readCatalogRecord, writeCatalogRecord } from '@shared/services/workspace-api'
 import { WORKSPACE_RECORD_KEYS } from '@shared/constants/storage-keys'
+import { DownloadFailureBuffer } from './download-failure-buffer'
 
 /**
  * app#338: fila de downloads unificada — CORE observável (a UI de widget/
@@ -27,12 +28,18 @@ interface QueuedTask {
 const PRIORITY_RANK: Record<DownloadPriority, number> = { user: 0, bg: 1 }
 
 const queue: QueuedTask[] = []
+const downloadFailures = new DownloadFailureBuffer()
+const attempts = new Map<string, number>()
 let draining = false
 const listeners = new Set<(snapshot: DownloadQueueItem[]) => void>()
 let persistTimer: ReturnType<typeof setTimeout> | null = null
 
 function snapshot(): DownloadQueueItem[] {
   return queue.map((q) => ({ ...q.item }))
+}
+
+function reportDownloadFailures(): void {
+  try { window.louvorja?.diagnostics?.reportDownloadFailures?.(downloadFailures.snapshot()) } catch { /* best effort */ }
 }
 
 function notify(): void {
@@ -64,6 +71,10 @@ export function downloadQueueSnapshot(): DownloadQueueItem[] {
   return snapshot()
 }
 
+export function downloadFailureSnapshot() {
+  return downloadFailures.snapshot()
+}
+
 export function pendingCount(): number {
   return queue.filter((q) => q.item.status === 'pending' || q.item.status === 'running').length
 }
@@ -80,6 +91,7 @@ export function enqueueDownload(options: {
     if (existing.item.status === 'failed') existing.item.status = 'pending'
     return
   }
+  attempts.set(options.id, 1)
   queue.push({
     item: {
       id: options.id,
@@ -117,6 +129,24 @@ async function drain(): Promise<void> {
       } catch (error) {
         next.item.status = 'failed'
         next.item.error = error instanceof Error ? error.message : String(error)
+        const details = error && typeof error === 'object' ? error as {
+          url?: unknown
+          urlFinal?: unknown
+          signedUrl?: unknown
+          status?: unknown
+          bytes?: unknown
+        } : {}
+        const url = [details.urlFinal, details.signedUrl, details.url].find((value): value is string => typeof value === 'string')
+        downloadFailures.add({
+          ts: new Date().toISOString(),
+          url: url ?? '',
+          label: next.item.label,
+          status: typeof details.status === 'number' ? details.status : null,
+          bytes: typeof details.bytes === 'number' ? details.bytes : null,
+          erro: next.item.error,
+          tentativa: attempts.get(next.item.id) ?? 1,
+        })
+        reportDownloadFailures()
       }
       notify()
     }
@@ -129,6 +159,7 @@ async function drain(): Promise<void> {
 export function retryDownload(id: string): void {
   const entry = queue.find((q) => q.item.id === id)
   if (!entry || entry.item.status === 'running') return
+  attempts.set(id, (attempts.get(id) ?? 0) + 1)
   entry.item.status = 'pending'
   entry.item.error = undefined
   notify()
@@ -142,6 +173,7 @@ export function cancelDownload(id: string): void {
   const entry = queue[index]
   if (entry.item.status === 'running') return
   queue.splice(index, 1)
+  attempts.delete(id)
   notify()
 }
 
@@ -157,6 +189,8 @@ export function clearFinishedDownloads(): void {
 /** Testes: esvazia a fila entre casos (estado é module-level). */
 export function _resetDownloadQueueForTests(): void {
   queue.length = 0
+  downloadFailures.clear()
+  attempts.clear()
   if (persistTimer) {
     clearTimeout(persistTimer)
     persistTimer = null

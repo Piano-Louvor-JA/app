@@ -870,7 +870,13 @@ export function registerWorkspaceIpc() {
       return await downloadMediaFile(url, mediaType, filename)
     } catch (error) {
       console.error('[ipc] media:download', error)
-      return false
+      return {
+        ok: false,
+        url: String(url ?? ''),
+        status: typeof error?.status === 'number' ? error.status : null,
+        bytes: typeof error?.bytes === 'number' ? error.bytes : 0,
+        error: error instanceof Error ? error.message : String(error ?? 'media download failed'),
+      }
     }
   })
 

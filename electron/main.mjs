@@ -15,6 +15,7 @@ import { checkEulaAcceptance } from "./eula.mjs";
 import { resolveAppLocale } from "./locale.mjs";
 import { registerWorkspaceIpc } from "./ipc/register.mjs";
 import { registerDiagnosticsIpc } from "./diagnostics.mjs";
+import { createMainLogger } from "./main-log.mjs";
 import { attachWindowStateEvents, registerWindowIpc } from "./ipc/window.mjs";
 import { attachRemoteServer } from "./remote-server.mjs";
 import { attachPalcoServer } from "./palco-server.mjs";
@@ -42,9 +43,11 @@ const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 const isDev = Boolean(VITE_DEV_SERVER_URL);
 const PRELOAD_PATH = path.join(__dirname, "preload.mjs");
 const bootT0 = Date.now();
+const mainLog = createMainLogger(() => app.getPath('userData'));
 
 function bootMark(label) {
 	console.log(`[boot +${Date.now() - bootT0}ms] ${label}`);
+	mainLog.info(`boot ${label}`);
 }
 
 registerLocalScheme();
@@ -54,6 +57,7 @@ registerLocalScheme();
 // app sem explicação. Loga, mostra diálogo amigável e segue.
 process.on("uncaughtException", (error) => {
   console.error("[main] uncaughtException:", error);
+  mainLog.error(`uncaughtException ${error instanceof Error ? error.stack ?? error.message : String(error ?? '')}`);
   try {
     const msg = error instanceof Error ? error.message : String(error ?? "erro desconhecido");
     dialog.showErrorBox(
@@ -63,6 +67,10 @@ process.on("uncaughtException", (error) => {
   } catch {
     /* diálogo falhou — segue */
   }
+});
+
+process.on('unhandledRejection', (reason) => {
+  mainLog.error(`unhandledRejection ${reason instanceof Error ? reason.stack ?? reason.message : String(reason ?? '')}`);
 });
 
 /**
@@ -581,6 +589,7 @@ function createWindow(locale = 'pt-BR') {
 	});
 
 	applyWindowIcon(mainWindow);
+	mainLog.info('main window created');
 	attachWindowStateEvents(mainWindow);
 	trackWindowState(mainWindow, { isMaximized: windowState.isMaximized });
 
@@ -730,6 +739,7 @@ app.whenReady().then(async () => {
 
 		registerWorkspaceIpc();
 		registerDiagnosticsIpc(); // diagnostics:* — SrCaldeira, rede no main
+		mainLog.info('diagnostics IPC handlers registered');
 		registerWindowIpc(() => mainWindow);
 		registerLocalFileProtocol();
 		registerYoutubeEmbedHeaders();
@@ -750,6 +760,7 @@ app.whenReady().then(async () => {
 		attachPalcoServer(() => mainWindow?.webContents ?? null);
 	} catch (error) {
 		console.error("[main] falha no startup", error);
+		mainLog.error(`startup failure ${error instanceof Error ? error.stack ?? error.message : String(error ?? '')}`);
 		closeSplash();
 		const message =
 			error instanceof Error ? error.message : String(error ?? "erro desconhecido");

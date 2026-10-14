@@ -27,11 +27,14 @@ import {
   cancelDownload,
   clearFinishedDownloads,
   retryDownload,
+  downloadFailureSnapshot,
+  _resetDownloadQueueForTests,
 } from '../download-queue-service'
 
 describe('fila de downloads (app#338 core)', () => {
   beforeEach(() => {
     store.clear()
+    _resetDownloadQueueForTests()
   })
 
   it('enqueue adiciona item pendente com prioridade e persiste', async () => {
@@ -84,15 +87,68 @@ describe('fila de downloads (app#338 core)', () => {
       attempts += 1
       if (attempts === 1) throw new Error('net')
     })
-    enqueueDownload({ id: 'r1', label: 'R1', priority: 'user', task: run })
+    enqueueDownload({ id: 'r1', label: 'https://cdn.test/media.mp3?token=secret', priority: 'user', task: run })
     await vi.waitFor(() => {
       expect(downloadQueueSnapshot().find((q) => q.id === 'r1')?.status).toBe('failed')
     })
+    expect(downloadFailureSnapshot()).toEqual([expect.objectContaining({
+      url: '',
+      label: 'https://cdn.test/media.mp3?token=[redacted]',
+      status: null,
+      bytes: null,
+      erro: 'net',
+      tentativa: 1,
+    })])
     retryDownload('r1')
     await vi.waitFor(() => {
       expect(downloadQueueSnapshot().find((q) => q.id === 'r1')?.status).toBe('done')
     })
     expect(attempts).toBe(2)
+  })
+
+  it('retryDownload registra tentativa incrementada quando falha novamente', async () => {
+    enqueueDownload({ id: 'retry-fail', label: 'https://cdn.test/retry.mp3', priority: 'user', task: async () => { throw new Error('offline') } })
+    await vi.waitFor(() => expect(downloadQueueSnapshot().find((q) => q.id === 'retry-fail')?.status).toBe('failed'))
+    retryDownload('retry-fail')
+    await vi.waitFor(() => expect(downloadFailureSnapshot()).toHaveLength(2))
+    expect(downloadFailureSnapshot().at(-1)).toEqual(expect.objectContaining({ tentativa: 2 }))
+  })
+
+  it('registra URL, status e bytes reais expostos pela falha do consumidor', async () => {
+    const failure = Object.assign(new Error('HTTP 403'), {
+      url: 'https://cdn.test/media.mp3?token=secret',
+      status: 403,
+      bytes: 12,
+    })
+    enqueueDownload({
+      id: 'real-url',
+      label: 'Nome humano do álbum',
+      priority: 'user',
+      task: async () => { throw failure },
+    })
+
+    await vi.waitFor(() => expect(downloadFailureSnapshot()).toHaveLength(1))
+    expect(downloadFailureSnapshot()[0]).toEqual(expect.objectContaining({
+      url: 'https://cdn.test/media.mp3',
+      status: 403,
+      bytes: 12,
+      label: 'Nome humano do álbum',
+    }))
+  })
+
+  it('recebe metadados do IPC no fluxo bridge.media.download', async () => {
+    const ipcFailure = { ok: false as const, url: 'https://cdn.test/final.mp3?token=secret', status: 404, bytes: 12, error: 'HTTP 404' }
+    enqueueDownload({
+      id: 'ipc-real',
+      label: 'Faixa real',
+      priority: 'user',
+      task: async () => { throw Object.assign(new Error(ipcFailure.error), ipcFailure) },
+    })
+
+    await vi.waitFor(() => expect(downloadFailureSnapshot()).toHaveLength(1))
+    expect(downloadFailureSnapshot()[0]).toEqual(expect.objectContaining({
+      url: 'https://cdn.test/final.mp3', status: 404, bytes: 12,
+    }))
   })
 
   it('cancelDownload: remove pending; running não é interrompido', async () => {

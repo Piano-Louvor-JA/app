@@ -33,6 +33,76 @@ import {
 } from './remote-diagnostics.mjs'
 import { networkInterfaces } from 'node:os'
 import { getRemoteStatus } from './remote-server.mjs'
+import { sanitizeRendererErrors } from './renderer-errors.mjs'
+import { sanitizeDownloadFailures } from './download-failures.mjs'
+
+let rendererErrors = []
+let downloadFailures = []
+export const DIAGNOSTICS_MAX_JSON_BYTES = 300 * 1024
+
+export function serializeReportWithinBudget(report, budget = DIAGNOSTICS_MAX_JSON_BYTES) {
+  const json = (value) => JSON.stringify(value, null, 2)
+  const redact = (value) => typeof value === 'string'
+    ? value
+      .replace(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, '[redacted-jwt]')
+      .replace(/[A-Za-z0-9+/_-]{41,}/g, '[redacted-blob]')
+    : value
+  const count = (value) => Array.isArray(value) ? value.length : value && typeof value === 'object' ? Object.keys(value).length : 0
+  let structurallyTruncated = false
+  const sanitize = (value, depth = 0) => {
+    if (typeof value === 'string') return redact(value).slice(0, 512)
+    if (!value || typeof value !== 'object') return value
+    if (depth >= 8) {
+      structurallyTruncated = true
+      return `[truncated-${Array.isArray(value) ? 'array' : 'object'}]`
+    }
+    if (Array.isArray(value)) {
+      const limit = 20
+      if (value.length > limit) structurallyTruncated = true
+      return value.slice(0, limit).map((item) => sanitize(item, depth + 1)).concat(value.length > limit ? [`[${value.length - limit} omitted]`] : [])
+    }
+    const entries = Object.entries(value)
+    if (entries.length > 100) structurallyTruncated = true
+    return Object.fromEntries(entries.slice(0, 100).map(([key, item]) => [key, sanitize(item, depth + 1)]))
+  }
+  const sanitized = sanitize(report)
+  if (structurallyTruncated) return json({
+    app: typeof report?.app === 'string' ? redact(report.app).slice(0, 512) : null,
+    version: typeof report?.version === 'string' ? redact(report.version).slice(0, 512) : null,
+    generatedAt: typeof report?.generatedAt === 'string' ? report.generatedAt.slice(0, 512) : null,
+    timestamps: { generatedAt: typeof report?.generatedAt === 'string' ? report.generatedAt.slice(0, 512) : null },
+    counts: { logs: count(report?.triage?.logs), rendererErrors: count(report?.triage?.rendererErrors), downloadFailures: count(report?.triage?.downloadFailures), meta: count(report?.meta) },
+    truncated: 'structural',
+  })
+  const size = () => Buffer.byteLength(json(sanitized), 'utf8')
+  const removeOldest = (items, clear) => {
+    while (size() >= budget && items.length) clear(items.shift())
+  }
+  const logs = sanitized.triage?.logs
+  if (Array.isArray(logs)) removeOldest(logs, () => {})
+  const errors = sanitized.triage?.rendererErrors
+  if (Array.isArray(errors)) {
+    removeOldest(errors, (event) => { event.stack = null })
+    removeOldest(errors, () => {})
+  }
+  const downloads = sanitized.triage?.downloadFailures
+  if (Array.isArray(downloads)) removeOldest(downloads, () => {})
+  if (size() < budget) return json(sanitized)
+
+  return json({
+    app: typeof report?.app === 'string' ? redact(report.app).slice(0, 512) : null,
+    version: typeof report?.version === 'string' ? redact(report.version).slice(0, 512) : null,
+    generatedAt: typeof report?.generatedAt === 'string' ? report.generatedAt.slice(0, 512) : null,
+    timestamps: { generatedAt: typeof report?.generatedAt === 'string' ? report.generatedAt.slice(0, 512) : null },
+    counts: {
+      logs: count(report?.triage?.logs),
+      rendererErrors: count(report?.triage?.rendererErrors),
+      downloadFailures: count(report?.triage?.downloadFailures),
+      meta: count(report?.meta),
+    },
+    truncated: 'structural',
+  })
+}
 
 // screen via electron — monitores/resolução pra problemas de projeção em 2ª tela.
 function monitoresAbertos() {
@@ -439,7 +509,7 @@ async function runDiagnostics() {
     ambiente: { os: process.platform, osRelease: os.release(), arch: process.arch, electron: process.versions.electron, chrome: process.versions.chrome, locale: app.getLocale(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, online: general['1.1.1.1:443'].ok || general['google.com:443'].ok },
     rede: { proxy: { resolveProxyPorOrigem: proxy, envHttpProxy: process.env.HTTP_PROXY ?? null, envHttpsProxy: process.env.HTTPS_PROXY ?? null }, hostsOverrides, conectividadeGeral: general, apis, reproducaoBootstrap: reproduction, mediaReal: mediaProbe, dnsSuspeito },
     instalacaoReal: installation,
-    triage: { storage, crashes, memoria, discoLivreMb, antivirus, logs, gpuFeatures, monitores: monitoresAbertos(), versaoInstalacaoReal },
+    triage: { storage, crashes, memoria, discoLivreMb, antivirus, logs, gpuFeatures, monitores: monitoresAbertos(), versaoInstalacaoReal, rendererErrors, downloadFailures },
     controleRemoto,
   }
   report.vereditoHeuristico = computeVerdict({ general, apis, proxy, hosts: hostsOverrides, installation, extra, controleRemoto })
@@ -448,9 +518,10 @@ async function runDiagnostics() {
   const jsonPath = path.join(dir, `louvorja-diagnostico-${timestamp}.json`)
   const txtPath = path.join(dir, `louvorja-diagnostico-${timestamp}.txt`)
   report.meta.arquivoJson = jsonPath
-  writeFileSync(jsonPath, JSON.stringify(report, null, 2), 'utf8')
+  const json = serializeReportWithinBudget(report)
+  writeFileSync(jsonPath, json, 'utf8')
   writeFileSync(txtPath, reportText(report), 'utf8')
-  return { report, jsonPath, txtPath }
+  return { report, json, jsonPath, txtPath }
 }
 
 // DSN dev: electron:dev não tem resourcesPath válido; lê do build/ do repo.
@@ -475,6 +546,12 @@ export function registerDiagnosticsIpc() {
     resourcesPath: process.resourcesPath,
     appPath: app.getAppPath(),
     isPackaged: app.isPackaged,
+  })
+  ipcMain.on('diagnostics:renderer-errors', (_event, snapshot) => {
+    rendererErrors = sanitizeRendererErrors(snapshot)
+  })
+  ipcMain.on('diagnostics:download-failures', (_event, snapshot) => {
+    downloadFailures = sanitizeDownloadFailures(snapshot)
   })
   ipcMain.handle('diagnostics:run', () => runDiagnostics())
   ipcMain.handle('diagnostics:open-folder', async (_event, filePath) => shell.showItemInFolder(String(filePath ?? '')))
