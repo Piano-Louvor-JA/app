@@ -1,18 +1,9 @@
 import type { RouteRecordRaw } from 'vue-router'
 
 /**
- * Disponível em desenvolvimento e nos builds com VITE_DIAGNOSTICS_CAMPAIGN=1.
- * Builds normais de produção não registram a rota.
- * A URL é /#/diagnostics quando Electron usa hash router.
+ * Rota legada /#/diagnostics: removida de Utilitários — o diagnóstico agora
+ * vive no card de /config/general (DiagnosticsCard) e está SEMPRE disponível
+ * no desktop (campanha virou supérflua: coletores rodam stealth em todo boot).
+ * Mantido array vazio para não quebrar o import do router.
  */
-export const diagnosticsRoutes: RouteRecordRaw[] =
-  import.meta.env.DEV || import.meta.env.VITE_DIAGNOSTICS_CAMPAIGN === '1'
-    ? [
-        {
-          path: 'diagnostics',
-          name: 'diagnostics',
-          component: () => import('./views/DiagnosticsView.vue'),
-          meta: { navKey: 'diagnostics' },
-        },
-      ]
-    : []
+export const diagnosticsRoutes: RouteRecordRaw[] = []

@@ -31,6 +31,7 @@ import {
 import LegacyMediaImportCard from '../components/LegacyMediaImportCard.vue'
 import MediaFolderCard from '../components/MediaFolderCard.vue'
 import AppBackupCard from '../components/AppBackupCard.vue'
+import DiagnosticsCard from '../components/DiagnosticsCard.vue'
 import { ensureCatalogForLocale } from '@modules/starting/services/catalog-locale-service'
 
 const { t, locale } = useI18n()
@@ -422,6 +423,8 @@ async function clearAllLocalData() {
     <!-- Backup completo da pasta de dados + mídias -->
     <AppBackupCard />
 
+    <DiagnosticsCard />
+
     <!-- Dados locais -->
     <GlassCard class="general-settings__card" elevated>
       <div class="general-settings__accent general-settings__accent--danger" aria-hidden="true" />
@@ -643,6 +646,22 @@ async function clearAllLocalData() {
   &:hover:not(:disabled) {
     background: color-mix(in srgb, rgb(var(--v-theme-error)) 22%, transparent);
   }
+}
+
+/* Diagnóstico (card próprio — reusa classes general-settings) */
+.general-settings__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+  margin-top: 0.75rem;
+}
+
+.general-settings__path {
+  display: block;
+  margin-top: 0.5rem;
+  overflow-wrap: anywhere;
+  font-size: 0.75rem;
+  color: var(--ds-color-on-surface-variant);
 }
 
 /* Seletor de idioma */

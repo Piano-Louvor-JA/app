@@ -1,6 +1,8 @@
 // @vitest-environment node
-// A rota existe em desenvolvimento e em builds de campanha explícitos.
-import { readFileSync } from 'node:fs'
+// Rota /#/diagnostics removida: o diagnóstico agora é card em /config/general
+// (sempre disponível no desktop). Este teste trava o contrato novo: nenhum
+// ambiente registra a rota legada e a view legada não volta ao disco.
+import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -10,28 +12,21 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 
 afterEach(() => { vi.unstubAllEnvs(); vi.resetModules() })
 
-describe('diagnostics UI route', () => {
+describe('diagnostics UI route (legada, removida)', () => {
   it.each([
-    [true, undefined, true],
-    [false, '1', true],
-    [false, undefined, false],
-    [false, '0', false],
-    [false, 'true', false],
-  ])('DEV=%s, campanha=%s: rota habilitada=%s', async (dev, campaign, enabled) => {
+    [true, undefined],
+    [false, '1'],
+    [false, undefined],
+  ])('DEV=%s, campanha=%s: nenhuma rota registrada', async (dev, campaign) => {
     vi.stubEnv('DEV', dev)
     vi.stubEnv('VITE_DIAGNOSTICS_CAMPAIGN', campaign)
     vi.resetModules()
     const { diagnosticsRoutes } = await import('../../src/modules/diagnostics/routes')
-    expect(diagnosticsRoutes).toHaveLength(enabled ? 1 : 0)
-    if (enabled) {
-      expect(diagnosticsRoutes[0].path).toBe('diagnostics')
-      expect(diagnosticsRoutes[0].name).toBe('diagnostics')
-      expect(typeof diagnosticsRoutes[0].component).toBe('function')
-    }
+    expect(diagnosticsRoutes).toEqual([])
   })
 
-  it('view existe no disco (import não resolvido quebraria o build)', () => {
+  it('view legada não existe no disco (rota morta não deve voltar)', () => {
     const view = path.resolve(here, '../../src/modules/diagnostics/views/DiagnosticsView.vue')
-    expect(() => readFileSync(view, 'utf8')).not.toThrow()
+    expect(existsSync(view)).toBe(false)
   })
 })

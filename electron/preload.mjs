@@ -128,6 +128,8 @@ contextBridge.exposeInMainWorld('louvorja', {
     openFolder: (filePath) => ipcRenderer.invoke('diagnostics:open-folder', filePath),
     reportRendererErrors: (errors) => ipcRenderer.send('diagnostics:renderer-errors', errors),
     reportDownloadFailures: (failures) => ipcRenderer.send('diagnostics:download-failures', failures),
+    reportAudioDevices: (snapshot) => ipcRenderer.send('diagnostics:audio-devices', snapshot),
+    reportJank: (snapshot) => ipcRenderer.send('diagnostics:jank', snapshot),
   },
 
   workspace: {

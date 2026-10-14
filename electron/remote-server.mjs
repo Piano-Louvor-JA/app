@@ -21,6 +21,7 @@ import { networkInterfaces } from 'node:os'
 
 import QRCode from 'qrcode'
 import { app, ipcMain } from 'electron'
+import { trackWsConnection, trackWsDisconnect } from './diagnostics.mjs'
 
 const PORT = 7071
 const HEARTBEAT_MS = 15_000
@@ -121,6 +122,7 @@ export async function startRemoteServer(wss, contents, opts = {}) {
   }
 
   wss.on('connection', (ws) => {
+    trackWsConnection()
     // Máx. 2 conexões FÍSICAS: 1 operador (APK/full) + 1 pregador (slides).
     // O papel só é revelado no hello — o limite POR PAPEL é aplicado lá.
     // (13/10 Rafael: antes era 1 cliente TOTAL — pregador tomava remote_busy
@@ -272,7 +274,8 @@ export async function startRemoteServer(wss, contents, opts = {}) {
       }
     })
 
-    ws.on('close', () => {
+    ws.on('close', (code, reason) => {
+      trackWsDisconnect(`${code}${reason?.length ? ` ${reason.toString().slice(0, 64)}` : ''}`)
       clearInterval(entry.timer)
       clients.delete(ws)
       notifyClients()

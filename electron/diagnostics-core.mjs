@@ -118,6 +118,14 @@ export async function httpProbe(host, endpoint, token) {
     })
     const body = await response.arrayBuffer()
     const result = { url, status: response.status, ok: response.ok, ttfbMs: elapsed(start), bytes: body.byteLength, erro: null }
+    try {
+      const { onLatencyObserved } = await import('./diagnostics-latency-hook.mjs'); onLatencyObserved(host, result.ttfbMs)
+      const dateHeader = response.headers?.get?.('date')
+      if (dateHeader) {
+        const { onServerDate } = await import('./diagnostics-latency-hook.mjs')
+        onServerDate(Date.parse(dateHeader))
+      }
+    } catch { /* best-effort */ }
     if (!response.ok) {
       const classe = response.status === 403 ? 'HTTP_403' : response.status === 429 ? 'HTTP_429' : response.status >= 500 ? 'HTTP_5XX' : 'OTHER'
       result.erro = { classe, bruto: `HTTP ${response.status}` }
@@ -277,6 +285,16 @@ export function reportText(report) {
     'Reprodução do bootstrap:',
     ...report.rede.reproducaoBootstrap.map((p) => `${p.passo}: ${p.ok ? `OK em ${p.base} (${p.ms}ms)` : `FALHOU (${p.erroBruto}) após ${p.tentativas.length} host(s)`}`),
     '',
+    ...(report.telemetria ? [
+      'Telemetria da sessão:',
+      `  Palco WS: ${report.telemetria.palcoWs?.connections ?? 0} conexões, ${report.telemetria.palcoWs?.drops ?? 0} drops, uptime ${Math.round((report.telemetria.palcoWs?.uptimeMs ?? 0) / 1000)}s`,
+      ...Object.entries(report.telemetria.redeLatencia ?? {}).map(([host, l]) => `  Latência ${host}: p50 ${l.p50Ms}ms / p95 ${l.p95Ms}ms (${l.count} amostras)`),
+      `  Clock: skew local ${report.telemetria.clockSkewMs ?? 'n/d'} ms; offset servidor ${report.telemetria.clockServidorOffsetMs ?? 'n/d'} ms`,
+      `  Áudio: ${report.telemetria.audioDevices?.devices ?? 'n/d'} dispositivos, ${report.telemetria.audioDevices?.devicechangeCount ?? 0} trocas`,
+      report.telemetria.jankRenderer ? `  Jank renderer: ${report.telemetria.jankRenderer.longFrames} frames >${report.telemetria.jankRenderer.thresholdMs}ms de ${report.telemetria.jankRenderer.sampledFrames} (pior ${report.telemetria.jankRenderer.worstFrameMs ?? 'n/d'}ms)` : '  Jank renderer: n/d',
+      `  Processos filhos: ${report.telemetria.processosFilhos?.count ?? 0} mortes; transições rede: ${(report.telemetria.transicoesRede ?? []).length}`,
+      '',
+    ] : []),
     `Arquivo JSON completo: ${report.meta.arquivoJson}`,
   ]
   return lines.join('\n')
