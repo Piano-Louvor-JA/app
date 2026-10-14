@@ -282,6 +282,8 @@ jobs:
         run: node --test scripts/release-publish-decision.test.mjs
       - name: Limite de cobertura por destino
         run: node --test scripts/coverage-gate-limit.test.mjs
+      - name: DMG universal e binários nativos
+        run: node --test scripts/mac-universal-arch-files.test.mjs
 
   e2e-tests:
     name: E2E Tests (playwright)

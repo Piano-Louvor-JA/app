@@ -227,6 +227,7 @@
           ]
         }
       ],
+      "x64ArchFiles": "**/*.node",
       "icon": "build/icon.png"
     },
     "nsis": {

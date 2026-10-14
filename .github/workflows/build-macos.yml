@@ -1,7 +1,8 @@
 # Build macOS DMG — gera instalador .dmg UNIVERSAL (Intel + Apple Silicon no mesmo
 # arquivo, o sistema escolhe a fatia) + latest-mac.yml.
 # Cross-build funciona sem Rosetta: o electron-builder baixa os dists do Electron
-# por arquitetura e funde (não há módulos nativos — npmRebuild: false).
+# por arquitetura e funde com lipo. Binários .node pré-compilados entram iguais
+# nas duas árvores; mac.x64ArchFiles em package.json autoriza essa fusão.
 # Roda manualmente (workflow_dispatch) ou em push de tags v*
 name: Build macOS
 
