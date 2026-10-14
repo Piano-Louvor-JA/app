@@ -2,7 +2,7 @@ name: CodeQL
 
 on:
   pull_request:
-    branches: [staging, main]
+    branches: [staging, main, dev-tudo]
   push:
     branches: [staging, main]
   # Segunda, 09:17 em America/Sao_Paulo. Agendamento ativa em main.

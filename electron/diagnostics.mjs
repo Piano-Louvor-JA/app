@@ -610,14 +610,15 @@ export function registerDiagnosticsIpc() {
         return { ok: false, reason: 'DSN malformado; compartilhe o arquivo salvo.' }
       }
       const endpoint = `${url.origin}/api/${projectId}/store/`
+      const campanha = report?.meta?.campanha ?? `${process.env.LOUVORJA_CAMPAIGN ?? 'SrCaldeira'}-v2`
       const event = {
         event_id: crypto.randomUUID().replace(/-/g, ''),
         timestamp: new Date().toISOString(),
         platform: 'javascript',
         environment: 'diagnostico',
         logger: 'louvorja-diagnostics',
-        message: `Diagnóstico LouvorJA PIANO — campanha SrCaldeira`,
-        tags: { campanha: 'SrCaldeira', versao: app.getVersion() },
+        message: `Diagnóstico LouvorJA PIANO — campanha ${campanha}`,
+        tags: { campanha, versao: app.getVersion() },
         extra: { report },
       }
       const response = await fetch(endpoint, {
