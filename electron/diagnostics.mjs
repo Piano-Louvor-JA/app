@@ -453,18 +453,34 @@ async function runDiagnostics() {
   return { report, jsonPath, txtPath }
 }
 
+// DSN dev: electron:dev não tem resourcesPath válido; lê do build/ do repo.
+export function resolveDiagnosticsDsn({ resourcesPath, appPath, isPackaged }) {
+  const fromEnv = process.env.DIAGNOSTICS_GLITCHTIP_DSN
+  if (fromEnv) return fromEnv
+  const fromBundle = (() => {
+    if (!resourcesPath) return ''
+    try { return readFileSync(path.join(resourcesPath, 'diagnostics-dsn.txt'), 'utf8').trim() } catch { return '' }
+  })()
+  if (fromBundle) return fromBundle
+  if (!isPackaged && appPath) {
+    try { return readFileSync(path.join(appPath, 'build', 'diagnostics-dsn.txt'), 'utf8').trim() } catch { return '' }
+  }
+  return ''
+}
+
 export function registerDiagnosticsIpc() {
   // electron-builder copia arquivos sem passar pelo Vite; injeta DSN em build-time
   // via resource opcional. process.env mantém a sobreposição para dev/CI.
-  const bundledDsn = (() => {
-    try { return readFileSync(path.join(process.resourcesPath, 'diagnostics-dsn.txt'), 'utf8').trim() } catch { return '' }
-  })()
+  const dsn = resolveDiagnosticsDsn({
+    resourcesPath: process.resourcesPath,
+    appPath: app.getAppPath(),
+    isPackaged: app.isPackaged,
+  })
   ipcMain.handle('diagnostics:run', () => runDiagnostics())
   ipcMain.handle('diagnostics:open-folder', async (_event, filePath) => shell.showItemInFolder(String(filePath ?? '')))
   // DSN Sentry/Glitchtip via build secret. Sem DSN, falha deliberada com
   // fallback local; o botão nunca bloqueia o arquivo já salvo.
   ipcMain.handle('diagnostics:send', async (_event, report) => {
-    const dsn = process.env.DIAGNOSTICS_GLITCHTIP_DSN || bundledDsn
     if (!dsn) return { ok: false, reason: 'DSN de diagnóstico não configurado; compartilhe o arquivo salvo.' }
     try {
       // Protocolo Sentry/GlitchTip: parse do DSN https://<key>@<host>/<project>

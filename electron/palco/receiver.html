@@ -11,6 +11,8 @@
     font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#fff}
   #bg{position:fixed;top:0;left:0;width:100%;height:100%;object-fit:cover;
     filter:brightness(.55);transition:opacity .8s}
+  /* Frame de slide projetado: fidelidade total — sem escurecimento. */
+  #bg.frame-slide{filter:none;object-fit:contain;background:#000}
   #bg[src=""]{opacity:0}
   #bgPalco{position:fixed;top:0;left:0;width:100%;height:100%;object-fit:cover}
   #veil{position:fixed;inset:0;background:rgba(0,0,0,.45)}
@@ -3132,7 +3134,13 @@ function handle(m){
         t.style.display='none';$('text').style.display='';}}
       const bgEl=$('bg');
       bgEl.onerror=()=>{bgEl.onerror=null;bgEl.src='bg-fallback.png'};
-      if(m.background){bgEl.src=proxyUrl(m.background);bgEl.style.opacity='';document.body.style.background=''}
+      // Frame de slide (data:image/ do pump PDF/PPT/imagens): imagem é o
+      // CONTEÚDO, não bg decorativo — sem brightness(.55) nem véu (paridade
+      // com a tela do operador). 13/10 Rafael: tonalidade lavada no palco.
+      const isFrameSlide=typeof m.background==='string'&&m.background.startsWith('data:image/');
+      bgEl.classList.toggle('frame-slide',isFrameSlide);
+      bgEl.onerror=isFrameSlide?null:bgEl.onerror;
+      if(m.background){bgEl.src=isFrameSlide?m.background:proxyUrl(m.background);bgEl.style.opacity='';document.body.style.background=''}
       // Sem bg na mensagem: usa o BG configurado no app (bgPalco — enviado
       // ao ligar o palco). Só se NÃO houver bg configurado cai no fallback
       // fixo. Vale pra qualquer módulo (26/08 Rafael).
