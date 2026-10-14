@@ -8,6 +8,12 @@ name: Build Windows
 
 on:
   workflow_dispatch:
+    inputs:
+      homologation:
+        description: 'Build de homologação (STG): builda NSIS/portable SEM publicar'
+        required: false
+        default: false
+        type: boolean
   push:
     tags:
       - 'v*'
@@ -57,7 +63,7 @@ jobs:
           echo "Nenhum pacote Windows foi enviado a registry ou GitHub Release."
 
       - name: Install dependencies
-        if: steps.decision.outputs.publish == 'true'
+        if: steps.decision.outputs.publish == 'true' || inputs.homologation == true
         run: npm ci
 
       # Perfil de ambiente API (SPEC piano-api-env-guard): tag oficial =>
@@ -86,6 +92,25 @@ jobs:
             echo "enabled=false" >> "$GITHUB_OUTPUT"
             echo "MS_STORE_* secrets ausentes — build NSIS/portable apenas (appx pulado)"
           fi
+
+      # Homologação (workflow_dispatch homologation=true): builda sem publicar.
+      # publish never => nada vai a GitHub Release/registry; artifact abaixo é o entregável.
+      # Só portable — homologação em grupo não usa instalador NSIS.
+      - name: Build homologação (STG, sem publicar)
+        if: inputs.homologation == true
+        run: npm run electron:build -- --win portable --x64 --publish never
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload homologação (portable)
+        if: inputs.homologation == true
+        uses: actions/upload-artifact@v7
+        with:
+          name: LouvorJA-PIANO-Windows-x64-portable-homologation
+          path: |
+            dist-electron/*portable*.exe
+          if-no-files-found: error
+          retention-days: 14
 
       # O wrapper scripts/build-electron.mjs remove o target appx do
       # package.json quando as env MS_STORE_* estão ausentes e restaura
