@@ -10,6 +10,8 @@ function text(value, maxLength = MAX_TEXT_LENGTH) {
       .replace(/([?&#](?:token|access_token|api[_-]?key|key|secret|password|authorization|cookie)=)[^&#\s]+/gi, '$1[redacted]')
       .replace(/\b(Bearer\s+)[^\s]+/gi, '$1[redacted]')
       .replace(/\b(authorization\s*[:=]\s*)[^\s,;]+/gi, '$1[redacted]')
+      .replace(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, '[redacted-jwt]')
+      .replace(/[A-Za-z0-9+/_-]{41,}/g, '[redacted-blob]')
       .slice(0, maxLength)
   } catch { return '[unserializable]' }
 }

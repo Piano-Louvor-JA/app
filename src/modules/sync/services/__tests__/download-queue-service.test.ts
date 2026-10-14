@@ -92,7 +92,8 @@ describe('fila de downloads (app#338 core)', () => {
       expect(downloadQueueSnapshot().find((q) => q.id === 'r1')?.status).toBe('failed')
     })
     expect(downloadFailureSnapshot()).toEqual([expect.objectContaining({
-      url: 'https://cdn.test/media.mp3',
+      url: '',
+      label: 'https://cdn.test/media.mp3?token=[redacted]',
       status: null,
       bytes: null,
       erro: 'net',
@@ -111,6 +112,28 @@ describe('fila de downloads (app#338 core)', () => {
     retryDownload('retry-fail')
     await vi.waitFor(() => expect(downloadFailureSnapshot()).toHaveLength(2))
     expect(downloadFailureSnapshot().at(-1)).toEqual(expect.objectContaining({ tentativa: 2 }))
+  })
+
+  it('registra URL, status e bytes reais expostos pela falha do consumidor', async () => {
+    const failure = Object.assign(new Error('HTTP 403'), {
+      url: 'https://cdn.test/media.mp3?token=secret',
+      status: 403,
+      bytes: 12,
+    })
+    enqueueDownload({
+      id: 'real-url',
+      label: 'Nome humano do álbum',
+      priority: 'user',
+      task: async () => { throw failure },
+    })
+
+    await vi.waitFor(() => expect(downloadFailureSnapshot()).toHaveLength(1))
+    expect(downloadFailureSnapshot()[0]).toEqual(expect.objectContaining({
+      url: 'https://cdn.test/media.mp3',
+      status: 403,
+      bytes: 12,
+      label: 'Nome humano do álbum',
+    }))
   })
 
   it('cancelDownload: remove pending; running não é interrompido', async () => {

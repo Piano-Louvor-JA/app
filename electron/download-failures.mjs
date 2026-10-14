@@ -9,6 +9,8 @@ function text(value) {
       .replace(/([?&#](?:token|access_token|api[_-]?key|key|secret|password|authorization|cookie)=)[^&#\s]+/gi, '$1[redacted]')
       .replace(/\b(Bearer\s+)[^\s]+/gi, '$1[redacted]')
       .replace(/\b(authorization\s*[:=]\s*)[^\s,;]+/gi, '$1[redacted]')
+      .replace(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, '[redacted-jwt]')
+      .replace(/[A-Za-z0-9+/_-]{41,}/g, '[redacted-blob]')
       .slice(0, MAX_TEXT_LENGTH)
   } catch { return '[unserializable]' }
 }
@@ -36,6 +38,7 @@ export function sanitizeDownloadFailures(value) {
       url: url(event.url),
       status: typeof event.status === 'number' ? event.status : null,
       bytes: typeof event.bytes === 'number' ? event.bytes : null,
+      ...(typeof event.label === 'string' ? { label: text(event.label) } : {}),
       erro: text(event.erro),
       tentativa: event.tentativa,
     }]

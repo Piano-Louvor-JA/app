@@ -260,6 +260,8 @@ function sanitizeLog(text, token) {
     .replace(/(Bearer\s+)([^\s,;]+)/gi, '$1***MASKED***')
     .replace(/(authorization\s*[:=]\s*)([^\s,;]+)/gi, '$1***MASKED***')
     .replace(/(dsn\s*[:=]\s*)([^\s,;]+)/gi, '$1***MASKED***')
+    .replace(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, '***MASKED***')
+    .replace(/[A-Za-z0-9+/_-]{41,}/g, '***MASKED***')
     .replace(/\bhttps?:\/\/([^\s/@]+@)?([^\s?#]+)(?:\?[^\s#]*)?(?:#[^\s]*)?/gi, 'https://$2')
     .replace(/([?&#](?:token|access_token|api[_-]?key|key|secret|password|authorization|cookie)=)[^&#\s]+/gi, '$1***MASKED***')
   return out

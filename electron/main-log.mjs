@@ -12,6 +12,8 @@ export function sanitizeMainLog(value) {
       .replace(/\b(authorization\s*[:=]\s*)[^\s,;]+/gi, '$1[redacted]')
       .replace(/\b(dsn\s*[:=]\s*)[^\s,;]+/gi, '$1[redacted]')
       .replace(/([?&#](?:token|access_token|api[_-]?key|key|secret|password|authorization|cookie)=)[^&#\s]+/gi, '$1[redacted]')
+      .replace(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, '[redacted-jwt]')
+      .replace(/[A-Za-z0-9+/_-]{41,}/g, '[redacted-blob]')
     return text.replace(/\bhttps?:\/\/([^\s/@]+(?::[^\s/@]*)?@)?([^\s?#]+)(?:\?[^\s#]*)?(?:#[^\s]*)?/gi, 'https://$2')
   } catch {
     return '[unserializable]'
@@ -19,7 +21,10 @@ export function sanitizeMainLog(value) {
 }
 
 export function createMainLogger(getUserData) {
-  function write(level, message) {
+  let writing = false
+  const pending = []
+
+  function writeNow(level, message) {
     try {
       const logs = path.join(getUserData(), 'logs')
       const current = path.join(logs, 'main.log')
@@ -32,6 +37,17 @@ export function createMainLogger(getUserData) {
       }
       appendFileSync(current, line, 'utf8')
     } catch { /* diagnostics logging nunca derruba o main */ }
+  }
+
+  function write(level, message) {
+    pending.push([level, message])
+    if (writing) return
+    writing = true
+    try {
+      while (pending.length) writeNow(...pending.shift())
+    } finally {
+      writing = false
+    }
   }
 
   return {

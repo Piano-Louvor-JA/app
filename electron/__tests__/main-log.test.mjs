@@ -24,11 +24,13 @@ describe('main logger', () => {
     const root = tempRoot()
     const log = createMainLogger(() => root)
 
-    log.info('Api-Token secret-token authorization: top-secret Bearer bearer-secret https://user:pass@example.test/a?token=query-secret#hash dsn=https://key@example.test/42')
+    const jwt = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.signature'
+    const blob = 'a'.repeat(41)
+    log.info(`Api-Token secret-token authorization: top-secret Bearer bearer-secret https://user:pass@example.test/a?token=query-secret#hash dsn=https://key@example.test/42 ${jwt} ${blob}`)
 
     const text = readFileSync(path.join(root, 'logs', 'main.log'), 'utf8')
     expect(text).toContain('INFO')
-    for (const secret of ['secret-token', 'top-secret', 'bearer-secret', 'user:pass', 'query-secret', 'key@example.test']) {
+    for (const secret of ['secret-token', 'top-secret', 'bearer-secret', 'user:pass', 'query-secret', 'key@example.test', jwt, blob]) {
       expect(text).not.toContain(secret)
     }
   })
@@ -46,6 +48,15 @@ describe('main logger', () => {
 
     expect(readFileSync(path.join(logs, 'main.log.1'), 'utf8')).toHaveLength(1_048_570)
     expect(readFileSync(current, 'utf8')).toContain('novo registro')
+  })
+
+  it('serializa writes concorrentes sem perder linhas ou lançar', async () => {
+    const root = tempRoot()
+    const log = createMainLogger(() => root)
+
+    await expect(Promise.all(Array.from({ length: 100 }, (_, index) => log.info(`linha-${index}`)))).resolves.toEqual(Array(100).fill(undefined))
+    const text = readFileSync(path.join(root, 'logs', 'main.log'), 'utf8')
+    for (let index = 0; index < 100; index++) expect(text).toContain(`linha-${index}`)
   })
 
   it('ignora falha de I/O', () => {

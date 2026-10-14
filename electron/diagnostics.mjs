@@ -41,12 +41,15 @@ let downloadFailures = []
 export const DIAGNOSTICS_MAX_JSON_BYTES = 300 * 1024
 
 export function serializeReportWithinBudget(report, budget = DIAGNOSTICS_MAX_JSON_BYTES) {
-  const size = () => Buffer.byteLength(JSON.stringify(report, null, 2), 'utf8')
+  const json = (value) => JSON.stringify(value, null, 2)
+  const redact = (value) => typeof value === 'string'
+    ? value
+      .replace(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, '[redacted-jwt]')
+      .replace(/[A-Za-z0-9+/_-]{41,}/g, '[redacted-blob]')
+    : value
+  const size = () => Buffer.byteLength(json(report), 'utf8')
   const removeOldest = (items, clear) => {
-    while (size() >= budget && items.length) {
-      const item = items.shift()
-      clear(item)
-    }
+    while (size() >= budget && items.length) clear(items.shift())
   }
   const logs = report.triage?.logs
   if (Array.isArray(logs)) removeOldest(logs, () => {})
@@ -57,7 +60,29 @@ export function serializeReportWithinBudget(report, budget = DIAGNOSTICS_MAX_JSO
   }
   const downloads = report.triage?.downloadFailures
   if (Array.isArray(downloads)) removeOldest(downloads, () => {})
-  return JSON.stringify(report, null, 2)
+  const sanitizeText = (value) => {
+    if (typeof value === 'string') return redact(value)
+    if (!value || typeof value !== 'object') return value
+    if (Array.isArray(value)) return value.map(sanitizeText)
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, sanitizeText(item)]))
+  }
+  const sanitized = sanitizeText(report)
+  if (Buffer.byteLength(json(sanitized), 'utf8') < budget) return json(sanitized)
+
+  const compactText = (value) => {
+    if (typeof value === 'string') return redact(value).slice(0, 512)
+    if (!value || typeof value !== 'object') return value
+    if (Array.isArray(value)) return value.map(compactText)
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, compactText(item)]))
+  }
+  const compact = compactText(report)
+  if (Buffer.byteLength(json(compact), 'utf8') < budget) return json(compact)
+
+  const meta = report.meta && typeof report.meta === 'object'
+    ? Object.fromEntries(Object.entries(report.meta).filter(([, value]) => typeof value !== 'string' || value.length <= 512))
+    : {}
+  const fallback = { meta, truncated: 'reason:budget' }
+  return json(fallback).slice(0, budget - 1)
 }
 
 // screen via electron — monitores/resolução pra problemas de projeção em 2ª tela.

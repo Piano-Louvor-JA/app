@@ -27,4 +27,31 @@ describe('serializeReportWithinBudget', () => {
     expect(first.triage.rendererErrors).toEqual([])
     expect(first.triage.downloadFailures).not.toEqual([])
   })
+
+  it('nunca excede o budget quando meta sozinha excede 300 KiB', () => {
+    const oversized = {
+      meta: { versao: '1.0.0', keep: 'scalar', huge: 'x'.repeat(400 * 1024) },
+      triage: { logs: [], rendererErrors: [], downloadFailures: [] },
+    }
+
+    const json = serializeReportWithinBudget(oversized)
+    const parsed = JSON.parse(json)
+
+    expect(Buffer.byteLength(json)).toBeLessThan(DIAGNOSTICS_MAX_JSON_BYTES)
+    expect(parsed.meta).toEqual(expect.objectContaining({ versao: '1.0.0', keep: 'scalar' }))
+    expect(parsed.meta.huge).toBe('[redacted-blob]')
+  })
+
+  it('mascara JWT e blob base64 longo sem tocar em URL ou base64 curto', () => {
+    const jwt = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.signature'
+    const blob = 'a'.repeat(41)
+    const json = serializeReportWithinBudget({
+      meta: { message: `https://app.test/a abc123 ${jwt} ${blob}` },
+    })
+
+    expect(json).toContain('https://app.test/a')
+    expect(json).toContain('abc123')
+    expect(json).not.toContain(jwt)
+    expect(json).not.toContain(blob)
+  })
 })

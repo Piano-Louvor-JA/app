@@ -129,9 +129,20 @@ async function drain(): Promise<void> {
       } catch (error) {
         next.item.status = 'failed'
         next.item.error = error instanceof Error ? error.message : String(error)
+        const details = error && typeof error === 'object' ? error as {
+          url?: unknown
+          urlFinal?: unknown
+          signedUrl?: unknown
+          status?: unknown
+          bytes?: unknown
+        } : {}
+        const url = [details.urlFinal, details.signedUrl, details.url].find((value): value is string => typeof value === 'string')
         downloadFailures.add({
           ts: new Date().toISOString(),
-          url: next.item.label,
+          url: url ?? '',
+          label: next.item.label,
+          status: typeof details.status === 'number' ? details.status : null,
+          bytes: typeof details.bytes === 'number' ? details.bytes : null,
           erro: next.item.error,
           tentativa: attempts.get(next.item.id) ?? 1,
         })

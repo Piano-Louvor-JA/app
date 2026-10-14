@@ -3,6 +3,7 @@ export type DownloadFailure = {
   url: string
   status: number | null
   bytes: number | null
+  label?: string
   erro: string
   tentativa: number
 }
@@ -18,6 +19,8 @@ function text(value: unknown): string {
       .replace(/([?&#](?:token|access_token|api[_-]?key|key|secret|password|authorization|cookie)=)[^&#\s]+/gi, '$1[redacted]')
       .replace(/\b(Bearer\s+)[^\s]+/gi, '$1[redacted]')
       .replace(/\b(authorization\s*[:=]\s*)[^\s,;]+/gi, '$1[redacted]')
+      .replace(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, '[redacted-jwt]')
+      .replace(/[A-Za-z0-9+/_-]{41,}/g, '[redacted-blob]')
       .slice(0, MAX_TEXT_LENGTH)
   } catch { return '[unserializable]' }
 }
@@ -45,6 +48,7 @@ export class DownloadFailureBuffer {
       url: url(event.url),
       status: typeof event.status === 'number' ? event.status : null,
       bytes: typeof event.bytes === 'number' ? event.bytes : null,
+      label: typeof event.label === 'string' ? text(event.label) : undefined,
       erro: text(event.erro),
       tentativa: event.tentativa,
     })
