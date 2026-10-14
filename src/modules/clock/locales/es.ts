@@ -1,7 +1,5 @@
 export default {
   utilities: {
-    diagnostics: 'Diagnóstico de red',
-    diagnosticsDescription: 'Prueba la conexión con el catálogo y genera un informe técnico',
     title: 'Utilidades',
     subtitle: 'Herramientas de proyección para el culto',
     temporizador: 'Temporizador',
