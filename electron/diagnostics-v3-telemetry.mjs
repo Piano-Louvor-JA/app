@@ -114,3 +114,34 @@ export function createChildProcessGone() {
     },
   }
 }
+
+const JANK_THRESHOLD_MS = 100
+
+// diag-v4b: jank medido no renderer (rAF) e enviado via IPC — main sanitiza e armazena.
+export function sanitizeJank(raw) {
+  try {
+    if (!raw || typeof raw !== 'object') return null
+    const sampledFrames = Number(raw.sampledFrames)
+    const longFrames = Number(raw.longFrames)
+    const worstFrameMs = Number(raw.worstFrameMs)
+    if (![sampledFrames, longFrames].every((n) => Number.isFinite(n) && n >= 0)) return null
+    return {
+      sampledFrames: Math.min(Math.round(sampledFrames), 10_000_000),
+      longFrames: Math.min(Math.round(longFrames), 10_000_000),
+      worstFrameMs: Number.isFinite(worstFrameMs) && worstFrameMs > 0 ? Math.round(worstFrameMs) : null,
+      thresholdMs: JANK_THRESHOLD_MS,
+    }
+  } catch {
+    return null
+  }
+}
+
+// diag-v4b: offset do relógio local vs servidor (header Date — resolução 1s).
+export function computeNtpOffsetMs({ serverDateMs, localAtParseMs }) {
+  try {
+    if (![serverDateMs, localAtParseMs].every((n) => Number.isFinite(n))) return null
+    return Math.round(Number(localAtParseMs) - Number(serverDateMs))
+  } catch {
+    return null
+  }
+}

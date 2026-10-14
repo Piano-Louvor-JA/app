@@ -453,6 +453,7 @@ export type DiagnosticsApi = {
   reportRendererErrors?: (errors: unknown) => void
   reportDownloadFailures?: (failures: unknown) => void,
   reportAudioDevices?: (snapshot: unknown) => void
+  reportJank?: (snapshot: unknown) => void
 }
 
 export type LouvorJaBridge = {

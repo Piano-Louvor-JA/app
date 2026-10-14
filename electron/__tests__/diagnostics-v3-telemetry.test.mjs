@@ -7,7 +7,9 @@ import {
   createNetTransitionLog,
   createWsTelemetry,
   computeClockSkewMs,
+  computeNtpOffsetMs,
   sanitizeAudioDevices,
+  sanitizeJank,
 } from '../diagnostics-v3-telemetry.mjs'
 
 describe('diag-v4-umbrella: telemetria volátil', () => {
@@ -79,5 +81,31 @@ describe('diag-v4-umbrella: telemetria volátil', () => {
     expect(snap.count).toBe(2)
     expect(snap.lastType).toBe('Utility')
     expect(snap.lastReason).toBe('oom')
+  })
+
+  it('jank: sanitiza frames amostrados/longos/worst + threshold fixo', () => {
+    const snap = sanitizeJank({ sampledFrames: 500, longFrames: 3, worstFrameMs: 220.7 })
+    expect(snap.sampledFrames).toBe(500)
+    expect(snap.longFrames).toBe(3)
+    expect(snap.worstFrameMs).toBe(221)
+    expect(snap.thresholdMs).toBe(100)
+  })
+
+  it('jank: lixo/negativo/null → null, nunca lança', () => {
+    expect(sanitizeJank(null)).toBeNull()
+    expect(sanitizeJank({ sampledFrames: -1, longFrames: 0 })).toBeNull()
+    expect(sanitizeJank({ sampledFrames: 'x', longFrames: 0 })).toBeNull()
+  })
+
+  it('clock NTP: parse Date header → offset ms', () => {
+    const serverDate = new Date('2026-10-14T12:00:01.000Z')
+    const localAtParse = serverDate.getTime() + 250 // local adiantado 250ms
+    const off = computeNtpOffsetMs({ serverDateMs: serverDate.getTime(), localAtParseMs: localAtParse })
+    expect(off).toBe(250)
+  })
+
+  it('clock NTP: valores ruins → null, nunca lança', () => {
+    expect(computeNtpOffsetMs({})).toBeNull()
+    expect(computeNtpOffsetMs({ serverDateMs: NaN, localAtParseMs: 1 })).toBeNull()
   })
 })

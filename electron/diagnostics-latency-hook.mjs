@@ -10,3 +10,14 @@ export function setLatencyObserver(fn) {
 export function onLatencyObserved(host, ms) {
   try { observer?.(host, ms) } catch { /* best-effort */ }
 }
+
+// diag-v4b: header Date da resposta → offset do relógio local vs servidor
+let serverDateObserver = null
+
+export function setServerDateObserver(fn) {
+  serverDateObserver = typeof fn === 'function' ? fn : null
+}
+
+export function onServerDate(serverDateMs) {
+  try { serverDateObserver?.(serverDateMs) } catch { /* best-effort */ }
+}
