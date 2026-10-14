@@ -143,24 +143,23 @@ function buildApiMediaUrl(mediaType, filename) {
  */
 export async function downloadMediaFile(requestedUrl, mediaType, filename) {
   const TIMEOUT_MS = 20_000
-
-  /** @returns {Promise<boolean>} */
+  let apiUrl = requestedUrl
+  const failure = (error) => ({
+    ok: false,
+    url: error?.url || apiUrl,
+    status: typeof error?.status === 'number' ? error.status : null,
+    bytes: typeof error?.bytes === 'number' ? error.bytes : 0,
+    error: error instanceof Error ? error.message : String(error ?? 'media download failed'),
+  })
   const run = async () => {
-    // HTTP no mesmo host do catálogo. Sem FTP legado.
     const destFolder = resolveMediaDirectory(mediaType)
     const decodedFilename = decodeURIComponent(filename)
     const filePath = path.join(destFolder, decodedFilename)
     mkdirSync(path.dirname(filePath), { recursive: true })
-
-    const apiUrl = resolveMediaFetchUrl(
-      requestedUrl,
-      buildApiMediaUrl(mediaType, decodedFilename),
-      API_BASE_URL,
-    )
+    apiUrl = resolveMediaFetchUrl(requestedUrl, buildApiMediaUrl(mediaType, decodedFilename), API_BASE_URL)
     const response = await net.fetch(apiUrl)
-    if (!response.ok) return false
-
     const buffer = Buffer.from(await response.arrayBuffer())
+    if (!response.ok) return { ok: false, url: response.url || apiUrl, status: response.status, bytes: buffer.byteLength, error: `HTTP ${response.status}` }
     writeFileSync(filePath, buffer)
     return true
   }
@@ -168,19 +167,16 @@ export async function downloadMediaFile(requestedUrl, mediaType, filename) {
   let timer
   try {
     const work = run()
-    // Evita unhandled rejection se o timeout vencer primeiro.
     work.catch(() => {})
     return await Promise.race([
       work,
       new Promise((_, reject) => {
-        timer = setTimeout(() => {
-          reject(new Error(`media download timeout (${TIMEOUT_MS}ms)`))
-        }, TIMEOUT_MS)
+        timer = setTimeout(() => reject(new Error(`media download timeout (${TIMEOUT_MS}ms)`)), TIMEOUT_MS)
       }),
     ])
   } catch (error) {
     console.warn('[media] download falhou/timeout:', error?.message || error)
-    return false
+    return failure(error)
   } finally {
     if (timer) clearTimeout(timer)
   }

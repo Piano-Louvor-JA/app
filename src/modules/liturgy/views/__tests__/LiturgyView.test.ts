@@ -120,6 +120,7 @@ function createWrapper() {
 }
 
 beforeEach(() => {
+  setActivePinia(createPinia())
   for (const k of Object.keys(mockState)) delete mockState[k]
 })
 

@@ -17,8 +17,6 @@ const mocks = vi.hoisted(() => ({
   updateCustomMusic: vi.fn(),
   uploadCustomFile: vi.fn(),
   ensureImportCollectionId: vi.fn(),
-  uploadCustomFile: vi.fn(),
-  updateCustomMusic: vi.fn(),
   parseSljaFile: vi.fn(),
   sha256Hex: vi.fn(),
   getAuthSession: vi.fn(),
@@ -42,6 +40,10 @@ vi.mock('@shared/services/slja', () => ({
 
 vi.mock('@shared/services/content-hash', () => ({
   sha256Hex: mocks.sha256Hex,
+  sha256ToUuid: (hex: string) => {
+    const h = hex.replace(/-/g, '').padEnd(32, '0').slice(0, 32)
+    return [h.slice(0,8), h.slice(8,12), h.slice(12,16), h.slice(16,20), h.slice(20,32)].join('-')
+  },
 }))
 
 vi.mock('@modules/media/services/auth-client', () => ({

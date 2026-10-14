@@ -245,7 +245,7 @@ describe('com electron', () => {
     expect(payload.textTransform).toBeUndefined()
   })
 
-  it('hymns overrideBg: bg do escopo vence o input', async () => {
+  it('hymns overrideBg: bg do escopo vence capa da música', async () => {
     const palco = fullMock()
     setBridge(palco)
     readEffectiveStageSettings.mockReturnValue({
@@ -260,10 +260,31 @@ describe('com electron', () => {
     expect(String(payload.background)).toContain('/bg/bg-3.png')
   })
 
+  it('bg do usuário (backgroundImage) vence capa da API em qualquer escopo (14/10)', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    readEffectiveStageSettings.mockReturnValue({
+      ...readEffectiveStageSettings(),
+      hymns: { overrideBg: false },
+    })
+    await palcoSession.project('hymns', {
+      text: 'x',
+      background: 'https://cdn.example/capa.jpg',
+    })
+    const payload = palco.send.mock.calls[0]?.[0] as Record<string, unknown>
+    // Projeção local (MediaProjectionView): preferência ?? capa. Palco era
+    // inverso (capa ?? preferência) → bg da API vencia a escolha do usuário.
+    expect(String(payload.background)).toContain('/bg/bg-3.png')
+  })
+
   it('resolveBgUrl: http passa direto; local serve via servePath; quebrado -> undefined', async () => {
     const palco = fullMock()
     setBridge(palco)
-    // http direto
+    // SEM preferência do usuário: input http passa direto (14/10)
+    readEffectiveStageSettings.mockReturnValue({
+      ...readEffectiveStageSettings(),
+      backgroundImage: '',
+    })
     await palcoSession.project('hymns', { text: 'a', background: 'https://x/b.jpg' })
     let payload = palco.send.mock.calls[0]?.[0] as Record<string, unknown>
     expect(payload.background).toBe('https://x/b.jpg')
@@ -393,6 +414,11 @@ describe('gaps finais — wake falho, bg oficial sem match, rotas', () => {
   it('official: sem id bg-NN -> serveLocal; inexistente -> bg undefined', async () => {
     const palco = fullMock()
     setBridge(palco)
+    // SEM preferência do usuário: input official inválido -> bg undefined (14/10)
+    readEffectiveStageSettings.mockReturnValue({
+      ...readEffectiveStageSettings(),
+      backgroundImage: '',
+    })
     palco.servePath.mockRejectedValue(new Error('x'))
     await palcoSession.project('hymns', {
       text: 'a',
@@ -462,7 +488,10 @@ describe('gaps finais — wake falho, bg oficial sem match, rotas', () => {
     })
     await palcoSession.project('hymns', { text: 'x' })
     const payload = palco.send.mock.calls[0]?.[0] as Record<string, unknown>
-    expect(payload.boxBorder).toMatchObject({ width: 0.4 })
+    expect(payload.boxBorder).toMatchObject({
+      width: 0.2,
+      color: 'rgba(255,255,255,0.85)',
+    })
   })
 })
 
@@ -529,6 +558,11 @@ describe('gaps 3 — status sem url, official sem match com serve ok, bgPalco un
     palco.status.mockResolvedValue({ running: true, clients: 0, url: null, wsUrl: null })
     palco.servePath.mockResolvedValue('http://192.168.0.5:7080/media/x.png')
     setBridge(palco)
+    // SEM preferência do usuário: input official resolve via serve (14/10)
+    readEffectiveStageSettings.mockReturnValue({
+      ...readEffectiveStageSettings(),
+      backgroundImage: '',
+    })
     await palcoSession.project('hymns', {
       text: 'x',
       background: 'official:bg-99',

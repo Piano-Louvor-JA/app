@@ -348,20 +348,22 @@ describe("community-catalog — saveCommunityCopy (F0.4, mata mutantes 64-133)",
 	});
 
 	it("URL de musics usa o id da coletânea (mata mutante StringLiteral do path)", async () => {
-			vi.stubEnv("VITE_PALCO_API_URL", undefined as unknown as string);
-			let calledUrl = "";
-			vi.stubGlobal(
-				"fetch",
-				vi.fn(async (url: string) => {
-					calledUrl = url;
-					return jsonResponse({ data: [] });
-				}),
-			);
-			await saveCommunityCopy(BASE);
-			expect(calledUrl).toBe(
-				"https://api-stg.pianolouvorja.com.br/v1/custom/collections/77/musics",
-			);
-		});
+		vi.stubEnv("VITE_PALCO_API_URL", "https://api.test.local/");
+		let calledUrl = "";
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (url: string) => {
+				calledUrl = url;
+				return jsonResponse({ data: [] });
+			}),
+		);
+		await saveCommunityCopy(BASE);
+		// Host stubado explícito: origem contratada junto com o path — não
+		// aceita host arbitrário do .env.local da máquina do dev.
+		expect(calledUrl).toBe(
+			"https://api.test.local/v1/custom/collections/77/musics",
+		);
+	});
 
 	it("descrição null da origem → cópia sem descrição (mata mutante L85)", async () => {
 		let capturedDescription: unknown;

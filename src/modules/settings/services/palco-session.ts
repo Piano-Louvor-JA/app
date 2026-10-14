@@ -15,7 +15,7 @@ import {
 import { getPalcoRoute, type PalcoModule } from './palco-routing'
 
 /** Envolve o HTML do texto em cor (receiver não lê textColor separado). */
-function colorizeProjectionText(text: string, color: string): string {
+function colorizeProjectionText(text: string, color: string | null): string {
   if (!text || !color) return text
   // Já colorizado (reprojeção / caller explícito): não aninha.
   if (/^<span\s+style=["']color:/i.test(text.trim())) return text
@@ -48,12 +48,14 @@ export type ProjectionInput = {
   text: string
   /** Referência do rodapé (ex.: 'João 3:16 — ARC'). */
   footerRef?: string
-  /** Versão da Bíblia no rodapé. */
+  /** Versão da Bíblia no rodapé (ex.: 'ARC'). */
   footerVersion?: string
   /** BG: URL http(s) já resolvível pela TV; omitir usa o bg do stage. */
   background?: string
   /** Capa da música: título destaque amarelo, sem caixinha (paridade cabo). */
   isCover?: boolean
+  /** Frame do slide PDF/PPT/imagens: dataURL completo (data:image/png;base64,…). */
+  frameDataUrl?: string
 }
 
 /** Acesso tipado ao palco exposto pelo preload (contextBridge). */
@@ -180,13 +182,17 @@ class PalcoSession {
   async project(scope: string, input: ProjectionInput): Promise<void> {
     if (!this.isElectron) return
     const s = readEffectiveStageSettings(scope)
-    // Hinos com overrideBg: o bg configurado no escopo vence o asset da
-    // música (capa/slide) — fundo próprio pra todas as músicas.
+    // BG do usuário (backgroundImage) é a personalização ativa: vence a capa/
+    // asset da API em QUALQUER escopo — paridade com a projeção local
+    // (MediaProjectionView: preferência ?? capa). Antes o palco fazia o
+    // inverso (capa ?? preferência) → bg da API vencia a escolha do usuário
+    // só no palco (14/10). Hymns overrideBg continua indiferente ao input.
     const overrideHymnBg = scope === 'hymns' && s.hymns?.overrideBg === true
+    const userBg = resolveBackgroundImage(s.backgroundImage)
     const bg = await this.resolveBgUrl(
-      overrideHymnBg
-        ? resolveBackgroundImage(s.backgroundImage)
-        : input.background ?? resolveBackgroundImage(s.backgroundImage),
+      overrideHymnBg || userBg
+        ? userBg
+        : input.background ?? userBg,
     )
     // Bíblia tem tipografia própria (paridade APK StageSession / PalcoOrchestrator).
     const isBible = scope === 'bible'
@@ -202,21 +208,28 @@ class PalcoSession {
         ? input.text
         : colorizeProjectionText(input.text, textColor)
     const footerRef = resolveProjectionFooterRef(scope, s, input.footerRef)
+    // Frame de slide (PDF/PPT/imagens): imagem vira o bg e texto vai vazio —
+    // receiver trata projection sem texto como mídia visual pura (sem véu),
+    // preservando a tonalidade original do canvas do operador.
+    const isFrameSlide = typeof input.frameDataUrl === 'string' && input.frameDataUrl.startsWith('data:image/')
     await palcoApi().send({
       v: 2,
       type: 'projection',
-      background: bg,
-      text: colorized,
+      background: isFrameSlide ? input.frameDataUrl : bg,
+      text: isFrameSlide ? '' : colorized,
       // px@1920 → o receiver divide por 10.8 (px@1080p → vw)
       fontSize: (sizeAt1920 / 1920) * 1080,
       fontWeight,
       textShadow: s.textShadow,
       shadowBlur: s.shadowBlur,
       shadowIntensity: s.shadowIntensity,
+      // Caixa GRANDE (véu de leitura) é exclusiva da Bíblia (13/10 Rafael);
+      // demais escopos: caixa justa ao texto (padrão media-slide/receiver).
       textBox: s.textBox,
+      bibleBox: isBible,
       boxOpacity: s.boxOpacity,
       boxBorder: s.boxBorder
-        ? { width: 0.4, color: 'rgba(255,255,255,.25)' }
+        ? { width: 0.2, color: 'rgba(255,255,255,0.85)' }
         : undefined,
       footerRef,
       footerColor: s.footerRefColor,
@@ -230,7 +243,13 @@ class PalcoSession {
         input.isCover === true
           ? (isHymns && s.lyricTextColor != null ? s.lyricTextColor : undefined)
           : (isHymns && s.lyricTextColor != null ? s.lyricTextColor : textColor),
-      lyricUpperCase: isHymns ? s.lyricUpperCase : false,
+      // Paridade total (13/10): uppercase da letra em TODOS os escopos —
+      // mesma chave lUpper que o app/projeção aplicam.
+      lyricUpperCase: s.lyricUpperCase,
+      // Capa (isCover): uppercase do TÍTULO — paridade titleStyle local.
+      titleUpperCase: s.titleUpperCase,
+      // Caixa opcional na capa (14/10): default off = capa clássica amarela.
+      titleTextBox: s.titleTextBox,
       lyricTextShadow: isHymns && s.lyricTextShadow != null ? s.lyricTextShadow : s.textShadow,
       // Personalização completa da projeção local refletida no palco:
       textAlign: s.textAlign,

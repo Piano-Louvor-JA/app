@@ -48,6 +48,7 @@ vi.mock('vue-i18n', () => ({
 // Estratégia: montar a view com stubs globais pros filhos pesados.
 import MediaEditorView from '../MediaEditorView.vue'
 
+
 vi.mock('../../components/MediaSlideStage.vue', () => ({
 	default: { template: '<div />' },
 }))
@@ -129,7 +130,7 @@ describe('MediaEditorView — toggle de visibilidade (t_35e4d3ea)', () => {
 		const wrapper = await mountEditor()
 		const createGroup = wrapper.findAll('.editor__visibility')[0]!
 		await createGroup.findAll('.editor__visibility-btn')[1]!.trigger('click') // public
-		const input = wrapper.find('input[placeholder="Nova coletânea…"]')
+		const input = wrapper.find('input[placeholder="media.editor.newCollection"]')
 		await input.setValue('Nova')
 		await wrapper
 			.findAll('.editor__visibility')[0]!

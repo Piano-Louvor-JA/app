@@ -121,8 +121,8 @@ function playSungFromRow() {
         type="button"
         class="album-track-row__playlist"
         :disabled="busy || isDownloading"
-        title="Adicionar à playlist"
-        aria-label="Adicionar à playlist"
+        :title="t('common.addToPlaylist')"
+        :aria-label="t('common.addToPlaylist')"
         @click.stop="emit('playlist')"
       >
         <i class="ti ti-playlist-add" aria-hidden="true" />

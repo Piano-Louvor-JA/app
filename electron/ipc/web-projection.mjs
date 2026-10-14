@@ -6,6 +6,7 @@ import { convertPresentationToPdf } from './presentation-convert.mjs'
 import { readWorkspaceRecord, writeWorkspaceRecord } from '../workspace.mjs'
 import { getPalcoManager } from '../palco-server.mjs'
 import { addProjectionWindowProvider, ensureProjectionHotkey, releaseProjectionHotkey } from '../projection-hotkey.mjs'
+import { projectionPowerSaveAcquire, projectionPowerSaveRelease } from '../projection-power-save.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const PRELOAD_PATH = path.join(__dirname, '../preload.mjs')
@@ -1083,6 +1084,9 @@ function createSiteProjectionWindow(display, loadUrl) {
   win.once('ready-to-show', () => {
     win.setBounds(display.bounds)
     win.setFullScreen(true)
+    // Tela do operador não apaga durante o culto (ref-count global)
+    projectionPowerSaveAcquire()
+    win.once('closed', () => projectionPowerSaveRelease())
     if (process.platform === 'darwin') {
       win.setSimpleFullScreen(true)
     }
@@ -1173,6 +1177,9 @@ function createMirrorWindow(display) {
     // Fullscreen real só nas telas estendidas
     win.setBounds(display.bounds)
     win.setFullScreen(true)
+    // Tela do operador não apaga durante o culto (ref-count global)
+    projectionPowerSaveAcquire()
+    win.once('closed', () => projectionPowerSaveRelease())
     if (process.platform === 'darwin') {
       win.setSimpleFullScreen(true)
     }
@@ -1239,6 +1246,9 @@ function createImageProjectionWindow(display, loadUrl) {
   win.once('ready-to-show', () => {
     win.setBounds(display.bounds)
     win.setFullScreen(true)
+    // Tela do operador não apaga durante o culto (ref-count global)
+    projectionPowerSaveAcquire()
+    win.once('closed', () => projectionPowerSaveRelease())
     if (process.platform === 'darwin') {
       win.setSimpleFullScreen(true)
     }
@@ -2300,6 +2310,11 @@ export async function captureSourceFrameBase64() {
       true,
     )
     if (typeof canvasPng === 'string' && canvasPng.length > 32) return canvasPng
+    // Modos pdf/presentation: o player sempre expõe __liturgyPdf. Canvas
+    // vazio = PDF.js ainda renderizando — capturePage aqui devolve o frame
+    // CINZA de loading (regressão "TV cinza" 13/10). Sem fallback: quem
+    // chama (syncPptToTvs) retenta até o canvas ficar pronto.
+    if (isPdfDocumentMode()) return null
     const image = await sourceWindow.webContents.capturePage()
     const png = image.toPNG()
     if (!png?.length) return null

@@ -151,7 +151,8 @@ describe("app#331 — import .slja → item de liturgia → player (offline)", (
 		const track = await resolveMediaTrack(displayId);
 		expect(track).not.toBeNull();
 		expect(track?.name).toBe("Missao Para Todos");
-		expect(track?.audioUrl).toMatch(/^data:audio/);
+		// slja-storage: áudio local agora vive em IndexedDB → blob: objectURL
+		expect(track?.audioUrl).toMatch(/^(data:audio|blob:)/);
 		expect(track?.lyrics).toHaveLength(1);
 		expect(track?.lyrics[0]?.time).toBe("00:00:20");
 		expect(fetchMock).not.toHaveBeenCalled();
@@ -183,7 +184,7 @@ describe("app#331 — import .slja → item de liturgia → player (offline)", (
 		// "reload": mesmo storage novo, dados voltam do localStorage
 		const trackAfter = await resolveMediaTrack(imported.displayMusicId);
 		expect(trackAfter?.name).toBe("Missao Para Todos");
-		expect(trackAfter?.audioUrl ?? "").toMatch(/^data:audio/);
+		expect(trackAfter?.audioUrl ?? "").toMatch(/^(data:audio|blob:)/);
 	});
 
 	it("arquivo só com capa não cria música vazia", async () => {
@@ -271,7 +272,7 @@ describe("app#331 — import .slja → item de liturgia → player (offline)", (
 		const spy = vi
 			.spyOn(Storage.prototype, "setItem")
 			.mockImplementation(function (this: Storage, key: string, value: string) {
-				if (value.includes("audioBase64")) {
+				if (value.includes("audioBase64") || value.includes("audioMediaId")) {
 					throw new DOMException("quota", "QuotaExceededError");
 				}
 				return original.call(this, key, value);

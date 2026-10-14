@@ -161,6 +161,19 @@ describe("readOrFetchCatalogRecord (via coletânea)", () => {
 		);
 	});
 
+	it("es isola records de álbum e faixa", async () => {
+		getCurrentApiPrefixMock.mockReturnValue("es");
+		readCatalogRecordMock.mockResolvedValueOnce(
+			albumRecord([{ id_music: 2643 }]),
+		);
+
+		await listAlbumMusicIds(albumBase({ id: 713 }));
+		await resolveAlbumIdsForMusic(2643);
+
+		expect(readCatalogRecordMock).toHaveBeenNthCalledWith(1, "album_713");
+		expect(readCatalogRecordMock).toHaveBeenNthCalledWith(2, "music_2643");
+	});
+
 	it("reporta falha de catálogo sem impedir o fallback local", async () => {
 		const error = new Error("offline");
 		fetchRemoteCatalogJsonMock.mockRejectedValueOnce(error);
@@ -898,7 +911,7 @@ describe("gaps finais 5", () => {
 					],
 				};
 			}
-			const id = Number(filename.replace("music_", ""));
+			const id = Number(filename.replace(/^music_/, ""));
 			return { id_music: id, url_instrumental_music: `audio/inst-${id}.mp3` };
 		});
 		const result = await downloadAlbumMedia(albumBase(), hooks());
@@ -924,7 +937,7 @@ describe("gaps finais 5", () => {
 					],
 				};
 			}
-			const id = Number(filename.replace("music_", ""));
+			const id = Number(filename.replace(/^music_/, ""));
 			return {
 				id_music: id,
 				url_instrumental_music: `audio/inst-${id}.mp3`,

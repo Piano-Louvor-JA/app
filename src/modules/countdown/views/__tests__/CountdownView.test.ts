@@ -50,6 +50,7 @@ vi.mock('../../../settings/services/stage-settings-runtime', () => ({
 vi.mock('../../../settings/types/stage-settings', () => ({
   stageBgCss: (color: string | null) => color ?? 'transparent',
   resolveBackgroundImage: vi.fn(() => null),
+  stageBgCss: () => '#0A0E1A',
 }))
 
 vi.mock('../../../settings/components/PalcoRouteSelect.vue', () => ({

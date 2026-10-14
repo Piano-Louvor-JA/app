@@ -127,6 +127,7 @@ function lastDlg<T extends HTMLElement>(sel: string): T | null {
 describe('LiturgyItemDialog', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    setActivePinia(createPinia())
   })
 
   it('renderiza sem erros quando open=true', () => {

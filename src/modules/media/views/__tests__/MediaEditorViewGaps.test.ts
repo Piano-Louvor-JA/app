@@ -95,6 +95,7 @@ vi.mock('../../services/custom-catalog', async (importOriginal) => {
 import MediaEditorView from '../MediaEditorView.vue'
 import AppConfirm from '@shared/components/AppConfirm.vue'
 
+
 function seedCollection() {
   mocks.listCustomCollections.mockResolvedValue([
     { id: 9, name: 'Coleção', description: null, ownerId: 4, visibility: 'public', musicsCount: 1 },
@@ -219,7 +220,7 @@ describe('MediaEditorView — capa da coletânea', () => {
     await flushPromises()
     const removeBtn = wrapper
       .findAll('button')
-      .filter((b) => b.attributes('title') === 'Remover capa')[0]
+      .filter((b) => b.attributes('title') === 'media.editor.removeCover')[0]
     expect(removeBtn).toBeDefined()
     await removeBtn!.trigger('click')
     await flushPromises()
@@ -237,7 +238,7 @@ describe('MediaEditorView — capa da coletânea', () => {
     await flushPromises()
     const removeBtn = wrapper
       .findAll('button')
-      .filter((b) => b.attributes('title') === 'Remover capa')[0]
+      .filter((b) => b.attributes('title') === 'media.editor.removeCover')[0]
     expect(removeBtn).toBeDefined()
     await removeBtn!.trigger('click')
     await flushPromises()
@@ -249,7 +250,7 @@ describe('MediaEditorView — busca de hino oficial e reuso de custom', () => {
   it('busca oficial: resultados aparecem e clique adiciona à coletânea', async () => {
     seedCollection()
     const wrapper = await mountEditorWithMusic()
-    const search = wrapper.find('input[placeholder="Buscar hino oficial (nº ou nome)…"]')
+    const search = wrapper.find('input[placeholder="media.editor.searchOfficial"]')
     await search.setValue('san')
     await search.trigger('input')
     await flushPromises()
@@ -266,7 +267,7 @@ describe('MediaEditorView — busca de hino oficial e reuso de custom', () => {
     seedCollection()
     addOfficialMusicToCollection.mockResolvedValue(null)
     const wrapper = await mountEditorWithMusic()
-    const search = wrapper.find('input[placeholder="Buscar hino oficial (nº ou nome)…"]')
+    const search = wrapper.find('input[placeholder="media.editor.searchOfficial"]')
     await search.setValue('san')
     await search.trigger('input')
     await flushPromises()
@@ -278,7 +279,7 @@ describe('MediaEditorView — busca de hino oficial e reuso de custom', () => {
   it('reuso: busca música de outra coletânea, copia com letra/áudio', async () => {
     seedCollection()
     const wrapper = await mountEditorWithMusic()
-    const search = wrapper.find('input[placeholder="Reutilizar música existente…"]')
+    const search = wrapper.find('input[placeholder="media.editor.reuseMusic"]')
     await search.setValue('santo')
     await search.trigger('input')
     await flushPromises()
@@ -295,7 +296,7 @@ describe('MediaEditorView — busca de hino oficial e reuso de custom', () => {
     seedCollection()
     copyCustomMusic.mockResolvedValue(null)
     const wrapper = await mountEditorWithMusic()
-    const search = wrapper.find('input[placeholder="Reutilizar música existente…"]')
+    const search = wrapper.find('input[placeholder="media.editor.reuseMusic"]')
     await search.setValue('santo')
     await search.trigger('input')
     await flushPromises()

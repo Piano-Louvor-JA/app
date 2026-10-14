@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { readFileSync } from 'node:fs'
+import { readFileSync, realpathSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
 
 import { defineConfig } from 'vite'
@@ -35,21 +35,19 @@ const rendererEnv = {
 export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
-    // Injeta o contrato efetivo (auditoria RF-01 + paridade renderer/main).
-    'import.meta.env.VITE_PIANO_PROFILE': JSON.stringify(rendererEnv.VITE_PIANO_PROFILE),
-    'import.meta.env.VITE_URL_DATABASE': JSON.stringify(rendererEnv.VITE_URL_DATABASE),
-    'import.meta.env.VITE_URL_FILES': JSON.stringify(rendererEnv.VITE_URL_FILES),
-    'import.meta.env.VITE_PALCO_API_URL': JSON.stringify(rendererEnv.VITE_PALCO_API_URL),
-    ...(rendererEnv.VITE_API_FALLBACK_URLS !== undefined
-      ? {
-          'import.meta.env.VITE_API_FALLBACK_URLS': JSON.stringify(
-            rendererEnv.VITE_API_FALLBACK_URLS,
-          ),
-        }
-      : {}),
+    __DIAGNOSTICS_DSN__: JSON.stringify(process.env.DIAGNOSTICS_GLITCHTIP_DSN ?? ''),
   },
   server: {
-    fs: { allow: ['.', '/media/rafaelejosi/Dados/repos/piano-app/node_modules'] },
+    // node_modules é symlink p/ outro worktree (api-env-wt) — fora do root,
+    // o Vite nega /@fs/ dele (403 em fontes tabler/fontsource). Autorizar o
+    // caminho real resolvido mantém o bloqueio para todo o resto.
+    fs: {
+      // Root do projeto + realpath do node_modules (symlink p/ outro worktree).
+      allow: [
+        fileURLToPath(new URL('.', import.meta.url)),
+        path.dirname(realpathSync('node_modules')),
+      ],
+    },
     watch: {
       // Worktrees de kanban geram milhares de arquivos — watcher satura e o
       // dev server para de responder (ENOSPC inotify / startup travado).
@@ -65,6 +63,8 @@ export default defineConfig({
         '**/coverage/**',
       ],
     },
+    strictPort: true,
+    port: 5173,
   },
   plugins: [
     vue(),

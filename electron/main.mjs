@@ -15,6 +15,7 @@ import { checkEulaAcceptance } from "./eula.mjs";
 import { resolveAppLocale } from "./locale.mjs";
 import { registerWorkspaceIpc } from "./ipc/register.mjs";
 import { registerDiagnosticsIpc, setDiagnosticsToken } from "./diagnostics.mjs";
+import { createMainLogger } from "./main-log.mjs";
 import { attachWindowStateEvents, registerWindowIpc } from "./ipc/window.mjs";
 import { attachRemoteServer } from "./remote-server.mjs";
 import { attachPalcoServer } from "./palco-server.mjs";
@@ -42,9 +43,11 @@ const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 const isDev = Boolean(VITE_DEV_SERVER_URL);
 const PRELOAD_PATH = path.join(__dirname, "preload.mjs");
 const bootT0 = Date.now();
+const mainLog = createMainLogger(() => app.getPath('userData'));
 
 function bootMark(label) {
 	console.log(`[boot +${Date.now() - bootT0}ms] ${label}`);
+	mainLog.info(`boot ${label}`);
 }
 
 registerLocalScheme();
@@ -54,6 +57,7 @@ registerLocalScheme();
 // app sem explicação. Loga, mostra diálogo amigável e segue.
 process.on("uncaughtException", (error) => {
   console.error("[main] uncaughtException:", error);
+  mainLog.error(`uncaughtException ${error instanceof Error ? error.stack ?? error.message : String(error ?? '')}`);
   try {
     const msg = error instanceof Error ? error.message : String(error ?? "erro desconhecido");
     dialog.showErrorBox(
@@ -63,6 +67,10 @@ process.on("uncaughtException", (error) => {
   } catch {
     /* diálogo falhou — segue */
   }
+});
+
+process.on('unhandledRejection', (reason) => {
+  mainLog.error(`unhandledRejection ${reason instanceof Error ? reason.stack ?? reason.message : String(reason ?? '')}`);
 });
 
 /**
@@ -581,6 +589,7 @@ function createWindow(locale = 'pt-BR') {
 	});
 
 	applyWindowIcon(mainWindow);
+	mainLog.info('main window created');
 	attachWindowStateEvents(mainWindow);
 	trackWindowState(mainWindow, { isMaximized: windowState.isMaximized });
 
@@ -617,10 +626,13 @@ function createWindow(locale = 'pt-BR') {
 			}
 	}
 
-	// Timeout de segurança: se ready-to-show não disparar em 15s, mostra erro
+	// Timeout de segurança: se ready-to-show não disparar, mostra erro.
+	// Dev: 90s (cold-optimize do Vite pode levar minutos neste disco);
+	// release mantém 15s (build pronto, sem depender de dev server).
+	const bootTimeoutMs = isDev ? 90_000 : 15_000;
 	const loadTimeout = setTimeout(() => {
 		if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
-			console.error("[main] timeout: janela principal não carregou em 15s");
+			console.error(`[main] timeout: janela principal não carregou em ${bootTimeoutMs / 1000}s`);
 			closeSplash();
 			dialog.showMessageBoxSync(mainWindow, {
 				type: "error",
@@ -631,7 +643,7 @@ function createWindow(locale = 'pt-BR') {
 			mainWindow.destroy();
 			mainWindow = null;
 		}
-	}, 15_000);
+	}, bootTimeoutMs);
 
 	mainWindow.once("ready-to-show", () => {
 		clearTimeout(loadTimeout);
@@ -730,6 +742,7 @@ app.whenReady().then(async () => {
 		// VITE_* — config de build do renderer não existe no processo principal).
 		setDiagnosticsToken(process.env.LOUVORJA_DIAGNOSTICS_TOKEN ?? "");
 		registerDiagnosticsIpc(); // diagnostics:* — SrCaldeira, rede no main
+		mainLog.info('diagnostics IPC handlers registered');
 		registerWindowIpc(() => mainWindow);
 		registerLocalFileProtocol();
 		registerYoutubeEmbedHeaders();
@@ -750,6 +763,7 @@ app.whenReady().then(async () => {
 		attachPalcoServer(() => mainWindow?.webContents ?? null);
 	} catch (error) {
 		console.error("[main] falha no startup", error);
+		mainLog.error(`startup failure ${error instanceof Error ? error.stack ?? error.message : String(error ?? '')}`);
 		closeSplash();
 		const message =
 			error instanceof Error ? error.message : String(error ?? "erro desconhecido");

@@ -24,6 +24,18 @@ type Scope = string
 const LEGACY_FACTORY_BG = '#0A0E1A'
 const STAGE_BG_MIGRATED_KEY = 'stage.bg-migrated-0510'
 
+/**
+ * Cores de TEXTO de fábrica gravadas pelo código velho (13/10 Rafael): default
+ * gravado não é escolha — sai do storage (vira null = render padrão branco).
+ * Quem QUER a cor, clica no swatch de novo (escolha explícita).
+ */
+const LEGACY_FACTORY_TEXT_COLORS: Record<string, string> = {
+  fg: '#FFFFFF',
+  bFg: '#FFFFFF',
+  refColor: '#FCCE02',
+}
+const STAGE_TEXT_COLOR_MIGRATED_KEY = 'stage.text-color-migrated-1310'
+
 function migrateFactoryBg(prefs: Record<string, unknown>): boolean {
   try {
     if (localStorage.getItem(STAGE_BG_MIGRATED_KEY) === '1') return false
@@ -48,12 +60,39 @@ function migrateFactoryBg(prefs: Record<string, unknown>): boolean {
   }
 }
 
+function migrateFactoryTextColors(prefs: Record<string, unknown>): boolean {
+  try {
+    if (localStorage.getItem(STAGE_TEXT_COLOR_MIGRATED_KEY) === '1') return false
+    let changed = false
+    for (const key of Object.keys(prefs)) {
+      if (!key.startsWith('stage.settings.')) continue
+      const stored = prefs[key]
+      if (!stored || typeof stored !== 'object') continue
+      const rec = stored as Record<string, unknown>
+      for (const [field, factory] of Object.entries(LEGACY_FACTORY_TEXT_COLORS)) {
+        if (rec[field] === factory) {
+          delete rec[field]
+          changed = true
+        }
+      }
+    }
+    if (changed) {
+      localStorage.setItem('user_data', JSON.stringify(prefs))
+    }
+    localStorage.setItem(STAGE_TEXT_COLOR_MIGRATED_KEY, '1')
+    return changed
+  } catch {
+    return false
+  }
+}
+
 function readScope(scope: Scope): StageSettings | null {
   try {
     const raw = localStorage.getItem('user_data')
     if (!raw) return null
     const prefs = JSON.parse(raw) as Record<string, unknown>
     migrateFactoryBg(prefs)
+    migrateFactoryTextColors(prefs)
     const stored = prefs[`stage.settings.${scope}`]
     if (!stored || typeof stored !== 'object') return null
     return parseStageSettings(stored)

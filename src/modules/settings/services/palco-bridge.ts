@@ -128,9 +128,16 @@ async function renderAllSlots(): Promise<void> {
       // Mídia externa (vídeo/pdf/ppt da liturgia) vive fora da bridge e
       // manda direto nos slots; o owner NÃO pode renderizar por cima dela
       // (caso real 28/08: random tomou o slot onde o vídeo projetava).
+      // externalAlive conta POPUPS (hinos/bíblia — 28df66ab, ESC-confirm);
+      // popup do próprio hino NÃO é mídia externa — consultava o handler
+      // antigo e a TV congelava no 1º slide (regressão 13/10). Handler
+      // novo = só web-projection; main antigo sem ele → fallback antigo.
       let ext = false
       try {
-        ext = await getDesktopBridge()?.projection?.externalAlive?.() ?? false
+        const bridge = getDesktopBridge()
+        ext = typeof bridge?.projection?.externalMediaAlive === 'function'
+          ? await bridge.projection.externalMediaAlive()
+          : await (bridge?.projection?.externalAlive?.() ?? false)
       } catch {
         // main antigo sem o handler: assume SEM mídia externa (comportamento
         // legado) em vez de quebrar o renderAllSlots inteiro.

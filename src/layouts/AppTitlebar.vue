@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
@@ -8,7 +9,7 @@ import { getDesktopBridge, isDesktopApp } from '@shared/services/desktop-bridge'
 import { isProjectionPopupLocation } from '@shared/services/projection-window-location'
 import DownloadQueueIndicator from '@modules/sync/components/DownloadQueueIndicator.vue'
 
-
+const { t } = useI18n()
 
 const route = useRoute()
 const isMaximized = ref(false)
@@ -99,7 +100,7 @@ onUnmounted(() => {
         <button
           type="button"
           class="app-titlebar__mac-btn app-titlebar__mac-btn--close"
-          aria-label="Fechar"
+          :aria-label="t('windowControls.close')"
           @click="close"
         >
           <i class="ti ti-x" aria-hidden="true" />
@@ -107,7 +108,7 @@ onUnmounted(() => {
         <button
           type="button"
           class="app-titlebar__mac-btn app-titlebar__mac-btn--minimize"
-          aria-label="Minimizar"
+          :aria-label="t('windowControls.minimize')"
           @click="minimize"
         >
           <i class="ti ti-minus" aria-hidden="true" />
@@ -115,7 +116,7 @@ onUnmounted(() => {
         <button
           type="button"
           class="app-titlebar__mac-btn app-titlebar__mac-btn--maximize"
-          aria-label="Maximizar"
+          :aria-label="t('windowControls.maximize')"
           @click="maximize"
         >
           <i class="ti ti-plus" aria-hidden="true" />
@@ -143,7 +144,7 @@ onUnmounted(() => {
         <button
           type="button"
           class="app-titlebar__btn"
-          aria-label="Minimizar"
+          :aria-label="t('windowControls.minimize')"
           @click="minimize"
         >
           <i class="ti ti-minus" aria-hidden="true" />
@@ -151,7 +152,7 @@ onUnmounted(() => {
         <button
           type="button"
           class="app-titlebar__btn"
-          aria-label="Maximizar"
+          :aria-label="t('windowControls.maximize')"
           @click="maximize"
         >
           <i
@@ -163,7 +164,7 @@ onUnmounted(() => {
         <button
           type="button"
           class="app-titlebar__btn app-titlebar__btn--close"
-          aria-label="Fechar"
+          :aria-label="t('windowControls.close')"
           @click="close"
         >
           <i class="ti ti-x" aria-hidden="true" />
@@ -223,6 +224,7 @@ onUnmounted(() => {
   margin-right: 6px;
   align-items: center;
   display: inline-flex;
+  /* app#423: titlebar é drag region — o widget precisa ser clicável. */
   -webkit-app-region: no-drag;
 }
 

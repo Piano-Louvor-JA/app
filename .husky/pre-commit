@@ -1,4 +1,6 @@
 #!/bin/bash
+# husky v9 wrapper roda 'sh -e' (dash); pipefail exige bash — re-exec
+if [ -z "${BASH_VERSION:-}" ]; then exec bash "$0" "$@"; fi
 set -euo pipefail
 # Preserve npm failures through output filtering; use actual project script.
 echo "🔍 Pre-commit: lint + typecheck..."

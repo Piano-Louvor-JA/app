@@ -120,6 +120,7 @@ describe('LiturgyItemDialog — gaps (url/type/pick)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     document.body.innerHTML = ''
+    setActivePinia(createPinia())
   })
 
   it('urlRequiredMissing: site sem URL mostra erro de validação', async () => {

@@ -16,6 +16,7 @@ const invalidateTrackMediaCache = vi.hoisted(() => vi.fn())
 const peekTrackDownloadCache = vi.hoisted(() => vi.fn(() => undefined))
 vi.mock('@shared/services/track-media', () => ({
   invalidateTrackMediaCache,
+  onTrackMediaChanged: vi.fn(),
   peekTrackDownloadCache,
 }))
 

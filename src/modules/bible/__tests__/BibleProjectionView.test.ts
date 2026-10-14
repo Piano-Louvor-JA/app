@@ -76,7 +76,7 @@ describe('BibleProjectionView', () => {
     expect(style).toContain('bg.png')
     // caixa: backgroundColor rgba + border
     const verseStyle = wrapper.find('.bible-projection__text').attributes('style') ?? ''
-    expect(verseStyle).toContain('rgba(0, 0, 0, 0.4)')
+    expect(verseStyle).toContain('rgba(24, 24, 24, 0.4)')
     expect(verseStyle).toContain('text-shadow')
   })
 

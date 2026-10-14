@@ -10,10 +10,11 @@
   html,body{margin:0;height:100%;overflow:hidden;background:#0A0E1A;
     font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#fff}
   #bg{position:fixed;top:0;left:0;width:100%;height:100%;object-fit:cover;
-    filter:brightness(.55);transition:opacity .8s}
+    /* PARIDADE BG (14/10): projeção local não escurece — espelha receiver. */
+    filter:brightness(1);transition:opacity .8s}
   #bg[src=""]{opacity:0}
   #bgPalco{position:fixed;top:0;left:0;width:100%;height:100%;object-fit:cover}
-  #veil{position:fixed;inset:0;background:rgba(0,0,0,.45)}
+  #veil{position:fixed;inset:0;background:transparent;pointer-events:none}
   #content{position:fixed;top:0;left:0;right:0;bottom:0;padding:6vh 8vw;
     box-sizing:border-box}
   #text{position:absolute;top:50%;left:0;right:0;
@@ -24,28 +25,40 @@
     overflow-wrap:break-word;
     transform:translateY(-50%);
     text-align:center;font-size:6.5vh;font-weight:700;line-height:1.35;
-    letter-spacing:.03em;text-transform:uppercase;
+    letter-spacing:.03em;
     text-shadow:0 2px 12px rgba(0,0,0,.8)}
   /* F3.3m: estilos dinâmicos da letra (sombra/caixinha) */
   #text.shadow-on{text-shadow:var(--ts,0 3px 18px rgba(0,0,0,.8))}
   /* Caixinha no PADRÃO da projeção (StagePreview): canto folha
      1.4cqw 0 1.4cqw 0 (16:9 → ~2.7vh 0), borda fina 1px, padding
      justo ao texto (2cqw ≈ 3.8vh lateral, 2vh vertical). */
-  #text.box-on{background:rgba(0,0,0,var(--box-bg,.45));
+  #text.box-on{background:rgba(24,24,24,var(--box-bg,.55));
+    backdrop-filter:blur(16px);
+    -webkit-backdrop-filter:blur(16px);
     /* Player: radius folha clamp(14px,2.4vmin,32px) 0, borda 0.2vmin e
        sombra suave. Padding mínimo — caixa abraça o texto (vmin). */
+    width:fit-content;max-width:100%;
     padding:1.6vmin 1.8vmin;
     border-radius:clamp(14px,2.4vmin,32px) 0 clamp(14px,2.4vmin,32px) 0;
-    border:var(--box-border,clamp(2px,.2vmin,4px) solid rgba(255,255,255,.25));
+    border:var(--box-border,clamp(2px,.2vmin,4px) solid rgba(255,255,255,.85));
     box-shadow:0 10px 30px rgba(0,0,0,.4)}
   #text.shadow-off{text-shadow:none}
   /* Capa da música (isCover): título destaque amarelo, sem caixinha/borda —
      paridade com media-projection__title--cover via cabo. */
-  #text.cover-on{text-transform:uppercase;font-weight:900;letter-spacing:.03em;
+  #text.cover-on{font-weight:900;letter-spacing:.03em;
     color:#f6c32a;background:none;padding:0;border:none;box-shadow:none;
     border-radius:0;line-height:1.1}
+  /* Caixa opcional na capa (titleTextBox, 14/10) — depois de .cover-on. */
+  #text.cover-on.title-box-on{background:rgba(24,24,24,var(--box-bg,.55));
+    backdrop-filter:blur(16px);width:fit-content;max-width:100%;margin-inline:auto;
+    padding:2.5vmin 4vmin;
+    border-radius:2.4vmin 0 2.4vmin 0;
+    border:var(--box-border,.2vmin solid rgba(255,255,255,.85));
+    box-shadow:0 10px 30px rgba(0,0,0,.4)}
   #text.box-off{background:none;padding:0;border:none;box-shadow:none}
-
+  /* Caixa GRANDE (Bíblia): véu de leitura — width FIXO (fit-content do
+     .box-on é só pra mídia, Bíblia NÃO — 14/10 Rafael). */
+  #text.bible-box{padding:2vh 3.8vh;width:min(86vw,1600px);max-width:86vw;max-height:72vh}
   #footer{position:fixed;bottom:4vh;left:0;right:0;text-align:center;
     font-size:2.6vh;font-weight:300;opacity:.7}
   /* F3.3m: referência da passagem destacada + versão ao lado */
@@ -147,7 +160,7 @@
     <div style="background:#00C1E6"></div>
     <div style="background:#FCCE02"></div>
   </div>
-  <p id="idleMsg">Aguardando conteúdo…</p>
+  <p id="idleMsg" data-l10n="idle"></p>
   <!-- F3.3u: status de conexão visível no idle (sem ?debug) + dica da tecla vermelha -->
   <p id="idleConn" style="font-size:1.8vh;opacity:.45;margin:1.2vh 0 0 0"></p>
   </div>
@@ -171,6 +184,29 @@ window.addEventListener('unhandledrejection',function(ev){
 });
 const $=id=>document.getElementById(id);
 const qs=new URLSearchParams(location.search);
+// L10N: strings do sender. Idioma: ?lang= > navigator.language > pt (14/10).
+var L10N=(function(){var d={
+  pt:{idle:'Aguardando conteúdo…',wait:'Aguardando operador conectar…',audio:'Reproduzindo áudio',
+      connTo:'conectado a {t} · vermelha = IP/porta · azul = atualizar',redKey:'tecla vermelha = digitar IP',
+      searching:'procurando LouvorJA na rede…',notFound:'nenhum sender encontrado — tentando de novo…',
+      connecting:'conectando {h}:{p}…',reconn:'reconectando em {s}s',cloudSearch:'nuvem: buscando sessão {c}…',
+      cloudErr:'nuvem: {m}',cloudConn:'nuvem: conectando…',invalid:'sessão inválida — tecla vermelha p/ novo código',
+      cloudReconn:'nuvem: reconectando em {s}s',cloudCreating:'nuvem: criando sessão…',portSearch:'procurando LouvorJA na porta {p}…',ipHintSender:'Digite o IP — ou SÓ A PORTA (ex.: 7081) para achar o LouvorJA na rede',pairHint:'Acesse e informe o código',tapUnmute:'Toque para ativar o som',ipHint:'CÓDIGO (6 letras/números) · IP · IP:PORTA — ou SÓ A PORTA (ex.: 7081) para achar o LouvorJA na rede',ipHelp:'OK conectar · vermelha cancelar · backspace apaga',mainSlot:'Principal (espelho)',tvConn:' · TV {ip} · conectado · vermelha = digitar IP'},
+  en:{idle:'Waiting for content…',wait:'Waiting for operator to connect…',audio:'Playing audio',
+      connTo:'connected to {t} · red = IP/port · blue = refresh',redKey:'red key = type IP',
+      searching:'searching for LouvorJA on the network…',notFound:'no sender found — trying again…',
+      connecting:'connecting {h}:{p}…',reconn:'reconnecting in {s}s',cloudSearch:'cloud: fetching session {c}…',
+      cloudErr:'cloud: {m}',cloudConn:'cloud: connecting…',invalid:'invalid session — red key for a new code',
+      cloudReconn:'cloud: reconnecting in {s}s',cloudCreating:'cloud: creating session…',portSearch:'searching for LouvorJA on port {p}…',ipHintSender:'Type the IP — or PORT ONLY (e.g. 7081) to find LouvorJA on the network',pairHint:'Go to the site and enter the code',tapUnmute:'Tap to enable sound',ipHint:'CODE (6 letters/numbers) · IP · IP:PORT — or PORT ONLY (e.g. 7081) to find LouvorJA on the network',ipHelp:'OK connect · red cancel · backspace deletes',mainSlot:'Main (mirror)',tvConn:' · TV {ip} · connected · red = type IP'},
+  es:{idle:'Esperando contenido…',wait:'Esperando al operador…',audio:'Reproduciendo audio',
+      connTo:'conectado a {t} · roja = IP/puerto · azul = actualizar',redKey:'tecla roja = escribir IP',
+      searching:'buscando LouvorJA en la red…',notFound:'ningún sender encontrado — reintentando…',
+      connecting:'conectando {h}:{p}…',reconn:'reconectando en {s}s',cloudSearch:'nube: buscando sesión {c}…',
+      cloudErr:'nube: {m}',cloudConn:'nube: conectando…',invalid:'sesión inválida — tecla roja p/ nuevo código',
+      cloudReconn:'nube: reconectando en {s}s',cloudCreating:'nube: creando sesión…',portSearch:'buscando LouvorJA en el puerto {p}…',ipHintSender:'Escriba la IP — o SÓLO EL PUERTO (ej. 7081) para hallar LouvorJA en la red',pairHint:'Acceda e informe el código',tapUnmute:'Toque para activar el sonido',ipHint:'CÓDIGO (6 letras/números) · IP · IP:PUERTO — o SÓLO EL PUERTO (ej. 7081) para hallar LouvorJA en la red',ipHelp:'OK conectar · roja cancelar · backspace borra',mainSlot:'Principal (espejo)',tvConn:' · TV {ip} · conectado · roja = escribir IP'}
+};var l=(qs.get('lang')||(navigator.language||'')).slice(0,2).toLowerCase();
+return Object.assign({},d.pt,d[l]||{});})();
+document.querySelectorAll('[data-l10n]').forEach(function(el){var k=el.getAttribute('data-l10n');if(L10N[k])el.textContent=L10N[k];});
 // F3.3q: versão no idle (canto inferior direito) — ?v= override ou padrão.
 (function(){var el=$('idleVer');if(!el)return;var qv=qs.get('v')||window.__PALCO_APPV__||'0.1.42';if(qv){el.textContent='PIANO LouvorJA Palco · receiver v'+qv;return}fetch('appinfo.json').then(function(r){return r.json()}).then(function(j){el.textContent='PIANO LouvorJA Palco · receiver v'+(j.version||'?')}).catch(function(){fetch('config.xml').then(function(r){return r.text()}).then(function(t){var m2=t.match(/version="([^"]+)"/);el.textContent='PIANO LouvorJA Palco · receiver v'+(m2?m2[1]:'?')}).catch(function(){el.textContent='PIANO LouvorJA Palco'})})})()
 // webOS: ares-launch -p '{"host":"..."}' chega em PalmSystem.launchParams,
@@ -186,24 +222,30 @@ let unlocked=true;
 let bgPalco='';  // BG personalizado do palco (idle) — persiste entre músicas
 
 function proxyUrl(original){
-  if(!original)return original;
+  if(!original)return '';
+  let parsed;
+  try{ parsed=new URL(String(original), location.href) }
+  catch(e){ return '' }
+  // javascript: e outros esquemas não entram em src/áudio/vídeo.
+  if(parsed.protocol!=='http:'&&parsed.protocol!=='https:'&&parsed.protocol!=='blob:'&&parsed.protocol!=='file:'&&parsed.protocol!=='data:')return '';
+  if(parsed.protocol==='file:'&&location.protocol!=='file:')return '';
+  if(parsed.protocol==='data:'&&!/^data:(image|audio|video)\/[a-z0-9.+-]+;base64,/i.test(String(original)))return '';
+  if(parsed.protocol==='data:'||parsed.protocol==='blob:'||parsed.protocol==='file:')return parsed.href;
+  const safe=parsed.href;
   // Qualquer porta do MESMO sender é local: 7080 (Principal), 7082 (TV 2),
   // 7084... Antes só aceitava :7080; bg vindo de slot :7082 era proxyado
   // de volta e falhava → receiver caía no bg-12 (caso real 26/08).
-  if(original.startsWith('http://'+host+':'))return original;
-  if(original.startsWith('http://')||original.startsWith('https://')){
-    return `http://${host}:7080/proxy?url=${encodeURIComponent(original)}`;
-  }
-  return original;
+  if(safe.startsWith('http://'+host+':'))return safe;
+  return `http://${host}:7080/proxy?url=${encodeURIComponent(safe)}`;
 }
 
 function setStatus(t,err){const s=$('status');s.textContent=t;
   const c=$('idleConn');if(c){
     if(t.indexOf('●')===0){
       var lb=localStorage.getItem('palcoSlotLabel');
-      c.textContent=(lb?lb+' · ':'')+'conectado a '+t.slice(1).trim()+' · vermelha = IP/porta · azul = atualizar';
+      c.textContent=(lb?lb+' · ':'')+L10N.connTo.replace('{t}',t.slice(1).trim());
     }
-    else c.textContent=(localStorage.getItem('palcoSlotLabel')?localStorage.getItem('palcoSlotLabel')+' · ':'')+t+' · tecla vermelha = digitar IP';
+    else c.textContent=(localStorage.getItem('palcoSlotLabel')?localStorage.getItem('palcoSlotLabel')+' · ':'')+t+' · '+L10N.redKey;
   }
   s.className=err?'err':''}
 
@@ -274,10 +316,10 @@ async function scanSubnet(){
 function connect(){
   dlog('connect() host="'+host+'"');
   if(!host){
-    setStatus('procurando LouvorJA na rede…');
+    setStatus(L10N.searching);
     scanSubnet().then(found=>{
       if(found){host=found;localStorage.setItem('palcoHost',host);doConnect()}
-      else{setStatus('nenhum sender encontrado — tentando de novo…',true);retry()}
+      else{setStatus(L10N.notFound,true);retry()}
     });
     return;
   }
@@ -317,7 +359,7 @@ function stopMediaOnServerLoss(){
 
 function doConnect(){
   dlog('doConnect '+host+':'+port);
-  setStatus('conectando '+host+':'+port+'…');
+  setStatus(L10N.connecting.replace('{h}',host).replace('{p}',port));
   try{ws=new WebSocket('ws://'+host+':'+port+'/palco')}catch(e){retry();return}
   ws.onopen=()=>{tries=0;dlog('WS OPEN '+host);setStatus('● '+host);
     if(window.__hideSplash)window.__hideSplash(); // F3.3j: splash sai no connect
@@ -332,7 +374,7 @@ function doConnect(){
 }
 function retry(){
   const wait=Math.min(1000*Math.pow(2,tries++),10000);
-  setStatus('reconectando em '+Math.round(wait/1000)+'s',true);
+  setStatus(L10N.reconn.replace('{s}',Math.round(wait/1000)),true);
   setTimeout(connect,wait);
 }
 function showIdle(msg){
@@ -349,7 +391,7 @@ function showIdle(msg){
   $('text').textContent='';$('footer').textContent='';
   // F3.3ac: remove estilos de projeção (caixa/sombra) — senão a caixa
   // vazia continuava desenhada no idle após "Limpar projeção".
-  $('text').classList.remove('box-on','shadow-on','box-off','shadow-off','cover-on');
+  $('text').classList.remove('box-on','shadow-on','box-off','shadow-off','cover-on','bible-box');
   $('text').style.removeProperty('--box-bg');
   $('text').style.removeProperty('--box-border');
   $('text').style.removeProperty('--ts');
@@ -383,7 +425,7 @@ function hideNp(){
 }
 
 const a0=$('audio');
-a0.onended=()=>showIdle('Aguardando conteúdo…');
+a0.onended=()=>showIdle(L10N.idle);
 let pendingPlay=false;
 // F3.3h: autoplay-mudo — o browser bloqueia play() COM SOM sem gesto, mas
 // permite MUDO. Estratégia Chromecast-like: play com som falha → retry
@@ -398,7 +440,7 @@ function showMuteBadge(){
   b.style.cssText='position:fixed;top:3vh;right:3vh;z-index:98;cursor:pointer;'+
     'background:rgba(0,0,0,.75);border-radius:3vh;padding:1.5vh 2.5vh;'+
     'font-size:2.4vh;color:#fff;display:flex;align-items:center;gap:1.2vh';
-  b.innerHTML='<span style="font-size:3vh">🔇</span> Toque para ativar o som';
+  b.innerHTML='<span style="font-size:3vh">🔇</span> '+L10N.tapUnmute;
   b.addEventListener('click',unmuteNow);
   document.body.appendChild(b);
 }
@@ -480,10 +522,10 @@ function openIpEntry(){
   ipEntry.style.cssText='position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.85);'+
     'display:flex;align-items:center;justify-content:center';
   ipEntry.innerHTML='<div style="text-align:center">'+
-    '<p style="font-size:2.6vh;opacity:.7;margin:0 0 2vh 0">Digite o IP — ou SÓ A PORTA (ex.: 7081) para achar o LouvorJA na rede</p>'+
+    '<p style="font-size:2.6vh;opacity:.7;margin:0 0 2vh 0">'+L10N.ipHintSender+'</p>'+
     '<p id="ipVal" style="font-size:6vh;font-weight:700;letter-spacing:.5vh;margin:0;'+
     'min-height:7vh;border-bottom:.3vh solid #FCCE02;padding:0 4vh"></p>'+
-    '<p style="font-size:1.8vh;opacity:.5;margin:2vh 0 0 0">OK conectar · vermelha cancelar · backspace apaga</p></div>';
+    '<p style="font-size:1.8vh;opacity:.5;margin:2vh 0 0 0">'+L10N.ipHelp+'</p></div>';
   document.body.appendChild(ipEntry);
   ipEntry._val='';
   renderIp();
@@ -499,7 +541,7 @@ function submitIp(){
     port=v;localStorage.setItem('palcoPort',port);tries=0;closeIpEntry();
     try{if(ws)ws.close()}catch(e){}
     host='';localStorage.removeItem('palcoHost');
-    setStatus('procurando LouvorJA na porta '+port+'…');
+    setStatus(L10N.portSearch.replace('{p}',port));
     scanSubnet();
     return;
   }
@@ -542,7 +584,7 @@ window.addEventListener('keydown',function(e){
     {const a=$('audio');a.pause();a.removeAttribute('src');a.load();}
     {const v=$('video');v.pause();v.removeAttribute('src');v.style.display='none';v.load();}
     hideNp();
-    showIdle('Aguardando conteúdo…');
+    showIdle(L10N.idle);
     return;
   }
   // tecla vermelha (403) no idle abre entrada de IP
@@ -573,24 +615,57 @@ function handle(m){
       $('veil').style.display=m.text?'':'none';
       $('text').innerHTML=m.text||'';
       $('text').classList.toggle('cover-on',m.isCover===true);
-      // F3.3o: fontSize/fontWeight dinâmicos (settings do operador).
+      $('text').classList.toggle('title-box-on',m.titleTextBox===true);
+      // F3.3o: fontSize dinâmico. px@1080 → vw (% da LARGURA, paridade com
+      // web cqw): px@1920 = px@1080*16/9; web usa px@1920/19.2 = vw.
       {const t=$('text');
-        if(typeof m.fontSize==='number')
-          t.style.fontSize=(m.fontSize/10.8)+'vh'; // px@1080p -> vh
+        const fs=typeof m.lyricFontSize==='number'?m.lyricFontSize:m.fontSize;
+        if(typeof fs==='number')
+          t.style.fontSize=((fs*16/9)/19.2)+'vw'; // px@1080→px@1920→vw
         if(typeof m.fontWeight==='number')
           t.style.fontWeight=m.fontWeight;
       }
+      // Paridade total: personalizações do app aplicadas na TV.
+      // lUpper (13/10): uppercase da letra é ESCOLHA do usuário, não hardcode.
+      {const t=$('text');
+        t.style.textTransform=(m.isCover===true
+          ?m.titleUpperCase===true
+          :m.lyricUpperCase===true)?'uppercase':(m.textTransform||'none');
+      }
+      // Margem: paridade StagePreview — margin px@1920 reduz a área útil
+      // (max-width), NUNCA margin CSS: `20vh 0` mata o margin:0 auto que
+      // centra a caixa (left:0/right:0 → caixa colava à esquerda, 14/10).
+      {const t=$('text');
+        t.style.maxWidth='calc(100vw - '+((typeof m.margin==='number'?m.margin:120)/9.6)+'vw)';
+        t.style.margin='0 auto';
+      }
+      {const c=$('content'),tx=$('text');
+        // Alinhamento horizontal escolhido no app (paridade receiver).
+        tx.style.textAlign=(m.textAlign||'center');
+        // textVerticalAlign: top/bottom/center (center = padrão 50%).
+        const va=m.textVerticalAlign;
+        if(va==='top'){tx.style.top='6vh';tx.style.transform='none'}
+        else if(va==='bottom'){tx.style.top='auto';tx.style.bottom='6vh';tx.style.transform='none'}
+        else{tx.style.top='50%';tx.style.bottom='auto';tx.style.transform='translateY(-50%)'}
+      }
+      // Cor explícita é a personalização ativa do Palco: vence capa/bg do
+      // runtime também. Antes só pintava o body ATRÁS da <img> (capa/
+      // bgPalco/fallback sempre na frente → cor invisível). Paridade
+      // receiver: remove o src da img e pinta o body (14/10).
+      if(m.backgroundColor){bgEl.removeAttribute('src');bgPalco='';document.body.style.background=m.backgroundColor}
+      else document.body.style.background='';
       // F3.3m: estilos da letra — sombra (intensidade) + caixinha (borda)
       {const t=$('text');
-        t.classList.remove('shadow-on','shadow-off','box-on','box-off');
+        t.classList.remove('shadow-on','shadow-off','box-on','box-off','bible-box');
         if(m.textShadow===false){t.classList.add('shadow-off')}
         else{t.classList.add('shadow-on');
           if(typeof m.shadowBlur==='number')
             t.style.setProperty('--ts',`0 ${Math.max(1,m.shadowBlur/3)}vh ${m.shadowBlur}vh rgba(0,0,0,${m.shadowIntensity!=null?m.shadowIntensity:0.8})`)}
         if(m.textBox){t.classList.add('box-on');
+          t.classList.toggle('bible-box',m.bibleBox===true);
           if(typeof m.boxOpacity==='number')t.style.setProperty('--box-bg',m.boxOpacity);
           t.style.setProperty('--box-border',
-            m.boxBorder?`${m.boxBorder.width||0.4}vh solid ${m.boxBorder.color||'rgba(255,255,255,.25)'}`:'none')}
+            m.boxBorder?`${m.boxBorder.width||0.2}vmin solid ${m.boxBorder.color||'rgba(255,255,255,.85)'}`:'none')}
         else{t.classList.add('box-off')}
       }
       // F3.3m: footer com referência destacada + versão
@@ -624,21 +699,25 @@ function handle(m){
             const apply=()=>{try{a.currentTime=m.positionMs/1000}catch(e){}};
             if(a.readyState>=1)apply();else a.addEventListener('loadedmetadata',apply,{once:true});
           }
-          a.onended=()=>{hideNp();showIdle('Aguardando conteúdo…')};
+          a.onended=()=>{hideNp();showIdle(L10N.idle)};
           // Áudio "desconhecido" (sem metadados): now-playing padrão do
           // Palco — sem nome de arquivo, com a animação eq indicando que
           // há algo tocando. Mesmo visual do "só áudio" do app.
           if(m.title){
             showNp(m.title, m.subtitle||'', m.cover||'');
           }else{
-            showNp('Reproduzindo áudio', m.subtitle||'', m.cover||'');
+            showNp(L10N.audio, m.subtitle||'', m.cover||'');
           }
-          $('bg').src=m.background?proxyUrl(m.background):'bg-fallback.png';
+          // BG de áudio: cor explícita do Palco vence capa/fallback (paridade
+          // projection, 14/10) — não re-seta o src se a personalização pintou.
+          if(!m.backgroundColor)
+            $('bg').src=m.background?proxyUrl(m.background):'bg-fallback.png';
         }
       }
       // BG garantido em TODA mensagem de áudio (load, play, pause, seek):
       // sem isso, mensagens action-only podiam deixar tela preta.
-      if(!m.background){
+      // Cor explícita = personalização ativa: não força fallback (14/10).
+      if(!m.background&&!m.backgroundColor){
         const cur=$('bg');
         if(!cur.src||cur.src.endsWith('/'))cur.src='bg-fallback.png';
       }
@@ -646,19 +725,19 @@ function handle(m){
         // Now-playing tardio APENAS se não há projeção ativa na TV.
         // Hino da liturgia = projection (letra) + audio juntos: o np não
         // pode cobrir a letra projetada (caso real: hino mostrava
-        // 'Reproduzindo áudio' em vez da letra).
+        // L10N.audio em vez da letra).
         const np=$('np');
         const textEl=$('text');
         const hasProjection=textEl&&textEl.innerHTML&&textEl.innerHTML.trim()!==''&&np.style.display==='none';
         if(np.style.display==='none'&&!hasProjection){
-          showNp(m.title||'Reproduzindo áudio', m.subtitle||'', m.cover||'');
+          showNp(m.title||L10N.audio, m.subtitle||'', m.cover||'');
           if(!m.background)$('bg').src='bg-fallback.png';
         }
         if(a.paused){dlog('PLAY src='+(a.src||'').slice(0,60));playWithFallback()}
         else dlog('PLAY ignorado — já tocando');
       }
       if(m.action==='pause'&&!a.paused)a.pause();
-      if(m.action==='stop'){a.pause();a.currentTime=0;showIdle('Aguardando conteúdo…')}
+      if(m.action==='stop'){a.pause();a.currentTime=0;showIdle(L10N.idle)}
       if(m.action==='seek'){
         const target=(m.position||m.positionMs/1000||0);
         // só corrige se o desvio for perceptível — micro-sync causa stutter
@@ -677,7 +756,7 @@ function handle(m){
       {const a=$('audio');
         if(a&&a.src&&!(m.action==='stop'&&!m.url)){a.pause();a.removeAttribute('src');a.load()}}
       if(m.action==='stop'){v.pause();v.removeAttribute('src');v.style.display='none';
-        v.load();showIdle('Aguardando conteúdo…');
+        v.load();showIdle(L10N.idle);
         sendEvent({v:2,type:'ended',media:'video'});break}
       if(m.url){v.src=proxyUrl(m.url);v.style.display='';
         // Sync inicial (padrão F3.3g do áudio): positionMs aplicado antes
@@ -687,7 +766,7 @@ function handle(m){
           if(v.readyState>=1)apply();else v.addEventListener('loadedmetadata',apply,{once:true});
         }
         v.onended=()=>{v.style.display='none';v.removeAttribute('src');v.load();
-          showIdle('Aguardando conteúdo…');
+          showIdle(L10N.idle);
           sendEvent({v:2,type:'ended',media:'video'})}}
       if(m.action==='seek'){
         const target=(m.position||((m.positionMs||0)/1000)||0);
@@ -731,17 +810,17 @@ function handle(m){
       t._iv=setInterval(()=>{rem-=1000;elapsed+=1000;render();
         if(mode!=='chrono'&&rem<=0){clearInterval(t._iv)}},1000);
       break}
-    case 'idle':showIdle(m.msg||'Aguardando conteúdo…');break;
+    case 'idle':showIdle(m.msg||L10N.idle);break;
     // F3.3x: sender informa IP DA TV (visto pelo socket) + SLOT onde ela
     // caiu — identificação visível pro operador conferir com o app.
     case 'youare':{
       if(m.ip){
         var who=(m.slotLabel||m.slot||'Palco');
         var isMain=!m.slot||m.slot==='0';
-        if(isMain)who='Principal (espelho)';
+        if(isMain)who=L10N.mainSlot;
         var el=document.getElementById('idleConn');
         if(el&&document.getElementById('idle')&&!document.getElementById('idle').classList.contains('hidden'))
-          el.textContent=who+' · TV '+m.ip+' · conectado · vermelha = digitar IP';
+          el.textContent=who+L10N.tvConn.replace('{ip}',m.ip);
         try{
           localStorage.setItem('palcoSelfIp',m.ip);
           localStorage.setItem('palcoSlotLabel',who);

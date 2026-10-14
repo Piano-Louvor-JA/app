@@ -1,9 +1,13 @@
 // @vitest-environment jsdom
+import { createI18n } from 'vue-i18n'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { nextTick } from 'vue'
 
 import DiagnosticsView from '../views/DiagnosticsView.vue'
+
+const i18n = createI18n({ legacy: false, messages: {} })
+
 
 type BridgeShape = {
   isElectron: boolean
@@ -34,7 +38,7 @@ afterEach(() => {
 
 describe('DiagnosticsView (dev — SrCaldeira)', () => {
   it('sem bridge: avisa que precisa do Electron e botão desabilitado', () => {
-    const w = mount(DiagnosticsView)
+    const w = mount(DiagnosticsView, { global: { plugins: [i18n] } })
     expect(w.find('.warning').text()).toContain('Electron')
     expect(w.find('button.run').attributes('disabled')).toBeDefined()
   })
@@ -42,7 +46,7 @@ describe('DiagnosticsView (dev — SrCaldeira)', () => {
   it('com bridge: botão habilitado; run() mostra caminhos dos arquivos', async () => {
     const run = vi.fn().mockResolvedValue(runResult)
     setBridge({ isElectron: true, diagnostics: { run, send: vi.fn(), openFolder: vi.fn() } })
-    const w = mount(DiagnosticsView)
+    const w = mount(DiagnosticsView, { global: { plugins: [i18n] } })
     expect(w.find('button.run').attributes('disabled')).toBeUndefined()
     await w.find('button.run').trigger('click')
     expect(run).toHaveBeenCalledOnce()
@@ -55,7 +59,7 @@ describe('DiagnosticsView (dev — SrCaldeira)', () => {
   it('run() que lança: mensagem de erro, sem result', async () => {
     const run = vi.fn().mockRejectedValue(new Error('handler crash'))
     setBridge({ isElectron: true, diagnostics: { run, send: vi.fn(), openFolder: vi.fn() } })
-    const w = mount(DiagnosticsView)
+    const w = mount(DiagnosticsView, { global: { plugins: [i18n] } })
     await w.find('button.run').trigger('click')
     await flushPromises()
     expect(w.find('.warning').text()).toContain('handler crash')
@@ -64,14 +68,14 @@ describe('DiagnosticsView (dev — SrCaldeira)', () => {
 
   it('run com bridge sem diagnostics: click é no-op', async () => {
     setBridge({ isElectron: true })
-    const w = mount(DiagnosticsView)
+    const w = mount(DiagnosticsView, { global: { plugins: [i18n] } })
     expect(w.find('button.run').attributes('disabled')).toBeDefined()
   })
 
   it('send() ok mostra confirmação; send() falho mostra fallback "compartilhe o arquivo"', async () => {
     const sendOk = vi.fn().mockResolvedValue({ ok: true })
     setBridge({ isElectron: true, diagnostics: { run: vi.fn().mockResolvedValue(runResult), send: sendOk, openFolder: vi.fn() } })
-    let w = mount(DiagnosticsView)
+    let w = mount(DiagnosticsView, { global: { plugins: [i18n] } })
     const vmResult = w.vm as unknown as { result: unknown }
     expect(vmResult.result).toBeNull()
     // produz result sem passar pelo botão (run já testado):
@@ -85,7 +89,7 @@ describe('DiagnosticsView (dev — SrCaldeira)', () => {
 
     const sendFail = vi.fn().mockResolvedValue({ ok: false, reason: 'DSN não configurado' })
     setBridge({ isElectron: true, diagnostics: { run: vi.fn().mockResolvedValue(runResult), send: sendFail, openFolder: vi.fn() } })
-    w = mount(DiagnosticsView)
+    w = mount(DiagnosticsView, { global: { plugins: [i18n] } })
     ;(w.vm as unknown as { result: typeof runResult | null }).result = runResult
     await nextTick()
     await w.find('button.secondary').trigger('click')
@@ -97,7 +101,7 @@ describe('DiagnosticsView (dev — SrCaldeira)', () => {
   it('openFolder chama a bridge com o jsonPath', async () => {
     const openFolder = vi.fn()
     setBridge({ isElectron: true, diagnostics: { run: vi.fn().mockResolvedValue(runResult), send: vi.fn(), openFolder } })
-    const w = mount(DiagnosticsView)
+    const w = mount(DiagnosticsView, { global: { plugins: [i18n] } })
     ;(w.vm as unknown as { result: typeof runResult | null }).result = runResult
     await nextTick()
     const buttons = w.findAll('button.secondary')

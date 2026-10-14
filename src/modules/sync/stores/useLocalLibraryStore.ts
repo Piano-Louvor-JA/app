@@ -4,6 +4,7 @@ import { computed, ref } from 'vue'
 import { isDesktopApp } from '@shared/services/desktop-bridge'
 import {
   invalidateTrackMediaCache,
+  onTrackMediaChanged,
   peekTrackDownloadCache,
 } from '@shared/services/track-media'
 
@@ -159,12 +160,34 @@ export const useLocalLibraryStore = defineStore('localLibrary', () => {
     } finally {
       isLoadingList.value = false
     }
+
+    // Boot reconcile: 1× por sessão, em background, sem bloquear a UI.
+    if (!reconciledOnBoot) {
+      reconciledOnBoot = true
+      void reconcileFromLocalMedia().catch(() => {
+        /* best-effort: falha silenciosa mantém listagem do catálogo */
+      })
+    }
   }
 
   // Store Pinia é singleton por app; listener vive até fechar a janela.
   window.addEventListener('louvorja:catalog-refreshed', () => {
     if (collectionsLoaded) void refreshCollections()
   })
+
+  /**
+   * Badge /albums reativo (app#albums-badge-live): download/delete de faixa
+   * pode terminar em QUALQUER fluxo (pre-play ensureTrackDownloaded, ondemand,
+   * MusicTrackActions). O evento do serviço dispara o reconcile do álbum
+   * linkado — a grade reflete o disco sem reload.
+   */
+  onTrackMediaChanged((musicId) => {
+    void reconcileAlbumsForMusic(musicId)
+  })
+
+  // Reconcile de disco 1× por sessão: boot com faixas baixadas fora do
+  // manifesto (fluxos antigos) também deve mostrar o check.
+  let reconciledOnBoot = false
 
   /**
    * Marca no manifesto as coletâneas já presentes no disco (import legado)

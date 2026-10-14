@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { GlassCard } from '@design-system/index'
@@ -52,6 +52,13 @@ const subtitle = computed(() => {
 const coverIcon = computed(() =>
   props.collection.id === 'hymnal_1996' ? 'ti-history' : 'ti-book-2',
 )
+
+const coverSrc = computed(() => props.collection.coverUrl || '')
+
+const coverFailed = ref(false)
+watch(coverSrc, () => {
+  coverFailed.value = false
+})
 </script>
 
 <template>
@@ -84,7 +91,15 @@ const coverIcon = computed(() =>
             showDownloadControls && (status === 'idle' || status === 'error'),
         }"
       >
+        <img
+          v-if="coverSrc && !coverFailed"
+          class="album-hymnal-card__cover-img"
+          :src="coverSrc"
+          alt=""
+          @error="coverFailed = true"
+        >
         <i
+          v-else
           class="ti album-hymnal-card__fallback-icon"
           :class="coverIcon"
           aria-hidden="true"
@@ -240,6 +255,7 @@ const coverIcon = computed(() =>
 }
 
 .album-hymnal-card__cover {
+  position: relative;
   display: flex;
   width: 5rem;
   height: 6rem;
@@ -251,6 +267,15 @@ const coverIcon = computed(() =>
   border: 1px solid color-mix(in srgb, var(--ds-color-on-surface) 10%, transparent);
   background: var(--ds-color-surface-container-high, #2a2a2a);
   box-shadow: 0 12px 24px rgb(0 0 0 / 35%);
+
+  .album-hymnal-card__cover-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
 
   &--muted {
     border-color: color-mix(in srgb, var(--ds-color-on-surface) 5%, transparent);

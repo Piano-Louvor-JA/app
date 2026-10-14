@@ -59,7 +59,12 @@ export type StageSettings = {
    * Presets recebem a cor explícita ao serem clicados.
    */
   backgroundColor: string | null
-  textColor: string
+  /**
+   * Cores de TEXTO null-first (13/10 Rafael): null = usuário NÃO escolheu —
+   * render usa o padrão dele (branco na projeção/palco); cor só vai ao
+   * storage/palco se for escolha explícita. Mesmo contrato do backgroundColor.
+   */
+  textColor: string | null
   fontSize: number // px @1920 (60–160)
   fontWeight: StageFontWeight
   margin: number
@@ -71,7 +76,7 @@ export type StageSettings = {
   boxBorder: boolean
   textAlign: StageAlign
   textVerticalAlign: StageVerticalAlign
-  footerRefColor: string
+  footerRefColor: string | null
   footerRefWeight: number
   /**
    * Título (1º slide / capa): personalização própria. `null`/`undefined`
@@ -82,6 +87,8 @@ export type StageSettings = {
   titleTextColor: string | null
   titleUpperCase: boolean
   titleTextShadow: boolean | null
+  /** Caixa atrás do título (1º slide). Default false = capa clássica sem caixa (14/10). */
+  titleTextBox: boolean
   /**
    * Estrofes (slides de letra): personalização própria. `null`/`undefined`
    * = usa o estilo geral (que JÁ É o das estrofes) — espelha title*.
@@ -94,7 +101,7 @@ export type StageSettings = {
   showBibleVersion: boolean
   bibleFontSize: number // px @1920 (50–140)
   bibleFontWeight: 400 | 500 | 700
-  bibleTextColor: string
+  bibleTextColor: string | null
   /** Capitalização do versículo (paridade web — mesmo campo/serde `bTransform`). */
   bibleTextTransform: 'none' | 'uppercase' | 'capitalize'
   /** Data URL da imagem de fundo do escopo (1 ativa por escopo). */
@@ -167,7 +174,7 @@ export const COUNTDOWN_TIME_FORMAT_OPTIONS: NonNullable<StageSettings['countdown
 
 export const DEFAULT_STAGE_SETTINGS: StageSettings = {
   backgroundColor: null,
-  textColor: '#FFFFFF',
+  textColor: null,
   fontSize: 96,
   fontWeight: 600,
   margin: 120,
@@ -179,18 +186,19 @@ export const DEFAULT_STAGE_SETTINGS: StageSettings = {
   boxBorder: true,
   textAlign: 'center',
   textVerticalAlign: 'middle',
-  footerRefColor: '#FCCE02',
+  footerRefColor: null,
   footerRefWeight: 600,
   showBibleVersion: true,
   bibleFontSize: 84,
   bibleFontWeight: 500,
-  bibleTextColor: '#FFFFFF',
+  bibleTextColor: null,
   bibleTextTransform: 'none',
   titleFontSize: null,
   titleFontWeight: null,
   titleTextColor: null,
   titleUpperCase: false,
   titleTextShadow: null,
+  titleTextBox: false,
   lyricFontSize: null,
   lyricFontWeight: null,
   lyricTextColor: null,
@@ -321,6 +329,11 @@ function asColor(value: unknown, fallback: string): string {
     : fallback
 }
 
+/** Cor opcional: só aceita hex válido; ausente/inválida → null (13/10). */
+function asColorOrNull(value: unknown): string | null {
+  return typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value) ? value : null
+}
+
 function asNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback
 }
@@ -345,7 +358,7 @@ export function parseStageSettings(raw: unknown): StageSettings {
       typeof s['bg'] === 'string' && /^#[0-9a-fA-F]{6}$/.test(s['bg'])
         ? s['bg']
         : null,
-    textColor: asColor(s['fg'], DEFAULT_STAGE_SETTINGS.textColor),
+    textColor: asColorOrNull(s['fg']),
     fontSize: clamp(asNumber(s['size'], 96), 60, 160),
     fontWeight: WEIGHTS.includes(weight) ? weight : 600,
     margin: clamp(asNumber(s['margin'], 120), 0, 480),
@@ -358,12 +371,12 @@ export function parseStageSettings(raw: unknown): StageSettings {
     textAlign: s['tAlign'] === 'left' || s['tAlign'] === 'right' ? s['tAlign'] : 'center',
     textVerticalAlign:
       s['tVAlign'] === 'top' || s['tVAlign'] === 'bottom' ? s['tVAlign'] : 'middle',
-    footerRefColor: asColor(s['refColor'], DEFAULT_STAGE_SETTINGS.footerRefColor),
+    footerRefColor: asColorOrNull(s['refColor']),
     footerRefWeight: clamp(Math.round(asNumber(s['refWeight'], 600)), 100, 900),
     showBibleVersion: typeof s['showVer'] === 'boolean' ? s['showVer'] : true,
     bibleFontSize: clamp(asNumber(s['bSize'], 84), 50, 140),
     bibleFontWeight: BIBLE_WEIGHTS.includes(bibleWeight) ? bibleWeight : 500,
-    bibleTextColor: asColor(s['bFg'], DEFAULT_STAGE_SETTINGS.bibleTextColor),
+    bibleTextColor: asColorOrNull(s['bFg']),
     bibleTextTransform: BIBLE_TEXT_TRANSFORM_OPTIONS.includes(
       s['bTransform'] as StageSettings['bibleTextTransform'],
     )
@@ -372,13 +385,14 @@ export function parseStageSettings(raw: unknown): StageSettings {
     titleFontSize:
       s['tSize'] == null ? null : clamp(asNumber(s['tSize'], 96), 60, 160),
     titleFontWeight: s['tWeight'] == null ? null : (WEIGHTS.includes(asNumber(s['tWeight'], 600) as StageFontWeight) ? (asNumber(s['tWeight'], 600) as StageFontWeight) : null),
-    titleTextColor: s['tFg'] == null ? null : asColor(s['tFg'], DEFAULT_STAGE_SETTINGS.textColor),
+    titleTextColor: s['tFg'] == null ? null : asColorOrNull(s['tFg']),
     titleUpperCase: typeof s['tUpper'] === 'boolean' ? s['tUpper'] : false,
     titleTextShadow: typeof s['tsOnT'] === 'boolean' ? s['tsOnT'] : null,
+    titleTextBox: typeof s['tBox'] === 'boolean' ? s['tBox'] : false,
     lyricFontSize:
       s['lSize'] == null ? null : clamp(asNumber(s['lSize'], 84), 60, 160),
     lyricFontWeight: s['lWeight'] == null ? null : (WEIGHTS.includes(asNumber(s['lWeight'], 600) as StageFontWeight) ? (asNumber(s['lWeight'], 600) as StageFontWeight) : null),
-    lyricTextColor: s['lFg'] == null ? null : asColor(s['lFg'], DEFAULT_STAGE_SETTINGS.textColor),
+    lyricTextColor: s['lFg'] == null ? null : asColorOrNull(s['lFg']),
     lyricUpperCase: typeof s['lUpper'] === 'boolean' ? s['lUpper'] : false,
     lyricTextShadow: typeof s['tsOnL'] === 'boolean' ? s['tsOnL'] : null,
     backgroundImage:
@@ -456,7 +470,9 @@ export function serializeStageSettings(s: StageSettings): Record<string, unknown
     // null = não setado: chave AUSENTE no storage (05/10 Rafael — cor só
     // existe se o usuário escolher; parse trata ausente como null).
     ...(s.backgroundColor ? { bg: s.backgroundColor } : {}),
-    fg: s.textColor,
+    // Cores de texto null-first: chave AUSENTE = não setado (13/10 Rafael —
+    // cor só existe se o usuário escolher; parse trata ausente como null).
+    ...(s.textColor ? { fg: s.textColor } : {}),
     size: s.fontSize,
     weight: s.fontWeight,
     margin: s.margin,
@@ -468,18 +484,19 @@ export function serializeStageSettings(s: StageSettings): Record<string, unknown
     boxBorder: s.boxBorder,
     tAlign: s.textAlign,
     tVAlign: s.textVerticalAlign,
-    refColor: s.footerRefColor,
+    ...(s.footerRefColor ? { refColor: s.footerRefColor } : {}),
     refWeight: s.footerRefWeight,
     showVer: s.showBibleVersion,
     bSize: s.bibleFontSize,
     bWeight: s.bibleFontWeight,
-    bFg: s.bibleTextColor,
+    ...(s.bibleTextColor ? { bFg: s.bibleTextColor } : {}),
     bTransform: s.bibleTextTransform,
     ...(s.titleFontSize != null ? { tSize: s.titleFontSize } : {}),
     ...(s.titleFontWeight != null ? { tWeight: s.titleFontWeight } : {}),
     ...(s.titleTextColor != null ? { tFg: s.titleTextColor } : {}),
     ...(s.titleUpperCase ? { tUpper: true } : {}),
     ...(s.titleTextShadow != null ? { tsOnT: s.titleTextShadow } : {}),
+    ...(s.titleTextBox ? { tBox: true } : {}),
     ...(s.lyricFontSize != null ? { lSize: s.lyricFontSize } : {}),
     ...(s.lyricFontWeight != null ? { lWeight: s.lyricFontWeight } : {}),
     ...(s.lyricTextColor != null ? { lFg: s.lyricTextColor } : {}),

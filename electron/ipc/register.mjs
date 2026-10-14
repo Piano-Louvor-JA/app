@@ -214,6 +214,17 @@ export function registerWorkspaceIpc() {
     }
   })
 
+  // SÓ mídia externa (vídeo/pdf/ppt do web-projection). Popups de
+  // hinos/bíblia NÃO contam: a palco-bridge usa este handler — consultar o
+  // antigo com popup do hino aberto congelava a TV no 1º slide (13/10).
+  ipcMain.handle('projection:external-media-alive', () => {
+    try {
+      return Boolean(isExternalProjectionAlive())
+    } catch {
+      return false
+    }
+  })
+
   ipcMain.handle('projection:get-source-media-id', (event) => {
     try {
       return getSourceMediaIdFor(event.sender)
@@ -874,7 +885,13 @@ export function registerWorkspaceIpc() {
       return await downloadMediaFile(url, mediaType, filename)
     } catch (error) {
       console.error('[ipc] media:download', error)
-      return false
+      return {
+        ok: false,
+        url: String(url ?? ''),
+        status: typeof error?.status === 'number' ? error.status : null,
+        bytes: typeof error?.bytes === 'number' ? error.bytes : 0,
+        error: error instanceof Error ? error.message : String(error ?? 'media download failed'),
+      }
     }
   })
 

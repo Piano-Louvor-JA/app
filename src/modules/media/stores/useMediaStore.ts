@@ -246,6 +246,8 @@ export const useMediaStore = defineStore('media', () => {
         resolvedSlideImageUrl.value ??
         (slide.imageUrl ? resolveRemoteFileUrl(slide.imageUrl) : null),
       imagePosition: slide.imagePosition,
+      // Frame PDF/PPT (frame-slide): data:image/ direto, sem véu (paridade receiver).
+      frameDataUrl: slide.frameDataUrl ?? null,
       isCover: slide.isCover,
       slideIndex: slideIndex.value,
       slideCount: session.value.slides.length,

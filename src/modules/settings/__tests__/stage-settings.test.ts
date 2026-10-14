@@ -14,13 +14,14 @@ describe('stage-settings (paridade APK)', () => {
     // 05/10 Rafael: backgroundColor default é NULL (não setado) — cor só
     // existe se o usuário escolher; sem escolha, a imagem da projeção vence.
     expect(DEFAULT_STAGE_SETTINGS.backgroundColor).toBeNull()
-    expect(DEFAULT_STAGE_SETTINGS.textColor).toBe('#FFFFFF')
+    // 13/10 Rafael: cores de TEXTO também null-first (mesmo contrato do bg).
+    expect(DEFAULT_STAGE_SETTINGS.textColor).toBeNull()
     expect(DEFAULT_STAGE_SETTINGS.fontSize).toBe(96)
     expect(DEFAULT_STAGE_SETTINGS.shadowBlur).toBeCloseTo(2.2)
     expect(DEFAULT_STAGE_SETTINGS.shadowIntensity).toBeCloseTo(0.8)
     expect(DEFAULT_STAGE_SETTINGS.textBox).toBe(true)
     expect(DEFAULT_STAGE_SETTINGS.boxOpacity).toBeCloseTo(0.45)
-    expect(DEFAULT_STAGE_SETTINGS.footerRefColor).toBe('#FCCE02')
+    expect(DEFAULT_STAGE_SETTINGS.footerRefColor).toBeNull()
     expect(DEFAULT_STAGE_SETTINGS.bibleFontSize).toBe(84)
     expect(DEFAULT_STAGE_SETTINGS.textAlign).toBe('center')
     expect(DEFAULT_STAGE_SETTINGS.textVerticalAlign).toBe('middle')

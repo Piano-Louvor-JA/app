@@ -6,6 +6,7 @@
  * (minimize/maximize/close), estado maximized, plataforma mac, sync da
  * CSS var --app-titlebar-height e cleanup no unmount.
  */
+import { createI18n } from 'vue-i18n'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter, type Router } from 'vue-router'
@@ -13,6 +14,9 @@ import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 vi.mock('@assets/brand/logo-louvor-ja.svg', () => ({ default: 'logo.svg' }))
 
 import AppTitlebar from '@layouts/AppTitlebar.vue'
+
+const i18n = createI18n({ legacy: false, messages: {} })
+
 
 type WindowControl = (action: string) => Promise<unknown>
 
@@ -60,7 +64,7 @@ afterEach(() => {
 function mountBar() {
   return mount(AppTitlebar, {
     global: {
-      plugins: [router],
+      plugins: [router, i18n],
       stubs: { DownloadQueueIndicator: true },
     },
   })
@@ -93,7 +97,7 @@ describe('AppTitlebar', () => {
     await routerProj.push('/popup')
     await routerProj.isReady()
     setBridge(makeBridge())
-    const w = mount(AppTitlebar, { global: { plugins: [routerProj] } })
+    const w = mount(AppTitlebar, { global: { plugins: [routerProj, i18n] } })
     await flushPromises()
     expect(w.find('.app-titlebar').exists()).toBe(false)
     w.unmount()

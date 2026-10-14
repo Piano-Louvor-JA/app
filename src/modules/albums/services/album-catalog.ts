@@ -1,5 +1,11 @@
 import hymnalCover from '@assets/library/hymnal.jpeg'
 import hymnal1996Cover from '@assets/library/hymnal_1996.jpeg'
+/** Capa do hinário por idioma. ES aguarda asset próprio (hymnal_es.jpeg) —
+ *  enquanto não existe, cai na capa PT (histeresis visual, não erro). */
+const hymnalCovers: Record<string, string> = {
+  pt: hymnalCover,
+}
+
 import { fetchRemoteCatalogJson } from '@shared/services/remote-catalog'
 import { readCatalogRecord } from '@shared/services/workspace-api'
 import { getCurrentApiPrefix } from '@modules/sync/services/library-catalog'
@@ -46,6 +52,23 @@ async function readOrFetchCatalog<T>(filename: string): Promise<T | null> {
   }
 }
 
+/** Coletâneas por álbum: mais recente primeiro (id_album DESC — 2026 → 1996). */
+export function sortCollectionsRecentFirst(
+  collections: AlbumCollection[],
+): AlbumCollection[] {
+  return [...collections].sort((a, b) => {
+    const idA = Number(a.id)
+    const idB = Number(b.id)
+    const numA = Number.isFinite(idA) ? idA : null
+    const numB = Number.isFinite(idB) ? idB : null
+    // Ids não numéricos (custom) caem no fim, alfabético entre si.
+    if (numA == null && numB == null) return a.name.localeCompare(b.name)
+    if (numA == null) return 1
+    if (numB == null) return -1
+    return numB - numA
+  })
+}
+
 async function buildHymnalCollections(): Promise<AlbumCollection[]> {
   const collections: AlbumCollection[] = []
   const langPrefix = getCurrentApiPrefix()
@@ -57,7 +80,7 @@ async function buildHymnalCollections(): Promise<AlbumCollection[]> {
       kind: 'hymnal',
       name: 'Hinário Adventista',
       subtitle: '',
-      coverUrl: hymnalCover,
+      coverUrl: hymnalCovers[langPrefix] ?? hymnalCover,
       trackCount: hymnal.length,
       catalogKey: `${langPrefix}_hymnal`,
     })
@@ -155,11 +178,12 @@ export async function loadAlbumCategories(): Promise<AlbumCategory[]> {
     }
 
     if (collections.length > 0) {
+      // Coletâneas por ano: mais recente primeiro (2026 → 2003/1996).
       result.push({
         id: category.id_category ?? category.name ?? collections[0]!.id,
         name: String(category.name ?? '').trim() || 'Coletâneas',
         slug: category.slug,
-        collections,
+        collections: sortCollectionsRecentFirst(collections),
       })
     }
   }

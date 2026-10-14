@@ -159,6 +159,7 @@ export function exportLouvorjaFromBrowser(
 		};
 	}
 
+	// Rotações agendadas (#414 P3).
 	const scheduled = getUserPreference<ScheduledState>(
 		USER_PREFERENCE_KEYS.scheduledState,
 		null,

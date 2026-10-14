@@ -7,12 +7,50 @@
  *   quando há DSN; falha de carga = telemetria silenciosamente desligada.
  */
 
+import { RendererErrorBuffer } from './renderer-error-buffer'
+
 type CaptureFn = (err: unknown, ctx?: Record<string, unknown>) => void;
+
+type ConsoleError = typeof console.error
 
 let captureError: CaptureFn | null = null;
 let started = false;
+let rendererErrorsStarted = false;
+const rendererErrors = new RendererErrorBuffer()
+
+function reportRendererErrors(): void {
+  try { window.louvorja?.diagnostics?.reportRendererErrors?.(rendererErrors.snapshot()) } catch { /* best effort */ }
+}
+
+function errorDetails(value: unknown): { message: string; stack: string | null } {
+  if (value instanceof Error) return { message: value.message, stack: value.stack ?? null }
+  try { return { message: String(value ?? ''), stack: null } } catch { return { message: '[unserializable]', stack: null } }
+}
+
+export function startRendererErrorBuffer(): void {
+  if (rendererErrorsStarted || typeof window === 'undefined') return
+  rendererErrorsStarted = true
+  const originalConsoleError: ConsoleError = console.error.bind(console)
+  console.error = (...args: unknown[]) => {
+    const details = errorDetails(args[0])
+    rendererErrors.add({ kind: 'console.error', message: details.message, stack: details.stack, url: window.location.href })
+    reportRendererErrors()
+    originalConsoleError(...args)
+  }
+  window.addEventListener('error', (event) => {
+    rendererErrors.add({ kind: 'onerror', message: event.message, stack: event.error?.stack, url: event.filename })
+    reportRendererErrors()
+  })
+  window.addEventListener('unhandledrejection', (event) => {
+    const details = errorDetails(event.reason)
+    rendererErrors.add({ kind: 'unhandledrejection', message: details.message, stack: details.stack, url: window.location.href })
+    reportRendererErrors()
+  })
+  reportRendererErrors()
+}
 
 export async function startRendererTelemetry(): Promise<void> {
+  startRendererErrorBuffer()
   if (started) return;
   const dsn = import.meta.env.VITE_TELEMETRIA_DSN as string | undefined;
   if (!dsn) return;

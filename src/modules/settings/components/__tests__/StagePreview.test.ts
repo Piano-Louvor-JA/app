@@ -96,9 +96,10 @@ describe('StagePreview', () => {
   it('boxStyle: caixinha com opacity e borda quando textBox ativo', () => {
     const wrapper = createWrapper({ settings: { ...base, textBox: true, boxOpacity: 0.45, boxBorder: true } })
     const style = wrapper.find('.stage-preview__box').attributes('style')
-    expect(style).toContain('rgba(0, 0, 0, 0.45)')
-    expect(style).toContain('1px solid rgba(255, 255, 255, 0.25)')
+    expect(style).toContain('rgba(24, 24, 24, 0.45)')
+    expect(style).toContain('rgba(255, 255, 255, 0.85)')
     expect(style).toContain('1.4cqw 0 1.4cqw 0')
+    expect(style).toContain('blur(16px)')
   })
 
   it('boxStyle: textBox false → style vazio', () => {

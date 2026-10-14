@@ -88,6 +88,7 @@ vi.mock("@modules/media/services/open-music-player", () => ({
 
 vi.mock("@shared/services/track-media", () => ({
   invalidateTrackMediaCache: vi.fn(),
+  onTrackMediaChanged: vi.fn(),
   peekTrackDownloadCache: vi.fn(() => null),
 }));
 

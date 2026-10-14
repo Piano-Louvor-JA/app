@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const { handlers } = vi.hoisted(() => ({ handlers: new Map() }))
-vi.mock('electron', () => ({ app: { getVersion: () => '1.30.0' }, ipcMain: { handle: (name, handler) => handlers.set(name, handler) }, session: {}, shell: {}, screen: {} }))
+vi.mock('electron', () => ({ app: { getVersion: () => '1.30.0' }, ipcMain: { handle: (name, handler) => handlers.set(name, handler), on: () => {} }, session: {}, shell: {}, screen: {} }))
 import { registerDiagnosticsIpc } from '../diagnostics.mjs'
 const report = { meta: { campanha: 'teste', versao: '1.30.0' }, triage: { discoLivreMb: 100 } }
 beforeEach(() => {

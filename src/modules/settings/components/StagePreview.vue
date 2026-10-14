@@ -43,7 +43,7 @@ const textStyle = computed(() => {
   const s = props.settings
   const isBible = props.module === 'bible'
   return {
-    color: isBible ? s.bibleTextColor : s.textColor,
+    color: (isBible ? s.bibleTextColor : s.textColor) ?? undefined,
     // 96px @1920 → 5% da largura do preview (font-size em cqw)
     fontSize: `${((isBible ? s.bibleFontSize : s.fontSize) / 1920) * 100}cqw`,
     fontWeight: String(isBible ? s.bibleFontWeight : s.fontWeight),
@@ -61,15 +61,17 @@ const boxStyle = computed(() => {
   const s = props.settings
   if (!s.textBox) return {}
   return {
-    backgroundColor: `rgba(0,0,0,${s.boxOpacity})`,
-    border: s.boxBorder ? '1px solid rgba(255,255,255,0.25)' : 'none',
+    backgroundColor: `rgba(24,24,24,${s.boxOpacity})`,
+    border: s.boxBorder ? 'clamp(2px, 0.2vmin, 4px) solid rgba(255,255,255,0.85)' : 'none',
     // Padrão folha característico do design (como o media-projection)
     borderRadius: '1.4cqw 0 1.4cqw 0',
+    backdropFilter: 'blur(16px)',
+    '-webkit-backdrop-filter': 'blur(16px)',
   }
 })
 
 const footerStyle = computed(() => ({
-  color: props.settings.footerRefColor,
+  color: props.settings.footerRefColor ?? undefined,
   fontWeight: String(props.settings.footerRefWeight),
 }))
 </script>

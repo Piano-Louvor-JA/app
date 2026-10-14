@@ -147,21 +147,15 @@ async function onImportSljaFile(event: Event): Promise<void> {
           slides: imported.slides,
         })
   } catch (error) {
-    if (run !== sljaRun.value) return
     sljaError.value = true
-    const code = error instanceof Error ? error.message : ''
-    const key =
-      code === 'SLJA_LOCAL_AUDIO_PERSIST_FAILED' ||
-      code === 'SLJA_LOCAL_LYRIC_PERSIST_FAILED'
-        ? 'liturgy.slja.importStorageFailed'
-        : code === 'SLJA_IMPORT_COLLECTION_FAILED' ||
-            code === 'SLJA_IMPORT_MUSIC_FAILED' ||
-            code === 'SLJA_IMPORT_LYRICS_INCOMPLETE'
-          ? 'liturgy.slja.importRemoteFailed'
-          : code === 'SLJA_IMPORT_NO_LYRICS'
-            ? 'liturgy.slja.importNoLyrics'
-            : 'liturgy.slja.importFailed'
-    sljaMessage.value = t(key)
+    // slja-storage: quota do localStorage NÃO é mais engolida — informa
+    // "armazenamento cheio" em vez de sucesso falso com dados perdidos.
+    const isQuota =
+      error instanceof DOMException &&
+      (error.name === 'QuotaExceededError' || error.name === 'QuotaExceeded')
+    sljaMessage.value = isQuota
+      ? t('liturgy.slja.importStorageFull')
+      : t('liturgy.slja.importFailed')
   } finally {
     if (run === sljaRun.value) sljaImporting.value = false
   }

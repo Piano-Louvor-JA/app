@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
-import { computed, onScopeDispose, ref } from 'vue'
 import { useScheduledStore } from './useScheduledStore'
+import { computed, onScopeDispose, ref } from 'vue'
 import type { Router } from 'vue-router'
 
 import { getDesktopBridge } from '@shared/services/desktop-bridge'
@@ -43,7 +43,6 @@ import {
   reconcileMusicItemTitles,
   reorderLiturgyItems,
 } from '../services/liturgy-item-helpers'
-import { enrichItemsDurations } from '../services/liturgy-duration-enrich'
 import {
   loadLiturgyState,
   saveLiturgyState,
@@ -51,7 +50,7 @@ import {
 } from '../services/liturgy-preferences'
 import { clearLiturgyWebRuntime } from '../services/liturgy-web-runtime'
 import { parseJaLiturgy } from '../services/liturgy-ja-import'
-import { resolveLegacyScheduledRotationId } from '../services/scheduled-resolver'
+import { enrichItemsDurations } from '../services/liturgy-duration-enrich'
 import {
   DEFAULT_LITURGY_ITEM_DRAFT,
   DEFAULT_MOMENT_DURATION_MS,
@@ -497,18 +496,6 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     return result
   }
 
-  function migrateLegacyScheduledPlaceholders(items: LiturgyItem[]): LiturgyItem[] {
-    const categories = useScheduledStore().categories
-    let changed = false
-    const migrated = items.map((item) => {
-      const scheduledRotationId = resolveLegacyScheduledRotationId(item, categories)
-      if (!scheduledRotationId) return item
-      changed = true
-      return { ...item, scheduledRotationId }
-    })
-    return changed ? migrated : items
-  }
-
   function persist() {
     saveLiturgyState({
       weekdays: weekdays.value,
@@ -542,27 +529,6 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     daySessionTimes.value = state.daySessionTimes
     customLiturgies.value = state.customLiturgies
     deletionLocks.value = state.deletionLocks
-
-    // Persistência anterior guardou a rotação em `categoryId`, que agora é
-    // exclusivamente a posição na liturgia. Migra só nomes inequivocamente iguais.
-    let migratedLegacyScheduled = false
-    const migratedWeekdays = { ...weekdays.value }
-    for (const day of LITURGY_WEEKDAYS) {
-      const items = migrateLegacyScheduledPlaceholders(migratedWeekdays[day])
-      if (items !== migratedWeekdays[day]) {
-        migratedWeekdays[day] = items
-        migratedLegacyScheduled = true
-      }
-    }
-    weekdays.value = migratedWeekdays
-    customLiturgies.value = customLiturgies.value.map((custom) => {
-      const items = migrateLegacyScheduledPlaceholders(custom.items)
-      if (items === custom.items) return custom
-      migratedLegacyScheduled = true
-      return { ...custom, items }
-    })
-    if (migratedLegacyScheduled) persist()
-
     selectedDay.value = todayWeekday()
     countdownRunning.value = false
 
@@ -606,55 +572,6 @@ export const useLiturgyStore = defineStore('liturgy', () => {
 
     hydrated.value = true
   }
-
-  /**
-   * Re-import sem F5 (t_8bdaf97b): o import `.louvorja` grava no storage direto
-   * (`louvorja-adapter.ts`); este handler recarrega o estado do disco e reconcilia
-   * com o catálogo de música, sem recarregar a janela.
-   */
-  async function reloadImportedState() {
-    const state = loadLiturgyState()
-    weekdays.value = state.weekdays
-    dayNotes.value = state.dayNotes
-    daySessionTimes.value = state.daySessionTimes
-    customLiturgies.value = state.customLiturgies
-    deletionLocks.value = state.deletionLocks
-    if (selectedItemIndex.value != null) selectedItemIndex.value = null
-
-    const music = musicList.value
-    if (music.length === 0) return
-    const nextWeekdays = { ...weekdays.value }
-    let changed = false
-    for (const day of Object.keys(nextWeekdays) as LiturgyWeekday[]) {
-      // t_14d066ea: duração da API para músicas zeradas (mesmo contrato do .ja).
-      const enriched = await enrichItemsDurations(nextWeekdays[day], music)
-      const reconciled = reconcileMusicItemTitles(enriched, music)
-      if (reconciled !== nextWeekdays[day]) {
-        nextWeekdays[day] = reconciled
-        changed = true
-      }
-    }
-    weekdays.value = nextWeekdays
-    const nextCustoms = await Promise.all(
-      customLiturgies.value.map(async (custom) => {
-        const enriched = await enrichItemsDurations(custom.items, music)
-        const reconciled = reconcileMusicItemTitles(enriched, music)
-        if (reconciled === custom.items) return custom
-        changed = true
-        return { ...custom, items: reconciled }
-      }),
-    )
-    customLiturgies.value = nextCustoms
-    if (changed) persist()
-  }
-
-  const onLiturgyImported = () => {
-    void reloadImportedState()
-  }
-  window.addEventListener('liturgy:imported', onLiturgyImported)
-  onScopeDispose(() => {
-    window.removeEventListener('liturgy:imported', onLiturgyImported)
-  })
 
   function selectDay(day: LiturgyDayKey) {
     selectedDay.value = day
@@ -1029,7 +946,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     const item = markItemStarted(index)
     if (!item) return
 
-    const result = await executeLiturgyItem(item, router, { day: selectedDay.value })
+    const result = await executeLiturgyItem(item, router)
     if (item.type === 'site') {
       siteProjectionItemId.value = null
     } else if (
@@ -1336,6 +1253,56 @@ export const useLiturgyStore = defineStore('liturgy', () => {
   async function refreshMusicCatalog() {
     musicList.value = await loadLiturgyMusicOptions()
   }
+
+  /**
+   * Re-import sem F5 (app#412): o import `.louvorja` grava no storage direto
+   * (`louvorja-adapter.ts`); este handler recarrega o estado do disco e reconcilia
+   * com o catálogo de música, sem recarregar a janela.
+   */
+  async function reloadImportedState() {
+    const state = loadLiturgyState()
+    weekdays.value = state.weekdays
+    dayNotes.value = state.dayNotes
+    daySessionTimes.value = state.daySessionTimes
+    customLiturgies.value = state.customLiturgies
+    deletionLocks.value = state.deletionLocks
+    if (selectedItemIndex.value != null) selectedItemIndex.value = null
+
+    const music = musicList.value
+    if (music.length === 0) return
+
+    const nextWeekdays = { ...weekdays.value }
+    let changed = false
+    for (const day of Object.keys(nextWeekdays) as LiturgyWeekday[]) {
+      const enriched = await enrichItemsDurations(nextWeekdays[day], music)
+      const reconciled = reconcileMusicItemTitles(enriched, music)
+      if (reconciled !== nextWeekdays[day]) {
+        nextWeekdays[day] = reconciled
+        changed = true
+      }
+    }
+    weekdays.value = nextWeekdays
+
+    customLiturgies.value = await Promise.all(
+      customLiturgies.value.map(async (custom) => {
+        const enriched = await enrichItemsDurations(custom.items, music)
+        const reconciled = reconcileMusicItemTitles(enriched, music)
+        if (reconciled === custom.items) return custom
+        changed = true
+        return { ...custom, items: reconciled }
+      }),
+    )
+
+    if (changed) persist()
+  }
+
+  const onLiturgyImported = () => {
+    void reloadImportedState()
+  }
+  window.addEventListener('liturgy:imported', onLiturgyImported)
+  onScopeDispose(() => {
+    window.removeEventListener('liturgy:imported', onLiturgyImported)
+  })
 
   function onMusicPick(musicId: number) {
     const music = musicList.value.find((entry) => entry.id === musicId)

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createI18n } from 'vue-i18n'
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, vi } from "vitest";
 import { createMemoryHistory, createRouter } from "vue-router";
@@ -35,6 +36,9 @@ vi.mock("@assets/brand/logo-louvor-ja.svg", () => ({ default: "logo.svg" }));
 
 import AppTitlebar from "../AppTitlebar.vue";
 
+const i18n = createI18n({ legacy: false, messages: {} })
+
+
 function makeRouter(name = "home", projection = false) {
   return createRouter({
     history: createMemoryHistory(),
@@ -52,7 +56,7 @@ async function mountBar(route: { name?: string; projection?: boolean } = {}) {
   await router.isReady();
   const wrapper = mount(AppTitlebar, {
     global: {
-      plugins: [router],
+      plugins: [router, i18n],
       stubs: { teleport: true, DownloadQueueIndicator: true },
     },
   });

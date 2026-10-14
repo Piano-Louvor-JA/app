@@ -117,8 +117,8 @@ describe('TimerPreview.vue', () => {
     setSize(w, 400, 300)
     await nextTick()
     const style = w.find('.timer-preview__digital').attributes('style') ?? ''
-    expect(style).toContain('rgba(0, 0, 0, 0.6)')
-    expect(style).toContain('border: 1px solid')
+    expect(style).toContain('rgba(24, 24, 24, 0.6)')
+    expect(style).toContain('rgba(255, 255, 255, 0.85)')
     w.unmount()
   })
 

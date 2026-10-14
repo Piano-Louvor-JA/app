@@ -145,8 +145,16 @@ export type BackupApi = {
   onProgress: (callback: (progress: BackupProgress) => void) => () => void
 }
 
+export type MediaDownloadFailure = {
+  ok: false
+  url: string
+  status: number | null
+  bytes: number
+  error: string
+}
+
 export type MediaApi = {
-  download: (url: string, mediaType: MediaFolderType, filename: string) => Promise<boolean>
+  download: (url: string, mediaType: MediaFolderType, filename: string) => Promise<boolean | MediaDownloadFailure>
   check: (mediaType: MediaFolderType, filename: string) => Promise<string | false>
   /** Checagem em lote no main process (um IPC). */
   checkMany?: (
@@ -174,8 +182,14 @@ export type RemotePairingInfo = {
   qrDataUrl: string
   speakerUrl?: string
   speakerQrDataUrl?: string
+  operatorUrl?: string
+  operatorQrDataUrl?: string
   clientCount: number
   clientAddress?: string | null
+  /** Identidade do APK/controle remoto conectado (painel esquerdo). */
+  remoteAddress?: string | null
+  /** Identidade do pregador conectado (painel direito). */
+  speakerAddress?: string | null
 }
 
 export type RemoteApi = {
@@ -185,7 +199,12 @@ export type RemoteApi = {
   sendState: (state: Record<string, unknown>) => void
   pairingInfo: () => Promise<RemotePairingInfo>
   onClients?: (
-    callback: (payload: { count: number; address?: string | null }) => void,
+    callback: (payload: {
+      count: number
+      address?: string | null
+      remoteAddress?: string | null
+      speakerAddress?: string | null
+    }) => void,
   ) => () => void
 }
 
@@ -335,6 +354,8 @@ export type ProjectionApi = {
   closeUrl: () => Promise<boolean>
   /** Há projeção externa (video/pdf/ppt/site) com janela viva no main? */
   externalAlive: () => Promise<boolean>
+  /** SÓ mídia externa de verdade (vídeo/pdf/ppt do web-projection) — sem popups. */
+  externalMediaAlive: () => Promise<boolean>
   getSourceMediaId?: () => Promise<string | null>
   publishPlaybackSync?: (payload: PlaybackSyncPayload) => void
   onPlaybackSync?: (callback: (payload: PlaybackSyncPayload) => void) => () => void
@@ -377,6 +398,7 @@ export type ProjectionApi = {
     total: number
     projecting?: boolean
   } | null>
+  captureSourceFrame?: () => Promise<string | null>
   getSiteTargetMonitors?: () => Promise<number[]>
   setSiteTargetMonitors?: (ids: number[]) => Promise<boolean>
   getVideoTargetMonitors?: () => Promise<number[]>
@@ -428,6 +450,8 @@ export type DiagnosticsApi = {
   run: () => Promise<{ report: unknown; jsonPath: string; txtPath: string }>
   send: (report: unknown) => Promise<{ ok: boolean; reason?: string }>
   openFolder: (filePath: string) => Promise<void>
+  reportRendererErrors?: (errors: unknown) => void
+  reportDownloadFailures?: (failures: unknown) => void
 }
 
 export type LouvorJaBridge = {

@@ -12,6 +12,7 @@ node_modules
 dist
 dist-ssr
 dist-electron/
+build/diagnostics-dsn.txt
 coverage
 *.local
 
@@ -60,3 +61,4 @@ dist-windows/
 reports/mutation/
 .stryker-tmp/
 voidbr/
+.worktrees/
