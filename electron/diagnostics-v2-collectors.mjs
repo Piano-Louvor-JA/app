@@ -255,7 +255,12 @@ export function collectLogs(userDataDir, maskTokenValue) {
 function sanitizeLog(text, token) {
   let out = text
   if (token && token.length > 8) out = out.replaceAll(token, '***MASKED***')
-  out = out.replace(/(Api-Token["\s:=]+)([A-Za-z0-9._-]{8,})/gi, '$1***MASKED***')
-  out = out.replace(/(Bearer\s+)([A-Za-z0-9._-]{8,})/gi, '$1***MASKED***')
+  out = out
+    .replace(/(Api-Token["\s:=]+)([^\s,;]+)/gi, '$1***MASKED***')
+    .replace(/(Bearer\s+)([^\s,;]+)/gi, '$1***MASKED***')
+    .replace(/(authorization\s*[:=]\s*)([^\s,;]+)/gi, '$1***MASKED***')
+    .replace(/(dsn\s*[:=]\s*)([^\s,;]+)/gi, '$1***MASKED***')
+    .replace(/\bhttps?:\/\/([^\s/@]+@)?([^\s?#]+)(?:\?[^\s#]*)?(?:#[^\s]*)?/gi, 'https://$2')
+    .replace(/([?&#](?:token|access_token|api[_-]?key|key|secret|password|authorization|cookie)=)[^&#\s]+/gi, '$1***MASKED***')
   return out
 }
