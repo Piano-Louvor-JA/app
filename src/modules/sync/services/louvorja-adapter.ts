@@ -18,12 +18,12 @@ import {
 	type LiturgyPersistedState,
 	type LiturgyWeekday,
 } from "@modules/liturgy/types/liturgy";
+import { deriveSessionTimesFromCategories } from "@modules/liturgy/services/liturgy-duration-enrich";
 import type {
 	ScheduledCategory,
 	ScheduledItem,
 } from "@modules/liturgy/stores/useScheduledStore";
 import { USER_PREFERENCE_KEYS } from "@shared/constants/storage-keys";
-import { deriveSessionTimesFromCategories } from "@modules/liturgy/services/liturgy-duration-enrich";
 import {
 	getUserPreference,
 	setUserPreference,
@@ -46,6 +46,8 @@ import {
 	parseMediaCustomCatalogData,
 	preserveLocalAudio,
 } from "./louvorja-entities";
+
+import { backupMediaCustomCatalog } from './media-custom-backup';
 
 /** Mesmo prefixo do APK (`sync_timestamps.dart`). */
 export const SYNC_MODIFIED_PREFIX = "sync.modified.v1";
@@ -142,7 +144,7 @@ export function exportLouvorjaFromBrowser(
 	if (customDb.collections.length > 0 || customDb.musics.length > 0) {
 		entities[MEDIA_CUSTOM_CATALOG_ENTITY] = {
 			type: MEDIA_CUSTOM_CATALOG_ENTITY,
-			modified: readModified(MEDIA_CUSTOM_CATALOG_ENTITY),
+			modified: readModified(MEDIA_CUSTOM_CATALOG_ENTITY) || new Date().toISOString(),
 			data: { db: customDb },
 		};
 	}
@@ -152,7 +154,7 @@ export function exportLouvorjaFromBrowser(
 	if (Object.keys(prefData).length > 0) {
 		entities[PREFERENCES_ENTITY] = {
 			type: PREFERENCES_ENTITY,
-			modified: readModified(PREFERENCES_ENTITY),
+			modified: readModified(PREFERENCES_ENTITY) || new Date().toISOString(),
 			data: prefData,
 		};
 	}
@@ -181,6 +183,7 @@ export function exportLouvorjaFromBrowser(
 
 export function importLouvorjaIntoBrowser(
 	pkg: LouvorjaSyncPackage,
+	options: { catalogReplacementConfirmed?: boolean } = {},
 ): LouvorjaImportResult {
 	const applied: string[] = [];
 	const skipped: string[] = [];
@@ -253,6 +256,11 @@ export function importLouvorjaIntoBrowser(
 						skipped.push(MEDIA_CUSTOM_CATALOG_ENTITY);
 						break;
 					}
+					if (!options.catalogReplacementConfirmed) {
+						skipped.push(MEDIA_CUSTOM_CATALOG_ENTITY);
+						break;
+					}
+					backupMediaCustomCatalog();
 					// Substituição total SÓ desta entidade (offline-first:
 					// liturgia/preferências não são tocados; áudio local existente
 					// com o mesmo id é preservado).

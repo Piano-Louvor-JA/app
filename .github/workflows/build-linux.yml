@@ -44,7 +44,7 @@ jobs:
           sha256sum LouvorJA-PIANO-Linux-x64-portable.zip
 
       - name: Upload AppImage + portable + updater metadata (artifact backup)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: LouvorJA-PIANO-Linux-x64
           path: |

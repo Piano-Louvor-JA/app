@@ -2570,6 +2570,10 @@ function renderProjectionText(target, value){
   for(const child of Array.from(parsed.body.childNodes))copy(child,target);
 }
 
+function projectionColor(value){
+  const match=/^\s*(#[0-9a-fA-F]{3,8}|rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*(?:,\s*(?:0|1|0?\.\d+)\s*)?\)|hsla?\(\s*\d{1,3}\s*,\s*\d{1,3}%\s*,\s*\d{1,3}%\s*(?:,\s*(?:0|1|0?\.\d+)\s*)?\)|[a-zA-Z]{1,20})\s*$/.exec(String(value||''));
+  return match?match[1]:'';
+}
 function proxyUrl(original){
   if(!original)return original;
   // Sender/popup legado pode mandar barra codificada (%2F) — decodifica
@@ -3204,25 +3208,21 @@ function handle(m){
       // Estrofes (lyric*) vencem quando presentes; capa (isCover) mantém o
       // tamanho do título.
       {const t=$('text');
-        const fs=typeof m.lyricFontSize==='number'?m.lyricFontSize:m.fontSize;
+        // Estrofes (lyric*) vencem fora da capa; a capa mantém o estilo geral.
+        const useLyric=m.isCover!==true;
+        const fs=useLyric&&typeof m.lyricFontSize==='number'?m.lyricFontSize:m.fontSize;
+        const fw=useLyric&&typeof m.lyricFontWeight==='number'?m.lyricFontWeight:m.fontWeight;
         // fontSize chega px@1080 (sender converte px@1920→1080). Paridade
         // com web (cqw = px@1920/19.2vw): voltar a px@1920 (*16/9) → /19.2.
-        // Antes /19.2 direto = fonte 56% menor que a projeção (14/10).
         if(typeof fs==='number')t.style.setProperty('--fit-size',(fs*16/9/19.2)+'vw');
-        if(typeof m.fontWeight==='number')
-          t.style.fontWeight=m.fontWeight;
-        // Capa (isCover): o AMARELO do .cover-on (CSS) é o visual do título.
-        // inline style.color (no #text OU no <span> interno vindo do sender)
-        // venceria a classe — capa remove cor inline de ambos os níveis
-        // (05/10: capa nascia branca).
+        if(typeof fw==='number')t.style.fontWeight=fw;
         if(m.isCover===true){
           t.style.removeProperty('color');
           t.querySelectorAll('span[style*="color"]').forEach(function(sp){sp.style.removeProperty('color')});
+        } else {
+          const rawColor=useLyric&&typeof m.lyricTextColor==='string'&&m.lyricTextColor?m.lyricTextColor:m.textColor;
+          if(rawColor){var nextText=projectionColor(rawColor);if(nextText)t.style.color=nextText}
         }
-        else if(m.textColor){t.style.color=m.textColor}
-        // SOLUÇÃO EZEQUIAS (web 3dc37df, 05/10): sem fit JS p/ letra. pre-line
-        // quebra onde o autor mandou (\n) e flui até a max-width antes de
-        // quebrar de novo — fonte configurada aplicada direta.
         // Auto-fit: reduz a fonte até o texto caber na altura útil (76vh) —
         // mesma passagem de linhas do popup (frase em 2 linhas lá, 2 aqui).
         t.style.transform='translate(-50%,-50%)';
@@ -3259,7 +3259,7 @@ function handle(m){
           else if(v==='top'){t.style.top=padV; t.style.transform='translate(-50%,0)'}
           else{t.style.transform='translate(-50%,-50%)'}
         })();
-        requestAnimationFrame(function(){
+        if(m.footerRef) requestAnimationFrame(function(){
           // WT-5f paridade popup: auto-fit mede scrollHeight vs área útil
           // (86% do palco) e reduz até caber — MESMO algoritmo do popup
           // (applyFit/fitScale), não só altura total em 76vh.
@@ -3283,6 +3283,11 @@ function handle(m){
             f.style.bottom='auto';
           }
         });
+        if(!m.footerRef){
+          t.style.fontSize='';
+          if(typeof fs==='number')t.style.setProperty('--fit-size',(fs*16/9/19.2)+'vw');
+          if(m.isCover===true){t.style.removeProperty('color');t.querySelectorAll('span[style*="color"]').forEach(function(sp){sp.style.removeProperty('color')})}
+        }
       }
       // Paridade total: personalizações do app aplicadas na TV.
 

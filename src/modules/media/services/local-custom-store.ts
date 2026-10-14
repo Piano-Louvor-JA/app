@@ -108,6 +108,9 @@ export function replaceLocalDb(next: LocalDb): boolean {
 function saveDb(db: LocalDb): boolean {
 	try {
 		localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+		try {
+			localStorage.setItem("sync.modified.v1.mediaCustomCatalog", new Date().toISOString());
+		} catch { /* O catálogo já foi persistido; falta de espaço no timestamp não o invalida. */ }
 		return true;
 	} catch {
 		return false;

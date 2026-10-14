@@ -107,10 +107,12 @@ const defaultProps = {
 
 function createWrapper(props = {}) {
   const { attachTo, ...rest } = props as Record<string, unknown>
+  const pinia = createPinia()
+  setActivePinia(pinia)
   return mount(LiturgyItemDialog, {
     props: { ...defaultProps, ...rest },
     attachTo: attachTo as HTMLElement | undefined,
-    global: { plugins: [i18n] },
+    global: { plugins: [i18n, pinia] },
   })
 }
 

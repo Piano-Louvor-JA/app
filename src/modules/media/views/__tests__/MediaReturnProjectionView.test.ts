@@ -39,6 +39,7 @@ vi.mock('../../../settings/services/stage-settings-runtime', () => ({
   subscribeStageSettings: stageSettings.subscribe,
 }))
 vi.mock('../../../settings/types/stage-settings', () => ({
+  stageBgCss: (color: string | null) => color ?? 'transparent',
   resolveBackgroundImage: (bg: unknown) => (bg ? String(bg) : null),
   stageBgCss: (c: unknown) => (c ? String(c) : 'transparent'),
 }))

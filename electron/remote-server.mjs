@@ -62,10 +62,16 @@ export function getRemoteStatus() {
 /**
  * @param {any} wss WebSocketServer (ou fake)
  * @param {any} contents BrowserWindow.webContents (ou fake)
- * @param {{ token?: string }} [opts] token fixo p/ testes (default: random)
+ * @param {{ token?: string, speakerToken?: string }} [opts] tokens fixos p/ testes (default: random)
  */
 export async function startRemoteServer(wss, contents, opts = {}) {
   const token = opts.token ?? randomBytes(4).toString('hex').toUpperCase()
+  // Token próprio do pregador: a URL/QR do pregador nunca leva o token
+  // completo, e o escopo é decidido pelo token, não pelo que o cliente declara.
+  let speakerToken = opts.speakerToken ?? randomBytes(4).toString('hex').toUpperCase()
+  while (speakerToken === token) {
+    speakerToken = randomBytes(4).toString('hex').toUpperCase()
+  }
   /** @type {Map<import('ws').WebSocket, {aliveAt: number, authed: boolean, timer: NodeJS.Timeout}>} */
   const clients = new Map()
 
@@ -153,7 +159,7 @@ export async function startRemoteServer(wss, contents, opts = {}) {
       switch (msg.type) {
         case 'hello': {
           // Browser do pregador só recebe navegação de slides.
-          if (msg.role === 'speaker' && msg.token === token) {
+          if (msg.role === 'speaker' && (msg.token === token || msg.token === speakerToken)) {
             // 1 pregador por desktop: 2º browser de pregador → busy.
             for (const [other, oEntry] of clients) {
               if (other === ws || !oEntry.speaker) continue
@@ -201,11 +207,13 @@ export async function startRemoteServer(wss, contents, opts = {}) {
             `[remote] RAW command ${action} id=${id} payload=${JSON.stringify(msg).slice(0, 300)}`,
           )
           if (typeof id !== 'string' || typeof action !== 'string') return
-          if (tok !== token) {
+          if (tok !== token && tok !== speakerToken) {
             send(ws, { v: 1, type: 'error', id, code: 'bad_token' })
             ws.close()
             return
           }
+          // Quem usa o token do pregador fica no escopo speaker nesta conexão.
+          if (tok === speakerToken) entry.speaker = true
           entry.authed = true
           if (entry.speaker && !SPEAKER_ALLOWED.has(action)) {
             send(ws, { v: 1, type: 'error', id, code: 'forbidden' })
@@ -298,7 +306,7 @@ export async function startRemoteServer(wss, contents, opts = {}) {
   // Pairing: renderer pergunta host+token+QR (Configurações > Controle Remoto)
   const host = lanIp()
   const connectUrl = `louvorja://connect?host=${host}:${activePort}&token=${token}`
-  const speakerUrl = `http://${host}:7080/speaker?remotePort=${activePort}&palcoPort=7081&token=${token}`
+  const speakerUrl = `http://${host}:7080/speaker?remotePort=${activePort}&palcoPort=7081&token=${speakerToken}`
   const qrDataUrl = await QRCode.toDataURL(connectUrl, { margin: 1, width: 220 })
   const speakerQrDataUrl = await QRCode.toDataURL(speakerUrl, { margin: 1, width: 220 })
   ipcMain.handle('remote:pairing-info', () => ({

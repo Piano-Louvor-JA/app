@@ -399,7 +399,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
       if (mode === 'overwrite') {
         /* v8 ignore next 1 -- enrichJaDurations normaliza dia ausente pra []; ?? inalcançável */
         weekdays.value = { ...weekdays.value, [weekday]: [...(items ?? [])] }
-        /* v8 ignore next 1 -- idem: items sempre array */ 
+        /* v8 ignore next 1 -- idem: items sempre array */
         added += items?.length ?? 0
         days.push(day)
         continue

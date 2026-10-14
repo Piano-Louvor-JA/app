@@ -522,16 +522,7 @@ function onRotationChange(event: Event) {
   patch({ scheduledRotationId: value || null })
 }
 
-const {
-  globalPlayer,
-  playerOptions,
-  loadPlayerChoices,
-  selectedPlayerId: resolvePlayerId,
-  storedPlayerId,
-} = useExternalPlayerChoices()
-
-const selectedPlayerId = computed(() => resolvePlayerId(props.draft.playerId))
-
+const { loadPlayerChoices } = useExternalPlayerChoices()
 watch(
   () => [props.open, props.draft.type] as const,
   ([open, type]) => {

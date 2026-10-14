@@ -279,6 +279,7 @@ export default {
       itemAdded: 'Item adicionado com sucesso.',
       liturgySaved: 'Liturgia salva com sucesso.',
       mediaDesktopOnly: 'Informe o caminho do arquivo de mídia.',
+      videoSelectFile: 'Selecionar arquivo',
       catalogEmpty: 'Nenhuma música no catálogo local. Importe um arquivo .slja na Central de Mídia (botão "Importar .slja") ou adicione músicas da Comunidade.',
       customRequired:
         'Crie ou selecione uma liturgia personalizada antes de adicionar itens.',

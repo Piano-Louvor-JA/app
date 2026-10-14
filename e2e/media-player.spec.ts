@@ -37,7 +37,7 @@ test.describe('Media player — persistência e retomada', () => {
   test('runtime persiste após reload da janela de projeção (offline-first)', async ({ page }) => {
     await page.addInitScript(EULA_AND_RUNTIME(runtimePayload({ lyric: 'Frase pós-reload' })))
     await page.route('**/api.louvorja.com.br/**', (route) => route.fulfill({ json: [] }))
-    await page.route('**/api.pianolouvorja.com.br/**', (route) => route.fulfill({ json: [] }))
+    await page.route('**/localhost:3100/**', (route) => route.fulfill({ json: [] }))
     await page.goto('/popup?module=media&layout=return', { waitUntil: 'commit' })
     await expect(page.locator('body')).toContainText('Frase pós-reload', { timeout: 20000 })
 
@@ -49,7 +49,7 @@ test.describe('Media player — persistência e retomada', () => {
   test('atualização via BroadcastChannel sobrevive ao reload', async ({ page }) => {
     await page.addInitScript(EULA_AND_RUNTIME(runtimePayload({ lyric: 'Inicial' })))
     await page.route('**/api.louvorja.com.br/**', (route) => route.fulfill({ json: [] }))
-    await page.route('**/api.pianolouvorja.com.br/**', (route) => route.fulfill({ json: [] }))
+    await page.route('**/localhost:3100/**', (route) => route.fulfill({ json: [] }))
     await page.goto('/popup?module=media&layout=return', { waitUntil: 'commit' })
     await expect(page.locator('body')).toContainText('Inicial', { timeout: 20000 })
 
@@ -72,7 +72,7 @@ test.describe('Media player — persistência e retomada', () => {
   test('isCover: projeção mostra a capa e não a letra', async ({ page }) => {
     await page.addInitScript(EULA_AND_RUNTIME(runtimePayload({ isCover: true, lyric: '', title: 'Título da Capa' })))
     await page.route('**/api.louvorja.com.br/**', (route) => route.fulfill({ json: [] }))
-    await page.route('**/api.pianolouvorja.com.br/**', (route) => route.fulfill({ json: [] }))
+    await page.route('**/localhost:3100/**', (route) => route.fulfill({ json: [] }))
     await page.goto('/popup?module=media&layout=return', { waitUntil: 'commit' })
     await expect(page.locator('.media-return')).toBeVisible({ timeout: 20000 })
     await expect(page.locator('body')).toContainText('Título da Capa', { timeout: 20000 })

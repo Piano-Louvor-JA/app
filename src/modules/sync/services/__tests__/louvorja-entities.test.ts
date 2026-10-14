@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@shared/services/user-preferences", () => ({
 	getUserPreference: vi.fn(),
@@ -59,7 +59,11 @@ function pkgWith(entities: Record<string, unknown>) {
 	);
 }
 
+afterEach(() => vi.useRealTimers());
+
 beforeEach(() => {
+ vi.useFakeTimers();
+ vi.setSystemTime(new Date(TS_OLDER));
 	vi.clearAllMocks();
 	localStorage.clear();
 	replaceLocalDb({
@@ -103,7 +107,7 @@ describe("entidade mediaCustomCatalog (desktop)", () => {
 					modified: TS_REMOTE,
 					data: { db: CUSTOM_DB },
 				},
-			}),
+			}), { catalogReplacementConfirmed: true },
 		);
 
 		expect(res.applied).toContain("mediaCustomCatalog");
@@ -129,7 +133,7 @@ describe("entidade mediaCustomCatalog (desktop)", () => {
 					modified: TS_REMOTE,
 					data: { db: remote },
 				},
-			}),
+			}), { catalogReplacementConfirmed: true },
 		);
 
 		expect(res.applied).toContain("mediaCustomCatalog");
@@ -149,7 +153,7 @@ describe("entidade mediaCustomCatalog (desktop)", () => {
 					modified: TS_OLDER,
 					data: { db: CUSTOM_DB },
 				},
-			}),
+			}), { catalogReplacementConfirmed: true },
 		);
 
 		expect(res.skipped).toContain("mediaCustomCatalog");
@@ -164,7 +168,7 @@ describe("entidade mediaCustomCatalog (desktop)", () => {
 					modified: TS_REMOTE,
 					data: { db: { foo: 1 } },
 				},
-			}),
+			}), { catalogReplacementConfirmed: true },
 		);
 		expect(res.skipped).toContain("mediaCustomCatalog");
 	});
@@ -198,7 +202,7 @@ describe("entidade preferences (desktop)", () => {
 						"stage.settings.evil": { x: 1 },
 					},
 				},
-			}),
+			}), { catalogReplacementConfirmed: true },
 		);
 
 		expect(res.applied).toContain("preferences");
@@ -217,7 +221,7 @@ describe("entidade preferences (desktop)", () => {
 					modified: TS_OLDER,
 					data: { "stage.settings.global": STAGE_PREF },
 				},
-			}),
+			}), { catalogReplacementConfirmed: true },
 		);
 
 		expect(res.skipped).toContain("preferences");
@@ -232,7 +236,7 @@ describe("entidade preferences (desktop)", () => {
 					modified: TS_REMOTE,
 					data: { unknown: true },
 				},
-			}),
+			}), { catalogReplacementConfirmed: true },
 		);
 		expect(res.skipped).toContain("preferences");
 	});
@@ -264,7 +268,7 @@ describe("round-trip desktop → desktop", () => {
 			musics: [],
 		});
 
-		const res = importLouvorjaIntoBrowser(decoded);
+		const res = importLouvorjaIntoBrowser(decoded, { catalogReplacementConfirmed: true });
 
 		expect(res.applied).toEqual(
 			expect.arrayContaining(["mediaCustomCatalog", "preferences"]),
@@ -279,8 +283,61 @@ describe("round-trip desktop → desktop", () => {
 		const res = importLouvorjaIntoBrowser(
 			pkgWith({
 				futureEntity: { type: "futureEntity", modified: TS_REMOTE, data: {} },
-			}),
+			}), { catalogReplacementConfirmed: true },
 		);
 		expect(res.applied).toHaveLength(0);
 	});
+});
+
+
+describe("regressões identificadas na preparação do PR429", () => {
+  it("round-trip real sem manipular timestamps aplica em outro aparelho vazio", () => {
+    replaceLocalDb(structuredClone(CUSTOM_DB));
+    const pkg = decodeLouvorjaPackage(encodeLouvorjaPackage(exportLouvorjaFromBrowser("test", "desktop")));
+    localStorage.clear();
+    const result = importLouvorjaIntoBrowser(pkg, { catalogReplacementConfirmed: true });
+    expect(result.applied).toContain("mediaCustomCatalog");
+    expect(loadLocalDb().musics).toHaveLength(1);
+  });
+
+  it("importação sem confirmação preserva o catálogo atual", () => {
+    const current = structuredClone(CUSTOM_DB);
+    current.musics.push({ ...structuredClone(current.musics[0]), id: -2, name: "Hino local que não está no pacote", audioBase64: "REVG" });
+    replaceLocalDb(current);
+    const incoming = structuredClone(CUSTOM_DB);
+    incoming.musics[0].audioBase64 = "";
+    const result = importLouvorjaIntoBrowser(pkgWith({ mediaCustomCatalog: { type: "mediaCustomCatalog", modified: TS_REMOTE, data: { db: incoming } } }));
+    expect(result.skipped).toContain("mediaCustomCatalog");
+    expect(loadLocalDb().musics.some(music => music.id === -2)).toBe(true);
+  });
+});
+
+import { MEDIA_CUSTOM_BACKUP_KEY, restoreMediaCustomCatalogBackup } from '../media-custom-backup';
+
+describe('substituição confirmada com backup', () => {
+ it('substitui e permite restaurar músicas ausentes e áudio depois de recarregar', () => {
+  const current = structuredClone(CUSTOM_DB);
+  current.musics.push({ ...structuredClone(current.musics[0]), id: -2, name: 'Somente local', audioBase64: 'REVG' });
+  replaceLocalDb(current);
+  const incoming = structuredClone(CUSTOM_DB);
+  incoming.musics[0].audioBase64 = null;
+  const result = importLouvorjaIntoBrowser(pkgWith({mediaCustomCatalog:{type:'mediaCustomCatalog',modified:TS_REMOTE,data:{db:incoming}}}), {catalogReplacementConfirmed:true});
+  expect(result.applied).toContain('mediaCustomCatalog');
+  expect(loadLocalDb().musics).toHaveLength(1);
+  expect(JSON.parse(localStorage.getItem(MEDIA_CUSTOM_BACKUP_KEY)!).db).toEqual(current);
+  expect(restoreMediaCustomCatalogBackup()).toBe(true);
+  expect(loadLocalDb()).toEqual(current);
+ });
+ it('falha no backup bloqueia qualquer alteração do catálogo', () => {
+  replaceLocalDb(structuredClone(CUSTOM_DB));
+  const original = Storage.prototype.setItem;
+  const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function(key, value) {
+   if(key === MEDIA_CUSTOM_BACKUP_KEY) throw new DOMException('Quota', 'QuotaExceededError');
+   original.call(this, key, value);
+  });
+  try {
+   expect(() => importLouvorjaIntoBrowser(pkgWith({mediaCustomCatalog:{type:'mediaCustomCatalog',modified:TS_REMOTE,data:{db:{...CUSTOM_DB,musics:[]}}}}), {catalogReplacementConfirmed:true})).toThrow();
+   expect(loadLocalDb()).toEqual(CUSTOM_DB);
+  } finally { spy.mockRestore(); }
+ });
 });

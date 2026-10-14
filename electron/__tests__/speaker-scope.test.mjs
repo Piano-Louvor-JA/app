@@ -30,6 +30,7 @@ const serverUrl = pathToFileURL(path.resolve(process.cwd(), 'electron/remote-ser
 const { SPEAKER_ALLOWED, startRemoteServer } = await import(serverUrl)
 
 const TOKEN = 'TESTTOKEN'
+const SPEAKER_TOKEN = 'SPEAKERTK'
 
 /** FakeWebSocket mínimo (superfície usada pelo servidor: readyState/OPEN/send/close/on). */
 function fakeWs() {
@@ -73,14 +74,14 @@ function fakeContents() {
 async function makeSpeakerServer() {
   const wss = fakeWss()
   const contents = fakeContents()
-  await startRemoteServer(wss, contents, { token: TOKEN })
+  await startRemoteServer(wss, contents, { token: TOKEN, speakerToken: SPEAKER_TOKEN })
   const connection = wss.handlers.connection
   expect(connection).toBeTruthy()
   const ws = fakeWs()
   connection(ws)
   const message = (msg) => ws.listeners.message(JSON.stringify(msg))
   // Handshake do pregador: hello marca o escopo speaker.
-  message({ v: 1, type: 'hello', role: 'speaker', token: TOKEN })
+  message({ v: 1, type: 'hello', role: 'speaker', token: SPEAKER_TOKEN })
   return { ws, message, contents }
 }
 
@@ -93,7 +94,7 @@ describe('escopo speaker — permissão mínima', () => {
     const { ws, message, contents } = await makeSpeakerServer()
     ws.sent.length = 0
     contents.sent.length = 0
-    message({ v: 1, type: 'command', id: 'c1', action: 'slide:next', token: TOKEN })
+    message({ v: 1, type: 'command', id: 'c1', action: 'slide:next', token: SPEAKER_TOKEN })
     const fwd = contents.sent.find((m) => m.channel === 'remote:command')
     expect(fwd?.payload?.action).toBe('slide:next')
     expect(ws.sent.find((m) => m.type === 'error')).toBeUndefined()
@@ -108,7 +109,7 @@ describe('escopo speaker — permissão mínima', () => {
       'player.setVolume', 'player.open', 'media.open', 'liturgy.next', 'bible.open',
     ]
     for (const [i, action] of denied.entries()) {
-      message({ v: 1, type: 'command', id: `f${i}`, action, token: TOKEN })
+      message({ v: 1, type: 'command', id: `f${i}`, action, token: SPEAKER_TOKEN })
     }
     const errors = ws.sent.filter((m) => m.type === 'error')
     expect(errors).toHaveLength(denied.length)
@@ -138,6 +139,39 @@ describe('escopo speaker — permissão mínima', () => {
     const fwd = contents.sent.find((m) => m.channel === 'remote:command')
     expect(fwd?.payload?.action).toBe('player.play')
     expect(ws.sent.find((m) => m.type === 'error')).toBeUndefined()
+  })
+
+  it('token do pregador sem hello de pregador: play → forbidden (escopo vem do token)', async () => {
+    const wss = fakeWss()
+    const contents = fakeContents()
+    await startRemoteServer(wss, contents, { token: TOKEN, speakerToken: SPEAKER_TOKEN })
+    const ws = fakeWs()
+    wss.handlers.connection(ws)
+    const message = (msg) => ws.listeners.message(JSON.stringify(msg))
+    message({ v: 1, type: 'hello', device: 'Pixel', token: SPEAKER_TOKEN })
+    message({ v: 1, type: 'command', id: 'p1', action: 'player.play', token: SPEAKER_TOKEN })
+    message({ v: 1, type: 'command', id: 'p2', action: 'slide:next', token: SPEAKER_TOKEN })
+    expect(ws.sent.find((m) => m.id === 'p1')?.code).toBe('forbidden')
+    const actions = contents.sent.filter((m) => m.channel === 'remote:command').map((m) => m.payload.action)
+    expect(actions).toEqual(['slide:next'])
+  })
+
+  it('URL do pregador leva só o token do pregador; o pareamento do APK mantém o token completo', async () => {
+    const wss = fakeWss()
+    await startRemoteServer(wss, fakeContents(), { token: TOKEN, speakerToken: SPEAKER_TOKEN })
+    const info = await ipcHandlers.get('remote:pairing-info')()
+    expect(new URL(info.speakerUrl).searchParams.get('token')).toBe(SPEAKER_TOKEN)
+    expect(info.speakerUrl).not.toContain(TOKEN)
+    expect(info.connectUrl).toContain(`token=${TOKEN}`)
+  })
+
+  it('tokens aleatórios do pregador e do APK são diferentes', async () => {
+    const wss = fakeWss()
+    await startRemoteServer(wss, fakeContents())
+    const info = await ipcHandlers.get('remote:pairing-info')()
+    const speakerToken = new URL(info.speakerUrl).searchParams.get('token')
+    expect(speakerToken).toMatch(/^[0-9A-F]{8}$/)
+    expect(speakerToken).not.toBe(info.token)
   })
 })
 

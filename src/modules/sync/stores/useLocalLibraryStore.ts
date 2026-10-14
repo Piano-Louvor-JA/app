@@ -142,7 +142,11 @@ export const useLocalLibraryStore = defineStore('localLibrary', () => {
     // no-op intencional
   }
 
+  // A Central pode ter aberto vazia; o evento de cache curado precisa recarregar.
+  let collectionsLoaded = false
+
   async function refreshCollections() {
+    collectionsLoaded = true
     isLoadingList.value = true
     clearError()
     try {
@@ -159,7 +163,7 @@ export const useLocalLibraryStore = defineStore('localLibrary', () => {
 
   // Store Pinia é singleton por app; listener vive até fechar a janela.
   window.addEventListener('louvorja:catalog-refreshed', () => {
-    if (categories.value.length > 0) void refreshCollections()
+    if (collectionsLoaded) void refreshCollections()
   })
 
   /**

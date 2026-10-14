@@ -95,6 +95,13 @@ describe("flags de bootstrap", () => {
 		expect(await isBootstrapComplete()).toBe(false);
 	});
 
+	it("flag sem arquivos não comprova instalação completa", async () => {
+		mocks.state.catalog.set(WORKSPACE_RECORD_KEYS.bootstrapComplete, {
+			complete: true,
+		});
+		expect(await isBootstrapComplete()).toBe(false);
+	});
+
 	it("isBootstrapComplete true com flag + arquivos", async () => {
 		mocks.state.catalog.set(WORKSPACE_RECORD_KEYS.bootstrapComplete, {
 			complete: true,

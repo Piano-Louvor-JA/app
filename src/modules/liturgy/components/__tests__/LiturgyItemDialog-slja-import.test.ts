@@ -5,6 +5,7 @@
 // o evento pro pai recarrega o catálogo ANTES da seleção valer.
 
 import { flushPromises, mount } from "@vue/test-utils";
+import { createPinia, setActivePinia } from "pinia";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { importMock, authSessionMock, fetchMock } = vi.hoisted(() => ({
@@ -47,6 +48,8 @@ function makeDraft(partial: Partial<LiturgyItemDraft> = {}): LiturgyItemDraft {
 }
 
 function mountDialog(draft: LiturgyItemDraft) {
+	const pinia = createPinia();
+	setActivePinia(pinia);
 	return mount(LiturgyItemDialog, {
 		props: {
 			open: true,
@@ -61,6 +64,7 @@ function mountDialog(draft: LiturgyItemDraft) {
 			selectedMusic: null,
 		},
 		global: {
+			plugins: [pinia],
 			config: {
 				globalProperties: { $t: (key: string) => key },
 			},

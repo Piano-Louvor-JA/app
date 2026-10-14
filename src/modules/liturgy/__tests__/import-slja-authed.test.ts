@@ -328,6 +328,7 @@ describe("import .slja LOGADO → API custom (app#331)", () => {
      const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
      if (u.endsWith("/collections") && init?.method === "POST") return json({ id_collection: 55 });
      if (u.includes("/collections/55/musics") && init?.method === "POST") return json({ id_music: 7 }, 201);
+     if (u.endsWith("/musics/7/lyrics") && init?.method === "POST") return json({ message: "persist failed" }, 500);
      if (u.endsWith("/musics/7") && init?.method === "DELETE") return json({});
      if (u.endsWith("/files") && init?.method === "POST") return json({ id_file: 901, url: "/custom/f1.png" });
      return json({ message: "not found" }, 404);
@@ -338,6 +339,7 @@ describe("import .slja LOGADO → API custom (app#331)", () => {
    };
    await expect(importSljaAsLiturgyMusic({ bytes: await buildSlja(archive), name: "lyricfail.slja" }, { confirmUpload: async () => true }))
      .rejects.toThrow("SLJA_IMPORT_LYRICS_INCOMPLETE");
+   expect(fetchMock.mock.calls.some(([url, init]) => String(url).endsWith("/musics/7") && init?.method === "DELETE")).toBe(true);
  });
 
  it("falha ao criar a música remota → SLJA_IMPORT_MUSIC_FAILED", async () => {

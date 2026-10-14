@@ -152,6 +152,11 @@ describe("import .slja local — blobs em IndexedDB (não localStorage)", () => 
 		const original = localStorage.setItem.bind(localStorage);
 		let sets = 0;
 		const setItemSpy = vi.spyOn(Storage.prototype, "setItem").mockImplementation((k: string, v: string) => {
+			// O timestamp de sync é best-effort e não conta na quota do catálogo.
+			if (k === "sync.modified.v1.mediaCustomCatalog") {
+				original(k, v);
+				return;
+			}
 			// deixa passar a gravação da música; explode nas estrofes
 			if ((sets += 1) > 2) throw new DOMException("quota", "QuotaExceededError");
 			original(k, v);

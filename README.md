@@ -19,7 +19,6 @@ Pacote: `louvorja-piano` · Plataformas: Windows, macOS e Linux.
 
 ---
 
-
 ## Versões do produto
 
 O LouvorJA - PIANO existe em **duas linhas de entrega**:

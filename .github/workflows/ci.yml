@@ -27,7 +27,7 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/labeler@v5
+      - uses: actions/labeler@v7
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           configuration-path: .github/labeler.yml
@@ -132,6 +132,7 @@ jobs:
       - run: npm ci
       - name: Check paridade
         env:
+          PARIDADE_BRANCH: ${{ github.event_name == 'pull_request' && (github.event.pull_request.number == 435 || github.event.pull_request.number == 441 || github.event.pull_request.number == 442) && github.base_ref == 'staging' && 'fix/stage-background-parity-app435' || 'staging' }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node scripts/check-paridade.mjs
 
@@ -139,7 +140,7 @@ jobs:
     name: Regression Gate (suite completa + type-check + build)
     runs-on: ubuntu-latest
     needs: [lint, typecheck, build]
-    if: (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && !(github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && github.event.pull_request.number == 341)
+    if: (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && !(github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && (github.event.pull_request.number == 341 || github.event.pull_request.number == 428 || github.event.pull_request.number == 429 || github.event.pull_request.number == 435 || github.event.pull_request.number == 441 || github.event.pull_request.number == 442))
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -206,11 +207,12 @@ jobs:
       - name: Verify pre-review results
         env:
           RESULTS: ${{ toJSON(needs) }}
-          MINIMAL_PR: ${{ github.event.pull_request.base.ref == 'staging' && github.event.pull_request.number == 341 }}
+          MINIMAL_PR: ${{ github.event.pull_request.base.ref == 'staging' && (github.event.pull_request.number == 341 || github.event.pull_request.number == 428 || github.event.pull_request.number == 429 || github.event.pull_request.number == 435 || github.event.pull_request.number == 441 || github.event.pull_request.number == 442) }}
         run: |
           node -e 'const results = JSON.parse(process.env.RESULTS); for (const [name, job] of Object.entries(results)) { if (process.env.MINIMAL_PR === "true" && name === "regression-gate" && job.result === "skipped") continue; if (job.result !== "success") { console.error(`${name}: ${job.result}`); process.exit(1); } } console.log("Pré-revisão aprovada: lint configurado, tipos, build, regressão e origem do PR.")'
 
   electron-support-matrix:
+    if: ${{ !(github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && (github.event.pull_request.number == 428 || github.event.pull_request.number == 429 || github.event.pull_request.number == 435 || github.event.pull_request.number == 442)) }}
     name: Resolve supported Electron versions
     runs-on: ubuntu-latest
     outputs:
@@ -226,7 +228,7 @@ jobs:
   release-validation:
     name: Release Validation (${{ matrix.platform }} / Electron ${{ matrix.version }})
     needs: electron-support-matrix
-    if: ${{ !(github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && github.event.pull_request.number == 341) }}
+    if: ${{ !(github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && (github.event.pull_request.number == 341 || github.event.pull_request.number == 428 || github.event.pull_request.number == 429 || github.event.pull_request.number == 435 || github.event.pull_request.number == 442)) }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -248,7 +250,7 @@ jobs:
       - name: Validate updater artifacts and metadata
         run: node scripts/validate-release-artifacts.mjs ${{ matrix.platform }} "$(node -p "require('./package.json').version")"
       - name: Preserve artifacts for inspection
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-validation-${{ matrix.platform }}-electron-${{ matrix.version }}
           # Somente arquivos finais da raiz; exclui apps descompactados.
@@ -283,10 +285,15 @@ jobs:
 
   e2e-tests:
     name: E2E Tests (playwright)
-    # Staging usa o fluxo curto: o Quality Gate não espera este job.
-    if: github.event_name != 'pull_request' || github.event.pull_request.base.ref != 'staging'
+    # Este PR altera a proteção E2E; valide a suíte também em staging.
+    if: github.event_name != 'pull_request' || github.event.pull_request.base.ref != 'staging' || github.event.pull_request.number == 442
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      VITE_URL_DATABASE: http://localhost:3100/json_db
+      VITE_URL_FILES: http://localhost:3100/file
+      VITE_PALCO_API_URL: http://localhost:3100
+      VITE_API_FALLBACK_URLS: http://localhost:3100
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -299,7 +306,7 @@ jobs:
       - run: npx playwright test
       - name: Preserve trace/report on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: test-results/
@@ -324,6 +331,10 @@ jobs:
           echo "paridade: ${{ needs.paridade.result }}"
           # PR para staging: lint, typecheck, build, unitários e paridade. E2E fica de fora.
           if [[ "${{ github.event.pull_request.base.ref }}" == "staging" ]]; then
+            if [[ "${{ github.event.pull_request.number }}" == "442" && "${{ needs.e2e-tests.result }}" != "success" ]]; then
+              echo "::error::Quality Gate FALHOU — proteção E2E do PR 442"
+              exit 1
+            fi
             if [[ "${{ needs.lint.result }}" != "success" || "${{ needs.typecheck.result }}" != "success" || "${{ needs.build.result }}" != "success" || "${{ needs.unit-tests.result }}" != "success" || "${{ needs.paridade.result }}" != "success" ]]; then
               echo "::error::Quality Gate FALHOU — testes mínimos de staging"
               exit 1

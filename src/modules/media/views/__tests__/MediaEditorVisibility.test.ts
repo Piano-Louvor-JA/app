@@ -145,11 +145,14 @@ describe('MediaEditorView — toggle de visibilidade (t_35e4d3ea)', () => {
 			undefined,
 			'public',
 		)
-		// reset: de volta pra privado
-		const btns = wrapper.findAll('.editor__visibility')[0]!.findAll(
-			'.editor__visibility-btn',
-		)
-		await vi.waitFor(() => expect(btns[0]!.classes()).toContain('editor__visibility-btn--active'))
+		// reset: de volta pra privado — reconsulta o DOM a cada tentativa
+		// (findAll antigo fica stale sob carga no CI).
+		await vi.waitFor(() => {
+			const btns = wrapper
+				.findAll('.editor__visibility')[0]!
+				.findAll('.editor__visibility-btn')
+			expect(btns[0]!.classes()).toContain('editor__visibility-btn--active')
+		})
 	})
 })
 

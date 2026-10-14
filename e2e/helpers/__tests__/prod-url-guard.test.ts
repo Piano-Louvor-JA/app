@@ -74,13 +74,13 @@ describe('assertNoProdApiUrl', () => {
   test('P2-1 fail-closed: host de prod SEM protocolo bloqueia', () => {
     expect(() =>
       assertNoProdApiUrl(['api.pianolouvorja.com.br'], 'VITE_API_FALLBACK_URLS'),
-    ).toThrowError(/api\.pianolouvorja\.com\.br/)
+    ).toThrowError(/^E2E apontando para PRODUÇÃO \(api\.pianolouvorja\.com\.br em /)
   })
 
   test('P2-1 fail-closed: URL de prod com aspas envolventes (CSV malformado) bloqueia', () => {
     expect(() =>
       assertNoProdApiUrl(['"https://api.pianolouvorja.com.br"'], 'process.env'),
-    ).toThrowError(/api\.pianolouvorja\.com\.br/)
+    ).toThrowError(/^E2E apontando para PRODUÇÃO \(api\.pianolouvorja\.com\.br em /)
   })
 
   test('P2-1: host sem protocolo de NÃO-prod (staging/localhost) NÃO bloqueia', () => {
@@ -98,7 +98,7 @@ describe('assertNoProdApiUrl', () => {
         splitCsvUrls('https://api.louvorja.com.br,https://api.pianolouvorja.com.br'),
         'process.env',
       ),
-    ).toThrowError(/URL ofensora: https:\/\/api\.pianolouvorja\.com\.br$/)
+    ).toThrowError(/^E2E apontando para PRODUÇÃO .*URL ofensora: https:\/\/api\.pianolouvorja\.com\.br\/$/)
   })
 
   test('subdomínio diferente NÃO é bloqueado (comparação de hostname exato)', () => {
@@ -241,4 +241,15 @@ describe('resolveEffectiveApiUrls', () => {
     ])
     expect(resolved).toEqual([])
   })
+})
+
+// A falha precisa explicar o host sem expor credenciais de uma env local.
+test('mensagem de bloqueio remove credenciais, query e fragmento', () => {
+  let message = ''
+  try { assertNoProdApiUrl(['https://user:secret@api.pianolouvorja.com.br/file?token=private#secret'], 'process.env') }
+  catch (error) { message = String(error) }
+  expect(message).toContain('PRODUÇÃO')
+  expect(message).not.toContain('secret')
+  expect(message).not.toContain('private')
+  expect(message).not.toContain('user:')
 })

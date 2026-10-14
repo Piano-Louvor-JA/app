@@ -446,7 +446,7 @@ describe('LiturgyTimelineItem', () => {
   describe('player menu', () => {
     it('áudio: botão de player visível, abre menu ao clicar', async () => {
       const wrapper = createWrapper({ item: createItem({ type: 'audio' }) })
-      
+
       const btn = wrapper.find('.liturgy-item__player-trigger')
       expect(btn.exists()).toBe(true)
       await btn.trigger('click')

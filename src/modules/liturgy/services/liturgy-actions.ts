@@ -6,10 +6,9 @@ import type { ExternalPlayerPreference } from '@shared/types/desktop-bridge'
 import type { Router } from 'vue-router'
 
 import type { LiturgyItem, LiturgyMusicMode } from '../types/liturgy'
-import { INTERNAL_FILE_TYPES } from '../types/liturgy'
 import { isExecutableItem } from './liturgy-item-helpers'
 import { useScheduledStore } from '../stores/useScheduledStore'
-import { activeDateISO } from './liturgy-preferences'
+import { activeDateISO, todayISO } from './liturgy-preferences'
 import { getLiturgyVideoObjectUrl } from './liturgy-local-video'
 import {
   openLiturgyLocalImageControl,
@@ -27,6 +26,9 @@ import {
   getPalcoRoute,
   parseLiturgyWebTarget,
 } from './liturgy-web-projection'
+
+export { todayISO }
+
 export type LiturgyScheduledContent =
   | { kind: 'music'; musicId: number; musicMode?: LiturgyMusicMode }
   | { kind: 'file'; filePath: string }
@@ -37,14 +39,6 @@ export type LiturgyScheduledContent =
 export type LiturgyActionResult =
   | { ok: true; messageKey?: string; resolved?: LiturgyScheduledContent }
   | { ok: false; messageKey: string; resolved?: LiturgyScheduledContent }
-
-/** ISO yyyy-mm-dd de hoje no fuso local (a data do culto é local, nunca UTC). */
-export function todayISO(): string {
-  const d = new Date()
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const dd = String(d.getDate()).padStart(2, '0')
-  return `${d.getFullYear()}-${mm}-${dd}`
-}
 
 /**
  * app#331: id de música do item → namespace único de mídia.

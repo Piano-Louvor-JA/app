@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { appConfirm } from '@shared/composables/useAppConfirm'
+import { hasMediaCustomCatalogBackup, restoreMediaCustomCatalogBackup } from '@modules/sync/services/media-custom-backup'
 
 import { GlassCard } from '@design-system/index'
 import { isDesktopApp } from '@shared/services/desktop-bridge'
@@ -61,6 +63,7 @@ type SyncStatus =
 
 const syncStatus = ref<SyncStatus>({ kind: 'idle' })
 const isSyncBusy = ref(false)
+const hasCatalogBackup = ref(hasMediaCustomCatalogBackup())
 
 async function handleSyncExport() {
   if (isSyncBusy.value) return
@@ -94,7 +97,23 @@ async function handleSyncImport() {
       syncStatus.value = { kind: 'error', messageKey: 'settings.general.syncInvalid' }
       return
     }
-    const result = importLouvorjaIntoBrowser(decodeLouvorjaPackage(raw))
+    const pkg = decodeLouvorjaPackage(raw)
+    let catalogReplacementConfirmed = false
+    if (pkg.entities.mediaCustomCatalog) {
+      catalogReplacementConfirmed = await appConfirm({
+        title: t('settings.general.catalogReplaceTitle'),
+        message: t('settings.general.catalogReplaceMessage'),
+        confirmLabel: t('settings.general.catalogReplaceConfirm'),
+        cancelLabel: t('settings.general.catalogCancel'),
+        danger: true,
+      })
+      if (!catalogReplacementConfirmed) {
+        syncStatus.value = { kind: 'error', messageKey: 'settings.general.syncCancelled' }
+        return
+      }
+    }
+    const result = importLouvorjaIntoBrowser(pkg, { catalogReplacementConfirmed })
+    hasCatalogBackup.value = hasMediaCustomCatalogBackup()
     if (result.applied.length > 0) {
       if (result.applied.includes("liturgy")) {
         window.dispatchEvent(new CustomEvent("liturgy:imported"))
@@ -116,7 +135,23 @@ async function handleSyncImport() {
     }
   } catch (error) {
     console.error('[settings] falha ao importar pacote', error)
-    syncStatus.value = { kind: 'error', messageKey: 'settings.general.syncInvalid' }
+    syncStatus.value = { kind: 'error', messageKey: 'settings.general.catalogImportFailed' }
+  } finally {
+    isSyncBusy.value = false
+  }
+}
+
+async function handleCatalogRestore() {
+  if (isSyncBusy.value) return
+  isSyncBusy.value = true
+  try {
+    const confirmed = await appConfirm({ title: t('settings.general.catalogRestore'), message: t('settings.general.catalogRestoreMessage'), confirmLabel: t('settings.general.catalogRestore'), cancelLabel: t('settings.general.catalogCancel'), danger: true })
+    if (!confirmed) return
+    syncStatus.value = restoreMediaCustomCatalogBackup()
+      ? { kind: 'success', messageKey: 'settings.general.catalogRestored' }
+      : { kind: 'error', messageKey: 'settings.general.catalogImportFailed' }
+  } catch {
+    syncStatus.value = { kind: 'error', messageKey: 'settings.general.catalogImportFailed' }
   } finally {
     isSyncBusy.value = false
   }
@@ -140,21 +175,34 @@ const currentLanguage = ref(
   getUserPreference<string>(USER_PREFERENCE_KEYS.language, 'pt-BR') ?? 'pt-BR',
 )
 
-function changeLanguage(lang: string) {
-  currentLanguage.value = lang
-  locale.value = lang
-  setUserPreference(USER_PREFERENCE_KEYS.language, lang)
-  // app#339: garante o catálogo essencial do idioma alvo em bg (retomável).
-  // A UI troca na hora; hinário/bíblia/coletâneas recarregam com os índices
-  // do novo idioma assim que o download completa.
-  catalogSyncState.value = 'syncing'
-  ensureCatalogForLocale(lang)
-    .then(() => {
-      catalogSyncState.value = 'done'
-    })
-    .catch(() => {
-      catalogSyncState.value = 'error'
-    })
+/** Ordem D2 da SPEC-locale-hot-reload: download do catálogo do idioma alvo
+ * PRIMEIRO, persistir o idioma DEPOIS, reload do renderer por último. O guard
+ * de ensureCatalogForLocale compara com getCurrentApiPrefix(), que lê a
+ * preferência persistida — persistir antes = early-return = download nunca
+ * roda (causa do "tem que fechar e abrir denovo", app#locale-hot-reload).
+ * Falha de rede = rollback real: nada persistido, UI fica no idioma antigo. */
+let languageSwitchBusy = false
+async function changeLanguage(lang: string) {
+  if (languageSwitchBusy) return
+  languageSwitchBusy = true
+  try {
+    // D4: no-op re-clicar o idioma ativo (nada a baixar nem recarregar).
+    if (lang === currentLanguage.value) return
+    catalogSyncState.value = 'syncing'
+    await ensureCatalogForLocale(lang)
+    setUserPreference(USER_PREFERENCE_KEYS.language, lang)
+    currentLanguage.value = lang
+    locale.value = lang
+    // D1: reload controlado do renderer (precedente runFirstBoot) — zera as
+    // consts de módulo (ex.: BOOKS_FILE da bíblia) e recarrega os stores com
+    // os índices do novo idioma. Não chega aqui se o download falhou.
+    window.location.reload()
+  } catch {
+    catalogSyncState.value = 'error'
+    // rollback: locale/currentLanguage ficam no idioma antigo (D2).
+  } finally {
+    languageSwitchBusy = false
+  }
 }
 
 async function handleCheckUpdate() {
@@ -272,9 +320,35 @@ async function clearAllLocalData() {
           type="button"
           class="general-settings__lang-btn"
           :class="{ 'general-settings__lang-btn--active': currentLanguage === lang.value }"
+          :disabled="catalogSyncState === 'syncing'"
           @click="changeLanguage(lang.value)"
         >
           {{ t(lang.labelKey) }}
+        </button>
+      </div>
+
+      <!-- D3 SPEC-locale-hot-reload: feedback do download do catálogo -->
+      <p
+        v-if="catalogSyncState === 'syncing'"
+        class="general-settings__hint general-settings__lang-sync"
+        data-testid="language-sync-downloading"
+        role="status"
+      >
+        {{ t('settings.general.languageSyncDownloading') }}
+      </p>
+      <div
+        v-else-if="catalogSyncState === 'error'"
+        class="general-settings__lang-sync-error"
+        data-testid="language-sync-error"
+        role="alert"
+      >
+        <span>{{ t('settings.general.languageSyncErrorTitle') }}</span>
+        <button
+          type="button"
+          class="general-settings__lang-sync-retry"
+          @click="changeLanguage(currentLanguage === 'es' ? 'pt-BR' : 'es')"
+        >
+          {{ t('settings.general.languageSyncRetry') }}
         </button>
       </div>
     </GlassCard>
@@ -315,6 +389,9 @@ async function clearAllLocalData() {
         >
           <i class="ti ti-file-import" aria-hidden="true" />
           {{ t('settings.general.syncImport') }}
+        </button>
+        <button v-if="hasCatalogBackup" type="button" class="general-settings__btn" :disabled="isSyncBusy" @click="handleCatalogRestore">
+          {{ t('settings.general.catalogRestore') }}
         </button>
       </div>
 

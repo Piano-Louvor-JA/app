@@ -18,6 +18,9 @@ permissions:
 jobs:
   build-windows:
     name: Build Windows x64 (NSIS + Portable + Store APPX)
+    permissions:
+      contents: write
+      actions: write
     runs-on: windows-latest
     env:
       MS_STORE_IDENTITY_NAME: ${{ secrets.MS_STORE_IDENTITY_NAME }}
@@ -40,7 +43,7 @@ jobs:
           WORKFLOW_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          script="$(mktemp).mjs"
+          script="$(mktemp --suffix=.mjs)"
           gh api "repos/${GITHUB_REPOSITORY}/contents/scripts/release-publish-decision.mjs?ref=${WORKFLOW_SHA}" --jq .content \
             | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{let t=s.trim();if(t.startsWith(String.fromCharCode(34)))t=JSON.parse(t);process.stdout.write(Buffer.from(String(t).replace(/\s/g,""),"base64"))})' \
             > "$script"
@@ -56,6 +59,21 @@ jobs:
       - name: Install dependencies
         if: steps.decision.outputs.publish == 'true'
         run: npm ci
+
+      # Perfil de ambiente API (SPEC piano-api-env-guard): tag oficial =>
+      # release/produção sob gate do guard; dispatch manual => homologation/STG.
+      - name: Resolve API build profile
+        id: profile
+        shell: bash
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "profile=release" >> "$GITHUB_OUTPUT"
+            echo "PIANO_BUILD_PROFILE=release" >> "$GITHUB_ENV"
+            echo "PIANO_RELEASE_AUTHORIZED=true" >> "$GITHUB_ENV"
+          else
+            echo "profile=homologation" >> "$GITHUB_OUTPUT"
+            echo "PIANO_BUILD_PROFILE=homologation" >> "$GITHUB_ENV"
+          fi
 
       - name: Check MS Store secrets
         id: store
@@ -83,7 +101,7 @@ jobs:
       # electron-builder gera .appx; Partner Center aceita esse pacote diretamente.
       - name: Upload Microsoft Store .appx
         if: steps.store.outputs.enabled == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: LouvorJA-PIANO-MicrosoftStore-appx
           path: dist-electron/*.appx
@@ -107,7 +125,7 @@ jobs:
 
       - name: Upload x64 installer + portable (artifact backup)
         if: steps.decision.outputs.publish == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: LouvorJA-PIANO-Windows-x64
           path: |
@@ -116,3 +134,15 @@ jobs:
             dist-electron/SHA256SUMS-win-x64
           if-no-files-found: warn
           retention-days: 30
+
+      - name: Dispatch Microsoft Store after APPX upload
+        if: steps.decision.outputs.publish == 'true' && steps.store.outputs.enabled == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+        run: |
+          set -euo pipefail
+          # Manual builds resolve package version from their checked-out commit.
+          if [ -z "$TAG" ]; then TAG="v$(node -p "require('./package.json').version")"; fi
+          gh workflow run msstore-release.yml --ref main -f "version=$TAG"

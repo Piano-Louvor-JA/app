@@ -81,6 +81,7 @@ export function loadStageSettingsOptionalRaw(scope: StageScope): unknown {
 
 export function saveStageSettings(scope: StageScope, settings: StageSettings): void {
   setUserPreference(keyFor(scope), serializeStageSettings(settings))
+  localStorage.setItem("sync.modified.v1.preferences", new Date().toISOString())
 }
 
 /** Remove o override do escopo (volta a herdar o global). */
@@ -90,4 +91,5 @@ export function clearStageSettings(scope: StageScope): void {
   if (!(key in prefs)) return
   delete prefs[key]
   saveUserPreferences(prefs)
+  localStorage.setItem("sync.modified.v1.preferences", new Date().toISOString())
 }
