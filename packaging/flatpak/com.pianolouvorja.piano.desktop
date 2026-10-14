@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=LouvorJA - PIANO
+Comment=Aplicativo desktop para gerenciamento de culto
+Exec=louvorja-piano %U
+Icon=louvorja-piano
+Type=Application
+Categories=AudioVideo;Audio;Player;
+MimeType=x-scheme-handler/louvorja-piano;
+StartupNotify=true
+StartupWMClass=LouvorJA - PIANO
