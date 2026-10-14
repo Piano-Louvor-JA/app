@@ -227,11 +227,11 @@
         {
           "target": "dmg",
           "arch": [
-            "x64",
-            "arm64"
+            "universal"
           ]
         }
       ],
+      "x64ArchFiles": "**/*.node",
       "icon": "build/icon.png"
     },
     "nsis": {

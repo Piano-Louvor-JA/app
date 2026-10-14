@@ -1,4 +1,8 @@
-# Build macOS DMG — gera instalador .dmg x64 + arm64 + latest-mac.yml
+# Build macOS DMG — gera instalador .dmg UNIVERSAL (Intel + Apple Silicon no mesmo
+# arquivo, o sistema escolhe a fatia) + latest-mac.yml.
+# Cross-build funciona sem Rosetta: o electron-builder baixa os dists do Electron
+# por arquitetura e funde com lipo. Binários .node pré-compilados entram iguais
+# nas duas árvores; mac.x64ArchFiles em package.json autoriza essa fusão.
 # Roda manualmente (workflow_dispatch) ou em push de tags v*
 name: Build macOS
 
@@ -13,7 +17,7 @@ permissions:
 
 jobs:
   build-macos:
-    name: Build macOS DMG x64+arm64
+    name: Build macOS DMG universal
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
@@ -60,26 +64,17 @@ jobs:
             echo "PIANO_BUILD_PROFILE=homologation" >> "$GITHUB_ENV"
           fi
 
-      - name: Build Vite + Electron DMG (x64 + arm64) + publish
+      - name: Build Vite + Electron DMG universal + publish
         if: steps.decision.outputs.publish == 'true'
-        run: npm run electron:build -- --mac --publish always
+        run: npm run electron:build -- --mac --universal --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload x64 DMG (artifact backup)
+      - name: Upload DMG universal (artifact backup)
         if: steps.decision.outputs.publish == 'true'
         uses: actions/upload-artifact@v7
         with:
-          name: LouvorJA-PIANO-macOS-x64-DMG
-          path: dist-electron/*x64*.dmg
-          if-no-files-found: warn
-          retention-days: 30
-
-      - name: Upload arm64 DMG (artifact backup)
-        if: steps.decision.outputs.publish == 'true'
-        uses: actions/upload-artifact@v7
-        with:
-          name: LouvorJA-PIANO-macOS-arm64-DMG
-          path: dist-electron/*arm64*.dmg
-          if-no-files-found: warn
+          name: LouvorJA-PIANO-macOS-universal-DMG
+          path: dist-electron/*universal*.dmg
+          if-no-files-found: error
           retention-days: 30
