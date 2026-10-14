@@ -43,6 +43,11 @@ export async function ensureCatalogForLocale(
   locale: string,
   onProgress?: (progress: number) => void,
 ): Promise<void> {
+  // ATENÇÃO (SPEC-locale-hot-reload RAIZ-1): este guard compara com
+  // getCurrentApiPrefix(), que lê user_data.language PERSISTIDA. O caller
+  // (GeneralView.changeLanguage) DEVE chamar ensureCatalogForLocale ANTES de
+  // setUserPreference(language) — persistir antes = early-return aqui =
+  // download nunca roda e o idioma alvo nunca chega ao disco.
   const targetPrefix = localeToApiPrefix(locale)
   const currentPrefix = getCurrentApiPrefix()
   if (targetPrefix === currentPrefix) {
