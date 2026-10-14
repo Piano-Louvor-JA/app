@@ -505,13 +505,17 @@ describe('palco-bridge — mídia externa e slots', () => {
   it('troca de slide do hino re-projeta no mesmo slot (TV acompanha)', async () => {
     startPalcoBridge()
     bridgeState.externalAlive = true // popup do hino aberto
+    bridgeState.externalMediaAlive = false
     publish(MEDIA_CH, { active: true, title: 'Hino', lyric: 'verso 1' })
     await settle()
-    const first = sendBuf.buf.filter((s) => s.slot === '0' && s.msg.type === 'projection').length
     publish(MEDIA_CH, { active: true, title: 'Hino', lyric: 'verso 2' })
     await settle()
-    const second = sendBuf.buf.filter((s) => s.slot === '0' && s.msg.type === 'projection').length
-    expect(second).toBeGreaterThan(first)
+    const slides = sendBuf.buf.filter((s) => s.slot === '0' && s.msg.type === 'projection')
+    expect(slides).toHaveLength(3)
+    expect(slides.slice(-2).map((slide) => slide.msg.input)).toEqual([
+      expect.objectContaining({ text: 'verso 1' }),
+      expect.objectContaining({ text: 'verso 2' }),
+    ])
   })
 
   it('bridge desktop com erro no externalAlive: fallback sem externa (projeta)', async () => {
