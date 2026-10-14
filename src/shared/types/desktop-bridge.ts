@@ -451,7 +451,8 @@ export type DiagnosticsApi = {
   send: (report: unknown) => Promise<{ ok: boolean; reason?: string }>
   openFolder: (filePath: string) => Promise<void>
   reportRendererErrors?: (errors: unknown) => void
-  reportDownloadFailures?: (failures: unknown) => void
+  reportDownloadFailures?: (failures: unknown) => void,
+  reportAudioDevices?: (snapshot: unknown) => void
 }
 
 export type LouvorJaBridge = {

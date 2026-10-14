@@ -10,6 +10,8 @@ import path from 'node:path'
 import { app, ipcMain, session, shell, screen } from 'electron'
 import { API_HOSTS, ESSENTIAL_FILES, ENDPOINTS, TIMEOUT_MS, computeVerdict, dnsProbe, elapsed, folderSize, generalProbes, httpProbe, maskToken, rawError, readHostsOverrides, reproduceBootstrap, reportText, sanitizeProxyEnv, socketProbe, tlsConnectStrict } from './diagnostics-core.mjs'
 import { collectLogs, crashHistory, diskFreeMb, dnsSanity, essentialHeaders, memorySnapshot, storageHealth, userDataWriteProbe, windowsAntivirus } from './diagnostics-v2-collectors.mjs'
+import { createChildProcessGone, createLatencyAggregator, createNetTransitionLog, createWsTelemetry, sanitizeAudioDevices } from './diagnostics-v3-telemetry.mjs'
+import { setLatencyObserver } from './diagnostics-latency-hook.mjs'
 import {
   analyzeInterfaces,
   computeRemoteVerdict,
@@ -27,8 +29,39 @@ import { collectEdidMonitors } from './edid.mjs'
 
 let diagnosticToken = ''
 export function setDiagnosticsToken(token) {
+
   diagnosticToken = typeof token === 'string' ? token : ''
 }
+
+// diag-v4-umbrella: telemetria volátil de sessão (spec frozen 2026-10-14)
+const wsTelemetry = createWsTelemetry()
+const latency = createLatencyAggregator()
+const netTransitions = createNetTransitionLog()
+const childGone = createChildProcessGone()
+let audioDevices = null
+
+export function trackWsConnection() { try { wsTelemetry.onConnection() } catch { /* best-effort */ } }
+export function trackWsDisconnect(reason) { try { wsTelemetry.onDisconnect(reason) } catch { /* best-effort */ } }
+export function trackApiLatency(host, ms) { try { latency.observe(host, ms) } catch { /* best-effort */ } }
+export function trackNetTransition(type) { try { netTransitions.record(type) } catch { /* best-effort */ } }
+
+function telemetrySnapshot() {
+  const safeSnap = (fn) => { try { return fn() } catch { return null } }
+  return {
+    palcoWs: safeSnap(() => wsTelemetry.snapshot()),
+    redeLatencia: safeSnap(() => latency.snapshot()),
+    clockSkewMs: safeSnap(() => sessionClockSkewMs()),
+    audioDevices,
+    processosFilhos: safeSnap(() => childGone.snapshot()),
+    transicoesRede: safeSnap(() => netTransitions.snapshot()),
+  }
+}
+
+let sessionClockSkewMs = () => null
+export function setClockSkewProvider(fn) { sessionClockSkewMs = typeof fn === 'function' ? fn : () => null }
+
+// liga o hook de latência do diagnostics-core ao agregador desta sessão
+setLatencyObserver((host, ms) => latency.observe(host, ms))
 
 let rendererErrors = []
 let downloadFailures = []
@@ -363,6 +396,7 @@ async function runDiagnostics() {
     rede: { proxy: { resolveProxyPorOrigem: proxy, env: sanitizeProxyEnv(process.env) }, hostsOverrides, conectividadeGeral: general, apis, reproducaoBootstrap: reproduction, mediaReal: mediaProbe, dnsSuspeito },
     instalacaoReal: installation,
     triage: { storage, crashes, memoria, discoLivreMb, antivirus, logs, gpuFeatures, monitores: monitoresDetalhes(), versaoInstalacaoReal, rendererErrors, downloadFailures },
+    telemetria: telemetrySnapshot(),
     controleRemoto,
   }
   report.vereditoHeuristico = verdictWithRemote({ general, apis, proxy, hosts: hostsOverrides, installation, extra, controleRemoto })
@@ -408,6 +442,14 @@ export function registerDiagnosticsIpc() {
   ipcMain.on('diagnostics:download-failures', (_event, snapshot) => {
     downloadFailures = sanitizeDownloadFailures(snapshot)
   })
+  ipcMain.on('diagnostics:audio-devices', (_event, snapshot) => {
+    audioDevices = sanitizeAudioDevices(snapshot)
+  })
+  try {
+    app.on('child-process-gone', (_event, details) => childGone.onGone(details))
+    app.on('online', () => trackNetTransition('online'))
+    app.on('offline', () => trackNetTransition('offline'))
+  } catch { /* best-effort */ }
   ipcMain.handle('diagnostics:run', () => runDiagnostics())
   ipcMain.handle('diagnostics:open-folder', async (_event, filePath) => shell.showItemInFolder(String(filePath ?? '')))
   ipcMain.handle('diagnostics:send', async (_event, report) => {

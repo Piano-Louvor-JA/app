@@ -118,6 +118,7 @@ export async function httpProbe(host, endpoint, token) {
     })
     const body = await response.arrayBuffer()
     const result = { url, status: response.status, ok: response.ok, ttfbMs: elapsed(start), bytes: body.byteLength, erro: null }
+    try { const { onLatencyObserved } = await import('./diagnostics-latency-hook.mjs'); onLatencyObserved(host, result.ttfbMs) } catch { /* best-effort */ }
     if (!response.ok) {
       const classe = response.status === 403 ? 'HTTP_403' : response.status === 429 ? 'HTTP_429' : response.status >= 500 ? 'HTTP_5XX' : 'OTHER'
       result.erro = { classe, bruto: `HTTP ${response.status}` }

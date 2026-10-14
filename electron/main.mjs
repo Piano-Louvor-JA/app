@@ -1,4 +1,5 @@
 import path from "node:path";
+import { statSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { app, BrowserWindow, dialog, globalShortcut, screen, shell } from "electron";
 
@@ -14,7 +15,7 @@ import { configureUserDataPath } from "./user-data-path.mjs";
 import { checkEulaAcceptance } from "./eula.mjs";
 import { resolveAppLocale } from "./locale.mjs";
 import { registerWorkspaceIpc } from "./ipc/register.mjs";
-import { registerDiagnosticsIpc, setDiagnosticsToken } from "./diagnostics.mjs";
+import { registerDiagnosticsIpc, setClockSkewProvider, setDiagnosticsToken } from "./diagnostics.mjs";
 import { createMainLogger } from "./main-log.mjs";
 import { attachWindowStateEvents, registerWindowIpc } from "./ipc/window.mjs";
 import { attachRemoteServer } from "./remote-server.mjs";
@@ -742,6 +743,20 @@ app.whenReady().then(async () => {
 		// VITE_* — config de build do renderer não existe no processo principal).
 		setDiagnosticsToken(process.env.LOUVORJA_DIAGNOSTICS_TOKEN ?? "");
 		registerDiagnosticsIpc(); // diagnostics:* — SrCaldeira, rede no main
+		// diag-v4-umbrella: skew do relógio via mtime de marker em userData (best-effort)
+		setClockSkewProvider(() => {
+			try {
+				const dir = app.getPath("userData");
+				const marker = path.join(dir, "diag-clock-marker");
+				const before = Date.now();
+				writeFileSync(marker, String(before));
+				const mtime = statSync(marker).mtimeMs;
+				const after = Date.now();
+				return Math.round(mtime - (before + after) / 2);
+			} catch {
+				return null;
+			}
+		});
 		mainLog.info('diagnostics IPC handlers registered');
 		registerWindowIpc(() => mainWindow);
 		registerLocalFileProtocol();

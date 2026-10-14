@@ -22,6 +22,35 @@ function reportRendererErrors(): void {
   try { window.louvorja?.diagnostics?.reportRendererErrors?.(rendererErrors.snapshot()) } catch { /* best effort */ }
 }
 
+// diag-v4-umbrella: dispositivos de áudio do renderer → telemetria do main.
+let audioStarted = false
+function startAudioDeviceReporter(): void {
+  if (audioStarted) return
+  audioStarted = true
+  const report = () => {
+    try {
+      navigator.mediaDevices?.enumerateDevices?.().then((devices) => {
+        let outputLabel: string | null = null
+        try {
+          // ponytail: MediaDeviceInfo sem permissão devolve label vazio — suficiente p/ contar dispositivos
+          const audioOut = devices.find((d) => d.kind === 'audiooutput')
+          outputLabel = audioOut?.label || null
+        } catch { /* best effort */ }
+        window.louvorja?.diagnostics?.reportAudioDevices?.({
+          devices: devices.filter((d) => d.kind.startsWith('audio')).length,
+          devicechangeCount,
+          outputLabel,
+        })
+      }).catch(() => { /* best effort */ })
+    } catch { /* best effort */ }
+  }
+  let devicechangeCount = 0
+  try {
+    navigator.mediaDevices?.addEventListener?.('devicechange', () => { devicechangeCount += 1; report() })
+  } catch { /* best effort */ }
+  report()
+}
+
 function errorDetails(value: unknown): { message: string; stack: string | null } {
   if (value instanceof Error) return { message: value.message, stack: value.stack ?? null }
   try { return { message: String(value ?? ''), stack: null } } catch { return { message: '[unserializable]', stack: null } }
@@ -30,6 +59,7 @@ function errorDetails(value: unknown): { message: string; stack: string | null }
 export function startRendererErrorBuffer(): void {
   if (rendererErrorsStarted || typeof window === 'undefined') return
   rendererErrorsStarted = true
+  startAudioDeviceReporter()
   const originalConsoleError: ConsoleError = console.error.bind(console)
   console.error = (...args: unknown[]) => {
     const details = errorDetails(args[0])
