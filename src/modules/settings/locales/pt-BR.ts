@@ -228,6 +228,20 @@ export default {
       updateAvailable: 'Versão {version} disponível!',
       updateNotAvailable: 'Você já está usando a versão mais recente.',
       updateError: 'Não foi possível verificar atualizações.',
+      diagnosticsTitle: 'Diagnóstico',
+      diagnosticsHint:
+        'Verifica o aplicativo e coleta informações técnicas para suporte. Não altera seus dados.',
+      diagnosticsRun: 'Executar diagnóstico',
+      diagnosticsRunning: 'Executando…',
+      diagnosticsProgress:
+        'Testando DNS, rede, proxy, certificado e catálogo. Pode levar até 90 segundos.',
+      diagnosticsDone: 'Diagnóstico concluído.',
+      diagnosticsSend: 'Enviar relatório',
+      diagnosticsSendOk: 'Relatório enviado. Obrigado!',
+      diagnosticsSendFail: 'Envio indisponível — compartilhe o arquivo salvo.',
+      diagnosticsOpenFolder: 'Abrir pasta',
+      diagnosticsDesktopOnly:
+        'O diagnóstico está disponível apenas no aplicativo desktop.',
       updateDesktopOnly:
         'Atualizações automáticas estão disponíveis apenas no aplicativo desktop.',
       syncTitle: 'Sincronização',
