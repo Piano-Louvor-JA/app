@@ -48,12 +48,14 @@ export type ProjectionInput = {
   text: string
   /** Referência do rodapé (ex.: 'João 3:16 — ARC'). */
   footerRef?: string
-  /** Versão da Bíblia no rodapé. */
+  /** Versão da Bíblia no rodapé (ex.: 'ARC'). */
   footerVersion?: string
   /** BG: URL http(s) já resolvível pela TV; omitir usa o bg do stage. */
   background?: string
   /** Capa da música: título destaque amarelo, sem caixinha (paridade cabo). */
   isCover?: boolean
+  /** Frame do slide PDF/PPT/imagens: dataURL completo (data:image/png;base64,…). */
+  frameDataUrl?: string
 }
 
 /** Acesso tipado ao palco exposto pelo preload (contextBridge). */
@@ -202,11 +204,15 @@ class PalcoSession {
         ? input.text
         : colorizeProjectionText(input.text, textColor)
     const footerRef = resolveProjectionFooterRef(scope, s, input.footerRef)
+    // Frame de slide (PDF/PPT/imagens): imagem vira o bg e texto vai vazio —
+    // receiver trata projection sem texto como mídia visual pura (sem véu),
+    // preservando a tonalidade original do canvas do operador.
+    const isFrameSlide = typeof input.frameDataUrl === 'string' && input.frameDataUrl.startsWith('data:image/')
     await palcoApi().send({
       v: 2,
       type: 'projection',
-      background: bg,
-      text: colorized,
+      background: isFrameSlide ? input.frameDataUrl : bg,
+      text: isFrameSlide ? '' : colorized,
       // px@1920 → o receiver divide por 10.8 (px@1080p → vw)
       fontSize: (sizeAt1920 / 1920) * 1080,
       fontWeight,
@@ -216,7 +222,7 @@ class PalcoSession {
       textBox: s.textBox,
       boxOpacity: s.boxOpacity,
       boxBorder: s.boxBorder
-        ? { width: 0.4, color: 'rgba(255,255,255,.25)' }
+        ? { width: 0.2, color: 'rgba(255,255,255,0.85)' }
         : undefined,
       footerRef,
       footerColor: s.footerRefColor,

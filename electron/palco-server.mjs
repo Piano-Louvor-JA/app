@@ -251,7 +251,7 @@ class PalcoSlot {
     if (p === '/speaker') {
       res.setHeader('Content-Type', 'text/html; charset=utf-8')
       res.setHeader('Cache-Control', 'no-store')
-      res.end(speakerPageHtml())
+      res.end(speakerPageHtml({ palcoToken: getPalcoToken() }))
       return
     }
 
@@ -705,11 +705,13 @@ export const SPEAKER_I18N = {
  * HTML da página /speaker. `lang` força idioma (teste); no navegador decide
  * ?lang= > navigator.language > pt-BR.
  */
-export function speakerPageHtml() {
+export function speakerPageHtml({ palcoToken = '' } = {}) {
   const t = SPEAKER_TOKENS
   const dictJson = JSON.stringify(SPEAKER_I18N)
+  // Token do palco embutido no JS (regex do receiver aceita A-Z0-9 de 5).
+  const safeToken = /^[A-Z0-9]{5}$/.test(palcoToken) ? palcoToken : ''
   return `<!doctype html>
-<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pregador · LouvorJA</title>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no,viewport-fit=cover"><title>Pregador · LouvorJA</title>
 <style>
 :root{--bg:${t.bg};--surface:${t.surface};--surface-input:${t.surfaceInput};--on-surface:${t.onSurface};--on-surface-variant:${t.onSurfaceVariant};--primary:${t.primary};--on-primary:${t.onPrimary};--outline:${t.outline};--success:${t.success};--radius-sm:${t.radiusSm};--radius-md:${t.radiusMd};--sp1:${t.spacing1};--sp2:${t.spacing2};--sp3:${t.spacing3};--sp4:${t.spacing4}}
 html,body{height:100%}
@@ -735,6 +737,7 @@ nav{display:flex;justify-content:space-between;gap:var(--sp3)}
 <h1 id="t" data-i18n="title">Pregador</h1>
 <div class="preview"><iframe id="frame" data-i18n-attr="title:previewTitle" title="Preview da projeção" style="display:none"></iframe><div id="msg" data-i18n="connecting">Conectando preview…</div></div>
 <footer>
+<div id="conn" style="font-size:13px;text-align:center;margin-bottom:6px;color:var(--on-surface-variant)"><span class="dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--on-surface-variant);margin-right:6px"></span><span data-i18n="connecting">Conectando preview…</span></div>
 <div id="count">—/—</div>
 <nav><button id="prev" data-i18n-attr="aria-label:back" aria-label="Voltar">◀</button><button id="next" data-i18n-attr="aria-label:next" aria-label="Avançar">▶</button></nav>
 <button id="repair" class="small" style="margin-top:var(--sp3)" data-i18n-attr="aria-label:repair" aria-label="Reemparelhar" data-i18n="repair">Reemparelhar</button>
@@ -757,6 +760,9 @@ document.querySelectorAll('[data-i18n-attr]').forEach(el=>{const[k,key]=el.datas
 let token=q.get('token')||localStorage.getItem('speaker.token');
 let remotePort=q.get('remotePort')||localStorage.getItem('speaker.remotePort')||'7071';
 let palcoPort=q.get('palcoPort')||localStorage.getItem('speaker.palcoPort')||'7081';
+// Token do palco (valor real injetado server-side abaixo) — o preview precisa
+// dele para o WS do palco não fechar a conexão fora do localhost.
+let palcoToken='${safeToken}';
 if(token){localStorage.setItem('speaker.token',token);localStorage.setItem('speaker.remotePort',remotePort);localStorage.setItem('speaker.palcoPort',palcoPort)}
 let preview,remote,queued=[],state={index:0,total:0},seq=0,lastSend=0;
 const frame=document.querySelector('#frame'),msg=document.querySelector('#msg'),count=document.querySelector('#count');
@@ -766,19 +772,27 @@ function host(port,path){return 'ws://'+location.hostname+':'+port+path}
 function fitFrame(){const box=frame.parentElement,s=Math.min(box.clientWidth/1280,box.clientHeight/720)||box.clientWidth/1280;
   frame.style.transform='scale('+s+')';frame.style.left=((box.clientWidth-1280*s)/2)+'px';frame.style.top=((box.clientHeight-720*s)/2)+'px'}
 addEventListener('resize',fitFrame);
+// Gestos de zoom (pinça/duplo-toque) travados — preview fixo, sem acidentes.
+document.addEventListener('gesturestart',e=>e.preventDefault());
+document.addEventListener('gesturechange',e=>e.preventDefault());
+let lastTouch=0;
+document.addEventListener('touchend',e=>{const now=Date.now();if(now-lastTouch<300)e.preventDefault();lastTouch=now},{passive:false});
 function render(){count.textContent=(state.total?state.index+1:'—')+'/'+(state.total||'—')}
+function setConn(online){const c=document.querySelector('#conn'),d=c.querySelector('.dot'),s=c.querySelector('[data-i18n]');d.style.background=online?'var(--success)':'var(--on-surface-variant)';s.textContent=online?({ptBR:'Conectado',en:'Connected',es:'Conectado'})[lang.replace('-','')]||'Conectado':T.connecting}
 function pulse(){count.classList.add('changed');setTimeout(()=>count.classList.remove('changed'),350)}
 // Preview: receiver.html real (mesmo renderizador da TV) apontando pro palco.
+// palcoToken: WS do palco exige token fora do localhost — sem ele o receiver
+// é fechado na conexão e o preview fica preso no splash (fix 13/10).
 function openPreview(){try{preview&&preview.close()}catch{}
-  frame.src='receiver.html?host='+encodeURIComponent(location.hostname)+'&port='+palcoPort;
+  frame.src='receiver.html?host='+encodeURIComponent(location.hostname)+'&port='+palcoPort+(palcoToken?'&token='+encodeURIComponent(palcoToken):'');
   frame.style.display='';msg.style.display='none';fitFrame()}
 function send(action){const now=Date.now();if(now-lastSend<250)return;lastSend=now;
   const m={v:1,type:'command',id:'s'+(++seq),action,token};
   if(remote&&remote.readyState===1)remote.send(JSON.stringify(m));else queued.push(m)}
 function openRemote(){remote=new WebSocket(host(remotePort,''));
-  remote.onopen=()=>{remote.send(JSON.stringify({v:1,type:'hello',role:'speaker',token}));queued.splice(0).forEach(m=>remote.send(JSON.stringify(m)))};
+  remote.onopen=()=>{setConn(true);remote.send(JSON.stringify({v:1,type:'hello',role:'speaker',token}));queued.splice(0).forEach(m=>remote.send(JSON.stringify(m)))};
   remote.onmessage=e=>{try{const m=JSON.parse(e.data);if(m.type==='state'&&m.slide){const old=state.index;state=m.slide;render();if(old!==state.index)pulse()}}catch{}};
-  remote.onclose=()=>setTimeout(openRemote,800)}
+  remote.onclose=()=>{setConn(false);setTimeout(openRemote,800)}}
 document.querySelector('#prev').onclick=()=>send('slide:prev');
 document.querySelector('#next').onclick=()=>send('slide:next');
 // Reemparelhar: limpa pareamento e abre overlay pra colar o link do QR de novo.

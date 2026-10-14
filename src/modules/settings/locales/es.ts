@@ -320,6 +320,7 @@ export default {
       speakerSteps: 'Apunte la cámara del teléfono del predicador al código — se abre en el navegador, sin instalar nada.',
       speakerReady: 'Predicador listo',
       speakerWaiting: 'Esperando enlace del predicador',
+      speakerConnected: 'Predicador conectado — {device}',
       operatorTitle: 'Operador',
       operatorHint: 'El operador escanea este QR con la app Piano LouvorJA (Configuración → Control Remoto) — control total de la liturgia desde la app.',
       operatorCopy: 'Copiar enlace del operador',

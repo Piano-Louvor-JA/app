@@ -109,7 +109,7 @@ describe('RemotePairingView', () => {
   })
 
   it('onClients conectado: status connected com device', async () => {
-    let clientsCb: ((p: { count: number; address?: string }) => void) | null = null
+    let clientsCb: ((p: { count: number; address?: string; remoteAddress?: string }) => void) | null = null
     mocks.getDesktopBridge.mockReturnValue(makeBridge({
       onClients: vi.fn((cb: typeof clientsCb) => {
         clientsCb = cb
@@ -118,7 +118,7 @@ describe('RemotePairingView', () => {
     }))
     const wrapper = createWrapper()
     await flushPromises()
-    clientsCb!({ count: 1, address: '192.168.0.50' })
+    clientsCb!({ count: 1, address: '192.168.0.50', remoteAddress: '192.168.0.50' })
     await wrapper.vm.$nextTick()
     expect(wrapper.find('[data-testid="remote-client-status"]').classes()).toContain('pairing-status--on')
     expect(wrapper.text()).toContain('192.168.0.50')
@@ -202,13 +202,13 @@ describe('RemotePairingView', () => {
   })
 
   it('onClients com address null: device fallback (br 59)', async () => {
-    let cb: ((p: { count: number; address: string | null }) => void) | null = null
+    let cb: ((p: { count: number; address: string | null; remoteAddress?: string | null }) => void) | null = null
     mocks.getDesktopBridge.mockReturnValue(makeBridge({
       onClients: vi.fn((fn: typeof cb) => { cb = fn; return () => {} }),
     }))
     const w = createWrapper()
     await flushPromises()
-    cb?.({ count: 2, address: null })
+    cb?.({ count: 2, address: null, remoteAddress: 'Piano LouvorJA' })
     await flushPromises()
     expect(w.text()).toContain('Piano LouvorJA')
     w.unmount()

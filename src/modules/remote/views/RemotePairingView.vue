@@ -12,6 +12,9 @@ const info = ref<RemotePairingInfo | null>(null)
 const failed = ref(false)
 const clientCount = ref(0)
 const clientAddress = ref<string | null>(null)
+/** Identidade por papel: remote = APK (esquerda), speaker = pregador (direita). */
+const remoteAddress = ref<string | null>(null)
+const speakerAddress = ref<string | null>(null)
 let offClients: (() => void) | undefined
 
 /** id do botão copiado (para feedback "copiado") — volta sozinho. */
@@ -31,9 +34,13 @@ onMounted(async () => {
     info.value = await remote.pairingInfo()
     clientCount.value = info.value.clientCount
     clientAddress.value = info.value.clientAddress ?? null
-    offClients = remote.onClients?.(({ count, address }) => {
+    remoteAddress.value = info.value.remoteAddress ?? null
+    speakerAddress.value = info.value.speakerAddress ?? null
+    offClients = remote.onClients?.(({ count, address, remoteAddress: ra, speakerAddress: sa }) => {
       clientCount.value = count
       clientAddress.value = address ?? null
+      remoteAddress.value = ra ?? null
+      speakerAddress.value = sa ?? null
     })
   } catch {
     failed.value = true
@@ -86,12 +93,12 @@ function copyOperatorUrl() {
 
       <div
         class="pairing-status"
-        :class="{ 'pairing-status--on': clientCount > 0 }"
+        :class="{ 'pairing-status--on': !!remoteAddress }"
         data-testid="remote-client-status"
       >
         <span class="status-dot" />
-        {{ clientCount > 0
-          ? t('settings.remote.clientConnected', { device: clientAddress ?? 'Piano LouvorJA' })
+        {{ remoteAddress
+          ? t('settings.remote.clientConnected', { device: remoteAddress })
           : t('settings.remote.waitingClient') }}
       </div>
 
@@ -169,11 +176,13 @@ function copyOperatorUrl() {
 
       <div
         class="pairing-status"
-        :class="{ 'pairing-status--on': !!info?.speakerUrl }"
+        :class="{ 'pairing-status--on': !!speakerAddress }"
         data-testid="remote-speaker-status"
       >
         <span class="status-dot" />
-        {{ info?.speakerUrl ? t('settings.remote.speakerReady') : t('settings.remote.speakerWaiting') }}
+        {{ speakerAddress
+          ? t('settings.remote.speakerConnected', { device: speakerAddress })
+          : (info?.speakerUrl ? t('settings.remote.speakerReady') : t('settings.remote.speakerWaiting')) }}
       </div>
 
       <div v-if="info?.speakerQrDataUrl" class="pairing-panel" data-testid="remote-speaker-block">

@@ -318,6 +318,7 @@ export default {
       speakerSteps: 'Point the speaker’s phone camera at the code — it opens in the browser, nothing to install.',
       speakerReady: 'Speaker ready',
       speakerWaiting: 'Waiting for speaker link',
+      speakerConnected: 'Speaker connected — {device}',
       operatorTitle: 'Operator',
       operatorHint: 'The operator scans this QR with the Piano LouvorJA app (Settings → Remote Control) — full liturgy control from the app.',
       operatorCopy: 'Copy operator link',

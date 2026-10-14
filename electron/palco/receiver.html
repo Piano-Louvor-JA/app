@@ -33,7 +33,8 @@
   /* Caixinha no PADRÃO da projeção (StagePreview): canto folha
      1.4cqw 0 1.4cqw 0 (16:9 → ~2.7vh 0), borda fina 1px, padding
      justo ao texto (2cqw ≈ 3.8vh lateral, 2vh vertical). */
-  #text.box-on{background:rgba(0,0,0,var(--box-bg,.45));
+  #text.box-on{background:rgba(24,24,24,var(--box-bg,.55));
+    backdrop-filter:blur(16px);
     /* Player: radius folha clamp(14px,2.4vmin,32px) 0, borda 0.2vmin e
        sombra suave. Padding mínimo — caixa abraça o texto (vmin).
        WIDTH (05/10 Rafael: "coloca ela mais perto do texto"): fit-content
@@ -44,7 +45,7 @@
     max-width:86vw;margin-inline:auto;
     padding:2.5vmin 4vmin;
     border-radius:2.4vmin 0 2.4vmin 0;
-    border:var(--box-border,.2vmin solid rgba(255,255,255,.25));
+    border:var(--box-border,.2vmin solid rgba(255,255,255,.85));
     box-shadow:0 10px 30px rgba(0,0,0,.4)}
   #text.shadow-off{text-shadow:none}
   /* Capa da música (isCover): título destaque amarelo, sem caixinha/borda —
@@ -3248,7 +3249,7 @@ function handle(m){
         if(m.textBox){t.classList.add('box-on');
           if(typeof m.boxOpacity==='number')t.style.setProperty('--box-bg',m.boxOpacity);
           t.style.setProperty('--box-border',
-            m.boxBorder?`${m.boxBorder.width||0.4}vh solid ${m.boxBorder.color||'rgba(255,255,255,.25)'}`:'none')}
+            m.boxBorder?`${m.boxBorder.width||0.2}vmin solid ${m.boxBorder.color||'rgba(255,255,255,.85)'}`:'none')}
         else{t.classList.add('box-off')}
       }
       // F3.3m: footer com referência destacada + versão

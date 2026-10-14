@@ -18,6 +18,8 @@ import type { MediaPlaybackMode } from '../../media/types/media'
 import { resolveMediaTarget } from './media-target'
 import { createModuleHandlers } from './module-handlers'
 import { palcoSession } from '../../settings/services/palco-session'
+import type { ProjectionInput } from '../../settings/services/palco-session'
+import { getPalcoRoute } from '../../settings/services/palco-routing'
 import { openMusicPlayer } from '../../media/services/open-music-player'
 import {
   loadAlbumMusicIndex,
@@ -62,6 +64,7 @@ interface ProjectionSlideApi {
   getPdfPageState?: () => Promise<{ index: number; total: number; projecting?: boolean } | null>
   getPptSlideState?: () => Promise<{ index: number; total: number; projecting?: boolean } | null>
   getImageSlideState?: () => Promise<{ index: number; total: number; projecting?: boolean } | null>
+  captureSourceFrame?: () => Promise<string | null>
   remotePdfNext?: () => Promise<{ index: number; total: number } | null>
   remotePdfPrev?: () => Promise<{ index: number; total: number } | null>
   remotePptNext?: () => Promise<{ index: number; total: number } | null>
@@ -200,6 +203,22 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
       }
     }
 
+    // Slides: PDF/PPT/imagens projetados têm precedência sobre o player
+    // de hinos — o pregador navega a apresentação, não o hino (fix -/-).
+    let slide: { index: number; total: number }
+    const docSlide =
+      (await projection?.getPdfPageState?.()) ??
+      (await projection?.getPptSlideState?.()) ??
+      (await projection?.getImageSlideState?.())
+    if (docSlide && docSlide.total > 0) {
+      slide = { index: docSlide.index, total: docSlide.total }
+    } else {
+      slide = {
+        index: player.slideIndex.value,
+        total: player.session.value?.slides?.length ?? 0,
+      }
+    }
+
     return {
       liturgy: {
         total: items.length,
@@ -214,10 +233,7 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
           done: item.done === true,
         })),
       },
-      slide: {
-        index: player.slideIndex.value,
-        total: player.session.value?.slides?.length ?? 0,
-      },
+      slide,
       player: {
         ...media,
         canPrevious: (liturgy.selectedItemIndex ?? 0) > 0,
@@ -470,10 +486,51 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
     if (timerRunning || countdownRunning) pushState()
   }, 1000)
 
+  // Documento projetado (PDF/PPT/imagens): sem evento de mudança de página —
+  // opera detects mudança por polling (2s), empurra ao pregador/APK e
+  // BOMBEIA o frame do slide ao Palco (TVs) — paridade com a tela por cabo.
+  let lastDocSlide = -1
+  const docPoll = setInterval(() => {
+    void (async () => {
+      try {
+        const s =
+          (await projection?.getPdfPageState?.()) ??
+          (await projection?.getPptSlideState?.()) ??
+          (await projection?.getImageSlideState?.())
+        if (s && s.total > 0 && s.index !== lastDocSlide) {
+          lastDocSlide = s.index
+          pushState()
+          // Frame → TV: capturePng (canvas) tem cor fiel; capturePage dava
+          // frame cinza de loading. dataURL vai como background da projeção.
+          const png = await projection?.captureSourceFrame?.()
+          if (png) {
+            const input: ProjectionInput = {
+              text: '',
+              frameDataUrl: `data:image/png;base64,${png}`,
+            }
+            await palcoSession.projectRouted('liturgy', 'liturgy', input)
+            // Preview do pregador assiste ao slot Principal (7081) — se a
+            // rota do módulo é outra TV, espelha no 0 também, senão o
+            // celular fica no splash (frame nunca chega lá).
+            if (getPalcoRoute('liturgy') !== 'mirror') {
+              await palcoSession.projectTo('0', 'liturgy', input)
+            }
+          }
+        } else if (!s && lastDocSlide !== -1) {
+          lastDocSlide = -1
+          pushState()
+        }
+      } catch {
+        /* projeção encerrada no meio do poll — ignora */
+      }
+    })()
+  }, 2000)
+
   pushState()
 
   return () => {
     clearInterval(progressTicker)
+    clearInterval(docPoll)
     onUn.command?.()
     onUn.state?.()
     unwatch()

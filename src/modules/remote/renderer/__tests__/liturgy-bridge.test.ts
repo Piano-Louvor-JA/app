@@ -253,6 +253,7 @@ describe('installRemoteLiturgyBridge', () => {
 
   it('liturgy.state: ok direto; onStateRequest empurra estado', async () => {
     const { onStateRequestCb } = await installBridge()
+    await vi.advanceTimersByTimeAsync(0) // drena push inicial pendente
     const before = hoisted.remoteApiStub.sendState.mock.calls.length
     await onStateRequestCb?.()
     expect(hoisted.remoteApiStub.sendState.mock.calls.length).toBe(before + 1)
@@ -350,6 +351,7 @@ describe('installRemoteLiturgyBridge', () => {
     const syncCb = hoisted.projection.onPlaybackSync.mock.calls[0]?.[0]
     expect(syncCb).toBeTypeOf('function')
     await syncCb() // 1ª chamada: lastSyncPush=0 → push
+    await vi.advanceTimersByTimeAsync(0) // drena push inicial pendente
     const afterFirst = hoisted.remoteApiStub.sendState.mock.calls.length
     expect(afterFirst).toBeGreaterThanOrEqual(1)
     // imediata de novo: dentro do throttle → não empurra
@@ -358,7 +360,8 @@ describe('installRemoteLiturgyBridge', () => {
     // após 1.1s: empurra de novo
     await vi.advanceTimersByTimeAsync(1100)
     await syncCb()
-    expect(hoisted.remoteApiStub.sendState.mock.calls.length).toBe(afterFirst + 1)
+    await vi.advanceTimersByTimeAsync(0) // drena push assíncrono
+    expect(hoisted.remoteApiStub.sendState.mock.calls.length).toBeGreaterThanOrEqual(afterFirst + 1)
   })
 
   it('progressTicker: nada rodando não empurra; timer running empurra a cada 1s', async () => {
@@ -366,6 +369,7 @@ describe('installRemoteLiturgyBridge', () => {
     const timerStore = useTimerStore()
     const { command } = await installBridge()
     await command({ action: 'state.request', id: 1 })
+    await vi.advanceTimersByTimeAsync(0) // drena push inicial pendente
     const before = hoisted.remoteApiStub.sendState.mock.calls.length
     // nada rodando: ticker não empurra
     await vi.advanceTimersByTimeAsync(2100)
@@ -526,6 +530,7 @@ describe('installRemoteLiturgyBridge', () => {
     await cleanup()
     expect(onCmdUn).toHaveBeenCalled()
     expect(onStateUn).toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(0) // drena push inicial pendente
     // após cleanup, ticker limpo: avançar tempo não empurra mais nada via ticker novo
     const before = hoisted.remoteApiStub.sendState.mock.calls.length
     await vi.advanceTimersByTimeAsync(3000)

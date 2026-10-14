@@ -134,6 +134,13 @@ describe('receiver do palco — regressão', () => {
     expect(w.__mediaLastSeen).toBeGreaterThan(0)
   })
 
+  it('caixa de letra: defaults alinham projeção e operador', () => {
+    const html = readFileSync(RECEIVER_PATH, 'utf-8')
+    expect(html).toContain('#text.box-on{background:rgba(24,24,24,var(--box-bg,.55));')
+    expect(html).toContain('backdrop-filter:blur(16px)')
+    expect(html).toContain('rgba(255,255,255,.85)')
+  })
+
   it('paridade: receiver embutido é idêntico ao webos do palco-receiver', () => {
     // fonte da verdade: ~/palco-receiver/webos/index.html (se existir na máquina)
     const webosPath = resolve(process.env.HOME ?? '', 'palco-receiver/webos/index.html')

@@ -186,6 +186,10 @@ export type RemotePairingInfo = {
   operatorQrDataUrl?: string
   clientCount: number
   clientAddress?: string | null
+  /** Identidade do APK/controle remoto conectado (painel esquerdo). */
+  remoteAddress?: string | null
+  /** Identidade do pregador conectado (painel direito). */
+  speakerAddress?: string | null
 }
 
 export type RemoteApi = {
@@ -195,7 +199,12 @@ export type RemoteApi = {
   sendState: (state: Record<string, unknown>) => void
   pairingInfo: () => Promise<RemotePairingInfo>
   onClients?: (
-    callback: (payload: { count: number; address?: string | null }) => void,
+    callback: (payload: {
+      count: number
+      address?: string | null
+      remoteAddress?: string | null
+      speakerAddress?: string | null
+    }) => void,
   ) => () => void
 }
 
@@ -389,6 +398,7 @@ export type ProjectionApi = {
     total: number
     projecting?: boolean
   } | null>
+  captureSourceFrame?: () => Promise<string | null>
   getSiteTargetMonitors?: () => Promise<number[]>
   setSiteTargetMonitors?: (ids: number[]) => Promise<boolean>
   getVideoTargetMonitors?: () => Promise<number[]>

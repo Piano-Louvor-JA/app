@@ -462,7 +462,10 @@ describe('gaps finais — wake falho, bg oficial sem match, rotas', () => {
     })
     await palcoSession.project('hymns', { text: 'x' })
     const payload = palco.send.mock.calls[0]?.[0] as Record<string, unknown>
-    expect(payload.boxBorder).toMatchObject({ width: 0.4 })
+    expect(payload.boxBorder).toMatchObject({
+      width: 0.2,
+      color: 'rgba(255,255,255,0.85)',
+    })
   })
 })
 
