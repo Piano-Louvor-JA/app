@@ -200,6 +200,18 @@ describe("ensureAlbumCovers", () => {
 		expect(mocks.state.catalog.get(COVERS_KEY)).toBeUndefined();
 	});
 
+	it("objeto de falha do IPC não conta como baixado", async () => {
+		mocks.state.bridge = {
+			media: {
+				check: vi.fn(async () => false),
+				download: vi.fn(async () => ({ ok: false, url: "http://api/covers/a.jpg", status: 500, bytes: 0, error: "boom" })),
+			},
+		};
+		const result = await ensureAlbumCovers({ skipIfSynced: false });
+		expect(result.downloaded).toBe(0);
+		expect(mocks.state.catalog.get(COVERS_KEY)).toBeUndefined();
+	});
+
 	it("erro inesperado → vazio com warn (isRunning liberado)", async () => {
 		const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 		// albums presente mas iteração interna quebra

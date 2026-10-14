@@ -250,6 +250,27 @@ describe('downloadTrackMedia', () => {
     expect(warn).toHaveBeenCalled()
     expect(download).toHaveBeenCalled()
     warn.mockRestore()
+  })
+
+  it('objeto de falha do IPC não marca cache nem sucesso', async () => {
+    isDesktopApp.mockReturnValue(true)
+    readCatalogRecord.mockResolvedValue({ url_music: '/musics/pt/1.mp3' })
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    getDesktopBridge.mockReturnValue({
+      media: {
+        check: vi.fn().mockResolvedValue(false),
+        download: vi.fn().mockResolvedValue({ ok: false, url: 'https://api/file', status: 500, bytes: 0, error: 'boom' }),
+      },
+    } as never)
+
+    expect(await downloadTrackMedia(1)).toEqual({ status: 'error', reason: 'server' })
+    expect(peekTrackDownloadCache(1)).not.toBe(true)
+    warn.mockRestore()
+  })
+
+  it('abort pós-check -> cancelled', async () => {
+    isDesktopApp.mockReturnValue(true)
+    readCatalogRecord.mockResolvedValue({ url_music: '/musics/pt/1.mp3' })
 
     // abort após o check: shouldAbort alterna false->true
     let calls = 0

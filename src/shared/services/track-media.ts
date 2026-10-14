@@ -285,7 +285,7 @@ export async function downloadTrackMedia(
         invalidateTrackMediaCache(musicId)
         return { status: 'idle', reason: 'cancelled' }
       }
-      if (!ok) {
+      if (ok !== true) {
         errors += 1
         console.warn(
           `[track-media] falha ao baixar ${item.type}: ${relative}`,
