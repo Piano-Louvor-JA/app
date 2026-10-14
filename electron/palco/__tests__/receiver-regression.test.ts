@@ -128,6 +128,51 @@ describe('receiver do palco — regressão', () => {
     w.__mediaLastSeen = 0
   })
 
+  it('REGRESSÃO 13/10 (paridade total): lyricUpperCase/textAlign/margin/bg aplicados', () => {
+    w.__mediaLastSeen = 0
+    w.__videoAudioActive = false
+    w.handle({
+      ...PROJECTION,
+      lyricUpperCase: false,
+      textAlign: 'left',
+      textVerticalAlign: 'top',
+      margin: 216,
+      backgroundColor: '#101014',
+    })
+    const t0 = el('text') as HTMLElement
+    expect(t0.style.textTransform).toBe('none')
+    expect(t0.style.textAlign).toBe('left')
+    // vAlign=top usa o padding do IIFE (paridade popup): 120/10.8 ≈ 11.11vh
+    expect(t0.style.top).toBe((120 / 10.8) + 'vh')
+    // margin px@1920 → área útil (max-width), nunca margin CSS (14/10:
+    // `20vh 0` matava o margin:0 auto e deslocava a caixa na TV).
+    expect(t0.style.maxWidth).toBe('calc(77.5vw)') // 100−(216/9.6), normalizado
+    expect(t0.style.margin).toBe('0px auto')
+    // cor de fundo pinta o PALCO (body), paridade local
+    expect(w.document.body.style.background).toBe('rgb(16, 16, 20)')
+    // volta ao padrão
+    w.handle(PROJECTION)
+  })
+
+  it('REGRESSÃO 13/10 (bible-box): caixa grande só na Bíblia', () => {
+    w.__mediaLastSeen = 0
+    w.__videoAudioActive = false
+    w.handle({ ...PROJECTION, textBox: true, bibleBox: true })
+    expect(el('text').classList.contains('bible-box')).toBe(true)
+    w.handle({ ...PROJECTION, textBox: true, bibleBox: false })
+    expect(el('text').classList.contains('bible-box')).toBe(false)
+  })
+
+  it('REGRESSÃO 13/10 (cover): uppercase da capa é escolha do usuário', () => {
+    w.__mediaLastSeen = 0
+    w.__videoAudioActive = false
+    w.handle({ ...PROJECTION, isCover: true, titleUpperCase: false })
+    expect((el('text') as HTMLElement).style.textTransform).toBe('none')
+    w.handle({ ...PROJECTION, isCover: true, titleUpperCase: true })
+    expect((el('text') as HTMLElement).style.textTransform).toBe('uppercase')
+    w.handle(PROJECTION)
+  })
+
   it('heartbeat: mensagens video/audio renovam __mediaLastSeen', () => {
     w.__mediaLastSeen = 0
     w.handle({ v: 2, type: 'audio', action: 'pause' })

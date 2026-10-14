@@ -75,6 +75,7 @@ const digitalStyle = computed(() => {
         : 'none',
     borderRadius: st?.textBox ? '1.4cqw 0 1.4cqw 0' : '0',
     padding: st?.textBox ? '2.5vmin 1.8vmin' : '0',
+    backdropFilter: st?.textBox ? 'blur(16px)' : 'none',
   } as Record<string, string>
 })
 

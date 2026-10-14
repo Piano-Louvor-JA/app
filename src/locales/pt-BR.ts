@@ -1,4 +1,12 @@
 export default {
+  windowControls: {
+    close: 'Fechar',
+    minimize: 'Minimizar',
+    maximize: 'Maximizar',
+  },
+  a11y: {
+    mainNav: 'Navegação principal',
+  },
   apiOffline: {
     message: 'Sem conex\u00e3o com o servi\u00e7o \u2014 verifique sua internet',
     retrying: 'Tentando reconectar...',
@@ -14,6 +22,8 @@ export default {
   common: {
     close: 'Fechar',
     comingSoon: 'Em breve',
+    openFolder: 'Abrir pasta',
+    addToPlaylist: 'Adicionar à playlist',
     cancel: 'Cancelar',
     copied: 'Copiado!',
   },

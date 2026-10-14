@@ -155,7 +155,7 @@ const titleWeightOptions: { value: NonNullable<StageSettings['titleFontWeight']>
 ]
 
 function clearTitleOverrides() {
-  patch({ titleFontSize: null, titleFontWeight: null, titleTextColor: null, titleTextShadow: null, titleUpperCase: false })
+  patch({ titleFontSize: null, titleFontWeight: null, titleTextColor: null, titleTextShadow: null, titleUpperCase: false, titleTextBox: false })
 }
 
 function clearLyricOverrides() {
@@ -553,6 +553,23 @@ const confirmReset = ref(false)
             :checked="settings.titleTextShadow ?? settings.textShadow"
             :aria-label="t('settings.stage.titleTextShadow')"
             @change="patch({ titleTextShadow: ($event.target as HTMLInputElement).checked })"
+          >
+        </div>
+
+        <div class="stage-custom__toggle-row">
+          <button
+            type="button"
+            class="stage-custom__toggle-label"
+            @click="patch({ titleTextBox: !settings.titleTextBox })"
+          >
+            {{ t('settings.stage.titleTextBox') }}
+          </button>
+          <input
+            type="checkbox"
+            class="stage-custom__toggle"
+            :checked="settings.titleTextBox"
+            :aria-label="t('settings.stage.titleTextBox')"
+            @change="patch({ titleTextBox: ($event.target as HTMLInputElement).checked })"
           >
         </div>
       </div>

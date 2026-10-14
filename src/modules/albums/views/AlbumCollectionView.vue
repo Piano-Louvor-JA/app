@@ -249,7 +249,7 @@ async function runAction(
           class="playlist-picker"
           role="dialog"
           aria-modal="true"
-          aria-label="Adicionar à playlist"
+          :aria-label="t('common.addToPlaylist')"
           @click.self="closePlaylistPicker"
           @keydown.esc="closePlaylistPicker"
         >
@@ -260,14 +260,14 @@ async function runAction(
                   <i class="ti ti-music" aria-hidden="true" />
                 </span>
                 <div class="playlist-picker__track-info">
-                  <small>Adicionar à playlist</small>
+                  <small>{{ t('common.addToPlaylist') }}</small>
                   <strong>{{ playlistItem.title }}</strong>
                 </div>
               </div>
               <button
                 type="button"
                 class="playlist-picker__close"
-                aria-label="Fechar"
+                :aria-label="t('common.close')"
                 @click="closePlaylistPicker"
               >
                 <i class="ti ti-x" aria-hidden="true" />

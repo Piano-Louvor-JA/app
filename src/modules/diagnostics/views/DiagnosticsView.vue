@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import { getDesktopBridge } from '@shared/services/desktop-bridge'
+
+const { t } = useI18n()
 
 type RunResult = { report: unknown; jsonPath: string; txtPath: string }
 
@@ -162,7 +165,7 @@ function openFolder() {
         </div>
         <div class="actions">
           <button class="secondary" @click="send">Enviar relatório</button>
-          <button class="secondary" @click="openFolder">Abrir pasta</button>
+          <button class="secondary" @click="openFolder">{{ t('common.openFolder') }}</button>
         </div>
         <p v-if="sendMessage" class="progress">{{ sendMessage }}</p>
       </template>

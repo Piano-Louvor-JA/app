@@ -30,6 +30,40 @@ type CatalogMusicRecord = {
 
 const downloadedCache = new Map<string, boolean>()
 
+/**
+ * Eventos de mutação do disco (download concluído / delete / invalidação).
+ * UI (badge "baixado") assina para refletir o disco em tempo real sem
+ * depender de re-mount — downloads podem terminar em OUTRO fluxo
+ * (pre-play ensureTrackDownloaded, ondemand).
+ */
+export type TrackMediaChangedListener = (
+  musicId: number,
+  downloaded: boolean,
+) => void
+
+const trackMediaChangedListeners = new Set<TrackMediaChangedListener>()
+
+export function onTrackMediaChanged(l: TrackMediaChangedListener): void {
+  trackMediaChangedListeners.add(l)
+}
+
+export function offTrackMediaChanged(l: TrackMediaChangedListener): void {
+  trackMediaChangedListeners.delete(l)
+}
+
+function emitTrackMediaChanged(
+  musicId: number,
+  downloaded: boolean,
+): void {
+  for (const l of trackMediaChangedListeners) {
+    try {
+      l(musicId, downloaded)
+    } catch (err) {
+      console.warn('[track-media] listener falhou', err)
+    }
+  }
+}
+
 function trackCacheKey(musicId: number): string {
   return `${getCurrentApiPrefix()}:${musicId}`
 }
@@ -304,6 +338,7 @@ export async function downloadTrackMedia(
   }
 
   downloadedCache.set(trackCacheKey(musicId), true)
+  emitTrackMediaChanged(musicId, true)
   return { status: 'downloaded' }
 }
 
@@ -319,4 +354,5 @@ export async function deleteTrackMedia(musicId: number): Promise<void> {
   }
 
   downloadedCache.set(trackCacheKey(musicId), false)
+  emitTrackMediaChanged(musicId, false)
 }

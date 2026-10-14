@@ -1079,7 +1079,7 @@ onMounted(async () => {
       <button
         type="button"
         class="editor__btn"
-        title="Importar arquivo .slja"
+        :title="t('media.editor.importSlja')"
         @click="onImportSlja"
       >
         <i
@@ -1092,7 +1092,7 @@ onMounted(async () => {
         type="button"
         class="editor__btn"
         :disabled="!hasSelection || lyrics.length === 0"
-        title="Exportar música atual como .slja"
+        :title="t('media.editor.exportSlja')"
         @click="onExportSlja"
       >
         <i
@@ -1162,7 +1162,7 @@ onMounted(async () => {
             :style="selectedCollection.coverUrl
               ? { backgroundImage: `url(${customFileUrl(selectedCollection.coverUrl)})` }
               : undefined"
-            title="Alterar capa da coletânea"
+            :title="t('media.editor.changeCover')"
             @click="coverInput?.click()"
           >
             <i
@@ -1175,7 +1175,7 @@ onMounted(async () => {
             v-if="selectedCollection.coverUrl"
             type="button"
             class="editor__btn editor__btn--danger editor__btn--icon"
-            title="Remover capa"
+            :title="t('media.editor.removeCover')"
             @click="onRemoveCover"
           >
             <i
@@ -1188,7 +1188,7 @@ onMounted(async () => {
             type="file"
             accept="image/*"
             class="editor__file-input"
-            aria-label="Alterar capa da coletânea"
+            :aria-label="t('media.editor.changeCover')"
             @change="onCoverFile"
           >
         </div>
@@ -1197,7 +1197,7 @@ onMounted(async () => {
             v-model="newCollectionName"
             type="text"
             class="editor__input"
-            placeholder="Nova coletânea…"
+            :placeholder="t('media.editor.newCollection')"
             @keyup.enter="onCreateCollection"
           >
           <button
@@ -1329,7 +1329,7 @@ onMounted(async () => {
           type="button"
           class="editor__btn editor__btn--danger"
           :disabled="saving"
-          title="Excluir coletânea selecionada"
+          :title="t('media.editor.deleteCollection')"
           @click="requestDelete('collection')"
         >
           <i
@@ -1360,7 +1360,7 @@ onMounted(async () => {
               v-model="newMusicName"
               type="text"
               class="editor__input"
-              placeholder="Nova música…"
+              :placeholder="t('media.editor.newMusic')"
               @keyup.enter="onCreateMusic"
             >
             <button
@@ -1382,7 +1382,7 @@ onMounted(async () => {
               v-model="reuseSearch"
               type="text"
               class="editor__input"
-              placeholder="Reutilizar música existente…"
+              :placeholder="t('media.editor.reuseMusic')"
               @input="onReuseSearchInput"
             >
             <ul
@@ -1425,7 +1425,7 @@ onMounted(async () => {
                 v-model="officialSearch"
                 type="text"
                 class="editor__input"
-                placeholder="Buscar hino oficial (nº ou nome)…"
+                :placeholder="t('media.editor.searchOfficial')"
                 @input="onOfficialSearchInput"
                 @keyup.enter="onAddOfficialFromSearch"
               >
@@ -1433,7 +1433,7 @@ onMounted(async () => {
                 type="button"
                 class="editor__btn"
                 :disabled="saving || officialSearchResults.length === 0"
-                title="Adicionar 1º resultado"
+                :title="t('media.editor.addFirstResult')"
                 @click="onAddOfficialFromSearch"
               >
                 <i
@@ -1482,7 +1482,7 @@ onMounted(async () => {
                 <i
                   v-if="music.officialMusicId"
                   class="ti ti-book editor__official-badge"
-                  title="Hino oficial (gerenciado no catálogo)"
+                  :title="t('media.editor.officialHymn')"
                   aria-hidden="true"
                 />
                 {{ music.name }}
@@ -1494,7 +1494,7 @@ onMounted(async () => {
             type="button"
             class="editor__btn editor__btn--danger"
             :disabled="saving"
-            title="Excluir música selecionada"
+            :title="t('media.editor.deleteMusic')"
             @click="requestDelete('music')"
           >
             <i
@@ -1591,7 +1591,7 @@ onMounted(async () => {
                   type="button"
                   class="editor__btn"
                   :disabled="saving"
-                  title="Vincular um arquivo de áudio (MP3) à música"
+                  :title="t('media.editor.linkAudio')"
                   @click="onPickAudio"
                 >
                   <i
@@ -1605,7 +1605,7 @@ onMounted(async () => {
                   type="button"
                   class="editor__btn editor__btn--danger"
                   :disabled="saving"
-                  title="Remover o áudio vinculado"
+                  :title="t('media.editor.removeAudio')"
                   @click="onRemoveAudio"
                 >
                   <i
@@ -1644,7 +1644,7 @@ onMounted(async () => {
                   type="button"
                   class="editor__btn editor__btn--mark"
                   :disabled="saving || !isPlaying"
-                  title="Marcar o instante atual do áudio como timing desta estrofe"
+                  :title="t('media.editor.markTiming')"
                   @click="onMarkStanzaTime(index)"
                 >
                   <i
@@ -1669,7 +1669,7 @@ onMounted(async () => {
                   type="button"
                   class="editor__btn editor__btn--danger editor__btn--icon"
                   :disabled="saving"
-                  title="Excluir estrofe"
+                  :title="t('media.editor.deleteStanza')"
                   @click="requestDelete('stanza', { stanzaIndex: index })"
                 >
                   <i
@@ -1682,7 +1682,7 @@ onMounted(async () => {
                 v-model="stanza.lyric"
                 class="editor__textarea"
                 rows="4"
-                placeholder="Letra da estrofe…"
+                :placeholder="t('media.editor.lyricPlaceholder')"
                 @dblclick="onSeekToStanza(index)"
               />
               <div class="editor__stanza-media">
@@ -1743,7 +1743,7 @@ onMounted(async () => {
           <button
             type="button"
             class="editor__lyric-pane-toggle"
-            title="Ocultar letra"
+            :title="t('media.editor.hideLyric')"
             @click="lyricPaneOpen = false"
           >
             <i
@@ -1774,7 +1774,7 @@ onMounted(async () => {
         v-else-if="hasSelection"
         type="button"
         class="editor__lyric-pane-toggle editor__lyric-pane-toggle--floating"
-        title="Mostrar letra"
+        :title="t('media.editor.showLyric')"
         @click="lyricPaneOpen = true"
       >
         <i
@@ -1787,8 +1787,8 @@ onMounted(async () => {
       :open="confirmOpen"
       :title="confirmTitle"
       :message="confirmMessage"
-      confirm-label="Excluir"
-      cancel-label="Cancelar"
+      :confirm-label="t('media.editor.delete')"
+      :cancel-label="t('media.editor.cancel')"
       danger
       @confirm="onConfirmDelete"
       @cancel="confirmOpen = false"

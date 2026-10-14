@@ -393,6 +393,7 @@ export default {
       titleFontWeight: 'Peso de la fuente del título',
       titleUpperCase: 'Título en MAYÚSCULAS',
       titleTextShadow: 'Sombra en el título',
+      titleTextBox: 'Caja en el título',
       lyricAppearance: 'Estrofas — apariencia propia',
       lyricReset: 'Usar estilo general',
       lyricTextColor: 'Color de las estrofas',

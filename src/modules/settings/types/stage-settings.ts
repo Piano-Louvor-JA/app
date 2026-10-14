@@ -87,6 +87,8 @@ export type StageSettings = {
   titleTextColor: string | null
   titleUpperCase: boolean
   titleTextShadow: boolean | null
+  /** Caixa atrás do título (1º slide). Default false = capa clássica sem caixa (14/10). */
+  titleTextBox: boolean
   /**
    * Estrofes (slides de letra): personalização própria. `null`/`undefined`
    * = usa o estilo geral (que JÁ É o das estrofes) — espelha title*.
@@ -196,6 +198,7 @@ export const DEFAULT_STAGE_SETTINGS: StageSettings = {
   titleTextColor: null,
   titleUpperCase: false,
   titleTextShadow: null,
+  titleTextBox: false,
   lyricFontSize: null,
   lyricFontWeight: null,
   lyricTextColor: null,
@@ -385,6 +388,7 @@ export function parseStageSettings(raw: unknown): StageSettings {
     titleTextColor: s['tFg'] == null ? null : asColorOrNull(s['tFg']),
     titleUpperCase: typeof s['tUpper'] === 'boolean' ? s['tUpper'] : false,
     titleTextShadow: typeof s['tsOnT'] === 'boolean' ? s['tsOnT'] : null,
+    titleTextBox: typeof s['tBox'] === 'boolean' ? s['tBox'] : false,
     lyricFontSize:
       s['lSize'] == null ? null : clamp(asNumber(s['lSize'], 84), 60, 160),
     lyricFontWeight: s['lWeight'] == null ? null : (WEIGHTS.includes(asNumber(s['lWeight'], 600) as StageFontWeight) ? (asNumber(s['lWeight'], 600) as StageFontWeight) : null),
@@ -492,6 +496,7 @@ export function serializeStageSettings(s: StageSettings): Record<string, unknown
     ...(s.titleTextColor != null ? { tFg: s.titleTextColor } : {}),
     ...(s.titleUpperCase ? { tUpper: true } : {}),
     ...(s.titleTextShadow != null ? { tsOnT: s.titleTextShadow } : {}),
+    ...(s.titleTextBox ? { tBox: true } : {}),
     ...(s.lyricFontSize != null ? { lSize: s.lyricFontSize } : {}),
     ...(s.lyricFontWeight != null ? { lWeight: s.lyricFontWeight } : {}),
     ...(s.lyricTextColor != null ? { lFg: s.lyricTextColor } : {}),

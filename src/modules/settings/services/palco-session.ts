@@ -182,13 +182,17 @@ class PalcoSession {
   async project(scope: string, input: ProjectionInput): Promise<void> {
     if (!this.isElectron) return
     const s = readEffectiveStageSettings(scope)
-    // Hinos com overrideBg: o bg configurado no escopo vence o asset da
-    // música (capa/slide) — fundo próprio pra todas as músicas.
+    // BG do usuário (backgroundImage) é a personalização ativa: vence a capa/
+    // asset da API em QUALQUER escopo — paridade com a projeção local
+    // (MediaProjectionView: preferência ?? capa). Antes o palco fazia o
+    // inverso (capa ?? preferência) → bg da API vencia a escolha do usuário
+    // só no palco (14/10). Hymns overrideBg continua indiferente ao input.
     const overrideHymnBg = scope === 'hymns' && s.hymns?.overrideBg === true
+    const userBg = resolveBackgroundImage(s.backgroundImage)
     const bg = await this.resolveBgUrl(
-      overrideHymnBg
-        ? resolveBackgroundImage(s.backgroundImage)
-        : input.background ?? resolveBackgroundImage(s.backgroundImage),
+      overrideHymnBg || userBg
+        ? userBg
+        : input.background ?? userBg,
     )
     // Bíblia tem tipografia própria (paridade APK StageSession / PalcoOrchestrator).
     const isBible = scope === 'bible'
@@ -219,7 +223,10 @@ class PalcoSession {
       textShadow: s.textShadow,
       shadowBlur: s.shadowBlur,
       shadowIntensity: s.shadowIntensity,
+      // Caixa GRANDE (véu de leitura) é exclusiva da Bíblia (13/10 Rafael);
+      // demais escopos: caixa justa ao texto (padrão media-slide/receiver).
       textBox: s.textBox,
+      bibleBox: isBible,
       boxOpacity: s.boxOpacity,
       boxBorder: s.boxBorder
         ? { width: 0.2, color: 'rgba(255,255,255,0.85)' }
@@ -236,7 +243,13 @@ class PalcoSession {
         input.isCover === true
           ? (isHymns && s.lyricTextColor != null ? s.lyricTextColor : undefined)
           : (isHymns && s.lyricTextColor != null ? s.lyricTextColor : textColor),
-      lyricUpperCase: isHymns ? s.lyricUpperCase : false,
+      // Paridade total (13/10): uppercase da letra em TODOS os escopos —
+      // mesma chave lUpper que o app/projeção aplicam.
+      lyricUpperCase: s.lyricUpperCase,
+      // Capa (isCover): uppercase do TÍTULO — paridade titleStyle local.
+      titleUpperCase: s.titleUpperCase,
+      // Caixa opcional na capa (14/10): default off = capa clássica amarela.
+      titleTextBox: s.titleTextBox,
       lyricTextShadow: isHymns && s.lyricTextShadow != null ? s.lyricTextShadow : s.textShadow,
       // Personalização completa da projeção local refletida no palco:
       textAlign: s.textAlign,

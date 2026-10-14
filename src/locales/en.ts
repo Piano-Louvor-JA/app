@@ -1,4 +1,12 @@
 export default {
+  windowControls: {
+    close: 'Close',
+    minimize: 'Minimize',
+    maximize: 'Maximize',
+  },
+  a11y: {
+    mainNav: 'Main navigation',
+  },
   apiOffline: {
     message: 'No connection to the service \u2014 check your internet',
     retrying: 'Trying to reconnect...',
@@ -14,6 +22,8 @@ export default {
   common: {
     close: 'Close',
     comingSoon: 'Coming soon',
+    openFolder: 'Open folder',
+    addToPlaylist: 'Add to playlist',
     cancel: 'Cancel',
     copied: 'Copied!',
   },

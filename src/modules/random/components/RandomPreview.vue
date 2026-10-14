@@ -30,6 +30,7 @@ const textStyle = computed(() => {
     border: st?.textBox && st.boxBorder && !drawing ? 'clamp(2px, 0.2vmin, 4px) solid rgba(255,255,255,.85)' : 'none',
     borderRadius: st?.textBox ? '1.4cqw 0 1.4cqw 0' : '0',
     padding: st?.textBox ? '2.5vmin 1.8vmin' : '0 2.5rem',
+    backdropFilter: st?.textBox ? 'blur(16px)' : 'none',
     opacity: props.runtime.currentDisplay ? 1 : 0,
   }
 })

@@ -391,6 +391,7 @@ export default {
       titleFontWeight: 'Title font weight',
       titleUpperCase: 'Title in UPPERCASE',
       titleTextShadow: 'Title text shadow',
+      titleTextBox: 'Box behind title',
       lyricAppearance: 'Verses — own appearance',
       lyricReset: 'Use general style',
       lyricTextColor: 'Verse color',

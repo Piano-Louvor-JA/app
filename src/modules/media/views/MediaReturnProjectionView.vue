@@ -347,15 +347,20 @@ const barColor = computed(() => stage.value.footerRefColor || '#FCCE02')
 const showNext = computed(() => Boolean(shownNext.value) || shownNextCover.value)
 const progressPct = computed(() => Math.round(barDisplay.value * 100))
 
-const textStyle = computed(() => ({
-  color: stage.value.textColor ?? undefined,
-  fontSize: `${(stage.value.fontSize / 1920) * 100}cqw`,
-  fontWeight: String(stage.value.fontWeight),
-  textAlign: stage.value.textAlign,
-  textShadow: stage.value.textShadow
-    ? `0 0 ${(stage.value.shadowBlur / 108) * 100}cqw rgba(0,0,0,${stage.value.shadowIntensity})`
-    : 'none',
-}))
+const textStyle = computed(() => {
+  const s = stage.value
+  return {
+    color: s.lyricTextColor ?? s.textColor ?? undefined,
+    fontSize: `${((s.lyricFontSize ?? s.fontSize) / 1920) * 100}cqw`,
+    fontWeight: String(s.lyricFontWeight ?? s.fontWeight),
+    textAlign: s.textAlign,
+    textShadow: (s.lyricTextShadow ?? s.textShadow)
+      ? `0 0 ${(s.shadowBlur / 108) * 100}cqw rgba(0,0,0,${s.shadowIntensity})`
+      : 'none',
+    // Paridade total (13/10): uppercase é ESCOLHA — CSS base sem hardcode.
+    textTransform: s.lyricUpperCase ? 'uppercase' : 'none',
+  }
+})
 
 const nextTextStyle = computed(() => ({
   ...textStyle.value,
@@ -530,7 +535,6 @@ watch(barFillRef, (el) => {
   line-height: 1.35;
   letter-spacing: 0.03em;
   text-align: center;
-  text-transform: uppercase;
   white-space: pre-line;
 }
 

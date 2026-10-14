@@ -9,7 +9,7 @@ import net from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
 import tls from 'node:tls'
-import { app, ipcMain, session, shell } from 'electron'
+import { app, ipcMain, screen, session, shell } from 'electron'
 import {
   collectLogs,
   crashHistory,
@@ -105,10 +105,39 @@ export function serializeReportWithinBudget(report, budget = DIAGNOSTICS_MAX_JSO
 }
 
 // screen via electron — monitores/resolução pra problemas de projeção em 2ª tela.
-function monitoresAbertos() {
+// v3 (14/10): detalhes por monitor (bounds/scale/EDID) + TVs. Antes: só contagem
+// via require('electron') — quebrado em ESM .mjs (sempre null).
+import { collectEdidMonitors } from './edid.mjs'
+
+function monitoresDetalhes() {
   try {
-    const { screen } = require('electron')
-    return screen.getAllDisplays().length
+    const primaryId = screen.getPrimaryDisplay().id
+    const displays = screen.getAllDisplays()
+    let edid = []
+    try { edid = collectEdidMonitors() } catch { /* EDID é best-effort */ }
+    return displays.map((display, i) => {
+      const edidMatch =
+        edid.find((m) => display.label && m.connector?.includes(String(display.label))) ??
+        edid[i] ??
+        null
+      const { bounds, workArea } = display
+      const overscanSuspeito =
+        bounds.width - workArea.width !== 0 || bounds.height - workArea.height !== 0
+      return {
+        indice: i + 1,
+        id: display.id,
+        primario: display.id === primaryId,
+        bounds: { width: bounds.width, height: bounds.height },
+        workArea: { width: workArea.width, height: workArea.height },
+        rotacao: display.rotation,
+        scaleFactor: display.scaleFactor,
+        overscanSuspeito,
+        fabricante: edidMatch?.manufacturer ?? null,
+        modelo: edidMatch?.name ?? null,
+        productCode: edidMatch?.productCode ?? null,
+        connector: edidMatch?.connector ?? null,
+      }
+    })
   } catch { return null }
 }
 
@@ -374,6 +403,18 @@ function reportText(report) {
     if (cr.caos?.vpnAtiva) crLines.push('VPN/adapter virtual ativo detectado.')
     if (report.vereditoHeuristico?.startsWith('remote-')) crLines.push(`Dica: ${REMOTE_TIPS[report.vereditoHeuristico] ?? ''}`)
   }
+  const monitores = Array.isArray(report.triage?.monitores) ? report.triage.monitores : []
+  const monitoresLines = []
+  if (monitores.length) {
+    monitoresLines.push('', 'Monitores/TVs:')
+    for (const m of monitores) {
+      const modelo = m.modelo ? ` — ${m.modelo}` : m.fabricante ? ` — ${m.fabricante}` : ''
+      monitoresLines.push(
+        `#${m.indice}${m.primario ? ' (principal)' : ''}: ${m.bounds.width}x${m.bounds.height}${m.scaleFactor !== 1 ? ` @${m.scaleFactor}x` : ''}${modelo}` +
+          (m.overscanSuspeito ? ' [ATENÇÃO: bordas prováveis — ajuste Picture Size da TV p/ "Just Scan"/"Screen Fit"]' : ''),
+      )
+    }
+  }
   const lines = [
     'LouvorJA Diagnóstico — SrCaldeira',
     `Data (local): ${report.meta.dataLocal} (${report.ambiente.timezone})`,
@@ -381,6 +422,7 @@ function reportText(report) {
     `Duração: ${report.meta.duracaoMs} ms`,
     `Veredito heurístico: ${report.vereditoHeuristico}`,
     ...crLines,
+    ...monitoresLines,
     '',
     'APIs:',
     ...report.rede.apis.map((api) => `${api.host}: DNS ${api.dns.ok ? 'OK' : api.dns.erro?.classe}; TCP ${api.tcp.ok ? 'OK' : api.tcp.erro?.classe}; TLS ${api.tls.ok ? 'OK' : api.tls.erro?.classe}; HTTP ${api.http.map((item) => item.status ?? item.erro?.classe).join(', ')}`),
@@ -509,7 +551,7 @@ async function runDiagnostics() {
     ambiente: { os: process.platform, osRelease: os.release(), arch: process.arch, electron: process.versions.electron, chrome: process.versions.chrome, locale: app.getLocale(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, online: general['1.1.1.1:443'].ok || general['google.com:443'].ok },
     rede: { proxy: { resolveProxyPorOrigem: proxy, envHttpProxy: process.env.HTTP_PROXY ?? null, envHttpsProxy: process.env.HTTPS_PROXY ?? null }, hostsOverrides, conectividadeGeral: general, apis, reproducaoBootstrap: reproduction, mediaReal: mediaProbe, dnsSuspeito },
     instalacaoReal: installation,
-    triage: { storage, crashes, memoria, discoLivreMb, antivirus, logs, gpuFeatures, monitores: monitoresAbertos(), versaoInstalacaoReal, rendererErrors, downloadFailures },
+    triage: { storage, crashes, memoria, discoLivreMb, antivirus, logs, gpuFeatures, monitores: monitoresDetalhes(), versaoInstalacaoReal, rendererErrors, downloadFailures },
     controleRemoto,
   }
   report.vereditoHeuristico = computeVerdict({ general, apis, proxy, hosts: hostsOverrides, installation, extra, controleRemoto })

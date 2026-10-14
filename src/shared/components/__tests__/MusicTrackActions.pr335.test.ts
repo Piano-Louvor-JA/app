@@ -26,6 +26,8 @@ vi.mock('@shared/services/track-media', () => ({
   isTrackMediaDownloaded: (...a: unknown[]) => isTrackMediaDownloaded(...(a as [])),
   downloadTrackMedia: (...a: unknown[]) => downloadTrackMedia(...(a as [])),
   deleteTrackMedia: (...a: unknown[]) => deleteTrackMedia(...(a as [])),
+  onTrackMediaChanged: () => {},
+  offTrackMediaChanged: () => {},
 }))
 
 const reconcileAlbumsForMusic = vi.fn(async () => {})

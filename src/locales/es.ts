@@ -1,4 +1,12 @@
 export default {
+  windowControls: {
+    close: 'Cerrar',
+    minimize: 'Minimizar',
+    maximize: 'Maximizar',
+  },
+  a11y: {
+    mainNav: 'Navegación principal',
+  },
   apiOffline: {
     message: 'Sin conexi\u00f3n con el servicio \u2014 verifica tu internet',
     retrying: 'Intentando reconectar...',
@@ -14,6 +22,8 @@ export default {
   common: {
     close: 'Cerrar',
     comingSoon: 'Próximamente',
+    openFolder: 'Abrir carpeta',
+    addToPlaylist: 'Añadir a la lista',
     cancel: 'Cancelar',
     copied: '¡Copiado!',
   },

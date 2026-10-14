@@ -95,7 +95,9 @@ const textStyle = computed(() => ({
     : 'none',
 }))
 
-// Título (capa) com personalização própria; fallback = estilo geral da letra.
+// Título (capa) com personalização própria; fallback = estilo geral.
+// Cor/box: SEM default inline — a classe --cover (amarelo, sem caixa) só
+// vale quando o usuário NÃO personalizou; personalização vence (14/10).
 const titleStyle = computed(() => {
   const st = stage.value
   return {
@@ -109,6 +111,16 @@ const titleStyle = computed(() => {
     textTransform: st.titleUpperCase ? 'uppercase' : 'none',
   }
 })
+// Caixa no título: default = SEM caixa (padrão capa amarela 14/10 Rafael);
+// só aparece quando o usuário liga 'titleTextBox'.
+const titleBoxStyle = computed(() =>
+  stage.value.titleTextBox
+    ? {
+        ...boxStyle.value,
+        padding: '1.6vmin 1.8vmin',
+      }
+    : {},
+)
 
 // Estrofes com personalização própria; fallback = estilo geral.
 const lyricStyle = computed(() => {
@@ -159,7 +171,7 @@ const boxStyle = computed(() =>
         v-if="showTitle"
         class="media-projection__title"
         :class="{ 'media-projection__title--cover': runtime.isCover }"
-        :style="titleStyle"
+        :style="[titleStyle, runtime.isCover ? titleBoxStyle : boxStyle]"
       >
         {{ runtime.title }}
       </p>
@@ -170,6 +182,17 @@ const boxStyle = computed(() =>
       >{{ lyric }}</p>
     </div>
   </div>
+  <div
+    v-if="runtime.active && runtime.frameDataUrl"
+    class="media-projection__frame"
+    :style="{
+      backgroundImage: `url(${runtime.frameDataUrl})`,
+      filter: 'brightness(1) saturate(1) contrast(1) blur(0px)',
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+    }"
+    aria-hidden="true"
+  />
 </template>
 
 <style scoped lang="scss">
