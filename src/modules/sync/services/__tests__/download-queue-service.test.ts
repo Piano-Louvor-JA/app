@@ -27,11 +27,14 @@ import {
   cancelDownload,
   clearFinishedDownloads,
   retryDownload,
+  downloadFailureSnapshot,
+  _resetDownloadQueueForTests,
 } from '../download-queue-service'
 
 describe('fila de downloads (app#338 core)', () => {
   beforeEach(() => {
     store.clear()
+    _resetDownloadQueueForTests()
   })
 
   it('enqueue adiciona item pendente com prioridade e persiste', async () => {
@@ -84,15 +87,30 @@ describe('fila de downloads (app#338 core)', () => {
       attempts += 1
       if (attempts === 1) throw new Error('net')
     })
-    enqueueDownload({ id: 'r1', label: 'R1', priority: 'user', task: run })
+    enqueueDownload({ id: 'r1', label: 'https://cdn.test/media.mp3?token=secret', priority: 'user', task: run })
     await vi.waitFor(() => {
       expect(downloadQueueSnapshot().find((q) => q.id === 'r1')?.status).toBe('failed')
     })
+    expect(downloadFailureSnapshot()).toEqual([expect.objectContaining({
+      url: 'https://cdn.test/media.mp3',
+      status: null,
+      bytes: null,
+      erro: 'net',
+      tentativa: 1,
+    })])
     retryDownload('r1')
     await vi.waitFor(() => {
       expect(downloadQueueSnapshot().find((q) => q.id === 'r1')?.status).toBe('done')
     })
     expect(attempts).toBe(2)
+  })
+
+  it('retryDownload registra tentativa incrementada quando falha novamente', async () => {
+    enqueueDownload({ id: 'retry-fail', label: 'https://cdn.test/retry.mp3', priority: 'user', task: async () => { throw new Error('offline') } })
+    await vi.waitFor(() => expect(downloadQueueSnapshot().find((q) => q.id === 'retry-fail')?.status).toBe('failed'))
+    retryDownload('retry-fail')
+    await vi.waitFor(() => expect(downloadFailureSnapshot()).toHaveLength(2))
+    expect(downloadFailureSnapshot().at(-1)).toEqual(expect.objectContaining({ tentativa: 2 }))
   })
 
   it('cancelDownload: remove pending; running não é interrompido', async () => {
