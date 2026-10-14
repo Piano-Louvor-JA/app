@@ -64,9 +64,11 @@ describe('collectLogs', () => {
     const lines = Array.from({ length: 150 }, (_, index) => `line-${index} Bearer exposed-token-${index} https://user:pass@example.test/a?token=query-${index}`)
     mkdirSync(logs, { recursive: true })
     writeFileSync(path.join(logs, 'main.log'), lines.join('\n'))
+    writeFileSync(path.join(logs, 'main.log.1'), 'rotated generation')
 
     const out = collectLogs(root, 'never-in-log')
     const main = out.find((log) => log.arquivo === 'main.log')
+    expect(out).toContainEqual(expect.objectContaining({ arquivo: 'main.log.1', conteudo: 'rotated generation' }))
 
     expect(main.conteudo).not.toContain('exposed-token')
     expect(main.conteudo).not.toContain('user:pass')

@@ -227,7 +227,7 @@ export function collectLogs(userDataDir, maskTokenValue) {
     for (const dir of logDirs) {
       if (!existsSync(dir)) continue
       for (const name of readdirSync(dir)) {
-        if (!name.endsWith('.log')) continue
+        if (!(/\.log$/.test(name) || /^main\.log\.1$/.test(name))) continue
         const full = path.join(dir, name)
         try {
           if (!statSync(full).isFile()) continue

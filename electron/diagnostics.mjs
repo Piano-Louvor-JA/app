@@ -38,6 +38,27 @@ import { sanitizeDownloadFailures } from './download-failures.mjs'
 
 let rendererErrors = []
 let downloadFailures = []
+export const DIAGNOSTICS_MAX_JSON_BYTES = 300 * 1024
+
+export function serializeReportWithinBudget(report, budget = DIAGNOSTICS_MAX_JSON_BYTES) {
+  const size = () => Buffer.byteLength(JSON.stringify(report, null, 2), 'utf8')
+  const removeOldest = (items, clear) => {
+    while (size() >= budget && items.length) {
+      const item = items.shift()
+      clear(item)
+    }
+  }
+  const logs = report.triage?.logs
+  if (Array.isArray(logs)) removeOldest(logs, () => {})
+  const errors = report.triage?.rendererErrors
+  if (Array.isArray(errors)) {
+    removeOldest(errors, (event) => { event.stack = null })
+    removeOldest(errors, () => {})
+  }
+  const downloads = report.triage?.downloadFailures
+  if (Array.isArray(downloads)) removeOldest(downloads, () => {})
+  return JSON.stringify(report, null, 2)
+}
 
 // screen via electron — monitores/resolução pra problemas de projeção em 2ª tela.
 function monitoresAbertos() {
@@ -453,7 +474,7 @@ async function runDiagnostics() {
   const jsonPath = path.join(dir, `louvorja-diagnostico-${timestamp}.json`)
   const txtPath = path.join(dir, `louvorja-diagnostico-${timestamp}.txt`)
   report.meta.arquivoJson = jsonPath
-  writeFileSync(jsonPath, JSON.stringify(report, null, 2), 'utf8')
+  writeFileSync(jsonPath, serializeReportWithinBudget(report), 'utf8')
   writeFileSync(txtPath, reportText(report), 'utf8')
   return { report, jsonPath, txtPath }
 }

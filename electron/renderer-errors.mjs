@@ -5,6 +5,8 @@ const KINDS = new Set(['console.error', 'onerror', 'unhandledrejection'])
 function text(value, maxLength = MAX_TEXT_LENGTH) {
   try {
     return String(value ?? '')
+      .replace(/https?:\/\/[^\s/@]+@([^\s/?#]+)/gi, 'https://$1')
+      .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, '[redacted-email]')
       .replace(/([?&#](?:token|access_token|api[_-]?key|key|secret|password|authorization|cookie)=)[^&#\s]+/gi, '$1[redacted]')
       .replace(/\b(Bearer\s+)[^\s]+/gi, '$1[redacted]')
       .replace(/\b(authorization\s*[:=]\s*)[^\s,;]+/gi, '$1[redacted]')

@@ -11,7 +11,7 @@ describe('DownloadFailureBuffer', () => {
         url: `https://user:secret@cdn.test/media/${index}.mp3?token=secret#fragment`,
         status: index === 21 ? 503 : undefined,
         bytes: undefined,
-        erro: 'Bearer secret',
+        erro: 'Bearer secret https://key@host/1 user@example.com Authorization: top-secret',
         tentativa: index === 21 ? 2 : 1,
       })
     }
@@ -22,7 +22,7 @@ describe('DownloadFailureBuffer', () => {
       url: 'https://cdn.test/media/2.mp3',
       status: null,
       bytes: null,
-      erro: 'Bearer [redacted]',
+      erro: expect.stringContaining('Bearer [redacted]'),
       tentativa: 1,
     }))
     expect(snapshot.at(-1)).toEqual(expect.objectContaining({
@@ -31,5 +31,6 @@ describe('DownloadFailureBuffer', () => {
       bytes: null,
       tentativa: 2,
     }))
+    expect(JSON.stringify(snapshot)).not.toMatch(/key@host|user@example\.com|top-secret/)
   })
 })
