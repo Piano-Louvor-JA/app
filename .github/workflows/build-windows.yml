@@ -108,7 +108,7 @@ jobs:
         with:
           name: LouvorJA-PIANO-Windows-x64-portable-homologation
           path: |
-            dist-electron/*portable*.exe
+            dist-electron/LouvorJA-PIANO-*-x64.exe
           if-no-files-found: error
           retention-days: 14
 
