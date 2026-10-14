@@ -106,7 +106,7 @@ function loadBar(captureSourceFrame: () => Promise<string | null>): {
 
   const scripts = html.match(/<script>([\s\S]*?)<\/script>/g) ?? []
   for (const s of scripts) {
-    w.eval(s.replace(/<\/?script>/g, ''))
+    w.eval(s.replace(/<\/?script\b[^>]*>/gi, ''))
   }
   return { sent, served, receiverConnectedCbs }
 }

@@ -222,15 +222,21 @@ let unlocked=true;
 let bgPalco='';  // BG personalizado do palco (idle) — persiste entre músicas
 
 function proxyUrl(original){
-  if(!original)return original;
+  if(!original)return '';
+  let parsed;
+  try{ parsed=new URL(String(original), location.href) }
+  catch(e){ return '' }
+  // javascript: e outros esquemas não entram em src/áudio/vídeo.
+  if(parsed.protocol!=='http:'&&parsed.protocol!=='https:'&&parsed.protocol!=='blob:'&&parsed.protocol!=='file:'&&parsed.protocol!=='data:')return '';
+  if(parsed.protocol==='file:'&&location.protocol!=='file:')return '';
+  if(parsed.protocol==='data:'&&!/^data:(image|audio|video)\/[a-z0-9.+-]+;base64,/i.test(String(original)))return '';
+  if(parsed.protocol==='data:'||parsed.protocol==='blob:'||parsed.protocol==='file:')return parsed.href;
+  const safe=parsed.href;
   // Qualquer porta do MESMO sender é local: 7080 (Principal), 7082 (TV 2),
   // 7084... Antes só aceitava :7080; bg vindo de slot :7082 era proxyado
   // de volta e falhava → receiver caía no bg-12 (caso real 26/08).
-  if(original.startsWith('http://'+host+':'))return original;
-  if(original.startsWith('http://')||original.startsWith('https://')){
-    return `http://${host}:7080/proxy?url=${encodeURIComponent(original)}`;
-  }
-  return original;
+  if(safe.startsWith('http://'+host+':'))return safe;
+  return `http://${host}:7080/proxy?url=${encodeURIComponent(safe)}`;
 }
 
 function setStatus(t,err){const s=$('status');s.textContent=t;
