@@ -20,6 +20,13 @@ export function sanitizeMainLog(value) {
   }
 }
 
+function rotateLog(current, previous, line) {
+  rmSync(previous, { force: true })
+  try { renameSync(current, previous) } catch { /* ainda não há geração anterior */ }
+  const fd = openSync(current, 'a')
+  try { writeSync(fd, line) } finally { closeSync(fd) }
+}
+
 export function createMainLogger(getUserData) {
   let writing = false
   const pending = []
@@ -32,14 +39,12 @@ export function createMainLogger(getUserData) {
       const previous = `${current}.1`
       const line = `${new Date().toISOString()} ${level} ${sanitizeMainLog(message)}\n`
       mkdirSync(logs, { recursive: true })
-      // Tamanho lido no descritor aberto, sem exists/stat no caminho (TOCTOU).
       fd = openSync(current, 'a')
       if (fstatSync(fd).size + Buffer.byteLength(line) > MAX_MAIN_LOG_BYTES) {
         closeSync(fd)
         fd = undefined
-        rmSync(previous, { force: true })
-        renameSync(current, previous)
-        fd = openSync(current, 'a')
+        rotateLog(current, previous, line)
+        return
       }
       writeSync(fd, line)
     } catch { /* diagnostics logging nunca derruba o main */ }
