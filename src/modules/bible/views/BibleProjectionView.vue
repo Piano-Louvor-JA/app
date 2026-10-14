@@ -128,10 +128,11 @@ const displayReference = computed(() => {
 const verseBoxStyle = computed(() => {
   if (!stage.value.textBox) return {}
   return {
-    backgroundColor: `rgba(0,0,0,${stage.value.boxOpacity})`,
-    border: stage.value.boxBorder ? '1px solid rgba(255,255,255,0.25)' : 'none',
+    backgroundColor: `rgba(24,24,24,${stage.value.boxOpacity})`,
+    border: stage.value.boxBorder ? 'clamp(2px, 0.2vmin, 4px) solid rgba(255,255,255,0.85)' : 'none',
     // Padrão folha característico do design (como o media-projection)
     borderRadius: 'clamp(14px, 2.4vmin, 32px) 0 clamp(14px, 2.4vmin, 32px) 0',
+    backdropFilter: 'blur(16px)',
     // caixinha só no versículo: padding para respirar dentro da caixa
     padding: '0.35em 0.75em',
     // Bíblia: caixa horizontal aproveita a projeção e reduz quebras de verso.

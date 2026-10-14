@@ -68,10 +68,10 @@ const digitalStyle = computed(() => {
             : props.preview
               ? 'none'
               : '0 4px 30px rgba(0, 0, 0, 0.35)',
-    background: st?.textBox && !isFinished.value ? `rgba(0,0,0,${st.boxOpacity})` : 'transparent',
+    background: st?.textBox && !isFinished.value ? `rgba(24,24,24,${st.boxOpacity})` : 'transparent',
     border:
       st?.textBox && st.boxBorder && !isFinished.value
-        ? '1px solid rgba(255,255,255,0.25)'
+        ? 'clamp(2px, 0.2vmin, 4px) solid rgba(255,255,255,0.85)'
         : 'none',
     borderRadius: st?.textBox ? '1.4cqw 0 1.4cqw 0' : '0',
     padding: st?.textBox ? '2.5vmin 1.8vmin' : '0',

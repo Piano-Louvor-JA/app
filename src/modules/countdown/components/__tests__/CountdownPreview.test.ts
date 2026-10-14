@@ -123,8 +123,8 @@ describe('CountdownPreview', () => {
     const style = wrapper.find('.countdown-preview__digital').attributes('style')
     expect(style).toContain('font-weight: 600')
     expect(style).toContain('rgb(0, 255, 0)')
-    expect(style).toContain('rgba(0, 0, 0, 0.4)')
-    expect(style).toContain('1px solid rgba(255, 255, 255, 0.25)')
+    expect(style).toContain('rgba(24, 24, 24, 0.4)')
+    expect(style).toContain('rgba(255, 255, 255, 0.85)')
     // surface: coluna com align top/left
     const surface = wrapper.find('.countdown-preview').attributes('style')
     expect(surface).toContain('align-items: flex-start')

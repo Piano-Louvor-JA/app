@@ -159,8 +159,8 @@ describe('CountdownPreview', () => {
       })
     const digital = wrapper.find('.countdown-preview__digital').attributes('style')
     expect(digital).toContain('rgba(0,0,0,0.5)')
-    expect(digital).toContain('rgba(0, 0, 0, 0.4)')
-    expect(digital).toContain('border: 1px solid rgba(255, 255, 255, 0.25)')
+    expect(digital).toContain('rgba(24, 24, 24, 0.4)')
+    expect(digital).toContain('rgba(255, 255, 255, 0.85)')
     expect(digital).toContain('2.5vmin 1.8vmin')
   })
 

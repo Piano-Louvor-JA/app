@@ -147,8 +147,8 @@ describe("RandomPreview", () => {
 		const st = stage({ textBox: true, boxBorder: true, boxOpacity: 0.4 });
 		const w1 = mountPreview(runtime({ currentDisplay: "Ana" }), st);
 		const s1 = (w1.find(".random-preview__text").element as HTMLElement).style;
-		expect(s1.background).toContain("rgba(0, 0, 0, 0.4)");
-		expect(s1.border).toContain("1px solid");
+		expect(s1.background).toContain("rgba(24, 24, 24, 0.4)");
+		expect(s1.border).toContain("rgba(255, 255, 255, 0.85)");
 		expect(s1.padding).toContain("2.5vmin");
 
 		const w2 = mountPreview(

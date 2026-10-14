@@ -114,7 +114,7 @@ function computeDigitalStyle(
             ? "none"
             : `0 4px 30px ${color}40`,
     background: st?.textBox ? `rgba(0,0,0,${st.boxOpacity})` : "transparent",
-    border: st?.textBox && st.boxBorder ? "1px solid rgba(255,255,255,0.25)" : "none",
+    border: st?.textBox && st.boxBorder ? "clamp(2px, 0.2vmin, 4px) solid rgba(255,255,255,0.85)" : "none",
     borderRadius: st?.textBox ? "1.4cqw 0 1.4cqw 0" : "0",
     padding: st?.textBox ? "2.5vmin 1.8vmin" : "0",
   } as Record<string, string>
@@ -316,7 +316,7 @@ describe("ClockPreview.vue - Pure Function Tests", () => {
       const stageWithBox = { ...mockStage, textBox: true, boxOpacity: 0.7, boxBorder: true } as StageSettings
       const result = computeDigitalStyle(stageWithBox, false, "#ff0000", 50)
       expect(result.background).toBe("rgba(0,0,0,0.7)")
-      expect(result.border).toBe("1px solid rgba(255,255,255,0.25)")
+      expect(result.border).toBe("clamp(2px, 0.2vmin, 4px) solid rgba(255,255,255,0.85)")
       expect(result.borderRadius).toBe("1.4cqw 0 1.4cqw 0")
       expect(result.padding).toBe("2.5vmin 1.8vmin")
     })
@@ -889,8 +889,8 @@ describe("ClockPreview.vue - Exposed Function Coverage", () => {
 
     const stageWithBox = { ...mockStage, textBox: true, boxOpacity: 0.7, boxBorder: true } as StageSettings
     const result5 = exposed.computeDigitalStyle(stageWithBox, false, "#ff0000", 50)
-    expect(result5.background).toBe("rgba(0,0,0,0.7)")
-    expect(result5.border).toBe("1px solid rgba(255,255,255,0.25)")
+    expect(result5.background).toBe("rgba(24,24,24,0.7)")
+    expect(result5.border).toBe("clamp(2px, 0.2vmin, 4px) solid rgba(255,255,255,0.85)")
 
     const stageNoBorder = { ...mockStage, textBox: true, boxBorder: false } as StageSettings
     const result6 = exposed.computeDigitalStyle(stageNoBorder, false, "#ff0000", 50)

@@ -103,10 +103,11 @@ function computeDigitalStyle(
           : st
             ? 'none'
             : `0 4px 30px ${color}40`,
-    background: st?.textBox ? `rgba(0,0,0,${st.boxOpacity})` : 'transparent',
-    border: st?.textBox && st.boxBorder ? '1px solid rgba(255,255,255,0.25)' : 'none',
+    background: st?.textBox ? `rgba(24,24,24,${st.boxOpacity})` : 'transparent',
+    border: st?.textBox && st.boxBorder ? 'clamp(2px, 0.2vmin, 4px) solid rgba(255,255,255,0.85)' : 'none',
     borderRadius: st?.textBox ? '1.4cqw 0 1.4cqw 0' : '0',
     padding: st?.textBox ? '2.5vmin 1.8vmin' : '0',
+    backdropFilter: st?.textBox ? 'blur(16px)' : 'none',
   } as Record<string, string>
 }
 

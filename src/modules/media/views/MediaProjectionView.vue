@@ -127,10 +127,12 @@ const lyricStyle = computed(() => {
 const boxStyle = computed(() =>
   stage.value.textBox
     ? {
-        backgroundColor: `rgba(0,0,0,${stage.value.boxOpacity})`,
-        border: stage.value.boxBorder ? '1px solid rgba(255,255,255,0.25)' : 'none',
+        backgroundColor: `rgba(24,24,24,${stage.value.boxOpacity})`,
+        border: stage.value.boxBorder ? 'clamp(2px, 0.2vmin, 4px) solid rgba(255,255,255,0.85)' : 'none',
         // Padrão folha característico do design
         borderRadius: 'clamp(14px, 2.4vmin, 32px) 0 clamp(14px, 2.4vmin, 32px) 0',
+        backdropFilter: 'blur(16px)',
+        '-webkit-backdrop-filter': 'blur(16px)',
       }
     : {},
 )
