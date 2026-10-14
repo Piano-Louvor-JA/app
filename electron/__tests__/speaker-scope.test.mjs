@@ -140,3 +140,68 @@ describe('escopo speaker — permissão mínima', () => {
     expect(ws.sent.find((m) => m.type === 'error')).toBeUndefined()
   })
 })
+
+describe('convivência operador (APK) + pregador — limites POR PAPEL', () => {
+  /** Servidor com um operador APK já conectado e autenticado. */
+  async function serverWithOperator() {
+    const wss = fakeWss()
+    const contents = fakeContents()
+    await startRemoteServer(wss, contents, { token: TOKEN })
+    const op = fakeWs()
+    wss.handlers.connection(op)
+    const opMessage = (msg) => op.listeners.message(JSON.stringify(msg))
+    opMessage({ v: 1, type: 'hello', device: 'Moto G85', appVersion: '0.2.0', token: TOKEN })
+    const connect = () => {
+      const ws = fakeWs()
+      wss.handlers.connection(ws)
+      const message = (msg) => ws.listeners.message(JSON.stringify(msg))
+      return { ws, message }
+    }
+    return { wss, contents, op, opMessage, connect }
+  }
+
+  it('pregador conecta COM operador ativo — aceito, sem remote_busy', async () => {
+    const { contents, op, connect } = await serverWithOperator()
+    const { ws, message } = connect()
+    message({ v: 1, type: 'hello', role: 'speaker', token: TOKEN })
+    // Nenhum lado foi rejeitado.
+    expect(ws.sent.find((m) => m.type === 'error')).toBeUndefined()
+    expect(op.sent.find((m) => m.type === 'error')).toBeUndefined()
+    expect(ws.close).not.toHaveBeenCalled()
+    // Pregador navega slides normalmente.
+    contents.sent.length = 0
+    message({ v: 1, type: 'command', id: 's1', action: 'slide:next', token: TOKEN })
+    expect(contents.sent.find((m) => m.channel === 'remote:command')?.payload?.action).toBe('slide:next')
+  })
+
+  it('2º OPERADOR é rejeitado com remote_busy; operador original segue vivo', async () => {
+    const { op, connect } = await serverWithOperator()
+    const { ws, message } = connect()
+    message({ v: 1, type: 'hello', device: 'Pixel 8', token: TOKEN })
+    expect(ws.sent.find((m) => m.type === 'error')?.code).toBe('remote_busy')
+    expect(ws.close).toHaveBeenCalled()
+    expect(op.sent.find((m) => m.type === 'error')).toBeUndefined()
+  })
+
+  it('2º PREGADOR é rejeitado com remote_busy', async () => {
+    const { connect } = await serverWithOperator()
+    const s1 = connect()
+    s1.message({ v: 1, type: 'hello', role: 'speaker', token: TOKEN })
+    // Operador + pregador já ocupam as 2 vagas físicas — rejeitado na conexão,
+    // antes mesmo do hello (listeners.message nunca é registrado).
+    const s2 = connect()
+    expect(s2.ws.sent.find((m) => m.type === 'error')?.code).toBe('remote_busy')
+    expect(s2.ws.close).toHaveBeenCalled()
+    expect(s1.ws.sent.find((m) => m.type === 'error')).toBeUndefined()
+  })
+
+  it('pairing-info distingue os dois papéis conectados', async () => {
+    const { connect } = await serverWithOperator()
+    const { message } = connect()
+    message({ v: 1, type: 'hello', role: 'speaker', token: TOKEN })
+    const info = ipcHandlers.get('remote:pairing-info')?.()
+    expect(info.clientCount).toBe(2)
+    expect(info.remoteAddress).toMatch(/Moto G85/)
+    expect(info.speakerAddress).toBeTruthy()
+  })
+})

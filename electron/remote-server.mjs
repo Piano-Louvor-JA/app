@@ -75,14 +75,18 @@ export async function startRemoteServer(wss, contents, opts = {}) {
     }
   }
 
-  const clientIdentity = () => {
-    const first = clients.keys().next().value
-    if (!first) return null
-    const entry = clients.get(first)
-    const address = first._socket?.remoteAddress?.replace(/^::ffff:/, '') ?? null
-    if (entry?.device && address) return `${entry.device} • ${address}`
-    return entry?.device ?? address ?? null
+  // Identidade POR PAPEL: APK/controle remoto (esquerda) vs pregador (direita).
+  const identityFor = (speaker) => {
+    for (const [ws, entry] of clients) {
+      if (!!entry.speaker !== speaker) continue
+      const address =
+        ws._socket?.remoteAddress?.replace(/^::ffff:/, '') ?? null
+      if (entry.device && address) return `${entry.device} • ${address}`
+      return entry.device ?? address ?? null
+    }
+    return null
   }
+  const clientIdentity = () => identityFor(false) ?? identityFor(true)
 
   const notifyClients = () => {
     try {
@@ -90,6 +94,10 @@ export async function startRemoteServer(wss, contents, opts = {}) {
         contents.send('remote:clients', {
           count: clients.size,
           address: clientIdentity(),
+          // Papéis separados — o painel mostra cada um no seu lugar:
+          // remote = APK/controle (esquerda), speaker = pregador (direita).
+          remoteAddress: identityFor(false),
+          speakerAddress: identityFor(true),
         })
       }
     } catch {
@@ -107,8 +115,11 @@ export async function startRemoteServer(wss, contents, opts = {}) {
   }
 
   wss.on('connection', (ws) => {
-    // Um operador por desktop: evita comandos concorrentes e ambiguidade UX.
-    if (clients.size >= 1) {
+    // Máx. 2 conexões FÍSICAS: 1 operador (APK/full) + 1 pregador (slides).
+    // O papel só é revelado no hello — o limite POR PAPEL é aplicado lá.
+    // (13/10 Rafael: antes era 1 cliente TOTAL — pregador tomava remote_busy
+    // do APK e vice-versa, impossibilitando os dois conectados ao mesmo tempo.)
+    if (clients.size >= 2) {
       send(ws, { v: 1, type: 'error', code: 'remote_busy' })
       ws.close()
       return
@@ -142,7 +153,33 @@ export async function startRemoteServer(wss, contents, opts = {}) {
       switch (msg.type) {
         case 'hello': {
           // Browser do pregador só recebe navegação de slides.
-          if (msg.role === 'speaker' && msg.token === token) entry.speaker = true
+          if (msg.role === 'speaker' && msg.token === token) {
+            // 1 pregador por desktop: 2º browser de pregador → busy.
+            for (const [other, oEntry] of clients) {
+              if (other === ws || !oEntry.speaker) continue
+              send(ws, { v: 1, type: 'error', code: 'remote_busy' })
+              clients.delete(ws)
+              clearInterval(entry.timer)
+              ws.close()
+              return
+            }
+            const was = entry.speaker
+            entry.speaker = true
+            // 1º hello do pregador (e mudanças de papel) precisam notificar —
+            // senão o painel direito fica no "Pronto" sem IP (13/10 Rafael).
+            if (!was) notifyClients()
+          } else if (msg.device && msg.token === token) {
+            // 1 operador (APK/full) por desktop: 2º APK → busy.
+            // Papel operador = tem device e NÃO declarou speaker no hello.
+            for (const [other, oEntry] of clients) {
+              if (other === ws || oEntry.speaker) continue
+              send(ws, { v: 1, type: 'error', code: 'remote_busy' })
+              clients.delete(ws)
+              clearInterval(entry.timer)
+              ws.close()
+              return
+            }
+          }
           // APK identifica o aparelho logo após conectar.
           const device = typeof msg.device === 'string' ? msg.device : null
           const appVersion =
@@ -274,6 +311,8 @@ export async function startRemoteServer(wss, contents, opts = {}) {
     speakerQrDataUrl,
     clientCount: clients.size,
     clientAddress: clientIdentity(),
+    remoteAddress: identityFor(false),
+    speakerAddress: identityFor(true),
   }))
 
   return {
