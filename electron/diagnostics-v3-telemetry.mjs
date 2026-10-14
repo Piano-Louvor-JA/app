@@ -6,7 +6,6 @@
 
 const MAX_SAMPLES = 200
 const MAX_TRANSITIONS = 10
-const MAX_LABEL = 64
 
 export function createWsTelemetry(now = Date.now) {
   const startedAt = now()
@@ -91,8 +90,9 @@ export function sanitizeAudioDevices(raw) {
     const devices = Number(raw.devices)
     const devicechangeCount = Number(raw.devicechangeCount)
     if (!Number.isFinite(devices) || !Number.isFinite(devicechangeCount)) return null
-    const outputLabel = typeof raw.outputLabel === 'string' ? raw.outputLabel.slice(0, MAX_LABEL) : null
-    return { devices, devicechangeCount, outputLabel }
+    // Só contagens: o nome do dispositivo (ex.: "AirPods de Fulano") pode
+    // identificar a pessoa e o relatório pode ser enviado ao Glitchtip.
+    return { devices, devicechangeCount }
   } catch {
     return null
   }

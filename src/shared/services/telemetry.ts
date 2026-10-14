@@ -30,16 +30,9 @@ function startAudioDeviceReporter(): void {
   const report = () => {
     try {
       navigator.mediaDevices?.enumerateDevices?.().then((devices) => {
-        let outputLabel: string | null = null
-        try {
-          // ponytail: MediaDeviceInfo sem permissão devolve label vazio — suficiente p/ contar dispositivos
-          const audioOut = devices.find((d) => d.kind === 'audiooutput')
-          outputLabel = audioOut?.label || null
-        } catch { /* best effort */ }
         window.louvorja?.diagnostics?.reportAudioDevices?.({
           devices: devices.filter((d) => d.kind.startsWith('audio')).length,
           devicechangeCount,
-          outputLabel,
         })
       }).catch(() => { /* best effort */ })
     } catch { /* best effort */ }

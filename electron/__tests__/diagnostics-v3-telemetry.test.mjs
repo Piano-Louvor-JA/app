@@ -62,10 +62,12 @@ describe('diag-v4-umbrella: telemetria volátil', () => {
   })
 
   it('audio devices: sanitiza labels e conta devicechange', () => {
-    const snap = sanitizeAudioDevices({ devices: 3, devicechangeCount: 2, outputLabel: 'x'.repeat(200) })
+    const snap = sanitizeAudioDevices({ devices: 3, devicechangeCount: 2, outputLabel: 'AirPods de Fulano' })
     expect(snap.devices).toBe(3)
     expect(snap.devicechangeCount).toBe(2)
-    expect(snap.outputLabel.length).toBeLessThanOrEqual(64)
+    // o nome do dispositivo pode identificar a pessoa e o relatório pode ir ao Glitchtip
+    expect(snap).not.toHaveProperty('outputLabel')
+    expect(JSON.stringify(snap)).not.toContain('Fulano')
   })
 
   it('audio devices: lixo → null, nunca lança', () => {
