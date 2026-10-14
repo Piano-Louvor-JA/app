@@ -165,7 +165,7 @@ jobs:
           find dist-electron -maxdepth 1 -type f ! -name 'SHA256SUMS-*' -print0 | sort -z | xargs -0 sha256sum > "dist-electron/SHA256SUMS-${ARCH}"
 
       - name: Upload package artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: linux-${{ matrix.arch }}
           path: dist-electron/
