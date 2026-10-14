@@ -57,9 +57,9 @@ function loadReceiver(url: string): void {
   ;(w as unknown as { PalmSystem?: unknown }).PalmSystem = undefined
   w.localStorage.clear()
 
-  const scripts = html.match(/<script\b[^>]*>([\s\S]*?)<\/script>/gi) ?? []
-  for (const raw of scripts) {
-    const code = raw.replace(/^<script\b[^>]*>/i, '').replace(/<\/script>$/i, '')
+  for (const el of dom.window.document.querySelectorAll('script')) {
+    const code = el.textContent ?? ''
+    if (!code.trim()) continue
     try {
       dom.window.eval(code)
     } catch {

@@ -104,9 +104,10 @@ function loadBar(captureSourceFrame: () => Promise<string | null>): {
   }
   Object.defineProperty(w, 'louvorja', { value: stub, configurable: true })
 
-  const scripts = html.match(/<script>([\s\S]*?)<\/script>/g) ?? []
-  for (const s of scripts) {
-    w.eval(s.replace(/<\/?script\b[^>]*>/gi, ''))
+  for (const el of dom.window.document.querySelectorAll('script')) {
+    const code = el.textContent ?? ''
+    if (!code.trim()) continue
+    w.eval(code)
   }
   return { sent, served, receiverConnectedCbs }
 }
