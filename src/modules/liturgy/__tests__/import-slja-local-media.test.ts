@@ -132,7 +132,7 @@ describe("import .slja local — blobs em IndexedDB (não localStorage)", () => 
 
 	it("quota excedida no localStorage PROPAGA erro (sem sucesso falso)", async () => {
 		const bytes = await makeSljaBuffer();
-		const spy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+		const setItemSpy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
 			throw new DOMException("quota", "QuotaExceededError");
 		});
 		try {
@@ -140,7 +140,7 @@ describe("import .slja local — blobs em IndexedDB (não localStorage)", () => 
 				importSljaAsLiturgyMusic({ bytes, name: "encontro.slja" }),
 			).rejects.toThrow();
 		} finally {
-			spy.mockRestore();
+			setItemSpy.mockRestore();
 		}
 	});
 
@@ -149,19 +149,19 @@ describe("import .slja local — blobs em IndexedDB (não localStorage)", () => 
 
 		// 1ª tentativa: quota estoura no MEIO do import (música+áudio gravados,
 		// estrofes não) — simula saveDb falhando a partir da estrofe N.
+		const original = localStorage.setItem.bind(localStorage);
 		let sets = 0;
-		const realSetItem = Storage.prototype.setItem.bind(localStorage);
-		const spy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (k: string, v: string) {
+		const setItemSpy = vi.spyOn(Storage.prototype, "setItem").mockImplementation((k: string, v: string) => {
 			// deixa passar a gravação da música; explode nas estrofes
 			if ((sets += 1) > 2) throw new DOMException("quota", "QuotaExceededError");
-			realSetItem(k, v);
+			original(k, v);
 		});
 		try {
 			await expect(
 				importSljaAsLiturgyMusic({ bytes, name: "encontro.slja" }),
 			).rejects.toThrow();
 		} finally {
-			spy.mockRestore();
+			setItemSpy.mockRestore();
 		}
 		const importCollection = listLocalCollections().find(
 			(c) => c.name === "Importações .slja",
