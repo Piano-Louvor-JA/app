@@ -255,6 +255,7 @@ watch(coverSrc, () => {
 }
 
 .album-hymnal-card__cover {
+  position: relative;
   display: flex;
   width: 5rem;
   height: 6rem;
