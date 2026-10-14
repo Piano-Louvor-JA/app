@@ -86,7 +86,15 @@ vi.mock('@shared/services/user-preferences', () => ({
   setUserPreference: vi.fn(),
 }))
 
-import { setUserPreference } from '@shared/services/user-preferences'
+// RAIZ-1 (SPEC-locale-hot-reload): serviço de catálogo mockado — o teste de
+// regressão usa getCurrentApiPrefix REAL lendo localStorage do user-preferences.
+vi.mock('@modules/starting/services/catalog-locale-service', () => ({
+  ensureCatalogForLocale: vi.fn(async () => {}),
+  localeToApiPrefix: vi.fn((l: string) => (l === 'es' ? 'es' : 'pt')),
+}))
+
+import { ensureCatalogForLocale } from '@modules/starting/services/catalog-locale-service'
+import { setUserPreference, getUserPreference } from '@shared/services/user-preferences'
 
 describe('GeneralView.vue', () => {
   let wrapper: ReturnType<typeof mount>
@@ -147,6 +155,30 @@ describe('GeneralView.vue', () => {
     const esBtn = wrapper.findAll('.general-settings__lang-btn')[1]
     await esBtn.trigger('click')
     expect(mockLocale.value).toBe('es')
+  })
+
+  // REGRA RAIZ-1 (SPEC-locale-hot-reload D2): o download do catálogo do
+  // idioma alvo tem que rodar ANTES de persistir user_data.language — o
+  // guard do serviço compara com getCurrentApiPrefix() que lê essa
+  // preferência; persistir antes = early-return = download nunca roda.
+  it('RED RAIZ-1: baixa catalogo ANTES de persistir o idioma', async () => {
+    const wrapper = mountComponent()
+    const esBtn = wrapper.findAll('.general-settings__lang-btn')[1]
+    await esBtn.trigger('click')
+    expect(ensureCatalogForLocale).toHaveBeenCalledWith('es')
+    expect(setUserPreference).toHaveBeenCalledWith('language', 'es')
+  })
+
+  it('RED RAIZ-1: falha de download NAO persiste o idioma (rollback)', async () => {
+    vi.mocked(ensureCatalogForLocale).mockRejectedValueOnce(new Error('rede'))
+    const wrapper = mountComponent()
+    const esBtn = wrapper.findAll('.general-settings__lang-btn')[1]
+    await esBtn.trigger('click')
+    await vi.waitFor(() => {
+      expect(ensureCatalogForLocale).toHaveBeenCalled()
+    })
+    expect(setUserPreference).not.toHaveBeenCalledWith('language', 'es')
+    expect(mockLocale.value).toBe('pt-BR') // rollback: locale antigo
   })
 
   it('renderiza a secao de dados locais com botao danger', () => {
@@ -384,12 +416,14 @@ describe('GeneralView.vue', () => {
       updateCheckerState.error.value = null
     })
 
-    it('changeLanguage pt-BR: volta locale', async () => {
+    it('changeLanguage pt-BR: no-op no idioma ativo (D4 SPEC-locale-hot-reload)', async () => {
       const wrapper = mountComponent()
       const ptBtn = wrapper.findAll('.general-settings__lang-btn')[0]
       await ptBtn.trigger('click')
       expect(mockLocale.value).toBe('pt-BR')
-      expect(setUserPreference).toHaveBeenCalledWith('language', 'pt-BR')
+      // idioma já ativo: sem persistir de novo, sem baixar catálogo
+      expect(setUserPreference).not.toHaveBeenCalled()
+      expect(ensureCatalogForLocale).not.toHaveBeenCalled()
     })
 
     it('clear sem acknowledged: botão confirmar desabilitado já coberto; desktopOnly mostra hint', () => {

@@ -184,6 +184,9 @@ export default {
       languagePortuguese: 'Português',
       languageEnglish: 'English',
       languageSpanish: 'Español',
+      languageSyncDownloading: 'Baixando catálogo do idioma… a tela vai recarregar em seguida.',
+      languageSyncErrorTitle: 'Não foi possível baixar o catálogo do idioma. Verifique a conexão.',
+      languageSyncRetry: 'Tentar de novo',
       dataTitle: 'Dados locais',
       dataHint:
         'Remove o catálogo, mídias baixadas e preferências salvas na pasta de dados do app (Windows: C:\\ProgramData\\LouvorJA-PIANO; Linux: /var/lib/LouvorJA-PIANO; macOS: /Users/Shared/LouvorJA-PIANO — compartilhada entre usuários). O app reinicia o setup na próxima abertura.',
