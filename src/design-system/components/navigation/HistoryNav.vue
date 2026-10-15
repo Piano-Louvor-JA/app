@@ -114,13 +114,13 @@ function onDot(dot: HistoryNavDot) {
   list-style: none;
 }
 
-/* Área clicável 24×24; o ponto desenhado é o ::before. */
+/* Área clicável 28×28; o ponto desenhado é o ::before. */
 .ds-history-nav__dot {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   padding: 0;
   border: 0;
   border-radius: 9999px;
@@ -129,9 +129,9 @@ function onDot(dot: HistoryNavDot) {
 
   &::before {
     content: '';
-    width: 8px;
-    height: 8px;
-    border: 1.5px solid var(--ds-color-on-surface-variant);
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--ds-color-on-surface-variant);
     border-radius: 9999px;
     transition:
       width var(--ds-motion-duration, 280ms) ease,
@@ -145,16 +145,16 @@ function onDot(dot: HistoryNavDot) {
   }
 
   &--edge::before {
-    width: 5px;
-    height: 5px;
+    width: 8px;
+    height: 8px;
   }
 
   &--current {
     cursor: default;
 
     &::before {
-      width: 14px;
-      height: 14px;
+      width: 18px;
+      height: 18px;
       border-color: var(--ds-color-primary);
       background: var(--ds-color-primary);
     }
