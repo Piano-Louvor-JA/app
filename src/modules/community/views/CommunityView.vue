@@ -3,6 +3,7 @@ import { GlassCard } from "@design-system/index";
 import { getAuthSession } from "@modules/media/services/auth-client";
 
 import ReportDialog from "../components/ReportDialog.vue";
+import { storeToRefs } from "pinia";
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -23,6 +24,7 @@ import {
 	getNotifications,
 } from "../services/notifications";
 import NotificationsDropdown from "../components/NotificationsDropdown.vue";
+import { useCommunityBrowseStore } from "../stores/useCommunityBrowseStore";
 
 const { t } = useI18n();
 const router = useRouter();
@@ -34,8 +36,8 @@ const savedId = ref<number | null>(null);
 const savedError = ref<number | null>(null);
 const weeklyTasks = ref<WeeklyTask[]>([]);
 const viewEl = ref<HTMLElement | null>(null);
-const searchQuery = ref("");
-const page = ref(1);
+// busca e página sobrevivem a sair e voltar para a tela
+const { searchQuery, page } = storeToRefs(useCommunityBrowseStore());
 const lastPage = ref(1);
 const total = ref(0);
 
