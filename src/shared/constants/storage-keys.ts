@@ -27,6 +27,8 @@ export const USER_PREFERENCE_KEYS = {
   liturgyState: 'liturgy.state',
   scheduledState: 'scheduled.state',
   language: 'language',
+  /** Posição (left/top em px) do player minimizado arrastado; ausente = canto padrão. */
+  mediaChromePosition: 'media.chromePosition',
   /** Prefixo das personalizações do Palco por escopo (stage.settings.global|hymns|bible|...). */
   stageSettingsPrefix: 'stage.settings.',
 } as const

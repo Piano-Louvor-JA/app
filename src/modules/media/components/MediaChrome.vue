@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
+import { useMediaChromeDrag } from '../composables/useMediaChromeDrag'
 import { useMediaPlayer } from '../composables/useMediaPlayer'
 import MediaProjectFab from './MediaProjectFab.vue'
 import MediaStatusPreview from './MediaStatusPreview.vue'
@@ -25,6 +26,10 @@ const {
 
 const visible = computed(() => hasSession.value && minimized.value)
 
+const chromeRoot = ref<HTMLElement | null>(null)
+const { positionStyle, dragging, onPointerDown, resetPosition } =
+  useMediaChromeDrag(chromeRoot)
+
 async function onProject() {
   await toggleProjection()
 }
@@ -46,12 +51,22 @@ async function onToggleAudio() {
 <template>
   <div
     v-if="visible"
+    ref="chromeRoot"
     class="media-chrome"
+    :class="{ 'media-chrome--dragging': dragging }"
+    :style="positionStyle"
+    @pointerdown="onPointerDown"
   >
-    <MediaStatusPreview
-      :snippet="previewSnippet"
-      :reference="previewReference"
-    />
+    <div
+      class="media-chrome__handle"
+      :title="t('media.chromeDragHint')"
+      @dblclick="resetPosition"
+    >
+      <MediaStatusPreview
+        :snippet="previewSnippet"
+        :reference="previewReference"
+      />
+    </div>
 
     <div class="media-chrome__actions">
       <button
@@ -100,6 +115,13 @@ async function onToggleAudio() {
   align-items: flex-end;
   gap: 0.75rem;
   pointer-events: none;
+  user-select: none;
+  touch-action: none;
+}
+
+.media-chrome__handle {
+  pointer-events: auto;
+  cursor: grab;
 }
 
 .media-chrome__actions {
@@ -107,6 +129,11 @@ async function onToggleAudio() {
   align-items: center;
   gap: 0.5rem;
   pointer-events: auto;
+}
+
+.media-chrome--dragging,
+.media-chrome--dragging .media-chrome__handle {
+  cursor: grabbing;
 }
 
 .media-chrome__icon-btn {

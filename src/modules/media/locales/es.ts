@@ -60,6 +60,7 @@ export default {
     clearProjection: 'Ocultar contenido',
     maximize: 'Abrir reproductor',
     minimize: 'Minimizar',
+    chromeDragHint: 'Arrastra para mover · doble clic vuelve a la esquina',
     close: 'Cerrar',
     seek: 'Posición de la pista',
     volume: 'Volumen',
