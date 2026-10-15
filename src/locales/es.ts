@@ -58,6 +58,16 @@ export default {
     bible: 'Biblia',
     utilities: 'Utilidades',
     settings: 'Configuraciones',
+    history: {
+      label: 'Historial de navegación',
+      back: 'Atrás',
+      forward: 'Adelante',
+      goTo: 'Ir a {label}',
+    },
+    historyDetail: {
+      player: 'Reproductor',
+      editor: 'Editor',
+    },
     },
   sync: {
     downloadQueue: {
