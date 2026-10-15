@@ -51,6 +51,10 @@ export function useBibleReader() {
       return
     }
 
+    const isArrow = event.key === 'ArrowLeft' || event.key === 'ArrowRight'
+    // Alt+setas é do histórico de navegação; Ctrl/Meta+setas ficam livres.
+    if (isArrow && (event.altKey || event.ctrlKey || event.metaKey)) return
+
     if (event.key === 'ArrowLeft') {
       event.preventDefault()
       void store.goToAdjacentVerse(-1)

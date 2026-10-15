@@ -119,6 +119,26 @@ describe('useMediaPlayerHotkeys', () => {
     wrapper.unmount()
   })
 
+  it('setas com Alt/Ctrl/Meta não trocam slide nem engolem o evento (Alt+setas = histórico)', async () => {
+    const wrapper = mount(Host)
+    const store = useMediaStore()
+    await new Promise((r) => setTimeout(r, 0))
+    const bubbled: string[] = []
+    const onBubble = (e: KeyboardEvent) => bubbled.push(e.key)
+    window.addEventListener('keydown', onBubble)
+
+    for (const modifier of ['altKey', 'ctrlKey', 'metaKey'] as const) {
+      const e = new KeyboardEvent('keydown', { key: 'ArrowRight', [modifier]: true, cancelable: true })
+      window.dispatchEvent(e)
+      expect(e.defaultPrevented, modifier).toBe(false)
+    }
+    expect(store.slideIndex).toBe(0)
+    expect(bubbled).toEqual(['ArrowRight', 'ArrowRight', 'ArrowRight'])
+
+    window.removeEventListener('keydown', onBubble)
+    wrapper.unmount()
+  })
+
   it('input de texto bloqueia; range não bloqueia', async () => {
     const wrapper = mount(Host)
     await new Promise((r) => setTimeout(r, 0))
