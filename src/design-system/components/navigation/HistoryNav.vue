@@ -9,7 +9,8 @@ defineProps<{
   dots: HistoryNavDot[]
   canGoBack: boolean
   canGoForward: boolean
-  ariaLabel: string
+  /** aria-label do <nav> (`aria-label` no pai vira atributo, não prop). */
+  navLabel: string
   backLabel: string
   forwardLabel: string
 }>()
@@ -26,7 +27,7 @@ function onDot(dot: HistoryNavDot) {
 </script>
 
 <template>
-  <nav class="ds-history-nav" :aria-label="ariaLabel">
+  <nav class="ds-history-nav" :aria-label="navLabel">
     <button
       type="button"
       class="ds-history-nav__arrow ds-history-nav__arrow--back"

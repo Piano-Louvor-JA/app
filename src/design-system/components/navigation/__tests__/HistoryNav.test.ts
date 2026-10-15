@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest'
 import HistoryNav from '../HistoryNav.vue'
 
 const labels = {
-  ariaLabel: 'Histórico de navegação',
+  navLabel: 'Histórico de navegação',
   backLabel: 'Voltar',
   forwardLabel: 'Avançar',
 }
