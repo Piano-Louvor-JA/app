@@ -17,7 +17,7 @@ import { resolveAppLocale } from "./locale.mjs";
 import { registerWorkspaceIpc } from "./ipc/register.mjs";
 import { registerDiagnosticsIpc, setClockSkewProvider, setDiagnosticsToken } from "./diagnostics.mjs";
 import { createMainLogger } from "./main-log.mjs";
-import { attachWindowStateEvents, registerWindowIpc } from "./ipc/window.mjs";
+import { attachHistoryAppCommand, attachWindowStateEvents, registerWindowIpc } from "./ipc/window.mjs";
 import { attachRemoteServer } from "./remote-server.mjs";
 import { attachPalcoServer } from "./palco-server.mjs";
 import { ensureWorkspaceDirectories } from "./paths.mjs";
@@ -683,6 +683,7 @@ function createWindow(locale = 'pt-BR') {
 	applyWindowIcon(mainWindow);
 	mainLog.info('main window created');
 	attachWindowStateEvents(mainWindow);
+	attachHistoryAppCommand(mainWindow);
 	trackWindowState(mainWindow, { isMaximized: windowState.isMaximized });
 
 	mainWindow.on("page-title-updated", (event) => {

@@ -112,6 +112,8 @@ contextBridge.exposeInMainWorld('louvorja', {
   window: {
     control: (action) => ipcRenderer.invoke('window:control', action),
     onMaximizedState: (callback) => subscribe('window:maximized-state', callback),
+    // Voltar/avançar do sistema (app-command no Windows) → histórico de navegação
+    onHistoryCommand: (callback) => subscribe('window:history-command', callback),
   },
 
   zoom: {

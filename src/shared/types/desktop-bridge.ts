@@ -417,7 +417,11 @@ export type WindowControlAction = 'minimize' | 'maximize' | 'close' | 'is-maximi
 export type WindowApi = {
   control: (action: WindowControlAction) => Promise<boolean | null>
   onMaximizedState: (callback: (isMaximized: boolean) => void) => () => void
+  /** Voltar/avançar do sistema (app-command no Windows). */
+  onHistoryCommand?: (callback: (direction: HistoryCommandDirection) => void) => () => void
 }
+
+export type HistoryCommandDirection = 'back' | 'forward'
 
 export type ZoomChangedPayload = {
   factor: number

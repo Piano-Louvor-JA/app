@@ -35,6 +35,26 @@ export function registerWindowIpc(getMainWindow) {
 }
 
 /** @param {import('electron').BrowserWindow} win */
+/** `app-command` do Windows (botões laterais do mouse, teclas multimídia) → direção do histórico. */
+const HISTORY_APP_COMMANDS = {
+  'browser-backward': 'back',
+  'browser-forward': 'forward',
+}
+
+/**
+ * Voltar/avançar do histórico de navegação vindos do sistema. No Windows os
+ * botões laterais do mouse podem chegar só como `app-command`, sem `mouseup`
+ * no DOM; o renderer deduplica quando chegam os dois.
+ * @param {import('electron').BrowserWindow} win
+ */
+export function attachHistoryAppCommand(win) {
+  win.on('app-command', (_event, command) => {
+    const direction = HISTORY_APP_COMMANDS[command]
+    if (!direction || win.isDestroyed()) return
+    win.webContents.send('window:history-command', direction)
+  })
+}
+
 export function attachWindowStateEvents(win) {
   win.on('maximize', () => {
     win.webContents.send('window:maximized-state', true)

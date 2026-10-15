@@ -144,3 +144,84 @@ describe('useHistoryNavShortcuts — ciclo de vida', () => {
     expect(forward).not.toHaveBeenCalled()
   })
 })
+
+describe('useHistoryNavShortcuts — app-command do Windows (IPC)', () => {
+  type Direction = 'back' | 'forward'
+  const originalBridge = window.louvorja
+  let emit: (direction: Direction) => void
+  const unsubscribe = vi.fn()
+
+  beforeEach(() => {
+    wrapper?.unmount()
+    vi.useFakeTimers()
+    unsubscribe.mockClear()
+    window.louvorja = {
+      ...originalBridge,
+      isElectron: true,
+      window: {
+        control: vi.fn(),
+        onMaximizedState: vi.fn(),
+        onHistoryCommand: vi.fn((callback: (direction: Direction) => void) => {
+          emit = callback
+          return unsubscribe
+        }),
+      },
+    } as unknown as typeof window.louvorja
+    mountHost()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    window.louvorja = originalBridge
+  })
+
+  it('comando back/forward vindo do main navega', () => {
+    emit('back')
+    expect(back).toHaveBeenCalledTimes(1)
+    emit('forward')
+    expect(forward).toHaveBeenCalledTimes(1)
+  })
+
+  it('cancela a assinatura ao desmontar', () => {
+    wrapper?.unmount()
+    wrapper = null
+    expect(unsubscribe).toHaveBeenCalledTimes(1)
+  })
+
+  it('ignora com diálogo aberto', () => {
+    const dialog = document.createElement('div')
+    dialog.setAttribute('role', 'dialog')
+    document.body.appendChild(dialog)
+    emit('back')
+    expect(back).not.toHaveBeenCalled()
+  })
+
+  it('mouseup + app-command do mesmo clique contam uma vez só (mouseup primeiro)', () => {
+    mouse('mouseup', 3)
+    vi.advanceTimersByTime(50)
+    emit('back')
+    expect(back).toHaveBeenCalledTimes(1)
+  })
+
+  it('app-command + mouseup do mesmo clique contam uma vez só (app-command primeiro)', () => {
+    emit('forward')
+    vi.advanceTimersByTime(50)
+    const event = mouse('mouseup', 4)
+    expect(forward).toHaveBeenCalledTimes(1)
+    expect(event.defaultPrevented).toBe(true)
+  })
+
+  it('cliques separados no tempo contam os dois', () => {
+    mouse('mouseup', 3)
+    vi.advanceTimersByTime(1000)
+    emit('back')
+    expect(back).toHaveBeenCalledTimes(2)
+  })
+
+  it('direções diferentes não se anulam', () => {
+    mouse('mouseup', 3)
+    emit('forward')
+    expect(back).toHaveBeenCalledTimes(1)
+    expect(forward).toHaveBeenCalledTimes(1)
+  })
+})
