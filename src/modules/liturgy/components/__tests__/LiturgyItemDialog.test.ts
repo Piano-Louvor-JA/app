@@ -234,6 +234,40 @@ describe('LiturgyItemDialog', () => {
       expect(wrapper.vm.categoryRequiredMissing).toBe(false)
     })
 
+    it('label de categoria NÃO tem marcador visual de obrigatório (*)', async () => {
+      const wrapper = createWrapper({
+        open: true,
+        draft: { ...defaultProps.draft, type: 'music', musicId: 1 },
+      })
+      await flushPromises()
+      // dialog usa Teleport to body — busca no document
+      const label = document.querySelector('label[for="moment-category"]')
+      expect(label).not.toBeNull()
+      // categoria é opcional (paridade web ff8b481): sem asterisco e sem aria-required
+      expect(label!.querySelector('.moment-dialog__required')).toBeNull()
+      expect(label!.getAttribute('aria-required')).toBeNull()
+      wrapper.unmount()
+    })
+
+    it('hint categoryEmpty some quando não há categorias (não bloqueia migrados do classic)', async () => {
+      const wrapper = createWrapper({
+        open: true,
+        categoryOptions: [],
+        draft: { ...defaultProps.draft, type: 'music', musicId: 1 },
+      })
+      await flushPromises()
+      // sem categorias: hint (último dialog teleportado) diz OPCIONAL
+      const selects = Array.from(document.querySelectorAll('#moment-category'))
+      const hint = selects
+        .at(-1)
+        ?.closest('.moment-dialog__section')
+        ?.querySelector('.moment-dialog__type-hint')
+      expect(hint).not.toBeNull()
+      expect(hint!.textContent).not.toContain('Crie uma')
+      expect(hint!.textContent).toContain('Opcional')
+      wrapper.unmount()
+    })
+
     it('categoryRequiredMissing: false quando categoryId setado', () => {
       const wrapper = createWrapper({
         draft: { ...defaultProps.draft, type: 'music', categoryId: 'cat1' },
