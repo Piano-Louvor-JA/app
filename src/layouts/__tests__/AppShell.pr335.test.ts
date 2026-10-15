@@ -48,7 +48,12 @@ vi.mock('@design-system/index', () => ({
     emits: ['select'],
     template: '<div class="dock-stub"><button v-for="i in items" :key="i.key" :data-key="i.key" @click="$emit(\'select\', i.key)">{{ i.key }}</button></div>',
   },
-  GradientBackground: { template: '<div class="gradient-stub"><slot /></div>' },
+  GradientBackground: { template: '<div class="gradient-stub"><slot /></div>' },  HistoryNav: {
+    name: 'HistoryNav',
+    template: '<nav class="history-nav-mock" />',
+    props: ['dots', 'canGoBack', 'canGoForward', 'navLabel', 'backLabel', 'forwardLabel'],
+    emits: ['back', 'forward', 'go'],
+  },
 }))
 vi.mock('@design-system/composables', () => ({
   usePageTransition: () => ({ transitionName: ref('fade') }),

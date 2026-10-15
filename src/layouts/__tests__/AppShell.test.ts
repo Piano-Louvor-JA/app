@@ -184,6 +184,11 @@ vi.mock('@design-system/index', () => ({
   GradientBackground: {
     name: 'GradientBackground',
     template: '<div class="gradient-mock"><slot /></div>',
+  },  HistoryNav: {
+    name: 'HistoryNav',
+    template: '<nav class="history-nav-mock" />',
+    props: ['dots', 'canGoBack', 'canGoForward', 'navLabel', 'backLabel', 'forwardLabel'],
+    emits: ['back', 'forward', 'go'],
   },
 }))
 
@@ -225,6 +230,7 @@ vi.mock('@modules/timer/views/TimerProjectionView.vue', () => ({
 }))
 
 import AppShell from '@layouts/AppShell.vue'
+import { installNavigationHistory } from '@shared/composables/useNavigationHistory'
 
 function makeRouter(navKey: string | null = null, routeName = 'test') {
   return createRouter({
@@ -498,6 +504,92 @@ describe('AppShell — viewKey e transição', () => {
   it('viewKey usa navKey da meta', async () => {
     const { w } = await mountShell('utilities')
     expect(w.find('.view-mock').exists()).true
+    w.unmount()
+  })
+})
+
+describe('AppShell — navegador de histórico', () => {
+  let uninstallHistory: (() => void) | null = null
+
+  afterEach(() => {
+    uninstallHistory?.()
+    uninstallHistory = null
+  })
+
+  async function mountWithHistory() {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/', name: 'home', component: { template: '<div />' }, meta: { navKey: 'home' } },
+        { path: '/bible', name: 'bible', component: { template: '<div />' }, meta: { navKey: 'bible' } },
+        {
+          path: '/settings/projection',
+          name: 'settings-projection',
+          component: { template: '<div />' },
+          meta: { navKey: 'settings' },
+        },
+      ],
+    })
+    uninstallHistory = installNavigationHistory({ router })
+    await router.push('/')
+    await router.isReady()
+    const w = mount(AppShell, { global: { plugins: [router] } })
+    await flushPromises()
+    const nav = () => w.findComponent({ name: 'HistoryNav' })
+    return { w, router, nav }
+  }
+
+  it('aparece já na abertura com um ponto e as setas desabilitadas (Q1)', async () => {
+    const { w, nav } = await mountWithHistory()
+    expect(w.find('.app-shell__history .history-nav-mock').exists()).true
+    expect(nav().props('dots')).toEqual([{ index: 0, label: 'nav.home', current: true, edge: false }])
+    expect(nav().props('canGoBack')).false
+    expect(nav().props('canGoForward')).false
+    expect(nav().props('navLabel')).toBe('nav.history.label')
+    expect(nav().props('backLabel')).toBe('nav.history.back')
+    expect(nav().props('forwardLabel')).toBe('nav.history.forward')
+    w.unmount()
+  })
+
+  it('depois de navegar mostra os pontos com o nome de cada tela', async () => {
+    const { w, router, nav } = await mountWithHistory()
+    await router.push('/bible')
+    await router.push('/settings/projection')
+    await flushPromises()
+    expect(nav().props('dots').map((d: { label: string }) => d.label)).toEqual([
+      'nav.home',
+      'nav.bible',
+      'nav.settings · settings.tabs.projection',
+    ])
+    expect(nav().props('canGoBack')).true
+    w.unmount()
+  })
+
+  it('seta voltar e avançar navegam pelo histórico', async () => {
+    const { w, router, nav } = await mountWithHistory()
+    await router.push('/bible')
+    await flushPromises()
+
+    nav().vm.$emit('back')
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe('/')
+    expect(nav().props('canGoForward')).true
+
+    nav().vm.$emit('forward')
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe('/bible')
+    w.unmount()
+  })
+
+  it('clicar num ponto salta para aquela tela', async () => {
+    const { w, router, nav } = await mountWithHistory()
+    await router.push('/bible')
+    await router.push('/settings/projection')
+    await flushPromises()
+
+    nav().vm.$emit('go', 0)
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe('/')
     w.unmount()
   })
 })

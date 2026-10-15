@@ -5,8 +5,8 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import { usePageTransition } from '@design-system/composables'
-import { DockFooter, GradientBackground } from '@design-system/index'
-import type { DockNavItem } from '@design-system/types/navigation'
+import { DockFooter, GradientBackground, HistoryNav } from '@design-system/index'
+import type { DockNavItem, HistoryNavDot } from '@design-system/types/navigation'
 import AuthAccountDialog from '@modules/auth/components/AuthAccountDialog.vue'
 import { useAuth, setNotify } from '@modules/auth/composables/useAuth'
 import { useBibleStore } from '@modules/bible/stores/useBibleStore'
@@ -33,6 +33,8 @@ import {
 import { subscribeDisplaysChanged } from '@modules/settings/services/display-service'
 import { useProjectionStore } from '@modules/settings/stores/useProjectionStore'
 import { mainNavRoutes } from '@shared/constants/navigation'
+import { useNavigationHistory } from '@shared/composables/useNavigationHistory'
+import { describeHistoryEntry } from '@shared/services/navigation-history-label'
 import logoUrl from '@assets/brand/logo-louvor-ja.svg'
 import CodenameLogo from '@assets/brand/CodenameLogo.vue'
 import { APP_VERSION } from '@shared/constants/app'
@@ -333,6 +335,21 @@ const navItems = computed<DockNavItem[]>(() =>
   })),
 )
 
+const history = useNavigationHistory()
+const {
+  entries: historyEntries,
+  dots: historyIndexes,
+  canGoBack: canGoBackInHistory,
+  canGoForward: canGoForwardInHistory,
+} = history
+
+const historyDots = computed<HistoryNavDot[]>(() =>
+  historyIndexes.value.map((dot) => ({
+    ...dot,
+    label: describeHistoryEntry(historyEntries.value[dot.index], t),
+  })),
+)
+
 function onNavigate(key: string) {
   const item = mainNavRoutes.find((nav) => nav.key === key)
   if (item) {
@@ -487,6 +504,20 @@ function viewKey(viewRoute: typeof route) {
     >
       <ClockProjectionView embedded />
     </InAppProjectionOverlay>
+
+    <div class="app-shell__history">
+      <HistoryNav
+        :dots="historyDots"
+        :can-go-back="canGoBackInHistory"
+        :can-go-forward="canGoForwardInHistory"
+        :nav-label="t('nav.history.label')"
+        :back-label="t('nav.history.back')"
+        :forward-label="t('nav.history.forward')"
+        @back="history.back"
+        @forward="history.forward"
+        @go="history.goTo"
+      />
+    </div>
 
     <DockFooter
       :items="navItems"
@@ -661,6 +692,22 @@ function viewKey(viewRoute: typeof route) {
   }
 }
 
+/* Faixa voltar/avançar + pontos: logo acima do dock, abaixo das projeções in-app. */
+.app-shell__history {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: var(--ds-dock-height);
+  z-index: 45;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+
+  > * {
+    pointer-events: auto;
+  }
+}
+
 .app-shell__main {
   position: relative;
   z-index: 1;
@@ -669,7 +716,7 @@ function viewKey(viewRoute: typeof route) {
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
-  padding-bottom: var(--ds-dock-height);
+  padding-bottom: calc(var(--ds-dock-height) + var(--ds-history-nav-height));
 
   /* View ativa (RouterView não cria wrapper) preenche a área útil. */
   > * {
