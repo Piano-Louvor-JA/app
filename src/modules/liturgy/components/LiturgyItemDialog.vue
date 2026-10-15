@@ -1088,10 +1088,6 @@ function isLightDot(hex: string): boolean {
                 for="moment-category"
               >
                 {{ t('liturgy.dialog.categoryField') }}
-                <span
-                  class="moment-dialog__required"
-                  aria-hidden="true"
-                >*</span>
               </label>
               <select
                 id="moment-category"
@@ -1116,7 +1112,7 @@ function isLightDot(hex: string): boolean {
                 v-if="categoryOptions.length === 0"
                 class="moment-dialog__type-hint"
               >
-                {{ t('liturgy.dialog.categoryEmpty') }}
+                {{ t('liturgy.dialog.categoryOptionalHint') }}
               </p>
             </div>
           </div>
