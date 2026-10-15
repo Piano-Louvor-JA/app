@@ -64,6 +64,10 @@ vi.mock('vue-router', () => ({
   useRoute: () => routeState,
   useRouter: () => ({ push: routerPush }),
 }))
+// router mockado sem guards: a memória de rolagem é testada à parte
+vi.mock('@shared/composables/useViewScrollMemory', () => ({
+  useViewScrollMemory: () => ({ restore: vi.fn() }),
+}))
 
 import AppShell from '@layouts/AppShell.vue'
 import { useBibleStore } from '@modules/bible/stores/useBibleStore'
