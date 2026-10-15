@@ -581,6 +581,21 @@ describe('AppShell — navegador de histórico', () => {
     w.unmount()
   })
 
+  it('Alt+← e Alt+→ navegam pelo histórico', async () => {
+    const { w, router } = await mountWithHistory()
+    await router.push('/bible')
+    await flushPromises()
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', altKey: true }))
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe('/')
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', altKey: true }))
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe('/bible')
+    w.unmount()
+  })
+
   it('clicar num ponto salta para aquela tela', async () => {
     const { w, router, nav } = await mountWithHistory()
     await router.push('/bible')

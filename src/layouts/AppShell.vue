@@ -34,6 +34,7 @@ import { subscribeDisplaysChanged } from '@modules/settings/services/display-ser
 import { useProjectionStore } from '@modules/settings/stores/useProjectionStore'
 import { mainNavRoutes } from '@shared/constants/navigation'
 import { useNavigationHistory } from '@shared/composables/useNavigationHistory'
+import { useHistoryNavShortcuts } from '@shared/composables/useHistoryNavShortcuts'
 import { describeHistoryEntry } from '@shared/services/navigation-history-label'
 import logoUrl from '@assets/brand/logo-louvor-ja.svg'
 import CodenameLogo from '@assets/brand/CodenameLogo.vue'
@@ -342,6 +343,8 @@ const {
   canGoBack: canGoBackInHistory,
   canGoForward: canGoForwardInHistory,
 } = history
+
+useHistoryNavShortcuts({ back: history.back, forward: history.forward })
 
 const historyDots = computed<HistoryNavDot[]>(() =>
   historyIndexes.value.map((dot) => ({
