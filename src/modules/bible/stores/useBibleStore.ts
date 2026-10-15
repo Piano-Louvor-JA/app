@@ -314,19 +314,27 @@ export const useBibleStore = defineStore('bible', () => {
         return
       }
 
-      const saved = getUserPreference<number>(
-        USER_PREFERENCE_KEYS.bibleSelectedVersion,
-        null,
-      )
-      const versionId = pickDefaultVersionId(loadedVersions, saved)
-      selectedVersionId.value = versionId
+      // A tela chama bootstrap toda vez que abre: se já há uma seleção que
+      // ainda existe no catálogo, o operador volta exatamente onde estava.
+      const keepSelection =
+        loadedVersions.some((version) => version.id === selectedVersionId.value) &&
+        loadedBooks.some((book) => book.id === selectedBookId.value)
 
-      const firstBook = loadedBooks[0]
-      selectedBookId.value = firstBook.id
-      testamentFilter.value = resolveTestament(firstBook.bookNumber)
-      selectedChapter.value = 1
-      selectedVerses.value = []
-      lastVerseAnchor.value = 1
+      if (!keepSelection) {
+        const saved = getUserPreference<number>(
+          USER_PREFERENCE_KEYS.bibleSelectedVersion,
+          null,
+        )
+        const versionId = pickDefaultVersionId(loadedVersions, saved)
+        selectedVersionId.value = versionId
+
+        const firstBook = loadedBooks[0]
+        selectedBookId.value = firstBook.id
+        testamentFilter.value = resolveTestament(firstBook.bookNumber)
+        selectedChapter.value = 1
+        selectedVerses.value = []
+        lastVerseAnchor.value = 1
+      }
 
       isProjecting.value = isProjectionModuleOpen('bible')
       if (isProjecting.value) startProjectionWatch()

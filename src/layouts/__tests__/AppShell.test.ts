@@ -608,3 +608,40 @@ describe('AppShell — navegador de histórico', () => {
     w.unmount()
   })
 })
+
+describe('AppShell — memória de rolagem', () => {
+  /** Deixa a Transition (out-in) terminar: ela espera frames, não só promises. */
+  async function settle() {
+    for (let i = 0; i < 6; i++) {
+      await vi.advanceTimersByTimeAsync(50)
+      await flushPromises()
+    }
+  }
+
+  it('ao voltar para uma tela, restaura a rolagem de onde parou', async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/', component: { template: '<section class="scroll-view" />' }, meta: { navKey: 'home' } },
+        { path: '/bible', component: { template: '<section class="scroll-view" />' }, meta: { navKey: 'bible' } },
+      ],
+    })
+    await router.push('/')
+    await router.isReady()
+    // Transition real: o restore roda no @after-enter (test-utils stuba por padrão)
+    const w = mount(AppShell, { global: { plugins: [router], stubs: { transition: false } } })
+    await flushPromises()
+
+    const first = w.find('.scroll-view').element as HTMLElement
+    first.scrollTop = 420
+    await router.push('/bible')
+    await settle()
+
+    await router.push('/')
+    await settle()
+    const again = w.find('.scroll-view').element as HTMLElement
+    expect(again).not.toBe(first)
+    expect(again.scrollTop).toBe(420)
+    w.unmount()
+  })
+})

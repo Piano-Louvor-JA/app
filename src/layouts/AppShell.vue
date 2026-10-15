@@ -36,6 +36,7 @@ import { mainNavRoutes } from '@shared/constants/navigation'
 import { useNavigationHistory } from '@shared/composables/useNavigationHistory'
 import { useHistoryNavShortcuts } from '@shared/composables/useHistoryNavShortcuts'
 import { describeHistoryEntry } from '@shared/services/navigation-history-label'
+import { useViewScrollMemory } from '@shared/composables/useViewScrollMemory'
 import logoUrl from '@assets/brand/logo-louvor-ja.svg'
 import CodenameLogo from '@assets/brand/CodenameLogo.vue'
 import { APP_VERSION } from '@shared/constants/app'
@@ -44,6 +45,10 @@ const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 const { transitionName } = usePageTransition()
+
+// Voltar a uma tela restaura a rolagem de onde o operador parou (sessão).
+const mainEl = ref<HTMLElement | null>(null)
+const { restore: restoreViewScroll } = useViewScrollMemory(mainEl)
 
 const {
   hasSession: hasMediaSession,
@@ -446,9 +451,13 @@ function viewKey(viewRoute: typeof route) {
       </div>
     </header>
 
-    <main class="app-shell__main">
+    <main ref="mainEl" class="app-shell__main">
       <RouterView v-slot="{ Component, route: viewRoute }">
-        <Transition :name="transitionName" mode="out-in">
+        <Transition
+          :name="transitionName"
+          mode="out-in"
+          @after-enter="restoreViewScroll(route.fullPath)"
+        >
           <component
             :is="Component"
             :key="viewKey(viewRoute)"

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
+import { createPinia, setActivePinia } from "pinia";
 
 // vi.mock é HOISTED: refs aos mocks precisam de vi.hoisted (sino do load morrer silencioso)
 const mocks = vi.hoisted(() => {
@@ -84,6 +85,7 @@ const NOTIFS = [
 // jsdom não implementa scrollTo em Element
 beforeEach(() => {
 	Element.prototype.scrollTo = (() => {}) as unknown as typeof Element.prototype.scrollTo;
+	setActivePinia(createPinia());
 });
 
 async function mountView() {
@@ -353,6 +355,43 @@ describe("CommunityView — busca, filtragem, cópia, report e paginação", () 
 		wrapper.vm.goTo(1);
 		await flushPromises();
 		expect(mocks.listCommunityCollectionsPage.mock.calls.length).toBe(stable + 1);
+	});
+
+	it("abrir a tela não rola para o topo (a rolagem restaurada fica); trocar de página rola", async () => {
+		const scrollTo = vi.fn();
+		Element.prototype.scrollTo = scrollTo as unknown as typeof Element.prototype.scrollTo;
+		mocks.listCommunityCollectionsPage.mockImplementation(async (p: number) => ({
+			items: [],
+			page: p,
+			lastPage: 3,
+			total: 6,
+		}));
+		const wrapper = await mountView();
+		expect(scrollTo).not.toHaveBeenCalled();
+
+		wrapper.vm.goTo(2);
+		await flushPromises();
+		expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "smooth" });
+	});
+
+	it("sair e voltar para a tela mantém a busca e a página", async () => {
+		mocks.listCommunityCollectionsPage.mockImplementation(async (p: number) => ({
+			items: [],
+			page: p,
+			lastPage: 3,
+			total: 6,
+		}));
+		const first = await mountView();
+		first.vm.searchQuery = "arautos";
+		first.vm.goTo(2);
+		await flushPromises();
+		first.unmount();
+
+		mocks.listCommunityCollectionsPage.mockClear();
+		const again = await mountView();
+		expect(again.vm.searchQuery).toBe("arautos");
+		expect(again.vm.page).toBe(2);
+		expect(mocks.listCommunityCollectionsPage).toHaveBeenCalledWith(2, 24);
 	});
 
 	it("navegação: voltar usa router.back() e ranking-link usa push", async () => {

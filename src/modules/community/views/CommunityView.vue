@@ -3,6 +3,7 @@ import { GlassCard } from "@design-system/index";
 import { getAuthSession } from "@modules/media/services/auth-client";
 
 import ReportDialog from "../components/ReportDialog.vue";
+import { storeToRefs } from "pinia";
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -23,6 +24,7 @@ import {
 	getNotifications,
 } from "../services/notifications";
 import NotificationsDropdown from "../components/NotificationsDropdown.vue";
+import { useCommunityBrowseStore } from "../stores/useCommunityBrowseStore";
 
 const { t } = useI18n();
 const router = useRouter();
@@ -34,8 +36,8 @@ const savedId = ref<number | null>(null);
 const savedError = ref<number | null>(null);
 const weeklyTasks = ref<WeeklyTask[]>([]);
 const viewEl = ref<HTMLElement | null>(null);
-const searchQuery = ref("");
-const page = ref(1);
+// busca e página sobrevivem a sair e voltar para a tela
+const { searchQuery, page } = storeToRefs(useCommunityBrowseStore());
 const lastPage = ref(1);
 const total = ref(0);
 
@@ -75,14 +77,15 @@ async function load() {
 	seasonalEvent.value = seasonal;
 	// serviços nunca lançam; falha = vazio/null.
 	isLoading.value = false;
-	// o scroll container é o próprio section (a página inteira rola)
-	viewEl.value?.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function goTo(p: number) {
+async function goTo(p: number) {
 	if (p < 1 || p > lastPage.value || p === page.value) return;
 	page.value = p;
-	load();
+	await load();
+	// página nova começa do topo; ao só voltar para a tela, a rolagem
+	// restaurada pelo AppShell fica. O scroll container é o próprio section.
+	viewEl.value?.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function openReport(collection: CommunityCollectionSummary) {
@@ -124,7 +127,7 @@ onMounted(load);
 </script>
 
 <template>
-  <section class="community-view">
+  <section ref="viewEl" class="community-view">
     <header class="community-view__header">
       <button
         type="button"
