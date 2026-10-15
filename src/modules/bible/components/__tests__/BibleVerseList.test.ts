@@ -22,6 +22,7 @@ vi.mock('../../../settings/types/stage-settings', () => ({
 }))
 
 import BibleVerseList from '../BibleVerseList.vue'
+import { readEffectiveStageSettings } from '../../../settings/services/stage-settings-runtime'
 import type { BibleSelection } from '../types/bible'
 
 const i18n = createI18n({
@@ -169,6 +170,17 @@ describe('BibleVerseList', () => {
   it('sem projeção: preview escondido', () => {
     const wrapper = createWrapper({ hasProjection: false })
     expect(wrapper.find('.bible-reader__preview').exists()).toBe(false)
+  })
+
+  it('preview sem cor de palco fica preto', () => {
+    vi.mocked(readEffectiveStageSettings).mockReturnValueOnce({
+      backgroundColor: null,
+      backgroundImage: null,
+    } as ReturnType<typeof readEffectiveStageSettings>)
+    const wrapper = createWrapper({ hasProjection: true })
+    const style = wrapper.find('.bible-reader__preview').attributes('style') ?? ''
+    expect(style).toContain('background-color: rgb(0, 0, 0)')
+    expect(style).not.toContain('transparent')
   })
 
   it('com projeção: preview com snippet e referência', () => {

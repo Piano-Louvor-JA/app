@@ -10,6 +10,7 @@ import StartingOverlay from '@modules/starting/components/StartingOverlay.vue'
 import { useStartingStore } from '@modules/starting/stores/useStartingStore'
 import { useThemeManager } from '@design-system/composables'
 import AppTitlebar from '@layouts/AppTitlebar.vue'
+import { prewarmMediaProjection } from '@shared/composables/useProjectionWindow'
 import { isProjectionPopupLocation } from '@shared/services/projection-window-location'
 import { useOperatorEscapeToCloseProjection } from '@shared/composables/useOperatorEscapeToCloseProjection'
 import { useMediaPlayerHotkeys } from '@modules/media/composables/useMediaPlayerHotkeys'
@@ -72,6 +73,7 @@ onMounted(() => {
   // quando o PalcoCard monta. Sem isso, hino/bíblia/timer só espelhavam
   // se o operador tivesse visitado Configurações → Projeção antes.
   if (!isProjectionWindow.value) {
+    prewarmMediaProjection()
     import('@modules/settings/services/palco-bridge')
       .then((m) => {
         m.startPalcoBridge()

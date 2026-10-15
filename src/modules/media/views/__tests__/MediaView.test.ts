@@ -141,7 +141,7 @@ describe("MediaView — montagem", () => {
 		const w = await mountView();
 		expect(w.find(".media-window").exists()).toBe(true);
 		expect(w.find(".media-slide-stage").exists()).toBe(true);
-		expect(w.find(".media-player-pill").exists()).toBe(true);
+		expect(w.find(".media-window__stage .media-player-pill").exists()).toBe(true);
 		expect(
 			w.find('[data-testid="playlist"], .media-playlist, aside').exists(),
 		).toBe(true);
