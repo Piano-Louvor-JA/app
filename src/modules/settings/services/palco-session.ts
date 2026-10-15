@@ -77,6 +77,9 @@ function palcoApi(): {
 class PalcoSession {
   private baseUrl: string | null = null
   private activeSlotId = '0'
+  /** Cache blob:/data: → URL /media/ — o runtime republisha por tick; sem
+   * cache cada publish re-enviaria a capa base64 ao main (4 MB × 4/s). */
+  private servedDataUrl = new Map<string, string>()
 
   get slotId(): string {
     return this.activeSlotId
@@ -447,6 +450,36 @@ class PalcoSession {
 
   /** Publica arquivo local no /media/ do sender e devolve URL absoluta. */
   private async serveLocal(target: string): Promise<string | null> {
+    // blob:/data: (capa .slja do IndexedDB — o renderer resolve coverMediaId
+    // como objectURL) não são paths: o servePath do main faria stat("blob:...")
+    // e falharia → TV sem bg (fallback). Busca os bytes e publica via
+    // serveMedia (base64 → /media/ no sender), com nome determinístico
+    // (hash dos bytes) e cache por sessão — mesma capa não republisha.
+    if (/^(blob|data):/i.test(target)) {
+      const cached = this.servedDataUrl.get(target)
+      if (cached) return cached
+      try {
+        const res = await fetch(target)
+        if (!res.ok) return null
+        const blob = await res.blob()
+        const buf = new Uint8Array(await blob.arrayBuffer())
+        if (buf.byteLength === 0 || buf.byteLength > 50 * 1024 * 1024) return null
+        const mime = blob.type || 'image/png'
+        const ext = mime.includes('jpeg') ? 'jpg' : mime.includes('webp') ? 'webp' : 'png'
+        let hash = 0
+        for (const b of buf) hash = (Math.imul(hash, 31) + b) | 0
+        const name = `slja_${(hash >>> 0).toString(16).padStart(8, '0')}${buf.byteLength.toString(16)}.${ext}`
+        let bin = ''
+        for (let i = 0; i < buf.length; i += 0x8000) {
+          bin += String.fromCharCode(...buf.subarray(i, i + 0x8000))
+        }
+        const url = await palcoApi().serveMedia(name, mime, btoa(bin), this.activeSlotId)
+        if (url) this.servedDataUrl.set(target, url)
+        return url
+      } catch {
+        return null
+      }
+    }
     try {
       return await palcoApi().servePath(target, this.activeSlotId)
     } catch {
