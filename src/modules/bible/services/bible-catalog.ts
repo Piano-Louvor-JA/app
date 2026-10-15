@@ -1,3 +1,11 @@
+import {
+  chapterRecordKey,
+  cleanCatalogText,
+  pickDefaultVersionId,
+  resolveBookTone,
+  resolveTestament,
+  resolveVersionAbbreviation,
+} from '@louvorja/shared/services'
 import { fetchRemoteCatalogJson } from '@shared/services/remote-catalog'
 import { readCatalogRecord } from '@shared/services/workspace-api'
 
@@ -9,7 +17,7 @@ import type {
   BibleVersion,
   CatalogBibleBookRow,
   CatalogBibleVersionRow,
-} from '../types/bible'
+} from '@louvorja/shared/types'
 
 const BOOKS_FILE_BY_PREFIX: Record<string, string> = {
   pt: 'pt_bible_book',
@@ -38,50 +46,6 @@ async function bibleCatalogFile(kind: 'book' | 'version'): Promise<string> {
   const prefix = getCurrentApiPrefix()
   if (kind === 'book') return BOOKS_FILE_BY_PREFIX[prefix] ?? 'pt_bible_book'
   return VERSIONS_FILE_BY_PREFIX[prefix] ?? 'pt_bible_version'
-}
-
-/** Abreviações conhecidas quando o catálogo/API vem com abbreviation vazia/null. */
-const VERSION_ABBREVIATION_BY_NAME: Array<{ match: RegExp; abbr: string }> = [
-  { match: /nova\s+almeida\s+atualizada/i, abbr: 'NAA' },
-  { match: /almeida\s+corrigida\s+e\s+revisada\s+fiel/i, abbr: 'ACRF' },
-  { match: /almeida\s+corrigida\s+e\s+fiel/i, abbr: 'ACF' },
-  { match: /almeida\s+revisada\s+imprensa/i, abbr: 'ARIB' },
-  { match: /almeida\s+revista\s+e\s+atualizada/i, abbr: 'ARA' },
-  { match: /almeida\s+revista\s+e\s+corrigida/i, abbr: 'ARC' },
-  { match: /king\s+james\s+atualizada/i, abbr: 'KJA' },
-  { match: /nova\s+vers[aã]o\s+internacional/i, abbr: 'NVI' },
-  { match: /sagradas\s+escrituras/i, abbr: 'SEV' },
-  { match: /reina[-\s]?valera\s*1989/i, abbr: 'RVA' },
-  { match: /reina[-\s]?valera/i, abbr: 'RV' },
-]
-
-function cleanCatalogText(value: unknown): string {
-  if (value == null) return ''
-  const text = String(value).trim()
-  if (!text || text.toLowerCase() === 'null' || text.toLowerCase() === 'undefined') {
-    return ''
-  }
-  return text
-}
-
-/** Evita `String(null) === "null"` e completa abreviação a partir do nome/id. */
-export function resolveVersionAbbreviation(
-  abbreviation: unknown,
-  name: unknown,
-  versionId?: unknown,
-): string {
-  const fromField = cleanCatalogText(abbreviation)
-  if (fromField) return fromField
-
-  const versionName = cleanCatalogText(name)
-  for (const entry of VERSION_ABBREVIATION_BY_NAME) {
-    if (entry.match.test(versionName)) return entry.abbr
-  }
-
-  const idText = cleanCatalogText(versionId)
-  if (/^[a-z]{2,6}$/i.test(idText)) return idText.toUpperCase()
-
-  return ''
 }
 
 function mapBook(row: CatalogBibleBookRow): BibleBook {
@@ -121,32 +85,14 @@ async function readOrFetchCatalog<T>(filename: string): Promise<T | null> {
   }
 }
 
-export function resolveTestament(bookNumber: number): BibleTestament {
-  return bookNumber <= 39 ? 'ot' : 'nt'
-}
-
-/** Tom visual do tile conforme faixas canônicas. */
-export function resolveBookTone(bookNumber: number): BibleBookTone {
-  if (bookNumber <= 5) return 'law'
-  if (bookNumber <= 17) return 'history'
-  if (bookNumber <= 22) return 'poetry'
-  if (bookNumber <= 27) return 'major-prophet'
-  if (bookNumber <= 39) return 'minor-prophet'
-  if (bookNumber <= 43) return 'gospels'
-  if (bookNumber === 44) return 'acts'
-  if (bookNumber <= 57) return 'pauline'
-  if (bookNumber <= 65) return 'general'
-  if (bookNumber === 66) return 'apocalyptic'
-  return 'neutral'
-}
-
-export function chapterRecordKey(
-  versionId: number,
-  bookId: number,
-  chapter: number,
-): string {
-  return `bible_${versionId}_${bookId}_${chapter}`
-}
+export {
+  chapterRecordKey,
+  cleanCatalogText,
+  pickDefaultVersionId,
+  resolveBookTone,
+  resolveTestament,
+  resolveVersionAbbreviation,
+} from '@louvorja/shared/services'
 
 export async function loadBibleBooks(): Promise<BibleBook[]> {
   const rows = await readOrFetchCatalog<CatalogBibleBookRow[]>(
@@ -173,23 +119,4 @@ export async function loadChapterVerses(
   const verses = await readOrFetchCatalog<BibleChapterVerses>(key)
   if (!verses || typeof verses !== 'object') return {}
   return verses
-}
-
-/** Preferência padrão: ARA, senão a primeira versão. */
-export function pickDefaultVersionId(
-  versions: BibleVersion[],
-  savedId: number | null,
-): number | null {
-  if (versions.length === 0) return null
-
-  if (savedId != null && versions.some((version) => version.id === savedId)) {
-    return savedId
-  }
-
-  const ara = versions.find(
-    (version) =>
-      version.abbreviation.toUpperCase() === 'ARA' ||
-      version.name.toUpperCase() === 'ARA',
-  )
-  return ara?.id ?? versions[0].id
 }

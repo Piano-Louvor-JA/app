@@ -15,7 +15,8 @@
       "@themes/*": ["./src/design-system/themes/*"],
       "@assets/*": ["./src/assets/*"],
       "@styles/*": ["./src/styles/*"],
-      "@locales/*": ["./src/locales/*"]
+      "@locales/*": ["./src/locales/*"],
+      "@louvorja/shared/*": ["../../packages/shared/src/*"]
     }
   }
 }

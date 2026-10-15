@@ -84,6 +84,9 @@ export default defineConfig({
       '@assets': path.resolve(__dirname, './src/assets'),
       '@styles': path.resolve(__dirname, './src/styles'),
       '@locales': path.resolve(__dirname, './src/locales'),
+      '@louvorja/shared': path.resolve(__dirname, '../packages/shared/dist'),
+      '@louvorja/shared/types': path.resolve(__dirname, '../packages/shared/dist/types'),
+      '@louvorja/shared/services': path.resolve(__dirname, '../packages/shared/dist/services'),
     },
   },
 })

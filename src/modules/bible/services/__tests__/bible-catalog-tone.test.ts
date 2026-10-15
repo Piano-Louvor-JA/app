@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { resolveBookTone } from '../bible-catalog'
+import { resolveBookTone } from '@louvorja/shared/services'
 
-import type { BibleBookTone } from '../../types/bible'
+import type { BibleBookTone } from '@louvorja/shared/types'
 
 /**
  * Tabela dos 66 livros canônicos (ordem protestante, book_number do
