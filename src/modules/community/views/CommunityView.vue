@@ -77,14 +77,15 @@ async function load() {
 	seasonalEvent.value = seasonal;
 	// serviços nunca lançam; falha = vazio/null.
 	isLoading.value = false;
-	// o scroll container é o próprio section (a página inteira rola)
-	viewEl.value?.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function goTo(p: number) {
+async function goTo(p: number) {
 	if (p < 1 || p > lastPage.value || p === page.value) return;
 	page.value = p;
-	load();
+	await load();
+	// página nova começa do topo; ao só voltar para a tela, a rolagem
+	// restaurada pelo AppShell fica. O scroll container é o próprio section.
+	viewEl.value?.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function openReport(collection: CommunityCollectionSummary) {
@@ -126,7 +127,7 @@ onMounted(load);
 </script>
 
 <template>
-  <section class="community-view">
+  <section ref="viewEl" class="community-view">
     <header class="community-view__header">
       <button
         type="button"

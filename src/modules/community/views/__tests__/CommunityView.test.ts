@@ -357,6 +357,23 @@ describe("CommunityView — busca, filtragem, cópia, report e paginação", () 
 		expect(mocks.listCommunityCollectionsPage.mock.calls.length).toBe(stable + 1);
 	});
 
+	it("abrir a tela não rola para o topo (a rolagem restaurada fica); trocar de página rola", async () => {
+		const scrollTo = vi.fn();
+		Element.prototype.scrollTo = scrollTo as unknown as typeof Element.prototype.scrollTo;
+		mocks.listCommunityCollectionsPage.mockImplementation(async (p: number) => ({
+			items: [],
+			page: p,
+			lastPage: 3,
+			total: 6,
+		}));
+		const wrapper = await mountView();
+		expect(scrollTo).not.toHaveBeenCalled();
+
+		wrapper.vm.goTo(2);
+		await flushPromises();
+		expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "smooth" });
+	});
+
 	it("sair e voltar para a tela mantém a busca e a página", async () => {
 		mocks.listCommunityCollectionsPage.mockImplementation(async (p: number) => ({
 			items: [],
