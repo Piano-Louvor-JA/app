@@ -243,6 +243,7 @@ contextBridge.exposeInMainWorld('louvorja', {
       return () => ipcRenderer.removeListener('projection:popups-closed', listener)
     },
     closeUrl: () => ipcRenderer.invoke('projection:close-url'),
+    revealWarm: (payload) => ipcRenderer.invoke('projection:reveal-warm', payload),
     externalAlive: () => ipcRenderer.invoke('projection:external-alive'),
     externalMediaAlive: () => ipcRenderer.invoke('projection:external-media-alive'),
     getSourceMediaId: () => ipcRenderer.invoke('projection:get-source-media-id'),

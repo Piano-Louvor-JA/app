@@ -10,6 +10,7 @@ import {
   saveProjectionSettings,
 } from '@modules/settings/services/projection-preferences'
 import { getDesktopBridge } from '@shared/services/desktop-bridge'
+import { isProjectionPopupLocation } from '@shared/services/projection-window-location'
 
 type ProjectionLayout = 'audience' | 'return'
 
@@ -32,6 +33,9 @@ let lastProjectedModule: string | null = null
 let reapplyingTargets = false
 /** Nome único a cada open — reusar o mesmo nome após close falha no Chromium/Electron. */
 let projectionWindowSeq = 0
+/** Janelas de mídia carregadas em segundo plano, prontas para aparecer juntas. */
+let warmWindows: ProjectionWindow[] = []
+let prewarmTask: Promise<void> | null = null
 
 function pruneWindows() {
   openWindows = openWindows.filter((win) => win && !win.closed)
@@ -145,6 +149,111 @@ async function resolveMonitorTargets(
   return { monitorIds: [], fullscreen: false, returnId }
 }
 
+function canPrewarmMediaProjection(): boolean {
+  if (typeof window === 'undefined' || !window.location) return false
+  if (isProjectionPopupLocation()) return false
+  if (!window.louvorja?.isElectron) return false
+  // Preload antigo não esconde a janela: sem revealWarm o aquecimento
+  // abriria a projeção sozinho na inicialização.
+  return typeof getDesktopBridge()?.projection?.revealWarm === 'function'
+}
+
+function aliveWarm(layout: ProjectionLayout): ProjectionWindow[] {
+  warmWindows = warmWindows.filter((win) => win && !win.closed)
+  return warmWindows.filter((win) => (win.layout ?? 'audience') === layout)
+}
+
+function discardWarmWindows(): void {
+  for (const win of warmWindows) {
+    try {
+      win.close()
+    } catch {
+      // janela já fechada
+    }
+  }
+  warmWindows = []
+}
+
+function openWarm(layout: ProjectionLayout): void {
+  projectionWindowSeq += 1
+  const url = `${buildPopupUrl('media', {
+    fullscreen: true,
+    layout: layout === 'return' ? 'return' : undefined,
+  })}&warm=1`
+  const win = window.open(
+    url,
+    `Projection_warm_media_${layout}_${projectionWindowSeq}`,
+    'width=800,height=600,frame=no',
+  ) as ProjectionWindow | null
+  if (!win || win.closed) return
+  win.layout = layout
+  warmWindows.push(win)
+}
+
+/**
+ * Sobe, escondidas, todas as janelas de projeção de mídia que vão ser usadas.
+ * No play elas são mostradas juntas, sem boot uma a uma.
+ */
+export function prewarmMediaProjection(): Promise<void> {
+  if (!canPrewarmMediaProjection()) return Promise.resolve()
+  if (prewarmTask) return prewarmTask
+  prewarmTask = (async () => {
+    const targets = await resolveMonitorTargets('media')
+    const needReturn = targets.returnId != null ? 1 : 0
+    for (let i = aliveWarm('audience').length; i < targets.monitorIds.length; i += 1) {
+      openWarm('audience')
+    }
+    for (let i = aliveWarm('return').length; i < needReturn; i += 1) {
+      openWarm('return')
+    }
+  })().finally(() => {
+    prewarmTask = null
+  })
+  return prewarmTask
+}
+
+async function claimWarmProjection(
+  slots: { monitorId: number; layout: ProjectionLayout }[],
+): Promise<ProjectionWindow[] | null> {
+  if (slots.length === 0) return []
+  const reveal = getDesktopBridge()?.projection?.revealWarm
+  if (!reveal) return null
+
+  const needAudience = slots.filter((slot) => slot.layout === 'audience').length
+  const needReturn = slots.length - needAudience
+  if (aliveWarm('audience').length < needAudience || aliveWarm('return').length < needReturn) {
+    return null
+  }
+
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    const ready = await reveal({
+      shows: slots.map((slot) => ({
+        monitorId: slot.monitorId,
+        fullscreen: true,
+        layout: slot.layout,
+      })),
+    })
+    if (ready) {
+      const claimed: ProjectionWindow[] = []
+      for (const slot of slots) {
+        const index = warmWindows.findIndex(
+          (win) => !win.closed && (win.layout ?? 'audience') === slot.layout,
+        )
+        const win = index >= 0 ? warmWindows.splice(index, 1)[0] : undefined
+        if (!win) break
+        win.monitorId = slot.monitorId
+        win.layout = slot.layout
+        claimed.push(win)
+      }
+      // O processo principal já mostrou todas. Não reabrir por cima.
+      return claimed
+    }
+    await delay(25)
+  }
+
+  return null
+}
+
 function openOnMonitor(
   moduleId: string,
   monitorId: number | null,
@@ -229,6 +338,7 @@ export function closeProjectionModule(): void {
   activeModule = null
   lastProjectedModule = null
   closeWebUrlProjection()
+  prewarmMediaProjection()
 }
 
 export async function openProjectionModule(
@@ -259,17 +369,34 @@ export async function openProjectionModule(
 
   const targets = await resolveMonitorTargets(moduleId, preferredIds)
   const nextWindows: ProjectionWindow[] = []
+  const slots = [
+    ...targets.monitorIds.map((monitorId) => ({
+      monitorId,
+      layout: 'audience' as const,
+    })),
+    ...(targets.returnId != null
+      ? [{ monitorId: targets.returnId, layout: 'return' as const }]
+      : []),
+  ]
 
-  if (targets.monitorIds.length > 0) {
-    for (const monitorId of targets.monitorIds) {
-      const win = openOnMonitor(moduleId, monitorId, true, 'audience')
-      if (win) nextWindows.push(win)
+  let claimedAll = false
+  if (moduleId === 'media' && slots.length > 0) {
+    await prewarmMediaProjection()
+    const claimed = await claimWarmProjection(slots)
+    if (claimed) {
+      nextWindows.push(...claimed)
+      claimedAll = true
+      void prewarmMediaProjection()
+    } else {
+      discardWarmWindows()
     }
   }
 
-  if (targets.returnId != null) {
-    const win = openOnMonitor(moduleId, targets.returnId, true, 'return')
-    if (win) nextWindows.push(win)
+  if (!claimedAll) {
+    for (const slot of slots) {
+      const win = openOnMonitor(moduleId, slot.monitorId, true, slot.layout)
+      if (win) nextWindows.push(win)
+    }
   }
 
   openWindows = nextWindows

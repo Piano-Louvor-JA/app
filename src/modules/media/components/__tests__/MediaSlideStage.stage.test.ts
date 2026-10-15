@@ -62,6 +62,7 @@ describe("MediaSlideStage — paridade StageSettings (scope hymns)", () => {
 		const style = w.find(".media-slide-stage__lyric").attributes("style");
 		expect(style).toContain("rgba(24, 24, 24, 0.4)");
 		expect(style).toContain("rgba(255, 255, 255, 0.85)");
+		expect(style).toContain("padding: 0.75em 1.25em");
 	});
 
 	it("alinhamento: respeita textAlign do usuário (não força center)", () => {
@@ -69,6 +70,21 @@ describe("MediaSlideStage — paridade StageSettings (scope hymns)", () => {
 		const w = mountStage({ lyric: "abc" });
 		const style = w.find(".media-slide-stage__lyric").attributes("style");
 		expect(style).toContain("left");
+	});
+
+	it("capa: sombra em camadas destaca o título sobre a foto", () => {
+		settingsMock.current = { textShadow: true, titleTextColor: "#f6c32a" };
+		const w = mountStage({ lyric: "", title: "Maranata", isCover: true });
+		const style = w.find(".media-slide-stage__lyric--cover").attributes("style") ?? "";
+		expect(style).toContain("0.14em 0.28em");
+		expect(style).toContain("color-mix(in srgb, #f6c32a 40%, transparent)");
+	});
+
+	it("capa: sombra desligada não desenha o halo", () => {
+		settingsMock.current = { textShadow: false };
+		const w = mountStage({ lyric: "", title: "Maranata", isCover: true });
+		const style = w.find(".media-slide-stage__lyric").attributes("style") ?? "";
+		expect(style).toContain("text-shadow: none");
 	});
 
 	it("sombra: textShadow off → sem sombra custom", () => {

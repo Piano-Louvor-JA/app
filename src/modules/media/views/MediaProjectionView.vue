@@ -9,6 +9,7 @@ import {
   writeMediaRuntimeToStorage,
 } from '../services/media-runtime'
 import { stripHtmlBreaks } from '../services/media-slides'
+import { coverTitleTextShadow } from '../services/media-cover-style'
 import { readEffectiveStageSettings, subscribeStageSettings } from '../../settings/services/stage-settings-runtime'
 import type { StageSettings } from '../../settings/types/stage-settings'
 import { resolveBackgroundImage, stageFlexAlign,
@@ -98,6 +99,19 @@ const textStyle = computed(() => ({
 // Título (capa) com personalização própria; fallback = estilo geral.
 // Cor/box: SEM default inline — a classe --cover (amarelo, sem caixa) só
 // vale quando o usuário NÃO personalizou; personalização vence (14/10).
+const titleColor = computed(
+  () => stage.value.titleTextColor ?? stage.value.textColor ?? '#f6c32a',
+)
+
+const coverSubtitle = computed(() => {
+  const subtitle = runtime.value.subtitle.trim()
+  const title = runtime.value.title.trim()
+  if (!subtitle || subtitle.localeCompare(title, undefined, { sensitivity: 'accent' }) === 0) {
+    return ''
+  }
+  return subtitle
+})
+
 const titleStyle = computed(() => {
   const st = stage.value
   return {
@@ -105,9 +119,7 @@ const titleStyle = computed(() => {
     fontSize: `${((st.titleFontSize ?? st.fontSize) / 1920) * 100}cqw`,
     fontWeight: String(st.titleFontWeight ?? st.fontWeight),
     color: st.titleTextColor ?? st.textColor ?? undefined,
-    textShadow: (st.titleTextShadow ?? st.textShadow)
-      ? `0 0 ${(st.shadowBlur / 108) * 100}cqw rgba(0,0,0,${st.shadowIntensity})`
-      : 'none',
+    textShadow: coverTitleTextShadow(Boolean(st.titleTextShadow ?? st.textShadow), titleColor.value),
     textTransform: st.titleUpperCase ? 'uppercase' : 'none',
   }
 })
@@ -167,14 +179,31 @@ const boxStyle = computed(() =>
       class="media-projection__content"
       :style="contentStyle"
     >
-      <p
+      <div
         v-if="showTitle"
-        class="media-projection__title"
-        :class="{ 'media-projection__title--cover': runtime.isCover }"
-        :style="[titleStyle, runtime.isCover ? titleBoxStyle : boxStyle]"
+        class="media-projection__titlecard"
+        :class="{ 'media-projection__titlecard--boxed': stage.titleTextBox }"
+        :style="{ color: titleColor }"
       >
-        {{ runtime.title }}
-      </p>
+        <span
+          class="media-projection__titlemark media-projection__titlemark--tl"
+          aria-hidden="true"
+        />
+        <span
+          class="media-projection__titlemark media-projection__titlemark--br"
+          aria-hidden="true"
+        />
+        <p
+          v-if="coverSubtitle"
+          class="media-projection__kicker"
+        >{{ coverSubtitle }}</p>
+        <p
+          class="media-projection__title media-projection__title--cover"
+          :style="[titleStyle, titleBoxStyle]"
+        >
+          {{ runtime.title }}
+        </p>
+      </div>
       <p
         v-if="lyric && !runtime.isCover"
         class="media-projection__lyric"
@@ -253,8 +282,104 @@ const boxStyle = computed(() =>
   -webkit-backdrop-filter: none;
   color: #f6c32a;
   font-weight: 900;
-  line-height: 1.1;
-  letter-spacing: -0.01em;
-  text-shadow: 0 10px 30px rgb(0 0 0 / 0.9), 0 2px 6px rgb(0 0 0 / 0.7);
+  line-height: 1.15;
+  letter-spacing: 0.04em;
+}
+
+.media-projection__titlecard {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8cqw;
+  max-width: min(88%, 1600px);
+  padding: 3.6cqw 5cqw 3.8cqw;
+  text-align: center;
+  animation: media-titlecard-in 780ms cubic-bezier(0.22, 1, 0.36, 1) both;
+
+  &::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    left: 50%;
+    top: 52%;
+    width: 96cqw;
+    height: 42cqw;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(
+      ellipse at center,
+      rgb(0 0 0 / 0.34) 0%,
+      rgb(0 0 0 / 0.14) 46%,
+      rgb(0 0 0 / 0.05) 72%,
+      transparent 100%
+    );
+    filter: blur(1.4cqw);
+    pointer-events: none;
+  }
+
+  &--boxed {
+    padding: 0;
+
+    &::before,
+    .media-projection__titlemark {
+      display: none;
+    }
+  }
+}
+
+.media-projection__titlemark {
+  position: absolute;
+  width: 3.6cqw;
+  height: 3.6cqw;
+  pointer-events: none;
+
+  &--tl {
+    top: 0.2cqw;
+    left: 0.2cqw;
+    border-top: 0.28cqw solid currentColor;
+    border-left: 0.28cqw solid currentColor;
+    border-top-left-radius: 2cqw;
+  }
+
+  &--br {
+    right: 0.2cqw;
+    bottom: 0.2cqw;
+    border-right: 0.28cqw solid currentColor;
+    border-bottom: 0.28cqw solid currentColor;
+    border-bottom-right-radius: 2cqw;
+  }
+}
+
+.media-projection__kicker {
+  margin: 0;
+  max-width: 100%;
+  padding-left: 0.34em;
+  color: #fff;
+  font-size: 1.45cqw;
+  font-weight: 700;
+  letter-spacing: 0.34em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  text-shadow: 0 0.08em 0.22em rgb(0 0 0 / 0.85);
+}
+
+@keyframes media-titlecard-in {
+  from {
+    opacity: 0;
+    transform: translateY(1.2cqw);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .media-projection__titlecard {
+    animation: none;
+  }
 }
 </style>
