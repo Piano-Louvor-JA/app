@@ -40,7 +40,3 @@ export async function goAndWait(router: Router, delta: number): Promise<void> {
   router.go(delta)
   await done
 }
-
-export function historyPosition(router: Router): number {
-  return (router.options.history.state as { position: number }).position
-}

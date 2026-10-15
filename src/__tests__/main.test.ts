@@ -18,10 +18,12 @@ vi.mock('@shared/services/projection-window-location', () => ({
   isProjectionPopupLocation: vi.fn(() => false),
 }))
 vi.mock('@modules/remote/renderer/liturgy-bridge', () => ({ installRemoteLiturgyBridge: vi.fn() }))
+vi.mock('@shared/composables/useNavigationHistory', () => ({ installNavigationHistory: vi.fn() }))
 
 import { createApp } from 'vue'
 import { isProjectionPopupLocation } from '@shared/services/projection-window-location'
 import { installRemoteLiturgyBridge } from '@modules/remote/renderer/liturgy-bridge'
+import { installNavigationHistory } from '@shared/composables/useNavigationHistory'
 
 describe('main.ts', () => {
   beforeEach(() => {
@@ -29,11 +31,12 @@ describe('main.ts', () => {
     vi.resetModules()
   })
 
-  it('janela principal: monta app e instala bridge remota', async () => {
+  it('janela principal: monta app, instala bridge remota e histórico de navegação', async () => {
     vi.mocked(isProjectionPopupLocation).mockReturnValue(false)
     await import('../main')
     expect(createApp).toHaveBeenCalled()
     expect(installRemoteLiturgyBridge).toHaveBeenCalled()
+    expect(installNavigationHistory).toHaveBeenCalledWith({ router: expect.anything() })
   })
 
   it('janela de projeção: esconde splash e NÃO instala bridge', async () => {
@@ -43,6 +46,7 @@ describe('main.ts', () => {
     document.body.appendChild(splash)
     await import('../main')
     expect(installRemoteLiturgyBridge).not.toHaveBeenCalled()
+    expect(installNavigationHistory).not.toHaveBeenCalled()
     expect(splash.hidden).toBe(true)
   })
 
