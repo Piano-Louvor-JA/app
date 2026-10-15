@@ -336,6 +336,38 @@ describe('com electron', () => {
     }
   })
 
+  it('republica a capa em cada slot e após reiniciar o sender', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    palco.serveMedia.mockImplementation(async (name: string, _mime: string, _bytes: string, slot: string) =>
+      `http://192.168.0.5:${slot === '0' ? 7080 : 7082}/media/${name}`,
+    )
+    readEffectiveStageSettings.mockReturnValue({ ...DEFAULT_SETTINGS, backgroundImage: '' })
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      blob: async () => new Blob([new Uint8Array([5, 6, 7])], { type: 'image/png' }),
+    } as unknown as Response)
+    const input = { text: 'capa', background: 'blob:multi-slot-cover' }
+    try {
+      await palcoSession.projectTo('0', 'hymns', input)
+      await palcoSession.projectTo('1', 'hymns', input)
+      expect(palco.serveMedia).toHaveBeenCalledTimes(2)
+      expect(palco.send.mock.calls[1]?.[0].background).toContain(':7082/media/')
+      await palcoSession.projectTo('0', 'hymns', input)
+      expect(palco.serveMedia).toHaveBeenCalledTimes(2)
+      await palcoSession.stopSlot('1')
+      await palcoSession.startSlot('1')
+      await palcoSession.projectTo('1', 'hymns', input)
+      expect(palco.serveMedia).toHaveBeenCalledTimes(3)
+      await palcoSession.turnOff()
+      await palcoSession.turnOn()
+      await palcoSession.project('hymns', input)
+      expect(palco.serveMedia).toHaveBeenCalledTimes(4)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
   it('projectTo: usa slot alvo e restaura o ativo', async () => {
     const palco = fullMock()
     setBridge(palco)
