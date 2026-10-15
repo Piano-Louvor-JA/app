@@ -169,6 +169,17 @@ describe('useProjectionWindow', () => {
     expect(names.some((n) => n.includes('_return_3'))).toBe(true)
   })
 
+  it('não aquece projeção sem contexto de navegação disponível', async () => {
+    const mod = await loadFresh()
+    vi.stubGlobal('window', { louvorja: { isElectron: true } })
+    try {
+      await expect(mod.prewarmMediaProjection()).resolves.toBeUndefined()
+      expect(winOpen).not.toHaveBeenCalled()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('reaproveita a janela de mídia já aquecida em vez de abrir outra', async () => {
     resolveSelectedReturnMonitorId.mockReturnValue(null)
     loadProjectionSettings.mockReturnValue({

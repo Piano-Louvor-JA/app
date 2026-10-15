@@ -3,11 +3,11 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { stripHtmlBreaks } from '../services/media-slides'
+import { coverTitleTextShadow } from '../services/media-cover-style'
 import { readEffectiveStageSettings, subscribeStageSettings } from '../../settings/services/stage-settings-runtime'
 import {
   resolveBackgroundImage,
   stageBgCss,
-  coverTitleTextShadow,
   stageFlexAlign,
   type StageSettings,
 } from '../../settings/types/stage-settings'

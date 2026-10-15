@@ -9,9 +9,10 @@ import {
   writeMediaRuntimeToStorage,
 } from '../services/media-runtime'
 import { stripHtmlBreaks } from '../services/media-slides'
+import { coverTitleTextShadow } from '../services/media-cover-style'
 import { readEffectiveStageSettings, subscribeStageSettings } from '../../settings/services/stage-settings-runtime'
 import type { StageSettings } from '../../settings/types/stage-settings'
-import { coverTitleTextShadow, resolveBackgroundImage, stageFlexAlign,
+import { resolveBackgroundImage, stageFlexAlign,
   stageBgCss } from '../../settings/types/stage-settings'
 import type { MediaProjectionRuntime } from '../types/media'
 import { DEFAULT_MEDIA_PROJECTION } from '../types/media'

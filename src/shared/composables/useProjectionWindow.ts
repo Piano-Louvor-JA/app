@@ -150,7 +150,7 @@ async function resolveMonitorTargets(
 }
 
 function canPrewarmMediaProjection(): boolean {
-  if (typeof window === 'undefined') return false
+  if (typeof window === 'undefined' || !window.location) return false
   if (isProjectionPopupLocation()) return false
   if (!window.louvorja?.isElectron) return false
   // Preload antigo não esconde a janela: sem revealWarm o aquecimento
