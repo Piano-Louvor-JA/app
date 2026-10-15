@@ -352,6 +352,10 @@ export type ProjectionNavigationState = {
 export type ProjectionApi = {
   openUrl: (payload: OpenUrlProjectionPayload) => Promise<boolean>
   closeUrl: () => Promise<boolean>
+  /** Mostra juntas as janelas de mídia já carregadas em segundo plano. */
+  revealWarm?: (payload: {
+    shows: { monitorId: number; fullscreen?: boolean; layout?: 'audience' | 'return' }[]
+  }) => Promise<boolean>
   /** Há projeção externa (video/pdf/ppt/site) com janela viva no main? */
   externalAlive: () => Promise<boolean>
   /** SÓ mídia externa de verdade (vídeo/pdf/ppt do web-projection) — sem popups. */

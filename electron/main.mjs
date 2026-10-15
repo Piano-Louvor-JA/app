@@ -1,7 +1,7 @@
 import path from "node:path";
 import { statSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { app, BrowserWindow, dialog, globalShortcut, screen, shell } from "electron";
+import { app, BrowserWindow, dialog, globalShortcut, ipcMain, screen, shell } from "electron";
 
 import {
 	APP_DESKTOP_ID,
@@ -225,6 +225,10 @@ function applyWindowIcon(win) {
 	}
 }
 
+function isWarmProjectionUrl(url) {
+	return typeof url === "string" && /(?:\?|&)warm=1(?:&|$)/.test(url);
+}
+
 function isProjectionPopupUrl(url) {
 	try {
 		const parsed = new URL(url);
@@ -335,6 +339,8 @@ function buildPopupWindowOptions(url, features = '') {
       nodeIntegration: false,
       sandbox: false,
       spellcheck: false,
+      // Janela aquecida fica oculta: sem isso o Chromium congela o renderer.
+      backgroundThrottling: !isWarmProjectionUrl(url),
     },
   }
 
@@ -414,6 +420,74 @@ function attachProjectionWindowHandlers(parentWindow) {
   // 'none' com projeção aberta. A marca é a fonte de verdade.
   /** @type {Set<import('electron').BrowserWindow>} */
   const projectionPopups = new Set()
+  /** Janelas de mídia já com o Vue montado, escondidas até o play. */
+  /** @type {{ win: import('electron').BrowserWindow, layout: 'audience' | 'return' }[]} */
+  let warmPool = []
+  /** @type {WeakSet<import('electron').BrowserWindow>} */
+  const standbyWindows = new WeakSet()
+  /** @type {WeakSet<import('electron').BrowserWindow>} */
+  const standbyReady = new WeakSet()
+
+  const focusOperator = () => {
+    if (!parentWindow || parentWindow.isDestroyed()) return
+    setTimeout(() => {
+      try {
+        if (!parentWindow.isDestroyed()) parentWindow.focus()
+      } catch { /* ignore */ }
+    }, 0)
+  }
+
+  ipcMain.removeHandler("projection:reveal-warm")
+  ipcMain.handle("projection:reveal-warm", (_event, payload) => {
+    const shows = Array.isArray(payload?.shows)
+      ? payload.shows
+      : payload?.monitorId != null
+        ? [payload]
+        : []
+    if (shows.length === 0) return false
+
+    const available = warmPool.filter(
+      (item) => !item.win.isDestroyed() && standbyReady.has(item.win),
+    )
+    /** @type {{ item: (typeof available)[number], show: { monitorId?: unknown, fullscreen?: unknown, layout?: unknown } }[]} */
+    const assigned = []
+    const taken = new Set()
+    for (const show of shows) {
+      const layout = show?.layout === "return" ? "return" : "audience"
+      const index = available.findIndex(
+        (item, itemIndex) => !taken.has(itemIndex) && item.layout === layout,
+      )
+      if (index < 0) return false
+      taken.add(index)
+      assigned.push({ item: available[index], show })
+    }
+
+    try {
+      for (const { item, show } of assigned) {
+        const monitorId = Number(show?.monitorId)
+        const fullscreen = show?.fullscreen !== false
+        const bounds = buildProjectionWindowBounds({
+          fullscreen,
+          monitorId: Number.isFinite(monitorId) ? monitorId : null,
+          displays: screen.getAllDisplays(),
+          primary: screen.getPrimaryDisplay(),
+        })
+        standbyWindows.delete(item.win)
+        warmPool = warmPool.filter((entry) => entry.win !== item.win)
+        if (bounds) item.win.setBounds(bounds)
+        applyProjectionDisplayMode(item.win, fullscreen)
+      }
+      for (const { item } of assigned) {
+        item.win.showInactive()
+        projectionPopups.add(item.win)
+      }
+      ensureProjectionHotkey()
+      focusOperator()
+    } catch {
+      return false
+    }
+    return true
+  })
 
   const popupProvider = () => {
     for (const win of [...projectionPopups]) {
@@ -481,12 +555,25 @@ function attachProjectionWindowHandlers(parentWindow) {
 
     const childUrl = details?.url ?? ''
     const isProjection = isProjectionPopupUrl(childUrl)
+    const warm = isWarmProjectionUrl(childUrl)
 
     // Marca a popup na criação (fonte de verdade do provider da hotkey —
-    // independe da URL em runtime, que em dev nem sempre contém #/popup)
-    if (isProjection) {
+    // independe da URL em runtime, que em dev nem sempre contém #/popup).
+    // A janela aquecida fica de fora até ser revelada no play.
+    if (isProjection && !warm) {
       projectionPopups.add(childWindow)
       ensureProjectionHotkey()
+      // Fundo preto na hora: a splash de boot não pode pintar na tela do público.
+      try { childWindow.setBackgroundColor('#000000') } catch { /* ignore */ }
+    }
+    if (warm) {
+      const layout = /(?:\?|&)layout=return(?:&|$)/.test(childUrl) ? "return" : "audience"
+      warmPool.push({ win: childWindow, layout })
+      standbyWindows.add(childWindow)
+      try { childWindow.setBackgroundColor('#000000') } catch { /* ignore */ }
+      childWindow.on('closed', () => {
+        warmPool = warmPool.filter((entry) => entry.win !== childWindow)
+      })
     }
 
     const { fullscreen } = isProjection
@@ -528,6 +615,10 @@ function attachProjectionWindowHandlers(parentWindow) {
     childWindow.once('ready-to-show', () => {
       if (childWindow.isDestroyed()) return
       childWindow.webContents.setAudioMuted(false)
+      if (standbyWindows.has(childWindow)) {
+        standbyReady.add(childWindow)
+        return
+      }
       const shouldFullscreen = fullscreenByWindow.get(childWindow) ?? fullscreen
       applyProjectionDisplayMode(childWindow, shouldFullscreen)
       childWindow.show()

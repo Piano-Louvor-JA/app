@@ -77,7 +77,7 @@ const contentKey = computed(
 )
 
 const stageStyle = computed(() => ({
-  backgroundColor: stage.value.backgroundColor,
+  backgroundColor: stage.value.backgroundColor ?? '#000000',
   backgroundImage: resolveBackgroundImage(stage.value.backgroundImage)
     ? `url(${resolveBackgroundImage(stage.value.backgroundImage)})`
     : undefined,

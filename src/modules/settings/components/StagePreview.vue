@@ -27,9 +27,11 @@ const footer = computed(() =>
 const containerStyle = computed(() => {
   const s = props.settings
   return {
-    // null (não setado) → transparent: o preview mostra o comportamento
-    // real (imagem da música vence / preto do palco por baixo).
-    backgroundColor: stageBgCss(s.backgroundColor),
+    // Hinos: null deixa a capa aparecer. Bíblia não tem capa — o palco é preto.
+    backgroundColor:
+      props.module === 'bible'
+        ? (s.backgroundColor ?? '#000000')
+        : stageBgCss(s.backgroundColor),
     backgroundImage: resolveBackgroundImage(s.backgroundImage)
       ? `url(${resolveBackgroundImage(s.backgroundImage)})`
       : undefined,

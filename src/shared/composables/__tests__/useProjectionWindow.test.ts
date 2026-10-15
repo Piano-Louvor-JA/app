@@ -169,6 +169,69 @@ describe('useProjectionWindow', () => {
     expect(names.some((n) => n.includes('_return_3'))).toBe(true)
   })
 
+  it('não aquece projeção sem contexto de navegação disponível', async () => {
+    const mod = await loadFresh()
+    vi.stubGlobal('window', { louvorja: { isElectron: true } })
+    try {
+      await expect(mod.prewarmMediaProjection()).resolves.toBeUndefined()
+      expect(winOpen).not.toHaveBeenCalled()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('reaproveita a janela de mídia já aquecida em vez de abrir outra', async () => {
+    resolveSelectedReturnMonitorId.mockReturnValue(null)
+    loadProjectionSettings.mockReturnValue({
+      ...SETTINGS,
+      targetDisplayIds: [2],
+    })
+    const revealWarm = vi.fn().mockResolvedValue(true)
+    getDesktopBridge.mockReturnValue({
+      projection: { closeUrl: vi.fn(), revealWarm },
+    })
+    window.louvorja = { isElectron: true } as typeof window.louvorja
+    const mod = await loadFresh()
+    await mod.prewarmMediaProjection()
+    expect(winOpen).toHaveBeenCalledTimes(1)
+    expect(String(winOpen.mock.calls[0]?.[0])).toContain('warm=1')
+    winOpen.mockClear()
+    const ok = await mod.openProjectionModule('media')
+    expect(ok).toBe(true)
+    expect(revealWarm).toHaveBeenCalledWith({
+      shows: [{ monitorId: 2, fullscreen: true, layout: 'audience' }],
+    })
+    const openedWhileProjecting = winOpen.mock.calls.map((call) => String(call[0]))
+    expect(openedWhileProjecting.every((url) => url.includes('warm=1'))).toBe(true)
+    delete window.louvorja
+  })
+
+  it('revela audiência e retorno no mesmo pedido', async () => {
+    resolveSelectedReturnMonitorId.mockReturnValue(3)
+    loadProjectionSettings.mockReturnValue({
+      ...SETTINGS,
+      targetDisplayIds: [2],
+    })
+    const revealWarm = vi.fn().mockResolvedValue(true)
+    getDesktopBridge.mockReturnValue({
+      projection: { closeUrl: vi.fn(), revealWarm },
+    })
+    window.louvorja = { isElectron: true } as typeof window.louvorja
+    const mod = await loadFresh()
+    await mod.prewarmMediaProjection()
+    expect(winOpen).toHaveBeenCalledTimes(2)
+    winOpen.mockClear()
+    const ok = await mod.openProjectionModule('media')
+    expect(ok).toBe(true)
+    expect(revealWarm).toHaveBeenCalledWith({
+      shows: [
+        { monitorId: 2, fullscreen: true, layout: 'audience' },
+        { monitorId: 3, fullscreen: true, layout: 'return' },
+      ],
+    })
+    delete window.louvorja
+  })
+
   it('fecha todas as janelas e limpa estado', async () => {
     const mod = await loadFresh()
     await mod.openProjectionModule('clock')

@@ -7,6 +7,18 @@
     <link rel="icon" href="./favicon.ico" sizes="any">
     <link rel="apple-touch-icon" href="./ico/favicon.png">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+      // Projeção (#/popup): sem splash. O preload cobre o começo da música.
+      ;(function () {
+        var href = String(location.href || '')
+        var path = String(location.pathname || '')
+        var isProjection =
+          href.indexOf('#/popup') !== -1 ||
+          path.indexOf('/popup') !== -1 ||
+          href.indexOf('/popup?') !== -1
+        if (isProjection) document.documentElement.classList.add('projection-boot')
+      })()
+    </script>
     <style>
       :root {
         --boot-bg: #12121c;
@@ -33,8 +45,13 @@
         user-select: none;
         -webkit-user-select: none;
       }
-      #boot-splash[hidden] {
+      #boot-splash[hidden],
+      html.projection-boot #boot-splash {
         display: none !important;
+      }
+      html.projection-boot,
+      html.projection-boot body {
+        background: #000;
       }
       #boot-splash .boot-logo {
         width: 96px;
@@ -88,20 +105,6 @@
       <div class="boot-spinner" aria-hidden="true"></div>
     </div>
     <div id="app"></div>
-    <script>
-      // Projeção (#/popup): mensagem curta. Inicialização do app: frase completa.
-      ;(function () {
-        var href = String(location.href || '')
-        var path = String(location.pathname || '')
-        var isProjection =
-          href.indexOf('#/popup') !== -1 ||
-          path.indexOf('/popup') !== -1 ||
-          href.indexOf('/popup?') !== -1
-        if (!isProjection) return
-        var msg = document.getElementById('boot-message')
-        if (msg) msg.textContent = 'carregando...'
-      })()
-    </script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

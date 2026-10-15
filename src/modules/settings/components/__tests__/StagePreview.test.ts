@@ -123,6 +123,16 @@ describe('StagePreview', () => {
     expect(style).toContain('font-weight: 800')
   })
 
+  it('bíblia sem cor de fundo fica preta', () => {
+    const wrapper = createWrapper({
+      module: 'bible',
+      settings: { ...base, backgroundColor: null },
+    })
+    const style = wrapper.find('.stage-preview').attributes('style') ?? ''
+    expect(style).toContain('background-color: rgb(0, 0, 0)')
+    expect(style).not.toContain('transparent')
+  })
+
   it('backgroundImage com dataURL: aplica url(...)', () => {
     const dataUrl = 'data:image/png;base64,AAA'
     const wrapper = createWrapper({ settings: { ...base, backgroundImage: dataUrl } })

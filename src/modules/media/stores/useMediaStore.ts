@@ -600,6 +600,12 @@ export const useMediaStore = defineStore('media', () => {
     minimized.value =
       params.minimized ?? loadProjectionSettings().autoMinimizePlayer === true
 
+    // A janela de projeção sobe junto com o áudio, não depois dele.
+    const shouldProject = params.project !== false
+    const retainProjection = shouldProject && Boolean(params.keepQueue) && isProjecting.value
+    const projectionTask =
+      shouldProject && !retainProjection ? startProjection() : null
+
     if (playbackUrl) {
       bindAudio()
       const audio = getMediaAudioElement()
@@ -621,17 +627,15 @@ export const useMediaStore = defineStore('media', () => {
     // Hino tocando = PROJETANDO, sempre (decisão Rafael 27/08): destino vem
     // do seletor na biblioteca (Espelhar/TV individual). Antes: minimizado
     // não projetava — operador tinha que clicar Projetar a cada hino.
-    if (params.project !== false) {
-      const retainProjection = params.keepQueue && isProjecting.value
-      if (retainProjection) {
-        // Fila: janela já está aberta — não chamar startProjection de novo
-        // (window.open sem gesto do usuário falha e zera isProjecting).
-        isProjecting.value = true
-        publishProjectionState()
-        if (!projectionWatchTimer) startProjectionWatch()
-      } else {
-        await startProjection()
-      }
+    if (retainProjection) {
+      // Fila: janela já está aberta — não chamar startProjection de novo
+      // (window.open sem gesto do usuário falha e zera isProjecting).
+      isProjecting.value = true
+      publishProjectionState()
+      if (!projectionWatchTimer) startProjectionWatch()
+    } else if (projectionTask) {
+      await projectionTask
+      publishProjectionState()
     }
 
     return { ok: true, warningKey }
@@ -1145,6 +1149,10 @@ export const useMediaStore = defineStore('media', () => {
       publishProjectionState()
       return true
     }
+    // Publica o slide antes de mostrar a janela aquecida, para ela já
+    // abrir com a capa em vez de esperar o boot.
+    isProjecting.value = true
+    publishProjectionState()
     const opened = await openProjectionModule('media')
     if (opened) {
       projectingTvsOnly.value = false
