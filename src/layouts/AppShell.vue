@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, provide, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -41,7 +41,7 @@ import { mainNavRoutes } from '@shared/constants/navigation'
 import { useNavigationHistory } from '@shared/composables/useNavigationHistory'
 import { useHistoryNavShortcuts } from '@shared/composables/useHistoryNavShortcuts'
 import { describeHistoryEntry } from '@shared/services/navigation-history-label'
-import { useViewScrollMemory } from '@shared/composables/useViewScrollMemory'
+import { VIEW_SCROLL_MEMORY, useViewScrollMemory } from '@shared/composables/useViewScrollMemory'
 import logoUrl from '@assets/brand/logo-louvor-ja.svg'
 import CodenameLogo from '@assets/brand/CodenameLogo.vue'
 import { APP_VERSION } from '@shared/constants/app'
@@ -53,7 +53,10 @@ const { transitionName } = usePageTransition()
 
 // Voltar a uma tela restaura a rolagem de onde o operador parou (sessão).
 const mainEl = ref<HTMLElement | null>(null)
-const { restore: restoreViewScroll } = useViewScrollMemory(mainEl)
+const viewScrollMemory = useViewScrollMemory(mainEl)
+const restoreViewScroll = viewScrollMemory.restore
+// páginas minimizáveis leem/semeiam a rolagem do <main> por aqui
+provide(VIEW_SCROLL_MEMORY, viewScrollMemory)
 
 const {
   hasSession: hasMediaSession,

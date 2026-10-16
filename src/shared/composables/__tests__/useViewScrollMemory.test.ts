@@ -1,13 +1,16 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
-import { defineComponent, ref } from 'vue'
+import { defineComponent, h, ref } from 'vue'
 import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 
 import {
   SCROLL_MEMORY_MAX_ROUTES,
   SCROLL_RESTORE_TIMEOUT_MS,
+  VIEW_SCROLL_MEMORY,
+  injectViewScrollMemory,
   useViewScrollMemory,
+  type ViewScrollMemory,
 } from '../useViewScrollMemory'
 
 /** Elemento rolável com limite (jsdom não calcula alturas). */
@@ -30,6 +33,7 @@ function makeScrollable(el: Element, maxTop = 10_000) {
 let router: Router
 let wrapper: VueWrapper
 let restore: (fullPath: string) => void
+let memory: ViewScrollMemory
 let view: HTMLElement
 let viewCtl: ReturnType<typeof makeScrollable>
 
@@ -47,7 +51,8 @@ async function setup() {
     defineComponent({
       setup() {
         const root = ref<HTMLElement | null>(null)
-        ;({ restore } = useViewScrollMemory(root))
+        memory = useViewScrollMemory(root)
+        ;({ restore } = memory)
         return { root }
       },
       template: '<main ref="root"><section class="view"></section></main>',
@@ -191,5 +196,85 @@ describe('useViewScrollMemory', () => {
     expect(() => restoreOrphan('/x')).not.toThrow()
     w.unmount()
     await flushPromises()
+  })
+})
+
+describe('useViewScrollMemory — captura e semente (páginas minimizadas)', () => {
+  it('captureCurrent devolve a rolagem da tela atual', () => {
+    view.scrollTop = 250
+    expect(memory.captureCurrent()).toEqual([{ path: [0], top: 250, left: 0 }])
+  })
+
+  it('seed deixa a rolagem pronta para quando a tela voltar', async () => {
+    await router.push('/b')
+    memory.seed('/p/9', [{ path: [0], top: 640, left: 0 }])
+    view.scrollTop = 0
+    restore('/p/9')
+    expect(view.scrollTop).toBe(640)
+  })
+
+  it('seed vazio apaga a rolagem guardada daquela tela', async () => {
+    view.scrollTop = 300
+    await router.push('/b')
+    memory.seed('/a', [])
+    view.scrollTop = 5
+    restore('/a')
+    expect(view.scrollTop).toBe(5)
+  })
+
+  it('seed respeita o limite de telas guardadas', () => {
+    for (let n = 0; n <= SCROLL_MEMORY_MAX_ROUTES; n++) memory.seed(`/p/${n}`, [{ path: [0], top: 10, left: 0 }])
+    view.scrollTop = 0
+    restore('/p/0')
+    expect(view.scrollTop).toBe(0)
+    restore(`/p/${SCROLL_MEMORY_MAX_ROUTES}`)
+    expect(view.scrollTop).toBe(10)
+  })
+
+  it('sem raiz montada, captureCurrent devolve vazio', async () => {
+    const r = createRouter({ history: createMemoryHistory(), routes: [{ path: '/x', component: {} }] })
+    await r.push('/x')
+    let orphan!: ViewScrollMemory
+    const w = mount(
+      defineComponent({
+        setup() {
+          orphan = useViewScrollMemory(ref(null))
+          return () => null
+        },
+      }),
+      { global: { plugins: [r] } },
+    )
+    expect(orphan.captureCurrent()).toEqual([])
+    w.unmount()
+  })
+
+  it('as páginas recebem a mesma memória por inject; fora do AppShell é null', () => {
+    let injected: ViewScrollMemory | null = null
+    const Child = defineComponent({
+      setup() {
+        injected = injectViewScrollMemory()
+        return () => null
+      },
+    })
+    const w = mount(
+      defineComponent({
+        provide: { [VIEW_SCROLL_MEMORY as symbol]: memory },
+        render: () => h(Child),
+      }),
+    )
+    expect(injected).toBe(memory)
+    w.unmount()
+
+    let outside: ViewScrollMemory | null | undefined
+    const w2 = mount(
+      defineComponent({
+        setup() {
+          outside = injectViewScrollMemory()
+          return () => null
+        },
+      }),
+    )
+    expect(outside).toBeNull()
+    w2.unmount()
   })
 })

@@ -76,7 +76,8 @@ vi.mock('vue-router', () => ({
 }))
 // router mockado sem guards: a memória de rolagem é testada à parte
 vi.mock('@shared/composables/useViewScrollMemory', () => ({
-  useViewScrollMemory: () => ({ restore: vi.fn() }),
+  VIEW_SCROLL_MEMORY: Symbol('view-scroll-memory'),
+  useViewScrollMemory: () => ({ restore: vi.fn(), captureCurrent: vi.fn(() => []), seed: vi.fn() }),
 }))
 
 import AppShell from '@layouts/AppShell.vue'
