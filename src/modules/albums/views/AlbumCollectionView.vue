@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import { MediaCollectionList } from '@design-system/index'
+import { useMinimizablePage } from '@shared/composables/useMinimizablePage'
 
 import AlbumLyricDialog from '../components/AlbumLyricDialog.vue'
 import AlbumTrackRow from '../components/AlbumTrackRow.vue'
@@ -65,9 +66,36 @@ const title = computed(
   () => activeCollection.value?.name || t('albums.collectionFallback'),
 )
 
+/** Retrato guardado ao minimizar (coletânea + busca). */
+interface CollectionSnapshot {
+  collectionId: string
+  searchQuery: string
+}
+
+const { minimize, takeRestoredState } = useMinimizablePage<CollectionSnapshot>({
+  describe: () => {
+    const query = searchQuery.value.trim()
+    const parts = [
+      query ? t('minimize.search', { q: query }) : '',
+      t('albums.trackCount', { count: filteredTracks.value.length }),
+    ]
+    return {
+      title: title.value,
+      icon: activeCollection.value?.kind === 'hymnal' ? 'ti-book' : 'ti-disc',
+      summary: parts.filter(Boolean).join(' · '),
+    }
+  },
+  capture: () => ({ collectionId: collectionId.value, searchQuery: searchQuery.value }),
+  fallbackRoute: { name: 'albums' },
+})
+
 async function load() {
   clearError()
   await openCollection(collectionId.value)
+  // Reaberta pela barra de minimizadas: a busca volta depois de carregar
+  // (abrir outra coletânea no meio-tempo limpava a busca na store).
+  const restored = takeRestoredState()
+  if (restored?.collectionId === collectionId.value) searchQuery.value = restored.searchQuery
 }
 
 onMounted(() => {
@@ -127,18 +155,32 @@ async function runAction(
   <section class="album-collection-view">
     <header class="album-collection-view__header">
       <div class="album-collection-view__brand">
-        <button
-          type="button"
-          class="album-collection-view__back"
-          :aria-label="t('albums.back')"
-          :title="t('albums.back')"
-          @click="goBack"
-        >
-          <i
-            class="ti ti-arrow-left"
-            aria-hidden="true"
-          />
-        </button>
+        <div class="album-collection-view__nav">
+          <button
+            type="button"
+            class="album-collection-view__back"
+            :aria-label="t('albums.back')"
+            :title="t('albums.back')"
+            @click="goBack"
+          >
+            <i
+              class="ti ti-arrow-left"
+              aria-hidden="true"
+            />
+          </button>
+          <button
+            type="button"
+            class="album-collection-view__minimize"
+            :aria-label="t('minimize.page')"
+            :title="t('minimize.page')"
+            @click="minimize"
+          >
+            <i
+              class="ti ti-minus"
+              aria-hidden="true"
+            />
+          </button>
+        </div>
 
         <div class="album-collection-view__icon">
           <i
@@ -355,7 +397,15 @@ async function runAction(
   min-width: 0;
 }
 
-.album-collection-view__back {
+.album-collection-view__nav {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.album-collection-view__back,
+.album-collection-view__minimize {
   width: 2.4rem;
   height: 2.4rem;
   border: none;

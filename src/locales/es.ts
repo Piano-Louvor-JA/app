@@ -69,6 +69,10 @@ export default {
       editor: 'Editor',
     },
     },
+  minimize: {
+    page: 'Minimizar página',
+    search: 'Búsqueda: {q}',
+  },
   sync: {
     downloadQueue: {
       title: 'Descargas',

@@ -141,6 +141,10 @@ export default {
         projection: 'Configurações de projeção e telas em breve.',
       },
     },
+  minimize: {
+    page: 'Minimizar página',
+    search: 'Busca: {q}',
+  },
   sync: {
     downloadQueue: {
       title: 'Downloads',
