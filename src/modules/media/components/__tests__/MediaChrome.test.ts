@@ -25,6 +25,8 @@ const storeState = {
 	isPlaying: ref(false),
 	previewSnippet: ref("Porque tal amou"),
 	previewReference: ref("João 3:16"),
+	session: ref<{ subtitle: string } | null>(null),
+	queueLabel: ref<string | null>(null),
 	toggleProjection: vi.fn().mockResolvedValue(undefined),
 	clearProjection: vi.fn(),
 	togglePlay: vi.fn().mockResolvedValue(undefined),
@@ -53,6 +55,8 @@ beforeEach(() => {
 	storeState.minimized.value = true;
 	storeState.isProjecting.value = false;
 	storeState.isPlaying.value = false;
+	storeState.session.value = null;
+	storeState.queueLabel.value = null;
 });
 
 describe("MediaChrome — visibilidade", () => {
@@ -137,6 +141,24 @@ describe("MediaChrome — título da prévia", () => {
 		const title = w.find(".floating-preview-title");
 		expect(title.exists()).toBe(true);
 		expect(title.text()).toBe("Player");
+		w.unmount();
+	});
+});
+
+describe("MediaChrome — nome da coletânea/playlist no título", () => {
+	it("com playlist tocando: Player · nome da playlist", () => {
+		storeState.queueLabel.value = "Culto de Sábado";
+		storeState.session.value = { subtitle: "Maranata" };
+		const w = mountChrome();
+		expect(w.find(".floating-preview-title").text()).toBe("Player · Culto de Sábado");
+		w.unmount();
+	});
+
+	it("sem playlist: Player · coletânea/hinário do hino", () => {
+		storeState.queueLabel.value = null;
+		storeState.session.value = { subtitle: "Hinário Adventista" };
+		const w = mountChrome();
+		expect(w.find(".floating-preview-title").text()).toBe("Player · Hinário Adventista");
 		w.unmount();
 	});
 });
