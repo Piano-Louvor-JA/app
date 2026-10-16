@@ -1,19 +1,11 @@
 <script setup lang="ts">
 import PalcoRouteSelect from '../../settings/components/PalcoRouteSelect.vue'
-import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
 import { GlassCard } from '@design-system/index'
-import { readEffectiveStageSettings, subscribeStageSettings } from '../../settings/services/stage-settings-runtime'
-import { resolveBackgroundImage, type StageSettings,
-  stageBgCss } from '../../settings/types/stage-settings'
-
 
 import StageCustomizationDialog from '../../settings/components/StageCustomizationDialog.vue'
-import TimerConfigDialog from '../components/TimerConfigDialog.vue'
-import TimerPreview from '../components/TimerPreview.vue'
-import TimerProjectFab from '../components/TimerProjectFab.vue'
 import TimerSavedList from '../components/TimerSavedList.vue'
 import { useTimerFeature } from '../composables/useTimer'
 
@@ -25,53 +17,17 @@ const {
   runtime,
   isProjecting,
   configOpen,
-  isRunning,
-  setTimeFormat,
-  setBgColor,
-  setTextColor,
-  resetDisplayToDefault,
   openConfig,
   closeConfig,
-  start,
-  pause,
   reset,
   saveMark,
   removeSavedMark,
   clearSavedMarks,
-  toggleProjection,
 } = useTimerFeature()
 
 function goBack() {
   void router.push({ name: 'utilities-temporizador' })
 }
-
-function onToggleProjection() {
-  void toggleProjection()
-}
-
-const stage = ref<StageSettings>(readEffectiveStageSettings('timer'))
-let unsubStage: (() => void) | null = null
-onMounted(() => {
-  unsubStage = subscribeStageSettings(() => {
-    stage.value = readEffectiveStageSettings('timer')
-  })
-})
-onUnmounted(() => unsubStage?.())
-
-const stageBg = computed(() => ({
-  backgroundColor: stageBgCss(stage.value.backgroundColor),
-  backgroundImage: resolveBackgroundImage(stage.value.backgroundImage)
-    ? `url(${resolveBackgroundImage(stage.value.backgroundImage)})`
-    : undefined,
-  backgroundSize: 'cover',
-  backgroundPosition: 'center',
-}))
-
-// Características do módulo vindas do StageSettings (fonte única).
-const effectiveConfig = computed(() => {
-  const mod = stage.value.timer
-  return mod ? { ...config.value, ...mod } : { ...config.value }
-})
 </script>
 
 <template>
@@ -105,87 +61,43 @@ const effectiveConfig = computed(() => {
 
     <div class="timer-view__content">
       <div class="timer-view__stage">
-        <GlassCard
-          class="timer-view__widget"
-          :padding="false"
-        >
-          <div class="timer-view__toolbar">
-            <button
-              type="button"
-              class="timer-view__tool-btn"
-              :aria-label="t('timer.config')"
-              :title="t('timer.config')"
-              @click="openConfig"
-            >
-              <i
-                class="ti ti-palette"
-                aria-hidden="true"
-              />
-            </button>
-          </div>
-
-          <div
-          class="timer-view__preview"
-          :style="stageBg"
-        >
-            <TimerPreview
-              :config="effectiveConfig"
-              :runtime="runtime"
-              :stage="stage"
-              preview
+        <GlassCard class="timer-view__widget">
+          <button
+            type="button"
+            class="timer-view__tool-btn"
+            :aria-label="t('timer.config')"
+            :title="t('timer.config')"
+            @click="openConfig"
+          >
+            <i
+              class="ti ti-palette"
+              aria-hidden="true"
             />
-          </div>
+          </button>
 
-          <div class="timer-view__controls">
-            <button
-              v-if="!isRunning"
-              type="button"
-              class="timer-view__ctrl timer-view__ctrl--start"
-              @click="start"
-            >
-              <i
-                class="ti ti-player-play"
-                aria-hidden="true"
-              />
-              {{ t('timer.start') }}
-            </button>
-            <button
-              v-else
-              type="button"
-              class="timer-view__ctrl timer-view__ctrl--pause"
-              @click="pause"
-            >
-              <i
-                class="ti ti-player-pause"
-                aria-hidden="true"
-              />
-              {{ t('timer.pause') }}
-            </button>
+          <button
+            type="button"
+            class="timer-view__ctrl timer-view__ctrl--reset"
+            @click="reset"
+          >
+            <i
+              class="ti ti-refresh"
+              aria-hidden="true"
+            />
+            {{ t('timer.reset') }}
+          </button>
 
-            <button
-              type="button"
-              class="timer-view__ctrl timer-view__ctrl--reset"
-              @click="reset"
-            >
-              <i
-                class="ti ti-refresh"
-                aria-hidden="true"
-              />
-              {{ t('timer.reset') }}
-            </button>
-
-            <button
-              type="button"
-              class="timer-view__ctrl timer-view__ctrl--save"
-              @click="saveMark"
-            >
-              <i
-                class="ti ti-device-floppy"
-                aria-hidden="true"
-              />
-              {{ t('timer.save') }}
-            </button>
-          </div>
+          <button
+            type="button"
+            class="timer-view__ctrl timer-view__ctrl--save"
+            @click="saveMark"
+          >
+            <i
+              class="ti ti-device-floppy"
+              aria-hidden="true"
+            />
+            {{ t('timer.save') }}
+          </button>
 
           <div
             v-if="isProjecting"
@@ -214,11 +126,6 @@ const effectiveConfig = computed(() => {
       @close="closeConfig"
     />
 
-    <TimerProjectFab
-      :projecting="isProjecting"
-      @project="onToggleProjection"
-      @clear="onToggleProjection"
-    />
   </section>
 </template>
 
@@ -312,23 +219,13 @@ const effectiveConfig = computed(() => {
 }
 
 .timer-view__widget {
-  position: relative;
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
   width: 100%;
   max-width: 56rem;
-  aspect-ratio: 21 / 9;
-  max-height: min(100%, 28rem);
-  overflow: hidden;
-  flex-direction: column;
-}
-
-.timer-view__toolbar {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  z-index: 2;
-  display: flex;
-  gap: 0.5rem;
 }
 
 .timer-view__tool-btn {
@@ -356,23 +253,6 @@ const effectiveConfig = computed(() => {
   }
 }
 
-.timer-view__preview {
-  border-radius: 0.75rem;
-  overflow: hidden;
-  flex: 1;
-  min-height: 0;
-  padding: 1.5rem 1.5rem 0.5rem;
-}
-
-.timer-view__controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 0.65rem;
-  padding: 0.75rem 1.25rem 1.25rem;
-}
-
 .timer-view__ctrl {
   display: inline-flex;
   height: 2.35rem;
@@ -389,16 +269,6 @@ const effectiveConfig = computed(() => {
     font-size: 1.05rem;
   }
 
-  &--start {
-    background: color-mix(in srgb, #43a047 22%, transparent);
-    color: #66bb6a;
-  }
-
-  &--pause {
-    background: color-mix(in srgb, #fb8c00 22%, transparent);
-    color: #ffa726;
-  }
-
   &--reset {
     background: color-mix(in srgb, #e53935 18%, transparent);
     color: #ef5350;
@@ -411,10 +281,6 @@ const effectiveConfig = computed(() => {
 }
 
 .timer-view__projecting {
-  position: absolute;
-  bottom: 4.25rem;
-  left: 50%;
-  z-index: 2;
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
@@ -424,7 +290,6 @@ const effectiveConfig = computed(() => {
   color: var(--ds-color-primary);
   font-size: 0.75rem;
   font-weight: 600;
-  transform: translateX(-50%);
 
   .ti {
     font-size: 0.95rem;
@@ -460,14 +325,6 @@ const effectiveConfig = computed(() => {
 
   .timer-view__title {
     font-size: 1.15rem;
-  }
-
-  .timer-view__widget {
-    max-height: min(100%, 20rem);
-  }
-
-  .timer-view__preview {
-    padding: 1rem 1rem 0.5rem;
   }
 }
 </style>

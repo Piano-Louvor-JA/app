@@ -1,9 +1,8 @@
 // @vitest-environment jsdom
-// Cobertura TimerView.vue (gaps_map3: 87/63/69): header, controles
-// start/pause/reset/save, toolbar config, projecting badge, savedList,
-// stageBg com/sem backgroundImage, effectiveConfig com stage.timer.
+// Cobertura TimerView.vue: header, reset/save, toolbar config, projecting
+// badge e savedList. Prévia, iniciar/pausar e projetar ficam no TimerChrome.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { flushPromises, mount } from '@vue/test-utils'
+import { mount } from '@vue/test-utils'
 import { computed } from 'vue'
 
 const fns = vi.hoisted(() => ({
@@ -26,7 +25,6 @@ const fns = vi.hoisted(() => ({
     configOpen: false,
     runtime: { savedTimesMs: [1000, 2000] },
     config: { timeFormat: 'mm:ss' },
-    stage: null as Record<string, unknown> | null,
   },
 }))
 
@@ -47,53 +45,8 @@ vi.mock('../../../settings/components/PalcoRouteSelect.vue', () => ({
   default: { name: 'PalcoRouteSelect', props: ['module'], template: '<div class="palco-route-mock" />' },
 }))
 
-const stageSettings = vi.hoisted(() => {
-  const listeners: Array<() => void> = []
-  return {
-    listeners,
-    settings: { timer: null as Record<string, unknown> | null, backgroundImage: null as string | null, backgroundColor: '#101010' },
-    subscribe: (fn: () => void) => {
-      listeners.push(fn)
-      return () => { const i = listeners.indexOf(fn); if (i >= 0) listeners.splice(i, 1) }
-    },
-  }
-})
-
-vi.mock('../../../settings/services/stage-settings-runtime', () => ({
-  readEffectiveStageSettings: () => JSON.parse(JSON.stringify(stageSettings.settings)),
-  subscribeStageSettings: stageSettings.subscribe,
-}))
-
-vi.mock('../../../settings/types/stage-settings', () => ({
-  stageBgCss: (color: string | null) => color ?? 'transparent',
-  resolveBackgroundImage: (bg: unknown) => (bg ? String(bg) : null),
-  stageBgCss: (bg: unknown) => (bg ? String(bg) : 'transparent'),
-}))
-
 vi.mock('../../../settings/components/StageCustomizationDialog.vue', () => ({
   default: { name: 'StageCustomizationDialog', props: ['open', 'scope'], template: '<div class="stage-dialog-mock" />' },
-}))
-vi.mock('../../components/TimerConfigDialog.vue', () => ({
-  default: { name: 'TimerConfigDialog', props: ['open'], template: '<div class="config-dialog-mock" />' },
-}))
-vi.mock('../../components/TimerPreview.vue', () => ({
-  default: {
-    name: 'TimerPreview',
-    props: {
-      config: { type: Object, default: null },
-      runtime: { type: Object, default: null },
-      stage: { type: Object, default: null },
-      preview: { type: Boolean, default: false },
-    },
-    template: `<div
-      class="timer-preview-mock"
-      :data-config="JSON.stringify(config)"
-      :data-preview="String(preview)"
-    />`,
-  },
-}))
-vi.mock('../../components/TimerProjectFab.vue', () => ({
-  default: { name: 'TimerProjectFab', props: ['projecting'], emits: ['project', 'clear'], template: '<div class="fab-mock" />' },
 }))
 vi.mock('../../components/TimerSavedList.vue', () => ({
   default: { name: 'TimerSavedList', props: ['items', 'timeFormat'], emits: ['remove', 'clear'], template: '<div class="saved-list-mock" />' },
@@ -143,9 +96,6 @@ beforeEach(() => {
   fns.state.configOpen = false
   fns.state.runtime = { savedTimesMs: [1000, 2000] }
   fns.state.config = { timeFormat: 'mm:ss' }
-  stageSettings.listeners.length = 0
-  stageSettings.settings.timer = null
-  stageSettings.settings.backgroundImage = null
 })
 
 describe('TimerView.vue', () => {
@@ -164,23 +114,13 @@ describe('TimerView.vue', () => {
     w.unmount()
   })
 
-  it('isRunning=false: botão start visível; clique chama start', async () => {
-    const w = mountView()
-    const start = w.find('.timer-view__ctrl--start')
-    expect(start.exists()).toBe(true)
-    await start.trigger('click')
-    expect(fns.start).toHaveBeenCalled()
-    w.unmount()
-  })
-
-  it('isRunning=true: botão pause visível; clique chama pause', async () => {
+  it('card sem prévia, iniciar/pausar nem projetar: ficam no painel flutuante', () => {
     fns.state.isRunning = true
     const w = mountView()
-    const pause = w.find('.timer-view__ctrl--pause')
-    expect(pause.exists()).toBe(true)
-    await pause.trigger('click')
-    expect(fns.pause).toHaveBeenCalled()
+    expect(w.find('.timer-preview').exists()).toBe(false)
     expect(w.find('.timer-view__ctrl--start').exists()).toBe(false)
+    expect(w.find('.timer-view__ctrl--pause').exists()).toBe(false)
+    expect(w.find('.timer-project-fab').exists()).toBe(false)
     w.unmount()
   })
 
@@ -218,64 +158,6 @@ describe('TimerView.vue', () => {
     const list = w.findComponent({ name: 'TimerSavedList' })
     expect(list.props('items')).toEqual([1000, 2000])
     expect(list.props('timeFormat')).toBe('mm:ss')
-    w.unmount()
-  })
-
-  it('stageBg sem backgroundImage: só backgroundColor', () => {
-    const w = mountView()
-    const style = w.find('.timer-view__preview').attributes('style') ?? ''
-    expect(style).toContain('rgb(16, 16, 16)')
-    expect(style).not.toContain('url(')
-    w.unmount()
-  })
-
-  it('stageBg com backgroundImage: url aplicada (branch)', () => {
-    stageSettings.settings.backgroundImage = 'img://fundo.png'
-    const w = mountView()
-    const style = w.find('.timer-view__preview').attributes('style') ?? ''
-    expect(style).toContain('img://fundo.png')
-    w.unmount()
-  })
-
-  it('effectiveConfig: stage.timer merge por cima do config', async () => {
-    stageSettings.settings.timer = { bgColor: '#202020' }
-    const w = mountView()
-    await flushPromises()
-    const preview = w.findComponent({ name: 'TimerPreview' })
-    expect((preview.props('config') as { bgColor: string }).bgColor).toBe('#202020')
-    w.unmount()
-  })
-
-  it('effectiveConfig sem stage.timer: config puro', async () => {
-    const w = mountView()
-    await flushPromises()
-    const preview = w.findComponent({ name: 'TimerPreview' })
-    const mock = w.find('.timer-preview-mock')
-    expect(mock.exists()).toBe(true)
-    const raw = mock.attributes('data-config') ?? '{}'
-    const cfg = JSON.parse(raw) as Record<string, unknown>
-    expect(cfg).toEqual({ timeFormat: 'mm:ss' })
-    w.unmount()
-  })
-
-  it('subscribeStageSettings: update re-read settings; unmount desinscreve', async () => {
-    const w = mountView()
-    await flushPromises()
-    const before = stageSettings.listeners.length
-    expect(before).toBeGreaterThan(0)
-    stageSettings.settings.backgroundImage = 'img://novo.png'
-    stageSettings.listeners.forEach((fn) => fn())
-    await flushPromises()
-    const style = w.find('.timer-view__preview').attributes('style') ?? ''
-    expect(style).toContain('img://novo.png')
-    w.unmount()
-    expect(stageSettings.listeners.length).toBe(before - 1)
-  })
-
-  it('TimerPreview recebe preview=true e stage', () => {
-    const w = mountView()
-    const preview = w.findComponent({ name: 'TimerPreview' })
-    expect(w.find('.timer-preview-mock').attributes('data-preview')).toBeTruthy()
     w.unmount()
   })
 })
