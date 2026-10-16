@@ -512,3 +512,25 @@ describe('AlbumCollectionView — minimizar página', () => {
     w.unmount()
   })
 })
+
+describe('AlbumCollectionView — lista longa desenhada aos poucos', () => {
+  it('Hinário grande: primeiros hinos na hora, o resto logo em seguida (sem travar a tela)', async () => {
+    vi.useFakeTimers()
+    routeMock.params = { collectionId: '10' }
+    const many: AlbumTrack[] = Array.from({ length: 100 }, (_, i) => ({
+      musicId: i + 1,
+      name: `Hino ${i + 1}`,
+      track: i + 1,
+      durationLabel: '2:00',
+      hasInstrumental: true,
+    }))
+    setupMocks()
+    ;(globalThis as any).__tracks = many
+    const w = await mountView()
+    expect(w.findAll('.track-row-stub')).toHaveLength(40)
+    await vi.runAllTimersAsync()
+    expect(w.findAll('.track-row-stub')).toHaveLength(100)
+    w.unmount()
+    vi.useRealTimers()
+  })
+})

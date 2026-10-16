@@ -6,6 +6,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { MediaCollectionList } from '@design-system/index'
 import PageBackStack from '@shared/components/PageBackStack.vue'
 import { useMinimizablePage } from '@shared/composables/useMinimizablePage'
+import { useProgressiveList } from '@shared/composables/useProgressiveList'
 
 import AlbumLyricDialog from '../components/AlbumLyricDialog.vue'
 import AlbumTrackRow from '../components/AlbumTrackRow.vue'
@@ -62,6 +63,9 @@ onBeforeUnmount(() => {
 })
 
 const collectionId = computed(() => String(route.params.collectionId ?? ''))
+
+// Hinário: 610 hinos — desenhar tudo de uma vez travava a tela por ~1,7 s
+const { visible: renderedTracks } = useProgressiveList(filteredTracks)
 
 const title = computed(
   () => activeCollection.value?.name || t('albums.collectionFallback'),
@@ -248,7 +252,7 @@ async function runAction(
       "
     >
       <AlbumTrackRow
-        v-for="track in filteredTracks"
+        v-for="track in renderedTracks"
         :key="track.musicId"
         :track="track"
         :collection-name="title"
