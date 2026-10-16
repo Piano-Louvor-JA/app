@@ -8,15 +8,24 @@ import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 import { useMinimizedPagesStore } from '@shared/stores/useMinimizedPagesStore'
 
 const genie = vi.hoisted(() => ({
-  calls: [] as Array<{ el: unknown; target: unknown; direction: string; itemsAtStart: number }>,
+  calls: [] as Array<{ kind: 'ghost' | 'page'; el: unknown; target: unknown; direction: string; itemsAtStart: number; image?: unknown }>,
   target: { left: 1, top: 2, width: 3, height: 4 },
+  ghostSupported: true,
+  removed: 0,
 }))
 vi.mock('@shared/services/genie-animation', async () => {
   const { useMinimizedPagesStore } = await import('@shared/stores/useMinimizedPagesStore')
   return {
     predictMinimizedTarget: () => genie.target,
     playGenie: async (el: unknown, target: unknown, direction: string) => {
-      genie.calls.push({ el, target, direction, itemsAtStart: useMinimizedPagesStore().items.length })
+      genie.calls.push({ kind: 'page', el, target, direction, itemsAtStart: useMinimizedPagesStore().items.length })
+    },
+    playGenieGhost: async (image: unknown, _area: unknown, target: unknown, direction: string, hide: unknown) => {
+      if (!genie.ghostSupported) return null
+      genie.calls.push({ kind: 'ghost', el: hide, image, target, direction, itemsAtStart: useMinimizedPagesStore().items.length })
+      return () => {
+        genie.removed++
+      }
     },
   }
 })
@@ -210,10 +219,12 @@ describe('useMinimizablePage — janelas (ex.: Playlists)', () => {
 describe('useMinimizablePage — efeito gênio e desempenho', () => {
   beforeEach(() => {
     genie.calls.length = 0
+    genie.removed = 0
+    genie.ghostSupported = true
     instant.requests = 0
   })
 
-  it('o efeito começa já no clique (antes de o item entrar na barra) e a troca de página é instantânea', async () => {
+  it('com miniatura: imagem da tela sugada (não a página viva), já no clique; depois troca instantânea', async () => {
     const pageRoot = document.createElement('section')
     main.innerHTML = ''
     main.appendChild(pageRoot)
@@ -221,18 +232,50 @@ describe('useMinimizablePage — efeito gênio e desempenho', () => {
     const w = await mountPage('/albums/5')
     const navigation = vi.fn()
     const off = router.beforeEach(() => {
-      navigation(genie.calls.length, instant.requests)
+      navigation(genie.calls.length, genie.removed, instant.requests)
     })
 
     await minimize()
     await flushPromises()
 
     expect(genie.calls).toHaveLength(1)
-    expect(genie.calls[0]).toMatchObject({ el: pageRoot, target: genie.target, direction: 'minimize', itemsAtStart: 0 })
+    expect(genie.calls[0]).toMatchObject({
+      kind: 'ghost',
+      el: pageRoot,
+      image: 'data:image/jpeg;base64,AA',
+      target: genie.target,
+      direction: 'minimize',
+      itemsAtStart: 0,
+    })
     expect(useMinimizedPagesStore().items).toHaveLength(1)
-    // navegação só depois do efeito, já com o pedido de troca instantânea
-    expect(navigation).toHaveBeenCalledWith(1, 1)
+    // a imagem sai antes da navegação, que já vem sem fade
+    expect(navigation).toHaveBeenCalledWith(1, 1, 1)
     off()
+    w.unmount()
+  })
+
+  it('se a navegação não tirar a página, ela volta a aparecer', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout'] })
+    const pageRoot = document.createElement('section')
+    main.innerHTML = ''
+    main.appendChild(pageRoot)
+    const w = await mountPage('/albums/5')
+    pageRoot.style.visibility = 'hidden' // o fantasma escondeu
+    await minimize()
+    vi.advanceTimersByTime(1100)
+    expect(pageRoot.style.visibility).toBe('')
+    w.unmount()
+  })
+
+  it('sem suporte ao fantasma: o efeito roda na própria página', async () => {
+    genie.ghostSupported = false
+    const pageRoot = document.createElement('section')
+    main.innerHTML = ''
+    main.appendChild(pageRoot)
+    const w = await mountPage('/albums/5')
+    await minimize()
+    expect(genie.calls).toEqual([expect.objectContaining({ kind: 'page', el: pageRoot, direction: 'minimize' })])
+    genie.ghostSupported = true
     w.unmount()
   })
 
@@ -243,11 +286,11 @@ describe('useMinimizablePage — efeito gênio e desempenho', () => {
     w.unmount()
   })
 
-  it('animateEl troca o que anima (ex.: janela)', async () => {
+  it('animateEl (janela): anima o próprio painel, sem imagem', async () => {
     const panel = document.createElement('div')
     const w = await mountPage('/albums', { extra: { animateEl: () => panel, onMinimized: vi.fn() } })
     await minimize()
-    expect(genie.calls[0].el).toBe(panel)
+    expect(genie.calls).toEqual([expect.objectContaining({ kind: 'page', el: panel })])
     w.unmount()
   })
 

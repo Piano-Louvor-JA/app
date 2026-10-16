@@ -46,7 +46,8 @@ import {
   requestInstantPageTransition,
   usePageTransitionOverride,
 } from '@shared/composables/useInstantPageTransition'
-import { findMinimizedItemRect, playGenie } from '@shared/services/genie-animation'
+import { findMinimizedItemRect, playGenie, playGenieGhost } from '@shared/services/genie-animation'
+import { previewArea } from '@shared/services/page-preview'
 import { VIEW_SCROLL_MEMORY, useViewScrollMemory } from '@shared/composables/useViewScrollMemory'
 import logoUrl from '@assets/brand/logo-louvor-ja.svg'
 import CodenameLogo from '@assets/brand/CodenameLogo.vue'
@@ -385,8 +386,11 @@ const minimizedItems = computed<MinimizedBarItem[]>(() =>
 let genieFrom: DOMRect | null = null
 let genieTimer: ReturnType<typeof setTimeout> | null = null
 
+/** A imagem do efeito sai logo depois que a página real entra por baixo. */
+const GHOST_REMOVE_DELAY_MS = 60
+
 /** Reabre uma página minimizada como estava (rolagem + retrato). */
-function onOpenMinimized(fullPath: string) {
+async function onOpenMinimized(fullPath: string) {
   // já está aberta (o operador voltou por outro caminho): só sai da barra
   if (route.fullPath === fullPath) {
     minimizedPages.close(fullPath)
@@ -396,15 +400,23 @@ function onOpenMinimized(fullPath: string) {
   const from = findMinimizedItemRect(fullPath)
   const page = minimizedPages.reopen(fullPath)
   if (!page) return
-  genieFrom = from
-  // se a tela não for recriada (mesma página por trás), o efeito não fica pendurado
-  if (genieTimer) clearTimeout(genieTimer)
-  genieTimer = setTimeout(() => {
-    genieFrom = null
-  }, 2000)
   viewScrollMemory.seed(fullPath, page.scroll)
+
+  // com miniatura: a IMAGEM cresce do item até a tela (barato) e fica por cima
+  // até a página real entrar por baixo, no mesmo lugar
+  const removeGhost = await playGenieGhost(page.preview, previewArea(mainEl.value), from, 'restore')
+  if (!removeGhost) {
+    // sem miniatura: a própria página cresce a partir do item ao entrar
+    genieFrom = from
+    // se a tela não for recriada (mesma página por trás), o efeito não fica pendurado
+    if (genieTimer) clearTimeout(genieTimer)
+    genieTimer = setTimeout(() => {
+      genieFrom = null
+    }, 2000)
+  }
   requestInstantPageTransition()
-  void router.push(fullPath)
+  await router.push(fullPath)
+  if (removeGhost) setTimeout(removeGhost, GHOST_REMOVE_DELAY_MS)
 }
 
 /** Página nova terminou de entrar: libera a transição e restaura a rolagem. */
@@ -615,7 +627,7 @@ function viewKey(viewRoute: typeof route) {
       <MinimizedPagesBar
         :items="minimizedItems"
         :nav-label="t('minimize.bar')"
-        @open="onOpenMinimized"
+        @open="(fullPath: string) => void onOpenMinimized(fullPath)"
         @close="minimizedPages.close"
       />
     </div>

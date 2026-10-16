@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { capturePagePreview } from '../page-preview'
+import { capturePagePreview, previewArea } from '../page-preview'
 
 const originalBridge = window.louvorja
 
@@ -81,5 +81,18 @@ describe('capturePagePreview', () => {
   it('erro na captura devolve null', async () => {
     installBridge({ capture: vi.fn(async () => Promise.reject(new Error('gpu'))) })
     expect(await capturePagePreview(element({ width: 200, height: 100 }))).toBeNull()
+  })
+})
+
+describe('previewArea', () => {
+  it('área da página sem o rodapé reservado (faixa e dock por cima)', () => {
+    const el = element({ x: 0, y: 120, width: 1600, height: 780 })
+    el.style.paddingBottom = '108px'
+    expect(previewArea(el)).toEqual({ left: 0, top: 120, width: 1600, height: 672 })
+  })
+
+  it('sem elemento ou sem área: null', () => {
+    expect(previewArea(null)).toBeNull()
+    expect(previewArea(element({ width: 0, height: 100 }))).toBeNull()
   })
 })

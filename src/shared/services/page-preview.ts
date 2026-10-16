@@ -1,5 +1,19 @@
 import { getDesktopBridge } from '@shared/services/desktop-bridge'
 
+import type { Box } from './genie-animation'
+
+/**
+ * Área da tela em si (CSS px): o elemento sem o rodapé reservado, que fica
+ * coberto pela faixa de histórico e pelo dock. É o que a miniatura mostra.
+ */
+export function previewArea(el: Element | null): Box | null {
+  if (!el) return null
+  const rect = el.getBoundingClientRect()
+  const height = rect.height - (parseFloat(getComputedStyle(el).paddingBottom) || 0)
+  if (rect.width <= 0 || height <= 0) return null
+  return { left: rect.x, top: rect.y, width: rect.width, height }
+}
+
 /**
  * Miniatura da área de um elemento (prévia de página minimizada).
  * Só no desktop: o main captura a janela (`window:capture-preview`).
@@ -8,22 +22,17 @@ import { getDesktopBridge } from '@shared/services/desktop-bridge'
 export async function capturePagePreview(el: Element | null): Promise<string | null> {
   const bridge = getDesktopBridge()
   const capture = bridge?.window?.capturePreview
-  if (!capture || !el) return null
-
-  const rect = el.getBoundingClientRect()
-  // O rodapé reservado do <main> fica coberto pela faixa de histórico e pelo
-  // dock (fixos): a miniatura é só a tela em si.
-  const height = rect.height - (parseFloat(getComputedStyle(el).paddingBottom) || 0)
-  if (rect.width <= 0 || height <= 0) return null
+  const area = previewArea(el)
+  if (!capture || !area) return null
 
   // getBoundingClientRect é em CSS px; com zoom da interface, a janela é maior.
   const factor = bridge.zoom?.getFactor() ?? 1
   try {
     return await capture({
-      x: Math.round(rect.x * factor),
-      y: Math.round(rect.y * factor),
-      width: Math.round(rect.width * factor),
-      height: Math.round(height * factor),
+      x: Math.round(area.left * factor),
+      y: Math.round(area.top * factor),
+      width: Math.round(area.width * factor),
+      height: Math.round(area.height * factor),
     })
   } catch {
     return null

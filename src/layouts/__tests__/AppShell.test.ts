@@ -255,10 +255,13 @@ vi.mock('@modules/timer/views/TimerProjectionView.vue', () => ({
 const genieMock = vi.hoisted(() => ({
   rect: { left: 10, top: 700, width: 120, height: 30 },
   playGenie: vi.fn(async () => {}),
+  removeGhost: vi.fn(),
+  playGenieGhost: vi.fn(async (image: unknown) => (image ? genieMock.removeGhost : null)),
 }))
 vi.mock('@shared/services/genie-animation', () => ({
   findMinimizedItemRect: vi.fn(() => genieMock.rect),
   playGenie: genieMock.playGenie,
+  playGenieGhost: genieMock.playGenieGhost,
 }))
 
 import AppShell from '@layouts/AppShell.vue'
@@ -785,9 +788,25 @@ describe('AppShell — páginas minimizadas', () => {
     w.unmount()
   })
 
-  it('reabrir pela barra: a página cresce a partir do item (efeito gênio ao contrário)', async () => {
+  it('reabrir pela barra com miniatura: a imagem cresce do item e sai quando a página real entra', async () => {
     genieMock.playGenie.mockClear()
+    genieMock.playGenieGhost.mockClear()
+    genieMock.removeGhost.mockClear()
     useMinimizedPagesStore().minimize(hinario())
+    const { w, router, bar } = await mountShell2()
+    bar().vm.$emit('open', '/albums/5')
+    await flushPromises()
+    expect(genieMock.playGenieGhost).toHaveBeenCalledWith('data:image/jpeg;base64,AA', null, genieMock.rect, 'restore')
+    await settle()
+    expect(router.currentRoute.value.fullPath).toBe('/albums/5')
+    expect(genieMock.removeGhost).toHaveBeenCalledTimes(1)
+    expect(genieMock.playGenie).not.toHaveBeenCalled()
+    w.unmount()
+  })
+
+  it('reabrir pela barra sem miniatura: a página cresce a partir do item (efeito gênio ao contrário)', async () => {
+    genieMock.playGenie.mockClear()
+    useMinimizedPagesStore().minimize(hinario({ preview: null }))
     const { w, bar } = await mountShell2()
     bar().vm.$emit('open', '/albums/5')
     await settle()
@@ -802,8 +821,8 @@ describe('AppShell — páginas minimizadas', () => {
   it('reabrir dois itens seguidos anima os dois; o efeito pendente expira', async () => {
     genieMock.playGenie.mockClear()
     const store = useMinimizedPagesStore()
-    store.minimize(hinario())
-    store.minimize(hinario({ fullPath: '/albums/9', title: 'Vox', minimizedAt: 2 }))
+    store.minimize(hinario({ preview: null }))
+    store.minimize(hinario({ fullPath: '/albums/9', title: 'Vox', minimizedAt: 2, preview: null }))
     const { w, router, bar } = await mountShell2()
 
     bar().vm.$emit('open', '/albums/5')

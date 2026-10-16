@@ -118,6 +118,64 @@ function prefersReducedMotion(): boolean {
   return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 
+function framesFor(page: Box, target: Box, direction: GenieDirection) {
+  const frames = genieKeyframes(page, target)
+  return direction === 'minimize'
+    ? frames
+    : [...frames].reverse().map((frame) => ({ ...frame, offset: 1 - frame.offset }))
+}
+
+/**
+ * Efeito sobre uma IMAGEM da tela (a miniatura) em vez da página viva: animar
+ * uma imagem é barato até sem placa de vídeo, enquanto a página real pode ter
+ * milhares de elementos (Hinário: ~14 mil). Ao minimizar, `hide` (a página)
+ * some na hora e a imagem é sugada até o item; ao reabrir, a imagem cresce do
+ * item até a tela e fica lá até quem chamou remover (a página real entrou).
+ * Devolve como remover a imagem, ou null quando não dá para usar o efeito
+ * (sem imagem, sem suporte ou movimento reduzido) — aí nada foi alterado.
+ */
+export async function playGenieGhost(
+  image: string | null,
+  area: Box | null,
+  target: Box | null,
+  direction: GenieDirection,
+  hide?: HTMLElement | null,
+): Promise<(() => void) | null> {
+  if (!image || !area || !target || prefersReducedMotion()) return null
+  const ghost = document.createElement('img')
+  if (typeof ghost.animate !== 'function') return null
+
+  ghost.className = 'genie-ghost'
+  ghost.alt = ''
+  ghost.src = image
+  const origin = genieOrigin(area, target)
+  Object.assign(ghost.style, {
+    position: 'fixed',
+    left: `${area.left}px`,
+    top: `${area.top}px`,
+    width: `${area.width}px`,
+    height: `${area.height}px`,
+    margin: '0',
+    zIndex: '1000',
+    pointerEvents: 'none',
+    transformOrigin: `${origin.x}px ${origin.y}px`,
+    willChange: 'transform, opacity',
+  })
+  document.body.appendChild(ghost)
+  if (hide) hide.style.visibility = 'hidden'
+
+  try {
+    await ghost.animate(framesFor(area, target, direction) as unknown as Keyframe[], {
+      duration: GENIE_DURATION_MS,
+      easing: EASING[direction],
+      fill: 'forwards',
+    }).finished
+  } catch {
+    // cancelada: quem chamou ainda remove a imagem
+  }
+  return () => ghost.remove()
+}
+
 /**
  * Toca o efeito em `el` rumo a `target` (minimizar) ou a partir dele
  * (reabrir). Ao minimizar o estado final fica preso: a página sai logo
@@ -135,11 +193,7 @@ export async function playGenie(
   const page = el.getBoundingClientRect()
   if (page.width <= 0 || page.height <= 0) return
 
-  const frames = genieKeyframes(page, target)
-  const keyframes =
-    direction === 'minimize'
-      ? frames
-      : [...frames].reverse().map((frame) => ({ ...frame, offset: 1 - frame.offset }))
+  const keyframes = framesFor(page, target, direction)
 
   const origin = genieOrigin(page, target)
   animatable.style.transformOrigin = `${origin.x}px ${origin.y}px`

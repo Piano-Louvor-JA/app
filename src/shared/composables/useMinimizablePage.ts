@@ -3,8 +3,8 @@ import { useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 import { useNavigationHistory } from '@shared/composables/useNavigationHistory'
 import { requestInstantPageTransition } from '@shared/composables/useInstantPageTransition'
 import { injectViewScrollMemory } from '@shared/composables/useViewScrollMemory'
-import { playGenie, predictMinimizedTarget } from '@shared/services/genie-animation'
-import { capturePagePreview } from '@shared/services/page-preview'
+import { playGenie, playGenieGhost, predictMinimizedTarget } from '@shared/services/genie-animation'
+import { capturePagePreview, previewArea } from '@shared/services/page-preview'
 import { useMinimizedPagesStore } from '@shared/stores/useMinimizedPagesStore'
 
 export interface MinimizablePageOptions<S> {
@@ -31,6 +31,9 @@ export interface MinimizablePageOptions<S> {
  */
 /** Miniatura preparada há mais que isso é capturada de novo no clique. */
 const PREPARED_PREVIEW_TTL_MS = 5000
+
+/** Se a navegação não tirar a página escondida, ela volta a aparecer. */
+const UNHIDE_FALLBACK_MS = 1000
 
 export function useMinimizablePage<S>(options: MinimizablePageOptions<S>) {
   const route = useRoute()
@@ -68,8 +71,27 @@ export function useMinimizablePage<S>(options: MinimizablePageOptions<S>) {
 
     // efeito já no clique, rumo a onde o item vai aparecer; o item só entra na
     // barra depois — o recálculo de layout acontece com a página já sumida
-    const animated = options.animateEl?.() ?? scroll?.getRoot()?.firstElementChild ?? null
-    await playGenie(animated, predictMinimizedTarget(), 'minimize')
+    const target = predictMinimizedTarget()
+    const windowEl = options.animateEl?.()
+    if (windowEl) {
+      // janela: elemento pequeno, anima ele mesmo
+      await playGenie(windowEl, target, 'minimize')
+    } else {
+      // página: anima a IMAGEM dela (barato) e esconde a página viva na hora
+      const root = scroll?.getRoot() ?? null
+      const pageEl = (root?.firstElementChild as HTMLElement | null | undefined) ?? null
+      const removeGhost = await playGenieGhost(preview, previewArea(root), target, 'minimize', pageEl)
+      if (removeGhost) {
+        removeGhost()
+        if (pageEl) {
+          setTimeout(() => {
+            pageEl.style.visibility = ''
+          }, UNHIDE_FALLBACK_MS)
+        }
+      } else {
+        await playGenie(pageEl, target, 'minimize')
+      }
+    }
 
     store.minimize({ fullPath, routeName, title, icon, summary, state, scroll: marks, preview, minimizedAt: Date.now() })
 

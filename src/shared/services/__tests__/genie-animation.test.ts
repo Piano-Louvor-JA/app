@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   GENIE_DURATION_MS,
@@ -7,6 +7,7 @@ import {
   genieKeyframes,
   genieOrigin,
   playGenie,
+  playGenieGhost,
   predictMinimizedTarget,
 } from '../genie-animation'
 
@@ -175,5 +176,72 @@ describe('playGenie', () => {
     el.getBoundingClientRect = () => page as DOMRect
     ;(el as unknown as { animate: () => unknown }).animate = () => ({ finished: Promise.reject(new DOMException('abort', 'AbortError')) })
     await expect(playGenie(el, item, 'restore')).resolves.toBeUndefined()
+  })
+})
+
+describe('playGenieGhost (imagem da tela no lugar da página viva)', () => {
+  const originalMatchMedia = window.matchMedia
+  const originalAnimate = (HTMLElement.prototype as { animate?: unknown }).animate
+  let animate: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    window.matchMedia = vi.fn(() => ({ matches: false })) as unknown as typeof window.matchMedia
+    animate = vi.fn(() => ({ finished: Promise.resolve() }))
+    ;(HTMLElement.prototype as { animate?: unknown }).animate = animate
+  })
+
+  afterEach(() => {
+    window.matchMedia = originalMatchMedia
+    ;(HTMLElement.prototype as { animate?: unknown }).animate = originalAnimate
+    document.body.innerHTML = ''
+  })
+
+  const ghost = () => document.querySelector<HTMLImageElement>('img.genie-ghost')
+
+  it('minimizar: põe a imagem sobre a página, esconde a página e suga a imagem para o item', async () => {
+    const realPage = document.createElement('section')
+    const remove = await playGenieGhost('data:image/jpeg;base64,AA', page, item, 'minimize', realPage)
+    const img = ghost()!
+    expect(img.src).toContain('data:image/jpeg;base64,AA')
+    expect(img.style.cssText).toContain('position: fixed')
+    expect([img.style.left, img.style.top, img.style.width, img.style.height]).toEqual(['0px', '100px', '1000px', '600px'])
+    expect(img.style.transformOrigin).toBe('500px 695px')
+    expect(realPage.style.visibility).toBe('hidden')
+    expect(animate).toHaveBeenCalledWith(genieKeyframes(page, item), {
+      duration: GENIE_DURATION_MS,
+      easing: 'cubic-bezier(0.55, 0, 0.75, 0.3)',
+      fill: 'forwards',
+    })
+    remove!()
+    expect(ghost()).toBeNull()
+  })
+
+  it('reabrir: a imagem cresce do item até a tela e fica até a página real entrar', async () => {
+    const remove = await playGenieGhost('data:image/jpeg;base64,AA', page, item, 'restore')
+    expect(animate.mock.calls[0][1]).toMatchObject({ easing: 'cubic-bezier(0.25, 0.7, 0.45, 1)', fill: 'forwards' })
+    expect(ghost()).not.toBeNull()
+    remove!()
+    expect(ghost()).toBeNull()
+  })
+
+  it('sem imagem, área, destino, suporte a animação ou com movimento reduzido: não faz nada (null)', async () => {
+    expect(await playGenieGhost(null, page, item, 'minimize')).toBeNull()
+    expect(await playGenieGhost('x', null, item, 'minimize')).toBeNull()
+    expect(await playGenieGhost('x', page, null, 'minimize')).toBeNull()
+    window.matchMedia = vi.fn(() => ({ matches: true })) as unknown as typeof window.matchMedia
+    expect(await playGenieGhost('x', page, item, 'minimize')).toBeNull()
+    window.matchMedia = vi.fn(() => ({ matches: false })) as unknown as typeof window.matchMedia
+    ;(HTMLElement.prototype as { animate?: unknown }).animate = undefined
+    const realPage = document.createElement('section')
+    expect(await playGenieGhost('x', page, item, 'minimize', realPage)).toBeNull()
+    expect(realPage.style.visibility).toBe('')
+    expect(ghost()).toBeNull()
+  })
+
+  it('animação cancelada não quebra e ainda devolve como remover a imagem', async () => {
+    animate.mockReturnValue({ finished: Promise.reject(new DOMException('abort', 'AbortError')) })
+    const remove = await playGenieGhost('x', page, item, 'minimize')
+    expect(typeof remove).toBe('function')
+    remove!()
   })
 })
