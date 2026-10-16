@@ -24,12 +24,12 @@ const { PalcoSlot } = (await import(serverUrl)) as { PalcoSlot: any }
 
 /** Resposta fake que captura status/body (statusCode é propriedade do res). */
 function fakeRes() {
-  const state = { statusCode: 200, body: undefined as string | Buffer | undefined, done: false }
+  const state = { statusCode: 200, body: undefined as string | Buffer | undefined, done: false, headers: {} as Record<string, string> }
   return {
     state,
     set statusCode(v: number) { state.statusCode = v },
     get statusCode() { return state.statusCode },
-    setHeader() {},
+    setHeader(name: string, value: string) { state.headers[name] = value },
     end(b?: string | Buffer) {
       if (b !== undefined) state.body = b
       state.done = true
@@ -70,4 +70,13 @@ describe('palco-server handleHttp — assets do receiver (regressão 1adecdf9→
     const code = await statusOf('/proxy')
     expect([200, 400, 403, 404]).toContain(code)
   })
+})
+
+it('serves the projection sanitizer as JavaScript for LAN receivers', async () => {
+  const slot = new PalcoSlot('0', 'Principal', 0, 0, null)
+  const res = fakeRes()
+  await slot.handleHttp(fakeReq('/purify.min.js'), res)
+  expect(res.state.statusCode).toBe(200)
+  expect(res.state.headers['Content-Type']).toBe('text/javascript; charset=utf-8')
+  expect(String(res.state.body)).toContain('@license DOMPurify')
 })

@@ -58,7 +58,9 @@ function loadReceiver(url: string): void {
   w.localStorage.clear()
 
   for (const el of dom.window.document.querySelectorAll('script')) {
-    const code = el.textContent ?? ''
+    const code = el.getAttribute('src') === 'purify.min.js'
+      ? readFileSync(resolve(__dirname, '../purify.min.js'), 'utf8')
+      : el.textContent ?? ''
     if (!code.trim()) continue
     try {
       dom.window.eval(code)

@@ -282,7 +282,7 @@ class PalcoSlot {
         const file = path.join(__dirname, 'palco', String(assetMatch[1]))
         const buf = await readFile(file)
         const ext = path.extname(file).toLowerCase()
-        res.setHeader('Content-Type', ext === '.svg' ? 'image/svg+xml' : ext === '.png' ? 'image/png' : 'application/octet-stream')
+        res.setHeader('Content-Type', ext === '.js' ? 'text/javascript; charset=utf-8' : ext === '.svg' ? 'image/svg+xml' : ext === '.png' ? 'image/png' : 'application/octet-stream')
         res.end(buf)
       } catch {
         res.statusCode = 404; res.end()
