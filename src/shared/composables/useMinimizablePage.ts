@@ -1,7 +1,9 @@
+import { nextTick } from 'vue'
 import { useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 
 import { useNavigationHistory } from '@shared/composables/useNavigationHistory'
 import { injectViewScrollMemory } from '@shared/composables/useViewScrollMemory'
+import { findMinimizedItemRect, playGenie } from '@shared/services/genie-animation'
 import { capturePagePreview } from '@shared/services/page-preview'
 import { useMinimizedPagesStore } from '@shared/stores/useMinimizedPagesStore'
 
@@ -16,6 +18,8 @@ export interface MinimizablePageOptions<S> {
   fullPath?: () => string
   /** Em vez de sair da tela (ex.: janela que só fecha e fica na mesma tela). */
   onMinimized?: () => void
+  /** O que anima no efeito gênio (padrão: a página dentro do <main>). */
+  animateEl?: () => Element | null
 }
 
 /**
@@ -42,6 +46,11 @@ export function useMinimizablePage<S>(options: MinimizablePageOptions<S>) {
     const preview = await capturePagePreview(scroll?.getRoot() ?? null)
 
     store.minimize({ fullPath, routeName, title, icon, summary, state, scroll: marks, preview, minimizedAt: Date.now() })
+
+    // efeito gênio até o item que acabou de entrar na barra; só depois sai
+    await nextTick()
+    const animated = options.animateEl?.() ?? scroll?.getRoot()?.firstElementChild ?? null
+    await playGenie(animated, findMinimizedItemRect(fullPath), 'minimize')
 
     if (options.onMinimized) options.onMinimized()
     else if (history.canGoBack.value) history.back()

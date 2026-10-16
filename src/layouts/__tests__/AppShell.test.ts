@@ -251,6 +251,16 @@ vi.mock('@modules/timer/views/TimerProjectionView.vue', () => ({
   default: { template: '<div class="timer-view-mock" />' },
 }))
 
+// efeito gênio observado (a animação real é testada à parte)
+const genieMock = vi.hoisted(() => ({
+  rect: { left: 10, top: 700, width: 120, height: 30 },
+  playGenie: vi.fn(async () => {}),
+}))
+vi.mock('@shared/services/genie-animation', () => ({
+  findMinimizedItemRect: vi.fn(() => genieMock.rect),
+  playGenie: genieMock.playGenie,
+}))
+
 import AppShell from '@layouts/AppShell.vue'
 import { installNavigationHistory } from '@shared/composables/useNavigationHistory'
 import { useMinimizedPagesStore } from '@shared/stores/useMinimizedPagesStore'
@@ -770,6 +780,54 @@ describe('AppShell — páginas minimizadas', () => {
     expect(store.items).toEqual([])
     expect(store.takeRestore('/albums/5')?.state).toEqual({ collectionId: '5', searchQuery: 'santo' })
     expect((w.find('.scroll-view.album').element as HTMLElement).scrollTop).toBe(333)
+    w.unmount()
+  })
+
+  it('reabrir pela barra: a página cresce a partir do item (efeito gênio ao contrário)', async () => {
+    genieMock.playGenie.mockClear()
+    useMinimizedPagesStore().minimize(hinario())
+    const { w, bar } = await mountShell2()
+    bar().vm.$emit('open', '/albums/5')
+    await settle()
+    expect(genieMock.playGenie).toHaveBeenCalledTimes(1)
+    const [el, from, direction] = genieMock.playGenie.mock.calls[0] as unknown as [Element, unknown, string]
+    expect(el.classList.contains('album')).toBe(true)
+    expect(from).toEqual(genieMock.rect)
+    expect(direction).toBe('restore')
+    w.unmount()
+  })
+
+  it('reabrir dois itens seguidos anima os dois; o efeito pendente expira', async () => {
+    genieMock.playGenie.mockClear()
+    const store = useMinimizedPagesStore()
+    store.minimize(hinario())
+    store.minimize(hinario({ fullPath: '/albums/9', title: 'Vox', minimizedAt: 2 }))
+    const { w, router, bar } = await mountShell2()
+
+    bar().vm.$emit('open', '/albums/5')
+    await settle()
+    // entre uma e outra o operador vai para outra tela (coletânea → coletânea
+    // reaproveita a mesma tela e não tem entrada para animar)
+    await router.push('/')
+    await settle()
+    bar().vm.$emit('open', '/albums/9')
+    await settle()
+    expect(genieMock.playGenie).toHaveBeenCalledTimes(2)
+
+    // efeito marcado mas a tela não foi recriada a tempo: expira e não vaza
+    await vi.advanceTimersByTimeAsync(2100)
+    await router.push('/')
+    await settle()
+    expect(genieMock.playGenie).toHaveBeenCalledTimes(2)
+    w.unmount()
+  })
+
+  it('navegar normalmente (sem a barra) não toca o efeito', async () => {
+    genieMock.playGenie.mockClear()
+    const { w, router } = await mountShell2()
+    await router.push('/albums/5')
+    await settle()
+    expect(genieMock.playGenie).not.toHaveBeenCalled()
     w.unmount()
   })
 

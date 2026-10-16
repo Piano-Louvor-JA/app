@@ -42,6 +42,7 @@ import { useNavigationHistory } from '@shared/composables/useNavigationHistory'
 import { useHistoryNavShortcuts } from '@shared/composables/useHistoryNavShortcuts'
 import { describeHistoryEntry } from '@shared/services/navigation-history-label'
 import { useMinimizedPagesStore } from '@shared/stores/useMinimizedPagesStore'
+import { findMinimizedItemRect, playGenie } from '@shared/services/genie-animation'
 import { VIEW_SCROLL_MEMORY, useViewScrollMemory } from '@shared/composables/useViewScrollMemory'
 import logoUrl from '@assets/brand/logo-louvor-ja.svg'
 import CodenameLogo from '@assets/brand/CodenameLogo.vue'
@@ -373,6 +374,10 @@ const minimizedItems = computed<MinimizedBarItem[]>(() =>
   })),
 )
 
+/** De onde a página reaberta "sai" (item da barra) para o efeito gênio. */
+let genieFrom: DOMRect | null = null
+let genieTimer: ReturnType<typeof setTimeout> | null = null
+
 /** Reabre uma página minimizada como estava (rolagem + retrato). */
 function onOpenMinimized(fullPath: string) {
   // já está aberta (o operador voltou por outro caminho): só sai da barra
@@ -380,10 +385,26 @@ function onOpenMinimized(fullPath: string) {
     minimizedPages.close(fullPath)
     return
   }
+  // posição do item antes de ele sair da barra
+  const from = findMinimizedItemRect(fullPath)
   const page = minimizedPages.reopen(fullPath)
   if (!page) return
+  genieFrom = from
+  // se a tela não for recriada (mesma página por trás), o efeito não fica pendurado
+  if (genieTimer) clearTimeout(genieTimer)
+  genieTimer = setTimeout(() => {
+    genieFrom = null
+  }, 2000)
   viewScrollMemory.seed(fullPath, page.scroll)
   void router.push(fullPath)
+}
+
+/** Página nova entrando: se veio da barra, cresce a partir do item. */
+function onViewEnter(el: Element) {
+  if (!genieFrom) return
+  const from = genieFrom
+  genieFrom = null
+  void playGenie(el, from, 'restore')
 }
 
 const historyDots = computed<HistoryNavDot[]>(() =>
@@ -494,6 +515,7 @@ function viewKey(viewRoute: typeof route) {
         <Transition
           :name="transitionName"
           mode="out-in"
+          @enter="onViewEnter"
           @after-enter="restoreViewScroll(route.fullPath)"
         >
           <component

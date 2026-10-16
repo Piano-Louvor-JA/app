@@ -6,6 +6,17 @@ import { defineComponent, h } from 'vue'
 import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 
 import { useMinimizedPagesStore } from '@shared/stores/useMinimizedPagesStore'
+
+const genie = vi.hoisted(() => ({
+  calls: [] as Array<{ el: unknown; target: unknown; direction: string; at: string }>,
+}))
+vi.mock('@shared/services/genie-animation', () => ({
+  findMinimizedItemRect: (key: string) =>
+    document.querySelector(`[data-minimized-key]`) ? { left: 1, top: 2, width: 3, height: 4, key } : null,
+  playGenie: async (el: unknown, target: unknown, direction: string) => {
+    genie.calls.push({ el, target, direction, at: window.location.hash || 'sem-hash' })
+  },
+}))
 import { useNavigationHistoryStore } from '@shared/stores/useNavigationHistoryStore'
 
 import { installNavigationHistory } from '../useNavigationHistory'
@@ -182,6 +193,50 @@ describe('useMinimizablePage — janelas (ex.: Playlists)', () => {
     await flushPromises()
     expect(onMinimized).toHaveBeenCalledTimes(1)
     expect(router.currentRoute.value.fullPath).toBe('/albums')
+    w.unmount()
+  })
+})
+
+describe('useMinimizablePage — efeito gênio', () => {
+  beforeEach(() => {
+    genie.calls.length = 0
+    document.querySelectorAll('[data-minimized-key]').forEach((e) => e.remove())
+  })
+
+  it('anima a página até o item da barra antes de sair dela', async () => {
+    const pageRoot = document.createElement('section')
+    main.innerHTML = ''
+    main.appendChild(pageRoot)
+    // simula o item que a barra cria ao minimizar
+    const item = document.createElement('button')
+    item.dataset.minimizedKey = '/albums/5'
+    document.body.appendChild(item)
+
+    await router.push('/')
+    const w = await mountPage('/albums/5')
+    const navigatedBefore = vi.fn()
+    const off = router.beforeEach(() => {
+      navigatedBefore(genie.calls.length)
+    })
+    await minimize()
+    await flushPromises()
+
+    expect(genie.calls).toHaveLength(1)
+    expect(genie.calls[0].el).toBe(pageRoot)
+    expect(genie.calls[0].direction).toBe('minimize')
+    expect(genie.calls[0].target).toMatchObject({ key: '/albums/5' })
+    // a navegação só começa depois do efeito
+    expect(navigatedBefore).toHaveBeenCalledWith(1)
+    off()
+    item.remove()
+    w.unmount()
+  })
+
+  it('animateEl troca o que anima (ex.: janela)', async () => {
+    const panel = document.createElement('div')
+    const w = await mountPage('/albums', { extra: { animateEl: () => panel, onMinimized: vi.fn() } })
+    await minimize()
+    expect(genie.calls[0].el).toBe(panel)
     w.unmount()
   })
 })

@@ -56,6 +56,7 @@ function onItemKeydown(key: string, event: KeyboardEvent) {
         <button
           type="button"
           class="ds-minimized-bar__item"
+          :data-minimized-key="item.key"
           :aria-label="item.title"
           @click="emit('open', item.key)"
           @keydown="onItemKeydown(item.key, $event)"

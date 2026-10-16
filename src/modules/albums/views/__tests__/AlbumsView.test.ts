@@ -546,6 +546,13 @@ describe('AlbumsView — minimizar a janela de Playlists', () => {
     expect(options().capture()).toBeNull()
   })
 
+  it('o efeito ao minimizar anima o painel da janela', async () => {
+    const w = await mountView()
+    expect(options().animateEl()).toBeNull()
+    await openPlaylists(w)
+    expect(options().animateEl()).toBe(body().querySelector('.albums-view__modal-panel'))
+  })
+
   it('minimizar só fecha a janela (fica na Central de Mídia)', async () => {
     const w = await mountView()
     await openPlaylists(w)

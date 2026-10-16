@@ -56,6 +56,12 @@ describe('MinimizedPagesBar', () => {
     expect(buttons[1].find('i').classes()).toContain('ti-disc')
   })
 
+  it('cada item leva a chave da página (destino do efeito ao minimizar)', () => {
+    wrapper = mountBar()
+    const buttons = wrapper.findAll('.ds-minimized-bar__item')
+    expect(buttons.map((b) => b.attributes('data-minimized-key'))).toEqual(['/albums/5', '/albums/9'])
+  })
+
   it('sem o mouse em cima: nem prévia nem x', () => {
     wrapper = mountBar()
     expect(wrapper.find('.ds-minimized-bar__preview').exists()).toBe(false)

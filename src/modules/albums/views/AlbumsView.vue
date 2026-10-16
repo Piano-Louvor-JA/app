@@ -158,6 +158,8 @@ const { minimize: minimizePlaylists, takeRestoredState } = useMinimizablePage({
   onMinimized: () => {
     playlistsModalOpen.value = false
   },
+  // o efeito gênio anima a janela, não a Central de Mídia por trás
+  animateEl: () => document.querySelector('.albums-view__modal-panel'),
 })
 
 watch(
