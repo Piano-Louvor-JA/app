@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
+import FloatingPreviewTitle from '@shared/components/FloatingPreviewTitle.vue'
 import { FLOATING_STACK_ORDER, useFloatingDrag } from '@shared/composables/useFloatingDrag'
 import { USER_PREFERENCE_KEYS } from '@shared/constants/storage-keys'
 
@@ -61,6 +62,8 @@ async function onToggleAudio() {
     :style="positionStyle"
     @pointerdown="onPointerDown"
   >
+    <FloatingPreviewTitle :label="t('media.title')" />
+
     <div
       class="media-chrome__handle"
       :title="t('media.chromeDragHint')"
