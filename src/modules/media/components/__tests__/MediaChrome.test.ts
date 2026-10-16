@@ -130,3 +130,13 @@ describe("MediaChrome — ações", () => {
 		w.unmount();
 	});
 });
+
+describe("MediaChrome — título da prévia", () => {
+	it('mostra "Player" acima da prévia flutuante', () => {
+		const w = mountChrome();
+		const title = w.find(".floating-preview-title");
+		expect(title.exists()).toBe(true);
+		expect(title.text()).toBe("Player");
+		w.unmount();
+	});
+});
