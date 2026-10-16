@@ -70,6 +70,7 @@ export default {
     },
     },
   minimize: {
+    playlistCount: '{n} lista(s)',
     pageNumber: 'Página {n}',
     bar: 'Páginas minimizadas',
     close: 'Cerrar {title}',

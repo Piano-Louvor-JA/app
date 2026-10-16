@@ -42,8 +42,31 @@ vi.mock('vue-i18n', () => ({
   useI18n: () => ({ t: (k: string) => k, locale: { value: 'pt-BR' } }),
 }))
 
+const replaceMock = vi.fn(async () => {})
+const routeMock = vi.hoisted(() => {
+  const { reactive } = require('vue') as typeof import('vue')
+  return reactive({ query: {} as Record<string, string> })
+})
+
 vi.mock('vue-router', () => ({
-  useRouter: () => ({ push: pushMock }),
+  useRouter: () => ({ push: pushMock, replace: replaceMock }),
+  useRoute: () => routeMock,
+}))
+
+// Composable testado à parte: aqui só o contrato tela ↔ minimizar.
+const minimizeMock = vi.fn(async () => {})
+vi.mock('@shared/composables/useMinimizablePage', () => ({
+  useMinimizablePage: (options: unknown) => {
+    ;(globalThis as any).__minimizeOptions = options
+    return {
+      minimize: minimizeMock,
+      takeRestoredState: () => {
+        const restored = (globalThis as any).__restored ?? null
+        ;(globalThis as any).__restored = null
+        return restored
+      },
+    }
+  },
 }))
 
 vi.mock('@modules/media/services/custom-catalog', () => customCatalogMock)
@@ -481,5 +504,79 @@ describe('AlbumsView', () => {
   it('openCustomCollection navega pro id custom', async () => {
     // coberto indiretamente pelo toCustomCollectionId no mock; navegação direta é do modal custom list
     expect(true).toBe(true)
+  })
+})
+
+describe('AlbumsView — minimizar a janela de Playlists', () => {
+  const options = () => (globalThis as any).__minimizeOptions
+  const openPlaylists = async (w: Awaited<ReturnType<typeof mountView>>) => {
+    const btn = w.findAll('button').find((b) => b.attributes('aria-label') === 'albums.playlists.title')!
+    await btn.trigger('click')
+  }
+
+  beforeEach(() => {
+    localStorage.clear()
+    document.body.innerHTML = ''
+    minimizeMock.mockClear()
+    replaceMock.mockClear()
+    routeMock.query = {}
+    ;(globalThis as any).__restored = null
+    savePlaylists([{ id: 'pl-1', name: 'Culto', items: [] }, { id: 'pl-2', name: 'Vespertina', items: [] }])
+  })
+
+  it('– no cabeçalho da janela minimiza', async () => {
+    const w = await mountView()
+    await openPlaylists(w)
+    const btn = body().querySelector('.albums-view__playlists-minimize') as HTMLButtonElement
+    expect(btn).not.toBeNull()
+    expect(btn.getAttribute('aria-label')).toBe('minimize.page')
+    expect(btn.querySelector('i')?.classList.contains('ti-minus')).toBe(true)
+    btn.click()
+    expect(minimizeMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('item da barra: título, ícone, resumo e endereço com o painel', async () => {
+    await mountView()
+    expect(options().describe()).toEqual({
+      title: 'albums.playlists.title',
+      icon: 'ti-playlist',
+      summary: 'minimize.playlistCount',
+    })
+    expect(options().fullPath()).toBe('/albums?painel=playlists')
+    expect(options().capture()).toBeNull()
+  })
+
+  it('minimizar só fecha a janela (fica na Central de Mídia)', async () => {
+    const w = await mountView()
+    await openPlaylists(w)
+    expect(body().querySelector('.albums-view__playlists-minimize')).not.toBeNull()
+    options().onMinimized()
+    await flushPromises()
+    expect(body().querySelector('.albums-view__playlists-minimize')).toBeNull()
+    expect(pushMock).not.toHaveBeenCalledWith(expect.objectContaining({ name: 'albums' }))
+  })
+
+  it('aberta com ?painel=playlists (reabrir pela barra): mostra a janela e limpa o endereço', async () => {
+    routeMock.query = { painel: 'playlists' }
+    ;(globalThis as any).__restored = {}
+    await mountView()
+    expect(body().querySelector('.albums-view__playlists-minimize')).not.toBeNull()
+    expect((globalThis as any).__restored).toBeNull()
+    expect(replaceMock).toHaveBeenCalledWith({ name: 'albums' })
+  })
+
+  it('com a tela já aberta, o parâmetro também abre a janela', async () => {
+    await mountView()
+    expect(body().querySelector('.albums-view__playlists-minimize')).toBeNull()
+    routeMock.query = { painel: 'playlists' }
+    await flushPromises()
+    expect(body().querySelector('.albums-view__playlists-minimize')).not.toBeNull()
+  })
+
+  it('outro valor de painel não abre nada', async () => {
+    routeMock.query = { painel: 'outra-coisa' }
+    await mountView()
+    expect(body().querySelector('.albums-view__playlists-minimize')).toBeNull()
+    expect(replaceMock).not.toHaveBeenCalled()
   })
 })

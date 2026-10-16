@@ -142,6 +142,7 @@ export default {
       },
     },
   minimize: {
+    playlistCount: '{n} playlist(s)',
     pageNumber: 'Página {n}',
     bar: 'Páginas minimizadas',
     close: 'Fechar {title}',
