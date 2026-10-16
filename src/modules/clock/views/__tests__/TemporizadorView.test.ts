@@ -1,5 +1,15 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
+
+// Composable testado à parte: aqui só o contrato tela ↔ minimizar.
+const minimizeMock = vi.fn(async () => {})
+const prepareMock = vi.fn()
+vi.mock('@shared/composables/useMinimizablePage', () => ({
+  useMinimizablePage: (options: unknown) => {
+    ;(globalThis as any).__minimizeOptions = options
+    return { minimize: minimizeMock, prepare: prepareMock, takeRestoredState: () => null }
+  },
+}))
 import { mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 
@@ -102,3 +112,19 @@ describe("TemporizadorView.vue", () => {
     expect(push).toHaveBeenCalledWith({ name: "utilities" });
   });
 });
+
+describe('TemporizadorView — minimizar página', () => {
+  it('– fica abaixo da seta de voltar, minimiza e descreve a tela', async () => {
+    minimizeMock.mockClear()
+    const w = mountView()
+    const stack = w.find('.page-back-stack')
+    expect(stack.find('.temporizador-view__back').exists()).toBe(true)
+    await stack.find('.page-back-stack__minimize').trigger('click')
+    expect(minimizeMock).toHaveBeenCalledTimes(1)
+    const options = (globalThis as any).__minimizeOptions
+    expect(options.describe()).toEqual({ title: 'Temporizador', icon: 'ti-clock-cog', summary: '' })
+    expect(options.capture()).toBeNull()
+    expect(options.fallbackRoute).toEqual({ name: 'utilities' })
+    w.unmount()
+  })
+})

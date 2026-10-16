@@ -7,44 +7,73 @@
 <meta http-equiv="Expires" content="0">
 <title>LouvorJA Palco</title>
 <style>
-  html,body{margin:0;height:100%;overflow:hidden;background:#0A0E1A;
+  html,body{margin:0;height:100%;overflow:hidden;background:#000;
     font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#fff}
   #bg{position:fixed;top:0;left:0;width:100%;height:100%;object-fit:cover;
-    filter:brightness(.55);transition:opacity .8s}
+    /* PARIDADE BG (14/10 Rafael: idêntico em todas as telas): projeção
+       local NÃO escurece bg de música (brightness 1, sem véu). O véu
+       antigo rgba(0,0,0,.45) + .55 dupla-escurecia vs operador/projeção. */
+    filter:brightness(1);transition:opacity .8s}
+  /* Frame de slide projetado: fidelidade total — sem escurecimento. */
+  #bg.frame-slide{filter:none;object-fit:contain;background:#000}
   #bg[src=""]{opacity:0}
   #bgPalco{position:fixed;top:0;left:0;width:100%;height:100%;object-fit:cover}
-  #veil{position:fixed;inset:0;background:rgba(0,0,0,.45)}
+  /* Véu de leitura DESLIGADO em música (paridade projeção local, 14/10).
+     Mantido no DOM p/ módulos que ainda usam. */
+  #veil{position:fixed;inset:0;background:transparent;pointer-events:none}
   #content{position:fixed;top:0;left:0;right:0;bottom:0;padding:3vh 4vw;
     box-sizing:border-box}
   #text{position:absolute;top:50%;left:50%;
-    /* Caixa encolhe até o texto como via cabo. display:table = shrink-to-fit
-       compatível com Chromium antigo (webOS/Tizen) — fit-content em
-       position:absolute colapsava no simulador (26/08). margin auto centra. */
-    display:table;max-width:92vw;max-height:76vh;transform:translate(-50%,-50%);
-    overflow-wrap:break-word;
-    text-align:center;font-size:3.65vw;font-weight:700;line-height:1.25;
-    letter-spacing:.03em;text-transform:uppercase;
+    /* ÁREA ÚTIL do slide: teto 1600px (05/10 Rafael — 100% da área ficou
+       DEMAIS). SOLUÇÃO EZEQUIAS (web 3dc37df): pre-line + quebra natural —
+       as quebras \n do autor viram linhas e o texto flui até a max-width
+       antes de quebrar. SEM fit JS: fonte configurada aplicada direta. */
+    display:block;width:min(86vw,1600px);max-height:72vh;transform:translate(-50%,-50%);
+    overflow-wrap:break-word;white-space:pre-line;
+    text-align:center;font-size:calc(var(--fit-size,3.65vw));font-weight:700;line-height:1.4;
+    letter-spacing:.03em;
     text-shadow:0 2px 12px rgba(0,0,0,.8)}
   /* F3.3m: estilos dinâmicos da letra (sombra/caixinha) */
   #text.shadow-on{text-shadow:var(--ts,0 3px 18px rgba(0,0,0,.8))}
   /* Caixinha no PADRÃO da projeção (StagePreview): canto folha
      1.4cqw 0 1.4cqw 0 (16:9 → ~2.7vh 0), borda fina 1px, padding
      justo ao texto (2cqw ≈ 3.8vh lateral, 2vh vertical). */
-  #text.box-on{background:rgba(0,0,0,var(--box-bg,.45));
+  #text.box-on{background:rgba(24,24,24,var(--box-bg,.55));
+    backdrop-filter:blur(16px);
     /* Player: radius folha clamp(14px,2.4vmin,32px) 0, borda 0.2vmin e
-       sombra suave. Padding apertado — caixa abraça o texto (vmin);
-       WT-5f: menor ainda (Rafael 02/09) p/ versículo curto caber em linha. */
-    padding:.9vmin 1.2vmin;
+       sombra suave. Padding mínimo — caixa abraça o texto (vmin).
+       WIDTH (05/10 Rafael: "coloca ela mais perto do texto"): fit-content
+       abraça o texto com padding justo — sem faixa full-bleed; o teto
+       continua sendo a área útil (max-width 100% do #content). */
+    /* PARIDADE WEB (MediaSlideStage): caixa com respiro — max-width 86%
+       e padding 2.5vmin 4vmin, igual MediaSlideStage.vue do web. */
+    max-width:86vw;margin-inline:auto;
+    /* WIDTH fit-content (14/10): caixa ABRAÇA o texto. width fixo 86vw do
+       #text esticava a caixa em música com linha curta — vêa larga. */
+    width:fit-content;
+    padding:2.5vmin 4vmin;
     border-radius:2.4vmin 0 2.4vmin 0;
-    border:var(--box-border,.2vmin solid rgba(255,255,255,.25));
+    border:var(--box-border,.2vmin solid rgba(255,255,255,.85));
     box-shadow:0 10px 30px rgba(0,0,0,.4)}
   #text.shadow-off{text-shadow:none}
   /* Capa da música (isCover): título destaque amarelo, sem caixinha/borda —
      paridade com media-projection__title--cover via cabo. */
-  #text.cover-on{text-transform:uppercase;font-weight:900;letter-spacing:.03em;
+  #text.cover-on{font-weight:900;letter-spacing:.03em;
     color:#f6c32a;background:none;padding:0;border:none;box-shadow:none;
     border-radius:0;line-height:1.1}
+  /* Caixa opcional na capa: usuário liga 'titleTextBox'. Depois de
+     .cover-on para vencer o background:none quando ambos ativos. */
+  #text.cover-on.title-box-on{background:rgba(24,24,24,var(--box-bg,.55));
+    backdrop-filter:blur(16px);width:fit-content;max-width:86vw;margin-inline:auto;
+    padding:2.5vmin 4vmin;
+    border-radius:2.4vmin 0 2.4vmin 0;
+    border:var(--box-border,.2vmin solid rgba(255,255,255,.85));
+    box-shadow:0 10px 30px rgba(0,0,0,.4)}
   #text.box-off{background:none;padding:0;border:none;box-shadow:none}
+  /* Caixa GRANDE (Bíblia): padding generoso, típico véu de leitura.
+     width FIXO restaura o véu largo — o fit-content do .box-on é só
+     para MÍDIA (música), Bíblia NÃO (14/10 Rafael). */
+  #text.bible-box{padding:2vh 3.8vh;width:min(86vw,1600px);max-height:72vh}
 
   #footer{position:fixed;bottom:4vh;left:0;right:0;text-align:center;
     font-size:2.6vh;font-weight:300;opacity:1;letter-spacing:.02em}
@@ -96,10 +125,11 @@
 </head>
 <body>
 <!-- F3.3j: splash screen — some no WS OPEN ou 2.5s -->
-<div id="splash" style="position:fixed;inset:0;z-index:200;background:#0A0E1A;
+<div id="splash" style="position:fixed;inset:0;z-index:200;background:#000;
   display:flex;align-items:center;justify-content:center;transition:opacity .6s">
   <img src="splash.jpg" alt="Palco Piano LouvorJA" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">
 </div>
+<script src="purify.min.js"></script>
 <script>
 (function(){
   var s=document.getElementById('splash');
@@ -149,7 +179,7 @@
     <div style="background:#00C1E6"></div>
     <div style="background:#FCCE02"></div>
   </div>
-  <p id="idleMsg">Aguardando conteúdo…</p>
+  <p id="idleMsg" data-l10n="idle"></p>
   <!-- F3.3u: status de conexão visível no idle (sem ?debug) + dica da tecla vermelha -->
   <p id="idleConn" style="font-size:1.8vh;opacity:.45;margin:1.2vh 0 0 0"></p>
   </div>
@@ -2463,10 +2493,6 @@ var qrcode = function() {
 
 </script>
 <script>
-(function(){
-window.handle=handle;
-window.proxyUrl=palcoMediaUrl;
-window.trustedCloudApi=trustedCloudApi;
 function dlog(m1,m2,m3){try{const clean=value=>String(value===undefined?'':value).replace(/[\x00-\x1f\x7f]/g,' ');console.log('[P]',clean(m1),clean(m2),clean(m3))}catch(e){}}
 // window.onerror → visível no DevTools e reportado ao sender (debug remoto)
 window.onerror=function(msg,src,line,col){
@@ -2478,6 +2504,30 @@ window.addEventListener('unhandledrejection',function(ev){
 });
 const $=id=>document.getElementById(id);
 const qs=new URLSearchParams(location.search);
+// L10N: strings do receiver (idle/audio). Idioma: ?lang= > navigator.language
+// > pt. Sender pode anexar &lang= ao URL da TV (14/10).
+var L10N=(function(){var d={
+  pt:{idle:'Aguardando conteúdo…',wait:'Aguardando operador conectar…',audio:'Reproduzindo áudio',
+      connTo:'conectado a {t} · vermelha = IP/porta · azul = atualizar',redKey:'tecla vermelha = digitar IP',
+      searching:'procurando LouvorJA na rede…',notFound:'nenhum sender encontrado — tentando de novo…',
+      connecting:'conectando {h}:{p}…',reconn:'reconectando em {s}s',cloudSearch:'nuvem: buscando sessão {c}…',
+      cloudErr:'nuvem: {m}',cloudConn:'nuvem: conectando…',invalid:'sessão inválida — tecla vermelha p/ novo código',
+      cloudReconn:'nuvem: reconectando em {s}s',cloudCreating:'nuvem: criando sessão…',portSearch:'procurando LouvorJA na porta {p}…',pairHint:'Acesse e informe o código',tapUnmute:'Toque para ativar o som',ipHint:'CÓDIGO (6 letras/números) · IP · IP:PORTA — ou SÓ A PORTA (ex.: 7081) para achar o LouvorJA na rede',ipHelp:'OK conectar · vermelha cancelar · backspace apaga',mainSlot:'Principal (espelho)',tvConn:' · TV {ip} · conectado · vermelha = digitar IP'},
+  en:{idle:'Waiting for content…',wait:'Waiting for operator to connect…',audio:'Playing audio',
+      connTo:'connected to {t} · red = IP/port · blue = refresh',redKey:'red key = type IP',
+      searching:'searching for LouvorJA on the network…',notFound:'no sender found — trying again…',
+      connecting:'connecting {h}:{p}…',reconn:'reconnecting in {s}s',cloudSearch:'cloud: fetching session {c}…',
+      cloudErr:'cloud: {m}',cloudConn:'cloud: connecting…',invalid:'invalid session — red key for a new code',
+      cloudReconn:'cloud: reconnecting in {s}s',cloudCreating:'cloud: creating session…',portSearch:'searching for LouvorJA on port {p}…',pairHint:'Go to the site and enter the code',tapUnmute:'Tap to enable sound',ipHint:'CODE (6 letters/numbers) · IP · IP:PORT — or PORT ONLY (e.g. 7081) to find LouvorJA on the network',ipHelp:'OK connect · red cancel · backspace deletes',mainSlot:'Main (mirror)',tvConn:' · TV {ip} · connected · red = type IP'},
+  es:{idle:'Esperando contenido…',wait:'Esperando al operador…',audio:'Reproduciendo audio',
+      connTo:'conectado a {t} · roja = IP/puerto · azul = actualizar',redKey:'tecla roja = escribir IP',
+      searching:'buscando LouvorJA en la red…',notFound:'ningún sender encontrado — reintentando…',
+      connecting:'conectando {h}:{p}…',reconn:'reconectando en {s}s',cloudSearch:'nube: buscando sesión {c}…',
+      cloudErr:'nube: {m}',cloudConn:'nube: conectando…',invalid:'sesión inválida — tecla roja p/ nuevo código',
+      cloudReconn:'nube: reconectando en {s}s',cloudCreating:'nube: creando sesión…',portSearch:'buscando LouvorJA en el puerto {p}…',pairHint:'Acceda e informe el código',tapUnmute:'Toque para activar el sonido',ipHint:'CÓDIGO (6 letras/números) · IP · IP:PUERTO — o SÓLO EL PUERTO (ej. 7081) para hallar LouvorJA en la red',ipHelp:'OK conectar · roja cancelar · backspace borra',mainSlot:'Principal (espejo)',tvConn:' · TV {ip} · conectado · roja = escribir IP'}
+};var l=(qs.get('lang')||(navigator.language||'')).slice(0,2).toLowerCase();
+return Object.assign({},d.pt,d[l]||{});})();
+document.querySelectorAll('[data-l10n]').forEach(function(el){var k=el.getAttribute('data-l10n');if(L10N[k])el.textContent=L10N[k];});
 // F3.3q: versão no idle (canto inferior direito) — ?v= override ou padrão.
 window.__PALCO_APPV__=window.__PALCO_APPV__||'0.1.55';
 (function(){var el=$('idleVer');if(!el)return;var qv=qs.get('v')||window.__PALCO_APPV__||'';if(qv){el.textContent='PIANO LouvorJA Palco · receiver v'+qv;return}fetch('appinfo.json').then(function(r){return r.json()}).then(function(j){el.textContent='PIANO LouvorJA Palco · receiver v'+(j.version||'?')}).catch(function(){fetch('config.xml').then(function(r){return r.text()}).then(function(t){var m2=t.match(/version="([^"]+)"/);el.textContent='PIANO LouvorJA Palco · receiver v'+(m2?m2[1]:'?')}).catch(function(){el.textContent='PIANO LouvorJA Palco'})})})()
@@ -2495,122 +2545,105 @@ let bgPalco='';  // BG personalizado do palco (idle) — persiste entre músicas
 
 // Received projection text is untrusted HTML. Rebuild only basic formatting;
 // never copy attributes, executable elements, links, or resource URLs.
+function renderProjectionText(target, value){
+  const text=String(value||'');
+  if(!window.DOMPurify||!window.DOMPurify.isSupported){target.textContent=text;return}
+  const parsed=window.DOMPurify.sanitize(text,{
+    ALLOWED_TAGS:['br','b','strong','i','em','u','s','span','p','div','small'],
+    ALLOWED_ATTR:['style'],ALLOW_DATA_ATTR:false,ALLOW_ARIA_ATTR:false,
+    RETURN_DOM_FRAGMENT:true
+  });
+  const allowed=new Set(['BR','B','STRONG','I','EM','U','S','SPAN','P','DIV','SMALL']);
+  const blocked=new Set(['SCRIPT','STYLE','IFRAME','OBJECT','EMBED','SVG','MATH','TEMPLATE']);
+  function copy(source,parent){
+    if(source.nodeType===3){parent.appendChild(document.createTextNode(source.nodeValue||''));return}
+    if(source.nodeType!==1||blocked.has(source.tagName))return;
+    let destination=parent;
+    if(allowed.has(source.tagName)){
+      destination=document.createElement(source.tagName.toLowerCase());
+      // CSSOM accepts color values, not executable HTML or URL attributes.
+      destination.style.color=source.style.color;
+      destination.style.backgroundColor=source.style.backgroundColor;
+      const weight=source.style.fontWeight;
+      if(/^(normal|bold|bolder|lighter|[1-9]00)$/.test(weight))destination.style.fontWeight=weight;
+      if(['normal','italic','oblique'].includes(source.style.fontStyle))destination.style.fontStyle=source.style.fontStyle;
+      if(['none','underline','line-through'].includes(source.style.textDecorationLine))destination.style.textDecorationLine=source.style.textDecorationLine;
+      if(['left','center','right','justify'].includes(source.style.textAlign))destination.style.textAlign=source.style.textAlign;
+      parent.appendChild(destination);
+    }
+    for(const child of Array.from(source.childNodes))copy(child,destination);
+  }
+  while(target.firstChild)target.removeChild(target.firstChild);
+  for(const child of Array.from(parsed.childNodes))copy(child,target);
+}
+
 function projectionColor(value){
   const match=/^\s*(#[0-9a-fA-F]{3,8}|rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*(?:,\s*(?:0|1|0?\.\d+)\s*)?\)|hsla?\(\s*\d{1,3}\s*,\s*\d{1,3}%\s*,\s*\d{1,3}%\s*(?:,\s*(?:0|1|0?\.\d+)\s*)?\)|[a-zA-Z]{1,20})\s*$/.exec(String(value||''));
   return match?match[1]:'';
 }
-function projectionElement(name){
-  switch(name){
-    case 'br': return document.createElement('br');
-    case 'b': return document.createElement('b');
-    case 'strong': return document.createElement('strong');
-    case 'i': return document.createElement('i');
-    case 'em': return document.createElement('em');
-    case 'u': return document.createElement('u');
-    case 's': return document.createElement('s');
-    case 'span': return document.createElement('span');
-    case 'p': return document.createElement('p');
-    case 'div': return document.createElement('div');
-    case 'small': return document.createElement('small');
-    default: return null;
+// Conexões diretas: somente IPv4 de LAN/loopback e localhost, nunca DNS público.
+function palcoLanHost(value){
+  if(value==='localhost')return 'localhost';
+  if(typeof value!=='string'||! /^(?:0|[1-9][0-9]{0,2})(?:\.(?:0|[1-9][0-9]{0,2})){3}$/.test(value))return '';
+  const parts=value.split('.').map(Number);
+  if(parts.some(n=>n>255))return '';
+  if(parts[0]!==10&&parts[0]!==127&&!(parts[0]===172&&parts[1]>=16&&parts[1]<=31)&&!(parts[0]===192&&parts[1]===168)&&!(parts[0]===169&&parts[1]===254))return '';
+  return parts.join('.');
+}
+function palcoLanUrl(value,portValue,path,scheme){
+  const sender=palcoLanHost(value);
+  if(!sender||!/^\d{1,5}$/.test(String(portValue)))return '';
+  const number=Number(portValue);
+  if(number<1||number>65535)return '';
+  return scheme+'://'+sender+':'+number+path;
+}
+function palcoOfficialOrigin(origin){
+  // Mesmas origens oficiais/legadas do contrato de API do aplicativo.
+  switch(origin){
+    case 'https://api.pianolouvorja.com.br':return 'https://api.pianolouvorja.com.br';
+    case 'https://api-stg.pianolouvorja.com.br':return 'https://api-stg.pianolouvorja.com.br';
+    case 'https://api.louvorja.com.br':return 'https://api.louvorja.com.br';
+    case 'https://api-stg.louvorja.com.br':return 'https://api-stg.louvorja.com.br';
+    case 'https://api.louvorja.workers.dev':return 'https://api.louvorja.workers.dev';
+    default:return '';
   }
 }
-function applyProjectionStyle(el, rawAttrs){
-  const styleMatch=/\bstyle\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(rawAttrs||'');
-  const style=(styleMatch&&(styleMatch[1]||styleMatch[2]))||'';
-  const color=projectionColor((/(?:^|;)\s*color\s*:\s*([^;]+)/i.exec(style)||[])[1]);
-  if(color)el.style.color=color;
-  const background=projectionColor((/(?:^|;)\s*background-color\s*:\s*([^;]+)/i.exec(style)||[])[1]);
-  if(background)el.style.backgroundColor=background;
-  const weight=((/(?:^|;)\s*font-weight\s*:\s*([^;]+)/i.exec(style)||[])[1]||'').trim();
-  if(/^(normal|bold|bolder|lighter|[1-9]00)$/.test(weight))el.style.fontWeight=weight;
-  const fontStyle=((/(?:^|;)\s*font-style\s*:\s*([^;]+)/i.exec(style)||[])[1]||'').trim();
-  if(fontStyle==='normal'||fontStyle==='italic'||fontStyle==='oblique')el.style.fontStyle=fontStyle;
-  const deco=((/(?:^|;)\s*text-decoration-line\s*:\s*([^;]+)/i.exec(style)||[])[1]||'').trim();
-  if(deco==='none'||deco==='underline'||deco==='line-through')el.style.textDecorationLine=deco;
-  const align=((/(?:^|;)\s*text-align\s*:\s*([^;]+)/i.exec(style)||[])[1]||'').trim();
-  if(align==='left'||align==='center'||align==='right'||align==='justify')el.style.textAlign=align;
-}
-function decodeProjectionText(value){
-  return String(value||'').replace(/&(#x[0-9a-fA-F]+|#\d+|amp|lt|gt|quot|apos|nbsp);/g, function(entity, body){
-    if(body==='amp')return '&';
-    if(body==='lt')return '<';
-    if(body==='gt')return '>';
-    if(body==='quot')return '"';
-    if(body==='apos')return "'";
-    if(body==='nbsp')return ' ';
-    const code=body[1]==='x'?parseInt(body.slice(2),16):parseInt(body.slice(1),10);
-    if(!Number.isFinite(code)||code<32||code===127||code>0x10ffff)return '';
-    try{return String.fromCodePoint(code)}catch(e){return ''}
-  });
-}
-// HTML da projeção é do operador, mas só a formatação básica entra no DOM.
-// Tags e cores saem de uma lista fechada; o texto vira nó de texto.
-function renderProjectionText(target, value){
-  while(target.firstChild)target.removeChild(target.firstChild);
-  const blocked={script:1,style:1,iframe:1,object:1,embed:1,svg:1,math:1,template:1};
-  const stack=[target];
-  let skip=0;
-  const re=/<!--[\s\S]*?-->|<\/([a-zA-Z0-9]+)\s*>|<([a-zA-Z0-9]+)([^>]*?)\/?>|([^<]+)/g;
-  const raw=String(value||'');
-  let match;
-  while((match=re.exec(raw))){
-    if(match[0].indexOf('<!--')===0)continue;
-    if(match[1]){
-      const name=match[1].toLowerCase();
-      if(skip){if(blocked[name])skip--;continue}
-      for(let i=stack.length-1;i>0;i--){
-        if(stack[i].tagName.toLowerCase()===name){stack.length=i;break}
-      }
-      continue;
-    }
-    if(match[2]){
-      const name=match[2].toLowerCase();
-      const selfClose=/\/\s*>$/.test(match[0])||name==='br';
-      if(blocked[name]){if(!selfClose)skip++;continue}
-      if(skip)continue;
-      const el=projectionElement(name);
-      if(!el)continue;
-      applyProjectionStyle(el, match[3]||'');
-      stack[stack.length-1].appendChild(el);
-      if(!selfClose)stack.push(el);
-      continue;
-    }
-    if(match[4]&&!skip)stack[stack.length-1].appendChild(document.createTextNode(decodeProjectionText(match[4])));
-  }
-}
-
-function lanSenderHost(){
-  const match=/^(?:localhost|127\.0\.0\.1|(?:\d{1,3}\.){3}\d{1,3})$/.exec(String(host||'').trim());
-  return match?match[0]:'';
-}
-function palcoMediaUrl(original){
-  if(!original)return '';
-  let decoded;
-  try{decoded=decodeURIComponent(String(original))}catch(e){decoded=String(original)}
+function palcoMediaUrl(value){
+  if(!value)return '';
+  try{value=decodeURIComponent(String(value))}catch(e){value=String(value)}
   let parsed;
-  try{parsed=new URL(decoded)}catch(e){return ''}
+  try{parsed=new URL(String(value),location.href)}catch(e){return ''}
   if(parsed.username||parsed.password)return '';
-  if(parsed.protocol!=='http:'&&parsed.protocol!=='https:'&&parsed.protocol!=='blob:'&&parsed.protocol!=='file:'&&parsed.protocol!=='data:')return '';
-  if(parsed.protocol==='file:'&&location.protocol!=='file:')return '';
-  if(parsed.protocol==='data:'&&!/^data:(image|audio|video)\/[a-z0-9.+-]+;base64,/i.test(parsed.href))return '';
-  const safe=parsed.href;
-  if(parsed.protocol==='blob:'||parsed.protocol==='file:'||parsed.protocol==='data:'||cloudMode)return safe;
-  const sender=lanSenderHost();
-  if(sender&&parsed.protocol==='http:'&&parsed.hostname===sender)return safe;
-  // URL externa segue o próprio endereço já filtrado. O proxy com o IP da
-  // query reabria o alerta de redirecionamento no src da imagem.
-  if(parsed.protocol==='http:'||parsed.protocol==='https:')return safe;
-  return '';
+  if(parsed.protocol==='data:')return /^data:(image|audio|video)\/[a-z0-9.+-]+;base64,/i.test(String(value))?parsed.href:'';
+  if(parsed.protocol==='file:')return location.protocol==='file:'?parsed.href:'';
+  if(parsed.protocol==='blob:'){
+    if(parsed.origin==='null')return location.protocol==='file:'?parsed.href:'';
+    try{const source=new URL(parsed.origin);return palcoLanHost(source.hostname)||palcoOfficialOrigin(source.origin)?parsed.href:''}catch(e){return ''}
+  }
+  if(parsed.protocol!=='http:'&&parsed.protocol!=='https:')return '';
+  const local=palcoLanHost(parsed.hostname);
+  const official=palcoOfficialOrigin(parsed.origin);
+  if(!local&&!official)return '';
+  const origin=official||(parsed.protocol+'//'+local+(parsed.port?':'+Number(parsed.port):''));
+  return origin+parsed.pathname+parsed.search+parsed.hash;
 }
+function proxyUrl(original){return palcoMediaUrl(original)}
+function lanSenderHost(){return palcoLanHost(host)}
+function palcoSocketUrl(){
+  const base=palcoLanUrl(host,port,'/palco','ws');
+  if(!base)return '';
+  const raw=qs.get('token');
+  return base+(typeof raw==='string'&&/^[A-Z0-9]{5}$/.test(raw)?'?token='+raw:'');
+}
+function palcoWsUrl(){return palcoSocketUrl()}
 
 function setStatus(t,err){const s=$('status');s.textContent=t;
   const c=$('idleConn');if(c){
     if(t.indexOf('●')===0){
       var lb=localStorage.getItem('palcoSlotLabel');
-      c.textContent=(lb?lb+' · ':'')+'conectado a '+t.slice(1).trim()+' · vermelha = IP/porta · azul = atualizar';
+      c.textContent=(lb?lb+' · ':'')+L10N.connTo.replace('{t}',t.slice(1).trim());
     }
-    else c.textContent=(localStorage.getItem('palcoSlotLabel')?localStorage.getItem('palcoSlotLabel')+' · ':'')+t+' · tecla vermelha = digitar IP';
+    else c.textContent=(localStorage.getItem('palcoSlotLabel')?localStorage.getItem('palcoSlotLabel')+' · ':'')+t+' · '+L10N.redKey;
   }
   s.className=err?'err':''}
 
@@ -2624,8 +2657,10 @@ let host=qs.get('host')||localStorage.getItem('palcoHost')||location.hostname||'
 let port=qs.get('port')||localStorage.getItem('palcoPort')||'7081';
 
 function probeHttp(ip,httpPort){
+  const url=palcoLanUrl(ip,httpPort,'/status','http');
+  if(!url)return Promise.resolve(null);
   return new Promise(res=>{
-    fetch('http://'+ip+':'+httpPort+'/status')
+    fetch(url,{redirect:'error'})
       .then(function(r){return r.json()})
       .then(function(j){res(j&&('unlocked' in j)?j:null)})
       .catch(function(){res(null)});
@@ -2635,7 +2670,8 @@ function probeSender(ip){
   // Porta digitada pode ser WS (7081) OU HTTP do slot (a UI mostra a HTTP,
   // ex.: slot 1 = 7082/7083). Tenta a dupla HTTP/WS em ambos os sentidos:
   // p como HTTP, p-1 (p=WS) e p+1 (p=HTTP→WS=p+1).
-  var p=parseInt(port,10)||7081;
+  if(!palcoLanUrl(ip,port,'/status','http'))return Promise.resolve(null);
+  var p=Number(port);
   return probeHttp(ip,p).then(function(j){
     if(j)return normalizePort(ip,j,p+1);        // p era HTTP → WS=p+1
     return probeHttp(ip,p-1).then(function(j2){
@@ -2648,8 +2684,9 @@ function probeSender(ip){
   });
 }
 function normalizePort(ip,j,wsPort){
-  port=String(wsPort);
-  return ip;
+  if(!palcoLanUrl(ip,wsPort,'/palco','ws'))return null;
+  port=String(Number(wsPort));
+  return palcoLanHost(ip);
 }
 
 async function scanSubnet(){
@@ -2657,16 +2694,17 @@ async function scanSubnet(){
   // presume /24 da própria TV (rede típica de igreja)
   // file:// (IPK/simulador local): hostname vazio — tenta últimos hosts
   // conhecidos da sub-rede salva antes do default. Cobertura p/ IPK.
-  let me=location.hostname;
+  let me=palcoLanHost(location.hostname);
   if(!me){
     const saved=localStorage.getItem('palcoHost');
-    me=saved||'192.168.1.100';
+    me=palcoLanHost(saved)||'192.168.1.100';
   }
   const prefix=me.split('.').slice(0,3).join('.');
-  const base=host?host.split('.').slice(0,3).join('.'):prefix;
+  const known=palcoLanHost(host);
+  const base=known&&known!=='localhost'?known.split('.').slice(0,3).join('.'):prefix;
   const ips=[];
   for(let i=1;i<255;i++)ips.push(base+'.'+i);
-  if(host)ips.unshift(host); // último conhecido primeiro
+  if(known)ips.unshift(known); // último conhecido primeiro
   const found=[];
   const CONC=42; // F3.3v: 20→42 e timeout 900→450ms — scan ~3x mais rápido
   for(let i=0;i<ips.length;i+=CONC){
@@ -2681,10 +2719,10 @@ async function scanSubnet(){
 function connect(){
   dlog('connect() host="'+host+'"');
   if(!host){
-    setStatus('procurando LouvorJA na rede…');
+    setStatus(L10N.searching);
     scanSubnet().then(found=>{
       if(found){host=found;localStorage.setItem('palcoHost',host);doConnect()}
-      else{setStatus('nenhum sender encontrado — tentando de novo…',true);retry()}
+      else{setStatus(L10N.notFound,true);retry()}
     });
     return;
   }
@@ -2703,9 +2741,11 @@ function connect(){
   }
   // Tenta WS direto no host salvo; se falhar 1x sem nunca abrir, host é stale.
   function directTry(){
+    const socketUrl=palcoWsUrl();
+    if(!socketUrl){setStatus(L10N.notFound,true);return}
     var opened=false;
     var t=setTimeout(function(){if(!opened){dlog('WS direto falhou — host stale');localStorage.removeItem('palcoHost');host='';connect()}},3000);
-    try{var w=new WebSocket('ws://'+host+':'+port+'/palco');
+    try{var w=new WebSocket(socketUrl);
       w.onopen=function(){opened=true;clearTimeout(t);try{w.close()}catch(e){};doConnect()};
       w.onerror=function(){};
     }catch(e){clearTimeout(t);localStorage.removeItem('palcoHost');host='';connect()}
@@ -2723,9 +2763,11 @@ function stopMediaOnServerLoss(){
 }
 
 function doConnect(){
+  const socketUrl=palcoWsUrl();
+  if(!socketUrl){setStatus(L10N.notFound,true);return}
   dlog('doConnect '+host+':'+port);
-  setStatus('conectando '+host+':'+port+'…');
-  try{ws=new WebSocket('ws://'+host+':'+port+'/palco')}catch(e){retry();return}
+  setStatus(L10N.connecting.replace('{h}',host).replace('{p}',port));
+  try{ws=new WebSocket(socketUrl)}catch(e){retry();return}
   ws.onopen=()=>{tries=0;dlog('WS OPEN '+host);setStatus('● '+host);
     if(window.__hideSplash)window.__hideSplash(); // F3.3j: splash sai no connect
     localStorage.setItem('palcoHost',host);
@@ -2739,7 +2781,7 @@ function doConnect(){
 }
 function retry(){
   const wait=Math.min(1000*Math.pow(2,tries++),10000);
-  setStatus('reconectando em '+Math.round(wait/1000)+'s',true);
+  setStatus(L10N.reconn.replace('{s}',Math.round(wait/1000)),true);
   setTimeout(connect,wait);
 }
 
@@ -2754,65 +2796,56 @@ var PALCO_API_WS_DEFAULT='wss://api.louvorja.com.br/v1/palco';
 // (IPK instalado) mantém a API oficial.
 var PALCO_API_WS_DEV='ws://localhost:3100/v1/palco';
 function trustedCloudApi(value){
-  let url;
-  try{url=new URL(String(value))}catch(e){return null}
-  if(url.username||url.password||url.search||url.hash)return null;
-  if(url.pathname.replace(/\/$/,'')!=='/v1/palco')return null;
-  if(url.hostname==='api.louvorja.com.br'&&url.protocol==='wss:'&&(!url.port||url.port==='443'))return 'wss://api.louvorja.com.br/v1/palco';
-  if(url.hostname==='api-stg.louvorja.com.br'&&url.protocol==='wss:'&&(!url.port||url.port==='443'))return 'wss://api-stg.louvorja.com.br/v1/palco';
-  if(url.hostname==='localhost'&&url.port==='3100'&&url.protocol==='ws:')return 'ws://localhost:3100/v1/palco';
-  if(url.hostname==='localhost'&&url.port==='3100'&&url.protocol==='wss:')return 'wss://localhost:3100/v1/palco';
-  return null;
+  try{
+    const url=new URL(String(value));
+    if(url.username||url.password||url.search||url.hash)return null;
+    if(url.pathname.replace(/\/$/,'')!=='/v1/palco')return null;
+    if(url.hostname==='localhost'){
+      return url.protocol==='ws:'&&url.port==='3100'?PALCO_API_WS_DEV:null;
+    }
+    if(url.protocol!=='wss:'||(url.port&&url.port!=='443'))return null;
+    switch(url.hostname){
+      case 'api.louvorja.com.br':return 'wss://api.louvorja.com.br/v1/palco';
+      case 'api-stg.louvorja.com.br':return 'wss://api-stg.louvorja.com.br/v1/palco';
+      case 'api.pianolouvorja.com.br':return 'wss://api.pianolouvorja.com.br/v1/palco';
+      case 'api-stg.pianolouvorja.com.br':return 'wss://api-stg.pianolouvorja.com.br/v1/palco';
+      default:return null;
+    }
+  }catch(e){return null}
 }
 var cloudApi=trustedCloudApi(qs.get('api'))||((location.protocol==='file:'||/^(localhost|127\.)/.test(location.hostname))&&(location.protocol==='file:'||location.port==='5173'||location.port==='3100')?PALCO_API_WS_DEV:PALCO_API_WS_DEFAULT);
 var cloudCode='';
 var cloudMode=false;
 var cloudTimer=null;
 
-function cloudHttpBase(){
-  if(cloudApi==='wss://api-stg.louvorja.com.br/v1/palco')return 'https://api-stg.louvorja.com.br/v1/palco';
-  if(cloudApi==='ws://localhost:3100/v1/palco')return 'http://localhost:3100/v1/palco';
-  if(cloudApi==='wss://localhost:3100/v1/palco')return 'https://localhost:3100/v1/palco';
-  return 'https://api.louvorja.com.br/v1/palco';
-}
-function cloudWsBase(){
-  if(cloudApi==='wss://api-stg.louvorja.com.br/v1/palco')return 'wss://api-stg.louvorja.com.br/v1/palco';
-  if(cloudApi==='ws://localhost:3100/v1/palco')return 'ws://localhost:3100/v1/palco';
-  if(cloudApi==='wss://localhost:3100/v1/palco')return 'wss://localhost:3100/v1/palco';
-  return 'wss://api.louvorja.com.br/v1/palco';
-}
 function cloudConnect(code){
-  var session=/^[A-Z0-9]{6}$/.exec(String(code||'').toUpperCase());
-  if(!session)return;
-  session=session[0];
-  cloudMode=true;cloudCode=session;
-  dlog('cloudConnect',session,cloudApi);
-  var base=cloudHttpBase();
-  setStatus('nuvem: buscando sessão '+session+'…');
-  fetch(base+'/sessions/'+encodeURIComponent(session)+'/token')
+  if(typeof code!=='string'||!/^[A-Z0-9]{6}$/.test(code)){setStatus(L10N.invalid,true);return}
+  cloudMode=true;cloudCode=code;
+  dlog('cloudConnect',code,cloudApi);
+  var base=cloudApi.replace(/^ws/,'http');
+  setStatus(L10N.cloudSearch.replace('{c}',code));
+  fetch(base+'/sessions/'+encodeURIComponent(code)+'/token',{redirect:'error'})
     .then(function(r){if(!r.ok)throw Error('sessão não encontrada');return r.json()})
-    .then(function(j){cloudOpen(session,j.token)})
-    .catch(function(e){setStatus('nuvem: '+e.message,true);cloudRetry()});
+    .then(function(j){cloudOpen(code,j.token)})
+    .catch(function(e){setStatus(L10N.cloudErr.replace('{m}',e.message),true);cloudRetry()});
 }
 function cloudOpen(code,token){
-  var session=/^[A-Z0-9]{6}$/.exec(String(code||'').toUpperCase());
-  if(!session){cloudRetry();return}
-  session=session[0];
-  setStatus('nuvem: conectando…');
+  if(typeof code!=='string'||!/^[A-Z0-9]{6}$/.test(code)||typeof token!=='string'||!token){setStatus(L10N.invalid,true);return}
+  setStatus(L10N.cloudConn);
   var cid='';
   try{cid=localStorage.getItem('palcoCloudCid')||''}catch(e){}
   if(!cid){cid='tv-'+Math.random().toString(36).slice(2,10);try{localStorage.setItem('palcoCloudCid',cid)}catch(e){}}
-  try{ws=new WebSocket(cloudWsBase()+'/relay/'+encodeURIComponent(session)+'?token='+encodeURIComponent(String(token||''))+'&role=receiver&cid='+encodeURIComponent(cid))}
+  try{ws=new WebSocket(cloudApi+'/relay/'+code+'?token='+encodeURIComponent(token)+'&role=receiver&cid='+encodeURIComponent(cid))}
   catch(e){cloudRetry();return}
-  ws.onopen=function(){tries=0;dlog('CLOUD WS OPEN',session);
-    setStatus('● nuvem '+session);
+  ws.onopen=function(){tries=0;dlog('CLOUD WS OPEN',code);
+    setStatus('● nuvem '+code);
     if(window.__hideSplash)window.__hideSplash();
-    try{localStorage.setItem('palcoCloudCode',session)}catch(e){}};
+    try{localStorage.setItem('palcoCloudCode',code)}catch(e){}};
   ws.onmessage=function(ev){try{handle(JSON.parse(ev.data))}catch(e){}};
   ws.onclose=function(ev){
     dlog('CLOUD WS CLOSE',ev&&ev.code);
     stopMediaOnServerLoss();showIdle();
-    if(ev&&ev.code===4404){setStatus('sessão inválida — tecla vermelha p/ novo código',true);cloudMode=false;return}
+    if(ev&&ev.code===4404){setStatus(L10N.invalid,true);cloudMode=false;return}
     // 4409 = join recusado (ex.: sessão recém-recriada) — reseta backoff pra
     // tentar de novo rápido em vez de esperar 10s crescendo.
     if(ev&&(ev.code===4409||ev.code===4400)){tries=0}
@@ -2821,7 +2854,7 @@ function cloudOpen(code,token){
 }
 function cloudRetry(){
   var wait=Math.min(1000*Math.pow(2,tries++),10000);
-  setStatus('nuvem: reconectando em '+Math.round(wait/1000)+'s',true);
+  setStatus(L10N.cloudReconn.replace('{s}',Math.round(wait/1000)),true);
   cloudTimer=setTimeout(function(){if(cloudMode&&cloudCode)cloudConnect(cloudCode)},wait);
 }
 
@@ -2831,19 +2864,18 @@ function cloudRetry(){
 // código (ou escaneia) e projeta. Padrão YouTube/Netflix.
 function cloudCreate(){
   cloudMode=true;cloudCode='';
-  var base=cloudHttpBase();
-  setStatus('nuvem: criando sessão…');
-  fetch(base+'/sessions',{method:'POST'})
+  var base=cloudApi.replace(/^ws/,'http');
+  setStatus(L10N.cloudCreating);
+  fetch(base+'/sessions',{method:'POST',redirect:'error'})
     .then(function(r){if(!r.ok)throw Error('falha ao criar sessão');return r.json()})
     .then(function(j){
-      var created=/^[A-Z0-9]{6}$/.exec(String(j.code||'').toUpperCase());
-      if(!created)throw Error('sessão inválida');
-      cloudCode=created[0];
+      cloudCode=String(j.code||'').toUpperCase();
+      if(!/^[A-Z0-9]{6}$/.test(cloudCode))throw Error('sessão inválida');
       try{localStorage.setItem('palcoCloudCode',cloudCode)}catch(e){}
       showCloudPair(cloudCode);
       cloudOpen(cloudCode,j.token);
     })
-    .catch(function(e){setStatus('nuvem: '+e.message,true);cloudMode=false;retry()});
+    .catch(function(e){setStatus(L10N.cloudErr.replace('{m}',e.message),true);cloudMode=false;retry()});
 }
 
 // ===== QRCode minimal (qrcodegen, MIT, Nayuki) — só o necessário p/ v1 =====
@@ -2851,7 +2883,7 @@ function cloudCreate(){
 
 // Pinta o par código+QR no idle enquanto aguarda o operador.
 function showCloudPair(code){
-  showIdle('Aguardando operador conectar…');
+  showIdle(L10N.wait);
   var wrap=document.createElement('div');
   wrap.id='cloudPair';
   wrap.style.cssText='display:flex;gap:3vh;align-items:center;justify-content:center;margin-top:3vh';
@@ -2873,7 +2905,7 @@ function showCloudPair(code){
   }catch(e){dlog('QR falhou (código em texto segue):',e&&e.message)}
   var info=document.createElement('div');
   info.style.cssText='text-align:left';
-  info.innerHTML='<div style="font-size:2.4vh;opacity:.75">Acesse e informe o código</div>'+
+  info.innerHTML='<div style="font-size:2.4vh;opacity:.75">'+L10N.pairHint+'</div>'+
     '<div style="font-size:9vh;font-weight:800;letter-spacing:1.2vh;line-height:1.15;color:#FCCE02">'+code+'</div>'+
     '<div style="font-size:2vh;opacity:.6">app.pianolouvorja.com.br</div>';
   wrap.appendChild(info);
@@ -2895,7 +2927,7 @@ function showIdle(msg){
   $('text').textContent='';$('footer').textContent='';
   // F3.3ac: remove estilos de projeção (caixa/sombra) — senão a caixa
   // vazia continuava desenhada no idle após "Limpar projeção".
-  $('text').classList.remove('box-on','shadow-on','box-off','shadow-off','cover-on');
+  $('text').classList.remove('box-on','shadow-on','box-off','shadow-off','cover-on','bible-box');
   $('text').style.removeProperty('--box-bg');
   $('text').style.removeProperty('--box-border');
   $('text').style.removeProperty('--ts');
@@ -2933,7 +2965,7 @@ function hideNp(){
 }
 
 const a0=$('audio');
-a0.onended=()=>showIdle('Aguardando conteúdo…');
+a0.onended=()=>showIdle(L10N.idle);
 let pendingPlay=false;
 // F3.3h: autoplay-mudo — o browser bloqueia play() COM SOM sem gesto, mas
 // permite MUDO. Estratégia Chromecast-like: play com som falha → retry
@@ -2948,7 +2980,7 @@ function showMuteBadge(){
   b.style.cssText='position:fixed;top:3vh;right:3vh;z-index:98;cursor:pointer;'+
     'background:rgba(0,0,0,.75);border-radius:3vh;padding:1.5vh 2.5vh;'+
     'font-size:2.4vh;color:#fff;display:flex;align-items:center;gap:1.2vh';
-  b.innerHTML='<span style="font-size:3vh">🔇</span> Toque para ativar o som';
+  b.innerHTML='<span style="font-size:3vh">🔇</span> '+L10N.tapUnmute;
   b.addEventListener('click',unmuteNow);
   document.body.appendChild(b);
 }
@@ -3030,10 +3062,10 @@ function openIpEntry(){
   ipEntry.style.cssText='position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.85);'+
     'display:flex;align-items:center;justify-content:center';
   ipEntry.innerHTML='<div style="text-align:center">'+
-    '<p style="font-size:2.6vh;opacity:.7;margin:0 0 2vh 0">CÓDIGO (6 letras/números) · IP · IP:PORTA — ou SÓ A PORTA (ex.: 7081) para achar o LouvorJA na rede</p>'+
+    '<p style="font-size:2.6vh;opacity:.7;margin:0 0 2vh 0">'+L10N.ipHint+'</p>'+
     '<p id="ipVal" style="font-size:6vh;font-weight:700;letter-spacing:.5vh;margin:0;'+
     'min-height:7vh;border-bottom:.3vh solid #FCCE02;padding:0 4vh"></p>'+
-    '<p style="font-size:1.8vh;opacity:.5;margin:2vh 0 0 0">OK conectar · vermelha cancelar · backspace apaga</p></div>';
+    '<p style="font-size:1.8vh;opacity:.5;margin:2vh 0 0 0">'+L10N.ipHelp+'</p></div>';
   document.body.appendChild(ipEntry);
   ipEntry._val='';
   renderIp();
@@ -3066,7 +3098,7 @@ function submitIp(){
     port=v;localStorage.setItem('palcoPort',port);tries=0;closeIpEntry();
     try{if(ws)ws.close()}catch(e){}
     host='';localStorage.removeItem('palcoHost');
-    setStatus('procurando LouvorJA na porta '+port+'…');
+    setStatus(L10N.portSearch.replace('{p}',port));
     scanSubnet();
     return;
   }
@@ -3118,7 +3150,7 @@ window.addEventListener('keydown',function(e){
     {const a=$('audio');a.pause();a.removeAttribute('src');a.load();}
     {const v=$('video');v.pause();v.removeAttribute('src');v.style.display='none';v.load();}
     hideNp();
-    showIdle('Aguardando conteúdo…');
+    showIdle(L10N.idle);
     return;
   }
   // tecla vermelha (403) no idle abre entrada de IP
@@ -3165,29 +3197,46 @@ function handle(m){
         t.style.display='none';$('text').style.display='';}}
       const bgEl=$('bg');
       bgEl.onerror=()=>{bgEl.onerror=null;bgEl.src='bg-fallback.png'};
-      if(m.background){var nextBg=palcoMediaUrl(m.background);if(nextBg){bgEl.src=nextBg;bgEl.style.opacity='';document.body.style.background=''}else bgEl.src='bg-fallback.png'}
+      // Frame de slide (data:image/ do pump PDF/PPT/imagens): imagem é o
+      // CONTEÚDO, não bg decorativo — sem brightness(.55) nem véu (paridade
+      // com a tela do operador). 13/10 Rafael: tonalidade lavada no palco.
+      const isFrameSlide=typeof m.background==='string'&&m.background.startsWith('data:image/');
+      bgEl.classList.toggle('frame-slide',isFrameSlide);
+      bgEl.onerror=isFrameSlide?null:bgEl.onerror;
+      // Cor explícita é a personalização ativa do Palco: vence capa/bg do
+      // runtime também. Antes só valia sem `m.background`, então música com
+      // capa escondia a alteração feita nas configurações (14/10).
+      if(m.backgroundColor){bgEl.removeAttribute('src');document.body.style.background=m.backgroundColor}
+      else if(m.background){bgEl.src=palcoMediaUrl(m.background);bgEl.style.opacity='';document.body.style.background=''}
       // Sem bg na mensagem: usa o BG configurado no app (bgPalco — enviado
-      // ao ligar o palco). Só se NÃO houver bg configurado cai no fallback
-      // fixo. Vale pra qualquer módulo (26/08 Rafael).
-      // WT-5 web: backgroundColor do palco (paridade popup) também conta
-      // como bg válido — pinta o body e esconde o img (hino sem capa e sem
-      // bg custom usa a cor do palco; fallback é só MP3 sem nada, 01/09).
-      else if(m.backgroundColor){var nextColor=projectionColor(m.backgroundColor);if(nextColor){bgEl.removeAttribute('src');document.body.style.backgroundColor=nextColor}else bgEl.src='bg-fallback.png'}
-      else if(bgPalco){var nextPalco=palcoMediaUrl(bgPalco);if(nextPalco){bgEl.src=nextPalco;bgEl.style.opacity='';document.body.style.background=''}else bgEl.src='bg-fallback.png'}
+      // ao ligar o palco). Só se NÃO houver bg configurado cai no fallback.
+      else if(bgPalco){bgEl.src=proxyUrl(bgPalco);bgEl.style.opacity='';document.body.style.background=''}
       else{bgEl.src='bg-fallback.png'}
       // Slide/PDF/PPT (text vazio) é mídia visual pura: sem véu de leitura,
       // preserva a tonalidade original do canvas do operador.
       $('veil').style.display=m.text?'':'none';
       renderProjectionText($('text'),m.text);
       $('text').classList.toggle('cover-on',m.isCover===true);
+      $('text').classList.toggle('title-box-on',m.titleTextBox===true);
       // F3.3o: fontSize/fontWeight dinâmicos (settings do operador).
+      // Estrofes (lyric*) vencem quando presentes; capa (isCover) mantém o
+      // tamanho do título.
       {const t=$('text');
-        if(typeof m.fontSize==='number')
-          t.style.fontSize=(m.fontSize/19.2)+'vw'; // px@1920 → vw: paridade com cqw dos popups (era 10.8 — fonte ~78% maior)
-        if(typeof m.fontWeight==='number')
-          t.style.fontWeight=m.fontWeight;
-        // WT-5 web: cor do texto do operador (paridade popup)
-        if(m.textColor){var nextText=projectionColor(m.textColor);if(nextText)t.style.color=nextText}
+        // Estrofes (lyric*) vencem fora da capa; a capa mantém o estilo geral.
+        const useLyric=m.isCover!==true;
+        const fs=useLyric&&typeof m.lyricFontSize==='number'?m.lyricFontSize:m.fontSize;
+        const fw=useLyric&&typeof m.lyricFontWeight==='number'?m.lyricFontWeight:m.fontWeight;
+        // fontSize chega px@1080 (sender converte px@1920→1080). Paridade
+        // com web (cqw = px@1920/19.2vw): voltar a px@1920 (*16/9) → /19.2.
+        if(typeof fs==='number')t.style.setProperty('--fit-size',(fs*16/9/19.2)+'vw');
+        if(typeof fw==='number')t.style.fontWeight=fw;
+        if(m.isCover===true){
+          t.style.removeProperty('color');
+          t.querySelectorAll('span[style*="color"]').forEach(function(sp){sp.style.removeProperty('color')});
+        } else {
+          const rawColor=useLyric&&typeof m.lyricTextColor==='string'&&m.lyricTextColor?m.lyricTextColor:m.textColor;
+          if(rawColor){var nextText=projectionColor(rawColor);if(nextText)t.style.color=nextText}
+        }
         // Auto-fit: reduz a fonte até o texto caber na altura útil (76vh) —
         // mesma passagem de linhas do popup (frase em 2 linhas lá, 2 aqui).
         t.style.transform='translate(-50%,-50%)';
@@ -3224,7 +3273,7 @@ function handle(m){
           else if(v==='top'){t.style.top=padV; t.style.transform='translate(-50%,0)'}
           else{t.style.transform='translate(-50%,-50%)'}
         })();
-        requestAnimationFrame(function(){
+        if(m.footerRef) requestAnimationFrame(function(){
           // WT-5f paridade popup: auto-fit mede scrollHeight vs área útil
           // (86% do palco) e reduz até caber — MESMO algoritmo do popup
           // (applyFit/fitScale), não só altura total em 76vh.
@@ -3248,18 +3297,56 @@ function handle(m){
             f.style.bottom='auto';
           }
         });
+        if(!m.footerRef){
+          t.style.fontSize='';
+          if(typeof fs==='number')t.style.setProperty('--fit-size',(fs*16/9/19.2)+'vw');
+          if(m.isCover===true){t.style.removeProperty('color');t.querySelectorAll('span[style*="color"]').forEach(function(sp){sp.style.removeProperty('color')})}
+        }
       }
-      // F3.3m: estilos da letra — sombra (intensidade) + caixinha (borda)
+      // Paridade total: personalizações do app aplicadas na TV.
+
+      // lUpper (13/10): uppercase da letra é ESCOLHA do usuário, não hardcode.
+
       {const t=$('text');
-        t.classList.remove('shadow-on','shadow-off','box-on','box-off');
+
+        t.style.textTransform=(m.isCover===true
+
+          ?m.titleUpperCase===true
+
+          :m.lyricUpperCase===true)?'uppercase':(m.textTransform||'none');
+
+      }
+
+      // Alinhamentos verticais/horizontais: o IIFE acima (paridade popup)
+      // já aplica textAlign/textVerticalAlign com o transform completo —
+      // NÃO duplicar aqui: bloco duplicado setava transform sem o -50% X e
+      // empurrava a caixa pra direita da TV (bug 14/10).
+      // Margem (paridade StagePreview: margin px@1920 → max-width menor):
+      {const t=$('text');
+        // px@1920 → vw (120px → 12.5vw); sem margin mantém o respiro base.
+        t.style.maxWidth='calc(100vw - '+((typeof m.margin==='number'?m.margin:120)/9.6)+'vw)';
+        t.style.margin='0 auto';
+        t.style.width='';
+      }
+      // Cor de fundo escolhida: pinta o PALCO (body), paridade local —
+      // imagem de bg continua vencendo quando existe (else-if acima).
+      {document.body.style.background=(typeof m.backgroundColor==='string'&&m.backgroundColor)?m.backgroundColor:''}
+
+      // F3.3m: estilos da letra — sombra (intensidade) + caixinha (borda)
+
+      {const t=$('text');
+
+        t.classList.remove('shadow-on','shadow-off','box-on','box-off','bible-box');
+
         if(m.textShadow===false){t.classList.add('shadow-off')}
         else{t.classList.add('shadow-on');
           if(typeof m.shadowBlur==='number')
             t.style.setProperty('--ts',`0 ${Math.max(1,m.shadowBlur/3)}vh ${m.shadowBlur}vh rgba(0,0,0,${m.shadowIntensity!=null?m.shadowIntensity:0.8})`)}
         if(m.textBox){t.classList.add('box-on');
+          t.classList.toggle('bible-box',m.bibleBox===true);
           if(typeof m.boxOpacity==='number')t.style.setProperty('--box-bg',m.boxOpacity);
           t.style.setProperty('--box-border',
-            m.boxBorder?`${m.boxBorder.width||0.4}vh solid ${m.boxBorder.color||'rgba(255,255,255,.25)'}`:'none')}
+            m.boxBorder?`${m.boxBorder.width||0.2}vmin solid ${m.boxBorder.color||'rgba(255,255,255,.85)'}`:'none')}
         else{t.classList.add('box-off')}
       }
       // F3.3m: footer com referência destacada + versão
@@ -3312,21 +3399,25 @@ function handle(m){
             const apply=()=>{try{a.currentTime=m.positionMs/1000}catch(e){}};
             if(a.readyState>=1)apply();else a.addEventListener('loadedmetadata',apply,{once:true});
           }
-          a.onended=()=>{hideNp();showIdle('Aguardando conteúdo…')};
+          a.onended=()=>{hideNp();showIdle(L10N.idle)};
           // Áudio "desconhecido" (sem metadados): now-playing padrão do
           // Palco — sem nome de arquivo, com a animação eq indicando que
           // há algo tocando. Mesmo visual do "só áudio" do app.
           if(m.title){
             showNp(m.title, m.subtitle||'', m.cover||'');
           }else{
-            showNp('Reproduzindo áudio', m.subtitle||'', m.cover||'');
+            showNp(L10N.audio, m.subtitle||'', m.cover||'');
           }
-          $('bg').src=m.background?palcoMediaUrl(m.background):'bg-fallback.png';
+          // BG de áudio: cor explícita do Palco vence capa/fallback (paridade
+          // projection, 14/10) — não re-seta o src se a personalização pintou.
+          if(!m.backgroundColor)
+            $('bg').src=m.background?palcoMediaUrl(m.background):'bg-fallback.png';
         }
       }
       // BG garantido em TODA mensagem de áudio (load, play, pause, seek):
       // sem isso, mensagens action-only podiam deixar tela preta.
-      if(!m.background){
+      // Cor explícita = personalização ativa: não força fallback (14/10).
+      if(!m.background&&!m.backgroundColor){
         const cur=$('bg');
         if(!cur.src||cur.src.endsWith('/'))cur.src='bg-fallback.png';
       }
@@ -3334,12 +3425,12 @@ function handle(m){
         // Now-playing tardio APENAS se não há projeção ativa na TV.
         // Hino da liturgia = projection (letra) + audio juntos: o np não
         // pode cobrir a letra projetada (caso real: hino mostrava
-        // 'Reproduzindo áudio' em vez da letra).
+        // L10N.audio em vez da letra).
         const np=$('np');
         const textEl=$('text');
         const hasProjection=textEl&&textEl.innerHTML&&textEl.innerHTML.trim()!==''&&np.style.display==='none';
         if(np.style.display==='none'&&!hasProjection){
-          showNp(m.title||'Reproduzindo áudio', m.subtitle||'', m.cover||'');
+          showNp(m.title||L10N.audio, m.subtitle||'', m.cover||'');
           if(!m.background)$('bg').src='bg-fallback.png';
         }
         if(a.paused){dlog('PLAY src='+(a.src||'').slice(0,60));playWithFallback()}
@@ -3348,7 +3439,7 @@ function handle(m){
       if(m.action==='pause'&&!a.paused)a.pause();
       if(m.action==='stop'){
         if(!window.__videoAudioActive){
-          a.pause();a.currentTime=0;showIdle('Aguardando conteúdo…')}}
+          a.pause();a.currentTime=0;showIdle(L10N.idle)}}
       if(m.action==='seek'){
         const target=(m.position||m.positionMs/1000||0);
         // só corrige se o desvio for perceptível — micro-sync causa stutter
@@ -3369,8 +3460,8 @@ function handle(m){
         const av=$('audio');const next=palcoMediaUrl(m.url);
         window.__videoAudioActive=true;
         if(av.src!==next){av.src=next;
-          av.onended=()=>{hideNp();showIdle('Aguardando conteúdo…')};
-          showNp(m.title||'Reproduzindo áudio', m.subtitle||'', m.cover||'');
+          av.onended=()=>{hideNp();showIdle(L10N.idle)};
+          showNp(m.title||L10N.audio, m.subtitle||'', m.cover||'');
           $('bg').src=m.background?palcoMediaUrl(m.background):'bg-fallback.png';}
         if(m.action!=='pause'&&m.action!=='stop'&&av.paused)playWithFallback();
         if(m.action==='pause'&&!av.paused)av.pause();
@@ -3385,7 +3476,7 @@ function handle(m){
       {const a=$('audio');
         if(a&&a.src&&!(m.action==='stop'&&!m.url)){a.pause();a.removeAttribute('src');a.load()}}
       if(m.action==='stop'){v.pause();v.removeAttribute('src');v.style.display='none';
-        v.load();showIdle('Aguardando conteúdo…');
+        v.load();showIdle(L10N.idle);
         sendEvent({v:2,type:'ended',media:'video'});break}
       if(m.url){v.src=palcoMediaUrl(m.url);v.style.display='';
         // Sync inicial (padrão F3.3g do áudio): positionMs aplicado antes
@@ -3395,7 +3486,7 @@ function handle(m){
           if(v.readyState>=1)apply();else v.addEventListener('loadedmetadata',apply,{once:true});
         }
         v.onended=()=>{v.style.display='none';v.removeAttribute('src');v.load();
-          showIdle('Aguardando conteúdo…');
+          showIdle(L10N.idle);
           sendEvent({v:2,type:'ended',media:'video'})}}
       if(m.action==='seek'){
         const target=(m.position||((m.positionMs||0)/1000)||0);
@@ -3450,17 +3541,17 @@ function handle(m){
       t._iv=setInterval(()=>{rem-=1000;elapsed+=1000;render();
         if(mode!=='chrono'&&rem<=0){clearInterval(t._iv)}},1000);
       break}
-    case 'idle':showIdle(m.msg||'Aguardando conteúdo…');break;
+    case 'idle':showIdle(m.msg||L10N.idle);break;
     // F3.3x: sender informa IP DA TV (visto pelo socket) + SLOT onde ela
     // caiu — identificação visível pro operador conferir com o app.
     case 'youare':{
       if(m.ip){
         var who=(m.slotLabel||m.slot||'Palco');
         var isMain=!m.slot||m.slot==='0';
-        if(isMain)who='Principal (espelho)';
+        if(isMain)who=L10N.mainSlot;
         var el=document.getElementById('idleConn');
         if(el&&document.getElementById('idle')&&!document.getElementById('idle').classList.contains('hidden'))
-          el.textContent=who+' · TV '+m.ip+' · conectado · vermelha = digitar IP';
+          el.textContent=who+L10N.tvConn.replace('{ip}',m.ip);
         try{
           localStorage.setItem('palcoSelfIp',m.ip);
           localStorage.setItem('palcoSlotLabel',who);
@@ -3470,7 +3561,6 @@ function handle(m){
     }
   }
 }
-
 
 // WT-5d: boot — código cloud na query (?code=XXXXXX) ou salvo em localStorage
 // tem prioridade; sem código, segue o fluxo local (scan do sender na LAN).
@@ -3512,7 +3602,6 @@ function handle(m){
       dlog('AUTO-RELAUNCH cancelado (voltou ao foreground)');
     }
   });
-})();
 })();
 </script>
 </body>

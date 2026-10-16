@@ -56,6 +56,7 @@ import {
 } from '../../countdown/services/countdown-runtime'
 import type { TimerRuntimeState } from '../../timer/types/timer'
 import type { CountdownRuntimeState } from '../../countdown/types/countdown'
+import { resolveRemoteFileUrl } from '../../media/services/media-audio'
 import { useMediaStore } from '../../media/stores/useMediaStore'
 import { watch } from 'vue'
 
@@ -127,9 +128,16 @@ async function renderAllSlots(): Promise<void> {
       // Mídia externa (vídeo/pdf/ppt da liturgia) vive fora da bridge e
       // manda direto nos slots; o owner NÃO pode renderizar por cima dela
       // (caso real 28/08: random tomou o slot onde o vídeo projetava).
+      // externalAlive conta POPUPS (hinos/bíblia — 28df66ab, ESC-confirm);
+      // popup do próprio hino NÃO é mídia externa — consultava o handler
+      // antigo e a TV congelava no 1º slide (regressão 13/10). Handler
+      // novo = só web-projection; main antigo sem ele → fallback antigo.
       let ext = false
       try {
-        ext = await getDesktopBridge()?.projection?.externalAlive?.() ?? false
+        const bridge = getDesktopBridge()
+        ext = typeof bridge?.projection?.externalMediaAlive === 'function'
+          ? await bridge.projection.externalMediaAlive()
+          : await (bridge?.projection?.externalAlive?.() ?? false)
       } catch {
         // main antigo sem o handler: assume SEM mídia externa (comportamento
         // legado) em vez de quebrar o renderAllSlots inteiro.
@@ -162,6 +170,17 @@ function assignedSlotHasContent(m: OutputModule): boolean {
   }
 }
 
+/**
+ * BG à prova de cru: path relativo da API vira URL absoluta síncrona.
+ * Sem isso, um cru escapa (runtime entre trocas) e o resolveBgUrl do
+ * session descarta → receiver cai no fallback (oscilação 04/10).
+ */
+function bgOrResolved(imageUrl: string | null | undefined): string | undefined {
+  if (!imageUrl) return undefined
+  if (/^(https?:|local:|data:|blob:|file:|official:)/i.test(imageUrl)) return imageUrl
+  return resolveRemoteFileUrl(imageUrl)
+}
+
 /** Input de projeção do owner (ou null → idle). */
 function ownerInput(): ProjectionInput | { timer: TimerOpts } | null {
   switch (owner) {
@@ -176,7 +195,7 @@ function ownerInput(): ProjectionInput | { timer: TimerOpts } | null {
         // Título NUNCA no rodapé dos slides de letra — o nome da música
         // aparece só na capa (decisão Rafael 26/08).
         footerRef: '',
-        background: r.imageUrl ?? undefined,
+        background: bgOrResolved(r.imageUrl),
         isCover: r.isCover === true,
       }
     }
@@ -240,7 +259,7 @@ async function renderModuleTo(m: 'bible' | 'media', slotId: string): Promise<voi
   await palcoSession.projectTo(slotId, 'hymns', {
     text: text.split('\n').join('<br>'),
     footerRef: '',
-    background: r.imageUrl ?? undefined,
+    background: bgOrResolved(r.imageUrl),
     isCover: r.isCover === true,
   })
 }

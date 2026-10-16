@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { mount, flushPromises } from '@vue/test-utils'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
 import { createI18n } from 'vue-i18n'
 import LiturgyItemDialog from '../LiturgyItemDialog.vue'
 import liturgyLocale from '../../locales/pt-BR'
@@ -106,10 +107,12 @@ const defaultProps = {
 
 function createWrapper(props = {}) {
   const { attachTo, ...rest } = props as Record<string, unknown>
+  const pinia = createPinia()
+  setActivePinia(pinia)
   return mount(LiturgyItemDialog, {
     props: { ...defaultProps, ...rest },
     attachTo: attachTo as HTMLElement | undefined,
-    global: { plugins: [i18n] },
+    global: { plugins: [i18n, pinia] },
   })
 }
 
@@ -117,6 +120,7 @@ describe('LiturgyItemDialog — gaps (url/type/pick)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     document.body.innerHTML = ''
+    setActivePinia(createPinia())
   })
 
   it('urlRequiredMissing: site sem URL mostra erro de validação', async () => {

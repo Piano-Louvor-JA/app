@@ -2,23 +2,30 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import PageBackStack from '@shared/components/PageBackStack.vue'
+import { useMinimizablePage } from '@shared/composables/useMinimizablePage'
 
 import { GlassCard } from '@design-system/index'
-import { readEffectiveStageSettings, subscribeStageSettings } from '../../settings/services/stage-settings-runtime'
-import { resolveBackgroundImage, type StageSettings } from '../../settings/types/stage-settings'
+import { resolveBackgroundImage, stageBgCss } from '../../settings/types/stage-settings'
 
 
 import StageCustomizationDialog from '../../settings/components/StageCustomizationDialog.vue'
 import CountdownDurationInput from '../components/CountdownDurationInput.vue'
-import CountdownPreview from '../components/CountdownPreview.vue'
 import CountdownConfigDialog from '../components/CountdownConfigDialog.vue'
-import CountdownProjectFab from '../components/CountdownProjectFab.vue'
 import CountdownSavedList from '../components/CountdownSavedList.vue'
 import { useCountdownFeature } from '../composables/useCountdown'
-import { useCountdownStore } from '../stores/useCountdownStore'
-import { DEFAULT_COUNTDOWN_DISPLAY_CONFIG, type CountdownDisplayConfig, type CountdownTimeFormat, type SabbathModeConfig } from '../types/countdown'
+import { useCountdownStage } from '../composables/useCountdownStage'
+import { timeToMs } from '../services/countdown-sabbath-preview'
+import type { SabbathModeConfig } from '../types/countdown'
 
 const { t } = useI18n()
+
+// Minimizar: o estado da tela já vive na store; o retrato guarda só rolagem e miniatura.
+const { minimize, prepare } = useMinimizablePage({
+  describe: () => ({ title: t('countdown.title'), icon: 'ti-hourglass', summary: '' }),
+  capture: () => null,
+  fallbackRoute: { name: 'utilities-temporizador' },
+})
 const router = useRouter()
 
 const {
@@ -28,7 +35,6 @@ const {
   configOpen,
   displayConfigOpen,
   isRunning,
-  canStart,
   setTimeFormat,
   setBgColor,
   setTextColor,
@@ -46,20 +52,14 @@ const {
   audioVolume,
   setAudioMuted,
   setAudioVolume,
-  audioPaused,
-  setAudioPaused,
   stopAudio,
   setMode,
   setSabbathConfig,
   adjustTime,
-  start,
-  pause,
   reset,
   saveMark,
   removeSavedMark,
   clearSavedMarks,
-  toggleProjection,
-  clearProjection,
   refreshProjectionState,
 } = useCountdownFeature()
 
@@ -135,43 +135,6 @@ onUnmounted(() => {
   unsubPopupsClosed = null
 })
 
-/** Converte HH:MM → ms desde meia-noite */
-function timeToMs(val: string): number {
-  if (!/^\d{2}:\d{2}$/.test(val)) return 0
-  const [h, m] = val.split(':').map(Number)
-  return (h * 3600 + m * 60) * 1000
-}
-
-// web#175: no modo ES com cronômetro idle, o preview tem que mostrar a
-// duração DERIVADA do agendamento — não o 00:05:00 do cronômetro normal
-// ("fica fixo, não atualiza"). Regra: scheduleMode 'start' → duração =
-// Término − Início (a aula inteira, acumulado 0 — o relógio do preview
-// mostra o total configurado); 'endOnly' → Término − agora.
-const sabbathIdlePreviewRuntime = computed(() => {
-  if (effectiveConfig.value.mode !== 'sabbath') return null
-  if (runtime.value.status !== 'idle') return null
-  const sc = effectiveConfig.value.sabbathConfig
-  if (!sc || !/^\d{2}:\d{2}$/.test(sc.endTime)) return null
-  const now = new Date()
-  const nowMs = (now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds()) * 1000
-  const endMs = timeToMs(sc.endTime)
-  const endVsNow = endMs > nowMs ? endMs - nowMs : endMs - nowMs + 24 * 3600 * 1000
-  const usesStart =
-    sc.scheduleMode === 'start' && /^\d{2}:\d{2}$/.test(sc.startTime ?? '')
-  const startMs = usesStart ? timeToMs(sc.startTime ?? '') : 0
-  const durationMs = usesStart
-    ? Math.max(0, endMs - startMs)
-    : endVsNow
-  return {
-    ...runtime.value,
-    durationMs,
-    accumulatedMs: 0,
-    segmentStartedAt: null,
-    status: 'idle' as const,
-    finished: false,
-  }
-})
-
 /** Converte ms → HH:MM */
 function msToTime(ms: number): string {
   const totalSec = Math.round(ms / 1000)
@@ -214,55 +177,34 @@ const scheduleMode = computed({
 function updateEndTimeMs(ms: number) { endTimeMs.value = ms }
 function updateStartTimeMs(ms: number) { startTimeMs.value = ms }
 
-function onToggleProjection() {
-  toggleProjection()
-}
-
-const stage = ref<StageSettings>(readEffectiveStageSettings('countdown'))
-let unsubStage: (() => void) | null = null
-onMounted(() => {
-  unsubStage = subscribeStageSettings(() => {
-    stage.value = readEffectiveStageSettings('countdown')
-  })
-})
-onUnmounted(() => unsubStage?.())
+const { stage, effectiveConfig } = useCountdownStage(config)
 
 const stageBg = computed(() => ({
-  backgroundColor: stage.value.backgroundColor,
+  backgroundColor: stageBgCss(stage.value.backgroundColor),
   backgroundImage: resolveBackgroundImage(stage.value.backgroundImage)
     ? `url(${resolveBackgroundImage(stage.value.backgroundImage)})`
     : undefined,
   backgroundSize: 'cover',
   backgroundPosition: 'center',
 }))
-
-// Características do módulo vindas do StageSettings (fonte única).
-const effectiveConfig = computed(() => {
-  const mod = stage.value.countdown
-  const merged = mod ? { ...config.value, ...mod } : { ...config.value }
-  // Garante defaults pra evitar undefined no template
-  return {
-    ...DEFAULT_COUNTDOWN_DISPLAY_CONFIG,
-    ...merged,
-    allowNegative: merged.allowNegative ?? false,
-  }
-})
 </script>
 
 <template>
   <section class="countdown-view">
     <header class="countdown-view__header">
-      <button
-        type="button"
-        class="countdown-view__back"
-        :aria-label="t('countdown.backToUtilities')"
-        @click="goBack"
-      >
-        <i
-          class="ti ti-arrow-left"
-          aria-hidden="true"
-        />
-      </button>
+      <PageBackStack @minimize="minimize" @prepare="prepare">
+        <button
+          type="button"
+          class="countdown-view__back"
+          :aria-label="t('countdown.backToUtilities')"
+          @click="goBack"
+        >
+          <i
+            class="ti ti-arrow-left"
+            aria-hidden="true"
+          />
+        </button>
+      </PageBackStack>
 
       <div class="countdown-view__brand">
         <div class="countdown-view__brand-icon">
@@ -435,57 +377,14 @@ const effectiveConfig = computed(() => {
 @update:until="setUntilTime"
                           />
                         </div>
-            <CountdownPreview
-              :config="effectiveConfig"
-              :runtime="sabbathIdlePreviewRuntime ?? runtime"
-:stage="stage"
-              preview
-            />
           </div>
 
-          <div class="countdown-view__controls">
-                      <button
-                        v-if="!isRunning && effectiveConfig.mode !== 'sabbath'"
-                        type="button"
-                        class="countdown-view__ctrl countdown-view__ctrl--start"
-                        :disabled="!canStart"
-                        @click="start"
-                      >
-                        <i
-                          class="ti ti-player-play"
-                          aria-hidden="true"
-                        />
-                        {{ t('countdown.start') }}
-                      </button>
-                      <button
-                        v-if="!isRunning && effectiveConfig.mode === 'sabbath'"
-                        type="button"
-                        class="countdown-view__ctrl countdown-view__ctrl--start"
-                        :disabled="!canStart"
-                        @click="start"
-                      >
-                        <i
-                          class="ti ti-player-play"
-                          aria-hidden="true"
-                        />
-                        {{ t('countdown.start') }}
-                      </button>
-                      <button
-                        v-else
-                        type="button"
-                        class="countdown-view__ctrl countdown-view__ctrl--pause"
-                        @click="pause"
-                      >
-                        <i
-                          class="ti ti-player-pause"
-                          aria-hidden="true"
-                        />
-                        {{ t('countdown.pause') }}
-                      </button>
-
+          <div
+            v-if="effectiveConfig.mode !== 'sabbath'"
+            class="countdown-view__controls"
+          >
                       <button
                         type="button"
-                        v-if="effectiveConfig.mode !== 'sabbath'"
                         class="countdown-view__ctrl countdown-view__ctrl--reset"
                         @click="reset"
                       >
@@ -498,7 +397,6 @@ const effectiveConfig = computed(() => {
 
                       <button
                         type="button"
-                        v-if="effectiveConfig.mode !== 'sabbath'"
                         class="countdown-view__ctrl countdown-view__ctrl--save"
                         @click="saveMark"
                       >
@@ -601,42 +499,6 @@ const effectiveConfig = computed(() => {
               :aria-label="t('countdown.audioVolume')"
               @input="setAudioVolume(Number(($event.target as HTMLInputElement).value))"
             >
-            <!-- Feedback Ezequias: botão único funciona como TOGGLE —
-                 tocando = pausa (retoma de onde parou); pausado = retoma -->
-            <button
-              type="button"
-              class="countdown-view__audio-btn countdown-view__audio-btn--toggle"
-              :class="{ 'countdown-view__audio-btn--toggle-playing': !audioPaused }"
-              :aria-label="audioPaused ? t('countdown.playAudio') : t('countdown.pauseAudio')"
-              :title="audioPaused ? t('countdown.playAudio') : t('countdown.pauseAudio')"
-              @click="setAudioPaused(!audioPaused)"
-            >
-              <i
-                :class="audioPaused ? 'ti ti-player-play' : 'ti ti-player-pause'"
-                aria-hidden="true"
-              />
-            </button>
-            <label
-              class="countdown-view__audio-toggle"
-              :title="t('countdown.audioAppliesToProjection')"
-            >
-              <input
-                type="checkbox"
-                role="switch"
-                class="countdown-view__audio-toggle-input"
-                :checked="!audioMuted"
-                :aria-label="t('countdown.audioAppliesToProjection')"
-                @change="setAudioMuted(!($event.target as HTMLInputElement).checked)"
-              >
-              <span
-                class="countdown-view__audio-toggle-track"
-                :class="{ 'countdown-view__audio-toggle-track--on': !audioMuted }"
-                aria-hidden="true"
-              >
-                <span class="countdown-view__audio-toggle-thumb" />
-              </span>
-              <span class="countdown-view__audio-hint">{{ t('countdown.audioAppliesToProjection') }}</span>
-            </label>
           </div>
         </GlassCard>
       </div>
@@ -666,13 +528,6 @@ const effectiveConfig = computed(() => {
       :open="configOpen"
       scope="countdown"
       @close="closeConfig"
-    />
-
-
-    <CountdownProjectFab
-      :projecting="isProjecting"
-      @project="onToggleProjection"
-      @clear="() => void clearProjection()"
     />
   </section>
 </template>
@@ -770,33 +625,11 @@ const effectiveConfig = computed(() => {
   display: flex;
   width: 100%;
   max-width: 56rem;
-  aspect-ratio: 21 / 9;
-  max-height: min(100%, 28rem);
-  overflow: hidden;
   flex-direction: column;
 }
 
-/* web#175: modo ES — TODOS os elementos visíveis em qualquer breakpoint,
-   com folga vertical (o preview nunca pode colapsar). Largo (>1280):
-   proporção 21/9 com teto 30rem. Estreito (≤1280): altura por conteúdo,
-   sem aspect-ratio/max-height e SEM overflow:hidden (era ele que cortava
-   o display e os controles nos prints do Ezequias). O display escala
-   pelas container queries; a view tem scroll natural se precisar. */
-.countdown-view__widget--sabbath {
-  aspect-ratio: 21 / 9;
-  max-height: min(100%, 30rem);
-  min-height: 20rem;
-}
-
-/* web#175: no modo ES a área de controles tem 2 fileiras (ações + ajustes);
-   compacta pra devolver altura ao preview e manter o display centrado */
-.countdown-view__widget--sabbath .countdown-view__controls {
-  padding: 0.4rem 1.25rem 0.6rem;
-  gap: 0.4rem;
-}
-
 .countdown-view__widget--sabbath .countdown-view__adjust {
-  margin-top: 0;
+  margin-top: 0.75rem;
 }
 
 .countdown-view__widget--sabbath .countdown-view__ctrl {
@@ -833,10 +666,6 @@ const effectiveConfig = computed(() => {
     color: var(--ds-color-primary);
   }
 
-  &--toggle-playing {
-    background: color-mix(in srgb, var(--ds-color-primary) 25%, transparent);
-  }
-
   &--stop:hover {
     background: color-mix(in srgb, var(--ds-color-error, #ff5252) 25%, transparent);
     color: var(--ds-color-error, #ff5252);
@@ -846,56 +675,6 @@ const effectiveConfig = computed(() => {
 .countdown-view__audio-volume {
   width: 5.5rem;
   accent-color: var(--ds-color-primary);
-}
-
-.countdown-view__audio-hint {
-  font-size: 0.68rem;
-  color: var(--ds-color-on-surface-variant);
-  user-select: none;
-}
-
-/* Feedback Ezequias: "fazer o toggle" — controle visual ON/OFF pro áudio da projeção */
-.countdown-view__audio-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  cursor: pointer;
-  user-select: none;
-}
-
-.countdown-view__audio-toggle-input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-}
-
-.countdown-view__audio-toggle-track {
-  position: relative;
-  width: 2.1rem;
-  height: 1.15rem;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--ds-color-on-surface) 20%, transparent);
-  transition: background 0.15s ease;
-
-  &--on {
-    background: var(--ds-color-primary);
-  }
-}
-
-.countdown-view__audio-toggle-thumb {
-  position: absolute;
-  top: 0.15rem;
-  left: 0.15rem;
-  width: 0.85rem;
-  height: 0.85rem;
-  border-radius: 999px;
-  background: #fff;
-  transition: transform 0.15s ease;
-
-  .countdown-view__audio-toggle-track--on & {
-    transform: translateX(0.95rem);
-  }
 }
 
 .countdown-view__toolbar {
@@ -1150,8 +929,6 @@ const effectiveConfig = computed(() => {
   border-radius: 0.75rem;
   overflow: hidden;
   position: relative;
-  flex: 1;
-  min-height: 8rem;
   padding: 0.75rem 1.5rem 1rem;
 }
 
@@ -1261,26 +1038,6 @@ const effectiveConfig = computed(() => {
 
   .countdown-view__title {
     font-size: 1.15rem;
-  }
-
-  .countdown-view__widget {
-    min-height: 16rem;
-    max-height: min(100%, 24rem);
-  }
-
-  /* web#175: modo ES estreito — todos os elementos visíveis com folga:
-     sem aspect-ratio, sem max-height, e o preview ganha altura MÍNIMA
-     real (não colapsa) com o display escalando por container query. */
-  .countdown-view__widget--sabbath {
-    aspect-ratio: auto;
-    max-height: none;
-    overflow: visible;
-  }
-
-  .countdown-view__widget--sabbath .countdown-view__preview {
-    overflow: visible;
-    min-height: 11rem;
-    flex-shrink: 0;
   }
 
   .countdown-view__preview {

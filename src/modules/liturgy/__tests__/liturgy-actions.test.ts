@@ -19,6 +19,8 @@ const webProjectionMocks = vi.hoisted(() => ({
   openLiturgySiteControl: vi.fn(),
   openLiturgySiteOnScreens: vi.fn(),
   openLiturgyVideoControl: vi.fn(),
+  parseLiturgyWebTarget: vi.fn(() => ({})),
+  getPalcoRoute: vi.fn(() => '/palco'),
   playLiturgyLocalImageOnScreens: vi.fn(),
   playLiturgyLocalPdfOnScreens: vi.fn(),
   playLiturgyLocalPresentationOnScreens: vi.fn(),

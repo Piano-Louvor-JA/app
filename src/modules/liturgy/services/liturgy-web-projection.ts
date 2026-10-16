@@ -14,6 +14,7 @@ import { palcoSession } from '../../settings/services/palco-session'
 import {
   parseLiturgyWebTarget,
   publishLiturgyWebRuntime,
+  getPalcoRoute,
 } from './liturgy-web-runtime'
 
 function sleep(ms: number) {
@@ -352,4 +353,5 @@ export async function playLiturgyLocalPresentationOnScreens(
   presentationEngine?: PresentationEngine,
 ): Promise<boolean> {
   return openLiturgyLocalPresentation(filePath, title, true, presentationEngine)
-}
+}export { getPalcoRoute }
+export { parseLiturgyWebTarget }

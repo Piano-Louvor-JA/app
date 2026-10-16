@@ -45,6 +45,8 @@ vi.mock('../liturgy-local-video', () => ({
 }))
 
 vi.mock('../liturgy-web-projection', () => ({
+  parseLiturgyWebTarget: vi.fn(() => ({})),
+  getPalcoRoute: vi.fn(() => '/palco'),
   openLiturgyLocalImageControl: mocks.openLiturgyLocalImageControl,
   openLiturgyLocalPdfControl: mocks.openLiturgyLocalPdfControl,
   openLiturgyLocalPresentationControl: mocks.openLiturgyLocalPresentationControl,

@@ -42,8 +42,33 @@ vi.mock('vue-i18n', () => ({
   useI18n: () => ({ t: (k: string) => k, locale: { value: 'pt-BR' } }),
 }))
 
+const replaceMock = vi.fn(async () => {})
+const routeMock = vi.hoisted(() => {
+  const { reactive } = require('vue') as typeof import('vue')
+  return reactive({ query: {} as Record<string, string> })
+})
+
 vi.mock('vue-router', () => ({
-  useRouter: () => ({ push: pushMock }),
+  useRouter: () => ({ push: pushMock, replace: replaceMock }),
+  useRoute: () => routeMock,
+}))
+
+// Composable testado à parte: aqui só o contrato tela ↔ minimizar.
+const minimizeMock = vi.fn(async () => {})
+const prepareMock = vi.fn()
+vi.mock('@shared/composables/useMinimizablePage', () => ({
+  useMinimizablePage: (options: unknown) => {
+    ;(globalThis as any).__minimizeOptions = options
+    return {
+      minimize: minimizeMock,
+      prepare: prepareMock,
+      takeRestoredState: () => {
+        const restored = (globalThis as any).__restored ?? null
+        ;(globalThis as any).__restored = null
+        return restored
+      },
+    }
+  },
 }))
 
 vi.mock('@modules/media/services/custom-catalog', () => customCatalogMock)
@@ -549,6 +574,8 @@ describe('AlbumsView', () => {
     ;((body().querySelector('.albums-view__playlist') as HTMLElement).querySelector('.albums-view__playlist-play') as HTMLElement).click()
     await flushPromises()
     expect(pushMock).toHaveBeenCalledWith({ name: 'media' })
+    // o nome da playlist vai para o título do player
+    expect(playQueueMock).toHaveBeenCalledWith(expect.any(Array), 0, undefined, 'Com faixas')
     // remover faixa
     ;((body().querySelector('.albums-view__playlist') as HTMLElement).querySelector('.albums-view__playlist-track-remove') as HTMLElement).click()
     await flushPromises()

@@ -17,8 +17,8 @@ const { state } = useApiConnectivityLifecycle()
     role="status"
   >
     <i class="ti ti-cloud-off" aria-hidden="true" />
-    <span class="api-offline-banner__text">{{ t('shared.apiOffline.message') }}</span>
-    <span class="api-offline-banner__retry">{{ t('shared.apiOffline.retrying') }}</span>
+    <span class="api-offline-banner__text">{{ t('apiOffline.message') }}</span>
+    <span class="api-offline-banner__retry">{{ t('apiOffline.retrying') }}</span>
   </div>
 </template>
 

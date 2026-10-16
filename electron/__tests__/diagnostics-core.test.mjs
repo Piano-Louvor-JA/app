@@ -157,9 +157,14 @@ describe('veredito e hosts', () => {
   it('parser de hosts filtra apenas domínios da API', () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'diag-hosts-'))
     const file = path.join(dir, 'hosts')
-    writeFileSync(file, `127.0.0.1 localhost\n10.0.0.1 api.pianolouvorja.com.br # comentário\n10.0.0.2 unrelated.example\n`)
+    // API_HOSTS deriva do env (ex.: .env.local com localhost) — o parser
+    // deve casar exatamente os domínios vigiados, nada mais.
+    const watched = [...new Set([...API_HOSTS, 'api.pianolouvorja.com.br'])]
+    const lines = watched.map((hostname, i) => `10.1.0.${i} ${hostname} # comentário`)
+    lines.push('10.0.0.9 unrelated.example')
+    writeFileSync(file, `${lines.join('\n')}\n`)
     const out = readHostsOverrides(file)
-    expect(out).toEqual([{ ip: '10.0.0.1', hostname: 'api.pianolouvorja.com.br' }])
+    expect(out).toEqual(watched.map((hostname, i) => ({ ip: `10.1.0.${i}`, hostname })))
   })
 
   it('hosts inacessível reporta erro sem crash', () => {

@@ -4,6 +4,8 @@
  * Bônus: +15 por tarefa, 1x por usuário×tarefa×semana (idempotente no servidor).
  */
 
+import { defaultApiOrigin } from '@shared/services/api-env'
+
 import { getAuthSession, saveSession } from "@modules/media/services/auth-client";
 
 export type WeeklyTask = {
@@ -15,7 +17,7 @@ export type WeeklyTask = {
 
 function communityBaseUrl(): string {
 	const base =
-		import.meta.env.VITE_PALCO_API_URL ?? "https://api.pianolouvorja.com.br";
+		import.meta.env.VITE_PALCO_API_URL ?? defaultApiOrigin();
 	return `${base.replace(/\/$/, "")}/v1/custom`;
 }
 

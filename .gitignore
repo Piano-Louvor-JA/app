@@ -12,6 +12,7 @@ node_modules
 dist
 dist-ssr
 dist-electron/
+build/diagnostics-dsn.txt
 coverage
 *.local
 
@@ -50,10 +51,14 @@ __screenshots__/
 .env.*
 !.env.example
 
+# Playwright (artefatos de execução E2E)
+test-results/
+playwright-report/
+
 # SDD planning (internal)
 .planning/
 dist-windows/
 reports/mutation/
 .stryker-tmp/
-packaging/flatpak/.flatpak-builder/
 voidbr/
+.worktrees/

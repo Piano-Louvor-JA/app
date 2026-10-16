@@ -1,20 +1,25 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, provide, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import { usePageTransition } from '@design-system/composables'
-import { DockFooter, GradientBackground } from '@design-system/index'
-import type { DockNavItem } from '@design-system/types/navigation'
+import { DockFooter, GradientBackground, HistoryNav, MinimizedPagesBar } from '@design-system/index'
+import type { DockNavItem, HistoryNavDot, MinimizedBarItem } from '@design-system/types/navigation'
 import AuthAccountDialog from '@modules/auth/components/AuthAccountDialog.vue'
 import { useAuth, setNotify } from '@modules/auth/composables/useAuth'
 import { useBibleStore } from '@modules/bible/stores/useBibleStore'
+import BibleChrome from '@modules/bible/components/BibleChrome.vue'
 import BibleInAppProjection from '@modules/bible/components/BibleInAppProjection.vue'
+import ClockChrome from '@modules/clock/components/ClockChrome.vue'
 import ClockProjectionView from '@modules/clock/views/ClockProjectionView.vue'
 import { useClockStore } from '@modules/clock/stores/useClockStore'
+import CountdownChrome from '@modules/countdown/components/CountdownChrome.vue'
 import CountdownProjectionView from '@modules/countdown/views/CountdownProjectionView.vue'
+import RandomChrome from '@modules/random/components/RandomChrome.vue'
 import RandomProjectionView from '@modules/random/views/RandomProjectionView.vue'
+import TimerChrome from '@modules/timer/components/TimerChrome.vue'
 import TimerProjectionView from '@modules/timer/views/TimerProjectionView.vue'
 import InAppProjectionOverlay from '@shared/components/InAppProjectionOverlay.vue'
 import { useCountdownStore } from '@modules/countdown/stores/useCountdownStore'
@@ -33,6 +38,17 @@ import {
 import { subscribeDisplaysChanged } from '@modules/settings/services/display-service'
 import { useProjectionStore } from '@modules/settings/stores/useProjectionStore'
 import { mainNavRoutes } from '@shared/constants/navigation'
+import { useNavigationHistory } from '@shared/composables/useNavigationHistory'
+import { useHistoryNavShortcuts } from '@shared/composables/useHistoryNavShortcuts'
+import { describeHistoryEntry } from '@shared/services/navigation-history-label'
+import { useMinimizedPagesStore } from '@shared/stores/useMinimizedPagesStore'
+import {
+  requestInstantPageTransition,
+  usePageTransitionOverride,
+} from '@shared/composables/useInstantPageTransition'
+import { findMinimizedItemRect, playGenie, startGenieGhost } from '@shared/services/genie-animation'
+import { previewArea } from '@shared/services/page-preview'
+import { VIEW_SCROLL_MEMORY, useViewScrollMemory } from '@shared/composables/useViewScrollMemory'
 import logoUrl from '@assets/brand/logo-louvor-ja.svg'
 import CodenameLogo from '@assets/brand/CodenameLogo.vue'
 import { APP_VERSION } from '@shared/constants/app'
@@ -41,6 +57,16 @@ const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 const { transitionName } = usePageTransition()
+// minimizar/reabrir pedem troca de página sem fade: o efeito gênio faz o papel
+const { name: pageTransitionName, settle: settlePageTransition } =
+  usePageTransitionOverride(transitionName)
+
+// Voltar a uma tela restaura a rolagem de onde o operador parou (sessão).
+const mainEl = ref<HTMLElement | null>(null)
+const viewScrollMemory = useViewScrollMemory(mainEl)
+const restoreViewScroll = viewScrollMemory.restore
+// páginas minimizáveis leem/semeiam a rolagem do <main> por aqui
+provide(VIEW_SCROLL_MEMORY, viewScrollMemory)
 
 const {
   hasSession: hasMediaSession,
@@ -333,6 +359,118 @@ const navItems = computed<DockNavItem[]>(() =>
   })),
 )
 
+const history = useNavigationHistory()
+const {
+  entries: historyEntries,
+  dots: historyIndexes,
+  canGoBack: canGoBackInHistory,
+  canGoForward: canGoForwardInHistory,
+} = history
+
+useHistoryNavShortcuts({ back: history.back, forward: history.forward })
+
+const minimizedPages = useMinimizedPagesStore()
+
+const minimizedItems = computed<MinimizedBarItem[]>(() =>
+  minimizedPages.items.map((page) => ({
+    key: page.fullPath,
+    title: page.title,
+    icon: page.icon,
+    summary: page.summary,
+    preview: page.preview,
+    closeLabel: t('minimize.close', { title: page.title }),
+  })),
+)
+
+/** De onde a página reaberta "sai" (item da barra) para o efeito gênio. */
+let genieFrom: DOMRect | null = null
+let genieTimer: ReturnType<typeof setTimeout> | null = null
+
+/** Fade curto da imagem do efeito ao sair, com a página real já pintada por baixo. */
+const GHOST_FADE_MS = 120
+
+/** Se a página nova não entrar (navegação cancelada, mesma tela), libera assim mesmo. */
+const VIEW_ENTER_LIMIT_MS = 1000
+
+function nextFrame(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => resolve()))
+}
+
+/** Resolve quando a próxima página terminar de entrar (ou no limite de tempo). */
+let viewEntered: (() => void) | null = null
+function waitViewEnter(): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(done, VIEW_ENTER_LIMIT_MS)
+    function done() {
+      clearTimeout(timer)
+      if (viewEntered === done) viewEntered = null
+      resolve()
+    }
+    viewEntered = done
+  })
+}
+
+/** Reabre uma página minimizada como estava (rolagem + retrato). */
+async function onOpenMinimized(fullPath: string) {
+  // já está aberta (o operador voltou por outro caminho): só sai da barra
+  if (route.fullPath === fullPath) {
+    minimizedPages.close(fullPath)
+    return
+  }
+  // posição do item antes de ele sair da barra
+  const from = findMinimizedItemRect(fullPath)
+  const page = minimizedPages.reopen(fullPath)
+  if (!page) return
+  viewScrollMemory.seed(fullPath, page.scroll)
+
+  // com miniatura: a IMAGEM cresce do item até a tela (barato, no compositor)
+  // e, AO MESMO TEMPO, a página real monta por baixo, transparente; quando as
+  // duas coisas acabam, a página aparece e a imagem esmaece rápido
+  const main = mainEl.value
+  const ghost = startGenieGhost(page.preview, previewArea(main), from, 'restore')
+  if (!ghost) {
+    // sem miniatura: a própria página cresce a partir do item ao entrar
+    genieFrom = from
+    // se a tela não for recriada (mesma página por trás), o efeito não fica pendurado
+    if (genieTimer) clearTimeout(genieTimer)
+    genieTimer = setTimeout(() => {
+      genieFrom = null
+    }, 2000)
+  }
+  const entered = ghost ? waitViewEnter() : null
+  if (ghost && main) main.style.opacity = '0'
+  requestInstantPageTransition()
+  await router.push(fullPath)
+  if (!ghost) return
+  await Promise.all([ghost.finished, entered])
+  // um quadro com a página já pintada por baixo antes de trocar
+  await nextFrame()
+  if (main) main.style.opacity = ''
+  void ghost.remove(GHOST_FADE_MS)
+}
+
+/** Página nova terminou de entrar: libera a transição e restaura a rolagem. */
+function onViewAfterEnter() {
+  viewEntered?.()
+  settlePageTransition()
+  restoreViewScroll(route.fullPath)
+}
+
+/** Página nova entrando: se veio da barra, cresce a partir do item. */
+function onViewEnter(el: Element) {
+  if (!genieFrom) return
+  const from = genieFrom
+  genieFrom = null
+  void playGenie(el, from, 'restore')
+}
+
+const historyDots = computed<HistoryNavDot[]>(() =>
+  historyIndexes.value.map((dot) => ({
+    ...dot,
+    label: describeHistoryEntry(historyEntries.value[dot.index], t),
+  })),
+)
+
 function onNavigate(key: string) {
   const item = mainNavRoutes.find((nav) => nav.key === key)
   if (item) {
@@ -349,7 +487,10 @@ function viewKey(viewRoute: typeof route) {
 </script>
 
 <template>
-  <GradientBackground class="app-shell">
+  <GradientBackground
+    class="app-shell"
+    :class="{ 'app-shell--has-minimized': minimizedPages.hasItems }"
+  >
     <header class="app-shell__header">
       <div class="app-shell__brand-group" :aria-label="t('app.name')">
         <img
@@ -426,9 +567,14 @@ function viewKey(viewRoute: typeof route) {
       </div>
     </header>
 
-    <main class="app-shell__main">
+    <main ref="mainEl" class="app-shell__main">
       <RouterView v-slot="{ Component, route: viewRoute }">
-        <Transition :name="transitionName" mode="out-in">
+        <Transition
+          :name="pageTransitionName"
+          mode="out-in"
+          @enter="onViewEnter"
+          @after-enter="onViewAfterEnter"
+        >
           <component
             :is="Component"
             :key="viewKey(viewRoute)"
@@ -438,6 +584,12 @@ function viewKey(viewRoute: typeof route) {
     </main>
 
     <MediaChrome />
+
+    <BibleChrome />
+    <CountdownChrome />
+    <TimerChrome />
+    <ClockChrome />
+    <RandomChrome />
 
     <BibleInAppProjection
       v-if="bibleInAppPreview"
@@ -487,6 +639,29 @@ function viewKey(viewRoute: typeof route) {
     >
       <ClockProjectionView embedded />
     </InAppProjectionOverlay>
+
+    <div class="app-shell__history">
+      <HistoryNav
+        :dots="historyDots"
+        :can-go-back="canGoBackInHistory"
+        :can-go-forward="canGoForwardInHistory"
+        :nav-label="t('nav.history.label')"
+        :back-label="t('nav.history.back')"
+        :forward-label="t('nav.history.forward')"
+        @back="history.back"
+        @forward="history.forward"
+        @go="history.goTo"
+      />
+    </div>
+
+    <div v-if="minimizedPages.hasItems" class="app-shell__minimized">
+      <MinimizedPagesBar
+        :items="minimizedItems"
+        :nav-label="t('minimize.bar')"
+        @open="(fullPath: string) => void onOpenMinimized(fullPath)"
+        @close="minimizedPages.close"
+      />
+    </div>
 
     <DockFooter
       :items="navItems"
@@ -661,6 +836,46 @@ function viewKey(viewRoute: typeof route) {
   }
 }
 
+/* Faixa voltar/avançar + pontos: logo acima do dock, abaixo das projeções in-app. */
+/* Com páginas minimizadas, a barra entra entre a faixa de histórico e o dock. */
+.app-shell {
+  --app-shell-minimized-offset: 0px;
+}
+
+.app-shell--has-minimized {
+  --app-shell-minimized-offset: var(--ds-minimized-bar-height);
+}
+
+.app-shell__minimized {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: var(--ds-dock-height);
+  z-index: 45;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+
+  > * {
+    pointer-events: auto;
+  }
+}
+
+.app-shell__history {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--ds-dock-height) + var(--app-shell-minimized-offset));
+  z-index: 45;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+
+  > * {
+    pointer-events: auto;
+  }
+}
+
 .app-shell__main {
   position: relative;
   z-index: 1;
@@ -669,7 +884,9 @@ function viewKey(viewRoute: typeof route) {
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
-  padding-bottom: var(--ds-dock-height);
+  padding-bottom: calc(
+    var(--ds-dock-height) + var(--ds-history-nav-height) + var(--app-shell-minimized-offset)
+  );
 
   /* View ativa (RouterView não cria wrapper) preenche a área útil. */
   > * {

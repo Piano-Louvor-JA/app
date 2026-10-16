@@ -17,6 +17,7 @@ const invalidateTrackMediaCache = vi.hoisted(() => vi.fn());
 const peekTrackDownloadCache = vi.hoisted(() => vi.fn(() => undefined));
 vi.mock("@shared/services/track-media", () => ({
 	invalidateTrackMediaCache,
+	onTrackMediaChanged: vi.fn(),
 	peekTrackDownloadCache,
 }));
 
@@ -150,5 +151,24 @@ describe("L255-257: catch com cancelRequested -> idle", () => {
 		const result = await store.downloadAlbum(1);
 		expect(result).toBe("idle");
 		spy.mockRestore();
+	});
+});
+
+describe("evento louvorja:catalog-refreshed", () => {
+	const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+	it("Central que abriu vazia recarrega quando o cache é curado", async () => {
+		loadLibraryCategories.mockResolvedValue([]);
+		const store = useLocalLibraryStore();
+		await store.refreshCollections();
+		expect(store.categories).toEqual([]);
+
+		loadLibraryCategories.mockResolvedValue([
+			{ id: "c1", name: "CDs", albums: [album(1)] },
+		]);
+		window.dispatchEvent(new CustomEvent("louvorja:catalog-refreshed"));
+		await flush();
+
+		expect(store.categories.map((c) => c.id)).toEqual(["c1"]);
 	});
 });

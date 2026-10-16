@@ -88,6 +88,7 @@ vi.mock("@modules/media/services/open-music-player", () => ({
 
 vi.mock("@shared/services/track-media", () => ({
   invalidateTrackMediaCache: vi.fn(),
+  onTrackMediaChanged: vi.fn(),
   peekTrackDownloadCache: vi.fn(() => null),
 }));
 
@@ -389,7 +390,7 @@ describe("useAlbums", () => {
       const ok = await api.playAllInActiveCollection();
       expect(ok).toBe(false);
     });
-  
+
 describe("useAlbums — gaps isDesktop/albumId", () => {
   it("não-desktop: onMounted não chama refreshCollections", async () => {
     desktopFlag.value = false;

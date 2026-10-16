@@ -15,6 +15,9 @@ const { mockReconcileAlbumsForMusic } = vi.hoisted(() => ({
   mockReconcileAlbumsForMusic: vi.fn(),
 }))
 
+// Listener registry do mock (badge live, 14/10)
+const { tmSubs } = vi.hoisted(() => ({ tmSubs: new Set<(id: number, dl: boolean) => void>() }))
+
 const { mockIsDesktopApp } = vi.hoisted(() => ({
   mockIsDesktopApp: vi.fn(() => true),
 }))
@@ -27,6 +30,8 @@ vi.mock('@shared/services/track-media', () => ({
   downloadTrackMedia: mockDownloadTrackMedia,
   isTrackMediaDownloaded: mockIsTrackMediaDownloaded,
   deleteTrackMedia: mockDeleteTrackMedia,
+  onTrackMediaChanged: (l: (id: number, dl: boolean) => void) => tmSubs.add(l),
+  offTrackMediaChanged: (l: (id: number, dl: boolean) => void) => tmSubs.delete(l),
 }))
 
 vi.mock('@shared/services/desktop-bridge', () => ({
@@ -163,5 +168,65 @@ describe('MusicTrackActions — remove offline + cancel (gaps)', () => {
     await flushPromises()
     expect(mockDownloadTrackMedia).toHaveBeenCalledWith(123, expect.objectContaining({ onProgress: expect.any(Function) }))
     wrapper.unmount()
+  })
+})
+
+describe('MusicTrackActions — badge live via evento track-media (14/10)', () => {
+  const defaultProps = {
+    hasInstrumental: true,
+    busy: false,
+    variant: 'plain',
+    musicId: 123,
+    trackName: 'Test Track',
+    rowHovered: true,
+    allowOfflineRemove: true,
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    tmSubs.clear()
+    mockIsDesktopApp.mockReturnValue(true)
+    mockIsTrackMediaDownloaded.mockResolvedValue(false) // NÃO baixado no mount
+    ;(useLocalLibraryStore as any).mockReturnValue({
+      reconcileAlbumsForMusic: mockReconcileAlbumsForMusic,
+    })
+  })
+
+  it('evento changed(id, true) de outro fluxo → badge aparece sem interação', async () => {
+    const wrapper = mount(MusicTrackActions, {
+      props: defaultProps,
+      global: { plugins: [i18n] },
+    })
+    await flushPromises()
+    expect(wrapper.find('.music-track-actions__check').exists()).toBe(false)
+
+    // download termina em OUTRO fluxo (pre-play) → evento broadcast
+    tmSubs.forEach((s) => s(123, true))
+    await flushPromises()
+    expect(wrapper.find('.music-track-actions__check').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('evento de outro id não mexe no badge', async () => {
+    const wrapper = mount(MusicTrackActions, {
+      props: defaultProps,
+      global: { plugins: [i18n] },
+    })
+    await flushPromises()
+    tmSubs.forEach((s) => s(999, true))
+    await flushPromises()
+    expect(wrapper.find('.music-track-actions__check').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('unmount remove listener (sem leak)', async () => {
+    const wrapper = mount(MusicTrackActions, {
+      props: defaultProps,
+      global: { plugins: [i18n] },
+    })
+    await flushPromises()
+    expect(tmSubs.size).toBe(1)
+    wrapper.unmount()
+    expect(tmSubs.size).toBe(0)
   })
 })

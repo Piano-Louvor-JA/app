@@ -101,7 +101,7 @@ describe('StageCustomizationCard', () => {
     const swatches = w.findAll('.stage-custom__swatch')
     expect(swatches.length).toBeGreaterThan(0)
     // swatches 4+ são os de COR DE TEXTO (mesma cor do bg ativo); usa um de bg (#000000)
-    await swatches[1].trigger('click')
+    await w.find('[aria-label="Preto"]').trigger('click')
     expect(store.settings.backgroundColor).toBe('#000000')
   })
 

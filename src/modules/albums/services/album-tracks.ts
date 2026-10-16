@@ -247,7 +247,10 @@ export async function loadAlbumLyric(
     }
   }
 
-  const record = await readOrFetchCatalog<CatalogMusicRecord>(`music_${musicId}`)
+  const record = await readOrFetchCatalog<CatalogMusicRecord>(
+    // Contrato compat.ts: record individual sem prefixo de idioma (music_{id}).
+    `music_${musicId}`,
+  )
   if (!record) return null
 
   const raw = record.lyric

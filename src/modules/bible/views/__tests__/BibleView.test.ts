@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 /**
  * BibleView — template completo com useBibleReader mockado:
- * alerta de erro (retry/dismiss), loading, catálogo vazio, body (nav + reader),
- * FAB de projeção (project/clear) e handlers de versículo (prev/next).
+ * alerta de erro (retry/dismiss), loading, catálogo vazio, body (nav + reader)
+ * e handlers de versículo (prev/next). O FAB de projeção vive no BibleChrome.
  * Componentes filhos são stubbed — o objetivo é cobrir o <template> do view.
  */
 import { mount } from '@vue/test-utils'
@@ -37,7 +37,6 @@ function defaultRefs() {
     chapterTitle: ref('Gênesis 1'),
     verseEntries: ref([{ verse: 1, text: 'No princípio criou Deus' }]),
     hasProjection: computed(() => true),
-    previewSnippet: computed(() => 'No princípio'),
   }
 }
 
@@ -86,14 +85,6 @@ const ReaderStub = {
   </div>`,
   emits: ['update:verse-search-query', 'select-verse', 'previous-verse', 'next-verse', 'clear-projection'],
 }
-const FabStub = {
-  name: 'BibleProjectFab',
-  template: `<div class="fab-stub">
-    <button class="fab-project" @click="$emit('project')" />
-    <button class="fab-clear" @click="$emit('clear')" />
-  </div>`,
-  emits: ['project', 'clear'],
-}
 const PalcoStub = { name: 'PalcoRouteSelect', template: '<div class="palco-route-stub" />' }
 
 function mountView() {
@@ -104,7 +95,6 @@ function mountView() {
         BibleToolbar: ToolbarStub,
         BibleNavPanel: NavStub,
         BibleVerseList: ReaderStub,
-        BibleProjectFab: FabStub,
         PalcoRouteSelect: PalcoStub,
       },
     },
@@ -120,17 +110,17 @@ describe('BibleView — estados do template', () => {
     for (const fn of [
       'clearError', 'selectVersion', 'selectBook', 'selectChapter', 'selectVerse',
       'clearSelection', 'goToAdjacentVerse', 'setTestamentFilter', 'toggleNavPanel',
-      'toggleProjection', 'clearProjectionWindow', 'refresh',
+      'refresh',
     ]) {
       mockState[fn] = vi.fn()
     }
   })
 
-  it('body padrão: nav + reader renderizados, FAB habilitado', () => {
+  it('body padrão: nav + reader renderizados, sem FAB próprio', () => {
     const w = mountView()
     expect(w.find('.nav-stub').exists()).toBe(true)
     expect(w.find('.reader-stub').exists()).toBe(true)
-    expect(w.find('.fab-stub').exists()).toBe(true)
+    expect(w.find('.bible-project-fab').exists()).toBe(false)
     expect(w.find('.bible-view__body--reader-only').exists()).toBe(false)
   })
 
@@ -165,14 +155,6 @@ describe('BibleView — estados do template', () => {
     defaults.versions.value = []
     const w = mountView()
     expect(w.find('.bible-view__state').exists()).toBe(true)
-  })
-
-  it('FAB: project chama toggleProjection; clear chama clearProjectionWindow', async () => {
-    const w = mountView()
-    await w.find('.fab-project').trigger('click')
-    expect(mockState.toggleProjection).toHaveBeenCalled()
-    await w.find('.fab-clear').trigger('click')
-    expect(mockState.clearProjectionWindow).toHaveBeenCalled()
   })
 
   it('toolbar emite: select-version, toggle-nav e search query', async () => {
@@ -215,16 +197,5 @@ describe('BibleView — estados do template', () => {
     reader.vm.$emit('update:verse-search-query', 'luz')
     await Promise.resolve()
     expect(defaults.verseSearchQuery.value).toBe('luz')
-  })
-
-  it('projection desabilitada: FAB disabled', () => {
-    defaults = {
-      ...defaults,
-      hasProjection: computed(() => false),
-      projection: ref({ verses: [], text: '' }),
-    }
-    const w = mountView()
-    // fab disabled é prop do stub — só garante que não quebra
-    expect(w.find('.fab-stub').exists()).toBe(true)
   })
 })

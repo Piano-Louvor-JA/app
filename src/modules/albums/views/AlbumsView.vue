@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useMediaStore } from '@modules/media/stores/useMediaStore'
 
 import { GlassCard } from '@design-system/index'
+import { useMinimizablePage } from '@shared/composables/useMinimizablePage'
 import PalcoRouteSelect from '@modules/settings/components/PalcoRouteSelect.vue'
 import type { LibraryAlbum } from '@modules/sync/types/library'
 import { getShowCustomCollections, setShowCustomCollections } from '../visibility'
@@ -31,6 +32,7 @@ import {
 import { parsePlaylistsImport, serializePlaylists } from '../services/playlist-io'
 
 const { t } = useI18n()
+const route = useRoute()
 const router = useRouter()
 const mediaStore = useMediaStore()
 const playlists = ref<Playlist[]>(listPlaylists())
@@ -138,6 +140,40 @@ const importFeedback = ref('')
 
 /* ---------- Modais (padrão web): Playlists + Minhas Coletâneas ---------- */
 const playlistsModalOpen = ref(false)
+
+/**
+ * Minimizar a janela de Playlists: ela fecha e vai para a barra como
+ * /albums?painel=playlists; reabrir pela barra cai aqui e reabre a janela.
+ */
+const PLAYLISTS_PANEL = 'playlists'
+const { minimize: minimizePlaylists, prepare: preparePlaylists, takeRestoredState } = useMinimizablePage({
+  describe: () => ({
+    title: t('albums.playlists.title'),
+    icon: 'ti-playlist',
+    summary: t('minimize.playlistCount', { n: playlists.value.length }),
+  }),
+  capture: () => null,
+  fallbackRoute: { name: 'albums' },
+  fullPath: () => `/albums?painel=${PLAYLISTS_PANEL}`,
+  onMinimized: () => {
+    playlistsModalOpen.value = false
+  },
+  // o efeito gênio anima a janela, não a Central de Mídia por trás
+  animateEl: () => document.querySelector('.albums-view__modal-panel'),
+})
+
+watch(
+  () => route.query.painel,
+  (painel) => {
+    if (painel !== PLAYLISTS_PANEL) return
+    takeRestoredState()
+    playlistsModalOpen.value = true
+    // o parâmetro só serve para reabrir; o endereço volta a ser /albums
+    void router.replace({ name: 'albums' })
+  },
+  { immediate: true },
+)
+
 const customModalOpen = ref(false)
 const customCollections = ref<CustomCollectionSummary[]>([])
 const isLoadingCustomCollections = ref(false)
@@ -221,7 +257,7 @@ function onImportFile(event: Event) {
 
 async function playPlaylist(playlist: Playlist) {
   if (playlist.items.length === 0) return
-  await mediaStore.playQueue(playlist.items, 0)
+  await mediaStore.playQueue(playlist.items, 0, undefined, playlist.name)
   await router.push({ name: 'media' })
 }
 
@@ -466,6 +502,17 @@ async function runAction(
               <i class="ti ti-playlist" aria-hidden="true" />
               <h2 id="playlists-title">{{ t('albums.playlists.title') }}</h2>
             </div>
+            <button
+              type="button"
+              class="albums-view__playlists-minimize"
+              :aria-label="t('minimize.page')"
+              :title="t('minimize.page')"
+              @click="minimizePlaylists"
+              @pointerenter="preparePlaylists"
+              @focus="preparePlaylists"
+            >
+              <i class="ti ti-minus" aria-hidden="true" />
+            </button>
             <button
               type="button"
               class="albums-view__playlists-io"
@@ -1428,6 +1475,11 @@ async function runAction(
   flex-wrap: wrap;
 }
 
+/* – e x lado a lado à direita (o – empurra os dois para o fim) */
+.albums-view__playlists-minimize {
+  margin-left: auto;
+}
+
 .albums-view__playlists-heading {
   display: inline-flex;
   align-items: center;
@@ -1702,7 +1754,8 @@ async function runAction(
     padding: 0.75rem;
   }
 }
-.albums-view__playlists-io {
+.albums-view__playlists-io,
+.albums-view__playlists-minimize {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1715,11 +1768,24 @@ async function runAction(
   font-size: 0.95rem;
   transition: all 0.2s ease;
 }
-.albums-view__playlists-io:hover:not(:disabled) {
+.albums-view__playlists-io:hover:not(:disabled),
+.albums-view__playlists-minimize:hover {
   color: var(--ds-color-primary);
   border-color: color-mix(in srgb, var(--ds-color-primary) 45%, transparent);
 }
 .albums-view__playlists-io:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* – da janela: mesmo destaque do – das telas (cor do tema) */
+.albums-view__playlists-minimize {
+  border-color: color-mix(in srgb, var(--ds-color-primary) 60%, transparent);
+  background: color-mix(in srgb, var(--ds-color-primary) 18%, transparent);
+  color: var(--ds-color-primary);
+}
+
+.albums-view__playlists-minimize:hover {
+  background: var(--ds-color-primary);
+  color: var(--ds-color-on-primary);
+}
 .albums-view__playlists-feedback {
   flex-basis: 100%;
   margin: 0;

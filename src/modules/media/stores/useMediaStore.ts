@@ -33,6 +33,7 @@ import {
   playMediaAudio,
   resolveMusicAudioUrl,
   resolveSlideImageUrl,
+  resolveRemoteFileUrl,
   stopAllMediaAudio,
   switchMediaAudioElement,
 } from '../services/media-audio'
@@ -76,6 +77,8 @@ export const useMediaStore = defineStore('media', () => {
   // Fila de reprodução (spec playlist RF-03): vazia = comportamento atual.
   const queue = ref<QueueItem[]>([])
   const queueIndex = ref(-1)
+  /** Nome da fila (playlist) para o título do player; null = coletânea do hino. */
+  const queueLabel = ref<string | null>(null)
   const isProjecting = computed({
     get: () => isProjectingRaw.value,
     set: (v: boolean) => {
@@ -237,8 +240,16 @@ export const useMediaStore = defineStore('media', () => {
       title: session.value.title,
       subtitle: session.value.subtitle,
       lyric: stripHtmlBreaks(slide.lyric),
-      imageUrl: resolvedSlideImageUrl.value ?? slide.imageUrl,
+      // Sem cru: enquanto o resolved async não chega, URL absoluta síncrona
+      // (mesma origem do resolved p/ não-baixado). Path cru chegava ao palco,
+      // virava bg undefined e o receiver caía no fallback a cada troca de
+      // slide (oscilação fallback↔imagem reportada 04/10).
+      imageUrl:
+        resolvedSlideImageUrl.value ??
+        (slide.imageUrl ? resolveRemoteFileUrl(slide.imageUrl) : null),
       imagePosition: slide.imagePosition,
+      // Frame PDF/PPT (frame-slide): data:image/ direto, sem véu (paridade receiver).
+      frameDataUrl: slide.frameDataUrl ?? null,
       isCover: slide.isCover,
       slideIndex: slideIndex.value,
       slideCount: session.value.slides.length,
@@ -486,6 +497,7 @@ export const useMediaStore = defineStore('media', () => {
     if (!params.keepQueue) {
       queue.value = []
       queueIndex.value = -1
+      queueLabel.value = null
     }
 
     // Mesma faixa: troca de modo sem reset (legado Media.open + isSameSong).
@@ -591,6 +603,12 @@ export const useMediaStore = defineStore('media', () => {
     minimized.value =
       params.minimized ?? loadProjectionSettings().autoMinimizePlayer === true
 
+    // A janela de projeção sobe junto com o áudio, não depois dele.
+    const shouldProject = params.project !== false
+    const retainProjection = shouldProject && Boolean(params.keepQueue) && isProjecting.value
+    const projectionTask =
+      shouldProject && !retainProjection ? startProjection() : null
+
     if (playbackUrl) {
       bindAudio()
       const audio = getMediaAudioElement()
@@ -612,17 +630,15 @@ export const useMediaStore = defineStore('media', () => {
     // Hino tocando = PROJETANDO, sempre (decisão Rafael 27/08): destino vem
     // do seletor na biblioteca (Espelhar/TV individual). Antes: minimizado
     // não projetava — operador tinha que clicar Projetar a cada hino.
-    if (params.project !== false) {
-      const retainProjection = params.keepQueue && isProjecting.value
-      if (retainProjection) {
-        // Fila: janela já está aberta — não chamar startProjection de novo
-        // (window.open sem gesto do usuário falha e zera isProjecting).
-        isProjecting.value = true
-        publishProjectionState()
-        if (!projectionWatchTimer) startProjectionWatch()
-      } else {
-        await startProjection()
-      }
+    if (retainProjection) {
+      // Fila: janela já está aberta — não chamar startProjection de novo
+      // (window.open sem gesto do usuário falha e zera isProjecting).
+      isProjecting.value = true
+      publishProjectionState()
+      if (!projectionWatchTimer) startProjectionWatch()
+    } else if (projectionTask) {
+      await projectionTask
+      publishProjectionState()
     }
 
     return { ok: true, warningKey }
@@ -789,8 +805,14 @@ export const useMediaStore = defineStore('media', () => {
   }
 
   /** Substitui a fila e toca a partir de startIndex. */
-  async function playQueue(items: QueueItem[], startIndex = 0, mode?: MediaPlaybackMode): Promise<void> {
+  async function playQueue(
+    items: QueueItem[],
+    startIndex = 0,
+    mode?: MediaPlaybackMode,
+    label: string | null = null,
+  ): Promise<void> {
     queue.value = items
+    queueLabel.value = label
     const first = items[startIndex]
     if (!first) return
     await playQueueItem(first, mode)
@@ -822,6 +844,7 @@ export const useMediaStore = defineStore('media', () => {
   function clearQueue(): void {
     queue.value = []
     queueIndex.value = -1
+    queueLabel.value = null
   }
 
   /** Há fila ativa? (UI: next/prev do player = faixa; sem fila = slides) */
@@ -1136,6 +1159,10 @@ export const useMediaStore = defineStore('media', () => {
       publishProjectionState()
       return true
     }
+    // Publica o slide antes de mostrar a janela aquecida, para ela já
+    // abrir com a capa em vez de esperar o boot.
+    isProjecting.value = true
+    publishProjectionState()
     const opened = await openProjectionModule('media')
     if (opened) {
       projectingTvsOnly.value = false
@@ -1276,6 +1303,7 @@ export const useMediaStore = defineStore('media', () => {
     previousSlide,
     queue,
     queueIndex,
+    queueLabel,
     playQueue,
     playAlbumQueue,
     playQueueItem,

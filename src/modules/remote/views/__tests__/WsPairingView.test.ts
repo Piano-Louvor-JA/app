@@ -389,4 +389,3 @@ describe('WsPairingView — geração do scan', () => {
     vi.useRealTimers()
   })
 })
-

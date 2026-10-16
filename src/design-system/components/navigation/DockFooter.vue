@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import type { DockNavItem } from "@design-system/types/navigation";
+
+const { t } = useI18n()
 
 const props = withDefaults(
 	defineProps<{
@@ -25,7 +28,7 @@ function onSelect(key: string) {
 </script>
 
 <template>
-  <nav class="ds-dock" aria-label="Navegação principal">
+  <nav class="ds-dock" :aria-label="t('a11y.mainNav')">
     <button
       v-for="item in items"
       :key="item.key"

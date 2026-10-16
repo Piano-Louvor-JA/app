@@ -1,4 +1,12 @@
 export default {
+  windowControls: {
+    close: 'Cerrar',
+    minimize: 'Minimizar',
+    maximize: 'Maximizar',
+  },
+  a11y: {
+    mainNav: 'Navegación principal',
+  },
   apiOffline: {
     message: 'Sin conexi\u00f3n con el servicio \u2014 verifica tu internet',
     retrying: 'Intentando reconectar...',
@@ -12,8 +20,12 @@ export default {
     nameJa: 'JA',
   },
   common: {
+    close: 'Cerrar',
     comingSoon: 'Próximamente',
+    openFolder: 'Abrir carpeta',
+    addToPlaylist: 'Añadir a la lista',
     cancel: 'Cancelar',
+    copied: '¡Copiado!',
   },
   monitors: {
     selectScreens: 'Seleccionar pantallas',
@@ -46,7 +58,25 @@ export default {
     bible: 'Biblia',
     utilities: 'Utilidades',
     settings: 'Configuraciones',
+    history: {
+      label: 'Historial de navegación',
+      back: 'Atrás',
+      forward: 'Adelante',
+      goTo: 'Ir a {label}',
     },
+    historyDetail: {
+      player: 'Reproductor',
+      editor: 'Editor',
+    },
+    },
+  minimize: {
+    playlistCount: '{n} lista(s)',
+    pageNumber: 'Página {n}',
+    bar: 'Páginas minimizadas',
+    close: 'Cerrar {title}',
+    page: 'Minimizar página',
+    search: 'Búsqueda: {q}',
+  },
   sync: {
     downloadQueue: {
       title: 'Descargas',

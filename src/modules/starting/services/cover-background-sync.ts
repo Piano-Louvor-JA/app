@@ -132,7 +132,7 @@ export async function ensureAlbumCovers(
           if (!relativePath) return
           const fullUrl = resolveMediaUrl(urlImage)
           const ok = await bridge.media.download(fullUrl, 'covers', relativePath)
-          if (ok) downloaded += 1
+          if (ok === true) downloaded += 1
         }),
       )
 

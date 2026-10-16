@@ -29,5 +29,7 @@ export default {
     clearAll: 'Clear All',
     noSavedTimes: 'No saved times',
     removeSaved: 'Remove saved time',
+    chromeDragHint: 'Drag to move · double-click to return to the corner',
+    openStopwatch: 'Open the Stopwatch',
   },
 }

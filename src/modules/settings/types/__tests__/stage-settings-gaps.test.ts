@@ -87,7 +87,7 @@ describe('stage-settings — parse/serialize gaps', () => {
     const parsed = parseStageSettings(raw)
     expect(parsed.timer?.timeFormat).toBe(DEFAULT_TIMER_MODULE_SETTINGS.timeFormat)
     expect(parsed.countdown?.timeFormat).toBe(DEFAULT_COUNTDOWN_MODULE_SETTINGS.timeFormat)
-    expect(parsed.random?.fontSizePc).toBe(14)
+    expect(parsed.random?.fontSizePc).toBe(50)
     expect(parsed.random?.textTransform).toBe('none')
     expect(parsed.random?.animationSpeed).toBe('normal')
   })

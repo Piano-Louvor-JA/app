@@ -54,13 +54,14 @@ describe('stage-settings-runtime (projeção popup)', () => {
 
   it('lê defaults quando storage vazio', () => {
     const s = readEffectiveStageSettings('bible')
-    expect(s.backgroundColor).toBe('#0A0E1A')
+    // 05/10 Rafael: default null (não setado) — imagem vence sem escolha
+    expect(s.backgroundColor).toBeNull()
     expect(s.bibleFontSize).toBe(84)
   })
 
   it('lê override salvo por escopo (herança global)', () => {
     localStorage.setItem('user_data', JSON.stringify({
-      'stage.settings.global': { bg: '#111111', fg: '#FFFFFF' },
+      'stage.settings.global': { bg: '#111111', fg: null },
       'stage.settings.bible': { bg: '#222222', fg: '#FFFF00' }, // override completo
     }))
     const s = readEffectiveStageSettings('bible')
@@ -69,7 +70,7 @@ describe('stage-settings-runtime (projeção popup)', () => {
     // módulo sem override → global
     const h = readEffectiveStageSettings('hymns')
     expect(h.backgroundColor).toBe('#111111')
-    expect(h.textColor).toBe('#FFFFFF')
+    expect(h.textColor).toBeNull()
   })
 
   it('notifica subscriber quando BroadcastChannel dispara', () => {

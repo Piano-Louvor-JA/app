@@ -48,6 +48,8 @@ function makeBridge(overrides: Record<string, unknown> = {}) {
         token: 'TOKEN123',
         connectUrl: 'http://192.168.0.10:8787/?token=TOKEN123',
         qrDataUrl: 'data:image/png;base64,QR',
+        speakerUrl: 'http://192.168.0.10:7080/speaker?remotePort=8787&palcoPort=7081&token=TOKEN123',
+        speakerQrDataUrl: 'data:image/png;base64,QRSPK',
         clientCount: 0,
         clientAddress: null,
       })),
@@ -79,9 +81,22 @@ describe('RemotePairingView', () => {
     const wrapper = createWrapper()
     await flushPromises()
     expect(wrapper.find('[data-testid="remote-qr"]').attributes('src')).toBe('data:image/png;base64,QR')
+    // host:port + token vivem no painel recolhível — abre antes de afirmar
+    await wrapper.find('.details-toggle').trigger('click')
     expect(wrapper.text()).toContain('192.168.0.10:8787')
     expect(wrapper.find('[data-testid="remote-token"]').text()).toBe('TOKEN123')
     expect(wrapper.text()).toContain('Aguardando')
+    // Bloco do pregador: QR + URL
+    expect(wrapper.find('[data-testid="remote-speaker-block"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="remote-speaker-qr"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="remote-speaker-url"]').text()).toBe('http://192.168.0.10:7080/speaker?remotePort=8787&palcoPort=7081&token=TOKEN123')
+    expect(wrapper.find('[data-testid="remote-speaker-copy"]').exists()).toBe(true)
+    const writeText = vi.fn()
+    Object.assign(navigator, { clipboard: { writeText } })
+    // 1º clique com clipboard ausente (branch opcional) — jsdom default
+    await wrapper.find('[data-testid="remote-speaker-copy"]').trigger('click')
+    await flushPromises()
+    expect(writeText).toHaveBeenCalledWith('http://192.168.0.10:7080/speaker?remotePort=8787&palcoPort=7081&token=TOKEN123')
   })
 
   it('pairingInfo rejeita: failed', async () => {
@@ -94,7 +109,7 @@ describe('RemotePairingView', () => {
   })
 
   it('onClients conectado: status connected com device', async () => {
-    let clientsCb: ((p: { count: number; address?: string }) => void) | null = null
+    let clientsCb: ((p: { count: number; address?: string; remoteAddress?: string }) => void) | null = null
     mocks.getDesktopBridge.mockReturnValue(makeBridge({
       onClients: vi.fn((cb: typeof clientsCb) => {
         clientsCb = cb
@@ -103,9 +118,9 @@ describe('RemotePairingView', () => {
     }))
     const wrapper = createWrapper()
     await flushPromises()
-    clientsCb!({ count: 1, address: '192.168.0.50' })
+    clientsCb!({ count: 1, address: '192.168.0.50', remoteAddress: '192.168.0.50' })
     await wrapper.vm.$nextTick()
-    expect(wrapper.find('[data-testid="remote-client-status"]').classes()).toContain('connected')
+    expect(wrapper.find('[data-testid="remote-client-status"]').classes()).toContain('pairing-status--on')
     expect(wrapper.text()).toContain('192.168.0.50')
   })
 
@@ -117,6 +132,25 @@ describe('RemotePairingView', () => {
     await flushPromises()
     await wrapper.find('[data-testid="remote-copy"]').trigger('click')
     expect(writeText).toHaveBeenCalledWith('http://192.168.0.10:8787/?token=TOKEN123')
+  })
+
+  it('copySpeakerUrl sem speakerUrl: early return sem clipboard', async () => {
+    const writeText = vi.fn()
+    Object.assign(navigator, { clipboard: { writeText } })
+    mocks.getDesktopBridge.mockReturnValue(makeBridge({
+      pairingInfo: vi.fn(async () => ({
+        host: '192.168.0.10', port: 8787, token: 'TOKEN123',
+        connectUrl: 'http://192.168.0.10:8787/?token=TOKEN123',
+        qrDataUrl: 'data:image/png;base64,QR',
+        clientCount: 0, clientAddress: null,
+      })),
+    }))
+    const wrapper = createWrapper()
+    await flushPromises()
+    expect(wrapper.find('[data-testid="remote-speaker-block"]').exists()).toBe(false)
+    const vm = wrapper.vm as unknown as { copySpeakerUrl?: () => void }
+    expect(() => vm.copySpeakerUrl?.()).not.toThrow()
+    expect(writeText).not.toHaveBeenCalled()
   })
 
   it('unmount: desinscreve onClients', async () => {
@@ -168,13 +202,13 @@ describe('RemotePairingView', () => {
   })
 
   it('onClients com address null: device fallback (br 59)', async () => {
-    let cb: ((p: { count: number; address: string | null }) => void) | null = null
+    let cb: ((p: { count: number; address: string | null; remoteAddress?: string | null }) => void) | null = null
     mocks.getDesktopBridge.mockReturnValue(makeBridge({
       onClients: vi.fn((fn: typeof cb) => { cb = fn; return () => {} }),
     }))
     const w = createWrapper()
     await flushPromises()
-    cb?.({ count: 2, address: null })
+    cb?.({ count: 2, address: null, remoteAddress: 'Piano LouvorJA' })
     await flushPromises()
     expect(w.text()).toContain('Piano LouvorJA')
     w.unmount()

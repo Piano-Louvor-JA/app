@@ -24,8 +24,11 @@ import {
 	updateCustomMusic,
 	uploadCustomFile,
 } from "@modules/media/services/custom-catalog";
+import {
+	sha256Hex,
+	sha256ToUuid,
+} from "@shared/services/content-hash";
 import { parseSljaFile } from "@shared/services/slja";
-import { sha256Hex } from "@shared/services/content-hash";
 
 export interface ImportedSljaLiturgyMusic {
 	/**
@@ -50,11 +53,11 @@ export interface ImportedSljaLiturgyMusic {
 	durationMs: number;
 	/** true = gravado só local (sem login); sync pra conta é versão futura. */
 	local: boolean;
-	/** SHA-256 do arquivo de origem — dedupe de re-import. */
+	/** SHA-256 do arquivo de origem — dedupe de re-import/migração (app#336). */
 	sljaHash: string;
 	/** true = arquivo já importado antes; a música existente foi ATUALIZADA. */
 	updatedExisting: boolean;
-	/** Imagens do .slja não cabem no armazenamento local e foram omitidas. */
+	/** Imagens do .slja não couberam no armazenamento local e foram omitidas. */
 	imagesOmitted: boolean;
 }
 
@@ -93,7 +96,9 @@ export function sljaDisplayName(
 ): string {
 	const title = archive.title?.trim() ?? "";
 	const generic =
-		/^v[\d.]+$/.test(title) || title.length === 0 || title === "Sem título";
+		/^v[\d.]+$/.test(title) ||
+		title.length === 0 ||
+		title === "Sem título";
 	if (generic) {
 		return fallback
 			.replace(/\.slja(\.zip)?$/i, "")
@@ -101,14 +106,6 @@ export function sljaDisplayName(
 			.trim();
 	}
 	return title;
-}
-
-
-/** hex sha256 → formato uuid (determinístico; não precisa ser RFC v5 canônico,
- *  só estável pro mesmo conteúdo). */
-async function sha256ToUuid(hex: string): Promise<string> {
-	const h = hex.replace(/-/g, "").padEnd(32, "0").slice(0, 32);
-	return [h.slice(0, 8), h.slice(8, 12), h.slice(12, 16), h.slice(16, 20), h.slice(20, 32)].join("-");
 }
 
 async function ensureImportCollectionId(): Promise<number | null> {
@@ -137,7 +134,6 @@ async function ensureImportCollectionId(): Promise<number | null> {
 		undefined,
 		undefined,
 		"private",
-		{ queueOffline: false },
 	);
 	if (created == null || created.id <= 0) return null;
 	return created.id;
@@ -151,8 +147,9 @@ export interface SljaImportSource {
 
 export interface SljaImportOptions {
 	/**
-	 * Aprovação do usuário pra subir pra conta. Quando o callback existe,
-	 * recusar grava só no aparelho. Sem callback, login segue o envio.
+	 * Aprovação explícita pra subir pra conta (regra do Rafael: banco só
+	 * recebe após aprovação — import com consentimento). Logado sem isso
+	 * = LOCAL.
 	 */
 	confirmUpload?: () => Promise<boolean>;
 }
@@ -164,70 +161,53 @@ export async function importSljaAsLiturgyMusic(
 	const { bytes, name: fileName } = source;
 	// Aceita .slja direto OU .slja.zip (wrapper do WhatsApp) — parser pronto.
 	const archive = await parseSljaFile(bytes, fileName);
-	// Identidade de conteúdo: re-import do mesmo arquivo atualiza em vez de
-	// duplicar (feedback Ezequias/Rafael: "itens importados não deveriam
-	// duplicar").
-	const sljaHash = await sha256Hex(new Uint8Array(bytes));
 	const innerName = (archive as { innerName?: string }).innerName;
 
 	const name = sljaDisplayName(archive, innerName ?? fileName);
 
-	const coverImageName = archive.slides.find((slide) => slide.type === "CAPA")
-		?.image?.name;
 	const slides = [...archive.slides]
 		.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
 		.filter((slide) => slide.type !== "CAPA" && slide.lyric.trim().length > 0);
 
-	const durationMs = estimateSljaDurationMs(slides);
 	if (slides.length === 0) {
 		throw new Error("SLJA_IMPORT_NO_LYRICS");
 	}
 
+	const durationMs = estimateSljaDurationMs(slides);
+
 	// ── Deslogado: grava 100% LOCAL (regra de produto 12/09 — sem identidade
 	// não há escrita confiável na API). Uso local sem conta é requisito
 	// permanente (offline-first): áudio/estrofes ficam no localStorage.
-	// Regra de produto (Rafael 03/10): o disco local pode ter quantas
-	// cópias o usuário quiser (tanto faz); pro BANCO o arquivo sobe UM
-	// (dedup) e SÓ após aprovação do usuário. Deslogado nem pergunta.
-	const session = getAuthSession();
-	if (!session) {
-		return importSljaLocal({
-			name,
-			archive,
-			slides,
-			durationMs,
-			sljaHash,
-			coverImageName,
-		});
+	// Dedup (app#336 fase 3): hash do arquivo ANTES de qualquer caminho —
+	// deslogado grava no local (dedupe de re-import), logado vira
+	// client_uuid determinístico (re-import vira no-op na API).
+	const sljaHash = await sha256Hex(new Uint8Array(bytes));
+
+	if (!getAuthSession()) {
+		return importSljaLocal({ name, archive, slides, durationMs, sljaHash });
 	}
 
-	if (options?.confirmUpload) {
-		const approved = await options.confirmUpload();
-		if (!approved) {
-			return importSljaLocal({
-				name,
-				archive,
-				slides,
-				durationMs,
-				sljaHash,
-				coverImageName,
-			});
-		}
+	// Gate de aprovação (regra do Rafael): logado SEM confirmUpload=true =
+	// grava local (sem erro, sem API).
+	const approved = options?.confirmUpload
+		? await options.confirmUpload()
+		: false;
+	if (!approved) {
+		return importSljaLocal({ name, archive, slides, durationMs, sljaHash });
 	}
 
 	// ── Logado: sobe pra API (Minhas Coletâneas → "Importações .slja").
 	const collectionId = await ensureImportCollectionId();
-	if (collectionId == null || collectionId <= 0) {
+	if (collectionId == null) {
 		throw new Error("SLJA_IMPORT_COLLECTION_FAILED");
 	}
 
-	// Dedup (app#336 fase 3): client_uuid determinístico do hash do arquivo —
-	// re-import do MESMO .slja (ou import nos 2 dispositivos) vira no-op na
-	// API (a rota retorna o registro existente) em vez de duplicar no banco.
-	const clientUuid = await sha256ToUuid(sljaHash);
+	const clientUuid = sha256ToUuid(sljaHash);
 	const created = await createCustomMusic(collectionId, {
 		name,
 		client_uuid: clientUuid,
+		// Duração estimada (s) na criação: catálogo mostra e player usa como
+		// fallback. No-update: PUT posterior sobrescreveria campos editáveis.
 		...(durationMs > 0 ? { duration: durationMs / 1000 } : {}),
 	});
 	if (!created) {
@@ -307,23 +287,19 @@ export async function importSljaAsLiturgyMusic(
 	}
 
 	const imageIdByUrl = new Map(uploadedAssets.map((a) => [a.url, a.idFile]));
-	const coverAsset = matchUploadedAsset(coverImageName, uploadedAssets);
-	if (coverAsset) {
-		await updateCustomMusic(musicId, { id_file_image: coverAsset.idFile });
-	}
 
 	// Background da MÚSICA: o .slja clássico põe a imagem de fundo na CAPA
 	// (Slide:1) e as estrofes herdam — mas a capa não vira estrofe no
 	// import, então o bg precisa ser vinculado à custom_musics (é o que o
 	// editor de letras usa como bg). Fallback: primeira imagem de estrofe.
-	const coverMatchName =
+	const coverImageName =
 		archive.slides.find((sl) => sl.type === "CAPA")?.image?.name?.toLowerCase() ??
 		archive.slides.find((sl) => sl.image?.name)?.image?.name?.toLowerCase();
-	if (coverMatchName && uploadedAssets.length) {
+	if (coverImageName && uploadedAssets.length) {
 		const coverMatch = uploadedAssets.find(
 			(a) =>
-				coverMatchName.includes(a.path.toLowerCase()) ||
-				a.path.toLowerCase().includes(coverMatchName),
+				coverImageName.includes(a.path.toLowerCase()) ||
+				a.path.toLowerCase().includes(coverImageName),
 		);
 		if (coverMatch) {
 			await updateCustomMusic(musicId, { id_file_image: coverMatch.idFile });
@@ -334,24 +310,30 @@ export async function importSljaAsLiturgyMusic(
 	// garantida pelo campo, não pela sequência de requests. 15 slides caem
 	// de 15 RTTs (~10s) para ~3.
 	let slideCount = 0;
+	const validSlides = slides.filter((slide) => slide.lyric.trim());
 	const LYRIC_BATCH = 5;
-	for (let i = 0; i < slides.length; i += LYRIC_BATCH) {
-		const created = await Promise.all(slides.slice(i, i + LYRIC_BATCH).map((slide, j) => {
-			const imageUrl = matchUploadedAsset(slide.image?.name, uploadedAssets)?.url ?? "";
-			return createCustomLyric(musicId, {
-				lyric: slide.lyric.trim(),
-				aux_lyric: slide.auxiliaryLyric?.trim() || undefined,
-				time: formatSljaMsAsTime(slide.timeMs),
-				order: i + j + 1,
-				id_file_image: imageIdByUrl.get(imageUrl),
-				image_position: slide.imagePosition ?? undefined,
-			});
-		}));
+	for (let i = 0; i < validSlides.length; i += LYRIC_BATCH) {
+		const batch = validSlides.slice(i, i + LYRIC_BATCH);
+		const created = await Promise.all(
+			batch.map((slide, j) => {
+				const imageUrl =
+					matchUploadedAsset(slide.image?.name, uploadedAssets)?.url ?? "";
+				return createCustomLyric(musicId, {
+					lyric: slide.lyric.trim(),
+					aux_lyric: (slide as { auxiliaryLyric?: string }).auxiliaryLyric
+						?.trim() || undefined,
+					time: formatSljaMsAsTime(slide.timeMs),
+					order: i + j + 1,
+					id_file_image: imageIdByUrl.get(imageUrl),
+					image_position: (slide as { imagePosition?: number }).imagePosition,
+				});
+			}),
+		);
 		slideCount += created.filter(Boolean).length;
 	}
 	// Upload de mídia pode falhar e o import segue só com texto. Estrofe
 	// incompleta não: a projeção ficaria truncada e o dialog trataria como sucesso.
-	if (slideCount < slides.length) {
+	if (slideCount < validSlides.length) {
 		await deleteCustomMusic(musicId);
 		throw new Error("SLJA_IMPORT_LYRICS_INCOMPLETE");
 	}
@@ -373,21 +355,28 @@ export async function importSljaAsLiturgyMusic(
 }
 
 /**
- * Import local (deslogado): áudio vira base64 no LocalMusic (o player já
- * monta data: URL — loadCustomMusicTrack, branch isLocalId) e as estrofes
- * vão com timing (time HH:MM:SS). Nada sobe pra rede.
+ * Import local (deslogado): áudio e capa viram BLOBS em IndexedDB
+ * (local-media-store) — localStorage guarda só metadados (ids da mídia,
+ * duração, nome). Bug slja-storage: base64 no localStorage estourava a
+ * quota (~10 MB) e o saveDb silencioso descartava as estrofes 2..N.
+ * Re-import do mesmo arquivo (dedupe por sljaHash) → no-op.
  */
+/** Match de asset p/ background do slide: exato > basename único (evita
+ * ambiguidade quando dois assets compartilham sufixo/prefixo). */
 function matchUploadedAsset(
 	imageName: string | undefined,
 	assets: Array<{ path: string; url: string; idFile: number }>,
 ) {
 	if (!imageName || assets.length === 0) return undefined;
-	const normalize = (path: string) => path.replace(/\\/g, "/").replace(/^\.\//, "").toLowerCase();
+	const normalize = (path: string) =>
+		path.replace(/\\/g, "/").replace(/^\.\//, "").toLowerCase();
 	const needle = normalize(imageName);
-	const exact = assets.find(asset => normalize(asset.path) === needle);
+	const exact = assets.find((asset) => normalize(asset.path) === needle);
 	if (exact) return exact;
 	const basename = needle.split("/").pop();
-	const candidates = assets.filter(asset => normalize(asset.path).split("/").pop() === basename);
+	const candidates = assets.filter(
+		(asset) => normalize(asset.path).split("/").pop() === basename,
+	);
 	return candidates.length === 1 ? candidates[0] : undefined;
 }
 
@@ -397,20 +386,12 @@ async function importSljaLocal({
 	slides,
 	durationMs,
 	sljaHash,
-	coverImageName,
 }: {
 	name: string;
 	archive: Awaited<ReturnType<typeof parseSljaFile>>;
-	slides: Array<{
-		lyric: string;
-		timeMs: number;
-		order?: number;
-		auxiliaryLyric?: string;
-		image?: { name: string };
-	}>;
+	slides: Array<{ lyric: string; timeMs: number; order?: number }>;
 	durationMs: number;
 	sljaHash: string;
-	coverImageName?: string;
 }): Promise<ImportedSljaLiturgyMusic> {
 	// Import dinâmico: mantém a API fora do caminho local (offline-first e
 	// testes sem rede nunca tocam fetch).
@@ -419,10 +400,44 @@ async function importSljaLocal({
 		createLocalMusic,
 		createLocalLyric,
 		updateLocalMusic,
-		getLocalMusic,
 		deleteLocalMusic,
 		listLocalCollections,
+		findLocalMusicBySljaHash,
+		getLocalMusic,
 	} = await import("@modules/media/services/local-custom-store");
+	const { putMedia } = await import(
+		"@modules/media/services/local-media-store"
+	);
+
+	// Dedupe (app#336): mesmo arquivo já importado → no-op (retorna a música
+	// existente sem regravar mídia/estrofes). EXCETO se a música existente
+	// estiver PARCIAL (import anterior interrompido por QuotaExceededError —
+	// achado M1 do QA): nesse caso deleta e refaz o import completo (blobs
+	// em IndexedDB são idempotentes por hash — putMedia sobrescreve).
+	const expectedSlides = slides.filter((s) => s.lyric.trim().length > 0).length;
+	const existing = findLocalMusicBySljaHash(sljaHash);
+	if (existing && existing.lyrics.length >= expectedSlides) {
+		return {
+			musicId: existing.id,
+			displayMusicId: existing.id,
+			name: existing.name || name,
+			collectionId: existing.collectionId,
+			slides: existing.lyrics.length,
+			hasAudio: Boolean(existing.audioMediaId || existing.audioBase64),
+			uploadedImages: 0,
+			durationMs: existing.durationMs ?? durationMs,
+			local: true,
+			sljaHash,
+			updatedExisting: true,
+			imagesOmitted: false,
+		};
+	}
+	if (existing) {
+		// Parcial (import interrompido por quota): recomeça do zero — sem
+		// estrofes/mídia órfãs (o saveDb que estourou já não persistiu o
+		// excedente; a música com sljaHash sim, senão nem cairia aqui).
+		deleteLocalMusic(existing.id);
+	}
 
 	let collectionId = listLocalCollections().find(
 		(c) => c.name === IMPORT_COLLECTION_NAME,
@@ -431,66 +446,89 @@ async function importSljaLocal({
 		collectionId = createLocalCollection(IMPORT_COLLECTION_NAME).id;
 	}
 
-	const created = createLocalMusic(collectionId, { name });
+	const created = createLocalMusic(collectionId, { name, sljaHash });
 	const musicId = created.id;
 	if (!getLocalMusic(musicId)) {
 		throw new Error("SLJA_LOCAL_LYRIC_PERSIST_FAILED");
 	}
 
+	// Áudio → 1 blob em IndexedDB (id estável derivado do hash). localStorage
+	// fica só com o id do blob (metadado).
 	let hasAudio = false;
 	if (archive.audio?.bytes?.length) {
-		const saved = updateLocalMusic(musicId, {
-			audioBase64: bytesToBase64(archive.audio.bytes),
+		await putMedia(`slja-${sljaHash}-audio`, archive.audio.bytes);
+		updateLocalMusic(musicId, {
+			audioMediaId: `slja-${sljaHash}-audio`,
 			audioName: archive.audio.name,
 		});
-		const storedAudio = getLocalMusic(musicId)?.audioBase64;
-		hasAudio = saved && Boolean(storedAudio);
-		if (!hasAudio) {
+		// Verificar persistência: updateLocalMusic grava via setItem (pode
+		// jogar QuotaExceededError). Se o campo audioBase64/audioMediaId não
+		// apareceu, significa que o write falhou silenciosamente.
+		const savedAudio = getLocalMusic(musicId);
+		if (!savedAudio?.audioBase64 && !savedAudio?.audioMediaId) {
 			deleteLocalMusic(musicId);
 			throw new Error("SLJA_LOCAL_AUDIO_PERSIST_FAILED");
 		}
+		hasAudio = true;
 	}
 	// Duração estimada do item (último tempo_hms + margem) — o dialog aplica
 	// no draft e o catálogo da liturgia expõe; 0 = desconhecida.
-	let persistedDurationMs = 0;
-	if (durationMs > 0 && updateLocalMusic(musicId, { durationMs })) {
-		persistedDurationMs = getLocalMusic(musicId)?.durationMs ?? 0;
+	if (durationMs > 0) {
+		updateLocalMusic(musicId, { durationMs });
 	}
 
-	// Fundo compartilhado (padrão web#174): primeiro asset do .slja vira data:
-	// URL e cobre a capa + todos os slides (o .slja traz fundo único).
-	let coverDataUrl: string | null = null;
+	// Capa → 1 blob em IndexedDB, VINCULADA À MÚSICA (não por estrofe — o
+	// agravante do bug era a mesma data: URL de 4 MB repetida 33×). O .slja
+	// clássico traz fundo único: primeiro asset cobre capa + todos os slides
+	// (padrão web#174), resolvido na leitura via getMedia.
 	if (archive.assets?.length && archive.assets[0]?.bytes?.length) {
-		coverDataUrl = `data:image/png;base64,${bytesToBase64(archive.assets[0].bytes)}`;
-		updateLocalMusic(musicId, { image_url: coverDataUrl });
+		await putMedia(`slja-${sljaHash}-cover`, archive.assets[0].bytes);
+		updateLocalMusic(musicId, {
+			coverMediaId: `slja-${sljaHash}-cover`,
+		});
 	}
 
 	let slideCount = 0;
-	try {
-		for (const slide of slides) {
-			const text = slide.lyric.trim();
-			// Empty lyrics were removed before any asynchronous import work.
+	for (const slide of slides) {
+		const text = slide.lyric.trim();
+		if (!text) continue;
+		try {
 			createLocalLyric(musicId, {
 				lyric: text,
-				aux_lyric: slide.auxiliaryLyric?.trim() || undefined,
-				image_url: coverDataUrl,
+				aux_lyric: (slide as { auxiliaryLyric?: string }).auxiliaryLyric?.trim() || undefined,
 				time: formatSljaMsAsTime(slide.timeMs),
+				// SEM image_url por estrofe — a capa compartilhada vive 1× na
+				// música (coverMediaId) e o player herda (media-slides fallback).
 			});
-			const persisted = getLocalMusic(musicId)?.lyrics.some(
-				(lyric) => lyric.lyric === text,
-			);
-			if (!persisted) {
+		} catch (err) {
+			deleteLocalMusic(musicId);
+			if (err instanceof Error && err.message === 'local-persist-failed') {
 				throw new Error("SLJA_LOCAL_LYRIC_PERSIST_FAILED");
 			}
-			slideCount += 1;
+			throw err;
 		}
-	} catch (error) {
-		deleteLocalMusic(musicId);
-		if (error instanceof Error && error.message === "local-persist-failed") {
-			throw new Error("SLJA_LOCAL_LYRIC_PERSIST_FAILED");
-		}
-		throw error;
+		slideCount += 1;
 	}
+	const validSlideCount = slides.filter(s => s.lyric.trim()).length;
+	if (slideCount < validSlideCount) {
+		deleteLocalMusic(musicId);
+		throw new Error("SLJA_LOCAL_LYRIC_PERSIST_FAILED");
+	}
+
+	// Consistência: se localStorage não persistiu as letras (quota, IndexedDB,
+	// etc.), slides count = 0 apesar de createLocalLyric não ter jogado.
+	const persistedMusic = getLocalMusic(musicId);
+	if (
+		slideCount > 0 &&
+		(persistedMusic?.lyrics?.length ?? 0) < slideCount
+	) {
+		deleteLocalMusic(musicId);
+		throw new Error("SLJA_LOCAL_LYRIC_PERSIST_FAILED");
+	}
+
+	// Duração real: lida de volta do store (updateLocalMusic pode falhar sem
+	// throw; se falhou durationMs permanece 0 no storage).
+	const persistedDurationMs = persistedMusic?.durationMs ?? 0;
 
 	return {
 		musicId,
@@ -507,18 +545,7 @@ async function importSljaLocal({
 		sljaHash,
 		updatedExisting: false,
 		imagesOmitted:
-			Boolean(coverImageName) ||
-			(archive.assets?.length ?? 0) > 0 ||
-			slides.some((slide) => Boolean(slide.image?.name)),
+			Boolean((slides as Array<{ image?: { name?: string } }>).find(s => s.image?.name)) ||
+			(archive.assets?.length ?? 0) > 0,
 	};
-}
-
-/** bytes → base64 (sem any; chunks grandes em passos de 0x8000). */
-function bytesToBase64(bytes: Uint8Array): string {
-	let binary = "";
-	const chunk = 0x8000;
-	for (let i = 0; i < bytes.length; i += chunk) {
-		binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
-	}
-	return btoa(binary);
 }

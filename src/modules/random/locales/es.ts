@@ -70,5 +70,7 @@ export default {
     decreaseFont: 'Disminuir fuente',
     increaseFont: 'Aumentar fuente',
     placeholderDisplay: '- - - -',
+    chromeDragHint: 'Arrastra para mover · doble clic vuelve a la esquina',
+    openRandom: 'Abrir el Sorteo',
   },
 }

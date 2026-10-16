@@ -15,7 +15,7 @@ import {
 import { getPalcoRoute, type PalcoModule } from './palco-routing'
 
 /** Envolve o HTML do texto em cor (receiver não lê textColor separado). */
-function colorizeProjectionText(text: string, color: string): string {
+function colorizeProjectionText(text: string, color: string | null): string {
   if (!text || !color) return text
   // Já colorizado (reprojeção / caller explícito): não aninha.
   if (/^<span\s+style=["']color:/i.test(text.trim())) return text
@@ -48,12 +48,14 @@ export type ProjectionInput = {
   text: string
   /** Referência do rodapé (ex.: 'João 3:16 — ARC'). */
   footerRef?: string
-  /** Versão da Bíblia no rodapé. */
+  /** Versão da Bíblia no rodapé (ex.: 'ARC'). */
   footerVersion?: string
   /** BG: URL http(s) já resolvível pela TV; omitir usa o bg do stage. */
   background?: string
   /** Capa da música: título destaque amarelo, sem caixinha (paridade cabo). */
   isCover?: boolean
+  /** Frame do slide PDF/PPT/imagens: dataURL completo (data:image/png;base64,…). */
+  frameDataUrl?: string
 }
 
 /** Acesso tipado ao palco exposto pelo preload (contextBridge). */
@@ -75,6 +77,9 @@ function palcoApi(): {
 class PalcoSession {
   private baseUrl: string | null = null
   private activeSlotId = '0'
+  /** Cache blob:/data: → URL /media/ — o runtime republisha por tick; sem
+   * cache cada publish re-enviaria a capa base64 ao main (4 MB × 4/s). */
+  private servedDataUrl = new Map<string, Map<string, string>>()
 
   get slotId(): string {
     return this.activeSlotId
@@ -97,7 +102,9 @@ class PalcoSession {
 
   async removeSlot(id: string): Promise<boolean> {
     if (!this.isElectron) return false
-    return (window as never as { louvorja: { palco: { removeSlot(id: string): Promise<boolean> } } }).louvorja.palco.removeSlot(id)
+    const removed = await (window as never as { louvorja: { palco: { removeSlot(id: string): Promise<boolean> } } }).louvorja.palco.removeSlot(id)
+    if (removed) this.servedDataUrl.delete(id)
+    return removed
   }
 
   async startSlot(id: string): Promise<boolean> {
@@ -108,6 +115,7 @@ class PalcoSession {
   async stopSlot(id: string): Promise<void> {
     if (!this.isElectron) return
     await (window as never as { louvorja: { palco: { stop(id: string): Promise<void> } } }).louvorja.palco.stop(id)
+    this.servedDataUrl.delete(id)
   }
 
   get isElectron(): boolean {
@@ -138,7 +146,7 @@ class PalcoSession {
   async turnOff(): Promise<void> {
     if (!this.isElectron) return
     this.baseUrl = null
-    await palcoApi().stop(this.activeSlotId)
+    await this.stopSlot(this.activeSlotId)
   }
 
   /** BaseUrl do sender (http://ip:7080) — cacheado após 1º status. */
@@ -180,39 +188,87 @@ class PalcoSession {
   async project(scope: string, input: ProjectionInput): Promise<void> {
     if (!this.isElectron) return
     const s = readEffectiveStageSettings(scope)
-    // Hinos com overrideBg: o bg configurado no escopo vence o asset da
-    // música (capa/slide) — fundo próprio pra todas as músicas.
+    // BG do usuário (backgroundImage) é a personalização ativa: vence a capa/
+    // asset da API em QUALQUER escopo — paridade com a projeção local
+    // (MediaProjectionView: preferência ?? capa). Antes o palco fazia o
+    // inverso (capa ?? preferência) → bg da API vencia a escolha do usuário
+    // só no palco (14/10). Hymns overrideBg continua indiferente ao input.
     const overrideHymnBg = scope === 'hymns' && s.hymns?.overrideBg === true
+    const userBg = resolveBackgroundImage(s.backgroundImage)
     const bg = await this.resolveBgUrl(
-      overrideHymnBg
-        ? resolveBackgroundImage(s.backgroundImage)
-        : input.background ?? resolveBackgroundImage(s.backgroundImage),
+      overrideHymnBg || userBg
+        ? userBg
+        : input.background ?? userBg,
     )
     // Bíblia tem tipografia própria (paridade APK StageSession / PalcoOrchestrator).
     const isBible = scope === 'bible'
+    const isHymns = scope === 'hymns'
     const sizeAt1920 = isBible ? s.bibleFontSize : s.fontSize
     const fontWeight = isBible ? s.bibleFontWeight : s.fontWeight
     const textColor = isBible ? s.bibleTextColor : s.textColor
+    // Capa (isCover): o span colorido INLINE venceria o amarelo do
+    // .cover-on no receiver (inline > classe) — título nascia branco.
+    // Capa não leva colorize; estrofes sim (05/10).
+    const colorized =
+      input.isCover === true
+        ? input.text
+        : colorizeProjectionText(input.text, textColor)
     const footerRef = resolveProjectionFooterRef(scope, s, input.footerRef)
+    // Frame de slide (PDF/PPT/imagens): imagem vira o bg e texto vai vazio —
+    // receiver trata projection sem texto como mídia visual pura (sem véu),
+    // preservando a tonalidade original do canvas do operador.
+    const isFrameSlide = typeof input.frameDataUrl === 'string' && input.frameDataUrl.startsWith('data:image/')
     await palcoApi().send({
       v: 2,
       type: 'projection',
-      background: bg,
-      text: colorizeProjectionText(input.text, textColor),
+      background: isFrameSlide ? input.frameDataUrl : bg,
+      text: isFrameSlide ? '' : colorized,
       // px@1920 → o receiver divide por 10.8 (px@1080p → vw)
       fontSize: (sizeAt1920 / 1920) * 1080,
       fontWeight,
       textShadow: s.textShadow,
       shadowBlur: s.shadowBlur,
       shadowIntensity: s.shadowIntensity,
+      // Caixa GRANDE (véu de leitura) é exclusiva da Bíblia (13/10 Rafael);
+      // demais escopos: caixa justa ao texto (padrão media-slide/receiver).
       textBox: s.textBox,
+      bibleBox: isBible,
       boxOpacity: s.boxOpacity,
       boxBorder: s.boxBorder
-        ? { width: 0.4, color: 'rgba(255,255,255,.25)' }
+        ? { width: 0.2, color: 'rgba(255,255,255,0.85)' }
         : undefined,
       footerRef,
       footerColor: s.footerRefColor,
       footerWeight: s.footerRefWeight,
+      // Estrofes com aparência própria (paridade do title*):
+      lyricFontSize: (isHymns && s.lyricFontSize != null ? s.lyricFontSize : sizeAt1920) / 1920 * 1080,
+      lyricFontWeight: isHymns && s.lyricFontWeight != null ? s.lyricFontWeight : fontWeight,
+      // Capa (isCover): null = deixa o .cover-on amarelo do receiver mandar —
+      // NÃO cai pro textColor global (inline branco vencia a classe, 05/10).
+      lyricTextColor:
+        input.isCover === true
+          ? (isHymns && s.lyricTextColor != null ? s.lyricTextColor : undefined)
+          : (isHymns && s.lyricTextColor != null ? s.lyricTextColor : textColor),
+      // Paridade total (13/10): uppercase da letra em TODOS os escopos —
+      // mesma chave lUpper que o app/projeção aplicam.
+      lyricUpperCase: s.lyricUpperCase,
+      // Capa (isCover): uppercase do TÍTULO — paridade titleStyle local.
+      titleUpperCase: s.titleUpperCase,
+      // Caixa opcional na capa (14/10): default off = capa clássica amarela.
+      titleTextBox: s.titleTextBox,
+      lyricTextShadow: isHymns && s.lyricTextShadow != null ? s.lyricTextShadow : s.textShadow,
+      // Personalização completa da projeção local refletida no palco:
+      textAlign: s.textAlign,
+      textVerticalAlign: s.textVerticalAlign,
+      // null = usuário NÃO escolheu cor → não seta: receiver mantém o véu
+      // padrão e a IMAGEM vence; cor só vai se for escolha explícita.
+      backgroundColor: s.backgroundColor ?? undefined,
+      margin: s.margin,
+      // Capitalização do versículo (receiver aplica CSS text-transform).
+      ...(isBible &&
+      (s.bibleTextTransform === 'uppercase' || s.bibleTextTransform === 'capitalize')
+        ? { textTransform: s.bibleTextTransform }
+        : {}),
       // Versão já vem embutida em footerRef (formato desktop); não duplicar.
       footerVersion:
         isBible && !s.showBibleVersion ? undefined : input.footerVersion,
@@ -397,6 +453,44 @@ class PalcoSession {
 
   /** Publica arquivo local no /media/ do sender e devolve URL absoluta. */
   private async serveLocal(target: string): Promise<string | null> {
+    // blob:/data: (capa .slja do IndexedDB — o renderer resolve coverMediaId
+    // como objectURL) não são paths: o servePath do main faria stat("blob:...")
+    // e falharia → TV sem bg (fallback). Busca os bytes e publica via
+    // serveMedia (base64 → /media/ no sender), com nome determinístico
+    // (hash dos bytes) e cache por sessão — mesma capa não republisha.
+    if (/^(blob|data):/i.test(target)) {
+      const slotId = this.activeSlotId
+      const cached = this.servedDataUrl.get(slotId)?.get(target)
+      if (cached) return cached
+      try {
+        const res = await fetch(target)
+        if (!res.ok) return null
+        const blob = await res.blob()
+        const buf = new Uint8Array(await blob.arrayBuffer())
+        if (buf.byteLength === 0 || buf.byteLength > 50 * 1024 * 1024) return null
+        const mime = blob.type || 'image/png'
+        const ext = mime.includes('jpeg') ? 'jpg' : mime.includes('webp') ? 'webp' : 'png'
+        let hash = 0
+        for (const b of buf) hash = (Math.imul(hash, 31) + b) | 0
+        const name = `slja_${(hash >>> 0).toString(16).padStart(8, '0')}${buf.byteLength.toString(16)}.${ext}`
+        let bin = ''
+        for (let i = 0; i < buf.length; i += 0x8000) {
+          bin += String.fromCharCode(...buf.subarray(i, i + 0x8000))
+        }
+        const url = await palcoApi().serveMedia(name, mime, btoa(bin), slotId)
+        if (url) {
+          let cache = this.servedDataUrl.get(slotId)
+          if (!cache) {
+            cache = new Map<string, string>()
+            this.servedDataUrl.set(slotId, cache)
+          }
+          cache.set(target, url)
+        }
+        return url
+      } catch {
+        return null
+      }
+    }
     try {
       return await palcoApi().servePath(target, this.activeSlotId)
     } catch {

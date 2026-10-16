@@ -136,6 +136,44 @@ describe('bootstrap', () => {
     expect(store.isProjecting).toBe(true)
   })
 
+  it('bootstrap de novo (voltar para a tela) mantém versão, livro, capítulo, versículos e filtro', async () => {
+    const store = useBibleStore()
+    await store.bootstrap()
+    store.selectedVersionId = 2
+    store.selectedBookId = 40
+    store.selectedChapter = 1
+    store.selectedVerses = [2, 3]
+    store.lastVerseAnchor = 3
+    store.testamentFilter = 'nt'
+    mockVerses.mockClear()
+
+    await store.bootstrap()
+
+    expect(store.selectedVersionId).toBe(2)
+    expect(store.selectedBookId).toBe(40)
+    expect(store.selectedChapter).toBe(1)
+    expect(store.selectedVerses).toEqual([2, 3])
+    expect(store.lastVerseAnchor).toBe(3)
+    expect(store.testamentFilter).toBe('nt')
+    expect(mockVerses).toHaveBeenCalledWith(2, 40, 1)
+  })
+
+  it('seleção que sumiu do catálogo volta ao padrão', async () => {
+    const store = useBibleStore()
+    await store.bootstrap()
+    store.selectedBookId = 99
+    store.selectedVerses = [1]
+    await store.bootstrap()
+    expect(store.selectedBookId).toBe(1)
+    expect(store.selectedVerses).toEqual([])
+
+    store.selectedVersionId = 77
+    store.selectedBookId = 40
+    await store.bootstrap()
+    expect(store.selectedVersionId).toBe(1)
+    expect(store.selectedBookId).toBe(1)
+  })
+
   it('versão salva na preferência é usada', async () => {
     mockGetPref.mockReturnValue(2)
     mockPick.mockImplementation((versions, saved) => saved ?? versions[0].id)

@@ -1,22 +1,11 @@
 // @vitest-environment jsdom
-// BibleVerseList — nav, search, copy feedback, loading/empty, verses, preview
+// BibleVerseList — nav, search, copy feedback, loading/empty, verses
 import { mount, flushPromises } from '@vue/test-utils'
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { createI18n } from 'vue-i18n'
 
 vi.mock('@design-system/index', () => ({
   GlassCard: { template: '<div class="glass-card"><slot /></div>' },
-}))
-
-vi.mock('../../../settings/services/stage-settings-runtime', () => ({
-  readEffectiveStageSettings: vi.fn(() => ({
-    backgroundColor: '#101010',
-    backgroundImage: null,
-  })),
-}))
-
-vi.mock('../../../settings/types/stage-settings', () => ({
-  resolveBackgroundImage: vi.fn(() => null),
 }))
 
 import BibleVerseList from '../BibleVerseList.vue'
@@ -67,7 +56,6 @@ function createWrapper(props: Record<string, unknown> = {}) {
       verseSearchQuery: '',
       isLoading: false,
       projection,
-      previewSnippet: 'No princípio...',
       hasProjection: false,
       ...props,
     },
@@ -162,17 +150,6 @@ describe('BibleVerseList', () => {
   it('capítulo vazio: mostra estado vazio', () => {
     const wrapper = createWrapper({ verses: [] })
     expect(wrapper.text()).toContain('Capítulo vazio')
-  })
-
-  it('sem projeção: preview escondido', () => {
-    const wrapper = createWrapper({ hasProjection: false })
-    expect(wrapper.find('.bible-reader__preview').exists()).toBe(false)
-  })
-
-  it('com projeção: preview com snippet e referência', () => {
-    const wrapper = createWrapper({ hasProjection: true })
-    expect(wrapper.find('.bible-reader__preview-text').text()).toContain('No princípio')
-    expect(wrapper.find('.bible-reader__preview-ref').text()).toBe('Gn 1:1')
   })
 
   it('copy: com projeção copia texto+ref, feedback copied, emite copy', async () => {

@@ -8,6 +8,10 @@ export type ProgressPayload = {
 export type WorkspaceApi = {
   /** Lê bytes de arquivo escolhido via openFile (decode fica no caller). */
   readBinaryFile?: (path: string) => Promise<Uint8Array | null>
+  /** Baixa url → Media/provai-e-vede/<fileName>. Retorna o caminho local ou null. */
+  downloadToMedia?: (url: string, fileName: string) => Promise<string | null>
+  /** Fetch de página remota pelo main process (sem CORS). Retorna texto ou null. */
+  fetchText?: (url: string) => Promise<string | null>
   getRecord: <T = unknown>(filename: string) => Promise<T | null>
   saveRecord: (filename: string, data: unknown) => Promise<boolean>
   clear: (options?: { preserveMedia?: boolean }) => Promise<boolean>
@@ -141,8 +145,16 @@ export type BackupApi = {
   onProgress: (callback: (progress: BackupProgress) => void) => () => void
 }
 
+export type MediaDownloadFailure = {
+  ok: false
+  url: string
+  status: number | null
+  bytes: number
+  error: string
+}
+
 export type MediaApi = {
-  download: (url: string, mediaType: MediaFolderType, filename: string) => Promise<boolean>
+  download: (url: string, mediaType: MediaFolderType, filename: string) => Promise<boolean | MediaDownloadFailure>
   check: (mediaType: MediaFolderType, filename: string) => Promise<string | false>
   /** Checagem em lote no main process (um IPC). */
   checkMany?: (
@@ -168,8 +180,16 @@ export type RemotePairingInfo = {
   token: string
   connectUrl: string
   qrDataUrl: string
+  speakerUrl?: string
+  speakerQrDataUrl?: string
+  operatorUrl?: string
+  operatorQrDataUrl?: string
   clientCount: number
   clientAddress?: string | null
+  /** Identidade do APK/controle remoto conectado (painel esquerdo). */
+  remoteAddress?: string | null
+  /** Identidade do pregador conectado (painel direito). */
+  speakerAddress?: string | null
 }
 
 export type RemoteApi = {
@@ -179,7 +199,12 @@ export type RemoteApi = {
   sendState: (state: Record<string, unknown>) => void
   pairingInfo: () => Promise<RemotePairingInfo>
   onClients?: (
-    callback: (payload: { count: number; address?: string | null }) => void,
+    callback: (payload: {
+      count: number
+      address?: string | null
+      remoteAddress?: string | null
+      speakerAddress?: string | null
+    }) => void,
   ) => () => void
 }
 
@@ -327,8 +352,14 @@ export type ProjectionNavigationState = {
 export type ProjectionApi = {
   openUrl: (payload: OpenUrlProjectionPayload) => Promise<boolean>
   closeUrl: () => Promise<boolean>
+  /** Mostra juntas as janelas de mídia já carregadas em segundo plano. */
+  revealWarm?: (payload: {
+    shows: { monitorId: number; fullscreen?: boolean; layout?: 'audience' | 'return' }[]
+  }) => Promise<boolean>
   /** Há projeção externa (video/pdf/ppt/site) com janela viva no main? */
   externalAlive: () => Promise<boolean>
+  /** SÓ mídia externa de verdade (vídeo/pdf/ppt do web-projection) — sem popups. */
+  externalMediaAlive: () => Promise<boolean>
   getSourceMediaId?: () => Promise<string | null>
   publishPlaybackSync?: (payload: PlaybackSyncPayload) => void
   onPlaybackSync?: (callback: (payload: PlaybackSyncPayload) => void) => () => void
@@ -371,6 +402,7 @@ export type ProjectionApi = {
     total: number
     projecting?: boolean
   } | null>
+  captureSourceFrame?: () => Promise<string | null>
   getSiteTargetMonitors?: () => Promise<number[]>
   setSiteTargetMonitors?: (ids: number[]) => Promise<boolean>
   getVideoTargetMonitors?: () => Promise<number[]>
@@ -385,7 +417,15 @@ export type WindowControlAction = 'minimize' | 'maximize' | 'close' | 'is-maximi
 export type WindowApi = {
   control: (action: WindowControlAction) => Promise<boolean | null>
   onMaximizedState: (callback: (isMaximized: boolean) => void) => () => void
+  /** Voltar/avançar do sistema (app-command no Windows). */
+  onHistoryCommand?: (callback: (direction: HistoryCommandDirection) => void) => () => void
+  /** Miniatura JPEG (data URL) de uma área da janela, em DIP; `null` se falhar. */
+  capturePreview?: (rect: PreviewRect) => Promise<string | null>
 }
+
+export type PreviewRect = { x: number; y: number; width: number; height: number }
+
+export type HistoryCommandDirection = 'back' | 'forward'
 
 export type ZoomChangedPayload = {
   factor: number
@@ -422,6 +462,10 @@ export type DiagnosticsApi = {
   run: () => Promise<{ report: unknown; jsonPath: string; txtPath: string }>
   send: (report: unknown) => Promise<{ ok: boolean; reason?: string }>
   openFolder: (filePath: string) => Promise<void>
+  reportRendererErrors?: (errors: unknown) => void
+  reportDownloadFailures?: (failures: unknown) => void,
+  reportAudioDevices?: (snapshot: unknown) => void
+  reportJank?: (snapshot: unknown) => void
 }
 
 export type LouvorJaBridge = {

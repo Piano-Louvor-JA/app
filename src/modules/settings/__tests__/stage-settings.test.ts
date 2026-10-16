@@ -11,14 +11,17 @@ import {
 
 describe('stage-settings (paridade APK)', () => {
   it('defaults idênticos ao APK', () => {
-    expect(DEFAULT_STAGE_SETTINGS.backgroundColor).toBe('#0A0E1A')
-    expect(DEFAULT_STAGE_SETTINGS.textColor).toBe('#FFFFFF')
+    // 05/10 Rafael: backgroundColor default é NULL (não setado) — cor só
+    // existe se o usuário escolher; sem escolha, a imagem da projeção vence.
+    expect(DEFAULT_STAGE_SETTINGS.backgroundColor).toBeNull()
+    // 13/10 Rafael: cores de TEXTO também null-first (mesmo contrato do bg).
+    expect(DEFAULT_STAGE_SETTINGS.textColor).toBeNull()
     expect(DEFAULT_STAGE_SETTINGS.fontSize).toBe(96)
     expect(DEFAULT_STAGE_SETTINGS.shadowBlur).toBeCloseTo(2.2)
     expect(DEFAULT_STAGE_SETTINGS.shadowIntensity).toBeCloseTo(0.8)
     expect(DEFAULT_STAGE_SETTINGS.textBox).toBe(true)
     expect(DEFAULT_STAGE_SETTINGS.boxOpacity).toBeCloseTo(0.45)
-    expect(DEFAULT_STAGE_SETTINGS.footerRefColor).toBe('#FCCE02')
+    expect(DEFAULT_STAGE_SETTINGS.footerRefColor).toBeNull()
     expect(DEFAULT_STAGE_SETTINGS.bibleFontSize).toBe(84)
     expect(DEFAULT_STAGE_SETTINGS.textAlign).toBe('center')
     expect(DEFAULT_STAGE_SETTINGS.textVerticalAlign).toBe('middle')
@@ -55,6 +58,16 @@ describe('stage-settings (paridade APK)', () => {
     expect(s.bibleFontSize).toBe(70)
     expect(s.bibleFontWeight).toBe(700)
     expect(s.bibleTextColor).toBe('#B8E0FF')
+  })
+
+  it('bTransform aceita a allowlist e cai em none se for legado', () => {
+    expect(parseStageSettings({ bTransform: 'uppercase' }).bibleTextTransform).toBe('uppercase')
+    expect(parseStageSettings({ bTransform: 'capitalize' }).bibleTextTransform).toBe('capitalize')
+    expect(parseStageSettings({ bTransform: 'lowercase' }).bibleTextTransform).toBe('none')
+    expect(parseStageSettings({}).bibleTextTransform).toBe('none')
+    const s = { ...DEFAULT_STAGE_SETTINGS, bibleTextTransform: 'uppercase' as const }
+    expect(serializeStageSettings(s).bTransform).toBe('uppercase')
+    expect(parseStageSettings(serializeStageSettings(s)).bibleTextTransform).toBe('uppercase')
   })
 
   it('parse clampa valores fora de faixa (como o APK)', () => {

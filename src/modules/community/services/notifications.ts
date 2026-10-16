@@ -4,6 +4,7 @@
  */
 
 import { getAuthSession, saveSession } from "@modules/media/services/auth-client";
+import { defaultApiOrigin } from '@shared/services/api-env'
 
 export type AppNotification = {
 	id: number;
@@ -15,7 +16,7 @@ export type AppNotification = {
 
 function communityBaseUrl(): string {
 	const base =
-		import.meta.env.VITE_PALCO_API_URL ?? "https://api.pianolouvorja.com.br";
+		import.meta.env.VITE_PALCO_API_URL ?? defaultApiOrigin();
 	return `${base.replace(/\/$/, "")}/v1/custom`;
 }
 

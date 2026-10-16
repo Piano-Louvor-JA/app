@@ -69,6 +69,18 @@ describe('loadAlbumCategories', () => {
     expect(cats[0]?.collections[1]?.trackCount).toBe(2)
   })
 
+  it('hinário: capa por idioma — map pt coberto; prefix fora do map (en) cai no fallback', async () => {
+    stubCatalogs({ pt_hymnal: [{ id_music: 1 }], en_hymnal: [{ id_music: 1 }], pt_categories: [] })
+    getCurrentApiPrefix.mockReturnValue('en')
+    try {
+      const catsEn = await loadAlbumCategories()
+      expect(catsEn[0]?.collections[0]?.coverUrl).toBeTypeOf('string')
+      expect(catsEn[0]?.collections[0]?.coverUrl).toBe('/src/assets/library/hymnal.jpeg')
+    } finally {
+      getCurrentApiPrefix.mockReturnValue('pt')
+    }
+  })
+
   it('hinário vazio não gera categoria; categorias ausentes -> só hinários', async () => {
     stubCatalogs({ pt_hymnal: [], pt_hymnal_1996: null })
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
@@ -125,8 +137,10 @@ describe('loadAlbumCategories', () => {
     const cats = await loadAlbumCategories()
     const uncategorized = cats.find((c) => c.id !== 'hymnals')
     expect(uncategorized?.name).toBe('Coletâneas')
+    // DESC por id_album: 201 (Sem capa) vem antes de 200.
     expect(uncategorized?.collections[0]?.coverUrl).toBe(null)
-    expect(uncategorized?.collections[0]?.id).toBe(200)
+    expect(uncategorized?.collections[0]?.id).toBe(201)
+    expect(uncategorized?.collections[1]?.id).toBe(200)
     // categoria sem id usa nome? id_category ausente e name ausente -> 1o collection id
     // aqui só tem 1 categoria: id vira collections[0].id = 200? não: ambas no mesmo array,
     // id = category.id_category ?? category.name ?? collections[0].id

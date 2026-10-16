@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createI18n } from 'vue-i18n'
 import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as auth from "../../services/auth-client";
@@ -7,6 +8,27 @@ import * as auth from "../../services/auth-client";
  * auth-client mockado; valida gating do form, os 4 modos e logout.
  */
 import MediaAccountBar from "../MediaAccountBar.vue";
+
+const i18n = createI18n({
+	legacy: false,
+	locale: 'pt-BR',
+	messages: {
+		'pt-BR': {
+			media: {
+				account: {
+					email: 'E-mail',
+					password: 'Senha',
+					yourName: 'Seu nome',
+					passwordMin6: 'Senha (mín. 6)',
+					accountEmail: 'E-mail da conta',
+					resetToken: 'Token de reset',
+					newPasswordMin8: 'Senha nova (mín. 8)',
+				},
+			},
+		},
+	},
+})
+
 
 type AuthSessionLike = {
 	token: string;
@@ -30,7 +52,7 @@ const sessionMock: AuthSessionLike = {
 const notify = vi.fn();
 
 function mountBar() {
-	return mount(MediaAccountBar, { props: { notify } });
+	return mount(MediaAccountBar, { props: { notify }, global: { plugins: [i18n] } });
 }
 
 beforeEach(() => {

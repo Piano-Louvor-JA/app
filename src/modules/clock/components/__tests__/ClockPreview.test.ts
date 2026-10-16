@@ -3,6 +3,29 @@ import { mount, flushPromises } from "@vue/test-utils"
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest"
 import { ref, nextTick } from "vue"
 
+/** jsdom 30 descarta box-shadow com cor de 8 dígitos; o vnode guarda o valor real. */
+function boundStyle(wrapper: { vm: object }, className: string): Record<string, string> | undefined {
+  const walk = (vnode: any): Record<string, string> | undefined => {
+    if (!vnode || typeof vnode !== "object") return
+    const cls = vnode.props?.class
+    if (typeof cls === "string" && cls.split(/\s+/).includes(className) && vnode.props?.style) {
+      return vnode.props.style
+    }
+    const kids = vnode.children
+    if (Array.isArray(kids)) {
+      for (const kid of kids) {
+        const found = walk(kid)
+        if (found) return found
+      }
+    } else if (kids && typeof kids === "object") {
+      const found = walk(kids)
+      if (found) return found
+    }
+    if (vnode.component?.subTree) return walk(vnode.component.subTree)
+  }
+  return walk((wrapper.vm as { $: { subTree: unknown } }).$.subTree)
+}
+
 const useClockMockState = {
   /** Quando true, o mock delega ao useClockDisplay real (testes de integração). */
   useReal: false,
@@ -90,8 +113,8 @@ function computeDigitalStyle(
           : st
             ? "none"
             : `0 4px 30px ${color}40`,
-    background: st?.textBox ? `rgba(0,0,0,${st.boxOpacity})` : "transparent",
-    border: st?.textBox && st.boxBorder ? "1px solid rgba(255,255,255,0.25)" : "none",
+    background: st?.textBox ? `rgba(24,24,24,${st.boxOpacity})` : "transparent",
+    border: st?.textBox && st.boxBorder ? "clamp(2px, 0.2vmin, 4px) solid rgba(255,255,255,0.85)" : "none",
     borderRadius: st?.textBox ? "1.4cqw 0 1.4cqw 0" : "0",
     padding: st?.textBox ? "2.5vmin 1.8vmin" : "0",
   } as Record<string, string>
@@ -292,8 +315,8 @@ describe("ClockPreview.vue - Pure Function Tests", () => {
     it("background, border, borderRadius, padding quando textBox=true", () => {
       const stageWithBox = { ...mockStage, textBox: true, boxOpacity: 0.7, boxBorder: true } as StageSettings
       const result = computeDigitalStyle(stageWithBox, false, "#ff0000", 50)
-      expect(result.background).toBe("rgba(0,0,0,0.7)")
-      expect(result.border).toBe("1px solid rgba(255,255,255,0.25)")
+      expect(result.background).toBe("rgba(24,24,24,0.7)")
+      expect(result.border).toBe("clamp(2px, 0.2vmin, 4px) solid rgba(255,255,255,0.85)")
       expect(result.borderRadius).toBe("1.4cqw 0 1.4cqw 0")
       expect(result.padding).toBe("2.5vmin 1.8vmin")
     })
@@ -652,9 +675,9 @@ describe("ClockPreview.vue - Component Integration Tests", () => {
         boxBorder: false,
       } as StageSettings,
     })
-    const style = wrapper.find(".clock-preview__analog").attributes("style") ?? ""
-    expect(style).toContain("inset 0 0 40px rgba(0,0,0,0.2)")
-    expect(style).toContain("rgba(0,0,0,0.6)")
+    const shadow = (wrapper.find(".clock-preview__analog").element as HTMLElement).style.boxShadow
+    expect(shadow).toContain("inset 0 0 40px rgba(0,0,0,0.2)")
+    expect(shadow).toContain("rgba(0,0,0,0.6)")
     clockConfigState.cfg = { ...clockConfigState.cfg, style: "digital" } as ClockConfig
   })
 
@@ -678,9 +701,9 @@ describe("ClockPreview.vue - Component Integration Tests", () => {
         boxBorder: false,
       } as StageSettings,
     })
-    const style = wrapper.find(".clock-preview__analog").attributes("style") ?? ""
-    expect(style).toContain("inset 0 0 40px")
-    expect(style).toContain("0 10px 40px")
+    const shadow = boundStyle(wrapper, "clock-preview__analog")?.boxShadow ?? ""
+    expect(shadow).toContain("inset 0 0 40px")
+    expect(shadow).toContain("0 10px 40px")
     clockConfigState.cfg = { ...clockConfigState.cfg, style: "digital" } as ClockConfig
   })
 
@@ -866,8 +889,8 @@ describe("ClockPreview.vue - Exposed Function Coverage", () => {
 
     const stageWithBox = { ...mockStage, textBox: true, boxOpacity: 0.7, boxBorder: true } as StageSettings
     const result5 = exposed.computeDigitalStyle(stageWithBox, false, "#ff0000", 50)
-    expect(result5.background).toBe("rgba(0,0,0,0.7)")
-    expect(result5.border).toBe("1px solid rgba(255,255,255,0.25)")
+    expect(result5.background).toBe("rgba(24,24,24,0.7)")
+    expect(result5.border).toBe("clamp(2px, 0.2vmin, 4px) solid rgba(255,255,255,0.85)")
 
     const stageNoBorder = { ...mockStage, textBox: true, boxBorder: false } as StageSettings
     const result6 = exposed.computeDigitalStyle(stageNoBorder, false, "#ff0000", 50)

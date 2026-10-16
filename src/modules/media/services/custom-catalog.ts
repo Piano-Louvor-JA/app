@@ -1,4 +1,3 @@
-import { parseSlideTimeToSeconds } from './media-slides'
 import type {
   MediaLyricSlide,
   MediaTrackRecord,
@@ -144,7 +143,8 @@ function customBaseUrl(): string {
   // (coletâneas não baixam). .env é gitignored / CI não injeta (hotfix 14/09).
   const base =
     import.meta.env.VITE_PALCO_API_URL ?? 'https://api.pianolouvorja.com.br'
-  return `${base.replace(/\/$/, '')}/v1/custom`
+  if (base) return `${base.replace(/\/$/, '')}/v1/custom`
+  return '/v1/custom'
 }
 
 /**
@@ -181,8 +181,9 @@ function formatSeconds(total: number): string {
 export async function loadCustomMusicTrack(
   musicId: number,
 ): Promise<MediaTrackRecord | null> {
-  // Música LOCAL (sem auth): monta o record do localStorage. O áudio vai
-  // como data: URL (base64) — o browser toca direto, sem servidor.
+  // Música LOCAL (sem auth): monta o record do localStorage. Áudio/capa em
+  // IndexedDB (audioMediaId/coverMediaId) resolvem como blob: objectURL;
+  // LEGACY pré-fix (audioBase64/image_url data: inline) segue funcionando.
   if (isLocalId(musicId)) {
     const local = getLocalMusic(musicId)
     if (!local) return null
@@ -192,6 +193,21 @@ export async function loadCustomMusicTrack(
       if (official) return { ...official, id: musicId }
       return null
     }
+    const { getMedia } = await import('./local-media-store')
+    const audioBlob = local.audioMediaId
+      ? await getMedia(local.audioMediaId)
+      : null
+    const coverBlob = local.coverMediaId
+      ? await getMedia(local.coverMediaId)
+      : null
+    const audioUrl = audioBlob
+      ? URL.createObjectURL(audioBlob)
+      : local.audioBase64
+        ? `data:audio/mpeg;base64,${local.audioBase64}`
+        : null
+    const coverUrl = coverBlob
+      ? URL.createObjectURL(coverBlob)
+      : (local.image_url ?? null)
     const lyrics = local.lyrics.map((l) => ({
       order: l.order,
       lyric: l.lyric ?? '',
@@ -207,11 +223,9 @@ export async function loadCustomMusicTrack(
       id: musicId,
       name: local.name,
       durationLabel: '0:00',
-      audioUrl: local.audioBase64
-        ? `data:audio/mpeg;base64,${local.audioBase64}`
-        : null,
+      audioUrl,
       instrumentalUrl: null,
-      coverUrl: local.image_url ?? null,
+      coverUrl,
       coverPosition: null,
       albums: [],
       categories: ['Minhas Coletâneas'],
@@ -334,9 +348,9 @@ export async function updateCustomCollection(
   }
 }
 
-export async function listCustomCollections(options?: { signal?: AbortSignal }): Promise<
-  CustomCollectionSummary[]
-> {
+export async function listCustomCollections(opts?: {
+  signal?: AbortSignal
+}): Promise<CustomCollectionSummary[]> {
   // Locais (ids negativos, só desta máquina) entram primeiro na lista.
   const locals: CustomCollectionSummary[] = listLocalCollections().map((c) => ({
     id: c.id,
@@ -349,7 +363,7 @@ export async function listCustomCollections(options?: { signal?: AbortSignal }):
   try {
     const response = await fetch(`${customBaseUrl()}/collections`, {
       headers: authHeaders(),
-      signal: options?.signal,
+      signal: opts?.signal,
     })
     if (!response.ok) return locals
     const json = (await response.json()) as {
@@ -398,8 +412,11 @@ function localMusicToSummary(m: LocalMusic): CustomMusicSummary {
     id: m.id,
     name: m.name,
     duration: null,
-    hasAudio: Boolean(m.audioBase64) || Boolean(m.officialMusicId),
-    hasImage: Boolean(m.image_url),
+    hasAudio:
+      Boolean(m.audioBase64) ||
+      Boolean(m.audioMediaId) ||
+      Boolean(m.officialMusicId),
+    hasImage: Boolean(m.image_url) || Boolean(m.coverMediaId),
     audioUrl: m.audioBase64 ? `data:audio/mpeg;base64,${m.audioBase64}` : null,
     officialMusicId: m.officialMusicId ?? null,
   }
@@ -462,9 +479,10 @@ export async function listAllCustomMusics(options?: {
     return (json.data ?? []).map((row) => ({
       id: row.id_music,
       name: row.name ?? '',
-      duration: typeof row.duration === 'string'
-        ? parseSlideTimeToSeconds(row.duration) || null
-        : row.duration ?? null,
+      duration:
+        typeof row.duration === 'string'
+          ? Number(row.duration.split(':').reduce((acc, part) => acc * 60 + Number(part), 0)) || null
+          : row.duration ?? null,
       hasAudio: Boolean(row.audio_url),
       hasImage: Boolean(row.image_url),
       audioUrl: row.audio_url ?? null,
@@ -573,7 +591,7 @@ export function probeAudioDuration(
     const done = (value: number | null) => {
       clearTimeout(timer)
       audio.removeAttribute('src')
-      try { audio.load() } catch {}
+      audio.load()
       resolve(value)
     }
     const timer = setTimeout(() => done(null), timeoutMs)
@@ -667,7 +685,7 @@ export async function createCustomMusic(
     )
     if (!response.ok) return null
     const json = (await response.json()) as { id_music: number }
-    // 200 = mesmo client_uuid já existia; 201 = criada agora.
+    // Dedup (web#187 paridade): 200 = já existia (mesmo client_uuid)
     return { id: json.id_music, existed: response.status === 200 }
   } catch {
     return null

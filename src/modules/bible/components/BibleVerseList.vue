@@ -5,8 +5,6 @@ import { useI18n } from 'vue-i18n'
 import { GlassCard } from '@design-system/index'
 
 import type { BibleSelection } from '../types/bible'
-import { readEffectiveStageSettings } from '../../settings/services/stage-settings-runtime'
-import { resolveBackgroundImage } from '../../settings/types/stage-settings'
 
 const props = defineProps<{
   chapterTitle: string
@@ -15,7 +13,6 @@ const props = defineProps<{
   verseSearchQuery: string
   isLoading: boolean
   projection: BibleSelection
-  previewSnippet: string
   hasProjection: boolean
 }>()
 
@@ -32,18 +29,6 @@ const { t } = useI18n()
 const copyFeedbackKey = ref<string | null>(null)
 
 const canNavigate = computed(() => props.selectedVerses.length > 0)
-
-/** Miniatura reflete a personalização do escopo bible (bg/caixa/cores). */
-const previewStyle = computed(() => {
-  const st = readEffectiveStageSettings('bible')
-  const bg = resolveBackgroundImage(st.backgroundImage)
-  return {
-    backgroundColor: st.backgroundColor,
-    backgroundImage: bg ? `url(${bg})` : undefined,
-    backgroundSize: 'cover',
-    backgroundPosition: 'center',
-  }
-})
 
 async function handleCopy() {
   const text = props.hasProjection
@@ -194,20 +179,6 @@ function isSelected(verseNumber: number): boolean {
         </button>
       </div>
     </div>
-
-    <aside
-      v-if="hasProjection"
-      class="bible-reader__preview"
-      :style="previewStyle"
-      aria-live="polite"
-    >
-      <p class="bible-reader__preview-text">
-        “{{ previewSnippet }}”
-      </p>
-      <p class="bible-reader__preview-ref">
-        {{ projection.scripturalReference }}
-      </p>
-    </aside>
   </GlassCard>
 </template>
 
@@ -464,43 +435,6 @@ function isSelected(verseNumber: number): boolean {
   flex: 1;
   line-height: 1.65;
 }
-
-.bible-reader__preview {
-  position: absolute;
-  right: 1.25rem;
-  bottom: 1.25rem;
-  width: 16rem;
-  aspect-ratio: 16 / 9;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 1rem;
-  text-align: center;
-  border-radius: var(--ds-radius-md, 0.5rem 0 0.5rem 0);
-  background: #000;
-  border: 1px solid rgb(255 255 255 / 0.2);
-  box-shadow: 0 16px 40px rgb(0 0 0 / 0.45);
-  pointer-events: none;
-}
-
-.bible-reader__preview-text {
-  margin: 0;
-  color: #fff;
-  font-size: 0.7rem;
-  line-height: 1.45;
-}
-
-.bible-reader__preview-ref {
-  margin: 0;
-  color: #fb8c00;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
 </style>
 
 <style lang="scss">

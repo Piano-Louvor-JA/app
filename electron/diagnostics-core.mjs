@@ -9,11 +9,23 @@ import os from 'node:os'
 import path from 'node:path'
 import tls from 'node:tls'
 
+import { diagnosticApiHosts } from './profile.mjs'
+
 export const TIMEOUT_MS = 8_000
-export const API_HOSTS = [
-  'api.pianolouvorja.com.br',
-  'api.louvorja.com.br',
-  'api.louvorja.workers.dev',
+/**
+ * Hosts SONDAIS da cascata de diagnóstico (bootstrap real) — derivados do
+ * CONTRATO DE PERFIL (SPEC piano-api-env-guard RF-02): non-release sonda STG,
+ * nunca produção.
+ */
+export const API_HOSTS = diagnosticApiHosts(process.env)
+
+/**
+ * Domínios vigiados na LEITURA do /etc/hosts — TODOS (STG + produção +
+ * legados), independente do perfil: sequestro de `api.pianolouvorja.com.br`
+ * é sintoma relevante mesmo em build STG (mesma máquina pode rodar produção).
+ */
+export const HOSTS_WATCH_DOMAINS = [
+  ...new Set([...API_HOSTS, 'api.pianolouvorja.com.br']),
 ]
 export const ENDPOINTS = ['config', 'pt_categories']
 export const ESSENTIAL_FILES = [
@@ -106,6 +118,14 @@ export async function httpProbe(host, endpoint, token) {
     })
     const body = await response.arrayBuffer()
     const result = { url, status: response.status, ok: response.ok, ttfbMs: elapsed(start), bytes: body.byteLength, erro: null }
+    try {
+      const { onLatencyObserved } = await import('./diagnostics-latency-hook.mjs'); onLatencyObserved(host, result.ttfbMs)
+      const dateHeader = response.headers?.get?.('date')
+      if (dateHeader) {
+        const { onServerDate } = await import('./diagnostics-latency-hook.mjs')
+        onServerDate(Date.parse(dateHeader))
+      }
+    } catch { /* best-effort */ }
     if (!response.ok) {
       const classe = response.status === 403 ? 'HTTP_403' : response.status === 429 ? 'HTTP_429' : response.status >= 500 ? 'HTTP_5XX' : 'OTHER'
       result.erro = { classe, bruto: `HTTP ${response.status}` }
@@ -156,7 +176,7 @@ export function readHostsOverrides(hostsPath = defaultHostsPath()) {
       const [ip, ...names] = fields
       for (const hostname of names) {
         const h = hostname.toLowerCase()
-        if (API_HOSTS.some((domain) => h === domain || h.endsWith(`.${domain}`))) out.push({ ip, hostname: h })
+        if (HOSTS_WATCH_DOMAINS.some((domain) => h === domain || h.endsWith(`.${domain}`))) out.push({ ip, hostname: h })
       }
     }
     return out
@@ -220,7 +240,7 @@ export function maskToken(token) {
   return token ? `${token.slice(0, 4)}…(${token.length} chars)` : null
 }
 
-export function computeVerdict({ general, apis, proxy, hosts, installation }) {
+export function computeVerdict({ general, apis, proxy, hosts, installation, extra }) {
   if (!general['1.1.1.1:443']?.ok && !general['google.com:443']?.ok) return 'sem-internet'
   const errors = apis.flatMap((api) => [api.dns?.erro, api.tcp?.erro, api.tls?.erro, ...api.http.map((h) => h.erro)].filter(Boolean))
   const classes = errors.map((e) => e.classe)
@@ -232,6 +252,11 @@ export function computeVerdict({ general, apis, proxy, hosts, installation }) {
   if (classes.some((c) => ['ECONNREFUSED', 'EHOSTUNREACH', 'ETIMEDOUT', 'TIMEOUT_LOCAL'].includes(c)) || hosts.length) return 'firewall-seletivo'
   if (proxyDetectado) return 'proxy'
   if (installation.existe && Object.values(installation.sysdata).some((value) => value === null)) return 'estado-app'
+  if (extra?.escritaUserData?.ok === false) return 'sem-permissao-escrita'
+  if (extra?.storage?.lockOrfao || extra?.storage?.ldbVazio || extra?.storage?.localStorageSuspeito) return 'storage-corrompido'
+  if (extra?.crashes?.total >= 3) return 'crash-loop'
+  if (extra?.headersTruncados) return 'arquivo-truncado'
+  if (extra?.gpuBloqueada) return 'gpu-bloqueada'
   return 'ok'
 }
 
@@ -249,6 +274,7 @@ export function folderSize(dir) {
 export function reportText(report) {
   const lines = [
     'LouvorJA Diagnóstico — SrCaldeira',
+    ...(report.meta.dataLocal ? [`Data (local): ${report.meta.dataLocal} (${report.ambiente.timezone})`] : []),
     `Data: ${report.meta.dataISO}`,
     `Duração: ${report.meta.duracaoMs} ms`,
     `Veredito heurístico: ${report.vereditoHeuristico}`,
@@ -259,14 +285,25 @@ export function reportText(report) {
     'Reprodução do bootstrap:',
     ...report.rede.reproducaoBootstrap.map((p) => `${p.passo}: ${p.ok ? `OK em ${p.base} (${p.ms}ms)` : `FALHOU (${p.erroBruto}) após ${p.tentativas.length} host(s)`}`),
     '',
+    ...(report.telemetria ? [
+      'Telemetria da sessão:',
+      `  Palco WS: ${report.telemetria.palcoWs?.connections ?? 0} conexões, ${report.telemetria.palcoWs?.drops ?? 0} drops, uptime ${Math.round((report.telemetria.palcoWs?.uptimeMs ?? 0) / 1000)}s`,
+      ...Object.entries(report.telemetria.redeLatencia ?? {}).map(([host, l]) => `  Latência ${host}: p50 ${l.p50Ms}ms / p95 ${l.p95Ms}ms (${l.count} amostras)`),
+      `  Clock: skew local ${report.telemetria.clockSkewMs ?? 'n/d'} ms; offset servidor ${report.telemetria.clockServidorOffsetMs ?? 'n/d'} ms`,
+      `  Áudio: ${report.telemetria.audioDevices?.devices ?? 'n/d'} dispositivos, ${report.telemetria.audioDevices?.devicechangeCount ?? 0} trocas`,
+      report.telemetria.jankRenderer ? `  Jank renderer: ${report.telemetria.jankRenderer.longFrames} frames >${report.telemetria.jankRenderer.thresholdMs}ms de ${report.telemetria.jankRenderer.sampledFrames} (pior ${report.telemetria.jankRenderer.worstFrameMs ?? 'n/d'}ms)` : '  Jank renderer: n/d',
+      `  Processos filhos: ${report.telemetria.processosFilhos?.count ?? 0} mortes; transições rede: ${(report.telemetria.transicoesRede ?? []).length}`,
+      '',
+    ] : []),
     `Arquivo JSON completo: ${report.meta.arquivoJson}`,
   ]
   return lines.join('\n')
 }
 
-export function generalProbes() {
-  return {
-    '1.1.1.1:443': socketProbe(() => net.connect({ host: '1.1.1.1', port: 443 })),
-    'google.com:443': socketProbe(() => tls.connect({ host: 'google.com', port: 443, servername: 'google.com' })),
-  }
+export async function generalProbes() {
+  const [ip, google] = await Promise.all([
+    socketProbe(() => net.connect({ host: '1.1.1.1', port: 443 })),
+    socketProbe(() => tls.connect({ host: 'google.com', port: 443, servername: 'google.com' })),
+  ])
+  return { '1.1.1.1:443': ip, 'google.com:443': google }
 }

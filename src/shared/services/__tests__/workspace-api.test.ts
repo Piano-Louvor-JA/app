@@ -126,7 +126,7 @@ describe("resolveMediaUrl", () => {
 	it("web usa base da API", () => {
 		mocks.isDesktopApp.mockReturnValue(false);
 		expect(resolveMediaUrl("slides/1.png")).toBe(
-			"https://api.pianolouvorja.com.br/file/slides/1.png",
+			"https://api-stg.pianolouvorja.com.br/file/slides/1.png",
 		);
 	});
 
@@ -144,13 +144,13 @@ describe("resolveMediaUrl", () => {
 describe("resolveDatabaseUrl", () => {
 	it("usa default da API", () => {
 		expect(resolveDatabaseUrl("album_1.json")).toBe(
-			"https://api.pianolouvorja.com.br/json_db/album_1.json",
+			"https://api-stg.pianolouvorja.com.br/json_db/album_1.json",
 		);
 	});
 
 	it("normaliza barra inicial duplicada", () => {
 		expect(resolveDatabaseUrl("/album_1.json")).toBe(
-			"https://api.pianolouvorja.com.br/json_db/album_1.json",
+			"https://api-stg.pianolouvorja.com.br/json_db/album_1.json",
 		);
 	});
 
@@ -169,7 +169,7 @@ describe("resolveMediaUrl — ramos VITE_URL_FILES", () => {
 		mocks.isDesktopApp.mockReturnValue(false);
 		delete (import.meta.env as Record<string, unknown>).VITE_URL_FILES;
 		expect(resolveMediaUrl("slides/2.png")).toBe(
-			"https://api.pianolouvorja.com.br/file/slides/2.png",
+			"https://api-stg.pianolouvorja.com.br/file/slides/2.png",
 		);
 	});
 
@@ -183,7 +183,7 @@ describe("resolveDatabaseUrl — sem barra final", () => {
 	it("base sem barra final normaliza path com barra", () => {
 		delete (import.meta.env as Record<string, unknown>).VITE_URL_DATABASE;
 		expect(resolveDatabaseUrl("x.json")).toBe(
-			"https://api.pianolouvorja.com.br/json_db/x.json",
+			"https://api-stg.pianolouvorja.com.br/json_db/x.json",
 		);
 	});
 });

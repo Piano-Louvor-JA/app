@@ -132,7 +132,7 @@ describe("TimerPreview.vue", () => {
     expect(style).toContain("rgb(255, 204, 0)");
     expect(style).toContain("700");
     // stage textBox → background rgba
-    expect(style.toLowerCase()).toContain("rgba(0, 0, 0, 0.5)");
+    expect(style.toLowerCase()).toContain("rgba(24, 24, 24, 0.5)");
   });
 
   it("stage com textShadow: aplica sombra com blur/intensidade", () => {

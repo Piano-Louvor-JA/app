@@ -23,7 +23,7 @@ vi.mock('@shared/services/browser-storage', () => ({
   },
 }))
 
-const prefs: Record<string, unknown> = {}
+const prefs = vi.hoisted(() => ({} as Record<string, unknown>))
 vi.mock('@shared/services/user-preferences', () => ({
   getUserPreference: (key: string, fallback: unknown = null) => (key in prefs ? prefs[key] : fallback),
   setUserPreference: (key: string, value: unknown) => {

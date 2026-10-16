@@ -16,6 +16,10 @@ vi.mock('@shared/services/desktop-bridge', () => ({
 
 const readCatalogRecord = vi.fn()
 const fetchRemoteCatalogJson = vi.fn()
+const getCurrentApiPrefix = vi.fn(() => 'pt')
+vi.mock('@modules/sync/services/library-catalog', () => ({
+  getCurrentApiPrefix: () => getCurrentApiPrefix(),
+}))
 vi.mock('@shared/services/workspace-api', () => ({
   readCatalogRecord: (...a: unknown[]) => readCatalogRecord(...a),
 }))
@@ -41,6 +45,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   isDesktopApp.mockReturnValue(false)
   getDesktopBridge.mockReturnValue(null)
+  getCurrentApiPrefix.mockReturnValue('pt')
   invalidateTrackMediaCache()
 })
 
@@ -106,6 +111,42 @@ describe('collectTrackMediaItems', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     expect(await collectTrackMediaItems(9)).toEqual([])
     vi.restoreAllMocks()
+  })
+
+  it('es usa record e mídia espanhóis isolados', async () => {
+    getCurrentApiPrefix.mockReturnValue('es')
+    readCatalogRecord.mockResolvedValue({
+      url_music: '/musics/es/Himnario Adventista/Cantad alegres al Senor.mp3',
+      url_image: '/covers/es/2003.jpg',
+    })
+
+    const items = await collectTrackMediaItems(2643)
+
+    expect(readCatalogRecord).toHaveBeenCalledWith('music_2643')
+    expect(fetchRemoteCatalogJson).not.toHaveBeenCalled()
+    expect(items).toEqual([
+      { type: 'music', url: '/musics/es/Himnario Adventista/Cantad alegres al Senor.mp3' },
+      { type: 'covers', url: '/covers/es/2003.jpg' },
+    ])
+  })
+})
+
+describe('cache isolado por idioma', () => {
+  it('não reaproveita status pt para a mesma faixa es', async () => {
+    isDesktopApp.mockReturnValue(true)
+    const check = vi.fn().mockResolvedValue(true)
+    getDesktopBridge.mockReturnValue({ media: { check } } as never)
+    readCatalogRecord.mockResolvedValue({ url_music: '/musics/pt/1.mp3' })
+
+    expect(await isTrackMediaDownloaded(1)).toBe(true)
+    expect(peekTrackDownloadCache(1)).toBe(true)
+
+    getCurrentApiPrefix.mockReturnValue('es')
+    readCatalogRecord.mockResolvedValue({ url_music: '/musics/es/1.mp3' })
+
+    expect(peekTrackDownloadCache(1)).toBeUndefined()
+    expect(await isTrackMediaDownloaded(1)).toBe(true)
+    expect(readCatalogRecord).toHaveBeenLastCalledWith('music_1')
   })
 })
 
@@ -209,6 +250,27 @@ describe('downloadTrackMedia', () => {
     expect(warn).toHaveBeenCalled()
     expect(download).toHaveBeenCalled()
     warn.mockRestore()
+  })
+
+  it('objeto de falha do IPC não marca cache nem sucesso', async () => {
+    isDesktopApp.mockReturnValue(true)
+    readCatalogRecord.mockResolvedValue({ url_music: '/musics/pt/1.mp3' })
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    getDesktopBridge.mockReturnValue({
+      media: {
+        check: vi.fn().mockResolvedValue(false),
+        download: vi.fn().mockResolvedValue({ ok: false, url: 'https://api/file', status: 500, bytes: 0, error: 'boom' }),
+      },
+    } as never)
+
+    expect(await downloadTrackMedia(1)).toEqual({ status: 'error', reason: 'server' })
+    expect(peekTrackDownloadCache(1)).not.toBe(true)
+    warn.mockRestore()
+  })
+
+  it('abort pós-check -> cancelled', async () => {
+    isDesktopApp.mockReturnValue(true)
+    readCatalogRecord.mockResolvedValue({ url_music: '/musics/pt/1.mp3' })
 
     // abort após o check: shouldAbort alterna false->true
     let calls = 0
@@ -313,7 +375,7 @@ describe('downloadTrackMedia', () => {
     } as never)
     await downloadTrackMedia(43)
     expect(download).toHaveBeenCalledWith(
-      'https://api.pianolouvorja.com.br/file/musics/pt/43.mp3',
+      'https://api-stg.pianolouvorja.com.br/file/musics/pt/43.mp3',
       'music',
       'pt/43.mp3',
     )

@@ -156,6 +156,7 @@ export function useCountdownDisplay(
     const activeMarkers = computed(() => config.value.alertMarkers ?? DEFAULT_ALERT_MARKERS)
 
     function playMarkerPreset(preset: string, markerId: string): void {
+      if (config.value.mode !== 'sabbath') return // alertas são exclusivos do modo Escola Sabatina
       if (!claimAudioHost()) return // só a janela eleita neste instante toca
       if (store.audioMuted) return // F2: operador silenciou
       // Fila (feedback Ezequias: "adiciona queue") — marcos que cruzam juntos
@@ -178,6 +179,12 @@ export function useCountdownDisplay(
 
     // F2: Stop do operador corta na hora o que estiver tocando
     watch(() => store.audioStopTick, () => {
+      stopAllAlerts()
+    })
+
+    watch(() => config.value.mode, (mode) => {
+      if (mode === 'sabbath') return
+      clearAlertQueue()
       stopAllAlerts()
     })
 

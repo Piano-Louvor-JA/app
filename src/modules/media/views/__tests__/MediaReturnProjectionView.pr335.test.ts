@@ -818,4 +818,3 @@ describe("MediaReturnProjectionView — stage visual", () => {
 		vi.restoreAllMocks()
 		vi.unstubAllGlobals()
 	})
-

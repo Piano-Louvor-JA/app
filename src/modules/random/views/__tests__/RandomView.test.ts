@@ -2,6 +2,16 @@
 // Cobertura RandomView.vue (gaps_map3: 5 pts): header (voltar/modos/reset),
 // delegates ao useRandomFeature, appConfirm no reset, importFile com erro.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+// Composable testado à parte: aqui só o contrato tela ↔ minimizar.
+const minimizeMock = vi.fn(async () => {})
+const prepareMock = vi.fn()
+vi.mock('@shared/composables/useMinimizablePage', () => ({
+  useMinimizablePage: (options: unknown) => {
+    ;(globalThis as any).__minimizeOptions = options
+    return { minimize: minimizeMock, prepare: prepareMock, takeRestoredState: () => null }
+  },
+}))
 import { flushPromises, mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 
@@ -122,7 +132,6 @@ function mountView() {
         RandomAvailablePanel: true,
         RandomHistoryPanel: true,
         RandomConfigDialog: true,
-        RandomProjectFab: true,
         RandomStage: true,
         Teleport: true,
       },
@@ -183,6 +192,22 @@ describe('RandomView.vue', () => {
     const w = mountView()
     const stage = w.findComponent({ name: 'RandomStage' })
     expect(stage).toBeTruthy()
+    w.unmount()
+  })
+})
+
+describe('RandomView — minimizar página', () => {
+  it('– fica abaixo da seta de voltar, minimiza e descreve a tela', async () => {
+    minimizeMock.mockClear()
+    const w = mountView()
+    const stack = w.find('.page-back-stack')
+    expect(stack.find('.random-view__back').exists()).toBe(true)
+    await stack.find('.page-back-stack__minimize').trigger('click')
+    expect(minimizeMock).toHaveBeenCalledTimes(1)
+    const options = (globalThis as any).__minimizeOptions
+    expect(options.describe()).toEqual({ title: 'random.title', icon: 'ti-ticket', summary: '' })
+    expect(options.capture()).toBeNull()
+    expect(options.fallbackRoute).toEqual({ name: 'utilities' })
     w.unmount()
   })
 })

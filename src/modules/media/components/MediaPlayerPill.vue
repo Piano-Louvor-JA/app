@@ -310,7 +310,9 @@ function selectMode(mode: MediaPlaybackMode) {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.85rem 1.1rem;
-  width: min(920px, calc(100vw - 3rem));
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
   padding: 0.7rem 1.25rem;
   border-radius: var(--ds-radius-xl, 24px 0 24px 0);
   background: rgb(24 24 24 / 0.88);
@@ -478,7 +480,6 @@ function selectMode(mode: MediaPlaybackMode) {
 @media (max-width: 780px) {
   .media-player-pill {
     border-radius: 1.25rem 0 1.25rem 0;
-    width: min(100%, calc(100vw - 1.5rem));
   }
 
   .media-player-pill__info {
@@ -490,7 +491,6 @@ function selectMode(mode: MediaPlaybackMode) {
 @media (max-width: 1280px) {
   .media-player-pill {
     gap: 0.55rem 0.75rem;
-    width: min(920px, calc(100vw - 2rem));
     padding: 0.5rem 0.9rem;
   }
 

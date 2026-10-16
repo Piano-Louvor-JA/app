@@ -35,6 +35,11 @@ vi.mock('@assets/brand/CodenameLogo.vue', () => ({ default: { template: '<svg />
 vi.mock('@modules/media/components/MediaChrome.vue', () => ({ default: { template: '<div class="media-chrome-stub" />' } }))
 vi.mock('@shared/components/MonitorTargetSelect.vue', () => ({ default: { template: '<div class="monitor-select-stub" />' } }))
 vi.mock('@shared/components/UiZoomControls.vue', () => ({ default: { template: '<div class="zoom-stub" />' } }))
+vi.mock('@modules/bible/components/BibleChrome.vue', () => ({ default: { template: '<div class="bible-chrome-stub" />' } }))
+vi.mock('@modules/countdown/components/CountdownChrome.vue', () => ({ default: { template: '<div class="countdown-chrome-stub" />' } }))
+vi.mock('@modules/timer/components/TimerChrome.vue', () => ({ default: { template: '<div class="timer-chrome-stub" />' } }))
+vi.mock('@modules/clock/components/ClockChrome.vue', () => ({ default: { template: '<div class="clock-chrome-stub" />' } }))
+vi.mock('@modules/random/components/RandomChrome.vue', () => ({ default: { template: '<div class="random-chrome-stub" />' } }))
 vi.mock('@modules/bible/components/BibleInAppProjection.vue', () => ({ default: { template: '<div class="bible-overlay-stub"><slot name="default" /></div>' } }))
 vi.mock('@shared/components/InAppProjectionOverlay.vue', () => ({ default: { template: '<div class="overlay-stub"><slot /></div>' } }))
 vi.mock('@modules/clock/views/ClockProjectionView.vue', () => ({ default: { template: '<div />' } }))
@@ -48,7 +53,18 @@ vi.mock('@design-system/index', () => ({
     emits: ['select'],
     template: '<div class="dock-stub"><button v-for="i in items" :key="i.key" :data-key="i.key" @click="$emit(\'select\', i.key)">{{ i.key }}</button></div>',
   },
-  GradientBackground: { template: '<div class="gradient-stub"><slot /></div>' },
+  GradientBackground: { template: '<div class="gradient-stub"><slot /></div>' },  MinimizedPagesBar: {
+    name: 'MinimizedPagesBar',
+    template: '<nav class="minimized-bar-mock" />',
+    props: ['items', 'navLabel'],
+    emits: ['open', 'close'],
+  },
+  HistoryNav: {
+    name: 'HistoryNav',
+    template: '<nav class="history-nav-mock" />',
+    props: ['dots', 'canGoBack', 'canGoForward', 'navLabel', 'backLabel', 'forwardLabel'],
+    emits: ['back', 'forward', 'go'],
+  },
 }))
 vi.mock('@design-system/composables', () => ({
   usePageTransition: () => ({ transitionName: ref('fade') }),
@@ -63,6 +79,11 @@ const routerPush = vi.fn(async () => {})
 vi.mock('vue-router', () => ({
   useRoute: () => routeState,
   useRouter: () => ({ push: routerPush }),
+}))
+// router mockado sem guards: a memória de rolagem é testada à parte
+vi.mock('@shared/composables/useViewScrollMemory', () => ({
+  VIEW_SCROLL_MEMORY: Symbol('view-scroll-memory'),
+  useViewScrollMemory: () => ({ restore: vi.fn(), captureCurrent: vi.fn(() => []), seed: vi.fn() }),
 }))
 
 import AppShell from '@layouts/AppShell.vue'

@@ -31,7 +31,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Sync boards
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           PORTFOLIO_ID: PVT_kwDOE_gVsM4BlArD
           PORTFOLIO_STATUS: PVTSSF_lADOE_gVsM4BlArDzhjvIPA

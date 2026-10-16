@@ -21,6 +21,8 @@ export type MediaLyricSlide = {
   instrumentalTime: string
   imageUrl: string | null
   imagePosition: string | null
+  /** Frame PDF/PPT capturado (data:image/) — slide de frame, sem véu. */
+  frameDataUrl?: string
   isCover: boolean
 }
 
@@ -72,6 +74,7 @@ export type MediaProjectionRuntime = {
   lyric: string
   imageUrl: string | null
   imagePosition: string | null
+  frameDataUrl: string | null
   isCover: boolean
   slideIndex: number
   slideCount: number
@@ -92,6 +95,7 @@ export const DEFAULT_MEDIA_PROJECTION: MediaProjectionRuntime = {
   lyric: '',
   imageUrl: null,
   imagePosition: null,
+  frameDataUrl: null,
   isCover: false,
   slideIndex: 0,
   slideCount: 0,

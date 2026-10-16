@@ -253,9 +253,78 @@ async function onToggleFullscreen() {
         <MediaSlideStage
           :lyric="stageLyric"
           :title="stageTitle"
+          :subtitle="session?.subtitle || ''"
           :image-url="stageImage"
           :is-cover="isCover"
         />
+
+        <div class="media-window__pill-wrap">
+          <div class="media-window__pill-stack">
+            <MediaPlayerPill
+              :title="session?.title || t('media.title')"
+              :subtitle="session?.subtitle || ''"
+              :is-playing="isPlaying"
+              :has-audio="hasAudio"
+              :has-instrumental="hasInstrumental"
+              :mode="playbackMode"
+              :current-time-label="currentTimeLabel"
+              :duration-label="durationLabel"
+              :progress-ratio="progressRatio"
+              :volume="volume"
+              :projecting="isProjecting"
+              :audio-on-tv="audioOnTv"
+              :playlist-open="showPlaylist"
+              @toggle-play="togglePlay"
+              @previous-slide="previousSlide"
+              @next-slide="nextSlide"
+              @seek-ratio="seekRatio"
+              @update:volume="setVolume"
+              @update:mode="onMode"
+              @toggle-projection="toggleProjection"
+              @toggle-audio-on-tv="onToggleAudioOnTv"
+              @toggle-playlist="togglePlaylist"
+              @toggle-fullscreen="onToggleFullscreen"
+            />
+            <div
+              v-if="showOndemandNotice"
+              class="media-window__ondemand"
+              :class="{ 'media-window__ondemand--done': ondemandDownloadDone }"
+              aria-live="polite"
+            >
+              <div
+                class="media-window__ondemand-track"
+                role="progressbar"
+                :aria-valuenow="ondemandDownloadPercent ?? 100"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                :aria-label="
+                  ondemandDownloadDone
+                    ? t('media.ondemandDownloadSuccess')
+                    : t('media.ondemandDownload')
+                "
+              >
+                <div
+                  class="media-window__ondemand-fill"
+                  :style="{ transform: `scaleX(${ondemandProgressRatio})` }"
+                />
+              </div>
+              <p
+                class="media-window__ondemand-label"
+                :class="{
+                  'media-window__ondemand-label--done': ondemandDownloadDone,
+                }"
+              >
+                {{
+                  preplayDownloadMusicId && !ondemandDownloadDone
+                    ? t('media.ondemandPreplay')
+                    : ondemandDownloadDone
+                    ? t('media.ondemandDownloadSuccess')
+                    : t('media.ondemandDownload')
+                }}
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
       <aside
@@ -308,74 +377,6 @@ async function onToggleFullscreen() {
           </ul>
         </template>
       </aside>
-
-      <div class="media-window__pill-wrap">
-        <div class="media-window__pill-stack">
-          <MediaPlayerPill
-            :title="session?.title || t('media.title')"
-            :subtitle="session?.subtitle || ''"
-            :is-playing="isPlaying"
-            :has-audio="hasAudio"
-            :has-instrumental="hasInstrumental"
-            :mode="playbackMode"
-            :current-time-label="currentTimeLabel"
-            :duration-label="durationLabel"
-            :progress-ratio="progressRatio"
-            :volume="volume"
-            :projecting="isProjecting"
-            :audio-on-tv="audioOnTv"
-            :playlist-open="showPlaylist"
-            @toggle-play="togglePlay"
-            @previous-slide="previousSlide"
-            @next-slide="nextSlide"
-            @seek-ratio="seekRatio"
-            @update:volume="setVolume"
-            @update:mode="onMode"
-            @toggle-projection="toggleProjection"
-            @toggle-audio-on-tv="onToggleAudioOnTv"
-            @toggle-playlist="togglePlaylist"
-            @toggle-fullscreen="onToggleFullscreen"
-          />
-          <div
-            v-if="showOndemandNotice"
-            class="media-window__ondemand"
-            :class="{ 'media-window__ondemand--done': ondemandDownloadDone }"
-            aria-live="polite"
-          >
-            <div
-              class="media-window__ondemand-track"
-              role="progressbar"
-              :aria-valuenow="ondemandDownloadPercent ?? 100"
-              aria-valuemin="0"
-              aria-valuemax="100"
-              :aria-label="
-                ondemandDownloadDone
-                  ? t('media.ondemandDownloadSuccess')
-                  : t('media.ondemandDownload')
-              "
-            >
-              <div
-                class="media-window__ondemand-fill"
-                :style="{ transform: `scaleX(${ondemandProgressRatio})` }"
-              />
-            </div>
-            <p
-              class="media-window__ondemand-label"
-              :class="{
-                'media-window__ondemand-label--done': ondemandDownloadDone,
-              }"
-            >
-              {{
-                preplayDownloadMusicId && !ondemandDownloadDone
-                  ? t('media.ondemandPreplay')
-                  : ondemandDownloadDone
-                  ? t('media.ondemandDownloadSuccess')
-                  : t('media.ondemandDownload')
-              }}
-            </p>
-          </div>
-        </div>
-      </div>
     </div>
 
     <MediaCloseDialog
@@ -605,8 +606,8 @@ async function onToggleFullscreen() {
   flex-direction: column;
   align-items: stretch;
   gap: 0.45rem;
-  width: max-content;
-  max-width: calc(100% - 2rem);
+  width: min(920px, calc(100% - 2rem));
+  min-width: 0;
 }
 
 .media-window__ondemand {

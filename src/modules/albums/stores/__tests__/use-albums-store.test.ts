@@ -159,6 +159,28 @@ describe('useAlbumsStore', () => {
     expect(store.tracks).toHaveLength(1)
   })
 
+  it('openCollection: reabrir a mesma coletânea (voltar para a tela) mantém a busca', async () => {
+    h.findCollectionById.mockReturnValue(collection)
+    h.loadCollectionTracks.mockResolvedValue([{ id: 1, name: 'T' }])
+    const store = useAlbumsStore()
+    await store.openCollection('5')
+    store.searchQuery = 'arautos'
+    await store.openCollection('5')
+    expect(store.searchQuery).toBe('arautos')
+    expect(h.loadCollectionTracks).toHaveBeenCalledTimes(2)
+  })
+
+  it('openCollection: abrir outra coletânea limpa a busca', async () => {
+    h.findCollectionById.mockReturnValue(collection)
+    h.loadCollectionTracks.mockResolvedValue([{ id: 1, name: 'T' }])
+    const store = useAlbumsStore()
+    await store.openCollection('5')
+    store.searchQuery = 'arautos'
+    h.findCollectionById.mockReturnValue({ ...collection, id: '6' })
+    await store.openCollection('6')
+    expect(store.searchQuery).toBe('')
+  })
+
   it('openCollection: coletânea inexistente', async () => {
     h.findCollectionById.mockReturnValue(null)
     const store = useAlbumsStore()
@@ -281,5 +303,38 @@ describe('useAlbumsStore', () => {
     store.tracks = [{ id: 1 }, { id: 2 }] as never
     store.searchQuery = 'a'
     expect(store.filteredTracks).toHaveLength(2)
+  })
+})
+
+describe('useAlbumsStore — evento louvorja:catalog-refreshed', () => {
+  const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
+
+  it('catálogo que abriu vazio recarrega quando o cache é curado', async () => {
+    const store = useAlbumsStore()
+    await store.hydrateCatalog()
+    expect(store.categories).toEqual([])
+
+    h.loadAlbumCategories.mockResolvedValue([{ id: 12, name: 'CDs', albums: [] }])
+    window.dispatchEvent(new CustomEvent('louvorja:catalog-refreshed'))
+    await flush()
+    await flush()
+
+    expect(store.categories.map((c) => String(c.id))).toEqual(['12'])
+  })
+
+  it('recarga pelo evento mantém Minhas Coletâneas', async () => {
+    h.getShowCustomCollections.mockReturnValue(true)
+    h.loadCustomAlbumCategory.mockResolvedValue({ id: 'custom', name: 'Minhas', albums: [] })
+    h.loadAlbumCategories.mockResolvedValue([{ id: 12, name: 'CDs', albums: [] }])
+    const store = useAlbumsStore()
+    await store.hydrateCatalog()
+    await flush()
+    expect(store.categories.map((c) => String(c.id))).toEqual(['custom', '12'])
+
+    window.dispatchEvent(new CustomEvent('louvorja:catalog-refreshed'))
+    await flush()
+    await flush()
+
+    expect(store.categories.map((c) => String(c.id))).toEqual(['custom', '12'])
   })
 })

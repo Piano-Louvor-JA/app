@@ -119,6 +119,7 @@ const trackMediaMock = vi.hoisted(() => ({
 	download: vi.fn().mockResolvedValue({ status: "downloaded" }),
 }));
 vi.mock("@shared/services/track-media", () => ({
+	onTrackMediaChanged: vi.fn(),
 	isTrackMediaDownloaded: (...a: unknown[]) =>
 		trackMediaMock.isDownloaded(...(a as [number])),
 	downloadTrackMedia: (...a: unknown[]) =>

@@ -83,15 +83,12 @@ describe("fetchRemoteCatalogJson", () => {
 		expect(mocks.state.fetch).toHaveBeenCalledTimes(2);
 	});
 
-	it("404 sem retry → erro imediato e vai pro fallback", async () => {
+	it("404 é terminal: erro imediato, sem fallback", async () => {
 		mocks.state.fetch.mockResolvedValue(mockFetchResponse(404));
-		const data = await fetchRemoteCatalogJson("catalog");
-		expect(data).toEqual({ via: "fallback" });
-		expect(mocks.state.fallback).toHaveBeenCalledWith(
-			"database",
-			"catalog",
-			expect.objectContaining({ retries: 5 }),
+		await expect(fetchRemoteCatalogJson("catalog")).rejects.toThrow(
+			"Servidor retornou erro 404",
 		);
+		expect(mocks.state.fallback).not.toHaveBeenCalled();
 	});
 
 	it("network error com retries → retry; esgotado → fallback", async () => {

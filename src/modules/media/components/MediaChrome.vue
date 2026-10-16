@@ -1,7 +1,11 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+
+import FloatingPreviewTitle from '@shared/components/FloatingPreviewTitle.vue'
+import { FLOATING_STACK_ORDER, useFloatingDrag } from '@shared/composables/useFloatingDrag'
+import { USER_PREFERENCE_KEYS } from '@shared/constants/storage-keys'
 
 import { useMediaPlayer } from '../composables/useMediaPlayer'
 import MediaProjectFab from './MediaProjectFab.vue'
@@ -17,6 +21,8 @@ const {
   isPlaying,
   previewSnippet,
   previewReference,
+  session,
+  queueLabel,
   toggleProjection,
   clearProjection,
   togglePlay,
@@ -24,6 +30,15 @@ const {
 } = useMediaPlayer()
 
 const visible = computed(() => hasSession.value && minimized.value)
+
+/** "Player · nome": a playlist tocando, ou a coletânea/hinário do hino. */
+const chromeDetail = computed(() => queueLabel.value || session.value?.subtitle || undefined)
+
+const chromeRoot = ref<HTMLElement | null>(null)
+const { positionStyle, dragging, onPointerDown, resetPosition } =
+  useFloatingDrag(chromeRoot, USER_PREFERENCE_KEYS.mediaChromePosition, {
+    stackOrder: FLOATING_STACK_ORDER.media,
+  })
 
 async function onProject() {
   await toggleProjection()
@@ -46,12 +61,27 @@ async function onToggleAudio() {
 <template>
   <div
     v-if="visible"
+    ref="chromeRoot"
     class="media-chrome"
+    :class="{ 'media-chrome--dragging': dragging }"
+    :style="positionStyle"
+    @pointerdown="onPointerDown"
   >
-    <MediaStatusPreview
-      :snippet="previewSnippet"
-      :reference="previewReference"
+    <FloatingPreviewTitle
+      :label="t('media.title')"
+      :detail="chromeDetail"
     />
+
+    <div
+      class="media-chrome__handle"
+      :title="t('media.chromeDragHint')"
+      @dblclick="resetPosition"
+    >
+      <MediaStatusPreview
+        :snippet="previewSnippet"
+        :reference="previewReference"
+      />
+    </div>
 
     <div class="media-chrome__actions">
       <button
@@ -100,6 +130,13 @@ async function onToggleAudio() {
   align-items: flex-end;
   gap: 0.75rem;
   pointer-events: none;
+  user-select: none;
+  touch-action: none;
+}
+
+.media-chrome__handle {
+  pointer-events: auto;
+  cursor: grab;
 }
 
 .media-chrome__actions {
@@ -107,6 +144,11 @@ async function onToggleAudio() {
   align-items: center;
   gap: 0.5rem;
   pointer-events: auto;
+}
+
+.media-chrome--dragging,
+.media-chrome--dragging .media-chrome__handle {
+  cursor: grabbing;
 }
 
 .media-chrome__icon-btn {

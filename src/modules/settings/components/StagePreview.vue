@@ -7,7 +7,7 @@
  */
 import { computed } from 'vue'
 
-import { resolveBackgroundImage, stageFlexAlign, type StageSettings } from '../types/stage-settings'
+import { resolveBackgroundImage, stageBgCss, stageFlexAlign, type StageSettings } from '../types/stage-settings'
 
 const props = defineProps<{
   settings: StageSettings
@@ -27,7 +27,11 @@ const footer = computed(() =>
 const containerStyle = computed(() => {
   const s = props.settings
   return {
-    backgroundColor: s.backgroundColor,
+    // Hinos: null deixa a capa aparecer. Bíblia não tem capa — o palco é preto.
+    backgroundColor:
+      props.module === 'bible'
+        ? (s.backgroundColor ?? '#000000')
+        : stageBgCss(s.backgroundColor),
     backgroundImage: resolveBackgroundImage(s.backgroundImage)
       ? `url(${resolveBackgroundImage(s.backgroundImage)})`
       : undefined,
@@ -41,11 +45,14 @@ const textStyle = computed(() => {
   const s = props.settings
   const isBible = props.module === 'bible'
   return {
-    color: isBible ? s.bibleTextColor : s.textColor,
+    color: (isBible ? s.bibleTextColor : s.textColor) ?? undefined,
     // 96px @1920 → 5% da largura do preview (font-size em cqw)
     fontSize: `${((isBible ? s.bibleFontSize : s.fontSize) / 1920) * 100}cqw`,
     fontWeight: String(isBible ? s.bibleFontWeight : s.fontWeight),
     textAlign: s.textAlign,
+    // Paridade web: capitalização do versículo no preview da Bíblia.
+    textTransform:
+      isBible && s.bibleTextTransform !== 'none' ? s.bibleTextTransform : 'none',
     textShadow: s.textShadow
       ? `0 0 ${(s.shadowBlur / 108) * 100}cqw rgba(0,0,0,${s.shadowIntensity})`
       : 'none',
@@ -56,15 +63,17 @@ const boxStyle = computed(() => {
   const s = props.settings
   if (!s.textBox) return {}
   return {
-    backgroundColor: `rgba(0,0,0,${s.boxOpacity})`,
-    border: s.boxBorder ? '1px solid rgba(255,255,255,0.25)' : 'none',
+    backgroundColor: `rgba(24,24,24,${s.boxOpacity})`,
+    border: s.boxBorder ? 'clamp(2px, 0.2vmin, 4px) solid rgba(255,255,255,0.85)' : 'none',
     // Padrão folha característico do design (como o media-projection)
     borderRadius: '1.4cqw 0 1.4cqw 0',
+    backdropFilter: 'blur(16px)',
+    '-webkit-backdrop-filter': 'blur(16px)',
   }
 })
 
 const footerStyle = computed(() => ({
-  color: props.settings.footerRefColor,
+  color: props.settings.footerRefColor ?? undefined,
   fontWeight: String(props.settings.footerRefWeight),
 }))
 </script>

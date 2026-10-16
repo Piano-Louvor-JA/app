@@ -15,6 +15,8 @@ interface ImportMetaEnv {
   readonly VITE_URL_FILES?: string
   readonly VITE_URL_DATABASE?: string
   readonly VITE_API_TOKEN?: string
+  /** Build de campanha (SrCaldeira/Ezequias): expõe rota+card do diagnóstico. */
+  readonly VITE_DIAGNOSTICS_CAMPAIGN?: string
 }
 
 interface ImportMeta {

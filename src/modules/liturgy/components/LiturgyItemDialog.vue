@@ -22,6 +22,7 @@ import {
   type LiturgyMusicOption,
 } from '../types/liturgy'
 import { probeMediaDurationMs } from '../services/media-probe'
+import { useScheduledStore } from '../stores/useScheduledStore'
 import { useExternalPlayerChoices } from '../composables/useExternalPlayerChoices'
 import {
   importSljaAsLiturgyMusic,
@@ -146,21 +147,15 @@ async function onImportSljaFile(event: Event): Promise<void> {
           slides: imported.slides,
         })
   } catch (error) {
-    if (run !== sljaRun.value) return
     sljaError.value = true
-    const code = error instanceof Error ? error.message : ''
-    const key =
-      code === 'SLJA_LOCAL_AUDIO_PERSIST_FAILED' ||
-      code === 'SLJA_LOCAL_LYRIC_PERSIST_FAILED'
-        ? 'liturgy.slja.importStorageFailed'
-        : code === 'SLJA_IMPORT_COLLECTION_FAILED' ||
-            code === 'SLJA_IMPORT_MUSIC_FAILED' ||
-            code === 'SLJA_IMPORT_LYRICS_INCOMPLETE'
-          ? 'liturgy.slja.importRemoteFailed'
-          : code === 'SLJA_IMPORT_NO_LYRICS'
-            ? 'liturgy.slja.importNoLyrics'
-            : 'liturgy.slja.importFailed'
-    sljaMessage.value = t(key)
+    // slja-storage: quota do localStorage NÃO é mais engolida — informa
+    // "armazenamento cheio" em vez de sucesso falso com dados perdidos.
+    const isQuota =
+      error instanceof DOMException &&
+      (error.name === 'QuotaExceededError' || error.name === 'QuotaExceeded')
+    sljaMessage.value = isQuota
+      ? t('liturgy.slja.importStorageFull')
+      : t('liturgy.slja.importFailed')
   } finally {
     if (run === sljaRun.value) sljaImporting.value = false
   }
@@ -280,6 +275,9 @@ const dialogTitle = computed(() => {
   if (props.hideTypePicker) return t('liturgy.dialog.addCategoryTitle')
   return t('liturgy.dialog.title')
 })
+
+const scheduledStore = useScheduledStore()
+const rotationOptions = computed(() => scheduledStore.categories)
 
 const typeGroups = computed(() => {
   const groups = LITURGY_TYPE_GROUPS.map((group) => ({
@@ -518,8 +516,13 @@ function onCategoryChange(event: Event) {
   patch({ categoryId: value || null })
 }
 
-const { loadPlayerChoices } = useExternalPlayerChoices()
+/** Rotação agendada: campo PRÓPRIO — nunca move o item na árvore da liturgia. */
+function onRotationChange(event: Event) {
+  const value = (event.target as HTMLSelectElement).value
+  patch({ scheduledRotationId: value || null })
+}
 
+const { loadPlayerChoices } = useExternalPlayerChoices()
 watch(
   () => [props.open, props.draft.type] as const,
   ([open, type]) => {
@@ -1034,7 +1037,49 @@ function isLightDot(hex: string): boolean {
             </div>
 
             <div
-              v-if="showCategoryField"
+              v-if="draft.type === 'scheduled'"
+              class="moment-dialog__section"
+            >
+              <label
+                class="moment-dialog__label"
+                :class="{ 'moment-dialog__label--error': categoryFieldError }"
+                for="moment-rotation"
+              >
+                {{
+                  t('liturgy.dialog.rotationField')
+                }}
+                <span
+                  class="moment-dialog__required"
+                  aria-hidden="true"
+                >*</span>
+              </label>
+              <select
+                id="moment-rotation"
+                class="moment-dialog__input moment-dialog__select"
+                :value="draft.scheduledRotationId ?? ''"
+                :aria-invalid="categoryFieldError"
+                @change="onRotationChange"
+              >
+                <option value="">
+                  {{ t('liturgy.dialog.categoryPlaceholder') }}
+                </option>
+                <option
+                  v-for="option in rotationOptions"
+                  :key="option.id"
+                  :value="option.id"
+                >
+                  {{ option.name }}
+                </option>
+              </select>
+              <p
+                v-if="categoryFieldError"
+                class="moment-dialog__error"
+              >
+                {{ t('liturgy.dialog.categoryRequired') }}
+              </p>
+            </div>
+            <div
+              v-if="showCategoryField && draft.type !== 'scheduled'"
               class="moment-dialog__section"
             >
               <label
@@ -1067,7 +1112,7 @@ function isLightDot(hex: string): boolean {
                 v-if="categoryOptions.length === 0"
                 class="moment-dialog__type-hint"
               >
-                {{ t('liturgy.dialog.categoryEmpty') }}
+                {{ t('liturgy.dialog.categoryOptionalHint') }}
               </p>
             </div>
           </div>

@@ -63,6 +63,28 @@ describe("MediaSlideStage", () => {
 		expect(w.text()).not.toContain("letra qualquer");
 		expect(w.find(".media-slide-stage__lyric--cover").exists()).toBe(true);
 		expect(w.find(".media-slide-stage__content--cover").exists()).toBe(true);
+		expect(w.find(".media-slide-stage__titlecard").exists()).toBe(true);
+		expect(w.find(".media-slide-stage__kicker").exists()).toBe(false);
+	});
+
+	it("capa: intérprete diferente do título entra no cartaz", () => {
+		const w = mountStage({
+			lyric: "",
+			title: "Maranata",
+			subtitle: "Athus Santos",
+			isCover: true,
+		});
+		expect(w.find(".media-slide-stage__kicker").text()).toBe("Athus Santos");
+	});
+
+	it("capa: não repete o intérprete quando é igual ao título", () => {
+		const w = mountStage({
+			lyric: "",
+			title: "Maranata",
+			subtitle: "maranata",
+			isCover: true,
+		});
+		expect(w.find(".media-slide-stage__kicker").exists()).toBe(false);
 	});
 
 	it("com imagem: aplica background url", () => {

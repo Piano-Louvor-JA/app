@@ -6,8 +6,10 @@ import {
 	deleteTrackMedia,
 	downloadTrackMedia,
 	isTrackMediaDownloaded,
+	onTrackMediaChanged,
+	offTrackMediaChanged,
 } from "@shared/services/track-media";
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 /**
@@ -175,6 +177,35 @@ async function onOfflineAction() {
 onMounted(() => {
 	void refreshOfflineStatus();
 });
+
+/**
+ * Badge live: download/delete pode terminar em OUTRO fluxo (pre-play
+ * ensureTrackDownloaded, ondemand). Evento do serviço atualiza este
+ * componente sem re-mount (14/10).
+ */
+function onTrackMediaChangedLocal(musicId: number, downloaded: boolean) {
+	if (musicId !== props.musicId) return;
+	if (offlineStatus.value === "downloading") return; // fluxo próprio já controla
+	offlineStatus.value = downloaded ? "downloaded" : "idle";
+	downloadProgress.value = 0;
+	emitDownloadProgress(null);
+}
+
+onMounted(() => onTrackMediaChanged(onTrackMediaChangedLocal));
+onUnmounted(() => {
+	offTrackMediaChanged(onTrackMediaChangedLocal);
+	window.removeEventListener("focus", onWindowFocusRevalidate);
+});
+
+/**
+ * Usuário pode apagar arquivos fora do app (gerenciador) — badge não pode
+ * mentir. No focus do app, revalida SE o status atual diz "baixado"
+ * (idle/erro não precisa: o evento track-media cobre mutações do app).
+ */
+function onWindowFocusRevalidate() {
+	if (offlineStatus.value === "downloaded") void refreshOfflineStatus();
+}
+onMounted(() => window.addEventListener("focus", onWindowFocusRevalidate));
 
 watch(
 	() => props.musicId,

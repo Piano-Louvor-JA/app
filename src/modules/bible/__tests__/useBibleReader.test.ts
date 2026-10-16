@@ -144,6 +144,25 @@ describe('useBibleReader', () => {
     wrapper.unmount()
   })
 
+  it('setas com Alt/Ctrl/Meta não trocam versículo (Alt+setas = histórico de navegação)', async () => {
+    const store = useBibleStore()
+    const spyNav = vi.spyOn(store, 'goToAdjacentVerse').mockResolvedValue()
+    const wrapper = mountWith(() => useBibleReader())
+
+    for (const modifier of ['altKey', 'ctrlKey', 'metaKey'] as const) {
+      for (const key of ['ArrowLeft', 'ArrowRight']) {
+        const e = new KeyboardEvent('keydown', { key, [modifier]: true, bubbles: true, cancelable: true })
+        window.dispatchEvent(e)
+        expect(e.defaultPrevented, `${modifier}+${key}`).toBe(false)
+      }
+    }
+    expect(spyNav).not.toHaveBeenCalled()
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+    expect(spyNav).toHaveBeenCalledWith(1)
+    wrapper.unmount()
+  })
+
   it('Escape no preview in-app fecha a projeção', async () => {
     const store = useBibleStore()
     store.inAppPreview = true

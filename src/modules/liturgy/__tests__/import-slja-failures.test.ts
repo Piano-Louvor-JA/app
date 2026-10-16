@@ -3,7 +3,7 @@ const m = vi.hoisted(() => ({ auth: vi.fn(), parse: vi.fn(), list: vi.fn(), coll
 vi.mock('@modules/media/services/auth-client', () => ({ getAuthSession: m.auth }));
 vi.mock('@shared/services/slja', () => ({ parseSljaFile: m.parse }));
 vi.mock('@modules/media/services/custom-catalog', () => ({ listCustomCollections: m.list, createCustomCollection: m.collection, createCustomMusic: m.music, createCustomLyric: m.lyric, uploadCustomFile: m.upload, updateCustomMusic: m.update, deleteCustomMusic: m.remove, toCustomMusicId: (id: number) => 1000000 + id }));
-vi.mock('@modules/media/services/local-custom-store', () => ({ listLocalCollections: m.localList, createLocalCollection: m.localCreate, createLocalMusic: m.localMusic, getLocalMusic: m.localGet, updateLocalMusic: m.localUpdate, createLocalLyric: m.localLyric, deleteLocalMusic: m.localDelete }));
+vi.mock('@modules/media/services/local-custom-store', () => ({ listLocalCollections: m.localList, createLocalCollection: m.localCreate, createLocalMusic: m.localMusic, getLocalMusic: m.localGet, updateLocalMusic: m.localUpdate, createLocalLyric: m.localLyric, deleteLocalMusic: m.localDelete, findLocalMusicBySljaHash: () => null }));
 import { importSljaAsLiturgyMusic, sljaDisplayName } from '../services/import-slja-to-liturgy';
 const source = { bytes: new ArrayBuffer(1), name: 'song.slja' };
 const archive = () => ({ title: 'Song', assets: [], slides: [{ lyric: 'Verse', timeMs: 0, type: 'LETRA' }] });
@@ -21,29 +21,29 @@ afterEach(() => vi.restoreAllMocks());
 it('falls back to the file name when title is missing', () => expect(sljaDisplayName({}, 'fallback.slja')).toBe('fallback'));
 it('reuses only an existing owned import collection', async () => {
   m.list.mockResolvedValue([{ name: 'Importações .slja', id: 3, ownerId: 1 }]);
-  expect((await importSljaAsLiturgyMusic(source)).collectionId).toBe(3);
+  expect((await importSljaAsLiturgyMusic(source, { confirmUpload: async () => true })).collectionId).toBe(3);
   expect(m.collection).not.toHaveBeenCalled();
 });
 it('rejects a failed music creation', async () => {
   m.music.mockResolvedValue(null);
-  await expect(importSljaAsLiturgyMusic(source)).rejects.toThrow('SLJA_IMPORT_MUSIC_FAILED');
+  await expect(importSljaAsLiturgyMusic(source, { confirmUpload: async () => true })).rejects.toThrow('SLJA_IMPORT_MUSIC_FAILED');
   expect(m.lyric).not.toHaveBeenCalled();
 });
 it('rejects a failed collection creation', async () => {
   m.collection.mockResolvedValue(null);
-  await expect(importSljaAsLiturgyMusic(source)).rejects.toThrow('SLJA_IMPORT_COLLECTION_FAILED');
+  await expect(importSljaAsLiturgyMusic(source, { confirmUpload: async () => true })).rejects.toThrow('SLJA_IMPORT_COLLECTION_FAILED');
 });
 it('aborts when the collection query completed after its deadline', async () => {
   const controller = new AbortController(); controller.abort();
   vi.spyOn(AbortSignal, 'timeout').mockReturnValue(controller.signal);
-  await expect(importSljaAsLiturgyMusic(source)).rejects.toThrow('SLJA_IMPORT_COLLECTION_FAILED');
+  await expect(importSljaAsLiturgyMusic(source, { confirmUpload: async () => true })).rejects.toThrow('SLJA_IMPORT_COLLECTION_FAILED');
   expect(m.music).not.toHaveBeenCalled();
 });
 it.each([['folder/BG.png'], ['one/bg.png', 'two/bg.png']])('matches image basenames only if unique (%s)', async (...paths) => {
   const assetPaths = paths.flat();
   m.parse.mockResolvedValue({ ...archive(), assets: assetPaths.map(path => ({ path, bytes: new Uint8Array([1]) })), slides: [{ lyric: 'Verse', timeMs: 0, type: 'LETRA', image: { name: 'bg.png' } }] });
   m.upload.mockImplementation(async (_bytes, path) => ({ idFile: 10, url: path }));
-  await importSljaAsLiturgyMusic(source);
+  await importSljaAsLiturgyMusic(source, { confirmUpload: async () => true });
   expect(m.lyric.mock.calls[0][1].id_file_image).toBe(assetPaths.length === 1 ? 10 : undefined);
 });
 it('reuses the local import collection and reports slide images omitted', async () => {

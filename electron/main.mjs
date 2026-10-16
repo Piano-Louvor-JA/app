@@ -1,6 +1,7 @@
 import path from "node:path";
+import { statSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { app, BrowserWindow, dialog, globalShortcut, screen, shell } from "electron";
+import { app, BrowserWindow, dialog, globalShortcut, ipcMain, screen, shell } from "electron";
 
 import {
 	APP_DESKTOP_ID,
@@ -14,8 +15,9 @@ import { configureUserDataPath } from "./user-data-path.mjs";
 import { checkEulaAcceptance } from "./eula.mjs";
 import { resolveAppLocale } from "./locale.mjs";
 import { registerWorkspaceIpc } from "./ipc/register.mjs";
-import { registerDiagnosticsIpc, setDiagnosticsToken } from "./diagnostics.mjs";
-import { attachWindowStateEvents, registerWindowIpc } from "./ipc/window.mjs";
+import { registerDiagnosticsIpc, setClockSkewProvider, setDiagnosticsToken } from "./diagnostics.mjs";
+import { createMainLogger } from "./main-log.mjs";
+import { attachHistoryAppCommand, attachWindowStateEvents, registerWindowIpc } from "./ipc/window.mjs";
 import { attachRemoteServer } from "./remote-server.mjs";
 import { attachPalcoServer } from "./palco-server.mjs";
 import { ensureWorkspaceDirectories } from "./paths.mjs";
@@ -42,9 +44,11 @@ const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 const isDev = Boolean(VITE_DEV_SERVER_URL);
 const PRELOAD_PATH = path.join(__dirname, "preload.mjs");
 const bootT0 = Date.now();
+const mainLog = createMainLogger(() => app.getPath('userData'));
 
 function bootMark(label) {
 	console.log(`[boot +${Date.now() - bootT0}ms] ${label}`);
+	mainLog.info(`boot ${label}`);
 }
 
 registerLocalScheme();
@@ -54,6 +58,7 @@ registerLocalScheme();
 // app sem explicação. Loga, mostra diálogo amigável e segue.
 process.on("uncaughtException", (error) => {
   console.error("[main] uncaughtException:", error);
+  mainLog.error(`uncaughtException ${error instanceof Error ? error.stack ?? error.message : String(error ?? '')}`);
   try {
     const msg = error instanceof Error ? error.message : String(error ?? "erro desconhecido");
     dialog.showErrorBox(
@@ -63,6 +68,10 @@ process.on("uncaughtException", (error) => {
   } catch {
     /* diálogo falhou — segue */
   }
+});
+
+process.on('unhandledRejection', (reason) => {
+  mainLog.error(`unhandledRejection ${reason instanceof Error ? reason.stack ?? reason.message : String(reason ?? '')}`);
 });
 
 /**
@@ -93,7 +102,8 @@ if (typeof process.getuid === "function" && process.getuid() === 0) {
  *  renderização por software é suficiente pro app e estabiliza o dev. */
 if (process.env.VITE_DEV_SERVER_URL) {
 	app.commandLine.appendSwitch("disable-gpu");
-	app.commandLine.appendSwitch("in-process-gpu");
+	// in-process-gpu removido (07/10): SIGTRAP do electron em dev ~35s pós-boot
+	// (crash no processo GPU in-process; com gpu em software separado estabiliza).
 }
 
 /** Permite autoplay com áudio nas janelas de projeção (YouTube). */
@@ -215,6 +225,10 @@ function applyWindowIcon(win) {
 	}
 }
 
+function isWarmProjectionUrl(url) {
+	return typeof url === "string" && /(?:\?|&)warm=1(?:&|$)/.test(url);
+}
+
 function isProjectionPopupUrl(url) {
 	try {
 		const parsed = new URL(url);
@@ -325,6 +339,8 @@ function buildPopupWindowOptions(url, features = '') {
       nodeIntegration: false,
       sandbox: false,
       spellcheck: false,
+      // Janela aquecida fica oculta: sem isso o Chromium congela o renderer.
+      backgroundThrottling: !isWarmProjectionUrl(url),
     },
   }
 
@@ -404,6 +420,74 @@ function attachProjectionWindowHandlers(parentWindow) {
   // 'none' com projeção aberta. A marca é a fonte de verdade.
   /** @type {Set<import('electron').BrowserWindow>} */
   const projectionPopups = new Set()
+  /** Janelas de mídia já com o Vue montado, escondidas até o play. */
+  /** @type {{ win: import('electron').BrowserWindow, layout: 'audience' | 'return' }[]} */
+  let warmPool = []
+  /** @type {WeakSet<import('electron').BrowserWindow>} */
+  const standbyWindows = new WeakSet()
+  /** @type {WeakSet<import('electron').BrowserWindow>} */
+  const standbyReady = new WeakSet()
+
+  const focusOperator = () => {
+    if (!parentWindow || parentWindow.isDestroyed()) return
+    setTimeout(() => {
+      try {
+        if (!parentWindow.isDestroyed()) parentWindow.focus()
+      } catch { /* ignore */ }
+    }, 0)
+  }
+
+  ipcMain.removeHandler("projection:reveal-warm")
+  ipcMain.handle("projection:reveal-warm", (_event, payload) => {
+    const shows = Array.isArray(payload?.shows)
+      ? payload.shows
+      : payload?.monitorId != null
+        ? [payload]
+        : []
+    if (shows.length === 0) return false
+
+    const available = warmPool.filter(
+      (item) => !item.win.isDestroyed() && standbyReady.has(item.win),
+    )
+    /** @type {{ item: (typeof available)[number], show: { monitorId?: unknown, fullscreen?: unknown, layout?: unknown } }[]} */
+    const assigned = []
+    const taken = new Set()
+    for (const show of shows) {
+      const layout = show?.layout === "return" ? "return" : "audience"
+      const index = available.findIndex(
+        (item, itemIndex) => !taken.has(itemIndex) && item.layout === layout,
+      )
+      if (index < 0) return false
+      taken.add(index)
+      assigned.push({ item: available[index], show })
+    }
+
+    try {
+      for (const { item, show } of assigned) {
+        const monitorId = Number(show?.monitorId)
+        const fullscreen = show?.fullscreen !== false
+        const bounds = buildProjectionWindowBounds({
+          fullscreen,
+          monitorId: Number.isFinite(monitorId) ? monitorId : null,
+          displays: screen.getAllDisplays(),
+          primary: screen.getPrimaryDisplay(),
+        })
+        standbyWindows.delete(item.win)
+        warmPool = warmPool.filter((entry) => entry.win !== item.win)
+        if (bounds) item.win.setBounds(bounds)
+        applyProjectionDisplayMode(item.win, fullscreen)
+      }
+      for (const { item } of assigned) {
+        item.win.showInactive()
+        projectionPopups.add(item.win)
+      }
+      ensureProjectionHotkey()
+      focusOperator()
+    } catch {
+      return false
+    }
+    return true
+  })
 
   const popupProvider = () => {
     for (const win of [...projectionPopups]) {
@@ -471,12 +555,25 @@ function attachProjectionWindowHandlers(parentWindow) {
 
     const childUrl = details?.url ?? ''
     const isProjection = isProjectionPopupUrl(childUrl)
+    const warm = isWarmProjectionUrl(childUrl)
 
     // Marca a popup na criação (fonte de verdade do provider da hotkey —
-    // independe da URL em runtime, que em dev nem sempre contém #/popup)
-    if (isProjection) {
+    // independe da URL em runtime, que em dev nem sempre contém #/popup).
+    // A janela aquecida fica de fora até ser revelada no play.
+    if (isProjection && !warm) {
       projectionPopups.add(childWindow)
       ensureProjectionHotkey()
+      // Fundo preto na hora: a splash de boot não pode pintar na tela do público.
+      try { childWindow.setBackgroundColor('#000000') } catch { /* ignore */ }
+    }
+    if (warm) {
+      const layout = /(?:\?|&)layout=return(?:&|$)/.test(childUrl) ? "return" : "audience"
+      warmPool.push({ win: childWindow, layout })
+      standbyWindows.add(childWindow)
+      try { childWindow.setBackgroundColor('#000000') } catch { /* ignore */ }
+      childWindow.on('closed', () => {
+        warmPool = warmPool.filter((entry) => entry.win !== childWindow)
+      })
     }
 
     const { fullscreen } = isProjection
@@ -518,6 +615,10 @@ function attachProjectionWindowHandlers(parentWindow) {
     childWindow.once('ready-to-show', () => {
       if (childWindow.isDestroyed()) return
       childWindow.webContents.setAudioMuted(false)
+      if (standbyWindows.has(childWindow)) {
+        standbyReady.add(childWindow)
+        return
+      }
       const shouldFullscreen = fullscreenByWindow.get(childWindow) ?? fullscreen
       applyProjectionDisplayMode(childWindow, shouldFullscreen)
       childWindow.show()
@@ -580,7 +681,9 @@ function createWindow(locale = 'pt-BR') {
 	});
 
 	applyWindowIcon(mainWindow);
+	mainLog.info('main window created');
 	attachWindowStateEvents(mainWindow);
+	attachHistoryAppCommand(mainWindow);
 	trackWindowState(mainWindow, { isMaximized: windowState.isMaximized });
 
 	mainWindow.on("page-title-updated", (event) => {
@@ -616,10 +719,13 @@ function createWindow(locale = 'pt-BR') {
 			}
 	}
 
-	// Timeout de segurança: se ready-to-show não disparar em 15s, mostra erro
+	// Timeout de segurança: se ready-to-show não disparar, mostra erro.
+	// Dev: 90s (cold-optimize do Vite pode levar minutos neste disco);
+	// release mantém 15s (build pronto, sem depender de dev server).
+	const bootTimeoutMs = isDev ? 90_000 : 15_000;
 	const loadTimeout = setTimeout(() => {
 		if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
-			console.error("[main] timeout: janela principal não carregou em 15s");
+			console.error(`[main] timeout: janela principal não carregou em ${bootTimeoutMs / 1000}s`);
 			closeSplash();
 			dialog.showMessageBoxSync(mainWindow, {
 				type: "error",
@@ -630,7 +736,7 @@ function createWindow(locale = 'pt-BR') {
 			mainWindow.destroy();
 			mainWindow = null;
 		}
-	}, 15_000);
+	}, bootTimeoutMs);
 
 	mainWindow.once("ready-to-show", () => {
 		clearTimeout(loadTimeout);
@@ -729,6 +835,21 @@ app.whenReady().then(async () => {
 		// VITE_* — config de build do renderer não existe no processo principal).
 		setDiagnosticsToken(process.env.LOUVORJA_DIAGNOSTICS_TOKEN ?? "");
 		registerDiagnosticsIpc(); // diagnostics:* — SrCaldeira, rede no main
+		// diag-v4-umbrella: skew do relógio via mtime de marker em userData (best-effort)
+		setClockSkewProvider(() => {
+			try {
+				const dir = app.getPath("userData");
+				const marker = path.join(dir, "diag-clock-marker");
+				const before = Date.now();
+				writeFileSync(marker, String(before));
+				const mtime = statSync(marker).mtimeMs;
+				const after = Date.now();
+				return Math.round(mtime - (before + after) / 2);
+			} catch {
+				return null;
+			}
+		});
+		mainLog.info('diagnostics IPC handlers registered');
 		registerWindowIpc(() => mainWindow);
 		registerLocalFileProtocol();
 		registerYoutubeEmbedHeaders();
@@ -749,6 +870,7 @@ app.whenReady().then(async () => {
 		attachPalcoServer(() => mainWindow?.webContents ?? null);
 	} catch (error) {
 		console.error("[main] falha no startup", error);
+		mainLog.error(`startup failure ${error instanceof Error ? error.stack ?? error.message : String(error ?? '')}`);
 		closeSplash();
 		const message =
 			error instanceof Error ? error.message : String(error ?? "erro desconhecido");
@@ -799,10 +921,8 @@ app.on("will-quit", () => {
 });
 
 app.on("window-all-closed", () => {
-	// window-all-closed pode disparar quando o splash fecha mas a main
-	// ainda está carregando. Só saímos se mainWindow já existiu ou se
-	// não há intenção de criar janela (eula recusado, erro fatal, etc).
-	if (process.platform !== "darwin") {
-		app.quit();
-	}
+	// Fechar a splash pode disparar este evento durante o handoff para a
+	// main window. Não mata o processo se a principal ainda existe/carrega.
+	if (mainWindow && !mainWindow.isDestroyed()) return;
+	if (process.platform !== "darwin") app.quit();
 });

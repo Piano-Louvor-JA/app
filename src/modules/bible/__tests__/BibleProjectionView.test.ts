@@ -76,7 +76,7 @@ describe('BibleProjectionView', () => {
     expect(style).toContain('bg.png')
     // caixa: backgroundColor rgba + border
     const verseStyle = wrapper.find('.bible-projection__text').attributes('style') ?? ''
-    expect(verseStyle).toContain('rgba(0, 0, 0, 0.4)')
+    expect(verseStyle).toContain('rgba(24, 24, 24, 0.4)')
     expect(verseStyle).toContain('text-shadow')
   })
 
@@ -178,11 +178,10 @@ describe('BibleProjectionView', () => {
     stageSettings.textShadow = true
     w2.unmount()
 
-    // boxBorder off → border none
+    // boxBorder off → border none. jsdom 30 serializa isso como "border: medium".
     stageSettings.boxBorder = false
     const w3 = await mountView()
-    // jsdom descarta border:'none'? o style simplesmente omite a propriedade
-    expect(w3.find('.bible-projection__text').attributes('style') ?? '').not.toContain('border:')
+    expect(w3.find('.bible-projection__text').attributes('style') ?? '').not.toContain('1px solid')
     stageSettings.boxBorder = true
     w3.unmount()
 

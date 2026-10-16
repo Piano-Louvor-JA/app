@@ -61,6 +61,9 @@ const mediaAudioHoisted = vi.hoisted(() => {
 			getMediaAudioElement: vi.fn(() => state.audio),
 			pauseMediaAudio: vi.fn(),
 			playMediaAudio: vi.fn().mockResolvedValue(true),
+			resolveRemoteFileUrl: vi.fn((p: string) =>
+				/^https?:\/\//i.test(p) ? p : `https://files.test/${p.replace(/^\//, "")}`,
+			),
 			resolveMusicAudioUrl: vi
 				.fn()
 				.mockResolvedValue({ ok: true, url: "audio://x", source: "remote" }),
@@ -122,6 +125,7 @@ const trackMediaMock = vi.hoisted(() => ({
 	download: vi.fn().mockResolvedValue({ status: "downloaded" }),
 }));
 vi.mock("@shared/services/track-media", () => ({
+	onTrackMediaChanged: vi.fn(),
 	isTrackMediaDownloaded: (...a: unknown[]) =>
 		trackMediaMock.isDownloaded(...(a as [number])),
 	downloadTrackMedia: (...a: unknown[]) =>
@@ -404,6 +408,37 @@ describe("fila", () => {
 		await store.playQueue([{ musicId: 3, albumId: 1, title: "c" } as never], 5);
 		// startIndex fora do range: first undefined -> retorna sem tocar; index mantém 0
 		expect(store.queueIndex).toBe(0);
+	});
+});
+
+describe("nome da fila (título do player)", () => {
+	const items = [
+		{ musicId: 1, albumId: 1, title: "a" },
+		{ musicId: 2, albumId: 1, title: "b" },
+	];
+
+	it("playlist define o nome; trocar de faixa dentro da fila mantém", async () => {
+		const { store } = await openTrack({});
+		expect(store.queueLabel).toBeNull();
+		await store.playQueue(items, 0, undefined, "Culto de Sábado");
+		expect(store.queueLabel).toBe("Culto de Sábado");
+		await store.playQueueItem(store.queue[1]);
+		expect(store.queueLabel).toBe("Culto de Sábado");
+	});
+
+	it("fila de álbum (sem nome), clearQueue e hino avulso limpam o nome", async () => {
+		const { store } = await openTrack({});
+		await store.playQueue(items, 0, undefined, "Culto");
+		await store.playAlbumQueue(items);
+		expect(store.queueLabel).toBeNull();
+
+		await store.playQueue(items, 0, undefined, "Culto");
+		store.clearQueue();
+		expect(store.queueLabel).toBeNull();
+
+		await store.playQueue(items, 0, undefined, "Culto");
+		await store.open({ musicId: 2, project: false });
+		expect(store.queueLabel).toBeNull();
 	});
 });
 

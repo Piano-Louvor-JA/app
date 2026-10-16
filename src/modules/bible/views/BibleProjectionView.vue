@@ -77,7 +77,7 @@ const contentKey = computed(
 )
 
 const stageStyle = computed(() => ({
-  backgroundColor: stage.value.backgroundColor,
+  backgroundColor: stage.value.backgroundColor ?? '#000000',
   backgroundImage: resolveBackgroundImage(stage.value.backgroundImage)
     ? `url(${resolveBackgroundImage(stage.value.backgroundImage)})`
     : undefined,
@@ -104,10 +104,13 @@ const verseStyle = computed(() => {
   const cqw =
     (stage.value.bibleFontSize / 1920) * 100 * adaptiveBibleFontScale.value
   return {
-    color: stage.value.bibleTextColor,
+    color: stage.value.bibleTextColor ?? undefined,
     fontSize: `${cqw}cqw`,
     fontWeight: String(stage.value.bibleFontWeight),
     textAlign: stage.value.textAlign,
+    // Paridade web: capitalização do versículo configurável no Palco.
+    textTransform:
+      stage.value.bibleTextTransform === 'none' ? 'none' : stage.value.bibleTextTransform,
     textShadow: stage.value.textShadow
       ? `0 0 ${(stage.value.shadowBlur / 108) * 100}cqw rgba(0,0,0,${stage.value.shadowIntensity})`
       : 'none',
@@ -125,10 +128,11 @@ const displayReference = computed(() => {
 const verseBoxStyle = computed(() => {
   if (!stage.value.textBox) return {}
   return {
-    backgroundColor: `rgba(0,0,0,${stage.value.boxOpacity})`,
-    border: stage.value.boxBorder ? '1px solid rgba(255,255,255,0.25)' : 'none',
+    backgroundColor: `rgba(24,24,24,${stage.value.boxOpacity})`,
+    border: stage.value.boxBorder ? 'clamp(2px, 0.2vmin, 4px) solid rgba(255,255,255,0.85)' : 'none',
     // Padrão folha característico do design (como o media-projection)
     borderRadius: 'clamp(14px, 2.4vmin, 32px) 0 clamp(14px, 2.4vmin, 32px) 0',
+    backdropFilter: 'blur(16px)',
     // caixinha só no versículo: padding para respirar dentro da caixa
     padding: '0.35em 0.75em',
     // Bíblia: caixa horizontal aproveita a projeção e reduz quebras de verso.
@@ -139,7 +143,7 @@ const verseBoxStyle = computed(() => {
 })
 
 const referenceStyle = computed(() => ({
-  color: stage.value.footerRefColor,
+  color: stage.value.footerRefColor ?? undefined,
   fontWeight: String(stage.value.footerRefWeight),
 }))
 </script>

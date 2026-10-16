@@ -24,6 +24,8 @@ const openLocalPdf = vi.fn()
 const openSiteControl = vi.fn()
 
 vi.mock('../services/liturgy-web-projection', () => ({
+  parseLiturgyWebTarget: vi.fn(() => ({})),
+  getPalcoRoute: vi.fn(() => '/palco'),
   openLiturgyLocalPdfControl: (...a: unknown[]) => openPdf(...a),
   openLiturgySiteControl: (...a: unknown[]) => openSite(...a),
   openLiturgyVideoControl: (...a: unknown[]) => openVideo(...a),

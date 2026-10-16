@@ -3,6 +3,8 @@
  * Endpoint público: GET /v1/custom/seasonal-event.
  */
 
+import { defaultApiOrigin } from '@shared/services/api-env'
+
 export type SeasonalEventBanner = {
 	active: true;
 	name: string;
@@ -16,7 +18,7 @@ type SeasonalEventResponse =
 
 function communityBaseUrl(): string {
 	const base =
-		import.meta.env.VITE_PALCO_API_URL ?? "https://api.pianolouvorja.com.br";
+		import.meta.env.VITE_PALCO_API_URL ?? defaultApiOrigin();
 	return `${base.replace(/\/$/, "")}/v1/custom`;
 }
 

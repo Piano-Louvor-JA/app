@@ -3,6 +3,16 @@
 import { mount } from '@vue/test-utils'
 import { describe, it, expect, vi } from 'vitest'
 
+// Composable testado à parte: aqui só o contrato tela ↔ minimizar.
+const minimizeMock = vi.fn(async () => {})
+const prepareMock = vi.fn()
+vi.mock('@shared/composables/useMinimizablePage', () => ({
+  useMinimizablePage: (options: unknown) => {
+    ;(globalThis as any).__minimizeOptions = options
+    return { minimize: minimizeMock, prepare: prepareMock, takeRestoredState: () => null }
+  },
+}))
+
 // Mock global (refs p/ acionar v-ifs do template)
 import { ref as __ref } from 'vue'
 const isProjectingRef = __ref(false)
@@ -59,34 +69,12 @@ vi.mock('@design-system/index', () => ({
   GlassCard: { template: '<div class="glass-card"><slot /></div>' }
 }))
 
-vi.mock('../../../settings/services/stage-settings-runtime', () => ({
-  readEffectiveStageSettings: vi.fn(() => ({})),
-  subscribeStageSettings: vi.fn(() => () => {})
-}))
-
-vi.mock('../../../settings/types/stage-settings', () => ({
-  resolveBackgroundImage: vi.fn(() => 'bg-url'),
-  StageSettings: class {}
-}))
-
 vi.mock('../../../settings/components/PalcoRouteSelect.vue', () => ({
   default: { template: '<div class="palco-route-select" />;' }
 }))
 
 vi.mock('../../../settings/components/StageCustomizationDialog.vue', () => ({
   default: { template: '<div class="stage-custom-dialog" />;' }
-}))
-
-vi.mock('../../components/TimerConfigDialog.vue', () => ({
-  default: { template: '<div class="timer-config-dialog" />;' }
-}))
-
-vi.mock('../../components/TimerPreview.vue', () => ({
-  default: { template: '<div class="timer-preview" />;' }
-}))
-
-vi.mock('../../components/TimerProjectFab.vue', () => ({
-  default: { template: '<div class="timer-project-fab" />;' }
 }))
 
 vi.mock('../../components/TimerSavedList.vue', () => ({
@@ -110,12 +98,6 @@ describe('TimerView - coverage básico', () => {
     const wrapper = mount(TimerView)
     wrapper.vm.goBack()
     expect(mockRouter.push).toHaveBeenCalledWith({ name: 'utilities-temporizador' })
-  })
-
-  it('onToggleProjection chama toggleProjection', () => {
-    const wrapper = mount(TimerView)
-    wrapper.vm.onToggleProjection()
-    expect(mockTimerFeature.toggleProjection).toHaveBeenCalled()
   })
 
   describe('controles do timer (cliques finais)', () => {
@@ -162,69 +144,18 @@ describe('TimerView - coverage básico', () => {
       expect(() => wrapper.unmount()).not.toThrow()
     })
 
-    it('isRunning true: pause/save renderizam e disparam; projecting aparece', async () => {
-      isRunningRef.value = true
+    it('projetando: selo aparece e salvar dispara', async () => {
       isProjectingRef.value = true
-      mockTimerFeature.pause.mockClear()
       mockTimerFeature.saveMark.mockClear()
       const w = mount(TimerView, { global: { stubs: { teleport: true } } })
       await w.vm.$nextTick()
       expect(w.find('.timer-view__projecting').exists()).toBe(true)
-      const pauseBtn = w.find('.timer-view__ctrl--pause')
-      expect(pauseBtn.exists()).toBe(true)
-      await pauseBtn.trigger('click')
-      expect(mockTimerFeature.pause).toHaveBeenCalled()
       const saveBtn = w.find('.timer-view__ctrl--save')
       expect(saveBtn.exists()).toBe(true)
       await saveBtn.trigger('click')
       expect(mockTimerFeature.saveMark).toHaveBeenCalled()
       w.unmount()
-      isRunningRef.value = false
       isProjectingRef.value = false
     })
   })
-
-  describe('gaps onda1 — stage settings real', () => {
-    it('stage com backgroundImage, timer modificado e callback de subscribe atualizando', async () => {
-      const rt = await import('../../../settings/services/stage-settings-runtime')
-      const st = await import('../../../settings/types/stage-settings')
-      let cb: (() => void) | null = null
-      ;(rt.subscribeStageSettings as ReturnType<typeof vi.fn>).mockImplementation((fn: () => void) => {
-        cb = fn
-        return () => {}
-      })
-      ;(rt.readEffectiveStageSettings as ReturnType<typeof vi.fn>).mockReturnValue({
-        backgroundColor: '#101010',
-        backgroundImage: 'img.png',
-        timer: { durationSec: 99 },
-      })
-      ;(st.resolveBackgroundImage as ReturnType<typeof vi.fn>).mockReturnValue('resolved://img.png')
-      const w = mount(TimerView, { global: { stubs: { teleport: true } } })
-      await w.vm.$nextTick()
-      // effectiveConfig com mod: branch TRUE (72 arm0)
-      expect((w.vm as unknown as { effectiveConfig: { durationSec?: number } }).effectiveConfig).toBeTruthy()
-      w.unmount()
-    })
-
-    it('stage sem timer modificado: spread só do config base (72 arm1); subscribe callback roda', async () => {
-      const rt = await import('../../../settings/services/stage-settings-runtime')
-      const st = await import('../../../settings/types/stage-settings')
-      let cb: (() => void) | null = null
-      ;(rt.subscribeStageSettings as ReturnType<typeof vi.fn>).mockImplementation((fn: () => void) => {
-        cb = fn
-        return () => {}
-      })
-      ;(rt.readEffectiveStageSettings as ReturnType<typeof vi.fn>).mockReturnValue({
-        backgroundColor: '#202020',
-        backgroundImage: undefined,
-      })
-      ;(st.resolveBackgroundImage as ReturnType<typeof vi.fn>).mockReturnValue(null)
-      const w = mount(TimerView, { global: { stubs: { teleport: true } } })
-      await w.vm.$nextTick()
-      cb?.()
-      await w.vm.$nextTick()
-      w.unmount()
-    })
-  })
-
 })

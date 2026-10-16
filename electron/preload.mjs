@@ -56,6 +56,25 @@ function stepZoomLevel(delta) {
   }
 }
 
+async function downloadDiagnosticsJson() {
+  const result = await ipcRenderer.invoke('diagnostics:run')
+  const json = result.json
+  const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }))
+  const link = document.createElement('a')
+  link.href = url
+  link.download = 'louvorja-diagnostics.json'
+  document.body.appendChild(link)
+  try {
+    link.click()
+  } finally {
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+  return result
+}
+
+contextBridge.exposeInMainWorld('__louvorjaDiag', downloadDiagnosticsJson)
+
 contextBridge.exposeInMainWorld('louvorja', {
   platform: process.platform,
   isElectron: true,
@@ -93,6 +112,10 @@ contextBridge.exposeInMainWorld('louvorja', {
   window: {
     control: (action) => ipcRenderer.invoke('window:control', action),
     onMaximizedState: (callback) => subscribe('window:maximized-state', callback),
+    // Voltar/avançar do sistema (app-command no Windows) → histórico de navegação
+    onHistoryCommand: (callback) => subscribe('window:history-command', callback),
+    // Miniatura de uma área da janela (prévia de página minimizada)
+    capturePreview: (rect) => ipcRenderer.invoke('window:capture-preview', rect),
   },
 
   zoom: {
@@ -107,10 +130,17 @@ contextBridge.exposeInMainWorld('louvorja', {
     run: () => ipcRenderer.invoke('diagnostics:run'),
     send: (report) => ipcRenderer.invoke('diagnostics:send', report),
     openFolder: (filePath) => ipcRenderer.invoke('diagnostics:open-folder', filePath),
+    reportRendererErrors: (errors) => ipcRenderer.send('diagnostics:renderer-errors', errors),
+    reportDownloadFailures: (failures) => ipcRenderer.send('diagnostics:download-failures', failures),
+    reportAudioDevices: (snapshot) => ipcRenderer.send('diagnostics:audio-devices', snapshot),
+    reportJank: (snapshot) => ipcRenderer.send('diagnostics:jank', snapshot),
   },
 
   workspace: {
     readBinaryFile: (path) => ipcRenderer.invoke('dialog:read-binary-file', path),
+    fetchText: (url) => ipcRenderer.invoke('workspace:fetch-text', url),
+    downloadToMedia: (url, fileName) =>
+      ipcRenderer.invoke('workspace:download-to-media', url, fileName),
     getRecord: (filename) => ipcRenderer.invoke('workspace:get-record', filename),
     saveRecord: (filename, data) => ipcRenderer.invoke('workspace:save-record', filename, data),
     clear: (options) => ipcRenderer.invoke('workspace:clear', options),
@@ -217,7 +247,9 @@ contextBridge.exposeInMainWorld('louvorja', {
       return () => ipcRenderer.removeListener('projection:popups-closed', listener)
     },
     closeUrl: () => ipcRenderer.invoke('projection:close-url'),
+    revealWarm: (payload) => ipcRenderer.invoke('projection:reveal-warm', payload),
     externalAlive: () => ipcRenderer.invoke('projection:external-alive'),
+    externalMediaAlive: () => ipcRenderer.invoke('projection:external-media-alive'),
     getSourceMediaId: () => ipcRenderer.invoke('projection:get-source-media-id'),
     publishPlaybackSync: (payload) => {
       ipcRenderer.send('projection:playback-sync', payload)

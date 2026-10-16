@@ -26,7 +26,7 @@ import { buildSlja, type SljaArchive } from "@shared/services/slja";
 import { importSljaAsLiturgyMusic } from "../services/import-slja-to-liturgy";
 
 /** fetch roteado por URL (API fake em memória). */
-function routeFetch(musicId: number, lyricId: number) {
+function routeFetch(musicId: number, lyricId: number, fileStatus = 200) {
 	const files: Array<Record<string, unknown>> = [];
 	fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
 		const u = String(url);
@@ -40,10 +40,9 @@ function routeFetch(musicId: number, lyricId: number) {
 		}
 		if (u.endsWith("/files") && init?.method === "POST") {
 			files.push({});
-			return json({
-				id_file: 900 + files.length,
-				url: `/custom/f${files.length}.mp3`,
-			});
+			return fileStatus === 200
+				? json({ id_file: 900 + files.length, url: `/custom/f${files.length}.mp3` })
+				: json({ message: "upload failed" }, fileStatus);
 		}
 		if (u.endsWith(`/musics/${musicId}`) && init?.method === "PUT") {
 			return json({});
@@ -116,7 +115,7 @@ describe("import .slja LOGADO → API custom (app#331)", () => {
 		const imported = await importSljaAsLiturgyMusic({
 			bytes: await buildSlja(archive),
 			name: "hino-autoral.slja",
-		});
+		}, { confirmUpload: async () => true });
 
 		expect(imported.local).toBe(false);
 		expect(imported.displayMusicId).toBe(1_000_007);
@@ -206,7 +205,7 @@ describe("import .slja LOGADO → API custom (app#331)", () => {
 		const imported = await importSljaAsLiturgyMusic({
 			bytes: await buildSlja(archive),
 			name: "capa.slja",
-		});
+		}, { confirmUpload: async () => true });
 		expect(imported.slides).toBe(1);
 		expect(coverFileId).toBe(44);
 	});
@@ -251,7 +250,7 @@ describe("import .slja LOGADO → API custom (app#331)", () => {
 		const imported = await importSljaAsLiturgyMusic({
 			bytes: await buildSlja(archive),
 			name: "minha.slja",
-		});
+		}, { confirmUpload: async () => true });
 		expect(imported.collectionId).toBe(55);
 		expect(
 			fetchMock.mock.calls.some((call) =>
@@ -289,10 +288,10 @@ describe("import .slja LOGADO → API custom (app#331)", () => {
 			slides: [{ lyric: "Verso", type: "LETRA", timeMs: 1_000, order: 1 }],
 		};
 		await expect(
-			importSljaAsLiturgyMusic({
-				bytes: await buildSlja(archive),
-				name: "quebrada.slja",
-			}),
+			importSljaAsLiturgyMusic(
+				{ bytes: await buildSlja(archive), name: "quebrada.slja" },
+				{ confirmUpload: async () => true },
+			),
 		).rejects.toThrow("SLJA_IMPORT_LYRICS_INCOMPLETE");
 		expect(
 			fetchMock.mock.calls.some(
@@ -302,7 +301,6 @@ describe("import .slja LOGADO → API custom (app#331)", () => {
 			),
 		).toBe(true);
 	});
-});
 
  it("prefere imagem exata quando nomes de assets se sobrepõem", async () => {
    authSessionMock.mockReturnValue({ token: "tok", user: { id_user: 1 } });
@@ -316,12 +314,80 @@ describe("import .slja LOGADO → API custom (app#331)", () => {
      slides: [{ lyric: "Verso", type: "LETRA", order: 1, timeMs: 1000,
        image: { name: "bg.png", bytes: new Uint8Array([2]) } }],
    };
-   await importSljaAsLiturgyMusic({ bytes: await buildSlja(archive), name: "assets.slja" });
+   await importSljaAsLiturgyMusic({ bytes: await buildSlja(archive), name: "assets.slja" }, { confirmUpload: async () => true });
    const call = fetchMock.mock.calls.find(([url, init]) => String(url).endsWith("/musics/7/lyrics") && init?.method === "POST");
    expect(JSON.parse(String(call?.[1]?.body)).id_file_image).toBe(902);
  });
 
- it("encerra importação quando consulta de coletâneas expira", async () => {
+ it("falha de persistência da lyric remota desfaz a música (erro 500 na lyrics)", async () => {
+   authSessionMock.mockReturnValue({ token: "tok", user: { id_user: 1 } });
+   fetchMock.mockClear();
+   // rota custom: lyrics POST responde 500 → persisted=false → desfaz tudo
+   fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+     const u = String(url);
+     const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
+     if (u.endsWith("/collections") && init?.method === "POST") return json({ id_collection: 55 });
+     if (u.includes("/collections/55/musics") && init?.method === "POST") return json({ id_music: 7 }, 201);
+     if (u.endsWith("/musics/7/lyrics") && init?.method === "POST") return json({ message: "persist failed" }, 500);
+     if (u.endsWith("/musics/7") && init?.method === "DELETE") return json({});
+     if (u.endsWith("/files") && init?.method === "POST") return json({ id_file: 901, url: "/custom/f1.png" });
+     return json({ message: "not found" }, 404);
+   });
+   const archive: SljaArchive = {
+     title: "LyricFail", assets: [],
+     slides: [{ lyric: "Verso", type: "LETRA", order: 1, timeMs: 0 }],
+   };
+   await expect(importSljaAsLiturgyMusic({ bytes: await buildSlja(archive), name: "lyricfail.slja" }, { confirmUpload: async () => true }))
+     .rejects.toThrow("SLJA_IMPORT_LYRICS_INCOMPLETE");
+   expect(fetchMock.mock.calls.some(([url, init]) => String(url).endsWith("/musics/7") && init?.method === "DELETE")).toBe(true);
+ });
+
+ it("falha ao criar a música remota → SLJA_IMPORT_MUSIC_FAILED", async () => {
+   authSessionMock.mockReturnValue({ token: "tok", user: { id_user: 1 } });
+   fetchMock.mockClear();
+   fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+     const u = String(url);
+     const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
+     if (u.endsWith("/collections") && init?.method === "POST") return json({ id_collection: 55 });
+     if (u.includes("/collections/55/musics") && init?.method === "POST") return json({}, 500);
+     return json({ message: "not found" }, 404);
+   });
+   const archive: SljaArchive = { title: "MusicFail", assets: [], slides: [{ lyric: "V", type: "LETRA", order: 1, timeMs: 0 }] };
+   await expect(importSljaAsLiturgyMusic({ bytes: await buildSlja(archive), name: "musicfail.slja" }, { confirmUpload: async () => true }))
+     .rejects.toThrow("SLJA_IMPORT_MUSIC_FAILED");
+ });
+
+ it("casa asset por basename quando o slide referencia subpasta (match inequívoco)", async () => {
+   authSessionMock.mockReturnValue({ token: "tok", user: { id_user: 1 } });
+   fetchMock.mockClear();
+   routeFetch(7, 0);
+   const archive: SljaArchive = {
+     title: "Subpasta", assets: [
+       { path: "bg.png", bytes: new Uint8Array([2]) },
+     ],
+     slides: [{ lyric: "Verso", type: "LETRA", order: 1, timeMs: 1000,
+       image: { name: "assets/bg.png", bytes: new Uint8Array([2]) } }],
+   };
+   await importSljaAsLiturgyMusic({ bytes: await buildSlja(archive), name: "subpasta.slja" }, { confirmUpload: async () => true });
+   const call = fetchMock.mock.calls.find(([url, init]) => String(url).endsWith("/musics/7/lyrics") && init?.method === "POST");
+   expect(JSON.parse(String(call?.[1]?.body)).id_file_image).toBe(901);
+ });
+
+ it("continua sem imagem quando upload de asset remoto falha", async () => {
+  authSessionMock.mockReturnValue({ token: "tok", user: { id_user: 1 } });
+  routeFetch(7, 0, 500);
+  const archive: SljaArchive = {
+    title: "Asset ausente",
+    assets: [{ path: "bg.png", bytes: new Uint8Array([2]) }],
+    slides: [{ lyric: "Verso", type: "LETRA", order: 1, timeMs: 0,
+      image: { name: "bg.png", bytes: new Uint8Array([2]) } }],
+  };
+
+  await expect(importSljaAsLiturgyMusic({ bytes: await buildSlja(archive), name: "asset-fail.slja" }, { confirmUpload: async () => true }))
+    .resolves.toMatchObject({ uploadedImages: 0, slides: 1 });
+});
+
+it("encerra importação quando consulta de coletâneas expira", async () => {
    authSessionMock.mockReturnValue({ token: "tok", user: { id_user: 1 } });
    const controller = new AbortController();
    const timeout = vi.spyOn(AbortSignal, "timeout").mockReturnValue(controller.signal);
@@ -333,7 +399,7 @@ describe("import .slja LOGADO → API custom (app#331)", () => {
    });
    try {
      const archive: SljaArchive = { title: "Timeout", assets: [], slides: [{ lyric: "Verso", type: "LETRA", order: 1, timeMs: 0 }] };
-     await expect(importSljaAsLiturgyMusic({ bytes: await buildSlja(archive), name: "timeout.slja" })).rejects.toThrow("SLJA_IMPORT_COLLECTION_FAILED");
+     await expect(importSljaAsLiturgyMusic({ bytes: await buildSlja(archive), name: "timeout.slja" }, { confirmUpload: async () => true })).rejects.toThrow("SLJA_IMPORT_COLLECTION_FAILED");
      expect(timeout).toHaveBeenCalledWith(15_000);
      expect(fetchMock).toHaveBeenCalledTimes(1);
    } finally { timeout.mockRestore(); }
@@ -347,7 +413,7 @@ describe("import .slja LOGADO → API custom (app#331)", () => {
      { lyric: "Slide com posição", type: "LETRA", order: 1, timeMs: 0, imagePosition: 2 },
      { lyric: "Slide default", type: "LETRA", order: 2, timeMs: 5000 },
    ] };
-   await importSljaAsLiturgyMusic({ bytes: await buildSlja(archive), name: "posicao.slja" });
+   await importSljaAsLiturgyMusic({ bytes: await buildSlja(archive), name: "posicao.slja" }, { confirmUpload: async () => true });
    const lyricCalls = fetchMock.mock.calls.filter(([url, init]) => String(url).endsWith("/lyrics") && init?.method === "POST");
    expect(lyricCalls.length).toBe(2);
    const bodies = lyricCalls.map(([, init]) => JSON.parse(String(init?.body)));
@@ -363,8 +429,9 @@ it("persiste estimativa de duração na música remota em segundos", async () =>
      { lyric: "Primeira", type: "LETRA", order: 1, timeMs: 0 },
      { lyric: "Última", type: "LETRA", order: 2, timeMs: 30000 },
    ] };
-   const imported = await importSljaAsLiturgyMusic({ bytes: await buildSlja(archive), name: "duration.slja" });
+   const imported = await importSljaAsLiturgyMusic({ bytes: await buildSlja(archive), name: "duration.slja" }, { confirmUpload: async () => true });
    const call = fetchMock.mock.calls.find(([url, init]) => String(url).endsWith("/collections/55/musics") && init?.method === "POST");
    expect(imported.durationMs).toBeGreaterThan(0);
    expect(JSON.parse(String(call?.[1]?.body)).duration).toBe(imported.durationMs / 1000);
  });
+});

@@ -1,4 +1,12 @@
 export default {
+  windowControls: {
+    close: 'Close',
+    minimize: 'Minimize',
+    maximize: 'Maximize',
+  },
+  a11y: {
+    mainNav: 'Main navigation',
+  },
   apiOffline: {
     message: 'No connection to the service \u2014 check your internet',
     retrying: 'Trying to reconnect...',
@@ -12,8 +20,12 @@ export default {
     nameJa: 'JA',
   },
   common: {
+    close: 'Close',
     comingSoon: 'Coming soon',
+    openFolder: 'Open folder',
+    addToPlaylist: 'Add to playlist',
     cancel: 'Cancel',
+    copied: 'Copied!',
   },
   monitors: {
     selectScreens: 'Select screens',
@@ -46,7 +58,25 @@ export default {
     bible: 'Bible',
     utilities: 'Utilities',
     settings: 'Settings',
+    history: {
+      label: 'Navigation history',
+      back: 'Back',
+      forward: 'Forward',
+      goTo: 'Go to {label}',
     },
+    historyDetail: {
+      player: 'Player',
+      editor: 'Editor',
+    },
+    },
+  minimize: {
+    playlistCount: '{n} playlist(s)',
+    pageNumber: 'Page {n}',
+    bar: 'Minimized pages',
+    close: 'Close {title}',
+    page: 'Minimize page',
+    search: 'Search: {q}',
+  },
   sync: {
     downloadQueue: {
       title: 'Downloads',

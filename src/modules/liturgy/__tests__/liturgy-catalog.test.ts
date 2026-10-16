@@ -162,7 +162,7 @@ describe('filterLiturgyMusicOptions', () => {
     expect(filterLiturgyMusicOptions(opts, '', 5).map((o) => o.id)).toEqual([5])
     // query 'a' casa com ambos e o sort empata em track → localeCompare decide
     const sorted = filterLiturgyMusicOptions(opts, 'a', null)
-    expect(sorted.map((o) => o.id)).toEqual([5, 6]) // localeCompare('Zebra','Abacaxi') > 0? não: localeCompare real ordena Abacaxi primeiro
+    expect(sorted.map((o) => o.id)).toEqual([5, 6])
   })
 
   it('score 1996 empurra hinário antigo pro topo', () => {

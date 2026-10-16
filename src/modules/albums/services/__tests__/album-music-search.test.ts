@@ -407,4 +407,48 @@ describe('gaps onda1 — normalização de albums e ranking numérico', () => {
     expect(results[0]!.isHymnal).toBe(false)
   })
 })
+
+describe('filterAlbumMusicIndex — relevância da busca (apk#127)', () => {
+  const index = [
+    hit({ musicId: 1, name: 'Teu Santo Nome', albumNames: 'Adoradores' }),
+    hit({ musicId: 2, name: 'Não Há o Que Temer', albumNames: 'Adoradores, Ao Vivo' }),
+    hit({ musicId: 3, name: 'Adoradores da Última Hora', albumNames: 'Outra Coletânea' }),
+    hit({ musicId: 4, name: 'Santo Espírito', albumNames: 'Adoradores' }),
+  ]
+
+  it('termo que casa com o nome do álbum deixa o título na frente', () => {
+    const results = filterAlbumMusicIndex(index, 'adoradores')
+    expect(results[0]?.musicId).toBe(3)
+    expect(results.slice(1).map((r) => r.musicId)).toEqual([1, 2, 4])
+  })
+
+  it('título que começa com o termo ordena antes de título que só contém', () => {
+    const results = filterAlbumMusicIndex(index, 'santo')
+    expect(results.map((r) => r.musicId)).toEqual([4, 1])
+  })
+
+  it('título acentuado continua à frente de match só de álbum', () => {
+    const results = filterAlbumMusicIndex(
+      [
+        hit({ musicId: 1, name: 'Outra', albumNames: 'Não Temas' }),
+        hit({ musicId: 2, name: 'Não Temas', albumNames: 'CD' }),
+      ],
+      'nao temas',
+    )
+    expect(results.map((r) => r.musicId)).toEqual([2, 1])
+  })
+
+  it('busca numérica continua devolvendo o hino pelo número', () => {
+    const hymn = hit({
+      musicId: 10,
+      name: 'Castelo Forte',
+      track: 101,
+      albumNames: 'Hinário Adventista',
+      isHymnal: true,
+      hymnalTracks: [101],
+    })
+    const results = filterAlbumMusicIndex([...index, hymn], '101')
+    expect(results[0]?.musicId).toBe(10)
+  })
+})
 })

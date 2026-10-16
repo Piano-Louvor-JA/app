@@ -29,5 +29,7 @@ export default {
     clearAll: 'Limpar Todos',
     noSavedTimes: 'Nenhum tempo salvo',
     removeSaved: 'Remover tempo salvo',
+    chromeDragHint: 'Arraste para mover · duplo clique volta ao canto',
+    openStopwatch: 'Abrir o Cronômetro',
   },
 }

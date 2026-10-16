@@ -36,8 +36,10 @@ import {
   saveCountdownDisplayConfig,
 } from '../services/countdown-preferences'
 import {
+  beginCountdownSession,
   publishCountdownRuntime,
   readCountdownRuntimeFromStorage,
+  stopCountdownRuntime,
 } from '../services/countdown-runtime'
 import {
   DEFAULT_COUNTDOWN_DISPLAY_CONFIG,
@@ -199,6 +201,12 @@ export const useCountdownStore = defineStore('countdown', () => {
     startAudioControlSync()
     runtime.value = readCountdownRuntimeFromStorage()
     isProjecting.value = isProjectionModuleOpen('countdown')
+    // Contagem deixada rodando quando o app foi fechado não pode voltar
+    // sozinha ao abrir a tela; dentro da mesma execução ela continua.
+    if (beginCountdownSession() && (runtime.value.status !== 'idle' || runtime.value.finished)) {
+      runtime.value = stopCountdownRuntime(runtime.value)
+      syncRuntime()
+    }
     if (isProjecting.value) startProjectionWatch()
     if (runtime.value.status === 'running') startFinishWatch()
     hydrated.value = true
