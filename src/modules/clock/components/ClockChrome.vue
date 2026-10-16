@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
+import FloatingPreviewTitle from '@shared/components/FloatingPreviewTitle.vue'
 import { FLOATING_STACK_ORDER, useFloatingDrag } from '@shared/composables/useFloatingDrag'
 import { USER_PREFERENCE_KEYS } from '@shared/constants/storage-keys'
 
@@ -78,6 +79,8 @@ async function onOpenClock() {
     :style="positionStyle"
     @pointerdown="onPointerDown"
   >
+    <FloatingPreviewTitle :label="t('clock.title')" />
+
     <aside
       class="clock-chrome__preview"
       :style="previewStyle"

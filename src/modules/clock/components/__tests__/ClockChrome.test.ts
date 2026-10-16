@@ -250,3 +250,12 @@ describe('ClockChrome — arrastar', () => {
     expect(loadFloatingPosition(KEY)).toBeNull()
   })
 })
+
+describe('ClockChrome — título da prévia', () => {
+  it('mostra "Relógio" acima da prévia flutuante', () => {
+    const w = mountChrome()
+    const title = w.find('.floating-preview-title')
+    expect(title.exists()).toBe(true)
+    expect(title.text()).toBe('Relógio')
+  })
+})
