@@ -7,6 +7,8 @@ import {
 
 export const COUNTDOWN_RUNTIME_CHANNEL = 'louvorja-countdown-runtime'
 export const COUNTDOWN_RUNTIME_STORAGE_KEY = 'louvorja-countdown-runtime-state-v2'
+/** sessionStorage: sobrevive a reload da janela e some quando o app é fechado. */
+const COUNTDOWN_SESSION_KEY = 'louvorja-countdown-session'
 
 function asStatus(value: unknown): CountdownStatus {
   if (value === 'running' || value === 'paused' || value === 'idle') return value
@@ -83,6 +85,29 @@ export function readCountdownRuntimeFromStorage(): CountdownRuntimeState {
       savedTimesMs: [],
       durationMs: DEFAULT_COUNTDOWN_DURATION_MS,
     }
+  }
+}
+
+/** true só na primeira chamada desde que o app (ou a aba, no web) foi aberto. */
+export function beginCountdownSession(): boolean {
+  try {
+    if (sessionStorage.getItem(COUNTDOWN_SESSION_KEY)) return false
+    sessionStorage.setItem(COUNTDOWN_SESSION_KEY, '1')
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Para e zera a contagem; duração, modo e marcas salvas continuam. */
+export function stopCountdownRuntime(state: CountdownRuntimeState): CountdownRuntimeState {
+  return {
+    ...state,
+    status: 'idle',
+    segmentStartedAt: null,
+    accumulatedMs: 0,
+    finished: false,
+    pausedRemainingMs: null,
   }
 }
 
