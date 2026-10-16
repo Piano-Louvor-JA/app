@@ -267,7 +267,7 @@ jobs:
         run: |
           set -euo pipefail
           for workflow in build-flatpak.yml snap-release.yml; do
-            gh workflow run "$workflow" --ref main -f "version=$TAG"
+            gh workflow run "$workflow" --repo "$GITHUB_REPOSITORY" --ref main -f "version=$TAG"
           done
 
   verify:

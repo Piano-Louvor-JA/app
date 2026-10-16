@@ -259,7 +259,10 @@
         "description": "Liturgia exportada pelo LouvorJA Delphi",
         "role": "Editor"
       }
-    ]
+    ],
+    "portable": {
+      "artifactName": "LouvorJA-PIANO-${version}-portable-${arch}.${ext}"
+    }
   },
   "description": "LouvorJA - PIANO — aplicativo desktop para gerenciamento de culto",
   "author": {
