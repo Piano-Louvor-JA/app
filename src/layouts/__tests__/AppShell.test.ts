@@ -219,6 +219,9 @@ vi.mock('@modules/timer/components/TimerChrome.vue', () => ({
 vi.mock('@modules/clock/components/ClockChrome.vue', () => ({
   default: { name: 'ClockChrome', template: '<div class="clock-chrome-mock" />' },
 }))
+vi.mock('@modules/random/components/RandomChrome.vue', () => ({
+  default: { name: 'RandomChrome', template: '<div class="random-chrome-mock" />' },
+}))
 
 vi.mock('@modules/bible/components/BibleInAppProjection.vue', () => ({
   default: { name: 'BibleInAppProjection', template: '<div class="bible-overlay-mock" />' },

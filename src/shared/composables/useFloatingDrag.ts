@@ -26,7 +26,7 @@ type DragState = {
 export const FLOATING_STACK_GAP = 12
 
 /** Ordem de baixo para cima dos painéis que dividem o canto padrão. */
-export const FLOATING_STACK_ORDER = { media: 0, bible: 1, countdown: 2, timer: 3, clock: 4 } as const
+export const FLOATING_STACK_ORDER = { media: 0, bible: 1, countdown: 2, timer: 3, clock: 4, random: 5 } as const
 
 type StackEntry = { order: number; height: number; active: boolean }
 

@@ -37,6 +37,8 @@ export const USER_PREFERENCE_KEYS = {
   timerChromePosition: 'timer.chromePosition',
   /** Posição (left/top em px) da prévia flutuante do Relógio; ausente = canto padrão. */
   clockChromePosition: 'clock.chromePosition',
+  /** Posição (left/top em px) da prévia flutuante do Sorteio; ausente = canto padrão. */
+  randomChromePosition: 'random.chromePosition',
   /** Prefixo das personalizações do Palco por escopo (stage.settings.global|hymns|bible|...). */
   stageSettingsPrefix: 'stage.settings.',
 } as const

@@ -17,6 +17,7 @@ import ClockProjectionView from '@modules/clock/views/ClockProjectionView.vue'
 import { useClockStore } from '@modules/clock/stores/useClockStore'
 import CountdownChrome from '@modules/countdown/components/CountdownChrome.vue'
 import CountdownProjectionView from '@modules/countdown/views/CountdownProjectionView.vue'
+import RandomChrome from '@modules/random/components/RandomChrome.vue'
 import RandomProjectionView from '@modules/random/views/RandomProjectionView.vue'
 import TimerChrome from '@modules/timer/components/TimerChrome.vue'
 import TimerProjectionView from '@modules/timer/views/TimerProjectionView.vue'
@@ -447,6 +448,7 @@ function viewKey(viewRoute: typeof route) {
     <CountdownChrome />
     <TimerChrome />
     <ClockChrome />
+    <RandomChrome />
 
     <BibleInAppProjection
       v-if="bibleInAppPreview"

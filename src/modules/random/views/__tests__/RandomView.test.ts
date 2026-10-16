@@ -122,7 +122,6 @@ function mountView() {
         RandomAvailablePanel: true,
         RandomHistoryPanel: true,
         RandomConfigDialog: true,
-        RandomProjectFab: true,
         RandomStage: true,
         Teleport: true,
       },
