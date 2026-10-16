@@ -90,3 +90,31 @@ export function visibleWindow(
   }
   return { start, end, items }
 }
+
+function isHistoryEntry(value: unknown): value is HistoryEntry {
+  if (typeof value !== 'object' || value === null) return false
+  const { fullPath, name, navKey } = value as Record<string, unknown>
+  return (
+    typeof fullPath === 'string' &&
+    (name === null || typeof name === 'string') &&
+    typeof navKey === 'string'
+  )
+}
+
+/**
+ * Valida um estado salvo (sessionStorage). Devolve `null` se não for um
+ * histórico bem formado; limita o índice e aplica o máximo de entradas.
+ */
+export function parseHistoryState(raw: unknown): HistoryState | null {
+  if (typeof raw !== 'object' || raw === null) return null
+  const { entries, index } = raw as Record<string, unknown>
+  if (!Array.isArray(entries) || entries.length === 0 || !entries.every(isHistoryEntry)) return null
+  if (typeof index !== 'number' || !Number.isInteger(index)) return null
+
+  const overflow = Math.max(0, entries.length - HISTORY_MAX_ENTRIES)
+  const kept = entries.slice(overflow)
+  return {
+    entries: kept,
+    index: Math.min(Math.max(index - overflow, 0), kept.length - 1),
+  }
+}

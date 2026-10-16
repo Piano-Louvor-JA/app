@@ -5,6 +5,7 @@ import {
   HISTORY_MAX_VISIBLE_DOTS,
   createHistoryState,
   moveTo,
+  parseHistoryState,
   recordPush,
   recordReplace,
   visibleWindow,
@@ -179,5 +180,50 @@ describe('visibleWindow', () => {
     const win = visibleWindow(state, 3)
     expect(win.items.map((i) => i.index)).toEqual([4, 5, 6])
     expect(win.items.map((i) => i.edge)).toEqual([true, false, true])
+  })
+})
+
+describe('parseHistoryState (dados salvos)', () => {
+  it('aceita um estado bem formado', () => {
+    const raw = { entries: [entry('/'), entry('/bible', 'bible')], index: 1 }
+    expect(parseHistoryState(raw)).toEqual(raw)
+  })
+
+  it('aceita name nulo', () => {
+    const raw = { entries: [{ fullPath: '/', name: null, navKey: 'home' }], index: 0 }
+    expect(parseHistoryState(raw)).toEqual(raw)
+  })
+
+  it('rejeita formatos inválidos', () => {
+    for (const raw of [
+      null,
+      'texto',
+      42,
+      {},
+      { entries: 'x', index: 0 },
+      { entries: [], index: 0 },
+      { entries: [entry('/')], index: 'zero' },
+      { entries: [entry('/')], index: 1.5 },
+      { entries: [{ fullPath: 1, name: null, navKey: 'home' }], index: 0 },
+      { entries: [{ fullPath: '/', name: 2, navKey: 'home' }], index: 0 },
+      { entries: [{ fullPath: '/', name: null, navKey: null }], index: 0 },
+      { entries: [null], index: 0 },
+    ]) {
+      expect(parseHistoryState(raw), JSON.stringify(raw)).toBeNull()
+    }
+  })
+
+  it('índice fora do intervalo é limitado', () => {
+    const raw = { entries: [entry('/'), entry('/bible')], index: 9 }
+    expect(parseHistoryState(raw)?.index).toBe(1)
+    expect(parseHistoryState({ ...raw, index: -3 })?.index).toBe(0)
+  })
+
+  it('mais de 50 entradas: fica com as últimas e ajusta o índice', () => {
+    const entries = Array.from({ length: HISTORY_MAX_ENTRIES + 5 }, (_, i) => entry(`/p${i}`))
+    const parsed = parseHistoryState({ entries, index: 10 })
+    expect(parsed?.entries).toHaveLength(HISTORY_MAX_ENTRIES)
+    expect(parsed?.entries[0].fullPath).toBe('/p5')
+    expect(parsed?.index).toBe(5)
   })
 })

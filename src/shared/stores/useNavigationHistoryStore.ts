@@ -38,9 +38,14 @@ export const useNavigationHistoryStore = defineStore('navigation-history', () =>
     state.value = moveToIndex(state.value, target)
   }
 
+  /** Restaura um histórico salvo (já validado por parseHistoryState). */
+  function hydrate(saved: HistoryState) {
+    state.value = saved
+  }
+
   function reset() {
     state.value = createHistoryState()
   }
 
-  return { entries, index, current, canGoBack, canGoForward, dots, push, replace, moveTo, reset }
+  return { entries, index, current, canGoBack, canGoForward, dots, push, replace, moveTo, hydrate, reset }
 })

@@ -5,6 +5,8 @@ export const BROWSER_STORAGE_KEYS = {
   topSongs: 'history_top_songs',
   catalogSessionPrefix: 'db:',
   playlists: 'louvorja-playlists-v1',
+  /** sessionStorage: histórico de navegação (sobrevive a reload, não a fechar o app). */
+  navigationHistory: 'navigation-history-v1',
 } as const
 
 /** Campos dentro de `user_data` (preferências do operador). */

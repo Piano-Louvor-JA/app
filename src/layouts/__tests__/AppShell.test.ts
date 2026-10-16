@@ -511,6 +511,11 @@ describe('AppShell — viewKey e transição', () => {
 describe('AppShell — navegador de histórico', () => {
   let uninstallHistory: (() => void) | null = null
 
+  // o histórico agora vai para o sessionStorage: cada teste começa do zero
+  beforeEach(() => {
+    sessionStorage.clear()
+  })
+
   afterEach(() => {
     uninstallHistory?.()
     uninstallHistory = null
