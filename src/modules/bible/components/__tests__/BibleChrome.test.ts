@@ -19,9 +19,11 @@ import type { BibleSelection } from '../../types/bible'
 import BibleChrome from '../BibleChrome.vue'
 
 const route = reactive<{ meta: Record<string, unknown> }>({ meta: { navKey: 'bible' } })
+const push = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
 
 vi.mock('vue-router', () => ({
   useRoute: () => route,
+  useRouter: () => ({ push }),
 }))
 
 const readSettings = vi.hoisted(() =>
@@ -51,9 +53,11 @@ function emptySelection(): BibleSelection {
 
 const store = reactive({
   isProjecting: false,
+  selectedVerses: [] as number[],
   projection: emptySelection(),
   toggleProjection: vi.fn().mockResolvedValue(undefined),
   clearProjectionWindow: vi.fn(),
+  goToAdjacentVerse: vi.fn().mockResolvedValue(undefined),
 })
 
 vi.mock('../../stores/useBibleStore', () => ({
@@ -77,6 +81,7 @@ function mountChrome() {
 }
 
 function selectVerse() {
+  store.selectedVerses = [2]
   store.projection = {
     ...emptySelection(),
     versionId: 1,
@@ -97,9 +102,12 @@ beforeEach(() => {
   localStorage.clear()
   route.meta = { navKey: 'bible' }
   store.isProjecting = false
+  store.selectedVerses = []
   store.projection = emptySelection()
   store.toggleProjection.mockClear()
   store.clearProjectionWindow.mockClear()
+  store.goToAdjacentVerse.mockClear()
+  push.mockClear()
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
     ...RECT,
     x: RECT.left,
@@ -159,6 +167,54 @@ describe('BibleChrome — ações', () => {
     await nextTick()
     await w.find('.bible-project-fab__btn').trigger('click')
     expect(store.clearProjectionWindow).toHaveBeenCalledTimes(1)
+  })
+
+  it('setas da prévia passam para o versículo anterior/próximo', async () => {
+    selectVerse()
+    const w = mountChrome()
+    const prev = w.find('.bible-chrome__verse-btn--prev')
+    expect(prev.attributes('aria-label')).toBe(bibleLocale.bible.previousVerse)
+    await prev.trigger('click')
+    await w.find('.bible-chrome__verse-btn--next').trigger('click')
+    expect(store.goToAdjacentVerse).toHaveBeenNthCalledWith(1, -1)
+    expect(store.goToAdjacentVerse).toHaveBeenNthCalledWith(2, 1)
+  })
+
+  it('setas desabilitadas sem versículo selecionado (projeção ainda no ar)', () => {
+    selectVerse()
+    store.selectedVerses = []
+    const w = mountChrome()
+    expect(w.find('.bible-chrome__verse-btn--prev').attributes('disabled')).toBeDefined()
+    expect(w.find('.bible-chrome__verse-btn--next').attributes('disabled')).toBeDefined()
+  })
+
+  it('cliques rápidos nas setas não devolvem o painel ao canto nem iniciam arraste', async () => {
+    selectVerse()
+    saveFloatingPosition(KEY, { x: 100, y: 100 })
+    const w = mountChrome()
+    const next = w.find('.bible-chrome__verse-btn--next')
+    next.element.dispatchEvent(pointer('pointerdown', 650, 520))
+    window.dispatchEvent(pointer('pointermove', 300, 300))
+    window.dispatchEvent(pointer('pointerup', 300, 300))
+    await next.trigger('dblclick')
+    await w.find('.bible-chrome__verse-btn--prev').trigger('dblclick')
+    expect((w.find('.bible-chrome').element as HTMLElement).style.left).toBe('100px')
+    expect(loadFloatingPosition(KEY)).toEqual({ x: 100, y: 100 })
+  })
+
+  it('botão de abrir a Bíblia: só fora da Bíblia e leva de volta ao leitor', async () => {
+    selectVerse()
+    const onBible = mountChrome()
+    expect(onBible.find('.bible-chrome__icon-btn').exists()).toBe(false)
+    onBible.unmount()
+
+    route.meta = { navKey: 'liturgy' }
+    store.isProjecting = true
+    const w = mountChrome()
+    const open = w.find('.bible-chrome__icon-btn')
+    expect(open.attributes('aria-label')).toBe(bibleLocale.bible.openReader)
+    await open.trigger('click')
+    expect(push).toHaveBeenCalledWith({ name: 'bible' })
   })
 })
 
