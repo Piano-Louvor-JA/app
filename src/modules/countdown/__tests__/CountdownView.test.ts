@@ -154,6 +154,25 @@ describe('CountdownView', () => {
     wrapper.unmount()
   })
 
+  it('iniciar/pausar é um único botão alternado (nunca os dois juntos)', async () => {
+    const wrapper = await mountView()
+    await wrapper.find('input[aria-label="countdown.hours"]').setValue('1')
+
+    expect(wrapper.findAll('.countdown-view__ctrl--start')).toHaveLength(1)
+    expect(wrapper.find('.countdown-view__ctrl--pause').exists()).toBe(false)
+
+    await wrapper.find('.countdown-view__ctrl--start').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('.countdown-view__ctrl--start').exists()).toBe(false)
+    expect(wrapper.findAll('.countdown-view__ctrl--pause')).toHaveLength(1)
+
+    await wrapper.find('.countdown-view__ctrl--pause').trigger('click')
+    await wrapper.find('.countdown-view__ctrl--reset').trigger('click')
+    await flushPromises()
+    wrapper.unmount()
+  })
+
   it('background image do palco vira url no style', async () => {
     stagePayload.backgroundImage = 'https://example.com/palco.png'
     const wrapper = await mountView()

@@ -446,20 +446,7 @@ const effectiveConfig = computed(() => {
 
           <div class="countdown-view__controls">
                       <button
-                        v-if="!isRunning && effectiveConfig.mode !== 'sabbath'"
-                        type="button"
-                        class="countdown-view__ctrl countdown-view__ctrl--start"
-                        :disabled="!canStart"
-                        @click="start"
-                      >
-                        <i
-                          class="ti ti-player-play"
-                          aria-hidden="true"
-                        />
-                        {{ t('countdown.start') }}
-                      </button>
-                      <button
-                        v-if="!isRunning && effectiveConfig.mode === 'sabbath'"
+                        v-if="!isRunning"
                         type="button"
                         class="countdown-view__ctrl countdown-view__ctrl--start"
                         :disabled="!canStart"
