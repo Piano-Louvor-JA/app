@@ -12,6 +12,10 @@ export interface MinimizablePageOptions<S> {
   capture(): S
   /** Para onde ir ao minimizar quando não há tela anterior no histórico. */
   fallbackRoute: RouteLocationRaw
+  /** Endereço do item na barra (padrão: a rota atual). Janelas usam um parâmetro. */
+  fullPath?: () => string
+  /** Em vez de sair da tela (ex.: janela que só fecha e fica na mesma tela). */
+  onMinimized?: () => void
 }
 
 /**
@@ -30,7 +34,7 @@ export function useMinimizablePage<S>(options: MinimizablePageOptions<S>) {
 
   async function minimize() {
     const { title, icon, summary } = options.describe()
-    const fullPath = route.fullPath
+    const fullPath = options.fullPath?.() ?? route.fullPath
     const routeName = typeof route.name === 'string' ? route.name : null
     const state = options.capture()
     const marks = scroll?.captureCurrent() ?? []
@@ -39,7 +43,8 @@ export function useMinimizablePage<S>(options: MinimizablePageOptions<S>) {
 
     store.minimize({ fullPath, routeName, title, icon, summary, state, scroll: marks, preview, minimizedAt: Date.now() })
 
-    if (history.canGoBack.value) history.back()
+    if (options.onMinimized) options.onMinimized()
+    else if (history.canGoBack.value) history.back()
     else await router.push(options.fallbackRoute)
   }
 

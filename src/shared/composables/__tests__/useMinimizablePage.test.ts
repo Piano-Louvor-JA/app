@@ -30,7 +30,10 @@ function scrollMemory(): ViewScrollMemory {
   }
 }
 
-async function mountPage(path: string, { provideScroll = true } = {}) {
+async function mountPage(
+  path: string,
+  { provideScroll = true, extra = {} as Record<string, unknown> } = {},
+) {
   await router.push(path)
   const Page = defineComponent({
     setup() {
@@ -38,6 +41,7 @@ async function mountPage(path: string, { provideScroll = true } = {}) {
         describe: () => ({ title: 'Hinário Adventista', icon: 'ti-book', summary: 'Busca: santo' }),
         capture: () => ({ collectionId: '5', searchQuery: 'santo' }),
         fallbackRoute: { name: 'albums' },
+        ...extra,
       }))
       return () => null
     },
@@ -154,6 +158,30 @@ describe('useMinimizablePage', () => {
     const w = await mountPage('/albums/5')
     expect(takeRestoredState()).toEqual({ collectionId: '5', searchQuery: 'santo' })
     expect(takeRestoredState()).toBeNull()
+    w.unmount()
+  })
+})
+
+describe('useMinimizablePage — janelas (ex.: Playlists)', () => {
+  it('fullPath próprio vira o endereço do item na barra', async () => {
+    const onMinimized = vi.fn()
+    const w = await mountPage('/albums', {
+      extra: { fullPath: () => '/albums?painel=playlists', onMinimized },
+    })
+    await minimize()
+    expect(useMinimizedPagesStore().items[0].fullPath).toBe('/albums?painel=playlists')
+    w.unmount()
+  })
+
+  it('onMinimized substitui a navegação (a janela só fecha)', async () => {
+    await router.push('/')
+    const onMinimized = vi.fn()
+    const w = await mountPage('/albums', { extra: { onMinimized } })
+    expect(useNavigationHistoryStore().canGoBack).toBe(true)
+    await minimize()
+    await flushPromises()
+    expect(onMinimized).toHaveBeenCalledTimes(1)
+    expect(router.currentRoute.value.fullPath).toBe('/albums')
     w.unmount()
   })
 })
