@@ -46,7 +46,7 @@ describe('window:capture-preview (main)', () => {
     fromWebContents.mockReset()
   })
 
-  it('captura o retângulo (arredondado), reduz para 320 px e devolve JPEG em data URL', async () => {
+  it('captura o retângulo (arredondado), reduz para 800 px (prévia e efeito) e devolve JPEG', async () => {
     const image = fakeImage()
     const win = fakeWindow(image)
     fromWebContents.mockReturnValue(win)
@@ -54,12 +54,12 @@ describe('window:capture-preview (main)', () => {
     const result = await capture({ x: 10.4, y: 120.6, width: 1200.2, height: 700 })
 
     expect(win.webContents.capturePage).toHaveBeenCalledWith({ x: 10, y: 121, width: 1200, height: 700 })
-    expect(image.resize).toHaveBeenCalledWith({ width: 320 })
+    expect(image.resize).toHaveBeenCalledWith({ width: 800 })
     expect(image.resized.toJPEG).toHaveBeenCalledWith(70)
     expect(result).toBe(`data:image/jpeg;base64,${Buffer.from('jpeg-bytes').toString('base64')}`)
   })
 
-  it('imagem menor que 320 px não é ampliada', async () => {
+  it('imagem menor que 800 px não é ampliada', async () => {
     const image = fakeImage({ width: 200 })
     fromWebContents.mockReturnValue(fakeWindow(image))
     await capture({ x: 0, y: 0, width: 200, height: 100 })

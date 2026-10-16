@@ -38,8 +38,11 @@ export function registerWindowIpc(getMainWindow) {
   )
 }
 
-/** Largura máxima da miniatura de uma página minimizada. */
-const PREVIEW_WIDTH = 320
+/**
+ * Largura máxima da miniatura de uma página minimizada: serve à prévia da
+ * barra e à imagem do efeito gênio (que começa do tamanho da tela).
+ */
+const PREVIEW_WIDTH = 800
 const PREVIEW_JPEG_QUALITY = 70
 
 /** @returns {{ x: number, y: number, width: number, height: number } | null} */
@@ -54,7 +57,7 @@ function normalizeRect(rect) {
 
 /**
  * Miniatura de uma área da janela (prévia de página minimizada): JPEG
- * reduzido para até 320 px de largura, em data URL. Qualquer falha = null
+ * reduzido para até 800 px de largura, em data URL. Qualquer falha = null
  * (o renderer mostra a prévia em cartão).
  * @param {import('electron').BrowserWindow | null} win
  * @param {unknown} rect retângulo em DIP da janela
