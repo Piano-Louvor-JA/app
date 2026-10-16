@@ -25,7 +25,9 @@ function receiver(file: string, host: string, port = '7081', extra = '') {
     },
   })
   for (const script of w.document.querySelectorAll('script')) {
-    if (script.textContent?.trim()) w.eval(script.textContent)
+    const code = script.getAttribute('src') === 'purify.min.js'
+      ? readFileSync(resolve('electron/palco/purify.min.js'), 'utf8') : script.textContent
+    if (code?.trim()) w.eval(code)
   }
   fetch.mockClear()
   sockets.length = 0

@@ -54,9 +54,11 @@ function loadReceiver(): void {
   w.localStorage.clear()
 
   // executa os <script> do receiver na ordem (fora do parsing automático)
-  const scripts = html.match(/<script>([\s\S]*?)<\/script>/g) ?? []
-  for (const raw of scripts) {
-    const code = raw.replace(/^<script>/, '').replace(/<\/script>$/, '')
+  const scripts = dom.window.document.querySelectorAll('script')
+  for (const script of scripts) {
+    const code = script.getAttribute('src') === 'purify.min.js'
+      ? readFileSync(resolve(__dirname, '../purify.min.js'), 'utf8')
+      : script.textContent ?? ''
     try {
       dom.window.eval(code)
     } catch {
@@ -239,4 +241,21 @@ it('restricts the cloud API to production, staging and localhost', () => {
   expect(trusted('wss://api-stg.louvorja.com.br/v1/palco/')).toBe('wss://api-stg.louvorja.com.br/v1/palco');
   expect(trusted('ws://localhost:3100/v1/palco')).toBe('ws://localhost:3100/v1/palco');
   for(const url of ['wss://evil.example/v1/palco','wss://api.louvorja.com.br.evil.example/v1/palco','wss://api.louvorja.com.br@evil.example/v1/palco','ws://api.louvorja.com.br/v1/palco','wss://api-stg.louvorja.com.br:8443/v1/palco','wss://api.louvorja.com.br/other','wss://api.louvorja.com.br/v1/palco?redirect=evil','javascript:alert(1)'])expect(trusted(url)).toBeNull();
+});
+
+it('falls back to literal text when the projection sanitizer is unavailable', () => {
+  const runtime = dom.window as unknown as { DOMPurify?: unknown };
+  const sanitizer = runtime.DOMPurify;
+  try {
+    runtime.DOMPurify = undefined;
+    const text = '<b>Safe fallback</b><img src=x onerror=alert(1)>';
+    w.handle({ ...PROJECTION, text });
+    expect(el('text').textContent).toBe(text);
+    expect(el('text').children.length).toBe(0);
+  } finally { runtime.DOMPurify = sanitizer; }
+});
+
+it('ships the same sanitizer as the locked production dependency', () => {
+  expect(readFileSync(resolve(__dirname, '../purify.min.js'), 'utf8'))
+    .toBe(readFileSync(resolve('node_modules/dompurify/dist/purify.min.js'), 'utf8'));
 });
