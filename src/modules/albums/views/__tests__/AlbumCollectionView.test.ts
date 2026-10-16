@@ -443,13 +443,14 @@ describe('AlbumCollectionView — minimizar página', () => {
 
   it('botão – fica logo abaixo do voltar e minimiza a página', async () => {
     const w = await mountView()
-    const nav = w.find('.album-collection-view__nav')
+    // mesmo componente das outras telas (PageBackStack): seta + – destacado
+    const nav = w.find('.page-back-stack')
     const buttons = nav.findAll('button')
     expect(buttons.map((b) => b.classes()[0])).toEqual([
       'album-collection-view__back',
-      'album-collection-view__minimize',
+      'page-back-stack__minimize',
     ])
-    const minimize = w.find('.album-collection-view__minimize')
+    const minimize = w.find('.page-back-stack__minimize')
     expect(minimize.attributes('aria-label')).toBe('minimize.page')
     expect(minimize.attributes('title')).toBe('minimize.page')
     expect(minimize.find('i').classes()).toContain('ti-minus')

@@ -42,19 +42,32 @@ const { t } = useI18n()
   justify-content: center;
   width: 2.4rem;
   height: 2.4rem;
-  border: none;
+  /* destaque: cor do tema, para não se perder ao lado da seta de voltar */
+  border: 1px solid color-mix(in srgb, var(--ds-color-primary) 60%, transparent);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--ds-color-surface-card) 80%, transparent);
-  color: var(--ds-color-on-surface);
+  background: color-mix(in srgb, var(--ds-color-primary) 18%, transparent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--ds-color-primary) 30%, transparent);
+  color: var(--ds-color-primary);
+  font-size: 1.15rem;
   cursor: pointer;
+  transition:
+    background-color var(--ds-motion-duration, 280ms) ease,
+    color var(--ds-motion-duration, 280ms) ease;
 
   &:hover {
-    background: color-mix(in srgb, var(--ds-color-primary) 22%, transparent);
+    background: var(--ds-color-primary);
+    color: var(--ds-color-on-primary);
   }
 
   &:focus-visible {
     outline: 2px solid var(--ds-color-primary);
     outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-back-stack__minimize {
+    transition: none;
   }
 }
 </style>

@@ -1770,6 +1770,18 @@ async function runAction(
   border-color: color-mix(in srgb, var(--ds-color-primary) 45%, transparent);
 }
 .albums-view__playlists-io:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* – da janela: mesmo destaque do – das telas (cor do tema) */
+.albums-view__playlists-minimize {
+  border-color: color-mix(in srgb, var(--ds-color-primary) 60%, transparent);
+  background: color-mix(in srgb, var(--ds-color-primary) 18%, transparent);
+  color: var(--ds-color-primary);
+}
+
+.albums-view__playlists-minimize:hover {
+  background: var(--ds-color-primary);
+  color: var(--ds-color-on-primary);
+}
 .albums-view__playlists-feedback {
   flex-basis: 100%;
   margin: 0;

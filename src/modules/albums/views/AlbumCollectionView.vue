@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import { MediaCollectionList } from '@design-system/index'
+import PageBackStack from '@shared/components/PageBackStack.vue'
 import { useMinimizablePage } from '@shared/composables/useMinimizablePage'
 
 import AlbumLyricDialog from '../components/AlbumLyricDialog.vue'
@@ -155,7 +156,7 @@ async function runAction(
   <section class="album-collection-view">
     <header class="album-collection-view__header">
       <div class="album-collection-view__brand">
-        <div class="album-collection-view__nav">
+        <PageBackStack @minimize="minimize">
           <button
             type="button"
             class="album-collection-view__back"
@@ -168,19 +169,7 @@ async function runAction(
               aria-hidden="true"
             />
           </button>
-          <button
-            type="button"
-            class="album-collection-view__minimize"
-            :aria-label="t('minimize.page')"
-            :title="t('minimize.page')"
-            @click="minimize"
-          >
-            <i
-              class="ti ti-minus"
-              aria-hidden="true"
-            />
-          </button>
-        </div>
+        </PageBackStack>
 
         <div class="album-collection-view__icon">
           <i
@@ -397,15 +386,7 @@ async function runAction(
   min-width: 0;
 }
 
-.album-collection-view__nav {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.35rem;
-}
-
-.album-collection-view__back,
-.album-collection-view__minimize {
+.album-collection-view__back {
   width: 2.4rem;
   height: 2.4rem;
   border: none;
