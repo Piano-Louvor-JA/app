@@ -2574,66 +2574,61 @@ function projectionColor(value){
   const match=/^\s*(#[0-9a-fA-F]{3,8}|rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*(?:,\s*(?:0|1|0?\.\d+)\s*)?\)|hsla?\(\s*\d{1,3}\s*,\s*\d{1,3}%\s*,\s*\d{1,3}%\s*(?:,\s*(?:0|1|0?\.\d+)\s*)?\)|[a-zA-Z]{1,20})\s*$/.exec(String(value||''));
   return match?match[1]:'';
 }
-function proxyUrl(original){
-  if(!original)return original;
-  // Sender/popup legado pode mandar barra codificada (%2F) — decodifica
-  // caminho antes de qualquer comparação/use (404 silencioso caso contrário).
-  try{ original=decodeURIComponent(String(original)) }catch(e){original=String(original)}
-  // Media may be remote, local or an offline data/blob resource, never code.
-  try{
-    const parsed=new URL(original,location.href);
-    if(!['http:','https:','blob:','file:','data:'].includes(parsed.protocol))return '';
-    if(parsed.protocol==='file:'&&location.protocol!=='file:')return '';
-    if(parsed.protocol==='data:'&&!/^data:(image|audio|video)\/[a-z0-9.+-]+;base64,/i.test(original))return '';
-  }catch(e){return ''}
-  // WT-5f cloud: no modo relay a TV carrega DIRETO da rede do operador web
-  // (a URL vem absoluta, ex. http://192.168.x.x:5173/...). O proxy :7080 é
-  // do sender APK — se não está rodando, 502 e bg nunca carrega.
-  if(cloudMode)return original;
-  // Qualquer porta do MESMO sender é local: 7080 (Principal), 7082 (TV 2),
-  // 7084... Antes só aceitava :7080; bg vindo de slot :7082 era proxyado
-  // de volta e falhava → receiver caía no bg-12 (caso real 26/08).
-  if(original.startsWith('http://'+host+':'))return original;
-  if(original.startsWith('http://')||original.startsWith('https://')){
-    return `http://${host}:7080/proxy?url=${encodeURIComponent(original)}`;
+// Conexões diretas: somente IPv4 de LAN/loopback e localhost, nunca DNS público.
+function palcoLanHost(value){
+  if(value==='localhost')return 'localhost';
+  if(typeof value!=='string'||! /^(?:0|[1-9][0-9]{0,2})(?:\.(?:0|[1-9][0-9]{0,2})){3}$/.test(value))return '';
+  const parts=value.split('.').map(Number);
+  if(parts.some(n=>n>255))return '';
+  if(parts[0]!==10&&parts[0]!==127&&!(parts[0]===172&&parts[1]>=16&&parts[1]<=31)&&!(parts[0]===192&&parts[1]===168)&&!(parts[0]===169&&parts[1]===254))return '';
+  return parts.join('.');
+}
+function palcoLanUrl(value,portValue,path,scheme){
+  const sender=palcoLanHost(value);
+  if(!sender||!/^\d{1,5}$/.test(String(portValue)))return '';
+  const number=Number(portValue);
+  if(number<1||number>65535)return '';
+  return scheme+'://'+sender+':'+number+path;
+}
+function palcoOfficialOrigin(origin){
+  // Mesmas origens oficiais/legadas do contrato de API do aplicativo.
+  switch(origin){
+    case 'https://api.pianolouvorja.com.br':return 'https://api.pianolouvorja.com.br';
+    case 'https://api-stg.pianolouvorja.com.br':return 'https://api-stg.pianolouvorja.com.br';
+    case 'https://api.louvorja.com.br':return 'https://api.louvorja.com.br';
+    case 'https://api-stg.louvorja.com.br':return 'https://api-stg.louvorja.com.br';
+    case 'https://api.louvorja.workers.dev':return 'https://api.louvorja.workers.dev';
+    default:return '';
   }
-  // data:/blob:/file: relativos já validados acima — passam direto.
-  return original;
 }
-function lanSenderHost(){
-  const match=/^(?:localhost|127\.0\.0\.1|(?:\d{1,3}\.){3}\d{1,3})$/.exec(String(host||'').trim());
-  return match?match[0]:'';
-}
-function palcoSocketUrl(){
-  // CodeQL trata location.search como entrada. O teste da regex é a barreira:
-  // host só IP de LAN/localhost, porta numérica, token só A-Z0-9 de 5 chars.
-  if(typeof host!=='string'||!/^(?:localhost|127\.0\.0\.1|(?:\d{1,3}\.){3}\d{1,3})$/.test(host))return '';
-  if(typeof port!=='string'||!/^\d{1,5}$/.test(port))return '';
-  const portNum=Number(port);
-  if(portNum<1||portNum>65535)return '';
-  const rawToken=qs.get('token');
-  const token=typeof rawToken==='string'&&/^[A-Z0-9]{5}$/.test(rawToken)?rawToken:'';
-  return 'ws://'+host+':'+port+'/palco'+(token?'?token='+token:'');
-}
-function palcoMediaUrl(original){
-  if(!original)return '';
-  let decoded;
-  try{decoded=decodeURIComponent(String(original))}catch(e){decoded=String(original)}
+function palcoMediaUrl(value){
+  if(!value)return '';
+  try{value=decodeURIComponent(String(value))}catch(e){value=String(value)}
   let parsed;
-  try{parsed=new URL(decoded)}catch(e){return ''}
+  try{parsed=new URL(String(value),location.href)}catch(e){return ''}
   if(parsed.username||parsed.password)return '';
-  if(parsed.protocol!=='http:'&&parsed.protocol!=='https:'&&parsed.protocol!=='blob:'&&parsed.protocol!=='file:'&&parsed.protocol!=='data:')return '';
-  if(parsed.protocol==='file:'&&location.protocol!=='file:')return '';
-  if(parsed.protocol==='data:'&&!/^data:(image|audio|video)\/[a-z0-9.+-]+;base64,/i.test(parsed.href))return '';
-  const safe=parsed.href;
-  if(parsed.protocol==='blob:'||parsed.protocol==='file:'||parsed.protocol==='data:'||cloudMode)return safe;
-  const sender=lanSenderHost();
-  if(sender&&parsed.protocol==='http:'&&parsed.hostname===sender)return safe;
-  // URL externa segue o próprio endereço já filtrado. O proxy com o IP da
-  // query reabria o alerta de redirecionamento no src da imagem.
-  if(parsed.protocol==='http:'||parsed.protocol==='https:')return safe;
-  return '';
+  if(parsed.protocol==='data:')return /^data:(image|audio|video)\/[a-z0-9.+-]+;base64,/i.test(String(value))?parsed.href:'';
+  if(parsed.protocol==='file:')return location.protocol==='file:'?parsed.href:'';
+  if(parsed.protocol==='blob:'){
+    if(parsed.origin==='null')return location.protocol==='file:'?parsed.href:'';
+    try{const source=new URL(parsed.origin);return palcoLanHost(source.hostname)||palcoOfficialOrigin(source.origin)?parsed.href:''}catch(e){return ''}
+  }
+  if(parsed.protocol!=='http:'&&parsed.protocol!=='https:')return '';
+  const local=palcoLanHost(parsed.hostname);
+  const official=palcoOfficialOrigin(parsed.origin);
+  if(!local&&!official)return '';
+  const origin=official||(parsed.protocol+'//'+local+(parsed.port?':'+Number(parsed.port):''));
+  return origin+parsed.pathname+parsed.search+parsed.hash;
 }
+function proxyUrl(original){return palcoMediaUrl(original)}
+function lanSenderHost(){return palcoLanHost(host)}
+function palcoSocketUrl(){
+  const base=palcoLanUrl(host,port,'/palco','ws');
+  if(!base)return '';
+  const raw=qs.get('token');
+  return base+(typeof raw==='string'&&/^[A-Z0-9]{5}$/.test(raw)?'?token='+raw:'');
+}
+function palcoWsUrl(){return palcoSocketUrl()}
 
 function setStatus(t,err){const s=$('status');s.textContent=t;
   const c=$('idleConn');if(c){
@@ -2655,8 +2650,10 @@ let host=qs.get('host')||localStorage.getItem('palcoHost')||location.hostname||'
 let port=qs.get('port')||localStorage.getItem('palcoPort')||'7081';
 
 function probeHttp(ip,httpPort){
+  const url=palcoLanUrl(ip,httpPort,'/status','http');
+  if(!url)return Promise.resolve(null);
   return new Promise(res=>{
-    fetch('http://'+ip+':'+httpPort+'/status')
+    fetch(url,{redirect:'error'})
       .then(function(r){return r.json()})
       .then(function(j){res(j&&('unlocked' in j)?j:null)})
       .catch(function(){res(null)});
@@ -2666,7 +2663,8 @@ function probeSender(ip){
   // Porta digitada pode ser WS (7081) OU HTTP do slot (a UI mostra a HTTP,
   // ex.: slot 1 = 7082/7083). Tenta a dupla HTTP/WS em ambos os sentidos:
   // p como HTTP, p-1 (p=WS) e p+1 (p=HTTP→WS=p+1).
-  var p=parseInt(port,10)||7081;
+  if(!palcoLanUrl(ip,port,'/status','http'))return Promise.resolve(null);
+  var p=Number(port);
   return probeHttp(ip,p).then(function(j){
     if(j)return normalizePort(ip,j,p+1);        // p era HTTP → WS=p+1
     return probeHttp(ip,p-1).then(function(j2){
@@ -2679,8 +2677,9 @@ function probeSender(ip){
   });
 }
 function normalizePort(ip,j,wsPort){
-  port=String(wsPort);
-  return ip;
+  if(!palcoLanUrl(ip,wsPort,'/palco','ws'))return null;
+  port=String(Number(wsPort));
+  return palcoLanHost(ip);
 }
 
 async function scanSubnet(){
@@ -2688,16 +2687,17 @@ async function scanSubnet(){
   // presume /24 da própria TV (rede típica de igreja)
   // file:// (IPK/simulador local): hostname vazio — tenta últimos hosts
   // conhecidos da sub-rede salva antes do default. Cobertura p/ IPK.
-  let me=location.hostname;
+  let me=palcoLanHost(location.hostname);
   if(!me){
     const saved=localStorage.getItem('palcoHost');
-    me=saved||'192.168.1.100';
+    me=palcoLanHost(saved)||'192.168.1.100';
   }
   const prefix=me.split('.').slice(0,3).join('.');
-  const base=host?host.split('.').slice(0,3).join('.'):prefix;
+  const known=palcoLanHost(host);
+  const base=known&&known!=='localhost'?known.split('.').slice(0,3).join('.'):prefix;
   const ips=[];
   for(let i=1;i<255;i++)ips.push(base+'.'+i);
-  if(host)ips.unshift(host); // último conhecido primeiro
+  if(known)ips.unshift(known); // último conhecido primeiro
   const found=[];
   const CONC=42; // F3.3v: 20→42 e timeout 900→450ms — scan ~3x mais rápido
   for(let i=0;i<ips.length;i+=CONC){
@@ -2734,9 +2734,11 @@ function connect(){
   }
   // Tenta WS direto no host salvo; se falhar 1x sem nunca abrir, host é stale.
   function directTry(){
+    const socketUrl=palcoWsUrl();
+    if(!socketUrl){setStatus(L10N.notFound,true);return}
     var opened=false;
     var t=setTimeout(function(){if(!opened){dlog('WS direto falhou — host stale');localStorage.removeItem('palcoHost');host='';connect()}},3000);
-    try{var w=new WebSocket(palcoWsUrl());
+    try{var w=new WebSocket(socketUrl);
       w.onopen=function(){opened=true;clearTimeout(t);try{w.close()}catch(e){};doConnect()};
       w.onerror=function(){};
     }catch(e){clearTimeout(t);localStorage.removeItem('palcoHost');host='';connect()}
@@ -2753,15 +2755,12 @@ function stopMediaOnServerLoss(){
   }catch(e){}
 }
 
-// URL endurecida (host/porta/token validados — 082ece48). Se a validação
-// falhar (ex.: token fora do formato), cai na URL simples pra não travar
-// o boot — o servidor recusa no handshake e o retry cuida do resto.
-function palcoWsUrl(){var u=palcoSocketUrl();return u||('ws://'+host+':'+port+'/palco')}
-
 function doConnect(){
+  const socketUrl=palcoWsUrl();
+  if(!socketUrl){setStatus(L10N.notFound,true);return}
   dlog('doConnect '+host+':'+port);
   setStatus(L10N.connecting.replace('{h}',host).replace('{p}',port));
-  try{ws=new WebSocket(palcoWsUrl())}catch(e){retry();return}
+  try{ws=new WebSocket(socketUrl)}catch(e){retry();return}
   ws.onopen=()=>{tries=0;dlog('WS OPEN '+host);setStatus('● '+host);
     if(window.__hideSplash)window.__hideSplash(); // F3.3j: splash sai no connect
     localStorage.setItem('palcoHost',host);
@@ -2793,12 +2792,19 @@ function trustedCloudApi(value){
   try{
     const url=new URL(String(value));
     if(url.username||url.password||url.search||url.hash)return null;
-    const local=url.hostname==='localhost';
-    if(!local&&url.hostname!=='api.louvorja.com.br'&&url.hostname!=='api-stg.louvorja.com.br')return null;
-    if(local){if(url.protocol!=='ws:'&&url.protocol!=='wss:')return null}
-    else if(url.protocol!=='wss:'||(url.port&&url.port!=='443'))return null;
     if(url.pathname.replace(/\/$/,'')!=='/v1/palco')return null;
-    return url.origin+'/v1/palco';
+    if(url.hostname==='localhost'){
+      if(url.protocol!=='ws:'&&url.protocol!=='wss:')return null;
+      return palcoLanUrl('localhost',url.port||(url.protocol==='wss:'?443:80),'/v1/palco',url.protocol.slice(0,-1))||null;
+    }
+    if(url.protocol!=='wss:'||(url.port&&url.port!=='443'))return null;
+    switch(url.hostname){
+      case 'api.louvorja.com.br':return 'wss://api.louvorja.com.br/v1/palco';
+      case 'api-stg.louvorja.com.br':return 'wss://api-stg.louvorja.com.br/v1/palco';
+      case 'api.pianolouvorja.com.br':return 'wss://api.pianolouvorja.com.br/v1/palco';
+      case 'api-stg.pianolouvorja.com.br':return 'wss://api-stg.pianolouvorja.com.br/v1/palco';
+      default:return null;
+    }
   }catch(e){return null}
 }
 var cloudApi=trustedCloudApi(qs.get('api'))||((location.protocol==='file:'||/^(localhost|127\.)/.test(location.hostname))&&(location.protocol==='file:'||location.port==='5173'||location.port==='3100')?PALCO_API_WS_DEV:PALCO_API_WS_DEFAULT);
@@ -2807,16 +2813,18 @@ var cloudMode=false;
 var cloudTimer=null;
 
 function cloudConnect(code){
+  if(typeof code!=='string'||!/^[A-Z0-9]{6}$/.test(code)){setStatus(L10N.invalid,true);return}
   cloudMode=true;cloudCode=code;
   dlog('cloudConnect',code,cloudApi);
   var base=cloudApi.replace(/^ws/,'http');
   setStatus(L10N.cloudSearch.replace('{c}',code));
-  fetch(base+'/sessions/'+code+'/token')
+  fetch(base+'/sessions/'+code+'/token',{redirect:'error'})
     .then(function(r){if(!r.ok)throw Error('sessão não encontrada');return r.json()})
     .then(function(j){cloudOpen(code,j.token)})
     .catch(function(e){setStatus(L10N.cloudErr.replace('{m}',e.message),true);cloudRetry()});
 }
 function cloudOpen(code,token){
+  if(typeof code!=='string'||!/^[A-Z0-9]{6}$/.test(code)||typeof token!=='string'||!token){setStatus(L10N.invalid,true);return}
   setStatus(L10N.cloudConn);
   var cid='';
   try{cid=localStorage.getItem('palcoCloudCid')||''}catch(e){}
@@ -2852,11 +2860,11 @@ function cloudCreate(){
   cloudMode=true;cloudCode='';
   var base=cloudApi.replace(/^ws/,'http');
   setStatus(L10N.cloudCreating);
-  fetch(base+'/sessions',{method:'POST'})
+  fetch(base+'/sessions',{method:'POST',redirect:'error'})
     .then(function(r){if(!r.ok)throw Error('falha ao criar sessão');return r.json()})
     .then(function(j){
       cloudCode=String(j.code||'').toUpperCase();
-      if(!cloudCode)throw Error('sessão inválida');
+      if(!/^[A-Z0-9]{6}$/.test(cloudCode))throw Error('sessão inválida');
       try{localStorage.setItem('palcoCloudCode',cloudCode)}catch(e){}
       showCloudPair(cloudCode);
       cloudOpen(cloudCode,j.token);
@@ -3193,7 +3201,7 @@ function handle(m){
       // runtime também. Antes só valia sem `m.background`, então música com
       // capa escondia a alteração feita nas configurações (14/10).
       if(m.backgroundColor){bgEl.removeAttribute('src');document.body.style.background=m.backgroundColor}
-      else if(m.background){bgEl.src=isFrameSlide?m.background:proxyUrl(m.background);bgEl.style.opacity='';document.body.style.background=''}
+      else if(m.background){bgEl.src=palcoMediaUrl(m.background);bgEl.style.opacity='';document.body.style.background=''}
       // Sem bg na mensagem: usa o BG configurado no app (bgPalco — enviado
       // ao ligar o palco). Só se NÃO houver bg configurado cai no fallback.
       else if(bgPalco){bgEl.src=proxyUrl(bgPalco);bgEl.style.opacity='';document.body.style.background=''}
