@@ -306,3 +306,12 @@ describe('CountdownChrome — arrastar', () => {
     expect(loadFloatingPosition(KEY)).toBeNull()
   })
 })
+
+describe('CountdownChrome — título da prévia', () => {
+  it('mostra "Timer" acima da prévia flutuante', () => {
+    const w = mountChrome()
+    const title = w.find('.floating-preview-title')
+    expect(title.exists()).toBe(true)
+    expect(title.text()).toBe('Timer')
+  })
+})

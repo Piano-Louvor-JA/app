@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
+import FloatingPreviewTitle from '@shared/components/FloatingPreviewTitle.vue'
 import { FLOATING_STACK_ORDER, useFloatingDrag } from '@shared/composables/useFloatingDrag'
 import { USER_PREFERENCE_KEYS } from '@shared/constants/storage-keys'
 
@@ -89,6 +90,8 @@ async function onOpenRandom() {
     :style="positionStyle"
     @pointerdown="onPointerDown"
   >
+    <FloatingPreviewTitle :label="t('random.title')" />
+
     <aside
       class="random-chrome__preview"
       :style="previewStyle"

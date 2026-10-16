@@ -280,3 +280,12 @@ describe('TimerChrome — arrastar', () => {
     expect(loadFloatingPosition(KEY)).toBeNull()
   })
 })
+
+describe('TimerChrome — título da prévia', () => {
+  it('mostra "Cronômetro" acima da prévia flutuante', () => {
+    const w = mountChrome()
+    const title = w.find('.floating-preview-title')
+    expect(title.exists()).toBe(true)
+    expect(title.text()).toBe('Cronômetro')
+  })
+})

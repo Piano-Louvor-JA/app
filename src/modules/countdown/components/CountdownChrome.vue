@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
+import FloatingPreviewTitle from '@shared/components/FloatingPreviewTitle.vue'
 import { FLOATING_STACK_ORDER, useFloatingDrag } from '@shared/composables/useFloatingDrag'
 import { USER_PREFERENCE_KEYS } from '@shared/constants/storage-keys'
 
@@ -76,6 +77,8 @@ async function onOpenTimer() {
     :style="positionStyle"
     @pointerdown="onPointerDown"
   >
+    <FloatingPreviewTitle :label="t('countdown.title')" />
+
     <aside
       class="countdown-chrome__preview"
       :style="previewStyle"

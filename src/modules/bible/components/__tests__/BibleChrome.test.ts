@@ -267,3 +267,12 @@ describe('BibleChrome — arrastar', () => {
     expect(loadFloatingPosition(KEY)).toBeNull()
   })
 })
+
+describe('BibleChrome — título da prévia', () => {
+  it('mostra "Bíblia" acima da prévia flutuante', () => {
+    const w = mountChrome()
+    const title = w.find('.floating-preview-title')
+    expect(title.exists()).toBe(true)
+    expect(title.text()).toBe('Bíblia')
+  })
+})

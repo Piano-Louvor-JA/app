@@ -281,3 +281,12 @@ describe('RandomChrome — arrastar', () => {
     expect(loadFloatingPosition(KEY)).toBeNull()
   })
 })
+
+describe('RandomChrome — título da prévia', () => {
+  it('mostra "Sorteio" acima da prévia flutuante', () => {
+    const w = mountChrome()
+    const title = w.find('.floating-preview-title')
+    expect(title.exists()).toBe(true)
+    expect(title.text()).toBe('Sorteio')
+  })
+})
