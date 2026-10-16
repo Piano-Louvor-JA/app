@@ -45,8 +45,6 @@ export default {
     unmuteAudio: 'Activar alertas',
     audioVolume: 'Volumen de las alertas',
     stopAudio: 'Parar audio ahora',
-    playAudio: 'Reanudar alerta',
-    pauseAudio: 'Pausar alerta',
     modeDuration: 'Duración',
     modeUntil: 'Hasta',
     until: 'Hora de término',
@@ -55,7 +53,6 @@ export default {
     inAppProjection: 'Vista previa del timer',
     projectionHotkeyHint:
       'ESC finaliza la proyección  ·  Ctrl+Alt+P alterna con la pantalla del operador',
-    audioAppliesToProjection: 'El audio suena en la proyección',
     allowNegativeHint: 'El cronómetro se vuelve negativo parpadeando en rojo (estilo Escuela Sabática)',
     bgColor: 'Color de Fondo',
     bgColorHint: 'Color base de fondo de la pantalla de visualización',

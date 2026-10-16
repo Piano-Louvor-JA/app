@@ -43,8 +43,6 @@ const {
   audioVolume,
   setAudioMuted,
   setAudioVolume,
-  audioPaused,
-  setAudioPaused,
   stopAudio,
   setMode,
   setSabbathConfig,
@@ -490,42 +488,6 @@ const stageBg = computed(() => ({
               :aria-label="t('countdown.audioVolume')"
               @input="setAudioVolume(Number(($event.target as HTMLInputElement).value))"
             >
-            <!-- Feedback Ezequias: botão único funciona como TOGGLE —
-                 tocando = pausa (retoma de onde parou); pausado = retoma -->
-            <button
-              type="button"
-              class="countdown-view__audio-btn countdown-view__audio-btn--toggle"
-              :class="{ 'countdown-view__audio-btn--toggle-playing': !audioPaused }"
-              :aria-label="audioPaused ? t('countdown.playAudio') : t('countdown.pauseAudio')"
-              :title="audioPaused ? t('countdown.playAudio') : t('countdown.pauseAudio')"
-              @click="setAudioPaused(!audioPaused)"
-            >
-              <i
-                :class="audioPaused ? 'ti ti-player-play' : 'ti ti-player-pause'"
-                aria-hidden="true"
-              />
-            </button>
-            <label
-              class="countdown-view__audio-toggle"
-              :title="t('countdown.audioAppliesToProjection')"
-            >
-              <input
-                type="checkbox"
-                role="switch"
-                class="countdown-view__audio-toggle-input"
-                :checked="!audioMuted"
-                :aria-label="t('countdown.audioAppliesToProjection')"
-                @change="setAudioMuted(!($event.target as HTMLInputElement).checked)"
-              >
-              <span
-                class="countdown-view__audio-toggle-track"
-                :class="{ 'countdown-view__audio-toggle-track--on': !audioMuted }"
-                aria-hidden="true"
-              >
-                <span class="countdown-view__audio-toggle-thumb" />
-              </span>
-              <span class="countdown-view__audio-hint">{{ t('countdown.audioAppliesToProjection') }}</span>
-            </label>
           </div>
         </GlassCard>
       </div>
@@ -693,10 +655,6 @@ const stageBg = computed(() => ({
     color: var(--ds-color-primary);
   }
 
-  &--toggle-playing {
-    background: color-mix(in srgb, var(--ds-color-primary) 25%, transparent);
-  }
-
   &--stop:hover {
     background: color-mix(in srgb, var(--ds-color-error, #ff5252) 25%, transparent);
     color: var(--ds-color-error, #ff5252);
@@ -706,56 +664,6 @@ const stageBg = computed(() => ({
 .countdown-view__audio-volume {
   width: 5.5rem;
   accent-color: var(--ds-color-primary);
-}
-
-.countdown-view__audio-hint {
-  font-size: 0.68rem;
-  color: var(--ds-color-on-surface-variant);
-  user-select: none;
-}
-
-/* Feedback Ezequias: "fazer o toggle" — controle visual ON/OFF pro áudio da projeção */
-.countdown-view__audio-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  cursor: pointer;
-  user-select: none;
-}
-
-.countdown-view__audio-toggle-input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-}
-
-.countdown-view__audio-toggle-track {
-  position: relative;
-  width: 2.1rem;
-  height: 1.15rem;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--ds-color-on-surface) 20%, transparent);
-  transition: background 0.15s ease;
-
-  &--on {
-    background: var(--ds-color-primary);
-  }
-}
-
-.countdown-view__audio-toggle-thumb {
-  position: absolute;
-  top: 0.15rem;
-  left: 0.15rem;
-  width: 0.85rem;
-  height: 0.85rem;
-  border-radius: 999px;
-  background: #fff;
-  transition: transform 0.15s ease;
-
-  .countdown-view__audio-toggle-track--on & {
-    transform: translateX(0.95rem);
-  }
 }
 
 .countdown-view__toolbar {

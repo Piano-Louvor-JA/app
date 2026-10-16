@@ -45,8 +45,6 @@ export default {
     unmuteAudio: 'Unmute alerts',
     audioVolume: 'Alert volume',
     stopAudio: 'Stop audio now',
-    playAudio: 'Resume alert',
-    pauseAudio: 'Pause alert',
     modeDuration: 'Duration',
     modeUntil: 'Until',
     until: 'End time',
@@ -55,7 +53,6 @@ export default {
     inAppProjection: 'Timer preview',
     projectionHotkeyHint:
       'ESC ends projection  ·  Ctrl+Alt+P toggles with the operator screen',
-    audioAppliesToProjection: 'Audio plays on the projection',
     allowNegativeHint: 'The timer goes negative blinking in red (Sabbath School style)',
     bgColor: 'Background Color',
     bgColorHint: 'Base background color of the display screen',

@@ -46,8 +46,6 @@ export default {
     unmuteAudio: 'Ativar alertas',
     audioVolume: 'Volume dos alertas',
     stopAudio: 'Parar áudio agora',
-    playAudio: 'Retomar alerta',
-    pauseAudio: 'Pausar alerta',
     modeDuration: 'Duração',
     modeUntil: 'Até',
     until: 'Horário de término',
@@ -56,7 +54,6 @@ export default {
     inAppProjection: 'Pré-visualização do timer',
     projectionHotkeyHint:
       'ESC encerra a projeção  ·  Ctrl+Alt+P alterna com a tela do operador',
-    audioAppliesToProjection: 'Áudio toca na projeção',
     bgColor: 'Cor de Fundo',
     bgColorHint: 'Cor base de fundo da tela de exibição',
     textColor: 'Cor do Texto',

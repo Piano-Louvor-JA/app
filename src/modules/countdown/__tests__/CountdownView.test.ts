@@ -149,6 +149,17 @@ describe('CountdownView', () => {
     wrapper.unmount()
   })
 
+  it('modo sabatina: áudio do operador tem só mudo e volume', async () => {
+    stagePayload.countdown = { ...(stagePayload.countdown as object), mode: 'sabbath' }
+    const wrapper = await mountView()
+    const controls = wrapper.find('[data-testid="operator-audio-controls"]')
+    expect(controls.exists()).toBe(true)
+    expect(controls.findAll('button')).toHaveLength(1)
+    expect(controls.find('.countdown-view__audio-volume').exists()).toBe(true)
+    expect(controls.find('input[role="switch"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
   it('modo until via botões do DurationInput compacto', async () => {
     const wrapper = await mountView()
     const modes = wrapper.findAll('.countdown-duration__mode')
