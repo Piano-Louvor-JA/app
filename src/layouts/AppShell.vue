@@ -5,8 +5,8 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import { usePageTransition } from '@design-system/composables'
-import { DockFooter, GradientBackground, HistoryNav } from '@design-system/index'
-import type { DockNavItem, HistoryNavDot } from '@design-system/types/navigation'
+import { DockFooter, GradientBackground, HistoryNav, MinimizedPagesBar } from '@design-system/index'
+import type { DockNavItem, HistoryNavDot, MinimizedBarItem } from '@design-system/types/navigation'
 import AuthAccountDialog from '@modules/auth/components/AuthAccountDialog.vue'
 import { useAuth, setNotify } from '@modules/auth/composables/useAuth'
 import { useBibleStore } from '@modules/bible/stores/useBibleStore'
@@ -41,6 +41,7 @@ import { mainNavRoutes } from '@shared/constants/navigation'
 import { useNavigationHistory } from '@shared/composables/useNavigationHistory'
 import { useHistoryNavShortcuts } from '@shared/composables/useHistoryNavShortcuts'
 import { describeHistoryEntry } from '@shared/services/navigation-history-label'
+import { useMinimizedPagesStore } from '@shared/stores/useMinimizedPagesStore'
 import { VIEW_SCROLL_MEMORY, useViewScrollMemory } from '@shared/composables/useViewScrollMemory'
 import logoUrl from '@assets/brand/logo-louvor-ja.svg'
 import CodenameLogo from '@assets/brand/CodenameLogo.vue'
@@ -359,6 +360,32 @@ const {
 
 useHistoryNavShortcuts({ back: history.back, forward: history.forward })
 
+const minimizedPages = useMinimizedPagesStore()
+
+const minimizedItems = computed<MinimizedBarItem[]>(() =>
+  minimizedPages.items.map((page) => ({
+    key: page.fullPath,
+    title: page.title,
+    icon: page.icon,
+    summary: page.summary,
+    preview: page.preview,
+    closeLabel: t('minimize.close', { title: page.title }),
+  })),
+)
+
+/** Reabre uma página minimizada como estava (rolagem + retrato). */
+function onOpenMinimized(fullPath: string) {
+  // já está aberta (o operador voltou por outro caminho): só sai da barra
+  if (route.fullPath === fullPath) {
+    minimizedPages.close(fullPath)
+    return
+  }
+  const page = minimizedPages.reopen(fullPath)
+  if (!page) return
+  viewScrollMemory.seed(fullPath, page.scroll)
+  void router.push(fullPath)
+}
+
 const historyDots = computed<HistoryNavDot[]>(() =>
   historyIndexes.value.map((dot) => ({
     ...dot,
@@ -382,7 +409,10 @@ function viewKey(viewRoute: typeof route) {
 </script>
 
 <template>
-  <GradientBackground class="app-shell">
+  <GradientBackground
+    class="app-shell"
+    :class="{ 'app-shell--has-minimized': minimizedPages.hasItems }"
+  >
     <header class="app-shell__header">
       <div class="app-shell__brand-group" :aria-label="t('app.name')">
         <img
@@ -542,6 +572,15 @@ function viewKey(viewRoute: typeof route) {
         @back="history.back"
         @forward="history.forward"
         @go="history.goTo"
+      />
+    </div>
+
+    <div v-if="minimizedPages.hasItems" class="app-shell__minimized">
+      <MinimizedPagesBar
+        :items="minimizedItems"
+        :nav-label="t('minimize.bar')"
+        @open="onOpenMinimized"
+        @close="minimizedPages.close"
       />
     </div>
 
@@ -719,11 +758,35 @@ function viewKey(viewRoute: typeof route) {
 }
 
 /* Faixa voltar/avançar + pontos: logo acima do dock, abaixo das projeções in-app. */
-.app-shell__history {
+/* Com páginas minimizadas, a barra entra entre a faixa de histórico e o dock. */
+.app-shell {
+  --app-shell-minimized-offset: 0px;
+}
+
+.app-shell--has-minimized {
+  --app-shell-minimized-offset: var(--ds-minimized-bar-height);
+}
+
+.app-shell__minimized {
   position: fixed;
   left: 0;
   right: 0;
   bottom: var(--ds-dock-height);
+  z-index: 45;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+
+  > * {
+    pointer-events: auto;
+  }
+}
+
+.app-shell__history {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--ds-dock-height) + var(--app-shell-minimized-offset));
   z-index: 45;
   display: flex;
   justify-content: center;
@@ -742,7 +805,9 @@ function viewKey(viewRoute: typeof route) {
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
-  padding-bottom: calc(var(--ds-dock-height) + var(--ds-history-nav-height));
+  padding-bottom: calc(
+    var(--ds-dock-height) + var(--ds-history-nav-height) + var(--app-shell-minimized-offset)
+  );
 
   /* View ativa (RouterView não cria wrapper) preenche a área útil. */
   > * {

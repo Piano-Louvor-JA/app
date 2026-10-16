@@ -184,7 +184,13 @@ vi.mock('@design-system/index', () => ({
   GradientBackground: {
     name: 'GradientBackground',
     template: '<div class="gradient-mock"><slot /></div>',
-  },  HistoryNav: {
+  },  MinimizedPagesBar: {
+    name: 'MinimizedPagesBar',
+    template: '<nav class="minimized-bar-mock" />',
+    props: ['items', 'navLabel'],
+    emits: ['open', 'close'],
+  },
+  HistoryNav: {
     name: 'HistoryNav',
     template: '<nav class="history-nav-mock" />',
     props: ['dots', 'canGoBack', 'canGoForward', 'navLabel', 'backLabel', 'forwardLabel'],
@@ -247,6 +253,8 @@ vi.mock('@modules/timer/views/TimerProjectionView.vue', () => ({
 
 import AppShell from '@layouts/AppShell.vue'
 import { installNavigationHistory } from '@shared/composables/useNavigationHistory'
+import { useMinimizedPagesStore } from '@shared/stores/useMinimizedPagesStore'
+import type { MinimizedPage } from '@shared/services/minimized-pages'
 
 function makeRouter(navKey: string | null = null, routeName = 'test') {
   return createRouter({
@@ -663,6 +671,138 @@ describe('AppShell — memória de rolagem', () => {
     const again = w.find('.scroll-view').element as HTMLElement
     expect(again).not.toBe(first)
     expect(again.scrollTop).toBe(420)
+    w.unmount()
+  })
+})
+
+describe('AppShell — páginas minimizadas', () => {
+  let uninstallHistory: (() => void) | null = null
+
+  beforeEach(() => {
+    sessionStorage.clear()
+  })
+
+  afterEach(() => {
+    uninstallHistory?.()
+    uninstallHistory = null
+  })
+
+  /** Deixa a Transition (out-in) terminar: ela espera frames. */
+  async function settle() {
+    for (let i = 0; i < 6; i++) {
+      await vi.advanceTimersByTimeAsync(50)
+      await flushPromises()
+    }
+  }
+
+  function hinario(extra: Partial<MinimizedPage> = {}): MinimizedPage {
+    return {
+      fullPath: '/albums/5',
+      routeName: 'albums-collection',
+      title: 'Hinário Adventista',
+      icon: 'ti-book',
+      summary: 'Busca: santo',
+      state: { collectionId: '5', searchQuery: 'santo' },
+      scroll: [{ path: [0], top: 333, left: 0 }],
+      preview: 'data:image/jpeg;base64,AA',
+      minimizedAt: 1,
+      ...extra,
+    }
+  }
+
+  async function mountShell2(start = '/') {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/', name: 'home', component: { template: '<section class="scroll-view" />' }, meta: { navKey: 'home' } },
+        {
+          path: '/albums/:collectionId',
+          name: 'albums-collection',
+          component: { template: '<section class="scroll-view album" />' },
+          meta: { navKey: 'albums' },
+        },
+      ],
+    })
+    uninstallHistory = installNavigationHistory({ router })
+    await router.push(start)
+    await router.isReady()
+    const w = mount(AppShell, { global: { plugins: [router], stubs: { transition: false } } })
+    await flushPromises()
+    const bar = () => w.findComponent({ name: 'MinimizedPagesBar' })
+    return { w, router, bar }
+  }
+
+  it('sem páginas minimizadas a barra não aparece nem ocupa espaço', async () => {
+    const { w, bar } = await mountShell2()
+    expect(bar().exists()).false
+    expect(w.find('.app-shell').classes()).not.toContain('app-shell--has-minimized')
+    w.unmount()
+  })
+
+  it('mostra as páginas minimizadas entre a faixa e o dock', async () => {
+    useMinimizedPagesStore().minimize(hinario())
+    const { w, bar } = await mountShell2()
+    expect(w.find('.app-shell').classes()).toContain('app-shell--has-minimized')
+    expect(w.find('.app-shell__minimized .minimized-bar-mock').exists()).true
+    expect(bar().props('navLabel')).toBe('minimize.bar')
+    expect(bar().props('items')).toEqual([
+      {
+        key: '/albums/5',
+        title: 'Hinário Adventista',
+        icon: 'ti-book',
+        summary: 'Busca: santo',
+        preview: 'data:image/jpeg;base64,AA',
+        closeLabel: 'minimize.close',
+      },
+    ])
+    w.unmount()
+  })
+
+  it('clicar reabre a página, tira da barra e volta a rolagem guardada', async () => {
+    const store = useMinimizedPagesStore()
+    store.minimize(hinario())
+    const { w, router, bar } = await mountShell2()
+
+    bar().vm.$emit('open', '/albums/5')
+    await settle()
+
+    expect(router.currentRoute.value.fullPath).toBe('/albums/5')
+    expect(store.items).toEqual([])
+    expect(store.takeRestore('/albums/5')?.state).toEqual({ collectionId: '5', searchQuery: 'santo' })
+    expect((w.find('.scroll-view.album').element as HTMLElement).scrollTop).toBe(333)
+    w.unmount()
+  })
+
+  it('x fecha sem navegar', async () => {
+    const store = useMinimizedPagesStore()
+    store.minimize(hinario())
+    const { w, router, bar } = await mountShell2()
+    bar().vm.$emit('close', '/albums/5')
+    await flushPromises()
+    expect(store.items).toEqual([])
+    expect(router.currentRoute.value.fullPath).toBe('/')
+    w.unmount()
+  })
+
+  it('item de uma página que já está aberta: só sai da barra', async () => {
+    const store = useMinimizedPagesStore()
+    store.minimize(hinario())
+    const { w, router, bar } = await mountShell2('/albums/5')
+    bar().vm.$emit('open', '/albums/5')
+    await flushPromises()
+    expect(store.items).toEqual([])
+    expect(store.takeRestore('/albums/5')).toBeNull()
+    expect(router.currentRoute.value.fullPath).toBe('/albums/5')
+    w.unmount()
+  })
+
+  it('item que não existe mais é ignorado', async () => {
+    const { w, router, bar } = await mountShell2()
+    useMinimizedPagesStore().minimize(hinario())
+    await flushPromises()
+    bar().vm.$emit('open', '/sumiu')
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe('/')
     w.unmount()
   })
 })

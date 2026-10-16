@@ -34,6 +34,7 @@
   --ds-spacing-page: 32px;
   --ds-dock-height: 72px;
   --ds-history-nav-height: 36px;
+  --ds-minimized-bar-height: 40px;
   --ds-header-height: 5rem;
   --app-titlebar-height: 0px;
   /* Zoom da UI (useUiZoom). Compensa 100vh quando CSS zoom ≠ 1. */
@@ -192,6 +193,7 @@ body {
     --ds-spacing-6: 18px;
     --ds-dock-height: 60px;
     --ds-history-nav-height: 32px;
+    --ds-minimized-bar-height: 36px;
     --ds-header-height: 4.25rem;
   }
 }

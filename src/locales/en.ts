@@ -70,6 +70,8 @@ export default {
     },
     },
   minimize: {
+    bar: 'Minimized pages',
+    close: 'Close {title}',
     page: 'Minimize page',
     search: 'Search: {q}',
   },

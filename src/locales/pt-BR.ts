@@ -142,6 +142,8 @@ export default {
       },
     },
   minimize: {
+    bar: 'Páginas minimizadas',
+    close: 'Fechar {title}',
     page: 'Minimizar página',
     search: 'Busca: {q}',
   },
