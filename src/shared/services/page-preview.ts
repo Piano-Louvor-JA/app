@@ -11,7 +11,10 @@ export async function capturePagePreview(el: Element | null): Promise<string | n
   if (!capture || !el) return null
 
   const rect = el.getBoundingClientRect()
-  if (rect.width <= 0 || rect.height <= 0) return null
+  // O rodapé reservado do <main> fica coberto pela faixa de histórico e pelo
+  // dock (fixos): a miniatura é só a tela em si.
+  const height = rect.height - (parseFloat(getComputedStyle(el).paddingBottom) || 0)
+  if (rect.width <= 0 || height <= 0) return null
 
   // getBoundingClientRect é em CSS px; com zoom da interface, a janela é maior.
   const factor = bridge.zoom?.getFactor() ?? 1
@@ -20,7 +23,7 @@ export async function capturePagePreview(el: Element | null): Promise<string | n
       x: Math.round(rect.x * factor),
       y: Math.round(rect.y * factor),
       width: Math.round(rect.width * factor),
-      height: Math.round(rect.height * factor),
+      height: Math.round(height * factor),
     })
   } catch {
     return null

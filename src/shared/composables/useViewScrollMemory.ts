@@ -19,6 +19,8 @@ export interface ViewScrollMemory {
   captureCurrent(): ScrollMark[]
   /** Deixa a rolagem pronta para a próxima vez que a tela entrar (vazio = apaga). */
   seed(fullPath: string, marks: ScrollMark[]): void
+  /** O <main> observado (área da miniatura de uma página minimizada). */
+  getRoot(): HTMLElement | null
 }
 
 /** O AppShell provê; as páginas usam `injectViewScrollMemory()`. */
@@ -87,5 +89,5 @@ export function useViewScrollMemory(root: Ref<HTMLElement | null>): ViewScrollMe
     cancelRestore?.()
   })
 
-  return { restore, captureCurrent, seed }
+  return { restore, captureCurrent, seed, getRoot: () => root.value }
 }

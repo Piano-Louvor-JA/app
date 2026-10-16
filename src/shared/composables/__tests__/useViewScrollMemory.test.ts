@@ -231,6 +231,10 @@ describe('useViewScrollMemory — captura e semente (páginas minimizadas)', () 
     expect(view.scrollTop).toBe(10)
   })
 
+  it('getRoot devolve o <main> observado', () => {
+    expect(memory.getRoot()).toBe(wrapper.find('main').element)
+  })
+
   it('sem raiz montada, captureCurrent devolve vazio', async () => {
     const r = createRouter({ history: createMemoryHistory(), routes: [{ path: '/x', component: {} }] })
     await r.push('/x')
@@ -245,6 +249,7 @@ describe('useViewScrollMemory — captura e semente (páginas minimizadas)', () 
       { global: { plugins: [r] } },
     )
     expect(orphan.captureCurrent()).toEqual([])
+    expect(orphan.getRoot()).toBeNull()
     w.unmount()
   })
 

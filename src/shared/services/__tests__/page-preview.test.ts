@@ -33,6 +33,22 @@ describe('capturePagePreview', () => {
     expect(result).toBe('data:image/jpeg;base64,AA')
   })
 
+  it('desconta o rodapé reservado (faixa de histórico e dock ficam por cima)', async () => {
+    const capture = installBridge()
+    const el = element({ x: 0, y: 120, width: 1600, height: 780 })
+    el.style.paddingBottom = '108px'
+    await capturePagePreview(el)
+    expect(capture).toHaveBeenCalledWith({ x: 0, y: 120, width: 1600, height: 672 })
+  })
+
+  it('rodapé maior que a área: nada a capturar', async () => {
+    const capture = installBridge()
+    const el = element({ x: 0, y: 0, width: 800, height: 100 })
+    el.style.paddingBottom = '100px'
+    expect(await capturePagePreview(el)).toBeNull()
+    expect(capture).not.toHaveBeenCalled()
+  })
+
   it('aplica o zoom da interface (CSS px → px da janela)', async () => {
     const capture = installBridge({ factor: 1.25 })
     await capturePagePreview(element({ x: 10, y: 100, width: 800, height: 400 }))
