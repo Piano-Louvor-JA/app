@@ -70,6 +70,7 @@ export default {
     },
     },
   minimize: {
+    pageNumber: 'Page {n}',
     bar: 'Minimized pages',
     close: 'Close {title}',
     page: 'Minimize page',

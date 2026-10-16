@@ -4,6 +4,8 @@ import { getAuthSession } from "@modules/media/services/auth-client";
 import { onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
+import PageBackStack from "@shared/components/PageBackStack.vue";
+import { useMinimizablePage } from "@shared/composables/useMinimizablePage";
 
 import {
 	getMyPosition,
@@ -16,6 +18,20 @@ const { t } = useI18n();
 const router = useRouter();
 
 const window = ref<RankingWindow>("all");
+
+const { minimize, takeRestoredState } = useMinimizablePage<{ window: RankingWindow }>({
+	describe: () => ({
+		title: t("ranking.title"),
+		icon: "ti-trophy",
+		summary: t(window.value === "week" ? "ranking.week" : "ranking.all"),
+	}),
+	capture: () => ({ window: window.value }),
+	fallbackRoute: { name: "community" },
+});
+
+// Reaberta pela barra: volta na aba guardada (antes do watch, carrega 1 vez).
+const restored = takeRestoredState();
+if (restored) window.value = restored.window;
 const entries = ref<RankingEntry[]>([]);
 const me = ref<MyPosition | null>(null);
 const isLogged = ref(false);
@@ -42,14 +58,16 @@ onMounted(load);
 <template>
 	<section class="ranking-view">
 		<header class="ranking-view__header">
-			<button
-				type="button"
-				class="ranking-view__back"
-				:aria-label="t('community.back')"
-				@click="router.push('/community')"
-			>
-				<i class="ti ti-arrow-left" aria-hidden="true" />
-			</button>
+			<PageBackStack @minimize="minimize">
+				<button
+					type="button"
+					class="ranking-view__back"
+					:aria-label="t('community.back')"
+					@click="router.push('/community')"
+				>
+					<i class="ti ti-arrow-left" aria-hidden="true" />
+				</button>
+			</PageBackStack>
 			<div class="ranking-view__headings">
 				<h1 class="ranking-view__title">{{ t("ranking.title") }}</h1>
 				<p class="ranking-view__subtitle">

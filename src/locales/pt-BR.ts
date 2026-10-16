@@ -142,6 +142,7 @@ export default {
       },
     },
   minimize: {
+    pageNumber: 'Página {n}',
     bar: 'Páginas minimizadas',
     close: 'Fechar {title}',
     page: 'Minimizar página',

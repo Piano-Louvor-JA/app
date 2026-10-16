@@ -25,6 +25,8 @@ import {
 } from "../services/notifications";
 import NotificationsDropdown from "../components/NotificationsDropdown.vue";
 import { useCommunityBrowseStore } from "../stores/useCommunityBrowseStore";
+import PageBackStack from "@shared/components/PageBackStack.vue";
+import { useMinimizablePage } from "@shared/composables/useMinimizablePage";
 
 const { t } = useI18n();
 const router = useRouter();
@@ -38,6 +40,32 @@ const weeklyTasks = ref<WeeklyTask[]>([]);
 const viewEl = ref<HTMLElement | null>(null);
 // busca e página sobrevivem a sair e voltar para a tela
 const { searchQuery, page } = storeToRefs(useCommunityBrowseStore());
+
+/** Retrato guardado ao minimizar: busca e página da lista. */
+interface CommunitySnapshot {
+	searchQuery: string;
+	page: number;
+}
+
+const { minimize, takeRestoredState } = useMinimizablePage<CommunitySnapshot>({
+	describe: () => {
+		const query = searchQuery.value.trim();
+		const parts = [
+			query ? t("minimize.search", { q: query }) : "",
+			t("minimize.pageNumber", { n: page.value }),
+		];
+		return { title: t("community.title"), icon: "ti-users-group", summary: parts.filter(Boolean).join(" · ") };
+	},
+	capture: () => ({ searchQuery: searchQuery.value, page: page.value }),
+	fallbackRoute: { name: "home" },
+});
+
+// Reaberta pela barra: volta com a busca e a página antes do 1º carregamento.
+const restored = takeRestoredState();
+if (restored) {
+	searchQuery.value = restored.searchQuery;
+	page.value = restored.page;
+}
 const lastPage = ref(1);
 const total = ref(0);
 
@@ -129,14 +157,16 @@ onMounted(load);
 <template>
   <section ref="viewEl" class="community-view">
     <header class="community-view__header">
-      <button
-        type="button"
-        class="community-view__back"
-        :aria-label="t('community.back')"
-        @click="router.back()"
-      >
-        <i class="ti ti-arrow-left" aria-hidden="true" />
-      </button>
+      <PageBackStack @minimize="minimize">
+        <button
+          type="button"
+          class="community-view__back"
+          :aria-label="t('community.back')"
+          @click="router.back()"
+        >
+          <i class="ti ti-arrow-left" aria-hidden="true" />
+        </button>
+      </PageBackStack>
       <div class="community-view__headings">
         <h1 class="community-view__title">
           {{ t('community.title') }}

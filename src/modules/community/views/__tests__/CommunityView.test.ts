@@ -1,5 +1,21 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+// Composable testado à parte: aqui só o contrato tela ↔ minimizar.
+const minimizeMock = vi.fn(async () => {});
+vi.mock("@shared/composables/useMinimizablePage", () => ({
+	useMinimizablePage: (options: unknown) => {
+		(globalThis as any).__minimizeOptions = options;
+		return {
+			minimize: minimizeMock,
+			takeRestoredState: () => {
+				const restored = (globalThis as any).__restored ?? null;
+				(globalThis as any).__restored = null;
+				return restored;
+			},
+		};
+	},
+}));
 import { mount, flushPromises } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 
@@ -725,5 +741,55 @@ describe("CommunityView — branches residuais (sem autor, sem capa, sem sessão
 		expect(
 			wrapper.find(".community-view__card-author").exists(),
 		).toBe(false);
+	});
+});
+
+describe("CommunityView — minimizar página", () => {
+	const options = () => (globalThis as any).__minimizeOptions;
+
+	beforeEach(() => {
+		vi.clearAllMocks();
+		(globalThis as any).__restored = null;
+		mocks.listCommunityCollectionsPage.mockImplementation(async (p: number) => ({
+			items: [],
+			page: p,
+			lastPage: 5,
+			total: 10,
+		}));
+	});
+
+	it("– fica abaixo da seta de voltar e minimiza", async () => {
+		const w = await mountView();
+		const stack = w.find(".page-back-stack");
+		expect(stack.find(".community-view__back").exists()).toBe(true);
+		await stack.find(".page-back-stack__minimize").trigger("click");
+		expect(minimizeMock).toHaveBeenCalledTimes(1);
+		expect(options().fallbackRoute).toEqual({ name: "home" });
+		w.unmount();
+	});
+
+	it("descreve a tela e guarda busca e página", async () => {
+		const w = await mountView();
+		expect(options().describe()).toEqual({
+			title: "community.title",
+			icon: "ti-users-group",
+			summary: "minimize.pageNumber",
+		});
+		w.vm.searchQuery = "  vox ";
+		w.vm.goTo(3);
+		await flushPromises();
+		expect(options().describe().summary).toBe("minimize.search · minimize.pageNumber");
+		expect(options().capture()).toEqual({ searchQuery: "  vox ", page: 3 });
+		w.unmount();
+	});
+
+	it("reaberta pela barra: carrega já na página e com a busca guardadas", async () => {
+		(globalThis as any).__restored = { searchQuery: "arautos", page: 4 };
+		const w = await mountView();
+		expect(w.vm.searchQuery).toBe("arautos");
+		expect(w.vm.page).toBe(4);
+		expect(mocks.listCommunityCollectionsPage).toHaveBeenCalledTimes(1);
+		expect(mocks.listCommunityCollectionsPage).toHaveBeenCalledWith(4, 24);
+		w.unmount();
 	});
 });
