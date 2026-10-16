@@ -2,12 +2,12 @@ import path from 'node:path'
 import { readFileSync, realpathSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
 
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import tailwindcss from '@tailwindcss/vite'
 
-import { profileApiConfig, resolveBuildProfile } from './electron/profile.mjs'
+import { BAKED_PROFILE_FILE, rendererApiEnvFor } from './electron/profile.mjs'
 
 const pkg = JSON.parse(
   readFileSync(new URL('./package.json', import.meta.url), 'utf8'),
@@ -16,26 +16,35 @@ const pkg = JSON.parse(
 // Contrato de perfil (SPEC piano-api-env-guard): o perfil efetivo é definido
 // AQUI, uma única vez, a partir de PIANO_BUILD_PROFILE — nunca de .env local.
 // O renderer recebe o perfil e os hosts derivados via import.meta.env.
-const buildProfile = resolveBuildProfile(process.env)
-const profileConfig = profileApiConfig(buildProfile)
-const rendererEnv = {
-  VITE_PIANO_PROFILE: buildProfile,
-  VITE_URL_DATABASE: process.env.VITE_URL_DATABASE ?? `${profileConfig.primary}/json_db`,
-  VITE_URL_FILES: process.env.VITE_URL_FILES ?? `${profileConfig.primary}/file`,
-  VITE_PALCO_API_URL: process.env.VITE_PALCO_API_URL ?? profileConfig.primary,
-  ...(process.env.VITE_API_FALLBACK_URLS || profileConfig.fallbackHosts.length
-    ? {
-        VITE_API_FALLBACK_URLS:
-          process.env.VITE_API_FALLBACK_URLS ?? profileConfig.fallbackHosts.join(','),
-      }
-    : {}),
+// Caso real (v1.31.0): este define sumiu num merge e a release saiu em STG —
+// `electron/guard/verify-bundle.mjs` confere o bundle depois do build.
+const rendererEnv = rendererApiEnvFor(process.env)
+const rendererDefine = Object.fromEntries(
+  Object.entries(rendererEnv).map(([key, value]) => [`import.meta.env.${key}`, JSON.stringify(value)]),
+)
+
+/** Grava o perfil em dist/ para o main empacotado (o PC do usuário não tem env). */
+function bakeBuildProfile(): Plugin {
+  return {
+    name: 'piano-bake-build-profile',
+    apply: 'build',
+    generateBundle() {
+      this.emitFile({
+        type: 'asset',
+        fileName: BAKED_PROFILE_FILE,
+        source: `${JSON.stringify({ profile: rendererEnv.VITE_PIANO_PROFILE })}\n`,
+      })
+    },
+  }
 }
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
     __DIAGNOSTICS_DSN__: JSON.stringify(process.env.DIAGNOSTICS_GLITCHTIP_DSN ?? ''),
+    // Só no build: o dev server segue lendo .env/.env.local (E2E e API local).
+    ...(command === 'build' ? rendererDefine : {}),
   },
   server: {
     // node_modules é symlink p/ outro worktree (api-env-wt) — fora do root,
@@ -70,6 +79,7 @@ export default defineConfig({
     vue(),
     vueDevTools(),
     tailwindcss(),
+    bakeBuildProfile(),
   ],
   resolve: {
     alias: {
@@ -86,4 +96,4 @@ export default defineConfig({
       '@locales': path.resolve(__dirname, './src/locales'),
     },
   },
-})
+}))

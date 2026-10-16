@@ -10,6 +10,10 @@
 //   - vite.config.ts (via import direto — injeta o contrato no renderer)
 //   - scripts/guard (build guard fail-closed)
 
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
 export const PROFILES = ['development', 'test', 'homologation', 'release']
 
 /** Hosts canônicos (SPEC). */
@@ -36,12 +40,36 @@ export function isReleaseProfile(profile) {
   return profile === 'release'
 }
 
+/** Arquivo que o build grava em dist/ com o perfil do pacote (lido pelo main). */
+export const BAKED_PROFILE_FILE = 'build-profile.json'
+
+const MODULE_PATH = fileURLToPath(import.meta.url)
+
 /**
- * Perfil efetivo do build. Ausente/vazio => homologation (fail-safe STG).
- * Valor inválido lança — melhor falhar na cara do que empacotar produção.
+ * Perfil gravado no pacote pelo build (dist/build-profile.json).
+ *
+ * O main roda no PC do usuário, onde PIANO_BUILD_PROFILE não existe: sem isso
+ * uma release cai em homologation/STG. Só vale dentro do app.asar — em dev,
+ * build e testes um dist/ antigo nunca decide o perfil.
  */
-export function resolveBuildProfile(env = process.env) {
-  const raw = env.PIANO_BUILD_PROFILE?.trim()
+export function readBakedProfile(modulePath = MODULE_PATH) {
+  if (!/[\\/]app\.asar[\\/]/.test(modulePath)) return undefined
+  try {
+    const file = path.join(path.dirname(modulePath), '..', 'dist', BAKED_PROFILE_FILE)
+    const { profile } = JSON.parse(readFileSync(file, 'utf8'))
+    return typeof profile === 'string' ? profile : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Perfil efetivo. Ordem: PIANO_BUILD_PROFILE > perfil gravado no pacote >
+ * homologation (fail-safe STG). Valor inválido lança — melhor falhar na cara
+ * do que empacotar produção.
+ */
+export function resolveBuildProfile(env = process.env, bakedProfile = readBakedProfile()) {
+  const raw = env.PIANO_BUILD_PROFILE?.trim() || bakedProfile?.trim()
   if (!raw) return 'homologation'
   const profile = raw.toLowerCase()
   if (!PROFILES.includes(profile)) {
@@ -68,6 +96,23 @@ export function profileApiConfig(profile) {
   return { profile, primary: HOSTS.stg, fallbackHosts: [...PUBLIC_FALLBACK_HOSTS] }
 }
 
+/**
+ * Variáveis que o vite.config injeta no renderer (define). VITE_* explícito no
+ * env do processo vence; senão vale o contrato do perfil. Nunca lê .env local.
+ */
+export function rendererApiEnvFor(env = process.env) {
+  const profile = resolveBuildProfile(env)
+  const contract = profileApiConfig(profile)
+  const fallbacks = env.VITE_API_FALLBACK_URLS ?? contract.fallbackHosts.join(',')
+  return {
+    VITE_PIANO_PROFILE: profile,
+    VITE_URL_DATABASE: env.VITE_URL_DATABASE ?? `${contract.primary}/json_db`,
+    VITE_URL_FILES: env.VITE_URL_FILES ?? `${contract.primary}/file`,
+    VITE_PALCO_API_URL: env.VITE_PALCO_API_URL ?? contract.primary,
+    ...(fallbacks ? { VITE_API_FALLBACK_URLS: fallbacks } : {}),
+  }
+}
+
 function originOf(value) {
   if (typeof value !== 'string' || !value.trim()) return ''
   try {
@@ -88,8 +133,8 @@ function originOf(value) {
  * Ordem da primária: PIANO_API_BASE_URL > VITE_URL_FILES (origem) >
  * VITE_PALCO_API_URL (origem) > contrato do perfil.
  */
-export function resolveEffectiveApi(env = process.env) {
-  const profile = resolveBuildProfile(env)
+export function resolveEffectiveApi(env = process.env, bakedProfile = readBakedProfile()) {
+  const profile = resolveBuildProfile(env, bakedProfile)
   const contract = profileApiConfig(profile)
   const explicit = env.PIANO_API_BASE_URL?.trim()
   const candidate =
@@ -124,8 +169,8 @@ export function resolveEffectiveApi(env = process.env) {
  * Hosts para o diagnóstico (RF-02): primário do perfil + fallbacks.
  * Diagnóstico de non-release NUNCA sonda produção.
  */
-export function diagnosticApiHosts(env = process.env) {
-  const { primary, fallbackHosts } = resolveEffectiveApi(env)
+export function diagnosticApiHosts(env = process.env, bakedProfile = readBakedProfile()) {
+  const { primary, fallbackHosts } = resolveEffectiveApi(env, bakedProfile)
   const hosts = [new URL(primary).hostname]
   for (const fb of fallbackHosts) {
     try {
