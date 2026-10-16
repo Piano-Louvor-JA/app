@@ -56,7 +56,9 @@ async function openMediaHubAndAwaitPrefix(
   // Sidebar so aparece depois do bootstrap (boot-splash some) — esperar pelo
   // item de menu (nav principal, botao Media Center/Central de Midia).
   const hubButton = page
-    .getByRole('navigation', { name: 'Navegação principal' })
+    .getByRole('navigation', {
+      name: /^(Navegação principal|Navegación principal|Main navigation)$/,
+    })
     .getByRole('button')
     .nth(1)
   await hubButton.waitFor({ timeout: 20000 })
