@@ -221,7 +221,7 @@ function onImportFile(event: Event) {
 
 async function playPlaylist(playlist: Playlist) {
   if (playlist.items.length === 0) return
-  await mediaStore.playQueue(playlist.items, 0)
+  await mediaStore.playQueue(playlist.items, 0, undefined, playlist.name)
   await router.push({ name: 'media' })
 }
 

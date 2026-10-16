@@ -36,6 +36,8 @@ const storeState = {
 	isPlaying: ref(false),
 	previewSnippet: ref("Santo, santo, santo"),
 	previewReference: ref("Hinário Adventista"),
+	session: ref<{ subtitle: string } | null>(null),
+	queueLabel: ref<string | null>(null),
 	toggleProjection: vi.fn().mockResolvedValue(undefined),
 	clearProjection: vi.fn(),
 	togglePlay: vi.fn().mockResolvedValue(undefined),

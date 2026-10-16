@@ -21,6 +21,8 @@ const {
   isPlaying,
   previewSnippet,
   previewReference,
+  session,
+  queueLabel,
   toggleProjection,
   clearProjection,
   togglePlay,
@@ -28,6 +30,12 @@ const {
 } = useMediaPlayer()
 
 const visible = computed(() => hasSession.value && minimized.value)
+
+/** "Player · nome da playlist", ou da coletânea/hinário do hino tocando. */
+const chromeTitle = computed(() => {
+  const source = queueLabel.value || session.value?.subtitle
+  return source ? `${t('media.title')} · ${source}` : t('media.title')
+})
 
 const chromeRoot = ref<HTMLElement | null>(null)
 const { positionStyle, dragging, onPointerDown, resetPosition } =
@@ -62,7 +70,7 @@ async function onToggleAudio() {
     :style="positionStyle"
     @pointerdown="onPointerDown"
   >
-    <FloatingPreviewTitle :label="t('media.title')" />
+    <FloatingPreviewTitle :label="chromeTitle" />
 
     <div
       class="media-chrome__handle"

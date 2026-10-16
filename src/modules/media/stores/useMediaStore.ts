@@ -77,6 +77,8 @@ export const useMediaStore = defineStore('media', () => {
   // Fila de reprodução (spec playlist RF-03): vazia = comportamento atual.
   const queue = ref<QueueItem[]>([])
   const queueIndex = ref(-1)
+  /** Nome da fila (playlist) para o título do player; null = coletânea do hino. */
+  const queueLabel = ref<string | null>(null)
   const isProjecting = computed({
     get: () => isProjectingRaw.value,
     set: (v: boolean) => {
@@ -495,6 +497,7 @@ export const useMediaStore = defineStore('media', () => {
     if (!params.keepQueue) {
       queue.value = []
       queueIndex.value = -1
+      queueLabel.value = null
     }
 
     // Mesma faixa: troca de modo sem reset (legado Media.open + isSameSong).
@@ -802,8 +805,14 @@ export const useMediaStore = defineStore('media', () => {
   }
 
   /** Substitui a fila e toca a partir de startIndex. */
-  async function playQueue(items: QueueItem[], startIndex = 0, mode?: MediaPlaybackMode): Promise<void> {
+  async function playQueue(
+    items: QueueItem[],
+    startIndex = 0,
+    mode?: MediaPlaybackMode,
+    label: string | null = null,
+  ): Promise<void> {
     queue.value = items
+    queueLabel.value = label
     const first = items[startIndex]
     if (!first) return
     await playQueueItem(first, mode)
@@ -835,6 +844,7 @@ export const useMediaStore = defineStore('media', () => {
   function clearQueue(): void {
     queue.value = []
     queueIndex.value = -1
+    queueLabel.value = null
   }
 
   /** Há fila ativa? (UI: next/prev do player = faixa; sem fila = slides) */
@@ -1293,6 +1303,7 @@ export const useMediaStore = defineStore('media', () => {
     previousSlide,
     queue,
     queueIndex,
+    queueLabel,
     playQueue,
     playAlbumQueue,
     playQueueItem,

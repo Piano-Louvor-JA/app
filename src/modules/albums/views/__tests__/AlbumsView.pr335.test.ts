@@ -549,6 +549,8 @@ describe('AlbumsView', () => {
     ;((body().querySelector('.albums-view__playlist') as HTMLElement).querySelector('.albums-view__playlist-play') as HTMLElement).click()
     await flushPromises()
     expect(pushMock).toHaveBeenCalledWith({ name: 'media' })
+    // o nome da playlist vai para o título do player
+    expect(playQueueMock).toHaveBeenCalledWith(expect.any(Array), 0, undefined, 'Com faixas')
     // remover faixa
     ;((body().querySelector('.albums-view__playlist') as HTMLElement).querySelector('.albums-view__playlist-track-remove') as HTMLElement).click()
     await flushPromises()
