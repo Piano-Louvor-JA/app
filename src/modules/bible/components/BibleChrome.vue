@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
-import { useFloatingDrag } from '@shared/composables/useFloatingDrag'
+import { FLOATING_STACK_ORDER, useFloatingDrag } from '@shared/composables/useFloatingDrag'
 import { USER_PREFERENCE_KEYS } from '@shared/constants/storage-keys'
 
 import { readEffectiveStageSettings } from '../../settings/services/stage-settings-runtime'
@@ -41,7 +41,9 @@ const previewStyle = computed(() => {
 
 const chromeRoot = ref<HTMLElement | null>(null)
 const { positionStyle, dragging, onPointerDown, resetPosition } =
-  useFloatingDrag(chromeRoot, USER_PREFERENCE_KEYS.bibleChromePosition)
+  useFloatingDrag(chromeRoot, USER_PREFERENCE_KEYS.bibleChromePosition, {
+    stackOrder: FLOATING_STACK_ORDER.bible,
+  })
 
 function onProject() {
   void store.toggleProjection()

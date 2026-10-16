@@ -71,6 +71,8 @@ export default {
     backToUtilities: 'Volver al Temporizador',
     start: 'Iniciar',
     pause: 'Pausar',
+    chromeDragHint: 'Arrastra para mover · doble clic vuelve a la esquina',
+    openTimer: 'Abrir el Temporizador',
     reset: 'Reiniciar',
     addMinute: 'Añadir 1 minuto',
     addFiveMinutes: 'Añadir 5 minutos',

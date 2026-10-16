@@ -14,6 +14,7 @@ import BibleChrome from '@modules/bible/components/BibleChrome.vue'
 import BibleInAppProjection from '@modules/bible/components/BibleInAppProjection.vue'
 import ClockProjectionView from '@modules/clock/views/ClockProjectionView.vue'
 import { useClockStore } from '@modules/clock/stores/useClockStore'
+import CountdownChrome from '@modules/countdown/components/CountdownChrome.vue'
 import CountdownProjectionView from '@modules/countdown/views/CountdownProjectionView.vue'
 import RandomProjectionView from '@modules/random/views/RandomProjectionView.vue'
 import TimerProjectionView from '@modules/timer/views/TimerProjectionView.vue'
@@ -441,6 +442,7 @@ function viewKey(viewRoute: typeof route) {
     <MediaChrome />
 
     <BibleChrome />
+    <CountdownChrome />
 
     <BibleInAppProjection
       v-if="bibleInAppPreview"

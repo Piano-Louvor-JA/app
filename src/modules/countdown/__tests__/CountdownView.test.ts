@@ -96,11 +96,10 @@ beforeEach(() => {
 })
 
 describe('CountdownView', () => {
-  it('monta com header, widget e FAB; stage sem countdown usa config puro', async () => {
+  it('monta com header e widget; stage sem countdown usa config puro', async () => {
     delete (stagePayload as Record<string, unknown>).countdown
     const wrapper = await mountView()
     expect(wrapper.find('.countdown-view__widget').exists()).toBe(true)
-    expect(wrapper.find('.countdown-project-fab').exists()).toBe(true)
     wrapper.unmount()
   })
 
@@ -127,47 +126,17 @@ describe('CountdownView', () => {
     expect(stageSubscribers.length).toBe(before)
   })
 
-  it('fluxo completo: set duration, start, pause, reset, save', async () => {
+  it('fluxo: set duration, save e reset no card; iniciar/pausar ficam só no painel flutuante', async () => {
     const wrapper = await mountView()
 
-    // define duração via input de horas (1h)
     const hoursInput = wrapper.find('input[aria-label="countdown.hours"]')
     await hoursInput.setValue('1')
 
-    // start habilitado após duração > 0
-    const startBtn = wrapper.find('.countdown-view__ctrl--start')
-    expect(startBtn.attributes('disabled')).toBeUndefined()
-    await startBtn.trigger('click')
-    await flushPromises()
-
-    // rodando: botão vira pause
-    const pauseBtn = wrapper.find('.countdown-view__ctrl--pause')
-    expect(pauseBtn.exists()).toBe(true)
-    await pauseBtn.trigger('click')
-    await flushPromises()
-
-    // save marca tempo; reset zera
-    await wrapper.find('.countdown-view__ctrl--save').trigger('click')
-    await flushPromises()
-    await wrapper.find('.countdown-view__ctrl--reset').trigger('click')
-    await flushPromises()
-    wrapper.unmount()
-  })
-
-  it('iniciar/pausar é um único botão alternado (nunca os dois juntos)', async () => {
-    const wrapper = await mountView()
-    await wrapper.find('input[aria-label="countdown.hours"]').setValue('1')
-
-    expect(wrapper.findAll('.countdown-view__ctrl--start')).toHaveLength(1)
+    expect(wrapper.find('.countdown-view__ctrl--start').exists()).toBe(false)
     expect(wrapper.find('.countdown-view__ctrl--pause').exists()).toBe(false)
 
-    await wrapper.find('.countdown-view__ctrl--start').trigger('click')
+    await wrapper.find('.countdown-view__ctrl--save').trigger('click')
     await flushPromises()
-
-    expect(wrapper.find('.countdown-view__ctrl--start').exists()).toBe(false)
-    expect(wrapper.findAll('.countdown-view__ctrl--pause')).toHaveLength(1)
-
-    await wrapper.find('.countdown-view__ctrl--pause').trigger('click')
     await wrapper.find('.countdown-view__ctrl--reset').trigger('click')
     await flushPromises()
     wrapper.unmount()
@@ -190,17 +159,6 @@ describe('CountdownView', () => {
     await untilHour.setValue('21')
     const untilMinute = wrapper.find('input[aria-label="countdown.untilMinute"]')
     await untilMinute.setValue('45')
-    wrapper.unmount()
-  })
-
-  it('FAB aciona toggleProjection (projecting indicator aparece/desaparece)', async () => {
-    const wrapper = await mountView()
-    const fab = wrapper.find('.countdown-project-fab')
-    await fab.trigger('click')
-    await flushPromises()
-    // segunda chamada volta ao estado original
-    await wrapper.find('.countdown-project-fab').trigger('click')
-    await flushPromises()
     wrapper.unmount()
   })
 })

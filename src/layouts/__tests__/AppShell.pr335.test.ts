@@ -36,6 +36,7 @@ vi.mock('@modules/media/components/MediaChrome.vue', () => ({ default: { templat
 vi.mock('@shared/components/MonitorTargetSelect.vue', () => ({ default: { template: '<div class="monitor-select-stub" />' } }))
 vi.mock('@shared/components/UiZoomControls.vue', () => ({ default: { template: '<div class="zoom-stub" />' } }))
 vi.mock('@modules/bible/components/BibleChrome.vue', () => ({ default: { template: '<div class="bible-chrome-stub" />' } }))
+vi.mock('@modules/countdown/components/CountdownChrome.vue', () => ({ default: { template: '<div class="countdown-chrome-stub" />' } }))
 vi.mock('@modules/bible/components/BibleInAppProjection.vue', () => ({ default: { template: '<div class="bible-overlay-stub"><slot name="default" /></div>' } }))
 vi.mock('@shared/components/InAppProjectionOverlay.vue', () => ({ default: { template: '<div class="overlay-stub"><slot /></div>' } }))
 vi.mock('@modules/clock/views/ClockProjectionView.vue', () => ({ default: { template: '<div />' } }))

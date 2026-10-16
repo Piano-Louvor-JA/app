@@ -4,20 +4,17 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
 import { GlassCard } from '@design-system/index'
-import { readEffectiveStageSettings, subscribeStageSettings } from '../../settings/services/stage-settings-runtime'
-import { resolveBackgroundImage, type StageSettings,
-  stageBgCss } from '../../settings/types/stage-settings'
+import { resolveBackgroundImage, stageBgCss } from '../../settings/types/stage-settings'
 
 
 import StageCustomizationDialog from '../../settings/components/StageCustomizationDialog.vue'
 import CountdownDurationInput from '../components/CountdownDurationInput.vue'
-import CountdownPreview from '../components/CountdownPreview.vue'
 import CountdownConfigDialog from '../components/CountdownConfigDialog.vue'
-import CountdownProjectFab from '../components/CountdownProjectFab.vue'
 import CountdownSavedList from '../components/CountdownSavedList.vue'
 import { useCountdownFeature } from '../composables/useCountdown'
-import { useCountdownStore } from '../stores/useCountdownStore'
-import { DEFAULT_COUNTDOWN_DISPLAY_CONFIG, type CountdownDisplayConfig, type CountdownTimeFormat, type SabbathModeConfig } from '../types/countdown'
+import { useCountdownStage } from '../composables/useCountdownStage'
+import { timeToMs } from '../services/countdown-sabbath-preview'
+import type { SabbathModeConfig } from '../types/countdown'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -29,7 +26,6 @@ const {
   configOpen,
   displayConfigOpen,
   isRunning,
-  canStart,
   setTimeFormat,
   setBgColor,
   setTextColor,
@@ -53,14 +49,10 @@ const {
   setMode,
   setSabbathConfig,
   adjustTime,
-  start,
-  pause,
   reset,
   saveMark,
   removeSavedMark,
   clearSavedMarks,
-  toggleProjection,
-  clearProjection,
   refreshProjectionState,
 } = useCountdownFeature()
 
@@ -136,43 +128,6 @@ onUnmounted(() => {
   unsubPopupsClosed = null
 })
 
-/** Converte HH:MM → ms desde meia-noite */
-function timeToMs(val: string): number {
-  if (!/^\d{2}:\d{2}$/.test(val)) return 0
-  const [h, m] = val.split(':').map(Number)
-  return (h * 3600 + m * 60) * 1000
-}
-
-// web#175: no modo ES com cronômetro idle, o preview tem que mostrar a
-// duração DERIVADA do agendamento — não o 00:05:00 do cronômetro normal
-// ("fica fixo, não atualiza"). Regra: scheduleMode 'start' → duração =
-// Término − Início (a aula inteira, acumulado 0 — o relógio do preview
-// mostra o total configurado); 'endOnly' → Término − agora.
-const sabbathIdlePreviewRuntime = computed(() => {
-  if (effectiveConfig.value.mode !== 'sabbath') return null
-  if (runtime.value.status !== 'idle') return null
-  const sc = effectiveConfig.value.sabbathConfig
-  if (!sc || !/^\d{2}:\d{2}$/.test(sc.endTime)) return null
-  const now = new Date()
-  const nowMs = (now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds()) * 1000
-  const endMs = timeToMs(sc.endTime)
-  const endVsNow = endMs > nowMs ? endMs - nowMs : endMs - nowMs + 24 * 3600 * 1000
-  const usesStart =
-    sc.scheduleMode === 'start' && /^\d{2}:\d{2}$/.test(sc.startTime ?? '')
-  const startMs = usesStart ? timeToMs(sc.startTime ?? '') : 0
-  const durationMs = usesStart
-    ? Math.max(0, endMs - startMs)
-    : endVsNow
-  return {
-    ...runtime.value,
-    durationMs,
-    accumulatedMs: 0,
-    segmentStartedAt: null,
-    status: 'idle' as const,
-    finished: false,
-  }
-})
-
 /** Converte ms → HH:MM */
 function msToTime(ms: number): string {
   const totalSec = Math.round(ms / 1000)
@@ -215,18 +170,7 @@ const scheduleMode = computed({
 function updateEndTimeMs(ms: number) { endTimeMs.value = ms }
 function updateStartTimeMs(ms: number) { startTimeMs.value = ms }
 
-function onToggleProjection() {
-  toggleProjection()
-}
-
-const stage = ref<StageSettings>(readEffectiveStageSettings('countdown'))
-let unsubStage: (() => void) | null = null
-onMounted(() => {
-  unsubStage = subscribeStageSettings(() => {
-    stage.value = readEffectiveStageSettings('countdown')
-  })
-})
-onUnmounted(() => unsubStage?.())
+const { stage, effectiveConfig } = useCountdownStage(config)
 
 const stageBg = computed(() => ({
   backgroundColor: stageBgCss(stage.value.backgroundColor),
@@ -236,18 +180,6 @@ const stageBg = computed(() => ({
   backgroundSize: 'cover',
   backgroundPosition: 'center',
 }))
-
-// Características do módulo vindas do StageSettings (fonte única).
-const effectiveConfig = computed(() => {
-  const mod = stage.value.countdown
-  const merged = mod ? { ...config.value, ...mod } : { ...config.value }
-  // Garante defaults pra evitar undefined no template
-  return {
-    ...DEFAULT_COUNTDOWN_DISPLAY_CONFIG,
-    ...merged,
-    allowNegative: merged.allowNegative ?? false,
-  }
-})
 </script>
 
 <template>
@@ -436,44 +368,14 @@ const effectiveConfig = computed(() => {
 @update:until="setUntilTime"
                           />
                         </div>
-            <CountdownPreview
-              :config="effectiveConfig"
-              :runtime="sabbathIdlePreviewRuntime ?? runtime"
-:stage="stage"
-              preview
-            />
           </div>
 
-          <div class="countdown-view__controls">
-                      <button
-                        v-if="!isRunning"
-                        type="button"
-                        class="countdown-view__ctrl countdown-view__ctrl--start"
-                        :disabled="!canStart"
-                        @click="start"
-                      >
-                        <i
-                          class="ti ti-player-play"
-                          aria-hidden="true"
-                        />
-                        {{ t('countdown.start') }}
-                      </button>
-                      <button
-                        v-else
-                        type="button"
-                        class="countdown-view__ctrl countdown-view__ctrl--pause"
-                        @click="pause"
-                      >
-                        <i
-                          class="ti ti-player-pause"
-                          aria-hidden="true"
-                        />
-                        {{ t('countdown.pause') }}
-                      </button>
-
+          <div
+            v-if="effectiveConfig.mode !== 'sabbath'"
+            class="countdown-view__controls"
+          >
                       <button
                         type="button"
-                        v-if="effectiveConfig.mode !== 'sabbath'"
                         class="countdown-view__ctrl countdown-view__ctrl--reset"
                         @click="reset"
                       >
@@ -486,7 +388,6 @@ const effectiveConfig = computed(() => {
 
                       <button
                         type="button"
-                        v-if="effectiveConfig.mode !== 'sabbath'"
                         class="countdown-view__ctrl countdown-view__ctrl--save"
                         @click="saveMark"
                       >
@@ -655,13 +556,6 @@ const effectiveConfig = computed(() => {
       scope="countdown"
       @close="closeConfig"
     />
-
-
-    <CountdownProjectFab
-      :projecting="isProjecting"
-      @project="onToggleProjection"
-      @clear="() => void clearProjection()"
-    />
   </section>
 </template>
 
@@ -758,33 +652,11 @@ const effectiveConfig = computed(() => {
   display: flex;
   width: 100%;
   max-width: 56rem;
-  aspect-ratio: 21 / 9;
-  max-height: min(100%, 28rem);
-  overflow: hidden;
   flex-direction: column;
 }
 
-/* web#175: modo ES — TODOS os elementos visíveis em qualquer breakpoint,
-   com folga vertical (o preview nunca pode colapsar). Largo (>1280):
-   proporção 21/9 com teto 30rem. Estreito (≤1280): altura por conteúdo,
-   sem aspect-ratio/max-height e SEM overflow:hidden (era ele que cortava
-   o display e os controles nos prints do Ezequias). O display escala
-   pelas container queries; a view tem scroll natural se precisar. */
-.countdown-view__widget--sabbath {
-  aspect-ratio: 21 / 9;
-  max-height: min(100%, 30rem);
-  min-height: 20rem;
-}
-
-/* web#175: no modo ES a área de controles tem 2 fileiras (ações + ajustes);
-   compacta pra devolver altura ao preview e manter o display centrado */
-.countdown-view__widget--sabbath .countdown-view__controls {
-  padding: 0.4rem 1.25rem 0.6rem;
-  gap: 0.4rem;
-}
-
 .countdown-view__widget--sabbath .countdown-view__adjust {
-  margin-top: 0;
+  margin-top: 0.75rem;
 }
 
 .countdown-view__widget--sabbath .countdown-view__ctrl {
@@ -1138,8 +1010,6 @@ const effectiveConfig = computed(() => {
   border-radius: 0.75rem;
   overflow: hidden;
   position: relative;
-  flex: 1;
-  min-height: 8rem;
   padding: 0.75rem 1.5rem 1rem;
 }
 
@@ -1249,26 +1119,6 @@ const effectiveConfig = computed(() => {
 
   .countdown-view__title {
     font-size: 1.15rem;
-  }
-
-  .countdown-view__widget {
-    min-height: 16rem;
-    max-height: min(100%, 24rem);
-  }
-
-  /* web#175: modo ES estreito — todos os elementos visíveis com folga:
-     sem aspect-ratio, sem max-height, e o preview ganha altura MÍNIMA
-     real (não colapsa) com o display escalando por container query. */
-  .countdown-view__widget--sabbath {
-    aspect-ratio: auto;
-    max-height: none;
-    overflow: visible;
-  }
-
-  .countdown-view__widget--sabbath .countdown-view__preview {
-    overflow: visible;
-    min-height: 11rem;
-    flex-shrink: 0;
   }
 
   .countdown-view__preview {

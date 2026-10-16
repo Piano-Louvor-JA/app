@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
-import { useFloatingDrag } from '@shared/composables/useFloatingDrag'
+import { FLOATING_STACK_ORDER, useFloatingDrag } from '@shared/composables/useFloatingDrag'
 import { USER_PREFERENCE_KEYS } from '@shared/constants/storage-keys'
 
 import { useMediaPlayer } from '../composables/useMediaPlayer'
@@ -30,7 +30,9 @@ const visible = computed(() => hasSession.value && minimized.value)
 
 const chromeRoot = ref<HTMLElement | null>(null)
 const { positionStyle, dragging, onPointerDown, resetPosition } =
-  useFloatingDrag(chromeRoot, USER_PREFERENCE_KEYS.mediaChromePosition)
+  useFloatingDrag(chromeRoot, USER_PREFERENCE_KEYS.mediaChromePosition, {
+    stackOrder: FLOATING_STACK_ORDER.media,
+  })
 
 async function onProject() {
   await toggleProjection()

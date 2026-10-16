@@ -71,6 +71,8 @@ export default {
     backToUtilities: 'Back to Timer',
     start: 'Start',
     pause: 'Pause',
+    chromeDragHint: 'Drag to move · double-click to return to the corner',
+    openTimer: 'Open the Timer',
     reset: 'Restart',
     addMinute: 'Add 1 minute',
     addFiveMinutes: 'Add 5 minutes',

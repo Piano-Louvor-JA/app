@@ -94,23 +94,17 @@ describe('CountdownView', () => {
     expect(wrapper.exists()).toBe(true)
   })
 
-  it('monta preview, fab, saved list e duration input', () => {
+  it('monta saved list e duration input; prévia e projetar ficam no painel flutuante', () => {
     const wrapper = mount(CountdownView)
-    expect(wrapper.find('.countdown-preview').exists()).toBe(true)
-    expect(wrapper.find('.countdown-project-fab').exists()).toBe(true)
     expect(wrapper.find('.countdown-saved-list').exists()).toBe(true)
     expect(wrapper.find('.countdown-duration-input').exists()).toBe(true)
+    expect(wrapper.find('.countdown-preview').exists()).toBe(false)
+    expect(wrapper.find('.countdown-project-fab').exists()).toBe(false)
   })
 
   it('goBack navega para utilities-temporizador', () => {
     const wrapper = mount(CountdownView)
     wrapper.vm.goBack()
     expect(mockRouter.push).toHaveBeenCalledWith({ name: 'utilities-temporizador' })
-  })
-
-  it('onToggleProjection repassa para o composable', () => {
-    const wrapper = mount(CountdownView)
-    wrapper.vm.onToggleProjection()
-    expect(mockCountdown.toggleProjection).toHaveBeenCalledTimes(1)
   })
 })
