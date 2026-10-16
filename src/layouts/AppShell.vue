@@ -10,6 +10,7 @@ import type { DockNavItem } from '@design-system/types/navigation'
 import AuthAccountDialog from '@modules/auth/components/AuthAccountDialog.vue'
 import { useAuth, setNotify } from '@modules/auth/composables/useAuth'
 import { useBibleStore } from '@modules/bible/stores/useBibleStore'
+import BibleChrome from '@modules/bible/components/BibleChrome.vue'
 import BibleInAppProjection from '@modules/bible/components/BibleInAppProjection.vue'
 import ClockProjectionView from '@modules/clock/views/ClockProjectionView.vue'
 import { useClockStore } from '@modules/clock/stores/useClockStore'
@@ -438,6 +439,8 @@ function viewKey(viewRoute: typeof route) {
     </main>
 
     <MediaChrome />
+
+    <BibleChrome />
 
     <BibleInAppProjection
       v-if="bibleInAppPreview"

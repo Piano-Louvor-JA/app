@@ -207,6 +207,10 @@ vi.mock('@modules/media/components/MediaChrome.vue', () => ({
   default: { name: 'MediaChrome', template: '<div class="media-chrome-mock" />' },
 }))
 
+vi.mock('@modules/bible/components/BibleChrome.vue', () => ({
+  default: { name: 'BibleChrome', template: '<div class="bible-chrome-mock" />' },
+}))
+
 vi.mock('@modules/bible/components/BibleInAppProjection.vue', () => ({
   default: { name: 'BibleInAppProjection', template: '<div class="bible-overlay-mock" />' },
 }))

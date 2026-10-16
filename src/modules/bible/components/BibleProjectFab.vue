@@ -43,16 +43,9 @@ function onClick(projecting: boolean) {
 
 <style scoped lang="scss">
 .bible-project-fab {
-  position: fixed;
-  right: 2rem;
-  bottom: calc(var(--ds-dock-height, 5.5rem) + 1.25rem);
-  z-index: 35;
-  /* Coluna vertical: play em cima, TV embaixo — não invade o
-     StagePaletteButton (que fica à direita com offset próprio). */
   display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.65rem;
+  flex-shrink: 0;
+  pointer-events: auto;
 }
 
 .bible-project-fab__btn {

@@ -25,6 +25,7 @@ export default {
     clearSelection: 'Limpar seleção',
     projectTvsOnly: 'Projetar só nas TVs',
     clearProjection: 'Retirar da projeção',
+    chromeDragHint: 'Arraste para mover · duplo clique volta ao canto',
     close: 'Fechar',
     inAppProjection: 'Pré-visualização da Bíblia',
     projectionHotkeyHint:

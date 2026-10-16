@@ -10,23 +10,6 @@ vi.mock('@design-system/index', () => ({
   GlassCard: { name: 'GlassCard', template: '<div class="glass-stub"><slot /></div>' },
 }))
 
-const readSettings = vi.hoisted(() =>
-  vi.fn(() => ({
-    backgroundColor: '#101010',
-    backgroundImage: 'stage:gradients/sunrise',
-  })),
-)
-const resolveBg = vi.hoisted(() => vi.fn(() => 'http://localhost/img/bg.png'))
-
-vi.mock('../../settings/services/stage-settings-runtime', () => ({
-  readEffectiveStageSettings: readSettings,
-}))
-vi.mock('../../settings/types/stage-settings', () => ({
-  stageBgCss: (color: string | null) => color ?? 'transparent',
-  resolveBackgroundImage: resolveBg,
-  stageBgCss: () => '#0A0E1A',
-}))
-
 import BibleVerseList from '../components/BibleVerseList.vue'
 import type { BibleSelection } from '../types/bible'
 
@@ -53,7 +36,6 @@ function mountList(props: Record<string, unknown> = {}) {
       verseSearchQuery: '',
       isLoading: false,
       projection,
-      previewSnippet: 'No princípio',
       hasProjection: true,
       ...props,
     },
@@ -150,25 +132,7 @@ describe('BibleVerseList', () => {
     expect(wrapper.text()).toContain('bible.copyFailed')
   })
 
-  it('preview usa o estilo efetivo do escopo bible', () => {
-    const wrapper = mountList()
-    const preview = wrapper.find('.bible-reader__preview')
-    expect(preview.exists()).toBe(true)
-    const style = preview.attributes('style') ?? ''
-    expect(style).toContain('background-color')
-    expect(style).toContain('bg.png')
-    expect(wrapper.text()).toContain('Gn 1:1')
-  })
-
-  it('preview sem imagem de fundo: backgroundImage undefined', () => {
-    resolveBg.mockReturnValueOnce(null)
-    const wrapper = mountList()
-    const style = wrapper.find('.bible-reader__preview').attributes('style') ?? ''
-    expect(style).not.toContain('url(')
-  })
-
-  it('sem projeção: preview some', () => {
-    const wrapper = mountList({ hasProjection: false })
-    expect(wrapper.find('.bible-reader__preview').exists()).toBe(false)
+  it('a miniatura da projeção não fica mais dentro do leitor (vive no BibleChrome)', () => {
+    expect(mountList().find('.bible-reader__preview').exists()).toBe(false)
   })
 })

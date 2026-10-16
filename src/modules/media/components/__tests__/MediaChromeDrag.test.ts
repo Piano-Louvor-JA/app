@@ -10,12 +10,20 @@ import { createI18n } from "vue-i18n";
  * MediaChrome solto: arrastar o player minimizado, persistir a posição,
  * manter dentro da janela e voltar ao canto com duplo clique.
  */
-import mediaLocale from "../../locales/pt-BR";
+import { USER_PREFERENCE_KEYS } from "@shared/constants/storage-keys";
 import {
-	loadMediaChromePosition,
-	saveMediaChromePosition,
-} from "../../services/media-chrome-position";
+	type FloatingPosition,
+	loadFloatingPosition,
+	saveFloatingPosition,
+} from "@shared/services/floating-position";
+
+import mediaLocale from "../../locales/pt-BR";
 import MediaChrome from "../MediaChrome.vue";
+
+const loadMediaChromePosition = () =>
+	loadFloatingPosition(USER_PREFERENCE_KEYS.mediaChromePosition);
+const saveMediaChromePosition = (position: FloatingPosition | null) =>
+	saveFloatingPosition(USER_PREFERENCE_KEYS.mediaChromePosition, position);
 
 vi.mock("vue-router", () => ({
 	useRouter: () => ({ push: vi.fn().mockResolvedValue(undefined) }),

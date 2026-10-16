@@ -1,11 +1,11 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue'
 
 import {
-  clampMediaChromePosition,
-  loadMediaChromePosition,
-  saveMediaChromePosition,
-  type MediaChromePosition,
-} from '../services/media-chrome-position'
+  clampFloatingPosition,
+  loadFloatingPosition,
+  saveFloatingPosition,
+  type FloatingPosition,
+} from '@shared/services/floating-position'
 
 /** Deslocamento mínimo (px) para o gesto contar como arraste e não clique. */
 const DRAG_THRESHOLD = 4
@@ -18,7 +18,7 @@ type DragState = {
   grabOffsetY: number
   width: number
   height: number
-  origin: MediaChromePosition | null
+  origin: FloatingPosition | null
   moved: boolean
 }
 
@@ -27,11 +27,15 @@ function viewportSize() {
 }
 
 /**
- * Player minimizado solto na tela: arrasta pelo preview (ou pelo vão entre
- * os botões), persiste left/top e volta ao canto padrão com duplo clique.
+ * Painel flutuante solto na tela (player minimizado, prévia da Bíblia):
+ * arrasta por qualquer ponto fora dos botões, persiste left/top na
+ * preferência `preferenceKey` e volta ao canto padrão com `resetPosition`.
  */
-export function useMediaChromeDrag(rootRef: Ref<HTMLElement | null>) {
-  const position = ref<MediaChromePosition | null>(loadMediaChromePosition())
+export function useFloatingDrag(
+  rootRef: Ref<HTMLElement | null>,
+  preferenceKey: string,
+) {
+  const position = ref<FloatingPosition | null>(loadFloatingPosition(preferenceKey))
   const dragging = ref(false)
   let drag: DragState | null = null
 
@@ -50,7 +54,7 @@ export function useMediaChromeDrag(rootRef: Ref<HTMLElement | null>) {
     const el = rootRef.value
     if (!el || !position.value) return
     const rect = el.getBoundingClientRect()
-    position.value = clampMediaChromePosition(
+    position.value = clampFloatingPosition(
       position.value,
       { width: rect.width, height: rect.height },
       viewportSize(),
@@ -100,7 +104,7 @@ export function useMediaChromeDrag(rootRef: Ref<HTMLElement | null>) {
       drag.moved = true
       dragging.value = true
     }
-    position.value = clampMediaChromePosition(
+    position.value = clampFloatingPosition(
       { x: event.clientX - drag.grabOffsetX, y: event.clientY - drag.grabOffsetY },
       { width: drag.width, height: drag.height },
       viewportSize(),
@@ -109,7 +113,7 @@ export function useMediaChromeDrag(rootRef: Ref<HTMLElement | null>) {
 
   function onPointerUp(event: PointerEvent) {
     if (!drag || event.pointerId !== drag.pointerId) return
-    if (drag.moved) saveMediaChromePosition(position.value)
+    if (drag.moved) saveFloatingPosition(preferenceKey, position.value)
     drag = null
     dragging.value = false
     stopListening()
@@ -125,7 +129,7 @@ export function useMediaChromeDrag(rootRef: Ref<HTMLElement | null>) {
 
   function resetPosition() {
     position.value = null
-    saveMediaChromePosition(null)
+    saveFloatingPosition(preferenceKey, null)
   }
 
   watch(rootRef, (el) => {

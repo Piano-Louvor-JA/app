@@ -29,6 +29,8 @@ export const USER_PREFERENCE_KEYS = {
   language: 'language',
   /** Posição (left/top em px) do player minimizado arrastado; ausente = canto padrão. */
   mediaChromePosition: 'media.chromePosition',
+  /** Posição (left/top em px) da prévia flutuante da Bíblia; ausente = canto padrão. */
+  bibleChromePosition: 'bible.chromePosition',
   /** Prefixo das personalizações do Palco por escopo (stage.settings.global|hymns|bible|...). */
   stageSettingsPrefix: 'stage.settings.',
 } as const
