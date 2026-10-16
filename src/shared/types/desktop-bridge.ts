@@ -419,7 +419,11 @@ export type WindowApi = {
   onMaximizedState: (callback: (isMaximized: boolean) => void) => () => void
   /** Voltar/avançar do sistema (app-command no Windows). */
   onHistoryCommand?: (callback: (direction: HistoryCommandDirection) => void) => () => void
+  /** Miniatura JPEG (data URL) de uma área da janela, em DIP; `null` se falhar. */
+  capturePreview?: (rect: PreviewRect) => Promise<string | null>
 }
+
+export type PreviewRect = { x: number; y: number; width: number; height: number }
 
 export type HistoryCommandDirection = 'back' | 'forward'
 
