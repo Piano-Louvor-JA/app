@@ -6,11 +6,18 @@
  */
 defineProps<{
   label: string
+  /** Segunda parte opcional, em branco (ex.: coletânea no "Player · …"). */
+  detail?: string
 }>()
 </script>
 
 <template>
-  <span class="floating-preview-title">{{ label }}</span>
+  <span class="floating-preview-title">
+    {{ label }}<template v-if="detail">
+      <span class="floating-preview-title__separator" aria-hidden="true"> · </span>
+      <span class="floating-preview-title__detail">{{ detail }}</span>
+    </template>
+  </span>
 </template>
 
 <style scoped lang="scss">
@@ -33,5 +40,10 @@ defineProps<{
   text-overflow: ellipsis;
   white-space: nowrap;
   pointer-events: none;
+}
+
+/* fundo da etiqueta é sempre escuro: branco fixo, independente do tema */
+.floating-preview-title__detail {
+  color: #fff;
 }
 </style>

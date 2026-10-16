@@ -151,6 +151,7 @@ describe("MediaChrome — nome da coletânea/playlist no título", () => {
 		storeState.session.value = { subtitle: "Maranata" };
 		const w = mountChrome();
 		expect(w.find(".floating-preview-title").text()).toBe("Player · Culto de Sábado");
+		expect(w.find(".floating-preview-title__detail").text()).toBe("Culto de Sábado");
 		w.unmount();
 	});
 
@@ -159,6 +160,7 @@ describe("MediaChrome — nome da coletânea/playlist no título", () => {
 		storeState.session.value = { subtitle: "Hinário Adventista" };
 		const w = mountChrome();
 		expect(w.find(".floating-preview-title").text()).toBe("Player · Hinário Adventista");
+		expect(w.find(".floating-preview-title__detail").text()).toBe("Hinário Adventista");
 		w.unmount();
 	});
 });

@@ -31,11 +31,8 @@ const {
 
 const visible = computed(() => hasSession.value && minimized.value)
 
-/** "Player · nome da playlist", ou da coletânea/hinário do hino tocando. */
-const chromeTitle = computed(() => {
-  const source = queueLabel.value || session.value?.subtitle
-  return source ? `${t('media.title')} · ${source}` : t('media.title')
-})
+/** "Player · nome": a playlist tocando, ou a coletânea/hinário do hino. */
+const chromeDetail = computed(() => queueLabel.value || session.value?.subtitle || undefined)
 
 const chromeRoot = ref<HTMLElement | null>(null)
 const { positionStyle, dragging, onPointerDown, resetPosition } =
@@ -70,7 +67,10 @@ async function onToggleAudio() {
     :style="positionStyle"
     @pointerdown="onPointerDown"
   >
-    <FloatingPreviewTitle :label="chromeTitle" />
+    <FloatingPreviewTitle
+      :label="t('media.title')"
+      :detail="chromeDetail"
+    />
 
     <div
       class="media-chrome__handle"
