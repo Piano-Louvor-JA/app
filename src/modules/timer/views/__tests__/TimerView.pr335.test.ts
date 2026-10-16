@@ -3,6 +3,15 @@
 import { mount } from '@vue/test-utils'
 import { describe, it, expect, vi } from 'vitest'
 
+// Composable testado à parte: aqui só o contrato tela ↔ minimizar.
+const minimizeMock = vi.fn(async () => {})
+vi.mock('@shared/composables/useMinimizablePage', () => ({
+  useMinimizablePage: (options: unknown) => {
+    ;(globalThis as any).__minimizeOptions = options
+    return { minimize: minimizeMock, takeRestoredState: () => null }
+  },
+}))
+
 // Mock global (refs p/ acionar v-ifs do template)
 import { ref as __ref } from 'vue'
 const isProjectingRef = __ref(false)

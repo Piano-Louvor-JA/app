@@ -4,6 +4,8 @@ import { readEffectiveStageSettings, subscribeStageSettings } from '../../settin
 import type { StageSettings } from '../../settings/types/stage-settings'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import PageBackStack from '@shared/components/PageBackStack.vue'
+import { useMinimizablePage } from '@shared/composables/useMinimizablePage'
 
 import PalcoRouteSelect from '../../settings/components/PalcoRouteSelect.vue'
 import RandomAvailablePanel from '../components/RandomAvailablePanel.vue'
@@ -16,6 +18,13 @@ import { decodeTextFileBytes } from '@shared/services/text-encoding'
 import type { RandomDrawMode } from '../types/random'
 
 const { t } = useI18n()
+
+// Minimizar: o estado da tela já vive na store; o retrato guarda só rolagem e miniatura.
+const { minimize } = useMinimizablePage({
+  describe: () => ({ title: t('random.title'), icon: 'ti-ticket', summary: '' }),
+  capture: () => null,
+  fallbackRoute: { name: 'utilities' },
+})
 const router = useRouter()
 
 const {
@@ -116,17 +125,19 @@ const effectiveConfig = computed(() => {
   <section class="random-view">
     <header class="random-view__header">
       <PalcoRouteSelect module="random" />
-      <button
-        type="button"
-        class="random-view__back"
-        :aria-label="t('random.backToUtilities')"
-        @click="goBack"
-      >
-        <i
-          class="ti ti-arrow-left"
-          aria-hidden="true"
-        />
-      </button>
+      <PageBackStack @minimize="minimize">
+        <button
+          type="button"
+          class="random-view__back"
+          :aria-label="t('random.backToUtilities')"
+          @click="goBack"
+        >
+          <i
+            class="ti ti-arrow-left"
+            aria-hidden="true"
+          />
+        </button>
+      </PageBackStack>
 
       <div class="random-view__brand">
         <div class="random-view__brand-icon">

@@ -2,6 +2,8 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import PageBackStack from '@shared/components/PageBackStack.vue'
+import { useMinimizablePage } from '@shared/composables/useMinimizablePage'
 
 import { GlassCard } from '@design-system/index'
 import { resolveBackgroundImage, stageBgCss } from '../../settings/types/stage-settings'
@@ -17,6 +19,13 @@ import { timeToMs } from '../services/countdown-sabbath-preview'
 import type { SabbathModeConfig } from '../types/countdown'
 
 const { t } = useI18n()
+
+// Minimizar: o estado da tela já vive na store; o retrato guarda só rolagem e miniatura.
+const { minimize } = useMinimizablePage({
+  describe: () => ({ title: t('countdown.title'), icon: 'ti-hourglass', summary: '' }),
+  capture: () => null,
+  fallbackRoute: { name: 'utilities-temporizador' },
+})
 const router = useRouter()
 
 const {
@@ -183,17 +192,19 @@ const stageBg = computed(() => ({
 <template>
   <section class="countdown-view">
     <header class="countdown-view__header">
-      <button
-        type="button"
-        class="countdown-view__back"
-        :aria-label="t('countdown.backToUtilities')"
-        @click="goBack"
-      >
-        <i
-          class="ti ti-arrow-left"
-          aria-hidden="true"
-        />
-      </button>
+      <PageBackStack @minimize="minimize">
+        <button
+          type="button"
+          class="countdown-view__back"
+          :aria-label="t('countdown.backToUtilities')"
+          @click="goBack"
+        >
+          <i
+            class="ti ti-arrow-left"
+            aria-hidden="true"
+          />
+        </button>
+      </PageBackStack>
 
       <div class="countdown-view__brand">
         <div class="countdown-view__brand-icon">

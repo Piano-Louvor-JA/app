@@ -3,6 +3,15 @@
 import { mount } from '@vue/test-utils'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
+// Composable testado à parte: aqui só o contrato tela ↔ minimizar.
+const minimizeMock = vi.fn(async () => {})
+vi.mock('@shared/composables/useMinimizablePage', () => ({
+  useMinimizablePage: (options: unknown) => {
+    ;(globalThis as any).__minimizeOptions = options
+    return { minimize: minimizeMock, takeRestoredState: () => null }
+  },
+}))
+
 const mockCountdown = {
   config: { durationSeconds: 300 },
   runtime: { remaining: 300, isRunning: false },
@@ -106,5 +115,21 @@ describe('CountdownView', () => {
     const wrapper = mount(CountdownView)
     wrapper.vm.goBack()
     expect(mockRouter.push).toHaveBeenCalledWith({ name: 'utilities-temporizador' })
+  })
+})
+
+describe('CountdownView — minimizar página', () => {
+  it('– fica abaixo da seta de voltar, minimiza e descreve a tela', async () => {
+    minimizeMock.mockClear()
+    const w = mount(CountdownView)
+    const stack = w.find('.page-back-stack')
+    expect(stack.find('.countdown-view__back').exists()).toBe(true)
+    await stack.find('.page-back-stack__minimize').trigger('click')
+    expect(minimizeMock).toHaveBeenCalledTimes(1)
+    const options = (globalThis as any).__minimizeOptions
+    expect(options.describe()).toEqual({ title: 'countdown.title', icon: 'ti-hourglass', summary: '' })
+    expect(options.capture()).toBeNull()
+    expect(options.fallbackRoute).toEqual({ name: 'utilities-temporizador' })
+    w.unmount()
   })
 })

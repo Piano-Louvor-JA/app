@@ -2,6 +2,15 @@
 // Cobertura TimerView.vue: header, reset/save, toolbar config, projecting
 // badge e savedList. Prévia, iniciar/pausar e projetar ficam no TimerChrome.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+// Composable testado à parte: aqui só o contrato tela ↔ minimizar.
+const minimizeMock = vi.fn(async () => {})
+vi.mock('@shared/composables/useMinimizablePage', () => ({
+  useMinimizablePage: (options: unknown) => {
+    ;(globalThis as any).__minimizeOptions = options
+    return { minimize: minimizeMock, takeRestoredState: () => null }
+  },
+}))
 import { mount } from '@vue/test-utils'
 import { computed } from 'vue'
 
@@ -158,6 +167,22 @@ describe('TimerView.vue', () => {
     const list = w.findComponent({ name: 'TimerSavedList' })
     expect(list.props('items')).toEqual([1000, 2000])
     expect(list.props('timeFormat')).toBe('mm:ss')
+    w.unmount()
+  })
+})
+
+describe('TimerView — minimizar página', () => {
+  it('– fica abaixo da seta de voltar, minimiza e descreve a tela', async () => {
+    minimizeMock.mockClear()
+    const w = mountView()
+    const stack = w.find('.page-back-stack')
+    expect(stack.find('.timer-view__back').exists()).toBe(true)
+    await stack.find('.page-back-stack__minimize').trigger('click')
+    expect(minimizeMock).toHaveBeenCalledTimes(1)
+    const options = (globalThis as any).__minimizeOptions
+    expect(options.describe()).toEqual({ title: 'timer.title', icon: 'ti-clock', summary: '' })
+    expect(options.capture()).toBeNull()
+    expect(options.fallbackRoute).toEqual({ name: 'utilities-temporizador' })
     w.unmount()
   })
 })

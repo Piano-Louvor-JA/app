@@ -1,5 +1,14 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi, beforeEach } from 'vitest'
+
+// Composable testado à parte: aqui só o contrato tela ↔ minimizar.
+const minimizeMock = vi.fn(async () => {})
+vi.mock('@shared/composables/useMinimizablePage', () => ({
+  useMinimizablePage: (options: unknown) => {
+    ;(globalThis as any).__minimizeOptions = options
+    return { minimize: minimizeMock, takeRestoredState: () => null }
+  },
+}))
 import { mount, flushPromises } from '@vue/test-utils'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import { createI18n } from 'vue-i18n'
@@ -94,5 +103,21 @@ describe('ClockView.vue', () => {
     await flushPromises()
     expect(second.wrapper.find('.clock-view__projecting').text()).toContain('Projetando')
     second.wrapper.unmount()
+  })
+})
+
+describe('ClockView — minimizar página', () => {
+  it('– fica abaixo da seta de voltar, minimiza e descreve a tela', async () => {
+    minimizeMock.mockClear()
+    const w = createWrapper().wrapper
+    const stack = w.find('.page-back-stack')
+    expect(stack.find('.clock-view__back').exists()).toBe(true)
+    await stack.find('.page-back-stack__minimize').trigger('click')
+    expect(minimizeMock).toHaveBeenCalledTimes(1)
+    const options = (globalThis as any).__minimizeOptions
+    expect(options.describe()).toEqual({ title: 'Relógio', icon: 'ti-clock', summary: '' })
+    expect(options.capture()).toBeNull()
+    expect(options.fallbackRoute).toEqual({ name: 'utilities-temporizador' })
+    w.unmount()
   })
 })

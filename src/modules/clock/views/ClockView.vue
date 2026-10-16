@@ -2,6 +2,8 @@
 import PalcoRouteSelect from '../../settings/components/PalcoRouteSelect.vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import PageBackStack from '@shared/components/PageBackStack.vue'
+import { useMinimizablePage } from '@shared/composables/useMinimizablePage'
 
 import { GlassCard } from '@design-system/index'
 
@@ -9,6 +11,13 @@ import StageCustomizationDialog from '../../settings/components/StageCustomizati
 import { useClockFeature } from '../composables/useClock'
 
 const { t } = useI18n()
+
+// Minimizar: o estado da tela já vive na store; o retrato guarda só rolagem e miniatura.
+const { minimize } = useMinimizablePage({
+  describe: () => ({ title: t('clock.title'), icon: 'ti-clock', summary: '' }),
+  capture: () => null,
+  fallbackRoute: { name: 'utilities-temporizador' },
+})
 const router = useRouter()
 
 const { isProjecting, configOpen, openConfig, closeConfig } = useClockFeature()
@@ -22,17 +31,19 @@ function goBack() {
   <section class="clock-view">
     <header class="clock-view__header">
       <PalcoRouteSelect module="clock" />
-      <button
-        type="button"
-        class="clock-view__back"
-        :aria-label="t('clock.backToUtilities')"
-        @click="goBack"
-      >
-        <i
-          class="ti ti-arrow-left"
-          aria-hidden="true"
-        />
-      </button>
+      <PageBackStack @minimize="minimize">
+        <button
+          type="button"
+          class="clock-view__back"
+          :aria-label="t('clock.backToUtilities')"
+          @click="goBack"
+        >
+          <i
+            class="ti ti-arrow-left"
+            aria-hidden="true"
+          />
+        </button>
+      </PageBackStack>
 
       <div class="clock-view__brand">
         <div class="clock-view__brand-icon">

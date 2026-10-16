@@ -1,11 +1,20 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import PageBackStack from '@shared/components/PageBackStack.vue'
+import { useMinimizablePage } from '@shared/composables/useMinimizablePage'
 
 import UtilitiesHubCard from '../components/UtilitiesHubCard.vue'
 import type { UtilityHubItem } from '../types/clock'
 
 const { t } = useI18n()
+
+// Minimizar: o estado da tela já vive na store; o retrato guarda só rolagem e miniatura.
+const { minimize } = useMinimizablePage({
+  describe: () => ({ title: t('utilities.temporizador'), icon: 'ti-clock-cog', summary: '' }),
+  capture: () => null,
+  fallbackRoute: { name: 'utilities' },
+})
 const router = useRouter()
 
 const items: UtilityHubItem[] = [
@@ -43,17 +52,19 @@ function goBack() {
 <template>
   <section class="temporizador-view">
     <header class="temporizador-view__header">
-      <button
-        type="button"
-        class="temporizador-view__back"
-        :aria-label="t('utilities.backToUtilities')"
-        @click="goBack"
-      >
-        <i
-          class="ti ti-arrow-left"
-          aria-hidden="true"
-        />
-      </button>
+      <PageBackStack @minimize="minimize">
+        <button
+          type="button"
+          class="temporizador-view__back"
+          :aria-label="t('utilities.backToUtilities')"
+          @click="goBack"
+        >
+          <i
+            class="ti ti-arrow-left"
+            aria-hidden="true"
+          />
+        </button>
+      </PageBackStack>
 
       <div class="temporizador-view__heading">
         <h1 class="temporizador-view__title">
