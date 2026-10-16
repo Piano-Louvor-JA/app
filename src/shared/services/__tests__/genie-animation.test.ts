@@ -9,6 +9,7 @@ import {
   playGenie,
   playGenieGhost,
   predictMinimizedTarget,
+  startGenieGhost,
 } from '../genie-animation'
 
 describe('duração', () => {
@@ -223,6 +224,58 @@ describe('playGenieGhost (imagem da tela no lugar da página viva)', () => {
     expect(animate.mock.calls[0][1]).toMatchObject({ easing: 'cubic-bezier(0.25, 0.7, 0.45, 1)', fill: 'forwards' })
     expect(ghost()).not.toBeNull()
     remove!()
+    expect(ghost()).toBeNull()
+  })
+
+  it('remover com fade: a imagem esmaece antes de sair (sem corte seco)', async () => {
+    const remove = await playGenieGhost('data:image/jpeg;base64,AA', page, item, 'restore')
+    animate.mockClear()
+    await remove!(150)
+    expect(animate).toHaveBeenCalledWith([{ opacity: 1 }, { opacity: 0 }], {
+      duration: 150,
+      easing: 'ease-out',
+      fill: 'forwards',
+    })
+    expect(ghost()).toBeNull()
+  })
+
+  it('fade cancelado ainda remove a imagem', async () => {
+    const remove = await playGenieGhost('x', page, item, 'restore')
+    animate.mockReturnValue({ finished: Promise.reject(new DOMException('abort', 'AbortError')) })
+    await remove!(150)
+    expect(ghost()).toBeNull()
+  })
+
+  it('startGenieGhost: a imagem já está na tela no mesmo instante (quem chama segue trabalhando enquanto ela cresce)', async () => {
+    let grow!: () => void
+    animate.mockReturnValueOnce({ finished: new Promise<void>((r) => (grow = r)) })
+    const g = startGenieGhost('data:image/jpeg;base64,AA', page, item, 'restore')
+    // sem await: a imagem já existe e a animação já começou
+    expect(ghost()).not.toBeNull()
+    expect(animate).toHaveBeenCalledTimes(1)
+    let grown = false
+    void g!.finished.then(() => (grown = true))
+    await Promise.resolve()
+    expect(grown).toBe(false)
+    grow()
+    await g!.finished
+    expect(grown).toBe(true)
+    await g!.remove(120)
+    expect(ghost()).toBeNull()
+  })
+
+  it('startGenieGhost: animação cancelada ainda conclui (finished nunca rejeita)', async () => {
+    animate.mockReturnValueOnce({ finished: Promise.reject(new DOMException('abort', 'AbortError')) })
+    const g = startGenieGhost('x', page, item, 'restore')
+    await expect(g!.finished).resolves.toBeUndefined()
+    await g!.remove()
+    expect(ghost()).toBeNull()
+  })
+
+  it('startGenieGhost sem imagem ou com movimento reduzido: null, nada na tela', () => {
+    expect(startGenieGhost(null, page, item, 'restore')).toBeNull()
+    window.matchMedia = vi.fn(() => ({ matches: true })) as unknown as typeof window.matchMedia
+    expect(startGenieGhost('x', page, item, 'restore')).toBeNull()
     expect(ghost()).toBeNull()
   })
 

@@ -125,22 +125,30 @@ function framesFor(page: Box, target: Box, direction: GenieDirection) {
     : [...frames].reverse().map((frame) => ({ ...frame, offset: 1 - frame.offset }))
 }
 
+/** Imagem do efeito já na tela: `finished` quando acaba de mexer (nunca rejeita). */
+export interface GenieGhost {
+  finished: Promise<void>
+  /** Tira a imagem; com `fadeMs` ela esmaece antes de sair. */
+  remove: (fadeMs?: number) => Promise<void>
+}
+
 /**
  * Efeito sobre uma IMAGEM da tela (a miniatura) em vez da página viva: animar
  * uma imagem é barato até sem placa de vídeo, enquanto a página real pode ter
  * milhares de elementos (Hinário: ~14 mil). Ao minimizar, `hide` (a página)
  * some na hora (content-visibility) e a imagem é sugada até o item; ao reabrir, a imagem cresce do
  * item até a tela e fica lá até quem chamou remover (a página real entrou).
- * Devolve como remover a imagem, ou null quando não dá para usar o efeito
- * (sem imagem, sem suporte ou movimento reduzido) — aí nada foi alterado.
+ * Começa na hora (sem await): quem chama pode montar a página por baixo
+ * enquanto a imagem cresce. Devolve null quando não dá para usar o efeito
+ * (sem imagem, sem suporte ou movimento reduzido); aí nada foi alterado.
  */
-export async function playGenieGhost(
+export function startGenieGhost(
   image: string | null,
   area: Box | null,
   target: Box | null,
   direction: GenieDirection,
   hide?: HTMLElement | null,
-): Promise<(() => void) | null> {
+): GenieGhost | null {
   if (!image || !area || !target || prefersReducedMotion()) return null
   const ghost = document.createElement('img')
   if (typeof ghost.animate !== 'function') return null
@@ -166,16 +174,48 @@ export async function playGenieGhost(
   // ~20 ms contra ~250 ms de visibility:hidden numa tela de ~14 mil elementos
   if (hide) hide.style.contentVisibility = 'hidden'
 
-  try {
-    await ghost.animate(framesFor(area, target, direction) as unknown as Keyframe[], {
+  const finished = ghost
+    .animate(framesFor(area, target, direction) as unknown as Keyframe[], {
       duration: GENIE_DURATION_MS,
       easing: EASING[direction],
       fill: 'forwards',
-    }).finished
-  } catch {
-    // cancelada: quem chamou ainda remove a imagem
+    })
+    .finished.then(
+      () => undefined,
+      // cancelada: quem chamou ainda remove a imagem
+      () => undefined,
+    )
+
+  async function remove(fadeMs = 0) {
+    if (fadeMs > 0) {
+      try {
+        await ghost.animate([{ opacity: 1 }, { opacity: 0 }], {
+          duration: fadeMs,
+          easing: 'ease-out',
+          fill: 'forwards',
+        }).finished
+      } catch {
+        // cancelado: sai do mesmo jeito
+      }
+    }
+    ghost.remove()
   }
-  return () => ghost.remove()
+
+  return { finished, remove }
+}
+
+/** Como `startGenieGhost`, mas espera a imagem acabar de mexer; devolve como removê-la. */
+export async function playGenieGhost(
+  image: string | null,
+  area: Box | null,
+  target: Box | null,
+  direction: GenieDirection,
+  hide?: HTMLElement | null,
+): Promise<GenieGhost['remove'] | null> {
+  const ghost = startGenieGhost(image, area, target, direction, hide)
+  if (!ghost) return null
+  await ghost.finished
+  return ghost.remove
 }
 
 /**

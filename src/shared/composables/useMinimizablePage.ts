@@ -82,7 +82,7 @@ export function useMinimizablePage<S>(options: MinimizablePageOptions<S>) {
       const pageEl = (root?.firstElementChild as HTMLElement | null | undefined) ?? null
       const removeGhost = await playGenieGhost(preview, previewArea(root), target, 'minimize', pageEl)
       if (removeGhost) {
-        removeGhost()
+        void removeGhost()
         if (pageEl) {
           setTimeout(() => {
             pageEl.style.contentVisibility = ''

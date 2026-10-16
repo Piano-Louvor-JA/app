@@ -255,13 +255,18 @@ vi.mock('@modules/timer/views/TimerProjectionView.vue', () => ({
 const genieMock = vi.hoisted(() => ({
   rect: { left: 10, top: 700, width: 120, height: 30 },
   playGenie: vi.fn(async () => {}),
-  removeGhost: vi.fn(),
-  playGenieGhost: vi.fn(async (image: unknown) => (image ? genieMock.removeGhost : null)),
+  removeGhost: vi.fn(async () => {}),
+  grow: null as null | (() => void),
+  startGenieGhost: vi.fn((image: unknown) =>
+    image
+      ? { finished: new Promise<void>((r) => (genieMock.grow = r)), remove: genieMock.removeGhost }
+      : null,
+  ),
 }))
 vi.mock('@shared/services/genie-animation', () => ({
   findMinimizedItemRect: vi.fn(() => genieMock.rect),
   playGenie: genieMock.playGenie,
-  playGenieGhost: genieMock.playGenieGhost,
+  startGenieGhost: genieMock.startGenieGhost,
 }))
 
 import AppShell from '@layouts/AppShell.vue'
@@ -788,19 +793,47 @@ describe('AppShell — páginas minimizadas', () => {
     w.unmount()
   })
 
-  it('reabrir pela barra com miniatura: a imagem cresce do item e sai quando a página real entra', async () => {
+  it('reabrir pela barra com miniatura: a página monta por baixo enquanto a imagem cresce e a imagem sai quando a página entrou', async () => {
     genieMock.playGenie.mockClear()
-    genieMock.playGenieGhost.mockClear()
+    genieMock.startGenieGhost.mockClear()
     genieMock.removeGhost.mockClear()
     useMinimizedPagesStore().minimize(hinario())
     const { w, router, bar } = await mountShell2()
+    const main = w.find('.app-shell__main').element as HTMLElement
     bar().vm.$emit('open', '/albums/5')
     await flushPromises()
-    expect(genieMock.playGenieGhost).toHaveBeenCalledWith('data:image/jpeg;base64,AA', null, genieMock.rect, 'restore')
-    await settle()
+    expect(genieMock.startGenieGhost).toHaveBeenCalledWith('data:image/jpeg;base64,AA', null, genieMock.rect, 'restore')
+    // navega junto com o crescimento (não espera a imagem): a página já está por baixo
     expect(router.currentRoute.value.fullPath).toBe('/albums/5')
+    // por baixo da imagem a área fica transparente: a página não "pula" pronta antes do efeito
+    expect(main.style.opacity).toBe('0')
+    await settle()
+    expect(genieMock.removeGhost).not.toHaveBeenCalled()
+    // a imagem acabou de crescer e a página já entrou: troca rápida, sem tempo embaçado
+    genieMock.grow!()
+    await settle()
+    expect(main.style.opacity).toBe('')
     expect(genieMock.removeGhost).toHaveBeenCalledTimes(1)
+    expect(genieMock.removeGhost).toHaveBeenCalledWith(120)
     expect(genieMock.playGenie).not.toHaveBeenCalled()
+    w.unmount()
+  })
+
+  it('reabrir com miniatura e a navegação é cancelada: a imagem sai mesmo assim', async () => {
+    genieMock.removeGhost.mockClear()
+    useMinimizedPagesStore().minimize(hinario())
+    const { w, router, bar } = await mountShell2()
+    router.beforeEach(() => false)
+    const main = w.find('.app-shell__main').element as HTMLElement
+    bar().vm.$emit('open', '/albums/5')
+    await flushPromises()
+    genieMock.grow!()
+    expect(main.style.opacity).toBe('0')
+    // nenhuma página entra: o limite de tempo libera a tela
+    await vi.advanceTimersByTimeAsync(1500)
+    await flushPromises()
+    expect(genieMock.removeGhost).toHaveBeenCalledTimes(1)
+    expect(main.style.opacity).toBe('')
     w.unmount()
   })
 

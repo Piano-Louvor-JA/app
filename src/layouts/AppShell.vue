@@ -46,7 +46,7 @@ import {
   requestInstantPageTransition,
   usePageTransitionOverride,
 } from '@shared/composables/useInstantPageTransition'
-import { findMinimizedItemRect, playGenie, playGenieGhost } from '@shared/services/genie-animation'
+import { findMinimizedItemRect, playGenie, startGenieGhost } from '@shared/services/genie-animation'
 import { previewArea } from '@shared/services/page-preview'
 import { VIEW_SCROLL_MEMORY, useViewScrollMemory } from '@shared/composables/useViewScrollMemory'
 import logoUrl from '@assets/brand/logo-louvor-ja.svg'
@@ -386,8 +386,29 @@ const minimizedItems = computed<MinimizedBarItem[]>(() =>
 let genieFrom: DOMRect | null = null
 let genieTimer: ReturnType<typeof setTimeout> | null = null
 
-/** A imagem do efeito sai logo depois que a página real entra por baixo. */
-const GHOST_REMOVE_DELAY_MS = 60
+/** Fade curto da imagem do efeito ao sair, com a página real já pintada por baixo. */
+const GHOST_FADE_MS = 120
+
+/** Se a página nova não entrar (navegação cancelada, mesma tela), libera assim mesmo. */
+const VIEW_ENTER_LIMIT_MS = 1000
+
+function nextFrame(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => resolve()))
+}
+
+/** Resolve quando a próxima página terminar de entrar (ou no limite de tempo). */
+let viewEntered: (() => void) | null = null
+function waitViewEnter(): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(done, VIEW_ENTER_LIMIT_MS)
+    function done() {
+      clearTimeout(timer)
+      if (viewEntered === done) viewEntered = null
+      resolve()
+    }
+    viewEntered = done
+  })
+}
 
 /** Reabre uma página minimizada como estava (rolagem + retrato). */
 async function onOpenMinimized(fullPath: string) {
@@ -402,10 +423,12 @@ async function onOpenMinimized(fullPath: string) {
   if (!page) return
   viewScrollMemory.seed(fullPath, page.scroll)
 
-  // com miniatura: a IMAGEM cresce do item até a tela (barato) e fica por cima
-  // até a página real entrar por baixo, no mesmo lugar
-  const removeGhost = await playGenieGhost(page.preview, previewArea(mainEl.value), from, 'restore')
-  if (!removeGhost) {
+  // com miniatura: a IMAGEM cresce do item até a tela (barato, no compositor)
+  // e, AO MESMO TEMPO, a página real monta por baixo, transparente; quando as
+  // duas coisas acabam, a página aparece e a imagem esmaece rápido
+  const main = mainEl.value
+  const ghost = startGenieGhost(page.preview, previewArea(main), from, 'restore')
+  if (!ghost) {
     // sem miniatura: a própria página cresce a partir do item ao entrar
     genieFrom = from
     // se a tela não for recriada (mesma página por trás), o efeito não fica pendurado
@@ -414,13 +437,21 @@ async function onOpenMinimized(fullPath: string) {
       genieFrom = null
     }, 2000)
   }
+  const entered = ghost ? waitViewEnter() : null
+  if (ghost && main) main.style.opacity = '0'
   requestInstantPageTransition()
   await router.push(fullPath)
-  if (removeGhost) setTimeout(removeGhost, GHOST_REMOVE_DELAY_MS)
+  if (!ghost) return
+  await Promise.all([ghost.finished, entered])
+  // um quadro com a página já pintada por baixo antes de trocar
+  await nextFrame()
+  if (main) main.style.opacity = ''
+  void ghost.remove(GHOST_FADE_MS)
 }
 
 /** Página nova terminou de entrar: libera a transição e restaura a rolagem. */
 function onViewAfterEnter() {
+  viewEntered?.()
   settlePageTransition()
   restoreViewScroll(route.fullPath)
 }
