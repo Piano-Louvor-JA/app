@@ -13,6 +13,16 @@ vi.mock("../../../settings/services/stage-settings-runtime", async (importOrigin
 })
 import { createPinia, setActivePinia } from "pinia";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// Composable testado à parte: aqui só o contrato tela ↔ minimizar.
+const minimizeMock = vi.fn(async () => {})
+const prepareMock = vi.fn()
+vi.mock('@shared/composables/useMinimizablePage', () => ({
+  useMinimizablePage: (options: unknown) => {
+    ;(globalThis as any).__minimizeOptions = options
+    return { minimize: minimizeMock, prepare: prepareMock, takeRestoredState: () => null }
+  },
+}))
 import { createI18n } from "vue-i18n";
 
 /**
@@ -347,10 +357,9 @@ describe("RandomView — áudio custom", () => {
       w.unmount()
     })
 
-    it('onToggleProjection: chama toggleProjection da store', async () => {
+    it('projetar fica no painel flutuante, não na tela do Sorteio', () => {
       const w = mountView()
-      const vm = w.vm as any
-      await vm.onToggleProjection?.()
+      expect(w.find('.random-project-fab').exists()).toBe(false)
       w.unmount()
     })
 

@@ -3,6 +3,7 @@ import { GlassCard } from "@design-system/index";
 import { getAuthSession } from "@modules/media/services/auth-client";
 
 import ReportDialog from "../components/ReportDialog.vue";
+import { storeToRefs } from "pinia";
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -23,6 +24,9 @@ import {
 	getNotifications,
 } from "../services/notifications";
 import NotificationsDropdown from "../components/NotificationsDropdown.vue";
+import { useCommunityBrowseStore } from "../stores/useCommunityBrowseStore";
+import PageBackStack from "@shared/components/PageBackStack.vue";
+import { useMinimizablePage } from "@shared/composables/useMinimizablePage";
 
 const { t } = useI18n();
 const router = useRouter();
@@ -34,8 +38,34 @@ const savedId = ref<number | null>(null);
 const savedError = ref<number | null>(null);
 const weeklyTasks = ref<WeeklyTask[]>([]);
 const viewEl = ref<HTMLElement | null>(null);
-const searchQuery = ref("");
-const page = ref(1);
+// busca e página sobrevivem a sair e voltar para a tela
+const { searchQuery, page } = storeToRefs(useCommunityBrowseStore());
+
+/** Retrato guardado ao minimizar: busca e página da lista. */
+interface CommunitySnapshot {
+	searchQuery: string;
+	page: number;
+}
+
+const { minimize, prepare, takeRestoredState } = useMinimizablePage<CommunitySnapshot>({
+	describe: () => {
+		const query = searchQuery.value.trim();
+		const parts = [
+			query ? t("minimize.search", { q: query }) : "",
+			t("minimize.pageNumber", { n: page.value }),
+		];
+		return { title: t("community.title"), icon: "ti-users-group", summary: parts.filter(Boolean).join(" · ") };
+	},
+	capture: () => ({ searchQuery: searchQuery.value, page: page.value }),
+	fallbackRoute: { name: "home" },
+});
+
+// Reaberta pela barra: volta com a busca e a página antes do 1º carregamento.
+const restored = takeRestoredState();
+if (restored) {
+	searchQuery.value = restored.searchQuery;
+	page.value = restored.page;
+}
 const lastPage = ref(1);
 const total = ref(0);
 
@@ -75,14 +105,15 @@ async function load() {
 	seasonalEvent.value = seasonal;
 	// serviços nunca lançam; falha = vazio/null.
 	isLoading.value = false;
-	// o scroll container é o próprio section (a página inteira rola)
-	viewEl.value?.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function goTo(p: number) {
+async function goTo(p: number) {
 	if (p < 1 || p > lastPage.value || p === page.value) return;
 	page.value = p;
-	load();
+	await load();
+	// página nova começa do topo; ao só voltar para a tela, a rolagem
+	// restaurada pelo AppShell fica. O scroll container é o próprio section.
+	viewEl.value?.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function openReport(collection: CommunityCollectionSummary) {
@@ -124,16 +155,18 @@ onMounted(load);
 </script>
 
 <template>
-  <section class="community-view">
+  <section ref="viewEl" class="community-view">
     <header class="community-view__header">
-      <button
-        type="button"
-        class="community-view__back"
-        :aria-label="t('community.back')"
-        @click="router.back()"
-      >
-        <i class="ti ti-arrow-left" aria-hidden="true" />
-      </button>
+      <PageBackStack @minimize="minimize" @prepare="prepare">
+        <button
+          type="button"
+          class="community-view__back"
+          :aria-label="t('community.back')"
+          @click="router.back()"
+        >
+          <i class="ti ti-arrow-left" aria-hidden="true" />
+        </button>
+      </PageBackStack>
       <div class="community-view__headings">
         <h1 class="community-view__title">
           {{ t('community.title') }}

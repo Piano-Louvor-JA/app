@@ -60,6 +60,7 @@ export default {
     clearProjection: 'Hide content',
     maximize: 'Open player',
     minimize: 'Minimize',
+    chromeDragHint: 'Drag to move · double-click to return to the corner',
     close: 'Close',
     seek: 'Track position',
     volume: 'Volume',

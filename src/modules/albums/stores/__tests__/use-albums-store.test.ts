@@ -159,6 +159,28 @@ describe('useAlbumsStore', () => {
     expect(store.tracks).toHaveLength(1)
   })
 
+  it('openCollection: reabrir a mesma coletânea (voltar para a tela) mantém a busca', async () => {
+    h.findCollectionById.mockReturnValue(collection)
+    h.loadCollectionTracks.mockResolvedValue([{ id: 1, name: 'T' }])
+    const store = useAlbumsStore()
+    await store.openCollection('5')
+    store.searchQuery = 'arautos'
+    await store.openCollection('5')
+    expect(store.searchQuery).toBe('arautos')
+    expect(h.loadCollectionTracks).toHaveBeenCalledTimes(2)
+  })
+
+  it('openCollection: abrir outra coletânea limpa a busca', async () => {
+    h.findCollectionById.mockReturnValue(collection)
+    h.loadCollectionTracks.mockResolvedValue([{ id: 1, name: 'T' }])
+    const store = useAlbumsStore()
+    await store.openCollection('5')
+    store.searchQuery = 'arautos'
+    h.findCollectionById.mockReturnValue({ ...collection, id: '6' })
+    await store.openCollection('6')
+    expect(store.searchQuery).toBe('')
+  })
+
   it('openCollection: coletânea inexistente', async () => {
     h.findCollectionById.mockReturnValue(null)
     const store = useAlbumsStore()

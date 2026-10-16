@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import PageBackStack from '@shared/components/PageBackStack.vue'
+import { useMinimizablePage } from '@shared/composables/useMinimizablePage'
 
 import { palcoSession } from '@modules/settings/services/palco-session'
 import ObsBrandIcon from '@design-system/components/icons/ObsBrandIcon.vue'
@@ -8,6 +10,13 @@ import ObsBrandIcon from '@design-system/components/icons/ObsBrandIcon.vue'
 // Issue app#361: card funcional do OBS — Browser Source do palco-server.
 // Por baixo usa o palco (transporte); por fora é "Transmitir via OBS".
 const { t } = useI18n()
+
+// Minimizar: o estado da tela já vive na store; o retrato guarda só rolagem e miniatura.
+const { minimize, prepare } = useMinimizablePage({
+  describe: () => ({ title: t('utilities.obs'), icon: 'ti-broadcast', summary: '' }),
+  capture: () => null,
+  fallbackRoute: { name: 'utilities' },
+})
 
 const running = ref(false)
 const obsUrl = ref('')
@@ -69,9 +78,11 @@ onUnmounted(() => {
 <template>
   <section class="obs-view">
     <header class="obs-view__header">
-      <button type="button" class="obs-view__back" @click="$router.back()">
-        <i class="ti ti-arrow-left" aria-hidden="true"></i>
-      </button>
+      <PageBackStack @minimize="minimize" @prepare="prepare">
+        <button type="button" class="obs-view__back" @click="$router.back()">
+          <i class="ti ti-arrow-left" aria-hidden="true"></i>
+        </button>
+      </PageBackStack>
       <ObsBrandIcon :size="28" class="obs-view__brand" />
       <h1 class="obs-view__title">{{ t('utilities.obs') }}</h1>
       <span class="obs-view__status" :class="{ 'obs-view__status--on': running }">

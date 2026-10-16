@@ -5,8 +5,10 @@ export { default as ProjectionBackground } from './components/backgrounds/Projec
 export { default as MediaCollectionList } from './components/data/MediaCollectionList.vue'
 export { default as DockFooter } from './components/navigation/DockFooter.vue'
 export { default as BottomNavigation } from './components/navigation/BottomNavigation.vue'
+export { default as HistoryNav } from './components/navigation/HistoryNav.vue'
+export { default as MinimizedPagesBar } from './components/navigation/MinimizedPagesBar.vue'
 
-export type { DockNavItem } from './types/navigation'
+export type { DockNavItem, HistoryNavDot, MinimizedBarItem } from './types/navigation'
 
 export * from './tokens'
 export * from './themes'

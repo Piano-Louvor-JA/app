@@ -184,6 +184,17 @@ vi.mock('@design-system/index', () => ({
   GradientBackground: {
     name: 'GradientBackground',
     template: '<div class="gradient-mock"><slot /></div>',
+  },  MinimizedPagesBar: {
+    name: 'MinimizedPagesBar',
+    template: '<nav class="minimized-bar-mock" />',
+    props: ['items', 'navLabel'],
+    emits: ['open', 'close'],
+  },
+  HistoryNav: {
+    name: 'HistoryNav',
+    template: '<nav class="history-nav-mock" />',
+    props: ['dots', 'canGoBack', 'canGoForward', 'navLabel', 'backLabel', 'forwardLabel'],
+    emits: ['back', 'forward', 'go'],
   },
 }))
 
@@ -207,6 +218,22 @@ vi.mock('@modules/media/components/MediaChrome.vue', () => ({
   default: { name: 'MediaChrome', template: '<div class="media-chrome-mock" />' },
 }))
 
+vi.mock('@modules/bible/components/BibleChrome.vue', () => ({
+  default: { name: 'BibleChrome', template: '<div class="bible-chrome-mock" />' },
+}))
+vi.mock('@modules/countdown/components/CountdownChrome.vue', () => ({
+  default: { name: 'CountdownChrome', template: '<div class="countdown-chrome-mock" />' },
+}))
+vi.mock('@modules/timer/components/TimerChrome.vue', () => ({
+  default: { name: 'TimerChrome', template: '<div class="timer-chrome-mock" />' },
+}))
+vi.mock('@modules/clock/components/ClockChrome.vue', () => ({
+  default: { name: 'ClockChrome', template: '<div class="clock-chrome-mock" />' },
+}))
+vi.mock('@modules/random/components/RandomChrome.vue', () => ({
+  default: { name: 'RandomChrome', template: '<div class="random-chrome-mock" />' },
+}))
+
 vi.mock('@modules/bible/components/BibleInAppProjection.vue', () => ({
   default: { name: 'BibleInAppProjection', template: '<div class="bible-overlay-mock" />' },
 }))
@@ -224,7 +251,28 @@ vi.mock('@modules/timer/views/TimerProjectionView.vue', () => ({
   default: { template: '<div class="timer-view-mock" />' },
 }))
 
+// efeito gênio observado (a animação real é testada à parte)
+const genieMock = vi.hoisted(() => ({
+  rect: { left: 10, top: 700, width: 120, height: 30 },
+  playGenie: vi.fn(async () => {}),
+  removeGhost: vi.fn(async () => {}),
+  grow: null as null | (() => void),
+  startGenieGhost: vi.fn((image: unknown) =>
+    image
+      ? { finished: new Promise<void>((r) => (genieMock.grow = r)), remove: genieMock.removeGhost }
+      : null,
+  ),
+}))
+vi.mock('@shared/services/genie-animation', () => ({
+  findMinimizedItemRect: vi.fn(() => genieMock.rect),
+  playGenie: genieMock.playGenie,
+  startGenieGhost: genieMock.startGenieGhost,
+}))
+
 import AppShell from '@layouts/AppShell.vue'
+import { installNavigationHistory } from '@shared/composables/useNavigationHistory'
+import { useMinimizedPagesStore } from '@shared/stores/useMinimizedPagesStore'
+import type { MinimizedPage } from '@shared/services/minimized-pages'
 
 function makeRouter(navKey: string | null = null, routeName = 'test') {
   return createRouter({
@@ -498,6 +546,393 @@ describe('AppShell — viewKey e transição', () => {
   it('viewKey usa navKey da meta', async () => {
     const { w } = await mountShell('utilities')
     expect(w.find('.view-mock').exists()).true
+    w.unmount()
+  })
+})
+
+describe('AppShell — navegador de histórico', () => {
+  let uninstallHistory: (() => void) | null = null
+
+  // o histórico agora vai para o sessionStorage: cada teste começa do zero
+  beforeEach(() => {
+    sessionStorage.clear()
+  })
+
+  afterEach(() => {
+    uninstallHistory?.()
+    uninstallHistory = null
+  })
+
+  async function mountWithHistory() {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/', name: 'home', component: { template: '<div />' }, meta: { navKey: 'home' } },
+        { path: '/bible', name: 'bible', component: { template: '<div />' }, meta: { navKey: 'bible' } },
+        {
+          path: '/settings/projection',
+          name: 'settings-projection',
+          component: { template: '<div />' },
+          meta: { navKey: 'settings' },
+        },
+      ],
+    })
+    uninstallHistory = installNavigationHistory({ router })
+    await router.push('/')
+    await router.isReady()
+    const w = mount(AppShell, { global: { plugins: [router] } })
+    await flushPromises()
+    const nav = () => w.findComponent({ name: 'HistoryNav' })
+    return { w, router, nav }
+  }
+
+  it('aparece já na abertura com um ponto e as setas desabilitadas (Q1)', async () => {
+    const { w, nav } = await mountWithHistory()
+    expect(w.find('.app-shell__history .history-nav-mock').exists()).true
+    expect(nav().props('dots')).toEqual([{ index: 0, label: 'nav.home', current: true, edge: false }])
+    expect(nav().props('canGoBack')).false
+    expect(nav().props('canGoForward')).false
+    expect(nav().props('navLabel')).toBe('nav.history.label')
+    expect(nav().props('backLabel')).toBe('nav.history.back')
+    expect(nav().props('forwardLabel')).toBe('nav.history.forward')
+    w.unmount()
+  })
+
+  it('depois de navegar mostra os pontos com o nome de cada tela', async () => {
+    const { w, router, nav } = await mountWithHistory()
+    await router.push('/bible')
+    await router.push('/settings/projection')
+    await flushPromises()
+    expect(nav().props('dots').map((d: { label: string }) => d.label)).toEqual([
+      'nav.home',
+      'nav.bible',
+      'nav.settings · settings.tabs.projection',
+    ])
+    expect(nav().props('canGoBack')).true
+    w.unmount()
+  })
+
+  it('seta voltar e avançar navegam pelo histórico', async () => {
+    const { w, router, nav } = await mountWithHistory()
+    await router.push('/bible')
+    await flushPromises()
+
+    nav().vm.$emit('back')
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe('/')
+    expect(nav().props('canGoForward')).true
+
+    nav().vm.$emit('forward')
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe('/bible')
+    w.unmount()
+  })
+
+  it('Alt+← e Alt+→ navegam pelo histórico', async () => {
+    const { w, router } = await mountWithHistory()
+    await router.push('/bible')
+    await flushPromises()
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', altKey: true }))
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe('/')
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', altKey: true }))
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe('/bible')
+    w.unmount()
+  })
+
+  it('clicar num ponto salta para aquela tela', async () => {
+    const { w, router, nav } = await mountWithHistory()
+    await router.push('/bible')
+    await router.push('/settings/projection')
+    await flushPromises()
+
+    nav().vm.$emit('go', 0)
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe('/')
+    w.unmount()
+  })
+})
+
+describe('AppShell — memória de rolagem', () => {
+  /** Deixa a Transition (out-in) terminar: ela espera frames, não só promises. */
+  async function settle() {
+    for (let i = 0; i < 6; i++) {
+      await vi.advanceTimersByTimeAsync(50)
+      await flushPromises()
+    }
+  }
+
+  it('ao voltar para uma tela, restaura a rolagem de onde parou', async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/', component: { template: '<section class="scroll-view" />' }, meta: { navKey: 'home' } },
+        { path: '/bible', component: { template: '<section class="scroll-view" />' }, meta: { navKey: 'bible' } },
+      ],
+    })
+    await router.push('/')
+    await router.isReady()
+    // Transition real: o restore roda no @after-enter (test-utils stuba por padrão)
+    const w = mount(AppShell, { global: { plugins: [router], stubs: { transition: false } } })
+    await flushPromises()
+
+    const first = w.find('.scroll-view').element as HTMLElement
+    first.scrollTop = 420
+    // no navegador rolar dispara scroll (o jsdom não dispara sozinho)
+    first.dispatchEvent(new Event('scroll'))
+    await router.push('/bible')
+    await settle()
+
+    await router.push('/')
+    await settle()
+    const again = w.find('.scroll-view').element as HTMLElement
+    expect(again).not.toBe(first)
+    expect(again.scrollTop).toBe(420)
+    w.unmount()
+  })
+})
+
+describe('AppShell — páginas minimizadas', () => {
+  let uninstallHistory: (() => void) | null = null
+
+  beforeEach(() => {
+    sessionStorage.clear()
+  })
+
+  afterEach(() => {
+    uninstallHistory?.()
+    uninstallHistory = null
+  })
+
+  /** Deixa a Transition (out-in) terminar: ela espera frames. */
+  async function settle() {
+    for (let i = 0; i < 6; i++) {
+      await vi.advanceTimersByTimeAsync(50)
+      await flushPromises()
+    }
+  }
+
+  function hinario(extra: Partial<MinimizedPage> = {}): MinimizedPage {
+    return {
+      fullPath: '/albums/5',
+      routeName: 'albums-collection',
+      title: 'Hinário Adventista',
+      icon: 'ti-book',
+      summary: 'Busca: santo',
+      state: { collectionId: '5', searchQuery: 'santo' },
+      scroll: [{ path: [0], top: 333, left: 0 }],
+      preview: 'data:image/jpeg;base64,AA',
+      minimizedAt: 1,
+      ...extra,
+    }
+  }
+
+  async function mountShell2(start = '/') {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/', name: 'home', component: { template: '<section class="scroll-view" />' }, meta: { navKey: 'home' } },
+        {
+          path: '/albums/:collectionId',
+          name: 'albums-collection',
+          component: { template: '<section class="scroll-view album" />' },
+          meta: { navKey: 'albums' },
+        },
+      ],
+    })
+    uninstallHistory = installNavigationHistory({ router })
+    await router.push(start)
+    await router.isReady()
+    const w = mount(AppShell, { global: { plugins: [router], stubs: { transition: false } } })
+    await flushPromises()
+    const bar = () => w.findComponent({ name: 'MinimizedPagesBar' })
+    return { w, router, bar }
+  }
+
+  it('sem páginas minimizadas a barra não aparece nem ocupa espaço', async () => {
+    const { w, bar } = await mountShell2()
+    expect(bar().exists()).false
+    expect(w.find('.app-shell').classes()).not.toContain('app-shell--has-minimized')
+    w.unmount()
+  })
+
+  it('mostra as páginas minimizadas entre a faixa e o dock', async () => {
+    useMinimizedPagesStore().minimize(hinario())
+    const { w, bar } = await mountShell2()
+    expect(w.find('.app-shell').classes()).toContain('app-shell--has-minimized')
+    expect(w.find('.app-shell__minimized .minimized-bar-mock').exists()).true
+    expect(bar().props('navLabel')).toBe('minimize.bar')
+    expect(bar().props('items')).toEqual([
+      {
+        key: '/albums/5',
+        title: 'Hinário Adventista',
+        icon: 'ti-book',
+        summary: 'Busca: santo',
+        preview: 'data:image/jpeg;base64,AA',
+        closeLabel: 'minimize.close',
+      },
+    ])
+    w.unmount()
+  })
+
+  it('clicar reabre a página, tira da barra e volta a rolagem guardada', async () => {
+    const store = useMinimizedPagesStore()
+    store.minimize(hinario())
+    const { w, router, bar } = await mountShell2()
+
+    bar().vm.$emit('open', '/albums/5')
+    await settle()
+
+    expect(router.currentRoute.value.fullPath).toBe('/albums/5')
+    expect(store.items).toEqual([])
+    expect(store.takeRestore('/albums/5')?.state).toEqual({ collectionId: '5', searchQuery: 'santo' })
+    expect((w.find('.scroll-view.album').element as HTMLElement).scrollTop).toBe(333)
+    w.unmount()
+  })
+
+  it('reabrir pela barra com miniatura: a página monta por baixo enquanto a imagem cresce e a imagem sai quando a página entrou', async () => {
+    genieMock.playGenie.mockClear()
+    genieMock.startGenieGhost.mockClear()
+    genieMock.removeGhost.mockClear()
+    useMinimizedPagesStore().minimize(hinario())
+    const { w, router, bar } = await mountShell2()
+    const main = w.find('.app-shell__main').element as HTMLElement
+    bar().vm.$emit('open', '/albums/5')
+    await flushPromises()
+    expect(genieMock.startGenieGhost).toHaveBeenCalledWith('data:image/jpeg;base64,AA', null, genieMock.rect, 'restore')
+    // navega junto com o crescimento (não espera a imagem): a página já está por baixo
+    expect(router.currentRoute.value.fullPath).toBe('/albums/5')
+    // por baixo da imagem a área fica transparente: a página não "pula" pronta antes do efeito
+    expect(main.style.opacity).toBe('0')
+    await settle()
+    expect(genieMock.removeGhost).not.toHaveBeenCalled()
+    // a imagem acabou de crescer e a página já entrou: troca rápida, sem tempo embaçado
+    genieMock.grow!()
+    await settle()
+    expect(main.style.opacity).toBe('')
+    expect(genieMock.removeGhost).toHaveBeenCalledTimes(1)
+    expect(genieMock.removeGhost).toHaveBeenCalledWith(120)
+    expect(genieMock.playGenie).not.toHaveBeenCalled()
+    w.unmount()
+  })
+
+  it('reabrir com miniatura e a navegação é cancelada: a imagem sai mesmo assim', async () => {
+    genieMock.removeGhost.mockClear()
+    useMinimizedPagesStore().minimize(hinario())
+    const { w, router, bar } = await mountShell2()
+    router.beforeEach(() => false)
+    const main = w.find('.app-shell__main').element as HTMLElement
+    bar().vm.$emit('open', '/albums/5')
+    await flushPromises()
+    genieMock.grow!()
+    expect(main.style.opacity).toBe('0')
+    // nenhuma página entra: o limite de tempo libera a tela
+    await vi.advanceTimersByTimeAsync(1500)
+    await flushPromises()
+    expect(genieMock.removeGhost).toHaveBeenCalledTimes(1)
+    expect(main.style.opacity).toBe('')
+    w.unmount()
+  })
+
+  it('reabrir pela barra sem miniatura: a página cresce a partir do item (efeito gênio ao contrário)', async () => {
+    genieMock.playGenie.mockClear()
+    useMinimizedPagesStore().minimize(hinario({ preview: null }))
+    const { w, bar } = await mountShell2()
+    bar().vm.$emit('open', '/albums/5')
+    await settle()
+    expect(genieMock.playGenie).toHaveBeenCalledTimes(1)
+    const [el, from, direction] = genieMock.playGenie.mock.calls[0] as unknown as [Element, unknown, string]
+    expect(el.classList.contains('album')).toBe(true)
+    expect(from).toEqual(genieMock.rect)
+    expect(direction).toBe('restore')
+    w.unmount()
+  })
+
+  it('reabrir dois itens seguidos anima os dois; o efeito pendente expira', async () => {
+    genieMock.playGenie.mockClear()
+    const store = useMinimizedPagesStore()
+    store.minimize(hinario({ preview: null }))
+    store.minimize(hinario({ fullPath: '/albums/9', title: 'Vox', minimizedAt: 2, preview: null }))
+    const { w, router, bar } = await mountShell2()
+
+    bar().vm.$emit('open', '/albums/5')
+    await settle()
+    // entre uma e outra o operador vai para outra tela (coletânea → coletânea
+    // reaproveita a mesma tela e não tem entrada para animar)
+    await router.push('/')
+    await settle()
+    bar().vm.$emit('open', '/albums/9')
+    await settle()
+    expect(genieMock.playGenie).toHaveBeenCalledTimes(2)
+
+    // efeito marcado mas a tela não foi recriada a tempo: expira e não vaza
+    await vi.advanceTimersByTimeAsync(2100)
+    await router.push('/')
+    await settle()
+    expect(genieMock.playGenie).toHaveBeenCalledTimes(2)
+    w.unmount()
+  })
+
+  it('reabrir pela barra troca de página sem a transição do tema (o gênio faz o papel)', async () => {
+    useMinimizedPagesStore().minimize(hinario())
+    const { w, bar } = await mountShell2()
+    bar().vm.$emit('open', '/albums/5')
+    await flushPromises()
+    // a troca usa as classes da transição instantânea, não as do tema ('none')
+    expect(w.html()).toMatch(/page-instant-(leave|enter)/)
+    expect(w.html()).not.toMatch(/none-(leave|enter)/)
+    await settle()
+    // depois que a página entrou, as próximas trocas voltam à transição do tema
+    const { router } = { router: (w.vm as any).$router }
+    await router.push('/')
+    await flushPromises()
+    expect(w.html()).toMatch(/none-(leave|enter)/)
+    await settle()
+    w.unmount()
+  })
+
+  it('navegar normalmente (sem a barra) não toca o efeito', async () => {
+    genieMock.playGenie.mockClear()
+    const { w, router } = await mountShell2()
+    await router.push('/albums/5')
+    await settle()
+    expect(genieMock.playGenie).not.toHaveBeenCalled()
+    w.unmount()
+  })
+
+  it('x fecha sem navegar', async () => {
+    const store = useMinimizedPagesStore()
+    store.minimize(hinario())
+    const { w, router, bar } = await mountShell2()
+    bar().vm.$emit('close', '/albums/5')
+    await flushPromises()
+    expect(store.items).toEqual([])
+    expect(router.currentRoute.value.fullPath).toBe('/')
+    w.unmount()
+  })
+
+  it('item de uma página que já está aberta: só sai da barra', async () => {
+    const store = useMinimizedPagesStore()
+    store.minimize(hinario())
+    const { w, router, bar } = await mountShell2('/albums/5')
+    bar().vm.$emit('open', '/albums/5')
+    await flushPromises()
+    expect(store.items).toEqual([])
+    expect(store.takeRestore('/albums/5')).toBeNull()
+    expect(router.currentRoute.value.fullPath).toBe('/albums/5')
+    w.unmount()
+  })
+
+  it('item que não existe mais é ignorado', async () => {
+    const { w, router, bar } = await mountShell2()
+    useMinimizedPagesStore().minimize(hinario())
+    await flushPromises()
+    bar().vm.$emit('open', '/sumiu')
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe('/')
     w.unmount()
   })
 })

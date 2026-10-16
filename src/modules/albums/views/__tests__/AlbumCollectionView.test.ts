@@ -107,6 +107,24 @@ vi.mock('../../composables/useAlbums', async () => {
   }
 })
 
+// Composable testado à parte: aqui só o contrato tela ↔ minimizar.
+const minimizeMock = vi.fn(async () => {})
+const prepareMock = vi.fn()
+vi.mock('@shared/composables/useMinimizablePage', () => ({
+  useMinimizablePage: (options: unknown) => {
+    ;(globalThis as any).__minimizeOptions = options
+    return {
+      minimize: minimizeMock,
+      prepare: prepareMock,
+      takeRestoredState: () => {
+        const restored = (globalThis as any).__restored ?? null
+        ;(globalThis as any).__restored = null
+        return restored
+      },
+    }
+  },
+}))
+
 vi.mock('@design-system/index', () => ({
   MediaCollectionList: {
     name: 'MediaCollectionList',
@@ -407,5 +425,112 @@ describe('AlbumCollectionView', () => {
     await flushPromises()
     expect(document.body.querySelector('.playlist-toast')).not.toBeNull()
     w.unmount()
+  })
+})
+
+describe('AlbumCollectionView — minimizar página', () => {
+  const options = () => (globalThis as any).__minimizeOptions as {
+    describe(): { title: string; icon: string; summary: string }
+    capture(): unknown
+    fallbackRoute: unknown
+  }
+
+  beforeEach(() => {
+    minimizeMock.mockClear()
+    ;(globalThis as any).__restored = null
+    // rota mockada é compartilhada; testes anteriores trocam o id
+    routeMock.params = { collectionId: '10' }
+    setupMocks()
+  })
+
+  it('botão – fica logo abaixo do voltar e minimiza a página', async () => {
+    const w = await mountView()
+    // mesmo componente das outras telas (PageBackStack): seta + – destacado
+    const nav = w.find('.page-back-stack')
+    const buttons = nav.findAll('button')
+    expect(buttons.map((b) => b.classes()[0])).toEqual([
+      'album-collection-view__back',
+      'page-back-stack__minimize',
+    ])
+    const minimize = w.find('.page-back-stack__minimize')
+    expect(minimize.attributes('aria-label')).toBe('minimize.page')
+    expect(minimize.attributes('title')).toBe('minimize.page')
+    expect(minimize.find('i').classes()).toContain('ti-minus')
+    await minimize.trigger('click')
+    expect(minimizeMock).toHaveBeenCalledTimes(1)
+    prepareMock.mockClear()
+    await minimize.trigger('pointerenter')
+    expect(prepareMock).toHaveBeenCalledTimes(1)
+    w.unmount()
+  })
+
+  it('descreve a página: título, ícone do tipo e resumo com busca e faixas', async () => {
+    setupMocks({ activeCollection: { ...collection, kind: 'hymnal', name: 'Hinário Adventista' } })
+    const w = await mountView()
+    await w.find('input[type="search"]').setValue('  santo ')
+    expect(options().describe()).toEqual({
+      title: 'Hinário Adventista',
+      icon: 'ti-book',
+      summary: 'minimize.search · albums.trackCount',
+    })
+    w.unmount()
+  })
+
+  it('álbum sem busca: ícone de disco e resumo só com as faixas', async () => {
+    const w = await mountView()
+    expect(options().describe()).toEqual({
+      title: 'CD Vocacional',
+      icon: 'ti-disc',
+      summary: 'albums.trackCount',
+    })
+    expect(options().fallbackRoute).toEqual({ name: 'albums' })
+    w.unmount()
+  })
+
+  it('retrato guarda a coletânea e a busca', async () => {
+    const w = await mountView()
+    await w.find('input[type="search"]').setValue('gratidão')
+    expect(options().capture()).toEqual({ collectionId: '10', searchQuery: 'gratidão' })
+    w.unmount()
+  })
+
+  it('reaberta pela barra: aplica a busca guardada depois de carregar a coletânea', async () => {
+    const order: string[] = []
+    setupMocks({ openCollection: vi.fn(async () => { order.push('open'); return true }) })
+    ;(globalThis as any).__restored = { collectionId: '10', searchQuery: 'santo' }
+    const w = await mountView()
+    order.push('checked')
+    expect(order).toEqual(['open', 'checked'])
+    expect((w.find('input[type="search"]').element as HTMLInputElement).value).toBe('santo')
+    w.unmount()
+  })
+
+  it('retrato de outra coletânea é ignorado', async () => {
+    ;(globalThis as any).__restored = { collectionId: '99', searchQuery: 'santo' }
+    const w = await mountView()
+    expect((w.find('input[type="search"]').element as HTMLInputElement).value).toBe('')
+    w.unmount()
+  })
+})
+
+describe('AlbumCollectionView — lista longa desenhada aos poucos', () => {
+  it('Hinário grande: primeiros hinos na hora, o resto logo em seguida (sem travar a tela)', async () => {
+    vi.useFakeTimers()
+    routeMock.params = { collectionId: '10' }
+    const many: AlbumTrack[] = Array.from({ length: 100 }, (_, i) => ({
+      musicId: i + 1,
+      name: `Hino ${i + 1}`,
+      track: i + 1,
+      durationLabel: '2:00',
+      hasInstrumental: true,
+    }))
+    setupMocks()
+    ;(globalThis as any).__tracks = many
+    const w = await mountView()
+    expect(w.findAll('.track-row-stub')).toHaveLength(40)
+    await vi.runAllTimersAsync()
+    expect(w.findAll('.track-row-stub')).toHaveLength(100)
+    w.unmount()
+    vi.useRealTimers()
   })
 })

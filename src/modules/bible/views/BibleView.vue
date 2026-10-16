@@ -3,7 +3,6 @@ import { useI18n } from 'vue-i18n'
 
 import PalcoRouteSelect from '../../settings/components/PalcoRouteSelect.vue'
 import BibleNavPanel from '../components/BibleNavPanel.vue'
-import BibleProjectFab from '../components/BibleProjectFab.vue'
 import BibleToolbar from '../components/BibleToolbar.vue'
 import BibleVerseList from '../components/BibleVerseList.vue'
 import { useBibleReader } from '../composables/useBibleReader'
@@ -25,7 +24,6 @@ const {
   isLoadingMeta,
   isLoadingVerses,
   lastErrorKey,
-  isProjecting,
   projection,
   filteredBooks,
   chapterNumbers,
@@ -33,7 +31,6 @@ const {
   chapterTitle,
   verseEntries,
   hasProjection,
-  previewSnippet,
   clearError,
   selectVersion,
   selectBook,
@@ -43,18 +40,8 @@ const {
   goToAdjacentVerse,
   setTestamentFilter,
   toggleNavPanel,
-  toggleProjection,
-  clearProjectionWindow,
   refresh,
 } = useBibleReader()
-
-function onProject() {
-  void toggleProjection()
-}
-
-function onClearProjection() {
-  clearProjectionWindow()
-}
 
 function onPreviousVerse() {
   void goToAdjacentVerse(-1)
@@ -148,7 +135,6 @@ function onNextVerse() {
         :verse-search-query="verseSearchQuery"
         :is-loading="isLoadingVerses"
         :projection="projection"
-        :preview-snippet="previewSnippet"
         :has-projection="hasProjection"
         @update:verse-search-query="verseSearchQuery = $event"
         @select-verse="selectVerse"
@@ -157,13 +143,6 @@ function onNextVerse() {
         @clear-projection="clearSelection"
       />
     </div>
-
-    <BibleProjectFab
-      :disabled="!hasProjection"
-      :projecting="isProjecting"
-      @project="onProject"
-      @clear="onClearProjection"
-    />
   </section>
 </template>
 

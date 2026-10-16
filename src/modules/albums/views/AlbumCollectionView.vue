@@ -4,6 +4,9 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import { MediaCollectionList } from '@design-system/index'
+import PageBackStack from '@shared/components/PageBackStack.vue'
+import { useMinimizablePage } from '@shared/composables/useMinimizablePage'
+import { useProgressiveList } from '@shared/composables/useProgressiveList'
 
 import AlbumLyricDialog from '../components/AlbumLyricDialog.vue'
 import AlbumTrackRow from '../components/AlbumTrackRow.vue'
@@ -61,13 +64,43 @@ onBeforeUnmount(() => {
 
 const collectionId = computed(() => String(route.params.collectionId ?? ''))
 
+// Hinário: 610 hinos — desenhar tudo de uma vez travava a tela por ~1,7 s
+const { visible: renderedTracks } = useProgressiveList(filteredTracks)
+
 const title = computed(
   () => activeCollection.value?.name || t('albums.collectionFallback'),
 )
 
+/** Retrato guardado ao minimizar (coletânea + busca). */
+interface CollectionSnapshot {
+  collectionId: string
+  searchQuery: string
+}
+
+const { minimize, prepare, takeRestoredState } = useMinimizablePage<CollectionSnapshot>({
+  describe: () => {
+    const query = searchQuery.value.trim()
+    const parts = [
+      query ? t('minimize.search', { q: query }) : '',
+      t('albums.trackCount', { count: filteredTracks.value.length }),
+    ]
+    return {
+      title: title.value,
+      icon: activeCollection.value?.kind === 'hymnal' ? 'ti-book' : 'ti-disc',
+      summary: parts.filter(Boolean).join(' · '),
+    }
+  },
+  capture: () => ({ collectionId: collectionId.value, searchQuery: searchQuery.value }),
+  fallbackRoute: { name: 'albums' },
+})
+
 async function load() {
   clearError()
   await openCollection(collectionId.value)
+  // Reaberta pela barra de minimizadas: a busca volta depois de carregar
+  // (abrir outra coletânea no meio-tempo limpava a busca na store).
+  const restored = takeRestoredState()
+  if (restored?.collectionId === collectionId.value) searchQuery.value = restored.searchQuery
 }
 
 onMounted(() => {
@@ -127,18 +160,20 @@ async function runAction(
   <section class="album-collection-view">
     <header class="album-collection-view__header">
       <div class="album-collection-view__brand">
-        <button
-          type="button"
-          class="album-collection-view__back"
-          :aria-label="t('albums.back')"
-          :title="t('albums.back')"
-          @click="goBack"
-        >
-          <i
-            class="ti ti-arrow-left"
-            aria-hidden="true"
-          />
-        </button>
+        <PageBackStack @minimize="minimize" @prepare="prepare">
+          <button
+            type="button"
+            class="album-collection-view__back"
+            :aria-label="t('albums.back')"
+            :title="t('albums.back')"
+            @click="goBack"
+          >
+            <i
+              class="ti ti-arrow-left"
+              aria-hidden="true"
+            />
+          </button>
+        </PageBackStack>
 
         <div class="album-collection-view__icon">
           <i
@@ -217,7 +252,7 @@ async function runAction(
       "
     >
       <AlbumTrackRow
-        v-for="track in filteredTracks"
+        v-for="track in renderedTracks"
         :key="track.musicId"
         :track="track"
         :collection-name="title"

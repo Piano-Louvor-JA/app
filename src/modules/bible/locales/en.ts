@@ -25,6 +25,8 @@ export default {
     clearSelection: 'Clear selection',
     projectTvsOnly: 'Project to TVs only',
     clearProjection: 'Remove from projection',
+    chromeDragHint: 'Drag to move · double-click to return to the corner',
+    openReader: 'Open the Bible',
     close: 'Close',
     inAppProjection: 'Bible preview',
     projectionHotkeyHint:

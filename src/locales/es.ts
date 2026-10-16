@@ -58,7 +58,25 @@ export default {
     bible: 'Biblia',
     utilities: 'Utilidades',
     settings: 'Configuraciones',
+    history: {
+      label: 'Historial de navegación',
+      back: 'Atrás',
+      forward: 'Adelante',
+      goTo: 'Ir a {label}',
     },
+    historyDetail: {
+      player: 'Reproductor',
+      editor: 'Editor',
+    },
+    },
+  minimize: {
+    playlistCount: '{n} lista(s)',
+    pageNumber: 'Página {n}',
+    bar: 'Páginas minimizadas',
+    close: 'Cerrar {title}',
+    page: 'Minimizar página',
+    search: 'Búsqueda: {q}',
+  },
   sync: {
     downloadQueue: {
       title: 'Descargas',

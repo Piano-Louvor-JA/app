@@ -21,15 +21,14 @@ describe('UtilitiesView', () => {
     const w = mount(UtilitiesView, { global: { plugins: [i18n] } })
     expect(w.find('.utilities-view__title').text()).toBe('Utilitários')
     const cards = w.findAll('.hub-stub')
-    // 4 cards: temporizador, random, draw, obs. Diagnóstico saiu de
-    // Utilitários — agora é card em /config/general (app#423 follow-up).
-    expect(cards).toHaveLength(4)
+    // 3 cards: temporizador, random, obs. Desenho fica oculto até ser feito.
+    // Diagnóstico saiu de Utilitários — agora é card em /config/general (app#423 follow-up).
+    expect(cards).toHaveLength(3)
     expect(cards.some((card) => card.attributes('data-to') === '/diagnostics')).toBe(false)
     const obs = cards.find((card) => card.text() === 'utilities.obs')
     expect(obs?.attributes('data-available')).toBe('true')
     expect(obs?.attributes('data-to')).toBe('/utilities/obs')
-    const draw = cards.find((card) => card.text() === 'utilities.draw')
-    expect(draw?.attributes('data-available')).toBe('false')
+    expect(cards.some((card) => card.text() === 'utilities.draw')).toBe(false)
     w.unmount()
   })
 })

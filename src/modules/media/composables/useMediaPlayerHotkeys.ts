@@ -62,6 +62,8 @@ export function useMediaPlayerHotkeys(isProjectionWindow: () => boolean) {
   function onKeyDown(event: KeyboardEvent) {
     if (!playerKeysActive()) return
     if (isTypingTarget(event.target)) return
+    // Alt+setas é do histórico de navegação; sem stopPropagation aqui.
+    if (event.altKey || event.ctrlKey || event.metaKey) return
 
     if (event.key === 'ArrowLeft') {
       event.preventDefault()

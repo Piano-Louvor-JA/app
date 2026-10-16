@@ -1,6 +1,25 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+// Composable testado à parte: aqui só o contrato tela ↔ minimizar.
+const minimizeMock = vi.fn(async () => {});
+const prepareMock = vi.fn();
+vi.mock("@shared/composables/useMinimizablePage", () => ({
+	useMinimizablePage: (options: unknown) => {
+		(globalThis as any).__minimizeOptions = options;
+		return {
+			minimize: minimizeMock,
+			prepare: prepareMock,
+			takeRestoredState: () => {
+				const restored = (globalThis as any).__restored ?? null;
+				(globalThis as any).__restored = null;
+				return restored;
+			},
+		};
+	},
+}));
 import { mount, flushPromises } from "@vue/test-utils";
+import { createPinia, setActivePinia } from "pinia";
 
 // vi.mock é HOISTED: refs aos mocks precisam de vi.hoisted (sino do load morrer silencioso)
 const mocks = vi.hoisted(() => {
@@ -84,6 +103,7 @@ const NOTIFS = [
 // jsdom não implementa scrollTo em Element
 beforeEach(() => {
 	Element.prototype.scrollTo = (() => {}) as unknown as typeof Element.prototype.scrollTo;
+	setActivePinia(createPinia());
 });
 
 async function mountView() {
@@ -353,6 +373,43 @@ describe("CommunityView — busca, filtragem, cópia, report e paginação", () 
 		wrapper.vm.goTo(1);
 		await flushPromises();
 		expect(mocks.listCommunityCollectionsPage.mock.calls.length).toBe(stable + 1);
+	});
+
+	it("abrir a tela não rola para o topo (a rolagem restaurada fica); trocar de página rola", async () => {
+		const scrollTo = vi.fn();
+		Element.prototype.scrollTo = scrollTo as unknown as typeof Element.prototype.scrollTo;
+		mocks.listCommunityCollectionsPage.mockImplementation(async (p: number) => ({
+			items: [],
+			page: p,
+			lastPage: 3,
+			total: 6,
+		}));
+		const wrapper = await mountView();
+		expect(scrollTo).not.toHaveBeenCalled();
+
+		wrapper.vm.goTo(2);
+		await flushPromises();
+		expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "smooth" });
+	});
+
+	it("sair e voltar para a tela mantém a busca e a página", async () => {
+		mocks.listCommunityCollectionsPage.mockImplementation(async (p: number) => ({
+			items: [],
+			page: p,
+			lastPage: 3,
+			total: 6,
+		}));
+		const first = await mountView();
+		first.vm.searchQuery = "arautos";
+		first.vm.goTo(2);
+		await flushPromises();
+		first.unmount();
+
+		mocks.listCommunityCollectionsPage.mockClear();
+		const again = await mountView();
+		expect(again.vm.searchQuery).toBe("arautos");
+		expect(again.vm.page).toBe(2);
+		expect(mocks.listCommunityCollectionsPage).toHaveBeenCalledWith(2, 24);
 	});
 
 	it("navegação: voltar usa router.back() e ranking-link usa push", async () => {
@@ -686,5 +743,55 @@ describe("CommunityView — branches residuais (sem autor, sem capa, sem sessão
 		expect(
 			wrapper.find(".community-view__card-author").exists(),
 		).toBe(false);
+	});
+});
+
+describe("CommunityView — minimizar página", () => {
+	const options = () => (globalThis as any).__minimizeOptions;
+
+	beforeEach(() => {
+		vi.clearAllMocks();
+		(globalThis as any).__restored = null;
+		mocks.listCommunityCollectionsPage.mockImplementation(async (p: number) => ({
+			items: [],
+			page: p,
+			lastPage: 5,
+			total: 10,
+		}));
+	});
+
+	it("– fica abaixo da seta de voltar e minimiza", async () => {
+		const w = await mountView();
+		const stack = w.find(".page-back-stack");
+		expect(stack.find(".community-view__back").exists()).toBe(true);
+		await stack.find(".page-back-stack__minimize").trigger("click");
+		expect(minimizeMock).toHaveBeenCalledTimes(1);
+		expect(options().fallbackRoute).toEqual({ name: "home" });
+		w.unmount();
+	});
+
+	it("descreve a tela e guarda busca e página", async () => {
+		const w = await mountView();
+		expect(options().describe()).toEqual({
+			title: "community.title",
+			icon: "ti-users-group",
+			summary: "minimize.pageNumber",
+		});
+		w.vm.searchQuery = "  vox ";
+		w.vm.goTo(3);
+		await flushPromises();
+		expect(options().describe().summary).toBe("minimize.search · minimize.pageNumber");
+		expect(options().capture()).toEqual({ searchQuery: "  vox ", page: 3 });
+		w.unmount();
+	});
+
+	it("reaberta pela barra: carrega já na página e com a busca guardadas", async () => {
+		(globalThis as any).__restored = { searchQuery: "arautos", page: 4 };
+		const w = await mountView();
+		expect(w.vm.searchQuery).toBe("arautos");
+		expect(w.vm.page).toBe(4);
+		expect(mocks.listCommunityCollectionsPage).toHaveBeenCalledTimes(1);
+		expect(mocks.listCommunityCollectionsPage).toHaveBeenCalledWith(4, 24);
+		w.unmount();
 	});
 });

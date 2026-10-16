@@ -39,6 +39,7 @@ export function useMediaPlayer() {
     audioOnTv,
     queue,
     queueIndex,
+    queueLabel,
   } = storeToRefs(store)
 
   async function openTrack(params: MediaOpenParams): Promise<MediaOpenResult> {
@@ -82,6 +83,7 @@ export function useMediaPlayer() {
     slideCount,
     queue,
     queueIndex,
+    queueLabel,
     openTrack,
     play: store.play,
     pause: store.pause,

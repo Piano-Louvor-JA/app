@@ -24,14 +24,6 @@ const items: UtilityHubItem[] = [
     available: true,
   },
   {
-    key: 'draw',
-    titleKey: 'utilities.draw',
-    descriptionKey: 'utilities.drawDescription',
-    icon: 'ti-pencil',
-    to: null,
-    available: false,
-  },
-  {
     // Issue app#361: funcional — palco-server (#351) como transporte, fachada OBS.
     key: 'obs',
     titleKey: 'utilities.obs',

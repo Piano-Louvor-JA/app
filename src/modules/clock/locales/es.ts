@@ -59,5 +59,7 @@ export default {
       'ESC finaliza la proyección  ·  Ctrl+Alt+P alterna con la pantalla del operador',
     projecting: 'En proyección',
     backToUtilities: 'Volver al Temporizador',
+    chromeDragHint: 'Arrastra para mover · doble clic vuelve a la esquina',
+    openClock: 'Abrir el Reloj',
   },
 }

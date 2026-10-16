@@ -58,6 +58,16 @@ export default {
       bible: 'Bíblia',
       utilities: 'Utilitários',
       settings: 'Configurações',
+    history: {
+      label: 'Histórico de navegação',
+      back: 'Voltar',
+      forward: 'Avançar',
+      goTo: 'Ir para {label}',
+    },
+    historyDetail: {
+      player: 'Player',
+      editor: 'Editor',
+    },
     },
     settings: {
       appearance: {
@@ -131,6 +141,14 @@ export default {
         projection: 'Configurações de projeção e telas em breve.',
       },
     },
+  minimize: {
+    playlistCount: '{n} playlist(s)',
+    pageNumber: 'Página {n}',
+    bar: 'Páginas minimizadas',
+    close: 'Fechar {title}',
+    page: 'Minimizar página',
+    search: 'Busca: {q}',
+  },
   sync: {
     downloadQueue: {
       title: 'Downloads',

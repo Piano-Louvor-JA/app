@@ -19,14 +19,6 @@ vi.mock('../components/BibleNavPanel.vue', () => ({
     template: '<div class="nav-panel-stub" />',
   },
 }))
-vi.mock('../components/BibleProjectFab.vue', () => ({
-  default: {
-    name: 'BibleProjectFab',
-    props: ['disabled', 'projecting'],
-    emits: ['project', 'clear'],
-    template: '<div class="fab-stub" />',
-  },
-}))
 vi.mock('../components/BibleToolbar.vue', () => ({
   default: {
     name: 'BibleToolbar',
@@ -38,7 +30,7 @@ vi.mock('../components/BibleToolbar.vue', () => ({
 vi.mock('../components/BibleVerseList.vue', () => ({
   default: {
     name: 'BibleVerseList',
-    props: ['chapterTitle', 'verses', 'selectedVerses', 'verseSearchQuery', 'isLoading', 'projection', 'previewSnippet', 'hasProjection'],
+    props: ['chapterTitle', 'verses', 'selectedVerses', 'verseSearchQuery', 'isLoading', 'projection', 'hasProjection'],
     emits: ['update:verseSearchQuery', 'selectVerse', 'previousVerse', 'nextVerse', 'clearProjection'],
     template: '<div class="verse-list-stub" />',
   },
@@ -92,13 +84,12 @@ describe('BibleView', () => {
     return wrapper
   }
 
-  it('estado carregado: corpo com nav panel + verse list; fab com projeção', async () => {
+  it('estado carregado: corpo com nav panel + verse list', async () => {
     const wrapper = await mountView()
     expect(wrapper.find('.route-select-stub').exists()).toBe(true)
     expect(wrapper.find('.toolbar-stub').exists()).toBe(true)
     expect(wrapper.find('.nav-panel-stub').exists()).toBe(true)
     expect(wrapper.find('.verse-list-stub').exists()).toBe(true)
-    expect(wrapper.find('.fab-stub').exists()).toBe(true)
 
     const store = useBibleStore()
     await store.bootstrap()
@@ -151,26 +142,15 @@ describe('BibleView', () => {
     wrapper.unmount()
   })
 
-  it('eventos: fab project/clear, verse prev/next', async () => {
+  it('eventos: verse prev/next/clear/search/select', async () => {
     const store = useBibleStore()
     vi.spyOn(store, 'bootstrap').mockResolvedValue(undefined)
     store.books = [{ id: 1, name: 'Gênesis', abbreviation: 'Gn', chapters: 2, bookNumber: 1, languageId: 'pt' }]
     store.versions = [{ id: 1, abbreviation: 'ARA', name: 'ARA', languageId: 'pt' }]
-    const projSpy = vi.spyOn(store, 'toggleProjection').mockResolvedValue(undefined)
-    const clearWinSpy = vi.spyOn(store, 'clearProjectionWindow')
     const navSpy = vi.spyOn(store, 'goToAdjacentVerse').mockResolvedValue(undefined)
     const clearSpy = vi.spyOn(store, 'clearSelection')
 
     const wrapper = await mountView()
-    const fab = wrapper.findComponent({ name: 'BibleProjectFab' })
-    fab.vm.$emit('project')
-    await flushPromises()
-    expect(projSpy).toHaveBeenCalledTimes(1)
-
-    fab.vm.$emit('clear')
-    await flushPromises()
-    expect(clearWinSpy).toHaveBeenCalledTimes(1)
-
     const list = wrapper.findComponent({ name: 'BibleVerseList' })
     list.vm.$emit('previousVerse')
     list.vm.$emit('nextVerse')

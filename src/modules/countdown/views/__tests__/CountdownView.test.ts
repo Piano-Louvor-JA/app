@@ -3,6 +3,16 @@
 import { mount } from '@vue/test-utils'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
+// Composable testado à parte: aqui só o contrato tela ↔ minimizar.
+const minimizeMock = vi.fn(async () => {})
+const prepareMock = vi.fn()
+vi.mock('@shared/composables/useMinimizablePage', () => ({
+  useMinimizablePage: (options: unknown) => {
+    ;(globalThis as any).__minimizeOptions = options
+    return { minimize: minimizeMock, prepare: prepareMock, takeRestoredState: () => null }
+  },
+}))
+
 const mockCountdown = {
   config: { durationSeconds: 300 },
   runtime: { remaining: 300, isRunning: false },
@@ -94,12 +104,12 @@ describe('CountdownView', () => {
     expect(wrapper.exists()).toBe(true)
   })
 
-  it('monta preview, fab, saved list e duration input', () => {
+  it('monta saved list e duration input; prévia e projetar ficam no painel flutuante', () => {
     const wrapper = mount(CountdownView)
-    expect(wrapper.find('.countdown-preview').exists()).toBe(true)
-    expect(wrapper.find('.countdown-project-fab').exists()).toBe(true)
     expect(wrapper.find('.countdown-saved-list').exists()).toBe(true)
     expect(wrapper.find('.countdown-duration-input').exists()).toBe(true)
+    expect(wrapper.find('.countdown-preview').exists()).toBe(false)
+    expect(wrapper.find('.countdown-project-fab').exists()).toBe(false)
   })
 
   it('goBack navega para utilities-temporizador', () => {
@@ -107,10 +117,20 @@ describe('CountdownView', () => {
     wrapper.vm.goBack()
     expect(mockRouter.push).toHaveBeenCalledWith({ name: 'utilities-temporizador' })
   })
+})
 
-  it('onToggleProjection repassa para o composable', () => {
-    const wrapper = mount(CountdownView)
-    wrapper.vm.onToggleProjection()
-    expect(mockCountdown.toggleProjection).toHaveBeenCalledTimes(1)
+describe('CountdownView — minimizar página', () => {
+  it('– fica abaixo da seta de voltar, minimiza e descreve a tela', async () => {
+    minimizeMock.mockClear()
+    const w = mount(CountdownView)
+    const stack = w.find('.page-back-stack')
+    expect(stack.find('.countdown-view__back').exists()).toBe(true)
+    await stack.find('.page-back-stack__minimize').trigger('click')
+    expect(minimizeMock).toHaveBeenCalledTimes(1)
+    const options = (globalThis as any).__minimizeOptions
+    expect(options.describe()).toEqual({ title: 'countdown.title', icon: 'ti-hourglass', summary: '' })
+    expect(options.capture()).toBeNull()
+    expect(options.fallbackRoute).toEqual({ name: 'utilities-temporizador' })
+    w.unmount()
   })
 })

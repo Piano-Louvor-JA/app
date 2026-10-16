@@ -1,5 +1,23 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+// Composable testado à parte: aqui só o contrato tela ↔ minimizar.
+const minimizeMock = vi.fn(async () => {});
+const prepareMock = vi.fn();
+vi.mock("@shared/composables/useMinimizablePage", () => ({
+	useMinimizablePage: (options: unknown) => {
+		(globalThis as any).__minimizeOptions = options;
+		return {
+			minimize: minimizeMock,
+			prepare: prepareMock,
+			takeRestoredState: () => {
+				const restored = (globalThis as any).__restored ?? null;
+				(globalThis as any).__restored = null;
+				return restored;
+			},
+		};
+	},
+}));
 import { flushPromises, mount } from "@vue/test-utils";
 
 // vi.mock é HOISTED: refs aos mocks precisam de vi.hoisted
@@ -184,5 +202,36 @@ describe("RankingView — branch me.total null → 0", () => {
 		const pts = wrapper.find(".ranking-view__me-points");
 		expect(pts.exists()).toBe(true);
 		expect(pts.text()).toContain("0");
+	});
+});
+
+describe("RankingView — minimizar página", () => {
+	const options = () => (globalThis as any).__minimizeOptions;
+
+	beforeEach(() => {
+		vi.clearAllMocks();
+		(globalThis as any).__restored = null;
+		mocks.getRanking.mockResolvedValue([]);
+	});
+
+	it("– fica abaixo da seta de voltar, minimiza e descreve a aba atual", async () => {
+		const w = await mountView();
+		const stack = w.find(".page-back-stack");
+		expect(stack.find(".ranking-view__back").exists()).toBe(true);
+		await stack.find(".page-back-stack__minimize").trigger("click");
+		expect(minimizeMock).toHaveBeenCalledTimes(1);
+		expect(options().describe()).toEqual({ title: "ranking.title", icon: "ti-trophy", summary: "ranking.all" });
+		expect(options().capture()).toEqual({ window: "all" });
+		expect(options().fallbackRoute).toEqual({ name: "community" });
+		w.unmount();
+	});
+
+	it("reaberta pela barra: volta na aba guardada, carregando uma vez só", async () => {
+		(globalThis as any).__restored = { window: "week" };
+		const w = await mountView();
+		expect(mocks.getRanking).toHaveBeenCalledTimes(1);
+		expect(mocks.getRanking).toHaveBeenCalledWith("week");
+		expect(options().describe().summary).toBe("ranking.week");
+		w.unmount();
 	});
 });

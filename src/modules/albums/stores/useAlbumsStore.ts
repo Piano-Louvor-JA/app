@@ -135,7 +135,8 @@ export const useAlbumsStore = defineStore('albums', () => {
   async function openCollection(collectionId: string) {
     isLoadingTracks.value = true
     lastErrorKey.value = null
-    searchQuery.value = ''
+    // Reabrir a mesma coletânea (voltar para a tela) mantém a busca digitada.
+    if (String(activeCollection.value?.id ?? '') !== collectionId) searchQuery.value = ''
     tracks.value = []
 
     try {
