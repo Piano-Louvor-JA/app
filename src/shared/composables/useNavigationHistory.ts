@@ -2,6 +2,10 @@ import { storeToRefs } from 'pinia'
 import type { RouteLocationNormalized, Router } from 'vue-router'
 
 import type { HistoryEntry } from '@shared/services/navigation-history'
+import {
+  loadNavigationHistory,
+  saveNavigationHistory,
+} from '@shared/services/navigation-history-storage'
 import { useNavigationHistoryStore } from '@shared/stores/useNavigationHistoryStore'
 
 interface Installation {
@@ -29,6 +33,8 @@ function toEntry(route: RouteLocationNormalized): HistoryEntry {
  * - Push × replace vem de `history.state.replaced`.
  * - `history.state.position` (history web/hash) é a fonte da verdade do
  *   índice em pops; sem ela (memory history) usa o `delta`.
+ * - O registro vai para o sessionStorage a cada navegação e volta no
+ *   install: recarregar a página não perde o histórico (fechar o app, sim).
  */
 export function installNavigationHistory({ router }: { router: Router }): () => void {
   if (installation?.router === router) return installation.uninstall
@@ -38,6 +44,12 @@ export function installNavigationHistory({ router }: { router: Router }): () => 
   let pendingPopDelta: number | null = null
   /** `position` do navegador que corresponde ao índice 0 do registro. */
   let basePosition: number | null = null
+
+  const saved = loadNavigationHistory()
+  if (saved) {
+    store.hydrate(saved.state)
+    basePosition = saved.basePosition
+  }
 
   const stopListen = router.options.history.listen((_to, _from, info) => {
     pendingPopDelta = info.delta
@@ -62,12 +74,16 @@ export function installNavigationHistory({ router }: { router: Router }): () => 
       // saiu pelo limite: o que está na tela passa a ser a atual.
       if (store.current?.fullPath !== entry.fullPath) store.replace(entry)
     } else if (state.replaced === true) {
+      // Replace não muda a posição; depois de um reload é ela que diz em
+      // qual entrada salva o operador está.
+      if (position !== null && basePosition !== null) store.moveTo(position - basePosition)
       store.replace(entry)
     } else {
       store.push(entry)
     }
 
     if (position !== null) basePosition = position - store.index
+    saveNavigationHistory({ entries: store.entries, index: store.index }, basePosition)
   })
 
   const current: Installation = {

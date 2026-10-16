@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 
+import { BROWSER_STORAGE_KEYS } from '@shared/constants/storage-keys'
+import { loadNavigationHistory } from '@shared/services/navigation-history-storage'
 import { useNavigationHistoryStore } from '@shared/stores/useNavigationHistoryStore'
 
 import { installNavigationHistory, useNavigationHistory } from '../useNavigationHistory'
@@ -28,9 +30,7 @@ async function visit(...targets: string[]) {
   for (const target of targets) await router.push(target)
 }
 
-beforeEach(() => {
-  setActivePinia(createPinia())
-  router = createTestHashRouter([
+const ROUTES = [
     { path: '/', component: Empty, meta: { navKey: 'home' } },
     { path: '/a', name: 'a', component: Empty, meta: { navKey: 'albums' } },
     { path: '/b', name: 'b', component: Empty, meta: { navKey: 'bible' } },
@@ -39,9 +39,27 @@ beforeEach(() => {
     { path: '/settings', redirect: '/settings/appearance' },
     { path: '/settings/appearance', name: 'settings-appearance', component: Empty, meta: { navKey: 'settings' } },
     { path: '/popup', name: 'projection-popup', component: Empty, meta: { projection: true } },
-  ])
+]
+
+beforeEach(() => {
+  sessionStorage.clear()
+  setActivePinia(createPinia())
+  router = createTestHashRouter(ROUTES)
   uninstall = installNavigationHistory({ router })
 })
+
+/**
+ * Simula recarregar a página: Pinia e router novos sobre o MESMO
+ * window.history (como o Electron/navegador faz no reload).
+ */
+async function reload() {
+  uninstall()
+  router.options.history.destroy()
+  setActivePinia(createPinia())
+  router = createTestHashRouter(ROUTES)
+  uninstall = installNavigationHistory({ router })
+  await router.push(router.options.history.location)
+}
 
 afterEach(() => {
   uninstall()
@@ -240,5 +258,51 @@ describe('useNavigationHistory', () => {
     useNavigationHistoryStore().push({ fullPath: '/a', name: 'a', navKey: 'albums' })
     history.back()
     expect(go).not.toHaveBeenCalled()
+  })
+})
+
+describe('installNavigationHistory — sobrevive a recarregar a página', () => {
+  it('salva o histórico a cada navegação', async () => {
+    await visit('/', '/a')
+    expect(loadNavigationHistory()?.state).toEqual({
+      entries: [
+        { fullPath: '/', name: null, navKey: 'home' },
+        { fullPath: '/a', name: 'a', navKey: 'albums' },
+      ],
+      index: 1,
+    })
+  })
+
+  it('depois do reload volta com as mesmas telas e a mesma posição', async () => {
+    await visit('/', '/a', '/b')
+    await goAndWait(router, -1)
+
+    await reload()
+
+    expect(paths()).toEqual(['/', '/a', '/b'])
+    expect(index()).toBe(1)
+    expect(router.currentRoute.value.fullPath).toBe('/a')
+    expect(useNavigationHistoryStore().canGoForward).toBe(true)
+
+    await goAndWait(router, 1)
+    expect(index()).toBe(2)
+    expect(router.currentRoute.value.fullPath).toBe('/b')
+  })
+
+  it('depois do reload, navegar para tela nova continua descartando o que está à frente', async () => {
+    await visit('/', '/a', '/b')
+    await goAndWait(router, -2)
+    await reload()
+    await visit('/d')
+    expect(paths()).toEqual(['/', '/d'])
+  })
+
+  it('dado salvo inválido: começa um histórico novo', async () => {
+    uninstall()
+    sessionStorage.setItem(BROWSER_STORAGE_KEYS.navigationHistory, '{"state":{"entries":"x"}}')
+    setActivePinia(createPinia())
+    uninstall = installNavigationHistory({ router })
+    await visit('/', '/a')
+    expect(paths()).toEqual(['/', '/a'])
   })
 })

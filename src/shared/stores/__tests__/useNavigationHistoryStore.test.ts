@@ -90,6 +90,14 @@ describe('useNavigationHistoryStore', () => {
     expect(store.dots[0].edge).toBe(true)
   })
 
+  it('hydrate restaura um histórico salvo', () => {
+    const store = useNavigationHistoryStore()
+    store.hydrate({ entries: [entry('/'), entry('/bible', 'bible')], index: 0 })
+    expect(paths(store)).toEqual(['/', '/bible'])
+    expect(store.index).toBe(0)
+    expect(store.canGoForward).toBe(true)
+  })
+
   it('reset volta ao estado vazio', () => {
     const store = useNavigationHistoryStore()
     for (const p of ['/', '/bible']) store.push(entry(p))
