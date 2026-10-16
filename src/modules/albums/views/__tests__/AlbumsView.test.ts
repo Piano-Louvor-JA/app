@@ -55,11 +55,13 @@ vi.mock('vue-router', () => ({
 
 // Composable testado à parte: aqui só o contrato tela ↔ minimizar.
 const minimizeMock = vi.fn(async () => {})
+const prepareMock = vi.fn()
 vi.mock('@shared/composables/useMinimizablePage', () => ({
   useMinimizablePage: (options: unknown) => {
     ;(globalThis as any).__minimizeOptions = options
     return {
       minimize: minimizeMock,
+      prepare: prepareMock,
       takeRestoredState: () => {
         const restored = (globalThis as any).__restored ?? null
         ;(globalThis as any).__restored = null
@@ -533,6 +535,10 @@ describe('AlbumsView — minimizar a janela de Playlists', () => {
     expect(btn.querySelector('i')?.classList.contains('ti-minus')).toBe(true)
     btn.click()
     expect(minimizeMock).toHaveBeenCalledTimes(1)
+    prepareMock.mockClear()
+    btn.dispatchEvent(new Event('pointerenter'))
+    btn.dispatchEvent(new Event('focus'))
+    expect(prepareMock).toHaveBeenCalledTimes(2)
   })
 
   it('item da barra: título, ícone, resumo e endereço com o painel', async () => {

@@ -21,7 +21,7 @@ import type { SabbathModeConfig } from '../types/countdown'
 const { t } = useI18n()
 
 // Minimizar: o estado da tela já vive na store; o retrato guarda só rolagem e miniatura.
-const { minimize } = useMinimizablePage({
+const { minimize, prepare } = useMinimizablePage({
   describe: () => ({ title: t('countdown.title'), icon: 'ti-hourglass', summary: '' }),
   capture: () => null,
   fallbackRoute: { name: 'utilities-temporizador' },
@@ -192,7 +192,7 @@ const stageBg = computed(() => ({
 <template>
   <section class="countdown-view">
     <header class="countdown-view__header">
-      <PageBackStack @minimize="minimize">
+      <PageBackStack @minimize="minimize" @prepare="prepare">
         <button
           type="button"
           class="countdown-view__back"

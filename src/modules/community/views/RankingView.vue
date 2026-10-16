@@ -19,7 +19,7 @@ const router = useRouter();
 
 const window = ref<RankingWindow>("all");
 
-const { minimize, takeRestoredState } = useMinimizablePage<{ window: RankingWindow }>({
+const { minimize, prepare, takeRestoredState } = useMinimizablePage<{ window: RankingWindow }>({
 	describe: () => ({
 		title: t("ranking.title"),
 		icon: "ti-trophy",
@@ -58,7 +58,7 @@ onMounted(load);
 <template>
 	<section class="ranking-view">
 		<header class="ranking-view__header">
-			<PageBackStack @minimize="minimize">
+			<PageBackStack @minimize="minimize" @prepare="prepare">
 				<button
 					type="button"
 					class="ranking-view__back"

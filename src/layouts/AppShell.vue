@@ -42,6 +42,10 @@ import { useNavigationHistory } from '@shared/composables/useNavigationHistory'
 import { useHistoryNavShortcuts } from '@shared/composables/useHistoryNavShortcuts'
 import { describeHistoryEntry } from '@shared/services/navigation-history-label'
 import { useMinimizedPagesStore } from '@shared/stores/useMinimizedPagesStore'
+import {
+  requestInstantPageTransition,
+  usePageTransitionOverride,
+} from '@shared/composables/useInstantPageTransition'
 import { findMinimizedItemRect, playGenie } from '@shared/services/genie-animation'
 import { VIEW_SCROLL_MEMORY, useViewScrollMemory } from '@shared/composables/useViewScrollMemory'
 import logoUrl from '@assets/brand/logo-louvor-ja.svg'
@@ -52,6 +56,9 @@ const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 const { transitionName } = usePageTransition()
+// minimizar/reabrir pedem troca de página sem fade: o efeito gênio faz o papel
+const { name: pageTransitionName, settle: settlePageTransition } =
+  usePageTransitionOverride(transitionName)
 
 // Voltar a uma tela restaura a rolagem de onde o operador parou (sessão).
 const mainEl = ref<HTMLElement | null>(null)
@@ -396,7 +403,14 @@ function onOpenMinimized(fullPath: string) {
     genieFrom = null
   }, 2000)
   viewScrollMemory.seed(fullPath, page.scroll)
+  requestInstantPageTransition()
   void router.push(fullPath)
+}
+
+/** Página nova terminou de entrar: libera a transição e restaura a rolagem. */
+function onViewAfterEnter() {
+  settlePageTransition()
+  restoreViewScroll(route.fullPath)
 }
 
 /** Página nova entrando: se veio da barra, cresce a partir do item. */
@@ -513,10 +527,10 @@ function viewKey(viewRoute: typeof route) {
     <main ref="mainEl" class="app-shell__main">
       <RouterView v-slot="{ Component, route: viewRoute }">
         <Transition
-          :name="transitionName"
+          :name="pageTransitionName"
           mode="out-in"
           @enter="onViewEnter"
-          @after-enter="restoreViewScroll(route.fullPath)"
+          @after-enter="onViewAfterEnter"
         >
           <component
             :is="Component"

@@ -12,7 +12,7 @@ import ObsBrandIcon from '@design-system/components/icons/ObsBrandIcon.vue'
 const { t } = useI18n()
 
 // Minimizar: o estado da tela já vive na store; o retrato guarda só rolagem e miniatura.
-const { minimize } = useMinimizablePage({
+const { minimize, prepare } = useMinimizablePage({
   describe: () => ({ title: t('utilities.obs'), icon: 'ti-broadcast', summary: '' }),
   capture: () => null,
   fallbackRoute: { name: 'utilities' },
@@ -78,7 +78,7 @@ onUnmounted(() => {
 <template>
   <section class="obs-view">
     <header class="obs-view__header">
-      <PageBackStack @minimize="minimize">
+      <PageBackStack @minimize="minimize" @prepare="prepare">
         <button type="button" class="obs-view__back" @click="$router.back()">
           <i class="ti ti-arrow-left" aria-hidden="true"></i>
         </button>

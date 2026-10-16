@@ -13,7 +13,7 @@ import { useClockFeature } from '../composables/useClock'
 const { t } = useI18n()
 
 // Minimizar: o estado da tela já vive na store; o retrato guarda só rolagem e miniatura.
-const { minimize } = useMinimizablePage({
+const { minimize, prepare } = useMinimizablePage({
   describe: () => ({ title: t('clock.title'), icon: 'ti-clock', summary: '' }),
   capture: () => null,
   fallbackRoute: { name: 'utilities-temporizador' },
@@ -31,7 +31,7 @@ function goBack() {
   <section class="clock-view">
     <header class="clock-view__header">
       <PalcoRouteSelect module="clock" />
-      <PageBackStack @minimize="minimize">
+      <PageBackStack @minimize="minimize" @prepare="prepare">
         <button
           type="button"
           class="clock-view__back"

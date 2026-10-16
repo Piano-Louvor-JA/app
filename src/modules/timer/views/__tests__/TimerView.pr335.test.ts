@@ -5,10 +5,11 @@ import { describe, it, expect, vi } from 'vitest'
 
 // Composable testado à parte: aqui só o contrato tela ↔ minimizar.
 const minimizeMock = vi.fn(async () => {})
+const prepareMock = vi.fn()
 vi.mock('@shared/composables/useMinimizablePage', () => ({
   useMinimizablePage: (options: unknown) => {
     ;(globalThis as any).__minimizeOptions = options
-    return { minimize: minimizeMock, takeRestoredState: () => null }
+    return { minimize: minimizeMock, prepare: prepareMock, takeRestoredState: () => null }
   },
 }))
 

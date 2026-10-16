@@ -10,7 +10,7 @@ import type { UtilityHubItem } from '../types/clock'
 const { t } = useI18n()
 
 // Minimizar: o estado da tela já vive na store; o retrato guarda só rolagem e miniatura.
-const { minimize } = useMinimizablePage({
+const { minimize, prepare } = useMinimizablePage({
   describe: () => ({ title: t('utilities.temporizador'), icon: 'ti-clock-cog', summary: '' }),
   capture: () => null,
   fallbackRoute: { name: 'utilities' },
@@ -52,7 +52,7 @@ function goBack() {
 <template>
   <section class="temporizador-view">
     <header class="temporizador-view__header">
-      <PageBackStack @minimize="minimize">
+      <PageBackStack @minimize="minimize" @prepare="prepare">
         <button
           type="button"
           class="temporizador-view__back"

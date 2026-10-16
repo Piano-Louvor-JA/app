@@ -7,7 +7,14 @@ import {
   genieKeyframes,
   genieOrigin,
   playGenie,
+  predictMinimizedTarget,
 } from '../genie-animation'
+
+describe('duração', () => {
+  it('efeito curto (300 ms) para não parecer lento', () => {
+    expect(GENIE_DURATION_MS).toBe(300)
+  })
+})
 
 const page = { left: 0, top: 100, width: 1000, height: 600 }
 const item = { left: 450, top: 780, width: 100, height: 30 }
@@ -21,38 +28,63 @@ describe('genieOrigin', () => {
 describe('genieKeyframes (minimizar)', () => {
   const frames = genieKeyframes(page, item)
 
-  it('começa a página inteira, sem transformação', () => {
-    expect(frames[0]).toEqual({
-      offset: 0,
-      transform: 'none',
-      clipPath: 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)',
-      opacity: 1,
-    })
+  it('só transform e opacity (rodam na placa de vídeo, sem redesenhar a página)', () => {
+    for (const frame of frames) {
+      expect(Object.keys(frame).sort()).toEqual(['offset', 'opacity', 'transform'])
+    }
   })
 
-  it('no meio a borda de baixo afunila até a largura do item (efeito lâmpada)', () => {
+  it('começa a página inteira', () => {
+    expect(frames[0]).toEqual({ offset: 0, transform: 'none', opacity: 1 })
+  })
+
+  it('no meio inclina (base mais estreita que o topo: o funil do gênio) e já encolhe', () => {
     expect(frames[1]).toEqual({
       offset: 0.45,
-      transform: 'none',
-      clipPath: 'polygon(0% 0%, 100% 0%, 55% 100%, 45% 100%)',
-      opacity: 1,
+      transform: 'perspective(1200px) rotateX(-28deg) scale(0.595, 0.335)',
+      opacity: 0.95,
     })
   })
 
-  it('termina do tamanho do item, já no lugar dele', () => {
+  it('termina do tamanho do item e some dentro dele', () => {
     expect(frames[2]).toEqual({
       offset: 1,
-      transform: 'scale(0.1, 0.05)',
-      clipPath: 'polygon(45% 0%, 55% 0%, 55% 100%, 45% 100%)',
-      opacity: 0.4,
+      transform: 'perspective(1200px) rotateX(-55deg) scale(0.1, 0.05)',
+      opacity: 0,
+    })
+  })
+})
+
+describe('predictMinimizedTarget', () => {
+  afterEach(() => {
+    document.body.innerHTML = ''
+    document.documentElement.style.removeProperty('--ds-dock-height')
+    document.documentElement.style.removeProperty('--ds-minimized-bar-height')
+  })
+
+  it('barra vazia: centro da barra, logo acima do dock', () => {
+    document.documentElement.style.setProperty('--ds-dock-height', '72px')
+    document.documentElement.style.setProperty('--ds-minimized-bar-height', '40px')
+    expect(predictMinimizedTarget()).toEqual({
+      left: window.innerWidth / 2 - 70,
+      top: window.innerHeight - 72 - 20 - 15,
+      width: 140,
+      height: 30,
     })
   })
 
-  it('item fora da página (limites) não gera porcentagens negativas nem acima de 100', () => {
-    const [, middle] = genieKeyframes(page, { left: -80, top: 780, width: 40, height: 30 })
-    expect(middle.clipPath).toBe('polygon(0% 0%, 100% 0%, 0% 100%, 0% 100%)')
-    const [, right] = genieKeyframes(page, { left: 1200, top: 780, width: 40, height: 30 })
-    expect(right.clipPath).toBe('polygon(0% 0%, 100% 0%, 100% 100%, 100% 100%)')
+  it('sem os tokens de layout usa os tamanhos padrão', () => {
+    expect(predictMinimizedTarget().top).toBe(window.innerHeight - 72 - 20 - 15)
+  })
+
+  it('barra com itens: logo depois do último', () => {
+    for (const left of [100, 260]) {
+      const el = document.createElement('button')
+      el.dataset.minimizedKey = `/p/${left}`
+      el.getBoundingClientRect = () => ({ left, top: 790, right: left + 150, width: 150, height: 30 }) as DOMRect
+      document.body.appendChild(el)
+    }
+    expect(predictMinimizedTarget()).toEqual({ left: 418, top: 790, width: 150, height: 30 })
   })
 })
 
@@ -96,6 +128,7 @@ describe('playGenie', () => {
     const { el, animate } = element()
     await playGenie(el, item, 'minimize')
     expect(el.style.transformOrigin).toBe('500px 695px')
+    expect(el.style.willChange).toBe('transform, opacity')
     expect(animate).toHaveBeenCalledWith(genieKeyframes(page, item), {
       duration: GENIE_DURATION_MS,
       easing: 'cubic-bezier(0.55, 0, 0.75, 0.3)',
@@ -113,6 +146,7 @@ describe('playGenie', () => {
       fill: 'none',
     })
     expect(el.style.transformOrigin).toBe('')
+    expect(el.style.willChange).toBe('')
   })
 
   it('movimento reduzido no sistema: sem efeito', async () => {

@@ -73,7 +73,7 @@ interface CollectionSnapshot {
   searchQuery: string
 }
 
-const { minimize, takeRestoredState } = useMinimizablePage<CollectionSnapshot>({
+const { minimize, prepare, takeRestoredState } = useMinimizablePage<CollectionSnapshot>({
   describe: () => {
     const query = searchQuery.value.trim()
     const parts = [
@@ -156,7 +156,7 @@ async function runAction(
   <section class="album-collection-view">
     <header class="album-collection-view__header">
       <div class="album-collection-view__brand">
-        <PageBackStack @minimize="minimize">
+        <PageBackStack @minimize="minimize" @prepare="prepare">
           <button
             type="button"
             class="album-collection-view__back"

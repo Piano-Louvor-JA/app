@@ -14,7 +14,7 @@ import { useTimerFeature } from '../composables/useTimer'
 const { t } = useI18n()
 
 // Minimizar: o estado da tela já vive na store; o retrato guarda só rolagem e miniatura.
-const { minimize } = useMinimizablePage({
+const { minimize, prepare } = useMinimizablePage({
   describe: () => ({ title: t('timer.title'), icon: 'ti-clock', summary: '' }),
   capture: () => null,
   fallbackRoute: { name: 'utilities-temporizador' },
@@ -43,7 +43,7 @@ function goBack() {
   <section class="timer-view">
     <header class="timer-view__header">
       <PalcoRouteSelect module="timer" />
-      <PageBackStack @minimize="minimize">
+      <PageBackStack @minimize="minimize" @prepare="prepare">
         <button
           type="button"
           class="timer-view__back"

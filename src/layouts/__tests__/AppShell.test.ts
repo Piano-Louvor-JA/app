@@ -822,6 +822,24 @@ describe('AppShell — páginas minimizadas', () => {
     w.unmount()
   })
 
+  it('reabrir pela barra troca de página sem a transição do tema (o gênio faz o papel)', async () => {
+    useMinimizedPagesStore().minimize(hinario())
+    const { w, bar } = await mountShell2()
+    bar().vm.$emit('open', '/albums/5')
+    await flushPromises()
+    // a troca usa as classes da transição instantânea, não as do tema ('none')
+    expect(w.html()).toMatch(/page-instant-(leave|enter)/)
+    expect(w.html()).not.toMatch(/none-(leave|enter)/)
+    await settle()
+    // depois que a página entrou, as próximas trocas voltam à transição do tema
+    const { router } = { router: (w.vm as any).$router }
+    await router.push('/')
+    await flushPromises()
+    expect(w.html()).toMatch(/none-(leave|enter)/)
+    await settle()
+    w.unmount()
+  })
+
   it('navegar normalmente (sem a barra) não toca o efeito', async () => {
     genieMock.playGenie.mockClear()
     const { w, router } = await mountShell2()

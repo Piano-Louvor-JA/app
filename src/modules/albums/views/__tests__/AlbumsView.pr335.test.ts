@@ -55,11 +55,13 @@ vi.mock('vue-router', () => ({
 
 // Composable testado à parte: aqui só o contrato tela ↔ minimizar.
 const minimizeMock = vi.fn(async () => {})
+const prepareMock = vi.fn()
 vi.mock('@shared/composables/useMinimizablePage', () => ({
   useMinimizablePage: (options: unknown) => {
     ;(globalThis as any).__minimizeOptions = options
     return {
       minimize: minimizeMock,
+      prepare: prepareMock,
       takeRestoredState: () => {
         const restored = (globalThis as any).__restored ?? null
         ;(globalThis as any).__restored = null

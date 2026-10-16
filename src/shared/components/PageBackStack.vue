@@ -8,6 +8,8 @@ import { useI18n } from 'vue-i18n'
  */
 const emit = defineEmits<{
   minimize: []
+  /** Mouse entrou no – ou ele ganhou foco: antecipar a miniatura. */
+  prepare: []
 }>()
 
 const { t } = useI18n()
@@ -22,6 +24,8 @@ const { t } = useI18n()
       :aria-label="t('minimize.page')"
       :title="t('minimize.page')"
       @click="emit('minimize')"
+      @pointerenter="emit('prepare')"
+      @focus="emit('prepare')"
     >
       <i class="ti ti-minus" aria-hidden="true" />
     </button>

@@ -20,7 +20,7 @@ import type { RandomDrawMode } from '../types/random'
 const { t } = useI18n()
 
 // Minimizar: o estado da tela já vive na store; o retrato guarda só rolagem e miniatura.
-const { minimize } = useMinimizablePage({
+const { minimize, prepare } = useMinimizablePage({
   describe: () => ({ title: t('random.title'), icon: 'ti-ticket', summary: '' }),
   capture: () => null,
   fallbackRoute: { name: 'utilities' },
@@ -125,7 +125,7 @@ const effectiveConfig = computed(() => {
   <section class="random-view">
     <header class="random-view__header">
       <PalcoRouteSelect module="random" />
-      <PageBackStack @minimize="minimize">
+      <PageBackStack @minimize="minimize" @prepare="prepare">
         <button
           type="button"
           class="random-view__back"

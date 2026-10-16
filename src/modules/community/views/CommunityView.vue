@@ -47,7 +47,7 @@ interface CommunitySnapshot {
 	page: number;
 }
 
-const { minimize, takeRestoredState } = useMinimizablePage<CommunitySnapshot>({
+const { minimize, prepare, takeRestoredState } = useMinimizablePage<CommunitySnapshot>({
 	describe: () => {
 		const query = searchQuery.value.trim();
 		const parts = [
@@ -157,7 +157,7 @@ onMounted(load);
 <template>
   <section ref="viewEl" class="community-view">
     <header class="community-view__header">
-      <PageBackStack @minimize="minimize">
+      <PageBackStack @minimize="minimize" @prepare="prepare">
         <button
           type="button"
           class="community-view__back"

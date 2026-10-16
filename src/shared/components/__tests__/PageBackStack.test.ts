@@ -39,4 +39,13 @@ describe('PageBackStack', () => {
     await w.find('.page-back-stack__minimize').trigger('click')
     expect(w.emitted('minimize')).toHaveLength(1)
   })
+
+  it('mouse entrando ou foco no – avisam prepare (miniatura antecipada)', async () => {
+    const w = mountStack()
+    const btn = w.find('.page-back-stack__minimize')
+    await btn.trigger('pointerenter')
+    await btn.trigger('focus')
+    expect(w.emitted('prepare')).toHaveLength(2)
+  })
 })
+

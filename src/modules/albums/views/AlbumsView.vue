@@ -146,7 +146,7 @@ const playlistsModalOpen = ref(false)
  * /albums?painel=playlists; reabrir pela barra cai aqui e reabre a janela.
  */
 const PLAYLISTS_PANEL = 'playlists'
-const { minimize: minimizePlaylists, takeRestoredState } = useMinimizablePage({
+const { minimize: minimizePlaylists, prepare: preparePlaylists, takeRestoredState } = useMinimizablePage({
   describe: () => ({
     title: t('albums.playlists.title'),
     icon: 'ti-playlist',
@@ -508,6 +508,8 @@ async function runAction(
               :aria-label="t('minimize.page')"
               :title="t('minimize.page')"
               @click="minimizePlaylists"
+              @pointerenter="preparePlaylists"
+              @focus="preparePlaylists"
             >
               <i class="ti ti-minus" aria-hidden="true" />
             </button>

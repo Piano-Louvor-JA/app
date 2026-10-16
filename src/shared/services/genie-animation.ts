@@ -1,14 +1,15 @@
 /**
  * Efeito "gênio" (macOS) / "lâmpada mágica" (Mint) ao minimizar e reabrir
- * páginas: a borda de baixo afunila até o item da barra e a página encolhe
- * para dentro dele. Reabrir faz o caminho inverso.
+ * páginas: a página inclina (base mais estreita que o topo) e é sugada para
+ * dentro do item da barra. Reabrir faz o caminho inverso.
  *
- * Web Animations API (clip-path + transform), sem bibliotecas. Sem suporte
- * (ex.: jsdom) ou com movimento reduzido no sistema: sem efeito.
+ * Só transform + opacity (Web Animations API): roda na placa de vídeo, sem
+ * redesenhar a página a cada quadro — telas grandes (Hinário) não travam.
+ * Sem suporte (ex.: jsdom) ou com movimento reduzido no sistema: sem efeito.
  */
 
-/** Duração do efeito (minimizar e reabrir). */
-export const GENIE_DURATION_MS = 420
+/** Duração do efeito (minimizar e reabrir): curta para não parecer lento. */
+export const GENIE_DURATION_MS = 300
 
 /** Acelera ao sair (sugado pela barra) e desacelera ao voltar. */
 const EASING = {
@@ -28,15 +29,19 @@ export interface Box {
 export interface GenieFrame {
   offset: number
   transform: string
-  clipPath: string
   opacity: number
 }
 
-const FULL = 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)'
+/** Perspectiva da inclinação (px): quanto menor, mais forte o funil. */
+const PERSPECTIVE = 1200
 
-function percent(value: number): string {
-  const clamped = Math.min(Math.max(value, 0), 100)
-  return `${Math.round(clamped * 100) / 100}%`
+function round3(value: number): number {
+  return Math.round(value * 1000) / 1000
+}
+
+/** Escala intermediária: `t` = quanto do caminho até `scale` já foi feito. */
+function towards(scale: number, t: number): number {
+  return round3(1 + (scale - 1) * t)
 }
 
 /** Centro do item, em px a partir do canto da página (transform-origin). */
@@ -49,22 +54,55 @@ export function genieOrigin(page: Box, target: Box): { x: number; y: number } {
 
 /** Quadros do efeito ao minimizar (reabrir = os mesmos, invertidos). */
 export function genieKeyframes(page: Box, target: Box): GenieFrame[] {
-  const left = percent(((target.left - page.left) / page.width) * 100)
-  const right = percent(((target.left + target.width - page.left) / page.width) * 100)
-  const scaleX = Math.round((target.width / page.width) * 1000) / 1000
-  const scaleY = Math.round((target.height / page.height) * 1000) / 1000
+  const scaleX = round3(target.width / page.width)
+  const scaleY = round3(target.height / page.height)
   return [
-    { offset: 0, transform: 'none', clipPath: FULL, opacity: 1 },
-    // borda de baixo afunila até a largura do item (o "funil" do gênio)
-    { offset: 0.45, transform: 'none', clipPath: `polygon(0% 0%, 100% 0%, ${right} 100%, ${left} 100%)`, opacity: 1 },
-    // tudo encolhe para dentro do item
+    { offset: 0, transform: 'none', opacity: 1 },
+    // inclina para trás (topo mais largo que a base: o funil) e começa a encolher,
+    // mais rápido na altura que na largura, como o gênio do macOS
+    {
+      offset: 0.45,
+      transform: `perspective(${PERSPECTIVE}px) rotateX(-28deg) scale(${towards(scaleX, 0.45)}, ${towards(scaleY, 0.7)})`,
+      opacity: 0.95,
+    },
+    // sugada para dentro do item
     {
       offset: 1,
-      transform: `scale(${scaleX}, ${scaleY})`,
-      clipPath: `polygon(${left} 0%, ${right} 0%, ${right} 100%, ${left} 100%)`,
-      opacity: 0.4,
+      transform: `perspective(${PERSPECTIVE}px) rotateX(-55deg) scale(${scaleX}, ${scaleY})`,
+      opacity: 0,
     },
   ]
+}
+
+/** Folga entre itens da barra e tamanho padrão de um item novo (px). */
+const BAR_GAP = 8
+const NEW_ITEM = { width: 140, height: 30 }
+
+function cssPx(name: string, fallback: number): number {
+  const value = parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name))
+  return Number.isFinite(value) ? value : fallback
+}
+
+/**
+ * Onde o item da página vai aparecer na barra — antes de ele existir, para o
+ * efeito começar já no clique: logo depois do último item, ou no centro da
+ * barra (logo acima do dock) quando ela ainda está vazia.
+ */
+export function predictMinimizedTarget(): Box {
+  const items = document.querySelectorAll<HTMLElement>('[data-minimized-key]')
+  const last = items[items.length - 1]
+  if (last) {
+    const rect = last.getBoundingClientRect()
+    return { left: rect.right + BAR_GAP, top: rect.top, width: rect.width, height: rect.height }
+  }
+  const dock = cssPx('--ds-dock-height', 72)
+  const bar = cssPx('--ds-minimized-bar-height', 40)
+  return {
+    left: window.innerWidth / 2 - NEW_ITEM.width / 2,
+    top: window.innerHeight - dock - bar / 2 - NEW_ITEM.height / 2,
+    width: NEW_ITEM.width,
+    height: NEW_ITEM.height,
+  }
 }
 
 /** Posição do item da barra de minimizadas para uma página (fullPath). */
@@ -105,6 +143,8 @@ export async function playGenie(
 
   const origin = genieOrigin(page, target)
   animatable.style.transformOrigin = `${origin.x}px ${origin.y}px`
+  // camada própria na placa de vídeo durante o efeito
+  animatable.style.willChange = 'transform, opacity'
   try {
     await animatable.animate(keyframes as unknown as Keyframe[], {
       duration: GENIE_DURATION_MS,
@@ -114,6 +154,9 @@ export async function playGenie(
   } catch {
     // cancelada (navegou no meio): sem efeito colateral
   } finally {
-    if (direction === 'restore') animatable.style.transformOrigin = ''
+    if (direction === 'restore') {
+      animatable.style.transformOrigin = ''
+      animatable.style.willChange = ''
+    }
   }
 }

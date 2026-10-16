@@ -1,9 +1,9 @@
-import { nextTick } from 'vue'
 import { useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 
 import { useNavigationHistory } from '@shared/composables/useNavigationHistory'
+import { requestInstantPageTransition } from '@shared/composables/useInstantPageTransition'
 import { injectViewScrollMemory } from '@shared/composables/useViewScrollMemory'
-import { findMinimizedItemRect, playGenie } from '@shared/services/genie-animation'
+import { playGenie, predictMinimizedTarget } from '@shared/services/genie-animation'
 import { capturePagePreview } from '@shared/services/page-preview'
 import { useMinimizedPagesStore } from '@shared/stores/useMinimizedPagesStore'
 
@@ -29,6 +29,9 @@ export interface MinimizablePageOptions<S> {
  * - `takeRestoredState()`: ao ser reaberta pela barra, a tela pega o retrato
  *   (uma vez) e aplica quando ela mesma terminar de carregar.
  */
+/** Miniatura preparada há mais que isso é capturada de novo no clique. */
+const PREPARED_PREVIEW_TTL_MS = 5000
+
 export function useMinimizablePage<S>(options: MinimizablePageOptions<S>) {
   const route = useRoute()
   const router = useRouter()
@@ -36,24 +39,47 @@ export function useMinimizablePage<S>(options: MinimizablePageOptions<S>) {
   const history = useNavigationHistory()
   const scroll = injectViewScrollMemory()
 
+  /** Miniatura capturada antes do clique (mouse entrou no –). */
+  let prepared: { at: number; preview: Promise<string | null> } | null = null
+
+  function capture() {
+    return capturePagePreview(scroll?.getRoot() ?? null)
+  }
+
+  /**
+   * Antecipa a miniatura (mouse sobre o – ou foco nele): no clique o efeito
+   * começa na hora, sem esperar a captura (~130 ms no desktop).
+   */
+  function prepare() {
+    if (prepared && Date.now() - prepared.at < PREPARED_PREVIEW_TTL_MS) return
+    prepared = { at: Date.now(), preview: capture() }
+  }
+
   async function minimize() {
     const { title, icon, summary } = options.describe()
     const fullPath = options.fullPath?.() ?? route.fullPath
     const routeName = typeof route.name === 'string' ? route.name : null
     const state = options.capture()
     const marks = scroll?.captureCurrent() ?? []
-    // captura antes de sair: a miniatura é a tela como o operador a deixou
-    const preview = await capturePagePreview(scroll?.getRoot() ?? null)
+    // miniatura antecipada (prepare) ou capturada agora, antes de a tela mudar
+    const fresh = prepared && Date.now() - prepared.at < PREPARED_PREVIEW_TTL_MS
+    const preview = await (fresh ? prepared!.preview : capture())
+    prepared = null
+
+    // efeito já no clique, rumo a onde o item vai aparecer; o item só entra na
+    // barra depois — o recálculo de layout acontece com a página já sumida
+    const animated = options.animateEl?.() ?? scroll?.getRoot()?.firstElementChild ?? null
+    await playGenie(animated, predictMinimizedTarget(), 'minimize')
 
     store.minimize({ fullPath, routeName, title, icon, summary, state, scroll: marks, preview, minimizedAt: Date.now() })
 
-    // efeito gênio até o item que acabou de entrar na barra; só depois sai
-    await nextTick()
-    const animated = options.animateEl?.() ?? scroll?.getRoot()?.firstElementChild ?? null
-    await playGenie(animated, findMinimizedItemRect(fullPath), 'minimize')
-
-    if (options.onMinimized) options.onMinimized()
-    else if (history.canGoBack.value) history.back()
+    if (options.onMinimized) {
+      options.onMinimized()
+      return
+    }
+    // o gênio já fez a saída: a troca de página não repete a transição do tema
+    requestInstantPageTransition()
+    if (history.canGoBack.value) history.back()
     else await router.push(options.fallbackRoute)
   }
 
@@ -61,5 +87,5 @@ export function useMinimizablePage<S>(options: MinimizablePageOptions<S>) {
     return (store.takeRestore(route.fullPath)?.state as S | undefined) ?? null
   }
 
-  return { minimize, takeRestoredState }
+  return { minimize, prepare, takeRestoredState }
 }
