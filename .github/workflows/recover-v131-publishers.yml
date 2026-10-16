@@ -67,12 +67,23 @@ jobs:
           writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
           JS
       - name: Build and publish exact release
-        run: npm run electron:build -- ${{ matrix.args }} --publish always
+        shell: bash
+        run: |
+          set -euo pipefail
+          # GITHUB_* defaults cannot be replaced through step.env on dispatch.
+          # Bind the child build process to the tag checked out and verified above.
+          tag="$(git describe --exact-match --tags HEAD)"
+          test "$tag" = "$RELEASE_TAG"
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          export GITHUB_REF_TYPE=tag
+          export GITHUB_REF="refs/tags/$tag"
+          export GITHUB_REF_NAME="$tag"
+          export GITHUB_SHA="$RELEASE_SHA"
+          npm run electron:build -- ${{ matrix.args }} --publish always
         env:
           GH_TOKEN: ${{ github.token }}
           PIANO_BUILD_PROFILE: release
           PIANO_RELEASE_AUTHORIZED: 'true'
-          GITHUB_REF_TYPE: tag
       - name: Verify installers and publish checksums
         shell: bash
         env:
