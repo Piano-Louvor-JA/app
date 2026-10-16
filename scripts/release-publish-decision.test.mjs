@@ -248,3 +248,27 @@ test('Flatpak e lojas preservam tag_only e usam a versão exata', () => {
   assert.ok(manifests.length >= 2, 'build-flatpak.yml deve referenciar o manifesto')
   for (const manifest of manifests) assert.equal(existsSync(join(repoRoot, manifest)), true, manifest)
 })
+
+test('CLI invocada por diretório symlink executa a decisão fail-closed', async () => {
+  const { symlinkSync } = await import('node:fs')
+  const root = mkdtempSync(join(tmpdir(), 'publisher-link-'))
+  symlinkSync(join(repoRoot, 'scripts'), join(root, 'alias'), 'dir')
+  const result = spawnSync(process.execPath, [join(root, 'alias/release-publish-decision.mjs'),
+    '--fetch', '--repo', repo, '--ref', 'invalid-tag'], { encoding: 'utf8' })
+  assert.equal(result.status, 1)
+  assert.match(result.stdout, /publish=false/)
+  assert.match(result.stdout, /reason=/)
+})
+
+test('NSIS e portable possuem nomes diferentes de instalador', () => {
+  const config = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8')).build
+  assert.notEqual(config.nsis.artifactName ?? config.artifactName,
+    config.portable?.artifactName ?? config.artifactName)
+})
+
+test('dispatch de pacotes não depende de checkout implícito', () => {
+  const workflow = readFileSync(join(repoRoot, '.github/workflows/release.yml'), 'utf8')
+  for (const line of workflow.split('\n').filter(line => line.includes('gh workflow run'))) {
+    assert.match(line, /--repo/)
+  }
+})

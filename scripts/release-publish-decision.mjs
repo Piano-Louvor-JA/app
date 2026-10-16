@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { appendFileSync } from 'node:fs'
+import { appendFileSync, realpathSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 
 const SHA = /^[a-f0-9]{40}$/
@@ -176,5 +176,5 @@ function main() {
   if (result.fail) process.exit(1)
 }
 
-const executedDirectly = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href
+const executedDirectly = process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href
 if (executedDirectly) main()
