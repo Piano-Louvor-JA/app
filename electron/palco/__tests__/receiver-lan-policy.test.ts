@@ -90,6 +90,14 @@ describe.each(['receiver.html', 'index.html'])('%s — política LAN', file => {
 })
 
 describe('nuvem oficial do Palco', () => {
+  it('restringe a exceção de desenvolvimento à API local conhecida', () => {
+    const { w } = receiver('receiver.html', '192.168.1.25')
+    expect(w.trustedCloudApi('ws://localhost:3100/v1/palco')).toBe('ws://localhost:3100/v1/palco')
+    for (const url of ['ws://localhost:5555/v1/palco', 'wss://localhost:3100/v1/palco', 'ws://localhost/v1/palco']) {
+      expect(w.trustedCloudApi(url)).toBeNull()
+    }
+  })
+
   it('mantém o relay oficial, valida o código e codifica o token', () => {
     const { w, sockets, fetch } = receiver('receiver.html', '192.168.1.25')
     w.cloudOpen('../other', 'token')

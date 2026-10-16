@@ -2794,8 +2794,7 @@ function trustedCloudApi(value){
     if(url.username||url.password||url.search||url.hash)return null;
     if(url.pathname.replace(/\/$/,'')!=='/v1/palco')return null;
     if(url.hostname==='localhost'){
-      if(url.protocol!=='ws:'&&url.protocol!=='wss:')return null;
-      return palcoLanUrl('localhost',url.port||(url.protocol==='wss:'?443:80),'/v1/palco',url.protocol.slice(0,-1))||null;
+      return url.protocol==='ws:'&&url.port==='3100'?PALCO_API_WS_DEV:null;
     }
     if(url.protocol!=='wss:'||(url.port&&url.port!=='443'))return null;
     switch(url.hostname){
@@ -2818,7 +2817,7 @@ function cloudConnect(code){
   dlog('cloudConnect',code,cloudApi);
   var base=cloudApi.replace(/^ws/,'http');
   setStatus(L10N.cloudSearch.replace('{c}',code));
-  fetch(base+'/sessions/'+code+'/token',{redirect:'error'})
+  fetch(base+'/sessions/'+encodeURIComponent(code)+'/token',{redirect:'error'})
     .then(function(r){if(!r.ok)throw Error('sessão não encontrada');return r.json()})
     .then(function(j){cloudOpen(code,j.token)})
     .catch(function(e){setStatus(L10N.cloudErr.replace('{m}',e.message),true);cloudRetry()});
