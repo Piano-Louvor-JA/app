@@ -1,70 +1,21 @@
 <script setup lang="ts">
 import PalcoRouteSelect from '../../settings/components/PalcoRouteSelect.vue'
-import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
 import { GlassCard } from '@design-system/index'
-import { readEffectiveStageSettings, subscribeStageSettings } from '../../settings/services/stage-settings-runtime'
-import { resolveBackgroundImage, type StageSettings,
-  stageBgCss } from '../../settings/types/stage-settings'
-
 
 import StageCustomizationDialog from '../../settings/components/StageCustomizationDialog.vue'
-import ClockConfigDialog from '../components/ClockConfigDialog.vue'
-import ClockPreview from '../components/ClockPreview.vue'
-import ClockProjectFab from '../components/ClockProjectFab.vue'
 import { useClockFeature } from '../composables/useClock'
 
 const { t } = useI18n()
 const router = useRouter()
 
-const {
-  config,
-  isProjecting,
-  configOpen,
-  setStyle,
-  setShowSeconds,
-  setFormat24h,
-  setBgColor,
-  setTextColor,
-  resetToDefault,
-  openConfig,
-  closeConfig,
-  toggleProjection,
-} = useClockFeature()
+const { isProjecting, configOpen, openConfig, closeConfig } = useClockFeature()
 
 function goBack() {
   void router.push({ name: 'utilities-temporizador' })
 }
-
-function onToggleProjection() {
-  void toggleProjection()
-}
-
-const stage = ref<StageSettings>(readEffectiveStageSettings('clock'))
-let unsubStage: (() => void) | null = null
-onMounted(() => {
-  unsubStage = subscribeStageSettings(() => {
-    stage.value = readEffectiveStageSettings('clock')
-  })
-})
-onUnmounted(() => unsubStage?.())
-
-const stageBg = computed(() => ({
-  backgroundColor: stageBgCss(stage.value.backgroundColor),
-  backgroundImage: resolveBackgroundImage(stage.value.backgroundImage)
-    ? `url(${resolveBackgroundImage(stage.value.backgroundImage)})`
-    : undefined,
-  backgroundSize: 'cover',
-  backgroundPosition: 'center',
-}))
-
-// Características do módulo vindas do StageSettings (fonte única).
-const effectiveConfig = computed(() => {
-  const mod = stage.value.clock
-  return mod ? { ...config.value, ...mod } : { ...config.value }
-})
 </script>
 
 <template>
@@ -97,35 +48,20 @@ const effectiveConfig = computed(() => {
     </header>
 
     <div class="clock-view__stage">
-      <GlassCard
-        class="clock-view__widget"
-        :padding="false"
-      >
-        <div class="clock-view__toolbar">
-          <button
-            type="button"
-            class="clock-view__tool-btn"
-            :aria-label="t('clock.config')"
-            :title="t('clock.config')"
-            @click="openConfig"
-          >
-            <i
-              class="ti ti-palette"
-              aria-hidden="true"
-            />
-          </button>
-        </div>
-
-        <div
-          class="clock-view__preview"
-          :style="stageBg"
+      <GlassCard class="clock-view__widget">
+        <button
+          type="button"
+          class="clock-view__tool-btn"
+          :aria-label="t('clock.config')"
+          :title="t('clock.config')"
+          @click="openConfig"
         >
-          <ClockPreview
-            :config="effectiveConfig"
-            :stage="stage"
-            preview
+          <i
+            class="ti ti-palette"
+            aria-hidden="true"
           />
-        </div>
+          {{ t('clock.config') }}
+        </button>
 
         <div
           v-if="isProjecting"
@@ -144,12 +80,6 @@ const effectiveConfig = computed(() => {
       :open="configOpen"
       scope="clock"
       @close="closeConfig"
-    />
-
-    <ClockProjectFab
-      :projecting="isProjecting"
-      @project="onToggleProjection"
-      @clear="onToggleProjection"
     />
   </section>
 </template>
@@ -234,63 +164,40 @@ const effectiveConfig = computed(() => {
 }
 
 .clock-view__widget {
-  position: relative;
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
   width: 100%;
   max-width: 56rem;
-  aspect-ratio: 21 / 9;
-  max-height: min(100%, 28rem);
-  overflow: hidden;
-}
-
-.clock-view__toolbar {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  z-index: 2;
-  display: flex;
-  gap: 0.5rem;
 }
 
 .clock-view__tool-btn {
   display: inline-flex;
-  width: 2.25rem;
-  height: 2.25rem;
+  height: 2.35rem;
   align-items: center;
-  justify-content: center;
+  gap: 0.35rem;
+  padding: 0 0.95rem;
   border: 0;
-  border-radius: 9999px;
+  border-radius: var(--ds-radius-md, 0.5rem 0 0.5rem 0);
   background: color-mix(in srgb, var(--ds-color-primary) 18%, transparent);
   color: var(--ds-color-primary);
   cursor: pointer;
-  transition:
-    transform 160ms ease,
-    background-color 160ms ease,
-    color 160ms ease;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  transition: background-color 160ms ease;
 
   &:hover {
-    transform: scale(1.06);
     background: color-mix(in srgb, var(--ds-color-primary) 28%, transparent);
   }
 
   .ti {
-    font-size: 1.1rem;
+    font-size: 1.05rem;
   }
 }
 
-.clock-view__preview {
-  border-radius: 0.75rem;
-  overflow: hidden;
-  width: 100%;
-  height: 100%;
-  padding: 1.5rem;
-}
-
 .clock-view__projecting {
-  position: absolute;
-  bottom: 1rem;
-  left: 50%;
-  z-index: 2;
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
@@ -300,7 +207,6 @@ const effectiveConfig = computed(() => {
   color: var(--ds-color-primary);
   font-size: 0.75rem;
   font-weight: 600;
-  transform: translateX(-50%);
 
   .ti {
     font-size: 0.95rem;
@@ -329,14 +235,6 @@ const effectiveConfig = computed(() => {
 
   .clock-view__title {
     font-size: 1.15rem;
-  }
-
-  .clock-view__widget {
-    max-height: min(100%, 20rem);
-  }
-
-  .clock-view__preview {
-    padding: 1rem;
   }
 }
 </style>

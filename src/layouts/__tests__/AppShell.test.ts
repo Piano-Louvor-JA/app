@@ -212,6 +212,22 @@ vi.mock('@modules/media/components/MediaChrome.vue', () => ({
   default: { name: 'MediaChrome', template: '<div class="media-chrome-mock" />' },
 }))
 
+vi.mock('@modules/bible/components/BibleChrome.vue', () => ({
+  default: { name: 'BibleChrome', template: '<div class="bible-chrome-mock" />' },
+}))
+vi.mock('@modules/countdown/components/CountdownChrome.vue', () => ({
+  default: { name: 'CountdownChrome', template: '<div class="countdown-chrome-mock" />' },
+}))
+vi.mock('@modules/timer/components/TimerChrome.vue', () => ({
+  default: { name: 'TimerChrome', template: '<div class="timer-chrome-mock" />' },
+}))
+vi.mock('@modules/clock/components/ClockChrome.vue', () => ({
+  default: { name: 'ClockChrome', template: '<div class="clock-chrome-mock" />' },
+}))
+vi.mock('@modules/random/components/RandomChrome.vue', () => ({
+  default: { name: 'RandomChrome', template: '<div class="random-chrome-mock" />' },
+}))
+
 vi.mock('@modules/bible/components/BibleInAppProjection.vue', () => ({
   default: { name: 'BibleInAppProjection', template: '<div class="bible-overlay-mock" />' },
 }))

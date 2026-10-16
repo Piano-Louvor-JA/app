@@ -60,6 +60,7 @@ export default {
     clearProjection: 'Ocultar conteúdo',
     maximize: 'Abrir player',
     minimize: 'Minimizar',
+    chromeDragHint: 'Arraste para mover · duplo clique volta ao canto',
     close: 'Fechar',
     seek: 'Posição da faixa',
     volume: 'Volume',

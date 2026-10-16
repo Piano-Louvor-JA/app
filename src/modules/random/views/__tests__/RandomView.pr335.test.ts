@@ -347,10 +347,9 @@ describe("RandomView — áudio custom", () => {
       w.unmount()
     })
 
-    it('onToggleProjection: chama toggleProjection da store', async () => {
+    it('projetar fica no painel flutuante, não na tela do Sorteio', () => {
       const w = mountView()
-      const vm = w.vm as any
-      await vm.onToggleProjection?.()
+      expect(w.find('.random-project-fab').exists()).toBe(false)
       w.unmount()
     })
 

@@ -10,11 +10,16 @@ import type { DockNavItem, HistoryNavDot } from '@design-system/types/navigation
 import AuthAccountDialog from '@modules/auth/components/AuthAccountDialog.vue'
 import { useAuth, setNotify } from '@modules/auth/composables/useAuth'
 import { useBibleStore } from '@modules/bible/stores/useBibleStore'
+import BibleChrome from '@modules/bible/components/BibleChrome.vue'
 import BibleInAppProjection from '@modules/bible/components/BibleInAppProjection.vue'
+import ClockChrome from '@modules/clock/components/ClockChrome.vue'
 import ClockProjectionView from '@modules/clock/views/ClockProjectionView.vue'
 import { useClockStore } from '@modules/clock/stores/useClockStore'
+import CountdownChrome from '@modules/countdown/components/CountdownChrome.vue'
 import CountdownProjectionView from '@modules/countdown/views/CountdownProjectionView.vue'
+import RandomChrome from '@modules/random/components/RandomChrome.vue'
 import RandomProjectionView from '@modules/random/views/RandomProjectionView.vue'
+import TimerChrome from '@modules/timer/components/TimerChrome.vue'
 import TimerProjectionView from '@modules/timer/views/TimerProjectionView.vue'
 import InAppProjectionOverlay from '@shared/components/InAppProjectionOverlay.vue'
 import { useCountdownStore } from '@modules/countdown/stores/useCountdownStore'
@@ -467,6 +472,12 @@ function viewKey(viewRoute: typeof route) {
     </main>
 
     <MediaChrome />
+
+    <BibleChrome />
+    <CountdownChrome />
+    <TimerChrome />
+    <ClockChrome />
+    <RandomChrome />
 
     <BibleInAppProjection
       v-if="bibleInAppPreview"

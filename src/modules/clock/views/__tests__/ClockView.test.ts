@@ -5,57 +5,21 @@ import { createRouter, createMemoryHistory } from 'vue-router'
 import { createI18n } from 'vue-i18n'
 
 const useClockFeatureMock = vi.hoisted(() => ({
-  config: { value: { style: 'digital', format24h: true, showSeconds: true, textColor: '#fff', bgColor: '#000' } },
   isProjecting: { __v_isRef: true, value: false },
   configOpen: { __v_isRef: true, value: false },
-  setStyle: vi.fn(),
-  setShowSeconds: vi.fn(),
-  setFormat24h: vi.fn(),
-  setBgColor: vi.fn(),
-  setTextColor: vi.fn(),
-  resetToDefault: vi.fn(),
   openConfig: vi.fn(),
   closeConfig: vi.fn(),
-  toggleProjection: vi.fn(async () => {}),
 }))
 
 vi.mock('../../composables/useClock', () => ({
   useClockFeature: () => useClockFeatureMock,
-  useClockDisplay: () => ({
-    timeText: { value: '12:00' },
-    dateText: { value: '' },
-    analogAngleHours: { value: 0 },
-    analogAngleMinutes: { value: 0 },
-    analogAngleSeconds: { value: 0 },
-    showSeconds: { value: true },
-  }),
-}))
-
-const stageSubs = vi.hoisted(() => ({ cbs: [] as Array<() => void> }))
-const stageSettingsState = vi.hoisted(() => ({ value: { backgroundColor: '#123', backgroundImage: null, clock: { style: 'analog' } } }))
-vi.mock('../../../settings/services/stage-settings-runtime', () => ({
-  readEffectiveStageSettings: () => stageSettingsState.value,
-  subscribeStageSettings: vi.fn((cb: () => void) => {
-    stageSubs.cbs.push(cb)
-    return () => {}
-  }),
 }))
 
 vi.mock('../../../settings/components/PalcoRouteSelect.vue', () => ({
   default: { name: 'PalcoRouteSelect', props: ['module'], template: '<div class="palco-route-stub" />' },
 }))
 vi.mock('../../../settings/components/StageCustomizationDialog.vue', () => ({
-  default: { name: 'StageCustomizationDialog', template: '<div class="stage-custom-dialog-stub" />' },
-}))
-vi.mock('../../components/ClockConfigDialog.vue', () => ({
-  default: { name: 'ClockConfigDialog', template: '<div class="clock-config-dialog-stub" />' },
-}))
-vi.mock('../../components/ClockPreview.vue', () => ({
-  default: { name: 'ClockPreview', props: ['config'], template: '<div class="clock-preview-stub" />' },
-}))
-void 0
-vi.mock('../../components/ClockProjectFab.vue', () => ({
-  default: { name: 'ClockProjectFab', props: ['isProjecting'], emits: ['project', 'clear'], template: '<button class="clock-project-fab-stub" @click="$emit(\'project\')" />' },
+  default: { name: 'StageCustomizationDialog', props: ['open', 'scope'], template: '<div class="stage-custom-dialog-stub" />' },
 }))
 vi.mock('@design-system/index', () => ({
   GlassCard: { name: 'GlassCard', template: '<div class="glass-card-stub"><slot /></div>' },
@@ -77,99 +41,58 @@ function createWrapper() {
       { path: '/utilities/temporizador', name: 'utilities-temporizador', component: { template: '<div />' } },
     ],
   })
-  return mount(ClockView, {
+  const push = vi.spyOn(router, 'push')
+  const wrapper = mount(ClockView, {
     global: { plugins: [router, i18n] },
   })
+  return { wrapper, push }
 }
 
 describe('ClockView.vue', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    useClockFeatureMock.config.value = { style: 'digital', format24h: true, showSeconds: true, textColor: '#fff', bgColor: '#000' }
     useClockFeatureMock.isProjecting.value = false
     useClockFeatureMock.configOpen.value = false
   })
 
-  it('monta com header e preview', async () => {
-    const wrapper = createWrapper()
+  it('card sem prévia nem projetar: ficam no painel flutuante', async () => {
+    const { wrapper } = createWrapper()
     await flushPromises()
     expect(wrapper.find('.clock-view__title').text()).toBe('Relógio')
-    expect(wrapper.find('.clock-preview-stub').exists()).toBe(true)
+    expect(wrapper.find('.clock-preview').exists()).toBe(false)
+    expect(wrapper.find('.clock-project-fab').exists()).toBe(false)
+    wrapper.unmount()
   })
 
-  it('goBack: roteia para utilities-temporizador', async () => {
-    const wrapper = createWrapper()
+  it('voltar leva ao Temporizador', async () => {
+    const { wrapper, push } = createWrapper()
     await flushPromises()
     await wrapper.find('.clock-view__back').trigger('click')
-    await flushPromises()
-    const route = wrapper.getCurrentRoute?.()
-    void route
-    // router.push é void — verificar via spy no router real não é trivial; basta não lançar
-    expect(true).toBe(true)
-  })
-
-  it('openConfig pelo botão de config', async () => {
-    const wrapper = createWrapper()
-    await flushPromises()
-    await wrapper.find('.clock-view__tool-btn').trigger('click')
-    expect(useClockFeatureMock.openConfig).toHaveBeenCalled()
-  })
-
-  it('toggleProjection via FAB', async () => {
-    const wrapper = createWrapper()
-    await flushPromises()
-    await wrapper.find('.clock-project-fab-stub').trigger('click')
-    expect(useClockFeatureMock.toggleProjection).toHaveBeenCalled()
-  })
-
-  it('effectiveConfig: mescla clock do stage por cima do config do composable', async () => {
-    const wrapper = createWrapper()
-    await flushPromises()
-    // stage.clock.style='analog' sobrepõe config.style='digital'
-    const preview = wrapper.findComponent({ name: 'ClockPreview' })
-    expect(preview.props('config')).toMatchObject({ style: 'analog', format24h: true })
-  })
-
-  it('unmount limpa subscribe', async () => {
-    const wrapper = createWrapper()
-    await flushPromises()
+    expect(push).toHaveBeenCalledWith({ name: 'utilities-temporizador' })
     wrapper.unmount()
-    expect(true).toBe(true)
   })
 
-  describe('subscribe stage callback (48)', () => {
-    it('callback do subscribe atualiza stage', async () => {
-      const w = createWrapper()
-      await w.vm.$nextTick()
-      expect(stageSubs.cbs.length).toBeGreaterThanOrEqual(1)
-      for (const cb of stageSubs.cbs) cb()
-      await w.vm.$nextTick()
-      w.unmount()
-    })
+  it('Personalizar abre a customização do palco do Relógio', async () => {
+    const { wrapper } = createWrapper()
+    await flushPromises()
+    const btn = wrapper.find('.clock-view__tool-btn')
+    expect(btn.text()).toBe('Config')
+    await btn.trigger('click')
+    expect(useClockFeatureMock.openConfig).toHaveBeenCalled()
+    expect(wrapper.findComponent({ name: 'StageCustomizationDialog' }).props('scope')).toBe('clock')
+    wrapper.unmount()
+  })
 
-    it('gaps: isProjecting renderiza o selo de projeção', async () => {
-      const w = createWrapper()
-      await w.vm.$nextTick()
-      const vm = w.vm as unknown as Record<string, unknown>
-      if ('isProjecting' in vm) vm.isProjecting = true
-      await w.vm.$nextTick()
-      w.unmount()
-    })
-  it('gaps: backgroundImage setado usa url; isProjecting=true via mock renderiza selo', async () => {
-      stageSettingsState.value = { backgroundColor: '#123', backgroundImage: 'https://x/img.png', clock: { style: 'digital' } }
-      useClockFeatureMock.isProjecting.value = true
-      const w = createWrapper()
-      await w.vm.$nextTick()
-      await w.vm.$nextTick()
-      expect(w.html()).toContain('clock-view__projecting')
-      w.unmount()
-      // stage SEM módulo clock (mod ausente → spread puro, br 65)
-      stageSettingsState.value = { backgroundColor: '#123', backgroundImage: null }
-      const w2 = createWrapper()
-      await w2.vm.$nextTick()
-      w2.unmount()
-      stageSettingsState.value = { backgroundColor: '#123', backgroundImage: null, clock: { style: 'analog' } }
-      useClockFeatureMock.isProjecting.value = false
-    })
+  it('selo "em projeção" só enquanto projeta', async () => {
+    const first = createWrapper()
+    await flushPromises()
+    expect(first.wrapper.find('.clock-view__projecting').exists()).toBe(false)
+    first.wrapper.unmount()
+
+    useClockFeatureMock.isProjecting.value = true
+    const second = createWrapper()
+    await flushPromises()
+    expect(second.wrapper.find('.clock-view__projecting').text()).toContain('Projetando')
+    second.wrapper.unmount()
   })
 })

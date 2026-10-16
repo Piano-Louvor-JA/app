@@ -70,5 +70,7 @@ export default {
     decreaseFont: 'Decrease font',
     increaseFont: 'Increase font',
     placeholderDisplay: '- - - -',
+    chromeDragHint: 'Drag to move · double-click to return to the corner',
+    openRandom: 'Open the Draw',
   },
 }

@@ -37,10 +37,8 @@ function onClick(projecting: boolean) {
 
 <style scoped lang="scss">
 .countdown-project-fab {
-  position: fixed;
-  right: 2rem;
-  bottom: calc(var(--ds-dock-height, 5.5rem) + 1.25rem);
-  z-index: 35;
+  flex-shrink: 0;
+  pointer-events: auto;
   width: 4rem;
   height: 4rem;
   border: 4px solid color-mix(in srgb, #fff 20%, transparent);
@@ -79,8 +77,6 @@ function onClick(projecting: boolean) {
 
 @media (max-width: 1280px) {
   .countdown-project-fab {
-    right: 1.25rem;
-    bottom: calc(var(--ds-dock-height, 5.5rem) + 0.75rem);
     width: 3.25rem;
     height: 3.25rem;
     border-width: 3px;

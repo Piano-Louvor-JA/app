@@ -59,5 +59,7 @@ export default {
       'ESC ends projection  ·  Ctrl+Alt+P toggles with the operator screen',
     projecting: 'Projecting',
     backToUtilities: 'Back to Timer',
+    chromeDragHint: 'Drag to move · double-click to return to the corner',
+    openClock: 'Open the Clock',
   },
 }
