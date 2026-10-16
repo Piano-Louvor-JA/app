@@ -20,12 +20,17 @@ defineProps<{
   left: 0;
   max-width: 16rem;
   overflow: hidden;
-  color: var(--ds-color-on-surface);
+  padding: 0.15rem 0.6rem;
+  border: 1px solid color-mix(in srgb, var(--ds-color-primary) 35%, transparent);
+  border-radius: 999px;
+  /* fundo escuro meio transparente: separa do texto da tela por trás */
+  background: rgb(0 0 0 / 0.6);
+  backdrop-filter: blur(4px);
+  color: var(--ds-color-primary);
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.02em;
   text-overflow: ellipsis;
-  text-shadow: 0 1px 4px rgb(0 0 0 / 0.6);
   white-space: nowrap;
   pointer-events: none;
 }
