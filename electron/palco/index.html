@@ -221,23 +221,61 @@ let ws,tries=0;
 let unlocked=true;
 let bgPalco='';  // BG personalizado do palco (idle) — persiste entre músicas
 
-function proxyUrl(original){
-  if(!original)return '';
-  let parsed;
-  try{ parsed=new URL(String(original), location.href) }
-  catch(e){ return '' }
-  // javascript: e outros esquemas não entram em src/áudio/vídeo.
-  if(parsed.protocol!=='http:'&&parsed.protocol!=='https:'&&parsed.protocol!=='blob:'&&parsed.protocol!=='file:'&&parsed.protocol!=='data:')return '';
-  if(parsed.protocol==='file:'&&location.protocol!=='file:')return '';
-  if(parsed.protocol==='data:'&&!/^data:(image|audio|video)\/[a-z0-9.+-]+;base64,/i.test(String(original)))return '';
-  if(parsed.protocol==='data:'||parsed.protocol==='blob:'||parsed.protocol==='file:')return parsed.href;
-  const safe=parsed.href;
-  // Qualquer porta do MESMO sender é local: 7080 (Principal), 7082 (TV 2),
-  // 7084... Antes só aceitava :7080; bg vindo de slot :7082 era proxyado
-  // de volta e falhava → receiver caía no bg-12 (caso real 26/08).
-  if(safe.startsWith('http://'+host+':'))return safe;
-  return `http://${host}:7080/proxy?url=${encodeURIComponent(safe)}`;
+// Conexões diretas: somente IPv4 de LAN/loopback e localhost, nunca DNS público.
+function palcoLanHost(value){
+  if(value==='localhost')return 'localhost';
+  if(typeof value!=='string'||! /^(?:0|[1-9][0-9]{0,2})(?:\.(?:0|[1-9][0-9]{0,2})){3}$/.test(value))return '';
+  const parts=value.split('.').map(Number);
+  if(parts.some(n=>n>255))return '';
+  if(parts[0]!==10&&parts[0]!==127&&!(parts[0]===172&&parts[1]>=16&&parts[1]<=31)&&!(parts[0]===192&&parts[1]===168)&&!(parts[0]===169&&parts[1]===254))return '';
+  return parts.join('.');
 }
+function palcoLanUrl(value,portValue,path,scheme){
+  const sender=palcoLanHost(value);
+  if(!sender||!/^\d{1,5}$/.test(String(portValue)))return '';
+  const number=Number(portValue);
+  if(number<1||number>65535)return '';
+  return scheme+'://'+sender+':'+number+path;
+}
+function palcoOfficialOrigin(origin){
+  // Mesmas origens oficiais/legadas do contrato de API do aplicativo.
+  switch(origin){
+    case 'https://api.pianolouvorja.com.br':return 'https://api.pianolouvorja.com.br';
+    case 'https://api-stg.pianolouvorja.com.br':return 'https://api-stg.pianolouvorja.com.br';
+    case 'https://api.louvorja.com.br':return 'https://api.louvorja.com.br';
+    case 'https://api-stg.louvorja.com.br':return 'https://api-stg.louvorja.com.br';
+    case 'https://api.louvorja.workers.dev':return 'https://api.louvorja.workers.dev';
+    default:return '';
+  }
+}
+function palcoMediaUrl(value){
+  if(!value)return '';
+  try{value=decodeURIComponent(String(value))}catch(e){value=String(value)}
+  let parsed;
+  try{parsed=new URL(String(value),location.href)}catch(e){return ''}
+  if(parsed.username||parsed.password)return '';
+  if(parsed.protocol==='data:')return /^data:(image|audio|video)\/[a-z0-9.+-]+;base64,/i.test(String(value))?parsed.href:'';
+  if(parsed.protocol==='file:')return location.protocol==='file:'?parsed.href:'';
+  if(parsed.protocol==='blob:'){
+    if(parsed.origin==='null')return location.protocol==='file:'?parsed.href:'';
+    try{const source=new URL(parsed.origin);return palcoLanHost(source.hostname)||palcoOfficialOrigin(source.origin)?parsed.href:''}catch(e){return ''}
+  }
+  if(parsed.protocol!=='http:'&&parsed.protocol!=='https:')return '';
+  const local=palcoLanHost(parsed.hostname);
+  const official=palcoOfficialOrigin(parsed.origin);
+  if(!local&&!official)return '';
+  const origin=official||(parsed.protocol+'//'+local+(parsed.port?':'+Number(parsed.port):''));
+  return origin+parsed.pathname+parsed.search+parsed.hash;
+}
+function proxyUrl(original){return palcoMediaUrl(original)}
+function lanSenderHost(){return palcoLanHost(host)}
+function palcoSocketUrl(){
+  const base=palcoLanUrl(host,port,'/palco','ws');
+  if(!base)return '';
+  const raw=qs.get('token');
+  return base+(typeof raw==='string'&&/^[A-Z0-9]{5}$/.test(raw)?'?token='+raw:'');
+}
+function palcoWsUrl(){return palcoSocketUrl()}
 
 function setStatus(t,err){const s=$('status');s.textContent=t;
   const c=$('idleConn');if(c){
@@ -259,8 +297,10 @@ let host=qs.get('host')||localStorage.getItem('palcoHost')||location.hostname||'
 let port=qs.get('port')||localStorage.getItem('palcoPort')||'7081';
 
 function probeHttp(ip,httpPort){
+  const url=palcoLanUrl(ip,httpPort,'/status','http');
+  if(!url)return Promise.resolve(null);
   return new Promise(res=>{
-    fetch('http://'+ip+':'+httpPort+'/status')
+    fetch(url,{redirect:'error'})
       .then(function(r){return r.json()})
       .then(function(j){res(j&&('unlocked' in j)?j:null)})
       .catch(function(){res(null)});
@@ -270,7 +310,8 @@ function probeSender(ip){
   // Porta digitada pode ser WS (7081) OU HTTP do slot (a UI mostra a HTTP,
   // ex.: slot 1 = 7082/7083). Tenta a dupla HTTP/WS em ambos os sentidos:
   // p como HTTP, p-1 (p=WS) e p+1 (p=HTTP→WS=p+1).
-  var p=parseInt(port,10)||7081;
+  if(!palcoLanUrl(ip,port,'/status','http'))return Promise.resolve(null);
+  var p=Number(port);
   return probeHttp(ip,p).then(function(j){
     if(j)return normalizePort(ip,j,p+1);        // p era HTTP → WS=p+1
     return probeHttp(ip,p-1).then(function(j2){
@@ -283,8 +324,9 @@ function probeSender(ip){
   });
 }
 function normalizePort(ip,j,wsPort){
-  port=String(wsPort);
-  return ip;
+  if(!palcoLanUrl(ip,wsPort,'/palco','ws'))return null;
+  port=String(Number(wsPort));
+  return palcoLanHost(ip);
 }
 
 async function scanSubnet(){
@@ -292,16 +334,17 @@ async function scanSubnet(){
   // presume /24 da própria TV (rede típica de igreja)
   // file:// (IPK/simulador local): hostname vazio — tenta últimos hosts
   // conhecidos da sub-rede salva antes do default. Cobertura p/ IPK.
-  let me=location.hostname;
+  let me=palcoLanHost(location.hostname);
   if(!me){
     const saved=localStorage.getItem('palcoHost');
-    me=saved||'192.168.1.100';
+    me=palcoLanHost(saved)||'192.168.1.100';
   }
   const prefix=me.split('.').slice(0,3).join('.');
-  const base=host?host.split('.').slice(0,3).join('.'):prefix;
+  const known=palcoLanHost(host);
+  const base=known&&known!=='localhost'?known.split('.').slice(0,3).join('.'):prefix;
   const ips=[];
   for(let i=1;i<255;i++)ips.push(base+'.'+i);
-  if(host)ips.unshift(host); // último conhecido primeiro
+  if(known)ips.unshift(known); // último conhecido primeiro
   const found=[];
   const CONC=42; // F3.3v: 20→42 e timeout 900→450ms — scan ~3x mais rápido
   for(let i=0;i<ips.length;i+=CONC){
@@ -338,9 +381,11 @@ function connect(){
   }
   // Tenta WS direto no host salvo; se falhar 1x sem nunca abrir, host é stale.
   function directTry(){
+    const socketUrl=palcoWsUrl();
+    if(!socketUrl){setStatus(L10N.notFound,true);return}
     var opened=false;
     var t=setTimeout(function(){if(!opened){dlog('WS direto falhou — host stale');localStorage.removeItem('palcoHost');host='';connect()}},3000);
-    try{var w=new WebSocket('ws://'+host+':'+port+'/palco');
+    try{var w=new WebSocket(socketUrl);
       w.onopen=function(){opened=true;clearTimeout(t);try{w.close()}catch(e){};doConnect()};
       w.onerror=function(){};
     }catch(e){clearTimeout(t);localStorage.removeItem('palcoHost');host='';connect()}
@@ -358,9 +403,11 @@ function stopMediaOnServerLoss(){
 }
 
 function doConnect(){
+  const socketUrl=palcoWsUrl();
+  if(!socketUrl){setStatus(L10N.notFound,true);return}
   dlog('doConnect '+host+':'+port);
   setStatus(L10N.connecting.replace('{h}',host).replace('{p}',port));
-  try{ws=new WebSocket('ws://'+host+':'+port+'/palco')}catch(e){retry();return}
+  try{ws=new WebSocket(socketUrl)}catch(e){retry();return}
   ws.onopen=()=>{tries=0;dlog('WS OPEN '+host);setStatus('● '+host);
     if(window.__hideSplash)window.__hideSplash(); // F3.3j: splash sai no connect
     localStorage.setItem('palcoHost',host);
