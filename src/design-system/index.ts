@@ -6,8 +6,9 @@ export { default as MediaCollectionList } from './components/data/MediaCollectio
 export { default as DockFooter } from './components/navigation/DockFooter.vue'
 export { default as BottomNavigation } from './components/navigation/BottomNavigation.vue'
 export { default as HistoryNav } from './components/navigation/HistoryNav.vue'
+export { default as MinimizedPagesBar } from './components/navigation/MinimizedPagesBar.vue'
 
-export type { DockNavItem, HistoryNavDot } from './types/navigation'
+export type { DockNavItem, HistoryNavDot, MinimizedBarItem } from './types/navigation'
 
 export * from './tokens'
 export * from './themes'
