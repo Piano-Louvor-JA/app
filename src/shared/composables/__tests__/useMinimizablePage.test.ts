@@ -260,10 +260,10 @@ describe('useMinimizablePage — efeito gênio e desempenho', () => {
     main.innerHTML = ''
     main.appendChild(pageRoot)
     const w = await mountPage('/albums/5')
-    pageRoot.style.visibility = 'hidden' // o fantasma escondeu
+    pageRoot.style.contentVisibility = 'hidden' // o fantasma escondeu
     await minimize()
     vi.advanceTimersByTime(1100)
-    expect(pageRoot.style.visibility).toBe('')
+    expect(pageRoot.style.contentVisibility).toBe('')
     w.unmount()
   })
 

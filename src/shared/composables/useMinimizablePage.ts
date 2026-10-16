@@ -85,7 +85,7 @@ export function useMinimizablePage<S>(options: MinimizablePageOptions<S>) {
         removeGhost()
         if (pageEl) {
           setTimeout(() => {
-            pageEl.style.visibility = ''
+            pageEl.style.contentVisibility = ''
           }, UNHIDE_FALLBACK_MS)
         }
       } else {

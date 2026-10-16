@@ -206,7 +206,9 @@ describe('playGenieGhost (imagem da tela no lugar da página viva)', () => {
     expect(img.style.cssText).toContain('position: fixed')
     expect([img.style.left, img.style.top, img.style.width, img.style.height]).toEqual(['0px', '100px', '1000px', '600px'])
     expect(img.style.transformOrigin).toBe('500px 695px')
-    expect(realPage.style.visibility).toBe('hidden')
+    // content-visibility: some sem recalcular o estilo de cada elemento (~20 ms × ~250 ms)
+    expect(realPage.style.contentVisibility).toBe('hidden')
+    expect(realPage.style.visibility).toBe('')
     expect(animate).toHaveBeenCalledWith(genieKeyframes(page, item), {
       duration: GENIE_DURATION_MS,
       easing: 'cubic-bezier(0.55, 0, 0.75, 0.3)',
@@ -234,7 +236,7 @@ describe('playGenieGhost (imagem da tela no lugar da página viva)', () => {
     ;(HTMLElement.prototype as { animate?: unknown }).animate = undefined
     const realPage = document.createElement('section')
     expect(await playGenieGhost('x', page, item, 'minimize', realPage)).toBeNull()
-    expect(realPage.style.visibility).toBe('')
+    expect(realPage.style.contentVisibility).toBe('')
     expect(ghost()).toBeNull()
   })
 
