@@ -13,14 +13,15 @@ import {
   type ViewScrollMemory,
 } from '../useViewScrollMemory'
 
-/** Elemento rolável com limite (jsdom não calcula alturas). */
-function makeScrollable(el: Element, maxTop = 10_000) {
+/** Elemento rolável com limite (jsdom não calcula alturas). Rolar dispara scroll, como no navegador. */
+function makeScrollable(el: Element, maxTop = 10_000, { emit = true } = {}) {
   let top = 0
   Object.defineProperty(el, 'scrollTop', {
     configurable: true,
     get: () => top,
     set: (v: number) => {
       top = Math.max(0, Math.min(v, maxTop))
+      if (emit) el.dispatchEvent(new Event('scroll'))
     },
   })
   return {
@@ -200,6 +201,15 @@ describe('useViewScrollMemory', () => {
 })
 
 describe('useViewScrollMemory — captura e semente (páginas minimizadas)', () => {
+  it('só os elementos que dispararam scroll entram na conta (página grande não pesa)', async () => {
+    const quiet = document.createElement('div')
+    view.appendChild(quiet)
+    makeScrollable(quiet, 10_000, { emit: false })
+    quiet.scrollTop = 70 // sem evento de scroll: não entra na conta
+    view.scrollTop = 250
+    expect(memory.captureCurrent()).toEqual([{ path: [0], top: 250, left: 0 }])
+  })
+
   it('captureCurrent devolve a rolagem da tela atual', () => {
     view.scrollTop = 250
     expect(memory.captureCurrent()).toEqual([{ path: [0], top: 250, left: 0 }])

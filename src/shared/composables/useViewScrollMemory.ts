@@ -1,4 +1,4 @@
-import { inject, onUnmounted, type InjectionKey, type Ref } from 'vue'
+import { inject, onUnmounted, watch, type InjectionKey, type Ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { applyScroll, captureScroll, type ScrollMark } from '@shared/services/view-scroll-memory'
@@ -41,6 +41,21 @@ export function useViewScrollMemory(root: Ref<HTMLElement | null>): ViewScrollMe
   const saved = new Map<string, ScrollMark[]>()
   let cancelRestore: (() => void) | null = null
 
+  /** Elementos que rolaram (evento scroll em captura): só eles são medidos. */
+  const scrolled = new Set<Element>()
+  // só elementos dentro do <main> chegam aqui (listener nele, em captura)
+  const onScroll = (event: Event) => {
+    scrolled.add(event.target as Element)
+  }
+  watch(
+    root,
+    (el, previous) => {
+      previous?.removeEventListener('scroll', onScroll, true)
+      el?.addEventListener('scroll', onScroll, { capture: true, passive: true })
+    },
+    { immediate: true },
+  )
+
   function seed(fullPath: string, marks: ScrollMark[]) {
     saved.delete(fullPath)
     if (marks.length === 0) return
@@ -49,13 +64,15 @@ export function useViewScrollMemory(root: Ref<HTMLElement | null>): ViewScrollMe
   }
 
   function captureCurrent(): ScrollMark[] {
-    return root.value ? captureScroll(root.value) : []
+    return root.value ? captureScroll(root.value, scrolled) : []
   }
 
   const stopGuard = router.beforeEach((_to, from) => {
     cancelRestore?.()
     if (!root.value) return
-    seed(from.fullPath, captureScroll(root.value))
+    seed(from.fullPath, captureScroll(root.value, scrolled))
+    // a tela vai embora: os elementos dela saem da conta
+    scrolled.clear()
   })
 
   function restore(fullPath: string) {
@@ -87,6 +104,7 @@ export function useViewScrollMemory(root: Ref<HTMLElement | null>): ViewScrollMe
   onUnmounted(() => {
     stopGuard()
     cancelRestore?.()
+    root.value?.removeEventListener('scroll', onScroll, true)
   })
 
   return { restore, captureCurrent, seed, getRoot: () => root.value }

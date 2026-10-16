@@ -78,6 +78,49 @@ describe('captureScroll', () => {
   })
 })
 
+describe('captureScroll com candidatos (só o que rolou)', () => {
+  it('mede só os candidatos: não percorre a página inteira', () => {
+    const root = build('<section><div class="a"></div><div class="b"><ul></ul></div></section>')
+    const section = root.querySelector('section')!
+    const list = root.querySelector('ul')!
+    const other = root.querySelector('.a')!
+    scrollable(section)
+    scrollable(list)
+    scrollable(other)
+    section.scrollTop = 300
+    list.scrollTop = 40
+    other.scrollTop = 99 // rolou, mas não está entre os candidatos
+    expect(captureScroll(root, [list, section])).toEqual([
+      { path: [0], top: 300, left: 0 },
+      { path: [0, 1, 0], top: 40, left: 0 },
+    ])
+  })
+
+  it('devolve na ordem do documento mesmo com candidatos fora de ordem', () => {
+    const root = build('<section><div class="a"></div><div class="b"></div></section>')
+    const a = root.querySelector('.a')!
+    const b = root.querySelector('.b')!
+    scrollable(a)
+    scrollable(b)
+    a.scrollTop = 10
+    b.scrollTop = 20
+    expect(captureScroll(root, [b, a]).map((m) => m.path)).toEqual([[0, 0], [0, 1]])
+  })
+
+  it('ignora candidatos fora da raiz, a própria raiz e os que voltaram ao topo', () => {
+    const root = build('<section></section>')
+    const section = root.querySelector('section')!
+    scrollable(section)
+    const outside = document.createElement('div')
+    document.body.appendChild(outside)
+    scrollable(outside)
+    outside.scrollTop = 50
+    scrollable(root)
+    root.scrollTop = 10
+    expect(captureScroll(root, [outside, root, section])).toEqual([])
+  })
+})
+
 describe('applyScroll', () => {
   it('aplica e informa que terminou quando todas as posições foram alcançadas', () => {
     const root = build('<section><ul></ul></section>')

@@ -673,6 +673,8 @@ describe('AppShell — memória de rolagem', () => {
 
     const first = w.find('.scroll-view').element as HTMLElement
     first.scrollTop = 420
+    // no navegador rolar dispara scroll (o jsdom não dispara sozinho)
+    first.dispatchEvent(new Event('scroll'))
     await router.push('/bible')
     await settle()
 
