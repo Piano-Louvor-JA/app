@@ -1,6 +1,6 @@
 {
   "name": "louvorja-piano",
-  "version": "1.31.1",
+  "version": "1.31.2",
   "private": true,
   "license": "MIT",
   "type": "module",
@@ -19,6 +19,7 @@
     "guard": "node electron/guard/cli.mjs",
     "build": "run-p type-check \"build-only {@}\" --",
     "build-only": "npm run guard && vite build --base=./",
+    "postbuild-only": "node electron/guard/verify-bundle.mjs",
     "type-check": "vue-tsc --build",
     "build:stg": "cross-env PIANO_BUILD_PROFILE=homologation npm run build-only",
     "build:release": "cross-env PIANO_BUILD_PROFILE=release npm run build-only",
