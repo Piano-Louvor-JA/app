@@ -1,12 +1,19 @@
 // @vitest-environment node
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import {
+  BAKED_PROFILE_FILE,
   HOSTS,
   PROFILES,
   isProductionUrl,
   isReleaseProfile,
+  diagnosticApiHosts,
   profileApiConfig,
+  readBakedProfile,
+  rendererApiEnvFor,
   resolveBuildProfile,
   resolveEffectiveApi,
 } from '../profile.mjs'
@@ -92,5 +99,75 @@ describe('resolveEffectiveApi — env sobrepõe, produção bloqueada fora de re
   it('fallbacks de non-release nunca contêm produção (RF-05.6)', () => {
     const cfg = resolveEffectiveApi({ PIANO_API_FALLBACK_URLS: `${PROD},https://api.louvorja.com.br` })
     expect(cfg.fallbackHosts.join(' ')).not.toContain('api.pianolouvorja.com.br')
+  })
+})
+
+// Caso real (v1.31.0): o main resolvia o perfil pelo env do PC do usuário, onde
+// PIANO_BUILD_PROFILE não existe — release publicada caía em STG. O build grava
+// o perfil em dist/build-profile.json e o app empacotado lê dali.
+describe('perfil gravado no pacote (dist/build-profile.json)', () => {
+  function packagedModulePath(content, { asar = true } = {}) {
+    const root = mkdtempSync(path.join(tmpdir(), 'piano-profile-'))
+    const appDir = path.join(root, asar ? 'app.asar' : 'app')
+    mkdirSync(path.join(appDir, 'electron'), { recursive: true })
+    mkdirSync(path.join(appDir, 'dist'), { recursive: true })
+    if (content !== undefined) writeFileSync(path.join(appDir, 'dist', BAKED_PROFILE_FILE), content)
+    return path.join(appDir, 'electron', 'profile.mjs')
+  }
+
+  it('app empacotado: lê o perfil gravado pelo build', () => {
+    expect(readBakedProfile(packagedModulePath(JSON.stringify({ profile: 'release' })))).toBe('release')
+  })
+
+  it('fora do asar (dev, build, testes): nunca usa um dist/ antigo', () => {
+    const modulePath = packagedModulePath(JSON.stringify({ profile: 'release' }), { asar: false })
+    expect(readBakedProfile(modulePath)).toBeUndefined()
+  })
+
+  it('arquivo ausente ou inválido: sem perfil gravado (cai em homologation)', () => {
+    expect(readBakedProfile(packagedModulePath(undefined))).toBeUndefined()
+    expect(readBakedProfile(packagedModulePath('{quebrado'))).toBeUndefined()
+    expect(readBakedProfile(packagedModulePath(JSON.stringify({ profile: 7 })))).toBeUndefined()
+  })
+
+  it('sem env, o perfil gravado decide: release usa produção no main', () => {
+    expect(resolveBuildProfile({}, 'release')).toBe('release')
+    expect(resolveEffectiveApi({}, 'release').primary).toBe(PROD)
+    expect(diagnosticApiHosts({}, 'release')[0]).toBe('api.pianolouvorja.com.br')
+  })
+
+  it('env explícito vence o perfil gravado', () => {
+    expect(resolveBuildProfile({ PIANO_BUILD_PROFILE: 'homologation' }, 'release')).toBe('homologation')
+    expect(resolveEffectiveApi({ PIANO_BUILD_PROFILE: 'development' }, 'release').primary).toBe(STG)
+  })
+
+  it('perfil gravado inválido: erro claro (fail-closed)', () => {
+    expect(() => resolveBuildProfile({}, 'production')).toThrow(/PIANO_BUILD_PROFILE/)
+  })
+})
+
+describe('rendererApiEnvFor — o que o vite injeta no renderer', () => {
+  it('release: perfil e URLs de produção', () => {
+    expect(rendererApiEnvFor({ PIANO_BUILD_PROFILE: 'release' })).toEqual({
+      VITE_PIANO_PROFILE: 'release',
+      VITE_URL_DATABASE: `${PROD}/json_db`,
+      VITE_URL_FILES: `${PROD}/file`,
+      VITE_PALCO_API_URL: PROD,
+      VITE_API_FALLBACK_URLS: PUBLIC_FALLBACKS.join(','),
+    })
+  })
+
+  it('sem perfil: homologation com URLs STG', () => {
+    const env = rendererApiEnvFor({})
+    expect(env.VITE_PIANO_PROFILE).toBe('homologation')
+    expect(env.VITE_URL_DATABASE).toBe(`${STG}/json_db`)
+    expect(env.VITE_URL_FILES).toBe(`${STG}/file`)
+    expect(env.VITE_PALCO_API_URL).toBe(STG)
+  })
+
+  it('VITE_* explícito no env do processo vence o contrato', () => {
+    const env = rendererApiEnvFor({ VITE_URL_FILES: 'http://localhost:3100/file', VITE_API_FALLBACK_URLS: 'http://localhost:3100' })
+    expect(env.VITE_URL_FILES).toBe('http://localhost:3100/file')
+    expect(env.VITE_API_FALLBACK_URLS).toBe('http://localhost:3100')
   })
 })
