@@ -49,6 +49,24 @@ jobs:
             > "$script"
           node "$script" --fetch --repo "$GITHUB_REPOSITORY" --ref "$TARGET_REF"
 
+      # Único criador da GitHub Release da tag. build-windows.yml e
+      # build-macos.yml esperam por este draft e só anexam assets; antes,
+      # cada publisher criava a sua e a v1.31.2 ficou com duas releases.
+      # Checkout do commit do workflow: tags antigas não têm o script.
+      - name: Checkout release scripts
+        if: steps.decision.outputs.publish == 'true'
+        uses: actions/checkout@v7
+        with:
+          sparse-checkout: scripts
+          fetch-depth: 1
+
+      - name: Create the single draft release
+        if: steps.decision.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: node scripts/release-draft.mjs --repo "$GITHUB_REPOSITORY" --tag "$TAG" --mode create
+
   package:
     name: Package ${{ matrix.arch }}
     needs: decide
@@ -288,6 +306,12 @@ jobs:
           TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
+          # Uma só release por tag (drafts entram na listagem da API).
+          releases="$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" --paginate --jq ".[] | select(.tag_name == \"$TAG\") | .id" | wc -l)"
+          if [ "$releases" -ne 1 ]; then
+            echo "Esperada 1 GitHub Release para $TAG; encontradas $releases" >&2
+            exit 1
+          fi
           gh release view "$TAG" --json assets --jq '.assets[].name' | tee /tmp/assets
           test "$(grep -cE '\.(AppImage|deb|rpm|pacman|tar\.gz)$' /tmp/assets)" -ge 10
           # Linux exige x64+arm64; Windows/macOS também sobem SHA256SUMS-* na mesma release.
