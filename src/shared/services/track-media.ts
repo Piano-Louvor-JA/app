@@ -272,7 +272,7 @@ export type TrackMediaDownloadResult =
 function resolveRemoteFileUrl(urlPath: string): string {
   if (/^https?:\/\//i.test(urlPath)) return urlPath
   const cleanPath = urlPath.startsWith('/') ? urlPath.slice(1) : urlPath
-  const base = import.meta.env.VITE_URL_FILES ?? 'https://api-stg.pianolouvorja.com.br/file'
+  const base = import.meta.env.VITE_URL_FILES ?? defaultFilesBase()
   return `${base}/${cleanPath}`
 }
 

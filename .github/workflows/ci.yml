@@ -284,6 +284,8 @@ jobs:
         run: node --test scripts/coverage-gate-limit.test.mjs
       - name: DMG universal e binários nativos
         run: node --test scripts/mac-universal-arch-files.test.mjs
+      - name: Bundle de release aponta para produção (renderer + main)
+        run: node --test scripts/release-bundle.test.mjs
 
   e2e-tests:
     name: E2E Tests (playwright)
