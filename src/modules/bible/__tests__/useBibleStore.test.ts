@@ -113,6 +113,27 @@ describe('bootstrap', () => {
     expect(store.verses).toEqual(GEN1)
   })
 
+  it('catálogo pronto libera a tela antes do capítulo chegar (loading só nos versículos)', async () => {
+    let resolveChapter: (verses: Record<string, string>) => void = () => {}
+    mockVerses.mockReturnValue(
+      new Promise((resolve) => {
+        resolveChapter = resolve
+      }),
+    )
+    const store = useBibleStore()
+    const pending = store.bootstrap()
+    await vi.waitFor(() => expect(mockVerses).toHaveBeenCalled())
+
+    expect(store.isLoadingMeta).toBe(false)
+    expect(store.isLoadingVerses).toBe(true)
+    expect(store.books).toEqual(BOOKS)
+
+    resolveChapter(GEN1)
+    await pending
+    expect(store.isLoadingVerses).toBe(false)
+    expect(store.verses).toEqual(GEN1)
+  })
+
   it('erro de catálogo seta lastErrorKey e zera listas', async () => {
     mockBooks.mockRejectedValue(new Error('offline'))
     const store = useBibleStore()

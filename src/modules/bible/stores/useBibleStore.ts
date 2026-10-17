@@ -339,6 +339,9 @@ export const useBibleStore = defineStore('bible', () => {
       isProjecting.value = isProjectionModuleOpen('bible')
       if (isProjecting.value) startProjectionWatch()
 
+      // Catálogo pronto: a tela aparece já; o capítulo tem loading próprio
+      // (isLoadingVerses) e não segura o "Carregando" do módulo inteiro.
+      isLoadingMeta.value = false
       await refreshChapter()
     } catch (error) {
       console.error('[bible] falha ao iniciar módulo', error)
