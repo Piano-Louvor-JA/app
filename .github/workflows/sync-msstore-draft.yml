@@ -1,0 +1,102 @@
+# Gate C (PLAN msstore-mcp): sincroniza o draft da Microsoft Store com um
+# asset .exe de GitHub Release. SOMENTE workflow_dispatch, environment
+# protegido microsoft-store-draft (required reviewer humano). Nunca dispara
+# submit. Nunca roda por tag, release ou workflow encadeado.
+name: Sync MS Store Draft
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag da release com o instalador (ex: v1.31.0)'
+        required: true
+        type: string
+      asset_regex:
+        description: 'Regex do asset (deve casar com EXATAMENTE um .exe). Padrão: Setup\.exe$'
+        required: false
+        default: 'Setup\.exe$'
+        type: string
+      package_id:
+        description: 'Package ID do draft a atualizar (obrigatório)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: msstore-draft-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  sync-draft:
+    name: PATCH package + commit draft
+    runs-on: ubuntu-24.04
+    # Gate humano: environment com required reviewer. Segredos MSSTORE_*
+    # existem APENAS neste environment.
+    environment: microsoft-store-draft
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Resolver asset único da release (antes de qualquer mutação)
+        id: asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          ASSET_REGEX: ${{ inputs.asset_regex }}
+        run: |
+          set -euo pipefail
+          node --input-type=module -e "
+            import { pickSingleAsset, assertHttpsUrl, assertTagMatchesVersion } from './scripts/msstore-release-helpers.mjs';
+            const assets = JSON.parse(process.env.RELEASE_ASSETS ?? '[]');
+            const url = assertHttpsUrl(pickSingleAsset(process.env.TAG, process.env.ASSET_REGEX, assets));
+            console.log('url=' + url);
+          " 2>&1 || {
+            # assets precisam vir da API; refaz com gh e valida
+            gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq '.assets' > /tmp/assets.json
+            RELEASE_ASSETS="$(cat /tmp/assets.json)" node --input-type=module -e "
+              import { pickSingleAsset, assertHttpsUrl, assertTagMatchesVersion } from './scripts/msstore-release-helpers.mjs';
+              import { readFileSync } from 'node:fs';
+              const assets = JSON.parse(process.env.RELEASE_ASSETS);
+              const url = assertHttpsUrl(pickSingleAsset(process.env.TAG, process.env.ASSET_REGEX, assets));
+              const version = assertTagMatchesVersion(process.env.TAG, JSON.parse(readFileSync('package.json','utf8')).version);
+              console.log('ASSET_URL=' + url);
+              console.log('VERSION=' + version);
+            " | tee -a "$GITHUB_OUTPUT"
+          }
+
+      - name: Status do draft antes da mutação (read-only)
+        env:
+          MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
+          MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
+          MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
+          MSSTORE_SELLER_ID: ${{ secrets.MSSTORE_SELLER_ID }}
+          MSSTORE_PRODUCT_ID: ${{ secrets.MSSTORE_PRODUCT_ID }}
+        run: node scripts/msstore-cli.mjs status
+
+      - name: PATCH pacote + commit draft
+        env:
+          MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
+          MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
+          MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
+          MSSTORE_SELLER_ID: ${{ secrets.MSSTORE_SELLER_ID }}
+          MSSTORE_PRODUCT_ID: ${{ secrets.MSSTORE_PRODUCT_ID }}
+          TAG: ${{ inputs.tag }}
+          ASSET_REGEX: ${{ inputs.asset_regex }}
+          PACKAGE_ID: ${{ inputs.package_id }}
+        run: node scripts/msstore-cli.mjs sync-draft "$TAG" "$ASSET_REGEX" "$PACKAGE_ID"
+
+      - name: Resumo
+        if: always()
+        run: |
+          {
+            echo "## Sync MS Store Draft"
+            echo "- tag: \`${{ inputs.tag }}\`"
+            echo "- package_id: \`${{ inputs.package_id }}\`"
+            echo "- Correlation IDs nos logs (stderr) do job."
+            echo "- Nenhum submit foi executado. Certificação é outro workflow dispatch."
+          } >> "$GITHUB_STEP_SUMMARY"

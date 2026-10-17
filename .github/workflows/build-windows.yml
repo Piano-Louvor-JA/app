@@ -160,14 +160,6 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
-      - name: Dispatch Microsoft Store after APPX upload
-        if: steps.decision.outputs.publish == 'true' && steps.store.outputs.enabled == 'true'
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
-        run: |
-          set -euo pipefail
-          # Manual builds resolve package version from their checked-out commit.
-          if [ -z "$TAG" ]; then TAG="v$(node -p "require('./package.json').version")"; fi
-          gh workflow run msstore-release.yml --ref main -f "version=$TAG"
+      # PLAN msstore-mcp (ADR-003): tag NÃO dispara automação Microsoft Store.
+      # Sync de draft e certificação são workflow_dispatch separados, com
+      # environments protegidos distintos e aprovação humana obrigatória.
