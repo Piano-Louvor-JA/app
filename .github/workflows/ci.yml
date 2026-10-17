@@ -280,6 +280,8 @@ jobs:
       - run: npx vitest run --exclude='.stryker-tmp/**' --exclude='.worktrees/**'
       - name: Release publish decision
         run: node --test scripts/release-publish-decision.test.mjs
+      - name: Release única por tag
+        run: node --test scripts/release-draft.test.mjs
       - name: Limite de cobertura por destino
         run: node --test scripts/coverage-gate-limit.test.mjs
       - name: DMG universal e binários nativos
