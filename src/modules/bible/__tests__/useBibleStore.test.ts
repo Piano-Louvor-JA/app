@@ -7,6 +7,7 @@ vi.mock('../services/bible-catalog', () => ({
   loadBibleVersions: vi.fn(),
   loadChapterVerses: vi.fn(),
   pickDefaultVersionId: vi.fn(),
+  requestBibleBundleUpdate: vi.fn(async () => undefined),
   resolveTestament: vi.fn((n: number) => (n <= 39 ? 'ot' : 'nt')),
 }))
 
@@ -45,6 +46,7 @@ import {
   loadBibleVersions,
   loadChapterVerses,
   pickDefaultVersionId,
+  requestBibleBundleUpdate,
 } from '../services/bible-catalog'
 import { publishBibleSelection, publishBibleRuntimeOff } from '../services/bible-runtime'
 import { useBibleStore } from '../stores/useBibleStore'
@@ -111,6 +113,12 @@ describe('bootstrap', () => {
     expect(store.testamentFilter).toBe('ot')
     expect(store.isLoadingMeta).toBe(false)
     expect(store.verses).toEqual(GEN1)
+  })
+
+  it('abrir o módulo pede verificação de bundles novos (sem esperar)', async () => {
+    const store = useBibleStore()
+    await store.bootstrap()
+    expect(vi.mocked(requestBibleBundleUpdate)).toHaveBeenCalledTimes(1)
   })
 
   it('catálogo pronto libera a tela antes do capítulo chegar (loading só nos versículos)', async () => {

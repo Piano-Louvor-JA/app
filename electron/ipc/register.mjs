@@ -27,6 +27,7 @@ import {
 } from '../workspace.mjs'
 import { ensureWorkspaceDirectories, getWorkspacePaths } from '../paths.mjs'
 import { getBibleStore } from '../bible-store.mjs'
+import { getBibleUpdater } from '../bible-updater.mjs'
 import {
   ensureSorteioDefaultAudio,
   importSorteioCustomAudio,
@@ -530,6 +531,15 @@ export function registerWorkspaceIpc() {
     } catch (error) {
       console.error('[ipc] bible:list-versions', error)
       return []
+    }
+  })
+
+  ipcMain.handle('bible:check-updates', async () => {
+    try {
+      return await getBibleUpdater().check()
+    } catch (error) {
+      console.error('[ipc] bible:check-updates', error)
+      return { status: 'error', updated: [], failed: [] }
     }
   })
 

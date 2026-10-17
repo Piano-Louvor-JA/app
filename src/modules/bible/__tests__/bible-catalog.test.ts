@@ -6,6 +6,7 @@ import {
   loadBibleVersions,
   loadChapterVerses,
   pickDefaultVersionId,
+  requestBibleBundleUpdate,
   resolveBookTone,
   resolveTestament,
   resolveVersionAbbreviation,
@@ -339,6 +340,32 @@ describe('loadChapterVerses', () => {
     mockFetch.mockRejectedValue(new Error('offline'))
     await expect(loadChapterVerses(8, 19, 23)).resolves.toEqual({ '1': 'primeira vez' })
     expect(mockFetch).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('requestBibleBundleUpdate', () => {
+  it('fora do desktop não faz nada', async () => {
+    await expect(requestBibleBundleUpdate()).resolves.toBeUndefined()
+  })
+
+  it('pede ao main para conferir bundles novos', async () => {
+    const checkUpdates = vi.fn(async () => ({ status: 'up-to-date', updated: [], failed: [] }))
+    mockBridge.mockReturnValue({
+      bible: { getChapter: vi.fn(), listVersions: vi.fn(), checkUpdates },
+    } as unknown as LouvorJaBridge)
+    await requestBibleBundleUpdate()
+    expect(checkUpdates).toHaveBeenCalledTimes(1)
+  })
+
+  it('falha do main não vaza para a tela', async () => {
+    mockBridge.mockReturnValue({
+      bible: {
+        getChapter: vi.fn(),
+        listVersions: vi.fn(),
+        checkUpdates: vi.fn(async () => Promise.reject(new Error('ipc'))),
+      },
+    } as unknown as LouvorJaBridge)
+    await expect(requestBibleBundleUpdate()).resolves.toBeUndefined()
   })
 })
 

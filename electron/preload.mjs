@@ -150,6 +150,7 @@ contextBridge.exposeInMainWorld('louvorja', {
     getChapter: (versionId, bookId, chapter) =>
       ipcRenderer.invoke('bible:get-chapter', versionId, bookId, chapter),
     listVersions: () => ipcRenderer.invoke('bible:list-versions'),
+    checkUpdates: () => ipcRenderer.invoke('bible:check-updates'),
   },
 
   random: {

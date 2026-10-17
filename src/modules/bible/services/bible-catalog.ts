@@ -224,6 +224,18 @@ export async function loadChapterVerses(
   return remote
 }
 
+/**
+ * Pede ao main para conferir bundles novos na API (o main limita a 1x/dia).
+ * Nunca lança: atualização é melhor esforço e não afeta a leitura.
+ */
+export async function requestBibleBundleUpdate(): Promise<void> {
+  try {
+    await getDesktopBridge()?.bible?.checkUpdates?.()
+  } catch (error) {
+    console.warn('[bible] falha ao verificar atualização da Bíblia', error)
+  }
+}
+
 /** Preferência padrão: ARA, senão a primeira versão. */
 export function pickDefaultVersionId(
   versions: BibleVersion[],

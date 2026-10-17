@@ -19,6 +19,7 @@ import {
   loadBibleVersions,
   loadChapterVerses,
   pickDefaultVersionId,
+  requestBibleBundleUpdate,
   resolveTestament,
 } from '../services/bible-catalog'
 import { publishBibleSelection, publishBibleRuntimeOff } from '../services/bible-runtime'
@@ -342,6 +343,7 @@ export const useBibleStore = defineStore('bible', () => {
       // Catálogo pronto: a tela aparece já; o capítulo tem loading próprio
       // (isLoadingVerses) e não segura o "Carregando" do módulo inteiro.
       isLoadingMeta.value = false
+      void requestBibleBundleUpdate()
       await refreshChapter()
     } catch (error) {
       console.error('[bible] falha ao iniciar módulo', error)

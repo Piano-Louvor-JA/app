@@ -27,6 +27,12 @@ export type BibleApi = {
   listVersions: () => Promise<
     Array<{ versionId: number; source: 'download' | 'bundled' }>
   >
+  /** Confere bundles novos na API (no máximo 1x/dia). */
+  checkUpdates?: () => Promise<{
+    status: 'skipped' | 'up-to-date' | 'updated' | 'error'
+    updated: number[]
+    failed: number[]
+  }>
 }
 
 export type CatalogApi = {
