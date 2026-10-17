@@ -26,6 +26,7 @@ import {
   writeWorkspaceRecord,
 } from '../workspace.mjs'
 import { ensureWorkspaceDirectories, getWorkspacePaths } from '../paths.mjs'
+import { getBibleStore } from '../bible-store.mjs'
 import {
   ensureSorteioDefaultAudio,
   importSorteioCustomAudio,
@@ -507,6 +508,28 @@ export function registerWorkspaceIpc() {
       return writeWorkspaceRecord(filename, data)
     } catch {
       return false
+    }
+  })
+
+  ipcMain.handle('bible:get-chapter', async (_event, versionId, bookId, chapter) => {
+    try {
+      return await getBibleStore().getChapter(
+        Number(versionId),
+        Number(bookId),
+        Number(chapter),
+      )
+    } catch (error) {
+      console.error('[ipc] bible:get-chapter', error)
+      return null
+    }
+  })
+
+  ipcMain.handle('bible:list-versions', async () => {
+    try {
+      return await getBibleStore().listVersions()
+    } catch (error) {
+      console.error('[ipc] bible:list-versions', error)
+      return []
     }
   })
 

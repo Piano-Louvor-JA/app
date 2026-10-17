@@ -146,6 +146,12 @@ contextBridge.exposeInMainWorld('louvorja', {
     clear: (options) => ipcRenderer.invoke('workspace:clear', options),
   },
 
+  bible: {
+    getChapter: (versionId, bookId, chapter) =>
+      ipcRenderer.invoke('bible:get-chapter', versionId, bookId, chapter),
+    listVersions: () => ipcRenderer.invoke('bible:list-versions'),
+  },
+
   random: {
     ensureDefaultAudio: () => ipcRenderer.invoke('random:ensure-default-audio'),
     importAudio: () => ipcRenderer.invoke('random:import-audio'),
