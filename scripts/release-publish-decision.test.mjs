@@ -272,3 +272,19 @@ test('dispatch de pacotes não depende de checkout implícito', () => {
     assert.match(line, /--repo/)
   }
 })
+
+test('Snap é disparado a partir da tag, exigida pelo perfil de produção', () => {
+  const workflow = readFileSync(join(repoRoot, '.github/workflows/release.yml'), 'utf8')
+  const snap = workflow.split('\n').filter(line => line.includes('gh workflow run') && line.includes('snap-release.yml'))
+  assert.equal(snap.length, 1)
+  assert.match(snap[0], /--ref "\$TAG"/)
+})
+
+test('Microsoft Store espera a release publicada com o .appx antes de baixar', () => {
+  const workflow = readFileSync(join(repoRoot, '.github/workflows/msstore-release.yml'), 'utf8')
+  const job = workflow.slice(workflow.indexOf('\n  release-ready:'), workflow.indexOf('\n  msstore:'))
+  assert.match(job, /needs: decide/)
+  assert.match(job, /releases\/tags\/\$TAG/)
+  assert.match(job, /\.appx/)
+  assert.match(workflow, /\n  msstore:\n\s+needs: \[decide, release-ready\]/)
+})

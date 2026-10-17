@@ -58,8 +58,34 @@ jobs:
           gh api "repos/${GITHUB_REPOSITORY}/contents/scripts/release-publish-decision.mjs?ref=${WORKFLOW_SHA}" -H 'Accept: application/vnd.github.raw' > "$script"
           node "$script" --fetch --repo "$GITHUB_REPOSITORY" --ref "$TARGET_REF"
           rm -f "$script"
-  msstore:
+  # O Build Windows envia o .appx e dispara este workflow enquanto a release ainda
+  # é rascunho; ela só é publicada quando o Release Linux termina.
+  release-ready:
     needs: decide
+    if: needs.decide.outputs.publish == 'true'
+    name: Wait for published release with .appx
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - name: Wait for published release with .appx
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.decide.outputs.tag }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 140); do
+            if gh api "repos/${GITHUB_REPOSITORY}/releases/tags/$TAG" \
+              --jq '.assets[].name' 2>/dev/null | grep -q '\.appx$'; then
+              echo "Release $TAG publicada com .appx."
+              exit 0
+            fi
+            echo "Release $TAG ainda não publicada com .appx (tentativa $attempt)."
+            sleep 30
+          done
+          echo "Release $TAG não foi publicada com .appx a tempo." >&2
+          exit 1
+  msstore:
+    needs: [decide, release-ready]
     if: needs.decide.outputs.publish == 'true'
     name: Publish .appx to Partner Center
     runs-on: windows-latest

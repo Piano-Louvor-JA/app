@@ -266,9 +266,9 @@ jobs:
           TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
-          for workflow in build-flatpak.yml snap-release.yml; do
-            gh workflow run "$workflow" --repo "$GITHUB_REPOSITORY" --ref main -f "version=$TAG"
-          done
+          gh workflow run build-flatpak.yml --repo "$GITHUB_REPOSITORY" --ref main -f "version=$TAG"
+          # O Snap recompila com perfil de produção, que só é liberado com github.ref_type == tag.
+          gh workflow run snap-release.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG" -f "version=$TAG"
 
   verify:
     name: Verify central release
