@@ -65,6 +65,38 @@ describe('app-backup', () => {
     ])
   })
 
+  it('inclui a Bíblia atualizada (pasta bible/) no zip e restaura substituindo a anterior', async () => {
+    const dataRoot = tempDir('piano-bible-data-')
+    const mediaRoot = tempDir('piano-bible-media-')
+    mkdirSync(path.join(dataRoot, '.sysdata'), { recursive: true })
+    mkdirSync(path.join(dataRoot, 'bible'), { recursive: true })
+    writeFileSync(path.join(dataRoot, '.sysdata', 'bible_2_43_3.bin'), 'capitulo')
+    writeFileSync(path.join(dataRoot, 'bible', '2.json.gz'), 'ARA-gz')
+    writeFileSync(path.join(dataRoot, 'bible', 'manifest.json'), '{"schema":1}')
+
+    const entries = collectBackupEntries({ dataRoot, mediaRoot })
+    expect(entries.map((e) => e.zipPath).sort()).toEqual([
+      '.sysdata/bible_2_43_3.bin',
+      'bible/2.json.gz',
+      'bible/manifest.json',
+    ])
+    expect(isRestorableZipPath('bible/2.json.gz')).toBe(true)
+
+    const zipPath = path.join(tempDir('piano-bible-zip-'), 'LouvorJA-PIANO_biblia.zip')
+    await writeBackupZip(entries, zipPath)
+
+    const restoreRoot = tempDir('piano-bible-restore-')
+    mkdirSync(path.join(restoreRoot, 'bible'), { recursive: true })
+    writeFileSync(path.join(restoreRoot, 'bible', '9.json.gz'), 'versao-antiga')
+    await restoreBackupZip(zipPath, restoreRoot)
+
+    expect(readFileSync(path.join(restoreRoot, 'bible', '2.json.gz'), 'utf8')).toBe('ARA-gz')
+    expect(readFileSync(path.join(restoreRoot, 'bible', 'manifest.json'), 'utf8')).toBe(
+      '{"schema":1}',
+    )
+    expect(() => readFileSync(path.join(restoreRoot, 'bible', '9.json.gz'))).toThrow()
+  })
+
   it('junta leftover da pasta padrão com mídia custom e sobe se o root for covers', () => {
     const dataRoot = tempDir('piano-leftover-')
     const customMedia = tempDir('piano-custom-full-')

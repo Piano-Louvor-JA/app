@@ -839,6 +839,8 @@ export function registerWorkspaceIpc() {
         destRoot: root,
         onProgress: sendProgress,
       })
+      // A pasta bible/ veio do backup: versões já abertas saem da memória.
+      getBibleStore().invalidate()
       const browserStorage = readRestoredBrowserStorage(root)
       if (browserStorage) {
         try {

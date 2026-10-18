@@ -4,6 +4,8 @@ import { promisify } from 'node:util'
 import { gunzip as gunzipCallback } from 'node:zlib'
 import { app } from 'electron'
 
+import { WORKSPACE_DIRS } from './constants.mjs'
+
 const gunzip = promisify(gunzipCallback)
 
 /** Formato de `GET /v1/bible/bundles/{versionId}` da API. */
@@ -129,7 +131,7 @@ export function createBibleStore({ getSources, maxLoaded = 2 }) {
 
 /** Pasta dos bundles baixados pela atualização (fora do `.sysdata`). */
 export function getDownloadedBibleDir() {
-  return path.join(app.getPath('userData'), 'bible')
+  return path.join(app.getPath('userData'), WORKSPACE_DIRS.bible)
 }
 
 /** Pasta dos bundles que vieram no instalador (`extraResources`). */

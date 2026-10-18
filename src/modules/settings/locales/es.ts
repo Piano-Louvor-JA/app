@@ -201,7 +201,7 @@ export default {
       desktopOnly: 'Solo disponible en la aplicación de escritorio.',
       backupTitle: 'Copia de seguridad',
       backupHint:
-        'Guarda un zip de la carpeta de datos (medios, liturgia y playlists). Si los medios están en otro disco, entran en el backup como la carpeta Media predeterminada. La restauración siempre usa las carpetas predeterminadas; luego puede mover los medios en Carpeta de medios.',
+        'Guarda un zip de la carpeta de datos (medios, liturgia, playlists y Biblia). Si los medios están en otro disco, entran en el backup como la carpeta Media predeterminada. La restauración siempre usa las carpetas predeterminadas; luego puede mover los medios en Carpeta de medios.',
       backupCreate: 'Crear copia',
       backupRestore: 'Restaurar copia',
       backupCreating: 'Creando copia…',
