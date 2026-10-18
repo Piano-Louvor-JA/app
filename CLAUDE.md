@@ -91,7 +91,7 @@ Nunca commitar `.env`/`.env.prod` nem copiar seus valores.
 ## Testes e CI
 
 - Testes Vitest em `__tests__/` ao lado do código, com ambiente jsdom, setup em `vitest.setup.ts` e timeout de 30 s. E2E em `e2e/`.
-- Cobertura: o `vitest.config.ts` exige 100%. No CI, a PR para `staging` usa limite de 50% e o resto usa 100%.
+- Cobertura: o `vitest.config.ts` exige 100%. No CI, o caminho da `staging` (PR com base `staging` e push/dispatch em `refs/heads/staging`) usa limite de 50%; `main`, tags e o resto usam 100%.
 - **Jobs do CI (`ci.yml`):**
   - `validate-source`, `lint`, `typecheck`, `coverage`, `build`, `unit-tests`, `paridade`;
   - `regression-gate`, que falha se diminuir o número de testes passando;
