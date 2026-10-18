@@ -351,7 +351,7 @@ describe("pause/volume/queue — rotas de áudio", () => {
 });
 
 describe("gaps3 — preplay download cancelado e displayTitle", () => {
-	it("open desktop: download em curso + close → shouldAbort, fluxo segue (stream)", async () => {
+	it("open desktop: download em curso + close → shouldAbort, nada toca", async () => {
 		bridgeMock.isDesktop = true;
 		trackMediaMock.isDownloaded.mockResolvedValue(false);
 		let releaseDl!: (v: { status: string }) => void;
@@ -373,8 +373,10 @@ describe("gaps3 — preplay download cancelado e displayTitle", () => {
 		expect(dlOpts.shouldAbort()).toBe(true); // br 360
 		releaseDl({ status: "cancelled" });
 		const res = await p;
-		// close() cancelou o gen: ensureTrackDownloaded → false → playbackFailed
-		expect(res.ok).toBe(false);
+		// O player abriu na hora (ok); close() cancelou o gen → não toca.
+		expect(res.ok).toBe(true);
+		await new Promise((r) => setTimeout(r, 0));
+		expect(store.session).toBeNull();
 		expect(store.ondemandDownloadPercent).toBeNull();
 	});
 

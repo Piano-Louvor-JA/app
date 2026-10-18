@@ -348,22 +348,26 @@ export const useMediaStore = defineStore('media', () => {
     void startOndemandDownload(musicId)
   }
 
-  /**
-   * Download PRÉ-play: se a faixa não está no disco e o modo tem áudio,
-   * baixa ANTES de abrir o player. UI mostra progresso; ao concluir, o
-   * caller abre a música normalmente (toca na hora, sem erro feio).
-   */
-  async function ensureTrackDownloaded(musicId: number): Promise<boolean> {
-    if (!isDesktopApp()) return true // web: sempre stream remoto
+  /** Faixa oficial sem cópia no disco (desktop): precisa do download pré-play. */
+  async function needsPreplayDownload(musicId: number): Promise<boolean> {
+    if (!isDesktopApp()) return false // web: sempre stream remoto
     // Música local (id negativo): o áudio já está no data: URL. O download
     // oficial consultaria `music_-N` no catálogo remoto antes de tocar.
-    if (musicId < 0) return true
+    if (musicId < 0) return false
     try {
-      if (await isTrackMediaDownloaded(musicId)) return true
+      // priority: o clique do operador não espera a fila das linhas da lista.
+      return !(await isTrackMediaDownloaded(musicId, { priority: true }))
     } catch {
-      return true // sem certeza: segue fluxo antigo (stream)
+      return false // sem certeza: segue fluxo antigo (stream)
     }
+  }
 
+  /**
+   * Download PRÉ-play: baixa a faixa com o player JÁ aberto (progresso no
+   * player). Retorna false se outra faixa/fechar cancelou (não tocar);
+   * true quando pode tocar (baixou, ou falhou e segue por stream remoto).
+   */
+  async function runPreplayDownload(musicId: number): Promise<boolean> {
     const gen = ++ondemandGen
     ondemandAbort = false
     preplayDownloadMusicId.value = musicId
@@ -555,19 +559,25 @@ export const useMediaStore = defineStore('media', () => {
     let mode: MediaPlaybackMode = requestedMode
     let playbackUrl = ''
     let warningKey: string | undefined
+    // Áudio do catálogo a tocar quando o download pré-play terminar.
+    let preplayAudio: string | null = null
 
     if (mode !== 'no_audio') {
       const catalogAudio = pickSourceUrl(mode, track.audioUrl, track.instrumentalUrl)
-      // Sem cópia local: baixa PRIMEIRO (progresso no player) e toca ao fim.
-      const ready = await ensureTrackDownloaded(musicId)
-      if (!ready) return { ok: false, messageKey: 'media.messages.playbackFailed' }
-      const resolved = await resolveMusicAudioUrl(catalogAudio)
-      if (resolved.ok) {
-        playbackUrl = resolved.url
+      if (await needsPreplayDownload(musicId)) {
+        // Sem cópia local: abre o player JÁ (progresso nele) e toca ao fim do
+        // download. Antes o download inteiro rodava com o operador parado na
+        // lista, sem retorno (caso real de usuário).
+        preplayAudio = catalogAudio
       } else {
-        // Sem path de áudio no catálogo: segue só com slides.
-        mode = 'no_audio'
-        warningKey = 'media.messages.slidesOnlyNoAudio'
+        const resolved = await resolveMusicAudioUrl(catalogAudio)
+        if (resolved.ok) {
+          playbackUrl = resolved.url
+        } else {
+          // Sem path de áudio no catálogo: segue só com slides.
+          mode = 'no_audio'
+          warningKey = 'media.messages.slidesOnlyNoAudio'
+        }
       }
     }
 
@@ -609,14 +619,11 @@ export const useMediaStore = defineStore('media', () => {
     const projectionTask =
       shouldProject && !retainProjection ? startProjection() : null
 
-    if (playbackUrl) {
-      bindAudio()
-      const audio = getMediaAudioElement()
-      audio.volume = volume.value
-      audio.src = playbackUrl
-      audio.load()
-      const played = await playMediaAudio(audio)
-      status.value = played ? 'playing' : 'paused'
+    if (preplayAudio !== null) {
+      status.value = 'loading'
+      void playAfterPreplayDownload(musicId, mode, preplayAudio)
+    } else if (playbackUrl) {
+      const played = await startSessionAudio(playbackUrl)
       if (!played) {
         warningKey = warningKey ?? 'media.messages.playbackFailed'
       }
@@ -625,7 +632,8 @@ export const useMediaStore = defineStore('media', () => {
     }
 
     await refreshResolvedSlideImage()
-    void maybeStartOndemandDownload(musicId)
+    // No pré-play o download já está em curso (não iniciar outro: cancelaria).
+    if (preplayAudio === null) void maybeStartOndemandDownload(musicId)
 
     // Hino tocando = PROJETANDO, sempre (decisão Rafael 27/08): destino vem
     // do seletor na biblioteca (Espelhar/TV individual). Antes: minimizado
@@ -642,6 +650,54 @@ export const useMediaStore = defineStore('media', () => {
     }
 
     return { ok: true, warningKey }
+  }
+
+  async function startSessionAudio(url: string): Promise<boolean> {
+    bindAudio()
+    const audio = getMediaAudioElement()
+    audio.volume = volume.value
+    audio.src = url
+    audio.load()
+    const played = await playMediaAudio(audio)
+    status.value = played ? 'playing' : 'paused'
+    return played
+  }
+
+  function isCurrentSession(musicId: number, mode: MediaPlaybackMode): boolean {
+    return session.value?.musicId === musicId && session.value.mode === mode
+  }
+
+  /**
+   * Continuação do open() sem cópia local: baixa com o player aberto e toca
+   * ao fim. Fechar o player, trocar de faixa ou de modo no meio cancela.
+   */
+  async function playAfterPreplayDownload(
+    musicId: number,
+    mode: MediaPlaybackMode,
+    catalogAudio: string,
+  ): Promise<void> {
+    const canPlay = await runPreplayDownload(musicId)
+    if (!canPlay || !isCurrentSession(musicId, mode)) return
+
+    const resolved = await resolveMusicAudioUrl(catalogAudio)
+    const current = session.value
+    if (!current || !isCurrentSession(musicId, mode)) return
+
+    if (!resolved.ok) {
+      // Sem path de áudio no catálogo: segue só com slides.
+      session.value = {
+        ...current,
+        mode: 'no_audio',
+        audioUrl: '',
+        slideTimesSec: buildSlideTimesSec(current.slides, 'no_audio'),
+      }
+      status.value = 'ready'
+      return
+    }
+
+    session.value = { ...current, audioUrl: resolved.url }
+    await startSessionAudio(resolved.url)
+    void maybeStartOndemandDownload(musicId)
   }
 
   async function play(): Promise<void> {
