@@ -17,6 +17,24 @@ export type WorkspaceApi = {
   clear: (options?: { preserveMedia?: boolean }) => Promise<boolean>
 }
 
+/** Bíblia offline: bundles `<versionId>.json.gz` (download > instalador). */
+export type BibleApi = {
+  getChapter: (
+    versionId: number,
+    bookId: number,
+    chapter: number,
+  ) => Promise<Record<string, string> | null>
+  listVersions: () => Promise<
+    Array<{ versionId: number; source: 'download' | 'bundled' }>
+  >
+  /** Confere bundles novos na API (no máximo 1x/dia). */
+  checkUpdates?: () => Promise<{
+    status: 'skipped' | 'up-to-date' | 'updated' | 'error'
+    updated: number[]
+    failed: number[]
+  }>
+}
+
 export type CatalogApi = {
   downloadDatabase: () => Promise<boolean>
   extractDatabase: () => Promise<boolean>
@@ -476,6 +494,7 @@ export type LouvorJaBridge = {
   zoom?: ZoomApi
   workspace: WorkspaceApi
   catalog: CatalogApi
+  bible?: BibleApi
   classo?: ClassoApi
   ytAuth?: YoutubeAuthApi
   ytAdblock?: YoutubeAdblockApi

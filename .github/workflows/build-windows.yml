@@ -117,9 +117,13 @@ jobs:
       # o arquivo ao final — mesmo comportamento local e no CI.
       # Target "portable" definido no package.json (win.target) — gera
       # LouvorJA-PIANO-<ver>-portable.exe (arquivo único) junto com o Setup.
-      - name: Build Vite + Electron NSIS + Portable (x64) + publish
+      # --publish never: o electron-builder só gera os pacotes e o latest.yml.
+      # Quem cria a GitHub Release é o release.yml (um único draft por tag);
+      # este job apenas anexa os assets no passo "Attach assets" abaixo.
+      # Com --publish always, publishers paralelos criaram duas releases na v1.31.2.
+      - name: Build Vite + Electron NSIS + Portable (x64)
         if: steps.decision.outputs.publish == 'true'
-        run: npm run electron:build -- --win --x64 --publish always
+        run: npm run electron:build -- --win --x64 --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -133,20 +137,14 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Generate SHA256SUMS and upload to release
+      - name: Generate SHA256SUMS
         if: steps.decision.outputs.publish == 'true'
         shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           cd dist-electron
           find . -maxdepth 1 -type f -name '*.exe' -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS-win-x64
           cat SHA256SUMS-win-x64
-          if [ -n "$TAG" ]; then
-            gh release upload "$TAG" SHA256SUMS-win-x64 --clobber
-          fi
 
       - name: Upload x64 installer + portable (artifact backup)
         if: steps.decision.outputs.publish == 'true'
@@ -159,6 +157,26 @@ jobs:
             dist-electron/SHA256SUMS-win-x64
           if-no-files-found: warn
           retention-days: 30
+
+      # Tag: espera o draft criado pelo release.yml (nunca cria). Dispatch
+      # manual: não há release.yml concorrente, então cria se faltar.
+      # Vem antes do dispatch da Store, que baixa o .appx da release.
+      - name: Attach assets to the GitHub Release
+        if: steps.decision.outputs.publish == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+        run: |
+          set -euo pipefail
+          mode=wait
+          if [ -z "$TAG" ]; then TAG="v$(node -p "require('./package.json').version")"; mode=create; fi
+          node scripts/release-draft.mjs --repo "$GITHUB_REPOSITORY" --tag "$TAG" --mode "$mode"
+          shopt -s nullglob
+          assets=(dist-electron/*.exe dist-electron/*.exe.blockmap dist-electron/*.appx dist-electron/latest.yml dist-electron/SHA256SUMS-win-x64)
+          test -f dist-electron/latest.yml || { echo "latest.yml ausente (auto-update)" >&2; exit 1; }
+          gh release upload "$TAG" "${assets[@]}" --clobber
+          printf 'Anexado: %s\n' "${assets[@]}"
 
       - name: Dispatch Microsoft Store after APPX upload
         if: steps.decision.outputs.publish == 'true' && steps.store.outputs.enabled == 'true'

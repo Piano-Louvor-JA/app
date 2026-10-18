@@ -26,6 +26,8 @@ import {
   writeWorkspaceRecord,
 } from '../workspace.mjs'
 import { ensureWorkspaceDirectories, getWorkspacePaths } from '../paths.mjs'
+import { getBibleStore } from '../bible-store.mjs'
+import { getBibleUpdater } from '../bible-updater.mjs'
 import {
   ensureSorteioDefaultAudio,
   importSorteioCustomAudio,
@@ -510,6 +512,37 @@ export function registerWorkspaceIpc() {
     }
   })
 
+  ipcMain.handle('bible:get-chapter', async (_event, versionId, bookId, chapter) => {
+    try {
+      return await getBibleStore().getChapter(
+        Number(versionId),
+        Number(bookId),
+        Number(chapter),
+      )
+    } catch (error) {
+      console.error('[ipc] bible:get-chapter', error)
+      return null
+    }
+  })
+
+  ipcMain.handle('bible:list-versions', async () => {
+    try {
+      return await getBibleStore().listVersions()
+    } catch (error) {
+      console.error('[ipc] bible:list-versions', error)
+      return []
+    }
+  })
+
+  ipcMain.handle('bible:check-updates', async () => {
+    try {
+      return await getBibleUpdater().check()
+    } catch (error) {
+      console.error('[ipc] bible:check-updates', error)
+      return { status: 'error', updated: [], failed: [] }
+    }
+  })
+
   ipcMain.handle('workspace:clear', (_event, options) => {
     try {
       return clearWorkspaceData(options ?? {})
@@ -806,6 +839,8 @@ export function registerWorkspaceIpc() {
         destRoot: root,
         onProgress: sendProgress,
       })
+      // A pasta bible/ veio do backup: versões já abertas saem da memória.
+      getBibleStore().invalidate()
       const browserStorage = readRestoredBrowserStorage(root)
       if (browserStorage) {
         try {
