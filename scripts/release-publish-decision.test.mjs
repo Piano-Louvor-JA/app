@@ -230,7 +230,17 @@ test('workflows preservam a publicação padrão e omitem só a promoção marca
 
 // All downstream publishers use the same exact-tag, fail-closed policy.
 test('Flatpak e lojas preservam tag_only e usam a versão exata', () => {
-  for (const name of ['build-flatpak.yml', 'snap-release.yml', 'msstore-release.yml']) {
+  // Microsoft Store (ADR-003 msstore-mcp): tag NÃO publica na Store; draft e
+  // certificação são workflow_dispatch com aprovação humana — tag_only fica
+  // garantido por não existir caminho automático.
+  assert.equal(existsSync(join(repoRoot, '.github/workflows/msstore-release.yml')), false)
+  for (const name of ['sync-msstore-draft.yml', 'submit-msstore-certification.yml']) {
+    const text = readFileSync(join(repoRoot, '.github/workflows', name), 'utf8')
+    const triggers = text.slice(text.indexOf('\non:'), text.indexOf('\npermissions:'))
+    assert.match(triggers, /workflow_dispatch:/, name)
+    assert.doesNotMatch(triggers, /\n {2}(push|release|workflow_run|schedule):/, name)
+  }
+  for (const name of ['build-flatpak.yml', 'snap-release.yml']) {
     const text = readFileSync(join(repoRoot, '.github/workflows', name), 'utf8')
     assert.match(text, /scripts\/release-publish-decision\.mjs/, name)
     assert.match(text, /needs\.decide\.outputs\.publish == 'true'/, name)
