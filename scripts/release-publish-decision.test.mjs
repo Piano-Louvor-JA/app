@@ -293,3 +293,14 @@ test('release dispara o Snap a partir da tag exata', () => {
   assert.match(snap[0], /--ref "\$TAG"/)
   assert.ok(dispatches.some(line => line.includes('build-flatpak.yml')), 'Flatpak continua disparado')
 })
+
+// Em --destructive-mode o snapcraft instala os build-snaps da extensão gnome
+// no host; como usuário comum (snapcore/action-build) a instalação falha.
+test('Snap empacota como root num host igual à base core24', () => {
+  const snap = readFileSync(join(repoRoot, '.github/workflows/snap-release.yml'), 'utf8')
+  const job = snap.slice(snap.indexOf('\n  snap:'))
+  assert.match(job, /runs-on: ubuntu-24\.04/)
+  assert.match(job, /sudo snapcraft pack --destructive-mode/)
+  assert.doesNotMatch(job, /snapcore\/action-build/)
+  assert.match(readFileSync(join(repoRoot, 'snap/snapcraft.yaml'), 'utf8'), /^base: core24$/m)
+})
