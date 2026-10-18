@@ -97,6 +97,7 @@ vi.mock("@shared/services/desktop-bridge", () => ({
 }));
 
 vi.mock("@modules/sync/services/library-catalog", () => ({
+  getCurrentApiPrefix: vi.fn(() => "pt"),
   loadLibraryCategories: vi.fn(async () => []),
   hydrateLocalLibraryCoverUrls: vi.fn(),
 }));

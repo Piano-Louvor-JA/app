@@ -243,11 +243,12 @@ async function loadHymnalOptions(
   byId: Map<number, LiturgyMusicOption>,
 ): Promise<void> {
   for (const source of HYMNAL_SOURCES) {
-    const rows = await readOrFetchCatalog<CatalogHymnalRow[]>(source.file)
+    const language = getCurrentApiPrefix()
+    const rows = await readOrFetchCatalog<CatalogHymnalRow[]>(source.file.replace(/^pt_/, `${language}_`))
     if (!rows || !Array.isArray(rows)) continue
 
     for (const row of rows) {
-      const mapped = mapMusicOption(row, source.albumName, {
+      const mapped = mapMusicOption(row, language === 'es' ? (source.file.endsWith('1996') ? 'Himnario Adventista 1996' : 'Himnario Adventista') : source.albumName, {
         useTrackInLabel: true,
       })
       if (mapped) upsertMusicOption(byId, mapped)
@@ -388,6 +389,13 @@ async function mergeOperatorMusicOptions(
 }
 
 export async function loadLiturgyMusicOptions(): Promise<LiturgyMusicOption[]> {
+  if (getCurrentApiPrefix() === 'fr') {
+    // Le catalogue officiel français n’est pas encore fourni. Les imports de
+    // l’opérateur restent disponibles, sans substitution par des chants portugais.
+    const byId = new Map<number, LiturgyMusicOption>()
+    await mergeOperatorMusicOptions(byId)
+    return sortMusicOptions([...byId.values()])
+  }
   const fromIndex = await loadFromMusicIndex()
   if (fromIndex && fromIndex.length > 0) {
     const byId = new Map(fromIndex.map((entry) => [entry.id, entry]))
@@ -405,7 +413,12 @@ export async function loadLiturgyMusicOptions(): Promise<LiturgyMusicOption[]> {
 }
 
 export async function loadLiturgyBibleBooks(): Promise<LiturgyBibleBookOption[]> {
-  const rows = await readOrFetchCatalog<CatalogBibleBookRow[]>(BOOKS_FILE)
+  const language = getCurrentApiPrefix()
+  if (language === 'fr') {
+    const { loadBundledBible } = await import('@modules/bible/services/bundled-bibles')
+    return (await loadBundledBible()).books.map(({ id, name, chapters }) => ({ id, name, chapters }))
+  }
+  const rows = await readOrFetchCatalog<CatalogBibleBookRow[]>(BOOKS_FILE.replace(/^pt_/, `${language}_`))
   if (!rows || !Array.isArray(rows)) return []
 
   return rows

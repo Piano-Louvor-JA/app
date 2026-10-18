@@ -1,0 +1,6 @@
+export default { timer: {
+        title: 'Chronomètre', config: 'Personnaliser', configTitle: 'Personnaliser la projection', configSubtitle: 'Régler l’affichage du chronomètre à l’écran', timeFormat: 'Format du temps', timeFormatHint: 'Choisir le format d’affichage du temps écoulé',
+        bgColor: 'Couleur de fond', bgColorHint: 'Couleur de fond de l’écran projeté', textColor: 'Couleur du texte', textColorHint: 'Couleur du texte projeté', customColor: 'Couleur personnalisée', resetDisplay: 'Rétablir les valeurs par défaut', apply: 'Appliquer', close: 'Fermer', project: 'Projeter', clearProjection: 'Retirer de la projection', inAppProjection: 'Aperçu du chronomètre', projectionHotkeyHint: 'Échap termine la projection · Ctrl+Alt+P bascule vers l’écran de l’opérateur', projecting: 'Projection en cours', backToUtilities: 'Retour à la gestion du temps', start: 'Démarrer', pause: 'Pause', reset: 'Recommencer', save: 'Enregistrer', savedTimes: 'Temps enregistrés', clearAll: 'Tout effacer', noSavedTimes: 'Aucun temps enregistré', removeSaved: 'Supprimer ce temps',
+        chromeDragHint: "Faites glisser pour d\u00E9placer \u00B7 double-cliquez pour revenir dans le coin",
+        openStopwatch: "Ouvrir le chronom\u00E8tre"
+    } };

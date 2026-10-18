@@ -151,6 +151,7 @@ const { t } = useI18n()
 
 .bible-books__header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
@@ -208,7 +209,7 @@ const { t } = useI18n()
 
 .bible-books__grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 4.25rem), 1fr));
   gap: 0.5rem;
   overflow-y: auto;
   padding-right: 0.25rem;
@@ -254,6 +255,7 @@ const { t } = useI18n()
 }
 
 .bible-books__tile {
+  min-width: 0;
   aspect-ratio: 1;
   display: flex;
   flex-direction: column;
@@ -354,9 +356,9 @@ const { t } = useI18n()
   }
 
   &--active {
-    background: color-mix(in srgb, #ca8a04 40%, transparent);
-    border-color: #eab308;
-    color: #fef08a;
+    background: var(--ds-color-primary);
+    border-color: var(--ds-color-primary);
+    color: var(--ds-color-on-primary);
     font-weight: 700;
   }
 
@@ -367,6 +369,9 @@ const { t } = useI18n()
 }
 
 .bible-books__abbr {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 1.05rem;
   font-weight: 700;
   line-height: 1.1;
@@ -471,11 +476,11 @@ const { t } = useI18n()
 }
 
 [data-mode='light'] .bible-books__tile--active {
-  background: #fdba74;
-  border-color: #ea580c;
-  color: #7c2d12;
+  background: var(--ds-color-primary);
+  border-color: var(--ds-color-primary);
+  color: var(--ds-color-on-primary);
   filter: none;
-  box-shadow: 0 2px 8px rgb(234 88 12 / 0.28);
+  box-shadow: none;
 }
 
 [data-mode='light'] .bible-books__name {

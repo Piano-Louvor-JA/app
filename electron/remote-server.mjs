@@ -22,6 +22,7 @@ import { networkInterfaces } from 'node:os'
 import QRCode from 'qrcode'
 import { app, ipcMain } from 'electron'
 import { trackWsConnection, trackWsDisconnect } from './diagnostics.mjs'
+import { listenRemoteHttp } from './remote-http.mjs'
 
 const PORT = 7071
 const HEARTBEAT_MS = 15_000
@@ -66,6 +67,7 @@ export function getRemoteStatus() {
  * @param {{ token?: string, speakerToken?: string }} [opts] tokens fixos p/ testes (default: random)
  */
 export async function startRemoteServer(wss, contents, opts = {}) {
+  const httpServer = opts.httpServer ?? null
   const token = opts.token ?? randomBytes(4).toString('hex').toUpperCase()
   // Token próprio do pregador: a URL/QR do pregador nunca leva o token
   // completo, e o escopo é decidido pelo token, não pelo que o cliente declara.
@@ -85,7 +87,7 @@ export async function startRemoteServer(wss, contents, opts = {}) {
   // Identidade POR PAPEL: APK/controle remoto (esquerda) vs pregador (direita).
   const identityFor = (speaker) => {
     for (const [ws, entry] of clients) {
-      if (!!entry.speaker !== speaker) continue
+      if (!entry.authed || !!entry.speaker !== speaker) continue
       const address =
         ws._socket?.remoteAddress?.replace(/^::ffff:/, '') ?? null
       if (entry.device && address) return `${entry.device} • ${address}`
@@ -99,7 +101,7 @@ export async function startRemoteServer(wss, contents, opts = {}) {
     try {
       if (!contents.isDestroyed()) {
         contents.send('remote:clients', {
-          count: clients.size,
+          count: [...clients.values()].filter(entry => entry.authed).length,
           address: clientIdentity(),
           // Papéis separados — o painel mostra cada um no seu lugar:
           // remote = APK/controle (esquerda), speaker = pregador (direita).
@@ -135,9 +137,14 @@ export async function startRemoteServer(wss, contents, opts = {}) {
 
     const entry = {
       aliveAt: Date.now(),
+      connectedAt: Date.now(),
       authed: false,
       device: null,
       timer: setInterval(() => {
+        if (!entry.authed && Date.now() - entry.connectedAt > 10000) {
+          ws.terminate()
+          return
+        }
         if (Date.now() - entry.aliveAt > HEARTBEAT_TIMEOUT_MS + HEARTBEAT_MS) {
           ws.terminate()
           return
@@ -160,42 +167,32 @@ export async function startRemoteServer(wss, contents, opts = {}) {
 
       switch (msg.type) {
         case 'hello': {
-          // Browser do pregador só recebe navegação de slides.
-          if (msg.role === 'speaker' && (msg.token === token || msg.token === speakerToken)) {
-            // 1 pregador por desktop: 2º browser de pregador → busy.
-            for (const [other, oEntry] of clients) {
-              if (other === ws || !oEntry.speaker) continue
-              send(ws, { v: 1, type: 'error', code: 'remote_busy' })
-              clients.delete(ws)
-              clearInterval(entry.timer)
-              ws.close()
-              return
-            }
-            const was = entry.speaker
-            entry.speaker = true
-            // 1º hello do pregador (e mudanças de papel) precisam notificar —
-            // senão o painel direito fica no "Pronto" sem IP (13/10 Rafael).
-            if (!was) notifyClients()
-          } else if (msg.device && msg.token === token) {
-            // 1 operador (APK/full) por desktop: 2º APK → busy.
-            // Papel operador = tem device e NÃO declarou speaker no hello.
-            for (const [other, oEntry] of clients) {
-              if (other === ws || oEntry.speaker) continue
-              send(ws, { v: 1, type: 'error', code: 'remote_busy' })
-              clients.delete(ws)
-              clearInterval(entry.timer)
-              ws.close()
-              return
-            }
+          if (msg.token !== token && msg.token !== speakerToken) {
+            send(ws, { v: 1, type: 'error', code: 'bad_token' })
+            ws.close()
+            return
           }
+          // O token limitado nunca ganha privilégios declarando outro papel.
+          const speaker = entry.speaker === true || msg.role === 'speaker' || msg.token === speakerToken
+          for (const [other, otherEntry] of clients) {
+            if (other === ws || !otherEntry.authed || !!otherEntry.speaker !== speaker) continue
+            send(ws, { v: 1, type: 'error', code: 'remote_busy' })
+            clients.delete(ws)
+            clearInterval(entry.timer)
+            ws.close()
+            return
+          }
+          entry.speaker = speaker
+          entry.authed = true
           // APK identifica o aparelho logo após conectar.
           const device = typeof msg.device === 'string' ? msg.device : null
           const appVersion =
             typeof msg.appVersion === 'string' ? msg.appVersion : null
           if (device) {
             entry.device = appVersion ? `${device} (${appVersion})` : device
-            notifyClients()
           }
+          notifyClients()
+          pushState()
           return
         }
         case 'ping':
@@ -205,9 +202,6 @@ export async function startRemoteServer(wss, contents, opts = {}) {
           return
         case 'command': {
           const { id, action, token: tok } = msg
-          console.info(
-            `[remote] RAW command ${action} id=${id} payload=${JSON.stringify(msg).slice(0, 300)}`,
-          )
           if (typeof id !== 'string' || typeof action !== 'string') return
           if (tok !== token && tok !== speakerToken) {
             send(ws, { v: 1, type: 'error', id, code: 'bad_token' })
@@ -221,6 +215,7 @@ export async function startRemoteServer(wss, contents, opts = {}) {
             send(ws, { v: 1, type: 'error', id, code: 'forbidden' })
             return
           }
+          notifyClients()
           // Encaminha ao renderer; o ack volta via 'remote:ack'.
           // Campos v2 (bible/timer/countdown) além dos do v1.
           contents.send('remote:command', {
@@ -288,11 +283,11 @@ export async function startRemoteServer(wss, contents, opts = {}) {
 
   // Renderer → APK: ack de comando e push de estado (ipcMain, global)
   const onAck = (_e, ack) => {
-    for (const [ws] of clients) send(ws, { v: 1, type: 'ack', ...ack })
+    for (const [ws, entry] of clients) if (entry.authed) send(ws, { v: 1, type: 'ack', ...ack })
   }
   const onState = (_e, player) => {
-    for (const [ws] of clients) {
-      send(ws, { v: 1, type: 'state', ...(player ?? {}) })
+    for (const [ws, entry] of clients) {
+      if (entry.authed) send(ws, { v: 1, type: 'state', ...(player ?? {}) })
     }
   }
   ipcMain.on('remote:ack', onAck)
@@ -300,7 +295,7 @@ export async function startRemoteServer(wss, contents, opts = {}) {
 
   // Porta real em uso (pode ser fallback 7072-7075)
   const activePort = wss.address().port
-  console.info(`[remote] servidor WS na porta ${activePort} — token ${token}`)
+  console.info(`[remote] servidor WS na porta ${activePort}`)
   // RF2 — publica status p/ getRemoteStatus()
   remoteStatus.status = activePort === PORT ? 'ok' : 'fallback'
   remoteStatus.port = activePort
@@ -312,6 +307,8 @@ export async function startRemoteServer(wss, contents, opts = {}) {
   const speakerUrl = `http://${host}:7080/speaker?remotePort=${activePort}&palcoPort=7081&token=${speakerToken}`
   const qrDataUrl = await QRCode.toDataURL(connectUrl, { margin: 1, width: 220 })
   const speakerQrDataUrl = await QRCode.toDataURL(speakerUrl, { margin: 1, width: 220 })
+  const webUrl = `http://${host}:${activePort}/control#token=${encodeURIComponent(token)}`
+  const webQrDataUrl = await QRCode.toDataURL(webUrl, { margin: 1, width: 220 })
   ipcMain.handle('remote:pairing-info', () => ({
     host,
     port: activePort,
@@ -320,7 +317,9 @@ export async function startRemoteServer(wss, contents, opts = {}) {
     qrDataUrl,
     speakerUrl,
     speakerQrDataUrl,
-    clientCount: clients.size,
+    webUrl,
+    webQrDataUrl,
+    clientCount: [...clients.values()].filter(entry => entry.authed).length,
     clientAddress: clientIdentity(),
     remoteAddress: identityFor(false),
     speakerAddress: identityFor(true),
@@ -338,7 +337,9 @@ export async function startRemoteServer(wss, contents, opts = {}) {
       clients.clear()
       ipcMain.removeListener('remote:ack', onAck)
       ipcMain.removeListener('remote:state', onState)
+      ipcMain.removeHandler?.('remote:pairing-info')
       wss.close()
+      httpServer?.close()
     },
   }
 }
@@ -348,6 +349,7 @@ export const REMOTE_PORT = PORT
 /** Conveniência para o main: sobe junto com o app em dev (devmode). */
 export function attachRemoteServer(getContents) {
   let stopped = false
+  let runningHandle = null
   const MAX_ATTEMPTS = 5
   const boot = async () => {
     if (stopped) return
@@ -361,22 +363,17 @@ export function attachRemoteServer(getContents) {
     // do bind e o erro chega como evento 'error' re-throwado (uncaughtException).
     // try/catch em volta do new NÃO pega (bug do fix 400475e, reproduzido
     // 30/08 à noite). Por isso o handler de erro vai no evento, via promessa.
-    const tryListen = (port) =>
-      new Promise((resolve, reject) => {
-        const server = new WebSocketServer({ port })
-        server.once('error', (err) => {
-          try { server.close() } catch { /* já morto */ }
-          reject(err)
-        })
-        server.once('listening', () => resolve(server))
-      })
+    const tryListen = port => listenRemoteHttp(WebSocketServer, port)
 
     let wss = null
+    let httpServer = null
     let activePort = PORT
     let lastError = null
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       try {
-        wss = await tryListen(activePort)
+        const listening = await tryListen(activePort)
+        wss = listening.wss
+        httpServer = listening.httpServer
         if (activePort !== PORT) {
           console.warn(`[remote] porta ${PORT} indisponível — usando ${activePort} (QR/IP mudam junto)`)
         }
@@ -402,11 +399,14 @@ export function attachRemoteServer(getContents) {
       // proxy mínimo de WebContents usado pelo servidor
       send: (channel, ...args) => getContents()?.send(channel, ...args),
       isDestroyed: () => !getContents(),
-    })
+    }, { httpServer })
+    if (stopped) { handle.stop(); return }
+    runningHandle = handle
     app.on('quit', handle.stop)
   }
   boot().catch((err) => console.error('[remote] falhou:', err))
   return () => {
     stopped = true
+    runningHandle?.stop()
   }
 }

@@ -40,40 +40,25 @@ export const accentsLegacy = {
   },
 } as const
 
-/**
- * Paleta atual — 4 realces.
- * Ordem: âmbar → laranja (padrão) → verde-água → verde (verdes juntos).
- * Azure e demais tons foram removidos da UI.
- */
+/** Louange: each accent has a separate ink for light surfaces. */
 export const accents = {
-  apricot: {
-    id: 'apricot',
-    label: 'Âmbar',
-    primary: '#E0A84A',
-    soft: '#F0D9A8',
-  },
-  orange: {
-    id: 'orange',
-    label: 'Laranja',
-    primary: '#E0895A',
-    soft: '#F0C4A8',
-  },
-  teal: {
-    id: 'teal',
-    label: 'Verde-água',
-    primary: '#4DB6AC',
-    soft: '#B2DFDB',
-  },
-  emerald: {
-    id: 'emerald',
-    label: 'Verde',
-    primary: '#6BAA7A',
-    soft: '#B8D9C0',
-  },
+  azure: { id: 'azure', label: 'Azul horizonte', primary: '#81BAFF', soft: '#B9D7FF', light: '#245BC3' },
+  teal: { id: 'teal', label: 'Verde oceano', primary: '#5ED5C5', soft: '#ACEDE3', light: '#087B70' },
+  violet: { id: 'violet', label: 'Violeta', primary: '#BBA6FF', soft: '#DED2FF', light: '#7043C2' },
+  apricot: { id: 'apricot', label: 'Ouro', primary: '#EBC264', soft: '#F6DFA8', light: '#8B5A08' },
+  orange: { id: 'orange', label: 'Terracota', primary: '#F3AB82', soft: '#F8D5BF', light: '#AD4B17' },
+  emerald: { id: 'emerald', label: 'Verde jardim', primary: '#7BD5A4', soft: '#B6EBCB', light: '#207446' },
 } as const
 
 export type AccentKey = keyof typeof accents
 export type AccentDefinition = (typeof accents)[AccentKey]
+export const defaultAccent: AccentKey = 'azure'
 
-/** Padrão do sistema — não alterar sem decisão de produto. */
-export const defaultAccent: AccentKey = 'orange'
+export function resolveAccentColors(key: AccentKey, mode: 'light' | 'dark') {
+  const accent = accents[key]
+  return {
+    primary: mode === 'light' ? accent.light : accent.primary,
+    soft: mode === 'light' ? accent.light : accent.soft,
+    onPrimary: mode === 'light' ? '#FFFFFF' : '#081522',
+  }
+}

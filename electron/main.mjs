@@ -817,7 +817,8 @@ app.whenReady().then(async () => {
 
 	let locale = "pt-BR";
 	try {
-		ensureLinuxTaskbarIntegration();
+		// O perfil isolado de desenvolvimento não substitui o atalho instalado.
+		if (!(isDev && process.env.PIANO_DEV_DATA_DIR)) ensureLinuxTaskbarIntegration();
 		ensureWorkspaceDirectories();
 		bootMark("workspace");
 

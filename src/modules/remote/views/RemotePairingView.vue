@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { GlassCard } from '@design-system/index'
@@ -10,6 +10,11 @@ const { t } = useI18n()
 
 const info = ref<RemotePairingInfo | null>(null)
 const failed = ref(false)
+const pairingMode = ref<'browser' | 'app'>('browser')
+const copyStatus = ref('')
+const useBrowser = computed(() => pairingMode.value === 'browser' && Boolean(info.value?.webUrl))
+const pairingQr = computed(() => useBrowser.value ? info.value?.webQrDataUrl : info.value?.qrDataUrl)
+const pairingUrl = computed(() => useBrowser.value ? info.value?.webUrl : info.value?.connectUrl)
 const clientCount = ref(0)
 const clientAddress = ref<string | null>(null)
 /** Identidade por papel: remote = APK (esquerda), speaker = pregador (direita). */
@@ -55,17 +60,19 @@ onUnmounted(() => {
 async function copyToClipboard(url: string | undefined | null, id: string) {
   if (!url) return
   try {
-    await navigator.clipboard?.writeText(url)
+    if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable')
+    await navigator.clipboard.writeText(url)
+    copyStatus.value = 'remoteBrowser.copied'
     copiedId.value = id
     clearTimeout(copiedTimer)
     copiedTimer = setTimeout(() => { copiedId.value = null }, 2000)
   } catch {
-    // clipboard bloqueado — mantém botão como estava, sem feedback falso
+    copyStatus.value = 'remoteBrowser.copyError'
   }
 }
 
 function copyUrl() {
-  void copyToClipboard(info.value?.connectUrl, 'remote')
+  void copyToClipboard(pairingUrl.value, 'remote')
 }
 
 function copySpeakerUrl() {
@@ -87,10 +94,15 @@ function copyOperatorUrl() {
         </span>
         <div class="pairing-head__text">
           <h3 class="pairing-title">{{ t('settings.remote.title') }}</h3>
-          <p class="pairing-desc">{{ t('settings.remote.pairingDescription') }}</p>
+          <p class="pairing-desc">{{ t(useBrowser ? 'remoteBrowser.hint' : 'settings.remote.pairingDescription') }}</p>
         </div>
       </header>
 
+      <div v-if="info?.webUrl" class="pairing-modes" :aria-label="t('settings.remote.title')">
+        <button type="button" :aria-pressed="pairingMode === 'browser'" @click="pairingMode = 'browser'">{{ t('remoteBrowser.browser') }}</button>
+        <button type="button" :aria-pressed="pairingMode === 'app'" @click="pairingMode = 'app'">{{ t('remoteBrowser.app') }}</button>
+      </div>
+      <p v-if="copyStatus" role="status">{{ t(copyStatus) }}</p>
       <div
         class="pairing-status"
         :class="{ 'pairing-status--on': !!remoteAddress }"
@@ -109,8 +121,8 @@ function copyOperatorUrl() {
       <div v-else-if="info" class="pairing-panel">
         <div class="qr-frame">
           <img
-            v-if="info.qrDataUrl"
-            :src="info.qrDataUrl"
+            v-if="pairingQr"
+            :src="pairingQr"
             width="220"
             height="220"
             class="qr"
@@ -122,7 +134,7 @@ function copyOperatorUrl() {
         <p class="pairing-steps">{{ t('settings.remote.steps') }}</p>
 
         <div class="url-row">
-          <code class="url mono" data-testid="remote-url">{{ info.connectUrl }}</code>
+          <code class="url mono" data-testid="remote-url">{{ pairingUrl }}</code>
           <button
             type="button"
             class="copy-btn"
@@ -258,6 +270,9 @@ function copyOperatorUrl() {
 </template>
 
 <style scoped>
+.pairing-modes { display:flex; flex-wrap:wrap; gap:.5rem; margin:1rem 0; }
+.pairing-modes button { padding:.6rem .8rem; border-radius:.6rem; border:1px solid var(--ds-color-outline); color:var(--ds-color-on-surface); background:var(--ds-color-surface); cursor:pointer; }
+.pairing-modes button[aria-pressed="true"] { border-color:var(--ds-color-primary); color:var(--ds-color-primary); }
 .pairing-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));

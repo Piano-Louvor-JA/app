@@ -1,5 +1,5 @@
 import { storeToRefs } from 'pinia'
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
@@ -14,6 +14,8 @@ import { useScheduledStore } from '../stores/useScheduledStore'
 import { appConfirm } from '@shared/composables/useAppConfirm'
 import type { LiturgyDayKey } from '../types/liturgy'
 import { useLiturgyClock } from './useLiturgyClock'
+import { buildLiturgySchedule, exportScheduleCsv } from '../services/liturgy-schedule'
+import type { LiturgyTemplateId } from '../services/liturgy-templates'
 
 /** Orquestra a feature de liturgia na view. */
 export function useLiturgy() {
@@ -64,6 +66,13 @@ export function useLiturgy() {
   const { lyricOpen, lyricDoc, isLoadingLyric } = storeToRefs(albumsStore)
 
   const busyMusicId = ref<number | null>(null)
+  const teamDialogOpen = ref(false)
+  watch([selectedDay, selectedCustomIndex], () => { teamDialogOpen.value = false })
+
+  function saveTeam(assignments: Record<string, string>) {
+    store.setTeamAssignments(assignments)
+    teamDialogOpen.value = false
+  }
 
   const musicInstrumentalById = computed(() => {
     const map: Record<number, boolean> = {}
@@ -106,7 +115,22 @@ export function useLiturgy() {
     return t('liturgy.worshipOf', { day: dayLabel })
   }
 
-  const startLabels = computed(() => currentItems.value.map(() => '—'))
+  const schedule = computed(() => buildLiturgySchedule(currentItems.value, currentStartTime.value))
+  const startLabels = computed(() => schedule.value.rows.map(row => row.startLabel))
+
+  function createTemplateLiturgy(id: LiturgyTemplateId, startTime: string) {
+    return store.createTemplateLiturgy(id, key => t(key), startTime)
+  }
+
+  function exportSchedule() {
+    const csv = exportScheduleCsv(schedule.value, ['order', 'start', 'moment', 'duration', 'responsible', 'notes'].map(key => t(`liturgyPlan.csv.${key}`)))
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'programme-culte.csv'
+    link.click()
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
 
   const durationLabels = computed(() =>
     currentItems.value.map((item) => formatMomentDuration(item.durationMs)),
@@ -328,13 +352,7 @@ export function useLiturgy() {
     })
   }
 
-  async function onManageTeam() {
-    await appConfirm({
-      title: t('liturgy.team.title'),
-      message: t('liturgy.team.comingSoon'),
-      confirmLabel: t('liturgy.ok'),
-    })
-  }
+  function onManageTeam() { teamDialogOpen.value = true }
 
   async function runMusicAction(
     index: number,
@@ -422,6 +440,9 @@ export function useLiturgy() {
     lyricDoc,
     isLoadingLyric,
     startLabels,
+    schedule,
+    createTemplateLiturgy,
+    exportSchedule,
     durationLabels,
     worshipLabel,
     headerDateTime: clock.headerDateTime,
@@ -473,6 +494,8 @@ export function useLiturgy() {
     setActionMessage: store.setActionMessage,
     setNotes: store.setNotes,
     onManageTeam,
+    teamDialogOpen,
+    saveTeam,
     onMusicPick: store.onMusicPick,
     clearMusicPick: store.clearMusicPick,
     refreshMusicCatalog: store.refreshMusicCatalog,

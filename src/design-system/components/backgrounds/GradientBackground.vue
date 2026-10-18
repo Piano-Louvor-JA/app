@@ -23,10 +23,10 @@ withDefaults(
 
 <style scoped lang="scss">
 .ds-gradient-bg {
-  --ds-glow-a: 10%;
-  --ds-glow-b: 5%;
-  --ds-glow-c: 2%;
-  --ds-lift: 3.2%;
+  --ds-glow-a: 4%;
+  --ds-glow-b: 2%;
+  --ds-glow-c: 0%;
+  --ds-lift: 0%;
 
   position: relative;
   isolation: isolate;

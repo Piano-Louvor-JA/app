@@ -180,8 +180,9 @@ export default {
       },
     },
     general: {
+      languageFrench: 'Français',
       languageTitle: 'Idioma',
-      languageHint: 'Selecione o idioma da interface do aplicativo.',
+      languageHint: "Escolha o idioma do aplicativo. Menus, mensagens, Bíblia e biblioteca de músicas acompanham sua escolha.",
       languagePortuguese: 'Português',
       languageEnglish: 'English',
       languageSpanish: 'Español',

@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
  */
 
 const h = vi.hoisted(() => ({
+  language: 'pt',
   loadAlbumCategories: vi.fn(),
   loadAlbumMusicIndex: vi.fn(),
   loadCustomAlbumCategory: vi.fn(),
@@ -19,6 +20,8 @@ const h = vi.hoisted(() => ({
   getShowCustomCollections: vi.fn(() => false),
   openMusicPlayer: vi.fn(),
 }))
+
+vi.mock('@modules/sync/services/library-catalog', () => ({ getCurrentApiPrefix: () => h.language }))
 
 vi.mock('../../services/album-catalog', () => ({
   loadAlbumCategories: h.loadAlbumCategories,
@@ -56,6 +59,7 @@ beforeEach(async () => {
   await new Promise((resolve) => setTimeout(resolve, 0))
   setActivePinia(createPinia())
   vi.clearAllMocks()
+  h.language = 'pt'
   h.getShowCustomCollections.mockReturnValue(false)
   h.loadAlbumCategories.mockResolvedValue([])
   h.loadAlbumMusicIndex.mockResolvedValue([])
@@ -65,6 +69,22 @@ beforeEach(async () => {
 })
 
 describe('useAlbumsStore', () => {
+  it('recarrega o catálogo e descarta resultados antigos ao mudar o idioma', async () => {
+    h.loadAlbumCategories.mockResolvedValueOnce([{ id: 'pt', name: 'Português', collections: [] }])
+    const store = useAlbumsStore()
+    await store.hydrateCatalog()
+    await store.hydrateMusicIndex()
+    store.activeCollection = collection
+    store.hubSearchQuery = 'antigo'
+    h.language = 'fr'
+    h.loadAlbumCategories.mockResolvedValueOnce([{ id: 'fr', name: 'Français', collections: [] }])
+    await store.hydrateCatalog()
+    expect(store.categories[0]?.id).toBe('fr')
+    expect(store.activeCollection).toBeNull()
+    expect(store.hubSearchQuery).toBe('')
+    expect(h.loadAlbumCategories).toHaveBeenCalledTimes(2)
+  })
+
   it('hydrateCatalog: carrega categorias e sinaliza vazio', async () => {
     const store = useAlbumsStore()
     await store.hydrateCatalog()

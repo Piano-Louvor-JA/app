@@ -77,7 +77,7 @@ export default defineConfig(({ command }) => ({
   },
   plugins: [
     vue(),
-    vueDevTools(),
+    ...(process.env.VITE_DEVTOOLS === 'true' ? [vueDevTools()] : []),
     tailwindcss(),
     bakeBuildProfile(),
   ],

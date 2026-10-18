@@ -1,4 +1,5 @@
 import { computed, ref, watchEffect } from 'vue'
+import { resolveAccentColors } from '../themes/accents'
 
 import {
   blur as blurTokens,
@@ -85,7 +86,7 @@ function persistAppearance() {
 
 function applyCssVars(target: HTMLElement = document.documentElement) {
   const theme = themes[themeKey.value]
-  const accent = accents[accentKey.value]
+  const accent = resolveAccentColors(accentKey.value, theme.mode)
   const interaction = interactions[interactionKey.value]
   const intensity = glassIntensity.value
 
@@ -101,8 +102,9 @@ function applyCssVars(target: HTMLElement = document.documentElement) {
   target.style.setProperty('--ds-color-primary', accent.primary)
   target.style.setProperty(
     '--ds-color-primary-soft',
-    theme.mode === 'light' ? accent.primary : accent.soft,
+    accent.soft,
   )
+  target.style.setProperty('--ds-color-on-primary', accent.onPrimary)
   target.style.setProperty('--ds-blur-active', blurPxFromIntensity(intensity))
   target.style.setProperty('--ds-glass-fill', glassFillFromIntensity(intensity))
   target.style.setProperty('--ds-motion-duration', interaction.duration)
@@ -110,7 +112,7 @@ function applyCssVars(target: HTMLElement = document.documentElement) {
 
   target.dataset.theme = theme.id
   target.dataset.mode = theme.mode
-  target.dataset.accent = accent.id
+  target.dataset.accent = accentKey.value
   target.dataset.motion = interaction.id
   target.dataset.glass = String(intensity)
 }

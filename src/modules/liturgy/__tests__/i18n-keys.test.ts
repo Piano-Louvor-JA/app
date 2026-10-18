@@ -5,6 +5,7 @@
  */
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import liturgyPlan from '@locales/liturgy-plan'
 
 type Nested = Record<string, unknown>
 
@@ -26,9 +27,9 @@ function loadLocale(path: string): Nested {
 const liturgyPt = flatten((await import('../locales/pt-BR')).default as Nested)
 const liturgyEn = flatten((await import('../locales/en')).default as Nested)
 const liturgyEs = flatten((await import('../locales/es')).default as Nested)
-const commonPt = flatten((await import('@locales/pt-BR')).default as Nested)
-const commonEn = flatten((await import('@locales/en')).default as Nested)
-const commonEs = flatten((await import('@locales/es')).default as Nested)
+const commonPt = flatten({ ...(await import('@locales/pt-BR')).default, ...liturgyPlan['pt-BR'] } as Nested)
+const commonEn = flatten({ ...(await import('@locales/en')).default, ...liturgyPlan.en } as Nested)
+const commonEs = flatten({ ...(await import('@locales/es')).default, ...liturgyPlan.es } as Nested)
 
 /** Extrai chaves t('...') literais de um arquivo fonte. */
 function usedKeys(src: string): string[] {

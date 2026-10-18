@@ -77,6 +77,21 @@ import {
 import { app } from 'electron'
 
 describe('user-data-path', () => {
+  it('isole les données de développement sans migrer le catalogue installé', () => {
+    vi.stubEnv('PIANO_DEV_DATA_DIR', '/tmp/piano-development-test')
+    configureUserDataPath({ isDev: true })
+    expect(app.setPath).toHaveBeenCalledWith('userData', '/tmp/piano-development-test')
+    expect(mocks.cpSync).not.toHaveBeenCalled()
+    expect(ensureLinuxSharedFolderAvailable).not.toHaveBeenCalled()
+  })
+  it('refuse un dossier de développement relatif', () => {
+    vi.stubEnv('PIANO_DEV_DATA_DIR', '../data')
+    expect(() => resolveUserDataPath({ isDev: true })).toThrow(/absolute/)
+  })
+  it('ignore le dossier de développement en mode normal', () => {
+    vi.stubEnv('PIANO_DEV_DATA_DIR', '/tmp/piano-development-test')
+    expect(resolveUserDataPath({ isDev: false })).toBe('/var/lib/LouvorJA-PIANO')
+  })
   let platformSpy
 
   beforeEach(() => {
@@ -90,6 +105,7 @@ describe('user-data-path', () => {
   })
 
   afterEach(() => {
+    vi.unstubAllEnvs()
     platformSpy.mockRestore()
     delete process.env.APPDATA
     delete process.env.ProgramData

@@ -11,6 +11,8 @@ import { createI18n } from "vue-i18n";
  */
 import mediaLocale from "../../locales/pt-BR";
 import MediaPlayerPill from "../MediaPlayerPill.vue";
+import { TEST_DISPLAYS } from "@modules/settings/services/__tests__/display-fixture";
+import * as displayService from "@modules/settings/services/display-service";
 
 vi.mock("@shared/components/MonitorTargetSelect.vue", () => ({
 	default: { template: '<div class="monitor-target-select-stub" />' },
@@ -258,7 +260,8 @@ describe("MediaPlayerPill — áudio na TV, projeção, fullscreen, playlist", (
 			const pinia = createPinia();
 			setActivePinia(pinia);
 			const store = useProjectionStore();
-			await store.refreshDisplays();
+			vi.spyOn(displayService, "listSystemDisplays").mockResolvedValue(structuredClone(TEST_DISPLAYS));
+		await store.refreshDisplays();
 			store.applySettings({ ...DEFAULT_PROJECTION_SETTINGS, targetDisplayIds: [2] });
 			const w = mount(MediaPlayerPill, {
 				props: baseProps({ projecting: false }),
@@ -284,6 +287,7 @@ describe("MediaPlayerPill — áudio na TV, projeção, fullscreen, playlist", (
 		const pinia = createPinia();
 		setActivePinia(pinia);
 		const store = useProjectionStore();
+		vi.spyOn(displayService, "listSystemDisplays").mockResolvedValue(structuredClone(TEST_DISPLAYS));
 		await store.refreshDisplays();
 		store.applySettings({ ...DEFAULT_PROJECTION_SETTINGS, targetDisplayIds: [2] });
 		const w2 = mount(MediaPlayerPill, { props: baseProps({ projecting: false }), global: { plugins: [i18n, pinia] } });

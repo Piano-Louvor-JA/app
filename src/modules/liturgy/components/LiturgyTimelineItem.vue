@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppIcon from '@design-system/components/AppIcon.vue'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
@@ -450,14 +451,8 @@ const projectActionTitle = computed(() => {
         class="liturgy-item__check-box"
         aria-hidden="true"
       >
-        <i
-          v-if="item.done"
-          class="ti ti-check"
-        />
-        <i
-          v-else-if="indeterminate"
-          class="ti ti-minus"
-        />
+        <AppIcon name="check" v-if="item.done" />
+        <AppIcon name="minus" v-else-if="indeterminate" />
       </span>
     </label>
 
@@ -475,10 +470,7 @@ const projectActionTitle = computed(() => {
           @dragstart.stop="!item.done && onHandleDragStart($event)"
           @dragend="onHandleDragEnd"
         >
-          <i
-            class="ti ti-grip-vertical"
-            aria-hidden="true"
-          />
+          <AppIcon name="grip-vertical" aria-hidden="true" />
         </span>
 
         <div
@@ -493,9 +485,8 @@ const projectActionTitle = computed(() => {
                 }
           "
         >
-          <i
-            class="ti"
-            :class="effectiveIcon ?? getItemTypeIcon(item.type)"
+          <AppIcon
+            :name="effectiveIcon ?? getItemTypeIcon(item.type)"
             aria-hidden="true"
           />
         </div>
@@ -564,6 +555,10 @@ const projectActionTitle = computed(() => {
             class="liturgy-item__notes"
           >
             {{ item.notes }}
+          </p>
+          <p v-if="item.responsible" class="liturgy-item__subtitle">
+            <AppIcon name="user" aria-hidden="true" />
+            {{ t('liturgy.team.responsible') }}: {{ item.responsible }}
           </p>
         </div>
       </div>
@@ -638,10 +633,7 @@ const projectActionTitle = computed(() => {
             :disabled="item.done"
             @click="emit('addSubItem')"
           >
-            <i
-              class="ti ti-plus"
-              aria-hidden="true"
-            />
+            <AppIcon name="plus" aria-hidden="true" />
             <span>{{ t('liturgy.actions.addSubItem') }}</span>
           </button>
           <button
@@ -680,15 +672,9 @@ const projectActionTitle = computed(() => {
               data-test="liturgy-row-player"
               @click="togglePlayerMenu"
             >
-              <i
-                class="ti ti-device-speaker"
-                aria-hidden="true"
-              />
+              <AppIcon name="device-speaker" aria-hidden="true" />
               <span>{{ rowPlayerLabel }}</span>
-              <i
-                class="ti ti-chevron-down"
-                aria-hidden="true"
-              />
+              <AppIcon name="chevron-down" aria-hidden="true" />
             </button>
             <Teleport to="body">
               <div
@@ -758,10 +744,7 @@ const projectActionTitle = computed(() => {
             :disabled="item.done"
             @click.stop="emit('select')"
           >
-            <i
-              class="ti ti-player-play"
-              aria-hidden="true"
-            />
+            <AppIcon name="player-play" aria-hidden="true" />
           </button>
           <button
             v-if="!isCategory && (isSiteItem || isVideoRemote)"
@@ -854,10 +837,7 @@ const projectActionTitle = computed(() => {
             :disabled="item.done"
             @click="emit('edit')"
           >
-            <i
-              class="ti ti-pencil"
-              aria-hidden="true"
-            />
+            <AppIcon name="pencil" aria-hidden="true" />
           </button>
           <button
             v-if="!deletionLocked"
@@ -868,10 +848,7 @@ const projectActionTitle = computed(() => {
             :disabled="item.done"
             @click="emit('remove')"
           >
-            <i
-              class="ti ti-trash"
-              aria-hidden="true"
-            />
+            <AppIcon name="trash" aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -949,7 +926,7 @@ const projectActionTitle = computed(() => {
   font-size: 0.85rem;
 
   &--done {
-    background: var(--ds-color-secondary, #78d6d2);
+    background: var(--ds-color-success, #7bd5a4);
     border-color: transparent;
   }
 
@@ -1015,19 +992,19 @@ const projectActionTitle = computed(() => {
   }
 
   .liturgy-item__check:hover & {
-    border-color: color-mix(in srgb, var(--ds-color-secondary, #78d6d2) 55%, transparent);
+    border-color: color-mix(in srgb, var(--ds-color-success, #7bd5a4) 55%, transparent);
   }
 
   .liturgy-item__check--done & {
     border-color: transparent;
-    background: var(--ds-color-secondary, #78d6d2);
+    background: var(--ds-color-success, #7bd5a4);
     color: var(--ds-color-on-secondary, #003736);
   }
 
   .liturgy-item__check--indeterminate & {
-    border-color: color-mix(in srgb, var(--ds-color-secondary, #78d6d2) 55%, transparent);
-    background: color-mix(in srgb, var(--ds-color-secondary, #78d6d2) 18%, transparent);
-    color: var(--ds-color-secondary, #78d6d2);
+    border-color: color-mix(in srgb, var(--ds-color-success, #7bd5a4) 55%, transparent);
+    background: color-mix(in srgb, var(--ds-color-success, #7bd5a4) 18%, transparent);
+    color: var(--ds-color-success, #7bd5a4);
   }
 
   .liturgy-item__check--active:not(.liturgy-item__check--done) & {
@@ -1080,7 +1057,7 @@ const projectActionTitle = computed(() => {
   }
 
   .liturgy-item--pending & {
-    opacity: 0.62;
+    opacity: 1;
   }
 
   .liturgy-item--pending:hover & {
@@ -1303,9 +1280,9 @@ const projectActionTitle = computed(() => {
   border-radius: 999px;
 
   &--done {
-    color: var(--ds-color-secondary, #78d6d2);
-    background: color-mix(in srgb, var(--ds-color-secondary, #78d6d2) 12%, transparent);
-    border: 1px solid color-mix(in srgb, var(--ds-color-secondary, #78d6d2) 25%, transparent);
+    color: var(--ds-color-success, #7bd5a4);
+    background: color-mix(in srgb, var(--ds-color-success, #7bd5a4) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ds-color-success, #7bd5a4) 25%, transparent);
   }
 
   &--active {
@@ -1323,7 +1300,7 @@ const projectActionTitle = computed(() => {
 
   .liturgy-item--done &--done {
     opacity: 1;
-    color: var(--ds-color-secondary, #78d6d2);
+    color: var(--ds-color-success, #7bd5a4);
   }
 }
 
@@ -1617,7 +1594,7 @@ const projectActionTitle = computed(() => {
   &--site-project {
     background: #78d6d2;
     color: #000;
-    box-shadow: 0 0 14px color-mix(in srgb, var(--ds-color-secondary, #78d6d2) 38%, transparent);
+    box-shadow: 0 0 14px color-mix(in srgb, var(--ds-color-success, #7bd5a4) 38%, transparent);
 
     &:hover:not(:disabled) {
       background: #9be4e1;

@@ -71,6 +71,8 @@ import {
   type WeekdaySessionTimes,
 } from '../types/liturgy'
 import { pad2 } from '../services/liturgy-format'
+import { buildLiturgyTemplate, type LiturgyTemplateId } from '../services/liturgy-templates'
+import { getCurrentApiPrefix } from '@modules/sync/services/library-catalog'
 import {
   enqueueOperatorState,
   scheduleOutboxFlush,
@@ -112,6 +114,8 @@ export const useLiturgyStore = defineStore('liturgy', () => {
   const sessionStartedAt = ref<number | null>(null)
   const countdownRunning = ref(false)
   const hydrated = ref(false)
+  let hydratedLanguage: string | null = null
+  let catalogGeneration = 0
 
   const currentCustom = computed(() => {
     if (selectedDay.value !== 'custom') return null
@@ -521,16 +525,20 @@ export const useLiturgyStore = defineStore('liturgy', () => {
   }
 
   async function hydrate() {
-    if (hydrated.value) return
+    const language = getCurrentApiPrefix()
+    if (hydrated.value && hydratedLanguage === language) return
+    const generation = ++catalogGeneration
 
-    const state = loadLiturgyState()
-    weekdays.value = state.weekdays
-    dayNotes.value = state.dayNotes
-    daySessionTimes.value = state.daySessionTimes
-    customLiturgies.value = state.customLiturgies
-    deletionLocks.value = state.deletionLocks
-    selectedDay.value = todayWeekday()
-    countdownRunning.value = false
+    if (!hydrated.value) {
+      const state = loadLiturgyState()
+      weekdays.value = state.weekdays
+      dayNotes.value = state.dayNotes
+      daySessionTimes.value = state.daySessionTimes
+      customLiturgies.value = state.customLiturgies
+      deletionLocks.value = state.deletionLocks
+      selectedDay.value = todayWeekday()
+      countdownRunning.value = false
+    }
 
     catalogLoading.value = true
     try {
@@ -538,6 +546,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
         loadLiturgyMusicOptions(),
         loadLiturgyBibleBooks(),
       ])
+      if (generation !== catalogGeneration) return
       musicList.value = music
       bibleBooks.value = books
 
@@ -567,9 +576,11 @@ export const useLiturgyStore = defineStore('liturgy', () => {
 
       if (changed) persist()
     } finally {
-      catalogLoading.value = false
+      if (generation === catalogGeneration) catalogLoading.value = false
     }
 
+    if (generation !== catalogGeneration) return
+    hydratedLanguage = language
     hydrated.value = true
   }
 
@@ -759,6 +770,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     const next = [...currentItems.value]
     if (editingIndex.value != null) {
       const previous = next[editingIndex.value]
+      item.responsible = previous?.responsible
       const movedToAnotherCategory =
         item.type !== 'category' &&
         Boolean(item.categoryId) &&
@@ -783,6 +795,13 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     }
     closeItemDialog()
     return true
+  }
+
+  function setTeamAssignments(assignments: Record<string, string>) {
+    currentItems.value = currentItems.value.map((item) => {
+      if (item.type === 'category' || !Object.hasOwn(assignments, item.id)) return item
+      return { ...item, responsible: assignments[item.id]?.trim().slice(0, 120) || undefined }
+    })
   }
 
   function removeItem(index: number) {
@@ -1180,6 +1199,17 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     closeCustomDialog()
   }
 
+  function createTemplateLiturgy(id: LiturgyTemplateId, t: (key: string) => string, startTime: string) {
+    const prepared = buildLiturgyTemplate(id, t, startTime)
+    if (!prepared) return false
+    customLiturgies.value = [...customLiturgies.value, prepared]
+    selectedDay.value = 'custom'
+    selectedCustomIndex.value = customLiturgies.value.length - 1
+    selectedItemIndex.value = null
+    persist()
+    return true
+  }
+
   function removeCustomLiturgy(index: number) {
     const removed = customLiturgies.value[index]
     customLiturgies.value = customLiturgies.value.filter((_, i) => i !== index)
@@ -1427,6 +1457,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     openEditDialog,
     closeItemDialog,
     saveItemDraft,
+    setTeamAssignments,
     setItemPlayer,
     removeItem,
     clearAllItems,
@@ -1441,6 +1472,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     openCustomDialog,
     closeCustomDialog,
     createCustomLiturgy,
+    createTemplateLiturgy,
     removeCustomLiturgy,
     openCloneDialog,
     closeCloneDialog,

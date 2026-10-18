@@ -56,15 +56,13 @@ const { t } = useI18n()
 .bible-chapters {
   display: flex;
   flex-direction: column;
-  width: 12rem;
-  flex-shrink: 0;
+  width: auto;
+  min-width: 0;
+  flex: 0 0 clamp(7rem, 12vw, 10rem);
   height: 100%;
   min-height: 0;
   overflow: hidden;
 
-  @media (max-width: 1280px) {
-      flex: 0 0 11.5rem;
-    }
 }
 
 .bible-chapters__search {
@@ -132,7 +130,7 @@ const { t } = useI18n()
 
 .bible-chapters__grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(2rem, 1fr));
   gap: 0.5rem;
   overflow-y: auto;
   padding-right: 0.15rem;
@@ -174,9 +172,9 @@ const { t } = useI18n()
   }
 
   &--active {
-    background: var(--ds-color-tertiary-container, #db7900);
+    background: var(--ds-color-primary);
     border-color: transparent;
-    color: var(--ds-color-on-tertiary-container, #452200);
+    color: var(--ds-color-on-primary);
     font-weight: 700;
   }
 

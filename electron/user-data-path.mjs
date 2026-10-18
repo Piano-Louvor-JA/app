@@ -183,6 +183,12 @@ export function resolveLegacyDataPaths() {
  * @returns {string}
  */
 export function resolveUserDataPath({ isDev = false } = {}) {
+  const developmentRoot = isDev ? process.env.PIANO_DEV_DATA_DIR?.trim() : null
+  if (developmentRoot) {
+    if (!path.isAbsolute(developmentRoot)) throw new Error('PIANO_DEV_DATA_DIR must be an absolute path')
+    mkdirSync(developmentRoot, { recursive: true })
+    return developmentRoot
+  }
   if (!shouldUseSharedUserData({ isDev })) {
     return resolvePerUserDataPath()
   }

@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
+import { getCurrentApiPrefix } from '@modules/sync/services/library-catalog'
 
 import { openMusicPlayer } from '@modules/media/services/open-music-player'
 import type { MediaPlaybackMode } from '@modules/media/types/media'
@@ -28,6 +29,8 @@ import type {
 } from '../types/albums'
 
 export const useAlbumsStore = defineStore('albums', () => {
+  let catalogLanguage = getCurrentApiPrefix()
+  let catalogGeneration = 0
   const categories = ref<AlbumCategory[]>([])
   const activeCollection = ref<AlbumCollection | null>(null)
   const tracks = ref<AlbumTrack[]>([])
@@ -55,6 +58,7 @@ export const useAlbumsStore = defineStore('albums', () => {
   const isHubSearching = computed(() => hubSearchQuery.value.trim().length > 0)
 
   async function hydrateMusicIndex() {
+    const generation = catalogGeneration
     const first = musicIndex.value[0]
     if (
       (musicIndex.value.length > 0 && Array.isArray(first?.hymnalTracks)) ||
@@ -64,20 +68,22 @@ export const useAlbumsStore = defineStore('albums', () => {
     }
     isLoadingMusicIndex.value = true
     try {
-      musicIndex.value = await loadAlbumMusicIndex()
+      const loaded = await loadAlbumMusicIndex()
+      if (generation === catalogGeneration) musicIndex.value = loaded
     } catch (error) {
       console.error('[albums] falha ao carregar índice de músicas', error)
-      musicIndex.value = []
+      if (generation === catalogGeneration) musicIndex.value = []
     } finally {
-      isLoadingMusicIndex.value = false
+      if (generation === catalogGeneration) isLoadingMusicIndex.value = false
     }
   }
 
   async function mergeCustomCollections() {
+    const generation = catalogGeneration
     if (!getShowCustomCollections()) return
     try {
       const customCategory = await loadCustomAlbumCategory()
-      if (!customCategory) return
+      if (!customCategory || generation !== catalogGeneration) return
 
       const withoutCustom = categories.value.filter(
         (category) => String(category.id) !== 'custom',
@@ -89,11 +95,14 @@ export const useAlbumsStore = defineStore('albums', () => {
   }
 
   async function refreshCatalog() {
+    const generation = catalogGeneration
     isLoadingCatalog.value = true
     lastErrorKey.value = null
     try {
       // Catálogo local primeiro — a Central abre na hora com capas.
-      categories.value = await loadAlbumCategories()
+      const loaded = await loadAlbumCategories()
+      if (generation !== catalogGeneration) return
+      categories.value = loaded
       if (categories.value.length === 0) {
         lastErrorKey.value = 'albums.messages.catalogEmpty'
       }
@@ -105,11 +114,12 @@ export const useAlbumsStore = defineStore('albums', () => {
         tracks.value = []
       }
     } catch (error) {
+      if (generation !== catalogGeneration) return
       console.error('[albums] falha ao carregar catálogo', error)
       lastErrorKey.value = 'albums.messages.catalogFailed'
       categories.value = []
     } finally {
-      isLoadingCatalog.value = false
+      if (generation === catalogGeneration) isLoadingCatalog.value = false
     }
   }
 
@@ -118,6 +128,20 @@ export const useAlbumsStore = defineStore('albums', () => {
   let catalogHydrated = false
 
   async function hydrateCatalog() {
+    const language = getCurrentApiPrefix()
+    if (language !== catalogLanguage) {
+      catalogLanguage = language
+      catalogGeneration++
+      categories.value = []
+      activeCollection.value = null
+      tracks.value = []
+      musicIndex.value = []
+      searchQuery.value = ''
+      hubSearchQuery.value = ''
+      lyricOpen.value = false
+      lyricDoc.value = null
+      isLoadingMusicIndex.value = false
+    }
     if (categories.value.length > 0) return
     catalogHydrated = true
     await refreshCatalog()

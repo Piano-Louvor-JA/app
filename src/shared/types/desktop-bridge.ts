@@ -184,6 +184,9 @@ export type RemotePairingInfo = {
   speakerQrDataUrl?: string
   operatorUrl?: string
   operatorQrDataUrl?: string
+  /** Interface de controle para o navegador do celular, na mesma rede. */
+  webUrl?: string
+  webQrDataUrl?: string
   clientCount: number
   clientAddress?: string | null
   /** Identidade do APK/controle remoto conectado (painel esquerdo). */

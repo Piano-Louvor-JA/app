@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { TEST_DISPLAYS } from '../../services/__tests__/display-fixture'
 
 const h = vi.hoisted(() => ({
   getUserPreference: vi.fn(),
@@ -47,6 +48,9 @@ beforeEach(async () => {
   const userPrefs = await import('@shared/services/user-preferences')
   vi.spyOn(userPrefs, 'getUserPreference').mockImplementation(h.getUserPreference)
   vi.spyOn(userPrefs, 'setUserPreference').mockImplementation(h.setUserPreference)
+
+  const displays = await import('../../services/display-service')
+  vi.spyOn(displays, 'listSystemDisplays').mockResolvedValue(structuredClone(TEST_DISPLAYS))
 
   // Mock projection-preferences
   const projPrefs = await import('@modules/settings/services/projection-preferences')

@@ -126,6 +126,8 @@ export function getTypeDotColor(type: LiturgyItemType): string {
 
 export interface LiturgyItem {
   id: string
+  /** Pessoa ou equipe responsável por este momento do culto. */
+  responsible?: string
   type: LiturgyItemType
   name: string
   subtitle: string

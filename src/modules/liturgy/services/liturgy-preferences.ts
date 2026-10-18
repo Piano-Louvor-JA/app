@@ -70,6 +70,7 @@ function normalizeItem(raw: unknown): LiturgyItem | null {
     type,
     name,
     subtitle: asString(source.subtitle),
+    responsible: asString(source.responsible).trim().slice(0, 120) || undefined,
     done: Boolean(source.done),
     durationMs,
     accentColor: getTypeDotColor(type),

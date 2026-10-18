@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import AppIcon from '@design-system/components/AppIcon.vue'
 import { computed, onMounted, onUnmounted, provide, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import { usePageTransition } from '@design-system/composables'
+import AppSidebar from './components/AppSidebar.vue'
 import { DockFooter, GradientBackground, HistoryNav, MinimizedPagesBar } from '@design-system/index'
 import type { DockNavItem, HistoryNavDot, MinimizedBarItem } from '@design-system/types/navigation'
 import AuthAccountDialog from '@modules/auth/components/AuthAccountDialog.vue'
@@ -537,10 +539,7 @@ function viewKey(viewRoute: typeof route) {
             :title="t('popupControls.closeAll')"
             @click="onCloseAllScreens"
           >
-            <i
-              class="ti ti-square-x"
-              aria-hidden="true"
-            />
+            <AppIcon name="square-x" aria-hidden="true" />
           </button>
         </div>
         <div class="app-shell__codename-block">
@@ -567,6 +566,8 @@ function viewKey(viewRoute: typeof route) {
       </div>
     </header>
 
+    <div class="app-shell__workspace">
+    <AppSidebar :items="navItems" :active-key="activeKey" @select="onNavigate" />
     <main ref="mainEl" class="app-shell__main">
       <RouterView v-slot="{ Component, route: viewRoute }">
         <Transition
@@ -582,6 +583,7 @@ function viewKey(viewRoute: typeof route) {
         </Transition>
       </RouterView>
     </main>
+    </div>
 
     <MediaChrome />
 
@@ -664,6 +666,7 @@ function viewKey(viewRoute: typeof route) {
     </div>
 
     <DockFooter
+      class="app-shell__mobile-nav"
       :items="navItems"
       :active-key="activeKey"
       @select="onNavigate"
@@ -688,6 +691,8 @@ function viewKey(viewRoute: typeof route) {
   min-height: 0;
   overflow: hidden;
 }
+
+.app-shell__workspace { display:flex; flex:1; min-height:0; overflow:hidden; }
 
 .app-shell__header {
   display: flex;
@@ -729,7 +734,7 @@ function viewKey(viewRoute: typeof route) {
 }
 
 .app-shell__brand-ja {
-  color: var(--ds-color-brand-yellow);
+  color: var(--ds-color-primary);
 }
 
 .app-shell__header-end {
@@ -877,6 +882,7 @@ function viewKey(viewRoute: typeof route) {
 }
 
 .app-shell__main {
+  min-width: 0;
   position: relative;
   z-index: 1;
   display: flex;
@@ -934,5 +940,13 @@ function viewKey(viewRoute: typeof route) {
   .app-shell__header-end {
     gap: 0.5rem;
   }
+}
+</style>
+
+<style scoped>
+@media (min-width: 801px) {
+  .app-shell { --ds-dock-height: 0px; }
+  .app-shell__mobile-nav { display: none; }
+  .app-shell__header { height: 4.25rem; }
 }
 </style>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppIcon from '@design-system/components/AppIcon.vue'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
@@ -17,7 +18,10 @@ import LiturgyDayTabs from '../components/LiturgyDayTabs.vue'
 import LiturgyItemDialog from '../components/LiturgyItemDialog.vue'
 import LiturgySidebar from '../components/LiturgySidebar.vue'
 import LiturgyTimeline from '../components/LiturgyTimeline.vue'
+import LiturgyTeamDialog from '../components/LiturgyTeamDialog.vue'
 import { useLiturgy } from '../composables/useLiturgy'
+import { LITURGY_TEMPLATES, type LiturgyTemplateId } from '../services/liturgy-templates'
+import { formatElapsed } from '../services/liturgy-format'
 
 const scheduledDialogOpen = ref(false)
 
@@ -67,6 +71,8 @@ const scheduledResolvedByItemId = computed(() => {
 })
 
 const { t } = useI18n()
+const templatesOpen = ref(false)
+const templateStart = ref('09:00')
 
 const {
   selectedDay,
@@ -97,6 +103,9 @@ const {
   lyricDoc,
   isLoadingLyric,
   startLabels,
+  schedule,
+  createTemplateLiturgy,
+  exportSchedule,
   durationLabels,
   videoProjectionItemId,
   worshipLabel,
@@ -145,6 +154,8 @@ const {
   clearActionMessage,
   setNotes,
   onManageTeam,
+  teamDialogOpen,
+  saveTeam,
   onMusicPick,
   clearMusicPick,
   refreshMusicCatalog,
@@ -166,6 +177,10 @@ const liturgyAlertKey = computed(() => lastActionMessageKey.value || null)
 async function onSljaImported(): Promise<void> {
   await refreshMusicCatalog()
 }
+
+function useTemplate(id: LiturgyTemplateId) {
+  if (createTemplateLiturgy(id, templateStart.value)) templatesOpen.value = false
+}
 </script>
 
 <template>
@@ -176,10 +191,8 @@ async function onSljaImported(): Promise<void> {
         <PalcoRouteSelect module="liturgy" />
       </div>
       <div class="liturgy-view__brand">
-        <i
-          class="ti ti-clipboard-text liturgy-view__brand-icon"
-          aria-hidden="true"
-        />
+        <AppIcon name="clipboard-text" class="liturgy-view__brand-icon"
+          aria-hidden="true" />
         <h1 class="liturgy-view__title">
           {{ t('liturgy.title') }}
         </h1>
@@ -213,6 +226,7 @@ async function onSljaImported(): Promise<void> {
 
     <div class="liturgy-view__body">
       <LiturgySidebar
+        :team-items="currentItems"
         :remaining-countdown="remainingCountdownLabel"
         :countdown-expired="countdownExpired"
         :countdown-running="countdownRunning"
@@ -238,29 +252,25 @@ async function onSljaImported(): Promise<void> {
           />
 
           <div class="liturgy-view__toolbar-actions">
+            <button type="button" class="liturgy-view__clear liturgy-view__tool" :aria-expanded="templatesOpen" @click="templatesOpen = !templatesOpen"><AppIcon name="template" aria-hidden="true" /><span>{{ t('liturgyPlan.templatesTitle') }}</span></button>
+            <button type="button" class="liturgy-view__clear liturgy-view__tool" :disabled="!currentItems.length" @click="exportSchedule"><AppIcon name="file-spreadsheet" aria-hidden="true" /><span>{{ t('liturgyPlan.export') }}</span></button>
             <button
               type="button"
-              class="liturgy-view__clear"
+              class="liturgy-view__clear liturgy-view__tool"
               :title="t('liturgy.importJa')"
               @click="importJa"
             >
-              <i
-                class="ti ti-file-import"
-                aria-hidden="true"
-              />
+              <AppIcon name="file-import" aria-hidden="true" />
               <span>{{ t('liturgy.importJa') }}</span>
             </button>
 
             <button
               type="button"
-              class="liturgy-view__clear"
+              class="liturgy-view__clear liturgy-view__tool"
               :title="t('liturgy.scheduled.import')"
               @click="importScheduled"
             >
-              <i
-                class="ti ti-calendar-down"
-                aria-hidden="true"
-              />
+              <AppIcon name="calendar-down" aria-hidden="true" />
               <span>{{ t('liturgy.scheduled.import') }}</span>
             </button>
 
@@ -310,10 +320,7 @@ async function onSljaImported(): Promise<void> {
               :title="t('liturgy.clearLiturgy')"
               @click="confirmClearLiturgy"
             >
-              <i
-                class="ti ti-trash"
-                aria-hidden="true"
-              />
+              <AppIcon name="trash" aria-hidden="true" />
               <span>{{ t('liturgy.clearLiturgy') }}</span>
             </button>
 
@@ -323,14 +330,17 @@ async function onSljaImported(): Promise<void> {
               :title="t('liturgy.addItemToLiturgy')"
               @click="openAddDialog"
             >
-              <i
-                class="ti ti-plus"
-                aria-hidden="true"
-              />
+              <AppIcon name="plus" aria-hidden="true" />
               <span>{{ t('liturgy.addItem') }}</span>
             </button>
           </div>
         </div>
+
+        <section v-if="templatesOpen" class="liturgy-templates" :aria-label="t('liturgyPlan.templatesTitle')">
+          <div class="liturgy-templates__intro"><p>{{ t('liturgyPlan.templateHint') }}</p><button type="button" :aria-label="t('liturgyPlan.close')" @click="templatesOpen = false">×</button></div>
+          <label>{{ t('liturgyPlan.startTime') }} <input v-model="templateStart" type="time" required></label>
+          <div class="liturgy-templates__cards"><button v-for="template in LITURGY_TEMPLATES" :key="template.id" type="button" :disabled="!templateStart" @click="useTemplate(template.id)"><i class="ti" :class="template.icon" aria-hidden="true" />{{ t(`liturgyPlan.templates.${template.id}`) }}</button></div>
+        </section>
 
         <LiturgyCustomBar
           v-if="selectedDay === 'custom'"
@@ -340,6 +350,12 @@ async function onSljaImported(): Promise<void> {
           @remove="confirmRemoveCustom"
           @create="openCustomDialog"
         />
+
+        <div v-if="currentItems.length && schedule" class="liturgy-plan-summary" role="status">
+          <span>{{ t('liturgyPlan.total', { duration: formatElapsed(schedule.totalDurationMs) }) }}</span>
+          <span>{{ t('liturgyPlan.end', { time: schedule.endLabel }) }}</span>
+          <small v-if="schedule.unknownDurations">{{ t('liturgyPlan.unknown', { count: schedule.unknownDurations }) }}</small>
+        </div>
 
         <LiturgyTimeline
           :items="currentItems"
@@ -393,6 +409,13 @@ async function onSljaImported(): Promise<void> {
       :refresh-imported-catalog="onSljaImported"
     />
 
+    <LiturgyTeamDialog
+      :open="teamDialogOpen"
+      :items="currentItems"
+      @close="teamDialogOpen = false"
+      @save="saveTeam"
+    />
+
     <LiturgyCustomDialog
       :open="customDialogOpen"
       :name="newCustomName"
@@ -425,6 +448,18 @@ async function onSljaImported(): Promise<void> {
 </template>
 
 <style scoped lang="scss">
+.liturgy-templates { flex-shrink: 0; padding: 1rem; border: 1px solid var(--ds-color-outline); background: var(--ds-color-surface); border-radius: .9rem; display: grid; gap: .75rem; }
+.liturgy-templates__intro { display: flex; align-items: flex-start; gap: 1rem; }
+.liturgy-templates__intro p { margin: 0; color: var(--ds-color-on-surface-variant); font-size: .85rem; }
+.liturgy-templates__intro button { margin-left: auto; }
+.liturgy-templates input, .liturgy-templates button { background: transparent; color: var(--ds-color-on-surface); border: 1px solid var(--ds-color-outline); border-radius: .6rem; padding: .6rem .8rem; font: inherit; font-size: .85rem; }
+.liturgy-templates button { cursor: pointer; }
+.liturgy-templates label { font-size: .8rem; display: flex; align-items: center; gap: 1rem; }
+.liturgy-templates__cards { display: flex; flex-wrap: wrap; gap: .65rem; }
+.liturgy-templates__cards button { display: flex; align-items: center; gap: .65rem; }
+.liturgy-templates__cards button:hover { color: var(--ds-color-primary); border-color: var(--ds-color-primary); }
+.liturgy-plan-summary { display: flex; flex-wrap: wrap; flex-shrink: 0; gap: .5rem 1.25rem; padding: .65rem 0; color: var(--ds-color-on-surface-variant); font-size: .8rem; }
+.liturgy-plan-summary small { flex-basis: 100%; color: var(--ds-color-primary); }
 .liturgy-view {
   box-sizing: border-box;
   display: flex;
@@ -541,14 +576,16 @@ async function onSljaImported(): Promise<void> {
 
 .liturgy-view__toolbar {
   display: flex;
+  flex-direction: column;
   flex-shrink: 0;
-  align-items: center;
+  align-items: stretch;
   gap: 0.75rem;
   min-width: 0;
 }
 
 .liturgy-view__toolbar :deep(.liturgy-day-tabs) {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
+  width: 100%;
   min-width: 0;
   margin-bottom: 0;
   padding-bottom: 0;
@@ -556,6 +593,7 @@ async function onSljaImported(): Promise<void> {
 
 .liturgy-view__toolbar-actions {
   display: flex;
+  flex-wrap: wrap;
   flex-shrink: 0;
   align-items: center;
   gap: 0.5rem;
@@ -639,6 +677,16 @@ async function onSljaImported(): Promise<void> {
   }
 }
 
+.liturgy-view__tool {
+  color: var(--ds-color-on-surface);
+  background: var(--ds-color-surface-card);
+  border-color: var(--ds-color-outline);
+  &:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--ds-color-primary) 12%, var(--ds-color-surface-card));
+    border-color: var(--ds-color-primary);
+  }
+}
+
 .liturgy-view__add {
   display: inline-flex;
   flex-shrink: 0;
@@ -691,15 +739,29 @@ async function onSljaImported(): Promise<void> {
     padding: 1.25rem;
     height: auto;
     max-height: none;
-    overflow: visible;
+    overflow-y: auto;
   }
 
   .liturgy-view__body {
     flex-direction: column;
+    flex: 0 0 auto;
     overflow: visible;
   }
 
   .liturgy-view__main {
+    flex: 0 0 auto;
+    overflow: visible;
+  }
+
+  .liturgy-view__main :deep(.liturgy-timeline),
+  .liturgy-view__main :deep(.liturgy-timeline__list) {
+    flex: 0 0 auto;
+    overflow: visible;
+  }
+
+  .liturgy-view__body :deep(.liturgy-sidebar) {
+    order: 2;
+    max-width: none;
     overflow: visible;
   }
 
@@ -779,7 +841,9 @@ async function onSljaImported(): Promise<void> {
   }
 
   .liturgy-view__body :deep(.liturgy-sidebar) {
-    max-width: 16rem;
+    @media (min-width: 961px) {
+      max-width: 16rem;
+    }
   }
 
   .liturgy-view__body :deep(.ds-glass-card--padded) {

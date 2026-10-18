@@ -8,6 +8,7 @@ import { useBibleStore } from '../stores/useBibleStore'
 export function useBibleReader() {
   const store = useBibleStore()
   const {
+    contentLanguage,
     books,
     versions,
     selectedVersionId,
@@ -74,6 +75,7 @@ export function useBibleReader() {
   })
 
   return {
+    contentLanguage,
     books,
     versions,
     selectedVersionId,
@@ -100,11 +102,13 @@ export function useBibleReader() {
     verseEntries,
     hasProjection,
     previewSnippet,
+    changeContentLanguage: store.changeContentLanguage,
     clearError: store.clearError,
     selectVersion: store.selectVersion,
     selectBook: store.selectBook,
     selectChapter: store.selectChapter,
     selectVerse: store.selectVerse,
+    openReference: store.openReference,
     applyVerseSearch: store.applyVerseSearch,
     clearSelection: store.clearSelection,
     setTestamentFilter: store.setTestamentFilter,
