@@ -201,7 +201,7 @@ export default {
       desktopOnly: 'Only available in the desktop app.',
       backupTitle: 'Backup',
       backupHint:
-        'Saves a zip of the app data folder (media, liturgy and playlists). If media lives on another drive, it is stored in the backup as the default Media folder. Restore always uses the default folders; you can move media later in Media folder.',
+        'Saves a zip of the app data folder (media, liturgy, playlists and Bible). If media lives on another drive, it is stored in the backup as the default Media folder. Restore always uses the default folders; you can move media later in Media folder.',
       backupCreate: 'Create backup',
       backupRestore: 'Restore backup',
       backupCreating: 'Creating backup…',

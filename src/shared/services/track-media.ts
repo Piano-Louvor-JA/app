@@ -79,8 +79,16 @@ let offlineCheckActive = 0
 const offlineCheckWaiters: Array<() => void> = []
 const MAX_PARALLEL_OFFLINE_CHECKS = 2
 
-async function withOfflineCheckSlot<T>(fn: () => Promise<T>): Promise<T> {
-  if (offlineCheckActive >= MAX_PARALLEL_OFFLINE_CHECKS) {
+/**
+ * `priority`: ação do operador (clicar em tocar) não entra na fila das
+ * checagens das linhas da lista — com centenas de hinos sem download, cada
+ * uma buscando music_{id} na rede, a fila segurava a abertura do player.
+ */
+async function withOfflineCheckSlot<T>(
+  fn: () => Promise<T>,
+  priority = false,
+): Promise<T> {
+  if (!priority && offlineCheckActive >= MAX_PARALLEL_OFFLINE_CHECKS) {
     await new Promise<void>((resolve) => {
       offlineCheckWaiters.push(resolve)
     })
@@ -230,7 +238,10 @@ export function invalidateTrackMediaCache(musicId?: number): void {
  * Considera baixada quando áudio principal e todos os slides/capas
  * associados existem localmente.
  */
-export async function isTrackMediaDownloaded(musicId: number): Promise<boolean> {
+export async function isTrackMediaDownloaded(
+  musicId: number,
+  options: { priority?: boolean } = {},
+): Promise<boolean> {
   return withOfflineCheckSlot(async () => {
     if (!isDesktopApp()) return false
 
@@ -261,7 +272,7 @@ export async function isTrackMediaDownloaded(musicId: number): Promise<boolean> 
 
     downloadedCache.set(cacheKey, true)
     return true
-  })
+  }, options.priority === true)
 }
 
 export type TrackMediaDownloadResult =

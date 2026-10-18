@@ -1,5 +1,6 @@
+import { getDesktopBridge } from '@shared/services/desktop-bridge'
 import { fetchRemoteCatalogJson } from '@shared/services/remote-catalog'
-import { readCatalogRecord } from '@shared/services/workspace-api'
+import { readCatalogRecord, writeCatalogRecord } from '@shared/services/workspace-api'
 
 import type {
   BibleBook,
@@ -164,15 +165,75 @@ export async function loadBibleVersions(): Promise<BibleVersion[]> {
   return rows.map(mapVersion)
 }
 
+function isChapterVerses(value: unknown): value is BibleChapterVerses {
+  return (
+    value != null &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    Object.keys(value).length > 0
+  )
+}
+
+/** Bundle offline (atualização baixada > instalador), lido pelo main. */
+async function readBundledChapter(
+  versionId: number,
+  bookId: number,
+  chapter: number,
+): Promise<BibleChapterVerses | null> {
+  const bible = getDesktopBridge()?.bible
+  if (!bible) return null
+  try {
+    const verses = await bible.getChapter(versionId, bookId, chapter)
+    return isChapterVerses(verses) ? verses : null
+  } catch (error) {
+    console.warn('[bible] falha ao ler bundle offline', error)
+    return null
+  }
+}
+
+/**
+ * Ordem: bundle offline → capítulo salvo no disco → API. O que vem da API
+ * fica salvo no disco, para a próxima leitura não depender de rede.
+ */
 export async function loadChapterVerses(
   versionId: number,
   bookId: number,
   chapter: number,
 ): Promise<BibleChapterVerses> {
+  const bundled = await readBundledChapter(versionId, bookId, chapter)
+  if (bundled) return bundled
+
   const key = chapterRecordKey(versionId, bookId, chapter)
-  const verses = await readOrFetchCatalog<BibleChapterVerses>(key)
-  if (!verses || typeof verses !== 'object') return {}
-  return verses
+  const local = await readCatalogRecord<BibleChapterVerses>(key)
+  if (isChapterVerses(local)) return local
+
+  let remote: unknown
+  try {
+    remote = await fetchRemoteCatalogJson<BibleChapterVerses>(key)
+  } catch (error) {
+    console.warn(`[bible] falha ao obter capítulo ${key}`, error)
+    return {}
+  }
+  if (!isChapterVerses(remote)) return {}
+
+  try {
+    await writeCatalogRecord(key, remote)
+  } catch (error) {
+    console.warn(`[bible] falha ao salvar capítulo ${key}`, error)
+  }
+  return remote
+}
+
+/**
+ * Pede ao main para conferir bundles novos na API (o main limita a 1x/dia).
+ * Nunca lança: atualização é melhor esforço e não afeta a leitura.
+ */
+export async function requestBibleBundleUpdate(): Promise<void> {
+  try {
+    await getDesktopBridge()?.bible?.checkUpdates?.()
+  } catch (error) {
+    console.warn('[bible] falha ao verificar atualização da Bíblia', error)
+  }
 }
 
 /** Preferência padrão: ARA, senão a primeira versão. */

@@ -62,3 +62,6 @@ reports/mutation/
 .stryker-tmp/
 voidbr/
 .worktrees/
+
+# Bíblia offline: bundles baixados no build (scripts/fetch-bible-bundles.mjs)
+resources/bible/

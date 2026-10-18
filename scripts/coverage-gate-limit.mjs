@@ -3,9 +3,19 @@ import { pathToFileURL } from 'node:url'
 
 const METRICS = ['statements', 'branches', 'functions', 'lines']
 
-/** PRs para staging usam 50%. Main, push, dispatch e demais destinos permanecem em 100%. */
-export function coverageMinimumPercent({ eventName, baseRef } = {}) {
-  if (eventName === 'pull_request' && baseRef === 'staging') return 50
+const STAGING_REF = 'refs/heads/staging'
+
+/**
+ * Caminho da staging usa 50%: PR cuja base é staging, ou push/dispatch cujo ref
+ * do evento é refs/heads/staging. Main, tags, release e qualquer outro destino
+ * permanecem em 100%. Em PR só a base decide (o ref é refs/pull/N/merge); a
+ * branch de origem nunca entra na decisão.
+ */
+export function coverageMinimumPercent({ eventName, baseRef, ref } = {}) {
+  if (eventName === 'pull_request') return baseRef === 'staging' ? 50 : 100
+  if ((eventName === 'push' || eventName === 'workflow_dispatch') && ref === STAGING_REF) {
+    return 50
+  }
   return 100
 }
 
@@ -41,11 +51,12 @@ function main() {
 
   const eventName = process.env.GITHUB_EVENT_NAME ?? ''
   const baseRef = process.env.PR_BASE_REF ?? ''
-  const minimum = coverageMinimumPercent({ eventName, baseRef })
+  const ref = process.env.EVENT_REF ?? ''
+  const minimum = coverageMinimumPercent({ eventName, baseRef, ref })
   const summary = JSON.parse(readFileSync(summaryPath, 'utf8'))
   const result = evaluateCoverage(summary, minimum)
   console.log(
-    `Limite de cobertura: ${minimum}% (evento=${eventName || 'local'} base=${baseRef || 'n/a'})`,
+    `Limite de cobertura: ${minimum}% (evento=${eventName || 'local'} base=${baseRef || 'n/a'} ref=${ref || 'n/a'})`,
   )
 
   if (result.failures.length) {

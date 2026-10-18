@@ -64,9 +64,13 @@ jobs:
             echo "PIANO_BUILD_PROFILE=homologation" >> "$GITHUB_ENV"
           fi
 
-      - name: Build Vite + Electron DMG universal + publish
+      # --publish never: o electron-builder só gera o DMG e o latest-mac.yml.
+      # Quem cria a GitHub Release é o release.yml (um único draft por tag).
+      # Com --publish always, os dois publishers deste build criaram duas
+      # releases para a v1.31.2 (DMG numa, blockmap na outra).
+      - name: Build Vite + Electron DMG universal
         if: steps.decision.outputs.publish == 'true'
-        run: npm run electron:build -- --mac --universal --publish always
+        run: npm run electron:build -- --mac --universal --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -78,3 +82,22 @@ jobs:
           path: dist-electron/*universal*.dmg
           if-no-files-found: error
           retention-days: 30
+
+      # Tag: espera o draft criado pelo release.yml (nunca cria). Dispatch
+      # manual: não há release.yml concorrente, então cria se faltar.
+      - name: Attach assets to the GitHub Release
+        if: steps.decision.outputs.publish == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+        run: |
+          set -euo pipefail
+          mode=wait
+          if [ -z "$TAG" ]; then TAG="v$(node -p "require('./package.json').version")"; mode=create; fi
+          node scripts/release-draft.mjs --repo "$GITHUB_REPOSITORY" --tag "$TAG" --mode "$mode"
+          shopt -s nullglob
+          assets=(dist-electron/*.dmg dist-electron/*.dmg.blockmap dist-electron/latest-mac.yml)
+          test -f dist-electron/latest-mac.yml || { echo "latest-mac.yml ausente (auto-update)" >&2; exit 1; }
+          gh release upload "$TAG" "${assets[@]}" --clobber
+          printf 'Anexado: %s\n' "${assets[@]}"

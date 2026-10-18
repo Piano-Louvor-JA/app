@@ -28,7 +28,7 @@ export default defineConfig({
   },
   test: {
 // Helpers E2E rodam no Vitest; specs pertencem ao Playwright.
-    exclude: ['node_modules/**', 'dist/**', 'e2e/**/*.spec.ts', '.worktrees/**', 'coverage/**', 'scripts/release-publish-decision.test.mjs', 'scripts/coverage-gate-limit.test.mjs', 'scripts/mac-universal-arch-files.test.mjs', 'scripts/release-bundle.test.mjs'],
+    exclude: ['node_modules/**', 'dist/**', 'e2e/**/*.spec.ts', '.worktrees/**', 'coverage/**', 'scripts/release-publish-decision.test.mjs', 'scripts/release-draft.test.mjs', 'scripts/coverage-gate-limit.test.mjs', 'scripts/mac-universal-arch-files.test.mjs', 'scripts/release-bundle.test.mjs'],
     environment: 'jsdom',
     environmentOptions: {
       jsdom: {

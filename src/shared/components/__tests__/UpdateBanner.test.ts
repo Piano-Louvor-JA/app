@@ -71,9 +71,10 @@ describe("UpdateBanner", () => {
 		expect(mock.dismiss).toHaveBeenCalledOnce();
 	});
 
-	it("emite viewNotes ao clicar em Ver notas", async () => {
+	it("botão principal diz Atualizar e emite viewNotes ao clicar", async () => {
 		mockComposable({ hasUpdate: ref(true), newVersion: ref("2.0.0") });
 		const wrapper = mount(UpdateBanner);
+		expect(wrapper.find('[data-test="notes-btn"]').text()).toBe("Atualizar");
 		await wrapper.find('[data-test="notes-btn"]').trigger("click");
 		expect(wrapper.emitted("viewNotes")).toBeTruthy();
 		expect(wrapper.emitted("viewNotes")![0]).toEqual(["2.0.0"]);
