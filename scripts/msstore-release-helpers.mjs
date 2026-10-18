@@ -3,7 +3,9 @@
 // via node --input-type=module ou import direto.
 //
 // Contrato (SPEC frozen 2026-10-15):
-// - asset da release: exatamente um match da regex, URL HTTPS pública
+// - asset da release: exatamente um asset cujo nome termina com o filtro
+//   informado (texto literal, nunca RegExp — o filtro vem de input do
+//   workflow/CLI; RegExp montada a partir dele permitia ReDoS), URL HTTPS
 // - submit: só quando isReady === true, sem submissão em curso e
 //   submission ID igual ao esperado informado pelo operador.
 
@@ -21,15 +23,18 @@ export function assertHttpsUrl(url) {
   return value;
 }
 
-export function pickSingleAsset(tag, assetRegex, assets) {
-  const re = new RegExp(assetRegex);
-  const matches = (assets ?? []).filter((a) => re.test(a.name ?? ''));
+export function pickSingleAsset(tag, assetSuffix, assets) {
+  const suffix = String(assetSuffix ?? '');
+  if (!suffix) {
+    throw new Error('github_asset_filter_empty: informe o filtro (final do nome do asset, ex: Setup.exe)');
+  }
+  const matches = (assets ?? []).filter((a) => String(a.name ?? '').endsWith(suffix));
   if (matches.length === 0) {
-    throw new Error(`github_asset_not_found: nenhum asset casa com ${assetRegex} na release ${tag}`);
+    throw new Error(`github_asset_not_found: nenhum asset termina com "${suffix}" na release ${tag}`);
   }
   if (matches.length > 1) {
     const names = matches.map((a) => a.name).join(', ');
-    throw new Error(`github_asset_ambiguous: múltiplos assets (${matches.length}) casam com ${assetRegex} na release ${tag}: ${names}. Refine a regex.`);
+    throw new Error(`github_asset_ambiguous: múltiplos assets (${matches.length}) terminam com "${suffix}" na release ${tag}: ${names}. Refine o filtro.`);
   }
   return assertHttpsUrl(matches[0].browser_download_url);
 }

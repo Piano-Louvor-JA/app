@@ -18,18 +18,31 @@ const asset = (name) => ({
   browser_download_url: `https://github.com/Piano-Louvor-JA/app/releases/download/v1.31.0/${encodeURIComponent(name)}`,
 });
 
-test('pickSingleAsset resolve exatamente um .exe', () => {
-  const url = pickSingleAsset('v1.31.0', 'Setup\\.exe$', [asset('LouvorJA-PIANO-1.31.0-Setup.exe'), asset('SHA256SUMS-win-x64')]);
+test('pickSingleAsset resolve exatamente um .exe pelo final do nome', () => {
+  const url = pickSingleAsset('v1.31.0', 'Setup.exe', [asset('LouvorJA-PIANO-1.31.0-Setup.exe'), asset('SHA256SUMS-win-x64')]);
   assert.ok(url.startsWith('https://'));
   assert.ok(url.endsWith('LouvorJA-PIANO-1.31.0-Setup.exe'));
 });
 
 test('pickSingleAsset falha com zero matches', () => {
-  assert.throws(() => pickSingleAsset('v1.31.0', 'naoexiste\\.exe$', [asset('x.exe')]), /nenhum asset/i);
+  assert.throws(() => pickSingleAsset('v1.31.0', 'naoexiste.exe', [asset('x.exe')]), /nenhum asset/i);
 });
 
 test('pickSingleAsset falha com múltiplos matches', () => {
-  assert.throws(() => pickSingleAsset('v1.31.0', 'Setup\\.exe$', [asset('a-Setup.exe'), asset('b-Setup.exe')]), /m[úu]ltiplos assets/i);
+  assert.throws(() => pickSingleAsset('v1.31.0', 'Setup.exe', [asset('a-Setup.exe'), asset('b-Setup.exe')]), /m[úu]ltiplos assets/i);
+});
+
+// CodeQL js/regex-injection: o filtro vem de input do workflow/CLI e nunca
+// vira RegExp — metacaracteres são texto literal (sem ReDoS).
+test('pickSingleAsset trata o filtro como texto literal, nunca como regex', () => {
+  assert.throws(() => pickSingleAsset('v1.31.0', '.*', [asset('x.exe')]), /nenhum asset/i);
+  assert.throws(() => pickSingleAsset('v1.31.0', '(a+)+$', [asset('aaaaaaaaaaaaaaaaaaaaaaaaaaaa!')]), /nenhum asset/i);
+  const url = pickSingleAsset('v1.31.0', '[1].exe', [asset('LouvorJA-[1].exe'), asset('LouvorJA-1.exe')]);
+  assert.ok(url.endsWith(encodeURIComponent('LouvorJA-[1].exe')));
+});
+
+test('pickSingleAsset exige filtro não vazio', () => {
+  assert.throws(() => pickSingleAsset('v1.31.0', '', [asset('x.exe')]), /filtro/i);
 });
 
 test('assertHttpsUrl recusa http e protocolos estranhos', () => {

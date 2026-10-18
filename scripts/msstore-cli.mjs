@@ -101,12 +101,12 @@ switch (command) {
     break;
   }
   case 'sync-draft': {
-    const [tag, assetRegex, packageId, packageType = 'exe'] = args;
-    if (!tag || !assetRegex || !packageId) {
-      fail('invalid_input', 'Uso: sync-draft <tag> <asset_regex> <package_id> [package_type=exe]');
+    const [tag, assetSuffix, packageId, packageType = 'exe'] = args;
+    if (!tag || !assetSuffix || !packageId) {
+      fail('invalid_input', 'Uso: sync-draft <tag> <asset_suffix> <package_id> [package_type=exe]');
     }
     const assets = await releaseAssets(repo, tag);
-    const url = assertHttpsUrl(pickSingleAsset(tag, assetRegex, assets));
+    const url = assertHttpsUrl(pickSingleAsset(tag, assetSuffix, assets));
     if (!url.toLowerCase().endsWith(`.${packageType}`)) {
       fail('invalid_package_input', `Asset não termina em .${packageType}`);
     }
