@@ -282,3 +282,25 @@ test('dispatch de pacotes não depende de checkout implícito', () => {
     assert.match(line, /--repo/)
   }
 })
+
+// O Snap só gera build de produção quando roda a partir da tag (gate do perfil
+// release); disparado pela main ele falha antes de empacotar.
+test('release dispara o Snap a partir da tag exata', () => {
+  const workflow = readFileSync(join(repoRoot, '.github/workflows/release.yml'), 'utf8')
+  const dispatches = workflow.split('\n').filter(line => line.includes('gh workflow run'))
+  const snap = dispatches.filter(line => line.includes('snap-release.yml'))
+  assert.equal(snap.length, 1)
+  assert.match(snap[0], /--ref "\$TAG"/)
+  assert.ok(dispatches.some(line => line.includes('build-flatpak.yml')), 'Flatpak continua disparado')
+})
+
+// Em --destructive-mode o snapcraft instala os build-snaps da extensão gnome
+// no host; como usuário comum (snapcore/action-build) a instalação falha.
+test('Snap empacota como root num host igual à base core24', () => {
+  const snap = readFileSync(join(repoRoot, '.github/workflows/snap-release.yml'), 'utf8')
+  const job = snap.slice(snap.indexOf('\n  snap:'))
+  assert.match(job, /runs-on: ubuntu-24\.04/)
+  assert.match(job, /sudo snapcraft pack --destructive-mode/)
+  assert.doesNotMatch(job, /snapcore\/action-build/)
+  assert.match(readFileSync(join(repoRoot, 'snap/snapcraft.yaml'), 'utf8'), /^base: core24$/m)
+})
