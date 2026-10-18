@@ -518,7 +518,8 @@ function viewKey(viewRoute: typeof route) {
           />
           <button
             type="button"
-            class="app-shell__project-btn"
+            class="app-shell__project-btn ds-control"
+            :data-tone="isProjecting ? 'primary' : undefined"
             :class="{ 'app-shell__project-btn--on': isProjecting }"
             :disabled="!canToggleProjection"
             :aria-label="projectAriaLabel"
@@ -534,7 +535,7 @@ function viewKey(viewRoute: typeof route) {
           <button
             v-if="hasOpenScreens"
             type="button"
-            class="app-shell__project-btn"
+            class="app-shell__project-btn ds-control"
             :aria-label="t('popupControls.closeAll')"
             :title="t('popupControls.closeAll')"
             @click="onCloseAllScreens"
@@ -757,38 +758,17 @@ function viewKey(viewRoute: typeof route) {
 
 .app-shell__project-btn {
   display: inline-flex;
-  width: 2.25rem;
-  height: 2.25rem;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
   align-items: center;
   justify-content: center;
-  border: 0;
-  border-radius: 9999px;
-  background: color-mix(in srgb, var(--ds-color-primary) 18%, transparent);
-  color: var(--ds-color-primary);
-  cursor: pointer;
-  transition:
-    transform 160ms ease,
-    background-color 160ms ease,
-    opacity 160ms ease;
 
   .ti {
     font-size: 1.1rem;
     line-height: 1;
   }
 
-  &:hover:not(:disabled) {
-    transform: scale(1.06);
-    background: color-mix(in srgb, var(--ds-color-primary) 28%, transparent);
-  }
-
-  &--on {
-    background: color-mix(in srgb, var(--ds-color-primary) 32%, transparent);
-  }
-
-  &:disabled {
-    opacity: 0.4;
-    cursor: default;
-  }
 }
 
 .app-shell__codename-block {

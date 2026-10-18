@@ -14,12 +14,14 @@ import {
   type Router,
 } from 'vue-router'
 
-const { hideMock, currentThemeRef, updateCheckerMock, palcoBridgeMock } =
+const { hideMock, currentThemeRef, accentRef, vuetifyState, updateCheckerMock, palcoBridgeMock } =
   vi.hoisted(() => {
     const { ref } = require('vue') as typeof import('vue')
     return {
       hideMock: vi.fn(),
       currentThemeRef: ref({ mode: 'dark' }),
+      accentRef: ref('azure'),
+      vuetifyState: { themes: ref({ dark: { colors: {} as Record<string, string> }, light: { colors: {} as Record<string, string> } }), change: vi.fn(async () => {}) },
       updateCheckerMock: {
         hasUpdate: ref(false),
         init: vi.fn(),
@@ -29,13 +31,11 @@ const { hideMock, currentThemeRef, updateCheckerMock, palcoBridgeMock } =
   })
 
 vi.mock('vuetify', () => ({
-  useTheme: () => ({
-    change: vi.fn(async () => {}),
-  }),
+  useTheme: () => vuetifyState,
 }))
 
 vi.mock('@design-system/composables', () => ({
-  useThemeManager: () => ({ currentTheme: currentThemeRef }),
+  useThemeManager: () => ({ currentTheme: currentThemeRef, accentKey: accentRef }),
 }))
 
 vi.mock('@modules/starting/stores/useStartingStore', async () => {
@@ -123,6 +123,9 @@ beforeEach(async () => {
   updateCheckerMock.init.mockClear()
   palcoBridgeMock.startPalcoBridge.mockClear()
   currentThemeRef.value = { mode: 'dark' }
+  accentRef.value = 'azure'
+  vuetifyState.themes.value = { dark: { colors: {} }, light: { colors: {} } }
+  vuetifyState.change.mockClear()
   vi.spyOn(console, 'info').mockImplementation(() => {})
   vi.spyOn(console, 'error').mockImplementation(() => {})
   router = makeRouter()
@@ -199,11 +202,28 @@ describe('App.vue — janela principal', () => {
   it('mudança de tema propaga para vuetify (dark → dark, light → light)', async () => {
     const w = mountApp()
     await flushPromises()
+    expect(vuetifyState.change).toHaveBeenLastCalledWith('dark')
 
     currentThemeRef.value = { mode: 'light' }
     await flushPromises()
+    expect(vuetifyState.change).toHaveBeenLastCalledWith('light')
     currentThemeRef.value = { mode: 'dark' }
     await flushPromises()
+    w.unmount()
+  })
+
+  it('mantém componentes Vuetify na paleta escolhida, inclusive ao trocar apenas o acento', async () => {
+    const w = mountApp()
+    await flushPromises()
+    expect(vuetifyState.themes.value.dark.colors.primary).toBe('#81BAFF')
+    accentRef.value = 'violet'
+    await flushPromises()
+    expect(vuetifyState.themes.value.dark.colors.primary).toBe('#BBA6FF')
+    currentThemeRef.value = { mode: 'light' }
+    await flushPromises()
+    expect(vuetifyState.themes.value.light.colors.primary).toBe('#7043C2')
+    expect(vuetifyState.themes.value.light.colors['on-primary']).toBe('#FFFFFF')
+    expect(vuetifyState.themes.value.light.colors.error).toMatch(/^#[0-9A-F]{6}$/)
     w.unmount()
   })
 })

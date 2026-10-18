@@ -207,8 +207,11 @@ body {
 }
 
 /* Shared keyboard, selection and feedback vocabulary. */
+@media (max-width: 800px) {
+  :root { --ds-dock-height: calc(64px + env(safe-area-inset-bottom, 0px)); }
+}
 :where(button, a, input, select, textarea, [tabindex]):focus-visible {
-  outline: 2px solid var(--ds-color-primary);
+  outline: 3px solid var(--ds-focus-ring, var(--ds-color-primary));
   outline-offset: 3px;
 }
 ::selection { background: var(--ds-color-primary); color: var(--ds-color-on-primary); }

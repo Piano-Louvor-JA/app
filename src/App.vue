@@ -9,6 +9,7 @@ import { useTheme } from 'vuetify'
 import StartingOverlay from '@modules/starting/components/StartingOverlay.vue'
 import { useStartingStore } from '@modules/starting/stores/useStartingStore'
 import { useThemeManager } from '@design-system/composables'
+import { resolveVuetifyColors } from '@design-system/themes/vuetify-colors'
 import AppTitlebar from '@layouts/AppTitlebar.vue'
 import { prewarmMediaProjection } from '@shared/composables/useProjectionWindow'
 import { isProjectionPopupLocation } from '@shared/services/projection-window-location'
@@ -21,7 +22,7 @@ import { useUpdateChecker } from '@shared/composables/useUpdateChecker'
 
 const route = useRoute()
 const vuetifyTheme = useTheme()
-const { currentTheme } = useThemeManager()
+const { currentTheme, accentKey } = useThemeManager()
 const startingStore = useStartingStore()
 const { isAppReady } = storeToRefs(startingStore)
 
@@ -47,9 +48,11 @@ useOperatorEscapeToCloseProjection(() => isProjectionWindow.value)
 useMediaPlayerHotkeys(() => isProjectionWindow.value)
 
 watch(
-  () => currentTheme.value.mode,
-  (mode) => {
-    void vuetifyTheme.change(mode === 'dark' ? 'dark' : 'light')
+  [() => currentTheme.value.mode, accentKey],
+  ([mode, accent]) => {
+    const name = mode === 'dark' ? 'dark' : 'light'
+    Object.assign(vuetifyTheme.themes.value[name]!.colors, resolveVuetifyColors(name, accent))
+    void vuetifyTheme.change(name)
   },
   { immediate: true },
 )

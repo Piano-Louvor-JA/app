@@ -2,6 +2,16 @@ import { beforeEach, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 import { USER_PREFERENCE_KEYS } from '@shared/constants/storage-keys'
 beforeEach(() => { localStorage.clear(); vi.resetModules() })
+it.each(['constructor', '__proto__', 'toString'])('recovers from inherited keys in stored appearance: %s', async (invalid) => {
+  const { setUserPreference } = await import('@shared/services/user-preferences')
+  for (const key of ['theme', 'accent', 'interaction'] as const) setUserPreference(USER_PREFERENCE_KEYS[key], invalid)
+  const reopened = (await import('../useThemeManager')).useThemeManager()
+  expect(reopened.currentTheme.value.mode).toBe('dark')
+  expect(reopened.accentKey.value).toBe('azure')
+  expect(reopened.currentInteraction.value.id).toBeTruthy()
+  reopened.setTheme(invalid as never)
+  expect(reopened.currentTheme.value.mode).toBe('dark')
+})
 it('restores the chosen light palette with readable colors after reopening', async () => {
   const first = (await import('../useThemeManager')).useThemeManager()
   first.setTheme('luminousClarity')

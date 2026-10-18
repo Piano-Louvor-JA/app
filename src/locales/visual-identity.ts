@@ -1,8 +1,8 @@
 export default {
   "pt-BR": {
     "visualIdentity": {
-      "title": "Um visual para o seu culto",
-      "subtitle": "Escolha a luz e as cores do seu espaço de trabalho. As preferências são salvas automaticamente.",
+      "title": "Aparência do aplicativo",
+      "subtitle": "Ajuste o tema, as cores e as transições para operar com conforto. Suas escolhas são salvas automaticamente.",
       "mode": "Modo de exibição",
       "dark": "Noite",
       "light": "Dia",
@@ -39,8 +39,8 @@ export default {
   },
   "fr": {
     "visualIdentity": {
-      "title": "Un espace à l’image de votre culte",
-      "subtitle": "Choisissez la lumière et les couleurs de votre espace. Les préférences sont enregistrées automatiquement.",
+      "title": "Apparence de l’application",
+      "subtitle": "Réglez le thème, les couleurs et les transitions pour travailler confortablement. Vos choix sont enregistrés automatiquement.",
       "mode": "Mode d’affichage",
       "dark": "Nuit",
       "light": "Jour",
@@ -77,8 +77,8 @@ export default {
   },
   "es": {
     "visualIdentity": {
-      "title": "Un espacio para su culto",
-      "subtitle": "Elija la luz y los colores del espacio de trabajo. Las preferencias se guardan automáticamente.",
+      "title": "Apariencia de la aplicación",
+      "subtitle": "Ajuste el tema, los colores y las transiciones para trabajar con comodidad. Sus preferencias se guardan automáticamente.",
       "mode": "Modo de visualización",
       "dark": "Noche",
       "light": "Día",
@@ -115,8 +115,8 @@ export default {
   },
   "en": {
     "visualIdentity": {
-      "title": "A workspace for your service",
-      "subtitle": "Choose the light and colors of your workspace. Preferences are saved automatically.",
+      "title": "Application appearance",
+      "subtitle": "Adjust the theme, colors and transitions for comfortable operation. Your choices are saved automatically.",
       "mode": "Display mode",
       "dark": "Night",
       "light": "Day",
