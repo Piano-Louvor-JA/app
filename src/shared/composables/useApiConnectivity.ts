@@ -3,16 +3,17 @@
  * "quando a API cair, apresentar uma mensagem simplificada que o usuário
  * entenda — problema de conexão".
  *
- * Poll leve (HEAD no índice essencial, com fallback em cascata igual ao
- * bootstrap) a cada 15s. Estado exposto p/ banner global:
+ * Poll leve: HEAD em /v1/health de cada host (fallback em cascata igual ao
+ * bootstrap) a cada 60 s conectado e 15 s sem conexão; pausa com a janela
+ * oculta. Antes era HEAD em /json_db/pt_musics a cada 15 s — a API montava
+ * a lista inteira (≈1–2,5 s de SQLite síncrono) a cada checagem de cada app
+ * aberto. Estado exposto p/ banner global:
  *   - 'ok'       → nada aparece
  *   - 'offline'  → banner "sem conexão com o serviço — tentando reconectar"
  * Volta sozinho quando a API responde (banner some sem ação do usuário).
  * Janela de projeção NÃO mostra banner (é só espelho).
  */
 import { onMounted, onUnmounted, ref } from 'vue'
-
-import { getCurrentApiPrefix } from '@modules/sync/services/library-catalog'
 
 import { apiCandidateBases } from '../services/api-fallback'
 
@@ -32,8 +33,23 @@ function isProjectionContext(): boolean {
 
 export type ApiConnectivityState = 'ok' | 'offline'
 
-const POLL_MS = 15_000
+/** Conectado: checagem espaçada (cada app aberto bate na API). */
+const OK_POLL_MS = 60_000
+/** Sem conexão: tenta reconectar mais rápido. */
+const OFFLINE_POLL_MS = 15_000
 const TIMEOUT_MS = 6_000
+
+/**
+ * `/v1/health` na origem do host (o catálogo vem como `<origem>/json_db`).
+ * Base inválida lança e o probe passa ao próximo fallback.
+ */
+function healthUrl(base: string): string {
+  return `${new URL(base).origin}/v1/health`
+}
+
+function isWindowHidden(): boolean {
+  return typeof document !== 'undefined' && document.visibilityState === 'hidden'
+}
 
 /** Escapa da reatividade p/ o interval não reiniciar a cada leitura. */
 let singleton: {
@@ -48,14 +64,15 @@ async function probe(): Promise<boolean> {
     try {
       const controller = new AbortController()
       const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
-      const res = await fetch(`${base}/${getCurrentApiPrefix()}_musics`, {
+      await fetch(healthUrl(base), {
         method: 'HEAD',
         signal: controller.signal,
         cache: 'no-store',
       })
       clearTimeout(timer)
-      // Qualquer resposta HTTP = serviço vivo (mesmo 4xx/5x pontual de rota).
-      if (res.status < 500 || res.status >= 200) return true
+      // Qualquer resposta HTTP = serviço vivo (ex.: host legado sem
+      // /v1/health responde 404 — o servidor está no ar).
+      return true
     } catch {
       // tenta próximo fallback
     }
@@ -67,7 +84,8 @@ export function useApiConnectivity() {
   if (singleton) return singleton
 
   const state = ref<ApiConnectivityState>('ok')
-  let timer: ReturnType<typeof setInterval> | null = null
+  let timer: ReturnType<typeof setTimeout> | null = null
+  let running = false
   let probing = false
 
   async function check() {
@@ -81,15 +99,45 @@ export function useApiConnectivity() {
     }
   }
 
+  function clearTimer() {
+    if (timer) clearTimeout(timer)
+    timer = null
+  }
+
+  function schedule() {
+    clearTimer()
+    if (!running || isWindowHidden()) return
+    timer = setTimeout(
+      () => void tick(),
+      state.value === 'offline' ? OFFLINE_POLL_MS : OK_POLL_MS,
+    )
+  }
+
+  async function tick() {
+    timer = null
+    await check()
+    schedule()
+  }
+
+  // Janela minimizada/oculta: ninguém vê o banner — não checa. Ao voltar,
+  // checa na hora.
+  function onVisibilityChange() {
+    if (!running) return
+    if (isWindowHidden()) clearTimer()
+    else void tick()
+  }
+
   function start() {
-    if (isProjectionContext() || timer) return
-    void check()
-    timer = setInterval(() => void check(), POLL_MS)
+    if (isProjectionContext() || running) return
+    running = true
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    void tick()
   }
 
   function stop() {
-    if (timer) clearInterval(timer)
-    timer = null
+    running = false
+    clearTimer()
+    document.removeEventListener('visibilitychange', onVisibilityChange)
   }
 
   singleton = { state, start, stop }
