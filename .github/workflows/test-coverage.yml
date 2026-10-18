@@ -1,5 +1,7 @@
-# CI de Testes — cobertura rigorosa (istanbul) com thresholds 100/100/100/100.
-# Meta: nenhum PR entra sem toda a cobertura de testes passando.
+# CI de Testes — cobertura rigorosa (istanbul) por destino do evento:
+#   PR com base staging e push/dispatch em refs/heads/staging → 50/50/50/50;
+#   PR para main, push em main e demais refs → 100/100/100/100.
+# O limite vem de scripts/coverage-gate-limit.mjs (base/ref do evento, nunca a branch de origem).
 #
 # Duas passadas + merge determinístico:
 #   PASS 1 — suíte completa (statements/branches/functions de tudo).
@@ -104,4 +106,6 @@ jobs:
         env:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
           PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          # push/dispatch: ref integrado (refs/heads/staging → 50%; main/tags → 100%)
+          EVENT_REF: ${{ github.ref }}
         run: node scripts/coverage-gate-limit.mjs coverage-merged/coverage-final-summary.json

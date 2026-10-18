@@ -558,8 +558,13 @@ describe("ondemand download (desktop)", () => {
 			reason: "server",
 		});
 		const { store } = await openTrack({});
-		await vi.waitFor(() => expect(store.ondemandNoticeVisible).toBe(false));
-		expect(store.ondemandDownloadPercent).toBeNull();
+		// Pré-play falha → toca por stream e tenta baixar de novo em segundo
+		// plano (que também falha): ao fim, estado limpo.
+		await vi.waitFor(() => {
+			expect(trackMediaMock.download).toHaveBeenCalledTimes(2);
+			expect(store.ondemandNoticeVisible).toBe(false);
+			expect(store.ondemandDownloadPercent).toBeNull();
+		});
 	});
 
 	it("close durante download pós-open: cancela (gen++) e limpa estado", async () => {
@@ -926,7 +931,7 @@ describe("leva final — handlers completos, ondemand ramais, guards", () => {
 		await new Promise((r) => setTimeout(r, 0));
 	});
 
-	it("ensureTrackDownloaded: gen stale aborta download pré-play (L364)", async () => {
+	it("pré-play: gen stale (fechou no meio) não toca nem reabre a sessão", async () => {
 		bridgeMock.isDesktop = true;
 		trackMediaMock.isDownloaded.mockResolvedValue(false);
 		let resolveDownload!: (v: unknown) => void;
@@ -936,16 +941,14 @@ describe("leva final — handlers completos, ondemand ramais, guards", () => {
 					resolveDownload = resolve;
 				}),
 		);
-		const pending = openTrack({});
-		await new Promise((r2) => setTimeout(r2, 0));
-		const store = useMediaStore();
+		// O player abre na hora; o download segue em segundo plano.
+		const { store, r } = await openTrack({});
+		expect(r.ok).toBe(true);
 		store.close(); // cancela: gen++
 		resolveDownload({ status: "downloaded" });
-		const { r } = await pending;
-		expect(r).toMatchObject({
-			ok: false,
-			messageKey: "media.messages.playbackFailed",
-		});
+		await new Promise((r2) => setTimeout(r2, 0));
+		expect(store.session).toBeNull();
+		expect(mediaAudio.playMediaAudio).not.toHaveBeenCalled();
 	});
 
 	it("play com audioOnTv: volume 0 e playMediaAudio (L624-628)", async () => {
@@ -1392,4 +1395,137 @@ it('plays local songs on desktop without consulting the official download catalo
   expect(trackMediaMock.isDownloaded).not.toHaveBeenCalled();
   expect(store.session?.musicId).toBe(-2);
   store.close();
+});
+
+describe("open desktop sem mídia no disco: player abre na hora (caso real de usuário)", () => {
+	function pendingDownload() {
+		let resolve!: (v: unknown) => void;
+		trackMediaMock.download.mockImplementation(
+			() =>
+				new Promise((r) => {
+					resolve = r;
+				}),
+		);
+		return (v: unknown) => resolve(v);
+	}
+
+	it("open volta antes do download terminar, com sessão e progresso visíveis", async () => {
+		bridgeMock.isDesktop = true;
+		trackMediaMock.isDownloaded.mockResolvedValue(false);
+		const finish = pendingDownload();
+		const store = useMediaStore();
+
+		const r = await store.open({ musicId: 1, project: false });
+
+		expect(r.ok).toBe(true);
+		expect(store.session?.musicId).toBe(1);
+		expect(store.session?.title).toBe("Faixa 1");
+		expect(store.session?.audioUrl).toBe("");
+		expect(store.status).toBe("loading");
+		expect(store.preplayDownloadMusicId).toBe(1);
+		expect(store.ondemandNoticeVisible).toBe(true);
+		expect(mediaAudio.playMediaAudio).not.toHaveBeenCalled();
+		// clique do operador fura a fila das checagens das linhas da lista
+		expect(trackMediaMock.isDownloaded).toHaveBeenCalledWith(1, { priority: true });
+
+		trackMediaMock.isDownloaded.mockResolvedValue(true); // arquivo agora no disco
+		finish({ status: "downloaded" });
+		await vi.waitFor(() => expect(store.status).toBe("playing"));
+		expect(store.session?.audioUrl).toBe("audio://x");
+		await vi.waitFor(() => expect(store.ondemandDownloadDone).toBe(true));
+		expect(store.ondemandNoticeVisible).toBe(true);
+		expect(store.preplayDownloadMusicId).toBeNull();
+		expect(mediaAudio.playMediaAudio).toHaveBeenCalledTimes(1);
+		store.close();
+	});
+
+	it("fechar o player durante o download não toca a faixa depois", async () => {
+		bridgeMock.isDesktop = true;
+		trackMediaMock.isDownloaded.mockResolvedValue(false);
+		const finish = pendingDownload();
+		const store = useMediaStore();
+
+		await store.open({ musicId: 1, project: false });
+		store.close();
+		finish({ status: "downloaded" });
+		await new Promise((r) => setTimeout(r, 0));
+
+		expect(store.session).toBeNull();
+		expect(store.status).toBe("idle");
+		expect(mediaAudio.playMediaAudio).not.toHaveBeenCalled();
+	});
+
+	it("trocar de faixa durante o download toca só a nova", async () => {
+		bridgeMock.isDesktop = true;
+		trackMediaMock.isDownloaded.mockResolvedValue(false);
+		const finishFirst = pendingDownload();
+		const store = useMediaStore();
+		await store.open({ musicId: 1, project: false });
+
+		trackMediaMock.isDownloaded.mockResolvedValue(true);
+		loadMediaTrack.mockResolvedValue(trackStub({ id: 2, name: "Faixa 2" }));
+		await store.open({ musicId: 2, project: false });
+		expect(store.session?.musicId).toBe(2);
+		const playsAfterSecond = mediaAudio.playMediaAudio.mock.calls.length;
+
+		finishFirst({ status: "downloaded" });
+		await new Promise((r) => setTimeout(r, 0));
+		expect(store.session?.musicId).toBe(2);
+		expect(mediaAudio.playMediaAudio).toHaveBeenCalledTimes(playsAfterSecond);
+		store.close();
+	});
+
+	it("fechar enquanto resolve o áudio (pós-download) também não toca", async () => {
+		bridgeMock.isDesktop = true;
+		trackMediaMock.isDownloaded.mockResolvedValue(false);
+		const finish = pendingDownload();
+		let resolveUrl!: (v: unknown) => void;
+		mediaAudio.resolveMusicAudioUrl.mockImplementationOnce(
+			() =>
+				new Promise((r) => {
+					resolveUrl = r;
+				}),
+		);
+		const store = useMediaStore();
+		await store.open({ musicId: 1, project: false });
+
+		finish({ status: "downloaded" });
+		await vi.waitFor(() => expect(resolveUrl).toBeTypeOf("function"));
+		store.close();
+		resolveUrl({ ok: true, url: "audio://x", source: "local" });
+		await new Promise((r) => setTimeout(r, 0));
+
+		expect(store.session).toBeNull();
+		expect(mediaAudio.playMediaAudio).not.toHaveBeenCalled();
+	});
+
+	it("download falhou: segue tocando por stream remoto", async () => {
+		bridgeMock.isDesktop = true;
+		trackMediaMock.isDownloaded.mockResolvedValue(false);
+		const finish = pendingDownload();
+		const store = useMediaStore();
+		await store.open({ musicId: 1, project: false });
+
+		finish({ status: "error", reason: "network" });
+		await vi.waitFor(() => expect(store.status).toBe("playing"));
+		expect(store.session?.audioUrl).toBe("audio://x");
+		expect(store.preplayDownloadMusicId).toBeNull();
+		store.close();
+	});
+
+	it("sem áudio no catálogo após o download: fica só com slides", async () => {
+		bridgeMock.isDesktop = true;
+		trackMediaMock.isDownloaded.mockResolvedValue(false);
+		mediaAudio.resolveMusicAudioUrl.mockResolvedValue({ ok: false });
+		const finish = pendingDownload();
+		const store = useMediaStore();
+		await store.open({ musicId: 1, project: false });
+
+		finish({ status: "downloaded" });
+		await vi.waitFor(() => expect(store.status).toBe("ready"));
+		expect(store.session?.mode).toBe("no_audio");
+		expect(store.lastErrorKey).toBeNull();
+		expect(mediaAudio.playMediaAudio).not.toHaveBeenCalled();
+		store.close();
+	});
 });

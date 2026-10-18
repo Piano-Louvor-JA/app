@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 
 vi.mock('../../services/bible-catalog', () => ({
+  requestBibleBundleUpdate: vi.fn(async () => undefined),
   resolveVersionAbbreviation: vi.fn((id: number) => `ARC${id}`),
   resolveTestament: vi.fn((n: number) => (n <= 39 ? 'ot' : 'nt')),
   resolveBookTone: vi.fn(() => 'default'),

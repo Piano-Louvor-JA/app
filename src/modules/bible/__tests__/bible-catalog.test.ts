@@ -6,6 +6,7 @@ import {
   loadBibleVersions,
   loadChapterVerses,
   pickDefaultVersionId,
+  requestBibleBundleUpdate,
   resolveBookTone,
   resolveTestament,
   resolveVersionAbbreviation,
@@ -17,17 +18,36 @@ vi.mock('@shared/services/remote-catalog', () => ({
 
 vi.mock('@shared/services/workspace-api', () => ({
   readCatalogRecord: vi.fn(),
+  writeCatalogRecord: vi.fn(),
 }))
 
+vi.mock('@shared/services/desktop-bridge', () => ({
+  getDesktopBridge: vi.fn(() => null),
+}))
+
+import { getDesktopBridge } from '@shared/services/desktop-bridge'
 import { fetchRemoteCatalogJson } from '@shared/services/remote-catalog'
-import { readCatalogRecord } from '@shared/services/workspace-api'
+import { readCatalogRecord, writeCatalogRecord } from '@shared/services/workspace-api'
+import type { LouvorJaBridge } from '@shared/types/desktop-bridge'
 
 const mockRead = vi.mocked(readCatalogRecord)
+const mockWrite = vi.mocked(writeCatalogRecord)
 const mockFetch = vi.mocked(fetchRemoteCatalogJson)
+const mockBridge = vi.mocked(getDesktopBridge)
+
+function bridgeWithBible(getChapter: (...args: number[]) => Promise<unknown>) {
+  mockBridge.mockReturnValue({
+    bible: { getChapter, listVersions: vi.fn(async () => []) },
+  } as unknown as LouvorJaBridge)
+}
 
 beforeEach(() => {
   mockRead.mockReset()
+  mockWrite.mockReset()
+  mockWrite.mockResolvedValue(true)
   mockFetch.mockReset()
+  mockBridge.mockReset()
+  mockBridge.mockReturnValue(null)
 })
 
 describe('resolveVersionAbbreviation', () => {
@@ -241,6 +261,111 @@ describe('loadChapterVerses', () => {
     mockRead.mockResolvedValue(null)
     mockFetch.mockResolvedValue(null)
     await expect(loadChapterVerses(1, 1, 1)).resolves.toEqual({})
+  })
+
+  it('bundle offline (instalador/atualização) vem antes do disco e da API', async () => {
+    const getChapter = vi.fn(async () => ({ '1': 'do bundle' }))
+    bridgeWithBible(getChapter)
+    await expect(loadChapterVerses(2, 43, 3)).resolves.toEqual({ '1': 'do bundle' })
+    expect(getChapter).toHaveBeenCalledWith(2, 43, 3)
+    expect(mockRead).not.toHaveBeenCalled()
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
+
+  it('sem bundle usa o capítulo salvo no disco', async () => {
+    bridgeWithBible(vi.fn(async () => null))
+    mockRead.mockResolvedValue({ '1': 'salvo' })
+    await expect(loadChapterVerses(2, 43, 3)).resolves.toEqual({ '1': 'salvo' })
+    expect(mockRead).toHaveBeenCalledWith('bible_2_43_3')
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
+
+  it('bridge que falha não impede o fallback', async () => {
+    bridgeWithBible(vi.fn(async () => Promise.reject(new Error('ipc'))))
+    mockRead.mockResolvedValue({ '1': 'salvo' })
+    await expect(loadChapterVerses(2, 43, 3)).resolves.toEqual({ '1': 'salvo' })
+  })
+
+  it('sob demanda: busca na API e salva no disco', async () => {
+    mockRead.mockResolvedValue(null)
+    mockFetch.mockResolvedValue({ '16': 'Porque Deus amou o mundo' })
+    await expect(loadChapterVerses(2, 43, 3)).resolves.toEqual({
+      '16': 'Porque Deus amou o mundo',
+    })
+    expect(mockFetch).toHaveBeenCalledWith('bible_2_43_3')
+    expect(mockWrite).toHaveBeenCalledWith('bible_2_43_3', {
+      '16': 'Porque Deus amou o mundo',
+    })
+  })
+
+  it('registro vazio no disco não conta como capítulo: vai à API', async () => {
+    mockRead.mockResolvedValue({})
+    mockFetch.mockResolvedValue({ '1': 'da API' })
+    await expect(loadChapterVerses(2, 1, 1)).resolves.toEqual({ '1': 'da API' })
+  })
+
+  it('resposta inválida da API não é salva', async () => {
+    mockRead.mockResolvedValue(null)
+    for (const invalid of [{}, [], 'texto', null]) {
+      mockFetch.mockResolvedValueOnce(invalid as never)
+      await expect(loadChapterVerses(2, 1, 1)).resolves.toEqual({})
+    }
+    expect(mockWrite).not.toHaveBeenCalled()
+  })
+
+  it('API fora do ar → vazio, sem salvar', async () => {
+    mockRead.mockResolvedValue(null)
+    mockFetch.mockRejectedValue(new Error('offline'))
+    await expect(loadChapterVerses(2, 1, 1)).resolves.toEqual({})
+    expect(mockWrite).not.toHaveBeenCalled()
+  })
+
+  it('falha ao salvar não perde o capítulo baixado', async () => {
+    mockRead.mockResolvedValue(null)
+    mockFetch.mockResolvedValue({ '1': 'baixado' })
+    mockWrite.mockRejectedValue(new Error('disco cheio'))
+    await expect(loadChapterVerses(2, 1, 1)).resolves.toEqual({ '1': 'baixado' })
+  })
+
+  it('roundtrip: capítulo salvo sob demanda é lido do disco na próxima vez (sem rede)', async () => {
+    const disk = new Map<string, unknown>()
+    mockWrite.mockImplementation(async (key, data) => {
+      disk.set(key, JSON.parse(JSON.stringify(data)))
+      return true
+    })
+    mockRead.mockImplementation(async (key) => (disk.get(key) ?? null) as never)
+    mockFetch.mockResolvedValueOnce({ '1': 'primeira vez' })
+
+    await expect(loadChapterVerses(8, 19, 23)).resolves.toEqual({ '1': 'primeira vez' })
+    mockFetch.mockRejectedValue(new Error('offline'))
+    await expect(loadChapterVerses(8, 19, 23)).resolves.toEqual({ '1': 'primeira vez' })
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('requestBibleBundleUpdate', () => {
+  it('fora do desktop não faz nada', async () => {
+    await expect(requestBibleBundleUpdate()).resolves.toBeUndefined()
+  })
+
+  it('pede ao main para conferir bundles novos', async () => {
+    const checkUpdates = vi.fn(async () => ({ status: 'up-to-date', updated: [], failed: [] }))
+    mockBridge.mockReturnValue({
+      bible: { getChapter: vi.fn(), listVersions: vi.fn(), checkUpdates },
+    } as unknown as LouvorJaBridge)
+    await requestBibleBundleUpdate()
+    expect(checkUpdates).toHaveBeenCalledTimes(1)
+  })
+
+  it('falha do main não vaza para a tela', async () => {
+    mockBridge.mockReturnValue({
+      bible: {
+        getChapter: vi.fn(),
+        listVersions: vi.fn(),
+        checkUpdates: vi.fn(async () => Promise.reject(new Error('ipc'))),
+      },
+    } as unknown as LouvorJaBridge)
+    await expect(requestBibleBundleUpdate()).resolves.toBeUndefined()
   })
 })
 
