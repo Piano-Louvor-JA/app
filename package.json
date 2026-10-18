@@ -134,8 +134,17 @@
       {
         "from": "resources/midia/modulos/sorteios",
         "to": "midia/modulos/sorteios"
+      },
+      {
+        "from": "resources/bible",
+        "to": "bible",
+        "filter": [
+          "*.json.gz",
+          "manifest.json"
+        ]
       }
     ],
+    "beforePack": "./scripts/fetch-bible-bundles.mjs",
     "linux": {
       "target": [
         {

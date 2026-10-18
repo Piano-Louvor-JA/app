@@ -75,7 +75,7 @@ export const BACKUP_SKIP_NAMES = new Set([
   'SingletonSocket',
 ])
 
-/** Arquivos do app na raiz da pasta de dados (além de `.sysdata` e `Media`). */
+/** Arquivos do app na raiz da pasta de dados (além de `.sysdata`, `Media` e `bible`). */
 export const BACKUP_ROOT_FILES = new Set([
   'window-state.json',
   'palco-slots.json',
@@ -195,7 +195,7 @@ export function normalizeBackupZipPath(zipPath) {
 }
 
 /**
- * Só `.sysdata`, `Media` e arquivos conhecidos do app — nunca o perfil Chromium.
+ * Só `.sysdata`, `Media`, `bible` e arquivos conhecidos do app — nunca o perfil Chromium.
  * @param {string} zipPath
  * @returns {boolean}
  */
@@ -203,7 +203,13 @@ export function isRestorableZipPath(zipPath) {
   const normalized = normalizeBackupZipPath(zipPath)
   if (!normalized) return false
   const [top] = normalized.split('/')
-  if (top === WORKSPACE_DIRS.sysdata || top === WORKSPACE_DIRS.media) return true
+  if (
+    top === WORKSPACE_DIRS.sysdata ||
+    top === WORKSPACE_DIRS.media ||
+    top === WORKSPACE_DIRS.bible
+  ) {
+    return true
+  }
   return !normalized.includes('/') && BACKUP_ROOT_FILES.has(normalized)
 }
 
@@ -354,6 +360,8 @@ export function collectBackupEntries({ dataRoot, mediaRoot, mediaFolders }) {
   const defaultMedia = path.join(resolvedData, WORKSPACE_DIRS.media)
 
   walkFiles(path.join(resolvedData, WORKSPACE_DIRS.sysdata), WORKSPACE_DIRS.sysdata, entries, seen)
+  // Bíblia atualizada pela API (o texto do instalador não precisa de backup).
+  walkFiles(path.join(resolvedData, WORKSPACE_DIRS.bible), WORKSPACE_DIRS.bible, entries, seen)
 
   if (mediaFolders) {
     walkFiles(
@@ -585,6 +593,7 @@ export function restoreBackupZip(zipFile, destRoot, onProgress) {
       mkdirSync(destRoot, { recursive: true })
       emptyDirectoryContents(path.join(destRoot, WORKSPACE_DIRS.sysdata))
       emptyDirectoryContents(path.join(destRoot, WORKSPACE_DIRS.media))
+      emptyDirectoryContents(path.join(destRoot, WORKSPACE_DIRS.bible))
 
       const total = zipfile.entryCount
       let current = 0

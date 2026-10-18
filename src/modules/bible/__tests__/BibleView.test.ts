@@ -38,6 +38,7 @@ vi.mock('../components/BibleVerseList.vue', () => ({
 
 // store real com catálogo mockado
 vi.mock('../services/bible-catalog', () => ({
+  requestBibleBundleUpdate: vi.fn(async () => undefined),
   loadBibleBooks: vi.fn().mockResolvedValue([
     { id: 1, name: 'Gênesis', abbreviation: 'Gn', chapters: 2, bookNumber: 1, languageId: 'pt' },
   ]),

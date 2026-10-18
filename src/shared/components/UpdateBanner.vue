@@ -27,7 +27,7 @@ function handleViewNotes() {
         class="update-btn update-btn--primary"
         @click="handleViewNotes"
       >
-        Ver notas
+        Atualizar
       </button>
       <button
         data-test="dismiss-btn"
