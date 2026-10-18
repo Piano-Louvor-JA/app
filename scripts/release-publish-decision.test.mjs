@@ -282,3 +282,14 @@ test('dispatch de pacotes não depende de checkout implícito', () => {
     assert.match(line, /--repo/)
   }
 })
+
+// O Snap só gera build de produção quando roda a partir da tag (gate do perfil
+// release); disparado pela main ele falha antes de empacotar.
+test('release dispara o Snap a partir da tag exata', () => {
+  const workflow = readFileSync(join(repoRoot, '.github/workflows/release.yml'), 'utf8')
+  const dispatches = workflow.split('\n').filter(line => line.includes('gh workflow run'))
+  const snap = dispatches.filter(line => line.includes('snap-release.yml'))
+  assert.equal(snap.length, 1)
+  assert.match(snap[0], /--ref "\$TAG"/)
+  assert.ok(dispatches.some(line => line.includes('build-flatpak.yml')), 'Flatpak continua disparado')
+})
