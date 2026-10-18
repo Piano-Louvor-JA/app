@@ -46,4 +46,22 @@ describe('Informativo Mundial das Missões — auto-agendamento', () => {
       vi.useRealTimers()
     }
   })
+
+  it('CRÍTICO: entrada manual existente na mesma data é preservada (nunca sobrescrita)', () => {
+    const store = useScheduledStore()
+    const rotId = 'rot-manual'
+    store.upsertCategory({ id: rotId, name: 'Informativo' })
+    store.upsertItem({
+      id: 'sch-manual-1',
+      categoryId: rotId,
+      date: '2026-10-10',
+      name: 'Hino especial escolhido pela equipe',
+      content: { kind: 'music', musicId: 'mus-123' },
+    })
+    const report = importInformativoEpisodes(store, episodes)
+    expect(report.skipped).toBeGreaterThanOrEqual(1)
+    const kept = store.findOn(rotId, '2026-10-10')
+    expect(kept?.name).toBe('Hino especial escolhido pela equipe')
+    expect(kept?.content).toEqual({ kind: 'music', musicId: 'mus-123' })
+  })
 })

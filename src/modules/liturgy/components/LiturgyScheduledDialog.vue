@@ -12,7 +12,12 @@ import {
   type ProvaiEpisode,
 } from '../services/provai-e-vede-source'
 import { importProvaiEVedeEpisodes } from '../services/provai-e-vede-import'
-import { extractInformativoEpisode, type InformativoEpisode } from '../services/informativo-source'
+import {
+  extractInformativoEpisode,
+  informativoPostUrl,
+  informativoUpcomingSaturdays,
+  type InformativoEpisode,
+} from '../services/informativo-source'
 import { importInformativoEpisodes } from '../services/informativo-import'
 import { useScheduledStore } from '../stores/useScheduledStore'
 import {
@@ -33,6 +38,13 @@ async function fetchText(url: string): Promise<string | null> {
   if (bridge?.workspace?.fetchText) return bridge.workspace.fetchText(url)
   try {
     const resp = await fetch(url)
+    if (resp.ok) return await resp.text()
+  } catch {
+    // CORS/bloqueio: cai no proxy abaixo (r.jina.ai reflete qualquer origin)
+  }
+  // Web (B5): sites sem Access-Control-Allow-Origin (ex. daniellocutor) via proxy de leitura
+  try {
+    const resp = await fetch(`https://r.jina.ai/${url}`)
     return resp.ok ? await resp.text() : null
   } catch {
     return null
@@ -106,19 +118,8 @@ watch(
 )
 
 // ── Informativo Mundial das Missões ─────────────────────────
-const INFORMATIVO_POST_URL = 'https://www.daniellocutor.com.br/{year}/{month}/informativo-mundial-das-missoes-{day}-{monthName}-{year}/'
-const MONTH_NAMES = ['janeiro', 'fevereiro', 'marco', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro']
-
-function informativoPostUrl(dateISO: string): string {
-  const [year, month, day] = dateISO.split('-')
-  const index = Number(month) - 1
-  return INFORMATIVO_POST_URL
-    .replaceAll('{year}', year ?? '')
-    .replaceAll('{month}', month ?? '')
-    .replaceAll('{day}', day ?? '')
-    .replace('{monthName}', MONTH_NAMES[index] ?? '')
-}
-
+// Web (B5): daniellocutor não envia CORS; r.jina.ai reflete qualquer origin
+// (verificado: Access-Control-Allow-Origin reflete a origem) e devolve links YouTube.
 const informativoBusy = ref(false)
 const informativoProgress = ref('')
 
@@ -128,14 +129,9 @@ async function onInformativoOneClick() {
   informativoBusy.value = true
   informativoProgress.value = ''
   try {
-    const today = new Date()
-    const saturday = new Date(today)
-    saturday.setDate(today.getDate() + ((6 - today.getDay() + 7) % 7))
     const episodes: InformativoEpisode[] = []
-    for (let week = 0; week < 13; week++) {
-      const date = new Date(saturday)
-      date.setDate(saturday.getDate() + week * 7)
-      const dateISO = date.toISOString().slice(0, 10)
+    const saturdays = informativoUpcomingSaturdays(new Date(), 13)
+    for (const [week, dateISO] of saturdays.entries()) {
       informativoProgress.value = t('liturgy.messages.scheduledInformativoSearching', { done: week + 1, total: 13 })
       const html = await fetchText(informativoPostUrl(dateISO))
       const episode = html ? extractInformativoEpisode(html, dateISO) : null
