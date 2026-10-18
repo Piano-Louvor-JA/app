@@ -133,4 +133,4 @@ jobs:
         shell: bash
         env:
           PRODUCT_ID: ${{ secrets.MS_STORE_PRODUCT_ID }}
-        run: msstore publish "$APPX" -id "$PRODUCT_ID"
+        run: msstore publish "$(cygpath -w "$PWD/$APPX")" -v -id "$PRODUCT_ID"
