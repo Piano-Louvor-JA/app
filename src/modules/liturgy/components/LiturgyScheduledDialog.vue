@@ -12,6 +12,8 @@ import {
   type ProvaiEpisode,
 } from '../services/provai-e-vede-source'
 import { importProvaiEVedeEpisodes } from '../services/provai-e-vede-import'
+import { extractInformativoEpisode, type InformativoEpisode } from '../services/informativo-source'
+import { importInformativoEpisodes } from '../services/informativo-import'
 import { useScheduledStore } from '../stores/useScheduledStore'
 import {
   loadLiturgyMusicOptions,
@@ -26,17 +28,19 @@ const PAGE_URL =
   'https://downloads.adventistas.org/pt/mordomia-crista/video/provai-e-vede-2026-4o-trimestre'
 
 /** HTML da página do trimestre: main process (sem CORS) no Electron, fetch direto na web. */
-async function fetchQuarterHtml(): Promise<string | null> {
+async function fetchText(url: string): Promise<string | null> {
   const bridge = getDesktopBridge()
-  if (bridge?.workspace?.fetchText) {
-    return bridge.workspace.fetchText(PAGE_URL)
-  }
+  if (bridge?.workspace?.fetchText) return bridge.workspace.fetchText(url)
   try {
-    const resp = await fetch(PAGE_URL)
+    const resp = await fetch(url)
     return resp.ok ? await resp.text() : null
   } catch {
     return null
   }
+}
+
+async function fetchQuarterHtml(): Promise<string | null> {
+  return fetchText(PAGE_URL)
 }
 
 const { t } = useI18n()
@@ -100,6 +104,53 @@ watch(
   },
   { immediate: true },
 )
+
+// ── Informativo Mundial das Missões ─────────────────────────
+const INFORMATIVO_POST_URL = 'https://www.daniellocutor.com.br/{year}/{month}/informativo-mundial-das-missoes-{day}-{monthName}-{year}/'
+const MONTH_NAMES = ['janeiro', 'fevereiro', 'marco', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro']
+
+function informativoPostUrl(dateISO: string): string {
+  const [year, month, day] = dateISO.split('-')
+  const index = Number(month) - 1
+  return INFORMATIVO_POST_URL
+    .replaceAll('{year}', year ?? '')
+    .replaceAll('{month}', month ?? '')
+    .replaceAll('{day}', day ?? '')
+    .replace('{monthName}', MONTH_NAMES[index] ?? '')
+}
+
+const informativoBusy = ref(false)
+const informativoProgress = ref('')
+
+/** 1-click: consulta somente posts futuros, extrai embed YouTube, agenda como link online. */
+async function onInformativoOneClick() {
+  if (informativoBusy.value) return
+  informativoBusy.value = true
+  informativoProgress.value = ''
+  try {
+    const today = new Date()
+    const saturday = new Date(today)
+    saturday.setDate(today.getDate() + ((6 - today.getDay() + 7) % 7))
+    const episodes: InformativoEpisode[] = []
+    for (let week = 0; week < 13; week++) {
+      const date = new Date(saturday)
+      date.setDate(saturday.getDate() + week * 7)
+      const dateISO = date.toISOString().slice(0, 10)
+      informativoProgress.value = t('liturgy.messages.scheduledInformativoSearching', { done: week + 1, total: 13 })
+      const html = await fetchText(informativoPostUrl(dateISO))
+      const episode = html ? extractInformativoEpisode(html, dateISO) : null
+      if (episode) episodes.push(episode)
+    }
+    if (episodes.length === 0) {
+      informativoProgress.value = t('liturgy.messages.scheduledInformativoUnavailable')
+      return
+    }
+    const report = importInformativoEpisodes(useScheduledStore(), episodes, { onlyUpcoming: true })
+    informativoProgress.value = t('liturgy.messages.scheduledPvDone', { created: report.created, skipped: report.skipped })
+  } finally {
+    informativoBusy.value = false
+  }
+}
 
 // ── Baixar Provai e Vede ───────────────────────────────────
 const pvEpisodes = ref<ProvaiEpisode[]>([])
@@ -360,15 +411,29 @@ const dateFmt = (iso: string) => {
           <h2 class="liturgy-dialog__title">
             {{ t('liturgy.messages.scheduledTitle') }}
           </h2>
-          <button
-            type="button"
-            class="scheduled-dialog__btn"
-            :disabled="pvOneClickBusy"
-            style="flex-shrink: 0"
-            @click="onProvaiEVedeOneClick"
-          >
-            {{ t('liturgy.messages.scheduledPvOneClick') }}
-          </button>
+          <details class="scheduled-dialog__download-menu">
+            <summary class="scheduled-dialog__btn">
+              {{ t('liturgy.messages.scheduledDownloadQuarter') }}
+            </summary>
+            <div class="scheduled-dialog__download-options">
+              <button
+                type="button"
+                class="scheduled-dialog__btn"
+                :disabled="pvOneClickBusy"
+                @click="onProvaiEVedeOneClick"
+              >
+                {{ t('liturgy.messages.scheduledPvOneClick') }}
+              </button>
+              <button
+                type="button"
+                class="scheduled-dialog__btn"
+                :disabled="informativoBusy"
+                @click="onInformativoOneClick"
+              >
+                {{ t('liturgy.messages.scheduledInformativoOneClick') }}
+              </button>
+            </div>
+          </details>
           <button
             type="button"
             class="scheduled-dialog__close"
@@ -380,6 +445,12 @@ const dateFmt = (iso: string) => {
         </div>
         <p class="liturgy-dialog__hint">
           {{ t('liturgy.messages.scheduledHint') }}
+        </p>
+        <p
+          v-if="pvOneClickProgress || informativoProgress"
+          class="liturgy-dialog__hint"
+        >
+          {{ pvOneClickProgress || informativoProgress }}
         </p>
 
         <div
@@ -700,6 +771,33 @@ const dateFmt = (iso: string) => {
 
 .scheduled-dialog__header .liturgy-dialog__title {
   margin: 0;
+}
+
+.scheduled-dialog__download-menu {
+  position: relative;
+  margin-left: auto;
+}
+
+.scheduled-dialog__download-menu summary {
+  list-style: none;
+}
+
+.scheduled-dialog__download-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.scheduled-dialog__download-options {
+  position: absolute;
+  z-index: 1;
+  top: calc(100% + 0.25rem);
+  right: 0;
+  display: grid;
+  gap: 0.25rem;
+  min-width: max-content;
+  padding: 0.35rem;
+  border-radius: 0.5rem;
+  background: var(--ds-color-surface, #fff);
+  box-shadow: 0 0.5rem 1rem rgb(0 0 0 / 20%);
 }
 
 .scheduled-dialog__close {
