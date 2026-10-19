@@ -1,0 +1,63 @@
+# Gate D (PLAN msstore-mcp): certificação humana — POST /submit. SOMENTE
+# workflow_dispatch com expected_submission_id; environment protegido
+# microsoft-store-certification (required reviewer humano, separado do draft).
+# Reconsulta /status imediatamente antes; aborta se isReady != true, ID
+# divergente ou submissão em curso. POST único, sem retry. Nenhum gatilho
+# automático (tag, release, workflow_run, cron) alcança este workflow.
+name: Submit MS Store Certification
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_submission_id:
+        description: 'Submission ID esperado do draft (prova de que o operador viu o estado atual)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: msstore-certification
+  cancel-in-progress: false
+
+jobs:
+  submit:
+    name: Guard + POST /submit (único)
+    runs-on: ubuntu-24.04
+    environment: microsoft-store-certification
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Consulta imediata de status (read-only)
+        env:
+          MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
+          MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
+          MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
+          MSSTORE_SELLER_ID: ${{ secrets.MSSTORE_SELLER_ID }}
+          MSSTORE_PRODUCT_ID: ${{ secrets.MSSTORE_PRODUCT_ID }}
+        run: node scripts/msstore-cli.mjs status
+
+      - name: Guard + submit (uma única chamada)
+        env:
+          MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
+          MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
+          MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
+          MSSTORE_SELLER_ID: ${{ secrets.MSSTORE_SELLER_ID }}
+          MSSTORE_PRODUCT_ID: ${{ secrets.MSSTORE_PRODUCT_ID }}
+          EXPECTED_SUBMISSION_ID: ${{ inputs.expected_submission_id }}
+        run: node scripts/msstore-cli.mjs submit "$EXPECTED_SUBMISSION_ID"
+
+      - name: Resumo
+        if: always()
+        run: |
+          {
+            echo "## Submit MS Store Certification"
+            echo "- expected_submission_id: \`${{ inputs.expected_submission_id }}\`"
+            echo "- Correlation ID e polling URL nos logs do job."
+            echo "- Rollback pós-submit NÃO é automático (PLAN Gate E)."
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -431,4 +431,37 @@ describe('semáforo de checks paralelos', () => {
     ])
     expect(maxActive).toBeLessThanOrEqual(2)
   })
+
+  it('priority fura a fila das linhas da lista (clique no play não espera)', async () => {
+    isDesktopApp.mockReturnValue(true)
+    readCatalogRecord.mockResolvedValue({ url_music: '/musics/pt/1.mp3' })
+    // Checks das linhas presos (ex.: buscando music_{id} na rede)
+    const releases: Array<() => void> = []
+    const check = vi.fn().mockImplementation(
+      (_type: string, path: string) =>
+        path === 'pt/1.mp3' && releases.length >= 2
+          ? Promise.resolve(null)
+          : new Promise((r) => releases.push(() => r(true))),
+    )
+    getDesktopBridge.mockReturnValue({ media: { check } } as never)
+
+    const rows = [21, 22, 23, 24].map((id) => isTrackMediaDownloaded(id))
+    await vi.waitFor(() => expect(releases).toHaveLength(2)) // 2 slots ocupados
+
+    let done = false
+    const click = isTrackMediaDownloaded(99, { priority: true }).then((v) => {
+      done = true
+      return v
+    })
+    await vi.waitFor(() => expect(done).toBe(true))
+    await expect(click).resolves.toBe(false)
+
+    for (const release of releases) release()
+    await vi.waitFor(() => expect(releases.length).toBeGreaterThanOrEqual(2))
+    releases.splice(0).forEach((r) => r())
+    await vi.waitFor(async () => {
+      releases.splice(0).forEach((r) => r())
+      expect(await Promise.race([Promise.all(rows), new Promise((r) => setTimeout(() => r('pending'), 0))])).not.toBe('pending')
+    })
+  })
 })

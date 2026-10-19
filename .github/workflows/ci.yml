@@ -93,10 +93,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      # PR para staging: 50% em cada métrica. Main, push e demais destinos: 100%.
-      - name: Cobertura com limite da base do PR
+      # Caminho da staging (PR com base staging ou push/dispatch em refs/heads/staging): 50%.
+      # Main, tags e demais destinos: 100%. Mesma regra de scripts/coverage-gate-limit.mjs.
+      - name: Cobertura com limite do destino do evento
         env:
-          COVERAGE_MIN: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && '50' || '100' }}
+          COVERAGE_MIN: ${{ ((github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging') || (github.event_name != 'pull_request' && github.ref == 'refs/heads/staging')) && '50' || '100' }}
         run: |
           echo "Limite de cobertura deste evento: ${COVERAGE_MIN}%"
           npm run test -- --coverage \

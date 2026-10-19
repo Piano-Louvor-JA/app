@@ -25,6 +25,7 @@ import { registerLocalFileProtocol, registerLocalScheme } from "./protocol.mjs";
 import { registerCloseProjectionPopups } from "./ipc/web-projection.mjs";
 import { buildProjectionWindowBounds } from "./projection-display.mjs";
 import { initUpdater } from "./updater.mjs";
+import { getBibleUpdater } from "./bible-updater.mjs";
 import { loadWindowState, trackWindowState } from "./window-state.mjs";
 import { registerYoutubeEmbedHeaders } from "./youtube-embed.mjs";
 import { registerYoutubeAuthIpc } from "./youtube-auth.mjs";
@@ -890,6 +891,12 @@ app.whenReady().then(async () => {
 			mainWindow.webContents.send("updater:check-start");
 		}
 	}, 3000);
+	// Bíblia offline: confere bundles novos na API (1x/dia, em segundo plano)
+	setTimeout(() => {
+		getBibleUpdater()
+			.check()
+			.catch((error) => console.warn("[bible-updater] falha", error));
+	}, 20_000);
 	app.on("activate", () => {
 		if (BrowserWindow.getAllWindows().length === 0) {
 			createWindow(locale);

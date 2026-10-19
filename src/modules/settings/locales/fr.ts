@@ -339,7 +339,7 @@ export default {
     },
     "general": {
       "backupTitle": "Sauvegarde",
-      "backupHint": "Créer une archive ZIP des médias, programmes du culte et listes de lecture. La restauration utilise les dossiers par défaut ; vous pourrez déplacer les médias ensuite.",
+      "backupHint": "Créer une archive ZIP des médias, programmes du culte, listes de lecture et de la Bible. La restauration utilise les dossiers par défaut ; vous pourrez déplacer les médias ensuite.",
       "backupCreate": "Créer une sauvegarde",
       "backupRestore": "Restaurer une sauvegarde",
       "backupCreating": "Création de la sauvegarde…",

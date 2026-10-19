@@ -160,7 +160,6 @@ jobs:
 
       # Tag: espera o draft criado pelo release.yml (nunca cria). Dispatch
       # manual: não há release.yml concorrente, então cria se faltar.
-      # Vem antes do dispatch da Store, que baixa o .appx da release.
       - name: Attach assets to the GitHub Release
         if: steps.decision.outputs.publish == 'true'
         shell: bash
@@ -178,14 +177,6 @@ jobs:
           gh release upload "$TAG" "${assets[@]}" --clobber
           printf 'Anexado: %s\n' "${assets[@]}"
 
-      - name: Dispatch Microsoft Store after APPX upload
-        if: steps.decision.outputs.publish == 'true' && steps.store.outputs.enabled == 'true'
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
-        run: |
-          set -euo pipefail
-          # Manual builds resolve package version from their checked-out commit.
-          if [ -z "$TAG" ]; then TAG="v$(node -p "require('./package.json').version")"; fi
-          gh workflow run msstore-release.yml --ref main -f "version=$TAG"
+      # PLAN msstore-mcp (ADR-003): tag NÃO dispara automação Microsoft Store.
+      # Sync de draft e certificação são workflow_dispatch separados, com
+      # environments protegidos distintos e aprovação humana obrigatória.

@@ -1,6 +1,6 @@
 # Integração técnica — desktop, interface e documentação
 
-Status: proposta em rascunho para `staging`. Base funcional PIANO 1.31.2; o protótipo e os pacotes de referência não substituem a base oficial.
+Status: proposta em rascunho para `staging`, atualizada à base PIANO 1.32.1. O protótipo e os pacotes de referência não substituem a base oficial.
 
 ## Goal
 Manter a experiência de preparação e operação em Linux, Windows e macOS, preservando dados locais, contratos de projeção e preferências existentes.

@@ -230,7 +230,17 @@ test('workflows preservam a publicação padrão e omitem só a promoção marca
 
 // All downstream publishers use the same exact-tag, fail-closed policy.
 test('Flatpak e lojas preservam tag_only e usam a versão exata', () => {
-  for (const name of ['build-flatpak.yml', 'snap-release.yml', 'msstore-release.yml']) {
+  // Microsoft Store (ADR-003 msstore-mcp): tag NÃO publica na Store; draft e
+  // certificação são workflow_dispatch com aprovação humana — tag_only fica
+  // garantido por não existir caminho automático.
+  assert.equal(existsSync(join(repoRoot, '.github/workflows/msstore-release.yml')), false)
+  for (const name of ['sync-msstore-draft.yml', 'submit-msstore-certification.yml']) {
+    const text = readFileSync(join(repoRoot, '.github/workflows', name), 'utf8')
+    const triggers = text.slice(text.indexOf('\non:'), text.indexOf('\npermissions:'))
+    assert.match(triggers, /workflow_dispatch:/, name)
+    assert.doesNotMatch(triggers, /\n {2}(push|release|workflow_run|schedule):/, name)
+  }
+  for (const name of ['build-flatpak.yml', 'snap-release.yml']) {
     const text = readFileSync(join(repoRoot, '.github/workflows', name), 'utf8')
     assert.match(text, /scripts\/release-publish-decision\.mjs/, name)
     assert.match(text, /needs\.decide\.outputs\.publish == 'true'/, name)
@@ -271,4 +281,26 @@ test('dispatch de pacotes não depende de checkout implícito', () => {
   for (const line of workflow.split('\n').filter(line => line.includes('gh workflow run'))) {
     assert.match(line, /--repo/)
   }
+})
+
+// O Snap só gera build de produção quando roda a partir da tag (gate do perfil
+// release); disparado pela main ele falha antes de empacotar.
+test('release dispara o Snap a partir da tag exata', () => {
+  const workflow = readFileSync(join(repoRoot, '.github/workflows/release.yml'), 'utf8')
+  const dispatches = workflow.split('\n').filter(line => line.includes('gh workflow run'))
+  const snap = dispatches.filter(line => line.includes('snap-release.yml'))
+  assert.equal(snap.length, 1)
+  assert.match(snap[0], /--ref "\$TAG"/)
+  assert.ok(dispatches.some(line => line.includes('build-flatpak.yml')), 'Flatpak continua disparado')
+})
+
+// Em --destructive-mode o snapcraft instala os build-snaps da extensão gnome
+// no host; como usuário comum (snapcore/action-build) a instalação falha.
+test('Snap empacota como root num host igual à base core24', () => {
+  const snap = readFileSync(join(repoRoot, '.github/workflows/snap-release.yml'), 'utf8')
+  const job = snap.slice(snap.indexOf('\n  snap:'))
+  assert.match(job, /runs-on: ubuntu-24\.04/)
+  assert.match(job, /sudo snapcraft pack --destructive-mode/)
+  assert.doesNotMatch(job, /snapcore\/action-build/)
+  assert.match(readFileSync(join(repoRoot, 'snap/snapcraft.yaml'), 'utf8'), /^base: core24$/m)
 })

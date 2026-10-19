@@ -165,8 +165,49 @@ describe('GeneralView.vue', () => {
     const wrapper = mountComponent()
     const esBtn = wrapper.findAll('.general-settings__lang-btn').find(button => button.text() === 'settings.general.languageSpanish')!
     await esBtn.trigger('click')
-    expect(ensureCatalogForLocale).toHaveBeenCalledWith('es')
+    expect(ensureCatalogForLocale).toHaveBeenCalledWith('es', expect.any(Function))
     expect(setUserPreference).toHaveBeenCalledWith('language', 'es')
+  })
+
+  it('mostra loading com progresso enquanto baixa o catalogo do idioma', async () => {
+    let reportProgress!: (progress: number) => void
+    let finish!: () => void
+    vi.mocked(ensureCatalogForLocale).mockImplementationOnce(
+      (_locale, onProgress) =>
+        new Promise<void>((resolve) => {
+          reportProgress = onProgress!
+          finish = resolve
+        }),
+    )
+    const wrapper = mountComponent()
+    expect(wrapper.find('[data-testid="language-sync-progress"]').exists()).toBe(false)
+
+    await wrapper.findAll('.general-settings__lang-btn').find(button => button.text() === 'settings.general.languageSpanish')!.trigger('click')
+    const bar = wrapper.find('[data-testid="language-sync-progress"]')
+    expect(bar.exists()).toBe(true)
+    expect(bar.attributes('role')).toBe('progressbar')
+    // nada baixado ainda: barra animada (sem porcentagem)
+    expect(bar.classes()).toContain('general-settings__lang-progress--indeterminate')
+    expect(bar.attributes('aria-valuenow')).toBeUndefined()
+
+    reportProgress(50)
+    await wrapper.vm.$nextTick()
+    expect(bar.classes()).not.toContain('general-settings__lang-progress--indeterminate')
+    expect(bar.attributes('aria-valuenow')).toBe('50')
+    expect(wrapper.find('[data-testid="language-sync-percent"]').text()).toBe('50%')
+
+    finish()
+  })
+
+  it('francês usa conteúdo local e persiste sem solicitar catálogo remoto inexistente', async () => {
+    const wrapper = mountComponent()
+    const french = wrapper.findAll('.general-settings__lang-btn').find(button => button.text() === 'settings.general.languageFrench')!
+    await french.trigger('click')
+    await flushPromises()
+    expect(ensureCatalogForLocale).not.toHaveBeenCalled()
+    expect(setUserPreference).toHaveBeenCalledWith('language', 'fr')
+    expect(mockLocale.value).toBe('fr')
+    wrapper.unmount()
   })
 
   it('RED RAIZ-1: falha de download NAO persiste o idioma (rollback)', async () => {

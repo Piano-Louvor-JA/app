@@ -203,7 +203,7 @@ export default {
       desktopOnly: 'Disponível apenas no aplicativo desktop.',
       backupTitle: 'Backup',
       backupHint:
-        'Salva um zip da pasta de dados (mídias, liturgia e playlists). Se a mídia estiver em outro disco, ela entra no backup como pasta Media padrão. A restauração sempre volta para a pasta padrão; depois você pode mover a mídia em Pasta de mídia.',
+        'Salva um zip da pasta de dados (mídias, liturgia, playlists e Bíblia). Se a mídia estiver em outro disco, ela entra no backup como pasta Media padrão. A restauração sempre volta para a pasta padrão; depois você pode mover a mídia em Pasta de mídia.',
       backupCreate: 'Criar backup',
       backupRestore: 'Restaurar backup',
       backupCreating: 'Criando backup…',

@@ -1,6 +1,6 @@
 # Manual do operador — PIANO
 
-Status: documentação da contribuição em rascunho, integrada à base 1.31.2. Os nomes abaixo usam português; a interface também oferece outros idiomas. Este manual descreve o código desta contribuição, não todas as funções do Violin.
+Status: documentação da contribuição em rascunho, integrada à base 1.32.1. Os nomes abaixo usam português; a interface também oferece outros idiomas. Este manual descreve o código desta contribuição, não todas as funções do Violin.
 
 ## Objetivo
 Preparar a programação, conferir o conteúdo e conduzir a projeção mantendo o controle do operador separado da imagem exibida à congregação.

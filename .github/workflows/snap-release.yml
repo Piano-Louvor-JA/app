@@ -52,7 +52,7 @@ jobs:
   snap:
     needs: decide
     if: needs.decide.outputs.publish == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
@@ -106,11 +106,19 @@ jobs:
           sed -i "s/^version:.*/version: \"$TAG\"/" snap/snapcraft.yaml
           grep '^version:' snap/snapcraft.yaml
 
+      # Em --destructive-mode o snapcraft instala no host os build-snaps da
+      # extensão gnome (gnome-46-2404-sdk, gtk-common-themes). Como usuário
+      # comum (como fazia a action oficial de build) essa instalação falha; por isso roda
+      # como root, num host Ubuntu 24.04 igual à base core24.
       - name: Build snap
-        uses: snapcore/action-build@3bdaa03e1ba6bf59a65f84a751d943d549a54e79 # v1
         id: snapcraft
-        with:
-          snapcraft-args: '--destructive-mode'
+        run: |
+          set -euo pipefail
+          sudo snap install snapcraft --classic
+          sudo snapcraft pack --destructive-mode
+          snap_file="$(ls -1 ./*.snap | head -n 1)"
+          sudo chown "$(id -u):$(id -g)" "$snap_file"
+          echo "snap=$snap_file" >> "$GITHUB_OUTPUT"
 
       - name: Upload snap artifact
         uses: actions/upload-artifact@v7

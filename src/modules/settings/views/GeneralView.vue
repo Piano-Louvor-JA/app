@@ -37,6 +37,8 @@ import { ensureCatalogForLocale } from '@modules/starting/services/catalog-local
 
 const { t, locale } = useI18n()
 const catalogSyncState = ref<'idle' | 'syncing' | 'done' | 'error'>('idle')
+/** 0–100 do download do catálogo do idioma (0 = nada concluído ainda). */
+const catalogSyncProgress = ref(0)
 const isClearing = ref(false)
 const clearError = ref(false)
 const clearConfirmOpen = ref(false)
@@ -192,7 +194,13 @@ async function changeLanguage(lang: string) {
     // D4: no-op re-clicar o idioma ativo (nada a baixar nem recarregar).
     if (lang === currentLanguage.value) return
     catalogSyncState.value = 'syncing'
-    if (lang !== 'fr') await ensureCatalogForLocale(lang)
+    catalogSyncProgress.value = 0
+    // French uses the bundled editions; there is no remote French hymn catalog.
+    if (lang !== 'fr') {
+      await ensureCatalogForLocale(lang, (progress) => {
+        catalogSyncProgress.value = progress
+      })
+    }
     saveApplicationLanguage(lang)
     currentLanguage.value = lang
     locale.value = lang
@@ -332,14 +340,42 @@ async function clearAllLocalData() {
       </div>
 
       <!-- D3 SPEC-locale-hot-reload: feedback do download do catálogo -->
-      <p
+      <div
         v-if="catalogSyncState === 'syncing'"
-        class="general-settings__hint general-settings__lang-sync"
-        data-testid="language-sync-downloading"
-        role="status"
+        class="general-settings__lang-sync-box"
       >
-        {{ t('settings.general.languageSyncDownloading') }}
-      </p>
+        <p
+          class="general-settings__hint general-settings__lang-sync"
+          data-testid="language-sync-downloading"
+          role="status"
+        >
+          {{ t('settings.general.languageSyncDownloading') }}
+        </p>
+        <div class="general-settings__lang-progress-row">
+          <div
+            class="general-settings__lang-progress"
+            :class="{
+              'general-settings__lang-progress--indeterminate': catalogSyncProgress <= 0,
+            }"
+            data-testid="language-sync-progress"
+            role="progressbar"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            :aria-valuenow="catalogSyncProgress > 0 ? catalogSyncProgress : undefined"
+            :aria-label="t('settings.general.languageSyncDownloading')"
+          >
+            <div
+              class="general-settings__lang-progress-fill"
+              :style="catalogSyncProgress > 0 ? { width: `${catalogSyncProgress}%` } : undefined"
+            />
+          </div>
+          <span
+            v-if="catalogSyncProgress > 0"
+            class="general-settings__lang-progress-label"
+            data-testid="language-sync-percent"
+          >{{ catalogSyncProgress }}%</span>
+        </div>
+      </div>
       <div
         v-else-if="catalogSyncState === 'error'"
         class="general-settings__lang-sync-error"
@@ -841,6 +877,71 @@ async function clearAllLocalData() {
     &:hover:not(:disabled) {
       background: color-mix(in srgb, var(--ds-color-error, #ffb4ab) 28%, transparent);
     }
+  }
+}
+/* Loading da troca de idioma: barra animada até o 1º arquivo, depois % real. */
+.general-settings__lang-sync-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.general-settings__lang-sync-box .general-settings__lang-sync {
+  margin: 0;
+}
+
+.general-settings__lang-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.general-settings__lang-progress {
+  position: relative;
+  flex: 1;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ds-color-primary) 16%, transparent);
+}
+
+.general-settings__lang-progress-fill {
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: var(--ds-color-primary);
+  transition: width 0.3s ease;
+}
+
+.general-settings__lang-progress--indeterminate .general-settings__lang-progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 35%;
+  animation: general-settings-lang-progress 1.2s ease-in-out infinite;
+}
+
+.general-settings__lang-progress-label {
+  min-width: 3ch;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ds-color-on-surface-variant);
+}
+
+@keyframes general-settings-lang-progress {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .general-settings__lang-progress--indeterminate .general-settings__lang-progress-fill {
+    animation: none;
+    width: 100%;
+    opacity: 0.5;
   }
 }
 </style>
