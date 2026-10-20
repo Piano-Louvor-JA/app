@@ -1,12 +1,19 @@
+import { randomUUID } from 'node:crypto'
 import {
+  createWriteStream,
   existsSync,
   mkdirSync,
+  renameSync,
   unlinkSync,
   writeFileSync,
   readFileSync,
   rmSync,
 } from 'node:fs'
 import path from 'node:path'
+import { Readable, Transform } from 'node:stream'
+import { pipeline } from 'node:stream/promises'
+
+export const MEDIA_DOWNLOAD_STALL_TIMEOUT_MS = 15_000
 import { net } from 'electron'
 
 import { resolveMediaFetchUrl } from './api-base.mjs'
@@ -142,41 +149,66 @@ function buildApiMediaUrl(mediaType, filename) {
  * @param {string} filename
  */
 export async function downloadMediaFile(requestedUrl, mediaType, filename) {
-  const TIMEOUT_MS = 20_000
   let apiUrl = requestedUrl
+  let bytes = 0
+  let partPath = ''
+  let status = null
+  const controller = new AbortController()
+  let timer = null
   const failure = (error) => ({
     ok: false,
     url: error?.url || apiUrl,
-    status: typeof error?.status === 'number' ? error.status : null,
-    bytes: typeof error?.bytes === 'number' ? error.bytes : 0,
+    status: typeof error?.status === 'number' ? error.status : status,
+    bytes: typeof error?.bytes === 'number' ? error.bytes : bytes,
     error: error instanceof Error ? error.message : String(error ?? 'media download failed'),
   })
-  const run = async () => {
+  const resetStallTimer = () => {
+    if (timer) clearTimeout(timer)
+    timer = setTimeout(() => controller.abort(new Error(`media download stall (${MEDIA_DOWNLOAD_STALL_TIMEOUT_MS / 1000}s sem dados)`)), MEDIA_DOWNLOAD_STALL_TIMEOUT_MS)
+  }
+
+  try {
     const destFolder = resolveMediaDirectory(mediaType)
     const decodedFilename = decodeURIComponent(filename)
     const filePath = path.join(destFolder, decodedFilename)
+    partPath = `${filePath}.${randomUUID()}.part`
     mkdirSync(path.dirname(filePath), { recursive: true })
     apiUrl = resolveMediaFetchUrl(requestedUrl, buildApiMediaUrl(mediaType, decodedFilename), API_BASE_URL)
-    const response = await net.fetch(apiUrl)
-    const buffer = Buffer.from(await response.arrayBuffer())
-    if (!response.ok) return { ok: false, url: response.url || apiUrl, status: response.status, bytes: buffer.byteLength, error: `HTTP ${response.status}` }
-    writeFileSync(filePath, buffer)
-    return true
-  }
+    resetStallTimer()
+    const response = await net.fetch(apiUrl, { signal: controller.signal })
+    status = response.status
+    if (!response.ok) {
+      if (response.body) {
+        for await (const chunk of Readable.fromWeb(response.body)) {
+          bytes += chunk.length
+          resetStallTimer()
+        }
+      }
+      return { ok: false, url: response.url || apiUrl, status, bytes, error: `HTTP ${status}` }
+    }
+    if (!response.body) throw new Error('media download response body unavailable')
 
-  let timer
-  try {
-    const work = run()
-    work.catch(() => {})
-    return await Promise.race([
-      work,
-      new Promise((_, reject) => {
-        timer = setTimeout(() => reject(new Error(`media download timeout (${TIMEOUT_MS}ms)`)), TIMEOUT_MS)
-      }),
-    ])
+    const stream = Readable.fromWeb(response.body)
+    const progress = new Transform({
+      transform(chunk, _encoding, callback) {
+        bytes += chunk.length
+        resetStallTimer()
+        callback(null, chunk)
+      },
+    })
+
+    await pipeline(stream, progress, createWriteStream(partPath), { signal: controller.signal })
+    renameSync(partPath, filePath)
+    return true
   } catch (error) {
-    console.warn('[media] download falhou/timeout:', error?.message || error)
-    return failure(error)
+    const cause = controller.signal.aborted ? controller.signal.reason : error
+    console.warn('[media] download falhou/stall:', cause?.message || cause)
+    try {
+      if (partPath && existsSync(partPath)) unlinkSync(partPath)
+    } catch (cleanupError) {
+      console.warn('[media] falha ao limpar .part:', cleanupError?.message || cleanupError)
+    }
+    return failure(cause)
   } finally {
     if (timer) clearTimeout(timer)
   }

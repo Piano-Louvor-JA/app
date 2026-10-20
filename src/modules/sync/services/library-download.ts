@@ -16,8 +16,23 @@ import {
   writeDownloadedAlbumIds,
 } from './library-catalog'
 import { toRelativeMediaPath } from './media-paths'
+import { DownloadFailureBuffer } from './download-failure-buffer'
 
 const DOWNLOAD_BATCH_SIZE = 5
+const albumDownloadFailures = new DownloadFailureBuffer()
+
+function reportAlbumDownloadFailure(failure: { url: string; status: number | null; bytes: number | null; error: string }, label: string): void {
+  albumDownloadFailures.add({
+    ts: new Date().toISOString(),
+    url: failure.url,
+    label,
+    status: failure.status,
+    bytes: failure.bytes,
+    erro: failure.error,
+    tentativa: 1,
+  })
+  try { window.louvorja?.diagnostics?.reportDownloadFailures?.(albumDownloadFailures.snapshot()) } catch { /* best effort */ }
+}
 const MAX_CONSECUTIVE_ERRORS = 3
 
 function catalogAlbumKey(albumId: string | number): string {
@@ -291,7 +306,9 @@ export async function downloadAlbumMedia(
             relativePath,
           )
           if (success !== true) {
-            if (typeof success === 'object') throw Object.assign(new Error(success.error), success)
+            if (success && typeof success === 'object') {
+              reportAlbumDownloadFailure(success, relativePath)
+            }
             consecutiveErrors += 1
             totalErrors += 1
             console.warn(
