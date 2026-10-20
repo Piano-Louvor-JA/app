@@ -1,8 +1,9 @@
 // @vitest-environment node
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   resolveProjectionDisplay,
   buildProjectionWindowBounds,
+  applyProjectionDisplayMode,
 } from '../projection-display.mjs'
 
 const PRIMARY = {
@@ -54,6 +55,66 @@ describe('buildProjectionWindowBounds (fullscreen)', () => {
       primary: PRIMARY,
     })
     expect(b).toEqual({ x: 0, y: 0, width: 1920, height: 1080 })
+  })
+})
+
+describe('applyProjectionDisplayMode', () => {
+  function createWindow() {
+    return {
+      isDestroyed: () => false,
+      getBounds: () => SECONDARY.bounds,
+      setBounds: vi.fn(),
+      setFullScreen: vi.fn(),
+      setAlwaysOnTop: vi.fn(),
+      setSimpleFullScreen: vi.fn(),
+    }
+  }
+
+  const screenApi = { getDisplayMatching: vi.fn(() => SECONDARY) }
+
+  it('Wayland Linux aplica bounds antes do fullscreen real sem always-on-top', () => {
+    const win = createWindow()
+
+    applyProjectionDisplayMode(win, true, {
+      platform: 'linux',
+      sessionType: 'wayland',
+      screen: screenApi,
+    })
+
+    expect(win.setBounds).toHaveBeenCalledWith(SECONDARY.bounds)
+    expect(win.setFullScreen).toHaveBeenCalledWith(true)
+    expect(win.setAlwaysOnTop).not.toHaveBeenCalled()
+    expect(win.setBounds.mock.invocationCallOrder[0]).toBeLessThan(
+      win.setFullScreen.mock.invocationCallOrder[0],
+    )
+  })
+
+  it('X11 Linux preserva fullscreen fake com bounds e always-on-top', () => {
+    const win = createWindow()
+
+    applyProjectionDisplayMode(win, true, {
+      platform: 'linux',
+      sessionType: 'x11',
+      screen: screenApi,
+    })
+
+    expect(win.setFullScreen).toHaveBeenCalledWith(false)
+    expect(win.setBounds).toHaveBeenCalledWith(SECONDARY.bounds)
+    expect(win.setAlwaysOnTop).toHaveBeenCalledWith(true, 'screen-saver')
+  })
+
+  it('Windows mantém fullscreen fake atual', () => {
+    const win = createWindow()
+
+    applyProjectionDisplayMode(win, true, {
+      platform: 'win32',
+      sessionType: 'wayland',
+      screen: screenApi,
+    })
+
+    expect(win.setFullScreen).toHaveBeenCalledWith(false)
+    expect(win.setBounds).toHaveBeenCalledWith(SECONDARY.bounds)
+    expect(win.setAlwaysOnTop).toHaveBeenCalledWith(true, 'screen-saver')
   })
 })
 

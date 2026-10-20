@@ -7,6 +7,7 @@ import { readWorkspaceRecord, writeWorkspaceRecord } from '../workspace.mjs'
 import { getPalcoManager } from '../palco-server.mjs'
 import { addProjectionWindowProvider, ensureProjectionHotkey, releaseProjectionHotkey } from '../projection-hotkey.mjs'
 import { projectionPowerSaveAcquire, projectionPowerSaveRelease } from '../projection-power-save.mjs'
+import { applyRuntimeProjectionDisplayMode } from '../projection-display.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const PRELOAD_PATH = path.join(__dirname, '../preload.mjs')
@@ -63,6 +64,12 @@ const SITE_CONTROL_BAR_HEIGHT = 44
 const SITE_CONTROL_PANEL_HEIGHT = 300
 const SITE_MIN_WIDTH = 480
 const SITE_MIN_HEIGHT = 360
+
+function applyProjectionFullscreen(win, display) {
+  applyRuntimeProjectionDisplayMode(win, true, process, {
+    getDisplayMatching: () => display,
+  })
+}
 
 /**
  * Compacta o YouTube e remove a chrome nativa do player na captura.
@@ -940,12 +947,7 @@ function createSiteShieldWindow(display) {
   shield.setIgnoreMouseEvents(false)
 
   shield.once('ready-to-show', () => {
-    shield.setBounds(display.bounds)
-    shield.setFullScreen(true)
-    if (process.platform === 'darwin') {
-      shield.setSimpleFullScreen(true)
-    }
-    shield.setAlwaysOnTop(true, 'screen-saver')
+    applyProjectionFullscreen(shield, display)
     shield.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
     shield.showInactive()
   })
@@ -1082,15 +1084,10 @@ function createSiteProjectionWindow(display, loadUrl) {
   }
 
   win.once('ready-to-show', () => {
-    win.setBounds(display.bounds)
-    win.setFullScreen(true)
+    applyProjectionFullscreen(win, display)
     // Tela do operador não apaga durante o culto (ref-count global)
     projectionPowerSaveAcquire()
     win.once('closed', () => projectionPowerSaveRelease())
-    if (process.platform === 'darwin') {
-      win.setSimpleFullScreen(true)
-    }
-    win.setAlwaysOnTop(true, 'screen-saver')
     attachBlocker()
     layoutBlocker()
     win.showInactive()
@@ -1174,20 +1171,10 @@ function createMirrorWindow(display) {
   win.webContents.setAudioMuted(true)
 
   win.once('ready-to-show', () => {
-    // Fullscreen real só nas telas estendidas
-    win.setBounds(display.bounds)
-    win.setFullScreen(true)
+    applyProjectionFullscreen(win, display)
     // Tela do operador não apaga durante o culto (ref-count global)
     projectionPowerSaveAcquire()
     win.once('closed', () => projectionPowerSaveRelease())
-    if (process.platform === 'darwin') {
-      win.setSimpleFullScreen(true)
-    }
-    if (process.platform === 'win32') {
-      win.setAlwaysOnTop(true, 'screen-saver')
-    } else {
-      win.setAlwaysOnTop(true, 'screen-saver')
-    }
     win.showInactive()
   })
 
@@ -1244,15 +1231,10 @@ function createImageProjectionWindow(display, loadUrl) {
   win.webContents.setAudioMuted(true)
 
   win.once('ready-to-show', () => {
-    win.setBounds(display.bounds)
-    win.setFullScreen(true)
+    applyProjectionFullscreen(win, display)
     // Tela do operador não apaga durante o culto (ref-count global)
     projectionPowerSaveAcquire()
     win.once('closed', () => projectionPowerSaveRelease())
-    if (process.platform === 'darwin') {
-      win.setSimpleFullScreen(true)
-    }
-    win.setAlwaysOnTop(true, 'screen-saver')
     win.showInactive()
   })
 

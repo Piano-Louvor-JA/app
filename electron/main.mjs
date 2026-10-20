@@ -23,7 +23,7 @@ import { attachPalcoServer } from "./palco-server.mjs";
 import { ensureWorkspaceDirectories } from "./paths.mjs";
 import { registerLocalFileProtocol, registerLocalScheme } from "./protocol.mjs";
 import { registerCloseProjectionPopups } from "./ipc/web-projection.mjs";
-import { buildProjectionWindowBounds } from "./projection-display.mjs";
+import { applyRuntimeProjectionDisplayMode, buildProjectionWindowBounds } from "./projection-display.mjs";
 import { initUpdater } from "./updater.mjs";
 import { getBibleUpdater } from "./bible-updater.mjs";
 import { loadWindowState, trackWindowState } from "./window-state.mjs";
@@ -82,6 +82,7 @@ process.on('unhandledRejection', (reason) => {
 if (process.platform === "linux") {
 	app.setName(APP_DESKTOP_ID);
 	app.commandLine.appendSwitch("class", APP_DESKTOP_ID);
+	app.commandLine.appendSwitch("ozone-platform-hint", "auto");
 } else {
 	app.setName(APP_PRODUCT_NAME);
 }
@@ -369,36 +370,6 @@ function buildPopupWindowOptions(url, features = '') {
   return windowConfig
 }
 
-/**
- * Aplica fullscreen / bounds sem chrome após criar a janela (legado win32/linux/mac).
- *
- * Linux: NÃO usa setFullScreen — o fullscreen EWMH é decidido pelo window
- * manager, que em vários WMs ignora o monitor da janela e joga no primário
- * (bug "não projeta no segundo monitor"). Usa a mesma estratégia do win32:
- * borderless + setBounds(display.bounds) + alwaysOnTop (fullscreen fake).
- * @param {import('electron').BrowserWindow} childWindow
- * @param {boolean} fullscreen
- */
-function applyProjectionDisplayMode(childWindow, fullscreen) {
-  if (childWindow.isDestroyed()) return
-
-  if (fullscreen && (process.platform === 'win32' || process.platform === 'linux')) {
-    const bounds = childWindow.getBounds()
-    const display = screen.getDisplayMatching(bounds)
-    childWindow.setFullScreen(false)
-    childWindow.setBounds(display.bounds)
-    childWindow.setAlwaysOnTop(true, 'screen-saver')
-    return
-  }
-
-  if (!fullscreen) return
-
-  childWindow.setFullScreen(true)
-  if (process.platform === 'darwin') {
-    childWindow.setSimpleFullScreen(true)
-  }
-  childWindow.setAlwaysOnTop(true, 'screen-saver')
-}
 
 function attachProjectionWindowHandlers(parentWindow) {
   /** @type {WeakMap<import('electron').BrowserWindow, boolean>} */
@@ -476,7 +447,7 @@ function attachProjectionWindowHandlers(parentWindow) {
         standbyWindows.delete(item.win)
         warmPool = warmPool.filter((entry) => entry.win !== item.win)
         if (bounds) item.win.setBounds(bounds)
-        applyProjectionDisplayMode(item.win, fullscreen)
+        applyRuntimeProjectionDisplayMode(item.win, fullscreen, process, screen)
       }
       for (const { item } of assigned) {
         item.win.showInactive()
@@ -621,7 +592,7 @@ function attachProjectionWindowHandlers(parentWindow) {
         return
       }
       const shouldFullscreen = fullscreenByWindow.get(childWindow) ?? fullscreen
-      applyProjectionDisplayMode(childWindow, shouldFullscreen)
+      applyRuntimeProjectionDisplayMode(childWindow, shouldFullscreen, process, screen)
       childWindow.show()
       if (isProjection) {
         ensureProjectionHotkey()

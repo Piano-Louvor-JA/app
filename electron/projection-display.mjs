@@ -1,16 +1,59 @@
 /**
  * Seleção de monitor e bounds das janelas de projeção.
  *
- * No Linux, `setFullScreen(true)` é EWMH (_NET_WM_STATE_FULLSCREEN): o window
- * manager decide o monitor e vários WMs (Cinnamon, GNOME, XFCE) ignoram o
- * posicionamento pré-show, jogando o fullscreen no monitor primário. Por isso
- * a projeção no Linux usa a mesma estratégia do Windows: janela borderless
- * com bounds do monitor alvo + alwaysOnTop (fullscreen "fake"), imune ao
- * comportamento do WM. Bug: "não projeta no segundo monitor" — v1.8.9+.
+ * No Linux Wayland, a projeção usa bounds do monitor alvo antes de fullscreen
+ * real. X11 preserva bounds + alwaysOnTop (fullscreen "fake") por compatibilidade
+ * EWMH.
  */
 
 const WINDOWED_WIDTH = 800
 const WINDOWED_HEIGHT = 600
+
+/**
+ * Aplica o modo fullscreen sem sobrescrever a política Wayland após exibir.
+ * @param {import('electron').BrowserWindow} childWindow
+ * @param {boolean} fullscreen
+ * @param {{ platform: NodeJS.Platform, sessionType?: string, screen: Pick<import('electron').Screen, 'getDisplayMatching'> }} runtime
+ */
+export function applyProjectionDisplayMode(childWindow, fullscreen, runtime) {
+  if (childWindow.isDestroyed() || !fullscreen) return
+
+  const { platform, sessionType, screen } = runtime
+  const bounds = childWindow.getBounds()
+  const display = screen.getDisplayMatching(bounds)
+
+  if (platform === 'linux' && sessionType === 'wayland') {
+    childWindow.setBounds(display.bounds)
+    childWindow.setFullScreen(true)
+    return
+  }
+
+  if (platform === 'win32' || platform === 'linux') {
+    childWindow.setFullScreen(false)
+    childWindow.setBounds(display.bounds)
+    childWindow.setAlwaysOnTop(true, 'screen-saver')
+    return
+  }
+
+  childWindow.setFullScreen(true)
+  if (platform === 'darwin') childWindow.setSimpleFullScreen(true)
+  childWindow.setAlwaysOnTop(true, 'screen-saver')
+}
+
+/**
+ * Aplica o modo de projeção ao receber Electron runtime globals.
+ * @param {import('electron').BrowserWindow} childWindow
+ * @param {boolean} fullscreen
+ * @param {typeof process} processRef
+ * @param {import('electron').Screen} screen
+ */
+export function applyRuntimeProjectionDisplayMode(childWindow, fullscreen, processRef, screen) {
+  applyProjectionDisplayMode(childWindow, fullscreen, {
+    platform: processRef.platform,
+    sessionType: processRef.env.XDG_SESSION_TYPE,
+    screen,
+  })
+}
 
 /**
  * Resolve o display alvo da projeção.
