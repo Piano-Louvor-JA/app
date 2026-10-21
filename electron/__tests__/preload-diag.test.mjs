@@ -18,10 +18,10 @@ describe('DevTools diagnostics bridge', () => {
     const revokeObjectURL = vi.fn()
     globalThis.URL.createObjectURL = createObjectURL
     globalThis.URL.revokeObjectURL = revokeObjectURL
-    globalThis.document = {
+    vi.stubGlobal('document', {
       body: { appendChild, removeChild },
       createElement: vi.fn(() => ({ click })),
-    }
+    })
     const json = '{"meta":{"budgetado":true}}'
     invoke.mockResolvedValue({ report: { meta: {} }, json, jsonPath: '/tmp/diagnostico.json', txtPath: '/tmp/diagnostico.txt' })
 

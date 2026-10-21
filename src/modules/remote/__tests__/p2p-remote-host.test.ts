@@ -68,10 +68,10 @@ describe('P2pRemoteHost', () => {
     host.destroy()
   })
 
-  it('sem offer: acceptAnswer falha e send não lança', () => {
+  it('sem offer: acceptAnswer falha e send não lança', async () => {
     const host = new P2pRemoteHost()
     expect(host.isOpen).toBe(false)
-    expect(host.acceptAnswer('{}')).resolves.toBe(false)
+    await expect(host.acceptAnswer('{}')).resolves.toBe(false)
     expect(() => host.send({ x: 1 })).not.toThrow()
     host.destroy()
   })
