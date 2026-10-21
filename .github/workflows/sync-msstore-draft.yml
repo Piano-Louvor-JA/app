@@ -33,7 +33,10 @@ jobs:
     name: PATCH package + commit draft
     runs-on: ubuntu-24.04
     # Gate humano: environment com required reviewer. Segredos MSSTORE_*
-    # existem APENAS neste environment.
+    # existem APENAS neste environment. Fallback: enquanto o environment
+    # não existe, usa os secrets de repo AZURE_AD_*/SELLER_ID/MS_STORE_*
+    # (mesmas credenciais que o msstore-release.yml antigo usava com
+    # sucesso). Criado o environment, MSSTORE_* passa a valer sozinho.
     environment: microsoft-store-draft
     steps:
       - uses: actions/checkout@v7
@@ -71,20 +74,20 @@ jobs:
 
       - name: Status do draft antes da mutação (read-only)
         env:
-          MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
-          MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
-          MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
-          MSSTORE_SELLER_ID: ${{ secrets.MSSTORE_SELLER_ID }}
-          MSSTORE_PRODUCT_ID: ${{ secrets.MSSTORE_PRODUCT_ID }}
+          MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID || secrets.AZURE_AD_TENANT_ID }}
+          MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID || secrets.AZURE_AD_APPLICATION_CLIENT_ID }}
+          MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET || secrets.AZURE_AD_APPLICATION_SECRET }}
+          MSSTORE_SELLER_ID: ${{ secrets.MSSTORE_SELLER_ID || secrets.SELLER_ID }}
+          MSSTORE_PRODUCT_ID: ${{ secrets.MSSTORE_PRODUCT_ID || secrets.MS_STORE_PRODUCT_ID }}
         run: node scripts/msstore-cli.mjs status
 
       - name: PATCH pacote + commit draft
         env:
-          MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
-          MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
-          MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
-          MSSTORE_SELLER_ID: ${{ secrets.MSSTORE_SELLER_ID }}
-          MSSTORE_PRODUCT_ID: ${{ secrets.MSSTORE_PRODUCT_ID }}
+          MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID || secrets.AZURE_AD_TENANT_ID }}
+          MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID || secrets.AZURE_AD_APPLICATION_CLIENT_ID }}
+          MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET || secrets.AZURE_AD_APPLICATION_SECRET }}
+          MSSTORE_SELLER_ID: ${{ secrets.MSSTORE_SELLER_ID || secrets.SELLER_ID }}
+          MSSTORE_PRODUCT_ID: ${{ secrets.MSSTORE_PRODUCT_ID || secrets.MS_STORE_PRODUCT_ID }}
           TAG: ${{ inputs.tag }}
           ASSET_SUFFIX: ${{ inputs.asset_suffix }}
           PACKAGE_ID: ${{ inputs.package_id }}
