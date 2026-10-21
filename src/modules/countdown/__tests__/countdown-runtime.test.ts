@@ -15,8 +15,8 @@ vi.mock('../types/countdown', async () => {
 
 const dom = new JSDOM('', { url: 'http://localhost/' })
 const g = globalThis as unknown as Record<string, unknown>
-g.window = dom.window
-g.localStorage = dom.window.localStorage
+vi.stubGlobal('window', dom.window)
+vi.stubGlobal('localStorage', dom.window.localStorage)
 if (typeof BroadcastChannel === 'function') g.BroadcastChannel = BroadcastChannel
 
 import {
