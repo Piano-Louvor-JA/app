@@ -19,10 +19,10 @@ import {
 
 const dom = new JSDOM("", { url: "http://localhost/" });
 const g = globalThis as unknown as Record<string, unknown>;
-g.window = dom.window;
-g.document = dom.window.document;
-g.localStorage = dom.window.localStorage;
-g.sessionStorage = dom.window.sessionStorage;
+vi.stubGlobal('window', dom.window);
+vi.stubGlobal('document', dom.window.document);
+vi.stubGlobal('localStorage', dom.window.localStorage);
+vi.stubGlobal('sessionStorage', dom.window.sessionStorage);
 if (!g.setInterval) g.setInterval = dom.window.setInterval.bind(dom.window);
 if (!g.clearInterval)
 	g.clearInterval = dom.window.clearInterval.bind(dom.window);
