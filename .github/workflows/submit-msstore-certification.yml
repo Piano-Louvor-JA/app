@@ -26,6 +26,10 @@ jobs:
     name: Guard + POST /submit (único)
     runs-on: ubuntu-24.04
     environment: microsoft-store-certification
+    # Fallback: enquanto o environment microsoft-store-certification não
+    # existe com os secrets MSSTORE_*, usa os secrets de repo (mesmas
+    # credenciais do msstore-release.yml antigo). Segurança preservada:
+    # segue workflow_dispatch manual + guard de submission_id esperado.
     steps:
       - uses: actions/checkout@v7
 
@@ -35,20 +39,20 @@ jobs:
 
       - name: Consulta imediata de status (read-only)
         env:
-          MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
-          MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
-          MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
-          MSSTORE_SELLER_ID: ${{ secrets.MSSTORE_SELLER_ID }}
-          MSSTORE_PRODUCT_ID: ${{ secrets.MSSTORE_PRODUCT_ID }}
+          MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID || secrets.AZURE_AD_TENANT_ID }}
+          MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID || secrets.AZURE_AD_APPLICATION_CLIENT_ID }}
+          MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET || secrets.AZURE_AD_APPLICATION_SECRET }}
+          MSSTORE_SELLER_ID: ${{ secrets.MSSTORE_SELLER_ID || secrets.SELLER_ID }}
+          MSSTORE_PRODUCT_ID: ${{ secrets.MSSTORE_PRODUCT_ID || secrets.MS_STORE_PRODUCT_ID }}
         run: node scripts/msstore-cli.mjs status
 
       - name: Guard + submit (uma única chamada)
         env:
-          MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
-          MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
-          MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
-          MSSTORE_SELLER_ID: ${{ secrets.MSSTORE_SELLER_ID }}
-          MSSTORE_PRODUCT_ID: ${{ secrets.MSSTORE_PRODUCT_ID }}
+          MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID || secrets.AZURE_AD_TENANT_ID }}
+          MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID || secrets.AZURE_AD_APPLICATION_CLIENT_ID }}
+          MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET || secrets.AZURE_AD_APPLICATION_SECRET }}
+          MSSTORE_SELLER_ID: ${{ secrets.MSSTORE_SELLER_ID || secrets.SELLER_ID }}
+          MSSTORE_PRODUCT_ID: ${{ secrets.MSSTORE_PRODUCT_ID || secrets.MS_STORE_PRODUCT_ID }}
           EXPECTED_SUBMISSION_ID: ${{ inputs.expected_submission_id }}
         run: node scripts/msstore-cli.mjs submit "$EXPECTED_SUBMISSION_ID"
 
