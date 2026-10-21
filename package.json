@@ -65,7 +65,7 @@
     "@stryker-mutator/vitest-runner": "^10.0.0",
     "@tailwindcss/vite": "^4.3.3",
     "@tsconfig/node24": "^24.0.5",
-    "@types/node": "^24.13.2",
+    "@types/node": "^26.6.5",
     "@types/qrcode": "^1.5.6",
     "@vitejs/plugin-vue": "^6.0.10",
     "@vitest/coverage-istanbul": "^4.1.11",
