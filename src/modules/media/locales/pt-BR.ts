@@ -1,5 +1,6 @@
 export default {
   media: {
+    exitFullscreen: 'Sair da tela cheia',
     publishRules: {
       title: 'Regras da Comunidade',
       visibleToAll: 'Coletâneas públicas aparecem para toda a rede PIANO.',

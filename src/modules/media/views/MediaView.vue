@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
+import { usePrimaryProjectionControls } from '@shared/composables/usePrimaryProjectionControls'
 
 import MediaCloseDialog from '../components/MediaCloseDialog.vue'
 import StagePaletteButton from '../../settings/components/StagePaletteButton.vue'
@@ -16,6 +17,11 @@ const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
 const stageRoot = ref<HTMLElement | null>(null)
+const playerFullscreen = ref(false)
+function syncPlayerFullscreen() {
+  playerFullscreen.value = Boolean(stageRoot.value && document.fullscreenElement === stageRoot.value)
+}
+const { primaryOnly, minimizeVisible, controlsVisible } = usePrimaryProjectionControls()
 
 const {
   session,
@@ -66,6 +72,25 @@ const {
 } = useMediaPlayer()
 
 const playlistAsideEl = ref<HTMLElement | null>(null)
+let autoFullscreenAttempted = false
+
+// Mesmo critério da projeção interna: estendidos conectados mas desmarcados
+// permitem usar a tela principal inteira. Reabrir o player monta uma nova view.
+watch([primaryOnly, hasSession], async ([primary, active]) => {
+  if (!primary || !active || autoFullscreenAttempted) return
+  autoFullscreenAttempted = true
+  await nextTick()
+  const el = stageRoot.value
+  if (!el || document.fullscreenElement === el) return
+  try { await el.requestFullscreen?.() } catch { /* Fullscreen indisponível no sistema. */ }
+}, { flush: 'post' })
+
+async function leavePlayerFullscreen() {
+  if (!stageRoot.value || document.fullscreenElement !== stageRoot.value) return
+  try { await document.exitFullscreen?.() } catch { /* Já saiu de fullscreen. */ }
+}
+
+onBeforeUnmount(() => { void leavePlayerFullscreen() })
 
 /** Slide/faixa em reprodução visível no painel lateral (auto-scroll). */
 const activeListIndex = computed(() =>
@@ -103,6 +128,8 @@ const playlist = computed(() =>
 )
 
 onMounted(() => {
+  document.addEventListener('fullscreenchange', syncPlayerFullscreen)
+  syncPlayerFullscreen()
   document.documentElement.classList.add('media-player-open')
   maximize()
   setPlaylistOpen(true)
@@ -111,6 +138,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  document.removeEventListener('fullscreenchange', syncPlayerFullscreen)
   document.documentElement.classList.remove('media-player-open')
   window.removeEventListener('keydown', onGlobalKeydown, true)
   // Dock / back / qualquer saída da rota: mesmo efeito do botão minimizar
@@ -159,6 +187,7 @@ watch(hasSession, (active) => {
 })
 
 async function onMinimize() {
+  await leavePlayerFullscreen()
   minimize()
   leaveMediaRoute()
 }
@@ -190,8 +219,21 @@ async function onToggleFullscreen() {
       class="media-window"
       tabindex="-1"
     >
-    <header class="media-window__toolbar">
+    <header v-show="controlsVisible" class="media-window__toolbar">
       <button
+        type="button"
+        class="media-window__tool-btn"
+        :aria-label="t('media.close')"
+        :title="t('media.close')"
+        @click="requestClose"
+      >
+        <i
+          class="ti ti-x"
+          aria-hidden="true"
+        />
+      </button>
+      <button
+        v-if="!primaryOnly || minimizeVisible"
         type="button"
         class="media-window__tool-btn"
         :aria-label="t('media.minimize')"
@@ -204,16 +246,15 @@ async function onToggleFullscreen() {
         />
       </button>
       <button
+        v-if="playerFullscreen"
         type="button"
         class="media-window__tool-btn"
-        :aria-label="t('media.close')"
-        :title="t('media.close')"
-        @click="requestClose"
+        data-testid="exit-player-fullscreen"
+        :aria-label="t('media.exitFullscreen')"
+        :title="t('media.exitFullscreen')"
+        @click="leavePlayerFullscreen"
       >
-        <i
-          class="ti ti-x"
-          aria-hidden="true"
-        />
+        <i class="ti ti-square" aria-hidden="true" />
       </button>
     </header>
 
@@ -244,7 +285,7 @@ async function onToggleFullscreen() {
       :class="{ 'media-window__body--playlist': showPlaylist }"
     >
       <div class="media-window__stage">
-        <div class="media-window__stage-palette">
+        <div v-show="controlsVisible" class="media-window__stage-palette">
           <p class="media-window__hotkey-hint">
             {{ t('media.projectionHotkeyHint') }}
           </p>
@@ -258,7 +299,7 @@ async function onToggleFullscreen() {
           :is-cover="isCover"
         />
 
-        <div class="media-window__pill-wrap">
+        <div v-show="controlsVisible" class="media-window__pill-wrap">
           <div class="media-window__pill-stack">
             <MediaPlayerPill
               :title="session?.title || t('media.title')"

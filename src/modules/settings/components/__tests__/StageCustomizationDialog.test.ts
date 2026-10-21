@@ -37,6 +37,16 @@ function createWrapper(props: Record<string, unknown> = {}) {
 }
 
 describe('StageCustomizationDialog', () => {
+  it('mantém a paleta dentro do elemento em fullscreen', () => {
+    const fullscreen = document.createElement('section')
+    document.body.appendChild(fullscreen)
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: fullscreen })
+    const wrapper = createWrapper()
+    expect(fullscreen.querySelector('.stage-shortcut')).toBeTruthy()
+    wrapper.unmount()
+    fullscreen.remove()
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: null })
+  })
   it('open=false: não renderiza', () => {
     const wrapper = createWrapper({ open: false })
     expect(document.querySelector('.stage-shortcut')).toBeNull()

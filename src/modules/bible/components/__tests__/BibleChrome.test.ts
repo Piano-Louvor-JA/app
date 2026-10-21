@@ -17,6 +17,19 @@ import {
 import bibleLocale from '../../locales/pt-BR'
 import type { BibleSelection } from '../../types/bible'
 import BibleChrome from '../BibleChrome.vue'
+import { useInAppProjectionMinimized } from '@shared/composables/useInAppProjectionMinimized'
+
+it('restaura a projeção pelo controle flutuante existente, sem navegar nem encerrar', async () => {
+  const minimized = useInAppProjectionMinimized('bible')
+  minimized.value = true
+  const w = mountChrome()
+  const button = w.find('.bible-chrome__icon-btn')
+  expect(button.exists()).toBe(true)
+  await button.trigger('click')
+  expect(minimized.value).toBe(false)
+  expect(push).not.toHaveBeenCalled()
+  expect(store.clearProjectionWindow).not.toHaveBeenCalled()
+})
 
 const route = reactive<{ meta: Record<string, unknown> }>({ meta: { navKey: 'bible' } })
 const push = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))

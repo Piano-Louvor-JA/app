@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { computed, ref } from "vue";
@@ -12,6 +12,13 @@ import { createI18n } from "vue-i18n";
  */
 import mediaLocale from "../../locales/pt-BR";
 import MediaView from "../MediaView.vue";
+import { loadProjectionSettings, saveProjectionSettings } from '@modules/settings/services/projection-preferences';
+
+const displayMocks = vi.hoisted(() => ({ list: vi.fn() }));
+vi.mock('@modules/settings/services/display-service', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@modules/settings/services/display-service')>(),
+  listSystemDisplays: displayMocks.list,
+}));
 
 const pushMock = vi.fn().mockResolvedValue(undefined);
 const backMock = vi.fn().mockResolvedValue(undefined);
@@ -121,6 +128,8 @@ async function mountView() {
 
 beforeEach(() => {
 	vi.clearAllMocks();
+  saveProjectionSettings({ ...loadProjectionSettings(), targetDisplayIds: [2] });
+  displayMocks.list.mockResolvedValue([{ id: 1, isPrimary: true }, { id: 2, isPrimary: false }]);
 	document.documentElement.classList.remove("media-player-open");
 	// jsdom não implementa scrollTo — stub no prototype (usado por revealItemInAside)
 	HTMLElement.prototype.scrollTo = vi.fn();
@@ -137,6 +146,58 @@ beforeEach(() => {
 });
 
 describe("MediaView — montagem", () => {
+  it.each([false, true])('abre automaticamente em fullscreen com só o principal selecionado (estendidos conectados: %s)', async (connected) => {
+    const request = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', { configurable: true, value: request });
+    saveProjectionSettings({ ...loadProjectionSettings(), targetDisplayIds: [], declinedDisplayIds: [2, 3] });
+    displayMocks.list.mockResolvedValue(connected
+      ? [{ id: 1, isPrimary: true }, { id: 2, isPrimary: false }, { id: 3, isPrimary: false }]
+      : [{ id: 1, isPrimary: true }]);
+    const w = await mountView();
+    try {
+      await flushPromises();
+      expect(request).toHaveBeenCalledOnce();
+    } finally {
+      w.unmount();
+      delete (HTMLElement.prototype as Partial<HTMLElement>).requestFullscreen;
+    }
+  });
+  it('não entra automaticamente em fullscreen com estendido selecionado', async () => {
+    const request = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', { configurable: true, value: request });
+    const w = await mountView();
+    try {
+      await flushPromises();
+      expect(request).not.toHaveBeenCalled();
+    } finally {
+      w.unmount();
+      delete (HTMLElement.prototype as Partial<HTMLElement>).requestFullscreen;
+    }
+  });
+  it('monitor único: minimizar some após 5s e volta ao mover o mouse', async () => {
+    vi.useFakeTimers();
+    displayMocks.list.mockResolvedValue([{ id: 1, isPrimary: true }]);
+    const w = await mountView();
+    try {
+      await flushPromises();
+      const minimizeButton = () => w.find('.media-window__toolbar button[aria-label="' + mediaLocale.media.minimize + '"]');
+      expect(minimizeButton().exists()).toBe(true);
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(minimizeButton().exists()).toBe(false);
+      for (const selector of ['.media-window__toolbar', '.media-window__stage-palette', '.media-window__pill-wrap']) {
+        expect(w.get(selector).attributes('style')).toContain('display: none');
+      }
+      window.dispatchEvent(new MouseEvent('mousemove'));
+      await w.vm.$nextTick();
+      expect(minimizeButton().exists()).toBe(true);
+      for (const selector of ['.media-window__toolbar', '.media-window__stage-palette', '.media-window__pill-wrap']) {
+        expect(w.get(selector).attributes('style') ?? '').not.toContain('display: none');
+      }
+    } finally {
+      w.unmount();
+      vi.useRealTimers();
+    }
+  });
 	it("monta com janela, stage, pill e playlist", async () => {
 		const w = await mountView();
 		expect(w.find(".media-window").exists()).toBe(true);
@@ -301,6 +362,35 @@ describe("MediaView — toolbar e fechamento", () => {
 });
 
 describe("MediaView — pill integrada", () => {
+  it('botão quadrado só em fullscreen: sai sem encerrar e reaparece ao voltar', async () => {
+    const w = await mountView();
+    const setFullscreen = (element: Element | null) => {
+      Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: element });
+      document.dispatchEvent(new Event('fullscreenchange'));
+    };
+    const exit = vi.fn(async () => { setFullscreen(null); });
+    Object.defineProperty(document, 'exitFullscreen', { configurable: true, value: exit });
+    try {
+      expect(w.find('[data-testid="exit-player-fullscreen"]').exists()).toBe(false);
+      setFullscreen(w.get('.media-window').element);
+      await w.vm.$nextTick();
+      const buttons = w.findAll('.media-window__toolbar button');
+      expect(buttons[0]!.find('.ti-x').exists()).toBe(true);
+      expect(buttons[1]!.find('.ti-minus').exists()).toBe(true);
+      await w.get('[data-testid="exit-player-fullscreen"]').trigger('click');
+      expect(exit).toHaveBeenCalledOnce();
+      expect(w.find('[data-testid="exit-player-fullscreen"]').exists()).toBe(false);
+      expect(storeState.close).not.toHaveBeenCalled();
+      expect(storeState.minimize).not.toHaveBeenCalled();
+      expect(storeState.togglePlay).not.toHaveBeenCalled();
+      setFullscreen(w.get('.media-window').element);
+      await w.vm.$nextTick();
+      expect(w.find('[data-testid="exit-player-fullscreen"]').exists()).toBe(true);
+    } finally {
+      setFullscreen(null);
+      w.unmount();
+    }
+  });
 	it("mudar modo no pill chama switchMode", async () => {
 		const w = await mountView();
 		const pill = w.findComponent({ name: "MediaPlayerPill" });

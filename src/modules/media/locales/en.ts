@@ -1,5 +1,6 @@
 export default {
   media: {
+    exitFullscreen: 'Exit full screen',
     publishRules: {
       title: 'Community rules',
       visibleToAll: 'Public collections appear to the whole PIANO network.',

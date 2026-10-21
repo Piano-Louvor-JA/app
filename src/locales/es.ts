@@ -12,6 +12,8 @@ export default {
     retrying: 'Intentando reconectar...',
   },
   projection: {
+    minimizeProjection: 'Minimizar proyección',
+    restoreProjection: 'Restaurar proyección',
     confirmClose: 'La proyección está en curso. Cerrar esta ventana detiene la música. ¿Realmente desea salir?',
   },
   app: {
