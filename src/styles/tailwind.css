@@ -1,3 +1,4 @@
 @import "tailwindcss";
 @import "@fontsource-variable/plus-jakarta-sans/wght.css";
 @import "./base.css";
+@import "./controls.css";

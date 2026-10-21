@@ -7,6 +7,12 @@ export const etherealLumens = {
   mode: 'dark',
   description: 'Tema escuro para projeção e baixa luminosidade',
   cssVars: {
+    '--ds-color-success': '#7BD5A4',
+    '--ds-color-warning': '#EBC264',
+    '--ds-color-danger': '#FF9DA8',
+    '--ds-color-error': '#FF9DA8',
+    '--ds-color-info': '#81BAFF',
+
     '--ds-color-primary': colors.primary,
     '--ds-color-primary-soft': colors.primarySoft,
     '--ds-color-secondary': colors.secondary,

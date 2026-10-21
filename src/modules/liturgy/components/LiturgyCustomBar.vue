@@ -16,18 +16,11 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
-function onWheel(event: WheelEvent) {
-  const target = event.currentTarget as HTMLElement
-  if (event.deltaY !== 0) {
-    target.scrollLeft += event.deltaY
-  }
-}
 </script>
 
 <template>
   <div
     class="liturgy-custom-bar"
-    @wheel.prevent="onWheel"
   >
     <p
       v-if="liturgies.length === 0"
@@ -77,9 +70,11 @@ function onWheel(event: WheelEvent) {
 <style scoped lang="scss">
 .liturgy-custom-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
-  overflow-x: auto;
+  max-height: 8rem;
+  overflow-y: auto;
   padding: 0.75rem 0;
   scrollbar-width: thin;
 }
@@ -105,6 +100,8 @@ function onWheel(event: WheelEvent) {
   font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   transition:
     background-color 180ms ease,
     border-color 180ms ease;

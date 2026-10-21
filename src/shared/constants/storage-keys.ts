@@ -43,6 +43,8 @@ export const USER_PREFERENCE_KEYS = {
   clockChromePosition: 'clock.chromePosition',
   /** Posição (left/top em px) da prévia flutuante do Sorteio; ausente = canto padrão. */
   randomChromePosition: 'random.chromePosition',
+  musicLanguage: 'content.musicLanguage',
+  bibleLanguage: 'content.bibleLanguage',
   /** Prefixo das personalizações do Palco por escopo (stage.settings.global|hymns|bible|...). */
   stageSettingsPrefix: 'stage.settings.',
 } as const

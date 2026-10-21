@@ -7,6 +7,12 @@ export const luminousClarity = {
   mode: 'light',
   description: 'Tema claro e suave (sem branco puro)',
   cssVars: {
+    '--ds-color-success': '#207446',
+    '--ds-color-warning': '#8B5A08',
+    '--ds-color-danger': '#B72B43',
+    '--ds-color-error': '#B72B43',
+    '--ds-color-info': '#245BC3',
+
     '--ds-color-primary': colors.primary,
     '--ds-color-primary-soft': '#0061a4',
     '--ds-color-secondary': '#008f8b',

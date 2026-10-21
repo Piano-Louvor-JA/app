@@ -39,7 +39,7 @@ const emit = defineEmits<{
         <div class="app-confirm__actions">
           <button
             type="button"
-            class="app-confirm__btn"
+            class="app-confirm__btn ds-control"
             @click="emit('cancel')"
           >
             {{ cancelLabel }}
@@ -49,7 +49,8 @@ const emit = defineEmits<{
                AUDITORIA-COVERAGE.md) -->
           <button
             type="button"
-            class="app-confirm__btn app-confirm__btn--primary"
+            class="app-confirm__btn app-confirm__btn--primary ds-control"
+            :data-tone="danger ? 'danger' : 'primary'"
             :class="{ 'app-confirm__btn--danger': danger }"
             @click="emit('confirm')"
           >
@@ -83,9 +84,9 @@ const emit = defineEmits<{
   z-index: 1;
   width: min(32rem, calc(100% - 2rem));
   padding: 1.25rem 1.25rem 1rem;
-  border: 1px solid rgb(255 255 255 / 0.12);
-  border-radius: 1rem 0 1rem 0;
-  background: #2a2a2a;
+  border: 1px solid var(--ds-color-outline-strong);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-color-surface-card);
   box-shadow: 0 18px 50px rgb(0 0 0 / 0.5);
 }
 
@@ -93,47 +94,22 @@ const emit = defineEmits<{
   margin: 0 0 0.5rem;
   font-size: 1rem;
   font-weight: 500;
-  color: #fff;
+  color: var(--ds-color-on-surface);
 }
 
 .app-confirm__message {
   margin: 0 0 1.15rem;
   font-size: 0.9rem;
   line-height: 1.5;
-  color: rgb(255 255 255 / 0.78);
+  color: var(--ds-color-on-surface-variant);
 }
 
 .app-confirm__actions {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 10px;
   justify-content: flex-end;
 }
 
-.app-confirm__btn {
-  border: none;
-  border-radius: 999px;
-  padding: 0.45rem 1.1rem;
-  font-size: 0.85rem;
-  font-weight: 600;
-  white-space: nowrap;
-  color: #1a1a1a;
-  background: color-mix(in srgb, #a0a0a0 55%, #2a2a2a);
-  cursor: pointer;
-  transition: filter 0.15s ease;
-}
-
-.app-confirm__btn:hover {
-  filter: brightness(1.12);
-}
-
-.app-confirm__btn--primary {
-  background: var(--ds-color-primary, #2196f3);
-  color: #fff;
-}
-
-.app-confirm__btn--danger {
-  background: color-mix(in srgb, #e57373 75%, #4a2a2a);
-  color: #1a1a1a;
-}
+.app-confirm__btn { white-space: normal; }
 </style>

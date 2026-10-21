@@ -70,15 +70,13 @@ describe('LiturgyCustomBar', () => {
     w.unmount()
   })
 
-  it('wheel horizontal rola o container', async () => {
+  it('preserva a rolagem vertical ao passar sobre os programas', () => {
     const w = mountBar()
     const bar = w.find('.liturgy-custom-bar').element as HTMLElement
-    Object.defineProperty(bar, 'scrollLeft', { value: 0, writable: true })
-    await w.find('.liturgy-custom-bar').trigger('wheel', { deltaY: 60 })
-    expect(bar.scrollLeft).toBe(60)
-    // wheel vertical (deltaY 0) não rola
-    await w.find('.liturgy-custom-bar').trigger('wheel', { deltaY: 0 })
-    expect(bar.scrollLeft).toBe(60)
+    const event = new WheelEvent('wheel', { deltaY: 60, bubbles: true, cancelable: true })
+    bar.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(false)
+    expect(bar.scrollLeft).toBe(0)
     w.unmount()
   })
 })

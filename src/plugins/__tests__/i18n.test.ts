@@ -24,12 +24,12 @@ describe('i18n message merge', () => {
 
 describe('SUPPORTED_LOCALES', () => {
   it('contem pt-BR, en e es', () => {
-    expect(SUPPORTED_LOCALES).toEqual(['pt-BR', 'en', 'es'])
+    expect(SUPPORTED_LOCALES).toEqual(['pt-BR', 'en', 'es', 'fr'])
   })
 })
 
 describe('DEFAULT_LOCALE', () => {
-  it('e pt-BR', () => {
+  it('preserva pt-BR como idioma padrão da base oficial', () => {
     expect(DEFAULT_LOCALE).toBe('pt-BR')
   })
 })
@@ -60,7 +60,7 @@ describe('detectInitialLocale', () => {
   })
 
   it('retorna pt-BR (fallback) quando preferencia e idioma nao suportado', () => {
-    vi.mocked(getUserPreference).mockReturnValue('fr-FR')
+    vi.mocked(getUserPreference).mockReturnValue('de')
     expect(detectInitialLocale()).toBe('pt-BR')
   })
 

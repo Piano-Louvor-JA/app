@@ -49,10 +49,11 @@ const i18n = createI18n({
   locale: "pt-BR",
   messages: {
     "pt-BR": {
+      visualIdentity: { title: "Um visual para o seu culto", subtitle: "Preferências salvas automaticamente" },
       settings: {
         appearance: {
-          experienceTitle: "Personalize sua experiência",
-          experienceSubtitle: "Ajuste tema, cores e interações",
+          experienceTitle: "Um visual para o seu culto",
+          experienceSubtitle: "Preferências salvas automaticamente",
         },
       },
     },
@@ -80,24 +81,20 @@ describe("AppearanceView", () => {
   it("renderiza hero com título e subtítulo", () => {
     const wrapper = mountView();
     expect(wrapper.find(".appearance-experience__title").text()).toBe(
-      "Personalize sua experiência",
+      "Um visual para o seu culto",
     );
     expect(wrapper.find(".appearance-experience__subtitle").text()).toBe(
-      "Ajuste tema, cores e interações",
+      "Preferências salvas automaticamente",
     );
   });
 
-  it("layout com 3 colunas: interações à esquerda, tema no centro, accent à direita", () => {
+  it("apresenta modos, paleta e prévia de estados", () => {
     const wrapper = mountView();
-    const left = wrapper.find(".appearance-experience__col--left");
-    const center = wrapper.find(".appearance-experience__center");
-    const right = wrapper.find(".appearance-experience__col--right");
-    expect(left.exists()).toBe(true);
-    expect(center.exists()).toBe(true);
-    expect(right.exists()).toBe(true);
-    expect(left.html()).toContain("stub-imc");
-    expect(center.html()).toContain("stub-tos");
-    expect(right.html()).toContain("stub-acc");
+    expect(wrapper.findAll('.appearance-modes button')).toHaveLength(3);
+    expect(wrapper.find('.appearance-experience__controls .stub-acc').exists()).toBe(true);
+    expect(wrapper.find('.appearance-preview').exists()).toBe(true);
+    expect(wrapper.findAll('.appearance-states span')).toHaveLength(4);
+    wrapper.unmount();
   });
 
   it("SHOW_LYRIC_CUSTOMIZATION=false: seção de letra não renderiza", () => {

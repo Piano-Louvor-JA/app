@@ -1,4 +1,6 @@
 import { computed, ref, watchEffect } from 'vue'
+import { resolveAccentColors } from '../themes/accents'
+import { resolveInterfaceTokens } from '../tokens/interface'
 
 import {
   blur as blurTokens,
@@ -27,15 +29,15 @@ import {
 } from '@shared/services/user-preferences'
 
 function isThemeKey(value: unknown): value is ThemeKey {
-  return typeof value === 'string' && value in themes
+  return typeof value === 'string' && Object.hasOwn(themes, value)
 }
 
 function isAccentKey(value: unknown): value is AccentKey {
-  return typeof value === 'string' && value in accents
+  return typeof value === 'string' && Object.hasOwn(accents, value)
 }
 
 function isInteractionKey(value: unknown): value is InteractionKey {
-  return typeof value === 'string' && value in interactions
+  return typeof value === 'string' && Object.hasOwn(interactions, value)
 }
 
 function readStoredTheme(): ThemeKey {
@@ -85,7 +87,7 @@ function persistAppearance() {
 
 function applyCssVars(target: HTMLElement = document.documentElement) {
   const theme = themes[themeKey.value]
-  const accent = accents[accentKey.value]
+  const accent = resolveAccentColors(accentKey.value, theme.mode)
   const interaction = interactions[interactionKey.value]
   const intensity = glassIntensity.value
 
@@ -101,8 +103,12 @@ function applyCssVars(target: HTMLElement = document.documentElement) {
   target.style.setProperty('--ds-color-primary', accent.primary)
   target.style.setProperty(
     '--ds-color-primary-soft',
-    theme.mode === 'light' ? accent.primary : accent.soft,
+    accent.soft,
   )
+  target.style.setProperty('--ds-color-on-primary', accent.onPrimary)
+  Object.entries(resolveInterfaceTokens(theme.mode, accentKey.value)).forEach(([key, value]) => {
+    target.style.setProperty(key, value)
+  })
   target.style.setProperty('--ds-blur-active', blurPxFromIntensity(intensity))
   target.style.setProperty('--ds-glass-fill', glassFillFromIntensity(intensity))
   target.style.setProperty('--ds-motion-duration', interaction.duration)
@@ -110,7 +116,7 @@ function applyCssVars(target: HTMLElement = document.documentElement) {
 
   target.dataset.theme = theme.id
   target.dataset.mode = theme.mode
-  target.dataset.accent = accent.id
+  target.dataset.accent = accentKey.value
   target.dataset.motion = interaction.id
   target.dataset.glass = String(intensity)
 }
@@ -171,6 +177,7 @@ export function useThemeManager() {
   const currentInteraction = computed(() => interactions[interactionKey.value])
 
   function setTheme(key: ThemeKey) {
+    if (!isThemeKey(key)) return
     if (autoBrightness.value) {
       autoBrightness.value = false
       stopAutoBrightnessListener()

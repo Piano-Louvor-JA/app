@@ -64,6 +64,18 @@ function createWrapper() {
 }
 
 describe('RemotePairingView', () => {
+  it('oferece QR do navegador e mantém a alternativa do aplicativo móvel', async () => {
+    mocks.getDesktopBridge.mockReturnValue(makeBridge({ pairingInfo: vi.fn(async () => ({
+      host: '192.168.0.10', port: 7071, token: 'TOKEN', connectUrl: 'louvorja://connect', qrDataUrl: 'data:image/png;base64,APP',
+      webUrl: 'http://192.168.0.10:7071/control#token=TOKEN', webQrDataUrl: 'data:image/png;base64,WEB', clientCount: 0,
+    })) }))
+    const wrapper = createWrapper()
+    await flushPromises()
+    expect(wrapper.find('[data-testid="remote-qr"]').attributes('src')).toContain('WEB')
+    await wrapper.find('.pairing-modes button:last-child').trigger('click')
+    expect(wrapper.find('[data-testid="remote-qr"]').attributes('src')).toContain('APP')
+    wrapper.unmount()
+  })
   beforeEach(() => {
     vi.clearAllMocks()
   })

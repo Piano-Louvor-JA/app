@@ -26,6 +26,14 @@ function createWrapper(props: Record<string, unknown> = {}) {
 }
 
 describe('LiturgySidebar', () => {
+  it('identifica o contador como tempo restante, sem confundir com horário de término', () => {
+    const wrapper = createWrapper({ remainingCountdown: '03:21' })
+    const countdown = wrapper.find('.liturgy-sidebar__mono--countdown')
+    expect(countdown.element.parentElement?.textContent).toContain('Tempo restante')
+    expect(countdown.text()).toBe('03:21')
+    wrapper.unmount()
+  })
+
   it('renderiza o aside', () => {
     const wrapper = createWrapper()
     expect(wrapper.find('.liturgy-sidebar').exists()).toBe(true)

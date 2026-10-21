@@ -36,10 +36,10 @@ afterEach(() => {
 });
 
 describe("listSystemDisplays", () => {
-	it("fora do desktop → preview estático", async () => {
+	it("fora do desktop → não inventa telas físicas", async () => {
 		const displays = await listSystemDisplays();
-		expect(displays).toHaveLength(3);
-		expect(displays[0]?.isPrimary).toBe(true);
+		expect(displays).toHaveLength(0);
+		expect(displays[0]).toBeUndefined();
 	});
 
 	it("desktop sem bridge.displays.list → []", async () => {

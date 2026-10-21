@@ -2,12 +2,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp, defineComponent, h, ref, type Ref } from "vue";
 import { createPinia, setActivePinia } from "pinia";
+import { TEST_DISPLAYS } from "../../services/__tests__/display-fixture";
+import * as displayService from "../../services/display-service";
 
 /**
  * useMonitorArrangement — canvas de arranjo físico de monitores com drag.
  * Store real (100% coberta) + jsdom p/ pointer events e ResizeObserver stub.
- * desktop-bridge mockado: isDesktopApp=false → display-service usa os 3
- * PREVIEW_DISPLAYS (id 1, 2, 3) via refreshDisplays real da store.
+ * Hardware simulado explicitamente no teste; o browser não inventa monitores.
  */
 const bridgeMocks = vi.hoisted(() => ({
   isDesktopApp: vi.fn(() => false),
@@ -110,6 +111,7 @@ describe("useMonitorArrangement", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
+    vi.spyOn(displayService, "listSystemDisplays").mockResolvedValue(structuredClone(TEST_DISPLAYS));
   });
 
   it("sem displays: tiles vazio, draggingId null, hasCustomArrangement false", () => {
@@ -119,7 +121,7 @@ describe("useMonitorArrangement", () => {
     expect(result.hasCustomArrangement.value).toBe(false);
   });
 
-  it("com displays (preview x3): tiles derivados do layout; drag+commit move tile", async () => {
+  it("com três monitores simulados: tiles derivados do layout; drag+commit move tile", async () => {
     const result = withSetup((stage) => useMonitorArrangement(stage));
     // store do MESMO pinia do withSetup (setActivePinia dentro dele)
     const store = useProjectionStore();

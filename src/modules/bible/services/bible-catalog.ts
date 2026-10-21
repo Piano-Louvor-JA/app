@@ -1,3 +1,4 @@
+import { bundledBibleVersions, isBundledBible, loadBundledBible } from './bundled-bibles'
 import { getDesktopBridge } from '@shared/services/desktop-bridge'
 import { fetchRemoteCatalogJson } from '@shared/services/remote-catalog'
 import { readCatalogRecord, writeCatalogRecord } from '@shared/services/workspace-api'
@@ -32,11 +33,11 @@ const VERSIONS_FILE_BY_PREFIX: Record<string, string> = {
  * Import dinâmico: resolveBookTone e os demais helpers não devem carregar o
  * i18n só porque o módulo foi importado.
  */
-async function bibleCatalogFile(kind: 'book' | 'version'): Promise<string> {
+async function bibleCatalogFile(kind: 'book' | 'version', language?: string): Promise<string> {
   const { getCurrentApiPrefix } = await import(
     '@modules/sync/services/library-catalog'
   )
-  const prefix = getCurrentApiPrefix()
+  const prefix = language ?? getCurrentApiPrefix()
   if (kind === 'book') return BOOKS_FILE_BY_PREFIX[prefix] ?? 'pt_bible_book'
   return VERSIONS_FILE_BY_PREFIX[prefix] ?? 'pt_bible_version'
 }
@@ -149,17 +150,21 @@ export function chapterRecordKey(
   return `bible_${versionId}_${bookId}_${chapter}`
 }
 
-export async function loadBibleBooks(): Promise<BibleBook[]> {
+export async function loadBibleBooks(language?: string, versionId?: number): Promise<BibleBook[]> {
+  language ??= (await import('@modules/sync/services/library-catalog')).getCurrentApiPrefix()
+  if (language === 'fr') return (await loadBundledBible(versionId)).books
   const rows = await readOrFetchCatalog<CatalogBibleBookRow[]>(
-    await bibleCatalogFile('book'),
+    await bibleCatalogFile('book', language),
   )
   if (!rows || !Array.isArray(rows)) return []
   return rows.map(mapBook)
 }
 
-export async function loadBibleVersions(): Promise<BibleVersion[]> {
+export async function loadBibleVersions(language?: string): Promise<BibleVersion[]> {
+  language ??= (await import('@modules/sync/services/library-catalog')).getCurrentApiPrefix()
+  if (language === 'fr') return bundledBibleVersions
   const rows = await readOrFetchCatalog<CatalogBibleVersionRow[]>(
-    await bibleCatalogFile('version'),
+    await bibleCatalogFile('version', language),
   )
   if (!rows || !Array.isArray(rows)) return []
   return rows.map(mapVersion)
@@ -200,6 +205,9 @@ export async function loadChapterVerses(
   bookId: number,
   chapter: number,
 ): Promise<BibleChapterVerses> {
+  if (isBundledBible(versionId)) {
+    return (await loadBundledBible(versionId)).chapters[`${bookId}:${chapter}`] ?? {}
+  }
   const bundled = await readBundledChapter(versionId, bookId, chapter)
   if (bundled) return bundled
 

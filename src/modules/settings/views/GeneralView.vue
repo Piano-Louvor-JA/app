@@ -32,6 +32,7 @@ import LegacyMediaImportCard from '../components/LegacyMediaImportCard.vue'
 import MediaFolderCard from '../components/MediaFolderCard.vue'
 import AppBackupCard from '../components/AppBackupCard.vue'
 import DiagnosticsCard from '../components/DiagnosticsCard.vue'
+import { saveApplicationLanguage } from '@shared/services/application-language'
 import { ensureCatalogForLocale } from '@modules/starting/services/catalog-locale-service'
 
 const { t, locale } = useI18n()
@@ -170,6 +171,7 @@ const {
 } = useUpdateChecker()
 
 const SUPPORTED_LOCALES = [
+  { value: 'fr', labelKey: 'settings.general.languageFrench' },
   { value: 'pt-BR', labelKey: 'settings.general.languagePortuguese' },
   { value: 'es', labelKey: 'settings.general.languageSpanish' },
 ] as const
@@ -193,10 +195,13 @@ async function changeLanguage(lang: string) {
     if (lang === currentLanguage.value) return
     catalogSyncState.value = 'syncing'
     catalogSyncProgress.value = 0
-    await ensureCatalogForLocale(lang, (progress) => {
-      catalogSyncProgress.value = progress
-    })
-    setUserPreference(USER_PREFERENCE_KEYS.language, lang)
+    // French uses the bundled editions; there is no remote French hymn catalog.
+    if (lang !== 'fr') {
+      await ensureCatalogForLocale(lang, (progress) => {
+        catalogSyncProgress.value = progress
+      })
+    }
+    saveApplicationLanguage(lang)
     currentLanguage.value = lang
     locale.value = lang
     // D1: reload controlado do renderer (precedente runFirstBoot) — zera as
@@ -326,6 +331,7 @@ async function clearAllLocalData() {
           type="button"
           class="general-settings__lang-btn"
           :class="{ 'general-settings__lang-btn--active': currentLanguage === lang.value }"
+          :aria-pressed="currentLanguage === lang.value"
           :disabled="catalogSyncState === 'syncing'"
           @click="changeLanguage(lang.value)"
         >

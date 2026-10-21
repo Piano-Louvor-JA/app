@@ -26,6 +26,9 @@ Object.defineProperty(globalThis, 'localStorage', { value: lsStub, configurable:
 type SysDisplay = { id: number; bounds: { x: number; y: number; width: number; height: number }; workArea: { x: number; y: number; width: number; height: number }; scaleFactor: number; isPrimary: boolean }
 const mockDisplays = { value: [] as SysDisplay[] }
 const mockSettings = { value: { monitorArrangement: [] as unknown[] } }
+const desktopMock = vi.hoisted(() => vi.fn(() => false))
+vi.mock('@shared/services/desktop-bridge', () => ({ isDesktopApp: desktopMock }))
+const refreshDisplaysMock = vi.fn().mockResolvedValue(undefined)
 const identifyMonitorsMock = vi.fn().mockResolvedValue(undefined)
 const resetMonitorArrangementMock = vi.fn(() => {
   mockSettings.value = { monitorArrangement: [] }
@@ -42,6 +45,7 @@ vi.mock('../../composables/useProjectionSettings', async () => {
       isLoadingDisplays: ref(false),
       isIdentifying: ref(false),
       identifyMonitors: identifyMonitorsMock,
+      refreshDisplays: refreshDisplaysMock,
       hasCustomArrangement: {
         get value() { return mockSettings.value.monitorArrangement.length > 0 },
       },
@@ -63,12 +67,27 @@ describe('MonitorArrangementCard', () => {
   let active: ReturnType<typeof mount> | null = null
   beforeEach(() => {
     vi.clearAllMocks()
+    desktopMock.mockReturnValue(false)
     mockDisplays.value = []
     mockSettings.value = { monitorArrangement: [] }
   })
   afterEach(() => {
     active?.unmount()
     active = null
+  })
+
+  it('detecta novamente no desktop e mostra o acompanhamento automático', async () => {
+    desktopMock.mockReturnValue(true)
+    active = await mountCard()
+    expect(active.text()).toContain('screenDetection.automatic')
+    await active.find('.monitor-arrangement__detect').trigger('click')
+    expect(refreshDisplaysMock).toHaveBeenCalledOnce()
+  })
+
+  it('explica e desabilita a detecção física no navegador', async () => {
+    active = await mountCard()
+    expect(active.text()).toContain('screenDetection.desktopOnly')
+    expect(active.find('.monitor-arrangement__detect').attributes('disabled')).toBeDefined()
   })
 
   it('sem monitores: mostra estado vazio e identify desabilitado', async () => {

@@ -290,8 +290,8 @@ describe('LiturgyTimelineItem — cobertura extra', () => {
       const wrapper = createWrapper()
       const label = wrapper.find('.liturgy-item__check')
       expect(label.attributes('title')).toBe('Marcar como concluído')
-      expect(wrapper.find('.ti-check').exists()).toBe(false)
-      expect(wrapper.find('.ti-minus').exists()).toBe(false)
+      expect(wrapper.find('[data-icon="check"]').exists()).toBe(false)
+      expect(wrapper.find('[data-icon="minus"]').exists()).toBe(false)
     })
 
     it('checkbox done: title "Marcar como pendente" com ti-check', () => {
@@ -299,14 +299,14 @@ describe('LiturgyTimelineItem — cobertura extra', () => {
       const label = wrapper.find('.liturgy-item__check')
       expect(label.attributes('title')).toBe('Marcar como pendente')
       expect(label.classes()).toContain('liturgy-item__check--done')
-      expect(wrapper.find('.liturgy-item__check .ti-check').exists()).toBe(true)
+      expect(wrapper.find('.liturgy-item__check [data-icon="check"]').exists()).toBe(true)
     })
 
     it('checkbox indeterminate: ti-minus e prop indeterminate no input', () => {
       const wrapper = createWrapper({ indeterminate: true })
       const label = wrapper.find('.liturgy-item__check')
       expect(label.classes()).toContain('liturgy-item__check--indeterminate')
-      expect(wrapper.find('.liturgy-item__check .ti-minus').exists()).toBe(true)
+      expect(wrapper.find('.liturgy-item__check [data-icon="minus"]').exists()).toBe(true)
       const input = wrapper.find('input[type="checkbox"]').element as HTMLInputElement
       expect(input.indeterminate).toBe(true)
     })

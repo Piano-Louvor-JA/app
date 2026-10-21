@@ -43,6 +43,9 @@ export function getCurrentApiPrefix(customLocale?: string): string {
     const stored = localStorage.getItem('user_data')
     if (stored) {
       const prefs = JSON.parse(stored)
+      if (['pt', 'es', 'fr'].includes(prefs['content.musicLanguage'])) {
+        return prefs['content.musicLanguage']
+      }
       if (typeof prefs.language === 'string') {
         return localeToApiPrefix(prefs.language)
       }

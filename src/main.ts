@@ -5,6 +5,7 @@ import App from './App.vue'
 import '@styles/tailwind.css'
 import vuetify from '@plugins/vuetify'
 import i18n from '@plugins/i18n'
+import { saveApplicationLanguage } from '@shared/services/application-language'
 import router from '@/router'
 import { useThemeManager } from '@design-system/composables'
 import { initUiZoom } from '@shared/composables/useUiZoom'
@@ -13,6 +14,7 @@ import { installRemoteLiturgyBridge } from '@modules/remote/renderer/liturgy-bri
 import { installNavigationHistory } from '@shared/composables/useNavigationHistory'
 import { startRendererTelemetry } from '@shared/services/telemetry'
 
+saveApplicationLanguage(i18n.global.locale.value)
 installClientPlatformHeader()
 useThemeManager()
 initUiZoom()

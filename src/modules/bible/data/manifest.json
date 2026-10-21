@@ -1,0 +1,32 @@
+[
+  {
+    "id": 1000001,
+    "name": "Louis Segond 1910",
+    "abbreviation": "LSG",
+    "languageId": "fr",
+    "source": "https://ebible.org/details.php?id=fraLSG",
+    "download": "https://ebible.org/Scriptures/fraLSG_vpl.zip",
+    "license": "Public Domain (as declared by source)",
+    "archiveSha256": "62004857a68a76ef912e2e8f169c7322d04e6e4281f1a8267813635d3942d441",
+    "dataSha256": "3fd880f5ccde4427f7afad12b263a2d408508cc1df6c3645478708986f09187f",
+    "books": 66,
+    "chapters": 1189,
+    "verseRecords": 31170,
+    "emptyVerseRecords": 0
+  },
+  {
+    "id": 1000002,
+    "name": "J. N. Darby — édition BPC 2024",
+    "abbreviation": "JND",
+    "languageId": "fr",
+    "source": "https://ebible.org/details.php?id=frajnd",
+    "download": "https://ebible.org/Scriptures/frajnd_vpl.zip",
+    "license": "Public Domain (as declared by source)",
+    "archiveSha256": "287f3d51f75ce2d79c11ad145d77704516d67eb5be4dfff38f8ddb217df5e977",
+    "dataSha256": "21bb6fc9bec73a53d5aba6d82c756fb0ad5a1ae3e54ae3cf9ce751c6e6caf1c9",
+    "books": 66,
+    "chapters": 1189,
+    "verseRecords": 31170,
+    "emptyVerseRecords": 3
+  }
+]

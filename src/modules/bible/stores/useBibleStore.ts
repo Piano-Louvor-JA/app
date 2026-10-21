@@ -23,6 +23,7 @@ import {
   resolveTestament,
 } from '../services/bible-catalog'
 import { publishBibleSelection, publishBibleRuntimeOff } from '../services/bible-runtime'
+import { parseBibleReference } from '../services/bible-reference'
 import {
   buildProjectionText,
   emptySelection,
@@ -38,6 +39,11 @@ import type {
 } from '../types/bible'
 
 export const useBibleStore = defineStore('bible', () => {
+  const applicationLanguage = getUserPreference<string>(USER_PREFERENCE_KEYS.language, 'pt-BR')
+  const defaultContentLanguage = applicationLanguage === 'fr' || applicationLanguage === 'es' ? applicationLanguage : 'pt'
+  const savedLanguage = getUserPreference<string>(USER_PREFERENCE_KEYS.bibleLanguage, defaultContentLanguage)
+  const contentLanguage = ref(['pt', 'fr', 'es'].includes(savedLanguage ?? '') ? savedLanguage! : defaultContentLanguage)
+
   const books = ref<BibleBook[]>([])
   const versions = ref<BibleVersion[]>([])
   const verses = ref<BibleChapterVerses>({})
@@ -298,13 +304,15 @@ export const useBibleStore = defineStore('bible', () => {
   }
 
   async function bootstrap() {
+    const saved = getUserPreference<string>(USER_PREFERENCE_KEYS.bibleLanguage, contentLanguage.value)
+    if (saved && ['pt', 'fr', 'es'].includes(saved)) contentLanguage.value = saved
     isLoadingMeta.value = true
     clearError()
 
     try {
       const [loadedBooks, loadedVersions] = await Promise.all([
-        loadBibleBooks(),
-        loadBibleVersions(),
+        loadBibleBooks(contentLanguage.value),
+        loadBibleVersions(contentLanguage.value),
       ])
 
       books.value = loadedBooks
@@ -329,7 +337,8 @@ export const useBibleStore = defineStore('bible', () => {
         const versionId = pickDefaultVersionId(loadedVersions, saved)
         selectedVersionId.value = versionId
 
-        const firstBook = loadedBooks[0]
+        if (contentLanguage.value === 'fr' && versionId != null) books.value = await loadBibleBooks('fr', versionId)
+        const firstBook = books.value[0]
         selectedBookId.value = firstBook.id
         testamentFilter.value = resolveTestament(firstBook.bookNumber)
         selectedChapter.value = 1
@@ -355,8 +364,25 @@ export const useBibleStore = defineStore('bible', () => {
     }
   }
 
+  async function changeContentLanguage(language: string) {
+    if (!['pt', 'fr', 'es'].includes(language) || isLoadingMeta.value || isLoadingVerses.value) return
+    clearProjectionWindow()
+    contentLanguage.value = language
+    setUserPreference(USER_PREFERENCE_KEYS.bibleLanguage, language)
+    globalSearchQuery.value = ''
+    bookSearchQuery.value = ''
+    verseSearchQuery.value = ''
+    verses.value = {}
+    await bootstrap()
+  }
+
   async function selectVersion(versionId: number) {
     if (selectedVersionId.value === versionId) return
+    if (contentLanguage.value === 'fr') {
+      books.value = await loadBibleBooks('fr', versionId)
+      const book = books.value.find(item => item.id === selectedBookId.value)
+      selectedChapter.value = Math.min(selectedChapter.value, book?.chapters ?? 1)
+    }
     selectedVersionId.value = versionId
     setUserPreference(USER_PREFERENCE_KEYS.bibleSelectedVersion, versionId)
     selectedVerses.value = []
@@ -395,6 +421,21 @@ export const useBibleStore = defineStore('bible', () => {
     lastVerseAnchor.value = 1
     syncProjection()
     await refreshChapter()
+  }
+
+  async function openReference(query: string): Promise<boolean> {
+    const reference = parseBibleReference(query, books.value)
+    if (!reference || selectedVersionId.value == null) return false
+    const chapterVerses = await loadChapterVerses(selectedVersionId.value, reference.bookId, reference.chapter)
+    if (!Object.keys(chapterVerses).length || reference.verses.some(verse => !Object.hasOwn(chapterVerses, String(verse)))) return false
+    await selectBook(reference.bookId)
+    await selectChapter(reference.chapter)
+    selectedVerses.value = reference.verses.filter(verse => Boolean(chapterVerses[String(verse)]))
+    lastVerseAnchor.value = reference.verses[0] ?? 1
+    globalSearchQuery.value = ''
+    verseSearchQuery.value = ''
+    syncProjection()
+    return true
   }
 
   function selectVerse(verseNumber: number, event?: MouseEvent) {
@@ -511,6 +552,8 @@ export const useBibleStore = defineStore('bible', () => {
   }
 
   return {
+    contentLanguage,
+    changeContentLanguage,
     books,
     versions,
     verses,
@@ -543,6 +586,7 @@ export const useBibleStore = defineStore('bible', () => {
     selectBook,
     selectChapter,
     selectVerse,
+    openReference,
     applyVerseSearch,
     clearSelection,
     setTestamentFilter,

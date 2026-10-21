@@ -11,11 +11,11 @@ vi.mock("vue-router", () => ({
 }));
 
 vi.mock("vuetify", () => ({
-  useTheme: () => ({ change: vi.fn(async () => {}) }),
+  useTheme: () => ({ themes: ref({ dark: { colors: {} }, light: { colors: {} } }), change: vi.fn(async () => {}) }),
 }));
 
 vi.mock("@design-system/composables", () => ({
-  useThemeManager: () => ({ currentTheme: ref(themeState.theme) }),
+  useThemeManager: () => ({ currentTheme: ref(themeState.theme), accentKey: ref('azure') }),
 }));
 
 vi.mock("@modules/starting/stores/useStartingStore", () => ({

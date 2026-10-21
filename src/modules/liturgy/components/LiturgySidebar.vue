@@ -1,9 +1,13 @@
 <script setup lang="ts">
+import AppIcon from '@design-system/components/AppIcon.vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import type { LiturgyItem } from '../types/liturgy'
 
 import { GlassCard } from '@design-system/index'
 
-defineProps<{
+const props = defineProps<{
+  teamItems?: LiturgyItem[]
   remainingCountdown: string
   countdownExpired: boolean
   countdownRunning: boolean
@@ -25,6 +29,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const assignedItems = computed(() => (props.teamItems ?? []).filter(item => item.type !== 'category' && item.responsible))
 
 function onNotesInput(event: Event) {
   const target = event.target as HTMLTextAreaElement
@@ -66,10 +71,7 @@ function onEndTimeChange(event: Event) {
           :aria-label="t('liturgy.summary.startCountdown')"
           @click="emit('startCountdown')"
         >
-          <i
-            class="ti ti-player-play"
-            aria-hidden="true"
-          />
+          <AppIcon name="player-play" aria-hidden="true" />
         </button>
         <button
           v-else
@@ -79,10 +81,7 @@ function onEndTimeChange(event: Event) {
           :aria-label="t('liturgy.summary.stopCountdown')"
           @click="emit('stopCountdown')"
         >
-          <i
-            class="ti ti-player-stop"
-            aria-hidden="true"
-          />
+          <AppIcon name="player-stop" aria-hidden="true" />
         </button>
       </div>
 
@@ -105,10 +104,7 @@ function onEndTimeChange(event: Event) {
               :aria-label="t('liturgy.summary.clearTime')"
               @click="emit('clearStart')"
             >
-              <i
-                class="ti ti-x"
-                aria-hidden="true"
-              />
+              <AppIcon name="x" aria-hidden="true" />
             </button>
           </dd>
         </div>
@@ -131,16 +127,13 @@ function onEndTimeChange(event: Event) {
               :aria-label="t('liturgy.summary.clearTime')"
               @click="emit('clearEnd')"
             >
-              <i
-                class="ti ti-x"
-                aria-hidden="true"
-              />
+              <AppIcon name="x" aria-hidden="true" />
             </button>
           </dd>
         </div>
 
         <div class="liturgy-sidebar__stat">
-          <dt>{{ t('liturgy.summary.estimatedEnd') }}</dt>
+          <dt>{{ t('liturgy.summary.remainingTime') }}</dt>
           <dd
             class="liturgy-sidebar__mono liturgy-sidebar__mono--countdown"
             :class="{
@@ -162,7 +155,12 @@ function onEndTimeChange(event: Event) {
       <h3 class="liturgy-sidebar__team-title">
         {{ t('liturgy.team.title') }}
       </h3>
-      <p class="liturgy-sidebar__team-empty">
+      <ul v-if="assignedItems.length" class="liturgy-sidebar__team-list">
+        <li v-for="item in assignedItems" :key="item.id">
+          <strong>{{ item.responsible }}</strong><span>{{ item.name }}</span>
+        </li>
+      </ul>
+      <p v-else class="liturgy-sidebar__team-empty">
         {{ t('liturgy.team.empty') }}
       </p>
       <button
@@ -176,10 +174,7 @@ function onEndTimeChange(event: Event) {
 
     <GlassCard class="liturgy-sidebar__note">
       <div class="liturgy-sidebar__note-header">
-        <i
-          class="ti ti-info-circle"
-          aria-hidden="true"
-        />
+        <AppIcon name="info-circle" aria-hidden="true" />
         <h3>{{ t('liturgy.broadcastNote.title') }}</h3>
       </div>
       <textarea
@@ -194,6 +189,9 @@ function onEndTimeChange(event: Event) {
 </template>
 
 <style scoped lang="scss">
+.liturgy-sidebar__team-list { margin: 0; padding: 0; list-style: none; display: grid; gap: .6rem; }
+.liturgy-sidebar__team-list li { display: grid; gap: .15rem; font-size: .8rem; overflow-wrap: anywhere; }
+.liturgy-sidebar__team-list span { color: var(--ds-color-on-surface-variant); }
 .liturgy-sidebar {
   display: flex;
   width: 100%;

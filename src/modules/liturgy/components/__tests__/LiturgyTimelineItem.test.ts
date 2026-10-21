@@ -613,7 +613,7 @@ describe('LiturgyTimelineItem', () => {
 
     it('addSubItem e toggleCollapse (category): botões emitem', async () => {
       const w = createWrapper({ item: createCategory(), collapsible: true })
-      const addBtn = w.findAll('button').find(b => b.find('i.ti-plus').exists() && !b.attributes('disabled'))
+      const addBtn = w.findAll('button').find(b => b.find('[data-icon="plus"]').exists() && !b.attributes('disabled'))
       expect(addBtn).toBeTruthy()
       await addBtn!.trigger('click')
       expect(w.emitted('addSubItem')).toBeTruthy()
@@ -638,7 +638,7 @@ describe('LiturgyTimelineItem', () => {
 
     it('addSubItem (509): botão emite', async () => {
       const w = createWrapper({ item: createCategory(), collapsible: true })
-      const btn = w.findAll('button').find(b => (b.attributes('aria-label') ?? '').length > 0 && !b.attributes('disabled') && b.find('i.ti-plus').exists())
+      const btn = w.findAll('button').find(b => (b.attributes('aria-label') ?? '').length > 0 && !b.attributes('disabled') && b.find('[data-icon="plus"]').exists())
       if (btn) {
         await btn.trigger('click')
         expect(w.emitted('addSubItem')).toBeTruthy()
@@ -721,7 +721,7 @@ describe('LiturgyTimelineItem', () => {
       const w = createWrapper({ item: createCategory(), collapsible: true, collapsed: true, childCount: 2, indeterminate: true })
       expect(w.html()).toContain('ti-chevron-right')
       expect(w.html()).toContain('liturgy-item__child-count')
-      expect(w.html()).toContain('ti-minus')
+      expect(w.html()).toContain('data-icon="minus"')
       w.unmount()
     })
 
@@ -735,7 +735,7 @@ describe('LiturgyTimelineItem', () => {
 
     it('presentation: title/aria de controle de apresentação (676/697 arm0); prayer selecionado: botão control via selected (614 arm5)', async () => {
       const w = createWrapper({ item: createItem({ type: 'presentation', musicId: null }) })
-      expect(w.html()).toContain('ti-file-type-ppt')
+      expect(w.html()).toContain('data-icon="file-type-ppt"')
       w.unmount()
       const w2 = createWrapper({ item: createItem({ type: 'prayer', musicId: null }), selected: true })
       const btn = w2.findAll('button').find(b => b.classes().join(' ').includes('--primary') && !b.attributes('disabled'))

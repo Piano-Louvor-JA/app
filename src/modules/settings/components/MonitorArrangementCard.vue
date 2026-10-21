@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { isDesktopApp } from '@shared/services/desktop-bridge'
 import { useI18n } from 'vue-i18n'
 
 import { GlassCard } from '@design-system/index'
@@ -14,6 +15,7 @@ const {
   isLoadingDisplays,
   isIdentifying,
   identifyMonitors,
+  refreshDisplays,
 } = useProjectionSettings()
 
 const {
@@ -41,6 +43,9 @@ const {
       </div>
 
       <div class="monitor-arrangement__actions">
+        <button type="button" class="monitor-arrangement__detect" :disabled="!isDesktopApp() || isLoadingDisplays" @click="refreshDisplays">
+          <i class="ti ti-refresh" aria-hidden="true" />{{ t('screenDetection.detect') }}
+        </button>
         <!-- v8 ignore start -- texto do botão some do range do v-if p/ remap v8 -->
         <button
           v-if="hasCustomArrangement"
@@ -65,6 +70,7 @@ const {
       </div>
     </div>
 
+    <p class="monitor-arrangement__hint" role="status">{{ isDesktopApp() ? t('screenDetection.automatic') : t('screenDetection.desktopOnly') }}</p>
     <div
       ref="stageRef"
       class="monitor-arrangement__stage"
@@ -186,6 +192,7 @@ const {
   gap: 0.75rem;
 }
 
+.monitor-arrangement__detect,
 .monitor-arrangement__identify,
 .monitor-arrangement__reset {
   display: inline-flex;
@@ -217,6 +224,7 @@ const {
   }
 }
 
+.monitor-arrangement__detect,
 .monitor-arrangement__identify {
   border: 1px solid color-mix(in srgb, var(--ds-color-primary) 28%, transparent);
   background: color-mix(in srgb, var(--ds-color-primary) 12%, transparent);

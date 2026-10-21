@@ -131,10 +131,10 @@ describe('GeneralView.vue', () => {
     expect(wrapper.find('.general-settings__lang-options').exists()).toBe(true)
   })
 
-  it('renderiza 2 botoes de idioma (pt-BR, es) -- EN desabilitado temporariamente', () => {
+  it('renderiza os três idiomas principais', () => {
     const wrapper = mountComponent()
     const buttons = wrapper.findAll('.general-settings__lang-btn')
-    expect(buttons).toHaveLength(2)
+    expect(buttons).toHaveLength(3)
   })
 
   it('marca o botao pt-BR como ativo por padrao', () => {
@@ -145,14 +145,14 @@ describe('GeneralView.vue', () => {
 
   it('chama setUserPreference ao clicar num botao de idioma', async () => {
     const wrapper = mountComponent()
-    const esBtn = wrapper.findAll('.general-settings__lang-btn')[1]
+    const esBtn = wrapper.findAll('.general-settings__lang-btn').find(button => button.text() === 'settings.general.languageSpanish')!
     await esBtn.trigger('click')
     expect(setUserPreference).toHaveBeenCalledWith('language', 'es')
   })
 
   it('troca locale.value ao clicar num botao de idioma', async () => {
     const wrapper = mountComponent()
-    const esBtn = wrapper.findAll('.general-settings__lang-btn')[1]
+    const esBtn = wrapper.findAll('.general-settings__lang-btn').find(button => button.text() === 'settings.general.languageSpanish')!
     await esBtn.trigger('click')
     expect(mockLocale.value).toBe('es')
   })
@@ -163,7 +163,7 @@ describe('GeneralView.vue', () => {
   // preferência; persistir antes = early-return = download nunca roda.
   it('RED RAIZ-1: baixa catalogo ANTES de persistir o idioma', async () => {
     const wrapper = mountComponent()
-    const esBtn = wrapper.findAll('.general-settings__lang-btn')[1]
+    const esBtn = wrapper.findAll('.general-settings__lang-btn').find(button => button.text() === 'settings.general.languageSpanish')!
     await esBtn.trigger('click')
     expect(ensureCatalogForLocale).toHaveBeenCalledWith('es', expect.any(Function))
     expect(setUserPreference).toHaveBeenCalledWith('language', 'es')
@@ -182,7 +182,7 @@ describe('GeneralView.vue', () => {
     const wrapper = mountComponent()
     expect(wrapper.find('[data-testid="language-sync-progress"]').exists()).toBe(false)
 
-    await wrapper.findAll('.general-settings__lang-btn')[1].trigger('click')
+    await wrapper.findAll('.general-settings__lang-btn').find(button => button.text() === 'settings.general.languageSpanish')!.trigger('click')
     const bar = wrapper.find('[data-testid="language-sync-progress"]')
     expect(bar.exists()).toBe(true)
     expect(bar.attributes('role')).toBe('progressbar')
@@ -199,10 +199,21 @@ describe('GeneralView.vue', () => {
     finish()
   })
 
+  it('francês usa conteúdo local e persiste sem solicitar catálogo remoto inexistente', async () => {
+    const wrapper = mountComponent()
+    const french = wrapper.findAll('.general-settings__lang-btn').find(button => button.text() === 'settings.general.languageFrench')!
+    await french.trigger('click')
+    await flushPromises()
+    expect(ensureCatalogForLocale).not.toHaveBeenCalled()
+    expect(setUserPreference).toHaveBeenCalledWith('language', 'fr')
+    expect(mockLocale.value).toBe('fr')
+    wrapper.unmount()
+  })
+
   it('RED RAIZ-1: falha de download NAO persiste o idioma (rollback)', async () => {
     vi.mocked(ensureCatalogForLocale).mockRejectedValueOnce(new Error('rede'))
     const wrapper = mountComponent()
-    const esBtn = wrapper.findAll('.general-settings__lang-btn')[1]
+    const esBtn = wrapper.findAll('.general-settings__lang-btn').find(button => button.text() === 'settings.general.languageSpanish')!
     await esBtn.trigger('click')
     await vi.waitFor(() => {
       expect(ensureCatalogForLocale).toHaveBeenCalled()
@@ -448,7 +459,7 @@ describe('GeneralView.vue', () => {
 
     it('changeLanguage pt-BR: no-op no idioma ativo (D4 SPEC-locale-hot-reload)', async () => {
       const wrapper = mountComponent()
-      const ptBtn = wrapper.findAll('.general-settings__lang-btn')[0]
+      const ptBtn = wrapper.findAll('.general-settings__lang-btn').find(button => button.text() === 'settings.general.languagePortuguese')!
       await ptBtn.trigger('click')
       expect(mockLocale.value).toBe('pt-BR')
       // idioma já ativo: sem persistir de novo, sem baixar catálogo

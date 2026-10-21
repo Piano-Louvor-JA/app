@@ -43,6 +43,7 @@ const i18n = createI18n({
   locale: "pt-BR",
   messages: {
     "pt-BR": {
+      visualIdentity: { palette: "Paleta do aplicativo", palettes: { blue: "Azul", green: "Verde", amber: "Âmbar" } },
       settings: {
         appearance: { accentColor: "Cor de destaque" },
       },
@@ -65,7 +66,7 @@ describe("AccentColorCard", () => {
   it("renderiza título e um swatch por accent", () => {
     const wrapper = mountCard();
     expect(wrapper.find(".accent-color__title").text()).toBe(
-      "Cor de destaque",
+      "Paleta do aplicativo",
     );
     const swatches = wrapper.findAll(".accent-color__swatch");
     expect(swatches).toHaveLength(3);
@@ -100,8 +101,8 @@ describe("AccentColorCard", () => {
 
   it("radiogroup com aria-label", () => {
     const wrapper = mountCard();
-    expect(wrapper.find('[role="radiogroup"]').attributes("aria-label")).toBe(
-      "Cor de destaque",
+    expect(wrapper.find('[role="group"]').attributes("aria-label")).toBe(
+      "Paleta do aplicativo",
     );
   });
 });

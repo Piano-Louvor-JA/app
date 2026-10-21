@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import AppIcon from '@design-system/components/AppIcon.vue'
 import { computed, onMounted, onUnmounted, provide, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import { usePageTransition } from '@design-system/composables'
+import AppSidebar from './components/AppSidebar.vue'
 import { DockFooter, GradientBackground, HistoryNav, MinimizedPagesBar } from '@design-system/index'
 import type { DockNavItem, HistoryNavDot, MinimizedBarItem } from '@design-system/types/navigation'
 import AuthAccountDialog from '@modules/auth/components/AuthAccountDialog.vue'
@@ -516,7 +518,8 @@ function viewKey(viewRoute: typeof route) {
           />
           <button
             type="button"
-            class="app-shell__project-btn"
+            class="app-shell__project-btn ds-control"
+            :data-tone="isProjecting ? 'primary' : undefined"
             :class="{ 'app-shell__project-btn--on': isProjecting }"
             :disabled="!canToggleProjection"
             :aria-label="projectAriaLabel"
@@ -532,15 +535,12 @@ function viewKey(viewRoute: typeof route) {
           <button
             v-if="hasOpenScreens"
             type="button"
-            class="app-shell__project-btn"
+            class="app-shell__project-btn ds-control"
             :aria-label="t('popupControls.closeAll')"
             :title="t('popupControls.closeAll')"
             @click="onCloseAllScreens"
           >
-            <i
-              class="ti ti-square-x"
-              aria-hidden="true"
-            />
+            <AppIcon name="square-x" aria-hidden="true" />
           </button>
         </div>
         <div class="app-shell__codename-block">
@@ -567,6 +567,8 @@ function viewKey(viewRoute: typeof route) {
       </div>
     </header>
 
+    <div class="app-shell__workspace">
+    <AppSidebar :items="navItems" :active-key="activeKey" @select="onNavigate" />
     <main ref="mainEl" class="app-shell__main">
       <RouterView v-slot="{ Component, route: viewRoute }">
         <Transition
@@ -582,6 +584,7 @@ function viewKey(viewRoute: typeof route) {
         </Transition>
       </RouterView>
     </main>
+    </div>
 
     <MediaChrome />
 
@@ -664,6 +667,7 @@ function viewKey(viewRoute: typeof route) {
     </div>
 
     <DockFooter
+      class="app-shell__mobile-nav"
       :items="navItems"
       :active-key="activeKey"
       @select="onNavigate"
@@ -688,6 +692,8 @@ function viewKey(viewRoute: typeof route) {
   min-height: 0;
   overflow: hidden;
 }
+
+.app-shell__workspace { display:flex; flex:1; min-height:0; overflow:hidden; }
 
 .app-shell__header {
   display: flex;
@@ -729,7 +735,7 @@ function viewKey(viewRoute: typeof route) {
 }
 
 .app-shell__brand-ja {
-  color: var(--ds-color-brand-yellow);
+  color: var(--ds-color-primary);
 }
 
 .app-shell__header-end {
@@ -752,38 +758,17 @@ function viewKey(viewRoute: typeof route) {
 
 .app-shell__project-btn {
   display: inline-flex;
-  width: 2.25rem;
-  height: 2.25rem;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
   align-items: center;
   justify-content: center;
-  border: 0;
-  border-radius: 9999px;
-  background: color-mix(in srgb, var(--ds-color-primary) 18%, transparent);
-  color: var(--ds-color-primary);
-  cursor: pointer;
-  transition:
-    transform 160ms ease,
-    background-color 160ms ease,
-    opacity 160ms ease;
 
   .ti {
     font-size: 1.1rem;
     line-height: 1;
   }
 
-  &:hover:not(:disabled) {
-    transform: scale(1.06);
-    background: color-mix(in srgb, var(--ds-color-primary) 28%, transparent);
-  }
-
-  &--on {
-    background: color-mix(in srgb, var(--ds-color-primary) 32%, transparent);
-  }
-
-  &:disabled {
-    opacity: 0.4;
-    cursor: default;
-  }
 }
 
 .app-shell__codename-block {
@@ -877,6 +862,7 @@ function viewKey(viewRoute: typeof route) {
 }
 
 .app-shell__main {
+  min-width: 0;
   position: relative;
   z-index: 1;
   display: flex;
@@ -934,5 +920,13 @@ function viewKey(viewRoute: typeof route) {
   .app-shell__header-end {
     gap: 0.5rem;
   }
+}
+</style>
+
+<style scoped>
+@media (min-width: 801px) {
+  .app-shell { --ds-dock-height: 0px; }
+  .app-shell__mobile-nav { display: none; }
+  .app-shell__header { height: 4.25rem; }
 }
 </style>

@@ -1,26 +1,26 @@
 /* Variáveis base — sobrescritas pelo ThemeManager em runtime */
 :root {
-  --ds-color-primary: #2196f3;
-  --ds-color-primary-soft: #9ecaff;
-  --ds-color-secondary: #78d6d2;
+  --ds-color-primary: #81BAFF;
+  --ds-color-primary-soft: #B9D7FF;
+  --ds-color-secondary: #5ED5C5;
   --ds-color-brand-yellow: #f8c800;
-  --ds-color-background: #131313;
-  --ds-color-surface: #131313;
-  --ds-color-surface-elevated: #1e1e1e;
-  --ds-color-surface-card: #242424;
-  --ds-color-surface-container: #201f1f;
-  --ds-color-surface-container-high: #2a2a2a;
-  --ds-color-surface-variant: #353534;
-  --ds-color-on-surface: #e5e2e1;
-  --ds-color-on-surface-variant: #bfc7d4;
-  --ds-color-on-primary: #003258;
-  --ds-color-outline: rgba(255, 255, 255, 0.05);
-  --ds-color-outline-strong: rgba(255, 255, 255, 0.1);
-  /* Assimetria de marca: TL + BR arredondados; TR + BL retos */
-  --ds-radius-sm: 8px 0 8px 0;
-  --ds-radius-md: 12px 0 12px 0;
-  --ds-radius-lg: 16px 0 16px 0;
-  --ds-radius-xl: 24px 0 24px 0;
+  --ds-color-background: #0C1320;
+  --ds-color-surface: #101A2A;
+  --ds-color-surface-elevated: #1C2B42;
+  --ds-color-surface-card: #172337;
+  --ds-color-surface-container: #142035;
+  --ds-color-surface-container-high: #21314A;
+  --ds-color-surface-variant: #2B3D57;
+  --ds-color-on-surface: #F0F4FC;
+  --ds-color-on-surface-variant: #B4C2D7;
+  --ds-color-on-primary: #081522;
+  --ds-color-outline: #2C3C53;
+  --ds-color-outline-strong: #536881;
+  /* Raios consistentes para controles e superfícies. */
+  --ds-radius-sm: 8px;
+  --ds-radius-md: 12px;
+  --ds-radius-lg: 16px;
+  --ds-radius-xl: 24px;
   --ds-radius-full: 9999px;
   --ds-blur-default: 16px;
   --ds-blur-active: 16px;
@@ -58,11 +58,11 @@
 
 /*
  * Scrollbar global neutra.
- * As cores são intencionalmente fixas para não variarem com tema ou destaque.
+ * Acompanha as superfícies dos modos claro e escuro.
  */
 * {
   scrollbar-width: thin !important;
-  scrollbar-color: #7a7a7a #282828 !important;
+  scrollbar-color: var(--ds-color-outline-strong) var(--ds-color-surface-container) !important;
 }
 
 *::-webkit-scrollbar {
@@ -72,22 +72,22 @@
 
 *::-webkit-scrollbar-track {
   border-radius: 9999px !important;
-  background: #282828 !important;
+  background: var(--ds-color-surface-container) !important;
 }
 
 *::-webkit-scrollbar-thumb {
   min-width: 32px;
   min-height: 32px;
   border-radius: 9999px !important;
-  background: #7a7a7a !important;
+  background: var(--ds-color-outline-strong) !important;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: #929292 !important;
+  background: var(--ds-color-on-surface-variant) !important;
 }
 
 *::-webkit-scrollbar-corner {
-  background: #282828 !important;
+  background: var(--ds-color-surface-container) !important;
 }
 
 html,
@@ -204,4 +204,17 @@ body {
  */
 .editor__snackbar.v-snackbar--bottom {
   padding-bottom: calc(var(--ds-dock-height, 72px) + 1.25rem) !important;
+}
+
+/* Shared keyboard, selection and feedback vocabulary. */
+@media (max-width: 800px) {
+  :root { --ds-dock-height: calc(64px + env(safe-area-inset-bottom, 0px)); }
+}
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid var(--ds-focus-ring, var(--ds-color-primary));
+  outline-offset: 3px;
+}
+::selection { background: var(--ds-color-primary); color: var(--ds-color-on-primary); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }

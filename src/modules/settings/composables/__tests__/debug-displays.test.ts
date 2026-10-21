@@ -17,13 +17,13 @@ describe("debug displays", () => {
     setActivePinia(createPinia());
   });
 
-  it("store.refreshDisplays popula displays com preview", async () => {
+  it("store.refreshDisplays não inventa monitores no browser", async () => {
     const { useProjectionStore } = await import(
       "../../stores/useProjectionStore"
     );
     const store = useProjectionStore();
     await store.refreshDisplays();
     // sem console - valida
-    expect(store.displays.length).toBe(3);
+    expect(store.displays.length).toBe(0);
   });
 });

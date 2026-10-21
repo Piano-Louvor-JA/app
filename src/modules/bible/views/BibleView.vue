@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import { computed, ref } from 'vue'
+import BibleComparison from '../components/BibleComparison.vue'
+import BundledBibleSearch from '../components/BundledBibleSearch.vue'
+import { isBundledBible, type BibleSearchHit } from '../services/bundled-bibles'
+import bibleSources from '../data/manifest.json'
 import { useI18n } from 'vue-i18n'
 
 import PalcoRouteSelect from '../../settings/components/PalcoRouteSelect.vue'
@@ -8,6 +13,17 @@ import BibleVerseList from '../components/BibleVerseList.vue'
 import { useBibleReader } from '../composables/useBibleReader'
 
 const { t } = useI18n()
+const comparisonOpen = ref(false)
+const activeSource = computed(() => bibleSources.find(source => source.id === selectedVersionId.value))
+const showFullSearch = computed(() => Boolean(globalSearchQuery.value.trim()) && isBundledBible(selectedVersionId.value ?? 0))
+async function openSearchHit(hit: BibleSearchHit) {
+  globalSearchQuery.value = ''
+  verseSearchQuery.value = ''
+  await selectBook(hit.bookId)
+  await selectChapter(hit.chapter)
+  selectVerse(hit.verse)
+}
+
 
 const {
   versions,
@@ -36,6 +52,7 @@ const {
   selectBook,
   selectChapter,
   selectVerse,
+  openReference,
   clearSelection,
   goToAdjacentVerse,
   setTestamentFilter,
@@ -54,6 +71,10 @@ function onNextVerse() {
 
 <template>
   <section class="bible-view">
+    <p v-if="activeSource" class="bible-source">
+      {{ t('catalog.offline') }} · <a :href="activeSource.source" target="_blank" rel="noopener noreferrer">{{ t('catalog.source') }} : {{ activeSource.name }}</a>
+      <span>{{ t('catalog.editionNote') }}</span>
+    </p>
     <BibleToolbar
       :versions="versions"
       :selected-version-id="selectedVersionId"
@@ -62,10 +83,15 @@ function onNextVerse() {
       :bible-search-query="globalSearchQuery"
       :versions-disabled="isLoadingMeta"
       @select-version="selectVersion"
+      @open-reference="openReference(globalSearchQuery)"
       @toggle-nav="toggleNavPanel"
       @update:bible-search-query="globalSearchQuery = $event"
     />
     <PalcoRouteSelect module="bible" />
+    <div class="bible-study-tools">
+      <small>{{ t('bibleStudy.referenceHint') }}</small>
+      <button v-if="versions.length > 1" type="button" :aria-pressed="comparisonOpen" @click="comparisonOpen = !comparisonOpen"><i class="ti ti-columns-2" aria-hidden="true" /> {{ t('bibleStudy.compare') }}</button>
+    </div>
 
     <div
       v-if="lastErrorKey"
@@ -105,6 +131,7 @@ function onNextVerse() {
       {{ t('bible.emptyCatalog') }}
     </div>
 
+    <BundledBibleSearch v-else-if="showFullSearch && selectedVersionId" :version-id="selectedVersionId" :query="globalSearchQuery" @select="openSearchHit" />
     <div
       v-else
       class="bible-view__body"
@@ -143,10 +170,20 @@ function onNextVerse() {
         @clear-projection="clearSelection"
       />
     </div>
+
+    <BibleComparison v-if="comparisonOpen" :versions="versions" :version-id="selectedVersionId" :book-id="selectedBookId" :chapter="selectedChapter ?? 1" :verses="selectedVerses" @close="comparisonOpen = false" />
+
   </section>
 </template>
 
 <style scoped lang="scss">
+.bible-source { margin:0; font-size:.75rem; opacity:.85; }
+.bible-source a { color:var(--ds-color-primary); }
+.bible-source span { display:block; margin-top:.2rem; }
+.bible-study-tools { display: flex; align-items: center; justify-content: space-between; gap: .65rem; flex-shrink: 0; color: var(--ds-color-on-surface-variant); }
+.bible-study-tools small { font-size: .72rem; }
+.bible-study-tools button { padding: .4rem .7rem; font: inherit; font-size: .75rem; white-space: nowrap; color: var(--ds-color-primary); background: transparent; border: 1px solid var(--ds-color-outline); border-radius: .6rem; cursor: pointer; }
+
 .bible-view {
   box-sizing: border-box;
   display: flex;

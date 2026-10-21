@@ -19,7 +19,7 @@ const { stateKeys } = vi.hoisted(() => ({
     'worshipLabel', 'headerDateTime', 'remainingCountdownLabel', 'startTimeInput',
     'endTimeInput', 'countdownExpired', 'countdownRunning', 'canStartCountdown',
     'canCloneLiturgy', 'cloneDialogOpen', 'cloneSourceKey', 'cloneSources',
-    'deletionLocked',
+    'deletionLocked', 'teamDialogOpen', 'schedule',
   ],
 }))
 
@@ -67,6 +67,8 @@ vi.mock('../../composables/useLiturgy', () => ({
             cloneSourceKey: ref(''),
             cloneSources: ref([]),
             deletionLocked: ref(false),
+            teamDialogOpen: ref(false),
+            schedule: ref({ totalDurationMs: 0, endLabel: '—', unknownDurations: 0, rows: [] }),
           }
           const v = key in defaults ? defaults[key] : ref(null)
           target[key] = v
@@ -327,10 +329,10 @@ describe('LiturgyView', () => {
       const w = createWrapper()
       await w.vm.$nextTick()
       // botões com a classe compartilhada: import (185), ... e o clear real (237).
-      // O clear é o que contém o ícone ti-trash.
+      // O clear é o que contém o ícone SVG de exclusão.
       const clearBtn = w
         .findAll('button')
-        .find((b) => b.classes().includes('liturgy-view__clear') && b.find('.ti-trash').exists())
+        .find((b) => b.classes().includes('liturgy-view__clear') && b.find('[data-icon="trash"]').exists())
       expect(clearBtn).toBeTruthy()
       await clearBtn!.trigger('click')
       await w.vm.$nextTick()

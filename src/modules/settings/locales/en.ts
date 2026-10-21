@@ -179,8 +179,9 @@ export default {
       },
     },
     general: {
+      languageFrench: 'Français',
       languageTitle: 'Language',
-      languageHint: 'Choose the application interface language.',
+      languageHint: "Choose the application language. Menus, messages, Bible and music library follow your choice.",
       languagePortuguese: 'Português (BR)',
       languageEnglish: 'English',
       languageSpanish: 'Español',

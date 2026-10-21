@@ -1,6 +1,6 @@
 import type { RouteRecordRaw } from 'vue-router'
 
-import AlbumsView from './views/AlbumsView.vue'
+import AlbumsView from './views/MultilingualAlbumsView.vue'
 import AlbumCollectionView from './views/AlbumCollectionView.vue'
 
 export const albumsRoutes: RouteRecordRaw[] = [

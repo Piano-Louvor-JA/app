@@ -343,6 +343,22 @@ describe('loadChapterVerses', () => {
   })
 })
 
+describe('edições francesas e bundles desktop', () => {
+  it('mantém as edições locais fora do catálogo remoto e do IPC oficial', async () => {
+    const getChapter = vi.fn(async () => ({ '1': 'conteúdo oficial com outro ID' }))
+    bridgeWithBible(getChapter)
+    const versions = await loadBibleVersions('fr')
+    expect(versions.map(version => version.id)).toEqual([1000001, 1000002])
+    for (const version of versions) {
+      const chapter = await loadChapterVerses(version.id, 1, 1)
+      expect(chapter['1']).toContain('Dieu')
+    }
+    expect(getChapter).not.toHaveBeenCalled()
+    expect(mockFetch).not.toHaveBeenCalled()
+    expect(mockRead).not.toHaveBeenCalled()
+  })
+})
+
 describe('requestBibleBundleUpdate', () => {
   it('fora do desktop não faz nada', async () => {
     await expect(requestBibleBundleUpdate()).resolves.toBeUndefined()

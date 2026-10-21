@@ -1,0 +1,56 @@
+/* Shared operational controls. Opaque state pairs are measured in interface.ts. */
+.ds-control {
+  --control-bg: var(--ds-action-neutral-default);
+  --control-hover: var(--ds-action-neutral-hover);
+  --control-active: var(--ds-action-neutral-active);
+  --control-text: var(--ds-action-neutral-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  min-height: 2.75rem;
+  padding: .6rem .9rem;
+  border: 1px solid var(--ds-control-border);
+  border-radius: var(--ds-radius-sm);
+  font: inherit;
+  font-size: .85rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--control-text);
+  background: var(--control-bg);
+  cursor: pointer;
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+.ds-control[data-tone='primary'] {
+  --control-bg: var(--ds-action-primary-default);
+  --control-hover: var(--ds-action-primary-hover);
+  --control-active: var(--ds-action-primary-active);
+  --control-text: var(--ds-action-primary-text);
+  border-color: transparent;
+}
+.ds-control[data-tone='danger'] {
+  --control-bg: var(--ds-action-danger-default);
+  --control-hover: var(--ds-action-danger-hover);
+  --control-active: var(--ds-action-danger-active);
+  --control-text: var(--ds-action-danger-text);
+  border-color: transparent;
+}
+.ds-control:hover:not(:disabled):not([aria-disabled='true']) { background: var(--control-hover); }
+.ds-control:active:not(:disabled):not([aria-disabled='true']) { background: var(--control-active); }
+.ds-control:disabled, .ds-control[aria-disabled='true'] {
+  background: var(--ds-disabled-bg);
+  color: var(--ds-disabled-text);
+  border-color: var(--ds-control-border);
+  opacity: 1;
+  cursor: not-allowed;
+}
+.ds-control:focus-visible {
+  outline: 3px solid var(--ds-focus-ring);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 3px var(--ds-focus-gap);
+}
+@media (forced-colors: active) {
+  .ds-control { border: 1px solid ButtonText; }
+  .ds-control:focus-visible { outline-color: Highlight; }
+  .ds-control:disabled { color: GrayText; border-color: GrayText; }
+}

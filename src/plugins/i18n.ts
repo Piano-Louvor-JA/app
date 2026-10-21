@@ -1,8 +1,30 @@
+import visualIdentity from '@locales/visual-identity'
+import navigation from '@locales/navigation'
+import study from '@locales/study'
+import liturgyPlan from '@locales/liturgy-plan'
+import remoteBrowser from '@locales/remote-browser'
 import { createI18n } from 'vue-i18n'
 
 import ptBR from '@locales/pt-BR'
 import en from '@locales/en'
 import es from '@locales/es'
+import fr from '@locales/fr'
+import screenDetection from '@locales/screen-detection'
+import liturgyFr from '@modules/liturgy/locales/fr'
+import authFr from '@modules/auth/locales/fr'
+import albumsFr from '@modules/albums/locales/fr'
+import syncFr from '@modules/sync/locales/fr'
+import clockFr from '@modules/clock/locales/fr'
+import timerFr from '@modules/timer/locales/fr'
+import countdownFr from '@modules/countdown/locales/fr'
+import randomFr from '@modules/random/locales/fr'
+import mediaFr from '@modules/media/locales/fr'
+import communityFr from '@modules/community/locales/fr'
+import catalog from '@locales/catalog'
+import bibleFr from '@modules/bible/locales/fr'
+import homeFr from '@modules/home/locales/fr'
+import startingFr from '@modules/starting/locales/fr'
+import settingsFr from '@modules/settings/locales/fr'
 
 import albumsPtBR from '@modules/albums/locales/pt-BR'
 import authEn from '@modules/auth/locales/en'
@@ -61,7 +83,7 @@ import timerEs from '@modules/timer/locales/es'
 import { USER_PREFERENCE_KEYS } from '@shared/constants/storage-keys'
 import { getUserPreference } from '@shared/services/user-preferences'
 
-export const SUPPORTED_LOCALES = ['pt-BR', 'en', 'es'] as const
+export const SUPPORTED_LOCALES = ['pt-BR', 'en', 'es', 'fr'] as const
 export type SupportedLocale = (typeof SUPPORTED_LOCALES)[number]
 
 export const DEFAULT_LOCALE: SupportedLocale = 'pt-BR'
@@ -93,9 +115,12 @@ const initialLocale = detectInitialLocale()
 export default createI18n({
   legacy: false,
   locale: initialLocale,
-  fallbackLocale: DEFAULT_LOCALE,
+  fallbackLocale: 'pt-BR',
   messages: {
+    fr: { ...fr, ...catalog.fr, ...screenDetection.fr, ...navigation.fr, ...study.fr, ...liturgyPlan.fr, ...remoteBrowser.fr, ...visualIdentity.fr, ...bibleFr, ...homeFr, ...startingFr, ...settingsFr, ...liturgyFr, ...authFr, ...albumsFr, ...clockFr, ...timerFr, ...countdownFr, ...randomFr, ...mediaFr, ...communityFr, sync: { ...fr.sync, ...syncFr.sync } },
     'pt-BR': {
+      ...catalog['pt-BR'],
+      ...screenDetection['pt-BR'], ...navigation['pt-BR'], ...study['pt-BR'], ...liturgyPlan['pt-BR'], ...remoteBrowser['pt-BR'], ...visualIdentity['pt-BR'],
       ...ptBR,
       ...authPtBR,
       ...albumsPtBR,
@@ -113,6 +138,8 @@ export default createI18n({
       ...timerPtBR,
     },
     en: {
+      ...catalog.en,
+      ...screenDetection.en, ...navigation.en, ...study.en, ...liturgyPlan.en, ...remoteBrowser.en, ...visualIdentity.en,
       ...en,
       ...authEn,
       ...albumsEn,
@@ -130,6 +157,8 @@ export default createI18n({
       ...timerEn,
     },
     es: {
+      ...catalog.es,
+      ...screenDetection.es, ...navigation.es, ...study.es, ...liturgyPlan.es, ...remoteBrowser.es, ...visualIdentity.es,
       ...es,
       ...authEs,
       ...albumsEs,

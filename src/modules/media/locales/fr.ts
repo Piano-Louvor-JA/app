@@ -1,0 +1,41 @@
+export default { media: {
+        publishRules: { title: 'Règles de la communauté', visibleToAll: 'Les collections publiques sont visibles sur tout le réseau PIANO.', displayName: 'Votre nom public apparaît comme auteur ; votre adresse e-mail reste masquée.', readOnlyCopy: 'Les autres utilisateurs peuvent enregistrer une copie sans modifier votre original.', moderation: 'Les collections sont examinées avant publication. Un contenu inapproprié peut être signalé et supprimé.', ranking: 'Les 10 points sont comptabilisés après approbation.', showRules: 'Consulter les règles de la communauté', gotIt: 'Compris', linkLabel: 'Règles de la communauté' },
+        visibility: { label: 'Confidentialité', private: 'Privée', public: 'Publique', privateHint: 'Vous seul pouvez consulter cette collection.', publicHint: 'Soumise à examen ; visible sur le réseau après approbation.' },
+        title: 'Lecteur', empty: 'Aucun chant en cours. Ouvrez une piste depuis les albums ou le programme du culte.', play: 'Lire', pause: 'Pause', project: 'Projeter le contenu', audioOnTv: 'Diffuser le son sur le téléviseur', audioOnTvOff: 'Son sur l’ordinateur', clearProjection: 'Masquer le contenu', maximize: 'Ouvrir le lecteur', minimize: 'Réduire', close: 'Fermer', seek: 'Position de lecture', volume: 'Volume', audioType: 'Type d’audio', fullscreen: 'Plein écran', previousSlide: 'Précédente', nextSlide: 'Suivante', returnNext: 'Suivante', slideOf: 'Diapositive {current} sur {total}', coverSlide: 'Couverture et titre', playlist: 'Liste des diapositives', projectionHotkeyHint: 'Échap termine la projection · Ctrl+Alt+P bascule vers l’écran de l’opérateur', ondemandDownload: 'Téléchargement à la demande', ondemandPreplay: 'Téléchargement du chant en cours…', ondemandDownloadSuccess: 'Téléchargement terminé.', dismiss: 'Fermer', closeConfirmTitle: 'Fermer ce chant ?', closeConfirmYes: 'Oui', closeConfirmNo: 'Non',
+        actions: { sung: 'Chanté', instrumental: 'Accompagnement', slides: 'Sans audio', lyric: 'Paroles', downloadOffline: 'Télécharger les médias', removeOffline: 'Supprimer les médias', cancelDownload: 'Annuler le téléchargement', downloaded: 'Téléchargé', downloading: 'Téléchargement…', thisTrack: 'cette piste', removeConfirmTitle: 'Supprimer les médias', removeConfirmText: 'Supprimer les fichiers de « {name} » de cet ordinateur ?', removeConfirmYes: 'Supprimer', removeConfirmNo: 'Annuler' },
+        modes: { sung: 'Chanté', instrumental: 'Accompagnement', noAudio: 'Sans audio' },
+        messages: { trackMissing: 'Ce chant est introuvable dans le catalogue local.', audioMissing: 'Aucun audio disponible pour le mode choisi.', notDownloaded: 'Cette collection n’est pas téléchargée. Téléchargez-la depuis la bibliothèque pour l’utiliser hors connexion.', slidesOnlyNotDownloaded: 'Audio indisponible : collection non téléchargée. Seules les diapositives sont projetées.', slidesOnlyNoAudio: 'Cette piste ne contient pas d’audio. Seules les diapositives sont projetées.', playbackFailed: 'Impossible de démarrer la lecture audio.' },
+        editor: {
+            importSlja: "Importer un fichier .slja",
+            exportSlja: "Exporter le chant actuel au format .slja",
+            changeCover: "Changer la couverture du recueil",
+            removeCover: "Retirer la couverture",
+            newCollection: "Nouveau recueil\u2026",
+            deleteCollection: "Supprimer le recueil s\u00E9lectionn\u00E9",
+            newMusic: "Nouveau chant\u2026",
+            reuseMusic: "R\u00E9utiliser un chant existant\u2026",
+            searchOfficial: "Rechercher un cantique officiel par num\u00E9ro ou titre\u2026",
+            addFirstResult: "Ajouter le premier r\u00E9sultat",
+            officialHymn: "Cantique officiel g\u00E9r\u00E9 dans le catalogue",
+            deleteMusic: "Supprimer le chant s\u00E9lectionn\u00E9",
+            linkAudio: "Associer un fichier audio MP3 au chant",
+            removeAudio: "Retirer le fichier audio associ\u00E9",
+            markTiming: "Utiliser la position actuelle de l\u2019audio comme rep\u00E8re pour cette strophe",
+            deleteStanza: "Supprimer la strophe",
+            lyricPlaceholder: "Paroles de la strophe\u2026",
+            hideLyric: "Masquer les paroles",
+            showLyric: "Afficher les paroles",
+            delete: "Supprimer",
+            cancel: "Annuler"
+        },
+        account: {
+            email: "Adresse e-mail",
+            password: "Mot de passe",
+            yourName: "Votre nom",
+            passwordMin6: "Mot de passe (6 caract\u00E8res minimum)",
+            accountEmail: "Adresse e-mail du compte",
+            resetToken: "Code de r\u00E9initialisation",
+            newPasswordMin8: "Nouveau mot de passe (8 caract\u00E8res minimum)"
+        },
+        chromeDragHint: "Faites glisser pour d\u00E9placer \u00B7 double-cliquez pour revenir dans le coin"
+    } };

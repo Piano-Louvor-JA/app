@@ -46,16 +46,16 @@ beforeEach(() => {
 describe('AppearanceView.vue', () => {
   it('renderiza hero com título e subtítulo traduzidos', async () => {
     const w = await mountView()
-    expect(w.find('.appearance-experience__title').text()).toBe('settings.appearance.experienceTitle')
-    expect(w.find('.appearance-experience__subtitle').text()).toBe('settings.appearance.experienceSubtitle')
+    expect(w.find('.appearance-experience__title').text()).toBe('visualIdentity.title')
+    expect(w.find('.appearance-experience__subtitle').text()).toBe('visualIdentity.subtitle')
     w.unmount()
   })
 
   it('renderiza as 3 colunas (interaction, theme, accent)', async () => {
     const w = await mountView()
-    expect(w.find('.appearance-experience__col--left .interaction-mode').exists()).toBe(true)
-    expect(w.find('.appearance-experience__center .theme-orbital').exists()).toBe(true)
-    expect(w.find('.appearance-experience__col--right .accent-color').exists()).toBe(true)
+    expect(w.find('.appearance-motion .interaction-mode').exists()).toBe(true)
+    expect(w.find('.appearance-modes').exists()).toBe(true)
+    expect(w.find('.appearance-experience__controls .accent-color').exists()).toBe(true)
     w.unmount()
   })
 

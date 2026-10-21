@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Testes do escopo SPEAKER do Controle Remoto (página do pregador /speaker).
  *

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppIcon from '@design-system/components/AppIcon.vue'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
@@ -20,6 +21,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   selectVersion: [versionId: number]
   toggleNav: []
+  openReference: []
   'update:bibleSearchQuery': [value: string]
 }>()
 
@@ -67,10 +69,8 @@ const browseIcon = computed(() =>
     <div class="bible-toolbar__actions">
       <StagePaletteButton scope="bible" />
       <div class="bible-toolbar__search">
-        <i
-          class="ti ti-search bible-toolbar__search-icon"
-          aria-hidden="true"
-        />
+        <AppIcon name="search" class="bible-toolbar__search-icon"
+          aria-hidden="true" />
         <input
           class="bible-toolbar__search-input"
           type="search"
@@ -78,6 +78,7 @@ const browseIcon = computed(() =>
           :placeholder="t('bible.searchBible')"
           :aria-label="t('bible.searchBible')"
           @input="emit('update:bibleSearchQuery', ($event.target as HTMLInputElement).value)"
+          @keydown.enter="emit('openReference')"
         >
       </div>
 
@@ -115,6 +116,7 @@ const browseIcon = computed(() =>
 }
 
 .bible-toolbar__meta {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 1.5rem;
@@ -138,6 +140,7 @@ const browseIcon = computed(() =>
 }
 
 .bible-toolbar__location {
+  white-space: nowrap;
   font-weight: 500;
   color: var(--ds-color-on-surface);
 }
@@ -229,6 +232,12 @@ const browseIcon = computed(() =>
     background: color-mix(in srgb, var(--ds-color-primary) 28%, transparent);
     border-color: color-mix(in srgb, var(--ds-color-primary) 45%, transparent);
   }
+}
+
+@media (min-width: 801px) and (max-width: 1150px) {
+  .bible-toolbar { flex-wrap: wrap; }
+  .bible-toolbar__meta { flex: 1 1 100%; justify-content: space-between; }
+  .bible-toolbar__search { flex: 1; max-width: none; }
 }
 
 </style>

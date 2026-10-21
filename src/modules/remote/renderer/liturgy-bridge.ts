@@ -228,6 +228,7 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
           type: item.type,
           title: item.name || item.subtitle || null,
           subtitle: item.subtitle || null,
+          responsible: item.responsible || null,
           isCategory: item.type === 'category',
           accentColor: item.accentColor || null,
           done: item.done === true,
