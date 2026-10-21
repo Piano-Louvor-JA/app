@@ -1,4 +1,5 @@
 import path from "node:path";
+import { spawn } from "node:child_process";
 import { statSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { app, BrowserWindow, dialog, globalShortcut, ipcMain, screen, shell } from "electron";
@@ -24,6 +25,7 @@ import { ensureWorkspaceDirectories } from "./paths.mjs";
 import { registerLocalFileProtocol, registerLocalScheme } from "./protocol.mjs";
 import { registerCloseProjectionPopups } from "./ipc/web-projection.mjs";
 import { buildProjectionWindowBounds } from "./projection-display.mjs";
+import { X11_RELAUNCH_MARKER, buildX11Relaunch, consumeX11RelaunchMarker, shouldRelaunchWithX11 } from "./linux-display-backend.mjs";
 import { initUpdater } from "./updater.mjs";
 import { getBibleUpdater } from "./bible-updater.mjs";
 import { loadWindowState, trackWindowState } from "./window-state.mjs";
@@ -86,6 +88,23 @@ if (process.platform === "linux") {
 	app.setName(APP_PRODUCT_NAME);
 }
 
+/**
+ * Linux + Wayland: relança via XWayland para a projeção abrir no monitor
+ * escolhido (no Wayland nativo o compositor ignora a posição das janelas).
+ * Detalhes em linux-display-backend.mjs.
+ */
+let relaunchingForX11 = false;
+const wantsX11Relaunch = shouldRelaunchWithX11({ platform: process.platform, env: process.env, argv: process.argv });
+consumeX11RelaunchMarker(process.env);
+if (wantsX11Relaunch) {
+	relaunchingForX11 = true;
+	console.info("[main] wayland: relançando via XWayland (--ozone-platform=x11)");
+	process.env[X11_RELAUNCH_MARKER] = "1";
+	const relaunch = buildX11Relaunch({ argv: process.argv, env: process.env, execPath: process.execPath });
+	spawn(relaunch.command, relaunch.args, { detached: true, stdio: "ignore", env: process.env }).unref();
+	app.exit(0);
+}
+
 bootMark("main loaded");
 configureUserDataPath({ isDev });
 bootMark("userData");
@@ -115,7 +134,9 @@ if (process.env.VITE_DEV_SERVER_URL) {
 	app.commandLine.appendSwitch("remote-debugging-port", "9222");
 }
 
-const gotLock = app.requestSingleInstanceLock();
+// O processo que vai se relançar não pega o lock: senão o relançado
+// encontraria o lock ocupado e fecharia.
+const gotLock = relaunchingForX11 || app.requestSingleInstanceLock();
 if (!gotLock) {
 	app.quit();
 }
