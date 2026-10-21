@@ -11,6 +11,7 @@ const {
 	getDesktopBridgeMock,
 	loadLibraryCategoriesMock,
 	reportErrorMock,
+	reportDownloadFailuresMock,
 } = vi.hoisted(() => ({
 	readCatalogRecordMock: vi.fn(),
 	writeCatalogRecordMock: vi.fn(),
@@ -22,6 +23,7 @@ const {
 	getDesktopBridgeMock: vi.fn(),
 	loadLibraryCategoriesMock: vi.fn(),
 	reportErrorMock: vi.fn(),
+	reportDownloadFailuresMock: vi.fn(),
 }));
 
 vi.mock("@shared/services/workspace-api", () => ({
@@ -107,6 +109,7 @@ beforeEach(() => {
 	vi.spyOn(console, "warn").mockImplementation(() => {});
 	vi.spyOn(console, "error").mockImplementation(() => {});
 	vi.stubGlobal("navigator", { onLine: true });
+	vi.stubGlobal("window", { louvorja: { diagnostics: { reportDownloadFailures: reportDownloadFailuresMock } } });
 	getCurrentApiPrefixMock.mockReturnValue("pt");
 	readCatalogRecordMock.mockResolvedValue(null);
 	writeCatalogRecordMock.mockResolvedValue(undefined);
@@ -328,6 +331,33 @@ describe("collectMediaForAlbum", () => {
 			}),
 		),
 		);
+	});
+
+	it("registra falha HTTP do álbum no buffer de diagnóstico", async () => {
+		const b = bridge();
+		b.media.download.mockResolvedValue({
+			ok: false,
+			url: "https://cdn.test/audio/10.mp3?token=secret",
+			status: 404,
+			bytes: 12,
+			error: "HTTP 404",
+		} as never);
+		getDesktopBridgeMock.mockReturnValue(b);
+		readCatalogRecordMock
+			.mockResolvedValueOnce(albumRecord([{ id_music: 10 }]))
+			.mockResolvedValue(musicRecord());
+
+		const result = await downloadAlbumMedia(albumBase(), hooks());
+		expect(result).toMatchObject({ status: "error" });
+		expect(result.totalErrors).toBeGreaterThan(0);
+		expect(reportDownloadFailuresMock).toHaveBeenCalledWith([
+			expect.objectContaining({
+				url: "https://cdn.test/audio/10.mp3",
+				status: 404,
+				bytes: 12,
+				erro: "HTTP 404",
+			}),
+		]);
 	});
 
 	it("aborta por shouldAbort antes do download", async () => {
