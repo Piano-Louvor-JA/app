@@ -49,7 +49,7 @@
     "jsqr": "^1.4.0",
     "pinia": "^3.0.4",
     "qrcode": "^1.5.4",
-    "tldts-experimental": "6.1.86",
+    "tldts-experimental": "7.4.18",
     "vue": "^3.5.44",
     "vue-i18n": "^11.4.14",
     "vue-router": "^5.4.0",
