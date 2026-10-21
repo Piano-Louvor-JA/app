@@ -9,9 +9,9 @@ const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
   url: 'http://localhost',
   pretendToBeVisual: true,
 })
-globalThis.window = dom.window as unknown as Window & typeof globalThis
-globalThis.document = dom.window.document
-globalThis.localStorage = dom.window.localStorage
+vi.stubGlobal('window', dom.window as unknown as Window & typeof globalThis)
+vi.stubGlobal('document', dom.window.document)
+vi.stubGlobal('localStorage', dom.window.localStorage)
 
 // Mock da camada de persistência (user-preferences) — o serviço real
 // stage-settings-preferences roda por cima, testando a lógica de verdade.

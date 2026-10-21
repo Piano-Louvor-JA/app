@@ -40,9 +40,9 @@ const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
   url: 'http://localhost',
   pretendToBeVisual: true,
 })
-globalThis.window = dom.window as unknown as Window & typeof globalThis
-globalThis.document = dom.window.document
-globalThis.localStorage = dom.window.localStorage
+vi.stubGlobal('window', dom.window as unknown as Window & typeof globalThis)
+vi.stubGlobal('document', dom.window.document)
+vi.stubGlobal('localStorage', dom.window.localStorage)
 globalThis.BroadcastChannel = MockBroadcastChannel as unknown as BroadcastChannelConstructor
 
 describe('stage-settings-runtime (projeção popup)', () => {

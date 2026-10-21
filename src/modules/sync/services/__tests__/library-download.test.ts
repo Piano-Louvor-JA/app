@@ -398,7 +398,7 @@ describe("resolveAlbumIdsForMusic", () => {
 	it("id inválido → []", async () => {
 		expect(await resolveAlbumIdsForMusic(Number.NaN)).toEqual([]);
 		expect(await resolveAlbumIdsForMusic(0)).toEqual([]);
-		expect(resolveAlbumIdsForMusic(Number.NaN)).resolves.toBeTruthy();
+		await expect(resolveAlbumIdsForMusic(Number.NaN)).resolves.toBeTruthy();
 	});
 
 	it("música sem albums → []", async () => {
