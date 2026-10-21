@@ -12,11 +12,8 @@ const mocks = vi.hoisted(() => ({
   createWriteStream: vi.fn(),
   pipeline: vi.fn(),
   fromWeb: vi.fn(),
-  randomUUID: vi.fn(() => 'attempt-id'),
-  Transform: class {},
+  Transform: class { constructor(options) { this.options = options } },
 }))
-
-vi.mock('node:crypto', () => ({ randomUUID: mocks.randomUUID }))
 vi.mock('electron', () => ({ net: { fetch: mocks.fetch } }))
 vi.mock('node:fs', () => ({
   existsSync: mocks.existsSync,
@@ -62,9 +59,9 @@ describe('downloadMediaFile', () => {
     await expect(downloadMediaFile('https://cdn.test/song.mp3', 'music', 'album/song.mp3')).resolves.toBe(true)
 
     expect(mocks.fetch).toHaveBeenCalledWith('https://cdn.test/song.mp3', expect.objectContaining({ signal: expect.any(AbortSignal) }))
-    expect(mocks.createWriteStream).toHaveBeenCalledWith('/media/album/song.mp3.attempt-id.part')
+    expect(mocks.createWriteStream).toHaveBeenCalledWith('/media/album/song.mp3.part')
     expect(mocks.pipeline).toHaveBeenCalledTimes(1)
-    expect(mocks.renameSync).toHaveBeenCalledWith('/media/album/song.mp3.attempt-id.part', '/media/album/song.mp3')
+    expect(mocks.renameSync).toHaveBeenCalledWith('/media/album/song.mp3.part', '/media/album/song.mp3')
   })
 
   it('returns HTTP failure bytes without creating a part file', async () => {
@@ -91,6 +88,35 @@ describe('downloadMediaFile', () => {
     expect(MEDIA_DOWNLOAD_STALL_TIMEOUT_MS).toBe(15_000)
   })
 
+  it('removes the part file after a stalled stream aborts', async () => {
+    vi.useFakeTimers()
+    mocks.pipeline.mockImplementationOnce(async () => {
+      await vi.advanceTimersByTimeAsync(MEDIA_DOWNLOAD_STALL_TIMEOUT_MS)
+      throw new Error('aborted')
+    })
+
+    await expect(downloadMediaFile('https://cdn.test/song.mp3', 'music', 'stalled.mp3')).resolves.toMatchObject({
+      ok: false,
+      error: 'media download stall (15s sem dados)',
+    })
+    expect(mocks.unlinkSync).toHaveBeenCalledWith('/media/stalled.mp3.part')
+    expect(mocks.renameSync).not.toHaveBeenCalled()
+  })
+
+  it('allows active chunks to run longer than the former total timeout', async () => {
+    vi.useFakeTimers()
+    mocks.pipeline.mockImplementationOnce(async (_stream, progress) => {
+      const callback = vi.fn()
+      progress.options.transform(Buffer.alloc(1), 'buffer', callback)
+      await vi.advanceTimersByTimeAsync(14_000)
+      progress.options.transform(Buffer.alloc(1), 'buffer', callback)
+      await vi.advanceTimersByTimeAsync(14_000)
+    })
+
+    await expect(downloadMediaFile('https://cdn.test/song.mp3', 'music', 'slow.mp3')).resolves.toBe(true)
+    expect(mocks.renameSync).toHaveBeenCalledWith('/media/slow.mp3.part', '/media/slow.mp3')
+  })
+
   it('removes the part file and preserves the public failure shape when streaming fails', async () => {
     mocks.pipeline.mockRejectedValueOnce(new Error('socket closed'))
 
@@ -102,7 +128,7 @@ describe('downloadMediaFile', () => {
       error: 'socket closed',
     })
 
-    expect(mocks.unlinkSync).toHaveBeenCalledWith('/media/song.mp3.attempt-id.part')
+    expect(mocks.unlinkSync).toHaveBeenCalledWith('/media/song.mp3.part')
     expect(mocks.renameSync).not.toHaveBeenCalled()
   })
 })

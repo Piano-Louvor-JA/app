@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto'
 import {
   createWriteStream,
   existsSync,
@@ -12,9 +11,9 @@ import {
 import path from 'node:path'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
+import { net } from 'electron'
 
 export const MEDIA_DOWNLOAD_STALL_TIMEOUT_MS = 15_000
-import { net } from 'electron'
 
 import { resolveMediaFetchUrl } from './api-base.mjs'
 import { API_BASE_URL } from './constants.mjs'
@@ -171,7 +170,7 @@ export async function downloadMediaFile(requestedUrl, mediaType, filename) {
     const destFolder = resolveMediaDirectory(mediaType)
     const decodedFilename = decodeURIComponent(filename)
     const filePath = path.join(destFolder, decodedFilename)
-    partPath = `${filePath}.${randomUUID()}.part`
+    partPath = `${filePath}.part`
     mkdirSync(path.dirname(filePath), { recursive: true })
     apiUrl = resolveMediaFetchUrl(requestedUrl, buildApiMediaUrl(mediaType, decodedFilename), API_BASE_URL)
     resetStallTimer()
