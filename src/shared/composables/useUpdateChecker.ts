@@ -10,10 +10,10 @@ export interface UpdateInfo {
 }
 
 interface ElectronUpdaterAPI {
-  check: () => Promise<{ available: boolean; version?: string; releaseNotes?: string }>
-  download: () => Promise<{ success: boolean; error?: string }>
+  check: () => Promise<{ available: boolean; version?: string; releaseNotes?: string; manualInstall?: boolean }>
+  download: () => Promise<{ success: boolean; error?: string; manual?: boolean }>
   install: () => void
-  onAvailable: (cb: (_: unknown, data: { version: string; releaseNotes: string }) => void) => void
+  onAvailable: (cb: (_: unknown, data: { version: string; releaseNotes: string; manualInstall?: boolean }) => void) => void
   onProgress: (cb: (_: unknown, data: { progress: number }) => void) => void
   onDownloaded: (cb: () => void) => void
   onError: (cb: (_: unknown, data: { message: string }) => void) => void
@@ -37,6 +37,7 @@ function getElectronUpdaterAPI(): ElectronUpdaterAPI | undefined {
 
 function createUpdateState() {
   const hasUpdate = ref(false)
+  const manualInstall = ref(false)
   const newVersion = ref<string | null>(null)
   const releaseNotes = ref<string | null>(null)
   const downloadProgress = ref(0)
@@ -58,6 +59,7 @@ function createUpdateState() {
 
   function reset() {
     hasUpdate.value = false
+    manualInstall.value = false
     newVersion.value = null
     releaseNotes.value = null
     downloadProgress.value = 0
@@ -72,6 +74,7 @@ function createUpdateState() {
 
   return {
     hasUpdate,
+    manualInstall,
     newVersion,
     releaseNotes,
     downloadProgress,
@@ -120,6 +123,7 @@ export function useUpdateChecker() {
         state.hasUpdate.value = true
         state.newVersion.value = result.version ?? null
         state.releaseNotes.value = result.releaseNotes ?? null
+        state.manualInstall.value = result.manualInstall === true
       }
     } catch {
       state.hasChecked.value = true
@@ -140,6 +144,11 @@ export function useUpdateChecker() {
 
     try {
       const result = await api.download()
+      if (result.success && result.manual) {
+        state.manualInstall.value = true
+        state.isDownloading.value = false
+        return
+      }
       if (!result.success) {
         const msg = result.error || ''
         if (msg.includes('404')) {
@@ -172,6 +181,7 @@ export function useUpdateChecker() {
       state.hasUpdate.value = true
       state.newVersion.value = data.version
       state.releaseNotes.value = data.releaseNotes
+      state.manualInstall.value = data.manualInstall === true
     })
 
     api.onProgress((_, data) => {

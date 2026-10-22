@@ -1,4 +1,8 @@
 export default {
+  updates: {
+    downloadMacInstaller: 'Download macOS installer',
+    manualMacInstructions: 'On macOS, install this update manually. Download the installer below, quit LouvorJA, open the DMG and drag the app to Applications, replacing the previous version. Your data and preferences will be kept.',
+  },
   windowControls: {
     close: 'Close',
     minimize: 'Minimize',

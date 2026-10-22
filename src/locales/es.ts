@@ -1,4 +1,8 @@
 export default {
+  updates: {
+    downloadMacInstaller: 'Descargar instalador macOS',
+    manualMacInstructions: 'En macOS, esta actualización se instala manualmente. Descarga el instalador, cierra LouvorJA, abre el DMG y arrastra la aplicación a Aplicaciones, reemplazando la versión anterior. Tus datos y preferencias se conservarán.',
+  },
   windowControls: {
     close: 'Cerrar',
     minimize: 'Minimizar',
