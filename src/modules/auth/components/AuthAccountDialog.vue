@@ -71,9 +71,10 @@ async function onSubmit(): Promise<void> {
       }
       return
     }
-    const ok = mode.value === 'login'
-      ? await login(email.value, password.value)
-      : await register(email.value, password.value, displayName.value)
+    const request = mode.value === 'login'
+      ? login(email.value, password.value)
+      : register(email.value, password.value, displayName.value)
+    const ok = await request
     if (ok) {
       formOpen.value = false
       password.value = ''

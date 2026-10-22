@@ -28,10 +28,10 @@ const PAGE_URL =
 /** HTML da página do trimestre: main process (sem CORS) no Electron, fetch direto na web. */
 async function fetchQuarterHtml(): Promise<string | null> {
   const bridge = getDesktopBridge()
-  if (bridge?.workspace?.fetchText) {
-    return bridge.workspace.fetchText(PAGE_URL)
-  }
   try {
+    if (bridge?.workspace?.fetchText) {
+      return await bridge.workspace.fetchText(PAGE_URL)
+    }
     const resp = await fetch(PAGE_URL)
     return resp.ok ? await resp.text() : null
   } catch {
