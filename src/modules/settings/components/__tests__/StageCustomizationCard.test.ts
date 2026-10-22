@@ -425,3 +425,53 @@ describe('StageCustomizationCard', () => {
     w2.unmount()
   })
 })
+
+describe('aparência dos hinos — título e estrofes independentes', () => {
+  beforeEach(() => { lsStub.clear(); setActivePinia(createPinia()) })
+  it.each(['title', 'lyric'] as const)('edita cor, tamanho, peso e limpa personalização de %s', async field => {
+    const w = await mountCard({ onlyScope: 'hymns' })
+    const store = useStageSettingsStore()
+    const prefix = `settings.stage.${field}`
+    try {
+      await w.get(`input[aria-label="${prefix}TextColor"]`).setValue('#123456')
+      await w.get(`input[aria-label="${prefix}FontSize"]`).setValue('100')
+      expect(store.settings[`${field}TextColor`]).toBe('#123456')
+      expect(store.settings[`${field}FontSize`]).toBe(100)
+      const section = w.get(`input[aria-label="${prefix}TextColor"]`).element.closest('.stage-custom__section')!
+      const buttons = Array.from(section.querySelectorAll<HTMLButtonElement>('[role=radio]'))
+      buttons[1]!.click(); await flushPromises()
+      expect(store.settings[`${field}FontWeight`]).toBe(field === 'title' ? 600 : 400)
+      buttons[1]!.click(); await flushPromises()
+      expect(store.settings[`${field}FontWeight`]).toBeNull()
+      const swatches = section.querySelectorAll<HTMLButtonElement>('.stage-custom__swatch')
+      swatches[1]!.click(); await flushPromises()
+      expect(store.settings[`${field}TextColor`]).not.toBeNull()
+      swatches[0]!.click(); await flushPromises()
+      expect(store.settings[`${field}TextColor`]).toBeNull()
+      const reset = w.findAll('button').find(button => button.text() === `${prefix}Reset`)!
+      await reset.trigger('click')
+      expect(store.settings[`${field}FontSize`]).toBeNull()
+      expect(store.settings[`${field}TextShadow`]).toBeNull()
+      expect(store.settings[`${field}UpperCase`]).toBe(false)
+    } finally { w.unmount() }
+  })
+  it.each(['title', 'lyric'] as const)('alterna caixa e sombra de %s pelos rótulos e pelas caixas', async field => {
+    const w = await mountCard({ onlyScope: 'hymns' })
+    const store = useStageSettingsStore()
+    try {
+      for(const suffix of ['UpperCase', 'TextShadow', ...(field === 'title' ? ['TextBox'] : [])]) {
+        const key = `${field}${suffix}` as keyof typeof store.settings
+        const label = `settings.stage.${key}`
+        const button = w.findAll('button').find(button => button.text() === label)!
+        await button.trigger('click')
+        expect(typeof store.settings[key]).toBe('boolean')
+        await button.trigger('click')
+        const checkbox = w.get(`input[aria-label="${label}"]`)
+        await checkbox.setValue(true)
+        expect(store.settings[key]).toBe(true)
+        await checkbox.setValue(false)
+        expect(store.settings[key]).toBe(false)
+      }
+    } finally { w.unmount() }
+  })
+})

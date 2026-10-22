@@ -76,32 +76,6 @@ function patchSabbathConfig(sabbathConfig: SabbathModeConfig) {
   setSabbathConfig(sabbathConfig)
 }
 
-const sabbathEndTime = computed({
-  get: () => effectiveConfig.value.sabbathConfig?.endTime ?? '',
-  set: (v: string) => {
-    if (effectiveConfig.value.sabbathConfig) {
-      patchSabbathConfig({ ...effectiveConfig.value.sabbathConfig, endTime: v })
-    }
-  },
-})
-
-const sabbathStartTime = computed({
-  get: () => effectiveConfig.value.sabbathConfig?.startTime ?? '',
-  set: (v: string) => {
-    if (effectiveConfig.value.sabbathConfig) {
-      patchSabbathConfig({ ...effectiveConfig.value.sabbathConfig, startTime: v || undefined })
-    }
-  },
-})
-
-const canStartSabbath = computed(() => {
-  const sc = effectiveConfig.value.sabbathConfig
-  if (!sc) return false
-  if (!/^\d{2}:\d{2}$/.test(sc.endTime)) return false
-  if (sc.scheduleMode === 'start' && !/^\d{2}:\d{2}$/.test(sc.startTime ?? '')) return false
-  return true
-})
-
 const sabbathPanelOpen = ref(false)
 
 // web#175: popover de agendamento fecha ao clicar fora (document-level,
@@ -159,16 +133,6 @@ const startTimeMs = computed({
   set: (ms: number) => {
     if (effectiveConfig.value.sabbathConfig) {
       patchSabbathConfig({ ...effectiveConfig.value.sabbathConfig, startTime: msToTime(ms) })
-    }
-  },
-})
-
-/** Schedule mode reativo */
-const scheduleMode = computed({
-  get: () => effectiveConfig.value.sabbathConfig?.scheduleMode ?? 'endOnly',
-  set: (v: 'endOnly' | 'start') => {
-    if (effectiveConfig.value.sabbathConfig) {
-      patchSabbathConfig({ ...effectiveConfig.value.sabbathConfig, scheduleMode: v })
     }
   },
 })

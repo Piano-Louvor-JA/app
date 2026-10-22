@@ -220,7 +220,7 @@ export function useCountdownDisplay(
         // marco 5min): NÃO toca atrasado. Feedback Ezequias: "5min toca
         // faltando 4" — o catch-up tocava o alerta fora de hora (no app E no
         // web, mesmo comportamento). Alerta que perdeu a hora é pulado.
-        const remaining = remainingRawMs.value
+        const remaining = computeCountdownRemainingMs(runtime.value, base)
         deadlines = new Map(
           activeMarkers.value
             .filter(

@@ -80,13 +80,7 @@ export function clearAlertQueue(): void {
 }
 
 // Cache de AudioContext e elementos de áudio pré-carregados
-let audioCtx: AudioContext | null = null
 const audioCache = new Map<string, HTMLAudioElement>()
-
-function getAudioContext(): AudioContext {
-  if (!audioCtx) audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
-  return audioCtx
-}
 
 async function preloadAudio(url: string): Promise<HTMLAudioElement> {
   if (audioCache.has(url)) return audioCache.get(url)!
