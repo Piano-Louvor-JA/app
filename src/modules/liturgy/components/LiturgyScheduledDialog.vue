@@ -204,7 +204,7 @@ async function onDownloadSelected() {
       }
       // Importa com o caminho local (desktop) — sem download disponível (web),
       // agenda como online_video com a URL original (fallback).
-      importProvaiEVedeEpisodes(store, [ep], () => localPath ?? '')
+      await importProvaiEVedeEpisodes(store, [ep], () => localPath ?? '')
       if (!localPath) {
         // web/sem bridge: guarda a URL como online_video em vez de file vazio
         const rotation = store.categories.find((c) => c.name === 'Provai e Vede')
@@ -380,6 +380,10 @@ const dateFmt = (iso: string) => {
         </div>
         <p class="liturgy-dialog__hint">
           {{ t('liturgy.messages.scheduledHint') }}
+        </p>
+
+        <p v-if="pvOneClickProgress" class="scheduled-dialog__report" role="status">
+          {{ pvOneClickProgress }}
         </p>
 
         <div
