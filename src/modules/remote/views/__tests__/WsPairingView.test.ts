@@ -86,6 +86,7 @@ const mediaDevices = {
 }
 
 describe('WsPairingView', () => {
+  const mounted = new Set<ReturnType<typeof mount>>()
   beforeEach(() => {
     vi.clearAllMocks()
     FakeWebSocket.instances = []
@@ -98,14 +99,18 @@ describe('WsPairingView', () => {
   })
 
   afterEach(() => {
+    for (const wrapper of mounted) wrapper.unmount()
+    mounted.clear()
     vi.unstubAllGlobals()
   })
 
   function createWrapper() {
-    return mount(WsPairingView, {
+    const wrapper = mount(WsPairingView, {
       props: {},
       global: { plugins: [i18n] },
     })
+    mounted.add(wrapper)
+    return wrapper
   }
 
   it('estado inicial: idle, mostra botão iniciar e input manual', () => {
@@ -387,5 +392,39 @@ describe('WsPairingView — geração do scan', () => {
     await flushPromises()
     expect(jsQR).not.toHaveBeenCalled() // interval pós-unmount não instalado
     vi.useRealTimers()
+  })
+})
+
+
+describe('WsPairingView — câmera encerrada durante inicialização', () => {
+  afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals() })
+  it('não rearma o leitor quando play termina depois de sair da tela', async () => {
+    vi.useFakeTimers()
+    const stop = vi.fn()
+    vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop }] }) } })
+    let release!: () => void
+    vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(() => new Promise<void>(resolve => { release = resolve }))
+    const wrapper = mount(WsPairingView, { global: { plugins:[i18n] } })
+    await wrapper.get('.ws-pairing__btn').trigger('click')
+    await vi.advanceTimersByTimeAsync(200)
+    wrapper.unmount()
+    release()
+    await flushPromises()
+    expect(stop).toHaveBeenCalledOnce()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+  it('libera a câmera que só foi autorizada depois de sair da tela', async () => {
+    vi.useFakeTimers()
+    const stop = vi.fn()
+    let release!: (stream: unknown) => void
+    vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: vi.fn(() => new Promise(resolve => { release = resolve })) } })
+    const wrapper = mount(WsPairingView, { global: { plugins:[i18n] } })
+    await wrapper.get('.ws-pairing__btn').trigger('click')
+    wrapper.unmount()
+    release({ getTracks: () => [{ stop }] })
+    await flushPromises()
+    await vi.advanceTimersByTimeAsync(200)
+    expect(stop).toHaveBeenCalledOnce()
+    expect(vi.getTimerCount()).toBe(0)
   })
 })
