@@ -54,3 +54,27 @@ ML: 31
     expect(result.groups[0]!.entries[0]!.name).toBe('')
   })
 })
+
+describe('lista colada — erros e anos explícitos',()=>{
+  it.each(['26','2026'])('aceita ano %s em bloco e linha única',year=>{
+    const result=parseQuarterPaste(`24/10/${year}\ninicial: 15 - Adoração\n25/10/${year} — hino 22 — Louvor`,{year:2000})
+    expect(result.errors).toEqual([])
+    expect(result.groups.map(group=>group.dateISO)).toEqual(['2026-10-24','2026-10-25'])
+    expect(result.groups.map(group=>group.entries[0]?.musicId)).toEqual([15,22])
+  })
+  it('data inválida encerra o bloco e conteúdo órfão é informado como erro',()=>{
+    const result=parseQuarterPaste('texto sem data\n31/02/2026\ninicial: 15\n24/10/2026\nfinal: 22',{year:2026})
+    expect(result.errors).toEqual(['texto sem data','31/02/2026','inicial: 15'])
+    expect(result.groups).toHaveLength(1)
+    expect(result.groups[0]?.entries[0]?.musicId).toBe(22)
+  })
+  it('conteúdo vazio após prefixo não cria entrada, inclusive em linha única',()=>{
+    const result=parseQuarterPaste('24/10\ninicial:\n25/10 — final:',{year:2026})
+    expect(result.groups).toHaveLength(1)
+    expect(result.groups[0]?.entries).toEqual([])
+  })
+  it('conteúdo não numérico, prefixo inválido e número não positivo são mantidos como arquivo',()=>{
+    const result=parseQuarterPaste('24/10\n*: arquivo.mp4\nzero: 0 - Aviso\nprovai： filme.mp4',{year:2026})
+    expect(result.groups[0]?.entries).toMatchObject([{slotKey:'item',filePath:'*: arquivo.mp4'},{slotKey:'zero',filePath:'0 - Aviso'},{slotKey:'provai',filePath:'filme.mp4'}])
+  })
+})

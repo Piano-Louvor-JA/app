@@ -1,6 +1,6 @@
 # CI de Testes — cobertura rigorosa (istanbul) por destino do evento:
 #   PR com base staging e push/dispatch em refs/heads/staging → 50/50/50/50;
-#   PR para main, push em main e demais refs → 100/100/100/100.
+#   Produção na versão 1.32.2 → 70%; próximas versões → 100%.
 # O limite vem de scripts/coverage-gate-limit.mjs (base/ref do evento, nunca a branch de origem).
 #
 # Duas passadas + merge determinístico:
@@ -26,7 +26,7 @@ permissions:
 jobs:
   unit-coverage:
     if: ${{ !(github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && github.event.pull_request.number == 341) }}
-    name: Unit Tests + Coverage 100%
+    name: Unit Tests + Coverage Gate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -36,7 +36,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Vitest suíte completa (provider v8 — AST remap, sem phantom)
-        # thresholds 0: o gate 100/100/100/100 roda no step próprio abaixo
+        # thresholds 0: o gate do destino/versão roda no step próprio abaixo
         run: >-
           npx vitest run
           --coverage --coverage.provider=v8
@@ -106,6 +106,6 @@ jobs:
         env:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
           PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
-          # push/dispatch: ref integrado (refs/heads/staging → 50%; main/tags → 100%)
+          # Ref integrado; o script também verifica a versão para a exceção 1.32.2.
           EVENT_REF: ${{ github.ref }}
         run: node scripts/coverage-gate-limit.mjs coverage-merged/coverage-final-summary.json

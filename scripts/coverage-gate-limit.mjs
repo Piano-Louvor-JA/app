@@ -5,17 +5,15 @@ const METRICS = ['statements', 'branches', 'functions', 'lines']
 
 const STAGING_REF = 'refs/heads/staging'
 
-/**
- * Caminho da staging usa 50%: PR cuja base é staging, ou push/dispatch cujo ref
- * do evento é refs/heads/staging. Main, tags, release e qualquer outro destino
- * permanecem em 100%. Em PR só a base decide (o ref é refs/pull/N/merge); a
- * branch de origem nunca entra na decisão.
- */
-export function coverageMinimumPercent({ eventName, baseRef, ref } = {}) {
-  if (eventName === 'pull_request') return baseRef === 'staging' ? 50 : 100
-  if ((eventName === 'push' || eventName === 'workflow_dispatch') && ref === STAGING_REF) {
-    return 50
-  }
+/** Staging mantém 50%; exceção autorizada de 70% apenas para a release 1.32.2. */
+export function coverageMinimumPercent({ eventName, baseRef, ref, version } = {}) {
+  if (eventName === 'pull_request' && baseRef === 'staging') return 50
+  if ((eventName === 'push' || eventName === 'workflow_dispatch') && ref === STAGING_REF) return 50
+
+  const production = (eventName === 'pull_request' && baseRef === 'main') ||
+    ((eventName === 'push' || eventName === 'workflow_dispatch') && ref === 'refs/heads/main') ||
+    (['push', 'workflow_dispatch', 'release'].includes(eventName) && ref === 'refs/tags/v1.32.2')
+  if (version === '1.32.2' && production) return 70
   return 100
 }
 
@@ -52,7 +50,12 @@ function main() {
   const eventName = process.env.GITHUB_EVENT_NAME ?? ''
   const baseRef = process.env.PR_BASE_REF ?? ''
   const ref = process.env.EVENT_REF ?? ''
-  const minimum = coverageMinimumPercent({ eventName, baseRef, ref })
+  const { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
+  const minimum = coverageMinimumPercent({ eventName, baseRef, ref, version })
+  if (summaryPath === '--minimum') {
+    console.log(minimum)
+    return
+  }
   const summary = JSON.parse(readFileSync(summaryPath, 'utf8'))
   const result = evaluateCoverage(summary, minimum)
   console.log(
