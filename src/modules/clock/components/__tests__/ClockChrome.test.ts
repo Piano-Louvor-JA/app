@@ -1,3 +1,4 @@
+import { useInAppProjectionMinimized } from '@shared/composables/useInAppProjectionMinimized'
 // @vitest-environment jsdom
 /**
  * ClockChrome — prévia + projetar flutuantes do Relógio: visível no Relógio
@@ -258,4 +259,18 @@ describe('ClockChrome — título da prévia', () => {
     expect(title.exists()).toBe(true)
     expect(title.text()).toBe('Relógio')
   })
+})
+
+
+it('restaura a projeção recolhida pelo controle existente sem navegar', async () => {
+  const minimized = useInAppProjectionMinimized('clock')
+  minimized.value = true
+  const w = mountChrome()
+  try {
+    const button = w.find('button:has(.ti-arrows-maximize)')
+    expect(button.exists()).toBe(true)
+    await button.trigger('click')
+    expect(minimized.value).toBe(false)
+    expect(push).not.toHaveBeenCalled()
+  } finally { minimized.value = false; w.unmount() }
 })
