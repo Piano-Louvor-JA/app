@@ -28,10 +28,10 @@ const PAGE_URL =
 /** HTML da página do trimestre: main process (sem CORS) no Electron, fetch direto na web. */
 async function fetchQuarterHtml(): Promise<string | null> {
   const bridge = getDesktopBridge()
-  if (bridge?.workspace?.fetchText) {
-    return bridge.workspace.fetchText(PAGE_URL)
-  }
   try {
+    if (bridge?.workspace?.fetchText) {
+      return await bridge.workspace.fetchText(PAGE_URL)
+    }
     const resp = await fetch(PAGE_URL)
     return resp.ok ? await resp.text() : null
   } catch {
@@ -48,9 +48,7 @@ const tab = ref<TabId>('rotations')
 // ── Rotações ───────────────────────────────────────────────
 const activeRotationId = ref<string | null>(null)
 const newRotationName = ref('')
-const addEntryOpen = ref(false)
 const entryDate = ref(new Date().toISOString().slice(0, 10))
-const entryMusicId = ref('')
 const entryName = ref('')
 const entryKind = ref<'music' | 'online_video' | 'file'>('music')
 const entryUrl = ref('')
@@ -204,7 +202,7 @@ async function onDownloadSelected() {
       }
       // Importa com o caminho local (desktop) — sem download disponível (web),
       // agenda como online_video com a URL original (fallback).
-      importProvaiEVedeEpisodes(store, [ep], () => localPath ?? '')
+      await importProvaiEVedeEpisodes(store, [ep], () => localPath ?? '')
       if (!localPath) {
         // web/sem bridge: guarda a URL como online_video em vez de file vazio
         const rotation = store.categories.find((c) => c.name === 'Provai e Vede')
@@ -290,8 +288,6 @@ function onAddSong() {
 const pasteText = ref('')
 const pasteReport = ref<{ created: number; unmapped: string[]; errors: number } | null>(null)
 
-const slotChoices = ref<Record<string, string>>({})
-const unmappedSlots = computed(() => Array.from(dlg.pendingSlots.value.keys()))
 
 function onApplyPaste() {
   const mapping: Record<string, string | undefined> = {}
@@ -302,9 +298,6 @@ function onApplyPaste() {
       .replace(/[\u0300-\u036f]/g, '')
       .replace(/[^a-z0-9]/g, '')
     if (!(key in mapping)) mapping[key] = rot.id
-  }
-  for (const [slot, rotId] of Object.entries(slotChoices.value)) {
-    if (rotId) mapping[slot] = rotId
   }
   const year = new Date().getFullYear()
   // Modo newbie: slot desconhecido cria a rotação com o nome do slot —
@@ -325,12 +318,6 @@ function onApplyPaste() {
   }
 }
 
-function onResolveSlot(slot: string) {
-  const rotId = slotChoices.value[slot]
-  if (!rotId) return
-  dlg.applySlotMapping(slot, rotId)
-}
-
 // ── Duplicar trimestre ─────────────────────────────────────
 function onDuplicateQuarter() {
   if (!activeRotationId.value || activeEntries.value.length === 0) return
@@ -338,7 +325,6 @@ function onDuplicateQuarter() {
   dlg.duplicateQuarter(activeRotationId.value, { fromDate: first, weeks: 4 })
 }
 
-const entryKindKey = (kind: string) => `liturgy.messages.scheduledKind.${kind}`
 const dateFmt = (iso: string) => {
   const [y, m, d] = iso.split('-')
   return `${d}/${m}/${y}`
@@ -380,6 +366,10 @@ const dateFmt = (iso: string) => {
         </div>
         <p class="liturgy-dialog__hint">
           {{ t('liturgy.messages.scheduledHint') }}
+        </p>
+
+        <p v-if="pvOneClickProgress" class="scheduled-dialog__report" role="status">
+          {{ pvOneClickProgress }}
         </p>
 
         <div

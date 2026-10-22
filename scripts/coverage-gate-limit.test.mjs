@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { copyFileSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -99,15 +99,19 @@ test('medição de 50% passa na staging e falha no caminho de 100%', () => {
   assert.deepEqual(full.failures, [])
 })
 
-test('o comando aplica 50% no caminho da staging e 100% fora dele', () => {
+test('o comando aplica 50% na staging e a exceção 70% da versão 1.32.2 em main', () => {
   const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)))
   const dir = mkdtempSync(join(tmpdir(), 'coverage-gate-'))
+  mkdirSync(join(dir, 'scripts'))
+  const scriptPath = join(dir, 'scripts', 'coverage-gate-limit.mjs')
+  copyFileSync(join(repoRoot, 'scripts/coverage-gate-limit.mjs'), scriptPath)
+  writeFileSync(join(dir, 'package.json'), JSON.stringify({version:'1.32.2'}))
   const file = join(dir, 'summary.json')
   writeFileSync(file, JSON.stringify(summary(50)))
 
   const staging = spawnSync(
     process.execPath,
-    ['scripts/coverage-gate-limit.mjs', file],
+    [scriptPath, file],
     {
       cwd: repoRoot,
       env: { ...process.env, GITHUB_EVENT_NAME: 'pull_request', PR_BASE_REF: 'staging' },
@@ -119,7 +123,7 @@ test('o comando aplica 50% no caminho da staging e 100% fora dele', () => {
 
   const main = spawnSync(
     process.execPath,
-    ['scripts/coverage-gate-limit.mjs', file],
+    [scriptPath, file],
     {
       cwd: repoRoot,
       env: { ...process.env, GITHUB_EVENT_NAME: 'pull_request', PR_BASE_REF: 'main' },
@@ -127,11 +131,11 @@ test('o comando aplica 50% no caminho da staging e 100% fora dele', () => {
     },
   )
   assert.equal(main.status, 1)
-  assert.match(main.stdout, /Limite de cobertura: 100%/)
-  assert.match(main.stderr, /COBERTURA < 100/)
+  assert.match(main.stdout, /Limite de cobertura: 70%/)
+  assert.match(main.stderr, /COBERTURA < 70/)
 
   const run = (env) =>
-    spawnSync(process.execPath, ['scripts/coverage-gate-limit.mjs', file], {
+    spawnSync(process.execPath, [scriptPath, file], {
       cwd: repoRoot,
       env: { ...process.env, PR_BASE_REF: '', ...env },
       encoding: 'utf8',
@@ -144,6 +148,38 @@ test('o comando aplica 50% no caminho da staging e 100% fora dele', () => {
 
   const pushMain = run({ GITHUB_EVENT_NAME: 'push', EVENT_REF: 'refs/heads/main' })
   assert.equal(pushMain.status, 1)
-  assert.match(pushMain.stdout, /Limite de cobertura: 100%/)
-  assert.match(pushMain.stderr, /COBERTURA < 100/)
+  assert.match(pushMain.stdout, /Limite de cobertura: 70%/)
+  assert.match(pushMain.stderr, /COBERTURA < 70/)
+  writeFileSync(file, JSON.stringify(summary(70)))
+  const release = run({ GITHUB_EVENT_NAME:'push', EVENT_REF:'refs/heads/main' })
+  assert.equal(release.status,0,release.stderr)
+  writeFileSync(join(dir,'package.json'),JSON.stringify({version:'1.32.3'}))
+  const nextRelease = run({ GITHUB_EVENT_NAME:'push', EVENT_REF:'refs/heads/main' })
+  assert.equal(nextRelease.status,1)
+  assert.match(nextRelease.stdout,/Limite de cobertura: 100%/)
+  const minimum = spawnSync(process.execPath,[scriptPath,'--minimum'],{
+    cwd:repoRoot,env:{...process.env,GITHUB_EVENT_NAME:'push',EVENT_REF:'refs/heads/main',PR_BASE_REF:''},encoding:'utf8',
+  })
+  assert.equal(minimum.status,0,minimum.stderr)
+  assert.equal(minimum.stdout.trim(),'100')
+
+})
+
+test('exceção humana de 70% vale somente para v1.32.2 nos caminhos de produção', () => {
+  for (const context of [
+    {eventName:'pull_request',baseRef:'main'},
+    {eventName:'push',ref:'refs/heads/main'},
+    {eventName:'workflow_dispatch',ref:'refs/heads/main'},
+    {eventName:'push',ref:'refs/tags/v1.32.2'},
+    {eventName:'release',ref:'refs/tags/v1.32.2'},
+  ]) {
+    assert.equal(coverageMinimumPercent({...context,version:'1.32.2'}),70)
+    for(const version of ['1.32.1','1.32.3','1.33.0',undefined]) assert.equal(coverageMinimumPercent({...context,version}),100)
+  }
+  assert.equal(coverageMinimumPercent({eventName:'pull_request',baseRef:'staging',version:'1.32.2'}),50)
+  assert.equal(coverageMinimumPercent({eventName:'push',ref:'refs/tags/v1.32.3',version:'1.32.2'}),100)
+  assert.equal(coverageMinimumPercent({eventName:'push',ref:'refs/heads/feature',version:'1.32.2'}),100)
+  assert.equal(coverageMinimumPercent({eventName:'pull_request',baseRef:'other',version:'1.32.2'}),100)
+  assert.deepEqual(evaluateCoverage(summary(70),70).failures,[])
+  assert.equal(evaluateCoverage(summary(69.99),70).failures.length,4)
 })

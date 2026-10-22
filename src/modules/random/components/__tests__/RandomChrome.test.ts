@@ -1,3 +1,4 @@
+import { useInAppProjectionMinimized } from '@shared/composables/useInAppProjectionMinimized'
 // @vitest-environment jsdom
 /**
  * RandomChrome — prévia + sortear + projetar flutuantes do Sorteio: visível
@@ -289,4 +290,18 @@ describe('RandomChrome — título da prévia', () => {
     expect(title.exists()).toBe(true)
     expect(title.text()).toBe('Sorteio')
   })
+})
+
+
+it('restaura a projeção recolhida pelo controle existente sem navegar', async () => {
+  const minimized = useInAppProjectionMinimized('random')
+  minimized.value = true
+  const w = mountChrome()
+  try {
+    const button = w.find('button:has(.ti-arrows-maximize)')
+    expect(button.exists()).toBe(true)
+    await button.trigger('click')
+    expect(minimized.value).toBe(false)
+    expect(push).not.toHaveBeenCalled()
+  } finally { minimized.value = false; w.unmount() }
 })

@@ -86,8 +86,7 @@ function defaultsMarkers(): AlertMarker[] {
 }
 
 /** Valida entradas de alertMarkers: id string, offset >= 0 finito, preset string. */
-function asAlertMarkers(value: unknown): AlertMarker[] | null {
-  if (!Array.isArray(value)) return null
+function asAlertMarkers(value: unknown[]): AlertMarker[] | null {
   const out: AlertMarker[] = []
   for (const entry of value) {
     if (!entry || typeof entry !== 'object') continue

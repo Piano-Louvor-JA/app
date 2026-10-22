@@ -33,15 +33,21 @@ async function startScan() {
   errorMsg.value = ''
   const generation = ++scanGeneration
   try {
-    stream = await navigator.mediaDevices.getUserMedia({
+    const acquired = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: 'environment' },
     })
+    if (generation !== scanGeneration || unmounted) {
+      acquired.getTracks().forEach((track) => track.stop())
+      return
+    }
+    stream = acquired
     await new Promise((r) => setTimeout(r, 200))
     if (generation !== scanGeneration || unmounted) return
     /* v8 ignore next 1 -- video (v-if=step scanning) sempre existe quando o scan chega vivo */
     if (video) {
       video.srcObject = stream
       await video.play()
+      if (generation !== scanGeneration || unmounted) return
       scanTimer = window.setInterval(scanFrame, 250)
     }
   } catch {
