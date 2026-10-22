@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { GlassCard } from '@design-system/index'
@@ -55,6 +55,10 @@ const expandedToneId = ref<string | null>(null)
 function refreshLibrary(): void {
   toneLibrary.value = listLibraryTones()
 }
+
+watch(() => props.open, (open) => {
+  if (open) refreshLibrary()
+}, { immediate: true })
 
 /** Marcos efetivos: config v2 ou seeds (paridade). */
 const markers = computed(() => props.config.alertMarkers ?? [])
