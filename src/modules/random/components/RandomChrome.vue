@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
+import { useInAppProjectionMinimized } from '@shared/composables/useInAppProjectionMinimized'
 import FloatingPreviewTitle from '@shared/components/FloatingPreviewTitle.vue'
 import { FLOATING_STACK_ORDER, useFloatingDrag } from '@shared/composables/useFloatingDrag'
 import { USER_PREFERENCE_KEYS } from '@shared/constants/storage-keys'
@@ -20,6 +21,7 @@ const RANDOM_ROUTE = 'utilities-random'
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
+const projectionMinimized = useInAppProjectionMinimized('random')
 const store = useRandomStore()
 
 const stage = ref<StageSettings>(readEffectiveStageSettings('random'))
@@ -77,6 +79,10 @@ function onClear() {
 }
 
 async function onOpenRandom() {
+  if (projectionMinimized.value) {
+    projectionMinimized.value = false
+    return
+  }
   await router.push({ name: RANDOM_ROUTE })
 }
 </script>
@@ -111,12 +117,12 @@ async function onOpenRandom() {
     </aside>
 
     <div class="random-chrome__actions">
-      <template v-if="!onRandomRoute">
+      <template v-if="projectionMinimized || !onRandomRoute">
         <button
           type="button"
           class="random-chrome__icon-btn"
-          :aria-label="t('random.openRandom')"
-          :title="t('random.openRandom')"
+          :aria-label="projectionMinimized ? t('projection.restoreProjection') : t('random.openRandom')"
+          :title="projectionMinimized ? t('projection.restoreProjection') : t('random.openRandom')"
           @click="onOpenRandom"
         >
           <i
@@ -127,6 +133,7 @@ async function onOpenRandom() {
 
         <button
           type="button"
+          v-if="!onRandomRoute"
           class="random-chrome__draw"
           :disabled="!store.canDraw"
           :aria-label="t('random.drawButton')"

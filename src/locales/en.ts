@@ -1,4 +1,8 @@
 export default {
+  updates: {
+    downloadMacInstaller: 'Download macOS installer',
+    manualMacInstructions: 'On macOS, install this update manually. Download the installer below, quit LouvorJA, open the DMG and drag the app to Applications, replacing the previous version. Your data and preferences will be kept.',
+  },
   windowControls: {
     close: 'Close',
     minimize: 'Minimize',
@@ -12,6 +16,8 @@ export default {
     retrying: 'Trying to reconnect...',
   },
   projection: {
+    minimizeProjection: 'Minimize projection',
+    restoreProjection: 'Restore projection',
     confirmClose: 'Projection is in progress. Closing this window stops the music. Really leave?',
   },
   app: {

@@ -3,6 +3,8 @@
 import { mount } from '@vue/test-utils'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
+vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
+
 vi.mock('@modules/settings/components/StagePaletteButton.vue', () => ({
   default: { props: ['scope'], template: '<div class="palette-stub">{{ scope }}</div>' },
 }))

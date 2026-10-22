@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
+import { useInAppProjectionMinimized } from '@shared/composables/useInAppProjectionMinimized'
 import FloatingPreviewTitle from '@shared/components/FloatingPreviewTitle.vue'
 import { FLOATING_STACK_ORDER, useFloatingDrag } from '@shared/composables/useFloatingDrag'
 import { USER_PREFERENCE_KEYS } from '@shared/constants/storage-keys'
@@ -16,6 +17,7 @@ import BibleProjectFab from './BibleProjectFab.vue'
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
+const projectionMinimized = useInAppProjectionMinimized('bible')
 const store = useBibleStore()
 
 const hasProjection = computed(() => hasBibleProjection(store.projection))
@@ -59,6 +61,10 @@ function onAdjacentVerse(direction: -1 | 1) {
 }
 
 async function onOpenReader() {
+  if (projectionMinimized.value) {
+    projectionMinimized.value = false
+    return
+  }
   await router.push({ name: 'bible' })
 }
 </script>
@@ -128,11 +134,11 @@ async function onOpenReader() {
 
     <div class="bible-chrome__actions">
       <button
-        v-if="!onBibleRoute"
+        v-if="projectionMinimized || !onBibleRoute"
         type="button"
         class="bible-chrome__icon-btn"
-        :aria-label="t('bible.openReader')"
-        :title="t('bible.openReader')"
+        :aria-label="projectionMinimized ? t('projection.restoreProjection') : t('bible.openReader')"
+        :title="projectionMinimized ? t('projection.restoreProjection') : t('bible.openReader')"
         @click="onOpenReader"
       >
         <i

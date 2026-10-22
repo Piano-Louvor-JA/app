@@ -1,4 +1,5 @@
-import { app, ipcMain } from "electron";
+import { app, ipcMain, shell } from "electron";
+import { needsManualMacUpdate, macInstallerUrl } from './mac-update-mode.mjs';
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 const { autoUpdater } = require("electron-updater");
@@ -16,6 +17,7 @@ let updaterState = {
 	downloaded: false,
 	error: null,
 };
+let manualMacUpdate = false;
 
 /**
  * Detecta execução via pacote Microsoft Store (MSIX/APPX).
@@ -53,6 +55,7 @@ export function initUpdater(mainWindowGetter) {
 	}
 
 	autoUpdater.autoDownload = false;
+  manualMacUpdate = needsManualMacUpdate();
 	autoUpdater.autoInstallOnAppQuit = false;
 
 	autoUpdater.on("checking-for-update", () => {
@@ -67,6 +70,7 @@ export function initUpdater(mainWindowGetter) {
 		sendToRenderer(mainWindowGetter, "updater:available", {
 			version: info.version,
 			releaseNotes: info.releaseNotes || "",
+      manualInstall: manualMacUpdate,
 		});
 	});
 
@@ -114,6 +118,7 @@ function registerIpc(mainWindowGetter) {
 				available: updaterState.available,
 				version: updaterState.version,
 				releaseNotes: updaterState.releaseNotes,
+        manualInstall: manualMacUpdate,
 			};
 		} catch (error) {
 			console.error("[updater] check falhou:", error?.message);
@@ -126,6 +131,12 @@ function registerIpc(mainWindowGetter) {
 			return { success: false, error: "Updates gerenciados pela Microsoft Store" };
 		}
 		try {
+			if (manualMacUpdate) {
+        const url = updaterState.available ? macInstallerUrl(updaterState.version) : null;
+        if (!url) return { success: false, error: 'Nenhuma versão disponível para baixar' };
+        await shell.openExternal(url);
+        return { success: true, manual: true };
+      }
 			await autoUpdater.downloadUpdate();
 			return { success: true };
 		} catch (error) {
@@ -135,6 +146,7 @@ function registerIpc(mainWindowGetter) {
 	});
 
 	ipcMain.handle("updater:install", () => {
+    if (manualMacUpdate) return { success: false, error: 'Instale a atualização usando o DMG baixado' };
 		if (isWindowsStorePackage()) {
 			return { success: false, error: "Updates gerenciados pela Microsoft Store" };
 		}

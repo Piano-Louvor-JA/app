@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
+import { useInAppProjectionMinimized } from '@shared/composables/useInAppProjectionMinimized'
 import FloatingPreviewTitle from '@shared/components/FloatingPreviewTitle.vue'
 import { FLOATING_STACK_ORDER, useFloatingDrag } from '@shared/composables/useFloatingDrag'
 import { USER_PREFERENCE_KEYS } from '@shared/constants/storage-keys'
@@ -19,6 +20,7 @@ const COUNTDOWN_ROUTE = 'utilities-countdown'
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
+const projectionMinimized = useInAppProjectionMinimized('countdown')
 const store = useCountdownStore()
 
 const { stage, effectiveConfig } = useCountdownStage(() => store.config)
@@ -64,6 +66,10 @@ function onClear() {
 }
 
 async function onOpenTimer() {
+  if (projectionMinimized.value) {
+    projectionMinimized.value = false
+    return
+  }
   await router.push({ name: COUNTDOWN_ROUTE })
 }
 </script>
@@ -94,11 +100,11 @@ async function onOpenTimer() {
 
     <div class="countdown-chrome__actions">
       <button
-        v-if="!onCountdownRoute"
+        v-if="projectionMinimized || !onCountdownRoute"
         type="button"
         class="countdown-chrome__icon-btn"
-        :aria-label="t('countdown.openTimer')"
-        :title="t('countdown.openTimer')"
+        :aria-label="projectionMinimized ? t('projection.restoreProjection') : t('countdown.openTimer')"
+        :title="projectionMinimized ? t('projection.restoreProjection') : t('countdown.openTimer')"
         @click="onOpenTimer"
       >
         <i

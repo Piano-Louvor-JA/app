@@ -1,5 +1,4 @@
-# Build macOS DMG — gera instalador .dmg UNIVERSAL (Intel + Apple Silicon no mesmo
-# arquivo, o sistema escolhe a fatia) + latest-mac.yml.
+# Build macOS — DMG para instalação + ZIP universal para auto-update (Intel e Apple Silicon).
 # Cross-build funciona sem Rosetta: o electron-builder baixa os dists do Electron
 # por arquitetura e funde com lipo. Binários .node pré-compilados entram iguais
 # nas duas árvores; mac.x64ArchFiles em package.json autoriza essa fusão.
@@ -17,7 +16,7 @@ permissions:
 
 jobs:
   build-macos:
-    name: Build macOS DMG universal
+    name: Build macOS DMG + ZIP universal
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
@@ -64,22 +63,32 @@ jobs:
             echo "PIANO_BUILD_PROFILE=homologation" >> "$GITHUB_ENV"
           fi
 
-      # --publish never: o electron-builder só gera o DMG e o latest-mac.yml.
+      # --publish never: gera DMG, ZIP de atualização e latest-mac.yml.
       # Quem cria a GitHub Release é o release.yml (um único draft por tag).
       # Com --publish always, os dois publishers deste build criaram duas
       # releases para a v1.31.2 (DMG numa, blockmap na outra).
-      - name: Build Vite + Electron DMG universal
+      - name: Build Vite + Electron DMG e ZIP universal
         if: steps.decision.outputs.publish == 'true'
         run: npm run electron:build -- --mac --universal --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload DMG universal (artifact backup)
+      - name: Validate macOS update artifacts
+        if: steps.decision.outputs.publish == 'true'
+        shell: bash
+        run: node scripts/validate-release-artifacts.mjs mac "$(node -p "require('./package.json').version")"
+
+      - name: Upload DMG e ZIP universal (artifact backup)
         if: steps.decision.outputs.publish == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: LouvorJA-PIANO-macOS-universal-DMG
-          path: dist-electron/*universal*.dmg
+          path: |
+            dist-electron/*universal*.dmg
+            dist-electron/*.dmg.blockmap
+            dist-electron/*universal*.zip
+            dist-electron/*.zip.blockmap
+            dist-electron/latest-mac.yml
           if-no-files-found: error
           retention-days: 30
 
@@ -97,7 +106,7 @@ jobs:
           if [ -z "$TAG" ]; then TAG="v$(node -p "require('./package.json').version")"; mode=create; fi
           node scripts/release-draft.mjs --repo "$GITHUB_REPOSITORY" --tag "$TAG" --mode "$mode"
           shopt -s nullglob
-          assets=(dist-electron/*.dmg dist-electron/*.dmg.blockmap dist-electron/latest-mac.yml)
+          assets=(dist-electron/*.dmg dist-electron/*.dmg.blockmap dist-electron/*.zip dist-electron/*.zip.blockmap dist-electron/latest-mac.yml)
           test -f dist-electron/latest-mac.yml || { echo "latest-mac.yml ausente (auto-update)" >&2; exit 1; }
           gh release upload "$TAG" "${assets[@]}" --clobber
           printf 'Anexado: %s\n' "${assets[@]}"

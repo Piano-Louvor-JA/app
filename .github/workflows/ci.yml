@@ -258,6 +258,7 @@ jobs:
           path: |
             dist-electron/*.exe
             dist-electron/*.dmg
+            dist-electron/*.zip
             dist-electron/*.AppImage
             dist-electron/*.blockmap
             dist-electron/latest*.yml

@@ -23,13 +23,17 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
+function teleportTarget() {
+  return document.fullscreenElement || 'body'
+}
+
 function onKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape') emit('close')
 }
 </script>
 
 <template>
-  <Teleport to="body">
+  <Teleport :to="teleportTarget()">
     <Transition name="stage-shortcut-fade">
       <div
         v-if="open"
