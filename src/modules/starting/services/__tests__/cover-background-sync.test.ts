@@ -253,9 +253,9 @@ describe("ensureAlbumCovers", () => {
 		const first = ensureAlbumCovers({ skipIfSynced: false });
 		await vi.waitFor(() => expect(gated).toBe(true));
 		const second = ensureAlbumCovers({ skipIfSynced: false });
-		await vi.waitFor(() => {
+		await vi.waitFor(async () => {
 			// second deve ter resolvido com vazio (isRunning true)
-			expect(second).resolves.toBeTruthy();
+			await expect(second).resolves.toBeTruthy();
 		});
 		releaseCategories();
 		const r1 = await first;

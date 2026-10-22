@@ -5,7 +5,7 @@ const [platform, expectedVersion] = process.argv.slice(2)
 const expected = {
   win: { manifest: 'latest.yml', extension: '.exe' },
   linux: { manifest: 'latest-linux.yml', extension: '.AppImage' },
-  mac: { manifest: 'latest-mac.yml', extension: '.dmg' },
+  mac: { manifest: 'latest-mac.yml', extension: '.zip' },
 }[platform]
 
 if (!expected || !expectedVersion) {
@@ -35,6 +35,15 @@ if (!sha512 || sha512.length < 80) throw new Error(`${expected.manifest}: sha512
 if (!path) throw new Error(`${expected.manifest}: path ausente`)
 if (!files.includes(path)) throw new Error(`${expected.manifest}: artefato referenciado não existe: ${path}`)
 if (!path.endsWith(expected.extension)) throw new Error(`${expected.manifest}: path não é ${expected.extension}: ${path}`)
+
+if (platform === 'mac') {
+  if (!files.some((file) => file.endsWith('.dmg') && file.includes(`-${expectedVersion}-`))) {
+    throw new Error('Instalador macOS DMG da versão ausente')
+  }
+  const urls = [...yaml.matchAll(/^\s*-\s*url:\s*["']?([^\s"']+)["']?\s*$/gm)]
+    .map((match) => decodeURIComponent(basename(match[1])))
+  if (!urls.includes(path)) throw new Error(`${expected.manifest}: ZIP ausente da lista files usada pelo atualizador macOS`)
+}
 
 const blockmap = `${path}.blockmap`
 const hasExternalBlockmap = files.includes(blockmap)

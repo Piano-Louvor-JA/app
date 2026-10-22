@@ -1,5 +1,6 @@
 export default {
   media: {
+    exitFullscreen: 'Salir de pantalla completa',
     publishRules: {
       title: 'Reglas de la Comunidad',
       visibleToAll: 'Las colecciones públicas aparecen para toda la red PIANO.',

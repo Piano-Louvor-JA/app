@@ -14,6 +14,17 @@ const mockUpdater = {
 }
 
 describe('useUpdateChecker', () => {
+  it('download manual não fica aguardando progresso nem permite instalação automática', async () => {
+    const checker = useUpdateChecker()
+    checker.hasUpdate.value = true
+    mockUpdater.download.mockResolvedValue({ success: true, manual: true })
+    await checker.downloadUpdate()
+    expect(checker.isDownloading.value).toBe(false)
+    expect(checker.isDownloaded.value).toBe(false)
+    expect(checker.manualInstall.value).toBe(true)
+    checker.installUpdate()
+    expect(mockUpdater.install).not.toHaveBeenCalled()
+  })
   beforeEach(() => {
     vi.clearAllMocks()
     vi.useFakeTimers()

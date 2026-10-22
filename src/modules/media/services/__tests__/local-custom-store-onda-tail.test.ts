@@ -1,17 +1,17 @@
 // Cauda B263: deleteLocalLyric — branch `lyrics.length < before` FALSO quando a
 // música iterada não tem a lyric (loop continua até achar em outra música).
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 let store: Record<string, string>
 
 beforeEach(() => {
   store = {}
-  globalThis.localStorage = {
+  vi.stubGlobal('localStorage', {
     getItem: (k: string) => store[k] ?? null,
     setItem: (k: string, v: string) => void (store[k] = v),
     removeItem: (k: string) => void delete store[k],
     clear: () => void (store = {}),
-  } as Storage
+  } as Storage)
 })
 
 import { createLocalCollection, createLocalMusic, deleteLocalLyric, createLocalLyric } from '../local-custom-store'

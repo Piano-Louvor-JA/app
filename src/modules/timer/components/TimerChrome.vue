@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
+import { useInAppProjectionMinimized } from '@shared/composables/useInAppProjectionMinimized'
 import FloatingPreviewTitle from '@shared/components/FloatingPreviewTitle.vue'
 import { FLOATING_STACK_ORDER, useFloatingDrag } from '@shared/composables/useFloatingDrag'
 import { USER_PREFERENCE_KEYS } from '@shared/constants/storage-keys'
@@ -21,6 +22,7 @@ const TIMER_ROUTE = 'utilities-timer'
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
+const projectionMinimized = useInAppProjectionMinimized('timer')
 const store = useTimerStore()
 
 const stage = ref<StageSettings>(readEffectiveStageSettings('timer'))
@@ -68,6 +70,10 @@ function onClear() {
 }
 
 async function onOpenStopwatch() {
+  if (projectionMinimized.value) {
+    projectionMinimized.value = false
+    return
+  }
   await router.push({ name: TIMER_ROUTE })
 }
 </script>
@@ -98,11 +104,11 @@ async function onOpenStopwatch() {
 
     <div class="timer-chrome__actions">
       <button
-        v-if="!onTimerRoute"
+        v-if="projectionMinimized || !onTimerRoute"
         type="button"
         class="timer-chrome__icon-btn"
-        :aria-label="t('timer.openStopwatch')"
-        :title="t('timer.openStopwatch')"
+        :aria-label="projectionMinimized ? t('projection.restoreProjection') : t('timer.openStopwatch')"
+        :title="projectionMinimized ? t('projection.restoreProjection') : t('timer.openStopwatch')"
         @click="onOpenStopwatch"
       >
         <i

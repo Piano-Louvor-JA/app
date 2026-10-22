@@ -250,7 +250,8 @@ describe('MediaView — sessão com conteúdo', () => {
   it('minimizar: chama minimize e volta pra rota de origem (history)', async () => {
     // jsdom: history.length==1 → cai no replace({name:'albums'})
     const w = await mountView()
-    await w.find('.media-window__tool-btn').trigger('click')
+    await w.find('.media-window__tool-btn[aria-label="media.minimize"]').trigger('click')
+    await flushPromises()
     expect(P().fns.minimize).toHaveBeenCalled()
     expect(replace).toHaveBeenCalledWith({ name: 'albums' })
   })
@@ -258,7 +259,7 @@ describe('MediaView — sessão com conteúdo', () => {
   it('history curta: volta via replace albums', async () => {
     Object.defineProperty(window, 'history', { value: { length: 1 }, configurable: true })
     const w = await mountView()
-    await w.find('.media-window__tool-btn').trigger('click')
+    await w.find('.media-window__tool-btn[aria-label="media.minimize"]').trigger('click')
     await flushPromises()
     expect(replace).toHaveBeenCalledWith({ name: 'albums' })
     Object.defineProperty(window, 'history', { value: { length: 2 }, configurable: true })

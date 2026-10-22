@@ -1,4 +1,5 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch, type Ref } from 'vue'
+import { arrangeFloatingPanels } from '@shared/services/floating-layout'
 
 import {
   clampFloatingPosition,
@@ -28,10 +29,33 @@ export const FLOATING_STACK_GAP = 12
 /** Ordem de baixo para cima dos painéis que dividem o canto padrão. */
 export const FLOATING_STACK_ORDER = { media: 0, bible: 1, countdown: 2, timer: 3, clock: 4, random: 5 } as const
 
-type StackEntry = { order: number; height: number; active: boolean }
+type StackEntry = {
+  order: number
+  height: number
+  width: number
+  left: number
+  top: number
+  titleInset: number
+  active: boolean
+  visible: boolean
+  position: FloatingPosition | null
+}
 
-/** Painéis montados no canto padrão (sem posição arrastada), por instância. */
+/** Todos os painéis registrados, incluindo os arrastados e suas posições salvas. */
 const stackEntries = reactive(new Map<symbol, StackEntry>())
+const layoutViewport = ref({ width: 0, height: 0 })
+
+const arrangedPositions = computed(() => {
+  const entries = [...stackEntries].filter(([, entry]) => entry.visible && entry.width > 0 && entry.height > 0)
+    .sort((a, b) => a[1].order - b[1].order)
+  const rects = entries.map(([id, entry], index) => ({
+    id: String(index), width: entry.width, height: entry.height,
+    x: entry.position?.x ?? entry.left,
+    y: entry.position ? entry.position.y - entry.titleInset : entry.top - stackOffset(id),
+  }))
+  const arranged = arrangeFloatingPanels(rects, layoutViewport.value, FLOATING_STACK_GAP)
+  return new Map(entries.map(([id], index) => [id, arranged[index]!]))
+})
 
 function stackOffset(id: symbol): number {
   const me = stackEntries.get(id)
@@ -46,14 +70,21 @@ function stackOffset(id: symbol): number {
 }
 
 function viewportSize() {
-  return { width: window.innerWidth, height: window.innerHeight }
+  // O dock cobre a parte inferior da janela: essa faixa não é área livre
+  // para prévias, mesmo quando ainda está dentro do viewport do navegador.
+  const dock = document.querySelector('.ds-dock')?.getBoundingClientRect()
+  const bottom = dock && dock.height > 0 && dock.top > 0
+    ? Math.min(window.innerHeight, dock.top)
+    : window.innerHeight
+  return { width: window.innerWidth, height: bottom }
 }
 
 /**
  * Painel flutuante solto na tela (player minimizado, prévias da Bíblia e do
  * Timer): arrasta por qualquer ponto fora dos botões, persiste left/top na
  * preferência `preferenceKey` e volta ao canto padrão com `resetPosition`.
- * Com `stackOrder`, empilha no canto padrão sobre os painéis de ordem menor.
+ * Com `stackOrder`, organiza todos os painéis visíveis sem sobreposição,
+ * preferindo a pilha padrão e respeitando as posições arrastadas quando livres.
  */
 export function useFloatingDrag(
   rootRef: Ref<HTMLElement | null>,
@@ -64,27 +95,58 @@ export function useFloatingDrag(
   const dragging = ref(false)
   let drag: DragState | null = null
   const stackId = Symbol(preferenceKey)
+  let resizeObserver: ResizeObserver | undefined
+
+  function observeBounds() {
+    resizeObserver?.disconnect()
+    if (rootRef.value) resizeObserver?.observe(rootRef.value)
+    const dock = document.querySelector('.ds-dock')
+    if (dock) resizeObserver?.observe(dock)
+  }
 
   function syncStack() {
     if (options.stackOrder === undefined) return
     const el = rootRef.value
+    // Mede a âncora CSS sem o deslocamento aplicado pela organização automática.
+    const savedStyle = el?.style.cssText
+    if (el) for (const key of ['left', 'top', 'right', 'bottom', 'transform']) el.style.removeProperty(key)
+    const rect = el?.getBoundingClientRect()
+    const titleRect = el?.querySelector('.floating-preview-title')?.getBoundingClientRect()
+    const titleInset = rect && titleRect ? Math.max(0, rect.top - titleRect.top) : 0
+    if (el && savedStyle !== undefined) el.style.cssText = savedStyle
+    layoutViewport.value = viewportSize()
     stackEntries.set(stackId, {
       order: options.stackOrder,
-      height: el ? el.getBoundingClientRect().height : 0,
+      height: (rect?.height ?? 0) + titleInset,
+      width: rect?.width ?? 0,
+      left: rect?.left ?? 0,
+      top: (rect?.top ?? 0) - titleInset,
+      titleInset,
       active: el != null && position.value == null,
+      visible: el != null,
+      position: position.value,
     })
   }
 
   const positionStyle = computed(() => {
+    const arranged = arrangedPositions.value.get(stackId)
     if (position.value) {
+      const effective = arranged ?? position.value
       return {
-        left: `${position.value.x}px`,
-        top: `${position.value.y}px`,
+        left: `${effective.x}px`,
+        top: `${effective.y + (arranged ? stackEntries.get(stackId)?.titleInset ?? 0 : 0)}px`,
         right: 'auto',
         bottom: 'auto',
       }
     }
     const offset = stackOffset(stackId)
+    const entry = stackEntries.get(stackId)
+    if (arranged && entry) {
+      const dx = arranged.x - entry.left
+      const dy = arranged.y - entry.top
+      if (dx !== 0) return { transform: `translate(${dx}px, ${dy}px)` }
+      return dy !== 0 ? { transform: `translateY(${dy}px)` } : undefined
+    }
     return offset > 0 ? { transform: `translateY(-${offset}px)` } : undefined
   })
 
@@ -151,7 +213,12 @@ export function useFloatingDrag(
 
   function onPointerUp(event: PointerEvent) {
     if (!drag || event.pointerId !== drag.pointerId) return
-    if (drag.moved) saveFloatingPosition(preferenceKey, position.value)
+    if (drag.moved) {
+      syncStack()
+      const arranged = arrangedPositions.value.get(stackId)
+      if (arranged) position.value = { x: arranged.x, y: arranged.y + (stackEntries.get(stackId)?.titleInset ?? 0) }
+      saveFloatingPosition(preferenceKey, position.value)
+    }
     drag = null
     dragging.value = false
     stopListening()
@@ -176,6 +243,7 @@ export function useFloatingDrag(
   }
 
   watch(rootRef, (el) => {
+    observeBounds()
     if (el) clampToViewport()
     syncStack()
   })
@@ -183,11 +251,16 @@ export function useFloatingDrag(
   watch(position, syncStack)
 
   onMounted(() => {
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(onResize)
+      observeBounds()
+    }
     onResize()
     window.addEventListener('resize', onResize)
   })
 
   onBeforeUnmount(() => {
+    resizeObserver?.disconnect()
     window.removeEventListener('resize', onResize)
     stopListening()
     stackEntries.delete(stackId)

@@ -1,4 +1,8 @@
 export default {
+  updates: {
+    downloadMacInstaller: 'Baixar instalador macOS',
+    manualMacInstructions: 'No macOS, esta atualização é instalada manualmente. Baixe o instalador pelo botão abaixo, feche o LouvorJA, abra o arquivo DMG e arraste o aplicativo para Aplicativos, substituindo a versão anterior. Seus dados e preferências serão mantidos.',
+  },
   windowControls: {
     close: 'Fechar',
     minimize: 'Minimizar',
@@ -12,6 +16,8 @@ export default {
     retrying: 'Tentando reconectar...',
   },
   projection: {
+    minimizeProjection: 'Minimizar projeção',
+    restoreProjection: 'Restaurar projeção',
     confirmClose: 'A projeção está em andamento. Fechar a janela interrompe a música. Deseja realmente sair?',
   },
   app: {

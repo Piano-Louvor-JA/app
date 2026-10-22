@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import DOMPurify from 'dompurify'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useUpdateChecker } from '@shared/composables/useUpdateChecker'
 
 const model = defineModel<boolean>({ default: false })
+const { t } = useI18n()
 
 const {
   newVersion,
+  manualInstall,
   releaseNotes,
   isDownloading,
   isDownloaded,
@@ -45,6 +48,9 @@ const safeNotes = computed(() =>
         </div>
 
         <div class="update-card__body">
+          <p v-if="manualInstall" class="release-notes" data-test="manual-install-hint" role="status">
+            {{ t('updates.manualMacInstructions') }}
+          </p>
           <div
             v-if="error"
             class="error-msg"
@@ -89,7 +95,7 @@ const safeNotes = computed(() =>
             class="action-btn action-btn--primary"
             @click="downloadUpdate"
           >
-            Baixar atualização
+            {{ manualInstall ? t('updates.downloadMacInstaller') : 'Baixar atualização' }}
           </button>
 
           <button

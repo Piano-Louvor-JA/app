@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
+import { useInAppProjectionMinimized } from '@shared/composables/useInAppProjectionMinimized'
 import FloatingPreviewTitle from '@shared/components/FloatingPreviewTitle.vue'
 import { FLOATING_STACK_ORDER, useFloatingDrag } from '@shared/composables/useFloatingDrag'
 import { USER_PREFERENCE_KEYS } from '@shared/constants/storage-keys'
@@ -21,6 +22,7 @@ const CLOCK_ROUTE = 'utilities-clock'
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
+const projectionMinimized = useInAppProjectionMinimized('clock')
 const store = useClockStore()
 
 const stage = ref<StageSettings>(readEffectiveStageSettings('clock'))
@@ -66,6 +68,10 @@ function onClear() {
 }
 
 async function onOpenClock() {
+  if (projectionMinimized.value) {
+    projectionMinimized.value = false
+    return
+  }
   await router.push({ name: CLOCK_ROUTE })
 }
 </script>
@@ -95,11 +101,11 @@ async function onOpenClock() {
 
     <div class="clock-chrome__actions">
       <button
-        v-if="!onClockRoute"
+        v-if="projectionMinimized || !onClockRoute"
         type="button"
         class="clock-chrome__icon-btn"
-        :aria-label="t('clock.openClock')"
-        :title="t('clock.openClock')"
+        :aria-label="projectionMinimized ? t('projection.restoreProjection') : t('clock.openClock')"
+        :title="projectionMinimized ? t('projection.restoreProjection') : t('clock.openClock')"
         @click="onOpenClock"
       >
         <i

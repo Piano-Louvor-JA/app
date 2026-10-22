@@ -42,7 +42,8 @@ beforeEach(() => {
   localStorage.clear()
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
     const height = HEIGHTS[this.dataset.key ?? ''] ?? 0
-    return { left: 600, top: 500, width: 300, height, x: 600, y: 500, right: 900, bottom: 500 + height, toJSON: () => ({}) } as DOMRect
+    // Os painéis reais compartilham a mesma borda inferior, não o mesmo top.
+    return { left: 600, top: 600 - height, width: 300, height, x: 600, y: 600 - height, right: 900, bottom: 600, toJSON: () => ({}) } as DOMRect
   })
 })
 
@@ -53,6 +54,43 @@ afterEach(() => {
 })
 
 describe('useFloatingDrag — pilha no canto padrão', () => {
+  it('mantém posições salvas e reorganizadas acima do menu inferior, inclusive após resize', async () => {
+    const dock = document.createElement('nav')
+    dock.className = 'ds-dock'
+    let dockTop = 650
+    dock.getBoundingClientRect = () => ({ top: dockTop, height: 80 } as DOMRect)
+    document.body.appendChild(dock)
+    try {
+      saveFloatingPosition('test.a', { x: 600, y: 720 })
+      saveFloatingPosition('test.b', { x: 600, y: 720 })
+      const a = mountPanel('a', 0)
+      const b = mountPanel('b', 1)
+      await nextTick()
+      const bottom = (w: VueWrapper, height: number) => parseFloat((w.element as HTMLElement).style.top) + height
+      expect(bottom(a, HEIGHTS.a!)).toBeLessThanOrEqual(dockTop - 8)
+      expect(bottom(b, HEIGHTS.b!)).toBeLessThanOrEqual(dockTop - 8)
+      dockTop = 450
+      window.dispatchEvent(new Event('resize'))
+      await nextTick()
+      expect(bottom(a, HEIGHTS.a!)).toBeLessThanOrEqual(dockTop - 8)
+      expect(bottom(b, HEIGHTS.b!)).toBeLessThanOrEqual(dockTop - 8)
+    } finally {
+      dock.remove()
+    }
+  })
+  it('separa também painéis com posições salvas que se sobrepõem', async () => {
+    saveFloatingPosition('test.a', { x: 600, y: 500 })
+    saveFloatingPosition('test.b', { x: 600, y: 500 })
+    const a = mountPanel('a', 0)
+    const b = mountPanel('b', 1)
+    await nextTick()
+    const ay = parseFloat((a.element as HTMLElement).style.top)
+    const by = parseFloat((b.element as HTMLElement).style.top)
+    const ax = parseFloat((a.element as HTMLElement).style.left)
+    const bx = parseFloat((b.element as HTMLElement).style.left)
+    expect(ax + 300 + FLOATING_STACK_GAP <= bx || bx + 300 + FLOATING_STACK_GAP <= ax ||
+      ay + HEIGHTS.a! + FLOATING_STACK_GAP <= by || by + HEIGHTS.b! + FLOATING_STACK_GAP <= ay).toBe(true)
+  })
   it('cada painel sobe a altura dos que estão abaixo dele na pilha', async () => {
     const c = mountPanel('c', 2)
     const a = mountPanel('a', 0)

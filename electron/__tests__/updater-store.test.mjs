@@ -15,6 +15,11 @@ const mockAutoUpdater = vi.hoisted(() => ({
   quitAndInstall: vi.fn(),
   on: vi.fn(),
 }));
+const macMode = vi.hoisted(() => ({ manual: false, open: vi.fn(async () => {}) }));
+vi.mock('../mac-update-mode.mjs', async (importOriginal) => ({
+  ...await importOriginal(),
+  needsManualMacUpdate: () => macMode.manual,
+}));
 
 vi.mock("module", () => ({
   createRequire: () => () => ({ autoUpdater: mockAutoUpdater }),
@@ -22,6 +27,7 @@ vi.mock("module", () => ({
 
 // Mock do electron: isPackaged=true (produção) + ipcMain com handlers gravados.
 vi.mock("electron", () => ({
+  shell: { openExternal: macMode.open },
   app: { isPackaged: true },
   ipcMain: {
     handlers: new Map(),
@@ -44,8 +50,23 @@ describe("updater.mjs — pacote Microsoft Store", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    macMode.manual = false;
     originalExecPath = process.execPath;
     delete process.windowsStore;
+  });
+
+  it('Mac sem Developer ID baixa DMG oficial sem chamar o instalador nativo', async () => {
+    macMode.manual = true;
+    const { initUpdater } = await loadUpdater();
+    initUpdater(() => fakeWindow);
+    const available = mockAutoUpdater.on.mock.calls.find(([event]) => event === 'update-available')[1];
+    available({ version: '1.31.2' });
+    const handlers = (await import('electron')).ipcMain.handlers;
+    expect(await handlers.get('updater:download')()).toEqual({ success: true, manual: true });
+    expect(macMode.open).toHaveBeenCalledWith('https://github.com/Piano-Louvor-JA/app/releases/download/v1.31.2/LouvorJA-PIANO-1.31.2-universal.dmg');
+    expect(mockAutoUpdater.downloadUpdate).not.toHaveBeenCalled();
+    expect(handlers.get('updater:install')().success).toBe(false);
+    expect(mockAutoUpdater.quitAndInstall).not.toHaveBeenCalled();
   });
 
   afterEach(() => {

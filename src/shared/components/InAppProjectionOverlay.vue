@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import StagePaletteButton from "@modules/settings/components/StagePaletteButton.vue";
-import { onMounted, onUnmounted } from "vue";
+import { onBeforeUnmount, onMounted, onUnmounted, ref, watch } from "vue";
+import { useI18n } from 'vue-i18n';
+import { useInAppProjectionMinimized } from '@shared/composables/useInAppProjectionMinimized';
+import { usePrimaryProjectionControls } from '@shared/composables/usePrimaryProjectionControls';
 
+const { t } = useI18n();
+const { primaryOnly, minimizeVisible, controlsVisible, wake } = usePrimaryProjectionControls();
 const props = defineProps<{
 	label: string;
 	closeLabel: string;
@@ -9,11 +14,48 @@ const props = defineProps<{
 	scope: string;
 }>();
 
+const minimized = useInAppProjectionMinimized(props.scope);
+const projectionWindow = ref<HTMLElement | null>(null);
+const fullscreenRoot = ref<HTMLElement | null>(null);
+
+async function leaveFullscreen() {
+  if (!fullscreenRoot.value || document.fullscreenElement !== fullscreenRoot.value) return;
+  try { await document.exitFullscreen?.(); } catch { /* Janela já saiu de fullscreen. */ }
+}
+
+async function enterFullscreen() {
+  const root = fullscreenRoot.value;
+  if (!root || document.fullscreenElement === root) return;
+  try {
+    await root.requestFullscreen?.();
+  } catch {
+    // Sem permissão do sistema, o palco ainda ocupa toda a área do aplicativo.
+  }
+}
+
+watch(primaryOnly, (single) => {
+  if (!single) minimized.value = false;
+});
+
+watch(minimized, (value) => {
+  document.documentElement.classList.toggle('inapp-projection-open', !value);
+  if (!value) wake();
+}, { flush: 'sync' });
+
+watch(minimized, (value) => {
+  if (value) void leaveFullscreen();
+  else {
+    projectionWindow.value?.focus();
+    void enterFullscreen();
+  }
+}, { flush: 'post' });
+
 const emit = defineEmits<{
 	close: [];
 }>();
 
 function onGlobalKeydown(event: KeyboardEvent) {
+	if (minimized.value) return;
 	if (event.key !== "Escape") return;
 	const target = event.target as HTMLElement | null;
 	if (target?.isContentEditable || target?.tagName === "TEXTAREA") return;
@@ -41,11 +83,16 @@ function onGlobalKeydown(event: KeyboardEvent) {
 }
 
 onMounted(() => {
+  minimized.value = false;
+  void enterFullscreen();
 	document.documentElement.classList.add("inapp-projection-open");
 	window.addEventListener("keydown", onGlobalKeydown, true);
 });
 
+onBeforeUnmount(() => { void leaveFullscreen(); });
+
 onUnmounted(() => {
+  minimized.value = false;
 	document.documentElement.classList.remove("inapp-projection-open");
 	window.removeEventListener("keydown", onGlobalKeydown, true);
 });
@@ -53,16 +100,20 @@ onUnmounted(() => {
 
 <template>
   <div
+    ref="fullscreenRoot"
+    v-show="!minimized"
     class="inapp-projection"
+    :class="{ 'inapp-projection--idle': !controlsVisible }"
     role="dialog"
     aria-modal="true"
     :aria-label="props.label"
   >
     <section
+      ref="projectionWindow"
       class="inapp-projection__window"
       tabindex="-1"
     >
-      <header class="inapp-projection__toolbar">
+      <header v-show="controlsVisible" class="inapp-projection__toolbar">
         <button
           type="button"
           class="inapp-projection__tool-btn"
@@ -75,9 +126,20 @@ onUnmounted(() => {
             aria-hidden="true"
           />
         </button>
+        <button
+          v-if="minimizeVisible"
+          type="button"
+          class="inapp-projection__tool-btn"
+          data-testid="minimize-projection"
+          :aria-label="t('projection.minimizeProjection')"
+          :title="t('projection.minimizeProjection')"
+          @click="minimized = true"
+        >
+          <i class="ti ti-minus" aria-hidden="true" />
+        </button>
       </header>
 
-      <div class="inapp-projection__stage-palette">
+      <div v-show="controlsVisible" class="inapp-projection__stage-palette">
         <p class="inapp-projection__hotkey-hint">
           {{ props.hint }}
         </p>
@@ -95,26 +157,28 @@ onUnmounted(() => {
 .inapp-projection {
   position: fixed;
   inset: 0;
-  z-index: 80;
+  z-index: 100002;
   display: flex;
   flex-direction: column;
-  padding:
-    calc(var(--app-titlebar-height, 0px) + 1.5rem)
-    1.25rem
-    calc(var(--ds-dock-height, 5.5rem) + 0.75rem);
+  padding: 0;
   box-sizing: border-box;
-  background: rgb(0 0 0 / 0.55);
-  backdrop-filter: blur(2px);
+  background: #000;
+  width: 100%;
+  height: 100%;
+}
+
+.inapp-projection--idle {
+  cursor: none;
 }
 
 .inapp-projection__window {
   position: relative;
   flex: 1;
   min-height: 0;
-  border-radius: var(--ds-radius-lg, 1rem 0 1rem 0);
+  border-radius: 0;
   overflow: hidden;
   background: #000;
-  border: 1px solid rgb(255 255 255 / 0.08);
+  border: none;
 }
 
 .inapp-projection__toolbar {

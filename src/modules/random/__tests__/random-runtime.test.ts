@@ -1,11 +1,11 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { JSDOM } from 'jsdom'
 
 // JSDOM global (padrão palco-bridge-random.integration.test.ts)
 const dom = new JSDOM('', { url: 'http://localhost/' })
 const g = globalThis as unknown as Record<string, unknown>
-g.window = dom.window
-g.localStorage = dom.window.localStorage
+vi.stubGlobal('window', dom.window)
+vi.stubGlobal('localStorage', dom.window.localStorage)
 // jsdom não implementa BroadcastChannel — usar o nativo do Node 18+
 if (typeof BroadcastChannel === 'function') g.BroadcastChannel = BroadcastChannel
 
