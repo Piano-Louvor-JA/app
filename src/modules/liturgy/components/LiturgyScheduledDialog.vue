@@ -13,12 +13,11 @@ import {
 } from '../services/provai-e-vede-source'
 import { importProvaiEVedeEpisodes } from '../services/provai-e-vede-import'
 import {
-  extractInformativoEpisode,
-  informativoPostUrl,
   informativoUpcomingSaturdays,
   type InformativoEpisode,
 } from '../services/informativo-source'
-import { importInformativoEpisodes } from '../services/informativo-import'
+import { runInformativoOneClick } from '../services/informativo-one-click'
+import { fetchSourceText } from '../services/scheduled-source-fetch'
 import { useScheduledStore } from '../stores/useScheduledStore'
 import {
   loadLiturgyMusicOptions,
@@ -34,21 +33,7 @@ const PAGE_URL =
 
 /** HTML da página do trimestre: main process (sem CORS) no Electron, fetch direto na web. */
 async function fetchText(url: string): Promise<string | null> {
-  const bridge = getDesktopBridge()
-  if (bridge?.workspace?.fetchText) return bridge.workspace.fetchText(url)
-  try {
-    const resp = await fetch(url)
-    if (resp.ok) return await resp.text()
-  } catch {
-    // CORS/bloqueio: cai no proxy abaixo (r.jina.ai reflete qualquer origin)
-  }
-  // Web (B5): sites sem Access-Control-Allow-Origin (ex. daniellocutor) via proxy de leitura
-  try {
-    const resp = await fetch(`https://r.jina.ai/${url}`)
-    return resp.ok ? await resp.text() : null
-  } catch {
-    return null
-  }
+  return fetchSourceText(url)
 }
 
 async function fetchQuarterHtml(): Promise<string | null> {
@@ -129,20 +114,23 @@ async function onInformativoOneClick() {
   informativoBusy.value = true
   informativoProgress.value = ''
   try {
-    const episodes: InformativoEpisode[] = []
-    const saturdays = informativoUpcomingSaturdays(new Date(), 13)
-    for (const [week, dateISO] of saturdays.entries()) {
-      informativoProgress.value = t('liturgy.messages.scheduledInformativoSearching', { done: week + 1, total: 13 })
-      const html = await fetchText(informativoPostUrl(dateISO))
-      const episode = html ? extractInformativoEpisode(html, dateISO) : null
-      if (episode) episodes.push(episode)
-    }
-    if (episodes.length === 0) {
+    const result = await runInformativoOneClick(useScheduledStore(), {
+      fetchText,
+      onProgress: (done, total) => {
+        informativoProgress.value = t('liturgy.messages.scheduledInformativoSearching', {
+          done,
+          total,
+        })
+      },
+    })
+    if (result.unavailable) {
       informativoProgress.value = t('liturgy.messages.scheduledInformativoUnavailable')
       return
     }
-    const report = importInformativoEpisodes(useScheduledStore(), episodes, { onlyUpcoming: true })
-    informativoProgress.value = t('liturgy.messages.scheduledPvDone', { created: report.created, skipped: report.skipped })
+    informativoProgress.value = t('liturgy.messages.scheduledPvDone', {
+      created: result.created,
+      skipped: result.skipped,
+    })
   } finally {
     informativoBusy.value = false
   }
