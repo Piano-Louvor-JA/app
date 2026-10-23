@@ -28,6 +28,10 @@ import {
   DEFAULT_TIMER_DISPLAY_CONFIG,
   DEFAULT_TIMER_RUNTIME,
 } from '../types/timer'
+import { isIndependentProjectionLocation } from '@shared/services/projection-window-location'
+
+/** Projeção independente ignora o takeover da principal (projecting:false). */
+const independent = isIndependentProjectionLocation()
 
 withDefaults(
   defineProps<{
@@ -136,7 +140,7 @@ const effectiveConfig = computed(() => {
     :style="stageStyle"
   >
     <div
-      v-if="runtime.projecting !== false"
+      v-if="independent || runtime.projecting !== false"
       class="timer-projection__stage"
       :style="stageAlign"
     >

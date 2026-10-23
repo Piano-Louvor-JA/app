@@ -5,6 +5,8 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { useInAppProjectionMinimized } from '@shared/composables/useInAppProjectionMinimized'
 import FloatingPreviewTitle from '@shared/components/FloatingPreviewTitle.vue'
+import IndependentProjectionButton from '@shared/components/IndependentProjectionButton.vue'
+import { isIndependentProjectionActive } from '@shared/composables/useIndependentProjection'
 import { FLOATING_STACK_ORDER, useFloatingDrag } from '@shared/composables/useFloatingDrag'
 import { USER_PREFERENCE_KEYS } from '@shared/constants/storage-keys'
 
@@ -32,8 +34,9 @@ const onCountdownRoute = computed(() => route.name === COUNTDOWN_ROUTE)
  * rodando sem projeção, esta prévia é o que mantém os alertas tocando.
  */
 const visible = computed(
-  () => onCountdownRoute.value || store.isProjecting || store.isRunning,
+  () => onCountdownRoute.value || store.isProjecting || store.isRunning || isIndependentProjectionActive('countdown'),
 )
+
 
 const previewRuntime = computed(
   () => sabbathIdlePreviewRuntime(effectiveConfig.value, store.runtime) ?? store.runtime,
@@ -140,6 +143,10 @@ async function onOpenTimer() {
           aria-hidden="true"
         />
       </button>
+
+      <IndependentProjectionButton
+        module-id="countdown"
+      />
 
       <CountdownProjectFab
         :projecting="store.isProjecting"

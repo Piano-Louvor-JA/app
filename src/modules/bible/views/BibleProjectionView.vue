@@ -11,6 +11,12 @@ import {
   readBibleRuntimeFromStorage,
   type BibleProjectionRuntime,
 } from '../services/bible-runtime'
+import {
+  BIBLE_INDEPENDENT_CHANNEL,
+  BIBLE_INDEPENDENT_STORAGE_KEY,
+  readBibleIndependentFromStorage,
+} from '../services/bible-independent-runtime'
+import { isIndependentProjectionLocation } from '@shared/services/projection-window-location'
 import { readEffectiveStageSettings, subscribeStageSettings } from '../../settings/services/stage-settings-runtime'
 import type { StageSettings } from '../../settings/types/stage-settings'
 import { resolveBackgroundImage, stageFlexAlign } from '../../settings/types/stage-settings'
@@ -24,6 +30,10 @@ const props = withDefaults(
 )
 
 const runtime = ref<BibleProjectionRuntime>({ ...DEFAULT_BIBLE_RUNTIME })
+/** Projeção independente lê canal próprio (imune ao takeover da principal). */
+const independent = isIndependentProjectionLocation()
+const runtimeKey = independent ? BIBLE_INDEPENDENT_STORAGE_KEY : BIBLE_RUNTIME_STORAGE_KEY
+const runtimeChannelName = independent ? BIBLE_INDEPENDENT_CHANNEL : BIBLE_RUNTIME_CHANNEL
 let runtimeChannel: BroadcastChannel | null = null
 
 // Personalização do Palco (escopo bible)
@@ -31,11 +41,11 @@ const stage = ref<StageSettings>(readEffectiveStageSettings('bible'))
 let unsubStage: (() => void) | null = null
 
 function refreshRuntime() {
-  runtime.value = readBibleRuntimeFromStorage()
+  runtime.value = independent ? readBibleIndependentFromStorage() : readBibleRuntimeFromStorage()
 }
 
 function onStorage(event: StorageEvent) {
-  if (event.key === BIBLE_RUNTIME_STORAGE_KEY) {
+  if (event.key === runtimeKey) {
     refreshRuntime()
   }
 }
@@ -53,7 +63,7 @@ onMounted(() => {
   })
 
   try {
-    runtimeChannel = new BroadcastChannel(BIBLE_RUNTIME_CHANNEL)
+    runtimeChannel = new BroadcastChannel(runtimeChannelName)
     runtimeChannel.addEventListener('message', onRuntimeMessage)
   } catch {
     runtimeChannel = null

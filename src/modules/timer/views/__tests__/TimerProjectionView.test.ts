@@ -45,6 +45,11 @@ vi.mock('../../components/TimerPreview.vue', () => ({
   default: { props: ['config', 'runtime'], template: '<div class="timer-preview-stub" />' },
 }))
 
+const independentLocation = vi.hoisted(() => ({ value: false }))
+vi.mock('@shared/services/projection-window-location', () => ({
+  isIndependentProjectionLocation: () => independentLocation.value,
+}))
+
 import TimerProjectionView from '../TimerProjectionView.vue'
 
 const stageBase = {
@@ -191,5 +196,20 @@ describe('TimerProjectionView — stageStyle com backgroundImage (b119)', () => 
     expect(style).toContain('url(')
     expect(style).toContain('cover')
     wrapper.unmount()
+  })
+
+  it('projecting:false (takeover) esconde na principal, mas não na independente', async () => {
+    mockReadRuntime.mockReturnValue({ status: 'running', remainingMs: 1000, savedTimesMs: [], projecting: false })
+    const principal = mount(TimerProjectionView)
+    await flushPromises()
+    expect(principal.find('.timer-preview-stub').exists()).toBe(false)
+    principal.unmount()
+
+    independentLocation.value = true
+    const independent = mount(TimerProjectionView)
+    await flushPromises()
+    expect(independent.find('.timer-preview-stub').exists()).toBe(true)
+    independent.unmount()
+    independentLocation.value = false
   })
 })
