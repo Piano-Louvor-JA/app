@@ -33,6 +33,14 @@ export default {
     cancel: 'Cancelar',
     copied: '¡Copiado!',
   },
+  independentProjection: {
+    title: 'Proyección independiente',
+    unavailable: 'Solo se habilita con monitores extendidos disponibles',
+    hint: 'Elige un monitor. Este recurso aparece encima de lo que se esté proyectando en él; los demás monitores no cambian.',
+    monitor: 'Monitor {index}',
+    activeOn: 'Proyección independiente en el monitor {index}',
+    stop: 'Detener proyección independiente',
+  },
   monitors: {
     selectScreens: 'Seleccionar pantallas',
     identify: 'Detectar pantallas',
