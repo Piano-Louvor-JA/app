@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { identifySystemDisplays } from '@modules/settings/services/display-service'
-import { useIndependentProjectionControl } from '@shared/composables/useIndependentProjection'
+import {
+  useIndependentProjectionControl,
+  type IndependentProjectionMode,
+} from '@shared/composables/useIndependentProjection'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
@@ -12,8 +15,12 @@ const props = defineProps<{
 }>()
 
 const { t } = useI18n()
-const { monitors, available, activeMonitorId, project, stop } =
+const { monitors, available, activeMonitorId, activeMode, project, stop } =
   useIndependentProjectionControl(props.moduleId)
+
+/** Sobrepor (tela inteira) ou compartilhar (metade, com o que já está no monitor). */
+const mode = ref<IndependentProjectionMode>('overlay')
+const MODES: IndependentProjectionMode[] = ['overlay', 'share']
 
 const open = ref(false)
 const busy = ref(false)
@@ -29,7 +36,8 @@ const activeIndex = computed(
 const tooltip = computed(() => {
   if (!available.value) return t('independentProjection.unavailable')
   if (activeIndex.value != null) {
-    return t('independentProjection.activeOn', { index: activeIndex.value })
+    const key = activeMode.value === 'share' ? 'sharedOn' : 'activeOn'
+    return t(`independentProjection.${key}`, { index: activeIndex.value })
   }
   return t('independentProjection.title')
 })
@@ -48,7 +56,7 @@ async function onSelect(monitorId: number) {
   busy.value = true
   try {
     if (props.beforeProject && !(await props.beforeProject())) return
-    if (await project(monitorId)) open.value = false
+    if (await project(monitorId, mode.value)) open.value = false
   } finally {
     busy.value = false
   }
@@ -101,6 +109,7 @@ function onKeydown(event: KeyboardEvent) {
 
 watch(open, async (isOpen) => {
   if (!isOpen) return
+  mode.value = activeMode.value ?? 'overlay'
   await nextTick()
   updatePanelPosition()
 })
@@ -137,7 +146,8 @@ onBeforeUnmount(() => {
       @click.stop="onTriggerClick"
     >
       <i
-        class="ti ti-device-desktop-share"
+        class="ti"
+        :class="activeMode === 'share' ? 'ti-layout-columns' : 'ti-device-desktop-share'"
         aria-hidden="true"
       />
       <span
@@ -174,8 +184,33 @@ onBeforeUnmount(() => {
             />
           </button>
         </div>
+        <div
+          class="independent-projection__modes"
+          role="radiogroup"
+          :aria-label="t('independentProjection.modeLabel')"
+        >
+          <button
+            v-for="option in MODES"
+            :key="option"
+            type="button"
+            role="radio"
+            class="independent-projection__mode"
+            :class="{ 'independent-projection__mode--active': mode === option }"
+            :aria-checked="mode === option"
+            :data-mode="option"
+            @click="mode = option"
+          >
+            <i
+              class="ti"
+              :class="option === 'share' ? 'ti-layout-columns' : 'ti-device-desktop-share'"
+              aria-hidden="true"
+            />
+            {{ t(`independentProjection.mode.${option}`) }}
+          </button>
+        </div>
+
         <p class="independent-projection__hint">
-          {{ t('independentProjection.hint') }}
+          {{ t(mode === 'share' ? 'independentProjection.hintShare' : 'independentProjection.hint') }}
         </p>
 
         <ul
@@ -341,6 +376,37 @@ onBeforeUnmount(() => {
   font-size: 0.72rem;
   line-height: 1.35;
   color: color-mix(in srgb, var(--ds-color-on-surface) 70%, transparent);
+}
+
+.independent-projection__modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.3rem;
+  margin-top: 0.5rem;
+}
+
+.independent-projection__mode {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 0.4rem 0.35rem;
+  border-radius: 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--ds-color-on-surface) 12%, transparent);
+  background: transparent;
+  color: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+
+  .ti {
+    font-size: 1rem;
+  }
+
+  &--active {
+    border-color: var(--ds-color-primary);
+    background: color-mix(in srgb, var(--ds-color-primary) 22%, transparent);
+  }
 }
 
 .independent-projection__list {

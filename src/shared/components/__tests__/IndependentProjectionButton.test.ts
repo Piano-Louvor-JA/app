@@ -7,12 +7,15 @@ import { computed, ref } from 'vue'
 
 const monitors = ref<Array<{ id: number; index: number; resolutionLabel: string }>>([])
 const activeMonitorId = ref<number | null>(null)
-const project = vi.fn(async (id: number) => {
+const activeMode = ref<'overlay' | 'share' | null>(null)
+const project = vi.fn(async (id: number, mode: 'overlay' | 'share' = 'overlay') => {
   activeMonitorId.value = id
+  activeMode.value = mode
   return true
 })
 const stop = vi.fn(() => {
   activeMonitorId.value = null
+  activeMode.value = null
 })
 
 vi.mock('@shared/composables/useIndependentProjection', () => ({
@@ -21,7 +24,8 @@ vi.mock('@shared/composables/useIndependentProjection', () => ({
     available: computed(() => monitors.value.length > 0),
     loaded: ref(true),
     activeMonitorId,
-    project: (id: number) => project(id),
+    activeMode,
+    project: (id: number, mode?: 'overlay' | 'share') => project(id, mode),
     stop: () => stop(),
   }),
 }))
@@ -60,6 +64,7 @@ describe('IndependentProjectionButton', () => {
   beforeEach(() => {
     monitors.value = [...EXTENDED]
     activeMonitorId.value = null
+    activeMode.value = null
     project.mockClear()
     stop.mockClear()
     identifySystemDisplays.mockClear()
@@ -83,7 +88,7 @@ describe('IndependentProjectionButton', () => {
     expect(trigger.attributes('aria-disabled')).toBe('false')
     expect(trigger.attributes('title')).toBe('independentProjection.title')
     await trigger.trigger('click')
-    const options = panel()!.querySelectorAll('[role="radio"]')
+    const options = panel()!.querySelectorAll('[data-monitor-id]')
     expect([...options].map((el) => el.textContent)).toEqual([
       expect.stringContaining('independentProjection.monitor:2'),
       expect.stringContaining('independentProjection.monitor:3'),
@@ -97,7 +102,7 @@ describe('IndependentProjectionButton', () => {
     await wrapper.get('[data-testid="independent-projection-trigger"]').trigger('click')
     ;(panel()!.querySelector('[data-monitor-id="3"]') as HTMLButtonElement).click()
     await flushPromises()
-    expect(project).toHaveBeenCalledWith(3)
+    expect(project).toHaveBeenCalledWith(3, 'overlay')
     expect(panel()).toBeNull()
     const trigger = wrapper.get('[data-testid="independent-projection-trigger"]')
     expect(trigger.classes()).toContain('independent-projection__trigger--active')
@@ -132,7 +137,7 @@ describe('IndependentProjectionButton', () => {
     await wrapper.get('[data-testid="independent-projection-trigger"]').trigger('click')
     ;(panel()!.querySelector('[data-monitor-id="2"]') as HTMLButtonElement).click()
     await flushPromises()
-    expect(project).toHaveBeenCalledWith(2)
+    expect(project).toHaveBeenCalledWith(2, 'overlay')
     wrapper.unmount()
   })
 
@@ -156,7 +161,7 @@ describe('IndependentProjectionButton', () => {
     activeMonitorId.value = 2
     const wrapper = mountButton()
     await wrapper.get('[data-testid="independent-projection-trigger"]').trigger('click')
-    const checked = panel()!.querySelector('[aria-checked="true"]')
+    const checked = panel()!.querySelector('[data-monitor-id][aria-checked="true"]')
     expect(checked?.getAttribute('data-monitor-id')).toBe('2')
     ;(panel()!.querySelector('[data-testid="independent-projection-stop"]') as HTMLButtonElement).click()
     await flushPromises()
@@ -214,6 +219,36 @@ describe('IndependentProjectionButton', () => {
     await wrapper.get('[data-testid="independent-projection-trigger"]').trigger('pointerdown')
     await wrapper.get('[data-testid="independent-projection-trigger"]').trigger('click')
     expect(panel()).toBeNull()
+    wrapper.unmount()
+  })
+
+  it('modo compartilhar projeta com share e muda ícone e tooltip', async () => {
+    const wrapper = mountButton()
+    await wrapper.get('[data-testid="independent-projection-trigger"]').trigger('click')
+    const overlay = panel()!.querySelector('[data-mode="overlay"]')!
+    const share = panel()!.querySelector('[data-mode="share"]') as HTMLButtonElement
+    expect(overlay.getAttribute('aria-checked')).toBe('true')
+    expect(panel()!.textContent).toContain('independentProjection.hint')
+    share.click()
+    await flushPromises()
+    expect(share.getAttribute('aria-checked')).toBe('true')
+    expect(panel()!.textContent).toContain('independentProjection.hintShare')
+    ;(panel()!.querySelector('[data-monitor-id="2"]') as HTMLButtonElement).click()
+    await flushPromises()
+    expect(project).toHaveBeenCalledWith(2, 'share')
+    const trigger = wrapper.get('[data-testid="independent-projection-trigger"]')
+    expect(trigger.attributes('title')).toBe('independentProjection.sharedOn:2')
+    expect(trigger.find('.ti').classes()).toContain('ti-layout-columns')
+    wrapper.unmount()
+  })
+
+  it('ao reabrir, o modo começa no modo ativo', async () => {
+    activeMonitorId.value = 3
+    activeMode.value = 'share'
+    const wrapper = mountButton()
+    await wrapper.get('[data-testid="independent-projection-trigger"]').trigger('click')
+    await flushPromises()
+    expect(panel()!.querySelector('[data-mode="share"]')!.getAttribute('aria-checked')).toBe('true')
     wrapper.unmount()
   })
 })
