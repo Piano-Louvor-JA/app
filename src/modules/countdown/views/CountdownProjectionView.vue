@@ -32,6 +32,10 @@ import {
   DEFAULT_COUNTDOWN_DURATION_MS,
   DEFAULT_COUNTDOWN_RUNTIME,
 } from '../types/countdown'
+import { isIndependentProjectionLocation } from '@shared/services/projection-window-location'
+
+/** Projeção independente ignora o takeover da principal (projecting:false). */
+const independent = isIndependentProjectionLocation()
 
 withDefaults(
   defineProps<{
@@ -141,7 +145,7 @@ const effectiveConfig = computed(() => {
     :style="stageStyle"
   >
     <div
-      v-if="runtime.projecting !== false"
+      v-if="independent || runtime.projecting !== false"
       class="countdown-projection__stage"
       :style="stageAlign"
     >

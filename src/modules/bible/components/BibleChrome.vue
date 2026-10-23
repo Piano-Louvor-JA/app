@@ -5,6 +5,8 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { useInAppProjectionMinimized } from '@shared/composables/useInAppProjectionMinimized'
 import FloatingPreviewTitle from '@shared/components/FloatingPreviewTitle.vue'
+import IndependentProjectionButton from '@shared/components/IndependentProjectionButton.vue'
+import { isIndependentProjectionActive } from '@shared/composables/useIndependentProjection'
 import { FLOATING_STACK_ORDER, useFloatingDrag } from '@shared/composables/useFloatingDrag'
 import { USER_PREFERENCE_KEYS } from '@shared/constants/storage-keys'
 
@@ -27,7 +29,9 @@ const canNavigate = computed(() => store.selectedVerses.length > 0)
 const onBibleRoute = computed(() => route.meta.navKey === 'bible')
 
 /** Na Bíblia fica sempre à mão; nas outras telas só enquanto a Bíblia está no ar. */
-const visible = computed(() => onBibleRoute.value || store.isProjecting)
+const visible = computed(
+  () => onBibleRoute.value || store.isProjecting || isIndependentProjectionActive('bible'),
+)
 
 /** Miniatura reflete a personalização do escopo bible (bg/caixa/cores). */
 const previewStyle = computed(() => {
@@ -146,6 +150,11 @@ async function onOpenReader() {
           aria-hidden="true"
         />
       </button>
+
+      <IndependentProjectionButton
+        module-id="bible"
+        :before-project="store.prepareIndependentProjection"
+      />
 
       <BibleProjectFab
         :disabled="!hasProjection"

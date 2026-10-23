@@ -8,6 +8,7 @@ import {
   isProjectionModuleOpen,
   openProjectionModule,
 } from '@shared/composables/useProjectionWindow'
+import { isIndependentProjectionActive } from '@shared/composables/useIndependentProjection'
 import { USER_PREFERENCE_KEYS } from '@shared/constants/storage-keys'
 import {
   getUserPreference,
@@ -23,6 +24,7 @@ import {
   resolveTestament,
 } from '../services/bible-catalog'
 import { publishBibleSelection, publishBibleRuntimeOff } from '../services/bible-runtime'
+import { publishBibleIndependentSelection } from '../services/bible-independent-runtime'
 import {
   buildProjectionText,
   emptySelection,
@@ -91,6 +93,11 @@ export const useBibleStore = defineStore('bible', () => {
 
   function publishProjectionState(selection: BibleSelection) {
     publishBibleSelection(selection)
+  }
+
+  /** Projeção independente acompanha a seleção do operador em canal próprio. */
+  function publishIndependentState(selection: BibleSelection) {
+    if (isIndependentProjectionActive('bible')) publishBibleIndependentSelection(selection)
   }
 
   const selectedBook = computed(() =>
@@ -178,6 +185,7 @@ export const useBibleStore = defineStore('bible', () => {
     if (!book || !version || selectedVerses.value.length === 0) {
       projection.value = emptySelection()
       if (isProjecting.value) publishProjectionState(projection.value)
+      publishIndependentState(projection.value)
       return
     }
 
@@ -199,6 +207,14 @@ export const useBibleStore = defineStore('bible', () => {
 
     projection.value = selection
     if (isProjecting.value) publishProjectionState(selection)
+    publishIndependentState(selection)
+  }
+
+  /** Antes de abrir a independente: publica a seleção atual no canal dela. */
+  function prepareIndependentProjection(): boolean {
+    syncProjection()
+    publishBibleIndependentSelection(projection.value)
+    return true
   }
 
   async function openProjection(opts?: { targets?: 'all' | 'tvs-only' }) {
@@ -549,6 +565,7 @@ export const useBibleStore = defineStore('bible', () => {
     toggleNavPanel,
     goToAdjacentVerse,
     syncProjection,
+    prepareIndependentProjection,
     openProjection,
     toggleProjection,
     projectTvsOnly,

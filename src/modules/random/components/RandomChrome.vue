@@ -5,6 +5,8 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { useInAppProjectionMinimized } from '@shared/composables/useInAppProjectionMinimized'
 import FloatingPreviewTitle from '@shared/components/FloatingPreviewTitle.vue'
+import IndependentProjectionButton from '@shared/components/IndependentProjectionButton.vue'
+import { isIndependentProjectionActive } from '@shared/composables/useIndependentProjection'
 import { FLOATING_STACK_ORDER, useFloatingDrag } from '@shared/composables/useFloatingDrag'
 import { USER_PREFERENCE_KEYS } from '@shared/constants/storage-keys'
 
@@ -40,8 +42,9 @@ const onRandomRoute = computed(() => route.name === RANDOM_ROUTE)
 
 /** No Sorteio fica sempre à mão; nas outras telas enquanto projeta ou sorteia. */
 const visible = computed(
-  () => onRandomRoute.value || store.isProjecting || store.runtime.isDrawing,
+  () => onRandomRoute.value || store.isProjecting || store.runtime.isDrawing || isIndependentProjectionActive('random'),
 )
+
 
 /** Mesmo fundo da projeção: imagem do Palco ou a cor do diálogo do sorteio. */
 const previewStyle = computed(() => {
@@ -146,6 +149,10 @@ async function onOpenRandom() {
           />
         </button>
       </template>
+
+      <IndependentProjectionButton
+        module-id="random"
+      />
 
       <RandomProjectFab
         :projecting="store.isProjecting"

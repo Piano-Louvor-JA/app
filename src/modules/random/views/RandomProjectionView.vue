@@ -27,6 +27,10 @@ import {
   type RandomDisplayConfig,
   type RandomRuntimeState,
 } from '../types/random'
+import { isIndependentProjectionLocation } from '@shared/services/projection-window-location'
+
+/** Projeção independente ignora o takeover da principal (projecting:false). */
+const independent = isIndependentProjectionLocation()
 
 const props = withDefaults(
   defineProps<{
@@ -158,7 +162,7 @@ const effectiveConfig = computed(() => {
     :style="stageStyle"
   >
     <div
-      v-if="liveRuntime.projecting !== false"
+      v-if="independent || liveRuntime.projecting !== false"
       class="random-projection__stage"
       :style="stageAlign"
     >

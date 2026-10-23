@@ -5,6 +5,8 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { useInAppProjectionMinimized } from '@shared/composables/useInAppProjectionMinimized'
 import FloatingPreviewTitle from '@shared/components/FloatingPreviewTitle.vue'
+import IndependentProjectionButton from '@shared/components/IndependentProjectionButton.vue'
+import { isIndependentProjectionActive } from '@shared/composables/useIndependentProjection'
 import { FLOATING_STACK_ORDER, useFloatingDrag } from '@shared/composables/useFloatingDrag'
 import { USER_PREFERENCE_KEYS } from '@shared/constants/storage-keys'
 
@@ -39,7 +41,9 @@ const effectiveConfig = computed(() => ({ ...store.config, ...stage.value.clock 
 const onClockRoute = computed(() => route.name === CLOCK_ROUTE)
 
 /** No Relógio fica sempre à mão; nas outras telas só enquanto projeta. */
-const visible = computed(() => onClockRoute.value || store.isProjecting)
+const visible = computed(
+  () => onClockRoute.value || store.isProjecting || isIndependentProjectionActive('clock'),
+)
 
 /** Miniatura reflete a personalização do escopo clock (bg/caixa/cores). */
 const previewStyle = computed(() => {
@@ -113,6 +117,10 @@ async function onOpenClock() {
           aria-hidden="true"
         />
       </button>
+
+      <IndependentProjectionButton
+        module-id="clock"
+      />
 
       <ClockProjectFab
         :projecting="store.isProjecting"

@@ -34,6 +34,14 @@ vi.mock('../services/bible-runtime', () => ({
   publishBibleSelection: vi.fn(),
   publishBibleRuntimeOff: vi.fn(),
 }))
+const independentActive = vi.fn(() => false)
+vi.mock('@shared/composables/useIndependentProjection', () => ({
+  isIndependentProjectionActive: () => independentActive(),
+}))
+const publishBibleIndependentSelection = vi.fn()
+vi.mock('../../services/bible-independent-runtime', () => ({
+  publishBibleIndependentSelection: (...args: unknown[]) => publishBibleIndependentSelection(...args),
+}))
 
 vi.mock('@shared/services/user-preferences', () => ({
   getUserPreference: vi.fn((_key: string, fallback: unknown) => fallback),
@@ -165,6 +173,49 @@ describe('useBibleStore', () => {
       const before = store.showNavPanel
       store.showNavPanel = !before
       expect(store.showNavPanel).toBe(!before)
+    })
+  })
+
+  describe('projeção independente', () => {
+    it('prepareIndependentProjection publica a seleção atual no canal próprio', async () => {
+      const store = useBibleStore()
+      await store.bootstrap()
+      store.selectedBookId = 1
+      await store.selectChapter(1)
+      store.selectVerse(1)
+      publishBibleIndependentSelection.mockClear()
+
+      expect(store.prepareIndependentProjection()).toBe(true)
+      expect(publishBibleIndependentSelection).toHaveBeenCalledWith(
+        expect.objectContaining({ verses: [1], text: expect.stringContaining('No princípio') }),
+      )
+    })
+
+    it('com independente ativa, trocar o versículo atualiza a tela dela', async () => {
+      const store = useBibleStore()
+      await store.bootstrap()
+      store.selectedBookId = 1
+      await store.selectChapter(1)
+      independentActive.mockReturnValue(true)
+      store.selectVerse(2)
+      expect(publishBibleIndependentSelection).toHaveBeenLastCalledWith(
+        expect.objectContaining({ verses: [2] }),
+      )
+      store.selectVerse(2, { ctrlKey: true } as MouseEvent)
+      expect(publishBibleIndependentSelection).toHaveBeenLastCalledWith(
+        expect.objectContaining({ verses: [] }),
+      )
+      independentActive.mockReturnValue(false)
+    })
+
+    it('sem independente ativa não publica no canal dela', async () => {
+      const store = useBibleStore()
+      await store.bootstrap()
+      store.selectedBookId = 1
+      await store.selectChapter(1)
+      publishBibleIndependentSelection.mockClear()
+      store.selectVerse(1)
+      expect(publishBibleIndependentSelection).not.toHaveBeenCalled()
     })
   })
 })
