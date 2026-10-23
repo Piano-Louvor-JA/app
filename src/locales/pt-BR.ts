@@ -33,6 +33,21 @@ export default {
     cancel: 'Cancelar',
     copied: 'Copiado!',
   },
+  independentProjection: {
+    title: 'Projeção independente',
+    unavailable: 'Só habilita com monitores estendidos disponíveis',
+    hint: 'Escolha um monitor. Este recurso aparece por cima do que estiver projetado nele; os outros monitores não mudam.',
+    monitor: 'Monitor {index}',
+    activeOn: 'Projeção independente no monitor {index}',
+    stop: 'Encerrar projeção independente',
+    sharedOn: 'Projeção compartilhada no monitor {index}',
+    modeLabel: 'Modo da projeção',
+    mode: {
+      overlay: 'Sobrepor',
+      share: 'Compartilhar',
+    },
+    hintShare: 'Escolha um monitor. A tela dele é dividida ao meio com o que já está projetado; se um dos lados sair, o outro volta a ocupar a tela toda.',
+  },
   monitors: {
     selectScreens: 'Selecionar telas',
     identify: 'Detectar telas',

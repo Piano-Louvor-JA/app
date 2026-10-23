@@ -109,12 +109,15 @@ describe("import .slja local — blobs em IndexedDB (não localStorage)", () => 
 
 	it("re-import do mesmo arquivo é no-op (dedupe por sljaHash)", async () => {
 		const bytes = await makeSljaBuffer();
+		// Cópia do MESMO arquivo: montar outro zip grava a hora atual (resolução
+		// de 2 s) e, numa virada de relógio, gerava bytes/hash diferentes (flaky).
+		const sameFile = bytes.slice(0);
 		const first = await importSljaAsLiturgyMusic({
 			bytes,
 			name: "encontro.slja",
 		});
 		const second = await importSljaAsLiturgyMusic({
-			bytes: await makeSljaBuffer(), // mesmos bytes → mesmo hash
+			bytes: sameFile, // mesmos bytes → mesmo hash
 			name: "encontro.slja",
 		});
 
@@ -146,6 +149,7 @@ describe("import .slja local — blobs em IndexedDB (não localStorage)", () => 
 
 	it("re-import após import parcial por quota COMPLETA a música (33/33, sem duplicar)", async () => {
 		const bytes = await makeSljaBuffer();
+		const sameFile = bytes.slice(0); // mesmo arquivo: novo zip mudaria o hash (hora no zip)
 
 		// 1ª tentativa: quota estoura no MEIO do import (música+áudio gravados,
 		// estrofes não) — simula saveDb falhando a partir da estrofe N.
@@ -177,7 +181,7 @@ describe("import .slja local — blobs em IndexedDB (não localStorage)", () => 
 
 		// 2ª tentativa (espaço liberado): mesmo arquivo → deve REFAZER completo
 		const second = await importSljaAsLiturgyMusic({
-			bytes: await makeSljaBuffer(),
+			bytes: sameFile,
 			name: "encontro.slja",
 		});
 		expect(second.local).toBe(true);

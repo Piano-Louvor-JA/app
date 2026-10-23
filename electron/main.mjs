@@ -25,6 +25,8 @@ import { ensureWorkspaceDirectories } from "./paths.mjs";
 import { registerLocalFileProtocol, registerLocalScheme } from "./protocol.mjs";
 import { registerCloseProjectionPopups } from "./ipc/web-projection.mjs";
 import { buildProjectionWindowBounds } from "./projection-display.mjs";
+import { createIndependentProjectionRegistry, isIndependentProjectionUrl } from "./independent-projection.mjs";
+import { createSharedProjectionLayout, isSharedProjectionUrl } from "./shared-projection.mjs";
 import { X11_RELAUNCH_MARKER, buildX11Relaunch, consumeX11RelaunchMarker, shouldRelaunchWithX11 } from "./linux-display-backend.mjs";
 import { initUpdater } from "./updater.mjs";
 import { getBibleUpdater } from "./bible-updater.mjs";
@@ -40,6 +42,7 @@ import {
   removeProjectionWindowProvider,
   ensureProjectionHotkey,
   releaseProjectionHotkey,
+  collectAliveProjectionWindows,
 } from "./projection-hotkey.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -449,6 +452,22 @@ function attachProjectionWindowHandlers(parentWindow) {
   const standbyWindows = new WeakSet()
   /** @type {WeakSet<import('electron').BrowserWindow>} */
   const standbyReady = new WeakSet()
+  /** Projeções independentes: fora do fechar-tudo e sempre acima das demais. */
+  const independentPopups = createIndependentProjectionRegistry()
+  // Qualquer janela nova (popups, vídeo/pdf/site da web-projection) que
+  // aparecer ou mudar de nível devolve as independentes ao topo.
+  /** Projeção compartilhada: divide o monitor com o que já está projetado nele. */
+  const sharedLayout = createSharedProjectionLayout({
+    getProjectionWindows: collectAliveProjectionWindows,
+    getDisplays: () => screen.getAllDisplays(),
+  })
+  app.on('browser-window-created', (_event, win) => {
+    if (win === parentWindow) return
+    independentPopups.watch(win)
+    sharedLayout.watch(win)
+  })
+  screen.on('display-removed', () => sharedLayout.relayoutSoon())
+  screen.on('display-metrics-changed', () => sharedLayout.relayoutSoon())
 
   const focusOperator = () => {
     if (!parentWindow || parentWindow.isDestroyed()) return
@@ -524,6 +543,8 @@ function attachProjectionWindowHandlers(parentWindow) {
   // registra o "como fechar popups"; ipc/register.mjs chama closeAll.
   registerCloseProjectionPopups(() => {
     for (const win of popupProvider()) {
+      // Trocar/fechar a projeção principal não derruba a independente.
+      if (independentPopups.has(win)) continue
       try {
         win.close()
       } catch {
@@ -578,6 +599,12 @@ function attachProjectionWindowHandlers(parentWindow) {
     const childUrl = details?.url ?? ''
     const isProjection = isProjectionPopupUrl(childUrl)
     const warm = isWarmProjectionUrl(childUrl)
+    const independent = isProjection && isIndependentProjectionUrl(childUrl)
+    if (independent) independentPopups.add(childWindow)
+    if (independent && isSharedProjectionUrl(childUrl)) {
+      const { monitorId } = parseProjectionLaunchHints(childUrl, details?.features ?? '')
+      if (monitorId != null) sharedLayout.addShared(childWindow, monitorId)
+    }
 
     // Marca a popup na criação (fonte de verdade do provider da hotkey —
     // independe da URL em runtime, que em dev nem sempre contém #/popup).
@@ -613,6 +640,11 @@ function attachProjectionWindowHandlers(parentWindow) {
         try {
           if (!parentWindow || parentWindow.isDestroyed()) return
           if (input.key === 'Escape') {
+            // ESC na independente encerra só ela; a principal segue.
+            if (independent) {
+              childWindow.close()
+              return
+            }
             parentWindow.webContents.send('projection:close-requested')
             return
           }
@@ -643,6 +675,7 @@ function attachProjectionWindowHandlers(parentWindow) {
       }
       const shouldFullscreen = fullscreenByWindow.get(childWindow) ?? fullscreen
       applyProjectionDisplayMode(childWindow, shouldFullscreen)
+      if (independent) independentPopups.raiseOne(childWindow)
       childWindow.show()
       if (isProjection) {
         ensureProjectionHotkey()

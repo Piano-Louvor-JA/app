@@ -33,6 +33,21 @@ export default {
     cancel: 'Cancel',
     copied: 'Copied!',
   },
+  independentProjection: {
+    title: 'Independent projection',
+    unavailable: 'Only available with extended monitors connected',
+    hint: 'Pick one monitor. This feature appears on top of whatever is projected there; the other monitors stay the same.',
+    monitor: 'Monitor {index}',
+    activeOn: 'Independent projection on monitor {index}',
+    stop: 'Stop independent projection',
+    sharedOn: 'Shared projection on monitor {index}',
+    modeLabel: 'Projection mode',
+    mode: {
+      overlay: 'Overlay',
+      share: 'Share',
+    },
+    hintShare: 'Pick one monitor. Its screen is split in half with whatever is already projected; if one side leaves, the other takes the whole screen again.',
+  },
   monitors: {
     selectScreens: 'Select screens',
     identify: 'Detect screens',

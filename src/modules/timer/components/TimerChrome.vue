@@ -5,6 +5,8 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { useInAppProjectionMinimized } from '@shared/composables/useInAppProjectionMinimized'
 import FloatingPreviewTitle from '@shared/components/FloatingPreviewTitle.vue'
+import IndependentProjectionButton from '@shared/components/IndependentProjectionButton.vue'
+import { isIndependentProjectionActive } from '@shared/composables/useIndependentProjection'
 import { FLOATING_STACK_ORDER, useFloatingDrag } from '@shared/composables/useFloatingDrag'
 import { USER_PREFERENCE_KEYS } from '@shared/constants/storage-keys'
 
@@ -40,8 +42,9 @@ const onTimerRoute = computed(() => route.name === TIMER_ROUTE)
 
 /** No Cronômetro fica sempre à mão; nas outras telas enquanto projeta ou roda. */
 const visible = computed(
-  () => onTimerRoute.value || store.isProjecting || store.isRunning,
+  () => onTimerRoute.value || store.isProjecting || store.isRunning || isIndependentProjectionActive('timer'),
 )
+
 
 /** Miniatura reflete a personalização do escopo timer (bg/caixa/cores). */
 const previewStyle = computed(() => {
@@ -143,6 +146,10 @@ async function onOpenStopwatch() {
           aria-hidden="true"
         />
       </button>
+
+      <IndependentProjectionButton
+        module-id="timer"
+      />
 
       <TimerProjectFab
         :projecting="store.isProjecting"

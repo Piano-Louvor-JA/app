@@ -174,7 +174,7 @@ test('exceção humana de 70% vale somente para v1.32.2 nos caminhos de produç�
     {eventName:'release',ref:'refs/tags/v1.32.2'},
   ]) {
     assert.equal(coverageMinimumPercent({...context,version:'1.32.2'}),70)
-    for(const version of ['1.32.1','1.32.3','1.33.0',undefined]) assert.equal(coverageMinimumPercent({...context,version}),100)
+    for(const version of ['1.32.1','1.32.3','1.33.1',undefined]) assert.equal(coverageMinimumPercent({...context,version}),100)
   }
   assert.equal(coverageMinimumPercent({eventName:'pull_request',baseRef:'staging',version:'1.32.2'}),50)
   assert.equal(coverageMinimumPercent({eventName:'push',ref:'refs/tags/v1.32.3',version:'1.32.2'}),100)
@@ -182,4 +182,23 @@ test('exceção humana de 70% vale somente para v1.32.2 nos caminhos de produç�
   assert.equal(coverageMinimumPercent({eventName:'pull_request',baseRef:'other',version:'1.32.2'}),100)
   assert.deepEqual(evaluateCoverage(summary(70),70).failures,[])
   assert.equal(evaluateCoverage(summary(69.99),70).failures.length,4)
+})
+
+test('exceção humana de 30% vale somente para v1.33.0 nos caminhos de produção', () => {
+  for (const context of [
+    {eventName:'pull_request',baseRef:'main'},
+    {eventName:'push',ref:'refs/heads/main'},
+    {eventName:'workflow_dispatch',ref:'refs/heads/main'},
+    {eventName:'push',ref:'refs/tags/v1.33.0'},
+    {eventName:'release',ref:'refs/tags/v1.33.0'},
+  ]) {
+    assert.equal(coverageMinimumPercent({...context,version:'1.33.0'}),30)
+    for(const version of ['1.32.3','1.33.1','1.34.0']) assert.equal(coverageMinimumPercent({...context,version}),100)
+  }
+  // Staging continua em 50%; tag de outra versão não herda a exceção.
+  assert.equal(coverageMinimumPercent({eventName:'pull_request',baseRef:'staging',version:'1.33.0'}),50)
+  assert.equal(coverageMinimumPercent({eventName:'push',ref:'refs/heads/staging',version:'1.33.0'}),50)
+  assert.equal(coverageMinimumPercent({eventName:'push',ref:'refs/tags/v1.32.2',version:'1.33.0'}),100)
+  assert.equal(coverageMinimumPercent({eventName:'push',ref:'refs/tags/v1.33.0',version:'1.32.2'}),100)
+  assert.equal(coverageMinimumPercent({eventName:'push',ref:'refs/heads/feature',version:'1.33.0'}),100)
 })

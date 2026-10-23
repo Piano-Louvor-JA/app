@@ -5,16 +5,29 @@ const METRICS = ['statements', 'branches', 'functions', 'lines']
 
 const STAGING_REF = 'refs/heads/staging'
 
-/** Staging mantém 50%; exceção autorizada de 70% apenas para a release 1.32.2. */
+/**
+ * Exceções humanas no caminho de produção, uma por versão (autorizadas pelo
+ * mantenedor na promoção). Qualquer outra versão volta a 100%.
+ */
+const PRODUCTION_EXCEPTIONS = {
+  '1.32.2': 70,
+  '1.33.0': 30,
+}
+
+/** Staging mantém 50%; produção exige 100%, salvo exceção da versão. */
 export function coverageMinimumPercent({ eventName, baseRef, ref, version } = {}) {
   if (eventName === 'pull_request' && baseRef === 'staging') return 50
   if ((eventName === 'push' || eventName === 'workflow_dispatch') && ref === STAGING_REF) return 50
 
+  const exception = Object.hasOwn(PRODUCTION_EXCEPTIONS, version ?? '')
+    ? PRODUCTION_EXCEPTIONS[version]
+    : null
+  if (exception == null) return 100
+
   const production = (eventName === 'pull_request' && baseRef === 'main') ||
     ((eventName === 'push' || eventName === 'workflow_dispatch') && ref === 'refs/heads/main') ||
-    (['push', 'workflow_dispatch', 'release'].includes(eventName) && ref === 'refs/tags/v1.32.2')
-  if (version === '1.32.2' && production) return 70
-  return 100
+    (['push', 'workflow_dispatch', 'release'].includes(eventName) && ref === `refs/tags/v${version}`)
+  return production ? exception : 100
 }
 
 export function evaluateCoverage(summary, minimum) {
