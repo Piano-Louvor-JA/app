@@ -656,4 +656,26 @@ describe('reapply — falhas de abertura e janela de retorno', () => {
     await mod.closeProjectionModule()
   })
 
+
+  it('openProjectionPopupWindow abre avulsa marcada como independente, fora da principal', async () => {
+    const mod = await loadFresh()
+    const win = mod.openProjectionPopupWindow('clock', 3, { independent: true })
+    expect(win).not.toBeNull()
+    const [url, name, features] = winOpen.mock.calls[0]!.map(String)
+    expect(url).toContain('module=clock')
+    expect(url).toContain('monitorId=3')
+    expect(url).toContain('independent=1')
+    expect(name.startsWith('ProjectionIndependent_clock_audience_3_')).toBe(true)
+    expect(features).toContain('fullscreen=yes')
+    // Não entra no registro da projeção principal
+    expect(mod.isProjectionModuleOpen('clock')).toBe(false)
+  })
+
+  it('openProjectionPopupWindow sem opção não marca independente', async () => {
+    const mod = await loadFresh()
+    mod.openProjectionPopupWindow('timer', 2)
+    const url = String(winOpen.mock.calls[0]![0])
+    expect(url).not.toContain('independent=1')
+  })
+
 })

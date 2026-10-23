@@ -61,6 +61,7 @@ function buildPopupUrl(
     monitorId?: number | null
     fullscreen?: boolean
     layout?: ProjectionLayout
+    independent?: boolean
   },
 ): string {
   const params = new URLSearchParams()
@@ -76,6 +77,10 @@ function buildPopupUrl(
   }
   if (options?.layout === 'return') {
     params.set('layout', 'return')
+  }
+  if (options?.independent) {
+    // Main: fora do "fechar tudo" e sempre acima da projeção principal.
+    params.set('independent', '1')
   }
   const query = params.toString()
   const useHash =
@@ -259,9 +264,10 @@ function openOnMonitor(
   monitorId: number | null,
   fullscreen: boolean,
   layout: ProjectionLayout = 'audience',
+  independent = false,
 ): ProjectionWindow | null {
   projectionWindowSeq += 1
-  const url = buildPopupUrl(moduleId, { monitorId, fullscreen, layout })
+  const url = buildPopupUrl(moduleId, { monitorId, fullscreen, layout, independent })
   // frame=no é opção reconhecida pelo Electron; fullscreen/monitor também na URL
   const features = [
     'width=800',
@@ -278,9 +284,10 @@ function openOnMonitor(
 
   // Sequência no nome evita falha ao reabrir após close (mesmo targetName).
   /* v8 ignore start -- monitorId != null em todos os callers */
+  const prefix = independent ? 'ProjectionIndependent' : 'Projection'
   const name =
     monitorId != null
-      ? `Projection_${moduleId}_${layout}_${monitorId}_${projectionWindowSeq}`
+      ? `${prefix}_${moduleId}_${layout}_${monitorId}_${projectionWindowSeq}`
       : `Projection_${moduleId}_${layout}_${projectionWindowSeq}`
   /* v8 ignore stop */
 
@@ -294,6 +301,18 @@ function openOnMonitor(
   win.layout = layout
 
   return win
+}
+
+/**
+ * Abre uma popup de projeção avulsa, fora do registro da projeção principal
+ * (usada pela projeção independente).
+ */
+export function openProjectionPopupWindow(
+  moduleId: string,
+  monitorId: number,
+  options: { independent?: boolean } = {},
+): Window | null {
+  return openOnMonitor(moduleId, monitorId, true, 'audience', options.independent === true)
 }
 
 function notifyProjectionReapplied(moduleId: string, open: boolean) {
