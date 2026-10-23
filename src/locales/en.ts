@@ -40,6 +40,13 @@ export default {
     monitor: 'Monitor {index}',
     activeOn: 'Independent projection on monitor {index}',
     stop: 'Stop independent projection',
+    sharedOn: 'Shared projection on monitor {index}',
+    modeLabel: 'Projection mode',
+    mode: {
+      overlay: 'Overlay',
+      share: 'Share',
+    },
+    hintShare: 'Pick one monitor. Its screen is split in half with whatever is already projected; if one side leaves, the other takes the whole screen again.',
   },
   monitors: {
     selectScreens: 'Select screens',

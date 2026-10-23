@@ -62,6 +62,7 @@ function buildPopupUrl(
     fullscreen?: boolean
     layout?: ProjectionLayout
     independent?: boolean
+    share?: boolean
   },
 ): string {
   const params = new URLSearchParams()
@@ -81,6 +82,10 @@ function buildPopupUrl(
   if (options?.independent) {
     // Main: fora do "fechar tudo" e sempre acima da projeção principal.
     params.set('independent', '1')
+  }
+  if (options?.share) {
+    // Main: divide o monitor com o que já está projetado nele.
+    params.set('share', '1')
   }
   const query = params.toString()
   const useHash =
@@ -265,9 +270,10 @@ function openOnMonitor(
   fullscreen: boolean,
   layout: ProjectionLayout = 'audience',
   independent = false,
+  share = false,
 ): ProjectionWindow | null {
   projectionWindowSeq += 1
-  const url = buildPopupUrl(moduleId, { monitorId, fullscreen, layout, independent })
+  const url = buildPopupUrl(moduleId, { monitorId, fullscreen, layout, independent, share })
   // frame=no é opção reconhecida pelo Electron; fullscreen/monitor também na URL
   const features = [
     'width=800',
@@ -310,9 +316,16 @@ function openOnMonitor(
 export function openProjectionPopupWindow(
   moduleId: string,
   monitorId: number,
-  options: { independent?: boolean } = {},
+  options: { independent?: boolean; share?: boolean } = {},
 ): Window | null {
-  return openOnMonitor(moduleId, monitorId, true, 'audience', options.independent === true)
+  return openOnMonitor(
+    moduleId,
+    monitorId,
+    true,
+    'audience',
+    options.independent === true,
+    options.share === true,
+  )
 }
 
 function notifyProjectionReapplied(moduleId: string, open: boolean) {

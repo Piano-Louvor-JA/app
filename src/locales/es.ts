@@ -40,6 +40,13 @@ export default {
     monitor: 'Monitor {index}',
     activeOn: 'Proyección independiente en el monitor {index}',
     stop: 'Detener proyección independiente',
+    sharedOn: 'Proyección compartida en el monitor {index}',
+    modeLabel: 'Modo de proyección',
+    mode: {
+      overlay: 'Superponer',
+      share: 'Compartir',
+    },
+    hintShare: 'Elige un monitor. Su pantalla se divide a la mitad con lo que ya se está proyectando; si un lado sale, el otro vuelve a ocupar toda la pantalla.',
   },
   monitors: {
     selectScreens: 'Seleccionar pantallas',

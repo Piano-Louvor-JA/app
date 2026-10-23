@@ -67,7 +67,8 @@ describe('useIndependentProjection', () => {
     const ok = await mod.openIndependentProjection('clock', 3)
 
     expect(ok).toBe(true)
-    expect(openProjectionPopupWindow).toHaveBeenCalledWith('clock', 3, { independent: true })
+    expect(openProjectionPopupWindow).toHaveBeenCalledWith('clock', 3, { independent: true, share: false })
+    expect(mod.getIndependentMode('clock')).toBe('overlay')
     expect(mod.getIndependentMonitor('clock')).toBe(3)
     expect(mod.isIndependentProjectionActive('clock')).toBe(true)
   })
@@ -92,6 +93,26 @@ describe('useIndependentProjection', () => {
     await mod.openIndependentProjection('clock', 2)
     await mod.openIndependentProjection('clock', 2)
     expect(openProjectionPopupWindow).toHaveBeenCalledTimes(1)
+  })
+
+  it('modo compartilhado abre com share e fica registrado', async () => {
+    const mod = await loadFresh()
+    expect(await mod.openIndependentProjection('clock', 2, 'share')).toBe(true)
+    expect(openProjectionPopupWindow).toHaveBeenCalledWith('clock', 2, { independent: true, share: true })
+    expect(mod.getIndependentMode('clock')).toBe('share')
+  })
+
+  it('trocar de sobrepor para compartilhar no mesmo monitor reabre a janela', async () => {
+    const first = fakeWindow()
+    openProjectionPopupWindow.mockReturnValueOnce(first)
+    const mod = await loadFresh()
+    await mod.openIndependentProjection('clock', 2)
+    await mod.openIndependentProjection('clock', 2, 'share')
+    expect(first.close).toHaveBeenCalled()
+    expect(openProjectionPopupWindow).toHaveBeenCalledTimes(2)
+    expect(mod.getIndependentMode('clock')).toBe('share')
+    mod.closeIndependentProjection('clock')
+    expect(mod.getIndependentMode('clock')).toBeNull()
   })
 
   it('trocar o monitor do módulo fecha a janela anterior', async () => {
@@ -257,7 +278,11 @@ describe('useIndependentProjectionControl', () => {
     expect(api.activeMonitorId.value).toBeNull()
     await api.project(2)
     expect(api.activeMonitorId.value).toBe(2)
-    expect(mod.getIndependentMonitor('timer')).toBe(2)
+    expect(api.activeMode.value).toBe('overlay')
+    await api.project(3, 'share')
+    expect(api.activeMonitorId.value).toBe(3)
+    expect(api.activeMode.value).toBe('share')
+    expect(mod.getIndependentMonitor('timer')).toBe(3)
     api.stop()
     expect(api.activeMonitorId.value).toBeNull()
   })
