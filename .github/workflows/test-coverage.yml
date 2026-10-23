@@ -1,6 +1,6 @@
 # CI de Testes — cobertura rigorosa (istanbul) por destino do evento:
 #   PR com base staging e push/dispatch em refs/heads/staging → 50/50/50/50;
-#   Produção na versão 1.32.2 → 70%; próximas versões → 100%.
+#   Produção: exceções por versão (1.32.2 → 70%, 1.33.0 → 30%); demais → 100%.
 # O limite vem de scripts/coverage-gate-limit.mjs (base/ref do evento, nunca a branch de origem).
 #
 # Duas passadas + merge determinístico:
@@ -106,6 +106,6 @@ jobs:
         env:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
           PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
-          # Ref integrado; o script também verifica a versão para a exceção 1.32.2.
+          # Ref integrado; o script também verifica a versão para as exceções de produção.
           EVENT_REF: ${{ github.ref }}
         run: node scripts/coverage-gate-limit.mjs coverage-merged/coverage-final-summary.json
