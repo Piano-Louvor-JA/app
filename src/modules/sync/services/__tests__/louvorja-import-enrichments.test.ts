@@ -99,11 +99,11 @@ describe("import .louvorja: enriquecimentos pós-import (t_14d066ea + t_b1a9deae
     localStorage.clear();
     vi.clearAllMocks();
     setActivePinia(createPinia());
-    localStorage.setItem(`${SYNC_MODIFIED_PREFIX}.liturgy`, "2000-01-01T00:00:00.000Z");
+    localStorage.setItem(`${SYNC_MODIFIED_PREFIX}.liturgy.pt`, "2000-01-01T00:00:00.000Z");
     stored = normalizeLiturgyState(null);
     stored.weekdays.saturday = [];
     getUserPreferenceMock.mockImplementation((key: string) =>
-      key === USER_PREFERENCE_KEYS.liturgyState ? stored : null,
+      key === `${USER_PREFERENCE_KEYS.liturgyState}.pt` ? stored : null,
     );
     setUserPreferenceMock.mockImplementation((_key: string, value: unknown) => {
       // structuredClone do adapter falha em Proxy Vue — grava JSON puro.

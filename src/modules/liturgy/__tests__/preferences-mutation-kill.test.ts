@@ -26,7 +26,7 @@ vi.mock('@shared/services/browser-storage', () => ({
 }))
 
 vi.mock('@shared/constants/storage-keys', () => ({
-  USER_PREFERENCE_KEYS: { liturgyState: 'liturgyState' },
+  USER_PREFERENCE_KEYS: { liturgyState: 'liturgy.state' },
   CHECKS_CLEARED_KEY: 'liturgy_checks_cleared',
 }))
 
@@ -330,7 +330,7 @@ describe('liturgy-preferences — mata survivors L40-L192', () => {
         deletionLocks: {},
       }
       saveLiturgyState(state)
-      expect(mocks.mockSetUserPref).toHaveBeenCalledWith(USER_PREFERENCE_KEYS.liturgyState, state)
+      expect(mocks.mockSetUserPref).toHaveBeenCalledWith(`${USER_PREFERENCE_KEYS.liturgyState}.pt`, state)
       expect(mocks.mockSetBrowserItem).not.toHaveBeenCalled()
     })
 
@@ -339,7 +339,7 @@ describe('liturgy-preferences — mata survivors L40-L192', () => {
       mocks.mockGetUserPref.mockReturnValue({ weekdays: { sunday: withDone } })
       mocks.mockGetBrowserItem.mockReturnValue(false)
       loadLiturgyState()
-      expect(mocks.mockGetUserPref).toHaveBeenCalledWith(USER_PREFERENCE_KEYS.liturgyState, null)
+      expect(mocks.mockGetUserPref).toHaveBeenCalledWith(`${USER_PREFERENCE_KEYS.liturgyState}.pt`, null)
       expect(mocks.mockGetBrowserItem).toHaveBeenCalledWith(CHECKS_CLEARED_KEY, false, 'session')
       expect(mocks.mockSetBrowserItem).toHaveBeenCalledWith(CHECKS_CLEARED_KEY, true, 'session')
     })

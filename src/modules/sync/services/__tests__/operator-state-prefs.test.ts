@@ -32,10 +32,10 @@ describe('sincronização de preferências e agendados', () => {
   })
   it('prepara liturgia válida e registra instantes padrão dos três namespaces', () => {
     expect(currentLiturgyOperatorItem()).toBeNull()
-    values.set(keys.liturgyState,{ weekdays:{} })
-    expect(currentLiturgyOperatorItem()).toMatchObject({ namespace:'liturgy',key:'week',value_json:'{"weekdays":{}}' })
+    values.set(`${keys.liturgyState}.pt`,{ weekdays:{} })
+    expect(currentLiturgyOperatorItem()).toMatchObject({ namespace:'liturgy',key:'pt',value_json:'{"weekdays":{}}' })
     const now = Date.now()
     markLocalLiturgyPushed();markLocalScheduledPushed();markLocalPrefsPushed()
-    for(const key of ['liturgy:week','scheduled:items','prefs']) expect(Number(localStorage.getItem(`pianolouvorja:sync:${key}:updatedAt`))).toBeGreaterThanOrEqual(now)
+    for(const key of ['liturgy:pt','scheduled:items','prefs']) expect(Number(localStorage.getItem(`pianolouvorja:sync:${key}:updatedAt`))).toBeGreaterThanOrEqual(now)
   })
 })

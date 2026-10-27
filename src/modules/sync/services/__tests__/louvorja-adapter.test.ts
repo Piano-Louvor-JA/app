@@ -62,7 +62,7 @@ beforeEach(() => {
 describe("exportLouvorjaFromBrowser", () => {
 	it("inclui liturgy quando há estado salvo", () => {
 		mockGet.mockImplementation((key: string) => {
-			if (key === USER_PREFERENCE_KEYS.liturgyState) return LITURGY_STATE;
+			if (key === `${USER_PREFERENCE_KEYS.liturgyState}.pt`) return LITURGY_STATE;
 			return null;
 		});
 
@@ -99,7 +99,7 @@ describe("exportLouvorjaFromBrowser", () => {
 
 	it("não leva id local negativo para outro aparelho", () => {
 		mockGet.mockImplementation((key: string) => {
-			if (key === USER_PREFERENCE_KEYS.liturgyState) {
+			if (key === `${USER_PREFERENCE_KEYS.liturgyState}.pt`) {
 				return {
 					...LITURGY_STATE,
 					weekdays: {
@@ -131,11 +131,11 @@ describe("exportLouvorjaFromBrowser", () => {
 
 	it("usa timestamp LWW salvo quando existe", () => {
 		mockGet.mockImplementation((key: string) => {
-			if (key === USER_PREFERENCE_KEYS.liturgyState) return LITURGY_STATE;
+			if (key === `${USER_PREFERENCE_KEYS.liturgyState}.pt`) return LITURGY_STATE;
 			return null;
 		});
 		localStorage.setItem(
-			`${SYNC_MODIFIED_PREFIX}.liturgy`,
+			`${SYNC_MODIFIED_PREFIX}.liturgy.pt`,
 			"2026-08-14T00:00:00.000Z",
 		);
 
@@ -146,7 +146,7 @@ describe("exportLouvorjaFromBrowser", () => {
 
 	it("usa epoch quando não há timestamp LWW", () => {
 		mockGet.mockImplementation((key: string) => {
-			if (key === USER_PREFERENCE_KEYS.liturgyState) return LITURGY_STATE;
+			if (key === `${USER_PREFERENCE_KEYS.liturgyState}.pt`) return LITURGY_STATE;
 			return null;
 		});
 
@@ -159,7 +159,7 @@ describe("exportLouvorjaFromBrowser", () => {
 describe("importLouvorjaIntoBrowser", () => {
 	it("aplica liturgia remota mais nova", () => {
 		localStorage.setItem(
-			`${SYNC_MODIFIED_PREFIX}.liturgy`,
+			`${SYNC_MODIFIED_PREFIX}.liturgy.pt`,
 			"2026-08-10T00:00:00.000Z",
 		);
 
@@ -180,10 +180,10 @@ describe("importLouvorjaIntoBrowser", () => {
 
 		expect(result.applied).toContain("liturgy");
 		expect(mockSet).toHaveBeenCalledWith(
-			USER_PREFERENCE_KEYS.liturgyState,
+			`${USER_PREFERENCE_KEYS.liturgyState}.pt`,
 			LITURGY_STATE,
 		);
-		expect(localStorage.getItem(`${SYNC_MODIFIED_PREFIX}.liturgy`)).toBe(
+		expect(localStorage.getItem(`${SYNC_MODIFIED_PREFIX}.liturgy.pt`)).toBe(
 			"2026-08-16T00:00:00.000Z",
 		);
 	});
@@ -238,7 +238,7 @@ describe("importLouvorjaIntoBrowser", () => {
 
 	it("pula liturgia remota mais velha (LWW)", () => {
 		localStorage.setItem(
-			`${SYNC_MODIFIED_PREFIX}.liturgy`,
+			`${SYNC_MODIFIED_PREFIX}.liturgy.pt`,
 			"2026-08-17T00:00:00.000Z",
 		);
 
@@ -294,8 +294,8 @@ describe("importLouvorjaIntoBrowser", () => {
 describe("roundtrip com codec", () => {
 	it("export → encode → decode → import aplica", () => {
 		mockGet.mockImplementation((key: string) => {
-			if (key === USER_PREFERENCE_KEYS.liturgyState) return LITURGY_STATE;
-			if (key === `${SYNC_MODIFIED_PREFIX}.liturgy`)
+			if (key === `${USER_PREFERENCE_KEYS.liturgyState}.pt`) return LITURGY_STATE;
+			if (key === `${SYNC_MODIFIED_PREFIX}.liturgy.pt`)
 				return "2026-08-01T00:00:00.000Z";
 			return null;
 		});
@@ -312,18 +312,15 @@ describe("roundtrip com codec", () => {
   it("gaps: export com state mas dias vazios (59); import com current null (93), payload sem items/notes (105/108), toEpoch inválido → readModified catch (146)", () => {
     // export: state existe mas weekdays/dayNotes vazios → 59 false
     mockGet.mockImplementation((key: string) => {
-      if (key === USER_PREFERENCE_KEYS.liturgyState)
+      if (key === `${USER_PREFERENCE_KEYS.liturgyState}.pt`)
         return { weekdays: {}, dayNotes: {} };
       return null;
     });
     const pkg = exportLouvorjaFromBrowser("1.17.5", "web");
     expect(pkg.entities.liturgy).toBeUndefined();
 
-    // import: remote mais novo + current null → skipped (93)
-    mockGet.mockImplementation((key: string) => {
-      if (key === USER_PREFERENCE_KEYS.liturgyState) return null;
-      return null;
-    });
+    // import: remote mais novo + current null cria estado do idioma ativo
+    mockGet.mockImplementation(() => null);
     const result = importLouvorjaIntoBrowser(
       pkgWith({
         liturgy: {
@@ -333,14 +330,13 @@ describe("roundtrip com codec", () => {
         },
       }),
     );
-    console.log("RES1", JSON.stringify(result));
-    expect(result.skipped).toContain("liturgy");
+    expect(result.applied).toContain("liturgy");
 
-    // import: payload torto (items não-array, notes não-string) → hasDay false → skipped (105/108 false)
-    mockGet.mockImplementation((key: string) => {
-      if (key === USER_PREFERENCE_KEYS.liturgyState) return LITURGY_STATE;
-      return null;
-    });
+    // import: payload torto preserva o estado recém-importado
+    const activeState = { weekdays: { sunday: [{ id: "x" }] }, dayNotes: { sunday: "n" } };
+    mockGet.mockImplementation((key: string) =>
+      key === `${USER_PREFERENCE_KEYS.liturgyState}.pt` ? activeState : null,
+    );
     const r2 = importLouvorjaIntoBrowser(
       pkgWith({
         liturgy: {
@@ -353,7 +349,7 @@ describe("roundtrip com codec", () => {
     // dia presente porém sem items/notes válidos: aplicado, mas os campos
     // tortos NÃO sobrescrevem (105/108 false side); modified gravado
     expect(r2.applied).toContain("liturgy");
-    expect(mockSet.mock.calls[0][1].weekdays.sunday).toEqual(LITURGY_STATE.weekdays.sunday);
+    expect(mockSet.mock.calls[1][1].weekdays.sunday).toEqual(activeState.weekdays.sunday);
     // payload válido de novo → applied (105/108 true side) e modified gravado
     const r3 = importLouvorjaIntoBrowser(
       pkgWith({

@@ -1,5 +1,7 @@
 import { setUserPreference, getUserPreference } from '@shared/services/user-preferences'
 import { USER_PREFERENCE_KEYS } from '@shared/constants/storage-keys'
+import { activeLiturgyStateKey } from '@modules/liturgy/services/liturgy-preferences'
+import { getCurrentApiPrefix } from './api-prefix'
 
 /**
  * sync v2 fase 2 — PULL: aplicar operator_state do servidor no local (LWW).
@@ -16,7 +18,13 @@ import { USER_PREFERENCE_KEYS } from '@shared/constants/storage-keys'
  * Cada namespace tem META KEY própria (LWW independente por namespace).
  */
 
-const LOCAL_META_KEY = 'pianolouvorja:sync:liturgy:week:updatedAt'
+function liturgyMetaKey(prefix = getCurrentApiPrefix()): string {
+  return `pianolouvorja:sync:liturgy:${prefix}:updatedAt`
+}
+
+function activeLiturgySyncKey(): string {
+  return getCurrentApiPrefix()
+}
 const SCHEDULED_META_KEY = 'pianolouvorja:sync:scheduled:items:updatedAt'
 const PREFS_META_KEY = 'pianolouvorja:sync:prefs:updatedAt'
 
@@ -87,14 +95,15 @@ export function applyOperatorState(items: OperatorStateItem[]): boolean {
       continue
     }
 
-    if (item.namespace === 'liturgy' && item.key === 'week') {
+    if (item.namespace === 'liturgy' && item.key === activeLiturgySyncKey()) {
       if (!isValidLiturgyState(value)) continue
 
-      const localUpdatedAt = Number(localStorage.getItem(LOCAL_META_KEY) ?? '0')
+      const metaKey = liturgyMetaKey()
+      const localUpdatedAt = Number(localStorage.getItem(metaKey) ?? '0')
       if (item.updated_at_ms <= localUpdatedAt) continue // LWW: local vence
 
-      setUserPreference(USER_PREFERENCE_KEYS.liturgyState, value)
-      localStorage.setItem(LOCAL_META_KEY, String(item.updated_at_ms))
+      setUserPreference(activeLiturgyStateKey(), value)
+      localStorage.setItem(metaKey, String(item.updated_at_ms))
       applied = true
       continue
     }
@@ -138,7 +147,7 @@ export function applyOperatorState(items: OperatorStateItem[]): boolean {
 
 /** Registra o instante do push local (base do LWW no próximo pull). */
 export function markLocalLiturgyPushed(atMs: number = Date.now()): void {
-  localStorage.setItem(LOCAL_META_KEY, String(atMs))
+  localStorage.setItem(liturgyMetaKey(), String(atMs))
 }
 
 /** Registra o instante do push local das preferências (LWW da namespace prefs). */
@@ -153,11 +162,11 @@ export function markLocalScheduledPushed(atMs: number = Date.now()): void {
 
 /** Lê o estado atual da liturgia como operator_state item (uso no flush). */
 export function currentLiturgyOperatorItem(): Omit<OperatorStateItem, 'client_uuid'> | null {
-  const state = getUserPreference<unknown>(USER_PREFERENCE_KEYS.liturgyState, null)
+  const state = getUserPreference<unknown>(activeLiturgyStateKey(), null)
   if (!isValidLiturgyState(state)) return null
   return {
     namespace: 'liturgy',
-    key: 'week',
+    key: activeLiturgySyncKey(),
     value_json: JSON.stringify(state),
     updated_at_ms: Date.now(),
     deleted_at: null,

@@ -98,12 +98,12 @@ describe("import .louvorja hidrata o store de liturgia sem F5 (t_8bdaf97b)", () 
 		vi.clearAllMocks();
 		setActivePinia(createPinia());
 		localStorage.setItem(
-			`${SYNC_MODIFIED_PREFIX}.liturgy`,
+			`${SYNC_MODIFIED_PREFIX}.liturgy.pt`,
 			"2000-01-01T00:00:00.000Z",
 		);
 		stored = seedLocalState();
 		getUserPreferenceMock.mockImplementation((key: string) =>
-			key === USER_PREFERENCE_KEYS.liturgyState ? stored : null,
+			key === `${USER_PREFERENCE_KEYS.liturgyState}.pt` ? stored : null,
 		);
 		setUserPreferenceMock.mockImplementation((_key: string, value: unknown) => {
 			// Serialização real do user-preferences passa por localStorage (JSON):
@@ -135,7 +135,7 @@ describe("import .louvorja hidrata o store de liturgia sem F5 (t_8bdaf97b)", () 
 	});
 
 	it("RED: resultado de import LWW-skipped expõe timestamps local e do pacote", () => {
-		localStorage.setItem(`${SYNC_MODIFIED_PREFIX}.liturgy`, FUTURE);
+		localStorage.setItem(`${SYNC_MODIFIED_PREFIX}.liturgy.pt`, FUTURE);
 		const result = importLouvorjaIntoBrowser(saturdayPackage());
 		expect(result.applied).toEqual([]);
 		expect(result.skipped).toContain("liturgy");
@@ -145,7 +145,7 @@ describe("import .louvorja hidrata o store de liturgia sem F5 (t_8bdaf97b)", () 
 
 	it("RED: round-trip encode → decode preserva a nova entidade com timestamps", () => {
 		localStorage.setItem(
-			`${SYNC_MODIFIED_PREFIX}.liturgy`,
+			`${SYNC_MODIFIED_PREFIX}.liturgy.pt`,
 			"2000-01-01T00:00:00.000Z",
 		);
 		const pkg = saturdayPackage();
