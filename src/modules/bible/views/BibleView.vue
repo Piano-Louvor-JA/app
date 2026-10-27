@@ -36,6 +36,7 @@ const {
   selectBook,
   selectChapter,
   selectVerse,
+  applyBookSearchReference,
   clearSelection,
   goToAdjacentVerse,
   setTestamentFilter,
@@ -121,6 +122,7 @@ function onNextVerse() {
         :selected-chapter="selectedChapter"
         :chapter-search-query="chapterSearchQuery"
         @update:book-search-query="bookSearchQuery = $event"
+        @book-search-submit="applyBookSearchReference"
         @update:chapter-search-query="chapterSearchQuery = $event"
         @update:testament="setTestamentFilter"
         @select-book="selectBook"

@@ -29,6 +29,7 @@ import {
   buildProjectionText,
   emptySelection,
   formatScripturalReference,
+  parseBibleReference,
   parseVerseQuery,
 } from '../services/scripture-format'
 import type {
@@ -110,14 +111,24 @@ export const useBibleStore = defineStore('bible', () => {
   )
 
   const filteredBooks = computed(() => {
-    const query = bookSearchQuery.value.trim().toLowerCase()
+    const query = bookSearchQuery.value
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
     return books.value.filter((book) => {
-      if (resolveTestament(book.bookNumber) !== testamentFilter.value) return false
-      if (!query) return true
-      return (
-        book.name.toLowerCase().includes(query) ||
-        book.abbreviation.toLowerCase().includes(query)
-      )
+      // Com busca ativa o testamento NÃO filtra (SPEC R1): "apocalipse"
+      // precisa achar mesmo com AT selecionado.
+      if (!query) return resolveTestament(book.bookNumber) === testamentFilter.value
+      const name = book.name
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+      const abbreviation = book.abbreviation
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+      return name.includes(query) || abbreviation.includes(query)
     })
   })
 
@@ -453,6 +464,28 @@ export const useBibleStore = defineStore('bible', () => {
     syncProjection()
   }
 
+  /**
+   * Busca 1-shot de referência completa (SPEC R4): "genesis 1:1-4, 6" no
+   * campo de livros seleciona livro + capítulo + versículos de uma vez.
+   * Só dispara com capítulo (ou mais); livro sozinho segue filtrando o grid.
+   * Retorna true quando aplicou.
+   */
+  async function applyBookSearchReference(): Promise<boolean> {
+    const parsed = parseBibleReference(bookSearchQuery.value, books.value)
+    if (!parsed || parsed.chapter == null) return false
+
+    await selectBook(parsed.book.id)
+    await selectChapter(parsed.chapter)
+    if (parsed.verses.length > 0) {
+      const available = parseVerseQuery(parsed.verses.join(','), verses.value)
+      selectedVerses.value = available.length > 0 ? available : parsed.verses
+      lastVerseAnchor.value = selectedVerses.value[selectedVerses.value.length - 1] ?? 1
+    }
+    bookSearchQuery.value = ''
+    syncProjection()
+    return true
+  }
+
   function clearSelection() {
     selectedVerses.value = []
     syncProjection()
@@ -560,6 +593,7 @@ export const useBibleStore = defineStore('bible', () => {
     selectChapter,
     selectVerse,
     applyVerseSearch,
+    applyBookSearchReference,
     clearSelection,
     setTestamentFilter,
     toggleNavPanel,
