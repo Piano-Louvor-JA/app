@@ -21,6 +21,7 @@ const emit = defineEmits<{
   selectVersion: [versionId: number]
   toggleNav: []
   'update:bibleSearchQuery': [value: string]
+  searchSubmit: []
 }>()
 
 const { t } = useI18n()
@@ -78,6 +79,7 @@ const browseIcon = computed(() =>
           :placeholder="t('bible.searchBible')"
           :aria-label="t('bible.searchBible')"
           @input="emit('update:bibleSearchQuery', ($event.target as HTMLInputElement).value)"
+          @keydown.enter.prevent="emit('searchSubmit')"
         >
       </div>
 

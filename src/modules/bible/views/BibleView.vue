@@ -30,6 +30,7 @@ const {
   locationLabel,
   chapterTitle,
   verseEntries,
+  visibleVerseEntries,
   hasProjection,
   clearError,
   selectVersion,
@@ -51,6 +52,14 @@ function onPreviousVerse() {
 function onNextVerse() {
   void goToAdjacentVerse(1)
 }
+
+/** Enter na toolbar: tenta referência bíblica 1-shot ("genesis 1:1-4, 6");
+ *  sem parse válido mantém o filtro textual existente. */
+async function applyToolbarSearch() {
+  const query = globalSearchQuery.value
+  const resolved = await applyBookSearchReference(query)
+  if (resolved) globalSearchQuery.value = ''
+}
 </script>
 
 <template>
@@ -65,6 +74,7 @@ function onNextVerse() {
       @select-version="selectVersion"
       @toggle-nav="toggleNavPanel"
       @update:bible-search-query="globalSearchQuery = $event"
+      @search-submit="applyToolbarSearch"
     />
     <PalcoRouteSelect module="bible" />
 
@@ -132,7 +142,7 @@ function onNextVerse() {
       <BibleVerseList
         class="bible-view__reader"
         :chapter-title="chapterTitle"
-        :verses="verseEntries"
+        :verses="visibleVerseEntries"
         :selected-verses="selectedVerses"
         :verse-search-query="verseSearchQuery"
         :is-loading="isLoadingVerses"

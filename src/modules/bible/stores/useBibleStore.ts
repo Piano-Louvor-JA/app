@@ -182,6 +182,19 @@ export const useBibleStore = defineStore('bible', () => {
       )
   })
 
+  /** SPEC R4+: após referência 1-shot, a lista mostra SÓ os versículos da
+   *  referência (navegação focada). Limpa ao trocar capítulo/livro manualmente. */
+  const filteredVerseSet = ref<Set<number> | null>(null)
+
+  const visibleVerseEntries = computed(() => {
+    if (!filteredVerseSet.value) return verseEntries.value
+    return verseEntries.value.filter((entry) => filteredVerseSet.value!.has(entry.number))
+  })
+
+  function clearFilteredVerses() {
+    filteredVerseSet.value = null
+  }
+
   function clearError() {
     lastErrorKey.value = null
   }
@@ -400,6 +413,7 @@ export const useBibleStore = defineStore('bible', () => {
     testamentFilter.value = resolveTestament(book.bookNumber)
     selectedVerses.value = []
     lastVerseAnchor.value = 1
+    filteredVerseSet.value = null
 
     if (selectedChapter.value > book.chapters) {
       selectedChapter.value = book.chapters
@@ -420,6 +434,7 @@ export const useBibleStore = defineStore('bible', () => {
     selectedChapter.value = next
     selectedVerses.value = []
     lastVerseAnchor.value = 1
+    filteredVerseSet.value = null
     syncProjection()
     await refreshChapter()
   }
@@ -468,20 +483,22 @@ export const useBibleStore = defineStore('bible', () => {
    * Busca 1-shot de referência completa (SPEC R4): "genesis 1:1-4, 6" no
    * campo de livros seleciona livro + capítulo + versículos de uma vez.
    * Só dispara com capítulo (ou mais); livro sozinho segue filtrando o grid.
-   * Retorna true quando aplicou.
+   * Query opcional: default = bookSearchQuery (nav panel); toolbar passa
+   * globalSearchQuery. Retorna true quando aplicou.
    */
-  async function applyBookSearchReference(): Promise<boolean> {
-    const parsed = parseBibleReference(bookSearchQuery.value, books.value)
+  async function applyBookSearchReference(query?: string): Promise<boolean> {
+    const raw = (query ?? bookSearchQuery.value).trim()
+    const parsed = parseBibleReference(raw, books.value)
     if (!parsed || parsed.chapter == null) return false
 
     await selectBook(parsed.book.id)
     await selectChapter(parsed.chapter)
     if (parsed.verses.length > 0) {
-      const available = parseVerseQuery(parsed.verses.join(','), verses.value)
-      selectedVerses.value = available.length > 0 ? available : parsed.verses
-      lastVerseAnchor.value = selectedVerses.value[selectedVerses.value.length - 1] ?? 1
+      // R4+ (ajuste PO): lista filtrada mas NENHUM versículo pré-selecionado —
+      // o operador escolhe o primeiro e navega só pelas passagens do filtro.
+      filteredVerseSet.value = new Set(parsed.verses)
     }
-    bookSearchQuery.value = ''
+    if (query === undefined) bookSearchQuery.value = ''
     syncProjection()
     return true
   }
@@ -586,6 +603,8 @@ export const useBibleStore = defineStore('bible', () => {
     locationLabel,
     chapterTitle,
     verseEntries,
+    visibleVerseEntries,
+    clearFilteredVerses,
     clearError,
     bootstrap,
     selectVersion,

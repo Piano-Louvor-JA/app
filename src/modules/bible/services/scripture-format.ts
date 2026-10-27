@@ -169,10 +169,14 @@ export function parseBibleReference(
   const trimmed = query.trim()
   if (!trimmed) return null
 
+  // Normaliza travessões tipográficos (en/em dash) e hífens Unicode → "-"
+  // (usuário colando "genesis 1:1–4, 6" de outro app).
+  const normalized = trimmed.replace(/[\u2010-\u2015]/g, '-')
+
   // Separa nome do livro (tudo até o último espaço antes de número) do resto.
   // Formas tortas ("genesis 1:", "genesis :") não casam e o bookPart resultante
   // não bate em livro algum → null naturalmente.
-  const match = trimmed.match(/^(.+?)\s+(\d+)(?:[.:]([\d\s,-]+))?$/)
+  const match = normalized.match(/^(.+?)\s+(\d+)(?:[.:]([\d\s,-]+))?$/)
 
   let bookPart = trimmed
   let chapter: number | null = null
