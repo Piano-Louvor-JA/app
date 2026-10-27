@@ -17,6 +17,17 @@ import { DEFAULT_ALERT_MARKERS } from '../../types/countdown'
 describe('migração v1 → v2 (alertTonePresets → alertMarkers)', () => {
   beforeEach(() => localStorage.clear())
 
+  it('roundtrip save→reload preserva sabbathSchoolAudioLang (offline-first)', () => {
+    saveCountdownDisplayConfig(normalizeCountdownDisplayConfig({ sabbathSchoolAudioLang: 'es' }))
+    const reloaded = loadCountdownDisplayConfig()
+    expect(reloaded.sabbathSchoolAudioLang).toBe('es')
+  })
+
+  it('valor inválido persistido volta a auto no reload', () => {
+    localStorage.setItem('user_data', JSON.stringify({ 'countdown.config': { configVersion: 2, sabbathSchoolAudioLang: 'xx' } }))
+    expect(loadCountdownDisplayConfig().sabbathSchoolAudioLang).toBe('auto')
+  })
+
   it('config v1 (sem configVersion) migra preservando presets nos offsets padrão', () => {
     const migrated = normalizeCountdownDisplayConfig({
       timeFormat: 'hh:mm:ss',

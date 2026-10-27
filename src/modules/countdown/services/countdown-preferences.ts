@@ -40,6 +40,7 @@ export function normalizeCountdownDisplayConfig(raw: unknown): CountdownDisplayC
     allowNegative: typeof source.allowNegative === 'boolean' ? source.allowNegative : DEFAULT_COUNTDOWN_DISPLAY_CONFIG.allowNegative,
     mode: source.mode === 'sabbath' ? 'sabbath' : 'standard',
     sabbathConfig: asSabbathConfig(source.sabbathConfig),
+    sabbathSchoolAudioLang: asSabbathSchoolAudioLang(source.sabbathSchoolAudioLang),
     alertTonePresets: asAlertTonePresets(source.alertTonePresets),
   }
 
@@ -97,6 +98,10 @@ function asAlertMarkers(value: unknown[]): AlertMarker[] | null {
     out.push({ id: m.id, offsetMs: m.offsetMs, preset: m.preset as AlertMarkerPreset })
   }
   return out.length > 0 ? out : null
+}
+
+function asSabbathSchoolAudioLang(value: unknown): 'pt-BR' | 'es' | 'en' | 'fr' | 'auto' {
+  return value === 'pt-BR' || value === 'es' || value === 'en' || value === 'fr' ? value : 'auto'
 }
 
 function asSabbathConfig(value: unknown): SabbathModeConfig | undefined {

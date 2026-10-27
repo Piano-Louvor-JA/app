@@ -12,6 +12,8 @@ export default {
     scheduleStartEnd: 'Horário de início e término',
     sabbathSchedule: 'Agendamento Escola Sabatina',
     sabbathScheduleHint: 'Defina o horário de término (obrigatório) e opcionalmente o de início',
+    sabbathAudioLang: 'Idioma da narração',
+    sabbathAudioLangAuto: 'Automático (segue o app)',
     endTime: 'Horário de término',
     startTime: 'Horário de início',
     configSubtitle: 'Formato de tempo, alertas sonoros e modo de operação',
