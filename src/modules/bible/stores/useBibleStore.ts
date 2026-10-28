@@ -155,7 +155,8 @@ export const useBibleStore = defineStore('bible', () => {
   })
 
   const verseEntries = computed(() => {
-    const globalQuery = globalSearchQuery.value.trim().toLowerCase()
+    // R4+ (ajuste PO): a toolbar global NÃO filtra em tempo real (onchange) —
+    // o gatilho de busca é exclusivamente Enter (parser de referência).
     const verseQuery = verseSearchQuery.value.trim().toLowerCase()
 
     function matchesQuery(
@@ -177,9 +178,7 @@ export const useBibleStore = defineStore('bible', () => {
         number,
         text: verses.value[String(number)] ?? '',
       }))
-      .filter(
-        (entry) => matchesQuery(entry, globalQuery) && matchesQuery(entry, verseQuery),
-      )
+      .filter((entry) => matchesQuery(entry, verseQuery))
   })
 
   /** SPEC R4+: após referência 1-shot, a lista mostra SÓ os versículos da
