@@ -300,6 +300,25 @@ function isAuthPopupUrl(url) {
 }
 
 /**
+ * Popup OAuth filho da janela principal. A partir do Electron 45, um filho com
+ * sandbox diferente do opener nasce sem opener: window.open retorna null e o
+ * signInWithPopup do Firebase falha com auth/popup-blocked.
+ * @returns {import('electron').BrowserWindowConstructorOptions}
+ */
+function buildAuthPopupWindowOptions() {
+	return {
+		width: 500,
+		height: 640,
+		autoHideMenuBar: true,
+		webPreferences: {
+			contextIsolation: true,
+			nodeIntegration: false,
+			sandbox: false,
+		},
+	};
+}
+
+/**
  * Extrai dicas de projeção do features (window.open) e da URL (mais confiável).
  * @param {string} url
  * @param {string} [features]
@@ -578,13 +597,7 @@ function attachProjectionWindowHandlers(parentWindow) {
     if (isAuthPopupUrl(url)) {
       return {
         action: 'allow',
-        overrideBrowserWindowOptions: {
-          width: 500,
-          height: 640,
-          autoHideMenuBar: true,
-          contextIsolation: true,
-          sandbox: true,
-        },
+        overrideBrowserWindowOptions: buildAuthPopupWindowOptions(),
       }
     }
 
