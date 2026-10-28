@@ -259,11 +259,11 @@ export function useCountdownDisplay(
         }
       }
 
-      // start: primeira observação com status running (offset 0)
-      const startMarker = activeMarkers.value.find((m) => m.offsetMs === 0)
+      // start: resolve o marker no disparo; popup pode receber config depois do mount.
       watch(
         [() => runtime.value.status, remainingRawMs],
         ([status]) => {
+          const startMarker = activeMarkers.value.find((m) => m.offsetMs === 0)
           if (
             startMarker &&
             status === 'running' &&

@@ -86,6 +86,14 @@ describe('alertas por deadline absoluto', () => {
     await vi.advanceTimersByTimeAsync(1000)
     expect(audio.play).toHaveBeenCalledTimes(2)
   })
+  it('marker start desativado DEPOIS do mount não toca (popup recebe config via BC)', async () => {
+    open([{ id:'start', offsetMs:0, preset:'beep' }])
+    // CountdownProjectionView substitui a config ref após o mount (BroadcastChannel)
+    config.value = { ...DEFAULT_COUNTDOWN_DISPLAY_CONFIG, mode:'sabbath', alertMarkers: [{ id:'start', offsetMs:0, preset:'none' }] }
+    await nextTick()
+    await start()
+    expect(mocks.play).not.toHaveBeenCalled()
+  })
   it('sincroniza popup, reage a stop e volume e libera a eleição ao desmontar', async () => {
     window.history.replaceState({}, '', '/popup?module=countdown')
     open([{ id:'start', offsetMs:0, preset:'none' }])
