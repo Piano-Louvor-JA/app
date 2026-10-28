@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({ store: null as any, host: vi.fn(), operator: v
 vi.mock('../../stores/useCountdownStore', () => ({ useCountdownStore: () => mocks.store }))
 vi.mock('../../services/audio-control', () => ({ claimAudioHost: mocks.host, isOperatorWindow: mocks.operator, releaseAudioHost: mocks.release }))
 vi.mock('../../services/alert-tone-library', () => ({ getLibraryTone: mocks.library }))
-vi.mock('../../services/alert-tone', () => ({ enqueueAlert: (play: () => Promise<void>) => { void play() }, playAlertTone: mocks.play, stopAllAlerts: mocks.stop, setLiveVolume: mocks.volume, clearAlertQueue: mocks.clear }))
+vi.mock('../../services/alert-tone', () => ({ enqueueAlert: (play: () => Promise<void>) => { void play() }, playAlertTone: mocks.play, stopAllAlerts: mocks.stop, setLiveVolume: mocks.volume, clearAlertQueue: mocks.clear, resolveSabbathSchoolAudioLang: () => 'pt-BR' }))
 let wrapper: VueWrapper
 let config: ReturnType<typeof ref<any>>
 let runtime: ReturnType<typeof ref<any>>
@@ -42,9 +42,9 @@ describe('alertas por deadline absoluto', () => {
   it('toca marcos na hora mesmo com rAF congelado, sem repetir e sem disparar marcos já vencidos no início', async () => {
     open([{ id:'start', offsetMs:0, preset:'beep' }, { id:'five', offsetMs:300000, preset:'chime' }, { id:'late', offsetMs:700000, preset:'gong' }, { id:'disabled', offsetMs:200000, preset:'none' }])
     await start()
-    expect(mocks.play).toHaveBeenCalledWith('beep', undefined, undefined, { volume:0.4 })
+    expect(mocks.play).toHaveBeenCalledWith('beep', undefined, undefined, { volume: 0.4, sabbathAudioLang: 'pt-BR' })
     await vi.advanceTimersByTimeAsync(300000)
-    expect(mocks.play).toHaveBeenCalledWith('chime', undefined, undefined, { volume:0.4 })
+    expect(mocks.play).toHaveBeenCalledWith('chime', undefined, undefined, { volume: 0.4, sabbathAudioLang: 'pt-BR' })
     await vi.advanceTimersByTimeAsync(100000)
     expect(mocks.play).toHaveBeenCalledTimes(2)
     expect(mocks.store.firedMarkers.has('late')).toBe(true)
@@ -85,6 +85,14 @@ describe('alertas por deadline absoluto', () => {
     mocks.library.mockReturnValue(undefined)
     await vi.advanceTimersByTimeAsync(1000)
     expect(audio.play).toHaveBeenCalledTimes(2)
+  })
+  it('marker start desativado DEPOIS do mount não toca (popup recebe config via BC)', async () => {
+    open([{ id:'start', offsetMs:0, preset:'beep' }])
+    // CountdownProjectionView substitui a config ref após o mount (BroadcastChannel)
+    config.value = { ...DEFAULT_COUNTDOWN_DISPLAY_CONFIG, mode:'sabbath', alertMarkers: [{ id:'start', offsetMs:0, preset:'none' }] }
+    await nextTick()
+    await start()
+    expect(mocks.play).not.toHaveBeenCalled()
   })
   it('sincroniza popup, reage a stop e volume e libera a eleição ao desmontar', async () => {
     window.history.replaceState({}, '', '/popup?module=countdown')

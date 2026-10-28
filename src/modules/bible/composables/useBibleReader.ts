@@ -32,6 +32,7 @@ export function useBibleReader() {
     locationLabel,
     chapterTitle,
     verseEntries,
+    visibleVerseEntries,
   } = storeToRefs(store)
 
   const hasProjection = computed(() => hasBibleProjection(projection.value))
@@ -98,6 +99,7 @@ export function useBibleReader() {
     locationLabel,
     chapterTitle,
     verseEntries,
+    visibleVerseEntries,
     hasProjection,
     previewSnippet,
     clearError: store.clearError,
@@ -106,6 +108,7 @@ export function useBibleReader() {
     selectChapter: store.selectChapter,
     selectVerse: store.selectVerse,
     applyVerseSearch: store.applyVerseSearch,
+    applyBookSearchReference: store.applyBookSearchReference,
     clearSelection: store.clearSelection,
     setTestamentFilter: store.setTestamentFilter,
     toggleNavPanel: store.toggleNavPanel,

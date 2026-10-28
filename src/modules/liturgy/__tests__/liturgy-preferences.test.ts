@@ -33,7 +33,7 @@ vi.mock('@shared/services/user-preferences', () => ({
 
 import { USER_PREFERENCE_KEYS } from '@shared/constants/storage-keys'
 
-const KEY = USER_PREFERENCE_KEYS.liturgyState
+const KEY = `${USER_PREFERENCE_KEYS.liturgyState}.pt`
 const CHECKS_KEY = 'liturgy_checks_cleared'
 
 function seedState(extra: Record<string, unknown> = {}): Record<string, unknown> {

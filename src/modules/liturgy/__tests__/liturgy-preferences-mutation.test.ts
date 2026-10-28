@@ -17,7 +17,7 @@ const { mockGetUserPreference, mockSetUserPreference, mockGetBrowserItem, mockSe
 vi.mock('@shared/services/user-preferences', () => ({
   getUserPreference: mockGetUserPreference,
   setUserPreference: mockSetUserPreference,
-  USER_PREFERENCE_KEYS: { liturgyState: 'liturgyState' },
+  USER_PREFERENCE_KEYS: { liturgyState: 'liturgy.state' },
 }))
 vi.mock('@shared/services/browser-storage', () => ({
   getBrowserItem: mockGetBrowserItem,

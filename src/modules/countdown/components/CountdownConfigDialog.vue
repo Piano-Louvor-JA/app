@@ -16,7 +16,9 @@ import {
 import {
   getAvailablePresets,
   getPresetDurationMs,
+  resolveSabbathSchoolAudioLang,
   type AlertPresetKey,
+  type SabbathAudioLang,
 } from '../services/alert-tone'
 import {
   addLibraryTone,
@@ -45,8 +47,13 @@ const emit = defineEmits<{
 
 function onBgInput(event: Event) { emit('update:bgColor', (event.target as HTMLInputElement).value) }
 function onTextInput(event: Event) { emit('update:textColor', (event.target as HTMLInputElement).value) }
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const store = useCountdownStore()
+
+/** Mesmo idioma efetivo do runtime: auto segue locale; FR só via seleção explícita. */
+const sabbathAudioLang = computed<SabbathAudioLang>(() =>
+  resolveSabbathSchoolAudioLang(props.config.sabbathSchoolAudioLang ?? 'auto', locale.value),
+)
 
 const toneLibrary = ref<CustomTone[]>([])
 const toneError = ref('')
@@ -149,7 +156,9 @@ function previewPreset(preset: string): void {
   if (preset === 'none') return
   if (preset.startsWith('custom:')) return // preview da library no próprio player do navegador
   void import('../services/alert-tone').then(({ playAlertTone }) =>
-    playAlertTone(preset as AlertPresetKey),
+    playAlertTone(preset as AlertPresetKey, undefined, undefined, {
+      sabbathAudioLang: sabbathAudioLang.value,
+    }),
   )
 }
 

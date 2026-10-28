@@ -16,7 +16,7 @@ beforeEach(() => {
 });
 
 describe("applySyncPackage — liturgy sem estado local", () => {
-	it("remote mais novo + current null -> skipped liturgy (93-95)", () => {
+	it("remote mais novo + current null -> aplica no namespace ativo", () => {
 		const result = importLouvorjaIntoBrowser({
 			entities: {
 				liturgy: {
@@ -30,8 +30,8 @@ describe("applySyncPackage — liturgy sem estado local", () => {
 				},
 			},
 		} as never);
-		expect(result.skipped).toContain("liturgy");
-		expect(result.applied).not.toContain("liturgy");
+		expect(result.applied).toContain("liturgy");
+		expect(result.skipped).not.toContain("liturgy");
 	});
 
 	it("entidade desconhecida -> ignorada (forward-compatible)", () => {
@@ -69,7 +69,7 @@ describe("louvorja-adapter — ramos residuais", () => {
 	function setState(state: unknown): void {
 		localStorage.setItem(
 			"user_data",
-			JSON.stringify({ [USER_PREFERENCE_KEYS.liturgyState]: state }),
+			JSON.stringify({ [`${USER_PREFERENCE_KEYS.liturgyState}.pt`]: state }),
 		);
 	}
 
@@ -97,7 +97,7 @@ describe("louvorja-adapter — ramos residuais", () => {
 			dayNotes: { sunday: "" },
 		});
 		localStorage.setItem(
-			"sync.modified.v1.liturgy",
+			"sync.modified.v1.liturgy.pt",
 			"2026-08-10T00:00:00.000Z",
 		);
 		const result = importLouvorjaIntoBrowser({
@@ -119,7 +119,7 @@ describe("louvorja-adapter — ramos residuais", () => {
 			dayNotes: { sunday: "antiga" },
 		});
 		localStorage.setItem(
-			"sync.modified.v1.liturgy",
+			"sync.modified.v1.liturgy.pt",
 			"2026-08-10T00:00:00.000Z",
 		);
 		const result = importLouvorjaIntoBrowser({
@@ -134,10 +134,10 @@ describe("louvorja-adapter — ramos residuais", () => {
 		expect(result.applied).toContain("liturgy");
 		const saved = JSON.parse(
 			localStorage.getItem("user_data") ?? "{}",
-		)[USER_PREFERENCE_KEYS.liturgyState];
+		)[`${USER_PREFERENCE_KEYS.liturgyState}.pt`];
 		expect(saved.weekdays.sunday).toEqual([{ id: "old" }]);
 		expect(saved.dayNotes.sunday).toBe("antiga");
-		expect(localStorage.getItem("sync.modified.v1.liturgy")).toBe(
+		expect(localStorage.getItem("sync.modified.v1.liturgy.pt")).toBe(
 			"2030-01-01T00:00:00Z",
 		);
 	});
@@ -145,7 +145,7 @@ describe("louvorja-adapter — ramos residuais", () => {
 	it("import: só notes (sem items) aplica notas e marca aplicado (105 falso / 108 verdadeiro)", () => {
 		setState({ weekdays: {}, dayNotes: {} });
 		localStorage.setItem(
-			"sync.modified.v1.liturgy",
+			"sync.modified.v1.liturgy.pt",
 			"2026-08-10T00:00:00.000Z",
 		);
 		const result = importLouvorjaIntoBrowser({
@@ -160,7 +160,7 @@ describe("louvorja-adapter — ramos residuais", () => {
 		expect(result.applied).toContain("liturgy");
 		const saved = JSON.parse(
 			localStorage.getItem("user_data") ?? "{}",
-		)[USER_PREFERENCE_KEYS.liturgyState];
+		)[`${USER_PREFERENCE_KEYS.liturgyState}.pt`];
 		expect(saved.dayNotes.wednesday).toBe("ensaio 19h");
 	});
 
@@ -170,7 +170,7 @@ describe("louvorja-adapter — ramos residuais", () => {
 		const spy = vi
 			.spyOn(localStorage, "getItem")
 			.mockImplementation((key: string) => {
-				if (key === "sync.modified.v1.liturgy") {
+				if (key === "sync.modified.v1.liturgy.pt") {
 					throw new Error("storage bloqueado");
 				}
 				return original(key);

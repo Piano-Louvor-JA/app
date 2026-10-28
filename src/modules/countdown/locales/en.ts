@@ -12,6 +12,8 @@ export default {
     scheduleStartEnd: 'Start and end time',
     sabbathSchedule: 'Sabbath Schedule',
     sabbathScheduleHint: 'Set end time (required) and optionally start time',
+    sabbathAudioLang: 'Narration language',
+    sabbathAudioLangAuto: 'Automatic (follows the app)',
     endTime: 'End time',
     startTime: 'Start time',
     configSubtitle: 'Time format, sound alerts and operating mode',
