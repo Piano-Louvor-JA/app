@@ -19,6 +19,10 @@ import {
 	type LiturgyWeekday,
 } from "@modules/liturgy/types/liturgy";
 import { deriveSessionTimesFromCategories } from "@modules/liturgy/services/liturgy-duration-enrich";
+import {
+	activeLiturgyStateKey,
+	normalizeLiturgyState,
+} from "@modules/liturgy/services/liturgy-preferences";
 import type {
 	ScheduledCategory,
 	ScheduledItem,
@@ -109,7 +113,7 @@ export function exportLouvorjaFromBrowser(
 	const entities: LouvorjaSyncPackage["entities"] = {};
 
 	const liturgyState = getUserPreference<LiturgyPersistedState>(
-		USER_PREFERENCE_KEYS.liturgyState,
+		activeLiturgyStateKey(),
 		null,
 	);
 	if (liturgyState != null) {
@@ -133,7 +137,7 @@ export function exportLouvorjaFromBrowser(
 		if (Object.keys(days).length > 0) {
 			entities.liturgy = {
 				type: "liturgy",
-				modified: readModified("liturgy"),
+				modified: readModified(`liturgy.${activeLiturgyStateKey().split('.').pop()}`),
 				data: days,
 			};
 		}
@@ -193,21 +197,19 @@ export function importLouvorjaIntoBrowser(
 	for (const [name, entity] of Object.entries(pkg.entities)) {
 		switch (name) {
 			case "liturgy": {
-				localModified = readModified("liturgy");
+				localModified = readModified(`liturgy.${activeLiturgyStateKey().split('.').pop()}`);
 				packageModified = entity.modified;
 				const remoteEpoch = toEpoch(entity.modified);
 				if (remoteEpoch > toEpoch(localModified)) {
 					const current = getUserPreference<LiturgyPersistedState>(
-						USER_PREFERENCE_KEYS.liturgyState,
+						activeLiturgyStateKey(),
 						null,
 					);
-					if (current == null) {
-						skipped.push("liturgy");
-						break;
-					}
+					// Idioma ainda sem liturgia: importa para um estado vazio próprio;
+					// nunca reutiliza a liturgia de outro idioma.
+					const next = structuredClone(current ?? normalizeLiturgyState(null));
 					// Não elimina custom liturgies, horários de sessão ou locks que o
 					// schema mobile ainda não representa. Só substitui os dias recebidos.
-					const next = structuredClone(current);
 					let hasDay = false;
 					for (const day of LITURGY_WEEKDAYS) {
 						const payload = entity.data[day];
@@ -234,9 +236,9 @@ export function importLouvorjaIntoBrowser(
 						hasDay = true;
 					}
 					if (hasDay) {
-						setUserPreference(USER_PREFERENCE_KEYS.liturgyState, next);
+						setUserPreference(activeLiturgyStateKey(), next);
 						localStorage.setItem(
-							`${SYNC_MODIFIED_PREFIX}.liturgy`,
+							`${SYNC_MODIFIED_PREFIX}.liturgy.${activeLiturgyStateKey().split('.').pop()}`,
 							entity.modified,
 						);
 						applied.push("liturgy");

@@ -4,6 +4,7 @@ import {
   setUserPreference,
 } from '@shared/services/user-preferences'
 import { getBrowserItem, setBrowserItem } from '@shared/services/browser-storage'
+import { getCurrentApiPrefix } from '@modules/sync/services/api-prefix'
 
 import {
   createEmptySessionTimes,
@@ -32,6 +33,15 @@ import {
 } from './liturgy-item-helpers'
 
 const CHECKS_CLEARED_KEY = 'liturgy_checks_cleared'
+
+/**
+ * Chave de persistência da liturgia do idioma ativo: `liturgy.state.<prefix>`
+ * (pt/en/es). Liturgia é POR IDIOMA — importar em ES não pode sobrescrever a
+ * liturgia PT (SPEC piano-liturgy-locale-isolation).
+ */
+export function activeLiturgyStateKey(locale?: string): string {
+  return `${USER_PREFERENCE_KEYS.liturgyState}.${getCurrentApiPrefix(locale)}`
+}
 
 function asString(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value : fallback
@@ -216,7 +226,20 @@ export function normalizeLiturgyState(raw: unknown): LiturgyPersistedState {
 }
 
 export function loadLiturgyState(): LiturgyPersistedState {
-  const stored = getUserPreference<unknown>(USER_PREFERENCE_KEYS.liturgyState, null)
+  const key = activeLiturgyStateKey()
+  let stored = getUserPreference<unknown>(key, null)
+
+  // Migração v1: estado legado (chave única `liturgy.state`, cross-idioma)
+  // pertence ao primeiro idioma que o gravou — pt. Move uma única vez e
+  // preserva o original até que o namespace pt seja gravado.
+  if (stored == null && key === `${USER_PREFERENCE_KEYS.liturgyState}.pt`) {
+    const legacy = getUserPreference<unknown>(USER_PREFERENCE_KEYS.liturgyState, null)
+    if (legacy != null) {
+      stored = legacy
+      setUserPreference(key, normalizeLiturgyState(legacy))
+    }
+  }
+
   const state = normalizeLiturgyState(stored)
 
   const checksCleared = getBrowserItem<boolean>(CHECKS_CLEARED_KEY, false, 'session')
@@ -236,7 +259,7 @@ export function loadLiturgyState(): LiturgyPersistedState {
 }
 
 export function saveLiturgyState(state: LiturgyPersistedState): void {
-  setUserPreference(USER_PREFERENCE_KEYS.liturgyState, state)
+  setUserPreference(activeLiturgyStateKey(), state)
 }
 
 export function todayWeekday(): LiturgyWeekday {

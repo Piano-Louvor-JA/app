@@ -97,7 +97,7 @@ describe('pull do operator_state — namespace scheduled (LWW)', () => {
     const liturgyItem = {
       client_uuid: 'liturgy-week',
       namespace: 'liturgy',
-      key: 'week',
+      key: 'pt',
       value_json: JSON.stringify({ weekdays: {} }),
       updated_at_ms: 9000,
       deleted_at: null,

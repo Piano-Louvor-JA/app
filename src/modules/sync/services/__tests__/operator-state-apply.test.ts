@@ -22,13 +22,13 @@ vi.stubGlobal('localStorage', {
 import { applyOperatorState } from '../operator-state-apply'
 
 const USER_DATA_KEY = 'user_data'
-const LITURGY_KEY = 'liturgy.state'
+const LITURGY_KEY = 'liturgy.state.pt'
 
 function serverItem(value: unknown, updatedAtMs: number) {
   return {
     client_uuid: 'liturgy-week',
     namespace: 'liturgy',
-    key: 'week',
+    key: 'pt',
     value_json: JSON.stringify(value),
     updated_at_ms: updatedAtMs,
     deleted_at: null,
@@ -53,7 +53,7 @@ const LOCAL_STATE = {
   customLiturgies: [],
   deletionLocks: [],
 }
-const LOCAL_META_KEY = 'pianolouvorja:sync:liturgy:week:updatedAt'
+const LOCAL_META_KEY = 'pianolouvorja:sync:liturgy:pt:updatedAt'
 
 describe('pull do operator_state (LWW)', () => {
   beforeEach(() => {

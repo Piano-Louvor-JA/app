@@ -57,15 +57,19 @@ type CatalogBibleBookRow = {
   chapters?: number | string
 }
 
-const HYMNAL_SOURCES: Array<{ file: string; albumName: string }> = [
-  { file: 'pt_hymnal', albumName: 'Hinário Adventista' },
-  { file: 'pt_hymnal_1996', albumName: 'Hinário Adventista 1996' },
-]
+function hymnalSources(prefix: string): Array<{ file: string; albumName: string }> {
+  return [
+    { file: `${prefix}_hymnal`, albumName: 'Hinário Adventista' },
+    { file: `${prefix}_hymnal_1996`, albumName: 'Hinário Adventista 1996' },
+  ]
+}
 
 /** Coletâneas excluídas do catálogo (mesmo critério da biblioteca). */
 const EXCLUDED_ALBUM_IDS = new Set([712, 629])
 
-const BOOKS_FILE = 'pt_bible_book'
+function booksFile(prefix: string): string {
+  return `${prefix}_bible_book`
+}
 
 async function readOrFetchCatalog<T>(filename: string): Promise<T | null> {
   const local = await readCatalogRecord<T>(filename)
@@ -242,7 +246,7 @@ async function loadFromMusicIndex(): Promise<LiturgyMusicOption[] | null> {
 async function loadHymnalOptions(
   byId: Map<number, LiturgyMusicOption>,
 ): Promise<void> {
-  for (const source of HYMNAL_SOURCES) {
+  for (const source of hymnalSources(getCurrentApiPrefix())) {
     const rows = await readOrFetchCatalog<CatalogHymnalRow[]>(source.file)
     if (!rows || !Array.isArray(rows)) continue
 
@@ -405,7 +409,9 @@ export async function loadLiturgyMusicOptions(): Promise<LiturgyMusicOption[]> {
 }
 
 export async function loadLiturgyBibleBooks(): Promise<LiturgyBibleBookOption[]> {
-  const rows = await readOrFetchCatalog<CatalogBibleBookRow[]>(BOOKS_FILE)
+  const rows = await readOrFetchCatalog<CatalogBibleBookRow[]>(
+    booksFile(getCurrentApiPrefix()),
+  )
   if (!rows || !Array.isArray(rows)) return []
 
   return rows

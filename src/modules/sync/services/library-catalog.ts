@@ -5,7 +5,7 @@ import {
   readCatalogRecord,
   writeCatalogRecord,
 } from '@shared/services/workspace-api'
-import { localeToApiPrefix } from '@plugins/i18n'
+import { getCurrentApiPrefix } from './api-prefix'
 
 import type {
   CatalogCategory,
@@ -31,27 +31,11 @@ const CATEGORY_ORDER: Record<string, number> = {
 }
 
 /**
- * Detecta o prefixo de idioma atual com base na preferência do usuário.
- * Retorna `pt`, `en` ou `es` — usado para montar os nomes dos records da API
- * (`pt_hymnal`, `en_hymnal`, `es_hymnal`, etc.).
- *
- * @param customLocale - Override para testes. Se omitido, usa o locale do i18n.
+ * Prefixo do idioma do catálogo ativo. Implementação movida para
+ * `./api-prefix` (módulo leve, sem assets) — mantida aqui como re-export
+ * para não quebrar importadores existentes.
  */
-export function getCurrentApiPrefix(customLocale?: string): string {
-  if (customLocale) return localeToApiPrefix(customLocale)
-  try {
-    const stored = localStorage.getItem('user_data')
-    if (stored) {
-      const prefs = JSON.parse(stored)
-      if (typeof prefs.language === 'string') {
-        return localeToApiPrefix(prefs.language)
-      }
-    }
-  } catch {
-    // localStorage indisponível (SSR/test) — fallback pt
-  }
-  return 'pt'
-}
+export { getCurrentApiPrefix } from './api-prefix'
 
 /**
  * Atualiza coverUrl para local:// quando a capa já está no disco.
