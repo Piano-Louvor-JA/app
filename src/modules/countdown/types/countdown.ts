@@ -4,7 +4,7 @@ export type CountdownTimeFormat =
   | 'mm:ss.ms'
   | 'mm:ss'
 
-import type { AlertPresetKey } from '../services/alert-tone'
+import type { AlertPresetKey, SabbathAudioLangSetting } from '../services/alert-tone'
 
 export type CountdownStatus = 'idle' | 'running' | 'paused'
 
@@ -58,6 +58,8 @@ export interface CountdownDisplayConfig {
   mode?: CountdownMode
   /** Configuração extra quando mode === 'sabbath'. */
   sabbathConfig?: SabbathModeConfig
+  /** Idioma das narrações oficiais da Escola Sabatina (pt-BR/es/en/fr/auto). FR é só do áudio — a UI não tem locale FR. */
+  sabbathSchoolAudioLang?: SabbathAudioLangSetting
 }
 
 export interface CountdownRuntimeState {

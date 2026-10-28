@@ -21,7 +21,8 @@ import type {
   CountdownRuntimeState,
 } from '../types/countdown'
 import { useCountdownStore } from '../stores/useCountdownStore'
-import { clearAlertQueue, enqueueAlert, playAlertTone, setLiveVolume, stopAllAlerts } from '../services/alert-tone'
+import { clearAlertQueue, enqueueAlert, playAlertTone, resolveSabbathSchoolAudioLang, setLiveVolume, stopAllAlerts } from '../services/alert-tone'
+import i18n from '@/plugins/i18n'
 import { getLibraryTone } from '../services/alert-tone-library'
 import {
   DEFAULT_ALERT_MARKERS,
@@ -173,6 +174,10 @@ export function useCountdownDisplay(
         }
         return playAlertTone(preset as AlertPresetKey, undefined, undefined, {
           volume: store.audioVolume,
+          sabbathAudioLang: resolveSabbathSchoolAudioLang(
+            config.value.sabbathSchoolAudioLang ?? 'auto',
+            i18n.global.locale.value,
+          ),
         }).then(() => undefined)
       })
     }
@@ -254,11 +259,11 @@ export function useCountdownDisplay(
         }
       }
 
-      // start: primeira observação com status running (offset 0)
-      const startMarker = activeMarkers.value.find((m) => m.offsetMs === 0)
+      // start: resolve o marker no disparo; popup pode receber config depois do mount.
       watch(
         [() => runtime.value.status, remainingRawMs],
         ([status]) => {
+          const startMarker = activeMarkers.value.find((m) => m.offsetMs === 0)
           if (
             startMarker &&
             status === 'running' &&
@@ -351,6 +356,7 @@ export function useCountdownFeature() {
         stopAudio: store.stopAudio,
         setMode: store.setMode,
         setSabbathConfig: store.setSabbathConfig,
+        setSabbathSchoolAudioLang: store.setSabbathSchoolAudioLang,
         setDurationMs: store.setDurationMs,
     setCountdownMode: store.setCountdownMode,
     setUntilTime: store.setUntilTime,

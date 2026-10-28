@@ -5,7 +5,7 @@ import Dialog from '../CountdownConfigDialog.vue'
 import { DEFAULT_COUNTDOWN_DISPLAY_CONFIG } from '../../types/countdown'
 
 const mocks = vi.hoisted(() => ({ list: vi.fn(), add: vi.fn(), remove: vi.fn(), rename: vi.fn(), update: vi.fn(), addMarker: vi.fn(), removeMarker: vi.fn(), taken: vi.fn(), play: vi.fn() }))
-vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
+vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key, locale: { value: 'pt-BR' } }) }))
 vi.mock('@design-system/index', () => ({ GlassCard: { template: '<section><slot /></section>' } }))
 vi.mock('../../services/alert-tone-library', () => ({ listLibraryTones: mocks.list, addLibraryTone: mocks.add, removeLibraryTone: mocks.remove, renameLibraryTone: mocks.rename }))
 vi.mock('../../stores/useCountdownStore', () => ({ useCountdownStore: () => ({ runtime: { durationMs: 1000 }, updateAlertMarker: mocks.update, addAlertMarker: mocks.addMarker, removeAlertMarker: mocks.removeMarker, isOffsetTaken: mocks.taken }) }))
@@ -71,7 +71,7 @@ describe('configuração — alertas e biblioteca', () => {
     open()
     await wrapper.get('.countdown-config__tone-row [aria-label="countdown.markerPreview"]').trigger('click')
     await flushPromises()
-    expect(mocks.play).toHaveBeenCalledWith('beep')
+    expect(mocks.play).toHaveBeenCalledWith('beep', undefined, undefined, { sabbathAudioLang: 'pt-BR' })
     await wrapper.get('.countdown-config__library-item [aria-label="countdown.markerPreview"]').trigger('click')
     await flushPromises()
     expect(play).toHaveBeenCalledOnce()
