@@ -193,7 +193,7 @@ test('exceção humana de 30% vale somente para v1.33.0 nos caminhos de produç�
     {eventName:'release',ref:'refs/tags/v1.33.0'},
   ]) {
     assert.equal(coverageMinimumPercent({...context,version:'1.33.0'}),30)
-    for(const version of ['1.32.3','1.33.1','1.34.0']) assert.equal(coverageMinimumPercent({...context,version}),100)
+    for(const version of ['1.32.3','1.33.1','1.35.0']) assert.equal(coverageMinimumPercent({...context,version}),100)
   }
   // Staging continua em 50%; tag de outra versão não herda a exceção.
   assert.equal(coverageMinimumPercent({eventName:'pull_request',baseRef:'staging',version:'1.33.0'}),50)
@@ -201,4 +201,22 @@ test('exceção humana de 30% vale somente para v1.33.0 nos caminhos de produç�
   assert.equal(coverageMinimumPercent({eventName:'push',ref:'refs/tags/v1.32.2',version:'1.33.0'}),100)
   assert.equal(coverageMinimumPercent({eventName:'push',ref:'refs/tags/v1.33.0',version:'1.32.2'}),100)
   assert.equal(coverageMinimumPercent({eventName:'push',ref:'refs/heads/feature',version:'1.33.0'}),100)
+})
+
+test('exceção humana de 50% vale somente para v1.34.0 nos caminhos de produção', () => {
+  for (const context of [
+    {eventName:'pull_request',baseRef:'main'},
+    {eventName:'push',ref:'refs/heads/main'},
+    {eventName:'workflow_dispatch',ref:'refs/heads/main'},
+    {eventName:'push',ref:'refs/tags/v1.34.0'},
+    {eventName:'release',ref:'refs/tags/v1.34.0'},
+  ]) {
+    assert.equal(coverageMinimumPercent({...context,version:'1.34.0'}),50)
+    for(const version of ['1.33.1','1.34.1','1.35.0',undefined]) assert.equal(coverageMinimumPercent({...context,version}),100)
+  }
+  assert.equal(coverageMinimumPercent({eventName:'push',ref:'refs/tags/v1.33.0',version:'1.34.0'}),100)
+  assert.equal(coverageMinimumPercent({eventName:'push',ref:'refs/tags/v1.34.0',version:'1.33.0'}),100)
+  assert.equal(coverageMinimumPercent({eventName:'push',ref:'refs/heads/feature',version:'1.34.0'}),100)
+  assert.deepEqual(evaluateCoverage(summary(50),50).failures,[])
+  assert.equal(evaluateCoverage(summary(49.99),50).failures.length,4)
 })

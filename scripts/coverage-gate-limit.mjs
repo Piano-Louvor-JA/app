@@ -12,6 +12,7 @@ const STAGING_REF = 'refs/heads/staging'
 const PRODUCTION_EXCEPTIONS = {
   '1.32.2': 70,
   '1.33.0': 30,
+  '1.34.0': 50,
 }
 
 /** Staging mantém 50%; produção exige 100%, salvo exceção da versão. */
