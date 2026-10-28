@@ -55,6 +55,7 @@ const {
   stopAudio,
   setMode,
   setSabbathConfig,
+  setSabbathSchoolAudioLang,
   adjustTime,
   reset,
   saveMark,
@@ -294,6 +295,25 @@ const stageBg = computed(() => ({
                                 >
                                 <span>{{ t('countdown.scheduleStartEnd') }}</span>
                               </label>
+                            </div>
+
+                            <div class="countdown-view__sabbath-audio-lang">
+                              <label
+                                class="countdown-view__sabbath-lang-label"
+                                for="sabbath-audio-lang"
+                              >{{ t('countdown.sabbathAudioLang') }}</label>
+                              <select
+                                id="sabbath-audio-lang"
+                                data-testid="sabbath-audio-lang"
+                                :value="effectiveConfig.sabbathSchoolAudioLang ?? 'auto'"
+                                @change="setSabbathSchoolAudioLang(($event.target as HTMLSelectElement).value as 'pt-BR' | 'es' | 'en' | 'fr' | 'auto')"
+                              >
+                                <option value="auto">{{ t('countdown.sabbathAudioLangAuto') }}</option>
+                                <option value="pt-BR">Português (BR)</option>
+                                <option value="es">Español</option>
+                                <option value="en">English</option>
+                                <option value="fr">Français</option>
+                              </select>
                             </div>
 
 </div>
@@ -804,12 +824,32 @@ const stageBg = computed(() => ({
       }
     }
 
+    .countdown-view__sabbath-audio-lang {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+
+      .countdown-view__sabbath-lang-label {
+        font-size: 0.75rem;
+        opacity: 0.8;
+      }
+
+      select {
+        width: 100%;
+        padding: 0.35rem 0.5rem;
+        border-radius: 8px;
+        border: 1px solid rgb(var(--v-theme-border));
+        background: rgb(var(--v-theme-surface));
+        color: inherit;
+        font-size: 0.85rem;
+      }
+    }
+
     .countdown-view__sabbath-schedule {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 0.4rem;
       margin-bottom: 0.75rem;
-
       label {
         display: flex;
         align-items: center;

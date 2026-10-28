@@ -378,6 +378,12 @@ export const useCountdownStore = defineStore('countdown', () => {
       persistConfig()
     }
 
+    /** Idioma das narrações oficiais da Escola Sabatina (pt-BR/es/en/fr/auto). */
+    function setSabbathSchoolAudioLang(lang: 'pt-BR' | 'es' | 'en' | 'fr' | 'auto') {
+      config.value = { ...config.value, sabbathSchoolAudioLang: lang }
+      persistConfig()
+    }
+
     /** Adiciona (delta > 0) ou remove (delta < 0) tempo da contagem, em qualquer status.
      *  Remove nunca deixa abaixo de zero. Não reseta a contagem em curso. */
     function adjustTime(deltaMs: number) {
@@ -688,6 +694,7 @@ export const useCountdownStore = defineStore('countdown', () => {
             stopAudio,
             setMode,
         setSabbathConfig,
+        setSabbathSchoolAudioLang,
         resetDisplayToDefault,
     openConfig,
     closeConfig,

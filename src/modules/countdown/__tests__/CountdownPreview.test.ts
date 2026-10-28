@@ -4,7 +4,8 @@ import { mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 
 vi.mock('vue-i18n', () => ({
-  useI18n: () => ({ t: (key: string) => key }),
+  useI18n: () => ({ t: (key: string) => key, locale: { value: 'pt-BR' } }),
+  createI18n: () => ({ global: { locale: { value: 'pt-BR' }, t: (key: string) => key } }),
 }))
 
 import type { CountdownDisplayConfig, CountdownRuntimeState } from '../types/countdown'

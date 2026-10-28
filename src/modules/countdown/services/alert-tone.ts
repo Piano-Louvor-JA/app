@@ -18,15 +18,64 @@ export const ALERT_PRESETS = {
 
 export type AlertPresetKey = keyof typeof ALERT_PRESETS
 
+// ── i18n dos áudios oficiais da Escola Sabatina (SPEC countdown-audio-i18n) ──
+// Idioma EFETIVO da narração. 'fr' existe SÓ aqui — a UI não ganha locale FR.
+export type SabbathAudioLang = 'pt-BR' | 'es' | 'en' | 'fr'
+export type SabbathAudioLangSetting = SabbathAudioLang | 'auto'
+
+const SABBATH_AUDIO_LANGS: readonly SabbathAudioLang[] = ['pt-BR', 'es', 'en', 'fr']
+
+/** Locale de UI → idioma da narração; não mapeado → pt-BR. */
+export function resolveSabbathSchoolAudioLang(
+  setting: SabbathAudioLangSetting,
+  uiLocale: string,
+): SabbathAudioLang {
+  const auto = SABBATH_AUDIO_LANGS.slice(0, 3).find((l) => l === uiLocale) ?? 'pt-BR'
+  return SABBATH_AUDIO_LANGS.find((l) => l === setting) ?? auto
+}
+
+/** Manifesto: URL + duração ffprobe pré-medida por faixa/idioma (não medir em runtime). */
+export const officialToneAssets = {
+  abertura_es: {
+    'pt-BR': { url: ALERT_PRESETS.abertura_es.url, durationMs: 30_400 },
+    es: { url: new URL('../assets/abertura_escsb_es.mp3', import.meta.url).href, durationMs: 30_400 },
+    en: { url: new URL('../assets/abertura_escsb_en.mp3', import.meta.url).href, durationMs: 30_400 },
+    fr: { url: new URL('../assets/abertura_escsb_fr.mp3', import.meta.url).href, durationMs: 30_400 },
+  },
+  '5min_es': {
+    'pt-BR': { url: ALERT_PRESETS['5min_es'].url, durationMs: 18_000 },
+    es: { url: new URL('../assets/5minutos_escsb_es.mp3', import.meta.url).href, durationMs: 18_000 },
+    en: { url: new URL('../assets/5minutos_escsb_en.mp3', import.meta.url).href, durationMs: 18_000 },
+    fr: { url: new URL('../assets/5minutos_escsb_fr.mp3', import.meta.url).href, durationMs: 18_000 },
+  },
+  '1min_es': {
+    'pt-BR': { url: ALERT_PRESETS['1min_es'].url, durationMs: 65_500 },
+    es: { url: new URL('../assets/1minuto_escsb_es.mp3', import.meta.url).href, durationMs: 65_500 },
+    en: { url: new URL('../assets/1minuto_escsb_en.mp3', import.meta.url).href, durationMs: 65_500 },
+    fr: { url: new URL('../assets/1minuto_escsb_fr.mp3', import.meta.url).href, durationMs: 65_500 },
+  },
+} as const
+
+export type OfficialToneKey = keyof typeof officialToneAssets
+
+/** Asset efetivo (URL+duração) de uma faixa oficial no idioma dado. Fallback PT por faixa. */
+export function resolveSabbathSchoolAudio(preset: AlertPresetKey, lang: string): { url: string; durationMs: number } {
+  const track = officialToneAssets[preset as OfficialToneKey]
+  if (!track) return { url: '', durationMs: 0 }
+  return (track as Record<string, { url: string; durationMs: number }>)[lang] ?? track['pt-BR']
+}
+
 /** Duração aproximada de cada preset de áudio, em ms.
  *  Sintéticos: duration (s). MP3 oficiais: metadados pré-medidos.
  *  Custom: estimativa conservadora (usuário pode carregar áudio longo). */
-export function getPresetDurationMs(preset: AlertPresetKey | 'none' | 'custom', customAudio?: HTMLAudioElement | null): number {
+export function getPresetDurationMs(preset: AlertPresetKey | 'none' | 'custom', customAudio?: HTMLAudioElement | null, sabbathAudioLang?: SabbathAudioLang): number {
   if (preset === 'none') return 0
   if (preset === 'custom') return customAudio?.duration ? customAudio.duration * 1000 : 60_000
   const def = ALERT_PRESETS[preset]
   if ('duration' in def) return def.duration * 1000
-  // MP3s oficiais medidos com ffprobe
+  // MP3s oficiais medidos com ffprobe — durações idênticas nos 4 idiomas
+  // (mix preso ao instrumental original)
+  void sabbathAudioLang
   return preset === 'abertura_es' ? 30_400 : preset === '5min_es' ? 18_000 : 65_500
 }
 
@@ -98,7 +147,7 @@ export async function playAlertTone(
   preset: AlertPresetKey | 'custom',
   ctx?: AudioContext,
   customAudio?: HTMLAudioElement,
-  control?: { volume?: number },
+  control?: { volume?: number; sabbathAudioLang?: SabbathAudioLang },
 ): Promise<void> {
   const volume = control?.volume ?? 1
   // Presets sintéticos usam WebAudio
@@ -146,7 +195,13 @@ export async function playAlertTone(
   } else {
     const presetDef = (ALERT_PRESETS as unknown as Record<string, { url?: string }>)[preset]
     if (!presetDef || !('url' in presetDef) || !presetDef.url) return
-    audio = await preloadAudio(presetDef.url)
+    // i18n: faixas oficiais da Escola Sabatina resolvem URL pelo idioma efetivo
+    let url = presetDef.url
+    const lang = control?.sabbathAudioLang
+    if (lang && preset in officialToneAssets) {
+      url = resolveSabbathSchoolAudio(preset, lang).url || url
+    }
+    audio = await preloadAudio(url)
   }
   if (!audio) return
   try {
