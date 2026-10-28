@@ -13,6 +13,7 @@ defineProps<{
 
 const emit = defineEmits<{
   'update:searchQuery': [value: string]
+  searchSubmit: []
   'update:testament': [value: BibleTestament]
   selectBook: [bookId: number]
 }>()
@@ -34,6 +35,7 @@ const { t } = useI18n()
         :placeholder="t('bible.searchBook')"
         :aria-label="t('bible.searchBook')"
         @input="emit('update:searchQuery', ($event.target as HTMLInputElement).value)"
+        @keydown.enter.prevent="emit('searchSubmit')"
       >
     </div>
 

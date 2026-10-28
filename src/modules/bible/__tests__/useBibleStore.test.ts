@@ -268,14 +268,15 @@ describe('computed de navegação', () => {
     expect(fresh.chapterTitle).toBe('')
   })
 
-  it('verseEntries ordena e filtra por busca global e de versículo', async () => {
+  it('verseEntries ordena e filtra por busca de versículo (toolbar global não filtra em tempo real — gatilho é Enter)', async () => {
     const store = await bootstrappedStore()
     expect(store.verseEntries.map((e) => e.number)).toEqual([1, 2, 3])
 
+    // ajuste PO: digitar na toolbar NÃO filtra nada (onchange removido);
+    // o texto fica na caixa até o Enter disparar o parser de referência
     store.globalSearchQuery = 'v1'
-    expect(store.verseEntries.map((e) => e.number)).toEqual([1])
+    expect(store.verseEntries.map((e) => e.number)).toEqual([1, 2, 3])
 
-    store.globalSearchQuery = ''
     store.verseSearchQuery = '2'
     expect(store.verseEntries.map((e) => e.number)).toEqual([2])
 
