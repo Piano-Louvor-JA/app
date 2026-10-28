@@ -5,8 +5,8 @@ import { test, expect, type Page } from '@playwright/test'
  * RELOAD → reabrir → integridade total (offline-first).
  *
  * Requisito permanente do produto: NADA da liturgia pode se perder com
- * reload. O estado persiste em `user_data.liturgy.state` (localStorage,
- * via USER_PREFERENCE_KEYS.liturgyState) — o mesmo contrato cumprido
+ * reload. O estado persiste por idioma em `user_data.liturgy.state.pt`
+ * (localStorage, via activeLiturgyStateKey) — o mesmo contrato cumprido
  * pelo Electron em disco.
  *
  * Determinismo:
@@ -20,7 +20,8 @@ import { test, expect, type Page } from '@playwright/test'
  */
 
 const EULA_KEY = 'eula_accepted_v1'
-const LITURGY_STATE_KEY = 'liturgy.state'
+/** Idioma semeado é pt → liturgia do catálogo pt. */
+const LITURGY_STATE_KEY = 'liturgy.state.pt'
 
 /** Categoria criada no teste — os sub-itens vinculam a ela. */
 const CATEGORY_NAME = 'E2E Abertura'
@@ -112,7 +113,7 @@ function installMockBridge(): void {
 function seedBrowserState(): void {
   localStorage.setItem('eula_accepted_v1', 'true')
   // NÃO sobrescrever user_data se já existe: no reload isso apagaria
-  // liturgy.state (o seed roda antes de qualquer script em TODA navegação).
+  // liturgy.state.pt (o seed roda antes de qualquer script em TODA navegação).
   if (!localStorage.getItem('user_data')) {
     localStorage.setItem('user_data', JSON.stringify({ language: 'pt' }))
   }
