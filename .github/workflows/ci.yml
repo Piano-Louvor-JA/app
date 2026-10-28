@@ -94,7 +94,7 @@ jobs:
           cache: npm
       - run: npm ci
       # Caminho da staging (PR com base staging ou push/dispatch em refs/heads/staging): 50%.
-      # Exceções em produção por versão (1.32.2: 70%, 1.33.0: 30%); demais: 100%. Regra centralizada no script.
+      # Exceções em produção por versão (1.32.2: 70%, 1.33.0: 30%, 1.34.0: 50%); demais: 100%. Regra centralizada no script.
       - name: Cobertura com limite do destino do evento
         env:
           PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
