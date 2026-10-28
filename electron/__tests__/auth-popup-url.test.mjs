@@ -12,12 +12,12 @@ import { join } from 'node:path'
  * avalia a função isolada, garantindo que o handler reconhece os hosts
  * do fluxo real do signInWithPopup.
  */
-function extractIsAuthPopupUrl() {
+function extractMainFunction(name) {
   const source = readFileSync(
     join(process.cwd(), 'electron', 'main.mjs'),
     'utf-8',
   )
-  const start = source.indexOf('function isAuthPopupUrl')
+  const start = source.indexOf(`function ${name}(`)
   expect(start).toBeGreaterThan(-1)
   // pega do início da função até o fechamento balanceado de chaves
   let depth = 0
@@ -35,6 +35,10 @@ function extractIsAuthPopupUrl() {
   // eslint-disable-next-line @typescript-eslint/no-implied-eval
   const fn = new Function(`return (${source.slice(start, end)})`)
   return fn()
+}
+
+function extractIsAuthPopupUrl() {
+  return extractMainFunction('isAuthPopupUrl')
 }
 
 describe('isAuthPopupUrl — login Google in-app (feedback Ezequias)', () => {
@@ -66,5 +70,26 @@ describe('isAuthPopupUrl — login Google in-app (feedback Ezequias)', () => {
     // host.endsWith('.google.com') exige o ponto — notgoogle.com não passa
     expect(isAuthPopupUrl('https://notgoogle.com/o/oauth2')).toBe(false)
     expect(isAuthPopupUrl('https://google.com.evil.io')).toBe(false)
+  })
+})
+
+describe('buildAuthPopupWindowOptions — popup OAuth mantém o opener (Electron 45+)', () => {
+  const buildAuthPopupWindowOptions = extractMainFunction('buildAuthPopupWindowOptions')
+
+  it('sandbox igual ao da janela principal: signInWithPopup precisa do retorno de window.open', () => {
+    const options = buildAuthPopupWindowOptions()
+    expect(options.webPreferences.sandbox).toBe(false)
+  })
+
+  it('mantém isolamento: contextIsolation ligado, sem nodeIntegration e sem preload', () => {
+    const { webPreferences } = buildAuthPopupWindowOptions()
+    expect(webPreferences.contextIsolation).toBe(true)
+    expect(webPreferences.nodeIntegration).toBe(false)
+    expect(webPreferences).not.toHaveProperty('preload')
+  })
+
+  it('preserva o tamanho do popup', () => {
+    const options = buildAuthPopupWindowOptions()
+    expect(options).toMatchObject({ width: 500, height: 640, autoHideMenuBar: true })
   })
 })
