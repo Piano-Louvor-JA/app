@@ -519,6 +519,22 @@ export const useBibleStore = defineStore('bible', () => {
   async function goToAdjacentVerse(direction: -1 | 1) {
     if (selectedVerses.value.length === 0) return
 
+    // R4+ (ajuste PO): com filtro de passagem ativo, navegação (setas/botões)
+    // fica RESTITA aos versículos renderizados — nada fora do filtro projeta.
+    if (filteredVerseSet.value) {
+      const ordered = visibleVerseEntries.value.map((entry) => entry.number)
+      if (ordered.length === 0) return
+
+      const current = direction < 0
+        ? Math.min(...selectedVerses.value)
+        : Math.max(...selectedVerses.value)
+      const position = ordered.indexOf(current)
+      const fallback = direction < 0 ? ordered.length - 1 : 0
+      const next = position === -1 ? ordered[fallback] : ordered[position + direction]
+      if (next != null) selectVerse(next)
+      return
+    }
+
     const current =
       direction < 0
         ? Math.min(...selectedVerses.value)

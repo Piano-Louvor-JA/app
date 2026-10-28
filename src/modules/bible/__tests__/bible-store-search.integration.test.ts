@@ -156,4 +156,30 @@ describe('useBibleStore — busca de livros (SPEC R1/R2/R4)', () => {
     await store.applyBookSearchReference('genesis 2')
     expect(store.visibleVerseEntries.length).toBe(31)
   })
+
+  it('R4+: navegação com filtro ativo fica restrita aos versículos renderizados', async () => {
+    const store = useBibleStore()
+    await store.bootstrap()
+    await store.applyBookSearchReference('genesis 1:1-4, 6')
+    expect(store.selectedVerses).toEqual([])
+
+    // operador seleciona o primeiro → setas percorrem SÓ o filtro (1→2→3→4→6)
+    store.selectVerse(1)
+    await store.goToAdjacentVerse(1)
+    expect(store.selectedVerses).toEqual([2])
+    await store.goToAdjacentVerse(1)
+    await store.goToAdjacentVerse(1)
+    expect(store.selectedVerses).toEqual([4])
+    await store.goToAdjacentVerse(1)
+    expect(store.selectedVerses).toEqual([6]) // pulou o 5 (não renderizado)
+
+    // volta: 6→4, e no limite 1 não sai do filtro
+    await store.goToAdjacentVerse(-1)
+    expect(store.selectedVerses).toEqual([4])
+    await store.clearSelection()
+    store.selectVerse(1)
+    await store.goToAdjacentVerse(-1)
+    expect(store.selectedVerses).toEqual([1])
+    expect(store.visibleVerseEntries.map((e) => e.number)).toEqual([1, 2, 3, 4, 6])
+  })
 })
