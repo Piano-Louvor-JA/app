@@ -43,8 +43,9 @@ export default defineConfig(({ command }) => ({
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
     __DIAGNOSTICS_DSN__: JSON.stringify(process.env.DIAGNOSTICS_GLITCHTIP_DSN ?? ''),
-    // Só no build: o dev server segue lendo .env/.env.local (E2E e API local).
-    ...(command === 'build' ? rendererDefine : {}),
+    // Define também no dev: .env.local não pode fazer a bridge Firebase cair
+    // no origin do Vite; rendererApiEnvFor falha fechado fora de STG.
+    ...rendererDefine,
   },
   server: {
     // node_modules é symlink p/ outro worktree (api-env-wt) — fora do root,
