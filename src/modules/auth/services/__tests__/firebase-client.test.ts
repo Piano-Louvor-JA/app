@@ -16,6 +16,7 @@ beforeEach(() => {
   mocks.session.mockReturnValue(session)
   vi.stubEnv('VITE_FIREBASE_API_KEY', 'test-key')
   vi.stubEnv('VITE_FIREBASE_PROJECT_ID', 'test-project')
+  vi.stubEnv('VITE_PIANO_PROFILE', 'release')
   vi.stubEnv('VITE_URL_DATABASE', 'https://api.example.org/json_db/')
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200, text: async () => JSON.stringify(session) }))
   vi.spyOn(console, 'log').mockImplementation(() => {})
@@ -59,6 +60,19 @@ describe('cliente Firebase e ponte da sessão', () => {
     expect(await (await import('../firebase-client')).firebaseLogin('ana@example.org', 'secret')).toBeNull()
     expect(fetch).not.toHaveBeenCalled()
     expect(mocks.save).not.toHaveBeenCalled()
+  })
+  it('em non-release rejeita host HTTPS fora de STG antes do fetch', async () => {
+    vi.stubEnv('VITE_PIANO_PROFILE', 'development')
+    vi.stubEnv('VITE_URL_DATABASE', 'https://evil.example/json_db')
+    expect(await (await import('../firebase-client')).firebaseLogin('ana@example.org', 'secret')).toBeNull()
+    expect(fetch).not.toHaveBeenCalled()
+    expect(mocks.save).not.toHaveBeenCalled()
+  })
+  it('em release mantém a base HTTPS configurada', async () => {
+    vi.stubEnv('VITE_PIANO_PROFILE', 'release')
+    vi.stubEnv('VITE_URL_DATABASE', 'https://api.example.org/json_db')
+    expect(await (await import('../firebase-client')).firebaseLogin('ana@example.org', 'secret')).toEqual(session)
+    expect(fetch).toHaveBeenCalledWith('https://api.example.org/v1/custom/auth/firebase-session', expect.anything())
   })
   it('retorna null para falha de login ou cadastro', async () => {
     mocks.login.mockRejectedValue(new Error('bad credentials'))
