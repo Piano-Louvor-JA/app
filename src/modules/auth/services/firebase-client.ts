@@ -14,9 +14,9 @@ import {
   createUserWithEmailAndPassword,
   getAuth,
   getRedirectResult,
+  onAuthStateChanged,
   signInWithEmailAndPassword,
   signInWithPopup,
-  signInWithRedirect,
   signOut,
   updateProfile,
   type Auth,
@@ -166,6 +166,20 @@ export async function handleRedirectResult(): Promise<AuthSession | null> {
     return null
   } catch (e) {
     console.error('[auth] handleRedirectResult ERRO:', e)
+    return null
+  }
+}
+
+/** Mantém a sessão local sincronizada com Firebase após refresh de token. */
+export function subscribeFirebaseSession(): (() => void) | null {
+  try {
+    return onAuthStateChanged(getFirebaseAuth(), async user => {
+      if (!user) return
+      const current = getAuthSession()
+      if (!current) return
+      saveSession({ ...current, token: await user.getIdToken() })
+    })
+  } catch {
     return null
   }
 }

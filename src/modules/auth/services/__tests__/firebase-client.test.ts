@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({ initialize: vi.fn(), auth: vi.fn(), login: vi.fn(), register: vi.fn(), popup: vi.fn(), redirect: vi.fn(), logout: vi.fn(), profile: vi.fn(), save: vi.fn(), session: vi.fn() }))
 vi.mock('firebase/app', () => ({ initializeApp: mocks.initialize }))
-vi.mock('firebase/auth', () => ({ GoogleAuthProvider: class {}, getAuth: mocks.auth, signInWithEmailAndPassword: mocks.login, createUserWithEmailAndPassword: mocks.register, signInWithPopup: mocks.popup, getRedirectResult: mocks.redirect, signOut: mocks.logout, updateProfile: mocks.profile, signInWithRedirect: vi.fn() }))
+vi.mock('firebase/auth', () => ({ GoogleAuthProvider: class {}, getAuth: mocks.auth, signInWithEmailAndPassword: mocks.login, createUserWithEmailAndPassword: mocks.register, signInWithPopup: mocks.popup, getRedirectResult: mocks.redirect, onAuthStateChanged: vi.fn(), signOut: mocks.logout, updateProfile: mocks.profile }))
 vi.mock('@modules/media/services/auth-client', () => ({ saveSession: mocks.save, getAuthSession: mocks.session }))
 const session = { token: 'api-token', user: { id_user: 7, email: 'ana@example.org', displayName: 'Ana' } }
 const credential = { user: { email: 'ana@example.org', displayName: 'Ana', getIdToken: vi.fn().mockResolvedValue('id-token') } }
