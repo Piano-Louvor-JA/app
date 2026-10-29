@@ -103,10 +103,22 @@ export function profileApiConfig(profile) {
 export function rendererApiEnvFor(env = process.env) {
   const profile = resolveBuildProfile(env)
   const contract = profileApiConfig(profile)
+  const database = env.VITE_URL_DATABASE ?? `${contract.primary}/json_db`
+  if (!isReleaseProfile(profile)) {
+    let origin = ''
+    try {
+      origin = new URL(database).origin
+    } catch {
+      // fail closed below
+    }
+    if (origin !== HOSTS.stg) {
+      throw new Error(`[perfil ${profile}] VITE_URL_DATABASE deve usar ${HOSTS.stg}/json_db`)
+    }
+  }
   const fallbacks = env.VITE_API_FALLBACK_URLS ?? contract.fallbackHosts.join(',')
   return {
     VITE_PIANO_PROFILE: profile,
-    VITE_URL_DATABASE: env.VITE_URL_DATABASE ?? `${contract.primary}/json_db`,
+    VITE_URL_DATABASE: database,
     VITE_URL_FILES: env.VITE_URL_FILES ?? `${contract.primary}/file`,
     VITE_PALCO_API_URL: env.VITE_PALCO_API_URL ?? contract.primary,
     ...(fallbacks ? { VITE_API_FALLBACK_URLS: fallbacks } : {}),
