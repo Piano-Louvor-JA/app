@@ -47,10 +47,16 @@ function getFirebaseAuth(): Auth {
 
 function firebaseSessionBridgeUrl(): string | null {
   const database = import.meta.env.VITE_URL_DATABASE as string | undefined
+  const profile = import.meta.env.VITE_PIANO_PROFILE as string | undefined
   if (!database) return null
   try {
     const url = new URL(database)
-    if (url.protocol !== 'https:' || url.hostname === 'localhost' || url.hostname === '127.0.0.1') return null
+    if (
+      url.protocol !== 'https:' ||
+      url.hostname === 'localhost' ||
+      url.hostname === '127.0.0.1' ||
+      (profile !== 'release' && url.origin !== 'https://api-stg.pianolouvorja.com.br')
+    ) return null
     url.pathname = '/v1/custom/auth/firebase-session'
     url.search = ''
     url.hash = ''

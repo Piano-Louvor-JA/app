@@ -22,10 +22,13 @@ describe('registerTunnelCorpBypass', () => {
     await handler()
     const filter = headersHandler.mock.calls[0][0]
     expect(filter.urls).toEqual(expect.arrayContaining([
-      'https://*.firebaseapp.com/*',
-      'https://*.google.com/*',
+      'https://*.firebaseapp.com/__/auth/*',
+      'https://accounts.google.com/o/oauth2/*',
+      'https://accounts.google.com/gsi/*',
+      'https://identitytoolkit.googleapis.com/*',
       'https://*.gstatic.com/*',
     ]))
+    expect(filter.urls).not.toContain('https://*.google.com/*')
     expect(filter.urls).not.toContain('*://*/*')
   })
 
@@ -33,6 +36,7 @@ describe('registerTunnelCorpBypass', () => {
     const onHeadersReceived = await handler()
     const callback = vi.fn()
     onHeadersReceived({
+      url: 'https://pianolouvorja.firebaseapp.com/__/auth/handler',
       responseHeaders: {
         'Cross-Origin-Opener-Policy': ['same-origin'],
         'Cross-Origin-Resource-Policy': ['same-origin'],
@@ -44,6 +48,24 @@ describe('registerTunnelCorpBypass', () => {
       responseHeaders: {
         'Content-Security-Policy': ["default-src 'self'"],
         'X-Test': ['preserved'],
+      },
+    })
+  })
+
+  it('mantém COOP/CORP em Google fora do OAuth', async () => {
+    const onHeadersReceived = await handler()
+    const callback = vi.fn()
+    onHeadersReceived({
+      url: 'https://www.google.com/search?q=x',
+      responseHeaders: {
+        'Cross-Origin-Opener-Policy': ['same-origin'],
+        'Cross-Origin-Resource-Policy': ['same-origin'],
+      },
+    }, callback)
+    expect(callback).toHaveBeenCalledWith({
+      responseHeaders: {
+        'Cross-Origin-Opener-Policy': ['same-origin'],
+        'Cross-Origin-Resource-Policy': ['same-origin'],
       },
     })
   })
