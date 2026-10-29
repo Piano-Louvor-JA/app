@@ -176,4 +176,14 @@ describe('rendererApiEnvFor — o que o vite injeta no renderer', () => {
         .toThrow(/VITE_URL_DATABASE|produção|production/i)
     }
   })
+
+  it('VITE_* explícito no env do processo vence o contrato', () => {
+    const env = rendererApiEnvFor({
+      PIANO_BUILD_PROFILE: 'release',
+      VITE_URL_FILES: 'https://cdn.example.org/file',
+      VITE_API_FALLBACK_URLS: 'https://fallback.example.org',
+    })
+    expect(env.VITE_URL_FILES).toBe('https://cdn.example.org/file')
+    expect(env.VITE_API_FALLBACK_URLS).toBe('https://fallback.example.org')
+  })
 })
