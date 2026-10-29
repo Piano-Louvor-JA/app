@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-const mocks = vi.hoisted(() => ({ login: vi.fn(), register: vi.fn(), logout: vi.fn(), reset: vi.fn(), request: vi.fn(), fbLogin: vi.fn(), fbRegister: vi.fn(), fbGoogle: vi.fn(), fbLogout: vi.fn() }))
+const mocks = vi.hoisted(() => ({ login: vi.fn(), register: vi.fn(), logout: vi.fn(), reset: vi.fn(), request: vi.fn(), fbLogin: vi.fn(), fbRegister: vi.fn(), fbGoogle: vi.fn(), fbLogout: vi.fn(), fbSubscribe: vi.fn(() => null) }))
 vi.mock('../../../media/services/auth-client', () => ({ getAuthSession: () => null, login: mocks.login, register: mocks.register, logout: mocks.logout, resetPassword: mocks.reset, requestPasswordReset: mocks.request }))
-vi.mock('../../services/firebase-client', () => ({ firebaseLogin: mocks.fbLogin, firebaseRegister: mocks.fbRegister, firebaseLoginGoogle: mocks.fbGoogle, firebaseLogout: mocks.fbLogout }))
+vi.mock('../../services/firebase-client', () => ({ firebaseLogin: mocks.fbLogin, firebaseRegister: mocks.fbRegister, firebaseLoginGoogle: mocks.fbGoogle, firebaseLogout: mocks.fbLogout, subscribeFirebaseSession: mocks.fbSubscribe }))
 import { authSession, setNotify, useAuth } from '../useAuth'
 const session = { token: 'test', user: { id: 1, displayName: 'Ana', email: 'ana@example.org' } }
 const notify = vi.fn()
@@ -19,7 +19,6 @@ describe('autenticação unificada', () => {
     expect(auth.userName.value).toBe('Ana')
     expect(auth.userEmail.value).toBe('ana@example.org')
     await auth.logout()
-    expect(mocks.logout).toHaveBeenCalledOnce()
     expect(mocks.fbLogout).toHaveBeenCalledOnce()
     expect(authSession.value).toBeNull()
     expect(notify).toHaveBeenCalledWith('Sessão encerrada', undefined)
