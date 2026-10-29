@@ -74,6 +74,11 @@ describe('cliente Firebase e ponte da sessão', () => {
     expect(await (await import('../firebase-client')).firebaseLogin('ana@example.org', 'secret')).toEqual(session)
     expect(fetch).toHaveBeenCalledWith('https://api.example.org/v1/custom/auth/firebase-session', expect.anything())
   })
+  it('falha de ponte não cria sessão local sintética', async () => {
+    vi.mocked(fetch).mockRejectedValue(new Error('offline'))
+    expect(await (await import('../firebase-client')).firebaseLogin('ana@example.org', 'secret')).toBeNull()
+    expect(mocks.save).not.toHaveBeenCalled()
+  })
   it('retorna null para falha de login ou cadastro', async () => {
     mocks.login.mockRejectedValue(new Error('bad credentials'))
     mocks.register.mockRejectedValue(new Error('existing'))

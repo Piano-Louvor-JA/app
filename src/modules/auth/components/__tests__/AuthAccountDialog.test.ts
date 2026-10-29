@@ -72,4 +72,13 @@ describe('AuthAccountDialog', () => {
     expect(wrapper.emitted('update:modelValue')).toEqual([[false]])
     wrapper.unmount()
   })
+
+  it('login Google fecha o modal somente após sucesso', async () => {
+    const wrapper = mountDialog()
+    document.body.querySelector<HTMLButtonElement>('.auth-account__button--google')!.click()
+    await wrapper.vm.$nextTick()
+    expect(auth.loginGoogle).toHaveBeenCalledOnce()
+    expect(wrapper.emitted('update:modelValue')).toEqual([[false]])
+    wrapper.unmount()
+  })
 })
