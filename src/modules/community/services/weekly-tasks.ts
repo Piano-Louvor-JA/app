@@ -4,9 +4,8 @@
  * Bônus: +15 por tarefa, 1x por usuário×tarefa×semana (idempotente no servidor).
  */
 
-import { defaultApiOrigin } from '@shared/services/api-env'
-
 import { getAuthSession, saveSession } from "@modules/media/services/auth-client";
+import { communityBaseUrl, communityRequest } from "./community-http";
 
 export type WeeklyTask = {
 	id: string;
@@ -14,12 +13,6 @@ export type WeeklyTask = {
 	done: boolean;
 	bonus: number;
 };
-
-function communityBaseUrl(): string {
-	const base =
-		import.meta.env.VITE_PALCO_API_URL ?? defaultApiOrigin();
-	return `${base.replace(/\/$/, "")}/v1/custom`;
-}
 
 function token(): string | null {
 	return getAuthSession()?.token ?? null;
@@ -30,9 +23,10 @@ export async function getWeeklyTasks(): Promise<WeeklyTask[] | null> {
 	const t = token();
 	if (!t) return null;
 	try {
-		const response = await fetch(`${communityBaseUrl()}/weekly-tasks`, {
-			headers: { Authorization: `Bearer ${t}` },
-		});
+		const response = await fetch(
+			`${communityBaseUrl()}/weekly-tasks`,
+			communityRequest({ headers: { Authorization: `Bearer ${t}` } }),
+		);
 		if (response.status === 401) {
 			// Token salvo rejeitado pela API (placeholder de fallback ou sessão
 			// expirada) — limpa pra forçar re-login em vez de 401 em silêncio.
@@ -54,7 +48,10 @@ export async function completeWeeklyTask(taskId: string): Promise<boolean> {
 	try {
 		const response = await fetch(
 			`${communityBaseUrl()}/weekly-tasks/${taskId}/complete`,
-			{ method: "POST", headers: { Authorization: `Bearer ${t}` } },
+			communityRequest({
+				method: "POST",
+				headers: { Authorization: `Bearer ${t}` },
+			}),
 		);
 		if (!response.ok) return false;
 		const json = (await response.json()) as { credited?: boolean };

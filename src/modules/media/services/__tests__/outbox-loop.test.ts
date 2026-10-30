@@ -55,6 +55,7 @@ describe('outbox-loop', () => {
     mocks.countPending.mockResolvedValue(3)
     expect(await tryFlush()).toBe(true)
     expect(mocks.flushOutbox).toHaveBeenCalledWith('https://api.test/v1/custom', {
+      'X-Tenant': 'piano',
       authorization: 'Bearer tok-123',
     })
   })

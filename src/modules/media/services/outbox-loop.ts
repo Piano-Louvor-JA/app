@@ -21,6 +21,7 @@ export async function tryFlush(): Promise<boolean> {
   flushing = true
   try {
     const r = await flushOutbox(customApiUrl(''), {
+      'X-Tenant': 'piano',
       authorization: `Bearer ${session.token}`,
     })
     return r.ok

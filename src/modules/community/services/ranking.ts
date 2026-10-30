@@ -5,7 +5,7 @@
  * registerUse exige sessão: uso 1x/user×collection é credita +5 ao DONO (F1).
  */
 
-import { defaultApiOrigin } from '@shared/services/api-env'
+import { communityBaseUrl, communityRequest } from './community-http'
 
 export type RankingEntry = {
 	position: number;
@@ -18,12 +18,6 @@ export type MyPosition = { position: number | null; total: number | null };
 
 export type RankingWindow = "week" | "all";
 
-function communityBaseUrl(): string {
-	const base =
-		import.meta.env.VITE_PALCO_API_URL ?? defaultApiOrigin();
-	return `${base.replace(/\/$/, "")}/v1/custom`;
-}
-
 export function authHeaders(sessionToken: string | null): Record<string, string> {
 	return sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {};
 }
@@ -35,6 +29,7 @@ export async function getRanking(
 	try {
 		const response = await fetch(
 			`${communityBaseUrl()}/ranking?window=${window}`,
+			communityRequest(),
 		);
 		if (!response.ok) return [];
 		const json = (await response.json()) as { data?: unknown };
@@ -54,7 +49,7 @@ export async function getMyPosition(
 	try {
 		const response = await fetch(
 			`${communityBaseUrl()}/ranking/me?window=${window}`,
-			{ headers: authHeaders(sessionToken) },
+			communityRequest({ headers: authHeaders(sessionToken) }),
 		);
 		if (!response.ok) return null;
 		return (await response.json()) as MyPosition;
@@ -75,10 +70,10 @@ export async function registerUse(
 	try {
 		const response = await fetch(
 			`${communityBaseUrl()}/collections/${collectionId}/use`,
-			{
+			communityRequest({
 				method: "POST",
 				headers: authHeaders(sessionToken),
-			},
+			}),
 		);
 		if (!response.ok) return false;
 		const json = (await response.json()) as { first_use?: boolean };
@@ -101,14 +96,14 @@ export async function reportCollection(
 	try {
 		const response = await fetch(
 			`${communityBaseUrl()}/collections/${collectionId}/report`,
-			{
+			communityRequest({
 				method: "POST",
 				headers: {
 					"content-type": "application/json",
 					...authHeaders(sessionToken),
 				},
 				body: JSON.stringify({ reason }),
-			},
+			}),
 		);
 		return response.ok;
 	} catch {

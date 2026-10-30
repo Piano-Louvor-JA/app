@@ -1,8 +1,8 @@
-import { defaultApiOrigin } from '@shared/services/api-env'
 import {
 	createLocalCollection,
 	createLocalMusic,
 } from "@modules/media/services/local-custom-store";
+import { communityBaseUrl, communityRequest } from "./community-http";
 
 /**
  * Catálogo da Comunidade — coletâneas PÚBLICAS (read-only).
@@ -23,14 +23,6 @@ export type CommunityCollectionSummary = {
 	musicsCount: number;
 	updatedAt: string | null;
 };
-
-function communityBaseUrl(): string {
-	// Mesma regra do custom-catalog.ts: default é a API de produção
-	// (sem env, caminho relativo dá 404 no desktop).
-	const base =
-		import.meta.env.VITE_PALCO_API_URL ?? defaultApiOrigin();
-	return `${base.replace(/\/$/, "")}/v1/custom`;
-}
 
 function asString(value: unknown): string | null {
 	if (typeof value !== "string") return null;
@@ -62,6 +54,7 @@ export async function saveCommunityCopy(
 	try {
 		const response = await fetch(
 			`${communityBaseUrl()}/collections/${collection.id}/musics`,
+			communityRequest(),
 		);
 		if (!response.ok) return null;
 		const json = (await response.json()) as { data?: unknown };
@@ -111,6 +104,7 @@ export async function listCommunityCollectionsPage(
 	try {
 		const response = await fetch(
 			`${communityBaseUrl()}/collections?page=${page}&per_page=${perPage}`,
+			communityRequest(),
 		);
 		if (!response.ok) return empty;
 		const json = (await response.json()) as {

@@ -31,7 +31,7 @@ describe('cliente Firebase e ponte da sessão', () => {
     const client = await import('../firebase-client')
     expect(await client.firebaseLogin('ana@example.org', 'secret')).toEqual(session)
     expect(mocks.login).toHaveBeenCalledWith({}, 'ana@example.org', 'secret')
-    expect(fetch).toHaveBeenCalledWith('https://api.example.org/v1/custom/auth/firebase-session', expect.objectContaining({ method: 'POST', headers: { authorization: 'Bearer id-token' } }))
+    expect(fetch).toHaveBeenCalledWith('https://api.example.org/v1/custom/auth/firebase-session', expect.objectContaining({ method: 'POST', headers: { authorization: 'Bearer id-token', 'X-Tenant': 'piano' } }))
     expect(mocks.save).toHaveBeenCalledWith(session)
     await client.firebaseLoginGoogle()
     expect(mocks.initialize).toHaveBeenCalledOnce()
