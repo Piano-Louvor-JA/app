@@ -134,7 +134,8 @@ app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 
 /** CDP p/ debug automatizado (apenas dev). */
 if (process.env.VITE_DEV_SERVER_URL) {
-	app.commandLine.appendSwitch("remote-debugging-port", "9222");
+	// 9222 colide com Chrome do sistema; env PIANO_CDP_PORT permite override.
+	app.commandLine.appendSwitch("remote-debugging-port", process.env.PIANO_CDP_PORT ?? "9222");
 }
 
 // O processo que vai se relançar não pega o lock: senão o relançado

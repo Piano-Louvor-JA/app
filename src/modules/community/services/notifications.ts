@@ -4,7 +4,7 @@
  */
 
 import { getAuthSession, saveSession } from "@modules/media/services/auth-client";
-import { defaultApiOrigin } from '@shared/services/api-env'
+import { communityBaseUrl, communityRequest } from "./community-http";
 
 export type AppNotification = {
 	id: number;
@@ -13,12 +13,6 @@ export type AppNotification = {
 	body: string;
 	created_at: string;
 };
-
-function communityBaseUrl(): string {
-	const base =
-		import.meta.env.VITE_PALCO_API_URL ?? defaultApiOrigin();
-	return `${base.replace(/\/$/, "")}/v1/custom`;
-}
 
 function token(): string | null {
 	return getAuthSession()?.token ?? null;
@@ -29,9 +23,10 @@ export async function getNotifications(): Promise<AppNotification[]> {
 	const t = token();
 	if (!t) return [];
 	try {
-		const response = await fetch(`${communityBaseUrl()}/notifications`, {
-			headers: { Authorization: `Bearer ${t}` },
-		});
+		const response = await fetch(
+			`${communityBaseUrl()}/notifications`,
+			communityRequest({ headers: { Authorization: `Bearer ${t}` } }),
+		);
 		if (response.status === 401) {
 			// Token salvo rejeitado pela API (placeholder de fallback ou sessão
 			// expirada) — limpa pra forçar re-login em vez de 401 em silêncio.
@@ -53,10 +48,13 @@ export async function markAllRead(): Promise<void> {
 	const t = token();
 	if (!t) return;
 	try {
-		await fetch(`${communityBaseUrl()}/notifications/read-all`, {
-			method: "POST",
-			headers: { Authorization: `Bearer ${t}` },
-		});
+		await fetch(
+			`${communityBaseUrl()}/notifications/read-all`,
+			communityRequest({
+				method: "POST",
+				headers: { Authorization: `Bearer ${t}` },
+			}),
+		);
 	} catch {
 		// best-effort
 	}

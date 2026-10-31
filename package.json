@@ -108,6 +108,9 @@
     "executableName": "louvorja-piano",
     "artifactName": "LouvorJA-PIANO-${version}-${arch}.${ext}",
     "npmRebuild": false,
+    "asarUnpack": [
+      "dist/**/*"
+    ],
     "directories": {
       "output": "dist-electron",
       "buildResources": "build"

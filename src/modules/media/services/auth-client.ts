@@ -19,6 +19,11 @@ export type AuthSession = {
 }
 
 const SESSION_KEY = 'louvorja.custom.auth'
+const TENANT_HEADER = { 'X-Tenant': 'piano' }
+
+function authRequestHeaders(headers: Record<string, string> = {}): Record<string, string> {
+  return { ...TENANT_HEADER, ...headers }
+}
 
 function authBaseUrl(): string {
   const base = import.meta.env.VITE_PALCO_API_URL
@@ -31,7 +36,10 @@ export function getAuthSession(): AuthSession | null {
     const raw = localStorage.getItem(SESSION_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw) as AuthSession
-    if (!parsed?.token || !parsed?.user?.id_user) return null
+    if (!parsed?.token || !Number.isInteger(parsed.user?.id_user) || parsed.user.id_user <= 0) {
+      localStorage.removeItem(SESSION_KEY)
+      return null
+    }
     return parsed
   } catch {
     return null
@@ -61,7 +69,7 @@ async function authRequest(
   try {
     const response = await fetch(`${authBaseUrl()}/${path}`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: authRequestHeaders({ 'content-type': 'application/json' }),
       body: JSON.stringify(body),
     })
     if (!response.ok) return null
@@ -96,7 +104,7 @@ export async function logout(): Promise<void> {
     try {
       await fetch(`${authBaseUrl()}/logout`, {
         method: 'POST',
-        headers: { authorization: `Bearer ${session.token}` },
+        headers: authRequestHeaders({ authorization: `Bearer ${session.token}` }),
       })
     } catch {
       // best-effort — limpa local de qualquer forma
@@ -115,7 +123,7 @@ export async function requestPasswordReset(email: string): Promise<string | null
   try {
     const response = await fetch(`${authBaseUrl()}/forgot-password`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: authRequestHeaders({ 'content-type': 'application/json' }),
       body: JSON.stringify({ email }),
     })
     if (!response.ok) return null
@@ -131,7 +139,7 @@ export async function resetPassword(token: string, password: string): Promise<bo
   try {
     const response = await fetch(`${authBaseUrl()}/reset-password`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: authRequestHeaders({ 'content-type': 'application/json' }),
       body: JSON.stringify({ token, password }),
     })
     return response.ok
