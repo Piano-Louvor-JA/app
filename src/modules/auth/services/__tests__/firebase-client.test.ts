@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({ initialize: vi.fn(), auth: vi.fn(), login: vi.fn(), register: vi.fn(), popup: vi.fn(), redirect: vi.fn(), logout: vi.fn(), profile: vi.fn(), save: vi.fn(), session: vi.fn() }))
 vi.mock('firebase/app', () => ({ initializeApp: mocks.initialize }))
-vi.mock('firebase/auth', () => ({ GoogleAuthProvider: class {}, getAuth: mocks.auth, signInWithEmailAndPassword: mocks.login, createUserWithEmailAndPassword: mocks.register, signInWithPopup: mocks.popup, getRedirectResult: mocks.redirect, signOut: mocks.logout, updateProfile: mocks.profile, signInWithRedirect: vi.fn() }))
+vi.mock('firebase/auth', () => ({ GoogleAuthProvider: class {}, getAuth: mocks.auth, signInWithEmailAndPassword: mocks.login, createUserWithEmailAndPassword: mocks.register, signInWithPopup: mocks.popup, getRedirectResult: mocks.redirect, onAuthStateChanged: vi.fn(), signOut: mocks.logout, updateProfile: mocks.profile }))
 vi.mock('@modules/media/services/auth-client', () => ({ saveSession: mocks.save, getAuthSession: mocks.session }))
 const session = { token: 'api-token', user: { id_user: 7, email: 'ana@example.org', displayName: 'Ana' } }
 const credential = { user: { email: 'ana@example.org', displayName: 'Ana', getIdToken: vi.fn().mockResolvedValue('id-token') } }
@@ -16,6 +16,7 @@ beforeEach(() => {
   mocks.session.mockReturnValue(session)
   vi.stubEnv('VITE_FIREBASE_API_KEY', 'test-key')
   vi.stubEnv('VITE_FIREBASE_PROJECT_ID', 'test-project')
+  vi.stubEnv('VITE_PIANO_PROFILE', 'release')
   vi.stubEnv('VITE_URL_DATABASE', 'https://api.example.org/json_db/')
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200, text: async () => JSON.stringify(session) }))
   vi.spyOn(console, 'log').mockImplementation(() => {})
@@ -46,21 +47,37 @@ describe('cliente Firebase e ponte da sessão', () => {
     expect(mocks.profile).toHaveBeenCalledTimes(named ? 1 : 0)
     if (named) expect(mocks.profile).toHaveBeenCalledWith(credential.user, { displayName: 'Ana' })
   })
-  it.each(['http', 'invalid-json', 'invalid-session', 'offline'])('preserva fallback local quando ponte falha: %s', async failure => {
-    mocks.session.mockReturnValue(null)
+  it.each(['http', 'invalid-json', 'id_user zero', 'offline'])('falha sem salvar placeholder quando ponte falha: %s', async failure => {
     if (failure === 'http') vi.mocked(fetch).mockResolvedValue({ ok: false, status: 503, text: async () => 'offline' } as Response)
     if (failure === 'invalid-json') vi.mocked(fetch).mockResolvedValue({ ok: true, status: 200, text: async () => '{broken' } as Response)
-    if (failure === 'invalid-session') vi.mocked(fetch).mockResolvedValue({ ok: true, status: 200, text: async () => JSON.stringify({ token: 'token', user: {} }) } as Response)
+    if (failure === 'id_user zero') vi.mocked(fetch).mockResolvedValue({ ok: true, status: 200, text: async () => JSON.stringify({ token: 'token', user: { id_user: 0 } }) } as Response)
     if (failure === 'offline') vi.mocked(fetch).mockRejectedValue(new Error('offline'))
     expect(await (await import('../firebase-client')).firebaseLogin('ana@example.org', 'secret')).toBeNull()
-    expect(mocks.save).toHaveBeenCalledWith({ token: 'id-token', user: { id_user: 0, email: 'ana@example.org', displayName: 'Ana' } })
+    expect(mocks.save).not.toHaveBeenCalled()
   })
-  it.each([{ email: 'ana@example.org', displayName: null, expected: 'ana' }, { email: null, displayName: null, expected: '' }])('fallback deriva nome quando perfil não possui nome: %j', async data => {
-    vi.stubEnv('VITE_URL_DATABASE', undefined)
-    mocks.login.mockResolvedValue({ user: { ...credential.user, email: data.email, displayName: data.displayName } })
+  it.each(['', '/json_db', 'http://localhost:5173/json_db'])('rejeita base inválida sem usar rota relativa: %s', async base => {
+    vi.stubEnv('VITE_URL_DATABASE', base)
+    expect(await (await import('../firebase-client')).firebaseLogin('ana@example.org', 'secret')).toBeNull()
+    expect(fetch).not.toHaveBeenCalled()
+    expect(mocks.save).not.toHaveBeenCalled()
+  })
+  it('em non-release rejeita host HTTPS fora de STG antes do fetch', async () => {
+    vi.stubEnv('VITE_PIANO_PROFILE', 'development')
+    vi.stubEnv('VITE_URL_DATABASE', 'https://evil.example/json_db')
+    expect(await (await import('../firebase-client')).firebaseLogin('ana@example.org', 'secret')).toBeNull()
+    expect(fetch).not.toHaveBeenCalled()
+    expect(mocks.save).not.toHaveBeenCalled()
+  })
+  it('em release mantém a base HTTPS configurada', async () => {
+    vi.stubEnv('VITE_PIANO_PROFILE', 'release')
+    vi.stubEnv('VITE_URL_DATABASE', 'https://api.example.org/json_db')
+    expect(await (await import('../firebase-client')).firebaseLogin('ana@example.org', 'secret')).toEqual(session)
+    expect(fetch).toHaveBeenCalledWith('https://api.example.org/v1/custom/auth/firebase-session', expect.anything())
+  })
+  it('falha de ponte não cria sessão local sintética', async () => {
     vi.mocked(fetch).mockRejectedValue(new Error('offline'))
-    await (await import('../firebase-client')).firebaseLogin('ana@example.org', 'secret')
-    expect(mocks.save).toHaveBeenCalledWith(expect.objectContaining({ user: { id_user: 0, email: data.email ?? '', displayName: data.expected } }))
+    expect(await (await import('../firebase-client')).firebaseLogin('ana@example.org', 'secret')).toBeNull()
+    expect(mocks.save).not.toHaveBeenCalled()
   })
   it('retorna null para falha de login ou cadastro', async () => {
     mocks.login.mockRejectedValue(new Error('bad credentials'))
