@@ -61,6 +61,12 @@ vi.mock('vue-i18n', () => ({
   }),
 }))
 
+import { obsConnections, registerObsConnection } from '@modules/settings/services/obs-connections'
+const obsOutputs = ref<Array<{ id: string; label: string; selected: boolean; clients: number }>>([])
+vi.mock('@modules/settings/composables/useObsConnections', () => ({
+  useObsConnections: () => ({ activeConnections: obsOutputs }),
+}))
+
 import MonitorTargetSelect from '../MonitorTargetSelect.vue'
 
 const SETTINGS = {
@@ -89,8 +95,24 @@ async function mountSelect(props: Record<string, unknown> = {}) {
 describe('MonitorTargetSelect', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    obsOutputs.value = []
+    obsConnections.value = []
     listSystemDisplays.mockResolvedValue(DISPLAYS)
     loadProjectionSettings.mockReturnValue({ ...SETTINGS })
+  })
+
+  it('mostra conexões OBS criadas e permite selecionar o espelho', async () => {
+    registerObsConnection('7082', 'OBS 2')
+    obsOutputs.value = [{ id: '7082', label: 'OBS 2', selected: true, clients: 1 }]
+    const w = await mountSelect()
+    await w.find('.monitor-target-select__trigger').trigger('click')
+    await Promise.resolve()
+    await nextTick()
+    const group = w.find('ul[aria-label="obsOutputs.title"]')
+    expect(group.text()).toContain('OBS 2')
+    await group.find('input').setValue(false)
+    expect(obsConnections.value[0]?.selected).toBe(false)
+    w.unmount()
   })
 
   it('renderiza trigger com label padrão e abre painel com opções', async () => {

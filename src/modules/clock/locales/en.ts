@@ -1,5 +1,7 @@
 export default {
   utilities: {
+    obsAddConnection: 'Add OBS connection',
+    obsConnectionFailed: 'Could not start the OBS connection. Please try again.',
     title: 'Utilities',
     subtitle: 'Projection tools for the service',
     temporizador: 'Timer',

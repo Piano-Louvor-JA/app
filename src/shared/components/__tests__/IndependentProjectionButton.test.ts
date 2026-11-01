@@ -42,6 +42,12 @@ vi.mock('vue-i18n', () => ({
   }),
 }))
 
+import { obsAssignments } from '@modules/settings/services/obs-connections'
+const obsOutputs = ref<Array<{ id: string; label: string; running: boolean; clients: number; selected: boolean }>>([])
+vi.mock('@modules/settings/composables/useObsConnections', () => ({
+  useObsConnections: () => ({ activeConnections: obsOutputs }),
+}))
+
 import IndependentProjectionButton from '../IndependentProjectionButton.vue'
 
 const EXTENDED = [
@@ -62,6 +68,8 @@ function panel() {
 
 describe('IndependentProjectionButton', () => {
   beforeEach(() => {
+    obsOutputs.value = []
+    obsAssignments.value = {}
     monitors.value = [...EXTENDED]
     activeMonitorId.value = null
     activeMode.value = null
@@ -69,6 +77,23 @@ describe('IndependentProjectionButton', () => {
     stop.mockClear()
     identifySystemDisplays.mockClear()
     document.body.innerHTML = ''
+  })
+
+  it('oferece conexão OBS ativa mesmo sem monitor e atribui apenas o destino escolhido', async () => {
+    monitors.value = []
+    obsOutputs.value = [{ id: '7082', label: 'OBS 2', running: true, clients: 1, selected: true }]
+    const beforeProject = vi.fn(() => true)
+    const wrapper = mountButton({ moduleId: 'bible', beforeProject })
+    const trigger = wrapper.get('[data-testid="independent-projection-trigger"]')
+    expect(trigger.attributes('aria-disabled')).toBe('false')
+    await trigger.trigger('click')
+    const output = [...panel()!.querySelectorAll('button')].find((item) => item.textContent?.includes('OBS 2'))!
+    output.click()
+    await flushPromises()
+    expect(obsAssignments.value).toEqual({ '7082': 'bible' })
+    expect(beforeProject).toHaveBeenCalledOnce()
+    expect(project).not.toHaveBeenCalled()
+    wrapper.unmount()
   })
 
   it('sem monitor estendido fica desativado com o aviso no tooltip', async () => {

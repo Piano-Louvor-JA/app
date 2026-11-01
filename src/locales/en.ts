@@ -1,4 +1,5 @@
 export default {
+  obsOutputs: { title: 'OBS connections', browserSource: 'OBS Browser Source' },
   floating: { closeTitle: 'Close {title}?', closeMessage: 'Stop this feature and close its projection?' },
   updates: {
     downloadMacInstaller: 'Download macOS installer',

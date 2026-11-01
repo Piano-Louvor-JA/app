@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { useObsConnections } from '@modules/settings/composables/useObsConnections'
+import { selectObsConnection } from '@modules/settings/services/obs-connections'
+
 import { useMonitorTargetSelect } from "@shared/composables/useMonitorTargetSelect";
 import {
 	computed,
@@ -38,6 +41,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+const { activeConnections: obsOutputs } = useObsConnections();
 const rootEl = ref<HTMLElement | null>(null);
 const panelEl = ref<HTMLElement | null>(null);
 const panelStyle = ref<Record<string, string>>({});
@@ -66,9 +70,10 @@ const {
 	},
 });
 
+const totalSelectedCount = computed(() => selectedCount.value + obsOutputs.value.filter((item) => item.selected).length);
 const triggerLabel = computed(() => {
-	if (selectedCount.value > 0) {
-		return t("monitors.selectedCount", { count: selectedCount.value });
+	if (totalSelectedCount.value > 0) {
+		return t("monitors.selectedCount", { count: totalSelectedCount.value });
 	}
 	return t("monitors.selectScreens");
 });
@@ -183,10 +188,10 @@ watch(open, async (isOpen) => {
         {{ triggerLabel }}
       </span>
       <span
-        v-if="selectedCount > 0"
+        v-if="totalSelectedCount > 0"
         class="monitor-target-select__badge"
       >
-        {{ selectedCount }}
+        {{ totalSelectedCount }}
       </span>
     </button>
 
@@ -234,7 +239,7 @@ watch(open, async (isOpen) => {
         </div>
 
         <div
-          v-else-if="!hasDisplays"
+          v-else-if="!hasDisplays && !obsOutputs.length"
           class="monitor-target-select__empty"
           role="status"
         >
@@ -284,6 +289,18 @@ watch(open, async (isOpen) => {
                 <span class="monitor-target-select__option-meta">
                   {{ monitor.resolutionLabel }}
                 </span>
+              </span>
+            </label>
+          </li>
+        </ul>
+        <ul v-if="obsOutputs.length" class="monitor-target-select__list" :aria-label="t('obsOutputs.title')">
+          <li v-for="connection in obsOutputs" :key="connection.id">
+            <label class="monitor-target-select__option" :class="{ 'monitor-target-select__option--active': connection.selected }">
+              <input type="checkbox" class="monitor-target-select__checkbox" :checked="connection.selected" :disabled="disabled"
+                @change="selectObsConnection(connection.id, ($event.target as HTMLInputElement).checked)">
+              <span class="monitor-target-select__option-body">
+                <span class="monitor-target-select__option-name">{{ connection.label }}</span>
+                <span class="monitor-target-select__option-meta">{{ t('obsOutputs.browserSource') }} · {{ connection.clients }}</span>
               </span>
             </label>
           </li>

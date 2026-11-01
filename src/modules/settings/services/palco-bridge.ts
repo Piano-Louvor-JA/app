@@ -1,3 +1,5 @@
+import { obsAssignments, obsAllowsMirror } from './obs-connections'
+import { renderObsModule } from './obs-projection'
 /**
  * palco-bridge — espelha TODAS as projeções na TV (paridade APK StageSession).
  *
@@ -117,6 +119,15 @@ async function renderAllSlots(): Promise<void> {
   debugPalco('renderAllSlots slots=', JSON.stringify(slots), 'routeRandom=', getPalcoRoute('random'), 'routeBible=', getPalcoRoute('bible'))
   for (const s of slots) {
     if (!s.running) continue
+    const independentObs = obsAssignments.value[s.id]
+    if (independentObs) {
+      await renderObsModule(s.id, independentObs)
+      continue
+    }
+    if (!obsAllowsMirror(s.id)) {
+      palcoSession.idleTo(s.id)
+      continue
+    }
     const plan = planForSlot(s.id, {
       owner,
       routeOf: (m) => getPalcoRoute(m),
@@ -293,7 +304,7 @@ function restartClockTick(): void {
     const { moduleForSlot } = useOutputRegistry()
     const slots = await palcoSession.slots()
     for (const s of slots) {
-      if (!s.running) continue
+      if (!s.running || obsAssignments.value[s.id] || !obsAllowsMirror(s.id)) continue
       if (planForSlot(s.id, {
         owner,
         routeOf: (m) => getPalcoRoute(m),
@@ -698,6 +709,15 @@ export function startPalcoBridge() {
     )
   }
   window.setInterval(syncAudio, 3000)
+  const refreshObs = () => { void renderAllSlots() }
+  window.addEventListener('obs-connections-changed', refreshObs)
+  const obsTimer = window.setInterval(() => {
+    if (Object.keys(obsAssignments.value).length) void renderAllSlots()
+  }, 1000)
+  unwatchers.push(() => {
+    window.removeEventListener('obs-connections-changed', refreshObs)
+    window.clearInterval(obsTimer)
+  })
 
   // Personalização do Palco em tempo real: reenvia a projeção ativa na TV
   // (ex.: tipografia própria da Bíblia) sem precisar trocar o versículo.

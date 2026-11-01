@@ -1,4 +1,5 @@
 export default {
+  obsOutputs: { title: 'Conexões OBS', browserSource: 'Fonte de navegador OBS' },
   floating: { closeTitle: 'Fechar {title}?', closeMessage: 'Deseja encerrar este recurso e fechar sua projeção?' },
   updates: {
     downloadMacInstaller: 'Baixar instalador macOS',

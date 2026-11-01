@@ -376,6 +376,31 @@ describe('com electron', () => {
     expect(palcoSession.slotId).toBe('0')
   })
 
+  it('encerrar a conexão OBS libera sua atribuição independente', async () => {
+    const config = await import('../obs-connections')
+    const palco = fullMock()
+    setBridge(palco)
+    config.assignObsConnection('7082', 'clock')
+    await palcoSession.stopSlot('7082')
+    expect(config.obsAssignments.value['7082']).toBeUndefined()
+    expect(palco.stop).toHaveBeenCalledWith('7082')
+  })
+
+  it('envios concorrentes de projeção preservam o slot de cada conteúdo', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    palco.status.mockImplementation(async (id: string) => {
+      await Promise.resolve()
+      return { running: true, clients: 1, url: `http://localhost:${id === '0' ? 7080 : 7082}` }
+    })
+    await Promise.all([
+      palcoSession.projectTo('0', 'hymns', { text: 'Santo' }),
+      palcoSession.projectTo('7082', 'bible', { text: 'Haja luz' }),
+    ])
+    expect(palco.send).toHaveBeenCalledWith(expect.objectContaining({ type: 'projection', text: expect.stringContaining('Santo') }), '0')
+    expect(palco.send).toHaveBeenCalledWith(expect.objectContaining({ type: 'projection', text: expect.stringContaining('Haja luz') }), '7082')
+  })
+
   it('projectRouted mirror: serializa pros slots rodando; rota individual: só nela', async () => {
     const palco = fullMock()
     setBridge(palco)

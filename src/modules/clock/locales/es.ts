@@ -1,5 +1,7 @@
 export default {
   utilities: {
+    obsAddConnection: 'Añadir conexión OBS',
+    obsConnectionFailed: 'No se pudo iniciar la conexión OBS. Inténtelo de nuevo.',
     title: 'Utilidades',
     subtitle: 'Herramientas de proyección para el culto',
     temporizador: 'Temporizador',

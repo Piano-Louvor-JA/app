@@ -15,6 +15,11 @@ import { createI18n } from 'vue-i18n'
 
 const palco = vi.hoisted(() => ({
   status: vi.fn(),
+  slots: vi.fn(async () => []),
+  statusSlot: vi.fn(),
+  createSlot: vi.fn(),
+  startSlot: vi.fn(),
+  stopSlot: vi.fn(),
   turnOn: vi.fn(),
   turnOff: vi.fn(),
 }))
@@ -24,6 +29,7 @@ vi.mock('@modules/settings/services/palco-session', () => ({
 }))
 
 import ObsView from '../ObsView.vue'
+import { obsConnections } from '@modules/settings/services/obs-connections'
 
 const i18n = createI18n({
   legacy: false,
@@ -61,11 +67,30 @@ function mountView() {
 
 describe('ObsView', () => {
   beforeEach(() => {
+    obsConnections.value = []
+    palco.slots.mockResolvedValue([])
     palco.status.mockReset()
     palco.turnOn.mockReset()
     palco.turnOff.mockReset()
     palco.turnOn.mockResolvedValue(true)
     palco.turnOff.mockResolvedValue(undefined)
+  })
+
+  it('cria nova conexão OBS com URL própria sem trocar a principal', async () => {
+    palco.status.mockResolvedValue({ running: false, clients: 0, receiverUrl: null })
+    palco.createSlot.mockResolvedValue({ id: '7082', label: 'OBS 2' })
+    palco.startSlot.mockResolvedValue(true)
+    palco.statusSlot.mockResolvedValue({ running: true, clients: 0, receiverUrl: 'http://localhost:7082/?token=test' })
+    palco.slots.mockImplementation(async () => obsConnections.value.map((item) => ({ ...item, running: true, clients: 0 })))
+    const w = mountView()
+    await flushPromises()
+    await w.find('.obs-view__add').trigger('click')
+    await flushPromises()
+    expect(palco.createSlot).toHaveBeenCalledWith('OBS 2')
+    expect(palco.startSlot).toHaveBeenCalledWith('7082')
+    expect(w.find('.obs-view__connection').text()).toContain('http://localhost:7082/?token=test')
+    expect(palco.turnOff).not.toHaveBeenCalled()
+    w.unmount()
   })
 
   it('mostra a transmissão desligada e, ao ligar, a URL do Browser Source', async () => {

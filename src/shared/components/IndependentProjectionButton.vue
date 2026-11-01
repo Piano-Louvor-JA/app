@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { useObsConnections } from '@modules/settings/composables/useObsConnections'
+import { assignObsConnection, obsAssignments, clearObsModule, type ObsModule } from '@modules/settings/services/obs-connections'
+
 import { identifySystemDisplays } from '@modules/settings/services/display-service'
 import {
   useIndependentProjectionControl,
@@ -19,6 +22,22 @@ const { monitors, available, activeMonitorId, activeMode, project, stop } =
   useIndependentProjectionControl(props.moduleId)
 
 /** Sobrepor (tela inteira) ou compartilhar (metade, com o que já está no monitor). */
+const { activeConnections: obsOutputs } = useObsConnections()
+const obsActive = computed(() => obsOutputs.value.some((item) => obsAssignments.value[item.id] === props.moduleId))
+const outputAvailable = computed(() => available.value || obsOutputs.value.length > 0)
+async function onSelectObs(id: string) {
+  if (busy.value) return
+  busy.value = true
+  try {
+    if (props.beforeProject && !(await props.beforeProject())) return
+    // Cada Browser Source é um destino independente; a composição fica no OBS.
+    stop()
+    clearObsModule(props.moduleId)
+    assignObsConnection(id, props.moduleId as ObsModule)
+    open.value = false
+  } finally { busy.value = false }
+}
+
 const mode = ref<IndependentProjectionMode>('overlay')
 const MODES: IndependentProjectionMode[] = ['overlay', 'share']
 
@@ -28,13 +47,13 @@ const rootEl = ref<HTMLElement | null>(null)
 const panelEl = ref<HTMLElement | null>(null)
 const panelStyle = ref<Record<string, string>>({})
 
-const active = computed(() => activeMonitorId.value != null)
+const active = computed(() => activeMonitorId.value != null || obsActive.value)
 const activeIndex = computed(
   () => monitors.value.find((monitor) => monitor.id === activeMonitorId.value)?.index ?? null,
 )
 
 const tooltip = computed(() => {
-  if (!available.value) return t('independentProjection.unavailable')
+  if (!outputAvailable.value) return t('independentProjection.unavailable')
   if (activeIndex.value != null) {
     const key = activeMode.value === 'share' ? 'sharedOn' : 'activeOn'
     return t(`independentProjection.${key}`, { index: activeIndex.value })
@@ -42,12 +61,12 @@ const tooltip = computed(() => {
   return t('independentProjection.title')
 })
 
-watch(available, (isAvailable) => {
+watch(outputAvailable, (isAvailable) => {
   if (!isAvailable) open.value = false
 })
 
 function onTriggerClick() {
-  if (!available.value) return
+  if (!outputAvailable.value) return
   open.value = !open.value
 }
 
@@ -56,6 +75,7 @@ async function onSelect(monitorId: number) {
   busy.value = true
   try {
     if (props.beforeProject && !(await props.beforeProject())) return
+    clearObsModule(props.moduleId)
     if (await project(monitorId, mode.value)) open.value = false
   } finally {
     busy.value = false
@@ -63,6 +83,7 @@ async function onSelect(monitorId: number) {
 }
 
 function onStop() {
+  clearObsModule(props.moduleId)
   stop()
   open.value = false
 }
@@ -135,9 +156,9 @@ onBeforeUnmount(() => {
       class="independent-projection__trigger"
       :class="{
         'independent-projection__trigger--active': active,
-        'independent-projection__trigger--disabled': !available,
+        'independent-projection__trigger--disabled': !outputAvailable,
       }"
-      :aria-disabled="!available"
+      :aria-disabled="!outputAvailable"
       :aria-expanded="open"
       aria-haspopup="dialog"
       :aria-label="tooltip"
@@ -242,6 +263,20 @@ onBeforeUnmount(() => {
                   {{ t('independentProjection.monitor', { index: monitor.index }) }}
                 </span>
                 <span class="independent-projection__option-meta">{{ monitor.resolutionLabel }}</span>
+              </span>
+            </button>
+          </li>
+        </ul>
+        <ul v-if="obsOutputs.length" class="independent-projection__list" role="radiogroup" :aria-label="t('obsOutputs.title')">
+          <li v-for="connection in obsOutputs" :key="connection.id">
+            <button type="button" class="independent-projection__option" role="radio" :disabled="busy"
+              :aria-checked="obsAssignments[connection.id] === moduleId"
+              :class="{ 'independent-projection__option--active': obsAssignments[connection.id] === moduleId }"
+              @click="onSelectObs(connection.id)">
+              <i class="ti ti-broadcast" aria-hidden="true" />
+              <span class="independent-projection__option-body">
+                <span class="independent-projection__option-name">{{ connection.label }}</span>
+                <span class="independent-projection__option-meta">{{ t('obsOutputs.browserSource') }}</span>
               </span>
             </button>
           </li>

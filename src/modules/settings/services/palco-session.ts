@@ -1,3 +1,4 @@
+import { obsAllowsMirror, obsAssignments, assignObsConnection } from './obs-connections'
 /**
  * PalcoSession — sessão de cast para TV no desktop (padrão StageSession do APK).
  *
@@ -81,6 +82,14 @@ class PalcoSession {
    * cache cada publish re-enviaria a capa base64 ao main (4 MB × 4/s). */
   private servedDataUrl = new Map<string, Map<string, string>>()
 
+  /** Instância isolada evita que envios concorrentes troquem o destino uns dos outros. */
+  private forSlot(id: string): PalcoSession {
+    const session = new PalcoSession()
+    session.setSlot(id)
+    session.servedDataUrl = this.servedDataUrl
+    return session
+  }
+
   get slotId(): string {
     return this.activeSlotId
   }
@@ -115,6 +124,7 @@ class PalcoSession {
   async stopSlot(id: string): Promise<void> {
     if (!this.isElectron) return
     await (window as never as { louvorja: { palco: { stop(id: string): Promise<void> } } }).louvorja.palco.stop(id)
+    if (obsAssignments.value[id]) assignObsConnection(id, null)
     this.servedDataUrl.delete(id)
   }
 
@@ -123,6 +133,11 @@ class PalcoSession {
       typeof window !== 'undefined' &&
       !!(window as never as { louvorja?: { palco?: unknown } }).louvorja?.palco
     )
+  }
+
+  async statusSlot(id: string): Promise<(PalcoStatus & { receiverUrl?: string | null }) | null> {
+    if (!this.isElectron) return null
+    return palcoApi().status(id)
   }
 
   async status(): Promise<PalcoStatus | null> {
@@ -278,9 +293,7 @@ class PalcoSession {
 
   /** Projeta numa TV específica sem deixar slot ativo global alterado. */
   async projectTo(slotId: string, scope: string, input: ProjectionInput): Promise<void> {
-    const previous = this.activeSlotId
-    this.setSlot(slotId)
-    try { await this.project(scope, input) } finally { this.setSlot(previous) }
+    await this.forSlot(slotId).project(scope, input)
   }
 
   /** Espelha módulo em todos slots ligados, ou usa rota individual.
@@ -294,11 +307,9 @@ class PalcoSession {
     const { moduleForSlot } = useOutputRegistry()
     const slots = await this.slots()
     const targets = slots
-      .filter((s) => s.running)
+      .filter((s) => s.running && obsAllowsMirror(s.id, module))
       .filter((s) => moduleForSlot(s.id) === null || moduleForSlot(s.id) === module)
-    // SERIAL, nunca Promise.all: projectTo troca activeSlotId/baseUrl para
-    // gerar URLs (/bg,/media) daquele sender. Em paralelo, TV Principal
-    // recebia URL :7082 (TV 2) e caía no fallback (caso real 26/08).
+    // Mantém a ordem das publicações; cada destino usa uma sessão isolada.
     for (const target of targets) {
       await this.projectTo(target.id, scope, input)
     }
@@ -334,12 +345,8 @@ class PalcoSession {
 
   async timerRouted(module: PalcoModule, opts: { duration?: number; mode?: 'countdown' | 'chrono'; label?: string }): Promise<void> {
     const route = getPalcoRoute(module)
-    const slots = route === 'mirror' ? (await this.slots()).filter((s) => s.running).map((s) => s.id) : [route]
-    await Promise.all(slots.map(async (id) => {
-      const previous = this.activeSlotId
-      this.setSlot(id)
-      try { await this.timer(opts) } finally { this.setSlot(previous) }
-    }))
+    const slots = route === 'mirror' ? (await this.slots()).filter((s) => s.running && obsAllowsMirror(s.id, module)).map((s) => s.id) : [route]
+    await Promise.all(slots.map((id) => this.forSlot(id).timer(opts)))
   }
 
   timerStop(): void {
@@ -409,16 +416,12 @@ class PalcoSession {
     if (!this.isElectron) return
     const route = getPalcoRoute('liturgy')
     if (route !== 'mirror') {
-      const previous = this.activeSlotId
-      this.setSlot(route)
-      try { await this.video(input) } finally { this.setSlot(previous) }
+      await this.forSlot(route).video(input)
       return
     }
     const slots = await this.slots()
-    await Promise.all(slots.filter((slot) => slot.running).map((slot) => {
-      const previous = this.activeSlotId
-      this.setSlot(slot.id)
-      return this.video(input).finally(() => this.setSlot(previous))
+    await Promise.all(slots.filter((slot) => slot.running && obsAllowsMirror(slot.id, 'liturgy')).map((slot) => {
+      return this.forSlot(slot.id).video(input)
     }))
   }
 
@@ -438,16 +441,12 @@ class PalcoSession {
     }
     const route = getPalcoRoute('liturgy')
     if (route !== 'mirror') {
-      const previous = this.activeSlotId
-      this.setSlot(route)
-      try { await this.audio(input) } finally { this.setSlot(previous) }
+      await this.forSlot(route).audio(input)
       return
     }
     const slots = await this.slots()
-    await Promise.all(slots.filter((slot) => slot.running).map((slot) => {
-      const previous = this.activeSlotId
-      this.setSlot(slot.id)
-      return this.audio(input).finally(() => this.setSlot(previous))
+    await Promise.all(slots.filter((slot) => slot.running && obsAllowsMirror(slot.id, 'liturgy')).map((slot) => {
+      return this.forSlot(slot.id).audio(input)
     }))
   }
 

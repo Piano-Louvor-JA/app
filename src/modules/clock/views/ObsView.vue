@@ -5,6 +5,8 @@ import PageBackStack from '@shared/components/PageBackStack.vue'
 import { useMinimizablePage } from '@shared/composables/useMinimizablePage'
 
 import { palcoSession } from '@modules/settings/services/palco-session'
+import { useObsConnections } from '@modules/settings/composables/useObsConnections'
+import { obsConnections, registerObsConnection, notifyObsChanged } from '@modules/settings/services/obs-connections'
 import ObsBrandIcon from '@design-system/components/icons/ObsBrandIcon.vue'
 
 // Issue app#361: card funcional do OBS — Browser Source do palco-server.
@@ -23,6 +25,48 @@ const obsUrl = ref('')
 const copied = ref(false)
 const turning = ref(false)
 const receivers = ref(0)
+const { connections, refresh: refreshConnections } = useObsConnections()
+const additionalConnections = computed(() => connections.value.filter((item) => item.id !== '0'))
+const additionalUrls = ref<Record<string, string>>({})
+const connectionError = ref('')
+const busyConnection = ref<string | null>(null)
+const copiedConnection = ref<string | null>(null)
+async function createConnection() {
+  if (busyConnection.value) return
+  busyConnection.value = 'create'
+  connectionError.value = ''
+  try {
+    const number = Math.max(1, ...obsConnections.value.map((item) => Number(item.label.match(/\d+$/)?.[0]) || 1)) + 1
+    const slot = await palcoSession.createSlot(`OBS ${number}`)
+    if (!slot) throw new Error('create')
+    registerObsConnection(slot.id, slot.label)
+    const started = await palcoSession.startSlot(slot.id)
+    if (!started) throw new Error('start')
+    notifyObsChanged()
+    await refresh()
+  } catch { connectionError.value = t('utilities.obsConnectionFailed') }
+  finally { busyConnection.value = null }
+}
+async function toggleConnection(id: string, active: boolean) {
+  if (busyConnection.value) return
+  busyConnection.value = id
+  connectionError.value = ''
+  try {
+    if (active) await palcoSession.stopSlot(id)
+    else if (!(await palcoSession.startSlot(id))) throw new Error('start')
+    notifyObsChanged()
+    await refresh()
+  } catch { connectionError.value = t('utilities.obsConnectionFailed') }
+  finally { busyConnection.value = null }
+}
+function copyConnection(id: string) {
+  const url = additionalUrls.value[id]
+  if (!url) return
+  void navigator.clipboard?.writeText(url)
+  copiedConnection.value = id
+  setTimeout(() => { copiedConnection.value = null }, 2000)
+}
+
 
 let timer: ReturnType<typeof setInterval> | null = null
 
@@ -33,8 +77,16 @@ const steps = computed(() => [
 ])
 
 async function refresh() {
+  await refreshConnections()
+  const urls: Record<string, string> = {}
+  await Promise.all(additionalConnections.value.map(async (connection) => {
+    const status = await palcoSession.statusSlot(connection.id)
+    urls[connection.id] = status?.receiverUrl ?? ''
+  }))
+  additionalUrls.value = urls
   const st = await palcoSession.status()
   if (st) {
+    if (st.running) registerObsConnection('0', 'OBS 1')
     running.value = st.running
     receivers.value = st.clients
     obsUrl.value =
@@ -148,6 +200,27 @@ onUnmounted(() => {
         </div>
       </template>
 
+      <button type="button" class="obs-view__copy obs-view__add" :disabled="busyConnection !== null"
+        @click="createConnection">
+        <i class="ti ti-plus" aria-hidden="true" /> {{ t('utilities.obsAddConnection') }}
+      </button>
+      <p v-if="connectionError" role="alert">{{ connectionError }}</p>
+      <article v-for="connection in additionalConnections" :key="connection.id" class="obs-view__connection">
+        <div class="obs-view__row">
+          <strong>{{ connection.label }}</strong>
+          <span>{{ connection.running ? t('utilities.obsOn', { n: connection.clients }) : t('utilities.obsOff') }}</span>
+          <button type="button" class="obs-view__toggle" :disabled="busyConnection !== null"
+            @click="toggleConnection(connection.id, connection.running)">
+            {{ connection.running ? t('utilities.obsStop') : t('utilities.obsStart') }}
+          </button>
+        </div>
+        <div v-if="connection.running && additionalUrls[connection.id]" class="obs-view__url-row">
+          <code class="obs-view__url">{{ additionalUrls[connection.id] }}</code>
+          <button type="button" class="obs-view__copy" @click="copyConnection(connection.id)">
+            {{ copiedConnection === connection.id ? t('utilities.obsCopied') : t('utilities.obsCopy') }}
+          </button>
+        </div>
+      </article>
       <p class="obs-view__label">{{ t('utilities.obsHowTitle') }}</p>
       <ol class="obs-view__steps">
         <li v-for="(s, i) in steps" :key="i" class="obs-view__step">
@@ -160,6 +233,9 @@ onUnmounted(() => {
 </template>
 
 <style scoped lang="scss">
+.obs-view__connection { display: flex; flex-direction: column; gap: 0.75rem; border-top: 1px solid var(--ds-color-outline); padding-top: 1rem; }
+.obs-view__add { align-self: flex-start; color: var(--ds-color-primary); }
+
 .obs-view {
   display: flex;
   flex-direction: column;
