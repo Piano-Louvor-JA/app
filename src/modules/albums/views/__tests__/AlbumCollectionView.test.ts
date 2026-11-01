@@ -228,10 +228,17 @@ describe('AlbumCollectionView', () => {
     expect((globalThis as any).__albumsMock.playAll).toHaveBeenCalled()
   })
 
-  it('kind hinário esconde play-all', async () => {
+  it('botão aleatório chama reprodução da coletânea em modo aleatório', async () => {
+    const w = await mountView()
+    await w.find('.album-collection-view__shuffle').trigger('click')
+    expect((globalThis as any).__albumsMock.playAll).toHaveBeenCalledWith('audio', true)
+  })
+
+  it('hinário também oferece reprodução em sequência e aleatória', async () => {
     ;(globalThis as any).__albumsMock.activeCollection = { ...collection, kind: 'hymnal' }
     const w = await mountView()
-    expect(w.find('.album-collection-view__play-all').exists()).toBe(false)
+    expect(w.find('.album-collection-view__play-all').exists()).toBe(true)
+    expect(w.find('.album-collection-view__shuffle').exists()).toBe(true)
   })
 
   it('picker de playlist: abrir, adicionar e mostrar toast; duplicado mostra já está', async () => {

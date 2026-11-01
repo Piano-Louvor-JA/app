@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
+import { usePlaylistPanelStore } from '../stores/usePlaylistPanelStore'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useMediaStore } from '@modules/media/stores/useMediaStore'
@@ -26,6 +28,7 @@ import {
   deletePlaylist,
   listPlaylists,
   removePlaylistItem,
+  movePlaylistItem,
   savePlaylists,
   type Playlist,
 } from '../services/playlist-storage'
@@ -37,6 +40,14 @@ const router = useRouter()
 const mediaStore = useMediaStore()
 const playlists = ref<Playlist[]>(listPlaylists())
 const newPlaylistName = ref('')
+const playlistHint = ref<{ playlistId: string; key: string } | null>(null)
+const playlistHintParts = computed(() => {
+  const text = playlistHint.value ? t(playlistHint.value.key) : ''
+  const separator = text.indexOf(':')
+  return separator < 0
+    ? { label: text, description: '' }
+    : { label: text.slice(0, separator + 1), description: text.slice(separator + 1).trim() }
+})
 // Visibilidade de Minhas Coletâneas (preferência do usuário, persistida).
 const showCustomCollections = ref(getShowCustomCollections())
 
@@ -139,7 +150,7 @@ function exportPlaylists() {
 const importFeedback = ref('')
 
 /* ---------- Modais (padrão web): Playlists + Minhas Coletâneas ---------- */
-const playlistsModalOpen = ref(false)
+const { open: playlistsModalOpen, expandedPlaylistId } = storeToRefs(usePlaylistPanelStore())
 
 /**
  * Minimizar a janela de Playlists: ela fecha e vai para a barra como
@@ -261,6 +272,78 @@ async function playPlaylist(playlist: Playlist) {
   await router.push({ name: 'media' })
 }
 
+async function playPlaylistTrack(playlist: Playlist, index: number) {
+  const item = playlist.items[index]
+  if (!item) return
+  // Play da linha é avulso: ao terminar, o player fecha sem avançar na playlist.
+  await mediaStore.playQueue([item], 0, undefined, playlist.name, { minimized: true })
+}
+
+async function shufflePlaylist(playlist: Playlist) {
+  const items = [...playlist.items]
+  for (let i = items.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[items[i], items[j]] = [items[j]!, items[i]!]
+  }
+  if (!items.length) return
+  await mediaStore.playQueue(items, 0, undefined, playlist.name, { originalOrder: playlist.items, shuffled: true })
+  await router.push({ name: 'media' })
+}
+
+const draggedTrack = ref<{ playlistId: string; index: number } | null>(null)
+const dropTarget = ref<{ playlistId: string; index: number } | null>(null)
+
+function endTrackDrag() {
+  draggedTrack.value = null
+  dropTarget.value = null
+}
+
+function leaveTrackList(event: DragEvent) {
+  const list = event.currentTarget as HTMLElement
+  if (!(event.relatedTarget instanceof Node) || !list.contains(event.relatedTarget)) dropTarget.value = null
+}
+
+function hoverTrack(playlistId: string, index: number) {
+  if (draggedTrack.value?.playlistId !== playlistId) return
+  dropTarget.value = { playlistId, index }
+}
+
+function trackKey(items: Playlist['items'], index: number) {
+  const item = items[index]!
+  const occurrence = items.slice(0, index).filter((entry) =>
+    entry.musicId === item.musicId && entry.albumId === item.albumId).length
+  return `${item.musicId}-${item.albumId}-${occurrence}`
+}
+
+function startTrackDrag(event: DragEvent, playlistId: string, index: number) {
+  draggedTrack.value = { playlistId, index }
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', String(index))
+    // A prévia nativa acompanha a faixa inteira, em vez de só o ícone de arraste.
+    const row = (event.currentTarget as HTMLElement).closest('li')
+    if (row) {
+      const ghost = row.cloneNode(true) as HTMLElement
+      const rect = row.getBoundingClientRect()
+      ghost.style.cssText = `position:fixed;top:-10000px;left:0;width:${rect.width}px;display:flex;align-items:center;gap:0.65rem;padding:0.6rem;background:#c46b38;color:#fff;border:2px solid #ffc18e;border-radius:8px;box-shadow:0 8px 24px #0008;list-style:none;`
+      document.body.appendChild(ghost)
+      event.dataTransfer.setDragImage(ghost, 24, rect.height / 2)
+      setTimeout(() => ghost.remove(), 0)
+    }
+  }
+}
+
+function reorderTrack(playlistId: string, from: number, to: number) {
+  movePlaylistItem(playlistId, from, to)
+  playlists.value = listPlaylists()
+}
+
+function dropTrack(playlistId: string, index: number) {
+  const source = draggedTrack.value
+  endTrackDrag()
+  if (source?.playlistId === playlistId) reorderTrack(playlistId, source.index, index)
+}
+
 function addPlaylist() {
   const name = newPlaylistName.value.trim()
   if (!name) return
@@ -278,8 +361,6 @@ function removePlaylistTrack(id: string, index: number) {
   removePlaylistItem(id, index)
   playlists.value = listPlaylists()
 }
-
-const expandedPlaylistId = ref<string | null>(null)
 
 function togglePlaylist(id: string) {
   expandedPlaylistId.value = expandedPlaylistId.value === id ? null : id
@@ -494,7 +575,7 @@ async function runAction(
         <div
           class="albums-view__modal-backdrop"
           aria-hidden="true"
-          @click="playlistsModalOpen = false"
+          @click="minimizePlaylists"
         />
         <GlassCard class="albums-view__modal-panel">
           <header class="albums-view__playlists-header">
@@ -575,12 +656,29 @@ async function runAction(
                     aria-hidden="true"
                   />
                 </button>
+                <span class="albums-view__playlist-hint" role="status" aria-live="polite">
+                  <span v-if="playlistHint?.playlistId === playlist.id">
+                    <strong class="albums-view__playlist-hint-label">{{ playlistHintParts.label }}</strong>{{ ' ' }}{{ playlistHintParts.description }}
+                  </span>
+                </span>
                 <div class="albums-view__playlist-actions">
+                  <button type="button" class="albums-view__playlist-shuffle"
+                    :disabled="playlist.items.length === 0" :aria-label="t('albums.playlists.shuffle')"
+                    @mouseenter="playlistHint = { playlistId: playlist.id, key: 'albums.playlists.shuffleHint' }"
+                    @mouseleave="playlistHint = null"
+                    @focus="playlistHint = { playlistId: playlist.id, key: 'albums.playlists.shuffleHint' }"
+                    @blur="playlistHint = null" @click="shufflePlaylist(playlist)">
+                    <i class="ti ti-arrows-shuffle" aria-hidden="true" />
+                  </button>
                   <button
                     type="button"
-                    class="albums-view__playlist-play"
+                    class="albums-view__playlist-play albums-view__playlist-play-all"
                     :disabled="playlist.items.length === 0"
                     :aria-label="`Tocar ${playlist.name}`"
+                    @mouseenter="playlistHint = { playlistId: playlist.id, key: 'albums.playlists.playAllHint' }"
+                    @mouseleave="playlistHint = null"
+                    @focus="playlistHint = { playlistId: playlist.id, key: 'albums.playlists.playAllHint' }"
+                    @blur="playlistHint = null"
                     @click="playPlaylist(playlist)"
                   >
                     <i class="ti ti-player-play" aria-hidden="true" />
@@ -596,9 +694,32 @@ async function runAction(
                 </div>
               </div>
               <Transition name="playlist-tracks">
-                <ul v-if="expandedPlaylistId === playlist.id && playlist.items.length > 0" class="albums-view__playlist-tracks">
-                  <li v-for="(item, index) in playlist.items" :key="`${item.musicId}-${index}`">
+                <TransitionGroup v-if="expandedPlaylistId === playlist.id && playlist.items.length > 0" name="playlist-reorder" tag="ul" class="albums-view__playlist-tracks"
+                  @dragleave="leaveTrackList">
+                  <li v-for="(item, index) in playlist.items" :key="trackKey(playlist.items, index)"
+                    :class="{
+                      'playlist-track--dragging': draggedTrack?.playlistId === playlist.id && draggedTrack.index === index,
+                      'playlist-track--drop-before': dropTarget?.playlistId === playlist.id && dropTarget.index === index && draggedTrack && draggedTrack.index > index,
+                      'playlist-track--drop-after': dropTarget?.playlistId === playlist.id && dropTarget.index === index && draggedTrack && draggedTrack.index < index,
+                    }"
+                    @dragover.prevent="hoverTrack(playlist.id, index)" @drop.prevent="dropTrack(playlist.id, index)">
+                    <button type="button" class="albums-view__playlist-track-drag" draggable="true"
+                      :aria-label="t('albums.playlists.reorder')" :title="t('albums.playlists.reorder')"
+                      @dragstart="startTrackDrag($event, playlist.id, index)" @dragend="endTrackDrag"
+                      @keydown.up.prevent="reorderTrack(playlist.id, index, index - 1)"
+                      @keydown.down.prevent="reorderTrack(playlist.id, index, index + 1)">
+                      <i class="ti ti-grip-vertical" aria-hidden="true" />
+                    </button>
                     <span class="albums-view__playlist-track-index">{{ index + 1 }}</span>
+                    <button type="button" class="albums-view__playlist-track-play"
+                      :aria-label="t('albums.playlists.playTrack', { title: item.title })"
+                      @mouseenter="playlistHint = { playlistId: playlist.id, key: 'albums.playlists.singlePlayHint' }"
+                    @mouseleave="playlistHint = null"
+                    @focus="playlistHint = { playlistId: playlist.id, key: 'albums.playlists.singlePlayHint' }"
+                    @blur="playlistHint = null"
+                      @click="playPlaylistTrack(playlist, index)">
+                      <i class="ti ti-player-play" aria-hidden="true" />
+                    </button>
                     <span class="albums-view__playlist-track-title">{{ item.title }}</span>
                     <button
                       type="button"
@@ -609,7 +730,7 @@ async function runAction(
                       <i class="ti ti-x" aria-hidden="true" />
                     </button>
                   </li>
-                </ul>
+                </TransitionGroup>
               </Transition>
             </article>
           </TransitionGroup>
@@ -1619,6 +1740,7 @@ async function runAction(
 
 .albums-view__playlist-actions { display: inline-flex; gap: 0.4rem; align-items: center; flex-shrink: 0; }
 
+.albums-view__playlist-shuffle,
 .albums-view__playlist-play,
 .albums-view__playlist-remove {
   display: inline-flex;
@@ -1633,14 +1755,17 @@ async function runAction(
   cursor: pointer;
   transition: all 0.2s ease;
 }
+.albums-view__playlist-shuffle,
 .albums-view__playlist-play {
   color: var(--ds-color-primary);
   border-color: color-mix(in srgb, var(--ds-color-primary) 45%, transparent);
 }
+.albums-view__playlist-shuffle:hover:not(:disabled),
 .albums-view__playlist-play:hover:not(:disabled) {
   background: var(--ds-color-primary);
   color: var(--ds-color-on-primary, #fff);
 }
+.albums-view__playlist-shuffle:disabled,
 .albums-view__playlist-play:disabled { opacity: 0.35; cursor: not-allowed; }
 .albums-view__playlist-remove { color: var(--ds-color-on-surface-variant); }
 .albums-view__playlist-remove:hover {
@@ -1792,5 +1917,83 @@ async function runAction(
   color: var(--ds-color-primary-soft, var(--ds-color-primary));
   font-size: 0.82rem;
 }
+
+.albums-view__playlist-tracks li {
+  position: relative;
+  border-radius: 0.45rem;
+  transition: background-color 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
+}
+.albums-view__playlist-tracks .playlist-track--dragging {
+  background: color-mix(in srgb, var(--ds-color-primary) 30%, transparent);
+  box-shadow: inset 0 0 0 2px var(--ds-color-primary), 0 4px 14px rgb(0 0 0 / 25%);
+  opacity: 0.55;
+}
+.albums-view__playlist-tracks .playlist-track--drop-before,
+.albums-view__playlist-tracks .playlist-track--drop-after {
+  background: color-mix(in srgb, var(--ds-color-primary) 18%, transparent);
+}
+.playlist-track--drop-before::before,
+.playlist-track--drop-after::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--ds-color-primary);
+  box-shadow: 0 0 10px var(--ds-color-primary);
+  pointer-events: none;
+  z-index: 1;
+}
+.playlist-track--drop-before::before { top: -2px; }
+.playlist-track--drop-after::after { bottom: -2px; }
+.albums-view__playlist-tracks .playlist-reorder-move { transition: transform 240ms ease; }
+.albums-view__playlist-track-drag:hover {
+  background: color-mix(in srgb, var(--ds-color-primary) 28%, transparent);
+  color: var(--ds-color-primary);
+  border-color: var(--ds-color-primary);
+}
+@media (prefers-reduced-motion: reduce) {
+  .albums-view__playlist-tracks li,
+  .albums-view__playlist-tracks .playlist-reorder-move { transition: none; }
+}
+
+.albums-view__playlist-hint-label {
+  font-weight: 800;
+  color: var(--ds-color-on-surface);
+}
+.albums-view__playlist-hint {
+  flex: 1 1 14rem;
+  min-width: 0;
+  min-height: 2.6rem;
+  display: flex;
+  align-items: center;
+  padding: 0 0.65rem;
+  color: var(--ds-color-primary);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.albums-view__playlist-toggle { flex: 0 1 auto; max-width: 45%; }
 </style>
 
+
+<style scoped>
+.albums-view__playlist-track-drag,
+.albums-view__playlist-track-play {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.8rem;
+  height: 1.8rem;
+  border: 1px solid var(--ds-color-outline);
+  border-radius: 0.4rem;
+  background: transparent;
+  color: var(--ds-color-primary);
+  cursor: pointer;
+}
+.albums-view__playlist-track-drag { cursor: grab; color: var(--ds-color-on-surface-variant); }
+.albums-view__playlist-track-drag:active { cursor: grabbing; }
+.albums-view__playlist-track-play:hover { background: color-mix(in srgb, var(--ds-color-primary) 20%, transparent); }
+</style>

@@ -764,6 +764,20 @@ describe("bindAudio handlers — capturados do attach", () => {
 		expect(store.currentTimeSec).toBe(0);
 	});
 
+	it("onEnded da reprodução individual fecha também quando iniciada no miniplayer", async () => {
+		const { store } = await openTrack({});
+		await store.playQueue(
+			[{ musicId: 1, albumId: null, title: "Hino" }],
+			0, undefined, "Culto", { minimized: true },
+		);
+		expect(store.hasSession).toBe(true);
+		expect(store.minimized).toBe(true);
+		capturedHandlers()!.onEnded();
+		expect(store.hasSession).toBe(false);
+		expect(store.session).toBeNull();
+		expect(store.status).toBe("idle");
+	});
+
 	it("onEnded com fila: avança para próxima (unbind + playQueueItem)", async () => {
 		const { store } = await openTrack({});
 		store.queue = [

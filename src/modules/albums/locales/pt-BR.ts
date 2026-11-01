@@ -12,6 +12,14 @@ export default {
       show: 'Mostrar Minhas Coletâneas',
     },
     playlists: {
+      singlePlayHint: 'Modo único: tocar somente esta música',
+      shuffleHint: 'Tocar aleatório: reproduzir todas as músicas em ordem aleatória',
+      playAllHint: 'Tocar playlist: reproduzir todas as músicas em sequência',
+
+      shuffle: 'Tocar aleatoriamente',
+      playTrack: 'Tocar {title} no miniplayer',
+      reorder: 'Arrastar para reordenar (ou usar as setas para cima e para baixo)',
+
       title: 'Playlists',
       newPlaceholder: 'Nome da nova playlist...',
       create: 'Criar',

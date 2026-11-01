@@ -94,20 +94,27 @@ export function useAlbums() {
     )
   }
 
-  /** Toca a coletânea inteira. Hinários ficam fora por decisão da spec RF-01. */
-  async function playAllInActiveCollection(mode: MediaPlaybackMode = 'audio') {
+  /** Toca a coletânea ou o hinário inteiro, em sequência ou aleatoriamente. */
+  async function playAllInActiveCollection(mode: MediaPlaybackMode = 'audio', shuffled = false) {
     const collection = activeCollection.value
-    if (!collection || collection.kind === 'hymnal' || tracks.value.length === 0) return false
-    const albumId = Number(collection.id)
-    if (!Number.isFinite(albumId)) return false
-    await mediaStore.playAlbumQueue(
-      tracks.value.map((track) => ({
-        musicId: track.musicId,
-        albumId,
-        title: track.name,
-      })),
-      mode,
-    )
+    if (!collection || tracks.value.length === 0) return false
+    const albumId = collection.kind === 'hymnal' ? null : Number(collection.id)
+    if (albumId !== null && !Number.isFinite(albumId)) return false
+    const original = tracks.value.map((track) => ({
+      musicId: track.musicId,
+      albumId,
+      title: track.name,
+    }))
+    if (shuffled) {
+      const items = [...original]
+      for (let i = items.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1))
+        ;[items[i], items[j]] = [items[j]!, items[i]!]
+      }
+      await mediaStore.playQueue(items, 0, mode, collection.name, { originalOrder: original, shuffled: true })
+    } else {
+      await mediaStore.playAlbumQueue(original, mode)
+    }
     await router.push({ name: 'media' })
     return true
   }

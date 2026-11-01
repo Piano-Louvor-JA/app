@@ -12,6 +12,14 @@ export default {
       show: 'Mostrar Mis Colecciones',
     },
     playlists: {
+      singlePlayHint: 'Modo único: reproducir solo esta canción',
+      shuffleHint: 'Reproducción aleatoria: reproducir todas las canciones en orden aleatorio',
+      playAllHint: 'Reproducir playlist: reproducir todas las canciones en secuencia',
+
+      shuffle: 'Reproducir aleatoriamente',
+      playTrack: 'Reproducir {title} en el minirreproductor',
+      reorder: 'Arrastrar para reordenar (o usar las flechas arriba y abajo)',
+
       title: 'Playlists',
       newPlaceholder: 'Nombre de la nueva playlist...',
       create: 'Crear',

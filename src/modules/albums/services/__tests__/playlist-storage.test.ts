@@ -15,10 +15,25 @@ import {
   listPlaylists,
   removePlaylistItem,
   renamePlaylist,
+  movePlaylistItem,
 } from '../playlist-storage'
 
 describe('playlist-storage', () => {
   beforeEach(() => localStorage.clear())
+
+  it('persiste a nova ordem após mover uma faixa e reler o armazenamento', () => {
+    const playlist = createPlaylist('Culto')
+    const items = [1, 2, 3].map((musicId) => ({ musicId, albumId: null, title: String(musicId) }))
+    items.forEach((item) => addPlaylistItem(playlist.id, item))
+    movePlaylistItem(playlist.id, 0, 2)
+    expect(listPlaylists()[0]?.items).toEqual([items[1], items[2], items[0]])
+    movePlaylistItem(playlist.id, 2, 0)
+    expect(listPlaylists()[0]?.items).toEqual(items)
+    expect(movePlaylistItem(playlist.id, -1, 0)).toBeNull()
+    expect(movePlaylistItem(playlist.id, 0, 3)).toBeNull()
+    expect(movePlaylistItem('missing', 0, 1)).toBeNull()
+    expect(listPlaylists()[0]?.items).toEqual(items)
+  })
 
   it('cria e lista playlist persistida', () => {
     const playlist = createPlaylist('Culto jovem')

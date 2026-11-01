@@ -1,5 +1,10 @@
 export default {
   media: {
+    reorderQueue: 'Arrastar para reordenar (ou usar as setas para cima e para baixo)',
+    shuffleQueueApplied: 'Modo aleatório aplicado. A partir da próxima música, a reprodução será aleatória.',
+    sequentialQueueApplied: 'Modo sequencial aplicado. A partir da próxima música, a reprodução seguirá a sequência.',
+    shuffleQueue: 'Tocar aleatório',
+    playQueueSequential: 'Tocar playlist em sequência',
     exitFullscreen: 'Sair da tela cheia',
     publishRules: {
       title: 'Regras da Comunidade',

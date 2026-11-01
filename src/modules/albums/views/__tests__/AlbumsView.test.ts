@@ -54,7 +54,9 @@ vi.mock('vue-router', () => ({
 }))
 
 // Composable testado à parte: aqui só o contrato tela ↔ minimizar.
-const minimizeMock = vi.fn(async () => {})
+const minimizeMock = vi.fn(async () => {
+  ;(globalThis as any).__minimizeOptions?.onMinimized?.()
+})
 const prepareMock = vi.fn()
 vi.mock('@shared/composables/useMinimizablePage', () => ({
   useMinimizablePage: (options: unknown) => {
@@ -324,14 +326,21 @@ describe('AlbumsView', () => {
     expect(body().querySelector('.albums-view__state')).not.toBeNull()
   })
 
-  it('fechar modal de playlists pelo backdrop', async () => {
+  it('minimiza playlists ao clicar fora e mantém o botão de fechar independente', async () => {
     const w = await mountView()
     await w.findAll('button').find((b) => b.attributes('aria-label') === 'albums.playlists.title')!.trigger('click')
     await flushPromises()
     expect(body().querySelector('.albums-view__modal')).not.toBeNull()
+    minimizeMock.mockClear()
     ;(body().querySelector('.albums-view__modal-backdrop') as HTMLElement).click()
     await flushPromises()
+    expect(minimizeMock).toHaveBeenCalledOnce()
     expect(body().querySelector('.albums-view__modal')).toBeNull()
+    await w.findAll('button').find((b) => b.attributes('aria-label') === 'albums.playlists.title')!.trigger('click')
+    ;(body().querySelector('button[aria-label="albums.lyric.close"]') as HTMLElement).click()
+    await flushPromises()
+    expect(body().querySelector('.albums-view__modal')).toBeNull()
+    expect(minimizeMock).toHaveBeenCalledOnce()
   })
 
   it('modal custom: abre, hydrate lista, fechar backdrop', async () => {

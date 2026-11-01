@@ -48,7 +48,10 @@ const {
   slideProgressRatio,
   queue,
   queueIndex,
+  queueShuffled,
   jumpToQueue,
+  playQueueInOrder,
+  moveQueueItem,
   volume,
   maximize,
   minimize,
@@ -70,6 +73,55 @@ const {
   clearError,
   syncProjectionFlag,
 } = useMediaPlayer()
+
+const queueModeNotice = ref<string | null>(null)
+let queueModeNoticeTimer: ReturnType<typeof setTimeout> | null = null
+function clearQueueModeNotice() {
+  if (queueModeNoticeTimer !== null) clearTimeout(queueModeNoticeTimer)
+  queueModeNoticeTimer = null
+  queueModeNotice.value = null
+}
+function selectQueueMode(shuffled: boolean) {
+  playQueueInOrder(shuffled)
+  clearQueueModeNotice()
+  queueModeNotice.value = shuffled ? 'media.shuffleQueueApplied' : 'media.sequentialQueueApplied'
+  queueModeNoticeTimer = setTimeout(clearQueueModeNotice, 3200)
+}
+watch(() => session.value?.musicId, clearQueueModeNotice)
+onBeforeUnmount(clearQueueModeNotice)
+
+const draggedQueueIndex = ref<number | null>(null)
+const queueDropTarget = ref<number | null>(null)
+function endQueueDrag() {
+  draggedQueueIndex.value = null
+  queueDropTarget.value = null
+}
+function startQueueDrag(event: DragEvent, index: number) {
+  draggedQueueIndex.value = index
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', String(index))
+    const row = (event.currentTarget as HTMLElement).closest('li')
+    if (row) {
+      const ghost = row.cloneNode(true) as HTMLElement
+      ghost.style.cssText = `position:fixed;top:-10000px;left:0;width:${row.getBoundingClientRect().width}px;display:flex;align-items:center;gap:0.5rem;padding:0.6rem;background:#c46b38;color:#fff;border:2px solid #ffc18e;border-radius:8px;list-style:none;`
+      document.body.appendChild(ghost)
+      event.dataTransfer.setDragImage(ghost, 20, 20)
+      setTimeout(() => ghost.remove(), 0)
+    }
+  }
+}
+function dropQueueItem(index: number) {
+  const from = draggedQueueIndex.value
+  endQueueDrag()
+  if (from !== null) moveQueueItem(from, index)
+}
+function queueItemKey(index: number) {
+  const item = queue.value[index]!
+  const occurrence = queue.value.slice(0, index).filter((entry) =>
+    entry.musicId === item.musicId && entry.albumId === item.albumId).length
+  return `${item.musicId}-${item.albumId}-${occurrence}`
+}
 
 const playlistAsideEl = ref<HTMLElement | null>(null)
 let autoFullscreenAttempted = false
@@ -291,6 +343,25 @@ async function onToggleFullscreen() {
           </p>
           <StagePaletteButton scope="hymns" />
         </div>
+        <div v-show="controlsVisible" class="media-window__queue-actions">
+          <p v-if="queueModeNotice" class="media-window__queue-mode-notice" role="status" aria-live="polite">
+            {{ t(queueModeNotice) }}
+          </p>
+          <button type="button" :disabled="queue.length < 2"
+            :class="{ 'media-window__queue-action--active': queue.length > 1 && queueShuffled }"
+            :aria-pressed="queue.length > 1 && !!queueShuffled"
+            :aria-label="t('media.shuffleQueue')" :title="t('media.shuffleQueue')"
+            @click="selectQueueMode(true)">
+            <i class="ti ti-arrows-shuffle" aria-hidden="true" />
+          </button>
+          <button type="button" :disabled="queue.length < 2"
+            :class="{ 'media-window__queue-action--active': queue.length > 1 && !queueShuffled }"
+            :aria-pressed="queue.length > 1 && !queueShuffled"
+            :aria-label="t('media.playQueueSequential')" :title="t('media.playQueueSequential')"
+            @click="selectQueueMode(false)">
+            <i class="ti ti-player-play" aria-hidden="true" />
+          </button>
+        </div>
         <MediaSlideStage
           :lyric="stageLyric"
           :title="stageTitle"
@@ -375,8 +446,22 @@ async function onToggleFullscreen() {
       >
         <template v-if="queue.length > 1">
           <h2 class="media-window__playlist-title">Fila de reprodução</h2>
-          <ul class="media-window__playlist-list">
-            <li v-for="(item, index) in queue" :key="`${item.musicId}-${index}`">
+          <TransitionGroup name="queue-reorder" tag="ul" class="media-window__playlist-list">
+            <li v-for="(item, index) in queue" :key="queueItemKey(index)" class="media-window__queue-row"
+              :class="{
+                'media-window__queue-row--dragging': draggedQueueIndex === index,
+                'media-window__queue-row--before': queueDropTarget === index && draggedQueueIndex !== null && draggedQueueIndex > index,
+                'media-window__queue-row--after': queueDropTarget === index && draggedQueueIndex !== null && draggedQueueIndex < index,
+              }"
+              @dragover.prevent="draggedQueueIndex !== null && (queueDropTarget = index)"
+              @drop.prevent="dropQueueItem(index)">
+              <button type="button" class="media-window__queue-grip" draggable="true"
+                :aria-label="t('media.reorderQueue')" :title="t('media.reorderQueue')"
+                @dragstart="startQueueDrag($event, index)" @dragend="endQueueDrag"
+                @keydown.up.prevent="moveQueueItem(index, index - 1)"
+                @keydown.down.prevent="moveQueueItem(index, index + 1)">
+                <i class="ti ti-grip-vertical" aria-hidden="true" />
+              </button>
               <button
                 type="button"
                 class="media-window__playlist-item"
@@ -387,7 +472,7 @@ async function onToggleFullscreen() {
                 <span class="media-window__playlist-label">{{ item.title }}</span>
               </button>
             </li>
-          </ul>
+          </TransitionGroup>
         </template>
         <template v-else>
           <h2 class="media-window__playlist-title">
@@ -430,6 +515,92 @@ async function onToggleFullscreen() {
 </template>
 
 <style scoped lang="scss">
+.media-window__queue-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border-radius: 0.5rem;
+  .media-window__playlist-item { flex: 1; min-width: 0; }
+}
+.media-window__queue-grip {
+  flex-shrink: 0;
+  width: 1.5rem;
+  height: 1.8rem;
+  border: 1px solid rgb(255 255 255 / 15%);
+  border-radius: 0.35rem;
+  color: var(--ds-color-primary);
+  background: transparent;
+  cursor: grab;
+  &:hover { background: color-mix(in srgb, var(--ds-color-primary) 30%, transparent); }
+  &:active { cursor: grabbing; }
+}
+.media-window__queue-row--dragging {
+  opacity: 0.55;
+  background: color-mix(in srgb, var(--ds-color-primary) 30%, transparent);
+  box-shadow: inset 0 0 0 2px var(--ds-color-primary);
+}
+.media-window__queue-row--before,
+.media-window__queue-row--after { background: color-mix(in srgb, var(--ds-color-primary) 18%, transparent); }
+.media-window__queue-row--before::before,
+.media-window__queue-row--after::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--ds-color-primary);
+  box-shadow: 0 0 10px var(--ds-color-primary);
+  pointer-events: none;
+}
+.media-window__queue-row--before::before { top: -2px; }
+.media-window__queue-row--after::after { bottom: -2px; }
+.queue-reorder-move { transition: transform 240ms ease; }
+@media (prefers-reduced-motion: reduce) { .queue-reorder-move { transition: none; } }
+
+.media-window__queue-mode-notice {
+  margin: 0;
+  max-width: 22rem;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid color-mix(in srgb, var(--ds-color-primary) 55%, transparent);
+  border-radius: 0.65rem;
+  background: rgb(0 0 0 / 80%);
+  color: var(--ds-color-primary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.media-window__queue-actions {
+  position: absolute;
+  top: 3.75rem;
+  right: 0.75rem;
+  z-index: 5;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  max-width: calc(100% - 1.5rem);
+
+  button {
+    flex-shrink: 0;
+    width: 2.5rem;
+    height: 2.5rem;
+    border: 1px solid var(--ds-color-primary);
+    border-radius: 999px;
+    background: rgb(0 0 0 / 70%);
+    color: var(--ds-color-primary);
+    font-size: 1.15rem;
+    cursor: pointer;
+    &:hover:not(:disabled) { background: var(--ds-color-primary); color: #111; }
+    &.media-window__queue-action--active {
+      background: var(--ds-color-primary);
+      color: #111;
+      border-color: #ffd0ac;
+      box-shadow: 0 0 0 2px rgb(255 255 255 / 20%), 0 0 18px color-mix(in srgb, var(--ds-color-primary) 65%, transparent);
+    }
+    &:disabled { opacity: 0.35; cursor: not-allowed; }
+  }
+}
+
 .media-page {
   box-sizing: border-box;
   display: flex;

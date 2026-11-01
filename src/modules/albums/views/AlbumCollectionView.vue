@@ -192,17 +192,19 @@ async function runAction(
         </h1>
       </div>
 
-      <button
-        v-if="activeCollection?.kind !== 'hymnal' && filteredTracks.length > 0"
-        type="button"
-        class="album-collection-view__play-all"
-        :aria-label="t('albums.playAll')"
-        :title="t('albums.playAll')"
-        @click="playAllInActiveCollection()"
-      >
-        <i class="ti ti-player-play" aria-hidden="true" />
-        {{ t('albums.playAll') }}
-      </button>
+      <div v-if="activeCollection && filteredTracks.length > 0"
+        class="album-collection-view__playback-actions">
+        <button type="button" class="album-collection-view__shuffle"
+          :aria-label="t('albums.playlists.shuffle')" :title="t('albums.playlists.shuffleHint')"
+          @click="playAllInActiveCollection('audio', true)">
+          <i class="ti ti-arrows-shuffle" aria-hidden="true" />
+        </button>
+        <button type="button" class="album-collection-view__play-all"
+          :aria-label="t('albums.playAll')" :title="t('albums.playlists.playAllHint')"
+          @click="playAllInActiveCollection()">
+          <i class="ti ti-player-play" aria-hidden="true" />
+        </button>
+      </div>
     </header>
 
     <div
@@ -368,19 +370,30 @@ async function runAction(
   gap: 1rem;
 }
 
-.album-collection-view__play-all {
+.album-collection-view__playback-actions {
   display: inline-flex;
-  align-items: center;
   gap: 0.4rem;
   margin-left: auto;
-  border: 0;
-  border-radius: 0.7rem;
-  padding: 0.6rem 0.85rem;
+}
+.album-collection-view__play-all,
+.album-collection-view__shuffle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border: 1px solid color-mix(in srgb, var(--ds-color-primary) 45%, transparent);
+  border-radius: var(--ds-radius-sm, 8px 0 8px 0);
+  background: transparent;
+  color: var(--ds-color-primary);
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+.album-collection-view__play-all:hover,
+.album-collection-view__shuffle:hover {
   background: var(--ds-color-primary);
   color: var(--ds-color-on-primary);
-  font: inherit;
-  font-weight: 700;
-  cursor: pointer;
 }
 
 .album-collection-view__brand {

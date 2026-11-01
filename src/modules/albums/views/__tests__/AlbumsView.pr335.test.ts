@@ -54,7 +54,9 @@ vi.mock('vue-router', () => ({
 }))
 
 // Composable testado à parte: aqui só o contrato tela ↔ minimizar.
-const minimizeMock = vi.fn(async () => {})
+const minimizeMock = vi.fn(async () => {
+  ;(globalThis as any).__minimizeOptions?.onMinimized?.()
+})
 const prepareMock = vi.fn()
 vi.mock('@shared/composables/useMinimizablePage', () => ({
   useMinimizablePage: (options: unknown) => {
@@ -334,14 +336,21 @@ describe('AlbumsView', () => {
     expect(body().querySelector('.albums-view__state')).not.toBeNull()
   })
 
-  it('fechar modal de playlists pelo backdrop', async () => {
+  it('minimiza playlists ao clicar fora e mantém o botão de fechar independente', async () => {
     const w = await mountView()
     await w.findAll('button').find((b) => b.attributes('aria-label') === 'albums.playlists.title')!.trigger('click')
     await flushPromises()
     expect(body().querySelector('.albums-view__modal')).not.toBeNull()
+    minimizeMock.mockClear()
     ;(body().querySelector('.albums-view__modal-backdrop') as HTMLElement).click()
     await flushPromises()
+    expect(minimizeMock).toHaveBeenCalledOnce()
     expect(body().querySelector('.albums-view__modal')).toBeNull()
+    await w.findAll('button').find((b) => b.attributes('aria-label') === 'albums.playlists.title')!.trigger('click')
+    ;(body().querySelector('button[aria-label="albums.lyric.close"]') as HTMLElement).click()
+    await flushPromises()
+    expect(body().querySelector('.albums-view__modal')).toBeNull()
+    expect(minimizeMock).toHaveBeenCalledOnce()
   })
 
   it('modal custom: abre, hydrate lista, fechar backdrop', async () => {
@@ -551,6 +560,107 @@ describe('AlbumsView', () => {
       await flushPromises()
     }
     w3.unmount()
+  })
+
+  it('embaralha a fila sem alterar a ordem salva e permite reordenar por teclado e arraste', async () => {
+    const items = [1, 2, 3].map((musicId) => ({ musicId, albumId: null, title: `Hino ${musicId}` }))
+    savePlaylists([{ id: 'shuffle', name: 'Culto', items }])
+    const w = await mountView()
+    await w.findAll('button').find((b) => b.attributes('aria-label') === 'albums.playlists.title')!.trigger('click')
+    ;(body().querySelector('.albums-view__playlist-toggle') as HTMLElement).click()
+    await flushPromises()
+    vi.spyOn(Math, 'random').mockReturnValue(0)
+    ;(body().querySelector('.albums-view__playlist-shuffle') as HTMLElement).click()
+    await flushPromises()
+    expect(playQueueMock).toHaveBeenCalledWith([items[1], items[2], items[0]], 0, undefined, 'Culto', { originalOrder: items, shuffled: true })
+    expect(pushMock).toHaveBeenCalledWith({ name: 'media' })
+    expect(listPlaylists()[0]?.items).toEqual(items)
+    ;(body().querySelector('.albums-view__playlist-track-drag') as HTMLElement)
+      .dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+    await flushPromises()
+    expect(listPlaylists()[0]?.items).toEqual([items[1], items[0], items[2]])
+    ;(body().querySelector('.albums-view__playlist-track-drag') as HTMLElement)
+      .dispatchEvent(new Event('dragstart', { bubbles: true }))
+    await flushPromises()
+    expect(body().querySelectorAll('.playlist-track--dragging')).toHaveLength(1)
+    ;(body().querySelectorAll('.albums-view__playlist-tracks li')[2] as HTMLElement)
+      .dispatchEvent(new Event('dragover', { bubbles: true, cancelable: true }))
+    await flushPromises()
+    expect(body().querySelectorAll('.playlist-track--drop-after')).toHaveLength(1)
+    ;(body().querySelectorAll('.albums-view__playlist-tracks li')[2] as HTMLElement)
+      .dispatchEvent(new Event('drop', { bubbles: true, cancelable: true }))
+    await flushPromises()
+    expect(listPlaylists()[0]?.items).toEqual([items[0], items[2], items[1]])
+    expect(body().querySelector('.playlist-track--dragging')).toBeNull()
+    expect(body().querySelector('.playlist-track--drop-after')).toBeNull()
+    w.unmount()
+  })
+
+  it('mantém popup e playlist expandida ao voltar do player completo', async () => {
+    const w = await mountView()
+    await w.findAll('button').find((b) => b.attributes('aria-label') === 'albums.playlists.title')!.trigger('click')
+    ;(body().querySelector('.albums-view__playlist-toggle') as HTMLElement).click()
+    await flushPromises()
+    expect(body().querySelector('.albums-view__playlist-tracks')).not.toBeNull()
+    w.unmount()
+    // Navegar para o player desmonta AlbumsView. O retorno usa a mesma Pinia do app.
+    const restored = mount(AlbumsView)
+    await flushPromises()
+    expect(body().querySelector('.albums-view__modal')).not.toBeNull()
+    expect(body().querySelector('.albums-view__playlist-tracks')).not.toBeNull()
+    ;(body().querySelector('button[aria-label="albums.lyric.close"]') as HTMLElement).click()
+    await flushPromises()
+    restored.unmount()
+    const closed = mount(AlbumsView)
+    await flushPromises()
+    expect(body().querySelector('.albums-view__modal')).toBeNull()
+    closed.unmount()
+  })
+
+  it('mostra a explicação de cada play no cabeçalho ao passar o mouse ou focar', async () => {
+    const w = await mountView()
+    await w.findAll('button').find((b) => b.attributes('aria-label') === 'albums.playlists.title')!.trigger('click')
+    ;(body().querySelector('.albums-view__playlist-toggle') as HTMLElement).click()
+    await flushPromises()
+    const hint = () => body().querySelector('.albums-view__playlist-hint')!.textContent
+    for (const [selector, key] of [
+      ['.albums-view__playlist-shuffle', 'shuffleHint'],
+      ['.albums-view__playlist-play-all', 'playAllHint'],
+      ['.albums-view__playlist-track-play', 'singlePlayHint'],
+    ]) {
+      const button = body().querySelector(selector!) as HTMLElement
+      button.dispatchEvent(new MouseEvent('mouseenter'))
+      await flushPromises()
+      expect(hint()).toContain(`albums.playlists.${key}`)
+      button.dispatchEvent(new MouseEvent('mouseleave'))
+      await flushPromises()
+      expect(hint()?.trim()).toBe('')
+      button.dispatchEvent(new FocusEvent('focus'))
+      await flushPromises()
+      expect(hint()).toContain(`albums.playlists.${key}`)
+      button.dispatchEvent(new FocusEvent('blur'))
+    }
+    w.unmount()
+  })
+
+  it('play por faixa mantém o popup aberto e solicita miniplayer no índice escolhido', async () => {
+    savePlaylists([{ id: 'mini', name: 'Culto', items: [
+      { musicId: 1, albumId: null, title: 'Santo' },
+      { musicId: 2, albumId: null, title: 'Eu Vou' },
+    ] }])
+    const w = await mountView()
+    await w.findAll('button').find((b) => b.attributes('aria-label') === 'albums.playlists.title')!.trigger('click')
+    ;(body().querySelector('.albums-view__playlist-toggle') as HTMLElement).click()
+    await flushPromises()
+    ;(body().querySelectorAll('.albums-view__playlist-track-play')[1] as HTMLElement).click()
+    await flushPromises()
+    expect(playQueueMock).toHaveBeenCalledWith(
+      [{ musicId: 2, albumId: null, title: 'Eu Vou' }],
+      0, undefined, 'Culto', { minimized: true },
+    )
+    expect(body().querySelector('.albums-view__playlist-tracks')).not.toBeNull()
+    expect(pushMock).not.toHaveBeenCalledWith({ name: 'media' })
+    w.unmount()
   })
 
   it('playlist com faixas: play navega pro media, remove faixa e toggle colapsa', async () => {

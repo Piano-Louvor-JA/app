@@ -76,9 +76,12 @@ export const useMediaStore = defineStore('media', () => {
   const isProjectingRaw = ref(false)
   // Fila de reprodução (spec playlist RF-03): vazia = comportamento atual.
   const queue = ref<QueueItem[]>([])
+  let originalQueue: QueueItem[] = []
+  const queueShuffled = ref(false)
   const queueIndex = ref(-1)
   /** Nome da fila (playlist) para o título do player; null = coletânea do hino. */
   const queueLabel = ref<string | null>(null)
+  let preserveQueuePlayerMode = false
   const isProjecting = computed({
     get: () => isProjectingRaw.value,
     set: (v: boolean) => {
@@ -847,6 +850,7 @@ export const useMediaStore = defineStore('media', () => {
         // undefined = contrato 27/08; keepQueue + isProjecting evita reabrir janela
         project: undefined,
         keepQueue: true,
+        minimized: preserveQueuePlayerMode ? minimized.value : undefined,
       })
       queueIndex.value = queue.value.findIndex((q) => q.musicId === item.musicId)
       if (keepProjecting) {
@@ -866,12 +870,38 @@ export const useMediaStore = defineStore('media', () => {
     startIndex = 0,
     mode?: MediaPlaybackMode,
     label: string | null = null,
+    options?: { minimized?: boolean; originalOrder?: QueueItem[]; shuffled?: boolean },
   ): Promise<void> {
-    queue.value = items
+    queue.value = [...items]
+    originalQueue = [...(options?.originalOrder ?? items)]
+    queueShuffled.value = options?.shuffled ?? false
     queueLabel.value = label
+    preserveQueuePlayerMode = options?.minimized !== undefined
+    if (options?.minimized !== undefined) minimized.value = options.minimized
     const first = items[startIndex]
     if (!first) return
     await playQueueItem(first, mode)
+  }
+
+  /** Reordena somente as próximas faixas, preservando a reprodução e o histórico. */
+  function playQueueInOrder(shuffled: boolean): void {
+    if (queue.value.length < 2) return
+    const currentIndex = queueIndex.value
+    if (currentIndex < 0 || currentIndex >= queue.value.length) return
+    const history = queue.value.slice(0, currentIndex + 1)
+    const upcoming = queue.value.slice(currentIndex + 1)
+    if (shuffled) {
+      for (let i = upcoming.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1))
+        ;[upcoming[i], upcoming[j]] = [upcoming[j]!, upcoming[i]!]
+      }
+    } else {
+      const originalIndex = (item: QueueItem) => originalQueue.findIndex((entry) =>
+        entry.musicId === item.musicId && entry.albumId === item.albumId)
+      upcoming.sort((a, b) => originalIndex(a) - originalIndex(b))
+    }
+    queue.value = [...history, ...upcoming]
+    queueShuffled.value = shuffled
   }
 
   /** Fila inteira de um álbum (ordenada por track — caller já ordena). */
@@ -880,6 +910,21 @@ export const useMediaStore = defineStore('media', () => {
     mode?: MediaPlaybackMode,
   ): Promise<void> {
     await playQueue(items, 0, mode)
+  }
+
+  function moveQueueItem(from: number, to: number): void {
+    if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || to < 0 ||
+      from >= queue.value.length || to >= queue.value.length || from === to) return
+    const next = [...queue.value]
+    const [item] = next.splice(from, 1)
+    next.splice(to, 0, item!)
+    const current = queueIndex.value
+    if (current === from) queueIndex.value = to
+    else if (from < current && to >= current) queueIndex.value -= 1
+    else if (from > current && to <= current) queueIndex.value += 1
+    queue.value = next
+    originalQueue = [...next]
+    queueShuffled.value = false
   }
 
   function nextTrack(): void {
@@ -1253,6 +1298,13 @@ export const useMediaStore = defineStore('media', () => {
     await startProjection()
   }
 
+  function stopProjection(): void {
+    const hasMediaWindow = isProjectionModuleOpen('media')
+    clearProjection()
+    projectingTvsOnly.value = false
+    if (hasMediaWindow) closeProjectionModule()
+  }
+
   function close(): void {
     if (queueAdvanceInProgress > 0) return
 
@@ -1361,6 +1413,9 @@ export const useMediaStore = defineStore('media', () => {
     queueIndex,
     queueLabel,
     playQueue,
+    playQueueInOrder,
+    moveQueueItem,
+    queueShuffled,
     playAlbumQueue,
     playQueueItem,
     nextTrack,
@@ -1378,6 +1433,7 @@ export const useMediaStore = defineStore('media', () => {
     switchMode,
     startProjection,
     clearProjection,
+    stopProjection,
     toggleProjection,
     close,
     clearError,

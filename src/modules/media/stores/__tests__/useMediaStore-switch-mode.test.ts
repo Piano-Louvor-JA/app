@@ -95,6 +95,65 @@ function mockTrackWithInstrumental() {
 }
 
 describe('useMediaStore.switchMode — modo com áudio (964-978)', () => {
+  it('reordena a fila preservando a música atual, o tempo e seu índice', async () => {
+    mockTrackWithInstrumental()
+    const store = useMediaStore()
+    const items = [42, 43, 44].map((musicId) => ({ musicId, albumId: null, title: 'Hino Sacra' }))
+    await store.playQueue(items, 1, undefined, 'Culto')
+    store.currentTimeSec = 37
+    const loads = loadMediaTrackMock.mock.calls.length
+    store.moveQueueItem(0, 2)
+    expect(store.queue.map((item) => item.musicId)).toEqual([43, 44, 42])
+    expect(store.queueIndex).toBe(0)
+    store.moveQueueItem(0, 2)
+    expect(store.queueIndex).toBe(2)
+    expect(store.session?.musicId).toBe(43)
+    expect(store.currentTimeSec).toBe(37)
+    expect(loadMediaTrackMock).toHaveBeenCalledTimes(loads)
+    store.close()
+  })
+
+  it('aplica o modo apenas às próximas faixas sem reiniciar a música atual', async () => {
+    mockTrackWithInstrumental()
+    const store = useMediaStore()
+    const items = [42, 43, 44].map((musicId) => ({ musicId, albumId: null, title: 'Hino Sacra' }))
+    await store.playQueue(items, 0, undefined, 'Culto')
+    store.currentTimeSec = 37
+    const loads = loadMediaTrackMock.mock.calls.length
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0)
+    await store.playQueueInOrder(true)
+    expect(store.queueShuffled).toBe(true)
+    expect(store.queue.map((item) => item.musicId)).toEqual([42, 44, 43])
+    expect(store.session?.musicId).toBe(42)
+    expect(store.currentTimeSec).toBe(37)
+    expect(loadMediaTrackMock).toHaveBeenCalledTimes(loads)
+    await store.playQueueInOrder(false)
+    expect(store.queueShuffled).toBe(false)
+    expect(store.queue.map((item) => item.musicId)).toEqual([42, 43, 44])
+    expect(store.session?.musicId).toBe(42)
+    expect(store.currentTimeSec).toBe(37)
+    expect(loadMediaTrackMock).toHaveBeenCalledTimes(loads)
+    expect(store.queueLabel).toBe('Culto')
+    random.mockRestore()
+    store.close()
+  })
+
+  it('fila iniciada no miniplayer mantém o modo entre faixas e respeita maximizar', async () => {
+    mockTrackWithInstrumental()
+    const store = useMediaStore()
+    const items = [42, 43].map((musicId) => ({ musicId, albumId: null, title: 'Hino Sacra' }))
+    await store.playQueue(items, 0, undefined, 'Culto', { minimized: true })
+    expect(store.minimized).toBe(true)
+    await store.playQueueItem(items[1]!)
+    expect(store.minimized).toBe(true)
+    expect(store.queueIndex).toBe(1)
+    store.maximize()
+    await store.playQueueItem(items[0]!)
+    expect(store.minimized).toBe(false)
+    expect(store.queueLabel).toBe('Culto')
+    store.close()
+  })
+
   it('tocando audio → instrumental: fade-in reinicia o playback', async () => {
     mockTrackWithInstrumental()
     const store = useMediaStore()

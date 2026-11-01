@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, watch, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useInAppProjectionMinimized } from '@shared/composables/useInAppProjectionMinimized'
+import MiniPlayerCloseButton from '@shared/components/MiniPlayerCloseButton.vue'
+import { closeIndependentProjection } from '@shared/composables/useIndependentProjection'
 import FloatingPreviewTitle from '@shared/components/FloatingPreviewTitle.vue'
 import IndependentProjectionButton from '@shared/components/IndependentProjectionButton.vue'
 import { isIndependentProjectionActive } from '@shared/composables/useIndependentProjection'
@@ -29,8 +31,13 @@ const canNavigate = computed(() => store.selectedVerses.length > 0)
 const onBibleRoute = computed(() => route.meta.navKey === 'bible')
 
 /** Na Bíblia fica sempre à mão; nas outras telas só enquanto a Bíblia está no ar. */
+const dismissed = ref(false)
+watch(() => route.name, () => { dismissed.value = false })
+watch(() => store.isProjecting, (active) => { if (active) dismissed.value = false })
+watch(() => isIndependentProjectionActive('bible'), (active) => { if (active) dismissed.value = false })
+
 const visible = computed(
-  () => onBibleRoute.value || store.isProjecting || isIndependentProjectionActive('bible'),
+  () => !dismissed.value && (onBibleRoute.value || store.isProjecting || isIndependentProjectionActive('bible')),
 )
 
 /** Miniatura reflete a personalização do escopo bible (bg/caixa/cores). */
@@ -51,6 +58,13 @@ const { positionStyle, dragging, onPointerDown, resetPosition } =
   useFloatingDrag(chromeRoot, USER_PREFERENCE_KEYS.bibleChromePosition, {
     stackOrder: FLOATING_STACK_ORDER.bible,
   })
+
+function onCloseChrome() {
+  if (store.isProjecting) store.clearProjectionWindow()
+  closeIndependentProjection('bible')
+  projectionMinimized.value = false
+  dismissed.value = true
+}
 
 function onProject() {
   void store.toggleProjection()
@@ -91,6 +105,7 @@ async function onOpenReader() {
       aria-live="polite"
       @dblclick="resetPosition"
     >
+      <MiniPlayerCloseButton v-if="!onBibleRoute" :label="t('bible.title')" @close="onCloseChrome" />
       <template v-if="hasProjection">
         <p class="bible-chrome__preview-text">
           “{{ snippet }}”

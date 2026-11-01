@@ -79,6 +79,7 @@ const store = reactive({
   canStart: true,
   start: vi.fn(),
   pause: vi.fn(),
+  stopAudio: vi.fn(),
   toggleProjection: vi.fn().mockResolvedValue(undefined),
   clearProjection: vi.fn(),
 })
@@ -329,4 +330,15 @@ it('restaura a projeção recolhida pelo controle existente sem navegar', async 
     expect(minimized.value).toBe(false)
     expect(push).not.toHaveBeenCalled()
   } finally { minimized.value = false; w.unmount() }
+})
+
+it('fechar a prévia encerra a projeção e oculta o miniplayer', async () => {
+  store.isProjecting = true
+  const w = mountChrome()
+  const closeButton = w.findComponent({ name: 'MiniPlayerCloseButton' })
+  expect(closeButton.exists()).toBe(true)
+  closeButton.vm.$emit('close')
+  await nextTick()
+  expect(store.clearProjection).toHaveBeenCalledOnce()
+  expect(w.find('.countdown-chrome').exists()).toBe(false)
 })

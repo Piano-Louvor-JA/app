@@ -12,6 +12,14 @@ export default {
       show: 'Show My Collections',
     },
     playlists: {
+      singlePlayHint: 'Single mode: play only this song',
+      shuffleHint: 'Shuffle play: play all songs in random order',
+      playAllHint: 'Play playlist: play all songs in sequence',
+
+      shuffle: 'Shuffle play',
+      playTrack: 'Play {title} in mini player',
+      reorder: 'Drag to reorder (or use the up and down arrow keys)',
+
       title: 'Playlists',
       newPlaceholder: 'New playlist name...',
       create: 'Create',
