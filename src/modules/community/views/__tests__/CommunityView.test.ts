@@ -795,3 +795,33 @@ describe("CommunityView — minimizar página", () => {
 		w.unmount();
 	});
 });
+
+describe("CommunityView — botão Criar coletânea (editor-comunidade)", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it("CA1: renderiza botão .community-view__create-btn com ti-pencil-plus e label community.createCollection", async () => {
+		const w = await mountView();
+		const btn = w.find(".community-view__create-btn");
+		expect(btn.exists()).toBe(true);
+		expect(btn.find("i.ti-pencil-plus").exists()).toBe(true);
+		expect(btn.attributes("aria-label")).toBe("community.createCollection");
+		expect(btn.attributes("title")).toBe("community.createCollection");
+		w.unmount();
+	});
+
+	it("CA1: clique no botão navega para /media/editor", async () => {
+		const w = await mountView();
+		await w.find(".community-view__create-btn").trigger("click");
+		expect(mocks.routerPush).toHaveBeenCalledWith("/media/editor");
+		w.unmount();
+	});
+
+	it("CA2: botão visível SEM sessão (não gateado por isLogged)", async () => {
+		mocks.getSession.mockReturnValue(null);
+		const w = await mountView();
+		expect(w.find(".community-view__create-btn").exists()).toBe(true);
+		w.unmount();
+	});
+});

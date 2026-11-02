@@ -165,7 +165,13 @@ export async function loadCollectionTracks(
       musicId:
         music.officialMusicId != null
           ? music.officialMusicId
-          : toCustomMusicId(music.id),
+          : // Local (id negativo) NÃO empacota: toCustomMusicId(-N) = 1M−N
+            // não é >= 1M nem < 0 → dispatcher cairia no loader OFICIAL e
+            // tocaria hino errado. Negativo puro o dispatcher resolve via
+            // isLocalId (app#331).
+            music.id < 0
+            ? music.id
+            : toCustomMusicId(music.id),
       name: music.name ?? `Hino oficial #${music.officialMusicId ?? music.id}`,
       track: index + 1,
       durationLabel: music.duration != null ? formatDurationLabel(music.duration) : '—',
