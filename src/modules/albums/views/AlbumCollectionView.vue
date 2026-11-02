@@ -9,6 +9,7 @@ import { useMinimizablePage } from '@shared/composables/useMinimizablePage'
 import { useProgressiveList } from '@shared/composables/useProgressiveList'
 
 import AlbumLyricDialog from '../components/AlbumLyricDialog.vue'
+import AlbumPlaylistPickerDialog from '../components/AlbumPlaylistPickerDialog.vue'
 import AlbumTrackRow from '../components/AlbumTrackRow.vue'
 import { useAlbums } from '../composables/useAlbums'
 import {
@@ -39,6 +40,7 @@ const {
   playInstrumental,
   playSlides,
   playAllInActiveCollection,
+  appendActiveCollectionToQueue,
   openLyric,
   closeLyric,
 } = useAlbums()
@@ -192,17 +194,31 @@ async function runAction(
         </h1>
       </div>
 
-      <button
+      <div
         v-if="activeCollection?.kind !== 'hymnal' && filteredTracks.length > 0"
-        type="button"
-        class="album-collection-view__play-all"
-        :aria-label="t('albums.playAll')"
-        :title="t('albums.playAll')"
-        @click="playAllInActiveCollection()"
+        class="album-collection-view__queue-actions"
       >
-        <i class="ti ti-player-play" aria-hidden="true" />
-        {{ t('albums.playAll') }}
-      </button>
+        <button
+          type="button"
+          class="album-collection-view__play-all"
+          :aria-label="t('albums.playAll')"
+          :title="t('albums.playAll')"
+          @click="playAllInActiveCollection()"
+        >
+          <i class="ti ti-player-play" aria-hidden="true" />
+          {{ t('albums.playAll') }}
+        </button>
+        <button
+          type="button"
+          class="album-collection-view__append-queue"
+          :aria-label="t('albums.appendQueue')"
+          :title="t('albums.appendQueue')"
+          @click="appendActiveCollectionToQueue().then((added) => added && showPlaylistFeedback(t('albums.appendedToQueue')))"
+        >
+          <i class="ti ti-playlist-add" aria-hidden="true" />
+          {{ t('albums.appendQueue') }}
+        </button>
+      </div>
     </header>
 
     <div
@@ -277,67 +293,12 @@ async function runAction(
       </Transition>
     </Teleport>
 
-    <Teleport to="body">
-      <Transition name="playlist-picker">
-        <div
-          v-if="playlistItem"
-          class="playlist-picker"
-          role="dialog"
-          aria-modal="true"
-          :aria-label="t('common.addToPlaylist')"
-          @click.self="closePlaylistPicker"
-          @keydown.esc="closePlaylistPicker"
-        >
-          <div class="playlist-picker__panel">
-            <header class="playlist-picker__header">
-              <div class="playlist-picker__track">
-                <span class="playlist-picker__track-icon">
-                  <i class="ti ti-music" aria-hidden="true" />
-                </span>
-                <div class="playlist-picker__track-info">
-                  <small>{{ t('common.addToPlaylist') }}</small>
-                  <strong>{{ playlistItem.title }}</strong>
-                </div>
-              </div>
-              <button
-                type="button"
-                class="playlist-picker__close"
-                :aria-label="t('common.close')"
-                @click="closePlaylistPicker"
-              >
-                <i class="ti ti-x" aria-hidden="true" />
-              </button>
-            </header>
-
-            <div class="playlist-picker__body">
-              <p v-if="playlists.length === 0" class="playlist-picker__empty">
-                <i class="ti ti-music-plus" aria-hidden="true" />
-                Você ainda não tem playlists.<br>
-                Crie uma na seção Playlists da Biblioteca.
-              </p>
-              <button
-                v-for="playlist in playlists"
-                :key="playlist.id"
-                type="button"
-                class="playlist-picker__option"
-                @click="addToPlaylist(playlist.id)"
-              >
-                <i class="ti ti-playlist" aria-hidden="true" />
-                <span class="playlist-picker__name">{{ playlist.name }}</span>
-                <small class="playlist-picker__count">{{ playlist.items.length }}</small>
-                <i class="ti ti-plus playlist-picker__add" aria-hidden="true" />
-              </button>
-            </div>
-
-            <footer class="playlist-picker__footer">
-              <button type="button" class="playlist-picker__cancel" @click="closePlaylistPicker">
-                Cancelar
-              </button>
-            </footer>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
+    <AlbumPlaylistPickerDialog
+      :item="playlistItem"
+      :playlists="playlists"
+      @close="closePlaylistPicker"
+      @select="addToPlaylist"
+    />
 
     <AlbumLyricDialog
       :open="lyricOpen"
@@ -368,19 +329,35 @@ async function runAction(
   gap: 1rem;
 }
 
-.album-collection-view__play-all {
+.album-collection-view__queue-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.album-collection-view__play-all,
+.album-collection-view__append-queue {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  margin-left: auto;
   border: 0;
   border-radius: 0.7rem;
   padding: 0.6rem 0.85rem;
-  background: var(--ds-color-primary);
-  color: var(--ds-color-on-primary);
   font: inherit;
   font-weight: 700;
   cursor: pointer;
+}
+
+.album-collection-view__play-all {
+  background: var(--ds-color-primary);
+  color: var(--ds-color-on-primary);
+}
+
+.album-collection-view__append-queue {
+  border: 1px solid var(--ds-color-outline-strong);
+  background: transparent;
+  color: var(--ds-color-primary);
 }
 
 .album-collection-view__brand {

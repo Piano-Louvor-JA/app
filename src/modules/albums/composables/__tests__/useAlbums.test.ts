@@ -54,7 +54,7 @@ const { storeMock, libraryMock, mediaMock, pushMock, loadTracksMock, desktopFlag
       clearError: vi.fn(),
     };
 
-    const mediaMock = { playAlbumQueue: vi.fn(), playQueue: vi.fn() };
+    const mediaMock = { playAlbumQueue: vi.fn(), appendQueue: vi.fn(), playQueue: vi.fn() };
 
     const pushMock = vi.fn(async () => {});
 
@@ -254,6 +254,43 @@ describe("useAlbums", () => {
       "instrumental",
     );
     expect(pushMock).toHaveBeenCalledWith({ name: "media" });
+  });
+
+  it("appendActiveCollectionToQueue encadeia faixa ordenada sem navegar", async () => {
+    const albumsStore = useAlbumsStore();
+    albumsStore.activeCollection = { id: "3", kind: "album", name: "Col" } as never;
+    albumsStore.tracks = [
+      { musicId: 31, name: "a" },
+      { musicId: 32, name: "b" },
+    ] as never;
+    const { api } = await setup();
+
+    await expect(api.appendActiveCollectionToQueue()).resolves.toBe(true);
+    expect(mediaMock.appendQueue).toHaveBeenCalledWith([
+      { musicId: 31, albumId: 3, title: "a" },
+      { musicId: 32, albumId: 3, title: "b" },
+    ]);
+    expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it("appendActiveCollectionToQueue recusa sem coleção, hinário, vazio ou id inválido", async () => {
+    const { api } = await setup();
+    storeMock.activeCollection = null;
+    await expect(api.appendActiveCollectionToQueue()).resolves.toBe(false);
+
+    storeMock.activeCollection = { id: "1", kind: "hymnal" };
+    storeMock.tracks = [{ musicId: 1, name: "x" }];
+    await expect(api.appendActiveCollectionToQueue()).resolves.toBe(false);
+
+    storeMock.activeCollection = { id: "1", kind: "album" };
+    storeMock.tracks = [];
+    await expect(api.appendActiveCollectionToQueue()).resolves.toBe(false);
+
+    storeMock.activeCollection = { id: "abc", kind: "album" };
+    storeMock.tracks = [{ musicId: 1, name: "x" }];
+    await expect(api.appendActiveCollectionToQueue()).resolves.toBe(false);
+
+    expect(mediaMock.appendQueue).not.toHaveBeenCalled();
   });
 
   it("playAllInActiveCollection recusa sem coleção, hinário, vazio ou id inválido", async () => {
