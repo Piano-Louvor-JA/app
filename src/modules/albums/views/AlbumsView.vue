@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useMediaStore } from '@modules/media/stores/useMediaStore'
@@ -90,6 +90,10 @@ const playlistFeedback = ref('')
 const albumPendingRemoval = ref<LibraryAlbum | null>(null)
 
 let playlistFeedbackTimer: ReturnType<typeof setTimeout> | null = null
+
+onBeforeUnmount(() => {
+  if (playlistFeedbackTimer) clearTimeout(playlistFeedbackTimer)
+})
 
 function closePlaylistPicker() {
   playlistItem.value = null
