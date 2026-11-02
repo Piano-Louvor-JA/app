@@ -409,6 +409,31 @@ describe("fila", () => {
 		// startIndex fora do range: first undefined -> retorna sem tocar; index mantém 0
 		expect(store.queueIndex).toBe(0);
 	});
+
+	it("appendQueue preserva sessão, índice e reprodução", async () => {
+		const { store } = await openTrack({});
+		await store.playQueue([
+			{ musicId: 1, albumId: 1, title: "a" },
+			{ musicId: 2, albumId: 1, title: "b" },
+			{ musicId: 3, albumId: 1, title: "c" },
+		], 1, undefined, "Culto");
+		const session = store.session;
+		loadMediaTrack.mockClear();
+		mediaAudio.playMediaAudio.mockClear();
+
+		store.appendQueue([
+			{ musicId: 3, albumId: 2, title: "repetida na junção" },
+			{ musicId: 4, albumId: 2, title: "d" },
+			{ musicId: 5, albumId: 2, title: "e" },
+		]);
+
+		expect(store.queue.map((entry) => entry.musicId)).toEqual([1, 2, 3, 4, 5]);
+		expect(store.queueIndex).toBe(1);
+		expect(store.session).toBe(session);
+		expect(store.queueLabel).toBeNull();
+		expect(loadMediaTrack).not.toHaveBeenCalled();
+		expect(mediaAudio.playMediaAudio).not.toHaveBeenCalled();
+	});
 });
 
 describe("nome da fila (título do player)", () => {

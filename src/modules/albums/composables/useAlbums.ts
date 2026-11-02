@@ -112,6 +112,22 @@ export function useAlbums() {
     return true
   }
 
+  /** Acrescenta a coletânea ativa à fila sem interromper a reprodução. */
+  async function appendActiveCollectionToQueue() {
+    const collection = activeCollection.value
+    if (!collection || collection.kind === 'hymnal' || tracks.value.length === 0) return false
+    const albumId = Number(collection.id)
+    if (!Number.isFinite(albumId)) return false
+    mediaStore.appendQueue(
+      tracks.value.map((track) => ({
+        musicId: track.musicId,
+        albumId,
+        title: track.name,
+      })),
+    )
+    return true
+  }
+
   /** Toca todas as coletâneas da categoria; Hinários são excluídos no caller. */
   async function playAllInCategory(category: AlbumCategory, mode: MediaPlaybackMode = 'audio') {
     const queue = [] as Array<{ musicId: number; albumId: number | null; title: string }>
@@ -196,6 +212,7 @@ export function useAlbums() {
     playSlides,
     playMode,
     playAllInActiveCollection,
+    appendActiveCollectionToQueue,
     playAllInCategory,
     openLyric: store.openLyric,
     closeLyric: store.closeLyric,

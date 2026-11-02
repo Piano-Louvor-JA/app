@@ -37,6 +37,8 @@ export default {
     },
     trackCount: '{count} tracks',
     playAll: 'Play all',
+    appendQueue: 'Add to queue',
+    appendedToQueue: 'Collection added to queue',
     loading: 'Loading…',
     retry: 'Try again',
     dismiss: 'Dismiss',

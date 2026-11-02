@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   appendToQueue,
+  appendQueueToQueue,
   resolvePrevious,
   type QueueItem,
   removeFromQueue,
@@ -44,6 +45,12 @@ describe('media-queue — fila de reprodução (spec playlist RF-03)', () => {
     const items = [item(1), item(2)]
     const next = appendToQueue(items, item(2), 0)
     expect(next.items).toHaveLength(2)
+  })
+
+  it('append do batch preserva índice e aplica guarda na junção', () => {
+    const next = appendQueueToQueue([item(1), item(2), item(3)], [item(3), item(4), item(5)], 1)
+    expect(next.items.map((entry) => entry.musicId)).toEqual([1, 2, 3, 4, 5])
+    expect(next.index).toBe(1)
   })
 
   it('removeFromQueue ajusta o índice: remover antes da atual puxa o índice', () => {

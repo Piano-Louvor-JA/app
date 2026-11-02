@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 
 import { loadProjectionSettings } from '@modules/settings/services/projection-preferences'
 import {
+  appendQueueToQueue,
   type QueueItem,
   resolveNext,
   resolvePrevious,
@@ -882,6 +883,14 @@ export const useMediaStore = defineStore('media', () => {
     await playQueue(items, 0, mode)
   }
 
+  /** Acrescenta à fila sem alterar a reprodução atual. */
+  function appendQueue(items: QueueItem[]): void {
+    const next = appendQueueToQueue(queue.value, items, queueIndex.value)
+    queue.value = next.items
+    queueIndex.value = next.index
+    if (items.length > 0) queueLabel.value = null
+  }
+
   function nextTrack(): void {
     const item = resolveNext({ items: queue.value, index: queueIndex.value })
     if (item) void playQueueItem(item)
@@ -1362,6 +1371,7 @@ export const useMediaStore = defineStore('media', () => {
     queueLabel,
     playQueue,
     playAlbumQueue,
+    appendQueue,
     playQueueItem,
     nextTrack,
     jumpToQueue,

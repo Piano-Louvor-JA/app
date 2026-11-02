@@ -15,6 +15,7 @@ const emit = defineEmits<{
   instrumental: []
   slides: []
   lyric: []
+  playlist: []
 }>()
 
 const { t } = useI18n()
@@ -82,6 +83,16 @@ function playSungFromRow() {
     </span>
 
     <div class="album-search-hit__actions">
+      <button
+        type="button"
+        class="album-search-hit__playlist"
+        :disabled="busy || isDownloading"
+        :title="t('common.addToPlaylist')"
+        :aria-label="t('common.addToPlaylist')"
+        @click.stop="emit('playlist')"
+      >
+        <i class="ti ti-playlist-add" aria-hidden="true" />
+      </button>
       <MusicTrackActions
         :music-id="hit.musicId"
         :track-name="hit.name"
@@ -213,6 +224,20 @@ function playSungFromRow() {
   color: var(--ds-color-on-surface-variant);
   font-variant-numeric: tabular-nums;
   text-align: right;
+}
+
+.album-search-hit__playlist {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.35rem;
+  background: transparent;
+  color: var(--ds-color-primary);
+  cursor: pointer;
+}
+
+.album-search-hit__playlist:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
 }
 
 .album-search-hit__actions {
