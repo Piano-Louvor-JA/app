@@ -489,7 +489,7 @@
             window.louvorja.projection && window.louvorja.projection.getSourceMediaInfo
               ? await window.louvorja.projection.getSourceMediaInfo()
               : null
-          if (!media || !media.filePath) return
+          if (!media || (!media.filePath && !media.youtubeId)) return
           var st =
             window.louvorja.projection &&
             window.louvorja.projection.getPlaybackState
@@ -499,8 +499,53 @@
           for (var i = 0; i < tvSlots.length; i++) {
             var slot = tvSlots[i]
             if (slot.clients > 0 && tvChecked[slot.id] !== false) {
-              void tvSendVideo(slot.id, media.filePath, media.title, posMs)
+              void tvSendMedia(slot.id, media, posMs, st && st.paused)
             }
+          }
+        }
+
+        var youtubeReceiverReady = {}
+        function prepareYoutubeReceiver(slotId) {
+          if (youtubeReceiverReady[slotId]) return youtubeReceiverReady[slotId]
+          var requestId = 'youtube-' + slotId + '-' + Date.now() + '-' + Math.random().toString(36).slice(2)
+          var pending = new Promise(function (resolve, reject) {
+            var off = null
+            var timer = null
+            var settled = false
+            function finish(error) {
+              if (settled) return
+              settled = true
+              clearTimeout(timer)
+              if (typeof off === 'function') off()
+              if (error) reject(error); else resolve(true)
+            }
+            off = window.louvorja.palco.onEvent(function (event) {
+              if (event && event.type === 'receiver-ready' && event.requestId === requestId && event.youtube === true) finish()
+            })
+            timer = setTimeout(function () { finish(new Error('A conexão não confirmou a atualização do player.')) }, 10000)
+            window.louvorja.palco.send({ v: 2, type: 'obsControl', action: 'reload', requestId: requestId }, slotId)
+              .then(function (sent) { if (!sent) finish(new Error('Não foi possível atualizar a conexão.')) })
+              .catch(finish)
+          })
+          youtubeReceiverReady[slotId] = pending.catch(function (error) {
+            delete youtubeReceiverReady[slotId]
+            throw error
+          })
+          return youtubeReceiverReady[slotId]
+        }
+
+        async function tvSendMedia(slotId, media, positionMs, paused) {
+          if (!media.youtubeId) return tvSendVideo(slotId, media.filePath, media.title, positionMs)
+          try {
+            await prepareYoutubeReceiver(slotId)
+            if (tvChecked[slotId] === false) return
+            var latest = await window.louvorja.projection.getPlaybackState().catch(function () { return null })
+            await window.louvorja.palco.send({ v: 2, type: 'video', youtubeId: media.youtubeId,
+              title: media.title || '', positionMs: latest ? Math.round(latest.currentTime * 1000) : positionMs || 0,
+              paused: latest ? Boolean(latest.paused) : Boolean(paused) }, slotId)
+          } catch (e) {
+            tvHint.style.display = ''
+            tvHint.textContent = 'YouTube: ' + (e && e.message ? e.message : 'falha ao preparar a conexão.')
           }
         }
 
@@ -577,8 +622,9 @@
           if (!window.louvorja || !window.louvorja.palco) return
           if (event.target.checked) {
             var media = await window.louvorja.projection.getSourceMediaInfo()
-            if (media && media.filePath) {
-              await tvSendVideo(slotId, media.filePath, media.title)
+            if (media && (media.filePath || media.youtubeId)) {
+              var st = await window.louvorja.projection.getPlaybackState().catch(function () { return null })
+              await tvSendMedia(slotId, media, st ? Math.round(st.currentTime * 1000) : 0, st && st.paused)
             }
           } else {
             await window.louvorja.palco.send(

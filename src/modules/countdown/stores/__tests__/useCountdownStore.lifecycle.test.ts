@@ -90,3 +90,14 @@ describe('estado do cronômetro — ciclo de vida e áudio', () => {
     expect(store.isProjecting).toBe(false)
   })
 })
+
+it('reset stops the countdown, clears duration and publishes zero while keeping projection active', () => {
+  const store = useCountdownStore()
+  store.setDurationMs(1903000)
+  store.start()
+  store.runtime.projecting = true
+  store.reset()
+  expect(store.runtime).toMatchObject({ status: 'idle', durationMs: 0, accumulatedMs: 0, segmentStartedAt: null, pausedRemainingMs: null, finished: false })
+  expect(mocks.publishRuntime).toHaveBeenLastCalledWith(expect.objectContaining({ durationMs: 0, status: 'idle' }))
+  expect(mocks.stop).toHaveBeenCalled()
+})

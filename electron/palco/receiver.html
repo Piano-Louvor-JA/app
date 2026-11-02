@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" class="receiver-idle">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -7,6 +7,7 @@
 <meta http-equiv="Expires" content="0">
 <title>LouvorJA Palco</title>
 <style>
+  #idleVer{display:none!important}
   html,body{margin:0;height:100%;overflow:hidden;background:#000;
     font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#fff}
   #bg{position:fixed;top:0;left:0;width:100%;height:100%;object-fit:cover;
@@ -16,7 +17,7 @@
     filter:brightness(1);transition:opacity .8s}
   /* Frame de slide projetado: fidelidade total — sem escurecimento. */
   #bg.frame-slide{filter:none;object-fit:contain;background:#000}
-  #bg[src=""]{opacity:0}
+  #bg:not([src]),#bg[src=""],#bgPalco:not([src]),#bgPalco[src=""]{display:none}
   #bgPalco{position:fixed;top:0;left:0;width:100%;height:100%;object-fit:cover}
   /* Véu de leitura DESLIGADO em música (paridade projeção local, 14/10).
      Mantido no DOM p/ módulos que ainda usam. */
@@ -55,12 +56,22 @@
     border-radius:2.4vmin 0 2.4vmin 0;
     border:var(--box-border,.2vmin solid rgba(255,255,255,.85));
     box-shadow:0 10px 30px rgba(0,0,0,.4)}
+  /* Match the monitor lyric layout. max-content avoids absolute-position
+     shrink-to-fit using only the space to the right of left:50%. */
+  #text.music-lyrics{line-height:1;width:max-content;max-width:min(92vw,1600px);box-sizing:border-box}
+  #text.music-lyrics p,#text.music-lyrics div{margin:0;padding:0;line-height:inherit}
+  #text.music-lyrics.box-on{padding:1.6vmin 1.8vmin}
   #text.shadow-off{text-shadow:none}
   /* Capa da música (isCover): título destaque amarelo, sem caixinha/borda —
      paridade com media-projection__title--cover via cabo. */
   #text.cover-on{font-weight:900;letter-spacing:.03em;
     color:#f6c32a;background:none;padding:0;border:none;box-shadow:none;
+    backdrop-filter:none;-webkit-backdrop-filter:none;
     border-radius:0;line-height:1.1}
+  #text.cover-on:not(.title-box-on){width:max-content;max-width:min(88vw,1600px);box-sizing:border-box;padding:3.6vw 5vw 3.8vw;line-height:1.15;letter-spacing:.04em}
+  #text.cover-on:not(.title-box-on)::before,#text.cover-on:not(.title-box-on)::after{content:'';position:absolute;width:3.6vw;height:3.6vw;pointer-events:none}
+  #text.cover-on:not(.title-box-on)::before{top:.2vw;left:.2vw;border-top:.28vw solid currentColor;border-left:.28vw solid currentColor;border-top-left-radius:2vw}
+  #text.cover-on:not(.title-box-on)::after{bottom:.2vw;right:.2vw;border-bottom:.28vw solid currentColor;border-right:.28vw solid currentColor;border-bottom-right-radius:2vw}
   /* Caixa opcional na capa: usuário liga 'titleTextBox'. Depois de
      .cover-on para vencer o background:none quando ambos ativos. */
   #text.cover-on.title-box-on{background:rgba(24,24,24,var(--box-bg,.55));
@@ -84,9 +95,14 @@
   #footer .ver{font-weight:300;opacity:.65;margin-left:1.2vh;font-size:.85em;
     text-transform:none;letter-spacing:0}
   #idle{position:fixed;top:0;left:0;right:0;bottom:0;z-index:10;
-    text-align:center;transition:opacity .5s}
+    text-align:center;background:#000;transition:opacity .5s}
   #idleCenter{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
     text-align:center;width:60vw}
+  html.obs-black-idle:not(.obs-music) body{background:#000!important}
+  html.obs-black-idle:not(.obs-music) #bg:not(.frame-slide),html.obs-black-idle:not(.obs-music) #bgPalco{display:none!important}
+  html.obs-black-idle #idle{background:#000}
+  html.obs-black-idle #idleCenter,html.obs-black-idle #idleVer{display:none!important}
+  html.receiver-idle #idleCenter,html.receiver-idle #idleVer{display:none!important}
   #idle.hidden{opacity:0;pointer-events:none}
   #idleLogos img,#idleLogos svg{display:block;margin:0 auto}
   #idleLogo{height:14vh;max-width:50vw;margin:0 auto 4vh auto}#idleLogo svg{width:100%;height:100%;display:block}
@@ -115,12 +131,19 @@
   #npEq span:nth-child(3){animation-delay:.4s}
   @keyframes eq{0%,100%{height:1vh}50%{height:3vh}}
   #timer{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-    text-align:center;width:84vw;font-size:16vh;font-weight:700;
+    text-align:center;width:84vw;font-size:10vw;font-size:min(16vh,10vw);white-space:nowrap;font-weight:700;
     font-variant-numeric:tabular-nums;text-shadow:0 2px 12px rgba(0,0,0,.8)}
   #timer small{display:block;font-size:2.8vh;font-weight:300;opacity:.7;margin-top:2vh}
   /* Vídeo acima do idle (z=20) — idle nunca pode cobrir reprodução. */
   #video{position:fixed;top:0;left:0;width:100%;height:100%;object-fit:contain;
     background:#000;z-index:20}
+
+#obsWarmupView{position:fixed;inset:0;background:#000;z-index:100002;display:flex;align-items:center;justify-content:center}
+#obsWarmupView .warmup-logo{display:flex;flex-direction:column;align-items:center;gap:3vh}
+#obsWarmupView .warmup-logo img{display:block;width:min(28vw,28vh);height:auto;object-fit:contain;animation:obsWarmupPulse 2s ease-in-out infinite}
+#obsWarmupView .warmup-caption{margin:0;text-align:center;color:#fff;font:700 min(4vw,4vh)/1.4 Arial,sans-serif}
+#obsWarmupView svg{display:block;width:100%;height:auto}
+@keyframes obsWarmupPulse{0%,100%{opacity:.88;transform:scale(.985)}50%{opacity:1;transform:scale(1.015)}}
 </style>
 </head>
 <body>
@@ -2605,6 +2628,7 @@ function palcoOfficialOrigin(origin){
     case 'https://api.louvorja.com.br':return 'https://api.louvorja.com.br';
     case 'https://api-stg.louvorja.com.br':return 'https://api-stg.louvorja.com.br';
     case 'https://api.louvorja.workers.dev':return 'https://api.louvorja.workers.dev';
+    case 'https://pub-8c0e123c55a14cdfa0c52fa182688782.r2.dev':return 'https://pub-8c0e123c55a14cdfa0c52fa182688782.r2.dev';
     default:return '';
   }
 }
@@ -2653,8 +2677,10 @@ function sendEvent(m){try{if(ws&&ws.readyState===1)ws.send(JSON.stringify(m))}ca
 // ===== Auto-descoberta (F3.3): acha o sender (APK) na sub-rede =====
 // Prioridade: launchParams/query host > último host válido (localStorage)
 // > scan da sub-rede via GET :7080/status (resposta JSON identifica sender).
-let host=qs.get('host')||localStorage.getItem('palcoHost')||location.hostname||'';
-let port=qs.get('port')||localStorage.getItem('palcoPort')||'7081';
+const browserSourcePort=Number(location.port);
+const ownBrowserSource=/^https?:$/.test(location.protocol)&&!!palcoLanHost(location.hostname)&&browserSourcePort>=7080&&browserSourcePort<=65534;
+let host=qs.get('host')||(ownBrowserSource?location.hostname:localStorage.getItem('palcoHost'))||location.hostname||'';
+let port=qs.get('port')||(ownBrowserSource?String(browserSourcePort+1):localStorage.getItem('palcoPort'))||'7081';
 
 function probeHttp(ip,httpPort){
   const url=palcoLanUrl(ip,httpPort,'/status','http');
@@ -2684,6 +2710,7 @@ function probeSender(ip){
   });
 }
 function normalizePort(ip,j,wsPort){
+  if(j&&Number.isInteger(Number(j.wsPort)))wsPort=Number(j.wsPort);
   if(!palcoLanUrl(ip,wsPort,'/palco','ws'))return null;
   port=String(Number(wsPort));
   return palcoLanHost(ip);
@@ -2726,6 +2753,8 @@ function connect(){
     });
     return;
   }
+  // Browser sources have an authoritative address: never scan another output.
+  if(ownBrowserSource){doConnect();return;}
   // F3.3v: valida o host ANTES do WS — se o sender não responde em /status,
     // o IP é stale (DHCP) → esquece e escaneia JÁ, sem as 3 tentativas de WS
     // com backoff (que levavam ~15s antes de re-escanear).
@@ -2769,18 +2798,19 @@ function doConnect(){
   setStatus(L10N.connecting.replace('{h}',host).replace('{p}',port));
   try{ws=new WebSocket(socketUrl)}catch(e){retry();return}
   ws.onopen=()=>{tries=0;dlog('WS OPEN '+host);setStatus('● '+host);
+    try{const requestId=sessionStorage.getItem('palcoRefreshRequest');if(requestId){ws.send(JSON.stringify({v:2,type:'receiver-ready',requestId,youtube:true}));sessionStorage.removeItem('palcoRefreshRequest')}}catch(e){}
     if(window.__hideSplash)window.__hideSplash(); // F3.3j: splash sai no connect
     localStorage.setItem('palcoHost',host);
     localStorage.setItem('palcoPort',port)};
   ws.onmessage=ev=>{try{handle(JSON.parse(ev.data))}catch(e){}};
   ws.onclose=()=>{dlog('WS CLOSE');stopMediaOnServerLoss();showIdle();
     // host falhou 3x → esquece e re-escaneia (IP mudou)
-    if(tries>=3){localStorage.removeItem('palcoHost');host='';tries=0}
+    if(!ownBrowserSource&&tries>=3){localStorage.removeItem('palcoHost');host='';tries=0}
     retry()};
   ws.onerror=()=>{};
 }
 function retry(){
-  const wait=Math.min(1000*Math.pow(2,tries++),10000);
+  const wait=ownBrowserSource?1000:Math.min(1000*Math.pow(2,tries++),10000);
   setStatus(L10N.reconn.replace('{s}',Math.round(wait/1000)),true);
   setTimeout(connect,wait);
 }
@@ -2913,7 +2943,65 @@ function showCloudPair(code){
   if(c)c.appendChild(wrap);
 }
 function hideCloudPair(){var el=document.getElementById('cloudPair');if(el)el.remove()}
+// YouTube watch URLs are not playable by <video>. Each network receiver
+// loads the official embedded player and follows the operator commands.
+let youtubePlayer=null,youtubeId=null,youtubePending=null,youtubeReady=false;
+function stopYoutube(){
+  if(youtubeId)hideMuteBadge();
+  youtubeId=null;youtubePending=null;youtubeReady=false;
+  if(youtubePlayer){try{youtubePlayer.destroy()}catch(e){}youtubePlayer=null}
+  const view=document.getElementById('youtubeProjection');if(view)view.remove();
+}
+function applyYoutubeCommand(){
+  if(!youtubeReady||!youtubePlayer||!youtubePending)return;
+  const m=youtubePending;
+  if(typeof m.positionMs==='number'||m.action==='seek'){
+    youtubePlayer.seekTo(typeof m.positionMs==='number'?m.positionMs/1000:Number(m.position)||0,true);
+  }
+  if(m.action==='pause')youtubePlayer.pauseVideo();
+  else youtubePlayer.playVideo();
+  youtubePending={action:m.action==='pause'?'pause':'play'};
+}
+function mountYoutube(){
+  if(!youtubeId||youtubePlayer||!window.YT||!window.YT.Player)return;
+  const expected=youtubeId;
+  const view=document.createElement('div');view.id='youtubeProjection';
+  view.style.cssText='position:fixed;inset:0;z-index:100;background:#000';
+  const target=document.createElement('div');view.appendChild(target);document.body.appendChild(view);
+  youtubePlayer=new YT.Player(target,{width:'100%',height:'100%',videoId:expected,
+    playerVars:{autoplay:1,controls:0,playsinline:1,rel:0,origin:location.origin},
+    events:{onReady:function(event){
+      if(youtubeId!==expected)return;
+      youtubeReady=true;
+      // Silent autoplay is reliable on TV browsers; audio can be unlocked by
+      // the normal receiver interaction when the browser requires a gesture.
+      event.target.mute();applyYoutubeCommand();showMuteBadge();
+    },onStateChange:function(event){
+      if(event.data===0){stopYoutube();showIdle(L10N.idle);sendEvent({v:2,type:'ended',media:'video'})}
+    },onError:function(){
+      stopYoutube();showIdle('YouTube: não foi possível reproduzir este vídeo incorporado.');
+    }}});
+}
+function handleYoutube(m){
+  if(m.action==='stop'){stopYoutube();showIdle(L10N.idle);return}
+  if(m.youtubeId&&/^[\w-]{11}$/.test(m.youtubeId)&&m.youtubeId!==youtubeId){
+    stopYoutube();youtubeId=m.youtubeId;
+  }
+  if(!youtubeId)return;
+  hideIdle();hideNp();
+  ['video','audio'].forEach(id=>{const media=$(id);media.pause();media.removeAttribute('src');media.load();media.style.display='none'});
+  youtubePending=m.youtubeId?Object.assign({},m,{action:m.paused?'pause':'play'}):m;
+  if(window.YT&&YT.Player){mountYoutube();applyYoutubeCommand();return}
+  if(!document.getElementById('youtubeProjectionApi')){
+    const previous=window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady=function(){if(previous)previous();mountYoutube()};
+    const script=document.createElement('script');script.id='youtubeProjectionApi';script.src='https://www.youtube.com/iframe_api';
+    script.onerror=function(){stopYoutube();showIdle('YouTube: falha ao conectar ao player.')};document.head.appendChild(script);
+  }
+}
 function showIdle(msg){
+  document.documentElement.classList.remove('obs-music');
+  document.documentElement.classList.add('receiver-idle');
   $('idleMsg').textContent=msg;
   $('idle').classList.remove('hidden');
   // volta pro BG do palco (personalizado) — música "saiu de cena"
@@ -2924,6 +3012,7 @@ function showIdle(msg){
   hideNp();
   {const t=$('timer'); if(t.style.display!=='none'){clearInterval(t._iv||0);
     t.style.display='none';}}
+  $('text').style.display='';
   $('text').textContent='';$('footer').textContent='';
   // F3.3ac: remove estilos de projeção (caixa/sombra) — senão a caixa
   // vazia continuava desenhada no idle após "Limpar projeção".
@@ -2932,7 +3021,7 @@ function showIdle(msg){
   $('text').style.removeProperty('--box-border');
   $('text').style.removeProperty('--ts');
 }
-function hideIdle(){$('idle').classList.add('hidden')}
+function hideIdle(){document.documentElement.classList.remove('receiver-idle');$('idle').classList.add('hidden')}
 // F3.3e: fallback de cover — sem capa ou capa quebrada = logo da org.
 // Cover relativo (images/... ou covers/...) resolve contra / do sender.
 function coverUrl(cover){
@@ -2988,6 +3077,7 @@ function hideMuteBadge(){const b=$('muteBadge');if(b)b.remove()}
 function unmuteNow(){
   mutedUnlock=false;hideMuteBadge();
   a0.muted=false;
+  if(youtubePlayer&&youtubeReady){youtubePlayer.unMute();youtubePlayer.playVideo()}
   const vv=$('video'); if(vv){vv.muted=false; if(vv.paused&&vv.src)vv.play().catch(function(){})}
   a0.play().then(()=>sendEvent({v:1,type:'unlocked'})).catch(()=>{});
   sendEvent({v:1,type:'unlocked'});
@@ -3162,8 +3252,112 @@ document.addEventListener('pointerdown',function(){if(mutedUnlock||pendingPlay)u
 
 function isAudioUrl(u){return /\.(mp3|m4a|aac|wav|ogg|flac)(\?|$)/i.test(u||'')}
 
+// OBS share uses two isolated receiver viewports; only the parent opens WS.
+const obsShareState={enabled:false,frames:[],ready:[],messages:[new Map(),new Map()],active:[false,false]};
+function obsShareLayout(){
+  const state=obsShareState;
+  state.frames.forEach((frame,index)=>{
+    const both=state.active[0]&&state.active[1];
+    frame.style.display=state.active[index]?'block':'none';
+    frame.style.width=both?'50%':'100%';
+    frame.style.left=both&&index===1?'50%':'0';
+  });
+}
+function obsShareRemember(m,index){
+  const messages=obsShareState.messages[index];
+  if(m.type==='idle'||m.type==='stop-all'){['projection','timer','clock','video','audio','audio-sync','video-sync'].forEach(type=>messages.delete(type));}
+  messages.set(m.type,{...m,obsPane:false});
+  if(['projection','timer','clock','video','audio'].includes(m.type))obsShareState.active[index]=true;
+  if(m.type==='idle'||m.type==='stop-all')obsShareState.active[index]=false;
+}
+function obsShareSend(m,index){
+  if(obsShareState.ready[index])obsShareState.frames[index].contentWindow.handle({...m,obsPane:false});
+}
+function obsShareEnable(enabled){
+  const state=obsShareState;
+  if(state.enabled===enabled)return;
+  state.enabled=enabled;
+  if(!enabled){
+    const wrap=document.getElementById('obsShareView');if(wrap)wrap.remove();
+    state.frames=[];state.ready=[];state.messages[1].clear();state.active[1]=false;
+    for(const message of state.messages[0].values())handle(message);
+    return;
+  }
+  ['video','audio'].forEach(id=>{try{$(id).pause()}catch(e){}});
+  const wrap=document.createElement('div');wrap.id='obsShareView';
+  wrap.style.cssText='position:fixed;inset:0;background:#000;z-index:100000';
+  document.body.appendChild(wrap);
+  [0,1].forEach(index=>{
+    const frame=document.createElement('iframe');
+    const url=new URL(location.href);url.searchParams.set('obsPane','1');
+    frame.style.cssText='position:absolute;top:0;height:100%;border:0;background:#000';
+    frame.onload=()=>{
+      if(!state.enabled||state.frames[index]!==frame)return;
+      state.ready[index]=true;
+      for(const message of state.messages[index].values())obsShareSend(message,index);
+    };
+    state.frames[index]=frame;frame.src=url.href;wrap.appendChild(frame);
+  });
+  obsShareLayout();
+}
+
+let obsWarmupTimeout;
+function clearObsWarmup(){
+  clearTimeout(obsWarmupTimeout);
+  const view=document.getElementById('obsWarmupView');if(view)view.remove();
+}
+function showObsWarmup(message){
+  clearObsWarmup();
+  if(message.expiresAt && Number(message.expiresAt)<=Date.now())return;
+  const remaining=message.durationMs===3000?3000:Math.min(3000,Number(message.until)-Date.now());
+  if(!Number.isFinite(remaining)||remaining<=0)return;
+  const view=document.createElement('div');view.id='obsWarmupView';
+  const logo=document.createElement('div');logo.className='warmup-logo';
+  const image=document.createElement('img');image.src='logo-piano-louvorja.png';image.alt='Logo Piano Louvor JA';
+  const caption=document.createElement('p');caption.className='warmup-caption';
+  caption.appendChild(document.createTextNode('PALCO PIANO'));caption.appendChild(document.createElement('br'));
+  caption.appendChild(document.createTextNode('LOUVOR JA'));
+  logo.appendChild(image);logo.appendChild(caption);
+  view.appendChild(logo);document.body.appendChild(view);
+  sendEvent({v:2,type:'obs-warmup-started',requestId:message.requestId});
+  obsWarmupTimeout=setTimeout(()=>{clearObsWarmup();sendEvent({v:2,type:'obs-warmup-complete',requestId:message.requestId})},remaining);
+}
 function handle(m){
   if(m.v!==1&&m.v!==2)return;
+  if(m.type==='obsWarmup'){showObsWarmup(m);return;}
+  if(m.type==='obsControl'){
+    if(m.action==='reload'){try{sessionStorage.setItem('palcoRefreshRequest',String(m.requestId||''))}catch(e){}location.reload();return;}
+    if(m.action==='stop'){
+      clearObsWarmup();
+      stopYoutube();
+      obsShareState.enabled=false;
+      const shared=document.getElementById('obsShareView');if(shared)shared.remove();
+      obsShareState.frames=[];obsShareState.ready=[];
+      obsShareState.messages.forEach(messages=>messages.clear());obsShareState.active=[false,false];
+      ['video','audio'].forEach(id=>{const media=$(id);try{media.pause();media.removeAttribute('src');media.load()}catch(e){}media.style.display='none'});
+      showIdle('');
+      const previous=document.getElementById('obsStoppedView');if(previous)previous.remove();
+      const blank=document.createElement('div');blank.id='obsStoppedView';
+      blank.style.cssText='position:fixed;inset:0;background:#000;z-index:100001';document.body.appendChild(blank);
+    }
+    return;
+  }
+  if(['projection','timer','clock','video','audio'].includes(m.type)){
+    const stopped=document.getElementById('obsStoppedView');if(stopped)stopped.remove();
+  }
+  if(qs.get('obsPane')!=='1'){
+    if(m.type==='obsShare'){obsShareEnable(m.enabled===true);return;}
+    const index=m.obsPane===true?1:0;
+    if(m.type==='obsIdle'||m.type==='bgPalco'){
+      obsShareRemember(m,0);obsShareRemember(m,1);
+      if(obsShareState.enabled){obsShareSend(m,0);obsShareSend(m,1);return;}
+    }else{
+      obsShareRemember(m,index);
+      if(obsShareState.enabled){obsShareSend(m,index);obsShareLayout();return;}
+      if(index===1)return;
+    }
+  }
+  if(m.type==='timer'||m.type==='clock')document.documentElement.classList.remove('obs-music');
   // HARDENING culto: mídia externa (vídeo/pdf/ppt/áudio da liturgia) viva
   // tem prioridade absoluta no slot. Mensagens de texto/projection não podem
   // renderizar por cima (cross-bleed owner — caso real 28/08: random sobre
@@ -3174,7 +3368,7 @@ function handle(m){
     // Sem sinal novo, o lock expira (sender morto/stuck não trava o culto).
     const fresh=(Date.now()-(window.__mediaLastSeen||0))<25000;
     const _v=$('video'),_a=$('audio');
-    const mediaActive=(_v&&!_v.paused&&_v.style.display!=='none')||(_a&&!_a.paused)||window.__videoAudioActive;
+    const mediaActive=youtubeReady||(_v&&!_v.paused&&_v.style.display!=='none')||(_a&&!_a.paused)||window.__videoAudioActive;
     if(mediaActive&&fresh&&!window.__mediaLock){
       try{dlog('BLOCKED',m.type,'— mídia externa ativa')}catch(e){}
       return;
@@ -3188,15 +3382,18 @@ function handle(m){
     if(window.__videoAudioActive){window.__videoAudioActive=false}
     try{const _v2=$('video'),_a2=$('audio');_v2.pause();_v2.removeAttribute('src');_v2.load();_a2.pause()}catch(e){}
   }
+  // The operator sends duplicate transport actions on audio and video.
+  if(youtubeId&&m.type==='audio'&&!m.url)return;
+  if(youtubeId&&['projection','timer','clock','audio','idle','bgPalco','stop-all'].includes(m.type))stopYoutube();
   switch(m.type){
     case 'projection':
+      document.documentElement.classList.toggle('obs-music',m.scope==='media'||m.scope==='hymns');
       hideIdle();
       hideCloudPair();
       hideNp();
-      {const t=$('timer'); if(t.style.display!=='none'){clearInterval(t._iv||0);
-        t.style.display='none';$('text').style.display='';}}
+      {const t=$('timer');clearInterval(t._iv||0);t.style.display='none';$('text').style.display='';}
       const bgEl=$('bg');
-      bgEl.onerror=()=>{bgEl.onerror=null;bgEl.src='bg-fallback.png'};
+      bgEl.onerror=()=>{bgEl.onerror=()=>{bgEl.onerror=null;bgEl.removeAttribute('src')};bgEl.src='bg-fallback.png'};
       // Frame de slide (data:image/ do pump PDF/PPT/imagens): imagem é o
       // CONTEÚDO, não bg decorativo — sem brightness(.55) nem véu (paridade
       // com a tela do operador). 13/10 Rafael: tonalidade lavada no palco.
@@ -3215,7 +3412,10 @@ function handle(m){
       // Slide/PDF/PPT (text vazio) é mídia visual pura: sem véu de leitura,
       // preserva a tonalidade original do canvas do operador.
       $('veil').style.display=m.text?'':'none';
-      renderProjectionText($('text'),m.text);
+      const compactLyrics=(m.scope==='hymns'||m.scope==='media')&&m.isCover!==true;
+      const displayText=compactLyrics?String(m.text||'').replace(/(?:<br\s*\/?>|\r?\n)(?:[\t ]*(?:<br\s*\/?>|\r?\n))*/gi,'<br>'):m.text;
+      renderProjectionText($('text'),displayText);
+      $('text').classList.toggle('music-lyrics',(m.scope==='hymns'||m.scope==='media')&&m.isCover!==true);
       $('text').classList.toggle('cover-on',m.isCover===true);
       $('text').classList.toggle('title-box-on',m.titleTextBox===true);
       // F3.3o: fontSize/fontWeight dinâmicos (settings do operador).
@@ -3231,7 +3431,7 @@ function handle(m){
         if(typeof fs==='number')t.style.setProperty('--fit-size',(fs*16/9/19.2)+'vw');
         if(typeof fw==='number')t.style.fontWeight=fw;
         if(m.isCover===true){
-          t.style.removeProperty('color');
+          if(m.titleTextColor){const titleColor=projectionColor(m.titleTextColor);if(titleColor)t.style.color=titleColor}else t.style.removeProperty('color');
           t.querySelectorAll('span[style*="color"]').forEach(function(sp){sp.style.removeProperty('color')});
         } else {
           const rawColor=useLyric&&typeof m.lyricTextColor==='string'&&m.lyricTextColor?m.lyricTextColor:m.textColor;
@@ -3300,7 +3500,7 @@ function handle(m){
         if(!m.footerRef){
           t.style.fontSize='';
           if(typeof fs==='number')t.style.setProperty('--fit-size',(fs*16/9/19.2)+'vw');
-          if(m.isCover===true){t.style.removeProperty('color');t.querySelectorAll('span[style*="color"]').forEach(function(sp){sp.style.removeProperty('color')})}
+          if(m.isCover===true){if(m.titleTextColor){const titleColor=projectionColor(m.titleTextColor);if(titleColor)t.style.color=titleColor}else t.style.removeProperty('color');t.querySelectorAll('span[style*="color"]').forEach(function(sp){sp.style.removeProperty('color')})}
         }
       }
       // Paridade total: personalizações do app aplicadas na TV.
@@ -3342,7 +3542,7 @@ function handle(m){
         else{t.classList.add('shadow-on');
           if(typeof m.shadowBlur==='number')
             t.style.setProperty('--ts',`0 ${Math.max(1,m.shadowBlur/3)}vh ${m.shadowBlur}vh rgba(0,0,0,${m.shadowIntensity!=null?m.shadowIntensity:0.8})`)}
-        if(m.textBox){t.classList.add('box-on');
+        if(m.isCover===true?m.titleTextBox===true:m.textBox){t.classList.add('box-on');
           t.classList.toggle('bible-box',m.bibleBox===true);
           if(typeof m.boxOpacity==='number')t.style.setProperty('--box-bg',m.boxOpacity);
           t.style.setProperty('--box-border',
@@ -3381,6 +3581,7 @@ function handle(m){
     case 'bgPalco':
       // BG permanente do palco (idle) — personalização, não da música
       bgPalco=m.url||'';
+      $('bgPalco').onerror=()=>{$('bgPalco').removeAttribute('src')};
       if(bgPalco){
         $('bgPalco').src=palcoMediaUrl(bgPalco);
       }else{
@@ -3450,6 +3651,8 @@ function handle(m){
       }
       break}
     case 'video':{
+      if(m.youtubeId||(youtubeId&&!m.url)){handleYoutube(m);break}
+      if(youtubeId)stopYoutube();
       const v=$('video');
       // MP3/áudio puro no canal video (popup liturgia manda dual): redireciona
       // pro fluxo de áudio — now-playing + EQ + bg (tela preta NUNCA).
@@ -3514,6 +3717,26 @@ function handle(m){
       hideCloudPair();
       const t=$('timer');
       if(m.action==='stop'){t.style.display='none';clearInterval(t._iv||0);$('text').style.display='';break}
+      // Timer messages carry the same module background as monitor projections.
+      const timerBg=$('bg');
+      timerBg.classList.remove('frame-slide');
+      timerBg.onerror=()=>{timerBg.removeAttribute('src')};
+      timerBg.style.opacity='';
+      if(m.background){timerBg.src=palcoMediaUrl(m.background);document.body.style.background=''}
+      else{timerBg.removeAttribute('src');document.body.style.background=m.backgroundColor||'#000'}
+      $('bgPalco').removeAttribute('src');
+      $('veil').style.display='';
+      if(m.mode==='chrono'&&m.chronoRuntime){
+        const runtime=m.chronoRuntime;
+        clearInterval(t._iv||0);t.style.display='';$('text').style.display='none';
+        const renderChrono=()=>{
+          const elapsed=Math.max(0,Number(runtime.accumulatedMs)||0)+(runtime.status==='running'&&runtime.segmentStartedAt!=null?Math.max(0,Date.now()-runtime.segmentStartedAt):0);
+          const tokens={hh:String(Math.floor(elapsed/3600000)).padStart(2,'0'),mm:String(Math.floor(elapsed/60000)%60).padStart(2,'0'),ss:String(Math.floor(elapsed/1000)%60).padStart(2,'0'),ms:String(Math.floor(elapsed%1000/10)).padStart(2,'0')};
+          t.textContent=(m.timeFormat||'hh:mm:ss.ms').replace(/hh|mm|ss|ms/g,token=>tokens[token]);
+        };
+        renderChrono();if(runtime.status==='running')t._iv=setInterval(renderChrono,16);
+        break;
+      }
       // WT-5 cloud: text pronto (clock do web, timer/countdown) tem prioridade —
       // o operador já formata; sem tick local (evita dessincronia e zero inicial).
       if(typeof m.text==='string'&&m.text.trim()){
@@ -3531,7 +3754,7 @@ function handle(m){
       const fmt=ms=>{const s=Math.max(0,Math.round(ms/1000));
         const hh=Math.floor(s/3600),mm=String(Math.floor(s/60)%60).padStart(2,'0'),
               ss=String(s%60).padStart(2,'0');
-        return hh>0?`${hh}:${mm}:${ss}`:`${mm}:${ss}`};
+        return `${String(hh).padStart(2,'0')}:${mm}:${ss}`};
       const render=()=>{
         const val=mode==='chrono'?elapsed:rem;
         t.textContent=fmt(val);
@@ -3541,6 +3764,7 @@ function handle(m){
       t._iv=setInterval(()=>{rem-=1000;elapsed+=1000;render();
         if(mode!=='chrono'&&rem<=0){clearInterval(t._iv)}},1000);
       break}
+    case 'obsIdle':document.documentElement.classList.toggle('obs-black-idle',m.black===true);break;
     case 'idle':showIdle(m.msg||L10N.idle);break;
     // F3.3x: sender informa IP DA TV (visto pelo socket) + SLOT onde ela
     // caiu — identificação visível pro operador conferir com o app.
@@ -3565,6 +3789,7 @@ function handle(m){
 // WT-5d: boot — código cloud na query (?code=XXXXXX) ou salvo em localStorage
 // tem prioridade; sem código, segue o fluxo local (scan do sender na LAN).
 (function(){
+  if(qs.get('obsPane')==='1')return;
   var bootCode=(qs.get('code')||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
   if(!bootCode){try{bootCode=localStorage.getItem('palcoCloudCode')||''}catch(e){}}
   if(bootCode&&bootCode.length===6){cloudConnect(bootCode);return}

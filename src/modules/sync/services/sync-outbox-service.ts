@@ -6,6 +6,7 @@ import {
   markLocalPrefsPushed,
   markLocalScheduledPushed,
   SYNCABLE_PREF_KEYS,
+  syncablePreferenceValue,
 } from './operator-state-apply'
 
 /**
@@ -210,7 +211,7 @@ export function startOutboxTriggers(): () => void {
   registerPrefsChangedHook((key) => {
     if (!SYNCABLE_PREF_KEYS.has(key)) return
     enqueueOperatorState('prefs', 'values', {
-      [key]: getUserPreference(key),
+      [key]: syncablePreferenceValue(key, getUserPreference(key)),
     })
     scheduleOutboxFlush()
   })

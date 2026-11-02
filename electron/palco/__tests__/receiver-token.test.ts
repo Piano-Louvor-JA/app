@@ -123,6 +123,6 @@ describe('receiver — token no WebSocket (regressão 082ece48)', () => {
     state.port = '7081'
     capturedUrls.length = 0
     state.doConnect()
-    expect(capturedUrls[0]).toBe('ws://192.168.1.192:7081/palco')
+    expect(capturedUrls[0]).toBe('ws://192.168.1.192:7581/palco')
   })
 })

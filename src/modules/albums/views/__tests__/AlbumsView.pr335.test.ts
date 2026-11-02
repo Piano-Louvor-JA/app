@@ -325,6 +325,9 @@ describe('AlbumsView', () => {
     // remover
     ;(row.querySelector('.albums-view__playlist-remove') as HTMLElement).click()
     await flushPromises()
+    expect(listPlaylists().some((p) => p.id === 'pl-1')).toBe(true)
+    ;(body().querySelector('.app-confirm__btn--danger') as HTMLElement).click()
+    await flushPromises()
     expect(listPlaylists().some((p) => p.id === 'pl-1')).toBe(false)
   })
 

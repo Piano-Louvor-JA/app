@@ -1,3 +1,5 @@
+import { onReceiverEvent } from '../palco/receiver-events.mjs'
+import { youtubeSourceId } from '../youtube-source.mjs'
 import { BrowserWindow, screen, session, WebContentsView } from 'electron'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -159,9 +161,20 @@ const HIDE_YOUTUBE_SIDEBAR_SCRIPT = `
     .html5-video-container,
     .html5-video-container video,
     video.html5-main-video {
+      position: absolute !important;
+      inset: 0 !important;
+      left: 0 !important;
+      top: 0 !important;
       width: 100% !important;
       height: 100% !important;
-      object-fit: contain !important;
+      max-width: none !important;
+      max-height: none !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      border: 0 !important;
+      transform: none !important;
+      object-fit: cover !important;
+      object-position: center center !important;
     }
 
     /* Chrome nativa do player — não aparece nas projeções (captura do webContents) */
@@ -203,13 +216,15 @@ const HIDE_YOUTUBE_SIDEBAR_SCRIPT = `
     style.id = 'louvorja-hide-yt-sidebar';
     (document.head || document.documentElement).appendChild(style);
   }
-  style.textContent = css;
+  if (style.textContent !== css) style.textContent = css;
 
   const apply = () => {
     const hideIds = ['#secondary', '#related', '#masthead-container', '#below', '#comments'];
     hideIds.forEach((sel) => {
       const el = document.querySelector(sel);
-      if (el) el.style.setProperty('display', 'none', 'important');
+      if (el && (el.style.getPropertyValue('display') !== 'none' || el.style.getPropertyPriority('display') !== 'important')) {
+        el.style.setProperty('display', 'none', 'important');
+      }
     });
 
     // Ativa modo cinema (theater) — player largo, sem layout de coluna
@@ -229,7 +244,17 @@ const HIDE_YOUTUBE_SIDEBAR_SCRIPT = `
   apply();
 
   if (!window.__louvorjaYtSidebarObserver) {
-    window.__louvorjaYtSidebarObserver = new MutationObserver(apply);
+    // A YouTube page changes continually (progress, captions, ads). Batch
+    // those mutations instead of rescanning and changing layout each time.
+    let pendingApply = null;
+    const scheduleApply = () => {
+      if (pendingApply !== null) return;
+      pendingApply = setTimeout(() => {
+        pendingApply = null;
+        apply();
+      }, 250);
+    };
+    window.__louvorjaYtSidebarObserver = new MutationObserver(scheduleApply);
     window.__louvorjaYtSidebarObserver.observe(document.documentElement, {
       childList: true,
       subtree: true,
@@ -245,6 +270,7 @@ const HIDE_YOUTUBE_SIDEBAR_SCRIPT = `
 let sourceWindow = null
 /** @type {WebContentsView | null} */
 let controlBarView = null
+let unsubscribeControlReceiverEvents = null
 /** @type {'video' | 'site' | 'image' | 'pdf' | 'presentation'} */
 let currentProjectionMode = 'video'
 /** @type {BrowserWindow[]} */
@@ -595,6 +621,8 @@ function hideYoutubeSidebar(win) {
 }
 
 function detachControlBar() {
+  unsubscribeControlReceiverEvents?.()
+  unsubscribeControlReceiverEvents = null
   if (!controlBarView) return
   const view = controlBarView
   controlBarView = null
@@ -653,6 +681,9 @@ function attachControlBar(win) {
     ).href,
   )
   controlBarView = view
+  unsubscribeControlReceiverEvents = onReceiverEvent(message => {
+    if (!view.webContents.isDestroyed()) view.webContents.send('palco:event', message)
+  })
 }
 
 /**
@@ -687,6 +718,9 @@ function attachSiteControlBar(win) {
   })
   void view.webContents.loadURL(pathToFileURL(SITE_CONTROL_BAR_HTML).href)
   controlBarView = view
+  unsubscribeControlReceiverEvents = onReceiverEvent(message => {
+    if (!view.webContents.isDestroyed()) view.webContents.send('palco:event', message)
+  })
 }
 
 function layoutControlBar(win) {
@@ -711,6 +745,8 @@ function createSourceWindow(loadUrl, title) {
   /** @type {import('electron').BrowserWindowConstructorOptions} */
   const options = {
     ...bounds,
+    // Keep the captured web contents exactly 16:9, excluding OS decorations.
+    useContentSize: true,
     backgroundColor: '#000000',
     autoHideMenuBar: true,
     show: false,
@@ -739,8 +775,6 @@ function createSourceWindow(loadUrl, title) {
     event.preventDefault()
     win.setTitle(title || SOURCE_WINDOW_TITLE)
   })
-  win.setMinimumSize(CONTROL_WIDTH, CONTROL_HEIGHT)
-  win.setMaximumSize(CONTROL_WIDTH, CONTROL_HEIGHT)
   win.setResizable(false)
   win.setMaximizable(false)
   win.webContents.setAudioMuted(false)
@@ -748,12 +782,8 @@ function createSourceWindow(loadUrl, title) {
 
   win.once('ready-to-show', () => {
     win.webContents.setAudioMuted(false)
-    win.setBounds({
-      x: bounds.x,
-      y: bounds.y,
-      width: CONTROL_WIDTH,
-      height: CONTROL_HEIGHT,
-    })
+    win.setPosition(bounds.x, bounds.y)
+    win.setContentSize(CONTROL_WIDTH, CONTROL_HEIGHT)
     attachControlBar(win)
     layoutControlBar(win)
     win.show()
@@ -767,12 +797,8 @@ function createSourceWindow(loadUrl, title) {
   win.on('maximize', () => {
     if (!win.isDestroyed()) {
       win.unmaximize()
-      win.setBounds({
-        x: bounds.x,
-        y: bounds.y,
-        width: CONTROL_WIDTH,
-        height: CONTROL_HEIGHT,
-      })
+      win.setPosition(bounds.x, bounds.y)
+      win.setContentSize(CONTROL_WIDTH, CONTROL_HEIGHT)
       layoutControlBar(win)
     }
   })
@@ -1175,8 +1201,15 @@ function createMirrorWindow(display) {
 
   win.once('ready-to-show', () => {
     // Fullscreen real só nas telas estendidas
-    win.setBounds(display.bounds)
-    win.setFullScreen(true)
+    // Match the monitor bounds in DIP, without a second native-fullscreen
+    // transition on Windows/Linux (same policy as the hymn projection).
+    if (process.platform === 'win32' || process.platform === 'linux') {
+      win.setFullScreen(false)
+      win.setBounds(display.bounds)
+    } else {
+      win.setBounds(display.bounds)
+      win.setFullScreen(true)
+    }
     // Tela do operador não apaga durante o culto (ref-count global)
     projectionPowerSaveAcquire()
     win.once('closed', () => projectionPowerSaveRelease())
@@ -1653,10 +1686,12 @@ function openSiteScreensOnTargets(loadUrl, targets) {
 
 let currentSourceFilePath = ''
 let currentSourceTitle = ''
+let currentSourceYoutubeId = null
 
 export async function openWebProjectionWindows(payload) {
   const input = payload ?? {}
   let effective = input
+  currentSourceYoutubeId = youtubeSourceId(input)
 
   currentSourceFilePath =
     typeof effective.filePath === 'string' ? effective.filePath.trim() : ''
@@ -2143,7 +2178,7 @@ export async function remoteSetVolumeSource(volume) {
 
 /** FilePath/título da mídia corrente (para o popup espelhar no Palco). */
 export function getSourceMediaInfo() {
-  return { filePath: currentSourceFilePath, title: currentSourceTitle }
+  return { filePath: currentSourceFilePath, title: currentSourceTitle, youtubeId: currentSourceYoutubeId }
 }
 
 /** Estado de playback do vídeo no popup (para a barra do operador). */

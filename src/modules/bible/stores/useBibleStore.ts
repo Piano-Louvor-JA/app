@@ -1,3 +1,4 @@
+import { detectObsBeforeProjection } from '@modules/settings/services/obs-detection'
 import { getPalcoRoute } from '../../settings/services/palco-routing'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
@@ -241,6 +242,7 @@ export const useBibleStore = defineStore('bible', () => {
   }
 
   async function openProjection(opts?: { targets?: 'all' | 'tvs-only' }) {
+    await detectObsBeforeProjection()
     syncProjection()
     if (projection.value.verses.length === 0 || !projection.value.text) {
       return false

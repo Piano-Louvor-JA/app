@@ -121,12 +121,11 @@ if (typeof process.getuid === "function" && process.getuid() === 0) {
 	app.commandLine.appendSwitch("no-sandbox");
 }
 
-/** GPU instável nesta máquina (crash do gpu process em loop, 02/10/2026) —
- *  renderização por software é suficiente pro app e estabiliza o dev. */
-if (process.env.VITE_DEV_SERVER_URL) {
-	app.commandLine.appendSwitch("disable-gpu");
-	// in-process-gpu removido (07/10): SIGTRAP do electron em dev ~35s pós-boot
-	// (crash no processo GPU in-process; com gpu em software separado estabiliza).
+/** Software rendering is an explicit compatibility fallback. Disabling the
+ * GPU on every dev launch makes video decoding + projection capture compete
+ * on the CPU and causes stalls as soon as a mirror is opened. */
+if (process.env.LOUVORJA_DISABLE_GPU === "1") {
+  app.commandLine.appendSwitch("disable-gpu");
 }
 
 /** Permite autoplay com áudio nas janelas de projeção (YouTube). */

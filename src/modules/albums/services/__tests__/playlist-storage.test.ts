@@ -94,3 +94,13 @@ describe('playlist-storage', () => {
   })
 
 })
+
+it('retains the renamed playlist and its tracks after reloading the module', async () => {
+  localStorage.clear()
+  const playlist = createPlaylist('Culto')
+  addPlaylistItem(playlist.id, { musicId: 1, albumId: null, title: 'Uma' })
+  renamePlaylist(playlist.id, 'Culto Jovem')
+  vi.resetModules()
+  const reloaded = await import('../playlist-storage')
+  expect(reloaded.listPlaylists()[0]).toMatchObject({ id: playlist.id, name: 'Culto Jovem', items: [{ musicId: 1 }] })
+})

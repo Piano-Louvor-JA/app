@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, nextTick, onBeforeUnmount } from 'vue'
 import { storeToRefs } from 'pinia'
 import { usePlaylistPanelStore } from '../stores/usePlaylistPanelStore'
 import { useI18n } from 'vue-i18n'
@@ -8,7 +8,6 @@ import { useMediaStore } from '@modules/media/stores/useMediaStore'
 
 import { GlassCard } from '@design-system/index'
 import { useMinimizablePage } from '@shared/composables/useMinimizablePage'
-import PalcoRouteSelect from '@modules/settings/components/PalcoRouteSelect.vue'
 import type { LibraryAlbum } from '@modules/sync/types/library'
 import { getShowCustomCollections, setShowCustomCollections } from '../visibility'
 import AlbumCollectionCard from '../components/AlbumCollectionCard.vue'
@@ -17,15 +16,21 @@ import {
   listCustomCollections,
   type CustomCollectionSummary,
 } from '@modules/media/services/custom-catalog'
+import AppConfirm from '@shared/components/AppConfirm.vue'
 import AlbumHymnalCard from '../components/AlbumHymnalCard.vue'
 import AlbumLyricDialog from '../components/AlbumLyricDialog.vue'
+import PlaylistPicker from '../components/PlaylistPicker.vue'
 import AlbumSearchHitRow from '../components/AlbumSearchHitRow.vue'
 import DownloadFailureDialog from '@modules/sync/components/DownloadFailureDialog.vue'
+import { filterAlbumMusicIndex } from '../services/album-music-search'
 import { useAlbums } from '../composables/useAlbums'
-import type { AlbumCategory, AlbumCollection } from '../types/albums'
+import type { AlbumCategory, AlbumCollection, AlbumSearchHit } from '../types/albums'
 import {
   createPlaylist,
+  addPlaylistItem,
+  type PlaylistItem,
   deletePlaylist,
+  renamePlaylist,
   listPlaylists,
   removePlaylistItem,
   movePlaylistItem,
@@ -34,11 +39,35 @@ import {
 } from '../services/playlist-storage'
 import { parsePlaylistsImport, serializePlaylists } from '../services/playlist-io'
 
+const pendingPlaylistRemoval = ref<{ id: string; name: string } | null>(null)
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const mediaStore = useMediaStore()
 const playlists = ref<Playlist[]>(listPlaylists())
+const searchPlaylistItem = ref<PlaylistItem | null>(null)
+const searchPlaylistFeedback = ref('')
+let searchPlaylistFeedbackTimer: ReturnType<typeof setTimeout> | undefined
+onBeforeUnmount(() => clearTimeout(searchPlaylistFeedbackTimer))
+function searchArtwork(hit: AlbumSearchHit) {
+  return categories.value.flatMap(category => category.collections)
+    .find(collection => hit.albumNames.split(',').some(name => name.trim() === collection.name))?.coverUrl ?? null
+}
+function openSearchPlaylist(hit: AlbumSearchHit) {
+  playlists.value = listPlaylists()
+  searchPlaylistItem.value = { musicId: hit.musicId, albumId: null, title: hit.name }
+}
+function addSearchTrackToPlaylist(id: string) {
+  const item = searchPlaylistItem.value
+  if (!item) return
+  const result = addPlaylistItem(id, item)
+  if (!result) return
+  searchPlaylistFeedback.value = t(result.added ? 'albums.playlists.addedTo' : 'albums.playlists.alreadyIn', { title: item.title, name: result.playlist.name })
+  clearTimeout(searchPlaylistFeedbackTimer)
+  searchPlaylistFeedbackTimer = setTimeout(() => { searchPlaylistFeedback.value = '' }, 5000)
+  playlists.value = listPlaylists()
+  searchPlaylistItem.value = null
+}
 const newPlaylistName = ref('')
 const playlistHint = ref<{ playlistId: string; key: string } | null>(null)
 const playlistHintParts = computed(() => {
@@ -61,6 +90,7 @@ function toggleCustomCollectionsVisibility(): void {
 const {
   categories,
   hubSearchQuery,
+  musicIndex,
   hubSearchResults,
   isHubSearching,
   isLoadingCatalog,
@@ -91,6 +121,47 @@ const {
   openLyric,
   closeLyric,
 } = useAlbums()
+
+const addingPlaylist = ref<Playlist | null>(null)
+const playlistSearchQuery = ref('')
+const playlistSearchInput = ref<HTMLInputElement | null>(null)
+const playlistSearchResults = computed(() => playlistSearchQuery.value.trim()
+  ? filterAlbumMusicIndex(musicIndex?.value ?? [], playlistSearchQuery.value) : [])
+const addedPlaylistMusicIds = computed(() => new Set(
+  playlists.value.find(playlist => playlist.id === addingPlaylist.value?.id)?.items.map(item => item.musicId) ?? [],
+))
+async function openPlaylistSearch(playlist: Playlist) {
+  addingPlaylist.value = playlist
+  playlistSearchQuery.value = ''
+  searchPlaylistFeedback.value = ''
+  await nextTick()
+  playlistSearchInput.value?.focus()
+}
+function addPlaylistSearchHit(hit: AlbumSearchHit) {
+  if (!addingPlaylist.value) return
+  searchPlaylistItem.value = { musicId: hit.musicId, albumId: null, title: hit.name }
+  addSearchTrackToPlaylist(addingPlaylist.value.id)
+}
+
+const selectedSearchIndex = ref(0)
+watch(hubSearchResults, () => { selectedSearchIndex.value = 0 })
+async function onSearchKeydown(event: KeyboardEvent) {
+  if (event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return
+  if (!['ArrowDown', 'ArrowUp', 'Enter'].includes(event.key) || !hubSearchResults.value.length) return
+  // Buttons retain their own keyboard actions.
+  if ((event.target as HTMLElement)?.closest('button')) return
+  event.preventDefault()
+  event.stopPropagation()
+  if (event.key === 'Enter') {
+    const hit = hubSearchResults.value[selectedSearchIndex.value]
+    if (hit) await runAction(hit.musicId, () => playSung(hit.musicId))
+    return
+  }
+  selectedSearchIndex.value = Math.max(0, Math.min(hubSearchResults.value.length - 1,
+    selectedSearchIndex.value + (event.key === 'ArrowDown' ? 1 : -1)))
+  await nextTick()
+  document.getElementById(`album-search-result-${hubSearchResults.value[selectedSearchIndex.value]?.musicId}`)?.scrollIntoView?.({ block: 'nearest' })
+}
 
 const busyMusicId = ref<number | null>(null)
 const albumPendingRemoval = ref<LibraryAlbum | null>(null)
@@ -352,9 +423,35 @@ function addPlaylist() {
   newPlaylistName.value = ''
 }
 
-function removePlaylist(id: string) {
-  deletePlaylist(id)
+const editingPlaylistId = ref<string | null>(null)
+const playlistNameDraft = ref('')
+async function beginRenamePlaylist(playlist: Playlist) {
+  editingPlaylistId.value = playlist.id
+  playlistNameDraft.value = playlist.name
+  await nextTick()
+  const input = document.querySelector<HTMLInputElement>('[data-test="playlist-rename-input"]')
+  input?.focus()
+  input?.select()
+}
+function savePlaylistName() {
+  const name = playlistNameDraft.value.trim()
+  if (!editingPlaylistId.value || !name) return
+  renamePlaylist(editingPlaylistId.value, name)
   playlists.value = listPlaylists()
+  editingPlaylistId.value = null
+}
+
+function removePlaylist(id: string) {
+  const playlist = playlists.value.find(item => item.id === id)
+  if (playlist) pendingPlaylistRemoval.value = { id, name: playlist.name }
+}
+function confirmPlaylistRemoval() {
+  const playlist = pendingPlaylistRemoval.value
+  if (!playlist) return
+  deletePlaylist(playlist.id)
+  playlists.value = listPlaylists()
+  if (expandedPlaylistId.value === playlist.id) expandedPlaylistId.value = null
+  pendingPlaylistRemoval.value = null
 }
 
 function removePlaylistTrack(id: string, index: number) {
@@ -426,7 +523,6 @@ async function runAction(
       </div>
 
       <div class="albums-view__header-actions">
-        <PalcoRouteSelect module="hymns" compact />
         <button
           type="button"
           class="albums-view__toolbar-btn"
@@ -500,6 +596,8 @@ async function runAction(
           />
           <input
             v-model="hubSearchQuery"
+            @keydown="onSearchKeydown"
+            :aria-activedescendant="hubSearchResults.length ? `album-search-result-${hubSearchResults[selectedSearchIndex]?.musicId}` : undefined"
             type="search"
             :placeholder="t('albums.hubSearchPlaceholder')"
             :aria-label="t('albums.hubSearchPlaceholder')"
@@ -656,6 +754,20 @@ async function runAction(
                     aria-hidden="true"
                   />
                 </button>
+                  <button
+                    type="button"
+                    class="albums-view__playlist-rename"
+                    :aria-label="t('albums.playlists.rename', { name: playlist.name })"
+                    :title="t('albums.playlists.rename', { name: playlist.name })"
+                    @click="beginRenamePlaylist(playlist)"
+                  ><i class="ti ti-pencil" aria-hidden="true" /></button>
+                <button type="button" class="albums-view__playlist-rename albums-view__playlist-add"
+                  :title="t('albums.playlists.addMusic')" :aria-label="t('albums.playlists.addMusic')"
+                  @mouseenter="playlistHint = { playlistId: playlist.id, key: 'albums.playlists.addMusicHint' }"
+                  @mouseleave="playlistHint = null" @focus="playlistHint = { playlistId: playlist.id, key: 'albums.playlists.addMusicHint' }"
+                  @blur="playlistHint = null" @click="openPlaylistSearch(playlist)">
+                  <i class="ti ti-plus" aria-hidden="true" />
+                </button>
                 <span class="albums-view__playlist-hint" role="status" aria-live="polite">
                   <span v-if="playlistHint?.playlistId === playlist.id">
                     <strong class="albums-view__playlist-hint-label">{{ playlistHintParts.label }}</strong>{{ ' ' }}{{ playlistHintParts.description }}
@@ -683,8 +795,8 @@ async function runAction(
                   >
                     <i class="ti ti-player-play" aria-hidden="true" />
                   </button>
-                  <button
-                    type="button"
+
+                  <button type="button"
                     class="albums-view__playlist-remove"
                     :aria-label="`Remover playlist ${playlist.name}`"
                     @click="removePlaylist(playlist.id)"
@@ -693,6 +805,11 @@ async function runAction(
                   </button>
                 </div>
               </div>
+              <form v-if="editingPlaylistId === playlist.id" class="albums-view__modal-form albums-view__rename-form" @submit.prevent="savePlaylistName" @keydown.esc.stop="editingPlaylistId = null">
+                <input v-model="playlistNameDraft" data-test="playlist-rename-input" maxlength="120" :aria-label="t('albums.playlists.newName')" />
+                <button type="submit" class="albums-view__toolbar-btn" :disabled="!playlistNameDraft.trim()">{{ t('albums.playlists.saveName') }}</button>
+                <button type="button" class="albums-view__toolbar-btn" @click="editingPlaylistId = null">{{ t('common.cancel') }}</button>
+              </form>
               <Transition name="playlist-tracks">
                 <TransitionGroup v-if="expandedPlaylistId === playlist.id && playlist.items.length > 0" name="playlist-reorder" tag="ul" class="albums-view__playlist-tracks"
                   @dragleave="leaveTrackList">
@@ -810,6 +927,7 @@ async function runAction(
           <h2 class="albums-view__results-title">
             {{ t('albums.searchResultsTitle') }}
           </h2>
+          <p class="albums-view__search-explanation">{{ t('albums.searchExplanation') }}</p>
         </div>
 
         <div
@@ -826,15 +944,27 @@ async function runAction(
           {{ t('albums.messages.searchEmpty') }}
         </div>
 
+        <div v-if="!isLoadingMusicIndex && hubSearchResults.length" class="albums-view__results-columns" aria-hidden="true">
+          <span>{{ t('albums.columns.number') }}</span>
+          <span>{{ t('albums.columns.title') }}</span>
+          <span>{{ t('albums.columns.duration') }}</span>
+          <span>{{ t('albums.columns.actions') }}</span>
+        </div>
         <div
-          v-else
+          v-if="!isLoadingMusicIndex && hubSearchResults.length"
           class="albums-view__results-list"
+          @keydown.capture="onSearchKeydown"
         >
           <AlbumSearchHitRow
-            v-for="hit in hubSearchResults"
+            v-for="(hit, index) in hubSearchResults"
             :key="hit.musicId"
             :hit="hit"
+            :id="`album-search-result-${hit.musicId}`"
+            :selected="index === selectedSearchIndex"
+            @focus="selectedSearchIndex = index"
+            :artwork-url="searchArtwork(hit)"
             :busy="busyMusicId === hit.musicId"
+            @playlist="openSearchPlaylist(hit)"
             @sung="runAction(hit.musicId, () => playSung(hit.musicId))"
             @instrumental="
               runAction(hit.musicId, () => playInstrumental(hit.musicId))
@@ -935,6 +1065,8 @@ async function runAction(
       </section>
     </div>
 
+    <PlaylistPicker :playlist-item="searchPlaylistItem" :playlists="playlists" @close="searchPlaylistItem = null" @choose="addSearchTrackToPlaylist" />
+    <p v-if="searchPlaylistFeedback" class="albums-view__playlist-feedback" role="status">{{ searchPlaylistFeedback }}</p>
     <AlbumLyricDialog
       :open="lyricOpen"
       :loading="isLoadingLyric"
@@ -989,10 +1121,62 @@ async function runAction(
         </div>
       </div>
     </Teleport>
+    <Teleport to="body">
+      <div v-if="addingPlaylist" class="albums-view__modal albums-view__music-search" role="dialog" aria-modal="true"
+        :aria-label="t('albums.playlists.addMusic')" @keydown.esc.stop="addingPlaylist = null">
+        <div class="albums-view__modal-backdrop" @click="addingPlaylist = null" />
+        <GlassCard class="albums-view__modal-panel albums-view__music-search-panel">
+          <header class="albums-view__modal-header">
+            <h2>{{ t('albums.playlists.addMusic') }} — {{ addingPlaylist.name }}</h2>
+            <button type="button" class="albums-view__playlists-io" :aria-label="t('common.close')" @click="addingPlaylist = null"><i class="ti ti-x" /></button>
+          </header>
+          <label class="albums-view__search">
+            <i class="ti ti-search" aria-hidden="true" />
+            <input ref="playlistSearchInput" v-model="playlistSearchQuery" :placeholder="t('albums.hubSearchPlaceholder')" :aria-label="t('albums.hubSearchPlaceholder')">
+            <button v-if="playlistSearchQuery" type="button" class="albums-view__search-clear" :aria-label="t('albums.clearSearch')" @click="playlistSearchQuery = ''"><i class="ti ti-x" /></button>
+          </label>
+          <p class="albums-view__search-explanation">{{ t('albums.searchExplanation') }}</p>
+          <p v-if="searchPlaylistFeedback" class="albums-view__playlists-feedback" role="status" aria-live="polite">{{ searchPlaylistFeedback }}</p>
+          <p v-if="isLoadingMusicIndex">{{ t('albums.loading') }}</p>
+          <p v-else-if="!playlistSearchQuery.trim()">{{ t('albums.playlists.searchMusicHint') }}</p>
+          <p v-else-if="!playlistSearchResults.length">{{ t('albums.messages.searchEmpty') }}</p>
+          <div v-if="!isLoadingMusicIndex && playlistSearchResults.length" class="albums-view__results-columns" aria-hidden="true">
+            <span>{{ t('albums.columns.number') }}</span>
+            <span>{{ t('albums.columns.title') }}</span>
+            <span>{{ t('albums.columns.duration') }}</span>
+            <span>{{ t('albums.columns.actions') }}</span>
+          </div>
+          <div v-if="!isLoadingMusicIndex && playlistSearchResults.length" class="albums-view__results-list">
+            <AlbumSearchHitRow v-for="hit in playlistSearchResults" :key="hit.musicId" :hit="hit" prominent-playlist :already-added="addedPlaylistMusicIds.has(hit.musicId)" :artwork-url="searchArtwork(hit)"
+              :busy="busyMusicId === hit.musicId" @playlist="addPlaylistSearchHit(hit)"
+              @sung="runAction(hit.musicId, () => playSung(hit.musicId))"
+              @instrumental="runAction(hit.musicId, () => playInstrumental(hit.musicId))"
+              @slides="runAction(hit.musicId, () => playSlides(hit.musicId))"
+              @lyric="runAction(hit.musicId, () => openLyric(hit.musicId))" />
+          </div>
+        </GlassCard>
+      </div>
+    </Teleport>
+    <AppConfirm :open="pendingPlaylistRemoval !== null" :z-index="150" danger
+      :title="t('albums.playlists.deleteTitle', { name: pendingPlaylistRemoval?.name ?? '' })"
+      :message="t('albums.playlists.deleteMessage')"
+      :confirm-label="t('albums.playlists.deleteConfirm')" :cancel-label="t('common.cancel')"
+      @cancel="pendingPlaylistRemoval = null" @confirm="confirmPlaylistRemoval" />
   </section>
 </template>
 
 <style scoped lang="scss">
+.albums-view__modal.albums-view__music-search { z-index: 120; }
+.albums-view__modal-panel.albums-view__music-search-panel {
+  width: min(62rem, 100%);
+  max-height: 88vh;
+  overflow: hidden;
+  h2 { font-size: 1.1rem; }
+  .albums-view__search { width: 100%; flex: none; }
+  .albums-view__results-list { flex: 1 1 auto; }
+}
+.albums-view__playlist-feedback { position:fixed; bottom:6rem; left:50%; transform:translateX(-50%); max-width:90vw; z-index:1200; padding:.8rem 1rem; border:1px solid var(--ds-color-outline); border-radius:.7rem; background:var(--ds-color-surface,#202020); color:var(--ds-color-on-surface); box-shadow:0 8px 24px #0005; }
+
 .albums-view {
   position: relative;
   display: flex;
@@ -1451,6 +1635,13 @@ async function runAction(
   border-bottom: 1px solid var(--ds-color-outline);
 }
 
+.albums-view__search-explanation {
+  margin: .35rem 0 0;
+  font-size: .8rem;
+  line-height: 1.4;
+  color: var(--ds-color-on-surface-variant);
+}
+
 .albums-view__results-title {
   margin: 0;
   font-size: 0.95rem;
@@ -1458,7 +1649,22 @@ async function runAction(
   color: var(--ds-color-on-surface);
 }
 
+.albums-view__results-columns {
+  display: grid;
+  grid-template-columns: 4rem minmax(0, 1fr) 7rem 16rem;
+  gap: .75rem;
+  padding: .75rem 1.5rem;
+  color: var(--ds-color-primary);
+  font-size: .625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  span:nth-child(3) { text-align: center; }
+  span:last-child { text-align: right; }
+}
+@media (max-width: 800px) { .albums-view__results-columns { display: none; } }
 .albums-view__results-list {
+  padding: .5rem;
   flex: 1;
   min-height: 0;
   overflow: auto;
@@ -1740,6 +1946,7 @@ async function runAction(
 
 .albums-view__playlist-actions { display: inline-flex; gap: 0.4rem; align-items: center; flex-shrink: 0; }
 
+.albums-view__playlist-rename,
 .albums-view__playlist-shuffle,
 .albums-view__playlist-play,
 .albums-view__playlist-remove {
@@ -1755,6 +1962,7 @@ async function runAction(
   cursor: pointer;
   transition: all 0.2s ease;
 }
+.albums-view__playlist-rename,
 .albums-view__playlist-shuffle,
 .albums-view__playlist-play {
   color: var(--ds-color-primary);

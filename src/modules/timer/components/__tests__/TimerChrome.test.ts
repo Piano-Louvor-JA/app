@@ -305,7 +305,18 @@ it('restaura a projeção recolhida pelo controle existente sem navegar', async 
   } finally { minimized.value = false; w.unmount() }
 })
 
+it('oculta fechar no Cronômetro e mostra nas outras páginas', async () => {
+  const w = mountChrome()
+  expect(w.findComponent({ name: 'MiniPlayerCloseButton' }).exists()).toBe(false)
+  store.isProjecting = true
+  route.name = 'bible'
+  await nextTick()
+  expect(w.findComponent({ name: 'MiniPlayerCloseButton' }).exists()).toBe(true)
+  w.unmount()
+})
+
 it('fechar a prévia encerra a projeção e oculta o miniplayer', async () => {
+  route.name = 'bible'
   store.isProjecting = true
   const w = mountChrome()
   const closeButton = w.findComponent({ name: 'MiniPlayerCloseButton' })

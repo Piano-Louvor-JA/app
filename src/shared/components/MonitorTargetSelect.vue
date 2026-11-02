@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useObsConnections } from '@modules/settings/composables/useObsConnections'
-import { selectObsConnection } from '@modules/settings/services/obs-connections'
+import { obsConnectionName, selectObsConnection } from '@modules/settings/services/obs-connections'
 
 import { useMonitorTargetSelect } from "@shared/composables/useMonitorTargetSelect";
 import {
@@ -12,6 +12,7 @@ import {
 	watch,
 } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRouter } from "vue-router";
 
 const props = withDefaults(
 	defineProps<{
@@ -41,6 +42,11 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+const router = useRouter();
+function openObsSettings() {
+  close();
+  void router.push({ name: "settings-transmission" });
+}
 const { activeConnections: obsOutputs } = useObsConnections();
 const rootEl = ref<HTMLElement | null>(null);
 const panelEl = ref<HTMLElement | null>(null);
@@ -293,13 +299,18 @@ watch(open, async (isOpen) => {
             </label>
           </li>
         </ul>
+        <div class="obs-outputs-separator" role="separator" />
+        <p v-if="obsOutputs.length" class="obs-outputs-active" role="status">
+          <i class="ti ti-broadcast" aria-hidden="true" /> {{ t('obsOutputs.active') }}
+        </p>
+        <button v-if="!obsOutputs.length" type="button" class="obs-outputs-empty" @click="openObsSettings">{{ t('obsOutputs.activateHint') }} <i class="ti ti-arrow-right" aria-hidden="true" /></button>
         <ul v-if="obsOutputs.length" class="monitor-target-select__list" :aria-label="t('obsOutputs.title')">
           <li v-for="connection in obsOutputs" :key="connection.id">
             <label class="monitor-target-select__option" :class="{ 'monitor-target-select__option--active': connection.selected }">
               <input type="checkbox" class="monitor-target-select__checkbox" :checked="connection.selected" :disabled="disabled"
                 @change="selectObsConnection(connection.id, ($event.target as HTMLInputElement).checked)">
               <span class="monitor-target-select__option-body">
-                <span class="monitor-target-select__option-name">{{ connection.label }}</span>
+                <span class="monitor-target-select__option-name">{{ obsConnectionName(connection) }}</span>
                 <span class="monitor-target-select__option-meta">{{ t('obsOutputs.browserSource') }} · {{ connection.clients }}</span>
               </span>
             </label>
@@ -311,6 +322,39 @@ watch(open, async (isOpen) => {
 </template>
 
 <style scoped lang="scss">
+.obs-outputs-separator {
+  height: 1px;
+  margin: 0.8rem 0 0.65rem;
+  background: color-mix(in srgb, var(--ds-color-primary) 45%, transparent);
+}
+.obs-outputs-empty {
+  display: block;
+  width: 100%;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  margin: 0;
+  padding: 0.55rem 0.65rem;
+  border-left: 3px solid var(--ds-color-primary);
+  border-radius: 0.3rem;
+  background: color-mix(in srgb, var(--ds-color-primary) 10%, transparent);
+  color: var(--ds-color-primary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+.obs-outputs-empty:hover { background: color-mix(in srgb, var(--ds-color-primary) 18%, transparent); }
+.obs-outputs-empty:focus-visible { outline: 2px solid var(--ds-color-primary); outline-offset: 2px; }
+.obs-outputs-active {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.6rem;
+  color: #4ade80;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
 .monitor-target-select {
   position: relative;
   display: inline-flex;

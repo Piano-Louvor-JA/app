@@ -23,10 +23,12 @@ type MonitorTargets = {
   monitorIds: number[]
   fullscreen: boolean
   returnId: number | null
+  networkTargets?: boolean
 }
 
 let openWindows: ProjectionWindow[] = []
 let activeModule: string | null = null
+let networkOnlyModule: string | null = null
 /** Último módulo projetado — permite reabrir após close acidental no reapply. */
 let lastProjectedModule: string | null = null
 /** Evita que o watch trate o fechamento temporário do reapply como “parou de projetar”. */
@@ -39,7 +41,7 @@ let prewarmTask: Promise<void> | null = null
 
 function pruneWindows() {
   openWindows = openWindows.filter((win) => win && !win.closed)
-  if (openWindows.length === 0 && !reapplyingTargets) {
+  if (openWindows.length === 0 && !reapplyingTargets && !networkOnlyModule) {
     activeModule = null
     lastProjectedModule = null
   }
@@ -121,6 +123,10 @@ async function resolveMonitorTargets(
 
   const excludeReturn = (id: number) => returnId == null || id !== returnId
 
+  const { refreshObsConnections, hasSelectedObsTargets } = await import('@modules/settings/composables/useObsConnections')
+  await refreshObsConnections()
+  const networkTargets = hasSelectedObsTargets(moduleId ?? undefined)
+
   // null/undefined = ler settings; array (mesmo vazio) = seleção explícita (como YouTube/site).
   if (preferredIds != null) {
     const selected = preferredIds.filter(
@@ -129,7 +135,7 @@ async function resolveMonitorTargets(
     if (selected.length > 0) {
       return { monitorIds: selected, fullscreen: true, returnId }
     }
-    return { monitorIds: [], fullscreen: false, returnId }
+    return { monitorIds: [], fullscreen: false, returnId, networkTargets }
   }
 
   const selected = settings.targetDisplayIds.filter(
@@ -139,6 +145,8 @@ async function resolveMonitorTargets(
   if (selected.length > 0) {
     return { monitorIds: selected, fullscreen: true, returnId }
   }
+
+  if (networkTargets) return { monitorIds: [], fullscreen: false, returnId, networkTargets }
 
   // Sem alvos estendidos: só abre no primário se a setting permitir e
   // (não há estendidos) OU (disablePrimaryWhenExtended está desligado).
@@ -156,7 +164,7 @@ async function resolveMonitorTargets(
     return { monitorIds: [primary.id], fullscreen: true, returnId }
   }
 
-  return { monitorIds: [], fullscreen: false, returnId }
+  return { monitorIds: [], fullscreen: false, returnId, networkTargets }
 }
 
 function canPrewarmMediaProjection(): boolean {
@@ -351,12 +359,13 @@ export function isProjectionModuleOpen(moduleId?: string): boolean {
   }
 
   pruneWindows()
-  if (openWindows.length === 0) return false
+  if (openWindows.length === 0 && !networkOnlyModule) return false
   if (!moduleId) return true
   return activeModule === moduleId
 }
 
 export function closeProjectionModule(): void {
+  networkOnlyModule = null
   reapplyingTargets = false
   pruneWindows()
   for (const win of openWindows) {
@@ -378,6 +387,7 @@ export async function openProjectionModule(
   preferredIds?: number[] | null,
 ): Promise<boolean> {
   pruneWindows()
+  networkOnlyModule = null
 
   // Conteúdo oculto: janelas já existem — não chama closeUrl (senão o main
   // fecha as popups de hinos/bíblia) e não reabre.
@@ -432,7 +442,8 @@ export async function openProjectionModule(
   }
 
   openWindows = nextWindows
-  activeModule = nextWindows.length > 0 ? moduleId : null
+  networkOnlyModule = targets.networkTargets ? moduleId : null
+  activeModule = nextWindows.length > 0 || networkOnlyModule ? moduleId : null
   lastProjectedModule = activeModule
   // Projeção (window.open) rouba o teclado — devolve ao operador.
   try {
@@ -440,7 +451,7 @@ export async function openProjectionModule(
   } catch {
     /* ignore */
   }
-  return nextWindows.length > 0
+  return nextWindows.length > 0 || Boolean(networkOnlyModule)
 }
 
 /**
@@ -518,6 +529,16 @@ export async function reapplyProjectionTargets(
     const hasReturn = openWindows.some((win) => isReturnWindow(win))
 
     if (desiredIds.length === 0 && !hasReturn) {
+      const { refreshObsConnections, hasSelectedObsTargets } = await import('@modules/settings/composables/useObsConnections')
+      await refreshObsConnections()
+      if (hasSelectedObsTargets(moduleId)) {
+        networkOnlyModule = moduleId
+        activeModule = moduleId
+        lastProjectedModule = moduleId
+        notifyProjectionReapplied(moduleId, true)
+        return true
+      }
+      networkOnlyModule = null
       activeModule = null
       lastProjectedModule = null
       notifyProjectionReapplied(moduleId, false)
@@ -544,6 +565,7 @@ export async function reapplyProjectionTargets(
     }
 
     const opened = openWindows.length > 0
+    networkOnlyModule = null
     activeModule = opened ? moduleId : null
     if (opened) lastProjectedModule = moduleId
     notifyProjectionReapplied(moduleId, opened)
@@ -592,6 +614,12 @@ export async function syncProjectionAfterDisplayChange(): Promise<void> {
 
   // Legado: se sobrou só a tela principal, encerra popups — salvo retorno ativo.
   if (extendedIds.length === 0 && returnId == null) {
+    const { refreshObsConnections, hasSelectedObsTargets } = await import('@modules/settings/composables/useObsConnections')
+    await refreshObsConnections()
+    if (hasSelectedObsTargets(activeModule ?? undefined)) {
+      await reapplyProjectionTargets([])
+      return
+    }
     closeProjectionModule()
     return
   }

@@ -114,7 +114,7 @@ async function onOpenStopwatch() {
       :title="t('timer.chromeDragHint')"
       @dblclick="resetPosition"
     >
-      <MiniPlayerCloseButton :label="t('timer.title')" @close="onCloseChrome" />
+      <MiniPlayerCloseButton v-if="!onTimerRoute" :label="t('timer.title')" @close="onCloseChrome" />
       <TimerPreview
         :config="effectiveConfig"
         :runtime="store.runtime"
@@ -202,7 +202,7 @@ async function onOpenStopwatch() {
   background: #000;
   border: 1px solid rgb(255 255 255 / 0.2);
   box-shadow: 0 16px 40px rgb(0 0 0 / 0.45);
-  overflow: hidden;
+  overflow: visible;
   pointer-events: auto;
   cursor: grab;
 }

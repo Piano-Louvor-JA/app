@@ -174,15 +174,15 @@ async function onToggleAudio() {
   bottom: calc(100% + 0.35rem);
   width: 1.75rem;
   height: 1.75rem;
-  border-color: #ff8a80;
-  background: #c62828;
+  border-color: #b77b76;
+  background: #69413e;
   color: #fff;
   box-shadow: 0 2px 8px rgb(0 0 0 / 40%);
   pointer-events: auto;
 
   &:hover {
-    background: #e53935;
-    border-color: #fff;
+    background: #85534e;
+    border-color: #d6a29c;
   }
 }
 
@@ -195,7 +195,6 @@ async function onToggleAudio() {
 
 .media-chrome--dragging,
 .media-chrome--dragging .media-chrome__handle {
-  position: relative;
   cursor: grabbing;
 }
 

@@ -212,16 +212,16 @@ describe('filterAlbumTracks', () => {
   })
 
 
-  it('filter: track null -> busca por nome/id ainda funciona', () => {
+  it('filter: track null -> busca por nome, sem usar id interno', () => {
     const semTrack = [{ musicId: 7, name: 'Sétima', track: null, durationLabel: '', hasInstrumental: false }] as never[]
     expect(filterAlbumTracks(semTrack, 'sét')).toHaveLength(1)
-    expect(filterAlbumTracks(semTrack, '7')).toHaveLength(1)
+    expect(filterAlbumTracks(semTrack, '7')).toHaveLength(0)
   })
 
-  it('casa por número da faixa, nome e id', () => {
+  it('casa por número da faixa e nome, ignorando id interno', () => {
     expect(filterAlbumTracks(tracks, '2')).toHaveLength(1)
     expect(filterAlbumTracks(tracks, 'santo')).toHaveLength(1)
-    expect(filterAlbumTracks(tracks, '23')).toHaveLength(1)
+    expect(filterAlbumTracks(tracks, '23')).toHaveLength(0)
     expect(filterAlbumTracks(tracks, 'zzz')).toHaveLength(0)
   })
 })

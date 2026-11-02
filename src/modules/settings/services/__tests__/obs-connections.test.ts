@@ -3,6 +3,36 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 beforeEach(() => { localStorage.clear(); vi.resetModules() })
 describe('OBS connections', () => {
+  it('salva apelido separado do número OBS e restaura após reload', async () => {
+    const config = await import('../obs-connections')
+    config.registerObsConnection('7082', 'OBS 2')
+    config.setObsNickname('7082', '  Transmissão principal  ')
+    vi.resetModules()
+    const restored = await import('../obs-connections')
+    const connection = restored.obsConnections.value[0]!
+    expect(connection.label).toBe('OBS 2')
+    expect(connection.nickname).toBe('Transmissão principal')
+    expect(restored.obsConnectionName(connection)).toBe('OBS 2 — Transmissão principal')
+    restored.setObsNickname('7082', '')
+    expect(restored.obsConnectionName(restored.obsConnections.value[0]!)).toBe('OBS 2')
+  })
+  it('compartilhar preserva espelhamento principal no mesmo OBS', async () => {
+    const config = await import('../obs-connections')
+    config.registerObsConnection('7082', 'OBS 2')
+    config.assignObsConnection('7082', 'bible', 'share')
+    expect(config.obsAssignmentModes.value['7082']).toBe('share')
+    expect(config.obsAllowsMirror('7082', 'media')).toBe(true)
+    config.assignObsConnection('7082', null)
+    expect(config.obsAssignmentModes.value['7082']).toBeUndefined()
+  })
+  it('persiste a opção de tela preta após reload sem afetar TVs', async () => {
+    const config = await import('../obs-connections')
+    expect(config.obsBlackIdle.value).toBe(false)
+    config.setObsBlackIdle(true)
+    vi.resetModules()
+    const restored = await import('../obs-connections')
+    expect(restored.obsBlackIdle.value).toBe(true)
+  })
   it('salva conexões e seleção e recupera após reload', async () => {
     const config = await import('../obs-connections')
     config.registerObsConnection('7082', 'OBS 2')
@@ -25,4 +55,19 @@ describe('OBS connections', () => {
     expect(config.obsAssignments.value).toEqual({})
     expect(config.obsAllowsMirror('7082', 'random')).toBe(true)
   })
+})
+
+it('adopts legacy TV slots once and preserves ports, selection and nicknames after reload', async () => {
+  const config = await import('../obs-connections')
+  config.registerObsConnection('7082', 'OBS 2')
+  config.setObsNickname('7082', 'Mesa')
+  config.selectObsConnection('7082', false)
+  const slots = [{ id: '0', label: 'TV principal' }, { id: '7082', label: 'OBS 2' }, { id: '7084', label: 'TV Salão' }]
+  config.migratePalcoConnections(slots)
+  config.migratePalcoConnections(slots)
+  expect(config.obsConnections.value).toHaveLength(3)
+  expect(config.obsConnections.value.find(item => item.id === '7082')).toMatchObject({ selected: false, nickname: 'Mesa' })
+  vi.resetModules()
+  const reloaded = await import('../obs-connections')
+  expect(reloaded.obsConnections.value.find(item => item.id === '7084')).toMatchObject({ id: '7084', nickname: 'TV Salão' })
 })

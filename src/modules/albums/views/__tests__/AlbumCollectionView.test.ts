@@ -147,7 +147,7 @@ vi.mock('../../components/AlbumLyricDialog.vue', () => ({
 vi.mock('../../components/AlbumTrackRow.vue', () => ({
   default: {
     name: 'AlbumTrackRow',
-    props: ['track', 'collectionName', 'artworkUrl', 'busy'],
+    props: ['track', 'collectionName', 'artworkUrl', 'busy', 'selected'],
     emits: ['sung', 'instrumental', 'slides', 'lyric', 'playlist'],
     template: `<div class="track-row-stub" :data-id="track.musicId" :data-busy="String(busy)">
       <button class="row-sung" @click="$emit('sung')" />
@@ -232,6 +232,34 @@ describe('AlbumCollectionView', () => {
     const w = await mountView()
     await w.find('.album-collection-view__shuffle').trigger('click')
     expect((globalThis as any).__albumsMock.playAll).toHaveBeenCalledWith('audio', true)
+  })
+
+  it('selects the first track immediately and navigates without a search query', async () => {
+    const wrapper = await mountView()
+    const rows = () => wrapper.findAllComponents({ name: 'AlbumTrackRow' })
+    const input = wrapper.get('input[type="search"]')
+    expect((input.element as HTMLInputElement).value).toBe('')
+    expect(rows()[0].props('selected')).toBe(true)
+    await input.trigger('keydown', { key: 'ArrowDown' })
+    expect(rows()[1].props('selected')).toBe(true)
+    await input.trigger('keydown', { key: 'ArrowUp' })
+    expect(rows()[0].props('selected')).toBe(true)
+    await input.trigger('keydown', { key: 'Enter' })
+    await flushPromises()
+  })
+
+  it('selects and navigates hymnal search results with the keyboard', async () => {
+    const wrapper = await mountView()
+    const input = wrapper.get('input[type="search"]')
+    await input.setValue('hino')
+    const rows = () => wrapper.findAllComponents({ name: 'AlbumTrackRow' })
+    expect(rows()[0].props('selected')).toBe(true)
+    await input.trigger('keydown', { key: 'ArrowDown' })
+    expect(rows()[1].props('selected')).toBe(true)
+    await input.trigger('keydown', { key: 'ArrowUp' })
+    expect(rows()[0].props('selected')).toBe(true)
+    await input.trigger('keydown', { key: 'Enter' })
+    await flushPromises()
   })
 
   it('hinário também oferece reprodução em sequência e aleatória', async () => {

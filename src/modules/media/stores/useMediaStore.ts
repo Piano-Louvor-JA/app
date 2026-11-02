@@ -1,3 +1,4 @@
+import { detectObsBeforeProjection } from '@modules/settings/services/obs-detection'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
@@ -1227,6 +1228,7 @@ export const useMediaStore = defineStore('media', () => {
   }
 
   async function startProjection(): Promise<boolean> {
+    await detectObsBeforeProjection()
     if (!session.value) return false
 
     // Ocultar conteúdo deixa as janelas abertas com runtime inativo.

@@ -91,6 +91,8 @@ contextBridge.exposeInMainWorld('louvorja', {
 
   // Palco (cast p/ TV — receiver conecta em WS :7081, HTTP :7080)
   palco: {
+    getPersistence: () => ipcRenderer.invoke('palco:persistence-get'),
+    setPersistence: (enabled) => ipcRenderer.invoke('palco:persistence-set', { enabled }),
     slots: () => ipcRenderer.invoke('palco:slots'),
     wake: () => ipcRenderer.invoke('palco:wake'),
     createSlot: (label) => ipcRenderer.invoke('palco:slot-create', { label }),

@@ -34,13 +34,13 @@ function confirm() {
   justify-content: center;
   width: 1.75rem;
   height: 1.75rem;
-  border: 1px solid #ff8a80;
+  border: 1px solid #b77b76;
   border-radius: 50%;
-  background: #c62828;
+  background: #69413e;
   color: #fff;
   box-shadow: 0 2px 8px rgb(0 0 0 / 40%);
   pointer-events: auto;
   cursor: pointer;
 }
-.mini-player-close:hover { background: #e53935; border-color: #fff; }
+.mini-player-close:hover { background: #85534e; border-color: #d6a29c; }
 </style>

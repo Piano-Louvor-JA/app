@@ -1,5 +1,5 @@
 export default {
-  obsOutputs: { title: 'OBS connections', browserSource: 'OBS Browser Source' },
+  obsOutputs: { detecting: 'Detecting and refreshing OBS connections…', active: 'Active OBS connections', activateHint: 'Start a connection in Settings → Broadcast to use it here.', title: 'OBS connections', browserSource: 'OBS Browser Source' },
   floating: { closeTitle: 'Close {title}?', closeMessage: 'Stop this feature and close its projection?' },
   updates: {
     downloadMacInstaller: 'Download macOS installer',

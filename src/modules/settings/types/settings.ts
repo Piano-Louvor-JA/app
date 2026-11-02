@@ -3,6 +3,7 @@ export type SettingsSectionId =
   | 'general'
   | 'media'
   | 'projection'
+  | 'transmission'
   | 'remote'
 
 export type ThemeMode = 'light' | 'dark'

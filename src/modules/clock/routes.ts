@@ -1,7 +1,6 @@
 import type { RouteRecordRaw } from 'vue-router'
 
 import ClockView from './views/ClockView.vue'
-import ObsView from './views/ObsView.vue'
 import TemporizadorView from './views/TemporizadorView.vue'
 import UtilitiesView from './views/UtilitiesView.vue'
 
@@ -33,9 +32,7 @@ export const utilitiesRoutes: RouteRecordRaw[] = [
   {
     path: 'utilities/obs',
     name: 'utilities-obs',
-    component: ObsView,
-    meta: {
-      navKey: 'utilities',
-    },
+    redirect: { name: 'settings-transmission' },
+    meta: { navKey: 'settings' },
   },
 ]

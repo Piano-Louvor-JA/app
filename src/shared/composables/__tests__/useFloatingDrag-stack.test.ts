@@ -17,13 +17,13 @@ function panel(key: string, stackOrder?: number) {
   return defineComponent({
     setup() {
       const root = ref<HTMLElement | null>(null)
-      const { positionStyle, resetPosition } = useFloatingDrag(
+      const { positionStyle, resetPosition, onPointerDown } = useFloatingDrag(
         root,
         `test.${key}`,
         stackOrder === undefined ? {} : { stackOrder },
       )
       return () =>
-        h('div', { ref: root, class: `panel-${key}`, 'data-key': key, style: positionStyle.value, onDblclick: resetPosition })
+        h('div', { ref: root, class: `panel-${key}`, 'data-key': key, style: positionStyle.value, onPointerdown: onPointerDown, onDblclick: resetPosition })
     },
   })
 }
@@ -54,6 +54,22 @@ afterEach(() => {
 })
 
 describe('useFloatingDrag — pilha no canto padrão', () => {
+  it('acompanha o ponteiro durante o arraste sem a organização automática deslocar o painel', async () => {
+    mountPanel('a', 0)
+    const a = mountPanel('b', 1)
+    await nextTick()
+    const pointer = (type: string, x: number, y: number) => {
+      const event = new MouseEvent(type, { bubbles: true, clientX: x, clientY: y, button: 0 })
+      Object.defineProperty(event, 'pointerId', { value: 1 })
+      return event
+    }
+    a.element.dispatchEvent(pointer('pointerdown', 610, 460))
+    window.dispatchEvent(pointer('pointermove', 610, 510))
+    await nextTick()
+    expect((a.element as HTMLElement).style.left).toBe('600px')
+    expect((a.element as HTMLElement).style.top).toBe('500px')
+    window.dispatchEvent(pointer('pointerup', 610, 510))
+  })
   it('mantém posições salvas e reorganizadas acima do menu inferior, inclusive após resize', async () => {
     const dock = document.createElement('nav')
     dock.className = 'ds-dock'

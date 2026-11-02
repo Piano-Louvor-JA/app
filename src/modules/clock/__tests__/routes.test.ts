@@ -14,9 +14,10 @@ describe('utilitiesRoutes', () => {
     expect(utilitiesRoutes.find((r) => r.path === 'utilities/obs')?.name).toBe(
       'utilities-obs',
     )
+    expect(utilitiesRoutes.find(route => route.name === 'utilities-obs')?.redirect).toEqual({ name: 'settings-transmission' })
     for (const route of utilitiesRoutes) {
       expect(route.name).toBeTruthy()
-      expect(route.meta).toEqual({ navKey: 'utilities' })
+      expect(route.meta).toEqual({ navKey: route.name === 'utilities-obs' ? 'settings' : 'utilities' })
     }
   })
 })

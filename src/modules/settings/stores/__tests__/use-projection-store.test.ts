@@ -433,12 +433,12 @@ describe('useProjectionStore', () => {
   })
 
   // ===== MUTANT HARDENING =====
-  it('estado inicial: store id, displays vazios, settings default, flags false', async () => {
-    const { DEFAULT_PROJECTION_SETTINGS } = await import('@modules/settings/types/projection')
+  it('estado inicial: carrega preferências salvas antes da detecção de monitores', async () => {
+    const { normalizeProjectionSettings } = await import('@modules/settings/services/projection-preferences')
     const store = globalThis.useProjectionStore()
     expect(store.$id).toBe('settings-projection')
     expect(store.displays).toEqual([])
-    expect(store.settings).toEqual({ ...DEFAULT_PROJECTION_SETTINGS })
+    expect(store.settings).toEqual(normalizeProjectionSettings(baseSettings))
     expect(store.isLoadingDisplays).toBe(false)
     expect(store.isIdentifying).toBe(false)
     expect(store.lastErrorKey).toBeNull()
@@ -591,4 +591,21 @@ describe('useProjectionStore', () => {
     expect(spy).toHaveBeenCalledWith('[projection] background image', expect.any(Error))
     spy.mockRestore()
   })
+})
+it('startup and hotplug never persist return disabled or choose a different monitor while it is absent', async () => {
+  h.getUserPreference.mockReturnValue({ ...baseSettings, openReturnScreen: true, returnDisplayId: 2 })
+  const displays = await import('@modules/settings/services/display-service')
+  const list = vi.spyOn(displays, 'listSystemDisplays').mockResolvedValue([])
+  const store = globalThis.useProjectionStore()
+  expect(store.settings.openReturnScreen).toBe(true)
+  await store.hydrate()
+  list.mockResolvedValue([display1])
+  await store.refreshDisplays()
+  expect(store.settings.returnDisplayId).toBe(2)
+  expect(store.settings.openReturnScreen).toBe(true)
+  expect(h.setUserPreference.mock.calls.every(([, settings]) => settings.openReturnScreen === true)).toBe(true)
+  list.mockResolvedValue([display1, display2])
+  await store.refreshDisplays()
+  expect(store.settings.returnDisplayId).toBe(2)
+  expect(store.settings.targetDisplayIds).toContain(2)
 })

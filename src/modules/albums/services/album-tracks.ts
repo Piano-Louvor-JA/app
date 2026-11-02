@@ -1,3 +1,4 @@
+import { matchesAllTerms } from '@shared/services/search-terms'
 import { fetchRemoteCatalogJson } from '@shared/services/remote-catalog'
 import { readCatalogRecord } from '@shared/services/workspace-api'
 import {
@@ -14,6 +15,7 @@ import type {
   AlbumLyricDocument,
   AlbumLyricLine,
   AlbumTrack,
+  AlbumSearchHit,
 } from '../types/albums'
 
 type CatalogTrackRow = {
@@ -201,17 +203,18 @@ export async function loadCollectionTracks(
 export function filterAlbumTracks(
   tracks: AlbumTrack[],
   query: string,
+  musicIndex: AlbumSearchHit[] = [],
 ): AlbumTrack[] {
-  const normalized = query.trim().toLowerCase()
+  const normalized = query.trim()
   if (!normalized) return tracks
-
-  return tracks.filter((track) => {
-    const trackLabel = track.track != null ? String(track.track) : ''
-    return (
-      trackLabel.includes(normalized) ||
-      track.name.toLowerCase().includes(normalized) ||
-      String(track.musicId).includes(normalized)
-    )
+  const numericQuery = /^\d+$/.test(normalized) ? Number(normalized) : null
+  const indexed = new Map(musicIndex.map(entry => [entry.musicId, entry]))
+  return tracks.filter(track => {
+    const entry = indexed.get(track.musicId)
+    // The displayed collection number is authoritative; IDs and numbers from
+    // other hymnals must not match a search inside this collection.
+    return (numericQuery !== null && track.track === numericQuery) ||
+      matchesAllTerms(track.name, entry?.albumNames ?? '', normalized, entry?.lyricsText)
   })
 }
 

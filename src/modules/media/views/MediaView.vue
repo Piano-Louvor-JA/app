@@ -21,7 +21,7 @@ const playerFullscreen = ref(false)
 function syncPlayerFullscreen() {
   playerFullscreen.value = Boolean(stageRoot.value && document.fullscreenElement === stageRoot.value)
 }
-const { primaryOnly, minimizeVisible, controlsVisible } = usePrimaryProjectionControls()
+const { primaryOnly, minimizeVisible, controlsVisible } = usePrimaryProjectionControls('media')
 
 const {
   session,
@@ -73,6 +73,37 @@ const {
   clearError,
   syncProjectionFlag,
 } = useMediaPlayer()
+
+const selectedQueueIndex = ref(Math.max(0, queueIndex.value))
+watch(queueIndex, index => { selectedQueueIndex.value = Math.max(0, index) })
+watch(() => queue.value.length, length => {
+  selectedQueueIndex.value = Math.max(0, Math.min(selectedQueueIndex.value, length - 1))
+})
+function activateSelectedQueue(index: number) {
+  selectedQueueIndex.value = index
+  if (index === queueIndex.value) return
+  jumpToQueue(index)
+}
+async function navigateQueue(event: KeyboardEvent) {
+  const target = event.target as HTMLElement | null
+  if (!showPlaylist.value || queue.value.length < 2 || closeConfirmOpen.value || event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return false
+  if (target?.closest?.('input, textarea, select, [contenteditable="true"], .media-window__queue-grip')) return false
+  if (target?.closest?.('button') && !target.closest('.media-window__playlist-item')) return false
+  if (!['ArrowDown', 'ArrowUp', 'Enter'].includes(event.key)) return false
+  event.preventDefault()
+  event.stopImmediatePropagation()
+  if (event.key === 'Enter') {
+    if (!event.repeat) activateSelectedQueue(selectedQueueIndex.value)
+  } else {
+    selectedQueueIndex.value = Math.max(0, Math.min(queue.value.length - 1,
+      selectedQueueIndex.value + (event.key === 'ArrowDown' ? 1 : -1)))
+    await nextTick()
+    const aside = playlistAsideEl.value
+    const selected = aside?.querySelector<HTMLElement>('.media-window__queue-row--selected')
+    if (aside && selected) revealItemInAside(aside, selected)
+  }
+  return true
+}
 
 const queueModeNotice = ref<string | null>(null)
 let queueModeNoticeTimer: ReturnType<typeof setTimeout> | null = null
@@ -201,6 +232,10 @@ onUnmounted(() => {
 
 /** ESC fecha o player (←/→ ficam em useMediaPlayerHotkeys no App). */
 function onGlobalKeydown(event: KeyboardEvent) {
+  if (showPlaylist.value && queue.value.length > 1 && ['ArrowDown', 'ArrowUp', 'Enter'].includes(event.key)) {
+    void navigateQueue(event)
+    return
+  }
   if (event.key !== 'Escape') return
   const target = event.target as HTMLElement | null
   if (target?.isContentEditable || target?.tagName === 'TEXTAREA') return
@@ -449,6 +484,7 @@ async function onToggleFullscreen() {
           <TransitionGroup name="queue-reorder" tag="ul" class="media-window__playlist-list">
             <li v-for="(item, index) in queue" :key="queueItemKey(index)" class="media-window__queue-row"
               :class="{
+                'media-window__queue-row--selected': selectedQueueIndex === index,
                 'media-window__queue-row--dragging': draggedQueueIndex === index,
                 'media-window__queue-row--before': queueDropTarget === index && draggedQueueIndex !== null && draggedQueueIndex > index,
                 'media-window__queue-row--after': queueDropTarget === index && draggedQueueIndex !== null && draggedQueueIndex < index,
@@ -466,7 +502,8 @@ async function onToggleFullscreen() {
                 type="button"
                 class="media-window__playlist-item"
                 :class="{ 'media-window__playlist-item--active': index === queueIndex }"
-                @click="jumpToQueue(index)"
+                @focus="selectedQueueIndex = index"
+                @click="activateSelectedQueue(index)"
               >
                 <span class="media-window__playlist-index">{{ index + 1 }}</span>
                 <span class="media-window__playlist-label">{{ item.title }}</span>
@@ -533,6 +570,12 @@ async function onToggleFullscreen() {
   cursor: grab;
   &:hover { background: color-mix(in srgb, var(--ds-color-primary) 30%, transparent); }
   &:active { cursor: grabbing; }
+}
+.media-window__queue-row--selected {
+  outline: 1px solid var(--ds-color-primary);
+  outline-offset: -1px;
+  border-radius: .4rem;
+  background: color-mix(in srgb, var(--ds-color-primary) 12%, transparent);
 }
 .media-window__queue-row--dragging {
   opacity: 0.55;

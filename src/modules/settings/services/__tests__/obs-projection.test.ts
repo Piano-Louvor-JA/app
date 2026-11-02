@@ -17,6 +17,12 @@ vi.mock('@modules/random/services/random-runtime', () => ({
 import { renderObsModule } from '../obs-projection'
 beforeEach(() => vi.clearAllMocks())
 describe('OBS independent rendering', () => {
+  it('marca o recurso compartilhado como painel secundário', async () => {
+    await renderObsModule('7082', 'bible', true)
+    expect(api.projectTo).toHaveBeenCalledWith('7082', 'bible', {
+      obsPane: true, text: 'Haja luz', footerRef: 'Gênesis 1:3',
+    })
+  })
   it('renderiza a seleção bíblica independente somente no slot escolhido', async () => {
     await renderObsModule('7082', 'bible')
     expect(api.projectTo).toHaveBeenCalledWith('7082', 'bible', { text: 'Haja luz', footerRef: 'Gênesis 1:3' })
@@ -25,13 +31,13 @@ describe('OBS independent rendering', () => {
   it('envia cronômetro e contagem regressiva sem exigir projeção principal ativa', async () => {
     await renderObsModule('7082', 'timer')
     await renderObsModule('7084', 'countdown')
-    expect(api.projectTo).toHaveBeenCalledWith('7082', 'timer', { text: '00:00:12' })
+    expect(api.timerTo).toHaveBeenCalledWith('7082', expect.objectContaining({ mode: 'chrono', chronoRuntime: { status: 'paused', accumulatedMs: 12000, segmentStartedAt: null } }))
     expect(api.projectTo).toHaveBeenCalledWith('7084', 'countdown', { text: '00:00:48' })
   })
   it('envia relógio e sorteio para suas conexões', async () => {
     await renderObsModule('7082', 'random')
     await renderObsModule('7084', 'clock')
     expect(api.projectTo).toHaveBeenCalledWith('7082', 'random', { text: '7' })
-    expect(api.projectTo).toHaveBeenCalledWith('7084', 'clock', { text: expect.stringMatching(/^\d{2}:\d{2}$/) })
+    expect(api.projectTo).toHaveBeenCalledWith('7084', 'clock', { text: expect.stringMatching(/^\d{2}:\d{2}:\d{2}$/) })
   })
 })

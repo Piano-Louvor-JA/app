@@ -1,5 +1,5 @@
 export default {
-  obsOutputs: { title: 'Conexiones OBS', browserSource: 'Fuente de navegador OBS' },
+  obsOutputs: { detecting: 'Detectando y actualizando conexiones OBS…', active: 'Conexiones OBS activas', activateHint: 'Active una conexión en Configuración → Transmisión para usarla aquí.', title: 'Conexiones OBS', browserSource: 'Fuente de navegador OBS' },
   floating: { closeTitle: '¿Cerrar {title}?', closeMessage: '¿Desea detener este recurso y cerrar su proyección?' },
   updates: {
     downloadMacInstaller: 'Descargar instalador macOS',
