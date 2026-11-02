@@ -266,5 +266,5 @@ describe('custom-catalog — exceções de rede (catch)', () => {
    const fetcher = vi.fn(async () => jsonResponse({ data: [] }))
    vi.stubGlobal('fetch', fetcher)
    await listCustomMusics(55)
-   expect(fetcher).toHaveBeenCalledWith(expect.stringContaining('/collections/55/musics'), { headers: { Authorization: 'Bearer tok' } })
+   expect(fetcher).toHaveBeenCalledWith(expect.stringContaining('/collections/55/musics'), { headers: { authorization: 'Bearer tok', 'X-Tenant': 'piano' } })
  })
