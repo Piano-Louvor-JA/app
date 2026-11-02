@@ -90,6 +90,40 @@ async function persistSession(credential: UserCredential): Promise<AuthSession |
   }
 }
 
+async function exchangeFirebaseToken(token: string): Promise<{ session: AuthSession | null; rejected: boolean }> {
+  const url = firebaseSessionBridgeUrl()
+  if (!url) return { session: null, rejected: false }
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}` },
+    })
+    if (!response.ok) return { session: null, rejected: response.status === 401 || response.status === 403 }
+    const session = JSON.parse(await response.text()) as unknown
+    if (!isValidSession(session)) return { session: null, rejected: false }
+    saveSession(session)
+    return { session: getAuthSession(), rejected: false }
+  } catch {
+    return { session: null, rejected: false }
+  }
+}
+
+/** Revalida a sessão persistida no boot sem apagar dados durante falha de rede. */
+export async function revalidateFirebaseSessionOnBoot(): Promise<AuthSession | null> {
+  const current = getAuthSession()
+  if (!current) return null
+
+  try {
+    const user = getFirebaseAuth().currentUser
+    const token = user ? await user.getIdToken(true) : current.token
+    const result = await exchangeFirebaseToken(token)
+    if (result.rejected) saveSession(null)
+    return result.session
+  } catch {
+    return null
+  }
+}
+
 /** Login email/senha via Firebase. Retorna a sessão ou null. */
 export async function firebaseLogin(
   email: string,

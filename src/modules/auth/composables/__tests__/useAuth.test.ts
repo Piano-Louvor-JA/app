@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-const mocks = vi.hoisted(() => ({ login: vi.fn(), register: vi.fn(), logout: vi.fn(), reset: vi.fn(), request: vi.fn(), fbLogin: vi.fn(), fbRegister: vi.fn(), fbGoogle: vi.fn(), fbLogout: vi.fn(), fbSubscribe: vi.fn(() => null) }))
+const mocks = vi.hoisted(() => ({ login: vi.fn(), register: vi.fn(), logout: vi.fn(), reset: vi.fn(), request: vi.fn(), fbLogin: vi.fn(), fbRegister: vi.fn(), fbGoogle: vi.fn(), fbLogout: vi.fn(), fbSubscribe: vi.fn(() => null), fbRevalidate: vi.fn().mockResolvedValue(null) }))
 vi.mock('../../../media/services/auth-client', () => ({ getAuthSession: () => null, login: mocks.login, register: mocks.register, logout: mocks.logout, resetPassword: mocks.reset, requestPasswordReset: mocks.request }))
-vi.mock('../../services/firebase-client', () => ({ firebaseLogin: mocks.fbLogin, firebaseRegister: mocks.fbRegister, firebaseLoginGoogle: mocks.fbGoogle, firebaseLogout: mocks.fbLogout, subscribeFirebaseSession: mocks.fbSubscribe }))
+vi.mock('../../services/firebase-client', () => ({ firebaseLogin: mocks.fbLogin, firebaseRegister: mocks.fbRegister, firebaseLoginGoogle: mocks.fbGoogle, firebaseLogout: mocks.fbLogout, revalidateFirebaseSessionOnBoot: mocks.fbRevalidate, subscribeFirebaseSession: mocks.fbSubscribe }))
 import { authSession, setNotify, useAuth } from '../useAuth'
 const session = { token: 'test', user: { id: 1, displayName: 'Ana', email: 'ana@example.org' } }
 const notify = vi.fn()
-beforeEach(() => { vi.resetAllMocks(); authSession.value = null; setNotify(notify) })
+beforeEach(() => { vi.resetAllMocks(); mocks.fbRevalidate.mockResolvedValue(null); authSession.value = null; setNotify(notify) })
 
 describe('autenticação unificada', () => {
   it('expõe dados reativos de uma sessão e limpa ao sair dos dois provedores', async () => {
