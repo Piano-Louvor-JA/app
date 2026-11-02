@@ -25,6 +25,7 @@ import {
 import { getAuthSession, saveSession, type AuthSession } from '@modules/media/services/auth-client'
 
 let authInstance: Auth | null = null
+let bootRevalidation: Promise<AuthSession | null> | null = null
 
 function getFirebaseAuth(): Auth {
   if (!authInstance) {
@@ -109,19 +110,25 @@ async function exchangeFirebaseToken(token: string): Promise<{ session: AuthSess
 }
 
 /** Revalida a sessão persistida no boot sem apagar dados durante falha de rede. */
-export async function revalidateFirebaseSessionOnBoot(): Promise<AuthSession | null> {
-  const current = getAuthSession()
-  if (!current) return null
+export function revalidateFirebaseSessionOnBoot(): Promise<AuthSession | null> {
+  if (bootRevalidation) return bootRevalidation
 
-  try {
-    const user = getFirebaseAuth().currentUser
-    const token = user ? await user.getIdToken(true) : current.token
-    const result = await exchangeFirebaseToken(token)
-    if (result.rejected) saveSession(null)
-    return result.session
-  } catch {
-    return null
-  }
+  bootRevalidation = (async () => {
+    const current = getAuthSession()
+    if (!current) return null
+
+    try {
+      const user = getFirebaseAuth().currentUser
+      const token = user ? await user.getIdToken(true) : current.token
+      const result = await exchangeFirebaseToken(token)
+      if (result.rejected) saveSession(null)
+      return result.session
+    } catch {
+      return null
+    }
+  })()
+  void bootRevalidation.finally(() => { bootRevalidation = null })
+  return bootRevalidation
 }
 
 /** Login email/senha via Firebase. Retorna a sessão ou null. */

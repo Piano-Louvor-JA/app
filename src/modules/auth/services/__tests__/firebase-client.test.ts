@@ -110,6 +110,22 @@ describe('cliente Firebase e ponte da sessão', () => {
     expect(mocks.save).toHaveBeenCalledWith(session)
   })
 
+  it('no boot coalesce revalidações concorrentes em uma chamada à ponte', async () => {
+    const client = await import('../firebase-client')
+    await expect(Promise.all([
+      client.revalidateFirebaseSessionOnBoot(),
+      client.revalidateFirebaseSessionOnBoot(),
+    ])).resolves.toEqual([session, session])
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('no boot permite nova revalidação após concluir a anterior', async () => {
+    const client = await import('../firebase-client')
+    await client.revalidateFirebaseSessionOnBoot()
+    await client.revalidateFirebaseSessionOnBoot()
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
   it('no boot limpa sessão rejeitada uma vez, sem loop', async () => {
     vi.mocked(fetch).mockResolvedValue({ ok: false, status: 401, text: async () => '' } as Response)
     const client = await import('../firebase-client')
