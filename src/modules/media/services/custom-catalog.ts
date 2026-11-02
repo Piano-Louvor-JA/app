@@ -649,7 +649,16 @@ export async function createCustomCollection(
       entity: 'collection',
       client_uuid: newClientUuid(),
       action: 'upsert',
-      payload: { name, description: description ?? null, author_name: authorName ?? null, updated_at: Date.now() },
+      payload: {
+        name,
+        description: description ?? null,
+        author_name: authorName ?? null,
+        // Mesma regra do POST online (t_35e4d3ea): SEMPRE visibility
+        // explícita — sem ela a API aplica default 'public' e a coletânea
+        // privada sincronizada offline vaza pra comunidade (t_8e652bfe F2).
+        visibility: visibility ?? 'private',
+        updated_at: Date.now(),
+      },
       updated_at: Date.now(),
       owner_email: getAuthSession()?.user?.email ?? null,
     })
