@@ -22,7 +22,7 @@ const ROTATION_NAMES: Record<ProvaiSourceLanguage, 'Provai e Vede' | 'Probad y V
 }
 
 /** URLs auditadas (HTTP 200, 13 MP4s) — slugs ES literais, inclusive irregulares. */
-const PROVAI_SOURCES_2026: ProvaiSource[] = [
+const PROVAI_SOURCES_2026: ProvaiSource[] = ([
   { language: 'pt', quarter: 1, url: 'https://downloads.adventistas.org/pt/mordomia-crista/video/provai-e-vede-2026-1o-trimestre' },
   { language: 'pt', quarter: 2, url: 'https://downloads.adventistas.org/pt/mordomia-crista/video/provai-e-vede-2026-2o-trimestre' },
   { language: 'pt', quarter: 3, url: 'https://downloads.adventistas.org/pt/mordomia-crista/video/provai-e-vede-2026-3o-trimestre' },
@@ -31,7 +31,11 @@ const PROVAI_SOURCES_2026: ProvaiSource[] = [
   { language: 'es', quarter: 2, url: 'https://downloads.adventistas.org/es/mayordomia-cristiana/video/probad-y-ved-2026-2do-2026-trimestre/' },
   { language: 'es', quarter: 3, url: 'https://downloads.adventistas.org/es/mayordomia-cristiana/video/probad-y-ved-2026-3do-2026-trimestre/' },
   { language: 'es', quarter: 4, url: 'https://downloads.adventistas.org/es/mayordomia-cristiana/video/probad-y-ved-2026-4er-2026-trimestre/' },
-].map((s) => ({ ...s, year: 2026, rotationName: ROTATION_NAMES[s.language] }))
+] satisfies Array<Pick<ProvaiSource, 'language' | 'quarter' | 'url'>>).map((s) => ({
+  ...s,
+  year: 2026,
+  rotationName: ROTATION_NAMES[s.language],
+}))
 
 export { PROVAI_SOURCES_2026 }
 
