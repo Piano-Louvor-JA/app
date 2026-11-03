@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useMediaStore } from '@modules/media/stores/useMediaStore'
@@ -12,17 +12,20 @@ import { getShowCustomCollections, setShowCustomCollections } from '../visibilit
 import AlbumCollectionCard from '../components/AlbumCollectionCard.vue'
 import AlbumHymnalCard from '../components/AlbumHymnalCard.vue'
 import AlbumLyricDialog from '../components/AlbumLyricDialog.vue'
+import AlbumPlaylistPickerDialog from '../components/AlbumPlaylistPickerDialog.vue'
 import AlbumSearchHitRow from '../components/AlbumSearchHitRow.vue'
 import DownloadFailureDialog from '@modules/sync/components/DownloadFailureDialog.vue'
 import { useAlbums } from '../composables/useAlbums'
 import type { AlbumCategory, AlbumCollection } from '../types/albums'
 import {
+  addPlaylistItem,
   createPlaylist,
   deletePlaylist,
   listPlaylists,
   removePlaylistItem,
   savePlaylists,
   type Playlist,
+  type PlaylistItem,
 } from '../services/playlist-storage'
 import { parsePlaylistsImport, serializePlaylists } from '../services/playlist-io'
 
@@ -77,7 +80,37 @@ const {
 } = useAlbums()
 
 const busyMusicId = ref<number | null>(null)
+const playlistItem = ref<PlaylistItem | null>(null)
+const playlistFeedback = ref('')
 const albumPendingRemoval = ref<LibraryAlbum | null>(null)
+
+let playlistFeedbackTimer: ReturnType<typeof setTimeout> | null = null
+
+onBeforeUnmount(() => {
+  if (playlistFeedbackTimer) clearTimeout(playlistFeedbackTimer)
+})
+
+function closePlaylistPicker() {
+  playlistItem.value = null
+}
+
+function openPlaylistPicker(hit: { musicId: number; name: string }) {
+  playlistItem.value = { musicId: hit.musicId, albumId: null, title: hit.name }
+}
+
+function addToPlaylist(id: string) {
+  const item = playlistItem.value
+  if (!item) return
+  const target = playlists.value.find((playlist) => playlist.id === id)
+  const result = addPlaylistItem(id, item)
+  playlists.value = listPlaylists()
+  playlistItem.value = null
+  playlistFeedback.value = result?.added
+    ? `“${item.title}” adicionada a “${target?.name ?? 'playlist'}”`
+    : `“${item.title}” já está em “${target?.name ?? 'playlist'}”`
+  if (playlistFeedbackTimer) clearTimeout(playlistFeedbackTimer)
+  playlistFeedbackTimer = setTimeout(() => { playlistFeedback.value = '' }, 2600)
+}
 
 const showDownloadControls = computed(() => isDesktop)
 
@@ -607,6 +640,7 @@ async function runAction(
             "
             @slides="runAction(hit.musicId, () => playSlides(hit.musicId))"
             @lyric="runAction(hit.musicId, () => openLyric(hit.musicId))"
+            @playlist="openPlaylistPicker(hit)"
           />
         </div>
       </GlassCard>
@@ -689,6 +723,22 @@ async function runAction(
       </section>
     </div>
 
+    <Teleport to="body">
+      <Transition name="playlist-toast">
+        <div v-if="playlistFeedback" class="playlist-toast" role="status" aria-live="polite">
+          <i class="ti ti-circle-check" aria-hidden="true" />
+          {{ playlistFeedback }}
+        </div>
+      </Transition>
+    </Teleport>
+
+    <AlbumPlaylistPickerDialog
+      :item="playlistItem"
+      :playlists="playlists"
+      @close="closePlaylistPicker"
+      @select="addToPlaylist"
+    />
+
     <AlbumLyricDialog
       :open="lyricOpen"
       :loading="isLoadingLyric"
@@ -747,6 +797,26 @@ async function runAction(
 </template>
 
 <style scoped lang="scss">
+.playlist-toast {
+  position: fixed;
+  bottom: calc(var(--ds-dock-height, 4rem) + 1.25rem);
+  left: 50%;
+  z-index: 1200;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  transform: translateX(-50%);
+  padding: 0.7rem 1.1rem;
+  border: 1px solid color-mix(in srgb, var(--ds-color-primary, #2196f3) 35%, transparent);
+  border-radius: var(--ds-radius-md, 12px 0 12px 0);
+  background: var(--ds-color-surface-elevated, #1e1e1e);
+  color: var(--ds-color-on-surface, #e5e2e1);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 45%);
+}
+.playlist-toast .ti { color: var(--ds-color-primary, #2196f3); }
+.playlist-toast-enter-active, .playlist-toast-leave-active { transition: opacity .28s ease, transform .28s ease; }
+.playlist-toast-enter-from, .playlist-toast-leave-to { opacity: 0; transform: translateX(-50%) translateY(.6rem); }
+
 .albums-view {
   position: relative;
   display: flex;

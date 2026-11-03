@@ -183,10 +183,11 @@ vi.mock('../../components/AlbumSearchHitRow.vue', () => ({
   default: {
     name: 'AlbumSearchHitRow',
     props: ['hit', 'busy'],
-    emits: ['sung', 'instrumental', 'slides', 'lyric'],
+    emits: ['sung', 'instrumental', 'slides', 'lyric', 'playlist'],
     template: `<div class="hit-row-stub" :data-id="hit.musicId">
       <button class="hr-sung" @click="$emit('sung')" />
       <button class="hr-lyric" @click="$emit('lyric')" />
+      <button class="hr-playlist" @click="$emit('playlist')" />
     </div>`,
   },
 }))
@@ -279,6 +280,20 @@ describe('AlbumsView', () => {
     await w.find('.hr-sung').trigger('click')
     await flushPromises()
     void w.find('.hr-lyric')
+  })
+
+  it('hub search: playlist do hit abre picker, adiciona e mostra toast', async () => {
+    setState({ isHubSearching: true, hubResults: hits })
+    const w = await mountView()
+    await w.find('.hr-playlist').trigger('click')
+    const pickerInBody = () => body().querySelector('.playlist-picker')
+    expect(pickerInBody()).not.toBeNull()
+    ;(pickerInBody()!.querySelector('.playlist-picker__option') as HTMLElement).click()
+    await flushPromises()
+    expect(pickerInBody()).toBeNull()
+    expect(body().querySelector('.playlist-toast')).not.toBeNull()
+    expect(body().querySelector('.playlist-toast')!.textContent).toContain('adicionada')
+    expect(listPlaylists().find((p) => p.id === 'pl-1')!.items.some((i) => i.musicId === 1)).toBe(true)
   })
 
   it('toggle visibilidade de coletâneas custom persiste preferência', async () => {
