@@ -126,6 +126,38 @@ describe('cliente Firebase e ponte da sessão', () => {
     expect(fetch).toHaveBeenCalledTimes(2)
   })
 
+  it('authReadiness resolve após a revalidação inicial concluir', async () => {
+    let resolveBridge!: (value: Response) => void
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(resolve => { resolveBridge = resolve })))
+    const client = await import('../firebase-client')
+    const revalidation = client.revalidateFirebaseSessionOnBoot()
+    const readiness = client.authReadiness
+
+    let resolved = false
+    void readiness.then(() => { resolved = true })
+    await Promise.resolve()
+    expect(resolved).toBe(false)
+
+    resolveBridge({ ok: true, status: 200, text: async () => JSON.stringify(session) } as Response)
+    await expect(revalidation).resolves.toEqual(session)
+    await expect(readiness).resolves.toEqual(session)
+  })
+
+  it('authReadiness inicia a revalidação lazy quando o boot ainda não chamou', async () => {
+    const client = await import('../firebase-client')
+    await expect(client.authReadiness).resolves.toEqual(session)
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('authReadiness preserva sessão em reload após save offline', async () => {
+    mocks.auth.mockReturnValue({ currentUser: null })
+    vi.mocked(fetch).mockRejectedValue(new Error('offline'))
+    const client = await import('../firebase-client')
+    await expect(client.authReadiness).resolves.toBeNull()
+    expect(mocks.save).not.toHaveBeenCalled()
+    expect(mocks.session).toHaveReturnedWith(session)
+  })
+
   it('no boot limpa sessão rejeitada uma vez, sem loop', async () => {
     vi.mocked(fetch).mockResolvedValue({ ok: false, status: 401, text: async () => '' } as Response)
     const client = await import('../firebase-client')

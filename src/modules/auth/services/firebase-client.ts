@@ -26,6 +26,16 @@ import { getAuthSession, saveSession, type AuthSession } from '@modules/media/se
 
 let authInstance: Auth | null = null
 let bootRevalidation: Promise<AuthSession | null> | null = null
+let bootReadiness: Promise<AuthSession | null> | null = null
+
+/** Aguarda a revalidação inicial; a primeira chamada compartilha o coalescing do boot. */
+export const authReadiness: Promise<AuthSession | null> = new Proxy(Promise.resolve(null), {
+  get(_target, property, receiver) {
+    const readiness = bootReadiness ??= revalidateFirebaseSessionOnBoot()
+    const value = Reflect.get(readiness, property, receiver)
+    return typeof value === 'function' ? value.bind(readiness) : value
+  },
+})
 
 function getFirebaseAuth(): Auth {
   if (!authInstance) {
@@ -111,6 +121,7 @@ async function exchangeFirebaseToken(token: string): Promise<{ session: AuthSess
 
 /** Revalida a sessão persistida no boot sem apagar dados durante falha de rede. */
 export function revalidateFirebaseSessionOnBoot(): Promise<AuthSession | null> {
+  if (bootReadiness) return bootReadiness
   if (bootRevalidation) return bootRevalidation
 
   bootRevalidation = (async () => {
