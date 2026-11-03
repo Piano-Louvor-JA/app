@@ -72,7 +72,12 @@ it('confirms a delayed browser source shows the logo for three seconds, then rec
   const httpPort = await freePort(), wsPort = await freePort()
   const events: Array<{ type?: string; requestId?: string }> = []
   const slot = new PalcoSlot('test', 'OBS test', httpPort, wsPort, () => ({
-    send: (channel: string, event: { type?: string; requestId?: string }) => { if (channel === 'palco:event') events.push(event) },
+    send: (channel: string, event: { type?: string; requestId?: string }) => {
+      if (channel !== 'palco:event') return
+      // Exercise a slow renderer acknowledgement as seen on loaded CI runners.
+      if (event.type === 'obs-warmup-complete') setTimeout(() => events.push(event), 1500)
+      else events.push(event)
+    },
   }))
   const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] })
   try {
@@ -84,7 +89,7 @@ it('confirms a delayed browser source shows the logo for three seconds, then rec
     await page.locator('#obsWarmupView img').waitFor({ state: 'visible' })
     await page.waitForTimeout(2000)
     expect(await page.locator('#obsWarmupView').isVisible()).toBe(true)
-    await expect.poll(() => events.some(event => event.type === 'obs-warmup-complete' && event.requestId === 'delayed')).toBe(true)
+    await expect.poll(() => events.some(event => event.type === 'obs-warmup-complete' && event.requestId === 'delayed'), { timeout: 10000 }).toBe(true)
     expect(await page.locator('#obsWarmupView').count()).toBe(0)
     slot.send({ v: 2, type: 'projection', text: 'CONTEUDO APOS TESTE', scope: 'bible' })
     await page.waitForFunction(() => document.querySelector('#text')?.textContent === 'CONTEUDO APOS TESTE')
