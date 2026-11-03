@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { GlassCard } from "@design-system/index";
 import { getAuthSession } from "@modules/media/services/auth-client";
+import { getAuthReadiness } from "@modules/auth/services/firebase-client";
 
 import ReportDialog from "../components/ReportDialog.vue";
 import { storeToRefs } from "pinia";
@@ -89,6 +90,10 @@ const seasonalEvent = ref<SeasonalEventBanner | null>(null);
 
 async function load() {
 	isLoading.value = true;
+	await Promise.race([
+		getAuthReadiness(),
+		new Promise<void>(resolve => setTimeout(resolve, 8_000)),
+	]);
 	const [result, tasks, notifs, seasonal] = await Promise.all([
 		listCommunityCollectionsPage(page.value, PER_PAGE),
 		getWeeklyTasks(),
@@ -142,8 +147,8 @@ async function saveCopy(collection: CommunityCollectionSummary) {
 	const localId = await saveCommunityCopy(collection);
 	copyingId.value = null;
 	if (localId !== null) {
-		// O editor de Minhas Coletâneas está oculto por feature flag
-		// (SHOW_CUSTOM_COLLECTIONS=false): dar feedback aqui, sem navegar.
+		// Cópia fica em Minhas Coletâneas (/albums, SHOW_CUSTOM_COLLECTIONS=true
+		// desde 16/09); criar/editar agora parte daqui mesmo, via botão no header.
 		savedId.value = collection.id;
 		await load();
 	} else {
@@ -194,6 +199,16 @@ onMounted(load);
         >
           <i class="ti ti-trophy" aria-hidden="true" />
           {{ t('community.ranking') }}
+        </button>
+        <button
+          type="button"
+          class="community-view__create-btn"
+          :aria-label="t('community.createCollection')"
+          :title="t('community.createCollection')"
+          @click="router.push('/media/editor')"
+        >
+          <i class="ti ti-pencil-plus" aria-hidden="true" />
+          {{ t('community.createCollection') }}
         </button>
       </div>
     </header>
@@ -482,6 +497,20 @@ onMounted(load);
 }
 
 .community-view__ranking-link {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	margin-top: 0.5rem;
+	padding: 0.4rem 0.8rem;
+	border-radius: 0.5rem;
+	border: 1px solid var(--ds-border, rgba(255, 255, 255, 0.2));
+	background: var(--ds-glass-fill, rgba(255, 255, 255, 0.08));
+	color: inherit;
+	font-size: 0.9rem;
+	cursor: pointer;
+}
+
+.community-view__create-btn {
 	display: inline-flex;
 	align-items: center;
 	gap: 0.4rem;

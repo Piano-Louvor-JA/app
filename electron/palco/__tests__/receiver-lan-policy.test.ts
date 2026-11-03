@@ -26,7 +26,8 @@ function receiver(file: string, host: string, port = '7081', extra = '') {
   })
   for (const script of w.document.querySelectorAll('script')) {
     const code = script.getAttribute('src') === 'purify.min.js'
-      ? readFileSync(resolve('electron/palco/purify.min.js'), 'utf8') : script.textContent
+      ? readFileSync(resolve('electron/palco/purify.min.js'), 'utf8') : script.getAttribute('src') === 'network-mirror.js'
+        ? readFileSync(resolve('electron/palco/network-mirror.js'), 'utf8') : script.textContent
     if (code?.trim()) w.eval(code)
   }
   fetch.mockClear()

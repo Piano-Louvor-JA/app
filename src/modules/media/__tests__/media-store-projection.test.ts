@@ -99,6 +99,24 @@ describe('useMediaStore — controle de projeção e ocultação de conteúdo', 
     isProjectionModuleOpen.mockReturnValue(false)
   })
 
+  it('stopProjection fecha a janela de mídia e preserva a reprodução local', () => {
+    const store = useMediaStore()
+    store.isProjecting = true
+    store.status = 'playing'
+    isProjectionModuleOpen.mockReturnValue(true)
+    store.stopProjection()
+    expect(closeProjectionModule).toHaveBeenCalledOnce()
+    expect(store.isProjecting).toBe(false)
+    expect(readMediaRuntimeFromStorage().active).toBe(false)
+    expect(store.status).toBe('playing')
+  })
+
+  it('stopProjection não fecha a janela pertencente a outro módulo', () => {
+    const store = useMediaStore()
+    store.stopProjection()
+    expect(closeProjectionModule).not.toHaveBeenCalled()
+  })
+
   it('clearProjection define isProjecting como falso e publica runtime inativo sem fechar a janela', () => {
     const store = useMediaStore()
     store.session = {

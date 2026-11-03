@@ -12,6 +12,7 @@ import {
 
 import MusicTrackActions from '@shared/components/MusicTrackActions.vue'
 
+import { parseLiturgyWebTarget } from '../services/liturgy-web-runtime'
 import { formatDurationLabel } from '../services/liturgy-format'
 import { getItemTypeIcon, isExecutableItem } from '../services/liturgy-item-helpers'
 import { probeMediaDurationMs } from '../services/media-probe'
@@ -298,6 +299,7 @@ const isVideoRemote = computed(
     isLocalPdf.value ||
     isLocalPresentation.value,
 )
+const isYoutubeItem = computed(() => parseLiturgyWebTarget(props.item.url || '')?.kind === 'youtube')
 const isSiteItem = computed(() => props.item.type === 'site')
 const isDimmed = computed(
   () => Boolean(props.reorderActive) && !props.isDragSource,
@@ -808,12 +810,8 @@ const projectActionTitle = computed(() => {
           </button>
           <button
             v-if="
-              !isCategory &&
-                (isSiteItem ||
-                  // Player externo (VLC etc) não alimenta a projeção — o
-                  // botão de projetar só existe no player do sistema
-                  // (Rafael 03/10: esconde para não confundir).
-                  (isVideoRemote && rowPlayerId === 'associated'))
+              !isCategory && !isYoutubeItem && !isSiteItem && !isLocalImages && !isLocalPdf && !isLocalPresentation && !isLocalVideo &&
+                isVideoRemote && rowPlayerId === 'associated'
             "
             type="button"
             class="liturgy-item__action liturgy-item__action--site-project"

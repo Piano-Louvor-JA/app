@@ -169,6 +169,7 @@ describe("flushOutbox", () => {
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("https://api.test/v1/custom/sync");
+    expect(init.headers).toMatchObject({ "X-Tenant": "piano" });
     const body = JSON.parse(String(init.body)) as {
       collections: Array<{ client_uuid: string; musics: Array<{ client_uuid: string }> }>;
     };

@@ -163,6 +163,7 @@ export default {
       },
     },
     fields: {
+      provaiSourceEdition: 'Taste and See edition (official sources: PT/ES — falls back to PT)',
       name: 'Name',
       description: 'Description',
       url: 'URL',

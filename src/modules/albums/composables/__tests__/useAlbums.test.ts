@@ -54,7 +54,7 @@ const { storeMock, libraryMock, mediaMock, pushMock, loadTracksMock, desktopFlag
       clearError: vi.fn(),
     };
 
-    const mediaMock = { playAlbumQueue: vi.fn(), playQueue: vi.fn() };
+    const mediaMock = { playAlbumQueue: vi.fn(), appendQueue: vi.fn(), playQueue: vi.fn() };
 
     const pushMock = vi.fn(async () => {});
 
@@ -256,16 +256,88 @@ describe("useAlbums", () => {
     expect(pushMock).toHaveBeenCalledWith({ name: "media" });
   });
 
-  it("playAllInActiveCollection recusa sem coleção, hinário, vazio ou id inválido", async () => {
+  it("toca a coletânea aleatoriamente preservando sua sequência original", async () => {
+    const albumsStore = useAlbumsStore();
+    albumsStore.activeCollection = { id: '3', kind: 'album', name: 'Culto' } as never;
+    albumsStore.tracks = [{ musicId: 31, name: 'Santo' }, { musicId: 32, name: 'Eu Vou' }] as never;
+    const { api } = await setup();
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0);
+    try {
+      await api.playAllInActiveCollection('audio', true);
+      const original = [
+        { musicId: 31, albumId: 3, title: 'Santo' },
+        { musicId: 32, albumId: 3, title: 'Eu Vou' },
+      ];
+      expect(mediaMock.playQueue).toHaveBeenCalledWith(
+        [original[1], original[0]], 0, 'audio', 'Culto', { originalOrder: original, shuffled: true },
+      );
+      expect(albumsStore.tracks.map((track) => track.musicId)).toEqual([31, 32]);
+      expect(pushMock).toHaveBeenCalledWith({ name: 'media' });
+    } finally {
+      random.mockRestore();
+    }
+  });
+
+  it.each(['pt_hymnal', 'pt_hymnal_1996'])('toca o hinário %s em sequência e aleatoriamente', async (id) => {
+    const albumsStore = useAlbumsStore();
+    albumsStore.activeCollection = { id, kind: 'hymnal', name: 'Hinário Adventista' } as never;
+    albumsStore.tracks = [{ musicId: 1, name: 'Santo, Santo, Santo!' }, { musicId: 2, name: 'Ó Adorai o Senhor' }] as never;
+    const { api } = await setup();
+    const original = [
+      { musicId: 1, albumId: null, title: 'Santo, Santo, Santo!' },
+      { musicId: 2, albumId: null, title: 'Ó Adorai o Senhor' },
+    ];
+    await expect(api.playAllInActiveCollection()).resolves.toBe(true);
+    expect(mediaMock.playAlbumQueue).toHaveBeenCalledWith(original, 'audio');
+    await expect(api.playAllInActiveCollection('audio', true)).resolves.toBe(true);
+    expect(mediaMock.playQueue).toHaveBeenCalledWith(
+      expect.arrayContaining(original), 0, 'audio', 'Hinário Adventista', { originalOrder: original, shuffled: true },
+    );
+    expect(pushMock).toHaveBeenCalledWith({ name: 'media' });
+  });
+
+  it("appendActiveCollectionToQueue encadeia faixa ordenada sem navegar", async () => {
+    const albumsStore = useAlbumsStore();
+    albumsStore.activeCollection = { id: "3", kind: "album", name: "Col" } as never;
+    albumsStore.tracks = [
+      { musicId: 31, name: "a" },
+      { musicId: 32, name: "b" },
+    ] as never;
+    const { api } = await setup();
+
+    await expect(api.appendActiveCollectionToQueue()).resolves.toBe(true);
+    expect(mediaMock.appendQueue).toHaveBeenCalledWith([
+      { musicId: 31, albumId: 3, title: "a" },
+      { musicId: 32, albumId: 3, title: "b" },
+    ]);
+    expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it("appendActiveCollectionToQueue recusa sem coleção, hinário, vazio ou id inválido", async () => {
+    const { api } = await setup();
+    storeMock.activeCollection = null;
+    await expect(api.appendActiveCollectionToQueue()).resolves.toBe(false);
+
+    storeMock.activeCollection = { id: "1", kind: "hymnal" };
+    storeMock.tracks = [{ musicId: 1, name: "x" }];
+    await expect(api.appendActiveCollectionToQueue()).resolves.toBe(false);
+
+    storeMock.activeCollection = { id: "1", kind: "album" };
+    storeMock.tracks = [];
+    await expect(api.appendActiveCollectionToQueue()).resolves.toBe(false);
+
+    storeMock.activeCollection = { id: "abc", kind: "album" };
+    storeMock.tracks = [{ musicId: 1, name: "x" }];
+    await expect(api.appendActiveCollectionToQueue()).resolves.toBe(false);
+
+    expect(mediaMock.appendQueue).not.toHaveBeenCalled();
+  });
+
+  it("playAllInActiveCollection recusa sem coleção, vazio ou id inválido", async () => {
     const { api } = await setup();
 
     // sem coleção
     storeMock.activeCollection = null;
-    await expect(api.playAllInActiveCollection()).resolves.toBe(false);
-
-    // hinário
-    storeMock.activeCollection = { id: "1", kind: "hymnal" };
-    storeMock.tracks = [{ musicId: 1, name: "x" }];
     await expect(api.playAllInActiveCollection()).resolves.toBe(false);
 
     // sem faixas

@@ -163,6 +163,7 @@ export default {
       },
     },
     fields: {
+      provaiSourceEdition: 'Edição do Provai e Vede',
       name: 'Nome',
       description: 'Descrição',
       url: 'URL',

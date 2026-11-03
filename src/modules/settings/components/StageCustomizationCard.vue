@@ -33,6 +33,7 @@ import StagePreview from './StagePreview.vue'
 const { t } = useI18n()
 
 const props = defineProps<{
+  titleKey?: string
   /** Escopo inicial selecionado (atalho contextual: paleta do módulo abre na sua tab). */
   initialScope?: string
   /** Quando definido, mostra APENAS este escopo (paleta do módulo personaliza só ele). */
@@ -211,7 +212,7 @@ const confirmReset = ref(false)
   <GlassCard class="stage-custom">
     <div class="stage-custom__header">
       <i class="ti ti-palette stage-custom__icon" aria-hidden="true" />
-      <h3 class="stage-custom__title">{{ t('settings.stage.title') }}</h3>
+      <h3 class="stage-custom__title">{{ t(titleKey ?? 'settings.stage.title') }}</h3>
     </div>
 
     <!-- Escopos: global (padrão herdado) + um por módulo -->

@@ -100,6 +100,7 @@ vi.mock('../../composables/useAlbums', async () => {
         playInstrumental: vi.fn(async () => true),
         playSlides: vi.fn(async () => true),
         playAllInActiveCollection: mocks.playAll ?? (async () => true),
+        appendActiveCollectionToQueue: mocks.appendActiveCollectionToQueue ?? (async () => true),
         openLyric: vi.fn(async () => true),
         closeLyric: vi.fn(),
       }
@@ -147,7 +148,7 @@ vi.mock('../../components/AlbumLyricDialog.vue', () => ({
 vi.mock('../../components/AlbumTrackRow.vue', () => ({
   default: {
     name: 'AlbumTrackRow',
-    props: ['track', 'collectionName', 'artworkUrl', 'busy'],
+    props: ['track', 'collectionName', 'artworkUrl', 'busy', 'selected'],
     emits: ['sung', 'instrumental', 'slides', 'lyric', 'playlist'],
     template: `<div class="track-row-stub" :data-id="track.musicId" :data-busy="String(busy)">
       <button class="row-sung" @click="$emit('sung')" />
@@ -228,10 +229,45 @@ describe('AlbumCollectionView', () => {
     expect((globalThis as any).__albumsMock.playAll).toHaveBeenCalled()
   })
 
-  it('kind hinário esconde play-all', async () => {
+  it('botão aleatório chama reprodução da coletânea em modo aleatório', async () => {
+    const w = await mountView()
+    await w.find('.album-collection-view__shuffle').trigger('click')
+    expect((globalThis as any).__albumsMock.playAll).toHaveBeenCalledWith('audio', true)
+  })
+
+  it('selects the first track immediately and navigates without a search query', async () => {
+    const wrapper = await mountView()
+    const rows = () => wrapper.findAllComponents({ name: 'AlbumTrackRow' })
+    const input = wrapper.get('input[type="search"]')
+    expect((input.element as HTMLInputElement).value).toBe('')
+    expect(rows()[0].props('selected')).toBe(true)
+    await input.trigger('keydown', { key: 'ArrowDown' })
+    expect(rows()[1].props('selected')).toBe(true)
+    await input.trigger('keydown', { key: 'ArrowUp' })
+    expect(rows()[0].props('selected')).toBe(true)
+    await input.trigger('keydown', { key: 'Enter' })
+    await flushPromises()
+  })
+
+  it('selects and navigates hymnal search results with the keyboard', async () => {
+    const wrapper = await mountView()
+    const input = wrapper.get('input[type="search"]')
+    await input.setValue('hino')
+    const rows = () => wrapper.findAllComponents({ name: 'AlbumTrackRow' })
+    expect(rows()[0].props('selected')).toBe(true)
+    await input.trigger('keydown', { key: 'ArrowDown' })
+    expect(rows()[1].props('selected')).toBe(true)
+    await input.trigger('keydown', { key: 'ArrowUp' })
+    expect(rows()[0].props('selected')).toBe(true)
+    await input.trigger('keydown', { key: 'Enter' })
+    await flushPromises()
+  })
+
+  it('hinário também oferece reprodução em sequência e aleatória', async () => {
     ;(globalThis as any).__albumsMock.activeCollection = { ...collection, kind: 'hymnal' }
     const w = await mountView()
-    expect(w.find('.album-collection-view__play-all').exists()).toBe(false)
+    expect(w.find('.album-collection-view__play-all').exists()).toBe(true)
+    expect(w.find('.album-collection-view__shuffle').exists()).toBe(true)
   })
 
   it('picker de playlist: abrir, adicionar e mostrar toast; duplicado mostra já está', async () => {
@@ -327,6 +363,19 @@ describe('AlbumCollectionView', () => {
     w.unmount()
     await flushPromises()
     // sem throw
+  })
+
+  it('botão append-queue adiciona à fila e mostra toast appendedToQueue', async () => {
+    const appendMock = vi.fn(async () => true)
+    setupMocks({ appendActiveCollectionToQueue: appendMock })
+    const w = await mountView()
+    const btn = w.find('.album-collection-view__append-queue')
+    expect(btn.exists()).toBe(true)
+    await btn.trigger('click')
+    await flushPromises()
+    expect(appendMock).toHaveBeenCalledTimes(1)
+    expect(document.body.querySelector('.playlist-toast')!.textContent).toContain('albums.appendedToQueue')
+    w.unmount()
   })
 
   it('acao instrumental/slides/lyric das linhas disparam runAction', async () => {

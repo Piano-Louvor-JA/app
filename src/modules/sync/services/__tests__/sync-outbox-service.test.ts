@@ -74,6 +74,7 @@ describe('outbox do estado do operador (sync v2 fase 2)', () => {
     const [url, init] = fetchMock.mock.calls[0]
     expect(url).toContain('/v1/custom/sync')
     expect((init as RequestInit).headers).toMatchObject({
+      'X-Tenant': 'piano',
       authorization: 'Bearer tok-123',
     })
     const body = JSON.parse((init as RequestInit).body as string)

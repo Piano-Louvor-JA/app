@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { obsDetecting } from '@modules/settings/services/obs-detection'
 import { useI18n } from 'vue-i18n'
 
 defineProps<{
@@ -23,13 +24,15 @@ function onClick(projecting: boolean, disabled: boolean) {
 <template>
   <button
     type="button"
+    :aria-busy="obsDetecting"
     class="media-project-fab"
     :class="{ 'media-project-fab--active': projecting }"
-    :disabled="disabled && !projecting"
+    :disabled="obsDetecting || (disabled && !projecting)"
     :aria-label="projecting ? t('media.clearProjection') : t('media.project')"
     :title="projecting ? t('media.clearProjection') : t('media.project')"
     @click="onClick(Boolean(projecting), Boolean(disabled))"
   >
+    <span v-if="obsDetecting" class="obs-detection-status" role="status">{{ t('obsOutputs.detecting') }}</span>
     <i
       class="ti"
       :class="projecting ? 'ti-player-stop' : 'ti-player-play'"
@@ -39,6 +42,7 @@ function onClick(projecting: boolean, disabled: boolean) {
 </template>
 
 <style scoped lang="scss">
+.obs-detection-status { position: absolute; right: 0; bottom: calc(100% + 0.4rem); padding: 0.4rem 0.6rem; border-radius: 0.4rem; white-space: nowrap; background: var(--ds-color-surface, #222); color: var(--ds-color-on-surface, #fff); font-size: 0.75rem; font-weight: 500; }
 .media-project-fab {
   position: relative;
   z-index: 35;

@@ -536,7 +536,7 @@ async function onSelectMusic(id: number): Promise<void> {
 }
 
 function onBack(): void {
-  void router.push({ name: 'albums' })
+  void router.push({ name: 'community' })
 }
 
 /* ---------- Import / Export .slja ---------- */

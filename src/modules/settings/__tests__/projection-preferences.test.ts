@@ -138,7 +138,7 @@ describe('projection-preferences — tela de retorno', () => {
     expect(resolveSelectedReturnMonitorId(settings, [1, 2, 4], [1, 2])).toBeNull()
   })
 
-  it('pruneReturnDisplay desliga se o monitor sumiu', () => {
+  it('preserva a preferência de retorno quando o monitor está temporariamente ausente', () => {
     const next = pruneReturnDisplay(
       {
         ...DEFAULT_PROJECTION_SETTINGS,
@@ -147,8 +147,8 @@ describe('projection-preferences — tela de retorno', () => {
       },
       [1, 2],
     )
-    expect(next.returnDisplayId).toBeNull()
-    expect(next.openReturnScreen).toBe(false)
+    expect(next.returnDisplayId).toBe(9)
+    expect(next.openReturnScreen).toBe(true)
   })
 })
 
@@ -323,4 +323,29 @@ describe('projection-preferences — gaps de normalização e utilitários', () 
     await expect(readImageAsDataUrl(errFile)).rejects.toThrow()
     FileReader.prototype.readAsDataURL = OriginalRead
   })
+})
+
+it('keeps return enabled through save, missing monitors, reload and reconnect', () => {
+  const selected = enableReturnScreen({ ...DEFAULT_PROJECTION_SETTINGS, returnDisplayId: 2 }, DISPLAYS)
+  saveProjectionSettings(selected)
+  const offline = pruneReturnDisplay(reconcileTargetDisplays(loadProjectionSettings(), []), [])
+  saveProjectionSettings(offline)
+  const restarted = loadProjectionSettings()
+  expect(restarted.openReturnScreen).toBe(true)
+  expect(restarted.returnDisplayId).toBe(2)
+  expect(resolveReturnMonitorId(restarted, [1])).toBeNull()
+  const connected = reconcileTargetDisplays(restarted, [2, 3])
+  expect(resolveSelectedReturnMonitorId(connected, [1, 2, 3], connected.targetDisplayIds)).toBe(2)
+})
+
+it('keeps an intentional disable after save and reload even when the monitor returns', () => {
+  saveProjectionSettings({ ...DEFAULT_PROJECTION_SETTINGS, openReturnScreen: false, returnDisplayId: 2 })
+  const reloaded = reconcileTargetDisplays(loadProjectionSettings(), [2, 3])
+  expect(reloaded.openReturnScreen).toBe(false)
+  expect(resolveReturnMonitorId(reloaded, [1, 2, 3])).toBeNull()
+})
+it('keeps the selected return monitor when it is the primary display', () => {
+  const saved = { ...DEFAULT_PROJECTION_SETTINGS, openReturnScreen: true, returnDisplayId: 1, targetDisplayIds: [1, 2] }
+  const next = reconcileTargetDisplays(saved, [2])
+  expect(resolveSelectedReturnMonitorId(next, [1, 2], next.targetDisplayIds)).toBe(1)
 })

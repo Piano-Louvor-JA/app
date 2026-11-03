@@ -65,11 +65,14 @@ vi.mock('@modules/media/composables/useMediaPlayer', async () => {
     slideProgressRatio: ref(0.5),
     queue: ref([] as Array<{ musicId: number; title: string }>),
     queueIndex: ref(0),
+    queueShuffled: ref(false),
     volume: ref(0.8),
     audioOnTv: ref(false),
   }
   const fns = {
     jumpToQueue: vi.fn(),
+    playQueueInOrder: vi.fn(),
+    moveQueueItem: vi.fn(),
     maximize: vi.fn(),
     minimize: vi.fn(),
     togglePlay: vi.fn(),
@@ -167,6 +170,7 @@ beforeEach(() => {
   P().refs.session.value = null
   P().refs.hasSession.value = false
   P().refs.showPlaylist.value = true
+  P().refs.queueShuffled.value = false
   P().refs.queue.value = []
   P().refs.currentSlide.value = null
   P().refs.ondemandNoticeVisible.value = false
@@ -234,6 +238,68 @@ describe('MediaView — sessão com conteúdo', () => {
     expect(items.length).toBe(2)
     await items[1]!.trigger('click')
     expect(P().fns.goToSlide).toHaveBeenCalledWith(1)
+  })
+
+  it('botões do palco acionam reprodução aleatória e em sequência', async () => {
+    P().refs.queue.value = [
+      { musicId: 1, title: 'Santo' },
+      { musicId: 2, title: 'Eu Vou' },
+    ]
+    const w = await mountView()
+    const buttons = w.findAll('.media-window__queue-actions button')
+    expect(buttons).toHaveLength(2)
+    expect(buttons[1]!.attributes('aria-pressed')).toBe('true')
+    P().refs.queueShuffled.value = true
+    await flushPromises()
+    expect(buttons[0]!.classes()).toContain('media-window__queue-action--active')
+    expect(buttons[0]!.attributes('aria-pressed')).toBe('true')
+    expect(buttons[1]!.attributes('aria-pressed')).toBe('false')
+    await buttons[0]!.trigger('click')
+    expect(P().fns.playQueueInOrder).toHaveBeenCalledWith(true)
+    expect(w.find('.media-window__queue-mode-notice').text()).toBe('media.shuffleQueueApplied')
+    await buttons[1]!.trigger('click')
+    expect(P().fns.playQueueInOrder).toHaveBeenCalledWith(false)
+    expect(w.find('.media-window__queue-mode-notice').text()).toBe('media.sequentialQueueApplied')
+    P().refs.queueShuffled.value = false
+    P().refs.queue.value = []
+    await flushPromises()
+    expect(buttons[0]!.attributes('disabled')).toBeDefined()
+    expect(buttons[1]!.attributes('disabled')).toBeDefined()
+    w.unmount()
+  })
+
+  it('aviso desaparece após 3,2 segundos e uma nova escolha renova o prazo', async () => {
+    P().refs.queue.value = [{ musicId: 1, title: 'Santo' }, { musicId: 2, title: 'Eu Vou' }]
+    const w = await mountView()
+    vi.useFakeTimers()
+    try {
+      const buttons = w.findAll('.media-window__queue-actions button')
+      await buttons[0]!.trigger('click')
+      await vi.advanceTimersByTimeAsync(3000)
+      expect(w.find('.media-window__queue-mode-notice').exists()).toBe(true)
+      await buttons[1]!.trigger('click')
+      await vi.advanceTimersByTimeAsync(3199)
+      expect(w.find('.media-window__queue-mode-notice').exists()).toBe(true)
+      await vi.advanceTimersByTimeAsync(1)
+      expect(w.find('.media-window__queue-mode-notice').exists()).toBe(false)
+    } finally {
+      w.unmount()
+      vi.useRealTimers()
+    }
+  })
+
+  it('arrastar uma faixa destaca origem e destino sem iniciar outra música', async () => {
+    P().refs.queue.value = [{ musicId: 1, title: 'Santo' }, { musicId: 2, title: 'Eu Vou' }]
+    const w = await mountView()
+    await w.find('.media-window__queue-grip').trigger('dragstart')
+    expect(w.find('.media-window__queue-row--dragging').exists()).toBe(true)
+    await w.findAll('.media-window__queue-row')[1]!.trigger('dragover')
+    expect(w.find('.media-window__queue-row--after').exists()).toBe(true)
+    await w.findAll('.media-window__queue-row')[1]!.trigger('drop')
+    expect(P().fns.moveQueueItem).toHaveBeenCalledWith(0, 1)
+    expect(P().fns.jumpToQueue).not.toHaveBeenCalled()
+    expect(w.find('.media-window__queue-row--dragging').exists()).toBe(false)
+    w.unmount()
   })
 
   it('queue > 1: mostra fila de reprodução e jumpToQueue', async () => {

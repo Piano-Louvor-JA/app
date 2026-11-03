@@ -10,6 +10,7 @@ import { USER_PREFERENCE_KEYS } from '@shared/constants/storage-keys'
 import { useMediaPlayer } from '../composables/useMediaPlayer'
 import MediaProjectFab from './MediaProjectFab.vue'
 import MediaStatusPreview from './MediaStatusPreview.vue'
+import MediaCloseDialog from './MediaCloseDialog.vue'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -24,9 +25,13 @@ const {
   session,
   queueLabel,
   toggleProjection,
-  clearProjection,
+  stopProjection,
   togglePlay,
   maximize,
+  close,
+  requestClose,
+  cancelClose,
+  closeConfirmOpen,
 } = useMediaPlayer()
 
 const visible = computed(() => hasSession.value && minimized.value)
@@ -45,7 +50,7 @@ async function onProject() {
 }
 
 function onClear() {
-  clearProjection()
+  stopProjection()
 }
 
 async function onExpand() {
@@ -77,6 +82,15 @@ async function onToggleAudio() {
       :title="t('media.chromeDragHint')"
       @dblclick="resetPosition"
     >
+      <button
+        type="button"
+        class="media-chrome__icon-btn media-chrome__close"
+        :aria-label="t('media.close')"
+        :title="t('media.close')"
+        @click="requestClose"
+      >
+        <i class="ti ti-x" aria-hidden="true" />
+      </button>
       <MediaStatusPreview
         :snippet="previewSnippet"
         :reference="previewReference"
@@ -118,14 +132,28 @@ async function onToggleAudio() {
       />
     </div>
   </div>
+  <Teleport to="body">
+    <MediaCloseDialog
+      v-if="visible && closeConfirmOpen"
+      class="media-chrome-close-dialog"
+      :open="closeConfirmOpen"
+      @cancel="cancelClose"
+      @confirm="close"
+    />
+  </Teleport>
 </template>
 
 <style scoped lang="scss">
+.media-chrome-close-dialog {
+  position: fixed;
+  z-index: 112;
+}
+
 .media-chrome {
   position: fixed;
   right: 2rem;
   bottom: calc(var(--ds-dock-height, 5.5rem) + 1.25rem);
-  z-index: 36;
+  z-index: 111;
   display: flex;
   align-items: flex-end;
   gap: 0.75rem;
@@ -135,8 +163,27 @@ async function onToggleAudio() {
 }
 
 .media-chrome__handle {
+  position: relative;
   pointer-events: auto;
   cursor: grab;
+}
+
+.media-chrome__icon-btn.media-chrome__close {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 0.35rem);
+  width: 1.75rem;
+  height: 1.75rem;
+  border-color: #b77b76;
+  background: #69413e;
+  color: #fff;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 40%);
+  pointer-events: auto;
+
+  &:hover {
+    background: #85534e;
+    border-color: #d6a29c;
+  }
 }
 
 .media-chrome__actions {

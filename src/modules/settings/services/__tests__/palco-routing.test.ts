@@ -34,15 +34,15 @@ describe("palco-routing", () => {
 	});
 
 	it("rota de slot é tv-only", () => {
-		setPalcoRoute("hymns", "7082");
-		expect(isPalcoTvOnlyRoute("hymns")).toBe(true);
-		expect(isMirrorRoute("hymns")).toBe(false);
+		setPalcoRoute("random", "7082");
+		expect(isPalcoTvOnlyRoute("random")).toBe(true);
+		expect(isMirrorRoute("random")).toBe(false);
 	});
 
 	it("rota cable: não é tv-only", () => {
-		setPalcoRoute("hymns", "cable:1");
-		expect(isPalcoTvOnlyRoute("hymns")).toBe(false);
-		expect(isMirrorRoute("hymns")).toBe(false);
+		setPalcoRoute("random", "cable:1");
+		expect(isPalcoTvOnlyRoute("random")).toBe(false);
+		expect(isMirrorRoute("random")).toBe(false);
 	});
 
 	it("getPalcoRoutes retorna cópia de todas as rotas", () => {
@@ -70,3 +70,14 @@ describe("palco-routing — fallback interno", () => {
 		expect(route).toBe("mirror");
 	});
 });
+
+it('ignores the retired music destination saved by older versions', async () => {
+  localStorage.setItem('louvorja-palco-routing-v1', JSON.stringify({ hymns: '7082', bible: '7084' }))
+  vi.resetModules()
+  const routing = await import('../palco-routing')
+  expect(routing.getPalcoRoute('hymns')).toBe('mirror')
+  expect(routing.isPalcoTvOnlyRoute('hymns')).toBe(false)
+  expect(routing.getPalcoRoute('bible')).toBe('7084')
+  routing.setPalcoRoute('hymns', '7082')
+  expect(routing.getPalcoRoutes().hymns).toBe('mirror')
+})

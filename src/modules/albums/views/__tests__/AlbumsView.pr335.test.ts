@@ -54,7 +54,9 @@ vi.mock('vue-router', () => ({
 }))
 
 // Composable testado à parte: aqui só o contrato tela ↔ minimizar.
-const minimizeMock = vi.fn(async () => {})
+const minimizeMock = vi.fn(async () => {
+  ;(globalThis as any).__minimizeOptions?.onMinimized?.()
+})
 const prepareMock = vi.fn()
 vi.mock('@shared/composables/useMinimizablePage', () => ({
   useMinimizablePage: (options: unknown) => {
@@ -272,12 +274,13 @@ describe('AlbumsView', () => {
     expect(w.find('.collection-card-stub').exists()).toBe(true)
   })
 
-  it('categoria custom: editor btn e título default', async () => {
+  it('categoria custom: título default e SEM botão editor (criar/editar saiu pra /community)', async () => {
     setState({
       categories: [...categories, { id: 'custom', name: 'Minhas Coletâneas', collections: [] }],
     })
     const w = await mountView()
     expect(w.findAll('.albums-view__category-title')[2]!.text()).toContain('Minhas Coletâneas')
+    expect(w.find('.albums-view__editor-btn').exists()).toBe(false)
   })
 
   it('hub search: resultados renderizam e ações disparam play/open lyric', async () => {
@@ -323,6 +326,9 @@ describe('AlbumsView', () => {
     // remover
     ;(row.querySelector('.albums-view__playlist-remove') as HTMLElement).click()
     await flushPromises()
+    expect(listPlaylists().some((p) => p.id === 'pl-1')).toBe(true)
+    ;(body().querySelector('.app-confirm__btn--danger') as HTMLElement).click()
+    await flushPromises()
     expect(listPlaylists().some((p) => p.id === 'pl-1')).toBe(false)
   })
 
@@ -334,31 +340,31 @@ describe('AlbumsView', () => {
     expect(body().querySelector('.albums-view__state')).not.toBeNull()
   })
 
-  it('fechar modal de playlists pelo backdrop', async () => {
+  it('minimiza playlists ao clicar fora e mantém o botão de fechar independente', async () => {
     const w = await mountView()
     await w.findAll('button').find((b) => b.attributes('aria-label') === 'albums.playlists.title')!.trigger('click')
     await flushPromises()
     expect(body().querySelector('.albums-view__modal')).not.toBeNull()
+    minimizeMock.mockClear()
     ;(body().querySelector('.albums-view__modal-backdrop') as HTMLElement).click()
     await flushPromises()
+    expect(minimizeMock).toHaveBeenCalledOnce()
     expect(body().querySelector('.albums-view__modal')).toBeNull()
+    await w.findAll('button').find((b) => b.attributes('aria-label') === 'albums.playlists.title')!.trigger('click')
+    ;(body().querySelector('button[aria-label="albums.lyric.close"]') as HTMLElement).click()
+    await flushPromises()
+    expect(body().querySelector('.albums-view__modal')).toBeNull()
+    expect(minimizeMock).toHaveBeenCalledOnce()
   })
 
-  it('modal custom: abre, hydrate lista, fechar backdrop', async () => {
-    customCatalogMock.listCustomCollections.mockResolvedValueOnce([
-      { id: 3, name: 'Louvor jovem' },
-    ])
+  it('sem botão "Minhas Coletâneas" no toolbar nem modal custom (criação saiu pra /community)', async () => {
     const w = await mountView()
-    const btn = w.findAll('button').find((b) => b.attributes('aria-label') === 'albums.custom.title')
-    expect(btn).toBeDefined()
-    await btn!.trigger('click')
-    await flushPromises()
-    expect(customCatalogMock.listCustomCollections).toHaveBeenCalled()
-    expect(body().querySelector('.albums-view__modal')).not.toBeNull()
-    // fechar
-    ;(body().querySelector('.albums-view__modal-backdrop') as HTMLElement).click()
-    await flushPromises()
+    expect(w.findAll('button').find((b) => b.attributes('aria-label') === 'albums.custom.title')).toBeUndefined()
     expect(body().querySelector('.albums-view__modal')).toBeNull()
+    // olho de visibilidade continua
+    const toggle = w.findAll('.albums-view__header-actions button').find((b) =>
+      b.attributes('aria-label') === 'albums.custom.hide' || b.attributes('aria-label') === 'albums.custom.show')
+    expect(toggle).toBeDefined()
   })
 
   it('remoção de coletânea: requestRemove abre confirm (teleport body); dismiss e confirm', async () => {
@@ -495,25 +501,11 @@ describe('AlbumsView', () => {
     expect(body().querySelector('.albums-view__playlists-feedback')!.textContent).toContain('inválido')
   })
 
-  it('criar coletânea custom pelo modal com nome; nome vazio não chama API', async () => {
-    customCatalogMock.createCustomCollection.mockResolvedValueOnce({ id: 9, name: 'Jovem' })
+  it('digitar/submitar não tem mais form de criação custom (createCustomCollection não é chamado)', async () => {
     const w = await mountView()
-    await w.findAll('button').find((b) => b.attributes('aria-label') === 'albums.custom.title')!.trigger('click')
-    await flushPromises()
-    const form = body().querySelector('.albums-view__modal-form') as HTMLFormElement
-    const nameInput = form.querySelector('input') as HTMLInputElement
-    // nome vazio: não chama
-    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
-    await flushPromises()
+    expect(body().querySelector('.albums-view__modal-form')).toBeNull()
     expect(customCatalogMock.createCustomCollection).not.toHaveBeenCalled()
-    // com nome: cria e re-hydrata
-    nameInput.value = 'Jovem'
-    nameInput.dispatchEvent(new Event('input', { bubbles: true }))
-    await flushPromises()
-    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
-    await flushPromises()
-    expect(customCatalogMock.createCustomCollection).toHaveBeenCalledWith('Jovem')
-    expect(customCatalogMock.listCustomCollections).toHaveBeenCalledTimes(2)
+    w.unmount()
   })
 
   it('gaps: retry erro catálogo, dismiss downloadError/actionMessage, modais close/editor', async () => {
@@ -551,6 +543,107 @@ describe('AlbumsView', () => {
       await flushPromises()
     }
     w3.unmount()
+  })
+
+  it('embaralha a fila sem alterar a ordem salva e permite reordenar por teclado e arraste', async () => {
+    const items = [1, 2, 3].map((musicId) => ({ musicId, albumId: null, title: `Hino ${musicId}` }))
+    savePlaylists([{ id: 'shuffle', name: 'Culto', items }])
+    const w = await mountView()
+    await w.findAll('button').find((b) => b.attributes('aria-label') === 'albums.playlists.title')!.trigger('click')
+    ;(body().querySelector('.albums-view__playlist-toggle') as HTMLElement).click()
+    await flushPromises()
+    vi.spyOn(Math, 'random').mockReturnValue(0)
+    ;(body().querySelector('.albums-view__playlist-shuffle') as HTMLElement).click()
+    await flushPromises()
+    expect(playQueueMock).toHaveBeenCalledWith([items[1], items[2], items[0]], 0, undefined, 'Culto', { originalOrder: items, shuffled: true })
+    expect(pushMock).toHaveBeenCalledWith({ name: 'media' })
+    expect(listPlaylists()[0]?.items).toEqual(items)
+    ;(body().querySelector('.albums-view__playlist-track-drag') as HTMLElement)
+      .dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+    await flushPromises()
+    expect(listPlaylists()[0]?.items).toEqual([items[1], items[0], items[2]])
+    ;(body().querySelector('.albums-view__playlist-track-drag') as HTMLElement)
+      .dispatchEvent(new Event('dragstart', { bubbles: true }))
+    await flushPromises()
+    expect(body().querySelectorAll('.playlist-track--dragging')).toHaveLength(1)
+    ;(body().querySelectorAll('.albums-view__playlist-tracks li')[2] as HTMLElement)
+      .dispatchEvent(new Event('dragover', { bubbles: true, cancelable: true }))
+    await flushPromises()
+    expect(body().querySelectorAll('.playlist-track--drop-after')).toHaveLength(1)
+    ;(body().querySelectorAll('.albums-view__playlist-tracks li')[2] as HTMLElement)
+      .dispatchEvent(new Event('drop', { bubbles: true, cancelable: true }))
+    await flushPromises()
+    expect(listPlaylists()[0]?.items).toEqual([items[0], items[2], items[1]])
+    expect(body().querySelector('.playlist-track--dragging')).toBeNull()
+    expect(body().querySelector('.playlist-track--drop-after')).toBeNull()
+    w.unmount()
+  })
+
+  it('mantém popup e playlist expandida ao voltar do player completo', async () => {
+    const w = await mountView()
+    await w.findAll('button').find((b) => b.attributes('aria-label') === 'albums.playlists.title')!.trigger('click')
+    ;(body().querySelector('.albums-view__playlist-toggle') as HTMLElement).click()
+    await flushPromises()
+    expect(body().querySelector('.albums-view__playlist-tracks')).not.toBeNull()
+    w.unmount()
+    // Navegar para o player desmonta AlbumsView. O retorno usa a mesma Pinia do app.
+    const restored = mount(AlbumsView)
+    await flushPromises()
+    expect(body().querySelector('.albums-view__modal')).not.toBeNull()
+    expect(body().querySelector('.albums-view__playlist-tracks')).not.toBeNull()
+    ;(body().querySelector('button[aria-label="albums.lyric.close"]') as HTMLElement).click()
+    await flushPromises()
+    restored.unmount()
+    const closed = mount(AlbumsView)
+    await flushPromises()
+    expect(body().querySelector('.albums-view__modal')).toBeNull()
+    closed.unmount()
+  })
+
+  it('mostra a explicação de cada play no cabeçalho ao passar o mouse ou focar', async () => {
+    const w = await mountView()
+    await w.findAll('button').find((b) => b.attributes('aria-label') === 'albums.playlists.title')!.trigger('click')
+    ;(body().querySelector('.albums-view__playlist-toggle') as HTMLElement).click()
+    await flushPromises()
+    const hint = () => body().querySelector('.albums-view__playlist-hint')!.textContent
+    for (const [selector, key] of [
+      ['.albums-view__playlist-shuffle', 'shuffleHint'],
+      ['.albums-view__playlist-play-all', 'playAllHint'],
+      ['.albums-view__playlist-track-play', 'singlePlayHint'],
+    ]) {
+      const button = body().querySelector(selector!) as HTMLElement
+      button.dispatchEvent(new MouseEvent('mouseenter'))
+      await flushPromises()
+      expect(hint()).toContain(`albums.playlists.${key}`)
+      button.dispatchEvent(new MouseEvent('mouseleave'))
+      await flushPromises()
+      expect(hint()?.trim()).toBe('')
+      button.dispatchEvent(new FocusEvent('focus'))
+      await flushPromises()
+      expect(hint()).toContain(`albums.playlists.${key}`)
+      button.dispatchEvent(new FocusEvent('blur'))
+    }
+    w.unmount()
+  })
+
+  it('play por faixa mantém o popup aberto e solicita miniplayer no índice escolhido', async () => {
+    savePlaylists([{ id: 'mini', name: 'Culto', items: [
+      { musicId: 1, albumId: null, title: 'Santo' },
+      { musicId: 2, albumId: null, title: 'Eu Vou' },
+    ] }])
+    const w = await mountView()
+    await w.findAll('button').find((b) => b.attributes('aria-label') === 'albums.playlists.title')!.trigger('click')
+    ;(body().querySelector('.albums-view__playlist-toggle') as HTMLElement).click()
+    await flushPromises()
+    ;(body().querySelectorAll('.albums-view__playlist-track-play')[1] as HTMLElement).click()
+    await flushPromises()
+    expect(playQueueMock).toHaveBeenCalledWith(
+      [{ musicId: 2, albumId: null, title: 'Eu Vou' }],
+      0, undefined, 'Culto', { minimized: true },
+    )
+    expect(body().querySelector('.albums-view__playlist-tracks')).not.toBeNull()
+    expect(pushMock).not.toHaveBeenCalledWith({ name: 'media' })
+    w.unmount()
   })
 
   it('playlist com faixas: play navega pro media, remove faixa e toggle colapsa', async () => {
@@ -605,22 +698,10 @@ describe('AlbumsView', () => {
     const closeBtns = Array.from(body().querySelectorAll('.albums-view__playlists-io')) as HTMLElement[]
     closeBtns[0]?.click()
     await flushPromises()
-    // abre modal custom
-    ;(w.find('[aria-label="albums.custom.title"]').element as HTMLElement).click()
-    await flushPromises()
-    const forms = Array.from(body().querySelectorAll('.albums-view__modal-form')) as HTMLFormElement[]
-    const customForm = forms[forms.length - 1]
-    const cInput = customForm?.querySelector('input') as HTMLInputElement | null
-    if (cInput) {
-      cInput.value = 'Coletânea X'
-      cInput.dispatchEvent(new Event('input', { bubbles: true }))
-    }
-    customForm?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
-    await flushPromises()
-    // botão editor do modal custom (se renderizado)
+    // modal custom não existe mais: nenhum form de criação no body
+    expect(body().querySelectorAll('.albums-view__modal-form')).toHaveLength(0)
     const editorBtns = Array.from(body().querySelectorAll('.albums-view__editor-btn')) as HTMLElement[]
-    editorBtns[editorBtns.length - 1]?.click()
-    await flushPromises()
+    expect(editorBtns).toHaveLength(0)
     w.unmount()
     expect(closeBtns.length).toBeGreaterThan(0)
   })
@@ -660,26 +741,15 @@ describe('AlbumsView', () => {
     w.unmount()
   })
 
-  it('gaps finais: item custom do modal abre coletânea; import feedback timeout limpa; sem arquivo', async () => {
-    customCatalogMock.listCustomCollections.mockResolvedValueOnce([
-      { id: 7, name: 'Coletânea do Modal' },
-    ])
+  it('gaps finais: sem modal custom, item de coletânea custom não navega por modal; import feedback timeout limpa', async () => {
     const w = await mountView()
-    await w.findAll('button').find((b) => b.attributes('aria-label') === 'albums.custom.title')!.trigger('click')
-    await flushPromises()
-    // item da lista do modal → openCustomCollection
-    const item = Array.from(body().querySelectorAll('.albums-view__modal-item, .albums-view__custom-item, button, [role="button"]'))
-      .find((el) => el.textContent?.includes('Coletânea do Modal')) as HTMLElement | undefined
-    if (item) {
-      item.click()
-      await flushPromises()
-      expect(pushMock).toHaveBeenCalledWith(expect.stringContaining('7'))
-    }
+    // modal custom não existe mais: nenhum item "Coletânea do Modal" no body
+    expect(body().textContent).not.toContain('Coletânea do Modal')
     // import com feedback → setTimeout limpa (vi.useFakeTimers já pode não estar; usar real)
     w.unmount()
   })
 
-  it('gaps solo: digita busca hub (v-model), fecha modal custom pelo X, editor btn, card open/download', async () => {
+  it('gaps solo: digita busca hub (v-model), sem modal custom/editor btn, card open/download', async () => {
     setState({ isHubSearching: true, hubResults: hits })
     const w = await mountView()
     // v-model do hub search
@@ -689,16 +759,9 @@ describe('AlbumsView', () => {
       searchInput.dispatchEvent(new Event('input', { bubbles: true }))
       await flushPromises()
     }
-    // abre modal custom e fecha pelo botão X (605)
-    await w.findAll('button').find((b) => b.attributes('aria-label') === 'albums.custom.title')!.trigger('click')
-    await flushPromises()
-    const ioBtns = Array.from(body().querySelectorAll('.albums-view__playlists-io')) as HTMLElement[]
-    ioBtns.forEach((b) => b.click())
-    await flushPromises()
-    // editor btn de categoria custom (726) — showModal via showCustomCollections
-    const editorBtns = Array.from(body().querySelectorAll('.albums-view__editor-btn')) as HTMLElement[]
-    editorBtns.forEach((b) => b.click())
-    await flushPromises()
+    // modal custom e editor btn não existem mais
+    expect(body().querySelectorAll('.albums-view__playlists-io')).toHaveLength(0)
+    expect(body().querySelectorAll('.albums-view__editor-btn')).toHaveLength(0)
     // collection cards (767/768): stubs emitem? procurar botões de card e clicar
     const cardBtns = Array.from(body().querySelectorAll('[data-testid="collection-open"], .album-collection-card button'))
     cardBtns.slice(0, 3).forEach((b) => (b as HTMLElement).click())
@@ -771,10 +834,7 @@ describe('AlbumsView', () => {
     const exportBtn = body().querySelector('button[aria-label="albums.playlists.export"]') as HTMLElement | null
     exportBtn?.click()
     await flushPromises()
-    // 148/153: hydrate com listCustomCollections rejeitando
-    customCatalogMock.listCustomCollections.mockRejectedValueOnce(new Error('x'))
-    await w.findAll('button').find((b) => b.attributes('aria-label') === 'albums.custom.title')!.trigger('click')
-    await flushPromises()
+    // 148/153: modal custom removido — hydrate não é mais disparado daqui
     await flushPromises()
     w.unmount()
   })
@@ -817,12 +877,10 @@ describe('AlbumsView', () => {
     w.unmount()
   })
 
-  it('gaps onda1: hydrateCustomCollections busy → 2ª chamada no-op (147)', async () => {
-    customCatalogMock.listCustomCollections.mockImplementationOnce(() => new Promise(() => {}))
+  it('gaps onda1: sem modal custom — hydrate de coletâneas custom não dispara mais da view', async () => {
     const w = await mountView()
-    await w.findAll('button').find((b) => b.attributes('aria-label') === 'albums.custom.title')!.trigger('click')
     await flushPromises()
-    expect(customCatalogMock.listCustomCollections).toHaveBeenCalledTimes(1)
+    expect(customCatalogMock.listCustomCollections).not.toHaveBeenCalled()
     w.unmount()
   })
 
@@ -908,8 +966,7 @@ describe('AlbumsView', () => {
     w3.unmount()
     setState({ categories: [...categories, { id: 'custom', name: 'Minhas Coletâneas', collections: [] }] })
     const w4 = await mountView()
-    await w4.find('.albums-view__editor-btn').trigger('click')
-    expect(pushMock).toHaveBeenCalledWith('/media/editor')
+    expect(w4.find('.albums-view__editor-btn').exists()).toBe(false)
     await w4.find('.hc-cancel').trigger('click')
     expect((globalThis as AnyObj).__albumsCancelMock).toHaveBeenCalled()
   })
@@ -925,18 +982,10 @@ describe('AlbumsView', () => {
     await w.find('.cc-cancel').trigger('click')
     expect((globalThis as AnyObj).__albumsCancelMock).toHaveBeenCalled()
     w.unmount()
-    // hydrate reentrante: 1ª pendente, fechar e reabrir → early-return no busy
-    customCatalogMock.listCustomCollections.mockImplementationOnce(() => new Promise(() => {}))
+    // hydrate reentrante: modal custom removido — nada para reabrir
     const w2 = await mountView()
-    await w2.findAll('button').find((b) => b.attributes('aria-label') === 'albums.custom.title')!.trigger('click')
     await flushPromises()
-    // fecha (backdrop) e reabre enquanto a 1ª hydrate ainda está pendente
-    const backdrop = body().querySelector('.albums-view__modal-backdrop') as HTMLElement
-    backdrop.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    await flushPromises()
-    await w2.findAll('button').find((b) => b.attributes('aria-label') === 'albums.custom.title')!.trigger('click')
-    await flushPromises()
-    expect(customCatalogMock.listCustomCollections).toHaveBeenCalledTimes(1)
+    expect(body().querySelector('.albums-view__modal-backdrop')).toBeNull()
     w2.unmount()
   })
 })

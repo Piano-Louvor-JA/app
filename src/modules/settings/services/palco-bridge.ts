@@ -1,3 +1,8 @@
+import { loadTimerDisplayConfig } from '@modules/timer/services/timer-preferences'
+import { type PalcoTimerOptions } from './palco-session'
+import { formatElapsedMs as formatTimer } from '@modules/timer/services/timer-format'
+import { obsAssignments, obsAssignmentModes, obsConnections, obsAllowsMirror } from './obs-connections'
+import { renderObsModule } from './obs-projection'
 /**
  * palco-bridge — espelha TODAS as projeções na TV (paridade APK StageSession).
  *
@@ -114,9 +119,30 @@ async function renderAllSlots(): Promise<void> {
   if (!palcoSession.isElectron) return
   const { moduleForSlot } = useOutputRegistry()
   const slots = await palcoSession.slots()
+  let externalMediaAlive = false
+  try {
+    const bridge = getDesktopBridge()
+    externalMediaAlive = Boolean(typeof bridge?.projection?.externalMediaAlive === 'function'
+      ? await bridge.projection.externalMediaAlive()
+      : await (bridge?.projection?.externalAlive?.() ?? false))
+  } catch { /* Older desktop bridge: keep the normal module rendering. */ }
   debugPalco('renderAllSlots slots=', JSON.stringify(slots), 'routeRandom=', getPalcoRoute('random'), 'routeBible=', getPalcoRoute('bible'))
   for (const s of slots) {
     if (!s.running) continue
+    const independentObs = obsAssignments.value[s.id]
+    const sharedObs = Boolean(independentObs && obsAssignmentModes.value[s.id] === 'share')
+    if (obsConnections.value.some((item) => item.id === s.id)) palcoSession.syncObsShare(s.id, sharedObs)
+    if (independentObs) {
+      await renderObsModule(s.id, independentObs, sharedObs)
+      if (!sharedObs) continue
+    }
+    if (!obsAllowsMirror(s.id)) {
+      palcoSession.idleTo(s.id)
+      continue
+    }
+    // An external player also owns an otherwise idle slot. In particular,
+    // a receiver reconnect must not overwrite the replayed video with idle.
+    if (externalMediaAlive) continue
     const plan = planForSlot(s.id, {
       owner,
       routeOf: (m) => getPalcoRoute(m),
@@ -132,21 +158,6 @@ async function renderAllSlots(): Promise<void> {
       // popup do próprio hino NÃO é mídia externa — consultava o handler
       // antigo e a TV congelava no 1º slide (regressão 13/10). Handler
       // novo = só web-projection; main antigo sem ele → fallback antigo.
-      let ext = false
-      try {
-        const bridge = getDesktopBridge()
-        ext = typeof bridge?.projection?.externalMediaAlive === 'function'
-          ? await bridge.projection.externalMediaAlive()
-          : await (bridge?.projection?.externalAlive?.() ?? false)
-      } catch {
-        // main antigo sem o handler: assume SEM mídia externa (comportamento
-        // legado) em vez de quebrar o renderAllSlots inteiro.
-        ext = false
-      }
-      if (ext) {
-        debugPalco('slot', s.id, 'owner', owner, '→ PULADO (mídia externa viva)')
-        continue
-      }
       await renderOwnerTo(s.id)
     } else if (plan.render === 'assigned') {
       // video/pdf/ppt: runtime vive nos popups (não na bridge) — não tocar.
@@ -217,12 +228,12 @@ function ownerInput(): ProjectionInput | { timer: TimerOpts } | null {
       const r = runtimes.timer
       // guard: runtime stale (storage de sessão morta) não projeta —
       // era a causa do "contador 00:00 fundo preto" na TV.
-      if (!r || r.status === 'idle' || !r.projecting) return null
-      return { timer: { mode: 'chrono' as const, label: '', duration: Math.floor(elapsedMs(r) / 1000) } }
+      if (!r || !r.projecting) return null
+      return { timer: { mode: 'chrono' as const, label: '', duration: Math.floor(elapsedMs(r) / 1000), text: formatTimer(elapsedMs(r), loadTimerDisplayConfig().timeFormat), timeFormat: loadTimerDisplayConfig().timeFormat, chronoRuntime: { status: r.status, accumulatedMs: r.accumulatedMs, segmentStartedAt: r.segmentStartedAt } } }
     }
     case 'countdown': {
       const r = runtimes.countdown
-      if (!r || r.status === 'idle' || !r.projecting) return null
+      if (!r || !r.projecting) return null
       const remaining = Math.max(0, r.durationMs - elapsedMs(r))
       return { timer: { mode: 'countdown' as const, label: '', duration: Math.ceil(remaining / 1000) } }
     }
@@ -231,7 +242,7 @@ function ownerInput(): ProjectionInput | { timer: TimerOpts } | null {
   }
 }
 
-type TimerOpts = { mode: 'countdown' | 'chrono'; label?: string; duration?: number }
+type TimerOpts = PalcoTimerOptions
 
 async function renderOwnerTo(slotId: string): Promise<void> {
   if (owner === 'clock') return renderClockTo(slotId)
@@ -273,12 +284,13 @@ async function projectOwner() {
 
 let clockTimer: number | null = null
 
-/** Relógio num slot específico (tick próprio de 15s). */
+/** Relógio num slot específico (tick próprio de 1s). */
 async function renderClockTo(slotId: string): Promise<void> {
   const now = new Date()
   const hh = String(now.getHours()).padStart(2, '0')
   const mm = String(now.getMinutes()).padStart(2, '0')
-  await palcoSession.projectTo(slotId, 'clock', { text: `${hh}:${mm}` })
+  const ss = String(now.getSeconds()).padStart(2, '0')
+  await palcoSession.projectTo(slotId, 'clock', { text: `${hh}:${mm}:${ss}` })
 }
 
 /** Reinicia o tick do relógio pro slot tomado (owner=clock). */
@@ -293,7 +305,7 @@ function restartClockTick(): void {
     const { moduleForSlot } = useOutputRegistry()
     const slots = await palcoSession.slots()
     for (const s of slots) {
-      if (!s.running) continue
+      if (!s.running || obsAssignments.value[s.id] || !obsAllowsMirror(s.id)) continue
       if (planForSlot(s.id, {
         owner,
         routeOf: (m) => getPalcoRoute(m),
@@ -305,7 +317,7 @@ function restartClockTick(): void {
     }
   }
   void tick()
-  clockTimer = window.setInterval(() => void tick(), 15000)
+  clockTimer = window.setInterval(() => void tick(), 1000)
 }
 
 function stopClock() {
@@ -675,7 +687,7 @@ export function startPalcoBridge() {
       // Modo TV: isPlaying local não muda (player local fica pausado), mas o
       // status do store reflete o comando do operador (playing/paused).
       watch(
-        () => [media.status, media.session?.audioUrl] as const,
+        () => [media.status, media.audioRoute, media.hasSession, media.session?.audioUrl] as const,
         () => syncAudio(),
       ),
       watch(
@@ -698,6 +710,17 @@ export function startPalcoBridge() {
     )
   }
   window.setInterval(syncAudio, 3000)
+  const refreshObs = () => { if (started) void renderAllSlots() }
+  const unsubscribeReceiver = palcoSession.onReceiverConnected?.(refreshObs)
+  if (typeof unsubscribeReceiver === 'function') unwatchers.push(unsubscribeReceiver)
+  window.addEventListener('obs-connections-changed', refreshObs)
+  const obsTimer = window.setInterval(() => {
+    if (Object.keys(obsAssignments.value).length || owner === 'timer') void renderAllSlots()
+  }, 1000)
+  unwatchers.push(() => {
+    window.removeEventListener('obs-connections-changed', refreshObs)
+    window.clearInterval(obsTimer)
+  })
 
   // Personalização do Palco em tempo real: reenvia a projeção ativa na TV
   // (ex.: tipografia própria da Bíblia) sem precisar trocar o versículo.

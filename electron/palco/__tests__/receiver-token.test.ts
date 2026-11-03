@@ -60,7 +60,9 @@ function loadReceiver(url: string): void {
   for (const el of dom.window.document.querySelectorAll('script')) {
     const code = el.getAttribute('src') === 'purify.min.js'
       ? readFileSync(resolve(__dirname, '../purify.min.js'), 'utf8')
-      : el.textContent ?? ''
+      : el.getAttribute('src') === 'network-mirror.js'
+        ? readFileSync(resolve(__dirname, '../network-mirror.js'), 'utf8')
+        : el.textContent ?? ''
     if (!code.trim()) continue
     try {
       dom.window.eval(code)
@@ -123,6 +125,6 @@ describe('receiver — token no WebSocket (regressão 082ece48)', () => {
     state.port = '7081'
     capturedUrls.length = 0
     state.doConnect()
-    expect(capturedUrls[0]).toBe('ws://192.168.1.192:7081/palco')
+    expect(capturedUrls[0]).toBe('ws://192.168.1.192:7581/palco')
   })
 })

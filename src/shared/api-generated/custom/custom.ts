@@ -9,6 +9,14 @@
  * **Endpoints de compatibilidade** (`/json_db/*`, `/file/*`, `/db/*`) nao aparecem nesta documentacao pois usam path matching dinamico.
  * OpenAPI spec version: 1.4.1
  */
+const TENANT_HEADER = { 'X-Tenant': 'piano' }
+
+function customRequestOptions(options?: RequestInit): RequestInit {
+  const headers = new Headers(options?.headers)
+  if (!headers.has('X-Tenant')) headers.set('X-Tenant', 'piano')
+  return { ...options, headers }
+}
+
 import type {
   DeleteV1CustomCollectionsId200,
   DeleteV1CustomCollectionsId401,
@@ -158,12 +166,12 @@ export const getGetV1CustomCollectionsUrl = () => {
 export const getV1CustomCollections = async ( options?: RequestInit): Promise<getV1CustomCollectionsResponse> => {
 
   const res = await fetch(getGetV1CustomCollectionsUrl(),
-  {
+  customRequestOptions({
     ...options,
     method: 'GET'
 
 
-  }
+  })
 )
 
 
@@ -231,12 +239,12 @@ export const postV1CustomCollections = async (postV1CustomCollectionsBody?: Post
     return headers;
   };
 const res = await fetch(getPostV1CustomCollectionsUrl(),
-  {
+  customRequestOptions({
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: { ...TENANT_HEADER, 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(postV1CustomCollectionsBody)
-  }
+  })
 )
 
 
@@ -285,12 +293,12 @@ export const getGetV1CustomCollectionsIdUrl = (id: string,) => {
 export const getV1CustomCollectionsId = async (id: string, options?: RequestInit): Promise<getV1CustomCollectionsIdResponse> => {
 
   const res = await fetch(getGetV1CustomCollectionsIdUrl(id),
-  {
+  customRequestOptions({
     ...options,
     method: 'GET'
 
 
-  }
+  })
 )
 
 
@@ -364,12 +372,12 @@ export const putV1CustomCollectionsId = async (id: string,
     return headers;
   };
 const res = await fetch(getPutV1CustomCollectionsIdUrl(id),
-  {
+  customRequestOptions({
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: { ...TENANT_HEADER, 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(putV1CustomCollectionsIdBody)
-  }
+  })
 )
 
 
@@ -428,12 +436,12 @@ export const getDeleteV1CustomCollectionsIdUrl = (id: string,) => {
 export const deleteV1CustomCollectionsId = async (id: string, options?: RequestInit): Promise<deleteV1CustomCollectionsIdResponse> => {
 
   const res = await fetch(getDeleteV1CustomCollectionsIdUrl(id),
-  {
+  customRequestOptions({
     ...options,
     method: 'DELETE'
 
 
-  }
+  })
 )
 
 
@@ -477,12 +485,12 @@ export const getGetV1CustomMusicsUrl = () => {
 export const getV1CustomMusics = async ( options?: RequestInit): Promise<getV1CustomMusicsResponse> => {
 
   const res = await fetch(getGetV1CustomMusicsUrl(),
-  {
+  customRequestOptions({
     ...options,
     method: 'GET'
 
 
-  }
+  })
 )
 
 
@@ -526,12 +534,12 @@ export const getGetV1CustomCollectionsIdMusicsUrl = (id: string,) => {
 export const getV1CustomCollectionsIdMusics = async (id: string, options?: RequestInit): Promise<getV1CustomCollectionsIdMusicsResponse> => {
 
   const res = await fetch(getGetV1CustomCollectionsIdMusicsUrl(id),
-  {
+  customRequestOptions({
     ...options,
     method: 'GET'
 
 
-  }
+  })
 )
 
 
@@ -595,12 +603,12 @@ export const postV1CustomCollectionsIdMusics = async (id: string,
     return headers;
   };
 const res = await fetch(getPostV1CustomCollectionsIdMusicsUrl(id),
-  {
+  customRequestOptions({
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: { ...TENANT_HEADER, 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(postV1CustomCollectionsIdMusicsBody)
-  }
+  })
 )
 
 
@@ -656,12 +664,12 @@ export const postV1CustomCollectionsIdMusicsMusicIdCopy = async (id: string,
     musicId: string, options?: RequestInit): Promise<postV1CustomCollectionsIdMusicsMusicIdCopyResponse> => {
 
   const res = await fetch(getPostV1CustomCollectionsIdMusicsMusicIdCopyUrl(id,musicId),
-  {
+  customRequestOptions({
     ...options,
     method: 'POST'
 
 
-  }
+  })
 )
 
 
@@ -710,12 +718,12 @@ export const getGetV1CustomMusicsIdUrl = (id: string,) => {
 export const getV1CustomMusicsId = async (id: string, options?: RequestInit): Promise<getV1CustomMusicsIdResponse> => {
 
   const res = await fetch(getGetV1CustomMusicsIdUrl(id),
-  {
+  customRequestOptions({
     ...options,
     method: 'GET'
 
 
-  }
+  })
 )
 
 
@@ -789,12 +797,12 @@ export const putV1CustomMusicsId = async (id: string,
     return headers;
   };
 const res = await fetch(getPutV1CustomMusicsIdUrl(id),
-  {
+  customRequestOptions({
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: { ...TENANT_HEADER, 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(putV1CustomMusicsIdBody)
-  }
+  })
 )
 
 
@@ -853,12 +861,12 @@ export const getDeleteV1CustomMusicsIdUrl = (id: string,) => {
 export const deleteV1CustomMusicsId = async (id: string, options?: RequestInit): Promise<deleteV1CustomMusicsIdResponse> => {
 
   const res = await fetch(getDeleteV1CustomMusicsIdUrl(id),
-  {
+  customRequestOptions({
     ...options,
     method: 'DELETE'
 
 
-  }
+  })
 )
 
 
@@ -902,12 +910,12 @@ export const getGetV1CustomMusicsIdLyricsUrl = (id: string,) => {
 export const getV1CustomMusicsIdLyrics = async (id: string, options?: RequestInit): Promise<getV1CustomMusicsIdLyricsResponse> => {
 
   const res = await fetch(getGetV1CustomMusicsIdLyricsUrl(id),
-  {
+  customRequestOptions({
     ...options,
     method: 'GET'
 
 
-  }
+  })
 )
 
 
@@ -971,12 +979,12 @@ export const postV1CustomMusicsIdLyrics = async (id: string,
     return headers;
   };
 const res = await fetch(getPostV1CustomMusicsIdLyricsUrl(id),
-  {
+  customRequestOptions({
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: { ...TENANT_HEADER, 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(postV1CustomMusicsIdLyricsBody)
-  }
+  })
 )
 
 
@@ -1040,12 +1048,12 @@ export const putV1CustomLyricsId = async (id: string,
     return headers;
   };
 const res = await fetch(getPutV1CustomLyricsIdUrl(id),
-  {
+  customRequestOptions({
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: { ...TENANT_HEADER, 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(putV1CustomLyricsIdBody)
-  }
+  })
 )
 
 
@@ -1094,12 +1102,12 @@ export const getDeleteV1CustomLyricsIdUrl = (id: string,) => {
 export const deleteV1CustomLyricsId = async (id: string, options?: RequestInit): Promise<deleteV1CustomLyricsIdResponse> => {
 
   const res = await fetch(getDeleteV1CustomLyricsIdUrl(id),
-  {
+  customRequestOptions({
     ...options,
     method: 'DELETE'
 
 
-  }
+  })
 )
 
 
@@ -1155,12 +1163,12 @@ if(postV1CustomFilesBody?.kind !== undefined) {
  }
 
   const res = await fetch(getPostV1CustomFilesUrl(),
-  {
+  customRequestOptions({
     ...options,
     method: 'POST'
     ,
     body: formData
-  }
+  })
 )
 
 
@@ -1228,12 +1236,12 @@ export const postV1CustomAuthRegister = async (postV1CustomAuthRegisterBody?: Po
     return headers;
   };
 const res = await fetch(getPostV1CustomAuthRegisterUrl(),
-  {
+  customRequestOptions({
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: { ...TENANT_HEADER, 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(postV1CustomAuthRegisterBody)
-  }
+  })
 )
 
 
@@ -1296,12 +1304,12 @@ export const postV1CustomAuthLogin = async (postV1CustomAuthLoginBody?: PostV1Cu
     return headers;
   };
 const res = await fetch(getPostV1CustomAuthLoginUrl(),
-  {
+  customRequestOptions({
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: { ...TENANT_HEADER, 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(postV1CustomAuthLoginBody)
-  }
+  })
 )
 
 
@@ -1345,12 +1353,12 @@ export const getPostV1CustomAuthFirebaseSessionUrl = () => {
 export const postV1CustomAuthFirebaseSession = async ( options?: RequestInit): Promise<postV1CustomAuthFirebaseSessionResponse> => {
 
   const res = await fetch(getPostV1CustomAuthFirebaseSessionUrl(),
-  {
+  customRequestOptions({
     ...options,
     method: 'POST'
 
 
-  }
+  })
 )
 
 
@@ -1394,12 +1402,12 @@ export const getPostV1CustomAuthLogoutUrl = () => {
 export const postV1CustomAuthLogout = async ( options?: RequestInit): Promise<postV1CustomAuthLogoutResponse> => {
 
   const res = await fetch(getPostV1CustomAuthLogoutUrl(),
-  {
+  customRequestOptions({
     ...options,
     method: 'POST'
 
 
-  }
+  })
 )
 
 
@@ -1443,12 +1451,12 @@ export const getGetV1CustomAuthMeUrl = () => {
 export const getV1CustomAuthMe = async ( options?: RequestInit): Promise<getV1CustomAuthMeResponse> => {
 
   const res = await fetch(getGetV1CustomAuthMeUrl(),
-  {
+  customRequestOptions({
     ...options,
     method: 'GET'
 
 
-  }
+  })
 )
 
 
@@ -1506,12 +1514,12 @@ export const postV1CustomAuthForgotPassword = async (postV1CustomAuthForgotPassw
     return headers;
   };
 const res = await fetch(getPostV1CustomAuthForgotPasswordUrl(),
-  {
+  customRequestOptions({
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: { ...TENANT_HEADER, 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(postV1CustomAuthForgotPasswordBody)
-  }
+  })
 )
 
 
@@ -1574,12 +1582,12 @@ export const postV1CustomAuthResetPassword = async (postV1CustomAuthResetPasswor
     return headers;
   };
 const res = await fetch(getPostV1CustomAuthResetPasswordUrl(),
-  {
+  customRequestOptions({
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: { ...TENANT_HEADER, 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(postV1CustomAuthResetPasswordBody)
-  }
+  })
 )
 
 
@@ -1628,12 +1636,12 @@ export const getPostV1CustomCollectionsIdUseUrl = (id: string,) => {
 export const postV1CustomCollectionsIdUse = async (id: string, options?: RequestInit): Promise<postV1CustomCollectionsIdUseResponse> => {
 
   const res = await fetch(getPostV1CustomCollectionsIdUseUrl(id),
-  {
+  customRequestOptions({
     ...options,
     method: 'POST'
 
 
-  }
+  })
 )
 
 
@@ -1677,12 +1685,12 @@ export const getGetV1CustomRankingUrl = (params?: GetV1CustomRankingParams,) => 
 export const getV1CustomRanking = async (params?: GetV1CustomRankingParams, options?: RequestInit): Promise<getV1CustomRankingResponse> => {
 
   const res = await fetch(getGetV1CustomRankingUrl(params),
-  {
+  customRequestOptions({
     ...options,
     method: 'GET'
 
 
-  }
+  })
 )
 
 
@@ -1733,12 +1741,12 @@ export const getGetV1CustomRankingMeUrl = (params?: GetV1CustomRankingMeParams,)
 export const getV1CustomRankingMe = async (params?: GetV1CustomRankingMeParams, options?: RequestInit): Promise<getV1CustomRankingMeResponse> => {
 
   const res = await fetch(getGetV1CustomRankingMeUrl(params),
-  {
+  customRequestOptions({
     ...options,
     method: 'GET'
 
 
-  }
+  })
 )
 
 
@@ -1782,12 +1790,12 @@ export const getGetV1CustomWeeklyTasksUrl = () => {
 export const getV1CustomWeeklyTasks = async ( options?: RequestInit): Promise<getV1CustomWeeklyTasksResponse> => {
 
   const res = await fetch(getGetV1CustomWeeklyTasksUrl(),
-  {
+  customRequestOptions({
     ...options,
     method: 'GET'
 
 
-  }
+  })
 )
 
 
@@ -1836,12 +1844,12 @@ export const getPostV1CustomWeeklyTasksTaskIdCompleteUrl = (taskId: string,) => 
 export const postV1CustomWeeklyTasksTaskIdComplete = async (taskId: string, options?: RequestInit): Promise<postV1CustomWeeklyTasksTaskIdCompleteResponse> => {
 
   const res = await fetch(getPostV1CustomWeeklyTasksTaskIdCompleteUrl(taskId),
-  {
+  customRequestOptions({
     ...options,
     method: 'POST'
 
 
-  }
+  })
 )
 
 
@@ -1905,12 +1913,12 @@ export const postV1CustomCollectionsIdReport = async (id: string,
     return headers;
   };
 const res = await fetch(getPostV1CustomCollectionsIdReportUrl(id),
-  {
+  customRequestOptions({
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: { ...TENANT_HEADER, 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(postV1CustomCollectionsIdReportBody)
-  }
+  })
 )
 
 
@@ -1978,12 +1986,12 @@ export const postV1CustomAdminPromoteMusic = async (postV1CustomAdminPromoteMusi
     return headers;
   };
 const res = await fetch(getPostV1CustomAdminPromoteMusicUrl(),
-  {
+  customRequestOptions({
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: { ...TENANT_HEADER, 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(postV1CustomAdminPromoteMusicBody)
-  }
+  })
 )
 
 
@@ -2027,12 +2035,12 @@ export const getGetV1CustomNotificationsUrl = () => {
 export const getV1CustomNotifications = async ( options?: RequestInit): Promise<getV1CustomNotificationsResponse> => {
 
   const res = await fetch(getGetV1CustomNotificationsUrl(),
-  {
+  customRequestOptions({
     ...options,
     method: 'GET'
 
 
-  }
+  })
 )
 
 
@@ -2076,12 +2084,12 @@ export const getPostV1CustomNotificationsReadAllUrl = () => {
 export const postV1CustomNotificationsReadAll = async ( options?: RequestInit): Promise<postV1CustomNotificationsReadAllResponse> => {
 
   const res = await fetch(getPostV1CustomNotificationsReadAllUrl(),
-  {
+  customRequestOptions({
     ...options,
     method: 'POST'
 
 
-  }
+  })
 )
 
 
@@ -2118,12 +2126,12 @@ export const getGetV1CustomSeasonalEventUrl = () => {
 export const getV1CustomSeasonalEvent = async ( options?: RequestInit): Promise<getV1CustomSeasonalEventResponse> => {
 
   const res = await fetch(getGetV1CustomSeasonalEventUrl(),
-  {
+  customRequestOptions({
     ...options,
     method: 'GET'
 
 
-  }
+  })
 )
 
 

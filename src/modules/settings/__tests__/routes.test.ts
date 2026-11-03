@@ -27,6 +27,7 @@ describe("settings routes", () => {
 		expect(children).toContain("settings-general");
 		expect(children).toContain("settings-media");
 		expect(children).toContain("settings-projection");
+		expect(children).toContain("settings-transmission");
 	});
 });
 

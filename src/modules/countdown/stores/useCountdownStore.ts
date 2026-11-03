@@ -1,3 +1,4 @@
+import { detectObsBeforeProjection } from '@modules/settings/services/obs-detection'
 import type { CountdownRuntimeMode } from '../types/countdown'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
@@ -568,18 +569,20 @@ export const useCountdownStore = defineStore('countdown', () => {
   }
 
   function reset() {
-    const keepRunning = runtime.value.status === 'running'
-
+    stopFinishWatch()
+    stopAudio()
+    setAudioPaused(false)
     runtime.value = {
       ...runtime.value,
-      status: keepRunning ? 'running' : 'idle',
-      segmentStartedAt: keepRunning ? Date.now() : null,
+      mode: 'duration',
+      durationMs: 0,
+      status: 'idle',
+      segmentStartedAt: null,
       accumulatedMs: 0,
+      pausedRemainingMs: null,
       finished: false,
     }
     syncRuntime()
-    if (keepRunning) startFinishWatch()
-    else stopFinishWatch()
   }
 
   function saveMark() {
@@ -609,6 +612,7 @@ export const useCountdownStore = defineStore('countdown', () => {
   }
 
   async function syncProjection() {
+    await detectObsBeforeProjection()
     syncRuntime()
     if (isPalcoTvOnlyRoute('countdown')) {
       isProjecting.value = true

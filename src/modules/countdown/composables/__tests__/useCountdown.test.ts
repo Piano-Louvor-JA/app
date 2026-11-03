@@ -146,6 +146,7 @@ describe('useCountdownDisplay', () => {
 
     // accumulatedMs >= duração com status nem running nem paused → finished
     store.reset()
+    store.setDurationMs(1000)
     store.runtime.status = 'idle'
     store.runtime.accumulatedMs = 1500
     store.runtime.finished = false

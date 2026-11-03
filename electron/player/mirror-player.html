@@ -22,10 +22,9 @@
         background: #000;
       }
 
-      /*
-        Site: cover preenche a tela estendida (sem letterbox).
-        Vídeo: cover com leve corte inferior para esconder a barra do operador.
-      */
+      /* Controls live in a separate WebContentsView, outside the capture.
+         Fill the target display without distortion; aspect-ratio differences
+         are cropped symmetrically rather than leaving unused side bands. */
       #mirror {
         position: absolute;
         left: 0;
@@ -36,10 +35,6 @@
         background: #000;
         object-fit: cover;
         object-position: center center;
-      }
-
-      body.mode-video #mirror {
-        height: 104%;
       }
 
       .status {
@@ -114,8 +109,8 @@
               mandatory: {
                 chromeMediaSource: kind,
                 chromeMediaSourceId: sourceId,
-                maxWidth: 3840,
-                maxHeight: 2160,
+                maxWidth: 960,
+                maxHeight: 540,
                 maxFrameRate: 30,
               },
             },

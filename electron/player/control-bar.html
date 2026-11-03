@@ -19,6 +19,8 @@
         user-select: none;
         overflow: hidden;
       }
+      body.audio-only #audioOutput, body.audio-only #project, body.audio-only .monitor-wrap, body.audio-only #monitorPanel, body.audio-only #captions { display: none !important; }
+      button[hidden] { display: none !important; }
       .shell {
         position: relative;
         width: 100%;
@@ -36,15 +38,15 @@
       .shell.is-panel-open .bar {
         position: absolute;
         inset: auto 0 0;
-        height: 48px;
+        height: 64px;
       }
       .panel {
         display: none;
         position: absolute;
         left: 0.5rem;
-        bottom: 3.25rem;
+        bottom: 68px;
         width: min(23rem, calc(100% - 1rem));
-        max-height: calc(100% - 3.75rem);
+        max-height: calc(100% - 80px);
         padding: 0.85rem;
         border: 1px solid rgba(232, 237, 245, 0.12);
         border-radius: 0.65rem;
@@ -188,12 +190,12 @@
       }
       .volume {
         width: 4.5rem;
-        accent-color: #3b82f6;
+        accent-color: #E0895A;
         cursor: pointer;
       }
       .seek {
         width: 100%;
-        accent-color: #3b82f6;
+        accent-color: #E0895A;
         cursor: pointer;
       }
       .time {
@@ -264,6 +266,12 @@
           title="Volume"
           aria-label="Volume"
         />
+        <select id="audioOutput" aria-label="Destino do áudio" title="Destino do áudio"
+          style="max-width:120px;background:#222;color:#eee;border:1px solid #555;border-radius:6px;padding:5px;font-size:11px">
+          <option value="player">Som: só player</option>
+          <option value="connections">Som: só conexões</option>
+          <option value="both">Som: ambos</option>
+        </select>
         <button
           id="project"
           type="button"
@@ -300,6 +308,9 @@
             class="monitor-badge is-empty"
           >0</span>
         </span>
+        <button id="captions" type="button" title="Ocultar legendas" aria-label="Ocultar legendas" aria-pressed="false" hidden>
+          <i id="captionsIcon" style="font-size:12px;font-weight:800">CC</i>
+        </button>
       </div>
       <input
         id="seek"
@@ -319,12 +330,28 @@
       </div>
     </div>
     </div>
+    <script src="../palco/network-mirror.js"></script>
     <script>
       ;(function () {
+        var audioOnly = new URLSearchParams(window.location.search).get('audioOnly') === '1'
+        document.body.classList.toggle('audio-only', audioOnly)
         var playBtn = document.getElementById('play')
         var playIcon = document.getElementById('playIcon')
         var muteBtn = document.getElementById('mute')
         var muteIcon = document.getElementById('muteIcon')
+        var captionsBtn = document.getElementById('captions')
+        var captionsIcon = document.getElementById('captionsIcon')
+        var captionsHidden = false
+        var audioOutput = document.getElementById('audioOutput')
+        var audioOutputMode = 'player'
+        var changingAudioOutput = false
+        audioOutput.addEventListener('change', async function () {
+          changingAudioOutput = true; audioOutput.disabled = true
+          try {
+            var saved = await window.louvorja.projection.setAudioOutput(audioOutput.value)
+            if (saved) { audioOutputMode = saved; await tvBroadcast('audio-output', { mode: saved }) }
+          } finally { audioOutput.value = audioOutputMode; audioOutput.disabled = false; changingAudioOutput = false }
+        })
         var volume = document.getElementById('volume')
         var seek = document.getElementById('seek')
         var projectBtn = document.getElementById('project')
@@ -378,7 +405,10 @@
         }
 
         function setProjectingUi(projecting) {
-          var canProject = selectedIds.length > 0
+          projecting = projecting || networkProjectionActive
+          var canProject = selectedIds.length > 0 || (tvSlots || []).some(function (slot) {
+            return slot.clients > 0 && tvChecked[slot.id] !== false
+          })
           projectBtn.disabled = !projecting && !canProject
           if (projecting) {
             projectBtn.classList.add('is-active')
@@ -441,6 +471,7 @@
         // ===== TVs do Palco (cast): listar slots conectados, marcados por
         // padrão (modo espelhamento). Marcar = servir arquivo + play no slot;
         // desmarcar = stop. Recria funcionalidade perdida com o /tmp (24/08).
+        var networkProjectionActive = false
         var tvSlots = []
         var tvChecked = {}
         var tvList = document.getElementById('tvList')
@@ -478,6 +509,7 @@
         }
 
         async function loadTvs() {
+          if (audioOnly) return
           if (!window.louvorja || !window.louvorja.palco) return
           try {
             tvSlots = (await window.louvorja.palco.slots()) || []
@@ -485,11 +517,13 @@
             tvSlots = []
           }
           tvRenderList()
+          await refresh()
+          if (!networkProjectionActive) return
           var media =
             window.louvorja.projection && window.louvorja.projection.getSourceMediaInfo
               ? await window.louvorja.projection.getSourceMediaInfo()
               : null
-          if (!media || !media.filePath) return
+          if (!media || (!media.filePath && !media.youtubeId)) return
           var st =
             window.louvorja.projection &&
             window.louvorja.projection.getPlaybackState
@@ -499,21 +533,105 @@
           for (var i = 0; i < tvSlots.length; i++) {
             var slot = tvSlots[i]
             if (slot.clients > 0 && tvChecked[slot.id] !== false) {
-              void tvSendVideo(slot.id, media.filePath, media.title, posMs)
+              void tvSendMedia(slot.id, media, posMs, st && st.paused)
             }
+          }
+        }
+
+        var networkMirrorSender = null
+        function getNetworkMirrorSender() {
+          if (networkMirrorSender) return networkMirrorSender
+          networkMirrorSender = PianoNetworkMirror.createSender({
+            capture: async function () {
+              try {
+                return await navigator.mediaDevices.getDisplayMedia({ video: { width: { max: 960 }, height: { max: 540 }, frameRate: { max: 30 } }, audio: true })
+              } catch (displayError) { /* Older Chromium fallback below. */ }
+              var sourceId = await window.louvorja.projection.getSourceMediaId()
+              if (!sourceId) throw new Error('Fonte do player indisponível.')
+              function constraints(kind, audio) {
+                return { audio: audio ? { mandatory: { chromeMediaSource: kind, chromeMediaSourceId: sourceId } } : false,
+                  video: { mandatory: { chromeMediaSource: kind, chromeMediaSourceId: sourceId, maxWidth: 960, maxHeight: 540, maxFrameRate: 30 } } }
+              }
+              try { return await navigator.mediaDevices.getUserMedia(constraints('tab', true)) }
+              catch (audioError) {
+                sourceId = await window.louvorja.projection.getSourceMediaId()
+                var stream
+                try { stream = await navigator.mediaDevices.getUserMedia(constraints('tab', false)) }
+                catch (tabError) { stream = await navigator.mediaDevices.getUserMedia(constraints('desktop', false)) }
+                tvHint.style.display = ''
+                tvHint.textContent = 'Imagem conectada. O sistema não disponibilizou a captura de áudio deste player.'
+                return stream
+              }
+            },
+            connectionsMuted: function () { return audioOutputMode === 'player' },
+            send: function (message, slotId) { return window.louvorja.palco.send(message, slotId) },
+          })
+          return networkMirrorSender
+        }
+        if (window.louvorja && window.louvorja.palco && window.louvorja.palco.onEvent) {
+          window.louvorja.palco.onEvent(function (message) {
+            if (!networkMirrorSender || !networkProjectionActive) return
+            networkMirrorSender.handle(message).catch(function (error) {
+              tvHint.style.display = ''; tvHint.textContent = 'Transmissão: ' + error.message
+            })
+          })
+        }
+        window.addEventListener('beforeunload', function () { if (networkMirrorSender) void networkMirrorSender.stop() })
+        var youtubeReceiverReady = {}
+        function prepareYoutubeReceiver(slotId) {
+          if (youtubeReceiverReady[slotId]) return youtubeReceiverReady[slotId]
+          var requestId = 'youtube-' + slotId + '-' + Date.now() + '-' + Math.random().toString(36).slice(2)
+          var pending = new Promise(function (resolve, reject) {
+            var off = null
+            var timer = null
+            var settled = false
+            function finish(error) {
+              if (settled) return
+              settled = true
+              clearTimeout(timer)
+              if (typeof off === 'function') off()
+              if (error) reject(error); else resolve(true)
+            }
+            off = window.louvorja.palco.onEvent(function (event) {
+              if (event && event.type === 'receiver-ready' && event.requestId === requestId && event.cleanMirror === true) finish()
+            })
+            timer = setTimeout(function () { finish(new Error('A conexão não confirmou a atualização do player.')) }, 10000)
+            window.louvorja.palco.send({ v: 2, type: 'obsControl', action: 'reload', requestId: requestId }, slotId)
+              .then(function (sent) { if (!sent) finish(new Error('Não foi possível atualizar a conexão.')) })
+              .catch(finish)
+          })
+          youtubeReceiverReady[slotId] = pending.catch(function (error) {
+            delete youtubeReceiverReady[slotId]
+            throw error
+          })
+          return youtubeReceiverReady[slotId]
+        }
+
+        async function tvSendMedia(slotId, media, positionMs, paused) {
+          if (!networkProjectionActive || tvChecked[slotId] === false) return
+          if (!media.youtubeId) return tvSendVideo(slotId, media.filePath, media.title, positionMs)
+          try {
+            await getNetworkMirrorSender().prepare()
+            await prepareYoutubeReceiver(slotId)
+            if (!networkProjectionActive || tvChecked[slotId] === false) return
+            await getNetworkMirrorSender().start(slotId)
+          } catch (e) {
+            tvHint.style.display = ''
+            tvHint.textContent = 'YouTube: ' + (e && e.message ? e.message : 'falha ao preparar a conexão.')
           }
         }
 
         async function tvSendVideo(slotId, filePath, title, positionMs) {
           try {
             var url = await window.louvorja.palco.servePath(filePath, slotId)
-            if (!url) return
+            if (!url || !networkProjectionActive || tvChecked[slotId] === false) return
             await window.louvorja.palco.send(
               {
                 v: 2,
                 type: 'video',
                 url: url,
                 title: title || '',
+                connectionsMuted: audioOutputMode === 'player',
                 positionMs: positionMs || 0,
               },
               slotId,
@@ -529,6 +647,8 @@
 
         /** Manda ação (play/pause/seek/stop) p/ todas as TVs marcadas. */
         async function tvBroadcast(action, extra) {
+          if (audioOnly) return
+          if (!networkProjectionActive) return
           if (!window.louvorja || !window.louvorja.palco) return
           // Receiver pode ter conectado depois do boot do popup — atualiza
           // a lista antes de mandar (pause/play não chegavam a quem entrou tarde).
@@ -539,9 +659,10 @@
               // pause/play/stop valem para QUALQUER mídia tocando na TV
               // (vídeo OU áudio de item de liturgia) — manda nos dois canais.
               void window.louvorja.palco.send(
-                Object.assign({ v: 2, type: 'video', action: action }, extra || {}),
+                Object.assign({ v: 2, type: action === 'audio-output' ? 'audioOutput' : 'video', action: action }, extra || {}),
                 slot.id,
               )
+              if (action === 'audio-output') continue
               void window.louvorja.palco.send(
                 Object.assign({ v: 2, type: 'audio', action: action }, extra || {}),
                 slot.id,
@@ -555,6 +676,7 @@
         var lastTvPos = 0
         var lastTvSeekMs = 0
         async function tvSyncPosition() {
+          if (audioOnly) return
           if (!window.louvorja || !window.louvorja.projection) return
           var now = Date.now()
           // Spec multi-telas F4: 1s (era 3s) — drift corrigido antes de
@@ -575,21 +697,27 @@
           var slotId = event.target.getAttribute('data-tv')
           tvChecked[slotId] = event.target.checked
           if (!window.louvorja || !window.louvorja.palco) return
-          if (event.target.checked) {
+          var state = await window.louvorja.projection.getPlaybackState()
+          if (state && state.projecting) networkProjectionActive = true
+          if (event.target.checked && networkProjectionActive) {
             var media = await window.louvorja.projection.getSourceMediaInfo()
-            if (media && media.filePath) {
-              await tvSendVideo(slotId, media.filePath, media.title)
+            if (media && (media.filePath || media.youtubeId)) {
+              var st = await window.louvorja.projection.getPlaybackState().catch(function () { return null })
+              await tvSendMedia(slotId, media, st ? Math.round(st.currentTime * 1000) : 0, st && st.paused)
             }
-          } else {
+          } else if (!event.target.checked && networkProjectionActive) {
+            if (networkMirrorSender) await networkMirrorSender.remove(slotId)
             await window.louvorja.palco.send(
               { v: 2, type: 'video', action: 'stop' },
               slotId,
             )
           }
           tvRenderList()
+          await refresh()
         }
 
         async function loadMonitors() {
+          if (audioOnly) return
           if (!window.louvorja) return
           var list =
             window.louvorja.displays && window.louvorja.displays.list
@@ -654,14 +782,40 @@
             await window.louvorja.projection.setVideoTargetMonitors(
               selectedIds.slice(),
             )
+            if (networkProjectionActive && selectedIds.length > 0) {
+              var state = await window.louvorja.projection.getPlaybackState()
+              if (state && !state.projecting) await window.louvorja.projection.toggleVideoScreens()
+            }
           }
           await refresh()
         }
+
+        function setCaptionsUi(hidden) {
+          captionsHidden = Boolean(hidden)
+          var label = captionsHidden ? 'Mostrar legendas' : 'Ocultar legendas'
+          captionsBtn.title = label
+          captionsBtn.setAttribute('aria-label', label)
+          captionsBtn.setAttribute('aria-pressed', String(captionsHidden))
+          captionsIcon.style.textDecoration = captionsHidden ? 'line-through' : 'none'
+        }
+        captionsBtn.addEventListener('click', async function () {
+          if (captionsBtn.disabled) return
+          captionsBtn.disabled = true
+          try {
+            var state = await window.louvorja.projection.remoteSetCaptionsHidden(!captionsHidden)
+            if (!state) return
+            setCaptionsUi(state.captionsHidden)
+            await tvBroadcast('captions', { captionsHidden: captionsHidden })
+          } finally { captionsBtn.disabled = false }
+        })
 
         async function refresh() {
           if (!window.louvorja || !window.louvorja.projection) return
           var state = await window.louvorja.projection.getPlaybackState()
           if (!state) return
+          if (!changingAudioOutput && state.audioOutput) { audioOutputMode = state.audioOutput; audioOutput.value = state.audioOutput }
+          captionsBtn.hidden = !state.canControlCaptions
+          if (state.canControlCaptions) setCaptionsUi(state.captionsHidden)
           playIcon.textContent = state.paused ? '▶' : '❚❚'
           if (typeof state.volume === 'number' || typeof state.muted === 'boolean') {
             setVolumeUi(
@@ -714,7 +868,19 @@
           if (typeof window.louvorja.projection.toggleVideoScreens !== 'function') {
             return
           }
-          await window.louvorja.projection.toggleVideoScreens()
+          var state = await window.louvorja.projection.getPlaybackState()
+          var stopping = Boolean((state && state.projecting) || networkProjectionActive)
+          if ((stopping && state && state.projecting) || (!stopping && selectedIds.length > 0)) {
+            await window.louvorja.projection.toggleVideoScreens()
+          }
+          if (stopping) {
+            await tvBroadcast('stop')
+            if (networkMirrorSender) await networkMirrorSender.stop()
+            networkProjectionActive = false
+          } else {
+            networkProjectionActive = true
+            await loadTvs()
+          }
           refresh()
         })
 
@@ -789,7 +955,7 @@
         seek.addEventListener('pointerdown', function () {
           seeking = true
         })
-        seek.addEventListener('pointerup', async function () {
+        async function applySeek() {
           seeking = false
           if (!window.louvorja || !window.louvorja.projection) return
           var state = await window.louvorja.projection.getPlaybackState()
@@ -799,7 +965,9 @@
           await window.louvorja.projection.remoteSeek(t)
           await tvBroadcast('seek', { position: t })
           refresh()
-        })
+        }
+        seek.addEventListener('pointerup', applySeek)
+        seek.addEventListener('change', function () { if (!seeking) void applySeek() })
 
         setInterval(function () { refresh(); tvSyncPosition() }, 400)
         loadMonitors()

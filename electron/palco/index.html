@@ -7,6 +7,7 @@
 <meta http-equiv="Expires" content="0">
 <title>LouvorJA Palco</title>
 <style>
+  #idleVer{display:none!important}
   html,body{margin:0;height:100%;overflow:hidden;background:#0A0E1A;
     font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#fff}
   #bg{position:fixed;top:0;left:0;width:100%;height:100%;object-fit:cover;
@@ -245,6 +246,7 @@ function palcoOfficialOrigin(origin){
     case 'https://api.louvorja.com.br':return 'https://api.louvorja.com.br';
     case 'https://api-stg.louvorja.com.br':return 'https://api-stg.louvorja.com.br';
     case 'https://api.louvorja.workers.dev':return 'https://api.louvorja.workers.dev';
+    case 'https://pub-8c0e123c55a14cdfa0c52fa182688782.r2.dev':return 'https://pub-8c0e123c55a14cdfa0c52fa182688782.r2.dev';
     default:return '';
   }
 }
@@ -293,8 +295,10 @@ function sendEvent(m){try{if(ws&&ws.readyState===1)ws.send(JSON.stringify(m))}ca
 // ===== Auto-descoberta (F3.3): acha o sender (APK) na sub-rede =====
 // Prioridade: launchParams/query host > último host válido (localStorage)
 // > scan da sub-rede via GET :7080/status (resposta JSON identifica sender).
-let host=qs.get('host')||localStorage.getItem('palcoHost')||location.hostname||'';
-let port=qs.get('port')||localStorage.getItem('palcoPort')||'7081';
+const browserSourcePort=Number(location.port);
+const ownBrowserSource=/^https?:$/.test(location.protocol)&&!!palcoLanHost(location.hostname)&&browserSourcePort>=7080&&browserSourcePort<=65534;
+let host=qs.get('host')||(ownBrowserSource?location.hostname:localStorage.getItem('palcoHost'))||location.hostname||'';
+let port=qs.get('port')||(ownBrowserSource?String(browserSourcePort+1):localStorage.getItem('palcoPort'))||'7081';
 
 function probeHttp(ip,httpPort){
   const url=palcoLanUrl(ip,httpPort,'/status','http');
@@ -324,6 +328,7 @@ function probeSender(ip){
   });
 }
 function normalizePort(ip,j,wsPort){
+  if(j&&Number.isInteger(Number(j.wsPort)))wsPort=Number(j.wsPort);
   if(!palcoLanUrl(ip,wsPort,'/palco','ws'))return null;
   port=String(Number(wsPort));
   return palcoLanHost(ip);

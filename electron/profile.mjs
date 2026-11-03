@@ -89,6 +89,9 @@ export function resolveBuildProfile(env = process.env, bakedProfile = readBakedP
  */
 const PUBLIC_FALLBACK_HOSTS = [...RELEASE_FALLBACK_HOSTS]
 
+/** Mock local da API usado pelo E2E; aceito somente no perfil test. */
+const LOCAL_TEST_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/
+
 export function profileApiConfig(profile) {
   if (isReleaseProfile(profile)) {
     return { profile, primary: HOSTS.production, fallbackHosts: [...RELEASE_FALLBACK_HOSTS] }
@@ -111,7 +114,8 @@ export function rendererApiEnvFor(env = process.env) {
     } catch {
       // fail closed below
     }
-    if (origin !== HOSTS.stg) {
+    const localTestApi = profile === 'test' && LOCAL_TEST_ORIGIN.test(origin)
+    if (origin !== HOSTS.stg && !localTestApi) {
       throw new Error(`[perfil ${profile}] VITE_URL_DATABASE deve usar ${HOSTS.stg}/json_db`)
     }
   }

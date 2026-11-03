@@ -71,21 +71,21 @@ const safeNotes = computed(() =>
           >
             Sem notas de versão.
           </p>
+        </div>
 
-          <!-- Progresso de download -->
-          <div
-            v-if="isDownloading"
-            class="download-progress"
-            data-test="download-progress"
-          >
-            <div class="progress-bar">
-              <div
-                class="progress-fill"
-                :style="{ width: `${downloadProgress}%` }"
-              />
-            </div>
-            <span class="progress-text">{{ downloadProgress }}%</span>
+        <!-- Progresso fixo, fora das notas com rolagem -->
+        <div
+          v-if="isDownloading"
+          class="download-progress"
+          data-test="download-progress"
+        >
+          <div class="progress-bar">
+            <div
+              class="progress-fill"
+              :style="{ width: `${downloadProgress}%` }"
+            />
           </div>
+          <span class="progress-text">{{ downloadProgress }}%</span>
         </div>
 
         <div class="update-card__footer">
@@ -133,6 +133,7 @@ const safeNotes = computed(() =>
 
 .update-card {
   width: 480px;
+  max-width: calc(100vw - 32px);
   max-height: 80vh;
   display: flex;
   flex-direction: column;
@@ -144,6 +145,7 @@ const safeNotes = computed(() =>
 }
 
 .update-card__header {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -170,6 +172,7 @@ const safeNotes = computed(() =>
 }
 
 .update-card__body {
+  min-height: 0;
   flex: 1;
   overflow-y: auto;
   padding: 16px 20px;
@@ -211,7 +214,8 @@ const safeNotes = computed(() =>
 }
 
 .download-progress {
-  margin-top: 16px;
+  flex-shrink: 0;
+  padding: 12px 20px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -239,6 +243,7 @@ const safeNotes = computed(() =>
 }
 
 .update-card__footer {
+  flex-shrink: 0;
   display: flex;
   gap: 8px;
   padding: 12px 20px;

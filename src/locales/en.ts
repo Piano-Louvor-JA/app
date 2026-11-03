@@ -1,4 +1,6 @@
 export default {
+  obsOutputs: { detecting: 'Detecting and refreshing OBS connections…', active: 'Active OBS connections', activateHint: 'Start a connection in Settings → Broadcast to use it here.', title: 'OBS connections', browserSource: 'OBS Browser Source' },
+  floating: { closeTitle: 'Close {title}?', closeMessage: 'Stop this feature and close its projection?' },
   updates: {
     downloadMacInstaller: 'Download macOS installer',
     manualMacInstructions: 'On macOS, install this update manually. Download the installer below, quit LouvorJA, open the DMG and drag the app to Applications, replacing the previous version. Your data and preferences will be kept.',

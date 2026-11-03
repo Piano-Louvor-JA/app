@@ -78,6 +78,9 @@ describe('UpdateDialog.vue', () => {
     updateState.downloadProgress.value = 55
     createWrapper(true)
     expect(document.body.innerHTML).toContain('55')
+    const progress = document.querySelector('[data-test="download-progress"]')
+    expect(progress?.closest('.update-card__body')).toBeNull()
+    expect(progress?.parentElement?.classList.contains('update-card')).toBe(true)
   })
 
   it('erro: mostra mensagem de erro', async () => {

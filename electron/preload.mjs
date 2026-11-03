@@ -91,6 +91,8 @@ contextBridge.exposeInMainWorld('louvorja', {
 
   // Palco (cast p/ TV — receiver conecta em WS :7081, HTTP :7080)
   palco: {
+    getPersistence: () => ipcRenderer.invoke('palco:persistence-get'),
+    setPersistence: (enabled) => ipcRenderer.invoke('palco:persistence-set', { enabled }),
     slots: () => ipcRenderer.invoke('palco:slots'),
     wake: () => ipcRenderer.invoke('palco:wake'),
     createSlot: (label) => ipcRenderer.invoke('palco:slot-create', { label }),
@@ -269,7 +271,9 @@ contextBridge.exposeInMainWorld('louvorja', {
     remotePlay: () => ipcRenderer.invoke('projection:remote-play'),
     remotePause: () => ipcRenderer.invoke('projection:remote-pause'),
     remoteSeek: (seconds) => ipcRenderer.invoke('projection:remote-seek', seconds),
+    remoteSetCaptionsHidden: (hidden) => ipcRenderer.invoke('projection:remote-set-captions-hidden', hidden),
     remoteToggleMute: () => ipcRenderer.invoke('projection:remote-toggle-mute'),
+    setAudioOutput: (mode) => ipcRenderer.invoke('projection:set-audio-output', mode),
     remoteSetVolume: (volume) =>
       ipcRenderer.invoke('projection:remote-set-volume', volume),
     getSourceMediaInfo: () =>
