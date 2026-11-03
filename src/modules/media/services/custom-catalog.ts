@@ -4,6 +4,18 @@ import type {
 } from '../types/media'
 
 import { authHeaders, getAuthSession } from './auth-client'
+
+export function customHeaders(headers?: HeadersInit): Record<string, string> {
+  const source = new Headers(headers)
+  const merged = Object.fromEntries(source)
+  const authorization = source.get('Authorization')
+  if (authorization) delete merged.authorization
+  return {
+    ...merged,
+    ...(authorization ? { authorization } : {}),
+    'X-Tenant': 'piano',
+  }
+}
 import { enqueue, newClientUuid } from './outbox'
 import { loadMediaTrack } from './media-catalog'
 import { resolveRemoteFileUrl } from './media-audio'
@@ -236,7 +248,7 @@ export async function loadCustomMusicTrack(
 
   try {
     const response = await fetch(`${customBaseUrl()}/musics/${musicId}`, {
-      headers: authHeaders(),
+      headers: customHeaders(authHeaders()),
     })
     if (!response.ok) return null
     const row = (await response.json()) as CustomMusicRow
@@ -323,7 +335,7 @@ export async function updateCustomCollection(
   try {
     const response = await fetch(`${customBaseUrl()}/collections/${collectionId}`, {
       method: 'PUT',
-      headers: { 'content-type': 'application/json', ...authHeaders() },
+      headers: customHeaders({ 'content-type': 'application/json', ...authHeaders() }),
       body: JSON.stringify(patch),
     })
     if (!response.ok) return null
@@ -362,7 +374,7 @@ export async function listCustomCollections(opts?: {
   }))
   try {
     const response = await fetch(`${customBaseUrl()}/collections`, {
-      headers: authHeaders(),
+      headers: customHeaders(authHeaders()),
       signal: opts?.signal,
     })
     if (!response.ok) return locals
@@ -430,7 +442,7 @@ export async function copyCustomMusic(
   try {
     const response = await fetch(
       `${customBaseUrl()}/collections/${collectionId}/musics/${musicId}/copy`,
-      { method: 'POST', headers: authHeaders() },
+      { method: 'POST', headers: customHeaders(authHeaders()) },
     )
     if (!response.ok) return null
     const json = (await response.json()) as { id_music: number }
@@ -456,7 +468,7 @@ export async function listAllCustomMusics(options?: {
 > {
   try {
     const response = await fetch(`${customBaseUrl()}/musics`, {
-      headers: authHeaders(),
+      headers: customHeaders(authHeaders()),
       signal:
         options?.timeoutMs != null
           ? AbortSignal.timeout(options.timeoutMs)
@@ -505,7 +517,7 @@ export async function listCustomMusics(
   try {
     const response = await fetch(
       `${customBaseUrl()}/collections/${collectionId}/musics`,
-      { headers: authHeaders() },
+      { headers: customHeaders(authHeaders()) },
     )
     if (!response.ok) return []
     const json = (await response.json()) as {
@@ -626,7 +638,7 @@ export async function createCustomCollection(
   try {
     const response = await fetch(`${customBaseUrl()}/collections`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', ...authHeaders() },
+      headers: customHeaders({ 'content-type': 'application/json', ...authHeaders() }),
       // SEMPRE envia visibility explícita (default PRIVADO no app — decisão
       // t_35e4d3ea: usuário escolhe publicar; API-default 'public' é pegadinha).
       body: JSON.stringify({
@@ -679,7 +691,7 @@ export async function createCustomMusic(
       `${customBaseUrl()}/collections/${collectionId}/musics`,
       {
         method: 'POST',
-        headers: { 'content-type': 'application/json', ...authHeaders() },
+        headers: customHeaders({ 'content-type': 'application/json', ...authHeaders() }),
         body: JSON.stringify(input),
       },
     )
@@ -707,7 +719,7 @@ export async function addOfficialMusicToCollection(
       `${customBaseUrl()}/collections/${collectionId}/musics`,
       {
         method: 'POST',
-        headers: { 'content-type': 'application/json', ...authHeaders() },
+        headers: customHeaders({ 'content-type': 'application/json', ...authHeaders() }),
         // name opcional: o catálogo oficial (json_db remoto) é a fonte do nome —
         // o SQLite local pode não ter o hino.
         body: JSON.stringify({ official_music_id: officialMusicId, name }),
@@ -737,7 +749,7 @@ export async function updateCustomMusic(
   try {
     const response = await fetch(`${customBaseUrl()}/musics/${musicId}`, {
       method: 'PUT',
-      headers: { 'content-type': 'application/json', ...authHeaders() },
+      headers: customHeaders({ 'content-type': 'application/json', ...authHeaders() }),
       body: JSON.stringify(input),
     })
     return response.ok
@@ -772,7 +784,7 @@ export async function uploadCustomFile(
     formData.append('kind', kind)
     const response = await fetch(`${customBaseUrl()}/files`, {
       method: 'POST',
-      headers: authHeaders(),
+      headers: customHeaders(authHeaders()),
       body: formData,
     })
     if (!response.ok) return null
@@ -788,7 +800,7 @@ export async function deleteCustomMusic(musicId: number): Promise<boolean> {
   try {
     const response = await fetch(`${customBaseUrl()}/musics/${musicId}`, {
       method: 'DELETE',
-      headers: authHeaders(),
+      headers: customHeaders(authHeaders()),
     })
     return response.ok
   } catch {
@@ -801,7 +813,7 @@ export async function deleteCustomCollection(collectionId: number): Promise<bool
   try {
     const response = await fetch(`${customBaseUrl()}/collections/${collectionId}`, {
       method: 'DELETE',
-      headers: authHeaders(),
+      headers: customHeaders(authHeaders()),
     })
     return response.ok
   } catch {
@@ -831,7 +843,7 @@ export async function createCustomLyric(
   try {
     const response = await fetch(`${customBaseUrl()}/musics/${musicId}/lyrics`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', ...authHeaders() },
+      headers: customHeaders({ 'content-type': 'application/json', ...authHeaders() }),
       body: JSON.stringify(input),
     })
     if (!response.ok) return null
@@ -855,7 +867,7 @@ export async function updateCustomLyric(
   try {
     const response = await fetch(`${customBaseUrl()}/lyrics/${lyricId}`, {
       method: 'PUT',
-      headers: { 'content-type': 'application/json', ...authHeaders() },
+      headers: customHeaders({ 'content-type': 'application/json', ...authHeaders() }),
       body: JSON.stringify(input),
     })
     return response.ok
@@ -869,7 +881,7 @@ export async function deleteCustomLyric(lyricId: number): Promise<boolean> {
   try {
     const response = await fetch(`${customBaseUrl()}/lyrics/${lyricId}`, {
       method: 'DELETE',
-      headers: authHeaders(),
+      headers: customHeaders(authHeaders()),
     })
     return response.ok
   } catch {

@@ -147,6 +147,7 @@ export async function flushOutbox(): Promise<OperatorStateItem[] | null> {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
+        'X-Tenant': 'piano',
         authorization: `Bearer ${session!.token}`,
       },
       body: JSON.stringify({

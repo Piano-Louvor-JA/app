@@ -182,7 +182,7 @@ export async function flushOutbox(
   try {
     const res = await fetch(`${apiBase}/sync`, {
       method: "POST",
-      headers: { "content-type": "application/json", ...authHeaders },
+      headers: { "content-type": "application/json", "X-Tenant": "piano", ...authHeaders },
       body: JSON.stringify({ last_sync_at: 0, collections }),
     });
     if (res.status === 401) {
