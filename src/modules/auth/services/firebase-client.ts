@@ -29,13 +29,9 @@ let bootRevalidation: Promise<AuthSession | null> | null = null
 let bootReadiness: Promise<AuthSession | null> | null = null
 
 /** Aguarda a revalidação inicial; a primeira chamada compartilha o coalescing do boot. */
-export const authReadiness: Promise<AuthSession | null> = new Proxy(Promise.resolve(null), {
-  get(_target, property, receiver) {
-    const readiness = bootReadiness ??= revalidateFirebaseSessionOnBoot()
-    const value = Reflect.get(readiness, property, receiver)
-    return typeof value === 'function' ? value.bind(readiness) : value
-  },
-})
+export function getAuthReadiness(): Promise<AuthSession | null> {
+  return bootReadiness ??= revalidateFirebaseSessionOnBoot()
+}
 
 function getFirebaseAuth(): Auth {
   if (!authInstance) {
