@@ -170,14 +170,14 @@ describe("resolveReturnMonitorId / resolveSelectedReturnMonitorId", () => {
 });
 
 describe("pruneReturnDisplay", () => {
-	it("remove o return id quando display sumiu", () => {
+	it("preserva o return id quando display sumiu", () => {
 		const s = {
 			...baseSettings(),
 			openReturnScreen: true,
 			returnDisplayId: 4,
 		};
 		const pruned = pruneReturnDisplay(s, [1]);
-		expect(pruned.returnDisplayId).toBeNull();
+		expect(pruned.returnDisplayId).toBe(4);
 	});
 
 	it("display ainda existe -> mantém", () => {

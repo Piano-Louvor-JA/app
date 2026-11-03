@@ -1,3 +1,4 @@
+import { readConnectionStartup, saveConnectionStartup } from './palco/connection-startup.mjs'
 /**
  * Servidor do PALCO (cast para TV) — multi-slot (paridade PalcoOrchestrator APK).
  *
@@ -18,6 +19,8 @@
  * Receiver conecta em `ws://ip:7081+2N/palco?port=7081+2N` (query port opcional)
  */
 
+import { publishReceiverEvent } from './palco/receiver-events.mjs'
+import { updateReplayState } from './palco/replay-state.mjs'
 import { createServer } from 'node:http'
 import { networkInterfaces } from 'node:os'
 import { createHash } from 'node:crypto'
@@ -57,6 +60,7 @@ class PalcoSlot {
   #httpPort
   #wsPort
   #httpServer
+  #preparing
   #wss
   #clients = new Set()
   #receiverIps = new Map() // WebSocket -> IP físico da TV/browser
@@ -82,11 +86,7 @@ class PalcoSlot {
 
   /** Broadcast p/ todos os receivers conectados neste slot. */
   broadcast(obj) {
-    // idle = fim da projeção: o cache de replay da projection morre junto,
-    // senão quem reconecta recebe versículo velho por cima do idle
-    // (bíblia fantasma ao recarregar a TV — bug real 27/08).
-    if (obj.type === 'idle') this.#lastByType.delete('projection')
-    this.#lastByType.set(obj.type, obj)
+    updateReplayState(this.#lastByType, obj)
     const data = JSON.stringify(obj)
     for (const ws of this.#clients) {
       try { if (ws.readyState === ws.OPEN) ws.send(data) } catch { this.#clients.delete(ws) }
@@ -105,16 +105,28 @@ class PalcoSlot {
     }
   }
 
-  /** Inicia HTTP + WS deste slot. */
+  /** The receiver remains reachable while transmission is off. */
+  async prepare() {
+    if (this.#httpServer?.listening) return
+    if (this.#preparing) return this.#preparing
+    this.#preparing = (async () => {
+      const server = createServer((req, res) => { void this.handleHttp(req, res) })
+      this.#httpServer = server
+      try {
+        await new Promise((resolve, reject) => {
+          server.once('error', reject)
+          server.listen(this.#httpPort, '0.0.0.0', resolve)
+        })
+      } catch (error) { this.#httpServer = null; server.close(); throw error }
+    })()
+    try { await this.#preparing } finally { this.#preparing = null }
+  }
+
+  /** Enables transmission without replacing the already served receiver page. */
   async start() {
     if (this.#running) return true
     try {
-      this.#httpServer = createServer((req, res) => { void this.handleHttp(req, res) })
-      await new Promise((resolve, reject) => {
-        this.#httpServer.once('error', reject)
-        this.#httpServer.listen(this.#httpPort, '0.0.0.0', resolve)
-      })
-
+      await this.prepare()
       this.#wss = new WebSocketServer({ port: this.#wsPort })
       this.#wss.on('connection', (ws, req) => {
         if (req?.url && !req.url.split('?')[0].startsWith('/palco')) { ws.close(); return }
@@ -142,7 +154,11 @@ class PalcoSlot {
         }
         this.#contents()?.send('palco:receiver-connected', { ip: remoteIp, count: this.#clients.size, slotId: this.#id })
         ws.on('message', (raw) => {
-          try { this.#contents()?.send('palco:event', JSON.parse(String(raw))) } catch { /* ignore */ }
+          try {
+            const message = { ...JSON.parse(String(raw)), slotId: this.#id }
+            this.#contents()?.send('palco:event', message)
+            publishReceiverEvent(message)
+          } catch { /* ignore */ }
         })
         ws.on('close', () => {
           this.#clients.delete(ws)
@@ -153,6 +169,7 @@ class PalcoSlot {
         // SEM ping (webOS 4.x não responde)
       })
 
+      await new Promise((resolve, reject) => { this.#wss.once('listening', resolve); this.#wss.once('error', reject) })
       this.#running = true
       return true
     } catch (e) {
@@ -164,14 +181,27 @@ class PalcoSlot {
   /** Para este slot. */
   async stop() {
     if (!this.#running) return
+    this.broadcastTransient({ v: 2, type: 'obsControl', action: 'stop' })
     this.#running = false
-    this.#wss?.close()
-    await new Promise((r) => this.#httpServer?.close(r))
+    const wss = this.#wss
+    this.#wss = null
+    if (wss) await new Promise(resolve => {
+      const timeout = setTimeout(() => { for (const client of this.#clients) client.terminate(); resolve() }, 250)
+      for (const client of this.#clients) client.close()
+      wss.close(() => { clearTimeout(timeout); resolve() })
+    })
     this.#clients.clear()
+    this.#receiverIps.clear()
     this.#lastByType.clear()
     this.#media.clear()
-    this.#wss = null
+  }
+
+  async dispose() {
+    await this.stop()
+    await this.#preparing
+    const server = this.#httpServer
     this.#httpServer = null
+    if (server) await new Promise(resolve => { server.close(resolve); server.closeAllConnections?.() })
   }
 
   /** Manda mensagem prós receivers deste slot. */
@@ -183,6 +213,8 @@ class PalcoSlot {
       try { m = JSON.parse(m) } catch { return false }
     }
     if (!m || typeof m !== 'object' || !m.type) return false
+    if (m.type === 'mirror-signal') { this.broadcastTransient(m); return true }
+    if (m.type === 'obsControl') { this.broadcastTransient(m); return true }
     // OBS S1: URL de mídia sai COM o token (a TV/browser recebe a URL já
     // autenticada — o renderer não precisa saber do token).
     const token = getPalcoToken()
@@ -209,6 +241,12 @@ class PalcoSlot {
     // Transientes: action sem url/conteúdo NÃO entra no replay.
     // audio stop GRAVA (fix 27/08): é estado terminal — como transient, o
     // replay ficava com o 'play' velho e o F5 na TV ressuscitava o MP3.
+    if (m.type === 'video' && m.action === 'captions') {
+      const video = this.#lastByType.get('video')
+      if (video?.youtubeId) this.#lastByType.set('video', { ...video, captionsHidden: m.captionsHidden === true })
+      this.broadcastTransient(m)
+      return true
+    }
     const transient =
       m.action === 'pause' || m.action === 'play' || m.action === 'seek'
     if (transient) this.broadcastTransient(m)
@@ -241,7 +279,7 @@ class PalcoSlot {
     // Scan do receiver: identifica sender na sub-rede
     if (p === '/status') {
       res.setHeader('Content-Type', 'application/json')
-      res.end(JSON.stringify({ unlocked: true, clients: this.#clients.size, slotId: this.#id, label: this.#label }))
+      res.end(JSON.stringify({ unlocked: true, running: this.#running, clients: this.#clients.size, slotId: this.#id, label: this.#label, httpPort: this.#httpPort, wsPort: this.#wsPort }))
       return
     }
 
@@ -529,6 +567,7 @@ class PalcoManager {
     if (this.#slots.has(id)) return this.#slots.get(id)
     const slot = new PalcoSlot(id, label, httpPort, wsPort, () => this.#getContents())
     this.#slots.set(id, slot)
+    void slot.prepare().catch(error => console.warn('[palco] receiver prepare:', error?.message ?? error))
     return slot
   }
 
@@ -548,7 +587,7 @@ class PalcoManager {
     if (id === '0') return false
     const slot = this.#slots.get(id)
     if (!slot) return false
-    slot.stop()
+    void slot.dispose()
     this.#slots.delete(id)
     this.persistSlots()
     return true
@@ -586,6 +625,23 @@ let manager = null
 export function attachPalcoServer(getContents) {
   if (!manager) manager = new PalcoManager(getContents)
   manager.init()
+  const startupFile = path.join(app.getPath('userData'), 'palco-connections-startup.json')
+  let startup = readConnectionStartup(startupFile)
+  function saveStartup(next) {
+    saveConnectionStartup(startupFile, next)
+    startup = next
+  }
+  if (startup.enabled) {
+    for (const id of startup.activeIds) {
+      const slot = manager.getSlot(id)
+      if (slot) void slot.start().catch(error => console.warn('[palco] restore:', id, error))
+    }
+  }
+  ipcMain.handle('palco:persistence-get', () => ({ enabled: startup.enabled }))
+  ipcMain.handle('palco:persistence-set', (_e, { enabled }) => {
+    saveStartup({ enabled: enabled === true, activeIds: enabled === true ? manager.getAllSlots().filter(slot => slot.running).map(slot => slot.id) : [] })
+    return { enabled: startup.enabled }
+  })
 
   // OBS S1: token de acesso carregado/criado 1x no boot (persistido no userData)
   enablePalcoToken()
@@ -610,7 +666,11 @@ export function attachPalcoServer(getContents) {
   })
 
   // IPC: remove slot
-  ipcMain.handle('palco:slot-remove', (_e, { id }) => manager.removeSlot(id))
+  ipcMain.handle('palco:slot-remove', (_e, { id }) => {
+    const removed = manager.removeSlot(id)
+    if (removed && startup.enabled) saveStartup({ ...startup, activeIds: startup.activeIds.filter(active => active !== id) })
+    return removed
+  })
 
   // IPC: status (default slot 0)
   ipcMain.handle('palco:status', (_e, { slotId }) => {
@@ -619,8 +679,18 @@ export function attachPalcoServer(getContents) {
   })
 
   // IPC: start/stop (default slot 0)
-  ipcMain.handle('palco:start', (_e, { slotId }) => manager.getSlot(slotId ?? '0')?.start() ?? false)
-  ipcMain.handle('palco:stop', (_e, { slotId }) => { manager.getSlot(slotId ?? '0')?.stop(); return true })
+  ipcMain.handle('palco:start', async (_e, { slotId }) => {
+    const id = slotId ?? '0'
+    const started = await (manager.getSlot(id)?.start() ?? false)
+    if (started && startup.enabled) saveStartup({ ...startup, activeIds: [...new Set([...startup.activeIds, id])] })
+    return started
+  })
+  ipcMain.handle('palco:stop', async (_e, { slotId }) => {
+    const id = slotId ?? '0'
+    await manager.getSlot(id)?.stop()
+    if (startup.enabled) saveStartup({ ...startup, activeIds: startup.activeIds.filter(active => active !== id) })
+    return true
+  })
 
   // IPC: send → slot específico (default: principal)
   ipcMain.handle('palco:send', (_e, { slotId, ...msg }) => {

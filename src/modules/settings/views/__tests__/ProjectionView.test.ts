@@ -68,9 +68,9 @@ describe('ProjectionView.vue', () => {
     expect(w.find('.multi-screen').exists()).toBe(true)
     expect(w.find('.main-screen').exists()).toBe(true)
     expect(w.find('.return-screen').exists()).toBe(true)
-    expect(w.find('.palco').exists()).toBe(true)
-    expect(w.find('.palco-slots').exists()).toBe(true)
-    expect(w.find('.stage-customization').exists()).toBe(true)
+    expect(w.find('.palco').exists()).toBe(false)
+    expect(w.find('.palco-slots').exists()).toBe(false)
+    expect(w.find('.stage-customization').exists()).toBe(false)
     w.unmount()
   })
 
@@ -98,7 +98,7 @@ describe('ProjectionView.vue', () => {
 
   it('StageCustomizationCard recebe only-scope="global"', async () => {
     const w = await mountView()
-    expect(w.find('.stage-customization').attributes('data-scope')).toBe('global')
+    expect(w.find('.stage-customization').exists()).toBe(false)
     w.unmount()
   })
 

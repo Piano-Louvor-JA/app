@@ -186,6 +186,27 @@ describe('com electron', () => {
     expect(palco2.send).not.toHaveBeenCalled()
   })
 
+  it('atualizar OBS não deixa comando de reload no replay de servidores já abertos', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    let reconnect!: (info: unknown) => void
+    const unsubscribe = vi.fn()
+    palco.onEvent.mockImplementation(callback => { reconnect = callback; return unsubscribe })
+    const refreshing = palcoSession.refreshObs('7082')
+    await new Promise(resolve => setTimeout(resolve, 0))
+    const requestId = palco.send.mock.calls[0]?.[0].requestId
+    let completed = false
+    void refreshing.then(() => { completed = true })
+    reconnect({ type: 'receiver-ready', requestId: 'another-output' })
+    await Promise.resolve()
+    expect(completed).toBe(false)
+    reconnect({ type: 'receiver-ready', requestId })
+    expect(await refreshing).toBe(true)
+    expect(unsubscribe).toHaveBeenCalledOnce()
+    expect(palco.send).toHaveBeenNthCalledWith(1, expect.objectContaining({ v: 2, type: 'obsControl', action: 'reload', requestId: expect.any(String) }), '7082')
+    expect(palco.send).toHaveBeenLastCalledWith({ v: 2, type: 'obsControl', action: 'ready' }, '7082')
+  })
+
   it('turnOff para o slot', async () => {
     const palco = fullMock()
     setBridge(palco)
@@ -206,6 +227,16 @@ describe('com electron', () => {
     // bg official:bg-3 resolvido pro sender
     expect(String(payload.background)).toContain('/bg/bg-3.png')
     expect(payload.footerVersion).toBeUndefined() // não é bible
+  })
+
+  it('Bíblia envia imagem personalizada sem a cor preta encobri-la no OBS', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    readEffectiveStageSettings.mockReturnValue({ ...DEFAULT_SETTINGS, backgroundImage: 'official:bg-11', backgroundColor: '#000000' })
+    await palcoSession.project('bible', { text: 'No princípio', footerRef: 'Gênesis 1:1' })
+    const payload = palco.send.mock.calls[0]?.[0] as Record<string, unknown>
+    expect(String(payload.background)).toContain('/bg/bg-11.png')
+    expect(payload.backgroundColor).toBeUndefined()
   })
 
   it('project bible: fonte própria; showBibleVersion off remove sufixo do rodapé', async () => {
@@ -376,6 +407,31 @@ describe('com electron', () => {
     expect(palcoSession.slotId).toBe('0')
   })
 
+  it('encerrar a conexão OBS libera sua atribuição independente', async () => {
+    const config = await import('../obs-connections')
+    const palco = fullMock()
+    setBridge(palco)
+    config.assignObsConnection('7082', 'clock')
+    await palcoSession.stopSlot('7082')
+    expect(config.obsAssignments.value['7082']).toBeUndefined()
+    expect(palco.stop).toHaveBeenCalledWith('7082')
+  })
+
+  it('envios concorrentes de projeção preservam o slot de cada conteúdo', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    palco.status.mockImplementation(async (id: string) => {
+      await Promise.resolve()
+      return { running: true, clients: 1, url: `http://localhost:${id === '0' ? 7080 : 7082}` }
+    })
+    await Promise.all([
+      palcoSession.projectTo('0', 'hymns', { text: 'Santo' }),
+      palcoSession.projectTo('7082', 'bible', { text: 'Haja luz' }),
+    ])
+    expect(palco.send).toHaveBeenCalledWith(expect.objectContaining({ type: 'projection', text: expect.stringContaining('Santo') }), '0')
+    expect(palco.send).toHaveBeenCalledWith(expect.objectContaining({ type: 'projection', text: expect.stringContaining('Haja luz') }), '7082')
+  })
+
   it('projectRouted mirror: serializa pros slots rodando; rota individual: só nela', async () => {
     const palco = fullMock()
     setBridge(palco)
@@ -403,11 +459,8 @@ describe('com electron', () => {
       expect.objectContaining({ action: 'stop' }),
       '0',
     )
-    palcoSession.timerTo('1', { duration: 3 })
-    await new Promise((r) => setTimeout(r, 0))
-    // NOTA: timerTo restaura o slot antes do timer() async resolver — o send
-    // sai com o slot global ('0'). Comportamento atual documentado no teste.
-    expect(palco.send).toHaveBeenLastCalledWith(expect.anything(), '0')
+    await palcoSession.timerTo('1', { duration: 3 })
+    expect(palco.send).toHaveBeenLastCalledWith(expect.objectContaining({ duration: 3 }), '1')
   })
 
   it('audio: url/cover locais servidos; http direto; bg do escopo quando ausente', async () => {
@@ -694,3 +747,24 @@ describe('gaps 3 — status sem url, official sem match com serve ok, bgPalco un
     const payload = palco.send.mock.calls.at(-1)?.[0] as Record<string, unknown>
     expect(payload.background).toBeUndefined()
   })
+
+it('waits for the matching source confirmation before finishing the startup test', async () => {
+  const palco = fullMock()
+  setBridge(palco)
+  vi.spyOn(palcoSession, 'refreshObs').mockResolvedValueOnce(true)
+  let receive: (message: unknown) => void = () => {}
+  const unsubscribe = vi.fn()
+  palco.onEvent.mockImplementation(callback => { receive = callback; return unsubscribe })
+  let finished = false
+  const starting = palcoSession.warmupObs('7082').then(() => { finished = true })
+  await vi.waitFor(() => expect(palco.send).toHaveBeenCalled())
+  const message = palco.send.mock.calls.at(-1)![0]
+  expect(message).toMatchObject({ type: 'obsWarmup', durationMs: 3000 })
+  expect(palco.send.mock.calls.at(-1)![1]).toBe('7082')
+  receive({ type: 'obs-warmup-complete', requestId: 'another-source' })
+  await Promise.resolve()
+  expect(finished).toBe(false)
+  receive({ type: 'obs-warmup-complete', requestId: message.requestId })
+  await starting
+  expect(unsubscribe).toHaveBeenCalledOnce()
+})

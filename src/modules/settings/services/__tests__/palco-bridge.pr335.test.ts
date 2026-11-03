@@ -207,7 +207,7 @@ describe('palco-bridge', () => {
       palcoClockOn()
       await vi.advanceTimersByTimeAsync(0)
       const text = palcoSessionMock.projectTo.mock.calls.at(-1)?.[2]?.text as string
-      expect(text).toMatch(/^\d{2}:\d{2}$/)
+      expect(text).toMatch(/^\d{2}:\d{2}:\d{2}$/)
       palcoClockOff()
       vi.useRealTimers()
     })
@@ -302,9 +302,9 @@ describe('palco-bridge', () => {
       vi.useRealTimers()
     })
 
-    it('timer idle: sem claim', async () => {
+    it('timer idle sem projeção: sem claim', async () => {
       vi.useFakeTimers()
-      localStorage.setItem('timer-key', JSON.stringify({ ...freshTimer, status: 'idle' }))
+      localStorage.setItem('timer-key', JSON.stringify({ ...freshTimer, status: 'idle', projecting: false }))
       mod.startPalcoBridge()
       await vi.advanceTimersByTimeAsync(2100)
       const timerCall = palcoSessionMock.timerTo.mock.calls.at(-1) as any[] | undefined
@@ -886,12 +886,12 @@ describe('palco-bridge', () => {
       vi.useRealTimers()
     })
 
-    it('countdown idle: sem claim', async () => {
+    it('countdown idle sem projeção: sem claim', async () => {
       vi.useFakeTimers()
       startPalcoBridge()
       window.dispatchEvent(new StorageEvent('storage', {
         key: 'countdown-key',
-        newValue: JSON.stringify({ projecting: true, status: 'idle', segmentStartedAt: null, accumulatedMs: 0, durationMs: 60_000 }),
+        newValue: JSON.stringify({ projecting: false, status: 'idle', segmentStartedAt: null, accumulatedMs: 0, durationMs: 60_000 }),
       }))
       await vi.advanceTimersByTimeAsync(100)
       expect(palcoSessionMock.timerTo).not.toHaveBeenCalled()

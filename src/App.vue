@@ -94,13 +94,13 @@ function handleViewNotes() {
     :class="{ 'app-frame--projection': isProjectionWindow }"
   >
     <ApiStatusBanner v-if="!isProjectionWindow" />
-    <UpdateBanner @view-notes="handleViewNotes" />
+    <UpdateBanner v-if="!isProjectionWindow" @view-notes="handleViewNotes" />
     <AppTitlebar />
     <div class="app-frame__body">
       <StartingOverlay v-if="!isProjectionWindow" />
       <RouterView v-if="isAppReady || isProjectionWindow" />
     </div>
-    <UpdateDialog v-model="showUpdateDialog" />
+    <UpdateDialog v-if="!isProjectionWindow" v-model="showUpdateDialog" />
   </div>
 </template>
 

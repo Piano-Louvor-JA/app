@@ -173,3 +173,13 @@ describe('PalcoRouteSelect', () => {
     }
   })
 })
+
+it('offers module destinations when only a secondary source is running', async () => {
+  palcoApi.status.mockResolvedValue({ running: false })
+  palcoApi.slots.mockResolvedValue([{ id: '7082', label: 'TV Salão', running: true, clients: 1, httpPort: 7082, wsPort: 7083 }])
+  const wrapper = mount(PalcoRouteSelect, { props: { module: 'bible' } })
+  await flushPromises()
+  expect(wrapper.find('select').exists()).toBe(true)
+  expect(wrapper.find('option[value="7082"]').exists()).toBe(true)
+  wrapper.unmount()
+})

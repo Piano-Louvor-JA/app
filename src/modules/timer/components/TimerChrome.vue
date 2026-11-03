@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, watch, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useInAppProjectionMinimized } from '@shared/composables/useInAppProjectionMinimized'
+import MiniPlayerCloseButton from '@shared/components/MiniPlayerCloseButton.vue'
+import { closeIndependentProjection } from '@shared/composables/useIndependentProjection'
 import FloatingPreviewTitle from '@shared/components/FloatingPreviewTitle.vue'
 import IndependentProjectionButton from '@shared/components/IndependentProjectionButton.vue'
 import { isIndependentProjectionActive } from '@shared/composables/useIndependentProjection'
@@ -41,8 +43,14 @@ const effectiveConfig = computed(() => ({ ...store.config, ...stage.value.timer 
 const onTimerRoute = computed(() => route.name === TIMER_ROUTE)
 
 /** No Cronômetro fica sempre à mão; nas outras telas enquanto projeta ou roda. */
+const dismissed = ref(false)
+watch(() => route.name, () => { dismissed.value = false })
+watch(() => store.isProjecting, (active) => { if (active) dismissed.value = false })
+watch(() => isIndependentProjectionActive('timer'), (active) => { if (active) dismissed.value = false })
+watch(() => store.isRunning, (active) => { if (active) dismissed.value = false })
+
 const visible = computed(
-  () => onTimerRoute.value || store.isProjecting || store.isRunning || isIndependentProjectionActive('timer'),
+  () => !dismissed.value && (onTimerRoute.value || store.isProjecting || store.isRunning || isIndependentProjectionActive('timer')),
 )
 
 
@@ -63,6 +71,14 @@ const { positionStyle, dragging, onPointerDown, resetPosition } =
   useFloatingDrag(chromeRoot, USER_PREFERENCE_KEYS.timerChromePosition, {
     stackOrder: FLOATING_STACK_ORDER.timer,
   })
+
+function onCloseChrome() {
+  store.pause()
+  if (store.isProjecting) store.clearProjection()
+  closeIndependentProjection('timer')
+  projectionMinimized.value = false
+  dismissed.value = true
+}
 
 function onProject() {
   void store.toggleProjection()
@@ -98,6 +114,7 @@ async function onOpenStopwatch() {
       :title="t('timer.chromeDragHint')"
       @dblclick="resetPosition"
     >
+      <MiniPlayerCloseButton v-if="!onTimerRoute" :label="t('timer.title')" @close="onCloseChrome" />
       <TimerPreview
         :config="effectiveConfig"
         :runtime="store.runtime"
@@ -185,7 +202,7 @@ async function onOpenStopwatch() {
   background: #000;
   border: 1px solid rgb(255 255 255 / 0.2);
   box-shadow: 0 16px 40px rgb(0 0 0 / 0.45);
-  overflow: hidden;
+  overflow: visible;
   pointer-events: auto;
   cursor: grab;
 }

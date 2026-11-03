@@ -1,37 +1,73 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, nextTick, onBeforeUnmount } from 'vue'
+import { storeToRefs } from 'pinia'
+import { usePlaylistPanelStore } from '../stores/usePlaylistPanelStore'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useMediaStore } from '@modules/media/stores/useMediaStore'
 
 import { GlassCard } from '@design-system/index'
 import { useMinimizablePage } from '@shared/composables/useMinimizablePage'
-import PalcoRouteSelect from '@modules/settings/components/PalcoRouteSelect.vue'
 import type { LibraryAlbum } from '@modules/sync/types/library'
 import { getShowCustomCollections, setShowCustomCollections } from '../visibility'
 import AlbumCollectionCard from '../components/AlbumCollectionCard.vue'
+import AppConfirm from '@shared/components/AppConfirm.vue'
 import AlbumHymnalCard from '../components/AlbumHymnalCard.vue'
 import AlbumLyricDialog from '../components/AlbumLyricDialog.vue'
+import AlbumPlaylistPickerDialog from '../components/AlbumPlaylistPickerDialog.vue'
 import AlbumSearchHitRow from '../components/AlbumSearchHitRow.vue'
 import DownloadFailureDialog from '@modules/sync/components/DownloadFailureDialog.vue'
+import { filterAlbumMusicIndex } from '../services/album-music-search'
 import { useAlbums } from '../composables/useAlbums'
-import type { AlbumCategory, AlbumCollection } from '../types/albums'
+import type { AlbumCategory, AlbumCollection, AlbumSearchHit } from '../types/albums'
 import {
+  addPlaylistItem,
   createPlaylist,
+  type PlaylistItem,
   deletePlaylist,
+  renamePlaylist,
   listPlaylists,
   removePlaylistItem,
+  movePlaylistItem,
   savePlaylists,
   type Playlist,
 } from '../services/playlist-storage'
 import { parsePlaylistsImport, serializePlaylists } from '../services/playlist-io'
 
+const pendingPlaylistRemoval = ref<{ id: string; name: string } | null>(null)
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const mediaStore = useMediaStore()
 const playlists = ref<Playlist[]>(listPlaylists())
+const searchPlaylistItem = ref<PlaylistItem | null>(null)
+const searchPlaylistFeedback = ref('')
+let searchPlaylistFeedbackTimer: ReturnType<typeof setTimeout> | undefined
+onBeforeUnmount(() => clearTimeout(searchPlaylistFeedbackTimer))
+function searchArtwork(hit: AlbumSearchHit) {
+  return categories.value.flatMap(category => category.collections)
+    .find(collection => hit.albumNames.split(',').some(name => name.trim() === collection.name))?.coverUrl ?? null
+}
+function addSearchTrackToPlaylist(id: string) {
+  const item = searchPlaylistItem.value
+  if (!item) return
+  const result = addPlaylistItem(id, item)
+  if (!result) return
+  searchPlaylistFeedback.value = t(result.added ? 'albums.playlists.addedTo' : 'albums.playlists.alreadyIn', { title: item.title, name: result.playlist.name })
+  clearTimeout(searchPlaylistFeedbackTimer)
+  searchPlaylistFeedbackTimer = setTimeout(() => { searchPlaylistFeedback.value = '' }, 5000)
+  playlists.value = listPlaylists()
+  searchPlaylistItem.value = null
+}
 const newPlaylistName = ref('')
+const playlistHint = ref<{ playlistId: string; key: string } | null>(null)
+const playlistHintParts = computed(() => {
+  const text = playlistHint.value ? t(playlistHint.value.key) : ''
+  const separator = text.indexOf(':')
+  return separator < 0
+    ? { label: text, description: '' }
+    : { label: text.slice(0, separator + 1), description: text.slice(separator + 1).trim() }
+})
 // Visibilidade de Minhas Coletâneas (preferência do usuário, persistida).
 const showCustomCollections = ref(getShowCustomCollections())
 
@@ -45,6 +81,7 @@ function toggleCustomCollectionsVisibility(): void {
 const {
   categories,
   hubSearchQuery,
+  musicIndex,
   hubSearchResults,
   isHubSearching,
   isLoadingCatalog,
@@ -76,8 +113,79 @@ const {
   closeLyric,
 } = useAlbums()
 
+const addingPlaylist = ref<Playlist | null>(null)
+const playlistSearchQuery = ref('')
+const playlistSearchInput = ref<HTMLInputElement | null>(null)
+const playlistSearchResults = computed(() => playlistSearchQuery.value.trim()
+  ? filterAlbumMusicIndex(musicIndex?.value ?? [], playlistSearchQuery.value) : [])
+const addedPlaylistMusicIds = computed(() => new Set(
+  playlists.value.find(playlist => playlist.id === addingPlaylist.value?.id)?.items.map(item => item.musicId) ?? [],
+))
+async function openPlaylistSearch(playlist: Playlist) {
+  addingPlaylist.value = playlist
+  playlistSearchQuery.value = ''
+  searchPlaylistFeedback.value = ''
+  await nextTick()
+  playlistSearchInput.value?.focus()
+}
+function addPlaylistSearchHit(hit: AlbumSearchHit) {
+  if (!addingPlaylist.value) return
+  searchPlaylistItem.value = { musicId: hit.musicId, albumId: null, title: hit.name }
+  addSearchTrackToPlaylist(addingPlaylist.value.id)
+}
+
+const selectedSearchIndex = ref(0)
+watch(hubSearchResults, () => { selectedSearchIndex.value = 0 })
+async function onSearchKeydown(event: KeyboardEvent) {
+  if (event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return
+  if (!['ArrowDown', 'ArrowUp', 'Enter'].includes(event.key) || !hubSearchResults.value.length) return
+  // Buttons retain their own keyboard actions.
+  if ((event.target as HTMLElement)?.closest('button')) return
+  event.preventDefault()
+  event.stopPropagation()
+  if (event.key === 'Enter') {
+    const hit = hubSearchResults.value[selectedSearchIndex.value]
+    if (hit) await runAction(hit.musicId, () => playSung(hit.musicId))
+    return
+  }
+  selectedSearchIndex.value = Math.max(0, Math.min(hubSearchResults.value.length - 1,
+    selectedSearchIndex.value + (event.key === 'ArrowDown' ? 1 : -1)))
+  await nextTick()
+  document.getElementById(`album-search-result-${hubSearchResults.value[selectedSearchIndex.value]?.musicId}`)?.scrollIntoView?.({ block: 'nearest' })
+}
+
 const busyMusicId = ref<number | null>(null)
+const playlistItem = ref<PlaylistItem | null>(null)
+const playlistFeedback = ref('')
 const albumPendingRemoval = ref<LibraryAlbum | null>(null)
+
+let playlistFeedbackTimer: ReturnType<typeof setTimeout> | null = null
+
+onBeforeUnmount(() => {
+  if (playlistFeedbackTimer) clearTimeout(playlistFeedbackTimer)
+})
+
+function closePlaylistPicker() {
+  playlistItem.value = null
+}
+
+function openPlaylistPicker(hit: { musicId: number; name: string }) {
+  playlistItem.value = { musicId: hit.musicId, albumId: null, title: hit.name }
+}
+
+function addToPlaylist(id: string) {
+  const item = playlistItem.value
+  if (!item) return
+  const target = playlists.value.find((playlist) => playlist.id === id)
+  const result = addPlaylistItem(id, item)
+  playlists.value = listPlaylists()
+  playlistItem.value = null
+  playlistFeedback.value = result?.added
+    ? `“${item.title}” adicionada a “${target?.name ?? 'playlist'}”`
+    : `“${item.title}” já está em “${target?.name ?? 'playlist'}”`
+  if (playlistFeedbackTimer) clearTimeout(playlistFeedbackTimer)
+  playlistFeedbackTimer = setTimeout(() => { playlistFeedback.value = '' }, 2600)
+}
 
 const showDownloadControls = computed(() => isDesktop)
 
@@ -134,7 +242,7 @@ function exportPlaylists() {
 const importFeedback = ref('')
 
 /* ---------- Modais (padrão web): Playlists + Minhas Coletâneas ---------- */
-const playlistsModalOpen = ref(false)
+const { open: playlistsModalOpen, expandedPlaylistId } = storeToRefs(usePlaylistPanelStore())
 
 /**
  * Minimizar a janela de Playlists: ela fecha e vai para a barra como
@@ -224,6 +332,78 @@ async function playPlaylist(playlist: Playlist) {
   await router.push({ name: 'media' })
 }
 
+async function playPlaylistTrack(playlist: Playlist, index: number) {
+  const item = playlist.items[index]
+  if (!item) return
+  // Play da linha é avulso: ao terminar, o player fecha sem avançar na playlist.
+  await mediaStore.playQueue([item], 0, undefined, playlist.name, { minimized: true })
+}
+
+async function shufflePlaylist(playlist: Playlist) {
+  const items = [...playlist.items]
+  for (let i = items.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[items[i], items[j]] = [items[j]!, items[i]!]
+  }
+  if (!items.length) return
+  await mediaStore.playQueue(items, 0, undefined, playlist.name, { originalOrder: playlist.items, shuffled: true })
+  await router.push({ name: 'media' })
+}
+
+const draggedTrack = ref<{ playlistId: string; index: number } | null>(null)
+const dropTarget = ref<{ playlistId: string; index: number } | null>(null)
+
+function endTrackDrag() {
+  draggedTrack.value = null
+  dropTarget.value = null
+}
+
+function leaveTrackList(event: DragEvent) {
+  const list = event.currentTarget as HTMLElement
+  if (!(event.relatedTarget instanceof Node) || !list.contains(event.relatedTarget)) dropTarget.value = null
+}
+
+function hoverTrack(playlistId: string, index: number) {
+  if (draggedTrack.value?.playlistId !== playlistId) return
+  dropTarget.value = { playlistId, index }
+}
+
+function trackKey(items: Playlist['items'], index: number) {
+  const item = items[index]!
+  const occurrence = items.slice(0, index).filter((entry) =>
+    entry.musicId === item.musicId && entry.albumId === item.albumId).length
+  return `${item.musicId}-${item.albumId}-${occurrence}`
+}
+
+function startTrackDrag(event: DragEvent, playlistId: string, index: number) {
+  draggedTrack.value = { playlistId, index }
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', String(index))
+    // A prévia nativa acompanha a faixa inteira, em vez de só o ícone de arraste.
+    const row = (event.currentTarget as HTMLElement).closest('li')
+    if (row) {
+      const ghost = row.cloneNode(true) as HTMLElement
+      const rect = row.getBoundingClientRect()
+      ghost.style.cssText = `position:fixed;top:-10000px;left:0;width:${rect.width}px;display:flex;align-items:center;gap:0.65rem;padding:0.6rem;background:#c46b38;color:#fff;border:2px solid #ffc18e;border-radius:8px;box-shadow:0 8px 24px #0008;list-style:none;`
+      document.body.appendChild(ghost)
+      event.dataTransfer.setDragImage(ghost, 24, rect.height / 2)
+      setTimeout(() => ghost.remove(), 0)
+    }
+  }
+}
+
+function reorderTrack(playlistId: string, from: number, to: number) {
+  movePlaylistItem(playlistId, from, to)
+  playlists.value = listPlaylists()
+}
+
+function dropTrack(playlistId: string, index: number) {
+  const source = draggedTrack.value
+  endTrackDrag()
+  if (source?.playlistId === playlistId) reorderTrack(playlistId, source.index, index)
+}
+
 function addPlaylist() {
   const name = newPlaylistName.value.trim()
   if (!name) return
@@ -232,17 +412,41 @@ function addPlaylist() {
   newPlaylistName.value = ''
 }
 
-function removePlaylist(id: string) {
-  deletePlaylist(id)
+const editingPlaylistId = ref<string | null>(null)
+const playlistNameDraft = ref('')
+async function beginRenamePlaylist(playlist: Playlist) {
+  editingPlaylistId.value = playlist.id
+  playlistNameDraft.value = playlist.name
+  await nextTick()
+  const input = document.querySelector<HTMLInputElement>('[data-test="playlist-rename-input"]')
+  input?.focus()
+  input?.select()
+}
+function savePlaylistName() {
+  const name = playlistNameDraft.value.trim()
+  if (!editingPlaylistId.value || !name) return
+  renamePlaylist(editingPlaylistId.value, name)
   playlists.value = listPlaylists()
+  editingPlaylistId.value = null
+}
+
+function removePlaylist(id: string) {
+  const playlist = playlists.value.find(item => item.id === id)
+  if (playlist) pendingPlaylistRemoval.value = { id, name: playlist.name }
+}
+function confirmPlaylistRemoval() {
+  const playlist = pendingPlaylistRemoval.value
+  if (!playlist) return
+  deletePlaylist(playlist.id)
+  playlists.value = listPlaylists()
+  if (expandedPlaylistId.value === playlist.id) expandedPlaylistId.value = null
+  pendingPlaylistRemoval.value = null
 }
 
 function removePlaylistTrack(id: string, index: number) {
   removePlaylistItem(id, index)
   playlists.value = listPlaylists()
 }
-
-const expandedPlaylistId = ref<string | null>(null)
 
 function togglePlaylist(id: string) {
   expandedPlaylistId.value = expandedPlaylistId.value === id ? null : id
@@ -308,7 +512,6 @@ async function runAction(
       </div>
 
       <div class="albums-view__header-actions">
-        <PalcoRouteSelect module="hymns" compact />
         <button
           type="button"
           class="albums-view__toolbar-btn"
@@ -368,6 +571,8 @@ async function runAction(
           />
           <input
             v-model="hubSearchQuery"
+            @keydown="onSearchKeydown"
+            :aria-activedescendant="hubSearchResults.length ? `album-search-result-${hubSearchResults[selectedSearchIndex]?.musicId}` : undefined"
             type="search"
             :placeholder="t('albums.hubSearchPlaceholder')"
             :aria-label="t('albums.hubSearchPlaceholder')"
@@ -443,7 +648,7 @@ async function runAction(
         <div
           class="albums-view__modal-backdrop"
           aria-hidden="true"
-          @click="playlistsModalOpen = false"
+          @click="minimizePlaylists"
         />
         <GlassCard class="albums-view__modal-panel">
           <header class="albums-view__playlists-header">
@@ -524,18 +729,49 @@ async function runAction(
                     aria-hidden="true"
                   />
                 </button>
-                <div class="albums-view__playlist-actions">
                   <button
                     type="button"
-                    class="albums-view__playlist-play"
+                    class="albums-view__playlist-rename"
+                    :aria-label="t('albums.playlists.rename', { name: playlist.name })"
+                    :title="t('albums.playlists.rename', { name: playlist.name })"
+                    @click="beginRenamePlaylist(playlist)"
+                  ><i class="ti ti-pencil" aria-hidden="true" /></button>
+                <button type="button" class="albums-view__playlist-rename albums-view__playlist-add"
+                  :title="t('albums.playlists.addMusic')" :aria-label="t('albums.playlists.addMusic')"
+                  @mouseenter="playlistHint = { playlistId: playlist.id, key: 'albums.playlists.addMusicHint' }"
+                  @mouseleave="playlistHint = null" @focus="playlistHint = { playlistId: playlist.id, key: 'albums.playlists.addMusicHint' }"
+                  @blur="playlistHint = null" @click="openPlaylistSearch(playlist)">
+                  <i class="ti ti-plus" aria-hidden="true" />
+                </button>
+                <span class="albums-view__playlist-hint" role="status" aria-live="polite">
+                  <span v-if="playlistHint?.playlistId === playlist.id">
+                    <strong class="albums-view__playlist-hint-label">{{ playlistHintParts.label }}</strong>{{ ' ' }}{{ playlistHintParts.description }}
+                  </span>
+                </span>
+                <div class="albums-view__playlist-actions">
+                  <button type="button" class="albums-view__playlist-shuffle"
+                    :disabled="playlist.items.length === 0" :aria-label="t('albums.playlists.shuffle')"
+                    @mouseenter="playlistHint = { playlistId: playlist.id, key: 'albums.playlists.shuffleHint' }"
+                    @mouseleave="playlistHint = null"
+                    @focus="playlistHint = { playlistId: playlist.id, key: 'albums.playlists.shuffleHint' }"
+                    @blur="playlistHint = null" @click="shufflePlaylist(playlist)">
+                    <i class="ti ti-arrows-shuffle" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    class="albums-view__playlist-play albums-view__playlist-play-all"
                     :disabled="playlist.items.length === 0"
                     :aria-label="`Tocar ${playlist.name}`"
+                    @mouseenter="playlistHint = { playlistId: playlist.id, key: 'albums.playlists.playAllHint' }"
+                    @mouseleave="playlistHint = null"
+                    @focus="playlistHint = { playlistId: playlist.id, key: 'albums.playlists.playAllHint' }"
+                    @blur="playlistHint = null"
                     @click="playPlaylist(playlist)"
                   >
                     <i class="ti ti-player-play" aria-hidden="true" />
                   </button>
-                  <button
-                    type="button"
+
+                  <button type="button"
                     class="albums-view__playlist-remove"
                     :aria-label="`Remover playlist ${playlist.name}`"
                     @click="removePlaylist(playlist.id)"
@@ -544,10 +780,38 @@ async function runAction(
                   </button>
                 </div>
               </div>
+              <form v-if="editingPlaylistId === playlist.id" class="albums-view__modal-form albums-view__rename-form" @submit.prevent="savePlaylistName" @keydown.esc.stop="editingPlaylistId = null">
+                <input v-model="playlistNameDraft" data-test="playlist-rename-input" maxlength="120" :aria-label="t('albums.playlists.newName')" />
+                <button type="submit" class="albums-view__toolbar-btn" :disabled="!playlistNameDraft.trim()">{{ t('albums.playlists.saveName') }}</button>
+                <button type="button" class="albums-view__toolbar-btn" @click="editingPlaylistId = null">{{ t('common.cancel') }}</button>
+              </form>
               <Transition name="playlist-tracks">
-                <ul v-if="expandedPlaylistId === playlist.id && playlist.items.length > 0" class="albums-view__playlist-tracks">
-                  <li v-for="(item, index) in playlist.items" :key="`${item.musicId}-${index}`">
+                <TransitionGroup v-if="expandedPlaylistId === playlist.id && playlist.items.length > 0" name="playlist-reorder" tag="ul" class="albums-view__playlist-tracks"
+                  @dragleave="leaveTrackList">
+                  <li v-for="(item, index) in playlist.items" :key="trackKey(playlist.items, index)"
+                    :class="{
+                      'playlist-track--dragging': draggedTrack?.playlistId === playlist.id && draggedTrack.index === index,
+                      'playlist-track--drop-before': dropTarget?.playlistId === playlist.id && dropTarget.index === index && draggedTrack && draggedTrack.index > index,
+                      'playlist-track--drop-after': dropTarget?.playlistId === playlist.id && dropTarget.index === index && draggedTrack && draggedTrack.index < index,
+                    }"
+                    @dragover.prevent="hoverTrack(playlist.id, index)" @drop.prevent="dropTrack(playlist.id, index)">
+                    <button type="button" class="albums-view__playlist-track-drag" draggable="true"
+                      :aria-label="t('albums.playlists.reorder')" :title="t('albums.playlists.reorder')"
+                      @dragstart="startTrackDrag($event, playlist.id, index)" @dragend="endTrackDrag"
+                      @keydown.up.prevent="reorderTrack(playlist.id, index, index - 1)"
+                      @keydown.down.prevent="reorderTrack(playlist.id, index, index + 1)">
+                      <i class="ti ti-grip-vertical" aria-hidden="true" />
+                    </button>
                     <span class="albums-view__playlist-track-index">{{ index + 1 }}</span>
+                    <button type="button" class="albums-view__playlist-track-play"
+                      :aria-label="t('albums.playlists.playTrack', { title: item.title })"
+                      @mouseenter="playlistHint = { playlistId: playlist.id, key: 'albums.playlists.singlePlayHint' }"
+                    @mouseleave="playlistHint = null"
+                    @focus="playlistHint = { playlistId: playlist.id, key: 'albums.playlists.singlePlayHint' }"
+                    @blur="playlistHint = null"
+                      @click="playPlaylistTrack(playlist, index)">
+                      <i class="ti ti-player-play" aria-hidden="true" />
+                    </button>
                     <span class="albums-view__playlist-track-title">{{ item.title }}</span>
                     <button
                       type="button"
@@ -558,7 +822,7 @@ async function runAction(
                       <i class="ti ti-x" aria-hidden="true" />
                     </button>
                   </li>
-                </ul>
+                </TransitionGroup>
               </Transition>
             </article>
           </TransitionGroup>
@@ -576,6 +840,7 @@ async function runAction(
           <h2 class="albums-view__results-title">
             {{ t('albums.searchResultsTitle') }}
           </h2>
+          <p class="albums-view__search-explanation">{{ t('albums.searchExplanation') }}</p>
         </div>
 
         <div
@@ -592,14 +857,25 @@ async function runAction(
           {{ t('albums.messages.searchEmpty') }}
         </div>
 
+        <div v-if="!isLoadingMusicIndex && hubSearchResults.length" class="albums-view__results-columns" aria-hidden="true">
+          <span>{{ t('albums.columns.number') }}</span>
+          <span>{{ t('albums.columns.title') }}</span>
+          <span>{{ t('albums.columns.duration') }}</span>
+          <span>{{ t('albums.columns.actions') }}</span>
+        </div>
         <div
-          v-else
+          v-if="!isLoadingMusicIndex && hubSearchResults.length"
           class="albums-view__results-list"
+          @keydown.capture="onSearchKeydown"
         >
           <AlbumSearchHitRow
-            v-for="hit in hubSearchResults"
+            v-for="(hit, index) in hubSearchResults"
             :key="hit.musicId"
             :hit="hit"
+            :id="`album-search-result-${hit.musicId}`"
+            :selected="index === selectedSearchIndex"
+            @focus="selectedSearchIndex = index"
+            :artwork-url="searchArtwork(hit)"
             :busy="busyMusicId === hit.musicId"
             @sung="runAction(hit.musicId, () => playSung(hit.musicId))"
             @instrumental="
@@ -607,6 +883,7 @@ async function runAction(
             "
             @slides="runAction(hit.musicId, () => playSlides(hit.musicId))"
             @lyric="runAction(hit.musicId, () => openLyric(hit.musicId))"
+            @playlist="openPlaylistPicker(hit)"
           />
         </div>
       </GlassCard>
@@ -689,6 +966,22 @@ async function runAction(
       </section>
     </div>
 
+    <Teleport to="body">
+      <Transition name="playlist-toast">
+        <div v-if="playlistFeedback" class="playlist-toast" role="status" aria-live="polite">
+          <i class="ti ti-circle-check" aria-hidden="true" />
+          {{ playlistFeedback }}
+        </div>
+      </Transition>
+    </Teleport>
+
+    <AlbumPlaylistPickerDialog
+      :item="playlistItem"
+      :playlists="playlists"
+      @close="closePlaylistPicker"
+      @select="addToPlaylist"
+    />
+
     <AlbumLyricDialog
       :open="lyricOpen"
       :loading="isLoadingLyric"
@@ -743,10 +1036,81 @@ async function runAction(
         </div>
       </div>
     </Teleport>
+    <Teleport to="body">
+      <div v-if="addingPlaylist" class="albums-view__modal albums-view__music-search" role="dialog" aria-modal="true"
+        :aria-label="t('albums.playlists.addMusic')" @keydown.esc.stop="addingPlaylist = null">
+        <div class="albums-view__modal-backdrop" @click="addingPlaylist = null" />
+        <GlassCard class="albums-view__modal-panel albums-view__music-search-panel">
+          <header class="albums-view__modal-header">
+            <h2>{{ t('albums.playlists.addMusic') }} — {{ addingPlaylist.name }}</h2>
+            <button type="button" class="albums-view__playlists-io" :aria-label="t('common.close')" @click="addingPlaylist = null"><i class="ti ti-x" /></button>
+          </header>
+          <label class="albums-view__search">
+            <i class="ti ti-search" aria-hidden="true" />
+            <input ref="playlistSearchInput" v-model="playlistSearchQuery" :placeholder="t('albums.hubSearchPlaceholder')" :aria-label="t('albums.hubSearchPlaceholder')">
+            <button v-if="playlistSearchQuery" type="button" class="albums-view__search-clear" :aria-label="t('albums.clearSearch')" @click="playlistSearchQuery = ''"><i class="ti ti-x" /></button>
+          </label>
+          <p class="albums-view__search-explanation">{{ t('albums.searchExplanation') }}</p>
+          <p v-if="searchPlaylistFeedback" class="albums-view__playlists-feedback" role="status" aria-live="polite">{{ searchPlaylistFeedback }}</p>
+          <p v-if="isLoadingMusicIndex">{{ t('albums.loading') }}</p>
+          <p v-else-if="!playlistSearchQuery.trim()">{{ t('albums.playlists.searchMusicHint') }}</p>
+          <p v-else-if="!playlistSearchResults.length">{{ t('albums.messages.searchEmpty') }}</p>
+          <div v-if="!isLoadingMusicIndex && playlistSearchResults.length" class="albums-view__results-columns" aria-hidden="true">
+            <span>{{ t('albums.columns.number') }}</span>
+            <span>{{ t('albums.columns.title') }}</span>
+            <span>{{ t('albums.columns.duration') }}</span>
+            <span>{{ t('albums.columns.actions') }}</span>
+          </div>
+          <div v-if="!isLoadingMusicIndex && playlistSearchResults.length" class="albums-view__results-list">
+            <AlbumSearchHitRow v-for="hit in playlistSearchResults" :key="hit.musicId" :hit="hit" prominent-playlist :already-added="addedPlaylistMusicIds.has(hit.musicId)" :artwork-url="searchArtwork(hit)"
+              :busy="busyMusicId === hit.musicId" @playlist="addPlaylistSearchHit(hit)"
+              @sung="runAction(hit.musicId, () => playSung(hit.musicId))"
+              @instrumental="runAction(hit.musicId, () => playInstrumental(hit.musicId))"
+              @slides="runAction(hit.musicId, () => playSlides(hit.musicId))"
+              @lyric="runAction(hit.musicId, () => openLyric(hit.musicId))" />
+          </div>
+        </GlassCard>
+      </div>
+    </Teleport>
+    <AppConfirm :open="pendingPlaylistRemoval !== null" :z-index="150" danger
+      :title="t('albums.playlists.deleteTitle', { name: pendingPlaylistRemoval?.name ?? '' })"
+      :message="t('albums.playlists.deleteMessage')"
+      :confirm-label="t('albums.playlists.deleteConfirm')" :cancel-label="t('common.cancel')"
+      @cancel="pendingPlaylistRemoval = null" @confirm="confirmPlaylistRemoval" />
   </section>
 </template>
 
 <style scoped lang="scss">
+.albums-view__modal.albums-view__music-search { z-index: 120; }
+.albums-view__modal-panel.albums-view__music-search-panel {
+  width: min(62rem, 100%);
+  max-height: 88vh;
+  overflow: hidden;
+  h2 { font-size: 1.1rem; }
+  .albums-view__search { width: 100%; flex: none; }
+  .albums-view__results-list { flex: 1 1 auto; }
+}
+.albums-view__playlist-feedback { position:fixed; bottom:6rem; left:50%; transform:translateX(-50%); max-width:90vw; z-index:1200; padding:.8rem 1rem; border:1px solid var(--ds-color-outline); border-radius:.7rem; background:var(--ds-color-surface,#202020); color:var(--ds-color-on-surface); box-shadow:0 8px 24px #0005; }
+.playlist-toast {
+  position: fixed;
+  bottom: calc(var(--ds-dock-height, 4rem) + 1.25rem);
+  left: 50%;
+  z-index: 1200;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  transform: translateX(-50%);
+  padding: 0.7rem 1.1rem;
+  border: 1px solid color-mix(in srgb, var(--ds-color-primary, #2196f3) 35%, transparent);
+  border-radius: var(--ds-radius-md, 12px 0 12px 0);
+  background: var(--ds-color-surface-elevated, #1e1e1e);
+  color: var(--ds-color-on-surface, #e5e2e1);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 45%);
+}
+.playlist-toast .ti { color: var(--ds-color-primary, #2196f3); }
+.playlist-toast-enter-active, .playlist-toast-leave-active { transition: opacity .28s ease, transform .28s ease; }
+.playlist-toast-enter-from, .playlist-toast-leave-to { opacity: 0; transform: translateX(-50%) translateY(.6rem); }
+
 .albums-view {
   position: relative;
   display: flex;
@@ -1160,6 +1524,13 @@ async function runAction(
   border-bottom: 1px solid var(--ds-color-outline);
 }
 
+.albums-view__search-explanation {
+  margin: .35rem 0 0;
+  font-size: .8rem;
+  line-height: 1.4;
+  color: var(--ds-color-on-surface-variant);
+}
+
 .albums-view__results-title {
   margin: 0;
   font-size: 0.95rem;
@@ -1167,7 +1538,22 @@ async function runAction(
   color: var(--ds-color-on-surface);
 }
 
+.albums-view__results-columns {
+  display: grid;
+  grid-template-columns: 4rem minmax(0, 1fr) 7rem 16rem;
+  gap: .75rem;
+  padding: .75rem 1.5rem;
+  color: var(--ds-color-primary);
+  font-size: .625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  span:nth-child(3) { text-align: center; }
+  span:last-child { text-align: right; }
+}
+@media (max-width: 800px) { .albums-view__results-columns { display: none; } }
 .albums-view__results-list {
+  padding: .5rem;
   flex: 1;
   min-height: 0;
   overflow: auto;
@@ -1449,6 +1835,8 @@ async function runAction(
 
 .albums-view__playlist-actions { display: inline-flex; gap: 0.4rem; align-items: center; flex-shrink: 0; }
 
+.albums-view__playlist-rename,
+.albums-view__playlist-shuffle,
 .albums-view__playlist-play,
 .albums-view__playlist-remove {
   display: inline-flex;
@@ -1463,14 +1851,18 @@ async function runAction(
   cursor: pointer;
   transition: all 0.2s ease;
 }
+.albums-view__playlist-rename,
+.albums-view__playlist-shuffle,
 .albums-view__playlist-play {
   color: var(--ds-color-primary);
   border-color: color-mix(in srgb, var(--ds-color-primary) 45%, transparent);
 }
+.albums-view__playlist-shuffle:hover:not(:disabled),
 .albums-view__playlist-play:hover:not(:disabled) {
   background: var(--ds-color-primary);
   color: var(--ds-color-on-primary, #fff);
 }
+.albums-view__playlist-shuffle:disabled,
 .albums-view__playlist-play:disabled { opacity: 0.35; cursor: not-allowed; }
 .albums-view__playlist-remove { color: var(--ds-color-on-surface-variant); }
 .albums-view__playlist-remove:hover {
@@ -1622,5 +2014,83 @@ async function runAction(
   color: var(--ds-color-primary-soft, var(--ds-color-primary));
   font-size: 0.82rem;
 }
+
+.albums-view__playlist-tracks li {
+  position: relative;
+  border-radius: 0.45rem;
+  transition: background-color 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
+}
+.albums-view__playlist-tracks .playlist-track--dragging {
+  background: color-mix(in srgb, var(--ds-color-primary) 30%, transparent);
+  box-shadow: inset 0 0 0 2px var(--ds-color-primary), 0 4px 14px rgb(0 0 0 / 25%);
+  opacity: 0.55;
+}
+.albums-view__playlist-tracks .playlist-track--drop-before,
+.albums-view__playlist-tracks .playlist-track--drop-after {
+  background: color-mix(in srgb, var(--ds-color-primary) 18%, transparent);
+}
+.playlist-track--drop-before::before,
+.playlist-track--drop-after::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--ds-color-primary);
+  box-shadow: 0 0 10px var(--ds-color-primary);
+  pointer-events: none;
+  z-index: 1;
+}
+.playlist-track--drop-before::before { top: -2px; }
+.playlist-track--drop-after::after { bottom: -2px; }
+.albums-view__playlist-tracks .playlist-reorder-move { transition: transform 240ms ease; }
+.albums-view__playlist-track-drag:hover {
+  background: color-mix(in srgb, var(--ds-color-primary) 28%, transparent);
+  color: var(--ds-color-primary);
+  border-color: var(--ds-color-primary);
+}
+@media (prefers-reduced-motion: reduce) {
+  .albums-view__playlist-tracks li,
+  .albums-view__playlist-tracks .playlist-reorder-move { transition: none; }
+}
+
+.albums-view__playlist-hint-label {
+  font-weight: 800;
+  color: var(--ds-color-on-surface);
+}
+.albums-view__playlist-hint {
+  flex: 1 1 14rem;
+  min-width: 0;
+  min-height: 2.6rem;
+  display: flex;
+  align-items: center;
+  padding: 0 0.65rem;
+  color: var(--ds-color-primary);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.albums-view__playlist-toggle { flex: 0 1 auto; max-width: 45%; }
 </style>
 
+
+<style scoped>
+.albums-view__playlist-track-drag,
+.albums-view__playlist-track-play {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.8rem;
+  height: 1.8rem;
+  border: 1px solid var(--ds-color-outline);
+  border-radius: 0.4rem;
+  background: transparent;
+  color: var(--ds-color-primary);
+  cursor: pointer;
+}
+.albums-view__playlist-track-drag { cursor: grab; color: var(--ds-color-on-surface-variant); }
+.albums-view__playlist-track-drag:active { cursor: grabbing; }
+.albums-view__playlist-track-play:hover { background: color-mix(in srgb, var(--ds-color-primary) 20%, transparent); }
+</style>

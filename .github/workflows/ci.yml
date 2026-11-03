@@ -93,6 +93,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npx playwright install --with-deps chromium
       # Caminho da staging (PR com base staging ou push/dispatch em refs/heads/staging): 50%.
       # Exceções em produção por versão (1.32.2: 70%, 1.33.0: 30%, 1.34.0: 50%); demais: 100%. Regra centralizada no script.
       - name: Cobertura com limite do destino do evento
@@ -182,6 +183,7 @@ jobs:
           REGRESSION_GIT_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           npm ci
+          npx playwright install --with-deps chromium
           node scripts/test-regression.mjs --baseline
           cp .regression-baseline.json /tmp/pr-regression-baseline.json
       - name: Restaurar código do PR
@@ -191,6 +193,9 @@ jobs:
           cp /tmp/pr-regression-baseline.json .regression-baseline.json
           cp /tmp/test-regression.mjs scripts/test-regression.mjs
           npm ci
+      - name: Instalar Chromium para a suíte atual
+        if: github.event_name == 'pull_request'
+        run: npx playwright install --with-deps chromium
       - name: Comparar com baseline (falha se regressão)
         if: github.event_name == 'pull_request'
         run: node scripts/test-regression.mjs --compare
@@ -199,6 +204,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         run: |
           npm ci
+          npx playwright install --with-deps chromium
           npm run test:regression
 
   pr-pre-review:
@@ -280,6 +286,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npx playwright install --with-deps chromium
       # Excludes consagrados: worktrees do Stryker e dirs temporárias locais.
       - run: npx vitest run --exclude='.stryker-tmp/**' --exclude='.worktrees/**'
       - name: Release publish decision

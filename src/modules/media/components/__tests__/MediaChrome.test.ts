@@ -29,8 +29,13 @@ const storeState = {
 	queueLabel: ref<string | null>(null),
 	toggleProjection: vi.fn().mockResolvedValue(undefined),
 	clearProjection: vi.fn(),
+	stopProjection: vi.fn(),
 	togglePlay: vi.fn().mockResolvedValue(undefined),
 	maximize: vi.fn(),
+	close: vi.fn(),
+	closeConfirmOpen: ref(false),
+	requestClose: vi.fn(() => { storeState.closeConfirmOpen.value = true; }),
+	cancelClose: vi.fn(() => { storeState.closeConfirmOpen.value = false; }),
 };
 
 vi.mock("../../composables/useMediaPlayer", () => ({
@@ -57,6 +62,7 @@ beforeEach(() => {
 	storeState.isPlaying.value = false;
 	storeState.session.value = null;
 	storeState.queueLabel.value = null;
+	storeState.closeConfirmOpen.value = false;
 });
 
 describe("MediaChrome — visibilidade", () => {
@@ -83,6 +89,27 @@ describe("MediaChrome — visibilidade", () => {
 });
 
 describe("MediaChrome — ações", () => {
+	it("botão fechar pede confirmação e cancelar mantém a reprodução", async () => {
+		const w = mountChrome();
+		await w.find('.media-chrome__close').trigger('click');
+		expect(storeState.requestClose).toHaveBeenCalledOnce();
+		expect(storeState.close).not.toHaveBeenCalled();
+		w.findComponent({ name: 'MediaCloseDialog' }).vm.$emit('cancel');
+		await w.vm.$nextTick();
+		expect(storeState.cancelClose).toHaveBeenCalledOnce();
+		expect(storeState.close).not.toHaveBeenCalled();
+		expect(pushMock).not.toHaveBeenCalled();
+		w.unmount();
+	});
+
+	it("confirmar o fechamento encerra a reprodução", async () => {
+		const w = mountChrome();
+		await w.find('.media-chrome__close').trigger('click');
+		w.findComponent({ name: 'MediaCloseDialog' }).vm.$emit('confirm');
+		expect(storeState.close).toHaveBeenCalledOnce();
+		w.unmount();
+	});
+
 	it("preview mostra snippet e referência da store", () => {
 		const w = mountChrome();
 		expect(w.text()).toContain("Porque tal amou");
@@ -92,7 +119,7 @@ describe("MediaChrome — ações", () => {
 
 	it("botão play idle mostra play e chama togglePlay", async () => {
 		const w = mountChrome();
-		const button = w.findAll(".media-chrome__icon-btn")[0];
+		const button = w.findAll(".media-chrome__actions .media-chrome__icon-btn")[0];
 		expect(button.attributes("aria-label")).toBe("Reproduzir");
 		expect(button.find(".ti-player-play").exists()).toBe(true);
 		await button.trigger("click");
@@ -103,7 +130,7 @@ describe("MediaChrome — ações", () => {
 	it("botão play ativo mostra pause", () => {
 		storeState.isPlaying.value = true;
 		const w = mountChrome();
-		const button = w.findAll(".media-chrome__icon-btn")[0];
+		const button = w.findAll(".media-chrome__actions .media-chrome__icon-btn")[0];
 		expect(button.attributes("aria-label")).toBe("Pausar");
 		expect(button.find(".ti-player-pause").exists()).toBe(true);
 		w.unmount();
@@ -111,7 +138,7 @@ describe("MediaChrome — ações", () => {
 
 	it("botão maximizar chama maximize e navega pra media", async () => {
 		const w = mountChrome();
-		await w.findAll(".media-chrome__icon-btn")[1].trigger("click");
+		await w.findAll(".media-chrome__actions .media-chrome__icon-btn")[1].trigger("click");
 		expect(storeState.maximize).toHaveBeenCalledOnce();
 		expect(pushMock).toHaveBeenCalledWith({ name: "media" });
 		w.unmount();
@@ -125,11 +152,12 @@ describe("MediaChrome — ações", () => {
 		w.unmount();
 	});
 
-	it("FAB projecting: clique chama clearProjection", async () => {
+	it("FAB projecting: clique encerra a projeção em vez de ocultar a letra", async () => {
 		storeState.isProjecting.value = true;
 		const w = mountChrome();
 		await w.find(".media-project-fab").trigger("click");
-		expect(storeState.clearProjection).toHaveBeenCalledOnce();
+		expect(storeState.stopProjection).toHaveBeenCalledOnce();
+		expect(storeState.clearProjection).not.toHaveBeenCalled();
 		expect(storeState.toggleProjection).not.toHaveBeenCalled();
 		w.unmount();
 	});

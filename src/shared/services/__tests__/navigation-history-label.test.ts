@@ -81,6 +81,7 @@ describe('chaves i18n do histórico', () => {
         'settings-media',
         'settings-projection',
         'settings-remote',
+        'settings-transmission',
         'utilities-clock',
         'utilities-countdown',
         'utilities-obs',

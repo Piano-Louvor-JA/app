@@ -6,6 +6,7 @@ defineProps<{
 	confirmLabel: string;
 	cancelLabel: string;
 	danger?: boolean;
+	zIndex?: number;
 }>();
 
 const emit = defineEmits<{
@@ -20,6 +21,7 @@ const emit = defineEmits<{
     <div
       v-if="open"
       class="app-confirm"
+      :style="zIndex === undefined ? undefined : { zIndex }"
       role="dialog"
       aria-modal="true"
       :aria-label="title"

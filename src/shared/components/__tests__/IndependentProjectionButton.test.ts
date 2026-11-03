@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { computed, ref } from 'vue'
 
+vi.mock('@modules/settings/services/obs-detection', () => ({ detectObsBeforeProjection: vi.fn(async () => {}) }))
+
 const monitors = ref<Array<{ id: number; index: number; resolutionLabel: string }>>([])
 const activeMonitorId = ref<number | null>(null)
 const activeMode = ref<'overlay' | 'share' | null>(null)
@@ -42,6 +44,12 @@ vi.mock('vue-i18n', () => ({
   }),
 }))
 
+import { obsAssignments, obsAssignmentModes } from '@modules/settings/services/obs-connections'
+const obsOutputs = ref<Array<{ id: string; label: string; running: boolean; clients: number; selected: boolean }>>([])
+vi.mock('@modules/settings/composables/useObsConnections', () => ({
+  useObsConnections: () => ({ activeConnections: obsOutputs }),
+}))
+
 import IndependentProjectionButton from '../IndependentProjectionButton.vue'
 
 const EXTENDED = [
@@ -62,6 +70,8 @@ function panel() {
 
 describe('IndependentProjectionButton', () => {
   beforeEach(() => {
+    obsOutputs.value = []
+    obsAssignments.value = {}
     monitors.value = [...EXTENDED]
     activeMonitorId.value = null
     activeMode.value = null
@@ -71,12 +81,56 @@ describe('IndependentProjectionButton', () => {
     document.body.innerHTML = ''
   })
 
+  it('limita altura do menu e mostra encerrar antes dos destinos', async () => {
+    monitors.value = [{ id: 2, index: 2, resolutionLabel: '1920 × 1080' }]
+    activeMonitorId.value = 2
+    const wrapper = mountButton({ moduleId: 'bible' })
+    const trigger = wrapper.get('[data-testid="independent-projection-trigger"]')
+    await trigger.trigger('click')
+    const menu = panel()!
+    expect(menu.style.maxHeight).not.toBe('')
+    const stopButton = menu.querySelector('[data-testid="independent-projection-stop"]')!
+    const modes = menu.querySelector('.independent-projection__modes')!
+    expect(stopButton.compareDocumentPosition(modes) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    wrapper.unmount()
+  })
+
+  it('sem conexões OBS mostra apenas a orientação para ativá-las', async () => {
+    const wrapper = mountButton()
+    await wrapper.get('[data-testid="independent-projection-trigger"]').trigger('click')
+    expect(panel()!.querySelector('.obs-outputs-empty')?.textContent).toContain('obsOutputs.activateHint')
+    expect(panel()!.querySelector('ul[aria-label="obsOutputs.title"]')).toBeNull()
+    wrapper.unmount()
+  })
+
+  it('oferece conexão OBS ativa mesmo sem monitor e atribui apenas o destino escolhido', async () => {
+    monitors.value = []
+    obsOutputs.value = [{ id: '7082', label: 'OBS 2', running: true, clients: 1, selected: true }]
+    const beforeProject = vi.fn(() => true)
+    const wrapper = mountButton({ moduleId: 'bible', beforeProject })
+    const trigger = wrapper.get('[data-testid="independent-projection-trigger"]')
+    expect(trigger.attributes('aria-disabled')).toBe('false')
+    await trigger.trigger('click')
+    expect(panel()!.querySelector('.obs-outputs-active')?.textContent).toContain('obsOutputs.active')
+    expect(panel()!.querySelector('.obs-outputs-empty')).toBeNull()
+    ;(panel()!.querySelector('[data-mode="share"]') as HTMLButtonElement).click()
+    await flushPromises()
+    const output = [...panel()!.querySelectorAll('button')].find((item) => item.textContent?.includes('OBS 2'))!
+    output.click()
+    await flushPromises()
+    expect(obsAssignments.value).toEqual({ '7082': 'bible' })
+    expect(obsAssignmentModes.value['7082']).toBe('share')
+    expect(beforeProject).toHaveBeenCalledOnce()
+    expect(project).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
   it('sem monitor estendido fica desativado com o aviso no tooltip', async () => {
     monitors.value = []
     const wrapper = mountButton()
     const trigger = wrapper.get('[data-testid="independent-projection-trigger"]')
     expect(trigger.attributes('aria-disabled')).toBe('true')
-    expect(trigger.attributes('title')).toBe('independentProjection.unavailable')
+    expect(trigger.attributes('title')).toBe('independentProjection.unavailable obsOutputs.activateHint')
     await trigger.trigger('click')
     expect(panel()).toBeNull()
     wrapper.unmount()

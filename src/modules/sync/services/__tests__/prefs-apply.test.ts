@@ -18,7 +18,7 @@ vi.stubGlobal('localStorage', {
   removeItem: (k: string) => void lsStore.delete(k),
 })
 
-import { applyOperatorState } from '../operator-state-apply'
+import { applyOperatorState, syncablePreferenceValue } from '../operator-state-apply'
 
 const USER_DATA_KEY = 'user_data'
 const PREFS_META_KEY = 'pianolouvorja:sync:prefs:updatedAt'
@@ -80,4 +80,24 @@ describe('pull do operator_state — namespace prefs (LWW, whitelist)', () => {
     const applied = applyOperatorState([prefsItem('not-an-object', 9999)])
     expect(applied).toBe(false)
   })
+})
+
+it('cloud preferences cannot disable or move the local return screen', () => {
+  lsStore.clear()
+  localStorage.setItem('user_data', JSON.stringify({ 'projection.settings': {
+    openReturnScreen: true, returnDisplayId: 42, targetDisplayIds: [42], fontColor: '#fff',
+  } }))
+  applyOperatorState([prefsItem({ 'projection.settings': {
+    openReturnScreen: false, returnDisplayId: 7, targetDisplayIds: [7], fontColor: '#abc',
+  } }, 9000)])
+  expect(readPref('projection.settings')).toMatchObject({
+    openReturnScreen: true, returnDisplayId: 42, targetDisplayIds: [42], fontColor: '#abc',
+  })
+})
+
+it('does not upload hardware choices but still syncs presentation styling', () => {
+  expect(syncablePreferenceValue('projection.settings', {
+    openReturnScreen: true, returnDisplayId: 42, targetDisplayIds: [42],
+    declinedDisplayIds: [7], monitorArrangement: [], fontColor: '#abc',
+  })).toEqual({ fontColor: '#abc' })
 })

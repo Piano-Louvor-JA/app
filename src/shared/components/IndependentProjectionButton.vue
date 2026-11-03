@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import { detectObsBeforeProjection } from '@modules/settings/services/obs-detection'
+import { useObsConnections } from '@modules/settings/composables/useObsConnections'
+import { obsConnectionName, assignObsConnection, obsAssignments, obsAssignmentModes, clearObsModule, type ObsModule } from '@modules/settings/services/obs-connections'
+
 import { identifySystemDisplays } from '@modules/settings/services/display-service'
 import {
   useIndependentProjectionControl,
@@ -19,6 +23,23 @@ const { monitors, available, activeMonitorId, activeMode, project, stop } =
   useIndependentProjectionControl(props.moduleId)
 
 /** Sobrepor (tela inteira) ou compartilhar (metade, com o que já está no monitor). */
+const { activeConnections: obsOutputs } = useObsConnections()
+const obsActive = computed(() => obsOutputs.value.some((item) => obsAssignments.value[item.id] === props.moduleId))
+const outputAvailable = computed(() => available.value || obsOutputs.value.length > 0)
+async function onSelectObs(id: string) {
+  if (busy.value) return
+  busy.value = true
+  try {
+    await detectObsBeforeProjection()
+    if (props.beforeProject && !(await props.beforeProject())) return
+    // Compartilhar mantém a saída principal ao lado do recurso independente.
+    stop()
+    clearObsModule(props.moduleId)
+    assignObsConnection(id, props.moduleId as ObsModule, mode.value)
+    open.value = false
+  } finally { busy.value = false }
+}
+
 const mode = ref<IndependentProjectionMode>('overlay')
 const MODES: IndependentProjectionMode[] = ['overlay', 'share']
 
@@ -28,26 +49,30 @@ const rootEl = ref<HTMLElement | null>(null)
 const panelEl = ref<HTMLElement | null>(null)
 const panelStyle = ref<Record<string, string>>({})
 
-const active = computed(() => activeMonitorId.value != null)
+const active = computed(() => activeMonitorId.value != null || obsActive.value)
+const effectiveMode = computed(() => {
+  const output = obsOutputs.value.find((item) => obsAssignments.value[item.id] === props.moduleId)
+  return output ? obsAssignmentModes.value[output.id] ?? 'overlay' : activeMode.value
+})
 const activeIndex = computed(
   () => monitors.value.find((monitor) => monitor.id === activeMonitorId.value)?.index ?? null,
 )
 
 const tooltip = computed(() => {
-  if (!available.value) return t('independentProjection.unavailable')
+  if (!outputAvailable.value) return `${t('independentProjection.unavailable')} ${t('obsOutputs.activateHint')}`
   if (activeIndex.value != null) {
-    const key = activeMode.value === 'share' ? 'sharedOn' : 'activeOn'
+    const key = effectiveMode.value === 'share' ? 'sharedOn' : 'activeOn'
     return t(`independentProjection.${key}`, { index: activeIndex.value })
   }
   return t('independentProjection.title')
 })
 
-watch(available, (isAvailable) => {
+watch(outputAvailable, (isAvailable) => {
   if (!isAvailable) open.value = false
 })
 
 function onTriggerClick() {
-  if (!available.value) return
+  if (!outputAvailable.value) return
   open.value = !open.value
 }
 
@@ -55,7 +80,9 @@ async function onSelect(monitorId: number) {
   if (busy.value) return
   busy.value = true
   try {
+    await detectObsBeforeProjection()
     if (props.beforeProject && !(await props.beforeProject())) return
+    clearObsModule(props.moduleId)
     if (await project(monitorId, mode.value)) open.value = false
   } finally {
     busy.value = false
@@ -63,6 +90,7 @@ async function onSelect(monitorId: number) {
 }
 
 function onStop() {
+  clearObsModule(props.moduleId)
   stop()
   open.value = false
 }
@@ -86,6 +114,7 @@ function updatePanelPosition() {
   panelStyle.value = {
     position: 'fixed',
     width: `${panelWidth}px`,
+    maxHeight: `${Math.max(80, (openUp ? rect.top : spaceBelow) - 16)}px`,
     left: `${left}px`,
     zIndex: '80',
     ...(openUp
@@ -109,7 +138,8 @@ function onKeydown(event: KeyboardEvent) {
 
 watch(open, async (isOpen) => {
   if (!isOpen) return
-  mode.value = activeMode.value ?? 'overlay'
+  const selectedObs = obsOutputs.value.find((item) => obsAssignments.value[item.id] === props.moduleId)
+  mode.value = (selectedObs ? obsAssignmentModes.value[selectedObs.id] : null) ?? activeMode.value ?? 'overlay'
   await nextTick()
   updatePanelPosition()
 })
@@ -117,11 +147,13 @@ watch(open, async (isOpen) => {
 onMounted(() => {
   document.addEventListener('pointerdown', onDocumentPointerDown, true)
   window.addEventListener('keydown', onKeydown)
+  window.addEventListener('resize', updatePanelPosition)
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', onDocumentPointerDown, true)
   window.removeEventListener('keydown', onKeydown)
+  window.removeEventListener('resize', updatePanelPosition)
 })
 </script>
 
@@ -135,9 +167,9 @@ onBeforeUnmount(() => {
       class="independent-projection__trigger"
       :class="{
         'independent-projection__trigger--active': active,
-        'independent-projection__trigger--disabled': !available,
+        'independent-projection__trigger--disabled': !outputAvailable,
       }"
-      :aria-disabled="!available"
+      :aria-disabled="!outputAvailable"
       :aria-expanded="open"
       aria-haspopup="dialog"
       :aria-label="tooltip"
@@ -147,7 +179,7 @@ onBeforeUnmount(() => {
     >
       <i
         class="ti"
-        :class="activeMode === 'share' ? 'ti-layout-columns' : 'ti-device-desktop-share'"
+        :class="effectiveMode === 'share' ? 'ti-layout-columns' : 'ti-device-desktop-share'"
         aria-hidden="true"
       />
       <span
@@ -184,6 +216,19 @@ onBeforeUnmount(() => {
             />
           </button>
         </div>
+        <button
+          v-if="active"
+          type="button"
+          class="independent-projection__stop"
+          data-testid="independent-projection-stop"
+          @click="onStop"
+        >
+          <i
+            class="ti ti-player-stop"
+            aria-hidden="true"
+          />
+          {{ t('independentProjection.stop') }}
+        </button>
         <div
           class="independent-projection__modes"
           role="radiogroup"
@@ -246,26 +291,59 @@ onBeforeUnmount(() => {
             </button>
           </li>
         </ul>
+        <div class="obs-outputs-separator" role="separator" />
+        <p v-if="obsOutputs.length" class="obs-outputs-active" role="status">
+          <i class="ti ti-broadcast" aria-hidden="true" /> {{ t('obsOutputs.active') }}
+        </p>
+        <p v-if="!obsOutputs.length" class="obs-outputs-empty" role="status">{{ t('obsOutputs.activateHint') }}</p>
+        <ul v-if="obsOutputs.length" class="independent-projection__list" role="radiogroup" :aria-label="t('obsOutputs.title')">
+          <li v-for="connection in obsOutputs" :key="connection.id">
+            <button type="button" class="independent-projection__option" role="radio" :disabled="busy"
+              :aria-checked="obsAssignments[connection.id] === moduleId"
+              :class="{ 'independent-projection__option--active': obsAssignments[connection.id] === moduleId }"
+              @click="onSelectObs(connection.id)">
+              <i class="ti ti-broadcast" aria-hidden="true" />
+              <span class="independent-projection__option-body">
+                <span class="independent-projection__option-name">{{ obsConnectionName(connection) }}</span>
+                <span class="independent-projection__option-meta">{{ t('obsOutputs.browserSource') }}</span>
+              </span>
+            </button>
+          </li>
+        </ul>
 
-        <button
-          v-if="active"
-          type="button"
-          class="independent-projection__stop"
-          data-testid="independent-projection-stop"
-          @click="onStop"
-        >
-          <i
-            class="ti ti-player-stop"
-            aria-hidden="true"
-          />
-          {{ t('independentProjection.stop') }}
-        </button>
+
       </div>
     </Teleport>
   </div>
 </template>
 
 <style scoped lang="scss">
+.obs-outputs-separator {
+  height: 1px;
+  margin: 0.8rem 0 0.65rem;
+  background: color-mix(in srgb, var(--ds-color-primary) 45%, transparent);
+}
+.obs-outputs-empty {
+  margin: 0;
+  padding: 0.55rem 0.65rem;
+  border-left: 3px solid var(--ds-color-primary);
+  border-radius: 0.3rem;
+  background: color-mix(in srgb, var(--ds-color-primary) 10%, transparent);
+  color: var(--ds-color-primary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+.obs-outputs-active {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.6rem;
+  color: #4ade80;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
 .independent-projection {
   position: relative;
   display: inline-flex;
@@ -332,6 +410,10 @@ onBeforeUnmount(() => {
 }
 
 .independent-projection__panel {
+  box-sizing: border-box;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
   padding: 0.75rem;
   border-radius: 0.65rem 0 0.65rem 0;
   border: 1px solid color-mix(in srgb, var(--ds-color-on-surface) 12%, transparent);
@@ -461,7 +543,7 @@ onBeforeUnmount(() => {
 }
 
 .independent-projection__stop {
-  margin-top: 0.6rem;
+  margin: 0.6rem 0;
   width: 100%;
   display: inline-flex;
   align-items: center;
