@@ -8,6 +8,12 @@
 <title>LouvorJA Palco</title>
 <style>
   #idleVer{display:none!important}
+  /* Cover the receiver viewport, including ultrawide/portrait outputs. The
+     iframe API replaces its target and may retain embedded width/height. */
+  #youtubeProjection{position:fixed;inset:0;overflow:hidden;background:#000;z-index:100}
+  #youtubeProjection iframe{position:absolute!important;top:50%!important;left:50%!important;
+    width:100vw!important;height:100vh!important;min-width:177.7778vh;min-height:56.25vw;
+    max-width:none;max-height:none;transform:translate(-50%,-50%);border:0;display:block}
   html,body{margin:0;height:100%;overflow:hidden;background:#000;
     font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#fff}
   #bg{position:fixed;top:0;left:0;width:100%;height:100%;object-fit:cover;
@@ -153,6 +159,7 @@
   <img src="splash.jpg" alt="Palco Piano LouvorJA" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">
 </div>
 <script src="purify.min.js"></script>
+<script src="network-mirror.js"></script>
 <script>
 (function(){
   var s=document.getElementById('splash');
@@ -2784,6 +2791,7 @@ function connect(){
 // Watchdog: sender morreu/fechou com mídia tocando → para NA HORA.
 // Sem isso o áudio continuava até o fim depois do app cair.
 function stopMediaOnServerLoss(){
+  try{cleanMirror.stop()}catch(e){}
   try{
     const a=$('audio'); if(a&&!a.paused){a.pause();a.currentTime=0}
     const v=$('video'); if(v&&!v.paused){v.pause();v.removeAttribute('src');v.style.display='none';v.load()}
@@ -2798,7 +2806,7 @@ function doConnect(){
   setStatus(L10N.connecting.replace('{h}',host).replace('{p}',port));
   try{ws=new WebSocket(socketUrl)}catch(e){retry();return}
   ws.onopen=()=>{tries=0;dlog('WS OPEN '+host);setStatus('● '+host);
-    try{const requestId=sessionStorage.getItem('palcoRefreshRequest');if(requestId){ws.send(JSON.stringify({v:2,type:'receiver-ready',requestId,youtube:true}));sessionStorage.removeItem('palcoRefreshRequest')}}catch(e){}
+    try{const requestId=sessionStorage.getItem('palcoRefreshRequest');if(requestId){ws.send(JSON.stringify({v:2,type:'receiver-ready',requestId,youtube:true,cleanMirror:!!window.PianoNetworkMirror}));sessionStorage.removeItem('palcoRefreshRequest')}}catch(e){}
     if(window.__hideSplash)window.__hideSplash(); // F3.3j: splash sai no connect
     localStorage.setItem('palcoHost',host);
     localStorage.setItem('palcoPort',port)};
@@ -2945,12 +2953,41 @@ function showCloudPair(code){
 function hideCloudPair(){var el=document.getElementById('cloudPair');if(el)el.remove()}
 // YouTube watch URLs are not playable by <video>. Each network receiver
 // loads the official embedded player and follows the operator commands.
-let youtubePlayer=null,youtubeId=null,youtubePending=null,youtubeReady=false;
+let connectionAudioMuted=false;
+const cleanMirror=PianoNetworkMirror.createReceiver({
+  send:sendEvent,
+  attach:function(stream){
+    const video=$('video');video.pause();video.removeAttribute('src');video.srcObject=stream;
+    video.style.display='block';video.style.objectFit='contain';
+    hideIdle();hideNp();playVideoWithFallback();
+  },
+  clear:function(){hideMuteBadge();const video=$('video');if(video.srcObject){video.pause();video.srcObject=null;video.style.display='none'}},
+  error:function(message){showIdle(message)},
+});
+let youtubePlayer=null,youtubeId=null,youtubePending=null,youtubeReady=false,youtubeCaptionsHidden=false;
+let youtubeCaptionTrack=null,youtubeApplyingCaptions=false;
 function stopYoutube(){
   if(youtubeId)hideMuteBadge();
-  youtubeId=null;youtubePending=null;youtubeReady=false;
+  youtubeId=null;youtubePending=null;youtubeReady=false;youtubeCaptionTrack=null;
   if(youtubePlayer){try{youtubePlayer.destroy()}catch(e){}youtubePlayer=null}
   const view=document.getElementById('youtubeProjection');if(view)view.remove();
+}
+function applyYoutubeCaptions(){
+  if(!youtubeReady||!youtubePlayer||youtubeApplyingCaptions)return;
+  youtubeApplyingCaptions=true;
+  try{
+    if(youtubeCaptionsHidden){
+      const track=youtubePlayer.getOption?.('captions','track');
+      if(track&&track.languageCode)youtubeCaptionTrack=track;
+      // Embedded players do not consistently expose unloadModule. Clear the
+      // selected track as well, including when captions load after onReady.
+      youtubePlayer.setOption?.('captions','track',{});
+      youtubePlayer.unloadModule?.('captions');
+    }else{
+      youtubePlayer.loadModule?.('captions');
+      if(youtubeCaptionTrack)youtubePlayer.setOption?.('captions','track',youtubeCaptionTrack);
+    }
+  }catch(e){}finally{youtubeApplyingCaptions=false}
 }
 function applyYoutubeCommand(){
   if(!youtubeReady||!youtubePlayer||!youtubePending)return;
@@ -2975,7 +3012,10 @@ function mountYoutube(){
       youtubeReady=true;
       // Silent autoplay is reliable on TV browsers; audio can be unlocked by
       // the normal receiver interaction when the browser requires a gesture.
-      event.target.mute();applyYoutubeCommand();showMuteBadge();
+      event.target.mute();applyYoutubeCaptions();applyYoutubeCommand();showMuteBadge();
+    },onApiChange:function(){
+      // Captions may load after onReady; only unload a module actually loaded.
+      if(youtubeCaptionsHidden||youtubeCaptionTrack)applyYoutubeCaptions();
     },onStateChange:function(event){
       if(event.data===0){stopYoutube();showIdle(L10N.idle);sendEvent({v:2,type:'ended',media:'video'})}
     },onError:function(){
@@ -2983,6 +3023,7 @@ function mountYoutube(){
     }}});
 }
 function handleYoutube(m){
+  if(m.action==='captions'){youtubeCaptionsHidden=m.captionsHidden===true;applyYoutubeCaptions();return}
   if(m.action==='stop'){stopYoutube();showIdle(L10N.idle);return}
   if(m.youtubeId&&/^[\w-]{11}$/.test(m.youtubeId)&&m.youtubeId!==youtubeId){
     stopYoutube();youtubeId=m.youtubeId;
@@ -2990,8 +3031,9 @@ function handleYoutube(m){
   if(!youtubeId)return;
   hideIdle();hideNp();
   ['video','audio'].forEach(id=>{const media=$(id);media.pause();media.removeAttribute('src');media.load();media.style.display='none'});
+  if(m.youtubeId)youtubeCaptionsHidden=m.captionsHidden===true;
   youtubePending=m.youtubeId?Object.assign({},m,{action:m.paused?'pause':'play'}):m;
-  if(window.YT&&YT.Player){mountYoutube();applyYoutubeCommand();return}
+  if(window.YT&&YT.Player){mountYoutube();if(m.youtubeId)applyYoutubeCaptions();applyYoutubeCommand();return}
   if(!document.getElementById('youtubeProjectionApi')){
     const previous=window.onYouTubeIframeAPIReady;
     window.onYouTubeIframeAPIReady=function(){if(previous)previous();mountYoutube()};
@@ -3078,16 +3120,20 @@ function unmuteNow(){
   mutedUnlock=false;hideMuteBadge();
   a0.muted=false;
   if(youtubePlayer&&youtubeReady){youtubePlayer.unMute();youtubePlayer.playVideo()}
-  const vv=$('video'); if(vv){vv.muted=false; if(vv.paused&&vv.src)vv.play().catch(function(){})}
+  const vv=$('video'); if(vv){vv.muted=connectionAudioMuted; if(vv.paused&&vv.src)vv.play().catch(function(){})}
   a0.play().then(()=>sendEvent({v:1,type:'unlocked'})).catch(()=>{});
   sendEvent({v:1,type:'unlocked'});
 }
 function playVideoWithFallback(){
   const v=$('video');
-  v.muted=false;
+  v.muted=connectionAudioMuted;
   v.play().then(()=>{
-    dlog('VID PLAY OK (som)');
+    dlog('VID PLAY OK (som)');mutedUnlock=false;hideMuteBadge();
   }).catch(e=>{
+    // A replaced stream / concurrent play can abort a pending play promise.
+    // This is not an autoplay denial and must never mute a live connection.
+    if(e.name==='AbortError')return;
+    if(e.name!=='NotAllowedError'){dlog('VID PLAY FAIL: '+e.name);return}
     dlog('VID PLAY FAIL som: '+e.name+' — retry mudo');
     v.muted=true;
     v.play().then(()=>{
@@ -3324,12 +3370,20 @@ function showObsWarmup(message){
 }
 function handle(m){
   if(m.v!==1&&m.v!==2)return;
+  if(m.type==='audioOutput'){
+    connectionAudioMuted=m.mode==='player';
+    $('video').muted=connectionAudioMuted;$('audio').muted=connectionAudioMuted;
+    if(connectionAudioMuted)hideMuteBadge();
+    else if($('video').srcObject)playVideoWithFallback();
+    return;
+  }
+  if(m.type==='video'&&typeof m.connectionsMuted==='boolean')connectionAudioMuted=m.connectionsMuted;
   if(m.type==='obsWarmup'){showObsWarmup(m);return;}
   if(m.type==='obsControl'){
     if(m.action==='reload'){try{sessionStorage.setItem('palcoRefreshRequest',String(m.requestId||''))}catch(e){}location.reload();return;}
     if(m.action==='stop'){
       clearObsWarmup();
-      stopYoutube();
+      stopYoutube();cleanMirror.stop();
       obsShareState.enabled=false;
       const shared=document.getElementById('obsShareView');if(shared)shared.remove();
       obsShareState.frames=[];obsShareState.ready=[];
@@ -3368,7 +3422,7 @@ function handle(m){
     // Sem sinal novo, o lock expira (sender morto/stuck não trava o culto).
     const fresh=(Date.now()-(window.__mediaLastSeen||0))<25000;
     const _v=$('video'),_a=$('audio');
-    const mediaActive=youtubeReady||(_v&&!_v.paused&&_v.style.display!=='none')||(_a&&!_a.paused)||window.__videoAudioActive;
+    const mediaActive=cleanMirror.active()||youtubeReady||(_v&&!_v.paused&&_v.style.display!=='none')||(_a&&!_a.paused)||window.__videoAudioActive;
     if(mediaActive&&fresh&&!window.__mediaLock){
       try{dlog('BLOCKED',m.type,'— mídia externa ativa')}catch(e){}
       return;
@@ -3381,6 +3435,22 @@ function handle(m){
     window.__mediaLastSeen=0;
     if(window.__videoAudioActive){window.__videoAudioActive=false}
     try{const _v2=$('video'),_a2=$('audio');_v2.pause();_v2.removeAttribute('src');_v2.load();_a2.pause()}catch(e){}
+  }
+  if(m.type==='mirror-signal'){
+    cleanMirror.handle(m).catch(function(){showIdle('Não foi possível conectar a transmissão do player.')});return;
+  }
+  if(m.type==='video'&&m.cleanMirror&&typeof m.mirrorSession==='string'){
+    stopYoutube();hideIdle();hideNp();
+    const audio=$('audio');audio.pause();
+    cleanMirror.start(m.mirrorSession);return;
+  }
+  if(cleanMirror.active()){
+    if(m.type==='audio'&&!m.url)return;
+    if(m.type==='video'&&!m.url&&!m.youtubeId){
+      if(m.action==='stop'){cleanMirror.stop();showIdle(L10N.idle)}
+      return;
+    }
+    if(['video','audio','projection','timer','clock','idle','bgPalco','stop-all'].includes(m.type))cleanMirror.stop();
   }
   // The operator sends duplicate transport actions on audio and video.
   if(youtubeId&&m.type==='audio'&&!m.url)return;
@@ -3397,7 +3467,7 @@ function handle(m){
       // Frame de slide (data:image/ do pump PDF/PPT/imagens): imagem é o
       // CONTEÚDO, não bg decorativo — sem brightness(.55) nem véu (paridade
       // com a tela do operador). 13/10 Rafael: tonalidade lavada no palco.
-      const isFrameSlide=typeof m.background==='string'&&m.background.startsWith('data:image/');
+      const isFrameSlide=m.frameSlide===true||(typeof m.background==='string'&&m.background.startsWith('data:image/'));
       bgEl.classList.toggle('frame-slide',isFrameSlide);
       bgEl.onerror=isFrameSlide?null:bgEl.onerror;
       // Cor explícita é a personalização ativa do Palco: vence capa/bg do

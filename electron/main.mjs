@@ -20,7 +20,7 @@ import { registerDiagnosticsIpc, setClockSkewProvider, setDiagnosticsToken } fro
 import { createMainLogger } from "./main-log.mjs";
 import { attachHistoryAppCommand, attachWindowStateEvents, registerWindowIpc } from "./ipc/window.mjs";
 import { attachRemoteServer } from "./remote-server.mjs";
-import { attachPalcoServer } from "./palco-server.mjs";
+import { attachPalcoServer, getPalcoManager } from "./palco-server.mjs";
 import { ensureWorkspaceDirectories } from "./paths.mjs";
 import { registerLocalFileProtocol, registerLocalScheme } from "./protocol.mjs";
 import { registerCloseProjectionPopups } from "./ipc/web-projection.mjs";
@@ -854,8 +854,11 @@ function createWindow(locale = 'pt-BR') {
 
 	mainWindow.on("closed", () => {
 		mainWindow = null;
+		if (!isQuitting) app.quit();
 	});
 }
+
+let isQuitting = false;
 
 app.whenReady().then(async () => {
   // Origem http válida p/ Firebase Auth (popup Google) — ver renderer-server.mjs.
@@ -963,7 +966,7 @@ app.whenReady().then(async () => {
 			.catch((error) => console.warn("[bible-updater] falha", error));
 	}, 20_000);
 	app.on("activate", () => {
-		if (BrowserWindow.getAllWindows().length === 0) {
+		if (!isQuitting && BrowserWindow.getAllWindows().length === 0) {
 			createWindow(locale);
 		}
 	});
@@ -975,27 +978,23 @@ app.on("second-instance", () => {
 	mainWindow.focus();
 });
 
+// Stop receivers before Electron starts closing the player windows.
+app.on("before-quit", () => {
+  isQuitting = true;
+  try {
+    getPalcoManager()?.stopAllMedia();
+  } catch (error) {
+    console.warn('[shutdown] failed to stop receivers', error);
+  }
+});
+
 app.on("will-quit", () => {
-	// Hotkey global de projeção: libera Ctrl+Alt+P no encerrar (se registrada)
-	try {
-		const { globalShortcut } = require("electron");
-		globalShortcut.unregisterAll();
-	} catch {
-		/* ignore */
-	}
-	// Palco: app fechando → TVs param a mídia na hora (não toca até o fim).
-	try {
-		const { getPalcoManager } = require("./palco-server.mjs");
-		const manager = getPalcoManager && getPalcoManager();
-		if (manager) manager.stopAllMedia();
-	} catch {
-		/* palco não anexado */
-	}
+  globalShortcut.unregisterAll();
 });
 
 app.on("window-all-closed", () => {
 	// Fechar a splash pode disparar este evento durante o handoff para a
 	// main window. Não mata o processo se a principal ainda existe/carrega.
 	if (mainWindow && !mainWindow.isDestroyed()) return;
-	if (process.platform !== "darwin") app.quit();
+	if (!isQuitting) app.quit();
 });

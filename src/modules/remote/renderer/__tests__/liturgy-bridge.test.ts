@@ -640,6 +640,18 @@ describe('installRemoteLiturgyBridge', () => {
     expect(hoisted.projection.remotePptPrev).toHaveBeenCalledTimes(1)
   })
 
+  it('opening an image control does not automatically publish gallery frames to connections', async () => {
+    const capture = vi.fn(async () => 'frame')
+    hoisted.projection = {
+      getPlaybackState: vi.fn(async () => null),
+      getImageSlideState: vi.fn(async () => ({ index: 0, total: 3, projecting: false })),
+      captureSourceFrame: capture,
+    }
+    await installBridge()
+    await vi.advanceTimersByTimeAsync(2100)
+    expect(capture).not.toHaveBeenCalled()
+  })
+
   it('slide:next com IMAGEM projetada roteia para projection.remoteImage* (cabo E palco)', async () => {
     hoisted.projection = {
       getPlaybackState: vi.fn(async () => null),

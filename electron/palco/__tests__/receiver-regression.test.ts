@@ -58,7 +58,9 @@ function loadReceiver(): void {
   for (const script of scripts) {
     const code = script.getAttribute('src') === 'purify.min.js'
       ? readFileSync(resolve(__dirname, '../purify.min.js'), 'utf8')
-      : script.textContent ?? ''
+      : script.getAttribute('src') === 'network-mirror.js'
+        ? readFileSync(resolve(__dirname, '../network-mirror.js'), 'utf8')
+        : script.textContent ?? ''
     try {
       dom.window.eval(code)
     } catch {

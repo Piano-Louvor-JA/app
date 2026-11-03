@@ -318,6 +318,15 @@
           void audioCtx?.resume?.()
         })
 
+        function disposeMedia() {
+          cancelAnimationFrame(raf)
+          video.pause()
+          video.removeAttribute('src')
+          video.load()
+          if (audioCtx && audioCtx.state !== 'closed') void audioCtx.close().catch(function () {})
+        }
+        window.addEventListener('pagehide', disposeMedia, { once: true })
+        window.addEventListener('beforeunload', disposeMedia, { once: true })
         window.addEventListener('resize', resizeCanvas)
 
         const play = () => {

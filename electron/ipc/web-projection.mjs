@@ -1,4 +1,5 @@
 import { onReceiverEvent } from '../palco/receiver-events.mjs'
+import { youtubeCaptionsScript } from '../youtube-captions.mjs'
 import { youtubeSourceId } from '../youtube-source.mjs'
 import { BrowserWindow, screen, session, WebContentsView } from 'electron'
 import path from 'node:path'
@@ -55,12 +56,12 @@ const SITE_WINDOW_TITLE = 'Site — LouvorJA - PIANO'
 const CONTROL_WIDTH = 960
 const CONTROL_HEIGHT = 540
 /** Barra do operador de vídeo (WebContentsView — fora da captura das projeções). */
-const CONTROL_BAR_HEIGHT = 48
+const CONTROL_BAR_HEIGHT = 64
 
 /** Popup de site: tamanho inicial confortável, sem limite máximo. */
 const SITE_DEFAULT_WIDTH = 1280
 const SITE_DEFAULT_HEIGHT = 820
-const SITE_CONTROL_BAR_HEIGHT = 44
+const SITE_CONTROL_BAR_HEIGHT = CONTROL_BAR_HEIGHT
 /** Altura da WebContentsView quando o painel de monitores está aberto. */
 const SITE_CONTROL_PANEL_HEIGHT = 300
 const SITE_MIN_WIDTH = 480
@@ -282,6 +283,7 @@ const siteBlockerViews = new WeakMap()
 /** @type {number[]} */
 let lastSiteMonitorIds = []
 /** @type {number[]} */
+const videoDisplayIds = new WeakMap()
 let lastVideoMonitorIds = []
 /** Painel de seleção de monitores aberto na barra do controle de site. */
 let siteControlPanelOpen = false
@@ -678,7 +680,7 @@ function attachControlBar(win) {
             currentProjectionMode === 'presentation'
           ? PDF_CONTROL_BAR_HTML
           : CONTROL_BAR_HTML,
-    ).href,
+    ).href + (currentSourceAudioOnly ? '?audioOnly=1' : ''),
   )
   controlBarView = view
   unsubscribeControlReceiverEvents = onReceiverEvent(message => {
@@ -806,6 +808,7 @@ function createSourceWindow(loadUrl, title) {
   const onPageReady = () => {
     win.webContents.setAudioMuted(false)
     hideYoutubeSidebar(win)
+    if (currentSourceCaptionsHidden) void remoteSetCaptionsHiddenSource(true)
     // YouTube é SPA: reaplica após hidratação
     setTimeout(() => hideYoutubeSidebar(win), 800)
     setTimeout(() => hideYoutubeSidebar(win), 2000)
@@ -961,6 +964,7 @@ function createSiteShieldWindow(display) {
   }
 
   const shield = new BrowserWindow(options)
+  videoDisplayIds.set(shield, display.id)
   shield.setFocusable(false)
   // Absorve eventos (NÃO ignora) — cliques morrem aqui
   shield.setIgnoreMouseEvents(false)
@@ -976,7 +980,9 @@ function createSiteShieldWindow(display) {
     shield.showInactive()
   })
 
-  shield.webContents.on('before-input-event', (event) => {
+  shield.webContents.on('before-input-event', (event, input) => {
+    // Keep native application menu shortcuts available, including Cmd+Q.
+    if (input.meta) return
     event.preventDefault()
   })
 
@@ -1031,6 +1037,7 @@ function createSiteProjectionWindow(display, loadUrl) {
   }
 
   const win = new BrowserWindow(options)
+  videoDisplayIds.set(win, display.id)
   win.webContents.setAudioMuted(true)
   win.setFocusable(false)
 
@@ -1132,7 +1139,9 @@ function createSiteProjectionWindow(display, loadUrl) {
   win.webContents.on('did-navigate-in-page', hardenPage)
   win.webContents.on('dom-ready', hardenPage)
 
-  win.webContents.on('before-input-event', (event) => {
+  win.webContents.on('before-input-event', (event, input) => {
+    // Keep native application menu shortcuts available, including Cmd+Q.
+    if (input.meta) return
     event.preventDefault()
   })
 
@@ -1196,6 +1205,7 @@ function createMirrorWindow(display) {
   }
 
   const win = new BrowserWindow(options)
+  videoDisplayIds.set(win, display.id)
   // Som só no popup de controle
   win.webContents.setAudioMuted(true)
 
@@ -1232,7 +1242,6 @@ function createMirrorWindow(display) {
 
   win.on('closed', () => {
     mirrorWindows = mirrorWindows.filter((item) => item !== win)
-    stopPalcoMediaOnClose()
   })
 
   const mirrorUrl = `${pathToFileURL(MIRROR_HTML).href}?mode=video`
@@ -1274,6 +1283,7 @@ function createImageProjectionWindow(display, loadUrl) {
   }
 
   const win = new BrowserWindow(options)
+  videoDisplayIds.set(win, display.id)
   win.webContents.setAudioMuted(true)
 
   win.once('ready-to-show', () => {
@@ -1305,7 +1315,6 @@ function createImageProjectionWindow(display, loadUrl) {
 
   win.on('closed', () => {
     mirrorWindows = mirrorWindows.filter((item) => item !== win)
-    stopPalcoMediaOnClose()
   })
 
   void win.loadURL(loadUrl)
@@ -1618,6 +1627,7 @@ export function getVideoTargetMonitorIds() {
  * @returns {boolean}
  */
 export function setVideoTargetMonitorIds(ids) {
+  if (currentSourceAudioOnly) return false
   const primaryId = screen.getPrimaryDisplay().id
   lastVideoMonitorIds = normalizeMonitorIds(ids, primaryId)
 
@@ -1673,25 +1683,32 @@ function resolveExtendedTargets(monitorIds) {
 }
 
 function openSiteScreensOnTargets(loadUrl, targets) {
-  closeMirrorWindowsOnly()
+  const desired = new Set(targets.map(display => display.id))
+  for (const win of [...mirrorWindows, ...siteShieldWindows]) {
+    if (!win.isDestroyed() && !desired.has(videoDisplayIds.get(win))) win.close()
+  }
+  mirrorWindows = mirrorWindows.filter(win => !win.isDestroyed() && desired.has(videoDisplayIds.get(win)))
+  siteShieldWindows = siteShieldWindows.filter(win => !win.isDestroyed() && desired.has(videoDisplayIds.get(win)))
   for (const display of targets) {
-    mirrorWindows.push(createSiteProjectionWindow(display, loadUrl))
-    siteShieldWindows.push(createSiteShieldWindow(display))
+    if (!mirrorWindows.some(win => videoDisplayIds.get(win) === display.id)) mirrorWindows.push(createSiteProjectionWindow(display, loadUrl))
+    if (!siteShieldWindows.some(win => videoDisplayIds.get(win) === display.id)) siteShieldWindows.push(createSiteShieldWindow(display))
   }
-  if (targets.length > 0) {
-    startSiteProjectionSync()
-  }
+  if (targets.length > 0) startSiteProjectionSync()
+  else stopSiteProjectionSync()
   return targets.length > 0
 }
 
+let currentSourceAudioOnly = false
 let currentSourceFilePath = ''
 let currentSourceTitle = ''
 let currentSourceYoutubeId = null
+let currentSourceCaptionsHidden = false
 
 export async function openWebProjectionWindows(payload) {
   const input = payload ?? {}
   let effective = input
   currentSourceYoutubeId = youtubeSourceId(input)
+  currentSourceCaptionsHidden = false
 
   currentSourceFilePath =
     typeof effective.filePath === 'string' ? effective.filePath.trim() : ''
@@ -1782,8 +1799,9 @@ export async function openWebProjectionWindows(payload) {
                 effective.filePaths.length > 0)
             ? 'image'
             : 'video'
-  const withScreens = effective.withScreens !== false
-  const monitorIds = Array.isArray(effective.monitorIds)
+  currentSourceAudioOnly = mode === 'video' && (new URL(loadUrl).searchParams.get('audio') === '1' || AUDIO_FILE_EXT.test(currentSourceFilePath))
+  const withScreens = !currentSourceAudioOnly && effective.withScreens !== false
+  const monitorIds = !currentSourceAudioOnly && Array.isArray(effective.monitorIds)
     ? effective.monitorIds.filter(
         (id) => typeof id === 'number' && Number.isFinite(id),
       )
@@ -1844,8 +1862,10 @@ export async function openWebProjectionWindows(payload) {
       ? createSiteSourceWindow(loadUrl, title)
       : createSourceWindow(loadUrl, title)
 
-  // Hotkey global de alternância disponível enquanto houver projeção
-  enableProjectionHotkey()
+  if (mode === 'video' || mode === 'site') sourceWindow.webContents.setAudioMuted(!currentSourceAudioOnly && getAudioOutputMode() === 'connections')
+
+  // Audio playback has no projection or extended-screen controls.
+  if (!currentSourceAudioOnly) enableProjectionHotkey()
 
   if (!withScreens) {
     return true
@@ -1876,25 +1896,22 @@ export async function openWebProjectionWindows(payload) {
 }
 
 function openVideoScreensOnTargets(targets) {
-  closeMirrorWindowsOnly()
-  if (
-    currentProjectionMode === 'image' ||
-    currentProjectionMode === 'pdf' ||
-    currentProjectionMode === 'presentation'
-  ) {
-    const loadUrl =
-      sourceWindow && !sourceWindow.isDestroyed()
-        ? sourceWindow.webContents.getURL()
-        : ''
-    if (!loadUrl || loadUrl === 'about:blank') return false
-    for (const display of targets) {
-      mirrorWindows.push(createImageProjectionWindow(display, loadUrl))
-    }
-    return targets.length > 0
-  }
+  const isDocument = ['image', 'pdf', 'presentation'].includes(currentProjectionMode)
+  const loadUrl = isDocument && sourceWindow && !sourceWindow.isDestroyed()
+    ? sourceWindow.webContents.getURL() : ''
+  if (isDocument && (!loadUrl || loadUrl === 'about:blank')) return false
 
+  const desired = new Set(targets.map(display => display.id))
+  // Keep selected windows alive: their capture and playback must not restart.
+  for (const win of [...mirrorWindows]) {
+    if (!win.isDestroyed() && !desired.has(videoDisplayIds.get(win))) win.close()
+  }
+  mirrorWindows = mirrorWindows.filter(win => !win.isDestroyed() && desired.has(videoDisplayIds.get(win)))
   for (const display of targets) {
-    mirrorWindows.push(createMirrorWindow(display))
+    if (mirrorWindows.some(win => videoDisplayIds.get(win) === display.id)) continue
+    mirrorWindows.push(isDocument
+      ? createImageProjectionWindow(display, loadUrl)
+      : createMirrorWindow(display))
   }
   return targets.length > 0
 }
@@ -1925,6 +1942,7 @@ export function toggleSiteProjectionScreens() {
  * @returns {boolean}
  */
 export function toggleVideoProjectionScreens() {
+  if (currentSourceAudioOnly) return false
   if (
     !sourceWindow ||
     sourceWindow.isDestroyed() ||
@@ -2176,9 +2194,38 @@ export async function remoteSetVolumeSource(volume) {
   }
 }
 
+let audioOutputMode = null
+export function getAudioOutputMode() {
+  if (audioOutputMode) return audioOutputMode
+  try {
+    const saved = readWorkspaceRecord('player-audio-output')
+    audioOutputMode = ['player', 'connections', 'both'].includes(saved?.mode) ? saved.mode : 'player'
+  } catch { audioOutputMode = 'player' }
+  return audioOutputMode
+}
+export function setAudioOutputMode(mode) {
+  if (currentSourceAudioOnly) return null
+  if (!['player', 'connections', 'both'].includes(mode)) return null
+  if (!writeWorkspaceRecord('player-audio-output', { mode })) return null
+  audioOutputMode = mode
+  if (sourceWindow && !sourceWindow.isDestroyed()) sourceWindow.webContents.setAudioMuted(mode === 'connections')
+  return mode
+}
+
+/** Caption visibility follows this player session and its captured mirrors. */
+export async function remoteSetCaptionsHiddenSource(hidden) {
+  if (!sourceWindow || sourceWindow.isDestroyed() || !currentSourceYoutubeId) return null
+  try {
+    const state = await sourceWindow.webContents.executeJavaScript(youtubeCaptionsScript(hidden === true), true)
+    if (typeof state?.captionsHidden !== 'boolean') return null
+    currentSourceCaptionsHidden = state.captionsHidden
+    return state
+  } catch { return null }
+}
+
 /** FilePath/título da mídia corrente (para o popup espelhar no Palco). */
 export function getSourceMediaInfo() {
-  return { filePath: currentSourceFilePath, title: currentSourceTitle, youtubeId: currentSourceYoutubeId }
+  return { audioOnly: currentSourceAudioOnly, filePath: currentSourceFilePath, title: currentSourceTitle, youtubeId: currentSourceYoutubeId, captionsHidden: currentSourceCaptionsHidden }
 }
 
 /** Estado de playback do vídeo no popup (para a barra do operador). */
@@ -2208,6 +2255,10 @@ export async function getSourcePlaybackState() {
     if (!state || typeof state !== 'object') return null
     return {
       ...state,
+      audioOnly: currentSourceAudioOnly,
+      audioOutput: currentSourceAudioOnly ? 'player' : getAudioOutputMode(),
+      canControlCaptions: Boolean(currentSourceYoutubeId),
+      captionsHidden: currentSourceCaptionsHidden,
       projecting: isVideoProjectingToScreens(),
     }
   } catch {
@@ -2382,6 +2433,7 @@ export async function getSourceNavigationState() {
   try {
     const contents = sourceWindow.webContents
     return {
+      audioOutput: getAudioOutputMode(),
       canGoBack: contents.canGoBack(),
       canGoForward: contents.canGoForward(),
       projecting: isSiteProjectingToScreens(),
@@ -2421,6 +2473,15 @@ export function remoteReloadSource() {
 }
 
 export function registerProjectionCapturePermissions() {
+  // Grant only the Piano control bar access to this player, never arbitrary
+  // websites. Preserve local playback so the audio destination is explicit.
+  session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
+    if (currentSourceAudioOnly || !sourceWindow || sourceWindow.isDestroyed() || !controlBarView || controlBarView.webContents.isDestroyed()) { callback({}); return }
+    const trusted = controlBarView.webContents.mainFrame
+    if (!request.frame || request.frame.processId !== trusted.processId || request.frame.routingId !== trusted.routingId) { callback({}); return }
+    callback({ video: sourceWindow.webContents.mainFrame,
+      ...(request.audioRequested ? { audio: sourceWindow.webContents.mainFrame, enableLocalEcho: true } : {}) })
+  })
   session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
     if (
       permission === 'media' ||

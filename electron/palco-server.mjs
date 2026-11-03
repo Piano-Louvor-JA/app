@@ -155,7 +155,7 @@ class PalcoSlot {
         this.#contents()?.send('palco:receiver-connected', { ip: remoteIp, count: this.#clients.size, slotId: this.#id })
         ws.on('message', (raw) => {
           try {
-            const message = JSON.parse(String(raw))
+            const message = { ...JSON.parse(String(raw)), slotId: this.#id }
             this.#contents()?.send('palco:event', message)
             publishReceiverEvent(message)
           } catch { /* ignore */ }
@@ -213,6 +213,7 @@ class PalcoSlot {
       try { m = JSON.parse(m) } catch { return false }
     }
     if (!m || typeof m !== 'object' || !m.type) return false
+    if (m.type === 'mirror-signal') { this.broadcastTransient(m); return true }
     if (m.type === 'obsControl') { this.broadcastTransient(m); return true }
     // OBS S1: URL de mídia sai COM o token (a TV/browser recebe a URL já
     // autenticada — o renderer não precisa saber do token).
@@ -240,6 +241,12 @@ class PalcoSlot {
     // Transientes: action sem url/conteúdo NÃO entra no replay.
     // audio stop GRAVA (fix 27/08): é estado terminal — como transient, o
     // replay ficava com o 'play' velho e o F5 na TV ressuscitava o MP3.
+    if (m.type === 'video' && m.action === 'captions') {
+      const video = this.#lastByType.get('video')
+      if (video?.youtubeId) this.#lastByType.set('video', { ...video, captionsHidden: m.captionsHidden === true })
+      this.broadcastTransient(m)
+      return true
+    }
     const transient =
       m.action === 'pause' || m.action === 'play' || m.action === 'seek'
     if (transient) this.broadcastTransient(m)

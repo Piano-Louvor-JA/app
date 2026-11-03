@@ -7,8 +7,8 @@ it('keeps authored lyric lines across source sizes instead of wrapping them at h
   try {
     const page = await browser.newPage()
     await page.route('http://127.0.0.1:7080/**', async route => {
-      const purifier = route.request().url().endsWith('purify.min.js')
-      await route.fulfill({ contentType: purifier ? 'text/javascript' : 'text/html', body: readFileSync(new URL(purifier ? '../purify.min.js' : '../receiver.html', import.meta.url), 'utf8') })
+      const asset = ['purify.min.js', 'network-mirror.js'].find(name => route.request().url().endsWith(name))
+      await route.fulfill({ contentType: asset ? 'text/javascript' : 'text/html', body: readFileSync(new URL(asset ? '../' + asset : '../receiver.html', import.meta.url), 'utf8') })
     })
     await page.goto('http://127.0.0.1:7080/?obsPane=1')
     for (const width of [800, 1280, 1920]) {
@@ -30,8 +30,8 @@ it('applies the monitor title corner marks and custom title color on connection 
   try {
     const page = await browser.newPage({ viewport: { width: 1280, height: 720 } })
     await page.route('http://127.0.0.1:7080/**', async route => {
-      const js = route.request().url().endsWith('purify.min.js')
-      await route.fulfill({ contentType: js ? 'text/javascript' : 'text/html', body: readFileSync(new URL(js ? '../purify.min.js' : '../receiver.html', import.meta.url), 'utf8') })
+      const asset = ['purify.min.js', 'network-mirror.js'].find(name => route.request().url().endsWith(name))
+      await route.fulfill({ contentType: asset ? 'text/javascript' : 'text/html', body: readFileSync(new URL(asset ? '../' + asset : '../receiver.html', import.meta.url), 'utf8') })
     })
     await page.goto('http://127.0.0.1:7080/?obsPane=1')
     await page.evaluate(() => (window as any).handle({ v: 2, type: 'projection', scope: 'hymns', isCover: true, textBox: true, titleTextBox: false, text: 'Chegou a hora', titleTextColor: '#f6c32a', fontSize: 54 }))
