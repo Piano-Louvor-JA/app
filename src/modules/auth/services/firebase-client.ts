@@ -89,7 +89,10 @@ async function persistSession(credential: UserCredential): Promise<AuthSession |
   try {
     const response = await fetch(url, {
       method: 'POST',
-      headers: { authorization: `Bearer ${await credential.user.getIdToken()}` },
+      headers: {
+        'X-Tenant': 'piano',
+        authorization: `Bearer ${await credential.user.getIdToken()}`,
+      }
     })
     if (!response.ok) return null
     const session = JSON.parse(await response.text()) as unknown
@@ -107,7 +110,7 @@ async function exchangeFirebaseToken(token: string): Promise<{ session: AuthSess
   try {
     const response = await fetch(url, {
       method: 'POST',
-      headers: { authorization: `Bearer ${token}` },
+      headers: { 'X-Tenant': 'piano', authorization: `Bearer ${token}` },
     })
     if (!response.ok) return { session: null, rejected: response.status === 401 || response.status === 403 }
     const session = JSON.parse(await response.text()) as unknown
