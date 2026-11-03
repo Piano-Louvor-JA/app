@@ -786,12 +786,12 @@ describe("MediaEditorView — deleção", () => {
 });
 
 describe("MediaEditorView — navegação", () => {
-	it("botão voltar navega pra albums", async () => {
+	it("botão voltar navega pra community (editor mora no fluxo da comunidade)", async () => {
 		const w = await mountEditor();
 		(
 			w.vm.$.devtoolsRawSetupState as unknown as { onBack: () => void }
 		).onBack();
-		expect(pushMock).toHaveBeenCalledWith({ name: "albums" });
+		expect(pushMock).toHaveBeenCalledWith({ name: "community" });
 		w.unmount();
 	});
 });

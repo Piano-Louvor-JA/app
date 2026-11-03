@@ -48,7 +48,7 @@ export function getAuthSession(): AuthSession | null {
 
 /** Salva/limpa a sessão local (usada também pelo firebase-client — login Google). */
 export function saveSession(session: AuthSession | null): void {
-  if (session) {
+  if (session?.token && Number.isInteger(session.user?.id_user) && session.user.id_user > 0) {
     localStorage.setItem(SESSION_KEY, JSON.stringify(session))
   } else {
     localStorage.removeItem(SESSION_KEY)

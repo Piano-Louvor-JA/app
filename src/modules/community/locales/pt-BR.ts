@@ -13,6 +13,7 @@ export default {
 		copySaved: "Cópia salva em Minhas Coletâneas",
 		copyFailed: "Não foi possível salvar a cópia.",
 		ranking: "Ver ranking",
+		createCollection: "Criar coletânea",
 		pagination: "Paginação da Comunidade",
 		searchPlaceholder: "Buscar coletânea ou autor...",
 		clearSearch: "Limpar busca",

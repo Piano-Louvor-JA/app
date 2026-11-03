@@ -12,6 +12,7 @@ import {
   firebaseLoginGoogle,
   firebaseLogout,
   firebaseRegister,
+  revalidateFirebaseSessionOnBoot,
   subscribeFirebaseSession,
 } from '../services/firebase-client'
 
@@ -53,6 +54,9 @@ export function useAuth(): UseAuthReturn {
   const isLoggedIn = computed(() => !!session.value)
   const userName = computed(() => session.value?.user.displayName ?? '')
   const userEmail = computed(() => session.value?.user.email ?? '')
+  void revalidateFirebaseSessionOnBoot().then(result => {
+    authSession.value = result ?? getAuthSession()
+  })
   const unsubscribe = subscribeFirebaseSession()
   if (unsubscribe) onUnmounted(unsubscribe)
 
