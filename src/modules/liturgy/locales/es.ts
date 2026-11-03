@@ -163,6 +163,7 @@ export default {
       },
     },
     fields: {
+      provaiSourceEdition: 'Edición de Probad y Ved',
       name: 'Nombre',
       description: 'Descripción',
       url: 'URL',

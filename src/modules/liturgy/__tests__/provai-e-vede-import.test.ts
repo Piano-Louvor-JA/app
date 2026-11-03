@@ -107,3 +107,57 @@ describe('1-click — só sábados por vir', () => {
     }
   })
 })
+
+describe('multi-idioma — rotações separadas por edição (ADR-03, RF-04/05/06)', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    mockState.clear()
+  })
+
+  const ptEps = [{ dateISO: '2026-10-03', title: 'Quem chegou à igreja aqui', url: 'https://b2/10-03-26_a.mp4' }]
+  const esEps = [{ dateISO: '2026-10-03', title: 'Quiero ser como tú', url: 'https://b2/10-03-26_es.mp4' }]
+
+  it('import com language pt usa a rotação Provai e Vede', async () => {
+    const store = useScheduledStore()
+    const report = await importProvaiEVedeEpisodes(store, ptEps, () => '/v/pt.mp4', { sourceLanguage: 'pt' })
+    expect(store.categoryName(report.rotationId)).toBe('Provai e Vede')
+  })
+
+  it('import com language es cria rotação Probad y Ved separada mesmo na mesma data', async () => {
+    const store = useScheduledStore()
+    const pt = await importProvaiEVedeEpisodes(store, ptEps, () => '/v/pt.mp4', { sourceLanguage: 'pt' })
+    const es = await importProvaiEVedeEpisodes(store, esEps, () => '/v/es.mp4', { sourceLanguage: 'es' })
+    expect(pt.rotationId).not.toBe(es.rotationId)
+    expect(store.categoryName(es.rotationId)).toBe('Probad y Ved')
+    expect(store.categoryName(pt.rotationId)).toBe('Provai e Vede')
+    expect(store.findOn(pt.rotationId, '2026-10-03')).toBeDefined()
+    expect(store.findOn(es.rotationId, '2026-10-03')).toBeDefined()
+    expect(store.items).toHaveLength(2)
+  })
+
+  it('reimportar cada edição é idempotente (não duplica)', async () => {
+    const store = useScheduledStore()
+    await importProvaiEVedeEpisodes(store, ptEps, () => '/v/pt.mp4', { sourceLanguage: 'pt' })
+    await importProvaiEVedeEpisodes(store, esEps, () => '/v/es.mp4', { sourceLanguage: 'es' })
+    const pt2 = await importProvaiEVedeEpisodes(store, ptEps, () => '/v/pt.mp4', { sourceLanguage: 'pt' })
+    const es2 = await importProvaiEVedeEpisodes(store, esEps, () => '/v/es.mp4', { sourceLanguage: 'es' })
+    expect(pt2.created).toBe(0)
+    expect(es2.created).toBe(0)
+    expect(store.items).toHaveLength(2)
+    expect(store.categories.filter((c) => c.name === 'Provai e Vede')).toHaveLength(1)
+    expect(store.categories.filter((c) => c.name === 'Probad y Ved')).toHaveLength(1)
+  })
+
+  it('reutiliza a rotação PT já existente criada por versão anterior (compatibilidade)', async () => {
+    const store = useScheduledStore()
+    store.upsertCategory({ id: 'rot-antiga', name: 'Provai e Vede' })
+    const report = await importProvaiEVedeEpisodes(store, ptEps, () => '/v/pt.mp4', { sourceLanguage: 'pt' })
+    expect(report.rotationId).toBe('rot-antiga')
+  })
+
+  it('sem language explícita, default pt preserva comportamento antigo dos callers', async () => {
+    const store = useScheduledStore()
+    const report = await importProvaiEVedeEpisodes(store, ptEps, () => '/v/pt.mp4')
+    expect(store.categoryName(report.rotationId)).toBe('Provai e Vede')
+  })
+})

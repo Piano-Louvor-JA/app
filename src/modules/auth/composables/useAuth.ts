@@ -1,8 +1,7 @@
-import { ref, computed, type ComputedRef } from 'vue'
+import { computed, onUnmounted, ref, type ComputedRef } from 'vue'
 import {
   getAuthSession,
   login,
-  logout,
   register,
   resetPassword,
   requestPasswordReset,
@@ -13,6 +12,8 @@ import {
   firebaseLoginGoogle,
   firebaseLogout,
   firebaseRegister,
+  revalidateFirebaseSessionOnBoot,
+  subscribeFirebaseSession,
 } from '../services/firebase-client'
 
 /**
@@ -53,6 +54,11 @@ export function useAuth(): UseAuthReturn {
   const isLoggedIn = computed(() => !!session.value)
   const userName = computed(() => session.value?.user.displayName ?? '')
   const userEmail = computed(() => session.value?.user.email ?? '')
+  void revalidateFirebaseSessionOnBoot().then(result => {
+    authSession.value = result ?? getAuthSession()
+  })
+  const unsubscribe = subscribeFirebaseSession()
+  if (unsubscribe) onUnmounted(unsubscribe)
 
   async function doLogin(email: string, password: string): Promise<boolean> {
     const result = await login(email.trim(), password)
@@ -77,7 +83,6 @@ export function useAuth(): UseAuthReturn {
   }
 
   async function doLogout(): Promise<void> {
-    await logout()
     await firebaseLogout()
     session.value = null
     notify('Sessão encerrada')

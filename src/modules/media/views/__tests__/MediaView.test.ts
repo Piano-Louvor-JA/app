@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
-import { flushPromises, mount } from "@vue/test-utils";
+import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+enableAutoUnmount(afterEach);
 import { computed, ref } from "vue";
 import { createI18n } from "vue-i18n";
 
@@ -14,6 +15,11 @@ import mediaLocale from "../../locales/pt-BR";
 import MediaView from "../MediaView.vue";
 import { loadProjectionSettings, saveProjectionSettings } from '@modules/settings/services/projection-preferences';
 
+const networkOutputs = vi.hoisted(() => ({ selected: false }))
+vi.mock('@modules/settings/composables/useObsConnections', () => ({
+  useObsConnections: () => ({ connections: ref([]), activeConnections: ref([]), refresh: async () => {} }),
+  hasSelectedObsTargets: () => networkOutputs.selected,
+}))
 const displayMocks = vi.hoisted(() => ({ list: vi.fn() }));
 vi.mock('@modules/settings/services/display-service', async (importOriginal) => ({
   ...await importOriginal<typeof import('@modules/settings/services/display-service')>(),
@@ -146,6 +152,16 @@ beforeEach(() => {
 });
 
 describe("MediaView — montagem", () => {
+  it('keeps the operator out of fullscreen when only selected network outputs are active', async () => {
+    const request = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', { configurable: true, value: request })
+    saveProjectionSettings({ ...loadProjectionSettings(), targetDisplayIds: [] })
+    displayMocks.list.mockResolvedValue([{ id: 1, isPrimary: true }])
+    networkOutputs.selected = true
+    const wrapper = await mountView()
+    try { await flushPromises(); expect(request).not.toHaveBeenCalled() }
+    finally { networkOutputs.selected = false; wrapper.unmount(); delete (HTMLElement.prototype as Partial<HTMLElement>).requestFullscreen }
+  })
   it.each([false, true])('abre automaticamente em fullscreen com só o principal selecionado (estendidos conectados: %s)', async (connected) => {
     const request = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', { configurable: true, value: request });
@@ -331,6 +347,29 @@ describe("MediaView — toolbar e fechamento", () => {
 		storeState.lastErrorKey.value = null;
 		w.unmount();
 	});
+
+	it("navigates queue selection and does not restart the current song with Enter", async () => {
+    storeState.queue.value = [{ musicId: 1, title: 'A' }, { musicId: 2, title: 'B' }];
+    storeState.queueIndex.value = 0;
+    storeState.closeConfirmOpen.value = false;
+    storeState.showPlaylist.value = true;
+    const w = await mountView();
+    storeState.jumpToQueue.mockClear();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }));
+    expect(storeState.jumpToQueue).not.toHaveBeenCalled();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', cancelable: true }));
+    await flushPromises();
+    expect(w.findAll('.media-window__queue-row')[1].classes()).toContain('media-window__queue-row--selected');
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }));
+    expect(storeState.jumpToQueue).toHaveBeenCalledWith(1);
+    storeState.queueIndex.value = 1;
+    await flushPromises();
+    storeState.jumpToQueue.mockClear();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }));
+    expect(storeState.jumpToQueue).not.toHaveBeenCalled();
+    w.unmount();
+    storeState.queue.value = [];
+  });
 
 	it("fila com mais de 1 item: renderiza e jumpToQueue no clique", async () => {
 		storeState.queue.value = [

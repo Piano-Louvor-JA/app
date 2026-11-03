@@ -328,7 +328,9 @@ describe('AppShell — header e navegação', () => {
     const { w } = await mountShell()
     expect(w.find('.app-shell__header').exists()).true
     expect(w.find('.dock-mock').exists()).true
-    expect(w.find('.media-chrome-mock').exists()).true
+    // Miniplayer sai do stacking context do shell para ficar acima do modal de playlists.
+    expect(w.find('.media-chrome-mock').exists()).false
+    expect(document.body.querySelector('.media-chrome-mock')).not.toBeNull()
     w.unmount()
   })
 

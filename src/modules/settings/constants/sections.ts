@@ -22,6 +22,11 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     labelKey: 'settings.tabs.projection',
   },
   {
+    id: 'transmission',
+    routeName: 'settings-transmission',
+    labelKey: 'settings.tabs.transmission',
+  },
+  {
     id: 'remote',
     routeName: 'settings-remote',
     labelKey: 'settings.tabs.remote',

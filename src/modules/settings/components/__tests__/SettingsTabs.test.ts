@@ -20,11 +20,13 @@ const i18n = createI18n({
 			"settings.tabs.media": "Mídia",
 			"settings.tabs.projection": "Projeção",
 			"settings.tabs.remote": "Remoto",
+			"settings.tabs.transmission": "Transmissão",
 		},
 	},
 });
 
 const routes = [
+  { path: "/transmission", name: "settings-transmission", component: { template: "<div />" } },
 	{ path: "/", name: "settings-general", component: { template: "<div />" } },
 	{
 		path: "/appearance",
@@ -99,3 +101,12 @@ describe("SettingsTabs", () => {
 		expect(router.currentRoute.value.fullPath).toBe(before);
 	});
 });
+
+it('opens the transmission settings tab', async () => {
+  const { wrapper, router } = await mountTabs('settings-general')
+  const button = wrapper.findAll('button').find(button => button.text() === 'Transmissão')!
+  await button.trigger('click')
+  await new Promise(resolve => setTimeout(resolve, 0))
+  expect(router.currentRoute.value.name).toBe('settings-transmission')
+  wrapper.unmount()
+})

@@ -1,3 +1,4 @@
+import { detectObsBeforeProjection } from '@modules/settings/services/obs-detection'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
@@ -529,6 +530,7 @@ export const useRandomStore = defineStore('random', () => {
   }
 
   async function syncProjection() {
+    await detectObsBeforeProjection()
     runtime.value = { ...runtime.value, projecting: true }
     syncRuntime()
     // Mesmo contrato da Bíblia: slot individual = só TV; Espelhar =

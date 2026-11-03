@@ -1,4 +1,6 @@
 export default {
+  obsOutputs: { detecting: 'Detectando y actualizando conexiones OBS…', active: 'Conexiones OBS activas', activateHint: 'Active una conexión en Configuración → Transmisión para usarla aquí.', title: 'Conexiones OBS', browserSource: 'Fuente de navegador OBS' },
+  floating: { closeTitle: '¿Cerrar {title}?', closeMessage: '¿Desea detener este recurso y cerrar su proyección?' },
   updates: {
     downloadMacInstaller: 'Descargar instalador macOS',
     manualMacInstructions: 'En macOS, esta actualización se instala manualmente. Descarga el instalador, cierra LouvorJA, abre el DMG y arrastra la aplicación a Aplicaciones, reemplazando la versión anterior. Tus datos y preferencias se conservarán.',

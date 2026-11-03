@@ -6,6 +6,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { nextTick, ref } from 'vue'
 
+const navigate = vi.fn()
+vi.mock('vue-router', () => ({ useRouter: () => ({ push: navigate }) }))
+
 const listSystemDisplays = vi.fn()
 const listExtendedDisplaysImpl = (all: Array<{ id: number; isPrimary?: boolean }>) =>
   all.filter((d) => !d.isPrimary)
@@ -61,6 +64,12 @@ vi.mock('vue-i18n', () => ({
   }),
 }))
 
+import { obsConnections, registerObsConnection } from '@modules/settings/services/obs-connections'
+const obsOutputs = ref<Array<{ id: string; label: string; selected: boolean; clients: number }>>([])
+vi.mock('@modules/settings/composables/useObsConnections', () => ({
+  useObsConnections: () => ({ activeConnections: obsOutputs }),
+}))
+
 import MonitorTargetSelect from '../MonitorTargetSelect.vue'
 
 const SETTINGS = {
@@ -89,8 +98,39 @@ async function mountSelect(props: Record<string, unknown> = {}) {
 describe('MonitorTargetSelect', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    obsOutputs.value = []
+    obsConnections.value = []
     listSystemDisplays.mockResolvedValue(DISPLAYS)
     loadProjectionSettings.mockReturnValue({ ...SETTINGS })
+  })
+
+  it('sem conexões OBS mostra a orientação e oculta a lista OBS', async () => {
+    const w = await mountSelect()
+    await w.find('.monitor-target-select__trigger').trigger('click')
+    await Promise.resolve()
+    await nextTick()
+    expect(w.find('.obs-outputs-empty').text()).toContain('obsOutputs.activateHint')
+    await w.find('.obs-outputs-empty').trigger('click')
+    expect(navigate).toHaveBeenCalledWith({ name: 'settings-transmission' })
+    expect(w.find('ul[aria-label="obsOutputs.title"]').exists()).toBe(false)
+    w.unmount()
+  })
+
+  it('mostra conexões OBS criadas e permite selecionar o espelho', async () => {
+    registerObsConnection('7082', 'OBS 2')
+    obsOutputs.value = [{ id: '7082', label: 'OBS 2', selected: true, clients: 1 }]
+    const w = await mountSelect()
+    await w.find('.monitor-target-select__trigger').trigger('click')
+    await Promise.resolve()
+    await nextTick()
+    const group = w.find('ul[aria-label="obsOutputs.title"]')
+    expect(group.text()).toContain('OBS 2')
+    expect(w.find('.obs-outputs-active').text()).toContain('obsOutputs.active')
+    expect(w.find('.obs-outputs-empty').exists()).toBe(false)
+    expect(w.find('[role="separator"]').exists()).toBe(true)
+    await group.find('input').setValue(false)
+    expect(obsConnections.value[0]?.selected).toBe(false)
+    w.unmount()
   })
 
   it('renderiza trigger com label padrão e abre painel com opções', async () => {

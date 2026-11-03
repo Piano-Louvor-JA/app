@@ -46,6 +46,8 @@ vi.mock("../ipc/web-projection.mjs", () => ({
   remoteReloadSource: vi.fn(),
   remoteSeekSource: vi.fn(),
   remoteSetVolumeSource: vi.fn(),
+  setAudioOutputMode: vi.fn(),
+  remoteSetCaptionsHiddenSource: vi.fn(),
   remoteToggleMuteSource: vi.fn(),
   setSiteControlPanelOpen: vi.fn(),
   setSiteTargetMonitorIds: vi.fn(),

@@ -58,7 +58,9 @@ function loadReceiver(): void {
   for (const script of scripts) {
     const code = script.getAttribute('src') === 'purify.min.js'
       ? readFileSync(resolve(__dirname, '../purify.min.js'), 'utf8')
-      : script.textContent ?? ''
+      : script.getAttribute('src') === 'network-mirror.js'
+        ? readFileSync(resolve(__dirname, '../network-mirror.js'), 'utf8')
+        : script.textContent ?? ''
     try {
       dom.window.eval(code)
     } catch {
@@ -91,6 +93,123 @@ beforeAll(() => {
 })
 
 describe('receiver do palco — regressão', () => {
+  it('preserva o fundo da playlist hospedado no CDN de mídia do aplicativo', () => {
+    const background = 'https://pub-8c0e123c55a14cdfa0c52fa182688782.r2.dev/images/generico_061.jpg'
+    w.handle({ ...PROJECTION, scope: 'hymns', background })
+    expect(el('bg').getAttribute('src')).toBe(background)
+  })
+  it('nunca exibe identificação do receptor durante músicas ou Timer', () => {
+    w.handle({ v: 2, type: 'obsIdle', black: false })
+    w.handle({ ...PROJECTION, scope: 'hymns' })
+    expect(w.getComputedStyle(el('idleVer')).display).toBe('none')
+    w.handle({ v: 2, type: 'timer', duration: 60 })
+    expect(w.getComputedStyle(el('idleVer')).display).toBe('none')
+    w.handle({ v: 2, type: 'idle' })
+  })
+  it('mantém horas zeradas no Timer de contagem regressiva', () => {
+    w.handle({ v: 2, type: 'timer', mode: 'countdown', duration: 1860 })
+    expect(el('timer').textContent).toBe('00:31:00')
+    w.handle({ v: 2, type: 'idle' })
+  })
+  it('restaura texto bíblico após Cronômetro e espera em uma conexão OBS', () => {
+    w.handle({ v: 2, type: 'timer', mode: 'chrono', text: '00:00:05.54' })
+    expect(el('text').style.display).toBe('none')
+    w.handle({ v: 2, type: 'idle' })
+    w.handle({ ...PROJECTION, scope: 'bible', footerRef: 'Gênesis 1:1 (ARA)' })
+    expect(w.getComputedStyle(el('text')).display).not.toBe('none')
+    expect(el('text').innerHTML).toContain('TESTE REGRESSAO')
+    expect(el('footer').textContent).toContain('Gênesis 1:1')
+  })
+  it('mostra frações do Cronômetro pausado completas', () => {
+    w.handle({ v: 2, type: 'timer', mode: 'chrono', timeFormat: 'hh:mm:ss.ms', chronoRuntime: { status: 'paused', accumulatedMs: 5540, segmentStartedAt: null } })
+    expect(el('timer').textContent).toBe('00:00:05.54')
+    w.handle({ v: 2, type: 'idle' })
+  })
+  it('desmarcar restaura imediatamente a imagem personalizada de cada módulo', () => {
+    for (const scope of ['bible', 'clock', 'timer', 'countdown', 'random']) {
+      w.handle({ v: 2, type: 'obsIdle', black: false })
+      w.handle({ ...PROJECTION, scope, background: 'custom-module.jpg' })
+      const background = el('bg').getAttribute('src')
+      expect(w.getComputedStyle(el('bg')).display).not.toBe('none')
+      w.handle({ v: 2, type: 'obsIdle', black: true })
+      expect(w.getComputedStyle(el('bg')).display).toBe('none')
+      w.handle({ v: 2, type: 'obsIdle', black: false })
+      expect(w.getComputedStyle(el('bg')).display).not.toBe('none')
+      expect(el('bg').getAttribute('src')).toBe(background)
+    }
+  })
+  it('preserva fundo musical com opção preta ativa e reaplica preto na Bíblia', () => {
+    w.handle({ v: 2, type: 'obsIdle', black: true })
+    for (const scope of ['media', 'hymns']) {
+      w.handle({ ...PROJECTION, scope, backgroundColor: '#ff0000' })
+      expect(w.getComputedStyle(w.document.body).backgroundColor).toBe('rgb(255, 0, 0)')
+    }
+    w.handle({ ...PROJECTION, scope: 'bible', backgroundColor: '#ff0000' })
+    expect(w.getComputedStyle(w.document.body).backgroundColor).toBe('rgb(0, 0, 0)')
+    w.handle({ v: 2, type: 'obsIdle', black: false })
+  })
+  it('aguarda conteúdo com tela preta sem logos, conexão ou versão', () => {
+    w.handle({ v: 2, type: 'obsIdle', black: false })
+    w.handle({ v: 2, type: 'idle' })
+    expect(w.getComputedStyle(el('idle')).backgroundColor).toBe('rgb(0, 0, 0)')
+    expect(w.getComputedStyle(el('idleCenter')).display).toBe('none')
+    expect(w.getComputedStyle(el('idleVer')).display).toBe('none')
+    w.handle(PROJECTION)
+    expect(el('idle').classList.contains('hidden')).toBe(true)
+    expect(el('text').innerHTML).toContain('TESTE REGRESSAO')
+  })
+  it('encerrar OBS remove conteúdo e mantém tela preta até nova projeção', () => {
+    w.handle(PROJECTION)
+    w.handle({ v: 2, type: 'obsControl', action: 'stop' })
+    expect(w.document.getElementById('obsStoppedView')).not.toBeNull()
+    expect(el('text').textContent).toBe('')
+    w.handle({ v: 2, type: 'idle' })
+    expect(w.document.getElementById('obsStoppedView')).not.toBeNull()
+    w.handle(PROJECTION)
+    expect(w.document.getElementById('obsStoppedView')).toBeNull()
+  })
+  it('OBS compartilha duas projeções e expande o conteúdo restante', () => {
+    w.handle({ v: 2, type: 'obsShare', enabled: true })
+    w.handle(PROJECTION)
+    w.handle({ ...PROJECTION, obsPane: true, text: 'SEGUNDO RECURSO' })
+    const frames = w.document.querySelectorAll<HTMLIFrameElement>('#obsShareView iframe')
+    expect(frames).toHaveLength(2)
+    expect(frames[0]!.style.width).toBe('50%')
+    expect(frames[1]!.style.left).toBe('50%')
+    expect(frames[1]!.src).toContain('obsPane=1')
+    w.handle({ v: 2, type: 'idle' })
+    expect(frames[0]!.style.display).toBe('none')
+    expect(frames[1]!.style.width).toBe('100%')
+    w.handle({ v: 2, type: 'obsShare', enabled: false })
+    expect(w.document.getElementById('obsShareView')).toBeNull()
+  })
+  it('OBS preto prevalece sobre imagem e cor personalizadas sem esconder o texto', () => {
+    w.handle({ v: 2, type: 'obsIdle', black: true })
+    w.handle({ ...PROJECTION, background: 'custom.jpg', backgroundColor: '#ff0000' })
+    expect(w.getComputedStyle(w.document.body).backgroundColor).toBe('rgb(0, 0, 0)')
+    expect(w.getComputedStyle(el('bg')).display).toBe('none')
+    expect(w.getComputedStyle(el('bgPalco')).display).toBe('none')
+    expect(el('text').innerHTML).toContain('TESTE REGRESSAO')
+    w.handle({ v: 2, type: 'obsIdle', black: false })
+    expect(w.getComputedStyle(w.document.body).backgroundColor).toBe('rgb(255, 0, 0)')
+  })
+  it('remove fundo inválido para não mostrar ícone de imagem quebrada', () => {
+    w.handle({ v: 2, type: 'bgPalco', url: 'missing-background.png' })
+    el('bgPalco').dispatchEvent(new dom.window.Event('error'))
+    expect(el('bgPalco').hasAttribute('src')).toBe(false)
+    w.handle({ v: 2, type: 'bgPalco', url: '' })
+  })
+  it('OBS preto oculta a espera e continua recebendo conteúdo', () => {
+    w.handle({ v: 2, type: 'obsIdle', black: true })
+    w.handle({ v: 2, type: 'idle' })
+    expect(w.document.documentElement.classList.contains('obs-black-idle')).toBe(true)
+    expect(el('idle').classList.contains('hidden')).toBe(false)
+    w.handle(PROJECTION)
+    expect(el('idle').classList.contains('hidden')).toBe(true)
+    expect(el('text').innerHTML).toContain('TESTE REGRESSAO')
+    w.handle({ v: 2, type: 'obsIdle', black: false })
+    expect(w.document.documentElement.classList.contains('obs-black-idle')).toBe(false)
+  })
   it('handle() está definido após o boot do receiver', () => {
     expect(typeof w.handle).toBe('function')
   })
@@ -258,4 +377,52 @@ it('falls back to literal text when the projection sanitizer is unavailable', ()
 it('ships the same sanitizer as the locked production dependency', () => {
   expect(readFileSync(resolve(__dirname, '../purify.min.js'), 'utf8'))
     .toBe(readFileSync(resolve('node_modules/dompurify/dist/purify.min.js'), 'utf8'));
+});
+
+it('shows a pulsing Piano startup test and ignores expired tests', () => {
+  loadReceiver();
+  w.handle({ v: 2, type: 'obsWarmup', until: Date.now() + 3000 });
+  expect(el('obsWarmupView')?.querySelector('img[src="logo-piano-louvorja.png"]')).toBeTruthy();
+  w.handle({ v: 2, type: 'obsControl', action: 'stop' });
+  expect(el('obsWarmupView')).toBeNull();
+  w.handle({ v: 2, type: 'obsWarmup', until: Date.now() - 1 });
+  expect(el('obsWarmupView')).toBeNull();
+  dom.window.close();
+});
+
+it('removes the startup logo automatically after three seconds', async () => {
+  loadReceiver();
+  w.handle({ v: 2, type: 'obsWarmup', until: Date.now() + 3000 });
+  expect(el('obsWarmupView')).toBeTruthy();
+  await new Promise(resolve => setTimeout(resolve, 3100));
+  expect(el('obsWarmupView')).toBeNull();
+  dom.window.close();
+});
+
+it('starts the full test when a delayed source receives it, rather than at send time', () => {
+  loadReceiver();
+  w.handle({ v: 2, type: 'obsWarmup', requestId: 'late-source', durationMs: 3000, expiresAt: Date.now() + 60000 });
+  expect(el('obsWarmupView')?.querySelector('img[src="logo-piano-louvorja.png"]')).toBeTruthy();
+  dom.window.close();
+});
+
+it('chrono applies its module background and still obeys the black-background switch', () => {
+  loadReceiver();
+  w.handle({ v: 2, type: 'obsIdle', black: false });
+  w.handle({ v: 2, type: 'timer', mode: 'chrono', background: 'http://127.0.0.1:7080/bg/bg-11.png', chronoRuntime: { status: 'paused', accumulatedMs: 12340, segmentStartedAt: null } });
+  expect(el('bg').getAttribute('src')).toContain('/bg/bg-11.png');
+  expect(el('timer').textContent).toBe('00:00:12.34');
+  w.handle({ v: 2, type: 'obsIdle', black: true });
+  expect(w.getComputedStyle(el('bg')).display).toBe('none');
+  w.handle({ v: 2, type: 'obsIdle', black: false });
+  expect(w.getComputedStyle(el('bg')).display).not.toBe('none');
+  dom.window.close();
+});
+
+it('reduces excess blank lines in transmitted music lyrics', () => {
+  loadReceiver();
+  w.handle({ ...PROJECTION, scope: 'hymns', text: 'Então chegou a hora<br><br>de viver a missão' });
+  expect(el('text').querySelectorAll('br')).toHaveLength(1);
+  expect(w.getComputedStyle(el('text')).lineHeight).toBe('1');
+  dom.window.close();
 });

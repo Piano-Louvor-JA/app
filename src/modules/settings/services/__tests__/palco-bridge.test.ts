@@ -20,6 +20,8 @@ vi.mock('@shared/services/user-preferences', () => ({
   setUserPreference: vi.fn(),
 }))
 
+const receiverConnection = vi.hoisted(() => ({ callback: null as null | (() => void) }))
+
 type Send = { slot: string; msg: Record<string, unknown> }
 
 vi.mock('../../services/palco-session', () => ({
@@ -42,6 +44,7 @@ vi.mock('../../services/palco-session', () => ({
     idle() { sends().push({ slot: this.activeSlotId, msg: { type: 'idle' } }) },
     audio(payload: unknown) { sends().push({ slot: 'audio', msg: payload as Record<string, unknown> }) },
     onEvent: () => () => {},
+    onReceiverConnected: (callback: () => void) => { receiverConnection.callback = callback; return () => { receiverConnection.callback = null } },
   },
 }))
 
@@ -244,6 +247,25 @@ beforeEach(() => {
 afterEach(() => stopPalcoBridge())
 
 describe('palco-bridge — helpers via comportamento', () => {
+  it('projeta Cronômetro zerado no OBS antes de iniciar a contagem', async () => {
+    startPalcoBridge()
+    publish(TIMER_CH, { ...timerBase, status: 'idle', projecting: true })
+    await settle()
+    const sent = sendBuf.buf.find((item) => item.slot === '7082' && item.msg.type === 'timer')
+    expect(sent).toBeTruthy()
+    expect((sent!.msg.opts as { text: string }).text).toBe('00:00:00.00')
+  })
+  it('reenvia Bíblia ativa quando uma fonte OBS conecta ou atualiza', async () => {
+    startPalcoBridge()
+    publish(BIBLE_CH, { active: true, projecting: true, text: 'Versículo atual', reference: 'Gênesis 1:1' })
+    await settle()
+    sendBuf.buf.length = 0
+    receiverConnection.callback?.()
+    await settle()
+    expect(sendBuf.buf.some((item) => item.slot === '7082' && item.msg.scope === 'bible')).toBe(true)
+    stopPalcoBridge()
+    expect(receiverConnection.callback).toBeNull()
+  })
   it('startPalcoBridge: idempotente (2º start não duplica)', async () => {
     startPalcoBridge()
     startPalcoBridge()
@@ -346,7 +368,7 @@ describe('palco-bridge — projeção por módulo (owner)', () => {
 
   it('timer idle/projecting false: sem timerTo (guard anti 00:00 fantasma)', async () => {
     startPalcoBridge()
-    publish(TIMER_CH, { ...timerBase, status: 'idle', projecting: true })
+    publish(TIMER_CH, { ...timerBase, status: 'idle', projecting: false })
     await settle()
     publish(TIMER_CH, { ...timerBase, status: 'running', projecting: false })
     await settle()
@@ -479,6 +501,16 @@ describe('palco-bridge — takeover e turnOffOthers', () => {
 })
 
 describe('palco-bridge — mídia externa e slots', () => {
+  it('does not erase an external video on receiver reconnect when no module owns the output', async () => {
+    bridgeState.externalMediaAlive = true
+    startPalcoBridge()
+    await settle()
+    sendBuf.buf.length = 0
+    receiverConnection.callback?.()
+    await settle()
+    expect(sendBuf.buf.filter(item => item.msg.type === 'idle' || item.msg.type === 'projection')).toEqual([])
+  })
+
   it('mídia externa viva: owner é PULADO no slot (sem projection por cima)', async () => {
     startPalcoBridge()
     bridgeState.externalMediaAlive = true
@@ -545,13 +577,13 @@ describe('palco-bridge — mídia externa e slots', () => {
 })
 
 describe('palco-bridge — relógio (clock owner)', () => {
-  it('palcoClockOn: reclama owner e projeta HH:MM no slot', async () => {
+  it('palcoClockOn: reclama owner e projeta HH:MM:SS no slot', async () => {
     startPalcoBridge()
     palcoClockOn()
     await settle()
     const proj = sendBuf.buf.find((s) => s.msg.type === 'projection' && (s.msg as { scope?: string }).scope === 'clock')
     expect(proj).toBeTruthy()
-    expect((proj!.msg as { input: { text: string } }).input.text).toMatch(/^\d{2}:\d{2}$/)
+    expect((proj!.msg as { input: { text: string } }).input.text).toMatch(/^\d{2}:\d{2}:\d{2}$/)
   })
 
   it('palcoClockOn/Off: tick para após release (sem erro)', async () => {
@@ -711,4 +743,13 @@ describe('palco-bridge — storage events e estado inicial', () => {
     await settle()
     expect(sendBuf.buf.some((s) => s.msg.type === 'projection' && (s.msg as { scope?: string }).scope === 'hymns')).toBe(true)
   })
+})
+
+it('projects zero after countdown reset without dropping the active projection', async () => {
+  startPalcoBridge()
+  publish(COUNTDOWN_CH, { ...countdownBase, status: 'idle', projecting: true, durationMs: 0, accumulatedMs: 0, segmentStartedAt: null })
+  await settle()
+  const message = sendBuf.buf.find(item => item.msg.type === 'timer')
+  expect(message).toBeTruthy()
+  expect((message!.msg as { opts: { mode: string; duration: number } }).opts).toMatchObject({ mode: 'countdown', duration: 0 })
 })

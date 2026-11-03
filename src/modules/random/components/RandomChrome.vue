@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, watch, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useInAppProjectionMinimized } from '@shared/composables/useInAppProjectionMinimized'
+import MiniPlayerCloseButton from '@shared/components/MiniPlayerCloseButton.vue'
+import { closeIndependentProjection } from '@shared/composables/useIndependentProjection'
 import FloatingPreviewTitle from '@shared/components/FloatingPreviewTitle.vue'
 import IndependentProjectionButton from '@shared/components/IndependentProjectionButton.vue'
 import { isIndependentProjectionActive } from '@shared/composables/useIndependentProjection'
@@ -41,8 +43,14 @@ const effectiveConfig = computed(() => ({ ...stage.value.random, ...store.config
 const onRandomRoute = computed(() => route.name === RANDOM_ROUTE)
 
 /** No Sorteio fica sempre à mão; nas outras telas enquanto projeta ou sorteia. */
+const dismissed = ref(false)
+watch(() => route.name, () => { dismissed.value = false })
+watch(() => store.isProjecting, (active) => { if (active) dismissed.value = false })
+watch(() => isIndependentProjectionActive('random'), (active) => { if (active) dismissed.value = false })
+watch(() => store.runtime.isDrawing, (active) => { if (active) dismissed.value = false })
+
 const visible = computed(
-  () => onRandomRoute.value || store.isProjecting || store.runtime.isDrawing || isIndependentProjectionActive('random'),
+  () => !dismissed.value && (onRandomRoute.value || store.isProjecting || store.runtime.isDrawing || isIndependentProjectionActive('random')),
 )
 
 
@@ -72,6 +80,14 @@ const { positionStyle, dragging, onPointerDown, resetPosition } =
   useFloatingDrag(chromeRoot, USER_PREFERENCE_KEYS.randomChromePosition, {
     stackOrder: FLOATING_STACK_ORDER.random,
   })
+
+function onCloseChrome() {
+  store.cancelDrawAnimation()
+  if (store.isProjecting) store.clearProjection()
+  closeIndependentProjection('random')
+  projectionMinimized.value = false
+  dismissed.value = true
+}
 
 function onProject() {
   void store.toggleProjection()
@@ -107,6 +123,7 @@ async function onOpenRandom() {
       :title="t('random.chromeDragHint')"
       @dblclick="resetPosition"
     >
+      <MiniPlayerCloseButton :label="t('random.title')" @close="onCloseChrome" />
       <span
         class="random-chrome__display"
         :class="{
@@ -190,7 +207,7 @@ async function onOpenRandom() {
   background: #000;
   border: 1px solid rgb(255 255 255 / 0.2);
   box-shadow: 0 16px 40px rgb(0 0 0 / 0.45);
-  overflow: hidden;
+  overflow: visible;
   container-type: size;
   pointer-events: auto;
   cursor: grab;

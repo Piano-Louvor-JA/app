@@ -6,6 +6,7 @@ import {
   markLocalPrefsPushed,
   markLocalScheduledPushed,
   SYNCABLE_PREF_KEYS,
+  syncablePreferenceValue,
 } from './operator-state-apply'
 
 /**
@@ -147,6 +148,7 @@ export async function flushOutbox(): Promise<OperatorStateItem[] | null> {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
+        'X-Tenant': 'piano',
         authorization: `Bearer ${session!.token}`,
       },
       body: JSON.stringify({
@@ -210,7 +212,7 @@ export function startOutboxTriggers(): () => void {
   registerPrefsChangedHook((key) => {
     if (!SYNCABLE_PREF_KEYS.has(key)) return
     enqueueOperatorState('prefs', 'values', {
-      [key]: getUserPreference(key),
+      [key]: syncablePreferenceValue(key, getUserPreference(key)),
     })
     scheduleOutboxFlush()
   })

@@ -170,7 +170,9 @@ export function reconcileTargetDisplays(
     }
   }
 
-  const nextTargets = [...current].filter((id) => extendedDisplayIds.includes(id))
+  const nextTargets = [...current].filter((id) =>
+    extendedDisplayIds.includes(id) || (settings.openReturnScreen && id === settings.returnDisplayId),
+  )
   const nextDeclined = settings.declinedDisplayIds.filter((id) =>
     extendedDisplayIds.includes(id),
   )
@@ -291,18 +293,16 @@ export function resolveSelectedReturnMonitorId(
   return selectedIds.includes(returnId) ? returnId : null
 }
 
-/** Remove o monitor de retorno se ele não existir mais. */
+/**
+ * Hardware availability must not overwrite the operator's saved choice.
+ * resolveReturnMonitorId/resolveSelectedReturnMonitorId gate the live window.
+ * A missing display may be booting, disconnected, or an IPC list may be empty.
+ */
 export function pruneReturnDisplay(
   settings: ProjectionSettings,
-  displayIds: number[],
+  _displayIds: number[],
 ): ProjectionSettings {
-  if (settings.returnDisplayId == null) return settings
-  if (displayIds.includes(settings.returnDisplayId)) return settings
-  return {
-    ...settings,
-    returnDisplayId: null,
-    openReturnScreen: false,
-  }
+  return settings
 }
 
 export function readImageAsDataUrl(file: File): Promise<string> {

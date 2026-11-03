@@ -583,7 +583,9 @@ function viewKey(viewRoute: typeof route) {
       </RouterView>
     </main>
 
-    <MediaChrome />
+    <Teleport to="body">
+      <MediaChrome />
+    </Teleport>
 
     <BibleChrome />
     <CountdownChrome />

@@ -165,9 +165,44 @@ describe('rendererApiEnvFor — o que o vite injeta no renderer', () => {
     expect(env.VITE_PALCO_API_URL).toBe(STG)
   })
 
+  it('development sem VITE_URL_DATABASE expõe STG explícito ao renderer dev', () => {
+    expect(rendererApiEnvFor({ PIANO_BUILD_PROFILE: 'development' }).VITE_URL_DATABASE)
+      .toBe(`${STG}/json_db`)
+  })
+
+  it('non-release rejeita override PROD, vazio, relativo ou localhost', () => {
+    for (const value of [PROD, '', '/json_db', 'http://localhost:5173/json_db']) {
+      expect(() => rendererApiEnvFor({ PIANO_BUILD_PROFILE: 'development', VITE_URL_DATABASE: value }))
+        .toThrow(/VITE_URL_DATABASE|produção|production/i)
+    }
+  })
+
+  it('test aceita API local (mock do E2E) em localhost ou 127.0.0.1', () => {
+    for (const value of ['http://localhost:3100/json_db', 'http://127.0.0.1:3100/json_db']) {
+      expect(rendererApiEnvFor({ PIANO_BUILD_PROFILE: 'test', VITE_URL_DATABASE: value }).VITE_URL_DATABASE)
+        .toBe(value)
+    }
+  })
+
+  it('test segue rejeitando PROD, vazio, relativo ou host remoto fora de STG', () => {
+    for (const value of [PROD, '', '/json_db', 'https://evil.example.org/json_db', 'http://localhost.evil.org/json_db']) {
+      expect(() => rendererApiEnvFor({ PIANO_BUILD_PROFILE: 'test', VITE_URL_DATABASE: value }))
+        .toThrow(/VITE_URL_DATABASE/)
+    }
+  })
+
+  it('homologation rejeita API local', () => {
+    expect(() => rendererApiEnvFor({ VITE_URL_DATABASE: 'http://localhost:3100/json_db' }))
+      .toThrow(/VITE_URL_DATABASE/)
+  })
+
   it('VITE_* explícito no env do processo vence o contrato', () => {
-    const env = rendererApiEnvFor({ VITE_URL_FILES: 'http://localhost:3100/file', VITE_API_FALLBACK_URLS: 'http://localhost:3100' })
-    expect(env.VITE_URL_FILES).toBe('http://localhost:3100/file')
-    expect(env.VITE_API_FALLBACK_URLS).toBe('http://localhost:3100')
+    const env = rendererApiEnvFor({
+      PIANO_BUILD_PROFILE: 'release',
+      VITE_URL_FILES: 'https://cdn.example.org/file',
+      VITE_API_FALLBACK_URLS: 'https://fallback.example.org',
+    })
+    expect(env.VITE_URL_FILES).toBe('https://cdn.example.org/file')
+    expect(env.VITE_API_FALLBACK_URLS).toBe('https://fallback.example.org')
   })
 })

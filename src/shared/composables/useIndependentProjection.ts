@@ -1,3 +1,4 @@
+import { obsAssignments, clearObsModule, assignObsConnection } from '@modules/settings/services/obs-connections'
 import {
   formatDisplayResolution,
   listExtendedDisplays,
@@ -41,6 +42,7 @@ function closeWindow(win: Window | undefined) {
 }
 
 function release(moduleId: string) {
+  clearObsModule(moduleId)
   closeWindow(windows.get(moduleId))
   windows.delete(moduleId)
   if (moduleId in assignments.value) {
@@ -88,7 +90,7 @@ export function getIndependentMode(moduleId: string): IndependentProjectionMode 
 }
 
 export function isIndependentProjectionActive(moduleId: string): boolean {
-  return getIndependentMonitor(moduleId) != null
+  return getIndependentMonitor(moduleId) != null || Object.values(obsAssignments.value).some((value) => value === moduleId)
 }
 
 export async function openIndependentProjection(
@@ -137,6 +139,7 @@ export function closeIndependentProjection(moduleId: string): void {
 }
 
 export function closeAllIndependentProjections(): void {
+  for (const id of Object.keys(obsAssignments.value)) assignObsConnection(id, null)
   for (const moduleId of Object.keys(assignments.value)) release(moduleId)
 }
 

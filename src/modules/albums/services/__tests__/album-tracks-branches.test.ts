@@ -182,7 +182,7 @@ describe('loadCollectionTracks — custom/hymnal/fallbacks e loadAlbumLyric', ()
 })
 
 describe('filterAlbumTracks e loadAlbumLyric — branches', () => {
-  it('filterAlbumTracks: query vazia devolve tudo; filtra por track/nome/id', async () => {
+  it('filterAlbumTracks: query vazia devolve tudo; filtra por número e título sem usar id interno', async () => {
     const mod = await import('../album-tracks')
     const tracks = [
       { musicId: 1, name: 'Santo', track: 1, durationLabel: '—', hasInstrumental: false },
@@ -190,8 +190,19 @@ describe('filterAlbumTracks e loadAlbumLyric — branches', () => {
     ]
     expect(mod.filterAlbumTracks(tracks, '  ')).toHaveLength(2)
     expect(mod.filterAlbumTracks(tracks, 'sant')).toHaveLength(1)
-    expect(mod.filterAlbumTracks(tracks, '23')).toHaveLength(1)
-    expect(mod.filterAlbumTracks(tracks, '2')).toHaveLength(1)
+    expect(mod.filterAlbumTracks(tracks, '23')).toHaveLength(0)
+    expect(mod.filterAlbumTracks(tracks, '2')).toHaveLength(0)
+  })
+
+  it('searches exact hymn numbers and ignores matching internal IDs and partial numbers', async () => {
+    const { filterAlbumTracks } = await import('../album-tracks')
+    const tracks = [
+      { musicId: 551, name: 'Lindo És', track: 28, durationLabel: '', hasInstrumental: false },
+      { musicId: 2, name: 'Tua Palavra', track: 55, durationLabel: '', hasInstrumental: false },
+      { musicId: 3, name: 'Meu Cálice', track: 155, durationLabel: '', hasInstrumental: false },
+    ]
+    expect(filterAlbumTracks(tracks, '55').map(track => track.track)).toEqual([55])
+    expect(filterAlbumTracks(tracks, 'es lindo').map(track => track.track)).toEqual([28])
   })
 
   it('loadAlbumLyric: id inválido e record ausente → null', async () => {

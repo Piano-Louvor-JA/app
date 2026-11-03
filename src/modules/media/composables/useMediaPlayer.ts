@@ -39,6 +39,7 @@ export function useMediaPlayer() {
     audioOnTv,
     queue,
     queueIndex,
+    queueShuffled,
     queueLabel,
   } = storeToRefs(store)
 
@@ -83,6 +84,7 @@ export function useMediaPlayer() {
     slideCount,
     queue,
     queueIndex,
+    queueShuffled,
     queueLabel,
     openTrack,
     play: store.play,
@@ -94,6 +96,8 @@ export function useMediaPlayer() {
     nextSlide: store.nextSlide,
     previousSlide: store.previousSlide,
     jumpToQueue: store.jumpToQueue,
+    playQueueInOrder: store.playQueueInOrder,
+    moveQueueItem: store.moveQueueItem,
     setVolume: store.setVolume,
     minimize: store.minimize,
     maximize: store.maximize,
@@ -104,6 +108,7 @@ export function useMediaPlayer() {
     switchMode,
     startProjection: store.startProjection,
     clearProjection: store.clearProjection,
+    stopProjection: store.stopProjection,
     toggleProjection: store.toggleProjection,
     audioOnTv,
     onToggleAudioOnTv: () => store.setAudioOnTv(!audioOnTv.value),

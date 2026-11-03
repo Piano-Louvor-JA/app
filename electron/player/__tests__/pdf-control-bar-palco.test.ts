@@ -1,25 +1,9 @@
-/**
- * Regressão do bug "palco cinza" (13/10): syncPptToTvs do pdf-control-bar
- * enviava slide cinza às TVs. Duas causas combinadas:
- *
- * 1. captureSourceFrameBase64 (web-projection.mjs): capturePng() do PDF.js
- *    retorna null enquanto o canvas não renderizou → caía no fallback
- *    capturePage() que captura o frame cinza de loading do BrowserWindow.
- *    Em PDF grande (24 pág, LibreOffice), os 3 syncs do boot (0/700/1800ms)
- *    TODOS capturavam cinza → TV exibia "png cinza" (print do Rafael).
- * 2. Se a TV conecta DEPOIS do boot, nenhum re-sync dispara (replay devolve
- *    estado antigo/cinza).
- *
- * Aqui o pdf-control-bar real roda em jsdom: stub de window.louvorja com
- * captureSourceFrame controlável. O sync do boot TEM que:
- * - NÃO enviar frame cinza (capturePng null → abort, sem fallback);
- * - REPETIR até o canvas PDF.js estar pronto (retry com backoff);
- * - RE-SINCRONIZAR quando uma TV conecta (onReceiverConnected).
- */
+/** PDF projection is explicit. Once started, retry until PDF.js supplies a
+ * rendered canvas, resync newly connected receivers, and cancel late frames. */
 import { readFileSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { beforeAll, describe, expect, it } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { JSDOM } from 'jsdom'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -91,7 +75,7 @@ function loadBar(captureSourceFrame: () => Promise<string | null>): {
       getImageSlideState: () => Promise.resolve(null),
       getPptSlideState: () => Promise.resolve(null),
       getPdfPageState: () => Promise.resolve(null),
-      getPlaybackState: () => Promise.resolve(null),
+      getPlaybackState: () => Promise.resolve({ projecting: false }),
       getVideoTargetMonitors: () => Promise.resolve([]),
       toggleVideoScreens: () => Promise.resolve(),
       remotePdfNext: () => Promise.resolve(),
@@ -112,10 +96,21 @@ function loadBar(captureSourceFrame: () => Promise<string | null>): {
   return { sent, served, receiverConnectedCbs }
 }
 
-describe('pdf-control-bar: sync PPT/PDF → Palco (regressão cinza)', () => {
+describe('pdf-control-bar: explicit PDF projection and safe capture', () => {
+  afterEach(() => dom?.window.close())
+  it('opening the control only lists connections and does not capture or transmit', async () => {
+    let captures = 0
+    const { sent } = loadBar(async () => { captures++; return 'frame' })
+    await new Promise(resolve => setTimeout(resolve, 50))
+    expect(captures).toBe(0); expect(sent).toEqual([])
+    const checkbox = w.document.querySelector('#tvList input') as HTMLInputElement
+    expect(checkbox.disabled).toBe(false)
+  })
   it('NÃO envia frame cinza: capturePng null → abort SEM fallback capturePage', async () => {
     const { sent, served } = loadBar(() => Promise.resolve(null))
     await new Promise((r) => setTimeout(r, 50))
+    ;(w.document.getElementById('project') as HTMLButtonElement).click()
+    await new Promise(resolve => setTimeout(resolve, 50))
     expect(served).toEqual([])
     expect(sent).toEqual([])
   })
@@ -126,9 +121,12 @@ describe('pdf-control-bar: sync PPT/PDF → Palco (regressão cinza)', () => {
       calls++
       return Promise.resolve(calls < 4 ? null : 'aGVsbG8=')
     })
+    await new Promise(resolve => setTimeout(resolve, 50))
+    ;(w.document.getElementById('project') as HTMLButtonElement).click()
     // tentativas: 0ms(1ª) + 500 + 800 + 1280 ≈ 2.6s até a 4ª (válida)
     await new Promise((r) => setTimeout(r, 3500))
-    expect(served.length).toBeGreaterThan(0)
+    expect(served).toEqual([])
+    expect(sent[0]?.msg.background).toBe('data:image/png;base64,aGVsbG8=')
     expect(sent.length).toBeGreaterThan(0)
     expect((sent[0]!.msg as { type: string }).type).toBe('projection')
   })
@@ -136,9 +134,40 @@ describe('pdf-control-bar: sync PPT/PDF → Palco (regressão cinza)', () => {
   it('RE-SYNC quando TV conecta depois do boot', async () => {
     const { sent, receiverConnectedCbs } = loadBar(() => Promise.resolve('aGVsbG8='))
     await new Promise((r) => setTimeout(r, 50))
+    ;(w.document.getElementById('project') as HTMLButtonElement).click()
+    await new Promise(resolve => setTimeout(resolve, 50))
     const before = sent.length
     receiverConnectedCbs[0]?.({ slotId: '0' })
     await new Promise((r) => setTimeout(r, 50))
     expect(sent.length).toBeGreaterThan(before)
   })
+})
+
+ it('unchecking a connection sends a stop only to that destination', async () => {
+  const { sent } = loadBar(async () => 'frame')
+  await new Promise(resolve => setTimeout(resolve, 50))
+  ;(w.document.getElementById('project') as HTMLButtonElement).click()
+  await new Promise(resolve => setTimeout(resolve, 50))
+  sent.splice(0)
+  const input = w.document.querySelector('#tvList input') as HTMLInputElement
+  input.checked = false; input.dispatchEvent(new dom.window.Event('change'))
+  await new Promise(resolve => setTimeout(resolve, 50))
+  expect(sent).toEqual([{ slotId: '0', msg: { v: 2, type: 'idle' } }])
+  dom.window.close()
+})
+
+it('a capture completing after projection stops cannot transmit a late frame', async () => {
+  let release!: (value: string) => void
+  const pending = new Promise<string>(resolve => { release = resolve })
+  const { sent, served } = loadBar(() => pending)
+  await new Promise(resolve => setTimeout(resolve, 30))
+  ;(w.document.getElementById('project') as HTMLButtonElement).click()
+  await new Promise(resolve => setTimeout(resolve, 30))
+  ;(w.document.getElementById('project') as HTMLButtonElement).click()
+  await new Promise(resolve => setTimeout(resolve, 0))
+  release('frame')
+  await new Promise(resolve => setTimeout(resolve, 50))
+  expect(served).toEqual([])
+  expect(sent).toEqual([])
+  dom.window.close()
 })

@@ -317,15 +317,18 @@ describe('useCountdownStore', () => {
     expect(store.isRunning).toBe(true)
   })
 
-  it('reset pausado → idle; reset rodando → continua rodando zerado', () => {
+  it('reset rodando ou pausado zera a duração e deixa o timer parado', () => {
     store.setDurationMs(60_000)
     store.start()
     vi.setSystemTime(110_000)
     store.reset()
-    expect(store.runtime.status).toBe('running')
+    expect(store.runtime.status).toBe('idle')
+    expect(store.runtime.durationMs).toBe(0)
     expect(store.runtime.accumulatedMs).toBe(0)
-    expect(store.runtime.segmentStartedAt).toBe(110_000)
+    expect(store.runtime.segmentStartedAt).toBeNull()
 
+    store.setDurationMs(60_000)
+    store.start()
     store.pause()
     store.reset()
     expect(store.runtime.status).toBe('idle')

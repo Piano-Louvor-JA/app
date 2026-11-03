@@ -1,10 +1,13 @@
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { listSystemDisplays, subscribeDisplaysChanged } from '@modules/settings/services/display-service'
+import { useObsConnections, hasSelectedObsTargets } from '@modules/settings/composables/useObsConnections'
 import type { SystemDisplay } from '@modules/settings/types/projection'
 import { loadProjectionSettings } from '@modules/settings/services/projection-preferences'
 
 /** Controles temporários da projeção local; lista desconhecida não habilita minimizar. */
-export function usePrimaryProjectionControls() {
+export function usePrimaryProjectionControls(module?: string) {
+  const { refresh } = useObsConnections()
+  let networkReady = false
   const primaryOnly = ref(false)
   let currentDisplays: SystemDisplay[] = []
   const active = ref(true)
@@ -23,7 +26,7 @@ export function usePrimaryProjectionControls() {
 
   function wake() {
     const selected = new Set(loadProjectionSettings().targetDisplayIds)
-    primaryOnly.value = currentDisplays.some((display) => display.isPrimary) &&
+    primaryOnly.value = networkReady && !hasSelectedObsTargets(module) && currentDisplays.some((display) => display.isPrimary) &&
       !currentDisplays.some((display) => !display.isPrimary && selected.has(display.id))
     active.value = true
     clearTimeout(timer)
@@ -38,6 +41,8 @@ export function usePrimaryProjectionControls() {
     wake()
   }
 
+  watch(() => hasSelectedObsTargets(module), wake)
+
   onMounted(async () => {
     window.addEventListener('mousemove', wake)
     window.addEventListener('storage', wake)
@@ -47,8 +52,12 @@ export function usePrimaryProjectionControls() {
       updateDisplays(displays)
     })
     const revision = displayRevision
-    const displays = await listSystemDisplays()
-    if (!disposed && displayRevision === revision) updateDisplays(displays)
+    const [displays] = await Promise.all([listSystemDisplays(), refresh()])
+    networkReady = true
+    if (!disposed) {
+      if (displayRevision === revision) updateDisplays(displays)
+      else wake()
+    }
   })
 
   onUnmounted(() => {

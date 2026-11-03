@@ -14,9 +14,9 @@ import {
   createUserWithEmailAndPassword,
   getAuth,
   getRedirectResult,
+  onAuthStateChanged,
   signInWithEmailAndPassword,
   signInWithPopup,
-  signInWithRedirect,
   signOut,
   updateProfile,
   type Auth,
@@ -25,6 +25,13 @@ import {
 import { getAuthSession, saveSession, type AuthSession } from '@modules/media/services/auth-client'
 
 let authInstance: Auth | null = null
+let bootRevalidation: Promise<AuthSession | null> | null = null
+let bootReadiness: Promise<AuthSession | null> | null = null
+
+/** Aguarda a revalidação inicial; a primeira chamada compartilha o coalescing do boot. */
+export function getAuthReadiness(): Promise<AuthSession | null> {
+  return bootReadiness ??= revalidateFirebaseSessionOnBoot()
+}
 
 function getFirebaseAuth(): Auth {
   if (!authInstance) {
@@ -45,56 +52,93 @@ function getFirebaseAuth(): Auth {
   return authInstance
 }
 
-function toSession(credential: UserCredential): AuthSession {
-  const user = credential.user
-  return {
-    token: '', // preenchido abaixo (idToken é assíncrono)
-    user: {
-      id_user: 0, // id real vem do upsert na API; 0 = placeholder pós-login
-      email: user.email ?? '',
-      displayName: user.displayName ?? (user.email ?? '').split('@')[0],
-    },
+function firebaseSessionBridgeUrl(): string | null {
+  const database = import.meta.env.VITE_URL_DATABASE as string | undefined
+  const profile = import.meta.env.VITE_PIANO_PROFILE as string | undefined
+  if (!database) return null
+  try {
+    const url = new URL(database)
+    if (
+      url.protocol !== 'https:' ||
+      url.hostname === 'localhost' ||
+      url.hostname === '127.0.0.1' ||
+      (profile !== 'release' && url.origin !== 'https://api-stg.pianolouvorja.com.br')
+    ) return null
+    url.pathname = '/v1/custom/auth/firebase-session'
+    url.search = ''
+    url.hash = ''
+    return url.toString()
+  } catch {
+    return null
   }
 }
 
+function isValidSession(session: unknown): session is AuthSession {
+  if (!session || typeof session !== 'object') return false
+  const candidate = session as AuthSession
+  return Boolean(candidate.token) && Number.isInteger(candidate.user?.id_user) && candidate.user.id_user > 0
+}
+
 async function persistSession(credential: UserCredential): Promise<AuthSession | null> {
-  const idToken = await credential.user.getIdToken()
-  // Bridge: troca o Firebase ID token por sessão com id_user real
-  // (POST /v1/custom/auth/firebase-session — middleware firebaseAuth valida
-  // via Admin SDK e faz upsert em custom_users).
+  const url = firebaseSessionBridgeUrl()
+  if (!url) return null
   try {
-    // Produção: URL absoluta da API (VITE_URL_DATABASE). URL relativa só
-    // funciona em dev (proxy do Vite) — no deploy o host do web não tem /v1.
-    const base = (import.meta.env.VITE_URL_DATABASE as string | undefined)?.replace(/\/+$/, '').replace(/\/json_db$/, '') ?? ''
-    const url = `${base}/v1/custom/auth/firebase-session`
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { authorization: `Bearer ${idToken}` },
-      })
-      // Log VISÍVEL (console.log, não debug): feedback Ezequias 02/10 — os 401
-      // em notifications/weekly-tasks com sessão salva indicam token que a API
-      // rejeita; sem este log em level default o diagnóstico fica cego.
-      console.log('[auth] persistSession: API response status:', response.status)
-      const respText = await response.text()
-      console.log('[auth] persistSession: API response body:', respText.slice(0, 300))
-      if (response.ok) {
-        const json = JSON.parse(respText) as AuthSession
-        if (json?.token && json?.user?.id_user) {
-          saveSession(json)
-          return getAuthSession()
-        }
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'X-Tenant': 'piano',
+        authorization: `Bearer ${await credential.user.getIdToken()}`,
       }
-    } catch (e) {
-      // API indisponível → cai no fallback local abaixo
-      console.warn('[auth] persistSession: API falhou, fallback placeholder:', e)
-    }
-    // Fallback local (API offline): sessão placeholder sem id_user —
-    // getAuthSession() vai rejeitar, mas não corrompe o storage.
-    const session = toSession(credential)
-    session.token = idToken
+    })
+    if (!response.ok) return null
+    const session = JSON.parse(await response.text()) as unknown
+    if (!isValidSession(session)) return null
     saveSession(session)
-    console.warn('[auth] persistSession: FALLBACK placeholder salvo (id_user=0)')
     return getAuthSession()
+  } catch {
+    return null
+  }
+}
+
+async function exchangeFirebaseToken(token: string): Promise<{ session: AuthSession | null; rejected: boolean }> {
+  const url = firebaseSessionBridgeUrl()
+  if (!url) return { session: null, rejected: false }
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'X-Tenant': 'piano', authorization: `Bearer ${token}` },
+    })
+    if (!response.ok) return { session: null, rejected: response.status === 401 || response.status === 403 }
+    const session = JSON.parse(await response.text()) as unknown
+    if (!isValidSession(session)) return { session: null, rejected: false }
+    saveSession(session)
+    return { session: getAuthSession(), rejected: false }
+  } catch {
+    return { session: null, rejected: false }
+  }
+}
+
+/** Revalida a sessão persistida no boot sem apagar dados durante falha de rede. */
+export function revalidateFirebaseSessionOnBoot(): Promise<AuthSession | null> {
+  if (bootReadiness) return bootReadiness
+  if (bootRevalidation) return bootRevalidation
+
+  bootRevalidation = (async () => {
+    const current = getAuthSession()
+    if (!current) return null
+
+    try {
+      const user = getFirebaseAuth().currentUser
+      const token = user ? await user.getIdToken(true) : current.token
+      const result = await exchangeFirebaseToken(token)
+      if (result.rejected) saveSession(null)
+      return result.session
+    } catch {
+      return null
+    }
+  })()
+  void bootRevalidation.finally(() => { bootRevalidation = null })
+  return bootRevalidation
 }
 
 /** Login email/senha via Firebase. Retorna a sessão ou null. */
@@ -166,6 +210,20 @@ export async function handleRedirectResult(): Promise<AuthSession | null> {
     return null
   } catch (e) {
     console.error('[auth] handleRedirectResult ERRO:', e)
+    return null
+  }
+}
+
+/** Mantém a sessão local sincronizada com Firebase após refresh de token. */
+export function subscribeFirebaseSession(): (() => void) | null {
+  try {
+    return onAuthStateChanged(getFirebaseAuth(), async user => {
+      if (!user) return
+      const current = getAuthSession()
+      if (!current) return
+      saveSession({ ...current, token: await user.getIdToken() })
+    })
+  } catch {
     return null
   }
 }

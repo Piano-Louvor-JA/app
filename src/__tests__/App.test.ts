@@ -209,6 +209,32 @@ describe('App.vue — janela principal', () => {
 })
 
 describe('App.vue — janela de projeção (popup)', () => {
+  it.each(['meta', 'name', 'location'])('não monta avisos de atualização na projeção detectada por %s', async (detection) => {
+    updateCheckerMock.hasUpdate.value = true
+    if (detection === 'location') {
+      window.history.replaceState({}, '', '/#/popup')
+    }
+    const projectionRouter = createRouter({
+      history: createMemoryHistory(),
+      routes: [{
+        path: '/',
+        name: detection === 'name' ? 'projection-popup' : 'test',
+        meta: { projection: detection === 'meta' },
+        component: { template: '<div />' },
+      }],
+    })
+    await projectionRouter.push('/')
+    await projectionRouter.isReady()
+    const w = mount(App, { global: { plugins: [projectionRouter] } })
+    await flushPromises()
+
+    expect(w.findComponent({ name: 'UpdateBanner' }).exists()).toBe(false)
+    expect(w.findComponent({ name: 'UpdateDialog' }).exists()).toBe(false)
+
+    w.unmount()
+    updateCheckerMock.hasUpdate.value = false
+  })
+
   it('splash liberado na hora, sem overlay, sem palco-bridge, fundo preto', async () => {
     // O popup real usa hash history (#/popup) — espelhar no location do jsdom
     window.history.replaceState({}, '', '/#/popup')

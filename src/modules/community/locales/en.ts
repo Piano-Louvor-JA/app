@@ -13,6 +13,7 @@ export default {
 		copySaved: "Copy saved to My Collections",
 		copyFailed: "Could not save the copy.",
 		ranking: "View ranking",
+		createCollection: "Create collection",
 		pagination: "Community pagination",
 		searchPlaceholder: "Search collection or author...",
 		clearSearch: "Clear search",

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-const mocks = vi.hoisted(() => ({ initialize: vi.fn(), auth: vi.fn(), login: vi.fn(), register: vi.fn(), popup: vi.fn(), redirect: vi.fn(), logout: vi.fn(), profile: vi.fn(), save: vi.fn(), session: vi.fn() }))
+const mocks = vi.hoisted(() => ({ initialize: vi.fn(), auth: vi.fn(), login: vi.fn(), register: vi.fn(), popup: vi.fn(), redirect: vi.fn(), logout: vi.fn(), profile: vi.fn(), save: vi.fn(), session: vi.fn(), subscribe: vi.fn() }))
 vi.mock('firebase/app', () => ({ initializeApp: mocks.initialize }))
-vi.mock('firebase/auth', () => ({ GoogleAuthProvider: class {}, getAuth: mocks.auth, signInWithEmailAndPassword: mocks.login, createUserWithEmailAndPassword: mocks.register, signInWithPopup: mocks.popup, getRedirectResult: mocks.redirect, signOut: mocks.logout, updateProfile: mocks.profile, signInWithRedirect: vi.fn() }))
+vi.mock('firebase/auth', () => ({ GoogleAuthProvider: class {}, getAuth: mocks.auth, signInWithEmailAndPassword: mocks.login, createUserWithEmailAndPassword: mocks.register, signInWithPopup: mocks.popup, getRedirectResult: mocks.redirect, onAuthStateChanged: mocks.subscribe, signOut: mocks.logout, updateProfile: mocks.profile }))
 vi.mock('@modules/media/services/auth-client', () => ({ saveSession: mocks.save, getAuthSession: mocks.session }))
 const session = { token: 'api-token', user: { id_user: 7, email: 'ana@example.org', displayName: 'Ana' } }
 const credential = { user: { email: 'ana@example.org', displayName: 'Ana', getIdToken: vi.fn().mockResolvedValue('id-token') } }
@@ -12,10 +12,11 @@ beforeEach(() => {
   mocks.login.mockResolvedValue(credential)
   mocks.register.mockResolvedValue(credential)
   mocks.popup.mockResolvedValue(credential)
-  mocks.auth.mockReturnValue({})
+  mocks.auth.mockReturnValue({ currentUser: credential.user })
   mocks.session.mockReturnValue(session)
   vi.stubEnv('VITE_FIREBASE_API_KEY', 'test-key')
   vi.stubEnv('VITE_FIREBASE_PROJECT_ID', 'test-project')
+  vi.stubEnv('VITE_PIANO_PROFILE', 'release')
   vi.stubEnv('VITE_URL_DATABASE', 'https://api.example.org/json_db/')
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200, text: async () => JSON.stringify(session) }))
   vi.spyOn(console, 'log').mockImplementation(() => {})
@@ -29,8 +30,8 @@ describe('cliente Firebase e ponte da sessão', () => {
   it('troca credencial por sessão real da API e reutiliza a instância Firebase', async () => {
     const client = await import('../firebase-client')
     expect(await client.firebaseLogin('ana@example.org', 'secret')).toEqual(session)
-    expect(mocks.login).toHaveBeenCalledWith({}, 'ana@example.org', 'secret')
-    expect(fetch).toHaveBeenCalledWith('https://api.example.org/v1/custom/auth/firebase-session', expect.objectContaining({ method: 'POST', headers: { authorization: 'Bearer id-token' } }))
+    expect(mocks.login).toHaveBeenCalledWith(expect.anything(), 'ana@example.org', 'secret')
+    expect(fetch).toHaveBeenCalledWith('https://api.example.org/v1/custom/auth/firebase-session', expect.objectContaining({ method: 'POST', headers: { authorization: 'Bearer id-token', 'X-Tenant': 'piano' } }))
     expect(mocks.save).toHaveBeenCalledWith(session)
     await client.firebaseLoginGoogle()
     expect(mocks.initialize).toHaveBeenCalledOnce()
@@ -46,21 +47,37 @@ describe('cliente Firebase e ponte da sessão', () => {
     expect(mocks.profile).toHaveBeenCalledTimes(named ? 1 : 0)
     if (named) expect(mocks.profile).toHaveBeenCalledWith(credential.user, { displayName: 'Ana' })
   })
-  it.each(['http', 'invalid-json', 'invalid-session', 'offline'])('preserva fallback local quando ponte falha: %s', async failure => {
-    mocks.session.mockReturnValue(null)
+  it.each(['http', 'invalid-json', 'id_user zero', 'offline'])('falha sem salvar placeholder quando ponte falha: %s', async failure => {
     if (failure === 'http') vi.mocked(fetch).mockResolvedValue({ ok: false, status: 503, text: async () => 'offline' } as Response)
     if (failure === 'invalid-json') vi.mocked(fetch).mockResolvedValue({ ok: true, status: 200, text: async () => '{broken' } as Response)
-    if (failure === 'invalid-session') vi.mocked(fetch).mockResolvedValue({ ok: true, status: 200, text: async () => JSON.stringify({ token: 'token', user: {} }) } as Response)
+    if (failure === 'id_user zero') vi.mocked(fetch).mockResolvedValue({ ok: true, status: 200, text: async () => JSON.stringify({ token: 'token', user: { id_user: 0 } }) } as Response)
     if (failure === 'offline') vi.mocked(fetch).mockRejectedValue(new Error('offline'))
     expect(await (await import('../firebase-client')).firebaseLogin('ana@example.org', 'secret')).toBeNull()
-    expect(mocks.save).toHaveBeenCalledWith({ token: 'id-token', user: { id_user: 0, email: 'ana@example.org', displayName: 'Ana' } })
+    expect(mocks.save).not.toHaveBeenCalled()
   })
-  it.each([{ email: 'ana@example.org', displayName: null, expected: 'ana' }, { email: null, displayName: null, expected: '' }])('fallback deriva nome quando perfil não possui nome: %j', async data => {
-    vi.stubEnv('VITE_URL_DATABASE', undefined)
-    mocks.login.mockResolvedValue({ user: { ...credential.user, email: data.email, displayName: data.displayName } })
+  it.each(['', '/json_db', 'http://localhost:5173/json_db'])('rejeita base inválida sem usar rota relativa: %s', async base => {
+    vi.stubEnv('VITE_URL_DATABASE', base)
+    expect(await (await import('../firebase-client')).firebaseLogin('ana@example.org', 'secret')).toBeNull()
+    expect(fetch).not.toHaveBeenCalled()
+    expect(mocks.save).not.toHaveBeenCalled()
+  })
+  it('em non-release rejeita host HTTPS fora de STG antes do fetch', async () => {
+    vi.stubEnv('VITE_PIANO_PROFILE', 'development')
+    vi.stubEnv('VITE_URL_DATABASE', 'https://evil.example/json_db')
+    expect(await (await import('../firebase-client')).firebaseLogin('ana@example.org', 'secret')).toBeNull()
+    expect(fetch).not.toHaveBeenCalled()
+    expect(mocks.save).not.toHaveBeenCalled()
+  })
+  it('em release mantém a base HTTPS configurada', async () => {
+    vi.stubEnv('VITE_PIANO_PROFILE', 'release')
+    vi.stubEnv('VITE_URL_DATABASE', 'https://api.example.org/json_db')
+    expect(await (await import('../firebase-client')).firebaseLogin('ana@example.org', 'secret')).toEqual(session)
+    expect(fetch).toHaveBeenCalledWith('https://api.example.org/v1/custom/auth/firebase-session', expect.anything())
+  })
+  it('falha de ponte não cria sessão local sintética', async () => {
     vi.mocked(fetch).mockRejectedValue(new Error('offline'))
-    await (await import('../firebase-client')).firebaseLogin('ana@example.org', 'secret')
-    expect(mocks.save).toHaveBeenCalledWith(expect.objectContaining({ user: { id_user: 0, email: data.email ?? '', displayName: data.expected } }))
+    expect(await (await import('../firebase-client')).firebaseLogin('ana@example.org', 'secret')).toBeNull()
+    expect(mocks.save).not.toHaveBeenCalled()
   })
   it('retorna null para falha de login ou cadastro', async () => {
     mocks.login.mockRejectedValue(new Error('bad credentials'))
@@ -83,5 +100,90 @@ describe('cliente Firebase e ponte da sessão', () => {
     if (!ok) mocks.logout.mockRejectedValue(new Error('offline'))
     await (await import('../firebase-client')).firebaseLogout()
     expect(mocks.save).toHaveBeenCalledWith(null)
+  })
+
+  it('no boot renova a sessão salva com token Firebase forçado', async () => {
+    const client = await import('../firebase-client')
+    await expect(client.revalidateFirebaseSessionOnBoot()).resolves.toEqual(session)
+    expect(credential.user.getIdToken).toHaveBeenCalledWith(true)
+    expect(fetch).toHaveBeenCalledWith('https://api.example.org/v1/custom/auth/firebase-session', expect.objectContaining({ method: 'POST', headers: { authorization: 'Bearer id-token', 'X-Tenant': 'piano' } }))
+    expect(mocks.save).toHaveBeenCalledWith(session)
+  })
+
+  it('no boot coalesce revalidações concorrentes em uma chamada à ponte', async () => {
+    const client = await import('../firebase-client')
+    await expect(Promise.all([
+      client.revalidateFirebaseSessionOnBoot(),
+      client.revalidateFirebaseSessionOnBoot(),
+    ])).resolves.toEqual([session, session])
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('no boot permite nova revalidação após concluir a anterior', async () => {
+    const client = await import('../firebase-client')
+    await client.revalidateFirebaseSessionOnBoot()
+    await client.revalidateFirebaseSessionOnBoot()
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('getAuthReadiness aguarda a revalidação antes de liberar request autenticada', async () => {
+    let resolveBridge!: (value: Response) => void
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(resolve => { resolveBridge = resolve })))
+    const client = await import('../firebase-client')
+    const readiness = client.getAuthReadiness()
+    let requestAfterReadiness = false
+    const request = (async () => {
+      await readiness
+      requestAfterReadiness = true
+    })()
+
+    await Promise.resolve()
+    expect(requestAfterReadiness).toBe(false)
+    resolveBridge({ ok: true, status: 200, text: async () => JSON.stringify(session) } as Response)
+    await expect(request).resolves.toBeUndefined()
+    expect(requestAfterReadiness).toBe(true)
+  })
+
+  it('getAuthReadiness compartilha a promise lazy concorrente', async () => {
+    const client = await import('../firebase-client')
+    const first = client.getAuthReadiness()
+    const second = client.getAuthReadiness()
+    expect(first).toBe(second)
+    await expect(first).resolves.toEqual(session)
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('getAuthReadiness preserva sessão em reload após save offline', async () => {
+    mocks.auth.mockReturnValue({ currentUser: null })
+    vi.mocked(fetch).mockRejectedValue(new Error('offline'))
+    const client = await import('../firebase-client')
+    await expect(client.getAuthReadiness()).resolves.toBeNull()
+    expect(mocks.save).not.toHaveBeenCalled()
+    expect(mocks.session).toHaveReturnedWith(session)
+  })
+
+  it('getAuthReadiness faz roundtrip save e reload', async () => {
+    const client = await import('../firebase-client')
+    await expect(client.getAuthReadiness()).resolves.toEqual(session)
+    expect(mocks.save).toHaveBeenCalledWith(session)
+    mocks.session.mockReturnValue(session)
+    await expect(client.revalidateFirebaseSessionOnBoot()).resolves.toEqual(session)
+  })
+
+  it('no boot limpa sessão rejeitada uma vez, sem loop', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: false, status: 401, text: async () => '' } as Response)
+    const client = await import('../firebase-client')
+    await expect(client.revalidateFirebaseSessionOnBoot()).resolves.toBeNull()
+    expect(mocks.save).toHaveBeenCalledTimes(1)
+    expect(mocks.save).toHaveBeenCalledWith(null)
+  })
+
+  it('no boot mantém sessão salva em falha de rede', async () => {
+    mocks.auth.mockReturnValue({ currentUser: null })
+    vi.mocked(fetch).mockRejectedValue(new Error('offline'))
+    const client = await import('../firebase-client')
+    await expect(client.revalidateFirebaseSessionOnBoot()).resolves.toBeNull()
+    expect(fetch).toHaveBeenCalledWith('https://api.example.org/v1/custom/auth/firebase-session', expect.objectContaining({ headers: { authorization: 'Bearer api-token', 'X-Tenant': 'piano' } }))
+    expect(mocks.save).not.toHaveBeenCalled()
   })
 })
