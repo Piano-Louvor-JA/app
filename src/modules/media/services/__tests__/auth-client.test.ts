@@ -96,4 +96,18 @@ describe('auth-client', () => {
     localStorage.setItem(SESSION_KEY, '{{{')
     expect(getAuthSession()).toBeNull()
   })
+
+  it('saveSession mantém sessão válida após reload', async () => {
+    const { saveSession } = await import('../auth-client')
+    const session = { token: 'persisted-token', user: { id_user: 9, email: 'a@b.c', displayName: 'Rafael' } }
+    saveSession(session)
+    expect(getAuthSession()).toEqual(session)
+  })
+
+  it('saveSession nunca persiste placeholder', async () => {
+    const { saveSession } = await import('../auth-client')
+    saveSession({ token: 'fake', user: { id_user: 0, email: '', displayName: '' } })
+    expect(getAuthSession()).toBeNull()
+    expect(localStorage.getItem(SESSION_KEY)).toBeNull()
+  })
 })

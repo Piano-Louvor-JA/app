@@ -10,11 +10,6 @@ import PalcoRouteSelect from '@modules/settings/components/PalcoRouteSelect.vue'
 import type { LibraryAlbum } from '@modules/sync/types/library'
 import { getShowCustomCollections, setShowCustomCollections } from '../visibility'
 import AlbumCollectionCard from '../components/AlbumCollectionCard.vue'
-import {
-  createCustomCollection,
-  listCustomCollections,
-  type CustomCollectionSummary,
-} from '@modules/media/services/custom-catalog'
 import AlbumHymnalCard from '../components/AlbumHymnalCard.vue'
 import AlbumLyricDialog from '../components/AlbumLyricDialog.vue'
 import AlbumPlaylistPickerDialog from '../components/AlbumPlaylistPickerDialog.vue'
@@ -207,38 +202,6 @@ watch(
   { immediate: true },
 )
 
-const customModalOpen = ref(false)
-const customCollections = ref<CustomCollectionSummary[]>([])
-const isLoadingCustomCollections = ref(false)
-const newCustomCollectionName = ref('')
-
-async function hydrateCustomCollections(): Promise<void> {
-  if (isLoadingCustomCollections.value) return
-  isLoadingCustomCollections.value = true
-  try {
-    customCollections.value = await listCustomCollections()
-  } catch {
-    customCollections.value = []
-  } finally {
-    isLoadingCustomCollections.value = false
-  }
-}
-
-watch(customModalOpen, (open) => {
-  if (open) void hydrateCustomCollections()
-})
-
-async function onCreateCustomCollection(): Promise<void> {
-  const name = newCustomCollectionName.value.trim()
-  if (!name) return
-  const created = await createCustomCollection(name)
-  newCustomCollectionName.value = ''
-  if (created) {
-    await hydrateCatalog()
-    await hydrateCustomCollections()
-  }
-}
-
 function showImportFeedback(message: string) {
   importFeedback.value = message
   setTimeout(() => {
@@ -391,20 +354,6 @@ async function runAction(
             v-if="playlists.length > 0"
             class="albums-view__toolbar-count"
           >{{ playlists.length }}</span>
-        </button>
-        <button
-          v-if="showCustomCollections"
-          type="button"
-          class="albums-view__toolbar-btn"
-          :aria-label="t('albums.custom.title')"
-          @click="customModalOpen = true"
-        >
-          <i class="ti ti-folder" aria-hidden="true" />
-          {{ t('albums.custom.title') }}
-          <span
-            v-if="customCollections.length > 0"
-            class="albums-view__toolbar-count"
-          >{{ customCollections.length }}</span>
         </button>
         <button
           type="button"
@@ -650,68 +599,6 @@ async function runAction(
       </div>
     </Teleport>
 
-
-
-    <!-- Modal: Minhas Coletâneas (oculto enquanto SHOW_CUSTOM_COLLECTIONS=false) -->
-    <Teleport to="body">
-      <div
-        v-if="showCustomCollections && customModalOpen"
-        class="albums-view__modal"
-        role="dialog"
-        aria-modal="true"
-        :aria-label="t('albums.custom.title')"
-      >
-        <div
-          class="albums-view__modal-backdrop"
-          aria-hidden="true"
-          @click="customModalOpen = false"
-        />
-        <GlassCard class="albums-view__modal-panel">
-          <header class="albums-view__playlists-header">
-            <div class="albums-view__playlists-heading">
-              <i class="ti ti-folder" aria-hidden="true" />
-              <h2>{{ t('albums.custom.title') }}</h2>
-            </div>
-            <button
-              type="button"
-              class="albums-view__playlists-io"
-              :aria-label="t('albums.lyric.close')"
-              @click="customModalOpen = false"
-            >
-              <i class="ti ti-x" aria-hidden="true" />
-            </button>
-          </header>
-
-          <!-- A lista de coletâneas vive na própria página (cards) — o modal
-               é só criação rápida + atalhos, sem duplicar a lista. -->
-          <form class="albums-view__modal-form" @submit.prevent="onCreateCustomCollection">
-            <input
-              v-model="newCustomCollectionName"
-              required
-              :placeholder="t('albums.custom.newPlaceholder')"
-              :aria-label="t('albums.custom.newPlaceholder')"
-            >
-            <button type="submit">
-              <i class="ti ti-plus" aria-hidden="true" /> {{ t('albums.custom.create') }}
-            </button>
-          </form>
-
-          <footer class="albums-view__modal-footer">
-            <button
-              type="button"
-              class="albums-view__editor-btn"
-              :aria-label="t('albums.custom.openEditor')"
-              :title="t('albums.custom.openEditor')"
-              @click="router.push('/media/editor')"
-            >
-              <i class="ti ti-pencil" aria-hidden="true" />
-              {{ t('albums.custom.openEditor') }}
-            </button>
-          </footer>
-        </GlassCard>
-      </div>
-    </Teleport>
-
     <template v-if="isHubSearching">
       <GlassCard
         class="albums-view__results-card"
@@ -794,18 +681,6 @@ async function runAction(
               {{ categorySubtitle(category) }}
             </p>
           </div>
-          <button
-            v-if="showCustomCollections && isCustomCategory(category)"
-            type="button"
-            class="albums-view__editor-btn"
-            @click="router.push('/media/editor')"
-          >
-            <i
-              class="ti ti-pencil"
-              aria-hidden="true"
-            />
-            {{ t('albums.custom.openEditor') }}
-          </button>
         </header>
 
         <div
@@ -1306,51 +1181,6 @@ async function runAction(
     &:hover {
       filter: brightness(1.1);
     }
-  }
-}
-
-.albums-view__modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  padding-top: 0.25rem;
-  border-top: 1px solid var(--ds-color-outline, rgba(255, 255, 255, 0.06));
-}
-
-.albums-view__custom-editor-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  border: 1px solid var(--ds-color-outline-strong);
-  border-radius: 999px;
-  padding: 0.4rem 0.85rem;
-  background: transparent;
-  color: var(--ds-color-on-surface);
-  font: inherit;
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: background 120ms ease;
-
-  &:hover {
-    background: color-mix(in srgb, var(--ds-color-primary) 18%, transparent);
-  }
-}
-
-.albums-view__editor-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0.5rem 0.9rem;
-  border: 1px solid var(--ds-color-outline-strong, rgba(255, 255, 255, 0.1));
-  border-radius: var(--ds-radius-md, 12px 0 12px 0);
-  background: color-mix(in srgb, var(--ds-color-surface-card, #242424) 70%, transparent);
-  color: var(--ds-color-on-surface, #e5e2e1);
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: border-color 150ms ease, color 150ms ease;
-
-  &:hover {
-    border-color: var(--ds-color-primary, #2196f3);
-    color: var(--ds-color-primary, #2196f3);
   }
 }
 
