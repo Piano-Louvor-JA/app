@@ -4,8 +4,8 @@ import { createPinia, setActivePinia } from 'pinia'
 import Dialog from '../components/LiturgyScheduledDialog.vue'
 import { useScheduledStore } from '../stores/useScheduledStore'
 
-const mocks = vi.hoisted(() => ({ bridge: vi.fn(), catalog: vi.fn(), episodes: vi.fn() }))
-vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
+const mocks = vi.hoisted(() => ({ bridge: vi.fn(), catalog: vi.fn(), episodes: vi.fn(), locale: { value: 'pt-BR' } }))
+vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key, locale: mocks.locale }) }))
 vi.mock('@design-system/index', () => ({ GlassCard: { template: '<section><slot /></section>' } }))
 vi.mock('@shared/services/desktop-bridge', () => ({ getDesktopBridge: mocks.bridge }))
 vi.mock('@shared/services/user-preferences', () => ({ getUserPreference: (_key: string, fallback: unknown) => fallback, setUserPreference: vi.fn() }))
