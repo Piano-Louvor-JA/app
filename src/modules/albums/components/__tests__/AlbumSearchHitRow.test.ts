@@ -63,6 +63,17 @@ describe('AlbumSearchHitRow', () => {
     expect(w.emitted('sung')).toHaveLength(1)
   })
 
+  it('botão playlist emite playlist sem disparar sung e desabilita ocupado', async () => {
+    const w = mountRow()
+    const button = w.find('.album-search-hit__playlist')
+    expect(button.attributes('aria-label')).toBe('common.addToPlaylist')
+    expect(button.find('.ti-playlist-add').exists()).toBe(true)
+    await button.trigger('click')
+    expect(w.emitted('playlist')).toHaveLength(1)
+    expect(w.emitted('sung')).toBeUndefined()
+    expect(mountRow({ busy: true }).find('.album-search-hit__playlist').attributes('disabled')).toBeDefined()
+  })
+
   it('enter e espaço no teclado emitem sung', async () => {
     const w = mountRow()
     await w.find('.album-search-hit').trigger('keydown.enter')

@@ -191,6 +191,7 @@ vi.mock('../../components/AlbumSearchHitRow.vue', () => ({
       <button class="hr-playlist" @click="$emit('playlist')" />
       <button class="hr-sung" @click="$emit('sung')" />
       <button class="hr-lyric" @click="$emit('lyric')" />
+      <button class="hr-playlist" @click="$emit('playlist')" />
     </div>`,
   },
 }))
@@ -335,12 +336,13 @@ describe('AlbumsView', () => {
     expect(w.find('.collection-card-stub').exists()).toBe(true)
   })
 
-  it('categoria custom: editor btn e título default', async () => {
+  it('categoria custom: título default e SEM botão editor (criar/editar saiu pra /community)', async () => {
     setState({
       categories: [...categories, { id: 'custom', name: 'Minhas Coletâneas', collections: [] }],
     })
     const w = await mountView()
     expect(w.findAll('.albums-view__category-title')[2]!.text()).toContain('Minhas Coletâneas')
+    expect(w.find('.albums-view__editor-btn').exists()).toBe(false)
   })
 
   it('hub search: resultados renderizam e ações disparam play/open lyric', async () => {
@@ -351,6 +353,20 @@ describe('AlbumsView', () => {
     await w.find('.hr-sung').trigger('click')
     await flushPromises()
     void w.find('.hr-lyric')
+  })
+
+  it('hub search: playlist do hit abre picker, adiciona e mostra toast', async () => {
+    setState({ isHubSearching: true, hubResults: hits })
+    const w = await mountView()
+    await w.find('.hr-playlist').trigger('click')
+    const pickerInBody = () => body().querySelector('.playlist-picker')
+    expect(pickerInBody()).not.toBeNull()
+    ;(pickerInBody()!.querySelector('.playlist-picker__option') as HTMLElement).click()
+    await flushPromises()
+    expect(pickerInBody()).toBeNull()
+    expect(body().querySelector('.playlist-toast')).not.toBeNull()
+    expect(body().querySelector('.playlist-toast')!.textContent).toContain('adicionada')
+    expect(listPlaylists().find((p) => p.id === 'pl-1')!.items.some((i) => i.musicId === 1)).toBe(true)
   })
 
   it('toggle visibilidade de coletâneas custom persiste preferência', async () => {
@@ -425,21 +441,14 @@ describe('AlbumsView', () => {
     expect(minimizeMock).toHaveBeenCalledOnce()
   })
 
-  it('modal custom: abre, hydrate lista, fechar backdrop', async () => {
-    customCatalogMock.listCustomCollections.mockResolvedValueOnce([
-      { id: 3, name: 'Louvor jovem' },
-    ])
+  it('sem botão "Minhas Coletâneas" no toolbar nem modal custom (criação saiu pra /community)', async () => {
     const w = await mountView()
-    const btn = w.findAll('button').find((b) => b.attributes('aria-label') === 'albums.custom.title')
-    expect(btn).toBeDefined()
-    await btn!.trigger('click')
-    await flushPromises()
-    expect(customCatalogMock.listCustomCollections).toHaveBeenCalled()
-    expect(body().querySelector('.albums-view__modal')).not.toBeNull()
-    // fechar
-    ;(body().querySelector('.albums-view__modal-backdrop') as HTMLElement).click()
-    await flushPromises()
+    expect(w.findAll('button').find((b) => b.attributes('aria-label') === 'albums.custom.title')).toBeUndefined()
     expect(body().querySelector('.albums-view__modal')).toBeNull()
+    // olho de visibilidade continua
+    const toggle = w.findAll('.albums-view__header-actions button').find((b) =>
+      b.attributes('aria-label') === 'albums.custom.hide' || b.attributes('aria-label') === 'albums.custom.show')
+    expect(toggle).toBeDefined()
   })
 
   it('remoção de coletânea: requestRemove abre confirm (teleport body); dismiss e confirm', async () => {
@@ -573,25 +582,11 @@ describe('AlbumsView', () => {
     expect(body().querySelector('.albums-view__playlists-feedback')!.textContent).toContain('inválido')
   })
 
-  it('criar coletânea custom pelo modal com nome; nome vazio não chama API', async () => {
-    customCatalogMock.createCustomCollection.mockResolvedValueOnce({ id: 9, name: 'Jovem' })
+  it('digitar/submitar não tem mais form de criação custom (createCustomCollection não é chamado)', async () => {
     const w = await mountView()
-    await w.findAll('button').find((b) => b.attributes('aria-label') === 'albums.custom.title')!.trigger('click')
-    await flushPromises()
-    const form = body().querySelector('.albums-view__modal-form') as HTMLFormElement
-    const nameInput = form.querySelector('input') as HTMLInputElement
-    // nome vazio: não chama
-    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
-    await flushPromises()
+    expect(body().querySelector('.albums-view__modal-form')).toBeNull()
     expect(customCatalogMock.createCustomCollection).not.toHaveBeenCalled()
-    // com nome: cria e re-hydrata
-    nameInput.value = 'Jovem'
-    nameInput.dispatchEvent(new Event('input', { bubbles: true }))
-    await flushPromises()
-    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
-    await flushPromises()
-    expect(customCatalogMock.createCustomCollection).toHaveBeenCalledWith('Jovem')
-    expect(customCatalogMock.listCustomCollections).toHaveBeenCalledTimes(2)
+    w.unmount()
   })
 
   it('openCustomCollection navega pro id custom', async () => {

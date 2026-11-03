@@ -59,6 +59,8 @@ export default {
     },
     trackCount: '{count} pistas',
     playAll: 'Reproducir todo',
+    appendQueue: 'Añadir a la cola',
+    appendedToQueue: 'Colección añadida a la cola',
     loading: 'Cargando…',
     retry: 'Intentar de nuevo',
     dismiss: 'Descartar',

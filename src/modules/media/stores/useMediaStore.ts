@@ -4,6 +4,7 @@ import { computed, ref } from 'vue'
 
 import { loadProjectionSettings } from '@modules/settings/services/projection-preferences'
 import {
+  appendQueueToQueue,
   type QueueItem,
   resolveNext,
   resolvePrevious,
@@ -928,6 +929,15 @@ export const useMediaStore = defineStore('media', () => {
     queueShuffled.value = false
   }
 
+  /** Acrescenta à fila sem alterar a reprodução atual. */
+  function appendQueue(items: QueueItem[]): void {
+    const next = appendQueueToQueue(queue.value, items, queueIndex.value)
+    originalQueue = [...originalQueue, ...next.items.slice(queue.value.length)]
+    queue.value = next.items
+    queueIndex.value = next.index
+    if (items.length > 0) queueLabel.value = null
+  }
+
   function nextTrack(): void {
     const item = resolveNext({ items: queue.value, index: queueIndex.value })
     if (item) void playQueueItem(item)
@@ -1419,6 +1429,7 @@ export const useMediaStore = defineStore('media', () => {
     moveQueueItem,
     queueShuffled,
     playAlbumQueue,
+    appendQueue,
     playQueueItem,
     nextTrack,
     jumpToQueue,

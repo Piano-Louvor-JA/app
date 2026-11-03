@@ -336,6 +336,20 @@ function playSungFromRow() {
   opacity: 0.35;
 }
 
+.album-search-hit__playlist {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.35rem;
+  background: transparent;
+  color: var(--ds-color-primary);
+  cursor: pointer;
+}
+
+.album-search-hit__playlist:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
 .album-search-hit__actions {
   position: relative;
   z-index: 6;

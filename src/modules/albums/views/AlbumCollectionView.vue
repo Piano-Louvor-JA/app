@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import PlaylistPicker from '../components/PlaylistPicker.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -10,6 +9,7 @@ import { useMinimizablePage } from '@shared/composables/useMinimizablePage'
 import { useProgressiveList } from '@shared/composables/useProgressiveList'
 
 import AlbumLyricDialog from '../components/AlbumLyricDialog.vue'
+import AlbumPlaylistPickerDialog from '../components/AlbumPlaylistPickerDialog.vue'
 import AlbumTrackRow from '../components/AlbumTrackRow.vue'
 import { useAlbums } from '../composables/useAlbums'
 import {
@@ -40,6 +40,7 @@ const {
   playInstrumental,
   playSlides,
   playAllInActiveCollection,
+  appendActiveCollectionToQueue,
   openLyric,
   closeLyric,
 } = useAlbums()
@@ -236,6 +237,17 @@ async function runAction(
           @click="playAllInActiveCollection()">
           <i class="ti ti-player-play" aria-hidden="true" />
         </button>
+        <button
+          v-if="activeCollection?.kind !== 'hymnal'"
+          type="button"
+          class="album-collection-view__append-queue"
+          :aria-label="t('albums.appendQueue')"
+          :title="t('albums.appendQueue')"
+          @click="appendActiveCollectionToQueue().then((added) => added && showPlaylistFeedback(t('albums.appendedToQueue')))"
+        >
+          <i class="ti ti-playlist-add" aria-hidden="true" />
+          {{ t('albums.appendQueue') }}
+        </button>
       </div>
     </header>
 
@@ -320,7 +332,12 @@ async function runAction(
       </Transition>
     </Teleport>
 
-    <PlaylistPicker :playlist-item="playlistItem" :playlists="playlists" @close="closePlaylistPicker" @choose="addToPlaylist" />
+    <AlbumPlaylistPickerDialog
+      :item="playlistItem"
+      :playlists="playlists"
+      @close="closePlaylistPicker"
+      @select="addToPlaylist"
+    />
 
     <AlbumLyricDialog
       :open="lyricOpen"
@@ -360,26 +377,32 @@ async function runAction(
 
 .album-collection-view__playback-actions {
   display: inline-flex;
-  gap: 0.4rem;
+  align-items: center;
+  gap: 0.5rem;
   margin-left: auto;
 }
 .album-collection-view__play-all,
-.album-collection-view__shuffle {
+.album-collection-view__shuffle,
+.album-collection-view__append-queue {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.2rem;
-  height: 2.2rem;
+  gap: 0.4rem;
+  min-width: 2.2rem;
+  min-height: 2.2rem;
+  padding: 0.45rem 0.65rem;
   border: 1px solid color-mix(in srgb, var(--ds-color-primary) 45%, transparent);
   border-radius: var(--ds-radius-sm, 8px 0 8px 0);
   background: transparent;
   color: var(--ds-color-primary);
+  font: inherit;
   font-size: 0.95rem;
   cursor: pointer;
   transition: background-color 160ms ease, color 160ms ease;
 }
 .album-collection-view__play-all:hover,
-.album-collection-view__shuffle:hover {
+.album-collection-view__shuffle:hover,
+.album-collection-view__append-queue:hover {
   background: var(--ds-color-primary);
   color: var(--ds-color-on-primary);
 }

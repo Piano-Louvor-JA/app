@@ -100,6 +100,7 @@ vi.mock('../../composables/useAlbums', async () => {
         playInstrumental: vi.fn(async () => true),
         playSlides: vi.fn(async () => true),
         playAllInActiveCollection: mocks.playAll ?? (async () => true),
+        appendActiveCollectionToQueue: mocks.appendActiveCollectionToQueue ?? (async () => true),
         openLyric: vi.fn(async () => true),
         closeLyric: vi.fn(),
       }
@@ -362,6 +363,19 @@ describe('AlbumCollectionView', () => {
     w.unmount()
     await flushPromises()
     // sem throw
+  })
+
+  it('botão append-queue adiciona à fila e mostra toast appendedToQueue', async () => {
+    const appendMock = vi.fn(async () => true)
+    setupMocks({ appendActiveCollectionToQueue: appendMock })
+    const w = await mountView()
+    const btn = w.find('.album-collection-view__append-queue')
+    expect(btn.exists()).toBe(true)
+    await btn.trigger('click')
+    await flushPromises()
+    expect(appendMock).toHaveBeenCalledTimes(1)
+    expect(document.body.querySelector('.playlist-toast')!.textContent).toContain('albums.appendedToQueue')
+    w.unmount()
   })
 
   it('acao instrumental/slides/lyric das linhas disparam runAction', async () => {

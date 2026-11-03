@@ -11,23 +11,18 @@ import { useMinimizablePage } from '@shared/composables/useMinimizablePage'
 import type { LibraryAlbum } from '@modules/sync/types/library'
 import { getShowCustomCollections, setShowCustomCollections } from '../visibility'
 import AlbumCollectionCard from '../components/AlbumCollectionCard.vue'
-import {
-  createCustomCollection,
-  listCustomCollections,
-  type CustomCollectionSummary,
-} from '@modules/media/services/custom-catalog'
 import AppConfirm from '@shared/components/AppConfirm.vue'
 import AlbumHymnalCard from '../components/AlbumHymnalCard.vue'
 import AlbumLyricDialog from '../components/AlbumLyricDialog.vue'
-import PlaylistPicker from '../components/PlaylistPicker.vue'
+import AlbumPlaylistPickerDialog from '../components/AlbumPlaylistPickerDialog.vue'
 import AlbumSearchHitRow from '../components/AlbumSearchHitRow.vue'
 import DownloadFailureDialog from '@modules/sync/components/DownloadFailureDialog.vue'
 import { filterAlbumMusicIndex } from '../services/album-music-search'
 import { useAlbums } from '../composables/useAlbums'
 import type { AlbumCategory, AlbumCollection, AlbumSearchHit } from '../types/albums'
 import {
-  createPlaylist,
   addPlaylistItem,
+  createPlaylist,
   type PlaylistItem,
   deletePlaylist,
   renamePlaylist,
@@ -52,10 +47,6 @@ onBeforeUnmount(() => clearTimeout(searchPlaylistFeedbackTimer))
 function searchArtwork(hit: AlbumSearchHit) {
   return categories.value.flatMap(category => category.collections)
     .find(collection => hit.albumNames.split(',').some(name => name.trim() === collection.name))?.coverUrl ?? null
-}
-function openSearchPlaylist(hit: AlbumSearchHit) {
-  playlists.value = listPlaylists()
-  searchPlaylistItem.value = { musicId: hit.musicId, albumId: null, title: hit.name }
 }
 function addSearchTrackToPlaylist(id: string) {
   const item = searchPlaylistItem.value
@@ -164,7 +155,37 @@ async function onSearchKeydown(event: KeyboardEvent) {
 }
 
 const busyMusicId = ref<number | null>(null)
+const playlistItem = ref<PlaylistItem | null>(null)
+const playlistFeedback = ref('')
 const albumPendingRemoval = ref<LibraryAlbum | null>(null)
+
+let playlistFeedbackTimer: ReturnType<typeof setTimeout> | null = null
+
+onBeforeUnmount(() => {
+  if (playlistFeedbackTimer) clearTimeout(playlistFeedbackTimer)
+})
+
+function closePlaylistPicker() {
+  playlistItem.value = null
+}
+
+function openPlaylistPicker(hit: { musicId: number; name: string }) {
+  playlistItem.value = { musicId: hit.musicId, albumId: null, title: hit.name }
+}
+
+function addToPlaylist(id: string) {
+  const item = playlistItem.value
+  if (!item) return
+  const target = playlists.value.find((playlist) => playlist.id === id)
+  const result = addPlaylistItem(id, item)
+  playlists.value = listPlaylists()
+  playlistItem.value = null
+  playlistFeedback.value = result?.added
+    ? `“${item.title}” adicionada a “${target?.name ?? 'playlist'}”`
+    : `“${item.title}” já está em “${target?.name ?? 'playlist'}”`
+  if (playlistFeedbackTimer) clearTimeout(playlistFeedbackTimer)
+  playlistFeedbackTimer = setTimeout(() => { playlistFeedback.value = '' }, 2600)
+}
 
 const showDownloadControls = computed(() => isDesktop)
 
@@ -255,38 +276,6 @@ watch(
   },
   { immediate: true },
 )
-
-const customModalOpen = ref(false)
-const customCollections = ref<CustomCollectionSummary[]>([])
-const isLoadingCustomCollections = ref(false)
-const newCustomCollectionName = ref('')
-
-async function hydrateCustomCollections(): Promise<void> {
-  if (isLoadingCustomCollections.value) return
-  isLoadingCustomCollections.value = true
-  try {
-    customCollections.value = await listCustomCollections()
-  } catch {
-    customCollections.value = []
-  } finally {
-    isLoadingCustomCollections.value = false
-  }
-}
-
-watch(customModalOpen, (open) => {
-  if (open) void hydrateCustomCollections()
-})
-
-async function onCreateCustomCollection(): Promise<void> {
-  const name = newCustomCollectionName.value.trim()
-  if (!name) return
-  const created = await createCustomCollection(name)
-  newCustomCollectionName.value = ''
-  if (created) {
-    await hydrateCatalog()
-    await hydrateCustomCollections()
-  }
-}
 
 function showImportFeedback(message: string) {
   importFeedback.value = message
@@ -535,20 +524,6 @@ async function runAction(
             v-if="playlists.length > 0"
             class="albums-view__toolbar-count"
           >{{ playlists.length }}</span>
-        </button>
-        <button
-          v-if="showCustomCollections"
-          type="button"
-          class="albums-view__toolbar-btn"
-          :aria-label="t('albums.custom.title')"
-          @click="customModalOpen = true"
-        >
-          <i class="ti ti-folder" aria-hidden="true" />
-          {{ t('albums.custom.title') }}
-          <span
-            v-if="customCollections.length > 0"
-            class="albums-view__toolbar-count"
-          >{{ customCollections.length }}</span>
         </button>
         <button
           type="button"
@@ -855,68 +830,6 @@ async function runAction(
       </div>
     </Teleport>
 
-
-
-    <!-- Modal: Minhas Coletâneas (oculto enquanto SHOW_CUSTOM_COLLECTIONS=false) -->
-    <Teleport to="body">
-      <div
-        v-if="showCustomCollections && customModalOpen"
-        class="albums-view__modal"
-        role="dialog"
-        aria-modal="true"
-        :aria-label="t('albums.custom.title')"
-      >
-        <div
-          class="albums-view__modal-backdrop"
-          aria-hidden="true"
-          @click="customModalOpen = false"
-        />
-        <GlassCard class="albums-view__modal-panel">
-          <header class="albums-view__playlists-header">
-            <div class="albums-view__playlists-heading">
-              <i class="ti ti-folder" aria-hidden="true" />
-              <h2>{{ t('albums.custom.title') }}</h2>
-            </div>
-            <button
-              type="button"
-              class="albums-view__playlists-io"
-              :aria-label="t('albums.lyric.close')"
-              @click="customModalOpen = false"
-            >
-              <i class="ti ti-x" aria-hidden="true" />
-            </button>
-          </header>
-
-          <!-- A lista de coletâneas vive na própria página (cards) — o modal
-               é só criação rápida + atalhos, sem duplicar a lista. -->
-          <form class="albums-view__modal-form" @submit.prevent="onCreateCustomCollection">
-            <input
-              v-model="newCustomCollectionName"
-              required
-              :placeholder="t('albums.custom.newPlaceholder')"
-              :aria-label="t('albums.custom.newPlaceholder')"
-            >
-            <button type="submit">
-              <i class="ti ti-plus" aria-hidden="true" /> {{ t('albums.custom.create') }}
-            </button>
-          </form>
-
-          <footer class="albums-view__modal-footer">
-            <button
-              type="button"
-              class="albums-view__editor-btn"
-              :aria-label="t('albums.custom.openEditor')"
-              :title="t('albums.custom.openEditor')"
-              @click="router.push('/media/editor')"
-            >
-              <i class="ti ti-pencil" aria-hidden="true" />
-              {{ t('albums.custom.openEditor') }}
-            </button>
-          </footer>
-        </GlassCard>
-      </div>
-    </Teleport>
-
     <template v-if="isHubSearching">
       <GlassCard
         class="albums-view__results-card"
@@ -964,13 +877,13 @@ async function runAction(
             @focus="selectedSearchIndex = index"
             :artwork-url="searchArtwork(hit)"
             :busy="busyMusicId === hit.musicId"
-            @playlist="openSearchPlaylist(hit)"
             @sung="runAction(hit.musicId, () => playSung(hit.musicId))"
             @instrumental="
               runAction(hit.musicId, () => playInstrumental(hit.musicId))
             "
             @slides="runAction(hit.musicId, () => playSlides(hit.musicId))"
             @lyric="runAction(hit.musicId, () => openLyric(hit.musicId))"
+            @playlist="openPlaylistPicker(hit)"
           />
         </div>
       </GlassCard>
@@ -1011,18 +924,6 @@ async function runAction(
               {{ categorySubtitle(category) }}
             </p>
           </div>
-          <button
-            v-if="showCustomCollections && isCustomCategory(category)"
-            type="button"
-            class="albums-view__editor-btn"
-            @click="router.push('/media/editor')"
-          >
-            <i
-              class="ti ti-pencil"
-              aria-hidden="true"
-            />
-            {{ t('albums.custom.openEditor') }}
-          </button>
         </header>
 
         <div
@@ -1065,8 +966,22 @@ async function runAction(
       </section>
     </div>
 
-    <PlaylistPicker :playlist-item="searchPlaylistItem" :playlists="playlists" @close="searchPlaylistItem = null" @choose="addSearchTrackToPlaylist" />
-    <p v-if="searchPlaylistFeedback" class="albums-view__playlist-feedback" role="status">{{ searchPlaylistFeedback }}</p>
+    <Teleport to="body">
+      <Transition name="playlist-toast">
+        <div v-if="playlistFeedback" class="playlist-toast" role="status" aria-live="polite">
+          <i class="ti ti-circle-check" aria-hidden="true" />
+          {{ playlistFeedback }}
+        </div>
+      </Transition>
+    </Teleport>
+
+    <AlbumPlaylistPickerDialog
+      :item="playlistItem"
+      :playlists="playlists"
+      @close="closePlaylistPicker"
+      @select="addToPlaylist"
+    />
+
     <AlbumLyricDialog
       :open="lyricOpen"
       :loading="isLoadingLyric"
@@ -1176,6 +1091,25 @@ async function runAction(
   .albums-view__results-list { flex: 1 1 auto; }
 }
 .albums-view__playlist-feedback { position:fixed; bottom:6rem; left:50%; transform:translateX(-50%); max-width:90vw; z-index:1200; padding:.8rem 1rem; border:1px solid var(--ds-color-outline); border-radius:.7rem; background:var(--ds-color-surface,#202020); color:var(--ds-color-on-surface); box-shadow:0 8px 24px #0005; }
+.playlist-toast {
+  position: fixed;
+  bottom: calc(var(--ds-dock-height, 4rem) + 1.25rem);
+  left: 50%;
+  z-index: 1200;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  transform: translateX(-50%);
+  padding: 0.7rem 1.1rem;
+  border: 1px solid color-mix(in srgb, var(--ds-color-primary, #2196f3) 35%, transparent);
+  border-radius: var(--ds-radius-md, 12px 0 12px 0);
+  background: var(--ds-color-surface-elevated, #1e1e1e);
+  color: var(--ds-color-on-surface, #e5e2e1);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 45%);
+}
+.playlist-toast .ti { color: var(--ds-color-primary, #2196f3); }
+.playlist-toast-enter-active, .playlist-toast-leave-active { transition: opacity .28s ease, transform .28s ease; }
+.playlist-toast-enter-from, .playlist-toast-leave-to { opacity: 0; transform: translateX(-50%) translateY(.6rem); }
 
 .albums-view {
   position: relative;
@@ -1541,51 +1475,6 @@ async function runAction(
     &:hover {
       filter: brightness(1.1);
     }
-  }
-}
-
-.albums-view__modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  padding-top: 0.25rem;
-  border-top: 1px solid var(--ds-color-outline, rgba(255, 255, 255, 0.06));
-}
-
-.albums-view__custom-editor-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  border: 1px solid var(--ds-color-outline-strong);
-  border-radius: 999px;
-  padding: 0.4rem 0.85rem;
-  background: transparent;
-  color: var(--ds-color-on-surface);
-  font: inherit;
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: background 120ms ease;
-
-  &:hover {
-    background: color-mix(in srgb, var(--ds-color-primary) 18%, transparent);
-  }
-}
-
-.albums-view__editor-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0.5rem 0.9rem;
-  border: 1px solid var(--ds-color-outline-strong, rgba(255, 255, 255, 0.1));
-  border-radius: var(--ds-radius-md, 12px 0 12px 0);
-  background: color-mix(in srgb, var(--ds-color-surface-card, #242424) 70%, transparent);
-  color: var(--ds-color-on-surface, #e5e2e1);
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: border-color 150ms ease, color 150ms ease;
-
-  &:hover {
-    border-color: var(--ds-color-primary, #2196f3);
-    color: var(--ds-color-primary, #2196f3);
   }
 }
 

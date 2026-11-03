@@ -98,6 +98,33 @@ for (const [name, method, path, ids, body] of [
 
 afterEach(() => vi.unstubAllGlobals())
 
+it('envia X-Tenant: piano em todas as rotas /v1/custom geradas', async () => {
+  const fetch = vi.fn().mockImplementation(() => Promise.resolve(new Response('{}')))
+  vi.stubGlobal('fetch', fetch)
+
+  const customEndpoints = endpoints.filter(({ path }) => path.startsWith('/v1/custom'))
+  for (const { call, args, path } of customEndpoints) {
+    const before = fetch.mock.calls.length
+    await call(...args)
+    const [, init] = fetch.mock.calls[before]! as [string, RequestInit]
+    expect(new Headers(init.headers).get('X-Tenant'), `${path}: ${JSON.stringify(init)}`).toBe('piano')
+  }
+
+  expect(fetch).toHaveBeenCalledTimes(customEndpoints.length)
+})
+
+it('preserva Authorization quando a rota gerada recebe Headers', async () => {
+  const fetch = vi.fn().mockImplementation(() => Promise.resolve(new Response('{}')))
+  vi.stubGlobal('fetch', fetch)
+
+  await custom.getV1CustomCollections({ headers: new Headers({ Authorization: 'Bearer token' }) })
+
+  const [, init] = fetch.mock.calls[0]! as [string, RequestInit]
+  const headers = new Headers(init.headers)
+  expect(headers.get('Authorization')).toBe('Bearer token')
+  expect(headers.get('X-Tenant')).toBe('piano')
+})
+
 it('mantém os valores públicos usados no protocolo e nos dados persistidos', () => {
   // Flags numéricas não podem virar boolean, nem enums traduzirem seus valores.
   expect([

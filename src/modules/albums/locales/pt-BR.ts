@@ -59,6 +59,8 @@ export default {
     },
     trackCount: '{count} faixas',
     playAll: 'Tocar tudo',
+    appendQueue: 'Adicionar à fila',
+    appendedToQueue: 'Coletânea adicionada à fila',
     loading: 'Carregando…',
     retry: 'Tentar novamente',
     dismiss: 'Descartar',

@@ -687,7 +687,7 @@ export function startPalcoBridge() {
       // Modo TV: isPlaying local não muda (player local fica pausado), mas o
       // status do store reflete o comando do operador (playing/paused).
       watch(
-        () => [media.status, media.session?.audioUrl] as const,
+        () => [media.status, media.audioRoute, media.hasSession, media.session?.audioUrl] as const,
         () => syncAudio(),
       ),
       watch(
