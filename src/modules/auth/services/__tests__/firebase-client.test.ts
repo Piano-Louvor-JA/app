@@ -126,6 +126,50 @@ describe('cliente Firebase e ponte da sessão', () => {
     expect(fetch).toHaveBeenCalledTimes(2)
   })
 
+  it('getAuthReadiness aguarda a revalidação antes de liberar request autenticada', async () => {
+    let resolveBridge!: (value: Response) => void
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(resolve => { resolveBridge = resolve })))
+    const client = await import('../firebase-client')
+    const readiness = client.getAuthReadiness()
+    let requestAfterReadiness = false
+    const request = (async () => {
+      await readiness
+      requestAfterReadiness = true
+    })()
+
+    await Promise.resolve()
+    expect(requestAfterReadiness).toBe(false)
+    resolveBridge({ ok: true, status: 200, text: async () => JSON.stringify(session) } as Response)
+    await expect(request).resolves.toBeUndefined()
+    expect(requestAfterReadiness).toBe(true)
+  })
+
+  it('getAuthReadiness compartilha a promise lazy concorrente', async () => {
+    const client = await import('../firebase-client')
+    const first = client.getAuthReadiness()
+    const second = client.getAuthReadiness()
+    expect(first).toBe(second)
+    await expect(first).resolves.toEqual(session)
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('getAuthReadiness preserva sessão em reload após save offline', async () => {
+    mocks.auth.mockReturnValue({ currentUser: null })
+    vi.mocked(fetch).mockRejectedValue(new Error('offline'))
+    const client = await import('../firebase-client')
+    await expect(client.getAuthReadiness()).resolves.toBeNull()
+    expect(mocks.save).not.toHaveBeenCalled()
+    expect(mocks.session).toHaveReturnedWith(session)
+  })
+
+  it('getAuthReadiness faz roundtrip save e reload', async () => {
+    const client = await import('../firebase-client')
+    await expect(client.getAuthReadiness()).resolves.toEqual(session)
+    expect(mocks.save).toHaveBeenCalledWith(session)
+    mocks.session.mockReturnValue(session)
+    await expect(client.revalidateFirebaseSessionOnBoot()).resolves.toEqual(session)
+  })
+
   it('no boot limpa sessão rejeitada uma vez, sem loop', async () => {
     vi.mocked(fetch).mockResolvedValue({ ok: false, status: 401, text: async () => '' } as Response)
     const client = await import('../firebase-client')

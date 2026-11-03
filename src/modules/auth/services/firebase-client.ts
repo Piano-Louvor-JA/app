@@ -26,6 +26,12 @@ import { getAuthSession, saveSession, type AuthSession } from '@modules/media/se
 
 let authInstance: Auth | null = null
 let bootRevalidation: Promise<AuthSession | null> | null = null
+let bootReadiness: Promise<AuthSession | null> | null = null
+
+/** Aguarda a revalidação inicial; a primeira chamada compartilha o coalescing do boot. */
+export function getAuthReadiness(): Promise<AuthSession | null> {
+  return bootReadiness ??= revalidateFirebaseSessionOnBoot()
+}
 
 function getFirebaseAuth(): Auth {
   if (!authInstance) {
@@ -114,6 +120,7 @@ async function exchangeFirebaseToken(token: string): Promise<{ session: AuthSess
 
 /** Revalida a sessão persistida no boot sem apagar dados durante falha de rede. */
 export function revalidateFirebaseSessionOnBoot(): Promise<AuthSession | null> {
+  if (bootReadiness) return bootReadiness
   if (bootRevalidation) return bootRevalidation
 
   bootRevalidation = (async () => {

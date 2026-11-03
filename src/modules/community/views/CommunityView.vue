@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { GlassCard } from "@design-system/index";
 import { getAuthSession } from "@modules/media/services/auth-client";
+import { getAuthReadiness } from "@modules/auth/services/firebase-client";
 
 import ReportDialog from "../components/ReportDialog.vue";
 import { storeToRefs } from "pinia";
@@ -89,6 +90,10 @@ const seasonalEvent = ref<SeasonalEventBanner | null>(null);
 
 async function load() {
 	isLoading.value = true;
+	await Promise.race([
+		getAuthReadiness(),
+		new Promise<void>(resolve => setTimeout(resolve, 8_000)),
+	]);
 	const [result, tasks, notifs, seasonal] = await Promise.all([
 		listCommunityCollectionsPage(page.value, PER_PAGE),
 		getWeeklyTasks(),

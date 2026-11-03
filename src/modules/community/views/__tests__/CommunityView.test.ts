@@ -40,6 +40,7 @@ const mocks = vi.hoisted(() => {
 		routerBack: vi.fn(),
 		routerPush: vi.fn(),
 		getSession: vi.fn(() => ({ token: "tok-123", user: { id: 4 } })),
+		getAuthReadiness: vi.fn(() => Promise.resolve<unknown>(null)),
 	};
 });
 
@@ -66,6 +67,9 @@ vi.mock("../../services/seasonal-event", () => ({
 }));
 vi.mock("@modules/media/services/auth-client", () => ({
 	getAuthSession: mocks.getSession,
+}));
+vi.mock("@modules/auth/services/firebase-client", () => ({
+	getAuthReadiness: mocks.getAuthReadiness,
 }));
 vi.mock("@design-system/index", () => ({
 	GlassCard: {
@@ -116,6 +120,7 @@ async function mountView() {
 describe("CommunityView — carregamento popula estado (regressão do bug do sino)", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		mocks.getAuthReadiness.mockResolvedValue(null);
 		mocks.getNotifications.mockResolvedValue(NOTIFS);
 		mocks.getSession.mockReturnValue({ token: "tok-123", user: { id: 4 } });
 	});
@@ -125,6 +130,37 @@ describe("CommunityView — carregamento popula estado (regressão do bug do sin
 		expect(wrapper.vm.notifications).toHaveLength(2);
 		expect(wrapper.vm.notifications[0].id).toBe(1);
 		expect(mocks.getNotifications).toHaveBeenCalledTimes(1);
+	});
+
+	it("aguarda authReadiness antes de carregar weekly tasks e notifications", async () => {
+		let release!: () => void;
+		mocks.getAuthReadiness.mockReturnValue(new Promise<void>(resolve => { release = resolve; }));
+		const wrapper = mount(CommunityView);
+		await flushPromises();
+
+		expect(mocks.getWeeklyTasks).not.toHaveBeenCalled();
+		expect(mocks.getNotifications).not.toHaveBeenCalled();
+
+		release();
+		await flushPromises();
+		await flushPromises();
+		expect(mocks.getWeeklyTasks).toHaveBeenCalledOnce();
+		expect(mocks.getNotifications).toHaveBeenCalledOnce();
+		wrapper.unmount();
+	});
+
+	it("timeout de authReadiness destrava o carregamento", async () => {
+		vi.useFakeTimers();
+		mocks.getAuthReadiness.mockReturnValue(new Promise<void>(() => {}));
+		const wrapper = mount(CommunityView);
+		await Promise.resolve();
+		expect(mocks.getWeeklyTasks).not.toHaveBeenCalled();
+
+		await vi.advanceTimersByTimeAsync(8_000);
+		expect(mocks.getWeeklyTasks).toHaveBeenCalledOnce();
+		expect(mocks.getNotifications).toHaveBeenCalledOnce();
+		wrapper.unmount();
+		vi.useRealTimers();
 	});
 
 	it("isLogged = true quando há sessão com token", async () => {

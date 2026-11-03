@@ -177,6 +177,25 @@ describe('rendererApiEnvFor — o que o vite injeta no renderer', () => {
     }
   })
 
+  it('test aceita API local (mock do E2E) em localhost ou 127.0.0.1', () => {
+    for (const value of ['http://localhost:3100/json_db', 'http://127.0.0.1:3100/json_db']) {
+      expect(rendererApiEnvFor({ PIANO_BUILD_PROFILE: 'test', VITE_URL_DATABASE: value }).VITE_URL_DATABASE)
+        .toBe(value)
+    }
+  })
+
+  it('test segue rejeitando PROD, vazio, relativo ou host remoto fora de STG', () => {
+    for (const value of [PROD, '', '/json_db', 'https://evil.example.org/json_db', 'http://localhost.evil.org/json_db']) {
+      expect(() => rendererApiEnvFor({ PIANO_BUILD_PROFILE: 'test', VITE_URL_DATABASE: value }))
+        .toThrow(/VITE_URL_DATABASE/)
+    }
+  })
+
+  it('homologation rejeita API local', () => {
+    expect(() => rendererApiEnvFor({ VITE_URL_DATABASE: 'http://localhost:3100/json_db' }))
+      .toThrow(/VITE_URL_DATABASE/)
+  })
+
   it('VITE_* explícito no env do processo vence o contrato', () => {
     const env = rendererApiEnvFor({
       PIANO_BUILD_PROFILE: 'release',
