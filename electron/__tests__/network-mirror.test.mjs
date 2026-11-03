@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { webcrypto } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { runInNewContext } from 'node:vm'
 import { expect, it, vi } from 'vitest'
@@ -14,7 +15,7 @@ function setup() {
     async addIceCandidate(value) { (this.candidates ||= []).push(value) }
     close() { this.closed = true }
   }
-  const context = { RTCPeerConnection: Peer, Map, Promise, Math, Date, console }
+  const context = { RTCPeerConnection: Peer, Map, Promise, Math, Date, console, crypto: webcrypto }
   context.globalThis = context
   runInNewContext(readFileSync(new URL('../palco/network-mirror.js', import.meta.url), 'utf8'), context)
   return { ...context.PianoNetworkMirror, peers }
@@ -84,4 +85,21 @@ it('unchecking a connection closes only its peer and keeps capture and other rec
   expect(peers[1].closed).not.toBe(true)
   expect(track.stop).not.toHaveBeenCalled()
   expect(send).toHaveBeenCalledExactlyOnceWith({ v: 2, type: 'video', action: 'stop' }, '0')
+})
+
+it('uses 128-bit random identifiers and rotates the session after stop', async () => {
+  const { createSender, createReceiver } = setup()
+  const send = vi.fn(async () => true)
+  const sender = createSender({ capture: async () => ({ getTracks: () => [] }), send })
+  await sender.start('0')
+  const first = send.mock.calls[0][0].mirrorSession
+  expect(first).toMatch(/^[0-9a-f]{32}$/)
+  await sender.stop()
+  await sender.start('0')
+  const second = send.mock.calls.at(-1)[0].mirrorSession
+  expect(second).toMatch(/^[0-9a-f]{32}$/)
+  expect(second).not.toBe(first)
+  const signal = vi.fn()
+  createReceiver({ send: signal, clear: vi.fn() }).start(second)
+  expect(signal.mock.calls[0][0].receiverId).toMatch(/^[0-9a-f]{32}$/)
 })

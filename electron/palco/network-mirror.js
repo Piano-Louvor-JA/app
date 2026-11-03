@@ -1,7 +1,11 @@
 /* Shared by the trusted Electron control bar and LAN receivers. Media stays
    peer-to-peer on the LAN; authenticated Palco sockets carry signaling only. */
 ;(function (root) {
-  function id() { return Date.now().toString(36) + Math.random().toString(36).slice(2) }
+  function id() {
+    var bytes = new Uint8Array(16)
+    root.crypto.getRandomValues(bytes)
+    return Array.from(bytes, function (value) { return value.toString(16).padStart(2, '0') }).join('')
+  }
   function peer() { return new RTCPeerConnection({ iceServers: [] }) }
   function createSender(options) {
     var sessionId = id(), stream = null, pending = null, generation = 0

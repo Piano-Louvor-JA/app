@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { createServer } from 'node:net'
+import { JSDOM } from 'jsdom'
 import { tmpdir } from 'node:os'
 import { expect, it, vi } from 'vitest'
 import WebSocket from 'ws'
@@ -190,7 +191,10 @@ it('the URL control bar projects to a selected connection without a physical mon
     await expect.poll(() => slot.status().clients).toBe(1)
     await sender.exposeFunction('slots', () => [slot.status()])
     await sender.exposeFunction('sendPalco', (message: any) => slot.send(message))
-    await sender.setContent(html.replace(/<script[\s\S]*?<\/script>/g, ''))
+    const fixture = new JSDOM(html)
+    fixture.window.document.querySelectorAll('script').forEach(script => script.remove())
+    await sender.setContent(fixture.serialize())
+    fixture.window.close()
     await sender.addScriptTag({ content: runtime })
     await sender.evaluate(() => {
       const api = window as any
@@ -241,7 +245,10 @@ it('image control starts locally and projects only to selected connections on re
     await expect.poll(() => slot.status().clients).toBe(1)
     await sender.exposeFunction('slots', () => [slot.status()])
     await sender.exposeFunction('sendPalco', (message: any) => slot.send(message))
-    await sender.setContent(html.replace(/<script[\s\S]*?<\/script>/g, ''))
+    const fixture = new JSDOM(html)
+    fixture.window.document.querySelectorAll('script').forEach(script => script.remove())
+    await sender.setContent(fixture.serialize())
+    fixture.window.close()
     await sender.addScriptTag({ content: runtime })
     await sender.evaluate(() => {
       const api = window as any
@@ -302,7 +309,10 @@ it('PDF control opens locally, allows receiver selection, and publishes only aft
     // Simulate a receiver without the newer frameSlide flag.
     await sender.exposeFunction('sendPalco', (message: any) => { const { frameSlide, ...legacyMessage } = message; slot.send(legacyMessage) })
     await sender.exposeFunction('servePng', (name: string, mime: string, base64: string) => slot.serveMediaBase64(name, mime, base64)?.replace(/http:\/\/[^:]+:/, 'http://127.0.0.1:'))
-    await sender.setContent(html.replace(/<script[\s\S]*?<\/script>/g, ''))
+    const fixture = new JSDOM(html)
+    fixture.window.document.querySelectorAll('script').forEach(script => script.remove())
+    await sender.setContent(fixture.serialize())
+    fixture.window.close()
     await sender.evaluate(() => {
       const api = window as any; api.slide = 0; api.captures = 0
       api.louvorja = { displays: { list: async () => [] }, projection: {

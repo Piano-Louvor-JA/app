@@ -98,7 +98,7 @@ it('sizes the YouTube iframe to cover the receiver viewport rather than its defa
   const { readFileSync } = await import('node:fs')
   const { JSDOM } = await import('jsdom')
   const html = readFileSync(new URL('../palco/receiver.html', import.meta.url), 'utf8')
-  const dom = new JSDOM(html.replace(/<script[\s\S]*?<\/script>/g, ''))
+  const dom = new JSDOM(html)
   try {
     const view = dom.window.document.createElement('div')
     view.id = 'youtubeProjection'
