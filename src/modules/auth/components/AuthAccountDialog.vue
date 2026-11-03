@@ -1,36 +1,16 @@
 <script setup lang="ts">
-/**
- * Barra de conta para coletâneas custom — login/registro simples (e-mail + senha).
- * Compacto: quando logado mostra só nome + botão sair; senão formulário colapsável.
- * Inclui fluxo "esqueci minha senha": pede token via /auth/forgot-password
- * (o token chega pelo suporte quando sem SMTP) e troca a senha em /auth/reset-password.
- */
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+
+import { GlassCard } from '@design-system/index'
+
 import { useAuth } from '../composables/useAuth'
-import { VBtn, VCard, VDialog, VIcon, VTextField } from 'vuetify/components'
 
+const props = defineProps<{ modelValue: boolean }>()
+const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>()
 const { t } = useI18n()
+const { session, userName, userEmail, login, register, loginGoogle, logout, forgotPassword, resetPassword } = useAuth()
 
-const props = defineProps<{
-  /** Dialog/overlay pai controla a abertura. */
-  modelValue: boolean
-  /** Título customizado (opcional). */
-  title?: string
-}>()
-
-const emit = defineEmits<{
-  (e: 'update:modelValue', value: boolean): void
-}>()
-
-const { session, isLoggedIn, userName, userEmail, login, register, loginGoogle, logout, forgotPassword, resetPassword } = useAuth()
-
-// Abertura controlada pelo pai (AppShell) via v-model — sem estado interno
-// para evitar divergência (bug 24/09: dialog nascia aberto/ignorava o pai).
-const formOpen = computed({
-  get: () => props.modelValue,
-  set: (v: boolean) => emit('update:modelValue', v),
-})
 const mode = ref<'login' | 'register' | 'forgot' | 'reset'>('login')
 const email = ref('')
 const password = ref('')
@@ -38,294 +18,203 @@ const displayName = ref('')
 const resetToken = ref('')
 const busy = ref(false)
 
-const isValid = computed(() => {
-  if (mode.value === 'forgot') return email.value.includes('@')
-  if (mode.value === 'reset') {
-    return resetToken.value.trim().length >= 16 && password.value.length >= 8
-  }
-  if (email.value.includes('@') === false) return false
-  if (password.value.length < 6) return false
-  if (mode.value === 'register' && displayName.value.trim().length < 2) return false
-  return true
+const open = computed({
+  get: () => props.modelValue,
+  set: (value: boolean) => emit('update:modelValue', value),
 })
 
-async function onSubmit(): Promise<void> {
+const isValid = computed(() => {
+  if (mode.value === 'forgot') return email.value.includes('@')
+  if (mode.value === 'reset') return resetToken.value.trim().length >= 16 && password.value.length >= 8
+  return email.value.includes('@') && password.value.length >= 6 && (mode.value !== 'register' || displayName.value.trim().length >= 2)
+})
+
+function close(): void {
+  password.value = ''
+  resetToken.value = ''
+  mode.value = 'login'
+  open.value = false
+}
+
+async function submit(): Promise<void> {
   if (!isValid.value || busy.value) return
   busy.value = true
   try {
     if (mode.value === 'forgot') {
-      await forgotPassword(email.value)
-      if (resetToken.value) {
-        mode.value = 'reset'
-      } else {
-        mode.value = 'login'
-      }
+      mode.value = await forgotPassword(email.value) ? 'reset' : 'login'
       return
     }
     if (mode.value === 'reset') {
-      const ok = await resetPassword(resetToken.value, password.value)
-      if (ok) {
-        mode.value = 'login'
+      if (await resetPassword(resetToken.value, password.value)) {
         password.value = ''
         resetToken.value = ''
+        mode.value = 'login'
       }
       return
     }
-    const request = mode.value === 'login'
-      ? login(email.value, password.value)
-      : register(email.value, password.value, displayName.value)
-    const ok = await request
-    if (ok) {
-      formOpen.value = false
-      password.value = ''
-      emit('update:modelValue', false)
-    }
+    const ok = mode.value === 'login'
+      ? await login(email.value, password.value)
+      : await register(email.value, password.value, displayName.value)
+    if (ok) close()
   } finally {
     busy.value = false
   }
 }
 
-async function onGoogleLogin(): Promise<void> {
+async function googleLogin(): Promise<void> {
   if (busy.value) return
   busy.value = true
   try {
-    const ok = await loginGoogle()
-    if (ok) {
-      formOpen.value = false
-      emit('update:modelValue', false)
-    }
+    if (await loginGoogle()) close()
   } finally {
     busy.value = false
   }
 }
 
-async function onLogout(): Promise<void> {
+async function signOut(): Promise<void> {
   await logout()
-  formOpen.value = false
-  emit('update:modelValue', false)
-}
-
-function toggleForm(): void {
-  formOpen.value = !formOpen.value
-  if (!formOpen.value) {
-    password.value = ''
-    resetToken.value = ''
-    mode.value = 'login'
-    emit('update:modelValue', false)
-  }
-}
-
-function close(): void {
-  formOpen.value = false
-  emit('update:modelValue', false)
+  close()
 }
 </script>
 
 <template>
-  <v-dialog v-model="formOpen" :max-width="420" persistent>
-    <v-card class="pa-4 auth-dialog-card" elevation="8">
-      <div class="d-flex align-center justify-space-between mb-4">
-        <v-btn variant="text" size="small" @click="close">
-          <i class="ti ti-x" aria-hidden="true"></i>
-        </v-btn>
-        <div class="text-h6 font-weight-medium">{{ t('auth.title') }}</div>
-        <div style="width: 32px" />
+  <Teleport to="body">
+    <Transition name="auth-account-fade">
+      <div
+        v-if="open"
+        class="auth-account"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="t('auth.title')"
+        @click.self="close"
+      >
+        <GlassCard class="auth-account__panel" elevated :padding="false">
+          <header class="auth-account__header">
+            <div>
+              <h2>{{ t('auth.title') }}</h2>
+              <p v-if="!session">Acesse sua conta da Comunidade.</p>
+            </div>
+            <button type="button" class="auth-account__icon" :aria-label="t('random.close')" @click="close">
+              <i class="ti ti-x" aria-hidden="true" />
+            </button>
+          </header>
+
+          <section v-if="session" class="auth-account__body">
+            <div class="auth-account__identity">
+              <i class="ti ti-user-check" aria-hidden="true" />
+              <div>
+                <strong>{{ userName }}</strong>
+                <span v-if="userEmail">{{ userEmail }}</span>
+              </div>
+            </div>
+            <button type="button" class="auth-account__button auth-account__button--secondary" @click="signOut">
+              {{ t('auth.logout') }}
+            </button>
+          </section>
+
+          <form v-else class="auth-account__body" @submit.prevent="submit">
+            <template v-if="mode === 'login'">
+              <label>
+                <span>{{ t('auth.email') }}</span>
+                <input v-model="email" type="email" autocomplete="email" :disabled="busy">
+              </label>
+              <label>
+                <span>{{ t('auth.password') }}</span>
+                <input v-model="password" type="password" autocomplete="current-password" :disabled="busy">
+              </label>
+              <button type="submit" class="auth-account__button auth-account__button--primary" :disabled="!isValid || busy">
+                {{ t('auth.login') }}
+              </button>
+              <button type="button" class="auth-account__button auth-account__button--google" :disabled="busy" @click="googleLogin">
+                <i class="ti ti-brand-google" aria-hidden="true" />
+                Entrar com Google
+              </button>
+              <footer class="auth-account__links">
+                <button type="button" @click="mode = 'register'">{{ t('auth.createAccount') }}</button>
+                <button type="button" @click="mode = 'forgot'">{{ t('auth.forgotPassword') }}</button>
+              </footer>
+            </template>
+
+            <template v-else-if="mode === 'register'">
+              <label>
+                <span>{{ t('auth.displayName') }}</span>
+                <input v-model="displayName" autocomplete="name" :disabled="busy">
+              </label>
+              <label>
+                <span>{{ t('auth.email') }}</span>
+                <input v-model="email" type="email" autocomplete="email" :disabled="busy">
+              </label>
+              <label>
+                <span>{{ t('auth.password') }}</span>
+                <input v-model="password" type="password" autocomplete="new-password" :disabled="busy">
+              </label>
+              <button type="submit" class="auth-account__button auth-account__button--primary" :disabled="!isValid || busy">
+                {{ t('auth.register') }}
+              </button>
+              <footer class="auth-account__links">
+                <button type="button" @click="mode = 'login'">{{ t('auth.alreadyHaveAccount') }}</button>
+              </footer>
+            </template>
+
+            <template v-else-if="mode === 'forgot'">
+              <p>{{ t('auth.forgotHint') }}</p>
+              <label>
+                <span>{{ t('auth.email') }}</span>
+                <input v-model="email" type="email" autocomplete="email" :disabled="busy">
+              </label>
+              <button type="submit" class="auth-account__button auth-account__button--primary" :disabled="!isValid || busy">
+                {{ t('auth.sendResetToken') }}
+              </button>
+              <footer class="auth-account__links">
+                <button type="button" @click="mode = 'login'">{{ t('auth.back') }}</button>
+              </footer>
+            </template>
+
+            <template v-else>
+              <p>{{ t('auth.resetHint') }}</p>
+              <label>
+                <span>{{ t('auth.resetToken') }}</span>
+                <input v-model="resetToken" autocomplete="one-time-code" :disabled="busy">
+              </label>
+              <label>
+                <span>{{ t('auth.newPassword') }}</span>
+                <input v-model="password" type="password" autocomplete="new-password" :disabled="busy">
+              </label>
+              <button type="submit" class="auth-account__button auth-account__button--primary" :disabled="!isValid || busy">
+                {{ t('auth.changePassword') }}
+              </button>
+              <footer class="auth-account__links">
+                <button type="button" @click="mode = 'login'">{{ t('auth.back') }}</button>
+              </footer>
+            </template>
+          </form>
+        </GlassCard>
       </div>
-
-      <template v-if="session">
-        <!-- Logado: nome + email (feedback Ezequias: só nome confunde qual conta é) + sair -->
-        <div class="d-flex align-center justify-space-between">
-          <div class="d-flex flex-column">
-            <span class="text-body-1 font-weight-medium">{{ userName }}</span>
-            <span
-              v-if="userEmail"
-              class="text-body-2 text-medium-emphasis"
-            >{{ userEmail }}</span>
-          </div>
-          <v-btn variant="outlined" size="small" @click="onLogout">
-            {{ t('auth.logout') }}
-          </v-btn>
-        </div>
-      </template>
-
-      <template v-else>
-        <!-- Deslogado: formulário colapsável -->
-        <form @submit.prevent="onSubmit">
-          <!-- LOGIN -->
-          <template v-if="mode === 'login'">
-            <v-text-field
-              v-model="email"
-              :label="t('auth.email')"
-              type="email"
-              :autocomplete="'email'"
-              :rules="[v => !!v || t('auth.emailRequired'), v => v?.includes('@') || t('auth.emailInvalid')]"
-              :disabled="busy"
-            />
-            <v-text-field
-              v-model="password"
-              :label="t('auth.password')"
-              type="password"
-              :autocomplete="'current-password'"
-              :rules="[v => !!v || t('auth.passwordRequired'), v => (v?.length ?? 0) >= 6 || t('auth.passwordMin')]"
-              :disabled="busy"
-            />
-            <v-btn
-              :disabled="!isValid || busy"
-              block
-              class="auth-submit-btn"
-              type="submit"
-            >
-              {{ t('auth.login') }}
-            </v-btn>
-            <v-btn
-              :disabled="busy"
-              block
-              variant="outlined"
-              class="mt-2"
-              @click="onGoogleLogin"
-            >
-              <i class="ti ti-brand-google" aria-hidden="true"></i>
-              Entrar com Google
-            </v-btn>
-            <div class="d-flex justify-space-between mt-2">
-              <v-btn variant="text" size="small" @click="mode = 'register'">
-                {{ t('auth.createAccount') }}
-              </v-btn>
-              <v-btn variant="text" size="small" @click="mode = 'forgot'">
-                {{ t('auth.forgotPassword') }}
-              </v-btn>
-            </div>
-          </template>
-
-          <!-- REGISTRO -->
-          <template v-else-if="mode === 'register'">
-            <v-text-field
-              v-model="displayName"
-              :label="t('auth.displayName')"
-              :autocomplete="'name'"
-              :rules="[v => (v?.trim().length ?? 0) >= 2 || t('auth.nameMin')]"
-              :disabled="busy"
-            />
-            <v-text-field
-              v-model="email"
-              :label="t('auth.email')"
-              type="email"
-              :autocomplete="'email'"
-              :rules="[v => !!v || t('auth.emailRequired'), v => v?.includes('@') || t('auth.emailInvalid')]"
-              :disabled="busy"
-            />
-            <v-text-field
-              v-model="password"
-              :label="t('auth.password')"
-              type="password"
-              :autocomplete="'new-password'"
-              :rules="[v => !!v || t('auth.passwordRequired'), v => (v?.length ?? 0) >= 6 || t('auth.passwordMin')]"
-              :disabled="busy"
-            />
-            <v-btn
-              :disabled="!isValid || busy"
-              block
-              class="auth-submit-btn"
-              type="submit"
-            >
-              {{ t('auth.register') }}
-            </v-btn>
-            <div class="d-flex justify-space-between mt-2">
-              <v-btn variant="text" size="small" @click="mode = 'login'">
-                {{ t('auth.alreadyHaveAccount') }}
-              </v-btn>
-            </div>
-          </template>
-
-          <!-- ESQUECI MINHA SENHA -->
-          <template v-else-if="mode === 'forgot'">
-            <p class="text-caption mt-2" style="opacity: 0.75">
-              {{ t('auth.forgotHint') }}
-            </p>
-            <v-text-field
-              v-model="email"
-              :label="t('auth.email')"
-              type="email"
-              :autocomplete="'email'"
-              :rules="[v => !!v || t('auth.emailRequired'), v => v?.includes('@') || t('auth.emailInvalid')]"
-              :disabled="busy"
-            />
-            <v-btn
-              :disabled="!isValid || busy"
-              block
-              color="primary"
-              type="submit"
-            >
-              {{ t('auth.sendResetToken') }}
-            </v-btn>
-            <div class="d-flex justify-space-between mt-2">
-              <v-btn variant="text" size="small" @click="mode = 'login'">
-                {{ t('auth.back') }}
-              </v-btn>
-            </div>
-          </template>
-
-          <!-- RESET (token + senha nova) -->
-          <template v-else>
-            <p class="text-caption mt-2" style="opacity: 0.75">
-              {{ t('auth.resetHint') }}
-            </p>
-            <v-text-field
-              v-model="resetToken"
-              :label="t('auth.resetToken')"
-              :autocomplete="'one-time-code'"
-              :rules="[v => (v?.trim().length ?? 0) >= 16 || t('auth.tokenMin')]"
-              :disabled="busy"
-            />
-            <v-text-field
-              v-model="password"
-              :label="t('auth.newPassword')"
-              type="password"
-              :autocomplete="'new-password'"
-              :rules="[v => !!v || t('auth.passwordRequired'), v => (v?.length ?? 0) >= 8 || t('auth.newPasswordMin')]"
-              :disabled="busy"
-            />
-            <v-btn
-              :disabled="!isValid || busy"
-              block
-              color="primary"
-              type="submit"
-            >
-              {{ t('auth.changePassword') }}
-            </v-btn>
-            <div class="d-flex justify-space-between mt-2">
-              <v-btn variant="text" size="small" @click="mode = 'login'">
-                {{ t('auth.back') }}
-              </v-btn>
-            </div>
-          </template>
-        </form>
-      </template>
-    </v-card>
-  </v-dialog>
+    </Transition>
+  </Teleport>
 </template>
 
-<style scoped>
-/* Card segue o tema do design-system dinamicamente (claro/escuro). */
-.auth-dialog-card {
-  background: var(--ds-color-surface-container-high) !important;
-  color: var(--ds-color-on-surface) !important;
-}
-
-/* Botão de submit usa a cor primária do design-system (não a do tema Vuetify). */
-.auth-submit-btn {
-  background: var(--ds-color-primary) !important;
-  color: var(--ds-color-on-primary) !important;
-  font-weight: 600;
-  transition: filter 0.15s ease, box-shadow 0.15s ease;
-}
-
-.auth-submit-btn:hover:not(:disabled) {
-  filter: brightness(1.15);
-  box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
-}
-
-.auth-submit-btn:active:not(:disabled) {
-  filter: brightness(0.95);
-}
+<style scoped lang="scss">
+.auth-account { position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; padding: 1.5rem; background: rgb(0 0 0 / 55%); backdrop-filter: blur(2px); }
+.auth-account__panel { width: min(100%, 26rem); overflow: hidden; }
+.auth-account__header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.25rem 1.5rem; border-bottom: 1px solid color-mix(in srgb, var(--ds-color-on-surface) 8%, transparent); }
+.auth-account__header h2, .auth-account__header p { margin: 0; }
+.auth-account__header h2 { color: var(--ds-color-on-surface); font-size: 1.125rem; }
+.auth-account__header p, .auth-account__body p { color: var(--ds-color-on-surface-variant); font-size: .875rem; }
+.auth-account__icon { display: inline-flex; width: 2.25rem; height: 2.25rem; align-items: center; justify-content: center; border: 0; border-radius: 999px; background: transparent; color: var(--ds-color-on-surface); cursor: pointer; }
+.auth-account__body { display: grid; gap: .875rem; padding: 1.5rem; }
+.auth-account__body label { display: grid; gap: .35rem; color: var(--ds-color-on-surface); font-size: .875rem; font-weight: 600; }
+.auth-account__body input { width: 100%; box-sizing: border-box; padding: .7rem .8rem; border: 1px solid var(--ds-color-outline); border-radius: .6rem; background: color-mix(in srgb, var(--ds-color-surface) 90%, black); color: var(--ds-color-on-surface); }
+.auth-account__button { display: inline-flex; min-height: 2.75rem; align-items: center; justify-content: center; gap: .5rem; border: 0; border-radius: .65rem; font: inherit; font-weight: 700; cursor: pointer; }
+.auth-account__button:disabled { cursor: not-allowed; opacity: .55; }
+.auth-account__button--primary { background: var(--ds-color-primary); color: var(--ds-color-on-primary); }
+.auth-account__button--google, .auth-account__button--secondary { border: 1px solid var(--ds-color-outline); background: transparent; color: var(--ds-color-on-surface); }
+.auth-account__links { display: flex; justify-content: space-between; gap: .5rem; }
+.auth-account__links button { padding: .25rem 0; border: 0; background: transparent; color: var(--ds-color-primary); font: inherit; cursor: pointer; }
+.auth-account__identity { display: flex; align-items: center; gap: .75rem; color: var(--ds-color-on-surface); }
+.auth-account__identity > i { font-size: 2rem; color: var(--ds-color-primary); }
+.auth-account__identity div { display: grid; gap: .15rem; }
+.auth-account__identity span { color: var(--ds-color-on-surface-variant); font-size: .875rem; }
+.auth-account-fade-enter-active, .auth-account-fade-leave-active { transition: opacity .15s ease; }
+.auth-account-fade-enter-from, .auth-account-fade-leave-to { opacity: 0; }
 </style>

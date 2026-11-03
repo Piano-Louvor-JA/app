@@ -73,6 +73,23 @@ describe('identidade de plataforma nas requests', () => {
     }
   })
 
+  it('não injeta headers em hosts de terceiros (Google/Firebase) — preflight 403', async () => {
+    const fetch = vi.fn().mockResolvedValue(new Response())
+    vi.stubGlobal('fetch', fetch)
+    const { installClientPlatformHeader } = await client()
+    installClientPlatformHeader()
+    const urls = [
+      'https://identitytoolkit.googleapis.com/v1/projects?key=test-only',
+      'https://securetoken.googleapis.com/v1/token',
+      'https://pianolouvorja.firebaseapp.com/__/auth/handler',
+      'https://accounts.google.com/o/oauth2/v2/auth',
+    ]
+    for (const url of urls) {
+      await globalThis.fetch(url)
+      expect(fetch).toHaveBeenLastCalledWith(url, undefined)
+    }
+  })
+
   it('mantém o fetch original utilizável se não conseguir ler a URL', async () => {
     const response = new Response('fallback')
     const fetch = vi.fn().mockResolvedValue(response)

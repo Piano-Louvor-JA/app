@@ -300,6 +300,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
+      PIANO_BUILD_PROFILE: test
       VITE_URL_DATABASE: http://localhost:3100/json_db
       VITE_URL_FILES: http://localhost:3100/file
       VITE_PALCO_API_URL: http://localhost:3100

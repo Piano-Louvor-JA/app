@@ -86,6 +86,12 @@ describe('auth-client', () => {
     expect(localStorage.getItem(SESSION_KEY)).toBeNull()
   })
 
+  it.each([0, -1, '0', 'abc', undefined])('placeholder id_user=%j é removido e não autentica', id_user => {
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ token: 'tok', user: { id_user, email: 'a@b.c', displayName: 'Rafael' } }))
+    expect(getAuthSession()).toBeNull()
+    expect(localStorage.getItem(SESSION_KEY)).toBeNull()
+  })
+
   it('token corrompido no localStorage = sessão nula', () => {
     localStorage.setItem(SESSION_KEY, '{{{')
     expect(getAuthSession()).toBeNull()

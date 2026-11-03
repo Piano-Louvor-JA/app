@@ -31,7 +31,10 @@ export function getAuthSession(): AuthSession | null {
     const raw = localStorage.getItem(SESSION_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw) as AuthSession
-    if (!parsed?.token || !parsed?.user?.id_user) return null
+    if (!parsed?.token || !Number.isInteger(parsed.user?.id_user) || parsed.user.id_user <= 0) {
+      localStorage.removeItem(SESSION_KEY)
+      return null
+    }
     return parsed
   } catch {
     return null
