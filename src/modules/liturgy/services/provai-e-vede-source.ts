@@ -27,7 +27,9 @@ export function extractProvaiEVedeEpisodes(html: string): ProvaiEpisode[] {
   const episodes: ProvaiEpisode[] = []
   const seen = new Set<string>()
 
-  const re = /href="(https:[^"]*\/(\d{2})-(\d{2})-(\d{2})_[^"]*\.mp4)"/g
+  // Padrões auditados dos buckets: PT "MM-DD-YY_slug.mp4", ES "MM-DD-YYslug.mp4"
+  // (páginas ES não usam underscore após a data).
+  const re = /href="(https:[^"]*\/(\d{2})-(\d{2})-(\d{2})_?[^"]*\.mp4)"/g
   let m: RegExpExecArray | null
   while ((m = re.exec(html)) !== null) {
     const url = m[1]!
@@ -42,7 +44,7 @@ export function extractProvaiEVedeEpisodes(html: string): ProvaiEpisode[] {
 
     // slug: depois do "_", antes de ".mp4", decodificado
     const fileName = decodeURIComponent(url.split('/').pop() ?? '')
-    const slug = fileName.replace(/^\d{2}-\d{2}-\d{2}_/, '').replace(/\.mp4$/i, '')
+    const slug = fileName.replace(/^\d{2}-\d{2}-\d{2}_?/, '').replace(/\.mp4$/i, '')
 
     episodes.push({ dateISO, title: slugToTitle(slug), url })
   }

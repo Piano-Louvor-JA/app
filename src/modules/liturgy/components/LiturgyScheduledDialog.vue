@@ -12,6 +12,11 @@ import {
   type ProvaiEpisode,
 } from '../services/provai-e-vede-source'
 import { importProvaiEVedeEpisodes } from '../services/provai-e-vede-import'
+import {
+  resolveDefaultProvaiLanguage,
+  resolveProvaiSource,
+  type ProvaiSourceLanguage,
+} from '../services/provai-e-vede-catalog'
 import { useScheduledStore } from '../stores/useScheduledStore'
 import {
   loadLiturgyMusicOptions,
@@ -22,25 +27,41 @@ import type { LiturgyMusicOption } from '../types/liturgy'
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 
-const PAGE_URL =
-  'https://downloads.adventistas.org/pt/mordomia-crista/video/provai-e-vede-2026-4o-trimestre'
-
 /** HTML da página do trimestre: main process (sem CORS) no Electron, fetch direto na web. */
 async function fetchQuarterHtml(): Promise<string | null> {
+  const source = resolveCurrentProvaiUrl()
+  if (!source) return null
   const bridge = getDesktopBridge()
   try {
     if (bridge?.workspace?.fetchText) {
-      return await bridge.workspace.fetchText(PAGE_URL)
+      return await bridge.workspace.fetchText(source.url)
     }
-    const resp = await fetch(PAGE_URL)
+    const resp = await fetch(source.url)
     return resp.ok ? await resp.text() : null
   } catch {
     return null
   }
 }
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const dlg = useScheduledDialog()
+
+// ── Edição-fonte Provai/Probad (SPEC ADR-02/04) ────────────
+// Registry fechado PT/ES 2026; EN/FR são fallback PT explícito (sem fonte
+// oficial — nenhum request /en|/fr). Trimestre pelo calendário local.
+const pvSourceLanguage = ref<ProvaiSourceLanguage>(resolveDefaultProvaiLanguage(String(locale.value)))
+
+function currentQuarter(): 1 | 2 | 3 | 4 {
+  return (Math.floor(new Date().getMonth() / 3) + 1) as 1 | 2 | 3 | 4
+}
+
+function resolveCurrentProvaiUrl() {
+  return resolveProvaiSource({
+    language: pvSourceLanguage.value,
+    year: new Date().getFullYear(),
+    quarter: currentQuarter(),
+  })
+}
 
 type TabId = 'rotations' | 'paste' | 'grade'
 const tab = ref<TabId>('rotations')
@@ -163,6 +184,7 @@ async function onProvaiEVedeOneClick() {
     }
     const report = await importProvaiEVedeEpisodes(store, upcoming, resolvePath, {
       onlyUpcoming: true,
+      sourceLanguage: pvSourceLanguage.value,
     })
 
     // Sem disco (web): converter as entradas pra online_video com a URL original.
@@ -202,10 +224,13 @@ async function onDownloadSelected() {
       }
       // Importa com o caminho local (desktop) — sem download disponível (web),
       // agenda como online_video com a URL original (fallback).
-      await importProvaiEVedeEpisodes(store, [ep], () => localPath ?? '')
+      await importProvaiEVedeEpisodes(store, [ep], () => localPath ?? '', {
+        sourceLanguage: pvSourceLanguage.value,
+      })
       if (!localPath) {
         // web/sem bridge: guarda a URL como online_video em vez de file vazio
-        const rotation = store.categories.find((c) => c.name === 'Provai e Vede')
+        const rotationName = pvSourceLanguage.value === 'es' ? 'Probad y Ved' : 'Provai e Vede'
+        const rotation = store.categories.find((c) => c.name === rotationName)
         const entry = rotation ? store.findOn(rotation.id, ep.dateISO) : undefined
         if (entry) {
           store.upsertItem({
@@ -562,6 +587,16 @@ const dateFmt = (iso: string) => {
                   {{ t('liturgy.messages.scheduledFetchProvai') }}
                 </button>
               </details>
+              <label class="scheduled-dialog__pv-source">
+                {{ t('liturgy.fields.provaiSourceEdition') }}
+                <select
+                  v-model="pvSourceLanguage"
+                  :aria-label="t('liturgy.fields.provaiSourceEdition')"
+                >
+                  <option value="pt">Provai e Vede (PT)</option>
+                  <option value="es">Probad y Ved (ES)</option>
+                </select>
+              </label>
               <div
                 v-if="pvEpisodes.length > 0"
                 class="scheduled-dialog__pv"
