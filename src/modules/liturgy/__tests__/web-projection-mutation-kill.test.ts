@@ -226,14 +226,21 @@ describe('liturgy-web-projection — mata survivors', () => {
       expect(await openLiturgyLocalVideoControl('', 'Vídeo', undefined, 'blob:url')).toBe(false)
     })
 
-    it('bridge COM openUrl → chama bridge + palcoSession', async () => {
+    it('opening local audio never launches independent copies on connections', async () => {
+      const b = bridgeWith()
+      mocks.mockGetDesktopBridge.mockReturnValue(b)
+      expect(await openLiturgyLocalVideoControl('/audio.mp3', 'Áudio')).toBe(true)
+      expect(mocks.mockPalcoSession).not.toHaveBeenCalled()
+    })
+
+    it('bridge COM openUrl opens locally without starting receiver copies', async () => {
       const b = bridgeWith()
       mocks.mockGetDesktopBridge.mockReturnValue(b)
       expect(await openLiturgyLocalVideoControl('/video.mp4', 'Vídeo')).toBe(true)
       expect(b.projection.openUrl).toHaveBeenCalledWith(expect.objectContaining({
         filePath: '/video.mp4', title: 'Vídeo', mode: 'video', monitorIds: [1], withScreens: false,
       }))
-      expect(mocks.mockPalcoSession).toHaveBeenCalledWith({ url: '/video.mp4', title: 'Vídeo' })
+      expect(mocks.mockPalcoSession).not.toHaveBeenCalled()
     })
 
     it('withScreens false + SEM remotePlay → true', async () => {
@@ -310,12 +317,12 @@ describe('liturgy-web-projection — mata survivors', () => {
       expect(await openLiturgyLocalPdfControl('/doc.pdf', 'PDF')).toBe(false)
     })
 
-    it('bridge COM openUrl → chama bridge + palcoSession', async () => {
+    it('bridge COM openUrl opens locally without starting receiver copies', async () => {
       const b = bridgeWith()
       mocks.mockGetDesktopBridge.mockReturnValue(b)
       expect(await openLiturgyLocalPdfControl('/doc.pdf', 'PDF', true)).toBe(true)
       expect(b.projection.openUrl).toHaveBeenCalledWith(expect.objectContaining({ filePath: '/doc.pdf', mode: 'pdf' }))
-      expect(mocks.mockPalcoSession).toHaveBeenCalledWith('liturgy', 'liturgy', { text: 'PDF' })
+      expect(mocks.mockPalcoSession).not.toHaveBeenCalled()
     })
 
     it('label fallback: filename', async () => {
@@ -362,7 +369,7 @@ describe('liturgy-web-projection — mata survivors', () => {
       expect(await openLiturgyLocalPresentationControl('/file.pptx', 'Apres')).toBe(true)
     })
 
-    it('bridge COM openUrl → chama bridge + palcoSession', async () => {
+    it('bridge COM openUrl opens locally without starting receiver copies', async () => {
       const b = bridgeWith()
       mocks.mockGetDesktopBridge.mockReturnValue(b)
       expect(await playLiturgyLocalPresentationOnScreens('/file.pptx', 'Apres')).toBe(true)

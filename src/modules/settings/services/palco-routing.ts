@@ -20,7 +20,11 @@ try {
   // defaults
 }
 
+// Music destinations are now exclusively controlled by the Telas selector.
+routes.hymns = 'mirror'
+
 export function getPalcoRoute(module: PalcoModule): PalcoRoute {
+  if (module === 'hymns') return 'mirror'
   return routes[module] ?? 'mirror'
 }
 
@@ -34,7 +38,7 @@ export function isPalcoTvOnlyRoute(module: PalcoModule): boolean {
 }
 
 export function setPalcoRoute(module: PalcoModule, route: PalcoRoute): void {
-  routes[module] = route
+  routes[module] = module === 'hymns' ? 'mirror' : route
   try { localStorage.setItem(KEY, JSON.stringify(routes)) } catch { /* ignore */ }
 }
 

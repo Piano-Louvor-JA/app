@@ -20,7 +20,7 @@ import { registerDiagnosticsIpc, setClockSkewProvider, setDiagnosticsToken } fro
 import { createMainLogger } from "./main-log.mjs";
 import { attachHistoryAppCommand, attachWindowStateEvents, registerWindowIpc } from "./ipc/window.mjs";
 import { attachRemoteServer } from "./remote-server.mjs";
-import { attachPalcoServer } from "./palco-server.mjs";
+import { attachPalcoServer, getPalcoManager } from "./palco-server.mjs";
 import { ensureWorkspaceDirectories } from "./paths.mjs";
 import { registerLocalFileProtocol, registerLocalScheme } from "./protocol.mjs";
 import { registerCloseProjectionPopups } from "./ipc/web-projection.mjs";
@@ -121,12 +121,11 @@ if (typeof process.getuid === "function" && process.getuid() === 0) {
 	app.commandLine.appendSwitch("no-sandbox");
 }
 
-/** GPU instável nesta máquina (crash do gpu process em loop, 02/10/2026) —
- *  renderização por software é suficiente pro app e estabiliza o dev. */
-if (process.env.VITE_DEV_SERVER_URL) {
-	app.commandLine.appendSwitch("disable-gpu");
-	// in-process-gpu removido (07/10): SIGTRAP do electron em dev ~35s pós-boot
-	// (crash no processo GPU in-process; com gpu em software separado estabiliza).
+/** Software rendering is an explicit compatibility fallback. Disabling the
+ * GPU on every dev launch makes video decoding + projection capture compete
+ * on the CPU and causes stalls as soon as a mirror is opened. */
+if (process.env.LOUVORJA_DISABLE_GPU === "1") {
+  app.commandLine.appendSwitch("disable-gpu");
 }
 
 /** Permite autoplay com áudio nas janelas de projeção (YouTube). */
@@ -856,8 +855,11 @@ function createWindow(locale = 'pt-BR') {
 
 	mainWindow.on("closed", () => {
 		mainWindow = null;
+		if (!isQuitting) app.quit();
 	});
 }
+
+let isQuitting = false;
 
 app.whenReady().then(async () => {
   // Origem http válida p/ Firebase Auth (popup Google) — ver renderer-server.mjs.
@@ -965,7 +967,7 @@ app.whenReady().then(async () => {
 			.catch((error) => console.warn("[bible-updater] falha", error));
 	}, 20_000);
 	app.on("activate", () => {
-		if (BrowserWindow.getAllWindows().length === 0) {
+		if (!isQuitting && BrowserWindow.getAllWindows().length === 0) {
 			createWindow(locale);
 		}
 	});
@@ -977,27 +979,23 @@ app.on("second-instance", () => {
 	mainWindow.focus();
 });
 
+// Stop receivers before Electron starts closing the player windows.
+app.on("before-quit", () => {
+  isQuitting = true;
+  try {
+    getPalcoManager()?.stopAllMedia();
+  } catch (error) {
+    console.warn('[shutdown] failed to stop receivers', error);
+  }
+});
+
 app.on("will-quit", () => {
-	// Hotkey global de projeção: libera Ctrl+Alt+P no encerrar (se registrada)
-	try {
-		const { globalShortcut } = require("electron");
-		globalShortcut.unregisterAll();
-	} catch {
-		/* ignore */
-	}
-	// Palco: app fechando → TVs param a mídia na hora (não toca até o fim).
-	try {
-		const { getPalcoManager } = require("./palco-server.mjs");
-		const manager = getPalcoManager && getPalcoManager();
-		if (manager) manager.stopAllMedia();
-	} catch {
-		/* palco não anexado */
-	}
+  globalShortcut.unregisterAll();
 });
 
 app.on("window-all-closed", () => {
 	// Fechar a splash pode disparar este evento durante o handoff para a
 	// main window. Não mata o processo se a principal ainda existe/carrega.
 	if (mainWindow && !mainWindow.isDestroyed()) return;
-	if (process.platform !== "darwin") app.quit();
+	if (!isQuitting) app.quit();
 });

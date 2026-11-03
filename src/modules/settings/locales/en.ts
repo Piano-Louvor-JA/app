@@ -16,6 +16,7 @@ export default {
     },
     title: 'Settings',
     sectionTitle: {
+      transmission: 'Broadcast',
       appearance: 'Appearance Settings',
       general: 'General Settings',
       media: 'Media & Player',
@@ -24,6 +25,7 @@ export default {
       remoteP2p: 'P2P Control',
     },
     tabs: {
+      transmission: 'Broadcast',
       appearance: 'Appearance',
       general: 'General',
       media: 'Media & Player',
@@ -141,6 +143,7 @@ export default {
         autoMinimizePlayer: 'Minimize the player automatically',
       },
       returnScreen: {
+        unavailable: 'Return screen enabled. Waiting for the saved monitor; if it was replaced, select another monitor below.',
         title: 'Return screen',
         enable: 'Return screen',
         selectMonitor: 'Select the monitor for the return screen',

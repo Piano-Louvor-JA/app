@@ -328,7 +328,7 @@ describe("bridge — timer/countdown", () => {
 });
 
 describe("bridge — relógio", () => {
-	it("palcoClockOn/Off: projeta hh:mm e solta", async () => {
+	it("palcoClockOn/Off: projeta hh:mm:ss e solta", async () => {
 		startPalcoBridge();
 		palcoClockOn();
 		await vi.advanceTimersByTimeAsync(120);
@@ -336,7 +336,7 @@ describe("bridge — relógio", () => {
 		expect((proj?.msg as unknown as { scope: string }).scope).toBe("clock");
 		expect(
 			(proj?.msg as unknown as { input: { text: string } }).input.text,
-		).toMatch(/^\d{2}:\d{2}$/);
+		).toMatch(/^\d{2}:\d{2}:\d{2}$/);
 		palcoClockOff();
 		await vi.advanceTimersByTimeAsync(120);
 	});

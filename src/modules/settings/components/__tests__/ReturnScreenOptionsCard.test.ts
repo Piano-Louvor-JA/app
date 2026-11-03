@@ -28,7 +28,7 @@ vi.mock("../../composables/useProjectionSettings", async () => {
   ]);
   return {
     useProjectionSettings: vi.fn(() => ({
-      settings: mocks.settings,
+      settings: ref(mocks.settings),
       monitorOptions: mocks.monitorOptions,
       setOpenReturnScreen: mocks.setOpenReturnScreen,
       selectReturnDisplay: mocks.selectReturnDisplay,
@@ -145,3 +145,12 @@ describe("ReturnScreenOptionsCard", () => {
     );
   });
 });
+
+it('explains a missing monitor without turning the return toggle off', async () => {
+  mocks.settings.openReturnScreen = true
+  mocks.settings.returnDisplayId = 99
+  const wrapper = mount(ReturnScreenOptionsCard, { global: { plugins: [i18n] } })
+  expect(wrapper.find('[role="status"]').exists()).toBe(true)
+  expect(mocks.setOpenReturnScreen).not.toHaveBeenCalled()
+  wrapper.unmount()
+})

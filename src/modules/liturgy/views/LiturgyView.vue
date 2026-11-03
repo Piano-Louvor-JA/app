@@ -185,6 +185,48 @@ async function onSljaImported(): Promise<void> {
         </h1>
       </div>
 
+      <div class="liturgy-view__header-actions">
+            <button
+              type="button"
+              class="liturgy-view__clear"
+              :title="t('liturgy.importJa')"
+              @click="importJa"
+            >
+              <i
+                class="ti ti-file-import"
+                aria-hidden="true"
+              />
+              <span>{{ t('liturgy.importJa') }}</span>
+            </button>
+
+            <button
+              type="button"
+              class="liturgy-view__clear"
+              :title="t('liturgy.scheduled.import')"
+              @click="importScheduled"
+            >
+              <i
+                class="ti ti-calendar-down"
+                aria-hidden="true"
+              />
+              <span>{{ t('liturgy.scheduled.import') }}</span>
+            </button>
+
+            <button
+              type="button"
+              class="liturgy-view__clear"
+              :title="t('liturgy.messages.scheduledTitle')"
+              @click="scheduledDialogOpen = true"
+            >
+              <i
+                class="ti ti-calendar-time"
+                aria-hidden="true"
+              />
+              <span>{{ t('liturgy.messages.scheduledTitle') }}</span>
+            </button>
+
+      </div>
+
       <div class="liturgy-view__meta">
         <div class="liturgy-view__meta-text">
           <span class="liturgy-view__worship">
@@ -238,45 +280,6 @@ async function onSljaImported(): Promise<void> {
           />
 
           <div class="liturgy-view__toolbar-actions">
-            <button
-              type="button"
-              class="liturgy-view__clear"
-              :title="t('liturgy.importJa')"
-              @click="importJa"
-            >
-              <i
-                class="ti ti-file-import"
-                aria-hidden="true"
-              />
-              <span>{{ t('liturgy.importJa') }}</span>
-            </button>
-
-            <button
-              type="button"
-              class="liturgy-view__clear"
-              :title="t('liturgy.scheduled.import')"
-              @click="importScheduled"
-            >
-              <i
-                class="ti ti-calendar-down"
-                aria-hidden="true"
-              />
-              <span>{{ t('liturgy.scheduled.import') }}</span>
-            </button>
-
-            <button
-              type="button"
-              class="liturgy-view__clear"
-              :title="t('liturgy.messages.scheduledTitle')"
-              @click="scheduledDialogOpen = true"
-            >
-              <i
-                class="ti ti-calendar-time"
-                aria-hidden="true"
-              />
-              <span>{{ t('liturgy.messages.scheduledTitle') }}</span>
-            </button>
-
             <button
               v-if="currentItems.length > 0"
               type="button"
@@ -437,12 +440,20 @@ async function onSljaImported(): Promise<void> {
 }
 
 .liturgy-view__header {
-  display: flex;
+  display: grid;
+  grid-template-columns: 20rem minmax(0, 1fr) auto auto;
   flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
-  gap: 1.5rem;
+  gap: 2rem;
+}
+
+.liturgy-view__header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   flex-wrap: wrap;
+  gap: .5rem;
 }
 
 .liturgy-view__header-start {
@@ -715,8 +726,15 @@ async function onSljaImported(): Promise<void> {
   }
 
   .liturgy-view__header {
-    gap: 0.75rem;
+    grid-template-columns: 16rem minmax(0, 1fr) auto;
+    column-gap: .85rem;
+    row-gap: .75rem;
   }
+  .liturgy-view__header-actions {
+    grid-column: 2 / -1;
+    grid-row: 2;
+  }
+  .liturgy-view__meta { grid-column: 3; grid-row: 1; }
 
   .liturgy-view__brand {
     gap: 0.55rem;
@@ -785,5 +803,10 @@ async function onSljaImported(): Promise<void> {
   .liturgy-view__body :deep(.ds-glass-card--padded) {
     padding: 0.75rem;
   }
+}
+@media (max-width: 960px) {
+  .liturgy-view__header { display: flex; flex-wrap: wrap; }
+  .liturgy-view__brand { margin-right: auto; }
+  .liturgy-view__header-actions { justify-content: flex-start; }
 }
 </style>

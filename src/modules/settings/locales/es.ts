@@ -16,6 +16,7 @@ export default {
     },
     title: 'Configuraciones',
     sectionTitle: {
+      transmission: 'Transmisión',
       appearance: 'Configuraciones de Apariencia',
       general: 'Configuraciones Generales',
       media: 'Medios & Reproductor',
@@ -24,6 +25,7 @@ export default {
       remoteP2p: 'Control P2P',
     },
     tabs: {
+      transmission: 'Transmisión',
       appearance: 'Apariencia',
       general: 'General',
       media: 'Medios & Reproductor',
@@ -141,6 +143,7 @@ export default {
         autoMinimizePlayer: 'Minimizar el reproductor automáticamente',
       },
       returnScreen: {
+        unavailable: 'Pantalla de retorno habilitada. Esperando el monitor guardado; si fue reemplazado, seleccione otro monitor abajo.',
         title: 'Pantalla de retorno',
         enable: 'Pantalla de retorno',
         selectMonitor: 'Seleccionar el monitor para la pantalla de retorno',

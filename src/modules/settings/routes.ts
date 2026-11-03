@@ -1,5 +1,6 @@
 import type { RouteRecordRaw } from 'vue-router'
 
+import ObsView from '@modules/clock/views/ObsView.vue'
 import AppearanceView from './views/AppearanceView.vue'
 import GeneralView from './views/GeneralView.vue'
 import MediaView from './views/MediaView.vue'
@@ -51,6 +52,12 @@ export const settingsRoutes: RouteRecordRaw[] = [
         meta: {
           navKey: 'settings',
         },
+      },
+      {
+        path: 'transmission',
+        name: 'settings-transmission',
+        component: ObsView,
+        meta: { navKey: 'settings' },
       },
       // Controle remoto — desktop: WS :7071 (RemotePairingView);
       // web: P2P WebRTC 2-QR (P2pPairingView), sem servidor.

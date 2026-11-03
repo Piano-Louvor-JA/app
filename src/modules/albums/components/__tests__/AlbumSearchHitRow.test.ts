@@ -118,3 +118,39 @@ describe('AlbumSearchHitRow', () => {
     expect(w.findComponent({ name: 'MusicTrackActions' }).props('rowHovered')).toBe(false)
   })
 })
+
+it('adds to a playlist without starting playback from the row', async () => {
+  const wrapper = mountRow()
+  await wrapper.get('.album-search-hit__playlist').trigger('click')
+  expect(wrapper.emitted('playlist')).toHaveLength(1)
+  expect(wrapper.emitted('sung')).toBeUndefined()
+})
+
+it('marks saved playlist songs and disables adding them again', async () => {
+  const wrapper = mountRow({ prominentPlaylist: true })
+  const button = wrapper.get<HTMLButtonElement>('.album-search-hit__playlist--prominent')
+  expect(button.element.disabled).toBe(false)
+  await wrapper.setProps({ alreadyAdded: true })
+  expect(wrapper.classes()).toContain('album-search-hit--added')
+  expect(button.element.disabled).toBe(true)
+  expect(button.attributes('title')).toBe('albums.playlists.inPlaylist')
+  expect(button.find('.ti-check').exists()).toBe(true)
+  await button.trigger('click')
+  expect(wrapper.emitted('playlist')).toBeUndefined()
+  wrapper.unmount()
+  const reopened = mountRow({ prominentPlaylist: true, alreadyAdded: true })
+  expect(reopened.get<HTMLButtonElement>('.album-search-hit__playlist--prominent').element.disabled).toBe(true)
+})
+
+
+it('does not play from row clicks or keyboard in the playlist search modal', async () => {
+  const wrapper = mountRow({ prominentPlaylist: true })
+  const row = wrapper.get('.album-search-hit')
+  await row.trigger('click')
+  await row.trigger('keydown', { key: 'Enter' })
+  await row.trigger('keydown', { key: ' ' })
+  expect(wrapper.emitted('sung')).toBeUndefined()
+  expect(row.attributes('tabindex')).toBeUndefined()
+  await wrapper.get('.mta-sung').trigger('click')
+  expect(wrapper.emitted('sung')).toHaveLength(1)
+})

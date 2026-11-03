@@ -9,6 +9,7 @@ const props = defineProps<{
   track: AlbumTrack
   collectionName?: string
   artworkUrl?: string | null
+  selected?: boolean
   busy?: boolean
 }>()
 
@@ -40,7 +41,7 @@ function playSungFromRow() {
 <template>
   <div
     class="album-track-row"
-    :class="{ 'album-track-row--downloading': isDownloading }"
+    :class="{ 'album-track-row--downloading': isDownloading, 'album-track-row--selected': selected }"
     role="button"
     tabindex="0"
     :aria-label="t('media.actions.sung')"
@@ -373,6 +374,12 @@ function playSungFromRow() {
   align-items: center;
   gap: 0.5rem;
   justify-self: end;
+}
+
+.album-track-row--selected {
+  border-color: var(--ds-color-primary);
+  background: color-mix(in srgb, var(--ds-color-primary) 12%, var(--ds-color-surface-elevated));
+  box-shadow: inset 3px 0 var(--ds-color-primary);
 }
 
 @media (max-width: 720px) {

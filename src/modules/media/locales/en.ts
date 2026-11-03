@@ -1,5 +1,10 @@
 export default {
   media: {
+    reorderQueue: 'Drag to reorder (or use the up and down arrow keys)',
+    shuffleQueueApplied: 'Shuffle mode applied. Starting with the next song, playback will follow random order.',
+    sequentialQueueApplied: 'Sequential mode applied. Starting with the next song, playback will follow the sequence.',
+    shuffleQueue: 'Shuffle play',
+    playQueueSequential: 'Play playlist in sequence',
     exitFullscreen: 'Exit full screen',
     publishRules: {
       title: 'Community rules',

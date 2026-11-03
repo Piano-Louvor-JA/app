@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { obsDetecting } from '@modules/settings/services/obs-detection'
 import { useI18n } from 'vue-i18n'
 
 defineProps<{
@@ -25,14 +26,16 @@ function onClick(projecting: boolean) {
   <div class="bible-project-fab">
     <button
       type="button"
+    :aria-busy="obsDetecting"
       class="bible-project-fab__btn"
       :class="{ 'bible-project-fab__btn--active': projecting }"
-      :disabled="disabled && !projecting"
+      :disabled="obsDetecting || (disabled && !projecting)"
       :aria-label="projecting ? t('bible.clearProjection') : t('bible.project')"
       :title="projecting ? t('bible.clearProjection') : t('bible.project')"
       @click="onClick(Boolean(projecting))"
     >
-      <i
+      <span v-if="obsDetecting" class="obs-detection-status" role="status">{{ t('obsOutputs.detecting') }}</span>
+    <i
         class="ti"
         :class="projecting ? 'ti-player-stop' : 'ti-player-play'"
         aria-hidden="true"
@@ -42,6 +45,7 @@ function onClick(projecting: boolean) {
 </template>
 
 <style scoped lang="scss">
+.obs-detection-status { position: absolute; right: 0; bottom: calc(100% + 0.4rem); padding: 0.4rem 0.6rem; border-radius: 0.4rem; white-space: nowrap; background: var(--ds-color-surface, #222); color: var(--ds-color-on-surface, #fff); font-size: 0.75rem; font-weight: 500; }
 .bible-project-fab {
   display: inline-flex;
   flex-shrink: 0;

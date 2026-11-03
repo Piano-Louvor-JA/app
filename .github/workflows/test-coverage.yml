@@ -35,6 +35,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npx playwright install --with-deps chromium
       - name: Vitest suíte completa (provider v8 — AST remap, sem phantom)
         # thresholds 0: o gate do destino/versão roda no step próprio abaixo
         run: >-

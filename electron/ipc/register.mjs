@@ -89,6 +89,8 @@ import {
   remoteReloadSource,
   remoteSeekSource,
   remoteSetVolumeSource,
+  setAudioOutputMode,
+  remoteSetCaptionsHiddenSource,
   remoteToggleMuteSource,
   setSiteControlPanelOpen,
   setSiteTargetMonitorIds,
@@ -271,6 +273,10 @@ export function registerWorkspaceIpc() {
     }
   })
 
+  ipcMain.handle('projection:remote-set-captions-hidden', async (_event, hidden) => {
+    return remoteSetCaptionsHiddenSource(hidden === true)
+  })
+
   ipcMain.handle('projection:remote-toggle-mute', async () => {
     try {
       return await remoteToggleMuteSource()
@@ -279,6 +285,8 @@ export function registerWorkspaceIpc() {
       return null
     }
   })
+
+  ipcMain.handle('projection:set-audio-output', (_event, mode) => setAudioOutputMode(mode))
 
   ipcMain.handle('projection:remote-set-volume', async (_event, volume) => {
     try {
