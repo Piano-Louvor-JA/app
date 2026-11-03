@@ -40,7 +40,7 @@ const mocks = vi.hoisted(() => {
 		routerBack: vi.fn(),
 		routerPush: vi.fn(),
 		getSession: vi.fn(() => ({ token: "tok-123", user: { id: 4 } })),
-		authReadiness: Promise.resolve<unknown>(null),
+		getAuthReadiness: vi.fn(() => Promise.resolve<unknown>(null)),
 	};
 });
 
@@ -69,7 +69,7 @@ vi.mock("@modules/media/services/auth-client", () => ({
 	getAuthSession: mocks.getSession,
 }));
 vi.mock("@modules/auth/services/firebase-client", () => ({
-	get authReadiness() { return mocks.authReadiness; },
+	getAuthReadiness: mocks.getAuthReadiness,
 }));
 vi.mock("@design-system/index", () => ({
 	GlassCard: {
@@ -120,7 +120,7 @@ async function mountView() {
 describe("CommunityView — carregamento popula estado (regressão do bug do sino)", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		mocks.authReadiness = Promise.resolve(null);
+		mocks.getAuthReadiness.mockResolvedValue(null);
 		mocks.getNotifications.mockResolvedValue(NOTIFS);
 		mocks.getSession.mockReturnValue({ token: "tok-123", user: { id: 4 } });
 	});
@@ -134,7 +134,7 @@ describe("CommunityView — carregamento popula estado (regressão do bug do sin
 
 	it("aguarda authReadiness antes de carregar weekly tasks e notifications", async () => {
 		let release!: () => void;
-		mocks.authReadiness = new Promise<void>(resolve => { release = resolve; });
+		mocks.getAuthReadiness.mockReturnValue(new Promise<void>(resolve => { release = resolve; }));
 		const wrapper = mount(CommunityView);
 		await flushPromises();
 
@@ -151,7 +151,7 @@ describe("CommunityView — carregamento popula estado (regressão do bug do sin
 
 	it("timeout de authReadiness destrava o carregamento", async () => {
 		vi.useFakeTimers();
-		mocks.authReadiness = new Promise<void>(() => {});
+		mocks.getAuthReadiness.mockReturnValue(new Promise<void>(() => {}));
 		const wrapper = mount(CommunityView);
 		await Promise.resolve();
 		expect(mocks.getWeeklyTasks).not.toHaveBeenCalled();
