@@ -8,6 +8,16 @@ import { chromium } from 'playwright'
 vi.mock('electron', () => ({ app: { getPath: () => tmpdir() }, ipcMain: { handle: vi.fn() } }))
 // @ts-ignore Electron runtime module.
 import { PalcoSlot } from '../../palco-server.mjs'
+function inlineScript(html: string, marker: string): string {
+  const dom = new JSDOM(html)
+  try {
+    return Array.from(dom.window.document.querySelectorAll('script'), script => script.textContent ?? '')
+      .find(code => code.includes(marker))!
+  } finally {
+    dom.window.close()
+  }
+}
+
 async function freePort(): Promise<number> {
   const server = createServer()
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
@@ -213,7 +223,7 @@ it('the URL control bar projects to a selected connection without a physical mon
         return canvas.captureStream(30)
       } } })
     })
-    const inline = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)].map(match => match[1]).find(code => code.includes('var backBtn'))!
+    const inline = inlineScript(html, 'var backBtn')
     await sender.addScriptTag({ content: inline })
     await sender.locator('#tvList input').waitFor({ state: 'attached' })
     expect(await sender.locator('#projectScreens').isEnabled()).toBe(true)
@@ -269,7 +279,7 @@ it('image control starts locally and projects only to selected connections on re
         return canvas.captureStream(30)
       } } })
     })
-    const inline = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)].map(match => match[1]).find(code => code.includes('var prevBtn'))!
+    const inline = inlineScript(html, 'var prevBtn')
     await sender.addScriptTag({ content: inline })
     await sender.locator('#tvList input').waitFor({ state: 'attached' })
     expect(await receiver.evaluate(() => !!(document.querySelector('#video') as HTMLVideoElement).srcObject)).toBe(false)
@@ -329,7 +339,7 @@ it('PDF control opens locally, allows receiver selection, and publishes only aft
       }, palco: { slots: () => api.slots(), send: (message: any) => api.sendPalco(message),
         serveMedia: (name: string, mime: string, base64: string) => api.servePng(name, mime, base64), onReceiverConnected: () => () => {} } }
     })
-    const code = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)].map(match => match[1]).find(code => code.includes('var prevBtn'))!
+    const code = inlineScript(html, 'var prevBtn')
     await sender.addScriptTag({ content: code })
     await sender.locator('#tvList input').waitFor({ state: 'attached' })
     expect(await sender.evaluate(() => (window as any).captures)).toBe(0)
