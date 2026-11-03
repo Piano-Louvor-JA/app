@@ -28,9 +28,9 @@ const PROVAI_SOURCES_2026: ProvaiSource[] = ([
   { language: 'pt', quarter: 3, url: 'https://downloads.adventistas.org/pt/mordomia-crista/video/provai-e-vede-2026-3o-trimestre' },
   { language: 'pt', quarter: 4, url: 'https://downloads.adventistas.org/pt/mordomia-crista/video/provai-e-vede-2026-4o-trimestre' },
   { language: 'es', quarter: 1, url: 'https://downloads.adventistas.org/es/mayordomia-cristiana/video/probad-y-ved-2026-1er-trimestre/' },
-  { language: 'es', quarter: 2, url: 'https://downloads.adventistas.org/es/mayordomia-cristiana/video/probad-y-ved-2026-2do-2026-trimestre/' },
-  { language: 'es', quarter: 3, url: 'https://downloads.adventistas.org/es/mayordomia-cristiana/video/probad-y-ved-2026-3do-2026-trimestre/' },
-  { language: 'es', quarter: 4, url: 'https://downloads.adventistas.org/es/mayordomia-cristiana/video/probad-y-ved-2026-4er-2026-trimestre/' },
+  { language: 'es', quarter: 2, url: 'https://downloads.adventistas.org/es/mayordomia-cristiana/video/probad-y-ved-2026-2do-trimestre-2026/' },
+  { language: 'es', quarter: 3, url: 'https://downloads.adventistas.org/es/mayordomia-cristiana/video/probad-y-ved-2026-3do-trimestre-2026/' },
+  { language: 'es', quarter: 4, url: 'https://downloads.adventistas.org/es/mayordomia-cristiana/video/probad-y-ved-2026-4er-trimestre-2026/' },
 ] satisfies Array<Pick<ProvaiSource, 'language' | 'quarter' | 'url'>>).map((s) => ({
   ...s,
   year: 2026,

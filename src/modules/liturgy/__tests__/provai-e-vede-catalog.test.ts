@@ -20,9 +20,9 @@ const EXPECTED: Record<ProvaiSourceLanguage, Record<ProvaiQuarter, string>> = {
   },
   es: {
     1: `${ES_BASE}/probad-y-ved-2026-1er-trimestre/`,
-    2: `${ES_BASE}/probad-y-ved-2026-2do-2026-trimestre/`,
-    3: `${ES_BASE}/probad-y-ved-2026-3do-2026-trimestre/`,
-    4: `${ES_BASE}/probad-y-ved-2026-4er-2026-trimestre/`,
+    2: `${ES_BASE}/probad-y-ved-2026-2do-trimestre-2026/`,
+    3: `${ES_BASE}/probad-y-ved-2026-3do-trimestre-2026/`,
+    4: `${ES_BASE}/probad-y-ved-2026-4er-trimestre-2026/`,
   },
 }
 

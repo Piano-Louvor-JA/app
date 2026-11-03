@@ -107,7 +107,7 @@ describe('seletor de edição PT/ES no diálogo (RF-03/04/05, ADR-02/04)', () =>
       await pvSourceSelect().setValue('es')
       await clickText('liturgy.messages.scheduledPvOneClick')
       expect(fetchText).toHaveBeenCalledWith(
-        'https://downloads.adventistas.org/es/mayordomia-cristiana/video/probad-y-ved-2026-4er-2026-trimestre/',
+        'https://downloads.adventistas.org/es/mayordomia-cristiana/video/probad-y-ved-2026-4er-trimestre-2026/',
       )
       const store = useScheduledStore()
       expect(store.categories.find(c => c.name === 'Probad y Ved')).toBeDefined()
@@ -146,7 +146,7 @@ describe('seletor de edição PT/ES no diálogo (RF-03/04/05, ADR-02/04)', () =>
       await fetchButton().trigger('click')
       await flushPromises()
       expect(fetchText).toHaveBeenCalledWith(
-        'https://downloads.adventistas.org/es/mayordomia-cristiana/video/probad-y-ved-2026-2do-2026-trimestre/',
+        'https://downloads.adventistas.org/es/mayordomia-cristiana/video/probad-y-ved-2026-2do-trimestre-2026/',
       )
     } finally {
       vi.useRealTimers()
