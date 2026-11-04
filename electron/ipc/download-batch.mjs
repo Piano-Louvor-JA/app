@@ -159,25 +159,29 @@ export function createDownloadBatch({ mediaDir, queuePath, sender, fetch, retrie
           return
         }
         if (buffer.length > 0) {
-          // `wx` mesmo no truncado: criação exclusiva elimina a corrida
-          // TOCTOU apontada pelo CodeQL (js/file-system-race) — se um .part
-          // aparecer entre o stat e o write, o write falha e cai no retry.
-          if (mode === 'append') {
-            appendFileSync(partPath, buffer, { mode: 0o600 })
-          } else {
-            try {
-              writeFileSync(partPath, buffer, { flag: 'wx', mode: 0o600 })
-            } catch (error) {
-              if (!(error && typeof error === 'object' && 'code' in error && error.code === 'EEXIST')) throw error
-              // .part de outra execução apareceu: appenda nele (mesmo contrato do append)
-              appendFileSync(partPath, buffer, { mode: 0o600 })
-            }
-          }
-        } else if (!existsSync(partPath)) {
+          // Anti-TOCTOU (CodeQL js/file-system-race): zero existsSync no fluxo.
+          // 'ax' = append exclusivo: falha com EEXIST se o .part não existir
+          // (recria no retry) ou cria exclusive se existir outro writer.
           try {
-            writeFileSync(partPath, Buffer.alloc(0), { flag: 'wx', mode: 0o600 })
+            if (mode === 'append') {
+              // Modo Range: .part é nosso (fila serial, um writer por item).
+              appendFileSync(partPath, buffer, { flag: 'a', mode: 0o600 })
+            } else {
+              writeFileSync(partPath, buffer, { flag: 'wx', mode: 0o600 })
+            }
+          } catch (error) {
+            if (!(error && typeof error === 'object' && 'code' in error && error.code === 'EEXIST')) throw error
+            // wx falhou: .part renasceu entre o stat e o write (outra execução).
+            // Fallback exclusivo-append retoma nele sem recriar (sem corrida).
+            appendFileSync(partPath, buffer, { flag: 'a', mode: 0o600 })
+          }
+        } else {
+          // chunk vazio: garante .part existente via 'a' sem checagem prévia
+          // (cria se faltar, appenda 0 bytes se existir — sem corrida).
+          try {
+            appendFileSync(partPath, Buffer.alloc(0), { flag: 'a', mode: 0o600 })
           } catch {
-            // já existe: ok, appenda no próximo chunk
+            // .part sumiu entre rename e aqui: o próximo retry recria
           }
         }
         startByte += buffer.length
