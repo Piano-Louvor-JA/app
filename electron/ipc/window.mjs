@@ -1,6 +1,21 @@
 import { BrowserWindow, ipcMain } from 'electron'
 
 /**
+ * Chrome da janela principal. Win/Linux: sem frame, com os botões da titlebar
+ * customizada. macOS: titlebar oculta com os botões nativos ("traffic lights"),
+ * centralizados na titlebar de 32px do renderer. Botões em HTML dentro da área
+ * de arrastar não recebem hover nem clique no macOS.
+ * @param {NodeJS.Platform} platform
+ * @returns {import('electron').BrowserWindowConstructorOptions}
+ */
+export function mainWindowChromeOptions(platform) {
+  if (platform === 'darwin') {
+    return { titleBarStyle: 'hidden', trafficLightPosition: { x: 12, y: 10 } }
+  }
+  return { frame: false }
+}
+
+/**
  * Controles da titlebar customizada (frame: false) — espelha o legado.
  * @param {() => import('electron').BrowserWindow | null} getMainWindow
  */
