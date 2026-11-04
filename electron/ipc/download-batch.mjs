@@ -50,6 +50,7 @@ export function createDownloadBatch({ mediaDir, queuePath, sender, fetch, retrie
   let processing = false
   let cancelledIds = new Set()
   let idleWaiters = []
+  const batchDoneSubscribers = []
 
   function ensureDir() {
     if (!existsSync(targetDir)) mkdirSync(targetDir, { recursive: true, mode: 0o700 })
@@ -202,6 +203,16 @@ export function createDownloadBatch({ mediaDir, queuePath, sender, fetch, retrie
       const waiters = idleWaiters
       idleWaiters = []
       for (const resolve of waiters) resolve()
+      if (queue.items.length > 0) {
+        const summary = { done, failed, total: queue.items.length }
+        for (const cb of batchDoneSubscribers) {
+          try {
+            cb(summary)
+          } catch (error) {
+            console.error('[download-batch] batch-done subscriber', error)
+          }
+        }
+      }
     }
   }
 
@@ -267,6 +278,9 @@ export function createDownloadBatch({ mediaDir, queuePath, sender, fetch, retrie
           else idleWaiters.push(resolve)
         })
       })
+    },
+    onBatchDone(cb) {
+      if (typeof cb === 'function') batchDoneSubscribers.push(cb)
     },
   }
 }

@@ -10,6 +10,8 @@ import { ipcMain, net, app } from 'electron'
 import path from 'node:path'
 import { getWorkspacePaths } from '../paths.mjs'
 import { createDownloadBatch } from './download-batch.mjs'
+import { notifyDownloadComplete } from './download-notify.mjs'
+import { resolveAppLocale } from '../locale.mjs'
 
 let batchSingleton = null
 
@@ -52,5 +54,10 @@ export function registerDownloadBatchIpc(getMainWindow) {
 
   // Rehidratação no boot: itens 'active' viram pending e a fila retoma.
   batchSingleton.resume()
+
+  // T2/R3: notificação OS quando um batch conclui (locale do app).
+  batchSingleton.onBatchDone?.((summary) => {
+    notifyDownloadComplete(summary, resolveAppLocale(app.getLocale()))
+  })
   return batchSingleton
 }
