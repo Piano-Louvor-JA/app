@@ -16,6 +16,12 @@ export default {
       showRules: 'Ver regras da comunidade',
       gotIt: 'Entendi',
       linkLabel: 'Regras da comunidade',
+      conduct: {
+        title: 'Conduta',
+        summary:
+          'Publique conteúdo que glorifique a Deus, com mensagem genuína e respeito aos direitos autorais. Não é permitido conteúdo impróprio, contrário às crenças adventistas, spam ou assédio. Reports e strikes seguem moderação transparente com direito a recurso.',
+      },
+      readFull: 'Leia o Código completo',
     },
     editor: {
       importSlja: 'Importar arquivo .slja',

@@ -200,6 +200,15 @@ onMounted(load);
           <i class="ti ti-trophy" aria-hidden="true" />
           {{ t('community.ranking') }}
         </button>
+        <a
+          href="https://pianolouvorja.com.br/conduta"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="community-view__coc-link"
+        >
+          <i class="ti ti-shield-check" aria-hidden="true" />
+          {{ t('community.conductLink') }}
+        </a>
         <button
           type="button"
           class="community-view__create-btn"
@@ -508,6 +517,21 @@ onMounted(load);
 	color: inherit;
 	font-size: 0.9rem;
 	cursor: pointer;
+}
+
+.community-view__coc-link {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	margin-top: 0.5rem;
+	padding: 0.4rem 0.8rem;
+	border-radius: 0.5rem;
+	border: 1px solid var(--ds-border, rgba(255, 255, 255, 0.2));
+	background: var(--ds-glass-fill, rgba(255, 255, 255, 0.08));
+	color: inherit;
+	font-size: 0.9rem;
+	cursor: pointer;
+	text-decoration: none;
 }
 
 .community-view__create-btn {
