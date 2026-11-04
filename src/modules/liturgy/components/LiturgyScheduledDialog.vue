@@ -211,9 +211,9 @@ async function onProvaiEVedeOneClick() {
 }
 
 // T3/R4: promoção online_video → file quando o MAIN conclui cada download.
-if (getDesktopBridge()?.downloadBatch?.onItemDone) {
-  getDesktopBridge()
-    .downloadBatch.onItemDone((payload: { id: string, filePath: string }) => {
+const downloadBatchBridge = getDesktopBridge()?.downloadBatch
+if (downloadBatchBridge?.onItemDone) {
+  downloadBatchBridge.onItemDone((payload: { id: string, filePath: string }) => {
       if (!payload?.id || !payload?.filePath) return
       const [rotationId, dateISO] = payload.id.split('::')
       if (!rotationId || !dateISO) return
