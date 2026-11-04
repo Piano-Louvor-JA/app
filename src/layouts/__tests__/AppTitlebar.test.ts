@@ -188,7 +188,7 @@ describe('AppTitlebar', () => {
     ).toBe('0px')
   })
 
-  it('plataforma mac: controles de tráfego no lado esquerdo', async () => {
+  it('plataforma mac: reserva espaço para os botões nativos, sem botões HTML', async () => {
     const bridge = makeBridge()
     ;(bridge as { platform: string }).platform = 'darwin'
     setBridge(bridge)
@@ -196,34 +196,9 @@ describe('AppTitlebar', () => {
     await flushPromises()
 
     expect(w.find('.app-titlebar--mac').exists()).toBe(true)
-    const macBtns = w.findAll('.app-titlebar__mac-btn')
-    expect(macBtns.length).toBe(3)
-    // Ordem mac: close, minimize, maximize
-    await macBtns[0].trigger('click')
-    await macBtns[1].trigger('click')
-    await macBtns[2].trigger('click')
-    await flushPromises()
-    const calls = (bridge.window.control as ReturnType<typeof vi.fn>).mock.calls
-    expect(calls).toContainEqual(['close'])
-    expect(calls).toContainEqual(['minimize'])
-    expect(calls).toContainEqual(['maximize'])
-    w.unmount()
-  })
-
-  it('blur/focus alterna o estado de foco dos controles mac', async () => {
-    const bridge = makeBridge()
-    ;(bridge as { platform: string }).platform = 'darwin'
-    setBridge(bridge)
-    const w = mountBar()
-    await flushPromises()
-
-    window.dispatchEvent(new Event('blur'))
-    await w.vm.$nextTick()
-    expect(w.find('.app-titlebar__mac-controls--unfocused').exists()).toBe(true)
-
-    window.dispatchEvent(new Event('focus'))
-    await w.vm.$nextTick()
-    expect(w.find('.app-titlebar__mac-controls--unfocused').exists()).toBe(false)
+    expect(w.find('.app-titlebar__mac-traffic-lights').exists()).toBe(true)
+    expect(w.findAll('button').length).toBe(0)
+    expect(w.find('.app-titlebar__mac-title').text()).toBe('LouvorJA - PIANO')
     w.unmount()
   })
 })

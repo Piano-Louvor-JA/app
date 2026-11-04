@@ -18,7 +18,7 @@ import { resolveAppLocale } from "./locale.mjs";
 import { registerWorkspaceIpc } from "./ipc/register.mjs";
 import { registerDiagnosticsIpc, setClockSkewProvider, setDiagnosticsToken } from "./diagnostics.mjs";
 import { createMainLogger } from "./main-log.mjs";
-import { attachHistoryAppCommand, attachWindowStateEvents, registerWindowIpc } from "./ipc/window.mjs";
+import { attachHistoryAppCommand, attachWindowStateEvents, mainWindowChromeOptions, registerWindowIpc } from "./ipc/window.mjs";
 import { attachRemoteServer } from "./remote-server.mjs";
 import { attachPalcoServer, getPalcoManager } from "./palco-server.mjs";
 import { ensureWorkspaceDirectories } from "./paths.mjs";
@@ -734,7 +734,7 @@ function createWindow(locale = 'pt-BR') {
 		backgroundColor: "#12121c",
 		title: APP_PRODUCT_NAME,
 		show: false,
-		frame: false,
+		...mainWindowChromeOptions(process.platform),
 		autoHideMenuBar: true,
 		...(iconPath ? { icon: iconPath } : {}),
 		webPreferences: {
