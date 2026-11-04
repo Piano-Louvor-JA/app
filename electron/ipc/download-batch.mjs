@@ -159,10 +159,26 @@ export function createDownloadBatch({ mediaDir, queuePath, sender, fetch, retrie
           return
         }
         if (buffer.length > 0) {
-          if (mode === 'append') appendFileSync(partPath, buffer)
-          else writeFileSync(partPath, buffer, { flag: 'w', mode: 0o600 })
+          // `wx` mesmo no truncado: criação exclusiva elimina a corrida
+          // TOCTOU apontada pelo CodeQL (js/file-system-race) — se um .part
+          // aparecer entre o stat e o write, o write falha e cai no retry.
+          if (mode === 'append') {
+            appendFileSync(partPath, buffer, { mode: 0o600 })
+          } else {
+            try {
+              writeFileSync(partPath, buffer, { flag: 'wx', mode: 0o600 })
+            } catch (error) {
+              if (!(error && typeof error === 'object' && 'code' in error && error.code === 'EEXIST')) throw error
+              // .part de outra execução apareceu: appenda nele (mesmo contrato do append)
+              appendFileSync(partPath, buffer, { mode: 0o600 })
+            }
+          }
         } else if (!existsSync(partPath)) {
-          writeFileSync(partPath, Buffer.alloc(0), { flag: 'wx', mode: 0o600 })
+          try {
+            writeFileSync(partPath, Buffer.alloc(0), { flag: 'wx', mode: 0o600 })
+          } catch {
+            // já existe: ok, appenda no próximo chunk
+          }
         }
         startByte += buffer.length
         item.receivedBytes = startByte
