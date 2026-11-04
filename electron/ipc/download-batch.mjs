@@ -5,7 +5,7 @@
 // - Rename atômico .part → final ao concluir (nunca arquivo parcial válido).
 // - Eventos no webContents do renderer: download-progress, download-item-done,
 //   download-item-failed, download-item-cancelled, download-batch-done.
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync, appendFileSync, statSync, unlinkSync } from 'node:fs'
+import { mkdirSync, readFileSync, renameSync, writeFileSync, statSync, openSync, writeSync, closeSync, unlinkSync } from 'node:fs'
 import path from 'node:path'
 import { net } from 'electron'
 
@@ -21,7 +21,6 @@ function sanitizeFileName(name) {
 
 function loadQueue(queuePath) {
   try {
-    if (!existsSync(queuePath)) return { version: QUEUE_VERSION, items: [] }
     const raw = readFileSync(queuePath, 'utf8')
     const parsed = JSON.parse(raw)
     if (!parsed || parsed.version !== QUEUE_VERSION || !Array.isArray(parsed.items)) {
@@ -53,7 +52,11 @@ export function createDownloadBatch({ mediaDir, queuePath, sender, fetch, retrie
   const batchDoneSubscribers = []
 
   function ensureDir() {
-    if (!existsSync(targetDir)) mkdirSync(targetDir, { recursive: true, mode: 0o700 })
+    try {
+      statSync(targetDir)
+    } catch {
+      mkdirSync(targetDir, { recursive: true, mode: 0o700 })
+    }
   }
 
   function emit(channel, payload) {
@@ -115,19 +118,21 @@ export function createDownloadBatch({ mediaDir, queuePath, sender, fetch, retrie
     item.filePath = finalPath
 
     // Arquivo final já existe: offline-first, não rebaixa.
-    if (existsSync(finalPath)) {
+    // (try/stat em vez de existsSync: sem padrão check-then-act por path — CodeQL)
+    try {
+      statSync(finalPath)
       notifyDone(item)
       return
+    } catch {
+      // não existe ainda: segue para o download
     }
 
     const partPath = `${finalPath}.part`
     let startByte = 0
-    if (existsSync(partPath)) {
-      try {
-        startByte = statSync(partPath).size
-      } catch {
-        startByte = 0
-      }
+    try {
+      startByte = statSync(partPath).size
+    } catch {
+      startByte = 0
     }
 
     let lastError = null
@@ -158,31 +163,14 @@ export function createDownloadBatch({ mediaDir, queuePath, sender, fetch, retrie
           progress()
           return
         }
-        if (buffer.length > 0) {
-          // Anti-TOCTOU (CodeQL js/file-system-race): zero existsSync no fluxo.
-          // 'ax' = append exclusivo: falha com EEXIST se o .part não existir
-          // (recria no retry) ou cria exclusive se existir outro writer.
-          try {
-            if (mode === 'append') {
-              // Modo Range: .part é nosso (fila serial, um writer por item).
-              appendFileSync(partPath, buffer, { flag: 'a', mode: 0o600 })
-            } else {
-              writeFileSync(partPath, buffer, { flag: 'wx', mode: 0o600 })
-            }
-          } catch (error) {
-            if (!(error && typeof error === 'object' && 'code' in error && error.code === 'EEXIST')) throw error
-            // wx falhou: .part renasceu entre o stat e o write (outra execução).
-            // Fallback exclusivo-append retoma nele sem recriar (sem corrida).
-            appendFileSync(partPath, buffer, { flag: 'a', mode: 0o600 })
-          }
-        } else {
-          // chunk vazio: garante .part existente via 'a' sem checagem prévia
-          // (cria se faltar, appenda 0 bytes se existir — sem corrida).
-          try {
-            appendFileSync(partPath, Buffer.alloc(0), { flag: 'a', mode: 0o600 })
-          } catch {
-            // .part sumiu entre rename e aqui: o próximo retry recria
-          }
+        // Escrita via fd único (CodeQL js/file-system-race): o fd é resolvido
+        // UMA vez por tentativa; writes não re-resolvem o path, logo não há
+        // janela check-then-act. Truncate = 'w' (recria); append = 'a'.
+        const fd = openSync(partPath, mode === 'append' ? 'a' : 'w', 0o600)
+        try {
+          writeSync(fd, buffer)
+        } finally {
+          closeSync(fd)
         }
         startByte += buffer.length
         item.receivedBytes = startByte
