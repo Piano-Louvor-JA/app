@@ -195,9 +195,9 @@ export function createDownloadBatch({ mediaDir, queuePath, sender, fetch, retrie
     } finally {
       processing = false
       const allSettled = queue.items.every(i => i.status !== 'pending' && i.status !== 'active')
+      const failed = queue.items.filter(i => i.status === 'failed').length
+      const done = queue.items.filter(i => i.status === 'done').length
       if (allSettled && queue.items.length > 0) {
-        const failed = queue.items.filter(i => i.status === 'failed').length
-        const done = queue.items.filter(i => i.status === 'done').length
         emit('download-batch-done', { done, failed, total: queue.items.length })
       }
       const waiters = idleWaiters
