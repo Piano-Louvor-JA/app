@@ -14,6 +14,14 @@ import {
   type StageSettings,
 } from '../types/stage-settings'
 import { getPalcoRoute, type PalcoModule } from './palco-routing'
+import type {
+  PalcoSlotStatus,
+  SlotUpdate,
+  SlotUpdateResult,
+  TransmissionBind,
+  TransmissionInfo,
+  TransmissionSetResult,
+} from '../types/transmission'
 
 /** Envolve o HTML do texto em cor (receiver não lê textColor separado). */
 function colorizeProjectionText(text: string, color: string | null): string {
@@ -43,7 +51,7 @@ type PalcoStatus = {
   clients: number
   url: string | null
   wsUrl: string | null
-}
+} & Partial<Omit<PalcoSlotStatus, 'receiverIps' | 'running' | 'clients' | 'url'>>
 
 export type PalcoTimerOptions = { duration?: number; mode?: 'countdown' | 'chrono'; label?: string; background?: string; text?: string; obsPane?: boolean; timeFormat?: string; chronoRuntime?: { status: string; accumulatedMs: number; segmentStartedAt: number | null } }
 
@@ -77,6 +85,10 @@ function palcoApi(): {
   onReceiverConnected(cb: (i: unknown) => void): (() => void) | void
   onReceiverDisconnected(cb: (i: unknown) => void): void
   wake?(): Promise<{ ok: boolean; results?: string[] } | null>
+  updateSlot(id: string, changes: SlotUpdate): Promise<SlotUpdateResult>
+  transmission(): Promise<TransmissionInfo>
+  setTransmission(changes: { bind?: TransmissionBind; requireToken?: boolean }): Promise<TransmissionSetResult>
+  resetToken(): Promise<{ token: string }>
 } {
   return (window as never as { louvorja: { palco: never } }).louvorja.palco
 }
@@ -113,9 +125,31 @@ class PalcoSession {
     return (await palcoApi().setPersistence(enabled)).enabled
   }
 
-  async slots(): Promise<Array<{ id: string; label: string; running: boolean; clients: number; httpPort: number; wsPort: number }>> {
+  async slots(): Promise<PalcoSlotStatus[]> {
     if (!this.isElectron) return []
-    return (window as never as { louvorja: { palco: { slots(): Promise<Array<{ id: string; label: string; running: boolean; clients: number; httpPort: number; wsPort: number }>> } } }).louvorja.palco.slots()
+    return (window as never as { louvorja: { palco: { slots(): Promise<PalcoSlotStatus[]> } } }).louvorja.palco.slots()
+  }
+
+  /** Porta e/ou aparência do overlay de uma conexão. */
+  async updateSlot(id: string, changes: SlotUpdate): Promise<SlotUpdateResult> {
+    if (!this.isElectron) return { ok: false, reason: 'not-found' }
+    return palcoApi().updateSlot(id, changes)
+  }
+
+  async transmission(): Promise<TransmissionInfo | null> {
+    if (!this.isElectron) return null
+    return palcoApi().transmission()
+  }
+
+  async setTransmission(changes: { bind?: TransmissionBind; requireToken?: boolean }): Promise<TransmissionSetResult | null> {
+    if (!this.isElectron) return null
+    return palcoApi().setTransmission(changes)
+  }
+
+  /** Gera token novo; dispositivos da rede precisam do link atualizado. */
+  async resetToken(): Promise<string | null> {
+    if (!this.isElectron) return null
+    return (await palcoApi().resetToken()).token
   }
 
   async createSlot(label: string): Promise<{ id: string; label: string; httpPort: number; wsPort: number } | null> {
@@ -149,7 +183,7 @@ class PalcoSession {
     )
   }
 
-  async statusSlot(id: string): Promise<(PalcoStatus & { receiverUrl?: string | null }) | null> {
+  async statusSlot(id: string): Promise<PalcoStatus | null> {
     if (!this.isElectron) return null
     return palcoApi().status(id)
   }

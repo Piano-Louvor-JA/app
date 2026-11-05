@@ -135,6 +135,10 @@ describe('sem electron (sem bridge)', () => {
     await expect(palcoSession.videoRouted({ url: 'v.mp4' })).resolves.toBeUndefined()
     await expect(palcoSession.audioRouted({ url: 'a.mp3' })).resolves.toBeUndefined()
     await expect(palcoSession.serveMedia('f', 'audio/mpeg', 'QQ==')).resolves.toBeNull()
+    await expect(palcoSession.updateSlot('0', { httpPort: 9000 })).resolves.toEqual({ ok: false, reason: 'not-found' })
+    await expect(palcoSession.transmission()).resolves.toBeNull()
+    await expect(palcoSession.setTransmission({ bind: 'local' })).resolves.toBeNull()
+    await expect(palcoSession.resetToken()).resolves.toBeNull()
     palcoSession.idle()
     palcoSession.timerStop()
     palcoSession.onEvent(() => {})
@@ -158,6 +162,24 @@ describe('com electron', () => {
     expect(palco.start).toHaveBeenCalledWith('1')
     await palcoSession.stopSlot('1')
     expect(palco.stop).toHaveBeenCalledWith('1')
+  })
+
+  it('transmissão: rede, token, porta e aparência delegam ao main', async () => {
+    const info = { bind: 'all', requireToken: true, listenHost: '0.0.0.0', linkHost: '192.168.0.5', missing: false, interfaces: [], token: 'AB12C' }
+    const palco = {
+      ...fullMock(),
+      transmission: vi.fn().mockResolvedValue(info),
+      setTransmission: vi.fn().mockResolvedValue({ ok: false, reason: 'running' }),
+      resetToken: vi.fn().mockResolvedValue({ token: 'ZZ99Y' }),
+      updateSlot: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    setBridge(palco)
+    expect(await palcoSession.transmission()).toBe(info)
+    expect(await palcoSession.setTransmission({ bind: 'local' })).toEqual({ ok: false, reason: 'running' })
+    expect(palco.setTransmission).toHaveBeenCalledWith({ bind: 'local' })
+    expect(await palcoSession.resetToken()).toBe('ZZ99Y')
+    expect(await palcoSession.updateSlot('7082', { overlay: { theme: 'light' } })).toEqual({ ok: true })
+    expect(palco.updateSlot).toHaveBeenCalledWith('7082', { overlay: { theme: 'light' } })
   })
 
   it('setSlot troca o slot ativo; status usa slot ativo', async () => {

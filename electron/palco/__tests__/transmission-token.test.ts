@@ -63,10 +63,13 @@ describe('token requirement', () => {
   it('prints the token in links only when it is required', async () => {
     const slot = new PalcoSlot('links', 'Links', await freePort(), await freePort(), () => null)
     try {
+      expect(slot.status().overlayUrl).toBeNull()
       await slot.start()
       expect(slot.status().receiverUrl).toContain(`?token=${getPalcoToken()}`)
+      expect(slot.status().overlayUrl).toMatch(new RegExp(`:${slot.httpPort}/overlay\\?token=${getPalcoToken()}$`))
       setTransmissionState({ bind: 'all', requireToken: false })
       expect(slot.status().receiverUrl).toMatch(/\/$/)
+      expect(slot.status().overlayUrl).toMatch(/\/overlay$/)
     } finally { await slot.dispose() }
   }, 10000)
 
@@ -75,6 +78,13 @@ describe('token requirement', () => {
     expect(JSON.parse(readFileSync(path.join(env.root, 'palco-transmission.json'), 'utf8')).requireToken).toBe(false)
     expect(await env.handlers.get('palco:transmission-get')!({})).toMatchObject({ requireToken: false, token: getPalcoToken() })
   })
+})
+
+it('lists connections with port, style and error details for the settings screen', async () => {
+  const [principal] = await env.handlers.get('palco:slots')!({})
+  expect(principal).toMatchObject({ id: '0', label: 'Principal', running: false, clients: 0, httpPort: 7080, wsPort: 7081, overlay: { layout: 'lower-third' } })
+  expect(principal).toHaveProperty('error')
+  expect(principal).toHaveProperty('overlayUrl', null)
 })
 
 describe('token reset', () => {

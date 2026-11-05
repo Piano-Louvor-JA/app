@@ -336,6 +336,7 @@ class PalcoSlot {
   /** Status deste slot. */
   status() {
     const host = lanIp()
+    const tokenQuery = requiredToken() ? `?token=${requiredToken()}` : ''
     return {
       id: this.#id,
       label: this.#label,
@@ -350,9 +351,8 @@ class PalcoSlot {
       url: `http://${host}:${this.#httpPort}`,
       wsUrl: `ws://${host}:${this.#wsPort}/palco`,
       // OBS S1: receiver URL pronta com token (UI copia/cola no OBS Browser Source)
-      receiverUrl: this.#running
-        ? `http://${host}:${this.#httpPort}/${requiredToken() ? `?token=${requiredToken()}` : ''}`
-        : null,
+      receiverUrl: this.#running ? `http://${host}:${this.#httpPort}/${tokenQuery}` : null,
+      overlayUrl: this.#running ? `http://${host}:${this.#httpPort}/overlay${tokenQuery}` : null,
     }
   }
 
@@ -814,9 +814,7 @@ export function attachPalcoServer(getContents) {
   })
 
   // IPC: lista slots
-  ipcMain.handle('palco:slots', () =>
-    manager.getAllSlots().map(s => ({ id: s.id, label: s.label, running: s.running, clients: s.clientsCount, httpPort: s.httpPort, wsPort: s.wsPort }))
-  )
+  ipcMain.handle('palco:slots', () => manager.getAllSlots().map(slot => manager.statusOf(slot)))
 
   // IPC: cria slot
   ipcMain.handle('palco:slot-create', (_e, { label }) => {
