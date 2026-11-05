@@ -37,12 +37,13 @@ const VERSE = {
 }
 
 describe('tela de espera das conexões de transmissão', () => {
-  it('sem transmissão, mostra fundo preto, o logo do Piano e "Aguardando transmissão"', () => {
+  it('sem transmissão, mostra fundo preto, o logo do Louvor JA e "Aguardando transmissão"', () => {
     for (const path of ['/espelho', '/retorno', '/']) {
       const { w, waiting, visible } = receiver(path)
       expect(visible()).toBe(true)
       expect(w.getComputedStyle(waiting()).backgroundColor).toBe('rgb(0, 0, 0)')
-      expect(waiting().querySelector('.cast-waiting__logo svg[aria-label="codename PIANO"]')).toBeTruthy()
+      expect(waiting().querySelector('.cast-waiting__logo svg[viewBox="0 0 565 594"]')).toBeTruthy()
+      expect(waiting().querySelector('[aria-label="codename PIANO"]')).toBeNull()
       expect(waiting().querySelector('.cast-waiting__text')!.textContent).toBe('Aguardando transmissão')
     }
   })
@@ -50,6 +51,7 @@ describe('tela de espera das conexões de transmissão', () => {
   it('o logo aparece e apaga suavemente, sem animar para quem pede menos movimento', () => {
     const html = readFileSync(resolve('electron/palco/receiver.html'), 'utf8')
     expect(html).toMatch(/\.cast-waiting__logo\{[^}]*animation:castWaitingFade [\d.]+s ease-in-out infinite/)
+    expect(html).toMatch(/\.cast-waiting__logo\{[^}]*height:min\(1[0-2]vh,/)
     expect(html).toMatch(/@keyframes castWaitingFade\{0%,100%\{opacity:\.[2-5]\d*\}50%\{opacity:1\}\}/)
     expect(html).toMatch(/@media \(prefers-reduced-motion:reduce\)\{[^@]*\.cast-waiting__logo\{animation:none/)
   })
