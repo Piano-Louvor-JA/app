@@ -661,6 +661,11 @@ function attachProjectionWindowHandlers(parentWindow) {
             parentWindow.webContents.send('projection:close-requested')
             return
           }
+          // Esc + Enter: o operador só encerra se o confirm estiver aberto.
+          if (input.key === 'Enter' && !independent) {
+            parentWindow.webContents.send('projection:confirm-close-requested')
+            return
+          }
           const childUrl = childWindow.webContents.getURL()
           const isMediaProjection =
             /[?&#]module=media(?:&|$)/.test(childUrl) ||
