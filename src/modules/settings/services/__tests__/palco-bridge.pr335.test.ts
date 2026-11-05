@@ -12,6 +12,7 @@ const palcoSessionMock = vi.hoisted(() => ({
   timerTo: vi.fn(async () => true),
   idleTo: vi.fn(async () => true),
   hymnAudio: vi.fn(async () => {}),
+  stageReturn: vi.fn(async () => {}),
 }))
 const unsubscribeMocks = {
   bible: vi.fn(),

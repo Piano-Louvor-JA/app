@@ -623,6 +623,7 @@ export function startPalcoBridge() {
     normalizeMediaRuntime,
     (v) => {
       runtimes.media = v
+      void palcoSession.stageReturn(v)
       setIntent('media', Boolean(v.active && (v.lyric || v.title)))
     },
   )
@@ -712,7 +713,10 @@ export function startPalcoBridge() {
   const audioTimer = window.setInterval(syncAudio, 3000)
   unwatchers.push(() => window.clearInterval(audioTimer))
   const refreshObs = () => { if (started) void renderAllSlots() }
-  const unsubscribeReceiver = palcoSession.onReceiverConnected?.(refreshObs)
+  const unsubscribeReceiver = palcoSession.onReceiverConnected?.(() => {
+    refreshObs()
+    if (started) void palcoSession.stageReturn(runtimes.media)
+  })
   if (typeof unsubscribeReceiver === 'function') unwatchers.push(unsubscribeReceiver)
   window.addEventListener('obs-connections-changed', refreshObs)
   const obsTimer = window.setInterval(() => {
@@ -728,6 +732,7 @@ export function startPalcoBridge() {
   unwatchers.push(
     subscribeStageSettings(() => {
       void renderAllSlots()
+      void palcoSession.stageReturn(runtimes.media)
     }),
   )
 

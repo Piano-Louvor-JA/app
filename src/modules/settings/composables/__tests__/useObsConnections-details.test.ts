@@ -27,16 +27,16 @@ beforeEach(() => {
 it('lists the main source first with port, style, links and error from the main process', async () => {
   session.slots.mockResolvedValue([
     { id: '7082', label: 'OBS 2', running: false, clients: 0, httpPort: 9100, wsPort: 9101, error: { code: 'port-in-use', port: 9100, suggestedPort: 9102 } },
-    { id: '0', label: 'Principal', running: true, clients: 2, httpPort: 7080, wsPort: 7081, overlay, overlayUrl: 'http://192.168.0.5:7080/overlay?token=AB12C', receiverUrl: 'http://192.168.0.5:7080/?token=AB12C', receiverIps: ['192.168.0.9'] },
+    { id: '0', label: 'Principal', running: true, clients: 2, httpPort: 7080, wsPort: 7081, overlay, overlayUrl: 'http://192.168.0.5:7080/overlay?token=AB12C', receiverUrl: 'http://192.168.0.5:7080/?token=AB12C', returnUrl: 'http://192.168.0.5:7080/retorno?token=AB12C', receiverIps: ['192.168.0.9'] },
   ])
   let state!: ReturnType<typeof useObsConnections>
   const wrapper = mount(defineComponent({ setup() { state = useObsConnections(); return () => h('div') } }))
   await refreshObsConnections()
   await nextTick()
   const [main, extra] = state.connections.value
-  expect(main).toMatchObject({ id: '0', label: 'OBS 1', running: true, clients: 2, httpPort: 7080, overlay, overlayUrl: 'http://192.168.0.5:7080/overlay?token=AB12C', receiverUrl: 'http://192.168.0.5:7080/?token=AB12C', receiverIps: ['192.168.0.9'], error: null })
+  expect(main).toMatchObject({ id: '0', label: 'OBS 1', running: true, clients: 2, httpPort: 7080, overlay, overlayUrl: 'http://192.168.0.5:7080/overlay?token=AB12C', receiverUrl: 'http://192.168.0.5:7080/?token=AB12C', returnUrl: 'http://192.168.0.5:7080/retorno?token=AB12C', receiverIps: ['192.168.0.9'], error: null })
   expect(main).not.toHaveProperty('nickname')
-  expect(extra).toMatchObject({ id: '7082', label: 'OBS 2', running: false, httpPort: 9100, error: { code: 'port-in-use', suggestedPort: 9102 }, overlayUrl: null })
+  expect(extra).toMatchObject({ id: '7082', label: 'OBS 2', running: false, httpPort: 9100, error: { code: 'port-in-use', suggestedPort: 9102 }, overlayUrl: null, returnUrl: null })
   expect(extra.overlay).toMatchObject({ layout: 'lower-third', theme: 'dark' })
   wrapper.unmount()
 })

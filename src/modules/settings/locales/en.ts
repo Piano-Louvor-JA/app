@@ -395,6 +395,8 @@ export default {
       overlayHint: 'Text only, with a transparent background, to place over the camera.',
       replica: 'Stage replica',
       replicaHint: 'The same as the TV shows, with video and audio.',
+      stageReturn: 'Stage monitor',
+      stageReturnHint: 'Return screen during songs, with the current and next line; otherwise the same as the TV, without sound.',
       waitingLinks: 'Start the connection to get the links.',
       copy: 'Copy',
       copied: 'Copied',

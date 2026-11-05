@@ -397,6 +397,8 @@ export default {
       overlayHint: 'Solo el texto, con fondo transparente, para poner sobre la cámara.',
       replica: 'Réplica del Palco',
       replicaHint: 'Lo mismo que aparece en la TV, con video y audio.',
+      stageReturn: 'Retorno de escenario',
+      stageReturnHint: 'Pantalla de retorno en las canciones, con la frase actual y la siguiente; en otros momentos, lo mismo que la TV, sin sonido.',
       waitingLinks: 'Inicia la conexión para generar los enlaces.',
       copy: 'Copiar',
       copied: 'Copiado',

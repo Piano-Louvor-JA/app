@@ -42,6 +42,7 @@ const cards = computed<TransmissionConnection[]>(() => connections.value
     overlay: connection.overlay,
     overlayUrl: connection.overlayUrl,
     receiverUrl: connection.receiverUrl,
+    returnUrl: connection.returnUrl,
   })))
 const onAir = computed(() => cards.value.filter((card) => card.running))
 const allOnAir = computed(() => onAir.value.length === cards.value.length)

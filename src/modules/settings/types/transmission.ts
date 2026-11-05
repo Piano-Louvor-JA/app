@@ -74,6 +74,7 @@ export interface PalcoSlotStatus {
   overlay?: OverlayStyle
   url?: string
   receiverUrl?: string | null
+  returnUrl?: string | null
   overlayUrl?: string | null
 }
 
@@ -102,4 +103,5 @@ export interface TransmissionConnection {
   overlay: OverlayStyle
   overlayUrl: string | null
   receiverUrl: string | null
+  returnUrl: string | null
 }

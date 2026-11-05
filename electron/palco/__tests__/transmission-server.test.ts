@@ -12,7 +12,7 @@ vi.mock('electron', () => ({
   ipcMain: { handle: (name: string, fn: (...args: any[]) => any) => env.handlers.set(name, fn) },
 }))
 // @ts-ignore Native runtime module.
-import { attachPalcoServer, getPalcoManager, PalcoSlot, setTransmissionState } from '../../palco-server.mjs'
+import { attachPalcoServer, enablePalcoToken, getPalcoManager, PalcoSlot, setTransmissionState } from '../../palco-server.mjs'
 
 env.root = mkdtempSync(path.join(tmpdir(), 'piano-transmission-server-'))
 afterAll(() => rmSync(env.root, { recursive: true, force: true }))
@@ -121,6 +121,36 @@ describe('PalcoSlot overlay style', () => {
       await slot.stop()
       await slot.start()
       expect(await nextStyle()).toMatchObject({ layout: 'lower-third', theme: 'transparent', textScale: 120 })
+    } finally {
+      clients.forEach(client => client.terminate())
+      await slot.dispose()
+    }
+  }, 10000)
+})
+
+describe('PalcoSlot stage return', () => {
+  it('serves the stage return page and replays its state with an authenticated background', async () => {
+    const token = enablePalcoToken()
+    const slot = new PalcoSlot('return', 'Return', await freePort(), await freePort(), () => null)
+    const clients: WebSocket[] = []
+    const nextReturn = () => new Promise<any>((resolve, reject) => {
+      const client = new WebSocket(`ws://127.0.0.1:${slot.wsPort}/palco`)
+      clients.push(client)
+      client.once('error', reject)
+      client.on('message', raw => { const message = JSON.parse(String(raw)); if (message.type === 'stageReturn') resolve(message) })
+    })
+    try {
+      await slot.start()
+      const page = await fetch(`http://127.0.0.1:${slot.httpPort}/retorno`)
+      expect(page.status).toBe(200)
+      expect(page.headers.get('content-type')).toContain('text/html')
+      expect(await page.text()).toContain('id="stageReturn"')
+      const background = `http://192.168.0.5:${slot.httpPort}/media/capa.png`
+      slot.send({ v: 1, type: 'stageReturn', active: true, current: 'Santo', next: '', background })
+      slot.send({ v: 2, type: 'idle' })
+      const replayed = await nextReturn()
+      expect(replayed).toMatchObject({ active: true, current: 'Santo' })
+      expect(new URL(replayed.background).searchParams.get('token')).toBe(token)
     } finally {
       clients.forEach(client => client.terminate())
       await slot.dispose()

@@ -9,7 +9,11 @@ import {
   readMediaRuntimeFromStorage,
   writeMediaRuntimeToStorage,
 } from '../services/media-runtime'
-import { stripHtmlBreaks } from '../services/media-slides'
+import {
+  isReturnCover as isCoverSlide,
+  returnNextPhrase as nextPhraseOf,
+  returnPhrase as phraseOf,
+} from '../services/return-phrases'
 import { readEffectiveStageSettings, subscribeStageSettings } from '../../settings/services/stage-settings-runtime'
 import type { StageSettings } from '../../settings/types/stage-settings'
 import { resolveBackgroundImage,
@@ -51,21 +55,6 @@ let barSample = 0
 let barSampleAt = 0
 let barVel = 0
 let barLastTick = 0
-
-function isCoverSlide(state: MediaProjectionRuntime) {
-  return state.isCover || (!stripHtmlBreaks(state.lyric) && Boolean(state.title))
-}
-
-function phraseOf(state: MediaProjectionRuntime) {
-  if (isCoverSlide(state)) return state.title
-  return stripHtmlBreaks(state.lyric)
-}
-
-function nextPhraseOf(state: MediaProjectionRuntime) {
-  const lyric = stripHtmlBreaks(state.nextLyric)
-  if (state.nextIsCover && !lyric) return state.title
-  return lyric
-}
 
 function prefersReducedMotion() {
   return (

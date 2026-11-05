@@ -40,6 +40,7 @@ export function useObsConnections() {
         overlay: { ...DEFAULT_OVERLAY_STYLE, ...slot?.overlay },
         overlayUrl: slot?.overlayUrl ?? null,
         receiverUrl: slot?.receiverUrl ?? null,
+        returnUrl: slot?.returnUrl ?? null,
       }
     })
     .sort((a, b) => Number(b.id === '0') - Number(a.id === '0')))

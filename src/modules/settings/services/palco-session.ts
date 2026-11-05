@@ -14,6 +14,8 @@ import {
   type StageSettings,
 } from '../types/stage-settings'
 import { getPalcoRoute, type PalcoModule } from './palco-routing'
+import { buildStageReturn } from './stage-return'
+import type { MediaProjectionRuntime } from '../../media/types/media'
 import type {
   PalcoSlotStatus,
   SlotUpdate,
@@ -366,6 +368,18 @@ class PalcoSession {
     for (const target of targets) {
       await this.projectTo(target.id, scope, input)
     }
+  }
+
+  /** Retorno de palco (/retorno) em toda conexão no ar: segue a música, não a rota da TV. */
+  async stageReturn(runtime: MediaProjectionRuntime): Promise<void> {
+    if (!this.isElectron) return
+    const stage = readEffectiveStageSettings('hymns')
+    const background = runtime.active ? resolveBackgroundImage(stage.backgroundImage) ?? runtime.imageUrl : null
+    const slots = (await this.slots()).filter((slot) => slot.running)
+    await Promise.all(slots.map(async (slot) => {
+      const resolved = background ? await this.forSlot(slot.id).resolveBgUrl(background) : undefined
+      await palcoApi().send(buildStageReturn(runtime, stage, resolved), slot.id)
+    }))
   }
 
   /** BG permanente do palco (idle) — bg global do stage. */

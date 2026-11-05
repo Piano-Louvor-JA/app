@@ -307,7 +307,7 @@ class PalcoSlot {
     // Mesmo gate para o BG/cover da projection: <img> não manda header, e
     // localhost bypass escondia o 403 — browser/OBS/TV buscavam
     // http://<lan>:47080/media/... sem token → 403 → onerror → fallback FIXO.
-    const bgUrl = m.type === 'projection' ? (m.background ?? m.cover) : undefined
+    const bgUrl = m.type === 'projection' || m.type === 'stageReturn' ? (m.background ?? m.cover) : undefined
     if (token && typeof bgUrl === 'string' && bgUrl.includes('/media/')) {
       try {
         const u = new URL(bgUrl)
@@ -353,6 +353,7 @@ class PalcoSlot {
       // OBS S1: receiver URL pronta com token (UI copia/cola no OBS Browser Source)
       receiverUrl: this.#running ? `http://${host}:${this.#httpPort}/${tokenQuery}` : null,
       overlayUrl: this.#running ? `http://${host}:${this.#httpPort}/overlay${tokenQuery}` : null,
+      returnUrl: this.#running ? `http://${host}:${this.#httpPort}/retorno${tokenQuery}` : null,
     }
   }
 
@@ -398,8 +399,8 @@ class PalcoSlot {
       return
     }
 
-    // Receiver embutido (mesma página do palco-receiver)
-    if (p === '/' || p === '/receiver.html' || p === '/index.html') {
+    // Receiver embutido (mesma página do palco-receiver); em /retorno ele vira o retorno de palco
+    if (p === '/' || p === '/receiver.html' || p === '/index.html' || p === '/retorno') {
       try {
         const page = await readFile(path.join(__dirname, 'palco', 'receiver.html'))
         // Versão do RECEIVER (appinfo.json embutido, mesmo do .ipk webOS) —

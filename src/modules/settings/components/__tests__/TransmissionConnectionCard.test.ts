@@ -13,7 +13,7 @@ const i18n = createI18n({ legacy: false, locale: 'pt-BR', messages: { 'pt-BR': p
 function connection(overrides: Partial<TransmissionConnection> = {}): TransmissionConnection {
   return {
     id: '0', name: 'Fonte 1', running: false, clients: 0, receiverIps: [], httpPort: 47080, error: null,
-    overlay: { ...DEFAULT_OVERLAY_STYLE }, overlayUrl: null, receiverUrl: null, ...overrides,
+    overlay: { ...DEFAULT_OVERLAY_STYLE }, overlayUrl: null, receiverUrl: null, returnUrl: null, ...overrides,
   }
 }
 function mountCard(value: TransmissionConnection, extra: Record<string, unknown> = {}) {
@@ -55,6 +55,7 @@ it('extra source on air: both links, reload, delete and a locked port', async ()
   const card = mountCard(connection({
     id: '7082', name: 'Fonte 2', running: true, clients: 2, receiverIps: ['192.168.0.9', '192.168.0.12'], httpPort: 7082,
     overlayUrl: 'http://192.168.0.5:7082/overlay?token=AB12C', receiverUrl: 'http://192.168.0.5:7082/?token=AB12C',
+    returnUrl: 'http://192.168.0.5:7082/retorno?token=AB12C',
   }))
   expect(card.classes()).toContain('transmission-card--on')
   expect(card.text()).toContain('No ar')
@@ -64,12 +65,16 @@ it('extra source on air: both links, reload, delete and a locked port', async ()
   expect(card.text()).toContain('Encerre a conexão para trocar a porta.')
   expect(card.get('[data-test="port"]').attributes('disabled')).toBeDefined()
   const links = card.findAllComponents(TransmissionLinkRow)
-  expect(links.map(link => link.props('url'))).toEqual(['http://192.168.0.5:7082/overlay?token=AB12C', 'http://192.168.0.5:7082/?token=AB12C'])
+  expect(links.map(link => link.props('url'))).toEqual(['http://192.168.0.5:7082/overlay?token=AB12C', 'http://192.168.0.5:7082/?token=AB12C', 'http://192.168.0.5:7082/retorno?token=AB12C'])
   expect(links[0]!.props('primary')).toBe(true)
+  expect(links[2]!.props('label')).toBe('Retorno de palco')
+  expect(links[2]!.props('primary')).toBe(false)
+  links[2]!.vm.$emit('qr', 'http://192.168.0.5:7082/retorno?token=AB12C')
+  expect(card.emitted('qr')).toEqual([['http://192.168.0.5:7082/retorno?token=AB12C', 'Fonte 2 · Retorno de palco']])
   links[1]!.vm.$emit('qr', 'http://192.168.0.5:7082/?token=AB12C')
-  expect(card.emitted('qr')).toEqual([['http://192.168.0.5:7082/?token=AB12C', 'Fonte 2 · Réplica do Palco']])
+  expect(card.emitted('qr')![1]).toEqual(['http://192.168.0.5:7082/?token=AB12C', 'Fonte 2 · Réplica do Palco'])
   links[0]!.vm.$emit('qr', 'http://192.168.0.5:7082/overlay?token=AB12C')
-  expect(card.emitted('qr')![1]).toEqual(['http://192.168.0.5:7082/overlay?token=AB12C', 'Fonte 2 · Overlay para OBS'])
+  expect(card.emitted('qr')![2]).toEqual(['http://192.168.0.5:7082/overlay?token=AB12C', 'Fonte 2 · Overlay para OBS'])
   const actions = card.findAll('.transmission-card__actions button').map((b) => b.attributes('data-test'))
   expect(actions).toEqual(['reload', 'toggle', 'remove'])
   expect(card.find('.transmission-card__links [data-test="reload"]').exists()).toBe(false)

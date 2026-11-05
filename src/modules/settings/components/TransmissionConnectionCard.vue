@@ -51,6 +51,7 @@ const failure = computed(() => {
 const links = computed(() => [
   { key: 'overlay', url: props.connection.overlayUrl, label: t('settings.transmission.overlay'), hint: t('settings.transmission.overlayHint'), primary: true },
   { key: 'replica', url: props.connection.receiverUrl, label: t('settings.transmission.replica'), hint: t('settings.transmission.replicaHint'), primary: false },
+  { key: 'stageReturn', url: props.connection.returnUrl, label: t('settings.transmission.stageReturn'), hint: t('settings.transmission.stageReturnHint'), primary: false },
 ].filter((link): link is typeof link & { url: string } => Boolean(link.url)))
 
 const styleOpen = ref(false)

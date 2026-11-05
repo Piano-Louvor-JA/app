@@ -85,6 +85,7 @@ vi.mock("../services/palco-session", async () => {
 				msg: payload as Record<string, unknown>,
 			});
 		},
+		async stageReturn() {},
 		onEvent: () => () => {},
 		__sends: sendsList,
 	};
