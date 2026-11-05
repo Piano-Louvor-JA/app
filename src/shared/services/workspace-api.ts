@@ -61,3 +61,41 @@ export function resolveDatabaseUrl(relativePath: string): string {
   const path = relativePath.startsWith('/') ? relativePath : `/${relativePath}`
   return `${normalizedBase}${path}`
 }
+
+/**
+ * SPEC piano-bundle-sync ADR-01: estado de sync por artifact
+ * (`catalog` | `bible`), persistido no workspace via bridge.
+ */
+export type BundleSyncArtifact = 'catalog' | 'bible'
+
+export type BundleSyncState = {
+  md5: string
+  checkedAtEpochMs: number
+  appliedAtEpochMs: number
+  schema: 1
+}
+
+const BUNDLE_STATE_KEY = 'bundleSync.state.v1'
+
+type BundleStateFile = Partial<Record<BundleSyncArtifact, BundleSyncState>>
+
+export async function readBundleSyncState(
+  artifact: BundleSyncArtifact,
+): Promise<BundleSyncState | null> {
+  const file = await readCatalogRecord<BundleStateFile>(BUNDLE_STATE_KEY)
+  return file?.[artifact] ?? null
+}
+
+export async function writeBundleSyncState(
+  artifact: BundleSyncArtifact,
+  state: BundleSyncState | null,
+): Promise<void> {
+  const file =
+    (await readCatalogRecord<BundleStateFile>(BUNDLE_STATE_KEY)) ?? {}
+  if (state == null) {
+    delete file[artifact]
+  } else {
+    file[artifact] = state
+  }
+  await writeCatalogRecord(BUNDLE_STATE_KEY, file)
+}

@@ -123,10 +123,10 @@ describe("resolveMediaUrl", () => {
 		expect(resolveMediaUrl("/audio/10.mp3")).toBe("local://media/audio/10.mp3");
 	});
 
-	it("web usa base da API", () => {
+	it("web usa base R2 (SPEC bundle-sync ADR-04)", () => {
 		mocks.isDesktopApp.mockReturnValue(false);
 		expect(resolveMediaUrl("slides/1.png")).toBe(
-			"https://api-stg.pianolouvorja.com.br/file/slides/1.png",
+			"https://files.louvorja.com.br/slides/1.png",
 		);
 	});
 
@@ -165,11 +165,11 @@ describe("resolveDatabaseUrl", () => {
 });
 
 describe("resolveMediaUrl — ramos VITE_URL_FILES", () => {
-	it("web sem VITE_URL_FILES usa default", () => {
+	it("web sem VITE_URL_FILES usa default R2", () => {
 		mocks.isDesktopApp.mockReturnValue(false);
 		delete (import.meta.env as Record<string, unknown>).VITE_URL_FILES;
 		expect(resolveMediaUrl("slides/2.png")).toBe(
-			"https://api-stg.pianolouvorja.com.br/file/slides/2.png",
+			"https://files.louvorja.com.br/slides/2.png",
 		);
 	});
 

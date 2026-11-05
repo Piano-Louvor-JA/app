@@ -2,6 +2,7 @@ import { getDesktopBridge, isDesktopApp } from '@shared/services/desktop-bridge'
 import { defaultFilesBase } from './api-env'
 import { fetchRemoteCatalogJson } from '@shared/services/remote-catalog'
 import { readCatalogRecord } from '@shared/services/workspace-api'
+import { syncBundle } from '@shared/services/bundle-sync-client'
 import { getCurrentApiPrefix } from '@modules/sync/services/library-catalog'
 import { CUSTOM_MUSIC_ID_OFFSET } from '@modules/media/services/custom-catalog'
 
@@ -189,6 +190,19 @@ async function readMusicRecord(
   // json_db remoto — tentar buscar gerava 404 em cascata nas 3 APIs
   // (feedback Ezequias/Rafael 02/10).
   if (musicId < 0) return null
+
+  // SPEC piano-bundle-sync: quando falta local, tentar 1x o bundle do
+  // catálogo (1 request) antes do fetch item-a-item (ADR-03 — o fallback
+  // legado permanece para o caso do bundle falhar).
+  try {
+    const bundleResult = await syncBundle('catalog')
+    if (bundleResult != null && 'records' in bundleResult) {
+      const bundled = await readCatalogRecord<CatalogMusicRecord>(filename)
+      if (bundled != null) return bundled
+    }
+  } catch {
+    // bundle nunca bloqueia o fluxo legado
+  }
 
   try {
     return await fetchRemoteCatalogJson<CatalogMusicRecord>(filename)
