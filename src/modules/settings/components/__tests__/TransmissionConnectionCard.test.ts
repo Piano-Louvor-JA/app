@@ -51,7 +51,7 @@ it('main source stopped: editable port with the TV warning, no links and no dele
   expect(card.emitted('toggle')).toHaveLength(1)
 })
 
-it('extra source on air: both links, reload, delete and a locked port', async () => {
+it('extra source on air: mirror and stage return only (no caption), reload, delete and a locked port', async () => {
   const card = mountCard(connection({
     id: '7082', name: 'Fonte 2', running: true, clients: 2, receiverIps: ['192.168.0.9', '192.168.0.12'], httpPort: 7082,
     overlayUrl: 'http://192.168.0.5:7082/legenda?token=AB12C', receiverUrl: 'http://192.168.0.5:7082/espelho?token=AB12C',
@@ -65,16 +65,15 @@ it('extra source on air: both links, reload, delete and a locked port', async ()
   expect(card.text()).toContain('Encerre a conexão para trocar a porta.')
   expect(card.get('[data-test="port"]').attributes('disabled')).toBeDefined()
   const links = card.findAllComponents(TransmissionLinkRow)
-  expect(links.map(link => link.props('url'))).toEqual(['http://192.168.0.5:7082/legenda?token=AB12C', 'http://192.168.0.5:7082/espelho?token=AB12C', 'http://192.168.0.5:7082/retorno?token=AB12C'])
-  expect(links[0]!.props('primary')).toBe(true)
-  expect(links[2]!.props('label')).toBe('Retorno de palco')
-  expect(links[2]!.props('primary')).toBe(false)
-  links[2]!.vm.$emit('qr', 'http://192.168.0.5:7082/retorno?token=AB12C')
+  expect(links.map(link => link.props('url'))).toEqual(['http://192.168.0.5:7082/espelho?token=AB12C', 'http://192.168.0.5:7082/retorno?token=AB12C'])
+  expect(card.text()).not.toContain('Legenda para OBS')
+  expect(card.find('[data-test="style-toggle"]').exists()).toBe(false)
+  expect(links[1]!.props('label')).toBe('Retorno de palco')
+  expect(links.every(link => link.props('primary') === false)).toBe(true)
+  links[1]!.vm.$emit('qr', 'http://192.168.0.5:7082/retorno?token=AB12C')
   expect(card.emitted('qr')).toEqual([['http://192.168.0.5:7082/retorno?token=AB12C', 'Fonte 2 · Retorno de palco']])
-  links[1]!.vm.$emit('qr', 'http://192.168.0.5:7082/espelho?token=AB12C')
+  links[0]!.vm.$emit('qr', 'http://192.168.0.5:7082/espelho?token=AB12C')
   expect(card.emitted('qr')![1]).toEqual(['http://192.168.0.5:7082/espelho?token=AB12C', 'Fonte 2 · Espelho do Palco'])
-  links[0]!.vm.$emit('qr', 'http://192.168.0.5:7082/legenda?token=AB12C')
-  expect(card.emitted('qr')![2]).toEqual(['http://192.168.0.5:7082/legenda?token=AB12C', 'Fonte 2 · Legenda para OBS'])
   const actions = card.findAll('.transmission-card__actions button').map((b) => b.attributes('data-test'))
   expect(actions).toEqual(['reload', 'toggle', 'remove'])
   expect(card.find('.transmission-card__links [data-test="reload"]').exists()).toBe(false)
@@ -139,6 +138,9 @@ it('shows the overlay appearance inside the overlay link box, and still offers i
   await card.setProps({ connection: connection() })
   expect(card.findAll('[data-test="style-toggle"]')).toHaveLength(1)
   expect(card.findComponent(TransmissionOverlayStyle).exists()).toBe(true)
+  await card.setProps({ connection: connection({ id: '47082', name: 'Fonte 2' }) })
+  expect(card.find('[data-test="style-toggle"]').exists()).toBe(false)
+  expect(card.findComponent(TransmissionOverlayStyle).exists()).toBe(false)
 })
 
 it('opens the overlay appearance editor and forwards the chosen style', async () => {

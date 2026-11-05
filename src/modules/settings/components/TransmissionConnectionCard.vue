@@ -48,8 +48,10 @@ const failure = computed(() => {
     : t('settings.transmission.startFailed')
 })
 
+/** A legenda é só do servidor principal (OBS); as conexões adicionais servem a outros dispositivos. */
+const isMain = computed(() => props.connection.id === '0')
 const links = computed(() => [
-  { key: 'overlay', url: props.connection.overlayUrl, label: t('settings.transmission.overlay'), hint: t('settings.transmission.overlayHint'), primary: true },
+  { key: 'overlay', url: isMain.value ? props.connection.overlayUrl : null, label: t('settings.transmission.overlay'), hint: t('settings.transmission.overlayHint'), primary: true },
   { key: 'replica', url: props.connection.receiverUrl, label: t('settings.transmission.replica'), hint: t('settings.transmission.replicaHint'), primary: false },
   { key: 'stageReturn', url: props.connection.returnUrl, label: t('settings.transmission.stageReturn'), hint: t('settings.transmission.stageReturnHint'), primary: false },
 ].filter((link): link is typeof link & { url: string } => Boolean(link.url)))
@@ -146,7 +148,7 @@ const styleOpen = ref(false)
       </div>
     </div>
 
-    <div v-if="!links.some((link) => link.key === 'overlay')" class="transmission-card__style">
+    <div v-if="isMain && !links.some((link) => link.key === 'overlay')" class="transmission-card__style">
       <button type="button" class="transmission-card__style-toggle" data-test="style-toggle"
         :aria-expanded="styleOpen" @click="styleOpen = !styleOpen">
         <i class="ti" :class="styleOpen ? 'ti-chevron-up' : 'ti-chevron-down'" aria-hidden="true" />
