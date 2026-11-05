@@ -17,7 +17,6 @@ const session = vi.hoisted(() => ({
   updateSlot: vi.fn(),
   warmupObs: vi.fn(),
   refreshObs: vi.fn(),
-  syncObsIdle: vi.fn(),
   getConnectionPersistence: vi.fn(),
   setConnectionPersistence: vi.fn(),
 }))
@@ -30,7 +29,7 @@ vi.mock('../../components/TransmissionNetworkCard.vue', () => ({
 import TransmissionView from '../TransmissionView.vue'
 import TransmissionConnectionCard from '../../components/TransmissionConnectionCard.vue'
 import TransmissionQrDialog from '../../components/TransmissionQrDialog.vue'
-import { obsBlackIdle, obsConnections } from '../../services/obs-connections'
+import { obsConnections } from '../../services/obs-connections'
 
 const i18n = createI18n({ legacy: false, locale: 'pt-BR', messages: { 'pt-BR': { ...ptBR, common: { cancel: 'Cancelar' } } } })
 let state: PalcoSlotStatus[]
@@ -46,7 +45,6 @@ beforeEach(() => {
   vi.clearAllMocks()
   localStorage.clear()
   obsConnections.value = []
-  obsBlackIdle.value = false
   document.body.innerHTML = ''
   state = [slot('0', 7080), slot('7082', 7082, { running: true, clients: 3, overlayUrl: 'http://192.168.0.5:7082/overlay', receiverUrl: 'http://192.168.0.5:7082/' })]
   session.slots.mockImplementation(async () => state.map(item => ({ ...item })))
@@ -100,7 +98,6 @@ it('starts the main source with the stage greeting and stops the others directly
   await flushPromises()
   expect(session.turnOn).toHaveBeenCalledOnce()
   expect(session.warmupObs).toHaveBeenCalledWith('0')
-  expect(session.syncObsIdle).toHaveBeenCalledWith('0')
   expect(cards(view)[0]!.props('connection').running).toBe(true)
   cards(view)[1]!.vm.$emit('toggle')
   await flushPromises()
@@ -293,7 +290,7 @@ it('keeps a custom connection name and refreshes the list after a network change
   view.unmount()
 })
 
-it('saves the restart preference and the black background option', async () => {
+it('saves the restart preference and no longer offers the black background option', async () => {
   const view = await mountView()
   expect(session.getConnectionPersistence).toHaveBeenCalledOnce()
   const preserve = view.get('[data-test="preserve-connections"]')
@@ -307,12 +304,8 @@ it('saves the restart preference and the black background option', async () => {
   await flushPromises()
   expect(preserve.attributes('aria-checked')).toBe('true')
   expect(view.get('.transmission-view__error').text()).toBe('Não foi possível salvar a preferência das conexões.')
-  const black = view.get('[data-test="black-idle"]')
-  await black.trigger('click')
-  expect(obsBlackIdle.value).toBe(true)
-  expect(session.syncObsIdle).toHaveBeenCalledWith('7082')
-  expect(session.syncObsIdle).not.toHaveBeenCalledWith('0')
-  expect(view.text()).toContain('Marcado: fundo preto. Músicas mantêm seus fundos.')
+  expect(view.find('[data-test="black-idle"]').exists()).toBe(false)
+  expect(view.text()).not.toContain('Ignorar fundo personalizado')
   view.unmount()
 })
 
@@ -320,6 +313,6 @@ it('keeps the restart switch off when the preference cannot be read', async () =
   session.getConnectionPersistence.mockRejectedValueOnce(new Error('ipc'))
   const view = await mountView()
   expect(view.get('[data-test="preserve-connections"]').attributes('aria-checked')).toBe('false')
-  expect(view.text()).toContain('Desmarcado: cada módulo usa o próprio fundo.')
+  expect(view.text()).toContain('Ao abrir o app, religa as fontes que estavam no ar.')
   view.unmount()
 })

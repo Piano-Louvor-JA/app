@@ -10,10 +10,8 @@ import TransmissionQrDialog from '../components/TransmissionQrDialog.vue'
 import { startObsConnection, stopObsConnection, useObsConnections } from '../composables/useObsConnections'
 import {
   notifyObsChanged,
-  obsBlackIdle,
   obsConnections,
   registerObsConnection,
-  setObsBlackIdle,
   setObsNickname,
   unregisterObsConnection,
 } from '../services/obs-connections'
@@ -66,7 +64,6 @@ async function run(key: string, task: () => Promise<void>, failure: string) {
 
 /** O teste de inicialização roda em segundo plano: o OBS pode ainda não estar aberto. */
 function greet(id: string) {
-  palcoSession.syncObsIdle(id)
   void palcoSession.warmupObs(id).catch(() => {})
 }
 
@@ -165,11 +162,6 @@ async function changePreserve(enabled: boolean) {
   catch { pageError.value = t('settings.transmission.behavior.preserveFailed') }
 }
 
-function changeBlackIdle(enabled: boolean) {
-  setObsBlackIdle(enabled)
-  for (const card of onAir.value) palcoSession.syncObsIdle(card.id)
-}
-
 const steps = computed(() => [1, 2, 3, 4].map((step) => t(`settings.transmission.howTo.step${step}`)))
 
 /** Espaço ao lado do título de Configurações; fora dela o status fica na barra. */
@@ -227,14 +219,6 @@ onMounted(() => {
         </span>
         <SettingsToggle data-test="preserve-connections" :model-value="preserve"
           :label="t('settings.transmission.behavior.preserve')" @update:model-value="changePreserve" />
-      </div>
-      <div class="transmission-view__row">
-        <span class="transmission-view__label">
-          {{ t('settings.transmission.behavior.blackIdle') }}
-          <small class="transmission-view__hint" role="status">{{ t(obsBlackIdle ? 'settings.transmission.behavior.blackOn' : 'settings.transmission.behavior.blackOff') }}</small>
-        </span>
-        <SettingsToggle data-test="black-idle" :model-value="obsBlackIdle"
-          :label="t('settings.transmission.behavior.blackIdle')" @update:model-value="changeBlackIdle" />
       </div>
     </section>
 

@@ -454,9 +454,6 @@ export default {
         preserve: 'Preservar conexões após reiniciar o app e o sistema',
         preserveHint: 'Ao abrir o app, religa as fontes que estavam no ar. O conteúdo não volta sozinho.',
         preserveFailed: 'Não foi possível salvar a preferência das conexões.',
-        blackIdle: 'Ignorar fundo personalizado nas transmissões (exceto músicas)',
-        blackOn: 'Marcado: fundo preto. Músicas mantêm seus fundos.',
-        blackOff: 'Desmarcado: cada módulo usa o próprio fundo.',
       },
       howTo: {
         title: 'Como usar no OBS',

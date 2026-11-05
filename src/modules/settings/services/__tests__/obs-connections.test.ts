@@ -25,13 +25,10 @@ describe('OBS connections', () => {
     config.assignObsConnection('7082', null)
     expect(config.obsAssignmentModes.value['7082']).toBeUndefined()
   })
-  it('persiste a opção de tela preta após reload sem afetar TVs', async () => {
+  it('não guarda mais a opção de tela preta nas transmissões', async () => {
     const config = await import('../obs-connections')
-    expect(config.obsBlackIdle.value).toBe(false)
-    config.setObsBlackIdle(true)
-    vi.resetModules()
-    const restored = await import('../obs-connections')
-    expect(restored.obsBlackIdle.value).toBe(true)
+    expect('obsBlackIdle' in config).toBe(false)
+    expect('setObsBlackIdle' in config).toBe(false)
   })
   it('salva conexões e seleção e recupera após reload', async () => {
     const config = await import('../obs-connections')

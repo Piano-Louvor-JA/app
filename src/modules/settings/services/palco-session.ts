@@ -1,4 +1,4 @@
-import { obsBlackIdle, obsConnections, notifyObsChanged, obsAllowsMirror, obsAssignments, assignObsConnection } from './obs-connections'
+import { notifyObsChanged, obsAllowsMirror, obsAssignments, assignObsConnection } from './obs-connections'
 /**
  * PalcoSession — sessão de cast para TV no desktop (padrão StageSession do APK).
  *
@@ -618,15 +618,9 @@ class PalcoSession {
     void palcoApi().send({ v: 2, type: 'obsShare', enabled }, slotId)
   }
 
-  syncObsIdle(slotId: string): void {
-    if (!this.isElectron) return
-    void palcoApi().send({ v: 2, type: 'obsIdle', black: obsBlackIdle.value }, slotId)
-  }
-
   /** Volta ao idle (aguardando conteúdo). */
   idle(msg?: string): void {
     if (!this.isElectron) return
-    if (obsConnections.value.some((item) => item.id === this.activeSlotId)) this.syncObsIdle(this.activeSlotId)
     void palcoApi().send({
       v: 2,
       type: 'idle',

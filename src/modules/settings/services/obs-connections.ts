@@ -1,13 +1,5 @@
 import { ref } from 'vue'
 
-const OBS_BLACK_IDLE_KEY = 'louvorja-obs-black-idle-v1'
-export const obsBlackIdle = ref(localStorage.getItem(OBS_BLACK_IDLE_KEY) === 'true')
-export function setObsBlackIdle(enabled: boolean) {
-  obsBlackIdle.value = enabled
-  localStorage.setItem(OBS_BLACK_IDLE_KEY, String(enabled))
-  notifyObsChanged()
-}
-
 export type ObsConnection = { id: string; label: string; selected: boolean; nickname?: string }
 export type ObsModule = 'bible' | 'clock' | 'timer' | 'countdown' | 'random'
 export const OBS_CONNECTIONS_KEY = 'louvorja-obs-connections-v1'

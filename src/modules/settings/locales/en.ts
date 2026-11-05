@@ -447,9 +447,6 @@ export default {
         preserve: 'Keep connections after restarting the app and the system',
         preserveHint: 'When the app opens, sources that were on air start again. Content does not come back by itself.',
         preserveFailed: 'Could not save the connection preference.',
-        blackIdle: 'Ignore custom background on transmissions (except songs)',
-        blackOn: 'Checked: black background. Songs keep their backgrounds.',
-        blackOff: 'Unchecked: each module uses its own background.',
       },
       howTo: {
         title: 'How to use in OBS',
