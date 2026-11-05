@@ -16,6 +16,7 @@
   body {
     --overlay-scale: 1;
     --overlay-accent: #FFD54A;
+    --overlay-band: 0.6;
     --overlay-fade-out: 180ms;
     --overlay-fade-in: 260ms;
     font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, system-ui, sans-serif;
@@ -73,16 +74,19 @@
   body[data-layout="fullscreen"][data-theme="transparent"] #backdrop { display: none; }
 
   /* Temas */
-  body[data-theme="dark"] #card { background: rgba(10, 10, 12, 0.6); box-shadow: 0 0 1.4em 0.2em rgba(10, 10, 12, 0.35); backdrop-filter: blur(6px); }
-  body[data-theme="light"] #card { background: rgba(255, 255, 255, 0.82); color: #151515; box-shadow: 0 0 1.4em 0.2em rgba(255, 255, 255, 0.3); }
+  /* --overlay-band: opacidade da faixa escolhida na conexão (0 = só o texto). */
+  body[data-theme="dark"] #card { background: rgba(10, 10, 12, var(--overlay-band)); box-shadow: 0 0 1.4em 0.2em rgba(10, 10, 12, calc(var(--overlay-band) * 0.55)); }
+  body[data-theme="light"] #card { background: rgba(255, 255, 255, var(--overlay-band)); color: #151515; box-shadow: 0 0 1.4em 0.2em rgba(255, 255, 255, calc(var(--overlay-band) * 0.4)); }
   body[data-theme="light"] #reference,
   body[data-theme="light"] #card.is-cover #content { filter: brightness(0.7); }
-  body[data-theme="transparent"] #card { background: rgba(0, 0, 0, 0.35); box-shadow: 0 0 1.4em 0.3em rgba(0, 0, 0, 0.25); }
+  body[data-theme="transparent"] #card { background: rgba(0, 0, 0, var(--overlay-band)); box-shadow: 0 0 1.4em 0.3em rgba(0, 0, 0, calc(var(--overlay-band) * 0.7)); }
   body[data-theme="transparent"] #content,
-  body[data-theme="transparent"] #reference {
+  body[data-theme="transparent"] #reference,
+  body.no-band[data-theme="dark"] #content,
+  body.no-band[data-theme="dark"] #reference {
     text-shadow: 0 0.04em 0.14em rgba(0, 0, 0, 0.85);
   }
-  body[data-layout="fullscreen"][data-theme="dark"] #card { background: rgba(0, 0, 0, 0.5); }
+  body.no-band #card { box-shadow: none; }
 
   #badge {
     position: fixed; left: 50%; bottom: 6vh; transform: translateX(-50%);
@@ -158,6 +162,10 @@
     var scale = Number(style.textScale)
     body.style.setProperty('--overlay-scale', String((scale >= 70 && scale <= 160 ? scale : 100) / 100))
     if (/^#[0-9a-f]{6}$/i.test(style.accentColor || '')) body.style.setProperty('--overlay-accent', style.accentColor)
+    var band = Number(style.bandOpacity)
+    band = typeof style.bandOpacity === 'number' && band >= 0 && band <= 100 ? band : 60
+    body.style.setProperty('--overlay-band', String(band / 100))
+    body.classList.toggle('no-band', band === 0)
     body.classList.toggle('hide-heading', style.showHeading === false)
     syncBackdrop()
     fitText()

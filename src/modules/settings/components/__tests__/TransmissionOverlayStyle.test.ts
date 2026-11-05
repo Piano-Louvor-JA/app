@@ -38,17 +38,34 @@ it('emits every change and the preview follows it', async () => {
   await range.trigger('input')
   expect(wrapper.get('.transmission-style__preview').attributes('style')).toContain('--preview-scale: 1.3')
   expect(wrapper.text()).toContain('130%')
-  const emittedBeforeRelease = wrapper.emitted('update:modelValue')!.length
-  await range.trigger('change')
-  expect(wrapper.emitted('update:modelValue')).toHaveLength(emittedBeforeRelease + 1)
   expect(last(wrapper)).toMatchObject({ textScale: 130 })
+  const band = wrapper.get<HTMLInputElement>('[data-test="band-opacity"]')
+  band.element.value = '25'
+  await band.trigger('input')
+  expect(last(wrapper)).toMatchObject({ bandOpacity: 25 })
+  expect(wrapper.get('.transmission-style__preview').attributes('style')).toContain('--preview-band: 0.25')
+  expect(wrapper.text()).toContain('25%')
   await wrapper.get('[role="switch"]').trigger('click')
   expect(last(wrapper)).toMatchObject({ showHeading: false })
   expect(wrapper.get('.transmission-style__preview').text()).not.toContain('Hinário Adventista')
   const color = wrapper.get<HTMLInputElement>('[data-test="accent"]')
   color.element.value = '#33aaff'
   await color.trigger('change')
-  expect(last(wrapper)).toEqual({ layout: 'fullscreen', theme: 'light', position: 'top', textScale: 130, showHeading: false, accentColor: '#33AAFF' })
+  expect(last(wrapper)).toEqual({ layout: 'fullscreen', theme: 'light', position: 'top', textScale: 130, showHeading: false, accentColor: '#33AAFF', bandOpacity: 25 })
+})
+
+it('keeps the slider where the user is dragging until it is released', async () => {
+  const wrapper = mountStyle()
+  const range = wrapper.get<HTMLInputElement>('[data-test="text-scale"]')
+  range.element.value = '140'
+  await range.trigger('input')
+  await wrapper.setProps({ modelValue: { ...DEFAULT_OVERLAY_STYLE, textScale: 120 } })
+  expect(wrapper.text()).toContain('140%')
+  await range.trigger('change')
+  await wrapper.setProps({ modelValue: { ...DEFAULT_OVERLAY_STYLE, textScale: 140 } })
+  expect(wrapper.text()).toContain('140%')
+  await wrapper.setProps({ modelValue: { ...DEFAULT_OVERLAY_STYLE, textScale: 90 } })
+  expect(wrapper.text()).toContain('90%')
 })
 
 it('follows a style saved elsewhere and locks the controls while disabled', async () => {

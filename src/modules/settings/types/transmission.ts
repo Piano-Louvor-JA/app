@@ -13,6 +13,8 @@ export interface OverlayStyle {
   /** Mostra a referência/rodapé (versículo, legenda do cronômetro). */
   showHeading: boolean
   accentColor: string
+  /** Opacidade da faixa atrás da letra (0–100, passo 5); 0 = só o texto. */
+  bandOpacity: number
 }
 
 export const DEFAULT_OVERLAY_STYLE: Readonly<OverlayStyle> = Object.freeze({
@@ -22,11 +24,13 @@ export const DEFAULT_OVERLAY_STYLE: Readonly<OverlayStyle> = Object.freeze({
   textScale: 100,
   showHeading: true,
   accentColor: '#FFD54A',
+  bandOpacity: 60,
 })
 
 export const OVERLAY_SCALE_MIN = 70
 export const OVERLAY_SCALE_MAX = 160
 export const OVERLAY_SCALE_STEP = 10
+export const OVERLAY_BAND_STEP = 5
 
 /** 'all' = todas as redes; 'local' = só este computador; ou um IPv4 da máquina. */
 export type TransmissionBind = 'all' | 'local' | (string & {})

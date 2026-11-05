@@ -116,14 +116,17 @@ describe('ports', () => {
 describe('overlay style', () => {
   it('fills defaults for missing or invalid fields', () => {
     expect(normalizeOverlayStyle(undefined)).toEqual(DEFAULT_OVERLAY_STYLE)
-    expect(normalizeOverlayStyle({ layout: 'wide', theme: 'neon', position: 'left', textScale: 'big', showHeading: 'yes', accentColor: 'red' }))
+    expect(normalizeOverlayStyle({ layout: 'wide', theme: 'neon', position: 'left', textScale: 'big', showHeading: 'yes', accentColor: 'red', bandOpacity: 'x' }))
       .toEqual(DEFAULT_OVERLAY_STYLE)
+    expect(DEFAULT_OVERLAY_STYLE.bandOpacity).toBe(60)
   })
 
   it('keeps valid values, clamps the scale to steps of ten and normalizes colors', () => {
-    expect(normalizeOverlayStyle({ layout: 'fullscreen', theme: 'transparent', position: 'top', textScale: 134, showHeading: false, accentColor: '#a1b2c3' }))
-      .toEqual({ layout: 'fullscreen', theme: 'transparent', position: 'top', textScale: 130, showHeading: false, accentColor: '#A1B2C3' })
+    expect(normalizeOverlayStyle({ layout: 'fullscreen', theme: 'transparent', position: 'top', textScale: 134, showHeading: false, accentColor: '#a1b2c3', bandOpacity: 33 }))
+      .toEqual({ layout: 'fullscreen', theme: 'transparent', position: 'top', textScale: 130, showHeading: false, accentColor: '#A1B2C3', bandOpacity: 35 })
     expect(normalizeOverlayStyle({ textScale: 10 }).textScale).toBe(70)
     expect(normalizeOverlayStyle({ textScale: 400 }).textScale).toBe(160)
+    expect(normalizeOverlayStyle({ bandOpacity: -10 }).bandOpacity).toBe(0)
+    expect(normalizeOverlayStyle({ bandOpacity: 150 }).bandOpacity).toBe(100)
   })
 })

@@ -17,6 +17,7 @@ export const DEFAULT_OVERLAY_STYLE = Object.freeze({
   textScale: 100,
   showHeading: true,
   accentColor: '#FFD54A',
+  bandOpacity: 60,
 })
 
 const LAYOUTS = ['lower-third', 'fullscreen']
@@ -114,6 +115,7 @@ export function suggestPort(from, takenHttpPorts, busy = []) {
 export function normalizeOverlayStyle(input) {
   const source = input && typeof input === 'object' ? input : {}
   const scale = Number(source.textScale)
+  const band = Number(source.bandOpacity)
   return {
     layout: LAYOUTS.includes(source.layout) ? source.layout : DEFAULT_OVERLAY_STYLE.layout,
     theme: THEMES.includes(source.theme) ? source.theme : DEFAULT_OVERLAY_STYLE.theme,
@@ -125,5 +127,8 @@ export function normalizeOverlayStyle(input) {
     accentColor: typeof source.accentColor === 'string' && /^#[0-9a-f]{6}$/i.test(source.accentColor)
       ? source.accentColor.toUpperCase()
       : DEFAULT_OVERLAY_STYLE.accentColor,
+    bandOpacity: typeof source.bandOpacity === 'number' && Number.isFinite(band)
+      ? Math.min(100, Math.max(0, Math.round(band / 5) * 5))
+      : DEFAULT_OVERLAY_STYLE.bandOpacity,
   }
 }

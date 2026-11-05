@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import SettingsToggle from './SettingsToggle.vue'
 import {
+  OVERLAY_BAND_STEP,
   OVERLAY_SCALE_MAX,
   OVERLAY_SCALE_MIN,
   OVERLAY_SCALE_STEP,
@@ -14,12 +15,21 @@ const emit = defineEmits<{ 'update:modelValue': [style: OverlayStyle] }>()
 const { t } = useI18n()
 
 const draft = ref<OverlayStyle>({ ...props.modelValue })
-watch(() => props.modelValue, (value) => { draft.value = { ...value } })
+/** Enquanto arrasta, respostas atrasadas do app não puxam o controle de volta. */
+let sliding = false
+watch(() => props.modelValue, (value) => { if (!sliding) draft.value = { ...value } })
 
 function commit<K extends keyof OverlayStyle>(key: K, value: OverlayStyle[K]) {
   draft.value = { ...draft.value, [key]: value }
   emit('update:modelValue', { ...draft.value })
 }
+
+function slide(key: 'textScale' | 'bandOpacity', event: Event) {
+  sliding = true
+  commit(key, Number((event.target as HTMLInputElement).value))
+}
+
+function release() { sliding = false }
 
 const groups = computed(() => [
   { key: 'layout' as const, label: t('settings.transmission.style.layout'), options: [
@@ -40,6 +50,7 @@ const groups = computed(() => [
 const previewVars = computed(() => ({
   '--preview-scale': String(draft.value.textScale / 100),
   '--preview-accent': draft.value.accentColor,
+  '--preview-band': String(draft.value.bandOpacity / 100),
 }))
 </script>
 
@@ -61,8 +72,13 @@ const previewVars = computed(() => ({
         <span class="transmission-style__label">{{ t('settings.transmission.style.textScale') }} · {{ draft.textScale }}%</span>
         <input type="range" data-test="text-scale" :min="OVERLAY_SCALE_MIN" :max="OVERLAY_SCALE_MAX" :step="OVERLAY_SCALE_STEP"
           :value="draft.textScale" :disabled="disabled"
-          @input="draft = { ...draft, textScale: Number(($event.target as HTMLInputElement).value) }"
-          @change="commit('textScale', Number(($event.target as HTMLInputElement).value))">
+          @input="slide('textScale', $event)" @change="release">
+      </label>
+      <label class="transmission-style__field">
+        <span class="transmission-style__label">{{ t('settings.transmission.style.bandOpacity') }} · {{ draft.bandOpacity }}%</span>
+        <input type="range" data-test="band-opacity" min="0" max="100" :step="OVERLAY_BAND_STEP"
+          :value="draft.bandOpacity" :disabled="disabled"
+          @input="slide('bandOpacity', $event)" @change="release">
       </label>
       <div class="transmission-style__field transmission-style__field--inline">
         <span class="transmission-style__label">{{ t('settings.transmission.style.showHeading') }}</span>
@@ -155,14 +171,13 @@ const previewVars = computed(() => ({
     max-width: 100%;
     padding: 0.3rem 0.75rem;
     border-radius: var(--ds-radius-sm, 8px 0 8px 0);
-    background: rgb(10 10 12 / 0.6);
-    box-shadow: 0 0 0.8rem 0.1rem rgb(10 10 12 / 0.35);
+    background: rgb(10 10 12 / var(--preview-band));
+    box-shadow: 0 0 0.8rem 0.1rem rgb(10 10 12 / calc(var(--preview-band) * 0.55));
     color: #fff;
     text-align: center;
 
-    [data-theme='light'] & { background: rgb(255 255 255 / 0.82); box-shadow: 0 0 0.8rem 0.1rem rgb(255 255 255 / 0.3); color: #111; }
-    [data-theme='transparent'] & { background: rgb(0 0 0 / 0.35); box-shadow: 0 0 0.8rem 0.15rem rgb(0 0 0 / 0.25); text-shadow: 0 1px 3px rgb(0 0 0 / 0.85); }
-    [data-layout='fullscreen'][data-theme='dark'] & { background: rgb(0 0 0 / 0.5); }
+    [data-theme='light'] & { background: rgb(255 255 255 / var(--preview-band)); box-shadow: 0 0 0.8rem 0.1rem rgb(255 255 255 / calc(var(--preview-band) * 0.4)); color: #111; }
+    [data-theme='transparent'] & { background: rgb(0 0 0 / var(--preview-band)); box-shadow: 0 0 0.8rem 0.15rem rgb(0 0 0 / calc(var(--preview-band) * 0.7)); text-shadow: 0 1px 3px rgb(0 0 0 / 0.85); }
   }
 
   &__text { margin: 0; font-size: calc(var(--preview-base) * var(--preview-scale)); font-weight: 600; line-height: 1.3; }

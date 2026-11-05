@@ -417,6 +417,7 @@ export default {
         bottom: 'Bottom',
         top: 'Top',
         textScale: 'Text size',
+        bandOpacity: 'Lyrics background opacity',
         showHeading: 'Show reference',
         accent: 'Accent color',
         preview: 'Preview',

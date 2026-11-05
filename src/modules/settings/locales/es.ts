@@ -419,6 +419,7 @@ export default {
         bottom: 'Abajo',
         top: 'Arriba',
         textScale: 'Tamaño del texto',
+        bandOpacity: 'Opacidad del fondo de la letra',
         showHeading: 'Mostrar referencia',
         accent: 'Color de realce',
         preview: 'Vista previa',

@@ -94,6 +94,15 @@ describe('overlay page', () => {
           expect(band.alpha, `${layout}/${theme}`).toBeLessThan(0.9)
         }
       }
+      const look = () => page.locator('#card').evaluate((card) => {
+        const style = getComputedStyle(card)
+        return { background: style.backgroundColor, shadow: style.boxShadow }
+      })
+      slot.setOverlay({ layout: 'lower-third', theme: 'dark', bandOpacity: 25 })
+      await expect.poll(async () => (await look()).background).toBe('rgba(10, 10, 12, 0.25)')
+      slot.setOverlay({ bandOpacity: 0 })
+      await expect.poll(async () => (await look()).background).toBe('rgba(10, 10, 12, 0)')
+      expect((await look()).shadow).toBe('none')
     } finally { await slot.dispose() }
   }, 30000)
 

@@ -424,6 +424,7 @@ export default {
         bottom: 'Rodapé',
         top: 'Topo',
         textScale: 'Tamanho do texto',
+        bandOpacity: 'Opacidade do fundo da letra',
         showHeading: 'Mostrar referência',
         accent: 'Cor de destaque',
         preview: 'Prévia',
