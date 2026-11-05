@@ -376,6 +376,7 @@ export default {
       add: 'Adicionar conexão',
       startAll: 'Iniciar todas',
       stopAll: 'Encerrar todas',
+      reloadAll: 'Recarregar todas',
       source: 'Fonte {n}',
       mainSource: 'OBS - Servidor de transmissão',
       nickname: 'Nome',

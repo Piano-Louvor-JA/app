@@ -369,6 +369,7 @@ export default {
       add: 'Add connection',
       startAll: 'Start all',
       stopAll: 'Stop all',
+      reloadAll: 'Reload all',
       source: 'Source {n}',
       mainSource: 'OBS - Streaming server',
       nickname: 'Name',

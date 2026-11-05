@@ -154,6 +154,16 @@ async function changeStyle(id: string, overlay: OverlayStyle) {
   await refresh()
 }
 
+function reloadAll() {
+  void run('reload-all', async () => {
+    let failed = false
+    for (const card of onAir.value) {
+      try { failed = !(await palcoSession.refreshObs(card.id)) || failed } catch { failed = true }
+    }
+    if (failed) throw new Error('reload')
+  }, t('settings.transmission.errors.reload'))
+}
+
 function reload(id: string) {
   void run(id, async () => {
     const reloaded = await palcoSession.refreshObs(id)
@@ -202,6 +212,9 @@ onMounted(() => {
       </button>
       <button type="button" class="transmission-view__bulk" data-test="start-all" :disabled="busy !== null || allOnAir" @click="setAll(true)">
         <i class="ti ti-player-play" aria-hidden="true" /> {{ t('settings.transmission.startAll') }}
+      </button>
+      <button type="button" class="transmission-view__bulk" data-test="reload-all" :disabled="busy !== null || !onAir.length" @click="reloadAll">
+        <i class="ti ti-refresh" aria-hidden="true" /> {{ t('settings.transmission.reloadAll') }}
       </button>
       <button type="button" class="transmission-view__bulk transmission-view__bulk--stop" data-test="stop-all" :disabled="busy !== null || !onAir.length" @click="setAll(false)">
         <i class="ti ti-player-stop" aria-hidden="true" /> {{ t('settings.transmission.stopAll') }}
