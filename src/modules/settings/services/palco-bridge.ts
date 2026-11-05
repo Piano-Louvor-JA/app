@@ -709,7 +709,8 @@ export function startPalcoBridge() {
       ),
     )
   }
-  window.setInterval(syncAudio, 3000)
+  const audioTimer = window.setInterval(syncAudio, 3000)
+  unwatchers.push(() => window.clearInterval(audioTimer))
   const refreshObs = () => { if (started) void renderAllSlots() }
   const unsubscribeReceiver = palcoSession.onReceiverConnected?.(refreshObs)
   if (typeof unsubscribeReceiver === 'function') unwatchers.push(unsubscribeReceiver)
