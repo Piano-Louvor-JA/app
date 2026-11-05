@@ -152,10 +152,16 @@ const verseBoxStyle = computed(() => {
   }
 })
 
-const referenceStyle = computed(() => ({
-  color: stage.value.footerRefColor ?? undefined,
-  fontWeight: String(stage.value.footerRefWeight),
-}))
+const referenceCorner = computed(() => stage.value.bibleRefPosition === 'corner')
+
+const referenceStyle = computed(() => {
+  const position = stage.value.bibleRefPosition ?? 'below-right'
+  return {
+    color: stage.value.footerRefColor ?? undefined,
+    fontWeight: String(stage.value.footerRefWeight),
+    ...(referenceCorner.value ? {} : { textAlign: position.replace('below-', '') as 'left' | 'center' | 'right' }),
+  }
+})
 </script>
 
 <template>
@@ -185,7 +191,7 @@ const referenceStyle = computed(() => ({
             {{ runtime.text }}
           </p>
           <p
-            v-if="displayReference"
+            v-if="displayReference && !referenceCorner"
             class="bible-projection__reference"
             :style="referenceStyle"
           >
@@ -197,6 +203,20 @@ const referenceStyle = computed(() => ({
           key="empty"
           class="bible-projection__empty"
         />
+      </Transition>
+      <!-- Fora do conteúdo: o transform da transição moveria o canto junto. -->
+      <Transition
+        name="bible-fade"
+        mode="out-in"
+      >
+        <p
+          v-if="showContent && displayReference && referenceCorner"
+          :key="contentKey"
+          class="bible-projection__reference bible-projection__reference--corner"
+          :style="referenceStyle"
+        >
+          {{ displayReference }}
+        </p>
       </Transition>
     </div>
   </ProjectionBackground>
@@ -217,6 +237,7 @@ const referenceStyle = computed(() => ({
 }
 
 .bible-projection__stage {
+  position: relative;
   box-sizing: border-box;
   display: flex;
   align-items: center;
@@ -253,6 +274,12 @@ const referenceStyle = computed(() => ({
   letter-spacing: 0.02em;
   text-align: right;
   text-transform: uppercase;
+}
+
+.bible-projection__reference--corner {
+  position: absolute;
+  right: clamp(1rem, 3vmin, 2.5rem);
+  bottom: clamp(0.75rem, 2.5vmin, 1.75rem);
 }
 
 .bible-projection__empty {

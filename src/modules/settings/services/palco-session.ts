@@ -273,6 +273,7 @@ class PalcoSession {
       footerRef,
       footerColor: s.footerRefColor,
       footerWeight: s.footerRefWeight,
+      footerPosition: isBible ? s.bibleRefPosition ?? 'below-right' : undefined,
       // Estrofes com aparência própria (paridade do title*):
       lyricFontSize: (isHymns && s.lyricFontSize != null ? s.lyricFontSize : sizeAt1920) / 1920 * 1080,
       lyricFontWeight: isHymns && s.lyricFontWeight != null ? s.lyricFontWeight : fontWeight,

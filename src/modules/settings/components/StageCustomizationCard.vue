@@ -180,6 +180,13 @@ const bibleTransformOptions: { value: StageSettings['bibleTextTransform']; label
   { value: 'capitalize', label: t('settings.stage.bibleTransformCapitalize') },
 ]
 
+const bibleRefPositionOptions: { value: StageSettings['bibleRefPosition']; label: string; hint: string }[] = [
+  { value: 'below-left', label: t('settings.stage.refPositionLeft'), hint: t('settings.stage.refPositionLeftHint') },
+  { value: 'below-center', label: t('settings.stage.refPositionCenter'), hint: t('settings.stage.refPositionCenterHint') },
+  { value: 'below-right', label: t('settings.stage.refPositionRight'), hint: t('settings.stage.refPositionRightHint') },
+  { value: 'corner', label: t('settings.stage.refPositionCorner'), hint: t('settings.stage.refPositionCornerHint') },
+]
+
 const alignOptions = [
   { value: 'left', label: t('settings.stage.alignLeft') },
   { value: 'center', label: t('settings.stage.alignCenter') },
@@ -797,6 +804,30 @@ const confirmReset = ref(false)
             :label="t('settings.stage.showBibleVersion')"
             @update:model-value="patch({ showBibleVersion: $event })"
           />
+        </div>
+
+        <p class="stage-custom__label stage-custom__label--sub">
+          {{ t('settings.stage.refPosition') }}
+        </p>
+        <div
+          class="stage-custom__segment"
+          role="radiogroup"
+          data-testid="bible-ref-position"
+          :aria-label="t('settings.stage.refPosition')"
+        >
+          <button
+            v-for="opt in bibleRefPositionOptions"
+            :key="opt.value"
+            type="button"
+            role="radio"
+            :aria-checked="settings.bibleRefPosition === opt.value"
+            :title="opt.hint"
+            class="stage-custom__segment-btn"
+            :class="{ 'stage-custom__segment-btn--active': settings.bibleRefPosition === opt.value }"
+            @click="patch({ bibleRefPosition: opt.value })"
+          >
+            {{ opt.label }}
+          </button>
         </div>
 
         <p class="stage-custom__label stage-custom__label--sub">

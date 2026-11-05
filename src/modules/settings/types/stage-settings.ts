@@ -104,6 +104,8 @@ export type StageSettings = {
   bibleTextColor: string | null
   /** Capitalização do versículo (paridade web — mesmo campo/serde `bTransform`). */
   bibleTextTransform: 'none' | 'uppercase' | 'capitalize'
+  /** Referência: abaixo da caixa do texto (esquerda/centro/direita) ou no canto inferior direito da tela. */
+  bibleRefPosition: 'below-left' | 'below-center' | 'below-right' | 'corner'
   /** Data URL da imagem de fundo do escopo (1 ativa por escopo). */
   backgroundImage: string | null
   /**
@@ -193,6 +195,7 @@ export const DEFAULT_STAGE_SETTINGS: StageSettings = {
   bibleFontWeight: 500,
   bibleTextColor: null,
   bibleTextTransform: 'none',
+  bibleRefPosition: 'below-right',
   titleFontSize: null,
   titleFontWeight: null,
   titleTextColor: null,
@@ -323,6 +326,13 @@ export const BIBLE_TEXT_TRANSFORM_OPTIONS: StageSettings['bibleTextTransform'][]
   'capitalize',
 ]
 
+export const BIBLE_REF_POSITION_OPTIONS: StageSettings['bibleRefPosition'][] = [
+  'below-left',
+  'below-center',
+  'below-right',
+  'corner',
+]
+
 function asColor(value: unknown, fallback: string): string {
   return typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value)
     ? value
@@ -382,6 +392,9 @@ export function parseStageSettings(raw: unknown): StageSettings {
     )
       ? (s['bTransform'] as StageSettings['bibleTextTransform'])
       : 'none',
+    bibleRefPosition: BIBLE_REF_POSITION_OPTIONS.includes(s['refPos'] as StageSettings['bibleRefPosition'])
+      ? (s['refPos'] as StageSettings['bibleRefPosition'])
+      : DEFAULT_STAGE_SETTINGS.bibleRefPosition,
     titleFontSize:
       s['tSize'] == null ? null : clamp(asNumber(s['tSize'], 96), 60, 160),
     titleFontWeight: s['tWeight'] == null ? null : (WEIGHTS.includes(asNumber(s['tWeight'], 600) as StageFontWeight) ? (asNumber(s['tWeight'], 600) as StageFontWeight) : null),
@@ -491,6 +504,7 @@ export function serializeStageSettings(s: StageSettings): Record<string, unknown
     bWeight: s.bibleFontWeight,
     ...(s.bibleTextColor ? { bFg: s.bibleTextColor } : {}),
     bTransform: s.bibleTextTransform,
+    refPos: s.bibleRefPosition,
     ...(s.titleFontSize != null ? { tSize: s.titleFontSize } : {}),
     ...(s.titleFontWeight != null ? { tWeight: s.titleFontWeight } : {}),
     ...(s.titleTextColor != null ? { tFg: s.titleTextColor } : {}),

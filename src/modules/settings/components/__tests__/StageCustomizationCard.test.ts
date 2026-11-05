@@ -183,6 +183,27 @@ describe('StageCustomizationCard', () => {
     expect(store.settings.showBibleVersion).toBe(!beforeVersion)
   })
 
+  it('escopo bible: posição da referência com as 4 opções', async () => {
+    const w = await mountCard({ onlyScope: 'bible' })
+    active = w
+    const store = useStageSettingsStore()
+    const group = w.find('[data-testid="bible-ref-position"]')
+    expect(group.exists()).toBe(true)
+    const radios = group.findAll('[role="radio"]')
+    expect(radios.map((r) => r.text())).toEqual([
+      'settings.stage.refPositionLeft',
+      'settings.stage.refPositionCenter',
+      'settings.stage.refPositionRight',
+      'settings.stage.refPositionCorner',
+    ])
+    expect(radios[2].attributes('aria-checked')).toBe('true')
+    await radios[3].trigger('click')
+    expect(store.settings.bibleRefPosition).toBe('corner')
+    expect(group.findAll('[role="radio"]')[3].attributes('aria-checked')).toBe('true')
+    await radios[0].trigger('click')
+    expect(store.settings.bibleRefPosition).toBe('below-left')
+  })
+
   it('escopo clock: estilo e switches de segundos/24h', async () => {
     const w = await mountCard({ onlyScope: 'clock' })
     active = w

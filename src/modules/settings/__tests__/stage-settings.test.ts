@@ -70,6 +70,19 @@ describe('stage-settings (paridade APK)', () => {
     expect(parseStageSettings(serializeStageSettings(s)).bibleTextTransform).toBe('uppercase')
   })
 
+  it('refPos: posição da referência bíblica, padrão abaixo do texto à direita', () => {
+    expect(DEFAULT_STAGE_SETTINGS.bibleRefPosition).toBe('below-right')
+    expect(parseStageSettings({}).bibleRefPosition).toBe('below-right')
+    for (const pos of ['below-left', 'below-center', 'below-right', 'corner'] as const) {
+      expect(parseStageSettings({ refPos: pos }).bibleRefPosition).toBe(pos)
+      const s = { ...DEFAULT_STAGE_SETTINGS, bibleRefPosition: pos }
+      expect(serializeStageSettings(s).refPos).toBe(pos)
+      expect(parseStageSettings(serializeStageSettings(s)).bibleRefPosition).toBe(pos)
+    }
+    expect(parseStageSettings({ refPos: 'top' }).bibleRefPosition).toBe('below-right')
+    expect(parseStageSettings({ refPos: 3 }).bibleRefPosition).toBe('below-right')
+  })
+
   it('parse clampa valores fora de faixa (como o APK)', () => {
     const s = parseStageSettings({ size: 999, tsBlur: 99, boxBg: 5 })
     expect(s.fontSize).toBe(160)

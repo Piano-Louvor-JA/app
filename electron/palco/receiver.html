@@ -2611,6 +2611,11 @@ function projectionColor(value){
   const match=/^\s*(#[0-9a-fA-F]{3,8}|rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*(?:,\s*(?:0|1|0?\.\d+)\s*)?\)|hsla?\(\s*\d{1,3}\s*,\s*\d{1,3}%\s*,\s*\d{1,3}%\s*(?:,\s*(?:0|1|0?\.\d+)\s*)?\)|[a-zA-Z]{1,20})\s*$/.exec(String(value||''));
   return match?match[1]:'';
 }
+// Posição da referência bíblica; null = sender sem o campo (segue o alinhamento do texto).
+function footerPosition(m){
+  const p=m&&m.footerPosition;
+  return p==='below-left'||p==='below-center'||p==='below-right'||p==='corner'?p:null;
+}
 // Conexões diretas: somente IPv4 de LAN/loopback e localhost, nunca DNS público.
 function palcoLanHost(value){
   if(value==='localhost')return 'localhost';
@@ -3557,7 +3562,7 @@ function handle(m){
           // texto (abaixo dela, mesmo alinhamento horizontal), não no rodapé
           // da tela. Gap 1.4vmin como no popup.
           var f=$('footer');
-          if(f && m.footerRef && m.textVerticalAlign){
+          if(f && m.footerRef && m.textVerticalAlign && footerPosition(m)!=='corner'){
             var r=t.getBoundingClientRect();
             var gap=Math.round(innerHeight*0.014);
             f.style.left=r.left+'px';
@@ -3621,16 +3626,19 @@ function handle(m){
       }
       // F3.3m: footer com referência destacada + versão
       {const f=$('footer');
+        const pos=footerPosition(m);
         // WT-5f: footer segue o alinhamento do palco (paridade popup — a
         // referência fica dentro do conteúdo lá, alinhada com o texto).
         // padding 4vw = mesma borda da caixa de texto (92vw centrada).
-        if(m.textAlign){f.style.textAlign=m.textAlign;f.style.padding='0 4vw';f.style.boxSizing='border-box'}
+        // Posição escolhida no Personalizar Palco vence; sem ela (APK), segue o texto.
+        const align=pos==='corner'?'right':pos?pos.slice(6):m.textAlign;
+        if(align){f.style.textAlign=align;f.style.padding='0 4vw';f.style.boxSizing='border-box'}
         else{f.style.textAlign='center';f.style.padding='0'}
         // Default: rodapé da tela (8vh p/ sair da área do texto). O rAF do
         // auto-fit reposiciona PERTO da caixinha quando há footerRef (abaixo).
         f.style.left='0'; f.style.right='0'; f.style.width='auto';
         f.style.top='auto';
-        f.style.bottom=(m.footerRef?'8vh':'4vh');
+        f.style.bottom=(m.footerRef&&pos!=='corner'?'8vh':'4vh');
         if(m.footerRef){
           f.textContent='';
           const ref=document.createElement('span');ref.className='ref';ref.textContent=String(m.footerRef);

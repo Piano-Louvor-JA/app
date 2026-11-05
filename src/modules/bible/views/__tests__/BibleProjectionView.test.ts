@@ -177,4 +177,45 @@ describe('BibleProjectionView.vue', () => {
     )
     w.unmount()
   })
+
+  describe('posição da referência', () => {
+    const stage = stageValue.value as Record<string, unknown>
+    afterEach(() => {
+      delete stage.bibleRefPosition
+    })
+    async function reference() {
+      const w = mount(BibleProjectionView)
+      await flushPromises()
+      return { w, ref: w.find('.bible-projection__reference') }
+    }
+
+    it('padrão: abaixo do texto, à direita', async () => {
+      const { w, ref } = await reference()
+      expect(ref.element.parentElement?.classList.contains('bible-projection__content')).toBe(true)
+      expect(ref.attributes('style')).toContain('text-align: right')
+      expect(ref.classes()).not.toContain('bible-projection__reference--corner')
+      w.unmount()
+    })
+
+    it('abaixo do texto à esquerda e no centro', async () => {
+      stage.bibleRefPosition = 'below-left'
+      let r = await reference()
+      expect(r.ref.attributes('style')).toContain('text-align: left')
+      r.w.unmount()
+      stage.bibleRefPosition = 'below-center'
+      r = await reference()
+      expect(r.ref.attributes('style')).toContain('text-align: center')
+      r.w.unmount()
+    })
+
+    it('canto inferior direito da tela', async () => {
+      stage.bibleRefPosition = 'corner'
+      const { w, ref } = await reference()
+      expect(w.findAll('.bible-projection__reference')).toHaveLength(1)
+      expect(ref.classes()).toContain('bible-projection__reference--corner')
+      expect(ref.element.parentElement?.classList.contains('bible-projection__content')).toBe(false)
+      expect(ref.attributes('style')).not.toContain('text-align')
+      w.unmount()
+    })
+  })
 })
