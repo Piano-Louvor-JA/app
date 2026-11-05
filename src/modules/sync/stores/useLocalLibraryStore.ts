@@ -146,12 +146,26 @@ export const useLocalLibraryStore = defineStore('localLibrary', () => {
   // A Central pode ter aberto vazia; o evento de cache curado precisa recarregar.
   let collectionsLoaded = false
 
+  /** Coletâneas baixando: o download atualiza este objeto, então a lista recarregada o reaproveita. */
+  const inFlightAlbums = new Map<string, LibraryAlbum>()
+
+  function keepInFlightAlbums(loaded: LibraryCategory[]): LibraryCategory[] {
+    if (!inFlightAlbums.size) return loaded
+    return loaded.map((category) => ({
+      ...category,
+      albums: category.albums.map((album) => {
+        const running = inFlightAlbums.get(String(album.id))
+        return running?.status === 'downloading' ? running : album
+      }),
+    }))
+  }
+
   async function refreshCollections() {
     collectionsLoaded = true
     isLoadingList.value = true
     clearError()
     try {
-      categories.value = await loadLibraryCategories()
+      categories.value = keepInFlightAlbums(await loadLibraryCategories())
       void hydrateLocalLibraryCoverUrls(categories.value)
     } catch (error) {
       console.error('[sync] falha ao carregar coletâneas', error)
@@ -221,6 +235,7 @@ export const useLocalLibraryStore = defineStore('localLibrary', () => {
     album.downloadedCount = 0
     album.cancelRequested = false
     album.progressText = 'sync.progress.preparing'
+    inFlightAlbums.set(albumKey, album)
 
     const isCurrent = () => albumDownloadGen.get(albumKey) === gen
 
@@ -333,6 +348,11 @@ export const useLocalLibraryStore = defineStore('localLibrary', () => {
         setDownloadFailure({ reason: 'unknown', failedCount: 0 })
       }
       return 'error' as const
+    } finally {
+      // Um novo download da mesma coletânea pode já ter reassumido o objeto.
+      if (inFlightAlbums.get(albumKey) === album && album.status !== 'downloading') {
+        inFlightAlbums.delete(albumKey)
+      }
     }
   }
 
@@ -347,9 +367,11 @@ export const useLocalLibraryStore = defineStore('localLibrary', () => {
       outer: for (const category of categories.value) {
         for (const album of category.albums) {
           if (cancelBatchRequested.value) break outer
-          if (album.status !== 'idle') continue
+          // A lista pode ter sido recarregada durante o lote (sair e voltar à Central).
+          const latest = findAlbum(categories.value, album.id)
+          if (!latest || latest.status !== 'idle') continue
 
-          const status = await downloadAlbum(album.id)
+          const status = await downloadAlbum(latest.id)
 
           if (status === 'error' && !navigator.onLine) {
             cancelBatchRequested.value = true
