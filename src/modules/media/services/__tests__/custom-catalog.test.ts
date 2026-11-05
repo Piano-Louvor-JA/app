@@ -391,6 +391,80 @@ describe('collections CRUD', () => {
     routes = [{ match: () => true, throw: true }]
     expect(await copyCustomMusic(1, 2)).toBeNull()
   })
+
+  it('copyCustomMusic: destino LOCAL copia offline sem chamar API', async () => {
+    // Origem local: música importada offline com lyrics.
+    const srcCol = createLocalCollection('Origem')
+    const src = createLocalMusic(srcCol.id, { name: 'ENCONTRO ESPECIAL', lyric: 'estrofe 1' })
+
+    // Destino local negativo: NÃO pode chamar /copy da API (404 conhecido).
+    let apiCalled = false
+    routes = [{ match: () => { apiCalled = true; return true }, status: 404 }]
+    const dst = createLocalCollection('Destino local')
+    const result = await copyCustomMusic(dst.id, src.id)
+
+    expect(apiCalled).toBe(false)
+    expect(result).not.toBeNull()
+    expect(result!.id).toBeLessThan(0)
+    const copied = getLocalMusic(result!.id)!
+    expect(copied.name).toBe('ENCONTRO ESPECIAL')
+    expect(copied.collectionId).toBe(dst.id)
+    expect(copied.lyrics.length).toBe(1)
+    expect(copied.lyrics[0].lyric).toBe('estrofe 1')
+
+    // Idempotência: segunda cópia retorna a existente (existed).
+    const again = await copyCustomMusic(dst.id, src.id)
+    expect(again!.existed).toBe(true)
+    expect(again!.id).toBe(result!.id)
+    // Ainda sem chamada de API.
+    expect(apiCalled).toBe(false)
+  })
+
+  it('copyCustomMusic: origem REMOTA para destino LOCAL copia offline', async () => {
+    // Origem remota id 42: o GET /musics/42 é mockado por routes; o track
+    // é resolvido via loadCustomMusicTrack → fetch (routes).
+    routes = [
+      {
+        match: (url: string) => url.includes('/musics/42'),
+        status: 200,
+        body: {
+          id_music: 42,
+          name: 'MISSÃO PARA TODOS',
+          lyrics: [{ id_lyric: 1, lyric: 'l1', order: 1 }],
+        },
+      },
+      { match: () => true, status: 404 },
+    ]
+    const dst = createLocalCollection('Destino remota→local')
+    const result = await copyCustomMusic(dst.id, 42)
+    // Deve criar réplica local (id negativo) mesmo com demais rotas 404.
+    expect(result).not.toBeNull()
+    expect(result!.id).toBeLessThan(0)
+    expect(getLocalMusic(result!.id)!.name).toBe('MISSÃO PARA TODOS')
+  })
+
+  it('listAllCustomMusics inclui músicas LOCAIS junto às remotas', async () => {
+    const col = createLocalCollection('Local p/ busca')
+    createLocalMusic(col.id, { name: 'ENCONTRO ESPECIAL', lyric: 'x' })
+    routes = [
+      {
+        match: () => true,
+        status: 200,
+        body: { data: [{ id_music: 7, name: 'MISSÃO PARA TODOS' }] },
+      },
+    ]
+    const all = await listAllCustomMusics()
+    const names = all.map((m) => m.name)
+    expect(names).toContain('ENCONTRO ESPECIAL')
+    expect(names).toContain('MISSÃO PARA TODOS')
+    const localRow = all.find((m) => m.name === 'ENCONTRO ESPECIAL')!
+    expect(localRow.id).toBeLessThan(0)
+    expect(localRow.collectionId).toBe(col.id)
+    // Offline (fetch falha): locais ainda listadas.
+    routes = [{ match: () => true, throw: true }]
+    const offline = await listAllCustomMusics()
+    expect(offline.map((m) => m.name)).toContain('ENCONTRO ESPECIAL')
+  })
 })
 
 // ── musics ──────────────────────────────────────────────────────────────────
