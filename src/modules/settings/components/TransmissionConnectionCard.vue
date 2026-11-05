@@ -83,6 +83,9 @@ const styleOpen = ref(false)
         <small v-if="connection.receiverIps.length" class="transmission-card__ips">{{ connection.receiverIps.join(', ') }}</small>
       </div>
       <div class="transmission-card__actions">
+        <button v-if="links.length" type="button" class="transmission-card__reload" data-test="reload" :disabled="busy" @click="emit('reload')">
+          <i class="ti ti-refresh" aria-hidden="true" /> {{ t('settings.transmission.reload') }}
+        </button>
         <button type="button" class="transmission-card__toggle" data-test="toggle"
           :class="{ 'transmission-card__toggle--on': connection.running }" :disabled="busy" @click="emit('toggle')">
           <i class="ti" :class="connection.running ? 'ti-player-stop' : 'ti-player-play'" aria-hidden="true" />
@@ -107,10 +110,17 @@ const styleOpen = ref(false)
 
     <div v-if="links.length" class="transmission-card__links">
       <TransmissionLinkRow v-for="link in links" :key="link.key" :label="link.label" :hint="link.hint" :url="link.url"
-        :primary="link.primary" @qr="emit('qr', $event, `${connection.name} · ${link.label}`)" />
-      <button type="button" class="transmission-card__reload" data-test="reload" :disabled="busy" @click="emit('reload')">
-        <i class="ti ti-refresh" aria-hidden="true" /> {{ t('settings.transmission.reload') }}
-      </button>
+        :primary="link.primary" @qr="emit('qr', $event, `${connection.name} · ${link.label}`)">
+        <div v-if="link.key === 'overlay'" class="transmission-card__style">
+          <button type="button" class="transmission-card__style-toggle" data-test="style-toggle"
+            :aria-expanded="styleOpen" @click="styleOpen = !styleOpen">
+            <i class="ti" :class="styleOpen ? 'ti-chevron-up' : 'ti-chevron-down'" aria-hidden="true" />
+            {{ t('settings.transmission.style.title') }}
+          </button>
+          <TransmissionOverlayStyle v-if="styleOpen" :model-value="connection.overlay" :name="connection.name"
+            @update:model-value="emit('style', $event)" />
+        </div>
+      </TransmissionLinkRow>
     </div>
     <p v-else class="transmission-card__hint">{{ t('settings.transmission.waitingLinks') }}</p>
 
@@ -135,7 +145,7 @@ const styleOpen = ref(false)
       </div>
     </div>
 
-    <div class="transmission-card__style">
+    <div v-if="!links.some((link) => link.key === 'overlay')" class="transmission-card__style">
       <button type="button" class="transmission-card__style-toggle" data-test="style-toggle"
         :aria-expanded="styleOpen" @click="styleOpen = !styleOpen">
         <i class="ti" :class="styleOpen ? 'ti-chevron-up' : 'ti-chevron-down'" aria-hidden="true" />
@@ -195,7 +205,7 @@ const styleOpen = ref(false)
   &__state--on { color: #22c55e; }
   &__dot { width: 0.5rem; height: 0.5rem; border-radius: 999px; background: currentColor; }
   &__ips, &__hint { margin: 0; color: var(--ds-color-on-surface-variant); font-size: 0.78rem; }
-  &__actions { display: flex; align-items: center; gap: 0.5rem; }
+  &__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 0.5rem; }
 
   &__toggle {
     display: inline-flex;
@@ -261,7 +271,7 @@ const styleOpen = ref(false)
   }
 
   &__links { display: flex; flex-direction: column; gap: 0.55rem; }
-  &__reload { align-self: flex-start; }
+  &__reload { padding: 0.55rem 1.1rem; border-radius: 999px; white-space: nowrap; }
   &__port { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.5rem 0.75rem; }
   &__port-field { display: flex; flex-direction: column; gap: 0.3rem; }
   &__label { color: var(--ds-color-on-surface-variant); font-size: 0.78rem; font-weight: 600; }

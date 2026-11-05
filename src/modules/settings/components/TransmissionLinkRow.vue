@@ -44,6 +44,7 @@ onUnmounted(() => { if (resetCopied) clearTimeout(resetCopied) })
         <i class="ti ti-external-link" aria-hidden="true" />{{ t('settings.transmission.open') }}
       </button>
     </div>
+    <slot />
   </div>
 </template>
 
