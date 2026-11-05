@@ -154,7 +154,7 @@ const previewVars = computed(() => ({
     align-self: center;
     max-width: 100%;
     padding: 0.3rem 0.75rem;
-    border-radius: 0.4rem;
+    border-radius: var(--ds-radius-sm, 8px 0 8px 0);
     background: rgb(10 10 12 / 0.6);
     box-shadow: 0 0 0.8rem 0.1rem rgb(10 10 12 / 0.35);
     color: #fff;

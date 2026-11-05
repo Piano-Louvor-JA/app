@@ -57,7 +57,7 @@
   body[data-layout="lower-third"][data-position="top"] #stage { align-items: flex-start; padding: 4.5vh 4vw 0; }
   body[data-layout="lower-third"] #card {
     max-width: min(88vw, 1600px); max-height: 40vh;
-    padding: 0.35em 1em; border-radius: 0.45em;
+    padding: 0.35em 1em; border-radius: 0.45em 0 0.45em 0;
     font-size: calc(2.5vw * var(--overlay-scale));
   }
   body[data-layout="lower-third"] #backdrop { display: none; }
@@ -65,7 +65,7 @@
   /* Tela cheia: texto centralizado; fundo do slide nos temas com cartão. */
   body[data-layout="fullscreen"] #stage { align-items: center; padding: 6vh 6vw; }
   body[data-layout="fullscreen"] #card {
-    max-height: 88vh; padding: 0.4em 1em; border-radius: 0.4em;
+    max-height: 88vh; padding: 0.4em 1em; border-radius: 0.4em 0 0.4em 0;
     font-size: calc(4.2vw * var(--overlay-scale));
   }
   body[data-layout="fullscreen"][data-theme="dark"] { background: #000; }

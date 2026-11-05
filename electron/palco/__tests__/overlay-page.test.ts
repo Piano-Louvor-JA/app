@@ -83,8 +83,12 @@ describe('overlay page', () => {
           await page.waitForFunction(([l, t]) => document.body.dataset.layout === l && document.body.dataset.theme === t, [layout, theme])
           const band = await page.locator('#card').evaluate((card) => {
             const alpha = /rgba?\(([^)]+)\)/.exec(getComputedStyle(card).backgroundColor)?.[1].split(',')[3]
-            return { width: card.getBoundingClientRect().width, alpha: alpha === undefined ? 1 : Number(alpha) }
+            const style = getComputedStyle(card)
+            const corners = [style.borderTopLeftRadius, style.borderTopRightRadius, style.borderBottomRightRadius, style.borderBottomLeftRadius].map(parseFloat)
+            return { width: card.getBoundingClientRect().width, alpha: alpha === undefined ? 1 : Number(alpha), corners }
           })
+          expect(band.corners[0], `${layout}/${theme}`).toBeGreaterThan(0)
+          expect(band.corners, `${layout}/${theme}`).toEqual([band.corners[0], 0, band.corners[0], 0])
           expect(band.width, `${layout}/${theme}`).toBeLessThan(1280 * 0.6)
           expect(band.alpha, `${layout}/${theme}`).toBeGreaterThan(0.2)
           expect(band.alpha, `${layout}/${theme}`).toBeLessThan(0.9)
