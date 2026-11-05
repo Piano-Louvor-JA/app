@@ -378,6 +378,26 @@ class PalcoSlot {
       return
     }
 
+    // Overlay da Transmissão (fonte de navegador do OBS) e a aparência desta conexão
+    if (p === '/overlay' || p === '/overlay.html') {
+      try {
+        const page = await readFile(path.join(__dirname, 'palco', 'overlay.html'))
+        res.setHeader('Content-Type', 'text/html; charset=utf-8')
+        res.setHeader('Cache-Control', 'no-store')
+        res.end(page)
+      } catch {
+        res.statusCode = 404
+        res.end('overlay not bundled')
+      }
+      return
+    }
+    if (p === '/overlay-config') {
+      res.setHeader('Content-Type', 'application/json')
+      res.setHeader('Cache-Control', 'no-store')
+      res.end(JSON.stringify({ style: this.overlay }))
+      return
+    }
+
     // Receiver embutido (mesma página do palco-receiver)
     if (p === '/' || p === '/receiver.html' || p === '/index.html') {
       try {
