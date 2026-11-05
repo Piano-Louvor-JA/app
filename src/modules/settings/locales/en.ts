@@ -365,7 +365,7 @@ export default {
       off: 'Off',
       devices: 'No devices connected | 1 device connected | {n} devices connected',
       summary: '{on} of {total} on air',
-      waitingSource: 'Waiting for OBS to connect',
+      waitingSource: 'Waiting for connections',
       add: 'Add connection',
       startAll: 'Start all',
       stopAll: 'Stop all',
