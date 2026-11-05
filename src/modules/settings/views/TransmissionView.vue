@@ -172,7 +172,11 @@ function changeBlackIdle(enabled: boolean) {
 
 const steps = computed(() => [1, 2, 3, 4].map((step) => t(`settings.transmission.howTo.step${step}`)))
 
+/** Espaço ao lado do título de Configurações; fora dela o status fica na barra. */
+const headerAside = ref<HTMLElement | null>(null)
+
 onMounted(() => {
+  headerAside.value = document.getElementById('settings-header-aside')
   void palcoSession.getConnectionPersistence().then((enabled) => { preserve.value = enabled }).catch(() => {})
 })
 </script>
@@ -180,12 +184,14 @@ onMounted(() => {
 <template>
   <section class="transmission-view">
     <div class="transmission-view__bar">
-      <span class="transmission-view__status" :class="{ 'transmission-view__status--on': onAir.length }">
-        <span class="transmission-view__dot" aria-hidden="true" />{{ onAir.length
-          ? `${t('settings.transmission.onAir')} · ${t('settings.transmission.devices', clients)}`
-          : t('settings.transmission.off') }}
-      </span>
-      <span class="transmission-view__summary">{{ t('settings.transmission.summary', { on: onAir.length, total: cards.length }) }}</span>
+      <Teleport :to="headerAside ?? 'body'" :disabled="!headerAside">
+        <span class="transmission-view__status" :class="{ 'transmission-view__status--on': onAir.length }">
+          <span class="transmission-view__dot" aria-hidden="true" />{{ onAir.length
+            ? `${t('settings.transmission.onAir')} · ${t('settings.transmission.devices', clients)}`
+            : t('settings.transmission.off') }}
+        </span>
+        <span class="transmission-view__summary">{{ t('settings.transmission.summary', { on: onAir.length, total: cards.length }) }}</span>
+      </Teleport>
       <div class="transmission-view__actions">
         <button type="button" class="transmission-view__add" data-test="add" :disabled="busy !== null" @click="addConnection">
           <i class="ti ti-plus" aria-hidden="true" /> {{ t('settings.transmission.add') }}

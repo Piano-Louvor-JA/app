@@ -17,6 +17,16 @@ vi.mock('../../components/SettingsTabs.vue', () => ({
   default: { template: '<div class="settings-tabs-stub" />' },
 }))
 
+// Composable testado à parte: aqui só o contrato tela ↔ minimizar.
+const minimizeMock = vi.fn(async () => {})
+const prepareMock = vi.fn()
+vi.mock('@shared/composables/useMinimizablePage', () => ({
+  useMinimizablePage: (options: unknown) => {
+    ;(globalThis as any).__minimizeOptions = options
+    return { minimize: minimizeMock, prepare: prepareMock, takeRestoredState: () => null }
+  },
+}))
+
 import SettingsView from '../SettingsView.vue'
 import { SETTINGS_SECTIONS } from '../../constants/sections'
 
@@ -26,7 +36,8 @@ const i18n = createI18n({
   messages: {
     pt: {
       nav: { home: 'Início' },
-      settings: { sectionTitle: { appearance: 'Aparência', general: 'Geral' } },
+      settings: { sectionTitle: { appearance: 'Aparência', general: 'Geral', transmission: 'Transmissão' } },
+      minimize: { page: 'Minimizar' },
     },
   },
 })
@@ -71,6 +82,24 @@ describe('SettingsView', () => {
     expect(wrapper.find('.settings-view__header').exists()).toBe(true)
     expect(wrapper.find('.settings-view__title').exists()).toBe(true)
     expect(wrapper.find('.settings-view__back').exists()).toBe(true)
+    expect(wrapper.find('#settings-header-aside').exists()).toBe(true)
+    expect(wrapper.find('.page-back-stack').exists()).toBe(false)
+  })
+
+  it('rota transmission: – abaixo da seta minimiza e descreve a tela', async () => {
+    minimizeMock.mockClear()
+    const { wrapper, go } = mountAt('settings-transmission')
+    await go('settings-transmission')
+    const stack = wrapper.find('.page-back-stack')
+    expect(stack.find('.settings-view__back').exists()).toBe(true)
+    await stack.find('.page-back-stack__minimize').trigger('pointerenter')
+    expect(prepareMock).toHaveBeenCalled()
+    await stack.find('.page-back-stack__minimize').trigger('click')
+    expect(minimizeMock).toHaveBeenCalledTimes(1)
+    const options = (globalThis as any).__minimizeOptions
+    expect(options.describe()).toEqual({ title: 'Transmissão', icon: 'ti-broadcast', summary: '' })
+    expect(options.capture()).toBeNull()
+    expect(options.fallbackRoute).toEqual({ name: 'home' })
   })
 
   it('goBack: navega pra home', async () => {

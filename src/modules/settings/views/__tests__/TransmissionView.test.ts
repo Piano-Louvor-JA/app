@@ -82,6 +82,18 @@ it('lists the main source first through the same card and summarizes what is on 
   view.unmount()
 })
 
+it('shows the on-air status beside the settings title when the header has room for it', async () => {
+  const aside = document.createElement('div')
+  aside.id = 'settings-header-aside'
+  document.body.appendChild(aside)
+  const view = await mountView()
+  expect(aside.querySelector('.transmission-view__status')?.textContent).toBe('No ar · 3 dispositivos conectados')
+  expect(aside.querySelector('.transmission-view__summary')?.textContent).toBe('1 de 2 no ar')
+  expect(view.find('.transmission-view__bar .transmission-view__status').exists()).toBe(false)
+  view.unmount()
+  expect(aside.childElementCount).toBe(0)
+})
+
 it('starts the main source with the stage greeting and stops the others directly', async () => {
   const view = await mountView()
   cards(view)[0]!.vm.$emit('toggle')

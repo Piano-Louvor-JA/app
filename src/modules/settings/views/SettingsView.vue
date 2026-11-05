@@ -4,6 +4,8 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import { usePageTransition } from '@design-system/composables'
+import PageBackStack from '@shared/components/PageBackStack.vue'
+import { useMinimizablePage } from '@shared/composables/useMinimizablePage'
 
 import SettingsTabs from '../components/SettingsTabs.vue'
 import { SETTINGS_SECTIONS } from '../constants/sections'
@@ -28,6 +30,14 @@ const sectionTitleKey = computed(
 function goBack() {
   void router.push({ name: 'home' })
 }
+
+/** Só a Transmissão minimiza: as conexões seguem no ar fora da tela. */
+const minimizable = computed(() => activeSection.value === 'transmission')
+const { minimize, prepare } = useMinimizablePage({
+  describe: () => ({ title: t(sectionTitleKey.value), icon: 'ti-broadcast', summary: '' }),
+  capture: () => null,
+  fallbackRoute: { name: 'home' },
+})
 </script>
 
 <template>
@@ -37,18 +47,30 @@ function goBack() {
   >
     <SettingsTabs class="settings-view__tabs" />
 
-    <div v-if="!isAppearance" class="settings-view__header">
-      <button
-        type="button"
-        class="settings-view__back"
-        :aria-label="t('nav.home')"
-        @click="goBack"
+    <div
+      v-if="!isAppearance"
+      class="settings-view__header"
+      :class="{ 'settings-view__header--stacked': minimizable }"
+    >
+      <component
+        :is="minimizable ? PageBackStack : 'div'"
+        class="settings-view__back-slot"
+        @minimize="minimize"
+        @prepare="prepare"
       >
-        <i class="ti ti-arrow-left" aria-hidden="true" />
-      </button>
+        <button
+          type="button"
+          class="settings-view__back"
+          :aria-label="t('nav.home')"
+          @click="goBack"
+        >
+          <i class="ti ti-arrow-left" aria-hidden="true" />
+        </button>
+      </component>
       <h1 class="settings-view__title">
         {{ t(sectionTitleKey) }}
       </h1>
+      <div id="settings-header-aside" class="settings-view__aside" />
     </div>
 
     <div class="settings-view__content">
@@ -92,6 +114,38 @@ function goBack() {
   align-items: center;
   gap: 1rem;
   margin-bottom: 2rem;
+
+  /* Seta + – empilhados: título e status alinham com a seta. */
+  &--stacked {
+    align-items: flex-start;
+
+    .settings-view__title,
+    .settings-view__aside {
+      min-height: 2.5rem;
+    }
+  }
+}
+
+.settings-view__back-slot {
+  display: flex;
+}
+
+.settings-view__title {
+  display: flex;
+  align-items: center;
+}
+
+.settings-view__aside {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-left: auto;
+
+  &:empty {
+    display: none;
+  }
 }
 
 .settings-view__back {
