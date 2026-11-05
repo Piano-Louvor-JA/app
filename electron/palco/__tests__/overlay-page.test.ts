@@ -19,9 +19,9 @@ let browser: Browser
 beforeAll(async () => { browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] }) })
 afterAll(async () => { await browser?.close() })
 
-async function openOverlay(slot: any): Promise<Page> {
+async function openOverlay(slot: any, extra = ''): Promise<Page> {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } })
-  await page.goto(`http://127.0.0.1:${slot.httpPort}/overlay?port=${slot.wsPort}`)
+  await page.goto(`http://127.0.0.1:${slot.httpPort}/overlay?port=${slot.wsPort}${extra}`)
   await page.waitForFunction(() => document.body.dataset.connected === 'true')
   return page
 }
@@ -141,12 +141,30 @@ describe('overlay page', () => {
     try {
       await slot.start()
       const page = await openOverlay(slot)
-      slot.send({ v: 2, type: 'obsWarmup', requestId: 'warm', durationMs: 300, expiresAt: Date.now() + 5000 })
-      await expect.poll(() => events.some(event => event.type === 'obs-warmup-complete' && event.requestId === 'warm')).toBe(true)
-      expect(events.some(event => event.type === 'obs-warmup-started' && event.requestId === 'warm')).toBe(true)
+      slot.send({ v: 2, type: 'obsWarmup', requestId: 'warm', durationMs: 999999999, expiresAt: Date.now() + 10000 })
+      await expect.poll(() => events.some(event => event.type === 'obs-warmup-started' && event.requestId === 'warm')).toBe(true)
+      await expect.poll(() => events.some(event => event.type === 'obs-warmup-complete' && event.requestId === 'warm'), { timeout: 4500 }).toBe(true)
       slot.send({ v: 2, type: 'obsControl', action: 'reload', requestId: 'again' })
       await expect.poll(() => events.some(event => event.type === 'receiver-ready' && event.requestId === 'again'), { timeout: 10000 }).toBe(true)
       expect(await page.evaluate(() => document.body.dataset.connected)).toBe('true')
+    } finally { await slot.dispose() }
+  }, 30000)
+
+  it('connects only to its own network and loads backgrounds through its own server', async () => {
+    const slot = new PalcoSlot('safe', 'Safe', await freePort(), await freePort(), () => null, { overlay: { layout: 'fullscreen' } })
+    try {
+      await slot.start()
+      const page = await openOverlay(slot, '&host=example.com')
+      const backdrop = () => page.locator('#backdrop').getAttribute('src')
+      slot.send({ v: 2, type: 'projection', scope: 'hymns', text: 'Santo, Santo, Santo', background: `http://127.0.0.1:${slot.httpPort}/bg/bg-3.png` })
+      await expect.poll(backdrop).toBe('/bg/bg-3.png')
+      slot.send({ v: 2, type: 'projection', scope: 'hymns', text: 'Deus onipotente', background: `http://127.0.0.1:${slot.httpPort}/media/capa%20hino.jpg?token=ABCDE` })
+      await expect.poll(backdrop).toBe('/media/capa%20hino.jpg')
+      slot.send({ v: 2, type: 'projection', scope: 'hymns', text: 'Cedo de manhã', background: 'https://example.invalid/capa.jpg' })
+      await expect.poll(backdrop).toBe('/proxy?url=https%3A%2F%2Fexample.invalid%2Fcapa.jpg')
+      slot.send({ v: 2, type: 'projection', scope: 'hymns', text: 'Cantaremos', background: `http://127.0.0.1:${slot.httpPort}/outro/arquivo.png` })
+      await expect.poll(() => page.locator('#content').innerText()).toBe('Cantaremos')
+      expect(await page.locator('#backdrop').evaluate(img => img.classList.contains('is-shown'))).toBe(false)
     } finally { await slot.dispose() }
   }, 30000)
 

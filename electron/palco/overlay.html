@@ -124,8 +124,23 @@
   document.documentElement.lang = WORDS[lang] ? lang : 'pt'
 
   var token = /^[A-Z0-9]{5}$/.test(query.get('token') || '') ? query.get('token') : ''
-  var wsHost = query.get('host') || location.hostname || '127.0.0.1'
-  var wsPort = Number(query.get('port')) || (Number(location.port) || 80) + 1
+  /** Só localhost ou IPv4 de rede local: o overlay nunca conecta fora da LAN. */
+  function lanHost(value) {
+    if (value === 'localhost') return 'localhost'
+    if (typeof value !== 'string' || !/^(?:0|[1-9][0-9]{0,2})(?:\.(?:0|[1-9][0-9]{0,2})){3}$/.test(value)) return ''
+    var parts = value.split('.').map(Number)
+    if (parts.some(function (n) { return n > 255 })) return ''
+    var a = parts[0], b = parts[1]
+    if (a !== 10 && a !== 127 && !(a === 172 && b >= 16 && b <= 31) && !(a === 192 && b === 168) && !(a === 169 && b === 254)) return ''
+    return parts.join('.')
+  }
+  function validPort(value) {
+    if (!/^\d{1,5}$/.test(String(value))) return 0
+    var number = Number(value)
+    return number >= 1 && number <= 65535 ? number : 0
+  }
+  var wsHost = lanHost(query.get('host')) || lanHost(location.hostname) || '127.0.0.1'
+  var wsPort = validPort(query.get('port')) || validPort((Number(location.port) || 80) + 1) || 7081
   var forced = { layout: query.get('layout'), theme: query.get('theme') }
 
   // ── Aparência ───────────────────────────────────────────────────────────
@@ -226,8 +241,29 @@
     }
   }
 
+  /**
+   * Endereço do fundo sempre pelo próprio servidor: arte oficial e mídia
+   * local pelo caminho dele; imagem externa pelo /proxy.
+   */
+  function backdropSource(raw) {
+    var parsed
+    try { parsed = new URL(raw) } catch (e) { return '' }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return ''
+    var access = token ? 'token=' + encodeURIComponent(token) : ''
+    if (parsed.port === location.port && lanHost(parsed.hostname)) {
+      var official = /^\/bg\/(bg-\d+)\.png$/.exec(parsed.pathname)
+      if (official) return '/bg/' + encodeURIComponent(official[1]) + '.png'
+      var media = /^\/media\/([^/]+)$/.exec(parsed.pathname)
+      if (!media) return ''
+      var name
+      try { name = decodeURIComponent(media[1]) } catch (e) { return '' }
+      return '/media/' + encodeURIComponent(name) + (access ? '?' + access : '')
+    }
+    return '/proxy?url=' + encodeURIComponent(parsed.href) + (access ? '&' + access : '')
+  }
+
   function syncBackdrop() {
-    var url = body.dataset.layout === 'fullscreen' && shown.kind === 'text' ? shown.background : ''
+    var url = body.dataset.layout === 'fullscreen' && shown.kind === 'text' ? backdropSource(shown.background) : ''
     if (!url) { backdrop.classList.remove('is-shown'); return }
     if (backdrop.getAttribute('src') !== url) {
       backdrop.onload = function () { backdrop.classList.add('is-shown') }
@@ -307,6 +343,7 @@
     })
   }
 
+  var WARMUP_MS = 3000
   var handledWarmups = readSession('overlay.warmups', [])
   function onWarmup(m) {
     if (!m.requestId || handledWarmups.indexOf(m.requestId) >= 0) return
@@ -319,7 +356,7 @@
     setTimeout(function () {
       badge.classList.remove('is-shown')
       send({ v: 2, type: 'obs-warmup-complete', requestId: m.requestId })
-    }, Math.min(Math.max(Number(m.durationMs) || 0, 0), 5000))
+    }, WARMUP_MS)
   }
 
   function handle(m) {
