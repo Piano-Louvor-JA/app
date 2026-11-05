@@ -36,7 +36,8 @@ vi.mock('../../../settings/services/stage-settings-runtime', () => ({
   },
 }))
 
-vi.mock('../../../settings/types/stage-settings', () => ({
+vi.mock('../../../settings/types/stage-settings', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   resolveBackgroundImage: (v: unknown) => (v ? String(v) : null),
   stageFlexAlign: () => ({ display: 'flex' }),
 }))
@@ -176,6 +177,43 @@ describe('BibleProjectionView.vue', () => {
       'text-transform: capitalize',
     )
     w.unmount()
+  })
+
+  describe('transição ao trocar versículo', () => {
+    const stage = stageValue.value as Record<string, unknown>
+    afterEach(() => {
+      delete stage.bibleTransition
+      delete stage.bibleTransitionSpeed
+    })
+    async function mounted() {
+      const w = mount(BibleProjectionView)
+      await flushPromises()
+      return w
+    }
+
+    it('padrão: suave, na velocidade normal', async () => {
+      const w = await mounted()
+      expect(w.html()).toContain('name="bible-fade"')
+      expect(w.find('.pb-stub').attributes('style')).toContain('--bible-transition-ms: 250ms')
+      w.unmount()
+    })
+
+    it('tipo e velocidade do Palco', async () => {
+      stage.bibleTransition = 'zoom'
+      stage.bibleTransitionSpeed = 'slow'
+      const w = await mounted()
+      expect(w.html()).toContain('name="bible-zoom"')
+      expect(w.html()).not.toContain('name="bible-fade"')
+      expect(w.find('.pb-stub').attributes('style')).toContain('--bible-transition-ms: 450ms')
+      w.unmount()
+    })
+
+    it('nenhuma: sem animação', async () => {
+      stage.bibleTransition = 'none'
+      const w = await mounted()
+      expect(w.html()).toContain('name="bible-none"')
+      w.unmount()
+    })
   })
 
   describe('posição da referência', () => {

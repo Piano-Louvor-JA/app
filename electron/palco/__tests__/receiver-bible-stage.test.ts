@@ -92,3 +92,58 @@ describe('receiver — posição da referência bíblica', () => {
     expect(footer.querySelector('.ref')?.textContent).toBe('João 3:16 (ARC)')
   })
 })
+
+describe('receiver — transição ao trocar versículo', () => {
+  const ENTER = ['rx-enter-fade', 'rx-enter-slide', 'rx-enter-zoom']
+  const text = () => w.document.getElementById('text') as HTMLElement
+  const footer = () => w.document.getElementById('footer') as HTMLElement
+  const enterClasses = (el: HTMLElement) => ENTER.filter((c) => el.classList.contains(c))
+  let verse = 0
+  const next = (extra: Record<string, unknown>) =>
+    project({ text: `Versículo ${++verse}`, footerRef: `Salmos 23:${verse}`, ...extra })
+
+  it('versículo novo entra com o tipo e a duração escolhidos, no texto e na referência', async () => {
+    await next({ transition: 'fade', transitionMs: 250 })
+    expect(enterClasses(text())).toEqual(['rx-enter-fade'])
+    expect(enterClasses(footer())).toEqual(['rx-enter-fade'])
+    expect(text().style.getPropertyValue('--rx-ms')).toBe('250ms')
+
+    await next({ transition: 'zoom', transitionMs: 450 })
+    expect(enterClasses(text())).toEqual(['rx-enter-zoom'])
+    expect(text().style.getPropertyValue('--rx-ms')).toBe('450ms')
+
+    await next({ transition: 'slide', transitionMs: 150 })
+    expect(enterClasses(footer())).toEqual(['rx-enter-slide'])
+  })
+
+  it('o mesmo versículo reenviado não reinicia a animação', async () => {
+    await next({ transition: 'fade', transitionMs: 250 })
+    const before = text().style.getPropertyValue('--rx-ms')
+    await project({ text: `Versículo ${verse}`, footerRef: `Salmos 23:${verse}`, transition: 'fade', transitionMs: 450 })
+    expect(enterClasses(text())).toEqual(['rx-enter-fade'])
+    expect(text().style.getPropertyValue('--rx-ms')).toBe(before)
+  })
+
+  it('nenhuma, sem o campo (APK) ou fora da Bíblia: troca seca', async () => {
+    await next({ transition: 'none' })
+    expect(enterClasses(text())).toEqual([])
+    await next({ transition: 'fade', transitionMs: 250 })
+    await next({})
+    expect(enterClasses(text())).toEqual([])
+    expect(enterClasses(footer())).toEqual([])
+    await next({ scope: 'hymns', transition: 'fade', transitionMs: 250 })
+    expect(enterClasses(text())).toEqual([])
+  })
+
+  it('voltar ao mesmo versículo depois de limpar a tela anima de novo', async () => {
+    await next({ transition: 'fade', transitionMs: 250 })
+    w.handle({ v: 2, type: 'idle' })
+    await project({ text: `Versículo ${verse}`, footerRef: `Salmos 23:${verse}`, transition: 'zoom', transitionMs: 150 })
+    expect(enterClasses(text())).toEqual(['rx-enter-zoom'])
+  })
+
+  it('duração inválida cai na normal', async () => {
+    await next({ transition: 'fade', transitionMs: 99999 })
+    expect(text().style.getPropertyValue('--rx-ms')).toBe('250ms')
+  })
+})

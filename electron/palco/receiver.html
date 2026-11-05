@@ -91,6 +91,15 @@
      width FIXO restaura o véu largo — o fit-content do .box-on é só
      para MÍDIA (música), Bíblia NÃO (14/10 Rafael). */
   #text.bible-box{padding:2vh 3.8vh;width:min(86vw,1600px);max-height:72vh}
+  /* Entrada do versículo novo. translate/scale individuais somam ao transform
+     que posiciona o #text; motores antigos ignoram e ficam só com o fade. */
+  @keyframes rxEnterFade{from{opacity:0}}
+  @keyframes rxEnterSlide{from{opacity:0;translate:0 4vh}}
+  @keyframes rxEnterZoom{from{opacity:0;scale:.94}}
+  .rx-enter-fade{animation:rxEnterFade var(--rx-ms,250ms) ease-out both}
+  .rx-enter-slide{animation:rxEnterSlide var(--rx-ms,250ms) ease-out both}
+  .rx-enter-zoom{animation:rxEnterZoom var(--rx-ms,250ms) ease-out both}
+  @media (prefers-reduced-motion:reduce){.rx-enter-slide,.rx-enter-zoom{animation-name:rxEnterFade}}
 
   #footer{position:fixed;bottom:4vh;left:0;right:0;text-align:center;
     font-size:2.6vh;font-weight:300;opacity:1;letter-spacing:.02em}
@@ -2616,6 +2625,24 @@ function footerPosition(m){
   const p=m&&m.footerPosition;
   return p==='below-left'||p==='below-center'||p==='below-right'||p==='corner'?p:null;
 }
+// Transição do versículo: só anima quando o texto muda; sem o campo (APK), troca seca.
+let lastBibleVerse='';
+function bibleEnter(m){
+  const kind=m.scope==='bible'&&(m.transition==='fade'||m.transition==='slide'||m.transition==='zoom')?m.transition:null;
+  const verse=m.scope==='bible'?String(m.text||'')+'|'+String(m.footerRef||''):'';
+  const changed=verse!==lastBibleVerse;
+  lastBibleVerse=verse;
+  if(kind&&!changed)return;
+  const ms=Number(m.transitionMs);
+  ['text','footer'].forEach(function(id){
+    const el=$(id);if(!el)return;
+    el.classList.remove('rx-enter-fade','rx-enter-slide','rx-enter-zoom');
+    if(!kind)return;
+    el.style.setProperty('--rx-ms',(Number.isFinite(ms)&&ms>=0&&ms<=2000?ms:250)+'ms');
+    void el.offsetWidth;
+    el.classList.add('rx-enter-'+kind);
+  });
+}
 // Conexões diretas: somente IPv4 de LAN/loopback e localhost, nunca DNS público.
 function palcoLanHost(value){
   if(value==='localhost')return 'localhost';
@@ -3655,6 +3682,7 @@ function handle(m){
       // Label de versão some durante projection com referência (colidia no
       // canto inferior direito — print 02/09 Rafael).
       {const iv=$('idleVer');if(iv)iv.style.display=m.footerRef?'none':''}
+      bibleEnter(m);
       break;
     case 'bgPalco':
       // BG permanente do palco (idle) — personalização, não da música
@@ -3843,7 +3871,7 @@ function handle(m){
         if(mode!=='chrono'&&rem<=0){clearInterval(t._iv)}},1000);
       break}
     case 'obsIdle':document.documentElement.classList.toggle('obs-black-idle',m.black===true);break;
-    case 'idle':showIdle(m.msg||L10N.idle);break;
+    case 'idle':lastBibleVerse='';showIdle(m.msg||L10N.idle);break;
     // F3.3x: sender informa IP DA TV (visto pelo socket) + SLOT onde ela
     // caiu — identificação visível pro operador conferir com o app.
     case 'youare':{

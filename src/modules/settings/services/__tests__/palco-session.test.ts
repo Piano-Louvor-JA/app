@@ -297,6 +297,35 @@ describe('com electron', () => {
     expect((palco.send.mock.calls[2]?.[0] as Record<string, unknown>).footerPosition).toBeUndefined()
   })
 
+  it('project bible: envia tipo e duração da transição; outros escopos não', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    readEffectiveStageSettings.mockReturnValue({
+      ...readEffectiveStageSettings(),
+      bibleTransition: 'zoom',
+      bibleTransitionSpeed: 'slow',
+    })
+    await palcoSession.project('bible', { text: 'No princípio', footerRef: 'João 1:1' })
+    let payload = palco.send.mock.calls[0]?.[0] as Record<string, unknown>
+    expect(payload.transition).toBe('zoom')
+    expect(payload.transitionMs).toBe(450)
+
+    readEffectiveStageSettings.mockReturnValue({
+      ...readEffectiveStageSettings(),
+      bibleTransition: undefined,
+      bibleTransitionSpeed: undefined,
+    })
+    await palcoSession.project('bible', { text: 'No princípio', footerRef: 'João 1:1' })
+    payload = palco.send.mock.calls[1]?.[0] as Record<string, unknown>
+    expect(payload.transition).toBe('fade')
+    expect(payload.transitionMs).toBe(250)
+
+    await palcoSession.project('hymns', { text: 'Santo' })
+    payload = palco.send.mock.calls[2]?.[0] as Record<string, unknown>
+    expect(payload.transition).toBeUndefined()
+    expect(payload.transitionMs).toBeUndefined()
+  })
+
   it('hymns overrideBg: bg do escopo vence capa da música', async () => {
     const palco = fullMock()
     setBridge(palco)
