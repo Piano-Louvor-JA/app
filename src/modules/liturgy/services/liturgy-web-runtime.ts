@@ -191,7 +191,7 @@ export function publishLiturgyYtSync(payload: LiturgyYtSyncPayload): void {
  * 
  * - 'mirror': Cabeada (monitor físico conectado) — abre BrowserWindow fullscreen
  *   sem chrome/overlays. Usa popup Electron nativo (YouTube/Vimeo com controles).
- * - 'slot': TV/Receivers via Palco (ports 7080 HTTP + 7081 WS) — publica no
+ * - 'slot': TV/Receivers via Palco (ports 47080 HTTP + 47081 WS) — publica no
  *   palco-session para receivers conectados.
  * 
  * Regra: YouTube, Vimeo, site genérico → mirror (cabeada).

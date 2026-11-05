@@ -3,9 +3,9 @@ import { readConnectionStartup, saveConnectionStartup } from './palco/connection
  * Servidor do PALCO (cast para TV) — multi-slot (paridade PalcoOrchestrator APK).
  *
  * APK PalcoOrchestrator: cada slot = par de portas HTTP/WS próprio:
- *   slot 0 (principal): 7080/7081 — compatível com receivers atuais
- *   slot 1: 7082/7083
- *   slot 2: 7084/7085 ...
+ *   slot 0 (principal): 47080/47081 (antes 7080/7081; salvos são migrados)
+ *   slot 1: 47082/47083
+ *   slot 2: 47084/47085 ...
  * Cada slot tem sender próprio (HTTP + WS), replay de estado, mídia, etc.
  *
  * IPC do renderer:
@@ -16,7 +16,7 @@ import { readConnectionStartup, saveConnectionStartup } from './palco/connection
  *   palco:status {slotId?} → status de um slot (default: principal)
  *   palco:start {slotId?}, palco:stop {slotId?}, palco:slot-status {slotId?}
  *
- * Receiver conecta em `ws://ip:7081+2N/palco?port=7081+2N` (query port opcional)
+ * Receiver conecta em `ws://ip:47081+2N/palco?port=47081+2N` (query port opcional)
  */
 
 import { publishReceiverEvent } from './palco/receiver-events.mjs'
@@ -34,7 +34,9 @@ import { WebSocketServer } from 'ws'
 
 import { loadOrCreatePalcoToken, requestHasPalcoAccess } from './palco-token.mjs'
 import {
+  DEFAULT_HTTP_PORT,
   DEFAULT_TRANSMISSION,
+  migrateLegacyPort,
   normalizeOverlayStyle,
   rankInterfaces,
   readTransmissionConfig,
@@ -44,8 +46,6 @@ import {
   validatePort,
 } from './palco/transmission-config.mjs'
 
-const BASE_HTTP_PORT = 7080
-const BASE_WS_PORT = 7081
 const MAX_SLOTS = 8 // slot 0-7
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -306,7 +306,7 @@ class PalcoSlot {
     }
     // Mesmo gate para o BG/cover da projection: <img> não manda header, e
     // localhost bypass escondia o 403 — browser/OBS/TV buscavam
-    // http://<lan>:7080/media/... sem token → 403 → onerror → fallback FIXO.
+    // http://<lan>:47080/media/... sem token → 403 → onerror → fallback FIXO.
     const bgUrl = m.type === 'projection' ? (m.background ?? m.cover) : undefined
     if (token && typeof bgUrl === 'string' && bgUrl.includes('/media/')) {
       try {
@@ -637,12 +637,20 @@ class PalcoManager {
 
   /** Slot principal (id='0') sempre existe. */
   init() {
-    const rows = readPersistedSlots()
+    const stored = readPersistedSlots()
+    let migrated = false
+    const rows = stored.map((item) => {
+      const httpPort = Number(item?.httpPort)
+      const moved = migrateLegacyPort(httpPort)
+      if (moved === httpPort || Number(item?.wsPort) !== httpPort + 1) return item
+      migrated = true
+      return { ...item, httpPort: moved, wsPort: moved + 1 }
+    })
     const principal = rows.find(item => String(item?.id) === '0')
     const principalPort = Number(principal?.httpPort)
-    const principalHttp = validatePort(principalPort, []).ok && Number(principal?.wsPort) === principalPort + 1 ? principalPort : BASE_HTTP_PORT
+    const principalHttp = validatePort(principalPort, []).ok && Number(principal?.wsPort) === principalPort + 1 ? principalPort : DEFAULT_HTTP_PORT
     this.ensureSlot('0', 'Principal', principalHttp, principalHttp + 1, principal?.overlay)
-    // Operador configura TV 2/porta 7082 uma vez; slots voltam após restart.
+    // Operador configura a TV 2 uma vez; slots voltam após restart.
     for (const item of rows) {
       const httpPort = Number(item?.httpPort)
       const wsPort = Number(item?.wsPort)
@@ -654,6 +662,7 @@ class PalcoManager {
         wsPort === httpPort + 1 && this.#slots.size < MAX_SLOTS
       ) this.ensureSlot(id, label, httpPort, wsPort, item?.overlay)
     }
+    if (migrated) this.persistSlots()
   }
 
   #takenPorts(exceptId) {
@@ -688,8 +697,8 @@ class PalcoManager {
   /** Cria novo slot (aloca próximo par de portas livre). */
   createSlot(label = `TV ${this.#slots.size}`) {
     if (this.#slots.size >= MAX_SLOTS) throw new Error('max slots')
-    let httpPort = suggestPort(BASE_HTTP_PORT + 2, this.#takenPorts())
-    // id = porta HTTP de criação (ex: "7082"); continua o mesmo se a porta mudar depois
+    let httpPort = suggestPort(DEFAULT_HTTP_PORT + 2, this.#takenPorts())
+    // id = porta HTTP de criação (ex: "47082"); continua o mesmo se a porta mudar depois
     while (httpPort !== null && this.#slots.has(String(httpPort))) httpPort = suggestPort(httpPort + 2, this.#takenPorts())
     if (httpPort === null) throw new Error('no free port')
     const slot = this.ensureSlot(String(httpPort), label, httpPort, httpPort + 1)
@@ -981,7 +990,7 @@ nav{display:flex;justify-content:space-between;gap:var(--sp3)}
 </footer>
 </main>
 <div id="pair"><p class="hint" data-i18n="pairHint">Pareamento perdido. Cole abaixo o link do QR exibido no app do desktop (começa com http://…/speaker?token=…):</p>
-<input id="pairUrl" placeholder="http://192.168.x.x:7080/speaker?remotePort=7071&token=abcd1234">
+<input id="pairUrl" placeholder="http://192.168.x.x:47080/speaker?remotePort=7071&token=abcd1234">
 <button id="pairGo" class="small" data-i18n="connect">Conectar</button><button id="pairCancel" class="small" data-i18n="cancel">Cancelar</button></div>
 <script>
 const I18N=${dictJson};
@@ -996,7 +1005,7 @@ document.querySelectorAll('[data-i18n]').forEach(el=>{el.textContent=T[el.datase
 document.querySelectorAll('[data-i18n-attr]').forEach(el=>{const[k,key]=el.dataset.i18nAttr.split(':');el.setAttribute(k,T[key])});
 let token=q.get('token')||localStorage.getItem('speaker.token');
 let remotePort=q.get('remotePort')||localStorage.getItem('speaker.remotePort')||'7071';
-let palcoPort=q.get('palcoPort')||localStorage.getItem('speaker.palcoPort')||'7081';
+let palcoPort=q.get('palcoPort')||localStorage.getItem('speaker.palcoPort')||String((Number(location.port)||47080)+1);
 // Token do palco (valor real injetado server-side abaixo) — o preview precisa
 // dele para o WS do palco não fechar a conexão fora do localhost.
 let palcoToken='${safeToken}';

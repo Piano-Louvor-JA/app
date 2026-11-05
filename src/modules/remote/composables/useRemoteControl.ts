@@ -12,7 +12,7 @@ import { useMediaPlayer } from '../../media/composables/useMediaPlayer'
 import { RemoteControlReceiver } from '../services/remote-control-receiver'
 
 const STORAGE_KEY = 'remote.senderUrl'
-const DEFAULT_URL = 'ws://192.168.1.10:7081/palco'
+const DEFAULT_URL = 'ws://192.168.1.10:47081/palco'
 
 const connectionUrl = ref<string>(
   localStorage.getItem(STORAGE_KEY) ?? DEFAULT_URL,

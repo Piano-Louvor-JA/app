@@ -133,6 +133,7 @@ describe('PalcoManager', () => {
     writeFileSync(path.join(env.root, 'palco-slots.json'), JSON.stringify([
       { id: '0', httpPort: 7080, wsPort: 7081, overlay: { theme: 'light' } },
       { id: '7082', label: 'OBS 2', httpPort: 9100, wsPort: 9101 },
+      { id: '7084', label: 'OBS 4', httpPort: 7084, wsPort: 7085 },
       { id: 'bad', label: 'Bad', httpPort: 80, wsPort: 81 },
     ]), 'utf8')
     vi.spyOn(PalcoSlot.prototype, 'prepare').mockResolvedValue(undefined)
@@ -140,24 +141,26 @@ describe('PalcoManager', () => {
     vi.spyOn(PalcoSlot.prototype, 'dispose').mockResolvedValue(undefined)
     attachPalcoServer(() => null)
     const manager = getPalcoManager()
-    expect(manager.getAllSlots().map((slot: any) => [slot.id, slot.httpPort])).toEqual([['0', 7080], ['7082', 9100]])
+    expect(manager.getAllSlots().map((slot: any) => [slot.id, slot.httpPort, slot.wsPort])).toEqual([['0', 47080, 47081], ['7082', 9100, 9101], ['7084', 47084, 47085]])
+    const migrated = JSON.parse(readFileSync(path.join(env.root, 'palco-slots.json'), 'utf8'))
+    expect(migrated.map((row: any) => [row.id, row.httpPort])).toEqual([['0', 47080], ['7082', 9100], ['7084', 47084]])
     expect(manager.getPrincipal().overlay.theme).toBe('light')
 
     const created = manager.createSlot('OBS 3')
-    expect([created.id, created.httpPort]).toEqual(['7084', 7084])
+    expect([created.id, created.httpPort]).toEqual(['47082', 47082])
 
     const update = env.handlers.get('palco:slot-update')!
-    expect(await update({}, { id: '7084', httpPort: 9100 })).toEqual({ ok: false, reason: 'collision' })
-    expect(await update({}, { id: '7084', httpPort: 80 })).toEqual({ ok: false, reason: 'range' })
+    expect(await update({}, { id: '47082', httpPort: 9100 })).toEqual({ ok: false, reason: 'collision' })
+    expect(await update({}, { id: '47082', httpPort: 80 })).toEqual({ ok: false, reason: 'range' })
     expect(await update({}, { id: 'nope', httpPort: 9200 })).toEqual({ ok: false, reason: 'not-found' })
-    expect(await update({}, { id: '7084', httpPort: 9200, overlay: { position: 'top' } })).toMatchObject({ ok: true })
-    expect(manager.getSlot('7084').httpPort).toBe(9200)
-    expect(manager.getSlot('7084').overlay.position).toBe('top')
+    expect(await update({}, { id: '47082', httpPort: 9200, overlay: { position: 'top' } })).toMatchObject({ ok: true })
+    expect(manager.getSlot('47082').httpPort).toBe(9200)
+    expect(manager.getSlot('47082').overlay.position).toBe('top')
     expect(await update({}, { id: '0', overlay: { layout: 'fullscreen' } })).toMatchObject({ ok: true })
 
     const saved = JSON.parse(readFileSync(path.join(env.root, 'palco-slots.json'), 'utf8'))
-    expect(saved.find((row: any) => row.id === '0')).toMatchObject({ httpPort: 7080, wsPort: 7081, overlay: { theme: 'light', layout: 'fullscreen' } })
-    expect(saved.find((row: any) => row.id === '7084')).toMatchObject({ label: 'OBS 3', httpPort: 9200, wsPort: 9201, overlay: { position: 'top' } })
+    expect(saved.find((row: any) => row.id === '0')).toMatchObject({ httpPort: 47080, wsPort: 47081, overlay: { theme: 'light', layout: 'fullscreen' } })
+    expect(saved.find((row: any) => row.id === '47082')).toMatchObject({ label: 'OBS 3', httpPort: 9200, wsPort: 9201, overlay: { position: 'top' } })
 
     const setTransmission = env.handlers.get('palco:transmission-set')!
     vi.spyOn(manager.getSlot('7082'), 'running', 'get').mockReturnValue(true)
@@ -166,7 +169,7 @@ describe('PalcoManager', () => {
     vi.spyOn(PalcoSlot.prototype, 'rebind').mockResolvedValue(undefined)
     expect(await setTransmission({}, { bind: 'local' })).toMatchObject({ ok: true, bind: 'local' })
     expect(JSON.parse(readFileSync(path.join(env.root, 'palco-transmission.json'), 'utf8')).bind).toBe('local')
-    expect(PalcoSlot.prototype.rebind).toHaveBeenCalledTimes(3)
+    expect(PalcoSlot.prototype.rebind).toHaveBeenCalledTimes(4)
     const info = await env.handlers.get('palco:transmission-get')!({})
     expect(info).toMatchObject({ bind: 'local', requireToken: true, listenHost: '127.0.0.1', linkHost: '127.0.0.1', missing: false })
     expect(Array.isArray(info.interfaces)).toBe(true)

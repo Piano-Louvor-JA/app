@@ -89,7 +89,7 @@ contextBridge.exposeInMainWorld('louvorja', {
     onClients: (callback) => subscribe('remote:clients', callback),
   },
 
-  // Palco (cast p/ TV — receiver conecta em WS :7081, HTTP :7080)
+  // Palco (cast p/ TV — receiver conecta em WS :47081, HTTP :47080)
   palco: {
     getPersistence: () => ipcRenderer.invoke('palco:persistence-get'),
     setPersistence: (enabled) => ipcRenderer.invoke('palco:persistence-set', { enabled }),

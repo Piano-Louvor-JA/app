@@ -10,6 +10,20 @@ export const DEFAULT_TRANSMISSION = Object.freeze({ bind: 'all', requireToken: t
 export const MIN_PORT = 1024
 export const MAX_PORT = 65534
 
+/** Fonte 1 (HTTP) e o WebSocket dela; as demais conexões seguem de 2 em 2. */
+export const DEFAULT_HTTP_PORT = 47080
+export const DEFAULT_WS_PORT = DEFAULT_HTTP_PORT + 1
+/** Faixa antiga (7080, 7082…): receivers ainda a procuram durante a transição. */
+export const LEGACY_HTTP_PORT = 7080
+const LEGACY_LAST_PORT = LEGACY_HTTP_PORT + 30
+
+/** Porta salva na faixa automática antiga vai para a mesma posição na nova. */
+export function migrateLegacyPort(httpPort) {
+  if (!Number.isInteger(httpPort) || httpPort < LEGACY_HTTP_PORT || httpPort > LEGACY_LAST_PORT) return httpPort
+  if ((httpPort - LEGACY_HTTP_PORT) % 2 !== 0) return httpPort
+  return httpPort - LEGACY_HTTP_PORT + DEFAULT_HTTP_PORT
+}
+
 export const DEFAULT_OVERLAY_STYLE = Object.freeze({
   layout: 'lower-third',
   theme: 'dark',

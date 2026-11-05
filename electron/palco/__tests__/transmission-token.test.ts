@@ -82,7 +82,7 @@ describe('token requirement', () => {
 
 it('lists connections with port, style and error details for the settings screen', async () => {
   const [principal] = await env.handlers.get('palco:slots')!({})
-  expect(principal).toMatchObject({ id: '0', label: 'Principal', running: false, clients: 0, httpPort: 7080, wsPort: 7081, overlay: { layout: 'lower-third' } })
+  expect(principal).toMatchObject({ id: '0', label: 'Principal', running: false, clients: 0, httpPort: 47080, wsPort: 47081, overlay: { layout: 'lower-third' } })
   expect(principal).toHaveProperty('error')
   expect(principal).toHaveProperty('overlayUrl', null)
 })

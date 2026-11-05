@@ -2,7 +2,7 @@ import { notifyObsChanged, obsAllowsMirror, obsAssignments, assignObsConnection 
 /**
  * PalcoSession — sessão de cast para TV no desktop (padrão StageSession do APK).
  *
- * O sender (WS :7081 + HTTP :7080) vive no main process (electron/palco-server.mjs);
+ * O sender (WS :47081 + HTTP :47080) vive no main process (electron/palco-server.mjs);
  * este service no renderer comanda via preload (window.louvorja.palco.*) e traduz
  * StageSettings efetivo do escopo para as mensagens do protocolo Palco v2.
  */
@@ -213,7 +213,7 @@ class PalcoSession {
     await this.stopSlot(this.activeSlotId)
   }
 
-  /** BaseUrl do sender (http://ip:7080) — cacheado após 1º status. */
+  /** BaseUrl do sender (http://ip:47080) — cacheado após 1º status. */
   private async ensureBaseUrl(): Promise<string | null> {
     if (!this.baseUrl) {
       const st = await this.status()

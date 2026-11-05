@@ -12,7 +12,7 @@ const i18n = createI18n({ legacy: false, locale: 'pt-BR', messages: { 'pt-BR': p
 
 function connection(overrides: Partial<TransmissionConnection> = {}): TransmissionConnection {
   return {
-    id: '0', name: 'Fonte 1', running: false, clients: 0, receiverIps: [], httpPort: 7080, error: null,
+    id: '0', name: 'Fonte 1', running: false, clients: 0, receiverIps: [], httpPort: 47080, error: null,
     overlay: { ...DEFAULT_OVERLAY_STYLE }, overlayUrl: null, receiverUrl: null, ...overrides,
   }
 }
@@ -25,13 +25,13 @@ it('main source stopped: editable port with the TV warning, no links and no dele
   expect(card.get('.transmission-card__name').text()).toBe('Fonte 1')
   expect(card.text()).toContain('Desligada')
   expect(card.text()).toContain('Inicie a conexão para gerar os links.')
-  expect(card.text()).toContain('TVs com o app Palco procuram a porta padrão 7080.')
-  expect(card.text()).toContain('WebSocket na porta 7081')
+  expect(card.text()).toContain('TVs com o app Palco procuram a porta padrão 47080.')
+  expect(card.text()).toContain('WebSocket na porta 47081')
   expect(card.find('[data-test="remove"]').exists()).toBe(false)
   expect(card.find('[data-test="reload"]').exists()).toBe(false)
   expect(card.find('[data-test="port-apply"]').exists()).toBe(false)
   const port = card.get<HTMLInputElement>('[data-test="port"]')
-  expect(port.element.value).toBe('7080')
+  expect(port.element.value).toBe('47080')
   await port.setValue('7090')
   expect(card.text()).toContain('WebSocket na porta 7091')
   await card.get('[data-test="port-apply"]').trigger('click')

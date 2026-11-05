@@ -146,7 +146,7 @@
     return number >= 1 && number <= 65535 ? number : 0
   }
   var wsHost = lanHost(query.get('host')) || lanHost(location.hostname) || '127.0.0.1'
-  var wsPort = validPort(query.get('port')) || validPort((Number(location.port) || 80) + 1) || 7081
+  var wsPort = validPort(query.get('port')) || validPort((Number(location.port) || 80) + 1) || 47081
   var forced = { layout: query.get('layout'), theme: query.get('theme') }
 
   // ── Aparência ───────────────────────────────────────────────────────────

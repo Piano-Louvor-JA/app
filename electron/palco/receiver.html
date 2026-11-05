@@ -2683,11 +2683,16 @@ function sendEvent(m){try{if(ws&&ws.readyState===1)ws.send(JSON.stringify(m))}ca
 
 // ===== Auto-descoberta (F3.3): acha o sender (APK) na sub-rede =====
 // Prioridade: launchParams/query host > último host válido (localStorage)
-// > scan da sub-rede via GET :7080/status (resposta JSON identifica sender).
+// > scan da sub-rede via GET :47080/status (resposta JSON identifica sender).
+// Transição: computadores na porta antiga (7080/7081) também são procurados.
+const DEFAULT_WS_PORT='47081';
+const LEGACY_WS_PORT='7081';
 const browserSourcePort=Number(location.port);
 const ownBrowserSource=/^https?:$/.test(location.protocol)&&!!palcoLanHost(location.hostname)&&browserSourcePort>=7080&&browserSourcePort<=65534;
 let host=qs.get('host')||(ownBrowserSource?location.hostname:localStorage.getItem('palcoHost'))||location.hostname||'';
-let port=qs.get('port')||(ownBrowserSource?String(browserSourcePort+1):localStorage.getItem('palcoPort'))||'7081';
+let port=qs.get('port')||(ownBrowserSource?String(browserSourcePort+1):localStorage.getItem('palcoPort'))||DEFAULT_WS_PORT;
+// Porta do link ou da própria página é definitiva; a salva pode ser de antes da troca.
+const portFixed=!!(qs.get('port')||ownBrowserSource);
 
 function probeHttp(ip,httpPort){
   const url=palcoLanUrl(ip,httpPort,'/status','http');
@@ -2700,11 +2705,17 @@ function probeHttp(ip,httpPort){
   });
 }
 function probeSender(ip){
-  // Porta digitada pode ser WS (7081) OU HTTP do slot (a UI mostra a HTTP,
-  // ex.: slot 1 = 7082/7083). Tenta a dupla HTTP/WS em ambos os sentidos:
-  // p como HTTP, p-1 (p=WS) e p+1 (p=HTTP→WS=p+1).
   if(!palcoLanUrl(ip,port,'/status','http'))return Promise.resolve(null);
-  var p=Number(port);
+  var tries=[port];
+  if(!portFixed)[DEFAULT_WS_PORT,LEGACY_WS_PORT].forEach(function(p){if(tries.indexOf(p)<0)tries.push(p)});
+  return tries.slice(1).reduce(function(found,p){
+    return found.then(function(r){return r||probePair(ip,Number(p))});
+  },probePair(ip,Number(port)));
+}
+function probePair(ip,p){
+  // Porta digitada pode ser WS (47081) OU HTTP do slot (a UI mostra a HTTP,
+  // ex.: slot 1 = 47082/47083). Tenta a dupla HTTP/WS em ambos os sentidos:
+  // p como HTTP, p-1 (p=WS) e p+1 (p=HTTP→WS=p+1).
   return probeHttp(ip,p).then(function(j){
     if(j)return normalizePort(ip,j,p+1);        // p era HTTP → WS=p+1
     return probeHttp(ip,p-1).then(function(j2){
@@ -3072,7 +3083,7 @@ function coverUrl(cover){
   const path=encodeURI(String(cover).replace(/^\/+/, '')).split(/[?#]/)[0];
   if(!path)return null;
   const sender=lanSenderHost();
-  if(location.protocol==='file:'&&sender)return palcoMediaUrl('http://'+sender+':7080/'+path);
+  if(location.protocol==='file:'&&sender)return palcoMediaUrl('http://'+sender+':'+(Number(port)-1)+'/'+path);
   return '/'+path;
 }
 function showNp(title,sub,cover){

@@ -4,9 +4,13 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import {
+  DEFAULT_HTTP_PORT,
   DEFAULT_OVERLAY_STYLE,
   DEFAULT_TRANSMISSION,
+  DEFAULT_WS_PORT,
+  LEGACY_HTTP_PORT,
   listenHostFor,
+  migrateLegacyPort,
   normalizeOverlayStyle,
   rankInterfaces,
   readTransmissionConfig,
@@ -110,6 +114,20 @@ describe('ports', () => {
     expect(suggestPort(7082, [7080], [7082, 7084])).toBe(7086)
     expect(suggestPort(65534, [])).toBe(65534)
     expect(suggestPort(65534, [65534])).toBeNull()
+  })
+})
+
+describe('default ports', () => {
+  it('uses 47080/47081 and moves ports saved in the old automatic range', () => {
+    expect([DEFAULT_HTTP_PORT, DEFAULT_WS_PORT, LEGACY_HTTP_PORT]).toEqual([47080, 47081, 7080])
+    expect(migrateLegacyPort(7080)).toBe(47080)
+    expect(migrateLegacyPort(7082)).toBe(47082)
+    expect(migrateLegacyPort(7110)).toBe(47110)
+    expect(migrateLegacyPort(7112)).toBe(7112)
+    expect(migrateLegacyPort(7081)).toBe(7081)
+    expect(migrateLegacyPort(7078)).toBe(7078)
+    expect(migrateLegacyPort(9100)).toBe(9100)
+    expect(migrateLegacyPort(Number.NaN)).toBeNaN()
   })
 })
 
