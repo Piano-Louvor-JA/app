@@ -372,6 +372,7 @@ export default {
       startAll: 'Iniciar todas',
       stopAll: 'Detener todas',
       source: 'Fuente {n}',
+      mainSource: 'Servidor de transmisión',
       nickname: 'Agregar apodo',
       nicknameLabel: 'Apodo de {name}',
       start: 'Iniciar',

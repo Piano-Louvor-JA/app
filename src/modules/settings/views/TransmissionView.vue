@@ -21,7 +21,8 @@ import type { OverlayStyle, SlotUpdateFailure, TransmissionConnection } from '..
 const { t } = useI18n()
 const { connections, refresh } = useObsConnections()
 
-function sourceName(label: string) {
+function sourceName(id: string, label: string) {
+  if (id === '0') return t('settings.transmission.mainSource')
   const number = label.match(/^OBS\s*(\d+)$/)?.[1]
   return number ? t('settings.transmission.source', { n: number }) : label
 }
@@ -31,7 +32,7 @@ const cards = computed<TransmissionConnection[]>(() => connections.value
   .filter((connection) => connection.httpPort !== null)
   .map((connection) => ({
     id: connection.id,
-    name: sourceName(connection.label),
+    name: sourceName(connection.id, connection.label),
     nickname: connection.nickname,
     running: connection.running,
     clients: connection.clients,
@@ -175,7 +176,7 @@ onMounted(() => {
 
 <template>
   <section class="transmission-view">
-    <div class="transmission-view__bar">
+    <div v-show="!headerAside" class="transmission-view__bar">
       <Teleport :to="headerAside ?? 'body'" :disabled="!headerAside">
         <span class="transmission-view__status" :class="{ 'transmission-view__status--on': onAir.length }">
           <span class="transmission-view__dot" aria-hidden="true" />{{ onAir.length
@@ -184,17 +185,6 @@ onMounted(() => {
         </span>
         <span class="transmission-view__summary">{{ t('settings.transmission.summary', { on: onAir.length, total: cards.length }) }}</span>
       </Teleport>
-      <div class="transmission-view__actions">
-        <button type="button" class="transmission-view__add" data-test="add" :disabled="busy !== null" @click="addConnection">
-          <i class="ti ti-plus" aria-hidden="true" /> {{ t('settings.transmission.add') }}
-        </button>
-        <button type="button" class="transmission-view__bulk" data-test="start-all" :disabled="busy !== null || allOnAir" @click="setAll(true)">
-          <i class="ti ti-player-play" aria-hidden="true" /> {{ t('settings.transmission.startAll') }}
-        </button>
-        <button type="button" class="transmission-view__bulk transmission-view__bulk--stop" data-test="stop-all" :disabled="busy !== null || !onAir.length" @click="setAll(false)">
-          <i class="ti ti-player-stop" aria-hidden="true" /> {{ t('settings.transmission.stopAll') }}
-        </button>
-      </div>
     </div>
 
     <p v-if="pageError" class="transmission-view__error" role="alert">{{ pageError }}</p>
@@ -205,6 +195,18 @@ onMounted(() => {
         @toggle="toggle(card)" @remove="pendingRemoval = card" @reload="reload(card.id)"
         @nickname="setObsNickname(card.id, $event)" @port="changePort(card.id, $event)"
         @style="changeStyle(card.id, $event)" @qr="(url, title) => (qr = { url, title })" />
+    </div>
+
+    <div class="transmission-view__actions">
+      <button type="button" class="transmission-view__add" data-test="add" :disabled="busy !== null" @click="addConnection">
+        <i class="ti ti-plus" aria-hidden="true" /> {{ t('settings.transmission.add') }}
+      </button>
+      <button type="button" class="transmission-view__bulk" data-test="start-all" :disabled="busy !== null || allOnAir" @click="setAll(true)">
+        <i class="ti ti-player-play" aria-hidden="true" /> {{ t('settings.transmission.startAll') }}
+      </button>
+      <button type="button" class="transmission-view__bulk transmission-view__bulk--stop" data-test="stop-all" :disabled="busy !== null || !onAir.length" @click="setAll(false)">
+        <i class="ti ti-player-stop" aria-hidden="true" /> {{ t('settings.transmission.stopAll') }}
+      </button>
     </div>
 
     <TransmissionNetworkCard class="transmission-view__section" :locked="onAir.length > 0" @changed="refresh" />
@@ -278,7 +280,7 @@ onMounted(() => {
 
   &__dot { width: 0.5rem; height: 0.5rem; border-radius: 999px; background: currentColor; }
   &__summary { color: var(--ds-color-on-surface-variant); font-size: 0.8rem; }
-  &__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-left: auto; }
+  &__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.5rem; }
 
   &__add, &__bulk {
     display: inline-flex;
