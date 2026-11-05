@@ -88,8 +88,10 @@ export function migratePalcoConnections(slots: ReadonlyArray<{ id: string; label
     if (typeof slot.id !== 'string' || typeof slot.label !== 'string') continue
     if (next.some(connection => connection.id === slot.id)) continue
     const number = slot.id === '0' ? 1 : Math.max(1, ...next.map(item => Number(item.label.match(/\d+$/)?.[0]) || 1)) + 1
+    // "Principal" é o rótulo interno do slot 0 no main, não um apelido do operador.
+    const internalLabel = /^OBS\s*\d+$/.test(slot.label) || (slot.id === '0' && slot.label === 'Principal')
     next.push({ id: slot.id, label: `OBS ${number}`, selected: true,
-      ...(!/^OBS\s*\d+$/.test(slot.label) ? { nickname: slot.label.slice(0, 60) } : {}) })
+      ...(!internalLabel ? { nickname: slot.label.slice(0, 60) } : {}) })
     changed = true
   }
   if (changed) { obsConnections.value = next; save() }
