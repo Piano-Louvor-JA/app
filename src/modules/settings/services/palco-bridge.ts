@@ -718,12 +718,16 @@ export function startPalcoBridge() {
     if (started) void palcoSession.stageReturn(runtimes.media)
   })
   if (typeof unsubscribeReceiver === 'function') unwatchers.push(unsubscribeReceiver)
-  window.addEventListener('obs-connections-changed', refreshObs)
+  const onObsChanged = () => {
+    refreshObs()
+    if (started) void palcoSession.stageReturn(runtimes.media)
+  }
+  window.addEventListener('obs-connections-changed', onObsChanged)
   const obsTimer = window.setInterval(() => {
     if (Object.keys(obsAssignments.value).length || owner === 'timer') void renderAllSlots()
   }, 1000)
   unwatchers.push(() => {
-    window.removeEventListener('obs-connections-changed', refreshObs)
+    window.removeEventListener('obs-connections-changed', onObsChanged)
     window.clearInterval(obsTimer)
   })
 

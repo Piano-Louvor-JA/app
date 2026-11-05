@@ -370,13 +370,14 @@ class PalcoSession {
     }
   }
 
-  /** Retorno de palco (/retorno) em toda conexão no ar: segue a música, não a rota da TV. */
+  /** Retorno de palco (/retorno) nas conexões no ar marcadas no seletor de telas; as desmarcadas recebem o retorno desligado. */
   async stageReturn(runtime: MediaProjectionRuntime): Promise<void> {
     if (!this.isElectron) return
     const stage = readEffectiveStageSettings('hymns')
     const background = runtime.active ? resolveBackgroundImage(stage.backgroundImage) ?? runtime.imageUrl : null
     const slots = (await this.slots()).filter((slot) => slot.running)
     await Promise.all(slots.map(async (slot) => {
+      if (!obsAllowsMirror(slot.id, 'hymns')) return palcoApi().send(buildStageReturn({ ...runtime, active: false }, stage), slot.id)
       const resolved = background ? await this.forSlot(slot.id).resolveBgUrl(background) : undefined
       await palcoApi().send(buildStageReturn(runtime, stage, resolved), slot.id)
     }))

@@ -10,6 +10,7 @@ vi.mock('../stage-settings-runtime', async (importOriginal) => ({
 }))
 
 import { palcoSession } from '../palco-session'
+import { obsConnections } from '../obs-connections'
 
 const send = vi.fn()
 const status = vi.fn()
@@ -43,6 +44,28 @@ it('sends the stage return to every source on air, with the hymns look and each 
   expect(first).toMatchObject({ type: 'stageReturn', active: true, current: 'Santo, santo, santo', next: 'Cedo de manhã', progress: 0.5,
     background: 'http://192.168.0.5:47080/media/palco.jpg', style: { barColor: '#00ff00' } })
   expect(second.background).toBe('http://192.168.0.5:47082/media/palco.jpg')
+})
+
+it('turns the stage return off on sources unchecked in the screen selector', async () => {
+  obsConnections.value = [
+    { id: '0', label: 'OBS 1', selected: false },
+    { id: '47082', label: 'OBS 2', selected: true, nickname: 'TV Retorno', kind: 'return' },
+  ]
+  await palcoSession.stageReturn(music)
+  const bySlot = Object.fromEntries(send.mock.calls.map(([message, slot]) => [slot, message]))
+  expect(bySlot['0']).toEqual({ v: 1, type: 'stageReturn', active: false })
+  expect(bySlot['47082']).toMatchObject({ type: 'stageReturn', active: true, current: 'Santo, santo, santo' })
+  expect(servePath).toHaveBeenCalledTimes(1)
+  obsConnections.value = [
+    { id: '0', label: 'OBS 1', selected: true },
+    { id: '47082', label: 'OBS 2', selected: false },
+  ]
+  send.mockClear()
+  await palcoSession.stageReturn(music)
+  const again = Object.fromEntries(send.mock.calls.map(([message, slot]) => [slot, message]))
+  expect(again['0']).toMatchObject({ active: true })
+  expect(again['47082']).toEqual({ v: 1, type: 'stageReturn', active: false })
+  obsConnections.value = []
 })
 
 it('falls back to the song image when the stage has no background of its own', async () => {
