@@ -112,6 +112,96 @@ describe('retorno de palco no navegador', () => {
     expect($('.stage-return__next-label')!.textContent).toBe('Next')
   })
 
+  describe('animação igual à tela de retorno dos monitores', () => {
+    function animated(reducedMotion = false) {
+      const page = receiver('/retorno')
+      const frames: Array<(now: number) => void> = []
+      let now = 1000
+      const animations: Array<{ keyframes: unknown; options: unknown }> = []
+      let finish!: () => void
+      Object.assign(page.w, {
+        requestAnimationFrame: (cb: (now: number) => void) => { frames.push(cb); return frames.length },
+        cancelAnimationFrame: () => {},
+        matchMedia: () => ({ matches: reducedMotion }),
+      })
+      page.w.performance.now = () => now
+      page.w.HTMLElement.prototype.getBoundingClientRect = function () {
+        const next = this.classList.contains('stage-return__next-lyric')
+        return { left: next ? 300 : 100, top: next ? 800 : 300, width: next ? 600 : 1200, height: next ? 60 : 140, right: 0, bottom: 0, x: 0, y: 0, toJSON() {} } as DOMRect
+      }
+      page.w.HTMLElement.prototype.animate = function (keyframes: unknown, options: unknown) {
+        animations.push({ keyframes, options })
+        return { finished: new Promise<void>((resolve) => { finish = resolve }), cancel() {} } as unknown as Animation
+      }
+      const flush = (rounds = 4) => { for (let i = 0; i < rounds; i++) frames.splice(0).forEach(cb => cb(now)) }
+      return { ...page, animations, flush, finish: () => finish(), advance: (ms: number) => { now += ms } }
+    }
+    const tick = () => new Promise(resolve => setTimeout(resolve, 0))
+
+    it('o próximo trecho voa até o lugar do atual, o anterior sobe e some, e o novo próximo entra', async () => {
+      const { w, $, animations, flush, finish } = animated()
+      w.handle(VERSE)
+      w.handle({ ...VERSE, slideIndex: 3, current: 'Cedo de manhã', next: 'Louvado seja', progress: 0 })
+      const ghost = $('.stage-return__lyric--ghost')!
+      const flyer = $('.stage-return__flyer')!
+      expect(ghost.hidden).toBe(false)
+      expect(ghost.textContent).toBe('Santo, santo, santo\nDeus Todo-Poderoso')
+      expect(ghost.classList.contains('out')).toBe(true)
+      expect($('.stage-return__card .stage-return__lyric:not(.stage-return__lyric--ghost)')!.textContent).toBe('Cedo de manhã')
+      expect($('.stage-return__card .stage-return__lyric:not(.stage-return__lyric--ghost)')!.classList.contains('wait')).toBe(true)
+      expect(flyer.hidden).toBe(false)
+      expect(flyer.textContent).toBe('Cedo de manhã')
+      expect($('.stage-return__next-lyric')!.classList.contains('out')).toBe(true)
+      expect(animations).toHaveLength(1)
+      expect(animations[0]!.keyframes).toEqual([
+        { transform: 'translate(-100px, 500px) scale(0.5)' },
+        { transform: 'translate(0px, 0px) scale(1)' },
+      ])
+      expect(animations[0]!.options).toMatchObject({ duration: 780, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' })
+      finish()
+      await tick()
+      flush()
+      await tick()
+      expect($('.stage-return__next-lyric')!.textContent).toBe('Louvado seja')
+      expect($('.stage-return__next-lyric')!.classList.contains('enter')).toBe(true)
+      expect($('.stage-return__next-lyric')!.classList.contains('out')).toBe(false)
+      expect($('.stage-return__lyric.wait')).toBeNull()
+      expect(ghost.hidden).toBe(true)
+      expect(flyer.hidden).toBe(true)
+    })
+
+    it('saltos, capa e quem prefere menos movimento trocam direto', () => {
+      const jump = animated()
+      jump.w.handle(VERSE)
+      jump.w.handle({ ...VERSE, slideIndex: 7, current: 'Outro trecho', next: '' })
+      expect(jump.animations).toHaveLength(0)
+      expect(jump.$('.stage-return__card .stage-return__lyric:not(.stage-return__lyric--ghost)')!.textContent).toBe('Outro trecho')
+      const calm = animated(true)
+      calm.w.handle(VERSE)
+      calm.w.handle({ ...VERSE, slideIndex: 3, current: 'Cedo de manhã', next: 'Louvado seja' })
+      expect(calm.animations).toHaveLength(0)
+      expect(calm.$('.stage-return__next-lyric')!.textContent).toBe('Louvado seja')
+      expect(calm.$('.stage-return__flyer')!.hidden).toBe(true)
+    })
+
+    it('a barra avança suave entre as atualizações, sem saltos', () => {
+      const { w, $, flush, advance } = animated()
+      w.handle({ ...VERSE, progress: 0.2 })
+      const fill = $('.stage-return__bar-fill')!
+      expect(fill.style.transform).toBe('scaleX(0.2)')
+      advance(1000)
+      w.handle({ ...VERSE, progress: 0.3 })
+      expect(fill.style.transform).toBe('scaleX(0.2)')
+      advance(200)
+      flush(1)
+      const shown = Number(fill.style.transform.match(/scaleX\(([\d.]+)\)/)![1])
+      expect(shown).toBeGreaterThan(0.2)
+      expect(shown).toBeLessThan(0.33)
+      w.handle({ ...VERSE, slideIndex: 3, current: 'Cedo de manhã', progress: 0 })
+      expect(fill.style.transform).toBe('scaleX(0)')
+    })
+  })
+
   it('o espelho comum ignora o retorno de palco', () => {
     const { w, $ } = receiver('/')
     w.handle(VERSE)

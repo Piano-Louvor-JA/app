@@ -167,8 +167,19 @@
   text-shadow:0 10px 30px rgba(0,0,0,.9),0 2px 6px rgba(0,0,0,.7)}
 .stage-return__bar{flex-shrink:0;width:100%;height:clamp(7px,1.05vmin,12px);overflow:hidden;
   border-radius:0 0 clamp(8px,1.2vmin,12px) clamp(8px,1.2vmin,12px);background:rgba(255,255,255,.18)}
-.stage-return__bar-fill{width:100%;height:100%;transform:scaleX(0);transform-origin:left center;background:#FCCE02;transition:transform .45s linear}
-.stage-return__bar-fill.reset{transition:none}
+.stage-return__bar-fill{width:100%;height:100%;transform:scaleX(0);transform-origin:left center;background:#FCCE02}
+.stage-return__lyric.wait{visibility:hidden}
+.stage-return__lyric--ghost{position:absolute;z-index:1;top:0;right:0;left:0;pointer-events:none}
+.stage-return__lyric--ghost[hidden],.stage-return__flyer[hidden]{display:none}
+.stage-return__lyric--ghost.out{animation:stageReturnGhostOut 780ms cubic-bezier(.22,1,.36,1) forwards}
+@keyframes stageReturnGhostOut{from{opacity:1;transform:none}to{opacity:0;transform:translateY(-24%)}}
+.stage-return__flyer{position:fixed;z-index:4;max-width:90vw;pointer-events:none;will-change:transform}
+.stage-return__next-lyric.out{opacity:0;transition:opacity 160ms ease}
+.stage-return__next-lyric.enter{animation:stageReturnNextIn 520ms cubic-bezier(.22,1,.36,1)}
+@keyframes stageReturnNextIn{from{opacity:0;transform:translateY(.45em)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){
+  .stage-return__lyric--ghost.out,.stage-return__next-lyric,.stage-return__next-lyric.enter,.stage-return__flyer{animation:none;transition:none}
+}
 .stage-return__next{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:.55rem;min-height:0}
 .stage-return__next-label{color:#f6c32a;font-size:clamp(.7rem,1.8vmin,1.1rem);font-weight:800;letter-spacing:.18em;text-transform:uppercase}
 .stage-return__next-lyric{margin:0;max-width:86vw;color:rgba(255,255,255,.82);font-size:clamp(1.25rem,4.2vmin,3.4rem);
@@ -252,7 +263,7 @@
     <div class="stage-return__main">
       <p class="stage-return__title" hidden></p>
       <div class="stage-return__block">
-        <div class="stage-return__card"><p class="stage-return__lyric"></p></div>
+        <div class="stage-return__card"><p class="stage-return__lyric"></p><p class="stage-return__lyric stage-return__lyric--ghost" hidden></p></div>
         <div class="stage-return__bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="stage-return__bar-fill"></div></div>
       </div>
     </div>
@@ -261,6 +272,7 @@
       <p class="stage-return__next-lyric"></p>
     </div>
   </div>
+  <p class="stage-return__lyric stage-return__flyer" aria-hidden="true" hidden></p>
 </div>
 <script>
 //---------------------------------------------------------------------
@@ -2600,7 +2612,98 @@ return Object.assign({},d.pt,d[l]||{});})();
 document.querySelectorAll('[data-l10n]').forEach(function(el){var k=el.getAttribute('data-l10n');if(L10N[k])el.textContent=L10N[k];});
 // Retorno de palco: em /retorno, música ativa cobre o espelho; sem música, segue igual à TV. Nunca toca som.
 const stageReturnMode=location.pathname.replace(/\/+$/,'')==='/retorno';
-let stageReturnSlide=-1,stageReturnRatio=0;
+const SR_ADVANCE_MS=780,SR_ADVANCE_EASE='cubic-bezier(0.22, 1, 0.36, 1)';
+const sr={active:false,slide:-1,cover:false,current:'',next:'',nextCover:false,busy:false,flyerText:'',gen:0,anim:null,
+  bar:{shown:0,sample:0,sampleAt:0,vel:0,lastTick:0,raf:0}};
+function srEl(sel){return $('stageReturn').querySelector(sel)}
+function srLyric(){return srEl('.stage-return__card .stage-return__lyric:not(.stage-return__lyric--ghost)')}
+function srReducedMotion(){return typeof window.matchMedia==='function'&&window.matchMedia('(prefers-reduced-motion: reduce)').matches}
+// Barra: prevê a velocidade entre as atualizações e aproxima suave, como na tela de retorno dos monitores.
+function srPaintBar(value){
+  sr.bar.shown=value;
+  srEl('.stage-return__bar-fill').style.transform='scaleX('+(Math.round(value*10000)/10000)+')';
+  srEl('.stage-return__bar').setAttribute('aria-valuenow',String(Math.round(value*100)));
+}
+function srStopBar(){if(sr.bar.raf)cancelAnimationFrame(sr.bar.raf);sr.bar.raf=0}
+function srTickBar(){
+  const b=sr.bar,now=performance.now();b.raf=0;
+  if(!sr.active){srPaintBar(0);return}
+  if(now-b.sampleAt>420)b.vel=0;
+  const predicted=Math.min(1,Math.max(0,b.sample+Math.max(0,b.vel)*(now-b.sampleAt)));
+  const dt=Math.min(40,Math.max(0,now-b.lastTick));b.lastTick=now;
+  const next=b.shown+(predicted-b.shown)*(1-Math.exp(-dt/95));
+  srPaintBar(next);
+  if(Math.abs(predicted-next)>0.0005||(b.vel>0&&next<0.999))b.raf=requestAnimationFrame(srTickBar);
+}
+function srStartBar(){if(sr.bar.raf)return;sr.bar.lastTick=performance.now();sr.bar.raf=requestAnimationFrame(srTickBar)}
+function srSyncBar(ratio,reset){
+  const b=sr.bar,now=performance.now();
+  if(reset||ratio+0.05<b.shown){
+    b.sample=ratio;b.vel=0;b.sampleAt=now;srPaintBar(ratio);
+    if(sr.active&&ratio>0&&ratio<1)srStartBar();else srStopBar();
+    return;
+  }
+  const dt=now-b.sampleAt;
+  if(dt>12)b.vel=Math.max(0,(ratio-b.sample)/dt);
+  b.sample=ratio;b.sampleAt=now;srStartBar();
+}
+function srResetFlyer(){
+  if(sr.anim){try{sr.anim.cancel()}catch(e){}}
+  sr.anim=null;
+  const flyer=srEl('.stage-return__flyer');
+  flyer.hidden=true;flyer.textContent='';
+  ['left','top','width','transform','transformOrigin','opacity','transition'].forEach(function(k){flyer.style[k]=''});
+}
+function srShowNext(text,cover){
+  const nextLyric=srEl('.stage-return__next-lyric');
+  nextLyric.textContent=text;nextLyric.classList.toggle('cover',cover);
+  srEl('.stage-return__next').hidden=!(text||cover);
+}
+function srSnap(m){
+  sr.gen+=1;sr.busy=false;sr.flyerText='';
+  srResetFlyer();
+  const ghost=srEl('.stage-return__lyric--ghost'),lyric=srLyric(),title=srEl('.stage-return__title');
+  ghost.hidden=true;ghost.textContent='';ghost.classList.remove('out');
+  lyric.classList.remove('wait');
+  srEl('.stage-return__next-lyric').classList.remove('out','enter');
+  sr.cover=m.isCover===true;sr.current=String(m.current||'');sr.next=String(m.next||'');sr.nextCover=m.nextIsCover===true;
+  title.hidden=!sr.cover;title.textContent=sr.cover?sr.current:'';
+  srEl('.stage-return__block').hidden=sr.cover;lyric.textContent=sr.cover?'':sr.current;
+  srShowNext(sr.next,sr.nextCover);
+}
+function srNextFrame(){return new Promise(function(resolve){requestAnimationFrame(function(){requestAnimationFrame(function(){resolve()})})})}
+// O próximo trecho voa até o lugar do atual; o anterior sobe e some; o novo próximo entra.
+async function srPromote(m){
+  const incoming=String(m.current||''),gen=++sr.gen;
+  const nextLyric=srEl('.stage-return__next-lyric'),lyric=srLyric(),flyer=srEl('.stage-return__flyer'),ghost=srEl('.stage-return__lyric--ghost');
+  const from=nextLyric.getBoundingClientRect();
+  if(srReducedMotion()||typeof flyer.animate!=='function'||!from||from.height<2){srSnap(m);return}
+  nextLyric.classList.remove('enter');
+  ghost.textContent=sr.current;ghost.hidden=false;ghost.classList.remove('out');void ghost.offsetWidth;ghost.classList.add('out');
+  lyric.textContent=incoming;lyric.classList.add('wait');
+  nextLyric.classList.add('out');
+  sr.current=incoming;sr.cover=false;sr.busy=true;sr.flyerText=incoming;
+  flyer.textContent=incoming;flyer.hidden=false;
+  const to=lyric.getBoundingClientRect();
+  if(!to||to.height<2){srSnap(m);return}
+  const s=from.width/Math.max(1,to.width),dx=from.left+from.width/2-(to.left+to.width/2),dy=from.top-to.top;
+  const start='translate('+dx+'px, '+dy+'px) scale('+s+')';
+  Object.assign(flyer.style,{transition:'none',left:to.left+'px',top:to.top+'px',width:to.width+'px',transformOrigin:'top center',transform:start,opacity:'1'});
+  if(sr.anim){try{sr.anim.cancel()}catch(e){}}
+  sr.anim=flyer.animate([{transform:start},{transform:'translate(0px, 0px) scale(1)'}],{duration:SR_ADVANCE_MS,easing:SR_ADVANCE_EASE,fill:'forwards'});
+  try{await sr.anim.finished}catch(e){return}
+  if(gen!==sr.gen)return;
+  sr.next=String(m.next||'');sr.nextCover=m.nextIsCover===true;
+  srShowNext(sr.next,sr.nextCover);
+  lyric.classList.remove('wait');
+  await srNextFrame();
+  if(gen!==sr.gen)return;
+  ghost.hidden=true;ghost.textContent='';ghost.classList.remove('out');
+  nextLyric.classList.remove('out');
+  if(sr.next||sr.nextCover){void nextLyric.offsetWidth;nextLyric.classList.add('enter')}
+  sr.busy=false;sr.flyerText='';
+  srResetFlyer();
+}
 function stageReturnColor(value){
   return typeof value==='string'&&/^(#[0-9a-f]{3,8}|rgba?\([\d\s.,%]+\)|[a-z]+)$/i.test(value.trim())?value.trim():'';
 }
@@ -2611,8 +2714,8 @@ function stageReturnVw(px){
 function applyStageReturn(m){
   if(!stageReturnMode)return;
   const root=$('stageReturn'),q=function(sel){return root.querySelector(sel)};
-  if(!m.active){root.hidden=true;stageReturnSlide=-1;stageReturnRatio=0;return}
-  const s=m.style||{},current=String(m.current||''),next=String(m.next||''),cover=m.isCover===true,nextCover=m.nextIsCover===true;
+  if(!m.active){root.hidden=true;sr.active=false;sr.slide=-1;srSnap({});srSyncBar(0,true);return}
+  const s=m.style||{},current=String(m.current||''),cover=m.isCover===true;
   const blur=Number(s.shadow&&s.shadow.blur),intensity=Math.min(1,Math.max(0,Number(s.shadow&&s.shadow.intensity)||0));
   const text={
     color:stageReturnColor(s.color),fontWeight:Number(s.fontWeight)>0?String(Number(s.fontWeight)):'',
@@ -2620,21 +2723,22 @@ function applyStageReturn(m){
     textTransform:s.upperCase?'uppercase':'none',
     textShadow:s.shadow&&blur>=0?'0 0 '+(Math.round(blur/108*100*1000)/1000)+'vw rgba(0,0,0,'+intensity+')':'none',
   };
-  const title=q('.stage-return__title'),lyric=q('.stage-return__lyric'),nextLyric=q('.stage-return__next-lyric');
-  [title,lyric,nextLyric].forEach(function(el){Object.assign(el.style,text)});
-  title.style.fontSize=lyric.style.fontSize=stageReturnVw(s.fontSize);
+  const title=q('.stage-return__title'),nextLyric=q('.stage-return__next-lyric');
+  const lyrics=root.querySelectorAll('.stage-return__lyric');
+  [title,nextLyric].concat(Array.prototype.slice.call(lyrics)).forEach(function(el){Object.assign(el.style,text)});
+  title.style.fontSize=stageReturnVw(s.fontSize);
+  lyrics.forEach(function(el){el.style.fontSize=stageReturnVw(s.fontSize)});
   nextLyric.style.fontSize=stageReturnVw(s.nextFontSize);
-  title.hidden=!cover;title.textContent=cover?current:'';
-  q('.stage-return__block').hidden=cover;lyric.textContent=cover?'':current;
-  q('.stage-return__next').hidden=!(next||nextCover);
   q('.stage-return__next-label').textContent=L10N.returnNext;
-  nextLyric.textContent=next;nextLyric.classList.toggle('cover',nextCover);
-  const ratio=Math.min(1,Math.max(0,Number(m.progress)||0)),slide=Number(m.slideIndex),fill=q('.stage-return__bar-fill');
-  fill.classList.toggle('reset',slide!==stageReturnSlide||ratio<stageReturnRatio);
-  fill.style.transform='scaleX('+ratio+')';
-  fill.style.backgroundColor=stageReturnColor(s.barColor);
-  q('.stage-return__bar').setAttribute('aria-valuenow',String(Math.round(ratio*100)));
-  stageReturnSlide=slide;stageReturnRatio=ratio;
+  const slide=Number(m.slideIndex),ratio=Math.min(1,Math.max(0,Number(m.progress)||0));
+  const canPromote=sr.active&&slide===sr.slide+1&&current.length>0&&current===sr.next&&!cover&&!sr.cover;
+  const slideChanged=!sr.active||slide!==sr.slide;
+  sr.active=true;sr.slide=slide;
+  srSyncBar(ratio,slideChanged);
+  if(canPromote)void srPromote(m);
+  else if(sr.busy){if(current!==sr.flyerText||cover)srSnap(m)}
+  else if(current!==sr.current||String(m.next||'')!==sr.next||cover!==sr.cover||(m.nextIsCover===true)!==sr.nextCover)srSnap(m);
+  q('.stage-return__bar-fill').style.backgroundColor=stageReturnColor(s.barColor);
   root.style.backgroundColor=stageReturnColor(s.backgroundColor);
   const bg=typeof m.background==='string'&&/^https?:\/\//i.test(m.background)?m.background:'';
   q('.stage-return__bg').style.backgroundImage=bg?'url("'+bg.replace(/["\\\s]/g,function(c){return encodeURIComponent(c)})+'")':'';
