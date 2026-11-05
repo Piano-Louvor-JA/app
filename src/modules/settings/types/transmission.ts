@@ -83,3 +83,19 @@ export interface SlotUpdate {
   httpPort?: number
   overlay?: Partial<OverlayStyle>
 }
+
+/** Conexão pronta para o cartão da aba Transmissão. */
+export interface TransmissionConnection {
+  id: string
+  /** "Fonte N", já traduzido. */
+  name: string
+  nickname?: string
+  running: boolean
+  clients: number
+  receiverIps: string[]
+  httpPort: number | null
+  error: SlotError | null
+  overlay: OverlayStyle
+  overlayUrl: string | null
+  receiverUrl: string | null
+}
