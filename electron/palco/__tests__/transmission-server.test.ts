@@ -41,7 +41,7 @@ describe('PalcoSlot network', () => {
       const status = slot.status()
       expect(status.listenHost).toBe('127.0.0.1')
       expect(status.url).toBe(`http://127.0.0.1:${slot.httpPort}`)
-      expect(status.receiverUrl).toMatch(new RegExp(`^http://127\\.0\\.0\\.1:${slot.httpPort}/\\?token=`))
+      expect(status.receiverUrl).toBe(`http://127.0.0.1:${slot.httpPort}/`)
       expect((await fetch(`http://127.0.0.1:${slot.httpPort}/status`)).status).toBe(200)
     } finally { await slot.dispose() }
   }, 10000)

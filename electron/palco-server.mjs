@@ -64,6 +64,9 @@ function networkBinding() {
   return resolveBind(_transmission.bind, rankInterfaces(networkInterfaces()))
 }
 function lanIp() { return networkBinding().linkHost }
+/** Token cobrado da rede; null quando o operador desligou a exigência. */
+function requiredToken() { return _transmission.requireToken ? getPalcoToken() : null }
+function isLoopback(ip) { return ip === '127.0.0.1' || ip === '::1' }
 
 function portInUse(error, port) {
   return error?.code === 'EADDRINUSE' ? { code: 'port-in-use', port } : { code: 'start-failed', port }
@@ -113,6 +116,13 @@ class PalcoSlot {
   }
 
   #overlayMessage() { return { v: 2, type: 'overlayStyle', style: this.overlay } }
+
+  /** Fecha quem entrou pela rede (token antigo); fontes deste computador seguem. */
+  disconnectNetworkClients() {
+    for (const [ws, ip] of this.#receiverIps) {
+      if (!isLoopback(ip)) { try { ws.close() } catch { /* ignore */ } }
+    }
+  }
 
   /** Troca o par de portas (WS = HTTP + 1) mantendo o id. */
   async setPorts(httpPort) {
@@ -198,7 +208,7 @@ class PalcoSlot {
             remoteAddress: req?.socket?.remoteAddress,
             url: req?.url,
             headers: req?.headers,
-            expectedToken: getPalcoToken(),
+            expectedToken: requiredToken(),
           })
         ) {
           try { ws.close() } catch { /* ignore */ }
@@ -286,7 +296,7 @@ class PalcoSlot {
     if (m.type === 'obsControl') { this.broadcastTransient(m); return true }
     // OBS S1: URL de mídia sai COM o token (a TV/browser recebe a URL já
     // autenticada — o renderer não precisa saber do token).
-    const token = getPalcoToken()
+    const token = requiredToken()
     if (token && typeof m.url === 'string' && m.url.includes('/media/')) {
       try {
         const u = new URL(m.url)
@@ -341,7 +351,7 @@ class PalcoSlot {
       wsUrl: `ws://${host}:${this.#wsPort}/palco`,
       // OBS S1: receiver URL pronta com token (UI copia/cola no OBS Browser Source)
       receiverUrl: this.#running
-        ? `http://${host}:${this.#httpPort}/?token=${getPalcoToken()}`
+        ? `http://${host}:${this.#httpPort}/${requiredToken() ? `?token=${requiredToken()}` : ''}`
         : null,
     }
   }
@@ -444,7 +454,7 @@ class PalcoSlot {
           remoteAddress: req.socket?.remoteAddress,
           url: req.url,
           headers: req.headers,
-          expectedToken: getPalcoToken(),
+          expectedToken: requiredToken(),
         })
       ) {
         res.statusCode = 403
@@ -480,7 +490,7 @@ class PalcoSlot {
           remoteAddress: req.socket?.remoteAddress,
           url: req.url,
           headers: req.headers,
-          expectedToken: getPalcoToken(),
+          expectedToken: requiredToken(),
         })
       ) {
         res.statusCode = 403
@@ -779,7 +789,7 @@ export function attachPalcoServer(getContents) {
   ipcMain.handle('palco:token', () => ({ token: getPalcoToken(), path: palcoTokenPath() }))
   ipcMain.handle('palco:token-reset', () => {
     const token = resetPalcoToken()
-    // receivers conectados com o token velho caem na reconexão — ok
+    for (const slot of manager.getAllSlots()) slot.disconnectNetworkClients()
     return { token }
   })
 
@@ -807,7 +817,7 @@ export function attachPalcoServer(getContents) {
   ipcMain.handle('palco:transmission-get', () => {
     const interfaces = rankInterfaces(networkInterfaces())
     const state = getTransmissionState()
-    return { ...state, ...resolveBind(state.bind, interfaces), bind: state.bind, interfaces }
+    return { ...state, ...resolveBind(state.bind, interfaces), bind: state.bind, interfaces, token: getPalcoToken() }
   })
   ipcMain.handle('palco:transmission-set', (_e, next) => manager.setTransmission(transmissionFile, next))
 
