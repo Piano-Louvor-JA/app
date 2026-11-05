@@ -51,7 +51,8 @@ describe('tela de espera das conexões de transmissão', () => {
   it('o logo aparece e apaga suavemente, sem animar para quem pede menos movimento', () => {
     const html = readFileSync(resolve('electron/palco/receiver.html'), 'utf8')
     expect(html).toMatch(/\.cast-waiting__logo\{[^}]*animation:castWaitingFade [\d.]+s ease-in-out infinite/)
-    expect(html).toMatch(/\.cast-waiting__logo\{[^}]*height:min\(1[0-2]vh,/)
+    expect(html).toMatch(/\.cast-waiting__logo\{[^}]*height:min\([4-6](\.\d)?vh,/)
+    expect(html).toMatch(/\.cast-waiting__text\{[^}]*font-size:min\(1\.\d+vh,/)
     expect(html).toMatch(/@keyframes castWaitingFade\{0%,100%\{opacity:\.[2-5]\d*\}50%\{opacity:1\}\}/)
     expect(html).toMatch(/@media \(prefers-reduced-motion:reduce\)\{[^@]*\.cast-waiting__logo\{animation:none/)
   })
