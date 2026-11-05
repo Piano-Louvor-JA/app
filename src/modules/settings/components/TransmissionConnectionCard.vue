@@ -63,7 +63,7 @@ const styleOpen = ref(false)
       <div class="transmission-card__info">
         <div class="transmission-card__name-row">
           <strong class="transmission-card__name">{{ connection.name }}</strong>
-          <input class="transmission-card__nickname" type="text" maxlength="60" data-test="nickname"
+          <input v-if="connection.id !== '0'" class="transmission-card__nickname" type="text" maxlength="60" data-test="nickname"
             :value="nicknameDraft ?? connection.nickname ?? ''"
             :placeholder="t('settings.transmission.nickname')"
             :aria-label="t('settings.transmission.nicknameLabel', { name: connection.name })"

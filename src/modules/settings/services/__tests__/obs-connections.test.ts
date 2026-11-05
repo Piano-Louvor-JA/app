@@ -16,6 +16,22 @@ describe('OBS connections', () => {
     restored.setObsNickname('7082', '')
     expect(restored.obsConnectionName(restored.obsConnections.value[0]!)).toBe('OBS 2')
   })
+  it('o servidor principal não tem apelido: ignora novos e apaga o salvo', async () => {
+    localStorage.setItem('louvorja-obs-connections-v1', JSON.stringify([
+      { id: '0', label: 'OBS 1', selected: true, nickname: 'TV Frontal' },
+      { id: '7082', label: 'OBS 2', selected: true, nickname: 'Mesa' },
+    ]))
+    const config = await import('../obs-connections')
+    expect(config.obsConnectionName(config.obsConnections.value[0]!)).toBe('OBS 1')
+    expect(config.obsConnections.value[1]).toMatchObject({ nickname: 'Mesa' })
+    const stored = JSON.parse(localStorage.getItem('louvorja-obs-connections-v1')!)
+    expect(stored[0]).toEqual({ id: '0', label: 'OBS 1', selected: true })
+    expect(stored[1].nickname).toBe('Mesa')
+    config.setObsNickname('0', 'Palco')
+    expect(config.obsConnections.value[0]!.nickname).toBeUndefined()
+    config.migratePalcoConnections([{ id: '0', label: 'TV principal' }])
+    expect(config.obsConnections.value[0]!.nickname).toBeUndefined()
+  })
   it('compartilhar preserva espelhamento principal no mesmo OBS', async () => {
     const config = await import('../obs-connections')
     config.registerObsConnection('7082', 'OBS 2')

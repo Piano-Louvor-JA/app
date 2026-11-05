@@ -3,15 +3,23 @@ import { ref } from 'vue'
 export type ObsConnection = { id: string; label: string; selected: boolean; nickname?: string }
 export type ObsModule = 'bible' | 'clock' | 'timer' | 'countdown' | 'random'
 export const OBS_CONNECTIONS_KEY = 'louvorja-obs-connections-v1'
+/** O servidor principal (slot 0) já tem nome próprio na tela e não recebe apelido. */
+const MAIN_ID = '0'
+let droppedMainNickname = false
 function read(): ObsConnection[] {
   try {
     const value: unknown = JSON.parse(localStorage.getItem(OBS_CONNECTIONS_KEY) ?? '[]')
     if (!Array.isArray(value)) return []
     return value.filter((item) => item && typeof item.id === 'string' && typeof item.label === 'string')
-      .map((item) => ({ id: item.id, label: item.label, selected: item.selected !== false, ...(typeof item.nickname === 'string' && item.nickname.trim() ? { nickname: item.nickname.trim().slice(0, 60) } : {}) }))
+      .map((item) => {
+        const nickname = typeof item.nickname === 'string' ? item.nickname.trim().slice(0, 60) : ''
+        if (nickname && item.id === MAIN_ID) droppedMainNickname = true
+        return { id: item.id, label: item.label, selected: item.selected !== false, ...(nickname && item.id !== MAIN_ID ? { nickname } : {}) }
+      })
   } catch { return [] }
 }
 export const obsConnections = ref<ObsConnection[]>(read())
+if (droppedMainNickname) localStorage.setItem(OBS_CONNECTIONS_KEY, JSON.stringify(obsConnections.value))
 export const obsAssignmentModes = ref<Record<string, 'overlay' | 'share'>>({})
 export const obsAssignments = ref<Record<string, ObsModule>>({})
 export function notifyObsChanged() {
@@ -65,7 +73,7 @@ export function obsConnectionName(connection: { label: string; nickname?: string
   return connection.nickname ? `${connection.label} — ${connection.nickname}` : connection.label
 }
 export function setObsNickname(id: string, nickname: string) {
-  if (id === '0') registerObsConnection('0', 'OBS 1')
+  if (id === MAIN_ID) return
   obsConnections.value = obsConnections.value.map((connection) => connection.id === id
     ? { ...connection, nickname: nickname.trim().slice(0, 60) }
     : connection)
@@ -80,8 +88,7 @@ export function migratePalcoConnections(slots: ReadonlyArray<{ id: string; label
     if (typeof slot.id !== 'string' || typeof slot.label !== 'string') continue
     if (next.some(connection => connection.id === slot.id)) continue
     const number = slot.id === '0' ? 1 : Math.max(1, ...next.map(item => Number(item.label.match(/\d+$/)?.[0]) || 1)) + 1
-    // "Principal" é o rótulo interno do slot 0 no main, não um apelido do operador.
-    const internalLabel = /^OBS\s*\d+$/.test(slot.label) || (slot.id === '0' && slot.label === 'Principal')
+    const internalLabel = /^OBS\s*\d+$/.test(slot.label) || slot.id === MAIN_ID
     next.push({ id: slot.id, label: `OBS ${number}`, selected: true,
       ...(!internalLabel ? { nickname: slot.label.slice(0, 60) } : {}) })
     changed = true

@@ -41,11 +41,11 @@ it('lists the main source first with port, style, links and error from the main 
   wrapper.unmount()
 })
 
-it('keeps a nickname the operator already saved for the main source', async () => {
+it('drops a nickname saved for the main source, which now has its own name', async () => {
   localStorage.setItem(OBS_CONNECTIONS_KEY, JSON.stringify([{ id: '0', label: 'OBS 1', selected: true, nickname: 'Principal' }]))
   vi.resetModules()
   const fresh = await import('../../services/obs-connections')
-  expect(fresh.obsConnections.value[0]).toMatchObject({ nickname: 'Principal' })
+  expect(fresh.obsConnections.value[0]).not.toHaveProperty('nickname')
 })
 
 it('starts and stops the main source with its stage greeting and the others directly', async () => {
