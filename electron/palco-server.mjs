@@ -33,6 +33,16 @@ import { app, ipcMain } from 'electron'
 import { WebSocketServer } from 'ws'
 
 import { loadOrCreatePalcoToken, requestHasPalcoAccess } from './palco-token.mjs'
+import {
+  DEFAULT_TRANSMISSION,
+  normalizeOverlayStyle,
+  rankInterfaces,
+  readTransmissionConfig,
+  resolveBind,
+  saveTransmissionConfig,
+  suggestPort,
+  validatePort,
+} from './palco/transmission-config.mjs'
 
 const BASE_HTTP_PORT = 7080
 const BASE_WS_PORT = 7081
@@ -44,13 +54,19 @@ const DIST_DIR = path.resolve(__dirname, '../dist')
 /** @typedef {import('node:http').IncomingMessage} Req */
 /** @typedef {import('node:http').ServerResponse} Res */
 
-function lanIp() {
-  for (const ifaces of Object.values(networkInterfaces())) {
-    for (const iface of ifaces ?? []) {
-      if (iface.family === 'IPv4' && !iface.internal) return iface.address
-    }
-  }
-  return '127.0.0.1'
+/** Rede e token escolhidos na aba Transmissão (persistidos pelo manager). */
+let _transmission = { ...DEFAULT_TRANSMISSION }
+export function getTransmissionState() { return { ..._transmission } }
+export function setTransmissionState(next) {
+  _transmission = { bind: next?.bind ?? 'all', requireToken: next?.requireToken !== false }
+}
+function networkBinding() {
+  return resolveBind(_transmission.bind, rankInterfaces(networkInterfaces()))
+}
+function lanIp() { return networkBinding().linkHost }
+
+function portInUse(error, port) {
+  return error?.code === 'EADDRINUSE' ? { code: 'port-in-use', port } : { code: 'start-failed', port }
 }
 
 /** Estado de um slot de palco. */
@@ -68,13 +84,17 @@ class PalcoSlot {
   #running = false
   #media = new Map() // mídia local servida em /media/
   #contents // callback pro renderer
+  #overlay
+  #error = null
+  #listenHost = null
 
-  constructor(id, label, httpPort, wsPort, getContents) {
+  constructor(id, label, httpPort, wsPort, getContents, options = {}) {
     this.#id = id
     this.#label = label
     this.#httpPort = httpPort
     this.#wsPort = wsPort
     this.#contents = getContents
+    this.#overlay = normalizeOverlayStyle(options.overlay)
   }
 
   get id() { return this.#id }
@@ -83,6 +103,40 @@ class PalcoSlot {
   get wsPort() { return this.#wsPort }
   get running() { return this.#running }
   get clientsCount() { return this.#clients.size }
+  get overlay() { return { ...this.#overlay } }
+
+  /** Aparência do overlay desta conexão; fontes abertas recebem na hora. */
+  setOverlay(style) {
+    this.#overlay = normalizeOverlayStyle({ ...this.#overlay, ...style })
+    if (this.#running) this.broadcast(this.#overlayMessage())
+    return this.overlay
+  }
+
+  #overlayMessage() { return { v: 2, type: 'overlayStyle', style: this.overlay } }
+
+  /** Troca o par de portas (WS = HTTP + 1) mantendo o id. */
+  async setPorts(httpPort) {
+    if (this.#running) throw new Error('running')
+    await this.#closeHttp()
+    this.#httpPort = httpPort
+    this.#wsPort = httpPort + 1
+    this.#error = null
+    await this.prepare()
+  }
+
+  /** Refaz o bind HTTP depois de a interface de rede mudar. */
+  async rebind() {
+    if (this.#running) throw new Error('running')
+    await this.#closeHttp()
+    await this.prepare()
+  }
+
+  async #closeHttp() {
+    await this.#preparing?.catch(() => {})
+    const server = this.#httpServer
+    this.#httpServer = null
+    if (server) await new Promise(resolve => { server.close(() => resolve()); server.closeAllConnections?.() })
+  }
 
   /** Broadcast p/ todos os receivers conectados neste slot. */
   broadcast(obj) {
@@ -111,13 +165,21 @@ class PalcoSlot {
     if (this.#preparing) return this.#preparing
     this.#preparing = (async () => {
       const server = createServer((req, res) => { void this.handleHttp(req, res) })
+      const host = networkBinding().listenHost
       this.#httpServer = server
       try {
         await new Promise((resolve, reject) => {
           server.once('error', reject)
-          server.listen(this.#httpPort, '0.0.0.0', resolve)
+          server.listen(this.#httpPort, host, resolve)
         })
-      } catch (error) { this.#httpServer = null; server.close(); throw error }
+        this.#listenHost = host
+        this.#error = null
+      } catch (error) {
+        this.#httpServer = null
+        server.close()
+        this.#error = portInUse(error, this.#httpPort)
+        throw error
+      }
     })()
     try { await this.#preparing } finally { this.#preparing = null }
   }
@@ -127,7 +189,7 @@ class PalcoSlot {
     if (this.#running) return true
     try {
       await this.prepare()
-      this.#wss = new WebSocketServer({ port: this.#wsPort })
+      this.#wss = new WebSocketServer({ port: this.#wsPort, host: this.#listenHost ?? networkBinding().listenHost })
       this.#wss.on('connection', (ws, req) => {
         if (req?.url && !req.url.split('?')[0].startsWith('/palco')) { ws.close(); return }
         // OBS S1: token na LAN (localhost bypass) — feature off = comportamento atual
@@ -169,8 +231,18 @@ class PalcoSlot {
         // SEM ping (webOS 4.x não responde)
       })
 
-      await new Promise((resolve, reject) => { this.#wss.once('listening', resolve); this.#wss.once('error', reject) })
+      try {
+        await new Promise((resolve, reject) => { this.#wss.once('listening', resolve); this.#wss.once('error', reject) })
+      } catch (error) {
+        const wss = this.#wss
+        this.#wss = null
+        wss?.close()
+        this.#error = portInUse(error, this.#wsPort)
+        throw error
+      }
+      this.#error = null
       this.#running = true
+      updateReplayState(this.#lastByType, this.#overlayMessage())
       return true
     } catch (e) {
       console.error(`[palco:slot:${this.#id}] start error:`, e)
@@ -198,10 +270,7 @@ class PalcoSlot {
 
   async dispose() {
     await this.stop()
-    await this.#preparing
-    const server = this.#httpServer
-    this.#httpServer = null
-    if (server) await new Promise(resolve => { server.close(resolve); server.closeAllConnections?.() })
+    await this.#closeHttp()
   }
 
   /** Manda mensagem prós receivers deste slot. */
@@ -256,17 +325,23 @@ class PalcoSlot {
 
   /** Status deste slot. */
   status() {
+    const host = lanIp()
     return {
       id: this.#id,
       label: this.#label,
       running: this.#running,
       clients: this.#clients.size,
       receiverIps: Array.from(new Set(this.#receiverIps.values())),
-      url: `http://${lanIp()}:${this.#httpPort}`,
-      wsUrl: `ws://${lanIp()}:${this.#wsPort}/palco`,
+      httpPort: this.#httpPort,
+      wsPort: this.#wsPort,
+      listenHost: this.#listenHost ?? networkBinding().listenHost,
+      error: this.#error,
+      overlay: this.overlay,
+      url: `http://${host}:${this.#httpPort}`,
+      wsUrl: `ws://${host}:${this.#wsPort}/palco`,
       // OBS S1: receiver URL pronta com token (UI copia/cola no OBS Browser Source)
       receiverUrl: this.#running
-        ? `http://${lanIp()}:${this.#httpPort}/?token=${getPalcoToken()}`
+        ? `http://${host}:${this.#httpPort}/?token=${getPalcoToken()}`
         : null,
     }
   }
@@ -532,26 +607,35 @@ class PalcoManager {
 
   /** Slot principal (id='0') sempre existe. */
   init() {
-    this.ensureSlot('0', 'Principal', BASE_HTTP_PORT, BASE_WS_PORT)
+    const rows = readPersistedSlots()
+    const principal = rows.find(item => String(item?.id) === '0')
+    const principalPort = Number(principal?.httpPort)
+    const principalHttp = validatePort(principalPort, []).ok && Number(principal?.wsPort) === principalPort + 1 ? principalPort : BASE_HTTP_PORT
+    this.ensureSlot('0', 'Principal', principalHttp, principalHttp + 1, principal?.overlay)
     // Operador configura TV 2/porta 7082 uma vez; slots voltam após restart.
-    for (const item of readPersistedSlots()) {
+    for (const item of rows) {
       const httpPort = Number(item?.httpPort)
       const wsPort = Number(item?.wsPort)
       const id = String(item?.id ?? '')
       const label = String(item?.label ?? '').trim()
       if (
-        id !== '0' && label && Number.isInteger(httpPort) &&
-        Number.isInteger(wsPort) && httpPort >= BASE_HTTP_PORT + 2 &&
+        id !== '0' && label && !this.#slots.has(id) &&
+        validatePort(httpPort, this.#takenPorts()).ok &&
         wsPort === httpPort + 1 && this.#slots.size < MAX_SLOTS
-      ) this.ensureSlot(id, label, httpPort, wsPort)
+      ) this.ensureSlot(id, label, httpPort, wsPort, item?.overlay)
     }
+  }
+
+  #takenPorts(exceptId) {
+    return this.getAllSlots().filter(slot => slot.id !== exceptId).map(slot => slot.httpPort)
   }
 
   persistSlots() {
     try {
       const rows = Array.from(this.#slots.values())
-        .filter((slot) => slot.id !== '0')
-        .map((slot) => ({ id: slot.id, label: slot.label, httpPort: slot.httpPort, wsPort: slot.wsPort }))
+        .map((slot) => slot.id === '0'
+          ? { id: slot.id, httpPort: slot.httpPort, wsPort: slot.wsPort, overlay: slot.overlay }
+          : { id: slot.id, label: slot.label, httpPort: slot.httpPort, wsPort: slot.wsPort, overlay: slot.overlay })
       const file = slotsConfigPath()
       mkdirSync(path.dirname(file), { recursive: true })
       const tmp = `${file}.tmp`
@@ -563,9 +647,9 @@ class PalcoManager {
   }
 
   /** Garante slot; cria se não existe. */
-  ensureSlot(id, label, httpPort, wsPort) {
+  ensureSlot(id, label, httpPort, wsPort, overlay) {
     if (this.#slots.has(id)) return this.#slots.get(id)
-    const slot = new PalcoSlot(id, label, httpPort, wsPort, () => this.#getContents())
+    const slot = new PalcoSlot(id, label, httpPort, wsPort, () => this.#getContents(), { overlay })
     this.#slots.set(id, slot)
     void slot.prepare().catch(error => console.warn('[palco] receiver prepare:', error?.message ?? error))
     return slot
@@ -574,12 +658,55 @@ class PalcoManager {
   /** Cria novo slot (aloca próximo par de portas livre). */
   createSlot(label = `TV ${this.#slots.size}`) {
     if (this.#slots.size >= MAX_SLOTS) throw new Error('max slots')
-    let httpPort = BASE_HTTP_PORT + 2, wsPort = BASE_WS_PORT + 2
-    while (this.#slots.has(String(httpPort))) { httpPort += 2; wsPort += 2 }
-    const id = String(httpPort) // id = porta HTTP (ex: "7082")
-    const slot = this.ensureSlot(id, label, httpPort, wsPort)
+    let httpPort = suggestPort(BASE_HTTP_PORT + 2, this.#takenPorts())
+    // id = porta HTTP de criação (ex: "7082"); continua o mesmo se a porta mudar depois
+    while (httpPort !== null && this.#slots.has(String(httpPort))) httpPort = suggestPort(httpPort + 2, this.#takenPorts())
+    if (httpPort === null) throw new Error('no free port')
+    const slot = this.ensureSlot(String(httpPort), label, httpPort, httpPort + 1)
     this.persistSlots()
     return slot
+  }
+
+  /** Porta e/ou aparência de uma conexão. */
+  async updateSlot(id, { httpPort, overlay } = {}) {
+    const slot = this.#slots.get(id)
+    if (!slot) return { ok: false, reason: 'not-found' }
+    if (httpPort !== undefined && httpPort !== slot.httpPort) {
+      const check = validatePort(httpPort, this.#takenPorts(id))
+      if (!check.ok) return check
+      if (slot.running) return { ok: false, reason: 'running' }
+      try {
+        await slot.setPorts(httpPort)
+      } catch (error) {
+        this.persistSlots()
+        console.warn('[palco] port change:', error?.message ?? error)
+        return { ok: false, reason: 'port-in-use', status: this.statusOf(slot) }
+      }
+    }
+    if (overlay) slot.setOverlay(overlay)
+    this.persistSlots()
+    return { ok: true, status: this.statusOf(slot) }
+  }
+
+  /** Status com sugestão de porta quando a atual está ocupada por outro programa. */
+  statusOf(slot) {
+    const status = slot.status()
+    if (status.error?.code !== 'port-in-use') return status
+    const suggestedPort = suggestPort(slot.httpPort + 2, this.#takenPorts(slot.id), [status.error.port])
+    return { ...status, error: { ...status.error, suggestedPort } }
+  }
+
+  /** Aplica rede/token; trocar a interface exige todas as conexões paradas. */
+  async setTransmission(file, next) {
+    const current = getTransmissionState()
+    const bind = next?.bind ?? current.bind
+    if (bind !== current.bind && this.getAllSlots().some(slot => slot.running)) return { ok: false, reason: 'running' }
+    const saved = saveTransmissionConfig(file, { bind, requireToken: next?.requireToken ?? current.requireToken })
+    setTransmissionState(saved)
+    if (saved.bind !== current.bind) {
+      await Promise.all(this.getAllSlots().map(slot => slot.rebind().catch(error => console.warn('[palco] rebind:', slot.id, error?.message ?? error))))
+    }
+    return { ok: true, ...saved }
   }
 
   /** Remove slot (exceto principal). */
@@ -623,6 +750,8 @@ let manager = null
 
 /** Anexa ao main process (chamado em main.mjs). */
 export function attachPalcoServer(getContents) {
+  const transmissionFile = path.join(app.getPath('userData'), 'palco-transmission.json')
+  setTransmissionState(readTransmissionConfig(transmissionFile))
   if (!manager) manager = new PalcoManager(getContents)
   manager.init()
   const startupFile = path.join(app.getPath('userData'), 'palco-connections-startup.json')
@@ -672,10 +801,20 @@ export function attachPalcoServer(getContents) {
     return removed
   })
 
+  ipcMain.handle('palco:slot-update', (_e, { id, httpPort, overlay } = {}) => manager.updateSlot(String(id ?? ''), { httpPort, overlay }))
+
+  // IPC: rede/token da aba Transmissão
+  ipcMain.handle('palco:transmission-get', () => {
+    const interfaces = rankInterfaces(networkInterfaces())
+    const state = getTransmissionState()
+    return { ...state, ...resolveBind(state.bind, interfaces), bind: state.bind, interfaces }
+  })
+  ipcMain.handle('palco:transmission-set', (_e, next) => manager.setTransmission(transmissionFile, next))
+
   // IPC: status (default slot 0)
   ipcMain.handle('palco:status', (_e, { slotId }) => {
     const slot = manager.getSlot(slotId ?? '0')
-    return slot ? slot.status() : null
+    return slot ? manager.statusOf(slot) : null
   })
 
   // IPC: start/stop (default slot 0)
