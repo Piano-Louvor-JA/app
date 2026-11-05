@@ -185,6 +185,15 @@
 .stage-return__next-lyric{margin:0;max-width:86vw;color:rgba(255,255,255,.82);font-size:clamp(1.25rem,4.2vmin,3.4rem);
   font-weight:600;line-height:1.3;letter-spacing:.02em;text-align:center;text-transform:uppercase;white-space:pre-line}
 .stage-return__next-lyric.cover{color:#f6c32a;font-weight:800}
+/* Conexões servidas pelo app: sem transmissão, tela preta com o logo do Piano e a espera. */
+#castWaiting{position:fixed;inset:0;z-index:100002;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:5vh;background:#000;color:#fff;pointer-events:none}
+#castWaiting[hidden]{display:none}
+.cast-waiting__logo{width:min(44vw,62vh);animation:castWaitingFade 3.2s ease-in-out infinite}
+.cast-waiting__logo svg{display:block;width:100%;height:auto;color:#fff}
+.cast-waiting__text{margin:0;font-size:min(2.8vh,3.4vw);font-weight:300;letter-spacing:.14em;opacity:.72;text-align:center}
+@keyframes castWaitingFade{0%,100%{opacity:.35}50%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.cast-waiting__logo{animation:none;opacity:.85}}
 </style>
 </head>
 <body>
@@ -273,6 +282,10 @@
     </div>
   </div>
   <p class="stage-return__lyric stage-return__flyer" aria-hidden="true" hidden></p>
+</div>
+<div id="castWaiting" role="status" hidden>
+  <div class="cast-waiting__logo" aria-hidden="true"></div>
+  <p class="cast-waiting__text" data-l10n="castWaiting"></p>
 </div>
 <script>
 //---------------------------------------------------------------------
@@ -2589,19 +2602,19 @@ const qs=new URLSearchParams(location.search);
 // L10N: strings do receiver (idle/audio). Idioma: ?lang= > navigator.language
 // > pt. Sender pode anexar &lang= ao URL da TV (14/10).
 var L10N=(function(){var d={
-  pt:{returnNext:'Próximo',idle:'Aguardando conteúdo…',wait:'Aguardando operador conectar…',audio:'Reproduzindo áudio',
+  pt:{returnNext:'Próximo',castWaiting:'Aguardando transmissão',idle:'Aguardando conteúdo…',wait:'Aguardando operador conectar…',audio:'Reproduzindo áudio',
       connTo:'conectado a {t} · vermelha = IP/porta · azul = atualizar',redKey:'tecla vermelha = digitar IP',
       searching:'procurando LouvorJA na rede…',notFound:'nenhum sender encontrado — tentando de novo…',
       connecting:'conectando {h}:{p}…',reconn:'reconectando em {s}s',cloudSearch:'nuvem: buscando sessão {c}…',
       cloudErr:'nuvem: {m}',cloudConn:'nuvem: conectando…',invalid:'sessão inválida — tecla vermelha p/ novo código',
       cloudReconn:'nuvem: reconectando em {s}s',cloudCreating:'nuvem: criando sessão…',portSearch:'procurando LouvorJA na porta {p}…',pairHint:'Acesse e informe o código',tapUnmute:'Toque para ativar o som',ipHint:'CÓDIGO (6 letras/números) · IP · IP:PORTA — ou SÓ A PORTA (ex.: 7081) para achar o LouvorJA na rede',ipHelp:'OK conectar · vermelha cancelar · backspace apaga',mainSlot:'Principal (espelho)',tvConn:' · TV {ip} · conectado · vermelha = digitar IP'},
-  en:{returnNext:'Next',idle:'Waiting for content…',wait:'Waiting for operator to connect…',audio:'Playing audio',
+  en:{returnNext:'Next',castWaiting:'Waiting for broadcast',idle:'Waiting for content…',wait:'Waiting for operator to connect…',audio:'Playing audio',
       connTo:'connected to {t} · red = IP/port · blue = refresh',redKey:'red key = type IP',
       searching:'searching for LouvorJA on the network…',notFound:'no sender found — trying again…',
       connecting:'connecting {h}:{p}…',reconn:'reconnecting in {s}s',cloudSearch:'cloud: fetching session {c}…',
       cloudErr:'cloud: {m}',cloudConn:'cloud: connecting…',invalid:'invalid session — red key for a new code',
       cloudReconn:'cloud: reconnecting in {s}s',cloudCreating:'cloud: creating session…',portSearch:'searching for LouvorJA on port {p}…',pairHint:'Go to the site and enter the code',tapUnmute:'Tap to enable sound',ipHint:'CODE (6 letters/numbers) · IP · IP:PORT — or PORT ONLY (e.g. 7081) to find LouvorJA on the network',ipHelp:'OK connect · red cancel · backspace deletes',mainSlot:'Main (mirror)',tvConn:' · TV {ip} · connected · red = type IP'},
-  es:{returnNext:'Siguiente',idle:'Esperando contenido…',wait:'Esperando al operador…',audio:'Reproduciendo audio',
+  es:{returnNext:'Siguiente',castWaiting:'Esperando transmisión',idle:'Esperando contenido…',wait:'Esperando al operador…',audio:'Reproduciendo audio',
       connTo:'conectado a {t} · roja = IP/puerto · azul = actualizar',redKey:'tecla roja = escribir IP',
       searching:'buscando LouvorJA en la red…',notFound:'ningún sender encontrado — reintentando…',
       connecting:'conectando {h}:{p}…',reconn:'reconectando en {s}s',cloudSearch:'nube: buscando sesión {c}…',
@@ -2612,6 +2625,20 @@ return Object.assign({},d.pt,d[l]||{});})();
 document.querySelectorAll('[data-l10n]').forEach(function(el){var k=el.getAttribute('data-l10n');if(L10N[k])el.textContent=L10N[k];});
 // Retorno de palco: em /retorno, música ativa cobre o espelho; sem música, segue igual à TV. Nunca toca som.
 const stageReturnMode=location.pathname.replace(/\/+$/,'')==='/retorno';
+// Só as conexões abertas pelo servidor do app mostram a espera; os painéis da projeção compartilhada, não.
+const castPage=/^https?:$/.test(location.protocol)&&qs.get('obsPane')!=='1';
+(function(){
+  const art=document.querySelector('#idleCodenameWrap svg');if(!art)return;
+  const logo=art.cloneNode(true);
+  logo.querySelectorAll('[id]').forEach(function(el){el.removeAttribute('id')});
+  document.querySelector('#castWaiting .cast-waiting__logo').appendChild(logo);
+})();
+function syncCastWaiting(){
+  let shared=false;
+  try{shared=obsShareState.enabled&&(obsShareState.active[0]||obsShareState.active[1])}catch(e){}
+  $('castWaiting').hidden=!(castPage&&document.documentElement.classList.contains('receiver-idle')&&$('stageReturn').hidden&&!shared);
+}
+syncCastWaiting();
 const SR_ADVANCE_MS=780,SR_ADVANCE_EASE='cubic-bezier(0.22, 1, 0.36, 1)';
 const sr={active:false,slide:-1,cover:false,current:'',next:'',nextCover:false,busy:false,flyerText:'',gen:0,anim:null,
   bar:{shown:0,sample:0,sampleAt:0,vel:0,lastTick:0,raf:0}};
@@ -2714,7 +2741,7 @@ function stageReturnVw(px){
 function applyStageReturn(m){
   if(!stageReturnMode)return;
   const root=$('stageReturn'),q=function(sel){return root.querySelector(sel)};
-  if(!m.active){root.hidden=true;sr.active=false;sr.slide=-1;srSnap({});srSyncBar(0,true);return}
+  if(!m.active){root.hidden=true;sr.active=false;sr.slide=-1;srSnap({});srSyncBar(0,true);syncCastWaiting();return}
   const s=m.style||{},current=String(m.current||''),cover=m.isCover===true;
   const blur=Number(s.shadow&&s.shadow.blur),intensity=Math.min(1,Math.max(0,Number(s.shadow&&s.shadow.intensity)||0));
   const text={
@@ -2743,6 +2770,7 @@ function applyStageReturn(m){
   const bg=typeof m.background==='string'&&/^https?:\/\//i.test(m.background)?m.background:'';
   q('.stage-return__bg').style.backgroundImage=bg?'url("'+bg.replace(/["\\\s]/g,function(c){return encodeURIComponent(c)})+'")':'';
   root.hidden=false;
+  syncCastWaiting();
 }
 // F3.3q: versão no idle (canto inferior direito) — ?v= override ou padrão.
 window.__PALCO_APPV__=window.__PALCO_APPV__||'0.1.55';
@@ -3259,8 +3287,9 @@ function showIdle(msg){
   $('text').style.removeProperty('--box-bg');
   $('text').style.removeProperty('--box-border');
   $('text').style.removeProperty('--ts');
+  syncCastWaiting();
 }
-function hideIdle(){document.documentElement.classList.remove('receiver-idle');$('idle').classList.add('hidden')}
+function hideIdle(){document.documentElement.classList.remove('receiver-idle');$('idle').classList.add('hidden');syncCastWaiting()}
 // F3.3e: fallback de cover — sem capa ou capa quebrada = logo da org.
 // Cover relativo (images/... ou covers/...) resolve contra / do sender.
 function coverUrl(cover){
@@ -3505,6 +3534,7 @@ function obsShareLayout(){
     frame.style.width=both?'50%':'100%';
     frame.style.left=both&&index===1?'50%':'0';
   });
+  syncCastWaiting();
 }
 function obsShareRemember(m,index){
   const messages=obsShareState.messages[index];
@@ -3524,6 +3554,7 @@ function obsShareEnable(enabled){
     const wrap=document.getElementById('obsShareView');if(wrap)wrap.remove();
     state.frames=[];state.ready=[];state.messages[1].clear();state.active[1]=false;
     for(const message of state.messages[0].values())handle(message);
+    syncCastWaiting();
     return;
   }
   ['video','audio'].forEach(id=>{try{$(id).pause()}catch(e){}});
