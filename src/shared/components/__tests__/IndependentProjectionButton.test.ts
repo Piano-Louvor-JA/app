@@ -40,7 +40,8 @@ vi.mock('@modules/settings/services/display-service', () => ({
 vi.mock('vue-i18n', () => ({
   useI18n: () => ({
     t: (key: string, params?: Record<string, unknown>) =>
-      params && 'index' in params ? `${key}:${params['index']}` : key,
+      params && 'index' in params ? `${key}:${params['index']}`
+        : params && 'count' in params ? `${key}:${params['count']}` : key,
   }),
 }))
 
@@ -112,6 +113,7 @@ describe('IndependentProjectionButton', () => {
     expect(trigger.attributes('aria-disabled')).toBe('false')
     await trigger.trigger('click')
     expect(panel()!.querySelector('.obs-outputs-active')?.textContent).toContain('obsOutputs.active')
+    expect(panel()!.querySelector('.independent-projection__option-meta')?.textContent).toBe('obsOutputs.activeConnections:1')
     expect(panel()!.querySelector('.obs-outputs-empty')).toBeNull()
     ;(panel()!.querySelector('[data-mode="share"]') as HTMLButtonElement).click()
     await flushPromises()

@@ -305,7 +305,7 @@ onBeforeUnmount(() => {
               <i class="ti ti-broadcast" aria-hidden="true" />
               <span class="independent-projection__option-body">
                 <span class="independent-projection__option-name">{{ obsConnectionName(connection) }}</span>
-                <span class="independent-projection__option-meta">{{ t('obsOutputs.browserSource') }}</span>
+                <span class="independent-projection__option-meta">{{ t('obsOutputs.activeConnections', { count: connection.clients }) }}</span>
               </span>
             </button>
           </li>
