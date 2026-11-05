@@ -556,8 +556,11 @@ class PalcoSession {
     }
   }
 
-  async warmupObs(slotId: string): Promise<void> {
+  /** Teste de inicialização nas fontes abertas; sem nenhuma aberta, só aguarda o OBS. */
+  async warmupObs(slotId: string): Promise<'confirmed' | 'waiting'> {
     if (!this.isElectron) throw new Error('OBS unavailable')
+    const status = await palcoApi().status(slotId).catch(() => null)
+    if (!status?.clients) return 'waiting'
     await this.refreshObs(slotId)
     const requestId = `warmup-${slotId}-${Date.now()}-${Math.random().toString(36).slice(2)}`
     let timeout: ReturnType<typeof setTimeout> | undefined
@@ -575,6 +578,7 @@ class PalcoSession {
       const sent = await palcoApi().send({ v: 2, type: 'obsWarmup', requestId, durationMs: 3000, expiresAt: Date.now() + 20000 }, slotId).catch(() => false)
       if (!sent) fail(new Error('OBS startup test could not be sent'))
       await confirmed
+      return 'confirmed'
     } finally {
       if (timeout) clearTimeout(timeout)
       if (typeof cleanup.unsubscribe === 'function') cleanup.unsubscribe()

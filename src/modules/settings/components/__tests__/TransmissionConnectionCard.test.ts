@@ -76,6 +76,8 @@ it('extra source on air: both links, reload, delete and a locked port', async ()
   await card.setProps({ connection: connection({ running: true, clients: 1, overlayUrl: 'http://127.0.0.1:7080/overlay' }) })
   expect(card.text()).toContain('1 dispositivo conectado')
   expect(card.findAllComponents(TransmissionLinkRow)).toHaveLength(1)
+  await card.setProps({ connection: connection({ running: true, clients: 0 }) })
+  expect(card.get('.transmission-card__state').text()).toBe('No ar · Aguardando o OBS conectar')
 })
 
 it('explains a busy port and offers the suggested one, plus generic failures', async () => {

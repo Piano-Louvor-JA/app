@@ -74,7 +74,9 @@ const styleOpen = ref(false)
         <span class="transmission-card__state" :class="{ 'transmission-card__state--on': connection.running }">
           <span class="transmission-card__dot" aria-hidden="true" />
           <template v-if="connection.running">
-            {{ t('settings.transmission.onAir') }} · {{ t('settings.transmission.devices', connection.clients) }}
+            {{ t('settings.transmission.onAir') }} · {{ connection.clients
+              ? t('settings.transmission.devices', connection.clients)
+              : t('settings.transmission.waitingSource') }}
           </template>
           <template v-else>{{ t('settings.transmission.off') }}</template>
         </span>

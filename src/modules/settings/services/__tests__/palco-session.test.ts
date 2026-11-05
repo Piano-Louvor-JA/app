@@ -778,7 +778,8 @@ it('waits for the matching source confirmation before finishing the startup test
   const unsubscribe = vi.fn()
   palco.onEvent.mockImplementation(callback => { receive = callback; return unsubscribe })
   let finished = false
-  const starting = palcoSession.warmupObs('7082').then(() => { finished = true })
+  const warmupResult = palcoSession.warmupObs('7082')
+  const starting = warmupResult.then(() => { finished = true })
   await vi.waitFor(() => expect(palco.send).toHaveBeenCalled())
   const message = palco.send.mock.calls.at(-1)![0]
   expect(message).toMatchObject({ type: 'obsWarmup', durationMs: 3000 })
@@ -789,4 +790,26 @@ it('waits for the matching source confirmation before finishing the startup test
   receive({ type: 'obs-warmup-complete', requestId: message.requestId })
   await starting
   expect(unsubscribe).toHaveBeenCalledOnce()
+  await expect(warmupResult).resolves.toBe('confirmed')
+})
+
+it('reads the status of one connection without changing the active one', async () => {
+  const palco = fullMock()
+  setBridge(palco)
+  await expect(palcoSession.statusSlot('7082')).resolves.toMatchObject({ running: true, clients: 1 })
+  expect(palco.status).toHaveBeenCalledWith('7082')
+  expect(palcoSession.slotId).toBe('0')
+})
+
+it('skips the startup test while no source is open and reports that it is waiting', async () => {
+  const palco = fullMock()
+  palco.status.mockResolvedValue({ running: true, clients: 0, url: 'http://192.168.0.5:7082' })
+  setBridge(palco)
+  const refresh = vi.spyOn(palcoSession, 'refreshObs')
+  await expect(palcoSession.warmupObs('7082')).resolves.toBe('waiting')
+  expect(palco.send).not.toHaveBeenCalled()
+  expect(refresh).not.toHaveBeenCalled()
+  palco.status.mockRejectedValueOnce(new Error('ipc'))
+  await expect(palcoSession.warmupObs('7082')).resolves.toBe('waiting')
+  refresh.mockRestore()
 })

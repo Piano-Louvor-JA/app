@@ -372,6 +372,7 @@ export default {
       off: 'Desligada',
       devices: 'Nenhum dispositivo conectado | 1 dispositivo conectado | {n} dispositivos conectados',
       summary: '{on} de {total} no ar',
+      waitingSource: 'Aguardando o OBS conectar',
       add: 'Adicionar conexão',
       startAll: 'Iniciar todas',
       stopAll: 'Encerrar todas',
