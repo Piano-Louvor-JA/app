@@ -393,7 +393,7 @@ export default {
       startFailed: 'Could not start the connection.',
       overlay: 'OBS caption',
       overlayHint: 'Text only, with a transparent background, to place over the camera.',
-      replica: 'Stage replica',
+      replica: 'Stage mirror',
       replicaHint: 'The same as the TV shows, with video and audio.',
       stageReturn: 'Stage monitor',
       stageReturnHint: 'Return screen during songs, with the current and next line; otherwise the same as the TV, without sound.',
@@ -456,7 +456,7 @@ export default {
         step1: 'Start a connection and copy the “OBS caption” link.',
         step2: 'In OBS: Sources → + → Browser. Paste the link into URL, width 1920 and height 1080.',
         step3: 'Project as usual. The text shows up in OBS and appearance changes apply right away, without pasting the link again.',
-        step4: 'For TVs and browsers, use the “Stage replica”, which includes video and audio.',
+        step4: 'For TVs and browsers, use the “Stage mirror”, which includes video and audio.',
       },
       errors: {
         connection: 'Could not change the connection. Try again.',

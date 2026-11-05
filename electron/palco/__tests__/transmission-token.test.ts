@@ -66,11 +66,11 @@ describe('token requirement', () => {
       expect(slot.status().overlayUrl).toBeNull()
       expect(slot.status().returnUrl).toBeNull()
       await slot.start()
-      expect(slot.status().receiverUrl).toContain(`?token=${getPalcoToken()}`)
+      expect(slot.status().receiverUrl).toMatch(new RegExp(`:${slot.httpPort}/espelho\\?token=${getPalcoToken()}$`))
       expect(slot.status().overlayUrl).toMatch(new RegExp(`:${slot.httpPort}/legenda\\?token=${getPalcoToken()}$`))
       expect(slot.status().returnUrl).toMatch(new RegExp(`:${slot.httpPort}/retorno\\?token=${getPalcoToken()}$`))
       setTransmissionState({ bind: 'all', requireToken: false })
-      expect(slot.status().receiverUrl).toMatch(/\/$/)
+      expect(slot.status().receiverUrl).toMatch(/\/espelho$/)
       expect(slot.status().overlayUrl).toMatch(/\/legenda$/)
       expect(slot.status().returnUrl).toMatch(/\/retorno$/)
     } finally { await slot.dispose() }

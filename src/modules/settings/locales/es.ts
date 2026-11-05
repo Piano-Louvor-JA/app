@@ -395,7 +395,7 @@ export default {
       startFailed: 'No se pudo iniciar la conexión.',
       overlay: 'Subtítulo para OBS',
       overlayHint: 'Solo el texto, con fondo transparente, para poner sobre la cámara.',
-      replica: 'Réplica del Palco',
+      replica: 'Espejo del Palco',
       replicaHint: 'Lo mismo que aparece en la TV, con video y audio.',
       stageReturn: 'Retorno de escenario',
       stageReturnHint: 'Pantalla de retorno en las canciones, con la frase actual y la siguiente; en otros momentos, lo mismo que la TV, sin sonido.',
@@ -458,7 +458,7 @@ export default {
         step1: 'Inicia una conexión y copia el enlace “Subtítulo para OBS”.',
         step2: 'En OBS: Fuentes → + → Navegador. Pega el enlace en URL, con ancho 1920 y alto 1080.',
         step3: 'Proyecta como siempre. El texto aparece en OBS y la apariencia cambia al instante, sin volver a pegar el enlace.',
-        step4: 'Para TVs y navegadores, usa la “Réplica del Palco”, que incluye video y audio.',
+        step4: 'Para TVs y navegadores, usa el “Espejo del Palco”, que incluye video y audio.',
       },
       errors: {
         connection: 'No se pudo cambiar la conexión. Inténtalo de nuevo.',

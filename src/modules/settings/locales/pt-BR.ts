@@ -400,7 +400,7 @@ export default {
       startFailed: 'Não foi possível iniciar a conexão.',
       overlay: 'Legenda para OBS',
       overlayHint: 'Só o texto, com fundo transparente, para pôr sobre a câmera.',
-      replica: 'Réplica do Palco',
+      replica: 'Espelho do Palco',
       replicaHint: 'O mesmo que aparece na TV, com vídeo e áudio.',
       stageReturn: 'Retorno de palco',
       stageReturnHint: 'Tela de retorno nas músicas, com a frase atual e a próxima; nos outros momentos, o mesmo da TV, sem som.',
@@ -463,7 +463,7 @@ export default {
         step1: 'Inicie uma conexão e copie o link “Legenda para OBS”.',
         step2: 'No OBS: Fontes → + → Navegador. Cole o link em URL, com largura 1920 e altura 1080.',
         step3: 'Projete normalmente. O texto aparece no OBS e a aparência muda na hora, sem recolar o link.',
-        step4: 'Para TVs e navegadores, use a “Réplica do Palco”, que inclui vídeo e áudio.',
+        step4: 'Para TVs e navegadores, use o “Espelho do Palco”, que inclui vídeo e áudio.',
       },
       errors: {
         connection: 'Não foi possível alterar a conexão. Tente novamente.',

@@ -41,8 +41,11 @@ describe('PalcoSlot network', () => {
       const status = slot.status()
       expect(status.listenHost).toBe('127.0.0.1')
       expect(status.url).toBe(`http://127.0.0.1:${slot.httpPort}`)
-      expect(status.receiverUrl).toBe(`http://127.0.0.1:${slot.httpPort}/`)
+      expect(status.receiverUrl).toBe(`http://127.0.0.1:${slot.httpPort}/espelho`)
       expect((await fetch(`http://127.0.0.1:${slot.httpPort}/status`)).status).toBe(200)
+      const mirror = await fetch(status.receiverUrl)
+      expect(mirror.status).toBe(200)
+      expect(mirror.headers.get('content-type')).toContain('text/html')
     } finally { await slot.dispose() }
   }, 10000)
 

@@ -351,7 +351,7 @@ class PalcoSlot {
       url: `http://${host}:${this.#httpPort}`,
       wsUrl: `ws://${host}:${this.#wsPort}/palco`,
       // OBS S1: receiver URL pronta com token (UI copia/cola no OBS Browser Source)
-      receiverUrl: this.#running ? `http://${host}:${this.#httpPort}/${tokenQuery}` : null,
+      receiverUrl: this.#running ? `http://${host}:${this.#httpPort}/espelho${tokenQuery}` : null,
       overlayUrl: this.#running ? `http://${host}:${this.#httpPort}/legenda${tokenQuery}` : null,
       returnUrl: this.#running ? `http://${host}:${this.#httpPort}/retorno${tokenQuery}` : null,
     }
@@ -399,8 +399,8 @@ class PalcoSlot {
       return
     }
 
-    // Receiver embutido (mesma página do palco-receiver); em /retorno ele vira o retorno de palco
-    if (p === '/' || p === '/receiver.html' || p === '/index.html' || p === '/retorno') {
+    // Receiver embutido (mesma página do palco-receiver): /espelho replica a TV; em /retorno vira o retorno de palco
+    if (p === '/' || p === '/receiver.html' || p === '/index.html' || p === '/espelho' || p === '/retorno') {
       try {
         const page = await readFile(path.join(__dirname, 'palco', 'receiver.html'))
         // Versão do RECEIVER (appinfo.json embutido, mesmo do .ipk webOS) —

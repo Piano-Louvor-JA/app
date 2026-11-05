@@ -15,14 +15,14 @@ const url = 'http://192.168.0.5:7080/?token=AB12C'
 afterEach(() => { document.body.innerHTML = '' })
 
 function mountDialog(link: string | null) {
-  return mount(TransmissionQrDialog, { props: { url: link, title: 'Fonte 1 · Réplica do Palco' }, global: { plugins: [i18n] }, attachTo: document.body })
+  return mount(TransmissionQrDialog, { props: { url: link, title: 'Fonte 1 · Espelho do Palco' }, global: { plugins: [i18n] }, attachTo: document.body })
 }
 
 it('renders the QR code of the full link, token included', async () => {
   const dialog = mountDialog(url)
   await flushPromises()
   const panel = document.querySelector('[role="dialog"]')!
-  expect(panel.getAttribute('aria-label')).toBe('Fonte 1 · Réplica do Palco')
+  expect(panel.getAttribute('aria-label')).toBe('Fonte 1 · Espelho do Palco')
   expect(toDataURL).toHaveBeenCalledWith(url, expect.objectContaining({ margin: 1 }))
   expect(document.querySelector<HTMLImageElement>('.transmission-qr__image')!.src).toBe(`data:image/png;base64,${btoa(url)}`)
   expect(panel.textContent).toContain(url)

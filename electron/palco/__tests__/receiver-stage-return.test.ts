@@ -39,7 +39,7 @@ const VERSE = {
 }
 
 describe('retorno de palco no navegador', () => {
-  it('com música, cobre a réplica com o trecho atual, o próximo e o progresso', () => {
+  it('com música, cobre o espelho com o trecho atual, o próximo e o progresso', () => {
     const { w, $ } = receiver('/retorno')
     expect($('#stageReturn')!.hidden).toBe(true)
     w.handle(VERSE)
@@ -112,7 +112,7 @@ describe('retorno de palco no navegador', () => {
     expect($('.stage-return__next-label')!.textContent).toBe('Next')
   })
 
-  it('a réplica comum ignora o retorno de palco', () => {
+  it('o espelho comum ignora o retorno de palco', () => {
     const { w, $ } = receiver('/')
     w.handle(VERSE)
     expect($('#stageReturn')!.hidden).toBe(true)

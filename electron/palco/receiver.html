@@ -150,7 +150,7 @@
 #obsWarmupView .warmup-caption{margin:0;text-align:center;color:#fff;font:700 min(4vw,4vh)/1.4 Arial,sans-serif}
 #obsWarmupView svg{display:block;width:100%;height:auto}
 @keyframes obsWarmupPulse{0%,100%{opacity:.88;transform:scale(.985)}50%{opacity:1;transform:scale(1.015)}}
-/* Retorno de palco (/retorno): com música, cobre a réplica com o trecho atual e o próximo. */
+/* Retorno de palco (/retorno): com música, cobre o espelho com o trecho atual e o próximo. */
 #stageReturn{position:fixed;inset:0;z-index:10000;overflow:hidden;background:#000;color:#fff}
 #stageReturn[hidden]{display:none}
 .stage-return__bg{position:absolute;inset:0;background-size:cover;background-position:center;opacity:.72}
@@ -2598,7 +2598,7 @@ var L10N=(function(){var d={
 };var l=(qs.get('lang')||(navigator.language||'')).slice(0,2).toLowerCase();
 return Object.assign({},d.pt,d[l]||{});})();
 document.querySelectorAll('[data-l10n]').forEach(function(el){var k=el.getAttribute('data-l10n');if(L10N[k])el.textContent=L10N[k];});
-// Retorno de palco: em /retorno, música ativa cobre a réplica; sem música, segue igual à TV. Nunca toca som.
+// Retorno de palco: em /retorno, música ativa cobre o espelho; sem música, segue igual à TV. Nunca toca som.
 const stageReturnMode=location.pathname.replace(/\/+$/,'')==='/retorno';
 let stageReturnSlide=-1,stageReturnRatio=0;
 function stageReturnColor(value){

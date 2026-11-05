@@ -46,7 +46,7 @@ beforeEach(() => {
   localStorage.clear()
   obsConnections.value = []
   document.body.innerHTML = ''
-  state = [slot('0', 7080), slot('7082', 7082, { running: true, clients: 3, overlayUrl: 'http://192.168.0.5:7082/legenda', receiverUrl: 'http://192.168.0.5:7082/' })]
+  state = [slot('0', 7080), slot('7082', 7082, { running: true, clients: 3, overlayUrl: 'http://192.168.0.5:7082/legenda', receiverUrl: 'http://192.168.0.5:7082/espelho' })]
   session.slots.mockImplementation(async () => state.map(item => ({ ...item })))
   session.turnOn.mockImplementation(async () => { setRunning('0', true); return true })
   session.turnOff.mockImplementation(async () => { setRunning('0', false) })

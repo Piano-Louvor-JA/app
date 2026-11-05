@@ -54,7 +54,7 @@ it('main source stopped: editable port with the TV warning, no links and no dele
 it('extra source on air: both links, reload, delete and a locked port', async () => {
   const card = mountCard(connection({
     id: '7082', name: 'Fonte 2', running: true, clients: 2, receiverIps: ['192.168.0.9', '192.168.0.12'], httpPort: 7082,
-    overlayUrl: 'http://192.168.0.5:7082/legenda?token=AB12C', receiverUrl: 'http://192.168.0.5:7082/?token=AB12C',
+    overlayUrl: 'http://192.168.0.5:7082/legenda?token=AB12C', receiverUrl: 'http://192.168.0.5:7082/espelho?token=AB12C',
     returnUrl: 'http://192.168.0.5:7082/retorno?token=AB12C',
   }))
   expect(card.classes()).toContain('transmission-card--on')
@@ -65,14 +65,14 @@ it('extra source on air: both links, reload, delete and a locked port', async ()
   expect(card.text()).toContain('Encerre a conexão para trocar a porta.')
   expect(card.get('[data-test="port"]').attributes('disabled')).toBeDefined()
   const links = card.findAllComponents(TransmissionLinkRow)
-  expect(links.map(link => link.props('url'))).toEqual(['http://192.168.0.5:7082/legenda?token=AB12C', 'http://192.168.0.5:7082/?token=AB12C', 'http://192.168.0.5:7082/retorno?token=AB12C'])
+  expect(links.map(link => link.props('url'))).toEqual(['http://192.168.0.5:7082/legenda?token=AB12C', 'http://192.168.0.5:7082/espelho?token=AB12C', 'http://192.168.0.5:7082/retorno?token=AB12C'])
   expect(links[0]!.props('primary')).toBe(true)
   expect(links[2]!.props('label')).toBe('Retorno de palco')
   expect(links[2]!.props('primary')).toBe(false)
   links[2]!.vm.$emit('qr', 'http://192.168.0.5:7082/retorno?token=AB12C')
   expect(card.emitted('qr')).toEqual([['http://192.168.0.5:7082/retorno?token=AB12C', 'Fonte 2 · Retorno de palco']])
-  links[1]!.vm.$emit('qr', 'http://192.168.0.5:7082/?token=AB12C')
-  expect(card.emitted('qr')![1]).toEqual(['http://192.168.0.5:7082/?token=AB12C', 'Fonte 2 · Réplica do Palco'])
+  links[1]!.vm.$emit('qr', 'http://192.168.0.5:7082/espelho?token=AB12C')
+  expect(card.emitted('qr')![1]).toEqual(['http://192.168.0.5:7082/espelho?token=AB12C', 'Fonte 2 · Espelho do Palco'])
   links[0]!.vm.$emit('qr', 'http://192.168.0.5:7082/legenda?token=AB12C')
   expect(card.emitted('qr')![2]).toEqual(['http://192.168.0.5:7082/legenda?token=AB12C', 'Fonte 2 · Legenda para OBS'])
   const actions = card.findAll('.transmission-card__actions button').map((b) => b.attributes('data-test'))
@@ -129,7 +129,7 @@ it('keeps the nickname being typed through refreshes and saves it on change', as
 })
 
 it('shows the overlay appearance inside the overlay link box, and still offers it while stopped', async () => {
-  const card = mountCard(connection({ running: true, clients: 1, overlayUrl: 'http://127.0.0.1:47080/legenda', receiverUrl: 'http://127.0.0.1:47080/' }))
+  const card = mountCard(connection({ running: true, clients: 1, overlayUrl: 'http://127.0.0.1:47080/legenda', receiverUrl: 'http://127.0.0.1:47080/espelho' }))
   const boxes = card.findAll('.transmission-link')
   expect(boxes[0]!.find('[data-test="style-toggle"]').exists()).toBe(true)
   expect(boxes[1]!.find('[data-test="style-toggle"]').exists()).toBe(false)
