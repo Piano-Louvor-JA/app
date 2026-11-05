@@ -22,7 +22,7 @@ describe('OBS connections', () => {
       { id: '7082', label: 'OBS 2', selected: true, nickname: 'Mesa' },
     ]))
     const config = await import('../obs-connections')
-    expect(config.obsConnectionName(config.obsConnections.value[0]!)).toBe('OBS 1')
+    expect(config.obsConnectionName(config.obsConnections.value[0]!)).toBe('OBS')
     expect(config.obsConnections.value[1]).toMatchObject({ nickname: 'Mesa' })
     const stored = JSON.parse(localStorage.getItem('louvorja-obs-connections-v1')!)
     expect(stored[0]).toEqual({ id: '0', label: 'OBS 1', selected: true })

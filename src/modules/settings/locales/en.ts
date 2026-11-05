@@ -370,7 +370,7 @@ export default {
       startAll: 'Start all',
       stopAll: 'Stop all',
       source: 'Source {n}',
-      mainSource: 'OBS',
+      mainSource: 'OBS - Streaming server',
       nickname: 'Add nickname',
       nicknameLabel: 'Nickname for {name}',
       start: 'Start',

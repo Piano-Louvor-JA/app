@@ -69,7 +69,8 @@ export function obsAllowsMirror(id: string, module?: string) {
   return connection.selected
 }
 
-export function obsConnectionName(connection: { label: string; nickname?: string }) {
+export function obsConnectionName(connection: { id?: string; label: string; nickname?: string }) {
+  if (connection.id === MAIN_ID) return 'OBS'
   return connection.nickname ? `${connection.label} — ${connection.nickname}` : connection.label
 }
 export function setObsNickname(id: string, nickname: string) {
