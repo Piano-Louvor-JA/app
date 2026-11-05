@@ -391,7 +391,7 @@ export default {
       portInUse: 'Port {port} is being used by another program.',
       portSuggest: 'Use port {port}',
       startFailed: 'Could not start the connection.',
-      overlay: 'OBS overlay',
+      overlay: 'OBS caption',
       overlayHint: 'Text only, with a transparent background, to place over the camera.',
       replica: 'Stage replica',
       replicaHint: 'The same as the TV shows, with video and audio.',
@@ -408,7 +408,7 @@ export default {
       openLabel: 'Open in browser: {name}',
       close: 'Close',
       style: {
-        title: 'Overlay appearance',
+        title: 'Caption appearance',
         layout: 'Layout',
         lowerThird: 'Lower third',
         fullscreen: 'Full screen',
@@ -453,7 +453,7 @@ export default {
       },
       howTo: {
         title: 'How to use in OBS',
-        step1: 'Start a connection and copy the “OBS overlay” link.',
+        step1: 'Start a connection and copy the “OBS caption” link.',
         step2: 'In OBS: Sources → + → Browser. Paste the link into URL, width 1920 and height 1080.',
         step3: 'Project as usual. The text shows up in OBS and appearance changes apply right away, without pasting the link again.',
         step4: 'For TVs and browsers, use the “Stage replica”, which includes video and audio.',

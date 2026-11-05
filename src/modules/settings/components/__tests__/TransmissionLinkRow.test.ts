@@ -6,11 +6,11 @@ import ptBR from '../../locales/pt-BR'
 import TransmissionLinkRow from '../TransmissionLinkRow.vue'
 
 const i18n = createI18n({ legacy: false, locale: 'pt-BR', messages: { 'pt-BR': ptBR } })
-const url = 'http://192.168.0.5:7080/overlay?token=AB12C'
+const url = 'http://192.168.0.5:7080/legenda?token=AB12C'
 
 function mountRow(primary = false) {
   return mount(TransmissionLinkRow, {
-    props: { label: 'Overlay para OBS', hint: 'Só o texto', url, primary },
+    props: { label: 'Legenda para OBS', hint: 'Só o texto', url, primary },
     global: { plugins: [i18n] },
   })
 }
@@ -45,7 +45,7 @@ it('asks for the QR code and opens the link in the system browser', async () => 
   expect(row.emitted('qr')).toEqual([[url]])
   await row.get('[data-test="open"]').trigger('click')
   expect(open).toHaveBeenCalledWith(url, '_blank', 'noopener')
-  expect(row.get('[data-test="open"]').attributes('aria-label')).toBe('Abrir no navegador: Overlay para OBS')
+  expect(row.get('[data-test="open"]').attributes('aria-label')).toBe('Abrir no navegador: Legenda para OBS')
   open.mockRestore()
   row.unmount()
 })

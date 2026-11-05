@@ -108,7 +108,7 @@ class PalcoSlot {
   get clientsCount() { return this.#clients.size }
   get overlay() { return { ...this.#overlay } }
 
-  /** Aparência do overlay desta conexão; fontes abertas recebem na hora. */
+  /** Aparência da legenda desta conexão; fontes abertas recebem na hora. */
   setOverlay(style) {
     this.#overlay = normalizeOverlayStyle({ ...this.#overlay, ...style })
     if (this.#running) this.broadcast(this.#overlayMessage())
@@ -352,7 +352,7 @@ class PalcoSlot {
       wsUrl: `ws://${host}:${this.#wsPort}/palco`,
       // OBS S1: receiver URL pronta com token (UI copia/cola no OBS Browser Source)
       receiverUrl: this.#running ? `http://${host}:${this.#httpPort}/${tokenQuery}` : null,
-      overlayUrl: this.#running ? `http://${host}:${this.#httpPort}/overlay${tokenQuery}` : null,
+      overlayUrl: this.#running ? `http://${host}:${this.#httpPort}/legenda${tokenQuery}` : null,
       returnUrl: this.#running ? `http://${host}:${this.#httpPort}/retorno${tokenQuery}` : null,
     }
   }
@@ -379,8 +379,8 @@ class PalcoSlot {
       return
     }
 
-    // Overlay da Transmissão (fonte de navegador do OBS) e a aparência desta conexão
-    if (p === '/overlay' || p === '/overlay.html') {
+    // Legenda da Transmissão (fonte de navegador do OBS) e a aparência desta conexão
+    if (p === '/legenda') {
       try {
         const page = await readFile(path.join(__dirname, 'palco', 'overlay.html'))
         res.setHeader('Content-Type', 'text/html; charset=utf-8')
@@ -392,7 +392,7 @@ class PalcoSlot {
       }
       return
     }
-    if (p === '/overlay-config') {
+    if (p === '/legenda-config') {
       res.setHeader('Content-Type', 'application/json')
       res.setHeader('Cache-Control', 'no-store')
       res.end(JSON.stringify({ style: this.overlay }))
@@ -422,6 +422,7 @@ class PalcoSlot {
     // quebrando todo bg/cover externo (músicas da API) → fallback.
     const assetMatch = /^(?!\/(?:proxy|status|bg|media)(?:\/|$))\/([a-z0-9._-]+)$/i.exec(p)
     if (assetMatch) {
+      if (/\.html$/i.test(p)) { res.statusCode = 404; res.end(); return }
       try {
         const file = path.join(__dirname, 'palco', String(assetMatch[1]))
         const buf = await readFile(file)

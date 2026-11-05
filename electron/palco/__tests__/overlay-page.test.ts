@@ -21,7 +21,7 @@ afterAll(async () => { await browser?.close() })
 
 async function openOverlay(slot: any, extra = ''): Promise<Page> {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } })
-  await page.goto(`http://127.0.0.1:${slot.httpPort}/overlay?port=${slot.wsPort}${extra}`)
+  await page.goto(`http://127.0.0.1:${slot.httpPort}/legenda?port=${slot.wsPort}${extra}`)
   await page.waitForFunction(() => document.body.dataset.connected === 'true')
   return page
 }
@@ -33,12 +33,15 @@ describe('overlay route', () => {
     const slot = new PalcoSlot('route', 'Route', await freePort(), await freePort(), () => null, { overlay: { theme: 'light' } })
     try {
       await slot.prepare()
-      const page = await fetch(`http://127.0.0.1:${slot.httpPort}/overlay`)
+      const page = await fetch(`http://127.0.0.1:${slot.httpPort}/legenda`)
       expect(page.status).toBe(200)
       expect(page.headers.get('cache-control')).toBe('no-store')
       expect(await page.text()).toContain('data-overlay-root')
-      const config = await (await fetch(`http://127.0.0.1:${slot.httpPort}/overlay-config`)).json()
+      const config = await (await fetch(`http://127.0.0.1:${slot.httpPort}/legenda-config`)).json()
       expect(config).toEqual({ style: slot.overlay })
+      for (const old of ['/overlay', '/overlay.html', '/overlay-config']) {
+        expect((await fetch(`http://127.0.0.1:${slot.httpPort}${old}`)).status).toBe(404)
+      }
     } finally { await slot.dispose() }
   })
 })

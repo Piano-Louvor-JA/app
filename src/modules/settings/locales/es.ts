@@ -393,7 +393,7 @@ export default {
       portInUse: 'El puerto {port} está en uso por otro programa.',
       portSuggest: 'Usar el puerto {port}',
       startFailed: 'No se pudo iniciar la conexión.',
-      overlay: 'Overlay para OBS',
+      overlay: 'Subtítulo para OBS',
       overlayHint: 'Solo el texto, con fondo transparente, para poner sobre la cámara.',
       replica: 'Réplica del Palco',
       replicaHint: 'Lo mismo que aparece en la TV, con video y audio.',
@@ -410,7 +410,7 @@ export default {
       openLabel: 'Abrir en el navegador: {name}',
       close: 'Cerrar',
       style: {
-        title: 'Apariencia del overlay',
+        title: 'Apariencia del subtítulo',
         layout: 'Formato',
         lowerThird: 'Tercio inferior',
         fullscreen: 'Pantalla completa',
@@ -455,7 +455,7 @@ export default {
       },
       howTo: {
         title: 'Cómo usar en OBS',
-        step1: 'Inicia una conexión y copia el enlace “Overlay para OBS”.',
+        step1: 'Inicia una conexión y copia el enlace “Subtítulo para OBS”.',
         step2: 'En OBS: Fuentes → + → Navegador. Pega el enlace en URL, con ancho 1920 y alto 1080.',
         step3: 'Proyecta como siempre. El texto aparece en OBS y la apariencia cambia al instante, sin volver a pegar el enlace.',
         step4: 'Para TVs y navegadores, usa la “Réplica del Palco”, que incluye video y audio.',

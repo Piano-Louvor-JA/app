@@ -38,7 +38,7 @@ function slot(id: string, httpPort: number, extra: Partial<PalcoSlotStatus> = {}
   return { id, label: id === '0' ? 'Principal' : `OBS ${(httpPort - 7080) / 2 + 1}`, running: false, clients: 0, httpPort, wsPort: httpPort + 1, overlay: { ...DEFAULT_OVERLAY_STYLE }, ...extra }
 }
 function setRunning(id: string, running: boolean) {
-  state = state.map(item => item.id === id ? { ...item, running, overlayUrl: running ? `http://192.168.0.5:${item.httpPort}/overlay` : null } : item)
+  state = state.map(item => item.id === id ? { ...item, running, overlayUrl: running ? `http://192.168.0.5:${item.httpPort}/legenda` : null } : item)
 }
 
 beforeEach(() => {
@@ -46,7 +46,7 @@ beforeEach(() => {
   localStorage.clear()
   obsConnections.value = []
   document.body.innerHTML = ''
-  state = [slot('0', 7080), slot('7082', 7082, { running: true, clients: 3, overlayUrl: 'http://192.168.0.5:7082/overlay', receiverUrl: 'http://192.168.0.5:7082/' })]
+  state = [slot('0', 7080), slot('7082', 7082, { running: true, clients: 3, overlayUrl: 'http://192.168.0.5:7082/legenda', receiverUrl: 'http://192.168.0.5:7082/' })]
   session.slots.mockImplementation(async () => state.map(item => ({ ...item })))
   session.turnOn.mockImplementation(async () => { setRunning('0', true); return true })
   session.turnOff.mockImplementation(async () => { setRunning('0', false) })
@@ -269,10 +269,10 @@ it('reloads open sources, saves nicknames and shows the QR code of a link', asyn
   await flushPromises()
   expect(obsConnections.value.find(item => item.id === '7082')?.nickname).toBe('Telão')
   expect(cards(view)[1]!.props('connection').nickname).toBe('Telão')
-  cards(view)[1]!.vm.$emit('qr', 'http://192.168.0.5:7082/overlay', 'Fonte 2 · Overlay para OBS')
+  cards(view)[1]!.vm.$emit('qr', 'http://192.168.0.5:7082/legenda', 'Fonte 2 · Legenda para OBS')
   await flushPromises()
   const qr = view.getComponent(TransmissionQrDialog)
-  expect(qr.props()).toEqual({ url: 'http://192.168.0.5:7082/overlay', title: 'Fonte 2 · Overlay para OBS' })
+  expect(qr.props()).toEqual({ url: 'http://192.168.0.5:7082/legenda', title: 'Fonte 2 · Legenda para OBS' })
   qr.vm.$emit('close')
   await flushPromises()
   expect(qr.props('url')).toBeNull()

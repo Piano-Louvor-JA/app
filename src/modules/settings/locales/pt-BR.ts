@@ -398,7 +398,7 @@ export default {
       portInUse: 'A porta {port} está em uso por outro programa.',
       portSuggest: 'Usar a porta {port}',
       startFailed: 'Não foi possível iniciar a conexão.',
-      overlay: 'Overlay para OBS',
+      overlay: 'Legenda para OBS',
       overlayHint: 'Só o texto, com fundo transparente, para pôr sobre a câmera.',
       replica: 'Réplica do Palco',
       replicaHint: 'O mesmo que aparece na TV, com vídeo e áudio.',
@@ -415,7 +415,7 @@ export default {
       openLabel: 'Abrir no navegador: {name}',
       close: 'Fechar',
       style: {
-        title: 'Aparência do overlay',
+        title: 'Aparência da legenda',
         layout: 'Formato',
         lowerThird: 'Terço inferior',
         fullscreen: 'Tela cheia',
@@ -460,7 +460,7 @@ export default {
       },
       howTo: {
         title: 'Como usar no OBS',
-        step1: 'Inicie uma conexão e copie o link “Overlay para OBS”.',
+        step1: 'Inicie uma conexão e copie o link “Legenda para OBS”.',
         step2: 'No OBS: Fontes → + → Navegador. Cole o link em URL, com largura 1920 e altura 1080.',
         step3: 'Projete normalmente. O texto aparece no OBS e a aparência muda na hora, sem recolar o link.',
         step4: 'Para TVs e navegadores, use a “Réplica do Palco”, que inclui vídeo e áudio.',
