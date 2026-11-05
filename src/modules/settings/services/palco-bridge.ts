@@ -397,7 +397,7 @@ function syncAudio() {
   // PC somente: projeção visual continua normal; áudio não vai ao Palco.
   // Stop só na transição, para não martelar receivers a cada poll.
   if (route === 'pc') {
-    if (lastAudioRoute !== 'pc') void palcoSession.audio({ action: 'stop' })
+    if (lastAudioRoute !== 'pc') void palcoSession.hymnAudio({ action: 'stop' })
     lastAudioRoute = 'pc'
     lastAudioKey = key
     return
@@ -415,7 +415,7 @@ function syncAudio() {
       lastTvPlayState = null
       if (audioUrl) {
         lastTvPlayState = 'play'
-        void palcoSession.audio({
+        void palcoSession.hymnAudio({
           url: audioUrl,
           title: session?.title ?? undefined,
           subtitle: session?.subtitle ?? undefined,
@@ -424,14 +424,14 @@ function syncAudio() {
           action: 'play',
         })
       } else {
-        void palcoSession.audio({ action: 'stop' })
+        void palcoSession.hymnAudio({ action: 'stop' })
       }
     } else if (audioUrl) {
       // Mesma faixa: propaga o estado de reprodução do operador.
       const wanted: 'play' | 'pause' = media.isPlaying ? 'play' : 'pause'
       if (wanted !== lastTvPlayState) {
         lastTvPlayState = wanted
-        void palcoSession.audio({
+        void palcoSession.hymnAudio({
           url: audioUrl,
           /* v8 ignore next 1 -- null e 0 produzem o mesmo positionMs */
           positionMs: Math.round((media.currentTimeSec ?? 0) * 1000),
@@ -448,7 +448,7 @@ function syncAudio() {
     lastPosSyncMs = 0
     if (audioUrl && media.isPlaying) {
       lastAudioKey = key
-      void palcoSession.audio({
+      void palcoSession.hymnAudio({
         url: audioUrl,
         title: session?.title ?? undefined,
         subtitle: session?.subtitle ?? undefined,
@@ -472,7 +472,7 @@ function syncAudio() {
     const now = Date.now()
     if (now - lastPosSyncMs > 3000) {
       lastPosSyncMs = now
-      void palcoSession.audio({
+      void palcoSession.hymnAudio({
         url: audioUrl,
         positionMs: Math.round((media.currentTimeSec ?? 0) * 1000),
         action: 'seek',
@@ -481,7 +481,7 @@ function syncAudio() {
   }
   /* v8 ignore start -- store mantém isPaused true com sessão parada */
   else if (media.isPaused) {
-    void palcoSession.audio({ action: 'pause' })
+    void palcoSession.hymnAudio({ action: 'pause' })
   }
   /* v8 ignore stop */
 }
@@ -695,7 +695,7 @@ export function startPalcoBridge() {
         (has) => {
           if (!has) {
             lastAudioKey = ''
-            void palcoSession.audio({ action: 'stop' })
+            void palcoSession.hymnAudio({ action: 'stop' })
           }
         },
       ),
@@ -703,7 +703,7 @@ export function startPalcoBridge() {
         () => media.currentTimeSec,
         (now, before) => {
           if (Math.abs(now - before) > 2 && media.hasSession) {
-            void palcoSession.audio({ action: 'seek', position: now })
+            void palcoSession.hymnAudio({ action: 'seek', position: now })
           }
         },
       ),

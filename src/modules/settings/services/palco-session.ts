@@ -501,6 +501,14 @@ class PalcoSession {
     }))
   }
 
+  /** Áudio dos hinos em toda conexão no ar que espelha hinos; stop vai a todas no ar. */
+  async hymnAudio(input: Parameters<PalcoSession['audio']>[0]): Promise<void> {
+    if (!this.isElectron) return
+    const slots = await this.slots()
+    const targets = slots.filter((slot) => slot.running && (input.action === 'stop' || obsAllowsMirror(slot.id, 'hymns')))
+    await Promise.all(targets.map((slot) => this.forSlot(slot.id).audio(input)))
+  }
+
   /** Publica arquivo local no /media/ do sender e devolve URL absoluta. */
   private async serveLocal(target: string): Promise<string | null> {
     // blob:/data: (capa .slja do IndexedDB — o renderer resolve coverMediaId

@@ -42,7 +42,7 @@ vi.mock('../../services/palco-session', () => ({
     idleTo(slot: string) { sends().push({ slot, msg: { type: 'idle' } }) },
     timerTo(slot: string, opts: unknown) { sends().push({ slot, msg: { type: 'timer', opts } }) },
     idle() { sends().push({ slot: this.activeSlotId, msg: { type: 'idle' } }) },
-    audio(payload: unknown) { sends().push({ slot: 'audio', msg: payload as Record<string, unknown> }) },
+    hymnAudio(payload: unknown) { sends().push({ slot: 'audio', msg: payload as Record<string, unknown> }) },
     onEvent: () => () => {},
     onReceiverConnected: (callback: () => void) => { receiverConnection.callback = callback; return () => { receiverConnection.callback = null } },
   },

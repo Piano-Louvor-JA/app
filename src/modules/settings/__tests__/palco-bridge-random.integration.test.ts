@@ -48,7 +48,7 @@ vi.mock('../services/palco-session', async () => {
     idle() { this.idleTo(this.activeSlotId) },
     async projectRouted() { /* não deve ser chamado no novo fluxo */ },
     timerRouted() {},
-    audio: () => {},
+    hymnAudio: () => {},
     onEvent: () => () => {},
     __sends: sends,
   }
