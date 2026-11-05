@@ -12,9 +12,34 @@ describe('OBS connections', () => {
     const connection = restored.obsConnections.value[0]!
     expect(connection.label).toBe('OBS 2')
     expect(connection.nickname).toBe('Transmissão principal')
-    expect(restored.obsConnectionName(connection)).toBe('OBS 2 — Transmissão principal')
-    restored.setObsNickname('7082', '')
-    expect(restored.obsConnectionName(restored.obsConnections.value[0]!)).toBe('OBS 2')
+    expect(restored.obsConnectionName(connection)).toBe('Transmissão principal')
+    restored.setObsNickname('7082', '   ')
+    expect(restored.obsConnectionName(restored.obsConnections.value[0]!)).toBe('Transmissão principal')
+    expect(restored.obsConnectionName({ id: '7090', label: 'OBS 5' })).toBe('OBS 5')
+  })
+  it('nova conexão nasce com nome e tipo, e o tipo pode mudar depois', async () => {
+    const config = await import('../obs-connections')
+    config.registerObsConnection('7082', 'OBS 2', { nickname: '  TV Frontal ', kind: 'return' })
+    config.registerObsConnection('7084', 'OBS 3', { nickname: 'Projetor' })
+    expect(config.obsConnections.value).toEqual([
+      { id: '7082', label: 'OBS 2', selected: true, nickname: 'TV Frontal', kind: 'return' },
+      { id: '7084', label: 'OBS 3', selected: true, nickname: 'Projetor', kind: 'mirror' },
+    ])
+    config.setObsKind('7082', 'mirror')
+    config.setObsKind('0', 'return')
+    vi.resetModules()
+    const restored = await import('../obs-connections')
+    expect(restored.obsConnections.value[0]).toMatchObject({ id: '7082', kind: 'mirror' })
+    expect(restored.obsConnections.value.some(item => item.id === '0')).toBe(false)
+  })
+  it('lê o tipo salvo com segurança', async () => {
+    localStorage.setItem('louvorja-obs-connections-v1', JSON.stringify([
+      { id: '7082', label: 'OBS 2', selected: true, kind: 'return' },
+      { id: '7084', label: 'OBS 3', selected: true, kind: 'estranho' },
+      { id: '0', label: 'OBS 1', selected: true, kind: 'return' },
+    ]))
+    const config = await import('../obs-connections')
+    expect(config.obsConnections.value.map(item => item.kind)).toEqual(['return', undefined, undefined])
   })
   it('o servidor principal não tem apelido: ignora novos e apaga o salvo', async () => {
     localStorage.setItem('louvorja-obs-connections-v1', JSON.stringify([

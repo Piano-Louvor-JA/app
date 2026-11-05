@@ -29,6 +29,7 @@ vi.mock('../../components/TransmissionNetworkCard.vue', () => ({
 import TransmissionView from '../TransmissionView.vue'
 import TransmissionConnectionCard from '../../components/TransmissionConnectionCard.vue'
 import TransmissionQrDialog from '../../components/TransmissionQrDialog.vue'
+import TransmissionAddDialog from '../../components/TransmissionAddDialog.vue'
 import { obsConnections } from '../../services/obs-connections'
 
 const i18n = createI18n({ legacy: false, locale: 'pt-BR', messages: { 'pt-BR': { ...ptBR, common: { cancel: 'Cancelar' } } } })
@@ -126,6 +127,7 @@ it('ignores new actions while one is running and survives a failed start', async
   cards(view)[1]!.vm.$emit('reload')
   cards(view)[1]!.vm.$emit('port', 9000)
   await view.get('[data-test="add"]').trigger('click')
+  expect(view.getComponent(TransmissionAddDialog).props('open')).toBe(false)
   expect(session.stopSlot).not.toHaveBeenCalled()
   expect(session.refreshObs).not.toHaveBeenCalled()
   expect(session.createSlot).not.toHaveBeenCalled()
@@ -178,26 +180,43 @@ it('saves port and appearance in the main and explains each refusal on the card'
   view.unmount()
 })
 
-it('adds a numbered connection, starts it and reports failures', async () => {
+it('asks for name and type before adding, then starts the new connection and reports failures', async () => {
   session.createSlot.mockImplementation(async (label: string) => { state = [...state, slot('7084', 7084, { label })]; return { id: '7084', label, httpPort: 7084, wsPort: 7085 } })
   const view = await mountView()
+  const dialog = view.getComponent(TransmissionAddDialog)
+  expect(dialog.props('open')).toBe(false)
   await view.get('[data-test="add"]').trigger('click')
+  expect(dialog.props('open')).toBe(true)
+  dialog.vm.$emit('cancel')
   await flushPromises()
+  expect(dialog.props('open')).toBe(false)
+  expect(session.createSlot).not.toHaveBeenCalled()
+  const add = async (name: string, kind: 'mirror' | 'return') => {
+    await view.get('[data-test="add"]').trigger('click')
+    dialog.vm.$emit('confirm', name, kind)
+    await flushPromises()
+  }
+  await add('TV Frontal', 'return')
+  expect(dialog.props('open')).toBe(false)
   expect(session.createSlot).toHaveBeenCalledWith('OBS 3')
   expect(session.startSlot).toHaveBeenCalledWith('7084')
   expect(session.warmupObs).toHaveBeenCalledWith('7084')
-  expect(cards(view).map(card => card.props('connection').name)).toEqual(['OBS - Servidor de transmissão', 'Fonte 2', 'Fonte 3'])
-  obsConnections.value = obsConnections.value.map(item => item.id === '7084' ? { ...item, label: 'Telão' } : item)
-  session.createSlot.mockResolvedValueOnce({ id: '7086', label: 'OBS 3', httpPort: 7086, wsPort: 7087 })
-  session.startSlot.mockResolvedValueOnce(false)
-  await view.get('[data-test="add"]').trigger('click')
+  expect(obsConnections.value.find(item => item.id === '7084')).toMatchObject({ nickname: 'TV Frontal', kind: 'return' })
+  expect(cards(view).map(card => card.props('connection').name)).toEqual(['OBS - Servidor de transmissão', 'Fonte 2', 'TV Frontal'])
+  expect(cards(view)[2]!.props('connection').kind).toBe('return')
+  expect(cards(view)[1]!.props('connection').kind).toBe('mirror')
+  cards(view)[2]!.vm.$emit('kind', 'mirror')
   await flushPromises()
-  expect(session.createSlot).toHaveBeenLastCalledWith('OBS 3')
+  expect(obsConnections.value.find(item => item.id === '7084')?.kind).toBe('mirror')
+  expect(cards(view)[2]!.props('connection').kind).toBe('mirror')
+  session.createSlot.mockResolvedValueOnce({ id: '7086', label: 'OBS 4', httpPort: 7086, wsPort: 7087 })
+  session.startSlot.mockResolvedValueOnce(false)
+  await add('Projetor', 'mirror')
+  expect(session.createSlot).toHaveBeenLastCalledWith('OBS 4')
   expect(session.warmupObs).not.toHaveBeenCalledWith('7086')
   expect(view.get('.transmission-view__error').text()).toBe('Não foi possível alterar a conexão. Tente novamente.')
   session.createSlot.mockResolvedValueOnce(null)
-  await view.get('[data-test="add"]').trigger('click')
-  await flushPromises()
+  await add('TV retorno', 'return')
   expect(view.get('.transmission-view__error').text()).toBe('Não foi possível alterar a conexão. Tente novamente.')
   view.unmount()
 })
@@ -282,10 +301,10 @@ it('reloads open sources, saves nicknames and shows the QR code of a link', asyn
 it('keeps a custom connection name and refreshes the list after a network change', async () => {
   state = [slot('0', 7080), slot('7082', 7082, { label: 'Telão lateral' })]
   const view = await mountView()
-  expect(cards(view)[1]!.props('connection')).toMatchObject({ name: 'Fonte 2', nickname: 'Telão lateral' })
+  expect(cards(view)[1]!.props('connection')).toMatchObject({ name: 'Telão lateral', nickname: 'Telão lateral', kind: 'mirror' })
   obsConnections.value = obsConnections.value.map(item => item.id === '7082' ? { ...item, label: 'Telão' } : item)
   await flushPromises()
-  expect(cards(view)[1]!.props('connection').name).toBe('Telão')
+  expect(cards(view)[1]!.props('connection').name).toBe('Telão lateral')
   const calls = session.slots.mock.calls.length
   view.getComponent({ name: 'TransmissionNetworkCard' }).vm.$emit('changed')
   await flushPromises()

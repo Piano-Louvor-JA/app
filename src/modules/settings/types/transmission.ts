@@ -95,6 +95,8 @@ export interface TransmissionConnection {
   /** "Fonte N", já traduzido. */
   name: string
   nickname?: string
+  /** Só nas conexões adicionais; sem valor vale espelho. */
+  kind?: 'mirror' | 'return'
   running: boolean
   clients: number
   receiverIps: string[]

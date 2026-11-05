@@ -17,13 +17,14 @@ const emit = defineEmits<{
   nickname: [value: string]
   port: [httpPort: number]
   style: [style: OverlayStyle]
+  kind: [kind: 'mirror' | 'return']
   qr: [url: string, title: string]
 }>()
 const { t } = useI18n()
 
 const nicknameDraft = ref<string | null>(null)
 function saveNickname(value: string) {
-  emit('nickname', value)
+  if (value.trim()) emit('nickname', value)
   nicknameDraft.value = null
 }
 
@@ -48,12 +49,17 @@ const failure = computed(() => {
     : t('settings.transmission.startFailed')
 })
 
-/** A legenda é só do servidor principal (OBS); as conexões adicionais servem a outros dispositivos. */
+/** A legenda é só do servidor principal (OBS); as adicionais mostram apenas o link do tipo escolhido. */
 const isMain = computed(() => props.connection.id === '0')
+const kind = computed(() => props.connection.kind ?? 'mirror')
+const kinds = computed(() => [
+  { id: 'mirror' as const, label: t('settings.transmission.replica') },
+  { id: 'return' as const, label: t('settings.transmission.stageReturn') },
+])
 const links = computed(() => [
   { key: 'overlay', url: isMain.value ? props.connection.overlayUrl : null, label: t('settings.transmission.overlay'), hint: t('settings.transmission.overlayHint'), primary: true },
-  { key: 'replica', url: props.connection.receiverUrl, label: t('settings.transmission.replica'), hint: t('settings.transmission.replicaHint'), primary: false },
-  { key: 'stageReturn', url: props.connection.returnUrl, label: t('settings.transmission.stageReturn'), hint: t('settings.transmission.stageReturnHint'), primary: false },
+  { key: 'replica', url: isMain.value || kind.value === 'mirror' ? props.connection.receiverUrl : null, label: t('settings.transmission.replica'), hint: t('settings.transmission.replicaHint'), primary: false },
+  { key: 'stageReturn', url: isMain.value || kind.value === 'return' ? props.connection.returnUrl : null, label: t('settings.transmission.stageReturn'), hint: t('settings.transmission.stageReturnHint'), primary: false },
 ].filter((link): link is typeof link & { url: string } => Boolean(link.url)))
 
 const styleOpen = ref(false)
@@ -64,16 +70,7 @@ const styleOpen = ref(false)
     <header class="transmission-card__header">
       <div class="transmission-card__icon"><TransmissionIcon :size="28" /></div>
       <div class="transmission-card__info">
-        <div class="transmission-card__name-row">
-          <strong class="transmission-card__name">{{ connection.name }}</strong>
-          <input v-if="connection.id !== '0'" class="transmission-card__nickname" type="text" maxlength="60" data-test="nickname"
-            :value="nicknameDraft ?? connection.nickname ?? ''"
-            :placeholder="t('settings.transmission.nickname')"
-            :aria-label="t('settings.transmission.nicknameLabel', { name: connection.name })"
-            @input="nicknameDraft = ($event.target as HTMLInputElement).value"
-            @change="saveNickname(($event.target as HTMLInputElement).value)"
-            @keydown.enter="($event.target as HTMLInputElement).blur()">
-        </div>
+        <strong class="transmission-card__name">{{ connection.name }}</strong>
         <span class="transmission-card__state" :class="{ 'transmission-card__state--on': connection.running }">
           <span class="transmission-card__dot" aria-hidden="true" />
           <template v-if="connection.running">
@@ -109,6 +106,29 @@ const styleOpen = ref(false)
         :disabled="busy" @click="emit('port', connection.error.suggestedPort)">
         {{ t('settings.transmission.portSuggest', { port: connection.error.suggestedPort }) }}
       </button>
+    </div>
+
+    <div v-if="!isMain" class="transmission-card__setup">
+      <label class="transmission-card__setup-field">
+        <span class="transmission-card__label">{{ t('settings.transmission.nickname') }}</span>
+        <input class="transmission-card__nickname" type="text" maxlength="60" data-test="nickname"
+          :value="nicknameDraft ?? connection.nickname ?? ''"
+          :placeholder="t('settings.transmission.addDialog.namePlaceholder')"
+          :aria-label="t('settings.transmission.nicknameLabel', { name: connection.name })"
+          @input="nicknameDraft = ($event.target as HTMLInputElement).value"
+          @change="saveNickname(($event.target as HTMLInputElement).value)"
+          @keydown.enter="($event.target as HTMLInputElement).blur()">
+      </label>
+      <div class="transmission-card__setup-field">
+        <span :id="`transmission-kind-${connection.id}`" class="transmission-card__label">{{ t('settings.transmission.kind') }}</span>
+        <div class="transmission-card__kinds" role="radiogroup" :aria-labelledby="`transmission-kind-${connection.id}`">
+          <button v-for="option in kinds" :key="option.id" type="button" role="radio" class="transmission-card__kind"
+            :class="{ 'transmission-card__kind--on': kind === option.id }" :aria-checked="kind === option.id"
+            :data-test="`kind-${option.id}`" :disabled="busy" @click="kind !== option.id && emit('kind', option.id)">
+            {{ option.label }}
+          </button>
+        </div>
+      </div>
     </div>
 
     <div v-if="links.length" class="transmission-card__links">
@@ -186,22 +206,46 @@ const styleOpen = ref(false)
   }
 
   &__info { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
-  &__name-row { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
-  &__name { color: var(--ds-color-on-surface); font-size: 1rem; white-space: nowrap; }
+  &__name { overflow: hidden; color: var(--ds-color-on-surface); font-size: 1rem; text-overflow: ellipsis; white-space: nowrap; }
+
+  &__setup { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.75rem 1rem; }
+  &__setup-field { display: flex; flex: 1 1 14rem; flex-direction: column; gap: 0.3rem; min-width: 0; }
 
   &__nickname {
     width: 100%;
     min-width: 0;
-    padding: 0.2rem 0.4rem;
-    border: 1px solid transparent;
-    border-radius: 0.3rem;
-    background: transparent;
+    padding: 0.45rem 0.65rem;
+    border: 1px solid var(--ds-color-outline);
+    border-radius: 0.5rem;
+    background: var(--ds-color-surface, #171717);
     color: var(--ds-color-on-surface);
     font: inherit;
-    font-size: 0.85rem;
+    font-size: 0.88rem;
 
-    &:hover { border-color: var(--ds-color-outline); }
-    &:focus { outline: 1px solid var(--ds-color-primary); background: var(--ds-color-surface); }
+    &:focus { outline: 1px solid var(--ds-color-primary); }
+  }
+
+  &__kinds {
+    display: inline-flex;
+    align-self: flex-start;
+    padding: 0.2rem;
+    border: 1px solid var(--ds-color-outline);
+    border-radius: 999px;
+  }
+
+  &__kind {
+    padding: 0.35rem 0.9rem;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--ds-color-on-surface-variant);
+    font-size: 0.82rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+
+    &--on { background: color-mix(in srgb, var(--ds-color-primary) 18%, transparent); color: var(--ds-color-primary); }
+    &:disabled { opacity: 0.55; cursor: not-allowed; }
   }
 
   &__state { display: flex; align-items: center; gap: 0.4rem; color: var(--ds-color-on-surface-variant); font-size: 0.8rem; }

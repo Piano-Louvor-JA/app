@@ -30,6 +30,7 @@ it('main source stopped: editable port with the TV warning, no links and no dele
   expect(card.find('[data-test="remove"]').exists()).toBe(false)
   expect(card.find('[data-test="reload"]').exists()).toBe(false)
   expect(card.find('[data-test="nickname"]').exists()).toBe(false)
+  expect(card.find('[data-test="kind-mirror"]').exists()).toBe(false)
   expect(card.find('[data-test="port-apply"]').exists()).toBe(false)
   const port = card.get<HTMLInputElement>('[data-test="port"]')
   expect(port.element.value).toBe('47080')
@@ -51,12 +52,13 @@ it('main source stopped: editable port with the TV warning, no links and no dele
   expect(card.emitted('toggle')).toHaveLength(1)
 })
 
-it('extra source on air: mirror and stage return only (no caption), reload, delete and a locked port', async () => {
-  const card = mountCard(connection({
-    id: '7082', name: 'Fonte 2', running: true, clients: 2, receiverIps: ['192.168.0.9', '192.168.0.12'], httpPort: 7082,
+it('extra source on air: only the link of its type (no caption), reload, delete and a locked port', async () => {
+  const extra = (overrides: Partial<TransmissionConnection> = {}) => connection({
+    id: '7082', name: 'TV Frontal', running: true, clients: 2, receiverIps: ['192.168.0.9', '192.168.0.12'], httpPort: 7082,
     overlayUrl: 'http://192.168.0.5:7082/legenda?token=AB12C', receiverUrl: 'http://192.168.0.5:7082/espelho?token=AB12C',
-    returnUrl: 'http://192.168.0.5:7082/retorno?token=AB12C',
-  }))
+    returnUrl: 'http://192.168.0.5:7082/retorno?token=AB12C', ...overrides,
+  })
+  const card = mountCard(extra())
   expect(card.classes()).toContain('transmission-card--on')
   expect(card.text()).toContain('No ar')
   expect(card.text()).toContain('2 dispositivos conectados')
@@ -64,16 +66,25 @@ it('extra source on air: mirror and stage return only (no caption), reload, dele
   expect(card.text()).not.toContain('TVs com o app Palco')
   expect(card.text()).toContain('Encerre a conexão para trocar a porta.')
   expect(card.get('[data-test="port"]').attributes('disabled')).toBeDefined()
-  const links = card.findAllComponents(TransmissionLinkRow)
-  expect(links.map(link => link.props('url'))).toEqual(['http://192.168.0.5:7082/espelho?token=AB12C', 'http://192.168.0.5:7082/retorno?token=AB12C'])
+  let links = card.findAllComponents(TransmissionLinkRow)
+  expect(links.map(link => link.props('url'))).toEqual(['http://192.168.0.5:7082/espelho?token=AB12C'])
   expect(card.text()).not.toContain('Legenda para OBS')
   expect(card.find('[data-test="style-toggle"]').exists()).toBe(false)
-  expect(links[1]!.props('label')).toBe('Retorno de palco')
-  expect(links.every(link => link.props('primary') === false)).toBe(true)
-  links[1]!.vm.$emit('qr', 'http://192.168.0.5:7082/retorno?token=AB12C')
-  expect(card.emitted('qr')).toEqual([['http://192.168.0.5:7082/retorno?token=AB12C', 'Fonte 2 · Retorno de palco']])
+  expect(links[0]!.props('primary')).toBe(false)
   links[0]!.vm.$emit('qr', 'http://192.168.0.5:7082/espelho?token=AB12C')
-  expect(card.emitted('qr')![1]).toEqual(['http://192.168.0.5:7082/espelho?token=AB12C', 'Fonte 2 · Espelho do Palco'])
+  expect(card.emitted('qr')).toEqual([['http://192.168.0.5:7082/espelho?token=AB12C', 'TV Frontal · Espelho do Palco']])
+  expect(card.get('[data-test="kind-mirror"]').attributes('aria-checked')).toBe('true')
+  await card.get('[data-test="kind-return"]').trigger('click')
+  await card.get('[data-test="kind-mirror"]').trigger('click')
+  expect(card.emitted('kind')).toEqual([['return']])
+  await card.setProps({ connection: extra({ kind: 'return' }) })
+  links = card.findAllComponents(TransmissionLinkRow)
+  expect(links.map(link => link.props('url'))).toEqual(['http://192.168.0.5:7082/retorno?token=AB12C'])
+  expect(links[0]!.props('label')).toBe('Retorno de palco')
+  expect(card.get('[data-test="kind-return"]').attributes('aria-checked')).toBe('true')
+  await card.setProps({ busy: true })
+  expect(card.get('[data-test="kind-mirror"]').attributes('disabled')).toBeDefined()
+  await card.setProps({ busy: false })
   const actions = card.findAll('.transmission-card__actions button').map((b) => b.attributes('data-test'))
   expect(actions).toEqual(['reload', 'toggle', 'remove'])
   expect(card.find('.transmission-card__links [data-test="reload"]').exists()).toBe(false)
@@ -117,6 +128,11 @@ it('keeps the nickname being typed through refreshes and saves it on change', as
   expect(input.element.value).toBe('Mesa de som')
   await input.trigger('change')
   expect(card.emitted('nickname')).toEqual([['Mesa de som']])
+  input.element.value = '   '
+  await input.trigger('input')
+  await input.trigger('change')
+  expect(card.emitted('nickname')).toHaveLength(1)
+  expect(input.element.value).toBe('Mesa')
   await card.setProps({ connection: extra({ nickname: 'Mesa de som' }) })
   expect(input.element.value).toBe('Mesa de som')
   input.element.focus()

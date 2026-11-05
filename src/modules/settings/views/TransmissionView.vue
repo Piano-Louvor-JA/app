@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppConfirm from '@shared/components/AppConfirm.vue'
 import SettingsToggle from '../components/SettingsToggle.vue'
+import TransmissionAddDialog from '../components/TransmissionAddDialog.vue'
 import TransmissionAudioOptions from '../components/TransmissionAudioOptions.vue'
 import TransmissionConnectionCard from '../components/TransmissionConnectionCard.vue'
 import TransmissionNetworkCard from '../components/TransmissionNetworkCard.vue'
@@ -12,8 +13,10 @@ import {
   notifyObsChanged,
   obsConnections,
   registerObsConnection,
+  setObsKind,
   setObsNickname,
   unregisterObsConnection,
+  type ObsKind,
 } from '../services/obs-connections'
 import { palcoSession } from '../services/palco-session'
 import type { OverlayStyle, SlotUpdateFailure, TransmissionConnection } from '../types/transmission'
@@ -32,8 +35,9 @@ const cards = computed<TransmissionConnection[]>(() => connections.value
   .filter((connection) => connection.httpPort !== null)
   .map((connection) => ({
     id: connection.id,
-    name: sourceName(connection.id, connection.label),
+    name: (connection.id !== '0' && connection.nickname) || sourceName(connection.id, connection.label),
     nickname: connection.nickname,
+    ...(connection.id !== '0' ? { kind: connection.kind ?? 'mirror' } : {}),
     running: connection.running,
     clients: connection.clients,
     receiverIps: connection.receiverIps,
@@ -96,12 +100,14 @@ function setAll(start: boolean) {
   }, t('settings.transmission.errors.bulk'))
 }
 
-function addConnection() {
+const addOpen = ref(false)
+function addConnection(name: string, kind: ObsKind) {
+  addOpen.value = false
   void run('add', async () => {
     const number = Math.max(1, ...obsConnections.value.map((item) => Number(item.label.match(/\d+$/)?.[0]) || 1)) + 1
     const created = await palcoSession.createSlot(`OBS ${number}`)
     if (!created) throw new Error('create')
-    registerObsConnection(created.id, created.label)
+    registerObsConnection(created.id, created.label, { nickname: name, kind })
     if (!(await switchOn(created.id))) throw new Error('start')
   }, t('settings.transmission.errors.connection'))
 }
@@ -191,7 +197,7 @@ onMounted(() => {
     <p v-if="pageError" class="transmission-view__error" role="alert">{{ pageError }}</p>
 
     <div class="transmission-view__actions">
-      <button type="button" class="transmission-view__add" data-test="add" :disabled="busy !== null" @click="addConnection">
+      <button type="button" class="transmission-view__add" data-test="add" :disabled="busy !== null" @click="addOpen = true">
         <i class="ti ti-plus" aria-hidden="true" /> {{ t('settings.transmission.add') }}
       </button>
       <button type="button" class="transmission-view__bulk" data-test="start-all" :disabled="busy !== null || allOnAir" @click="setAll(true)">
@@ -207,7 +213,7 @@ onMounted(() => {
         :notice="notices[card.id] ?? ''"
         @toggle="toggle(card)" @remove="pendingRemoval = card" @reload="reload(card.id)"
         @nickname="setObsNickname(card.id, $event)" @port="changePort(card.id, $event)"
-        @style="changeStyle(card.id, $event)" @qr="(url, title) => (qr = { url, title })" />
+        @style="changeStyle(card.id, $event)" @kind="setObsKind(card.id, $event)" @qr="(url, title) => (qr = { url, title })" />
     </div>
 
     <TransmissionNetworkCard class="transmission-view__section" :locked="onAir.length > 0" @changed="refresh" />
@@ -239,6 +245,7 @@ onMounted(() => {
       :title="t('settings.transmission.removeTitle', { name: pendingRemoval?.name ?? '' })"
       :message="t('settings.transmission.removeMessage')" :confirm-label="t('settings.transmission.removeConfirm')"
       :cancel-label="t('common.cancel')" @cancel="pendingRemoval = null" @confirm="confirmRemoval" />
+    <TransmissionAddDialog :open="addOpen" @cancel="addOpen = false" @confirm="addConnection" />
     <TransmissionQrDialog :url="qr?.url ?? null" :title="qr?.title ?? ''" @close="qr = null" />
   </section>
 </template>

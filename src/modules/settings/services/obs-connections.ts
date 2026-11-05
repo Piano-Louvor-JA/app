@@ -1,6 +1,8 @@
 import { ref } from 'vue'
 
-export type ObsConnection = { id: string; label: string; selected: boolean; nickname?: string }
+/** Conexões adicionais servem a outros dispositivos: espelho da TV ou retorno de palco. */
+export type ObsKind = 'mirror' | 'return'
+export type ObsConnection = { id: string; label: string; selected: boolean; nickname?: string; kind?: ObsKind }
 export type ObsModule = 'bible' | 'clock' | 'timer' | 'countdown' | 'random'
 export const OBS_CONNECTIONS_KEY = 'louvorja-obs-connections-v1'
 /** O servidor principal (slot 0) já tem nome próprio na tela e não recebe apelido. */
@@ -14,7 +16,12 @@ function read(): ObsConnection[] {
       .map((item) => {
         const nickname = typeof item.nickname === 'string' ? item.nickname.trim().slice(0, 60) : ''
         if (nickname && item.id === MAIN_ID) droppedMainNickname = true
-        return { id: item.id, label: item.label, selected: item.selected !== false, ...(nickname && item.id !== MAIN_ID ? { nickname } : {}) }
+        const kind = item.id !== MAIN_ID && (item.kind === 'mirror' || item.kind === 'return') ? item.kind as ObsKind : undefined
+        return {
+          id: item.id, label: item.label, selected: item.selected !== false,
+          ...(nickname && item.id !== MAIN_ID ? { nickname } : {}),
+          ...(kind ? { kind } : {}),
+        }
       })
   } catch { return [] }
 }
@@ -29,9 +36,18 @@ function save() {
   localStorage.setItem(OBS_CONNECTIONS_KEY, JSON.stringify(obsConnections.value))
   notifyObsChanged()
 }
-export function registerObsConnection(id: string, label: string) {
+export function registerObsConnection(id: string, label: string, details?: { nickname?: string; kind?: ObsKind }) {
   if (obsConnections.value.some((item) => item.id === id)) return
-  obsConnections.value = [...obsConnections.value, { id, label, selected: true }]
+  const nickname = details?.nickname?.trim().slice(0, 60)
+  obsConnections.value = [...obsConnections.value, {
+    id, label, selected: true,
+    ...(details ? { ...(nickname ? { nickname } : {}), kind: details.kind ?? 'mirror' } : {}),
+  }]
+  save()
+}
+export function setObsKind(id: string, kind: ObsKind) {
+  if (id === MAIN_ID) return
+  obsConnections.value = obsConnections.value.map((connection) => connection.id === id ? { ...connection, kind } : connection)
   save()
 }
 export function unregisterObsConnection(id: string) {
@@ -71,12 +87,14 @@ export function obsAllowsMirror(id: string, module?: string) {
 
 export function obsConnectionName(connection: { id?: string; label: string; nickname?: string }) {
   if (connection.id === MAIN_ID) return 'OBS'
-  return connection.nickname ? `${connection.label} — ${connection.nickname}` : connection.label
+  return connection.nickname || connection.label
 }
+/** O nome é obrigatório: um nome vazio mantém o anterior. */
 export function setObsNickname(id: string, nickname: string) {
-  if (id === MAIN_ID) return
+  const name = nickname.trim().slice(0, 60)
+  if (id === MAIN_ID || !name) return
   obsConnections.value = obsConnections.value.map((connection) => connection.id === id
-    ? { ...connection, nickname: nickname.trim().slice(0, 60) }
+    ? { ...connection, nickname: name }
     : connection)
   save()
 }
