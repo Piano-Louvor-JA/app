@@ -69,11 +69,11 @@ const cards = (wrapper: Awaited<ReturnType<typeof mountView>>) => wrapper.findAl
 it('lists the main source first through the same card and summarizes what is on air', async () => {
   obsConnections.value = [{ id: '9999', label: 'Antiga', selected: true }]
   const view = await mountView()
-  expect(cards(view).map(card => card.props('connection').name)).toEqual(['Servidor de transmissão', 'Fonte 2'])
+  expect(cards(view).map(card => card.props('connection').name)).toEqual(['OBS', 'Fonte 2'])
   expect(cards(view)[0]!.props('connection')).toMatchObject({ id: '0', httpPort: 7080, running: false })
   const order = [...view.element.querySelectorAll('.transmission-view__cards, .transmission-view__actions, .network-stub')]
     .map(element => element.className.split(' ')[0])
-  expect(order).toEqual(['transmission-view__cards', 'transmission-view__actions', 'network-stub'])
+  expect(order).toEqual(['transmission-view__actions', 'transmission-view__cards', 'network-stub'])
   expect(view.get('.transmission-view__status').text()).toBe('No ar · 3 dispositivos conectados')
   expect(view.get('.transmission-view__summary').text()).toBe('1 de 2 no ar')
   expect(view.findAll('h2').map(title => title.text())).toEqual(['Áudio e comportamento', 'Como usar no OBS'])
@@ -186,7 +186,7 @@ it('adds a numbered connection, starts it and reports failures', async () => {
   expect(session.createSlot).toHaveBeenCalledWith('OBS 3')
   expect(session.startSlot).toHaveBeenCalledWith('7084')
   expect(session.warmupObs).toHaveBeenCalledWith('7084')
-  expect(cards(view).map(card => card.props('connection').name)).toEqual(['Servidor de transmissão', 'Fonte 2', 'Fonte 3'])
+  expect(cards(view).map(card => card.props('connection').name)).toEqual(['OBS', 'Fonte 2', 'Fonte 3'])
   obsConnections.value = obsConnections.value.map(item => item.id === '7084' ? { ...item, label: 'Telão' } : item)
   session.createSlot.mockResolvedValueOnce({ id: '7086', label: 'OBS 3', httpPort: 7086, wsPort: 7087 })
   session.startSlot.mockResolvedValueOnce(false)

@@ -370,7 +370,7 @@ export default {
       startAll: 'Start all',
       stopAll: 'Stop all',
       source: 'Source {n}',
-      mainSource: 'Streaming server',
+      mainSource: 'OBS',
       nickname: 'Add nickname',
       nicknameLabel: 'Nickname for {name}',
       start: 'Start',
@@ -453,7 +453,7 @@ export default {
       },
       howTo: {
         title: 'How to use in OBS',
-        step1: 'Start a connection and copy the “OBS caption” link.',
+        step1: 'Start the OBS connection and copy the “OBS caption” link.',
         step2: 'In OBS: Sources → + → Browser. Paste the link into URL, width 1920 and height 1080.',
         step3: 'Project as usual. The text shows up in OBS and appearance changes apply right away, without pasting the link again.',
         step4: 'For TVs and browsers, use the “Stage mirror”, which includes video and audio.',

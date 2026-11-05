@@ -377,7 +377,7 @@ export default {
       startAll: 'Iniciar todas',
       stopAll: 'Encerrar todas',
       source: 'Fonte {n}',
-      mainSource: 'Servidor de transmissão',
+      mainSource: 'OBS',
       nickname: 'Adicionar apelido',
       nicknameLabel: 'Apelido de {name}',
       start: 'Iniciar',
@@ -460,7 +460,7 @@ export default {
       },
       howTo: {
         title: 'Como usar no OBS',
-        step1: 'Inicie uma conexão e copie o link “Legenda para OBS”.',
+        step1: 'Inicie a conexão OBS e copie o link “Legenda para OBS”.',
         step2: 'No OBS: Fontes → + → Navegador. Cole o link em URL, com largura 1920 e altura 1080.',
         step3: 'Projete normalmente. O texto aparece no OBS e a aparência muda na hora, sem recolar o link.',
         step4: 'Para TVs e navegadores, use o “Espelho do Palco”, que inclui vídeo e áudio.',

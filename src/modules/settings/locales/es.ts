@@ -372,7 +372,7 @@ export default {
       startAll: 'Iniciar todas',
       stopAll: 'Detener todas',
       source: 'Fuente {n}',
-      mainSource: 'Servidor de transmisión',
+      mainSource: 'OBS',
       nickname: 'Agregar apodo',
       nicknameLabel: 'Apodo de {name}',
       start: 'Iniciar',
@@ -455,7 +455,7 @@ export default {
       },
       howTo: {
         title: 'Cómo usar en OBS',
-        step1: 'Inicia una conexión y copia el enlace “Subtítulo para OBS”.',
+        step1: 'Inicia la conexión OBS y copia el enlace “Subtítulo para OBS”.',
         step2: 'En OBS: Fuentes → + → Navegador. Pega el enlace en URL, con ancho 1920 y alto 1080.',
         step3: 'Proyecta como siempre. El texto aparece en OBS y la apariencia cambia al instante, sin volver a pegar el enlace.',
         step4: 'Para TVs y navegadores, usa el “Espejo del Palco”, que incluye video y audio.',

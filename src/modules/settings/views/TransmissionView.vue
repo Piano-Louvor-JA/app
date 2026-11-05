@@ -190,14 +190,6 @@ onMounted(() => {
 
     <p v-if="pageError" class="transmission-view__error" role="alert">{{ pageError }}</p>
 
-    <div class="transmission-view__cards">
-      <TransmissionConnectionCard v-for="card in cards" :key="card.id" :connection="card" :busy="busy !== null"
-        :notice="notices[card.id] ?? ''"
-        @toggle="toggle(card)" @remove="pendingRemoval = card" @reload="reload(card.id)"
-        @nickname="setObsNickname(card.id, $event)" @port="changePort(card.id, $event)"
-        @style="changeStyle(card.id, $event)" @qr="(url, title) => (qr = { url, title })" />
-    </div>
-
     <div class="transmission-view__actions">
       <button type="button" class="transmission-view__add" data-test="add" :disabled="busy !== null" @click="addConnection">
         <i class="ti ti-plus" aria-hidden="true" /> {{ t('settings.transmission.add') }}
@@ -208,6 +200,14 @@ onMounted(() => {
       <button type="button" class="transmission-view__bulk transmission-view__bulk--stop" data-test="stop-all" :disabled="busy !== null || !onAir.length" @click="setAll(false)">
         <i class="ti ti-player-stop" aria-hidden="true" /> {{ t('settings.transmission.stopAll') }}
       </button>
+    </div>
+
+    <div class="transmission-view__cards">
+      <TransmissionConnectionCard v-for="card in cards" :key="card.id" :connection="card" :busy="busy !== null"
+        :notice="notices[card.id] ?? ''"
+        @toggle="toggle(card)" @remove="pendingRemoval = card" @reload="reload(card.id)"
+        @nickname="setObsNickname(card.id, $event)" @port="changePort(card.id, $event)"
+        @style="changeStyle(card.id, $event)" @qr="(url, title) => (qr = { url, title })" />
     </div>
 
     <TransmissionNetworkCard class="transmission-view__section" :locked="onAir.length > 0" @changed="refresh" />
