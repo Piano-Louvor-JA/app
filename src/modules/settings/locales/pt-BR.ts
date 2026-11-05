@@ -1,19 +1,5 @@
 export default {
   settings: {
-    outputs: {
-      title: 'Saídas — conteúdo por tela',
-      hint: 'Escolha o conteúdo de cada saída. "Espelhar" segue a projeção principal.',
-      monitor: 'Monitor',
-      tvConnected: 'TV conectada',
-      tvOffline: 'TV offline',
-      mirror: 'Espelhar projeção',
-      bible: 'Bíblia',
-      media: 'Hinos / Mídia',
-      video: 'Vídeo',
-      pdf: 'PDF',
-      ppt: 'Apresentação',
-      assign: 'Conteúdo da saída {output}',
-    },
     title: 'Configurações',
     sectionTitle: {
       transmission: 'Transmissão',
@@ -377,17 +363,8 @@ export default {
       tv: 'TV',
       tvs: 'TVs do Palco',
       mainTv: 'TV principal',
-      tvsHint: 'Cadastre TVs e escolha onde cada módulo projeta.',
-      addTv: 'Adicionar TV',
-      selected: 'selecionada',
-      start: 'Ligar',
-      stop: 'Desligar',
-      removeTv: 'Remover TV',
-      moduleHint: 'Nos módulos, escolha Espelhar (todas) ou uma TV individual.',
       route: 'Destino do palco',
       mirror: 'Espelhar todas',
-      obsCopy: 'Copiar URL do OBS',
-      obsHint: 'No OBS: Fontes → + → Navegador → cole esta URL (1920x1080).',
       connectedShort: 'TV online',
     },
     transmission: {
