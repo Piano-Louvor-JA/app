@@ -151,14 +151,18 @@ const previewVars = computed(() => ({
   }
 
   &__card {
-    padding: 0.5rem 0.7rem;
-    border-radius: 0.45rem;
-    background: rgb(10 10 10 / 0.72);
+    align-self: center;
+    max-width: 100%;
+    padding: 0.3rem 0.75rem;
+    border-radius: 0.4rem;
+    background: rgb(10 10 12 / 0.6);
+    box-shadow: 0 0 0.8rem 0.1rem rgb(10 10 12 / 0.35);
     color: #fff;
+    text-align: center;
 
-    [data-theme='light'] & { background: #fff; color: #111; }
-    [data-theme='transparent'] & { background: none; text-shadow: 0 1px 4px rgb(0 0 0 / 0.85); }
-    [data-layout='fullscreen'] & { background: none; }
+    [data-theme='light'] & { background: rgb(255 255 255 / 0.82); box-shadow: 0 0 0.8rem 0.1rem rgb(255 255 255 / 0.3); color: #111; }
+    [data-theme='transparent'] & { background: rgb(0 0 0 / 0.35); box-shadow: 0 0 0.8rem 0.15rem rgb(0 0 0 / 0.25); text-shadow: 0 1px 3px rgb(0 0 0 / 0.85); }
+    [data-layout='fullscreen'][data-theme='dark'] & { background: rgb(0 0 0 / 0.5); }
   }
 
   &__text { margin: 0; font-size: calc(var(--preview-base) * var(--preview-scale)); font-weight: 600; line-height: 1.3; }
@@ -166,6 +170,7 @@ const previewVars = computed(() => ({
   &__reference {
     margin: 0.3rem 0 0;
     color: var(--preview-accent);
+    text-align: right;
     font-size: calc(var(--preview-base) * var(--preview-scale) * 0.7);
 
     [data-theme='light'] & { filter: brightness(0.7); }

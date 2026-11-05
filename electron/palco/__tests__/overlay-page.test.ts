@@ -70,6 +70,29 @@ describe('overlay page', () => {
     } finally { await slot.dispose() }
   }, 30000)
 
+  it('wraps the lyrics in a soft band that hugs the text in every theme', async () => {
+    const slot = new PalcoSlot('band', 'Band', await freePort(), await freePort(), () => null)
+    try {
+      await slot.start()
+      const page = await openOverlay(slot)
+      slot.send({ v: 2, type: 'projection', scope: 'hymns', text: 'Toda tribo e nação' })
+      await expect.poll(() => cardVisible(page)).toBe(true)
+      for (const layout of ['lower-third', 'fullscreen']) {
+        for (const theme of ['dark', 'light', 'transparent']) {
+          slot.setOverlay({ layout, theme })
+          await page.waitForFunction(([l, t]) => document.body.dataset.layout === l && document.body.dataset.theme === t, [layout, theme])
+          const band = await page.locator('#card').evaluate((card) => {
+            const alpha = /rgba?\(([^)]+)\)/.exec(getComputedStyle(card).backgroundColor)?.[1].split(',')[3]
+            return { width: card.getBoundingClientRect().width, alpha: alpha === undefined ? 1 : Number(alpha) }
+          })
+          expect(band.width, `${layout}/${theme}`).toBeLessThan(1280 * 0.6)
+          expect(band.alpha, `${layout}/${theme}`).toBeGreaterThan(0.2)
+          expect(band.alpha, `${layout}/${theme}`).toBeLessThan(0.9)
+        }
+      }
+    } finally { await slot.dispose() }
+  }, 30000)
+
   it('shows the Bible reference only while the heading is enabled and highlights covers', async () => {
     const slot = new PalcoSlot('bible', 'Bible', await freePort(), await freePort(), () => null)
     try {

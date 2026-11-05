@@ -27,8 +27,10 @@
     object-fit: cover; opacity: 0; transition: opacity 400ms ease;
   }
   #backdrop.is-shown { opacity: 1; }
+  /* Faixa suave que abraça a letra (não ocupa a largura toda). */
   #card {
-    position: relative; display: flex; flex-direction: column; gap: 0.6em;
+    position: relative; display: flex; flex-direction: column; gap: 0.4em;
+    width: fit-content; max-width: 100%;
     opacity: 0; transform: translateY(0.6vw);
     transition: opacity var(--overlay-fade-out) ease, transform var(--overlay-fade-out) ease;
     text-align: center; overflow: hidden;
@@ -54,8 +56,8 @@
   body[data-layout="lower-third"] #stage { align-items: flex-end; padding: 0 4vw 4.5vh; }
   body[data-layout="lower-third"][data-position="top"] #stage { align-items: flex-start; padding: 4.5vh 4vw 0; }
   body[data-layout="lower-third"] #card {
-    width: min(88vw, 1600px); max-height: 40vh;
-    padding: 1.1vw 2.2vw; border-radius: 1.1vw;
+    max-width: min(88vw, 1600px); max-height: 40vh;
+    padding: 0.35em 1em; border-radius: 0.45em;
     font-size: calc(2.5vw * var(--overlay-scale));
   }
   body[data-layout="lower-third"] #backdrop { display: none; }
@@ -63,7 +65,7 @@
   /* Tela cheia: texto centralizado; fundo do slide nos temas com cartão. */
   body[data-layout="fullscreen"] #stage { align-items: center; padding: 6vh 6vw; }
   body[data-layout="fullscreen"] #card {
-    width: 100%; max-height: 88vh; padding: 2.4vw 3vw; border-radius: 1.4vw;
+    max-height: 88vh; padding: 0.4em 1em; border-radius: 0.4em;
     font-size: calc(4.2vw * var(--overlay-scale));
   }
   body[data-layout="fullscreen"][data-theme="dark"] { background: #000; }
@@ -71,16 +73,16 @@
   body[data-layout="fullscreen"][data-theme="transparent"] #backdrop { display: none; }
 
   /* Temas */
-  body[data-theme="dark"] #card { background: rgba(12, 12, 14, 0.8); box-shadow: 0 0.6vw 2vw rgba(0, 0, 0, 0.45); backdrop-filter: blur(10px); }
-  body[data-theme="light"] #card { background: rgba(255, 255, 255, 0.94); color: #151515; box-shadow: 0 0.6vw 2vw rgba(0, 0, 0, 0.25); }
+  body[data-theme="dark"] #card { background: rgba(10, 10, 12, 0.6); box-shadow: 0 0 1.4em 0.2em rgba(10, 10, 12, 0.35); backdrop-filter: blur(6px); }
+  body[data-theme="light"] #card { background: rgba(255, 255, 255, 0.82); color: #151515; box-shadow: 0 0 1.4em 0.2em rgba(255, 255, 255, 0.3); }
   body[data-theme="light"] #reference,
   body[data-theme="light"] #card.is-cover #content { filter: brightness(0.7); }
-  body[data-theme="transparent"] #card { background: none; }
+  body[data-theme="transparent"] #card { background: rgba(0, 0, 0, 0.35); box-shadow: 0 0 1.4em 0.3em rgba(0, 0, 0, 0.25); }
   body[data-theme="transparent"] #content,
   body[data-theme="transparent"] #reference {
-    text-shadow: 0 0 0.12em #000, 0 0 0.12em #000, 0.04em 0.06em 0.18em rgba(0, 0, 0, 0.9);
+    text-shadow: 0 0.04em 0.14em rgba(0, 0, 0, 0.85);
   }
-  body[data-layout="fullscreen"][data-theme="dark"] #card { background: rgba(0, 0, 0, 0.45); }
+  body[data-layout="fullscreen"][data-theme="dark"] #card { background: rgba(0, 0, 0, 0.5); }
 
   #badge {
     position: fixed; left: 50%; bottom: 6vh; transform: translateX(-50%);
