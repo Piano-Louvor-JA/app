@@ -303,6 +303,27 @@ describe('manifestDigestOf — digest canônico (ADR-09)', () => {
     const e2: Entry[] = [entry('pt_musics.json'), entry('config.json')]
     expect(await digestOfEntries(e1)).toBe(await digestOfEntries(e2))
   })
+
+  it('desempate por comprimento/comum-prefixo: pt_hymnal < pt_hymnal_1, music_1 < music_10', async () => {
+    // Pares com prefixo comum exercitam o tie-break do comparador
+    // byte-a-byte ('\t' 0x09 < '_' 0x5f; e o desempate de comprimento).
+    const entries: Entry[] = [
+      entry('pt_hymnal.json', 'a'.repeat(32)),
+      entry('pt_hymnal_1.json', 'b'.repeat(32)),
+      entry('music_1.json', 'c'.repeat(32)),
+      entry('music_10.json', 'd'.repeat(32)),
+    ]
+    const { createHash } = await import('node:crypto')
+    const canonical =
+      `music_1.json\tc${'c'.repeat(31)}\n` +
+      `music_10.json\td${'d'.repeat(31)}\n` +
+      `pt_hymnal.json\ta${'a'.repeat(31)}\n` +
+      `pt_hymnal_1.json\tb${'b'.repeat(31)}\n`
+    const expected = createHash('sha256').update(canonical).digest('hex')
+    const subset = parseManifest(entries, 'catalog')
+    expect(subset).not.toBeNull()
+    expect(await manifestDigestOf(subset!)).toBe(expected)
+  })
 })
 
 describe('syncBundle — warm gate digest (RF-20)', () => {
@@ -517,6 +538,25 @@ describe('syncBundle — integridade entry-wise do ZIP (ADR-10/RF-21)', () => {
     expect(await syncBundle('catalog')).toBeNull()
   })
 
+  it.each([
+    ['caminho absoluto /etc/x.json', '/etc/x.json'],
+    ['backslash a\\\\b.json', 'a\\b.json'],
+    ['entrada não-json (sem .json)', 'notjson'],
+  ])('ZIP com entrada insegura (%s) => null', async (_label, evilName) => {
+    const { zipSync, strToU8 } = await import('fflate')
+    const zip = zipSync({
+      '_bundle_manifest.json': strToU8(
+        JSON.stringify({ schema_version: 1, kind: 'catalog', files: [] }),
+      ),
+      [evilName]: strToU8('{}'),
+    })
+    mocks.state.fetch
+      .mockResolvedValueOnce(manifestResponse(catalogManifest()))
+      .mockResolvedValueOnce(zipResponse(zip))
+    expect(await syncBundle('catalog')).toBeNull()
+    expect(mocks.state.applyRecords).not.toHaveBeenCalled()
+  })
+
   it('ZIP sem _bundle_manifest.json => null', async () => {
     const { zipSync, strToU8 } = await import('fflate')
     const zip = zipSync({ 'pt_musics.json': strToU8('[]') })
@@ -568,6 +608,51 @@ describe('syncBundle — integridade entry-wise do ZIP (ADR-10/RF-21)', () => {
       .mockResolvedValueOnce(manifestResponse(catalogManifest()))
       .mockResolvedValueOnce(zipResponse(zip))
     expect(await syncBundle('catalog')).toBeNull()
+  })
+
+  it.each([
+    ['sem pt_categories', { pt_musics: [], config: {}, music_1: {} }],
+    ['sem pt_musics', { pt_categories: [], config: {}, music_1: {} }],
+    ['sem config', { pt_categories: [], pt_musics: [], music_1: {} }],
+  ])('catalog ZIP incompleto (%s) => null, nada aplicado', async (_label, files) => {
+    const zip = await makeZip(files)
+    mocks.state.fetch
+      .mockResolvedValueOnce(manifestResponse(catalogManifest()))
+      .mockResolvedValueOnce(zipResponse(zip))
+    expect(await syncBundle('catalog')).toBeNull()
+    expect(mocks.state.applyRecords).not.toHaveBeenCalled()
+  })
+
+  it('manifest responde 500 (não-ok) => null sem GET de ZIP', async () => {
+    mocks.state.fetch.mockResolvedValueOnce(new Response('boom', { status: 500 }))
+    expect(await syncBundle('catalog')).toBeNull()
+    expect(mocks.state.fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('ZIP responde 503 (não-ok) => null', async () => {
+    const { zip, entries } = await makeBundle({
+      pt_categories: [],
+      pt_musics: [],
+      config: {},
+      music_1: {},
+    })
+    mocks.state.fetch
+      .mockResolvedValueOnce(manifestResponse(entries))
+      .mockResolvedValueOnce(new Response('unavailable', { status: 503 }))
+    expect(await syncBundle('catalog')).toBeNull()
+    expect(mocks.state.applyRecords).not.toHaveBeenCalled()
+  })
+
+  it('ZIP fetch lança (rede) => null', async () => {
+    mocks.state.fetch
+      .mockResolvedValueOnce(manifestResponse(catalogManifest()))
+      .mockRejectedValueOnce(new Error('network down'))
+    expect(await syncBundle('catalog')).toBeNull()
+  })
+
+  it('manifest fetch lança (rede) => null', async () => {
+    mocks.state.fetch.mockRejectedValueOnce(new Error('dns fail'))
+    expect(await syncBundle('bible')).toBeNull()
   })
 
   it('bible bundle aplica capítulos (subset real de 3 segmentos)', async () => {
