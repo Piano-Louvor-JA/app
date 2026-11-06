@@ -17,6 +17,18 @@ export type WorkspaceApi = {
   clear: (options?: { preserveMedia?: boolean }) => Promise<boolean>
 }
 
+/** Download em background (fila no MAIN, T1/T2 — Provai e Vede). */
+export type DownloadBatchApi = {
+  enqueue: (items: Array<{ id: string, url: string, fileName: string }>) => Promise<{ ok: boolean }>
+  cancel: (id: string) => Promise<{ ok: boolean }>
+  retry: (id: string) => Promise<{ ok: boolean }>
+  pending: () => Promise<Array<{ id: string, fileName: string, status: string }>>
+  onProgress: (cb: (p: { done: number, total: number, current: { id: string, fileName: string, receivedBytes: number, totalBytes: number } | null }) => void) => () => void
+  onItemDone: (cb: (p: { id: string, fileName: string, filePath: string }) => void) => () => void
+  onItemFailed: (cb: (p: { id: string, fileName: string, reason: string }) => void) => () => void
+  onBatchDone: (cb: (p: { done: number, failed: number, total: number }) => void) => () => void
+}
+
 /** Bíblia offline: bundles `<versionId>.json.gz` (download > instalador). */
 export type BibleApi = {
   getChapter: (
@@ -495,6 +507,7 @@ export type LouvorJaBridge = {
   window?: WindowApi
   zoom?: ZoomApi
   workspace: WorkspaceApi
+  downloadBatch?: DownloadBatchApi
   catalog: CatalogApi
   bible?: BibleApi
   classo?: ClassoApi

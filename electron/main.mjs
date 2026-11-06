@@ -16,6 +16,7 @@ import { configureUserDataPath } from "./user-data-path.mjs";
 import { checkEulaAcceptance } from "./eula.mjs";
 import { resolveAppLocale } from "./locale.mjs";
 import { registerWorkspaceIpc } from "./ipc/register.mjs";
+import { registerDownloadBatchIpc } from "./ipc/download-batch-ipc.mjs";
 import { registerDiagnosticsIpc, setClockSkewProvider, setDiagnosticsToken } from "./diagnostics.mjs";
 import { createMainLogger } from "./main-log.mjs";
 import { attachHistoryAppCommand, attachWindowStateEvents, mainWindowChromeOptions, registerWindowIpc } from "./ipc/window.mjs";
@@ -927,6 +928,7 @@ app.whenReady().then(async () => {
 		});
 		mainLog.info('diagnostics IPC handlers registered');
 		registerWindowIpc(() => mainWindow);
+		registerDownloadBatchIpc(() => mainWindow);
 		registerLocalFileProtocol();
 		registerYoutubeEmbedHeaders();
 		registerYoutubeAuthIpc();

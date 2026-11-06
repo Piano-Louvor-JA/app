@@ -148,6 +148,34 @@ contextBridge.exposeInMainWorld('louvorja', {
     clear: (options) => ipcRenderer.invoke('workspace:clear', options),
   },
 
+  // Download em background (Provai e Vede): fila no MAIN, eventos de progresso.
+  downloadBatch: {
+    enqueue: (items) => ipcRenderer.invoke('download-batch:enqueue', items),
+    cancel: (id) => ipcRenderer.invoke('download-batch:cancel', id),
+    retry: (id) => ipcRenderer.invoke('download-batch:retry', id),
+    pending: () => ipcRenderer.invoke('download-batch:pending'),
+    onProgress: (cb) => {
+      const handler = (_e, payload) => cb(payload)
+      ipcRenderer.on('download-progress', handler)
+      return () => ipcRenderer.removeListener('download-progress', handler)
+    },
+    onItemDone: (cb) => {
+      const handler = (_e, payload) => cb(payload)
+      ipcRenderer.on('download-item-done', handler)
+      return () => ipcRenderer.removeListener('download-item-done', handler)
+    },
+    onItemFailed: (cb) => {
+      const handler = (_e, payload) => cb(payload)
+      ipcRenderer.on('download-item-failed', handler)
+      return () => ipcRenderer.removeListener('download-item-failed', handler)
+    },
+    onBatchDone: (cb) => {
+      const handler = (_e, payload) => cb(payload)
+      ipcRenderer.on('download-batch-done', handler)
+      return () => ipcRenderer.removeListener('download-batch-done', handler)
+    },
+  },
+
   bible: {
     getChapter: (versionId, bookId, chapter) =>
       ipcRenderer.invoke('bible:get-chapter', versionId, bookId, chapter),
