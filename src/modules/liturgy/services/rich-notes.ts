@@ -101,7 +101,17 @@ function parse(html: string): Document | null {
 /** Texto puro do HTML das notas: blocos e `<br>` viram quebras de linha, listas ganham marcador. */
 export function notesHtmlToPlainText(html: string): string {
   const doc = parse(html)
-  const raw = doc ? textOf(doc.body) : html.replace(/<[^>]*>/g, '')
+  // Sem parser, remova os delimitadores numa só passagem, inclusive tags incompletas.
+  let fallback = ''
+  let insideTag = false
+  if (!doc) {
+    for (const char of html) {
+      if (char === '<') insideTag = true
+      else if (char === '>' && insideTag) insideTag = false
+      else if (!insideTag) fallback += char
+    }
+  }
+  const raw = doc ? textOf(doc.body) : fallback
   return raw
     .replace(/\u00a0/g, ' ')
     .split('\n')

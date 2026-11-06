@@ -18,7 +18,10 @@ export type LinkInfoDeps = {
 }
 
 const NOTES_EXCERPT_MAX = 300
-const LINK_OR_TAGS_LINE = /^(https?:\/\/\S+|(#\S+\s*)+)$/i
+function isLinkOrTagsLine(line: string): boolean {
+  if (/^https?:\/\/\S+$/i.test(line)) return true
+  return line.split(/\s+/).every((token) => token.startsWith('#') && token.length > 1)
+}
 
 function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
@@ -80,7 +83,7 @@ export function descriptionExcerpt(description: string, max = NOTES_EXCERPT_MAX)
   const joined = description
     .split(/\r?\n/)
     .map((line) => line.trim())
-    .filter((line) => line && !LINK_OR_TAGS_LINE.test(line))
+    .filter((line) => line && !isLinkOrTagsLine(line))
     .join('\n')
   if (joined.length <= max) return joined
   const cut = joined.slice(0, max - 1)

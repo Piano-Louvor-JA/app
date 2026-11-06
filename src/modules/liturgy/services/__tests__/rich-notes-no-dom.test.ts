@@ -8,6 +8,10 @@ describe('notas formatadas fora do navegador', () => {
     expect(sanitizeNotesHtml('<b>Oi</b>')).toBe('')
   })
 
+  it('remove tags incompletas sem DOM', () => {
+    expect(notesHtmlToPlainText('<script')).not.toContain('<')
+  })
+
   it('texto puro ainda sai, sem as tags', () => {
     expect(notesHtmlToPlainText('<b>Oi</b> mundo')).toBe('Oi mundo')
   })

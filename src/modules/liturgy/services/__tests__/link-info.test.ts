@@ -105,6 +105,11 @@ describe('fetchSiteLinkInfo', () => {
 })
 
 describe('anotações do link', () => {
+  it('trata linhas longas e ambíguas de hashtags em tempo linear', () => {
+    expect(descriptionExcerpt('#' + '!#'.repeat(100_000), 20)).toBe('')
+    expect(descriptionExcerpt('#hino texto')).toBe('#hino texto')
+    expect(descriptionExcerpt('#')).toBe('#')
+  })
   it('trecho da descrição: tira linhas de link e hashtags, corta em palavra inteira', () => {
     expect(descriptionExcerpt('Linha 1\n\nhttps://x.com/a\n#hino #louvor\n  Linha 2  ')).toBe('Linha 1\nLinha 2')
     expect(descriptionExcerpt('')).toBe('')
