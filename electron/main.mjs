@@ -35,7 +35,7 @@ import { registerYoutubeEmbedHeaders } from "./youtube-embed.mjs";
 import { registerYoutubeAuthIpc } from "./youtube-auth.mjs";
 import { registerYoutubeInfoIpc } from "./youtube-info.mjs";
 import { registerSiteInfoIpc } from "./site-info.mjs";
-import { registerAdblockerIpc } from "./youtube-adblock.mjs";
+import { adblockEnabledFromRecord, registerAdblockerIpc } from "./youtube-adblock.mjs";
 import { readWorkspaceRecord, writeWorkspaceRecord } from "./workspace.mjs";
 import { registerTunnelCorpBypass } from "./tunnel-corp-bypass.mjs";
 import {
@@ -663,6 +663,11 @@ function attachProjectionWindowHandlers(parentWindow) {
             parentWindow.webContents.send('projection:close-requested')
             return
           }
+          // Esc + Enter: o operador só encerra se o confirm estiver aberto.
+          if (input.key === 'Enter' && !independent) {
+            parentWindow.webContents.send('projection:confirm-close-requested')
+            return
+          }
           const childUrl = childWindow.webContents.getURL()
           const isMediaProjection =
             /[?&#]module=media(?:&|$)/.test(childUrl) ||
@@ -929,13 +934,10 @@ app.whenReady().then(async () => {
 		registerYoutubeAuthIpc();
 		registerYoutubeInfoIpc(ipcMain, { fetch: (url, init) => net.fetch(url, init) });
 		registerSiteInfoIpc(ipcMain, { fetch: (url, init) => net.fetch(url, init) });
-		// adblock YouTube (opt-in): estado persistido em workspace record
+		// adblock YouTube (ligado por padrão): estado persistido em workspace record
 		registerAdblockerIpc(
 			(enabled) => writeWorkspaceRecord("yt-adblock.json", { enabled }),
-			() => {
-				const rec = readWorkspaceRecord("yt-adblock.json");
-				return rec?.enabled === true;
-			},
+			() => adblockEnabledFromRecord(readWorkspaceRecord("yt-adblock.json")),
 		);
 		registerTunnelCorpBypass();
 		createWindow(locale);

@@ -12,6 +12,7 @@ export default {
 		saveCopy: "Save copy",
 		copySaved: "Copy saved to My Collections",
 		copyFailed: "Could not save the copy.",
+		conductLink: "Code of Conduct",
 		ranking: "View ranking",
 		createCollection: "Create collection",
 		pagination: "Community pagination",

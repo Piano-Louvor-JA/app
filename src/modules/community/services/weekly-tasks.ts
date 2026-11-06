@@ -4,7 +4,7 @@
  * Bônus: +15 por tarefa, 1x por usuário×tarefa×semana (idempotente no servidor).
  */
 
-import { getAuthSession, saveSession } from "@modules/media/services/auth-client";
+import { authTokenAsync, saveSession } from "@modules/media/services/auth-client";
 import { communityBaseUrl, communityRequest } from "./community-http";
 
 export type WeeklyTask = {
@@ -14,13 +14,13 @@ export type WeeklyTask = {
 	bonus: number;
 };
 
-function token(): string | null {
-	return getAuthSession()?.token ?? null;
+async function token(): Promise<string | null> {
+	return authTokenAsync();
 }
 
 /** Tarefas da semana do usuário. Sem sessão/falha → null. */
 export async function getWeeklyTasks(): Promise<WeeklyTask[] | null> {
-	const t = token();
+	const t = await token();
 	if (!t) return null;
 	try {
 		const response = await fetch(
@@ -43,7 +43,7 @@ export async function getWeeklyTasks(): Promise<WeeklyTask[] | null> {
 
 /** Marca tarefa como concluída. Retorna true se o bônus foi creditado agora. */
 export async function completeWeeklyTask(taskId: string): Promise<boolean> {
-	const t = token();
+	const t = await token();
 	if (!t) return false;
 	try {
 		const response = await fetch(

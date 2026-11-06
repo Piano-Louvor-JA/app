@@ -38,6 +38,7 @@ vi.mock("../../services/ranking", () => ({
 }));
 vi.mock("@modules/media/services/auth-client", () => ({
 	getAuthSession: mocks.getSession,
+	authTokenAsync: async () => mocks.getSession()?.token ?? null,
 }));
 vi.mock("@design-system/index", () => ({
 	GlassCard: {
