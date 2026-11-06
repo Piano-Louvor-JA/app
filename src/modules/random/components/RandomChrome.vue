@@ -123,7 +123,7 @@ async function onOpenRandom() {
       :title="t('random.chromeDragHint')"
       @dblclick="resetPosition"
     >
-      <MiniPlayerCloseButton :label="t('random.title')" @close="onCloseChrome" />
+      <MiniPlayerCloseButton v-if="!onRandomRoute" :label="t('random.title')" @close="onCloseChrome" />
       <span
         class="random-chrome__display"
         :class="{

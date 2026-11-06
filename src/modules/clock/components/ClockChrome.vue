@@ -111,7 +111,7 @@ async function onOpenClock() {
       :title="t('clock.chromeDragHint')"
       @dblclick="resetPosition"
     >
-      <MiniPlayerCloseButton :label="t('clock.title')" @close="onCloseChrome" />
+      <MiniPlayerCloseButton v-if="!onClockRoute" :label="t('clock.title')" @close="onCloseChrome" />
       <ClockPreview
         :config="effectiveConfig"
         :stage="stage"
