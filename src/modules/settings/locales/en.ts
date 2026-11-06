@@ -108,9 +108,9 @@ export default {
       logout: 'Sign out',
       notPremiumHint:
         'This account has no YouTube Premium. Consider subscribing for ad-free videos, or enable the experimental blocker below.',
-      adblock: 'Reduce ads (experimental)',
+      adblock: 'Block YouTube ads',
       adblockHint:
-        'Blocks ads in the YouTube player for accounts without Premium. May break when YouTube changes its player; signing in with Premium is the recommended path.',
+        'Skips video ads (no picture or sound on the projection) and hides player banners for accounts without Premium. May break when YouTube changes its player; signing in with Premium is the recommended path.',
       desktopOnly: 'Available on the desktop application only.',
     },
     placeholder: {

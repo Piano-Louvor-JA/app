@@ -108,9 +108,9 @@ export default {
       logout: 'Cerrar sesión',
       notPremiumHint:
         'Esta cuenta no tiene YouTube Premium. Considera suscribirte para videos sin anuncios, o activa el bloqueador experimental abajo.',
-      adblock: 'Reducir anuncios (experimental)',
+      adblock: 'Bloquear anuncios de YouTube',
       adblockHint:
-        'Bloquea anuncios del reproductor de YouTube para cuentas sin Premium. Puede fallar cuando YouTube cambia su reproductor; iniciar sesión con Premium es el camino recomendado.',
+        'Salta los anuncios en video (sin imagen ni sonido en la proyección) y oculta los banners del reproductor, para cuentas sin Premium. Puede fallar cuando YouTube cambia su reproductor; iniciar sesión con Premium es el camino recomendado.',
       desktopOnly: 'Disponible solo en la aplicación de escritorio.',
     },
     placeholder: {
