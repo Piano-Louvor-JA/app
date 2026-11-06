@@ -5,7 +5,7 @@
 // - Rename atômico .part → final ao concluir (nunca arquivo parcial válido).
 // - Eventos no webContents do renderer: download-progress, download-item-done,
 //   download-item-failed, download-item-cancelled, download-batch-done.
-import { mkdirSync, readFileSync, renameSync, writeFileSync, statSync, openSync, writeSync, closeSync, unlinkSync } from 'node:fs'
+import { mkdirSync, readFileSync, renameSync, writeFileSync, statSync, fstatSync, ftruncateSync, constants, openSync, writeSync, closeSync, unlinkSync } from 'node:fs'
 import path from 'node:path'
 import { net } from 'electron'
 
@@ -128,13 +128,6 @@ export function createDownloadBatch({ mediaDir, queuePath, sender, fetch, retrie
     }
 
     const partPath = `${finalPath}.part`
-    let startByte = 0
-    try {
-      startByte = statSync(partPath).size
-    } catch {
-      startByte = 0
-    }
-
     let lastError = null
     for (let attempt = 1; attempt <= retries; attempt += 1) {
       if (cancelledIds.has(item.id)) {
@@ -142,7 +135,12 @@ export function createDownloadBatch({ mediaDir, queuePath, sender, fetch, retrie
         progress()
         return
       }
+      let fd
       try {
+        // O mesmo descritor fornece o tamanho do Range e recebe a escrita.
+        // Não siga links no .part: um download não pode alterar outro arquivo.
+        fd = openSync(partPath, constants.O_CREAT | constants.O_RDWR | constants.O_APPEND | (constants.O_NOFOLLOW || 0), 0o600)
+        let startByte = fstatSync(fd).size
         item.status = 'active'
         item.attempts = attempt
         progress()
@@ -155,7 +153,6 @@ export function createDownloadBatch({ mediaDir, queuePath, sender, fetch, retrie
         // 206 = Range atendido: appenda no .part. 200 = servidor ignorou Range
         // (proxy/CDN sem suporte): fallback seguro — recomeça do zero (PLAN, riscos).
         const mode = startByte > 0 && response.status === 206 ? 'append' : 'truncate'
-        if (mode === 'truncate') startByte = 0
 
         const buffer = Buffer.from(await response.arrayBuffer())
         if (cancelledIds.has(item.id)) {
@@ -163,15 +160,13 @@ export function createDownloadBatch({ mediaDir, queuePath, sender, fetch, retrie
           progress()
           return
         }
-        // Escrita via fd único (CodeQL js/file-system-race): o fd é resolvido
-        // UMA vez por tentativa; writes não re-resolvem o path, logo não há
-        // janela check-then-act. Truncate = 'w' (recria); append = 'a'.
-        const fd = openSync(partPath, mode === 'append' ? 'a' : 'w', 0o600)
-        try {
-          writeSync(fd, buffer)
-        } finally {
-          closeSync(fd)
+        if (mode === 'truncate') {
+          ftruncateSync(fd, 0)
+          startByte = 0
         }
+        writeSync(fd, buffer)
+        closeSync(fd)
+        fd = undefined
         startByte += buffer.length
         item.receivedBytes = startByte
 
@@ -181,6 +176,8 @@ export function createDownloadBatch({ mediaDir, queuePath, sender, fetch, retrie
       } catch (error) {
         lastError = error
         // Mantém .part pro próximo retry/boot retomar com Range.
+      } finally {
+        if (fd !== undefined) closeSync(fd)
       }
     }
     notifyFailed(item, lastError ? String(lastError.message || lastError) : 'unknown')

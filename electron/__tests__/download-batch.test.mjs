@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { EventEmitter } from 'node:events'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { createDownloadBatch } from '../ipc/download-batch.mjs'
@@ -118,6 +118,19 @@ describe('download-batch', () => {
     const finalSize = readFileSync(path.join(h.mediaDir, 'provai-e-vede', 'a.mp4')).length
     expect(finalSize).toBe(100)
   }, 15000)
+
+  it('não segue symlink no .part nem sobrescreve outro arquivo', async () => {
+    const h = createHarness()
+    const dir = path.join(h.mediaDir, 'provai-e-vede')
+    mkdirSync(dir, { recursive: true })
+    const external = path.join(h.workdir, 'private.txt')
+    writeFileSync(external, 'preservar')
+    symlinkSync(external, path.join(dir, 'a.mp4.part'))
+    h.batch.enqueue([{ id: 'a', url: 'http://x/a.mp4', fileName: 'a.mp4' }])
+    await h.batch.waitIdle()
+    expect(readFileSync(external, 'utf8')).toBe('preservar')
+    expect(channelOf(h.emitted, 'download-item-failed')).toHaveLength(1)
+  })
 
   it('falha → 3 retries → item failed + evento failed', async () => {
     let attempts = 0
