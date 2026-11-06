@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  bibleTransitionMs,
   DEFAULT_STAGE_SETTINGS,
   parseStageSettings,
   resolveBackgroundImage,
@@ -68,6 +69,45 @@ describe('stage-settings (paridade APK)', () => {
     const s = { ...DEFAULT_STAGE_SETTINGS, bibleTextTransform: 'uppercase' as const }
     expect(serializeStageSettings(s).bTransform).toBe('uppercase')
     expect(parseStageSettings(serializeStageSettings(s)).bibleTextTransform).toBe('uppercase')
+  })
+
+  it('refPos: posição da referência bíblica, padrão abaixo do texto à direita', () => {
+    expect(DEFAULT_STAGE_SETTINGS.bibleRefPosition).toBe('below-right')
+    expect(parseStageSettings({}).bibleRefPosition).toBe('below-right')
+    for (const pos of ['below-left', 'below-center', 'below-right', 'corner'] as const) {
+      expect(parseStageSettings({ refPos: pos }).bibleRefPosition).toBe(pos)
+      const s = { ...DEFAULT_STAGE_SETTINGS, bibleRefPosition: pos }
+      expect(serializeStageSettings(s).refPos).toBe(pos)
+      expect(parseStageSettings(serializeStageSettings(s)).bibleRefPosition).toBe(pos)
+    }
+    expect(parseStageSettings({ refPos: 'top' }).bibleRefPosition).toBe('below-right')
+    expect(parseStageSettings({ refPos: 3 }).bibleRefPosition).toBe('below-right')
+  })
+
+  it('bTrans/bTransSpd: transição ao trocar versículo, padrão suave e normal', () => {
+    expect(DEFAULT_STAGE_SETTINGS.bibleTransition).toBe('fade')
+    expect(DEFAULT_STAGE_SETTINGS.bibleTransitionSpeed).toBe('normal')
+    expect(parseStageSettings({}).bibleTransition).toBe('fade')
+    expect(parseStageSettings({}).bibleTransitionSpeed).toBe('normal')
+    for (const transition of ['none', 'fade', 'slide', 'zoom'] as const) {
+      const s = { ...DEFAULT_STAGE_SETTINGS, bibleTransition: transition, bibleTransitionSpeed: 'slow' as const }
+      expect(serializeStageSettings(s).bTrans).toBe(transition)
+      expect(serializeStageSettings(s).bTransSpd).toBe('slow')
+      const back = parseStageSettings(serializeStageSettings(s))
+      expect(back.bibleTransition).toBe(transition)
+      expect(back.bibleTransitionSpeed).toBe('slow')
+    }
+    expect(parseStageSettings({ bTrans: 'flip', bTransSpd: 'turbo' })).toMatchObject({
+      bibleTransition: 'fade',
+      bibleTransitionSpeed: 'normal',
+    })
+  })
+
+  it('bibleTransitionMs: duração de cada fase por velocidade', () => {
+    expect(bibleTransitionMs('fast')).toBe(150)
+    expect(bibleTransitionMs('normal')).toBe(250)
+    expect(bibleTransitionMs('slow')).toBe(450)
+    expect(bibleTransitionMs(undefined)).toBe(250)
   })
 
   it('parse clampa valores fora de faixa (como o APK)', () => {

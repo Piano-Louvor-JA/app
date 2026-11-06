@@ -72,10 +72,16 @@ const boxStyle = computed(() => {
   }
 })
 
-const footerStyle = computed(() => ({
-  color: props.settings.footerRefColor ?? undefined,
-  fontWeight: String(props.settings.footerRefWeight),
-}))
+const footerCorner = computed(() => props.settings.bibleRefPosition === 'corner')
+
+const footerStyle = computed(() => {
+  const position = props.settings.bibleRefPosition ?? 'below-right'
+  return {
+    color: props.settings.footerRefColor ?? undefined,
+    fontWeight: String(props.settings.footerRefWeight),
+    ...(footerCorner.value ? {} : { textAlign: position.replace('below-', '') as 'left' | 'center' | 'right' }),
+  }
+})
 </script>
 
 <template>
@@ -84,24 +90,27 @@ const footerStyle = computed(() => ({
     :class="{ 'stage-preview--bible': module === 'bible' }"
     :style="containerStyle"
   >
-    <div
-      class="stage-preview__box"
-      :style="boxStyle"
-    >
-      <p
-        class="stage-preview__text"
-        :style="textStyle"
+    <div class="stage-preview__content">
+      <div
+        class="stage-preview__box"
+        :style="boxStyle"
       >
-        {{ sample }}
+        <p
+          class="stage-preview__text"
+          :style="textStyle"
+        >
+          {{ sample }}
+        </p>
+      </div>
+      <p
+        v-if="footer && settings.showBibleVersion"
+        class="stage-preview__footer"
+        :class="{ 'stage-preview__footer--corner': footerCorner }"
+        :style="footerStyle"
+      >
+        {{ footer }}
       </p>
     </div>
-    <p
-      v-if="footer && settings.showBibleVersion"
-      class="stage-preview__footer"
-      :style="footerStyle"
-    >
-      {{ footer }}
-    </p>
   </div>
 </template>
 
@@ -125,10 +134,24 @@ const footerStyle = computed(() => ({
   /* radius (padrão folha) vem inline do boxStyle quando textBox ativo */
 }
 
-/* Bíblia: usa quase toda a largura (paridade com BibleProjectionView). */
+/* Hinos: a caixa segue sendo o filho alinhado pelo palco. */
+.stage-preview__content {
+  display: contents;
+}
+
+/* Bíblia: usa quase toda a largura (paridade com BibleProjectionView);
+   a referência "abaixo do texto" fica logo embaixo da caixa. */
+.stage-preview--bible .stage-preview__content {
+  display: flex;
+  flex-direction: column;
+  gap: 1cqw;
+  width: calc(100% - 2cqw);
+}
+
 .stage-preview--bible .stage-preview__box {
-  max-width: calc(100% - 2cqw);
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .stage-preview__text {
@@ -145,10 +168,13 @@ const footerStyle = computed(() => ({
 }
 
 .stage-preview__footer {
+  margin: 0;
+  font-size: 2.2cqw;
+}
+
+.stage-preview__footer--corner {
   position: absolute;
   right: 3cqw;
   bottom: 2.2cqw;
-  margin: 0;
-  font-size: 2.2cqw;
 }
 </style>

@@ -142,8 +142,10 @@ onUnmounted(() => {
   z-index: 100001;
   flex-shrink: 0;
   user-select: none;
-  border-bottom: 1px solid var(--ds-color-outline);
-  background: var(--ds-color-surface, #131313);
+  /* Tom próprio para não se fundir ao header (mesma superfície): clareia no
+     tema escuro e escurece no claro. */
+  border-bottom: 1px solid var(--ds-color-outline-strong, rgba(255, 255, 255, 0.1));
+  background: color-mix(in srgb, var(--ds-color-on-surface) 4%, var(--ds-color-surface, #131313));
   color: var(--ds-color-on-surface);
   -webkit-app-region: drag;
 }

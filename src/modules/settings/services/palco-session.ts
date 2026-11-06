@@ -10,6 +10,7 @@ import { obsBlackIdle, obsConnections, notifyObsChanged, obsAllowsMirror, obsAss
 import { useOutputRegistry } from './output-registry'
 import { readEffectiveStageSettings } from './stage-settings-runtime'
 import {
+  bibleTransitionMs,
   resolveBackgroundImage,
   type StageSettings,
 } from '../types/stage-settings'
@@ -273,6 +274,10 @@ class PalcoSession {
       footerRef,
       footerColor: s.footerRefColor,
       footerWeight: s.footerRefWeight,
+      footerPosition: isBible ? s.bibleRefPosition ?? 'below-right' : undefined,
+      // Receiver anima a entrada do versículo novo; sem o campo, troca seca.
+      transition: isBible ? s.bibleTransition ?? 'fade' : undefined,
+      transitionMs: isBible ? bibleTransitionMs(s.bibleTransitionSpeed) : undefined,
       // Estrofes com aparência própria (paridade do title*):
       lyricFontSize: (isHymns && s.lyricFontSize != null ? s.lyricFontSize : sizeAt1920) / 1920 * 1080,
       lyricFontWeight: isHymns && s.lyricFontWeight != null ? s.lyricFontWeight : fontWeight,
