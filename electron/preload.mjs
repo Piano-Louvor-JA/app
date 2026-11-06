@@ -161,6 +161,11 @@ contextBridge.exposeInMainWorld('louvorja', {
     deleteAudio: (fileName) => ipcRenderer.invoke('random:delete-audio', fileName),
   },
 
+  sabbathSchool: {
+    importVideo: () => ipcRenderer.invoke('sabbath-school:import-video'),
+    clearVideo: () => ipcRenderer.invoke('sabbath-school:clear-video'),
+  },
+
   catalog: {
     downloadDatabase: () => ipcRenderer.invoke('catalog:download-database'),
     extractDatabase: () => ipcRenderer.invoke('catalog:extract-database'),

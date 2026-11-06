@@ -23,6 +23,9 @@ import TimerChrome from '@modules/timer/components/TimerChrome.vue'
 import TimerProjectionView from '@modules/timer/views/TimerProjectionView.vue'
 import InAppProjectionOverlay from '@shared/components/InAppProjectionOverlay.vue'
 import { useCountdownStore } from '@modules/countdown/stores/useCountdownStore'
+import SabbathSchoolChrome from '@modules/sabbath-school/components/SabbathSchoolChrome.vue'
+import { useSabbathSchoolAlertEngine } from '@modules/sabbath-school/composables/useSabbathSchoolAlertEngine'
+import { useSabbathSchoolStore } from '@modules/sabbath-school/stores/useSabbathSchoolStore'
 import { useLiturgyStore } from '@modules/liturgy/stores/useLiturgyStore'
 import LiturgyAnnotationStage from '@modules/liturgy/components/LiturgyAnnotationStage.vue'
 import {
@@ -100,10 +103,17 @@ const {
 } = storeToRefs(timerStore)
 
 const countdownStore = useCountdownStore()
+useSabbathSchoolAlertEngine()
 const {
   isProjecting: isCountdownProjecting,
   inAppPreview: countdownInAppPreview,
 } = storeToRefs(countdownStore)
+
+const sabbathSchoolStore = useSabbathSchoolStore()
+const {
+  isProjecting: isSabbathSchoolProjecting,
+  inAppPreview: sabbathSchoolInAppPreview,
+} = storeToRefs(sabbathSchoolStore)
 
 const clockStore = useClockStore()
 const {
@@ -150,6 +160,7 @@ const hasBibleContent = computed(
 const isOnRandomRoute = computed(() => route.name === 'utilities-random')
 const isOnTimerRoute = computed(() => route.name === 'utilities-timer')
 const isOnCountdownRoute = computed(() => route.name === 'utilities-countdown')
+const isOnSabbathSchoolRoute = computed(() => route.name === 'utilities-sabbath-school')
 const isOnClockRoute = computed(() => route.name === 'utilities-clock')
 const isOnLiturgyRoute = computed(() => route.meta.navKey === 'liturgy')
 
@@ -175,6 +186,7 @@ const isProjecting = computed(
     isRandomProjecting.value ||
     isTimerProjecting.value ||
     isCountdownProjecting.value ||
+    isSabbathSchoolProjecting.value ||
     isClockProjecting.value ||
     isLiturgyProjecting.value,
 )
@@ -201,6 +213,7 @@ async function onCloseAllScreens() {
   if (isRandomProjecting.value) randomStore.clearProjection()
   if (isTimerProjecting.value) timerStore.clearProjection()
   if (isCountdownProjecting.value) countdownStore.clearProjection()
+  if (isSabbathSchoolProjecting.value) sabbathSchoolStore.clearProjection()
   if (isClockProjecting.value) clockStore.clearProjection()
   if (isLiturgyProjecting.value) await liturgyStore.clearWebProjection()
   closeProjectionModule()
@@ -241,6 +254,8 @@ const hasProjectableContent = computed(
     isTimerProjecting.value ||
     isOnCountdownRoute.value ||
     isCountdownProjecting.value ||
+    isOnSabbathSchoolRoute.value ||
+    isSabbathSchoolProjecting.value ||
     isOnClockRoute.value ||
     isClockProjecting.value ||
     isLiturgyProjecting.value ||
@@ -267,14 +282,14 @@ const projectAriaLabel = computed(() => {
   }
   if (isLiturgyProjecting.value) return t('liturgy.actions.stopSiteProjection')
   if (isClockProjecting.value) return t('clock.clearProjection')
-  if (isCountdownProjecting.value) return t('countdown.clearProjection')
+  if (isCountdownProjecting.value || isSabbathSchoolProjecting.value) return t('countdown.clearProjection')
   if (isTimerProjecting.value) return t('timer.clearProjection')
   if (isRandomProjecting.value) return t('random.clearProjection')
   if (isBibleProjecting.value) return t('bible.clearProjection')
   if (isMediaProjecting.value) return t('media.clearProjection')
   if (isOnLiturgyRoute.value) return t('liturgy.actions.project')
   if (isOnClockRoute.value) return t('clock.project')
-  if (isOnCountdownRoute.value) return t('countdown.project')
+  if (isOnCountdownRoute.value || isOnSabbathSchoolRoute.value) return t('countdown.project')
   if (isOnTimerRoute.value) return t('timer.project')
   if (isOnRandomRoute.value) return t('random.project')
   if (route.meta.navKey === 'bible') return t('bible.project')
@@ -304,6 +319,10 @@ async function onToggleProjection() {
     await countdownStore.clearProjection()
     return
   }
+  if (isSabbathSchoolProjecting.value) {
+    await sabbathSchoolStore.clearProjection()
+    return
+  }
   if (isClockProjecting.value) {
     await clockStore.clearProjection()
     return
@@ -326,6 +345,10 @@ async function onToggleProjection() {
   }
   if (isOnCountdownRoute.value) {
     await countdownStore.toggleProjection()
+    return
+  }
+  if (isOnSabbathSchoolRoute.value) {
+    await sabbathSchoolStore.toggleProjection()
     return
   }
   if (isOnTimerRoute.value) {
@@ -593,6 +616,7 @@ function viewKey(viewRoute: typeof route) {
 
     <BibleChrome />
     <CountdownChrome />
+    <SabbathSchoolChrome />
     <TimerChrome />
     <ClockChrome />
     <RandomChrome />
@@ -625,12 +649,12 @@ function viewKey(viewRoute: typeof route) {
     </InAppProjectionOverlay>
 
     <InAppProjectionOverlay
-      v-if="countdownInAppPreview"
+      v-if="countdownInAppPreview || sabbathSchoolInAppPreview"
       scope="countdown"
       :label="t('countdown.inAppProjection')"
       :close-label="t('countdown.close')"
       :hint="t('countdown.projectionHotkeyHint')"
-      @close="countdownStore.clearProjection"
+      @close="sabbathSchoolInAppPreview ? sabbathSchoolStore.clearProjection() : countdownStore.clearProjection()"
     >
       <CountdownProjectionView embedded />
     </InAppProjectionOverlay>

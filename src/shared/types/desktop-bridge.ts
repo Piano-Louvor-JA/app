@@ -497,6 +497,17 @@ export type RandomAudioApi = {
   }>
 }
 
+export type SabbathSchoolVideoApi = {
+  importVideo: () => Promise<{
+    ok: boolean
+    fileName?: string
+    relativePath?: string
+    originalName?: string
+    reason?: string
+  }>
+  clearVideo: () => Promise<{ ok: boolean; reason?: string }>
+}
+
 export type DiagnosticsApi = {
   run: () => Promise<{ report: unknown; jsonPath: string; txtPath: string }>
   send: (report: unknown) => Promise<{ ok: boolean; reason?: string }>
@@ -532,4 +543,5 @@ export type LouvorJaBridge = {
   projection: ProjectionApi
   remote?: RemoteApi
   random?: RandomAudioApi
+  sabbathSchool?: SabbathSchoolVideoApi
 }

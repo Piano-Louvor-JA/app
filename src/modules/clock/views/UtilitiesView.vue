@@ -23,7 +23,14 @@ const items: UtilityHubItem[] = [
     to: '/utilities/random',
     available: true,
   },
-
+  {
+    key: 'sabbath-school',
+    titleKey: 'utilities.sabbathSchool',
+    descriptionKey: 'utilities.sabbathSchoolDescription',
+    icon: 'ti-book-2',
+    to: '/utilities/sabbath-school',
+    available: true,
+  },
 ]
 </script>
 

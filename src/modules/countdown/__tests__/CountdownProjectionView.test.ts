@@ -9,8 +9,10 @@ vi.mock('vue-i18n', () => ({
 vi.mock('../composables/useCountdown', () => ({
   useCountdownDisplay: () => ({
     formattedTime: { value: '01:00' },
+    formattedTimeWithSign: { value: '01:00' },
     isUrgent: { value: false },
     isFinished: { value: false },
+    isNegative: { value: false },
   }),
 }))
 

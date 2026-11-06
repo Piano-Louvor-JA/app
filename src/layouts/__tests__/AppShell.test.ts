@@ -105,6 +105,11 @@ vi.mock('@modules/countdown/stores/useCountdownStore', async () => {
   }
 })
 
+const alertEngine = vi.hoisted(() => vi.fn())
+vi.mock('@modules/sabbath-school/composables/useSabbathSchoolAlertEngine', () => ({
+  useSabbathSchoolAlertEngine: alertEngine,
+}))
+
 vi.mock('@modules/random/stores/useRandomStore', async () => {
   const { defineStore } = await import('pinia')
   return {
@@ -331,6 +336,13 @@ describe('AppShell — header e navegação', () => {
     // Miniplayer sai do stacking context do shell para ficar acima do modal de playlists.
     expect(w.find('.media-chrome-mock').exists()).false
     expect(document.body.querySelector('.media-chrome-mock')).not.toBeNull()
+    w.unmount()
+  })
+
+  it('monta o motor de alertas do cronômetro uma vez, na janela principal', async () => {
+    alertEngine.mockClear()
+    const { w } = await mountShell()
+    expect(alertEngine).toHaveBeenCalledOnce()
     w.unmount()
   })
 
