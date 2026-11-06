@@ -46,6 +46,17 @@ vi.mock('@modules/clock/views/ClockProjectionView.vue', () => ({ default: { temp
 vi.mock('@modules/countdown/views/CountdownProjectionView.vue', () => ({ default: { template: '<div />' } }))
 vi.mock('@modules/random/views/RandomProjectionView.vue', () => ({ default: { template: '<div />' } }))
 vi.mock('@modules/timer/views/TimerProjectionView.vue', () => ({ default: { template: '<div />' } }))
+vi.mock('@modules/liturgy/components/LiturgyAnnotationStage.vue', () => ({ default: { template: '<div class="annotation-stage-stub" />' } }))
+vi.mock('@modules/liturgy/services/annotation-projection', async () => {
+  const { ref } = await import('vue')
+  const inAppPreview = ref(false)
+  return {
+    annotationPreviewForTest: inAppPreview,
+    stopAnnotationProjection: vi.fn(),
+    toggleAnnotationProjection: vi.fn(async () => true),
+    useAnnotationProjection: () => ({ inAppPreview, projectingItemId: ref(null), independentItemId: ref(null) }),
+  }
+})
 vi.mock('@design-system/index', () => ({
   DockFooter: {
     name: 'DockFooter',
@@ -56,7 +67,7 @@ vi.mock('@design-system/index', () => ({
   GradientBackground: { template: '<div class="gradient-stub"><slot /></div>' },  MinimizedPagesBar: {
     name: 'MinimizedPagesBar',
     template: '<nav class="minimized-bar-mock" />',
-    props: ['items', 'navLabel'],
+    props: ['items', 'navLabel', 'currentKey'],
     emits: ['open', 'close'],
   },
   HistoryNav: {
@@ -481,6 +492,19 @@ describe('AppShell', () => {
     cds.inAppPreview = false as never
     cls.inAppPreview = false as never
     await w.vm.$nextTick()
+    w.unmount()
+  })
+
+  it('prévia da anotação no app mostra o palco da anotação', async () => {
+    const annotation = (await import('@modules/liturgy/services/annotation-projection')) as unknown as {
+      annotationPreviewForTest: { value: boolean }
+    }
+    const w = await mountShell()
+    expect(w.find('.annotation-stage-stub').exists()).toBe(false)
+    annotation.annotationPreviewForTest.value = true
+    await w.vm.$nextTick()
+    expect(w.find('.annotation-stage-stub').exists()).toBe(true)
+    annotation.annotationPreviewForTest.value = false
     w.unmount()
   })
 

@@ -10,14 +10,23 @@ import {
   setLiturgyVideoFile,
 } from '../services/liturgy-local-video'
 
+import IndependentProjectionButton from '@shared/components/IndependentProjectionButton.vue'
 import MusicTrackActions from '@shared/components/MusicTrackActions.vue'
 
+import {
+  ANNOTATION_PROJECTION_MODULE,
+  prepareAnnotationIndependent,
+  refreshAnnotationProjection,
+  useAnnotationProjection,
+} from '../services/annotation-projection'
 import { parseLiturgyWebTarget } from '../services/liturgy-web-runtime'
 import { formatDurationLabel } from '../services/liturgy-format'
 import { getItemTypeIcon, isExecutableItem } from '../services/liturgy-item-helpers'
 import { probeMediaDurationMs } from '../services/media-probe'
+import { normalizeTitleColor, sanitizeNotesHtml } from '../services/rich-notes'
 import type { LiturgyItem } from '../types/liturgy'
 import type { OnlineVideoItemStatus } from '@/shared/types/desktop-bridge'
+import '../styles/rich-notes.css'
 
 const props = defineProps<{
   item: LiturgyItem
@@ -76,6 +85,33 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+
+const isAnnotation = computed(() => props.item.type === 'annotation')
+const richNotesHtml = computed(() =>
+  isAnnotation.value ? sanitizeNotesHtml(props.item.notesHtml) : '',
+)
+
+const annotationTitleColor = computed(() =>
+  isAnnotation.value && !props.item.done ? normalizeTitleColor(props.item.titleColor) : '',
+)
+
+const { projectingItemId: annotationProjectingId, independentItemId: annotationIndependentId } =
+  useAnnotationProjection()
+const annotationProjecting = computed(
+  () => isAnnotation.value && annotationProjectingId.value === props.item.id,
+)
+const annotationIndependentClaimed = computed(() => annotationIndependentId.value === props.item.id)
+
+function prepareIndependentAnnotation() {
+  return prepareAnnotationIndependent(props.item)
+}
+
+watch(
+  () => [props.item.name, props.item.subtitle, props.item.notesHtml, props.item.titleColor],
+  () => {
+    if (isAnnotation.value) refreshAnnotationProjection(props.item)
+  },
+)
 const rootEl = ref<HTMLElement | null>(null)
 let dragGhostEl: HTMLElement | null = null
 
@@ -542,7 +578,10 @@ const projectActionTitle = computed(() => {
             {{ t(`liturgy.types.${item.type}`) }}
           </p>
           <div class="liturgy-item__heading">
-            <h3 class="liturgy-item__name">
+            <h3
+              class="liturgy-item__name"
+              :style="annotationTitleColor ? { color: annotationTitleColor } : undefined"
+            >
               {{ item.name }}
               <span
                 v-if="item.complementaryTitle"
@@ -581,8 +620,15 @@ const projectActionTitle = computed(() => {
           >
             —
           </p>
+          <!-- eslint-disable-next-line vue/no-v-html -- HTML passa por sanitizeNotesHtml -->
+          <div
+            v-if="richNotesHtml"
+            class="liturgy-item__subtitle liturgy-item__rich-notes rich-notes"
+            data-testid="liturgy-item-rich-notes"
+            v-html="richNotesHtml"
+          />
           <p
-            v-if="item.subtitle"
+            v-else-if="item.subtitle"
             class="liturgy-item__subtitle"
           >
             {{ item.subtitle }}
@@ -651,6 +697,7 @@ const projectActionTitle = computed(() => {
               isSiteItem ||
               isMusicItem ||
               isAudioItem ||
+              isAnnotation ||
               isLocalMediaUpload,
           }"
           @click.stop
@@ -782,6 +829,7 @@ const projectActionTitle = computed(() => {
                 !isMusicItem &&
                 !isVideoRemote &&
                 !isSiteItem &&
+                !isAnnotation &&
                 (executable || selected)
             "
             type="button"
@@ -875,6 +923,32 @@ const projectActionTitle = computed(() => {
               aria-hidden="true"
             />
           </button>
+          <template v-if="isAnnotation">
+            <IndependentProjectionButton
+              :module-id="ANNOTATION_PROJECTION_MODULE"
+              compact
+              :obs="false"
+              :claimed="annotationIndependentClaimed"
+              :before-project="prepareIndependentAnnotation"
+            />
+            <button
+              type="button"
+              class="liturgy-item__action liturgy-item__action--site-project"
+              :class="{ 'liturgy-item__action--site-projecting': annotationProjecting }"
+              :title="annotationProjecting ? t('liturgy.actions.stopAnnotationProjection') : t('liturgy.actions.projectAnnotation')"
+              :aria-label="annotationProjecting ? t('liturgy.actions.stopAnnotationProjection') : t('liturgy.actions.projectAnnotation')"
+              :aria-pressed="annotationProjecting"
+              :disabled="item.done && !annotationProjecting"
+              data-testid="liturgy-annotation-project"
+              @click.stop="emit('playScreens')"
+            >
+              <i
+                class="ti"
+                :class="annotationProjecting ? 'ti-player-stop' : 'ti-arrow-up-right'"
+                aria-hidden="true"
+              />
+            </button>
+          </template>
           <button
             v-if="!deletionLocked"
             type="button"
@@ -1373,6 +1447,15 @@ const projectActionTitle = computed(() => {
 
   .liturgy-item--done & {
     color: color-mix(in srgb, var(--ds-color-on-surface) 30%, transparent);
+  }
+}
+
+.liturgy-item__rich-notes {
+  margin-top: 0.2rem;
+  line-height: 1.4;
+
+  .liturgy-item--done & {
+    opacity: 0.55;
   }
 }
 

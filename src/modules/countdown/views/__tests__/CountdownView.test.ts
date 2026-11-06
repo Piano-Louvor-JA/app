@@ -15,7 +15,7 @@ vi.mock('@shared/composables/useMinimizablePage', () => ({
 
 const mockCountdown = {
   config: { durationSeconds: 300 },
-  runtime: { remaining: 300, isRunning: false },
+  runtime: { status: 'idle', remaining: 300, isRunning: false },
   isProjecting: false,
   configOpen: false,
   isRunning: false,
@@ -69,10 +69,6 @@ vi.mock('../../../settings/components/PalcoRouteSelect.vue', () => ({
 
 vi.mock('../../../settings/components/StageCustomizationDialog.vue', () => ({
   default: { template: '<div class="stage-custom-dialog" />' },
-}))
-
-vi.mock('../../components/CountdownConfigDialog.vue', () => ({
-  default: { template: '<div class="countdown-config-dialog" />' },
 }))
 
 vi.mock('../../components/CountdownDurationInput.vue', () => ({

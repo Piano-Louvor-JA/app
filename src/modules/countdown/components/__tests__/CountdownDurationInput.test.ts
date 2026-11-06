@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// CountdownDurationInput — parts, commit/clamp, modes, until, disabled, compact
+// CountdownDurationInput — parts, commit/clamp, disabled, compact
 import { mount } from '@vue/test-utils'
 import { describe, it, expect } from 'vitest'
 import { createI18n } from 'vue-i18n'
@@ -14,12 +14,6 @@ const i18n = createI18n({
       countdown: {
         duration: 'Duração',
         durationHint: 'quanto tempo',
-        mode: 'Modo',
-        modeDuration: 'Duração',
-        modeUntil: 'Até',
-        until: 'Até horário',
-        untilHour: 'Hora',
-        untilMinute: 'Minuto',
         hours: 'Horas',
         minutes: 'Minutos',
         seconds: 'Segundos',
@@ -80,60 +74,15 @@ describe('CountdownDurationInput', () => {
     expect(wrapper.emitted('update:durationMs')![0]).toEqual([3690000])
   })
 
-  it('onMode: emite update:mode', async () => {
+  it('só contagem regressiva: sem seletor de modo nem campos de horário', () => {
     const wrapper = createWrapper()
-    const modeBtns = wrapper.findAll('.countdown-duration__mode')
-    expect(modeBtns.length).toBe(2)
-    await modeBtns[1].trigger('click')
-    expect(wrapper.emitted('update:mode')).toBeTruthy()
-    expect(wrapper.emitted('update:mode')![0]).toEqual(['until'])
+    expect(wrapper.find('.countdown-duration__modes').exists()).toBe(false)
+    expect(wrapper.findAll('button')).toHaveLength(0)
   })
 
-  it('onMode: mesmo modo não emite', async () => {
-    const wrapper = createWrapper()
-    const modeBtns = wrapper.findAll('.countdown-duration__mode')
-    await modeBtns[0].trigger('click') // já está em duration
-    expect(wrapper.emitted('update:mode')).toBeFalsy()
-  })
-
-  it('onMode: disabled não emite', async () => {
-    const wrapper = createWrapper({ disabled: true })
-    const modeBtns = wrapper.findAll('.countdown-duration__mode')
-    await modeBtns[1].trigger('click')
-    expect(wrapper.emitted('update:mode')).toBeFalsy()
-  })
-
-  it('modo until: campos de hora/minuto, emite update:until (hora)', async () => {
-    const wrapper = createWrapper({ mode: 'until', untilHour: 18, untilMinute: 30 })
-    const untilInputs = wrapper.findAll('.countdown-duration__field input')
-    expect(untilInputs.length).toBe(2)
-    await untilInputs[0].setValue('9')
-    await untilInputs[0].trigger('change')
-    expect(wrapper.emitted('update:until')![0]).toEqual([9, 30])
-  })
-
-  it('modo until: emite update:until (minuto)', async () => {
-    const wrapper = createWrapper({ mode: 'until', untilHour: 18, untilMinute: 30 })
-    const untilInputs = wrapper.findAll('.countdown-duration__field input')
-    await untilInputs[1].setValue('45')
-    await untilInputs[1].trigger('change')
-    expect(wrapper.emitted('update:until')![0]).toEqual([18, 45])
-  })
-
-  it('until: clamp hora 23', async () => {
-    const wrapper = createWrapper({ mode: 'until', untilHour: 18, untilMinute: 0 })
-    const untilInputs = wrapper.findAll('.countdown-duration__field input')
-    await untilInputs[0].setValue('99')
-    await untilInputs[0].trigger('change')
-    expect(wrapper.emitted('update:until')![0]).toEqual([23, 0])
-  })
-
-  it('until: clamp minuto 59', async () => {
-    const wrapper = createWrapper({ mode: 'until', untilHour: 18, untilMinute: 0 })
-    const untilInputs = wrapper.findAll('.countdown-duration__field input')
-    await untilInputs[1].setValue('99')
-    await untilInputs[1].trigger('change')
-    expect(wrapper.emitted('update:until')![0]).toEqual([18, 59])
+  it('sem segundos: só horas e minutos', () => {
+    const wrapper = createWrapper({ noSeconds: true })
+    expect(wrapper.findAll('input')).toHaveLength(2)
   })
 
   it('disabled: inputs desabilitados', () => {
@@ -142,12 +91,5 @@ describe('CountdownDurationInput', () => {
       expect((input.element as HTMLInputElement).disabled).toBe(true)
     }
     expect(wrapper.classes()).toContain('countdown-duration--disabled')
-  })
-
-  it('mode until: botão until tem classe --on', () => {
-    const wrapper = createWrapper({ mode: 'until' })
-    const modeBtns = wrapper.findAll('.countdown-duration__mode')
-    expect(modeBtns[1].classes()).toContain('countdown-duration__mode--on')
-    expect(modeBtns[0].classes()).not.toContain('countdown-duration__mode--on')
   })
 })

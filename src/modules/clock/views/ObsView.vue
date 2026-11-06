@@ -2,9 +2,6 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppConfirm from '@shared/components/AppConfirm.vue'
-import PageBackStack from '@shared/components/PageBackStack.vue'
-import { useMinimizablePage } from '@shared/composables/useMinimizablePage'
-
 import { palcoSession } from '@modules/settings/services/palco-session'
 import { useObsConnections } from '@modules/settings/composables/useObsConnections'
 import { obsBlackIdle, setObsBlackIdle, setObsNickname, obsConnections, registerObsConnection, unregisterObsConnection, notifyObsChanged } from '@modules/settings/services/obs-connections'
@@ -14,13 +11,6 @@ import TransmissionIcon from '@design-system/components/icons/TransmissionIcon.v
 // Issue app#361: card funcional do OBS — Browser Source do palco-server.
 // Por baixo usa o palco (transporte); por fora é "Transmitir via OBS".
 const { t } = useI18n()
-
-// Minimizar: o estado da tela já vive na store; o retrato guarda só rolagem e miniatura.
-const { minimize, prepare } = useMinimizablePage({
-  describe: () => ({ title: t('utilities.obs'), icon: 'ti-broadcast', summary: '' }),
-  capture: () => null,
-  fallbackRoute: { name: 'settings-appearance' },
-})
 
 const preserveConnections = ref(true)
 const persistenceBusy = ref(true)
@@ -227,11 +217,6 @@ onUnmounted(() => {
   <section class="obs-view">
     <div class="obs-view__content">
     <header class="obs-view__header">
-      <PageBackStack @minimize="minimize" @prepare="prepare">
-        <button type="button" class="obs-view__back" @click="$router.back()">
-          <i class="ti ti-arrow-left" aria-hidden="true"></i>
-        </button>
-      </PageBackStack>
       <TransmissionIcon :size="32" class="obs-view__brand" />
       <h1 class="obs-view__title">{{ t('utilities.obs') }}</h1>
       <span class="obs-view__status" :class="{ 'obs-view__status--on': anyRunning }">

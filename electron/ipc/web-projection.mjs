@@ -818,6 +818,16 @@ export function resolveSourceUrl(payload) {
       return resolveLocalVideoPlayerUrl(absolute, title)
     }
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null
+    // R6/SPEC v1.1: vídeo direto (MP4/WebM remoto) usa o player dedicado
+    // (controles + autoclose), igual ao arquivo local — não popup browser cru.
+    if (/\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(parsed.pathname + parsed.search)) {
+      const playerPage = toLocalAppUrl(LOCAL_VIDEO_PLAYER_HTML)
+      if (!playerPage) return parsed.toString()
+      const playerUrl = new URL(playerPage)
+      playerUrl.searchParams.set('src', parsed.toString())
+      if (title) playerUrl.searchParams.set('title', title)
+      return playerUrl.toString()
+    }
     return parsed.toString()
   } catch {
     return null

@@ -2,7 +2,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { statSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { app, BrowserWindow, dialog, globalShortcut, ipcMain, screen, shell } from "electron";
+import { app, BrowserWindow, dialog, globalShortcut, ipcMain, net, screen, shell } from "electron";
 
 import {
 	APP_DESKTOP_ID,
@@ -16,6 +16,7 @@ import { configureUserDataPath } from "./user-data-path.mjs";
 import { checkEulaAcceptance } from "./eula.mjs";
 import { resolveAppLocale } from "./locale.mjs";
 import { registerWorkspaceIpc } from "./ipc/register.mjs";
+import { registerDownloadBatchIpc } from "./ipc/download-batch-ipc.mjs";
 import { registerDiagnosticsIpc, setClockSkewProvider, setDiagnosticsToken } from "./diagnostics.mjs";
 import { createMainLogger } from "./main-log.mjs";
 import { attachHistoryAppCommand, attachWindowStateEvents, mainWindowChromeOptions, registerWindowIpc } from "./ipc/window.mjs";
@@ -35,6 +36,8 @@ import { getBibleUpdater } from "./bible-updater.mjs";
 import { loadWindowState, trackWindowState } from "./window-state.mjs";
 import { registerYoutubeEmbedHeaders } from "./youtube-embed.mjs";
 import { registerYoutubeAuthIpc } from "./youtube-auth.mjs";
+import { registerYoutubeInfoIpc } from "./youtube-info.mjs";
+import { registerSiteInfoIpc } from "./site-info.mjs";
 import { enableAdblocker } from "./youtube-adblock.mjs";
 import { registerTunnelCorpBypass } from "./tunnel-corp-bypass.mjs";
 import {
@@ -956,10 +959,13 @@ app.whenReady().then(async () => {
 		});
 		mainLog.info('diagnostics IPC handlers registered');
 		registerWindowIpc(() => mainWindow);
+		registerDownloadBatchIpc(() => mainWindow);
 		registerLocalFileProtocol();
 		startOnlineVideo(() => locale);
 		registerYoutubeEmbedHeaders();
 		registerYoutubeAuthIpc();
+		registerYoutubeInfoIpc(ipcMain, { fetch: (url, init) => net.fetch(url, init) });
+		registerSiteInfoIpc(ipcMain, { fetch: (url, init) => net.fetch(url, init) });
 		void enableAdblocker();
 		registerTunnelCorpBypass();
 		createWindow(locale);

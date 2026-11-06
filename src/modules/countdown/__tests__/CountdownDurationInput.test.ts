@@ -13,7 +13,7 @@ function input(wrapper: ReturnType<typeof mount>, index: number) {
 }
 
 describe('CountdownDurationInput', () => {
-  it('modo duration: decompõe ms em campos H/M/S', () => {
+  it('decompõe ms em campos H/M/S', () => {
     const wrapper = mount(CountdownDurationInput, {
       props: { durationMs: 3_723_000 }, // 1h 2m 3s
     })
@@ -48,48 +48,12 @@ describe('CountdownDurationInput', () => {
     expect(wrapper.emitted('update:durationMs')?.at(-1)).toEqual([30_000])
   })
 
-  it('alterna modo entre duration e until via botões', async () => {
-    const wrapper = mount(CountdownDurationInput, {
-      props: { durationMs: 60_000 },
-    })
-    const modes = wrapper.findAll('.countdown-duration__mode')
-    expect(modes).toHaveLength(2)
-
-    await modes[1].trigger('click')
-    expect(wrapper.emitted('update:mode')).toEqual([['until']])
-
-    // sem v-model, props.mode continua 'duration': clique no modo já ativo (props) não emite
-    await modes[0].trigger('click')
-    expect(wrapper.emitted('update:mode')).toEqual([['until']])
-
-    // com v-model aplicado (mode='until'), clicar em duration emite de volta
-    await wrapper.setProps({ mode: 'until' })
-    await modes[0].trigger('click')
-    expect(wrapper.emitted('update:mode')).toEqual([['until'], ['duration']])
-  })
-
-  it('disabled: não alterna modo', async () => {
+  it('disabled: campos travados', () => {
     const wrapper = mount(CountdownDurationInput, {
       props: { durationMs: 60_000, disabled: true },
     })
-    await wrapper.findAll('.countdown-duration__mode')[1].trigger('click')
-    expect(wrapper.emitted('update:mode')).toBeUndefined()
-  })
-
-  it('modo until: campos de hora/minuto emitem update:until com clamp', async () => {
-    const wrapper = mount(CountdownDurationInput, {
-      props: { durationMs: 60_000, mode: 'until', untilHour: 18, untilMinute: 30 },
-    })
-    const inputs = wrapper.findAll('input')
-    expect(inputs).toHaveLength(2)
-    expect((inputs[0].element as HTMLInputElement).value).toBe('18')
-
-    await inputs[0].setValue('25')
-    expect(wrapper.emitted('update:until')?.at(-1)).toEqual([23, 30])
-
-    // segundo input usa props.untilHour ainda 18 (componente puro, sem estado interno)
-    await inputs[1].setValue('99')
-    expect(wrapper.emitted('update:until')?.at(-1)).toEqual([18, 59])
+    expect(wrapper.find('.countdown-duration__mode').exists()).toBe(false)
+    for (const field of wrapper.findAll('input')) expect((field.element as HTMLInputElement).disabled).toBe(true)
   })
 
   it('compact: omite cabeçalho', () => {

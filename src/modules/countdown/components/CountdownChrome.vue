@@ -14,12 +14,9 @@ import { USER_PREFERENCE_KEYS } from '@shared/constants/storage-keys'
 
 import { resolveBackgroundImage } from '../../settings/types/stage-settings'
 import { useCountdownStage } from '../composables/useCountdownStage'
-import { sabbathIdlePreviewRuntime } from '../services/countdown-sabbath-preview'
 import { useCountdownStore } from '../stores/useCountdownStore'
 import CountdownPreview from './CountdownPreview.vue'
 import CountdownProjectFab from './CountdownProjectFab.vue'
-
-const COUNTDOWN_ROUTE = 'utilities-countdown'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -29,7 +26,9 @@ const store = useCountdownStore()
 
 const { stage, effectiveConfig } = useCountdownStage(() => store.config)
 
+const COUNTDOWN_ROUTE = 'utilities-countdown'
 const onCountdownRoute = computed(() => route.name === COUNTDOWN_ROUTE)
+const title = computed(() => t('countdown.title'))
 
 /**
  * No Timer fica sempre à mão; nas outras telas enquanto projeta ou roda —
@@ -45,10 +44,6 @@ const visible = computed(
   () => !dismissed.value && (onCountdownRoute.value || store.isProjecting || store.isRunning || isIndependentProjectionActive('countdown')),
 )
 
-
-const previewRuntime = computed(
-  () => sabbathIdlePreviewRuntime(effectiveConfig.value, store.runtime) ?? store.runtime,
-)
 
 /** Miniatura reflete a personalização do escopo countdown (bg/caixa/cores). */
 const previewStyle = computed(() => {
@@ -70,7 +65,6 @@ const { positionStyle, dragging, onPointerDown, resetPosition } =
 
 function onCloseChrome() {
   store.pause()
-  store.stopAudio()
   if (store.isProjecting) store.clearProjection()
   closeIndependentProjection('countdown')
   projectionMinimized.value = false
@@ -103,7 +97,7 @@ async function onOpenTimer() {
     :style="positionStyle"
     @pointerdown="onPointerDown"
   >
-    <FloatingPreviewTitle :label="t('countdown.title')" />
+    <FloatingPreviewTitle :label="title" />
 
     <aside
       class="countdown-chrome__preview"
@@ -111,10 +105,10 @@ async function onOpenTimer() {
       :title="t('countdown.chromeDragHint')"
       @dblclick="resetPosition"
     >
-      <MiniPlayerCloseButton v-if="!onCountdownRoute" :label="t('countdown.title')" @close="onCloseChrome" />
+      <MiniPlayerCloseButton v-if="!onCountdownRoute" :label="title" @close="onCloseChrome" />
       <CountdownPreview
         :config="effectiveConfig"
-        :runtime="previewRuntime"
+        :runtime="store.runtime"
         :stage="stage"
       />
     </aside>

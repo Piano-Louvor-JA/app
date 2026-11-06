@@ -142,6 +142,10 @@ export interface LiturgyItem {
   complementaryTitle?: string
   /** Anotações livres (em música, exibidas abaixo do álbum). */
   notes?: string
+  /** Anotação (annotation): texto formatado do editor; `subtitle` guarda o mesmo texto sem formatação. */
+  notesHtml?: string
+  /** Anotação (annotation): cor do título (hex). Vazio = cor padrão da projeção. */
+  titleColor?: string
   musicId?: number | null
   musicMode?: LiturgyMusicMode
   verseBookId?: number | null
@@ -197,6 +201,10 @@ export interface LiturgyItemDraft {
   type: LiturgyItemType | null
   name: string
   subtitle: string
+  /** Anotação (annotation): HTML do editor de texto. */
+  notesHtml?: string
+  /** Anotação (annotation): cor do título (hex). */
+  titleColor?: string
   durationMs: number
   accentColor: string
   categoryId: string | null
@@ -335,6 +343,16 @@ export const EXECUTABLE_ITEM_TYPES: LiturgyItemType[] = [
   'presentation',
   'other_files',
   'online_video',
+  'site',
+]
+
+/** Tipos sem duração: não entram na soma de tempo do culto e o diálogo não mostra o campo. */
+export const TYPES_WITHOUT_DURATION: LiturgyItemType[] = [
+  'category',
+  'annotation',
+  'images',
+  'pdf',
+  'presentation',
   'site',
 ]
 

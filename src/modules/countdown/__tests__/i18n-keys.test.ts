@@ -2,7 +2,7 @@
 /**
  * Guarda de i18n — toda chave `t('countdown.…')` literal do módulo DEVE
  * existir nos 3 locales. Sem isso a tela mostra o caminho cru
- * (ex.: "countdown.modeDuration" no seletor Duração/Até).
+ * (ex.: "countdown.hours" nos campos de duração).
  */
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -47,7 +47,7 @@ const usedKeys = [
 
 describe('guarda i18n do countdown — nenhuma chave vazando', () => {
   it('encontra as chaves usadas no módulo', () => {
-    expect(usedKeys).toContain('countdown.modeDuration')
+    expect(usedKeys).toContain('countdown.hours')
   })
 
   it.each([

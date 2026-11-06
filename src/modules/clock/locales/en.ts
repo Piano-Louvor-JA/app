@@ -57,6 +57,8 @@ export default {
     timerDescription: 'Progressive count projected on screen',
     countdown: 'Timer',
     countdownDescription: 'Countdown projected on screen',
+    sabbathSchool: 'Sabbath School',
+    sabbathSchoolDescription: 'Countdown with the Sabbath School sound alerts',
   },
   clock: {
     title: 'Clock',

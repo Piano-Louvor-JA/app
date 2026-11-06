@@ -148,6 +148,34 @@ contextBridge.exposeInMainWorld('louvorja', {
     clear: (options) => ipcRenderer.invoke('workspace:clear', options),
   },
 
+  // Download em background (Provai e Vede): fila no MAIN, eventos de progresso.
+  downloadBatch: {
+    enqueue: (items) => ipcRenderer.invoke('download-batch:enqueue', items),
+    cancel: (id) => ipcRenderer.invoke('download-batch:cancel', id),
+    retry: (id) => ipcRenderer.invoke('download-batch:retry', id),
+    pending: () => ipcRenderer.invoke('download-batch:pending'),
+    onProgress: (cb) => {
+      const handler = (_e, payload) => cb(payload)
+      ipcRenderer.on('download-progress', handler)
+      return () => ipcRenderer.removeListener('download-progress', handler)
+    },
+    onItemDone: (cb) => {
+      const handler = (_e, payload) => cb(payload)
+      ipcRenderer.on('download-item-done', handler)
+      return () => ipcRenderer.removeListener('download-item-done', handler)
+    },
+    onItemFailed: (cb) => {
+      const handler = (_e, payload) => cb(payload)
+      ipcRenderer.on('download-item-failed', handler)
+      return () => ipcRenderer.removeListener('download-item-failed', handler)
+    },
+    onBatchDone: (cb) => {
+      const handler = (_e, payload) => cb(payload)
+      ipcRenderer.on('download-batch-done', handler)
+      return () => ipcRenderer.removeListener('download-batch-done', handler)
+    },
+  },
+
   bible: {
     getChapter: (versionId, bookId, chapter) =>
       ipcRenderer.invoke('bible:get-chapter', versionId, bookId, chapter),
@@ -159,6 +187,11 @@ contextBridge.exposeInMainWorld('louvorja', {
     ensureDefaultAudio: () => ipcRenderer.invoke('random:ensure-default-audio'),
     importAudio: () => ipcRenderer.invoke('random:import-audio'),
     deleteAudio: (fileName) => ipcRenderer.invoke('random:delete-audio', fileName),
+  },
+
+  sabbathSchool: {
+    importVideo: () => ipcRenderer.invoke('sabbath-school:import-video'),
+    clearVideo: () => ipcRenderer.invoke('sabbath-school:clear-video'),
   },
 
   catalog: {
@@ -192,6 +225,16 @@ contextBridge.exposeInMainWorld('louvorja', {
     retryTools: () => ipcRenderer.invoke('online-video:retry-tools'),
     onChanged: (callback) => subscribe('online-video:changed', callback),
     onTools: (callback) => subscribe('online-video:tools', callback),
+  },
+
+  ytInfo: {
+    // Título, canal, duração e descrição do vídeo (preenche o item da liturgia ao colar o link)
+    get: (videoId) => ipcRenderer.invoke('youtube-info:get', videoId),
+  },
+
+  siteInfo: {
+    // Título, nome do site e descrição da página (preenche o item de site da liturgia)
+    get: (url) => ipcRenderer.invoke('site-info:get', url),
   },
 
   legacyMedia: {
