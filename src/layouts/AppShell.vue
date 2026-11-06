@@ -419,12 +419,9 @@ function waitViewEnter(): Promise<void> {
 
 /** Reabre uma página minimizada como estava (rolagem + retrato). */
 async function onOpenMinimized(fullPath: string) {
-  // já está aberta (o operador voltou por outro caminho): só sai da barra
-  if (route.fullPath === fullPath) {
-    minimizedPages.close(fullPath)
-    return
-  }
-  // posição do item antes de ele sair da barra
+  // já está aberta (item em destaque): nada a fazer
+  if (route.fullPath === fullPath) return
+  // de onde a página "sai" no efeito de reabrir
   const from = findMinimizedItemRect(fullPath)
   const page = minimizedPages.reopen(fullPath)
   if (!page) return
@@ -677,9 +674,11 @@ function viewKey(viewRoute: typeof route) {
     <div v-if="minimizedPages.hasItems" class="app-shell__minimized">
       <MinimizedPagesBar
         :items="minimizedItems"
+        :current-key="route.fullPath"
         :nav-label="t('minimize.bar')"
         @open="(fullPath: string) => void onOpenMinimized(fullPath)"
         @close="minimizedPages.close"
+        @reorder="minimizedPages.move"
       />
     </div>
 

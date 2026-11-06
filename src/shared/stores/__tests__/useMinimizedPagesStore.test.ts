@@ -73,15 +73,25 @@ describe('useMinimizedPagesStore', () => {
     expect(store.takeRestore('/albums/5')).toBeNull()
   })
 
-  it('reabrir tira da barra (Q2) e deixa o retrato para a página aplicar', () => {
+  it('reordenar muda a posição na barra e salva', () => {
+    const store = useMinimizedPagesStore()
+    store.minimize(page('/albums/5', 1))
+    store.minimize(page('/albums/6', 2))
+    store.minimize(page('/albums/7', 3))
+    store.move('/albums/7', 0)
+    expect(paths(store)).toEqual(['/albums/7', '/albums/5', '/albums/6'])
+    expect(loadMinimizedPages().map((p) => p.fullPath)).toEqual(['/albums/7', '/albums/5', '/albums/6'])
+  })
+
+  it('reabrir mantém na barra (fica marcada como em uso) e deixa o retrato para a página aplicar', () => {
     const store = useMinimizedPagesStore()
     const hinario = page('/albums/5', 1, { state: { collectionId: '5', searchQuery: 'santo' } })
     store.minimize(hinario)
     store.minimize(page('/albums/6', 2))
 
     expect(store.reopen('/albums/5')).toEqual(hinario)
-    expect(paths(store)).toEqual(['/albums/6'])
-    expect(loadMinimizedPages().map((p) => p.fullPath)).toEqual(['/albums/6'])
+    expect(paths(store)).toEqual(['/albums/5', '/albums/6'])
+    expect(loadMinimizedPages().map((p) => p.fullPath)).toEqual(['/albums/5', '/albums/6'])
 
     expect(store.takeRestore('/albums/6')).toBeNull()
     expect(store.takeRestore('/albums/5')).toEqual(hinario)

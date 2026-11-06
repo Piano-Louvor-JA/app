@@ -67,7 +67,7 @@ vi.mock('@design-system/index', () => ({
   GradientBackground: { template: '<div class="gradient-stub"><slot /></div>' },  MinimizedPagesBar: {
     name: 'MinimizedPagesBar',
     template: '<nav class="minimized-bar-mock" />',
-    props: ['items', 'navLabel'],
+    props: ['items', 'navLabel', 'currentKey'],
     emits: ['open', 'close'],
   },
   HistoryNav: {
