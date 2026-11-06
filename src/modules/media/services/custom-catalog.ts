@@ -32,6 +32,7 @@ import {
   listAllLocalMusicsWithLyrics,
   listLocalCollections,
   listLocalMusics,
+  publishLocalMusic,
   updateLocalCollection,
   updateLocalLyric,
   updateLocalMusic,
@@ -247,6 +248,7 @@ export async function loadCustomMusicTrack(
       albums: [],
       categories: ['Minhas Coletâneas'],
       lyrics,
+      status: local.status ?? 'published',
     } satisfies MediaTrackRecord
   }
   if (!Number.isFinite(musicId) || musicId <= 0) return null
@@ -429,6 +431,8 @@ export type CustomMusicSummary = {
   audioUrl?: string | null
   /** Link p/ hino oficial da API (null = música própria). */
   officialMusicId?: number | null
+  /** Estado de trabalho local (SPEC t_deed74b5) — ausente = published. */
+  status?: 'draft' | 'published'
 }
 
 /** LocalMusic (localStorage) → resumo no formato da listagem. */
@@ -444,6 +448,7 @@ function localMusicToSummary(m: LocalMusic): CustomMusicSummary {
     hasImage: Boolean(m.image_url) || Boolean(m.coverMediaId),
     audioUrl: m.audioBase64 ? audioDataUrlFromBase64(m.audioBase64) : null,
     officialMusicId: m.officialMusicId ?? null,
+    status: m.status ?? 'published',
   }
 }
 
@@ -469,6 +474,9 @@ async function copyLocalCustomMusic(
 
     const music = createLocalMusic(collectionId, { name: source.name })
     const { putMedia } = await import('./local-media-store')
+
+    // Copy preserva o estado de trabalho da origem (SPEC t_deed74b5).
+    updateLocalMusic(music.id, { status: source.status === 'draft' ? 'draft' : 'published' })
 
     // Áudio: blob objectURL → bytes → IndexedDB (audioMediaId).
     if (source.audioUrl?.startsWith('blob:')) {

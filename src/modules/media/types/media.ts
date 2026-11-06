@@ -24,6 +24,8 @@ export type MediaLyricSlide = {
   /** Frame PDF/PPT capturado (data:image/) — slide de frame, sem véu. */
   frameDataUrl?: string
   isCover: boolean
+  /** Estado de trabalho local (SPEC t_deed74b5) — ausente/remoto = published. */
+  status?: 'draft' | 'published'
 }
 
 export type MediaAlbumRef = {
@@ -44,6 +46,8 @@ export type MediaTrackRecord = {
   albums: MediaAlbumRef[]
   categories: string[]
   lyrics: MediaLyricSlide[]
+  /** Estado de trabalho local (SPEC t_deed74b5) — ausente/remoto = published. */
+  status?: 'draft' | 'published'
 }
 
 export type MediaSession = {

@@ -7,6 +7,7 @@ import MediaSlideStage from '../components/MediaSlideStage.vue'
 import MediaAccountBar from '../components/MediaAccountBar.vue'
 import AppConfirm from '@shared/components/AppConfirm.vue'
 import { getAuthSession } from '../services/auth-client'
+import { getAuthReadiness } from '@modules/auth/services/firebase-client'
 import { useAuth } from '@modules/auth/composables/useAuth'
 import { startOutboxLoop } from '../services/outbox-loop'
 import {
@@ -39,6 +40,7 @@ import {
   updateCustomLyric,
   updateCustomMusic,
   uploadCustomFile,
+  audioDataUrlFromBase64,
 } from '../services/custom-catalog'
 import type {
   CollectionVisibility,
@@ -268,6 +270,10 @@ function onReuseSearchInput(): void {
     reuseResults.value = []
     return
   }
+  // Fold diacrítico (padrão product-search): "missao" acha "MISSÃO".
+  const normalize = (s: string): string =>
+    s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  const queryFold = normalize(query)
   void (async () => {
     if (allCustomMusicsCache == null) {
       allCustomMusicsCache = await listAllCustomMusics()
@@ -275,7 +281,7 @@ function onReuseSearchInput(): void {
     const cached = allCustomMusicsCache
     if (!cached) return
     reuseResults.value = cached
-      .filter((m) => m.name.toLowerCase().includes(query))
+      .filter((m) => normalize(m.name.toLowerCase()).includes(queryFold))
       .slice(0, 8)
       .map((m) => ({
         id: m.id,
@@ -475,11 +481,21 @@ async function onSelectMusic(id: number): Promise<void> {
         return
       }
       musicName.value = local.name
-      lyrics.value = local.lyrics.map((row) => ({
-        id: row.id,
-        lyric: row.lyric,
-        time: row.time ?? '00:00',
-        imageUrl: row.image_url ?? '',
+      // Bg local (IndexedDB): resolve blob → objectURL p/ preview no editor.
+      lyrics.value = await Promise.all(local.lyrics.map(async (row) => {
+        let imageUrl = ''
+        if (row.imageMediaId) {
+          const blob = await getMedia(row.imageMediaId)
+          if (blob) imageUrl = URL.createObjectURL(blob)
+        } else {
+          imageUrl = row.image_url ?? ''
+        }
+        return {
+          id: row.id,
+          lyric: row.lyric,
+          time: row.time ?? '00:00',
+          imageUrl,
+        }
       }))
       loadAudioForMusic(local.audioBase64 || local.audioMediaId ? `local:${local.id}` : null)
       if (local.officialMusicId != null) {
@@ -555,6 +571,12 @@ async function onImportFile(event: Event): Promise<void> {
   loading.value = true
   notify('')
   try {
+    // Espera a revalidação da sessão no boot (coalescing; teto de 8s —
+    // offline segue com o que tem localmente, sem travar o import).
+    await Promise.race([
+      getAuthReadiness(),
+      new Promise<void>((resolve) => setTimeout(resolve, 8_000)),
+    ])
     const buffer = await file.arrayBuffer()
     // Aceita .slja direto OU .slja.zip (wrapper que o WhatsApp cria)
     const archive = await parseSljaFile(buffer, file.name)
@@ -588,39 +610,75 @@ async function onImportFile(event: Event): Promise<void> {
 
     const createdMusic = await createCustomMusic(collectionId, { name })
     if (!createdMusic) {
-      notify('Falha ao criar música a partir do .slja')
+      notify('Falha ao criar música a partir do .slja — verifique conexão/login', true)
       return
     }
     selectedMusicId.value = createdMusic.id
     musicName.value = name
     lyrics.value = []
 
-    // Upload de mídia embutida no .slja (áudio + imagens de fundo).
-    // Falha de upload não aborta o import — segue só com texto.
+    // Mídia embutida no .slja (áudio + imagens de fundo).
+    // OFFLINE-FIRST: música local (id negativo, sem sessão) guarda áudio/bg
+    // em IndexedDB — reprodução/projeção funcionam sem servidor. Música
+    // remota segue com upload pra API.
+    const isLocalMusic = isLocalId(createdMusic.id)
+    const hasSession = Boolean(getAuthSession())
     let uploadedAudio: { idFile: number; url: string } | null = null
+    let localAudioPath: string | null = null
+    const localImageMediaIds = new Map<string, string>() // asset.path → IndexedDB id
+    let localAssetIndex = 0
+
     if (archive.audio?.bytes?.length) {
-      uploadedAudio = await uploadCustomFile(
-        archive.audio.bytes,
-        archive.audio.name,
-        'audio',
-      )
-      if (uploadedAudio) {
-        await updateCustomMusic(createdMusic.id, { id_file_audio: uploadedAudio.idFile })
-        notify(`Importado: ${file.name} (com áudio)`)
+      if (isLocalMusic) {
+        const mediaId = `local-music-${createdMusic.id}-audio`
+        await putMedia(mediaId, archive.audio.bytes)
+        updateLocalMusic(createdMusic.id, {
+          audioMediaId: mediaId,
+          audioBase64: null,
+          audioName: archive.audio.name,
+        })
+        localAudioPath = `local:${createdMusic.id}`
+        notify(`Importado: ${file.name} (com áudio local)`)
       } else {
-        notify(`Importado: ${file.name} (áudio falhou no upload)`)
+        uploadedAudio = await uploadCustomFile(
+          archive.audio.bytes,
+          archive.audio.name,
+          'audio',
+        )
+        if (uploadedAudio) {
+          await updateCustomMusic(createdMusic.id, { id_file_audio: uploadedAudio.idFile })
+          notify(`Importado: ${file.name} (com áudio)`)
+        } else {
+          console.error('Falha no upload de áudio do .slja', { file: archive.audio.name })
+          notify(`Importado: ${file.name} (áudio falhou no upload — verifique conexão/login)`, true)
+        }
       }
-    }
-    if (archive.assets?.length) {
-      const uploaded: Array<{ path: string; url: string; idFile: number }> = []
-      for (const asset of archive.assets) {
-        const up = await uploadCustomFile(asset.bytes, asset.path, 'imagens')
-        if (up) uploaded.push({ path: asset.path, url: up.url, idFile: up.idFile })
-      }
-      uploadedAssets.value = uploaded
+    } else if (hasSession) {
+      notify(`Importado: ${file.name}`)
     }
 
-    /** imageUrl → id_file, pro createCustomLyric (API espera id, não url) */
+    if (archive.assets?.length) {
+      if (isLocalMusic) {
+        // Bg local em IndexedDB: sem upload e sem estourar quota do localStorage.
+        for (const asset of archive.assets) {
+          const mediaId = `local-music-${createdMusic.id}-image-${localAssetIndex++}`
+          await putMedia(mediaId, asset.bytes)
+          localImageMediaIds.set(asset.path, mediaId)
+        }
+      } else {
+        const uploaded: Array<{ path: string; url: string; idFile: number }> = []
+        for (const asset of archive.assets) {
+          const up = await uploadCustomFile(asset.bytes, asset.path, 'imagens')
+          if (up) uploaded.push({ path: asset.path, url: up.url, idFile: up.idFile })
+        }
+        uploadedAssets.value = uploaded
+      }
+    }
+    if (!isLocalMusic && !hasSession && (archive.audio?.bytes?.length || archive.assets?.length)) {
+      notify('Sem conta conectada: áudio e fundo não sobem — entre para incluí-los', true)
+    }
+
+    /** imageUrl → id_file (remoto) ou data: URL (local) */
     const imageIdByUrl = new Map(uploadedAssets.value.map((a) => [a.url, a.idFile]))
 
     // Slides CAPA do .slja NÃO viram estrofe: o player já projeta a capa
@@ -630,12 +688,21 @@ async function onImportFile(event: Event): Promise<void> {
     const slides = [...archive.slides]
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
       .filter((slide) => slide.type !== 'CAPA')
+    let importedCount = 0
+    let failedLyrics = 0
     for (const slide of slides) {
       const text = slide.lyric.trim()
       if (!text) continue
-      // Background do slide: se o .slja referencia imagem, usa a URL upada
+      // Background do slide: remoto → URL upada; local → data: URL do asset
       let imageUrl = ''
-      if (slide.image?.name && uploadedAssets.value.length) {
+      let imageMediaId: string | undefined
+      if (slide.image?.name && isLocalMusic && localImageMediaIds.size) {
+        const match = [...localImageMediaIds.entries()].find(([path]) =>
+          slide.image!.name.toLowerCase().includes(path.toLowerCase())
+          || path.toLowerCase().includes(slide.image!.name.toLowerCase()),
+        )
+        if (match) imageMediaId = match[1]
+      } else if (slide.image?.name && uploadedAssets.value.length) {
         const match = uploadedAssets.value.find((a) =>
           slide.image!.name.toLowerCase().includes(a.path.toLowerCase())
           || a.path.toLowerCase().includes(slide.image!.name.toLowerCase()),
@@ -646,18 +713,35 @@ async function onImportFile(event: Event): Promise<void> {
         lyric: text,
         time: formatMsAsTime(slide.timeMs),
         id_file_image: imageIdByUrl.get(imageUrl),
+        imageMediaId,
       })
       if (created) {
+        importedCount++
+        // No modo local o bg vive em IndexedDB (imageMediaId) — resolve o
+        // objectURL agora pra preview/projeção refletirem na hora.
+        let stanzaImageUrl = imageUrl
+        if (!stanzaImageUrl && imageMediaId) {
+          const blob = await getMedia(imageMediaId)
+          if (blob) stanzaImageUrl = URL.createObjectURL(blob)
+        }
         lyrics.value.push({
           id: created.id,
           lyric: text,
           time: formatMsAsTime(slide.timeMs),
-          imageUrl,
+          imageUrl: stanzaImageUrl,
         })
+      } else {
+        failedLyrics++
+        console.error('Falha ao criar estrofe do .slja', { slide: slide.order, musicId: createdMusic.id })
       }
     }
-    if (!statusMessage.value) {
-      notify(`Importado: ${slides.filter((s) => s.lyric.trim()).length} estrofes de ${file.name}`)
+    if (failedLyrics > 0) {
+      notify(
+        `Importado com falhas: ${importedCount} estrofes OK, ${failedLyrics} falharam — verifique conexão/login`,
+        true,
+      )
+    } else if (!statusMessage.value) {
+      notify(`Importado: ${importedCount} estrofes de ${file.name}`)
     }
 
     // Pós-import: reflete tudo na UI — sidebar da coletânea, áudio no player,
@@ -667,7 +751,7 @@ async function onImportFile(event: Event): Promise<void> {
       selectedCollectionId.value = collectionId
     }
     musics.value = await listCustomMusics(collectionId)
-    loadAudioForMusic(uploadedAudio?.url ?? null)
+    loadAudioForMusic(localAudioPath ?? uploadedAudio?.url ?? null)
   } catch (error) {
     console.error('Falha ao importar .slja', error)
     notify('Arquivo .slja inválido')
@@ -924,7 +1008,7 @@ async function loadAudioForMusic(audioPath: string | null): Promise<void> {
       audioSrc.value = blob ? URL.createObjectURL(blob) : null
     } else {
       audioSrc.value = local?.audioBase64
-        ? `data:audio/mpeg;base64,${local.audioBase64}`
+        ? audioDataUrlFromBase64(local.audioBase64)
         : null
     }
   } else {
@@ -1486,6 +1570,11 @@ onMounted(async () => {
                   aria-hidden="true"
                 />
                 {{ music.name }}
+                <span
+                  v-if="music.status === 'draft'"
+                  class="editor__draft-badge"
+                  title="Rascunho — só existe neste dispositivo até ser publicada"
+                >Rascunho</span>
               </button>
             </li>
           </ul>
@@ -1598,7 +1687,7 @@ onMounted(async () => {
                     class="ti ti-music"
                     aria-hidden="true"
                   />
-                  Adicionar áudio (MP3)
+                  Adicionar áudio
                 </button>
                 <button
                   v-else
@@ -2680,5 +2769,19 @@ onMounted(async () => {
   margin-right: 0.3rem;
   color: var(--ds-color-primary, #2196f3);
   opacity: 0.85;
+}
+
+/* Badge "Rascunho" (SPEC t_deed74b5) — trabalho em andamento, só local. */
+.editor__draft-badge {
+  flex-shrink: 0;
+  margin-left: 0.35rem;
+  padding: 0.05rem 0.35rem;
+  border: 1px solid var(--ds-color-border, rgba(255, 255, 255, 0.2));
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  opacity: 0.8;
 }
 </style>
