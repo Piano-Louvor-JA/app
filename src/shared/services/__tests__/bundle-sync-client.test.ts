@@ -258,6 +258,26 @@ describe('syncBundle — validação do manifest entry-wise (ADR-09/RF-19)', () 
     expect(Object.keys(subset!).sort()).toEqual(['es_categories', 'es_musics'])
   })
 
+  it('hymnal multi-dígito (pt_hymnal_123) entra no subset; hymnal puro também', async () => {
+    const subset = parseManifest(
+      [entry('pt_hymnal.json'), entry('pt_hymnal_123.json'), entry('pt_hymnal_1.json')],
+      'catalog',
+    )
+    expect(Object.keys(subset!).sort()).toEqual([
+      'pt_hymnal',
+      'pt_hymnal_1',
+      'pt_hymnal_123',
+    ])
+  })
+
+  it('MD5 da entry aceita exatamente 32 hex lowercase — 31/33/não-hex rejeitam', () => {
+    expect(parseManifest([entry('config.json', 'a'.repeat(31))], 'catalog')).toBeNull()
+    expect(parseManifest([entry('config.json', 'a'.repeat(33))], 'catalog')).toBeNull()
+    expect(parseManifest([entry('config.json', 'A'.repeat(32))], 'catalog')).toBeNull()
+    expect(parseManifest([entry('config.json', 'z'.repeat(32))], 'catalog')).toBeNull()
+    expect(parseManifest([entry('config.json', '0'.repeat(32))], 'catalog')).not.toBeNull()
+  })
+
   it('manifest 404 => null sem lançar', async () => {
     mocks.state.fetch.mockResolvedValueOnce(new Response('nope', { status: 404 }))
     await expect(syncBundle('catalog')).resolves.toBeNull()
@@ -611,14 +631,65 @@ describe('syncBundle — integridade entry-wise do ZIP (ADR-10/RF-21)', () => {
   })
 
   it.each([
-    ['sem pt_categories', { pt_musics: [], config: {}, music_1: {} }],
-    ['sem pt_musics', { pt_categories: [], config: {}, music_1: {} }],
-    ['sem config', { pt_categories: [], pt_musics: [], music_1: {} }],
-  ])('catalog ZIP incompleto (%s) => null, nada aplicado', async (_label, files) => {
-    const zip = await makeZip(files)
+    ['sem pt_categories', ['pt_musics.json', 'config.json', 'music_1.json']],
+    ['sem pt_musics', ['pt_categories.json', 'config.json', 'music_1.json']],
+    ['sem config', ['pt_categories.json', 'pt_musics.json', 'music_1.json']],
+  ])('catalog essencial ausente do MANIFEST+ZIP (%s) => null (além da completude)', async (_label, files) => {
+    // Manifest e ZIP coerentes entre si, mas SEM o essencial: a completude
+    // não dispara — só a checagem de essenciais (ADR-10 item 5) barra.
+    const { zipSync, strToU8 } = await import('fflate')
+    const inner: Record<string, Uint8Array> = {
+      '_bundle_manifest.json': strToU8(
+        JSON.stringify({ schema_version: 1, kind: 'catalog', files: [] }),
+      ),
+    }
+    const entries: Entry[] = []
+    for (const f of files) {
+      const raw = strToU8('[]')
+      inner[f] = raw
+      entries.push(entry(f, await md5Of(raw)))
+    }
+    const zip = zipSync(inner)
     mocks.state.fetch
-      .mockResolvedValueOnce(manifestResponse(catalogManifest()))
+      .mockResolvedValueOnce(manifestResponse(entries))
       .mockResolvedValueOnce(zipResponse(zip))
+    expect(await syncBundle('catalog')).toBeNull()
+    expect(mocks.state.applyRecords).not.toHaveBeenCalled()
+  })
+
+  it('bundle VÁLIDO + entrada maliciosa extra (..) => invalida o ZIP inteiro', async () => {
+    // Sem a checagem de caminho seguro o bundle aplicaria (entry fora do
+    // subset seria ignorada) — o teste prova que a estrutura insegura
+    // invalida mesmo sem afetar o subset (ADR-10 item 1).
+    const { zip, entries } = await makeBundle({
+      pt_categories: [],
+      pt_musics: [],
+      config: {},
+      music_1: {},
+    })
+    const { zipSync, strToU8 } = await import('fflate')
+    const evilZip = (() => {
+      // re-zipa adicionando a entrada maliciosa ao mesmo conteúdo
+      const inner: Record<string, Uint8Array> = {
+        '_bundle_manifest.json': strToU8(
+          JSON.stringify({ schema_version: 1, kind: 'catalog', files: [] }),
+        ),
+        '../evil.json': strToU8('{}'),
+      }
+      for (const [k, v] of Object.entries({
+        pt_categories: [],
+        pt_musics: [],
+        config: {},
+        music_1: {},
+      })) {
+        inner[`${k}.json`] = strToU8(JSON.stringify(v))
+      }
+      return zipSync(inner)
+    })()
+    void zip
+    mocks.state.fetch
+      .mockResolvedValueOnce(manifestResponse(entries))
+      .mockResolvedValueOnce(zipResponse(evilZip))
     expect(await syncBundle('catalog')).toBeNull()
     expect(mocks.state.applyRecords).not.toHaveBeenCalled()
   })
