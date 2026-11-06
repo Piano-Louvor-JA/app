@@ -82,6 +82,27 @@ export type YoutubeAdblockApi = {
   set: (enabled: boolean) => Promise<{ ok: boolean }>
 }
 
+export type YoutubeVideoInfo = {
+  title: string
+  channel: string
+  description: string
+  durationMs: number
+}
+
+export type YoutubeInfoApi = {
+  get: (videoId: string) => Promise<YoutubeVideoInfo | null>
+}
+
+export type SitePageInfo = {
+  title: string
+  siteName: string
+  description: string
+}
+
+export type SiteInfoApi = {
+  get: (url: string) => Promise<SitePageInfo | null>
+}
+
 export type LegacyMediaCounts = {
   covers: number
   music: number
@@ -498,6 +519,8 @@ export type LouvorJaBridge = {
   classo?: ClassoApi
   ytAuth?: YoutubeAuthApi
   ytAdblock?: YoutubeAdblockApi
+  ytInfo?: YoutubeInfoApi
+  siteInfo?: SiteInfoApi
   externalPlayer?: ExternalPlayerApi
   legacyMedia?: LegacyMediaApi
   mediaFolder?: MediaFolderApi

@@ -186,6 +186,16 @@ contextBridge.exposeInMainWorld('louvorja', {
     set: (enabled) => ipcRenderer.invoke('yt-adblock:set', enabled),
   },
 
+  ytInfo: {
+    // Título, canal, duração e descrição do vídeo (preenche o item da liturgia ao colar o link)
+    get: (videoId) => ipcRenderer.invoke('youtube-info:get', videoId),
+  },
+
+  siteInfo: {
+    // Título, nome do site e descrição da página (preenche o item de site da liturgia)
+    get: (url) => ipcRenderer.invoke('site-info:get', url),
+  },
+
   legacyMedia: {
     analyze: (selectedPath) =>
       ipcRenderer.invoke('legacy-media:analyze', selectedPath ?? ''),
