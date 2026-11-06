@@ -93,9 +93,22 @@
     <script>
       ;(() => {
         const params = new URLSearchParams(window.location.search)
-        const src = params.get('src') || ''
-        const audioSrc = params.get('audioSrc') || ''
-        const subtitleSrc = params.get('subtitle') || ''
+        // Este player recebe apenas arquivos e streams do protocolo local do app.
+        // Parâmetros da janela nunca podem selecionar um protocolo executável/remoto.
+        function localMediaUrl(value) {
+          if (!value) return ''
+          try {
+            const url = new URL(value)
+            if (url.protocol !== 'local:' || url.username || url.password) return ''
+            if (!['app', 'yt-cache', 'yt-stream'].includes(url.hostname)) return ''
+            return url.href
+          } catch {
+            return ''
+          }
+        }
+        const src = localMediaUrl(params.get('src'))
+        const audioSrc = localMediaUrl(params.get('audioSrc'))
+        const subtitleSrc = localMediaUrl(params.get('subtitle'))
         const title = (params.get('title') || '').trim()
         const forceAudio = params.get('audio') === '1'
         const video = document.getElementById('player')

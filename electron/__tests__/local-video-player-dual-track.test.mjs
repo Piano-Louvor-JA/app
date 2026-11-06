@@ -68,3 +68,15 @@ it('vídeo local comum: sem trilha de som separada, sem legenda e sem CORS', () 
     expect(attach).not.toHaveBeenCalled()
   } finally { dom.window.close() }
 })
+
+for (const field of ['src', 'audioSrc', 'subtitle']) {
+  it(`recusa protocolo executável em ${field}`, () => {
+    const query = new URLSearchParams({ src: 'local://app/home/v.mp4', [field]: 'javascript:alert(1)' })
+    const { dom, document } = openPlayer(query)
+    try {
+      for (const media of document.querySelectorAll('video, audio, track')) {
+        expect(media.getAttribute('src') || '').not.toMatch(/^javascript:/)
+      }
+    } finally { dom.window.close() }
+  })
+}

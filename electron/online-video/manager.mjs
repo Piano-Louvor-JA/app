@@ -49,7 +49,13 @@ async function fetchSubtitle(url, file, signal) {
   const timeout = AbortSignal.timeout(SUBTITLE_TIMEOUT_MS)
   const res = await fetch(url, { signal: signal ? AbortSignal.any([signal, timeout]) : timeout })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  await writeFile(file, Buffer.from(await res.arrayBuffer()))
+  const bytes = await res.arrayBuffer()
+  if (bytes.byteLength > 5 * 1024 * 1024) throw new Error('WebVTT muito grande')
+  const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+  if (!/^WEBVTT(?:[ \t][^\r\n]*)?(?:\r?\n|$)/.test(text) || text.includes('\0')) {
+    throw new Error('Legenda não é WebVTT válido')
+  }
+  await writeFile(file, text, 'utf8')
 }
 
 export class OnlineVideoManager {
