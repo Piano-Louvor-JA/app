@@ -12,6 +12,7 @@ export default {
 		saveCopy: "Salvar cópia",
 		copySaved: "Cópia salva em Minhas Coletâneas",
 		copyFailed: "Não foi possível salvar a cópia.",
+		conductLink: "Código de Conduta",
 		ranking: "Ver ranking",
 		createCollection: "Criar coletânea",
 		pagination: "Paginação da Comunidade",

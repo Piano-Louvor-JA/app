@@ -16,6 +16,12 @@ export default {
       showRules: 'View community rules',
       gotIt: 'Got it',
       linkLabel: 'Community rules',
+      conduct: {
+        title: 'Conduct',
+        summary:
+          'Publish content that glorifies God, with a genuine message and respect for copyright. Improper content, contrary to Adventist beliefs, spam or harassment is not allowed. Reports and strikes follow transparent moderation with the right to appeal.',
+      },
+      readFull: 'Read the full Code of Conduct',
     },
     editor: {
       importSlja: 'Import .slja file',
