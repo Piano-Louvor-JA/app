@@ -96,7 +96,8 @@ function loadDb(): LocalDb {
 			nextLyricId: parsed.nextLyricId ?? -1,
 			collections: Array.isArray(parsed.collections) ? parsed.collections : [],
 			// Migração draft (SPEC t_deed74b5): registro legado sem status
-			// = já existia antes = tratado como publicado.
+			// = já existia antes = tratado como publicado. O primeiro saveDb
+			// persiste o campo (roundtrip: migrado sobrevive a reload).
 			musics: Array.isArray(parsed.musics)
 				? parsed.musics.map((m) => ({
 						...m,

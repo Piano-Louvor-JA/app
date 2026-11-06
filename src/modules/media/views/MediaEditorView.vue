@@ -83,6 +83,21 @@ const collections = ref<CustomCollectionSummary[]>([])
 const newCollectionVisibility = ref<CollectionVisibility>('private')
 const selectedCollectionId = ref<number | null>(null)
 const musics = ref<CustomMusicSummary[]>([])
+/** Estado de trabalho da música local selecionada (SPEC t_deed74b5). */
+const musicStatus = ref<'draft' | 'published'>('published')
+
+/** Publica a música local selecionada: draft → published. */
+async function onPublishMusic(): Promise<void> {
+  const id = selectedMusicId.value
+  if (id == null || !(id < 0)) return
+  const { publishLocalMusic } = await import('../services/local-custom-store')
+  if (publishLocalMusic(id)) {
+    musicStatus.value = 'published'
+    notify(`“${musicName.value}” publicada — disponível neste dispositivo`)
+  } else {
+    notify('Falha ao publicar')
+  }
+}
 const selectedMusicId = ref<number | null>(null)
 const musicName = ref('')
 const lyrics = ref<EditorLyric[]>([])
@@ -258,6 +273,8 @@ interface ReusableMusic {
   name: string
   collectionName?: string
   isCurrent: boolean
+  /** Estado de trabalho local (SPEC t_deed74b5) — badge na busca de reuso. */
+  status?: 'draft' | 'published'
 }
 
 const reuseSearch = ref('')
@@ -288,6 +305,7 @@ function onReuseSearchInput(): void {
         name: m.name,
         collectionName: m.collectionName,
         isCurrent: m.collectionId === selectedCollectionId.value,
+        status: m.status,
       }))
   })()
 }
@@ -481,6 +499,8 @@ async function onSelectMusic(id: number): Promise<void> {
         return
       }
       musicName.value = local.name
+      // Estado de trabalho local (SPEC t_deed74b5) — badge/botão Publicar.
+      musicStatus.value = local.status ?? 'published'
       // Bg local (IndexedDB): resolve blob → objectURL p/ preview no editor.
       lyrics.value = await Promise.all(local.lyrics.map(async (row) => {
         let imageUrl = ''
@@ -1492,6 +1512,11 @@ onMounted(async () => {
                   />
                   <span class="editor__list-item-text">
                     {{ music.name }}
+                    <span
+                      v-if="music.status === 'draft'"
+                      class="editor__draft-badge"
+                      title="Rascunho — a cópia também nasce como rascunho"
+                    >Rascunho</span>
                     <small
                       v-if="music.collectionName"
                       class="editor__list-item-sub"
@@ -1578,6 +1603,20 @@ onMounted(async () => {
               </button>
             </li>
           </ul>
+          <button
+            v-if="selectedMusicId != null && musicStatus === 'draft'"
+            type="button"
+            class="editor__btn editor__btn--publish"
+            :disabled="saving"
+            title="Publica a música — deixa de ser rascunho neste dispositivo"
+            @click="onPublishMusic"
+          >
+            <i
+              class="ti ti-upload"
+              aria-hidden="true"
+            />
+            Publicar
+          </button>
           <button
             v-if="selectedMusicId != null"
             type="button"
@@ -2783,5 +2822,11 @@ onMounted(async () => {
   letter-spacing: 0.02em;
   text-transform: uppercase;
   opacity: 0.8;
+}
+
+/* Botão Publicar (SPEC t_deed74b5) — draft → published. */
+.editor__btn--publish {
+  border-color: var(--ds-color-primary, #2196f3);
+  color: var(--ds-color-primary, #2196f3);
 }
 </style>

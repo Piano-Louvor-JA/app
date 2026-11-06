@@ -62,6 +62,7 @@ vi.mock("../../services/local-custom-store", () => ({
 	getLocalMusic: vi.fn(),
 	isLocalId: vi.fn(() => false),
 	updateLocalMusic: vi.fn(),
+	publishLocalMusic: vi.fn(() => true),
 }));
 
 vi.mock("@modules/albums/services/album-music-search", () => ({
@@ -256,6 +257,67 @@ describe("MediaEditorView — seleção de música", () => {
 		).onSelectMusic(-5);
 		expect(getLocalMusic).toHaveBeenCalledWith(-5);
 		expect(w.text()).toContain("Localzinha");
+		w.unmount();
+	});
+
+	it("draft: botão Publicar aparece p/ draft local, publica e some após publicar", async () => {
+		const { getLocalMusic, isLocalId, publishLocalMusic } = await import(
+			"../../services/local-custom-store"
+		);
+		vi.mocked(isLocalId).mockReturnValue(true);
+		vi.mocked(getLocalMusic).mockReturnValue({
+			id: -7,
+			name: "Meu rascunho",
+			status: "draft",
+			lyrics: [{ id: 1, lyric: "V1", time: "00:01", image_url: null }],
+			audioBase64: null,
+			officialMusicId: null,
+		} as never);
+		const w = await mountEditor();
+		setupOf(w).collectionId.value = 3;
+		const st = w.vm.$.devtoolsRawSetupState as unknown as {
+			onSelectMusic: (id: number) => Promise<void>;
+			musicStatus: { value: string };
+			onPublishMusic: () => Promise<void>;
+		};
+		await st.onSelectMusic(-7);
+		await flushPromises();
+		// estado inicial: draft
+		expect(st.musicStatus.value).toBe("draft");
+		// botão visível no DOM
+		const pubBtn = w.findAll("button").find((b) => b.text().includes("Publicar"));
+		expect(pubBtn).toBeDefined();
+		// publica
+		await st.onPublishMusic();
+		await flushPromises();
+		expect(publishLocalMusic).toHaveBeenCalledWith(-7);
+		expect(st.musicStatus.value).toBe("published");
+		// botão some após publicar
+		expect(w.findAll("button").find((b) => b.text().includes("Publicar"))).toBeUndefined();
+		w.unmount();
+	});
+
+	it("draft: música published não mostra botão Publicar", async () => {
+		const { getLocalMusic, isLocalId } = await import(
+			"../../services/local-custom-store"
+		);
+		vi.mocked(isLocalId).mockReturnValue(true);
+		vi.mocked(getLocalMusic).mockReturnValue({
+			id: -8,
+			name: "Já publicada",
+			status: "published",
+			lyrics: [{ id: 1, lyric: "V1", time: "00:01", image_url: null }],
+			audioBase64: null,
+			officialMusicId: null,
+		} as never);
+		const w = await mountEditor();
+		setupOf(w).collectionId.value = 3;
+		await (
+			w.vm.$.devtoolsRawSetupState as unknown as {
+				onSelectMusic: (id: number) => Promise<void>;
+			}
+		).onSelectMusic(-8);
+		expect(w.findAll("button").find((b) => b.text().includes("Publicar"))).toBeUndefined();
 		w.unmount();
 	});
 

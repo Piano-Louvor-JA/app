@@ -32,7 +32,6 @@ import {
   listAllLocalMusicsWithLyrics,
   listLocalCollections,
   listLocalMusics,
-  publishLocalMusic,
   updateLocalCollection,
   updateLocalLyric,
   updateLocalMusic,
@@ -571,6 +570,7 @@ export async function listAllCustomMusics(options?: {
       duration: null,
       hasAudio: Boolean(m.audioMediaId ?? m.audioBase64),
       hasImage: Boolean(m.image_url ?? m.coverMediaId),
+      status: m.status ?? 'published',
       collectionName: col?.name,
       collectionId: m.collectionId,
     }
