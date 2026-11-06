@@ -22,8 +22,10 @@ import { attachHistoryAppCommand, attachWindowStateEvents, mainWindowChromeOptio
 import { attachRemoteServer } from "./remote-server.mjs";
 import { attachPalcoServer, getPalcoManager } from "./palco-server.mjs";
 import { ensureWorkspaceDirectories } from "./paths.mjs";
-import { registerLocalFileProtocol, registerLocalScheme } from "./protocol.mjs";
-import { registerCloseProjectionPopups } from "./ipc/web-projection.mjs";
+import { registerLocalFileProtocol, registerLocalScheme, setOnlineVideoSource } from "./protocol.mjs";
+import { registerCloseProjectionPopups, setOnlineVideoPlayer } from "./ipc/web-projection.mjs";
+import { OnlineVideoService, registerOnlineVideoIpc } from "./online-video/ipc.mjs";
+import { readWorkspaceRecord, writeWorkspaceRecord } from "./workspace.mjs";
 import { buildProjectionWindowBounds } from "./projection-display.mjs";
 import { createIndependentProjectionRegistry, isIndependentProjectionUrl } from "./independent-projection.mjs";
 import { createSharedProjectionLayout, isSharedProjectionUrl } from "./shared-projection.mjs";
@@ -724,6 +726,34 @@ function attachProjectionWindowHandlers(parentWindow) {
   })
 }
 
+/** @type {OnlineVideoService | null} */
+let onlineVideo = null;
+
+/** Cópia local dos vídeos do YouTube: IPC, protocolo `local://yt-*` e projeção. */
+function startOnlineVideo(getLocale) {
+	onlineVideo = new OnlineVideoService({
+		userDataDir: app.getPath("userData"),
+		readRecord: readWorkspaceRecord,
+		writeRecord: writeWorkspaceRecord,
+		getLocale,
+		windowsStore: process.windowsStore === true,
+		broadcast: (channel, payload) => {
+			for (const win of BrowserWindow.getAllWindows()) {
+				if (!win.isDestroyed()) win.webContents.send(channel, payload);
+			}
+		},
+		log: (message) => mainLog.info(`online-video ${message}`),
+	});
+	const service = onlineVideo;
+	registerOnlineVideoIpc(ipcMain, service);
+	setOnlineVideoSource({
+		serve: (id, kind, range, signal) => service.serve(id, kind, range, signal),
+		cacheFile: (name) => path.join(service.cache.dir, name),
+	});
+	setOnlineVideoPlayer(service);
+	void service.init().catch((error) => mainLog.error(`online-video init ${error?.message ?? error}`));
+}
+
 function createWindow(locale = 'pt-BR') {
 	const iconPath = resolveAppIconPath();
 	const windowState = loadWindowState();
@@ -927,6 +957,7 @@ app.whenReady().then(async () => {
 		mainLog.info('diagnostics IPC handlers registered');
 		registerWindowIpc(() => mainWindow);
 		registerLocalFileProtocol();
+		startOnlineVideo(() => locale);
 		registerYoutubeEmbedHeaders();
 		registerYoutubeAuthIpc();
 		void enableAdblocker();
@@ -988,6 +1019,8 @@ app.on("before-quit", () => {
 
 app.on("will-quit", () => {
   globalShortcut.unregisterAll();
+  onlineVideo?.dispose();
+  void onlineVideo?.manager.cancelAll().catch(() => {});
 });
 
 app.on("window-all-closed", () => {

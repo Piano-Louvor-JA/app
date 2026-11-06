@@ -9,6 +9,9 @@ export function youtubeCaptionsScript(hidden) {
       style.textContent = '#movie_player .ytp-caption-window-container, #movie_player .caption-window { display: none !important; visibility: hidden !important; }';
       document.head.appendChild(style);
     } else if (!hidden && style) style.remove();
+    for (const video of document.querySelectorAll('video')) {
+      for (const track of Array.from(video.textTracks || [])) track.mode = hidden ? 'hidden' : 'showing';
+    }
     return { captionsHidden: hidden };
   })()`
 }
