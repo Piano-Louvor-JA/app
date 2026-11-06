@@ -7,6 +7,12 @@ name: Build macOS
 
 on:
   workflow_dispatch:
+    inputs:
+      homologation:
+        description: 'Build de homologação (STG): builda DMG universal SEM publicar'
+        required: false
+        default: false
+        type: boolean
   push:
     tags:
       - 'v*'
@@ -49,7 +55,7 @@ jobs:
           echo "Nenhum pacote macOS foi enviado a registry ou GitHub Release."
 
       - name: Install dependencies
-        if: steps.decision.outputs.publish == 'true'
+        if: steps.decision.outputs.publish == 'true' || inputs.homologation == true
         run: npm ci
 
       - name: Resolve API build profile
@@ -67,6 +73,24 @@ jobs:
       # Quem cria a GitHub Release é o release.yml (um único draft por tag).
       # Com --publish always, os dois publishers deste build criaram duas
       # releases para a v1.31.2 (DMG numa, blockmap na outra).
+      # Homologação (workflow_dispatch homologation=true): DMG universal STG
+      # sem publicar — o artifact abaixo é o entregável pros testadores.
+      - name: Build homologação (STG, sem publicar)
+        if: inputs.homologation == true
+        run: npm run electron:build -- --mac --universal --publish never
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload homologação (DMG universal)
+        if: inputs.homologation == true
+        uses: actions/upload-artifact@v7
+        with:
+          name: LouvorJA-PIANO-macOS-universal-DMG-homologation
+          path: |
+            dist-electron/*universal*.dmg
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Build Vite + Electron DMG e ZIP universal
         if: steps.decision.outputs.publish == 'true'
         run: npm run electron:build -- --mac --universal --publish never
