@@ -36,7 +36,8 @@ vi.mock('../../../settings/services/stage-settings-runtime', () => ({
   },
 }))
 
-vi.mock('../../../settings/types/stage-settings', () => ({
+vi.mock('../../../settings/types/stage-settings', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   resolveBackgroundImage: (v: unknown) => (v ? String(v) : null),
   stageFlexAlign: () => ({ display: 'flex' }),
 }))
@@ -176,5 +177,83 @@ describe('BibleProjectionView.vue', () => {
       'text-transform: capitalize',
     )
     w.unmount()
+  })
+
+  describe('transição ao trocar versículo', () => {
+    const stage = stageValue.value as Record<string, unknown>
+    afterEach(() => {
+      delete stage.bibleTransition
+      delete stage.bibleTransitionSpeed
+    })
+    async function mounted() {
+      const w = mount(BibleProjectionView)
+      await flushPromises()
+      return w
+    }
+
+    it('padrão: suave, na velocidade normal', async () => {
+      const w = await mounted()
+      expect(w.html()).toContain('name="bible-fade"')
+      expect(w.find('.pb-stub').attributes('style')).toContain('--bible-transition-ms: 250ms')
+      w.unmount()
+    })
+
+    it('tipo e velocidade do Palco', async () => {
+      stage.bibleTransition = 'zoom'
+      stage.bibleTransitionSpeed = 'slow'
+      const w = await mounted()
+      expect(w.html()).toContain('name="bible-zoom"')
+      expect(w.html()).not.toContain('name="bible-fade"')
+      expect(w.find('.pb-stub').attributes('style')).toContain('--bible-transition-ms: 450ms')
+      w.unmount()
+    })
+
+    it('nenhuma: sem animação', async () => {
+      stage.bibleTransition = 'none'
+      const w = await mounted()
+      expect(w.html()).toContain('name="bible-none"')
+      w.unmount()
+    })
+  })
+
+  describe('posição da referência', () => {
+    const stage = stageValue.value as Record<string, unknown>
+    afterEach(() => {
+      delete stage.bibleRefPosition
+    })
+    async function reference() {
+      const w = mount(BibleProjectionView)
+      await flushPromises()
+      return { w, ref: w.find('.bible-projection__reference') }
+    }
+
+    it('padrão: abaixo do texto, à direita', async () => {
+      const { w, ref } = await reference()
+      expect(ref.element.parentElement?.classList.contains('bible-projection__content')).toBe(true)
+      expect(ref.attributes('style')).toContain('text-align: right')
+      expect(ref.classes()).not.toContain('bible-projection__reference--corner')
+      w.unmount()
+    })
+
+    it('abaixo do texto à esquerda e no centro', async () => {
+      stage.bibleRefPosition = 'below-left'
+      let r = await reference()
+      expect(r.ref.attributes('style')).toContain('text-align: left')
+      r.w.unmount()
+      stage.bibleRefPosition = 'below-center'
+      r = await reference()
+      expect(r.ref.attributes('style')).toContain('text-align: center')
+      r.w.unmount()
+    })
+
+    it('canto inferior direito da tela', async () => {
+      stage.bibleRefPosition = 'corner'
+      const { w, ref } = await reference()
+      expect(w.findAll('.bible-projection__reference')).toHaveLength(1)
+      expect(ref.classes()).toContain('bible-projection__reference--corner')
+      expect(ref.element.parentElement?.classList.contains('bible-projection__content')).toBe(false)
+      expect(ref.attributes('style')).not.toContain('text-align')
+      w.unmount()
+    })
   })
 })

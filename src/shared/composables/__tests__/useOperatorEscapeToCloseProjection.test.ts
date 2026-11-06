@@ -8,10 +8,11 @@ const closeUrl = vi.fn()
 let ipcCb: (() => void) | null = null
 const externalAlive = vi.fn(async () => true)
 const onCloseRequested = vi.fn()
+const onConfirmCloseRequested = vi.fn()
 
 vi.mock('@shared/services/desktop-bridge', () => ({
   getDesktopBridge: () => ({
-    projection: { closeUrl, externalAlive, onCloseRequested },
+    projection: { closeUrl, externalAlive, onCloseRequested, onConfirmCloseRequested },
   }),
 }))
 
@@ -414,4 +415,78 @@ describe('useOperatorEscapeToCloseProjection', () => {
     wrapper.unmount()
   })
 
+  describe('Esc + Enter encerra sem clicar', () => {
+    async function freshHost() {
+      externalAlive.mockResolvedValue(true)
+      onCloseRequested.mockImplementation((cb: () => void) => {
+        ipcCb = cb
+        return () => {}
+      })
+      vi.resetModules()
+      const mod = await import('../useOperatorEscapeToCloseProjection')
+      const { defineComponent, h } = await import('vue')
+      const { mount } = await import('@vue/test-utils')
+      const Host = defineComponent({
+        setup() {
+          mod.useOperatorEscapeToCloseProjection(() => false)
+          return () => h('div')
+        },
+      })
+      return mount(Host)
+    }
+    const pressEnter = () =>
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+
+    it('Esc abre o confirm (comportamento atual) e Enter na tela do operador encerra', async () => {
+      const wrapper = await freshHost()
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+      await new Promise((r) => setTimeout(r, 30))
+      expect(document.querySelector('[role="dialog"].app-confirm')).toBeTruthy()
+      expect(closeUrl).not.toHaveBeenCalled()
+      pressEnter()
+      await new Promise((r) => setTimeout(r, 80))
+      expect(closeUrl).toHaveBeenCalledOnce()
+      expect(closeProjectionModule).toHaveBeenCalled()
+      expect(document.querySelector('.app-confirm')).toBeNull()
+      wrapper.unmount()
+    })
+
+    it('Esc na janela de projeção + Enter lá (encaminhado pelo main) encerra', async () => {
+      let confirmCb: (() => void) | null = null
+      const unsubscribe = vi.fn()
+      onConfirmCloseRequested.mockImplementation((cb: () => void) => {
+        confirmCb = cb
+        return unsubscribe
+      })
+      const wrapper = await freshHost()
+      ipcCb?.()
+      await new Promise((r) => setTimeout(r, 30))
+      expect(document.querySelector('[role="dialog"].app-confirm')).toBeTruthy()
+      confirmCb!()
+      await new Promise((r) => setTimeout(r, 80))
+      expect(closeUrl).toHaveBeenCalledOnce()
+      expect(unsubscribe).toHaveBeenCalledOnce()
+      wrapper.unmount()
+    })
+
+    it('Enter sem o confirm aberto não encerra nada', async () => {
+      const wrapper = await freshHost()
+      pressEnter()
+      await new Promise((r) => setTimeout(r, 30))
+      expect(closeUrl).not.toHaveBeenCalled()
+      expect(document.querySelector('.app-confirm')).toBeNull()
+      wrapper.unmount()
+    })
+
+    it('o confirm avisa que Enter encerra', async () => {
+      const wrapper = await freshHost()
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+      await new Promise((r) => setTimeout(r, 30))
+      const dialog = document.querySelector('[role="dialog"].app-confirm')!
+      expect(dialog.textContent).toContain('Enter')
+      ;(dialog.querySelectorAll('button')[0] as HTMLButtonElement).click()
+      await new Promise((r) => setTimeout(r, 80))
+      wrapper.unmount()
+    })
+  })
 })
