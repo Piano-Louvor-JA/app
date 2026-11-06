@@ -24,6 +24,11 @@ import TimerProjectionView from '@modules/timer/views/TimerProjectionView.vue'
 import InAppProjectionOverlay from '@shared/components/InAppProjectionOverlay.vue'
 import { useCountdownStore } from '@modules/countdown/stores/useCountdownStore'
 import { useLiturgyStore } from '@modules/liturgy/stores/useLiturgyStore'
+import LiturgyAnnotationStage from '@modules/liturgy/components/LiturgyAnnotationStage.vue'
+import {
+  stopAnnotationProjection,
+  useAnnotationProjection,
+} from '@modules/liturgy/services/annotation-projection'
 import MediaChrome from '@modules/media/components/MediaChrome.vue'
 import { useMediaPlayer } from '@modules/media/composables/useMediaPlayer'
 import { useRandomStore } from '@modules/random/stores/useRandomStore'
@@ -105,6 +110,8 @@ const {
   isProjecting: isClockProjecting,
   inAppPreview: clockInAppPreview,
 } = storeToRefs(clockStore)
+
+const { inAppPreview: annotationInAppPreview } = useAnnotationProjection()
 
 const liturgyStore = useLiturgyStore()
 const {
@@ -640,6 +647,17 @@ function viewKey(viewRoute: typeof route) {
       @close="clockStore.clearProjection"
     >
       <ClockProjectionView embedded />
+    </InAppProjectionOverlay>
+
+    <InAppProjectionOverlay
+      v-if="annotationInAppPreview"
+      scope="liturgy"
+      :label="t('liturgy.annotationProjection.inAppProjection')"
+      :close-label="t('liturgy.annotationProjection.close')"
+      :hint="t('liturgy.annotationProjection.hotkeyHint')"
+      @close="stopAnnotationProjection"
+    >
+      <LiturgyAnnotationStage embedded />
     </InAppProjectionOverlay>
 
     <div class="app-shell__history">

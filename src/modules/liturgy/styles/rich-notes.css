@@ -1,0 +1,48 @@
+/* Texto formatado das anotações (editor e cartão da liturgia). Tamanhos relativos ao texto em volta:
+   o editor grava palavras-chave absolutas (x-large…), que ficariam enormes no cartão. */
+.rich-notes {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.rich-notes p,
+.rich-notes div {
+  margin: 0;
+}
+
+.rich-notes ul,
+.rich-notes ol {
+  margin: 0.15em 0;
+  padding-left: 1.4em;
+}
+
+.rich-notes ul {
+  list-style: disc;
+}
+
+.rich-notes ol {
+  list-style: decimal;
+}
+
+.rich-notes [style*="font-size: x-small"],
+.rich-notes [style*="font-size: small"] {
+  font-size: 0.85em !important;
+}
+
+.rich-notes [style*="font-size: medium"] {
+  font-size: 1em !important;
+}
+
+.rich-notes [style*="font-size: large"] {
+  font-size: 1.15em !important;
+}
+
+.rich-notes [style*="font-size: x-large"] {
+  font-size: 1.3em !important;
+}
+
+.rich-notes [style*="font-size: xx-large"],
+.rich-notes [style*="font-size: xxx-large"] {
+  font-size: 1.6em !important;
+  font-weight: 700;
+}
