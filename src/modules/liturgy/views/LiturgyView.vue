@@ -18,6 +18,7 @@ import LiturgyItemDialog from '../components/LiturgyItemDialog.vue'
 import LiturgySidebar from '../components/LiturgySidebar.vue'
 import LiturgyTimeline from '../components/LiturgyTimeline.vue'
 import { useLiturgy } from '../composables/useLiturgy'
+import { useLiturgyVideoPrefetch } from '../composables/useLiturgyVideoPrefetch'
 
 const scheduledDialogOpen = ref(false)
 
@@ -157,6 +158,8 @@ const {
   setItemDraft,
   setMusicSearchQuery,
 } = useLiturgy()
+
+const { statusByItemId: offlineStatusByItemId } = useLiturgyVideoPrefetch()
 
 /** Exibe avisos da liturgia e do player (ex.: áudio indisponível). */
 const liturgyAlertKey = computed(() => lastActionMessageKey.value || null)
@@ -356,6 +359,7 @@ async function onSljaImported(): Promise<void> {
           :deletion-locked="deletionLocked"
           :music-instrumental-by-id="musicInstrumentalById"
           :busy-music-id="busyMusicId"
+          :offline-status-by-item-id="offlineStatusByItemId"
           @select="selectItem"
           @video-file-selected="onVideoFileSelected"
           @play-screens="playItemOnScreens"

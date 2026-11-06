@@ -17,6 +17,7 @@ import { formatDurationLabel } from '../services/liturgy-format'
 import { getItemTypeIcon, isExecutableItem } from '../services/liturgy-item-helpers'
 import { probeMediaDurationMs } from '../services/media-probe'
 import type { LiturgyItem } from '../types/liturgy'
+import type { OnlineVideoItemStatus } from '@/shared/types/desktop-bridge'
 
 const props = defineProps<{
   item: LiturgyItem
@@ -51,6 +52,8 @@ const props = defineProps<{
   hasInstrumental?: boolean
   /** Ação de música em andamento. */
   musicBusy?: boolean
+  /** Cópia baixada do vídeo do YouTube (download antecipado). */
+  offlineStatus?: OnlineVideoItemStatus | null
 }>()
 
 const emit = defineEmits<{
@@ -77,6 +80,29 @@ const rootEl = ref<HTMLElement | null>(null)
 let dragGhostEl: HTMLElement | null = null
 
 const isCategory = computed(() => props.item.type === 'category')
+
+const OFFLINE_ICONS: Record<Exclude<OnlineVideoItemStatus['state'], 'none'>, string> = {
+  queued: 'ti-clock',
+  resolving: 'ti-loader-2',
+  downloading: 'ti-download',
+  muxing: 'ti-loader-2',
+  ready: 'ti-circle-check',
+  error: 'ti-alert-triangle',
+}
+
+const offlineBadge = computed(() => {
+  const status = props.offlineStatus
+  if (!status || status.state === 'none') return null
+  const label = t(`liturgy.offlineVideo.${status.state}`, {
+    progress: Math.round((status.progress ?? 0) * 100),
+  })
+  return {
+    state: status.state,
+    icon: OFFLINE_ICONS[status.state],
+    label,
+    title: status.state === 'error' && status.message ? `${label}: ${status.message}` : label,
+  }
+})
 
 /** Placeholder agendado: duração própria vem do conteúdo resolvido do dia. */
 const isScheduledPlaceholder = computed(() => props.item.type === 'scheduled')
@@ -571,6 +597,20 @@ const projectActionTitle = computed(() => {
       </div>
 
       <div class="liturgy-item__meta">
+        <span
+          v-if="offlineBadge"
+          class="liturgy-item__offline"
+          :class="`liturgy-item__offline--${offlineBadge.state}`"
+          :title="offlineBadge.title"
+          data-test="liturgy-offline-badge"
+        >
+          <i
+            class="ti"
+            :class="offlineBadge.icon"
+            aria-hidden="true"
+          />
+          {{ offlineBadge.label }}
+        </span>
         <div
           v-if="!isCategory"
           class="liturgy-item__time"
@@ -1356,6 +1396,44 @@ const projectActionTitle = computed(() => {
 
 .liturgy-item__time {
   text-align: right;
+}
+
+.liturgy-item__offline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--ds-color-on-surface-variant, var(--ds-color-on-surface));
+  background: color-mix(in srgb, var(--ds-color-on-surface) 8%, transparent);
+
+  i {
+    font-size: 0.8rem;
+  }
+
+  &--ready {
+    color: #24d36b;
+    background: color-mix(in srgb, #24d36b 14%, transparent);
+  }
+
+  &--error {
+    color: #ff6b6b;
+    background: color-mix(in srgb, #ff6b6b 14%, transparent);
+  }
+
+  &--resolving i,
+  &--muxing i {
+    animation: liturgy-offline-spin 1s linear infinite;
+  }
+}
+
+@keyframes liturgy-offline-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .liturgy-item__clock {
