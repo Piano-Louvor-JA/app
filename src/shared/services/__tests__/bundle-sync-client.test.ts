@@ -189,12 +189,17 @@ describe('syncBundle — validação do manifest entry-wise (ADR-09/RF-19)', () 
     ['não-array', { schema: 1, artifacts: {} }],
     ['array vazio', []],
     ['entry não-objeto', ['x']],
+    ['entry null', [null]],
     ['file sem .json', [entry('pt_musics')]],
     ['file com /', [{ ...entry('a/b.json'), path: '/db/a/b' }]],
     ['file com ..', [entry('..json')].map((e) => ({ ...e, file: 'a..b.json' }))],
     ['file com \\\\', [entry('a\\\\b.json')]],
+    ['file com controle \\\\u0000', [{ ...entry('a\u0000b.json') }]],
     ['hash uppercase', [entry('pt_musics.json', MD5_A.toUpperCase())]],
     ['hash curto', [entry('pt_musics.json', 'a'.repeat(31))]],
+    ['hash longo', [entry('pt_musics.json', 'a'.repeat(33))]],
+    ['hash com g (não-hex)', [entry('pt_musics.json', 'g'.repeat(32))]],
+    ['hash 32 bytes não-hex misto', [entry('pt_musics.json', '0123456789abcdef0123456789abcdeg')]],
     ['file duplicado', [entry('pt_musics.json'), entry('pt_musics.json')]],
     ['file não-string', [{ file: 1, hash: MD5_A }]],
     ['hash não-string', [{ file: 'a.json', hash: 7 }]],
@@ -222,6 +227,35 @@ describe('syncBundle — validação do manifest entry-wise (ADR-09/RF-19)', () 
     const subset = parseManifest(bibleManifest(), 'bible')
     expect(subset).not.toBeNull()
     expect(Object.keys(subset!)).toEqual(['bible_10_100_1'])
+  })
+
+  it('fronteiras de regex: nomes QUASE válidos ficam fora do subset (âncoras)', async () => {
+    const nearMiss: Entry[] = [
+      entry('xpt_musics.json'), // prefixo lixo antes de pt_
+      entry('pt_musicsx.json'), // sufixo lixo
+      entry('music_1x.json'), // music_<n> exige fim
+      entry('album_9z.json'),
+      entry('configx.json'),
+      entry('pt_hymnal_extra.json'),
+      entry('xx_bible_book.json'), // idioma fora de pt|es
+    ]
+    expect(parseManifest(nearMiss, 'catalog')).toEqual({})
+    const bibleNear: Entry[] = [
+      entry('bible_10_100.json'), // 2 segmentos
+      entry('bible_10_100_1x.json'), // sufixo
+      entry('bible_10_100_x.json'), // capítulo não numérico
+      entry('xbible_10_100_1.json'),
+      entry('BIBLE_10_100_1.json'), // case
+    ]
+    expect(parseManifest(bibleNear, 'bible')).toEqual({})
+  })
+
+  it('es_* também pertence ao subset catalog (paridade pt/es)', async () => {
+    const subset = parseManifest(
+      [entry('es_musics.json'), entry('es_categories.json')],
+      'catalog',
+    )
+    expect(Object.keys(subset!).sort()).toEqual(['es_categories', 'es_musics'])
   })
 
   it('manifest 404 => null sem lançar', async () => {
@@ -272,6 +306,19 @@ describe('manifestDigestOf — digest canônico (ADR-09)', () => {
 })
 
 describe('syncBundle — warm gate digest (RF-20)', () => {
+  it('exatamente 24h (fronteira) => consulta manifest de novo', async () => {
+    const digest = await digestOfEntries(catalogManifest())
+    mocks.state.readState.mockResolvedValue({
+      manifestDigest: digest,
+      checkedAtEpochMs: Date.now() - 24 * HOUR, // == TTL, não <
+      appliedAtEpochMs: Date.now() - 24 * HOUR,
+      schema: 2,
+    })
+    mocks.state.fetch.mockResolvedValueOnce(manifestResponse(catalogManifest()))
+    expect(await syncBundle('catalog')).toEqual({ status: 'up-to-date' })
+    expect(mocks.state.fetch).toHaveBeenCalledTimes(1) // consultou
+  })
+
   it('<24h => 0 requests', async () => {
     const digest = await digestOfEntries(catalogManifest())
     mocks.state.readState.mockResolvedValue({
