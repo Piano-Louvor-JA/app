@@ -418,7 +418,7 @@ describe('LiturgyTimelineItem — cobertura extra', () => {
 
     it('não executável mas selected → botão aparece (branch selected)', () => {
       const wrapper = createWrapper({
-        item: createItem({ type: 'annotation', musicId: undefined }),
+        item: createItem({ type: 'scheduled', musicId: undefined }),
         selected: true,
       })
       const control = wrapper

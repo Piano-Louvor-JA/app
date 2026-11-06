@@ -113,6 +113,31 @@ describe('LiturgyTimelineItem', () => {
     vi.clearAllMocks()
   })
 
+  it('anotação mostra o texto formatado, limpo', () => {
+    const wrapper = createWrapper({
+      item: createItem({
+        type: 'annotation',
+        subtitle: 'Almoço na igreja',
+        notesHtml: '<div><b>Almoço</b> na <span style="color: #ff6d00;">igreja</span></div><img src=x onerror="alert(1)">',
+      }),
+    })
+    const notes = wrapper.get('[data-testid="liturgy-item-rich-notes"]')
+    expect(notes.html()).toContain('<b>Almoço</b>')
+    expect(notes.html()).toContain('style="color: #ff6d00;"')
+    expect(notes.html()).not.toContain('img')
+    expect(wrapper.findAll('.liturgy-item__subtitle')).toHaveLength(1)
+  })
+
+  it('anotação sem formatação e outros tipos seguem com o texto puro', () => {
+    const plain = createWrapper({ item: createItem({ type: 'annotation', subtitle: 'Só texto' }) })
+    expect(plain.find('[data-testid="liturgy-item-rich-notes"]').exists()).toBe(false)
+    expect(plain.get('.liturgy-item__subtitle').text()).toBe('Só texto')
+    const site = createWrapper({
+      item: createItem({ type: 'site', subtitle: 'https://x.org', notesHtml: '<b>ignorado</b>' }),
+    })
+    expect(site.find('[data-testid="liturgy-item-rich-notes"]').exists()).toBe(false)
+  })
+
   it('renderiza item music básico', () => {
     const wrapper = createWrapper({ item: createItem({ type: 'music' }) })
     expect(wrapper.exists()).toBe(true)

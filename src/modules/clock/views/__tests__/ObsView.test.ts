@@ -2,16 +2,6 @@ vi.mock('@modules/settings/components/TransmissionAudioOptions.vue', () => ({ de
 vi.mock('@modules/settings/components/StageCustomizationCard.vue', () => ({ default: { props: ['onlyScope'], template: '<div class="stage-custom-stub" :data-scope="onlyScope" />' } }))
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-
-// Composable testado à parte: aqui só o contrato tela ↔ minimizar.
-const minimizeMock = vi.fn(async () => {})
-const prepareMock = vi.fn()
-vi.mock('@shared/composables/useMinimizablePage', () => ({
-  useMinimizablePage: (options: unknown) => {
-    ;(globalThis as any).__minimizeOptions = options
-    return { minimize: minimizeMock, prepare: prepareMock, takeRestoredState: () => null }
-  },
-}))
 import { flushPromises, mount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 
@@ -269,18 +259,12 @@ describe('ObsView', () => {
   })
 })
 
-describe('ObsView — minimizar página', () => {
-  it('– fica abaixo da seta de voltar, minimiza e descreve a tela', async () => {
-    minimizeMock.mockClear()
+describe('ObsView — dentro das Configurações', () => {
+  it('voltar e minimizar ficam no cabeçalho das Configurações, não na tela', () => {
     const w = mountView()
-    const stack = w.find('.page-back-stack')
-    expect(stack.find('.obs-view__back').exists()).toBe(true)
-    await stack.find('.page-back-stack__minimize').trigger('click')
-    expect(minimizeMock).toHaveBeenCalledTimes(1)
-    const options = (globalThis as any).__minimizeOptions
-    expect(options.describe()).toEqual({ title: 'Transmitir via OBS', icon: 'ti-broadcast', summary: '' })
-    expect(options.capture()).toBeNull()
-    expect(options.fallbackRoute).toEqual({ name: 'settings-appearance' })
+    expect(w.find('.page-back-stack').exists()).toBe(false)
+    expect(w.find('.obs-view__back').exists()).toBe(false)
+    expect(w.find('.obs-view__title').text()).toBe('Transmitir via OBS')
     w.unmount()
   })
 })

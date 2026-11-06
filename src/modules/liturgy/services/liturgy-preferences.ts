@@ -14,6 +14,7 @@ import {
   DEFAULT_MOMENT_DURATION_MS,
   getTypeDotColor,
   LITURGY_WEEKDAYS,
+  TYPES_WITHOUT_DURATION,
   type CustomLiturgy,
   type LiturgyDayKey,
   type LiturgyItem,
@@ -31,6 +32,7 @@ import {
   createLiturgyItemId,
   normalizeItemType,
 } from './liturgy-item-helpers'
+import { normalizeTitleColor, sanitizeNotesHtml } from './rich-notes'
 
 const CHECKS_CLEARED_KEY = 'liturgy_checks_cleared'
 
@@ -66,8 +68,10 @@ function normalizeItem(raw: unknown): LiturgyItem | null {
   if (!name) return null
 
   const durationRaw = asNumberOrNull(source.durationMs)
+  const notesHtml = type === 'annotation' ? sanitizeNotesHtml(asString(source.notesHtml)) : ''
+  const titleColor = type === 'annotation' ? normalizeTitleColor(source.titleColor) : ''
   const durationMs =
-    type === 'category'
+    TYPES_WITHOUT_DURATION.includes(type)
       ? 0
       : type === 'music'
         ? durationRaw != null && durationRaw > 0
@@ -115,6 +119,8 @@ function normalizeItem(raw: unknown): LiturgyItem | null {
       return single ? [single] : undefined
     })(),
     url: asString(source.url),
+    ...(notesHtml ? { notesHtml } : {}),
+    ...(titleColor ? { titleColor } : {}),
   }
 }
 

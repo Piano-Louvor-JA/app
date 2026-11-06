@@ -2,7 +2,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { statSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { app, BrowserWindow, dialog, globalShortcut, ipcMain, screen, shell } from "electron";
+import { app, BrowserWindow, dialog, globalShortcut, ipcMain, net, screen, shell } from "electron";
 
 import {
 	APP_DESKTOP_ID,
@@ -34,6 +34,8 @@ import { getBibleUpdater } from "./bible-updater.mjs";
 import { loadWindowState, trackWindowState } from "./window-state.mjs";
 import { registerYoutubeEmbedHeaders } from "./youtube-embed.mjs";
 import { registerYoutubeAuthIpc } from "./youtube-auth.mjs";
+import { registerYoutubeInfoIpc } from "./youtube-info.mjs";
+import { registerSiteInfoIpc } from "./site-info.mjs";
 import { adblockEnabledFromRecord, registerAdblockerIpc } from "./youtube-adblock.mjs";
 import { readWorkspaceRecord, writeWorkspaceRecord } from "./workspace.mjs";
 import { registerTunnelCorpBypass } from "./tunnel-corp-bypass.mjs";
@@ -932,6 +934,8 @@ app.whenReady().then(async () => {
 		registerLocalFileProtocol();
 		registerYoutubeEmbedHeaders();
 		registerYoutubeAuthIpc();
+		registerYoutubeInfoIpc(ipcMain, { fetch: (url, init) => net.fetch(url, init) });
+		registerSiteInfoIpc(ipcMain, { fetch: (url, init) => net.fetch(url, init) });
 		// adblock YouTube (ligado por padrão): estado persistido em workspace record
 		registerAdblockerIpc(
 			(enabled) => writeWorkspaceRecord("yt-adblock.json", { enabled }),

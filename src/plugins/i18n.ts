@@ -25,6 +25,9 @@ import clockEs from '@modules/clock/locales/es'
 import countdownPtBR from '@modules/countdown/locales/pt-BR'
 import countdownEn from '@modules/countdown/locales/en'
 import countdownEs from '@modules/countdown/locales/es'
+import sabbathSchoolPtBR from '@modules/sabbath-school/locales/pt-BR'
+import sabbathSchoolEn from '@modules/sabbath-school/locales/en'
+import sabbathSchoolEs from '@modules/sabbath-school/locales/es'
 
 import homePtBR from '@modules/home/locales/pt-BR'
 import homeEn from '@modules/home/locales/en'
@@ -103,6 +106,7 @@ export default createI18n({
       ...biblePtBR,
       ...clockPtBR,
       ...countdownPtBR,
+      ...sabbathSchoolPtBR,
       ...homePtBR,
       ...liturgyPtBR,
       ...mediaPtBR,
@@ -120,6 +124,7 @@ export default createI18n({
       ...bibleEn,
       ...clockEn,
       ...countdownEn,
+      ...sabbathSchoolEn,
       ...homeEn,
       ...liturgyEn,
       ...mediaEn,
@@ -137,6 +142,7 @@ export default createI18n({
       ...bibleEs,
       ...clockEs,
       ...countdownEs,
+      ...sabbathSchoolEs,
       ...homeEs,
       ...liturgyEs,
       ...mediaEs,

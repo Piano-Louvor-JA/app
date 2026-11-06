@@ -10,13 +10,17 @@ import { useMinimizedPagesStore } from '@shared/stores/useMinimizedPagesStore'
 const genie = vi.hoisted(() => ({
   calls: [] as Array<{ kind: 'ghost' | 'page'; el: unknown; target: unknown; direction: string; itemsAtStart: number; image?: unknown }>,
   target: { left: 1, top: 2, width: 3, height: 4 },
+  targetFor: null as string | null,
   ghostSupported: true,
   removed: 0,
 }))
 vi.mock('@shared/services/genie-animation', async () => {
   const { useMinimizedPagesStore } = await import('@shared/stores/useMinimizedPagesStore')
   return {
-    predictMinimizedTarget: () => genie.target,
+    predictMinimizedTarget: (fullPath: string) => {
+      genie.targetFor = fullPath
+      return genie.target
+    },
     playGenie: async (el: unknown, target: unknown, direction: string) => {
       genie.calls.push({ kind: 'page', el, target, direction, itemsAtStart: useMinimizedPagesStore().items.length })
     },
@@ -247,6 +251,7 @@ describe('useMinimizablePage — efeito gênio e desempenho', () => {
       direction: 'minimize',
       itemsAtStart: 0,
     })
+    expect(genie.targetFor).toBe('/albums/5')
     expect(useMinimizedPagesStore().items).toHaveLength(1)
     // a imagem sai antes da navegação, que já vem sem fade
     expect(navigation).toHaveBeenCalledWith(1, 1, 1)

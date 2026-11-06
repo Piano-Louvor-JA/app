@@ -189,6 +189,11 @@ contextBridge.exposeInMainWorld('louvorja', {
     deleteAudio: (fileName) => ipcRenderer.invoke('random:delete-audio', fileName),
   },
 
+  sabbathSchool: {
+    importVideo: () => ipcRenderer.invoke('sabbath-school:import-video'),
+    clearVideo: () => ipcRenderer.invoke('sabbath-school:clear-video'),
+  },
+
   catalog: {
     downloadDatabase: () => ipcRenderer.invoke('catalog:download-database'),
     extractDatabase: () => ipcRenderer.invoke('catalog:extract-database'),
@@ -212,6 +217,16 @@ contextBridge.exposeInMainWorld('louvorja', {
     // Bloqueador de anúncios do player YouTube (opt-in, experimental)
     status: () => ipcRenderer.invoke('yt-adblock:status'),
     set: (enabled) => ipcRenderer.invoke('yt-adblock:set', enabled),
+  },
+
+  ytInfo: {
+    // Título, canal, duração e descrição do vídeo (preenche o item da liturgia ao colar o link)
+    get: (videoId) => ipcRenderer.invoke('youtube-info:get', videoId),
+  },
+
+  siteInfo: {
+    // Título, nome do site e descrição da página (preenche o item de site da liturgia)
+    get: (url) => ipcRenderer.invoke('site-info:get', url),
   },
 
   legacyMedia: {

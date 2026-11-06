@@ -94,6 +94,27 @@ export type YoutubeAdblockApi = {
   set: (enabled: boolean) => Promise<{ ok: boolean }>
 }
 
+export type YoutubeVideoInfo = {
+  title: string
+  channel: string
+  description: string
+  durationMs: number
+}
+
+export type YoutubeInfoApi = {
+  get: (videoId: string) => Promise<YoutubeVideoInfo | null>
+}
+
+export type SitePageInfo = {
+  title: string
+  siteName: string
+  description: string
+}
+
+export type SiteInfoApi = {
+  get: (url: string) => Promise<SitePageInfo | null>
+}
+
 export type LegacyMediaCounts = {
   covers: number
   music: number
@@ -490,6 +511,17 @@ export type RandomAudioApi = {
   }>
 }
 
+export type SabbathSchoolVideoApi = {
+  importVideo: () => Promise<{
+    ok: boolean
+    fileName?: string
+    relativePath?: string
+    originalName?: string
+    reason?: string
+  }>
+  clearVideo: () => Promise<{ ok: boolean; reason?: string }>
+}
+
 export type DiagnosticsApi = {
   run: () => Promise<{ report: unknown; jsonPath: string; txtPath: string }>
   send: (report: unknown) => Promise<{ ok: boolean; reason?: string }>
@@ -513,6 +545,8 @@ export type LouvorJaBridge = {
   classo?: ClassoApi
   ytAuth?: YoutubeAuthApi
   ytAdblock?: YoutubeAdblockApi
+  ytInfo?: YoutubeInfoApi
+  siteInfo?: SiteInfoApi
   externalPlayer?: ExternalPlayerApi
   legacyMedia?: LegacyMediaApi
   mediaFolder?: MediaFolderApi
@@ -524,4 +558,5 @@ export type LouvorJaBridge = {
   projection: ProjectionApi
   remote?: RemoteApi
   random?: RandomAudioApi
+  sabbathSchool?: SabbathSchoolVideoApi
 }
