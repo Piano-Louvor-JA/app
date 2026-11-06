@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { mount } from "@vue/test-utils";
-import { describe, expect, it } from "vitest";
+import { enableAutoUnmount, mount } from "@vue/test-utils";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createI18n } from "vue-i18n";
 
 /**
@@ -15,6 +15,8 @@ const i18n = createI18n({
 	locale: "pt-BR",
 	messages: { "pt-BR": mediaLocale },
 });
+
+enableAutoUnmount(afterEach);
 
 function mountDialog(open = true) {
 	return mount(MediaCloseDialog, {
@@ -54,5 +56,48 @@ describe("MediaCloseDialog", () => {
 		await w.find(".media-close-dialog__backdrop").trigger("click");
 		expect(w.emitted("confirm")).toBeUndefined();
 		expect(w.emitted("cancel")).toBeUndefined();
+	});
+
+	describe("Esc + Enter", () => {
+		const pressEnter = (target: EventTarget = window) => {
+			const event = new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true });
+			target.dispatchEvent(event);
+			return event;
+		};
+
+		it("Enter com o dialog aberto confirma sem acionar o botão focado do player", () => {
+			const w = mountDialog();
+			const behind = vi.fn();
+			window.addEventListener("keydown", behind);
+			const playButton = document.createElement("button");
+			document.body.appendChild(playButton);
+			const event = pressEnter(playButton);
+			expect(w.emitted("confirm")).toHaveLength(1);
+			expect(event.defaultPrevented).toBe(true);
+			expect(behind).not.toHaveBeenCalled();
+			window.removeEventListener("keydown", behind);
+			playButton.remove();
+			w.unmount();
+		});
+
+		it("dialog fechado ou desmontado não reage ao Enter", async () => {
+			const w = mountDialog(false);
+			pressEnter();
+			expect(w.emitted("confirm")).toBeUndefined();
+			await w.setProps({ open: true });
+			pressEnter();
+			expect(w.emitted("confirm")).toHaveLength(1);
+			w.unmount();
+			expect(pressEnter().defaultPrevented).toBe(false);
+		});
+
+		it("player e mini player abertos juntos: um Enter fecha uma vez só", () => {
+			const a = mountDialog();
+			const b = mountDialog();
+			pressEnter();
+			expect((a.emitted("confirm") ?? []).length + (b.emitted("confirm") ?? []).length).toBe(1);
+			a.unmount();
+			b.unmount();
+		});
 	});
 });
