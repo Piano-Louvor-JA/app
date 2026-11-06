@@ -38,6 +38,7 @@ import { useRandomStore } from '@modules/random/stores/useRandomStore'
 import { useTimerStore } from '@modules/timer/stores/useTimerStore'
 import MonitorTargetSelect from '@shared/components/MonitorTargetSelect.vue'
 import UiZoomControls from '@shared/components/UiZoomControls.vue'
+import DownloadIndicator from '@shared/components/DownloadIndicator.vue'
 import {
   closeProjectionModule,
   isProjectionModuleOpen,
@@ -534,6 +535,7 @@ function viewKey(viewRoute: typeof route) {
         </span>
       </div>
       <div class="app-shell__header-end">
+        <DownloadIndicator />
         <UiZoomControls />
         <div class="app-shell__projection">
           <MonitorTargetSelect
