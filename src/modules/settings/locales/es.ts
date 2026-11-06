@@ -98,7 +98,7 @@ export default {
     youtube: {
       title: 'YouTube',
       description:
-        'Inicia sesión con tu cuenta de Google para reproducir videos sin anuncios durante el culto (requiere YouTube Premium en la cuenta).',
+        'La app salta los anuncios de YouTube por sí sola. Si la iglesia tiene YouTube Premium, inicia sesión con esa cuenta para que los videos no tengan ningún anuncio.',
       checking: 'Verificando sesión…',
       signedIn: 'Sesión iniciada en Google',
       premiumActive: 'Sesión iniciada — YouTube Premium activo (sin anuncios)',
@@ -107,10 +107,7 @@ export default {
       loggingIn: 'Esperando inicio de sesión…',
       logout: 'Cerrar sesión',
       notPremiumHint:
-        'Esta cuenta no tiene YouTube Premium. Considera suscribirte para videos sin anuncios, o activa el bloqueador experimental abajo.',
-      adblock: 'Bloquear anuncios de YouTube',
-      adblockHint:
-        'Salta los anuncios en video (sin imagen ni sonido en la proyección) y oculta los banners del reproductor, para cuentas sin Premium. Puede fallar cuando YouTube cambia su reproductor; iniciar sesión con Premium es el camino recomendado.',
+        'Esta cuenta no tiene YouTube Premium. La app sigue saltando los anuncios por sí sola.',
       desktopOnly: 'Disponible solo en la aplicación de escritorio.',
     },
     placeholder: {

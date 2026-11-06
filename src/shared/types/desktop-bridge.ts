@@ -77,11 +77,6 @@ export type YoutubeAuthApi = {
   logout: () => Promise<{ ok: boolean }>
 }
 
-export type YoutubeAdblockApi = {
-  status: () => Promise<{ enabled: boolean }>
-  set: (enabled: boolean) => Promise<{ ok: boolean }>
-}
-
 export type LegacyMediaCounts = {
   covers: number
   music: number
@@ -499,7 +494,6 @@ export type LouvorJaBridge = {
   bible?: BibleApi
   classo?: ClassoApi
   ytAuth?: YoutubeAuthApi
-  ytAdblock?: YoutubeAdblockApi
   externalPlayer?: ExternalPlayerApi
   legacyMedia?: LegacyMediaApi
   mediaFolder?: MediaFolderApi

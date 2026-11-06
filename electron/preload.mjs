@@ -180,12 +180,6 @@ contextBridge.exposeInMainWorld('louvorja', {
     logout: () => ipcRenderer.invoke('yt-auth:logout'),
   },
 
-  ytAdblock: {
-    // Bloqueador de anúncios do player YouTube (opt-in, experimental)
-    status: () => ipcRenderer.invoke('yt-adblock:status'),
-    set: (enabled) => ipcRenderer.invoke('yt-adblock:set', enabled),
-  },
-
   legacyMedia: {
     analyze: (selectedPath) =>
       ipcRenderer.invoke('legacy-media:analyze', selectedPath ?? ''),

@@ -1,10 +1,10 @@
 import { ElectronBlocker } from "@cliqz/adblocker-electron";
-import { ipcMain, session } from "electron";
+import { session } from "electron";
 import { registerYoutubeEmbedHeaders } from "./youtube-embed.mjs";
-import { disableYoutubeAdSkip, enableYoutubeAdSkip } from "./youtube-ad-skip.mjs";
+import { enableYoutubeAdSkip } from "./youtube-ad-skip.mjs";
 
 /**
- * Bloqueador de anúncios do YouTube (opt-in).
+ * Bloqueador de anúncios do YouTube, sempre ligado (não há opção para desligar).
  *
  * Duas camadas:
  * - youtube-ad-skip.mjs: esconde, silencia e pula o anúncio em vídeo dentro
@@ -12,17 +12,9 @@ import { disableYoutubeAdSkip, enableYoutubeAdSkip } from "./youtube-ad-skip.mjs
  * - filtros de rede da engine do Brave (adblock-rust via
  *   @cliqz/adblocker-electron) no webRequest da session padrão, para
  *   banners e rastreadores de anúncio.
- *
- * Regra de produto: LIGADO por padrão; o usuário pode desligar nas
- * Configurações, e essa escolha é respeitada nas próximas aberturas.
  */
 
 let active = false;
-
-/** Estado salvo em `yt-adblock.json`: só fica desligado se o usuário desligou. */
-export function adblockEnabledFromRecord(record) {
-	return record?.enabled !== false;
-}
 
 /** @type {import('@cliqz/adblocker-electron').ElectronBlocker | null} */
 let blocker = null;
@@ -46,12 +38,10 @@ async function enableNetworkFilters() {
 	cfg.enableMutationObserver = false;
 	cfg.enableHtmlFiltering = false;
 	cfg.enablePushInjectionsOnNavigationEvents = false;
-	// O usuário pode ter desligado enquanto a lista baixava.
-	if (!active) return;
 	blocker = next;
-	// escopo de efeito: defaultSession (o embed roda nela). O disable desta
-	// lib limpa TODOS os webRequest listeners da session — re-registramos o
-	// fix de Referer logo abaixo, senão o embed perde o header (Error 153).
+	// escopo de efeito: defaultSession (o embed roda nela). A lib substitui os
+	// webRequest listeners da session — re-registramos o fix de Referer logo
+	// abaixo, senão o embed perde o header (Error 153).
 	blocker.enableBlockingInSession(session.defaultSession);
 	registerYoutubeEmbedHeaders();
 }
@@ -69,54 +59,8 @@ export async function enableAdblocker() {
 	return { ok: true };
 }
 
-export function disableAdblocker() {
-	if (!active) return { ok: true, already: true };
-	active = false;
-	disableYoutubeAdSkip();
-	if (!blocker) return { ok: true };
-	try {
-		blocker.disableBlockingInSession(session.defaultSession);
-	} finally {
-		blocker = null;
-		// onBeforeRequest(null)/onHeadersReceived(null) da lib limpa o listener
-		// do fix de Referer também — restaura.
-		registerYoutubeEmbedHeaders();
-	}
-	return { ok: true };
-}
-
 export function isAdblockerEnabled() {
 	return active;
-}
-
-export async function setAdblocker(enabled) {
-	return enabled ? enableAdblocker() : disableAdblocker();
-}
-
-/** Registra IPC yt-adblock:* */
-export function registerAdblockerIpc(persist, restore) {
-	// persist(estado) — callback pra gravar o setting; restore() — lê no boot
-	ipcRegister(persist, restore);
-}
-
-function ipcRegister(persist, restore) {
-	ipcMain.handle("yt-adblock:status", () => ({
-		enabled: isAdblockerEnabled(),
-	}));
-	ipcMain.handle("yt-adblock:set", async (_e, enabled) => {
-		const r = await setAdblocker(Boolean(enabled));
-		if (r.ok && persist) persist(Boolean(enabled));
-		return r;
-	});
-	// boot: restaura último estado escolhido
-	void (async () => {
-		try {
-			const saved = restore ? await restore() : false;
-			if (saved) await enableAdblocker();
-		} catch {
-			/* boot segue sem adblock */
-		}
-	})();
 }
 
 export function _resetAdblockerForTests() {

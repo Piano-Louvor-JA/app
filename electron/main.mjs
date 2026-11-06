@@ -33,8 +33,7 @@ import { getBibleUpdater } from "./bible-updater.mjs";
 import { loadWindowState, trackWindowState } from "./window-state.mjs";
 import { registerYoutubeEmbedHeaders } from "./youtube-embed.mjs";
 import { registerYoutubeAuthIpc } from "./youtube-auth.mjs";
-import { adblockEnabledFromRecord, registerAdblockerIpc } from "./youtube-adblock.mjs";
-import { readWorkspaceRecord, writeWorkspaceRecord } from "./workspace.mjs";
+import { enableAdblocker } from "./youtube-adblock.mjs";
 import { registerTunnelCorpBypass } from "./tunnel-corp-bypass.mjs";
 import {
   initProjectionHotkey,
@@ -930,11 +929,7 @@ app.whenReady().then(async () => {
 		registerLocalFileProtocol();
 		registerYoutubeEmbedHeaders();
 		registerYoutubeAuthIpc();
-		// adblock YouTube (ligado por padrão): estado persistido em workspace record
-		registerAdblockerIpc(
-			(enabled) => writeWorkspaceRecord("yt-adblock.json", { enabled }),
-			() => adblockEnabledFromRecord(readWorkspaceRecord("yt-adblock.json")),
-		);
+		void enableAdblocker();
 		registerTunnelCorpBypass();
 		createWindow(locale);
 		bootMark("mainWindow");

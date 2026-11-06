@@ -103,7 +103,7 @@ export default {
     youtube: {
       title: 'YouTube',
       description:
-        'Entre com sua conta Google para reproduzir vídeos sem anúncios durante o culto (requer YouTube Premium na conta).',
+        'O app pula os anúncios do YouTube sozinho. Se a igreja tem YouTube Premium, entre com a conta para os vídeos virem sem nenhum anúncio.',
       checking: 'Verificando sessão…',
       signedIn: 'Conectado ao Google',
       premiumActive: 'Conectado — YouTube Premium ativo (sem anúncios)',
@@ -112,10 +112,7 @@ export default {
       loggingIn: 'Aguardando login…',
       logout: 'Sair da conta',
       notPremiumHint:
-        'Esta conta não tem YouTube Premium. Considere assinar para vídeos sem anúncios, ou ative o bloqueador experimental abaixo.',
-      adblock: 'Bloquear anúncios do YouTube',
-      adblockHint:
-        'Pula os anúncios em vídeo (sem imagem nem som na projeção) e esconde banners do player, para contas sem Premium. Pode falhar quando o YouTube muda o player; o login com Premium é o caminho recomendado.',
+        'Esta conta não tem YouTube Premium. O app continua pulando os anúncios sozinho.',
       desktopOnly: 'Disponível apenas no aplicativo desktop.',
     },
     projection: {

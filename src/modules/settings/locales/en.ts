@@ -98,7 +98,7 @@ export default {
     youtube: {
       title: 'YouTube',
       description:
-        'Sign in with your Google account to play videos without ads during the service (requires YouTube Premium on the account).',
+        'The app skips YouTube ads on its own. If your church has YouTube Premium, sign in with that account so videos come with no ads at all.',
       checking: 'Checking session…',
       signedIn: 'Signed in to Google',
       premiumActive: 'Signed in — YouTube Premium active (ad-free)',
@@ -107,10 +107,7 @@ export default {
       loggingIn: 'Waiting for sign-in…',
       logout: 'Sign out',
       notPremiumHint:
-        'This account has no YouTube Premium. Consider subscribing for ad-free videos, or enable the experimental blocker below.',
-      adblock: 'Block YouTube ads',
-      adblockHint:
-        'Skips video ads (no picture or sound on the projection) and hides player banners for accounts without Premium. May break when YouTube changes its player; signing in with Premium is the recommended path.',
+        'This account has no YouTube Premium. The app keeps skipping ads on its own.',
       desktopOnly: 'Available on the desktop application only.',
     },
     placeholder: {
