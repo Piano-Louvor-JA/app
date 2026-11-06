@@ -3,7 +3,7 @@
  *
  * Formato: ZIP contendo:
  * - slides.lja — INI (TMemIniFile) com a apresentação
- * - audio/<nome>.mp3 — áudio (opcional)
+ * - audio/<nome>.mp3|.wav|.ogg — áudio (opcional)
  * - imagens/<nome> — backgrounds referenciados (dedup)
  *
  * INI de 2 níveis: [Geral] + [Slide:1]...[Slide:N]

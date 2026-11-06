@@ -106,7 +106,7 @@ describe('cliente Firebase e ponte da sessão', () => {
     const client = await import('../firebase-client')
     await expect(client.revalidateFirebaseSessionOnBoot()).resolves.toEqual(session)
     expect(credential.user.getIdToken).toHaveBeenCalledWith(true)
-    expect(fetch).toHaveBeenCalledWith('https://api.example.org/v1/custom/auth/firebase-session', expect.objectContaining({ method: 'POST', headers: { authorization: 'Bearer id-token' } }))
+    expect(fetch).toHaveBeenCalledWith('https://api.example.org/v1/custom/auth/firebase-session', expect.objectContaining({ method: 'POST', headers: { authorization: 'Bearer id-token', 'X-Tenant': 'piano' } }))
     expect(mocks.save).toHaveBeenCalledWith(session)
   })
 
@@ -183,7 +183,7 @@ describe('cliente Firebase e ponte da sessão', () => {
     vi.mocked(fetch).mockRejectedValue(new Error('offline'))
     const client = await import('../firebase-client')
     await expect(client.revalidateFirebaseSessionOnBoot()).resolves.toBeNull()
-    expect(fetch).toHaveBeenCalledWith('https://api.example.org/v1/custom/auth/firebase-session', expect.objectContaining({ headers: { authorization: 'Bearer api-token' } }))
+    expect(fetch).toHaveBeenCalledWith('https://api.example.org/v1/custom/auth/firebase-session', expect.objectContaining({ headers: { authorization: 'Bearer api-token', 'X-Tenant': 'piano' } }))
     expect(mocks.save).not.toHaveBeenCalled()
   })
 })
