@@ -110,6 +110,29 @@ export default {
         'Esta cuenta no tiene YouTube Premium. La app sigue saltando los anuncios por sí sola.',
       desktopOnly: 'Disponible solo en la aplicación de escritorio.',
     },
+    youtubeOffline: {
+      title: 'Videos de YouTube descargados',
+      enabled: 'Reproducir videos de YouTube desde una copia descargada',
+      enabledHint:
+        'Los videos se reproducen desde una copia guardada en esta computadora: sin anuncios y sin cortes si internet falla.',
+      disabledHint:
+        'Los videos se reproducen directo desde internet. Si YouTube no reproduce, la app descarga una copia y sigue con ella.',
+      quality: 'Calidad máxima',
+      limit: 'Espacio máximo',
+      usage: 'En uso: {used} GB de {limit} GB ({count} videos)',
+      clear: 'Borrar videos descargados',
+      clearTitle: '¿Borrar videos descargados?',
+      clearMessage:
+        'Las copias guardadas en esta computadora se borrarán. Se descargan de nuevo cuando reproduzcas los videos.',
+      clearConfirm: 'Borrar',
+      cancel: 'Cancelar',
+      toolsMissing: 'Las herramientas de descarga se instalarán la primera vez que se necesiten.',
+      toolsInstalling: 'Instalando las herramientas de descarga… {progress}%',
+      toolsReady: 'Herramientas de descarga listas (versión {version})',
+      toolsError: 'No se pudieron instalar las herramientas de descarga.',
+      retry: 'Intentar de nuevo',
+      unavailable: 'Este sistema no permite descargar videos de YouTube; se reproducen directo desde internet.',
+    },
     placeholder: {
       general: 'Preferencias generales de la aplicación próximamente.',
       media: 'Configuraciones de audio, video y reproductor próximamente.',

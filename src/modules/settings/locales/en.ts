@@ -110,6 +110,29 @@ export default {
         'This account has no YouTube Premium. The app keeps skipping ads on its own.',
       desktopOnly: 'Available on the desktop application only.',
     },
+    youtubeOffline: {
+      title: 'Downloaded YouTube videos',
+      enabled: 'Play YouTube videos from a downloaded copy',
+      enabledHint:
+        'Videos play from a copy stored on this computer: no ads and no stalls when the internet is unstable.',
+      disabledHint:
+        'Videos play straight from the internet. If YouTube fails to play, the app downloads a copy and continues from it.',
+      quality: 'Maximum quality',
+      limit: 'Maximum space',
+      usage: 'In use: {used} GB of {limit} GB ({count} videos)',
+      clear: 'Delete downloaded videos',
+      clearTitle: 'Delete downloaded videos?',
+      clearMessage:
+        'The copies stored on this computer will be deleted. They are downloaded again when you play the videos.',
+      clearConfirm: 'Delete',
+      cancel: 'Cancel',
+      toolsMissing: 'The download tools will be installed the first time they are needed.',
+      toolsInstalling: 'Installing the download tools… {progress}%',
+      toolsReady: 'Download tools ready (version {version})',
+      toolsError: 'Could not install the download tools.',
+      retry: 'Try again',
+      unavailable: 'This system does not allow downloading YouTube videos; they play straight from the internet.',
+    },
     placeholder: {
       general: 'General app preferences coming soon.',
       media: 'Audio, video and player settings coming soon.',
