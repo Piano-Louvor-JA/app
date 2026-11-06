@@ -183,6 +183,54 @@ describe('StageCustomizationCard', () => {
     expect(store.settings.showBibleVersion).toBe(!beforeVersion)
   })
 
+  it('escopo bible: posição da referência com as 4 opções', async () => {
+    const w = await mountCard({ onlyScope: 'bible' })
+    active = w
+    const store = useStageSettingsStore()
+    const group = w.find('[data-testid="bible-ref-position"]')
+    expect(group.exists()).toBe(true)
+    const radios = group.findAll('[role="radio"]')
+    expect(radios.map((r) => r.text())).toEqual([
+      'settings.stage.refPositionLeft',
+      'settings.stage.refPositionCenter',
+      'settings.stage.refPositionRight',
+      'settings.stage.refPositionCorner',
+    ])
+    expect(radios[2].attributes('aria-checked')).toBe('true')
+    await radios[3].trigger('click')
+    expect(store.settings.bibleRefPosition).toBe('corner')
+    expect(group.findAll('[role="radio"]')[3].attributes('aria-checked')).toBe('true')
+    await radios[0].trigger('click')
+    expect(store.settings.bibleRefPosition).toBe('below-left')
+  })
+
+  it('escopo bible: transição ao trocar versículo e velocidade', async () => {
+    const w = await mountCard({ onlyScope: 'bible' })
+    active = w
+    const store = useStageSettingsStore()
+    const kinds = w.find('[data-testid="bible-transition"]').findAll('[role="radio"]')
+    expect(kinds.map((r) => r.text())).toEqual([
+      'settings.stage.transitionNone',
+      'settings.stage.transitionFade',
+      'settings.stage.transitionSlide',
+      'settings.stage.transitionZoom',
+    ])
+    expect(kinds[1].attributes('aria-checked')).toBe('true')
+    const speeds = () => w.find('[data-testid="bible-transition-speed"]')
+    expect(speeds().findAll('[role="radio"]').map((r) => r.text())).toEqual([
+      'settings.stage.transitionFast',
+      'settings.stage.transitionNormal',
+      'settings.stage.transitionSlow',
+    ])
+    await speeds().findAll('[role="radio"]')[2].trigger('click')
+    expect(store.settings.bibleTransitionSpeed).toBe('slow')
+    await kinds[3].trigger('click')
+    expect(store.settings.bibleTransition).toBe('zoom')
+    await kinds[0].trigger('click')
+    expect(store.settings.bibleTransition).toBe('none')
+    expect(speeds().exists()).toBe(false)
+  })
+
   it('escopo clock: estilo e switches de segundos/24h', async () => {
     const w = await mountCard({ onlyScope: 'clock' })
     active = w

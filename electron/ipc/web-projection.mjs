@@ -100,6 +100,9 @@ const HIDE_YOUTUBE_SIDEBAR_SCRIPT = `
     #bottom-row,
     #comments,
     #comment-teaser,
+    /* Cartão "YouTube Premium" no canto da página */
+    ytd-mealbar-promo-renderer,
+    yt-mealbar-promo-renderer,
     ytd-watch-metadata,
     ytd-video-primary-info-renderer,
     ytd-video-secondary-info-renderer {
@@ -227,6 +230,16 @@ const HIDE_YOUTUBE_SIDEBAR_SCRIPT = `
         el.style.setProperty('display', 'none', 'important');
       }
     });
+
+    // "Agora não" registra a dispensa no YouTube; o diálogo em volta fica vazio.
+    const promo = document.querySelector('ytd-mealbar-promo-renderer, yt-mealbar-promo-renderer');
+    if (promo && !promo.__louvorjaDismissed) {
+      promo.__louvorjaDismissed = true;
+      const dismiss = promo.querySelector('#dismiss-button button') || promo.querySelector('#dismiss-button');
+      if (dismiss) dismiss.click();
+      const dialog = promo.closest('tp-yt-paper-dialog') || promo;
+      dialog.style.setProperty('display', 'none', 'important');
+    }
 
     // Ativa modo cinema (theater) — player largo, sem layout de coluna
     const flexy = document.querySelector('ytd-watch-flexy');

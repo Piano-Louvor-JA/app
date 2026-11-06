@@ -1,25 +1,35 @@
 import { ElectronBlocker } from "@cliqz/adblocker-electron";
 import { ipcMain, session } from "electron";
 import { registerYoutubeEmbedHeaders } from "./youtube-embed.mjs";
+import { disableYoutubeAdSkip, enableYoutubeAdSkip } from "./youtube-ad-skip.mjs";
 
 /**
- * Bloqueador de anúncios para o player YouTube (opt-in, experimental).
+ * Bloqueador de anúncios do YouTube (opt-in).
  *
- * Mesma engine do Brave (adblock-rust via @cliqz/adblocker-electron),
- * plugada no webRequest da session padrão — o mesmo gancho do fix de
- * Referer (youtube-embed.mjs).
+ * Duas camadas:
+ * - youtube-ad-skip.mjs: esconde, silencia e pula o anúncio em vídeo dentro
+ *   do player (o filtro de rede não pega esse anúncio);
+ * - filtros de rede da engine do Brave (adblock-rust via
+ *   @cliqz/adblocker-electron) no webRequest da session padrão, para
+ *   banners e rastreadores de anúncio.
  *
- * Regra de produto: DESLIGADO por padrão. Só ativa quando o usuário liga
- * "Reduzir anúncios (experimental)" nas Configurações. Premium auth é o
- * caminho primário/recomendado; isto é fallback para contas free.
+ * Regra de produto: LIGADO por padrão; o usuário pode desligar nas
+ * Configurações, e essa escolha é respeitada nas próximas aberturas.
  */
+
+let active = false;
+
+/** Estado salvo em `yt-adblock.json`: só fica desligado se o usuário desligou. */
+export function adblockEnabledFromRecord(record) {
+	return record?.enabled !== false;
+}
 
 /** @type {import('@cliqz/adblocker-electron').ElectronBlocker | null} */
 let blocker = null;
 
-export async function enableAdblocker() {
-	if (blocker) return { ok: true, already: true };
-	blocker = await ElectronBlocker.fromPrebuiltAdsAndTracking(fetch);
+async function enableNetworkFilters() {
+	if (blocker) return;
+	const next = await ElectronBlocker.fromPrebuiltAdsAndTracking(fetch);
 	/**
 	 * Fix app#177 (Windows, Ezequias 13/09): com o blocker cru, "não abre vídeo
 	 * de jeito nenhum" — só funcionava desligando o adblock. Causa: a lib registra
@@ -28,7 +38,7 @@ export async function enableAdblocker() {
 	 * AQUI: só network filters (bloqueio de requests de anúncio) — sem CSS/DOM
 	 * injection, sem CSP, sem mutation observer.
 	 */
-	const cfg = blocker.config;
+	const cfg = next.config;
 	cfg.loadCosmeticFilters = false;
 	cfg.loadExtendedSelectors = false;
 	cfg.loadGenericCosmeticsFilters = false;
@@ -36,16 +46,34 @@ export async function enableAdblocker() {
 	cfg.enableMutationObserver = false;
 	cfg.enableHtmlFiltering = false;
 	cfg.enablePushInjectionsOnNavigationEvents = false;
+	// O usuário pode ter desligado enquanto a lista baixava.
+	if (!active) return;
+	blocker = next;
 	// escopo de efeito: defaultSession (o embed roda nela). O disable desta
 	// lib limpa TODOS os webRequest listeners da session — re-registramos o
 	// fix de Referer logo abaixo, senão o embed perde o header (Error 153).
 	blocker.enableBlockingInSession(session.defaultSession);
 	registerYoutubeEmbedHeaders();
+}
+
+export async function enableAdblocker() {
+	if (active) return { ok: true, already: true };
+	active = true;
+	enableYoutubeAdSkip();
+	try {
+		await enableNetworkFilters();
+	} catch (error) {
+		// Sem a lista (offline, CDN fora) o pulo do anúncio em vídeo segue ativo.
+		console.warn("[yt-adblock] filtros de rede indisponíveis:", error?.message || error);
+	}
 	return { ok: true };
 }
 
 export function disableAdblocker() {
-	if (!blocker) return { ok: true, already: true };
+	if (!active) return { ok: true, already: true };
+	active = false;
+	disableYoutubeAdSkip();
+	if (!blocker) return { ok: true };
 	try {
 		blocker.disableBlockingInSession(session.defaultSession);
 	} finally {
@@ -58,7 +86,7 @@ export function disableAdblocker() {
 }
 
 export function isAdblockerEnabled() {
-	return blocker !== null;
+	return active;
 }
 
 export async function setAdblocker(enabled) {
@@ -89,4 +117,9 @@ function ipcRegister(persist, restore) {
 			/* boot segue sem adblock */
 		}
 	})();
+}
+
+export function _resetAdblockerForTests() {
+	active = false;
+	blocker = null;
 }

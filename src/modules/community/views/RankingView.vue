@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { GlassCard } from "@design-system/index";
-import { getAuthSession } from "@modules/media/services/auth-client";
+import { authTokenAsync, getAuthSession } from "@modules/media/services/auth-client";
 import { onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -41,7 +41,7 @@ async function load() {
 	isLoading.value = true;
 	const session = getAuthSession();
 	isLogged.value = session !== null;
-	const token = session?.token ?? null;
+	const token = await authTokenAsync();
 	const [ranking, position] = await Promise.all([
 		getRanking(window.value),
 		getMyPosition(window.value, token),

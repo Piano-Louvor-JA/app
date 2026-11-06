@@ -67,6 +67,7 @@ vi.mock("../../services/seasonal-event", () => ({
 }));
 vi.mock("@modules/media/services/auth-client", () => ({
 	getAuthSession: mocks.getSession,
+	authTokenAsync: async () => mocks.getSession()?.token ?? null,
 }));
 vi.mock("@modules/auth/services/firebase-client", () => ({
 	getAuthReadiness: mocks.getAuthReadiness,

@@ -294,6 +294,8 @@ contextBridge.exposeInMainWorld('louvorja', {
     onPlaybackSync: (callback) => subscribe('projection:playback-sync', callback),
     // ESC pressionado na janela de projeção → operador decide no confirm
     onCloseRequested: (callback) => subscribe('projection:close-requested', callback),
+    // Enter na projeção → confirma o encerramento pendente (Esc + Enter)
+    onConfirmCloseRequested: (callback) => subscribe('projection:confirm-close-requested', callback),
     // ←/→ na projeção de mídia → operador avança/volta slide
     onMediaNavigate: (callback) => subscribe('projection:media-navigate', callback),
     remotePlay: () => ipcRenderer.invoke('projection:remote-play'),

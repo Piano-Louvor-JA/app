@@ -73,3 +73,39 @@ it('batches a burst of YouTube mutations into one layout update', async () => {
   runInNewContext(script, context)
   expect(styleWrites).toBe(1)
 })
+
+it('removes the YouTube Premium promo card from the projected page', async () => {
+  const { runInNewContext } = await import('node:vm')
+  const { JSDOM } = await import('jsdom')
+  const start = source.indexOf('const HIDE_YOUTUBE_SIDEBAR_SCRIPT =')
+  const end = source.indexOf('/** @type {BrowserWindow', start)
+  const script = runInNewContext(source.slice(start, end) + '\nHIDE_YOUTUBE_SIDEBAR_SCRIPT')
+  const dom = new JSDOM(`<body>
+    <div id="movie_player"><video></video></div>
+    <ytd-popup-container>
+      <tp-yt-paper-dialog>
+        <ytd-mealbar-promo-renderer>
+          <div id="dismiss-button"><button>Agora não</button></div>
+          <div id="action-button"><button>Inscreva-se</button></div>
+        </ytd-mealbar-promo-renderer>
+      </tp-yt-paper-dialog>
+    </ytd-popup-container>
+  </body>`, { runScripts: 'outside-only' })
+  try {
+    const { window } = dom
+    let dismissed = 0
+    let subscribed = 0
+    window.document.querySelector('#dismiss-button button').addEventListener('click', () => { dismissed++ })
+    window.document.querySelector('#action-button button').addEventListener('click', () => { subscribed++ })
+
+    window.eval(script)
+
+    const dialog = window.document.querySelector('tp-yt-paper-dialog')
+    const promo = window.document.querySelector('ytd-mealbar-promo-renderer')
+    expect(window.getComputedStyle(promo).display).toBe('none')
+    expect(dialog.style.getPropertyValue('display')).toBe('none')
+    expect(dismissed).toBe(1)
+    expect(subscribed).toBe(0)
+    expect(window.getComputedStyle(window.document.querySelector('video')).display).not.toBe('none')
+  } finally { dom.window.close() }
+})

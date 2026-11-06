@@ -123,6 +123,30 @@ describe('StagePreview', () => {
     expect(style).toContain('font-weight: 800')
   })
 
+  describe('posição da referência', () => {
+    const footerOf = (bibleRefPosition?: StageSettings['bibleRefPosition']) =>
+      createWrapper({ module: 'bible', settings: { ...base, ...(bibleRefPosition ? { bibleRefPosition } : {}) } })
+        .find('.stage-preview__footer')
+
+    it('padrão: logo abaixo da caixa do texto, à direita', () => {
+      const footer = footerOf()
+      expect(footer.element.previousElementSibling?.classList.contains('stage-preview__box')).toBe(true)
+      expect(footer.classes()).not.toContain('stage-preview__footer--corner')
+      expect(footer.attributes('style')).toContain('text-align: right')
+    })
+
+    it('abaixo do texto à esquerda e no centro', () => {
+      expect(footerOf('below-left').attributes('style')).toContain('text-align: left')
+      expect(footerOf('below-center').attributes('style')).toContain('text-align: center')
+    })
+
+    it('canto inferior direito da tela', () => {
+      const footer = footerOf('corner')
+      expect(footer.classes()).toContain('stage-preview__footer--corner')
+      expect(footer.attributes('style')).not.toContain('text-align')
+    })
+  })
+
   it('bíblia sem cor de fundo fica preta', () => {
     const wrapper = createWrapper({
       module: 'bible',
