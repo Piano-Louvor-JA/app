@@ -77,6 +77,50 @@ export type YoutubeAuthApi = {
   logout: () => Promise<{ ok: boolean }>
 }
 
+export type OnlineVideoQuality = 480 | 720 | 1080
+
+export type OnlineVideoSettings = {
+  enabled: boolean
+  maxHeight: OnlineVideoQuality
+  limitGb: number
+}
+
+export type OnlineVideoToolsStatus = {
+  state: 'unavailable' | 'missing' | 'installing' | 'ready' | 'error'
+  tool?: 'ytdlp' | 'ffmpeg'
+  progress?: number
+  version?: string
+  error?: string
+}
+
+export type OnlineVideoStatus = {
+  hidden: boolean
+  available: boolean
+  settings: OnlineVideoSettings
+  tools: OnlineVideoToolsStatus
+  usage: { bytes: number; count: number; limitBytes: number }
+}
+
+export type OnlineVideoItemStatus = {
+  state: 'none' | 'queued' | 'resolving' | 'downloading' | 'muxing' | 'ready' | 'error'
+  progress?: number
+  code?: string
+  message?: string
+}
+
+export type OnlineVideoApi = {
+  status: () => Promise<OnlineVideoStatus>
+  setSettings: (partial: Partial<OnlineVideoSettings>) => Promise<OnlineVideoStatus>
+  prefetch: (ids: string[]) => Promise<void>
+  cancel: (id: string) => Promise<void>
+  keep: (ids: string[]) => Promise<void>
+  clear: () => Promise<OnlineVideoStatus>
+  videoStatus: (ids: string[]) => Promise<Record<string, OnlineVideoItemStatus>>
+  retryTools: () => Promise<OnlineVideoStatus>
+  onChanged: (callback: (payload: { id: string; status: OnlineVideoItemStatus }) => void) => () => void
+  onTools: (callback: (status: OnlineVideoToolsStatus) => void) => () => void
+}
+
 export type LegacyMediaCounts = {
   covers: number
   music: number
@@ -494,6 +538,7 @@ export type LouvorJaBridge = {
   bible?: BibleApi
   classo?: ClassoApi
   ytAuth?: YoutubeAuthApi
+  onlineVideo?: OnlineVideoApi
   externalPlayer?: ExternalPlayerApi
   legacyMedia?: LegacyMediaApi
   mediaFolder?: MediaFolderApi
