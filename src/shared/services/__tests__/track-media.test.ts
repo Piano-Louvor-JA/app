@@ -16,12 +16,16 @@ vi.mock('@shared/services/desktop-bridge', () => ({
 
 const readCatalogRecord = vi.fn()
 const fetchRemoteCatalogJson = vi.fn()
+const syncBundle = vi.fn()
 const getCurrentApiPrefix = vi.fn(() => 'pt')
 vi.mock('@modules/sync/services/library-catalog', () => ({
   getCurrentApiPrefix: () => getCurrentApiPrefix(),
 }))
 vi.mock('@shared/services/workspace-api', () => ({
   readCatalogRecord: (...a: unknown[]) => readCatalogRecord(...a),
+}))
+vi.mock('@shared/services/bundle-sync-client', () => ({
+  syncBundle: (...a: unknown[]) => syncBundle(...a),
 }))
 vi.mock('@shared/services/remote-catalog', () => ({
   fetchRemoteCatalogJson: (...a: unknown[]) => fetchRemoteCatalogJson(...a),
@@ -129,6 +133,32 @@ describe('collectTrackMediaItems', () => {
       { type: 'covers', url: '/covers/es/2003.jpg' },
     ])
   })
+
+  it('registro faltante: bundle aplica => lê do bundle, sem fetch item-a-item', async () => {
+    readCatalogRecord
+      .mockResolvedValueOnce(null) // 1ª leitura: falta local
+      .mockResolvedValueOnce({ url_music: '/musics/pt/9.mp3' }) // após bundle
+    syncBundle.mockResolvedValue({ records: { music_9: { url_music: '/musics/pt/9.mp3' } } })
+    fetchRemoteCatalogJson.mockRejectedValue(new Error('não deveria ser chamado'))
+
+    const items = await collectTrackMediaItems(9)
+
+    expect(syncBundle).toHaveBeenCalledWith('catalog')
+    expect(fetchRemoteCatalogJson).not.toHaveBeenCalled()
+    expect(items).toEqual([{ type: 'music', url: '/musics/pt/9.mp3' }])
+  })
+
+  it('bundle indisponível (null) => cai no fetch item-a-item (ADR-03)', async () => {
+    readCatalogRecord.mockResolvedValue(null)
+    syncBundle.mockResolvedValue(null)
+    fetchRemoteCatalogJson.mockResolvedValue({ url_music: '/musics/pt/8.mp3' })
+
+    const items = await collectTrackMediaItems(8)
+
+    expect(syncBundle).toHaveBeenCalledWith('catalog')
+    expect(fetchRemoteCatalogJson).toHaveBeenCalledWith('music_8')
+    expect(items).toEqual([{ type: 'music', url: '/musics/pt/8.mp3' }])
+  })
 })
 
 describe('cache isolado por idioma', () => {
@@ -200,6 +230,8 @@ describe('downloadTrackMedia', () => {
     isDesktopApp.mockReturnValue(true)
     getDesktopBridge.mockReturnValue({ media: { check: vi.fn(), download: vi.fn() } } as never)
     readCatalogRecord.mockResolvedValue(null)
+    syncBundle.mockResolvedValue(null)
+    fetchRemoteCatalogJson.mockRejectedValue(new Error('off'))
     expect(await downloadTrackMedia(1)).toEqual({ status: 'idle', reason: 'empty' })
     readCatalogRecord.mockResolvedValue({ url_music: '/musics/pt/1.mp3' })
     expect(
@@ -375,7 +407,7 @@ describe('downloadTrackMedia', () => {
     } as never)
     await downloadTrackMedia(43)
     expect(download).toHaveBeenCalledWith(
-      'https://api-stg.pianolouvorja.com.br/file/musics/pt/43.mp3',
+      'https://files.louvorja.com.br/musics/pt/43.mp3',
       'music',
       'pt/43.mp3',
     )
