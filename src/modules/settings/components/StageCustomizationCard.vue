@@ -28,6 +28,7 @@ import {
 } from '../types/stage-settings'
 
 import SettingsToggle from './SettingsToggle.vue'
+import FontSelector from './FontSelector.vue'
 import StagePreview from './StagePreview.vue'
 
 const { t } = useI18n()
@@ -269,12 +270,14 @@ const confirmReset = ref(false)
         <StagePreview
           class="stage-custom__preview"
           :settings="settings"
+          :font-scope="activeScope"
           :module="activeScope === 'global' ? 'hymns' : activeScope"
         />
       </div><!-- /preview-pane -->
 
       <div class="stage-custom__controls">
       <div class="stage-custom__controls-inner">
+        <FontSelector :scope="activeScope" compact />
         <div class="stage-custom__section">
           <p class="stage-custom__label">{{ t('settings.stage.backgroundColor') }}</p>
       <div class="stage-custom__swatches">

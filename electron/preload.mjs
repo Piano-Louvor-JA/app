@@ -142,6 +142,16 @@ contextBridge.exposeInMainWorld('louvorja', {
     reportJank: (snapshot) => ipcRenderer.send('diagnostics:jank', snapshot),
   },
 
+  fonts: {
+    listInstalled: () => ipcRenderer.invoke('fonts:list-installed'),
+    download: (id, jobId) => ipcRenderer.invoke('fonts:download', { id, jobId }),
+    preview: (id, jobId) => ipcRenderer.invoke('fonts:preview', { id, jobId }),
+    downloadAll: (jobId) => ipcRenderer.invoke('fonts:download-all', { jobId }),
+    cancel: (jobId) => ipcRenderer.invoke('fonts:cancel', jobId),
+    release: (jobId) => ipcRenderer.invoke('fonts:release', jobId),
+    remove: (id) => ipcRenderer.invoke('fonts:remove', id),
+    onProgress: (callback) => subscribe('fonts:progress', callback),
+  },
   workspace: {
     readBinaryFile: (path) => ipcRenderer.invoke('dialog:read-binary-file', path),
     fetchText: (url) => ipcRenderer.invoke('workspace:fetch-text', url),

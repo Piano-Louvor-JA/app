@@ -119,7 +119,7 @@ describe('ClockProjectionView.vue', () => {
   it('broadcast channel: evento normalizado e armazenado', async () => {
     const w = mountView()
     await flushPromises()
-    const ch = FakeBroadcastChannel.instances[0]
+    const ch = FakeBroadcastChannel.instances.find(channel => channel.name === 'clock-config')
     expect(ch?.name).toBe('clock-config')
     const cb = channelListeners.message!
     expect(cb).toBeTruthy()
@@ -149,7 +149,7 @@ describe('ClockProjectionView.vue', () => {
   it('unmount: remove listeners, unsub e fecha channel', async () => {
     const w = mountView()
     await flushPromises()
-    const ch = FakeBroadcastChannel.instances[0]
+    const ch = FakeBroadcastChannel.instances.find(channel => channel.name === 'clock-config')
     const unsub = stageSubs.unsubs.at(-1)!
     w.unmount()
     expect(ch?.closed).toBe(true)

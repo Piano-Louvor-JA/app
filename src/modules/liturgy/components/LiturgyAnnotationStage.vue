@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useProjectionFont } from '@modules/settings/composables/useProjectionFont'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 
 import { ProjectionBackground } from '@design-system/index'
@@ -131,13 +132,15 @@ const boxStyle = computed(() => {
     padding: '0.5em 0.9em',
   }
 })
+
+const projectionFontStyle = useProjectionFont('liturgy')
 </script>
 
 <template>
   <ProjectionBackground
     class="annotation-projection"
     :class="{ 'annotation-projection--embedded': embedded }"
-    :style="stageStyle"
+    :style="[stageStyle, projectionFontStyle]"
   >
     <div
       class="annotation-projection__stage"

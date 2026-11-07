@@ -9,6 +9,7 @@ vi.mock('vue-i18n', () => ({
 
 vi.mock('@design-system/index', () => ({
   GlassCard: { name: 'GlassCard', template: '<div class="glass-card-mock"><slot /></div>' },
+  ProjectionBackground: { name: 'ProjectionBackground', template: '<div><slot /></div>' },
 }))
 
 vi.mock('@shared/services/browser-storage', () => ({

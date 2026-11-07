@@ -6,13 +6,17 @@
  * rodapé de referência.
  */
 import { computed } from 'vue'
+import { useProjectionFont } from '../composables/useProjectionFont'
 
 import { resolveBackgroundImage, stageBgCss, stageFlexAlign, type StageSettings } from '../types/stage-settings'
 
 const props = defineProps<{
   settings: StageSettings
+  fontScope?: string
   module?: string
 }>()
+
+const projectionFontStyle = useProjectionFont(() => props.fontScope ?? props.module ?? 'global')
 
 const sample = computed(() =>
   props.module === 'bible'
@@ -88,7 +92,7 @@ const footerStyle = computed(() => {
   <div
     class="stage-preview"
     :class="{ 'stage-preview--bible': module === 'bible' }"
-    :style="containerStyle"
+    :style="[containerStyle, projectionFontStyle]"
   >
     <div class="stage-preview__content">
       <div

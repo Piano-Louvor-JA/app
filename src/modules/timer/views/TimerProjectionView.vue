@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useProjectionFont } from '@modules/settings/composables/useProjectionFont'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 
 import { ProjectionBackground } from '@design-system/index'
@@ -131,13 +132,15 @@ const effectiveConfig = computed(() => {
   const mod = stage.value.timer
   return mod ? { ...config.value, ...mod } : { ...config.value }
 })
+
+const projectionFontStyle = useProjectionFont('timer')
 </script>
 
 <template>
   <ProjectionBackground
     class="timer-projection"
     :class="{ 'timer-projection--embedded': embedded }"
-    :style="stageStyle"
+    :style="[stageStyle, projectionFontStyle]"
   >
     <div
       v-if="independent || runtime.projecting !== false"

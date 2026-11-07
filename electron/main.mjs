@@ -15,6 +15,7 @@ import { startRendererServer, rendererUrl } from "./renderer-server.mjs";
 import { configureUserDataPath } from "./user-data-path.mjs";
 import { checkEulaAcceptance } from "./eula.mjs";
 import { resolveAppLocale } from "./locale.mjs";
+import { registerDesktopFonts } from "./fonts/register.mjs";
 import { registerWorkspaceIpc } from "./ipc/register.mjs";
 import { registerDownloadBatchIpc } from "./ipc/download-batch-ipc.mjs";
 import { registerDiagnosticsIpc, setClockSkewProvider, setDiagnosticsToken } from "./diagnostics.mjs";
@@ -950,6 +951,7 @@ app.whenReady().then(async () => {
 		bootMark("eula");
 
 		registerWorkspaceIpc();
+		await registerDesktopFonts();
 		// Token de diagnóstico: LOUVORJA_DIAGNOSTICS_TOKEN (variável do MAIN, não
 		// VITE_* — config de build do renderer não existe no processo principal).
 		setDiagnosticsToken(process.env.LOUVORJA_DIAGNOSTICS_TOKEN ?? "");

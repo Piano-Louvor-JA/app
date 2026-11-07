@@ -1,3 +1,4 @@
+import { installSystemFontRuntime } from '@shared/services/system-font-runtime'
 import { createApp } from 'vue'
 import { installClientPlatformHeader } from '@shared/lib/client-platform'
 import { createPinia } from 'pinia'
@@ -16,6 +17,8 @@ import { startRendererTelemetry } from '@shared/services/telemetry'
 installClientPlatformHeader()
 useThemeManager()
 initUiZoom()
+const stopSystemFont = installSystemFontRuntime()
+if (import.meta.hot) import.meta.hot.dispose(stopSystemFont)
 
 // telemetria de erros (Glitchtip) — no-op sem VITE_TELEMETRIA_DSN
 void startRendererTelemetry()
