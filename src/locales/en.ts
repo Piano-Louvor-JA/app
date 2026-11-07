@@ -37,6 +37,8 @@ export default {
   },
   independentProjection: {
     title: 'Independent projection',
+    /** Monitor desligado no seletor "Telas". */
+    enableHint: 'Turn on in Screens to use',
     unavailable: 'Only available with extended monitors connected',
     hint: 'Pick one monitor. This feature appears on top of whatever is projected there; the other monitors stay the same.',
     monitor: 'Monitor {index}',

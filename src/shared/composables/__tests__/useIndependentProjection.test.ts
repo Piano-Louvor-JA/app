@@ -115,15 +115,44 @@ describe('useIndependentProjection', () => {
     expect(mod.getIndependentMode('clock')).toBeNull()
   })
 
-  it('trocar o monitor do módulo fecha a janela anterior', async () => {
+  it('o mesmo módulo fica em vários monitores; tirar um não fecha os outros', async () => {
     const first = fakeWindow()
-    openProjectionPopupWindow.mockReturnValueOnce(first)
+    const second = fakeWindow()
+    openProjectionPopupWindow.mockReturnValueOnce(first).mockReturnValueOnce(second)
     const mod = await loadFresh()
     await mod.openIndependentProjection('clock', 2)
     await mod.openIndependentProjection('clock', 3)
 
+    expect(first.close).not.toHaveBeenCalled()
+    expect(mod.getIndependentMonitors('clock')).toEqual([2, 3])
+    expect(mod.getIndependentMonitor('clock')).toBe(2)
+
+    mod.closeIndependentMonitor('clock', 2)
     expect(first.close).toHaveBeenCalled()
-    expect(mod.getIndependentMonitor('clock')).toBe(3)
+    expect(second.close).not.toHaveBeenCalled()
+    expect(mod.getIndependentMonitors('clock')).toEqual([3])
+    expect(mod.isIndependentProjectionActive('clock')).toBe(true)
+
+    mod.closeIndependentMonitor('clock', 3)
+    expect(mod.getIndependentMonitors('clock')).toEqual([])
+    expect(mod.getIndependentMode('clock')).toBeNull()
+    mod.closeIndependentMonitor('clock', 9)
+  })
+
+  it('janela de um dos monitores fechada por fora some só ela', async () => {
+    const first = fakeWindow()
+    openProjectionPopupWindow.mockReturnValueOnce(first)
+    vi.useFakeTimers()
+    try {
+      const mod = await loadFresh()
+      await mod.openIndependentProjection('clock', 2)
+      await mod.openIndependentProjection('clock', 3)
+      first.closed = true
+      vi.advanceTimersByTime(600)
+      expect(mod.getIndependentMonitors('clock')).toEqual([3])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('um monitor só aceita uma independente: o último módulo assume', async () => {
@@ -273,16 +302,19 @@ describe('useIndependentProjectionControl', () => {
     expect(api.available.value).toBe(true)
   })
 
-  it('project/stop refletem o monitor ativo do módulo', async () => {
+  it('project/unproject/stop refletem os monitores ativos do módulo', async () => {
     const { api, mod } = await mountControl('timer')
     expect(api.activeMonitorId.value).toBeNull()
+    expect(api.activeMonitorIds.value).toEqual([])
     await api.project(2)
     expect(api.activeMonitorId.value).toBe(2)
     expect(api.activeMode.value).toBe('overlay')
     await api.project(3, 'share')
-    expect(api.activeMonitorId.value).toBe(3)
+    expect(api.activeMonitorIds.value).toEqual([2, 3])
     expect(api.activeMode.value).toBe('share')
-    expect(mod.getIndependentMonitor('timer')).toBe(3)
+    expect(mod.getIndependentMonitors('timer')).toEqual([2, 3])
+    api.unproject(2)
+    expect(api.activeMonitorIds.value).toEqual([3])
     api.stop()
     expect(api.activeMonitorId.value).toBeNull()
   })
