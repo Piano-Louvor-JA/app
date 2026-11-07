@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Texto — LouvorJA - PIANO</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: var(--bg, #000);
+      }
+      #stage {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2.2vw;
+        padding: 6vh 7vw;
+        background: var(--bg, #000);
+        color: var(--text, #fff);
+        font-family: 'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif;
+        text-align: center;
+      }
+      #title {
+        margin: 0;
+        color: var(--title, #fb8c00);
+        font-size: calc(var(--title-size, 4.2vw) * var(--scale, 1));
+        font-weight: 700;
+        line-height: 1.15;
+        text-shadow: 0 0.2vw 0.6vw rgba(0, 0, 0, 0.55);
+      }
+      #title:empty { display: none; }
+      #text {
+        max-width: 100%;
+        font-size: calc(var(--text-size, 3.2vw) * var(--scale, 1));
+        font-weight: 500;
+        line-height: 1.35;
+        text-shadow: 0 0.2vw 0.6vw rgba(0, 0, 0, 0.55);
+        overflow-wrap: anywhere;
+      }
+      #text p, #text div { margin: 0 0 0.35em; }
+      #text ul, #text ol { display: inline-block; margin: 0; padding-left: 1.2em; text-align: left; }
+    </style>
+  </head>
+  <body>
+    <div id="stage">
+      <h1 id="title"></h1>
+      <div id="text"></div>
+    </div>
+    <script>
+      ;(() => {
+        // Texto já vem limpo do app; limpa de novo aqui porque esta janela tem a ponte do app.
+        const ALLOWED = new Set(['P', 'DIV', 'BR', 'SPAN', 'B', 'STRONG', 'I', 'EM', 'U', 'UL', 'OL', 'LI'])
+        const COLOR = /^(#[\da-f]{3,8}|rgba?\(\s*[\d.]+%?\s*,\s*[\d.]+%?\s*,\s*[\d.]+%?\s*(,\s*[\d.]+%?\s*)?\)|transparent)$/i
+        const STYLE_PROPS = ['color', 'background-color', 'font-weight', 'font-style', 'text-decoration']
+
+        function cleanNode(node) {
+          for (const child of Array.from(node.childNodes)) {
+            if (child.nodeType === Node.TEXT_NODE) continue
+            if (child.nodeType !== Node.ELEMENT_NODE || !ALLOWED.has(child.tagName)) {
+              // Tag não permitida: mantém só o texto dela (script/style somem inteiros).
+              if (child.nodeType === Node.ELEMENT_NODE && !['SCRIPT', 'STYLE', 'IFRAME', 'OBJECT', 'EMBED'].includes(child.tagName)) {
+                child.replaceWith(document.createTextNode(child.textContent || ''))
+              } else {
+                child.remove()
+              }
+              continue
+            }
+            const style = child.style
+            const kept = []
+            for (const prop of STYLE_PROPS) {
+              const value = style.getPropertyValue(prop).trim()
+              if (!value) continue
+              if ((prop === 'color' || prop === 'background-color') && !COLOR.test(value)) continue
+              kept.push(prop + ':' + value)
+            }
+            for (const attr of Array.from(child.attributes)) child.removeAttribute(attr.name)
+            if (kept.length) child.setAttribute('style', kept.join(';'))
+            cleanNode(child)
+          }
+        }
+
+        function sanitize(html) {
+          const doc = new DOMParser().parseFromString('<div>' + String(html || '') + '</div>', 'text/html')
+          const root = doc.body.firstElementChild
+          if (!root) return ''
+          cleanNode(root)
+          return root.innerHTML
+        }
+
+        function safeColor(value, fallback) {
+          return typeof value === 'string' && COLOR.test(value.trim()) ? value.trim() : fallback
+        }
+
+        let data = {}
+        try {
+          data = JSON.parse(new URLSearchParams(window.location.search).get('data') || '{}') || {}
+        } catch {
+          data = {}
+        }
+
+        const root = document.documentElement
+        root.style.setProperty('--bg', safeColor(data.backgroundColor, '#000000'))
+        root.style.setProperty('--text', safeColor(data.textColor, '#ffffff'))
+        root.style.setProperty('--title', safeColor(data.titleColor, '#fb8c00'))
+
+        const titleEl = document.getElementById('title')
+        const textEl = document.getElementById('text')
+        titleEl.textContent = typeof data.title === 'string' ? data.title.trim() : ''
+        textEl.innerHTML = sanitize(data.html)
+
+        // Texto longo cede tamanho (mesma escala da anotação da Liturgia).
+        const length = (textEl.textContent || '').replace(/\s+/g, ' ').length
+        const base = length > 600 ? 0.5 : length > 360 ? 0.6 : length > 200 ? 0.7 : 0.8
+        root.style.setProperty('--text-size', (4 * base).toFixed(2) + 'vw')
+        root.style.setProperty('--title-size', (5.2 * base).toFixed(2) + 'vw')
+
+        let scale = 1
+        function setScale(next) {
+          const value = Number(next)
+          scale = Number.isFinite(value) ? Math.min(2, Math.max(0.5, Math.round(value * 10) / 10)) : 1
+          root.style.setProperty('--scale', String(scale))
+          return { scale }
+        }
+
+        window.__textSlide = {
+          getState() { return { scale } },
+          setScale,
+        }
+        // O processo principal trata o texto como uma galeria de um slide (telas e conexões).
+        window.__liturgyGallery = {
+          getState() { return { index: 0, total: 1 } },
+          next() { return { index: 0, total: 1 } },
+          prev() { return { index: 0, total: 1 } },
+          goTo() { return { index: 0, total: 1 } },
+        }
+        if (titleEl.textContent) document.title = 'Texto — ' + titleEl.textContent
+      })()
+    </script>
+  </body>
+</html>

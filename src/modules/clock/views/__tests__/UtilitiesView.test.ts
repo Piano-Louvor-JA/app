@@ -23,10 +23,13 @@ describe('UtilitiesView', () => {
     const cards = w.findAll('.hub-stub')
     // Desenho fica oculto até ser feito.
     // Diagnóstico saiu de Utilitários — agora é card em /config/general (app#423 follow-up).
-    expect(cards.map((card) => card.text())).toEqual(['utilities.temporizador', 'utilities.random', 'utilities.sabbathSchool'])
+    expect(cards.map((card) => card.text())).toEqual(['utilities.temporizador', 'utilities.random', 'utilities.sabbathSchool', 'utilities.announcements'])
     const sabbath = cards[2]!
     expect(sabbath.attributes('data-to')).toBe('/utilities/sabbath-school')
     expect(sabbath.attributes('data-available')).toBe('true')
+    const announcements = cards[3]!
+    expect(announcements.attributes('data-to')).toBe('/utilities/announcements')
+    expect(announcements.attributes('data-available')).toBe('true')
     expect(cards.some((card) => card.attributes('data-to') === '/diagnostics')).toBe(false)
     const obs = cards.find((card) => card.text() === 'utilities.obs')
     expect(obs).toBeUndefined()

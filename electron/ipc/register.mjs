@@ -38,6 +38,14 @@ import {
   clearEscolaSabatinaVideo,
   importEscolaSabatinaVideo,
 } from '../escola-sabatina-video.mjs'
+import {
+  AVISOS_EXTENSIONS,
+  copyAvisoFolder,
+  importAvisoFiles,
+  removeAvisoFiles,
+  removeAvisoFolder,
+  resolveAvisoPaths,
+} from '../avisos-files.mjs'
 import { writeWindowsMediaRootOverride } from '../windows-media-root.mjs'
 import {
   buildBackupFileName,
@@ -73,6 +81,12 @@ import {
   closeWebProjectionWindows,
   getSourceMediaIdFor,
   getImageSlideState,
+  getTextScale,
+  setTextScale,
+  openPlayerIndependent,
+  closePlayerIndependent,
+  getPlayerIndependentState,
+  getIndependentEnabledDisplays,
   getPdfPageState,
   getPptSlideState,
   getSourceNavigationState,
@@ -392,6 +406,60 @@ export function registerWorkspaceIpc() {
     }
   })
 
+  ipcMain.handle('projection:independent-open', (_event, displayIds, mode) => {
+    try {
+      return openPlayerIndependent(displayIds, mode)
+    } catch (error) {
+      console.error('[ipc] projection:independent-open', error)
+      return false
+    }
+  })
+
+  ipcMain.handle('projection:independent-close', () => {
+    try {
+      return closePlayerIndependent()
+    } catch (error) {
+      console.error('[ipc] projection:independent-close', error)
+      return false
+    }
+  })
+
+  ipcMain.handle('projection:independent-enabled-displays', () => {
+    try {
+      return getIndependentEnabledDisplays()
+    } catch (error) {
+      console.error('[ipc] projection:independent-enabled-displays', error)
+      return []
+    }
+  })
+
+  ipcMain.handle('projection:independent-state', () => {
+    try {
+      return getPlayerIndependentState()
+    } catch (error) {
+      console.error('[ipc] projection:independent-state', error)
+      return null
+    }
+  })
+
+  ipcMain.handle('projection:get-text-scale', () => {
+    try {
+      return getTextScale()
+    } catch (error) {
+      console.error('[ipc] projection:get-text-scale', error)
+      return null
+    }
+  })
+
+  ipcMain.handle('projection:set-text-scale', async (_event, scale) => {
+    try {
+      return await setTextScale(scale)
+    } catch (error) {
+      console.error('[ipc] projection:set-text-scale', error)
+      return null
+    }
+  })
+
   ipcMain.handle('projection:get-image-slide-state', async () => {
     try {
       return await getImageSlideState()
@@ -500,9 +568,9 @@ export function registerWorkspaceIpc() {
     }
   })
 
-  ipcMain.handle('projection:set-site-control-panel-open', (_event, open) => {
+  ipcMain.handle('projection:set-site-control-panel-open', (_event, open, height) => {
     try {
-      return setSiteControlPanelOpen(open)
+      return setSiteControlPanelOpen(open, height)
     } catch (error) {
       console.error('[ipc] projection:set-site-control-panel-open', error)
       return false
@@ -685,6 +753,70 @@ export function registerWorkspaceIpc() {
     } catch (error) {
       console.error('[ipc] sabbath-school:clear-video', error)
       return { ok: false, reason: 'error' }
+    }
+  })
+
+  const AVISOS_DIALOG = {
+    images: { title: 'Escolher imagens do aviso', filterName: 'Imagens', multiple: true },
+    video: { title: 'Escolher vídeo do aviso', filterName: 'Vídeo', multiple: false },
+    presentation: { title: 'Escolher apresentação do aviso', filterName: 'PowerPoint ou PDF', multiple: false },
+  }
+
+  ipcMain.handle('announcements:pick-and-import', async (event, avisoId, kind) => {
+    try {
+      const options = Object.hasOwn(AVISOS_DIALOG, kind) ? AVISOS_DIALOG[kind] : null
+      if (!options) return { ok: false, reason: 'invalid_kind' }
+      const win = BrowserWindow.fromWebContents(event.sender)
+      const result = await dialog.showOpenDialog(win ?? undefined, {
+        title: options.title,
+        filters: [{ name: options.filterName, extensions: AVISOS_EXTENSIONS[kind] }],
+        properties: options.multiple ? ['openFile', 'multiSelections'] : ['openFile'],
+      })
+      if (result.canceled || !result.filePaths?.length) return { ok: false, reason: 'cancelled' }
+      const { media } = getWorkspacePaths()
+      const imported = importAvisoFiles(media, avisoId, result.filePaths, kind)
+      return imported.ok ? imported : { ok: false, reason: imported.error }
+    } catch (error) {
+      console.error('[ipc] announcements:pick-and-import', error)
+      return { ok: false, reason: 'error' }
+    }
+  })
+
+  ipcMain.handle('announcements:copy-folder', (_event, fromId, toId) => {
+    try {
+      const copied = copyAvisoFolder(getWorkspacePaths().media, fromId, toId)
+      return copied.ok ? copied : { ok: false, reason: copied.error }
+    } catch (error) {
+      console.error('[ipc] announcements:copy-folder', error)
+      return { ok: false, reason: 'error' }
+    }
+  })
+
+  ipcMain.handle('announcements:remove-folder', (_event, avisoId) => {
+    try {
+      const removed = removeAvisoFolder(getWorkspacePaths().media, avisoId)
+      return removed.ok ? removed : { ok: false, reason: removed.error }
+    } catch (error) {
+      console.error('[ipc] announcements:remove-folder', error)
+      return { ok: false, reason: 'error' }
+    }
+  })
+
+  ipcMain.handle('announcements:remove-files', (_event, relativePaths) => {
+    try {
+      return removeAvisoFiles(getWorkspacePaths().media, Array.isArray(relativePaths) ? relativePaths : [])
+    } catch (error) {
+      console.error('[ipc] announcements:remove-files', error)
+      return { ok: false, reason: 'error' }
+    }
+  })
+
+  ipcMain.handle('announcements:resolve-paths', (_event, relativePaths) => {
+    try {
+      return resolveAvisoPaths(getWorkspacePaths().media, Array.isArray(relativePaths) ? relativePaths : [])
+    } catch (error) {
+      console.error('[ipc] announcements:resolve-paths', error)
+      return []
     }
   })
 

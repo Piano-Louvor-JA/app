@@ -19,6 +19,8 @@ export default {
     countdownDescription: 'Cuenta regresiva proyectada en pantalla',
     sabbathSchool: 'Escuela Sabática',
     sabbathSchoolDescription: 'Cuenta regresiva con los avisos sonoros de la Escuela Sabática',
+    announcements: 'Anuncios y presentaciones',
+    announcementsDescription: 'Avisos, anuncios y presentaciones para el culto',
   },
   clock: {
     title: 'Reloj',

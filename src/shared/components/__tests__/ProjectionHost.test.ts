@@ -18,6 +18,9 @@ vi.mock('@modules/liturgy/views/LiturgyWebProjectionView.vue', () => ({
 vi.mock('@modules/liturgy/components/LiturgyAnnotationStage.vue', () => ({
   default: { name: 'LiturgyAnnotationStage', template: '<div class="stub-annotation" />' },
 }))
+vi.mock('@modules/announcements/components/AnnouncementsCarouselStage.vue', () => ({
+  default: { name: 'AnnouncementsCarouselStage', template: '<div class="stub-announcements-carousel" />' },
+}))
 vi.mock('@modules/media/views/MediaProjectionView.vue', () => ({
   default: { name: 'MediaProjectionView', template: '<div class="stub-media" />' },
 }))
@@ -91,6 +94,11 @@ describe('ProjectionHost.vue', () => {
   it('module=annotation → palco da anotação', async () => {
     const wrapper = await createWrapper({ module: 'annotation' })
     expect(wrapper.find('.stub-annotation').exists()).toBe(true)
+  })
+
+  it('module=announcements-carousel → carrossel dos Avisos', async () => {
+    const wrapper = await createWrapper({ module: 'announcements-carousel' })
+    expect(wrapper.find('.stub-announcements-carousel').exists()).toBe(true)
   })
 
   it('sem module → empty state', async () => {

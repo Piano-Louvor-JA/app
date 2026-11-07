@@ -198,6 +198,14 @@ contextBridge.exposeInMainWorld('louvorja', {
     clearVideo: () => ipcRenderer.invoke('sabbath-school:clear-video'),
   },
 
+  announcements: {
+    pickAndImport: (avisoId, kind) => ipcRenderer.invoke('announcements:pick-and-import', avisoId, kind),
+    copyFolder: (fromId, toId) => ipcRenderer.invoke('announcements:copy-folder', fromId, toId),
+    removeFolder: (avisoId) => ipcRenderer.invoke('announcements:remove-folder', avisoId),
+    removeFiles: (relativePaths) => ipcRenderer.invoke('announcements:remove-files', relativePaths),
+    resolvePaths: (relativePaths) => ipcRenderer.invoke('announcements:resolve-paths', relativePaths),
+  },
+
   catalog: {
     downloadDatabase: () => ipcRenderer.invoke('catalog:download-database'),
     extractDatabase: () => ipcRenderer.invoke('catalog:extract-database'),
@@ -348,6 +356,13 @@ contextBridge.exposeInMainWorld('louvorja', {
     remoteImagePrev: () => ipcRenderer.invoke('projection:remote-image-prev'),
     getImageSlideState: () =>
       ipcRenderer.invoke('projection:get-image-slide-state'),
+    getTextScale: () => ipcRenderer.invoke('projection:get-text-scale'),
+    // Projeção independente do player (Sobrepor/Compartilhar num monitor).
+    openIndependent: (displayIds, mode) => ipcRenderer.invoke('projection:independent-open', displayIds, mode),
+    closeIndependent: () => ipcRenderer.invoke('projection:independent-close'),
+    getIndependentState: () => ipcRenderer.invoke('projection:independent-state'),
+    getIndependentEnabledDisplays: () => ipcRenderer.invoke('projection:independent-enabled-displays'),
+    setTextScale: (scale) => ipcRenderer.invoke('projection:set-text-scale', scale),
     remotePdfNext: () => ipcRenderer.invoke('projection:remote-pdf-next'),
     remotePdfPrev: () => ipcRenderer.invoke('projection:remote-pdf-prev'),
     getPdfPageState: () => ipcRenderer.invoke('projection:get-pdf-page-state'),
@@ -365,8 +380,8 @@ contextBridge.exposeInMainWorld('louvorja', {
       ipcRenderer.invoke('projection:get-video-target-monitors'),
     setVideoTargetMonitors: (ids) =>
       ipcRenderer.invoke('projection:set-video-target-monitors', ids),
-    setSiteControlPanelOpen: (open) =>
-      ipcRenderer.invoke('projection:set-site-control-panel-open', open),
+    setSiteControlPanelOpen: (open, height) =>
+      ipcRenderer.invoke('projection:set-site-control-panel-open', open, height),
     onSiteTargetsChanged: (callback) =>
       subscribe('projection:site-targets-changed', callback),
     onVideoTargetsChanged: (callback) =>

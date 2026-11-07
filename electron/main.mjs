@@ -24,7 +24,7 @@ import { attachRemoteServer } from "./remote-server.mjs";
 import { attachPalcoServer, getPalcoManager } from "./palco-server.mjs";
 import { ensureWorkspaceDirectories } from "./paths.mjs";
 import { registerLocalFileProtocol, registerLocalScheme, setOnlineVideoSource } from "./protocol.mjs";
-import { registerCloseProjectionPopups, setOnlineVideoPlayer } from "./ipc/web-projection.mjs";
+import { registerCloseProjectionPopups, setIndependentLayerHooks, setOnlineVideoPlayer } from "./ipc/web-projection.mjs";
 import { OnlineVideoService, registerOnlineVideoIpc } from "./online-video/ipc.mjs";
 import { readWorkspaceRecord, writeWorkspaceRecord } from "./workspace.mjs";
 import { buildProjectionWindowBounds } from "./projection-display.mjs";
@@ -488,6 +488,17 @@ function attachProjectionWindowHandlers(parentWindow) {
     if (win === parentWindow) return
     independentPopups.watch(win)
     sharedLayout.watch(win)
+  })
+  // Players do Piano (vídeo/imagens/texto/PDF/site): projeção independente usa as mesmas camadas.
+  setIndependentLayerHooks({
+    add: (win) => {
+      independentPopups.add(win)
+      win.once('show', () => independentPopups.raiseSoon())
+    },
+    addShared: (win, displayId) => {
+      sharedLayout.addShared(win, displayId)
+      win.once('show', () => sharedLayout.relayoutSoon())
+    },
   })
   screen.on('display-removed', () => sharedLayout.relayoutSoon())
   screen.on('display-metrics-changed', () => sharedLayout.relayoutSoon())

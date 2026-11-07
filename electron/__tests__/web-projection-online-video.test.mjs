@@ -22,6 +22,7 @@ const {
   fallbackWhenYoutubeFails,
   getSourceMediaInfo,
   resolveOnlineVideoPlayerUrl,
+  resolveLocalTextPlayerUrl,
   resolveSourceUrl,
   setOnlineVideoPlayer,
   startYoutubeSource,
@@ -361,5 +362,22 @@ describe('origem da projeção do YouTube', () => {
     expect(resolveSourceUrl({ url: `https://youtu.be/${ID}` })).toBe(resolveSourceUrl({ videoId: ID }))
     expect(resolveSourceUrl({ mode: 'site', url: `https://www.youtube.com/watch?v=${ID}` })).toBe(`https://www.youtube.com/watch?v=${ID}`)
     expect(resolveSourceUrl({ videoId: 'curto' })).toBe('https://www.youtube.com/watch?v=curto')
+  })
+})
+
+describe('modo texto (avisos)', () => {
+  it('monta a URL do player de texto com título, HTML e cores', () => {
+    const url = new URL(resolveSourceUrl({ mode: 'text', text: { title: ' Batismo ', html: '<p>Sábado</p>', titleColor: '#fff000', textColor: '#ffffff', backgroundColor: '#000000', extra: 1 } }))
+    expect(url.pathname.endsWith('/player/local-text-player.html')).toBe(true)
+    expect(JSON.parse(url.searchParams.get('data'))).toEqual({
+      title: 'Batismo', html: '<p>Sábado</p>', titleColor: '#fff000', textColor: '#ffffff', backgroundColor: '#000000',
+    })
+  })
+
+  it('sem conteúdo ou formato errado não abre', () => {
+    expect(resolveLocalTextPlayerUrl(null)).toBeNull()
+    expect(resolveLocalTextPlayerUrl({ title: ' ', html: '  ' })).toBeNull()
+    expect(resolveSourceUrl({ mode: 'text' })).toBeNull()
+    expect(new URL(resolveLocalTextPlayerUrl({ title: 7, html: '<p>x</p>' })).searchParams.get('data')).toContain('"title":""')
   })
 })
