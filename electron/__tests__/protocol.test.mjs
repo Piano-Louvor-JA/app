@@ -126,7 +126,7 @@ describe('local offline fonts', () => {
     app.getPath.mockReturnValueOnce(dir)
     const file = resolveLocalProtocolPath('local://media/fontes/inter/face-0.woff2', dir).filePath
     mkdirSync(path.dirname(file), { recursive: true })
-    writeFileSync(file, 'wOF2test')
+    writeFileSync(file, 'wOF2test', { flag: 'wx', mode: 0o600 })
     try {
       registerLocalFileProtocol()
       const response = await protocol.handle.mock.calls.at(-1)[1](new Request('local://media/fontes/inter/face-0.woff2'))

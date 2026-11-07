@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mkdtemp, readFile, rm, writeFile, readdir } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile, readdir, symlink } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { createFontService, parseFontCss } from '../fonts/service.mjs'
@@ -42,6 +42,15 @@ describe('offline font installation', () => {
     await service.download('inter')
     expect(await service.list()).toHaveLength(1)
     await expect(service.download('../bad')).rejects.toThrow()
+  })
+  it('rejects a font face replaced by a symbolic link', async () => {
+    await service.download('inter')
+    const face = path.join(root, 'fontes/inter/face-0.woff2')
+    const outside = path.join(root, 'outside.woff2')
+    await writeFile(outside, bytes)
+    await rm(face)
+    await symlink(outside, face)
+    expect(await service.list()).toEqual([])
   })
   it('cleans partial installation on failure and abort', async () => {
     fetcher.mockRejectedValueOnce(new Error('offline'))

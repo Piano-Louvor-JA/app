@@ -1,8 +1,10 @@
-import { readFile, writeFile, mkdir, rm, rename, readdir, lstat } from 'node:fs/promises'
+import { readFile, writeFile, mkdir, rm, rename, readdir, open, lstat } from 'node:fs/promises'
 import { createHash, randomUUID } from 'node:crypto'
 import path from 'node:path'
+import { constants } from 'node:fs'
+import catalog from './catalog.json' with { type: 'json' }
 
-export const FONT_CATALOG = JSON.parse(await readFile(new URL('./catalog.json', import.meta.url), 'utf8'))
+export const FONT_CATALOG = catalog
 const hash = bytes => createHash('sha256').update(bytes).digest('hex')
 const MAX_FILE_BYTES = 8 * 1024 * 1024
 const MAX_CSS_BYTES = 512 * 1024
@@ -95,8 +97,16 @@ export function createFontService({ mediaRoot, fetch: fetcher = globalThis.fetch
       for (const face of manifest.faces) {
         if (!/^face-\d+\.woff2$/.test(face.file)) return null
         const file = path.join(directory, face.file)
-        if ((await lstat(file)).isSymbolicLink()) return null
-        const bytes = await readFile(file)
+        // Open once without following symlinks; validate and read that same descriptor.
+        const before = await lstat(file)
+        if (before.isSymbolicLink()) return null
+        const handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW)
+        let bytes
+        try {
+          const stat = await handle.stat()
+          if (!stat.isFile() || stat.ino !== before.ino || stat.dev !== before.dev || stat.size > MAX_FILE_BYTES) return null
+          bytes = await handle.readFile()
+        } finally { await handle.close() }
         if (bytes.length !== face.bytes || hash(bytes) !== face.sha256 || bytes.toString('ascii', 0, 4) !== 'wOF2') return null
       }
       return exposed(manifest, relative)
