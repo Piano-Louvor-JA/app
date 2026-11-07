@@ -307,4 +307,43 @@ describe('IndependentProjectionButton', () => {
     expect(panel()!.querySelector('[data-mode="share"]')!.getAttribute('aria-checked')).toBe('true')
     wrapper.unmount()
   })
+
+  it('sem OBS: esconde as saídas OBS, mesmo ativas, e a dica de ativá-las', async () => {
+    obsOutputs.value = [{ id: '7082', label: 'OBS 2', running: true, clients: 1, selected: true }]
+    obsAssignments.value = { '7082': 'annotation' }
+    const wrapper = mountButton({ moduleId: 'annotation', obs: false })
+    const trigger = wrapper.get('[data-testid="independent-projection-trigger"]')
+    expect(trigger.classes()).not.toContain('independent-projection__trigger--active')
+    await trigger.trigger('click')
+    expect(panel()!.querySelector('.obs-outputs-separator')).toBeNull()
+    expect(panel()!.querySelector('.obs-outputs-empty')).toBeNull()
+    expect(panel()!.querySelector('.obs-outputs-active')).toBeNull()
+    expect(panel()!.textContent).not.toContain('OBS 2')
+    wrapper.unmount()
+  })
+
+  it('sem OBS e sem monitor: tooltip não sugere ativar OBS', () => {
+    monitors.value = []
+    obsOutputs.value = [{ id: '7082', label: 'OBS 2', running: true, clients: 1, selected: true }]
+    const wrapper = mountButton({ obs: false })
+    const trigger = wrapper.get('[data-testid="independent-projection-trigger"]')
+    expect(trigger.attributes('aria-disabled')).toBe('true')
+    expect(trigger.attributes('title')).toBe('independentProjection.unavailable')
+    wrapper.unmount()
+  })
+
+  it('não dono do conteúdo: não aparece ativo nem oferece encerrar', async () => {
+    activeMonitorId.value = 2
+    activeMode.value = 'share'
+    const wrapper = mountButton({ claimed: false, compact: true })
+    const trigger = wrapper.get('[data-testid="independent-projection-trigger"]')
+    expect(trigger.classes()).toContain('independent-projection__trigger--compact')
+    expect(trigger.classes()).not.toContain('independent-projection__trigger--active')
+    expect(trigger.find('.independent-projection__badge').exists()).toBe(false)
+    expect(trigger.find('.ti').classes()).toContain('ti-device-desktop-share')
+    expect(trigger.attributes('title')).toBe('independentProjection.title')
+    await trigger.trigger('click')
+    expect(panel()!.querySelector('[data-testid="independent-projection-stop"]')).toBeNull()
+    wrapper.unmount()
+  })
 })

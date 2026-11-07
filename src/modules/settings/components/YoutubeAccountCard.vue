@@ -11,8 +11,6 @@ const isDesktop = Boolean(bridge?.isElectron && bridge.ytAuth)
 
 const status = ref<YoutubeAuthStatus | null>(null)
 const busy = ref(false)
-const adblockEnabled = ref(false)
-const adblockBusy = ref(false)
 
 onMounted(async () => {
   if (!bridge?.ytAuth) return
@@ -20,14 +18,6 @@ onMounted(async () => {
     status.value = await bridge.ytAuth.status()
   } catch {
     status.value = { signedIn: false, premium: null }
-  }
-  if (bridge.ytAdblock) {
-    try {
-      const s = await bridge.ytAdblock.status()
-      adblockEnabled.value = s.enabled
-    } catch {
-      adblockEnabled.value = false
-    }
   }
 })
 
@@ -57,20 +47,6 @@ async function logout() {
     console.error('[yt-auth] logout falhou', err)
   } finally {
     busy.value = false
-  }
-}
-
-async function toggleAdblock() {
-  if (!bridge?.ytAdblock || adblockBusy.value) return
-  adblockBusy.value = true
-  const next = !adblockEnabled.value
-  try {
-    const r = await bridge.ytAdblock.set(next)
-    if (r.ok) adblockEnabled.value = next
-  } catch (err) {
-    console.error('[yt-adblock] toggle falhou', err)
-  } finally {
-    adblockBusy.value = false
   }
 }
 </script>
@@ -120,19 +96,6 @@ async function toggleAdblock() {
       <p v-if="status?.signedIn && status.premium === false" class="hint">
         {{ t('settings.youtube.notPremiumHint') }}
       </p>
-
-      <label class="adblock" data-test="youtube-adblock-toggle">
-        <input
-          type="checkbox"
-          :checked="adblockEnabled"
-          :disabled="adblockBusy"
-          @change="toggleAdblock"
-        />
-        <span>
-          {{ t('settings.youtube.adblock') }}
-          <small>{{ t('settings.youtube.adblockHint') }}</small>
-        </span>
-      </label>
     </template>
     <p v-else class="hint">{{ t('settings.youtube.desktopOnly') }}</p>
   </section>
@@ -193,17 +156,5 @@ button:disabled {
 button.secondary {
   background: transparent;
   border-color: currentColor;
-}
-.adblock {
-  display: flex;
-  gap: 0.5rem;
-  align-items: flex-start;
-  margin-top: 0.5rem;
-  cursor: pointer;
-}
-.adblock small {
-  display: block;
-  opacity: 0.65;
-  font-size: 0.78rem;
 }
 </style>

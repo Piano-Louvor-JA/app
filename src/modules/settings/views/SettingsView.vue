@@ -31,10 +31,13 @@ function goBack() {
   void router.push({ name: 'home' })
 }
 
-/** Só a Transmissão minimiza: as conexões seguem no ar fora da tela. */
-const minimizable = computed(() => activeSection.value === 'transmission')
+// O estado das abas já vive nas stores; o retrato guarda só a rolagem e a miniatura.
 const { minimize, prepare } = useMinimizablePage({
-  describe: () => ({ title: t(sectionTitleKey.value), icon: 'ti-broadcast', summary: '' }),
+  describe: () => ({
+    title: t(`settings.tabs.${activeSection.value}`),
+    icon: 'ti-settings',
+    summary: t('nav.settings'),
+  }),
   capture: () => null,
   fallbackRoute: { name: 'home' },
 })
@@ -48,16 +51,10 @@ const { minimize, prepare } = useMinimizablePage({
     <SettingsTabs class="settings-view__tabs" />
 
     <div
-      v-if="!isAppearance"
       class="settings-view__header"
-      :class="{ 'settings-view__header--stacked': minimizable }"
+      :class="{ 'settings-view__header--floating': isAppearance }"
     >
-      <component
-        :is="minimizable ? PageBackStack : 'div'"
-        class="settings-view__back-slot"
-        @minimize="minimize"
-        @prepare="prepare"
-      >
+      <PageBackStack @minimize="minimize" @prepare="prepare">
         <button
           type="button"
           class="settings-view__back"
@@ -66,8 +63,8 @@ const { minimize, prepare } = useMinimizablePage({
         >
           <i class="ti ti-arrow-left" aria-hidden="true" />
         </button>
-      </component>
-      <h1 class="settings-view__title">
+      </PageBackStack>
+      <h1 v-if="!isAppearance" class="settings-view__title">
         {{ t(sectionTitleKey) }}
       </h1>
       <div id="settings-header-aside" class="settings-view__aside" />
@@ -111,23 +108,17 @@ const { minimize, prepare } = useMinimizablePage({
 
 .settings-view__header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 1rem;
   margin-bottom: 2rem;
 
-  /* Seta + – empilhados: título e status alinham com a seta. */
-  &--stacked {
-    align-items: flex-start;
-
-    .settings-view__title,
-    .settings-view__aside {
-      min-height: 2.5rem;
-    }
+  /* Aparência: sem título; a seta e o – ficam no canto sem empurrar o conteúdo centralizado */
+  &--floating {
+    position: relative;
+    z-index: 2;
+    height: 0;
+    margin-bottom: 0;
   }
-}
-
-.settings-view__back-slot {
-  display: flex;
 }
 
 .settings-view__title {
@@ -135,12 +126,14 @@ const { minimize, prepare } = useMinimizablePage({
   align-items: center;
 }
 
+/* Status da aba (Transmissão): alinhado à seta, à direita do título. */
 .settings-view__aside {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: 0.75rem;
+  min-height: 2.5rem;
   margin-left: auto;
 
   &:empty {
@@ -179,6 +172,7 @@ const { minimize, prepare } = useMinimizablePage({
 
 .settings-view__title {
   margin: 0;
+  padding-top: 4px;
   color: var(--ds-color-on-surface);
   font-size: 24px;
   font-weight: 600;
@@ -209,6 +203,7 @@ const { minimize, prepare } = useMinimizablePage({
   }
 
   .settings-view__title {
+    padding-top: 7px;
     font-size: 20px;
     line-height: 26px;
   }

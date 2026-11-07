@@ -8,6 +8,7 @@ import {
   TEMP_DATABASE_FILE,
   WORKSPACE_DIRS,
 } from './constants.mjs'
+import { ensureEscolaSabatinaAudio } from './escola-sabatina-audio.mjs'
 import { ensureSorteioDefaultAudio } from './sorteio-audio.mjs'
 import { resolveMediaRoot } from './windows-media-root.mjs'
 
@@ -57,7 +58,7 @@ function ensureDir(dir) {
 }
 
 /**
- * Cria a árvore `.sysdata` + `Media/{covers,music,images,modulos/sorteios}` em userData.
+ * Cria a árvore `.sysdata` + `Media/{covers,music,images,modulos/{sorteios,escola-sabatina}}` em userData.
  */
 export function ensureWorkspaceDirectories() {
   const paths = getWorkspacePaths()
@@ -82,6 +83,7 @@ export function ensureWorkspaceDirectories() {
   ].forEach(ensureDir)
 
   ensureSorteioDefaultAudio(paths.media)
+  ensureEscolaSabatinaAudio(paths.media)
 
   return paths
 }

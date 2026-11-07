@@ -114,4 +114,9 @@ sljaMigration: {
     confirm: 'Upload to account',
     cancel: 'Keep on this device only',
   },
+  download: {
+    indicatorTitle: 'Background downloads: {done}/{total} ({percent}%)',
+    indicatorCounts: '{done} of {total} completed',
+    indicatorIdle: 'Preparing download…',
+  },
 }

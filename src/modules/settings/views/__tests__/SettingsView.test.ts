@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// SettingsView — activeSection da rota, header condicional, goBack
+// SettingsView — activeSection da rota, header condicional, goBack, minimizar
 import { mount, flushPromises } from '@vue/test-utils'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createI18n } from 'vue-i18n'
@@ -7,24 +7,28 @@ import { createRouter, createMemoryHistory } from 'vue-router'
 
 const mocks = vi.hoisted(() => ({
   transitionName: { value: 'fade' },
+  minimize: vi.fn(async () => {}),
+  prepare: vi.fn(),
+  options: null as null | {
+    describe: () => { title: string; icon: string; summary: string }
+    capture: () => unknown
+    fallbackRoute: unknown
+  },
 }))
 
 vi.mock('@design-system/composables', () => ({
   usePageTransition: () => ({ transitionName: mocks.transitionName }),
 }))
 
-vi.mock('../../components/SettingsTabs.vue', () => ({
-  default: { template: '<div class="settings-tabs-stub" />' },
+vi.mock('@shared/composables/useMinimizablePage', () => ({
+  useMinimizablePage: (options: typeof mocks.options) => {
+    mocks.options = options
+    return { minimize: mocks.minimize, prepare: mocks.prepare, takeRestoredState: () => null }
+  },
 }))
 
-// Composable testado à parte: aqui só o contrato tela ↔ minimizar.
-const minimizeMock = vi.fn(async () => {})
-const prepareMock = vi.fn()
-vi.mock('@shared/composables/useMinimizablePage', () => ({
-  useMinimizablePage: (options: unknown) => {
-    ;(globalThis as any).__minimizeOptions = options
-    return { minimize: minimizeMock, prepare: prepareMock, takeRestoredState: () => null }
-  },
+vi.mock('../../components/SettingsTabs.vue', () => ({
+  default: { template: '<div class="settings-tabs-stub" />' },
 }))
 
 import SettingsView from '../SettingsView.vue'
@@ -35,9 +39,17 @@ const i18n = createI18n({
   locale: 'pt',
   messages: {
     pt: {
-      nav: { home: 'Início' },
-      settings: { sectionTitle: { appearance: 'Aparência', general: 'Geral', transmission: 'Transmissão' } },
-      minimize: { page: 'Minimizar' },
+      nav: { home: 'Início', settings: 'Configurações' },
+      minimize: { page: 'Minimizar página' },
+      settings: {
+        sectionTitle: {
+          appearance: 'Aparência',
+          general: 'Geral',
+          remote: 'Controle Remoto',
+          transmission: 'Transmissão',
+        },
+        tabs: { general: 'Geral', remote: 'Controle Remoto', transmission: 'Transmissão' },
+      },
     },
   },
 })
@@ -45,6 +57,8 @@ const i18n = createI18n({
 describe('SettingsView', () => {
   beforeEach(() => {
     mocks.transitionName.value = 'fade'
+    mocks.minimize.mockClear()
+    mocks.prepare.mockClear()
   })
 
   function mountAt(routeName: string) {
@@ -62,51 +76,74 @@ describe('SettingsView', () => {
     const wrapper = mount(SettingsView, {
       global: { plugins: [i18n, router] },
     })
-    return { wrapper, router, go: async (name: string) => {
+    return { wrapper, router, go: async (name: string = routeName) => {
       await router.push({ name })
       await wrapper.vm.$nextTick()
     } }
   }
 
-  it('rota appearance: sem header, classe --appearance', async () => {
+  it('rota appearance: só voltar e minimizar, sem título, classe --appearance', async () => {
     const { wrapper, go } = mountAt('settings-appearance')
-    await go('settings-appearance')
+    await go()
     expect(wrapper.find('.settings-view').classes()).toContain('settings-view--appearance')
-    expect(wrapper.find('.settings-view__header').exists()).toBe(false)
+    const header = wrapper.get('.settings-view__header')
+    expect(header.classes()).toContain('settings-view__header--floating')
+    expect(header.find('.settings-view__back').exists()).toBe(true)
+    expect(header.find('.page-back-stack__minimize').exists()).toBe(true)
+    expect(header.find('.settings-view__title').exists()).toBe(false)
     expect(wrapper.find('.settings-tabs-stub').exists()).toBe(true)
   })
 
-  it('rota general: header com back e título', async () => {
+  it('rota general: header com back, minimizar e título', async () => {
     const { wrapper, go } = mountAt('settings-general')
-    await go('settings-general')
-    expect(wrapper.find('.settings-view__header').exists()).toBe(true)
-    expect(wrapper.find('.settings-view__title').exists()).toBe(true)
-    expect(wrapper.find('.settings-view__back').exists()).toBe(true)
-    expect(wrapper.find('#settings-header-aside').exists()).toBe(true)
-    expect(wrapper.find('.page-back-stack').exists()).toBe(false)
+    await go()
+    const header = wrapper.get('.settings-view__header')
+    expect(header.classes()).not.toContain('settings-view__header--floating')
+    expect(header.find('.settings-view__title').text()).toBe('Geral')
+    expect(header.find('.page-back-stack .settings-view__back').exists()).toBe(true)
+    expect(header.find('.page-back-stack__minimize').attributes('title')).toBe('Minimizar página')
+    expect(header.find('#settings-header-aside').exists()).toBe(true)
   })
 
-  it('rota transmission: – abaixo da seta minimiza e descreve a tela', async () => {
-    minimizeMock.mockClear()
+  it('rota transmission: minimiza como as outras abas, com o status ao lado do título', async () => {
     const { wrapper, go } = mountAt('settings-transmission')
-    await go('settings-transmission')
-    const stack = wrapper.find('.page-back-stack')
-    expect(stack.find('.settings-view__back').exists()).toBe(true)
-    await stack.find('.page-back-stack__minimize').trigger('pointerenter')
-    expect(prepareMock).toHaveBeenCalled()
-    await stack.find('.page-back-stack__minimize').trigger('click')
-    expect(minimizeMock).toHaveBeenCalledTimes(1)
-    const options = (globalThis as any).__minimizeOptions
-    expect(options.describe()).toEqual({ title: 'Transmissão', icon: 'ti-broadcast', summary: '' })
-    expect(options.capture()).toBeNull()
-    expect(options.fallbackRoute).toEqual({ name: 'home' })
+    await go()
+    const header = wrapper.get('.settings-view__header')
+    expect(header.find('.settings-view__title').text()).toBe('Transmissão')
+    expect(header.find('#settings-header-aside').exists()).toBe(true)
+    await header.get('.page-back-stack__minimize').trigger('click')
+    expect(mocks.minimize).toHaveBeenCalledTimes(1)
+    expect(mocks.options!.describe()).toEqual({
+      title: 'Transmissão',
+      icon: 'ti-settings',
+      summary: 'Configurações',
+    })
   })
 
   it('goBack: navega pra home', async () => {
     const { wrapper, router, go } = mountAt('settings-general')
-    await go('settings-general')
+    await go()
     await wrapper.find('.settings-view__back').trigger('click')
     await flushPromises()
     expect(router.currentRoute.value.name).toBe('home')
+  })
+
+  it('– minimiza a aba atual; na barra aparece o nome do menu', async () => {
+    const { wrapper, go } = mountAt('settings-remote')
+    await go()
+    const minimizeButton = wrapper.get('.page-back-stack__minimize')
+    await minimizeButton.trigger('pointerenter')
+    expect(mocks.prepare).toHaveBeenCalledTimes(1)
+    await minimizeButton.trigger('click')
+    expect(mocks.minimize).toHaveBeenCalledTimes(1)
+    expect(mocks.options!.describe()).toEqual({
+      title: 'Controle Remoto',
+      icon: 'ti-settings',
+      summary: 'Configurações',
+    })
+    await go('settings-general')
+    expect(mocks.options!.describe().title).toBe('Geral')
+    expect(mocks.options!.capture()).toBeNull()
+    expect(mocks.options!.fallbackRoute).toEqual({ name: 'home' })
   })
 })

@@ -17,6 +17,8 @@ export default {
     timerDescription: 'Cuenta progresiva proyectada en pantalla',
     countdown: 'Temporizador',
     countdownDescription: 'Cuenta regresiva proyectada en pantalla',
+    sabbathSchool: 'Escuela Sabática',
+    sabbathSchoolDescription: 'Cuenta regresiva con los avisos sonoros de la Escuela Sabática',
   },
   clock: {
     title: 'Reloj',

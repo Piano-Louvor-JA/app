@@ -85,8 +85,12 @@ LicenseLangString LicenseFile ${LANG_SPANISH_ES} "${LICENSE_ES}"
   ExecWait '"$WINDIR\System32\icacls.exe" "$0\\${DATA_FOLDER_NAME}" /grant *S-1-5-32-545:(OI)(CI)M /T /C' $1
   ; Recria o atalho do desktop apontando para o .exe da instalação atual.
   ; Sem isso, update que muda o caminho deixa .lnk órfão (ícone "sumido").
+  ; O AUMI tem que bater com app.setAppUserModelId: sem ele a janela aberta
+  ; não se agrupa com o ícone fixado na barra de tarefas.
   CreateShortCut "$DESKTOP\\${PRODUCT_NAME}.lnk" "$INSTDIR\\${APP_EXECUTABLE_FILENAME}" "" "$INSTDIR\\${APP_EXECUTABLE_FILENAME}" 0
+  WinShell::SetLnkAUMI "$DESKTOP\\${PRODUCT_NAME}.lnk" "${APP_ID}"
   CreateDirectory "$SMPROGRAMS"
   CreateShortCut "$SMPROGRAMS\\${PRODUCT_NAME}.lnk" "$INSTDIR\\${APP_EXECUTABLE_FILENAME}" "" "$INSTDIR\\${APP_EXECUTABLE_FILENAME}" 0
+  WinShell::SetLnkAUMI "$SMPROGRAMS\\${PRODUCT_NAME}.lnk" "${APP_ID}"
   !endif
 !macroend

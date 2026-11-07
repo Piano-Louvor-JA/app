@@ -186,4 +186,9 @@ sljaMigration: {
     confirm: 'Subir pra conta',
     cancel: 'Ficar só neste dispositivo',
   },
+  download: {
+    indicatorTitle: 'Downloads em segundo plano: {done}/{total} ({percent}%)',
+    indicatorCounts: '{done} de {total} concluídos',
+    indicatorIdle: 'Preparando download…',
+  },
 }

@@ -139,6 +139,10 @@
         "to": "midia/modulos/sorteios"
       },
       {
+        "from": "resources/midia/modulos/escola-sabatina",
+        "to": "midia/modulos/escola-sabatina"
+      },
+      {
         "from": "resources/bible",
         "to": "bible",
         "filter": [

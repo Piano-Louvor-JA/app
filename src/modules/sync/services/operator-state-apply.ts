@@ -48,6 +48,7 @@ export const SYNCABLE_PREF_KEYS: ReadonlySet<string> = new Set([
   USER_PREFERENCE_KEYS.clockConfig,
   USER_PREFERENCE_KEYS.timerConfig,
   USER_PREFERENCE_KEYS.countdownConfig,
+  USER_PREFERENCE_KEYS.sabbathSchoolConfig,
   USER_PREFERENCE_KEYS.randomConfig,
   USER_PREFERENCE_KEYS.language,
 ])

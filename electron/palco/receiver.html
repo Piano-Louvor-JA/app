@@ -14,6 +14,9 @@
   #youtubeProjection iframe{position:absolute!important;top:50%!important;left:50%!important;
     width:100vw!important;height:100vh!important;min-width:177.7778vh;min-height:56.25vw;
     max-width:none;max-height:none;transform:translate(-50%,-50%);border:0;display:block}
+  /* Covers the YouTube title, logo and spinner until the video actually plays. */
+  #youtubeVeil{position:absolute;inset:0;z-index:1;background:#000;pointer-events:none;transition:opacity .3s}
+  #youtubeVeil.is-hidden{opacity:0}
   html,body{margin:0;height:100%;overflow:hidden;background:#000;
     font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#fff}
   #bg{position:fixed;top:0;left:0;width:100%;height:100%;object-fit:cover;
@@ -91,6 +94,15 @@
      width FIXO restaura o véu largo — o fit-content do .box-on é só
      para MÍDIA (música), Bíblia NÃO (14/10 Rafael). */
   #text.bible-box{padding:2vh 3.8vh;width:min(86vw,1600px);max-height:72vh}
+  /* Entrada do versículo novo. translate/scale individuais somam ao transform
+     que posiciona o #text; motores antigos ignoram e ficam só com o fade. */
+  @keyframes rxEnterFade{from{opacity:0}}
+  @keyframes rxEnterSlide{from{opacity:0;translate:0 4vh}}
+  @keyframes rxEnterZoom{from{opacity:0;scale:.94}}
+  .rx-enter-fade{animation:rxEnterFade var(--rx-ms,250ms) ease-out both}
+  .rx-enter-slide{animation:rxEnterSlide var(--rx-ms,250ms) ease-out both}
+  .rx-enter-zoom{animation:rxEnterZoom var(--rx-ms,250ms) ease-out both}
+  @media (prefers-reduced-motion:reduce){.rx-enter-slide,.rx-enter-zoom{animation-name:rxEnterFade}}
 
   #footer{position:fixed;bottom:4vh;left:0;right:0;text-align:center;
     font-size:2.6vh;font-weight:300;opacity:1;letter-spacing:.02em}
@@ -2825,6 +2837,29 @@ function projectionColor(value){
   const match=/^\s*(#[0-9a-fA-F]{3,8}|rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*(?:,\s*(?:0|1|0?\.\d+)\s*)?\)|hsla?\(\s*\d{1,3}\s*,\s*\d{1,3}%\s*,\s*\d{1,3}%\s*(?:,\s*(?:0|1|0?\.\d+)\s*)?\)|[a-zA-Z]{1,20})\s*$/.exec(String(value||''));
   return match?match[1]:'';
 }
+// Posição da referência bíblica; null = sender sem o campo (segue o alinhamento do texto).
+function footerPosition(m){
+  const p=m&&m.footerPosition;
+  return p==='below-left'||p==='below-center'||p==='below-right'||p==='corner'?p:null;
+}
+// Transição do versículo: só anima quando o texto muda; sem o campo (APK), troca seca.
+let lastBibleVerse='';
+function bibleEnter(m){
+  const kind=m.scope==='bible'&&(m.transition==='fade'||m.transition==='slide'||m.transition==='zoom')?m.transition:null;
+  const verse=m.scope==='bible'?String(m.text||'')+'|'+String(m.footerRef||''):'';
+  const changed=verse!==lastBibleVerse;
+  lastBibleVerse=verse;
+  if(kind&&!changed)return;
+  const ms=Number(m.transitionMs);
+  ['text','footer'].forEach(function(id){
+    const el=$(id);if(!el)return;
+    el.classList.remove('rx-enter-fade','rx-enter-slide','rx-enter-zoom');
+    if(!kind)return;
+    el.style.setProperty('--rx-ms',(Number.isFinite(ms)&&ms>=0&&ms<=2000?ms:250)+'ms');
+    void el.offsetWidth;
+    el.classList.add('rx-enter-'+kind);
+  });
+}
 // Conexões diretas: somente IPv4 de LAN/loopback e localhost, nunca DNS público.
 function palcoLanHost(value){
   if(value==='localhost')return 'localhost';
@@ -3229,9 +3264,10 @@ function mountYoutube(){
   const expected=youtubeId;
   const view=document.createElement('div');view.id='youtubeProjection';
   view.style.cssText='position:fixed;inset:0;z-index:100;background:#000';
-  const target=document.createElement('div');view.appendChild(target);document.body.appendChild(view);
+  const target=document.createElement('div');view.appendChild(target);
+  const veil=document.createElement('div');veil.id='youtubeVeil';view.appendChild(veil);document.body.appendChild(view);
   youtubePlayer=new YT.Player(target,{width:'100%',height:'100%',videoId:expected,
-    playerVars:{autoplay:1,controls:0,playsinline:1,rel:0,origin:location.origin},
+    playerVars:{autoplay:1,controls:0,playsinline:1,rel:0,fs:0,iv_load_policy:3,disablekb:1,origin:location.origin},
     events:{onReady:function(event){
       if(youtubeId!==expected)return;
       youtubeReady=true;
@@ -3242,6 +3278,7 @@ function mountYoutube(){
       // Captions may load after onReady; only unload a module actually loaded.
       if(youtubeCaptionsHidden||youtubeCaptionTrack)applyYoutubeCaptions();
     },onStateChange:function(event){
+      if(event.data===1&&youtubeId===expected)veil.classList.add('is-hidden');
       if(event.data===0){stopYoutube();showIdle(L10N.idle);sendEvent({v:2,type:'ended',media:'video'})}
     },onError:function(){
       stopYoutube();showIdle('YouTube: não foi possível reproduzir este vídeo incorporado.');
@@ -3787,7 +3824,7 @@ function handle(m){
           // texto (abaixo dela, mesmo alinhamento horizontal), não no rodapé
           // da tela. Gap 1.4vmin como no popup.
           var f=$('footer');
-          if(f && m.footerRef && m.textVerticalAlign){
+          if(f && m.footerRef && m.textVerticalAlign && footerPosition(m)!=='corner'){
             var r=t.getBoundingClientRect();
             var gap=Math.round(innerHeight*0.014);
             f.style.left=r.left+'px';
@@ -3851,16 +3888,19 @@ function handle(m){
       }
       // F3.3m: footer com referência destacada + versão
       {const f=$('footer');
+        const pos=footerPosition(m);
         // WT-5f: footer segue o alinhamento do palco (paridade popup — a
         // referência fica dentro do conteúdo lá, alinhada com o texto).
         // padding 4vw = mesma borda da caixa de texto (92vw centrada).
-        if(m.textAlign){f.style.textAlign=m.textAlign;f.style.padding='0 4vw';f.style.boxSizing='border-box'}
+        // Posição escolhida no Personalizar Palco vence; sem ela (APK), segue o texto.
+        const align=pos==='corner'?'right':pos?pos.slice(6):m.textAlign;
+        if(align){f.style.textAlign=align;f.style.padding='0 4vw';f.style.boxSizing='border-box'}
         else{f.style.textAlign='center';f.style.padding='0'}
         // Default: rodapé da tela (8vh p/ sair da área do texto). O rAF do
         // auto-fit reposiciona PERTO da caixinha quando há footerRef (abaixo).
         f.style.left='0'; f.style.right='0'; f.style.width='auto';
         f.style.top='auto';
-        f.style.bottom=(m.footerRef?'8vh':'4vh');
+        f.style.bottom=(m.footerRef&&pos!=='corner'?'8vh':'4vh');
         if(m.footerRef){
           f.textContent='';
           const ref=document.createElement('span');ref.className='ref';ref.textContent=String(m.footerRef);
@@ -3877,6 +3917,7 @@ function handle(m){
       // Label de versão some durante projection com referência (colidia no
       // canto inferior direito — print 02/09 Rafael).
       {const iv=$('idleVer');if(iv)iv.style.display=m.footerRef?'none':''}
+      bibleEnter(m);
       break;
     case 'bgPalco':
       // BG permanente do palco (idle) — personalização, não da música
@@ -4065,7 +4106,7 @@ function handle(m){
         if(mode!=='chrono'&&rem<=0){clearInterval(t._iv)}},1000);
       break}
     case 'obsIdle':document.documentElement.classList.toggle('obs-black-idle',m.black===true);break;
-    case 'idle':showIdle(m.msg||L10N.idle);break;
+    case 'idle':lastBibleVerse='';showIdle(m.msg||L10N.idle);break;
     // F3.3x: sender informa IP DA TV (visto pelo socket) + SLOT onde ela
     // caiu — identificação visível pro operador conferir com o app.
     case 'youare':{

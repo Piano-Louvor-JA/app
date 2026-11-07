@@ -143,7 +143,7 @@ async function onFetchProvaiEVede() {
   }
 }
 
-/** 1-CLICK: busca → ignora sábados passados → baixa os futuros → agenda. */
+/** 1-CLICK async: agenda imediato (online_video, já funcional) → batch em background → fecha. */
 const pvOneClickBusy = ref(false)
 const pvOneClickProgress = ref('')
 
@@ -167,44 +167,62 @@ async function onProvaiEVedeOneClick() {
 
     const store = useScheduledStore()
     const bridge = getDesktopBridge()
-    let done = 0
-    const resolvePath = async (ep: ProvaiEpisode): Promise<string> => {
-      pvOneClickProgress.value = t('liturgy.messages.scheduledPvDownloading', {
-        done: done + 1,
-        total: upcoming.length,
-      })
-      if (bridge?.workspace?.downloadToMedia) {
-        const fileName = ep.url.split('/').pop() ?? `${ep.dateISO}.mp4`
-        const local = await bridge.workspace.downloadToMedia(ep.url, fileName)
-        done++
-        return local ?? ''
-      }
-      done++
-      return ''
-    }
-    const report = await importProvaiEVedeEpisodes(store, upcoming, resolvePath, {
+
+    // R6/SPEC v1.1: importa como online_video (toca de imediato em todos os
+    // idiomas — paridade pt-BR). O download em background depois promove a
+    // file localmente (T3) sem mudar o que o usuário já vê/agendou.
+    const report = await importProvaiEVedeEpisodes(store, upcoming, async () => '', {
       onlyUpcoming: true,
       sourceLanguage: pvSourceLanguage.value,
     })
-
-    // Sem disco (web): converter as entradas pra online_video com a URL original.
-    if (!bridge?.workspace?.downloadToMedia) {
-      for (const ep of upcoming) {
-        const entry = store.findOn(report.rotationId, ep.dateISO)
-        if (entry && !entry.content?.filePath) {
-          store.upsertItem({
-            id: entry.id, categoryId: entry.categoryId, date: entry.date,
-            name: entry.name, content: { kind: 'online_video', url: ep.url },
-          })
-        }
+    for (const ep of upcoming) {
+      const entry = store.findOn(report.rotationId, ep.dateISO)
+      if (entry && !entry.content?.filePath) {
+        store.upsertItem({
+          id: entry.id,
+          categoryId: entry.categoryId,
+          date: entry.date,
+          name: entry.name,
+          content: { kind: 'online_video', url: ep.url, name: ep.url.split('/').pop() ?? undefined },
+        })
       }
     }
+
+    // Desktop: dispara o batch de downloads em background (não trava o diálogo).
+    if (bridge?.downloadBatch?.enqueue) {
+      bridge.downloadBatch.enqueue(
+        upcoming.map((ep) => ({
+          id: `${report.rotationId}::${ep.dateISO}`,
+          url: ep.url,
+          fileName: ep.url.split('/').pop() ?? `${ep.dateISO}.mp4`,
+        })),
+      )
+    }
+
     pvOneClickProgress.value = t('liturgy.messages.scheduledPvDone', {
-      created: report.created, skipped: report.skipped,
+      created: report.created,
+      skipped: report.skipped,
     })
+    // Agendou + baixando em background: fecha o diálogo (decisão Rafael 03/11).
+    emit('close')
   } finally {
     pvOneClickBusy.value = false
   }
+}
+
+// T3/R4: promoção online_video → file quando o MAIN conclui cada download.
+const downloadBatchBridge = getDesktopBridge()?.downloadBatch
+if (downloadBatchBridge?.onItemDone) {
+  downloadBatchBridge.onItemDone((payload: { id: string, filePath: string }) => {
+      if (!payload?.id || !payload?.filePath) return
+      const [rotationId, dateISO] = payload.id.split('::')
+      if (!rotationId || !dateISO) return
+      const store = useScheduledStore()
+      const entry = store.findOn(rotationId, dateISO)
+      if (entry?.content?.kind === 'online_video') {
+        store.promoteOnlineVideoToFile(entry.id, payload.filePath)
+      }
+    })
 }
 
 async function onDownloadSelected() {
