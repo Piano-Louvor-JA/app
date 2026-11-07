@@ -10,8 +10,6 @@ vi.mock("vue-i18n", () => ({
 const statusMock = vi.fn();
 const loginMock = vi.fn();
 const logoutMock = vi.fn();
-const adblockStatusMock = vi.fn();
-const adblockSetMock = vi.fn();
 
 const originalLouvorja = window.louvorja;
 
@@ -64,10 +62,8 @@ describe("YoutubeAccountCard", () => {
 		setBridge({
 			isElectron: true,
 			ytAuth: { status: statusMock, login: loginMock, logout: logoutMock },
-			ytAdblock: { status: adblockStatusMock, set: adblockSetMock },
 		});
 		statusMock.mockResolvedValue({ signedIn: false, premium: null });
-		adblockStatusMock.mockResolvedValue({ enabled: false });
 
 		const wrapper = mountCard();
 		await flushPromises();
@@ -85,7 +81,6 @@ describe("YoutubeAccountCard", () => {
 			ytAuth: { status: statusMock, login: loginMock, logout: logoutMock },
 		});
 		statusMock.mockRejectedValue(new Error("boom"));
-		adblockStatusMock.mockResolvedValue({ enabled: false });
 
 		const wrapper = mountCard();
 		await flushPromises();
@@ -95,34 +90,12 @@ describe("YoutubeAccountCard", () => {
 		);
 	});
 
-	it("ytAdblock.status() rejeita no mount -> adblock desligado", async () => {
-		setBridge({
-			isElectron: true,
-			ytAuth: { status: statusMock, login: loginMock, logout: logoutMock },
-			ytAdblock: { status: adblockStatusMock, set: adblockSetMock },
-		});
-		statusMock.mockResolvedValue({ signedIn: false, premium: null });
-		adblockStatusMock.mockRejectedValue(new Error("boom"));
-
-		const wrapper = mountCard();
-		await flushPromises();
-
-		expect(
-			(
-				wrapper.find('[data-test="youtube-adblock-toggle"] input')
-					.element as HTMLInputElement
-			).checked,
-		).toBe(false);
-	});
-
 	it("logado com Premium: mostra premiumActive e botão Sair", async () => {
 		setBridge({
 			isElectron: true,
 			ytAuth: { status: statusMock, login: loginMock, logout: logoutMock },
-			ytAdblock: { status: adblockStatusMock, set: adblockSetMock },
 		});
 		statusMock.mockResolvedValue({ signedIn: true, premium: true });
-		adblockStatusMock.mockResolvedValue({ enabled: false });
 
 		const wrapper = mountCard();
 		await flushPromises();
@@ -138,14 +111,12 @@ describe("YoutubeAccountCard", () => {
 		);
 	});
 
-	it("logado sem Premium: mostra hint do adblock", async () => {
+	it("logado sem Premium: avisa que o app segue pulando os anúncios", async () => {
 		setBridge({
 			isElectron: true,
 			ytAuth: { status: statusMock, login: loginMock, logout: logoutMock },
-			ytAdblock: { status: adblockStatusMock, set: adblockSetMock },
 		});
 		statusMock.mockResolvedValue({ signedIn: true, premium: false });
-		adblockStatusMock.mockResolvedValue({ enabled: false });
 
 		const wrapper = mountCard();
 		await flushPromises();
@@ -153,89 +124,29 @@ describe("YoutubeAccountCard", () => {
 		expect(wrapper.text()).toContain("settings.youtube.notPremiumHint");
 	});
 
-	it("toggle adblock chama ytAdblock.set(true) e reflete estado", async () => {
+	it("não oferece opção para desligar o bloqueio de anúncios", async () => {
 		setBridge({
 			isElectron: true,
 			ytAuth: { status: statusMock, login: loginMock, logout: logoutMock },
-			ytAdblock: { status: adblockStatusMock, set: adblockSetMock },
 		});
-		statusMock.mockResolvedValue({ signedIn: false, premium: null });
-		adblockStatusMock.mockResolvedValue({ enabled: false });
-		adblockSetMock.mockResolvedValue({ ok: true });
+		statusMock.mockResolvedValue({ signedIn: true, premium: false });
 
 		const wrapper = mountCard();
 		await flushPromises();
 
-		const toggle = wrapper.find('[data-test="youtube-adblock-toggle"] input');
-		expect((toggle.element as HTMLInputElement).checked).toBe(false);
-		await toggle.setValue(true);
-		await flushPromises();
-
-		expect(adblockSetMock).toHaveBeenCalledWith(true);
-		expect(
-			(
-				wrapper.find('[data-test="youtube-adblock-toggle"] input')
-					.element as HTMLInputElement
-			).checked,
-		).toBe(true);
-	});
-
-	it("toggle adblock com set() rejeitando não muda o estado", async () => {
-		setBridge({
-			isElectron: true,
-			ytAuth: { status: statusMock, login: loginMock, logout: logoutMock },
-			ytAdblock: { status: adblockStatusMock, set: adblockSetMock },
-		});
-		statusMock.mockResolvedValue({ signedIn: false, premium: null });
-		adblockStatusMock.mockResolvedValue({ enabled: false });
-		adblockSetMock.mockRejectedValue(new Error("boom"));
-
-		const wrapper = mountCard();
-		await flushPromises();
-
-		await wrapper
-			.find('[data-test="youtube-adblock-toggle"] input')
-			.setValue(true);
-		await flushPromises();
-
-		// DOM checked é mutado pelo setValue; o estado do componente é que decide
-		const vm = wrapper.vm.$.setupState as { adblockEnabled: boolean };
-		expect(vm.adblockEnabled).toBe(false);
-	});
-
-	it("toggle adblock com set() retornando ok:false não muda o estado", async () => {
-		setBridge({
-			isElectron: true,
-			ytAuth: { status: statusMock, login: loginMock, logout: logoutMock },
-			ytAdblock: { status: adblockStatusMock, set: adblockSetMock },
-		});
-		statusMock.mockResolvedValue({ signedIn: false, premium: null });
-		adblockStatusMock.mockResolvedValue({ enabled: false });
-		adblockSetMock.mockResolvedValue({ ok: false });
-
-		const wrapper = mountCard();
-		await flushPromises();
-
-		await wrapper
-			.find('[data-test="youtube-adblock-toggle"] input')
-			.setValue(true);
-		await flushPromises();
-
-		const vm = wrapper.vm.$.setupState as { adblockEnabled: boolean };
-		expect(vm.adblockEnabled).toBe(false);
+		expect(wrapper.find('input[type="checkbox"]').exists()).toBe(false);
+		expect(wrapper.find('[data-test="youtube-adblock-toggle"]').exists()).toBe(false);
 	});
 
 	it("login atualiza status após retorno", async () => {
 		setBridge({
 			isElectron: true,
 			ytAuth: { status: statusMock, login: loginMock, logout: logoutMock },
-			ytAdblock: { status: adblockStatusMock, set: adblockSetMock },
 		});
 		statusMock
 			.mockResolvedValueOnce({ signedIn: false, premium: null })
 			.mockResolvedValueOnce({ signedIn: true, premium: true });
 		loginMock.mockResolvedValue({ ok: true, signedIn: true });
-		adblockStatusMock.mockResolvedValue({ enabled: false });
 
 		const wrapper = mountCard();
 		await flushPromises();

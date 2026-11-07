@@ -109,3 +109,99 @@ it('removes the YouTube Premium promo card from the projected page', async () =>
     expect(window.getComputedStyle(window.document.querySelector('video')).display).not.toBe('none')
   } finally { dom.window.close() }
 })
+
+async function openYoutubePage(url = 'https://www.youtube.com/watch?v=RxEJ9J45lnA') {
+  const { runInNewContext } = await import('node:vm')
+  const { JSDOM } = await import('jsdom')
+  const start = source.indexOf('const HIDE_YOUTUBE_SIDEBAR_SCRIPT =')
+  const end = source.indexOf('/** @type {BrowserWindow', start)
+  const script = runInNewContext(source.slice(start, end) + '\nHIDE_YOUTUBE_SIDEBAR_SCRIPT')
+  const dom = new JSDOM('<body><div id="movie_player" class="html5-video-player"><video class="html5-main-video"></video></div></body>', {
+    runScripts: 'outside-only',
+    url,
+  })
+  const { window } = dom
+  const timers = []
+  window.setTimeout = (callback, ms) => { timers.push({ callback, ms }); return timers.length }
+  window.clearTimeout = () => {}
+  window.setInterval = () => 1
+  const video = window.document.querySelector('video')
+  const media = { paused: true, ended: false, currentTime: 0 }
+  for (const key of Object.keys(media)) {
+    Object.defineProperty(video, key, { configurable: true, get: () => media[key] })
+  }
+  const player = window.document.getElementById('movie_player')
+  const veilShown = () => window.document.getElementById('louvorja-yt-veil')?.style.getPropertyValue('display') === 'block'
+  const emit = (type, state) => {
+    Object.assign(media, state)
+    video.dispatchEvent(new window.Event(type))
+  }
+  return { dom, window, script, timers, player, veilShown, emit, run: () => window.eval(script) }
+}
+
+it('covers the YouTube player until the content starts playing', async () => {
+  const page = await openYoutubePage()
+  try {
+    page.run()
+    expect(page.veilShown()).toBe(true)
+    page.emit('playing', { paused: false, currentTime: 0.2 })
+    expect(page.veilShown()).toBe(false)
+  } finally { page.dom.window.close() }
+})
+
+it('keeps the YouTube player covered while an ad is showing', async () => {
+  const page = await openYoutubePage()
+  try {
+    page.run()
+    page.player.classList.add('ad-showing')
+    page.emit('playing', { paused: false, currentTime: 3 })
+    expect(page.veilShown()).toBe(true)
+    page.player.classList.remove('ad-showing')
+    page.emit('loadstart', { paused: true, currentTime: 0 })
+    expect(page.veilShown()).toBe(true)
+    page.emit('playing', { paused: false, currentTime: 0.1 })
+    expect(page.veilShown()).toBe(false)
+  } finally { page.dom.window.close() }
+})
+
+it('covers the YouTube end screen and uncovers when the video plays again', async () => {
+  const page = await openYoutubePage()
+  try {
+    page.run()
+    page.emit('playing', { paused: false, currentTime: 1 })
+    page.emit('pause', { paused: true })
+    expect(page.veilShown()).toBe(false)
+    page.emit('ended', { paused: true, ended: true, currentTime: 288 })
+    expect(page.veilShown()).toBe(true)
+    page.emit('playing', { paused: false, ended: false, currentTime: 10 })
+    expect(page.veilShown()).toBe(false)
+  } finally { page.dom.window.close() }
+})
+
+it('lifts the veil after 15 s when the YouTube video never starts', async () => {
+  const page = await openYoutubePage()
+  try {
+    page.run()
+    const timeout = page.timers.find(timer => timer.ms === 15000)
+    expect(timeout).toBeDefined()
+    timeout.callback()
+    expect(page.veilShown()).toBe(false)
+  } finally { page.dom.window.close() }
+})
+
+it('installs a single veil when the cleanup script is injected again', async () => {
+  const page = await openYoutubePage()
+  try {
+    page.run()
+    page.run()
+    expect(page.window.document.querySelectorAll('#louvorja-yt-veil')).toHaveLength(1)
+  } finally { page.dom.window.close() }
+})
+
+it('does not cover local video pages that share the source window', async () => {
+  const page = await openYoutubePage('https://localhost/player/local-video-player.html')
+  try {
+    page.run()
+    expect(page.window.document.getElementById('louvorja-yt-veil')).toBeNull()
+  } finally { page.dom.window.close() }
+})

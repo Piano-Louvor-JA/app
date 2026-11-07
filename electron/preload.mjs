@@ -213,10 +213,18 @@ contextBridge.exposeInMainWorld('louvorja', {
     logout: () => ipcRenderer.invoke('yt-auth:logout'),
   },
 
-  ytAdblock: {
-    // Bloqueador de anúncios do player YouTube (opt-in, experimental)
-    status: () => ipcRenderer.invoke('yt-adblock:status'),
-    set: (enabled) => ipcRenderer.invoke('yt-adblock:set', enabled),
+  onlineVideo: {
+    // Cópia local dos vídeos do YouTube: tocar do disco, sem anúncio e sem depender da internet
+    status: () => ipcRenderer.invoke('online-video:status'),
+    setSettings: (partial) => ipcRenderer.invoke('online-video:set-settings', partial),
+    prefetch: (ids) => ipcRenderer.invoke('online-video:prefetch', ids),
+    cancel: (id) => ipcRenderer.invoke('online-video:cancel', id),
+    keep: (ids) => ipcRenderer.invoke('online-video:keep', ids),
+    clear: () => ipcRenderer.invoke('online-video:clear'),
+    videoStatus: (ids) => ipcRenderer.invoke('online-video:video-status', ids),
+    retryTools: () => ipcRenderer.invoke('online-video:retry-tools'),
+    onChanged: (callback) => subscribe('online-video:changed', callback),
+    onTools: (callback) => subscribe('online-video:tools', callback),
   },
 
   ytInfo: {

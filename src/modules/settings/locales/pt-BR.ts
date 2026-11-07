@@ -103,7 +103,7 @@ export default {
     youtube: {
       title: 'YouTube',
       description:
-        'Entre com sua conta Google para reproduzir vídeos sem anúncios durante o culto (requer YouTube Premium na conta).',
+        'O app pula os anúncios do YouTube sozinho. Se a igreja tem YouTube Premium, entre com a conta para os vídeos virem sem nenhum anúncio.',
       checking: 'Verificando sessão…',
       signedIn: 'Conectado ao Google',
       premiumActive: 'Conectado — YouTube Premium ativo (sem anúncios)',
@@ -112,11 +112,31 @@ export default {
       loggingIn: 'Aguardando login…',
       logout: 'Sair da conta',
       notPremiumHint:
-        'Esta conta não tem YouTube Premium. Considere assinar para vídeos sem anúncios, ou ative o bloqueador experimental abaixo.',
-      adblock: 'Bloquear anúncios do YouTube',
-      adblockHint:
-        'Pula os anúncios em vídeo (sem imagem nem som na projeção) e esconde banners do player, para contas sem Premium. Pode falhar quando o YouTube muda o player; o login com Premium é o caminho recomendado.',
+        'Esta conta não tem YouTube Premium. O app continua pulando os anúncios sozinho.',
       desktopOnly: 'Disponível apenas no aplicativo desktop.',
+    },
+    youtubeOffline: {
+      title: 'Vídeos do YouTube baixados',
+      enabled: 'Tocar vídeos do YouTube a partir de uma cópia baixada',
+      enabledHint:
+        'Os vídeos tocam de uma cópia guardada neste computador: sem anúncios e sem travar se a internet oscilar.',
+      disabledHint:
+        'Os vídeos tocam direto da internet. Se o YouTube não tocar, o app baixa uma cópia e continua por ela.',
+      quality: 'Qualidade máxima',
+      limit: 'Espaço máximo',
+      usage: 'Em uso: {used} GB de {limit} GB ({count} vídeos)',
+      clear: 'Apagar vídeos baixados',
+      clearTitle: 'Apagar vídeos baixados?',
+      clearMessage:
+        'As cópias guardadas neste computador serão apagadas. Elas são baixadas de novo quando você tocar os vídeos.',
+      clearConfirm: 'Apagar',
+      cancel: 'Cancelar',
+      toolsMissing: 'As ferramentas de download serão instaladas na primeira vez que forem necessárias.',
+      toolsInstalling: 'Instalando as ferramentas de download… {progress}%',
+      toolsReady: 'Ferramentas de download prontas (versão {version})',
+      toolsError: 'Não foi possível instalar as ferramentas de download.',
+      retry: 'Tentar de novo',
+      unavailable: 'Este sistema não permite baixar vídeos do YouTube; eles tocam direto da internet.',
     },
     projection: {
       monitors: {

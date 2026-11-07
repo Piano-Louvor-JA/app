@@ -98,7 +98,7 @@ export default {
     youtube: {
       title: 'YouTube',
       description:
-        'Inicia sesión con tu cuenta de Google para reproducir videos sin anuncios durante el culto (requiere YouTube Premium en la cuenta).',
+        'La app salta los anuncios de YouTube por sí sola. Si la iglesia tiene YouTube Premium, inicia sesión con esa cuenta para que los videos no tengan ningún anuncio.',
       checking: 'Verificando sesión…',
       signedIn: 'Sesión iniciada en Google',
       premiumActive: 'Sesión iniciada — YouTube Premium activo (sin anuncios)',
@@ -107,11 +107,31 @@ export default {
       loggingIn: 'Esperando inicio de sesión…',
       logout: 'Cerrar sesión',
       notPremiumHint:
-        'Esta cuenta no tiene YouTube Premium. Considera suscribirte para videos sin anuncios, o activa el bloqueador experimental abajo.',
-      adblock: 'Bloquear anuncios de YouTube',
-      adblockHint:
-        'Salta los anuncios en video (sin imagen ni sonido en la proyección) y oculta los banners del reproductor, para cuentas sin Premium. Puede fallar cuando YouTube cambia su reproductor; iniciar sesión con Premium es el camino recomendado.',
+        'Esta cuenta no tiene YouTube Premium. La app sigue saltando los anuncios por sí sola.',
       desktopOnly: 'Disponible solo en la aplicación de escritorio.',
+    },
+    youtubeOffline: {
+      title: 'Videos de YouTube descargados',
+      enabled: 'Reproducir videos de YouTube desde una copia descargada',
+      enabledHint:
+        'Los videos se reproducen desde una copia guardada en esta computadora: sin anuncios y sin cortes si internet falla.',
+      disabledHint:
+        'Los videos se reproducen directo desde internet. Si YouTube no reproduce, la app descarga una copia y sigue con ella.',
+      quality: 'Calidad máxima',
+      limit: 'Espacio máximo',
+      usage: 'En uso: {used} GB de {limit} GB ({count} videos)',
+      clear: 'Borrar videos descargados',
+      clearTitle: '¿Borrar videos descargados?',
+      clearMessage:
+        'Las copias guardadas en esta computadora se borrarán. Se descargan de nuevo cuando reproduzcas los videos.',
+      clearConfirm: 'Borrar',
+      cancel: 'Cancelar',
+      toolsMissing: 'Las herramientas de descarga se instalarán la primera vez que se necesiten.',
+      toolsInstalling: 'Instalando las herramientas de descarga… {progress}%',
+      toolsReady: 'Herramientas de descarga listas (versión {version})',
+      toolsError: 'No se pudieron instalar las herramientas de descarga.',
+      retry: 'Intentar de nuevo',
+      unavailable: 'Este sistema no permite descargar videos de YouTube; se reproducen directo desde internet.',
     },
     placeholder: {
       general: 'Preferencias generales de la aplicación próximamente.',

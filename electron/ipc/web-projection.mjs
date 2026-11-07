@@ -1,6 +1,6 @@
 import { onReceiverEvent } from '../palco/receiver-events.mjs'
 import { youtubeCaptionsScript } from '../youtube-captions.mjs'
-import { youtubeSourceId } from '../youtube-source.mjs'
+import { isYoutubeEmbedUrl, youtubeEmbedUrl, youtubeSourceId, youtubeWatchUrl } from '../youtube-source.mjs'
 import { BrowserWindow, screen, session, WebContentsView } from 'electron'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -201,6 +201,8 @@ const HIDE_YOUTUBE_SIDEBAR_SCRIPT = `
     .ytp-title,
     .ytp-title-channel,
     .ytp-watermark,
+    .ytp-youtube-button,
+    .ytp-impression-link,
     .ytp-large-play-button,
     .ytp-cued-thumbnail-overlay,
     .ytp-spinner,
@@ -222,7 +224,53 @@ const HIDE_YOUTUBE_SIDEBAR_SCRIPT = `
   }
   if (style.textContent !== css) style.textContent = css;
 
+  // Véu preto: a captura não mostra carregamento, anúncio nem a tela final de sugestões.
+  const host = (window.location && window.location.hostname) || '';
+  if (/(^|\\.)youtube\\.com$/.test(host) && !window.__louvorjaYtVeil) {
+    const VEIL_TIMEOUT_MS = 15000;
+    const veil = document.createElement('div');
+    veil.id = 'louvorja-yt-veil';
+    veil.style.cssText = 'position:fixed;inset:0;background:#000;z-index:2147483647;pointer-events:none';
+    const veilState = { started: false, expired: false, video: null, player: null, timer: null };
+    const armTimeout = () => {
+      clearTimeout(veilState.timer);
+      veilState.expired = false;
+      veilState.timer = setTimeout(() => {
+        veilState.expired = true;
+        updateVeil();
+      }, VEIL_TIMEOUT_MS);
+    };
+    const updateVeil = () => {
+      if (!veil.isConnected) (document.body || document.documentElement).appendChild(veil);
+      const player = document.getElementById('movie_player');
+      if (player && player !== veilState.player) {
+        veilState.player = player;
+        new MutationObserver(updateVeil).observe(player, { attributes: true, attributeFilter: ['class'] });
+      }
+      const video = player && player.querySelector('video');
+      if (video && video !== veilState.video) {
+        veilState.video = video;
+        ['playing', 'timeupdate', 'pause', 'ended', 'seeked', 'emptied'].forEach((type) => {
+          video.addEventListener(type, updateVeil);
+        });
+        video.addEventListener('loadstart', () => {
+          veilState.started = false;
+          armTimeout();
+          updateVeil();
+        });
+      }
+      const ad = !!player && (player.classList.contains('ad-showing') || player.classList.contains('ad-interrupting'));
+      if (video && !ad && !video.paused && !video.ended && video.currentTime > 0) veilState.started = true;
+      const cover = ad || (!!video && video.ended) || (!veilState.started && !veilState.expired);
+      veil.style.setProperty('display', cover ? 'block' : 'none', 'important');
+    };
+    window.__louvorjaYtVeil = { update: updateVeil };
+    armTimeout();
+    updateVeil();
+  }
+
   const apply = () => {
+    if (window.__louvorjaYtVeil) window.__louvorjaYtVeil.update();
     const hideIds = ['#secondary', '#related', '#masthead-container', '#below', '#comments'];
     hideIds.forEach((sel) => {
       const el = document.querySelector(sel);
@@ -545,7 +593,190 @@ function resolveLocalPptPlayerUrl(filePath) {
   return playerUrl.toString()
 }
 
-function resolveSourceUrl(payload) {
+/**
+ * @typedef {{ kind: 'cache'|'stream', src: string, audioSrc?: string | null, subtitle: string | null,
+ *   title: string, file?: string } | null} OnlineVideoSource
+ * @typedef {{ play: (id: string) => Promise<OnlineVideoSource>, release: (id: string) => unknown,
+ *   fallback?: (id: string) => Promise<OnlineVideoSource> }} OnlineVideoPlayer
+ * @type {OnlineVideoPlayer | null}
+ */
+let onlineVideoPlayer = null
+let currentOnlineVideoId = null
+
+/** @param {OnlineVideoPlayer | null} player */
+export function setOnlineVideoPlayer(player) {
+  onlineVideoPlayer = player
+}
+
+/**
+ * Player local com a cópia do vídeo do YouTube (pronta no cache ou ainda baixando).
+ * `null` quando o recurso está desligado ou falhou: a projeção segue com o player do YouTube.
+ * @param {string | null} youtubeId @param {OnlineVideoPlayer | null} [player]
+ */
+export async function resolveOnlineVideoPlayerUrl(youtubeId, player = onlineVideoPlayer) {
+  return (await resolveOnlineVideoCopy(youtubeId, player))?.url ?? null
+}
+
+/**
+ * @param {string | null} youtubeId @param {OnlineVideoPlayer | null} [player]
+ * @returns {Promise<{ url: string, file: string, captions: boolean } | null>} `file` vazio enquanto a cópia ainda baixa
+ */
+async function resolveOnlineVideoCopy(youtubeId, player = onlineVideoPlayer) {
+  if (!youtubeId || !player) return null
+  try {
+    const source = await player.play(youtubeId)
+    if (!source) return null
+    const url = new URL(pathToFileURL(LOCAL_VIDEO_PLAYER_HTML).href)
+    url.searchParams.set('src', source.src)
+    if (source.audioSrc) url.searchParams.set('audioSrc', source.audioSrc)
+    if (source.subtitle) url.searchParams.set('subtitle', source.subtitle)
+    if (source.title) url.searchParams.set('title', source.title)
+    return { url: url.toString(), file: source.kind === 'cache' && source.file ? source.file : '', captions: Boolean(source.subtitle) }
+  } catch (error) {
+    console.warn('[projection] cópia local do YouTube indisponível, usando o player do YouTube:', error?.code || error?.message || error)
+    return null
+  }
+}
+
+/** As TVs recebem o arquivo da cópia pronta como um vídeo local; sem arquivo, seguem no espelho. */
+function loadOnlineVideoCopy(win, youtubeId, copy) {
+  currentOnlineVideoId = youtubeId
+  currentSourceFilePath = copy.file
+  currentSourceHasCaptions = copy.captions
+  void win.loadURL(copy.url)
+}
+
+function releaseOnlineVideo(id, player = onlineVideoPlayer) {
+  if (!id || !player) return
+  try {
+    void Promise.resolve(player.release(id)).catch(() => {})
+  } catch { /* liberar nunca impede fechar a projeção */ }
+}
+
+function releaseCurrentOnlineVideo() {
+  const id = currentOnlineVideoId
+  currentOnlineVideoId = null
+  releaseOnlineVideo(id)
+}
+
+export const YOUTUBE_PLAYBACK_PROBE_SCRIPT = `(() => {
+  const video = document.querySelector('video');
+  const error = document.querySelector('.ytp-error');
+  return {
+    playing: !!video && !video.paused && video.currentTime > 0,
+    error: !!error && error.getClientRects().length > 0,
+    hasData: !!video && video.readyState >= 2,
+  };
+})()`
+
+/**
+ * Acompanha a página do YouTube até o vídeo começar a tocar.
+ * `idle` = carregou, mas ficou parado (autoplay bloqueado ou pausa): não é falha.
+ * @param {{ probe: () => Promise<{ playing?: boolean, error?: boolean, hasData?: boolean } | null>,
+ *   failedLoad: () => boolean, isClosed: () => boolean, timeoutMs?: number, intervalMs?: number,
+ *   sleep?: (ms: number) => Promise<unknown>, now?: () => number }} options
+ * @returns {Promise<'playing' | 'failed' | 'idle' | 'closed'>}
+ */
+export async function watchYoutubePlayback({
+  probe,
+  failedLoad,
+  isClosed,
+  timeoutMs = 20_000,
+  intervalMs = 1000,
+  sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  now = Date.now,
+}) {
+  const deadline = now() + timeoutMs
+  let hasData = false
+  for (;;) {
+    if (isClosed()) return 'closed'
+    if (failedLoad()) return 'failed'
+    const state = await Promise.resolve().then(probe).catch(() => null)
+    if (isClosed()) return 'closed'
+    if (state?.playing) return 'playing'
+    if (state?.error) return 'failed'
+    if (state?.hasData) hasData = true
+    if (now() >= deadline) return hasData ? 'idle' : 'failed'
+    await sleep(intervalMs)
+  }
+}
+
+const ERR_ABORTED = -3
+
+/**
+ * Sem a cópia baixada, a projeção abre o player embutido do YouTube. Se ele não tocar
+ * (vídeo que não aceita embed, erro do player, falha de rede), a janela passa para a
+ * cópia baixada; sem cópia, para a página do vídeo.
+ * @param {import('electron').BrowserWindow} win @param {string} youtubeId
+ * @param {{ player?: OnlineVideoPlayer | null, watch?: typeof watchYoutubePlayback, isCurrent?: () => boolean }} [options]
+ * @returns {Promise<'copy' | 'page' | null>}
+ */
+export async function fallbackWhenYoutubeFails(win, youtubeId, {
+  player = onlineVideoPlayer,
+  watch = watchYoutubePlayback,
+  isCurrent = () => sourceWindow === win,
+} = {}) {
+  const isClosed = () => win.isDestroyed() || !isCurrent()
+  let failed = false
+  const onFailLoad = (_event, code, _description, _url, isMainFrame) => {
+    if (isMainFrame && code !== ERR_ABORTED) failed = true
+  }
+  win.webContents.on('did-fail-load', onFailLoad)
+  try {
+    const result = await watch({
+      probe: () => win.webContents.executeJavaScript(YOUTUBE_PLAYBACK_PROBE_SCRIPT, true),
+      failedLoad: () => failed,
+      isClosed,
+    })
+    if (result !== 'failed') return null
+    const copy = player?.fallback
+      ? await resolveOnlineVideoCopy(youtubeId, { play: player.fallback.bind(player), release: player.release })
+      : null
+    if (isClosed()) {
+      if (copy && currentOnlineVideoId !== youtubeId) releaseOnlineVideo(youtubeId, player)
+      return null
+    }
+    if (copy) {
+      loadOnlineVideoCopy(win, youtubeId, copy)
+      return 'copy'
+    }
+    if (!isYoutubeEmbedUrl(win.webContents.getURL())) return null
+    void win.loadURL(youtubeWatchUrl(youtubeId))
+    return 'page'
+  } finally {
+    if (!win.isDestroyed()) win.webContents.removeListener('did-fail-load', onFailLoad)
+  }
+}
+
+/**
+ * A janela de controle já está aberta; a fonte entra quando fica pronta: a cópia baixada
+ * (chave ligada) ou o player embutido do YouTube, observado e recuperado se não tocar.
+ * @param {import('electron').BrowserWindow} win @param {string} youtubeId
+ * @param {string | null} youtubeUrl player do YouTube a carregar sem cópia; `null` = a janela já abriu nele
+ * @param {{ player?: OnlineVideoPlayer | null, isCurrent?: () => boolean, recover?: typeof fallbackWhenYoutubeFails }} [options]
+ * @returns {Promise<'copy' | 'youtube' | 'page' | null>}
+ */
+export async function startYoutubeSource(win, youtubeId, youtubeUrl, {
+  player = onlineVideoPlayer,
+  isCurrent = () => sourceWindow === win,
+  recover = fallbackWhenYoutubeFails,
+} = {}) {
+  if (youtubeUrl) {
+    const copy = await resolveOnlineVideoCopy(youtubeId, player)
+    if (win.isDestroyed() || !isCurrent()) {
+      if (copy && currentOnlineVideoId !== youtubeId) releaseOnlineVideo(youtubeId, player)
+      return null
+    }
+    if (copy) {
+      loadOnlineVideoCopy(win, youtubeId, copy)
+      return 'copy'
+    }
+    void win.loadURL(youtubeUrl)
+  }
+  return (await recover(win, youtubeId, { player, isCurrent })) ?? 'youtube'
+}
+
+export function resolveSourceUrl(payload) {
   const mode = typeof payload?.mode === 'string' ? payload.mode : ''
 
   const filePaths = Array.isArray(payload?.filePaths)
@@ -571,9 +802,9 @@ function resolveSourceUrl(payload) {
   const url = typeof payload?.url === 'string' ? payload.url.trim() : ''
   const videoId = typeof payload?.videoId === 'string' ? payload.videoId.trim() : ''
 
-  if (videoId) {
-    return `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`
-  }
+  const youtubeId = mode === 'site' ? null : youtubeSourceId(payload)
+  if (youtubeId) return youtubeEmbedUrl(youtubeId)
+  if (videoId) return youtubeWatchUrl(videoId)
 
   if (!url) return null
   try {
@@ -805,15 +1036,13 @@ function createSourceWindow(loadUrl, title) {
   win.webContents.setAudioMuted(false)
   win.setAlwaysOnTop(true, 'floating')
 
-  win.once('ready-to-show', () => {
-    win.webContents.setAudioMuted(false)
-    win.setPosition(bounds.x, bounds.y)
-    win.setContentSize(CONTROL_WIDTH, CONTROL_HEIGHT)
-    attachControlBar(win)
-    layoutControlBar(win)
-    win.show()
-    win.focus()
-  })
+  // Aparece na hora com fundo preto: esperar o ready-to-show segura o controle até o YouTube desenhar.
+  win.setPosition(bounds.x, bounds.y)
+  win.setContentSize(CONTROL_WIDTH, CONTROL_HEIGHT)
+  attachControlBar(win)
+  layoutControlBar(win)
+  win.show()
+  win.focus()
 
   // Impede redimensionar / maximizar por atalho ou SO
   win.on('will-resize', (event) => {
@@ -878,10 +1107,13 @@ function createSourceWindow(loadUrl, title) {
   })
 
   win.on('closed', () => {
+    // O close é assíncrono: a projeção seguinte pode já estar aberta com a barra dela.
+    if (sourceWindow && sourceWindow !== win) return
     detachControlBar(); stopPalcoMediaOnClose()
     if (sourceWindow === win) {
       sourceWindow = null
       closeMirrorWindowsOnly()
+      releaseCurrentOnlineVideo()
     }
   })
 
@@ -940,6 +1172,7 @@ function createSiteSourceWindow(loadUrl, title) {
   })
 
   win.on('closed', () => {
+    if (sourceWindow && sourceWindow !== win) return
     detachControlBar(); stopPalcoMediaOnClose()
     if (sourceWindow === win) {
       sourceWindow = null
@@ -1523,6 +1756,7 @@ export function isExternalProjectionAlive() {
 export function closeWebProjectionWindows() {
   closeMirrorWindowsOnly()
   detachControlBar()
+  releaseCurrentOnlineVideo()
   const win = sourceWindow
   sourceWindow = null
   currentProjectionMode = 'video'
@@ -1726,12 +1960,15 @@ let currentSourceFilePath = ''
 let currentSourceTitle = ''
 let currentSourceYoutubeId = null
 let currentSourceCaptionsHidden = false
+/** A página do YouTube pode ter legenda; a cópia baixada só quando veio com o `.vtt`. */
+let currentSourceHasCaptions = false
 
 export async function openWebProjectionWindows(payload) {
   const input = payload ?? {}
   let effective = input
   currentSourceYoutubeId = youtubeSourceId(input)
   currentSourceCaptionsHidden = false
+  currentSourceHasCaptions = Boolean(currentSourceYoutubeId)
 
   currentSourceFilePath =
     typeof effective.filePath === 'string' ? effective.filePath.trim() : ''
@@ -1880,12 +2117,19 @@ export async function openWebProjectionWindows(payload) {
               ? 'Apresentação — LouvorJA - PIANO'
               : SOURCE_WINDOW_TITLE
 
+  const youtubeId = mode === 'video' ? currentSourceYoutubeId : null
+  const waitsForCopy = Boolean(youtubeId && onlineVideoPlayer)
   sourceWindow =
     mode === 'site'
       ? createSiteSourceWindow(loadUrl, title)
-      : createSourceWindow(loadUrl, title)
+      : createSourceWindow(waitsForCopy ? 'about:blank' : loadUrl, title)
 
   if (mode === 'video' || mode === 'site') sourceWindow.webContents.setAudioMuted(!currentSourceAudioOnly && getAudioOutputMode() === 'connections')
+  if (youtubeId) {
+    void startYoutubeSource(sourceWindow, youtubeId, waitsForCopy ? loadUrl : null).catch((error) => {
+      console.warn('[projection] cópia local do YouTube indisponível:', error?.code || error?.message || error)
+    })
+  }
 
   // Audio playback has no projection or extended-screen controls.
   if (!currentSourceAudioOnly) enableProjectionHotkey()
@@ -2248,7 +2492,9 @@ export async function remoteSetCaptionsHiddenSource(hidden) {
 
 /** FilePath/título da mídia corrente (para o popup espelhar no Palco). */
 export function getSourceMediaInfo() {
-  return { audioOnly: currentSourceAudioOnly, filePath: currentSourceFilePath, title: currentSourceTitle, youtubeId: currentSourceYoutubeId, captionsHidden: currentSourceCaptionsHidden }
+  // As TVs não desenham a legenda do arquivo: com ela na tela, seguem no espelho.
+  const captionsOnScreen = currentSourceHasCaptions && !currentSourceCaptionsHidden
+  return { audioOnly: currentSourceAudioOnly, filePath: captionsOnScreen ? '' : currentSourceFilePath, title: currentSourceTitle, youtubeId: currentSourceYoutubeId, captionsHidden: currentSourceCaptionsHidden }
 }
 
 /** Estado de playback do vídeo no popup (para a barra do operador). */
@@ -2280,7 +2526,7 @@ export async function getSourcePlaybackState() {
       ...state,
       audioOnly: currentSourceAudioOnly,
       audioOutput: currentSourceAudioOnly ? 'player' : getAudioOutputMode(),
-      canControlCaptions: Boolean(currentSourceYoutubeId),
+      canControlCaptions: currentSourceHasCaptions,
       captionsHidden: currentSourceCaptionsHidden,
       projecting: isVideoProjectingToScreens(),
     }

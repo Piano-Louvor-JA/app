@@ -76,6 +76,7 @@ function mimeFromExtension(filePath) {
   if (ext === '.mkv') return 'video/x-matroska'
   if (ext === '.mov') return 'video/quicktime'
   if (ext === '.pdf') return 'application/pdf'
+  if (ext === '.vtt') return 'text/vtt; charset=utf-8'
   return 'application/octet-stream'
 }
 
@@ -93,7 +94,7 @@ function parseByteRange(header, size) {
 }
 
 /** Serve arquivo local com Content-Length + Range — senão o <video> fica com duration Infinity. */
-function serveDiskFile(filePath, request) {
+function serveDiskFile(filePath, request, extraHeaders = {}) {
   if (!existsSync(filePath)) return new Response(null, { status: 404 })
   const { size } = statSync(filePath)
   const mime = mimeFromExtension(filePath)
@@ -110,8 +111,46 @@ function serveDiskFile(filePath, request) {
       ...(range
         ? { 'Content-Range': `bytes ${range.start}-${range.end}/${size}` }
         : {}),
+      ...extraHeaders,
     },
   })
+}
+
+const YT_STREAM_PATH = /^\/([\w-]{11})\/(video|audio)$/
+const YT_CACHE_PATH = /^\/([\w-]{11})\.(mp4|vtt)$/
+
+/**
+ * @typedef {{ serve: (id: string, kind: 'video'|'audio', range: string | null, signal: AbortSignal) => Response,
+ *   cacheFile: (name: string) => string }} OnlineVideoSource
+ * @type {OnlineVideoSource | null}
+ */
+let onlineVideoSource = null
+
+/** @param {OnlineVideoSource | null} source */
+export function setOnlineVideoSource(source) {
+  onlineVideoSource = source
+}
+
+/**
+ * `local://yt-stream/<id>/<video|audio>` (trilha ainda baixando) e `local://yt-cache/<id>.<mp4|vtt>`
+ * (arquivo pronto). Devolve `null` para os demais hosts.
+ * @param {Request} request @param {OnlineVideoSource | null} [source]
+ */
+export function handleOnlineVideoRequest(request, source = onlineVideoSource) {
+  const url = new URL(request.url)
+  if (url.host !== 'yt-stream' && url.host !== 'yt-cache') return null
+  // O player é de outra origem e, com legenda, pede imagem, som e legenda em modo CORS.
+  const cors = { 'Access-Control-Allow-Origin': '*' }
+  if (url.host === 'yt-stream') {
+    const match = YT_STREAM_PATH.exec(url.pathname)
+    if (!match || !source) return new Response(null, { status: 404 })
+    const response = source.serve(match[1], /** @type {'video'|'audio'} */ (match[2]), request.headers.get('range'), request.signal)
+    response.headers.set('Access-Control-Allow-Origin', '*')
+    return response
+  }
+  const match = YT_CACHE_PATH.exec(url.pathname)
+  if (!match || !source) return new Response(null, { status: 404 })
+  return serveDiskFile(source.cacheFile(`${match[1]}.${match[2]}`), request, cors)
 }
 
 /**
@@ -164,6 +203,9 @@ function imageResponse(filePath) {
 
 export function registerLocalFileProtocol() {
   protocol.handle('local', async (request) => {
+    const onlineVideo = handleOnlineVideoRequest(request)
+    if (onlineVideo) return onlineVideo
+
     let resolved
     try {
       resolved = resolveLocalProtocolPath(request.url, app.getPath('userData'))

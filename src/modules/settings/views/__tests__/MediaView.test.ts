@@ -24,22 +24,27 @@ vi.mock("../../components/ExternalPlayerCard.vue", () => ({
 vi.mock("../../components/YoutubeAccountCard.vue", () => ({
   default: { name: "YoutubeAccountCard", template: "<div class='stub-yt' />" },
 }));
+vi.mock("../../components/YoutubeOfflineCard.vue", () => ({
+  default: { name: "YoutubeOfflineCard", template: "<div class='stub-yt-offline' />" },
+}));
 
 import MediaView from "../MediaView.vue";
 
 describe("MediaView", () => {
-  it("renderiza os 3 cards de mídia empilhados", () => {
+  it("renderiza os 4 cards de mídia empilhados", () => {
     const wrapper = mount(MediaView);
     expect(wrapper.find(".media-view").exists()).toBe(true);
     expect(wrapper.find(".stub-yt").exists()).toBe(true);
+    expect(wrapper.find(".stub-yt-offline").exists()).toBe(true);
     expect(wrapper.find(".stub-ppt").exists()).toBe(true);
     expect(wrapper.find(".stub-ext").exists()).toBe(true);
   });
 
-  it("ordem: YoutubeAccount, PptEngine, ExternalPlayer", () => {
+  it("ordem: YoutubeAccount, YoutubeOffline, PptEngine, ExternalPlayer", () => {
     const wrapper = mount(MediaView);
     const html = wrapper.html();
-    expect(html.indexOf("stub-yt")).toBeLessThan(html.indexOf("stub-ppt"));
+    expect(html.indexOf("stub-yt")).toBeLessThan(html.indexOf("stub-yt-offline"));
+    expect(html.indexOf("stub-yt-offline")).toBeLessThan(html.indexOf("stub-ppt"));
     expect(html.indexOf("stub-ppt")).toBeLessThan(html.indexOf("stub-ext"));
   });
 });
