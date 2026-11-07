@@ -162,6 +162,50 @@
 #obsWarmupView .warmup-caption{margin:0;text-align:center;color:#fff;font:700 min(4vw,4vh)/1.4 Arial,sans-serif}
 #obsWarmupView svg{display:block;width:100%;height:auto}
 @keyframes obsWarmupPulse{0%,100%{opacity:.88;transform:scale(.985)}50%{opacity:1;transform:scale(1.015)}}
+/* Retorno de palco (/retorno): com música, cobre o espelho com o trecho atual e o próximo. */
+#stageReturn{position:fixed;inset:0;z-index:10000;overflow:hidden;background:#000;color:#fff}
+#stageReturn[hidden]{display:none}
+.stage-return__bg{position:absolute;inset:0;background-size:cover;background-position:center;opacity:.72}
+.stage-return__body{position:relative;z-index:1;display:flex;flex-direction:column;height:100%;box-sizing:border-box;padding:6vh 5vw 5.5vh}
+.stage-return__main{flex:1;display:flex;align-items:center;justify-content:center;min-height:0}
+.stage-return__block{display:flex;flex-direction:column;align-items:stretch;width:max-content;max-width:90vw;min-width:min(78vw,18rem)}
+.stage-return__block[hidden],.stage-return__title[hidden],.stage-return__next[hidden]{display:none}
+.stage-return__card{position:relative;overflow:hidden;border:clamp(2px,.2vmin,4px) solid rgba(255,255,255,.85);border-bottom:0;
+  border-radius:clamp(16px,2.6vmin,28px) clamp(16px,2.6vmin,28px) 0 0;background:rgba(24,24,24,.55);
+  box-shadow:0 10px 30px rgba(0,0,0,.4);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+.stage-return__lyric,.stage-return__title{box-sizing:border-box;margin:0;padding:2.4vmin 4vmin 2.8vmin;color:#fff;
+  font-size:clamp(1.5rem,6.4vmin,6.5rem);font-weight:700;line-height:1.35;letter-spacing:.03em;text-align:center;white-space:pre-line}
+.stage-return__title{max-width:90vw;color:#f6c32a;font-weight:900;line-height:1.1;letter-spacing:-.01em;
+  text-shadow:0 10px 30px rgba(0,0,0,.9),0 2px 6px rgba(0,0,0,.7)}
+.stage-return__bar{flex-shrink:0;width:100%;height:clamp(7px,1.05vmin,12px);overflow:hidden;
+  border-radius:0 0 clamp(8px,1.2vmin,12px) clamp(8px,1.2vmin,12px);background:rgba(255,255,255,.18)}
+.stage-return__bar-fill{width:100%;height:100%;transform:scaleX(0);transform-origin:left center;background:#FCCE02}
+.stage-return__lyric.wait{visibility:hidden}
+.stage-return__lyric--ghost{position:absolute;z-index:1;top:0;right:0;left:0;pointer-events:none}
+.stage-return__lyric--ghost[hidden],.stage-return__flyer[hidden]{display:none}
+.stage-return__lyric--ghost.out{animation:stageReturnGhostOut 780ms cubic-bezier(.22,1,.36,1) forwards}
+@keyframes stageReturnGhostOut{from{opacity:1;transform:none}to{opacity:0;transform:translateY(-24%)}}
+.stage-return__flyer{position:fixed;z-index:4;max-width:90vw;pointer-events:none;will-change:transform}
+.stage-return__next-lyric.out{opacity:0;transition:opacity 160ms ease}
+.stage-return__next-lyric.enter{animation:stageReturnNextIn 520ms cubic-bezier(.22,1,.36,1)}
+@keyframes stageReturnNextIn{from{opacity:0;transform:translateY(.45em)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){
+  .stage-return__lyric--ghost.out,.stage-return__next-lyric,.stage-return__next-lyric.enter,.stage-return__flyer{animation:none;transition:none}
+}
+.stage-return__next{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:.55rem;min-height:0}
+.stage-return__next-label{color:#f6c32a;font-size:clamp(.7rem,1.8vmin,1.1rem);font-weight:800;letter-spacing:.18em;text-transform:uppercase}
+.stage-return__next-lyric{margin:0;max-width:86vw;color:rgba(255,255,255,.82);font-size:clamp(1.25rem,4.2vmin,3.4rem);
+  font-weight:600;line-height:1.3;letter-spacing:.02em;text-align:center;text-transform:uppercase;white-space:pre-line}
+.stage-return__next-lyric.cover{color:#f6c32a;font-weight:800}
+/* Conexões servidas pelo app: sem transmissão, tela preta com o logo do Louvor JA e a espera. */
+#castWaiting{position:fixed;inset:0;z-index:100002;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:2.2vh;background:#000;color:#fff;pointer-events:none}
+#castWaiting[hidden]{display:none}
+.cast-waiting__logo{height:min(5.5vh,7vw);aspect-ratio:565/594;animation:castWaitingFade 3.2s ease-in-out infinite}
+.cast-waiting__logo svg{display:block;width:100%;height:100%}
+.cast-waiting__text{margin:0;font-size:min(1.7vh,2.4vw);font-weight:300;letter-spacing:.12em;opacity:.72;text-align:center}
+@keyframes castWaitingFade{0%,100%{opacity:.35}50%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.cast-waiting__logo{animation:none;opacity:.85}}
 </style>
 </head>
 <body>
@@ -234,6 +278,27 @@
   font-family:inherit;color:#fff;text-shadow:0 1px 4px #000;
   padding:.45vh .8vh;background:rgba(0,0,0,.30);pointer-events:none">PIANO LouvorJA Palco · receiver v0.1.54</p>
 <audio id="audio" preload="auto"></audio>
+<div id="stageReturn" hidden>
+  <div class="stage-return__bg" aria-hidden="true"></div>
+  <div class="stage-return__body">
+    <div class="stage-return__main">
+      <p class="stage-return__title" hidden></p>
+      <div class="stage-return__block">
+        <div class="stage-return__card"><p class="stage-return__lyric"></p><p class="stage-return__lyric stage-return__lyric--ghost" hidden></p></div>
+        <div class="stage-return__bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="stage-return__bar-fill"></div></div>
+      </div>
+    </div>
+    <div class="stage-return__next" hidden>
+      <span class="stage-return__next-label"></span>
+      <p class="stage-return__next-lyric"></p>
+    </div>
+  </div>
+  <p class="stage-return__lyric stage-return__flyer" aria-hidden="true" hidden></p>
+</div>
+<div id="castWaiting" role="status" hidden>
+  <div class="cast-waiting__logo" aria-hidden="true"></div>
+  <p class="cast-waiting__text" data-l10n="castWaiting"></p>
+</div>
 <script>
 //---------------------------------------------------------------------
 //
@@ -2549,19 +2614,19 @@ const qs=new URLSearchParams(location.search);
 // L10N: strings do receiver (idle/audio). Idioma: ?lang= > navigator.language
 // > pt. Sender pode anexar &lang= ao URL da TV (14/10).
 var L10N=(function(){var d={
-  pt:{idle:'Aguardando conteúdo…',wait:'Aguardando operador conectar…',audio:'Reproduzindo áudio',
+  pt:{returnNext:'Próximo',castWaiting:'Aguardando transmissão',idle:'Aguardando conteúdo…',wait:'Aguardando operador conectar…',audio:'Reproduzindo áudio',
       connTo:'conectado a {t} · vermelha = IP/porta · azul = atualizar',redKey:'tecla vermelha = digitar IP',
       searching:'procurando LouvorJA na rede…',notFound:'nenhum sender encontrado — tentando de novo…',
       connecting:'conectando {h}:{p}…',reconn:'reconectando em {s}s',cloudSearch:'nuvem: buscando sessão {c}…',
       cloudErr:'nuvem: {m}',cloudConn:'nuvem: conectando…',invalid:'sessão inválida — tecla vermelha p/ novo código',
       cloudReconn:'nuvem: reconectando em {s}s',cloudCreating:'nuvem: criando sessão…',portSearch:'procurando LouvorJA na porta {p}…',pairHint:'Acesse e informe o código',tapUnmute:'Toque para ativar o som',ipHint:'CÓDIGO (6 letras/números) · IP · IP:PORTA — ou SÓ A PORTA (ex.: 7081) para achar o LouvorJA na rede',ipHelp:'OK conectar · vermelha cancelar · backspace apaga',mainSlot:'Principal (espelho)',tvConn:' · TV {ip} · conectado · vermelha = digitar IP'},
-  en:{idle:'Waiting for content…',wait:'Waiting for operator to connect…',audio:'Playing audio',
+  en:{returnNext:'Next',castWaiting:'Waiting for broadcast',idle:'Waiting for content…',wait:'Waiting for operator to connect…',audio:'Playing audio',
       connTo:'connected to {t} · red = IP/port · blue = refresh',redKey:'red key = type IP',
       searching:'searching for LouvorJA on the network…',notFound:'no sender found — trying again…',
       connecting:'connecting {h}:{p}…',reconn:'reconnecting in {s}s',cloudSearch:'cloud: fetching session {c}…',
       cloudErr:'cloud: {m}',cloudConn:'cloud: connecting…',invalid:'invalid session — red key for a new code',
       cloudReconn:'cloud: reconnecting in {s}s',cloudCreating:'cloud: creating session…',portSearch:'searching for LouvorJA on port {p}…',pairHint:'Go to the site and enter the code',tapUnmute:'Tap to enable sound',ipHint:'CODE (6 letters/numbers) · IP · IP:PORT — or PORT ONLY (e.g. 7081) to find LouvorJA on the network',ipHelp:'OK connect · red cancel · backspace deletes',mainSlot:'Main (mirror)',tvConn:' · TV {ip} · connected · red = type IP'},
-  es:{idle:'Esperando contenido…',wait:'Esperando al operador…',audio:'Reproduciendo audio',
+  es:{returnNext:'Siguiente',castWaiting:'Esperando transmisión',idle:'Esperando contenido…',wait:'Esperando al operador…',audio:'Reproduciendo audio',
       connTo:'conectado a {t} · roja = IP/puerto · azul = actualizar',redKey:'tecla roja = escribir IP',
       searching:'buscando LouvorJA en la red…',notFound:'ningún sender encontrado — reintentando…',
       connecting:'conectando {h}:{p}…',reconn:'reconectando en {s}s',cloudSearch:'nube: buscando sesión {c}…',
@@ -2570,6 +2635,155 @@ var L10N=(function(){var d={
 };var l=(qs.get('lang')||(navigator.language||'')).slice(0,2).toLowerCase();
 return Object.assign({},d.pt,d[l]||{});})();
 document.querySelectorAll('[data-l10n]').forEach(function(el){var k=el.getAttribute('data-l10n');if(L10N[k])el.textContent=L10N[k];});
+// Retorno de palco: em /retorno, música ativa cobre o espelho; sem música, segue igual à TV. Nunca toca som.
+const stageReturnMode=location.pathname.replace(/\/+$/,'')==='/retorno';
+// Só as conexões abertas pelo servidor do app mostram a espera; os painéis da projeção compartilhada, não.
+const castPage=/^https?:$/.test(location.protocol)&&qs.get('obsPane')!=='1';
+(function(){
+  const art=document.querySelector('#idleLogo svg');if(!art)return;
+  const logo=art.cloneNode(true);
+  logo.querySelectorAll('[id]').forEach(function(el){el.removeAttribute('id')});
+  document.querySelector('#castWaiting .cast-waiting__logo').appendChild(logo);
+})();
+function syncCastWaiting(){
+  let shared=false;
+  try{shared=obsShareState.enabled&&(obsShareState.active[0]||obsShareState.active[1])}catch(e){}
+  $('castWaiting').hidden=!(castPage&&document.documentElement.classList.contains('receiver-idle')&&$('stageReturn').hidden&&!shared);
+}
+syncCastWaiting();
+const SR_ADVANCE_MS=780,SR_ADVANCE_EASE='cubic-bezier(0.22, 1, 0.36, 1)';
+const sr={active:false,slide:-1,cover:false,current:'',next:'',nextCover:false,busy:false,flyerText:'',gen:0,anim:null,
+  bar:{shown:0,sample:0,sampleAt:0,vel:0,lastTick:0,raf:0}};
+function srEl(sel){return $('stageReturn').querySelector(sel)}
+function srLyric(){return srEl('.stage-return__card .stage-return__lyric:not(.stage-return__lyric--ghost)')}
+function srReducedMotion(){return typeof window.matchMedia==='function'&&window.matchMedia('(prefers-reduced-motion: reduce)').matches}
+// Barra: prevê a velocidade entre as atualizações e aproxima suave, como na tela de retorno dos monitores.
+function srPaintBar(value){
+  sr.bar.shown=value;
+  srEl('.stage-return__bar-fill').style.transform='scaleX('+(Math.round(value*10000)/10000)+')';
+  srEl('.stage-return__bar').setAttribute('aria-valuenow',String(Math.round(value*100)));
+}
+function srStopBar(){if(sr.bar.raf)cancelAnimationFrame(sr.bar.raf);sr.bar.raf=0}
+function srTickBar(){
+  const b=sr.bar,now=performance.now();b.raf=0;
+  if(!sr.active){srPaintBar(0);return}
+  if(now-b.sampleAt>420)b.vel=0;
+  const predicted=Math.min(1,Math.max(0,b.sample+Math.max(0,b.vel)*(now-b.sampleAt)));
+  const dt=Math.min(40,Math.max(0,now-b.lastTick));b.lastTick=now;
+  const next=b.shown+(predicted-b.shown)*(1-Math.exp(-dt/95));
+  srPaintBar(next);
+  if(Math.abs(predicted-next)>0.0005||(b.vel>0&&next<0.999))b.raf=requestAnimationFrame(srTickBar);
+}
+function srStartBar(){if(sr.bar.raf)return;sr.bar.lastTick=performance.now();sr.bar.raf=requestAnimationFrame(srTickBar)}
+function srSyncBar(ratio,reset){
+  const b=sr.bar,now=performance.now();
+  if(reset||ratio+0.05<b.shown){
+    b.sample=ratio;b.vel=0;b.sampleAt=now;srPaintBar(ratio);
+    if(sr.active&&ratio>0&&ratio<1)srStartBar();else srStopBar();
+    return;
+  }
+  const dt=now-b.sampleAt;
+  if(dt>12)b.vel=Math.max(0,(ratio-b.sample)/dt);
+  b.sample=ratio;b.sampleAt=now;srStartBar();
+}
+function srResetFlyer(){
+  if(sr.anim){try{sr.anim.cancel()}catch(e){}}
+  sr.anim=null;
+  const flyer=srEl('.stage-return__flyer');
+  flyer.hidden=true;flyer.textContent='';
+  ['left','top','width','transform','transformOrigin','opacity','transition'].forEach(function(k){flyer.style[k]=''});
+}
+function srShowNext(text,cover){
+  const nextLyric=srEl('.stage-return__next-lyric');
+  nextLyric.textContent=text;nextLyric.classList.toggle('cover',cover);
+  srEl('.stage-return__next').hidden=!(text||cover);
+}
+function srSnap(m){
+  sr.gen+=1;sr.busy=false;sr.flyerText='';
+  srResetFlyer();
+  const ghost=srEl('.stage-return__lyric--ghost'),lyric=srLyric(),title=srEl('.stage-return__title');
+  ghost.hidden=true;ghost.textContent='';ghost.classList.remove('out');
+  lyric.classList.remove('wait');
+  srEl('.stage-return__next-lyric').classList.remove('out','enter');
+  sr.cover=m.isCover===true;sr.current=String(m.current||'');sr.next=String(m.next||'');sr.nextCover=m.nextIsCover===true;
+  title.hidden=!sr.cover;title.textContent=sr.cover?sr.current:'';
+  srEl('.stage-return__block').hidden=sr.cover;lyric.textContent=sr.cover?'':sr.current;
+  srShowNext(sr.next,sr.nextCover);
+}
+function srNextFrame(){return new Promise(function(resolve){requestAnimationFrame(function(){requestAnimationFrame(function(){resolve()})})})}
+// O próximo trecho voa até o lugar do atual; o anterior sobe e some; o novo próximo entra.
+async function srPromote(m){
+  const incoming=String(m.current||''),gen=++sr.gen;
+  const nextLyric=srEl('.stage-return__next-lyric'),lyric=srLyric(),flyer=srEl('.stage-return__flyer'),ghost=srEl('.stage-return__lyric--ghost');
+  const from=nextLyric.getBoundingClientRect();
+  if(srReducedMotion()||typeof flyer.animate!=='function'||!from||from.height<2){srSnap(m);return}
+  nextLyric.classList.remove('enter');
+  ghost.textContent=sr.current;ghost.hidden=false;ghost.classList.remove('out');void ghost.offsetWidth;ghost.classList.add('out');
+  lyric.textContent=incoming;lyric.classList.add('wait');
+  nextLyric.classList.add('out');
+  sr.current=incoming;sr.cover=false;sr.busy=true;sr.flyerText=incoming;
+  flyer.textContent=incoming;flyer.hidden=false;
+  const to=lyric.getBoundingClientRect();
+  if(!to||to.height<2){srSnap(m);return}
+  const s=from.width/Math.max(1,to.width),dx=from.left+from.width/2-(to.left+to.width/2),dy=from.top-to.top;
+  const start='translate('+dx+'px, '+dy+'px) scale('+s+')';
+  Object.assign(flyer.style,{transition:'none',left:to.left+'px',top:to.top+'px',width:to.width+'px',transformOrigin:'top center',transform:start,opacity:'1'});
+  if(sr.anim){try{sr.anim.cancel()}catch(e){}}
+  sr.anim=flyer.animate([{transform:start},{transform:'translate(0px, 0px) scale(1)'}],{duration:SR_ADVANCE_MS,easing:SR_ADVANCE_EASE,fill:'forwards'});
+  try{await sr.anim.finished}catch(e){return}
+  if(gen!==sr.gen)return;
+  sr.next=String(m.next||'');sr.nextCover=m.nextIsCover===true;
+  srShowNext(sr.next,sr.nextCover);
+  lyric.classList.remove('wait');
+  await srNextFrame();
+  if(gen!==sr.gen)return;
+  ghost.hidden=true;ghost.textContent='';ghost.classList.remove('out');
+  nextLyric.classList.remove('out');
+  if(sr.next||sr.nextCover){void nextLyric.offsetWidth;nextLyric.classList.add('enter')}
+  sr.busy=false;sr.flyerText='';
+  srResetFlyer();
+}
+function stageReturnColor(value){
+  return typeof value==='string'&&/^(#[0-9a-f]{3,8}|rgba?\([\d\s.,%]+\)|[a-z]+)$/i.test(value.trim())?value.trim():'';
+}
+function stageReturnVw(px){
+  const n=Number(px);
+  return n>0?(Math.round(n/1920*100*1000)/1000)+'vw':'';
+}
+function applyStageReturn(m){
+  if(!stageReturnMode)return;
+  const root=$('stageReturn'),q=function(sel){return root.querySelector(sel)};
+  if(!m.active){root.hidden=true;sr.active=false;sr.slide=-1;srSnap({});srSyncBar(0,true);syncCastWaiting();return}
+  const s=m.style||{},current=String(m.current||''),cover=m.isCover===true;
+  const blur=Number(s.shadow&&s.shadow.blur),intensity=Math.min(1,Math.max(0,Number(s.shadow&&s.shadow.intensity)||0));
+  const text={
+    color:stageReturnColor(s.color),fontWeight:Number(s.fontWeight)>0?String(Number(s.fontWeight)):'',
+    textAlign:['left','center','right','justify'].indexOf(s.textAlign)>=0?s.textAlign:'',
+    textTransform:s.upperCase?'uppercase':'none',
+    textShadow:s.shadow&&blur>=0?'0 0 '+(Math.round(blur/108*100*1000)/1000)+'vw rgba(0,0,0,'+intensity+')':'none',
+  };
+  const title=q('.stage-return__title'),nextLyric=q('.stage-return__next-lyric');
+  const lyrics=root.querySelectorAll('.stage-return__lyric');
+  [title,nextLyric].concat(Array.prototype.slice.call(lyrics)).forEach(function(el){Object.assign(el.style,text)});
+  title.style.fontSize=stageReturnVw(s.fontSize);
+  lyrics.forEach(function(el){el.style.fontSize=stageReturnVw(s.fontSize)});
+  nextLyric.style.fontSize=stageReturnVw(s.nextFontSize);
+  q('.stage-return__next-label').textContent=L10N.returnNext;
+  const slide=Number(m.slideIndex),ratio=Math.min(1,Math.max(0,Number(m.progress)||0));
+  const canPromote=sr.active&&slide===sr.slide+1&&current.length>0&&current===sr.next&&!cover&&!sr.cover;
+  const slideChanged=!sr.active||slide!==sr.slide;
+  sr.active=true;sr.slide=slide;
+  srSyncBar(ratio,slideChanged);
+  if(canPromote)void srPromote(m);
+  else if(sr.busy){if(current!==sr.flyerText||cover)srSnap(m)}
+  else if(current!==sr.current||String(m.next||'')!==sr.next||cover!==sr.cover||(m.nextIsCover===true)!==sr.nextCover)srSnap(m);
+  q('.stage-return__bar-fill').style.backgroundColor=stageReturnColor(s.barColor);
+  root.style.backgroundColor=stageReturnColor(s.backgroundColor);
+  const bg=typeof m.background==='string'&&/^https?:\/\//i.test(m.background)?m.background:'';
+  q('.stage-return__bg').style.backgroundImage=bg?'url("'+bg.replace(/["\\\s]/g,function(c){return encodeURIComponent(c)})+'")':'';
+  root.hidden=false;
+  syncCastWaiting();
+}
 // F3.3q: versão no idle (canto inferior direito) — ?v= override ou padrão.
 window.__PALCO_APPV__=window.__PALCO_APPV__||'0.1.55';
 (function(){var el=$('idleVer');if(!el)return;var qv=qs.get('v')||window.__PALCO_APPV__||'';if(qv){el.textContent='PIANO LouvorJA Palco · receiver v'+qv;return}fetch('appinfo.json').then(function(r){return r.json()}).then(function(j){el.textContent='PIANO LouvorJA Palco · receiver v'+(j.version||'?')}).catch(function(){fetch('config.xml').then(function(r){return r.text()}).then(function(t){var m2=t.match(/version="([^"]+)"/);el.textContent='PIANO LouvorJA Palco · receiver v'+(m2?m2[1]:'?')}).catch(function(){el.textContent='PIANO LouvorJA Palco'})})})()
@@ -2718,11 +2932,16 @@ function sendEvent(m){try{if(ws&&ws.readyState===1)ws.send(JSON.stringify(m))}ca
 
 // ===== Auto-descoberta (F3.3): acha o sender (APK) na sub-rede =====
 // Prioridade: launchParams/query host > último host válido (localStorage)
-// > scan da sub-rede via GET :7080/status (resposta JSON identifica sender).
+// > scan da sub-rede via GET :47080/status (resposta JSON identifica sender).
+// Transição: computadores na porta antiga (7080/7081) também são procurados.
+const DEFAULT_WS_PORT='47081';
+const LEGACY_WS_PORT='7081';
 const browserSourcePort=Number(location.port);
 const ownBrowserSource=/^https?:$/.test(location.protocol)&&!!palcoLanHost(location.hostname)&&browserSourcePort>=7080&&browserSourcePort<=65534;
 let host=qs.get('host')||(ownBrowserSource?location.hostname:localStorage.getItem('palcoHost'))||location.hostname||'';
-let port=qs.get('port')||(ownBrowserSource?String(browserSourcePort+1):localStorage.getItem('palcoPort'))||'7081';
+let port=qs.get('port')||(ownBrowserSource?String(browserSourcePort+1):localStorage.getItem('palcoPort'))||DEFAULT_WS_PORT;
+// Porta do link ou da própria página é definitiva; a salva pode ser de antes da troca.
+const portFixed=!!(qs.get('port')||ownBrowserSource);
 
 function probeHttp(ip,httpPort){
   const url=palcoLanUrl(ip,httpPort,'/status','http');
@@ -2735,11 +2954,17 @@ function probeHttp(ip,httpPort){
   });
 }
 function probeSender(ip){
-  // Porta digitada pode ser WS (7081) OU HTTP do slot (a UI mostra a HTTP,
-  // ex.: slot 1 = 7082/7083). Tenta a dupla HTTP/WS em ambos os sentidos:
-  // p como HTTP, p-1 (p=WS) e p+1 (p=HTTP→WS=p+1).
   if(!palcoLanUrl(ip,port,'/status','http'))return Promise.resolve(null);
-  var p=Number(port);
+  var tries=[port];
+  if(!portFixed)[DEFAULT_WS_PORT,LEGACY_WS_PORT].forEach(function(p){if(tries.indexOf(p)<0)tries.push(p)});
+  return tries.slice(1).reduce(function(found,p){
+    return found.then(function(r){return r||probePair(ip,Number(p))});
+  },probePair(ip,Number(port)));
+}
+function probePair(ip,p){
+  // Porta digitada pode ser WS (47081) OU HTTP do slot (a UI mostra a HTTP,
+  // ex.: slot 1 = 47082/47083). Tenta a dupla HTTP/WS em ambos os sentidos:
+  // p como HTTP, p-1 (p=WS) e p+1 (p=HTTP→WS=p+1).
   return probeHttp(ip,p).then(function(j){
     if(j)return normalizePort(ip,j,p+1);        // p era HTTP → WS=p+1
     return probeHttp(ip,p-1).then(function(j2){
@@ -2988,7 +3213,7 @@ function showCloudPair(code){
 function hideCloudPair(){var el=document.getElementById('cloudPair');if(el)el.remove()}
 // YouTube watch URLs are not playable by <video>. Each network receiver
 // loads the official embedded player and follows the operator commands.
-let connectionAudioMuted=false;
+let connectionAudioMuted=stageReturnMode;
 const cleanMirror=PianoNetworkMirror.createReceiver({
   send:sendEvent,
   attach:function(stream){
@@ -3099,8 +3324,9 @@ function showIdle(msg){
   $('text').style.removeProperty('--box-bg');
   $('text').style.removeProperty('--box-border');
   $('text').style.removeProperty('--ts');
+  syncCastWaiting();
 }
-function hideIdle(){document.documentElement.classList.remove('receiver-idle');$('idle').classList.add('hidden')}
+function hideIdle(){document.documentElement.classList.remove('receiver-idle');$('idle').classList.add('hidden');syncCastWaiting()}
 // F3.3e: fallback de cover — sem capa ou capa quebrada = logo da org.
 // Cover relativo (images/... ou covers/...) resolve contra / do sender.
 function coverUrl(cover){
@@ -3109,7 +3335,7 @@ function coverUrl(cover){
   const path=encodeURI(String(cover).replace(/^\/+/, '')).split(/[?#]/)[0];
   if(!path)return null;
   const sender=lanSenderHost();
-  if(location.protocol==='file:'&&sender)return palcoMediaUrl('http://'+sender+':7080/'+path);
+  if(location.protocol==='file:'&&sender)return palcoMediaUrl('http://'+sender+':'+(Number(port)-1)+'/'+path);
   return '/'+path;
 }
 function showNp(title,sub,cover){
@@ -3142,7 +3368,7 @@ let pendingPlay=false;
 // no ponto certo). Badge discreto, não bloqueia a tela.
 let mutedUnlock=false;
 function showMuteBadge(){
-  if($('muteBadge'))return;
+  if(stageReturnMode||$('muteBadge'))return;
   const b=document.createElement('div');
   b.id='muteBadge';
   b.style.cssText='position:fixed;top:3vh;right:3vh;z-index:98;cursor:pointer;'+
@@ -3345,6 +3571,7 @@ function obsShareLayout(){
     frame.style.width=both?'50%':'100%';
     frame.style.left=both&&index===1?'50%':'0';
   });
+  syncCastWaiting();
 }
 function obsShareRemember(m,index){
   const messages=obsShareState.messages[index];
@@ -3364,6 +3591,7 @@ function obsShareEnable(enabled){
     const wrap=document.getElementById('obsShareView');if(wrap)wrap.remove();
     state.frames=[];state.ready=[];state.messages[1].clear();state.active[1]=false;
     for(const message of state.messages[0].values())handle(message);
+    syncCastWaiting();
     return;
   }
   ['video','audio'].forEach(id=>{try{$(id).pause()}catch(e){}});
@@ -3407,14 +3635,16 @@ function showObsWarmup(message){
 }
 function handle(m){
   if(m.v!==1&&m.v!==2)return;
+  if(m.type==='stageReturn'){applyStageReturn(m);return;}
+  if(stageReturnMode&&m.type==='audio')return;
   if(m.type==='audioOutput'){
-    connectionAudioMuted=m.mode==='player';
+    connectionAudioMuted=stageReturnMode||m.mode==='player';
     $('video').muted=connectionAudioMuted;$('audio').muted=connectionAudioMuted;
     if(connectionAudioMuted)hideMuteBadge();
     else if($('video').srcObject)playVideoWithFallback();
     return;
   }
-  if(m.type==='video'&&typeof m.connectionsMuted==='boolean')connectionAudioMuted=m.connectionsMuted;
+  if(m.type==='video'&&typeof m.connectionsMuted==='boolean')connectionAudioMuted=stageReturnMode||m.connectionsMuted;
   if(m.type==='obsWarmup'){showObsWarmup(m);return;}
   if(m.type==='obsControl'){
     if(m.action==='reload'){try{sessionStorage.setItem('palcoRefreshRequest',String(m.requestId||''))}catch(e){}location.reload();return;}

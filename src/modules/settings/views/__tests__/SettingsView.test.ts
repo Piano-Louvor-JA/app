@@ -42,8 +42,13 @@ const i18n = createI18n({
       nav: { home: 'Início', settings: 'Configurações' },
       minimize: { page: 'Minimizar página' },
       settings: {
-        sectionTitle: { appearance: 'Aparência', general: 'Geral', remote: 'Controle Remoto' },
-        tabs: { general: 'Geral', remote: 'Controle Remoto' },
+        sectionTitle: {
+          appearance: 'Aparência',
+          general: 'Geral',
+          remote: 'Controle Remoto',
+          transmission: 'Transmissão',
+        },
+        tabs: { general: 'Geral', remote: 'Controle Remoto', transmission: 'Transmissão' },
       },
     },
   },
@@ -97,6 +102,22 @@ describe('SettingsView', () => {
     expect(header.find('.settings-view__title').text()).toBe('Geral')
     expect(header.find('.page-back-stack .settings-view__back').exists()).toBe(true)
     expect(header.find('.page-back-stack__minimize').attributes('title')).toBe('Minimizar página')
+    expect(header.find('#settings-header-aside').exists()).toBe(true)
+  })
+
+  it('rota transmission: minimiza como as outras abas, com o status ao lado do título', async () => {
+    const { wrapper, go } = mountAt('settings-transmission')
+    await go()
+    const header = wrapper.get('.settings-view__header')
+    expect(header.find('.settings-view__title').text()).toBe('Transmissão')
+    expect(header.find('#settings-header-aside').exists()).toBe(true)
+    await header.get('.page-back-stack__minimize').trigger('click')
+    expect(mocks.minimize).toHaveBeenCalledTimes(1)
+    expect(mocks.options!.describe()).toEqual({
+      title: 'Transmissão',
+      icon: 'ti-settings',
+      summary: 'Configurações',
+    })
   })
 
   it('goBack: navega pra home', async () => {

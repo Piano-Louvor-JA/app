@@ -397,7 +397,7 @@ function syncAudio() {
   // PC somente: projeção visual continua normal; áudio não vai ao Palco.
   // Stop só na transição, para não martelar receivers a cada poll.
   if (route === 'pc') {
-    if (lastAudioRoute !== 'pc') void palcoSession.audio({ action: 'stop' })
+    if (lastAudioRoute !== 'pc') void palcoSession.hymnAudio({ action: 'stop' })
     lastAudioRoute = 'pc'
     lastAudioKey = key
     return
@@ -415,7 +415,7 @@ function syncAudio() {
       lastTvPlayState = null
       if (audioUrl) {
         lastTvPlayState = 'play'
-        void palcoSession.audio({
+        void palcoSession.hymnAudio({
           url: audioUrl,
           title: session?.title ?? undefined,
           subtitle: session?.subtitle ?? undefined,
@@ -424,14 +424,14 @@ function syncAudio() {
           action: 'play',
         })
       } else {
-        void palcoSession.audio({ action: 'stop' })
+        void palcoSession.hymnAudio({ action: 'stop' })
       }
     } else if (audioUrl) {
       // Mesma faixa: propaga o estado de reprodução do operador.
       const wanted: 'play' | 'pause' = media.isPlaying ? 'play' : 'pause'
       if (wanted !== lastTvPlayState) {
         lastTvPlayState = wanted
-        void palcoSession.audio({
+        void palcoSession.hymnAudio({
           url: audioUrl,
           /* v8 ignore next 1 -- null e 0 produzem o mesmo positionMs */
           positionMs: Math.round((media.currentTimeSec ?? 0) * 1000),
@@ -448,7 +448,7 @@ function syncAudio() {
     lastPosSyncMs = 0
     if (audioUrl && media.isPlaying) {
       lastAudioKey = key
-      void palcoSession.audio({
+      void palcoSession.hymnAudio({
         url: audioUrl,
         title: session?.title ?? undefined,
         subtitle: session?.subtitle ?? undefined,
@@ -472,7 +472,7 @@ function syncAudio() {
     const now = Date.now()
     if (now - lastPosSyncMs > 3000) {
       lastPosSyncMs = now
-      void palcoSession.audio({
+      void palcoSession.hymnAudio({
         url: audioUrl,
         positionMs: Math.round((media.currentTimeSec ?? 0) * 1000),
         action: 'seek',
@@ -481,7 +481,7 @@ function syncAudio() {
   }
   /* v8 ignore start -- store mantém isPaused true com sessão parada */
   else if (media.isPaused) {
-    void palcoSession.audio({ action: 'pause' })
+    void palcoSession.hymnAudio({ action: 'pause' })
   }
   /* v8 ignore stop */
 }
@@ -623,6 +623,7 @@ export function startPalcoBridge() {
     normalizeMediaRuntime,
     (v) => {
       runtimes.media = v
+      void palcoSession.stageReturn(v)
       setIntent('media', Boolean(v.active && (v.lyric || v.title)))
     },
   )
@@ -695,7 +696,7 @@ export function startPalcoBridge() {
         (has) => {
           if (!has) {
             lastAudioKey = ''
-            void palcoSession.audio({ action: 'stop' })
+            void palcoSession.hymnAudio({ action: 'stop' })
           }
         },
       ),
@@ -703,22 +704,30 @@ export function startPalcoBridge() {
         () => media.currentTimeSec,
         (now, before) => {
           if (Math.abs(now - before) > 2 && media.hasSession) {
-            void palcoSession.audio({ action: 'seek', position: now })
+            void palcoSession.hymnAudio({ action: 'seek', position: now })
           }
         },
       ),
     )
   }
-  window.setInterval(syncAudio, 3000)
+  const audioTimer = window.setInterval(syncAudio, 3000)
+  unwatchers.push(() => window.clearInterval(audioTimer))
   const refreshObs = () => { if (started) void renderAllSlots() }
-  const unsubscribeReceiver = palcoSession.onReceiverConnected?.(refreshObs)
+  const unsubscribeReceiver = palcoSession.onReceiverConnected?.(() => {
+    refreshObs()
+    if (started) void palcoSession.stageReturn(runtimes.media)
+  })
   if (typeof unsubscribeReceiver === 'function') unwatchers.push(unsubscribeReceiver)
-  window.addEventListener('obs-connections-changed', refreshObs)
+  const onObsChanged = () => {
+    refreshObs()
+    if (started) void palcoSession.stageReturn(runtimes.media)
+  }
+  window.addEventListener('obs-connections-changed', onObsChanged)
   const obsTimer = window.setInterval(() => {
     if (Object.keys(obsAssignments.value).length || owner === 'timer') void renderAllSlots()
   }, 1000)
   unwatchers.push(() => {
-    window.removeEventListener('obs-connections-changed', refreshObs)
+    window.removeEventListener('obs-connections-changed', onObsChanged)
     window.clearInterval(obsTimer)
   })
 
@@ -727,6 +736,7 @@ export function startPalcoBridge() {
   unwatchers.push(
     subscribeStageSettings(() => {
       void renderAllSlots()
+      void palcoSession.stageReturn(runtimes.media)
     }),
   )
 

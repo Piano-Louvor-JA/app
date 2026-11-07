@@ -89,7 +89,7 @@ contextBridge.exposeInMainWorld('louvorja', {
     onClients: (callback) => subscribe('remote:clients', callback),
   },
 
-  // Palco (cast p/ TV — receiver conecta em WS :7081, HTTP :7080)
+  // Palco (cast p/ TV — receiver conecta em WS :47081, HTTP :47080)
   palco: {
     getPersistence: () => ipcRenderer.invoke('palco:persistence-get'),
     setPersistence: (enabled) => ipcRenderer.invoke('palco:persistence-set', { enabled }),
@@ -97,6 +97,10 @@ contextBridge.exposeInMainWorld('louvorja', {
     wake: () => ipcRenderer.invoke('palco:wake'),
     createSlot: (label) => ipcRenderer.invoke('palco:slot-create', { label }),
     removeSlot: (slotId) => ipcRenderer.invoke('palco:slot-remove', { id: slotId }),
+    updateSlot: (slotId, changes) => ipcRenderer.invoke('palco:slot-update', { id: slotId, ...changes }),
+    transmission: () => ipcRenderer.invoke('palco:transmission-get'),
+    setTransmission: (changes) => ipcRenderer.invoke('palco:transmission-set', changes),
+    resetToken: () => ipcRenderer.invoke('palco:token-reset'),
     start: (slotId = '0') => ipcRenderer.invoke('palco:start', { slotId }),
     stop: (slotId = '0') => ipcRenderer.invoke('palco:stop', { slotId }),
     status: (slotId = '0') => ipcRenderer.invoke('palco:status', { slotId }),

@@ -67,6 +67,7 @@ const { minimize, prepare } = useMinimizablePage({
       <h1 v-if="!isAppearance" class="settings-view__title">
         {{ t(sectionTitleKey) }}
       </h1>
+      <div id="settings-header-aside" class="settings-view__aside" />
     </div>
 
     <div class="settings-view__content">
@@ -117,6 +118,26 @@ const { minimize, prepare } = useMinimizablePage({
     z-index: 2;
     height: 0;
     margin-bottom: 0;
+  }
+}
+
+.settings-view__title {
+  display: flex;
+  align-items: center;
+}
+
+/* Status da aba (Transmissão): alinhado à seta, à direita do título. */
+.settings-view__aside {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  min-height: 2.5rem;
+  margin-left: auto;
+
+  &:empty {
+    display: none;
   }
 }
 

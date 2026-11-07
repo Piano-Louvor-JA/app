@@ -165,6 +165,24 @@ describe('escopo speaker — permissão mínima', () => {
     expect(info.connectUrl).toContain(`token=${TOKEN}`)
   })
 
+  it('URL do pregador aponta para a porta padrão do palco (47080/47081)', async () => {
+    await startRemoteServer(fakeWss(), fakeContents(), { token: TOKEN, speakerToken: SPEAKER_TOKEN })
+    const url = new URL((await ipcHandlers.get('remote:pairing-info')()).speakerUrl)
+    expect(url.port).toBe('47080')
+    expect(url.searchParams.get('palcoPort')).toBe('47081')
+  })
+
+  it('URL do pregador acompanha a porta atual da Fonte 1', async () => {
+    let palcoPort = 47080
+    await startRemoteServer(fakeWss(), fakeContents(), { token: TOKEN, palcoHttpPort: () => palcoPort })
+    palcoPort = 47090
+    const info = await ipcHandlers.get('remote:pairing-info')()
+    const url = new URL(info.speakerUrl)
+    expect(url.port).toBe('47090')
+    expect(url.searchParams.get('palcoPort')).toBe('47091')
+    expect(info.speakerQrDataUrl).toMatch(/^data:image\/png;base64,/)
+  })
+
   it('tokens aleatórios do pregador e do APK são diferentes', async () => {
     const wss = fakeWss()
     await startRemoteServer(wss, fakeContents())
@@ -233,7 +251,7 @@ describe('convivência operador (APK) + pregador — limites POR PAPEL', () => {
     const { connect } = await serverWithOperator()
     const { message } = connect()
     message({ v: 1, type: 'hello', role: 'speaker', token: TOKEN })
-    const info = ipcHandlers.get('remote:pairing-info')?.()
+    const info = await ipcHandlers.get('remote:pairing-info')?.()
     expect(info.clientCount).toBe(2)
     expect(info.remoteAddress).toMatch(/Moto G85/)
     expect(info.speakerAddress).toBeTruthy()

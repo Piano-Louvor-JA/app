@@ -971,7 +971,9 @@ app.whenReady().then(async () => {
 		createWindow(locale);
 		bootMark("mainWindow");
 
-		attachRemoteServer(() => mainWindow?.webContents ?? null);
+		attachRemoteServer(() => mainWindow?.webContents ?? null, {
+			palcoHttpPort: () => getPalcoManager()?.getPrincipal()?.httpPort,
+		});
 		attachPalcoServer(() => mainWindow?.webContents ?? null);
 	} catch (error) {
 		console.error("[main] falha no startup", error);

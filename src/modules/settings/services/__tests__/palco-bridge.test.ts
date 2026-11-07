@@ -21,6 +21,8 @@ vi.mock('@shared/services/user-preferences', () => ({
 }))
 
 const receiverConnection = vi.hoisted(() => ({ callback: null as null | (() => void) }))
+const stageReturns = vi.hoisted(() => [] as Array<Record<string, unknown>>)
+const stageSettingsChange = vi.hoisted(() => ({ callback: null as null | (() => void) }))
 
 type Send = { slot: string; msg: Record<string, unknown> }
 
@@ -42,7 +44,8 @@ vi.mock('../../services/palco-session', () => ({
     idleTo(slot: string) { sends().push({ slot, msg: { type: 'idle' } }) },
     timerTo(slot: string, opts: unknown) { sends().push({ slot, msg: { type: 'timer', opts } }) },
     idle() { sends().push({ slot: this.activeSlotId, msg: { type: 'idle' } }) },
-    audio(payload: unknown) { sends().push({ slot: 'audio', msg: payload as Record<string, unknown> }) },
+    hymnAudio(payload: unknown) { sends().push({ slot: 'audio', msg: payload as Record<string, unknown> }) },
+    async stageReturn(runtime: Record<string, unknown>) { stageReturns.push(runtime) },
     onEvent: () => () => {},
     onReceiverConnected: (callback: () => void) => { receiverConnection.callback = callback; return () => { receiverConnection.callback = null } },
   },
@@ -122,7 +125,7 @@ vi.mock('../../../countdown/services/countdown-runtime', () => ({
   normalizeCountdownRuntime: (raw: unknown) => raw,
 }))
 vi.mock('../../services/stage-settings-runtime', () => ({
-  subscribeStageSettings: () => () => {},
+  subscribeStageSettings: (callback: () => void) => { stageSettingsChange.callback = callback; return () => { stageSettingsChange.callback = null } },
 }))
 
 // Media store: estado mutável por teste (reactive pra watchers Vue funcionarem).
@@ -265,6 +268,26 @@ describe('palco-bridge — helpers via comportamento', () => {
     expect(sendBuf.buf.some((item) => item.slot === '7082' && item.msg.scope === 'bible')).toBe(true)
     stopPalcoBridge()
     expect(receiverConnection.callback).toBeNull()
+  })
+  it('leva a música ao retorno de palco ao mudar, quando uma página conecta e quando a aparência muda', async () => {
+    startPalcoBridge()
+    stageReturns.length = 0
+    publish(MEDIA_CH, mediaPayload({ lyric: 'Santo, santo, santo', nextLyric: 'Cedo de manhã', slideProgressRatio: 0.3 }))
+    await settle()
+    expect(stageReturns.at(-1)).toMatchObject({ active: true, lyric: 'Santo, santo, santo', nextLyric: 'Cedo de manhã', slideProgressRatio: 0.3 })
+    stageReturns.length = 0
+    receiverConnection.callback?.()
+    expect(stageReturns).toHaveLength(1)
+    expect(stageReturns[0]).toMatchObject({ lyric: 'Santo, santo, santo' })
+    stageSettingsChange.callback?.()
+    expect(stageReturns).toHaveLength(2)
+    window.dispatchEvent(new Event('obs-connections-changed'))
+    expect(stageReturns).toHaveLength(3)
+    expect(stageReturns[2]).toMatchObject({ lyric: 'Santo, santo, santo' })
+    publish(MEDIA_CH, mediaPayload({ active: false }))
+    await settle()
+    expect(stageReturns.at(-1)).toMatchObject({ active: false })
+    stopPalcoBridge()
   })
   it('startPalcoBridge: idempotente (2º start não duplica)', async () => {
     startPalcoBridge()

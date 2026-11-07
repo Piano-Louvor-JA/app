@@ -311,7 +311,7 @@ watch(open, async (isOpen) => {
                 @change="selectObsConnection(connection.id, ($event.target as HTMLInputElement).checked)">
               <span class="monitor-target-select__option-body">
                 <span class="monitor-target-select__option-name">{{ obsConnectionName(connection) }}</span>
-                <span class="monitor-target-select__option-meta">{{ t('obsOutputs.browserSource') }} · {{ connection.clients }}</span>
+                <span class="monitor-target-select__option-meta">{{ t('obsOutputs.activeConnections', { count: connection.clients }) }}</span>
               </span>
             </label>
           </li>

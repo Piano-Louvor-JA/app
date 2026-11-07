@@ -1,6 +1,5 @@
 import type { RouteRecordRaw } from 'vue-router'
 
-import ObsView from '@modules/clock/views/ObsView.vue'
 import AppearanceView from './views/AppearanceView.vue'
 import GeneralView from './views/GeneralView.vue'
 import MediaView from './views/MediaView.vue'
@@ -8,6 +7,7 @@ import ProjectionView from './views/ProjectionView.vue'
 import RemotePairingView from '@modules/remote/views/RemotePairingView.vue'
 import { isElectronShell } from '@shared/services/desktop-bridge'
 import SettingsView from './views/SettingsView.vue'
+import TransmissionView from './views/TransmissionView.vue'
 
 export const settingsRoutes: RouteRecordRaw[] = [
   {
@@ -56,7 +56,7 @@ export const settingsRoutes: RouteRecordRaw[] = [
       {
         path: 'transmission',
         name: 'settings-transmission',
-        component: ObsView,
+        component: TransmissionView,
         meta: { navKey: 'settings' },
       },
       // Controle remoto — desktop: WS :7071 (RemotePairingView);
