@@ -101,6 +101,7 @@ const {
   videoProjectionItemId,
   worshipLabel,
   headerDateTime,
+  currentClock,
   remainingCountdownLabel,
   startTimeInput,
   endTimeInput,
@@ -214,6 +215,7 @@ async function onSljaImported(): Promise<void> {
     <div class="liturgy-view__body">
       <LiturgySidebar
         :remaining-countdown="remainingCountdownLabel"
+        :current-clock="currentClock"
         :countdown-expired="countdownExpired"
         :countdown-running="countdownRunning"
         :can-start-countdown="canStartCountdown"

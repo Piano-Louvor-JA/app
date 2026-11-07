@@ -322,15 +322,19 @@ describe('isLiturgyItemDraftValid', () => {
     expect(isLiturgyItemDraftValid(draft({ type: null }))).toBe(false)
     expect(isLiturgyItemDraftValid(draft({ name: '  ' }))).toBe(false)
   })
-  it('categoria exige horários válidos', () => {
+  it('categoria exige horários válidos (end opcional — SPEC t_50c9ac95)', () => {
     expect(
       isLiturgyItemDraftValid(draft({ type: 'category', categoryId: null, startTime: '09:00', endTime: '10:00' })),
     ).toBe(true)
     expect(
       isLiturgyItemDraftValid(draft({ type: 'category', categoryId: null, startTime: 'xx', endTime: '10:00' })),
     ).toBe(false)
+    // end vazio é válido (opcional); end inválido preenchido é rejeitado
     expect(
       isLiturgyItemDraftValid(draft({ type: 'category', categoryId: null, startTime: '09:00', endTime: '' })),
+    ).toBe(true)
+    expect(
+      isLiturgyItemDraftValid(draft({ type: 'category', categoryId: null, startTime: '09:00', endTime: '99:99' })),
     ).toBe(false)
   })
   it('música exige musicId; outros tipos exigem categoryId', () => {

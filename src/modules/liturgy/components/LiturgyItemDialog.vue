@@ -168,9 +168,9 @@ const nameRequiredMissing = computed(() => props.draft.name.trim().length === 0)
 const startTimeRequiredMissing = computed(
   () => isCategory.value && !normalizeLiturgyTimeHHmm(props.draft.startTime),
 )
-const endTimeRequiredMissing = computed(
-  () => isCategory.value && !normalizeLiturgyTimeHHmm(props.draft.endTime),
-)
+// SPEC t_50c9ac95 (A1): endTime é OPCIONAL na categoria — sem erro de
+// validação; duração vira estimativa marcada até o end ser definido.
+const endTimeRequiredMissing = computed(() => false)
 // Categoria OPCIONAL (paridade web ff8b481): sem erro de validação.
 const categoryRequiredMissing = computed(() => false)
 
@@ -607,8 +607,6 @@ function onSubmit(event: Event) {
       document.getElementById('moment-name')?.focus()
     } else if (isCategory.value && !normalizeLiturgyTimeHHmm(nextDraft.startTime)) {
       document.getElementById('moment-start-time')?.focus()
-    } else if (isCategory.value && !normalizeLiturgyTimeHHmm(nextDraft.endTime)) {
-      document.getElementById('moment-end-time')?.focus()
     }
     return
   }
@@ -1009,10 +1007,7 @@ function isLightDot(hex: string): boolean {
                   for="moment-end-time"
                 >
                   {{ t('liturgy.dialog.categoryEndTime') }}
-                  <span
-                    class="moment-dialog__required"
-                    aria-hidden="true"
-                  >*</span>
+                  <!-- SPEC t_50c9ac95 (A1): fim OPCIONAL — sem '*' nem erro. -->
                 </label>
                 <input
                   id="moment-end-time"
@@ -1023,7 +1018,7 @@ function isLightDot(hex: string): boolean {
                   :value="draft.endTime"
                   :aria-label="t('liturgy.dialog.categoryEndTime')"
                   :aria-invalid="endTimeFieldError"
-                  :aria-required="true"
+                  :aria-required="false"
                   @input="onEndTimeInput"
                   @change="onEndTimeInput"
                 >
