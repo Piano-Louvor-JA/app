@@ -169,3 +169,46 @@ describe("SPEC t_50c9ac95 — integração UI (QA gap)", () => {
     expect(estimatedSessionEnd([es], () => [])).toBeNull();
   });
 });
+
+describe("SPEC t_50c9ac95 — fix review: wrap meia-noite + UI end inválido", () => {
+  const catItem = (over: Record<string, unknown>) =>
+    ({
+      id: "c1",
+      type: "category",
+      name: "ES",
+      startTime: "09:00",
+      endTime: null,
+      durationMs: 0,
+      ...over,
+    }) as unknown as import("../types/liturgy").LiturgyItem;
+
+  it("23:30 + 60min → 00:30 vence categoria anterior que acaba 23:45 (B4)", () => {
+    const vigilia = catItem({ id: "v", name: "Vigília", startTime: "22:00", endTime: "23:45" });
+    const madrugada = catItem({ id: "m", name: "Madrugada", startTime: "23:30", endTime: null });
+    const children = {
+      m: [{ durationMs: 60 * 60_000 }] as unknown as import("../types/liturgy").LiturgyItem[],
+    };
+    const result = computeSessionTimes([vigilia, madrugada], { esChildren: children });
+    expect(result.endTime).toBe("00:30");
+  });
+
+  it("estimatedSessionEndSafe: wrap meia-noite → maior absoluto", async () => {
+    const { estimatedSessionEndSafe } = await import("../services/liturgy-item-helpers");
+    const v = catItem({ id: "v", name: "Vigília", startTime: "22:00", endTime: "23:45" });
+    const m = catItem({ id: "m", name: "Madrugada", startTime: "23:30", endTime: null });
+    const end = estimatedSessionEndSafe([v, m], (id) =>
+      id === "m" ? ([{ durationMs: 60 * 60_000 }] as unknown as import("../types/liturgy").LiturgyItem[]) : [],
+    );
+    expect(end).toBe("00:30");
+  });
+
+  it("end exatamente = início (0min) → válido, não é wrap", () => {
+    const c = catItem({ id: "x", startTime: "10:00", endTime: null });
+    const esChildren = {
+      x: [{ durationMs: 0 }] as unknown as import("../types/liturgy").LiturgyItem[],
+    };
+    // duração 0 → null (sem invenção), não 10:00
+    const result = computeSessionTimes([c], { esChildren });
+    expect(result.endTime).toBeNull();
+  });
+});

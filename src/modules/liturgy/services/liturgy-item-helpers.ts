@@ -616,3 +616,48 @@ export function estimatedSessionEnd(
   }
   return latest || null
 }
+
+/* ---------- Fix review (review deleg_3ba5e284): wrap meia-noite ---------- */
+
+/** Converte HH:MM → minutos do dia. */
+function hhmmToMinutes(hhmm: string): number | null {
+  const norm = normalizeLiturgyTimeHHmm(hhmm)
+  if (!norm) return null
+  const [h, m] = norm.split(':').map(Number)
+  return h * 60 + m
+}
+
+/**
+ * Chave de comparação de fim de categoria com wrap de meia-noite:
+ * fim < início → pertence ao dia seguinte (+24h). Retorna minutos absolutos.
+ */
+export function categoryEndSortKey(
+  category: LiturgyItem,
+  children: LiturgyItem[],
+): number | null {
+  const end = resolveCategoryEndTime(category, children)
+  if (!end) return null
+  const endMin = hhmmToMinutes(end)
+  if (endMin == null) return null
+  const startMin = hhmmToMinutes(category.startTime ?? '')
+  if (startMin != null && endMin < startMin) return endMin + 24 * 60
+  return endMin
+}
+
+/** Versão wrap-aware de estimatedSessionEnd (maior fim absoluto). */
+export function estimatedSessionEndSafe(
+  items: LiturgyItem[],
+  childrenByCategory: (id: string) => LiturgyItem[],
+): string | null {
+  let latest = -1
+  let latestHHmm: string | null = null
+  for (const cat of items) {
+    if (cat.type !== 'category') continue
+    const key = categoryEndSortKey(cat, childrenByCategory(cat.id))
+    if (key != null && key > latest) {
+      latest = key
+      latestHHmm = resolveCategoryEndTime(cat, childrenByCategory(cat.id))
+    }
+  }
+  return latestHHmm
+}

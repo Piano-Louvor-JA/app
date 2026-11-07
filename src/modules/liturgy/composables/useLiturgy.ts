@@ -12,7 +12,9 @@ import { getDesktopBridge } from '@shared/services/desktop-bridge'
 import { useLiturgyStore } from '../stores/useLiturgyStore'
 import { useScheduledStore } from '../stores/useScheduledStore'
 import { formatClock } from '../services/liturgy-format'
-import { estimatedSessionEnd } from '../services/liturgy-item-helpers'
+import {
+  estimatedSessionEndSafe as estimatedSessionEnd,
+} from '../services/liturgy-item-helpers'
 import { appConfirm } from '@shared/composables/useAppConfirm'
 import type { LiturgyDayKey } from '../types/liturgy'
 import { useLiturgyClock } from './useLiturgyClock'

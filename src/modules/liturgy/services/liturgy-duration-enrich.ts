@@ -1,6 +1,9 @@
 import type { LiturgyItem, LiturgyMusicOption } from "../types/liturgy";
 import { normalizeLiturgyTimeHHmm } from "./liturgy-format";
-import { resolveCategoryEndTime } from "./liturgy-item-helpers";
+import {
+  resolveCategoryEndTime,
+  categoryEndSortKey,
+} from "./liturgy-item-helpers";
 
 /**
  * Enriquecimento de duração (t_14d066ea): música com `musicId` do catálogo
@@ -82,11 +85,17 @@ export function computeSessionTimes(
   const categories = items.filter((i) => i.type === 'category' && i.startTime);
   if (categories.length === 0) return { startTime: null, endTime: null };
   const first = categories[0];
+  const cats = items.filter((i) => i.type === 'category' && i.startTime);
   let latest = '';
-  for (const cat of categories) {
+  let latestKey = -1;
+  for (const cat of cats) {
     const children = opts.esChildren?.[cat.id] ?? [];
-    const end = resolveCategoryEndTime(cat, children);
-    if (end && end > latest) latest = end;
+    const key = categoryEndSortKey(cat, children);
+    const end = key != null ? resolveCategoryEndTime(cat, children) : null;
+    if (key != null && key > latestKey) {
+      latestKey = key;
+      latest = end ?? '';
+    }
   }
   return {
     startTime: normalizeLiturgyTimeHHmm(first.startTime ?? null),
