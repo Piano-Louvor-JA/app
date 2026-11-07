@@ -19,6 +19,7 @@ import {
 	type LiturgyWeekday,
 } from "@modules/liturgy/types/liturgy";
 import { deriveSessionTimesFromCategories } from "@modules/liturgy/services/liturgy-duration-enrich";
+import { estimatedSessionEndSafe } from "@modules/liturgy/services/liturgy-item-helpers";
 import {
 	activeLiturgyStateKey,
 	normalizeLiturgyState,
@@ -222,10 +223,20 @@ export function importLouvorjaIntoBrowser(
 								startTime: null,
 								endTime: null,
 							};
-							const derivedSession = deriveSessionTimesFromCategories(
-								next.weekdays[day],
-								currentSession,
-							);
+							// SPEC t_50c9ac95 (B4/R1, review deleg_3ba5e284): derivar
+							// sessão considerando categorias SEM end — estimativa por
+							// durationMs dos filhos, wrap meia-noite; end real vence.
+							// Nunca sobrescreve sessão já definida nem grava vazio.
+							const items = next.weekdays[day] as import("@modules/liturgy/types/liturgy").LiturgyItem[];
+							const derivedStart =
+								currentSession.startTime ??
+								deriveSessionTimesFromCategories(items, currentSession).startTime;
+							const derivedEnd =
+								currentSession.endTime ?? estimatedSessionEndSafe(items, () => []);
+							const derivedSession =
+								derivedStart != null || derivedEnd != null
+									? { startTime: derivedStart, endTime: derivedEnd }
+									: currentSession;
 							if (next.daySessionTimes || derivedSession !== currentSession) {
 								next.daySessionTimes ??= {} as LiturgyPersistedState["daySessionTimes"];
 								next.daySessionTimes[day] = derivedSession;
