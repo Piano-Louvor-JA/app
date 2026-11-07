@@ -24,7 +24,10 @@ function loadPlayer(data: unknown): { w: TextWindow; doc: Document } {
   const query = typeof data === 'string' ? data : encodeURIComponent(JSON.stringify(data))
   dom = new JSDOM(html, { url: `http://localhost/local-text-player.html?data=${query}`, runScripts: 'outside-only' })
   const w = dom.window as unknown as TextWindow
-  for (const el of dom.window.document.querySelectorAll('script')) w.eval(el.textContent ?? '')
+  for (const el of dom.window.document.querySelectorAll('script')) {
+    const src = el.getAttribute('src')
+    w.eval(src ? readFileSync(resolve(dirname(PLAYER_PATH), src), 'utf-8') : el.textContent ?? '')
+  }
   return { w, doc: dom.window.document }
 }
 
@@ -55,6 +58,13 @@ describe('local-text-player', () => {
     expect(text.textContent).toBe('alinkb')
     expect(text.querySelector('p')!.getAttribute('style')).toMatch(/^color:(#ff0000|rgb\(255, 0, 0\))$/)
     expect(text.querySelector('span')!.hasAttribute('style')).toBe(false)
+  })
+
+  it('keeps content after a closing wrapper and strips active markup', () => {
+    const { doc } = loadPlayer({ html: '</div><p>Mensagem</p><svg onload="alert(1)"></svg>' })
+    const text = doc.getElementById('text')!
+    expect(text.textContent).toBe('Mensagem')
+    expect(text.querySelector('svg, script, [onload]')).toBeNull()
   })
 
   it('cores inválidas ou dados quebrados caem no padrão', () => {

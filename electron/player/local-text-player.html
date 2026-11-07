@@ -53,6 +53,7 @@
       <h1 id="title"></h1>
       <div id="text"></div>
     </div>
+    <script src="../../node_modules/dompurify/dist/purify.min.js"></script>
     <script>
       ;(() => {
         // Texto já vem limpo do app; limpa de novo aqui porque esta janela tem a ponte do app.
@@ -87,11 +88,13 @@
         }
 
         function sanitize(html) {
-          const doc = new DOMParser().parseFromString('<div>' + String(html || '') + '</div>', 'text/html')
-          const root = doc.body.firstElementChild
-          if (!root) return ''
-          cleanNode(root)
-          return root.innerHTML
+          const fragment = DOMPurify.sanitize(String(html || ''), {
+            ALLOWED_TAGS: Array.from(ALLOWED, tag => tag.toLowerCase()),
+            ALLOWED_ATTR: ['style'],
+            RETURN_DOM_FRAGMENT: true,
+          })
+          cleanNode(fragment)
+          return fragment
         }
 
         function safeColor(value, fallback) {
@@ -113,7 +116,7 @@
         const titleEl = document.getElementById('title')
         const textEl = document.getElementById('text')
         titleEl.textContent = typeof data.title === 'string' ? data.title.trim() : ''
-        textEl.innerHTML = sanitize(data.html)
+        textEl.replaceChildren(sanitize(data.html))
 
         // Texto longo cede tamanho (mesma escala da anotação da Liturgia).
         const length = (textEl.textContent || '').replace(/\s+/g, ' ').length

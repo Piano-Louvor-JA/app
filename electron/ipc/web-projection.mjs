@@ -2651,9 +2651,11 @@ export async function remoteImagePrev() {
  */
 async function applyTextScaleToWindow(win, scale) {
   if (win.isDestroyed()) return
+  const numericScale = Number(scale)
+  const safeScale = Number.isFinite(numericScale) ? Math.min(2, Math.max(0.5, numericScale)) : 1
   try {
     await win.webContents.executeJavaScript(
-      `(() => (window.__textSlide ? window.__textSlide.setScale(${JSON.stringify(scale)}) : null))()`,
+      `(() => (window.__textSlide ? window.__textSlide.setScale(${safeScale}) : null))()`,
       true,
     )
   } catch {
