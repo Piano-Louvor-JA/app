@@ -60,13 +60,10 @@ describe('playlist-io — compat fixture v1 (PW-3)', () => {
     const tampered = JSON.parse(fixtureRaw) as Record<string, unknown>
     tampered.version = 999
     const result = parsePlaylistsImport(JSON.stringify(tampered))
-    // Contrato atual: versão não faz parte da validação de entrada, mas o payload
-    // deve permanecer interpretável sem corromper storage — documento comportamento.
-    if (result.ok) {
-      expect(result.playlists.every((p) => p.items.every((i) => typeof i.musicId === 'number'))).toBe(true)
-    } else {
-      expect(result.playlists).toEqual([])
-    }
+    // Contrato PLAN PW-2: versão de schema desconhecida rejeita o payload.
+    expect(result.ok).toBe(false)
+    expect(result.playlists).toEqual([])
+    expect(result.discardedItems).toBe(0)
   })
 
   it('rejeita JSON corrompido sem lançar', () => {

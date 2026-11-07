@@ -54,7 +54,7 @@ export function parsePlaylistsImport(raw: string): ParseResult {
   }
 
   const data = parsed as Record<string, unknown> | null
-  if (!data || data.kind !== 'playlists' || !Array.isArray(data.playlists)) {
+  if (!data || data.kind !== 'playlists' || data.version !== 1 || !Array.isArray(data.playlists)) {
     return { ok: false, playlists: [], discardedItems: 0 }
   }
 
