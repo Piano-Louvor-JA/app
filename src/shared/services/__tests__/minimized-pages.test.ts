@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   MINIMIZED_PAGES_MAX,
   addMinimized,
+  moveMinimized,
   parseMinimizedPages,
   removeMinimized,
   type MinimizedPage,
@@ -28,8 +29,8 @@ function paths(list: MinimizedPage[]) {
 }
 
 describe('minimized-pages: constantes', () => {
-  it('limite aprovado no SPEC (Q4)', () => {
-    expect(MINIMIZED_PAGES_MAX).toBe(6)
+  it('limite alto: a barra usa a largura toda e rola; o teto só protege o storage', () => {
+    expect(MINIMIZED_PAGES_MAX).toBe(30)
   })
 })
 
@@ -76,6 +77,28 @@ describe('removeMinimized', () => {
   it('página que não está na lista: devolve igual', () => {
     const original = [page('/albums/1', 1)]
     expect(removeMinimized(original, '/x')).toEqual(original)
+  })
+})
+
+describe('moveMinimized', () => {
+  const list = () => ['/a', '/b', '/c', '/d'].map((path, i) => page(path, i))
+
+  it('leva a página para a nova posição (para frente e para trás)', () => {
+    expect(paths(moveMinimized(list(), '/a', 2))).toEqual(['/b', '/c', '/a', '/d'])
+    expect(paths(moveMinimized(list(), '/d', 0))).toEqual(['/d', '/a', '/b', '/c'])
+  })
+
+  it('posição fora da lista vai para a ponta', () => {
+    expect(paths(moveMinimized(list(), '/b', 99))).toEqual(['/a', '/c', '/d', '/b'])
+    expect(paths(moveMinimized(list(), '/c', -3))).toEqual(['/c', '/a', '/b', '/d'])
+  })
+
+  it('página que não está na lista ou mesma posição: devolve igual, sem alterar a original', () => {
+    const original = list()
+    expect(paths(moveMinimized(original, '/x', 0))).toEqual(['/a', '/b', '/c', '/d'])
+    const same = moveMinimized(original, '/b', 1)
+    expect(paths(same)).toEqual(['/a', '/b', '/c', '/d'])
+    expect(same).not.toBe(original)
   })
 })
 

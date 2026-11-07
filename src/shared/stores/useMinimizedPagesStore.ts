@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 
 import {
   addMinimized,
+  moveMinimized,
   removeMinimized,
   type MinimizedPage,
 } from '@shared/services/minimized-pages'
@@ -13,7 +14,7 @@ import {
 
 /**
  * Páginas minimizadas (barra acima do dock). Começa com o que estava salvo
- * na sessão e salva a cada mudança. Ao reabrir, o item sai da barra e o
+ * na sessão e salva a cada mudança. Ao reabrir, o item fica na barra e o
  * retrato fica pendente até a página pegá-lo (`takeRestore`) ao montar.
  */
 export const useMinimizedPagesStore = defineStore('minimized-pages', () => {
@@ -35,11 +36,15 @@ export const useMinimizedPagesStore = defineStore('minimized-pages', () => {
     setItems(removeMinimized(items.value, fullPath))
   }
 
+  function move(fullPath: string, toIndex: number) {
+    setItems(moveMinimized(items.value, fullPath, toIndex))
+  }
+
+  /** Reabre: o item continua na barra (marcado como em uso enquanto a página estiver aberta). */
   function reopen(fullPath: string): MinimizedPage | null {
     const page = items.value.find((item) => item.fullPath === fullPath) ?? null
     if (!page) return null
     pendingRestore.value = page
-    setItems(removeMinimized(items.value, fullPath))
     return page
   }
 
@@ -51,5 +56,5 @@ export const useMinimizedPagesStore = defineStore('minimized-pages', () => {
     return page
   }
 
-  return { items, hasItems, minimize, close, reopen, takeRestore }
+  return { items, hasItems, minimize, close, move, reopen, takeRestore }
 })

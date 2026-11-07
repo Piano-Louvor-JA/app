@@ -14,6 +14,9 @@
   #youtubeProjection iframe{position:absolute!important;top:50%!important;left:50%!important;
     width:100vw!important;height:100vh!important;min-width:177.7778vh;min-height:56.25vw;
     max-width:none;max-height:none;transform:translate(-50%,-50%);border:0;display:block}
+  /* Covers the YouTube title, logo and spinner until the video actually plays. */
+  #youtubeVeil{position:absolute;inset:0;z-index:1;background:#000;pointer-events:none;transition:opacity .3s}
+  #youtubeVeil.is-hidden{opacity:0}
   html,body{margin:0;height:100%;overflow:hidden;background:#000;
     font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#fff}
   #bg{position:fixed;top:0;left:0;width:100%;height:100%;object-fit:cover;
@@ -3036,9 +3039,10 @@ function mountYoutube(){
   const expected=youtubeId;
   const view=document.createElement('div');view.id='youtubeProjection';
   view.style.cssText='position:fixed;inset:0;z-index:100;background:#000';
-  const target=document.createElement('div');view.appendChild(target);document.body.appendChild(view);
+  const target=document.createElement('div');view.appendChild(target);
+  const veil=document.createElement('div');veil.id='youtubeVeil';view.appendChild(veil);document.body.appendChild(view);
   youtubePlayer=new YT.Player(target,{width:'100%',height:'100%',videoId:expected,
-    playerVars:{autoplay:1,controls:0,playsinline:1,rel:0,origin:location.origin},
+    playerVars:{autoplay:1,controls:0,playsinline:1,rel:0,fs:0,iv_load_policy:3,disablekb:1,origin:location.origin},
     events:{onReady:function(event){
       if(youtubeId!==expected)return;
       youtubeReady=true;
@@ -3049,6 +3053,7 @@ function mountYoutube(){
       // Captions may load after onReady; only unload a module actually loaded.
       if(youtubeCaptionsHidden||youtubeCaptionTrack)applyYoutubeCaptions();
     },onStateChange:function(event){
+      if(event.data===1&&youtubeId===expected)veil.classList.add('is-hidden');
       if(event.data===0){stopYoutube();showIdle(L10N.idle);sendEvent({v:2,type:'ended',media:'video'})}
     },onError:function(){
       stopYoutube();showIdle('YouTube: não foi possível reproduzir este vídeo incorporado.');

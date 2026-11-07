@@ -8,10 +8,11 @@ function lifecycle() {
   const app = new EventEmitter()
   app.quit = vi.fn(() => app.emit('before-quit'))
   const stop = vi.fn(), unregisterAll = vi.fn()
+  const onlineVideo = { dispose: vi.fn(), manager: { cancelAll: vi.fn(async () => {}) } }
   const context = { app, mainWindow: {}, isQuitting: false, process: { platform: 'darwin' },
-    globalShortcut: { unregisterAll }, getPalcoManager: () => ({ stopAllMedia: stop }), console }
+    globalShortcut: { unregisterAll }, getPalcoManager: () => ({ stopAllMedia: stop }), onlineVideo, console }
   runInNewContext(main.slice(main.indexOf('app.on("before-quit"'), main.indexOf('app.on("window-all-closed"')), context)
-  return { app, context, stop, unregisterAll }
+  return { app, context, stop, unregisterAll, onlineVideo }
 }
 it('closing the main window quits on macOS even with auxiliary windows alive', () => {
   const { app, context, stop } = lifecycle()
@@ -26,11 +27,18 @@ it('closing the main window quits on macOS even with auxiliary windows alive', (
   expect(app.quit).toHaveBeenCalledOnce()
 })
 it('explicit quit stops receivers before windows close and releases shortcuts without require', () => {
-  const { app, stop, unregisterAll } = lifecycle()
+  const { app, stop, unregisterAll, onlineVideo } = lifecycle()
   app.emit('before-quit')
   expect(stop).toHaveBeenCalledOnce()
   app.emit('will-quit')
   expect(unregisterAll).toHaveBeenCalledOnce()
+  expect(onlineVideo.dispose).toHaveBeenCalledOnce()
+  expect(onlineVideo.manager.cancelAll).toHaveBeenCalledOnce()
+})
+it('quit before the YouTube copy service starts does not fail', () => {
+  const { app, context } = lifecycle()
+  context.onlineVideo = null
+  expect(() => app.emit('will-quit')).not.toThrow()
 })
 it('projection keyboard shields allow Cmd+Q while blocking normal input', () => {
   const projection = readFileSync(new URL('../ipc/web-projection.mjs', import.meta.url), 'utf8')

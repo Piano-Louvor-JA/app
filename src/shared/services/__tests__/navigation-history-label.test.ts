@@ -86,6 +86,7 @@ describe('chaves i18n do histórico', () => {
         'utilities-countdown',
         'utilities-obs',
         'utilities-random',
+        'utilities-sabbath-school',
         'utilities-temporizador',
         'utilities-timer',
       ].sort(),

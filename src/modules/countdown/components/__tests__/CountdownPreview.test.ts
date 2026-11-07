@@ -19,8 +19,10 @@ import type { CountdownDisplayConfig, CountdownRuntimeState } from '../types/cou
 
 const display = {
   formattedTime: ref('00:01:00'),
+  formattedTimeWithSign: ref('00:01:00'),
   isUrgent: ref(false),
   isFinished: ref(false),
+  isNegative: ref(false),
 }
 
 const config: CountdownDisplayConfig = {
@@ -55,6 +57,27 @@ describe('CountdownPreview', () => {
   it('renderiza tempo formatado', () => {
     const wrapper = createWrapper()
     expect(wrapper.find('.countdown-preview__digital').text()).toBe('00:01:00')
+  })
+
+  it.each([
+    [true, '-00:00:05'],
+    [false, '00:00:00'],
+  ])('passou do zero com "continuar após zerar" = %s: mostra %s em vermelho', (allowNegative, expected) => {
+    display.formattedTime.value = '00:00:00'
+    display.formattedTimeWithSign.value = '-00:00:05'
+    display.isNegative.value = true
+    display.isFinished.value = true
+    try {
+      const wrapper = createWrapper({ config: { ...config, allowNegative } })
+      expect(wrapper.find('.countdown-preview__digital').text()).toBe(expected)
+      expect(wrapper.classes()).toContain('countdown-preview--finished')
+      expect(wrapper.find('.countdown-preview__digital').attributes('style')).toContain('color: rgb(255, 59, 48)')
+    } finally {
+      display.formattedTime.value = '00:01:00'
+      display.formattedTimeWithSign.value = '00:01:00'
+      display.isNegative.value = false
+      display.isFinished.value = false
+    }
   })
 
   it('normal: sem classes urgent/finished', () => {

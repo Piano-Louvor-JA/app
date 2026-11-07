@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import type { MinimizedBarItem } from '@design-system/types/navigation'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it } from 'vitest'
 /**
  * MinimizedPagesBar — barra de páginas minimizadas acima do dock. Só
@@ -143,9 +143,222 @@ describe('MinimizedPagesBar', () => {
     expect(wrapper.find('.ds-minimized-bar__preview').exists()).toBe(false)
   })
 
+  it('página aberta agora: item em destaque (aria-current); sem página aberta na barra, nenhum', async () => {
+    wrapper = mount(MinimizedPagesBar, {
+      props: { items, navLabel: 'Páginas minimizadas', currentKey: '/albums/9' },
+      attachTo: document.body,
+    })
+    const buttons = wrapper.findAll('.ds-minimized-bar__item')
+    expect(buttons[1].classes()).toContain('ds-minimized-bar__item--current')
+    expect(buttons[1].attributes('aria-current')).toBe('page')
+    expect(buttons[0].classes()).not.toContain('ds-minimized-bar__item--current')
+    expect(buttons[0].attributes('aria-current')).toBeUndefined()
+    await wrapper.setProps({ currentKey: '/outra' })
+    expect(wrapper.findAll('.ds-minimized-bar__item--current')).toHaveLength(0)
+  })
+
   it('outras teclas no item não fecham', async () => {
     wrapper = mountBar()
     await wrapper.findAll('.ds-minimized-bar__item')[0].trigger('keydown', { key: 'a' })
     expect(wrapper.emitted('close')).toBeUndefined()
+  })
+})
+
+/** jsdom não tem DragEvent — monta Event e anexa dataTransfer/clientX. */
+function fireDrag(el: Element, type: 'dragstart' | 'dragover' | 'drop' | 'dragend', extra: Record<string, unknown> = {}) {
+  const event = new Event(type, { bubbles: true, cancelable: true })
+  Object.assign(event, extra)
+  el.dispatchEvent(event)
+  return event
+}
+
+function fakeTransfer() {
+  return { effectAllowed: '', dropEffect: '', data: {} as Record<string, string>, setData(type: string, value: string) { this.data[type] = value } }
+}
+
+describe('MinimizedPagesBar — reordenar', () => {
+  /** 4 itens de 100px lado a lado: centro de cada um em 50, 150, 250, 350. */
+  function mountRow() {
+    wrapper = mountBar(many(4))
+    slots().forEach((slot, i) => {
+      slot.element.getBoundingClientRect = () => ({ left: i * 100, width: 100, top: 500 }) as DOMRect
+    })
+  }
+
+  async function drag(from: number, to: number, clientX: number) {
+    const dataTransfer = fakeTransfer()
+    fireDrag(slots()[from].element, 'dragstart', { dataTransfer })
+    await wrapper!.vm.$nextTick()
+    const over = fireDrag(slots()[to].element, 'dragover', { dataTransfer, clientX })
+    await wrapper!.vm.$nextTick()
+    return { dataTransfer, over }
+  }
+
+  it('os itens podem ser arrastados', () => {
+    mountRow()
+    expect(slots().every((slot) => slot.attributes('draggable') === 'true')).toBe(true)
+  })
+
+  it('arrastar marca o item, esconde a prévia e mostra onde ele vai cair', async () => {
+    mountRow()
+    await slots()[0].trigger('mouseenter')
+    const { dataTransfer, over } = await drag(0, 2, 280)
+    expect(dataTransfer.effectAllowed).toBe('move')
+    expect(dataTransfer.data['text/plain']).toBe('/albums/0')
+    expect(over.defaultPrevented).toBe(true)
+    expect(dataTransfer.dropEffect).toBe('move')
+    expect(wrapper!.find('.ds-minimized-bar__preview').exists()).toBe(false)
+    expect(slots()[0].classes()).toContain('ds-minimized-bar__slot--dragging')
+    expect(slots()[2].classes()).toContain('ds-minimized-bar__slot--drop-after')
+    fireDrag(slots()[2].element, 'dragover', { dataTransfer, clientX: 210 })
+    await wrapper!.vm.$nextTick()
+    expect(slots()[2].classes()).toContain('ds-minimized-bar__slot--drop-before')
+    expect(slots()[2].classes()).not.toContain('ds-minimized-bar__slot--drop-after')
+  })
+
+  it('soltar depois de um item mais à frente leva para lá', async () => {
+    mountRow()
+    await drag(0, 2, 280)
+    fireDrag(slots()[2].element, 'drop')
+    await wrapper!.vm.$nextTick()
+    expect(wrapper!.emitted('reorder')).toEqual([['/albums/0', 2]])
+    expect(wrapper!.findAll('.ds-minimized-bar__slot--dragging')).toHaveLength(0)
+    expect(wrapper!.findAll('.ds-minimized-bar__slot--drop-after')).toHaveLength(0)
+  })
+
+  it('soltar antes de um item mais atrás leva para lá', async () => {
+    mountRow()
+    await drag(3, 1, 120)
+    fireDrag(slots()[1].element, 'drop')
+    expect(wrapper!.emitted('reorder')).toEqual([['/albums/3', 1]])
+  })
+
+  it('soltar no mesmo lugar (ou sobre ele mesmo) não reordena', async () => {
+    mountRow()
+    await drag(1, 0, 80)
+    fireDrag(slots()[0].element, 'drop')
+    const { over } = await drag(2, 2, 250)
+    expect(slots()[2].classes()).not.toContain('ds-minimized-bar__slot--drop-before')
+    expect(slots()[2].classes()).not.toContain('ds-minimized-bar__slot--drop-after')
+    expect(over.defaultPrevented).toBe(true)
+    fireDrag(slots()[2].element, 'drop')
+    expect(wrapper!.emitted('reorder')).toBeUndefined()
+  })
+
+  it('soltar sem ter arrastado um item da barra (ex.: arquivo) não faz nada', () => {
+    mountRow()
+    const over = fireDrag(slots()[1].element, 'dragover', { clientX: 120 })
+    expect(over.defaultPrevented).toBe(false)
+    fireDrag(slots()[1].element, 'drop')
+    expect(wrapper!.emitted('reorder')).toBeUndefined()
+  })
+
+  it('arrasto sem dataTransfer (evento sintético) também reordena', async () => {
+    mountRow()
+    fireDrag(slots()[0].element, 'dragstart')
+    fireDrag(slots()[1].element, 'dragover', { clientX: 180 })
+    fireDrag(slots()[1].element, 'drop')
+    expect(wrapper!.emitted('reorder')).toEqual([['/albums/0', 1]])
+  })
+
+  it('cancelar o arrasto limpa as marcas', async () => {
+    mountRow()
+    await drag(0, 2, 280)
+    fireDrag(slots()[0].element, 'dragend')
+    await wrapper!.vm.$nextTick()
+    expect(wrapper!.findAll('.ds-minimized-bar__slot--dragging')).toHaveLength(0)
+    expect(wrapper!.findAll('.ds-minimized-bar__slot--drop-after')).toHaveLength(0)
+  })
+
+  it('teclado: Alt+setas move o item; nas pontas não faz nada', async () => {
+    mountRow()
+    const buttons = wrapper!.findAll('.ds-minimized-bar__item')
+    await buttons[1].trigger('keydown', { key: 'ArrowRight', altKey: true })
+    await buttons[1].trigger('keydown', { key: 'ArrowLeft', altKey: true })
+    await buttons[0].trigger('keydown', { key: 'ArrowLeft', altKey: true })
+    await buttons[3].trigger('keydown', { key: 'ArrowRight', altKey: true })
+    await buttons[1].trigger('keydown', { key: 'ArrowRight' })
+    expect(wrapper!.emitted('reorder')).toEqual([
+      ['/albums/1', 2],
+      ['/albums/1', 0],
+    ])
+  })
+})
+
+function many(count: number): MinimizedBarItem[] {
+  return Array.from({ length: count }, (_, i) => ({ ...items[1], key: `/albums/${i}`, title: `CD ${i}` }))
+}
+
+function setBox(el: Element, box: Partial<Record<'scrollWidth' | 'clientWidth', number>>) {
+  for (const [key, value] of Object.entries(box)) Object.defineProperty(el, key, { configurable: true, value })
+  if (!Object.prototype.hasOwnProperty.call(el, 'scrollLeft')) {
+    Object.defineProperty(el, 'scrollLeft', { configurable: true, writable: true, value: 0 })
+  }
+}
+
+const list = () => wrapper!.get('.ds-minimized-bar__list').element as HTMLElement
+
+describe('MinimizedPagesBar — muitos itens', () => {
+  it('a prévia fica acima do item, presa à janela (não é cortada pela rolagem)', async () => {
+    wrapper = mountBar()
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1000 })
+    const slot = slots()[0]
+    slot.element.getBoundingClientRect = () => ({ left: 400, width: 100, top: 500 }) as DOMRect
+    await slot.trigger('mouseenter')
+    const style = wrapper.get('.ds-minimized-bar__preview').attributes('style')
+    expect(style).toContain('left: 450px')
+    expect(style).toContain('top: 490px')
+  })
+
+  it('a prévia não sai pelas bordas da janela', async () => {
+    wrapper = mountBar()
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1000 })
+    slots()[0].element.getBoundingClientRect = () => ({ left: 0, width: 40, top: 500 }) as DOMRect
+    await slots()[0].trigger('mouseenter')
+    expect(wrapper.get('.ds-minimized-bar__preview').attributes('style')).toContain('left: 128px')
+    await slots()[0].trigger('mouseleave')
+    slots()[1].element.getBoundingClientRect = () => ({ left: 980, width: 40, top: 500 }) as DOMRect
+    await slots()[1].trigger('mouseenter')
+    expect(wrapper.get('.ds-minimized-bar__preview').attributes('style')).toContain('left: 872px')
+  })
+
+  it('rodinha do mouse rola para os lados quando não cabe; cabendo, não mexe', async () => {
+    wrapper = mountBar(many(20))
+    setBox(list(), { scrollWidth: 2000, clientWidth: 800 })
+    list().scrollLeft = 0
+    const event = new WheelEvent('wheel', { deltaY: 120, cancelable: true })
+    list().dispatchEvent(event)
+    expect(list().scrollLeft).toBe(120)
+    expect(event.defaultPrevented).toBe(true)
+
+    const sideways = new WheelEvent('wheel', { deltaX: 30, deltaY: 5, cancelable: true })
+    list().dispatchEvent(sideways)
+    expect(list().scrollLeft).toBe(120)
+    expect(sideways.defaultPrevented).toBe(false)
+
+    setBox(list(), { scrollWidth: 800, clientWidth: 800 })
+    const fits = new WheelEvent('wheel', { deltaY: 120, cancelable: true })
+    list().dispatchEvent(fits)
+    expect(fits.defaultPrevented).toBe(false)
+  })
+
+  it('rolar a barra esconde a prévia aberta', async () => {
+    wrapper = mountBar(many(3))
+    await slots()[0].trigger('mouseenter')
+    await wrapper.get('.ds-minimized-bar__list').trigger('scroll')
+    expect(wrapper.find('.ds-minimized-bar__preview').exists()).toBe(false)
+  })
+
+  it('página nova minimizada: a barra rola até o fim para mostrá-la', async () => {
+    wrapper = mountBar(many(3))
+    setBox(list(), { scrollWidth: 2000, clientWidth: 800 })
+    list().scrollLeft = 0
+    await wrapper.setProps({ items: many(4) })
+    await flushPromises()
+    expect(list().scrollLeft).toBe(2000)
+    list().scrollLeft = 10
+    await wrapper.setProps({ items: many(2) })
+    await flushPromises()
+    expect(list().scrollLeft).toBe(10)
   })
 })

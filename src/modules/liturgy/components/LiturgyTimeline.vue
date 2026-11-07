@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import type { LiturgyItem } from '../types/liturgy'
+import type { OnlineVideoItemStatus } from '@/shared/types/desktop-bridge'
 import { getCategoryBlockEnd } from '../services/liturgy-item-helpers'
 import LiturgyTimelineItem from './LiturgyTimelineItem.vue'
 
@@ -24,6 +25,8 @@ const props = defineProps<{
     | { entryName: string; kindLabel: string; kind?: string; filePath?: string }
     | { empty: string }
   >
+  /** Item → cópia baixada do vídeo do YouTube. */
+  offlineStatusByItemId?: Record<string, OnlineVideoItemStatus>
 }>()
 
 const emit = defineEmits<{
@@ -290,6 +293,7 @@ function isCategorySectionInProgress(categoryId: string): boolean {
           :has-instrumental="musicHasInstrumental(segment.entry.item)"
           :music-busy="isMusicBusy(segment.entry.item)"
           :resolved-schedule="scheduledResolvedByItemId?.[segment.entry.item.id] ?? null"
+          :offline-status="offlineStatusByItemId?.[segment.entry.item.id] ?? null"
           @select="emit('select', segment.entry.index)"
           @video-file-selected="
             emit('videoFileSelected', segment.entry.item.id, $event)
@@ -329,6 +333,7 @@ function isCategorySectionInProgress(categoryId: string): boolean {
             :start-label="startLabels[child.index] ?? '—'"
             :duration-label="durationLabels[child.index] ?? '—'"
             :resolved-schedule="scheduledResolvedByItemId?.[child.item.id] ?? null"
+            :offline-status="offlineStatusByItemId?.[child.item.id] ?? null"
             linked
             :reorder-active="dragFrom != null"
             :is-drag-source="isDragBlockIndex(child.index)"

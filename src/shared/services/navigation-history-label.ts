@@ -27,6 +27,7 @@ export const HISTORY_DETAIL_KEYS: Readonly<Record<string, string>> = {
   'settings-remote': 'settings.tabs.remote',
   'utilities-clock': 'utilities.clock',
   'utilities-countdown': 'utilities.countdown',
+  'utilities-sabbath-school': 'utilities.sabbathSchool',
   'settings-transmission': 'settings.tabs.transmission',
   'utilities-obs': 'utilities.obs',
   'utilities-random': 'utilities.random',

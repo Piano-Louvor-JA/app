@@ -25,7 +25,7 @@ it('closing the local player stops the media, releases the file, and closes its 
   const video = { pause: vi.fn(), removeAttribute: vi.fn(), load: vi.fn() }
   const audioCtx = { state: 'running', close: vi.fn(async () => {}) }
   const cancelAnimationFrame = vi.fn()
-  const context = { video, audioCtx, cancelAnimationFrame, raf: 42 }
+  const context = { video, audioTrack: null, audioCtx, cancelAnimationFrame, raf: 42 }
   runInNewContext(html.slice(html.indexOf('function disposeMedia()'), html.indexOf("window.addEventListener('pagehide'")), context)
   context.disposeMedia()
   expect(video.pause).toHaveBeenCalledOnce()
@@ -33,4 +33,14 @@ it('closing the local player stops the media, releases the file, and closes its 
   expect(video.load).toHaveBeenCalledOnce()
   expect(audioCtx.close).toHaveBeenCalledOnce()
   expect(cancelAnimationFrame).toHaveBeenCalledWith(42)
+})
+it('closing the local player also releases the separate audio track of a downloading YouTube copy', () => {
+  const html = readFileSync(new URL('../player/local-video-player.html', import.meta.url), 'utf8')
+  const media = () => ({ pause: vi.fn(), removeAttribute: vi.fn(), load: vi.fn() })
+  const context = { video: media(), audioTrack: media(), audioCtx: null, cancelAnimationFrame: vi.fn(), raf: 0 }
+  runInNewContext(html.slice(html.indexOf('function disposeMedia()'), html.indexOf("window.addEventListener('pagehide'")), context)
+  context.disposeMedia()
+  expect(context.audioTrack.pause).toHaveBeenCalledOnce()
+  expect(context.audioTrack.removeAttribute).toHaveBeenCalledWith('src')
+  expect(context.audioTrack.load).toHaveBeenCalledOnce()
 })
