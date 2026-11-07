@@ -64,6 +64,16 @@ type TimelineSegment =
   | { kind: 'item'; entry: TimelineEntry; linked: boolean; childCount: number }
   | { kind: 'branch'; categoryId: string; children: TimelineEntry[] }
 
+/** SPEC t_50c9ac95: filhos por categoria p/ estimativa na timeline. */
+const childItemsByCategory = computed<Record<string, LiturgyItem[]>>(() => {
+  const map: Record<string, LiturgyItem[]> = {}
+  for (const item of props.items) {
+    if (item.type === 'category' || !item.categoryId) continue
+    ;(map[item.categoryId] ??= []).push(item)
+  }
+  return map
+})
+
 const segments = computed((): TimelineSegment[] => {
   const result: TimelineSegment[] = []
   let index = 0
@@ -260,6 +270,11 @@ function isCategorySectionInProgress(categoryId: string): boolean {
           :start-label="startLabels[segment.entry.index] ?? '—'"
           :duration-label="durationLabels[segment.entry.index] ?? '—'"
           :linked="segment.linked"
+          :category-children="
+            segment.entry.item.type === 'category' && segment.childCount > 0
+              ? childItemsByCategory[segment.entry.item.id] ?? []
+              : []
+          "
           :indeterminate="
             segment.entry.item.type === 'category'
               ? isCategoryIndeterminate(segment.entry.item.id)

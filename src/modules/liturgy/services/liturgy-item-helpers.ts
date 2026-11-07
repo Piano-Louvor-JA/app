@@ -576,3 +576,43 @@ export function formatEstimatedDuration(
     : `${minutes}min`
   return estimated ? `~${label} (estimado)` : label
 }
+
+/* ---------- Integração UI (SPEC t_50c9ac95 B2/B4 na tela) ---------- */
+
+/**
+ * Rótulo de duração da categoria na timeline (B2): end real → exato
+ * (HH:MM - HH:MM); sem end + filhos com duração → "~HH:MM (estimado)";
+ * sem dados → só o start (B3). Retorno pronto pro categoryTimeRange.
+ */
+export function categoryTimeRangeWithEstimate(
+  category: Pick<LiturgyItem, 'startTime' | 'endTime'>,
+  children: LiturgyItem[],
+): string {
+  const start = normalizeLiturgyTimeHHmm(category.startTime ?? null)
+  const end = normalizeLiturgyTimeHHmm(category.endTime ?? null)
+  if (start && end) return `${start} - ${end}`
+  if (!start) return end ? end : '—'
+  const ms = estimateCategoryDurationMs(category as LiturgyItem, children)
+  if (ms == null) return start
+  return `${start} - ${formatEstimatedDuration(
+    ms,
+    true,
+  ).replace(/ \(estimado\)/, ' (estimado)')}`
+}
+
+/**
+ * Fim estimado da sessão para o resumo (B4): maior entre end real e
+ * estimado das categorias; sem nenhum → null (UI mostra '—').
+ */
+export function estimatedSessionEnd(
+  items: LiturgyItem[],
+  childrenByCategory: (id: string) => LiturgyItem[],
+): string | null {
+  let latest = ''
+  for (const cat of items) {
+    if (cat.type !== 'category') continue
+    const end = resolveCategoryEndTime(cat, childrenByCategory(cat.id))
+    if (end && end > latest) latest = end
+  }
+  return latest || null
+}

@@ -10,6 +10,10 @@ import type { LiturgyItemDraft } from "../types/liturgy";
 import {
   computeSessionTimes,
 } from "../services/liturgy-duration-enrich";
+import {
+  categoryTimeRangeWithEstimate,
+  estimatedSessionEnd,
+} from "../services/liturgy-item-helpers";
 
 const baseDraft = (): LiturgyItemDraft => ({
   type: "category",
@@ -119,5 +123,49 @@ describe("SPEC t_50c9ac95 — C: relógio no cronômetro ES", () => {
     // o relógio ao vivo deve renderizar now (não criar segundo setInterval)
     expect(src).toMatch(/now\b/);
     expect((src.match(/setInterval/g) ?? []).length).toBeLessThanOrEqual(1);
+  });
+});
+
+describe("SPEC t_50c9ac95 — integração UI (QA gap)", () => {
+  const catItem = (over: Record<string, unknown>) =>
+    ({
+      id: "c1",
+      type: "category",
+      name: "ES",
+      startTime: "09:00",
+      endTime: null,
+      durationMs: 0,
+      ...over,
+    }) as unknown as import("../types/liturgy").LiturgyItem;
+
+  it("categoryTimeRangeWithEstimate: end real → intervalo exato", () => {
+    expect(categoryTimeRangeWithEstimate({ startTime: "09:00", endTime: "10:15" }, [])).toBe("09:00 - 10:15");
+  });
+
+  it("categoryTimeRangeWithEstimate: sem end + filhos → estimado marcado com duração", () => {
+    const out = categoryTimeRangeWithEstimate({ startTime: "09:00", endTime: null }, [
+      { durationMs: 45 * 60_000 },
+    ] as unknown as import("../types/liturgy").LiturgyItem[]);
+    expect(out).toMatch(/estimado/);
+    expect(out).toContain("~45min");
+  });
+
+  it("categoryTimeRangeWithEstimate: sem end, filhos sem duração → só start (B3)", () => {
+    expect(categoryTimeRangeWithEstimate({ startTime: "09:00", endTime: null }, [])).toBe("09:00");
+  });
+
+  it("estimatedSessionEnd: maior entre real e estimado (B4/B5)", () => {
+    const es = catItem({ id: "es", startTime: "09:00", endTime: null });
+    const culto = catItem({ id: "culto", name: "Culto", startTime: "09:30", endTime: "10:15" });
+    const end = estimatedSessionEnd([es, culto], (id) =>
+      id === "es" ? ([{ durationMs: 45 * 60_000 }] as unknown as import("../types/liturgy").LiturgyItem[]) : [],
+    );
+    expect(end).toBe("10:15");
+  });
+
+  it("estimatedSessionEnd: só estimada → usa estimado; nada → null", () => {
+    const es = catItem({ id: "es", startTime: "09:00", endTime: null });
+    expect(estimatedSessionEnd([es], () => [{ durationMs: 30 * 60_000 }] as unknown as import("../types/liturgy").LiturgyItem[])).toBe("09:30");
+    expect(estimatedSessionEnd([es], () => [])).toBeNull();
   });
 });

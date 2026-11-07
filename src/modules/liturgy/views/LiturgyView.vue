@@ -102,6 +102,7 @@ const {
   worshipLabel,
   headerDateTime,
   currentClock,
+  estimatedSessionEndLabel,
   remainingCountdownLabel,
   startTimeInput,
   endTimeInput,
@@ -216,6 +217,7 @@ async function onSljaImported(): Promise<void> {
       <LiturgySidebar
         :remaining-countdown="remainingCountdownLabel"
         :current-clock="currentClock"
+        :estimated-session-end-label="estimatedSessionEndLabel"
         :countdown-expired="countdownExpired"
         :countdown-running="countdownRunning"
         :can-start-countdown="canStartCountdown"
