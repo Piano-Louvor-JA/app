@@ -2,7 +2,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { statSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { app, BrowserWindow, dialog, globalShortcut, ipcMain, screen, shell } from "electron";
+import { app, BrowserWindow, dialog, globalShortcut, ipcMain, net, screen, shell } from "electron";
 
 import {
 	APP_DESKTOP_ID,
@@ -16,14 +16,17 @@ import { configureUserDataPath } from "./user-data-path.mjs";
 import { checkEulaAcceptance } from "./eula.mjs";
 import { resolveAppLocale } from "./locale.mjs";
 import { registerWorkspaceIpc } from "./ipc/register.mjs";
+import { registerDownloadBatchIpc } from "./ipc/download-batch-ipc.mjs";
 import { registerDiagnosticsIpc, setClockSkewProvider, setDiagnosticsToken } from "./diagnostics.mjs";
 import { createMainLogger } from "./main-log.mjs";
 import { attachHistoryAppCommand, attachWindowStateEvents, mainWindowChromeOptions, registerWindowIpc } from "./ipc/window.mjs";
 import { attachRemoteServer } from "./remote-server.mjs";
 import { attachPalcoServer, getPalcoManager } from "./palco-server.mjs";
 import { ensureWorkspaceDirectories } from "./paths.mjs";
-import { registerLocalFileProtocol, registerLocalScheme } from "./protocol.mjs";
-import { registerCloseProjectionPopups } from "./ipc/web-projection.mjs";
+import { registerLocalFileProtocol, registerLocalScheme, setOnlineVideoSource } from "./protocol.mjs";
+import { registerCloseProjectionPopups, setOnlineVideoPlayer } from "./ipc/web-projection.mjs";
+import { OnlineVideoService, registerOnlineVideoIpc } from "./online-video/ipc.mjs";
+import { readWorkspaceRecord, writeWorkspaceRecord } from "./workspace.mjs";
 import { buildProjectionWindowBounds } from "./projection-display.mjs";
 import { createIndependentProjectionRegistry, isIndependentProjectionUrl } from "./independent-projection.mjs";
 import { createSharedProjectionLayout, isSharedProjectionUrl } from "./shared-projection.mjs";
@@ -33,8 +36,9 @@ import { getBibleUpdater } from "./bible-updater.mjs";
 import { loadWindowState, trackWindowState } from "./window-state.mjs";
 import { registerYoutubeEmbedHeaders } from "./youtube-embed.mjs";
 import { registerYoutubeAuthIpc } from "./youtube-auth.mjs";
-import { registerAdblockerIpc } from "./youtube-adblock.mjs";
-import { readWorkspaceRecord, writeWorkspaceRecord } from "./workspace.mjs";
+import { registerYoutubeInfoIpc } from "./youtube-info.mjs";
+import { registerSiteInfoIpc } from "./site-info.mjs";
+import { enableAdblocker } from "./youtube-adblock.mjs";
 import { registerTunnelCorpBypass } from "./tunnel-corp-bypass.mjs";
 import {
   initProjectionHotkey,
@@ -661,6 +665,11 @@ function attachProjectionWindowHandlers(parentWindow) {
             parentWindow.webContents.send('projection:close-requested')
             return
           }
+          // Esc + Enter: o operador só encerra se o confirm estiver aberto.
+          if (input.key === 'Enter' && !independent) {
+            parentWindow.webContents.send('projection:confirm-close-requested')
+            return
+          }
           const childUrl = childWindow.webContents.getURL()
           const isMediaProjection =
             /[?&#]module=media(?:&|$)/.test(childUrl) ||
@@ -718,6 +727,34 @@ function attachProjectionWindowHandlers(parentWindow) {
       }, 50)
     })
   })
+}
+
+/** @type {OnlineVideoService | null} */
+let onlineVideo = null;
+
+/** Cópia local dos vídeos do YouTube: IPC, protocolo `local://yt-*` e projeção. */
+function startOnlineVideo(getLocale) {
+	onlineVideo = new OnlineVideoService({
+		userDataDir: app.getPath("userData"),
+		readRecord: readWorkspaceRecord,
+		writeRecord: writeWorkspaceRecord,
+		getLocale,
+		windowsStore: process.windowsStore === true,
+		broadcast: (channel, payload) => {
+			for (const win of BrowserWindow.getAllWindows()) {
+				if (!win.isDestroyed()) win.webContents.send(channel, payload);
+			}
+		},
+		log: (message) => mainLog.info(`online-video ${message}`),
+	});
+	const service = onlineVideo;
+	registerOnlineVideoIpc(ipcMain, service);
+	setOnlineVideoSource({
+		serve: (id, kind, range, signal) => service.serve(id, kind, range, signal),
+		cacheFile: (name) => path.join(service.cache.dir, name),
+	});
+	setOnlineVideoPlayer(service);
+	void service.init().catch((error) => mainLog.error(`online-video init ${error?.message ?? error}`));
 }
 
 function createWindow(locale = 'pt-BR') {
@@ -922,22 +959,21 @@ app.whenReady().then(async () => {
 		});
 		mainLog.info('diagnostics IPC handlers registered');
 		registerWindowIpc(() => mainWindow);
+		registerDownloadBatchIpc(() => mainWindow);
 		registerLocalFileProtocol();
+		startOnlineVideo(() => locale);
 		registerYoutubeEmbedHeaders();
 		registerYoutubeAuthIpc();
-		// adblock YouTube (opt-in): estado persistido em workspace record
-		registerAdblockerIpc(
-			(enabled) => writeWorkspaceRecord("yt-adblock.json", { enabled }),
-			() => {
-				const rec = readWorkspaceRecord("yt-adblock.json");
-				return rec?.enabled === true;
-			},
-		);
+		registerYoutubeInfoIpc(ipcMain, { fetch: (url, init) => net.fetch(url, init) });
+		registerSiteInfoIpc(ipcMain, { fetch: (url, init) => net.fetch(url, init) });
+		void enableAdblocker();
 		registerTunnelCorpBypass();
 		createWindow(locale);
 		bootMark("mainWindow");
 
-		attachRemoteServer(() => mainWindow?.webContents ?? null);
+		attachRemoteServer(() => mainWindow?.webContents ?? null, {
+			palcoHttpPort: () => getPalcoManager()?.getPrincipal()?.httpPort,
+		});
 		attachPalcoServer(() => mainWindow?.webContents ?? null);
 	} catch (error) {
 		console.error("[main] falha no startup", error);
@@ -991,6 +1027,8 @@ app.on("before-quit", () => {
 
 app.on("will-quit", () => {
   globalShortcut.unregisterAll();
+  onlineVideo?.dispose();
+  void onlineVideo?.manager.cancelAll().catch(() => {});
 });
 
 app.on("window-all-closed", () => {

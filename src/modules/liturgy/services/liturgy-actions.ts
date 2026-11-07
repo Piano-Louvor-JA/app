@@ -552,7 +552,7 @@ export async function playLiturgyItemOnScreens(
 
   let ok: boolean
   if (route === 'slot') {
-    // TV/Receivers via Palco (7080/7081)
+    // TV/Receivers via Palco (47080/47081)
     const { palcoSession } = await import('../../settings/services/palco-session')
     await palcoSession.turnOn()
     const { publishLiturgyWebRuntime } = await import('./liturgy-web-runtime')

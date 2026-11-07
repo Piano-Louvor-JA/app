@@ -1,25 +1,32 @@
 import { ref } from 'vue'
 
-const OBS_BLACK_IDLE_KEY = 'louvorja-obs-black-idle-v1'
-export const obsBlackIdle = ref(localStorage.getItem(OBS_BLACK_IDLE_KEY) === 'true')
-export function setObsBlackIdle(enabled: boolean) {
-  obsBlackIdle.value = enabled
-  localStorage.setItem(OBS_BLACK_IDLE_KEY, String(enabled))
-  notifyObsChanged()
-}
-
-export type ObsConnection = { id: string; label: string; selected: boolean; nickname?: string }
+/** Conexões adicionais servem a outros dispositivos: espelho da TV ou retorno de palco. */
+export type ObsKind = 'mirror' | 'return'
+export type ObsConnection = { id: string; label: string; selected: boolean; nickname?: string; kind?: ObsKind }
 export type ObsModule = 'bible' | 'clock' | 'timer' | 'countdown' | 'random'
 export const OBS_CONNECTIONS_KEY = 'louvorja-obs-connections-v1'
+/** O servidor principal (slot 0) já tem nome próprio na tela e não recebe apelido. */
+const MAIN_ID = '0'
+let droppedMainNickname = false
 function read(): ObsConnection[] {
   try {
     const value: unknown = JSON.parse(localStorage.getItem(OBS_CONNECTIONS_KEY) ?? '[]')
     if (!Array.isArray(value)) return []
     return value.filter((item) => item && typeof item.id === 'string' && typeof item.label === 'string')
-      .map((item) => ({ id: item.id, label: item.label, selected: item.selected !== false, ...(typeof item.nickname === 'string' && item.nickname.trim() ? { nickname: item.nickname.trim().slice(0, 60) } : {}) }))
+      .map((item) => {
+        const nickname = typeof item.nickname === 'string' ? item.nickname.trim().slice(0, 60) : ''
+        if (nickname && item.id === MAIN_ID) droppedMainNickname = true
+        const kind = item.id !== MAIN_ID && (item.kind === 'mirror' || item.kind === 'return') ? item.kind as ObsKind : undefined
+        return {
+          id: item.id, label: item.label, selected: item.selected !== false,
+          ...(nickname && item.id !== MAIN_ID ? { nickname } : {}),
+          ...(kind ? { kind } : {}),
+        }
+      })
   } catch { return [] }
 }
 export const obsConnections = ref<ObsConnection[]>(read())
+if (droppedMainNickname) localStorage.setItem(OBS_CONNECTIONS_KEY, JSON.stringify(obsConnections.value))
 export const obsAssignmentModes = ref<Record<string, 'overlay' | 'share'>>({})
 export const obsAssignments = ref<Record<string, ObsModule>>({})
 export function notifyObsChanged() {
@@ -29,9 +36,18 @@ function save() {
   localStorage.setItem(OBS_CONNECTIONS_KEY, JSON.stringify(obsConnections.value))
   notifyObsChanged()
 }
-export function registerObsConnection(id: string, label: string) {
+export function registerObsConnection(id: string, label: string, details?: { nickname?: string; kind?: ObsKind }) {
   if (obsConnections.value.some((item) => item.id === id)) return
-  obsConnections.value = [...obsConnections.value, { id, label, selected: true }]
+  const nickname = details?.nickname?.trim().slice(0, 60)
+  obsConnections.value = [...obsConnections.value, {
+    id, label, selected: true,
+    ...(details ? { ...(nickname ? { nickname } : {}), kind: details.kind ?? 'mirror' } : {}),
+  }]
+  save()
+}
+export function setObsKind(id: string, kind: ObsKind) {
+  if (id === MAIN_ID) return
+  obsConnections.value = obsConnections.value.map((connection) => connection.id === id ? { ...connection, kind } : connection)
   save()
 }
 export function unregisterObsConnection(id: string) {
@@ -69,13 +85,16 @@ export function obsAllowsMirror(id: string, module?: string) {
   return connection.selected
 }
 
-export function obsConnectionName(connection: { label: string; nickname?: string }) {
-  return connection.nickname ? `${connection.label} — ${connection.nickname}` : connection.label
+export function obsConnectionName(connection: { id?: string; label: string; nickname?: string }) {
+  if (connection.id === MAIN_ID) return 'OBS'
+  return connection.nickname || connection.label
 }
+/** O nome é obrigatório: um nome vazio mantém o anterior. */
 export function setObsNickname(id: string, nickname: string) {
-  if (id === '0') registerObsConnection('0', 'OBS 1')
+  const name = nickname.trim().slice(0, 60)
+  if (id === MAIN_ID || !name) return
   obsConnections.value = obsConnections.value.map((connection) => connection.id === id
-    ? { ...connection, nickname: nickname.trim().slice(0, 60) }
+    ? { ...connection, nickname: name }
     : connection)
   save()
 }
@@ -88,8 +107,9 @@ export function migratePalcoConnections(slots: ReadonlyArray<{ id: string; label
     if (typeof slot.id !== 'string' || typeof slot.label !== 'string') continue
     if (next.some(connection => connection.id === slot.id)) continue
     const number = slot.id === '0' ? 1 : Math.max(1, ...next.map(item => Number(item.label.match(/\d+$/)?.[0]) || 1)) + 1
+    const internalLabel = /^OBS\s*\d+$/.test(slot.label) || slot.id === MAIN_ID
     next.push({ id: slot.id, label: `OBS ${number}`, selected: true,
-      ...(!/^OBS\s*\d+$/.test(slot.label) ? { nickname: slot.label.slice(0, 60) } : {}) })
+      ...(!internalLabel ? { nickname: slot.label.slice(0, 60) } : {}) })
     changed = true
   }
   if (changed) { obsConnections.value = next; save() }

@@ -49,6 +49,7 @@ import {
   todayWeekday,
 } from '../services/liturgy-preferences'
 import { clearLiturgyWebRuntime } from '../services/liturgy-web-runtime'
+import { toggleAnnotationProjection, useAnnotationProjection } from '../services/annotation-projection'
 import { parseJaLiturgy } from '../services/liturgy-ja-import'
 import { enrichItemsDurations } from '../services/liturgy-duration-enrich'
 import {
@@ -1010,6 +1011,14 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     }
     if (sessionStartedAt.value == null) {
       sessionStartedAt.value = Date.now()
+    }
+
+    if (item.type === 'annotation') {
+      const wasProjecting = useAnnotationProjection().projectingItemId.value === item.id
+      const projecting = await toggleAnnotationProjection(item)
+      lastActionMessageKey.value =
+        !wasProjecting && !projecting ? 'liturgy.messages.projectionFailed' : null
+      return
     }
 
     if (item.type === 'site') {

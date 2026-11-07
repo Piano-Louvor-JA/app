@@ -19,7 +19,7 @@ import {
 import { isIndependentProjectionLocation } from '@shared/services/projection-window-location'
 import { readEffectiveStageSettings, subscribeStageSettings } from '../../settings/services/stage-settings-runtime'
 import type { StageSettings } from '../../settings/types/stage-settings'
-import { resolveBackgroundImage, stageFlexAlign } from '../../settings/types/stage-settings'
+import { bibleTransitionMs, resolveBackgroundImage, stageFlexAlign } from '../../settings/types/stage-settings'
 
 const props = withDefaults(
   defineProps<{
@@ -93,7 +93,10 @@ const stageStyle = computed(() => ({
     : undefined,
   backgroundSize: 'cover',
   backgroundPosition: 'center',
+  '--bible-transition-ms': `${bibleTransitionMs(stage.value.bibleTransitionSpeed)}ms`,
 }))
+
+const transitionName = computed(() => `bible-${stage.value.bibleTransition ?? 'fade'}`)
 
 const stageAlign = computed(() => stageFlexAlign(stage.value, 'row'))
 
@@ -152,10 +155,16 @@ const verseBoxStyle = computed(() => {
   }
 })
 
-const referenceStyle = computed(() => ({
-  color: stage.value.footerRefColor ?? undefined,
-  fontWeight: String(stage.value.footerRefWeight),
-}))
+const referenceCorner = computed(() => stage.value.bibleRefPosition === 'corner')
+
+const referenceStyle = computed(() => {
+  const position = stage.value.bibleRefPosition ?? 'below-right'
+  return {
+    color: stage.value.footerRefColor ?? undefined,
+    fontWeight: String(stage.value.footerRefWeight),
+    ...(referenceCorner.value ? {} : { textAlign: position.replace('below-', '') as 'left' | 'center' | 'right' }),
+  }
+})
 </script>
 
 <template>
@@ -169,7 +178,7 @@ const referenceStyle = computed(() => ({
       :style="stageAlign"
     >
       <Transition
-        name="bible-fade"
+        :name="transitionName"
         mode="out-in"
       >
         <div
@@ -185,7 +194,7 @@ const referenceStyle = computed(() => ({
             {{ runtime.text }}
           </p>
           <p
-            v-if="displayReference"
+            v-if="displayReference && !referenceCorner"
             class="bible-projection__reference"
             :style="referenceStyle"
           >
@@ -197,6 +206,20 @@ const referenceStyle = computed(() => ({
           key="empty"
           class="bible-projection__empty"
         />
+      </Transition>
+      <!-- Fora do conteúdo: o transform da transição moveria o canto junto. -->
+      <Transition
+        :name="transitionName"
+        mode="out-in"
+      >
+        <p
+          v-if="showContent && displayReference && referenceCorner"
+          :key="contentKey"
+          class="bible-projection__reference bible-projection__reference--corner"
+          :style="referenceStyle"
+        >
+          {{ displayReference }}
+        </p>
       </Transition>
     </div>
   </ProjectionBackground>
@@ -217,6 +240,7 @@ const referenceStyle = computed(() => ({
 }
 
 .bible-projection__stage {
+  position: relative;
   box-sizing: border-box;
   display: flex;
   align-items: center;
@@ -255,24 +279,60 @@ const referenceStyle = computed(() => ({
   text-transform: uppercase;
 }
 
+.bible-projection__reference--corner {
+  position: absolute;
+  right: clamp(1rem, 3vmin, 2.5rem);
+  bottom: clamp(0.75rem, 2.5vmin, 1.75rem);
+}
+
 .bible-projection__empty {
   width: 100%;
   height: 100%;
 }
 
+/* bible-none não tem regra: o Vue troca o versículo sem animar. */
 .bible-fade-enter-active,
-.bible-fade-leave-active {
+.bible-fade-leave-active,
+.bible-slide-enter-active,
+.bible-slide-leave-active,
+.bible-zoom-enter-active,
+.bible-zoom-leave-active {
   transition:
-    opacity 0.18s ease,
-    transform 0.18s ease;
+    opacity var(--bible-transition-ms, 250ms) ease,
+    transform var(--bible-transition-ms, 250ms) ease;
 }
 
-.bible-fade-enter-from {
-  opacity: 0;
-  transform: translateY(8px);
-}
-
+.bible-fade-enter-from,
 .bible-fade-leave-to {
   opacity: 0;
+}
+
+.bible-slide-enter-from {
+  opacity: 0;
+  transform: translateY(4vh);
+}
+
+.bible-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-2vh);
+}
+
+.bible-zoom-enter-from {
+  opacity: 0;
+  transform: scale(0.94);
+}
+
+.bible-zoom-leave-to {
+  opacity: 0;
+  transform: scale(1.03);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bible-slide-enter-from,
+  .bible-slide-leave-to,
+  .bible-zoom-enter-from,
+  .bible-zoom-leave-to {
+    transform: none;
+  }
 }
 </style>

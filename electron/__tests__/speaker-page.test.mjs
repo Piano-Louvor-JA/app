@@ -74,6 +74,12 @@ describe('speakerPageHtml — design tokens (RF-tokens)', () => {
     expect(html).not.toContain('background:#333')
   })
 
+  it('sem palcoPort no link, usa o WS ao lado da porta da própria página (nada fixo em 7080/7081)', () => {
+    expect(html).toContain('String((Number(location.port)||47080)+1)')
+    expect(html).toContain('http://192.168.x.x:47080/speaker')
+    expect(html).not.toMatch(/\b708[01]\b/)
+  })
+
   it('runtime troca idioma via ?lang= (pickLang no script)', () => {
     expect(html).toContain('pickLang')
     expect(html).toContain("q.get('lang')")

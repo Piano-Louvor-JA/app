@@ -71,7 +71,7 @@ export function useMinimizablePage<S>(options: MinimizablePageOptions<S>) {
 
     // efeito já no clique, rumo a onde o item vai aparecer; o item só entra na
     // barra depois — o recálculo de layout acontece com a página já sumida
-    const target = predictMinimizedTarget()
+    const target = predictMinimizedTarget(fullPath)
     const windowEl = options.animateEl?.()
     if (windowEl) {
       // janela: elemento pequeno, anima ele mesmo

@@ -204,18 +204,4 @@ describe('useCountdownFeature', () => {
     await f.clearProjection()
     wrapper.unmount()
   })
-
-  it('until mode: setCountdownMode e setUntilTime', () => {
-    const store = useCountdownStore()
-    const wrapper = mountWith(() => useCountdownFeature())
-    const f = (wrapper.vm as unknown as { exposed: Exposed }).exposed
-
-    f.setCountdownMode('until')
-    expect(store.runtime.mode).toBe('until')
-    expect(f.isUntilMode.value).toBe(true)
-    f.setUntilTime(23, 59)
-    expect(store.runtime.untilHour).toBe(23)
-    expect(store.runtime.untilMinute).toBe(59)
-    wrapper.unmount()
-  })
 })

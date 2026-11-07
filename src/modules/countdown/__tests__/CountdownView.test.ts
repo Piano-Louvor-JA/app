@@ -149,27 +149,20 @@ describe('CountdownView', () => {
     wrapper.unmount()
   })
 
-  it('modo sabatina: áudio do operador tem só mudo e volume', async () => {
-    stagePayload.countdown = { ...(stagePayload.countdown as object), mode: 'sabbath' }
+  it('Timer limpo: sem modo Escola Sabatina, agenda ou controles de áudio', async () => {
     const wrapper = await mountView()
-    const controls = wrapper.find('[data-testid="operator-audio-controls"]')
-    expect(controls.exists()).toBe(true)
-    expect(controls.findAll('button')).toHaveLength(1)
-    expect(controls.find('.countdown-view__audio-volume').exists()).toBe(true)
-    expect(controls.find('input[role="switch"]').exists()).toBe(false)
+    expect(wrapper.find('input[role="switch"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="sabbath-schedule-toggle"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="operator-audio-controls"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="countdown-session-busy"]').exists()).toBe(false)
     wrapper.unmount()
   })
 
-  it('modo until via botões do DurationInput compacto', async () => {
+  it('Timer só regressivo: sem seletor Duração/Até nem campos de horário', async () => {
     const wrapper = await mountView()
-    const modes = wrapper.findAll('.countdown-duration__mode')
-    await modes[1].trigger('click')
-    await flushPromises()
-    const untilHour = wrapper.find('input[aria-label="countdown.untilHour"]')
-    expect(untilHour.exists()).toBe(true)
-    await untilHour.setValue('21')
-    const untilMinute = wrapper.find('input[aria-label="countdown.untilMinute"]')
-    await untilMinute.setValue('45')
+    expect(wrapper.find('.countdown-duration__mode').exists()).toBe(false)
+    expect(wrapper.find('input[aria-label="countdown.untilHour"]').exists()).toBe(false)
+    expect(wrapper.find('input[aria-label="countdown.hours"]').exists()).toBe(true)
     wrapper.unmount()
   })
 })

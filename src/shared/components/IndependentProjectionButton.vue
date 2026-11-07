@@ -11,20 +11,31 @@ import {
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-const props = defineProps<{
-  /** Id do módulo na popup de projeção (clock, timer, countdown, random, bible). */
-  moduleId: string
-  /** Prepara o estado do módulo antes de abrir (ex.: publicar o versículo). */
-  beforeProject?: () => boolean | Promise<boolean>
-}>()
+const props = withDefaults(
+  defineProps<{
+    /** Id do módulo na popup de projeção (clock, timer, countdown, random, bible, annotation). */
+    moduleId: string
+    /** Prepara o estado do módulo antes de abrir (ex.: publicar o versículo). */
+    beforeProject?: () => boolean | Promise<boolean>
+    /** Lista as saídas OBS (só módulos que a OBS sabe desenhar). */
+    obs?: boolean
+    /** Vários botões do mesmo módulo: só o dono do conteúdo no ar aparece ativo. */
+    claimed?: boolean
+    /** Botão menor, para linhas de lista. */
+    compact?: boolean
+  }>(),
+  { beforeProject: undefined, obs: true, claimed: true, compact: false },
+)
 
 const { t } = useI18n()
-const { monitors, available, activeMonitorId, activeMode, project, stop } =
+const { monitors, available, activeMonitorId: moduleMonitorId, activeMode, project, stop } =
   useIndependentProjectionControl(props.moduleId)
+const activeMonitorId = computed(() => (props.claimed ? moduleMonitorId.value : null))
 
 /** Sobrepor (tela inteira) ou compartilhar (metade, com o que já está no monitor). */
-const { activeConnections: obsOutputs } = useObsConnections()
-const obsActive = computed(() => obsOutputs.value.some((item) => obsAssignments.value[item.id] === props.moduleId))
+const { activeConnections: allObsOutputs } = useObsConnections()
+const obsOutputs = computed(() => (props.obs ? allObsOutputs.value : []))
+const obsActive = computed(() => props.claimed && obsOutputs.value.some((item) => obsAssignments.value[item.id] === props.moduleId))
 const outputAvailable = computed(() => available.value || obsOutputs.value.length > 0)
 async function onSelectObs(id: string) {
   if (busy.value) return
@@ -51,6 +62,7 @@ const panelStyle = ref<Record<string, string>>({})
 
 const active = computed(() => activeMonitorId.value != null || obsActive.value)
 const effectiveMode = computed(() => {
+  if (!props.claimed) return null
   const output = obsOutputs.value.find((item) => obsAssignments.value[item.id] === props.moduleId)
   return output ? obsAssignmentModes.value[output.id] ?? 'overlay' : activeMode.value
 })
@@ -59,7 +71,10 @@ const activeIndex = computed(
 )
 
 const tooltip = computed(() => {
-  if (!outputAvailable.value) return `${t('independentProjection.unavailable')} ${t('obsOutputs.activateHint')}`
+  if (!outputAvailable.value) {
+    const unavailable = t('independentProjection.unavailable')
+    return props.obs ? `${unavailable} ${t('obsOutputs.activateHint')}` : unavailable
+  }
   if (activeIndex.value != null) {
     const key = effectiveMode.value === 'share' ? 'sharedOn' : 'activeOn'
     return t(`independentProjection.${key}`, { index: activeIndex.value })
@@ -166,6 +181,7 @@ onBeforeUnmount(() => {
       type="button"
       class="independent-projection__trigger"
       :class="{
+        'independent-projection__trigger--compact': compact,
         'independent-projection__trigger--active': active,
         'independent-projection__trigger--disabled': !outputAvailable,
       }"
@@ -291,11 +307,11 @@ onBeforeUnmount(() => {
             </button>
           </li>
         </ul>
-        <div class="obs-outputs-separator" role="separator" />
+        <div v-if="obs" class="obs-outputs-separator" role="separator" />
         <p v-if="obsOutputs.length" class="obs-outputs-active" role="status">
           <i class="ti ti-broadcast" aria-hidden="true" /> {{ t('obsOutputs.active') }}
         </p>
-        <p v-if="!obsOutputs.length" class="obs-outputs-empty" role="status">{{ t('obsOutputs.activateHint') }}</p>
+        <p v-if="obs && !obsOutputs.length" class="obs-outputs-empty" role="status">{{ t('obsOutputs.activateHint') }}</p>
         <ul v-if="obsOutputs.length" class="independent-projection__list" role="radiogroup" :aria-label="t('obsOutputs.title')">
           <li v-for="connection in obsOutputs" :key="connection.id">
             <button type="button" class="independent-projection__option" role="radio" :disabled="busy"
@@ -305,7 +321,7 @@ onBeforeUnmount(() => {
               <i class="ti ti-broadcast" aria-hidden="true" />
               <span class="independent-projection__option-body">
                 <span class="independent-projection__option-name">{{ obsConnectionName(connection) }}</span>
-                <span class="independent-projection__option-meta">{{ t('obsOutputs.browserSource') }}</span>
+                <span class="independent-projection__option-meta">{{ t('obsOutputs.activeConnections', { count: connection.clients }) }}</span>
               </span>
             </button>
           </li>
@@ -375,6 +391,15 @@ onBeforeUnmount(() => {
   &:hover {
     transform: scale(1.06);
     background: color-mix(in srgb, var(--ds-color-primary) 28%, transparent);
+  }
+
+  &--compact {
+    width: 2.05rem;
+    height: 2.05rem;
+
+    .ti {
+      font-size: 1.1rem;
+    }
   }
 
   &--active {

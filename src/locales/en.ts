@@ -1,5 +1,5 @@
 export default {
-  obsOutputs: { detecting: 'Detecting and refreshing OBS connections…', active: 'Active OBS connections', activateHint: 'Start a connection in Settings → Broadcast to use it here.', title: 'OBS connections', browserSource: 'OBS Browser Source' },
+  obsOutputs: { detecting: 'Detecting and refreshing OBS connections…', active: 'Remote connections', activateHint: 'Start a connection in Settings → Broadcast to use it here.', title: 'OBS connections', activeConnections: 'Active connections: {count}' },
   floating: { closeTitle: 'Close {title}?', closeMessage: 'Stop this feature and close its projection?' },
   updates: {
     downloadMacInstaller: 'Download macOS installer',
@@ -113,5 +113,10 @@ sljaMigration: {
     message: 'You imported .slja files while logged out. They can go to your account (a single copy, never duplicated) and be available on any device.',
     confirm: 'Upload to account',
     cancel: 'Keep on this device only',
+  },
+  download: {
+    indicatorTitle: 'Background downloads: {done}/{total} ({percent}%)',
+    indicatorCounts: '{done} of {total} completed',
+    indicatorIdle: 'Preparing download…',
   },
 }

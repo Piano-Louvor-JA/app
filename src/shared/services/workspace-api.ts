@@ -61,3 +61,62 @@ export function resolveDatabaseUrl(relativePath: string): string {
   const path = relativePath.startsWith('/') ? relativePath : `/${relativePath}`
   return `${normalizedBase}${path}`
 }
+
+/**
+ * SPEC piano-bundle-sync v1.2.0 ADR-11: quem publica `/db/*` (manifest +
+ * ZIPs) é o UPSTREAM, não a nossa API. Origem própria `VITE_URL_BUNDLES`,
+ * nunca derivada de `VITE_URL_DATABASE`. Default público documentado
+ * (https://api.louvorja.com.br); env ausente/vazia => default.
+ */
+const DEFAULT_BUNDLES_BASE = 'https://api.louvorja.com.br'
+
+export function defaultBundlesBase(): string {
+  return DEFAULT_BUNDLES_BASE
+}
+
+export function resolveBundlesUrl(relativePath: string): string {
+  const raw = import.meta.env.VITE_URL_BUNDLES
+  const base = typeof raw === 'string' && raw.trim() !== '' ? raw : DEFAULT_BUNDLES_BASE
+  const normalizedBase = base.endsWith('/') ? base.slice(0, -1) : base
+  const path = relativePath.startsWith('/') ? relativePath : `/${relativePath}`
+  return `${normalizedBase}${path}`
+}
+
+/**
+ * SPEC piano-bundle-sync v1.2.0 ADR-09: estado de sync por artifact
+ * (`catalog` | `bible`), persistido no workspace via bridge.
+ * schema 2 = contrato entry-wise real (manifest array; digest condicional).
+ */
+export type BundleSyncArtifact = 'catalog' | 'bible'
+
+export type BundleSyncState = {
+  manifestDigest: string
+  checkedAtEpochMs: number
+  appliedAtEpochMs: number
+  schema: 2
+}
+
+const BUNDLE_STATE_KEY = 'bundleSync.state.v2'
+
+type BundleStateFile = Partial<Record<BundleSyncArtifact, BundleSyncState>>
+
+export async function readBundleSyncState(
+  artifact: BundleSyncArtifact,
+): Promise<BundleSyncState | null> {
+  const file = await readCatalogRecord<BundleStateFile>(BUNDLE_STATE_KEY)
+  return file?.[artifact] ?? null
+}
+
+export async function writeBundleSyncState(
+  artifact: BundleSyncArtifact,
+  state: BundleSyncState | null,
+): Promise<void> {
+  const file =
+    (await readCatalogRecord<BundleStateFile>(BUNDLE_STATE_KEY)) ?? {}
+  if (state == null) {
+    delete file[artifact]
+  } else {
+    file[artifact] = state
+  }
+  await writeCatalogRecord(BUNDLE_STATE_KEY, file)
+}

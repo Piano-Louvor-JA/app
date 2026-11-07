@@ -17,6 +17,18 @@ export type WorkspaceApi = {
   clear: (options?: { preserveMedia?: boolean }) => Promise<boolean>
 }
 
+/** Download em background (fila no MAIN, T1/T2 — Provai e Vede). */
+export type DownloadBatchApi = {
+  enqueue: (items: Array<{ id: string, url: string, fileName: string }>) => Promise<{ ok: boolean }>
+  cancel: (id: string) => Promise<{ ok: boolean }>
+  retry: (id: string) => Promise<{ ok: boolean }>
+  pending: () => Promise<Array<{ id: string, fileName: string, status: string }>>
+  onProgress: (cb: (p: { done: number, total: number, current: { id: string, fileName: string, receivedBytes: number, totalBytes: number } | null }) => void) => () => void
+  onItemDone: (cb: (p: { id: string, fileName: string, filePath: string }) => void) => () => void
+  onItemFailed: (cb: (p: { id: string, fileName: string, reason: string }) => void) => () => void
+  onBatchDone: (cb: (p: { done: number, failed: number, total: number }) => void) => () => void
+}
+
 /** Bíblia offline: bundles `<versionId>.json.gz` (download > instalador). */
 export type BibleApi = {
   getChapter: (
@@ -77,9 +89,69 @@ export type YoutubeAuthApi = {
   logout: () => Promise<{ ok: boolean }>
 }
 
-export type YoutubeAdblockApi = {
-  status: () => Promise<{ enabled: boolean }>
-  set: (enabled: boolean) => Promise<{ ok: boolean }>
+export type OnlineVideoQuality = 480 | 720 | 1080
+
+export type OnlineVideoSettings = {
+  enabled: boolean
+  maxHeight: OnlineVideoQuality
+  limitGb: number
+}
+
+export type OnlineVideoToolsStatus = {
+  state: 'unavailable' | 'missing' | 'installing' | 'ready' | 'error'
+  tool?: 'ytdlp' | 'ffmpeg'
+  progress?: number
+  version?: string
+  error?: string
+}
+
+export type OnlineVideoStatus = {
+  hidden: boolean
+  available: boolean
+  settings: OnlineVideoSettings
+  tools: OnlineVideoToolsStatus
+  usage: { bytes: number; count: number; limitBytes: number }
+}
+
+export type OnlineVideoItemStatus = {
+  state: 'none' | 'queued' | 'resolving' | 'downloading' | 'muxing' | 'ready' | 'error'
+  progress?: number
+  code?: string
+  message?: string
+}
+
+export type OnlineVideoApi = {
+  status: () => Promise<OnlineVideoStatus>
+  setSettings: (partial: Partial<OnlineVideoSettings>) => Promise<OnlineVideoStatus>
+  prefetch: (ids: string[]) => Promise<void>
+  cancel: (id: string) => Promise<void>
+  keep: (ids: string[]) => Promise<void>
+  clear: () => Promise<OnlineVideoStatus>
+  videoStatus: (ids: string[]) => Promise<Record<string, OnlineVideoItemStatus>>
+  retryTools: () => Promise<OnlineVideoStatus>
+  onChanged: (callback: (payload: { id: string; status: OnlineVideoItemStatus }) => void) => () => void
+  onTools: (callback: (status: OnlineVideoToolsStatus) => void) => () => void
+}
+
+export type YoutubeVideoInfo = {
+  title: string
+  channel: string
+  description: string
+  durationMs: number
+}
+
+export type YoutubeInfoApi = {
+  get: (videoId: string) => Promise<YoutubeVideoInfo | null>
+}
+
+export type SitePageInfo = {
+  title: string
+  siteName: string
+  description: string
+}
+
+export type SiteInfoApi = {
+  get: (url: string) => Promise<SitePageInfo | null>
 }
 
 export type LegacyMediaCounts = {
@@ -383,6 +455,8 @@ export type ProjectionApi = {
   onPlaybackSync?: (callback: (payload: PlaybackSyncPayload) => void) => () => void
   /** ESC pressionado na janela de projeção → operador exibe confirm. */
   onCloseRequested?: (callback: () => void) => () => void
+  /** Enter pressionado na janela de projeção → confirma o encerramento pendente. */
+  onConfirmCloseRequested?: (callback: () => void) => () => void
   /** ←/→ na projeção de mídia → operador navega slides. */
   onMediaNavigate?: (callback: (direction: 'previous' | 'next') => void) => () => void
   remotePlay?: () => Promise<boolean>
@@ -476,6 +550,17 @@ export type RandomAudioApi = {
   }>
 }
 
+export type SabbathSchoolVideoApi = {
+  importVideo: () => Promise<{
+    ok: boolean
+    fileName?: string
+    relativePath?: string
+    originalName?: string
+    reason?: string
+  }>
+  clearVideo: () => Promise<{ ok: boolean; reason?: string }>
+}
+
 export type DiagnosticsApi = {
   run: () => Promise<{ report: unknown; jsonPath: string; txtPath: string }>
   send: (report: unknown) => Promise<{ ok: boolean; reason?: string }>
@@ -493,11 +578,14 @@ export type LouvorJaBridge = {
   window?: WindowApi
   zoom?: ZoomApi
   workspace: WorkspaceApi
+  downloadBatch?: DownloadBatchApi
   catalog: CatalogApi
   bible?: BibleApi
   classo?: ClassoApi
   ytAuth?: YoutubeAuthApi
-  ytAdblock?: YoutubeAdblockApi
+  onlineVideo?: OnlineVideoApi
+  ytInfo?: YoutubeInfoApi
+  siteInfo?: SiteInfoApi
   externalPlayer?: ExternalPlayerApi
   legacyMedia?: LegacyMediaApi
   mediaFolder?: MediaFolderApi
@@ -509,4 +597,5 @@ export type LouvorJaBridge = {
   projection: ProjectionApi
   remote?: RemoteApi
   random?: RandomAudioApi
+  sabbathSchool?: SabbathSchoolVideoApi
 }

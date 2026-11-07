@@ -50,8 +50,10 @@ describe('apiCandidateBases', () => {
       'https://api.louvorja.com.br/json_db',
       'https://api.louvorja.workers.dev/json_db',
     ])
+    // SPEC bundle-sync ADR-04: primária de files é o R2; hosts legados com
+    // /file continuam como fallback de mídia.
     expect(apiCandidateBases('files')).toEqual([
-      'https://api-stg.pianolouvorja.com.br/file',
+      'https://files.louvorja.com.br',
       'https://api.louvorja.com.br/file',
       'https://api.louvorja.workers.dev/file',
     ])

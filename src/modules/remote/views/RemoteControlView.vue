@@ -29,7 +29,7 @@ const { enabled, connected, senderUrl, setSenderUrl } = useRemoteControl()
       :model-value="senderUrl"
       :label="t('settings.remote.senderUrl')"
       :disabled="!enabled"
-      placeholder="ws://192.168.1.10:7081/palco"
+      placeholder="ws://192.168.1.10:47081/palco"
       hint="settings.remote.senderUrlHint"
       persistent-hint
       data-testid="remote-sender-url"

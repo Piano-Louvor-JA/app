@@ -183,8 +183,18 @@ export async function importSljaAsLiturgyMusic(
 	// client_uuid determinístico (re-import vira no-op na API).
 	const sljaHash = await sha256Hex(new Uint8Array(bytes));
 
+	const fileFallbackName = sljaDisplayName({}, innerName ?? fileName);
+	const localInput = {
+		name,
+		fileFallbackName,
+		archive,
+		slides,
+		durationMs,
+		sljaHash,
+	};
+
 	if (!getAuthSession()) {
-		return importSljaLocal({ name, archive, slides, durationMs, sljaHash });
+		return importSljaLocal(localInput);
 	}
 
 	// Gate de aprovação (regra do Rafael): logado SEM confirmUpload=true =
@@ -193,7 +203,7 @@ export async function importSljaAsLiturgyMusic(
 		? await options.confirmUpload()
 		: false;
 	if (!approved) {
-		return importSljaLocal({ name, archive, slides, durationMs, sljaHash });
+		return importSljaLocal(localInput);
 	}
 
 	// ── Logado: sobe pra API (Minhas Coletâneas → "Importações .slja").
@@ -382,12 +392,15 @@ function matchUploadedAsset(
 
 async function importSljaLocal({
 	name,
+	fileFallbackName,
 	archive,
 	slides,
 	durationMs,
 	sljaHash,
 }: {
 	name: string;
+	/** Nome derivado do arquivo — o que imports antigos gravavam sem título. */
+	fileFallbackName: string;
 	archive: Awaited<ReturnType<typeof parseSljaFile>>;
 	slides: Array<{ lyric: string; timeMs: number; order?: number }>;
 	durationMs: number;
@@ -417,10 +430,16 @@ async function importSljaLocal({
 	const expectedSlides = slides.filter((s) => s.lyric.trim().length > 0).length;
 	const existing = findLocalMusicBySljaHash(sljaHash);
 	if (existing && existing.lyrics.length >= expectedSlides) {
+		// Só corrige o nome que veio do arquivo; renomeação manual fica.
+		let existingName = existing.name || name;
+		if (existing.name === fileFallbackName && name !== fileFallbackName) {
+			updateLocalMusic(existing.id, { name });
+			existingName = name;
+		}
 		return {
 			musicId: existing.id,
 			displayMusicId: existing.id,
-			name: existing.name || name,
+			name: existingName,
 			collectionId: existing.collectionId,
 			slides: existing.lyrics.length,
 			hasAudio: Boolean(existing.audioMediaId || existing.audioBase64),

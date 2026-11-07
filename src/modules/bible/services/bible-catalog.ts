@@ -1,6 +1,7 @@
 import { getDesktopBridge } from '@shared/services/desktop-bridge'
 import { fetchRemoteCatalogJson } from '@shared/services/remote-catalog'
 import { readCatalogRecord, writeCatalogRecord } from '@shared/services/workspace-api'
+import { syncBundle } from '@shared/services/bundle-sync-client'
 
 import type {
   BibleBook,
@@ -206,6 +207,18 @@ export async function loadChapterVerses(
   const key = chapterRecordKey(versionId, bookId, chapter)
   const local = await readCatalogRecord<BibleChapterVerses>(key)
   if (isChapterVerses(local)) return local
+
+  // SPEC piano-bundle-sync: 1 request do bible-bundle antes do fetch
+  // capítulo a capítulo (ADR-03 — fallback legado se o bundle falhar).
+  try {
+    const bundleResult = await syncBundle('bible')
+    if (bundleResult != null && 'records' in bundleResult) {
+      const bundled = await readCatalogRecord<BibleChapterVerses>(key)
+      if (isChapterVerses(bundled)) return bundled
+    }
+  } catch {
+    // bundle nunca bloqueia o fluxo legado
+  }
 
   let remote: unknown
   try {

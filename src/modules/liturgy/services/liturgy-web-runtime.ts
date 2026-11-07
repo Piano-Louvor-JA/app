@@ -2,7 +2,7 @@ export const LITURGY_WEB_RUNTIME_CHANNEL = 'louvorja-liturgy-web-runtime'
 export const LITURGY_WEB_RUNTIME_STORAGE_KEY = 'louvorja-liturgy-web-runtime-state'
 export const LITURGY_YT_SYNC_CHANNEL = 'louvorja-liturgy-yt-sync'
 
-export type LiturgyWebKind = 'youtube' | 'vimeo' | 'site' | 'local-video'
+export type LiturgyWebKind = 'youtube' | 'vimeo' | 'site' | 'local-video' | 'direct-video'
 
 export type LiturgyWebProjectionRuntime = {
   active: boolean
@@ -97,6 +97,13 @@ export function parseLiturgyWebTarget(raw: string): LiturgyWebTarget | null {
     }
 
     // Prefixo https?:// garantido acima — protocolo parseado é sempre http(s).
+    // R6/SPEC v1.1: MP4/WebM direto → player dedicado (não popup browser cru).
+    // local:// e outros esquemas não-http passam intocados (decididos na camada MAIN).
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      if (/\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(parsed.pathname + parsed.search)) {
+        return { kind: 'direct-video', videoId: '', url: withProtocol }
+      }
+    }
     return { kind: 'site', videoId: '', url: withProtocol }
   } catch {
     return null
@@ -191,7 +198,7 @@ export function publishLiturgyYtSync(payload: LiturgyYtSyncPayload): void {
  * 
  * - 'mirror': Cabeada (monitor físico conectado) — abre BrowserWindow fullscreen
  *   sem chrome/overlays. Usa popup Electron nativo (YouTube/Vimeo com controles).
- * - 'slot': TV/Receivers via Palco (ports 7080 HTTP + 7081 WS) — publica no
+ * - 'slot': TV/Receivers via Palco (ports 47080 HTTP + 47081 WS) — publica no
  *   palco-session para receivers conectados.
  * 
  * Regra: YouTube, Vimeo, site genérico → mirror (cabeada).

@@ -26,6 +26,8 @@ export const USER_PREFERENCE_KEYS = {
   clockConfig: 'clock.config',
   timerConfig: 'timer.config',
   countdownConfig: 'countdown.config',
+  /** Agenda, idioma das narrações e marcos de áudio da Escola Sabatina. */
+  sabbathSchoolConfig: 'sabbathSchool.config',
   randomConfig: 'random.config',
   randomSession: 'random.session',
   liturgyState: 'liturgy.state',
@@ -37,6 +39,7 @@ export const USER_PREFERENCE_KEYS = {
   bibleChromePosition: 'bible.chromePosition',
   /** Posição (left/top em px) da prévia flutuante do Timer; ausente = canto padrão. */
   countdownChromePosition: 'countdown.chromePosition',
+  sabbathSchoolChromePosition: 'sabbathSchool.chromePosition',
   /** Posição (left/top em px) da prévia flutuante do Cronômetro; ausente = canto padrão. */
   timerChromePosition: 'timer.chromePosition',
   /** Posição (left/top em px) da prévia flutuante do Relógio; ausente = canto padrão. */

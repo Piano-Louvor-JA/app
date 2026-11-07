@@ -11,7 +11,8 @@ const palcoSessionMock = vi.hoisted(() => ({
   projectTo: vi.fn(async () => true),
   timerTo: vi.fn(async () => true),
   idleTo: vi.fn(async () => true),
-  audio: vi.fn(async () => {}),
+  hymnAudio: vi.fn(async () => {}),
+  stageReturn: vi.fn(async () => {}),
 }))
 const unsubscribeMocks = {
   bible: vi.fn(),
@@ -379,18 +380,18 @@ describe('palco-bridge', () => {
       useMediaStoreMock.mockReturnValue(mediaStore({ audioRoute: 'pc' }))
       startPalcoBridge()
       await new Promise((r) => setTimeout(r, 3200))
-      const stops = palcoSessionMock.audio.mock.calls.filter((c: any[]) => c[0]?.action === 'stop')
+      const stops = palcoSessionMock.hymnAudio.mock.calls.filter((c: any[]) => c[0]?.action === 'stop')
       expect(stops.length).toBe(1)
-      palcoSessionMock.audio.mockClear()
+      palcoSessionMock.hymnAudio.mockClear()
       await new Promise((r) => setTimeout(r, 3200))
-      expect(palcoSessionMock.audio).not.toHaveBeenCalled()
+      expect(palcoSessionMock.hymnAudio).not.toHaveBeenCalled()
     })
 
     it('rota tv: play inicial com url/title/cover', async () => {
       useMediaStoreMock.mockReturnValue(mediaStore())
       startPalcoBridge()
       await new Promise((r) => setTimeout(r, 3200))
-      const play = palcoSessionMock.audio.mock.calls.find((c: any[]) => c[0]?.action === 'play')
+      const play = palcoSessionMock.hymnAudio.mock.calls.find((c: any[]) => c[0]?.action === 'play')
       expect(play).toBeTruthy()
       expect(play![0].url).toBe('http://audio/hino.mp3')
       expect(play![0].title).toBe('Hino 1')
@@ -401,7 +402,7 @@ describe('palco-bridge', () => {
       useMediaStoreMock.mockReturnValue(mediaStore({ session: null, audioRoute: 'tv' }))
       startPalcoBridge()
       await new Promise((r) => setTimeout(r, 3200))
-      const stop = palcoSessionMock.audio.mock.calls.find((c: any[]) => c[0]?.action === 'stop')
+      const stop = palcoSessionMock.hymnAudio.mock.calls.find((c: any[]) => c[0]?.action === 'stop')
       expect(stop).toBeTruthy()
     })
 
@@ -409,10 +410,10 @@ describe('palco-bridge', () => {
       useMediaStoreMock.mockReturnValue(mediaStore())
       startPalcoBridge()
       await new Promise((r) => setTimeout(r, 3200))
-      palcoSessionMock.audio.mockClear()
+      palcoSessionMock.hymnAudio.mockClear()
       useMediaStoreMock.mockReturnValue(mediaStore({ isPlaying: false, isPaused: true, status: 'paused' }))
       await new Promise((r) => setTimeout(r, 3200))
-      const pause = palcoSessionMock.audio.mock.calls.find((c: any[]) => c[0]?.action === 'pause')
+      const pause = palcoSessionMock.hymnAudio.mock.calls.find((c: any[]) => c[0]?.action === 'pause')
       expect(pause).toBeTruthy()
     })
 
@@ -421,12 +422,12 @@ describe('palco-bridge', () => {
       useMediaStoreMock.mockReturnValue(mediaStore({ audioRoute: 'both' }))
       startPalcoBridge()
       await vi.advanceTimersByTimeAsync(3200)
-      const play = palcoSessionMock.audio.mock.calls.find((c: any[]) => c[0]?.action === 'play')
+      const play = palcoSessionMock.hymnAudio.mock.calls.find((c: any[]) => c[0]?.action === 'play')
       expect(play).toBeTruthy()
-      palcoSessionMock.audio.mockClear()
+      palcoSessionMock.hymnAudio.mockClear()
       // mesmo estado: sync periódico manda seek
       await vi.advanceTimersByTimeAsync(3200)
-      const seek = palcoSessionMock.audio.mock.calls.find((c: any[]) => c[0]?.action === 'seek')
+      const seek = palcoSessionMock.hymnAudio.mock.calls.find((c: any[]) => c[0]?.action === 'seek')
       expect(seek).toBeTruthy()
       stopPalcoBridge()
       vi.useRealTimers()
@@ -438,9 +439,9 @@ describe('palco-bridge', () => {
       startPalcoBridge()
       await vi.advanceTimersByTimeAsync(3200)
       useMediaStoreMock.mockReturnValue(mediaStore({ hasSession: false, session: null }))
-      palcoSessionMock.audio.mockClear()
+      palcoSessionMock.hymnAudio.mockClear()
       await vi.advanceTimersByTimeAsync(3200)
-      const stop = palcoSessionMock.audio.mock.calls.find((c: any[]) => c[0]?.action === 'stop')
+      const stop = palcoSessionMock.hymnAudio.mock.calls.find((c: any[]) => c[0]?.action === 'stop')
       expect(stop).toBeTruthy()
       stopPalcoBridge()
       vi.useRealTimers()
@@ -761,7 +762,7 @@ describe('palco-bridge', () => {
       // dispara todos os watchers com has=false
       for (const w of watchCallbacks) w.cb()
       await new Promise((r) => setTimeout(r, 10))
-      const stops = palcoSessionMock.audio.mock.calls.filter((c: any[]) => c[0]?.action === 'stop')
+      const stops = palcoSessionMock.hymnAudio.mock.calls.filter((c: any[]) => c[0]?.action === 'stop')
       expect(stops.length).toBeGreaterThan(0)
       stopPalcoBridge()
     })
@@ -773,7 +774,7 @@ describe('palco-bridge', () => {
       // dispara só o de tempo: simulando salto via callback de índice 3
       if (watchCallbacks.length >= 4) watchCallbacks[3].cb()
       await new Promise((r) => setTimeout(r, 10))
-      const seeks = palcoSessionMock.audio.mock.calls.filter((c: any[]) => c[0]?.action === 'seek')
+      const seeks = palcoSessionMock.hymnAudio.mock.calls.filter((c: any[]) => c[0]?.action === 'seek')
       expect(seeks.length).toBeGreaterThanOrEqual(0)
       stopPalcoBridge()
     })
@@ -969,7 +970,7 @@ describe('palco-bridge', () => {
       useMediaStoreMock.mockReturnValue({ session: null, audioRoute: 'both', isPlaying: true, isPaused: false, currentTimeSec: 0, hasSession: true, status: 'playing' })
       startPalcoBridge()
       await vi.advanceTimersByTimeAsync(3200)
-      expect(palcoSessionMock.audio).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'play' }))
+      expect(palcoSessionMock.hymnAudio).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'play' }))
       stopPalcoBridge()
       vi.useRealTimers()
     })
@@ -979,7 +980,7 @@ describe('palco-bridge', () => {
       useMediaStoreMock.mockReturnValue({ session: { audioUrl: 'http://x.mp3' }, audioRoute: 'both', isPlaying: false, isPaused: true, currentTimeSec: 5, hasSession: true, status: 'paused' })
       startPalcoBridge()
       await vi.advanceTimersByTimeAsync(3200)
-      const plays = palcoSessionMock.audio.mock.calls.filter((c: any[]) => c[0]?.action === 'play')
+      const plays = palcoSessionMock.hymnAudio.mock.calls.filter((c: any[]) => c[0]?.action === 'play')
       expect(plays.length).toBe(0)
       stopPalcoBridge()
       vi.useRealTimers()
@@ -1039,30 +1040,30 @@ describe('palco-bridge', () => {
       // watchers 0 e 1 são isPlaying e status → ambos chamam syncAudio
       for (const i of [0, 1]) watchCallbacks[i]?.cb(undefined, undefined)
       await new Promise((r) => setTimeout(r, 10))
-      expect(palcoSessionMock.audio).toHaveBeenCalled()
+      expect(palcoSessionMock.hymnAudio).toHaveBeenCalled()
       stopPalcoBridge()
     })
 
     it('watcher hasSession false: stop + reset key', async () => {
       useMediaStoreMock.mockReturnValue({ session: { audioUrl: 'http://w.mp3' }, audioRoute: 'tv', isPlaying: true, isPaused: false, currentTimeSec: 1, hasSession: true, status: 'playing' })
       startPalcoBridge()
-      palcoSessionMock.audio.mockClear()
+      palcoSessionMock.hymnAudio.mockClear()
       useMediaStoreMock.mockReturnValue({ session: null, audioRoute: 'tv', isPlaying: false, isPaused: true, currentTimeSec: 1, hasSession: false, status: 'idle' })
       // watcher 2 = hasSession
       watchCallbacks[2]?.cb()
       await new Promise((r) => setTimeout(r, 10))
-      expect(palcoSessionMock.audio).toHaveBeenCalledWith(expect.objectContaining({ action: 'stop' }))
+      expect(palcoSessionMock.hymnAudio).toHaveBeenCalledWith(expect.objectContaining({ action: 'stop' }))
       stopPalcoBridge()
     })
 
     it('watcher currentTimeSec: salto > 2 com sessão → seek', async () => {
       useMediaStoreMock.mockReturnValue({ session: { audioUrl: 'http://w.mp3' }, audioRoute: 'both', isPlaying: true, isPaused: false, currentTimeSec: 1, hasSession: true, status: 'playing' })
       startPalcoBridge()
-      palcoSessionMock.audio.mockClear()
+      palcoSessionMock.hymnAudio.mockClear()
       // watcher 3 = currentTimeSec — media capturado no start (currentTimeSec 1); diff |99-1|>2
       watchCallbacks[3]?.cb(99, 1)
       await new Promise((r) => setTimeout(r, 10))
-      const seeks = palcoSessionMock.audio.mock.calls.filter((c: any[]) => c[0]?.action === 'seek')
+      const seeks = palcoSessionMock.hymnAudio.mock.calls.filter((c: any[]) => c[0]?.action === 'seek')
       expect(seeks.length).toBeGreaterThanOrEqual(1)
       stopPalcoBridge()
     })
@@ -1071,11 +1072,11 @@ describe('palco-bridge', () => {
       useMediaStoreMock.mockReturnValue({ session: { audioUrl: 'http://w.mp3' }, audioRoute: 'both', isPlaying: true, isPaused: false, currentTimeSec: 1, hasSession: false, status: 'playing' })
       startPalcoBridge()
       await new Promise((r) => setTimeout(r, 10))
-      palcoSessionMock.audio.mockClear()
+      palcoSessionMock.hymnAudio.mockClear()
       watchCallbacks[3]?.cb(99, 1)
       await new Promise((r) => setTimeout(r, 10))
       // hasSession false: watcher NÃO chama seek
-      expect(palcoSessionMock.audio).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'seek', position: 99 }))
+      expect(palcoSessionMock.hymnAudio).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'seek', position: 99 }))
       stopPalcoBridge()
     })
 
@@ -1165,9 +1166,9 @@ describe('palco-bridge', () => {
       useMediaStoreMock.mockReturnValue({ session: { audioUrl: 'http://y.mp3' }, audioRoute: 'both', isPlaying: true, isPaused: false, currentTimeSec: 10, hasSession: true, status: 'playing' })
       startPalcoBridge()
       await vi.advanceTimersByTimeAsync(3100)
-      const before = palcoSessionMock.audio.mock.calls.filter((c: any[]) => c[0]?.action === 'seek').length
+      const before = palcoSessionMock.hymnAudio.mock.calls.filter((c: any[]) => c[0]?.action === 'seek').length
       await vi.advanceTimersByTimeAsync(3100)
-      const after = palcoSessionMock.audio.mock.calls.filter((c: any[]) => c[0]?.action === 'seek').length
+      const after = palcoSessionMock.hymnAudio.mock.calls.filter((c: any[]) => c[0]?.action === 'seek').length
       expect(after).toBeGreaterThan(before)
       stopPalcoBridge()
       vi.useRealTimers()
@@ -1180,7 +1181,7 @@ describe('palco-bridge', () => {
       await vi.advanceTimersByTimeAsync(3100)
       useMediaStoreMock.mockReturnValue({ session: { audioUrl: 'http://y.mp3' }, audioRoute: 'both', isPlaying: false, isPaused: true, currentTimeSec: 10, hasSession: true, status: 'paused' })
       await vi.advanceTimersByTimeAsync(3100)
-      expect(palcoSessionMock.audio).toHaveBeenCalledWith(expect.objectContaining({ action: 'pause' }))
+      expect(palcoSessionMock.hymnAudio).toHaveBeenCalledWith(expect.objectContaining({ action: 'pause' }))
       stopPalcoBridge()
       vi.useRealTimers()
     })
@@ -1261,11 +1262,11 @@ describe('palco-bridge', () => {
     it('hasSession false via watcher: reset+stop (branch final do watch)', async () => {
       useMediaStoreMock.mockReturnValue({ session: { audioUrl: 'http://h.mp3' }, audioRoute: 'tv', isPlaying: true, isPaused: false, currentTimeSec: 0, hasSession: true, status: 'playing' })
       startPalcoBridge()
-      palcoSessionMock.audio.mockClear()
+      palcoSessionMock.hymnAudio.mockClear()
       useMediaStoreMock.mockReturnValue({ session: null, audioRoute: 'tv', isPlaying: false, isPaused: true, currentTimeSec: 0, hasSession: false, status: 'idle' })
       watchCallbacks[2]?.cb(false, true)
       await new Promise((r) => setTimeout(r, 10))
-      expect(palcoSessionMock.audio).toHaveBeenCalledWith(expect.objectContaining({ action: 'stop' }))
+      expect(palcoSessionMock.hymnAudio).toHaveBeenCalledWith(expect.objectContaining({ action: 'stop' }))
       stopPalcoBridge()
     })
 
@@ -1729,7 +1730,7 @@ describe('palco-bridge', () => {
       useMediaStoreMock.mockReturnValue({ session: null, audioRoute: 'both', isPlaying: true, isPaused: false, currentTimeSec: 1, hasSession: true, status: 'playing' })
       await vi.advanceTimersByTimeAsync(3100)
       // sem play novo após a troca
-      const plays = palcoSessionMock.audio.mock.calls.filter((c: any[]) => c[0]?.action === 'play')
+      const plays = palcoSessionMock.hymnAudio.mock.calls.filter((c: any[]) => c[0]?.action === 'play')
       expect(plays.length).toBe(1)
       stopPalcoBridge()
       vi.useRealTimers()
@@ -1944,7 +1945,7 @@ describe('palco-bridge', () => {
       useMediaStoreMock.mockReturnValue({ session: { audioUrl: 'http://pp.mp3' }, audioRoute: 'both', isPlaying: false, isPaused: true, currentTimeSec: 3, hasSession: true, status: 'paused' })
       startPalcoBridge()
       await vi.advanceTimersByTimeAsync(6100)
-      const pauses = palcoSessionMock.audio.mock.calls.filter((c: any[]) => c[0]?.action === 'pause')
+      const pauses = palcoSessionMock.hymnAudio.mock.calls.filter((c: any[]) => c[0]?.action === 'pause')
       expect(pauses.length).toBe(0)
       stopPalcoBridge()
       vi.useRealTimers()
@@ -2106,7 +2107,7 @@ describe('palco-bridge', () => {
       useMediaStoreMock.mockReturnValue({ session: null, audioRoute: 'both', isPlaying: true, isPaused: false, currentTimeSec: 0, hasSession: true, status: 'playing' })
       await vi.advanceTimersByTimeAsync(3100)
       // key mudou (url → 'none'): bloco key!==last → !audioUrl → lastAudioKey=key (sem play)
-      const plays = palcoSessionMock.audio.mock.calls.filter((c: any[]) => c[0]?.action === 'play')
+      const plays = palcoSessionMock.hymnAudio.mock.calls.filter((c: any[]) => c[0]?.action === 'play')
       expect(plays.length).toBe(1)
       stopPalcoBridge()
       vi.useRealTimers()
@@ -2259,7 +2260,7 @@ describe('palco-bridge', () => {
       useMediaStoreMock.mockReturnValue({ session: { audioUrl: 'http://u.mp3' }, audioRoute: 'tv', isPlaying: true, isPaused: false, currentTimeSec: 0, hasSession: true, status: 'playing' })
       await vi.advanceTimersByTimeAsync(2200)
       // rota tv same key: wanted play === lastTvPlayState? lastTvPlayState é null após troca de rota → play
-      const plays = palcoSessionMock.audio.mock.calls.filter((c: any[]) => c[0]?.action === 'play')
+      const plays = palcoSessionMock.hymnAudio.mock.calls.filter((c: any[]) => c[0]?.action === 'play')
       expect(plays.length).toBeGreaterThanOrEqual(1)
       stopPalcoBridge()
       vi.useRealTimers()
@@ -2390,12 +2391,12 @@ describe('palco-bridge', () => {
       startPalcoBridge()
       await vi.advanceTimersByTimeAsync(3100)
       // tv same-key: wanted play != null? lastTvPlayState='play' → sem re-envio
-      const c1 = palcoSessionMock.audio.mock.calls.filter((c: any[]) => c[0]?.action === 'play').length
+      const c1 = palcoSessionMock.hymnAudio.mock.calls.filter((c: any[]) => c[0]?.action === 'play').length
       // troca pra both: rota muda, key igual → bloqueio de ambos reenvia (último bloco antes do 429)
       useMediaStoreMock.mockReturnValue({ session: { audioUrl: 'http://b8.mp3' }, audioRoute: 'both', isPlaying: false, isPaused: true, currentTimeSec: 5, hasSession: true, status: 'paused' })
       await vi.advanceTimersByTimeAsync(3100)
       // both: key === lastAudioKey e routeChanged true → entrou no bloco de troca, isPlaying false → sem play, !audioUrl false → nada
-      const c2 = palcoSessionMock.audio.mock.calls.filter((c: any[]) => c[0]?.action === 'play').length
+      const c2 = palcoSessionMock.hymnAudio.mock.calls.filter((c: any[]) => c[0]?.action === 'play').length
       expect(c2).toBe(c1)
       stopPalcoBridge()
       vi.useRealTimers()
@@ -2513,7 +2514,7 @@ describe('palco-bridge', () => {
       useMediaStoreMock.mockReturnValue({ session: { audioUrl: 'http://tv2.mp3' }, audioRoute: 'both', isPlaying: true, isPaused: false, currentTimeSec: 0, hasSession: true, status: 'playing' })
       await vi.advanceTimersByTimeAsync(3100)
       // both: key igual mas routeChanged → reenvia play
-      const plays = palcoSessionMock.audio.mock.calls.filter((c: any[]) => c[0]?.action === 'play')
+      const plays = palcoSessionMock.hymnAudio.mock.calls.filter((c: any[]) => c[0]?.action === 'play')
       expect(plays.length).toBeGreaterThanOrEqual(2)
       stopPalcoBridge()
       vi.useRealTimers()
@@ -2697,9 +2698,9 @@ describe('palco-bridge', () => {
       })
       startPalcoBridge()
       await vi.advanceTimersByTimeAsync(3200)
-      const plays1 = palcoSessionMock.audio.mock.calls.filter((c: any[]) => c[0]?.action === 'play').length
+      const plays1 = palcoSessionMock.hymnAudio.mock.calls.filter((c: any[]) => c[0]?.action === 'play').length
       await vi.advanceTimersByTimeAsync(3200)
-      const plays2 = palcoSessionMock.audio.mock.calls.filter((c: any[]) => c[0]?.action === 'play').length
+      const plays2 = palcoSessionMock.hymnAudio.mock.calls.filter((c: any[]) => c[0]?.action === 'play').length
       expect(plays1).toBe(1)
       expect(plays2).toBe(1)
       stopPalcoBridge()
@@ -2714,7 +2715,7 @@ describe('palco-bridge', () => {
       })
       startPalcoBridge()
       await vi.advanceTimersByTimeAsync(3200)
-      const play = palcoSessionMock.audio.mock.calls.find((c: any[]) => c[0]?.action === 'play')
+      const play = palcoSessionMock.hymnAudio.mock.calls.find((c: any[]) => c[0]?.action === 'play')
       expect(play).toBeTruthy()
       expect(play![0].title).toBeUndefined()
       expect(play![0].cover).toBeUndefined()
@@ -2730,7 +2731,7 @@ describe('palco-bridge', () => {
       })
       startPalcoBridge()
       await vi.advanceTimersByTimeAsync(3200)
-      const play = palcoSessionMock.audio.mock.calls.find((c: any[]) => c[0]?.action === 'play')
+      const play = palcoSessionMock.hymnAudio.mock.calls.find((c: any[]) => c[0]?.action === 'play')
       expect(play).toBeTruthy()
       expect(play![0].title).toBeUndefined()
       stopPalcoBridge()
@@ -2744,9 +2745,9 @@ describe('palco-bridge', () => {
       })
       startPalcoBridge()
       await vi.advanceTimersByTimeAsync(3200)
-      palcoSessionMock.audio.mockClear()
+      palcoSessionMock.hymnAudio.mockClear()
       await vi.advanceTimersByTimeAsync(3200)
-      expect(palcoSessionMock.audio).not.toHaveBeenCalled()
+      expect(palcoSessionMock.hymnAudio).not.toHaveBeenCalled()
       stopPalcoBridge()
       vi.useRealTimers()
     })
@@ -2759,15 +2760,15 @@ describe('palco-bridge', () => {
       })
       startPalcoBridge()
       await vi.advanceTimersByTimeAsync(3200)
-      palcoSessionMock.audio.mockClear()
+      palcoSessionMock.hymnAudio.mockClear()
       // polls em 3s: seek só quando now - lastPosSyncMs > 3000 (janela)
       await vi.advanceTimersByTimeAsync(3100)
-      const s1 = palcoSessionMock.audio.mock.calls.filter((c: any[]) => c[0]?.action === 'seek').length
+      const s1 = palcoSessionMock.hymnAudio.mock.calls.filter((c: any[]) => c[0]?.action === 'seek').length
       await vi.advanceTimersByTimeAsync(3000)
-      const s2 = palcoSessionMock.audio.mock.calls.filter((c: any[]) => c[0]?.action === 'seek').length
+      const s2 = palcoSessionMock.hymnAudio.mock.calls.filter((c: any[]) => c[0]?.action === 'seek').length
       // ao menos um seek na janela; sem martelada dupla por poll
       expect(s1 + s2).toBeGreaterThanOrEqual(1)
-      expect(palcoSessionMock.audio.mock.calls.filter((c: any[]) => c[0]?.action === 'seek').length).toBeLessThan(3)
+      expect(palcoSessionMock.hymnAudio.mock.calls.filter((c: any[]) => c[0]?.action === 'seek').length).toBeLessThan(3)
       stopPalcoBridge()
       vi.useRealTimers()
     })
@@ -2781,7 +2782,7 @@ describe('palco-bridge', () => {
       startPalcoBridge()
       await vi.advanceTimersByTimeAsync(3200)
       await vi.advanceTimersByTimeAsync(3000)
-      const seek = palcoSessionMock.audio.mock.calls.find((c: any[]) => c[0]?.action === 'seek')
+      const seek = palcoSessionMock.hymnAudio.mock.calls.find((c: any[]) => c[0]?.action === 'seek')
       expect(seek).toBeTruthy()
       expect(seek![0].positionMs).toBe(0)
       stopPalcoBridge()
@@ -2796,9 +2797,9 @@ describe('palco-bridge', () => {
       })
       startPalcoBridge()
       await vi.advanceTimersByTimeAsync(3200)
-      palcoSessionMock.audio.mockClear()
+      palcoSessionMock.hymnAudio.mockClear()
       await vi.advanceTimersByTimeAsync(3200)
-      const acts = palcoSessionMock.audio.mock.calls.map((c: any[]) => c[0]?.action)
+      const acts = palcoSessionMock.hymnAudio.mock.calls.map((c: any[]) => c[0]?.action)
       expect(acts).not.toContain('pause')
       expect(acts).not.toContain('seek')
       stopPalcoBridge()
@@ -2850,13 +2851,13 @@ describe('palco-bridge', () => {
       })
       startPalcoBridge()
       await vi.advanceTimersByTimeAsync(100)
-      palcoSessionMock.audio.mockClear()
+      palcoSessionMock.hymnAudio.mockClear()
       // ordem de registro no start: isPlaying, status, hasSession, currentTimeSec
       // (media != null → 4 watches); hasSession é o 3º
       const entry = watchCallbacks[2]!
       entry.cb(true) // has=true → early return sem stop/reset
       await vi.advanceTimersByTimeAsync(100)
-      const stops = palcoSessionMock.audio.mock.calls.filter((c: any[]) => c[0]?.action === 'stop')
+      const stops = palcoSessionMock.hymnAudio.mock.calls.filter((c: any[]) => c[0]?.action === 'stop')
       expect(stops.length).toBe(0)
       stopPalcoBridge()
       vi.useRealTimers()
@@ -2871,7 +2872,7 @@ describe('palco-bridge', () => {
       })
       startPalcoBridge()
       await vi.advanceTimersByTimeAsync(3200)
-      const play = palcoSessionMock.audio.mock.calls.find((c: any[]) => c[0]?.action === 'play')
+      const play = palcoSessionMock.hymnAudio.mock.calls.find((c: any[]) => c[0]?.action === 'play')
       expect(play).toBeTruthy()
       expect(play![0].subtitle).toBeUndefined()
       expect(play![0].cover).toBeUndefined()
@@ -2891,7 +2892,7 @@ describe('palco-bridge', () => {
       // mesma faixa agora tocando: wanted play ≠ lastTvPlayState(null→pause?) → play com positionMs ?? 0
       useMediaStoreMock.mockReturnValue({ ...store, isPlaying: true, isPaused: false, status: 'playing' })
       await vi.advanceTimersByTimeAsync(3200)
-      const plays = palcoSessionMock.audio.mock.calls.filter((c: any[]) => c[0]?.action === 'play')
+      const plays = palcoSessionMock.hymnAudio.mock.calls.filter((c: any[]) => c[0]?.action === 'play')
       expect(plays.length).toBeGreaterThanOrEqual(1)
       expect(plays.at(-1)![0].positionMs).toBe(0)
       stopPalcoBridge()

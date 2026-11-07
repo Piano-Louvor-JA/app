@@ -79,7 +79,6 @@ const store = reactive({
   canStart: true,
   start: vi.fn(),
   pause: vi.fn(),
-  stopAudio: vi.fn(),
   toggleProjection: vi.fn().mockResolvedValue(undefined),
   clearProjection: vi.fn(),
 })
@@ -258,16 +257,6 @@ describe('CountdownChrome — miniatura', () => {
     expect(previewProps(w).config.timeFormat).toBe('hh:mm:ss')
   })
 
-  it('Escola Sabatina parada: prévia mostra a duração do agendamento', () => {
-    store.config = {
-      ...store.config,
-      mode: 'sabbath',
-      sabbathConfig: { scheduleMode: 'start', startTime: '09:00', endTime: '10:15' },
-    }
-    const w = mountChrome()
-    expect(previewProps(w).runtime.durationMs).toBe(75 * 60_000)
-  })
-
   it('desmontar cancela a inscrição no palco', () => {
     const w = mountChrome()
     expect(stageState.subscribers).toHaveLength(1)
@@ -340,6 +329,7 @@ it('fechar a prévia encerra a projeção e oculta o miniplayer', async () => {
   expect(closeButton.exists()).toBe(true)
   closeButton.vm.$emit('close')
   await nextTick()
+  expect(store.pause).toHaveBeenCalledOnce()
   expect(store.clearProjection).toHaveBeenCalledOnce()
   expect(w.find('.countdown-chrome').exists()).toBe(false)
 })

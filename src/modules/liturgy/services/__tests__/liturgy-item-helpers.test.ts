@@ -352,6 +352,50 @@ describe('buildLiturgyItemFromDraft', () => {
     expect(built.durationMs).toBe(0)
   })
 
+  it('annotation: guarda o texto formatado limpo e o texto puro equivalente', () => {
+    const built = buildLiturgyItemFromDraft(
+      {
+        ...baseDraft,
+        type: 'annotation',
+        subtitle: 'desatualizado',
+        notesHtml: '<div><b>Almoço</b> na igreja</div><ul><li>JA 17:00</li></ul><script>x</script>',
+      },
+      ctx,
+    )
+    expect(built.notesHtml).toBe('<div><b>Almoço</b> na igreja</div><ul><li>JA 17:00</li></ul>')
+    expect(built.subtitle).toBe('Almoço na igreja\n• JA 17:00')
+  })
+
+  it('annotation sem texto formatado fica só com o texto puro; outros tipos ignoram notesHtml', () => {
+    const plain = buildLiturgyItemFromDraft({ ...baseDraft, type: 'annotation', subtitle: 'Aviso', notesHtml: '' }, ctx)
+    expect(plain.subtitle).toBe('Aviso')
+    expect(plain).not.toHaveProperty('notesHtml')
+    const site = buildLiturgyItemFromDraft(
+      { ...baseDraft, type: 'site', url: 'https://x.org', notesHtml: '<b>x</b>' },
+      ctx,
+    )
+    expect(site).not.toHaveProperty('notesHtml')
+  })
+
+  it('cor do título: anotação guarda a cor válida; inválida ou outro tipo não guardam', () => {
+    expect(buildLiturgyItemFromDraft({ ...baseDraft, type: 'annotation', titleColor: '#42A5F5' }, ctx).titleColor).toBe(
+      '#42a5f5',
+    )
+    expect(buildLiturgyItemFromDraft({ ...baseDraft, type: 'annotation', titleColor: 'azul' }, ctx)).not.toHaveProperty(
+      'titleColor',
+    )
+    expect(
+      buildLiturgyItemFromDraft({ ...baseDraft, type: 'site', url: 'https://x.org', titleColor: '#42a5f5' }, ctx),
+    ).not.toHaveProperty('titleColor')
+  })
+
+  it.each(['annotation', 'images', 'pdf', 'presentation', 'site'] as const)(
+    '%s não guarda duração (não soma no tempo do culto)',
+    (type) => {
+      expect(buildLiturgyItemFromDraft({ ...baseDraft, type, durationMs: 300_000 }, ctx).durationMs).toBe(0)
+    },
+  )
+
   it('music com match: nome do catálogo, complementary do draft', () => {
     const built = buildLiturgyItemFromDraft(
       { ...baseDraft, type: 'music', name: 'Título livre', musicId: 1 },
@@ -469,6 +513,25 @@ describe('draftFromLiturgyItem', () => {
     expect(draft.endTime).toBe('09:30')
     expect(draft.durationMs).toBe(0)
   })
+
+  it('annotation abre com o texto formatado; outros tipos com vazio', () => {
+    expect(draftFromLiturgyItem(item({ id: 'a', type: 'annotation', notesHtml: '<b>Oi</b>' })).notesHtml).toBe('<b>Oi</b>')
+    expect(draftFromLiturgyItem(item({ id: 'b', type: 'annotation' })).notesHtml).toBe('')
+    expect(draftFromLiturgyItem(item({ id: 'c', type: 'site', notesHtml: '<b>x</b>' })).notesHtml).toBe('')
+  })
+
+  it('cor do título abre só em anotação', () => {
+    expect(draftFromLiturgyItem(item({ id: 'a', type: 'annotation', titleColor: '#ffee58' })).titleColor).toBe('#ffee58')
+    expect(draftFromLiturgyItem(item({ id: 'b', type: 'annotation' })).titleColor).toBe('')
+    expect(draftFromLiturgyItem(item({ id: 'c', type: 'site', titleColor: '#ffee58' })).titleColor).toBe('')
+  })
+
+  it.each(['annotation', 'images', 'pdf', 'presentation', 'site'] as const)(
+    '%s salvo com duração antiga abre sem duração',
+    (type) => {
+      expect(draftFromLiturgyItem(item({ id: 't', type, durationMs: 300_000 })).durationMs).toBe(0)
+    },
+  )
 })
 
 describe('reconcileMusicItemTitles', () => {

@@ -85,15 +85,19 @@ function cssPx(name: string, fallback: number): number {
 
 /**
  * Onde o item da página vai aparecer na barra — antes de ele existir, para o
- * efeito começar já no clique: logo depois do último item, ou no centro da
- * barra (logo acima do dock) quando ela ainda está vazia.
+ * efeito começar já no clique: o próprio item, se a página já está na barra;
+ * senão logo depois do último item, ou no centro da barra quando ela está vazia.
  */
-export function predictMinimizedTarget(): Box {
+export function predictMinimizedTarget(fullPath?: string): Box {
+  const own = fullPath ? findMinimizedItemRect(fullPath) : null
+  if (own) return { left: own.left, top: own.top, width: own.width, height: own.height }
   const items = document.querySelectorAll<HTMLElement>('[data-minimized-key]')
   const last = items[items.length - 1]
   if (last) {
     const rect = last.getBoundingClientRect()
-    return { left: rect.right + BAR_GAP, top: rect.top, width: rect.width, height: rect.height }
+    // barra cheia rola até o fim ao receber o item: ele aparece na borda visível
+    const left = Math.min(rect.right + BAR_GAP, window.innerWidth - rect.width - BAR_GAP)
+    return { left, top: rect.top, width: rect.width, height: rect.height }
   }
   const dock = cssPx('--ds-dock-height', 72)
   const bar = cssPx('--ds-minimized-bar-height', 40)

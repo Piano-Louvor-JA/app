@@ -89,7 +89,7 @@ contextBridge.exposeInMainWorld('louvorja', {
     onClients: (callback) => subscribe('remote:clients', callback),
   },
 
-  // Palco (cast p/ TV — receiver conecta em WS :7081, HTTP :7080)
+  // Palco (cast p/ TV — receiver conecta em WS :47081, HTTP :47080)
   palco: {
     getPersistence: () => ipcRenderer.invoke('palco:persistence-get'),
     setPersistence: (enabled) => ipcRenderer.invoke('palco:persistence-set', { enabled }),
@@ -97,6 +97,10 @@ contextBridge.exposeInMainWorld('louvorja', {
     wake: () => ipcRenderer.invoke('palco:wake'),
     createSlot: (label) => ipcRenderer.invoke('palco:slot-create', { label }),
     removeSlot: (slotId) => ipcRenderer.invoke('palco:slot-remove', { id: slotId }),
+    updateSlot: (slotId, changes) => ipcRenderer.invoke('palco:slot-update', { id: slotId, ...changes }),
+    transmission: () => ipcRenderer.invoke('palco:transmission-get'),
+    setTransmission: (changes) => ipcRenderer.invoke('palco:transmission-set', changes),
+    resetToken: () => ipcRenderer.invoke('palco:token-reset'),
     start: (slotId = '0') => ipcRenderer.invoke('palco:start', { slotId }),
     stop: (slotId = '0') => ipcRenderer.invoke('palco:stop', { slotId }),
     status: (slotId = '0') => ipcRenderer.invoke('palco:status', { slotId }),
@@ -148,6 +152,34 @@ contextBridge.exposeInMainWorld('louvorja', {
     clear: (options) => ipcRenderer.invoke('workspace:clear', options),
   },
 
+  // Download em background (Provai e Vede): fila no MAIN, eventos de progresso.
+  downloadBatch: {
+    enqueue: (items) => ipcRenderer.invoke('download-batch:enqueue', items),
+    cancel: (id) => ipcRenderer.invoke('download-batch:cancel', id),
+    retry: (id) => ipcRenderer.invoke('download-batch:retry', id),
+    pending: () => ipcRenderer.invoke('download-batch:pending'),
+    onProgress: (cb) => {
+      const handler = (_e, payload) => cb(payload)
+      ipcRenderer.on('download-progress', handler)
+      return () => ipcRenderer.removeListener('download-progress', handler)
+    },
+    onItemDone: (cb) => {
+      const handler = (_e, payload) => cb(payload)
+      ipcRenderer.on('download-item-done', handler)
+      return () => ipcRenderer.removeListener('download-item-done', handler)
+    },
+    onItemFailed: (cb) => {
+      const handler = (_e, payload) => cb(payload)
+      ipcRenderer.on('download-item-failed', handler)
+      return () => ipcRenderer.removeListener('download-item-failed', handler)
+    },
+    onBatchDone: (cb) => {
+      const handler = (_e, payload) => cb(payload)
+      ipcRenderer.on('download-batch-done', handler)
+      return () => ipcRenderer.removeListener('download-batch-done', handler)
+    },
+  },
+
   bible: {
     getChapter: (versionId, bookId, chapter) =>
       ipcRenderer.invoke('bible:get-chapter', versionId, bookId, chapter),
@@ -159,6 +191,11 @@ contextBridge.exposeInMainWorld('louvorja', {
     ensureDefaultAudio: () => ipcRenderer.invoke('random:ensure-default-audio'),
     importAudio: () => ipcRenderer.invoke('random:import-audio'),
     deleteAudio: (fileName) => ipcRenderer.invoke('random:delete-audio', fileName),
+  },
+
+  sabbathSchool: {
+    importVideo: () => ipcRenderer.invoke('sabbath-school:import-video'),
+    clearVideo: () => ipcRenderer.invoke('sabbath-school:clear-video'),
   },
 
   catalog: {
@@ -180,10 +217,28 @@ contextBridge.exposeInMainWorld('louvorja', {
     logout: () => ipcRenderer.invoke('yt-auth:logout'),
   },
 
-  ytAdblock: {
-    // Bloqueador de anúncios do player YouTube (opt-in, experimental)
-    status: () => ipcRenderer.invoke('yt-adblock:status'),
-    set: (enabled) => ipcRenderer.invoke('yt-adblock:set', enabled),
+  onlineVideo: {
+    // Cópia local dos vídeos do YouTube: tocar do disco, sem anúncio e sem depender da internet
+    status: () => ipcRenderer.invoke('online-video:status'),
+    setSettings: (partial) => ipcRenderer.invoke('online-video:set-settings', partial),
+    prefetch: (ids) => ipcRenderer.invoke('online-video:prefetch', ids),
+    cancel: (id) => ipcRenderer.invoke('online-video:cancel', id),
+    keep: (ids) => ipcRenderer.invoke('online-video:keep', ids),
+    clear: () => ipcRenderer.invoke('online-video:clear'),
+    videoStatus: (ids) => ipcRenderer.invoke('online-video:video-status', ids),
+    retryTools: () => ipcRenderer.invoke('online-video:retry-tools'),
+    onChanged: (callback) => subscribe('online-video:changed', callback),
+    onTools: (callback) => subscribe('online-video:tools', callback),
+  },
+
+  ytInfo: {
+    // Título, canal, duração e descrição do vídeo (preenche o item da liturgia ao colar o link)
+    get: (videoId) => ipcRenderer.invoke('youtube-info:get', videoId),
+  },
+
+  siteInfo: {
+    // Título, nome do site e descrição da página (preenche o item de site da liturgia)
+    get: (url) => ipcRenderer.invoke('site-info:get', url),
   },
 
   legacyMedia: {
@@ -266,6 +321,8 @@ contextBridge.exposeInMainWorld('louvorja', {
     onPlaybackSync: (callback) => subscribe('projection:playback-sync', callback),
     // ESC pressionado na janela de projeção → operador decide no confirm
     onCloseRequested: (callback) => subscribe('projection:close-requested', callback),
+    // Enter na projeção → confirma o encerramento pendente (Esc + Enter)
+    onConfirmCloseRequested: (callback) => subscribe('projection:confirm-close-requested', callback),
     // ←/→ na projeção de mídia → operador avança/volta slide
     onMediaNavigate: (callback) => subscribe('projection:media-navigate', callback),
     remotePlay: () => ipcRenderer.invoke('projection:remote-play'),

@@ -33,6 +33,11 @@ import {
   importSorteioCustomAudio,
   deleteSorteioCustomAudio,
 } from '../sorteio-audio.mjs'
+import {
+  ESCOLA_SABATINA_VIDEO_EXTENSIONS,
+  clearEscolaSabatinaVideo,
+  importEscolaSabatinaVideo,
+} from '../escola-sabatina-video.mjs'
 import { writeWindowsMediaRootOverride } from '../windows-media-root.mjs'
 import {
   buildBackupFileName,
@@ -649,6 +654,36 @@ export function registerWorkspaceIpc() {
       return deleteSorteioCustomAudio(media, fileName)
     } catch (error) {
       console.error('[ipc] random:delete-audio', error)
+      return { ok: false, reason: 'error' }
+    }
+  })
+
+  ipcMain.handle('sabbath-school:import-video', async (event) => {
+    try {
+      const win = BrowserWindow.fromWebContents(event.sender)
+      const result = await dialog.showOpenDialog(win ?? undefined, {
+        title: 'Escolher vídeo da Escola Sabatina',
+        filters: [{ name: 'Vídeo', extensions: ESCOLA_SABATINA_VIDEO_EXTENSIONS }],
+        properties: ['openFile'],
+      })
+      if (result.canceled || !result.filePaths?.[0]) {
+        return { ok: false, reason: 'cancelled' }
+      }
+      const { media } = getWorkspacePaths()
+      const imported = importEscolaSabatinaVideo(media, result.filePaths[0])
+      return imported.ok ? imported : { ok: false, reason: imported.error }
+    } catch (error) {
+      console.error('[ipc] sabbath-school:import-video', error)
+      return { ok: false, reason: 'error' }
+    }
+  })
+
+  ipcMain.handle('sabbath-school:clear-video', () => {
+    try {
+      const { media } = getWorkspacePaths()
+      return clearEscolaSabatinaVideo(media)
+    } catch (error) {
+      console.error('[ipc] sabbath-school:clear-video', error)
       return { ok: false, reason: 'error' }
     }
   })

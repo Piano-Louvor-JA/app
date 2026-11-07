@@ -1,8 +1,8 @@
-import { obsBlackIdle, obsConnections, notifyObsChanged, obsAllowsMirror, obsAssignments, assignObsConnection } from './obs-connections'
+import { notifyObsChanged, obsAllowsMirror, obsAssignments, assignObsConnection } from './obs-connections'
 /**
  * PalcoSession — sessão de cast para TV no desktop (padrão StageSession do APK).
  *
- * O sender (WS :7081 + HTTP :7080) vive no main process (electron/palco-server.mjs);
+ * O sender (WS :47081 + HTTP :47080) vive no main process (electron/palco-server.mjs);
  * este service no renderer comanda via preload (window.louvorja.palco.*) e traduz
  * StageSettings efetivo do escopo para as mensagens do protocolo Palco v2.
  */
@@ -10,10 +10,21 @@ import { obsBlackIdle, obsConnections, notifyObsChanged, obsAllowsMirror, obsAss
 import { useOutputRegistry } from './output-registry'
 import { readEffectiveStageSettings } from './stage-settings-runtime'
 import {
+  bibleTransitionMs,
   resolveBackgroundImage,
   type StageSettings,
 } from '../types/stage-settings'
 import { getPalcoRoute, type PalcoModule } from './palco-routing'
+import { buildStageReturn } from './stage-return'
+import type { MediaProjectionRuntime } from '../../media/types/media'
+import type {
+  PalcoSlotStatus,
+  SlotUpdate,
+  SlotUpdateResult,
+  TransmissionBind,
+  TransmissionInfo,
+  TransmissionSetResult,
+} from '../types/transmission'
 
 /** Envolve o HTML do texto em cor (receiver não lê textColor separado). */
 function colorizeProjectionText(text: string, color: string | null): string {
@@ -43,7 +54,7 @@ type PalcoStatus = {
   clients: number
   url: string | null
   wsUrl: string | null
-}
+} & Partial<Omit<PalcoSlotStatus, 'receiverIps' | 'running' | 'clients' | 'url'>>
 
 export type PalcoTimerOptions = { duration?: number; mode?: 'countdown' | 'chrono'; label?: string; background?: string; text?: string; obsPane?: boolean; timeFormat?: string; chronoRuntime?: { status: string; accumulatedMs: number; segmentStartedAt: number | null } }
 
@@ -77,6 +88,10 @@ function palcoApi(): {
   onReceiverConnected(cb: (i: unknown) => void): (() => void) | void
   onReceiverDisconnected(cb: (i: unknown) => void): void
   wake?(): Promise<{ ok: boolean; results?: string[] } | null>
+  updateSlot(id: string, changes: SlotUpdate): Promise<SlotUpdateResult>
+  transmission(): Promise<TransmissionInfo>
+  setTransmission(changes: { bind?: TransmissionBind; requireToken?: boolean }): Promise<TransmissionSetResult>
+  resetToken(): Promise<{ token: string }>
 } {
   return (window as never as { louvorja: { palco: never } }).louvorja.palco
 }
@@ -113,9 +128,31 @@ class PalcoSession {
     return (await palcoApi().setPersistence(enabled)).enabled
   }
 
-  async slots(): Promise<Array<{ id: string; label: string; running: boolean; clients: number; httpPort: number; wsPort: number }>> {
+  async slots(): Promise<PalcoSlotStatus[]> {
     if (!this.isElectron) return []
-    return (window as never as { louvorja: { palco: { slots(): Promise<Array<{ id: string; label: string; running: boolean; clients: number; httpPort: number; wsPort: number }>> } } }).louvorja.palco.slots()
+    return (window as never as { louvorja: { palco: { slots(): Promise<PalcoSlotStatus[]> } } }).louvorja.palco.slots()
+  }
+
+  /** Porta e/ou aparência do overlay de uma conexão. */
+  async updateSlot(id: string, changes: SlotUpdate): Promise<SlotUpdateResult> {
+    if (!this.isElectron) return { ok: false, reason: 'not-found' }
+    return palcoApi().updateSlot(id, changes)
+  }
+
+  async transmission(): Promise<TransmissionInfo | null> {
+    if (!this.isElectron) return null
+    return palcoApi().transmission()
+  }
+
+  async setTransmission(changes: { bind?: TransmissionBind; requireToken?: boolean }): Promise<TransmissionSetResult | null> {
+    if (!this.isElectron) return null
+    return palcoApi().setTransmission(changes)
+  }
+
+  /** Gera token novo; dispositivos da rede precisam do link atualizado. */
+  async resetToken(): Promise<string | null> {
+    if (!this.isElectron) return null
+    return (await palcoApi().resetToken()).token
   }
 
   async createSlot(label: string): Promise<{ id: string; label: string; httpPort: number; wsPort: number } | null> {
@@ -149,7 +186,7 @@ class PalcoSession {
     )
   }
 
-  async statusSlot(id: string): Promise<(PalcoStatus & { receiverUrl?: string | null }) | null> {
+  async statusSlot(id: string): Promise<PalcoStatus | null> {
     if (!this.isElectron) return null
     return palcoApi().status(id)
   }
@@ -179,7 +216,7 @@ class PalcoSession {
     await this.stopSlot(this.activeSlotId)
   }
 
-  /** BaseUrl do sender (http://ip:7080) — cacheado após 1º status. */
+  /** BaseUrl do sender (http://ip:47080) — cacheado após 1º status. */
   private async ensureBaseUrl(): Promise<string | null> {
     if (!this.baseUrl) {
       const st = await this.status()
@@ -273,6 +310,10 @@ class PalcoSession {
       footerRef,
       footerColor: s.footerRefColor,
       footerWeight: s.footerRefWeight,
+      footerPosition: isBible ? s.bibleRefPosition ?? 'below-right' : undefined,
+      // Receiver anima a entrada do versículo novo; sem o campo, troca seca.
+      transition: isBible ? s.bibleTransition ?? 'fade' : undefined,
+      transitionMs: isBible ? bibleTransitionMs(s.bibleTransitionSpeed) : undefined,
       // Estrofes com aparência própria (paridade do title*):
       lyricFontSize: (isHymns && s.lyricFontSize != null ? s.lyricFontSize : sizeAt1920) / 1920 * 1080,
       lyricFontWeight: isHymns && s.lyricFontWeight != null ? s.lyricFontWeight : fontWeight,
@@ -332,6 +373,19 @@ class PalcoSession {
     for (const target of targets) {
       await this.projectTo(target.id, scope, input)
     }
+  }
+
+  /** Retorno de palco (/retorno) nas conexões no ar marcadas no seletor de telas; as desmarcadas recebem o retorno desligado. */
+  async stageReturn(runtime: MediaProjectionRuntime): Promise<void> {
+    if (!this.isElectron) return
+    const stage = readEffectiveStageSettings('hymns')
+    const background = runtime.active ? resolveBackgroundImage(stage.backgroundImage) ?? runtime.imageUrl : null
+    const slots = (await this.slots()).filter((slot) => slot.running)
+    await Promise.all(slots.map(async (slot) => {
+      if (!obsAllowsMirror(slot.id, 'hymns')) return palcoApi().send(buildStageReturn({ ...runtime, active: false }, stage), slot.id)
+      const resolved = background ? await this.forSlot(slot.id).resolveBgUrl(background) : undefined
+      await palcoApi().send(buildStageReturn(runtime, stage, resolved), slot.id)
+    }))
   }
 
   /** BG permanente do palco (idle) — bg global do stage. */
@@ -467,6 +521,14 @@ class PalcoSession {
     }))
   }
 
+  /** Áudio dos hinos em toda conexão no ar que espelha hinos; stop vai a todas no ar. */
+  async hymnAudio(input: Parameters<PalcoSession['audio']>[0]): Promise<void> {
+    if (!this.isElectron) return
+    const slots = await this.slots()
+    const targets = slots.filter((slot) => slot.running && (input.action === 'stop' || obsAllowsMirror(slot.id, 'hymns')))
+    await Promise.all(targets.map((slot) => this.forSlot(slot.id).audio(input)))
+  }
+
   /** Publica arquivo local no /media/ do sender e devolve URL absoluta. */
   private async serveLocal(target: string): Promise<string | null> {
     // blob:/data: (capa .slja do IndexedDB — o renderer resolve coverMediaId
@@ -514,8 +576,11 @@ class PalcoSession {
     }
   }
 
-  async warmupObs(slotId: string): Promise<void> {
+  /** Teste de inicialização nas fontes abertas; sem nenhuma aberta, só aguarda o OBS. */
+  async warmupObs(slotId: string): Promise<'confirmed' | 'waiting'> {
     if (!this.isElectron) throw new Error('OBS unavailable')
+    const status = await palcoApi().status(slotId).catch(() => null)
+    if (!status?.clients) return 'waiting'
     await this.refreshObs(slotId)
     const requestId = `warmup-${slotId}-${Date.now()}-${Math.random().toString(36).slice(2)}`
     let timeout: ReturnType<typeof setTimeout> | undefined
@@ -533,6 +598,7 @@ class PalcoSession {
       const sent = await palcoApi().send({ v: 2, type: 'obsWarmup', requestId, durationMs: 3000, expiresAt: Date.now() + 20000 }, slotId).catch(() => false)
       if (!sent) fail(new Error('OBS startup test could not be sent'))
       await confirmed
+      return 'confirmed'
     } finally {
       if (timeout) clearTimeout(timeout)
       if (typeof cleanup.unsubscribe === 'function') cleanup.unsubscribe()
@@ -572,15 +638,9 @@ class PalcoSession {
     void palcoApi().send({ v: 2, type: 'obsShare', enabled }, slotId)
   }
 
-  syncObsIdle(slotId: string): void {
-    if (!this.isElectron) return
-    void palcoApi().send({ v: 2, type: 'obsIdle', black: obsBlackIdle.value }, slotId)
-  }
-
   /** Volta ao idle (aguardando conteúdo). */
   idle(msg?: string): void {
     if (!this.isElectron) return
-    if (obsConnections.value.some((item) => item.id === this.activeSlotId)) this.syncObsIdle(this.activeSlotId)
     void palcoApi().send({
       v: 2,
       type: 'idle',

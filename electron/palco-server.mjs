@@ -3,9 +3,9 @@ import { readConnectionStartup, saveConnectionStartup } from './palco/connection
  * Servidor do PALCO (cast para TV) — multi-slot (paridade PalcoOrchestrator APK).
  *
  * APK PalcoOrchestrator: cada slot = par de portas HTTP/WS próprio:
- *   slot 0 (principal): 7080/7081 — compatível com receivers atuais
- *   slot 1: 7082/7083
- *   slot 2: 7084/7085 ...
+ *   slot 0 (principal): 47080/47081 (antes 7080/7081; salvos são migrados)
+ *   slot 1: 47082/47083
+ *   slot 2: 47084/47085 ...
  * Cada slot tem sender próprio (HTTP + WS), replay de estado, mídia, etc.
  *
  * IPC do renderer:
@@ -16,7 +16,7 @@ import { readConnectionStartup, saveConnectionStartup } from './palco/connection
  *   palco:status {slotId?} → status de um slot (default: principal)
  *   palco:start {slotId?}, palco:stop {slotId?}, palco:slot-status {slotId?}
  *
- * Receiver conecta em `ws://ip:7081+2N/palco?port=7081+2N` (query port opcional)
+ * Receiver conecta em `ws://ip:47081+2N/palco?port=47081+2N` (query port opcional)
  */
 
 import { publishReceiverEvent } from './palco/receiver-events.mjs'
@@ -33,9 +33,19 @@ import { app, ipcMain } from 'electron'
 import { WebSocketServer } from 'ws'
 
 import { loadOrCreatePalcoToken, requestHasPalcoAccess } from './palco-token.mjs'
+import {
+  DEFAULT_HTTP_PORT,
+  DEFAULT_TRANSMISSION,
+  migrateLegacyPort,
+  normalizeOverlayStyle,
+  rankInterfaces,
+  readTransmissionConfig,
+  resolveBind,
+  saveTransmissionConfig,
+  suggestPort,
+  validatePort,
+} from './palco/transmission-config.mjs'
 
-const BASE_HTTP_PORT = 7080
-const BASE_WS_PORT = 7081
 const MAX_SLOTS = 8 // slot 0-7
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -44,13 +54,22 @@ const DIST_DIR = path.resolve(__dirname, '../dist')
 /** @typedef {import('node:http').IncomingMessage} Req */
 /** @typedef {import('node:http').ServerResponse} Res */
 
-function lanIp() {
-  for (const ifaces of Object.values(networkInterfaces())) {
-    for (const iface of ifaces ?? []) {
-      if (iface.family === 'IPv4' && !iface.internal) return iface.address
-    }
-  }
-  return '127.0.0.1'
+/** Rede e token escolhidos na aba Transmissão (persistidos pelo manager). */
+let _transmission = { ...DEFAULT_TRANSMISSION }
+export function getTransmissionState() { return { ..._transmission } }
+export function setTransmissionState(next) {
+  _transmission = { bind: next?.bind ?? 'all', requireToken: next?.requireToken !== false }
+}
+function networkBinding() {
+  return resolveBind(_transmission.bind, rankInterfaces(networkInterfaces()))
+}
+function lanIp() { return networkBinding().linkHost }
+/** Token cobrado da rede; null quando o operador desligou a exigência. */
+function requiredToken() { return _transmission.requireToken ? getPalcoToken() : null }
+function isLoopback(ip) { return ip === '127.0.0.1' || ip === '::1' }
+
+function portInUse(error, port) {
+  return error?.code === 'EADDRINUSE' ? { code: 'port-in-use', port } : { code: 'start-failed', port }
 }
 
 /** Estado de um slot de palco. */
@@ -68,13 +87,17 @@ class PalcoSlot {
   #running = false
   #media = new Map() // mídia local servida em /media/
   #contents // callback pro renderer
+  #overlay
+  #error = null
+  #listenHost = null
 
-  constructor(id, label, httpPort, wsPort, getContents) {
+  constructor(id, label, httpPort, wsPort, getContents, options = {}) {
     this.#id = id
     this.#label = label
     this.#httpPort = httpPort
     this.#wsPort = wsPort
     this.#contents = getContents
+    this.#overlay = normalizeOverlayStyle(options.overlay)
   }
 
   get id() { return this.#id }
@@ -83,6 +106,47 @@ class PalcoSlot {
   get wsPort() { return this.#wsPort }
   get running() { return this.#running }
   get clientsCount() { return this.#clients.size }
+  get overlay() { return { ...this.#overlay } }
+
+  /** Aparência da legenda desta conexão; fontes abertas recebem na hora. */
+  setOverlay(style) {
+    this.#overlay = normalizeOverlayStyle({ ...this.#overlay, ...style })
+    if (this.#running) this.broadcast(this.#overlayMessage())
+    return this.overlay
+  }
+
+  #overlayMessage() { return { v: 2, type: 'overlayStyle', style: this.overlay } }
+
+  /** Fecha quem entrou pela rede (token antigo); fontes deste computador seguem. */
+  disconnectNetworkClients() {
+    for (const [ws, ip] of this.#receiverIps) {
+      if (!isLoopback(ip)) { try { ws.close() } catch { /* ignore */ } }
+    }
+  }
+
+  /** Troca o par de portas (WS = HTTP + 1) mantendo o id. */
+  async setPorts(httpPort) {
+    if (this.#running) throw new Error('running')
+    await this.#closeHttp()
+    this.#httpPort = httpPort
+    this.#wsPort = httpPort + 1
+    this.#error = null
+    await this.prepare()
+  }
+
+  /** Refaz o bind HTTP depois de a interface de rede mudar. */
+  async rebind() {
+    if (this.#running) throw new Error('running')
+    await this.#closeHttp()
+    await this.prepare()
+  }
+
+  async #closeHttp() {
+    await this.#preparing?.catch(() => {})
+    const server = this.#httpServer
+    this.#httpServer = null
+    if (server) await new Promise(resolve => { server.close(() => resolve()); server.closeAllConnections?.() })
+  }
 
   /** Broadcast p/ todos os receivers conectados neste slot. */
   broadcast(obj) {
@@ -111,13 +175,21 @@ class PalcoSlot {
     if (this.#preparing) return this.#preparing
     this.#preparing = (async () => {
       const server = createServer((req, res) => { void this.handleHttp(req, res) })
+      const host = networkBinding().listenHost
       this.#httpServer = server
       try {
         await new Promise((resolve, reject) => {
           server.once('error', reject)
-          server.listen(this.#httpPort, '0.0.0.0', resolve)
+          server.listen(this.#httpPort, host, resolve)
         })
-      } catch (error) { this.#httpServer = null; server.close(); throw error }
+        this.#listenHost = host
+        this.#error = null
+      } catch (error) {
+        this.#httpServer = null
+        server.close()
+        this.#error = portInUse(error, this.#httpPort)
+        throw error
+      }
     })()
     try { await this.#preparing } finally { this.#preparing = null }
   }
@@ -127,7 +199,7 @@ class PalcoSlot {
     if (this.#running) return true
     try {
       await this.prepare()
-      this.#wss = new WebSocketServer({ port: this.#wsPort })
+      this.#wss = new WebSocketServer({ port: this.#wsPort, host: this.#listenHost ?? networkBinding().listenHost })
       this.#wss.on('connection', (ws, req) => {
         if (req?.url && !req.url.split('?')[0].startsWith('/palco')) { ws.close(); return }
         // OBS S1: token na LAN (localhost bypass) — feature off = comportamento atual
@@ -136,7 +208,7 @@ class PalcoSlot {
             remoteAddress: req?.socket?.remoteAddress,
             url: req?.url,
             headers: req?.headers,
-            expectedToken: getPalcoToken(),
+            expectedToken: requiredToken(),
           })
         ) {
           try { ws.close() } catch { /* ignore */ }
@@ -169,8 +241,18 @@ class PalcoSlot {
         // SEM ping (webOS 4.x não responde)
       })
 
-      await new Promise((resolve, reject) => { this.#wss.once('listening', resolve); this.#wss.once('error', reject) })
+      try {
+        await new Promise((resolve, reject) => { this.#wss.once('listening', resolve); this.#wss.once('error', reject) })
+      } catch (error) {
+        const wss = this.#wss
+        this.#wss = null
+        wss?.close()
+        this.#error = portInUse(error, this.#wsPort)
+        throw error
+      }
+      this.#error = null
       this.#running = true
+      updateReplayState(this.#lastByType, this.#overlayMessage())
       return true
     } catch (e) {
       console.error(`[palco:slot:${this.#id}] start error:`, e)
@@ -198,10 +280,7 @@ class PalcoSlot {
 
   async dispose() {
     await this.stop()
-    await this.#preparing
-    const server = this.#httpServer
-    this.#httpServer = null
-    if (server) await new Promise(resolve => { server.close(resolve); server.closeAllConnections?.() })
+    await this.#closeHttp()
   }
 
   /** Manda mensagem prós receivers deste slot. */
@@ -217,7 +296,7 @@ class PalcoSlot {
     if (m.type === 'obsControl') { this.broadcastTransient(m); return true }
     // OBS S1: URL de mídia sai COM o token (a TV/browser recebe a URL já
     // autenticada — o renderer não precisa saber do token).
-    const token = getPalcoToken()
+    const token = requiredToken()
     if (token && typeof m.url === 'string' && m.url.includes('/media/')) {
       try {
         const u = new URL(m.url)
@@ -227,8 +306,8 @@ class PalcoSlot {
     }
     // Mesmo gate para o BG/cover da projection: <img> não manda header, e
     // localhost bypass escondia o 403 — browser/OBS/TV buscavam
-    // http://<lan>:7080/media/... sem token → 403 → onerror → fallback FIXO.
-    const bgUrl = m.type === 'projection' ? (m.background ?? m.cover) : undefined
+    // http://<lan>:47080/media/... sem token → 403 → onerror → fallback FIXO.
+    const bgUrl = m.type === 'projection' || m.type === 'stageReturn' ? (m.background ?? m.cover) : undefined
     if (token && typeof bgUrl === 'string' && bgUrl.includes('/media/')) {
       try {
         const u = new URL(bgUrl)
@@ -256,18 +335,25 @@ class PalcoSlot {
 
   /** Status deste slot. */
   status() {
+    const host = lanIp()
+    const tokenQuery = requiredToken() ? `?token=${requiredToken()}` : ''
     return {
       id: this.#id,
       label: this.#label,
       running: this.#running,
       clients: this.#clients.size,
       receiverIps: Array.from(new Set(this.#receiverIps.values())),
-      url: `http://${lanIp()}:${this.#httpPort}`,
-      wsUrl: `ws://${lanIp()}:${this.#wsPort}/palco`,
+      httpPort: this.#httpPort,
+      wsPort: this.#wsPort,
+      listenHost: this.#listenHost ?? networkBinding().listenHost,
+      error: this.#error,
+      overlay: this.overlay,
+      url: `http://${host}:${this.#httpPort}`,
+      wsUrl: `ws://${host}:${this.#wsPort}/palco`,
       // OBS S1: receiver URL pronta com token (UI copia/cola no OBS Browser Source)
-      receiverUrl: this.#running
-        ? `http://${lanIp()}:${this.#httpPort}/?token=${getPalcoToken()}`
-        : null,
+      receiverUrl: this.#running ? `http://${host}:${this.#httpPort}/espelho${tokenQuery}` : null,
+      overlayUrl: this.#running ? `http://${host}:${this.#httpPort}/legenda${tokenQuery}` : null,
+      returnUrl: this.#running ? `http://${host}:${this.#httpPort}/retorno${tokenQuery}` : null,
     }
   }
 
@@ -293,8 +379,28 @@ class PalcoSlot {
       return
     }
 
-    // Receiver embutido (mesma página do palco-receiver)
-    if (p === '/' || p === '/receiver.html' || p === '/index.html') {
+    // Legenda da Transmissão (fonte de navegador do OBS) e a aparência desta conexão
+    if (p === '/legenda') {
+      try {
+        const page = await readFile(path.join(__dirname, 'palco', 'overlay.html'))
+        res.setHeader('Content-Type', 'text/html; charset=utf-8')
+        res.setHeader('Cache-Control', 'no-store')
+        res.end(page)
+      } catch {
+        res.statusCode = 404
+        res.end('overlay not bundled')
+      }
+      return
+    }
+    if (p === '/legenda-config') {
+      res.setHeader('Content-Type', 'application/json')
+      res.setHeader('Cache-Control', 'no-store')
+      res.end(JSON.stringify({ style: this.overlay }))
+      return
+    }
+
+    // Receiver embutido (mesma página do palco-receiver): /espelho replica a TV; em /retorno vira o retorno de palco
+    if (p === '/' || p === '/receiver.html' || p === '/index.html' || p === '/espelho' || p === '/retorno') {
       try {
         const page = await readFile(path.join(__dirname, 'palco', 'receiver.html'))
         // Versão do RECEIVER (appinfo.json embutido, mesmo do .ipk webOS) —
@@ -316,6 +422,7 @@ class PalcoSlot {
     // quebrando todo bg/cover externo (músicas da API) → fallback.
     const assetMatch = /^(?!\/(?:proxy|status|bg|media)(?:\/|$))\/([a-z0-9._-]+)$/i.exec(p)
     if (assetMatch) {
+      if (/\.html$/i.test(p)) { res.statusCode = 404; res.end(); return }
       try {
         const file = path.join(__dirname, 'palco', String(assetMatch[1]))
         const buf = await readFile(file)
@@ -369,7 +476,7 @@ class PalcoSlot {
           remoteAddress: req.socket?.remoteAddress,
           url: req.url,
           headers: req.headers,
-          expectedToken: getPalcoToken(),
+          expectedToken: requiredToken(),
         })
       ) {
         res.statusCode = 403
@@ -405,7 +512,7 @@ class PalcoSlot {
           remoteAddress: req.socket?.remoteAddress,
           url: req.url,
           headers: req.headers,
-          expectedToken: getPalcoToken(),
+          expectedToken: requiredToken(),
         })
       ) {
         res.statusCode = 403
@@ -532,26 +639,44 @@ class PalcoManager {
 
   /** Slot principal (id='0') sempre existe. */
   init() {
-    this.ensureSlot('0', 'Principal', BASE_HTTP_PORT, BASE_WS_PORT)
-    // Operador configura TV 2/porta 7082 uma vez; slots voltam após restart.
-    for (const item of readPersistedSlots()) {
+    const stored = readPersistedSlots()
+    let migrated = false
+    const rows = stored.map((item) => {
+      const httpPort = Number(item?.httpPort)
+      const moved = migrateLegacyPort(httpPort)
+      if (moved === httpPort || Number(item?.wsPort) !== httpPort + 1) return item
+      migrated = true
+      return { ...item, httpPort: moved, wsPort: moved + 1 }
+    })
+    const principal = rows.find(item => String(item?.id) === '0')
+    const principalPort = Number(principal?.httpPort)
+    const principalHttp = validatePort(principalPort, []).ok && Number(principal?.wsPort) === principalPort + 1 ? principalPort : DEFAULT_HTTP_PORT
+    this.ensureSlot('0', 'Principal', principalHttp, principalHttp + 1, principal?.overlay)
+    // Operador configura a TV 2 uma vez; slots voltam após restart.
+    for (const item of rows) {
       const httpPort = Number(item?.httpPort)
       const wsPort = Number(item?.wsPort)
       const id = String(item?.id ?? '')
       const label = String(item?.label ?? '').trim()
       if (
-        id !== '0' && label && Number.isInteger(httpPort) &&
-        Number.isInteger(wsPort) && httpPort >= BASE_HTTP_PORT + 2 &&
+        id !== '0' && label && !this.#slots.has(id) &&
+        validatePort(httpPort, this.#takenPorts()).ok &&
         wsPort === httpPort + 1 && this.#slots.size < MAX_SLOTS
-      ) this.ensureSlot(id, label, httpPort, wsPort)
+      ) this.ensureSlot(id, label, httpPort, wsPort, item?.overlay)
     }
+    if (migrated) this.persistSlots()
+  }
+
+  #takenPorts(exceptId) {
+    return this.getAllSlots().filter(slot => slot.id !== exceptId).map(slot => slot.httpPort)
   }
 
   persistSlots() {
     try {
       const rows = Array.from(this.#slots.values())
-        .filter((slot) => slot.id !== '0')
-        .map((slot) => ({ id: slot.id, label: slot.label, httpPort: slot.httpPort, wsPort: slot.wsPort }))
+        .map((slot) => slot.id === '0'
+          ? { id: slot.id, httpPort: slot.httpPort, wsPort: slot.wsPort, overlay: slot.overlay }
+          : { id: slot.id, label: slot.label, httpPort: slot.httpPort, wsPort: slot.wsPort, overlay: slot.overlay })
       const file = slotsConfigPath()
       mkdirSync(path.dirname(file), { recursive: true })
       const tmp = `${file}.tmp`
@@ -563,9 +688,9 @@ class PalcoManager {
   }
 
   /** Garante slot; cria se não existe. */
-  ensureSlot(id, label, httpPort, wsPort) {
+  ensureSlot(id, label, httpPort, wsPort, overlay) {
     if (this.#slots.has(id)) return this.#slots.get(id)
-    const slot = new PalcoSlot(id, label, httpPort, wsPort, () => this.#getContents())
+    const slot = new PalcoSlot(id, label, httpPort, wsPort, () => this.#getContents(), { overlay })
     this.#slots.set(id, slot)
     void slot.prepare().catch(error => console.warn('[palco] receiver prepare:', error?.message ?? error))
     return slot
@@ -574,12 +699,55 @@ class PalcoManager {
   /** Cria novo slot (aloca próximo par de portas livre). */
   createSlot(label = `TV ${this.#slots.size}`) {
     if (this.#slots.size >= MAX_SLOTS) throw new Error('max slots')
-    let httpPort = BASE_HTTP_PORT + 2, wsPort = BASE_WS_PORT + 2
-    while (this.#slots.has(String(httpPort))) { httpPort += 2; wsPort += 2 }
-    const id = String(httpPort) // id = porta HTTP (ex: "7082")
-    const slot = this.ensureSlot(id, label, httpPort, wsPort)
+    let httpPort = suggestPort(DEFAULT_HTTP_PORT + 2, this.#takenPorts())
+    // id = porta HTTP de criação (ex: "47082"); continua o mesmo se a porta mudar depois
+    while (httpPort !== null && this.#slots.has(String(httpPort))) httpPort = suggestPort(httpPort + 2, this.#takenPorts())
+    if (httpPort === null) throw new Error('no free port')
+    const slot = this.ensureSlot(String(httpPort), label, httpPort, httpPort + 1)
     this.persistSlots()
     return slot
+  }
+
+  /** Porta e/ou aparência de uma conexão. */
+  async updateSlot(id, { httpPort, overlay } = {}) {
+    const slot = this.#slots.get(id)
+    if (!slot) return { ok: false, reason: 'not-found' }
+    if (httpPort !== undefined && httpPort !== slot.httpPort) {
+      const check = validatePort(httpPort, this.#takenPorts(id))
+      if (!check.ok) return check
+      if (slot.running) return { ok: false, reason: 'running' }
+      try {
+        await slot.setPorts(httpPort)
+      } catch (error) {
+        this.persistSlots()
+        console.warn('[palco] port change:', error?.message ?? error)
+        return { ok: false, reason: 'port-in-use', status: this.statusOf(slot) }
+      }
+    }
+    if (overlay) slot.setOverlay(overlay)
+    this.persistSlots()
+    return { ok: true, status: this.statusOf(slot) }
+  }
+
+  /** Status com sugestão de porta quando a atual está ocupada por outro programa. */
+  statusOf(slot) {
+    const status = slot.status()
+    if (status.error?.code !== 'port-in-use') return status
+    const suggestedPort = suggestPort(slot.httpPort + 2, this.#takenPorts(slot.id), [status.error.port])
+    return { ...status, error: { ...status.error, suggestedPort } }
+  }
+
+  /** Aplica rede/token; trocar a interface exige todas as conexões paradas. */
+  async setTransmission(file, next) {
+    const current = getTransmissionState()
+    const bind = next?.bind ?? current.bind
+    if (bind !== current.bind && this.getAllSlots().some(slot => slot.running)) return { ok: false, reason: 'running' }
+    const saved = saveTransmissionConfig(file, { bind, requireToken: next?.requireToken ?? current.requireToken })
+    setTransmissionState(saved)
+    if (saved.bind !== current.bind) {
+      await Promise.all(this.getAllSlots().map(slot => slot.rebind().catch(error => console.warn('[palco] rebind:', slot.id, error?.message ?? error))))
+    }
+    return { ok: true, ...saved }
   }
 
   /** Remove slot (exceto principal). */
@@ -623,6 +791,8 @@ let manager = null
 
 /** Anexa ao main process (chamado em main.mjs). */
 export function attachPalcoServer(getContents) {
+  const transmissionFile = path.join(app.getPath('userData'), 'palco-transmission.json')
+  setTransmissionState(readTransmissionConfig(transmissionFile))
   if (!manager) manager = new PalcoManager(getContents)
   manager.init()
   const startupFile = path.join(app.getPath('userData'), 'palco-connections-startup.json')
@@ -650,14 +820,12 @@ export function attachPalcoServer(getContents) {
   ipcMain.handle('palco:token', () => ({ token: getPalcoToken(), path: palcoTokenPath() }))
   ipcMain.handle('palco:token-reset', () => {
     const token = resetPalcoToken()
-    // receivers conectados com o token velho caem na reconexão — ok
+    for (const slot of manager.getAllSlots()) slot.disconnectNetworkClients()
     return { token }
   })
 
   // IPC: lista slots
-  ipcMain.handle('palco:slots', () =>
-    manager.getAllSlots().map(s => ({ id: s.id, label: s.label, running: s.running, clients: s.clientsCount, httpPort: s.httpPort, wsPort: s.wsPort }))
-  )
+  ipcMain.handle('palco:slots', () => manager.getAllSlots().map(slot => manager.statusOf(slot)))
 
   // IPC: cria slot
   ipcMain.handle('palco:slot-create', (_e, { label }) => {
@@ -672,10 +840,20 @@ export function attachPalcoServer(getContents) {
     return removed
   })
 
+  ipcMain.handle('palco:slot-update', (_e, { id, httpPort, overlay } = {}) => manager.updateSlot(String(id ?? ''), { httpPort, overlay }))
+
+  // IPC: rede/token da aba Transmissão
+  ipcMain.handle('palco:transmission-get', () => {
+    const interfaces = rankInterfaces(networkInterfaces())
+    const state = getTransmissionState()
+    return { ...state, ...resolveBind(state.bind, interfaces), bind: state.bind, interfaces, token: getPalcoToken() }
+  })
+  ipcMain.handle('palco:transmission-set', (_e, next) => manager.setTransmission(transmissionFile, next))
+
   // IPC: status (default slot 0)
   ipcMain.handle('palco:status', (_e, { slotId }) => {
     const slot = manager.getSlot(slotId ?? '0')
-    return slot ? slot.status() : null
+    return slot ? manager.statusOf(slot) : null
   })
 
   // IPC: start/stop (default slot 0)
@@ -814,7 +992,7 @@ nav{display:flex;justify-content:space-between;gap:var(--sp3)}
 </footer>
 </main>
 <div id="pair"><p class="hint" data-i18n="pairHint">Pareamento perdido. Cole abaixo o link do QR exibido no app do desktop (começa com http://…/speaker?token=…):</p>
-<input id="pairUrl" placeholder="http://192.168.x.x:7080/speaker?remotePort=7071&token=abcd1234">
+<input id="pairUrl" placeholder="http://192.168.x.x:47080/speaker?remotePort=7071&token=abcd1234">
 <button id="pairGo" class="small" data-i18n="connect">Conectar</button><button id="pairCancel" class="small" data-i18n="cancel">Cancelar</button></div>
 <script>
 const I18N=${dictJson};
@@ -829,7 +1007,7 @@ document.querySelectorAll('[data-i18n]').forEach(el=>{el.textContent=T[el.datase
 document.querySelectorAll('[data-i18n-attr]').forEach(el=>{const[k,key]=el.dataset.i18nAttr.split(':');el.setAttribute(k,T[key])});
 let token=q.get('token')||localStorage.getItem('speaker.token');
 let remotePort=q.get('remotePort')||localStorage.getItem('speaker.remotePort')||'7071';
-let palcoPort=q.get('palcoPort')||localStorage.getItem('speaker.palcoPort')||'7081';
+let palcoPort=q.get('palcoPort')||localStorage.getItem('speaker.palcoPort')||String((Number(location.port)||47080)+1);
 // Token do palco (valor real injetado server-side abaixo) — o preview precisa
 // dele para o WS do palco não fechar a conexão fora do localhost.
 let palcoToken='${safeToken}';
