@@ -40,6 +40,8 @@ const CUSTOM_DB = {
 			name: "Hino Sacro",
 			audioBase64: "QUJD",
 			audioName: "hino.mp3",
+			// SPEC draft-local (cfb72b5c): legado migra para published.
+			status: "published",
 			lyrics: [{ id: -1, lyric: "Glória a Deus", order: 1, show_slide: true }],
 		},
 	],
