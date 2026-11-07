@@ -23,7 +23,8 @@ vi.mock('@design-system/index', () => ({
   },
 }))
 
-vi.mock('@shared/constants/storage-keys', () => ({
+vi.mock('@shared/constants/storage-keys', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@shared/constants/storage-keys')>(),
   BROWSER_STORAGE_KEYS: { userPreferences: 'user-preferences' },
 }))
 
@@ -188,7 +189,7 @@ describe('CountdownProjectionView', () => {
   it('BroadcastChannel: mensagens de config e runtime atualizam estado; unmount fecha', async () => {
     const wrapper = mount(CountdownProjectionView)
     await flushPromises()
-    expect(FakeBroadcastChannel.instances).toHaveLength(2)
+    expect(FakeBroadcastChannel.instances.filter(channel => channel.name !== 'louvorja-fonts-changed')).toHaveLength(2)
     const configCh = FakeBroadcastChannel.instances.find((c) => c.name === 'countdown-config')
     const runtimeCh = FakeBroadcastChannel.instances.find((c) => c.name === 'countdown-runtime')
     configCh!.emit({ timeFormat: 'hh:mm:ss.ms', bgColor: '#000', textColor: '#fff' })

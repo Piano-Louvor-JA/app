@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useProjectionFont } from '@modules/settings/composables/useProjectionFont'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 
 import { ProjectionBackground } from '@design-system/index'
@@ -165,13 +166,15 @@ const referenceStyle = computed(() => {
     ...(referenceCorner.value ? {} : { textAlign: position.replace('below-', '') as 'left' | 'center' | 'right' }),
   }
 })
+
+const projectionFontStyle = useProjectionFont('bible')
 </script>
 
 <template>
   <ProjectionBackground
     class="bible-projection"
     :class="{ 'bible-projection--embedded': embedded }"
-    :style="stageStyle"
+    :style="[stageStyle, projectionFontStyle]"
   >
     <div
       class="bible-projection__stage"

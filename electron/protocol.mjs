@@ -75,6 +75,7 @@ function mimeFromExtension(filePath) {
   if (ext === '.webm') return 'video/webm'
   if (ext === '.mkv') return 'video/x-matroska'
   if (ext === '.mov') return 'video/quicktime'
+  if (ext === '.woff2') return 'font/woff2'
   if (ext === '.pdf') return 'application/pdf'
   if (ext === '.vtt') return 'text/vtt; charset=utf-8'
   return 'application/octet-stream'
@@ -218,6 +219,9 @@ export function registerLocalFileProtocol() {
     }
 
     if (!existsSync(resolved.filePath)) {
+      // Font files are exclusively managed by explicit Google Fonts downloads.
+      // A missing/cancelled local face must never fall through to the media API.
+      if (resolved.mediaRelative.startsWith('fontes/')) return new Response(null, { status: 404 })
       const apiUrl = `${API_BASE_URL}/file/${resolved.mediaRelative}`
       try {
         const response = await net.fetch(apiUrl)
@@ -236,6 +240,10 @@ export function registerLocalFileProtocol() {
         console.error('[protocol] fallback download error:', error)
         return new Response(null, { status: 404 })
       }
+    }
+
+    if (resolved.mediaRelative.startsWith('fontes/')) {
+      return serveDiskFile(resolved.filePath, request, { 'Access-Control-Allow-Origin': '*' })
     }
 
     if (IMAGE_EXT.test(resolved.filePath)) {

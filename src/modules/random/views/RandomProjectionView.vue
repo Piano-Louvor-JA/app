@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useProjectionFont } from '@modules/settings/composables/useProjectionFont'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 
@@ -153,13 +154,15 @@ const effectiveConfig = computed(() => {
   const mod = stage.value.random
   return mod ? { ...mod, ...liveConfig.value } : { ...liveConfig.value }
 })
+
+const projectionFontStyle = useProjectionFont('random')
 </script>
 
 <template>
   <ProjectionBackground
     class="random-projection"
     :class="{ 'random-projection--embedded': embedded }"
-    :style="stageStyle"
+    :style="[stageStyle, projectionFontStyle]"
   >
     <div
       v-if="independent || liveRuntime.projecting !== false"

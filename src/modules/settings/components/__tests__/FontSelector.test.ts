@@ -1,0 +1,188 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { mount, flushPromises } from '@vue/test-utils'
+import { createPinia } from 'pinia'
+import { createI18n } from 'vue-i18n'
+import FontSelector from '../FontSelector.vue'
+import { resolveFontId, saveFontSelection } from '@shared/services/font-preferences'
+
+const api = { listInstalled: vi.fn(async () => []), preview: vi.fn(async () => { throw new Error('offline') }), download: vi.fn(async () => { throw new Error('offline') }), downloadAll: vi.fn(async () => ({ failed: [] })), cancel: vi.fn(async () => true), onProgress: vi.fn(() => () => {}), remove: vi.fn(async () => true), release: vi.fn(async () => true) }
+const loader = vi.hoisted(() => ({ load: vi.fn(async (id: string) => `'Preview-${id}'`) }))
+vi.mock('@shared/services/font-loader', () => ({ loadLocalFont: loader.load }))
+vi.mock('@shared/composables/useAppConfirm', () => ({ appConfirm: vi.fn(async () => false) }))
+const i18n = () => createI18n({ legacy: false, locale: 'pt-BR', missingWarn: false, fallbackWarn: false, messages: {} })
+function mountSelector(scope = 'system') { return mount(FontSelector, { props: { scope }, global: { plugins: [createPinia(), i18n()] } }) }
+async function open(w: ReturnType<typeof mountSelector>) {
+  await w.find('[data-font-toggle]').trigger('click')
+  await flushPromises()
+}
+beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); api.preview.mockReset().mockImplementation(async () => { throw new Error('offline') }); window.louvorja = { isElectron: true, fonts: api } as never })
+describe('FontSelector', () => {
+  it('does not access the bridge or network until expanded', () => {
+    const w = mountSelector()
+    expect(w.find('.ds-glass-card').exists()).toBe(true)
+    expect(w.find('[data-font-toggle]').attributes('aria-expanded')).toBe('false')
+    expect(api.listInstalled).not.toHaveBeenCalled()
+    expect(api.preview).not.toHaveBeenCalled()
+    w.unmount()
+  })
+  it('filters by name and category and keeps offline previews harmless', async () => {
+    const w = mountSelector()
+    await open(w)
+    await w.find('input[type=search]').setValue('Merriweather')
+    expect(w.findAll('[data-font-id]')).toHaveLength(1)
+    expect(w.text()).toContain('Merriweather')
+    expect(resolveFontId('system')).toBeNull()
+    w.unmount()
+  })
+  it('does not persist a selection if download fails', async () => {
+    const w = mountSelector('bible')
+    await open(w)
+    await w.find('[data-select-font="inter"]').trigger('click')
+    await w.find('[data-apply-font]').trigger('click')
+    await flushPromises()
+    expect(api.download).toHaveBeenCalled()
+    expect(resolveFontId('bible')).toBeNull()
+    expect(w.find('[role=alert]').exists()).toBe(true)
+    w.unmount()
+  })
+  it('downloads and loads before committing a scope and offers inheritance', async () => {
+    api.download.mockResolvedValueOnce({ id: 'inter', family: 'Inter', faces: [] } as never)
+    const w = mountSelector('bible')
+    await open(w)
+    await w.find('[data-select-font="inter"]').trigger('click')
+    await w.find('[data-apply-font]').trigger('click')
+    await flushPromises()
+    expect(loader.load).toHaveBeenCalled()
+    expect(resolveFontId('bible')).toBe('inter')
+    await w.find('[data-inherit-font]').trigger('click')
+    await w.find('[data-apply-font]').trigger('click')
+    await flushPromises()
+    expect(resolveFontId('bible')).toBeNull()
+    w.unmount()
+  })
+  it('does not apply a pending selection after its dialog closes', async () => {
+    let finish: ((value: unknown) => void) | undefined
+    api.download.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    const w = mountSelector('timer')
+    await open(w)
+    await w.find('[data-select-font="inter"]').trigger('click')
+    await w.find('[data-apply-font]').trigger('click')
+    w.unmount()
+    expect(api.cancel).toHaveBeenCalled()
+    finish?.({ id: 'inter', family: 'Inter', faces: [] })
+    await flushPromises()
+    expect(resolveFontId('timer')).toBeNull()
+    expect(api.release).toHaveBeenCalled()
+  })
+  it('restores the system while preserving explicit projection choices', async () => {
+    saveFontSelection('system', 'merriweather')
+    saveFontSelection('bible', 'lora')
+    const w = mountSelector()
+    await open(w)
+    await w.findAll('button').find(button => button.text() === 'settings.fonts.restore')!.trigger('click')
+    await flushPromises()
+    expect(resolveFontId('system')).toBeNull()
+    expect(resolveFontId('bible')).toBe('lora')
+    w.unmount()
+  })
+
+  it('previews a selected font on a Bible screen before applying or persisting it', async () => {
+    api.preview.mockResolvedValueOnce({ id: 'inter', family: 'Inter', faces: [] } as never)
+    const w = mountSelector('bible')
+    await open(w)
+    await w.find('[data-select-font="inter"]').trigger('click')
+    await flushPromises()
+    expect(w.find('[data-font-preview]').exists()).toBe(true)
+    expect(w.find('[data-font-preview]').text()).toContain('Inter')
+    expect(w.find('.font-preview__verse').attributes('style')).toContain('Preview-inter')
+    expect(w.find('.font-preview__verse').text()).toContain('settings.fonts.previewVerse')
+    expect(w.find('.font-preview__reference').text()).toContain('settings.fonts.previewReference')
+    expect(resolveFontId('bible')).toBeNull()
+    expect(api.download).not.toHaveBeenCalled()
+    w.unmount()
+  })
+
+  it('previews the global font when the module draft chooses inheritance', async () => {
+    saveFontSelection('global', 'lora')
+    saveFontSelection('bible', 'inter')
+    api.preview.mockImplementation(async (id: string) => {
+      if (['inter', 'lora'].includes(id)) return { id, family: id, faces: [] } as never
+      throw new Error('offline')
+    })
+    const w = mountSelector('bible')
+    await open(w)
+    await w.find('[data-inherit-font]').trigger('click')
+    await flushPromises()
+    expect(w.find('[data-font-preview]').text()).toContain('Lora')
+    expect(w.find('.font-preview__verse').attributes('style')).toContain('Preview-lora')
+    expect(resolveFontId('bible')).toBe('inter')
+    w.unmount()
+  })
+  it('loads the selected preview without waiting for another catalog preview', async () => {
+    let finish: ((value: unknown) => void) | undefined
+    api.preview.mockImplementation(async (id: string) => {
+      if (id === 'inter') return new Promise(resolve => { finish = resolve })
+      if (id === 'merriweather') return { id, family: 'Merriweather', faces: [] } as never
+      throw new Error('offline')
+    })
+    const w = mountSelector()
+    await open(w)
+    await w.find('input[type=search]').setValue('Merriweather')
+    await w.find('[data-select-font="merriweather"]').trigger('click')
+    await flushPromises()
+    expect(w.find('.font-preview__verse').attributes('style')).toContain('Preview-merriweather')
+    expect(resolveFontId('system')).toBeNull()
+    w.unmount()
+    finish?.({ id: 'inter', family: 'Inter', faces: [] })
+    await flushPromises()
+  })
+
+  it('allows decorative fonts to be selected and previewed in Appearance, with an explanation instead of a disabled row', async () => {
+    api.preview.mockImplementation(async (id: string) => {
+      if (id === 'caveat') return { id, family: 'Caveat', faces: [] } as never
+      throw new Error('offline')
+    })
+    const w = mountSelector()
+    await open(w)
+    await w.find('[role="switch"]').trigger('click')
+    await w.find('input[type=search]').setValue('Caveat')
+    const choice = w.find('[data-select-font="caveat"]')
+    expect(choice.attributes('disabled')).toBeUndefined()
+    await choice.trigger('click')
+    await flushPromises()
+    expect(w.find('.font-preview__verse').attributes('style')).toContain('Preview-caveat')
+    expect(w.find('[data-font-usage]').text()).toContain('settings.fonts.projectionSystemHint')
+    expect(w.find('[data-apply-font]').attributes('disabled')).toBeDefined()
+    expect(api.download).not.toHaveBeenCalled()
+    expect(resolveFontId('system')).toBeNull()
+    w.unmount()
+  })
+  it('re-enables system application when switching back from a decorative font', async () => {
+    const w = mountSelector()
+    await open(w)
+    await w.find('[role="switch"]').trigger('click')
+    await w.find('input[type=search]').setValue('Caveat')
+    await w.find('[data-select-font="caveat"]').trigger('click')
+    expect(w.find('[data-apply-font]').attributes('disabled')).toBeDefined()
+    await w.find('input[type=search]').setValue('Inter')
+    await w.find('[data-select-font="inter"]').trigger('click')
+    expect(w.find('[data-apply-font]').attributes('disabled')).toBeUndefined()
+    expect(w.find('[data-font-usage]').exists()).toBe(false)
+    w.unmount()
+  })
+  it('keeps decorative fonts applicable in projection modules', async () => {
+    api.download.mockResolvedValueOnce({ id: 'caveat', family: 'Caveat', faces: [] } as never)
+    const w = mountSelector('bible')
+    await open(w)
+    await w.find('input[type=search]').setValue('Caveat')
+    await w.find('[data-select-font="caveat"]').trigger('click')
+    expect(w.find('[data-font-usage]').text()).toContain('settings.fonts.projectionUseHint')
+    expect(w.find('[data-apply-font]').attributes('disabled')).toBeUndefined()
+    await w.find('[data-apply-font]').trigger('click')
+    await flushPromises()
+    expect(resolveFontId('bible')).toBe('caveat')
+    expect(resolveFontId('system')).toBeNull()
+    w.unmount()
+  })
+
+})

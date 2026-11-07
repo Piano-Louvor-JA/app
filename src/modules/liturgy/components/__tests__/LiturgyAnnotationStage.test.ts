@@ -112,9 +112,9 @@ describe('LiturgyAnnotationStage', () => {
     expect(style).toContain('font-size: 4cqw')
     expect(style).toContain('background-color: rgba(24, 24, 24, 0.45)')
     expect(wrapper.attributes('style')).toContain('background-color: rgb(0, 0, 0)')
-    expect(FakeChannel.instances[0].name).toBe('louvorja-liturgy-annotation')
+    expect(FakeChannel.instances.some(channel => channel.name === 'louvorja-liturgy-annotation')).toBe(true)
     wrapper.unmount()
-    expect(FakeChannel.instances[0].closed).toBe(true)
+    expect(FakeChannel.instances.every(channel => channel.closed)).toBe(true)
     expect(env.stageSubs).toHaveLength(0)
   })
 
@@ -124,8 +124,9 @@ describe('LiturgyAnnotationStage', () => {
     setRuntime(ANNOTATION_INDEPENDENT_STORAGE_KEY, { active: true, title: 'Independente', html: '' })
     const wrapper = mount(LiturgyAnnotationStage)
     expect(wrapper.text()).toContain('Independente')
-    expect(FakeChannel.instances[0].name).toBe('louvorja-liturgy-annotation-independent')
-    FakeChannel.instances[0].emit({ active: true, title: 'Novo aviso', html: '<i>texto</i>' })
+    const independentChannel = FakeChannel.instances.find(channel => channel.name === 'louvorja-liturgy-annotation-independent')!
+    expect(independentChannel).toBeTruthy()
+    independentChannel.emit({ active: true, title: 'Novo aviso', html: '<i>texto</i>' })
     await flushPromises()
     expect(wrapper.find('.annotation-projection__title').text()).toBe('Novo aviso')
     expect(wrapper.find('[data-testid="annotation-projection-text"]').html()).toContain('<i>texto</i>')

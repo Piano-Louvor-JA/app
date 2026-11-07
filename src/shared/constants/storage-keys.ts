@@ -13,6 +13,7 @@ export const BROWSER_STORAGE_KEYS = {
 
 /** Campos dentro de `user_data` (preferências do operador). */
 export const USER_PREFERENCE_KEYS = {
+  fonts: 'fonts.preferences.v1',
   theme: 'theme',
   blur: 'blur',
   accent: 'accent',

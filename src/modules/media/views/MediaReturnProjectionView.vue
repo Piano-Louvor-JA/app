@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useProjectionFont } from '@modules/settings/composables/useProjectionFont'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
@@ -360,12 +361,14 @@ const nextTextStyle = computed(() => ({
 watch(barFillRef, (el) => {
   if (el) el.style.transform = `scaleX(${barDisplay.value})`
 })
+
+const projectionFontStyle = useProjectionFont('hymns')
 </script>
 
 <template>
   <div
     class="media-return"
-    :style="stageStyle"
+    :style="[stageStyle, projectionFontStyle]"
   >
     <div
       v-if="bgImage"

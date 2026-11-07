@@ -1,3 +1,5 @@
+import type { FontsApi } from './fonts'
+
 export type MediaFolderType = 'covers' | 'music' | 'slides'
 
 export type ProgressPayload = {
@@ -574,6 +576,7 @@ export type DiagnosticsApi = {
 export type LouvorJaBridge = {
   platform: string
   isElectron: boolean
+  fonts?: FontsApi
   diagnostics?: DiagnosticsApi
   window?: WindowApi
   zoom?: ZoomApi

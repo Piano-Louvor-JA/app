@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import FontSelector from '@modules/settings/components/FontSelector.vue'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
@@ -235,6 +236,8 @@ function onRemoveTone(tone: CustomTone): void {
           </header>
 
           <div class="countdown-config__body">
+            <FontSelector scope="countdown" compact />
+
             <section class="countdown-config__section">
               <div class="countdown-config__section-head">
                 <i

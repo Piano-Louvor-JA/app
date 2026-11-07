@@ -11,7 +11,7 @@ vi.mock('electron', () => ({
   },
 }))
 
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { handleOnlineVideoRequest, resolveLocalProtocolPath, setOnlineVideoSource, sniffImageMime } from '../protocol.mjs'
@@ -106,4 +106,34 @@ describe('protocol local://', () => {
     expect(resolved.mediaRelative).toBe('covers/2026.bmp')
     expect(resolved.filePath.replace(/\\/g, '/')).toMatch(/Media\/covers\/2026\.bmp$/)
   })
+})
+
+describe('local offline fonts', () => {
+  it('does not attempt API fallback for a missing local font', async () => {
+    const { net, protocol } = await import('electron')
+    const { registerLocalFileProtocol } = await import('../protocol.mjs')
+    net.fetch.mockClear()
+    registerLocalFileProtocol()
+    const handler = protocol.handle.mock.calls.at(-1)[1]
+    const response = await handler(new Request('local://media/fontes/inter/missing.woff2'))
+    expect(response.status).toBe(404)
+    expect(net.fetch).not.toHaveBeenCalled()
+  })
+  it('serves WOFF2 with the CORS header required by FontFace in the HTTP renderer', async () => {
+    const { app, protocol } = await import('electron')
+    const { registerLocalFileProtocol } = await import('../protocol.mjs')
+    const dir = mkdtempSync(path.join(tmpdir(), 'font-protocol-'))
+    app.getPath.mockReturnValueOnce(dir)
+    const file = resolveLocalProtocolPath('local://media/fontes/inter/face-0.woff2', dir).filePath
+    mkdirSync(path.dirname(file), { recursive: true })
+    writeFileSync(file, 'wOF2test')
+    try {
+      registerLocalFileProtocol()
+      const response = await protocol.handle.mock.calls.at(-1)[1](new Request('local://media/fontes/inter/face-0.woff2'))
+      expect(response.headers.get('Content-Type')).toBe('font/woff2')
+      expect(response.headers.get('Access-Control-Allow-Origin')).toBe('*')
+      expect(await response.text()).toBe('wOF2test')
+    } finally { rmSync(dir, { recursive: true, force: true }) }
+  })
+
 })

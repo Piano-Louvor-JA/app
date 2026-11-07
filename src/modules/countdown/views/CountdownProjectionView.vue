@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useProjectionFont } from '@modules/settings/composables/useProjectionFont'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 
 import { ProjectionBackground } from '@design-system/index'
@@ -136,13 +137,15 @@ const effectiveConfig = computed(() => {
   const mod = stage.value.countdown
   return mod ? { ...config.value, ...mod } : { ...config.value }
 })
+
+const projectionFontStyle = useProjectionFont('countdown')
 </script>
 
 <template>
   <ProjectionBackground
     class="countdown-projection"
     :class="{ 'countdown-projection--embedded': embedded }"
-    :style="stageStyle"
+    :style="[stageStyle, projectionFontStyle]"
   >
     <div
       v-if="independent || runtime.projecting !== false"

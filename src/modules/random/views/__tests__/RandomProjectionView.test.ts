@@ -43,7 +43,8 @@ vi.mock('@design-system/index', () => ({
   },
 }))
 
-vi.mock('@shared/constants/storage-keys', () => ({
+vi.mock('@shared/constants/storage-keys', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@shared/constants/storage-keys')>(),
   BROWSER_STORAGE_KEYS: { userPreferences: 'user_preferences' },
 }))
 
