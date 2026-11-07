@@ -98,13 +98,12 @@ export function createFontService({ mediaRoot, fetch: fetcher = globalThis.fetch
         if (!/^face-\d+\.woff2$/.test(face.file)) return null
         const file = path.join(directory, face.file)
         // Open once without following symlinks; validate and read that same descriptor.
-        const before = await lstat(file)
-        if (before.isSymbolicLink()) return null
-        const handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW)
+        const handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
         let bytes
         try {
           const stat = await handle.stat()
-          if (!stat.isFile() || stat.ino !== before.ino || stat.dev !== before.dev || stat.size > MAX_FILE_BYTES) return null
+          const entry = await lstat(file)
+          if (entry.isSymbolicLink() || !stat.isFile() || stat.ino !== entry.ino || stat.dev !== entry.dev || stat.size > MAX_FILE_BYTES) return null
           bytes = await handle.readFile()
         } finally { await handle.close() }
         if (bytes.length !== face.bytes || hash(bytes) !== face.sha256 || bytes.toString('ascii', 0, 4) !== 'wOF2') return null
