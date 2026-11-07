@@ -19,6 +19,8 @@ export default {
     countdownDescription: 'Countdown projected on screen',
     sabbathSchool: 'Sabbath School',
     sabbathSchoolDescription: 'Countdown with the Sabbath School sound alerts',
+    announcements: 'Announcements & presentations',
+    announcementsDescription: 'Announcements, notices and presentations for the service',
   },
   clock: {
     title: 'Clock',

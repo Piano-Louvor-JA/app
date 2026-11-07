@@ -28,6 +28,8 @@ export const USER_PREFERENCE_KEYS = {
   countdownConfig: 'countdown.config',
   /** Agenda, idioma das narrações e marcos de áudio da Escola Sabatina. */
   sabbathSchoolConfig: 'sabbathSchool.config',
+  /** Listas de avisos, lista ativa e config do carrossel (módulo Avisos). Local: não sincroniza (caminhos de arquivo). */
+  announcementsState: 'announcements.state',
   randomConfig: 'random.config',
   randomSession: 'random.session',
   liturgyState: 'liturgy.state',

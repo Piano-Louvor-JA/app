@@ -3,7 +3,7 @@ import { ref } from 'vue'
 /** Conexões adicionais servem a outros dispositivos: espelho da TV ou retorno de palco. */
 export type ObsKind = 'mirror' | 'return'
 export type ObsConnection = { id: string; label: string; selected: boolean; nickname?: string; kind?: ObsKind }
-export type ObsModule = 'bible' | 'clock' | 'timer' | 'countdown' | 'random'
+export type ObsModule = 'bible' | 'clock' | 'timer' | 'countdown' | 'random' | 'announcements-carousel'
 export const OBS_CONNECTIONS_KEY = 'louvorja-obs-connections-v1'
 /** O servidor principal (slot 0) já tem nome próprio na tela e não recebe apelido. */
 const MAIN_ID = '0'

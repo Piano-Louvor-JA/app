@@ -31,6 +31,14 @@ const items: UtilityHubItem[] = [
     to: '/utilities/sabbath-school',
     available: true,
   },
+  {
+    key: 'announcements',
+    titleKey: 'utilities.announcements',
+    descriptionKey: 'utilities.announcementsDescription',
+    icon: 'ti-speakerphone',
+    to: '/utilities/announcements',
+    available: true,
+  },
 ]
 </script>
 
