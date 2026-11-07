@@ -411,7 +411,9 @@ export type OpenUrlProjectionPayload = {
   videoId?: string
   monitorIds?: number[]
   fullscreenOnPrimary?: boolean
-  mode?: 'video' | 'site' | 'image' | 'pdf' | 'presentation'
+  mode?: 'video' | 'site' | 'image' | 'pdf' | 'presentation' | 'text'
+  /** Modo texto (avisos): conteúdo e cores do Palco. */
+  text?: { title: string; html: string; titleColor?: string; textColor?: string; backgroundColor?: string }
   withScreens?: boolean
   /** Engine de conversão para este item (sobrepõe o setting global). */
   presentationEngine?: PresentationEngine
@@ -476,6 +478,15 @@ export type ProjectionApi = {
   toggleSiteScreens?: () => Promise<boolean>
   toggleVideoScreens?: () => Promise<boolean>
   remoteImageNext?: () => Promise<{ index: number; total: number } | null>
+  /** Tamanho do texto no player de texto (0,5–2). Null fora do modo texto. */
+  getTextScale?: () => Promise<{ scale: number } | null>
+  /** Projeção independente do player do Piano (monitor + sobrepor/compartilhar). */
+  openIndependent?: (displayIds: number | number[], mode: 'overlay' | 'share') => Promise<boolean>
+  closeIndependent?: () => Promise<boolean>
+  getIndependentState?: () => Promise<{ displayIds: number[]; mode: 'overlay' | 'share' } | null>
+  /** Monitores ativos no "Telas" quando o player abriu; os demais ficam desativados no painel. */
+  getIndependentEnabledDisplays?: () => Promise<number[]>
+  setTextScale?: (scale: number) => Promise<{ scale: number } | null>
   remoteImagePrev?: () => Promise<{ index: number; total: number } | null>
   getImageSlideState?: () => Promise<{
     index: number
@@ -501,7 +512,8 @@ export type ProjectionApi = {
   setSiteTargetMonitors?: (ids: number[]) => Promise<boolean>
   getVideoTargetMonitors?: () => Promise<number[]>
   setVideoTargetMonitors?: (ids: number[]) => Promise<boolean>
-  setSiteControlPanelOpen?: (open: boolean) => Promise<boolean>
+  /** `height`: altura que o painel precisa (px), limitada à janela do player. */
+  setSiteControlPanelOpen?: (open: boolean, height?: number) => Promise<boolean>
   onSiteTargetsChanged?: (callback: (ids: number[]) => void) => () => void
   onVideoTargetsChanged?: (callback: (ids: number[]) => void) => () => void
 }
@@ -563,6 +575,25 @@ export type SabbathSchoolVideoApi = {
   clearVideo: () => Promise<{ ok: boolean; reason?: string }>
 }
 
+export type AnnouncementFileKind = 'images' | 'video' | 'presentation'
+
+export type AnnouncementImportedFile = { relativePath: string; name: string }
+
+export type AnnouncementsFilesApi = {
+  /** Abre o diálogo (vários arquivos para imagens) e copia para Media/modulos/avisos/<id>/. */
+  pickAndImport: (avisoId: string, kind: AnnouncementFileKind) => Promise<{
+    ok: boolean
+    files?: AnnouncementImportedFile[]
+    rejected?: { name: string; reason: 'unsupported_format' | 'not_found' | 'copy_failed' }[]
+    reason?: string
+  }>
+  /** Duplicar aviso: copia a pasta; `paths` mapeia caminho antigo → novo. */
+  copyFolder: (fromId: string, toId: string) => Promise<{ ok: boolean; paths?: Record<string, string>; reason?: string }>
+  removeFolder: (avisoId: string) => Promise<{ ok: boolean; reason?: string }>
+  removeFiles: (relativePaths: string[]) => Promise<{ ok: boolean; removed?: number; reason?: string }>
+  resolvePaths: (relativePaths: string[]) => Promise<{ relativePath: string; absolutePath: string | null; exists: boolean }[]>
+}
+
 export type DiagnosticsApi = {
   run: () => Promise<{ report: unknown; jsonPath: string; txtPath: string }>
   send: (report: unknown) => Promise<{ ok: boolean; reason?: string }>
@@ -601,4 +632,5 @@ export type LouvorJaBridge = {
   remote?: RemoteApi
   random?: RandomAudioApi
   sabbathSchool?: SabbathSchoolVideoApi
+  announcements?: AnnouncementsFilesApi
 }

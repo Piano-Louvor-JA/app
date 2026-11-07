@@ -19,6 +19,8 @@ export default {
     countdownDescription: 'Contagem regressiva projetada',
     sabbathSchool: 'Escola Sabatina',
     sabbathSchoolDescription: 'Contagem com os avisos sonoros da Escola Sabatina',
+    announcements: 'Anúncios e apresentações',
+    announcementsDescription: 'Avisos, anúncios e apresentações para o culto',
   },
   clock: {
     title: 'Relógio',

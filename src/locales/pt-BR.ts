@@ -37,6 +37,8 @@ export default {
   },
   independentProjection: {
     title: 'Projeção independente',
+    /** Monitor desligado no seletor "Telas". */
+    enableHint: 'Ative em Telas para usar',
     unavailable: 'Só habilita com monitores estendidos disponíveis',
     hint: 'Escolha um monitor. Este recurso aparece por cima do que estiver projetado nele; os outros monitores não mudam.',
     monitor: 'Monitor {index}',

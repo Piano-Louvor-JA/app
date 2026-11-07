@@ -160,6 +160,67 @@
         height: 1.45rem;
         fill: currentColor;
       }
+      .autoplay {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        margin-left: 0.6rem;
+        padding-left: 0.6rem;
+        border-left: 1px solid rgba(255, 255, 255, 0.14);
+      }
+      .autoplay__repeat {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        margin-left: 0.3rem;
+        font-size: 0.78rem;
+        cursor: pointer;
+        user-select: none;
+      }
+      .autoplay__repeat input {
+        width: 0.95rem;
+        height: 0.95rem;
+        margin: 0;
+        accent-color: #fb923c;
+        cursor: pointer;
+      }
+      .autoplay__label {
+        font-size: 0.78rem;
+        opacity: 0.8;
+      }
+      .autoplay select {
+        height: 1.9rem;
+        padding: 0 0.4rem;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 0.45rem;
+        background: rgba(255, 255, 255, 0.06);
+        color: inherit;
+        font: inherit;
+        font-size: 0.78rem;
+      }
+      .autoplay select option { color: #111827; }
+      .text-size {
+        display: none;
+        align-items: center;
+        gap: 0.2rem;
+        margin-left: 0.6rem;
+        padding-left: 0.6rem;
+        border-left: 1px solid rgba(255, 255, 255, 0.14);
+      }
+      .text-size__btn { font-weight: 700; font-size: 0.95rem; }
+      .text-size__value {
+        min-width: 3rem;
+        font-size: 0.78rem;
+        text-align: center;
+        opacity: 0.85;
+        font-variant-numeric: tabular-nums;
+      }
+      /* Modo texto (avisos): um slide só, sem setas, automático nem contador. */
+      body.is-text #prev,
+      body.is-text #next,
+      body.is-text .autoplay,
+      body.is-text #counter { display: none; }
+      body.is-text .text-size { display: inline-flex; }
     </style>
   </head>
   <body>
@@ -196,6 +257,30 @@
             </button>
             <span id="monitorBadge" class="monitor-badge is-empty">0</span>
           </span>
+          <div class="autoplay">
+          <button id="autoplay" type="button" title="Passar sozinho" aria-label="Passar sozinho" aria-pressed="false" disabled>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path id="autoplayIcon" d="M8 5v14l11-7z"/></svg>
+          </button>
+          <span class="autoplay__label">Automático</span>
+          <select id="autoplaySeconds" title="Segundos por imagem" aria-label="Segundos por imagem">
+            <option value="3">3 s</option>
+            <option value="5" selected>5 s</option>
+            <option value="8">8 s</option>
+            <option value="10">10 s</option>
+            <option value="15">15 s</option>
+            <option value="30">30 s</option>
+            <option value="60">60 s</option>
+          </select>
+            <label class="autoplay__repeat" title="Volta à primeira imagem depois da última">
+              <input id="autoplayRepeat" type="checkbox" checked>
+              Repetir
+            </label>
+          </div>
+          <div class="text-size" role="group" aria-label="Tamanho do texto">
+            <button id="textSmaller" class="text-size__btn" type="button" title="Diminuir texto" aria-label="Diminuir texto">A−</button>
+            <span id="textScale" class="text-size__value">100%</span>
+            <button id="textBigger" class="text-size__btn" type="button" title="Aumentar texto" aria-label="Aumentar texto">A+</button>
+          </div>
         </div>
         <div></div>
         <div class="meta">
@@ -216,6 +301,25 @@
         var monitorList = document.getElementById('monitorList')
         var identifyBtn = document.getElementById('identifyMonitors')
         var counterEl = document.getElementById('counter')
+        var autoplayBtn = document.getElementById('autoplay')
+        var autoplayIcon = document.getElementById('autoplayIcon')
+        var autoplaySelect = document.getElementById('autoplaySeconds')
+        var autoplayRepeat = document.getElementById('autoplayRepeat')
+        var REPEAT_KEY = 'louvorja-image-autoplay-repeat'
+        var isText = new URLSearchParams(window.location.search).get('kind') === 'text'
+        var textScale = 1
+        var textScaleEl = document.getElementById('textScale')
+        var textSmallerBtn = document.getElementById('textSmaller')
+        var textBiggerBtn = document.getElementById('textBigger')
+        if (isText) document.body.classList.add('is-text')
+        var slideIndex = 0
+        var PLAY_PATH = 'M8 5v14l11-7z'
+        var PAUSE_PATH = 'M6 19h4V5H6v14zm8-14v14h4V5h-4z'
+        var AUTOPLAY_KEY = 'louvorja-image-autoplay-seconds'
+        var autoplayOn = false
+        var autoplayDeadline = 0
+        var autoplayBusy = false
+        var slideTotal = 0
         var panelOpen = false
         var selectedIds = []
         var displays = []
@@ -344,7 +448,75 @@
           counterEl.textContent = safeIndex + ' / ' + safeTotal
           prevBtn.disabled = safeTotal <= 1
           nextBtn.disabled = safeTotal <= 1
+          slideTotal = safeTotal
+          slideIndex = safeIndex > 0 ? safeIndex - 1 : 0
+          autoplayBtn.disabled = safeTotal <= 1
+          if (safeTotal <= 1 && autoplayOn) setAutoplay(false)
         }
+
+        // ── Passar sozinho (carrossel): prazo absoluto (Date.now), não contagem de ticks ──
+        function autoplayMs() {
+          var seconds = Number(autoplaySelect.value) || 5
+          return Math.max(1, seconds) * 1000
+        }
+
+        function restartAutoplayDeadline() {
+          autoplayDeadline = Date.now() + autoplayMs()
+        }
+
+        function setAutoplay(on) {
+          autoplayOn = Boolean(on) && slideTotal > 1
+          autoplayBtn.classList.toggle('is-active', autoplayOn)
+          autoplayBtn.setAttribute('aria-pressed', autoplayOn ? 'true' : 'false')
+          autoplayBtn.title = autoplayOn ? 'Pausar passagem automática' : 'Passar sozinho'
+          autoplayBtn.setAttribute('aria-label', autoplayBtn.title)
+          autoplayIcon.setAttribute('d', autoplayOn ? PAUSE_PATH : PLAY_PATH)
+          if (autoplayOn) restartAutoplayDeadline()
+        }
+
+        async function autoplayTick() {
+          if (!autoplayOn || autoplayBusy || Date.now() < autoplayDeadline) return
+          if (!window.louvorja || !window.louvorja.projection || !window.louvorja.projection.remoteImageNext) return
+          // Sem repetir: na última imagem o automático desliga e a imagem fica.
+          if (!autoplayRepeat.checked && slideIndex >= slideTotal - 1) {
+            setAutoplay(false)
+            return
+          }
+          autoplayBusy = true
+          try {
+            await window.louvorja.projection.remoteImageNext()
+            restartAutoplayDeadline()
+            await refresh()
+          } finally {
+            autoplayBusy = false
+          }
+        }
+
+        try {
+          var savedSeconds = window.localStorage.getItem(AUTOPLAY_KEY)
+          if (savedSeconds && autoplaySelect.querySelector('option[value="' + savedSeconds + '"]')) autoplaySelect.value = savedSeconds
+          if (window.localStorage.getItem(REPEAT_KEY) === 'false') autoplayRepeat.checked = false
+        } catch (error) { /* storage indisponível: fica o padrão */ }
+
+        autoplayRepeat.addEventListener('change', function () {
+          try { window.localStorage.setItem(REPEAT_KEY, autoplayRepeat.checked ? 'true' : 'false') } catch (error) { /* ignore */ }
+        })
+
+        autoplayBtn.addEventListener('click', async function () {
+          if (autoplayBtn.disabled) return
+          var restart = !autoplayOn && !autoplayRepeat.checked && slideIndex >= slideTotal - 1
+          setAutoplay(!autoplayOn)
+          // Sem repetir e parado na última: o play recomeça da primeira (a galeria dá a volta).
+          if (restart && autoplayOn && window.louvorja && window.louvorja.projection && window.louvorja.projection.remoteImageNext) {
+            await window.louvorja.projection.remoteImageNext()
+            restartAutoplayDeadline()
+            await refresh()
+          }
+        })
+        autoplaySelect.addEventListener('change', function () {
+          try { window.localStorage.setItem(AUTOPLAY_KEY, autoplaySelect.value) } catch (error) { /* ignore */ }
+          if (autoplayOn) restartAutoplayDeadline()
+        })
 
         function updateMonitorBadge() {
           var count = selectedIds.length
@@ -456,15 +628,41 @@
         prevBtn.addEventListener('click', async function () {
           if (window.louvorja && window.louvorja.projection && window.louvorja.projection.remoteImagePrev) {
             await window.louvorja.projection.remoteImagePrev()
+            if (autoplayOn) restartAutoplayDeadline()
             await refresh()
           }
         })
         nextBtn.addEventListener('click', async function () {
           if (window.louvorja && window.louvorja.projection && window.louvorja.projection.remoteImageNext) {
             await window.louvorja.projection.remoteImageNext()
+            if (autoplayOn) restartAutoplayDeadline()
             await refresh()
           }
         })
+        function renderTextScale(scale) {
+          textScale = Number(scale) || 1
+          textScaleEl.textContent = Math.round(textScale * 100) + '%'
+          textSmallerBtn.disabled = textScale <= 0.5
+          textBiggerBtn.disabled = textScale >= 2
+        }
+
+        async function changeTextScale(delta) {
+          if (!window.louvorja || !window.louvorja.projection || !window.louvorja.projection.setTextScale) return
+          // Atualiza na hora: cliques rápidos somam a partir do valor já mostrado.
+          var next = Math.min(2, Math.max(0.5, Math.round((textScale + delta) * 10) / 10))
+          renderTextScale(next)
+          var result = await window.louvorja.projection.setTextScale(next)
+          if (result && typeof result.scale === 'number' && textScale === next) renderTextScale(result.scale)
+        }
+
+        textSmallerBtn.addEventListener('click', function () { void changeTextScale(-0.1) })
+        textBiggerBtn.addEventListener('click', function () { void changeTextScale(0.1) })
+        if (isText && window.louvorja && window.louvorja.projection && window.louvorja.projection.getTextScale) {
+          window.louvorja.projection.getTextScale().then(function (state) {
+            if (state && typeof state.scale === 'number') renderTextScale(state.scale)
+          }).catch(function () {})
+        }
+
         projectBtn.addEventListener('click', async function () {
           if (projectBtn.disabled) return
           if (window.louvorja && window.louvorja.projection && window.louvorja.projection.toggleVideoScreens) {
@@ -494,7 +692,12 @@
         void loadConnections()
         void refresh()
         setInterval(function () { void refresh() }, 500)
+        setInterval(function () { void autoplayTick() }, 250)
       })()
+    </script>
+    <script src="independent-panel.js"></script>
+    <script>
+      window.PianoIndependentPanel && window.PianoIndependentPanel.mount()
     </script>
   </body>
 </html>

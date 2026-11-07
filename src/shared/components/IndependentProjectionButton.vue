@@ -4,6 +4,7 @@ import { useObsConnections } from '@modules/settings/composables/useObsConnectio
 import { obsConnectionName, assignObsConnection, obsAssignments, obsAssignmentModes, clearObsModule, type ObsModule } from '@modules/settings/services/obs-connections'
 
 import { identifySystemDisplays } from '@modules/settings/services/display-service'
+import { loadProjectionSettings } from '@modules/settings/services/projection-preferences'
 import {
   useIndependentProjectionControl,
   type IndependentProjectionMode,
@@ -28,26 +29,28 @@ const props = withDefaults(
 )
 
 const { t } = useI18n()
-const { monitors, available, activeMonitorId: moduleMonitorId, activeMode, project, stop } =
+const { monitors, available, activeMonitorIds: moduleMonitorIds, activeMode, project, unproject, stop } =
   useIndependentProjectionControl(props.moduleId)
-const activeMonitorId = computed(() => (props.claimed ? moduleMonitorId.value : null))
+/** Monitores (vários) onde este botão tem o módulo no ar. */
+const activeMonitorIds = computed<number[]>(() => (props.claimed ? moduleMonitorIds.value : []))
 
 /** Sobrepor (tela inteira) ou compartilhar (metade, com o que já está no monitor). */
 const { activeConnections: allObsOutputs } = useObsConnections()
 const obsOutputs = computed(() => (props.obs ? allObsOutputs.value : []))
 const obsActive = computed(() => props.claimed && obsOutputs.value.some((item) => obsAssignments.value[item.id] === props.moduleId))
 const outputAvailable = computed(() => available.value || obsOutputs.value.length > 0)
-async function onSelectObs(id: string) {
+/** Caixa de seleção da conexão: marca/desmarca só ela; monitores e outras conexões seguem. */
+async function onToggleObs(id: string) {
   if (busy.value) return
+  if (obsAssignments.value[id] === props.moduleId) {
+    assignObsConnection(id, null)
+    return
+  }
   busy.value = true
   try {
     await detectObsBeforeProjection()
     if (props.beforeProject && !(await props.beforeProject())) return
-    // Compartilhar mantém a saída principal ao lado do recurso independente.
-    stop()
-    clearObsModule(props.moduleId)
     assignObsConnection(id, props.moduleId as ObsModule, mode.value)
-    open.value = false
   } finally { busy.value = false }
 }
 
@@ -56,19 +59,26 @@ const MODES: IndependentProjectionMode[] = ['overlay', 'share']
 
 const open = ref(false)
 const busy = ref(false)
+/** Monitores ligados no seletor "Telas" (lidos ao abrir o painel); os outros ficam desativados. */
+const enabledMonitorIds = ref<number[]>(loadProjectionSettings().targetDisplayIds)
+function isMonitorEnabled(monitorId: number): boolean {
+  return enabledMonitorIds.value.includes(monitorId) || activeMonitorIds.value.includes(monitorId)
+}
 const rootEl = ref<HTMLElement | null>(null)
 const panelEl = ref<HTMLElement | null>(null)
 const panelStyle = ref<Record<string, string>>({})
 
-const active = computed(() => activeMonitorId.value != null || obsActive.value)
+const active = computed(() => activeMonitorIds.value.length > 0 || obsActive.value)
 const effectiveMode = computed(() => {
   if (!props.claimed) return null
   const output = obsOutputs.value.find((item) => obsAssignments.value[item.id] === props.moduleId)
   return output ? obsAssignmentModes.value[output.id] ?? 'overlay' : activeMode.value
 })
-const activeIndex = computed(
-  () => monitors.value.find((monitor) => monitor.id === activeMonitorId.value)?.index ?? null,
+/** Números dos monitores no ar (mesmos do "Identificar"), em ordem. */
+const activeIndexes = computed(() =>
+  monitors.value.filter((monitor) => activeMonitorIds.value.includes(monitor.id)).map((monitor) => monitor.index),
 )
+const activeIndex = computed(() => (activeIndexes.value.length > 0 ? activeIndexes.value.join(', ') : null))
 
 const tooltip = computed(() => {
   if (!outputAvailable.value) {
@@ -88,17 +98,23 @@ watch(outputAvailable, (isAvailable) => {
 
 function onTriggerClick() {
   if (!outputAvailable.value) return
+  if (!open.value) enabledMonitorIds.value = loadProjectionSettings().targetDisplayIds
   open.value = !open.value
 }
 
-async function onSelect(monitorId: number) {
+/** Caixa de seleção do monitor: liga/desliga só ele; o painel fica aberto para marcar outros. */
+async function onToggle(monitorId: number) {
   if (busy.value) return
+  if (activeMonitorIds.value.includes(monitorId)) {
+    unproject(monitorId)
+    return
+  }
+  if (!isMonitorEnabled(monitorId)) return
   busy.value = true
   try {
     await detectObsBeforeProjection()
     if (props.beforeProject && !(await props.beforeProject())) return
-    clearObsModule(props.moduleId)
-    if (await project(monitorId, mode.value)) open.value = false
+    await project(monitorId, mode.value)
   } finally {
     busy.value = false
   }
@@ -276,7 +292,7 @@ onBeforeUnmount(() => {
 
         <ul
           class="independent-projection__list"
-          role="radiogroup"
+          role="group"
           :aria-label="t('independentProjection.title')"
         >
           <li
@@ -285,17 +301,17 @@ onBeforeUnmount(() => {
           >
             <button
               type="button"
-              role="radio"
+              role="checkbox"
               class="independent-projection__option"
-              :class="{ 'independent-projection__option--active': monitor.id === activeMonitorId }"
-              :aria-checked="monitor.id === activeMonitorId"
-              :disabled="busy"
+              :class="{ 'independent-projection__option--active': activeMonitorIds.includes(monitor.id) }"
+              :aria-checked="activeMonitorIds.includes(monitor.id)"
+              :disabled="busy || !isMonitorEnabled(monitor.id)"
               :data-monitor-id="monitor.id"
-              @click="onSelect(monitor.id)"
+              @click="onToggle(monitor.id)"
             >
               <i
                 class="ti"
-                :class="monitor.id === activeMonitorId ? 'ti-circle-check' : 'ti-circle'"
+                :class="activeMonitorIds.includes(monitor.id) ? 'ti-square-check' : 'ti-square'"
                 aria-hidden="true"
               />
               <span class="independent-projection__option-body">
@@ -303,6 +319,10 @@ onBeforeUnmount(() => {
                   {{ t('independentProjection.monitor', { index: monitor.index }) }}
                 </span>
                 <span class="independent-projection__option-meta">{{ monitor.resolutionLabel }}</span>
+                <span
+                  v-if="!isMonitorEnabled(monitor.id)"
+                  class="independent-projection__option-note"
+                >{{ t('independentProjection.enableHint') }}</span>
               </span>
             </button>
           </li>
@@ -312,13 +332,14 @@ onBeforeUnmount(() => {
           <i class="ti ti-broadcast" aria-hidden="true" /> {{ t('obsOutputs.active') }}
         </p>
         <p v-if="obs && !obsOutputs.length" class="obs-outputs-empty" role="status">{{ t('obsOutputs.activateHint') }}</p>
-        <ul v-if="obsOutputs.length" class="independent-projection__list" role="radiogroup" :aria-label="t('obsOutputs.title')">
+        <ul v-if="obsOutputs.length" class="independent-projection__list" role="group" :aria-label="t('obsOutputs.title')">
           <li v-for="connection in obsOutputs" :key="connection.id">
-            <button type="button" class="independent-projection__option" role="radio" :disabled="busy"
+            <button type="button" class="independent-projection__option" role="checkbox" :disabled="busy"
               :aria-checked="obsAssignments[connection.id] === moduleId"
               :class="{ 'independent-projection__option--active': obsAssignments[connection.id] === moduleId }"
-              @click="onSelectObs(connection.id)">
-              <i class="ti ti-broadcast" aria-hidden="true" />
+              :data-obs-id="connection.id"
+              @click="onToggleObs(connection.id)">
+              <i class="ti" :class="obsAssignments[connection.id] === moduleId ? 'ti-square-check' : 'ti-square'" aria-hidden="true" />
               <span class="independent-projection__option-body">
                 <span class="independent-projection__option-name">{{ obsConnectionName(connection) }}</span>
                 <span class="independent-projection__option-meta">{{ t('obsOutputs.activeConnections', { count: connection.clients }) }}</span>
@@ -334,6 +355,17 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped lang="scss">
+.independent-projection__option-note {
+  display: block;
+  color: var(--ds-color-warning, #fbbf24);
+  font-size: 0.68rem;
+}
+
+.independent-projection__option:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .obs-outputs-separator {
   height: 1px;
   margin: 0.8rem 0 0.65rem;
