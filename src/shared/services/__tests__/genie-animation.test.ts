@@ -88,6 +88,26 @@ describe('predictMinimizedTarget', () => {
     }
     expect(predictMinimizedTarget()).toEqual({ left: 418, top: 790, width: 150, height: 30 })
   })
+
+  it('página que já tem item na barra: mira o próprio item', () => {
+    for (const left of [100, 260]) {
+      const el = document.createElement('button')
+      el.dataset.minimizedKey = `/p/${left}`
+      el.getBoundingClientRect = () => ({ left, top: 790, right: left + 150, width: 150, height: 30 }) as DOMRect
+      document.body.appendChild(el)
+    }
+    expect(predictMinimizedTarget('/p/100')).toEqual({ left: 100, top: 790, width: 150, height: 30 })
+    expect(predictMinimizedTarget('/p/outra')).toEqual({ left: 418, top: 790, width: 150, height: 30 })
+  })
+
+  it('barra cheia (rolando): mira a borda visível, não fora da janela', () => {
+    const el = document.createElement('button')
+    el.dataset.minimizedKey = '/p/ultimo'
+    const right = window.innerWidth + 300
+    el.getBoundingClientRect = () => ({ left: right - 150, top: 790, right, width: 150, height: 30 }) as DOMRect
+    document.body.appendChild(el)
+    expect(predictMinimizedTarget()).toEqual({ left: window.innerWidth - 150 - 8, top: 790, width: 150, height: 30 })
+  })
 })
 
 describe('findMinimizedItemRect', () => {

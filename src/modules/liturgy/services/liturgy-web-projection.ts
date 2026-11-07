@@ -8,7 +8,7 @@ import {
   openProjectionModule,
 } from '@shared/composables/useProjectionWindow'
 import { getDesktopBridge } from '@shared/services/desktop-bridge'
-import type { PresentationEngine } from '@shared/types/desktop-bridge'
+import type { OpenUrlProjectionPayload, PresentationEngine } from '@shared/types/desktop-bridge'
 import { palcoSession } from '../../settings/services/palco-session'
 
 import {
@@ -248,6 +248,25 @@ export async function playLiturgyLocalImageOnScreens(
   title = '',
 ): Promise<boolean> {
   return openLiturgyLocalImages(filePaths, title, true)
+}
+
+/** Texto (aviso): popup de controle com o player de texto, sem projetar nas telas. */
+export async function openLocalTextControl(
+  text: NonNullable<OpenUrlProjectionPayload['text']>,
+  title = '',
+): Promise<boolean> {
+  const bridge = getDesktopBridge()
+  if (!bridge?.projection?.openUrl) return false
+  if (!text.title.trim() && !text.html.trim()) return false
+  closeProjectionModule()
+  const monitorIds = await resolveTargetMonitorIds()
+  return bridge.projection.openUrl({
+    mode: 'text',
+    text,
+    title: title.trim() || text.title.trim() || 'Texto',
+    monitorIds,
+    withScreens: false,
+  })
 }
 
 async function openLiturgyLocalPdf(

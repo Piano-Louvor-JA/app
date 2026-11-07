@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { onMounted, onUnmounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import PageBackStack from '@shared/components/PageBackStack.vue'
@@ -11,12 +11,9 @@ import { resolveBackgroundImage, stageBgCss } from '../../settings/types/stage-s
 
 import StageCustomizationDialog from '../../settings/components/StageCustomizationDialog.vue'
 import CountdownDurationInput from '../components/CountdownDurationInput.vue'
-import CountdownConfigDialog from '../components/CountdownConfigDialog.vue'
 import CountdownSavedList from '../components/CountdownSavedList.vue'
 import { useCountdownFeature } from '../composables/useCountdown'
 import { useCountdownStage } from '../composables/useCountdownStage'
-import { timeToMs } from '../services/countdown-sabbath-preview'
-import type { SabbathModeConfig } from '../types/countdown'
 
 const { t } = useI18n()
 
@@ -33,30 +30,10 @@ const {
   runtime,
   isProjecting,
   configOpen,
-  displayConfigOpen,
   isRunning,
-  setTimeFormat,
-  setBgColor,
-  setTextColor,
-  resetDisplayToDefault,
   openConfig,
   closeConfig,
-  openDisplayConfig,
-  closeDisplayConfig,
   setDurationMs,
-  setCountdownMode,
-  setUntilTime,
-  setAllowNegative,
-  setAlertTonePreset: _setAlertTonePreset,
-  audioMuted,
-  audioVolume,
-  setAudioMuted,
-  setAudioVolume,
-  stopAudio,
-  setMode,
-  setSabbathConfig,
-  setSabbathSchoolAudioLang,
-  adjustTime,
   reset,
   saveMark,
   removeSavedMark,
@@ -69,80 +46,24 @@ function goBack() {
 }
 
 
-function patchMode(mode: 'standard' | 'sabbath') {
-  setMode(mode)
-}
-
-function patchSabbathConfig(sabbathConfig: SabbathModeConfig) {
-  setSabbathConfig(sabbathConfig)
-}
-
-const sabbathPanelOpen = ref(false)
-
-// web#175: popover de agendamento fecha ao clicar fora (document-level,
-// captura qualquer clique fora do popover — o popover faz @click.stop)
-function onDocumentClick() {
-  sabbathPanelOpen.value = false
-}
-function onKeydown(event: KeyboardEvent) {
-  if (event.key === 'Escape') sabbathPanelOpen.value = false
-}
-// Feedback Ezequias (02/10): "stopar ao sair da projeção" — popup fechado
-// pelo X da janela: o main avisa 'projection:popups-closed', o estado
-// dessincroniza e o áudio seguiria tocando. Corta o áudio na hora.
+// Popup fechado pelo X da janela: o main avisa 'projection:popups-closed'
+// e o estado de projeção é ressincronizado.
 let unsubPopupsClosed: (() => void) | null = null
 onMounted(() => {
-  document.addEventListener('click', onDocumentClick)
-  document.addEventListener('keydown', onKeydown)
   const bridge = (window as unknown as {
     louvorja?: { projection?: { onPopupsClosed?: (cb: () => void) => () => void } }
   }).louvorja
   unsubPopupsClosed =
     bridge?.projection?.onPopupsClosed?.(() => {
       refreshProjectionState()
-      stopAudio()
     }) ?? null
 })
 onUnmounted(() => {
-  document.removeEventListener('click', onDocumentClick)
-  document.removeEventListener('keydown', onKeydown)
   unsubPopupsClosed?.()
   unsubPopupsClosed = null
 })
 
-/** Converte ms → HH:MM */
-function msToTime(ms: number): string {
-  const totalSec = Math.round(ms / 1000)
-  const h = Math.floor(totalSec / 3600) % 24
-  const m = Math.floor((totalSec % 3600) / 60)
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
-}
-
-/** Ms do horário de término (para CountdownDurationInput) */
-const endTimeMs = computed({
-  get: () => effectiveConfig.value.sabbathConfig ? timeToMs(effectiveConfig.value.sabbathConfig.endTime) : 0,
-  set: (ms: number) => {
-    if (effectiveConfig.value.sabbathConfig) {
-      patchSabbathConfig({ ...effectiveConfig.value.sabbathConfig, endTime: msToTime(ms) })
-    }
-  },
-})
-
-/** Ms do horário de início (para CountdownDurationInput) */
-const startTimeMs = computed({
-  get: () => effectiveConfig.value.sabbathConfig?.startTime ? timeToMs(effectiveConfig.value.sabbathConfig.startTime) : 0,
-  set: (ms: number) => {
-    if (effectiveConfig.value.sabbathConfig) {
-      patchSabbathConfig({ ...effectiveConfig.value.sabbathConfig, startTime: msToTime(ms) })
-    }
-  },
-})
-
-/** Aliases para o template (o @update:duration-ms espera função) */
-function updateEndTimeMs(ms: number) { endTimeMs.value = ms }
-function updateStartTimeMs(ms: number) { startTimeMs.value = ms }
-
-const { stage, effectiveConfig } = useCountdownStage(config)
+const { stage } = useCountdownStage(config)
 
 const stageBg = computed(() => ({
   backgroundColor: stageBgCss(stage.value.backgroundColor),
@@ -182,51 +103,16 @@ const stageBg = computed(() => ({
           {{ t('countdown.title') }}
         </h1>
       </div>
-      <label
-        class="countdown-view__mode-switch"
-        :title="t('countdown.modeHint')"
-      >
-        <input
-          type="checkbox"
-          role="switch"
-          class="countdown-view__mode-switch-input"
-          :checked="effectiveConfig.mode === 'sabbath'"
-          :aria-label="t('countdown.mode')"
-          @change="patchMode(($event.target as HTMLInputElement).checked ? 'sabbath' : 'standard')"
-        >
-        <span
-          class="countdown-view__mode-switch-track"
-          :class="{ 'countdown-view__mode-switch-track--on': effectiveConfig.mode === 'sabbath' }"
-          aria-hidden="true"
-        >
-          <span class="countdown-view__mode-switch-thumb" />
-        </span>
-        <span class="countdown-view__mode-switch-label">{{ t('countdown.modeSabbath') }}</span>
-      </label>
     </header>
 
     <div class="countdown-view__content">
       <div class="countdown-view__stage">
         <GlassCard
           class="countdown-view__widget"
-          :class="{ 'countdown-view__widget--sabbath': effectiveConfig.mode === 'sabbath' }"
           :padding="false"
         >
           <div class="countdown-view__toolbar">
             <div class="countdown-view__tool-group countdown-view__tool-group--left">
-                          <button
-                                          v-if="effectiveConfig.mode === 'sabbath'"
-                                          type="button"
-                                          class="countdown-view__tool-btn"
-                                          :aria-label="t('countdown.config')"
-                                          :title="t('countdown.config')"
-                                          @click="openDisplayConfig"
-                                        >
-                                          <i
-                                            class="ti ti-settings"
-                                            aria-hidden="true"
-                                          />
-                                        </button>
                           <button
                             type="button"
                             class="countdown-view__tool-btn"
@@ -239,134 +125,25 @@ const stageBg = computed(() => ({
                               aria-hidden="true"
                             />
                           </button>
-                          <button
-                              v-if="effectiveConfig.mode === 'sabbath'"
-                              type="button"
-                              class="countdown-view__tool-btn"
-                              :class="{ 'countdown-view__tool-btn--active': sabbathPanelOpen }"
-                              :aria-label="t('countdown.sabbathSchedule')"
-                              :title="t('countdown.sabbathScheduleHint')"
-                              data-testid="sabbath-schedule-toggle"
-                              @click.stop="sabbathPanelOpen = !sabbathPanelOpen"
-                            >
-                              <i
-                                class="ti ti-calendar-clock"
-                                aria-hidden="true"
-                              />
-                            </button>
                           </div>
                         </div>
 
-                        <!-- Popover de agendamento Escola Sabatina (fecha ao clicar fora) -->
-                        <Transition name="countdown-popover">
-                          <div
-                            v-if="effectiveConfig.mode === 'sabbath' && sabbathPanelOpen"
-                            class="countdown-view__sabbath-popover"
-                            @click.stop
-                          >
-                            <div class="countdown-view__sabbath-head">
-                              <i
-                                class="ti ti-calendar-clock"
-                                aria-hidden="true"
-                              />
-                              <div>
-                                <h3>{{ t('countdown.sabbathSchedule') }}</h3>
-                                <p>{{ t('countdown.sabbathScheduleHint') }}</p>
-                              </div>
-                            </div>
-                            <div class="countdown-view__sabbath-schedule">
-                              <label class="countdown-view__sabbath-radio">
-                                <input
-                                  type="radio"
-                                  name="sabbath-schedule-mode"
-                                  value="endOnly"
-                                  :checked="effectiveConfig.sabbathConfig?.scheduleMode === 'endOnly'"
-                                  @change="patchSabbathConfig({ ...effectiveConfig.sabbathConfig, scheduleMode: 'endOnly', endTime: effectiveConfig.sabbathConfig?.endTime ?? '10:15' })"
-                                >
-                                <span>{{ t('countdown.scheduleEndOnly') }}</span>
-                              </label>
-                              <label class="countdown-view__sabbath-radio">
-                                <input
-                                  type="radio"
-                                  name="sabbath-schedule-mode"
-                                  value="start"
-                                  :checked="effectiveConfig.sabbathConfig?.scheduleMode === 'start'"
-                                  @change="patchSabbathConfig({ ...effectiveConfig.sabbathConfig, scheduleMode: 'start', endTime: effectiveConfig.sabbathConfig?.endTime ?? '10:15' })"
-                                >
-                                <span>{{ t('countdown.scheduleStartEnd') }}</span>
-                              </label>
-                            </div>
-
-                            <div class="countdown-view__sabbath-audio-lang">
-                              <label
-                                class="countdown-view__sabbath-lang-label"
-                                for="sabbath-audio-lang"
-                              >{{ t('countdown.sabbathAudioLang') }}</label>
-                              <select
-                                id="sabbath-audio-lang"
-                                data-testid="sabbath-audio-lang"
-                                :value="effectiveConfig.sabbathSchoolAudioLang ?? 'auto'"
-                                @change="setSabbathSchoolAudioLang(($event.target as HTMLSelectElement).value as 'pt-BR' | 'es' | 'en' | 'fr' | 'auto')"
-                              >
-                                <option value="auto">{{ t('countdown.sabbathAudioLangAuto') }}</option>
-                                <option value="pt-BR">Português (BR)</option>
-                                <option value="es">Español</option>
-                                <option value="en">English</option>
-                                <option value="fr">Français</option>
-                              </select>
-                            </div>
-
-</div>
-                        </Transition>
 
           <div
             class="countdown-view__preview"
             :style="stageBg"
           >
             <div class="countdown-view__duration">
-                          <template v-if="effectiveConfig.mode === 'sabbath' && effectiveConfig.sabbathConfig">
-                            <div
-                              v-if="effectiveConfig.sabbathConfig.scheduleMode === 'start'"
-                              class="countdown-view__sabbath-time-field"
-                            >
-                              <span class="countdown-view__sabbath-time-label">Início</span>
-                              <CountdownDurationInput
-                                :duration-ms="startTimeMs"
-                                :disabled="isRunning"
-                                compact
-                                no-seconds
-                                @update:duration-ms="updateStartTimeMs"
-                              />
-                            </div><div class="countdown-view__sabbath-time-field">
-                              <span class="countdown-view__sabbath-time-label">Término</span>
-                              <CountdownDurationInput
-                                :duration-ms="endTimeMs"
-                                :disabled="isRunning"
-                                compact
-                                no-seconds
-                                @update:duration-ms="updateEndTimeMs"
-                              />
-                            </div>
-                          </template>
                           <CountdownDurationInput
-                            v-else
                             :duration-ms="runtime.durationMs"
-:mode="runtime.mode"
-:until-hour="runtime.untilHour"
-:until-minute="runtime.untilMinute"
                             :disabled="isRunning"
                             compact
                             @update:duration-ms="setDurationMs"
-@update:mode="setCountdownMode"
-@update:until="setUntilTime"
                           />
                         </div>
           </div>
 
-          <div
-            v-if="effectiveConfig.mode !== 'sabbath'"
-            class="countdown-view__controls"
-          >
+          <div class="countdown-view__controls">
                       <button
                         type="button"
                         class="countdown-view__ctrl countdown-view__ctrl--reset"
@@ -392,56 +169,6 @@ const stageBg = computed(() => ({
                       </button>
                     </div>
 
-                    <div
-                      v-if="effectiveConfig.mode === 'sabbath'"
-                      class="countdown-view__adjust"
-                    >
-            <button
-              type="button"
-              class="countdown-view__ctrl countdown-view__ctrl--adjust"
-              :aria-label="t('countdown.addMinute')"
-              @click="adjustTime(60_000)"
-            >
-              <i
-                class="ti ti-plus"
-                aria-hidden="true"
-              /> 1 min
-            </button>
-            <button
-              type="button"
-              class="countdown-view__ctrl countdown-view__ctrl--adjust"
-              :aria-label="t('countdown.addFiveMinutes')"
-              @click="adjustTime(300_000)"
-            >
-              <i
-                class="ti ti-plus"
-                aria-hidden="true"
-              /> 5 min
-            </button>
-            <button
-              type="button"
-              class="countdown-view__ctrl countdown-view__ctrl--adjust"
-              :aria-label="t('countdown.subMinute')"
-              @click="adjustTime(-60_000)"
-            >
-              <i
-                class="ti ti-minus"
-                aria-hidden="true"
-              /> 1 min
-            </button>
-            <button
-              type="button"
-              class="countdown-view__ctrl countdown-view__ctrl--adjust"
-              :aria-label="t('countdown.subFiveMinutes')"
-              @click="adjustTime(-300_000)"
-            >
-              <i
-                class="ti ti-minus"
-                aria-hidden="true"
-              /> 5 min
-            </button>
-          </div>
-
           <div
             v-if="isProjecting"
             class="countdown-view__projecting"
@@ -451,38 +178,6 @@ const stageBg = computed(() => ({
               aria-hidden="true"
             />
             {{ t('countdown.projecting') }}
-          </div>
-
-          <!-- F2 (web#175): controles de áudio do operador (o áudio toca na
-               janela de projeção; estes controles sincronizam via canal) -->
-          <div
-            v-if="effectiveConfig.mode === 'sabbath'"
-            class="countdown-view__audio-controls"
-            data-testid="operator-audio-controls"
-          >
-            <button
-              type="button"
-              class="countdown-view__audio-btn"
-              :class="{ 'countdown-view__audio-btn--muted': audioMuted }"
-              :aria-label="audioMuted ? t('countdown.unmuteAudio') : t('countdown.muteAudio')"
-              :title="audioMuted ? t('countdown.unmuteAudio') : t('countdown.muteAudio')"
-              @click="setAudioMuted(!audioMuted)"
-            >
-              <i
-                :class="audioMuted ? 'ti ti-volume-off' : 'ti ti-volume'"
-                aria-hidden="true"
-              />
-            </button>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              class="countdown-view__audio-volume"
-              :value="audioVolume"
-              :aria-label="t('countdown.audioVolume')"
-              @input="setAudioVolume(Number(($event.target as HTMLInputElement).value))"
-            >
           </div>
         </GlassCard>
       </div>
@@ -494,19 +189,6 @@ const stageBg = computed(() => ({
         @clear="clearSavedMarks"
       />
     </div>
-
-        <CountdownConfigDialog
-          :open="displayConfigOpen"
-          :config="effectiveConfig"
-          @close="closeDisplayConfig"
-          @update:time-format="setTimeFormat"
-@update:bg-color="setBgColor"
-@update:text-color="setTextColor"
-          @update:allow-negative="setAllowNegative"
-          @update:mode="patchMode"
-          @update:sabbath-config="patchSabbathConfig"
-          @reset="resetDisplayToDefault"
-        />
 
         <StageCustomizationDialog
       :open="configOpen"
@@ -612,54 +294,6 @@ const stageBg = computed(() => ({
   flex-direction: column;
 }
 
-.countdown-view__widget--sabbath .countdown-view__adjust {
-  margin-top: 0.75rem;
-}
-
-.countdown-view__widget--sabbath .countdown-view__ctrl {
-  height: 2rem;
-}
-
-/* F2 (web#175): controles de áudio do operador (sincronizam com a projeção) */
-.countdown-view__audio-controls {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  margin-top: 0.4rem;
-}
-
-.countdown-view__audio-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.9rem;
-  height: 1.9rem;
-  border: none;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--ds-color-on-surface) 8%, transparent);
-  color: var(--ds-color-on-surface);
-  font-size: 1rem;
-  cursor: pointer;
-
-  &:hover {
-    background: color-mix(in srgb, var(--ds-color-on-surface) 15%, transparent);
-  }
-
-  &--muted {
-    color: var(--ds-color-primary);
-  }
-
-  &--stop:hover {
-    background: color-mix(in srgb, var(--ds-color-error, #ff5252) 25%, transparent);
-    color: var(--ds-color-error, #ff5252);
-  }
-}
-
-.countdown-view__audio-volume {
-  width: 5.5rem;
-  accent-color: var(--ds-color-primary);
-}
 
 .countdown-view__toolbar {
   position: absolute;
@@ -695,11 +329,6 @@ const stageBg = computed(() => ({
   color: var(--ds-color-primary);
   cursor: pointer;
 
-  /* web#175: popover aberto — botão de agenda fica no estado ativo */
-  &--active {
-    background: var(--ds-color-primary);
-    color: var(--ds-color-on-primary, #131313);
-  }
   transition:
     transform 160ms ease,
     background-color 160ms ease;
@@ -714,195 +343,6 @@ const stageBg = computed(() => ({
     }
   }
 
-  .countdown-view__mode-switch {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    cursor: pointer;
-    user-select: none;
-    white-space: nowrap;
-
-    &-input {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    &-track {
-      display: inline-flex;
-      width: 2.4rem;
-      height: 1.3rem;
-      align-items: center;
-      padding: 0.15rem;
-      border-radius: 9999px;
-      background: color-mix(in srgb, var(--ds-color-on-surface) 22%, transparent);
-      transition: background-color 180ms ease;
-
-      &--on {
-        background: var(--ds-color-primary);
-      }
-    }
-
-    &-thumb {
-      width: 1rem;
-      height: 1rem;
-      border-radius: 9999px;
-      background: var(--ds-color-surface);
-      box-shadow: 0 1px 3px rgb(0 0 0 / 35%);
-      transition: transform 180ms ease;
-    }
-
-    &-track--on &-thumb {
-      transform: translateX(1.1rem);
-    }
-
-    &-label {
-      font-size: 0.85rem;
-      color: var(--ds-color-on-surface);
-    }
-  }
-
-  .countdown-view__sabbath-times .countdown-view__ctrl--start {
-      align-self: flex-end;
-      margin-left: 0.5rem;
-    }
-
-    /* Popover de agendamento — ancorado abaixo do botão de agenda */
-    .countdown-view__sabbath-popover {
-              position: absolute;
-              top: 3.5rem;
-          right: 0;
-          z-index: 10;
-          min-width: min(20rem, calc(100vw - 2rem));
-          max-width: calc(100vw - 2rem);
-      padding: 1rem;
-      border-radius: 1rem;
-      background: var(--ds-color-surface-elevated, var(--ds-color-surface));
-      border: 1px solid color-mix(in srgb, var(--ds-color-on-surface) 12%, transparent);
-      box-shadow: 0 8px 32px rgb(0 0 0 / 25%);
-      animation: countdown-popover-in 160ms ease;
-    }
-
-    @keyframes countdown-popover-in {
-      from { opacity: 0; transform: translateY(-0.5rem); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    .countdown-popover-leave-active {
-      animation: countdown-popover-out 140ms ease forwards;
-    }
-
-    @keyframes countdown-popover-out {
-      to { opacity: 0; transform: translateY(-0.5rem); }
-    }
-
-    .countdown-view__sabbath-head {
-      display: flex;
-      align-items: flex-start;
-      gap: 0.5rem;
-      margin-bottom: 0.75rem;
-
-      i {
-        font-size: 1.25rem;
-        color: var(--ds-color-primary);
-        margin-top: 0.15rem;
-      }
-
-      div h3 {
-        margin: 0;
-        font-size: 0.9rem;
-        font-weight: 600;
-        color: var(--ds-color-on-surface);
-      }
-
-      div p {
-        margin: 0.15rem 0 0;
-        font-size: 0.75rem;
-        color: var(--ds-color-on-surface-muted, var(--ds-color-on-surface));
-      }
-    }
-
-    .countdown-view__sabbath-audio-lang {
-      display: flex;
-      flex-direction: column;
-      gap: 0.3rem;
-
-      .countdown-view__sabbath-lang-label {
-        font-size: 0.75rem;
-        opacity: 0.8;
-      }
-
-      select {
-        width: 100%;
-        padding: 0.35rem 0.5rem;
-        border-radius: 8px;
-        border: 1px solid rgb(var(--v-theme-border));
-        background: rgb(var(--v-theme-surface));
-        color: inherit;
-        font-size: 0.85rem;
-      }
-    }
-
-    .countdown-view__sabbath-schedule {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0.4rem;
-      margin-bottom: 0.75rem;
-      label {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        cursor: pointer;
-        font-size: 0.85rem;
-        color: var(--ds-color-on-surface);
-      }
-
-      input[type="radio"] {
-        accent-color: var(--ds-color-primary);
-      }
-    }
-
-    .countdown-view__sabbath-times {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: flex-end;
-      gap: 0.5rem;
-    }
-
-    .countdown-view__sabbath-field {
-      display: flex;
-      flex-direction: column;
-      gap: 0.25rem;
-      min-width: 8rem;
-
-      span {
-        font-size: 0.75rem;
-        color: var(--ds-color-on-surface-muted, var(--ds-color-on-surface));
-      }
-
-      input {
-        padding: 0.45rem 0.6rem;
-        border: 1px solid color-mix(in srgb, var(--ds-color-on-surface) 22%, transparent);
-        border-radius: 0.5rem;
-        background: color-mix(in srgb, var(--ds-color-on-surface) 6%, transparent);
-        color: var(--ds-color-on-surface);
-        font-size: 1rem;
-        text-align: center;
-
-        &:focus {
-          outline: 2px solid var(--ds-color-primary);
-          outline-offset: 1px;
-        }
-      }
-    }
-
-    .countdown-view__sabbath-times .countdown-view__ctrl--start {
-      align-self: flex-end;
-      margin-left: 0.5rem;
-    }
-
     .countdown-view__duration {
   /* F1 (web#175): fluxo, não overlay — inputs nunca mais cobrem os dígitos */
   position: static;
@@ -914,19 +354,6 @@ const stageBg = computed(() => ({
   overflow: visible;
   margin: 0.5rem auto 0;
   width: fit-content;
-}
-
-.countdown-view__duration .countdown-view__sabbath-time-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  align-items: center;
-}
-
-.countdown-view__duration .countdown-view__sabbath-time-label {
-  font-size: 0.7rem;
-  font-weight: 600;
-  opacity: 0.8;
 }
 
 .countdown-view__preview {
@@ -943,19 +370,6 @@ const stageBg = computed(() => ({
   justify-content: center;
   gap: 0.65rem;
   padding: 0.75rem 1.25rem 1.25rem;
-}
-
-.countdown-view__adjust {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
-}
-
-.countdown-view__ctrl--adjust {
-  min-width: 5.5rem;
-  font-size: 0.9rem;
 }
 
 .countdown-view__ctrl {

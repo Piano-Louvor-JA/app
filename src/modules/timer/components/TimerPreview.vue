@@ -150,7 +150,7 @@ onUnmounted(() => {
 
 .timer-preview__digital {
   max-width: 100%;
-  font-family: ui-monospace, 'Cascadia Code', 'Segoe UI Mono', monospace;
+  font-family: var(--projection-font-family, ui-monospace, 'Cascadia Code', 'Segoe UI Mono', monospace);
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
   line-height: 1;

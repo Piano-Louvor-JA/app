@@ -14,6 +14,8 @@ interface ImportMetaEnv {
   readonly VITE_APP_MODE?: string
   readonly VITE_URL_FILES?: string
   readonly VITE_URL_DATABASE?: string
+  /** SPEC bundle-sync v1.2.0 ADR-11: origem upstream de /db/* (bundles). */
+  readonly VITE_URL_BUNDLES?: string
   readonly VITE_API_TOKEN?: string
   /** Build de campanha (SrCaldeira/Ezequias): expõe rota+card do diagnóstico. */
   readonly VITE_DIAGNOSTICS_CAMPAIGN?: string

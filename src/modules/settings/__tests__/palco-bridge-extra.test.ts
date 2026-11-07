@@ -79,12 +79,13 @@ vi.mock("../services/palco-session", async () => {
 		timerTo(slot: string, opts: unknown) {
 			sendsList.push({ slot, msg: { type: "timer", opts } });
 		},
-		audio(payload: unknown) {
+		hymnAudio(payload: unknown) {
 			sendsList.push({
 				slot: "audio",
 				msg: payload as Record<string, unknown>,
 			});
 		},
+		async stageReturn() {},
 		onEvent: () => () => {},
 		__sends: sendsList,
 	};

@@ -4,6 +4,8 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import { usePageTransition } from '@design-system/composables'
+import PageBackStack from '@shared/components/PageBackStack.vue'
+import { useMinimizablePage } from '@shared/composables/useMinimizablePage'
 
 import SettingsTabs from '../components/SettingsTabs.vue'
 import { SETTINGS_SECTIONS } from '../constants/sections'
@@ -28,6 +30,17 @@ const sectionTitleKey = computed(
 function goBack() {
   void router.push({ name: 'home' })
 }
+
+// O estado das abas já vive nas stores; o retrato guarda só a rolagem e a miniatura.
+const { minimize, prepare } = useMinimizablePage({
+  describe: () => ({
+    title: t(`settings.tabs.${activeSection.value}`),
+    icon: 'ti-settings',
+    summary: t('nav.settings'),
+  }),
+  capture: () => null,
+  fallbackRoute: { name: 'home' },
+})
 </script>
 
 <template>
@@ -37,18 +50,24 @@ function goBack() {
   >
     <SettingsTabs class="settings-view__tabs" />
 
-    <div v-if="!isAppearance" class="settings-view__header">
-      <button
-        type="button"
-        class="settings-view__back"
-        :aria-label="t('nav.home')"
-        @click="goBack"
-      >
-        <i class="ti ti-arrow-left" aria-hidden="true" />
-      </button>
-      <h1 class="settings-view__title">
+    <div
+      class="settings-view__header"
+      :class="{ 'settings-view__header--floating': isAppearance }"
+    >
+      <PageBackStack @minimize="minimize" @prepare="prepare">
+        <button
+          type="button"
+          class="settings-view__back"
+          :aria-label="t('nav.home')"
+          @click="goBack"
+        >
+          <i class="ti ti-arrow-left" aria-hidden="true" />
+        </button>
+      </PageBackStack>
+      <h1 v-if="!isAppearance" class="settings-view__title">
         {{ t(sectionTitleKey) }}
       </h1>
+      <div id="settings-header-aside" class="settings-view__aside" />
     </div>
 
     <div class="settings-view__content">
@@ -89,9 +108,37 @@ function goBack() {
 
 .settings-view__header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 1rem;
   margin-bottom: 2rem;
+
+  /* Aparência: sem título; a seta e o – ficam no canto sem empurrar o conteúdo centralizado */
+  &--floating {
+    position: relative;
+    z-index: 2;
+    height: 0;
+    margin-bottom: 0;
+  }
+}
+
+.settings-view__title {
+  display: flex;
+  align-items: center;
+}
+
+/* Status da aba (Transmissão): alinhado à seta, à direita do título. */
+.settings-view__aside {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  min-height: 2.5rem;
+  margin-left: auto;
+
+  &:empty {
+    display: none;
+  }
 }
 
 .settings-view__back {
@@ -125,6 +172,7 @@ function goBack() {
 
 .settings-view__title {
   margin: 0;
+  padding-top: 4px;
   color: var(--ds-color-on-surface);
   font-size: 24px;
   font-weight: 600;
@@ -155,6 +203,7 @@ function goBack() {
   }
 
   .settings-view__title {
+    padding-top: 7px;
     font-size: 20px;
     line-height: 26px;
   }

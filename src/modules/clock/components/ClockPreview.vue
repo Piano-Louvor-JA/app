@@ -311,7 +311,7 @@ defineExpose({
   max-width: 100%;
   align-items: center;
   justify-content: center;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: var(--projection-font-family, system-ui, -apple-system, sans-serif);
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
 }

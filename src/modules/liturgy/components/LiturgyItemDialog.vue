@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { getDesktopBridge, isDesktopApp } from '@shared/services/desktop-bridge'
@@ -17,6 +17,7 @@ import {
   MOMENT_DURATION_MAX_MS,
   MOMENT_DURATION_MIN_MS,
   MOMENT_DURATION_STEP_MS,
+  TYPES_WITHOUT_DURATION,
   type LiturgyItemDraft,
   type LiturgyItemType,
   type LiturgyMusicOption,
@@ -34,6 +35,15 @@ import {
   isValidLiturgyUrl,
 } from '../services/liturgy-item-helpers'
 import { normalizeLiturgyTimeHHmm } from '../services/liturgy-format'
+import {
+  fetchOnlineVideoInfo,
+  fetchSiteLinkInfo,
+  linkInfoDraftPatch,
+  type LinkAutoFill,
+} from '../services/link-info'
+import { notesHtmlToPlainText, plainTextToNotesHtml } from '../services/rich-notes'
+import LiturgyRichNotesEditor from './LiturgyRichNotesEditor.vue'
+import LiturgyTitleColorPicker from './LiturgyTitleColorPicker.vue'
 
 const props = defineProps<{
   refreshImportedCatalog?: () => Promise<void>
@@ -72,6 +82,7 @@ const filePickerError = ref<string | null>(null)
 const hasTypeSelection = computed(() => props.draft.type != null)
 const isCategory = computed(() => props.draft.type === 'category')
 const isMusic = computed(() => props.draft.type === 'music')
+const isAnnotation = computed(() => props.draft.type === 'annotation')
 
 // app#331 RF-1: importar .slja direto no item de música
 const sljaInputEl = ref<HTMLInputElement | null>(null)
@@ -306,7 +317,7 @@ const showCategoryField = computed(
 )
 
 const showDurationTitleRow = computed(
-  () => hasTypeSelection.value && !isCategory.value,
+  () => props.draft.type != null && !TYPES_WITHOUT_DURATION.includes(props.draft.type),
 )
 
 watch(
@@ -350,6 +361,7 @@ function selectType(type: LiturgyItemType) {
           ? props.draft.durationMs
           : DEFAULT_MOMENT_DURATION_MS
     }
+    if (TYPES_WITHOUT_DURATION.includes(type)) next.durationMs = 0
     next.categoryId = props.draft.categoryId ?? null
     next.startTime = ''
     next.endTime = ''
@@ -399,9 +411,89 @@ function onDetailsInput(event: Event) {
   patch({ subtitle: (event.target as HTMLTextAreaElement).value })
 }
 
-function onUrlInput(event: Event) {
-  patch({ url: (event.target as HTMLInputElement).value })
+// Anotação antiga (só texto) abre no editor como HTML equivalente
+const annotationHtml = computed(
+  () => props.draft.notesHtml || plainTextToNotesHtml(props.draft.subtitle ?? ''),
+)
+
+function onRichNotesInput(html: string) {
+  patch({ notesHtml: html, subtitle: notesHtmlToPlainText(html) })
 }
+
+function onUrlInput(event: Event) {
+  const url = (event.target as HTMLInputElement).value
+  patch({ url })
+  scheduleLinkInfo(url)
+}
+
+// Vídeo online e site: ao colar o link, preenche título, anotações (canal/site + descrição) e duração
+const LINK_INFO_DEBOUNCE_MS = 400
+const linkInfoLoading = ref<'video' | 'site' | null>(null)
+let linkInfoTimer: ReturnType<typeof setTimeout> | null = null
+let linkInfoRun = 0
+let linkInfoUrl = ''
+let linkAutoFilled: LinkAutoFill = { name: '', subtitle: '' }
+
+function linkInfoKind(): 'video' | 'site' | null {
+  if (props.draft.type === 'online_video') return 'video'
+  // Página de outro site só é lida pelo desktop (o navegador bloqueia por CORS)
+  if (props.draft.type === 'site' && getDesktopBridge()?.siteInfo) return 'site'
+  return null
+}
+
+function cancelLinkInfo() {
+  if (linkInfoTimer) clearTimeout(linkInfoTimer)
+  linkInfoTimer = null
+  linkInfoRun += 1
+  linkInfoLoading.value = null
+}
+
+function scheduleLinkInfo(url: string) {
+  const kind = linkInfoKind()
+  if (!kind) return
+  const trimmed = url.trim()
+  if (trimmed && trimmed === linkInfoUrl) return
+  cancelLinkInfo()
+  linkInfoUrl = ''
+  if (!trimmed) return
+  linkInfoTimer = setTimeout(() => void loadLinkInfo(kind, trimmed), LINK_INFO_DEBOUNCE_MS)
+}
+
+async function loadLinkInfo(kind: 'video' | 'site', url: string) {
+  linkInfoTimer = null
+  const run = ++linkInfoRun
+  linkInfoUrl = url
+  linkInfoLoading.value = kind
+  const bridge = getDesktopBridge()
+  const deps = { ytInfo: bridge?.ytInfo, siteInfo: bridge?.siteInfo }
+  const info = kind === 'video' ? await fetchOnlineVideoInfo(url, deps) : await fetchSiteLinkInfo(url, deps)
+  if (run !== linkInfoRun) return
+  linkInfoLoading.value = null
+  if (!info) {
+    linkInfoUrl = ''
+    return
+  }
+  if (linkInfoKind() !== kind || props.draft.url.trim() !== url) return
+  const next = linkInfoDraftPatch(
+    props.draft,
+    info,
+    (name) => t(kind === 'video' ? 'liturgy.dialog.videoChannel' : 'liturgy.dialog.siteName', { name }),
+    linkAutoFilled,
+  )
+  linkAutoFilled = { name: next.name ?? '', subtitle: next.subtitle ?? '' }
+  patch(next)
+}
+
+watch(
+  () => props.open,
+  () => {
+    cancelLinkInfo()
+    linkInfoUrl = props.draft.url.trim()
+    linkAutoFilled = { name: '', subtitle: '' }
+  },
+)
+
+onBeforeUnmount(cancelLinkInfo)
 
 function fileFiltersForType(type: LiturgyItemType | null): FileDialogFilter[] {
   switch (type) {
@@ -727,6 +819,46 @@ function isLightDot(hex: string): boolean {
 
           <template v-if="hasTypeSelection">
           <div
+            v-if="showUrl"
+            class="moment-dialog__section"
+          >
+            <label
+              class="moment-dialog__label"
+              :class="{ 'moment-dialog__label--error': urlFieldError }"
+              for="moment-url"
+            >
+              {{ t('liturgy.fields.url') }}
+              <span
+                class="moment-dialog__required"
+                aria-hidden="true"
+              >*</span>
+            </label>
+            <input
+              id="moment-url"
+              class="moment-dialog__input"
+              :class="{ 'moment-dialog__input--error': urlFieldError }"
+              type="url"
+              :value="draft.url"
+              placeholder="https://"
+              :aria-invalid="urlFieldError"
+              @input="onUrlInput"
+            >
+            <p
+              v-if="linkInfoLoading"
+              class="moment-dialog__hint"
+              role="status"
+            >
+              {{ t(linkInfoLoading === 'video' ? 'liturgy.dialog.videoInfoLoading' : 'liturgy.dialog.siteInfoLoading') }}
+            </p>
+            <p
+              v-if="urlFieldError"
+              class="moment-dialog__field-error"
+            >
+              {{ t('liturgy.dialog.urlInvalid') }}
+            </p>
+          </div>
+
+          <div
             v-if="isMusic"
             class="moment-dialog__section"
           >
@@ -880,8 +1012,9 @@ function isLightDot(hex: string): boolean {
           <div
             class="moment-dialog__row"
             :class="{
-              'moment-dialog__row--name-only': isCategory,
-              'moment-dialog__row--with-category': showCategoryField,
+              'moment-dialog__row--name-only': !showDurationTitleRow && !showCategoryField,
+              'moment-dialog__row--with-category': showDurationTitleRow && showCategoryField,
+              'moment-dialog__row--title-category': !showDurationTitleRow && showCategoryField,
               'moment-dialog__row--duration-title':
                 showDurationTitleRow && !showCategoryField,
             }"
@@ -940,19 +1073,30 @@ function isLightDot(hex: string): boolean {
                   aria-hidden="true"
                 >*</span>
               </label>
-              <input
-                id="moment-name"
-                class="moment-dialog__input"
-                :class="{ 'moment-dialog__input--error': nameFieldError }"
-                type="text"
-                :value="draft.name"
-                :placeholder="momentNamePlaceholder"
-                :list="isMusic ? 'moment-complementary-titles' : undefined"
-                :aria-invalid="nameFieldError"
-                :aria-required="true"
-                autocomplete="off"
-                @input="onNameInput"
+              <div
+                class="moment-dialog__name-row"
+                :class="{ 'moment-dialog__name-row--color': isAnnotation }"
               >
+                <LiturgyTitleColorPicker
+                  v-if="isAnnotation"
+                  :model-value="draft.titleColor ?? ''"
+                  @update:model-value="patch({ titleColor: $event })"
+                />
+                <input
+                  id="moment-name"
+                  class="moment-dialog__input"
+                  :class="{ 'moment-dialog__input--error': nameFieldError }"
+                  :style="isAnnotation && draft.titleColor ? { color: draft.titleColor } : undefined"
+                  type="text"
+                  :value="draft.name"
+                  :placeholder="momentNamePlaceholder"
+                  :list="isMusic ? 'moment-complementary-titles' : undefined"
+                  :aria-invalid="nameFieldError"
+                  :aria-required="true"
+                  autocomplete="off"
+                  @input="onNameInput"
+                >
+              </div>
               <datalist
                 v-if="isMusic && complementaryTitleSuggestions.length > 0"
                 id="moment-complementary-titles"
@@ -1211,47 +1355,23 @@ function isLightDot(hex: string): boolean {
             <!-- Player: gerido pela linha (LiturgyTimelineItem) / Configurações → Mídia & Player. Select do modal removido (redundante). -->
           </div>
 
-          <div
-            v-if="showUrl"
-            class="moment-dialog__section"
-          >
-            <label
-              class="moment-dialog__label"
-              :class="{ 'moment-dialog__label--error': urlFieldError }"
-              for="moment-url"
-            >
-              {{ t('liturgy.fields.url') }}
-              <span
-                class="moment-dialog__required"
-                aria-hidden="true"
-              >*</span>
-            </label>
-            <input
-              id="moment-url"
-              class="moment-dialog__input"
-              :class="{ 'moment-dialog__input--error': urlFieldError }"
-              type="url"
-              :value="draft.url"
-              placeholder="https://"
-              :aria-invalid="urlFieldError"
-              @input="onUrlInput"
-            >
-            <p
-              v-if="urlFieldError"
-              class="moment-dialog__field-error"
-            >
-              {{ t('liturgy.dialog.urlInvalid') }}
-            </p>
-          </div>
-
           <div class="moment-dialog__section">
             <label
+              id="moment-details-label"
               class="moment-dialog__label"
               for="moment-details"
             >
               {{ t('liturgy.dialog.notesTitle') }}
             </label>
+            <LiturgyRichNotesEditor
+              v-if="draft.type === 'annotation'"
+              :model-value="annotationHtml"
+              :placeholder="t('liturgy.dialog.notesPlaceholder')"
+              labelledby="moment-details-label"
+              @update:model-value="onRichNotesInput"
+            />
             <textarea
+              v-else
               id="moment-details"
               class="moment-dialog__textarea"
               rows="4"
@@ -1432,6 +1552,13 @@ function isLightDot(hex: string): boolean {
   color: var(--ds-color-error, #ffb4ab);
 }
 
+.moment-dialog__hint {
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--ds-color-on-surface-variant, rgba(255, 255, 255, 0.65));
+}
+
 .moment-dialog__type-panel {
   display: flex;
   flex-direction: column;
@@ -1573,6 +1700,10 @@ function isLightDot(hex: string): boolean {
     grid-template-columns:
       minmax(6.25rem, 7.25rem) minmax(12rem, 1.7fr) minmax(8rem, 0.95fr);
   }
+
+  &--title-category {
+    grid-template-columns: minmax(12rem, 1.7fr) minmax(8rem, 0.95fr);
+  }
 }
 
 .moment-dialog__times {
@@ -1699,6 +1830,17 @@ function isLightDot(hex: string): boolean {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+}
+
+.moment-dialog__name-row--color {
+  display: flex;
+  align-items: stretch;
+  gap: 0.4rem;
+
+  .moment-dialog__input {
+    flex: 1;
+    min-width: 0;
   }
 }
 

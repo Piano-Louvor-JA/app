@@ -86,6 +86,7 @@ describe('playlist-io', () => {
 
   it('item com title vazio/whitespace é descartado', () => {
     const payload = {
+      version: 1,
       kind: 'playlists',
       playlists: [
         {
@@ -127,6 +128,7 @@ describe('playlist-io', () => {
 
   it('createdAt/updatedAt não-string viram ISO atual', () => {
     const payload = {
+      version: 1,
       kind: 'playlists',
       playlists: [
         { id: 'p1', name: 'Lista', items: [], createdAt: 12345, updatedAt: null },

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useProjectionFont } from '@modules/settings/composables/useProjectionFont'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
@@ -116,10 +117,12 @@ const lyricStyle = computed(() => {
       : {}),
   } as Record<string, string>
 })
+
+const projectionFontStyle = useProjectionFont('hymns')
 </script>
 
 <template>
-  <div class="media-slide-stage" :style="rootStyle">
+  <div class="media-slide-stage" :style="[rootStyle, projectionFontStyle]">
     <div
       v-if="bgImage"
       class="media-slide-stage__bg"

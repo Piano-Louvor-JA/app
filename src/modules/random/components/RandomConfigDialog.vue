@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import FontSelector from '@modules/settings/components/FontSelector.vue'
 import { useI18n } from 'vue-i18n'
 
 import { GlassCard } from '@design-system/index'
@@ -117,6 +118,8 @@ function bumpFont(delta: number, current: number) {
           </header>
 
           <div class="random-config__body">
+            <FontSelector scope="random" compact />
+
             <section class="random-config__section">
               <div class="random-config__section-head">
                 <i

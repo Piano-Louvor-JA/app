@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, useTemplateRef } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+
+import { resolveMediaUrl } from '@shared/services/workspace-api'
 
 import type { StageSettings } from '../../settings/types/stage-settings'
 import type { CountdownDisplayConfig, CountdownRuntimeState } from '../types/countdown'
 import { useCountdownDisplay } from '../composables/useCountdown'
+import { computeElapsedMs } from '../services/countdown-format'
 
 const props = withDefaults(
   defineProps<{
@@ -13,9 +16,12 @@ const props = withDefaults(
     /** Personalização Palco do escopo countdown — mesma fonte da projeção. */
     stage?: StageSettings
     preview?: boolean
+    /** Vídeo sem som: só a projeção toca o áudio do vídeo. */
+    muted?: boolean
   }>(),
   {
     preview: false,
+    muted: false,
   },
 )
 
@@ -24,9 +30,14 @@ const containerRef = useTemplateRef<HTMLElement>('container')
 const sizeWidth = ref(0)
 const sizeHeight = ref(0)
 
-const { formattedTime, isUrgent, isFinished } = useCountdownDisplay(
+const { formattedTime, formattedTimeWithSign, isUrgent, isFinished, isNegative } = useCountdownDisplay(
   () => props.config,
   () => props.runtime,
+)
+
+/** "Continuar após zerar": passado o zero, segue contando com sinal negativo. */
+const displayTime = computed(() =>
+  props.config.allowNegative && isNegative.value ? formattedTimeWithSign.value : formattedTime.value,
 )
 
 const digitalFontSize = computed(() => {
@@ -105,6 +116,40 @@ function stageFlexColumn(st?: StageSettings): Record<string, string> {
   return { alignItems, justifyContent }
 }
 
+/** Vídeo personalizado no lugar dos números, preso ao tempo da contagem. */
+const videoUrl = computed(() => (props.runtime.videoPath ? resolveMediaUrl(props.runtime.videoPath) : null))
+const videoRef = useTemplateRef<HTMLVideoElement>('video')
+/** Abaixo disso o vídeo segue o próprio relógio; pular a cada ajuste travaria a imagem. */
+const VIDEO_DRIFT_S = 1
+
+function syncVideo() {
+  const video = videoRef.value
+  if (!video) return
+  const rt = props.runtime
+  const elapsedMs = Math.min(rt.durationMs, computeElapsedMs(rt.accumulatedMs, rt.segmentStartedAt, rt.status, Date.now()))
+  const target = elapsedMs / 1000
+  video.volume = rt.videoVolume ?? 1
+  if (Math.abs(video.currentTime - target) > VIDEO_DRIFT_S) video.currentTime = target
+  if (rt.status === 'running' && !rt.finished) {
+    if (video.paused) void video.play().catch(() => undefined)
+  } else if (!video.paused) {
+    video.pause()
+  }
+}
+
+watch(
+  () => [
+    videoUrl.value,
+    props.runtime.status,
+    props.runtime.accumulatedMs,
+    props.runtime.segmentStartedAt,
+    props.runtime.finished,
+    props.runtime.videoVolume,
+  ],
+  () => void nextTick(syncVideo),
+  { immediate: true },
+)
+
 let measureTimer: ReturnType<typeof setTimeout> | null = null
 
 function measure() {
@@ -146,18 +191,30 @@ onUnmounted(() => {
     }"
     :style="surfaceStyle"
   >
-    <div
-      class="countdown-preview__digital"
-      :style="digitalStyle"
-    >
-      {{ formattedTime }}
-    </div>
-    <div
-      v-if="isFinished"
-      class="countdown-preview__finished"
-    >
-      {{ t('countdown.finished') }}
-    </div>
+    <video
+      v-if="videoUrl"
+      ref="video"
+      class="countdown-preview__video"
+      :src="videoUrl"
+      :muted="muted"
+      preload="auto"
+      playsinline
+      @loadedmetadata="syncVideo"
+    />
+    <template v-else>
+      <div
+        class="countdown-preview__digital"
+        :style="digitalStyle"
+      >
+        {{ displayTime }}
+      </div>
+      <div
+        v-if="isFinished"
+        class="countdown-preview__finished"
+      >
+        {{ t('countdown.finished') }}
+      </div>
+    </template>
   </div>
 </template>
 
@@ -172,9 +229,18 @@ onUnmounted(() => {
   gap: 0.5rem;
 }
 
+.countdown-preview__video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
 .countdown-preview__digital {
   max-width: 100%;
-  font-family: ui-monospace, 'Cascadia Code', 'Segoe UI Mono', monospace;
+  font-family: var(--projection-font-family, ui-monospace, 'Cascadia Code', 'Segoe UI Mono', monospace);
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
   line-height: 1;

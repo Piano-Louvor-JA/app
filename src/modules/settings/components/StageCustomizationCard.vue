@@ -28,6 +28,7 @@ import {
 } from '../types/stage-settings'
 
 import SettingsToggle from './SettingsToggle.vue'
+import FontSelector from './FontSelector.vue'
 import StagePreview from './StagePreview.vue'
 
 const { t } = useI18n()
@@ -180,6 +181,26 @@ const bibleTransformOptions: { value: StageSettings['bibleTextTransform']; label
   { value: 'capitalize', label: t('settings.stage.bibleTransformCapitalize') },
 ]
 
+const bibleRefPositionOptions: { value: StageSettings['bibleRefPosition']; label: string; hint: string }[] = [
+  { value: 'below-left', label: t('settings.stage.refPositionLeft'), hint: t('settings.stage.refPositionLeftHint') },
+  { value: 'below-center', label: t('settings.stage.refPositionCenter'), hint: t('settings.stage.refPositionCenterHint') },
+  { value: 'below-right', label: t('settings.stage.refPositionRight'), hint: t('settings.stage.refPositionRightHint') },
+  { value: 'corner', label: t('settings.stage.refPositionCorner'), hint: t('settings.stage.refPositionCornerHint') },
+]
+
+const bibleTransitionOptions: { value: StageSettings['bibleTransition']; label: string }[] = [
+  { value: 'none', label: t('settings.stage.transitionNone') },
+  { value: 'fade', label: t('settings.stage.transitionFade') },
+  { value: 'slide', label: t('settings.stage.transitionSlide') },
+  { value: 'zoom', label: t('settings.stage.transitionZoom') },
+]
+
+const bibleTransitionSpeedOptions: { value: StageSettings['bibleTransitionSpeed']; label: string }[] = [
+  { value: 'fast', label: t('settings.stage.transitionFast') },
+  { value: 'normal', label: t('settings.stage.transitionNormal') },
+  { value: 'slow', label: t('settings.stage.transitionSlow') },
+]
+
 const alignOptions = [
   { value: 'left', label: t('settings.stage.alignLeft') },
   { value: 'center', label: t('settings.stage.alignCenter') },
@@ -249,12 +270,14 @@ const confirmReset = ref(false)
         <StagePreview
           class="stage-custom__preview"
           :settings="settings"
+          :font-scope="activeScope"
           :module="activeScope === 'global' ? 'hymns' : activeScope"
         />
       </div><!-- /preview-pane -->
 
       <div class="stage-custom__controls">
       <div class="stage-custom__controls-inner">
+        <FontSelector :scope="activeScope" compact />
         <div class="stage-custom__section">
           <p class="stage-custom__label">{{ t('settings.stage.backgroundColor') }}</p>
       <div class="stage-custom__swatches">
@@ -784,6 +807,54 @@ const confirmReset = ref(false)
           </button>
         </div>
 
+        <p class="stage-custom__label stage-custom__label--sub">
+          {{ t('settings.stage.bibleTransition') }}
+        </p>
+        <div
+          class="stage-custom__segment"
+          role="radiogroup"
+          data-testid="bible-transition"
+          :aria-label="t('settings.stage.bibleTransition')"
+        >
+          <button
+            v-for="opt in bibleTransitionOptions"
+            :key="opt.value"
+            type="button"
+            role="radio"
+            :aria-checked="settings.bibleTransition === opt.value"
+            class="stage-custom__segment-btn"
+            :class="{ 'stage-custom__segment-btn--active': settings.bibleTransition === opt.value }"
+            @click="patch({ bibleTransition: opt.value })"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
+
+        <template v-if="settings.bibleTransition !== 'none'">
+          <p class="stage-custom__label stage-custom__label--sub">
+            {{ t('settings.stage.bibleTransitionSpeed') }}
+          </p>
+          <div
+            class="stage-custom__segment"
+            role="radiogroup"
+            data-testid="bible-transition-speed"
+            :aria-label="t('settings.stage.bibleTransitionSpeed')"
+          >
+            <button
+              v-for="opt in bibleTransitionSpeedOptions"
+              :key="opt.value"
+              type="button"
+              role="radio"
+              :aria-checked="settings.bibleTransitionSpeed === opt.value"
+              class="stage-custom__segment-btn"
+              :class="{ 'stage-custom__segment-btn--active': settings.bibleTransitionSpeed === opt.value }"
+              @click="patch({ bibleTransitionSpeed: opt.value })"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
+        </template>
+
         <div class="stage-custom__toggle-row">
           <button
             type="button"
@@ -797,6 +868,30 @@ const confirmReset = ref(false)
             :label="t('settings.stage.showBibleVersion')"
             @update:model-value="patch({ showBibleVersion: $event })"
           />
+        </div>
+
+        <p class="stage-custom__label stage-custom__label--sub">
+          {{ t('settings.stage.refPosition') }}
+        </p>
+        <div
+          class="stage-custom__segment"
+          role="radiogroup"
+          data-testid="bible-ref-position"
+          :aria-label="t('settings.stage.refPosition')"
+        >
+          <button
+            v-for="opt in bibleRefPositionOptions"
+            :key="opt.value"
+            type="button"
+            role="radio"
+            :aria-checked="settings.bibleRefPosition === opt.value"
+            :title="opt.hint"
+            class="stage-custom__segment-btn"
+            :class="{ 'stage-custom__segment-btn--active': settings.bibleRefPosition === opt.value }"
+            @click="patch({ bibleRefPosition: opt.value })"
+          >
+            {{ opt.label }}
+          </button>
         </div>
 
         <p class="stage-custom__label stage-custom__label--sub">

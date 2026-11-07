@@ -109,7 +109,7 @@ describe("playItemOnScreens — markItemDone interno via execute", () => {
 	it("playItemOnScreens falho: não marca done", async () => {
 		playLiturgyItemOnScreens.mockResolvedValueOnce({ ok: false, messageKey: "liturgy.err" });
 		const s = useLiturgyStore();
-		seedItems(s, [item({ type: "annotation" })]);
+		seedItems(s, [item({ type: "music" })]);
 		await s.playItemOnScreens(0);
 		const stored = (s as unknown as { currentItems: LiturgyItem[] }).currentItems;
 		expect(stored[0].done).toBe(false);

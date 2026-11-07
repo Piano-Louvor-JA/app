@@ -19,11 +19,14 @@ export async function requestCloseProjectionWithConfirm(): Promise<void> {
     const alive = (await bridge?.projection?.externalAlive?.()) ?? false
     if (!alive) return
     handling = true
+    // Esc + Enter encerra sem clicar; o Enter pode vir da própria janela de projeção.
     const ok = await appConfirm({
       title: 'Encerrar projeção?',
-      message: 'Há uma projeção ativa (bíblia/hinos/vídeo/site). Encerrar agora?',
+      message: 'Há uma projeção ativa (bíblia/hinos/vídeo/site). Encerrar agora? Enter encerra.',
       confirmLabel: 'Encerrar',
       danger: true,
+      enterConfirms: true,
+      externalConfirm: (confirm) => bridge?.projection?.onConfirmCloseRequested?.(confirm),
     })
     if (ok) {
       await bridge?.projection?.closeUrl?.()

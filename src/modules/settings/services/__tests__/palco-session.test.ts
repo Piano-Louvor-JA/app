@@ -135,6 +135,10 @@ describe('sem electron (sem bridge)', () => {
     await expect(palcoSession.videoRouted({ url: 'v.mp4' })).resolves.toBeUndefined()
     await expect(palcoSession.audioRouted({ url: 'a.mp3' })).resolves.toBeUndefined()
     await expect(palcoSession.serveMedia('f', 'audio/mpeg', 'QQ==')).resolves.toBeNull()
+    await expect(palcoSession.updateSlot('0', { httpPort: 9000 })).resolves.toEqual({ ok: false, reason: 'not-found' })
+    await expect(palcoSession.transmission()).resolves.toBeNull()
+    await expect(palcoSession.setTransmission({ bind: 'local' })).resolves.toBeNull()
+    await expect(palcoSession.resetToken()).resolves.toBeNull()
     palcoSession.idle()
     palcoSession.timerStop()
     palcoSession.onEvent(() => {})
@@ -158,6 +162,24 @@ describe('com electron', () => {
     expect(palco.start).toHaveBeenCalledWith('1')
     await palcoSession.stopSlot('1')
     expect(palco.stop).toHaveBeenCalledWith('1')
+  })
+
+  it('transmissão: rede, token, porta e aparência delegam ao main', async () => {
+    const info = { bind: 'all', requireToken: true, listenHost: '0.0.0.0', linkHost: '192.168.0.5', missing: false, interfaces: [], token: 'AB12C' }
+    const palco = {
+      ...fullMock(),
+      transmission: vi.fn().mockResolvedValue(info),
+      setTransmission: vi.fn().mockResolvedValue({ ok: false, reason: 'running' }),
+      resetToken: vi.fn().mockResolvedValue({ token: 'ZZ99Y' }),
+      updateSlot: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    setBridge(palco)
+    expect(await palcoSession.transmission()).toBe(info)
+    expect(await palcoSession.setTransmission({ bind: 'local' })).toEqual({ ok: false, reason: 'running' })
+    expect(palco.setTransmission).toHaveBeenCalledWith({ bind: 'local' })
+    expect(await palcoSession.resetToken()).toBe('ZZ99Y')
+    expect(await palcoSession.updateSlot('7082', { overlay: { theme: 'light' } })).toEqual({ ok: true })
+    expect(palco.updateSlot).toHaveBeenCalledWith('7082', { overlay: { theme: 'light' } })
   })
 
   it('setSlot troca o slot ativo; status usa slot ativo', async () => {
@@ -274,6 +296,56 @@ describe('com electron', () => {
     await palcoSession.project('bible', { text: 'No princípio', footerRef: 'João 1:1' })
     payload = palco.send.mock.calls[1]?.[0] as Record<string, unknown>
     expect(payload.textTransform).toBeUndefined()
+  })
+
+  it('project bible: envia a posição da referência; outros escopos não', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    readEffectiveStageSettings.mockReturnValue({
+      ...readEffectiveStageSettings(),
+      bibleRefPosition: 'corner',
+    })
+    await palcoSession.project('bible', { text: 'No princípio', footerRef: 'João 1:1' })
+    expect((palco.send.mock.calls[0]?.[0] as Record<string, unknown>).footerPosition).toBe('corner')
+
+    readEffectiveStageSettings.mockReturnValue({
+      ...readEffectiveStageSettings(),
+      bibleRefPosition: undefined,
+    })
+    await palcoSession.project('bible', { text: 'No princípio', footerRef: 'João 1:1' })
+    expect((palco.send.mock.calls[1]?.[0] as Record<string, unknown>).footerPosition).toBe('below-right')
+
+    await palcoSession.project('hymns', { text: 'Santo' })
+    expect((palco.send.mock.calls[2]?.[0] as Record<string, unknown>).footerPosition).toBeUndefined()
+  })
+
+  it('project bible: envia tipo e duração da transição; outros escopos não', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    readEffectiveStageSettings.mockReturnValue({
+      ...readEffectiveStageSettings(),
+      bibleTransition: 'zoom',
+      bibleTransitionSpeed: 'slow',
+    })
+    await palcoSession.project('bible', { text: 'No princípio', footerRef: 'João 1:1' })
+    let payload = palco.send.mock.calls[0]?.[0] as Record<string, unknown>
+    expect(payload.transition).toBe('zoom')
+    expect(payload.transitionMs).toBe(450)
+
+    readEffectiveStageSettings.mockReturnValue({
+      ...readEffectiveStageSettings(),
+      bibleTransition: undefined,
+      bibleTransitionSpeed: undefined,
+    })
+    await palcoSession.project('bible', { text: 'No princípio', footerRef: 'João 1:1' })
+    payload = palco.send.mock.calls[1]?.[0] as Record<string, unknown>
+    expect(payload.transition).toBe('fade')
+    expect(payload.transitionMs).toBe(250)
+
+    await palcoSession.project('hymns', { text: 'Santo' })
+    payload = palco.send.mock.calls[2]?.[0] as Record<string, unknown>
+    expect(payload.transition).toBeUndefined()
+    expect(payload.transitionMs).toBeUndefined()
   })
 
   it('hymns overrideBg: bg do escopo vence capa da música', async () => {
@@ -756,7 +828,8 @@ it('waits for the matching source confirmation before finishing the startup test
   const unsubscribe = vi.fn()
   palco.onEvent.mockImplementation(callback => { receive = callback; return unsubscribe })
   let finished = false
-  const starting = palcoSession.warmupObs('7082').then(() => { finished = true })
+  const warmupResult = palcoSession.warmupObs('7082')
+  const starting = warmupResult.then(() => { finished = true })
   await vi.waitFor(() => expect(palco.send).toHaveBeenCalled())
   const message = palco.send.mock.calls.at(-1)![0]
   expect(message).toMatchObject({ type: 'obsWarmup', durationMs: 3000 })
@@ -767,4 +840,26 @@ it('waits for the matching source confirmation before finishing the startup test
   receive({ type: 'obs-warmup-complete', requestId: message.requestId })
   await starting
   expect(unsubscribe).toHaveBeenCalledOnce()
+  await expect(warmupResult).resolves.toBe('confirmed')
+})
+
+it('reads the status of one connection without changing the active one', async () => {
+  const palco = fullMock()
+  setBridge(palco)
+  await expect(palcoSession.statusSlot('7082')).resolves.toMatchObject({ running: true, clients: 1 })
+  expect(palco.status).toHaveBeenCalledWith('7082')
+  expect(palcoSession.slotId).toBe('0')
+})
+
+it('skips the startup test while no source is open and reports that it is waiting', async () => {
+  const palco = fullMock()
+  palco.status.mockResolvedValue({ running: true, clients: 0, url: 'http://192.168.0.5:7082' })
+  setBridge(palco)
+  const refresh = vi.spyOn(palcoSession, 'refreshObs')
+  await expect(palcoSession.warmupObs('7082')).resolves.toBe('waiting')
+  expect(palco.send).not.toHaveBeenCalled()
+  expect(refresh).not.toHaveBeenCalled()
+  palco.status.mockRejectedValueOnce(new Error('ipc'))
+  await expect(palcoSession.warmupObs('7082')).resolves.toBe('waiting')
+  refresh.mockRestore()
 })

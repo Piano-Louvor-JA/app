@@ -62,6 +62,7 @@ vi.mock('../services/liturgy-web-runtime', async (importOriginal) => {
 })
 
 import {
+  openLocalTextControl,
   openLiturgyLocalImageControl,
   openLiturgyLocalPdfControl,
   openLiturgyLocalPresentationControl,
@@ -327,6 +328,28 @@ describe('imagens locais', () => {
     expect(openUrl).toHaveBeenCalledWith(
       expect.objectContaining({ filePaths: ['/i/a.png', '/i/b.png'], title: 'a.png', mode: 'image', withScreens: true }),
     )
+  })
+})
+
+describe('texto (avisos)', () => {
+  const text = { title: 'Batismo', html: '<p>Sábado</p>', titleColor: '#fff000' }
+
+  it('sem bridge ou sem conteúdo → false', async () => {
+    await expect(openLocalTextControl(text)).resolves.toBe(false)
+    mockState.bridge = makeBridge()
+    await expect(openLocalTextControl({ title: ' ', html: '  ' })).resolves.toBe(false)
+  })
+
+  it('abre o controle de texto sem projetar, com o título do aviso', async () => {
+    const openUrl = vi.fn(async () => true)
+    mockState.bridge = makeBridge({ openUrl })
+    await expect(openLocalTextControl(text, '')).resolves.toBe(true)
+    expect(closeProjectionModule).toHaveBeenCalled()
+    expect(openUrl).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: 'text', text, title: 'Batismo', withScreens: false, monitorIds: expect.any(Array) }),
+    )
+    await openLocalTextControl({ title: '', html: '<p>x</p>' })
+    expect(openUrl).toHaveBeenLastCalledWith(expect.objectContaining({ title: 'Texto' }))
   })
 })
 

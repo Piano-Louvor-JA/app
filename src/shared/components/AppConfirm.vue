@@ -1,5 +1,7 @@
 <script setup lang="ts">
-defineProps<{
+import { useEnterToConfirm } from '@shared/composables/useEnterToConfirm';
+
+const props = defineProps<{
 	open: boolean;
 	title: string;
 	message: string;
@@ -7,12 +9,19 @@ defineProps<{
 	cancelLabel: string;
 	danger?: boolean;
 	zIndex?: number;
+	/** Enter confirma. Fica desligado nos confirms de exclusão. */
+	enterConfirms?: boolean;
 }>();
 
 const emit = defineEmits<{
 	confirm: [];
 	cancel: [];
 }>();
+
+useEnterToConfirm(
+	() => props.open && props.enterConfirms === true,
+	() => emit('confirm'),
+);
 </script>
 
 <template>

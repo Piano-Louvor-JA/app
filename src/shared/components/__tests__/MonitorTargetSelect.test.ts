@@ -125,6 +125,7 @@ describe('MonitorTargetSelect', () => {
     await nextTick()
     const group = w.find('ul[aria-label="obsOutputs.title"]')
     expect(group.text()).toContain('OBS 2')
+    expect(group.find('.monitor-target-select__option-meta').text()).toBe('obsOutputs.activeConnections:1')
     expect(w.find('.obs-outputs-active').text()).toContain('obsOutputs.active')
     expect(w.find('.obs-outputs-empty').exists()).toBe(false)
     expect(w.find('[role="separator"]').exists()).toBe(true)

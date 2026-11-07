@@ -6,6 +6,7 @@ import { readBibleIndependentFromStorage } from '@modules/bible/services/bible-i
 import { readTimerRuntimeFromStorage } from '@modules/timer/services/timer-runtime'
 import { readCountdownRuntimeFromStorage } from '@modules/countdown/services/countdown-runtime'
 import { readRandomRuntimeFromStorage } from '@modules/random/services/random-runtime'
+import { carouselObsInput } from '@modules/announcements/services/carousel-obs'
 
 /** Renderização independente não publica intenção nem toma a projeção principal. */
 export async function renderObsModule(slotId: string, module: ObsModule, obsPane = false) {
@@ -16,6 +17,10 @@ export async function renderObsModule(slotId: string, module: ObsModule, obsPane
   if (module === 'clock') {
     const now = new Date()
     return palcoSession.projectTo(slotId, 'clock', { ...(obsPane ? { obsPane: true } : {}), text: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}` })
+  }
+  if (module === 'announcements-carousel') {
+    // Texto com a aparência da Liturgia (mesma da anotação); imagem vai como frame.
+    return palcoSession.projectTo(slotId, 'liturgy', { ...(obsPane ? { obsPane: true } : {}), ...(await carouselObsInput()) })
   }
   if (module === 'random') {
     return palcoSession.projectTo(slotId, 'random', { ...(obsPane ? { obsPane: true } : {}), text: readRandomRuntimeFromStorage().currentDisplay })

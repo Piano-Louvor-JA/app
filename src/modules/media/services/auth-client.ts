@@ -62,6 +62,31 @@ export function authHeaders(): Record<string, string> {
   return { authorization: `Bearer ${session.token}` }
 }
 
+/**
+ * piano-unified-auth RF-03: token de auth ASSÍNCRONO.
+ * Firebase user ativo → getIdToken() fresco (expira ~1h; localStorage ficaria stale).
+ * Sem Firebase → token opaco da sessão local (legacy) ou null.
+ */
+export async function authTokenAsync(): Promise<string | null> {
+  try {
+    const { getAuth } = await import('firebase/auth')
+    const user = getAuth().currentUser
+    if (user) {
+      const token = await user.getIdToken()
+      if (token) return token
+    }
+  } catch {
+    // Firebase indisponível → fallback sessão local
+  }
+  return getAuthSession()?.token ?? null
+}
+
+/** Headers assíncronos p/ chamadas autenticadas (token fresco). */
+export async function authHeadersAsync(): Promise<Record<string, string>> {
+  const token = await authTokenAsync()
+  return token ? { authorization: `Bearer ${token}` } : {}
+}
+
 async function authRequest(
   path: 'register' | 'login',
   body: Record<string, string>,

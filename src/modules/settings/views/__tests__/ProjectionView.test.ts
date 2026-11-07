@@ -34,12 +34,6 @@ vi.mock('../../components/MainScreenOptionsCard.vue', () => ({
 vi.mock('../../components/ReturnScreenOptionsCard.vue', () => ({
   default: { name: 'ReturnScreenOptionsCard', template: '<div class="card-mock return-screen" />' },
 }))
-vi.mock('../../components/PalcoCard.vue', () => ({
-  default: { name: 'PalcoCard', template: '<div class="card-mock palco" />' },
-}))
-vi.mock('../../components/PalcoSlotsCard.vue', () => ({
-  default: { name: 'PalcoSlotsCard', template: '<div class="card-mock palco-slots" />' },
-}))
 vi.mock('../../components/StageCustomizationCard.vue', () => ({
   default: {
     name: 'StageCustomizationCard',
@@ -68,8 +62,6 @@ describe('ProjectionView.vue', () => {
     expect(w.find('.multi-screen').exists()).toBe(true)
     expect(w.find('.main-screen').exists()).toBe(true)
     expect(w.find('.return-screen').exists()).toBe(true)
-    expect(w.find('.palco').exists()).toBe(false)
-    expect(w.find('.palco-slots').exists()).toBe(false)
     expect(w.find('.stage-customization').exists()).toBe(false)
     w.unmount()
   })

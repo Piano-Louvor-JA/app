@@ -607,9 +607,25 @@
           return youtubeReceiverReady[slotId]
         }
 
+        var tvYoutubeRoutes = {}
+        var tvUnservableFiles = {}
+        // Cópia do YouTube já baixada: a TV toca o arquivo; acima do limite de publicação, espelho.
+        function tvYoutubeRoute(media) {
+          return media.filePath && !tvUnservableFiles[media.filePath] ? 'file' : 'mirror'
+        }
+
         async function tvSendMedia(slotId, media, positionMs, paused) {
           if (!networkProjectionActive || tvChecked[slotId] === false) return
           if (!media.youtubeId) return tvSendVideo(slotId, media.filePath, media.title, positionMs)
+          if (tvYoutubeRoute(media) === 'file') {
+            if (await tvSendVideo(slotId, media.filePath, media.title, positionMs)) {
+              tvYoutubeRoutes[slotId] = 'file'
+              return
+            }
+            tvUnservableFiles[media.filePath] = true
+          }
+          if (!networkProjectionActive || tvChecked[slotId] === false) return
+          tvYoutubeRoutes[slotId] = 'mirror'
           try {
             await getNetworkMirrorSender().prepare()
             await prepareYoutubeReceiver(slotId)
@@ -621,10 +637,29 @@
           }
         }
 
+        /** As TVs não desenham a legenda do arquivo: ligar ou desligar a legenda troca entre arquivo e espelho. */
+        async function tvRerouteYoutube() {
+          if (!networkProjectionActive || !window.louvorja.palco) return
+          var media = await window.louvorja.projection.getSourceMediaInfo()
+          if (!media || !media.youtubeId) return
+          var route = tvYoutubeRoute(media)
+          var st = await window.louvorja.projection.getPlaybackState().catch(function () { return null })
+          var posMs = st && st.currentTime > 0 ? Math.round(st.currentTime * 1000) : 0
+          for (var i = 0; i < tvSlots.length; i++) {
+            var slot = tvSlots[i]
+            var previous = tvYoutubeRoutes[slot.id]
+            if (!(slot.clients > 0) || tvChecked[slot.id] === false || !previous || previous === route) continue
+            if (route === 'file' && networkMirrorSender) await networkMirrorSender.remove(slot.id)
+            if (route === 'mirror') await window.louvorja.palco.send({ v: 2, type: 'video', action: 'stop' }, slot.id)
+            void tvSendMedia(slot.id, media, posMs, st && st.paused)
+          }
+        }
+
         async function tvSendVideo(slotId, filePath, title, positionMs) {
           try {
             var url = await window.louvorja.palco.servePath(filePath, slotId)
-            if (!url || !networkProjectionActive || tvChecked[slotId] === false) return
+            if (!url) return false
+            if (!networkProjectionActive || tvChecked[slotId] === false) return true
             await window.louvorja.palco.send(
               {
                 v: 2,
@@ -640,8 +675,10 @@
               { v: 2, type: 'video', action: 'play' },
               slotId,
             )
+            return true
           } catch (e) {
             /* slot pode ter caído */
+            return false
           }
         }
 
@@ -806,6 +843,7 @@
             if (!state) return
             setCaptionsUi(state.captionsHidden)
             await tvBroadcast('captions', { captionsHidden: captionsHidden })
+            await tvRerouteYoutube().catch(function () { /* TV fora do ar segue como estava */ })
           } finally { captionsBtn.disabled = false }
         })
 
@@ -974,6 +1012,10 @@
         loadTvs()
         refresh()
       })()
+    </script>
+    <script src="independent-panel.js"></script>
+    <script>
+      window.PianoIndependentPanel && window.PianoIndependentPanel.mount()
     </script>
   </body>
 </html>

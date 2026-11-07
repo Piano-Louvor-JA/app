@@ -79,7 +79,7 @@ describe("useRemoteControl", () => {
 
     expect(rc.enabled.value).toBe(false);
     expect(rc.connected.value).toBe(false);
-    expect(rc.senderUrl.value).toBe("ws://192.168.1.10:7081/palco");
+    expect(rc.senderUrl.value).toBe("ws://192.168.1.10:47081/palco");
     expect(receiverInstances.instances.length).toBe(0);
   });
 

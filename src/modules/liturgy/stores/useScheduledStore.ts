@@ -154,6 +154,24 @@ export const useScheduledStore = defineStore('scheduled', {
       this.persist()
     },
 
+    /**
+     * Promoção online_video → file (T3/SPEC R4): o download do vídeo remoto
+     * concluiu no MAIN; a entrada passa a apontar pro arquivo local (paridade
+     * de execução imediata). Entry inexistente → ignora silencioso; entry que
+     * não é online_video → intocada.
+     */
+    promoteOnlineVideoToFile(entryId: string, filePath: string) {
+      const entry = this.items.find((i) => i.id === entryId)
+      if (!entry?.content || entry.content.kind !== 'online_video') return
+      entry.content = {
+        kind: 'file',
+        filePath,
+        name: entry.content.name,
+      }
+      entry.filePath = filePath
+      this.persist()
+    },
+
     persist() {
       const state = {
         categories: this.categories,

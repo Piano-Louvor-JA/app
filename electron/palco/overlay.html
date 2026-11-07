@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Legenda · Piano LouvorJA</title>
+<!--
+  Legenda da Transmissão (SPEC-06), servida em /legenda: fonte de navegador do OBS/vMix.
+  Só texto (letra, Bíblia, liturgia, sorteio, relógio, cronômetro); áudio e
+  vídeo ficam com a espelho do Palco (/espelho). Aparência por conexão via overlayStyle.
+-->
+<style>
+  :root { color-scheme: only light; background: transparent; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: transparent; }
+  body {
+    --overlay-scale: 1;
+    --overlay-accent: #FFD54A;
+    --overlay-band: 0.6;
+    --overlay-fade-out: 180ms;
+    --overlay-fade-in: 260ms;
+    font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, system-ui, sans-serif;
+    color: #fff;
+  }
+  #stage { position: fixed; inset: 0; display: flex; justify-content: center; }
+  #backdrop {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; opacity: 0; transition: opacity 400ms ease;
+  }
+  #backdrop.is-shown { opacity: 1; }
+  /* Faixa suave que abraça a letra (não ocupa a largura toda). */
+  #card {
+    position: relative; display: flex; flex-direction: column; gap: 0.4em;
+    width: fit-content; max-width: 100%;
+    opacity: 0; transform: translateY(0.6vw);
+    transition: opacity var(--overlay-fade-out) ease, transform var(--overlay-fade-out) ease;
+    text-align: center; overflow: hidden;
+  }
+  #card.is-visible {
+    opacity: 1; transform: none;
+    transition-duration: var(--overlay-fade-in);
+  }
+  #content { line-height: 1.25; font-weight: 600; overflow-wrap: anywhere; }
+  #reference {
+    margin: 0; color: var(--overlay-accent); font-weight: 700;
+    font-size: 0.55em; letter-spacing: 0.02em; text-align: right;
+  }
+  #reference:empty, body.hide-heading #reference { display: none; }
+  #card.is-cover #content { color: var(--overlay-accent); font-weight: 800; text-transform: uppercase; letter-spacing: 0.02em; }
+  #card.is-timer #content { font-variant-numeric: tabular-nums; font-weight: 700; }
+  #card.is-frame { padding: 0; background: none !important; box-shadow: none !important; }
+  #frame { display: none; max-width: 100%; max-height: 100%; object-fit: contain; }
+  #card.is-frame #frame { display: block; }
+  #card.is-frame #content, #card.is-frame #reference { display: none; }
+
+  /* Terço inferior: faixa no rodapé (ou topo) sobre a câmera. */
+  body[data-layout="lower-third"] #stage { align-items: flex-end; padding: 0 4vw 4.5vh; }
+  body[data-layout="lower-third"][data-position="top"] #stage { align-items: flex-start; padding: 4.5vh 4vw 0; }
+  body[data-layout="lower-third"] #card {
+    max-width: min(88vw, 1600px); max-height: 40vh;
+    padding: 0.35em 1em; border-radius: 0.45em 0 0.45em 0;
+    font-size: calc(2.5vw * var(--overlay-scale));
+  }
+  body[data-layout="lower-third"] #backdrop { display: none; }
+
+  /* Tela cheia: texto centralizado; fundo do slide nos temas com cartão. */
+  body[data-layout="fullscreen"] #stage { align-items: center; padding: 6vh 6vw; }
+  body[data-layout="fullscreen"] #card {
+    max-height: 88vh; padding: 0.4em 1em; border-radius: 0.4em 0 0.4em 0;
+    font-size: calc(4.2vw * var(--overlay-scale));
+  }
+  body[data-layout="fullscreen"][data-theme="dark"] { background: #000; }
+  body[data-layout="fullscreen"][data-theme="light"] { background: #f2f2f2; }
+  body[data-layout="fullscreen"][data-theme="transparent"] #backdrop { display: none; }
+
+  /* Temas */
+  /* --overlay-band: opacidade da faixa escolhida na conexão (0 = só o texto). */
+  body[data-theme="dark"] #card { background: rgba(10, 10, 12, var(--overlay-band)); box-shadow: 0 0 1.4em 0.2em rgba(10, 10, 12, calc(var(--overlay-band) * 0.55)); }
+  body[data-theme="light"] #card { background: rgba(255, 255, 255, var(--overlay-band)); color: #151515; box-shadow: 0 0 1.4em 0.2em rgba(255, 255, 255, calc(var(--overlay-band) * 0.4)); }
+  body[data-theme="light"] #reference,
+  body[data-theme="light"] #card.is-cover #content { filter: brightness(0.7); }
+  body[data-theme="transparent"] #card { background: rgba(0, 0, 0, var(--overlay-band)); box-shadow: 0 0 1.4em 0.3em rgba(0, 0, 0, calc(var(--overlay-band) * 0.7)); }
+  body[data-theme="transparent"] #content,
+  body[data-theme="transparent"] #reference,
+  body.no-band[data-theme="dark"] #content,
+  body.no-band[data-theme="dark"] #reference {
+    text-shadow: 0 0.04em 0.14em rgba(0, 0, 0, 0.85);
+  }
+  body.no-band #card { box-shadow: none; }
+
+  #badge {
+    position: fixed; left: 50%; bottom: 6vh; transform: translateX(-50%);
+    padding: 0.7vw 1.6vw; border-radius: 999px; font-size: 1.3vw; font-weight: 600;
+    background: rgba(12, 12, 14, 0.85); color: #fff; opacity: 0; transition: opacity 200ms ease;
+  }
+  #badge.is-shown { opacity: 1; }
+  #badge::before { content: ''; display: inline-block; width: 0.7em; height: 0.7em; margin-right: 0.6em; border-radius: 50%; background: #4cd38a; }
+  @media (prefers-reduced-motion: reduce) { #card, #backdrop { transition: none; } }
+</style>
+<script src="purify.min.js"></script>
+</head>
+<body data-overlay-root data-layout="lower-third" data-theme="dark" data-position="bottom" data-connected="false" data-renders="0">
+<main id="stage" aria-live="polite">
+  <img id="backdrop" alt="">
+  <section id="card">
+    <img id="frame" alt="">
+    <div id="content"></div>
+    <p id="reference"></p>
+  </section>
+</main>
+<div id="badge" role="status"></div>
+<script>
+(function () {
+  'use strict'
+  var query = new URLSearchParams(location.search)
+  var body = document.body
+  var card = document.getElementById('card')
+  var content = document.getElementById('content')
+  var reference = document.getElementById('reference')
+  var backdrop = document.getElementById('backdrop')
+  var frame = document.getElementById('frame')
+  var badge = document.getElementById('badge')
+
+  var WORDS = {
+    'pt': 'Fonte conectada ao Piano LouvorJA',
+    'en': 'Source connected to Piano LouvorJA',
+    'es': 'Fuente conectada a Piano LouvorJA'
+  }
+  var lang = (query.get('lang') || navigator.language || 'pt').slice(0, 2).toLowerCase()
+  document.documentElement.lang = WORDS[lang] ? lang : 'pt'
+
+  var token = /^[A-Z0-9]{5}$/.test(query.get('token') || '') ? query.get('token') : ''
+  /** Só localhost ou IPv4 de rede local: o overlay nunca conecta fora da LAN. */
+  function lanHost(value) {
+    if (value === 'localhost') return 'localhost'
+    if (typeof value !== 'string' || !/^(?:0|[1-9][0-9]{0,2})(?:\.(?:0|[1-9][0-9]{0,2})){3}$/.test(value)) return ''
+    var parts = value.split('.').map(Number)
+    if (parts.some(function (n) { return n > 255 })) return ''
+    var a = parts[0], b = parts[1]
+    if (a !== 10 && a !== 127 && !(a === 172 && b >= 16 && b <= 31) && !(a === 192 && b === 168) && !(a === 169 && b === 254)) return ''
+    return parts.join('.')
+  }
+  function validPort(value) {
+    if (!/^\d{1,5}$/.test(String(value))) return 0
+    var number = Number(value)
+    return number >= 1 && number <= 65535 ? number : 0
+  }
+  var wsHost = lanHost(query.get('host')) || lanHost(location.hostname) || '127.0.0.1'
+  var wsPort = validPort(query.get('port')) || validPort((Number(location.port) || 80) + 1) || 47081
+  var forced = { layout: query.get('layout'), theme: query.get('theme') }
+
+  // ── Aparência ───────────────────────────────────────────────────────────
+  var LAYOUTS = ['lower-third', 'fullscreen']
+  var THEMES = ['dark', 'light', 'transparent']
+  function applyStyle(style) {
+    style = style || {}
+    var layout = LAYOUTS.indexOf(forced.layout) >= 0 ? forced.layout : LAYOUTS.indexOf(style.layout) >= 0 ? style.layout : 'lower-third'
+    var theme = THEMES.indexOf(forced.theme) >= 0 ? forced.theme : THEMES.indexOf(style.theme) >= 0 ? style.theme : 'dark'
+    body.dataset.layout = layout
+    body.dataset.theme = theme
+    body.dataset.position = style.position === 'top' ? 'top' : 'bottom'
+    var scale = Number(style.textScale)
+    body.style.setProperty('--overlay-scale', String((scale >= 70 && scale <= 160 ? scale : 100) / 100))
+    if (/^#[0-9a-f]{6}$/i.test(style.accentColor || '')) body.style.setProperty('--overlay-accent', style.accentColor)
+    var band = Number(style.bandOpacity)
+    band = typeof style.bandOpacity === 'number' && band >= 0 && band <= 100 ? band : 60
+    body.style.setProperty('--overlay-band', String(band / 100))
+    body.classList.toggle('no-band', band === 0)
+    body.classList.toggle('hide-heading', style.showHeading === false)
+    syncBackdrop()
+    fitText()
+  }
+
+  // ── Estado exibido ──────────────────────────────────────────────────────
+  var EMPTY = { kind: 'empty' }
+  var shown = EMPTY
+  var shownKey = 'empty'
+  var pending = null
+  var swapping = false
+  var renders = 0
+  var timerHandle = 0
+
+  function sanitize(html) {
+    var withBreaks = String(html || '').replace(/\r?\n/g, '<br>')
+    if (window.DOMPurify) {
+      return window.DOMPurify.sanitize(withBreaks, {
+        ALLOWED_TAGS: ['br', 'b', 'strong', 'i', 'em', 'u', 'sup', 'sub', 'span', 'p', 'div', 'small'],
+        ALLOWED_ATTR: []
+      })
+    }
+    var holder = document.createElement('div')
+    holder.textContent = String(html || '')
+    return holder.innerHTML.replace(/\r?\n/g, '<br>')
+  }
+
+  function keyOf(state) {
+    return JSON.stringify([state.kind, state.html || '', state.text || '', state.reference || '', !!state.cover, state.background || '', state.frame || ''])
+  }
+
+  function show(next) {
+    var key = keyOf(next)
+    if (key === shownKey && !pending) return
+    if (next.kind === 'timer' && shown.kind === 'timer' && !swapping && !pending) {
+      shown = next
+      shownKey = key
+      content.textContent = next.text
+      reference.textContent = next.reference || ''
+      return
+    }
+    pending = { state: next, key: key }
+    if (!swapping) flush()
+  }
+
+  function flush() {
+    if (!pending) return
+    if (pending.key === shownKey) { pending = null; return }
+    var visible = card.classList.contains('is-visible')
+    swapping = true
+    card.classList.remove('is-visible')
+    setTimeout(function () {
+      var next = pending
+      pending = null
+      if (next && next.key !== shownKey) paint(next.state, next.key)
+      else if (shown.kind !== 'empty') card.classList.add('is-visible')
+      swapping = false
+      if (pending) flush()
+    }, visible ? fadeOutMs() : 0)
+  }
+
+  function fadeOutMs() {
+    return parseInt(getComputedStyle(body).getPropertyValue('--overlay-fade-out'), 10) || 180
+  }
+
+  function paint(state, key) {
+    shown = state
+    shownKey = key
+    card.classList.toggle('is-cover', !!state.cover)
+    card.classList.toggle('is-timer', state.kind === 'timer')
+    card.classList.toggle('is-frame', state.kind === 'frame')
+    if (state.kind === 'frame') frame.src = state.frame
+    else frame.removeAttribute('src')
+    if (state.kind === 'timer') content.textContent = state.text
+    else content.innerHTML = state.html || ''
+    reference.textContent = state.reference || ''
+    syncBackdrop()
+    if (state.kind !== 'empty') {
+      renders += 1
+      body.dataset.renders = String(renders)
+      fitText()
+      card.classList.add('is-visible')
+    }
+  }
+
+  /**
+   * Endereço do fundo sempre pelo próprio servidor: arte oficial e mídia
+   * local pelo caminho dele; imagem externa pelo /proxy.
+   */
+  function backdropSource(raw) {
+    var parsed
+    try { parsed = new URL(raw) } catch (e) { return '' }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return ''
+    var access = token ? 'token=' + encodeURIComponent(token) : ''
+    if (parsed.port === location.port && lanHost(parsed.hostname)) {
+      var official = /^\/bg\/(bg-\d+)\.png$/.exec(parsed.pathname)
+      if (official) return '/bg/' + encodeURIComponent(official[1]) + '.png'
+      var media = /^\/media\/([^/]+)$/.exec(parsed.pathname)
+      if (!media) return ''
+      var name
+      try { name = decodeURIComponent(media[1]) } catch (e) { return '' }
+      return '/media/' + encodeURIComponent(name) + (access ? '?' + access : '')
+    }
+    return '/proxy?url=' + encodeURIComponent(parsed.href) + (access ? '&' + access : '')
+  }
+
+  function syncBackdrop() {
+    var url = body.dataset.layout === 'fullscreen' && shown.kind === 'text' ? backdropSource(shown.background) : ''
+    if (!url) { backdrop.classList.remove('is-shown'); return }
+    if (backdrop.getAttribute('src') !== url) {
+      backdrop.onload = function () { backdrop.classList.add('is-shown') }
+      backdrop.onerror = function () { backdrop.classList.remove('is-shown') }
+      backdrop.src = url
+    } else backdrop.classList.add('is-shown')
+  }
+
+  /** Reduz a fonte do texto até caber no cartão (versículos longos). */
+  function fitText() {
+    content.style.fontSize = ''
+    if (shown.kind === 'empty' || shown.kind === 'frame') return
+    var size = 1
+    for (var i = 0; i < 14 && card.scrollHeight > card.clientHeight + 1; i++) {
+      size *= 0.92
+      content.style.fontSize = size + 'em'
+    }
+  }
+
+  function clearTimer() { clearInterval(timerHandle); timerHandle = 0 }
+  function clear() { clearTimer(); show(EMPTY) }
+
+  // ── Mensagens do app ────────────────────────────────────────────────────
+  function two(n) { return String(n).padStart(2, '0') }
+  function clockText(ms, format) {
+    var tokens = { hh: two(Math.floor(ms / 3600000)), mm: two(Math.floor(ms / 60000) % 60), ss: two(Math.floor(ms / 1000) % 60), ms: two(Math.floor(ms % 1000 / 10)) }
+    return String(format || 'hh:mm:ss').replace(/hh|mm|ss|ms/g, function (t) { return tokens[t] })
+  }
+
+  function onTimer(m) {
+    clearTimer()
+    if (m.action === 'stop') { show(EMPTY); return }
+    var label = typeof m.label === 'string' ? m.label : ''
+    if (typeof m.text === 'string' && m.text.trim()) {
+      show({ kind: 'timer', text: m.text, reference: label })
+      return
+    }
+    var tick
+    if (m.mode === 'chrono' && m.chronoRuntime) {
+      var run = m.chronoRuntime
+      tick = function () {
+        var running = run.status === 'running' && run.segmentStartedAt != null
+        var elapsed = Math.max(0, Number(run.accumulatedMs) || 0) + (running ? Math.max(0, Date.now() - run.segmentStartedAt) : 0)
+        show({ kind: 'timer', text: clockText(elapsed, m.timeFormat || 'hh:mm:ss'), reference: label })
+      }
+      tick()
+      if (run.status === 'running') timerHandle = setInterval(tick, 200)
+      return
+    }
+    var deadline = Date.now() + Math.max(0, Number(m.duration) || 0) * 1000
+    var startedAt = Date.now()
+    tick = function () {
+      var value = m.mode === 'chrono' ? Date.now() - startedAt : Math.max(0, deadline - Date.now())
+      show({ kind: 'timer', text: clockText(Math.ceil(value / 1000) * 1000, 'hh:mm:ss'), reference: label })
+      if (m.mode !== 'chrono' && value <= 0) clearTimer()
+    }
+    tick()
+    timerHandle = setInterval(tick, 250)
+  }
+
+  function onProjection(m) {
+    if (m.obsPane === true) return
+    clearTimer()
+    var text = typeof m.text === 'string' ? m.text : ''
+    if (!text.trim()) {
+      var image = typeof m.background === 'string' && m.background.indexOf('data:image/') === 0 ? m.background : ''
+      if (image && body.dataset.layout === 'fullscreen') show({ kind: 'frame', frame: image })
+      else show(EMPTY)
+      return
+    }
+    show({
+      kind: 'text',
+      html: sanitize(text),
+      reference: typeof m.footerRef === 'string' ? m.footerRef : '',
+      cover: m.isCover === true,
+      background: typeof m.background === 'string' && /^https?:\/\//i.test(m.background) ? m.background : ''
+    })
+  }
+
+  var WARMUP_MS = 3000
+  var handledWarmups = readSession('overlay.warmups', [])
+  function onWarmup(m) {
+    if (!m.requestId || handledWarmups.indexOf(m.requestId) >= 0) return
+    if (typeof m.expiresAt === 'number' && m.expiresAt < Date.now()) return
+    handledWarmups.push(m.requestId)
+    writeSession('overlay.warmups', handledWarmups.slice(-20))
+    send({ v: 2, type: 'obs-warmup-started', requestId: m.requestId })
+    badge.textContent = WORDS[document.documentElement.lang]
+    badge.classList.add('is-shown')
+    setTimeout(function () {
+      badge.classList.remove('is-shown')
+      send({ v: 2, type: 'obs-warmup-complete', requestId: m.requestId })
+    }, WARMUP_MS)
+  }
+
+  function handle(m) {
+    switch (m && m.type) {
+      case 'overlayStyle': applyStyle(m.style); break
+      case 'projection': onProjection(m); break
+      case 'timer': onTimer(m); break
+      case 'idle': clear(); break
+      case 'obsWarmup': onWarmup(m); break
+      case 'obsControl':
+        if (m.action === 'stop') clear()
+        if (m.action === 'reload') { writeSession('overlay.ready', m.requestId || ''); location.reload() }
+        break
+      default: break
+    }
+  }
+
+  // ── Conexão ─────────────────────────────────────────────────────────────
+  var socket = null
+  var retryMs = 1000
+  function send(message) {
+    try { if (socket && socket.readyState === 1) socket.send(JSON.stringify(message)) } catch (e) { /* reconecta */ }
+  }
+
+  function connect() {
+    var url = 'ws://' + wsHost + ':' + wsPort + '/palco' + (token ? '?token=' + encodeURIComponent(token) : '')
+    try { socket = new WebSocket(url) } catch (e) { return retry() }
+    socket.onopen = function () {
+      retryMs = 1000
+      body.dataset.connected = 'true'
+      var ready = readSession('overlay.ready', '')
+      if (ready) { writeSession('overlay.ready', ''); send({ v: 2, type: 'receiver-ready', requestId: ready }) }
+    }
+    socket.onmessage = function (event) {
+      try { handle(JSON.parse(event.data)) } catch (e) { /* mensagem inválida */ }
+    }
+    socket.onclose = function () {
+      body.dataset.connected = 'false'
+      retry()
+    }
+  }
+
+  function retry() {
+    setTimeout(connect, retryMs)
+    retryMs = Math.min(retryMs * 2, 5000)
+  }
+
+  function readSession(key, fallback) {
+    try { var raw = sessionStorage.getItem(key); return raw ? JSON.parse(raw) : fallback } catch (e) { return fallback }
+  }
+  function writeSession(key, value) {
+    try { sessionStorage.setItem(key, JSON.stringify(value)) } catch (e) { /* sem storage */ }
+  }
+
+  addEventListener('resize', fitText)
+  fetch('/legenda-config', { cache: 'no-store' })
+    .then(function (res) { return res.ok ? res.json() : null })
+    .then(function (config) { if (config) applyStyle(config.style) })
+    .catch(function () { /* estilo chega pelo WS */ })
+    .then(connect)
+})()
+</script>
+</body>
+</html>

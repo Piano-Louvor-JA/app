@@ -19,10 +19,6 @@ export const Duracao45Minutos: Story = {
   args: { durationMs: 45 * 60_000 },
 }
 
-export const ModoUntil: Story = {
-  args: { durationMs: 0, mode: 'until', untilHour: 18, untilMinute: 30 },
-}
-
 export const Compacto: Story = {
   args: { durationMs: 10 * 60_000, compact: true },
 }

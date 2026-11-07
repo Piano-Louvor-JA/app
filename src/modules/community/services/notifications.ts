@@ -3,7 +3,7 @@
  * Lista não lidas + marcar todas como lidas.
  */
 
-import { getAuthSession, saveSession } from "@modules/media/services/auth-client";
+import { authTokenAsync, saveSession } from "@modules/media/services/auth-client";
 import { communityBaseUrl, communityRequest } from "./community-http";
 
 export type AppNotification = {
@@ -14,13 +14,13 @@ export type AppNotification = {
 	created_at: string;
 };
 
-function token(): string | null {
-	return getAuthSession()?.token ?? null;
+async function token(): Promise<string | null> {
+	return authTokenAsync();
 }
 
 /** Notificações não lidas. Sem sessão/falha → lista vazia (nunca lança). */
 export async function getNotifications(): Promise<AppNotification[]> {
-	const t = token();
+	const t = await token();
 	if (!t) return [];
 	try {
 		const response = await fetch(
@@ -45,7 +45,7 @@ export async function getNotifications(): Promise<AppNotification[]> {
 
 /** Marca todas como lidas. */
 export async function markAllRead(): Promise<void> {
-	const t = token();
+	const t = await token();
 	if (!t) return;
 	try {
 		await fetch(
