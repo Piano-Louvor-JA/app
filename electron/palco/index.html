@@ -734,7 +734,11 @@ function handle(m){
       // F3.3m: footer com referência destacada + versão
       {const f=$('footer');
         if(m.footerRef){
-          f.innerHTML=`<span class="ref" style="--ref-color:${m.footerColor||'#FCCE02'};--ref-weight:${m.footerWeight||600}">${m.footerRef}</span>`+
+          const footerSize=Number(m.footerSize);
+          const footerTransform=['none','uppercase','capitalize'].includes(m.footerTransform)?m.footerTransform:'none';
+          const footerStyle=`--ref-color:${m.footerColor||'#FCCE02'};--ref-weight:${m.footerWeight||600};`+
+            (Number.isFinite(footerSize)&&footerSize>0?`font-size:${Math.round(footerSize/10.8*1000)/1000}vw;`:'')+`text-transform:${footerTransform}`;
+          f.innerHTML=`<span class="ref" style="${footerStyle}">${m.footerRef}</span>`+
             (m.footerVersion?`<span class="ver">${m.footerVersion}</span>`:'');
         }else{
           f.textContent=m.footer||'';
