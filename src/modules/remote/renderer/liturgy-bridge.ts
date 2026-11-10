@@ -557,7 +557,12 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
       (await projection?.getPdfPageState?.()) ??
       (await projection?.getPptSlideState?.()) ??
       (await projection?.getImageSlideState?.())
-    if (docSlide && docSlide.total > 0) {
+    const textOpen = await projection?.getTextScale?.()
+    if (textOpen) {
+      // Texto recebe quadros atuais pelo canal frame; uma foto de abertura
+      // pode estar preta e não deve encobrir os quadros que chegam depois.
+      slide = { index: 0, total: 1 }
+    } else if (docSlide && docSlide.total > 0) {
       slide = { index: docSlide.index, total: docSlide.total }
       const preview = await slidePreview(docSlide.index, docSlide.total)
       if (preview) slide.preview = preview
@@ -692,8 +697,15 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
       const command = videoControlCommand(msg)
       if (!command || !projection?.runVideoControlCommand) return false
       if (blockedConnection(command)) return false
+      const annotation = items[current]
+      const annotationState = command.type === 'project' && annotation?.type === 'annotation'
+        ? await projection.getVideoControlSnapshot?.()
+        : null
       const done = await projection.runVideoControlCommand(command)
       if (done) {
+        if (annotationState && !annotationState.projecting && !annotation.done) {
+          liturgy.toggleItemDone(current)
+        }
         await mirrorTargetToHeader(command)
         return true
       }
@@ -702,8 +714,16 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
         return (await projection.toggleVideoScreens?.()) === true
       }
       // Seta com site aberto: liga/desliga as telas do site.
-      if (command.type === 'project' && (await openSiteState())) {
-        return (await projection.toggleSiteScreens?.()) === true
+      if (command.type === 'project') {
+        const site = await openSiteState()
+        if (site) {
+          const toggled = (await projection.toggleSiteScreens?.()) === true
+          const item = items[current]
+          if (toggled && !site.projecting && item?.type === 'site' && !item.done) {
+            liturgy.toggleItemDone(current)
+          }
+          return toggled
+        }
       }
       return (await setIdleTarget(command)) || (await storeIdleIndependent(command))
     }
@@ -788,6 +808,9 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
         if (site) {
           if (site.projecting) await projection?.toggleSiteScreens?.()
           await projection?.closeUrl?.()
+          if (items[current]?.type === 'site' && !items[current].done) {
+            liturgy.toggleItemDone(current)
+          }
           return true
         }
       }
@@ -811,6 +834,9 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
               await projection?.toggleVideoScreens?.()
             }
             await projection?.closeUrl?.()
+            if (items[current]?.type === 'annotation' && !items[current].done) {
+              liturgy.toggleItemDone(current)
+            }
             return true
           case 'player.setVolume':
             if (typeof value !== 'number') return false

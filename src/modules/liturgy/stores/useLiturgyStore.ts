@@ -893,13 +893,16 @@ export const useLiturgyStore = defineStore('liturgy', () => {
   function markItemDone(index: number) {
     const target = currentItems.value[index]
     if (!target || target.done || target.type === 'category') return
-    if (!isLiturgyMediaPlayType(target.type)) return
+    const isTextOrSite = target.type === 'site' || target.type === 'annotation'
+    if (!isLiturgyMediaPlayType(target.type) && !isTextOrSite) return
 
     const next = currentItems.value.map((item, i) =>
       i === index ? { ...item, done: true } : item,
     )
     currentItems.value = syncCategoryDoneFromChildren(next)
 
+    // Site/texto continuam selecionados enquanto o operador usa seus controles.
+    if (isTextOrSite) return
     clearSelectionIfMatches((_, i) => i === index)
     if (target.categoryId) {
       const categoryId = target.categoryId
@@ -1019,10 +1022,12 @@ export const useLiturgyStore = defineStore('liturgy', () => {
       if (canOpenAnnotationTextControl()) {
         const opened = await openAnnotationTextControl(item)
         lastActionMessageKey.value = opened ? null : 'liturgy.messages.projectionFailed'
+        if (opened) markItemDone(index)
         return
       }
       const wasProjecting = useAnnotationProjection().projectingItemId.value === item.id
       const projecting = await toggleAnnotationProjection(item)
+      if (projecting) markItemDone(index)
       lastActionMessageKey.value =
         !wasProjecting && !projecting ? 'liturgy.messages.projectionFailed' : null
       return
@@ -1036,6 +1041,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
         const toggled = await projection?.toggleSiteScreens?.()
         if (toggled) {
           siteProjectionItemId.value = state.projecting ? null : item.id
+          markItemDone(index)
           lastActionMessageKey.value = null
           return
         }

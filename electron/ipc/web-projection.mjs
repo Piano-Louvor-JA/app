@@ -2917,7 +2917,7 @@ export async function captureSourceFrameBase64() {
  * para caber várias vezes por segundo na rede sem pesar no desktop.
  */
 export async function captureRemoteVideoFrame(maxWidth = 240, quality = 45) {
-  if (!sourceWindow || sourceWindow.isDestroyed() || currentProjectionMode !== 'video') {
+  if (!sourceWindow || sourceWindow.isDestroyed() || (currentProjectionMode !== 'video' && !currentDocumentIsText)) {
     return null
   }
   // Caminho leve: o próprio <video> desenhado num canvas pequeno, dentro da
@@ -2944,7 +2944,8 @@ export async function captureRemoteVideoFrame(maxWidth = 240, quality = 45) {
     // Página carregando: executeJavaScript só responderia no fim da carga.
     if (sourceWindow.webContents.isLoading?.()) return null
     const skipped = (captureRemoteVideoFrame.skipped ||= new WeakMap())
-    for (const frame of sourceWindow.webContents.mainFrame?.framesInSubtree ?? []) {
+    // Texto não contém <video>: captura a página renderizada, com sua formatação.
+    for (const frame of currentDocumentIsText ? [] : sourceWindow.webContents.mainFrame?.framesInSubtree ?? []) {
       // Quadro que não respondeu fica de fora por 3 s e depois é tentado de novo.
       if (Date.now() - (skipped.get(frame) ?? -Infinity) < 3000) continue
       try {

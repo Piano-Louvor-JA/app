@@ -8,7 +8,7 @@ const main = readFileSync(new URL('../ipc/web-projection.mjs', import.meta.url),
 const START = 'export async function captureRemoteVideoFrame('
 const END = '/** Miniatura do slide atual para o controle remoto (celular): JPEG pequeno. */'
 
-function load({ mode = 'video', destroyed = false, size = { width: 1920, height: 1080 }, frames = [], loading = false } = {}) {
+function load({ mode = 'video', destroyed = false, size = { width: 1920, height: 1080 }, frames = [], loading = false, text = false } = {}) {
   const small = { toJPEG: vi.fn(() => Buffer.from('jpeg')) }
   const image = { isEmpty: () => false, getSize: () => size, resize: vi.fn(() => small), toJPEG: vi.fn(() => Buffer.from('full')) }
   const context = {
@@ -17,6 +17,7 @@ function load({ mode = 'video', destroyed = false, size = { width: 1920, height:
     clearTimeout,
     Date,
     currentProjectionMode: mode,
+    currentDocumentIsText: text,
     sourceWindow: {
       isDestroyed: () => destroyed,
       webContents: {
@@ -108,4 +109,14 @@ it('foto da janela (reserva pesada) sai no máximo a cada 400 ms', async () => {
   vi.setSystemTime(Date.now() + 450)
   expect(await context.captureRemoteVideoFrame()).not.toBeNull()
   vi.useRealTimers()
+})
+
+
+it('anotação aberta no player de texto envia prévia sem procurar vídeo', async () => {
+  const video = frame(null)
+  const { context } = load({ mode: 'image', text: true, frames: [video] })
+
+  expect(await context.captureRemoteVideoFrame()).toBe(Buffer.from('jpeg').toString('base64'))
+  expect(context.sourceWindow.webContents.capturePage).toHaveBeenCalledOnce()
+  expect(video.executeJavaScript).not.toHaveBeenCalled()
 })

@@ -161,8 +161,8 @@ describe('useLiturgyStore — parte 2: ações com bridge/projeção', () => {
     // sem bridge: cai no playLiturgyItemOnScreens direto
     await s.playItemOnScreens(1)
     expect(actionsMock.playLiturgyItemOnScreens).toHaveBeenCalledOnce()
-    // site não é media play type → não marca done (só abre projeção)
-    expect(s.currentItems[1]!.done).toBe(false)
+    // Site aberto com sucesso conclui sem depender da projeção.
+    expect(s.currentItems[1]!.done).toBe(true)
 
     // com bridge: controle FECHADO (getNavigationState null) → id setado
     actionsMock.playLiturgyItemOnScreens.mockClear()

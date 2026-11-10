@@ -897,6 +897,70 @@ describe('installRemoteLiturgyBridge', () => {
       cleanup()
     })
 
+    it.each([[false, false, true, 1], [true, false, true, 0], [false, true, true, 0], [false, false, false, 0]])('site: projetando=%s concluído=%s sucesso=%s → %s marcações', async (projecting, done, success, calls) => {
+      const projection = siteOpen(projecting)
+      projection.toggleSiteScreens.mockResolvedValue(success)
+      const { useLiturgyStore } = await import('../../../liturgy/stores/useLiturgyStore')
+      const lit = useLiturgyStore()
+      hoisted.liturgyStore.currentItems = [{ type: 'site', name: 'Site', done }]
+      hoisted.liturgyStore.selectedItemIndex = 0
+      vi.mocked(lit.toggleItemDone).mockClear()
+      const { command, cleanup } = await installBridge()
+      await command({ action: 'video.toggleProjection', id: 991 })
+      expect(lit.toggleItemDone).toHaveBeenCalledTimes(calls)
+      if (calls) expect(lit.toggleItemDone).toHaveBeenCalledWith(0)
+      cleanup()
+    })
+
+    it.each([[false, false, true, 1], [true, false, true, 0], [false, true, true, 0], [false, false, false, 0]])('anotação: projetando=%s concluída=%s sucesso=%s → %s marcações', async (projecting, done, success, calls) => {
+      hoisted.projection = {
+        getPlaybackState: vi.fn(async () => null),
+        getVideoControlSnapshot: vi.fn(async () => ({ projecting })),
+        runVideoControlCommand: vi.fn(async () => success),
+      }
+      hoisted.liturgyStore.currentItems = [{ type: 'annotation', name: 'Aviso', done }]
+      hoisted.liturgyStore.selectedItemIndex = 0
+      const { useLiturgyStore } = await import('../../../liturgy/stores/useLiturgyStore')
+      const lit = useLiturgyStore()
+      vi.mocked(lit.toggleItemDone).mockClear()
+      const { command, cleanup } = await installBridge()
+      await command({ action: 'video.toggleProjection', id: 990 })
+      expect(lit.toggleItemDone).toHaveBeenCalledTimes(calls)
+      if (calls) expect(lit.toggleItemDone).toHaveBeenCalledWith(0)
+      cleanup()
+    })
+
+    it.each(['site', 'annotation'])('fechar %s usado sem projetar conclui o item', async (type) => {
+      const projection = siteOpen(false)
+      if (type === 'annotation') {
+        hoisted.targetRef = 'projection'
+        projection.getPlaybackState.mockResolvedValue({ projecting: false })
+      }
+      hoisted.liturgyStore.currentItems = [{ type, name: 'Usado', done: false }]
+      hoisted.liturgyStore.selectedItemIndex = 0
+      const lit = await getLit()
+      lit.toggleItemDone.mockClear()
+      const { command, cleanup } = await installBridge()
+      await command({ action: 'player.stop', id: 988 })
+      expect(lit.toggleItemDone).toHaveBeenCalledWith(0)
+      cleanup()
+    })
+
+    it('prévia do texto usa quadros novos, sem miniatura estática preta', async () => {
+      hoisted.projection = {
+        getTextScale: vi.fn(async () => ({ scale: 1 })),
+        getImageSlideState: vi.fn(async () => ({ index: 0, total: 1 })),
+        captureSlidePreview: vi.fn(async () => 'captura-preta'),
+        getVideoControlSnapshot: vi.fn(async () => ({ projecting: false })),
+      }
+      const { onStateRequestCb, cleanup } = await installBridge()
+      await onStateRequestCb()
+      const state = hoisted.remoteApiStub.sendState.mock.calls.at(-1)?.[0]
+      expect(state.slide.preview).toBeUndefined()
+      expect(state.video).toBeDefined()
+      cleanup()
+    })
+
     it('fechar desliga as telas e fecha o site', async () => {
       const projection = siteOpen(true)
       const { command, cleanup } = await installBridge()

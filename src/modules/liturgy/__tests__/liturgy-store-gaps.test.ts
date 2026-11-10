@@ -131,12 +131,12 @@ describe("playItemOnScreens — markItemDone interno via execute", () => {
 		expect(state2.videoProjectionItemId ?? (s.$ as unknown as Record<string, unknown>).videoProjectionItemId).toBeTruthy();
 	});
 
-	it("playItemOnScreens site: não marca done (não é media play type)", async () => {
+	it("playItemOnScreens site: abertura bem sucedida marca done", async () => {
 		const s = useLiturgyStore();
 		seedItems(s, [item({ type: "site", name: "Site" })]);
 		await s.playItemOnScreens(0);
 		const stored = (s as unknown as { currentItems: LiturgyItem[] }).currentItems;
-		expect(stored[0].done).toBe(false);
+		expect(stored[0].done).toBe(true);
 	});
 describe("liturgy — edit/remove/probe/execução (gaps round 2)", () => {
   it("openEditDialog: executa sem erro pra category e música", () => {
