@@ -48,6 +48,7 @@ export type StageVerticalAlign = 'top' | 'middle' | 'bottom'
 
 /** Peso da fonte do texto principal (mesmos passos do APK). */
 export type StageFontWeight = 400 | 600 | 800
+export type StageTextTransform = 'none' | 'uppercase' | 'capitalize'
 
 export type StageSettings = {
   /**
@@ -78,6 +79,9 @@ export type StageSettings = {
   textVerticalAlign: StageVerticalAlign
   footerRefColor: string | null
   footerRefWeight: number
+  /** null = 40% do tamanho do versículo (proporção visual de fábrica). */
+  refFontSize: number | null
+  refTextTransform: StageTextTransform
   /**
    * Título (1º slide / capa): personalização própria. `null`/`undefined`
    * = herda o estilo geral da letra (compatibilidade com salvos antigos).
@@ -103,7 +107,7 @@ export type StageSettings = {
   bibleFontWeight: 400 | 500 | 700
   bibleTextColor: string | null
   /** Capitalização do versículo (paridade web — mesmo campo/serde `bTransform`). */
-  bibleTextTransform: 'none' | 'uppercase' | 'capitalize'
+  bibleTextTransform: StageTextTransform
   /** Referência: abaixo da caixa do texto (esquerda/centro/direita) ou no canto inferior direito da tela. */
   bibleRefPosition: 'below-left' | 'below-center' | 'below-right' | 'corner'
   /** Transição ao trocar o versículo projetado. */
@@ -193,6 +197,8 @@ export const DEFAULT_STAGE_SETTINGS: StageSettings = {
   textVerticalAlign: 'middle',
   footerRefColor: null,
   footerRefWeight: 600,
+  refFontSize: null,
+  refTextTransform: 'none',
   showBibleVersion: true,
   bibleFontSize: 84,
   bibleFontWeight: 500,
@@ -403,6 +409,10 @@ export function parseStageSettings(raw: unknown): StageSettings {
       s['tVAlign'] === 'top' || s['tVAlign'] === 'bottom' ? s['tVAlign'] : 'middle',
     footerRefColor: asColorOrNull(s['refColor']),
     footerRefWeight: clamp(Math.round(asNumber(s['refWeight'], 600)), 100, 900),
+    refFontSize: s['rSize'] == null ? null : clamp(asNumber(s['rSize'], 50), 50, 140),
+    refTextTransform: BIBLE_TEXT_TRANSFORM_OPTIONS.includes(s['rUpper'] as StageTextTransform)
+      ? (s['rUpper'] as StageTextTransform)
+      : 'none',
     showBibleVersion: typeof s['showVer'] === 'boolean' ? s['showVer'] : true,
     bibleFontSize: clamp(asNumber(s['bSize'], 84), 50, 140),
     bibleFontWeight: BIBLE_WEIGHTS.includes(bibleWeight) ? bibleWeight : 500,
@@ -525,6 +535,8 @@ export function serializeStageSettings(s: StageSettings): Record<string, unknown
     tVAlign: s.textVerticalAlign,
     ...(s.footerRefColor ? { refColor: s.footerRefColor } : {}),
     refWeight: s.footerRefWeight,
+    ...(s.refFontSize != null ? { rSize: s.refFontSize } : {}),
+    rUpper: s.refTextTransform,
     showVer: s.showBibleVersion,
     bSize: s.bibleFontSize,
     bWeight: s.bibleFontWeight,

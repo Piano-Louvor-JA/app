@@ -162,7 +162,9 @@ const referenceStyle = computed(() => {
   const position = stage.value.bibleRefPosition ?? 'below-right'
   return {
     color: stage.value.footerRefColor ?? undefined,
+    fontSize: `${((stage.value.refFontSize ?? Math.round(stage.value.bibleFontSize * 0.4)) / 1920) * 100}cqw`,
     fontWeight: String(stage.value.footerRefWeight),
+    textTransform: stage.value.refTextTransform,
     ...(referenceCorner.value ? {} : { textAlign: position.replace('below-', '') as 'left' | 'center' | 'right' }),
   }
 })
