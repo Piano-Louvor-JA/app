@@ -606,6 +606,8 @@ export default {
       bibleTextColor: 'Cor do texto (Bíblia)',
       bibleFontSize: 'Tamanho da fonte (Bíblia)',
       bibleFontWeight: 'Espessura (Bíblia)',
+      refFontSize: 'Tamanho da referência',
+      refTextTransform: 'Capitalização da referência',
       bibleTextTransform: 'Capitalização (Bíblia)',
       bibleTransformNone: 'Normal',
       bibleTransformUppercase: 'MAIÚSCULAS',
