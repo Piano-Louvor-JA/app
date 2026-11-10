@@ -39,6 +39,7 @@ import {
 } from '../../albums/services/album-music-search'
 
 import { useLiturgyStore } from '../../liturgy/stores/useLiturgyStore'
+import { notesHtmlToPlainText } from '../../liturgy/services/rich-notes'
 import { makeSlideBackgroundThumb } from './slide-background'
 import { LITURGY_DAY_TAB_ORDER, type LiturgyDayKey } from '../../liturgy/types/liturgy'
 import { useMediaPlayer } from '../../media/composables/useMediaPlayer'
@@ -428,12 +429,7 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
     const slides = session?.slides
     if (!slides?.length) return null
     return Array.from(slides, (item) =>
-      item?.isCover
-        ? (session?.title ?? '')
-        : String(item?.lyric ?? '')
-            .replace(/<br\s*\/?>/gi, '\n')
-            .replace(/<[^>]*>/g, '')
-            .trim(),
+      item?.isCover ? (session?.title ?? '') : notesHtmlToPlainText(String(item?.lyric ?? '')),
     )
   }
 
@@ -663,8 +659,15 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
   }
 
   // Estado COMPLETO (spec v1): player + liturgia espelhada no APK.
-  const pushState = async (withGallery = false) =>
-    send('remote:state', await buildState(withGallery))
+  // Quase todos os chamadores disparam sem aguardar: falha de leitura (projeção fechada no meio)
+  // não pode virar rejeição sem tratamento; o próximo envio recupera o estado.
+  const pushState = async (withGallery = false) => {
+    try {
+      send('remote:state', await buildState(withGallery))
+    } catch {
+      // ignore
+    }
+  }
 
   // Snapshots v2 — ausentes para peers v1, que ignoram o extra.
   // null → undefined: todos os namespaces têm dep garantida no bridge,

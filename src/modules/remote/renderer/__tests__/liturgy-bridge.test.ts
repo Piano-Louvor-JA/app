@@ -793,6 +793,26 @@ describe('installRemoteLiturgyBridge', () => {
       cleanup()
     })
 
+    it('decodifica entidades e descarta marcação da letra', async () => {
+      hymnOpen()
+      hoisted.playerStub.session.value = {
+        title: 'Graça',
+        slides: [{ lyric: 'Graça &amp; paz<br><scr<script>ipt>x()</script><i>eterna</i>', isCover: false }],
+      } as never
+      hoisted.playerStub.slideIndex.value = 0
+      const { onStateRequestCb, cleanup } = await installBridge()
+
+      await onStateRequestCb()
+
+      await vi.waitFor(() => {
+        const lyrics = hoisted.remoteApiStub.sendState.mock.calls.at(-1)?.[0].slide?.lyrics
+        expect(lyrics?.[0]).toMatch(/^Graça & paz\n/)
+        expect(lyrics?.[0]).toContain('eterna')
+        expect(lyrics?.[0]).not.toMatch(/<\w/)
+      })
+      cleanup()
+    })
+
     function hymnWithBackgrounds() {
       hoisted.projection = { getPlaybackState: vi.fn(async () => null) }
       hoisted.playerStub.session.value = {
@@ -1438,10 +1458,13 @@ describe('installRemoteLiturgyBridge', () => {
 
   it('store random ausente → snapshot null → campo undefined no state', async () => {
     hoisted.randomStore = null
-    const { command } = await installBridge()
-    await command({ action: 'state.request', id: 99 })
-    const st = hoisted.remoteApiStub.sendState.mock.calls.at(-1)?.[0]
-    expect(st.random).toBeUndefined()
+    const { onStateRequestCb, cleanup } = await installBridge()
+    try {
+      await onStateRequestCb()
+      const st = hoisted.remoteApiStub.sendState.mock.calls.at(-1)?.[0]
+      expect(st).toBeDefined()
+      expect(st.random).toBeUndefined()
+    } finally { cleanup() }
   })
 
   it('projection sem remotePlay/remotePause no toggle → false via ?? false', async () => {
