@@ -24,6 +24,8 @@ const hoisted = vi.hoisted(() => {
     },
     playerStub: {
       isPlaying: { value: false },
+      isProjecting: { value: false },
+      toggleProjection: vi.fn(async () => {}),
       session: { value: { title: 'Faixa X' } },
       slideIndex: { value: 0 },
       nextSlide: vi.fn(async () => {}),
@@ -113,6 +115,7 @@ vi.mock('../../../liturgy/stores/useLiturgyStore', () => {
     selectedItemIndex: -1,
     selectItem: vi.fn(async () => {}),
     playItemOnScreens: vi.fn(async () => {}),
+    playMusicMode: vi.fn(async () => true),
     toggleItemDone: vi.fn(),
     weekdays: {} as Record<string, unknown[]>,
     customLiturgies: [] as Array<{ items: unknown[] }>,
@@ -203,6 +206,8 @@ function resetHoisted() {
   hoisted.liturgyStore.playItemOnScreens.mockClear()
   hoisted.liturgyStore.toggleItemDone.mockClear()
   hoisted.playerStub.isPlaying.value = false
+  hoisted.playerStub.isProjecting.value = false
+  hoisted.playerStub.toggleProjection.mockClear()
   hoisted.playerStub.session.value = { title: 'Faixa X' }
   hoisted.playerStub.volume.value = 0.7
   hoisted.playerStub.currentTimeSec.value = 0
@@ -358,8 +363,8 @@ describe('installRemoteLiturgyBridge', () => {
     await command({ action: 'player.setMode', id: 23, mode: 'instrumental' })
     expect(hoisted.playerStub.switchMode).toHaveBeenCalledWith('instrumental')
     await command({ action: 'player.open', id: 24, hymnId: 42 })
-    // rotas pelo handler real v2 → media.open → openMusicPlayer com project:true
-    expect(hoisted.openMusicPlayer).toHaveBeenCalledWith(expect.objectContaining({ musicId: 42, project: true }))
+    // Controle remoto abre o hino sem projetar; a seta liga a projeção.
+    expect(hoisted.openMusicPlayer).toHaveBeenCalledWith(expect.objectContaining({ musicId: 42, project: false }))
   })
 
   it('onPlaybackSync: empurra estado com throttle de 1s', async () => {
@@ -1055,6 +1060,36 @@ describe('installRemoteLiturgyBridge', () => {
 
       expect(projection.toggleSiteScreens).not.toHaveBeenCalled()
       expect(projection.closeUrl).toHaveBeenCalledOnce()
+      cleanup()
+    })
+  })
+
+  describe('hino: abertura e projeção separadas', () => {
+    it.each([false, true])('estado anuncia seta de projeção do hino (%s)', async (projecting) => {
+      hoisted.playerStub.session.value = { title: 'Hino', slides: [{ lyric: 'Letra' }] } as never
+      hoisted.playerStub.isProjecting.value = projecting
+      const { onStateRequestCb, cleanup } = await installBridge()
+      await onStateRequestCb()
+      expect(hoisted.remoteApiStub.sendState.mock.calls.at(-1)?.[0].video).toMatchObject({ canProject: true, projecting })
+      cleanup()
+    })
+
+    it('seta do hino alterna a projeção no próprio player', async () => {
+      hoisted.playerStub.session.value = { title: 'Hino', slides: [{ lyric: 'Letra' }] } as never
+      const { command, cleanup } = await installBridge()
+      await command({ action: 'video.toggleProjection', id: 1130 })
+      expect(hoisted.playerStub.toggleProjection).toHaveBeenCalledOnce()
+      expect(hoisted.remoteApiStub.sendAck.mock.calls.at(-1)?.[0].ok).toBe(true)
+      cleanup()
+    })
+
+    it('play da música da liturgia abre sem projetar', async () => {
+      hoisted.liturgyStore.currentItems = [{ type: 'music', name: 'Hino' }]
+      const { command, cleanup } = await installBridge()
+      const lit = await getLit()
+      await command({ action: 'liturgy.open', value: 0, id: 1131 })
+      expect((lit as any).playMusicMode).toHaveBeenCalledWith(0, 'audio', hoisted.router, { project: false })
+      expect(lit.playItemOnScreens).not.toHaveBeenCalled()
       cleanup()
     })
   })

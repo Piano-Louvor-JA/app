@@ -983,6 +983,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     index: number,
     mode: MediaPlaybackMode,
     router: Router,
+    options?: { project?: boolean },
   ) {
     const item = markItemStarted(index)
     if (!item || item.type !== 'music') {
@@ -991,9 +992,8 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     }
 
     const result = await openLiturgyMusicPlayer(item, mode, {
-      // Cantado / instrumental / slides: abre o player já projetando
-      // (antes só `no_audio` projetava e o operador precisava clicar em Projetar).
-      project: true,
+      // O controle remoto pode abrir primeiro e projetar pela seta da barra.
+      project: options?.project ?? true,
     })
     lastActionMessageKey.value = result.messageKey ?? null
     if (!result.ok) return false

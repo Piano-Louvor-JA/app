@@ -171,10 +171,9 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
   // Busca de hinos com os ids LOCAIS do desktop (a API pública tem ids
   // distintos — media.open com id da API dá trackMissing).
   let musicIndex: Awaited<ReturnType<typeof loadAlbumMusicIndex>> | null = null
-  // media.open via controle remoto SEMPRE projeta — o operador clica
-  // esperando ver na tela; openMusicPlayer puro só projeta em no_audio.
+  // Play remoto abre primeiro; a seta da barra decide quando projetar.
   const openMusicPlayerRemote: typeof openMusicPlayer = async (params) => {
-    return openMusicPlayer({ ...params, project: true })
+    return openMusicPlayer({ ...params, project: false })
   }
 
   const searchMusic = async (query: string) => {
@@ -603,6 +602,11 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
       if (site) videoControls = await imageControls(site.projecting === true)
     }
 
+    // Hinos usam a mesma seta da barra de vídeo, com o estado do renderer.
+    if (!videoControls && target === 'player' && player.session.value?.slides?.length) {
+      videoControls = await imageControls(player.isProjecting.value)
+    }
+
     return {
       liturgy: {
         total: items.length,
@@ -695,7 +699,13 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
 
     if (action.startsWith('video.')) {
       const command = videoControlCommand(msg)
-      if (!command || !projection?.runVideoControlCommand) return false
+      if (!command) return false
+      if (command.type === 'project' && player.session.value?.slides?.length &&
+          (await resolveMediaTarget({ projection, player })) === 'player' && !(await openSiteState())) {
+        await player.toggleProjection()
+        return true
+      }
+      if (!projection?.runVideoControlCommand) return false
       if (blockedConnection(command)) return false
       const annotation = items[current]
       const annotationState = command.type === 'project' && annotation?.type === 'annotation'
@@ -776,6 +786,9 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
           const idx = value
           if (typeof idx !== 'number' || idx < 0 || idx >= items.length) {
             return false
+          }
+          if (items[idx].type === 'music') {
+            return liturgy.playMusicMode(idx, items[idx].musicMode ?? 'audio', router, { project: false })
           }
           // Vídeo abre sem projetar: o operador projeta pelo botão da barra.
           if (VIDEO_BAR_ITEM_TYPES.has(items[idx].type) || PLAY_ROW_ITEM_TYPES.has(items[idx].type)) {
@@ -953,6 +966,7 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
   const unwatch = watch(
     () => [
       liturgy.selectedItemIndex,
+      player.isProjecting?.value,
       liturgy.selectedDay,
       JSON.stringify(liturgyDays()),
       JSON.stringify(liturgyCustoms()),
