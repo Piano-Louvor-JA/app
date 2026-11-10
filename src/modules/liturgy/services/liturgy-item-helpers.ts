@@ -608,10 +608,7 @@ export function categoryTimeRangeWithEstimate(
   if (!start) return end ? end : '—'
   const ms = estimateCategoryDurationMs(category as LiturgyItem, children)
   if (ms == null) return start
-  return `${start} - ${formatEstimatedDuration(
-    ms,
-    true,
-  ).replace(/ \(estimado\)/, ' (estimado)')}`
+  return `${start} - ${formatEstimatedDuration(ms, true)}`
 }
 
 /**
