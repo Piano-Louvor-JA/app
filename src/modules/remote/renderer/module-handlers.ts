@@ -179,6 +179,7 @@ async function executeBible(
   msg: Record<string, unknown>,
 ): Promise<boolean> {
   switch (action) {
+    case 'bible.select':
     case 'bible.open': {
       console.info(
         `[remote] bible.open RECEBIDO book=${msg.bookId} (${typeof msg.bookId}) cap=${msg.chapter} verse=${msg.verse} version=${msg.versionId}`,
@@ -208,7 +209,7 @@ async function executeBible(
       )
       if (!got) return false
       bible.selectVerse(verse)
-      return bible.openProjection()
+      return action === 'bible.open' ? bible.openProjection() : true
     }
     case 'bible.selectVerse': {
       const verse = msg.verse
@@ -238,6 +239,8 @@ function snapshotBible(bible: BibleStoreLike): Record<string, unknown> {
     selectedVerses: [...(readField<number[]>(bible, 'selectedVerses') ?? [])],
     isProjecting: readField<boolean>(bible, 'isProjecting') === true,
     versionId: readField<number>(bible, 'selectedVersionId') ?? null,
+    // Texto do capítulo: a prévia do operador funciona também sem projeção.
+    verses: { ...(readField<Record<string, string>>(bible, 'verses') ?? {}) },
     // Catálogo p/ o operador escolher por NOME (select) — não por id cego.
     books: books.map((b) => ({
       id: b.id,
