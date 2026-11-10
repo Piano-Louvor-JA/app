@@ -27,6 +27,13 @@ vi.mock('../services/annotation-projection', () => ({
   useAnnotationProjection: () => ({ projectingItemId }),
 }))
 
+const textControl = vi.hoisted(() => ({ available: false, opened: true }))
+const openAnnotationTextControl = vi.fn(async () => textControl.opened)
+vi.mock('../services/annotation-text-control', () => ({
+  canOpenAnnotationTextControl: () => textControl.available,
+  openAnnotationTextControl: (item: LiturgyItem) => openAnnotationTextControl(item),
+}))
+
 import { useLiturgyStore } from '../stores/useLiturgyStore'
 
 const note: LiturgyItem = {
@@ -51,6 +58,27 @@ describe('liturgia — play da anotação', () => {
     projectingItemId.value = null
     toggleAnnotationProjection.mockClear()
     playLiturgyItemOnScreens.mockClear()
+    openAnnotationTextControl.mockClear()
+    textControl.available = false
+    textControl.opened = true
+  })
+
+  it('no desktop abre o player de texto (como o aviso de texto), sem projetar direto', async () => {
+    textControl.available = true
+    const store = storeWith([{ ...note }])
+    await store.playItemOnScreens(0)
+    expect(openAnnotationTextControl).toHaveBeenCalledWith(expect.objectContaining({ id: 'note-1' }))
+    expect(toggleAnnotationProjection).not.toHaveBeenCalled()
+    expect(store.lastActionMessageKey).toBeNull()
+    expect(store.currentItems[0].done).toBe(false)
+  })
+
+  it('player de texto que não abre avisa o operador', async () => {
+    textControl.available = true
+    textControl.opened = false
+    const store = storeWith([{ ...note }])
+    await store.playItemOnScreens(0)
+    expect(store.lastActionMessageKey).toBe('liturgy.messages.projectionFailed')
   })
 
   it('liga e desliga a projeção da anotação sem marcar concluída', async () => {

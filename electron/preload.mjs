@@ -349,6 +349,9 @@ contextBridge.exposeInMainWorld('louvorja', {
     remoteSetCaptionsHidden: (hidden) => ipcRenderer.invoke('projection:remote-set-captions-hidden', hidden),
     remoteToggleMute: () => ipcRenderer.invoke('projection:remote-toggle-mute'),
     setAudioOutput: (mode) => ipcRenderer.invoke('projection:set-audio-output', mode),
+    getVideoControlSnapshot: () => ipcRenderer.invoke('projection:get-video-control-snapshot'),
+    runVideoControlCommand: (command) =>
+      ipcRenderer.invoke('projection:run-video-control-command', command),
     remoteSetVolume: (volume) =>
       ipcRenderer.invoke('projection:remote-set-volume', volume),
     getSourceMediaInfo: () =>
@@ -356,6 +359,8 @@ contextBridge.exposeInMainWorld('louvorja', {
     getPlaybackState: () => ipcRenderer.invoke('projection:get-playback-state'),
     getNavigationState: () => ipcRenderer.invoke('projection:get-navigation-state'),
     remoteGoBack: () => ipcRenderer.invoke('projection:remote-go-back'),
+    remoteNavigate: (url) => ipcRenderer.invoke('projection:remote-navigate', url),
+    remoteScroll: (ratio) => ipcRenderer.invoke('projection:remote-scroll', ratio),
     remoteGoForward: () => ipcRenderer.invoke('projection:remote-go-forward'),
     remoteReload: () => ipcRenderer.invoke('projection:remote-reload'),
     toggleSiteScreens: () => ipcRenderer.invoke('projection:toggle-site-screens'),
@@ -380,6 +385,10 @@ contextBridge.exposeInMainWorld('louvorja', {
     remotePptPrev: () => ipcRenderer.invoke('projection:remote-ppt-prev'),
     captureSourceFrame: () =>
       ipcRenderer.invoke('projection:capture-source-frame'),
+    captureSlidePreview: () =>
+      ipcRenderer.invoke('projection:capture-slide-preview'),
+    captureGalleryPreviews: () =>
+      ipcRenderer.invoke('projection:capture-gallery-previews'),
     getPptSlideState: () =>
       ipcRenderer.invoke('projection:get-ppt-slide-state'),
     getSiteTargetMonitors: () =>

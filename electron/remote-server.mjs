@@ -64,7 +64,7 @@ export function getRemoteStatus() {
 /**
  * @param {any} wss WebSocketServer (ou fake)
  * @param {any} contents BrowserWindow.webContents (ou fake)
- * @param {{ token?: string, speakerToken?: string, palcoHttpPort?: () => number }} [opts] tokens fixos p/ testes (default: random); porta HTTP atual da Fonte 1 do palco
+ * @param {{ token?: string, speakerToken?: string, palcoHttpPort?: () => number, captureVideoFrame?: () => Promise<string | null>, frameIntervalMs?: number }} [opts] tokens fixos p/ testes (default: random); porta HTTP atual da Fonte 1 do palco; captura do quadro do vídeo para a prévia do celular
  */
 export async function startRemoteServer(wss, contents, opts = {}) {
   const token = opts.token ?? randomBytes(4).toString('hex').toUpperCase()
@@ -188,6 +188,8 @@ export async function startRemoteServer(wss, contents, opts = {}) {
               ws.close()
               return
             }
+            // Operador validado pelo token: recebe a prévia do vídeo.
+            entry.operator = true
           }
           // APK identifica o aparelho logo após conectar.
           const device = typeof msg.device === 'string' ? msg.device : null
@@ -218,6 +220,9 @@ export async function startRemoteServer(wss, contents, opts = {}) {
           // Quem usa o token do pregador fica no escopo speaker nesta conexão.
           if (tok === speakerToken) entry.speaker = true
           entry.authed = true
+          // O APK manda o token só nos comandos (o hello dele não leva token):
+          // é aqui que o operador fica provado e passa a receber a prévia do vídeo.
+          if (tok === token && !entry.speaker) entry.operator = true
           if (entry.speaker && !SPEAKER_ALLOWED.has(action)) {
             send(ws, { v: 1, type: 'error', id, code: 'forbidden' })
             return
@@ -247,6 +252,9 @@ export async function startRemoteServer(wss, contents, opts = {}) {
             durationMs:
               typeof msg.durationMs === 'number' ? msg.durationMs : undefined,
             name: typeof msg.name === 'string' ? msg.name : undefined,
+            // Destino da barra de vídeo (monitor:<id> ou tv:<slot>).
+            targetId: typeof msg.targetId === 'string' ? msg.targetId : undefined,
+            enabled: typeof msg.enabled === 'boolean' ? msg.enabled : undefined,
             style: typeof msg.style === 'string' ? msg.style : undefined,
             showSeconds:
               typeof msg.showSeconds === 'boolean' ? msg.showSeconds : undefined,
@@ -260,6 +268,10 @@ export async function startRemoteServer(wss, contents, opts = {}) {
               typeof msg.namesText === 'string' ? msg.namesText : undefined,
             // Palco (cast TV): liga/desliga/projeta/idle
             text: typeof msg.text === 'string' ? msg.text : undefined,
+            // Endereço do navegador do celular (site.navigate).
+            url: typeof msg.url === 'string' ? msg.url : undefined,
+            // Proporção da rolagem do navegador do celular (site.scroll, 0..1).
+            ratio: typeof msg.ratio === 'number' ? msg.ratio : undefined,
             footerRef:
               typeof msg.footerRef === 'string' ? msg.footerRef : undefined,
             // Palco slots: criar/remover/ligar TVs remotamente
@@ -298,6 +310,33 @@ export async function startRemoteServer(wss, contents, opts = {}) {
   }
   ipcMain.on('remote:ack', onAck)
   ipcMain.on('remote:state', onState)
+
+  // Prévia do vídeo/YouTube: quadros num canal próprio, fora do estado (que
+  // sai a cada segundo e não pode pesar). Só para o APK operador; captura
+  // lenta não empilha e quadro repetido (vídeo pausado) não é reenviado.
+  const captureVideoFrame = opts.captureVideoFrame
+  let frameBusy = false
+  let lastFrame = null
+  const frameTimer = captureVideoFrame
+    ? setInterval(async () => {
+        if (frameBusy) return
+        const operators = [...clients].filter(([, entry]) => entry.operator).map(([ws]) => ws)
+        if (operators.length === 0) return
+        frameBusy = true
+        try {
+          const data = await captureVideoFrame()
+          // Sem quadro agora (reserva em intervalo, página carregando): mantém o último.
+          if (data && data !== lastFrame) {
+            lastFrame = data
+            for (const ws of operators) send(ws, { v: 1, type: 'frame', data })
+          }
+        } catch {
+          // janela do vídeo fechando no meio da captura
+        } finally {
+          frameBusy = false
+        }
+      }, opts.frameIntervalMs ?? 100)
+    : null
 
   // Porta real em uso (pode ser fallback 7072-7075)
   const activePort = wss.address().port
@@ -344,6 +383,7 @@ export async function startRemoteServer(wss, contents, opts = {}) {
         ws.close()
       }
       clients.clear()
+      if (frameTimer) clearInterval(frameTimer)
       ipcMain.removeListener('remote:ack', onAck)
       ipcMain.removeListener('remote:state', onState)
       wss.close()
@@ -410,7 +450,13 @@ export function attachRemoteServer(getContents, { palcoHttpPort } = {}) {
       // proxy mínimo de WebContents usado pelo servidor
       send: (channel, ...args) => getContents()?.send(channel, ...args),
       isDestroyed: () => !getContents(),
-    }, { palcoHttpPort })
+    }, {
+      palcoHttpPort,
+      captureVideoFrame: async () => {
+        const { captureRemoteVideoFrame } = await import('./ipc/web-projection.mjs')
+        return captureRemoteVideoFrame()
+      },
+    })
     app.on('quit', handle.stop)
   }
   boot().catch((err) => console.error('[remote] falhou:', err))

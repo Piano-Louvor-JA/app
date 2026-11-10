@@ -312,9 +312,12 @@
           canvas?.classList.remove('is-visible')
         }
 
-        // Legenda vem de outra origem (local://yt-cache): o <track> só carrega com o vídeo em modo CORS.
-        if (subtitleSrc) {
+        // Vídeo do YouTube (local://yt-stream / yt-cache) é de outra origem: em modo CORS
+        // o quadro pode ser lido para a prévia do controle remoto e o <track> da legenda carrega.
+        if (subtitleSrc || /^local:\/\/yt-(stream|cache)\//.test(src)) {
           video.crossOrigin = 'anonymous'
+        }
+        if (subtitleSrc) {
           const caption = document.createElement('track')
           caption.kind = 'subtitles'
           caption.default = true

@@ -473,6 +473,10 @@ export type ProjectionApi = {
   getPlaybackState?: () => Promise<ProjectionPlaybackState | null>
   getNavigationState?: () => Promise<ProjectionNavigationState | null>
   remoteGoBack?: () => Promise<boolean>
+  /** Leva o site projetado ao endereço que o celular abriu no navegador dele. */
+  remoteNavigate?: (url: string) => Promise<boolean>
+  /** Rola o site projetado na proporção (0..1) da rolagem do celular. */
+  remoteScroll?: (ratio: number) => Promise<boolean>
   remoteGoForward?: () => Promise<boolean>
   remoteReload?: () => Promise<boolean>
   toggleSiteScreens?: () => Promise<boolean>
@@ -508,10 +512,18 @@ export type ProjectionApi = {
     projecting?: boolean
   } | null>
   captureSourceFrame?: () => Promise<string | null>
+  /** Miniatura JPEG (base64) do slide atual, para o controle remoto. */
+  captureSlidePreview?: () => Promise<string | null>
+  /** Miniaturas JPEG de toda a galeria aberta e a chave dela. */
+  captureGalleryPreviews?: () => Promise<{ key: string; previews: string[] } | null>
   getSiteTargetMonitors?: () => Promise<number[]>
   setSiteTargetMonitors?: (ids: number[]) => Promise<boolean>
   getVideoTargetMonitors?: () => Promise<number[]>
   setVideoTargetMonitors?: (ids: number[]) => Promise<boolean>
+  /** Estado da barra de vídeo aberta, para o controle remoto. */
+  getVideoControlSnapshot?: () => Promise<Record<string, unknown> | null>
+  /** Executa um comando na barra de vídeo, pelo mesmo caminho do clique. */
+  runVideoControlCommand?: (command: Record<string, unknown>) => Promise<boolean>
   /** `height`: altura que o painel precisa (px), limitada à janela do player. */
   setSiteControlPanelOpen?: (open: boolean, height?: number) => Promise<boolean>
   onSiteTargetsChanged?: (callback: (ids: number[]) => void) => () => void

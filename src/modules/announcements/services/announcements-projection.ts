@@ -4,8 +4,8 @@ import { toggleAnnotationProjection } from '@modules/liturgy/services/annotation
 import { executeLiturgyItem } from '@modules/liturgy/services/liturgy-actions'
 import { openLocalTextControl } from '@modules/liturgy/services/liturgy-web-projection'
 import { parseLiturgyWebTarget } from '@modules/liturgy/services/liturgy-web-runtime'
+import { stageTextPayload } from '@modules/liturgy/services/text-control-payload'
 import type { LiturgyItem } from '@modules/liturgy/types/liturgy'
-import { readEffectiveStageSettings } from '@modules/settings/services/stage-settings-runtime'
 import { getDesktopBridge } from '@shared/services/desktop-bridge'
 
 import type { Announcement, TextAnnouncement, UrlAnnouncement } from '../types/announcements'
@@ -45,19 +45,9 @@ export function urlAnnouncementAsLiturgyItem(item: UrlAnnouncement): LiturgyItem
   }
 }
 
-/** Cor do título sem escolha própria: a mesma da anotação (Palco da Liturgia → referência da Bíblia). */
-const DEFAULT_TITLE_COLOR = '#fb8c00'
-
 /** Conteúdo e cores do Palco da Liturgia para o player de texto. */
 export function announcementTextPayload(item: TextAnnouncement) {
-  const stage = readEffectiveStageSettings('liturgy')
-  return {
-    title: item.title.trim(),
-    html: item.html,
-    titleColor: item.titleColor || stage.titleTextColor || readEffectiveStageSettings('bible').footerRefColor || DEFAULT_TITLE_COLOR,
-    textColor: stage.textColor ?? '#ffffff',
-    backgroundColor: stage.backgroundColor ?? '#000000',
-  }
+  return stageTextPayload({ title: item.title, html: item.html, titleColor: item.titleColor })
 }
 
 function isPdf(path: string): boolean {

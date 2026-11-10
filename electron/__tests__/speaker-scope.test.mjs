@@ -257,3 +257,28 @@ describe('convivência operador (APK) + pregador — limites POR PAPEL', () => {
     expect(info.speakerAddress).toBeTruthy()
   })
 })
+
+describe('operador — controles da barra de vídeo', () => {
+  it('encaminha destino e estado do comando video.setTarget', async () => {
+    const wss = fakeWss()
+    const contents = fakeContents()
+    await startRemoteServer(wss, contents, { token: TOKEN, speakerToken: SPEAKER_TOKEN })
+    const ws = fakeWs()
+    wss.handlers.connection(ws)
+
+    ws.listeners.message(
+      JSON.stringify({
+        v: 1,
+        type: 'command',
+        id: 'c1',
+        action: 'video.setTarget',
+        token: TOKEN,
+        targetId: 'tv:a',
+        enabled: false,
+      }),
+    )
+
+    const fwd = contents.sent.find((m) => m.channel === 'remote:command')
+    expect(fwd?.payload).toMatchObject({ targetId: 'tv:a', enabled: false })
+  })
+})
