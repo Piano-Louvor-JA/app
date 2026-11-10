@@ -289,3 +289,28 @@ describe('BibleChrome — título da prévia', () => {
     expect(title.text()).toBe('Bíblia')
   })
 })
+
+it('fechar a prévia encerra a projeção e oculta o miniplayer', async () => {
+  route.meta = { navKey: 'albums' }
+  store.isProjecting = true
+  const w = mountChrome()
+  const closeButton = w.findComponent({ name: 'MiniPlayerCloseButton' })
+  expect(closeButton.exists()).toBe(true)
+  closeButton.vm.$emit('close')
+  await nextTick()
+  expect(store.clearProjectionWindow).toHaveBeenCalledOnce()
+  expect(w.find('.bible-chrome').exists()).toBe(false)
+})
+
+it('oculta o fechar na página da Bíblia e mostra nas outras páginas', async () => {
+  store.isProjecting = true
+  const w = mountChrome()
+  expect(w.findComponent({ name: 'MiniPlayerCloseButton' }).exists()).toBe(false)
+  expect(w.find('.bible-chrome').exists()).toBe(true)
+  route.meta = { navKey: 'albums' }
+  await nextTick()
+  expect(w.findComponent({ name: 'MiniPlayerCloseButton' }).exists()).toBe(true)
+  route.meta = { navKey: 'bible' }
+  await nextTick()
+  expect(w.findComponent({ name: 'MiniPlayerCloseButton' }).exists()).toBe(false)
+})

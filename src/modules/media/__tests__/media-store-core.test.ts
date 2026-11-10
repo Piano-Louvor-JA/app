@@ -410,6 +410,25 @@ describe("fila", () => {
 		expect(store.queueIndex).toBe(0);
 	});
 
+	it("restaura a ordem com novas faixas acrescentadas após embaralhar", async () => {
+		const { store } = await openTrack({});
+		const original = [1, 2, 3].map((musicId) => ({ musicId, albumId: 1, title: String(musicId) }));
+		await store.playQueue([original[0]!, original[2]!, original[1]!], 0, undefined, "Culto", {
+			originalOrder: original,
+			shuffled: true,
+		});
+		const session = store.session;
+		loadMediaTrack.mockClear();
+		mediaAudio.playMediaAudio.mockClear();
+		store.appendQueue([{ musicId: 4, albumId: 2, title: "Nova faixa" }]);
+		store.playQueueInOrder(false);
+		expect(store.queue.map((entry) => entry.musicId)).toEqual([1, 2, 3, 4]);
+		expect(store.queueIndex).toBe(0);
+		expect(store.session).toBe(session);
+		expect(loadMediaTrack).not.toHaveBeenCalled();
+		expect(mediaAudio.playMediaAudio).not.toHaveBeenCalled();
+	});
+
 	it("appendQueue preserva sessão, índice e reprodução", async () => {
 		const { store } = await openTrack({});
 		await store.playQueue([
@@ -787,6 +806,20 @@ describe("bindAudio handlers — capturados do attach", () => {
 		expect(store.session).toBeNull();
 		expect(store.status).toBe("idle");
 		expect(store.currentTimeSec).toBe(0);
+	});
+
+	it("onEnded da reprodução individual fecha também quando iniciada no miniplayer", async () => {
+		const { store } = await openTrack({});
+		await store.playQueue(
+			[{ musicId: 1, albumId: null, title: "Hino" }],
+			0, undefined, "Culto", { minimized: true },
+		);
+		expect(store.hasSession).toBe(true);
+		expect(store.minimized).toBe(true);
+		capturedHandlers()!.onEnded();
+		expect(store.hasSession).toBe(false);
+		expect(store.session).toBeNull();
+		expect(store.status).toBe("idle");
 	});
 
 	it("onEnded com fila: avança para próxima (unbind + playQueueItem)", async () => {

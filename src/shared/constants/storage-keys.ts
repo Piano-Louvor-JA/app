@@ -13,6 +13,7 @@ export const BROWSER_STORAGE_KEYS = {
 
 /** Campos dentro de `user_data` (preferências do operador). */
 export const USER_PREFERENCE_KEYS = {
+  fonts: 'fonts.preferences.v1',
   theme: 'theme',
   blur: 'blur',
   accent: 'accent',
@@ -26,6 +27,10 @@ export const USER_PREFERENCE_KEYS = {
   clockConfig: 'clock.config',
   timerConfig: 'timer.config',
   countdownConfig: 'countdown.config',
+  /** Agenda, idioma das narrações e marcos de áudio da Escola Sabatina. */
+  sabbathSchoolConfig: 'sabbathSchool.config',
+  /** Listas de avisos, lista ativa e config do carrossel (módulo Avisos). Local: não sincroniza (caminhos de arquivo). */
+  announcementsState: 'announcements.state',
   randomConfig: 'random.config',
   randomSession: 'random.session',
   liturgyState: 'liturgy.state',
@@ -37,6 +42,7 @@ export const USER_PREFERENCE_KEYS = {
   bibleChromePosition: 'bible.chromePosition',
   /** Posição (left/top em px) da prévia flutuante do Timer; ausente = canto padrão. */
   countdownChromePosition: 'countdown.chromePosition',
+  sabbathSchoolChromePosition: 'sabbathSchool.chromePosition',
   /** Posição (left/top em px) da prévia flutuante do Cronômetro; ausente = canto padrão. */
   timerChromePosition: 'timer.chromePosition',
   /** Posição (left/top em px) da prévia flutuante do Relógio; ausente = canto padrão. */

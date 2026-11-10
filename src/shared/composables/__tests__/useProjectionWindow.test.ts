@@ -4,6 +4,11 @@
 // buildPopupUrl hash vs origin, primary fallback.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+const network = vi.hoisted(() => ({ selected: false }))
+vi.mock('@modules/settings/composables/useObsConnections', () => ({
+  refreshObsConnections: async () => {},
+  hasSelectedObsTargets: () => network.selected,
+}))
 const listSystemDisplays = vi.fn()
 const listExtendedDisplays = vi.fn((all: Array<{ id: number; isPrimary?: boolean }>) =>
   all.filter((d) => !d.isPrimary),
@@ -83,6 +88,7 @@ describe('useProjectionWindow', () => {
   let winOpen: ReturnType<typeof vi.spyOn>
 
   beforeEach(() => {
+    network.selected = false
     vi.restoreAllMocks()
     listSystemDisplays.mockResolvedValue(DISPLAYS)
     loadProjectionSettings.mockReturnValue({ ...SETTINGS })
@@ -117,6 +123,17 @@ describe('useProjectionWindow', () => {
     expect(url).not.toContain('#/')
   })
 
+  it('uses selected active connections without opening a fullscreen window on the only monitor', async () => {
+    listSystemDisplays.mockResolvedValue([DISPLAYS[0]])
+    loadProjectionSettings.mockReturnValue({ ...SETTINGS, targetDisplayIds: [] })
+    network.selected = true
+    const mod = await loadFresh()
+    expect(await mod.openProjectionModule('clock')).toBe(true)
+    expect(winOpen).not.toHaveBeenCalled()
+    expect(mod.isProjectionModuleOpen('clock')).toBe(true)
+    mod.closeProjectionModule()
+    expect(mod.isProjectionModuleOpen('clock')).toBe(false)
+  })
   it('sem seleção válida cai no primário (openFullscreenOnPrimary)', async () => {
     loadProjectionSettings.mockReturnValue({
       ...SETTINGS,
@@ -678,4 +695,29 @@ describe('reapply — falhas de abertura e janela de retorno', () => {
     expect(url).not.toContain('independent=1')
   })
 
+})
+it('deselecting the last monitor keeps selected network sources projecting and allows adding the monitor back', async () => {
+  network.selected = true
+  try {
+    const mod = await loadFresh()
+    await mod.openProjectionModule('media', [2])
+    expect(await mod.reapplyProjectionTargets([])).toBe(true)
+    expect(mod.isProjectionModuleOpen('media')).toBe(true)
+    expect(await mod.reapplyProjectionTargets([2])).toBe(true)
+    expect(mod.isProjectionModuleOpen('media')).toBe(true)
+    mod.closeProjectionModule()
+    expect(mod.isProjectionModuleOpen('media')).toBe(false)
+  } finally { network.selected = false }
+})
+
+it('monitor unplug does not end a projection still selected on network sources', async () => {
+  network.selected = true
+  try {
+    const mod = await loadFresh()
+    await mod.openProjectionModule('media', [2])
+    listSystemDisplays.mockResolvedValue([{ id: 1, isPrimary: true }])
+    await mod.syncProjectionAfterDisplayChange()
+    expect(mod.isProjectionModuleOpen('media')).toBe(true)
+    mod.closeProjectionModule()
+  } finally { network.selected = false }
 })

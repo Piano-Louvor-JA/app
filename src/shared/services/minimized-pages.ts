@@ -4,8 +4,11 @@
  */
 import type { ScrollMark } from './view-scroll-memory'
 
-/** Máximo de páginas na barra; ao passar, sai a minimizada há mais tempo. */
-export const MINIMIZED_PAGES_MAX = 6
+/**
+ * Máximo de páginas na barra; ao passar, sai a minimizada há mais tempo.
+ * A barra rola para os lados, então o teto só protege memória e storage.
+ */
+export const MINIMIZED_PAGES_MAX = 30
 
 export interface MinimizedPage {
   fullPath: string
@@ -46,6 +49,16 @@ export function addMinimized(list: MinimizedPage[], page: MinimizedPage): Minimi
 
 export function removeMinimized(list: MinimizedPage[], fullPath: string): MinimizedPage[] {
   return list.filter((item) => item.fullPath !== fullPath)
+}
+
+/** Reordena: leva a página para `toIndex` (fora da lista = ponta mais próxima). */
+export function moveMinimized(list: MinimizedPage[], fullPath: string, toIndex: number): MinimizedPage[] {
+  const from = list.findIndex((item) => item.fullPath === fullPath)
+  const next = [...list]
+  if (from < 0) return next
+  const [page] = next.splice(from, 1)
+  next.splice(Math.min(Math.max(toIndex, 0), next.length), 0, page)
+  return next
 }
 
 function isScrollMark(value: unknown): value is ScrollMark {

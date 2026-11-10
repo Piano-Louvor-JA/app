@@ -27,7 +27,8 @@
       video {
         width: 100%;
         height: 100%;
-        object-fit: contain;
+        object-fit: cover;
+        object-position: center center;
         background: #000;
       }
       video.is-audio {
@@ -88,10 +89,26 @@
       ></video>
       <p id="error">Não foi possível carregar o vídeo local.</p>
     </div>
+    <script src="./dual-track-sync.js"></script>
     <script>
       ;(() => {
         const params = new URLSearchParams(window.location.search)
-        const src = params.get('src') || ''
+        // Este player recebe apenas arquivos e streams do protocolo local do app.
+        // Parâmetros da janela nunca podem selecionar um protocolo executável/remoto.
+        function localMediaUrl(value) {
+          if (!value) return ''
+          try {
+            const url = new URL(value)
+            if (url.protocol !== 'local:' || url.username || url.password) return ''
+            if (!['app', 'yt-cache', 'yt-stream'].includes(url.hostname)) return ''
+            return url.href
+          } catch {
+            return ''
+          }
+        }
+        const src = localMediaUrl(params.get('src'))
+        const audioSrc = localMediaUrl(params.get('audioSrc'))
+        const subtitleSrc = localMediaUrl(params.get('subtitle'))
         const title = (params.get('title') || '').trim()
         const forceAudio = params.get('audio') === '1'
         const video = document.getElementById('player')
@@ -289,12 +306,34 @@
           draw()
         }
 
-        video.src = src
-        video.addEventListener('error', () => {
+        function showError() {
           error?.classList.add('is-visible')
           video.style.display = 'none'
           canvas?.classList.remove('is-visible')
-        })
+        }
+
+        // Legenda vem de outra origem (local://yt-cache): o <track> só carrega com o vídeo em modo CORS.
+        if (subtitleSrc) {
+          video.crossOrigin = 'anonymous'
+          const caption = document.createElement('track')
+          caption.kind = 'subtitles'
+          caption.default = true
+          caption.src = subtitleSrc
+          video.appendChild(caption)
+        }
+
+        let audioTrack = null
+        if (audioSrc) {
+          audioTrack = document.createElement('audio')
+          audioTrack.preload = 'auto'
+          audioTrack.crossOrigin = video.crossOrigin
+          audioTrack.src = audioSrc
+          video.after(audioTrack)
+          window.LouvorjaDualTrack?.attach(video, audioTrack, { onError: showError })
+        }
+
+        video.src = src
+        video.addEventListener('error', showError)
 
         video.addEventListener('loadedmetadata', () => {
           const hasPicture = video.videoWidth > 0 && video.videoHeight > 0
@@ -317,6 +356,20 @@
           void audioCtx?.resume?.()
         })
 
+        function disposeMedia() {
+          cancelAnimationFrame(raf)
+          video.pause()
+          video.removeAttribute('src')
+          video.load()
+          if (audioTrack) {
+            audioTrack.pause()
+            audioTrack.removeAttribute('src')
+            audioTrack.load()
+          }
+          if (audioCtx && audioCtx.state !== 'closed') void audioCtx.close().catch(function () {})
+        }
+        window.addEventListener('pagehide', disposeMedia, { once: true })
+        window.addEventListener('beforeunload', disposeMedia, { once: true })
         window.addEventListener('resize', resizeCanvas)
 
         const play = () => {

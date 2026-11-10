@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useProjectionFont } from '@modules/settings/composables/useProjectionFont'
 import { computed, onMounted, onUnmounted, ref, watch, nextTick } from 'vue'
 
 import {
@@ -160,12 +161,14 @@ const boxStyle = computed(() =>
       }
     : {},
 )
+
+const projectionFontStyle = useProjectionFont('hymns')
 </script>
 
 <template>
   <div
     class="media-projection"
-    :style="stageStyle"
+    :style="[stageStyle, projectionFontStyle]"
   >
     <div
       v-if="bgImage"

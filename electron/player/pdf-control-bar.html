@@ -222,7 +222,8 @@
         var STOP_PATH = 'M6 6h12v12H6z'
 
         function setProjectingUi(projecting) {
-          var canProject = selectedIds.length > 0
+          projecting = projecting || networkActive
+          var canProject = selectedIds.length > 0 || (tvSlots || []).some(function (slot) { return slot.clients > 0 && tvChecked[slot.id] !== false })
           projectBtn.disabled = !projecting && !canProject
           if (projecting) {
             projectBtn.classList.add('is-active')
@@ -283,6 +284,7 @@
           }
         }
 
+        var networkActive = false, syncGeneration = 0, sentTvIds = new Set()
         var tvSlots = []
         var tvChecked = {}
         var tvList = document.getElementById('tvList')
@@ -291,39 +293,63 @@
         function renderTvs() {
           var connected = tvSlots.filter(function (slot) { return slot.clients > 0 })
           tvHint.style.display = connected.length ? '' : 'none'
-          var html = connected.length ? '<ul class="panel__list"><li class="panel__empty">Espelhamento automático ativo</li>' : ''
-          for (var i = 0; i < connected.length; i++) {
-            var slot = connected[i]
-            html += '<li><label class="panel__option is-active"><input type="checkbox" checked disabled><span class="panel__option-body"><span class="panel__option-name">' + slot.label + '</span><span class="panel__option-meta">TV · ' + slot.clients + ' conectada(s) · HTTP ' + slot.httpPort + ' / WS ' + slot.wsPort + '</span></span></label></li>'
-          }
-          if (connected.length) html += '</ul>'
-          tvList.innerHTML = html
+          tvList.replaceChildren()
+          connected.forEach(function (slot) {
+            var label = document.createElement('label'); label.className = 'panel__option'
+            var input = document.createElement('input'); input.type = 'checkbox'; input.checked = tvChecked[slot.id] !== false
+            input.setAttribute('data-tv', slot.id)
+            input.addEventListener('change', async function () {
+              tvChecked[slot.id] = input.checked
+              var state = await window.louvorja.projection.getPlaybackState()
+              if (state && state.projecting) networkActive = true
+              if (networkActive) {
+                if (input.checked) syncPptWithRetry(0)
+                else { sentTvIds.delete(slot.id); await window.louvorja.palco.send({ v: 2, type: 'idle' }, slot.id) }
+              }
+              await refresh()
+            })
+            var text = document.createElement('span'); text.textContent = slot.label
+            label.append(input, text); tvList.appendChild(label)
+          })
+        }
+        async function loadTvs() {
+          if (!window.louvorja || !window.louvorja.palco) return
+          tvSlots = await window.louvorja.palco.slots().catch(function () { return [] })
+          renderTvs(); await refresh()
         }
 
-        var syncBusy = false
+        var syncBusy = false, pendingSync = false, lastSyncedIndex = -1
         async function syncPptToTvs() {
+          if (!networkActive) return false
+          var generation = syncGeneration
           if (!window.louvorja || !window.louvorja.palco || !window.louvorja.projection || !window.louvorja.projection.captureSourceFrame) return false
-          if (syncBusy) return false
+          if (syncBusy) { pendingSync = true; return false }
           syncBusy = true
           try {
+            var slide = window.louvorja.projection.getPptSlideState ? await window.louvorja.projection.getPptSlideState() : null
             var png = await window.louvorja.projection.captureSourceFrame()
-            if (!png) return false
+            if (!png || !networkActive || generation !== syncGeneration) return false
             tvSlots = await window.louvorja.palco.slots().catch(function () { return [] })
             renderTvs()
             var served = false
             for (var i = 0; i < tvSlots.length; i++) {
               var slot = tvSlots[i]
               if (slot.clients > 0 && tvChecked[slot.id] !== false) {
-                var url = await window.louvorja.palco.serveMedia('ppt-slide-' + Date.now() + '-' + i + '.png', 'image/png', png, slot.id)
-                if (url) {
-                  await window.louvorja.palco.send({ v: 2, type: 'projection', background: url, text: '', footerRef: '' }, slot.id)
+                // data:image is the established full-page protocol, including receivers
+                // opened before frameSlide support. HTTP backgrounds default to cover.
+                var url = 'data:image/png;base64,' + png
+                if (url && networkActive && generation === syncGeneration && tvChecked[slot.id] !== false) {
+                  await window.louvorja.palco.send({ v: 2, type: 'projection', frameSlide: true, background: url, text: '', footerRef: '' }, slot.id)
+                  sentTvIds.add(slot.id)
                   served = true
                 }
               }
             }
+            if (served && slide) lastSyncedIndex = slide.index
             return served
           } finally {
             syncBusy = false
+            if (pendingSync && networkActive) { pendingSync = false; syncPptWithRetry(0) }
           }
         }
 
@@ -331,9 +357,11 @@
         // LibreOffice). Retenta com backoff até a captura sair — sem isso a
         // TV ficava com o frame cinza de loading pra sempre (13/10).
         function syncPptWithRetry(attempt) {
+          if (!networkActive) return
+          var generation = syncGeneration
           void syncPptToTvs().then(function (served) {
-            if (served || attempt >= 8) return
-            setTimeout(function () { syncPptWithRetry(attempt + 1) }, Math.min(500 * Math.pow(1.6, attempt), 5000))
+            if (served || attempt >= 8 || !networkActive || generation !== syncGeneration) return
+            setTimeout(function () { if (networkActive && generation === syncGeneration) syncPptWithRetry(attempt + 1) }, Math.min(500 * Math.pow(1.6, attempt), 5000))
           })
         }
 
@@ -368,7 +396,7 @@
           if (window.louvorja && window.louvorja.projection && window.louvorja.projection.setSiteControlPanelOpen) {
             await window.louvorja.projection.setSiteControlPanelOpen(panelOpen)
           }
-          if (panelOpen) await loadMonitors()
+          if (panelOpen) { await loadMonitors(); await loadTvs() }
         }
 
         async function onToggleMonitor(event) {
@@ -384,6 +412,10 @@
           renderMonitorList()
           if (window.louvorja && window.louvorja.projection && window.louvorja.projection.setVideoTargetMonitors) {
             await window.louvorja.projection.setVideoTargetMonitors(selectedIds.slice())
+            if (networkActive && selectedIds.length > 0) {
+              var state = await window.louvorja.projection.getPlaybackState()
+              if (state && !state.projecting) await window.louvorja.projection.toggleVideoScreens()
+            }
           }
           await refresh()
         }
@@ -393,7 +425,10 @@
           var state = window.louvorja.projection.getPptSlideState
             ? await window.louvorja.projection.getPptSlideState()
             : null
-          if (state) setCounter(state.index, state.total)
+          if (state) {
+            setCounter(state.index, state.total)
+            if (networkActive && state.index !== lastSyncedIndex && !syncBusy) syncPptWithRetry(0)
+          }
           if (state && typeof state.projecting === 'boolean') {
             setProjectingUi(Boolean(state.projecting))
             return
@@ -455,7 +490,14 @@
         projectBtn.addEventListener('click', async function () {
           if (projectBtn.disabled) return
           if (window.louvorja && window.louvorja.projection && window.louvorja.projection.toggleVideoScreens) {
-            await window.louvorja.projection.toggleVideoScreens()
+            var state = await window.louvorja.projection.getPlaybackState()
+            var stopping = Boolean((state && state.projecting) || networkActive)
+            if ((stopping && state && state.projecting) || (!stopping && selectedIds.length > 0)) await window.louvorja.projection.toggleVideoScreens()
+            networkActive = !stopping; syncGeneration++; lastSyncedIndex = -1
+            if (stopping) {
+              await Promise.all(Array.from(sentTvIds).map(function (id) { return window.louvorja.palco.send({ v: 2, type: 'idle' }, id) }))
+              sentTvIds.clear()
+            } else { await loadTvs(); syncPptWithRetry(0) }
             await refresh()
           }
         })
@@ -472,13 +514,18 @@
         // PDF.js renderiza de forma assíncrona; primeira captura pode pegar
         // canvas vazio/loading. Retry com backoff cobre PDF grande (LibreOffice)
         // e re-sincroniza quando a TV conecta depois do boot (13/10).
-        syncPptWithRetry(0)
+        void loadTvs()
         if (window.louvorja && window.louvorja.palco && window.louvorja.palco.onReceiverConnected) {
-          window.louvorja.palco.onReceiverConnected(function () { void syncPptWithRetry(0) })
+          window.louvorja.palco.onReceiverConnected(function () { void loadTvs(); if (networkActive) syncPptWithRetry(0) })
         }
         void refresh()
         setInterval(function () { void refresh() }, 500)
       })()
+    </script>
+    <script src="../palco/network-mirror.js"></script>
+    <script src="independent-panel.js"></script>
+    <script>
+      window.PianoIndependentPanel && window.PianoIndependentPanel.mount()
     </script>
   </body>
 </html>

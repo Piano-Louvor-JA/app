@@ -1,3 +1,4 @@
+import { DEFAULT_PROJECTION_SETTINGS } from '@modules/settings/types/projection'
 import { setUserPreference, getUserPreference } from '@shared/services/user-preferences'
 import { USER_PREFERENCE_KEYS } from '@shared/constants/storage-keys'
 import { activeLiturgyStateKey } from '@modules/liturgy/services/liturgy-preferences'
@@ -47,9 +48,24 @@ export const SYNCABLE_PREF_KEYS: ReadonlySet<string> = new Set([
   USER_PREFERENCE_KEYS.clockConfig,
   USER_PREFERENCE_KEYS.timerConfig,
   USER_PREFERENCE_KEYS.countdownConfig,
+  USER_PREFERENCE_KEYS.sabbathSchoolConfig,
   USER_PREFERENCE_KEYS.randomConfig,
   USER_PREFERENCE_KEYS.language,
 ])
+
+// Monitor IDs and return-screen activation belong to this computer, not the account.
+const DEVICE_PROJECTION_KEYS = [
+  'targetDisplayIds', 'declinedDisplayIds', 'monitorArrangement',
+  'openReturnScreen', 'returnDisplayId', 'openFullscreenOnPrimary',
+  'disablePrimaryWhenExtended', 'autoMinimizePlayer',
+] as const
+
+export function syncablePreferenceValue(key: string, value: unknown): unknown {
+  if (key !== USER_PREFERENCE_KEYS.projectionSettings || !value || typeof value !== 'object') return value
+  const shared = { ...value } as Record<string, unknown>
+  for (const field of DEVICE_PROJECTION_KEYS) delete shared[field]
+  return shared
+}
 
 interface OperatorStateItem {
   client_uuid: string
@@ -129,7 +145,13 @@ export function applyOperatorState(items: OperatorStateItem[]): boolean {
       let prefApplied = false
       for (const [key, prefValue] of Object.entries(value as Record<string, unknown>)) {
         if (!SYNCABLE_PREF_KEYS.has(key)) continue // whitelist: fora nunca viaja
-        setUserPreference(key, prefValue)
+        if (key === USER_PREFERENCE_KEYS.projectionSettings) {
+          if (!prefValue || typeof prefValue !== 'object' || Array.isArray(prefValue)) continue
+          const local = getUserPreference<Record<string, unknown>>(key, {}) ?? {}
+          const next = { ...local, ...syncablePreferenceValue(key, prefValue) as Record<string, unknown> }
+          for (const field of DEVICE_PROJECTION_KEYS) next[field] = local[field] ?? DEFAULT_PROJECTION_SETTINGS[field]
+          setUserPreference(key, next)
+        } else setUserPreference(key, prefValue)
         prefApplied = true
       }
       if (prefApplied) {

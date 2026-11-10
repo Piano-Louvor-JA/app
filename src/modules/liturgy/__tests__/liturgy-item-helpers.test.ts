@@ -493,9 +493,9 @@ describe('buildLiturgyItemFromDraft', () => {
     )
     expect(s2.subtitle).toBe('Site oficial')
   })
-  it('annotation (não arquivo): durationMs clamp aplicado', () => {
+  it('online_video (não arquivo): durationMs clamp aplicado', () => {
     const a = buildLiturgyItemFromDraft(
-      draft({ type: 'annotation', musicId: null, durationMs: 2500 }),
+      draft({ type: 'online_video', musicId: null, url: 'https://youtu.be/x', durationMs: 2500 }),
       { musicList, bibleBooks },
     )
     expect(a.durationMs).toBe(3000) // round para 3000

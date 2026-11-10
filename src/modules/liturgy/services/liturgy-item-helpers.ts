@@ -6,6 +6,7 @@ import {
   LITURGY_ITEM_TYPES,
   MOMENT_DURATION_MAX_MS,
   MOMENT_DURATION_MIN_MS,
+  TYPES_WITHOUT_DURATION,
   type LiturgyItem,
   type LiturgyItemDraft,
   type LiturgyItemType,
@@ -13,6 +14,7 @@ import {
   type LiturgyBibleBookOption,
 } from '../types/liturgy'
 import { normalizeLiturgyTimeHHmm, pad2 } from './liturgy-format'
+import { normalizeTitleColor, notesHtmlToPlainText, sanitizeNotesHtml } from './rich-notes'
 
 export function createLiturgyItemId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
@@ -306,7 +308,7 @@ export function buildLiturgyItemFromDraft(
     subtitle: details,
     done: context.done ?? false,
     durationMs:
-      type === 'category'
+      TYPES_WITHOUT_DURATION.includes(type)
         ? 0
         : type === 'music'
           ? draft.durationMs > 0
@@ -407,6 +409,16 @@ export function buildLiturgyItemFromDraft(
     }
   }
 
+  if (type === 'annotation') {
+    const html = sanitizeNotesHtml(draft.notesHtml)
+    if (html) {
+      item.notesHtml = html
+      item.subtitle = notesHtmlToPlainText(html)
+    }
+    const titleColor = normalizeTitleColor(draft.titleColor)
+    if (titleColor) item.titleColor = titleColor
+  }
+
   return item
 }
 
@@ -425,7 +437,7 @@ export function draftFromLiturgyItem(item: LiturgyItem): LiturgyItemDraft {
     subtitle:
       item.type === 'music' ? (item.notes ?? '').trim() : item.subtitle,
     durationMs:
-      item.type === 'category'
+      TYPES_WITHOUT_DURATION.includes(item.type)
         ? 0
         : item.type === 'music'
           ? item.durationMs > 0
@@ -459,6 +471,8 @@ export function draftFromLiturgyItem(item: LiturgyItem): LiturgyItemDraft {
     playerId: item.playerId ?? 'default',
     url: item.url ?? '',
     presentationEngine: item.presentationEngine ?? 'auto',
+    notesHtml: item.type === 'annotation' ? (item.notesHtml ?? '') : '',
+    titleColor: item.type === 'annotation' ? normalizeTitleColor(item.titleColor) : '',
   }
 }
 

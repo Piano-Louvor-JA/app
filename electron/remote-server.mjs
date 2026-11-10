@@ -22,6 +22,7 @@ import { networkInterfaces } from 'node:os'
 import QRCode from 'qrcode'
 import { app, ipcMain } from 'electron'
 import { trackWsConnection, trackWsDisconnect } from './diagnostics.mjs'
+import { DEFAULT_HTTP_PORT } from './palco/transmission-config.mjs'
 
 const PORT = 7071
 const HEARTBEAT_MS = 15_000
@@ -63,7 +64,7 @@ export function getRemoteStatus() {
 /**
  * @param {any} wss WebSocketServer (ou fake)
  * @param {any} contents BrowserWindow.webContents (ou fake)
- * @param {{ token?: string, speakerToken?: string }} [opts] tokens fixos p/ testes (default: random)
+ * @param {{ token?: string, speakerToken?: string, palcoHttpPort?: () => number }} [opts] tokens fixos p/ testes (default: random); porta HTTP atual da Fonte 1 do palco
  */
 export async function startRemoteServer(wss, contents, opts = {}) {
   const token = opts.token ?? randomBytes(4).toString('hex').toUpperCase()
@@ -309,17 +310,24 @@ export async function startRemoteServer(wss, contents, opts = {}) {
   // Pairing: renderer pergunta host+token+QR (Configurações > Controle Remoto)
   const host = lanIp()
   const connectUrl = `louvorja://connect?host=${host}:${activePort}&token=${token}`
-  const speakerUrl = `http://${host}:7080/speaker?remotePort=${activePort}&palcoPort=7081&token=${speakerToken}`
   const qrDataUrl = await QRCode.toDataURL(connectUrl, { margin: 1, width: 220 })
-  const speakerQrDataUrl = await QRCode.toDataURL(speakerUrl, { margin: 1, width: 220 })
-  ipcMain.handle('remote:pairing-info', () => ({
+  const palcoHttpPort = typeof opts.palcoHttpPort === 'function' ? opts.palcoHttpPort : () => DEFAULT_HTTP_PORT
+  let speaker = { url: '', qr: '' }
+  const speakerPairing = async () => {
+    const httpPort = Number(palcoHttpPort()) || DEFAULT_HTTP_PORT
+    const url = `http://${host}:${httpPort}/speaker?remotePort=${activePort}&palcoPort=${httpPort + 1}&token=${speakerToken}`
+    if (url !== speaker.url) speaker = { url, qr: await QRCode.toDataURL(url, { margin: 1, width: 220 }) }
+    return speaker
+  }
+  await speakerPairing()
+  ipcMain.handle('remote:pairing-info', async () => ({
     host,
     port: activePort,
     token,
     connectUrl,
     qrDataUrl,
-    speakerUrl,
-    speakerQrDataUrl,
+    speakerUrl: (await speakerPairing()).url,
+    speakerQrDataUrl: speaker.qr,
     clientCount: clients.size,
     clientAddress: clientIdentity(),
     remoteAddress: identityFor(false),
@@ -346,7 +354,7 @@ export async function startRemoteServer(wss, contents, opts = {}) {
 export const REMOTE_PORT = PORT
 
 /** Conveniência para o main: sobe junto com o app em dev (devmode). */
-export function attachRemoteServer(getContents) {
+export function attachRemoteServer(getContents, { palcoHttpPort } = {}) {
   let stopped = false
   const MAX_ATTEMPTS = 5
   const boot = async () => {
@@ -402,7 +410,7 @@ export function attachRemoteServer(getContents) {
       // proxy mínimo de WebContents usado pelo servidor
       send: (channel, ...args) => getContents()?.send(channel, ...args),
       isDestroyed: () => !getContents(),
-    })
+    }, { palcoHttpPort })
     app.on('quit', handle.stop)
   }
   boot().catch((err) => console.error('[remote] falhou:', err))

@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "exported_at": "2026-11-05T12:00:00.000Z",
+  "kind": "playlists",
+  "playlists": [
+    {
+      "id": "fixture-pl-1",
+      "name": "Culto de Adoracao",
+      "items": [
+        { "musicId": 101, "albumId": 3, "title": "Quero Adorar" },
+        { "musicId": 205, "albumId": null, "title": "Gratos" }
+      ],
+      "createdAt": "2026-10-01T10:00:00.000Z",
+      "updatedAt": "2026-11-03T09:30:00.000Z"
+    },
+    {
+      "id": "fixture-pl-2",
+      "name": "Jovens",
+      "items": [
+        { "musicId": 310, "albumId": 7, "title": "Fogo Novo" }
+      ],
+      "createdAt": "2026-10-20T18:00:00.000Z",
+      "updatedAt": "2026-10-20T18:00:00.000Z"
+    }
+  ]
+}

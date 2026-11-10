@@ -62,6 +62,7 @@ vi.mock('../services/liturgy-web-runtime', async (importOriginal) => {
 })
 
 import {
+  openLocalTextControl,
   openLiturgyLocalImageControl,
   openLiturgyLocalPdfControl,
   openLiturgyLocalPresentationControl,
@@ -290,7 +291,7 @@ describe('vídeo local', () => {
     const remotePlay = vi.fn(async () => true)
     mockState.bridge = makeBridge({ openUrl, remotePlay })
     await expect(openLiturgyLocalVideoControl('/v/a.mp4')).resolves.toBe(true)
-    expect(mockState.videoRouted).toHaveLength(1)
+    expect(mockState.videoRouted).toHaveLength(0)
     expect(remotePlay).not.toHaveBeenCalled()
   })
 
@@ -330,22 +331,42 @@ describe('imagens locais', () => {
   })
 })
 
+describe('texto (avisos)', () => {
+  const text = { title: 'Batismo', html: '<p>Sábado</p>', titleColor: '#fff000' }
+
+  it('sem bridge ou sem conteúdo → false', async () => {
+    await expect(openLocalTextControl(text)).resolves.toBe(false)
+    mockState.bridge = makeBridge()
+    await expect(openLocalTextControl({ title: ' ', html: '  ' })).resolves.toBe(false)
+  })
+
+  it('abre o controle de texto sem projetar, com o título do aviso', async () => {
+    const openUrl = vi.fn(async () => true)
+    mockState.bridge = makeBridge({ openUrl })
+    await expect(openLocalTextControl(text, '')).resolves.toBe(true)
+    expect(closeProjectionModule).toHaveBeenCalled()
+    expect(openUrl).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: 'text', text, title: 'Batismo', withScreens: false, monitorIds: expect.any(Array) }),
+    )
+    await openLocalTextControl({ title: '', html: '<p>x</p>' })
+    expect(openUrl).toHaveBeenLastCalledWith(expect.objectContaining({ title: 'Texto' }))
+  })
+})
+
 describe('PDF local', () => {
   it('path vazio ou browser sem bridge → false', async () => {
     await expect(openLiturgyLocalPdfControl('')).resolves.toBe(false)
     await expect(playLiturgyLocalPdfOnScreens('/x.pdf')).resolves.toBe(false)
   })
 
-  it('electron ok → roteia título no palco', async () => {
+  it('abrir controle PDF não roteia título no palco', async () => {
     const openUrl = vi.fn(async () => true)
     mockState.bridge = makeBridge({ openUrl })
     await expect(openLiturgyLocalPdfControl('/x.pdf', 'Boletim')).resolves.toBe(true)
     expect(openUrl).toHaveBeenCalledWith(
       expect.objectContaining({ filePath: '/x.pdf', title: 'Boletim', mode: 'pdf', withScreens: false }),
     )
-    expect(mockState.projectRouted).toEqual([
-      ['liturgy', 'liturgy', { text: 'Boletim' }],
-    ])
+    expect(mockState.projectRouted).toEqual([])
   })
 
   it('electron openUrl falhou → false sem palco', async () => {
@@ -389,14 +410,14 @@ describe('apresentação local', () => {
     )
   })
 
-  it('sem Office e engine custom → segue; roteia palco', async () => {
+  it('abrir controle com engine custom não transmite o nome às conexões', async () => {
     const detectOffice = vi.fn(async () => false)
     const openUrl = vi.fn(async () => true)
     mockState.bridge = makeBridge({ openUrl, detectOffice })
     await expect(
       openLiturgyLocalPresentationControl('/x.odp', '', 'custom'),
     ).resolves.toBe(true)
-    expect(mockState.projectRouted).toHaveLength(1)
+    expect(mockState.projectRouted).toHaveLength(0)
   })
 
   it('detectOffice ausente no bridge → segue sem checar', async () => {
@@ -420,6 +441,8 @@ describe('apresentação local', () => {
     await expect(openLiturgyLocalPresentationControl('/x.pptx')).resolves.toBe(true)
     const payload = openUrl.mock.calls[0]![0] as Record<string, unknown>
     expect('presentationEngine' in payload).toBe(false)
+    expect(payload.withScreens).toBe(false)
+    expect(mockState.projectRouted).toHaveLength(0)
   })
 
   it('openUrl falhou → false sem palco', async () => {

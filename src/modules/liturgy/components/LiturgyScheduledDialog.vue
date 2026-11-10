@@ -12,6 +12,11 @@ import {
   type ProvaiEpisode,
 } from '../services/provai-e-vede-source'
 import { importProvaiEVedeEpisodes } from '../services/provai-e-vede-import'
+import {
+  resolveDefaultProvaiLanguage,
+  resolveProvaiSource,
+  type ProvaiSourceLanguage,
+} from '../services/provai-e-vede-catalog'
 import { useScheduledStore } from '../stores/useScheduledStore'
 import {
   loadLiturgyMusicOptions,
@@ -22,25 +27,41 @@ import type { LiturgyMusicOption } from '../types/liturgy'
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 
-const PAGE_URL =
-  'https://downloads.adventistas.org/pt/mordomia-crista/video/provai-e-vede-2026-4o-trimestre'
-
 /** HTML da página do trimestre: main process (sem CORS) no Electron, fetch direto na web. */
 async function fetchQuarterHtml(): Promise<string | null> {
+  const source = resolveCurrentProvaiUrl()
+  if (!source) return null
   const bridge = getDesktopBridge()
   try {
     if (bridge?.workspace?.fetchText) {
-      return await bridge.workspace.fetchText(PAGE_URL)
+      return await bridge.workspace.fetchText(source.url)
     }
-    const resp = await fetch(PAGE_URL)
+    const resp = await fetch(source.url)
     return resp.ok ? await resp.text() : null
   } catch {
     return null
   }
 }
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const dlg = useScheduledDialog()
+
+// ── Edição-fonte Provai/Probad (SPEC ADR-02/04) ────────────
+// Registry fechado PT/ES 2026; EN/FR são fallback PT explícito (sem fonte
+// oficial — nenhum request /en|/fr). Trimestre pelo calendário local.
+const pvSourceLanguage = ref<ProvaiSourceLanguage>(resolveDefaultProvaiLanguage(String(locale.value)))
+
+function currentQuarter(): 1 | 2 | 3 | 4 {
+  return (Math.floor(new Date().getMonth() / 3) + 1) as 1 | 2 | 3 | 4
+}
+
+function resolveCurrentProvaiUrl() {
+  return resolveProvaiSource({
+    language: pvSourceLanguage.value,
+    year: new Date().getFullYear(),
+    quarter: currentQuarter(),
+  })
+}
 
 type TabId = 'rotations' | 'paste' | 'grade'
 const tab = ref<TabId>('rotations')
@@ -122,7 +143,7 @@ async function onFetchProvaiEVede() {
   }
 }
 
-/** 1-CLICK: busca → ignora sábados passados → baixa os futuros → agenda. */
+/** 1-CLICK async: agenda imediato (online_video, já funcional) → batch em background → fecha. */
 const pvOneClickBusy = ref(false)
 const pvOneClickProgress = ref('')
 
@@ -146,43 +167,62 @@ async function onProvaiEVedeOneClick() {
 
     const store = useScheduledStore()
     const bridge = getDesktopBridge()
-    let done = 0
-    const resolvePath = async (ep: ProvaiEpisode): Promise<string> => {
-      pvOneClickProgress.value = t('liturgy.messages.scheduledPvDownloading', {
-        done: done + 1,
-        total: upcoming.length,
-      })
-      if (bridge?.workspace?.downloadToMedia) {
-        const fileName = ep.url.split('/').pop() ?? `${ep.dateISO}.mp4`
-        const local = await bridge.workspace.downloadToMedia(ep.url, fileName)
-        done++
-        return local ?? ''
-      }
-      done++
-      return ''
-    }
-    const report = await importProvaiEVedeEpisodes(store, upcoming, resolvePath, {
-      onlyUpcoming: true,
-    })
 
-    // Sem disco (web): converter as entradas pra online_video com a URL original.
-    if (!bridge?.workspace?.downloadToMedia) {
-      for (const ep of upcoming) {
-        const entry = store.findOn(report.rotationId, ep.dateISO)
-        if (entry && !entry.content?.filePath) {
-          store.upsertItem({
-            id: entry.id, categoryId: entry.categoryId, date: entry.date,
-            name: entry.name, content: { kind: 'online_video', url: ep.url },
-          })
-        }
+    // R6/SPEC v1.1: importa como online_video (toca de imediato em todos os
+    // idiomas — paridade pt-BR). O download em background depois promove a
+    // file localmente (T3) sem mudar o que o usuário já vê/agendou.
+    const report = await importProvaiEVedeEpisodes(store, upcoming, async () => '', {
+      onlyUpcoming: true,
+      sourceLanguage: pvSourceLanguage.value,
+    })
+    for (const ep of upcoming) {
+      const entry = store.findOn(report.rotationId, ep.dateISO)
+      if (entry && !entry.content?.filePath) {
+        store.upsertItem({
+          id: entry.id,
+          categoryId: entry.categoryId,
+          date: entry.date,
+          name: entry.name,
+          content: { kind: 'online_video', url: ep.url, name: ep.url.split('/').pop() ?? undefined },
+        })
       }
     }
+
+    // Desktop: dispara o batch de downloads em background (não trava o diálogo).
+    if (bridge?.downloadBatch?.enqueue) {
+      bridge.downloadBatch.enqueue(
+        upcoming.map((ep) => ({
+          id: `${report.rotationId}::${ep.dateISO}`,
+          url: ep.url,
+          fileName: ep.url.split('/').pop() ?? `${ep.dateISO}.mp4`,
+        })),
+      )
+    }
+
     pvOneClickProgress.value = t('liturgy.messages.scheduledPvDone', {
-      created: report.created, skipped: report.skipped,
+      created: report.created,
+      skipped: report.skipped,
     })
+    // Agendou + baixando em background: fecha o diálogo (decisão Rafael 03/11).
+    emit('close')
   } finally {
     pvOneClickBusy.value = false
   }
+}
+
+// T3/R4: promoção online_video → file quando o MAIN conclui cada download.
+const downloadBatchBridge = getDesktopBridge()?.downloadBatch
+if (downloadBatchBridge?.onItemDone) {
+  downloadBatchBridge.onItemDone((payload: { id: string, filePath: string }) => {
+      if (!payload?.id || !payload?.filePath) return
+      const [rotationId, dateISO] = payload.id.split('::')
+      if (!rotationId || !dateISO) return
+      const store = useScheduledStore()
+      const entry = store.findOn(rotationId, dateISO)
+      if (entry?.content?.kind === 'online_video') {
+        store.promoteOnlineVideoToFile(entry.id, payload.filePath)
+      }
+    })
 }
 
 async function onDownloadSelected() {
@@ -202,10 +242,13 @@ async function onDownloadSelected() {
       }
       // Importa com o caminho local (desktop) — sem download disponível (web),
       // agenda como online_video com a URL original (fallback).
-      await importProvaiEVedeEpisodes(store, [ep], () => localPath ?? '')
+      await importProvaiEVedeEpisodes(store, [ep], () => localPath ?? '', {
+        sourceLanguage: pvSourceLanguage.value,
+      })
       if (!localPath) {
         // web/sem bridge: guarda a URL como online_video em vez de file vazio
-        const rotation = store.categories.find((c) => c.name === 'Provai e Vede')
+        const rotationName = pvSourceLanguage.value === 'es' ? 'Probad y Ved' : 'Provai e Vede'
+        const rotation = store.categories.find((c) => c.name === rotationName)
         const entry = rotation ? store.findOn(rotation.id, ep.dateISO) : undefined
         if (entry) {
           store.upsertItem({
@@ -562,6 +605,16 @@ const dateFmt = (iso: string) => {
                   {{ t('liturgy.messages.scheduledFetchProvai') }}
                 </button>
               </details>
+              <label class="scheduled-dialog__pv-source">
+                {{ t('liturgy.fields.provaiSourceEdition') }}
+                <select
+                  v-model="pvSourceLanguage"
+                  :aria-label="t('liturgy.fields.provaiSourceEdition')"
+                >
+                  <option value="pt">Provai e Vede (PT)</option>
+                  <option value="es">Probad y Ved (ES)</option>
+                </select>
+              </label>
               <div
                 v-if="pvEpisodes.length > 0"
                 class="scheduled-dialog__pv"

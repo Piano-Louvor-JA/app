@@ -103,3 +103,15 @@ export function removePlaylistItem(id: string, index: number): Playlist | null {
   save(playlists)
   return playlist
 }
+
+export function movePlaylistItem(id: string, from: number, to: number): Playlist | null {
+  const playlists = read()
+  const playlist = playlists.find((entry) => entry.id === id)
+  if (!playlist || !Number.isInteger(from) || !Number.isInteger(to) ||
+    from < 0 || to < 0 || from >= playlist.items.length || to >= playlist.items.length) return null
+  const [item] = playlist.items.splice(from, 1)
+  playlist.items.splice(to, 0, item!)
+  playlist.updatedAt = now()
+  save(playlists)
+  return playlist
+}

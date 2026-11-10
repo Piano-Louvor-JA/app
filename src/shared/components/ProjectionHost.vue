@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import AnnouncementsCarouselStage from "@modules/announcements/components/AnnouncementsCarouselStage.vue";
 import BibleProjectionView from "@modules/bible/views/BibleProjectionView.vue";
 import ClockProjectionView from "@modules/clock/views/ClockProjectionView.vue";
 import CountdownProjectionView from "@modules/countdown/views/CountdownProjectionView.vue";
+import LiturgyAnnotationStage from "@modules/liturgy/components/LiturgyAnnotationStage.vue";
 import LiturgyWebProjectionView from "@modules/liturgy/views/LiturgyWebProjectionView.vue";
 import MediaProjectionView from "@modules/media/views/MediaProjectionView.vue";
 import MediaReturnProjectionView from "@modules/media/views/MediaReturnProjectionView.vue";
@@ -32,6 +34,8 @@ const layout = computed(() => {
   <MediaReturnProjectionView v-else-if="moduleId === 'media' && layout === 'return'" />
   <MediaProjectionView v-else-if="moduleId === 'media'" />
   <LiturgyWebProjectionView v-else-if="moduleId === 'liturgy-web'" />
+  <LiturgyAnnotationStage v-else-if="moduleId === 'annotation'" />
+  <AnnouncementsCarouselStage v-else-if="moduleId === 'announcements-carousel'" />
   <div
     v-else
     class="projection-host-empty"

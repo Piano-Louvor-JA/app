@@ -1,20 +1,26 @@
 // @vitest-environment jsdom
 // Botão de projeção independente: desativado sem estendidos (com tooltip),
-// lista de monitores com seleção única, encerrar, preparação do módulo.
+// monitores e conexões OBS como caixas de seleção (vários ao mesmo tempo), encerrar, preparação do módulo.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { computed, ref } from 'vue'
 
+vi.mock('@modules/settings/services/obs-detection', () => ({ detectObsBeforeProjection: vi.fn(async () => {}) }))
+
 const monitors = ref<Array<{ id: number; index: number; resolutionLabel: string }>>([])
-const activeMonitorId = ref<number | null>(null)
+const activeMonitorIds = ref<number[]>([])
 const activeMode = ref<'overlay' | 'share' | null>(null)
 const project = vi.fn(async (id: number, mode: 'overlay' | 'share' = 'overlay') => {
-  activeMonitorId.value = id
+  if (!activeMonitorIds.value.includes(id)) activeMonitorIds.value = [...activeMonitorIds.value, id]
   activeMode.value = mode
   return true
 })
+const unproject = vi.fn((id: number) => {
+  activeMonitorIds.value = activeMonitorIds.value.filter((item) => item !== id)
+  if (activeMonitorIds.value.length === 0) activeMode.value = null
+})
 const stop = vi.fn(() => {
-  activeMonitorId.value = null
+  activeMonitorIds.value = []
   activeMode.value = null
 })
 
@@ -23,11 +29,18 @@ vi.mock('@shared/composables/useIndependentProjection', () => ({
     monitors,
     available: computed(() => monitors.value.length > 0),
     loaded: ref(true),
-    activeMonitorId,
+    activeMonitorIds,
+    activeMonitorId: computed(() => activeMonitorIds.value[0] ?? null),
     activeMode,
     project: (id: number, mode?: 'overlay' | 'share') => project(id, mode),
+    unproject: (id: number) => unproject(id),
     stop: () => stop(),
   }),
+}))
+
+const projectionSettings = vi.hoisted(() => ({ targetDisplayIds: [2, 3] as number[] }))
+vi.mock('@modules/settings/services/projection-preferences', () => ({
+  loadProjectionSettings: () => ({ targetDisplayIds: [...projectionSettings.targetDisplayIds] }),
 }))
 
 const identifySystemDisplays = vi.fn(async () => true)
@@ -38,8 +51,15 @@ vi.mock('@modules/settings/services/display-service', () => ({
 vi.mock('vue-i18n', () => ({
   useI18n: () => ({
     t: (key: string, params?: Record<string, unknown>) =>
-      params && 'index' in params ? `${key}:${params['index']}` : key,
+      params && 'index' in params ? `${key}:${params['index']}`
+        : params && 'count' in params ? `${key}:${params['count']}` : key,
   }),
+}))
+
+import { obsAssignments, obsAssignmentModes } from '@modules/settings/services/obs-connections'
+const obsOutputs = ref<Array<{ id: string; label: string; running: boolean; clients: number; selected: boolean }>>([])
+vi.mock('@modules/settings/composables/useObsConnections', () => ({
+  useObsConnections: () => ({ activeConnections: obsOutputs }),
 }))
 
 import IndependentProjectionButton from '../IndependentProjectionButton.vue'
@@ -62,13 +82,62 @@ function panel() {
 
 describe('IndependentProjectionButton', () => {
   beforeEach(() => {
+    obsOutputs.value = []
+    obsAssignments.value = {}
     monitors.value = [...EXTENDED]
-    activeMonitorId.value = null
+    projectionSettings.targetDisplayIds = [2, 3]
+    activeMonitorIds.value = []
     activeMode.value = null
     project.mockClear()
+    unproject.mockClear()
     stop.mockClear()
     identifySystemDisplays.mockClear()
     document.body.innerHTML = ''
+  })
+
+  it('limita altura do menu e mostra encerrar antes dos destinos', async () => {
+    monitors.value = [{ id: 2, index: 2, resolutionLabel: '1920 × 1080' }]
+    activeMonitorIds.value = [2]
+    const wrapper = mountButton({ moduleId: 'bible' })
+    const trigger = wrapper.get('[data-testid="independent-projection-trigger"]')
+    await trigger.trigger('click')
+    const menu = panel()!
+    expect(menu.style.maxHeight).not.toBe('')
+    const stopButton = menu.querySelector('[data-testid="independent-projection-stop"]')!
+    const modes = menu.querySelector('.independent-projection__modes')!
+    expect(stopButton.compareDocumentPosition(modes) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    wrapper.unmount()
+  })
+
+  it('sem conexões OBS mostra apenas a orientação para ativá-las', async () => {
+    const wrapper = mountButton()
+    await wrapper.get('[data-testid="independent-projection-trigger"]').trigger('click')
+    expect(panel()!.querySelector('.obs-outputs-empty')?.textContent).toContain('obsOutputs.activateHint')
+    expect(panel()!.querySelector('ul[aria-label="obsOutputs.title"]')).toBeNull()
+    wrapper.unmount()
+  })
+
+  it('oferece conexão OBS ativa mesmo sem monitor e atribui apenas o destino escolhido', async () => {
+    monitors.value = []
+    obsOutputs.value = [{ id: '7082', label: 'OBS 2', running: true, clients: 1, selected: true }]
+    const beforeProject = vi.fn(() => true)
+    const wrapper = mountButton({ moduleId: 'bible', beforeProject })
+    const trigger = wrapper.get('[data-testid="independent-projection-trigger"]')
+    expect(trigger.attributes('aria-disabled')).toBe('false')
+    await trigger.trigger('click')
+    expect(panel()!.querySelector('.obs-outputs-active')?.textContent).toContain('obsOutputs.active')
+    expect(panel()!.querySelector('.independent-projection__option-meta')?.textContent).toBe('obsOutputs.activeConnections:1')
+    expect(panel()!.querySelector('.obs-outputs-empty')).toBeNull()
+    ;(panel()!.querySelector('[data-mode="share"]') as HTMLButtonElement).click()
+    await flushPromises()
+    const output = [...panel()!.querySelectorAll('button')].find((item) => item.textContent?.includes('OBS 2'))!
+    output.click()
+    await flushPromises()
+    expect(obsAssignments.value).toEqual({ '7082': 'bible' })
+    expect(obsAssignmentModes.value['7082']).toBe('share')
+    expect(beforeProject).toHaveBeenCalledOnce()
+    expect(project).not.toHaveBeenCalled()
+    wrapper.unmount()
   })
 
   it('sem monitor estendido fica desativado com o aviso no tooltip', async () => {
@@ -76,7 +145,7 @@ describe('IndependentProjectionButton', () => {
     const wrapper = mountButton()
     const trigger = wrapper.get('[data-testid="independent-projection-trigger"]')
     expect(trigger.attributes('aria-disabled')).toBe('true')
-    expect(trigger.attributes('title')).toBe('independentProjection.unavailable')
+    expect(trigger.attributes('title')).toBe('independentProjection.unavailable obsOutputs.activateHint')
     await trigger.trigger('click')
     expect(panel()).toBeNull()
     wrapper.unmount()
@@ -97,17 +166,76 @@ describe('IndependentProjectionButton', () => {
     wrapper.unmount()
   })
 
-  it('escolher um monitor projeta nele e fecha a lista', async () => {
+  it('caixas de seleção: marca vários monitores, a lista fica aberta e desmarcar tira só aquele', async () => {
     const wrapper = mountButton()
     await wrapper.get('[data-testid="independent-projection-trigger"]').trigger('click')
+    expect(panel()!.querySelector('[data-monitor-id="3"]')!.getAttribute('role')).toBe('checkbox')
     ;(panel()!.querySelector('[data-monitor-id="3"]') as HTMLButtonElement).click()
     await flushPromises()
     expect(project).toHaveBeenCalledWith(3, 'overlay')
-    expect(panel()).toBeNull()
+    expect(panel()).not.toBeNull()
+    ;(panel()!.querySelector('[data-monitor-id="2"]') as HTMLButtonElement).click()
+    await flushPromises()
+    expect(project).toHaveBeenCalledWith(2, 'overlay')
+    expect([...panel()!.querySelectorAll('[data-monitor-id][aria-checked="true"]')].map((el) => el.getAttribute('data-monitor-id'))).toEqual(['2', '3'])
+    expect(panel()!.querySelector('[data-monitor-id="2"] .ti-square-check')).not.toBeNull()
     const trigger = wrapper.get('[data-testid="independent-projection-trigger"]')
     expect(trigger.classes()).toContain('independent-projection__trigger--active')
-    expect(trigger.attributes('title')).toBe('independentProjection.activeOn:3')
-    expect(trigger.text()).toBe('3')
+    expect(trigger.attributes('title')).toBe('independentProjection.activeOn:2, 3')
+    expect(trigger.text()).toBe('2, 3')
+
+    ;(panel()!.querySelector('[data-monitor-id="3"]') as HTMLButtonElement).click()
+    await flushPromises()
+    expect(unproject).toHaveBeenCalledWith(3)
+    expect(trigger.text()).toBe('2')
+    wrapper.unmount()
+  })
+
+  it('monitor desligado em "Telas" aparece desativado com o aviso; no ar ainda dá para desmarcar', async () => {
+    projectionSettings.targetDisplayIds = [2]
+    const wrapper = mountButton()
+    await wrapper.get('[data-testid="independent-projection-trigger"]').trigger('click')
+    const off = panel()!.querySelector('[data-monitor-id="3"]') as HTMLButtonElement
+    expect(off.disabled).toBe(true)
+    expect(off.textContent).toContain('independentProjection.enableHint')
+    expect(panel()!.querySelector('[data-monitor-id="2"]')!.textContent).not.toContain('independentProjection.enableHint')
+    off.dispatchEvent(new MouseEvent('click'))
+    await flushPromises()
+    expect(project).not.toHaveBeenCalled()
+    wrapper.unmount()
+
+    activeMonitorIds.value = [3]
+    const again = mountButton()
+    await again.get('[data-testid="independent-projection-trigger"]').trigger('click')
+    const live = panel()!.querySelector('[data-monitor-id="3"]') as HTMLButtonElement
+    expect(live.disabled).toBe(false)
+    live.click()
+    await flushPromises()
+    expect(unproject).toHaveBeenCalledWith(3)
+    again.unmount()
+  })
+
+  it('OBS: marca várias conexões junto com monitores; desmarcar tira só aquela', async () => {
+    obsOutputs.value = [
+      { id: '7082', label: 'OBS 2', running: true, clients: 1, selected: true },
+      { id: '7083', label: 'OBS 3', running: true, clients: 2, selected: true },
+    ]
+    const wrapper = mountButton({ moduleId: 'bible' })
+    await wrapper.get('[data-testid="independent-projection-trigger"]').trigger('click')
+    ;(panel()!.querySelector('[data-monitor-id="2"]') as HTMLButtonElement).click()
+    await flushPromises()
+    ;(panel()!.querySelector('[data-obs-id="7082"]') as HTMLButtonElement).click()
+    await flushPromises()
+    ;(panel()!.querySelector('[data-obs-id="7083"]') as HTMLButtonElement).click()
+    await flushPromises()
+    expect(obsAssignments.value).toEqual({ '7082': 'bible', '7083': 'bible' })
+    expect(activeMonitorIds.value).toEqual([2])
+    expect(stop).not.toHaveBeenCalled()
+    expect(panel()!.querySelector('[data-obs-id="7082"]')!.getAttribute('aria-checked')).toBe('true')
+    ;(panel()!.querySelector('[data-obs-id="7082"]') as HTMLButtonElement).click()
+    await flushPromises()
+    expect(obsAssignments.value).toEqual({ '7083': 'bible' })
+    expect(activeMonitorIds.value).toEqual([2])
     wrapper.unmount()
   })
 
@@ -158,7 +286,7 @@ describe('IndependentProjectionButton', () => {
   })
 
   it('ativo mostra marcado e permite encerrar', async () => {
-    activeMonitorId.value = 2
+    activeMonitorIds.value = [2]
     const wrapper = mountButton()
     await wrapper.get('[data-testid="independent-projection-trigger"]').trigger('click')
     const checked = panel()!.querySelector('[data-monitor-id][aria-checked="true"]')
@@ -243,12 +371,51 @@ describe('IndependentProjectionButton', () => {
   })
 
   it('ao reabrir, o modo começa no modo ativo', async () => {
-    activeMonitorId.value = 3
+    activeMonitorIds.value = [3]
     activeMode.value = 'share'
     const wrapper = mountButton()
     await wrapper.get('[data-testid="independent-projection-trigger"]').trigger('click')
     await flushPromises()
     expect(panel()!.querySelector('[data-mode="share"]')!.getAttribute('aria-checked')).toBe('true')
+    wrapper.unmount()
+  })
+
+  it('sem OBS: esconde as saídas OBS, mesmo ativas, e a dica de ativá-las', async () => {
+    obsOutputs.value = [{ id: '7082', label: 'OBS 2', running: true, clients: 1, selected: true }]
+    obsAssignments.value = { '7082': 'annotation' }
+    const wrapper = mountButton({ moduleId: 'annotation', obs: false })
+    const trigger = wrapper.get('[data-testid="independent-projection-trigger"]')
+    expect(trigger.classes()).not.toContain('independent-projection__trigger--active')
+    await trigger.trigger('click')
+    expect(panel()!.querySelector('.obs-outputs-separator')).toBeNull()
+    expect(panel()!.querySelector('.obs-outputs-empty')).toBeNull()
+    expect(panel()!.querySelector('.obs-outputs-active')).toBeNull()
+    expect(panel()!.textContent).not.toContain('OBS 2')
+    wrapper.unmount()
+  })
+
+  it('sem OBS e sem monitor: tooltip não sugere ativar OBS', () => {
+    monitors.value = []
+    obsOutputs.value = [{ id: '7082', label: 'OBS 2', running: true, clients: 1, selected: true }]
+    const wrapper = mountButton({ obs: false })
+    const trigger = wrapper.get('[data-testid="independent-projection-trigger"]')
+    expect(trigger.attributes('aria-disabled')).toBe('true')
+    expect(trigger.attributes('title')).toBe('independentProjection.unavailable')
+    wrapper.unmount()
+  })
+
+  it('não dono do conteúdo: não aparece ativo nem oferece encerrar', async () => {
+    activeMonitorIds.value = [2]
+    activeMode.value = 'share'
+    const wrapper = mountButton({ claimed: false, compact: true })
+    const trigger = wrapper.get('[data-testid="independent-projection-trigger"]')
+    expect(trigger.classes()).toContain('independent-projection__trigger--compact')
+    expect(trigger.classes()).not.toContain('independent-projection__trigger--active')
+    expect(trigger.find('.independent-projection__badge').exists()).toBe(false)
+    expect(trigger.find('.ti').classes()).toContain('ti-device-desktop-share')
+    expect(trigger.attributes('title')).toBe('independentProjection.title')
+    await trigger.trigger('click')
+    expect(panel()!.querySelector('[data-testid="independent-projection-stop"]')).toBeNull()
     wrapper.unmount()
   })
 })

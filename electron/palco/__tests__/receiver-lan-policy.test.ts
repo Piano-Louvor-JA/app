@@ -6,9 +6,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 const opened: JSDOM[] = []
 afterEach(() => opened.splice(0).forEach(dom => dom.window.close()))
 
-function receiver(file: string, host: string, port = '7081', extra = '') {
+function receiver(file: string, host: string, port = '7081', extra = '', origin = 'http://192.168.1.20:7080') {
+  const portQuery = port ? `&port=${encodeURIComponent(port)}` : ''
   const dom = new JSDOM(readFileSync(resolve('electron/palco', file), 'utf8'), {
-    url: `http://192.168.1.20:7080/?host=${encodeURIComponent(host)}&port=${encodeURIComponent(port)}&token=91KCV${extra}`,
+    url: `${origin}/?host=${encodeURIComponent(host)}${portQuery}&token=91KCV${extra}`,
     runScripts: 'outside-only', pretendToBeVisual: true, virtualConsole: new VirtualConsole(),
   })
   opened.push(dom)
@@ -26,7 +27,8 @@ function receiver(file: string, host: string, port = '7081', extra = '') {
   })
   for (const script of w.document.querySelectorAll('script')) {
     const code = script.getAttribute('src') === 'purify.min.js'
-      ? readFileSync(resolve('electron/palco/purify.min.js'), 'utf8') : script.textContent
+      ? readFileSync(resolve('electron/palco/purify.min.js'), 'utf8') : script.getAttribute('src') === 'network-mirror.js'
+        ? readFileSync(resolve('electron/palco/network-mirror.js'), 'utf8') : script.textContent
     if (code?.trim()) w.eval(code)
   }
   fetch.mockClear()
@@ -78,6 +80,25 @@ describe.each(['receiver.html', 'index.html'])('%s — política LAN', file => {
     fetch.mockImplementationOnce(() => Promise.resolve({ json: async () => ({ unlocked: true }) } as Response))
     await expect(w.probeHttp('192.168.1.25', 7080)).resolves.toMatchObject({ unlocked: true })
     expect(fetch).toHaveBeenCalledWith('http://192.168.1.25:7080/status', { redirect: 'error' })
+  })
+
+  it('sem porta escolhida, procura a porta padrão e também a antiga', async () => {
+    const answer = (open: string) => (url: string) => url === `http://192.168.1.25:${open}/status`
+      ? Promise.resolve({ json: async () => ({ unlocked: true }) } as Response)
+      : Promise.reject(new Error('closed'))
+    const socketAfterProbe = async (open: string) => {
+      const page = receiver(file, '192.168.1.25', '', '', 'http://192.168.1.20:5173')
+      page.fetch.mockImplementation(answer(open))
+      await expect(page.w.probeSender('192.168.1.25')).resolves.toBe('192.168.1.25')
+      page.w.doConnect()
+      return page.sockets.at(-1)
+    }
+    expect(await socketAfterProbe('47080')).toBe('ws://192.168.1.25:47081/palco?token=91KCV')
+    expect(await socketAfterProbe('7080')).toBe('ws://192.168.1.25:7081/palco?token=91KCV')
+    const chosen = receiver(file, '192.168.1.25', '9001', '', 'http://192.168.1.20:5173')
+    chosen.fetch.mockImplementation(answer('7080'))
+    await expect(chosen.w.probeSender('192.168.1.25')).resolves.toBeNull()
+    expect(chosen.fetch).not.toHaveBeenCalledWith('http://192.168.1.25:7080/status', { redirect: 'error' })
   })
 
   it('não permite destinos públicos ou esquemas executáveis nas mídias', () => {

@@ -1,17 +1,27 @@
 <script setup lang="ts">
-defineProps<{
+import { useEnterToConfirm } from '@shared/composables/useEnterToConfirm';
+
+const props = defineProps<{
 	open: boolean;
 	title: string;
 	message: string;
 	confirmLabel: string;
 	cancelLabel: string;
 	danger?: boolean;
+	zIndex?: number;
+	/** Enter confirma. Fica desligado nos confirms de exclusão. */
+	enterConfirms?: boolean;
 }>();
 
 const emit = defineEmits<{
 	confirm: [];
 	cancel: [];
 }>();
+
+useEnterToConfirm(
+	() => props.open && props.enterConfirms === true,
+	() => emit('confirm'),
+);
 </script>
 
 <template>
@@ -20,6 +30,7 @@ const emit = defineEmits<{
     <div
       v-if="open"
       class="app-confirm"
+      :style="zIndex === undefined ? undefined : { zIndex }"
       role="dialog"
       aria-modal="true"
       :aria-label="title"

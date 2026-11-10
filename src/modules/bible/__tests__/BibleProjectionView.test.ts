@@ -36,7 +36,8 @@ vi.mock('../../settings/services/stage-settings-runtime', () => ({
   subscribeStageSettings: vi.fn(() => vi.fn()),
 }))
 
-vi.mock('../../settings/types/stage-settings', () => ({
+vi.mock('../../settings/types/stage-settings', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   resolveBackgroundImage: vi.fn(() => 'http://localhost/bg.png'),
   stageFlexAlign: vi.fn(() => ({ justifyContent: 'center' })),
 }))

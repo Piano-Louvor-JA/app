@@ -18,10 +18,10 @@ async function refresh() {
   if (!hasElectron.value) return
   const api = (window as never as { louvorja: { palco: { slots(): Promise<Slot[]>; status(): Promise<PalcoStatusLike | null> } } }).louvorja.palco
   // Visível apenas com o Palco ativo — desligado, o seletor não faz sentido.
-  const st = await api.status().catch(() => null)
-  senderOn.value = Boolean(st?.running)
-  if (!senderOn.value) return
   slots.value = await api.slots().catch(() => [])
+  const st = await api.status().catch(() => null)
+  senderOn.value = Boolean(st?.running) || slots.value.some(slot => slot.running)
+  if (!senderOn.value) return
   // Monitores cabeados como destino também (spec multi-telas):
   // destinos unificados — TVs Palco + monitores no mesmo select.
   const dispApi = (window as never as { louvorja: { displays?: { list?: () => Promise<DisplayInfo[]> } } }).louvorja?.displays

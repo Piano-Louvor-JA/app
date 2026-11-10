@@ -113,6 +113,31 @@ describe('LiturgyTimelineItem', () => {
     vi.clearAllMocks()
   })
 
+  it('anotação mostra o texto formatado, limpo', () => {
+    const wrapper = createWrapper({
+      item: createItem({
+        type: 'annotation',
+        subtitle: 'Almoço na igreja',
+        notesHtml: '<div><b>Almoço</b> na <span style="color: #ff6d00;">igreja</span></div><img src=x onerror="alert(1)">',
+      }),
+    })
+    const notes = wrapper.get('[data-testid="liturgy-item-rich-notes"]')
+    expect(notes.html()).toContain('<b>Almoço</b>')
+    expect(notes.html()).toContain('style="color: #ff6d00;"')
+    expect(notes.html()).not.toContain('img')
+    expect(wrapper.findAll('.liturgy-item__subtitle')).toHaveLength(1)
+  })
+
+  it('anotação sem formatação e outros tipos seguem com o texto puro', () => {
+    const plain = createWrapper({ item: createItem({ type: 'annotation', subtitle: 'Só texto' }) })
+    expect(plain.find('[data-testid="liturgy-item-rich-notes"]').exists()).toBe(false)
+    expect(plain.get('.liturgy-item__subtitle').text()).toBe('Só texto')
+    const site = createWrapper({
+      item: createItem({ type: 'site', subtitle: 'https://x.org', notesHtml: '<b>ignorado</b>' }),
+    })
+    expect(site.find('[data-testid="liturgy-item-rich-notes"]').exists()).toBe(false)
+  })
+
   it('renderiza item music básico', () => {
     const wrapper = createWrapper({ item: createItem({ type: 'music' }) })
     expect(wrapper.exists()).toBe(true)
@@ -763,12 +788,7 @@ describe('LiturgyTimelineItem', () => {
     })
 
     it.each([
-      ['site', 'site'],
-      ['pdf', 'pdf', { filePath: '/d.pdf' }],
-      ['images', 'images', { filePath: '/i.png' }],
       ['online_video', 'online_video'],
-      ['video', 'video', { filePath: '/v.mp4' }],
-      ['presentation', 'presentation', { filePath: '/a.pptx' }],
     ])('%s: projecting true/false troca title/aria do playScreens (666-722)', async (_n, type, extra) => {
       const wProj = createWrapper({ item: createItem({ type, musicId: null, ...extra }), siteProjecting: type === 'site', videoProjecting: type !== 'site' })
       expect(wProj.html()).toContain('ti-player-stop')
@@ -779,4 +799,54 @@ describe('LiturgyTimelineItem', () => {
       wIdle.unmount()
     })
   })
+})
+
+it('YouTube opens through the player without a direct projection arrow', () => {
+  const wrapper = createWrapper({ item: createItem({ type: 'online_video', url: 'https://www.youtube.com/watch?v=abcdefghijk' }) })
+  expect(wrapper.find('.liturgy-item__action--site-project').exists()).toBe(false)
+  expect(wrapper.find('.ti-layout-dashboard').exists()).toBe(true)
+  wrapper.unmount()
+})
+
+ it('site opens its control window without a direct projection arrow', () => {
+  const wrapper = createWrapper({ item: createItem({ type: 'site', url: 'https://example.test' }) })
+  expect(wrapper.find('.liturgy-item__action--site-project').exists()).toBe(false)
+  expect(wrapper.find('.ti-layout-dashboard').exists()).toBe(true)
+  wrapper.unmount()
+})
+
+it('images open their control without a direct projection arrow', () => {
+  const wrapper = createWrapper({ item: createItem({ type: 'images', filePath: '/i.png' }) })
+  expect(wrapper.find('.liturgy-item__action--site-project').exists()).toBe(false)
+  expect(wrapper.find('.ti-layout-dashboard').exists()).toBe(true)
+  wrapper.unmount()
+})
+
+it('PDF opens its control without a direct projection arrow', () => {
+  const wrapper = createWrapper({ item: createItem({ type: 'pdf', filePath: '/d.pdf' }) })
+  expect(wrapper.find('.liturgy-item__action--site-project').exists()).toBe(false)
+  expect(wrapper.find('.ti-layout-dashboard').exists()).toBe(true)
+  wrapper.unmount()
+})
+
+it('PPT opens through its control without a direct projection button, even while projecting', async () => {
+  const wrapper = createWrapper({ item: createItem({ type: 'presentation', filePath: '/slides.pptx', musicId: null }) })
+  expect(wrapper.find('.liturgy-item__action--site-project').exists()).toBe(false)
+  await wrapper.find('[title="Abrir controle da apresentação"]').trigger('click')
+  expect(wrapper.emitted('select')).toBeTruthy()
+  await wrapper.setProps({ videoProjecting: true })
+  expect(wrapper.find('.liturgy-item__action--site-project').exists()).toBe(false)
+  wrapper.unmount()
+})
+
+it('local video opens its player without a direct projection arrow', async () => {
+  const wrapper = createWrapper({ item: createItem({ type: 'video', filePath: '/video.mp4', playerId: 'associated' }) })
+  expect(wrapper.find('.liturgy-item__action--site-project').exists()).toBe(false)
+  const player = wrapper.find('.liturgy-item__action--site-control')
+  expect(player.exists()).toBe(true)
+  await player.trigger('click')
+  expect(wrapper.emitted('select')).toBeTruthy()
+  await wrapper.setProps({ videoProjecting: true })
+  expect(wrapper.find('.liturgy-item__action--site-project').exists()).toBe(false)
+  wrapper.unmount()
 })

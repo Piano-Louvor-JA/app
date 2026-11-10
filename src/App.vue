@@ -69,9 +69,9 @@ onMounted(() => {
   // sync v2 fase 3 (app#336): pós-login, oferece migrar .slja locais pra conta
   void startSljaMigrationWatch()
   updateChecker.init()
-  // Palco (cast TV): a bridge sobe no BOOT da janela principal — não só
-  // quando o PalcoCard monta. Sem isso, hino/bíblia/timer só espelhavam
-  // se o operador tivesse visitado Configurações → Projeção antes.
+  // Palco (cast TV): a bridge sobe no BOOT da janela principal, não quando
+  // uma tela de configuração monta. Sem isso, hino/bíblia/timer só
+  // espelhavam depois de o operador visitar Configurações.
   if (!isProjectionWindow.value) {
     prewarmMediaProjection()
     import('@modules/settings/services/palco-bridge')
@@ -94,13 +94,13 @@ function handleViewNotes() {
     :class="{ 'app-frame--projection': isProjectionWindow }"
   >
     <ApiStatusBanner v-if="!isProjectionWindow" />
-    <UpdateBanner @view-notes="handleViewNotes" />
+    <UpdateBanner v-if="!isProjectionWindow" @view-notes="handleViewNotes" />
     <AppTitlebar />
     <div class="app-frame__body">
       <StartingOverlay v-if="!isProjectionWindow" />
       <RouterView v-if="isAppReady || isProjectionWindow" />
     </div>
-    <UpdateDialog v-model="showUpdateDialog" />
+    <UpdateDialog v-if="!isProjectionWindow" v-model="showUpdateDialog" />
   </div>
 </template>
 

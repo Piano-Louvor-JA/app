@@ -2,7 +2,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { statSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { app, BrowserWindow, dialog, globalShortcut, ipcMain, screen, shell } from "electron";
+import { app, BrowserWindow, dialog, globalShortcut, ipcMain, net, screen, shell } from "electron";
 
 import {
 	APP_DESKTOP_ID,
@@ -15,15 +15,19 @@ import { startRendererServer, rendererUrl } from "./renderer-server.mjs";
 import { configureUserDataPath } from "./user-data-path.mjs";
 import { checkEulaAcceptance } from "./eula.mjs";
 import { resolveAppLocale } from "./locale.mjs";
+import { registerDesktopFonts } from "./fonts/register.mjs";
 import { registerWorkspaceIpc } from "./ipc/register.mjs";
+import { registerDownloadBatchIpc } from "./ipc/download-batch-ipc.mjs";
 import { registerDiagnosticsIpc, setClockSkewProvider, setDiagnosticsToken } from "./diagnostics.mjs";
 import { createMainLogger } from "./main-log.mjs";
-import { attachHistoryAppCommand, attachWindowStateEvents, registerWindowIpc } from "./ipc/window.mjs";
+import { attachHistoryAppCommand, attachWindowStateEvents, mainWindowChromeOptions, registerWindowIpc } from "./ipc/window.mjs";
 import { attachRemoteServer } from "./remote-server.mjs";
-import { attachPalcoServer } from "./palco-server.mjs";
+import { attachPalcoServer, getPalcoManager } from "./palco-server.mjs";
 import { ensureWorkspaceDirectories } from "./paths.mjs";
-import { registerLocalFileProtocol, registerLocalScheme } from "./protocol.mjs";
-import { registerCloseProjectionPopups } from "./ipc/web-projection.mjs";
+import { registerLocalFileProtocol, registerLocalScheme, setOnlineVideoSource } from "./protocol.mjs";
+import { registerCloseProjectionPopups, setIndependentLayerHooks, setOnlineVideoPlayer } from "./ipc/web-projection.mjs";
+import { OnlineVideoService, registerOnlineVideoIpc } from "./online-video/ipc.mjs";
+import { readWorkspaceRecord, writeWorkspaceRecord } from "./workspace.mjs";
 import { buildProjectionWindowBounds } from "./projection-display.mjs";
 import { createIndependentProjectionRegistry, isIndependentProjectionUrl } from "./independent-projection.mjs";
 import { createSharedProjectionLayout, isSharedProjectionUrl } from "./shared-projection.mjs";
@@ -33,8 +37,9 @@ import { getBibleUpdater } from "./bible-updater.mjs";
 import { loadWindowState, trackWindowState } from "./window-state.mjs";
 import { registerYoutubeEmbedHeaders } from "./youtube-embed.mjs";
 import { registerYoutubeAuthIpc } from "./youtube-auth.mjs";
-import { registerAdblockerIpc } from "./youtube-adblock.mjs";
-import { readWorkspaceRecord, writeWorkspaceRecord } from "./workspace.mjs";
+import { registerYoutubeInfoIpc } from "./youtube-info.mjs";
+import { registerSiteInfoIpc } from "./site-info.mjs";
+import { enableAdblocker } from "./youtube-adblock.mjs";
 import { registerTunnelCorpBypass } from "./tunnel-corp-bypass.mjs";
 import {
   initProjectionHotkey,
@@ -121,12 +126,11 @@ if (typeof process.getuid === "function" && process.getuid() === 0) {
 	app.commandLine.appendSwitch("no-sandbox");
 }
 
-/** GPU instável nesta máquina (crash do gpu process em loop, 02/10/2026) —
- *  renderização por software é suficiente pro app e estabiliza o dev. */
-if (process.env.VITE_DEV_SERVER_URL) {
-	app.commandLine.appendSwitch("disable-gpu");
-	// in-process-gpu removido (07/10): SIGTRAP do electron em dev ~35s pós-boot
-	// (crash no processo GPU in-process; com gpu em software separado estabiliza).
+/** Software rendering is an explicit compatibility fallback. Disabling the
+ * GPU on every dev launch makes video decoding + projection capture compete
+ * on the CPU and causes stalls as soon as a mirror is opened. */
+if (process.env.LOUVORJA_DISABLE_GPU === "1") {
+  app.commandLine.appendSwitch("disable-gpu");
 }
 
 /** Permite autoplay com áudio nas janelas de projeção (YouTube). */
@@ -486,6 +490,17 @@ function attachProjectionWindowHandlers(parentWindow) {
     independentPopups.watch(win)
     sharedLayout.watch(win)
   })
+  // Players do Piano (vídeo/imagens/texto/PDF/site): projeção independente usa as mesmas camadas.
+  setIndependentLayerHooks({
+    add: (win) => {
+      independentPopups.add(win)
+      win.once('show', () => independentPopups.raiseSoon())
+    },
+    addShared: (win, displayId) => {
+      sharedLayout.addShared(win, displayId)
+      win.once('show', () => sharedLayout.relayoutSoon())
+    },
+  })
   screen.on('display-removed', () => sharedLayout.relayoutSoon())
   screen.on('display-metrics-changed', () => sharedLayout.relayoutSoon())
 
@@ -662,6 +677,11 @@ function attachProjectionWindowHandlers(parentWindow) {
             parentWindow.webContents.send('projection:close-requested')
             return
           }
+          // Esc + Enter: o operador só encerra se o confirm estiver aberto.
+          if (input.key === 'Enter' && !independent) {
+            parentWindow.webContents.send('projection:confirm-close-requested')
+            return
+          }
           const childUrl = childWindow.webContents.getURL()
           const isMediaProjection =
             /[?&#]module=media(?:&|$)/.test(childUrl) ||
@@ -721,6 +741,34 @@ function attachProjectionWindowHandlers(parentWindow) {
   })
 }
 
+/** @type {OnlineVideoService | null} */
+let onlineVideo = null;
+
+/** Cópia local dos vídeos do YouTube: IPC, protocolo `local://yt-*` e projeção. */
+function startOnlineVideo(getLocale) {
+	onlineVideo = new OnlineVideoService({
+		userDataDir: app.getPath("userData"),
+		readRecord: readWorkspaceRecord,
+		writeRecord: writeWorkspaceRecord,
+		getLocale,
+		windowsStore: process.windowsStore === true,
+		broadcast: (channel, payload) => {
+			for (const win of BrowserWindow.getAllWindows()) {
+				if (!win.isDestroyed()) win.webContents.send(channel, payload);
+			}
+		},
+		log: (message) => mainLog.info(`online-video ${message}`),
+	});
+	const service = onlineVideo;
+	registerOnlineVideoIpc(ipcMain, service);
+	setOnlineVideoSource({
+		serve: (id, kind, range, signal) => service.serve(id, kind, range, signal),
+		cacheFile: (name) => path.join(service.cache.dir, name),
+	});
+	setOnlineVideoPlayer(service);
+	void service.init().catch((error) => mainLog.error(`online-video init ${error?.message ?? error}`));
+}
+
 function createWindow(locale = 'pt-BR') {
 	const iconPath = resolveAppIconPath();
 	const windowState = loadWindowState();
@@ -735,7 +783,7 @@ function createWindow(locale = 'pt-BR') {
 		backgroundColor: "#12121c",
 		title: APP_PRODUCT_NAME,
 		show: false,
-		frame: false,
+		...mainWindowChromeOptions(process.platform),
 		autoHideMenuBar: true,
 		...(iconPath ? { icon: iconPath } : {}),
 		webPreferences: {
@@ -856,8 +904,11 @@ function createWindow(locale = 'pt-BR') {
 
 	mainWindow.on("closed", () => {
 		mainWindow = null;
+		if (!isQuitting) app.quit();
 	});
 }
+
+let isQuitting = false;
 
 app.whenReady().then(async () => {
   // Origem http válida p/ Firebase Auth (popup Google) — ver renderer-server.mjs.
@@ -900,6 +951,7 @@ app.whenReady().then(async () => {
 		bootMark("eula");
 
 		registerWorkspaceIpc();
+		await registerDesktopFonts();
 		// Token de diagnóstico: LOUVORJA_DIAGNOSTICS_TOKEN (variável do MAIN, não
 		// VITE_* — config de build do renderer não existe no processo principal).
 		setDiagnosticsToken(process.env.LOUVORJA_DIAGNOSTICS_TOKEN ?? "");
@@ -920,22 +972,21 @@ app.whenReady().then(async () => {
 		});
 		mainLog.info('diagnostics IPC handlers registered');
 		registerWindowIpc(() => mainWindow);
+		registerDownloadBatchIpc(() => mainWindow);
 		registerLocalFileProtocol();
+		startOnlineVideo(() => locale);
 		registerYoutubeEmbedHeaders();
 		registerYoutubeAuthIpc();
-		// adblock YouTube (opt-in): estado persistido em workspace record
-		registerAdblockerIpc(
-			(enabled) => writeWorkspaceRecord("yt-adblock.json", { enabled }),
-			() => {
-				const rec = readWorkspaceRecord("yt-adblock.json");
-				return rec?.enabled === true;
-			},
-		);
+		registerYoutubeInfoIpc(ipcMain, { fetch: (url, init) => net.fetch(url, init) });
+		registerSiteInfoIpc(ipcMain, { fetch: (url, init) => net.fetch(url, init) });
+		void enableAdblocker();
 		registerTunnelCorpBypass();
 		createWindow(locale);
 		bootMark("mainWindow");
 
-		attachRemoteServer(() => mainWindow?.webContents ?? null);
+		attachRemoteServer(() => mainWindow?.webContents ?? null, {
+			palcoHttpPort: () => getPalcoManager()?.getPrincipal()?.httpPort,
+		});
 		attachPalcoServer(() => mainWindow?.webContents ?? null);
 	} catch (error) {
 		console.error("[main] falha no startup", error);
@@ -965,7 +1016,7 @@ app.whenReady().then(async () => {
 			.catch((error) => console.warn("[bible-updater] falha", error));
 	}, 20_000);
 	app.on("activate", () => {
-		if (BrowserWindow.getAllWindows().length === 0) {
+		if (!isQuitting && BrowserWindow.getAllWindows().length === 0) {
 			createWindow(locale);
 		}
 	});
@@ -977,27 +1028,25 @@ app.on("second-instance", () => {
 	mainWindow.focus();
 });
 
+// Stop receivers before Electron starts closing the player windows.
+app.on("before-quit", () => {
+  isQuitting = true;
+  try {
+    getPalcoManager()?.stopAllMedia();
+  } catch (error) {
+    console.warn('[shutdown] failed to stop receivers', error);
+  }
+});
+
 app.on("will-quit", () => {
-	// Hotkey global de projeção: libera Ctrl+Alt+P no encerrar (se registrada)
-	try {
-		const { globalShortcut } = require("electron");
-		globalShortcut.unregisterAll();
-	} catch {
-		/* ignore */
-	}
-	// Palco: app fechando → TVs param a mídia na hora (não toca até o fim).
-	try {
-		const { getPalcoManager } = require("./palco-server.mjs");
-		const manager = getPalcoManager && getPalcoManager();
-		if (manager) manager.stopAllMedia();
-	} catch {
-		/* palco não anexado */
-	}
+  globalShortcut.unregisterAll();
+  onlineVideo?.dispose();
+  void onlineVideo?.manager.cancelAll().catch(() => {});
 });
 
 app.on("window-all-closed", () => {
 	// Fechar a splash pode disparar este evento durante o handoff para a
 	// main window. Não mata o processo se a principal ainda existe/carrega.
 	if (mainWindow && !mainWindow.isDestroyed()) return;
-	if (process.platform !== "darwin") app.quit();
+	if (!isQuitting) app.quit();
 });

@@ -170,6 +170,75 @@ describe("NSIS multilingual EULA configuration", () => {
     expect(script).toMatch(/replace\(\/\^\\s\*OneMoreAttempt:/);
     expect(script).not.toMatch(/IDRETRY OneMoreAttempt/);
   });
+
+  const UNINSTALL_LOOP_ORIGINAL = `  UninstallLoop:
+    IntOp $R5 $R5 + 1
+
+    \${if} $R5 > 5
+      MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "$(appCannotBeClosed)" /SD IDCANCEL IDRETRY OneMoreAttempt
+      Return
+    \${endIf}
+
+    OneMoreAttempt:
+      ExecWait '"$uninstallerFileNameTemp" /S /KEEP_APP_DATA $0 _?=$installationDir' $R0
+      ifErrors TryInPlace CheckResult
+`;
+
+  const UNINSTALL_LOOP_PATCH_ANTIGO = `  UninstallLoop:
+    IntOp $R5 $R5 + 1
+
+    \${if} $R5 > 20
+      DetailPrint "Desinstalação anterior não concluiu — seguindo com a instalação."
+      Return
+    \${endIf}
+    nsExec::Exec \`taskkill /F /IM "\${APP_EXECUTABLE_FILENAME}" /T\`
+    Pop $0
+    Sleep 400
+    ExecWait '"$uninstallerFileNameTemp" /S /KEEP_APP_DATA $0 _?=$installationDir' $R0
+    ifErrors TryInPlace CheckResult
+`;
+
+  /** Entre o taskkill e o ExecWait nada pode gravar em $0 (argumentos do desinstalador). */
+  const argsSurviveTaskkill = (source) => {
+    const block = source.slice(
+      source.indexOf("nsExec::Exec `taskkill"),
+      source.indexOf("ExecWait '\"$uninstallerFileNameTemp\""),
+    );
+    return block.length > 0 && !/Pop \$0\b/.test(block) && /Pop \$R0\b/.test(block);
+  };
+
+  it.each([
+    ["template original do electron-builder", UNINSTALL_LOOP_ORIGINAL],
+    ["template já com o patch antigo (Pop $0)", UNINSTALL_LOOP_PATCH_ANTIGO],
+  ])("patch NSIS preserva --keep-shortcuts/--updated do desinstalador antigo: %s", async (_label, template) => {
+    const { patchInstallUtilSource } = await import("../../build/patch-nsis-templates.mjs");
+    const patched = patchInstallUtilSource(template);
+
+    expect(argsSurviveTaskkill(patched)).toBe(true);
+    expect(patched).toContain(
+      "ExecWait '\"$uninstallerFileNameTemp\" /S /KEEP_APP_DATA $0 _?=$installationDir' $R0",
+    );
+    expect(patched).toContain('taskkill /F /IM "${APP_EXECUTABLE_FILENAME}" /T');
+    expect(patched).toContain("$R5 > 20");
+    expect(patched).not.toContain("OneMoreAttempt:");
+    expect(patchInstallUtilSource(patched)).toBe(patched);
+  });
+
+  it("atalhos recriados no customInstall levam o AppUserModelID do app", async () => {
+    const { readFile } = await import("node:fs/promises");
+    const { fileURLToPath } = await import("node:url");
+    const script = await readFile(
+      fileURLToPath(new URL("../../build/nsis-eula.nsh", import.meta.url)),
+      "utf8",
+    );
+    const install = script.slice(script.indexOf("!macro customInstall"));
+    const links = [...install.matchAll(/CreateShortCut "([^"]+\.lnk)"/g)].map((m) => m[1]);
+
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) {
+      expect(install).toContain(`WinShell::SetLnkAUMI "${link}" "\${APP_ID}"`);
+    }
+  });
 });
 
 describe("getEulaText", () => {

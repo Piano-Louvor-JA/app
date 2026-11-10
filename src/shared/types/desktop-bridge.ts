@@ -1,3 +1,5 @@
+import type { FontsApi } from './fonts'
+
 export type MediaFolderType = 'covers' | 'music' | 'slides'
 
 export type ProgressPayload = {
@@ -15,6 +17,18 @@ export type WorkspaceApi = {
   getRecord: <T = unknown>(filename: string) => Promise<T | null>
   saveRecord: (filename: string, data: unknown) => Promise<boolean>
   clear: (options?: { preserveMedia?: boolean }) => Promise<boolean>
+}
+
+/** Download em background (fila no MAIN, T1/T2 — Provai e Vede). */
+export type DownloadBatchApi = {
+  enqueue: (items: Array<{ id: string, url: string, fileName: string }>) => Promise<{ ok: boolean }>
+  cancel: (id: string) => Promise<{ ok: boolean }>
+  retry: (id: string) => Promise<{ ok: boolean }>
+  pending: () => Promise<Array<{ id: string, fileName: string, status: string }>>
+  onProgress: (cb: (p: { done: number, total: number, current: { id: string, fileName: string, receivedBytes: number, totalBytes: number } | null }) => void) => () => void
+  onItemDone: (cb: (p: { id: string, fileName: string, filePath: string }) => void) => () => void
+  onItemFailed: (cb: (p: { id: string, fileName: string, reason: string }) => void) => () => void
+  onBatchDone: (cb: (p: { done: number, failed: number, total: number }) => void) => () => void
 }
 
 /** Bíblia offline: bundles `<versionId>.json.gz` (download > instalador). */
@@ -77,9 +91,69 @@ export type YoutubeAuthApi = {
   logout: () => Promise<{ ok: boolean }>
 }
 
-export type YoutubeAdblockApi = {
-  status: () => Promise<{ enabled: boolean }>
-  set: (enabled: boolean) => Promise<{ ok: boolean }>
+export type OnlineVideoQuality = 480 | 720 | 1080
+
+export type OnlineVideoSettings = {
+  enabled: boolean
+  maxHeight: OnlineVideoQuality
+  limitGb: number
+}
+
+export type OnlineVideoToolsStatus = {
+  state: 'unavailable' | 'missing' | 'installing' | 'ready' | 'error'
+  tool?: 'ytdlp' | 'ffmpeg'
+  progress?: number
+  version?: string
+  error?: string
+}
+
+export type OnlineVideoStatus = {
+  hidden: boolean
+  available: boolean
+  settings: OnlineVideoSettings
+  tools: OnlineVideoToolsStatus
+  usage: { bytes: number; count: number; limitBytes: number }
+}
+
+export type OnlineVideoItemStatus = {
+  state: 'none' | 'queued' | 'resolving' | 'downloading' | 'muxing' | 'ready' | 'error'
+  progress?: number
+  code?: string
+  message?: string
+}
+
+export type OnlineVideoApi = {
+  status: () => Promise<OnlineVideoStatus>
+  setSettings: (partial: Partial<OnlineVideoSettings>) => Promise<OnlineVideoStatus>
+  prefetch: (ids: string[]) => Promise<void>
+  cancel: (id: string) => Promise<void>
+  keep: (ids: string[]) => Promise<void>
+  clear: () => Promise<OnlineVideoStatus>
+  videoStatus: (ids: string[]) => Promise<Record<string, OnlineVideoItemStatus>>
+  retryTools: () => Promise<OnlineVideoStatus>
+  onChanged: (callback: (payload: { id: string; status: OnlineVideoItemStatus }) => void) => () => void
+  onTools: (callback: (status: OnlineVideoToolsStatus) => void) => () => void
+}
+
+export type YoutubeVideoInfo = {
+  title: string
+  channel: string
+  description: string
+  durationMs: number
+}
+
+export type YoutubeInfoApi = {
+  get: (videoId: string) => Promise<YoutubeVideoInfo | null>
+}
+
+export type SitePageInfo = {
+  title: string
+  siteName: string
+  description: string
+}
+
+export type SiteInfoApi = {
+  get: (url: string) => Promise<SitePageInfo | null>
 }
 
 export type LegacyMediaCounts = {
@@ -337,7 +411,9 @@ export type OpenUrlProjectionPayload = {
   videoId?: string
   monitorIds?: number[]
   fullscreenOnPrimary?: boolean
-  mode?: 'video' | 'site' | 'image' | 'pdf' | 'presentation'
+  mode?: 'video' | 'site' | 'image' | 'pdf' | 'presentation' | 'text'
+  /** Modo texto (avisos): conteúdo e cores do Palco. */
+  text?: { title: string; html: string; titleColor?: string; textColor?: string; backgroundColor?: string }
   withScreens?: boolean
   /** Engine de conversão para este item (sobrepõe o setting global). */
   presentationEngine?: PresentationEngine
@@ -383,6 +459,8 @@ export type ProjectionApi = {
   onPlaybackSync?: (callback: (payload: PlaybackSyncPayload) => void) => () => void
   /** ESC pressionado na janela de projeção → operador exibe confirm. */
   onCloseRequested?: (callback: () => void) => () => void
+  /** Enter pressionado na janela de projeção → confirma o encerramento pendente. */
+  onConfirmCloseRequested?: (callback: () => void) => () => void
   /** ←/→ na projeção de mídia → operador navega slides. */
   onMediaNavigate?: (callback: (direction: 'previous' | 'next') => void) => () => void
   remotePlay?: () => Promise<boolean>
@@ -400,6 +478,15 @@ export type ProjectionApi = {
   toggleSiteScreens?: () => Promise<boolean>
   toggleVideoScreens?: () => Promise<boolean>
   remoteImageNext?: () => Promise<{ index: number; total: number } | null>
+  /** Tamanho do texto no player de texto (0,5–2). Null fora do modo texto. */
+  getTextScale?: () => Promise<{ scale: number } | null>
+  /** Projeção independente do player do Piano (monitor + sobrepor/compartilhar). */
+  openIndependent?: (displayIds: number | number[], mode: 'overlay' | 'share') => Promise<boolean>
+  closeIndependent?: () => Promise<boolean>
+  getIndependentState?: () => Promise<{ displayIds: number[]; mode: 'overlay' | 'share' } | null>
+  /** Monitores ativos no "Telas" quando o player abriu; os demais ficam desativados no painel. */
+  getIndependentEnabledDisplays?: () => Promise<number[]>
+  setTextScale?: (scale: number) => Promise<{ scale: number } | null>
   remoteImagePrev?: () => Promise<{ index: number; total: number } | null>
   getImageSlideState?: () => Promise<{
     index: number
@@ -425,7 +512,8 @@ export type ProjectionApi = {
   setSiteTargetMonitors?: (ids: number[]) => Promise<boolean>
   getVideoTargetMonitors?: () => Promise<number[]>
   setVideoTargetMonitors?: (ids: number[]) => Promise<boolean>
-  setSiteControlPanelOpen?: (open: boolean) => Promise<boolean>
+  /** `height`: altura que o painel precisa (px), limitada à janela do player. */
+  setSiteControlPanelOpen?: (open: boolean, height?: number) => Promise<boolean>
   onSiteTargetsChanged?: (callback: (ids: number[]) => void) => () => void
   onVideoTargetsChanged?: (callback: (ids: number[]) => void) => () => void
 }
@@ -476,6 +564,36 @@ export type RandomAudioApi = {
   }>
 }
 
+export type SabbathSchoolVideoApi = {
+  importVideo: () => Promise<{
+    ok: boolean
+    fileName?: string
+    relativePath?: string
+    originalName?: string
+    reason?: string
+  }>
+  clearVideo: () => Promise<{ ok: boolean; reason?: string }>
+}
+
+export type AnnouncementFileKind = 'images' | 'video' | 'presentation'
+
+export type AnnouncementImportedFile = { relativePath: string; name: string }
+
+export type AnnouncementsFilesApi = {
+  /** Abre o diálogo (vários arquivos para imagens) e copia para Media/modulos/avisos/<id>/. */
+  pickAndImport: (avisoId: string, kind: AnnouncementFileKind) => Promise<{
+    ok: boolean
+    files?: AnnouncementImportedFile[]
+    rejected?: { name: string; reason: 'unsupported_format' | 'not_found' | 'copy_failed' }[]
+    reason?: string
+  }>
+  /** Duplicar aviso: copia a pasta; `paths` mapeia caminho antigo → novo. */
+  copyFolder: (fromId: string, toId: string) => Promise<{ ok: boolean; paths?: Record<string, string>; reason?: string }>
+  removeFolder: (avisoId: string) => Promise<{ ok: boolean; reason?: string }>
+  removeFiles: (relativePaths: string[]) => Promise<{ ok: boolean; removed?: number; reason?: string }>
+  resolvePaths: (relativePaths: string[]) => Promise<{ relativePath: string; absolutePath: string | null; exists: boolean }[]>
+}
+
 export type DiagnosticsApi = {
   run: () => Promise<{ report: unknown; jsonPath: string; txtPath: string }>
   send: (report: unknown) => Promise<{ ok: boolean; reason?: string }>
@@ -489,15 +607,19 @@ export type DiagnosticsApi = {
 export type LouvorJaBridge = {
   platform: string
   isElectron: boolean
+  fonts?: FontsApi
   diagnostics?: DiagnosticsApi
   window?: WindowApi
   zoom?: ZoomApi
   workspace: WorkspaceApi
+  downloadBatch?: DownloadBatchApi
   catalog: CatalogApi
   bible?: BibleApi
   classo?: ClassoApi
   ytAuth?: YoutubeAuthApi
-  ytAdblock?: YoutubeAdblockApi
+  onlineVideo?: OnlineVideoApi
+  ytInfo?: YoutubeInfoApi
+  siteInfo?: SiteInfoApi
   externalPlayer?: ExternalPlayerApi
   legacyMedia?: LegacyMediaApi
   mediaFolder?: MediaFolderApi
@@ -509,4 +631,6 @@ export type LouvorJaBridge = {
   projection: ProjectionApi
   remote?: RemoteApi
   random?: RandomAudioApi
+  sabbathSchool?: SabbathSchoolVideoApi
+  announcements?: AnnouncementsFilesApi
 }

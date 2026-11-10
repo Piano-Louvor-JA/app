@@ -33,8 +33,8 @@ describe('RF-01/RF-02 — defaults do renderer derivam do perfil (non-release =>
     expect(joined).not.toContain('api.pianolouvorja.com.br')
   })
 
-  it('files: base STG sem env', () => {
-    expect(apiCandidateBases('files')[0]).toBe(`${STG}/file`)
+  it('files: base R2 sem env (SPEC bundle-sync ADR-04)', () => {
+    expect(apiCandidateBases('files')[0]).toBe('https://files.louvorja.com.br')
   })
 
   it('env VITE_URL_DATABASE=STG sobrepõe default: continua STG', () => {

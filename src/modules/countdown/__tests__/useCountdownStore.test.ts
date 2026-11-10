@@ -38,13 +38,6 @@ function seedPref(key: string, value: unknown) {
   localStorage.setItem('user_data', JSON.stringify({ [key]: value }))
 }
 
-/** Remaining de um alvo wall-clock local (espelha wallClockUntilRemainingMs). */
-function computeUntilRemaining(hour: number, minute: number, nowMs: number): number {
-  const target = new Date(nowMs)
-  target.setHours(hour, minute, 0, 0)
-  return target.getTime() - nowMs
-}
-
 describe('useCountdownStore', () => {
   let store: ReturnType<typeof useCountdownStore>
 
@@ -74,20 +67,16 @@ describe('useCountdownStore', () => {
     expect(store.isRunning).toBe(false)
     expect(store.isPaused).toBe(false)
     expect(store.canStart).toBe(true) // idle com duração default (5min) > 0
-    expect(store.isUntilMode).toBe(false)
     expect(store.hydrated).toBe(false)
   })
 
-  it('canStart: true com duração > 0, false com duração 0, true em modo until', () => {
+  it('canStart: true com duração > 0, false com duração 0', () => {
     expect(store.canStart).toBe(true) // default 5min
     store.setDurationMs(0)
     expect(store.canStart).toBe(false)
-    store.setCountdownMode('until')
-    expect(store.canStart).toBe(true)
-    expect(store.isUntilMode).toBe(true)
   })
 
-  it('guards durante execução: canStart false, start/pause/setUntilTime recusam', () => {
+  it('guards durante execução: canStart false, start/pause recusam', () => {
     store.setDurationMs(60_000)
     store.start()
     expect(store.runtime.status).toBe('running')
@@ -95,14 +84,11 @@ describe('useCountdownStore', () => {
     // canStart com running (L55)
     expect(store.canStart).toBe(false)
 
-    const snapshot = { ...store.runtime }
     store.start() // no-op: já running (L201)
     store.pause() // pause válido, sai de running
     expect(store.runtime.status).toBe('paused')
     store.start() // retoma
     expect(store.runtime.status).toBe('running')
-    store.setUntilTime(9, 9) // no-op: running (L183-184 clamp não roda, early return)
-    expect(store.runtime.untilHour).toBe(snapshot.untilHour ?? store.runtime.untilHour)
     store.pause()
     // pause sem running (L215): segunda chamada é no-op
     store.pause()
@@ -113,21 +99,6 @@ describe('useCountdownStore', () => {
     store.setDurationMs(0)
     store.start()
     expect(store.runtime.status).toBe('idle')
-  })
-
-  it('setUntilTime clamp: hora >23 vira 23, minuto >59 vira 59, negativos viram 0', () => {
-    store.setUntilTime(99, 99)
-    expect(store.runtime.untilHour).toBe(23)
-    expect(store.runtime.untilMinute).toBe(59)
-    store.setUntilTime(-1, -1)
-    expect(store.runtime.untilHour).toBe(0)
-    expect(store.runtime.untilMinute).toBe(0)
-  })
-
-  it('setUntilTime com NaN cai no fallback 0', () => {
-    store.setUntilTime(NaN, NaN)
-    expect(store.runtime.untilHour).toBe(0)
-    expect(store.runtime.untilMinute).toBe(0)
   })
 
   it('toggleProjection desliga quando inAppPreview ativo', async () => {
@@ -241,32 +212,6 @@ describe('useCountdownStore', () => {
     expect(store.runtime.durationMs).toBe(0)
   })
 
-  it('setCountdownMode reseta a sessão; recusa durante execução', () => {
-    store.setDurationMs(60_000)
-    store.start()
-    store.setCountdownMode('until') // no-op
-    expect(store.runtime.mode).toBe('duration')
-
-    store.pause()
-    store.setCountdownMode('until')
-    expect(store.runtime.mode).toBe('until')
-    expect(store.runtime.accumulatedMs).toBe(0)
-  })
-
-  it('setUntilTime clamp hora 0-23 e minuto 0-59; recusa durante execução', () => {
-    store.setUntilTime(25, -3)
-    expect(store.runtime.untilHour).toBe(23)
-    expect(store.runtime.untilMinute).toBe(0)
-
-    store.setUntilTime(7.9, 8.9)
-    expect(store.runtime.untilHour).toBe(7)
-    expect(store.runtime.untilMinute).toBe(8)
-
-    store.start()
-    store.setUntilTime(1, 2) // no-op
-    expect(store.runtime.untilHour).toBe(7)
-  })
-
   it('start/pause modo duração: acumula e preserva overtime', () => {
     store.setDurationMs(60_000)
     store.start()
@@ -279,23 +224,14 @@ describe('useCountdownStore', () => {
     expect(store.runtime.segmentStartedAt).toBeNull()
   })
 
-  it('start/pause modo until: pausa guarda remaining', () => {
-    // Alvo no relógio de parede LOCAL: usar uma hora baseada no próprio epoch fake.
-    // epoch 100_000 é 00:01:40 UTC; local é UTC-3 → 21:01:40 de 31/12/1969.
-    // setHours usa fuso local: escolher until 23:00 → target 23:00 local de 31/12/1969.
-    const now = new Date(100_000)
-    const untilHour = (now.getHours() + 1) % 24 // 1h à frente no fuso local
-    const untilMinute = now.getMinutes()
-
-    store.setUntilTime(untilHour, untilMinute)
-    store.start()
-    // remaining no start: 1h - (40s do minuto atual)
-    const remainingAtStart = computeUntilRemaining(untilHour, untilMinute, 100_000)
-    expect(computeUntilRemaining(untilHour, untilMinute, 100_000)).toBe(remainingAtStart)
-
-    vi.setSystemTime(120_000) // +20s
-    store.pause()
-    expect(store.runtime.pausedRemainingMs).toBe(remainingAtStart - 20_000)
+  it('Timer deixado em "até horário" (versão anterior) volta parado à contagem regressiva', () => {
+    localStorage.setItem(
+      COUNTDOWN_RUNTIME_STORAGE_KEY,
+      JSON.stringify({ ...DEFAULT_COUNTDOWN_RUNTIME, mode: 'until', status: 'paused', untilHour: 18, untilMinute: 30, durationMs: 120_000 }),
+    )
+    freshStore()
+    store.hydrate()
+    expect(store.runtime).toMatchObject({ mode: 'duration', status: 'idle', durationMs: 120_000 })
   })
 
   it('pause sem segment (defensivo) retorna sem mudar', () => {
@@ -317,15 +253,18 @@ describe('useCountdownStore', () => {
     expect(store.isRunning).toBe(true)
   })
 
-  it('reset pausado → idle; reset rodando → continua rodando zerado', () => {
+  it('reset rodando ou pausado zera a duração e deixa o timer parado', () => {
     store.setDurationMs(60_000)
     store.start()
     vi.setSystemTime(110_000)
     store.reset()
-    expect(store.runtime.status).toBe('running')
+    expect(store.runtime.status).toBe('idle')
+    expect(store.runtime.durationMs).toBe(0)
     expect(store.runtime.accumulatedMs).toBe(0)
-    expect(store.runtime.segmentStartedAt).toBe(110_000)
+    expect(store.runtime.segmentStartedAt).toBeNull()
 
+    store.setDurationMs(60_000)
+    store.start()
     store.pause()
     store.reset()
     expect(store.runtime.status).toBe('idle')

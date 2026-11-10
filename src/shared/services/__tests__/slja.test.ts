@@ -97,4 +97,39 @@ describe('parseSljaFile — wrapper .slja.zip do WhatsApp', () => {
       expect(parsed.slides[0].lyric).toBe('alfa')
     })
   })
+
+  describe('título de .slja clássico (Delphi não grava titulo em [Geral])', () => {
+    async function parseIni(ini: string) {
+      const buffer = await zipBuffers({ 'slides.lja': new TextEncoder().encode(ini) })
+      return parseSljaFile(buffer, 'doxologia sem imagem.slja')
+    }
+
+    it('usa a primeira linha da letra da CAPA como título', async () => {
+      const parsed = await parseIni(
+        '[Geral]\nslides=2\nversao=2.0\n[Slide:1]\ntipo=CAPA\nletra=  |Doxologia|Hinario Adventista 1\n[Slide:2]\ntipo=LETRA\nletra=A Deus\n',
+      )
+      expect(parsed.title).toBe('Doxologia')
+    })
+
+    it('titulo em [Geral] continua tendo prioridade sobre a CAPA', async () => {
+      const parsed = await parseIni(
+        '[Geral]\nslides=1\ntitulo=Titulo Oficial\n[Slide:1]\ntipo=CAPA\nletra=Outro\n',
+      )
+      expect(parsed.title).toBe('Titulo Oficial')
+    })
+
+    it('CAPA sem texto mantém o fallback de versão', async () => {
+      const parsed = await parseIni(
+        '[Geral]\nslides=2\nversao=2.0\n[Slide:1]\ntipo=CAPA\nletra=\n[Slide:2]\ntipo=LETRA\nletra=Estrofe\n',
+      )
+      expect(parsed.title).toBe('v2.0')
+    })
+
+    it('só slides de LETRA: não usa a letra como título', async () => {
+      const parsed = await parseIni(
+        '[Geral]\nslides=1\n[Slide:1]\ntipo=LETRA\nletra=Estrofe\n',
+      )
+      expect(parsed.title).toBe('Sem título')
+    })
+  })
 })

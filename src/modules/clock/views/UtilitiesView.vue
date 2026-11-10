@@ -24,12 +24,19 @@ const items: UtilityHubItem[] = [
     available: true,
   },
   {
-    // Issue app#361: funcional — palco-server (#351) como transporte, fachada OBS.
-    key: 'obs',
-    titleKey: 'utilities.obs',
-    descriptionKey: 'utilities.obsDescription',
-    icon: 'ti-broadcast',
-    to: '/utilities/obs',
+    key: 'sabbath-school',
+    titleKey: 'utilities.sabbathSchool',
+    descriptionKey: 'utilities.sabbathSchoolDescription',
+    icon: 'ti-book-2',
+    to: '/utilities/sabbath-school',
+    available: true,
+  },
+  {
+    key: 'announcements',
+    titleKey: 'utilities.announcements',
+    descriptionKey: 'utilities.announcementsDescription',
+    icon: 'ti-speakerphone',
+    to: '/utilities/announcements',
     available: true,
   },
 ]

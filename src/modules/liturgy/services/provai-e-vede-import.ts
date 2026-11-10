@@ -10,8 +10,15 @@
 import type { useScheduledStore } from '../stores/useScheduledStore'
 
 import type { ProvaiEpisode } from './provai-e-vede-source'
+import type { ProvaiSourceLanguage } from './provai-e-vede-catalog'
 
 export const PROVAI_E_VEDE_ROTATION_NAME = 'Provai e Vede'
+export const PROBAD_Y_VED_ROTATION_NAME = 'Probad y Ved'
+
+const ROTATION_BY_LANGUAGE: Record<ProvaiSourceLanguage, string> = {
+  pt: PROVAI_E_VEDE_ROTATION_NAME,
+  es: PROBAD_Y_VED_ROTATION_NAME,
+}
 
 export interface ProvaiImportReport {
   rotationId: string
@@ -25,14 +32,17 @@ export async function importProvaiEVedeEpisodes(
   store: ReturnType<typeof useScheduledStore>,
   episodes: ProvaiEpisode[],
   resolveLocalPath: (ep: ProvaiEpisode) => string | Promise<string>,
-  options?: { onlyUpcoming?: boolean },
+  options?: { onlyUpcoming?: boolean; sourceLanguage?: ProvaiSourceLanguage },
 ): Promise<ProvaiImportReport> {
-  // Rotação: reusa se já existe (nome exato), senão cria.
-  let rotation = store.categories.find((c) => c.name === PROVAI_E_VEDE_ROTATION_NAME)
+  // Rotação canônica da EDIÇÃO (ADR-03): PT "Provai e Vede", ES "Probad y Ved".
+  // Coleções distintas — nunca mescladas. Reuso por nome exato mantém a
+  // compatibilidade com rotações PT criadas por versões anteriores.
+  const rotationName = ROTATION_BY_LANGUAGE[options?.sourceLanguage ?? 'pt']
+  let rotation = store.categories.find((c) => c.name === rotationName)
   if (!rotation) {
-    const id = `rot-${Date.now()}-pv`
-    store.upsertCategory({ id, name: PROVAI_E_VEDE_ROTATION_NAME })
-    rotation = { id, name: PROVAI_E_VEDE_ROTATION_NAME }
+    const id = `rot-${Date.now()}-pv-${options?.sourceLanguage ?? 'pt'}`
+    store.upsertCategory({ id, name: rotationName })
+    rotation = { id, name: rotationName }
   }
   const rotationId = rotation.id
 

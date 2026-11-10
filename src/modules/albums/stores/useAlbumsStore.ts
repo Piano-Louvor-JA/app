@@ -45,7 +45,7 @@ export const useAlbumsStore = defineStore('albums', () => {
   const isLoadingLyric = ref(false)
 
   const filteredTracks = computed(() =>
-    filterAlbumTracks(tracks.value, searchQuery.value),
+    filterAlbumTracks(tracks.value, searchQuery.value, musicIndex.value),
   )
 
   const hubSearchResults = computed(() =>

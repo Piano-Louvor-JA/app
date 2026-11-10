@@ -27,7 +27,7 @@ type DragState = {
 export const FLOATING_STACK_GAP = 12
 
 /** Ordem de baixo para cima dos painéis que dividem o canto padrão. */
-export const FLOATING_STACK_ORDER = { media: 0, bible: 1, countdown: 2, timer: 3, clock: 4, random: 5 } as const
+export const FLOATING_STACK_ORDER = { media: 0, bible: 1, countdown: 2, timer: 3, clock: 4, random: 5, sabbathSchool: 6 } as const
 
 type StackEntry = {
   order: number
@@ -105,7 +105,7 @@ export function useFloatingDrag(
   }
 
   function syncStack() {
-    if (options.stackOrder === undefined) return
+    if (options.stackOrder === undefined || dragging.value) return
     const el = rootRef.value
     // Mede a âncora CSS sem o deslocamento aplicado pela organização automática.
     const savedStyle = el?.style.cssText
@@ -129,6 +129,9 @@ export function useFloatingDrag(
   }
 
   const positionStyle = computed(() => {
+    if (dragging.value && position.value) {
+      return { left: `${position.value.x}px`, top: `${position.value.y}px`, right: 'auto', bottom: 'auto', transform: 'none' }
+    }
     const arranged = arrangedPositions.value.get(stackId)
     if (position.value) {
       const effective = arranged ?? position.value
@@ -188,6 +191,7 @@ export function useFloatingDrag(
       origin: position.value,
       moved: false,
     }
+    try { el.setPointerCapture(event.pointerId) } catch { /* Older renderers and synthetic events. */ }
     window.addEventListener('pointermove', onPointerMove)
     window.addEventListener('pointerup', onPointerUp)
     window.addEventListener('pointercancel', onPointerCancel)
@@ -213,6 +217,8 @@ export function useFloatingDrag(
 
   function onPointerUp(event: PointerEvent) {
     if (!drag || event.pointerId !== drag.pointerId) return
+    dragging.value = false
+    try { rootRef.value?.releasePointerCapture(event.pointerId) } catch { /* Pointer already released. */ }
     if (drag.moved) {
       syncStack()
       const arranged = arrangedPositions.value.get(stackId)
@@ -226,6 +232,7 @@ export function useFloatingDrag(
 
   function onPointerCancel(event: PointerEvent) {
     if (!drag || event.pointerId !== drag.pointerId) return
+    try { rootRef.value?.releasePointerCapture(event.pointerId) } catch { /* Pointer already released. */ }
     position.value = drag.origin
     drag = null
     dragging.value = false

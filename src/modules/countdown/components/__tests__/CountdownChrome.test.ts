@@ -257,16 +257,6 @@ describe('CountdownChrome — miniatura', () => {
     expect(previewProps(w).config.timeFormat).toBe('hh:mm:ss')
   })
 
-  it('Escola Sabatina parada: prévia mostra a duração do agendamento', () => {
-    store.config = {
-      ...store.config,
-      mode: 'sabbath',
-      sabbathConfig: { scheduleMode: 'start', startTime: '09:00', endTime: '10:15' },
-    }
-    const w = mountChrome()
-    expect(previewProps(w).runtime.durationMs).toBe(75 * 60_000)
-  })
-
   it('desmontar cancela a inscrição no palco', () => {
     const w = mountChrome()
     expect(stageState.subscribers).toHaveLength(1)
@@ -329,4 +319,27 @@ it('restaura a projeção recolhida pelo controle existente sem navegar', async 
     expect(minimized.value).toBe(false)
     expect(push).not.toHaveBeenCalled()
   } finally { minimized.value = false; w.unmount() }
+})
+
+it('fechar a prévia encerra a projeção e oculta o miniplayer', async () => {
+  route.name = 'home'
+  store.isProjecting = true
+  const w = mountChrome()
+  const closeButton = w.findComponent({ name: 'MiniPlayerCloseButton' })
+  expect(closeButton.exists()).toBe(true)
+  closeButton.vm.$emit('close')
+  await nextTick()
+  expect(store.pause).toHaveBeenCalledOnce()
+  expect(store.clearProjection).toHaveBeenCalledOnce()
+  expect(w.find('.countdown-chrome').exists()).toBe(false)
+})
+
+it('hides the close button on the Timer page and shows it on other pages', async () => {
+  const w = mountChrome()
+  expect(w.findComponent({ name: 'MiniPlayerCloseButton' }).exists()).toBe(false)
+  store.isProjecting = true
+  route.name = 'home'
+  await nextTick()
+  expect(w.findComponent({ name: 'MiniPlayerCloseButton' }).exists()).toBe(true)
+  w.unmount()
 })

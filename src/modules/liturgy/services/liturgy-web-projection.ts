@@ -8,7 +8,7 @@ import {
   openProjectionModule,
 } from '@shared/composables/useProjectionWindow'
 import { getDesktopBridge } from '@shared/services/desktop-bridge'
-import type { PresentationEngine } from '@shared/types/desktop-bridge'
+import type { OpenUrlProjectionPayload, PresentationEngine } from '@shared/types/desktop-bridge'
 import { palcoSession } from '../../settings/services/palco-session'
 
 import {
@@ -178,7 +178,11 @@ export async function _openLiturgyLocalVideo(
   // Espelho no Palco (TVs conectadas): arquivo servido em /media/ pelo
   // sender (servePath) e enviado como {type:'video'} pro receiver —
   // rota mirror do módulo liturgy por padrão.
-  void palcoSession.videoRouted({ url: path, title: label })
+  // Opening a control is local playback only. Audio never creates receiver
+  // copies; explicit video projection retains the existing routed path.
+  if (withScreens && !/\.(mp3|m4a|aac|wav|ogg|flac|wma|opus)$/i.test(path)) {
+    await palcoSession.videoRouted({ url: path, title: label })
+  }
   if (!withScreens || !bridge.projection.remotePlay) return true
 
   await sleep(400)
@@ -246,6 +250,25 @@ export async function playLiturgyLocalImageOnScreens(
   return openLiturgyLocalImages(filePaths, title, true)
 }
 
+/** Texto (aviso): popup de controle com o player de texto, sem projetar nas telas. */
+export async function openLocalTextControl(
+  text: NonNullable<OpenUrlProjectionPayload['text']>,
+  title = '',
+): Promise<boolean> {
+  const bridge = getDesktopBridge()
+  if (!bridge?.projection?.openUrl) return false
+  if (!text.title.trim() && !text.html.trim()) return false
+  closeProjectionModule()
+  const monitorIds = await resolveTargetMonitorIds()
+  return bridge.projection.openUrl({
+    mode: 'text',
+    text,
+    title: title.trim() || text.title.trim() || 'Texto',
+    monitorIds,
+    withScreens: false,
+  })
+}
+
 async function openLiturgyLocalPdf(
   filePath: string,
   title: string,
@@ -268,7 +291,7 @@ async function openLiturgyLocalPdf(
     mode: 'pdf',
     withScreens,
   })
-  if (opened) {
+  if (opened && withScreens) {
     // Palco: título na TV enquanto o PDF roda no popup/projetor.
     void palcoSession.projectRouted('liturgy', 'liturgy', {
       text: label,
@@ -328,8 +351,8 @@ async function openLiturgyLocalPresentation(
     withScreens,
     ...(presentationEngine ? { presentationEngine } : {}),
   })
-  if (opened) {
-    // Palco: título na TV enquanto a apresentação roda no popup/projetor.
+  if (opened && withScreens) {
+    // Publicar somente quando a projeção foi solicitada explicitamente.
     void palcoSession.projectRouted('liturgy', 'liturgy', {
       text: label,
     })

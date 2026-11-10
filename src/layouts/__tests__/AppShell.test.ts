@@ -105,6 +105,11 @@ vi.mock('@modules/countdown/stores/useCountdownStore', async () => {
   }
 })
 
+const alertEngine = vi.hoisted(() => vi.fn())
+vi.mock('@modules/sabbath-school/composables/useSabbathSchoolAlertEngine', () => ({
+  useSabbathSchoolAlertEngine: alertEngine,
+}))
+
 vi.mock('@modules/random/stores/useRandomStore', async () => {
   const { defineStore } = await import('pinia')
   return {
@@ -187,8 +192,8 @@ vi.mock('@design-system/index', () => ({
   },  MinimizedPagesBar: {
     name: 'MinimizedPagesBar',
     template: '<nav class="minimized-bar-mock" />',
-    props: ['items', 'navLabel'],
-    emits: ['open', 'close'],
+    props: ['items', 'navLabel', 'currentKey'],
+    emits: ['open', 'close', 'reorder'],
   },
   HistoryNav: {
     name: 'HistoryNav',
@@ -328,7 +333,16 @@ describe('AppShell — header e navegação', () => {
     const { w } = await mountShell()
     expect(w.find('.app-shell__header').exists()).true
     expect(w.find('.dock-mock').exists()).true
-    expect(w.find('.media-chrome-mock').exists()).true
+    // Miniplayer sai do stacking context do shell para ficar acima do modal de playlists.
+    expect(w.find('.media-chrome-mock').exists()).false
+    expect(document.body.querySelector('.media-chrome-mock')).not.toBeNull()
+    w.unmount()
+  })
+
+  it('monta o motor de alertas do cronômetro uma vez, na janela principal', async () => {
+    alertEngine.mockClear()
+    const { w } = await mountShell()
+    expect(alertEngine).toHaveBeenCalledOnce()
     w.unmount()
   })
 
@@ -778,16 +792,18 @@ describe('AppShell — páginas minimizadas', () => {
     w.unmount()
   })
 
-  it('clicar reabre a página, tira da barra e volta a rolagem guardada', async () => {
+  it('clicar reabre a página, mantém na barra marcada como em uso e volta a rolagem guardada', async () => {
     const store = useMinimizedPagesStore()
     store.minimize(hinario())
     const { w, router, bar } = await mountShell2()
+    expect(bar().props('currentKey')).toBe('/')
 
     bar().vm.$emit('open', '/albums/5')
     await settle()
 
     expect(router.currentRoute.value.fullPath).toBe('/albums/5')
-    expect(store.items).toEqual([])
+    expect(store.items.map((page) => page.fullPath)).toEqual(['/albums/5'])
+    expect(bar().props('currentKey')).toBe('/albums/5')
     expect(store.takeRestore('/albums/5')?.state).toEqual({ collectionId: '5', searchQuery: 'santo' })
     expect((w.find('.scroll-view.album').element as HTMLElement).scrollTop).toBe(333)
     w.unmount()
@@ -903,6 +919,18 @@ describe('AppShell — páginas minimizadas', () => {
     w.unmount()
   })
 
+  it('arrastar um item para outra posição reordena a barra', async () => {
+    const store = useMinimizedPagesStore()
+    store.minimize(hinario())
+    store.minimize(hinario({ fullPath: '/albums/9', title: 'Vox', minimizedAt: 2 }))
+    const { w, router, bar } = await mountShell2()
+    bar().vm.$emit('reorder', '/albums/9', 0)
+    await flushPromises()
+    expect(store.items.map((page) => page.fullPath)).toEqual(['/albums/9', '/albums/5'])
+    expect(router.currentRoute.value.fullPath).toBe('/')
+    w.unmount()
+  })
+
   it('x fecha sem navegar', async () => {
     const store = useMinimizedPagesStore()
     store.minimize(hinario())
@@ -914,13 +942,14 @@ describe('AppShell — páginas minimizadas', () => {
     w.unmount()
   })
 
-  it('item de uma página que já está aberta: só sai da barra', async () => {
+  it('item da página que já está aberta: continua na barra e nada acontece', async () => {
     const store = useMinimizedPagesStore()
     store.minimize(hinario())
     const { w, router, bar } = await mountShell2('/albums/5')
+    expect(bar().props('currentKey')).toBe('/albums/5')
     bar().vm.$emit('open', '/albums/5')
     await flushPromises()
-    expect(store.items).toEqual([])
+    expect(store.items.map((page) => page.fullPath)).toEqual(['/albums/5'])
     expect(store.takeRestore('/albums/5')).toBeNull()
     expect(router.currentRoute.value.fullPath).toBe('/albums/5')
     w.unmount()

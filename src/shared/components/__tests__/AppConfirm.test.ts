@@ -65,4 +65,56 @@ describe('AppConfirm', () => {
     expect(wrapper.emitted('confirm')).toBeTruthy()
     wrapper.unmount()
   })
+
+  describe('enterConfirms', () => {
+    const pressEnter = (target: EventTarget = window) => {
+      const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+      target.dispatchEvent(event)
+      return event
+    }
+
+    it('Enter emite confirm e bloqueia o Enter para o resto da tela', () => {
+      const wrapper = createWrapper({ enterConfirms: true })
+      const outside = vi.fn()
+      window.addEventListener('keydown', outside)
+      const button = document.createElement('button')
+      document.body.appendChild(button)
+      const event = pressEnter(button)
+      expect(wrapper.emitted('confirm')).toHaveLength(1)
+      expect(event.defaultPrevented).toBe(true)
+      expect(outside).not.toHaveBeenCalled()
+      window.removeEventListener('keydown', outside)
+      wrapper.unmount()
+    })
+
+    it('outras teclas e Enter repetido não confirmam', () => {
+      const wrapper = createWrapper({ enterConfirms: true })
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }))
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', repeat: true }))
+      expect(wrapper.emitted('confirm')).toBeUndefined()
+      wrapper.unmount()
+    })
+
+    it('sem a prop, Enter não confirma (confirms de exclusão seguem só no clique)', () => {
+      const wrapper = createWrapper()
+      expect(pressEnter().defaultPrevented).toBe(false)
+      expect(wrapper.emitted('confirm')).toBeUndefined()
+      wrapper.unmount()
+    })
+
+    it('fechado ou desmontado, Enter não confirma', async () => {
+      const wrapper = createWrapper({ enterConfirms: true, open: false })
+      pressEnter()
+      expect(wrapper.emitted('confirm')).toBeUndefined()
+      await wrapper.setProps({ open: true })
+      pressEnter()
+      expect(wrapper.emitted('confirm')).toHaveLength(1)
+      await wrapper.setProps({ open: false })
+      pressEnter()
+      expect(wrapper.emitted('confirm')).toHaveLength(1)
+      await wrapper.setProps({ open: true })
+      wrapper.unmount()
+      expect(pressEnter().defaultPrevented).toBe(false)
+    })
+  })
 })

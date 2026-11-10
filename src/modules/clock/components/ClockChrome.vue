@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, watch, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useInAppProjectionMinimized } from '@shared/composables/useInAppProjectionMinimized'
+import MiniPlayerCloseButton from '@shared/components/MiniPlayerCloseButton.vue'
+import { closeIndependentProjection } from '@shared/composables/useIndependentProjection'
 import FloatingPreviewTitle from '@shared/components/FloatingPreviewTitle.vue'
 import IndependentProjectionButton from '@shared/components/IndependentProjectionButton.vue'
 import { isIndependentProjectionActive } from '@shared/composables/useIndependentProjection'
@@ -41,8 +43,13 @@ const effectiveConfig = computed(() => ({ ...store.config, ...stage.value.clock 
 const onClockRoute = computed(() => route.name === CLOCK_ROUTE)
 
 /** No Relógio fica sempre à mão; nas outras telas só enquanto projeta. */
+const dismissed = ref(false)
+watch(() => route.name, () => { dismissed.value = false })
+watch(() => store.isProjecting, (active) => { if (active) dismissed.value = false })
+watch(() => isIndependentProjectionActive('clock'), (active) => { if (active) dismissed.value = false })
+
 const visible = computed(
-  () => onClockRoute.value || store.isProjecting || isIndependentProjectionActive('clock'),
+  () => !dismissed.value && (onClockRoute.value || store.isProjecting || isIndependentProjectionActive('clock')),
 )
 
 /** Miniatura reflete a personalização do escopo clock (bg/caixa/cores). */
@@ -62,6 +69,13 @@ const { positionStyle, dragging, onPointerDown, resetPosition } =
   useFloatingDrag(chromeRoot, USER_PREFERENCE_KEYS.clockChromePosition, {
     stackOrder: FLOATING_STACK_ORDER.clock,
   })
+
+function onCloseChrome() {
+  if (store.isProjecting) store.clearProjection()
+  closeIndependentProjection('clock')
+  projectionMinimized.value = false
+  dismissed.value = true
+}
 
 function onProject() {
   void store.toggleProjection()
@@ -97,6 +111,7 @@ async function onOpenClock() {
       :title="t('clock.chromeDragHint')"
       @dblclick="resetPosition"
     >
+      <MiniPlayerCloseButton v-if="!onClockRoute" :label="t('clock.title')" @close="onCloseChrome" />
       <ClockPreview
         :config="effectiveConfig"
         :stage="stage"
@@ -156,7 +171,7 @@ async function onOpenClock() {
   background: #000;
   border: 1px solid rgb(255 255 255 / 0.2);
   box-shadow: 0 16px 40px rgb(0 0 0 / 0.45);
-  overflow: hidden;
+  overflow: visible;
   pointer-events: auto;
   cursor: grab;
 }

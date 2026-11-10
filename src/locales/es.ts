@@ -1,4 +1,6 @@
 export default {
+  obsOutputs: { detecting: 'Detectando y actualizando conexiones OBS…', active: 'Conexiones remotas', activateHint: 'Active una conexión en Configuración → Transmisión para usarla aquí.', title: 'Conexiones OBS', activeConnections: 'Conexiones activas: {count}' },
+  floating: { closeTitle: '¿Cerrar {title}?', closeMessage: '¿Desea detener este recurso y cerrar su proyección?' },
   updates: {
     downloadMacInstaller: 'Descargar instalador macOS',
     manualMacInstructions: 'En macOS, esta actualización se instala manualmente. Descarga el instalador, cierra LouvorJA, abre el DMG y arrastra la aplicación a Aplicaciones, reemplazando la versión anterior. Tus datos y preferencias se conservarán.',
@@ -35,6 +37,8 @@ export default {
   },
   independentProjection: {
     title: 'Proyección independiente',
+    /** Monitor desligado no seletor "Telas". */
+    enableHint: 'Actívelo en Pantallas para usar',
     unavailable: 'Solo se habilita con monitores extendidos disponibles',
     hint: 'Elige un monitor. Este recurso aparece encima de lo que se esté proyectando en él; los demás monitores no cambian.',
     monitor: 'Monitor {index}',
@@ -111,5 +115,10 @@ sljaMigration: {
     message: 'Importaste archivos .slja sin sesión. Pueden ir a tu cuenta (una copia única, sin duplicar) y estar disponibles en cualquier dispositivo.',
     confirm: 'Subir a la cuenta',
     cancel: 'Quedar solo en este dispositivo',
+  },
+  download: {
+    indicatorTitle: 'Descargas en segundo plano: {done}/{total} ({percent}%)',
+    indicatorCounts: '{done} de {total} completadas',
+    indicatorIdle: 'Preparando descarga…',
   },
 }

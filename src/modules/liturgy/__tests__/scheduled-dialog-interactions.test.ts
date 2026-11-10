@@ -4,8 +4,8 @@ import { createPinia, setActivePinia } from 'pinia'
 import Dialog from '../components/LiturgyScheduledDialog.vue'
 import { useScheduledStore } from '../stores/useScheduledStore'
 
-const mocks = vi.hoisted(() => ({ bridge: vi.fn(), catalog: vi.fn(), episodes: vi.fn() }))
-vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
+const mocks = vi.hoisted(() => ({ bridge: vi.fn(), catalog: vi.fn(), episodes: vi.fn(), locale: { value: 'pt-BR' } }))
+vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key, locale: mocks.locale }) }))
 vi.mock('@design-system/index', () => ({ GlassCard: { template: '<section><slot /></section>' } }))
 vi.mock('@shared/services/desktop-bridge', () => ({ getDesktopBridge: mocks.bridge }))
 vi.mock('@shared/services/user-preferences', () => ({ getUserPreference: (_key: string, fallback: unknown) => fallback, setUserPreference: vi.fn() }))
@@ -83,19 +83,25 @@ describe('diálogo de programação — interação real', () => {
   it('importa em um clique sem disco e conserva a URL de cada episódio futuro', async () => {
     open()
     await clickText('liturgy.messages.scheduledPvOneClick')
-    expect(useScheduledStore().items[0]?.content).toEqual({ kind: 'online_video', url: 'https://example.org/episode.mp4' })
+    expect(useScheduledStore().items[0]?.content).toEqual({ kind: 'online_video', url: 'https://example.org/episode.mp4', name: 'episode.mp4' })
     expect(wrapper.text()).toContain('liturgy.messages.scheduledPvDone')
   })
 
-  it('baixa em um clique pela ponte desktop e conserva o arquivo local', async () => {
-    const downloadToMedia = vi.fn().mockResolvedValue('/media/episode.mp4')
+  it('agenda imediato como online_video e enfileira batch em background (não baixa inline)', async () => {
+    const enqueue = vi.fn()
     const fetchText = vi.fn().mockResolvedValue('<html />')
-    mocks.bridge.mockReturnValue({ workspace: { fetchText, downloadToMedia } })
+    mocks.bridge.mockReturnValue({ workspace: { fetchText }, downloadBatch: { enqueue } })
     open()
     await clickText('liturgy.messages.scheduledPvOneClick')
     expect(fetchText).toHaveBeenCalledOnce()
-    expect(downloadToMedia).toHaveBeenCalledWith('https://example.org/episode.mp4', 'episode.mp4')
-    expect(useScheduledStore().items[0]?.content).toEqual({ kind: 'file', filePath: '/media/episode.mp4' })
+    // Batch disparado com id rotationId::dateISO (promoção T3 usa esse par)
+    expect(enqueue).toHaveBeenCalledWith([
+      expect.objectContaining({ id: expect.stringMatching(/::/), url: 'https://example.org/episode.mp4', fileName: 'episode.mp4' }),
+    ])
+    // Entrada agendada imediatamente como online_video (funcional de cara)
+    expect(useScheduledStore().items[0]?.content).toEqual({ kind: 'online_video', url: 'https://example.org/episode.mp4', name: 'episode.mp4' })
+    // Diálogo fechado após agendar (decisão Rafael: não trava)
+    expect(wrapper.emitted('close')).toHaveLength(1)
   })
 
   it.each(['empty', 'past', 'http', 'network'])('informa ausência de episódios importáveis: %s', async (failure) => {

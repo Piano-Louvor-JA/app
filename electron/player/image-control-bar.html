@@ -160,6 +160,67 @@
         height: 1.45rem;
         fill: currentColor;
       }
+      .autoplay {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        margin-left: 0.6rem;
+        padding-left: 0.6rem;
+        border-left: 1px solid rgba(255, 255, 255, 0.14);
+      }
+      .autoplay__repeat {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        margin-left: 0.3rem;
+        font-size: 0.78rem;
+        cursor: pointer;
+        user-select: none;
+      }
+      .autoplay__repeat input {
+        width: 0.95rem;
+        height: 0.95rem;
+        margin: 0;
+        accent-color: #fb923c;
+        cursor: pointer;
+      }
+      .autoplay__label {
+        font-size: 0.78rem;
+        opacity: 0.8;
+      }
+      .autoplay select {
+        height: 1.9rem;
+        padding: 0 0.4rem;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 0.45rem;
+        background: rgba(255, 255, 255, 0.06);
+        color: inherit;
+        font: inherit;
+        font-size: 0.78rem;
+      }
+      .autoplay select option { color: #111827; }
+      .text-size {
+        display: none;
+        align-items: center;
+        gap: 0.2rem;
+        margin-left: 0.6rem;
+        padding-left: 0.6rem;
+        border-left: 1px solid rgba(255, 255, 255, 0.14);
+      }
+      .text-size__btn { font-weight: 700; font-size: 0.95rem; }
+      .text-size__value {
+        min-width: 3rem;
+        font-size: 0.78rem;
+        text-align: center;
+        opacity: 0.85;
+        font-variant-numeric: tabular-nums;
+      }
+      /* Modo texto (avisos): um slide só, sem setas, automático nem contador. */
+      body.is-text #prev,
+      body.is-text #next,
+      body.is-text .autoplay,
+      body.is-text #counter { display: none; }
+      body.is-text .text-size { display: inline-flex; }
     </style>
   </head>
   <body>
@@ -171,6 +232,8 @@
         </div>
         <p class="panel__hint">Marque os monitores onde as imagens devem ser projetadas</p>
         <div id="monitorList"><p class="panel__empty">Nenhum monitor estendido encontrado.</p></div>
+        <p id="tvSectionHint" class="panel__hint">Conexões ativas</p>
+        <div id="tvList"></div>
       </div>
 
       <div class="bar">
@@ -194,6 +257,30 @@
             </button>
             <span id="monitorBadge" class="monitor-badge is-empty">0</span>
           </span>
+          <div class="autoplay">
+          <button id="autoplay" type="button" title="Passar sozinho" aria-label="Passar sozinho" aria-pressed="false" disabled>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path id="autoplayIcon" d="M8 5v14l11-7z"/></svg>
+          </button>
+          <span class="autoplay__label">Automático</span>
+          <select id="autoplaySeconds" title="Segundos por imagem" aria-label="Segundos por imagem">
+            <option value="3">3 s</option>
+            <option value="5" selected>5 s</option>
+            <option value="8">8 s</option>
+            <option value="10">10 s</option>
+            <option value="15">15 s</option>
+            <option value="30">30 s</option>
+            <option value="60">60 s</option>
+          </select>
+            <label class="autoplay__repeat" title="Volta à primeira imagem depois da última">
+              <input id="autoplayRepeat" type="checkbox" checked>
+              Repetir
+            </label>
+          </div>
+          <div class="text-size" role="group" aria-label="Tamanho do texto">
+            <button id="textSmaller" class="text-size__btn" type="button" title="Diminuir texto" aria-label="Diminuir texto">A−</button>
+            <span id="textScale" class="text-size__value">100%</span>
+            <button id="textBigger" class="text-size__btn" type="button" title="Aumentar texto" aria-label="Aumentar texto">A+</button>
+          </div>
         </div>
         <div></div>
         <div class="meta">
@@ -201,6 +288,7 @@
         </div>
       </div>
     </div>
+    <script src="../palco/network-mirror.js"></script>
     <script>
       ;(function () {
         var prevBtn = document.getElementById('prev')
@@ -213,14 +301,131 @@
         var monitorList = document.getElementById('monitorList')
         var identifyBtn = document.getElementById('identifyMonitors')
         var counterEl = document.getElementById('counter')
+        var autoplayBtn = document.getElementById('autoplay')
+        var autoplayIcon = document.getElementById('autoplayIcon')
+        var autoplaySelect = document.getElementById('autoplaySeconds')
+        var autoplayRepeat = document.getElementById('autoplayRepeat')
+        var REPEAT_KEY = 'louvorja-image-autoplay-repeat'
+        var isText = new URLSearchParams(window.location.search).get('kind') === 'text'
+        var textScale = 1
+        var textScaleEl = document.getElementById('textScale')
+        var textSmallerBtn = document.getElementById('textSmaller')
+        var textBiggerBtn = document.getElementById('textBigger')
+        if (isText) document.body.classList.add('is-text')
+        var slideIndex = 0
+        var PLAY_PATH = 'M8 5v14l11-7z'
+        var PAUSE_PATH = 'M6 19h4V5H6v14zm8-14v14h4V5h-4z'
+        var AUTOPLAY_KEY = 'louvorja-image-autoplay-seconds'
+        var autoplayOn = false
+        var autoplayDeadline = 0
+        var autoplayBusy = false
+        var slideTotal = 0
         var panelOpen = false
         var selectedIds = []
         var displays = []
         var ARROW_PATH = 'M5 17.59 15.59 7H9V5h10v10h-2V8.41L6.41 19 5 17.59z'
         var STOP_PATH = 'M6 6h12v12H6z'
 
+        var networkActive = false, tvSlots = [], tvChecked = {}
+        var tvHint = document.getElementById('tvSectionHint'), tvList = document.getElementById('tvList')
+        function renderConnections() {
+          tvList.replaceChildren()
+          tvSlots.filter(function (slot) { return slot.clients > 0 }).forEach(function (slot) {
+            var label = document.createElement('label'); label.className = 'panel__option'
+            var input = document.createElement('input'); input.type = 'checkbox'; input.checked = tvChecked[slot.id] !== false
+            input.setAttribute('data-tv', slot.id)
+            input.addEventListener('change', async function () {
+              tvChecked[slot.id] = input.checked
+              try {
+                var state = await window.louvorja.projection.getImageSlideState()
+                if (state && state.projecting) networkActive = true
+                if (networkActive) {
+                  if (input.checked) await startConnection(slot.id)
+                  else if (networkMirrorSender) await networkMirrorSender.remove(slot.id)
+                }
+              } catch (error) { tvHint.textContent = error.message }
+              await refresh()
+            })
+            var text = document.createElement('span'); text.textContent = slot.label
+            label.append(input, text); tvList.appendChild(label)
+          })
+        }
+        async function loadConnections() {
+          if (!window.louvorja || !window.louvorja.palco) return
+          tvSlots = await window.louvorja.palco.slots().catch(function () { return [] })
+          renderConnections(); await refresh()
+        }
+        async function startConnection(slotId) {
+          try {
+            await getNetworkMirrorSender().prepare()
+            await prepareImageReceiver(slotId)
+            if (networkActive && tvChecked[slotId] !== false) await getNetworkMirrorSender().start(slotId)
+          } catch (error) { tvHint.textContent = 'Transmissão: ' + error.message }
+        }
+        async function startConnections() {
+          await loadConnections()
+          await Promise.all(tvSlots.filter(function (slot) { return slot.clients > 0 && tvChecked[slot.id] !== false }).map(function (slot) { return startConnection(slot.id) }))
+        }
+        var networkMirrorSender = null
+        function getNetworkMirrorSender() {
+          if (networkMirrorSender) return networkMirrorSender
+          networkMirrorSender = PianoNetworkMirror.createSender({
+            capture: async function () {
+              try {
+                return await navigator.mediaDevices.getDisplayMedia({ video: { width: { max: 960 }, height: { max: 540 }, frameRate: { max: 15 } }, audio: false })
+              } catch (error) {
+                var sourceId = await window.louvorja.projection.getSourceMediaId()
+                if (!sourceId) throw new Error('Fonte das imagens indisponível.')
+                return navigator.mediaDevices.getUserMedia({ audio: false, video: { mandatory: { chromeMediaSource: 'tab', chromeMediaSourceId: sourceId, maxWidth: 960, maxHeight: 540, maxFrameRate: 15 } } })
+              }
+            },
+            connectionsMuted: function () { return true },
+            send: function (message, slotId) { return window.louvorja.palco.send(message, slotId) },
+          })
+          return networkMirrorSender
+        }
+        if (window.louvorja && window.louvorja.palco && window.louvorja.palco.onEvent) {
+          window.louvorja.palco.onEvent(function (message) {
+            if (!networkMirrorSender || !networkActive) return
+            networkMirrorSender.handle(message).catch(function (error) {
+              tvHint.style.display = ''; tvHint.textContent = 'Transmissão: ' + error.message
+            })
+          })
+        }
+        window.addEventListener('beforeunload', function () { if (networkMirrorSender) void networkMirrorSender.stop() })
+        var imageReceiverReady = {}
+        function prepareImageReceiver(slotId) {
+          if (imageReceiverReady[slotId]) return imageReceiverReady[slotId]
+          var requestId = 'image-' + slotId + '-' + Date.now() + '-' + Math.random().toString(36).slice(2)
+          var pending = new Promise(function (resolve, reject) {
+            var off = null
+            var timer = null
+            var settled = false
+            function finish(error) {
+              if (settled) return
+              settled = true
+              clearTimeout(timer)
+              if (typeof off === 'function') off()
+              if (error) reject(error); else resolve(true)
+            }
+            off = window.louvorja.palco.onEvent(function (event) {
+              if (event && event.type === 'receiver-ready' && event.requestId === requestId && event.cleanMirror === true) finish()
+            })
+            timer = setTimeout(function () { finish(new Error('A conexão não confirmou a atualização do player.')) }, 10000)
+            window.louvorja.palco.send({ v: 2, type: 'obsControl', action: 'reload', requestId: requestId }, slotId)
+              .then(function (sent) { if (!sent) finish(new Error('Não foi possível atualizar a conexão.')) })
+              .catch(finish)
+          })
+          imageReceiverReady[slotId] = pending.catch(function (error) {
+            delete imageReceiverReady[slotId]
+            throw error
+          })
+          return imageReceiverReady[slotId]
+        }
+
         function setProjectingUi(projecting) {
-          var canProject = selectedIds.length > 0
+          projecting = projecting || networkActive
+          var canProject = selectedIds.length > 0 || tvSlots.some(function (slot) { return slot.clients > 0 && tvChecked[slot.id] !== false })
           projectBtn.disabled = !projecting && !canProject
           if (projecting) {
             projectBtn.classList.add('is-active')
@@ -243,7 +448,75 @@
           counterEl.textContent = safeIndex + ' / ' + safeTotal
           prevBtn.disabled = safeTotal <= 1
           nextBtn.disabled = safeTotal <= 1
+          slideTotal = safeTotal
+          slideIndex = safeIndex > 0 ? safeIndex - 1 : 0
+          autoplayBtn.disabled = safeTotal <= 1
+          if (safeTotal <= 1 && autoplayOn) setAutoplay(false)
         }
+
+        // ── Passar sozinho (carrossel): prazo absoluto (Date.now), não contagem de ticks ──
+        function autoplayMs() {
+          var seconds = Number(autoplaySelect.value) || 5
+          return Math.max(1, seconds) * 1000
+        }
+
+        function restartAutoplayDeadline() {
+          autoplayDeadline = Date.now() + autoplayMs()
+        }
+
+        function setAutoplay(on) {
+          autoplayOn = Boolean(on) && slideTotal > 1
+          autoplayBtn.classList.toggle('is-active', autoplayOn)
+          autoplayBtn.setAttribute('aria-pressed', autoplayOn ? 'true' : 'false')
+          autoplayBtn.title = autoplayOn ? 'Pausar passagem automática' : 'Passar sozinho'
+          autoplayBtn.setAttribute('aria-label', autoplayBtn.title)
+          autoplayIcon.setAttribute('d', autoplayOn ? PAUSE_PATH : PLAY_PATH)
+          if (autoplayOn) restartAutoplayDeadline()
+        }
+
+        async function autoplayTick() {
+          if (!autoplayOn || autoplayBusy || Date.now() < autoplayDeadline) return
+          if (!window.louvorja || !window.louvorja.projection || !window.louvorja.projection.remoteImageNext) return
+          // Sem repetir: na última imagem o automático desliga e a imagem fica.
+          if (!autoplayRepeat.checked && slideIndex >= slideTotal - 1) {
+            setAutoplay(false)
+            return
+          }
+          autoplayBusy = true
+          try {
+            await window.louvorja.projection.remoteImageNext()
+            restartAutoplayDeadline()
+            await refresh()
+          } finally {
+            autoplayBusy = false
+          }
+        }
+
+        try {
+          var savedSeconds = window.localStorage.getItem(AUTOPLAY_KEY)
+          if (savedSeconds && autoplaySelect.querySelector('option[value="' + savedSeconds + '"]')) autoplaySelect.value = savedSeconds
+          if (window.localStorage.getItem(REPEAT_KEY) === 'false') autoplayRepeat.checked = false
+        } catch (error) { /* storage indisponível: fica o padrão */ }
+
+        autoplayRepeat.addEventListener('change', function () {
+          try { window.localStorage.setItem(REPEAT_KEY, autoplayRepeat.checked ? 'true' : 'false') } catch (error) { /* ignore */ }
+        })
+
+        autoplayBtn.addEventListener('click', async function () {
+          if (autoplayBtn.disabled) return
+          var restart = !autoplayOn && !autoplayRepeat.checked && slideIndex >= slideTotal - 1
+          setAutoplay(!autoplayOn)
+          // Sem repetir e parado na última: o play recomeça da primeira (a galeria dá a volta).
+          if (restart && autoplayOn && window.louvorja && window.louvorja.projection && window.louvorja.projection.remoteImageNext) {
+            await window.louvorja.projection.remoteImageNext()
+            restartAutoplayDeadline()
+            await refresh()
+          }
+        })
+        autoplaySelect.addEventListener('change', function () {
+          try { window.localStorage.setItem(AUTOPLAY_KEY, autoplaySelect.value) } catch (error) { /* ignore */ }
+          if (autoplayOn) restartAutoplayDeadline()
+        })
 
         function updateMonitorBadge() {
           var count = selectedIds.length
@@ -312,7 +585,7 @@
           if (window.louvorja && window.louvorja.projection && window.louvorja.projection.setSiteControlPanelOpen) {
             await window.louvorja.projection.setSiteControlPanelOpen(panelOpen)
           }
-          if (panelOpen) await loadMonitors()
+          if (panelOpen) { await loadMonitors(); await loadConnections() }
         }
 
         async function onToggleMonitor(event) {
@@ -328,6 +601,10 @@
           renderMonitorList()
           if (window.louvorja && window.louvorja.projection && window.louvorja.projection.setVideoTargetMonitors) {
             await window.louvorja.projection.setVideoTargetMonitors(selectedIds.slice())
+            if (networkActive && selectedIds.length > 0) {
+              var state = await window.louvorja.projection.getImageSlideState()
+              if (state && !state.projecting) await window.louvorja.projection.toggleVideoScreens()
+            }
           }
           await refresh()
         }
@@ -351,19 +628,54 @@
         prevBtn.addEventListener('click', async function () {
           if (window.louvorja && window.louvorja.projection && window.louvorja.projection.remoteImagePrev) {
             await window.louvorja.projection.remoteImagePrev()
+            if (autoplayOn) restartAutoplayDeadline()
             await refresh()
           }
         })
         nextBtn.addEventListener('click', async function () {
           if (window.louvorja && window.louvorja.projection && window.louvorja.projection.remoteImageNext) {
             await window.louvorja.projection.remoteImageNext()
+            if (autoplayOn) restartAutoplayDeadline()
             await refresh()
           }
         })
+        function renderTextScale(scale) {
+          textScale = Number(scale) || 1
+          textScaleEl.textContent = Math.round(textScale * 100) + '%'
+          textSmallerBtn.disabled = textScale <= 0.5
+          textBiggerBtn.disabled = textScale >= 2
+        }
+
+        async function changeTextScale(delta) {
+          if (!window.louvorja || !window.louvorja.projection || !window.louvorja.projection.setTextScale) return
+          // Atualiza na hora: cliques rápidos somam a partir do valor já mostrado.
+          var next = Math.min(2, Math.max(0.5, Math.round((textScale + delta) * 10) / 10))
+          renderTextScale(next)
+          var result = await window.louvorja.projection.setTextScale(next)
+          if (result && typeof result.scale === 'number' && textScale === next) renderTextScale(result.scale)
+        }
+
+        textSmallerBtn.addEventListener('click', function () { void changeTextScale(-0.1) })
+        textBiggerBtn.addEventListener('click', function () { void changeTextScale(0.1) })
+        if (isText && window.louvorja && window.louvorja.projection && window.louvorja.projection.getTextScale) {
+          window.louvorja.projection.getTextScale().then(function (state) {
+            if (state && typeof state.scale === 'number') renderTextScale(state.scale)
+          }).catch(function () {})
+        }
+
         projectBtn.addEventListener('click', async function () {
           if (projectBtn.disabled) return
           if (window.louvorja && window.louvorja.projection && window.louvorja.projection.toggleVideoScreens) {
-            await window.louvorja.projection.toggleVideoScreens()
+            var state = await window.louvorja.projection.getImageSlideState()
+            var stopping = Boolean((state && state.projecting) || networkActive)
+            if ((stopping && state && state.projecting) || (!stopping && selectedIds.length > 0)) await window.louvorja.projection.toggleVideoScreens()
+            if (stopping) {
+              networkActive = false
+              if (networkMirrorSender) await networkMirrorSender.stop()
+            } else {
+              networkActive = true
+              await startConnections()
+            }
             await refresh()
           }
         })
@@ -377,9 +689,15 @@
         })
 
         void loadMonitors()
+        void loadConnections()
         void refresh()
         setInterval(function () { void refresh() }, 500)
+        setInterval(function () { void autoplayTick() }, 250)
       })()
+    </script>
+    <script src="independent-panel.js"></script>
+    <script>
+      window.PianoIndependentPanel && window.PianoIndependentPanel.mount()
     </script>
   </body>
 </html>

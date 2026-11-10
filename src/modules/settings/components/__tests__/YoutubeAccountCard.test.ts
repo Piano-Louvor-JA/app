@@ -10,8 +10,6 @@ vi.mock("vue-i18n", () => ({
 const statusMock = vi.fn();
 const loginMock = vi.fn();
 const logoutMock = vi.fn();
-const adblockStatusMock = vi.fn();
-const adblockSetMock = vi.fn();
 
 const originalLouvorja = window.louvorja;
 
@@ -62,10 +60,8 @@ describe("YoutubeAccountCard", () => {
 		setBridge({
 			isElectron: true,
 			ytAuth: { status: statusMock, login: loginMock, logout: logoutMock },
-			ytAdblock: { status: adblockStatusMock, set: adblockSetMock },
 		});
 		statusMock.mockResolvedValue({ signedIn: false, premium: null });
-		adblockStatusMock.mockResolvedValue({ enabled: false });
 
 		const wrapper = mountCard();
 		await flushPromises();
@@ -81,10 +77,8 @@ describe("YoutubeAccountCard", () => {
 		setBridge({
 			isElectron: true,
 			ytAuth: { status: statusMock, login: loginMock, logout: logoutMock },
-			ytAdblock: { status: adblockStatusMock, set: adblockSetMock },
 		});
 		statusMock.mockResolvedValue({ signedIn: true, premium: true });
-		adblockStatusMock.mockResolvedValue({ enabled: false });
 
 		const wrapper = mountCard();
 		await flushPromises();
@@ -100,14 +94,12 @@ describe("YoutubeAccountCard", () => {
 		);
 	});
 
-	it("logado sem Premium: mostra hint do adblock", async () => {
+	it("logado sem Premium: avisa que o app segue pulando os anúncios", async () => {
 		setBridge({
 			isElectron: true,
 			ytAuth: { status: statusMock, login: loginMock, logout: logoutMock },
-			ytAdblock: { status: adblockStatusMock, set: adblockSetMock },
 		});
 		statusMock.mockResolvedValue({ signedIn: true, premium: false });
-		adblockStatusMock.mockResolvedValue({ enabled: false });
 
 		const wrapper = mountCard();
 		await flushPromises();
@@ -115,44 +107,15 @@ describe("YoutubeAccountCard", () => {
 		expect(wrapper.text()).toContain("settings.youtube.notPremiumHint");
 	});
 
-	it("toggle adblock chama ytAdblock.set(true) e reflete estado", async () => {
-		setBridge({
-			isElectron: true,
-			ytAuth: { status: statusMock, login: loginMock, logout: logoutMock },
-			ytAdblock: { status: adblockStatusMock, set: adblockSetMock },
-		});
-		statusMock.mockResolvedValue({ signedIn: false, premium: null });
-		adblockStatusMock.mockResolvedValue({ enabled: false });
-		adblockSetMock.mockResolvedValue({ ok: true });
-
-		const wrapper = mountCard();
-		await flushPromises();
-
-		const toggle = wrapper.find('[data-test="youtube-adblock-toggle"] input');
-		expect((toggle.element as HTMLInputElement).checked).toBe(false);
-		await toggle.setValue(true);
-		await flushPromises();
-
-		expect(adblockSetMock).toHaveBeenCalledWith(true);
-		expect(
-			(
-				wrapper.find('[data-test="youtube-adblock-toggle"] input')
-					.element as HTMLInputElement
-			).checked,
-		).toBe(true);
-	});
-
 	it("login atualiza status após retorno", async () => {
 		setBridge({
 			isElectron: true,
 			ytAuth: { status: statusMock, login: loginMock, logout: logoutMock },
-			ytAdblock: { status: adblockStatusMock, set: adblockSetMock },
 		});
 		statusMock
 			.mockResolvedValueOnce({ signedIn: false, premium: null })
 			.mockResolvedValueOnce({ signedIn: true, premium: true });
 		loginMock.mockResolvedValue({ ok: true, signedIn: true });
-		adblockStatusMock.mockResolvedValue({ enabled: false });
 
 		const wrapper = mountCard();
 		await flushPromises();
@@ -167,7 +130,7 @@ describe("YoutubeAccountCard", () => {
 	});
 
 describe("gaps YoutubeAccountCard", () => {
-	it("mount: ytAuth.status rejeita e ytAdblock ausente (L22 + 24 arm1)", async () => {
+	it("mount: ytAuth.status rejeita → signedOut", async () => {
 		setBridge({
 			isElectron: true,
 			ytAuth: { status: statusMock, login: loginMock, logout: logoutMock },
@@ -178,21 +141,6 @@ describe("gaps YoutubeAccountCard", () => {
 		expect(w.find('[data-test="youtube-auth-status"]').text()).toContain(
 			"settings.youtube.signedOut",
 		);
-		w.unmount();
-	});
-
-	it("mount: adblock status rejeita → enabled false (L29)", async () => {
-		setBridge({
-			isElectron: true,
-			ytAuth: { status: statusMock, login: loginMock, logout: logoutMock },
-			ytAdblock: { status: adblockStatusMock, set: adblockSetMock },
-		});
-		statusMock.mockResolvedValue({ signedIn: true, premium: true });
-		adblockStatusMock.mockRejectedValue(new Error("x"));
-		const w = mountCard();
-		await flushPromises();
-		const tg = w.find('[data-test="youtube-adblock-toggle"]');
-		expect(tg.exists()).toBe(true);
 		w.unmount();
 	});
 
@@ -254,48 +202,6 @@ describe("gaps YoutubeAccountCard", () => {
 		w2.unmount();
 	});
 
-	it("toggle adblock: set ok false, rejeição e reentrância (L64/69 arm1/71)", async () => {
-		setBridge({
-			isElectron: true,
-			ytAuth: { status: statusMock, login: loginMock, logout: logoutMock },
-			ytAdblock: { status: adblockStatusMock, set: adblockSetMock },
-		});
-		statusMock.mockResolvedValue({ signedIn: true, premium: null });
-		adblockStatusMock.mockResolvedValue({ enabled: false });
-		adblockSetMock.mockResolvedValue({ ok: false });
-		const w = mountCard();
-		await flushPromises();
-		await w.find('[data-test="youtube-adblock-toggle"] input').trigger("change");
-		await flushPromises();
-		// estado não mudou (ok false)
-		expect(adblockSetMock).toHaveBeenCalledWith(true);
-		w.unmount();
-
-		const err = vi.spyOn(console, "error").mockImplementation(() => {});
-		adblockStatusMock.mockResolvedValue({ enabled: false });
-		adblockSetMock.mockRejectedValue(new Error("y"));
-		const w2 = mountCard();
-		await flushPromises();
-		await w2.find('[data-test="youtube-adblock-toggle"] input').trigger("change");
-		await flushPromises();
-		expect(err).toHaveBeenCalled();
-		err.mockRestore();
-		w2.unmount();
-
-		// reentrância: set pendente + 2º clique → guard L64 arm1
-		adblockStatusMock.mockResolvedValue({ enabled: false });
-		let rel!: (v?: unknown) => void;
-		adblockSetMock.mockImplementationOnce(() => new Promise((r) => (rel = r)));
-		const w3 = mountCard();
-		await flushPromises();
-		const p = w3.find('[data-test="youtube-adblock-toggle"] input').trigger("change");
-		await w3.find('[data-test="youtube-adblock-toggle"] input').trigger("change");
-		rel();
-		await p;
-		await flushPromises();
-		expect(adblockSetMock).toHaveBeenCalledTimes(3);
-		w3.unmount();
-	});
 });
 
 	it("login reentrante durante pendência → guard L35 arm1", async () => {

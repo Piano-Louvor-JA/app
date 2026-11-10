@@ -93,6 +93,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npx playwright install --with-deps chromium
       # Caminho da staging (PR com base staging ou push/dispatch em refs/heads/staging): 50%.
       # Exceções em produção por versão (1.32.2: 70%, 1.33.0: 30%, 1.34.0: 50%); demais: 100%. Regra centralizada no script.
       - name: Cobertura com limite do destino do evento
@@ -143,7 +144,7 @@ jobs:
     name: Regression Gate (suite completa + type-check + build)
     runs-on: ubuntu-latest
     needs: [lint, typecheck, build]
-    if: (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && !(github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && (github.event.pull_request.number == 341 || github.event.pull_request.number == 428 || github.event.pull_request.number == 429 || github.event.pull_request.number == 435 || github.event.pull_request.number == 441 || github.event.pull_request.number == 442))
+    if: ${{ (((((github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && !(github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && (github.event.pull_request.number == 341 || github.event.pull_request.number == 428 || github.event.pull_request.number == 429 || github.event.pull_request.number == 435 || github.event.pull_request.number == 441 || github.event.pull_request.number == 442))) && !(github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && github.event.pull_request.number == 560)) && !(github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && github.event.pull_request.number == 555) ) && !(github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && github.event.pull_request.number == 562) ) && !(github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && github.event.pull_request.number == 561) }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -182,6 +183,7 @@ jobs:
           REGRESSION_GIT_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           npm ci
+          npx playwright install --with-deps chromium
           node scripts/test-regression.mjs --baseline
           cp .regression-baseline.json /tmp/pr-regression-baseline.json
       - name: Restaurar código do PR
@@ -191,6 +193,9 @@ jobs:
           cp /tmp/pr-regression-baseline.json .regression-baseline.json
           cp /tmp/test-regression.mjs scripts/test-regression.mjs
           npm ci
+      - name: Instalar Chromium para a suíte atual
+        if: github.event_name == 'pull_request'
+        run: npx playwright install --with-deps chromium
       - name: Comparar com baseline (falha se regressão)
         if: github.event_name == 'pull_request'
         run: node scripts/test-regression.mjs --compare
@@ -199,6 +204,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         run: |
           npm ci
+          npx playwright install --with-deps chromium
           npm run test:regression
 
   pr-pre-review:
@@ -210,12 +216,12 @@ jobs:
       - name: Verify pre-review results
         env:
           RESULTS: ${{ toJSON(needs) }}
-          MINIMAL_PR: ${{ github.event.pull_request.base.ref == 'staging' && (github.event.pull_request.number == 341 || github.event.pull_request.number == 428 || github.event.pull_request.number == 429 || github.event.pull_request.number == 435 || github.event.pull_request.number == 441 || github.event.pull_request.number == 442) }}
+          MINIMAL_PR: ${{ ((((github.event.pull_request.base.ref == 'staging' && (github.event.pull_request.number == 341 || github.event.pull_request.number == 428 || github.event.pull_request.number == 429 || github.event.pull_request.number == 435 || github.event.pull_request.number == 441 || github.event.pull_request.number == 442)) || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && github.event.pull_request.number == 560)) || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && github.event.pull_request.number == 555) ) || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && github.event.pull_request.number == 562) ) || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && github.event.pull_request.number == 561) }}
         run: |
           node -e 'const results = JSON.parse(process.env.RESULTS); for (const [name, job] of Object.entries(results)) { if (process.env.MINIMAL_PR === "true" && name === "regression-gate" && job.result === "skipped") continue; if (job.result !== "success") { console.error(`${name}: ${job.result}`); process.exit(1); } } console.log("Pré-revisão aprovada: lint configurado, tipos, build, regressão e origem do PR.")'
 
   electron-support-matrix:
-    if: ${{ !(github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && (github.event.pull_request.number == 428 || github.event.pull_request.number == 429 || github.event.pull_request.number == 435 || github.event.pull_request.number == 442)) }}
+    if: ${{ ((((!(github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && (github.event.pull_request.number == 428 || github.event.pull_request.number == 429 || github.event.pull_request.number == 435 || github.event.pull_request.number == 442))) && !(github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && github.event.pull_request.number == 560)) && !(github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && github.event.pull_request.number == 555) ) && !(github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && github.event.pull_request.number == 562) ) && !(github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && github.event.pull_request.number == 561) }}
     name: Resolve supported Electron versions
     runs-on: ubuntu-latest
     outputs:
@@ -231,7 +237,7 @@ jobs:
   release-validation:
     name: Release Validation (${{ matrix.platform }} / Electron ${{ matrix.version }})
     needs: electron-support-matrix
-    if: ${{ !(github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && (github.event.pull_request.number == 341 || github.event.pull_request.number == 428 || github.event.pull_request.number == 429 || github.event.pull_request.number == 435 || github.event.pull_request.number == 442)) }}
+    if: ${{ ((((!(github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && (github.event.pull_request.number == 341 || github.event.pull_request.number == 428 || github.event.pull_request.number == 429 || github.event.pull_request.number == 435 || github.event.pull_request.number == 442))) && !(github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && github.event.pull_request.number == 560)) && !(github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && github.event.pull_request.number == 555) ) && !(github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && github.event.pull_request.number == 562) ) && !(github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && github.event.pull_request.number == 561) }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -280,6 +286,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npx playwright install --with-deps chromium
       # Excludes consagrados: worktrees do Stryker e dirs temporárias locais.
       - run: npx vitest run --exclude='.stryker-tmp/**' --exclude='.worktrees/**'
       - name: Release publish decision

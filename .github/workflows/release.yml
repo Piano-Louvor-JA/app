@@ -160,6 +160,18 @@ jobs:
           fi
           node -e "require('node:fs').rmSync('dist-electron', { recursive: true, force: true })"
           npx electron-builder --linux AppImage deb rpm pacman tar.gz --${{ matrix.arch }} --publish never
+          if [ "${{ matrix.arch }}" = "x64" ]; then
+            tarball="$(find dist-electron -maxdepth 1 -type f -name 'LouvorJA-PIANO-*-x64.tar.gz' -print -quit)"
+            test -n "$tarball"
+            stage="$(mktemp -d)"
+            trap 'rm -rf "$stage"' EXIT
+            tar -xzf "$tarball" -C "$stage"
+            install -Dm644 packaging/flatpak/br.com.pianolouvorja.piano.desktop \
+              "$stage/br.com.pianolouvorja.piano.desktop"
+            install -Dm644 packaging/flatpak/br.com.pianolouvorja.piano.metainfo.xml \
+              "$stage/br.com.pianolouvorja.piano.metainfo.xml"
+            tar -C "$stage" -czf "$tarball" .
+          fi
 
       - name: Verify package set
         env:
@@ -202,6 +214,12 @@ jobs:
           echo "OK pacman:"
           grep -E "$arch_re" /tmp/linux-artifacts.txt | grep -Ei '\.pacman$|\.pkg\.tar\.' || true
           require_one tar.gz '\.tar\.gz$'
+          if [ "$ARCH" = "x64" ]; then
+            tarball="$(find dist-electron -maxdepth 1 -type f -name 'LouvorJA-PIANO-*-x64.tar.gz' -print -quit)"
+            test -n "$tarball"
+            tar -tzf "$tarball" | grep -Fx './br.com.pianolouvorja.piano.desktop'
+            tar -tzf "$tarball" | grep -Fx './br.com.pianolouvorja.piano.metainfo.xml'
+          fi
 
           find dist-electron -maxdepth 1 -type f ! -name 'SHA256SUMS-*' -print0 | sort -z | xargs -0 sha256sum > "dist-electron/SHA256SUMS-${ARCH}"
 

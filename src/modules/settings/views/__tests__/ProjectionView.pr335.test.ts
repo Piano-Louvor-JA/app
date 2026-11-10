@@ -22,8 +22,6 @@ vi.mock('../../components/MonitorArrangementCard.vue', () => ({ default: { name:
 vi.mock('../../components/MultiScreenSelectCard.vue', () => ({ default: { name: 'MultiScreenSelectCard', template: '<div class="stub-multi" />' } }))
 vi.mock('../../components/MainScreenOptionsCard.vue', () => ({ default: { name: 'MainScreenOptionsCard', template: '<div class="stub-main" />' } }))
 vi.mock('../../components/ReturnScreenOptionsCard.vue', () => ({ default: { name: 'ReturnScreenOptionsCard', template: '<div class="stub-return" />' } }))
-vi.mock('../../components/PalcoCard.vue', () => ({ default: { name: 'PalcoCard', template: '<div class="stub-palco" />' } }))
-vi.mock('../../components/PalcoSlotsCard.vue', () => ({ default: { name: 'PalcoSlotsCard', template: '<div class="stub-slots" />' } }))
 vi.mock('../../components/StageCustomizationCard.vue', () => ({ default: { name: 'StageCustomizationCard', props: ['onlyScope'], template: '<div class="stub-stage">{{ onlyScope }}</div>' } }))
 
 import ProjectionView from '../ProjectionView.vue'
@@ -38,9 +36,7 @@ describe('ProjectionView', () => {
     expect(w.find('.stub-multi').exists()).toBe(true)
     expect(w.find('.stub-main').exists()).toBe(true)
     expect(w.find('.stub-return').exists()).toBe(true)
-    expect(w.find('.stub-palco').exists()).toBe(true)
-    expect(w.find('.stub-slots').exists()).toBe(true)
-    expect(w.find('.stub-stage').text()).toBe('global')
+    expect(w.find('.stub-stage').exists()).toBe(false)
     expect(w.find('.projection-settings__error').exists()).toBe(false)
     w.unmount()
   })

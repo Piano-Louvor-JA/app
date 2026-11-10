@@ -1,5 +1,10 @@
 export default {
   media: {
+    reorderQueue: 'Drag to reorder (or use the up and down arrow keys)',
+    shuffleQueueApplied: 'Shuffle mode applied. Starting with the next song, playback will follow random order.',
+    sequentialQueueApplied: 'Sequential mode applied. Starting with the next song, playback will follow the sequence.',
+    shuffleQueue: 'Shuffle play',
+    playQueueSequential: 'Play playlist in sequence',
     exitFullscreen: 'Exit full screen',
     publishRules: {
       title: 'Community rules',
@@ -11,6 +16,12 @@ export default {
       showRules: 'View community rules',
       gotIt: 'Got it',
       linkLabel: 'Community rules',
+      conduct: {
+        title: 'Conduct',
+        summary:
+          'Publish content that glorifies God, with a genuine message and respect for copyright. Improper content, contrary to Adventist beliefs, spam or harassment is not allowed. Reports and strikes follow transparent moderation with the right to appeal.',
+      },
+      readFull: 'Read the full Code of Conduct',
     },
     editor: {
       importSlja: 'Import .slja file',

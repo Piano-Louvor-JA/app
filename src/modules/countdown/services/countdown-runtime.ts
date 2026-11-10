@@ -1,6 +1,7 @@
 import {
   DEFAULT_COUNTDOWN_DURATION_MS,
   DEFAULT_COUNTDOWN_RUNTIME,
+  isCountdownVideoPath,
   type CountdownRuntimeState,
   type CountdownStatus,
 } from '../types/countdown'
@@ -65,12 +66,41 @@ export function normalizeCountdownRuntime(raw: unknown): CountdownRuntimeState {
     ...(source.projecting === undefined
       ? {}
       : { projecting: source.projecting === true }),
+    ...(isCountdownVideoPath(source.videoPath) ? { videoPath: source.videoPath } : {}),
+    ...(typeof source.videoVolume === 'number' && Number.isFinite(source.videoVolume)
+      ? { videoVolume: Math.min(1, Math.max(0, source.videoVolume)) }
+      : {}),
   }
 }
 
+/** Estado do próprio Timer: o canal da projeção também recebe a Escola Sabatina. */
+export const TIMER_RUNTIME_STORAGE_KEY = 'louvorja-countdown-timer-state-v1'
+
 export function readCountdownRuntimeFromStorage(): CountdownRuntimeState {
+  return readRuntime(COUNTDOWN_RUNTIME_STORAGE_KEY)
+}
+
+/** Sem estado próprio salvo (versões anteriores), parte do canal. */
+export function readTimerRuntimeFromStorage(): CountdownRuntimeState {
   try {
-    const raw = localStorage.getItem(COUNTDOWN_RUNTIME_STORAGE_KEY)
+    if (localStorage.getItem(TIMER_RUNTIME_STORAGE_KEY) == null) return readCountdownRuntimeFromStorage()
+  } catch {
+    return readCountdownRuntimeFromStorage()
+  }
+  return readRuntime(TIMER_RUNTIME_STORAGE_KEY)
+}
+
+export function writeTimerRuntimeToStorage(state: CountdownRuntimeState): void {
+  try {
+    localStorage.setItem(TIMER_RUNTIME_STORAGE_KEY, JSON.stringify(state))
+  } catch {
+    // localStorage pode falhar em contextos restritos
+  }
+}
+
+function readRuntime(key: string): CountdownRuntimeState {
+  try {
+    const raw = localStorage.getItem(key)
     if (!raw) {
       return {
         ...DEFAULT_COUNTDOWN_RUNTIME,

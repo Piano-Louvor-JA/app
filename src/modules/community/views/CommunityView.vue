@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { GlassCard } from "@design-system/index";
-import { getAuthSession } from "@modules/media/services/auth-client";
+import { authTokenAsync, getAuthSession } from "@modules/media/services/auth-client";
 import { getAuthReadiness } from "@modules/auth/services/firebase-client";
 
 import ReportDialog from "../components/ReportDialog.vue";
@@ -131,7 +131,7 @@ async function submitReport(reason: string) {
 	const ok = await reportCollection(
 		target.id,
 		reason,
-		getAuthSession()?.token ?? null,
+		await authTokenAsync(),
 	);
 	reportTarget.value = null;
 	if (ok) {
@@ -143,7 +143,7 @@ async function saveCopy(collection: CommunityCollectionSummary) {
 	// F0.4: cópia LOCAL editável, SEM tocar na do autor.
 	// F1: registra o uso (1x/user na API; credita +5 ao dono).
 	copyingId.value = collection.id;
-	await registerUse(collection.id, getAuthSession()?.token ?? null);
+	await registerUse(collection.id, await authTokenAsync());
 	const localId = await saveCommunityCopy(collection);
 	copyingId.value = null;
 	if (localId !== null) {
@@ -200,6 +200,15 @@ onMounted(load);
           <i class="ti ti-trophy" aria-hidden="true" />
           {{ t('community.ranking') }}
         </button>
+        <a
+          href="https://pianolouvorja.com.br/conduta"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="community-view__coc-link"
+        >
+          <i class="ti ti-shield-check" aria-hidden="true" />
+          {{ t('community.conductLink') }}
+        </a>
         <button
           type="button"
           class="community-view__create-btn"
@@ -508,6 +517,21 @@ onMounted(load);
 	color: inherit;
 	font-size: 0.9rem;
 	cursor: pointer;
+}
+
+.community-view__coc-link {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	margin-top: 0.5rem;
+	padding: 0.4rem 0.8rem;
+	border-radius: 0.5rem;
+	border: 1px solid var(--ds-border, rgba(255, 255, 255, 0.2));
+	background: var(--ds-glass-fill, rgba(255, 255, 255, 0.08));
+	color: inherit;
+	font-size: 0.9rem;
+	cursor: pointer;
+	text-decoration: none;
 }
 
 .community-view__create-btn {

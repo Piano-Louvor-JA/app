@@ -1,5 +1,10 @@
 export default {
   media: {
+    reorderQueue: 'Arrastar para reordenar (ou usar as setas para cima e para baixo)',
+    shuffleQueueApplied: 'Modo aleatório aplicado. A partir da próxima música, a reprodução será aleatória.',
+    sequentialQueueApplied: 'Modo sequencial aplicado. A partir da próxima música, a reprodução seguirá a sequência.',
+    shuffleQueue: 'Tocar aleatório',
+    playQueueSequential: 'Tocar playlist em sequência',
     exitFullscreen: 'Sair da tela cheia',
     publishRules: {
       title: 'Regras da Comunidade',
@@ -11,6 +16,12 @@ export default {
       showRules: 'Ver regras da comunidade',
       gotIt: 'Entendi',
       linkLabel: 'Regras da comunidade',
+      conduct: {
+        title: 'Conduta',
+        summary:
+          'Publique conteúdo que glorifique a Deus, com mensagem genuína e respeito aos direitos autorais. Não é permitido conteúdo impróprio, contrário às crenças adventistas, spam ou assédio. Reports e strikes seguem moderação transparente com direito a recurso.',
+      },
+      readFull: 'Leia o Código completo',
     },
     editor: {
       importSlja: 'Importar arquivo .slja',

@@ -13,7 +13,6 @@ const { t } = useI18n()
 
 const route = useRoute()
 const isMaximized = ref(false)
-const isFocused = ref(true)
 const isMac = computed(() => getDesktopBridge()?.platform === 'darwin')
 /** Titlebar só na janela principal — projeção fica sem chrome (como o legado). */
 const isProjectionWindow = computed(
@@ -25,14 +24,6 @@ const isProjectionWindow = computed(
 const visible = computed(() => isDesktopApp() && !isProjectionWindow.value)
 
 let unsubscribeMaximized: (() => void) | null = null
-
-function onFocus() {
-  isFocused.value = true
-}
-
-function onBlur() {
-  isFocused.value = false
-}
 
 async function minimize() {
   await getDesktopBridge()?.window?.control('minimize')
@@ -59,9 +50,6 @@ function syncTitlebarHeight(show: boolean) {
 }
 
 onMounted(async () => {
-  window.addEventListener('focus', onFocus)
-  window.addEventListener('blur', onBlur)
-
   syncTitlebarHeight(visible.value)
 
   const bridge = getDesktopBridge()
@@ -79,8 +67,6 @@ watch(visible, (show) => {
 })
 
 onUnmounted(() => {
-  window.removeEventListener('focus', onFocus)
-  window.removeEventListener('blur', onBlur)
   unsubscribeMaximized?.()
   syncTitlebarHeight(false)
 })
@@ -93,35 +79,7 @@ onUnmounted(() => {
     :class="{ 'app-titlebar--mac': isMac }"
   >
     <template v-if="isMac">
-      <div
-        class="app-titlebar__mac-controls"
-        :class="{ 'app-titlebar__mac-controls--unfocused': !isFocused }"
-      >
-        <button
-          type="button"
-          class="app-titlebar__mac-btn app-titlebar__mac-btn--close"
-          :aria-label="t('windowControls.close')"
-          @click="close"
-        >
-          <i class="ti ti-x" aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          class="app-titlebar__mac-btn app-titlebar__mac-btn--minimize"
-          :aria-label="t('windowControls.minimize')"
-          @click="minimize"
-        >
-          <i class="ti ti-minus" aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          class="app-titlebar__mac-btn app-titlebar__mac-btn--maximize"
-          :aria-label="t('windowControls.maximize')"
-          @click="maximize"
-        >
-          <i class="ti ti-plus" aria-hidden="true" />
-        </button>
-      </div>
+      <div class="app-titlebar__mac-traffic-lights" aria-hidden="true" />
       <div class="app-titlebar__mac-title">
         <span>{{ APP_PRODUCT_NAME }}</span>
       </div>
@@ -184,8 +142,10 @@ onUnmounted(() => {
   z-index: 100001;
   flex-shrink: 0;
   user-select: none;
-  border-bottom: 1px solid var(--ds-color-outline);
-  background: var(--ds-color-surface, #131313);
+  /* Tom próprio para não se fundir ao header (mesma superfície): clareia no
+     tema escuro e escurece no claro. */
+  border-bottom: 1px solid var(--ds-color-outline-strong, rgba(255, 255, 255, 0.1));
+  background: color-mix(in srgb, var(--ds-color-on-surface) 4%, var(--ds-color-surface, #131313));
   color: var(--ds-color-on-surface);
   -webkit-app-region: drag;
 }
@@ -264,59 +224,12 @@ onUnmounted(() => {
   }
 }
 
-.app-titlebar__mac-controls {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+/* Espaço dos botões nativos (trafficLightPosition no main). */
+.app-titlebar__mac-traffic-lights {
+  flex-shrink: 0;
+  width: 76px;
   height: 100%;
-  padding-left: 1rem;
-  z-index: 2;
   -webkit-app-region: no-drag;
-}
-
-.app-titlebar__mac-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 12px;
-  height: 12px;
-  border: 0;
-  border-radius: 50%;
-  padding: 0;
-  cursor: pointer;
-  -webkit-app-region: no-drag;
-
-  .ti {
-    font-size: 8px;
-    line-height: 1;
-    color: rgba(0, 0, 0, 0.6);
-    opacity: 0;
-    transition: opacity 0.2s ease;
-  }
-
-  &--close {
-    background: #ff5f56;
-  }
-
-  &--minimize {
-    background: #ffbd2e;
-  }
-
-  &--maximize {
-    background: #27c93f;
-  }
-}
-
-.app-titlebar__mac-controls:hover .app-titlebar__mac-btn .ti {
-  opacity: 1;
-}
-
-.app-titlebar__mac-controls--unfocused .app-titlebar__mac-btn {
-  background: rgba(128, 128, 128, 0.35);
-}
-
-.app-titlebar__mac-controls--unfocused .app-titlebar__mac-btn .ti {
-  opacity: 0;
 }
 
 .app-titlebar__mac-title {

@@ -51,7 +51,10 @@ export function rendererApiEnv(): RendererApiEnv {
     profile,
     isRelease,
     primary(kind) {
-      return kind === 'database' ? `${base}/json_db` : `${base}/file`
+      // SPEC piano-bundle-sync ADR-04: files primária é o R2 público
+      // (https://files.louvorja.com.br — GET + Range 206 verificados em
+      // HTTP real). `/file/` da API Piano deixa de ser primária de mídia.
+      return kind === 'database' ? `${base}/json_db` : 'https://files.louvorja.com.br'
     },
     fallbackHosts() {
       return [...PUBLIC_FALLBACK_HOSTS]

@@ -418,7 +418,7 @@ describe('LiturgyTimelineItem — cobertura extra', () => {
 
     it('não executável mas selected → botão aparece (branch selected)', () => {
       const wrapper = createWrapper({
-        item: createItem({ type: 'annotation', musicId: undefined }),
+        item: createItem({ type: 'scheduled', musicId: undefined }),
         selected: true,
       })
       const control = wrapper
@@ -467,6 +467,11 @@ describe('LiturgyTimelineItem — cobertura extra', () => {
         expect(wrapper.emitted('select')).toBeTruthy()
 
         const projectBtn = wrapper.find(`[title="${project}"]`)
+        if (['site', 'images', 'pdf', 'presentation'].includes(type)) {
+          expect(projectBtn.exists()).toBe(false)
+          expect(wrapper.emitted('playScreens')).toBeUndefined()
+          return
+        }
         expect(projectBtn.exists()).toBe(true)
         expect(projectBtn.attributes('aria-pressed')).toBe('false')
         expect(projectBtn.find('.ti-arrow-up-right').exists()).toBe(true)
@@ -481,6 +486,10 @@ describe('LiturgyTimelineItem — cobertura extra', () => {
           ...(type === 'site' ? { siteProjecting: true } : { videoProjecting: true }),
         })
         const stopBtn = wrapper.find(`[title="${stop}"]`)
+        if (['site', 'images', 'pdf', 'presentation'].includes(type)) {
+          expect(stopBtn.exists()).toBe(false)
+          return
+        }
         expect(stopBtn.exists()).toBe(true)
         expect(stopBtn.attributes('aria-pressed')).toBe('true')
         expect(stopBtn.classes()).toContain('liturgy-item__action--site-projecting')
@@ -496,7 +505,7 @@ describe('LiturgyTimelineItem — cobertura extra', () => {
         siteProjecting: true,
         videoProjecting: false,
       })
-      expect(wrapper.find('[title="Parar projeção do site"]').exists()).toBe(true)
+      expect(wrapper.find('[title="Parar projeção do site"]').exists()).toBe(false)
       expect(wrapper.find('[title="Projetar site nas telas estendidas"]').exists()).toBe(false)
     })
 
@@ -506,7 +515,7 @@ describe('LiturgyTimelineItem — cobertura extra', () => {
         siteProjecting: false,
         videoProjecting: true,
       })
-      expect(wrapper.find('[title="Projetar site nas telas estendidas"]').exists()).toBe(true)
+      expect(wrapper.find('[title="Projetar site nas telas estendidas"]').exists()).toBe(false)
     })
 
     it('done → botões de controle e projeção disabled', () => {
@@ -525,7 +534,7 @@ describe('LiturgyTimelineItem — cobertura extra', () => {
         siteProjecting: true,
       })
       const stopBtn = wrapper.find('[title="Parar projeção do site"]')
-      expect(stopBtn.classes()).not.toContain('liturgy-item__action--site-projecting')
+      expect(stopBtn.exists()).toBe(false)
     })
   })
 

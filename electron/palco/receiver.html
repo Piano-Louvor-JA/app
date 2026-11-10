@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" class="receiver-idle">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -7,6 +7,16 @@
 <meta http-equiv="Expires" content="0">
 <title>LouvorJA Palco</title>
 <style>
+  #idleVer{display:none!important}
+  /* Cover the receiver viewport, including ultrawide/portrait outputs. The
+     iframe API replaces its target and may retain embedded width/height. */
+  #youtubeProjection{position:fixed;inset:0;overflow:hidden;background:#000;z-index:100}
+  #youtubeProjection iframe{position:absolute!important;top:50%!important;left:50%!important;
+    width:100vw!important;height:100vh!important;min-width:177.7778vh;min-height:56.25vw;
+    max-width:none;max-height:none;transform:translate(-50%,-50%);border:0;display:block}
+  /* Covers the YouTube title, logo and spinner until the video actually plays. */
+  #youtubeVeil{position:absolute;inset:0;z-index:1;background:#000;pointer-events:none;transition:opacity .3s}
+  #youtubeVeil.is-hidden{opacity:0}
   html,body{margin:0;height:100%;overflow:hidden;background:#000;
     font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#fff}
   #bg{position:fixed;top:0;left:0;width:100%;height:100%;object-fit:cover;
@@ -16,7 +26,7 @@
     filter:brightness(1);transition:opacity .8s}
   /* Frame de slide projetado: fidelidade total — sem escurecimento. */
   #bg.frame-slide{filter:none;object-fit:contain;background:#000}
-  #bg[src=""]{opacity:0}
+  #bg:not([src]),#bg[src=""],#bgPalco:not([src]),#bgPalco[src=""]{display:none}
   #bgPalco{position:fixed;top:0;left:0;width:100%;height:100%;object-fit:cover}
   /* Véu de leitura DESLIGADO em música (paridade projeção local, 14/10).
      Mantido no DOM p/ módulos que ainda usam. */
@@ -55,12 +65,22 @@
     border-radius:2.4vmin 0 2.4vmin 0;
     border:var(--box-border,.2vmin solid rgba(255,255,255,.85));
     box-shadow:0 10px 30px rgba(0,0,0,.4)}
+  /* Match the monitor lyric layout. max-content avoids absolute-position
+     shrink-to-fit using only the space to the right of left:50%. */
+  #text.music-lyrics{line-height:1;width:max-content;max-width:min(92vw,1600px);box-sizing:border-box}
+  #text.music-lyrics p,#text.music-lyrics div{margin:0;padding:0;line-height:inherit}
+  #text.music-lyrics.box-on{padding:1.6vmin 1.8vmin}
   #text.shadow-off{text-shadow:none}
   /* Capa da música (isCover): título destaque amarelo, sem caixinha/borda —
      paridade com media-projection__title--cover via cabo. */
   #text.cover-on{font-weight:900;letter-spacing:.03em;
     color:#f6c32a;background:none;padding:0;border:none;box-shadow:none;
+    backdrop-filter:none;-webkit-backdrop-filter:none;
     border-radius:0;line-height:1.1}
+  #text.cover-on:not(.title-box-on){width:max-content;max-width:min(88vw,1600px);box-sizing:border-box;padding:3.6vw 5vw 3.8vw;line-height:1.15;letter-spacing:.04em}
+  #text.cover-on:not(.title-box-on)::before,#text.cover-on:not(.title-box-on)::after{content:'';position:absolute;width:3.6vw;height:3.6vw;pointer-events:none}
+  #text.cover-on:not(.title-box-on)::before{top:.2vw;left:.2vw;border-top:.28vw solid currentColor;border-left:.28vw solid currentColor;border-top-left-radius:2vw}
+  #text.cover-on:not(.title-box-on)::after{bottom:.2vw;right:.2vw;border-bottom:.28vw solid currentColor;border-right:.28vw solid currentColor;border-bottom-right-radius:2vw}
   /* Caixa opcional na capa: usuário liga 'titleTextBox'. Depois de
      .cover-on para vencer o background:none quando ambos ativos. */
   #text.cover-on.title-box-on{background:rgba(24,24,24,var(--box-bg,.55));
@@ -74,6 +94,15 @@
      width FIXO restaura o véu largo — o fit-content do .box-on é só
      para MÍDIA (música), Bíblia NÃO (14/10 Rafael). */
   #text.bible-box{padding:2vh 3.8vh;width:min(86vw,1600px);max-height:72vh}
+  /* Entrada do versículo novo. translate/scale individuais somam ao transform
+     que posiciona o #text; motores antigos ignoram e ficam só com o fade. */
+  @keyframes rxEnterFade{from{opacity:0}}
+  @keyframes rxEnterSlide{from{opacity:0;translate:0 4vh}}
+  @keyframes rxEnterZoom{from{opacity:0;scale:.94}}
+  .rx-enter-fade{animation:rxEnterFade var(--rx-ms,250ms) ease-out both}
+  .rx-enter-slide{animation:rxEnterSlide var(--rx-ms,250ms) ease-out both}
+  .rx-enter-zoom{animation:rxEnterZoom var(--rx-ms,250ms) ease-out both}
+  @media (prefers-reduced-motion:reduce){.rx-enter-slide,.rx-enter-zoom{animation-name:rxEnterFade}}
 
   #footer{position:fixed;bottom:4vh;left:0;right:0;text-align:center;
     font-size:2.6vh;font-weight:300;opacity:1;letter-spacing:.02em}
@@ -84,9 +113,14 @@
   #footer .ver{font-weight:300;opacity:.65;margin-left:1.2vh;font-size:.85em;
     text-transform:none;letter-spacing:0}
   #idle{position:fixed;top:0;left:0;right:0;bottom:0;z-index:10;
-    text-align:center;transition:opacity .5s}
+    text-align:center;background:#000;transition:opacity .5s}
   #idleCenter{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
     text-align:center;width:60vw}
+  html.obs-black-idle:not(.obs-music) body{background:#000!important}
+  html.obs-black-idle:not(.obs-music) #bg:not(.frame-slide),html.obs-black-idle:not(.obs-music) #bgPalco{display:none!important}
+  html.obs-black-idle #idle{background:#000}
+  html.obs-black-idle #idleCenter,html.obs-black-idle #idleVer{display:none!important}
+  html.receiver-idle #idleCenter,html.receiver-idle #idleVer{display:none!important}
   #idle.hidden{opacity:0;pointer-events:none}
   #idleLogos img,#idleLogos svg{display:block;margin:0 auto}
   #idleLogo{height:14vh;max-width:50vw;margin:0 auto 4vh auto}#idleLogo svg{width:100%;height:100%;display:block}
@@ -115,12 +149,63 @@
   #npEq span:nth-child(3){animation-delay:.4s}
   @keyframes eq{0%,100%{height:1vh}50%{height:3vh}}
   #timer{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-    text-align:center;width:84vw;font-size:16vh;font-weight:700;
+    text-align:center;width:84vw;font-size:10vw;font-size:min(16vh,10vw);white-space:nowrap;font-weight:700;
     font-variant-numeric:tabular-nums;text-shadow:0 2px 12px rgba(0,0,0,.8)}
   #timer small{display:block;font-size:2.8vh;font-weight:300;opacity:.7;margin-top:2vh}
   /* Vídeo acima do idle (z=20) — idle nunca pode cobrir reprodução. */
   #video{position:fixed;top:0;left:0;width:100%;height:100%;object-fit:contain;
     background:#000;z-index:20}
+
+#obsWarmupView{position:fixed;inset:0;background:#000;z-index:100002;display:flex;align-items:center;justify-content:center}
+#obsWarmupView .warmup-logo{display:flex;flex-direction:column;align-items:center;gap:3vh}
+#obsWarmupView .warmup-logo img{display:block;width:min(28vw,28vh);height:auto;object-fit:contain;animation:obsWarmupPulse 2s ease-in-out infinite}
+#obsWarmupView .warmup-caption{margin:0;text-align:center;color:#fff;font:700 min(4vw,4vh)/1.4 Arial,sans-serif}
+#obsWarmupView svg{display:block;width:100%;height:auto}
+@keyframes obsWarmupPulse{0%,100%{opacity:.88;transform:scale(.985)}50%{opacity:1;transform:scale(1.015)}}
+/* Retorno de palco (/retorno): com música, cobre o espelho com o trecho atual e o próximo. */
+#stageReturn{position:fixed;inset:0;z-index:10000;overflow:hidden;background:#000;color:#fff}
+#stageReturn[hidden]{display:none}
+.stage-return__bg{position:absolute;inset:0;background-size:cover;background-position:center;opacity:.72}
+.stage-return__body{position:relative;z-index:1;display:flex;flex-direction:column;height:100%;box-sizing:border-box;padding:6vh 5vw 5.5vh}
+.stage-return__main{flex:1;display:flex;align-items:center;justify-content:center;min-height:0}
+.stage-return__block{display:flex;flex-direction:column;align-items:stretch;width:max-content;max-width:90vw;min-width:min(78vw,18rem)}
+.stage-return__block[hidden],.stage-return__title[hidden],.stage-return__next[hidden]{display:none}
+.stage-return__card{position:relative;overflow:hidden;border:clamp(2px,.2vmin,4px) solid rgba(255,255,255,.85);border-bottom:0;
+  border-radius:clamp(16px,2.6vmin,28px) clamp(16px,2.6vmin,28px) 0 0;background:rgba(24,24,24,.55);
+  box-shadow:0 10px 30px rgba(0,0,0,.4);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+.stage-return__lyric,.stage-return__title{box-sizing:border-box;margin:0;padding:2.4vmin 4vmin 2.8vmin;color:#fff;
+  font-size:clamp(1.5rem,6.4vmin,6.5rem);font-weight:700;line-height:1.35;letter-spacing:.03em;text-align:center;white-space:pre-line}
+.stage-return__title{max-width:90vw;color:#f6c32a;font-weight:900;line-height:1.1;letter-spacing:-.01em;
+  text-shadow:0 10px 30px rgba(0,0,0,.9),0 2px 6px rgba(0,0,0,.7)}
+.stage-return__bar{flex-shrink:0;width:100%;height:clamp(7px,1.05vmin,12px);overflow:hidden;
+  border-radius:0 0 clamp(8px,1.2vmin,12px) clamp(8px,1.2vmin,12px);background:rgba(255,255,255,.18)}
+.stage-return__bar-fill{width:100%;height:100%;transform:scaleX(0);transform-origin:left center;background:#FCCE02}
+.stage-return__lyric.wait{visibility:hidden}
+.stage-return__lyric--ghost{position:absolute;z-index:1;top:0;right:0;left:0;pointer-events:none}
+.stage-return__lyric--ghost[hidden],.stage-return__flyer[hidden]{display:none}
+.stage-return__lyric--ghost.out{animation:stageReturnGhostOut 780ms cubic-bezier(.22,1,.36,1) forwards}
+@keyframes stageReturnGhostOut{from{opacity:1;transform:none}to{opacity:0;transform:translateY(-24%)}}
+.stage-return__flyer{position:fixed;z-index:4;max-width:90vw;pointer-events:none;will-change:transform}
+.stage-return__next-lyric.out{opacity:0;transition:opacity 160ms ease}
+.stage-return__next-lyric.enter{animation:stageReturnNextIn 520ms cubic-bezier(.22,1,.36,1)}
+@keyframes stageReturnNextIn{from{opacity:0;transform:translateY(.45em)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){
+  .stage-return__lyric--ghost.out,.stage-return__next-lyric,.stage-return__next-lyric.enter,.stage-return__flyer{animation:none;transition:none}
+}
+.stage-return__next{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:.55rem;min-height:0}
+.stage-return__next-label{color:#f6c32a;font-size:clamp(.7rem,1.8vmin,1.1rem);font-weight:800;letter-spacing:.18em;text-transform:uppercase}
+.stage-return__next-lyric{margin:0;max-width:86vw;color:rgba(255,255,255,.82);font-size:clamp(1.25rem,4.2vmin,3.4rem);
+  font-weight:600;line-height:1.3;letter-spacing:.02em;text-align:center;text-transform:uppercase;white-space:pre-line}
+.stage-return__next-lyric.cover{color:#f6c32a;font-weight:800}
+/* Conexões servidas pelo app: sem transmissão, tela preta com o logo do Louvor JA e a espera. */
+#castWaiting{position:fixed;inset:0;z-index:100002;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:2.2vh;background:#000;color:#fff;pointer-events:none}
+#castWaiting[hidden]{display:none}
+.cast-waiting__logo{height:min(5.5vh,7vw);aspect-ratio:565/594;animation:castWaitingFade 3.2s ease-in-out infinite}
+.cast-waiting__logo svg{display:block;width:100%;height:100%}
+.cast-waiting__text{margin:0;font-size:min(1.7vh,2.4vw);font-weight:300;letter-spacing:.12em;opacity:.72;text-align:center}
+@keyframes castWaitingFade{0%,100%{opacity:.35}50%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.cast-waiting__logo{animation:none;opacity:.85}}
 </style>
 </head>
 <body>
@@ -130,6 +215,7 @@
   <img src="splash.jpg" alt="Palco Piano LouvorJA" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">
 </div>
 <script src="purify.min.js"></script>
+<script src="network-mirror.js"></script>
 <script>
 (function(){
   var s=document.getElementById('splash');
@@ -192,6 +278,27 @@
   font-family:inherit;color:#fff;text-shadow:0 1px 4px #000;
   padding:.45vh .8vh;background:rgba(0,0,0,.30);pointer-events:none">PIANO LouvorJA Palco · receiver v0.1.54</p>
 <audio id="audio" preload="auto"></audio>
+<div id="stageReturn" hidden>
+  <div class="stage-return__bg" aria-hidden="true"></div>
+  <div class="stage-return__body">
+    <div class="stage-return__main">
+      <p class="stage-return__title" hidden></p>
+      <div class="stage-return__block">
+        <div class="stage-return__card"><p class="stage-return__lyric"></p><p class="stage-return__lyric stage-return__lyric--ghost" hidden></p></div>
+        <div class="stage-return__bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="stage-return__bar-fill"></div></div>
+      </div>
+    </div>
+    <div class="stage-return__next" hidden>
+      <span class="stage-return__next-label"></span>
+      <p class="stage-return__next-lyric"></p>
+    </div>
+  </div>
+  <p class="stage-return__lyric stage-return__flyer" aria-hidden="true" hidden></p>
+</div>
+<div id="castWaiting" role="status" hidden>
+  <div class="cast-waiting__logo" aria-hidden="true"></div>
+  <p class="cast-waiting__text" data-l10n="castWaiting"></p>
+</div>
 <script>
 //---------------------------------------------------------------------
 //
@@ -2507,19 +2614,19 @@ const qs=new URLSearchParams(location.search);
 // L10N: strings do receiver (idle/audio). Idioma: ?lang= > navigator.language
 // > pt. Sender pode anexar &lang= ao URL da TV (14/10).
 var L10N=(function(){var d={
-  pt:{idle:'Aguardando conteúdo…',wait:'Aguardando operador conectar…',audio:'Reproduzindo áudio',
+  pt:{returnNext:'Próximo',castWaiting:'Aguardando transmissão',idle:'Aguardando conteúdo…',wait:'Aguardando operador conectar…',audio:'Reproduzindo áudio',
       connTo:'conectado a {t} · vermelha = IP/porta · azul = atualizar',redKey:'tecla vermelha = digitar IP',
       searching:'procurando LouvorJA na rede…',notFound:'nenhum sender encontrado — tentando de novo…',
       connecting:'conectando {h}:{p}…',reconn:'reconectando em {s}s',cloudSearch:'nuvem: buscando sessão {c}…',
       cloudErr:'nuvem: {m}',cloudConn:'nuvem: conectando…',invalid:'sessão inválida — tecla vermelha p/ novo código',
       cloudReconn:'nuvem: reconectando em {s}s',cloudCreating:'nuvem: criando sessão…',portSearch:'procurando LouvorJA na porta {p}…',pairHint:'Acesse e informe o código',tapUnmute:'Toque para ativar o som',ipHint:'CÓDIGO (6 letras/números) · IP · IP:PORTA — ou SÓ A PORTA (ex.: 7081) para achar o LouvorJA na rede',ipHelp:'OK conectar · vermelha cancelar · backspace apaga',mainSlot:'Principal (espelho)',tvConn:' · TV {ip} · conectado · vermelha = digitar IP'},
-  en:{idle:'Waiting for content…',wait:'Waiting for operator to connect…',audio:'Playing audio',
+  en:{returnNext:'Next',castWaiting:'Waiting for broadcast',idle:'Waiting for content…',wait:'Waiting for operator to connect…',audio:'Playing audio',
       connTo:'connected to {t} · red = IP/port · blue = refresh',redKey:'red key = type IP',
       searching:'searching for LouvorJA on the network…',notFound:'no sender found — trying again…',
       connecting:'connecting {h}:{p}…',reconn:'reconnecting in {s}s',cloudSearch:'cloud: fetching session {c}…',
       cloudErr:'cloud: {m}',cloudConn:'cloud: connecting…',invalid:'invalid session — red key for a new code',
       cloudReconn:'cloud: reconnecting in {s}s',cloudCreating:'cloud: creating session…',portSearch:'searching for LouvorJA on port {p}…',pairHint:'Go to the site and enter the code',tapUnmute:'Tap to enable sound',ipHint:'CODE (6 letters/numbers) · IP · IP:PORT — or PORT ONLY (e.g. 7081) to find LouvorJA on the network',ipHelp:'OK connect · red cancel · backspace deletes',mainSlot:'Main (mirror)',tvConn:' · TV {ip} · connected · red = type IP'},
-  es:{idle:'Esperando contenido…',wait:'Esperando al operador…',audio:'Reproduciendo audio',
+  es:{returnNext:'Siguiente',castWaiting:'Esperando transmisión',idle:'Esperando contenido…',wait:'Esperando al operador…',audio:'Reproduciendo audio',
       connTo:'conectado a {t} · roja = IP/puerto · azul = actualizar',redKey:'tecla roja = escribir IP',
       searching:'buscando LouvorJA en la red…',notFound:'ningún sender encontrado — reintentando…',
       connecting:'conectando {h}:{p}…',reconn:'reconectando en {s}s',cloudSearch:'nube: buscando sesión {c}…',
@@ -2528,6 +2635,155 @@ var L10N=(function(){var d={
 };var l=(qs.get('lang')||(navigator.language||'')).slice(0,2).toLowerCase();
 return Object.assign({},d.pt,d[l]||{});})();
 document.querySelectorAll('[data-l10n]').forEach(function(el){var k=el.getAttribute('data-l10n');if(L10N[k])el.textContent=L10N[k];});
+// Retorno de palco: em /retorno, música ativa cobre o espelho; sem música, segue igual à TV. Nunca toca som.
+const stageReturnMode=location.pathname.replace(/\/+$/,'')==='/retorno';
+// Só as conexões abertas pelo servidor do app mostram a espera; os painéis da projeção compartilhada, não.
+const castPage=/^https?:$/.test(location.protocol)&&qs.get('obsPane')!=='1';
+(function(){
+  const art=document.querySelector('#idleLogo svg');if(!art)return;
+  const logo=art.cloneNode(true);
+  logo.querySelectorAll('[id]').forEach(function(el){el.removeAttribute('id')});
+  document.querySelector('#castWaiting .cast-waiting__logo').appendChild(logo);
+})();
+function syncCastWaiting(){
+  let shared=false;
+  try{shared=obsShareState.enabled&&(obsShareState.active[0]||obsShareState.active[1])}catch(e){}
+  $('castWaiting').hidden=!(castPage&&document.documentElement.classList.contains('receiver-idle')&&$('stageReturn').hidden&&!shared);
+}
+syncCastWaiting();
+const SR_ADVANCE_MS=780,SR_ADVANCE_EASE='cubic-bezier(0.22, 1, 0.36, 1)';
+const sr={active:false,slide:-1,cover:false,current:'',next:'',nextCover:false,busy:false,flyerText:'',gen:0,anim:null,
+  bar:{shown:0,sample:0,sampleAt:0,vel:0,lastTick:0,raf:0}};
+function srEl(sel){return $('stageReturn').querySelector(sel)}
+function srLyric(){return srEl('.stage-return__card .stage-return__lyric:not(.stage-return__lyric--ghost)')}
+function srReducedMotion(){return typeof window.matchMedia==='function'&&window.matchMedia('(prefers-reduced-motion: reduce)').matches}
+// Barra: prevê a velocidade entre as atualizações e aproxima suave, como na tela de retorno dos monitores.
+function srPaintBar(value){
+  sr.bar.shown=value;
+  srEl('.stage-return__bar-fill').style.transform='scaleX('+(Math.round(value*10000)/10000)+')';
+  srEl('.stage-return__bar').setAttribute('aria-valuenow',String(Math.round(value*100)));
+}
+function srStopBar(){if(sr.bar.raf)cancelAnimationFrame(sr.bar.raf);sr.bar.raf=0}
+function srTickBar(){
+  const b=sr.bar,now=performance.now();b.raf=0;
+  if(!sr.active){srPaintBar(0);return}
+  if(now-b.sampleAt>420)b.vel=0;
+  const predicted=Math.min(1,Math.max(0,b.sample+Math.max(0,b.vel)*(now-b.sampleAt)));
+  const dt=Math.min(40,Math.max(0,now-b.lastTick));b.lastTick=now;
+  const next=b.shown+(predicted-b.shown)*(1-Math.exp(-dt/95));
+  srPaintBar(next);
+  if(Math.abs(predicted-next)>0.0005||(b.vel>0&&next<0.999))b.raf=requestAnimationFrame(srTickBar);
+}
+function srStartBar(){if(sr.bar.raf)return;sr.bar.lastTick=performance.now();sr.bar.raf=requestAnimationFrame(srTickBar)}
+function srSyncBar(ratio,reset){
+  const b=sr.bar,now=performance.now();
+  if(reset||ratio+0.05<b.shown){
+    b.sample=ratio;b.vel=0;b.sampleAt=now;srPaintBar(ratio);
+    if(sr.active&&ratio>0&&ratio<1)srStartBar();else srStopBar();
+    return;
+  }
+  const dt=now-b.sampleAt;
+  if(dt>12)b.vel=Math.max(0,(ratio-b.sample)/dt);
+  b.sample=ratio;b.sampleAt=now;srStartBar();
+}
+function srResetFlyer(){
+  if(sr.anim){try{sr.anim.cancel()}catch(e){}}
+  sr.anim=null;
+  const flyer=srEl('.stage-return__flyer');
+  flyer.hidden=true;flyer.textContent='';
+  ['left','top','width','transform','transformOrigin','opacity','transition'].forEach(function(k){flyer.style[k]=''});
+}
+function srShowNext(text,cover){
+  const nextLyric=srEl('.stage-return__next-lyric');
+  nextLyric.textContent=text;nextLyric.classList.toggle('cover',cover);
+  srEl('.stage-return__next').hidden=!(text||cover);
+}
+function srSnap(m){
+  sr.gen+=1;sr.busy=false;sr.flyerText='';
+  srResetFlyer();
+  const ghost=srEl('.stage-return__lyric--ghost'),lyric=srLyric(),title=srEl('.stage-return__title');
+  ghost.hidden=true;ghost.textContent='';ghost.classList.remove('out');
+  lyric.classList.remove('wait');
+  srEl('.stage-return__next-lyric').classList.remove('out','enter');
+  sr.cover=m.isCover===true;sr.current=String(m.current||'');sr.next=String(m.next||'');sr.nextCover=m.nextIsCover===true;
+  title.hidden=!sr.cover;title.textContent=sr.cover?sr.current:'';
+  srEl('.stage-return__block').hidden=sr.cover;lyric.textContent=sr.cover?'':sr.current;
+  srShowNext(sr.next,sr.nextCover);
+}
+function srNextFrame(){return new Promise(function(resolve){requestAnimationFrame(function(){requestAnimationFrame(function(){resolve()})})})}
+// O próximo trecho voa até o lugar do atual; o anterior sobe e some; o novo próximo entra.
+async function srPromote(m){
+  const incoming=String(m.current||''),gen=++sr.gen;
+  const nextLyric=srEl('.stage-return__next-lyric'),lyric=srLyric(),flyer=srEl('.stage-return__flyer'),ghost=srEl('.stage-return__lyric--ghost');
+  const from=nextLyric.getBoundingClientRect();
+  if(srReducedMotion()||typeof flyer.animate!=='function'||!from||from.height<2){srSnap(m);return}
+  nextLyric.classList.remove('enter');
+  ghost.textContent=sr.current;ghost.hidden=false;ghost.classList.remove('out');void ghost.offsetWidth;ghost.classList.add('out');
+  lyric.textContent=incoming;lyric.classList.add('wait');
+  nextLyric.classList.add('out');
+  sr.current=incoming;sr.cover=false;sr.busy=true;sr.flyerText=incoming;
+  flyer.textContent=incoming;flyer.hidden=false;
+  const to=lyric.getBoundingClientRect();
+  if(!to||to.height<2){srSnap(m);return}
+  const s=from.width/Math.max(1,to.width),dx=from.left+from.width/2-(to.left+to.width/2),dy=from.top-to.top;
+  const start='translate('+dx+'px, '+dy+'px) scale('+s+')';
+  Object.assign(flyer.style,{transition:'none',left:to.left+'px',top:to.top+'px',width:to.width+'px',transformOrigin:'top center',transform:start,opacity:'1'});
+  if(sr.anim){try{sr.anim.cancel()}catch(e){}}
+  sr.anim=flyer.animate([{transform:start},{transform:'translate(0px, 0px) scale(1)'}],{duration:SR_ADVANCE_MS,easing:SR_ADVANCE_EASE,fill:'forwards'});
+  try{await sr.anim.finished}catch(e){return}
+  if(gen!==sr.gen)return;
+  sr.next=String(m.next||'');sr.nextCover=m.nextIsCover===true;
+  srShowNext(sr.next,sr.nextCover);
+  lyric.classList.remove('wait');
+  await srNextFrame();
+  if(gen!==sr.gen)return;
+  ghost.hidden=true;ghost.textContent='';ghost.classList.remove('out');
+  nextLyric.classList.remove('out');
+  if(sr.next||sr.nextCover){void nextLyric.offsetWidth;nextLyric.classList.add('enter')}
+  sr.busy=false;sr.flyerText='';
+  srResetFlyer();
+}
+function stageReturnColor(value){
+  return typeof value==='string'&&/^(#[0-9a-f]{3,8}|rgba?\([\d\s.,%]+\)|[a-z]+)$/i.test(value.trim())?value.trim():'';
+}
+function stageReturnVw(px){
+  const n=Number(px);
+  return n>0?(Math.round(n/1920*100*1000)/1000)+'vw':'';
+}
+function applyStageReturn(m){
+  if(!stageReturnMode)return;
+  const root=$('stageReturn'),q=function(sel){return root.querySelector(sel)};
+  if(!m.active){root.hidden=true;sr.active=false;sr.slide=-1;srSnap({});srSyncBar(0,true);syncCastWaiting();return}
+  const s=m.style||{},current=String(m.current||''),cover=m.isCover===true;
+  const blur=Number(s.shadow&&s.shadow.blur),intensity=Math.min(1,Math.max(0,Number(s.shadow&&s.shadow.intensity)||0));
+  const text={
+    color:stageReturnColor(s.color),fontWeight:Number(s.fontWeight)>0?String(Number(s.fontWeight)):'',
+    textAlign:['left','center','right','justify'].indexOf(s.textAlign)>=0?s.textAlign:'',
+    textTransform:s.upperCase?'uppercase':'none',
+    textShadow:s.shadow&&blur>=0?'0 0 '+(Math.round(blur/108*100*1000)/1000)+'vw rgba(0,0,0,'+intensity+')':'none',
+  };
+  const title=q('.stage-return__title'),nextLyric=q('.stage-return__next-lyric');
+  const lyrics=root.querySelectorAll('.stage-return__lyric');
+  [title,nextLyric].concat(Array.prototype.slice.call(lyrics)).forEach(function(el){Object.assign(el.style,text)});
+  title.style.fontSize=stageReturnVw(s.fontSize);
+  lyrics.forEach(function(el){el.style.fontSize=stageReturnVw(s.fontSize)});
+  nextLyric.style.fontSize=stageReturnVw(s.nextFontSize);
+  q('.stage-return__next-label').textContent=L10N.returnNext;
+  const slide=Number(m.slideIndex),ratio=Math.min(1,Math.max(0,Number(m.progress)||0));
+  const canPromote=sr.active&&slide===sr.slide+1&&current.length>0&&current===sr.next&&!cover&&!sr.cover;
+  const slideChanged=!sr.active||slide!==sr.slide;
+  sr.active=true;sr.slide=slide;
+  srSyncBar(ratio,slideChanged);
+  if(canPromote)void srPromote(m);
+  else if(sr.busy){if(current!==sr.flyerText||cover)srSnap(m)}
+  else if(current!==sr.current||String(m.next||'')!==sr.next||cover!==sr.cover||(m.nextIsCover===true)!==sr.nextCover)srSnap(m);
+  q('.stage-return__bar-fill').style.backgroundColor=stageReturnColor(s.barColor);
+  root.style.backgroundColor=stageReturnColor(s.backgroundColor);
+  const bg=typeof m.background==='string'&&/^https?:\/\//i.test(m.background)?m.background:'';
+  q('.stage-return__bg').style.backgroundImage=bg?'url("'+bg.replace(/["\\\s]/g,function(c){return encodeURIComponent(c)})+'")':'';
+  root.hidden=false;
+  syncCastWaiting();
+}
 // F3.3q: versão no idle (canto inferior direito) — ?v= override ou padrão.
 window.__PALCO_APPV__=window.__PALCO_APPV__||'0.1.55';
 (function(){var el=$('idleVer');if(!el)return;var qv=qs.get('v')||window.__PALCO_APPV__||'';if(qv){el.textContent='PIANO LouvorJA Palco · receiver v'+qv;return}fetch('appinfo.json').then(function(r){return r.json()}).then(function(j){el.textContent='PIANO LouvorJA Palco · receiver v'+(j.version||'?')}).catch(function(){fetch('config.xml').then(function(r){return r.text()}).then(function(t){var m2=t.match(/version="([^"]+)"/);el.textContent='PIANO LouvorJA Palco · receiver v'+(m2?m2[1]:'?')}).catch(function(){el.textContent='PIANO LouvorJA Palco'})})})()
@@ -2581,6 +2837,29 @@ function projectionColor(value){
   const match=/^\s*(#[0-9a-fA-F]{3,8}|rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*(?:,\s*(?:0|1|0?\.\d+)\s*)?\)|hsla?\(\s*\d{1,3}\s*,\s*\d{1,3}%\s*,\s*\d{1,3}%\s*(?:,\s*(?:0|1|0?\.\d+)\s*)?\)|[a-zA-Z]{1,20})\s*$/.exec(String(value||''));
   return match?match[1]:'';
 }
+// Posição da referência bíblica; null = sender sem o campo (segue o alinhamento do texto).
+function footerPosition(m){
+  const p=m&&m.footerPosition;
+  return p==='below-left'||p==='below-center'||p==='below-right'||p==='corner'?p:null;
+}
+// Transição do versículo: só anima quando o texto muda; sem o campo (APK), troca seca.
+let lastBibleVerse='';
+function bibleEnter(m){
+  const kind=m.scope==='bible'&&(m.transition==='fade'||m.transition==='slide'||m.transition==='zoom')?m.transition:null;
+  const verse=m.scope==='bible'?String(m.text||'')+'|'+String(m.footerRef||''):'';
+  const changed=verse!==lastBibleVerse;
+  lastBibleVerse=verse;
+  if(kind&&!changed)return;
+  const ms=Number(m.transitionMs);
+  ['text','footer'].forEach(function(id){
+    const el=$(id);if(!el)return;
+    el.classList.remove('rx-enter-fade','rx-enter-slide','rx-enter-zoom');
+    if(!kind)return;
+    el.style.setProperty('--rx-ms',(Number.isFinite(ms)&&ms>=0&&ms<=2000?ms:250)+'ms');
+    void el.offsetWidth;
+    el.classList.add('rx-enter-'+kind);
+  });
+}
 // Conexões diretas: somente IPv4 de LAN/loopback e localhost, nunca DNS público.
 function palcoLanHost(value){
   if(value==='localhost')return 'localhost';
@@ -2605,6 +2884,7 @@ function palcoOfficialOrigin(origin){
     case 'https://api.louvorja.com.br':return 'https://api.louvorja.com.br';
     case 'https://api-stg.louvorja.com.br':return 'https://api-stg.louvorja.com.br';
     case 'https://api.louvorja.workers.dev':return 'https://api.louvorja.workers.dev';
+    case 'https://pub-8c0e123c55a14cdfa0c52fa182688782.r2.dev':return 'https://pub-8c0e123c55a14cdfa0c52fa182688782.r2.dev';
     default:return '';
   }
 }
@@ -2652,9 +2932,16 @@ function sendEvent(m){try{if(ws&&ws.readyState===1)ws.send(JSON.stringify(m))}ca
 
 // ===== Auto-descoberta (F3.3): acha o sender (APK) na sub-rede =====
 // Prioridade: launchParams/query host > último host válido (localStorage)
-// > scan da sub-rede via GET :7080/status (resposta JSON identifica sender).
-let host=qs.get('host')||localStorage.getItem('palcoHost')||location.hostname||'';
-let port=qs.get('port')||localStorage.getItem('palcoPort')||'7081';
+// > scan da sub-rede via GET :47080/status (resposta JSON identifica sender).
+// Transição: computadores na porta antiga (7080/7081) também são procurados.
+const DEFAULT_WS_PORT='47081';
+const LEGACY_WS_PORT='7081';
+const browserSourcePort=Number(location.port);
+const ownBrowserSource=/^https?:$/.test(location.protocol)&&!!palcoLanHost(location.hostname)&&browserSourcePort>=7080&&browserSourcePort<=65534;
+let host=qs.get('host')||(ownBrowserSource?location.hostname:localStorage.getItem('palcoHost'))||location.hostname||'';
+let port=qs.get('port')||(ownBrowserSource?String(browserSourcePort+1):localStorage.getItem('palcoPort'))||DEFAULT_WS_PORT;
+// Porta do link ou da própria página é definitiva; a salva pode ser de antes da troca.
+const portFixed=!!(qs.get('port')||ownBrowserSource);
 
 function probeHttp(ip,httpPort){
   const url=palcoLanUrl(ip,httpPort,'/status','http');
@@ -2667,11 +2954,17 @@ function probeHttp(ip,httpPort){
   });
 }
 function probeSender(ip){
-  // Porta digitada pode ser WS (7081) OU HTTP do slot (a UI mostra a HTTP,
-  // ex.: slot 1 = 7082/7083). Tenta a dupla HTTP/WS em ambos os sentidos:
-  // p como HTTP, p-1 (p=WS) e p+1 (p=HTTP→WS=p+1).
   if(!palcoLanUrl(ip,port,'/status','http'))return Promise.resolve(null);
-  var p=Number(port);
+  var tries=[port];
+  if(!portFixed)[DEFAULT_WS_PORT,LEGACY_WS_PORT].forEach(function(p){if(tries.indexOf(p)<0)tries.push(p)});
+  return tries.slice(1).reduce(function(found,p){
+    return found.then(function(r){return r||probePair(ip,Number(p))});
+  },probePair(ip,Number(port)));
+}
+function probePair(ip,p){
+  // Porta digitada pode ser WS (47081) OU HTTP do slot (a UI mostra a HTTP,
+  // ex.: slot 1 = 47082/47083). Tenta a dupla HTTP/WS em ambos os sentidos:
+  // p como HTTP, p-1 (p=WS) e p+1 (p=HTTP→WS=p+1).
   return probeHttp(ip,p).then(function(j){
     if(j)return normalizePort(ip,j,p+1);        // p era HTTP → WS=p+1
     return probeHttp(ip,p-1).then(function(j2){
@@ -2684,6 +2977,7 @@ function probeSender(ip){
   });
 }
 function normalizePort(ip,j,wsPort){
+  if(j&&Number.isInteger(Number(j.wsPort)))wsPort=Number(j.wsPort);
   if(!palcoLanUrl(ip,wsPort,'/palco','ws'))return null;
   port=String(Number(wsPort));
   return palcoLanHost(ip);
@@ -2726,6 +3020,8 @@ function connect(){
     });
     return;
   }
+  // Browser sources have an authoritative address: never scan another output.
+  if(ownBrowserSource){doConnect();return;}
   // F3.3v: valida o host ANTES do WS — se o sender não responde em /status,
     // o IP é stale (DHCP) → esquece e escaneia JÁ, sem as 3 tentativas de WS
     // com backoff (que levavam ~15s antes de re-escanear).
@@ -2755,6 +3051,7 @@ function connect(){
 // Watchdog: sender morreu/fechou com mídia tocando → para NA HORA.
 // Sem isso o áudio continuava até o fim depois do app cair.
 function stopMediaOnServerLoss(){
+  try{cleanMirror.stop()}catch(e){}
   try{
     const a=$('audio'); if(a&&!a.paused){a.pause();a.currentTime=0}
     const v=$('video'); if(v&&!v.paused){v.pause();v.removeAttribute('src');v.style.display='none';v.load()}
@@ -2769,18 +3066,19 @@ function doConnect(){
   setStatus(L10N.connecting.replace('{h}',host).replace('{p}',port));
   try{ws=new WebSocket(socketUrl)}catch(e){retry();return}
   ws.onopen=()=>{tries=0;dlog('WS OPEN '+host);setStatus('● '+host);
+    try{const requestId=sessionStorage.getItem('palcoRefreshRequest');if(requestId){ws.send(JSON.stringify({v:2,type:'receiver-ready',requestId,youtube:true,cleanMirror:!!window.PianoNetworkMirror}));sessionStorage.removeItem('palcoRefreshRequest')}}catch(e){}
     if(window.__hideSplash)window.__hideSplash(); // F3.3j: splash sai no connect
     localStorage.setItem('palcoHost',host);
     localStorage.setItem('palcoPort',port)};
   ws.onmessage=ev=>{try{handle(JSON.parse(ev.data))}catch(e){}};
   ws.onclose=()=>{dlog('WS CLOSE');stopMediaOnServerLoss();showIdle();
     // host falhou 3x → esquece e re-escaneia (IP mudou)
-    if(tries>=3){localStorage.removeItem('palcoHost');host='';tries=0}
+    if(!ownBrowserSource&&tries>=3){localStorage.removeItem('palcoHost');host='';tries=0}
     retry()};
   ws.onerror=()=>{};
 }
 function retry(){
-  const wait=Math.min(1000*Math.pow(2,tries++),10000);
+  const wait=ownBrowserSource?1000:Math.min(1000*Math.pow(2,tries++),10000);
   setStatus(L10N.reconn.replace('{s}',Math.round(wait/1000)),true);
   setTimeout(connect,wait);
 }
@@ -2913,7 +3211,101 @@ function showCloudPair(code){
   if(c)c.appendChild(wrap);
 }
 function hideCloudPair(){var el=document.getElementById('cloudPair');if(el)el.remove()}
+// YouTube watch URLs are not playable by <video>. Each network receiver
+// loads the official embedded player and follows the operator commands.
+let connectionAudioMuted=stageReturnMode;
+const cleanMirror=PianoNetworkMirror.createReceiver({
+  send:sendEvent,
+  attach:function(stream){
+    const video=$('video');video.pause();video.removeAttribute('src');video.srcObject=stream;
+    video.style.display='block';video.style.objectFit='contain';
+    hideIdle();hideNp();playVideoWithFallback();
+  },
+  clear:function(){hideMuteBadge();const video=$('video');if(video.srcObject){video.pause();video.srcObject=null;video.style.display='none'}},
+  error:function(message){showIdle(message)},
+});
+let youtubePlayer=null,youtubeId=null,youtubePending=null,youtubeReady=false,youtubeCaptionsHidden=false;
+let youtubeCaptionTrack=null,youtubeApplyingCaptions=false;
+function stopYoutube(){
+  if(youtubeId)hideMuteBadge();
+  youtubeId=null;youtubePending=null;youtubeReady=false;youtubeCaptionTrack=null;
+  if(youtubePlayer){try{youtubePlayer.destroy()}catch(e){}youtubePlayer=null}
+  const view=document.getElementById('youtubeProjection');if(view)view.remove();
+}
+function applyYoutubeCaptions(){
+  if(!youtubeReady||!youtubePlayer||youtubeApplyingCaptions)return;
+  youtubeApplyingCaptions=true;
+  try{
+    if(youtubeCaptionsHidden){
+      const track=youtubePlayer.getOption?.('captions','track');
+      if(track&&track.languageCode)youtubeCaptionTrack=track;
+      // Embedded players do not consistently expose unloadModule. Clear the
+      // selected track as well, including when captions load after onReady.
+      youtubePlayer.setOption?.('captions','track',{});
+      youtubePlayer.unloadModule?.('captions');
+    }else{
+      youtubePlayer.loadModule?.('captions');
+      if(youtubeCaptionTrack)youtubePlayer.setOption?.('captions','track',youtubeCaptionTrack);
+    }
+  }catch(e){}finally{youtubeApplyingCaptions=false}
+}
+function applyYoutubeCommand(){
+  if(!youtubeReady||!youtubePlayer||!youtubePending)return;
+  const m=youtubePending;
+  if(typeof m.positionMs==='number'||m.action==='seek'){
+    youtubePlayer.seekTo(typeof m.positionMs==='number'?m.positionMs/1000:Number(m.position)||0,true);
+  }
+  if(m.action==='pause')youtubePlayer.pauseVideo();
+  else youtubePlayer.playVideo();
+  youtubePending={action:m.action==='pause'?'pause':'play'};
+}
+function mountYoutube(){
+  if(!youtubeId||youtubePlayer||!window.YT||!window.YT.Player)return;
+  const expected=youtubeId;
+  const view=document.createElement('div');view.id='youtubeProjection';
+  view.style.cssText='position:fixed;inset:0;z-index:100;background:#000';
+  const target=document.createElement('div');view.appendChild(target);
+  const veil=document.createElement('div');veil.id='youtubeVeil';view.appendChild(veil);document.body.appendChild(view);
+  youtubePlayer=new YT.Player(target,{width:'100%',height:'100%',videoId:expected,
+    playerVars:{autoplay:1,controls:0,playsinline:1,rel:0,fs:0,iv_load_policy:3,disablekb:1,origin:location.origin},
+    events:{onReady:function(event){
+      if(youtubeId!==expected)return;
+      youtubeReady=true;
+      // Silent autoplay is reliable on TV browsers; audio can be unlocked by
+      // the normal receiver interaction when the browser requires a gesture.
+      event.target.mute();applyYoutubeCaptions();applyYoutubeCommand();showMuteBadge();
+    },onApiChange:function(){
+      // Captions may load after onReady; only unload a module actually loaded.
+      if(youtubeCaptionsHidden||youtubeCaptionTrack)applyYoutubeCaptions();
+    },onStateChange:function(event){
+      if(event.data===1&&youtubeId===expected)veil.classList.add('is-hidden');
+      if(event.data===0){stopYoutube();showIdle(L10N.idle);sendEvent({v:2,type:'ended',media:'video'})}
+    },onError:function(){
+      stopYoutube();showIdle('YouTube: não foi possível reproduzir este vídeo incorporado.');
+    }}});
+}
+function handleYoutube(m){
+  if(m.action==='captions'){youtubeCaptionsHidden=m.captionsHidden===true;applyYoutubeCaptions();return}
+  if(m.action==='stop'){stopYoutube();showIdle(L10N.idle);return}
+  if(m.youtubeId&&/^[\w-]{11}$/.test(m.youtubeId)&&m.youtubeId!==youtubeId){
+    stopYoutube();youtubeId=m.youtubeId;
+  }
+  if(!youtubeId)return;
+  hideIdle();hideNp();
+  ['video','audio'].forEach(id=>{const media=$(id);media.pause();media.removeAttribute('src');media.load();media.style.display='none'});
+  if(m.youtubeId)youtubeCaptionsHidden=m.captionsHidden===true;
+  youtubePending=m.youtubeId?Object.assign({},m,{action:m.paused?'pause':'play'}):m;
+  if(window.YT&&YT.Player){mountYoutube();if(m.youtubeId)applyYoutubeCaptions();applyYoutubeCommand();return}
+  if(!document.getElementById('youtubeProjectionApi')){
+    const previous=window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady=function(){if(previous)previous();mountYoutube()};
+    const script=document.createElement('script');script.id='youtubeProjectionApi';script.src='https://www.youtube.com/iframe_api';
+    script.onerror=function(){stopYoutube();showIdle('YouTube: falha ao conectar ao player.')};document.head.appendChild(script);
+  }
+}
 function showIdle(msg){
+  document.documentElement.classList.remove('obs-music');
+  document.documentElement.classList.add('receiver-idle');
   $('idleMsg').textContent=msg;
   $('idle').classList.remove('hidden');
   // volta pro BG do palco (personalizado) — música "saiu de cena"
@@ -2924,6 +3316,7 @@ function showIdle(msg){
   hideNp();
   {const t=$('timer'); if(t.style.display!=='none'){clearInterval(t._iv||0);
     t.style.display='none';}}
+  $('text').style.display='';
   $('text').textContent='';$('footer').textContent='';
   // F3.3ac: remove estilos de projeção (caixa/sombra) — senão a caixa
   // vazia continuava desenhada no idle após "Limpar projeção".
@@ -2931,8 +3324,9 @@ function showIdle(msg){
   $('text').style.removeProperty('--box-bg');
   $('text').style.removeProperty('--box-border');
   $('text').style.removeProperty('--ts');
+  syncCastWaiting();
 }
-function hideIdle(){$('idle').classList.add('hidden')}
+function hideIdle(){document.documentElement.classList.remove('receiver-idle');$('idle').classList.add('hidden');syncCastWaiting()}
 // F3.3e: fallback de cover — sem capa ou capa quebrada = logo da org.
 // Cover relativo (images/... ou covers/...) resolve contra / do sender.
 function coverUrl(cover){
@@ -2941,7 +3335,7 @@ function coverUrl(cover){
   const path=encodeURI(String(cover).replace(/^\/+/, '')).split(/[?#]/)[0];
   if(!path)return null;
   const sender=lanSenderHost();
-  if(location.protocol==='file:'&&sender)return palcoMediaUrl('http://'+sender+':7080/'+path);
+  if(location.protocol==='file:'&&sender)return palcoMediaUrl('http://'+sender+':'+(Number(port)-1)+'/'+path);
   return '/'+path;
 }
 function showNp(title,sub,cover){
@@ -2974,7 +3368,7 @@ let pendingPlay=false;
 // no ponto certo). Badge discreto, não bloqueia a tela.
 let mutedUnlock=false;
 function showMuteBadge(){
-  if($('muteBadge'))return;
+  if(stageReturnMode||$('muteBadge'))return;
   const b=document.createElement('div');
   b.id='muteBadge';
   b.style.cssText='position:fixed;top:3vh;right:3vh;z-index:98;cursor:pointer;'+
@@ -2988,16 +3382,21 @@ function hideMuteBadge(){const b=$('muteBadge');if(b)b.remove()}
 function unmuteNow(){
   mutedUnlock=false;hideMuteBadge();
   a0.muted=false;
-  const vv=$('video'); if(vv){vv.muted=false; if(vv.paused&&vv.src)vv.play().catch(function(){})}
+  if(youtubePlayer&&youtubeReady){youtubePlayer.unMute();youtubePlayer.playVideo()}
+  const vv=$('video'); if(vv){vv.muted=connectionAudioMuted; if(vv.paused&&vv.src)vv.play().catch(function(){})}
   a0.play().then(()=>sendEvent({v:1,type:'unlocked'})).catch(()=>{});
   sendEvent({v:1,type:'unlocked'});
 }
 function playVideoWithFallback(){
   const v=$('video');
-  v.muted=false;
+  v.muted=connectionAudioMuted;
   v.play().then(()=>{
-    dlog('VID PLAY OK (som)');
+    dlog('VID PLAY OK (som)');mutedUnlock=false;hideMuteBadge();
   }).catch(e=>{
+    // A replaced stream / concurrent play can abort a pending play promise.
+    // This is not an autoplay denial and must never mute a live connection.
+    if(e.name==='AbortError')return;
+    if(e.name!=='NotAllowedError'){dlog('VID PLAY FAIL: '+e.name);return}
     dlog('VID PLAY FAIL som: '+e.name+' — retry mudo');
     v.muted=true;
     v.play().then(()=>{
@@ -3162,8 +3561,124 @@ document.addEventListener('pointerdown',function(){if(mutedUnlock||pendingPlay)u
 
 function isAudioUrl(u){return /\.(mp3|m4a|aac|wav|ogg|flac)(\?|$)/i.test(u||'')}
 
+// OBS share uses two isolated receiver viewports; only the parent opens WS.
+const obsShareState={enabled:false,frames:[],ready:[],messages:[new Map(),new Map()],active:[false,false]};
+function obsShareLayout(){
+  const state=obsShareState;
+  state.frames.forEach((frame,index)=>{
+    const both=state.active[0]&&state.active[1];
+    frame.style.display=state.active[index]?'block':'none';
+    frame.style.width=both?'50%':'100%';
+    frame.style.left=both&&index===1?'50%':'0';
+  });
+  syncCastWaiting();
+}
+function obsShareRemember(m,index){
+  const messages=obsShareState.messages[index];
+  if(m.type==='idle'||m.type==='stop-all'){['projection','timer','clock','video','audio','audio-sync','video-sync'].forEach(type=>messages.delete(type));}
+  messages.set(m.type,{...m,obsPane:false});
+  if(['projection','timer','clock','video','audio'].includes(m.type))obsShareState.active[index]=true;
+  if(m.type==='idle'||m.type==='stop-all')obsShareState.active[index]=false;
+}
+function obsShareSend(m,index){
+  if(obsShareState.ready[index])obsShareState.frames[index].contentWindow.handle({...m,obsPane:false});
+}
+function obsShareEnable(enabled){
+  const state=obsShareState;
+  if(state.enabled===enabled)return;
+  state.enabled=enabled;
+  if(!enabled){
+    const wrap=document.getElementById('obsShareView');if(wrap)wrap.remove();
+    state.frames=[];state.ready=[];state.messages[1].clear();state.active[1]=false;
+    for(const message of state.messages[0].values())handle(message);
+    syncCastWaiting();
+    return;
+  }
+  ['video','audio'].forEach(id=>{try{$(id).pause()}catch(e){}});
+  const wrap=document.createElement('div');wrap.id='obsShareView';
+  wrap.style.cssText='position:fixed;inset:0;background:#000;z-index:100000';
+  document.body.appendChild(wrap);
+  [0,1].forEach(index=>{
+    const frame=document.createElement('iframe');
+    const url=new URL(location.href);url.searchParams.set('obsPane','1');
+    frame.style.cssText='position:absolute;top:0;height:100%;border:0;background:#000';
+    frame.onload=()=>{
+      if(!state.enabled||state.frames[index]!==frame)return;
+      state.ready[index]=true;
+      for(const message of state.messages[index].values())obsShareSend(message,index);
+    };
+    state.frames[index]=frame;frame.src=url.href;wrap.appendChild(frame);
+  });
+  obsShareLayout();
+}
+
+let obsWarmupTimeout;
+function clearObsWarmup(){
+  clearTimeout(obsWarmupTimeout);
+  const view=document.getElementById('obsWarmupView');if(view)view.remove();
+}
+function showObsWarmup(message){
+  clearObsWarmup();
+  if(message.expiresAt && Number(message.expiresAt)<=Date.now())return;
+  const remaining=message.durationMs===3000?3000:Math.min(3000,Number(message.until)-Date.now());
+  if(!Number.isFinite(remaining)||remaining<=0)return;
+  const view=document.createElement('div');view.id='obsWarmupView';
+  const logo=document.createElement('div');logo.className='warmup-logo';
+  const image=document.createElement('img');image.src='logo-piano-louvorja.png';image.alt='Logo Piano Louvor JA';
+  const caption=document.createElement('p');caption.className='warmup-caption';
+  caption.appendChild(document.createTextNode('PALCO PIANO'));caption.appendChild(document.createElement('br'));
+  caption.appendChild(document.createTextNode('LOUVOR JA'));
+  logo.appendChild(image);logo.appendChild(caption);
+  view.appendChild(logo);document.body.appendChild(view);
+  sendEvent({v:2,type:'obs-warmup-started',requestId:message.requestId});
+  obsWarmupTimeout=setTimeout(()=>{clearObsWarmup();sendEvent({v:2,type:'obs-warmup-complete',requestId:message.requestId})},remaining);
+}
 function handle(m){
   if(m.v!==1&&m.v!==2)return;
+  if(m.type==='stageReturn'){applyStageReturn(m);return;}
+  if(stageReturnMode&&m.type==='audio')return;
+  if(m.type==='audioOutput'){
+    connectionAudioMuted=stageReturnMode||m.mode==='player';
+    $('video').muted=connectionAudioMuted;$('audio').muted=connectionAudioMuted;
+    if(connectionAudioMuted)hideMuteBadge();
+    else if($('video').srcObject)playVideoWithFallback();
+    return;
+  }
+  if(m.type==='video'&&typeof m.connectionsMuted==='boolean')connectionAudioMuted=stageReturnMode||m.connectionsMuted;
+  if(m.type==='obsWarmup'){showObsWarmup(m);return;}
+  if(m.type==='obsControl'){
+    if(m.action==='reload'){try{sessionStorage.setItem('palcoRefreshRequest',String(m.requestId||''))}catch(e){}location.reload();return;}
+    if(m.action==='stop'){
+      clearObsWarmup();
+      stopYoutube();cleanMirror.stop();
+      obsShareState.enabled=false;
+      const shared=document.getElementById('obsShareView');if(shared)shared.remove();
+      obsShareState.frames=[];obsShareState.ready=[];
+      obsShareState.messages.forEach(messages=>messages.clear());obsShareState.active=[false,false];
+      ['video','audio'].forEach(id=>{const media=$(id);try{media.pause();media.removeAttribute('src');media.load()}catch(e){}media.style.display='none'});
+      showIdle('');
+      const previous=document.getElementById('obsStoppedView');if(previous)previous.remove();
+      const blank=document.createElement('div');blank.id='obsStoppedView';
+      blank.style.cssText='position:fixed;inset:0;background:#000;z-index:100001';document.body.appendChild(blank);
+    }
+    return;
+  }
+  if(['projection','timer','clock','video','audio'].includes(m.type)){
+    const stopped=document.getElementById('obsStoppedView');if(stopped)stopped.remove();
+  }
+  if(qs.get('obsPane')!=='1'){
+    if(m.type==='obsShare'){obsShareEnable(m.enabled===true);return;}
+    const index=m.obsPane===true?1:0;
+    if(m.type==='obsIdle'||m.type==='bgPalco'){
+      obsShareRemember(m,0);obsShareRemember(m,1);
+      if(obsShareState.enabled){obsShareSend(m,0);obsShareSend(m,1);return;}
+    }else{
+      obsShareRemember(m,index);
+      if(obsShareState.enabled){obsShareSend(m,index);obsShareLayout();return;}
+      if(index===1)return;
+    }
+  }
+  if(m.type==='timer'||m.type==='clock')document.documentElement.classList.remove('obs-music');
   // HARDENING culto: mídia externa (vídeo/pdf/ppt/áudio da liturgia) viva
   // tem prioridade absoluta no slot. Mensagens de texto/projection não podem
   // renderizar por cima (cross-bleed owner — caso real 28/08: random sobre
@@ -3174,7 +3689,7 @@ function handle(m){
     // Sem sinal novo, o lock expira (sender morto/stuck não trava o culto).
     const fresh=(Date.now()-(window.__mediaLastSeen||0))<25000;
     const _v=$('video'),_a=$('audio');
-    const mediaActive=(_v&&!_v.paused&&_v.style.display!=='none')||(_a&&!_a.paused)||window.__videoAudioActive;
+    const mediaActive=cleanMirror.active()||youtubeReady||(_v&&!_v.paused&&_v.style.display!=='none')||(_a&&!_a.paused)||window.__videoAudioActive;
     if(mediaActive&&fresh&&!window.__mediaLock){
       try{dlog('BLOCKED',m.type,'— mídia externa ativa')}catch(e){}
       return;
@@ -3188,19 +3703,38 @@ function handle(m){
     if(window.__videoAudioActive){window.__videoAudioActive=false}
     try{const _v2=$('video'),_a2=$('audio');_v2.pause();_v2.removeAttribute('src');_v2.load();_a2.pause()}catch(e){}
   }
+  if(m.type==='mirror-signal'){
+    cleanMirror.handle(m).catch(function(){showIdle('Não foi possível conectar a transmissão do player.')});return;
+  }
+  if(m.type==='video'&&m.cleanMirror&&typeof m.mirrorSession==='string'){
+    stopYoutube();hideIdle();hideNp();
+    const audio=$('audio');audio.pause();
+    cleanMirror.start(m.mirrorSession);return;
+  }
+  if(cleanMirror.active()){
+    if(m.type==='audio'&&!m.url)return;
+    if(m.type==='video'&&!m.url&&!m.youtubeId){
+      if(m.action==='stop'){cleanMirror.stop();showIdle(L10N.idle)}
+      return;
+    }
+    if(['video','audio','projection','timer','clock','idle','bgPalco','stop-all'].includes(m.type))cleanMirror.stop();
+  }
+  // The operator sends duplicate transport actions on audio and video.
+  if(youtubeId&&m.type==='audio'&&!m.url)return;
+  if(youtubeId&&['projection','timer','clock','audio','idle','bgPalco','stop-all'].includes(m.type))stopYoutube();
   switch(m.type){
     case 'projection':
+      document.documentElement.classList.toggle('obs-music',m.scope==='media'||m.scope==='hymns');
       hideIdle();
       hideCloudPair();
       hideNp();
-      {const t=$('timer'); if(t.style.display!=='none'){clearInterval(t._iv||0);
-        t.style.display='none';$('text').style.display='';}}
+      {const t=$('timer');clearInterval(t._iv||0);t.style.display='none';$('text').style.display='';}
       const bgEl=$('bg');
-      bgEl.onerror=()=>{bgEl.onerror=null;bgEl.src='bg-fallback.png'};
+      bgEl.onerror=()=>{bgEl.onerror=()=>{bgEl.onerror=null;bgEl.removeAttribute('src')};bgEl.src='bg-fallback.png'};
       // Frame de slide (data:image/ do pump PDF/PPT/imagens): imagem é o
       // CONTEÚDO, não bg decorativo — sem brightness(.55) nem véu (paridade
       // com a tela do operador). 13/10 Rafael: tonalidade lavada no palco.
-      const isFrameSlide=typeof m.background==='string'&&m.background.startsWith('data:image/');
+      const isFrameSlide=m.frameSlide===true||(typeof m.background==='string'&&m.background.startsWith('data:image/'));
       bgEl.classList.toggle('frame-slide',isFrameSlide);
       bgEl.onerror=isFrameSlide?null:bgEl.onerror;
       // Cor explícita é a personalização ativa do Palco: vence capa/bg do
@@ -3215,7 +3749,10 @@ function handle(m){
       // Slide/PDF/PPT (text vazio) é mídia visual pura: sem véu de leitura,
       // preserva a tonalidade original do canvas do operador.
       $('veil').style.display=m.text?'':'none';
-      renderProjectionText($('text'),m.text);
+      const compactLyrics=(m.scope==='hymns'||m.scope==='media')&&m.isCover!==true;
+      const displayText=compactLyrics?String(m.text||'').replace(/(?:<br\s*\/?>|\r?\n)(?:[\t ]*(?:<br\s*\/?>|\r?\n))*/gi,'<br>'):m.text;
+      renderProjectionText($('text'),displayText);
+      $('text').classList.toggle('music-lyrics',(m.scope==='hymns'||m.scope==='media')&&m.isCover!==true);
       $('text').classList.toggle('cover-on',m.isCover===true);
       $('text').classList.toggle('title-box-on',m.titleTextBox===true);
       // F3.3o: fontSize/fontWeight dinâmicos (settings do operador).
@@ -3231,7 +3768,7 @@ function handle(m){
         if(typeof fs==='number')t.style.setProperty('--fit-size',(fs*16/9/19.2)+'vw');
         if(typeof fw==='number')t.style.fontWeight=fw;
         if(m.isCover===true){
-          t.style.removeProperty('color');
+          if(m.titleTextColor){const titleColor=projectionColor(m.titleTextColor);if(titleColor)t.style.color=titleColor}else t.style.removeProperty('color');
           t.querySelectorAll('span[style*="color"]').forEach(function(sp){sp.style.removeProperty('color')});
         } else {
           const rawColor=useLyric&&typeof m.lyricTextColor==='string'&&m.lyricTextColor?m.lyricTextColor:m.textColor;
@@ -3287,7 +3824,7 @@ function handle(m){
           // texto (abaixo dela, mesmo alinhamento horizontal), não no rodapé
           // da tela. Gap 1.4vmin como no popup.
           var f=$('footer');
-          if(f && m.footerRef && m.textVerticalAlign){
+          if(f && m.footerRef && m.textVerticalAlign && footerPosition(m)!=='corner'){
             var r=t.getBoundingClientRect();
             var gap=Math.round(innerHeight*0.014);
             f.style.left=r.left+'px';
@@ -3300,7 +3837,7 @@ function handle(m){
         if(!m.footerRef){
           t.style.fontSize='';
           if(typeof fs==='number')t.style.setProperty('--fit-size',(fs*16/9/19.2)+'vw');
-          if(m.isCover===true){t.style.removeProperty('color');t.querySelectorAll('span[style*="color"]').forEach(function(sp){sp.style.removeProperty('color')})}
+          if(m.isCover===true){if(m.titleTextColor){const titleColor=projectionColor(m.titleTextColor);if(titleColor)t.style.color=titleColor}else t.style.removeProperty('color');t.querySelectorAll('span[style*="color"]').forEach(function(sp){sp.style.removeProperty('color')})}
         }
       }
       // Paridade total: personalizações do app aplicadas na TV.
@@ -3342,7 +3879,7 @@ function handle(m){
         else{t.classList.add('shadow-on');
           if(typeof m.shadowBlur==='number')
             t.style.setProperty('--ts',`0 ${Math.max(1,m.shadowBlur/3)}vh ${m.shadowBlur}vh rgba(0,0,0,${m.shadowIntensity!=null?m.shadowIntensity:0.8})`)}
-        if(m.textBox){t.classList.add('box-on');
+        if(m.isCover===true?m.titleTextBox===true:m.textBox){t.classList.add('box-on');
           t.classList.toggle('bible-box',m.bibleBox===true);
           if(typeof m.boxOpacity==='number')t.style.setProperty('--box-bg',m.boxOpacity);
           t.style.setProperty('--box-border',
@@ -3351,16 +3888,19 @@ function handle(m){
       }
       // F3.3m: footer com referência destacada + versão
       {const f=$('footer');
+        const pos=footerPosition(m);
         // WT-5f: footer segue o alinhamento do palco (paridade popup — a
         // referência fica dentro do conteúdo lá, alinhada com o texto).
         // padding 4vw = mesma borda da caixa de texto (92vw centrada).
-        if(m.textAlign){f.style.textAlign=m.textAlign;f.style.padding='0 4vw';f.style.boxSizing='border-box'}
+        // Posição escolhida no Personalizar Palco vence; sem ela (APK), segue o texto.
+        const align=pos==='corner'?'right':pos?pos.slice(6):m.textAlign;
+        if(align){f.style.textAlign=align;f.style.padding='0 4vw';f.style.boxSizing='border-box'}
         else{f.style.textAlign='center';f.style.padding='0'}
         // Default: rodapé da tela (8vh p/ sair da área do texto). O rAF do
         // auto-fit reposiciona PERTO da caixinha quando há footerRef (abaixo).
         f.style.left='0'; f.style.right='0'; f.style.width='auto';
         f.style.top='auto';
-        f.style.bottom=(m.footerRef?'8vh':'4vh');
+        f.style.bottom=(m.footerRef&&pos!=='corner'?'8vh':'4vh');
         if(m.footerRef){
           f.textContent='';
           const ref=document.createElement('span');ref.className='ref';ref.textContent=String(m.footerRef);
@@ -3377,10 +3917,12 @@ function handle(m){
       // Label de versão some durante projection com referência (colidia no
       // canto inferior direito — print 02/09 Rafael).
       {const iv=$('idleVer');if(iv)iv.style.display=m.footerRef?'none':''}
+      bibleEnter(m);
       break;
     case 'bgPalco':
       // BG permanente do palco (idle) — personalização, não da música
       bgPalco=m.url||'';
+      $('bgPalco').onerror=()=>{$('bgPalco').removeAttribute('src')};
       if(bgPalco){
         $('bgPalco').src=palcoMediaUrl(bgPalco);
       }else{
@@ -3450,6 +3992,8 @@ function handle(m){
       }
       break}
     case 'video':{
+      if(m.youtubeId||(youtubeId&&!m.url)){handleYoutube(m);break}
+      if(youtubeId)stopYoutube();
       const v=$('video');
       // MP3/áudio puro no canal video (popup liturgia manda dual): redireciona
       // pro fluxo de áudio — now-playing + EQ + bg (tela preta NUNCA).
@@ -3514,6 +4058,26 @@ function handle(m){
       hideCloudPair();
       const t=$('timer');
       if(m.action==='stop'){t.style.display='none';clearInterval(t._iv||0);$('text').style.display='';break}
+      // Timer messages carry the same module background as monitor projections.
+      const timerBg=$('bg');
+      timerBg.classList.remove('frame-slide');
+      timerBg.onerror=()=>{timerBg.removeAttribute('src')};
+      timerBg.style.opacity='';
+      if(m.background){timerBg.src=palcoMediaUrl(m.background);document.body.style.background=''}
+      else{timerBg.removeAttribute('src');document.body.style.background=m.backgroundColor||'#000'}
+      $('bgPalco').removeAttribute('src');
+      $('veil').style.display='';
+      if(m.mode==='chrono'&&m.chronoRuntime){
+        const runtime=m.chronoRuntime;
+        clearInterval(t._iv||0);t.style.display='';$('text').style.display='none';
+        const renderChrono=()=>{
+          const elapsed=Math.max(0,Number(runtime.accumulatedMs)||0)+(runtime.status==='running'&&runtime.segmentStartedAt!=null?Math.max(0,Date.now()-runtime.segmentStartedAt):0);
+          const tokens={hh:String(Math.floor(elapsed/3600000)).padStart(2,'0'),mm:String(Math.floor(elapsed/60000)%60).padStart(2,'0'),ss:String(Math.floor(elapsed/1000)%60).padStart(2,'0'),ms:String(Math.floor(elapsed%1000/10)).padStart(2,'0')};
+          t.textContent=(m.timeFormat||'hh:mm:ss.ms').replace(/hh|mm|ss|ms/g,token=>tokens[token]);
+        };
+        renderChrono();if(runtime.status==='running')t._iv=setInterval(renderChrono,16);
+        break;
+      }
       // WT-5 cloud: text pronto (clock do web, timer/countdown) tem prioridade —
       // o operador já formata; sem tick local (evita dessincronia e zero inicial).
       if(typeof m.text==='string'&&m.text.trim()){
@@ -3531,7 +4095,7 @@ function handle(m){
       const fmt=ms=>{const s=Math.max(0,Math.round(ms/1000));
         const hh=Math.floor(s/3600),mm=String(Math.floor(s/60)%60).padStart(2,'0'),
               ss=String(s%60).padStart(2,'0');
-        return hh>0?`${hh}:${mm}:${ss}`:`${mm}:${ss}`};
+        return `${String(hh).padStart(2,'0')}:${mm}:${ss}`};
       const render=()=>{
         const val=mode==='chrono'?elapsed:rem;
         t.textContent=fmt(val);
@@ -3541,7 +4105,8 @@ function handle(m){
       t._iv=setInterval(()=>{rem-=1000;elapsed+=1000;render();
         if(mode!=='chrono'&&rem<=0){clearInterval(t._iv)}},1000);
       break}
-    case 'idle':showIdle(m.msg||L10N.idle);break;
+    case 'obsIdle':document.documentElement.classList.toggle('obs-black-idle',m.black===true);break;
+    case 'idle':lastBibleVerse='';showIdle(m.msg||L10N.idle);break;
     // F3.3x: sender informa IP DA TV (visto pelo socket) + SLOT onde ela
     // caiu — identificação visível pro operador conferir com o app.
     case 'youare':{
@@ -3565,6 +4130,7 @@ function handle(m){
 // WT-5d: boot — código cloud na query (?code=XXXXXX) ou salvo em localStorage
 // tem prioridade; sem código, segue o fluxo local (scan do sender na LAN).
 (function(){
+  if(qs.get('obsPane')==='1')return;
   var bootCode=(qs.get('code')||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
   if(!bootCode){try{bootCode=localStorage.getItem('palcoCloudCode')||''}catch(e){}}
   if(bootCode&&bootCode.length===6){cloudConnect(bootCode);return}

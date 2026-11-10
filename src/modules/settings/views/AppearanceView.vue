@@ -2,6 +2,7 @@
 import { onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+import FontSelector from '../components/FontSelector.vue'
 import AccentColorCard from '../components/AccentColorCard.vue'
 import InteractionModeCard from '../components/InteractionModeCard.vue'
 import LyricCustomizationCard from '../components/LyricCustomizationCard.vue'
@@ -46,6 +47,10 @@ onMounted(() => {
         <AccentColorCard />
       </aside>
     </div>
+
+    <section class="appearance-experience__fonts">
+      <FontSelector scope="system" />
+    </section>
 
     <section
       v-if="SHOW_LYRIC_CUSTOMIZATION"
@@ -129,6 +134,12 @@ onMounted(() => {
     flex: 1;
     min-width: 0;
   }
+}
+
+.appearance-experience__fonts {
+  width: 100%;
+  max-width: 64rem;
+  margin-top: 2rem;
 }
 
 .appearance-experience__lyrics {

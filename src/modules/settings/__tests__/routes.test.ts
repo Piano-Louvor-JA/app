@@ -9,6 +9,7 @@ vi.mock("@shared/services/desktop-bridge", () => ({
 }));
 
 import { settingsRoutes } from "../routes";
+import TransmissionView from "../views/TransmissionView.vue";
 
 describe("settings routes", () => {
 	it("exporta rota raiz de configurações com redirect", () => {
@@ -27,6 +28,14 @@ describe("settings routes", () => {
 		expect(children).toContain("settings-general");
 		expect(children).toContain("settings-media");
 		expect(children).toContain("settings-projection");
+		expect(children).toContain("settings-transmission");
+	});
+
+	it("a aba Transmissão abre a tela unificada", () => {
+		const transmission = settingsRoutes[0].children?.find(
+			(child) => child.name === "settings-transmission",
+		);
+		expect(transmission?.component).toBe(TransmissionView);
 	});
 });
 
