@@ -279,11 +279,6 @@ export function watchAuthSession(): () => void {
     if (!shouldPullForSession(session, Date.now())) return
     void flushOutbox().catch(() => {})
   }, WATCH_POLL_MS)
-  // primeiro tick imediato: login que ocorreu entre o mount e o watch não espera 2s
-  const session = getAuthSession()
-  if (shouldPullForSession(session, Date.now())) {
-    void flushOutbox().catch(() => {})
-  }
   return () => {
     if (watchTimer) {
       clearInterval(watchTimer)
