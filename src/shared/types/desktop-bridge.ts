@@ -290,6 +290,7 @@ export type RemoteApi = {
   sendAck: (ack: { id?: string | number; ok: boolean }) => void
   sendState: (state: Record<string, unknown>) => void
   pairingInfo: () => Promise<RemotePairingInfo>
+  resetToken?: (role: 'remote' | 'speaker') => Promise<RemotePairingInfo>
   onClients?: (
     callback: (payload: {
       count: number

@@ -86,3 +86,9 @@ describe('speakerPageHtml — design tokens (RF-tokens)', () => {
     expect(html).toContain('navigator.language')
   })
 })
+
+
+it('pregador usa a nova porta remota padrão sem alterar o HTTP da Transmissão', () => {
+  expect(html).toContain("localStorage.getItem('speaker.remotePort')||'48080'")
+  expect(html).toContain('47080/speaker?remotePort=48080')
+})

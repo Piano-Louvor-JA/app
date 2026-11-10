@@ -9,6 +9,10 @@
  */
 
 import { watch } from 'vue'
+import { createAnnouncementsHandlers } from './announcements-handlers'
+import { useAnnouncementsStore } from '../../announcements/stores/useAnnouncementsStore'
+import { useAnnouncementsCarousel } from '../../announcements/composables/useAnnouncementsCarousel'
+import { projectAnnouncement } from '../../announcements/services/announcements-projection'
 import type { Router } from 'vue-router'
 
 import { getDesktopBridge } from '@shared/services/desktop-bridge'
@@ -159,6 +163,12 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
   const desktop = getDesktopBridge()
   const projection = desktop?.projection
   if (!remoteApi) return () => {}
+
+  const announcements = createAnnouncementsHandlers({
+    store: useAnnouncementsStore(),
+    carousel: useAnnouncementsCarousel(),
+    project: item => projectAnnouncement(item, router),
+  })
 
   // Módulos v2: bible/timer/countdown com stores reais do desktop.
   // Cast: pinia expõe UnwrapRef que não é atribuível aos tipos estruturais
@@ -659,6 +669,7 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
       clock: orUndef('clock'),
       random: orUndef('random'),
       media: orUndef('media'),
+      announcements: announcements.snapshot(),
     }
   }
 
@@ -739,6 +750,7 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
     }
 
     // 0) Namespaces v2 (bible/timer/countdown) — spec controle remoto total.
+    if (action.startsWith('announcements.')) return announcements.execute(action, msg)
     const namespace = action.split('.')[0]
     if (V2_NAMESPACES.has(namespace)) {
       return modules.execute(namespace, action, msg)
@@ -965,6 +977,7 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
   // Push de estado quando seleção da liturgia muda (local ou remoto).
   const unwatch = watch(
     () => [
+      JSON.stringify(announcements.snapshot()),
       liturgy.selectedItemIndex,
       player.isProjecting?.value,
       liturgy.selectedDay,

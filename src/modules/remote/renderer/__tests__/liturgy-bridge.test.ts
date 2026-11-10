@@ -250,6 +250,27 @@ describe('installRemoteLiturgyBridge', () => {
     resetHoisted()
   })
 
+  it('anúncios: comandos alteram o desktop e mudanças locais atualizam o APK', async () => {
+    const { useAnnouncementsStore } = await import('../../../announcements/stores/useAnnouncementsStore')
+    const store = useAnnouncementsStore()
+    store.addAnnouncement({ id: 'remote-ann-test', title: 'Reunião remota', kind: 'text', html: '<p>Texto</p>', plainText: 'Texto', titleColor: '' })
+    const { command, cleanup } = await installBridge()
+    try {
+      await command({ action: 'announcements.setCarousel', id: 100, durationMs: 12000, enabled: false })
+      expect(store.carousel).toEqual({ slideMs: 12000, loop: false })
+      await vi.waitFor(() => {
+        const state = hoisted.remoteApiStub.sendState.mock.calls.at(-1)?.[0]
+        expect(state.announcements.slideMs).toBe(12000)
+        expect(state.announcements.lists.flatMap(list => list.items)).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'remote-ann-test' })]))
+      })
+      store.updateAnnouncement({ id: 'remote-ann-test', title: 'Atualizado no desktop', kind: 'text', html: '<p>Texto</p>', plainText: 'Texto', titleColor: '' })
+      await vi.waitFor(() => {
+        const state = hoisted.remoteApiStub.sendState.mock.calls.at(-1)?.[0]
+        expect(state.announcements.lists.flatMap(list => list.items)).toEqual(expect.arrayContaining([expect.objectContaining({ title: 'Atualizado no desktop' })]))
+      })
+    } finally { cleanup() }
+  })
+
   it('buildState: alvo projection com getPlaybackState monta media da projeção', async () => {
     hoisted.targetRef = 'projection'
     hoisted.projection = { getPlaybackState: vi.fn(() => ({ paused: false, currentTime: 1.5, duration: 30, volume: 0.7 })) }

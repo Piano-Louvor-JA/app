@@ -214,3 +214,52 @@ describe('RemotePairingView', () => {
     w.unmount()
   })
 })
+
+
+const confirmStub = {
+  props: ['open'], emits: ['confirm', 'cancel'],
+  template: '<div v-if="open"><button data-testid="token-confirm" @click="$emit(\'confirm\')"/><button data-testid="token-cancel" @click="$emit(\'cancel\')"/></div>',
+}
+
+it.each(['remote', 'speaker'])('atualizar token de %s exige confirmação e atualiza link/QR', async (role) => {
+  const bridge = makeBridge({ resetToken: vi.fn() })
+  const before = await bridge.remote.pairingInfo()
+  const after = { ...before, token: role === 'remote' ? 'NEW12345' : before.token,
+    connectUrl: role === 'remote' ? 'louvorja://novo' : before.connectUrl,
+    qrDataUrl: role === 'remote' ? 'data:image/png;base64,NOVO' : before.qrDataUrl,
+    speakerUrl: role === 'speaker' ? 'http://novo/speaker' : before.speakerUrl,
+    speakerQrDataUrl: role === 'speaker' ? 'data:image/png;base64,NOVOSP' : before.speakerQrDataUrl }
+  const reset = bridge.remote.resetToken as ReturnType<typeof vi.fn>
+  reset.mockResolvedValue(after)
+  mocks.getDesktopBridge.mockReturnValue(bridge)
+  const wrapper = mount(RemotePairingView, { global: { plugins: [i18n], stubs: { AppConfirm: confirmStub } } })
+  await flushPromises()
+  await wrapper.get(`[data-testid="${role}-renew-token"]`).trigger('click')
+  expect(reset).not.toHaveBeenCalled()
+  await wrapper.get('[data-testid="token-cancel"]').trigger('click')
+  expect(reset).not.toHaveBeenCalled()
+  await wrapper.get(`[data-testid="${role}-renew-token"]`).trigger('click')
+  await wrapper.get('[data-testid="token-confirm"]').trigger('click')
+  await flushPromises()
+  expect(reset).toHaveBeenCalledWith(role)
+  expect(wrapper.get('[data-testid="remote-url"]').text()).toBe(after.connectUrl)
+  expect(wrapper.get('[data-testid="remote-speaker-url"]').text()).toBe(after.speakerUrl)
+  wrapper.unmount()
+})
+
+
+it('erro ao atualizar token mantém links anteriores e informa a falha', async () => {
+  const reset = vi.fn(async () => { throw new Error('sem escrita') })
+  const bridge = makeBridge({ resetToken: reset })
+  mocks.getDesktopBridge.mockReturnValue(bridge)
+  const wrapper = mount(RemotePairingView, { global: { plugins: [i18n], stubs: { AppConfirm: confirmStub } } })
+  await flushPromises()
+  const url = wrapper.get('[data-testid="remote-url"]').text()
+  await wrapper.get('[data-testid="remote-renew-token"]').trigger('click')
+  await wrapper.get('[data-testid="token-confirm"]').trigger('click')
+  await flushPromises()
+  expect(wrapper.get('[data-testid="remote-token-error"]').exists()).toBe(true)
+  expect(wrapper.get('[data-testid="remote-url"]').text()).toBe(url)
+  expect(wrapper.get('[data-testid="remote-renew-token"]').attributes('disabled')).toBeUndefined()
+  wrapper.unmount()
+})
