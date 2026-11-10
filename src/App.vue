@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
 import { computed, watch, onMounted, ref } from 'vue'
-import { startOutboxTriggers } from '@modules/sync/services/sync-outbox-service'
+import { startOutboxTriggers, watchAuthSession } from '@modules/sync/services/sync-outbox-service'
 import { startSljaMigrationWatch } from '@modules/sync/services/slja-migration-watch'
 import { useRoute, RouterView } from 'vue-router'
 import { useTheme } from 'vuetify'
@@ -66,6 +66,9 @@ watch(
 onMounted(() => {
   // sync v2 fase 2 (app#336): flush on-online + pull no boot
   startOutboxTriggers()
+  // sync v2 (SPEC piano-sync-v2-post-login-pull): pull pós-login — login em
+  // app já aberto puxa prefs/liturgia/agendados da conta sem edição local
+  watchAuthSession()
   // sync v2 fase 3 (app#336): pós-login, oferece migrar .slja locais pra conta
   void startSljaMigrationWatch()
   updateChecker.init()
