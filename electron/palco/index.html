@@ -734,8 +734,17 @@ function handle(m){
       // F3.3m: footer com referência destacada + versão
       {const f=$('footer');
         if(m.footerRef){
-          f.innerHTML=`<span class="ref" style="--ref-color:${m.footerColor||'#FCCE02'};--ref-weight:${m.footerWeight||600}">${m.footerRef}</span>`+
-            (m.footerVersion?`<span class="ver">${m.footerVersion}</span>`:'');
+          f.textContent='';
+          const ref=document.createElement('span');
+          ref.className='ref';
+          ref.textContent=String(m.footerRef);
+          ref.style.setProperty('--ref-color',String(m.footerColor||'#FCCE02'));
+          ref.style.setProperty('--ref-weight',String(m.footerWeight||600));
+          const footerSize=Number(m.footerSize);
+          if(Number.isFinite(footerSize)&&footerSize>0)ref.style.fontSize=(Math.round(footerSize/10.8*1000)/1000)+'vw';
+          ref.style.textTransform=['none','uppercase','capitalize'].includes(m.footerTransform)?m.footerTransform:'none';
+          f.appendChild(ref);
+          if(m.footerVersion){const version=document.createElement('span');version.className='ver';version.textContent=String(m.footerVersion);f.appendChild(version)}
         }else{
           f.textContent=m.footer||'';
         }
