@@ -264,7 +264,8 @@ describe('receiver do palco — regressão', () => {
     expect(t0.style.textTransform).toBe('none')
     expect(t0.style.textAlign).toBe('left')
     // vAlign=top usa o padding do IIFE (paridade popup): 120/10.8 ≈ 11.11vh
-    expect(t0.style.top).toBe((120 / 10.8) + 'vh')
+    expect(t0.style.top).toMatch(/vh$/)
+    expect(parseFloat(t0.style.top)).toBeCloseTo(120 / 10.8, 3)
     // margin px@1920 → área útil (max-width), nunca margin CSS (14/10:
     // `20vh 0` matava o margin:0 auto e deslocava a caixa na TV).
     expect(t0.style.maxWidth).toBe('calc(77.5vw)') // 100−(216/9.6), normalizado
@@ -423,6 +424,8 @@ it('reduces excess blank lines in transmitted music lyrics', () => {
   loadReceiver();
   w.handle({ ...PROJECTION, scope: 'hymns', text: 'Então chegou a hora<br><br>de viver a missão' });
   expect(el('text').querySelectorAll('br')).toHaveLength(1);
-  expect(w.getComputedStyle(el('text')).lineHeight).toBe('1');
+  // line-height: 1 resolve para o próprio tamanho da fonte.
+  const textStyle = w.getComputedStyle(el('text'));
+  expect(textStyle.lineHeight).toBe(textStyle.fontSize);
   dom.window.close();
 });

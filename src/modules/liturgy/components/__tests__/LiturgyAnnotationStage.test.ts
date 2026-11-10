@@ -179,7 +179,7 @@ describe('LiturgyAnnotationStage', () => {
     expect(title).toContain('font-size: 10cqw')
     expect(title).toContain('font-weight: 800')
     expect(title).toContain('text-transform: uppercase')
-    expect(title).toContain('text-shadow: 0 0')
+    expect(title).toMatch(/text-shadow: rgba\([^)]*\) 0px 0px /)
     const text = wrapper.get('[data-testid="annotation-projection-text"]').attributes('style')!
     expect(text).toContain('color: rgb(238, 238, 238)')
     expect(text).toContain('text-shadow: none')

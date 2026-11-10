@@ -124,7 +124,7 @@ describe('CountdownPreview', () => {
     const style = wrapper.find('.countdown-preview__digital').attributes('style')
     expect(style).toContain('font-weight: 800')
     expect(style).toContain('text-align: center')
-    expect(style).toContain('0 4px 30px rgba(0, 0, 0, 0.35)')
+    expect(style).toContain('rgba(0, 0, 0, 0.35) 0px 4px 30px')
   })
 
   it('com stage: usa fontSize proporcional, fontWeight, textBox', () => {
@@ -172,7 +172,7 @@ describe('CountdownPreview', () => {
     })
     const style = wrapper.find('.countdown-preview__digital').attributes('style')
     expect(style).toContain('font-weight: 400')
-    expect(style).toContain('background: transparent')
+    expect((wrapper.find('.countdown-preview__digital').element as HTMLElement).style.backgroundColor).toBe('transparent')
     expect(style).not.toContain('border: 1px')
   })
 

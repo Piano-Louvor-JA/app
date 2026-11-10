@@ -459,7 +459,7 @@ describe("ClockPreview.vue - Component Integration Tests", () => {
       window.dispatchEvent(new Event("resize"))
       vi.advanceTimersByTime(200)
       const digital = wrapper.find(".clock-preview__digital")
-      expect(digital.attributes("style")).toContain("text-shadow: 0 4px 30px")
+      expect(digital.attributes("style")).toContain("0px 4px 30px")
     })
 
   it("digitalStyle: textShadow none quando preview=true sem stage", () => {
@@ -548,8 +548,8 @@ describe("ClockPreview.vue - Component Integration Tests", () => {
     vi.advanceTimersByTime(200)
     analog = wrapper.find(".clock-preview__analog")
     const style = analog.attributes("style") ?? ""
-    expect(style).toContain("inset 0 0 40px rgba(0,0,0,0.2)")
-    expect(style).toContain("rgba(0,0,0,0.5)")
+    expect(style).toContain("rgba(0, 0, 0, 0.2) 0px 0px 40px inset")
+    expect(style).toContain("rgba(0, 0, 0, 0.5)")
 
     clockConfigState.cfg.style = "analog"
     const stageNoShadow = { ...mockStage, textShadow: false } as StageSettings
@@ -560,7 +560,7 @@ describe("ClockPreview.vue - Component Integration Tests", () => {
     window.dispatchEvent(new Event("resize"))
     vi.advanceTimersByTime(200)
     analog = wrapper.find(".clock-preview__analog")
-    expect(analog.attributes("style")).toContain("inset 0 0 40px")
+    expect(analog.attributes("style")).toContain("0px 0px 40px inset")
   })
 
   it("measure: early return quando containerRef é null", () => {
@@ -676,8 +676,8 @@ describe("ClockPreview.vue - Component Integration Tests", () => {
       } as StageSettings,
     })
     const shadow = (wrapper.find(".clock-preview__analog").element as HTMLElement).style.boxShadow
-    expect(shadow).toContain("inset 0 0 40px rgba(0,0,0,0.2)")
-    expect(shadow).toContain("rgba(0,0,0,0.6)")
+    expect(shadow).toContain("rgba(0, 0, 0, 0.2) 0px 0px 40px inset")
+    expect(shadow).toContain("rgba(0, 0, 0, 0.6)")
     clockConfigState.cfg = { ...clockConfigState.cfg, style: "digital" } as ClockConfig
   })
 
