@@ -10,6 +10,9 @@
 
 import { watch } from 'vue'
 import { createAnnouncementsHandlers } from './announcements-handlers'
+import { createPlaylistHandlers } from './playlist-handlers'
+import { createSabbathHandlers } from './sabbath-handlers'
+import { useSabbathSchoolStore } from '../../sabbath-school/stores/useSabbathSchoolStore'
 import { useAnnouncementsStore } from '../../announcements/stores/useAnnouncementsStore'
 import { useAnnouncementsCarousel } from '../../announcements/composables/useAnnouncementsCarousel'
 import { projectAnnouncement } from '../../announcements/services/announcements-projection'
@@ -164,6 +167,8 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
   const projection = desktop?.projection
   if (!remoteApi) return () => {}
 
+  const sabbath = createSabbathHandlers(useSabbathSchoolStore())
+  const playlists = createPlaylistHandlers(player, () => player.session.value?.musicId ?? null)
   const announcements = createAnnouncementsHandlers({
     store: useAnnouncementsStore(),
     carousel: useAnnouncementsCarousel(),
@@ -175,6 +180,9 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
   // (RefLike) sem cast — a superfície usada é exatamente a declarada.
   // bible.open valida contra o catálogo de livros — sem bootstrap o
   // comando falha (ok:false) até alguém abrir o módulo Bíblia no desktop.
+  // Assina o estado do áudio mesmo quando o Sorteio só é aberto pelo APK.
+  const randomStore = useRandomStore()
+  randomStore?.hydrate?.()
   const bibleStore = useBibleStore()
   void bibleStore.bootstrap?.().catch(() => {})
 
@@ -210,7 +218,7 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
     timer: useTimerStore() as never,
     countdown: useCountdownStore() as never,
     clock: useClockStore() as never,
-    random: useRandomStore() as never,
+    random: randomStore as never,
     palco: {
       status: () => palcoSession.status(),
       slots: () => palcoSession.slots(),
@@ -642,9 +650,12 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
       videoTargets: videoControls ? undefined : await idleVideoTargets(),
       player: {
         ...media,
-        canPrevious: (liturgy.selectedItemIndex ?? 0) > 0,
-        canNext:
-          (liturgy.selectedItemIndex ?? -1) + 1 <
+        canPrevious: target === 'player' && (player.queue?.value?.length ?? 0) > 0
+          ? (player.queueIndex?.value ?? -1) > 0
+          : (liturgy.selectedItemIndex ?? 0) > 0,
+        canNext: target === 'player' && (player.queue?.value?.length ?? 0) > 0
+          ? (player.queueIndex?.value ?? -1) + 1 < player.queue.value.length
+          : (liturgy.selectedItemIndex ?? -1) + 1 <
           (liturgy.currentItems?.length ?? 0),
       },
       ...snapshotsV2(modules),
@@ -670,6 +681,8 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
       random: orUndef('random'),
       media: orUndef('media'),
       announcements: announcements.snapshot(),
+      playlist: playlists.snapshot(),
+      sabbath: sabbath.snapshot(),
     }
   }
 
@@ -750,6 +763,8 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
     }
 
     // 0) Namespaces v2 (bible/timer/countdown) — spec controle remoto total.
+    if (action.startsWith('sabbath.')) return sabbath.execute(action, msg)
+    if (action.startsWith('playlist.')) return playlists.execute(action, msg)
     if (action.startsWith('announcements.')) return announcements.execute(action, msg)
     const namespace = action.split('.')[0]
     if (V2_NAMESPACES.has(namespace)) {
@@ -896,6 +911,9 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
           return true
         case 'player.next':
         case 'player.previous':
+          if ((player.queue?.value?.length ?? 0) > 0) {
+            return playlists.execute(action === 'player.next' ? 'playlist.next' : 'playlist.previous', msg)
+          }
           // Sem playlist no renderer ainda — mapeia pra item da liturgia.
           return execute({
             ...msg,
@@ -974,10 +992,20 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
       : undefined,
   }
 
+  // Sincroniza participantes e áudio sem enviar cada quadro da animação do sorteio.
+  function randomStateKey() {
+    const random = modules.snapshot('random')
+    return JSON.stringify([random?.mode, random?.available, random?.drawn, random?.numberMin, random?.numberMax, random?.isDrawing, random?.audioSource, random?.audioVolume, random?.audioMuted,
+      random?.audioPlaying, random?.customAudioFile, random?.customAudioFiles])
+  }
+
   // Push de estado quando seleção da liturgia muda (local ou remoto).
   const unwatch = watch(
     () => [
       JSON.stringify(announcements.snapshot()),
+      JSON.stringify(playlists.snapshot()),
+      randomStateKey(),
+      JSON.stringify(sabbath.snapshot()),
       liturgy.selectedItemIndex,
       player.isProjecting?.value,
       liturgy.selectedDay,
@@ -1016,7 +1044,16 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
 
   let mediaWasPlaying = false
 
+  let lastSabbathKey = JSON.stringify(sabbath.snapshot())
+  let lastPlaylistKey = JSON.stringify(playlists.snapshot())
   const progressTicker = setInterval(async () => {
+    // localStorage não emite storage na própria janela: acompanha edições locais.
+    const sabbathKey = JSON.stringify(sabbath.snapshot())
+    const sabbathChanged = sabbathKey !== lastSabbathKey
+    lastSabbathKey = sabbathKey
+    const playlistKey = JSON.stringify(playlists.snapshot())
+    const playlistsChanged = playlistKey !== lastPlaylistKey
+    lastPlaylistKey = playlistKey
     const timerRunning = modules.snapshot('timer')?.status === 'running'
     const countdownRunning =
       modules.snapshot('countdown')?.status === 'running' ||
@@ -1025,7 +1062,7 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
     // O envio extra ao parar avisa pausa e fim do vídeo feitos no desktop.
     const mediaStopped = mediaWasPlaying && !mediaPlaying
     mediaWasPlaying = mediaPlaying
-    if (timerRunning || countdownRunning || mediaPlaying || mediaStopped) pushState()
+    if (sabbathChanged || playlistsChanged || timerRunning || countdownRunning || mediaPlaying || mediaStopped) pushState()
   }, 1000)
 
   // Poll document navigation for the remote controller. PDF/PPT retain their

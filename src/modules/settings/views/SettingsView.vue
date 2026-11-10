@@ -50,35 +50,37 @@ const { minimize, prepare } = useMinimizablePage({
   >
     <SettingsTabs class="settings-view__tabs" />
 
-    <div
-      class="settings-view__header"
-      :class="{ 'settings-view__header--floating': isAppearance }"
-    >
-      <PageBackStack @minimize="minimize" @prepare="prepare">
-        <button
-          type="button"
-          class="settings-view__back"
-          :aria-label="t('nav.home')"
-          @click="goBack"
-        >
-          <i class="ti ti-arrow-left" aria-hidden="true" />
-        </button>
-      </PageBackStack>
-      <h1 v-if="!isAppearance" class="settings-view__title">
-        {{ t(sectionTitleKey) }}
-      </h1>
-      <div id="settings-header-aside" class="settings-view__aside" />
-    </div>
+    <div class="settings-view__scroll">
+      <div
+        class="settings-view__header"
+        :class="{ 'settings-view__header--floating': isAppearance }"
+      >
+        <PageBackStack @minimize="minimize" @prepare="prepare">
+          <button
+            type="button"
+            class="settings-view__back"
+            :aria-label="t('nav.home')"
+            @click="goBack"
+          >
+            <i class="ti ti-arrow-left" aria-hidden="true" />
+          </button>
+        </PageBackStack>
+        <h1 v-if="!isAppearance" class="settings-view__title">
+          {{ t(sectionTitleKey) }}
+        </h1>
+        <div id="settings-header-aside" class="settings-view__aside" />
+      </div>
 
-    <div class="settings-view__content">
-      <RouterView v-slot="{ Component, route: sectionRoute }">
-        <Transition :name="transitionName" mode="out-in">
-          <component
-            :is="Component"
-            :key="String(sectionRoute.name ?? sectionRoute.path)"
-          />
-        </Transition>
-      </RouterView>
+      <div class="settings-view__content">
+        <RouterView v-slot="{ Component, route: sectionRoute }">
+          <Transition :name="transitionName" mode="out-in">
+            <component
+              :is="Component"
+              :key="String(sectionRoute.name ?? sectionRoute.path)"
+            />
+          </Transition>
+        </RouterView>
+      </div>
     </div>
   </section>
 </template>
@@ -92,8 +94,7 @@ const { minimize, prepare } = useMinimizablePage({
   max-width: 80rem;
   margin: 0 auto;
   padding: 1.5rem var(--ds-spacing-page) 2rem;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden;
 
   &--appearance {
     max-width: 90rem;
@@ -101,9 +102,18 @@ const { minimize, prepare } = useMinimizablePage({
 }
 
 .settings-view__tabs {
+  flex: 0 0 auto;
   margin-bottom: 2rem;
   padding-bottom: 0.25rem;
   border-bottom: 1px solid var(--ds-color-outline);
+}
+
+/* Só o conteúdo rola; o menu permanece no fluxo fixo acima dele. */
+.settings-view__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .settings-view__header {

@@ -23,6 +23,16 @@ const hoisted = vi.hoisted(() => {
       toggleItemDone: vi.fn((_idx: number) => {}),
     },
     playerStub: {
+      queue: { value: [] as Array<{ musicId: number; albumId: number | null; title: string }> },
+      queueIndex: { value: -1 },
+      queueLabel: { value: null as string | null },
+      queueShuffled: { value: false },
+      playQueue: vi.fn(async () => {}),
+      nextTrack: vi.fn(),
+      previousTrack: vi.fn(),
+      clearQueue: vi.fn(),
+      jumpToQueue: vi.fn(),
+      playQueueInOrder: vi.fn(),
       isPlaying: { value: false },
       isProjecting: { value: false },
       toggleProjection: vi.fn(async () => {}),
@@ -198,6 +208,12 @@ async function installBridge() {
 }
 
 function resetHoisted() {
+  hoisted.playerStub.queue.value = []
+  hoisted.playerStub.queueIndex.value = -1
+  hoisted.playerStub.queueLabel.value = null
+  hoisted.playerStub.playQueue.mockClear()
+  hoisted.playerStub.nextTrack.mockClear()
+  hoisted.playerStub.previousTrack.mockClear()
   hoisted.targetRef = 'player'
   hoisted.projection = undefined
   hoisted.liturgyStore.currentItems = []
@@ -248,6 +264,52 @@ describe('installRemoteLiturgyBridge', () => {
     setActivePinia(createPinia())
     vi.useFakeTimers()
     resetHoisted()
+  })
+
+  it('Escola Sabatina remota usa a contagem do desktop e publica o estado', async () => {
+    const { useSabbathSchoolStore } = await import('../../../sabbath-school/stores/useSabbathSchoolStore')
+    const store = useSabbathSchoolStore()
+    const { command, cleanup } = await installBridge()
+    try {
+      await command({ action: 'sabbath.setSchedule', mode: 'duration', durationMs: 1200000, id: 201 })
+      await command({ action: 'sabbath.start', id: 202 })
+      expect(store.isRunning).toBe(true)
+      await vi.waitFor(() => {
+        const state = hoisted.remoteApiStub.sendState.mock.calls.at(-1)?.[0]
+        expect(state.sabbath.status).toBe('running')
+        expect(state.sabbath.schedule.durationMs).toBe(1200000)
+      })
+      await command({ action: 'sabbath.pause', id: 203 })
+      expect(store.runtime.status).toBe('paused')
+    } finally { store.stop(); cleanup() }
+  })
+
+  it('inicializa o sorteio e sua assinatura de áudio sem abrir a tela no desktop', async () => {
+    const hydrate = vi.fn()
+    hoisted.randomStore = { hydrate }
+    const { cleanup } = await installBridge()
+    try { expect(hydrate).toHaveBeenCalledOnce() }
+    finally { cleanup() }
+  })
+
+  it('playlist: play usa fila e anterior/próxima deixam de navegar na liturgia', async () => {
+    const { createPlaylist, addPlaylistItem } = await import('../../../albums/services/playlist-storage')
+    const list = createPlaylist('Culto remoto')
+    addPlaylistItem(list.id, { musicId: 1, albumId: 3, title: 'Primeiro' })
+    addPlaylistItem(list.id, { musicId: 2, albumId: 3, title: 'Segundo' })
+    const { command, cleanup } = await installBridge()
+    try {
+      await command({ action: 'playlist.play', id: 101, targetId: list.id })
+      expect(hoisted.playerStub.playQueue).toHaveBeenCalledWith(expect.any(Array), 0, 'audio', 'Culto remoto', { minimized: true })
+      hoisted.playerStub.queue.value = [{ musicId: 1, albumId: 3, title: 'Primeiro' }, { musicId: 2, albumId: 3, title: 'Segundo' }]
+      hoisted.playerStub.queueIndex.value = 0
+      await command({ action: 'player.next', id: 102 })
+      expect(hoisted.playerStub.nextTrack).toHaveBeenCalledOnce()
+      hoisted.playerStub.queueIndex.value = 1
+      await command({ action: 'player.previous', id: 103 })
+      expect(hoisted.playerStub.previousTrack).toHaveBeenCalledOnce()
+      expect(hoisted.liturgyStore.playItemOnScreens).not.toHaveBeenCalled()
+    } finally { cleanup() }
   })
 
   it('anúncios: comandos alteram o desktop e mudanças locais atualizam o APK', async () => {
