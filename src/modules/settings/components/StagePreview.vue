@@ -82,7 +82,9 @@ const footerStyle = computed(() => {
   const position = props.settings.bibleRefPosition ?? 'below-right'
   return {
     color: props.settings.footerRefColor ?? undefined,
+    fontSize: `${((props.settings.refFontSize ?? Math.round(props.settings.bibleFontSize * 0.4)) / 1920) * 100}cqw`,
     fontWeight: String(props.settings.footerRefWeight),
+    textTransform: props.settings.refTextTransform,
     ...(footerCorner.value ? {} : { textAlign: position.replace('below-', '') as 'left' | 'center' | 'right' }),
   }
 })

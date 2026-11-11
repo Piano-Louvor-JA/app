@@ -606,6 +606,8 @@ export default {
       bibleTextColor: 'Text color (Bible)',
       bibleFontSize: 'Font size (Bible)',
       bibleFontWeight: 'Weight (Bible)',
+      refFontSize: 'Reference size',
+      refTextTransform: 'Reference capitalization',
       bibleTextTransform: 'Capitalization (Bible)',
       bibleTransformNone: 'Normal',
       bibleTransformUppercase: 'UPPERCASE',
