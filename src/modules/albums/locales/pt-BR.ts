@@ -12,6 +12,9 @@ export default {
       show: 'Mostrar Minhas Coletâneas',
     },
     playlists: {
+      removeTrackTitle: 'Remover da playlist?',
+      removeTrackMessage: '“{title}” sai de “{name}”. A música e os arquivos baixados continuam no acervo.',
+      removeTrackConfirm: 'Remover',
       inPlaylist: 'Já está nesta playlist',
       addMusic: 'Adicionar músicas',
       addMusicHint: 'Adicionar músicas: buscar músicas para esta playlist',

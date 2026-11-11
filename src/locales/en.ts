@@ -94,6 +94,14 @@ export default {
       editor: 'Editor',
     },
     },
+  connectedDevices: {
+    title: 'Connected devices',
+    remote: 'Remote control',
+    speaker: 'Preacher\'s clicker',
+    monitors: 'Monitor sharing',
+    none: 'None connected',
+    monitorsInUse: '{device} ({host}) · {n} monitor(s)',
+  },
   minimize: {
     playlistCount: '{n} playlist(s)',
     pageNumber: 'Page {n}',

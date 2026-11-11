@@ -80,6 +80,11 @@ contextBridge.exposeInMainWorld('louvorja', {
   isElectron: true,
 
   // Controle remoto (APK via WS :48080): comandos chegam do main.
+  monitorShare: {
+    get: () => ipcRenderer.invoke('monitor-share:get'),
+    set: (changes) => ipcRenderer.invoke('monitor-share:set', changes),
+    onChanged: (callback) => subscribe('monitor-share:changed', callback),
+  },
   remote: {
     onCommand: (callback) => subscribe('remote:command', callback),
     onStateRequest: (callback) => subscribe('remote:request-state', callback),

@@ -284,6 +284,30 @@ export type RemotePairingInfo = {
   speakerAddress?: string | null
 }
 
+/** Compartilhar monitores com o app mobile (electron/monitor-share.mjs). */
+export type MonitorShareMode = 'mirror' | 'return'
+export type MonitorShareInfo = {
+  enabled: boolean
+  running: boolean
+  /** Monitores estendidos disponíveis (o principal nunca entra). */
+  extendedCount: number
+  address: string
+  token: string
+  connectUrl: string
+  qrDataUrl: string
+  displays: { id: number; label: string; isPrimary: boolean; mode: MonitorShareMode | null; active: boolean }[]
+  phone: { device: string; host: string; monitors: number } | null
+}
+export type MonitorShareApi = {
+  get: () => Promise<MonitorShareInfo>
+  set: (changes: {
+    enabled?: boolean
+    displays?: Record<string, MonitorShareMode>
+    resetToken?: boolean
+  }) => Promise<MonitorShareInfo>
+  onChanged: (callback: (info: MonitorShareInfo) => void) => () => void
+}
+
 export type RemoteApi = {
   onCommand: (callback: (msg: RemoteBridgeMessage) => void) => () => void
   onStateRequest: (callback: () => void) => () => void
@@ -643,6 +667,7 @@ export type LouvorJaBridge = {
   presentation?: PresentationApi
   projection: ProjectionApi
   remote?: RemoteApi
+  monitorShare?: MonitorShareApi
   random?: RandomAudioApi
   sabbathSchool?: SabbathSchoolVideoApi
   announcements?: AnnouncementsFilesApi

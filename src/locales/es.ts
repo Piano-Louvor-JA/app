@@ -94,6 +94,14 @@ export default {
       editor: 'Editor',
     },
     },
+  connectedDevices: {
+    title: 'Dispositivos conectados',
+    remote: 'Control remoto',
+    speaker: 'Pasador del predicador',
+    monitors: 'Compartir monitores',
+    none: 'Ninguno conectado',
+    monitorsInUse: '{device} ({host}) · {n} monitor(es)',
+  },
   minimize: {
     playlistCount: '{n} lista(s)',
     pageNumber: 'Página {n}',

@@ -166,6 +166,14 @@ export default {
         projection: 'Configurações de projeção e telas em breve.',
       },
     },
+  connectedDevices: {
+    title: 'Aparelhos conectados',
+    remote: 'Controle remoto',
+    speaker: 'Passador do pregador',
+    monitors: 'Compartilhamento de monitores',
+    none: 'Nenhum conectado',
+    monitorsInUse: '{device} ({host}) · {n} monitor(es)',
+  },
   minimize: {
     playlistCount: '{n} playlist(s)',
     pageNumber: 'Página {n}',
