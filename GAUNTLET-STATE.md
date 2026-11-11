@@ -17,10 +17,10 @@
 - /tmp/wt-edits-wire (branch fix/community-edits-wire-desktop, PR #577 aberta — commit novo entra nela)
 
 ## Estado Atual
-- **Ciclo**: 1 CONCLUÍDO — builder done
-- **BARRA**: B1 ✓ B2 ✓ B3 ✓ (GREEN 3/3 edit-official-suggest.test.ts) B4 ✓ (diff 146+/37−, zero deps) B5 ✓ (BUILD_OK) B6 ✓ (31/31 focais: community-edits + wire + AlbumTrackRow)
-- **Commit**: 16a5fe58 pushado em fix/community-edits-wire-desktop (PR #577 atualizada)
-- **Crítico cego**: pendente — julgamento próprio do líder sobre diff 16a5fe58 com BARRA (takeover, sem subagents)
+- **Ciclos 1-2 CONCLUÍDOS** — desktop (16a5fe58) + paridade web (3be7294) pushados
+- Desktop: B1-B6 ✓ (GREEN 3/3, focais 31/31, BUILD_OK, crítico cego takeover PASSOU)
+- Web PR #244: GREEN 3/3 espelho, focais community-edits 25/25, BUILD_OK
+- **STOP do loop RF-01 atingido**: todas as peças verdes na mesma rodada
 
 ## Log de Ciclos
 | Ts | Ciclo | Papel | Ação | Resultado | Evidência |
