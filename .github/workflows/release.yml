@@ -112,6 +112,29 @@ jobs:
             echo "Perfil: homologation (dispatch manual — STG, sem produção)"
           fi
 
+      # Fix P0 (auth Google morto na 1.36): o vite build lê as VITE_FIREBASE_*
+      # do ambiente — sem elas o bundle release nasce sem a config do Firebase
+      # e o login Google falha com "Firebase não configurado" antes do popup.
+      # Config pública de cliente Firebase (não é segredo de servidor).
+      - name: Inject Firebase client config
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+        run: |
+          missing=0
+          for v in VITE_FIREBASE_API_KEY VITE_FIREBASE_PROJECT_ID VITE_FIREBASE_APP_ID; do
+            if [ -z "${!v:-}" ]; then
+              echo "::error::Secret $v ausente no repo (Settings → Secrets → Actions). Login Google morre na release sem ela."
+              missing=1
+            fi
+          done
+          exit $missing
+          echo "Firebase client config injetada."
+
       - name: Build Vite
         run: npm run build-only -- --base=./
 

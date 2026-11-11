@@ -20,6 +20,8 @@ export type LocalLyric = {
 	lyric: string;
 	aux_lyric?: string | null;
 	image_url?: string | null;
+	/** Id de blob de fundo no IndexedDB (offline, sem quota do localStorage). */
+	imageMediaId?: string | null;
 	image_position?: string | null;
 	time?: string | null;
 	instrumental_time?: string | null;
@@ -47,6 +49,9 @@ export type LocalMusic = {
 	durationMs?: number | null;
 	/** SHA-256 do arquivo de origem — dedupe de re-import/migração (app#336). */
 	sljaHash?: string | null;
+	/** Estado de trabalho (SPEC t_deed74b5): 'draft' = em andamento (nunca
+	 * sobe pra rede sem publicar); 'published' = publicado/legado. */
+	status?: "draft" | "published";
 };
 
 export type LocalCollection = {
@@ -90,7 +95,15 @@ function loadDb(): LocalDb {
 			nextMusicId: parsed.nextMusicId ?? -1,
 			nextLyricId: parsed.nextLyricId ?? -1,
 			collections: Array.isArray(parsed.collections) ? parsed.collections : [],
-			musics: Array.isArray(parsed.musics) ? parsed.musics : [],
+			// Migração draft (SPEC t_deed74b5): registro legado sem status
+			// = já existia antes = tratado como publicado. O primeiro saveDb
+			// persiste o campo (roundtrip: migrado sobrevive a reload).
+			musics: Array.isArray(parsed.musics)
+				? parsed.musics.map((m) => ({
+						...m,
+						status: m.status ?? "published",
+					}))
+				: [],
 		};
 	} catch {
 		return emptyDb();
@@ -204,6 +217,8 @@ export function createLocalMusic(
 		name: input.name ?? "",
 		officialMusicId: input.officialMusicId ?? null,
 		sljaHash: input.sljaHash ?? null,
+		// Novas criações nascem como rascunho (SPEC t_deed74b5).
+		status: "draft",
 		lyrics: [],
 	};
 	db.nextMusicId -= 1;
@@ -234,6 +249,8 @@ export function updateLocalMusic(
 		/** Ids de blobs em IndexedDB (local-media-store) — sem quota. */
 		audioMediaId?: string | null;
 		coverMediaId?: string | null;
+		/** Estado de trabalho (SPEC t_deed74b5). */
+		status?: "draft" | "published";
 	},
 ): boolean {
 	const db = loadDb();
@@ -246,8 +263,18 @@ export function updateLocalMusic(
 	if (patch.image_url !== undefined) music.image_url = patch.image_url;
 	if (patch.audioMediaId !== undefined) music.audioMediaId = patch.audioMediaId;
 	if (patch.coverMediaId !== undefined) music.coverMediaId = patch.coverMediaId;
+	if (patch.status !== undefined) music.status = patch.status;
 	saveDb(db);
 	return true;
+}
+
+/** Publica uma música local (SPEC t_deed74b5): draft → published. */
+export function publishLocalMusic(id: number): boolean {
+	const db = loadDb();
+	const music = db.musics.find((m) => m.id === id);
+	if (!music) return false;
+	music.status = "published";
+	return saveDb(db);
 }
 
 export function deleteLocalMusic(id: number): boolean {
@@ -267,8 +294,10 @@ export function createLocalLyric(
 		aux_lyric?: string;
 		time?: string;
 		order?: number;
-		/** Fundo do slide — data: URL base64 (import .slja local). */
+		/** Fundo remoto/data URL legado. */
 		image_url?: string | null;
+		/** Id de blob de fundo no IndexedDB para import .slja local. */
+		imageMediaId?: string | null;
 		image_position?: string | number | null;
 	},
 ): LocalLyric {
@@ -284,6 +313,7 @@ export function createLocalLyric(
 		order,
 		show_slide: true,
 		image_url: input.image_url ?? null,
+		imageMediaId: input.imageMediaId ?? null,
 		image_position: input.image_position == null ? null : String(input.image_position),
 	};
 	db.nextLyricId -= 1;

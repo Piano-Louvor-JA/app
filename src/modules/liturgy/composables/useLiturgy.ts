@@ -11,6 +11,10 @@ import { decodeJaBytes, parseJaLiturgy } from '../services/liturgy-ja-import'
 import { getDesktopBridge } from '@shared/services/desktop-bridge'
 import { useLiturgyStore } from '../stores/useLiturgyStore'
 import { useScheduledStore } from '../stores/useScheduledStore'
+import { formatClock } from '../services/liturgy-format'
+import {
+  estimatedSessionEndSafe as estimatedSessionEnd,
+} from '../services/liturgy-item-helpers'
 import { appConfirm } from '@shared/composables/useAppConfirm'
 import type { LiturgyDayKey } from '../types/liturgy'
 import { useLiturgyClock } from './useLiturgyClock'
@@ -426,6 +430,15 @@ export function useLiturgy() {
     worshipLabel,
     headerDateTime: clock.headerDateTime,
     remainingCountdownLabel: clock.remainingCountdownLabel,
+    currentClock: computed(() => formatClock(clock.now.value)),
+    estimatedSessionEndLabel: computed(() => {
+      const end = estimatedSessionEnd(currentItems.value, (id) =>
+        currentItems.value.filter(
+          (i) => i.type !== 'category' && i.categoryId === id,
+        ),
+      )
+      return end ?? ''
+    }),
     startTimeInput: clock.startTimeInput,
     endTimeInput: clock.endTimeInput,
     countdownExpired: clock.countdownExpired,

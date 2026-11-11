@@ -732,10 +732,10 @@ describe('LiturgyItemDialog', () => {
       w.unmount()
     })
 
-    it('endTimeRequiredMissing em categoria sem endTime', async () => {
+    it('endTimeRequiredMissing é sempre false — end é OPCIONAL (SPEC t_50c9ac95)', async () => {
       const w = createWrapper({ draft: { ...defaultProps.draft, type: 'category', startTime: '10:00', endTime: '' } })
       const vm = w.vm as any
-      expect(vm.endTimeRequiredMissing).toBe(true)
+      expect(vm.endTimeRequiredMissing).toBe(false)
       w.unmount()
     })
   })
@@ -873,7 +873,8 @@ describe('LiturgyItemDialog', () => {
 })
 
 describe('LiturgyItemDialog — save category com inputs REAIS no DOM (attachTo)', () => {
-  it('end-time faltando: foca #moment-end-time (ramo 514-515)', async () => {
+  // SPEC t_50c9ac95 (A1): end faltando NÃO bloqueia mais o save — salva direto.
+  it('end-time faltando: salva sem erro (end opcional)', async () => {
     const el = document.createElement('div')
     document.body.appendChild(el)
     const focusSpy = vi.fn()
@@ -888,8 +889,8 @@ describe('LiturgyItemDialog — save category com inputs REAIS no DOM (attachTo)
       await flushPromises()
       const vm = w.vm as any
       await vm.onSubmit?.({ preventDefault: () => {} } as unknown as Event)
-      expect(focusSpy).toHaveBeenCalled()
-      expect(w.emitted('save')).toBeFalsy()
+      expect(focusSpy).not.toHaveBeenCalled()
+      expect(w.emitted('save')).toBeTruthy()
       w.unmount()
     } finally {
       document.getElementById = origGet

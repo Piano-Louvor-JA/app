@@ -26,8 +26,10 @@ import {
   deleteLocalCollection,
   deleteLocalLyric,
   deleteLocalMusic,
+  getLocalCollection,
   getLocalMusic,
   isLocalId,
+  listAllLocalMusicsWithLyrics,
   listLocalCollections,
   listLocalMusics,
   updateLocalCollection,
@@ -215,21 +217,24 @@ export async function loadCustomMusicTrack(
     const audioUrl = audioBlob
       ? URL.createObjectURL(audioBlob)
       : local.audioBase64
-        ? `data:audio/mpeg;base64,${local.audioBase64}`
+        ? audioDataUrlFromBase64(local.audioBase64)
         : null
     const coverUrl = coverBlob
       ? URL.createObjectURL(coverBlob)
       : (local.image_url ?? null)
-    const lyrics = local.lyrics.map((l) => ({
-      order: l.order,
-      lyric: l.lyric ?? '',
-      auxLyric: l.aux_lyric ?? null,
-      showSlide: l.show_slide !== false && l.show_slide !== 0,
-      time: l.time ?? '00:00:00',
-      instrumentalTime: l.instrumental_time ?? '00:00:00',
-      imageUrl: l.image_url ?? null,
-      imagePosition: l.image_position ?? null,
-      isCover: l.order === 1 && Boolean(l.image_url),
+    const lyrics = await Promise.all(local.lyrics.map(async (l) => {
+      const imageBlob = l.imageMediaId ? await getMedia(l.imageMediaId) : null
+      return {
+        order: l.order,
+        lyric: l.lyric ?? '',
+        auxLyric: l.aux_lyric ?? null,
+        showSlide: l.show_slide !== false && l.show_slide !== 0,
+        time: l.time ?? '00:00:00',
+        instrumentalTime: l.instrumental_time ?? '00:00:00',
+        imageUrl: imageBlob ? URL.createObjectURL(imageBlob) : (l.image_url ?? null),
+        imagePosition: l.image_position ?? null,
+        isCover: l.order === 1 && Boolean(l.image_url ?? l.imageMediaId),
+      }
     }))
     return {
       id: musicId,
@@ -242,6 +247,7 @@ export async function loadCustomMusicTrack(
       albums: [],
       categories: ['Minhas Coletâneas'],
       lyrics,
+      status: local.status ?? 'published',
     } satisfies MediaTrackRecord
   }
   if (!Number.isFinite(musicId) || musicId <= 0) return null
@@ -250,7 +256,10 @@ export async function loadCustomMusicTrack(
     const response = await fetch(`${customBaseUrl()}/musics/${musicId}`, {
       headers: customHeaders(authHeaders()),
     })
-    if (!response.ok) return null
+    if (!response.ok) {
+      console.error('[custom-catalog] HTTP', response.status, response.url)
+      return null
+    }
     const row = (await response.json()) as CustomMusicRow
     if (!row || !row.name) return null
 
@@ -285,7 +294,8 @@ export async function loadCustomMusicTrack(
       categories: ['Minhas Coletâneas'],
       lyrics,
     } satisfies MediaTrackRecord
-  } catch {
+  } catch (error) {
+    console.error('[custom-catalog] fetch falhou', error)
     return null
   }
 }
@@ -338,7 +348,10 @@ export async function updateCustomCollection(
       headers: customHeaders({ 'content-type': 'application/json', ...authHeaders() }),
       body: JSON.stringify(patch),
     })
-    if (!response.ok) return null
+    if (!response.ok) {
+      console.error('[custom-catalog] HTTP', response.status, response.url)
+      return null
+    }
     const row = (await response.json()) as {
       id_collection: number
       name: string
@@ -355,7 +368,8 @@ export async function updateCustomCollection(
       visibility: row.visibility ?? patch.visibility,
       musicsCount: row.musics_count ?? 0,
     }
-  } catch {
+  } catch (error) {
+    console.error('[custom-catalog] fetch falhou', error)
     return null
   }
 }
@@ -416,6 +430,8 @@ export type CustomMusicSummary = {
   audioUrl?: string | null
   /** Link p/ hino oficial da API (null = música própria). */
   officialMusicId?: number | null
+  /** Estado de trabalho local (SPEC t_deed74b5) — ausente = published. */
+  status?: 'draft' | 'published'
 }
 
 /** LocalMusic (localStorage) → resumo no formato da listagem. */
@@ -429,27 +445,104 @@ function localMusicToSummary(m: LocalMusic): CustomMusicSummary {
       Boolean(m.audioMediaId) ||
       Boolean(m.officialMusicId),
     hasImage: Boolean(m.image_url) || Boolean(m.coverMediaId),
-    audioUrl: m.audioBase64 ? `data:audio/mpeg;base64,${m.audioBase64}` : null,
+    audioUrl: m.audioBase64 ? audioDataUrlFromBase64(m.audioBase64) : null,
     officialMusicId: m.officialMusicId ?? null,
+    status: m.status ?? 'published',
   }
 }
 
 /** Copia uma música custom existente (outra coletânea) pra coletânea aberta. */
+/**
+ * Cópia offline (offline-first app#336 fase local): resolve a origem via
+ * loadCustomMusicTrack (local ou remota), cria réplica local na coletânea
+ * destino e copia os blobs (áudio/capa/fundos) no IndexedDB.
+ */
+async function copyLocalCustomMusic(
+  collectionId: number,
+  musicId: number,
+): Promise<{ id: number; existed?: boolean } | null> {
+  try {
+    const source = await loadCustomMusicTrack(musicId)
+    if (!source) return null
+
+    // Dedupe por nome+destino (idempotente como o copy remoto por client_uuid).
+    const existing = listLocalMusics(collectionId).find(
+      (m) => m.name === source.name,
+    )
+    if (existing) return { id: existing.id, existed: true }
+
+    const music = createLocalMusic(collectionId, { name: source.name })
+    const { putMedia } = await import('./local-media-store')
+
+    // Copy preserva o estado de trabalho da origem (SPEC t_deed74b5).
+    updateLocalMusic(music.id, { status: source.status === 'draft' ? 'draft' : 'published' })
+
+    // Áudio: blob objectURL → bytes → IndexedDB (audioMediaId).
+    if (source.audioUrl?.startsWith('blob:')) {
+      const blob = await fetch(source.audioUrl).then((r) => r.blob())
+      await putMedia(`local-music-${music.id}-audio`, blob)
+      updateLocalMusic(music.id, { audioMediaId: `local-music-${music.id}-audio` })
+    }
+
+    // Capa da música.
+    if (source.coverUrl?.startsWith('blob:')) {
+      const blob = await fetch(source.coverUrl).then((r) => r.blob())
+      const coverId = `local-music-${music.id}-cover`
+      await putMedia(coverId, blob)
+      updateLocalMusic(music.id, { coverMediaId: coverId })
+    } else if (source.coverUrl) {
+      updateLocalMusic(music.id, { image_url: source.coverUrl })
+    }
+
+    for (const l of source.lyrics) {
+      let imageMediaId: string | null = null
+      if (l.imageUrl?.startsWith('blob:')) {
+        const blob = await fetch(l.imageUrl).then((r) => r.blob())
+        imageMediaId = `local-lyric-${music.id}-${l.order}-bg`
+        await putMedia(imageMediaId, blob)
+      }
+      createLocalLyric(music.id, {
+        lyric: l.lyric,
+        aux_lyric: undefined,
+        time: l.time,
+        order: l.order,
+        image_url: l.imageUrl && !l.imageUrl.startsWith('blob:') ? l.imageUrl : null,
+        imageMediaId,
+        image_position: l.imagePosition,
+      })
+    }
+    return { id: music.id }
+  } catch (error) {
+    console.error('[custom-catalog] copy local falhou', error)
+    return null
+  }
+}
+
 export async function copyCustomMusic(
   collectionId: number,
   musicId: number,
 ): Promise<{ id: number; existed?: boolean } | null> {
+  // Cópia envolvendo música LOCAL (origem importada offline) ou destino LOCAL
+  // (coletânea local, id negativo): replica no localStorage/IndexedDB, sem API
+  // — endpoints remotos não conhecem ids negativos (404 comprovado em STG).
+  if (isLocalId(collectionId) || isLocalId(musicId)) {
+    return copyLocalCustomMusic(collectionId, musicId)
+  }
   try {
     const response = await fetch(
       `${customBaseUrl()}/collections/${collectionId}/musics/${musicId}/copy`,
       { method: 'POST', headers: customHeaders(authHeaders()) },
     )
-    if (!response.ok) return null
+    if (!response.ok) {
+      console.error('[custom-catalog] HTTP', response.status, response.url)
+      return null
+    }
     const json = (await response.json()) as { id_music: number }
     // Dedup de imports (app#336 fase 3): 200 = já existia (mesmo client_uuid)
     // e a API retornou o registro existente; 201 = criado agora.
     return { id: json.id_music, existed: response.status === 200 }
-  } catch {
+  } catch (error) {
+    console.error('[custom-catalog] fetch falhou', error)
     return null
   }
 }
@@ -466,6 +559,22 @@ export async function listAllCustomMusics(options?: {
     }
   >
 > {
+  // Músicas LOCAIS (import offline) entram na busca de reuso — ids negativos.
+  const localMusics: Array<
+    CustomMusicSummary & { collectionName?: string; collectionId?: number }
+  > = listAllLocalMusicsWithLyrics().map((m) => {
+    const col = getLocalCollection(m.collectionId)
+    return {
+      id: m.id,
+      name: m.name,
+      duration: null,
+      hasAudio: Boolean(m.audioMediaId ?? m.audioBase64),
+      hasImage: Boolean(m.image_url ?? m.coverMediaId),
+      status: m.status ?? 'published',
+      collectionName: col?.name,
+      collectionId: m.collectionId,
+    }
+  })
   try {
     const response = await fetch(`${customBaseUrl()}/musics`, {
       headers: customHeaders(authHeaders()),
@@ -474,7 +583,7 @@ export async function listAllCustomMusics(options?: {
           ? AbortSignal.timeout(options.timeoutMs)
           : undefined,
     })
-    if (!response.ok) return []
+    if (!response.ok) return localMusics
     const json = (await response.json()) as {
       data?: Array<{
         id_music: number
@@ -488,23 +597,26 @@ export async function listAllCustomMusics(options?: {
         collection_name?: string
       }>
     }
-    return (json.data ?? []).map((row) => ({
-      id: row.id_music,
-      name: row.name ?? '',
-      duration:
-        typeof row.duration === 'string'
-          ? Number(row.duration.split(':').reduce((acc, part) => acc * 60 + Number(part), 0)) || null
-          : row.duration ?? null,
-      hasAudio: Boolean(row.audio_url),
-      hasImage: Boolean(row.image_url),
-      audioUrl: row.audio_url ?? null,
-      instrumentalUrl: asNullableString(row.instrumental_url),
-      officialMusicId: row.official_music_id ?? null,
-      collectionId: row.id_collection,
-      collectionName: row.collection_name,
-    }))
+    return [
+      ...localMusics,
+      ...(json.data ?? []).map((row) => ({
+        id: row.id_music,
+        name: row.name ?? '',
+        duration:
+          typeof row.duration === 'string'
+            ? Number(row.duration.split(':').reduce((acc, part) => acc * 60 + Number(part), 0)) || null
+            : row.duration ?? null,
+        hasAudio: Boolean(row.audio_url),
+        hasImage: Boolean(row.image_url),
+        audioUrl: row.audio_url ?? null,
+        instrumentalUrl: asNullableString(row.instrumental_url),
+        officialMusicId: row.official_music_id ?? null,
+        collectionId: row.id_collection,
+        collectionName: row.collection_name,
+      })),
+    ]
   } catch {
-    return []
+    return localMusics
   }
 }
 
@@ -648,7 +760,10 @@ export async function createCustomCollection(
         visibility: visibility ?? 'private',
       }),
     })
-    if (!response.ok) return null
+    if (!response.ok) {
+      console.error('[custom-catalog] HTTP', response.status, response.url)
+      return null
+    }
     const json = (await response.json()) as { id_collection: number }
     return { id: json.id_collection }
   } catch {
@@ -704,11 +819,15 @@ export async function createCustomMusic(
         body: JSON.stringify(input),
       },
     )
-    if (!response.ok) return null
+    if (!response.ok) {
+      console.error('[custom-catalog] HTTP', response.status, response.url)
+      return null
+    }
     const json = (await response.json()) as { id_music: number }
     // Dedup (web#187 paridade): 200 = já existia (mesmo client_uuid)
     return { id: json.id_music, existed: response.status === 200 }
-  } catch {
+  } catch (error) {
+    console.error('[custom-catalog] fetch falhou', error)
     return null
   }
 }
@@ -734,10 +853,14 @@ export async function addOfficialMusicToCollection(
         body: JSON.stringify({ official_music_id: officialMusicId, name }),
       },
     )
-    if (!response.ok) return null
+    if (!response.ok) {
+      console.error('[custom-catalog] HTTP', response.status, response.url)
+      return null
+    }
     const json = (await response.json()) as { id_music: number }
     return { id: json.id_music }
-  } catch {
+  } catch (error) {
+    console.error('[custom-catalog] fetch falhou', error)
     return null
   }
 }
@@ -773,9 +896,31 @@ export function customApiUrl(path: string): string {
 }
 
 export function customFileUrl(urlPath: string): string {
+  // objectURL/blob:/data: (áudio/bg locais do import .slja) já são URL final.
+  if (/^(blob:|data:|https?:|\/file)/.test(urlPath)) return urlPath
   const base = import.meta.env.VITE_PALCO_API_URL
   if (base) return `${base.replace(/\/$/, '')}/file${urlPath}`
   return `/file${urlPath}`
+}
+
+/**
+ * MIME de áudio pelo magic bytes do conteúdo base64.
+ * Formatos suportados no import/reprodução local: mp3, wav, ogg.
+ * Base64 legacy sem cabeçalho reconhecível cai em audio/mpeg (padrão antigo).
+ */
+export function audioMimeFromBase64(b64: string): string {
+  try {
+    const head = atob(b64.slice(0, 16))
+    if (head.startsWith('RIFF')) return 'audio/wav'
+    if (head.startsWith('OggS')) return 'audio/ogg'
+  } catch {
+    /* base64 inválido/truncado — cai no default */
+  }
+  return 'audio/mpeg'
+}
+
+export function audioDataUrlFromBase64(b64: string): string {
+  return `data:${audioMimeFromBase64(b64)};base64,${b64}`
 }
 
 /**
@@ -787,6 +932,10 @@ export async function uploadCustomFile(
   filename: string,
   kind: 'audio' | 'imagens',
 ): Promise<{ idFile: number; url: string } | null> {
+  // AbortController + timeout: WAV de 30MB pode pendurar o POST indefinidamente
+  // (observado em prod/STG) e congelar o import com loading eterno.
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 120_000)
   try {
     const formData = new FormData()
     formData.append('file', new Blob([bytes as BlobPart]), filename)
@@ -795,12 +944,19 @@ export async function uploadCustomFile(
       method: 'POST',
       headers: customHeaders(authHeaders()),
       body: formData,
+      signal: controller.signal,
     })
-    if (!response.ok) return null
+    if (!response.ok) {
+      console.error('[custom-catalog] HTTP', response.status, response.url)
+      return null
+    }
     const data = (await response.json()) as { id_file: number; url: string }
     return { idFile: data.id_file, url: data.url }
-  } catch {
+  } catch (error) {
+    console.error('[custom-catalog] upload falhou', error)
     return null
+  } finally {
+    clearTimeout(timer)
   }
 }
 
@@ -838,6 +994,8 @@ export async function createCustomLyric(
     time?: string
     order?: number
     id_file_image?: number
+    /** Apenas local: blob de background no IndexedDB. */
+    imageMediaId?: string
     image_position?: string | number
   },
 ): Promise<{ id: number } | null> {
@@ -855,10 +1013,14 @@ export async function createCustomLyric(
       headers: customHeaders({ 'content-type': 'application/json', ...authHeaders() }),
       body: JSON.stringify(input),
     })
-    if (!response.ok) return null
+    if (!response.ok) {
+      console.error('[custom-catalog] HTTP', response.status, response.url)
+      return null
+    }
     const json = (await response.json()) as { id_lyric: number }
     return { id: json.id_lyric }
-  } catch {
+  } catch (error) {
+    console.error('[custom-catalog] fetch falhou', error)
     return null
   }
 }
