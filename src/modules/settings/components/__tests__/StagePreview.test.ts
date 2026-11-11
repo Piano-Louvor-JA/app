@@ -84,7 +84,7 @@ describe('StagePreview', () => {
     const wrapper = createWrapper({ settings: { ...base, textShadow: true, shadowBlur: 2.2, shadowIntensity: 0.8 } })
     const style = wrapper.find('.stage-preview__text').attributes('style')
     expect(style).toContain('text-shadow')
-    expect(style).toContain('rgba(0,0,0,0.8)')
+    expect(style).toContain('rgba(0, 0, 0, 0.8)')
   })
 
   it('textStyle: textShadow none quando desativado', () => {
@@ -98,7 +98,7 @@ describe('StagePreview', () => {
     const style = wrapper.find('.stage-preview__box').attributes('style')
     expect(style).toContain('rgba(24, 24, 24, 0.45)')
     expect(style).toContain('rgba(255, 255, 255, 0.85)')
-    expect(style).toContain('1.4cqw 0 1.4cqw 0')
+    expect(style).toContain('border-radius: 1.4cqw 0px')
     expect(style).toContain('blur(16px)')
   })
 

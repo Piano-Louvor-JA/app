@@ -78,7 +78,7 @@ describe("RandomPreview", () => {
 			stage({ backgroundImage: "img://bg.png" }),
 		);
 		const surface = w.find(".random-preview");
-		expect((surface.element as HTMLElement).style.background).toBe(
+		expect((surface.element as HTMLElement).style.backgroundColor).toBe(
 			"transparent",
 		);
 	});
@@ -118,7 +118,7 @@ describe("RandomPreview", () => {
 			.style.textShadow;
 		expect(shadow).toContain("10px");
 		expect(shadow).toContain("40px");
-		expect(shadow).toContain("ffffff"); // cor translúcida
+		expect(shadow).toContain("rgba(255, 255, 255, "); // cor translúcida
 	});
 
 	it("stage: fontSize proporcional, uppercase, sombra do Palco", () => {
@@ -130,7 +130,7 @@ describe("RandomPreview", () => {
 			.style;
 		expect(style.fontSize).toBe(`${(96 / 1920) * 100}vw`);
 		expect(style.textTransform).toBe("uppercase");
-		expect(style.textShadow).toContain("rgba(0,0,0,0.5)");
+		expect(style.textShadow).toContain("rgba(0, 0, 0, 0.5)");
 	});
 
 	it("stage textShadow false: sombra none mesmo sem drawing", () => {
@@ -156,7 +156,7 @@ describe("RandomPreview", () => {
 			st,
 		);
 		const s2 = (w2.find(".random-preview__text").element as HTMLElement).style;
-		expect(s2.background).toBe("transparent");
+		expect(s2.backgroundColor).toBe("transparent");
 		expect(isClearedBorder(s2.border)).toBe(true);
 	});
 
