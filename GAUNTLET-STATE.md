@@ -17,11 +17,10 @@
 - /tmp/wt-edits-wire (branch fix/community-edits-wire-desktop, PR #577 aberta — commit novo entra nela)
 
 ## Estado Atual
-- **Ciclo**: 1 — builder
-- **Última ação concluída**: teste novo `src/modules/community-edits/__tests__/edit-official-suggest.test.ts` RED 3/3; implementação parcial aplicada em MediaEditorView.vue (loadOfficialForSuggestion/onSaveOfficialSuggestion + template painel + onMounted query editOfficial)
-- **Gap exato**: vi.mock do `@modules/media/services/custom-catalog` no teste é completo-demais-para-menos — MediaEditorView usa outros exports (listCustomCollections etc.) → mock com importOriginal spread + overrides
-- **Próximo comando EXATO**: corrigir mock e rodar `node_modules/.bin/vitest run src/modules/community-edits/__tests__/edit-official-suggest.test.ts`
-- **Decisão assumida (confirmar)**: entrada UX = botão "Sugerir correção" no AlbumTrackRow após GREEN do núcleo
+- **Ciclo**: 1 CONCLUÍDO — builder done
+- **BARRA**: B1 ✓ B2 ✓ B3 ✓ (GREEN 3/3 edit-official-suggest.test.ts) B4 ✓ (diff 146+/37−, zero deps) B5 ✓ (BUILD_OK) B6 ✓ (31/31 focais: community-edits + wire + AlbumTrackRow)
+- **Commit**: 16a5fe58 pushado em fix/community-edits-wire-desktop (PR #577 atualizada)
+- **Crítico cego**: pendente — julgamento próprio do líder sobre diff 16a5fe58 com BARRA (takeover, sem subagents)
 
 ## Log de Ciclos
 | Ts | Ciclo | Papel | Ação | Resultado | Evidência |
