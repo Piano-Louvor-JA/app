@@ -239,7 +239,10 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
     'remote:state': (payload) => remoteApi.sendState(payload),
     'remote:ack': (payload) => remoteApi.sendAck(payload as { id?: string | number; ok: boolean }),
   }
+  // Leitura ainda em andamento ao desligar não pode publicar estado de um bridge encerrado.
+  let disposed = false
   const send = (channel: string, payload: Record<string, unknown>) => {
+    if (disposed) return
     try {
       sendHandlers[channel]?.(payload)
     } catch {
@@ -1104,6 +1107,7 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
   pushState()
 
   return () => {
+    disposed = true
     clearInterval(progressTicker)
     clearInterval(docPoll)
     onUn.command?.()

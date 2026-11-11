@@ -2048,6 +2048,24 @@ describe('installRemoteLiturgyBridge', () => {
       cleanup()
     })
 
+    it('não publica o estado que ainda estava sendo lido quando foi desligado', async () => {
+      idleProjection()
+      const { onStateRequestCb, cleanup } = await installBridge()
+      await onStateRequestCb()
+      let release: (list: unknown[]) => void = () => {}
+      const list = vi.fn(() => new Promise<unknown[]>((resolve) => { release = resolve }))
+      ;(hoisted.displays as { list: typeof list }).list = list
+      const pending = onStateRequestCb()
+      await vi.waitFor(() => expect(list).toHaveBeenCalled())
+      hoisted.remoteApiStub.sendState.mockClear()
+
+      cleanup()
+      release([])
+      await pending
+
+      expect(hoisted.remoteApiStub.sendState).not.toHaveBeenCalled()
+    })
+
     it('guarda modo e destino escolhidos sem vídeo', async () => {
       idleProjection()
       const { command, cleanup } = await installBridge()
@@ -2062,6 +2080,7 @@ describe('installRemoteLiturgyBridge', () => {
           armed: true,
           monitors: [expect.objectContaining({ id: 'monitor:2', selected: true }), expect.anything()],
         }),
+        { timeout: 5000 },
       )
       cleanup()
     })
