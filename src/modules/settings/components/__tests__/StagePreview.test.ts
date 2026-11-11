@@ -113,14 +113,22 @@ describe('StagePreview', () => {
     expect(style).not.toContain('border: 1px')
   })
 
-  it('footerStyle: cor e peso do rodapé', () => {
+  it('footerStyle: cor, peso, tamanho e transformação do rodapé', () => {
     const wrapper = createWrapper({
       module: 'bible',
-      settings: { ...base, footerRefColor: '#FFCC00', footerRefWeight: 800 },
+      settings: {
+        ...base,
+        footerRefColor: '#FFCC00',
+        footerRefWeight: 800,
+        refFontSize: 72,
+        refTextTransform: 'uppercase',
+      },
     })
     const style = wrapper.find('.stage-preview__footer').attributes('style')
     expect(style).toContain('rgb(255, 204, 0)')
+    expect(style).toContain('font-size: 3.75cqw')
     expect(style).toContain('font-weight: 800')
+    expect(style).toContain('text-transform: uppercase')
   })
 
   describe('posição da referência', () => {

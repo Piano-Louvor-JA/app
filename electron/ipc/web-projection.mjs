@@ -1,7 +1,7 @@
 import { onReceiverEvent } from '../palco/receiver-events.mjs'
 import { youtubeCaptionsScript } from '../youtube-captions.mjs'
 import { isYoutubeEmbedUrl, youtubeEmbedUrl, youtubeSourceId, youtubeWatchUrl } from '../youtube-source.mjs'
-import { BrowserWindow, screen, session, WebContentsView } from 'electron'
+import { BrowserWindow, nativeImage, screen, session, WebContentsView } from 'electron'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
@@ -359,6 +359,10 @@ const independentByDisplay = new Map()
 let independentMode = 'overlay'
 /** Monitores ativos no "Telas" do app quando o player abriu (os que a independente pode usar). */
 let enabledDisplayIds = []
+/** Arquivos da galeria aberta: a prévia do celular lê a imagem atual direto do disco. */
+let currentImagePaths = []
+/** Miniaturas já geradas (caminho → JPEG base64): voltar uma imagem é instantâneo. */
+const previewCache = new Map()
 /**
  * Camadas do main.mjs: sempre acima das demais e metade do monitor.
  * @type {{ add?: (win: BrowserWindow) => void, addShared?: (win: BrowserWindow, displayId: number) => void }}
@@ -2131,6 +2135,9 @@ export async function openWebProjectionWindows(payload) {
             : 'video'
   currentSourceAudioOnly = mode === 'video' && (new URL(loadUrl).searchParams.get('audio') === '1' || AUDIO_FILE_EXT.test(currentSourceFilePath))
   const withScreens = !currentSourceAudioOnly && effective.withScreens !== false
+  currentImagePaths = mode === 'image' && Array.isArray(effective.filePaths)
+    ? effective.filePaths.map((entry) => String(entry))
+    : []
   const monitorIds = !currentSourceAudioOnly && Array.isArray(effective.monitorIds)
     ? effective.monitorIds.filter(
         (id) => typeof id === 'number' && Number.isFinite(id),
@@ -2551,6 +2558,33 @@ export function setAudioOutputMode(mode) {
   return mode
 }
 
+/** Roda JS na barra de vídeo aberta; null quando não há barra de vídeo. */
+async function runInVideoControlBar(script) {
+  if (currentProjectionMode !== 'video') return null
+  if (!controlBarView || controlBarView.webContents.isDestroyed()) return null
+  try {
+    return await controlBarView.webContents.executeJavaScript(script, true)
+  } catch {
+    return null
+  }
+}
+
+/** Estado da barra de vídeo para o controle remoto. */
+export function getVideoControlSnapshot() {
+  return runInVideoControlBar(
+    'window.__videoControlSnapshot ? window.__videoControlSnapshot() : null',
+  )
+}
+
+/** Executa um comando remoto na barra, pelo mesmo caminho do clique. */
+export async function runVideoControlCommand(command) {
+  const payload = JSON.stringify(command ?? {})
+  const result = await runInVideoControlBar(
+    `window.__videoControlCommand ? window.__videoControlCommand(${payload}) : false`,
+  )
+  return result === true
+}
+
 /** Caption visibility follows this player session and its captured mirrors. */
 export async function remoteSetCaptionsHiddenSource(hidden) {
   if (!sourceWindow || sourceWindow.isDestroyed() || !currentSourceYoutubeId) return null
@@ -2877,6 +2911,140 @@ export async function captureSourceFrameBase64() {
   }
 }
 
+/**
+ * Quadro do vídeo/YouTube aberto para a prévia do celular: 240 px e JPEG leve
+ * (a prévia prioriza fluidez, não qualidade),
+ * para caber várias vezes por segundo na rede sem pesar no desktop.
+ */
+export async function captureRemoteVideoFrame(maxWidth = 240, quality = 45) {
+  if (!sourceWindow || sourceWindow.isDestroyed() || (currentProjectionMode !== 'video' && !currentDocumentIsText)) {
+    return null
+  }
+  // Caminho leve: o próprio <video> desenhado num canvas pequeno, dentro da
+  // página (ou do iframe do YouTube). Não fotografa a janela inteira.
+  const script = `(() => {
+  const video = document.querySelector('video');
+  if (!video || !video.videoWidth) return null;
+  const width = Math.min(${maxWidth}, video.videoWidth);
+  const height = Math.round((width * video.videoHeight) / video.videoWidth);
+  const canvas = (window.__pianoFrameCanvas ||= document.createElement('canvas'));
+  if (canvas.width !== width) canvas.width = width;
+  if (canvas.height !== height) canvas.height = height;
+  canvas.getContext('2d').drawImage(video, 0, 0, width, height);
+  try {
+    return canvas.toDataURL('image/jpeg', ${quality / 100});
+  } catch (error) {
+    // Diz de onde vem o vídeo bloqueado, para o diagnóstico no terminal.
+    throw new Error(error.name + ' em ' + location.origin + ' <- ' + String(video.currentSrc).slice(0, 48));
+  }
+})()`
+  try {
+    // Quadro que não responde (iframe de outra origem carregando) não pode
+    // segurar a prévia: limite de tempo, e ele é pulado nas próximas capturas.
+    // Página carregando: executeJavaScript só responderia no fim da carga.
+    if (sourceWindow.webContents.isLoading?.()) return null
+    const skipped = (captureRemoteVideoFrame.skipped ||= new WeakMap())
+    // Texto não contém <video>: captura a página renderizada, com sua formatação.
+    for (const frame of currentDocumentIsText ? [] : sourceWindow.webContents.mainFrame?.framesInSubtree ?? []) {
+      // Quadro que não respondeu fica de fora por 3 s e depois é tentado de novo.
+      if (Date.now() - (skipped.get(frame) ?? -Infinity) < 3000) continue
+      try {
+        let timer
+        const dataUrl = await Promise.race([
+          frame.executeJavaScript(script, true),
+          new Promise((resolve) => {
+            timer = setTimeout(() => {
+              skipped.set(frame, Date.now())
+              resolve(null)
+            }, 300)
+          }),
+        ]).finally(() => clearTimeout(timer))
+        if (typeof dataUrl === 'string' && dataUrl.startsWith('data:image/jpeg;base64,')) {
+          logRemoteFramePath('elemento de vídeo')
+          return dataUrl.slice('data:image/jpeg;base64,'.length)
+        }
+      } catch (error) {
+        // canvas bloqueado (vídeo de outra origem) ou quadro saindo: tenta o próximo
+        const reason = String(error?.message ?? error)
+        if (captureRemoteVideoFrame.lastElementError !== reason) {
+          captureRemoteVideoFrame.lastElementError = reason
+          console.info(`[remote] prévia do vídeo: elemento indisponível (${reason})`)
+        }
+      }
+    }
+    // Sem acesso ao <video>: foto da janela, reduzida. É a reserva pesada,
+    // então sai no máximo a cada 400 ms mesmo com o envio mais rápido.
+    if (Date.now() - (captureRemoteVideoFrame.lastWindowShot ?? -Infinity) < 400) return null
+    captureRemoteVideoFrame.lastWindowShot = Date.now()
+    logRemoteFramePath('foto da janela')
+    const image = await sourceWindow.webContents.capturePage()
+    if (!image || image.isEmpty()) {
+      logRemoteFramePath('nenhuma (janela sem imagem)')
+      return null
+    }
+    const { width } = image.getSize()
+    const scaled = width > maxWidth ? image.resize({ width: maxWidth, quality: 'low' }) : image
+    return scaled.toJPEG(quality).toString('base64')
+  } catch (error) {
+    logRemoteFramePath(`nenhuma (erro: ${error?.message ?? error})`)
+    return null
+  }
+}
+
+/** Diagnóstico: registra uma vez (e a cada troca) por onde a prévia do vídeo está saindo. */
+function logRemoteFramePath(path) {
+  if (logRemoteFramePath.last === path) return
+  logRemoteFramePath.last = path
+  console.info(`[remote] prévia do vídeo via ${path}`)
+}
+
+/** Miniatura do slide atual para o controle remoto (celular): JPEG pequeno. */
+export async function captureSourcePreviewJpeg(maxWidth = 480) {
+  // Imagem: lê o arquivo atual. Não depende da janela já ter desenhado a troca.
+  if (currentProjectionMode === 'image' && currentImagePaths.length > 0) {
+    const state = await getImageSlideState()
+    const path = state ? currentImagePaths[state.index] : null
+    if (path) return filePreviewJpeg(path, maxWidth)
+  }
+  // PDF/PPT: o slide só existe desenhado na janela.
+  const frame = await captureSourceFrameBase64()
+  if (!frame) return null
+  return jpegFromImage(nativeImage.createFromBuffer(Buffer.from(frame, 'base64')), maxWidth)
+}
+
+/**
+ * Miniaturas de todas as imagens da galeria (até 30), para o celular trocar a
+ * prévia na hora do toque. A chave muda quando a galeria muda.
+ */
+export async function captureGalleryPreviewsJpeg(maxWidth = 480, limit = 30) {
+  if (currentProjectionMode !== 'image' || currentImagePaths.length === 0) return null
+  const paths = currentImagePaths.slice(0, limit)
+  let hash = 5381
+  for (const char of paths.join('|')) hash = ((hash * 33) ^ char.charCodeAt(0)) >>> 0
+  return {
+    key: `${paths.length}-${hash.toString(36)}`,
+    previews: paths.map((path) => filePreviewJpeg(path, maxWidth) ?? ''),
+  }
+}
+
+/** Miniatura de um arquivo de imagem, guardada para não reprocessar. */
+function filePreviewJpeg(path, maxWidth) {
+  const key = `${path}@${maxWidth}`
+  if (!previewCache.has(key)) {
+    if (previewCache.size > 60) previewCache.clear()
+    previewCache.set(key, jpegFromImage(nativeImage.createFromPath(path), maxWidth))
+  }
+  return previewCache.get(key) ?? null
+}
+
+function jpegFromImage(image, maxWidth) {
+  if (image.isEmpty()) return null
+  const small = image.getSize().width > maxWidth
+    ? image.resize({ width: maxWidth, quality: 'good' })
+    : image
+  return small.toJPEG(70).toString('base64')
+}
+
 /** Avança para o próximo slide da apresentação no popup. */
 export async function remotePptNext() {
   return remotePdfNext()
@@ -2936,6 +3104,46 @@ export function remoteReloadSource() {
   }
   siteSourceReloadPending = true
   sourceWindow.webContents.reload()
+  return true
+}
+
+/** Celular navegou no navegador dele: o site projetado vai para o mesmo endereço. */
+export function remoteNavigateSource(url) {
+  if (!sourceWindow || sourceWindow.isDestroyed() || currentProjectionMode !== 'site') {
+    return false
+  }
+  let parsed
+  try {
+    parsed = new URL(String(url))
+  } catch {
+    return false
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false
+  const contents = sourceWindow.webContents
+  if (contents.getURL() !== parsed.href) void contents.loadURL(parsed.href)
+  return true
+}
+
+/**
+ * Celular rolou o site: a janela de origem rola na mesma proporção (as telas
+ * têm alturas diferentes) e o espelho das projeções acompanha pela origem.
+ */
+export function remoteScrollSource(value) {
+  if (!sourceWindow || sourceWindow.isDestroyed() || currentProjectionMode !== 'site') {
+    return false
+  }
+  if (typeof value !== 'number' || !Number.isFinite(value)) return false
+  const ratio = Math.min(1, Math.max(0, value))
+  void sourceWindow.webContents.executeJavaScript(
+    `(() => {
+  const ratio = ${ratio};
+  const el = document.scrollingElement || document.documentElement;
+  const max = Math.max(0, el.scrollHeight - window.innerHeight);
+  window.scrollTo(0, Math.round(max * ratio));
+  return true;
+})()`,
+    true,
+  )
   return true
 }
 

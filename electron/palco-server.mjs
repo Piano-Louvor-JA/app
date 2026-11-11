@@ -1,3 +1,4 @@
+import { DEFAULT_REMOTE_PORT } from './remote-config.mjs'
 import { readConnectionStartup, saveConnectionStartup } from './palco/connection-startup.mjs'
 /**
  * Servidor do PALCO (cast para TV) — multi-slot (paridade PalcoOrchestrator APK).
@@ -992,7 +993,7 @@ nav{display:flex;justify-content:space-between;gap:var(--sp3)}
 </footer>
 </main>
 <div id="pair"><p class="hint" data-i18n="pairHint">Pareamento perdido. Cole abaixo o link do QR exibido no app do desktop (começa com http://…/speaker?token=…):</p>
-<input id="pairUrl" placeholder="http://192.168.x.x:47080/speaker?remotePort=7071&token=abcd1234">
+<input id="pairUrl" placeholder="http://192.168.x.x:47080/speaker?remotePort=${DEFAULT_REMOTE_PORT}&token=abcd1234">
 <button id="pairGo" class="small" data-i18n="connect">Conectar</button><button id="pairCancel" class="small" data-i18n="cancel">Cancelar</button></div>
 <script>
 const I18N=${dictJson};
@@ -1006,7 +1007,7 @@ document.title=T.title+' · LouvorJA';
 document.querySelectorAll('[data-i18n]').forEach(el=>{el.textContent=T[el.dataset.i18n]});
 document.querySelectorAll('[data-i18n-attr]').forEach(el=>{const[k,key]=el.dataset.i18nAttr.split(':');el.setAttribute(k,T[key])});
 let token=q.get('token')||localStorage.getItem('speaker.token');
-let remotePort=q.get('remotePort')||localStorage.getItem('speaker.remotePort')||'7071';
+let remotePort=q.get('remotePort')||localStorage.getItem('speaker.remotePort')||'${DEFAULT_REMOTE_PORT}';
 let palcoPort=q.get('palcoPort')||localStorage.getItem('speaker.palcoPort')||String((Number(location.port)||47080)+1);
 // Token do palco (valor real injetado server-side abaixo) — o preview precisa
 // dele para o WS do palco não fechar a conexão fora do localhost.

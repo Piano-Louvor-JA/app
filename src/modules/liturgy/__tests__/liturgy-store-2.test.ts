@@ -121,6 +121,16 @@ describe('useLiturgyStore — parte 2: ações com bridge/projeção', () => {
     expect(s.lastActionMessageKey).toBe('liturgy.errors.x')
   })
 
+  it('playMusicMode permite abrir sem projetar pelo controle remoto', async () => {
+    const s = useLiturgyStore()
+    await s.hydrate()
+    s.selectDay('sunday')
+    addCategory(s)
+    addSubDraft(s, { ...s.itemDraft, type: 'music', name: 'Hino', musicId: 101 })
+    await s.playMusicMode(1, 'vocal', makeRouter(), { project: false })
+    expect(actionsMock.openLiturgyMusicPlayer).toHaveBeenCalledWith(expect.objectContaining({ musicId: 101 }), 'vocal', { project: false })
+  })
+
   it('playMusicMode: só música; ok → done + navega pra /media; falha → false', async () => {
     const s = useLiturgyStore()
     await s.hydrate()
@@ -161,8 +171,8 @@ describe('useLiturgyStore — parte 2: ações com bridge/projeção', () => {
     // sem bridge: cai no playLiturgyItemOnScreens direto
     await s.playItemOnScreens(1)
     expect(actionsMock.playLiturgyItemOnScreens).toHaveBeenCalledOnce()
-    // site não é media play type → não marca done (só abre projeção)
-    expect(s.currentItems[1]!.done).toBe(false)
+    // Site aberto com sucesso conclui sem depender da projeção.
+    expect(s.currentItems[1]!.done).toBe(true)
 
     // com bridge: controle FECHADO (getNavigationState null) → id setado
     actionsMock.playLiturgyItemOnScreens.mockClear()

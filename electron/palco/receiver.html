@@ -3908,6 +3908,9 @@ function handle(m){
           ref.style.setProperty('--ref-color',color.style.color||'#FCCE02');
           const weight=Number(m.footerWeight);
           ref.style.setProperty('--ref-weight',String(Number.isFinite(weight)&&weight>=100&&weight<=900?weight:600));
+          const size=Number(m.footerSize);
+          ref.style.fontSize=Number.isFinite(size)&&size>0?(Math.round(size/10.8*1000)/1000)+'vw':'';
+          ref.style.textTransform=['none','uppercase','capitalize'].includes(m.footerTransform)?m.footerTransform:'none';
           f.appendChild(ref);
           if(m.footerVersion){const version=document.createElement('span');version.className='ver';version.textContent=String(m.footerVersion);f.appendChild(version)}
         }else{

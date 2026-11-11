@@ -366,6 +366,13 @@ export default {
     },
 
     remote: {
+      renewToken: 'Actualizar token',
+      tokenPersistent: 'El token se mantiene hasta que lo actualices.',
+      renewRemoteTitle: '¿Actualizar el token del control remoto?',
+      renewRemoteMessage: 'El celular conectado se desconectará. Para volver a conectarlo, usa el nuevo enlace, código QR o token.',
+      renewSpeakerTitle: '¿Actualizar el token del predicador?',
+      renewSpeakerMessage: 'El predicador conectado se desconectará. Para volver a conectarlo, usa el nuevo enlace o código QR.',
+      renewFailed: 'No se pudo actualizar el token. Inténtalo de nuevo.',
       p2pTitle: 'Control P2P (QR)',
       wsTitle: 'Conectar por el móvil',
       wsHint1: '1. En la app Piano LouvorJA: Ajustes → Control Remoto → Iniciar web link — aparecerá un QR.',
@@ -601,6 +608,8 @@ export default {
       bibleTextColor: 'Color del texto (Biblia)',
       bibleFontSize: 'Tamaño de fuente (Biblia)',
       bibleFontWeight: 'Peso (Biblia)',
+      refFontSize: 'Tamaño de referencia',
+      refTextTransform: 'Capitalización de referencia',
       bibleTextTransform: 'Capitalización (Biblia)',
       bibleTransformNone: 'Normal',
       bibleTransformUppercase: 'MAYÚSCULAS',

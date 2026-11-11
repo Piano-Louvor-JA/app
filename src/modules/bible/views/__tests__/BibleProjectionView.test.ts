@@ -13,6 +13,7 @@ const stageValue = vi.hoisted(() => ({
     bibleFontSize: 96,
     bibleTextColor: '#ffffff',
     bibleFontWeight: 400,
+    bibleTextTransform: 'none' as 'none' | 'uppercase' | 'capitalize',
     textAlign: 'left',
     textVerticalAlign: 'center',
     textShadow: true,
@@ -24,6 +25,8 @@ const stageValue = vi.hoisted(() => ({
     boxBorder: true,
     footerRefColor: '#dddddd',
     footerRefWeight: 600,
+    refFontSize: null as number | null,
+    refTextTransform: 'none' as 'none' | 'uppercase' | 'capitalize',
   },
 }))
 
@@ -144,6 +147,17 @@ describe('BibleProjectionView.vue', () => {
     const w = mount(BibleProjectionView, { props: { embedded: true } })
     await flushPromises()
     expect(w.html()).toContain('bible-projection--embedded')
+    w.unmount()
+  })
+
+  it('referência aplica tamanho e transformação configurados', async () => {
+    stageValue.value.refFontSize = 72
+    stageValue.value.refTextTransform = 'uppercase'
+    const w = mount(BibleProjectionView)
+    await flushPromises()
+    const style = w.find('.bible-projection__reference').attributes('style')
+    expect(style).toContain('font-size: 3.75cqw')
+    expect(style).toContain('text-transform: uppercase')
     w.unmount()
   })
 
