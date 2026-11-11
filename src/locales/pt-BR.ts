@@ -32,6 +32,7 @@ export default {
     comingSoon: 'Em breve',
     openFolder: 'Abrir pasta',
     addToPlaylist: 'Adicionar à playlist',
+    suggestFix: 'Sugerir correção de letra/timing',
     cancel: 'Cancelar',
     copied: 'Copiado!',
   },

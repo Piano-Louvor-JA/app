@@ -1,43 +1,38 @@
-# GAUNTLET-STATE — Loop de Issues 02/10 (app#337 → apk#106 → app#339 → #338 → orval → sync v2)
+# GAUNTLET-STATE — Editas RF-01: edição oficial via Media Editor (desktop) — 2026-11-11
 
-> Modo autônomo ativado por Rafael: "fica a seu critério mas faz em loop" + rafael-workflow.
-> Board: hermes kanban default. Branch de trabalho: `fix/<issue>-<slug>` a partir de main (feat→staging→main).
-> PRs: base staging, review Ezequias antes de merge.
+> Memória do loop. Primeira ação de qualquer turno = ler este arquivo + `git -C /tmp/wt-edits-wire status`.
+> Modo: takeover local, SEM subagents (builder/crítico = líder, julgamento próprio registrado).
+> Node CI: `export PATH="/home/rafaelejosi/.nvm/versions/node/v22.23.3/bin:$PATH"`.
 
-## Ordem do loop (critério: impacto em campo → dependências)
-1. [RUNNING] **t_7f36710d — app#337** (import first-boot para ao perder foco)
-2. [ ] t_f09e15a4 — apk#106 (réplica título/categoria)
-3. [ ] t_f09e15a4→339 — app#339 (idioma não recarrega catálogo)
-4. [ ] t_18f218a5 — app#338 (fila de downloads)
-5. [ ] t_9d7e1b49 — orval (4 frentes)
-6. [ ] t_7b5ba31a → 3fbf5431 → b13b4e6e → 092d9f36 / 7ec0e2ad — sync v2 (DAG)
+## BARRA (congelada — derivada SPEC piano-community-edits v1.0 + review R1 t_e40d28ff)
+- B1. `?editOfficial=<id>` carrega letra/timing oficial no editor em modo sugestão (teste GREEN)
+- B2. Salvar grava `saveLocalEdit` draft (JSON slides letra+timing), NUNCA PUT no catálogo oficial
+- B3. Resolver prioriza local > applied > oficial na reprodução (fase 1) — teste GREEN
+- B4. Zero deps novas; zero produção no diff (grep)
+- B5. `npm run build` exit 0
+- B6. Sem novas falhas vs baseline (focais + suíte afetada)
+- STOP: B1..B6 verdes com evidência → commit+push na branch → PR #577 atualizada
 
-## Tarefa atual: t_7f36710d (app#337)
-### Diagnóstico (já mapeado na issue)
-- Bootstrap do catálogo roda na render process (Electron): `bootstrap-service.ts` é sequencial
-  all-or-nothing; Chromium throttla rAF/timers de janela em bg → perda de foco congela/abandona.
-- Correção desenhada (na issue #337):
-  B1. Retomada por arquivo: `bootstrapComplete.files: string[]` — loop pula os já salvos.
-  B2. Fetch+write no processo MAIN via IPC (`ipcRenderer.invoke`) — main não sofre throttle.
-  B3. `visibilitychange`: ao voltar o foco, verificar e retomar bootstrap incompleto.
+## Workspace
+- /tmp/wt-edits-wire (branch fix/community-edits-wire-desktop, PR #577 aberta — commit novo entra nela)
 
-### Barra (B1..Bn)
-- B1: com downloads interrompidos no meio (simulado), reabrir o app retoma e completa o bootstrap
-  sem re-baixar arquivos já salvos (teste unitário do serviço com estado parcial).
-- B2: perda de foco DURANTE o bootstrap não aborta o download em andamento (mock de foco/timers).
-- B3: `bootstrapComplete` persiste por arquivo; `isBootstrapComplete` só true com todos.
-- B4: sem regressão — suite existente do módulo starting/bootstrap verde.
+## Estado Atual
+- **Ciclo**: 1 — builder
+- **Última ação concluída**: teste novo `src/modules/community-edits/__tests__/edit-official-suggest.test.ts` RED 3/3; implementação parcial aplicada em MediaEditorView.vue (loadOfficialForSuggestion/onSaveOfficialSuggestion + template painel + onMounted query editOfficial)
+- **Gap exato**: vi.mock do `@modules/media/services/custom-catalog` no teste é completo-demais-para-menos — MediaEditorView usa outros exports (listCustomCollections etc.) → mock com importOriginal spread + overrides
+- **Próximo comando EXATO**: corrigir mock e rodar `node_modules/.bin/vitest run src/modules/community-edits/__tests__/edit-official-suggest.test.ts`
+- **Decisão assumida (confirmar)**: entrada UX = botão "Sugerir correção" no AlbumTrackRow após GREEN do núcleo
 
-### Fase
-- [x] 0. MAPEAR (issue + diagnóstico acima)
-- [ ] 4. IMPLEMENTAR (TDD: teste do estado parcial primeiro)
-- [ ] 5. VERIFY (7 gates + regressão)
-- [ ] 6. RELEASE (PR base staging)
+## Log de Ciclos
+| Ts | Ciclo | Papel | Ação | Resultado | Evidência |
+|----|-------|-------|------|-----------|-----------|
+| 11:50 | 1 | builder | teste novo | RED 3/3 | vitest run |
+| 11:55 | 1 | builder | impl. parcial editor | RED (mock incompleto) | vitest run |
 
-### Log
-- 03/10: task claimed, workspace t_7f36710d. GAUNTLET-STATE criado.
+## Bloqueios externos
+(nenhum)
 
-## Decisão 03/10 (Rafael)
-- Sync v2 fases 2-3 (outbox/migração app + réplicas) → AMANHÃ (04/10)
-- Agora: apk#106 (título vazio + categoria opcional no Flutter) — desbloquear needs_device
-  (auditoria estática ok: código tolerante; falta validar em device A15 via adb Wi-Fi)
+## Retomada
+1. Ler este arquivo + git status.
+2. Corrigir mock do teste → GREEN B1-B3.
+3. B4 grep diff, B5 build, B6 focais existentes (wire 3/3) → commit+push.
