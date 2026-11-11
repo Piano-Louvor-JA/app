@@ -109,6 +109,7 @@ export function useBibleReader() {
     selectVerse: store.selectVerse,
     applyVerseSearch: store.applyVerseSearch,
     applyBookSearchReference: store.applyBookSearchReference,
+    applyPassage: store.applyPassage,
     clearSelection: store.clearSelection,
     setTestamentFilter: store.setTestamentFilter,
     toggleNavPanel: store.toggleNavPanel,

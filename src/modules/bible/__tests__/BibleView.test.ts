@@ -22,8 +22,8 @@ vi.mock('../components/BibleNavPanel.vue', () => ({
 vi.mock('../components/BibleToolbar.vue', () => ({
   default: {
     name: 'BibleToolbar',
-    props: ['versions', 'selectedVersionId', 'locationLabel', 'showNavPanel', 'bibleSearchQuery', 'versionsDisabled'],
-    emits: ['selectVersion', 'toggleNav', 'update:bibleSearchQuery'],
+    props: ['versions', 'selectedVersionId', 'locationLabel', 'showNavPanel', 'books', 'versionsDisabled'],
+    emits: ['selectVersion', 'toggleNav', 'openPassage', 'searchText'],
     template: '<div class="toolbar-stub" />',
   },
 }))
@@ -175,7 +175,7 @@ describe('BibleView', () => {
     expect(store.selectedVerses).toContain(1)
   })
 
-  it('eventos: toolbar toggleNav/selectVersion/search e nav panel binds', async () => {
+  it('eventos: toolbar toggleNav/selectVersion/searchText e nav panel binds', async () => {
     const store = useBibleStore()
     vi.spyOn(store, 'bootstrap').mockResolvedValue(undefined)
     store.books = [{ id: 1, name: 'Gênesis', abbreviation: 'Gn', chapters: 2, bookNumber: 1, languageId: 'pt' }]
@@ -185,11 +185,11 @@ describe('BibleView', () => {
     const toolbar = wrapper.findComponent({ name: 'BibleToolbar' })
     toolbar.vm.$emit('toggleNav')
     toolbar.vm.$emit('selectVersion', 9)
-    toolbar.vm.$emit('update:bibleSearchQuery', 'fe')
+    toolbar.vm.$emit('searchText', 'fe')
     await flushPromises()
     expect(store.showNavPanel).toBe(false)
     expect(store.selectedVersionId).toBe(9)
-    expect(store.globalSearchQuery).toBe('fe')
+    expect(store.verseSearchQuery).toBe('fe')
 
     store.showNavPanel = true
     await flushPromises()

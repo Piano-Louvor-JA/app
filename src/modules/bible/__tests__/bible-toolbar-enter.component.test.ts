@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
-import { mount, flushPromises } from '@vue/test-utils'
+import { mount, flushPromises, type VueWrapper } from '@vue/test-utils'
 
 // Loaders reais vivem em bible-catalog.ts — mock dos 3 que a store usa no boot.
 const { loadBibleBooks, loadBibleVersions, loadChapterVerses } = vi.hoisted(() => ({
@@ -28,7 +28,7 @@ const books: BibleBook[] = [
   { id: 66, name: 'Apocalipse', abbreviation: 'Ap', chapters: 22, bookNumber: 66, languageId: 'pt' },
 ]
 
-describe('BibleView — toolbar 1-shot (Enter no campo global)', () => {
+describe('BibleView — busca inteligente da toolbar (modal + Enter)', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
@@ -42,64 +42,55 @@ describe('BibleView — toolbar 1-shot (Enter no campo global)', () => {
     )
   })
 
-  it('Enter na toolbar dispara 1-shot: genesis 1:1-4, 6 seleciona versículos', async () => {
+  async function mountView() {
     const wrapper = mount(BibleView, {
-      global: { stubs: { GlassCard: false, PalcoRouteSelect: true,teleport: true } },
+      attachTo: document.body,
+      global: { stubs: { GlassCard: false, PalcoRouteSelect: true } },
     })
     await flushPromises()
+    return wrapper
+  }
 
-    // Abre nav panel para o fluxo real? Não — o campo alvo é o da toolbar.
-    const toolbar = wrapper.findComponent({ name: 'BibleToolbar' })
-    const input = toolbar.find('.bible-toolbar__search-input')
-    expect(input.exists()).toBe(true)
-
-    await input.setValue('genesis 1:1-4, 6')
-    await input.trigger('keydown.enter')
+  async function typeAndEnter(wrapper: VueWrapper, text: string) {
+    await wrapper.find('.smart-search__trigger').trigger('click')
     await flushPromises()
+    const input = document.body.querySelector('.smart-search__input') as HTMLInputElement
+    expect(input).not.toBeNull()
+    input.value = text
+    input.dispatchEvent(new Event('input'))
+    await flushPromises()
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    await flushPromises()
+  }
+
+  it.each([
+    ['genesis 1:1-4, 6', 'hífen'],
+    ['genesis 1:1\u20134, 6', 'travessão tipográfico'],
+  ])('Enter em "%s" (%s) abre Gênesis 1 filtrado em 1-4 e 6, sem seleção', async (text) => {
+    const wrapper = await mountView()
+    await typeAndEnter(wrapper, text)
 
     const store = useBibleStore()
     expect(store.selectedBookId).toBe(1)
     expect(store.selectedChapter).toBe(1)
     expect(store.selectedVerses).toEqual([]) // nada pré-selecionado (ajuste PO)
-    expect((input.element as HTMLInputElement).value).toBe('')
+    expect(store.visibleVerseEntries.map((e) => e.number)).toEqual([1, 2, 3, 4, 6])
+    expect(document.body.querySelector('.smart-search__overlay')).toBeNull() // modal fechou
     wrapper.unmount()
   })
 
-  it('Enter na toolbar com travessão tipográfico também resolve', async () => {
-    const wrapper = mount(BibleView, {
-      global: { stubs: { GlassCard: false, PalcoRouteSelect: true, teleport: true } },
-    })
-    await flushPromises()
-
-    const input = wrapper
-      .findComponent({ name: 'BibleToolbar' })
-      .find('.bible-toolbar__search-input')
-    await input.setValue('genesis 1:1\u20134, 6')
-    await input.trigger('keydown.enter')
-    await flushPromises()
-
+  it('Enter com texto comum filtra os versículos sem alterar a seleção', async () => {
+    const wrapper = await mountView()
     const store = useBibleStore()
-    expect(store.selectedBookId).toBe(1)
-    expect(store.selectedVerses).toEqual([]) // nada pré-selecionado (ajuste PO)
-    wrapper.unmount()
-  })
+    const bookBefore = store.selectedBookId
+    const chapterBefore = store.selectedChapter
 
-  it('Enter com texto comum NÃO altera seleção (mantém filtro textual)', async () => {
-    const wrapper = mount(BibleView, {
-      global: { stubs: { GlassCard: false, PalcoRouteSelect: true, teleport: true } },
-    })
-    await flushPromises()
+    await typeAndEnter(wrapper, 'amor de Deus')
 
-    const input = wrapper
-      .findComponent({ name: 'BibleToolbar' })
-      .find('.bible-toolbar__search-input')
-    await input.setValue('amor de Deus')
-    await input.trigger('keydown.enter')
-    await flushPromises()
-
-    const store = useBibleStore()
+    expect(store.verseSearchQuery).toBe('amor de deus') // serviço normaliza para minúsculas
     expect(store.selectedVerses).toEqual([])
-    expect(store.globalSearchQuery).toBe('amor de Deus')
+    expect(store.selectedBookId).toBe(bookBefore)
+    expect(store.selectedChapter).toBe(chapterBefore)
     wrapper.unmount()
   })
 })

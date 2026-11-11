@@ -24,10 +24,15 @@ vi.mock('../components/BibleVersionSelect.vue', () => ({
 }))
 
 import BibleToolbar from '../components/BibleToolbar.vue'
-import type { BibleVersion } from '../types/bible'
+import type { BibleBook, BibleVersion } from '../types/bible'
 
 const versions: BibleVersion[] = [
   { id: 1, abbreviation: 'ARA', name: 'ARA', languageId: 'pt' },
+]
+
+const books: BibleBook[] = [
+  { id: 1, name: 'Gênesis', abbreviation: 'Gn', chapters: 50, bookNumber: 1, languageId: 'pt' },
+  { id: 43, name: 'João', abbreviation: 'Jo', chapters: 21, bookNumber: 43, languageId: 'pt' },
 ]
 
 function mountToolbar(props: Record<string, unknown> = {}) {
@@ -37,7 +42,7 @@ function mountToolbar(props: Record<string, unknown> = {}) {
       selectedVersionId: 1,
       locationLabel: 'Gn 1',
       showNavPanel: false,
-      bibleSearchQuery: '',
+      books,
       ...props,
     },
   })
@@ -49,7 +54,7 @@ describe('BibleToolbar', () => {
     expect(wrapper.find('.version-select-stub').exists()).toBe(true)
     expect(wrapper.text()).toContain('bible.location')
     expect(wrapper.text()).toContain('Gn 1')
-    expect(wrapper.find('input[type="search"]').exists()).toBe(true)
+    expect(wrapper.find('.smart-search__trigger').exists()).toBe(true)
     expect(wrapper.find('.palette-stub').exists()).toBe(true)
   })
 
@@ -58,10 +63,32 @@ describe('BibleToolbar', () => {
     expect(wrapper.text()).toContain('bible.locationEmpty')
   })
 
-  it('digitar na busca emite update:bibleSearchQuery', async () => {
+  it('busca inteligente: referência + Enter emite openPassage', async () => {
     const wrapper = mountToolbar()
-    await wrapper.find('input[type="search"]').setValue('salv')
-    expect(wrapper.emitted('update:bibleSearchQuery')?.[0]).toEqual(['salv'])
+    await wrapper.find('.smart-search__trigger').trigger('click')
+    const input = document.body.querySelector('.smart-search__input') as HTMLInputElement
+    expect(input).not.toBeNull()
+    input.value = 'jo 3:16'
+    input.dispatchEvent(new Event('input'))
+    await wrapper.vm.$nextTick()
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    await wrapper.vm.$nextTick()
+    expect(wrapper.emitted('openPassage')?.[0]).toEqual([43, 3, [16]])
+    expect(document.body.querySelector('.smart-search__overlay')).toBeNull()
+    wrapper.unmount()
+  })
+
+  it('busca inteligente: texto + Enter emite searchText', async () => {
+    const wrapper = mountToolbar()
+    await wrapper.find('.smart-search__trigger').trigger('click')
+    const input = document.body.querySelector('.smart-search__input') as HTMLInputElement
+    input.value = 'salv'
+    input.dispatchEvent(new Event('input'))
+    await wrapper.vm.$nextTick()
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    await wrapper.vm.$nextTick()
+    expect(wrapper.emitted('searchText')?.[0]).toEqual(['salv'])
+    wrapper.unmount()
   })
 
   it('repassa select do VersionSelect', async () => {
