@@ -1077,5 +1077,25 @@ export async function resolveMediaTrack(
   if (isCustomMusicId(musicId)) {
     return loadCustomMusicTrack(fromCustomMusicId(musicId))
   }
-  return loadMediaTrack(musicId)
+  const official = await loadMediaTrack(musicId)
+  if (!official) return null
+  // E13 edits da comunidade (SPEC piano-community-edits v1.0): edit local do
+  // autor ou applied do concilio vence a letra/timing oficial (RF-02/RF-08).
+  // fetchApplied importado lazy para não puxar a API no boot do módulo.
+  const { resolveEditOverride } = await import('../../community-edits/services/edit-resolver')
+  return resolveEditOverride(musicId, official, fetchAppliedEdit)
+}
+
+/** Busca edit aprovado p/ música na API custom (RF-08). Falha de rede = oficial. */
+async function fetchAppliedEdit(musicId: number): Promise<{ lyrics: string | null; timing: string | null } | null> {
+  try {
+    const res = await fetch(customApiUrl(`/edits/applied?musicIds=${musicId}`), {
+      headers: customHeaders(),
+    })
+    if (!res.ok) return null
+    const body = (await res.json()) as { applied?: { musicId: number; lyrics: string | null; timing: string | null }[] }
+    return body.applied?.find((e) => e.musicId === musicId) ?? null
+  } catch {
+    return null // offline → oficial intacta
+  }
 }

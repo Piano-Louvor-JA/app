@@ -807,6 +807,38 @@ const confirmReset = ref(false)
           </button>
         </div>
 
+        <div class="stage-custom__row-head">
+          <span>{{ t('settings.stage.refFontSize') }}</span>
+          <span class="stage-custom__chip">{{ settings.refFontSize == null ? t('settings.stage.autoText') : `${Math.round(settings.refFontSize)}px` }}</span>
+        </div>
+        <input
+          type="range"
+          min="50"
+          max="140"
+          step="2"
+          :value="settings.refFontSize ?? Math.round(settings.bibleFontSize * 0.4)"
+          :aria-label="t('settings.stage.refFontSize')"
+          @input="patch({ refFontSize: Number(($event.target as HTMLInputElement).value) })"
+        >
+
+        <p class="stage-custom__label stage-custom__label--sub">
+          {{ t('settings.stage.refTextTransform') }}
+        </p>
+        <div class="stage-custom__segment" role="radiogroup">
+          <button
+            v-for="opt in bibleTransformOptions"
+            :key="opt.value"
+            type="button"
+            role="radio"
+            :aria-checked="settings.refTextTransform === opt.value"
+            class="stage-custom__segment-btn"
+            :class="{ 'stage-custom__segment-btn--active': settings.refTextTransform === opt.value }"
+            @click="patch({ refTextTransform: opt.value })"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
+
         <p class="stage-custom__label stage-custom__label--sub">
           {{ t('settings.stage.bibleTransition') }}
         </p>

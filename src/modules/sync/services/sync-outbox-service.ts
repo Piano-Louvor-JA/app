@@ -134,7 +134,6 @@ export type OperatorStateItem = {
 export async function flushOutbox(): Promise<OperatorStateItem[] | null> {
   const box = readOutbox()
   const entries = Object.values(box)
-  if (entries.length === 0) return null
   if (!hasRealSession()) return null
 
   const session = getAuthSession()
@@ -220,4 +219,70 @@ export function startOutboxTriggers(): () => void {
   // pull no boot (rede disponível): puxa o estado da conta
   onOnline()
   return () => window.removeEventListener('online', onOnline)
+}
+
+/**
+ * SPEC piano-sync-v2-post-login-pull: pull pós-login.
+ *
+ * Observa a sessão em polling leve e dispara flushOutbox() (push+pull
+ * atômico) na transição sem-sessão → com-sessão. Anti-loop:
+ * - mesmo token+uid → não dispara de novo;
+ * - renovação de token com uid igual dentro de 60s → segurada (ruído de
+ *   refresh do Firebase);
+ * - troca de conta (uid diferente) → dispara sempre.
+ * Zero acoplamento auth→sync: lê a sessão via getAuthSession().
+ */
+const WATCH_POLL_MS = 2_000
+const WATCH_MIN_INTERVAL_MS = 60_000
+
+let watchTimer: ReturnType<typeof setInterval> | null = null
+let lastSeenToken: string | null = null
+let lastSeenUid: number | null = null
+let lastPullAt = 0
+
+/** Testável: decide se a sessão observada exige um pull novo. */
+export function shouldPullForSession(
+  session: { token: string; user: { id_user: number } } | null,
+  now: number,
+): boolean {
+  if (!session?.token) {
+    lastSeenToken = null
+    lastSeenUid = null
+    return false
+  }
+  const uid = session.user.id_user
+  if (session.token === lastSeenToken && uid === lastSeenUid) return false
+  const uidChanged = lastSeenUid !== null && uid !== lastSeenUid
+  const inWindow = now - lastPullAt < WATCH_MIN_INTERVAL_MS
+  if (!uidChanged && inWindow) {
+    // renovação de token na mesma conta: segura agora; o pendingToken garante
+    // que o primeiro poll APÓS a janela dispare (não some com o refresh)
+    pendingToken = session.token
+    lastSeenUid = uid
+    return false
+  }
+  lastSeenToken = session.token
+  pendingToken = null
+  lastSeenUid = uid
+  lastPullAt = now
+  return true
+}
+
+/** Token renovado durante a janela — dispara pull assim que ela abrir. */
+let pendingToken: string | null = null
+
+/** Liga o observador de sessão; retorna disposer. */
+export function watchAuthSession(): () => void {
+  if (watchTimer) return () => {}
+  watchTimer = setInterval(() => {
+    const session = getAuthSession()
+    if (!shouldPullForSession(session, Date.now())) return
+    void flushOutbox().catch(() => {})
+  }, WATCH_POLL_MS)
+  return () => {
+    if (watchTimer) {
+      clearInterval(watchTimer)
+      watchTimer = null
+    }
+  }
 }

@@ -1,3 +1,4 @@
+import { DEFAULT_REMOTE_PORT, REMOTE_PORT_ATTEMPTS } from './remote-config.mjs'
 // remote-diagnostics — sondas de rede local do Controle Remoto (SPEC v1.2).
 // Módulo PURO: parsers e veredito testáveis em node (CI Linux); sondas de SO
 // são execFile com timeout curto e null-safe (falha = null, nunca crash/throw).
@@ -52,7 +53,7 @@ export function analyzeInterfaces(interfaces) {
 export function computeRemoteVerdict({
   status,
   portaAtiva,
-  portaEsperada = 7071,
+  portaEsperada = DEFAULT_REMOTE_PORT,
   janelasPortasExcluidas = [],
   selfProbe,
   ipSuspeito,
@@ -148,11 +149,11 @@ export function parseFirewallRules(stdout) {
 }
 
 /** ufw verbose → regras; retorna null se não gerenciado. */
-function parseUfw(stdout) {
+function parseUfw(stdout, port) {
   const text = String(stdout ?? '')
   if (!/Status: active/i.test(text)) return null
-  const allow7071 = /7071.*ALLOW/i.test(text) || /ALLOW.*7071/i.test(text)
-  return { allow7071 }
+  const allowRemote = new RegExp(`(?:${port}.*ALLOW|ALLOW.*${port})`, 'i').test(text)
+  return { allowRemote }
 }
 
 // RF4c — quem escuta as portas do controle remoto.
@@ -214,7 +215,7 @@ export async function probeExcludedPorts() {
 }
 
 /** RF4b — mapa de firewall do SO atual (perfis + regras relevantes, máx 10). */
-export async function probeFirewall() {
+export async function probeFirewall(port = DEFAULT_REMOTE_PORT) {
   const p = process.platform
   if (p === 'win32') {
     const [stateOut, rulesOut] = await Promise.all([
@@ -226,19 +227,19 @@ export async function probeFirewall() {
     return {
       perfis: stateOut == null ? null : parseFirewallProfiles(stateOut),
       block: rules.block.slice(0, 10),
-      allow: rules.allow.filter((r) => r.porta === 7071).slice(0, 10),
+      allow: rules.allow.filter((r) => r.porta === port).slice(0, 10),
     }
   }
   if (p === 'linux') {
     const ufw = await safeRun('ufw', ['status', 'verbose'])
     if (ufw != null) {
-      const parsed = parseUfw(ufw)
+      const parsed = parseUfw(ufw, port)
       return parsed && { gerenciador: 'ufw', ...parsed }
     }
     const fwalld = await safeRun('firewall-cmd', ['--list-all'])
     if (fwalld != null) {
-      const allow7071 = /7071/.test(fwalld)
-      return { gerenciador: 'firewalld', allow7071 }
+      const allowRemote = new RegExp(`\\b${port}\\b`).test(fwalld)
+      return { gerenciador: 'firewalld', allowRemote }
     }
     return null // iptables sem root não informa
   }
@@ -250,7 +251,7 @@ export async function probeFirewall() {
   return null
 }
 
-/** RF4c — quem escuta 7071..7075 neste momento. */
+/** RF4c — quem escuta a faixa do controle remoto neste momento. */
 export async function probeListeners() {
   const p = process.platform
   const out = p === 'win32'
@@ -259,7 +260,7 @@ export async function probeListeners() {
       ? await safeRun('ss', ['-tlnp'])
       : await safeRun('lsof', ['-iTCP', '-sTCP:LISTEN', '-P', '-n'])
   if (out == null) return null
-  return parseListeners(p, out).filter((l) => l.port >= 7071 && l.port <= 7075)
+  return parseListeners(p, out).filter((l) => l.port >= DEFAULT_REMOTE_PORT && l.port < DEFAULT_REMOTE_PORT + REMOTE_PORT_ATTEMPTS)
 }
 
 /** RF4c (win32) — categoria da rede atual (Public = rede pública). */

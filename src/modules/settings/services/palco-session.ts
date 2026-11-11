@@ -310,6 +310,8 @@ class PalcoSession {
       footerRef,
       footerColor: s.footerRefColor,
       footerWeight: s.footerRefWeight,
+      footerSize: isBible ? ((s.refFontSize ?? Math.round(s.bibleFontSize * 0.4)) / 1920) * 1080 : undefined,
+      footerTransform: isBible ? s.refTextTransform : undefined,
       footerPosition: isBible ? s.bibleRefPosition ?? 'below-right' : undefined,
       // Receiver anima a entrada do versículo novo; sem o campo, troca seca.
       transition: isBible ? s.bibleTransition ?? 'fade' : undefined,

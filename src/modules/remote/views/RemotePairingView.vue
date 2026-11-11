@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { GlassCard } from '@design-system/index'
+import AppConfirm from '@shared/components/AppConfirm.vue'
 import { getDesktopBridge } from '@shared/services/desktop-bridge'
 import type { RemotePairingInfo } from '@shared/types/desktop-bridge'
 
@@ -23,6 +24,37 @@ let copiedTimer: ReturnType<typeof setTimeout> | undefined
 
 /** Detalhes técnicos recolhíveis (IP/porta/token/protocolo). */
 const showDetails = ref(false)
+const tokenRole = ref<'remote' | 'speaker' | null>(null)
+const tokenBusy = ref(false)
+const tokenFailed = ref(false)
+const canResetTokens = computed(() => Boolean(getDesktopBridge()?.remote?.resetToken))
+
+function applyInfo(value: RemotePairingInfo) {
+  info.value = value
+  clientCount.value = value.clientCount
+  clientAddress.value = value.clientAddress ?? null
+  remoteAddress.value = value.remoteAddress ?? null
+  speakerAddress.value = value.speakerAddress ?? null
+}
+
+async function renewToken() {
+  const role = tokenRole.value
+  if (!role) return
+  tokenRole.value = null
+  tokenBusy.value = true
+  tokenFailed.value = false
+  try {
+    const reset = getDesktopBridge()?.remote?.resetToken
+    if (!reset) throw new Error('Token reset unavailable')
+    applyInfo(await reset(role))
+    copiedId.value = null
+  } catch {
+    tokenFailed.value = true
+  } finally {
+    tokenBusy.value = false
+  }
+}
+
 
 onMounted(async () => {
   const remote = getDesktopBridge()?.remote
@@ -31,11 +63,7 @@ onMounted(async () => {
     return
   }
   try {
-    info.value = await remote.pairingInfo()
-    clientCount.value = info.value.clientCount
-    clientAddress.value = info.value.clientAddress ?? null
-    remoteAddress.value = info.value.remoteAddress ?? null
-    speakerAddress.value = info.value.speakerAddress ?? null
+    applyInfo(await remote.pairingInfo())
     offClients = remote.onClients?.(({ count, address, remoteAddress: ra, speakerAddress: sa }) => {
       clientCount.value = count
       clientAddress.value = address ?? null
@@ -139,6 +167,12 @@ function copyOperatorUrl() {
           </button>
         </div>
 
+        <button v-if="canResetTokens" type="button" class="copy-btn"
+          data-testid="remote-renew-token" :disabled="tokenBusy" @click="tokenRole = 'remote'">
+          <i class="ti ti-refresh" aria-hidden="true" /> {{ t('settings.remote.renewToken') }}
+        </button>
+        <p class="pairing-steps">{{ t('settings.remote.tokenPersistent') }}</p>
+
         <button
           type="button"
           class="details-toggle"
@@ -216,6 +250,11 @@ function copyOperatorUrl() {
             <span>{{ copiedId === 'speaker' ? t('common.copied') : t('settings.remote.speakerCopy') }}</span>
           </button>
         </div>
+        <button v-if="canResetTokens" type="button" class="copy-btn"
+          data-testid="speaker-renew-token" :disabled="tokenBusy" @click="tokenRole = 'speaker'">
+          <i class="ti ti-refresh" aria-hidden="true" /> {{ t('settings.remote.renewToken') }}
+        </button>
+        <p class="pairing-steps">{{ t('settings.remote.tokenPersistent') }}</p>
       </div>
 
       <!-- Operador: mesma hierarquia, abaixo do pregador no mesmo painel -->
@@ -254,6 +293,12 @@ function copyOperatorUrl() {
         </div>
       </div>
     </GlassCard>
+    <p v-if="tokenFailed" class="pairing-warning" role="alert" data-testid="remote-token-error">{{ t('settings.remote.renewFailed') }}</p>
+    <AppConfirm :open="tokenRole !== null" :z-index="120"
+      :title="t(tokenRole === 'speaker' ? 'settings.remote.renewSpeakerTitle' : 'settings.remote.renewRemoteTitle')"
+      :message="t(tokenRole === 'speaker' ? 'settings.remote.renewSpeakerMessage' : 'settings.remote.renewRemoteMessage')"
+      :confirm-label="t('settings.remote.renewToken')" :cancel-label="t('common.cancel')"
+      @cancel="tokenRole = null" @confirm="renewToken" />
   </div>
 </template>
 

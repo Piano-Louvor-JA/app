@@ -23,6 +23,7 @@ import {
   selfProbe,
 } from './remote-diagnostics.mjs'
 import { getRemoteStatus } from './remote-server.mjs'
+import { DEFAULT_REMOTE_PORT, REMOTE_PORT_ATTEMPTS } from './remote-config.mjs'
 import { sanitizeRendererErrors } from './renderer-errors.mjs'
 import { sanitizeDownloadFailures } from './download-failures.mjs'
 import { collectEdidMonitors } from './edid.mjs'
@@ -270,17 +271,17 @@ async function collectControleRemoto() {
   const self = portaAtiva ? await selfProbe(picked.ipEscolhido, portaAtiva) : null
   const [excluded, firewall, listeners, redePublica] = await Promise.all([
     probeExcludedPorts(),
-    probeFirewall(),
+    probeFirewall(portaAtiva ?? DEFAULT_REMOTE_PORT),
     probeListeners(),
     probeNetworkCategory(),
   ])
-  const janelasPortasExcluidas = (excluded ?? []).filter(({ start, end }) => end >= 7071 && start <= 7075)
-  const { portaRoubada, dono } = listenersOnPort(listeners ?? [], portaAtiva ?? 7071, process.pid)
-  const regraFirewall = firewall && 'allow7071' in firewall
-    ? { allow7071: firewall.allow7071 }
+  const janelasPortasExcluidas = (excluded ?? []).filter(({ start, end }) => end >= DEFAULT_REMOTE_PORT && start < DEFAULT_REMOTE_PORT + REMOTE_PORT_ATTEMPTS)
+  const { portaRoubada, dono } = listenersOnPort(listeners ?? [], portaAtiva ?? DEFAULT_REMOTE_PORT, process.pid)
+  const regraFirewall = firewall && 'allowRemote' in firewall
+    ? { allowRemote: firewall.allowRemote }
     : firewall?.allow?.length
-      ? { allow7071: true }
-      : { allow7071: null }
+      ? { allowRemote: true }
+      : { allowRemote: null }
   return {
     status,
     portaAtiva,
@@ -303,8 +304,8 @@ async function collectControleRemoto() {
 }
 
 const REMOTE_TIPS = {
-  'remote-porta-excluida': 'Windows reservou a porta 7071 (Hyper-V/WSL). Reinicie o PC ou peça suporte para liberar a faixa.',
-  'remote-porta-roubada': 'Outro programa usa a porta 7071. Feche-o ou reinicie o PC e abra o LouvorJA primeiro.',
+  'remote-porta-excluida': 'Windows reservou a porta 48080 (Hyper-V/WSL). Reinicie o PC ou peça suporte para liberar a faixa.',
+  'remote-porta-roubada': 'Outro programa usa a porta 48080. Feche-o ou reinicie o PC e abra o LouvorJA primeiro.',
   'remote-ip-adaptador-errado': 'O QR aponta para um IP de rede virtual (WSL/Docker/VPN). Desative VPN/WSL ou conecte o cabo de rede.',
   'remote-firewall': 'Windows Defender está bloqueando. Permita o LouvorJA no firewall (rede privada) ou mude a rede para Privada.',
   'remote-ok': 'Controle remoto: tudo certo na rede.',
@@ -319,7 +320,7 @@ function verdictWithRemote({ general, apis, proxy, hosts, installation, extra, c
     ipSuspeito: controleRemoto?.ipSuspeito,
     portaRoubada: controleRemoto?.caos?.portaRoubada,
     redePublica: controleRemoto?.caos?.redePublica,
-    regraInbound: Boolean(controleRemoto?.regraFirewall?.allow7071 ?? controleRemoto?.evidenciaFirewall?.allow?.length),
+    regraInbound: Boolean(controleRemoto?.regraFirewall?.allowRemote ?? controleRemoto?.evidenciaFirewall?.allow?.length),
   })
   if (remoteVerdict && remoteVerdict !== 'remote-ok') return remoteVerdict
   return computeVerdict({ general, apis, proxy, hosts, installation, extra })

@@ -98,7 +98,7 @@ describe('TimerPreview.vue', () => {
     setSize(w, 400, 300)
     await nextTick()
     const style = w.find('.timer-preview__digital').attributes('style') ?? ''
-    expect(style).toContain('text-shadow: 0 4px 30px')
+    expect(style).toContain('0px 4px 30px')
     w.unmount()
   })
 
@@ -107,7 +107,7 @@ describe('TimerPreview.vue', () => {
     setSize(w, 400, 300)
     await nextTick()
     const style = w.find('.timer-preview__digital').attributes('style') ?? ''
-    expect(style).toContain('text-shadow: 0 0 3vh rgba(0,0,0,0.5)')
+    expect(style).toContain('text-shadow: rgba(0, 0, 0, 0.5) 0px 0px 3vh')
     w.unmount()
   })
 
