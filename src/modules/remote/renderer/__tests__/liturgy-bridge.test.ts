@@ -194,10 +194,17 @@ async function syncLit() {
   store.selectedItemIndex = hoisted.liturgyStore.selectedItemIndex
 }
 
+// Bridge esquecido ligado segue publicando pelos timers e contamina o teste seguinte.
+const installedBridges: Array<() => void> = []
+afterEach(() => {
+  for (const cleanup of installedBridges.splice(0)) cleanup()
+})
+
 async function installBridge() {
   await syncLit()
   const { installRemoteLiturgyBridge } = await import('../liturgy-bridge')
   const cleanup = await installRemoteLiturgyBridge({ router: hoisted.router })
+  installedBridges.push(cleanup)
   const onCommandCb = hoisted.remoteApiStub.onCommand.mock.calls[0]?.[0]
   if (!onCommandCb) throw new Error('onCommand not registered')
   const onStateRequestCb = hoisted.remoteApiStub.onStateRequest.mock.calls[0]?.[0]
@@ -1409,6 +1416,7 @@ describe('installRemoteLiturgyBridge', () => {
     const { command } = await installBridge()
     await command({ action: 'state.request', id: 95 })
     await command({ action: 'liturgy.next', id: 96 }) // current ?? -1 → -1+1=0 >= 0 items → false
+    await vi.waitFor(() => expect(hoisted.remoteApiStub.sendState).toHaveBeenCalled())
     const st = hoisted.remoteApiStub.sendState.mock.calls.at(-1)?.[0]
     expect(st.liturgy.total).toBe(0)
     expect(st.player.canPrevious).toBe(false)
@@ -1426,6 +1434,7 @@ describe('installRemoteLiturgyBridge', () => {
     hoisted.liturgyStore.selectedItemIndex = -1
     const { command } = await installBridge()
     await command({ action: 'state.request', id: 97 })
+    await vi.waitFor(() => expect(hoisted.remoteApiStub.sendState).toHaveBeenCalled())
     const st = hoisted.remoteApiStub.sendState.mock.calls.at(-1)?.[0]
     expect(st.liturgy.items[0].title).toBeNull()
     expect(st.liturgy.items[1].isCategory).toBe(true)
@@ -1441,6 +1450,7 @@ describe('installRemoteLiturgyBridge', () => {
     ]
     const { command } = await installBridge()
     await command({ action: 'state.request', id: 98 })
+    await vi.waitFor(() => expect(hoisted.remoteApiStub.sendState).toHaveBeenCalled())
     const st = hoisted.remoteApiStub.sendState.mock.calls.at(-1)?.[0]
     expect(st.liturgy.items[0].url).toBe('https://www.adventistas.org')
     expect(st.liturgy.items[1].url).toBeNull()
