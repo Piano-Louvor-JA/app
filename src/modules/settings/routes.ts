@@ -59,7 +59,7 @@ export const settingsRoutes: RouteRecordRaw[] = [
         component: TransmissionView,
         meta: { navKey: 'settings' },
       },
-      // Controle remoto — desktop: WS :7071 (RemotePairingView);
+      // Controle remoto — desktop: WS :48080 (RemotePairingView);
       // web: P2P WebRTC 2-QR (P2pPairingView), sem servidor.
       {
         path: 'remote',

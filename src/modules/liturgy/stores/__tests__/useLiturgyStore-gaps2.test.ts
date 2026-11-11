@@ -250,6 +250,15 @@ describe('useLiturgyStore — gaps2', () => {
     expect((store.currentItems as LiturgyItem[])[0]!.done).toBe(false)
   })
 
+  it.each([true, false])('abrir site conclui apenas se a abertura funcionar: %s', async (ok) => {
+    const store = useLiturgyStore()
+    store.currentItems = [mkItem({ type: 'site', done: false })] as never
+    executeLiturgyItem.mockResolvedValue({ ok })
+    await store.selectItem(0, {} as never)
+    expect(store.currentItems[0]!.done).toBe(ok)
+    expect(store.selectedItemIndex).toBe(0)
+  })
+
   it('selectItem ok com categoryId: limpa seleção da categoria concluída (L861-863)', async () => {
     const store = useLiturgyStore()
     store.selectedDay = LITURGY_WEEKDAYS[0]!

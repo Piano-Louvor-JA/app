@@ -82,6 +82,19 @@ describe('SettingsView', () => {
     } }
   }
 
+  it.each(['settings-general', 'settings-appearance', 'settings-transmission'])(
+    '%s: mantém menu fora da área que rola', async (name) => {
+      const { wrapper, go } = mountAt(name)
+      await go()
+      const scrolling = wrapper.get('.settings-view__scroll')
+      expect(scrolling.find('.settings-tabs-stub').exists()).toBe(false)
+      expect(scrolling.find('.settings-view__header').exists()).toBe(true)
+      expect(scrolling.find('.settings-view__content').exists()).toBe(true)
+      expect(wrapper.get('.settings-tabs-stub').element.parentElement).toBe(wrapper.get('.settings-view').element)
+      wrapper.unmount()
+    },
+  )
+
   it('rota appearance: só voltar e minimizar, sem título, classe --appearance', async () => {
     const { wrapper, go } = mountAt('settings-appearance')
     await go()

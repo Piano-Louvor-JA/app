@@ -371,6 +371,13 @@ export default {
     },
 
     remote: {
+      renewToken: 'Atualizar token',
+      tokenPersistent: 'O token permanece o mesmo até você atualizá-lo.',
+      renewRemoteTitle: 'Atualizar token do controle remoto?',
+      renewRemoteMessage: 'O celular conectado será desconectado. Para conectar novamente, use o novo link, QR code ou token.',
+      renewSpeakerTitle: 'Atualizar token do pregador?',
+      renewSpeakerMessage: 'O pregador conectado será desconectado. Para conectar novamente, use o novo link ou QR code.',
+      renewFailed: 'Não foi possível atualizar o token. Tente novamente.',
       p2pTitle: 'Controle via P2P (QR)',
       wsTitle: 'Conectar pelo celular',
       wsHint1: '1. No app Piano LouvorJA: Configurações → Controle Remoto → Iniciar web link — aparecerá um QR.',

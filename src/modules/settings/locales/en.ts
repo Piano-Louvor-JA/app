@@ -364,6 +364,13 @@ export default {
     },
 
     remote: {
+      renewToken: 'Refresh token',
+      tokenPersistent: 'The token stays the same until you refresh it.',
+      renewRemoteTitle: 'Refresh the remote control token?',
+      renewRemoteMessage: 'The connected phone will be disconnected. Reconnect using the new link, QR code or token.',
+      renewSpeakerTitle: 'Refresh the speaker token?',
+      renewSpeakerMessage: 'The connected speaker will be disconnected. Reconnect using the new link or QR code.',
+      renewFailed: 'Could not refresh the token. Please try again.',
       p2pTitle: 'P2P control (QR)',
       wsTitle: 'Connect via phone',
       wsHint1: '1. In the Piano LouvorJA app: Settings → Remote Control → Start web link — a QR will appear.',

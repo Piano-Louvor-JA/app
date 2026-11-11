@@ -138,6 +138,21 @@ describe('useMediaStore.switchMode — modo com áudio (964-978)', () => {
     store.close()
   })
 
+  it('playlist remota preserva toda a fila e só projeta após ação explícita', async () => {
+    mockTrackWithInstrumental()
+    const store = useMediaStore()
+    const items = [42, 43, 44].map(musicId => ({ musicId, albumId: null, title: 'Hino' }))
+    store.isProjecting = true
+    await store.playQueue(items, 1, 'audio', 'Culto', { minimized: true, project: false })
+    expect(store.queue).toHaveLength(3)
+    expect(store.queueIndex).toBe(1)
+    expect(store.isProjecting).toBe(false)
+    await store.playQueueItem(items[2]!)
+    expect(store.isProjecting).toBe(false)
+    expect(store.queueIndex).toBe(2)
+    store.close()
+  })
+
   it('fila iniciada no miniplayer mantém o modo entre faixas e respeita maximizar', async () => {
     mockTrackWithInstrumental()
     const store = useMediaStore()

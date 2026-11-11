@@ -345,13 +345,16 @@
         var audioOutput = document.getElementById('audioOutput')
         var audioOutputMode = 'player'
         var changingAudioOutput = false
-        audioOutput.addEventListener('change', async function () {
+        audioOutput.addEventListener('change', function () {
+          return applyAudioOutput(audioOutput.value)
+        })
+        async function applyAudioOutput(mode) {
           changingAudioOutput = true; audioOutput.disabled = true
           try {
-            var saved = await window.louvorja.projection.setAudioOutput(audioOutput.value)
+            var saved = await window.louvorja.projection.setAudioOutput(mode)
             if (saved) { audioOutputMode = saved; await tvBroadcast('audio-output', { mode: saved }) }
           } finally { audioOutput.value = audioOutputMode; audioOutput.disabled = false; changingAudioOutput = false }
-        })
+        }
         var volume = document.getElementById('volume')
         var seek = document.getElementById('seek')
         var projectBtn = document.getElementById('project')
@@ -731,18 +734,21 @@
         }
 
         async function onToggleTv(event) {
-          var slotId = event.target.getAttribute('data-tv')
-          tvChecked[slotId] = event.target.checked
+          await setTvEnabled(event.target.getAttribute('data-tv'), event.target.checked)
+        }
+
+        async function setTvEnabled(slotId, enabled) {
+          tvChecked[slotId] = enabled
           if (!window.louvorja || !window.louvorja.palco) return
           var state = await window.louvorja.projection.getPlaybackState()
           if (state && state.projecting) networkProjectionActive = true
-          if (event.target.checked && networkProjectionActive) {
+          if (enabled && networkProjectionActive) {
             var media = await window.louvorja.projection.getSourceMediaInfo()
             if (media && (media.filePath || media.youtubeId)) {
               var st = await window.louvorja.projection.getPlaybackState().catch(function () { return null })
               await tvSendMedia(slotId, media, st ? Math.round(st.currentTime * 1000) : 0, st && st.paused)
             }
-          } else if (!event.target.checked && networkProjectionActive) {
+          } else if (!enabled && networkProjectionActive) {
             if (networkMirrorSender) await networkMirrorSender.remove(slotId)
             await window.louvorja.palco.send(
               { v: 2, type: 'video', action: 'stop' },
@@ -802,7 +808,11 @@
           var input = event.target
           var id = Number(input.getAttribute('data-id'))
           if (!Number.isFinite(id)) return
-          if (input.checked) {
+          await setMonitorEnabled(id, input.checked)
+        }
+
+        async function setMonitorEnabled(id, enabled) {
+          if (enabled) {
             if (selectedIds.indexOf(id) < 0) selectedIds.push(id)
           } else {
             selectedIds = selectedIds.filter(function (item) {
@@ -835,7 +845,8 @@
           captionsBtn.setAttribute('aria-pressed', String(captionsHidden))
           captionsIcon.style.textDecoration = captionsHidden ? 'line-through' : 'none'
         }
-        captionsBtn.addEventListener('click', async function () {
+        captionsBtn.addEventListener('click', toggleCaptions)
+        async function toggleCaptions() {
           if (captionsBtn.disabled) return
           captionsBtn.disabled = true
           try {
@@ -845,7 +856,7 @@
             await tvBroadcast('captions', { captionsHidden: captionsHidden })
             await tvRerouteYoutube().catch(function () { /* TV fora do ar segue como estava */ })
           } finally { captionsBtn.disabled = false }
-        })
+        }
 
         async function refresh() {
           if (!window.louvorja || !window.louvorja.projection) return
@@ -900,7 +911,8 @@
           }
         })
 
-        projectBtn.addEventListener('click', async function () {
+        projectBtn.addEventListener('click', toggleProjection)
+        async function toggleProjection() {
           if (projectBtn.disabled) return
           if (!window.louvorja || !window.louvorja.projection) return
           if (typeof window.louvorja.projection.toggleVideoScreens !== 'function') {
@@ -920,7 +932,7 @@
             await loadTvs()
           }
           refresh()
-        })
+        }
 
         monitorBtn.addEventListener('click', async function () {
           await setPanelOpen(!panelOpen)
@@ -960,6 +972,91 @@
             if (panelOpen) renderMonitorList()
           })
         }
+
+        /* remote-controls:start */
+        // Controle remoto: mesmo caminho do clique, para valerem as regras de
+        // cada botão e o aviso às TVs do Palco.
+        window.__videoControlSnapshot = async function () {
+          if (audioOnly) return null
+          var projection = window.louvorja.projection
+          var state = await projection.getPlaybackState()
+          if (!state) return null
+          var list = (await window.louvorja.displays.list()) || []
+          var selected = (await projection.getVideoTargetMonitors()) || []
+          var slots = window.louvorja.palco ? (await window.louvorja.palco.slots()) || [] : []
+          var monitors = []
+          list.forEach(function (display, index) {
+            if (display.isPrimary) return
+            monitors.push({
+              id: 'monitor:' + display.id,
+              label: 'Monitor ' + (index + 1),
+              detail: display.bounds ? display.bounds.width + ' × ' + display.bounds.height : '',
+              selected: selected.indexOf(display.id) >= 0,
+            })
+          })
+          var tvs = slots
+            .filter(function (slot) { return slot.clients > 0 })
+            .map(function (slot) {
+              return { id: 'tv:' + slot.id, label: slot.label, selected: tvChecked[slot.id] !== false }
+            })
+          return {
+            audioOutput: state.audioOutput,
+            canProject: !projectBtn.disabled,
+            projecting: Boolean(state.projecting || networkProjectionActive),
+            canControlCaptions: Boolean(state.canControlCaptions),
+            captionsHidden: Boolean(state.captionsHidden),
+            monitors: monitors,
+            tvs: tvs,
+            independent: window.__independentControl
+              ? await window.__independentControl.snapshot()
+              : null,
+          }
+        }
+
+        window.__videoControlCommand = async function (command) {
+          switch (command.type) {
+            case 'audio-output':
+              if (['player', 'connections', 'both'].indexOf(command.mode) < 0) return false
+              await applyAudioOutput(command.mode)
+              return true
+            case 'project':
+              if (projectBtn.disabled) return false
+              // Clique real: a projeção independente escuta o botão na captura.
+              projectBtn.click()
+              await new Promise(function (resolve) { setTimeout(resolve, 400) })
+              return true
+            case 'independent-mode':
+              return window.__independentControl
+                ? window.__independentControl.setMode(command.mode)
+                : false
+            case 'independent-target':
+              return window.__independentControl
+                ? window.__independentControl.setTarget(command.targetId, command.enabled === true)
+                : false
+            case 'captions':
+              if (captionsBtn.hidden) return false
+              await toggleCaptions()
+              return true
+            case 'target': {
+              var parts = String(command.targetId).split(':')
+              if (parts[0] === 'monitor') {
+                var monitorId = Number(parts[1])
+                if (!Number.isFinite(monitorId)) return false
+                await loadMonitors()
+                await setMonitorEnabled(monitorId, command.enabled === true)
+                return true
+              }
+              if (parts[0] === 'tv' && parts[1]) {
+                await setTvEnabled(parts[1], command.enabled === true)
+                return true
+              }
+              return false
+            }
+            default:
+              return false
+          }
+        }
+        /* remote-controls:end */
 
         async function applyVolume() {
           if (!window.louvorja || !window.louvorja.projection) return

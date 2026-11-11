@@ -23,3 +23,17 @@ it('exposes the transmission settings, connection updates and token reset to the
     ['palco:token-reset'],
   ])
 })
+
+
+it('exposes independent remote and speaker token renewal', async () => {
+  vi.resetModules()
+  await import('../preload.mjs')
+  const { remote } = exposeInMainWorld.mock.calls.find(([name]) => name === 'louvorja')[1]
+  invoke.mockClear()
+  remote.resetToken('remote')
+  remote.resetToken('speaker')
+  expect(invoke.mock.calls).toEqual([
+    ['remote:token-reset', 'remote'],
+    ['remote:token-reset', 'speaker'],
+  ])
+})

@@ -57,7 +57,8 @@ function fakeWss() {
   return {
     handlers,
     on: (ev, fn) => { handlers[ev] = fn },
-    address: () => ({ port: 7071 }),
+    address: () => ({ port: 48080 }),
+    close: vi.fn(),
   }
 }
 
@@ -255,5 +256,127 @@ describe('convivência operador (APK) + pregador — limites POR PAPEL', () => {
     expect(info.clientCount).toBe(2)
     expect(info.remoteAddress).toMatch(/Moto G85/)
     expect(info.speakerAddress).toBeTruthy()
+  })
+})
+
+describe('operador — controles da barra de vídeo', () => {
+  it('encaminha destino e estado do comando video.setTarget', async () => {
+    const wss = fakeWss()
+    const contents = fakeContents()
+    await startRemoteServer(wss, contents, { token: TOKEN, speakerToken: SPEAKER_TOKEN })
+    const ws = fakeWs()
+    wss.handlers.connection(ws)
+
+    ws.listeners.message(
+      JSON.stringify({
+        v: 1,
+        type: 'command',
+        id: 'c1',
+        action: 'video.setTarget',
+        token: TOKEN,
+        targetId: 'tv:a',
+        enabled: false,
+      }),
+    )
+
+    const fwd = contents.sent.find((m) => m.channel === 'remote:command')
+    expect(fwd?.payload).toMatchObject({ targetId: 'tv:a', enabled: false })
+  })
+})
+
+
+describe('renovação manual dos tokens', () => {
+  it('porta padrão do controle remoto é 48080', async () => {
+    const { REMOTE_PORT } = await import(serverUrl)
+    expect(REMOTE_PORT).toBe(48080)
+  })
+
+  it.each(['remote', 'speaker'])('renovar %s atualiza QR/link e desconecta somente esse papel', async (role) => {
+    const wss = fakeWss()
+    const contents = fakeContents()
+    const saveTokens = vi.fn(async () => {})
+    const server = await startRemoteServer(wss, contents, { token: TOKEN, speakerToken: SPEAKER_TOKEN, saveTokens })
+    try {
+      const operator = fakeWs()
+      const speaker = fakeWs()
+      wss.handlers.connection(operator)
+      operator.listeners.message(JSON.stringify({ v: 1, type: 'hello', device: 'Celular', token: TOKEN }))
+      wss.handlers.connection(speaker)
+      speaker.listeners.message(JSON.stringify({ v: 1, type: 'hello', role: 'speaker', token: SPEAKER_TOKEN }))
+      const before = await ipcHandlers.get('remote:pairing-info')()
+      const reset = ipcHandlers.get('remote:token-reset')
+      expect(reset).toBeTypeOf('function')
+      const after = await reset(null, role)
+      expect(saveTokens).toHaveBeenCalledOnce()
+      if (role === 'remote') {
+        expect(after.token).not.toBe(TOKEN)
+        expect(after.connectUrl).not.toBe(before.connectUrl)
+        expect(after.qrDataUrl).not.toBe(before.qrDataUrl)
+        expect(after.speakerUrl).toBe(before.speakerUrl)
+        expect(operator.close).toHaveBeenCalledOnce()
+        expect(speaker.close).not.toHaveBeenCalled()
+      } else {
+        expect(after.token).toBe(TOKEN)
+        expect(after.connectUrl).toBe(before.connectUrl)
+        expect(after.speakerUrl).not.toBe(before.speakerUrl)
+        expect(after.speakerQrDataUrl).not.toBe(before.speakerQrDataUrl)
+        expect(speaker.close).toHaveBeenCalledOnce()
+        expect(operator.close).not.toHaveBeenCalled()
+      }
+      const saved = saveTokens.mock.calls[0][0]
+      expect(saved.token).not.toBe(saved.speakerToken)
+      expect(saved.token).toBe(after.token)
+      const bad = fakeWs()
+      wss.handlers.connection(bad)
+      bad.listeners.message(JSON.stringify({ v: 1, type: 'command', id: 'old', action: 'slide:next', token: role === 'remote' ? TOKEN : SPEAKER_TOKEN }))
+      expect(bad.sent.some((m) => m.code === 'bad_token')).toBe(true)
+    } finally { server.stop() }
+  })
+
+  it('falha ao persistir não troca token, QR ou conexões; papel inválido é recusado', async () => {
+    const saveTokens = vi.fn(async () => { throw new Error('sem escrita') })
+    const server = await startRemoteServer(fakeWss(), fakeContents(), { token: TOKEN, speakerToken: SPEAKER_TOKEN, saveTokens })
+    try {
+      const reset = ipcHandlers.get('remote:token-reset')
+      expect(reset).toBeTypeOf('function')
+      const before = await ipcHandlers.get('remote:pairing-info')()
+      await expect(reset(null, 'remote')).rejects.toThrow('sem escrita')
+      expect(await ipcHandlers.get('remote:pairing-info')()).toEqual(before)
+      await expect(reset(null, 'qualquer')).rejects.toThrow()
+    } finally { server.stop() }
+  })
+})
+
+
+it('renovações simultâneas preservam os dois tokens persistidos', async () => {
+  const saveTokens = vi.fn(async () => {})
+  const server = await startRemoteServer(fakeWss(), fakeContents(), { token: TOKEN, speakerToken: SPEAKER_TOKEN, saveTokens })
+  try {
+    const reset = ipcHandlers.get('remote:token-reset')
+    await Promise.all([reset(null, 'remote'), reset(null, 'speaker')])
+    const first = saveTokens.mock.calls[0][0]
+    const last = saveTokens.mock.calls[1][0]
+    expect(last.token).toBe(first.token)
+    expect(last.speakerToken).not.toBe(first.speakerToken)
+    const pairing = await ipcHandlers.get('remote:pairing-info')()
+    expect(pairing.token).toBe(last.token)
+    expect(new URL(pairing.speakerUrl).searchParams.get('token')).toBe(last.speakerToken)
+  } finally { server.stop() }
+})
+
+describe('confirmação de autenticação para recordar conexão no APK', () => {
+  it('confirma token válido no hello e rejeita token inválido', async () => {
+    const wss = fakeWss()
+    const server = await startRemoteServer(wss, fakeContents(), { token: TOKEN })
+    const valid = fakeWs()
+    wss.handlers.connection(valid)
+    await valid.listeners.message(JSON.stringify({ v: 1, type: 'hello', device: 'APK', token: TOKEN }))
+    expect(valid.sent).toContainEqual({ v: 1, type: 'ack', id: 'remote-auth', ok: true })
+    const invalid = fakeWs()
+    wss.handlers.connection(invalid)
+    await invalid.listeners.message(JSON.stringify({ v: 1, type: 'hello', device: 'APK', token: 'INVALID' }))
+    expect(invalid.sent).toContainEqual({ v: 1, type: 'error', code: 'bad_token' })
+    expect(invalid.close).toHaveBeenCalled()
+    server.stop()
   })
 })

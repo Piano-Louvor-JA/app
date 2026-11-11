@@ -84,6 +84,7 @@ export const useMediaStore = defineStore('media', () => {
   /** Nome da fila (playlist) para o título do player; null = coletânea do hino. */
   const queueLabel = ref<string | null>(null)
   let preserveQueuePlayerMode = false
+  let queueManualProjection = false
   const isProjecting = computed({
     get: () => isProjectingRaw.value,
     set: (v: boolean) => {
@@ -507,6 +508,7 @@ export const useMediaStore = defineStore('media', () => {
       queue.value = []
       queueIndex.value = -1
       queueLabel.value = null
+      queueManualProjection = false
     }
 
     // Mesma faixa: troca de modo sem reset (legado Media.open + isSameSong).
@@ -838,9 +840,11 @@ export const useMediaStore = defineStore('media', () => {
   // ===== Fila (spec playlist RF-03) =====
 
   /** Toca um item da fila pelo fluxo completo (open → auto-projeção). */
-  async function playQueueItem(item: QueueItem, mode?: MediaPlaybackMode): Promise<void> {
+  async function playQueueItem(item: QueueItem, mode?: MediaPlaybackMode, project?: boolean): Promise<void> {
     const target = mode ?? session.value?.mode ?? 'audio'
-    const keepProjecting = isProjecting.value
+    if (project === false && isProjecting.value) stopProjection()
+    const shouldProject = project ?? (queueManualProjection ? isProjecting.value : undefined)
+    const keepProjecting = shouldProject !== false && isProjecting.value
     if (keepProjecting) {
       queueAdvanceInProgress += 1
     }
@@ -850,7 +854,7 @@ export const useMediaStore = defineStore('media', () => {
         mode: target,
         albumId: item.albumId,
         // undefined = contrato 27/08; keepQueue + isProjecting evita reabrir janela
-        project: undefined,
+        project: shouldProject,
         keepQueue: true,
         minimized: preserveQueuePlayerMode ? minimized.value : undefined,
       })
@@ -872,17 +876,18 @@ export const useMediaStore = defineStore('media', () => {
     startIndex = 0,
     mode?: MediaPlaybackMode,
     label: string | null = null,
-    options?: { minimized?: boolean; originalOrder?: QueueItem[]; shuffled?: boolean },
+    options?: { minimized?: boolean; originalOrder?: QueueItem[]; shuffled?: boolean; project?: boolean },
   ): Promise<void> {
     queue.value = [...items]
     originalQueue = [...(options?.originalOrder ?? items)]
     queueShuffled.value = options?.shuffled ?? false
     queueLabel.value = label
     preserveQueuePlayerMode = options?.minimized !== undefined
+    queueManualProjection = options?.project !== undefined
     if (options?.minimized !== undefined) minimized.value = options.minimized
     const first = items[startIndex]
     if (!first) return
-    await playQueueItem(first, mode)
+    await playQueueItem(first, mode, options?.project)
   }
 
   /** Reordena somente as próximas faixas, preservando a reprodução e o histórico. */
@@ -954,6 +959,7 @@ export const useMediaStore = defineStore('media', () => {
   }
 
   function clearQueue(): void {
+    queueManualProjection = false
     queue.value = []
     queueIndex.value = -1
     queueLabel.value = null

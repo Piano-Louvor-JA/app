@@ -34,6 +34,8 @@ vi.mock("../ipc/web-projection.mjs", () => ({
   openWebProjectionWindows: vi.fn(),
   registerProjectionCapturePermissions: vi.fn(),
   remoteGoBackSource: vi.fn(),
+  remoteNavigateSource: vi.fn(),
+  remoteScrollSource: vi.fn(),
   remoteGoForwardSource: vi.fn(),
   remoteImageNext: vi.fn(),
   remoteImagePrev: vi.fn(),
