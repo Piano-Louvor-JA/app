@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
 import PalcoRenameDialog from '../components/PalcoRenameDialog.vue'
+import TransmissionBehaviorCard from '../components/TransmissionBehaviorCard.vue'
 import {
   discoverPalcoTvs,
   hasPalcoClients,
@@ -239,6 +240,8 @@ onUnmounted(() => {
           </li>
         </ul>
       </section>
+
+      <TransmissionBehaviorCard @error="notice = $event" />
 
       <section class="palco-view__section palco-view__section--ip">
         <p class="palco-view__hint">{{ t('settings.palcoTvs.redKey') }}</p>

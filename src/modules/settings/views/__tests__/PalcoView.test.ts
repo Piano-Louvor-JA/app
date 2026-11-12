@@ -29,6 +29,10 @@ vi.mock('../../services/palco-clients', () => ({
   wakePalcoTv: svc.wakePalcoTv,
 }))
 
+vi.mock('../../components/TransmissionBehaviorCard.vue', () => ({
+  default: { name: 'TransmissionBehaviorCard', emits: ['error'], template: '<div class="behavior-stub" />' },
+}))
+
 import PalcoView from '../PalcoView.vue'
 
 const i18n = createI18n({ legacy: false, locale: 'pt-BR', messages: { 'pt-BR': { ...ptBR, common: { cancel: 'Cancelar' } } } })
@@ -164,6 +168,15 @@ describe('PalcoView', () => {
     await wrapper.get('[data-test="palco-wake-192.168.0.30"]').trigger('click')
     await flushPromises()
     expect(wrapper.text()).toContain('Abra o app Palco na TV pelo controle remoto.')
+  })
+
+  it('mostra o bloco Áudio e comportamento e exibe o erro dele', async () => {
+    const { wrapper } = await mountView()
+    const card = wrapper.findComponent({ name: 'TransmissionBehaviorCard' })
+    expect(card.exists()).toBe(true)
+    card.vm.$emit('error', 'Não foi possível salvar')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Não foi possível salvar')
   })
 
   it('mostra e copia o IP do computador; Procurar TVs varre de novo', async () => {
