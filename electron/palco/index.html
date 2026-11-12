@@ -71,6 +71,7 @@
     text-align:center;width:60vw}
   #idle.hidden{opacity:0;pointer-events:none}
   #idleLogos img,#idleLogos svg{display:block;margin:0 auto}
+  .idle-no-logo #idleLogos,.idle-no-logo #bars{display:none}
   #idleLogo{height:14vh;max-width:50vw;margin:0 auto 4vh auto}#idleLogo svg{width:100%;height:100%;display:block}
   /* F3.3n: wordmark "Louvor JA" — identidade fixa, não personalizável. */
   #idleWordmark{font-size:3.6vh;font-weight:300;letter-spacing:.8vh;
@@ -672,6 +673,7 @@ document.addEventListener('pointerdown',function(){if(mutedUnlock||pendingPlay)u
 
 function handle(m){
   if(m.v!==1&&m.v!==2)return;
+  if(m.type==='idleStyle'){document.documentElement.classList.toggle('idle-no-logo',m.hideLogo===true);return;}
   switch(m.type){
     case 'projection':
       hideIdle();
