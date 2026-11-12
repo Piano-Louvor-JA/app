@@ -83,9 +83,6 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ push: routerPush.push }),
 }))
 
-vi.mock('../../../settings/components/PalcoRouteSelect.vue', () => ({
-  default: { name: 'PalcoRouteSelect', props: ['module'], template: '<div class="palco-route-mock" />' },
-}))
 
 vi.mock('../../settings/services/stage-settings-runtime', () => ({
   readEffectiveStageSettings: () => ({ random: null }),
@@ -147,9 +144,9 @@ beforeEach(() => {
 })
 
 describe('RandomView.vue', () => {
-  it('renderiza header com PalcoRouteSelect, título e modos', () => {
+  it('renderiza header com título e modos (sem Destino do palco)', () => {
     const w = mountView()
-    expect(w.find('.palco-route-mock').exists()).toBe(true)
+    expect(w.text()).not.toContain('Destino do palco')
     expect(w.find('.random-view__title').text()).toBe('random.title')
     expect(w.findAll('.random-view__mode')).toHaveLength(2)
     w.unmount()

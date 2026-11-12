@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 
-import PalcoRouteSelect from '../../settings/components/PalcoRouteSelect.vue'
 import BibleNavPanel from '../components/BibleNavPanel.vue'
 import BibleToolbar from '../components/BibleToolbar.vue'
 import BibleVerseList from '../components/BibleVerseList.vue'
@@ -76,7 +75,6 @@ function onSearchText(query: string) {
       @open-passage="applyPassage"
       @search-text="onSearchText"
     />
-    <PalcoRouteSelect module="bible" />
 
     <div
       v-if="lastErrorKey"

@@ -143,9 +143,6 @@ vi.mock('@design-system/index', () => ({
   GlassCard: { template: '<div class="glass-card-stub"><slot /></div>' },
 }))
 
-vi.mock('@modules/settings/components/PalcoRouteSelect.vue', () => ({
-  default: { props: ['module', 'compact'], template: '<div class="prs-stub" />' },
-}))
 
 vi.mock('@modules/sync/components/DownloadFailureDialog.vue', () => ({
   default: { props: ['open'], template: '<div class="dfd-stub" />' },

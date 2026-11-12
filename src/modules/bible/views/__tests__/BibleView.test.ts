@@ -85,7 +85,6 @@ const ReaderStub = {
   </div>`,
   emits: ['update:verse-search-query', 'select-verse', 'previous-verse', 'next-verse', 'clear-projection'],
 }
-const PalcoStub = { name: 'PalcoRouteSelect', template: '<div class="palco-route-stub" />' }
 
 function mountView() {
   return mount(BibleView, {
@@ -95,7 +94,6 @@ function mountView() {
         BibleToolbar: ToolbarStub,
         BibleNavPanel: NavStub,
         BibleVerseList: ReaderStub,
-        PalcoRouteSelect: PalcoStub,
       },
     },
   })

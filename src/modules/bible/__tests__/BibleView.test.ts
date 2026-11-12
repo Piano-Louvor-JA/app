@@ -7,9 +7,6 @@ vi.mock('vue-i18n', () => ({
   useI18n: () => ({ t: (key: string) => key }),
 }))
 
-vi.mock('../../settings/components/PalcoRouteSelect.vue', () => ({
-  default: { name: 'PalcoRouteSelect', props: ['module'], template: '<div class="route-select-stub" />' },
-}))
 
 // componentes filhos stubados: o alvo é a orquestração da view
 vi.mock('../components/BibleNavPanel.vue', () => ({
@@ -87,7 +84,6 @@ describe('BibleView', () => {
 
   it('estado carregado: corpo com nav panel + verse list', async () => {
     const wrapper = await mountView()
-    expect(wrapper.find('.route-select-stub').exists()).toBe(true)
     expect(wrapper.find('.toolbar-stub').exists()).toBe(true)
     expect(wrapper.find('.nav-panel-stub').exists()).toBe(true)
     expect(wrapper.find('.verse-list-stub').exists()).toBe(true)

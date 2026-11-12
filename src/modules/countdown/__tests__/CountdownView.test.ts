@@ -47,9 +47,6 @@ vi.mock('../../settings/services/stage-settings-runtime', () => ({
 vi.mock('../../settings/components/StageCustomizationDialog.vue', () => ({
   default: { template: '<div class="stage-custom-dbg" />', props: ['open'] },
 }))
-vi.mock('../../settings/components/PalcoRouteSelect.vue', () => ({
-  default: { template: '<div class="palco-select-dbg" />', props: ['module'] },
-}))
 
 import CountdownView from '../views/CountdownView.vue'
 

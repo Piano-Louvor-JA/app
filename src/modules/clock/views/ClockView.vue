@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import PalcoRouteSelect from '../../settings/components/PalcoRouteSelect.vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import PageBackStack from '@shared/components/PageBackStack.vue'
@@ -30,7 +29,6 @@ function goBack() {
 <template>
   <section class="clock-view">
     <header class="clock-view__header">
-      <PalcoRouteSelect module="clock" />
       <PageBackStack @minimize="minimize" @prepare="prepare">
         <button
           type="button"

@@ -2,7 +2,6 @@
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import PalcoRouteSelect from '../../settings/components/PalcoRouteSelect.vue'
 import StagePaletteButton from '../../settings/components/StagePaletteButton.vue'
 import AlbumLyricDialog from '@modules/albums/components/AlbumLyricDialog.vue'
 
@@ -178,7 +177,6 @@ async function onSljaImported(): Promise<void> {
     <header class="liturgy-view__header">
       <div class="liturgy-view__header-start">
         <StagePaletteButton scope="liturgy" />
-        <PalcoRouteSelect module="liturgy" />
       </div>
       <div class="liturgy-view__brand">
         <i

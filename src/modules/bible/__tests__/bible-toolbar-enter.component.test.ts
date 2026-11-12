@@ -45,7 +45,7 @@ describe('BibleView — busca inteligente da toolbar (modal + Enter)', () => {
   async function mountView() {
     const wrapper = mount(BibleView, {
       attachTo: document.body,
-      global: { stubs: { GlassCard: false, PalcoRouteSelect: true } },
+      global: { stubs: { GlassCard: false } },
     })
     await flushPromises()
     return wrapper
