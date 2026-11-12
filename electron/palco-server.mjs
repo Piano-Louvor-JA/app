@@ -22,6 +22,8 @@ import { readConnectionStartup, saveConnectionStartup } from './palco/connection
 
 import { publishReceiverEvent } from './palco/receiver-events.mjs'
 import { updateReplayState } from './palco/replay-state.mjs'
+import { clientFromRequest, commandMessage, isTv, muteKey, sameTv, withHello } from './palco/palco-clients.mjs'
+import { discoverTvs, wakeTv } from './palco/palco-discovery.mjs'
 import { createServer } from 'node:http'
 import { networkInterfaces } from 'node:os'
 import { createHash } from 'node:crypto'
@@ -69,6 +71,37 @@ function lanIp() { return networkBinding().linkHost }
 function requiredToken() { return _transmission.requireToken ? getPalcoToken() : null }
 function isLoopback(ip) { return ip === '127.0.0.1' || ip === '::1' }
 
+/**
+ * TVs desmarcadas no Palco (chave de muteKey): continuam conectadas, mas na
+ * tela de espera, e não recebem nada da transmissão. Vale para todas as
+ * conexões, então a TV segue desmarcada se mudar de transmissão.
+ */
+const mutedTvs = new Set()
+export function isMutedTv(info) { return Boolean(info) && isTv(info) && mutedTvs.has(muteKey(info)) }
+export function setMutedKey(key, muted) {
+  if (muted) mutedTvs.add(key)
+  else mutedTvs.delete(key)
+}
+
+/**
+ * TVs com projeção independente (um módulo só nelas, ex.: Bíblia): saem da
+ * transmissão geral e recebem só o que o renderer mandar para "slot#uid".
+ * Fica em memória, como as atribuições independentes do OBS.
+ */
+const pinnedTvs = new Set()
+export function isPinnedTv(info) { return Boolean(info) && isTv(info) && pinnedTvs.has(muteKey(info)) }
+export function setPinnedKey(key, pinned) {
+  if (pinned) pinnedTvs.add(key)
+  else pinnedTvs.delete(key)
+}
+
+/** "0#c12" → slot "0" e TV "c12"; sem "#", só o slot. */
+export function parseTarget(target) {
+  const [slotId, uid] = String(target ?? '0').split('#')
+  return { slotId: slotId || '0', uid: uid || null }
+}
+const IDLE_MESSAGE = { v: 2, type: 'idle' }
+
 function portInUse(error, port) {
   return error?.code === 'EADDRINUSE' ? { code: 'port-in-use', port } : { code: 'start-failed', port }
 }
@@ -84,6 +117,7 @@ class PalcoSlot {
   #wss
   #clients = new Set()
   #receiverIps = new Map() // WebSocket -> IP físico da TV/browser
+  #clientInfo = new Map() // WebSocket -> quem é (plataforma, nome, id, versão)
   #lastByType = new Map() // replay pro receiver que chega tarde
   #running = false
   #media = new Map() // mídia local servida em /media/
@@ -154,6 +188,7 @@ class PalcoSlot {
     updateReplayState(this.#lastByType, obj)
     const data = JSON.stringify(obj)
     for (const ws of this.#clients) {
+      if (this.#isMuted(ws)) continue
       try { if (ws.readyState === ws.OPEN) ws.send(data) } catch { this.#clients.delete(ws) }
     }
   }
@@ -166,7 +201,70 @@ class PalcoSlot {
   broadcastTransient(obj) {
     const data = JSON.stringify(obj)
     for (const ws of this.#clients) {
+      if (this.#isMuted(ws)) continue
       try { if (ws.readyState === ws.OPEN) ws.send(data) } catch { this.#clients.delete(ws) }
+    }
+  }
+
+  #isMuted(ws) {
+    const info = this.#clientInfo.get(ws)
+    return isMutedTv(info) || isPinnedTv(info)
+  }
+
+  #notifyClients() { this.#contents()?.send('palco:clients-changed', { slotId: this.#id }) }
+
+  #sendTo(ws, obj) {
+    try { if (ws.readyState === ws.OPEN) { ws.send(JSON.stringify(obj)); return true } } catch { /* ignore */ }
+    return false
+  }
+
+  /** Quem está conectado nesta transmissão (módulo Palco). */
+  clients() {
+    return Array.from(this.#clientInfo.values()).map(info => ({ ...info, muted: isMutedTv(info), pinned: isPinnedTv(info) }))
+  }
+
+  #socketOf(uid) {
+    for (const [ws, info] of this.#clientInfo) if (info.uid === uid) return ws
+    return null
+  }
+
+  /** Comando para uma TV só (identify, rename, reload, moveTo). */
+  sendToClient(uid, command, args = {}) {
+    const ws = this.#socketOf(uid)
+    const info = ws ? this.#clientInfo.get(ws) : null
+    if (!ws || !info) return false
+    const msg = commandMessage(command, { ...args, name: args.name ?? info.name, slotLabel: args.slotLabel ?? this.#label })
+    if (!msg) return false
+    const ok = this.#sendTo(ws, msg)
+    if (ok && msg.type === 'rename') {
+      this.#clientInfo.set(ws, withHello(info, { name: msg.name }))
+      this.#notifyClients()
+    }
+    return ok
+  }
+
+  /** Aplica a marca agora: desmarcada vai para a espera; remarcada recebe o estado atual. */
+  applyMute(uid) {
+    const ws = this.#socketOf(uid)
+    if (!ws) return false
+    if (isPinnedTv(this.#clientInfo.get(ws))) return true // o renderer manda o módulo dela
+    if (this.#isMuted(ws)) return this.#sendTo(ws, IDLE_MESSAGE)
+    for (const msg of this.#lastByType.values()) this.#sendTo(ws, msg)
+    return true
+  }
+
+  /**
+   * A mesma TV reconectou (Wi-Fi caiu, app reaberto) e a conexão antiga
+   * ficou meio aberta (sem ping): fecha a antiga para não aparecer em dobro.
+   */
+  #dropStaleTwin(current, info) {
+    if (!isTv(info)) return
+    for (const [ws, other] of this.#clientInfo) {
+      if (ws === current || !sameTv(info, other)) continue
+      this.#clientInfo.delete(ws)
+      this.#clients.delete(ws)
+      this.#receiverIps.delete(ws)
+      try { ws.close() } catch { /* ignore */ }
     }
   }
 
@@ -218,8 +316,11 @@ class PalcoSlot {
         this.#clients.add(ws)
         const remoteIp = req?.socket?.remoteAddress?.replace('::ffff:', '')
         if (remoteIp) this.#receiverIps.set(ws, remoteIp)
+        this.#clientInfo.set(ws, clientFromRequest({ ip: remoteIp ?? '', userAgent: String(req?.headers?.['user-agent'] ?? '') }))
+        this.#notifyClients()
         // replay do estado atual pro receiver que chegou depois
-        for (const msg of this.#lastByType.values()) {
+        if (this.#isMuted(ws)) this.#sendTo(ws, IDLE_MESSAGE)
+        else for (const msg of this.#lastByType.values()) {
           try { if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(msg)) } catch { this.#clients.delete(ws) }
         }
         if (remoteIp) {
@@ -229,6 +330,14 @@ class PalcoSlot {
         ws.on('message', (raw) => {
           try {
             const message = { ...JSON.parse(String(raw)), slotId: this.#id }
+            // hello da TV: completa quem é e fecha a conexão antiga dela.
+            if (message.type === 'hello' && message.role === 'tv' && this.#clientInfo.has(ws)) {
+              const info = withHello(this.#clientInfo.get(ws), message)
+              this.#clientInfo.set(ws, info)
+              this.#dropStaleTwin(ws, info)
+              if (isMutedTv(info)) this.#sendTo(ws, IDLE_MESSAGE)
+              this.#notifyClients()
+            }
             this.#contents()?.send('palco:event', message)
             publishReceiverEvent(message)
           } catch { /* ignore */ }
@@ -236,7 +345,9 @@ class PalcoSlot {
         ws.on('close', () => {
           this.#clients.delete(ws)
           this.#receiverIps.delete(ws)
+          const known = this.#clientInfo.delete(ws)
           this.#contents()?.send('palco:receiver-disconnected', { count: this.#clients.size, slotId: this.#id })
+          if (known) this.#notifyClients()
         })
         ws.on('error', () => this.#clients.delete(ws))
         // SEM ping (webOS 4.x não responde)
@@ -275,6 +386,8 @@ class PalcoSlot {
     })
     this.#clients.clear()
     this.#receiverIps.clear()
+    this.#clientInfo.clear()
+    this.#notifyClients()
     this.#lastByType.clear()
     this.#media.clear()
   }
@@ -284,8 +397,8 @@ class PalcoSlot {
     await this.#closeHttp()
   }
 
-  /** Manda mensagem prós receivers deste slot. */
-  send(msg) {
+  /** Manda mensagem prós receivers deste slot (ou só para a TV `uid`). */
+  send(msg, uid = null) {
     if (!this.#running) return false
     // normaliza: string JSON → objeto (spread de string vira {0:'{',1:'"'...})
     let m = msg
@@ -327,6 +440,11 @@ class PalcoSlot {
       this.broadcastTransient(m)
       return true
     }
+    // Projeção independente numa TV: só ela recebe, sem mexer no replay.
+    if (uid) {
+      const ws = this.#socketOf(uid)
+      return ws ? this.#sendTo(ws, m) : false
+    }
     const transient =
       m.action === 'pause' || m.action === 'play' || m.action === 'seek'
     if (transient) this.broadcastTransient(m)
@@ -366,6 +484,10 @@ class PalcoSlot {
     // Scan do receiver: identifica sender na sub-rede
     if (p === '/status') {
       res.setHeader('Content-Type', 'application/json')
+      // A TV roda o receiver como página local (file://, app webOS/Android
+      // TV): sem CORS ela não lê a resposta e nunca acha este computador
+      // na varredura. Só expõe portas e rótulo, nada sensível.
+      res.setHeader('Access-Control-Allow-Origin', '*')
       res.end(JSON.stringify({ unlocked: true, running: this.#running, clients: this.#clients.size, slotId: this.#id, label: this.#label, httpPort: this.#httpPort, wsPort: this.#wsPort }))
       return
     }
@@ -762,7 +884,7 @@ class PalcoManager {
     return true
   }
 
-  getSlot(id = '0') { return this.#slots.get(id) }
+  getSlot(id = '0') { return this.#slots.get(parseTarget(id).slotId) }
   getAllSlots() { return Array.from(this.#slots.values()) }
   getPrincipal() { return this.#slots.get('0') }
 
@@ -873,8 +995,9 @@ export function attachPalcoServer(getContents) {
 
   // IPC: send → slot específico (default: principal)
   ipcMain.handle('palco:send', (_e, { slotId, ...msg }) => {
-    const slot = manager.getSlot(slotId ?? '0')
-    const r = slot?.send(msg) ?? false
+    const target = parseTarget(slotId)
+    const slot = manager.getSlot(target.slotId)
+    const r = slot?.send(msg, target.uid) ?? false
     console.log('[palco:send]', slotId ?? '0', msg?.type, '→ ok=' + r)
     return r
   })
@@ -896,6 +1019,68 @@ export function attachPalcoServer(getContents) {
     const slot = manager.getSlot(slotId ?? '0')
     return slot?.clearMedia() ?? true
   })
+
+  // Módulo Palco: TVs conectadas, comandos por TV, marca e descoberta.
+  const mutedFile = path.join(app.getPath('userData'), 'palco-muted-tvs.json')
+  try {
+    const stored = JSON.parse(readFileSync(mutedFile, 'utf8'))
+    if (Array.isArray(stored)) for (const key of stored) if (typeof key === 'string') mutedTvs.add(key)
+  } catch { /* primeira vez: nenhuma desmarcada */ }
+  function saveMuted() {
+    try {
+      mkdirSync(path.dirname(mutedFile), { recursive: true })
+      writeFileSync(`${mutedFile}.tmp`, JSON.stringify([...mutedTvs]), 'utf8')
+      renameSync(`${mutedFile}.tmp`, mutedFile)
+    } catch (error) {
+      console.warn('[palco] persist muted:', error?.message ?? error)
+    }
+  }
+  ipcMain.handle('palco:clients', () => manager.getAllSlots()
+    .filter(slot => slot.running)
+    .flatMap(slot => slot.clients().map(client => ({ ...client, slotId: slot.id, slotLabel: slot.label }))))
+  ipcMain.handle('palco:client-command', (_e, { slotId, uid, command, ...args } = {}) => {
+    const slot = manager.getSlot(String(slotId ?? ''))
+    if (!slot) return false
+    if (command === 'moveTo') {
+      const target = manager.getSlot(String(args.targetSlotId ?? ''))
+      if (!target?.running || target.id === slot.id) return false
+      return slot.sendToClient(String(uid ?? ''), 'moveTo', { port: target.wsPort })
+    }
+    return slot.sendToClient(String(uid ?? ''), String(command ?? ''), args)
+  })
+  ipcMain.handle('palco:client-mute', (_e, { slotId, uid, muted } = {}) => {
+    const slot = manager.getSlot(String(slotId ?? ''))
+    const info = slot?.clients().find(client => client.uid === uid)
+    if (!slot || !info || !isTv(info)) return false
+    const key = muteKey(info)
+    setMutedKey(key, muted === true)
+    saveMuted()
+    for (const each of manager.getAllSlots()) {
+      for (const client of each.clients()) if (muteKey(client) === key) each.applyMute(client.uid)
+    }
+    getContents()?.send('palco:clients-changed', { slotId: slot.id })
+    return true
+  })
+  ipcMain.handle('palco:client-pin', (_e, { slotId, uid, pinned } = {}) => {
+    const slot = manager.getSlot(String(slotId ?? ''))
+    const info = slot?.clients().find(client => client.uid === uid)
+    if (!slot || !info || !isTv(info)) return false
+    const key = muteKey(info)
+    setPinnedKey(key, pinned === true)
+    // Soltou: volta a receber a transmissão (ou a espera, se desmarcada).
+    if (pinned !== true) {
+      for (const each of manager.getAllSlots()) {
+        for (const client of each.clients()) if (muteKey(client) === key) each.applyMute(client.uid)
+      }
+    }
+    getContents()?.send('palco:clients-changed', { slotId: slot.id })
+    return true
+  })
+  ipcMain.handle('palco:discover', async () => {
+    const connected = manager.getAllSlots().flatMap(slot => slot.clients().map(client => client.ip))
+    return { ownIp: lanIp(), tvs: await discoverTvs(lanIp(), { exclude: connected }) }
+  })
+  ipcMain.handle('palco:wake-tv', (_e, { ip } = {}) => wakeTv(String(ip ?? '')))
 
   // Expõe manager pra debug
   globalThis.__PALCO_MANAGER__ = manager
