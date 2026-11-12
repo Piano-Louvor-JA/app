@@ -273,6 +273,8 @@ export type RemotePairingInfo = {
   connectUrl: string
   qrDataUrl: string
   speakerUrl?: string
+  viewerUrl?: string
+  viewerQrDataUrl?: string
   speakerQrDataUrl?: string
   operatorUrl?: string
   operatorQrDataUrl?: string
@@ -291,6 +293,7 @@ export type RemoteApi = {
   sendState: (state: Record<string, unknown>) => void
   pairingInfo: () => Promise<RemotePairingInfo>
   resetToken?: (role: 'remote' | 'speaker') => Promise<RemotePairingInfo>
+  disconnectSpeaker?: () => Promise<RemotePairingInfo>
   onClients?: (
     callback: (payload: {
       count: number

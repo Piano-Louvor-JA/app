@@ -27,6 +27,9 @@ const showDetails = ref(false)
 const tokenRole = ref<'remote' | 'speaker' | null>(null)
 const tokenBusy = ref(false)
 const tokenFailed = ref(false)
+const disconnectBusy = ref(false)
+const disconnectFailed = ref(false)
+const canDisconnectSpeaker = computed(() => Boolean(getDesktopBridge()?.remote?.disconnectSpeaker))
 const canResetTokens = computed(() => Boolean(getDesktopBridge()?.remote?.resetToken))
 
 function applyInfo(value: RemotePairingInfo) {
@@ -35,6 +38,21 @@ function applyInfo(value: RemotePairingInfo) {
   clientAddress.value = value.clientAddress ?? null
   remoteAddress.value = value.remoteAddress ?? null
   speakerAddress.value = value.speakerAddress ?? null
+}
+
+async function disconnectSpeaker() {
+  if (disconnectBusy.value) return
+  disconnectBusy.value = true
+  disconnectFailed.value = false
+  try {
+    const disconnect = getDesktopBridge()?.remote?.disconnectSpeaker
+    if (!disconnect) throw new Error('Disconnect unavailable')
+    applyInfo(await disconnect())
+  } catch {
+    disconnectFailed.value = true
+  } finally {
+    disconnectBusy.value = false
+  }
 }
 
 async function renewToken() {
@@ -203,8 +221,8 @@ function copyOperatorUrl() {
           <i class="ti ti-presentation" />
         </span>
         <div class="pairing-head__text">
-          <h3 class="pairing-title">{{ t('settings.remote.speakerTitle') }}</h3>
-          <p class="pairing-desc">{{ t('settings.remote.speakerHint') }}</p>
+          <h3 class="pairing-title">{{ t('settings.remote.supportTitle') }}</h3>
+          <p class="pairing-desc">{{ t('settings.remote.supportHint') }}</p>
         </div>
       </header>
 
@@ -219,42 +237,40 @@ function copyOperatorUrl() {
           : (info?.speakerUrl ? t('settings.remote.speakerReady') : t('settings.remote.speakerWaiting')) }}
       </div>
 
-      <div v-if="info?.speakerQrDataUrl" class="pairing-panel" data-testid="remote-speaker-block">
-        <div class="qr-frame">
-          <img
-            :src="info.speakerQrDataUrl"
-            width="220"
-            height="220"
-            class="qr"
-            alt="QR Pregador"
-            data-testid="remote-speaker-qr"
-          >
-        </div>
-
-        <p class="pairing-steps">{{ t('settings.remote.speakerSteps') }}</p>
-
-        <div class="url-row">
-          <code class="url mono" data-testid="remote-speaker-url">{{ info.speakerUrl }}</code>
-          <button
-            type="button"
-            class="copy-btn"
-            :class="{ 'copy-btn--done': copiedId === 'speaker' }"
-            data-testid="remote-speaker-copy"
-            @click="copySpeakerUrl"
-          >
-            <i
-              class="ti"
-              :class="copiedId === 'speaker' ? 'ti-check' : 'ti-copy'"
-              aria-hidden="true"
-            />
-            <span>{{ copiedId === 'speaker' ? t('common.copied') : t('settings.remote.speakerCopy') }}</span>
+      <div v-if="info?.speakerQrDataUrl" class="support-qr-grid" data-testid="remote-speaker-block">
+        <section class="support-role">
+          <div class="qr-frame"><img v-if="info.viewerQrDataUrl" :src="info.viewerQrDataUrl" width="220" height="220" class="qr" :alt="t('settings.remote.regencyTitle')" data-testid="remote-viewer-qr"></div>
+          <h4>{{ t('settings.remote.regencyTitle') }}</h4>
+          <p class="pairing-steps">{{ t('settings.remote.regencyDescription') }}</p>
+          <div class="url-row">
+            <code class="url mono" data-testid="remote-viewer-url">{{ info.viewerUrl }}</code>
+            <button type="button" class="copy-btn" data-testid="remote-viewer-copy" @click="copyToClipboard(info.viewerUrl, 'viewer')">
+              <i class="ti ti-copy" aria-hidden="true" />{{ copiedId === 'viewer' ? t('common.copied') : t('settings.remote.copyLink') }}
+            </button>
+          </div>
+        </section>
+        <section class="support-role">
+          <div class="qr-frame"><img :src="info.speakerQrDataUrl" width="220" height="220" class="qr" :alt="t('settings.remote.presenterTitle')" data-testid="remote-speaker-qr"></div>
+          <h4>{{ t('settings.remote.presenterTitle') }}</h4>
+          <p class="pairing-steps">{{ t('settings.remote.presenterDescription') }}</p>
+          <div class="url-row">
+            <code class="url mono" data-testid="remote-speaker-url">{{ info.speakerUrl }}</code>
+            <button type="button" class="copy-btn" data-testid="remote-speaker-copy" @click="copySpeakerUrl">
+              <i class="ti ti-copy" aria-hidden="true" />{{ copiedId === 'speaker' ? t('common.copied') : t('settings.remote.copyLink') }}
+            </button>
+            <button v-if="canDisconnectSpeaker" type="button" class="copy-btn" data-testid="speaker-disconnect"
+              :disabled="disconnectBusy || tokenBusy || !speakerAddress" @click="disconnectSpeaker">
+              <i class="ti ti-plug-off" aria-hidden="true" /> {{ t('settings.remote.disconnectSpeaker') }}
+            </button>
+            <p v-if="disconnectFailed" class="pairing-warning" role="alert">{{ t('settings.remote.disconnectFailed') }}</p>
+          </div>
+        </section>
+        <div class="support-token-actions">
+          <button v-if="canResetTokens" type="button" class="copy-btn" data-testid="speaker-renew-token" :disabled="tokenBusy" @click="tokenRole = 'speaker'">
+            <i class="ti ti-refresh" aria-hidden="true" /> {{ t('settings.remote.renewToken') }}
           </button>
+          <p class="pairing-steps">{{ t('settings.remote.tokenPersistent') }}</p>
         </div>
-        <button v-if="canResetTokens" type="button" class="copy-btn"
-          data-testid="speaker-renew-token" :disabled="tokenBusy" @click="tokenRole = 'speaker'">
-          <i class="ti ti-refresh" aria-hidden="true" /> {{ t('settings.remote.renewToken') }}
-        </button>
-        <p class="pairing-steps">{{ t('settings.remote.tokenPersistent') }}</p>
       </div>
 
       <!-- Operador: mesma hierarquia, abaixo do pregador no mesmo painel -->
@@ -297,7 +313,7 @@ function copyOperatorUrl() {
     <AppConfirm :open="tokenRole !== null" :z-index="120"
       :title="t(tokenRole === 'speaker' ? 'settings.remote.renewSpeakerTitle' : 'settings.remote.renewRemoteTitle')"
       :message="t(tokenRole === 'speaker' ? 'settings.remote.renewSpeakerMessage' : 'settings.remote.renewRemoteMessage')"
-      :confirm-label="t('settings.remote.renewToken')" :cancel-label="t('common.cancel')"
+      :confirm-label="t('settings.remote.renewTokenConfirm')" :cancel-label="t('common.cancel')"
       @cancel="tokenRole = null" @confirm="renewToken" />
   </div>
 </template>
@@ -319,6 +335,16 @@ function copyOperatorUrl() {
   }
 }
 
+.support-qr-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px}
+.support-role{min-width:0;display:flex;flex-direction:column;align-items:center}
+.support-role .qr-frame{max-width:100%;box-sizing:border-box}
+.support-role .qr{width:100%;height:auto;max-width:220px}
+.support-role h4{margin:12px 0 0;color:var(--ds-color-on-surface);text-align:center}
+.support-role .pairing-steps{flex:1}
+.support-token-actions{grid-column:1/-1;text-align:center}
+.support-token-actions>.copy-btn{margin:4px}
+.copy-btn:disabled{opacity:.45;cursor:not-allowed}
+@media(max-width:480px){.support-qr-grid{gap:12px}.support-role h4{font-size:14px}}
 .pairing-card {
   min-width: 0;
 }
