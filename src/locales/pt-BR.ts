@@ -1,4 +1,5 @@
 export default {
+  palcoOutputs: { title: 'TVs com Palco', empty: 'Nenhuma TV com o Palco conectada. Ver no Palco', onHold: '{slot} · na espera' },
   obsOutputs: { detecting: 'Detectando e atualizando conexões OBS…', active: 'Conexões Remotas', activateHint: 'Ative uma conexão em Configurações → Transmissão para usá-la aqui.', title: 'Conexões OBS', activeConnections: 'Conexões ativas: {count}' },
   floating: { closeTitle: 'Fechar {title}?', closeMessage: 'Deseja encerrar este recurso e fechar sua projeção?' },
   updates: {
@@ -46,6 +47,12 @@ export default {
     stop: 'Encerrar projeção independente',
     sharedOn: 'Projeção compartilhada no monitor {index}',
     modeLabel: 'Modo da projeção',
+    status: {
+      stop: 'Encerrar',
+      overlay: 'Sobrepondo em:',
+      share: 'Compartilhando em:',
+      monitor: 'Monitor {index}',
+    },
     mode: {
       overlay: 'Sobrepor',
       share: 'Compartilhar',
@@ -53,6 +60,7 @@ export default {
     hintShare: 'Escolha um monitor. A tela dele é dividida ao meio com o que já está projetado; se um dos lados sair, o outro volta a ocupar a tela toda.',
   },
   monitors: {
+    wiredTitle: 'Conexões Cabeadas',
     selectScreens: 'Selecionar telas',
     identify: 'Detectar telas',
     hint: 'Marque os monitores onde o recurso deve ser projetado.',

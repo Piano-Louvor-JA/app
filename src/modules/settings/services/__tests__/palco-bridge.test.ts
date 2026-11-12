@@ -42,6 +42,8 @@ vi.mock('../../services/palco-session', () => ({
       sends().push({ slot, msg: { type: 'projection', scope, input } })
     },
     idleTo(slot: string) { sends().push({ slot, msg: { type: 'idle' } }) },
+    syncObsShare(slot: string, enabled: boolean) { sends().push({ slot, msg: { type: 'obsShare', enabled } }) },
+    syncTvShare(slot: string, enabled: boolean) { sends().push({ slot, msg: { type: 'tvShare', enabled } }) },
     timerTo(slot: string, opts: unknown) { sends().push({ slot, msg: { type: 'timer', opts } }) },
     idle() { sends().push({ slot: this.activeSlotId, msg: { type: 'idle' } }) },
     hymnAudio(payload: unknown) { sends().push({ slot: 'audio', msg: payload as Record<string, unknown> }) },
@@ -57,6 +59,13 @@ const sendBuf = vi.hoisted(() => {
   return { buf, sends: () => buf }
 })
 function sends(): Send[] { return sendBuf.buf }
+
+const palcoTvs = vi.hoisted(() => ({ list: [] as Array<Record<string, unknown>> }))
+vi.mock('../../services/palco-clients', () => ({
+  listPalcoTvs: async () => palcoTvs.list,
+  palcoTvKey: (tv: { id?: string | null; ip: string; platform: string }) => tv.id ? tv.id : `${tv.ip}|${tv.platform}`,
+  palcoTvTarget: (tv: { slotId: string; uid: string }) => `${tv.slotId}#${tv.uid}`,
+}))
 
 vi.mock('../../services/output-registry', () => ({
   useOutputRegistry: () => ({
@@ -268,6 +277,37 @@ describe('palco-bridge — helpers via comportamento', () => {
     expect(sendBuf.buf.some((item) => item.slot === '7082' && item.msg.scope === 'bible')).toBe(true)
     stopPalcoBridge()
     expect(receiverConnection.callback).toBeNull()
+  })
+  it('TV do Palco em projeção independente recebe só o módulo dela', async () => {
+    const { tvAssignments } = await import('../palco-tv-assignments')
+    palcoTvs.list = [
+      { uid: 'u1', slotId: '0', id: 'a', ip: '10.0.0.5', platform: 'webos' },
+      { uid: 'u2', slotId: '0', id: 'b', ip: '10.0.0.6', platform: 'webos' },
+    ]
+    tvAssignments.value = { a: 'clock' }
+    try {
+      startPalcoBridge()
+      sendBuf.buf.length = 0
+      window.dispatchEvent(new Event('obs-connections-changed'))
+      await settle()
+      expect(sendBuf.buf.some((item) => item.slot === '0#u1' && item.msg.scope === 'clock')).toBe(true)
+      expect(sendBuf.buf.some((item) => item.slot.startsWith('0#u2'))).toBe(false)
+      expect(sendBuf.buf.some((item) => item.msg.type === 'tvShare')).toBe(false)
+
+      // Compartilhar: liga a tela dividida na TV e manda o módulo como painel.
+      const { tvAssignmentModes } = await import('../palco-tv-assignments')
+      tvAssignmentModes.value = { a: 'share' }
+      sendBuf.buf.length = 0
+      window.dispatchEvent(new Event('obs-connections-changed'))
+      await settle()
+      expect(sendBuf.buf.some((item) => item.slot === '0#u1' && item.msg.type === 'tvShare' && item.msg.enabled === true)).toBe(true)
+      expect(sendBuf.buf.some((item) => item.slot === '0#u1' && (item.msg.input as { obsPane?: boolean })?.obsPane === true)).toBe(true)
+      tvAssignmentModes.value = {}
+    } finally {
+      tvAssignments.value = {}
+      palcoTvs.list = []
+      stopPalcoBridge()
+    }
   })
   it('leva a música ao retorno de palco ao mudar, quando uma página conecta e quando a aparência muda', async () => {
     startPalcoBridge()

@@ -3,6 +3,14 @@ import { detectObsBeforeProjection } from '@modules/settings/services/obs-detect
 import { useObsConnections } from '@modules/settings/composables/useObsConnections'
 import { obsConnectionName, assignObsConnection, obsAssignments, obsAssignmentModes, clearObsModule, type ObsModule } from '@modules/settings/services/obs-connections'
 
+import {
+  hasPalcoClients,
+  listPalcoTvs,
+  onPalcoClientsChanged,
+  palcoTvKey,
+  type PalcoClient,
+} from '@modules/settings/services/palco-clients'
+import { assignPalcoTv, clearPalcoTvModule, tvAssignmentModes, tvAssignments } from '@modules/settings/services/palco-tv-assignments'
 import { identifySystemDisplays } from '@modules/settings/services/display-service'
 import { loadProjectionSettings } from '@modules/settings/services/projection-preferences'
 import {
@@ -38,7 +46,32 @@ const activeMonitorIds = computed<number[]>(() => (props.claimed ? moduleMonitor
 const { activeConnections: allObsOutputs } = useObsConnections()
 const obsOutputs = computed(() => (props.obs ? allObsOutputs.value : []))
 const obsActive = computed(() => props.claimed && obsOutputs.value.some((item) => obsAssignments.value[item.id] === props.moduleId))
-const outputAvailable = computed(() => available.value || obsOutputs.value.length > 0)
+
+/** TVs do Palco: marcada = mostra só este módulo (sai da transmissão geral). */
+const palcoEnabled = props.obs && hasPalcoClients()
+const palcoTvs = ref<PalcoClient[]>([])
+async function refreshPalcoTvs() {
+  if (palcoEnabled) palcoTvs.value = await listPalcoTvs()
+}
+function tvHasModule(tv: PalcoClient) {
+  return tvAssignments.value[palcoTvKey(tv)] === props.moduleId
+}
+const palcoActive = computed(() => props.claimed && palcoTvs.value.some(tvHasModule))
+async function onTogglePalcoTv(tv: PalcoClient) {
+  if (busy.value) return
+  busy.value = true
+  try {
+    if (tvHasModule(tv)) {
+      await assignPalcoTv(tv, null)
+      return
+    }
+    if (props.beforeProject && !(await props.beforeProject())) return
+    await assignPalcoTv(tv, props.moduleId as ObsModule, mode.value)
+  } finally { busy.value = false }
+}
+let stopPalcoWatch: (() => void) | null = null
+
+const outputAvailable = computed(() => available.value || obsOutputs.value.length > 0 || palcoTvs.value.length > 0)
 /** Caixa de seleção da conexão: marca/desmarca só ela; monitores e outras conexões seguem. */
 async function onToggleObs(id: string) {
   if (busy.value) return
@@ -68,7 +101,7 @@ const rootEl = ref<HTMLElement | null>(null)
 const panelEl = ref<HTMLElement | null>(null)
 const panelStyle = ref<Record<string, string>>({})
 
-const active = computed(() => activeMonitorIds.value.length > 0 || obsActive.value)
+const active = computed(() => activeMonitorIds.value.length > 0 || obsActive.value || palcoActive.value)
 const effectiveMode = computed(() => {
   if (!props.claimed) return null
   const output = obsOutputs.value.find((item) => obsAssignments.value[item.id] === props.moduleId)
@@ -122,6 +155,7 @@ async function onToggle(monitorId: number) {
 
 function onStop() {
   clearObsModule(props.moduleId)
+  void clearPalcoTvModule(props.moduleId, palcoTvs.value)
   stop()
   open.value = false
 }
@@ -130,30 +164,13 @@ function onIdentify() {
   void identifySystemDisplays()
 }
 
-/* v8 ignore start -- posicionamento do painel depende de layout real (jsdom zera rects) */
+/** Abre como popup no centro da tela (a lista presa ao botão ficava espremida). */
 function updatePanelPosition() {
-  const trigger = rootEl.value
-  if (!trigger) return
-  const rect = trigger.getBoundingClientRect()
-  const panelWidth = Math.min(264, window.innerWidth - 16)
-  const left = Math.min(
-    Math.max(8, rect.right - panelWidth),
-    window.innerWidth - panelWidth - 8,
-  )
-  const spaceBelow = window.innerHeight - rect.bottom
-  const openUp = spaceBelow < 260 && rect.top > spaceBelow
   panelStyle.value = {
-    position: 'fixed',
-    width: `${panelWidth}px`,
-    maxHeight: `${Math.max(80, (openUp ? rect.top : spaceBelow) - 16)}px`,
-    left: `${left}px`,
-    zIndex: '80',
-    ...(openUp
-      ? { bottom: `${window.innerHeight - rect.top + 8}px`, top: 'auto' }
-      : { top: `${rect.bottom + 8}px`, bottom: 'auto' }),
+    width: 'min(28rem, calc(100vw - 2rem))',
+    maxHeight: 'calc(100vh - 4rem)',
   }
 }
-/* v8 ignore stop */
 
 function onDocumentPointerDown(event: PointerEvent) {
   if (!open.value) return
@@ -169,8 +186,12 @@ function onKeydown(event: KeyboardEvent) {
 
 watch(open, async (isOpen) => {
   if (!isOpen) return
+  void refreshPalcoTvs()
   const selectedObs = obsOutputs.value.find((item) => obsAssignments.value[item.id] === props.moduleId)
-  mode.value = (selectedObs ? obsAssignmentModes.value[selectedObs.id] : null) ?? activeMode.value ?? 'overlay'
+  const selectedTvKey = Object.keys(tvAssignments.value).find((key) => tvAssignments.value[key] === props.moduleId)
+  mode.value = (selectedObs ? obsAssignmentModes.value[selectedObs.id] : null)
+    ?? (selectedTvKey ? tvAssignmentModes.value[selectedTvKey] : null)
+    ?? activeMode.value ?? 'overlay'
   await nextTick()
   updatePanelPosition()
 })
@@ -179,12 +200,17 @@ onMounted(() => {
   document.addEventListener('pointerdown', onDocumentPointerDown, true)
   window.addEventListener('keydown', onKeydown)
   window.addEventListener('resize', updatePanelPosition)
+  if (palcoEnabled) {
+    void refreshPalcoTvs()
+    stopPalcoWatch = onPalcoClientsChanged(() => void refreshPalcoTvs())
+  }
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', onDocumentPointerDown, true)
   window.removeEventListener('keydown', onKeydown)
   window.removeEventListener('resize', updatePanelPosition)
+  stopPalcoWatch?.()
 })
 </script>
 
@@ -223,6 +249,10 @@ onBeforeUnmount(() => {
     <Teleport to="body">
       <div
         v-if="open"
+        class="independent-projection__overlay"
+        data-testid="independent-projection-overlay"
+      >
+      <div
         ref="panelEl"
         class="independent-projection__panel"
         :style="panelStyle"
@@ -235,18 +265,33 @@ onBeforeUnmount(() => {
           <p class="independent-projection__title">
             {{ t('independentProjection.title') }}
           </p>
-          <button
-            type="button"
-            class="independent-projection__identify"
-            :title="t('monitors.identify')"
-            :aria-label="t('monitors.identify')"
-            @click="onIdentify"
-          >
-            <i
-              class="ti ti-zoom-scan"
-              aria-hidden="true"
-            />
-          </button>
+          <span class="independent-projection__header-actions">
+            <button
+              type="button"
+              class="independent-projection__identify"
+              :title="t('monitors.identify')"
+              :aria-label="t('monitors.identify')"
+              @click="onIdentify"
+            >
+              <i
+                class="ti ti-zoom-scan"
+                aria-hidden="true"
+              />
+            </button>
+            <button
+              type="button"
+              class="independent-projection__identify"
+              :title="t('common.close')"
+              :aria-label="t('common.close')"
+              data-testid="independent-projection-close"
+              @click="open = false"
+            >
+              <i
+                class="ti ti-x"
+                aria-hidden="true"
+              />
+            </button>
+          </span>
         </div>
         <button
           v-if="active"
@@ -290,6 +335,9 @@ onBeforeUnmount(() => {
           {{ t(mode === 'share' ? 'independentProjection.hintShare' : 'independentProjection.hint') }}
         </p>
 
+        <p v-if="monitors.length" class="independent-projection__section-title" data-testid="independent-wired-title">
+          <i class="ti ti-device-desktop" aria-hidden="true" /> {{ t('monitors.wiredTitle') }}
+        </p>
         <ul
           class="independent-projection__list"
           role="group"
@@ -347,8 +395,28 @@ onBeforeUnmount(() => {
             </button>
           </li>
         </ul>
-
-
+        <template v-if="palcoEnabled && palcoTvs.length">
+          <div class="obs-outputs-separator" role="separator" />
+          <p class="obs-outputs-active" data-testid="independent-palco-title">
+            <i class="ti ti-device-tv" aria-hidden="true" /> {{ t('palcoOutputs.title') }}
+          </p>
+          <ul class="independent-projection__list" role="group" :aria-label="t('palcoOutputs.title')">
+            <li v-for="tv in palcoTvs" :key="tv.uid">
+              <button type="button" class="independent-projection__option" role="checkbox" :disabled="busy"
+                :aria-checked="tvHasModule(tv)"
+                :class="{ 'independent-projection__option--active': tvHasModule(tv) }"
+                :data-palco-tv="tv.uid"
+                @click="onTogglePalcoTv(tv)">
+                <i class="ti" :class="tvHasModule(tv) ? 'ti-square-check' : 'ti-square'" aria-hidden="true" />
+                <span class="independent-projection__option-body">
+                  <span class="independent-projection__option-name">{{ tv.name }}</span>
+                  <span class="independent-projection__option-meta">{{ tv.slotLabel }}</span>
+                </span>
+              </button>
+            </li>
+          </ul>
+        </template>
+      </div>
       </div>
     </Teleport>
   </div>
@@ -466,12 +534,28 @@ onBeforeUnmount(() => {
   color: var(--ds-color-surface, #121212);
 }
 
+.independent-projection__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.independent-projection__header-actions {
+  display: inline-flex;
+  gap: 0.35rem;
+}
+
 .independent-projection__panel {
   box-sizing: border-box;
+  padding: 1rem;
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
-  padding: 0.75rem;
   border-radius: 0.65rem 0 0.65rem 0;
   border: 1px solid color-mix(in srgb, var(--ds-color-on-surface) 12%, transparent);
   background: color-mix(in srgb, var(--ds-color-surface-container-high, #2a2a2a) 96%, transparent);
@@ -508,6 +592,17 @@ onBeforeUnmount(() => {
   &:hover {
     background: color-mix(in srgb, var(--ds-color-on-surface) 10%, transparent);
   }
+}
+
+.independent-projection__section-title {
+  /* Mesmo padrão de "Conexões Remotas" e "TVs com Palco". */
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.6rem;
+  color: #4ade80;
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
 .independent-projection__hint {
