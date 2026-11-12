@@ -16,6 +16,8 @@ const clientAddress = ref<string | null>(null)
 /** Identidade por papel: remote = APK (esquerda), speaker = pregador (direita). */
 const remoteAddress = ref<string | null>(null)
 const speakerAddress = ref<string | null>(null)
+const viewerCount = ref(0)
+const speakerCount = ref(0)
 let offClients: (() => void) | undefined
 
 /** id do botão copiado (para feedback "copiado") — volta sozinho. */
@@ -38,6 +40,8 @@ function applyInfo(value: RemotePairingInfo) {
   clientAddress.value = value.clientAddress ?? null
   remoteAddress.value = value.remoteAddress ?? null
   speakerAddress.value = value.speakerAddress ?? null
+  viewerCount.value = value.viewerCount ?? 0
+  speakerCount.value = value.speakerCount ?? (value.speakerAddress ? 1 : 0)
 }
 
 async function disconnectSpeaker() {
@@ -82,11 +86,13 @@ onMounted(async () => {
   }
   try {
     applyInfo(await remote.pairingInfo())
-    offClients = remote.onClients?.(({ count, address, remoteAddress: ra, speakerAddress: sa }) => {
+    offClients = remote.onClients?.(({ count, address, remoteAddress: ra, speakerAddress: sa, viewerCount: vc, speakerCount: sc }) => {
       clientCount.value = count
       clientAddress.value = address ?? null
       remoteAddress.value = ra ?? null
       speakerAddress.value = sa ?? null
+      viewerCount.value = vc ?? 0
+      speakerCount.value = sc ?? (sa ? 1 : 0)
     })
   } catch {
     failed.value = true
@@ -241,18 +247,19 @@ function copyOperatorUrl() {
         <section class="support-role">
           <div class="qr-frame"><img v-if="info.viewerQrDataUrl" :src="info.viewerQrDataUrl" width="220" height="220" class="qr" :alt="t('settings.remote.regencyTitle')" data-testid="remote-viewer-qr"></div>
           <h4>{{ t('settings.remote.regencyTitle') }}</h4>
-          <p class="pairing-steps">{{ t('settings.remote.regencyDescription') }}</p>
+          <p class="pairing-steps">{{ t('settings.remote.regencyDescription') }}<strong class="support-connection-note">{{ t('settings.remote.regencyConnections') }}</strong></p>
           <div class="url-row">
             <code class="url mono" data-testid="remote-viewer-url">{{ info.viewerUrl }}</code>
             <button type="button" class="copy-btn" data-testid="remote-viewer-copy" @click="copyToClipboard(info.viewerUrl, 'viewer')">
               <i class="ti ti-copy" aria-hidden="true" />{{ copiedId === 'viewer' ? t('common.copied') : t('settings.remote.copyLink') }}
             </button>
+            <p class="support-count" data-testid="viewer-connection-count" role="status">{{ t('settings.remote.activeConnections') }} <strong>{{ viewerCount }}</strong></p>
           </div>
         </section>
         <section class="support-role">
           <div class="qr-frame"><img :src="info.speakerQrDataUrl" width="220" height="220" class="qr" :alt="t('settings.remote.presenterTitle')" data-testid="remote-speaker-qr"></div>
           <h4>{{ t('settings.remote.presenterTitle') }}</h4>
-          <p class="pairing-steps">{{ t('settings.remote.presenterDescription') }}</p>
+          <p class="pairing-steps">{{ t('settings.remote.presenterDescription') }}<strong class="support-connection-note">{{ t('settings.remote.presenterConnections') }}</strong></p>
           <div class="url-row">
             <code class="url mono" data-testid="remote-speaker-url">{{ info.speakerUrl }}</code>
             <button type="button" class="copy-btn" data-testid="remote-speaker-copy" @click="copySpeakerUrl">
@@ -263,6 +270,7 @@ function copyOperatorUrl() {
               <i class="ti ti-plug-off" aria-hidden="true" /> {{ t('settings.remote.disconnectSpeaker') }}
             </button>
             <p v-if="disconnectFailed" class="pairing-warning" role="alert">{{ t('settings.remote.disconnectFailed') }}</p>
+            <p class="support-count" data-testid="speaker-connection-count" role="status">{{ t('settings.remote.activeConnections') }} <strong>{{ speakerCount }}</strong></p>
           </div>
         </section>
         <div class="support-token-actions">
@@ -341,6 +349,9 @@ function copyOperatorUrl() {
 .support-role .qr{width:100%;height:auto;max-width:220px}
 .support-role h4{margin:12px 0 0;color:var(--ds-color-on-surface);text-align:center}
 .support-role .pairing-steps{flex:1}
+.support-connection-note{display:block;margin-top:8px;font-weight:700;color:var(--ds-color-primary)}
+.support-count{display:flex;justify-content:center;align-items:center;gap:8px;margin:4px 0;padding:10px;border:1px solid var(--ds-color-outline-strong);border-radius:var(--ds-radius-sm);color:var(--ds-color-on-surface-variant);font-size:13px}
+.support-count strong{color:var(--ds-color-primary);font-size:18px;font-variant-numeric:tabular-nums}
 .support-token-actions{grid-column:1/-1;text-align:center}
 .support-token-actions>.copy-btn{margin:4px}
 .copy-btn:disabled{opacity:.45;cursor:not-allowed}

@@ -931,27 +931,30 @@ const SPEAKER_TOKENS = {
 /** Dicionário i18n da página do pregador — TODO texto visível passa por aqui. */
 export const SPEAKER_I18N = {
   'pt-BR': {
+    refreshPage: 'Atualizar página', closePage: 'Fechar', closeBlocked: 'O navegador bloqueou o fechamento automático. Feche esta aba ou janela pelo controle do próprio navegador.',
     disconnected: 'A conexão foi encerrada pelo desktop. Outro dispositivo já pode acessar o modo interativo.',
     waiting: 'Aguardando transmissão',
-    interactiveBusy: 'Já existe uma conexão interativa ativa. Encerre a conexão no outro dispositivo e atualize esta página para tentar novamente.',
+    interactiveBusy: 'Já existe uma conexão interativa ativa. Para liberar o acesso, use o botão “Encerrar conexão ativa” no app desktop, em Configurações → Controle Remoto → Tela de Apoio. Depois, atualize esta página para tentar novamente.',
     stopwatch: 'Tempo de pregação', start: 'Iniciar', pause: 'Pausar', resume: 'Continuar', reset: 'Zerar', title: 'Tela de apoio', connecting: 'Conectando preview…', noPairing: 'Sem pareamento — cole o link do QR',
     pairHint: 'Pareamento perdido. Cole abaixo o link do QR exibido no app do desktop (começa com http://…/speaker?token=…):',
     connect: 'Conectar', cancel: 'Cancelar', repair: 'Reemparelhar',
     previousSlide: 'Anterior', nextSlide: 'Próximo', unavailable: 'Sem slide', back: 'Voltar', next: 'Avançar', previewTitle: 'Preview da projeção',
   },
   en: {
+    refreshPage: 'Refresh page', closePage: 'Close', closeBlocked: 'The browser blocked automatic closing. Close this tab or window using the browser controls.',
     disconnected: 'The desktop ended this connection. Another device can now access interactive mode.',
     waiting: 'Waiting for broadcast',
-    interactiveBusy: 'An interactive connection is already active. Disconnect the other device and refresh this page to try again.',
+    interactiveBusy: 'An interactive connection is already active. To free access, use “End active connection” in the desktop app under Settings → Remote Control → Support Screen. Then refresh this page to try again.',
     stopwatch: 'Sermon time', start: 'Start', pause: 'Pause', resume: 'Resume', reset: 'Reset', title: 'Support screen', connecting: 'Connecting preview…', noPairing: 'Not paired — paste the QR link',
     pairHint: 'Pairing lost. Paste below the QR link shown in the desktop app (starts with http://…/speaker?token=…):',
     connect: 'Connect', cancel: 'Cancel', repair: 'Re-pair',
     previousSlide: 'Previous', nextSlide: 'Next', unavailable: 'No slide', back: 'Back', next: 'Next', previewTitle: 'Projection preview',
   },
   es: {
+    refreshPage: 'Actualizar página', closePage: 'Cerrar', closeBlocked: 'El navegador bloqueó el cierre automático. Cierra esta pestaña o ventana con los controles del navegador.',
     disconnected: 'El escritorio finalizó la conexión. Otro dispositivo ya puede acceder al modo interactivo.',
     waiting: 'Esperando transmisión',
-    interactiveBusy: 'Ya existe una conexión interactiva activa. Desconecta el otro dispositivo y actualiza esta página para intentarlo de nuevo.',
+    interactiveBusy: 'Ya existe una conexión interactiva activa. Para liberar el acceso, usa “Finalizar conexión activa” en la app de escritorio, en Configuración → Control Remoto → Pantalla de Apoyo. Después, actualiza esta página para intentarlo de nuevo.',
     stopwatch: 'Tiempo de predicación', start: 'Iniciar', pause: 'Pausar', resume: 'Continuar', reset: 'Reiniciar', title: 'Pantalla de apoyo', connecting: 'Conectando vista previa…', noPairing: 'Sin emparejar — pega el enlace del QR',
     pairHint: 'Emparejamiento perdido. Pega abajo el enlace del QR mostrado en la app de escritorio (empieza con http://…/speaker?token=…):',
     connect: 'Conectar', cancel: 'Cancelar', repair: 'Reemparejar',
@@ -973,6 +976,10 @@ export function speakerPageHtml({ palcoToken = '' } = {}) {
 <style>
 :root{--bg:${t.bg};--surface:${t.surface};--surface-input:${t.surfaceInput};--on-surface:${t.onSurface};--on-surface-variant:${t.onSurfaceVariant};--primary:${t.primary};--on-primary:${t.onPrimary};--outline:${t.outline};--success:${t.success};--radius-sm:${t.radiusSm};--radius-md:${t.radiusMd};--sp1:${t.spacing1};--sp2:${t.spacing2};--sp3:${t.spacing3};--sp4:${t.spacing4}}
 [hidden]{display:none!important}
+#connectionError .connection-error-actions{display:flex;justify-content:center;flex-wrap:wrap;gap:12px;margin-top:24px}
+#connectionError button{width:auto;min-height:48px;padding:12px 20px;font-size:16px}
+#connectionError .connection-error-close{background:var(--surface);color:var(--on-surface)}
+#connectionError p{max-width:600px;margin:0 auto}
 #connectionError{position:fixed;inset:0;z-index:20;display:grid;place-content:center;padding:32px;background:var(--bg);color:var(--on-surface);text-align:center;font-size:20px;line-height:1.6}
 html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--on-surface);font:16px 'Plus Jakarta Sans',system-ui,sans-serif;display:flex;flex-direction:column;min-height:100dvh}
@@ -1030,7 +1037,8 @@ nav{display:flex;justify-content:space-between;gap:var(--sp3)}
 .hint{color:var(--on-surface-variant);font-size:13px;line-height:1.4}
 </style></head>
 <body>
-<div id="connectionError" hidden role="alert" data-i18n="interactiveBusy">Já existe uma conexão interativa ativa.</div>
+<div id="connectionError" hidden role="alert"><p id="connectionErrorMessage" data-i18n="interactiveBusy">Já existe uma conexão interativa ativa.</p>
+<div class="connection-error-actions"><button id="refreshPage" data-i18n="refreshPage">Atualizar página</button><button id="closePage" class="connection-error-close" data-i18n="closePage">Fechar</button></div></div>
 <main>
 <header class="speaker-header"><h1 id="t" data-i18n="title">Tela de apoio</h1>
 <section class="stopwatch" data-i18n-attr="aria-label:stopwatch" aria-label="Tempo de pregação">
@@ -1156,8 +1164,10 @@ function send(action){if(connectionBlocked||readOnly||(action.startsWith('slide:
   if(remote&&remote.readyState===1)remote.send(JSON.stringify(m));else queued.push(m)}
 function openRemote(){remote=new WebSocket(host(remotePort,''));
   remote.onopen=()=>{setConn(true);remote.send(JSON.stringify({v:1,type:'hello',role:'speaker',token}));queued.splice(0).forEach(m=>remote.send(JSON.stringify(m)))};
-  remote.onmessage=e=>{try{const m=JSON.parse(e.data);if(m.type==='error'&&(m.code==='remote_busy'||m.code==='speaker_disconnected')){connectionBlocked=true;queued=[];setConn(false);document.getElementById('connectionError').textContent=m.code==='speaker_disconnected'?T.disconnected:T.interactiveBusy;document.getElementById('connectionError').hidden=false;frame.src='about:blank';return}if(connectionBlocked)return;if(m.type==='state'&&m.slide){const old=state.index;updateSlide(m.slide,m.supportActive);if(old!==state.index)pulse()}}catch{}};
+  remote.onmessage=e=>{try{const m=JSON.parse(e.data);if(m.type==='error'&&(m.code==='remote_busy'||m.code==='speaker_disconnected')){connectionBlocked=true;queued=[];setConn(false);document.getElementById('connectionErrorMessage').textContent=m.code==='speaker_disconnected'?T.disconnected:T.interactiveBusy;document.getElementById('connectionError').hidden=false;frame.src='about:blank';return}if(connectionBlocked)return;if(m.type==='state'&&m.slide){const old=state.index;updateSlide(m.slide,m.supportActive);if(old!==state.index)pulse()}}catch{}};
   remote.onclose=()=>{setConn(false);if(!connectionBlocked)setTimeout(openRemote,800)}}
+document.getElementById('refreshPage').onclick=()=>location.reload();
+document.getElementById('closePage').onclick=()=>{window.close();setTimeout(()=>{if(!window.closed)document.getElementById('connectionErrorMessage').textContent=T.closeBlocked},200)};
 document.querySelector('#prev').onclick=()=>send('slide:prev');
 document.querySelector('#next').onclick=()=>send('slide:next');
 // Reemparelhar: limpa pareamento e abre overlay pra colar o link do QR de novo.

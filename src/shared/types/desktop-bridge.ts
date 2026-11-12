@@ -275,6 +275,8 @@ export type RemotePairingInfo = {
   speakerUrl?: string
   viewerUrl?: string
   viewerQrDataUrl?: string
+  viewerCount?: number
+  speakerCount?: number
   speakerQrDataUrl?: string
   operatorUrl?: string
   operatorQrDataUrl?: string
@@ -297,6 +299,8 @@ export type RemoteApi = {
   onClients?: (
     callback: (payload: {
       count: number
+      viewerCount?: number
+      speakerCount?: number
       address?: string | null
       remoteAddress?: string | null
       speakerAddress?: string | null

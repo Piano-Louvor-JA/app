@@ -405,6 +405,10 @@ it('regência tem token próprio, aceita múltiplos leitores e rejeita qualquer 
       }
     }
     expect(contents.sent.filter(m => m.channel === 'remote:command')).toHaveLength(0)
+    const current = await ipcHandlers.get('remote:pairing-info')()
+    expect(current.viewerCount).toBe(2)
+    expect(current.speakerCount).toBe(1)
+    expect(contents.sent.filter(m => m.channel === 'remote:clients').at(-1).payload.viewerCount).toBe(2)
   } finally { server.stop?.() }
 })
 

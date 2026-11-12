@@ -225,6 +225,8 @@ it.each(['remote_busy', 'speaker_disconnected'])('aviso %s bloqueia a página e 
   expect(dom.window.document.getElementById('connectionError').textContent).toContain(code === 'remote_busy' ? 'Já existe uma conexão interativa ativa' : 'A conexão foi encerrada pelo desktop')
   expect(dom.window.document.getElementById('next').disabled).toBe(true)
   expect(timers).toHaveLength(0)
+  expect(dom.window.document.getElementById('refreshPage').textContent).toBe('Atualizar página')
+  expect(dom.window.document.getElementById('closePage').textContent).toBe('Fechar')
   dom.window.close()
 })
 

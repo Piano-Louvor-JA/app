@@ -283,3 +283,20 @@ it('encerra o passador pelo desktop e desabilita o botão ao liberar a conexão'
   expect(wrapper.get('[data-testid="remote-speaker-url"]').text()).toBe(before.speakerUrl)
   wrapper.unmount()
 })
+
+it('atualiza contadores de regência e passador ao conectar e desconectar', async () => {
+  const bridge = makeBridge()
+  mocks.getDesktopBridge.mockReturnValue(bridge)
+  const wrapper = createWrapper()
+  await flushPromises()
+  expect(wrapper.get('[data-testid="viewer-connection-count"]').text()).toContain('0')
+  const callback = (bridge.remote.onClients.mock.calls as unknown as Array<[(value: Record<string, unknown>) => void]>)[0][0]
+  callback({ count: 4, viewerCount: 3, speakerCount: 1 })
+  await flushPromises()
+  expect(wrapper.get('[data-testid="viewer-connection-count"]').text()).toContain('3')
+  expect(wrapper.get('[data-testid="speaker-connection-count"]').text()).toContain('1')
+  callback({ count: 0, viewerCount: 0, speakerCount: 0 })
+  await flushPromises()
+  expect(wrapper.get('[data-testid="viewer-connection-count"]').text()).toContain('0')
+  wrapper.unmount()
+})

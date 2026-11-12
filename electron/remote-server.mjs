@@ -100,10 +100,16 @@ export async function startRemoteServer(wss, contents, opts = {}) {
   }
   const clientIdentity = () => identityFor(false) ?? identityFor(true)
 
+  const supportCounts = () => ({
+    viewerCount: [...clients].filter(([ws, entry]) => ws.readyState === ws.OPEN && entry.viewer).length,
+    speakerCount: [...clients].filter(([ws, entry]) => ws.readyState === ws.OPEN && entry.speaker && !entry.viewer).length,
+  })
+
   const notifyClients = () => {
     try {
       if (!contents.isDestroyed()) {
         contents.send('remote:clients', {
+          ...supportCounts(),
           count: clients.size,
           address: clientIdentity(),
           // Papéis separados — o painel mostra cada um no seu lugar:
@@ -392,6 +398,7 @@ export async function startRemoteServer(wss, contents, opts = {}) {
     const viewerUrl = `http://${host}:${Number(palcoHttpPort()) || DEFAULT_HTTP_PORT}/speaker?remotePort=${activePort}&palcoPort=${(Number(palcoHttpPort()) || DEFAULT_HTTP_PORT) + 1}&mode=view&token=${viewerTokenFor()}`
     if (viewer.url !== viewerUrl) viewer = { url: viewerUrl, qr: await QRCode.toDataURL(viewerUrl, { margin: 1, width: 220 }) }
     return {
+      ...supportCounts(),
       viewerUrl: viewer.url, viewerQrDataUrl: viewer.qr,
       host, port: activePort, token, connectUrl, qrDataUrl: operator.qr,
       speakerUrl: (await speakerPairing()).url, speakerQrDataUrl: speaker.qr,
