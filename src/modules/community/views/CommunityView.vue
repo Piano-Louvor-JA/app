@@ -25,6 +25,10 @@ import {
 	getNotifications,
 } from "../services/notifications";
 import NotificationsDropdown from "../components/NotificationsDropdown.vue";
+import MyEditsPanel from "@modules/community-edits/views/MyEditsPanel.vue";
+import { listLocalEdits } from "@modules/community-edits/services/local-edits-store";
+import { publishEdit } from "@modules/community-edits/services/publish-edit";
+import type { ServerEditStatus } from "@modules/community-edits/views/MyEditsPanel.vue";
 import { useCommunityBrowseStore } from "../stores/useCommunityBrowseStore";
 import PageBackStack from "@shared/components/PageBackStack.vue";
 import { useMinimizablePage } from "@shared/composables/useMinimizablePage";
@@ -88,6 +92,49 @@ const showNotifications = ref(false);
 const isLogged = ref(false);
 const seasonalEvent = ref<SeasonalEventBanner | null>(null);
 
+/** Minhas Edições: status do servidor (RF-05) + publish com a sessão real. */
+const myServerStatuses = ref<ServerEditStatus[]>([]);
+const publishInFlight = ref<number | null>(null);
+
+async function onPublishEdit(musicId: number): Promise<void> {
+  if (publishInFlight.value != null) return;
+  publishInFlight.value = musicId;
+  try {
+    const token = await authTokenAsync();
+    await publishEdit(musicId, { getToken: () => token });
+  } finally {
+    publishInFlight.value = null;
+  }
+}
+
+function refreshMyServerStatuses(): void {
+  if (!isLogged.value) {
+    myServerStatuses.value = [];
+    return;
+  }
+  void (async () => {
+    try {
+      const token = await authTokenAsync();
+      if (!token) return;
+      const res = await fetch(
+        `${import.meta.env.VITE_URL_DATABASE?.replace(/\/json_db$/, '') ?? ''}/v1/custom/edits/mine`,
+        { headers: { authorization: `Bearer ${token}` } },
+      );
+      if (!res.ok) return;
+      const body = (await res.json()) as {
+        edits?: { musicId?: number; music_id?: number; status: string; reason?: string | null }[];
+      };
+      myServerStatuses.value = (body.edits ?? []).map((e) => ({
+        musicId: (e.musicId ?? e.music_id) as number,
+        status: e.status,
+        reason: e.reason ?? null,
+      }));
+    } catch {
+      myServerStatuses.value = [];
+    }
+  })();
+}
+
 async function load() {
 	isLoading.value = true;
 	await Promise.race([
@@ -108,6 +155,7 @@ async function load() {
 	notifications.value = notifs;
 	isLogged.value = Boolean(getAuthSession()?.token);
 	seasonalEvent.value = seasonal;
+	refreshMyServerStatuses();
 	// serviços nunca lançam; falha = vazio/null.
 	isLoading.value = false;
 }
@@ -220,6 +268,13 @@ onMounted(load);
           {{ t('community.createCollection') }}
         </button>
       </div>
+
+      <MyEditsPanel
+        v-if="isLogged"
+        :server-statuses="myServerStatuses"
+        @publish="onPublishEdit"
+        class="community-view__my-edits"
+      />
     </header>
 
     <div
