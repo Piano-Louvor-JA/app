@@ -116,7 +116,7 @@ jobs:
       # do ambiente — sem elas o bundle release nasce sem a config do Firebase
       # e o login Google falha com "Firebase não configurado" antes do popup.
       # Config pública de cliente Firebase (não é segredo de servidor).
-      - name: Inject Firebase client config
+      - name: Validate Firebase client config
         env:
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
@@ -136,6 +136,13 @@ jobs:
           echo "Firebase client config injetada."
 
       - name: Build Vite
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
         run: npm run build-only -- --base=./
 
       - name: Install Linux packaging dependencies
