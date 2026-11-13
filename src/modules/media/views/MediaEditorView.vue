@@ -106,6 +106,58 @@ const saving = ref(false)
 const statusMessage = ref('')
 const snackbarOpen = ref(false)
 
+/* ---------- Edição de música OFICIAL como sugestão (RF-01, SPEC piano-community-edits) ---------- */
+const editOfficialId = ref<number | null>(null)
+
+/** Abre modo sugestão: carrega track oficial (resolver aplica local/applied p/ contexto) e trava escopo letra/timing. */
+async function loadOfficialForSuggestion(musicId: number): Promise<void> {
+  editOfficialId.value = musicId
+  selectedMusicId.value = null
+  loading.value = true
+  notify('')
+  try {
+    const { resolveMediaTrack } = await import('@modules/media/services/custom-catalog')
+    const track = await resolveMediaTrack(musicId)
+    if (!track) {
+      notify('Música oficial não encontrada', true)
+      editOfficialId.value = null
+      return
+    }
+    musicName.value = track.name
+    lyrics.value = (track.lyrics ?? []).map((s) => ({
+      id: s.order,
+      lyric: s.lyric,
+      time: s.time ?? '00:00',
+      imageUrl: s.imageUrl ?? '',
+    }))
+    notify('')
+  } finally {
+    loading.value = false
+  }
+}
+
+/** Salva sugestão: somente letra/timing → saveLocalEdit (draft). Nunca faz PUT no catálogo oficial. */
+async function onSaveOfficialSuggestion(): Promise<void> {
+  if (editOfficialId.value == null) return
+  const { saveLocalEdit } = await import('@modules/community-edits/services/local-edits-store')
+  const slides = lyrics.value.map((row, i) => ({
+    order: i + 1,
+    lyric: row.lyric,
+    showSlide: true,
+    time: row.time,
+    instrumentalTime: '',
+    imageUrl: row.imageUrl || null,
+    imagePosition: null,
+    frameDataUrl: null,
+  }))
+  saveLocalEdit(editOfficialId.value, {
+    lyrics: JSON.stringify(slides),
+    timing: null,
+    status: 'draft',
+  })
+  notify('Correção salva localmente — publique em Minhas Edições (Comunidade)')
+}
+
 /** statusMessage + snackbar juntos (toast). Mensagem vazia só limpa, sem abrir toast. */
 function notify(message: string, isError = false): void {
   const text = message.trim()
@@ -138,7 +190,7 @@ const newMusicName = ref('')
 /** Assets de imagem upados no último import .slja (path → url) */
 const uploadedAssets = ref<Array<{ path: string; url: string; idFile: number }>>([])
 
-const hasSelection = computed(() => selectedMusicId.value != null)
+const hasSelection = computed(() => selectedMusicId.value != null || editOfficialId.value != null)
 
 /* ---------- Aside de coletâneas colapsável ---------- */
 const asideCollapsed = ref(false)
@@ -1147,6 +1199,10 @@ onMounted(async () => {
     selectedCollectionId.value = null
     musics.value = []
   }
+  if (route.query.editOfficial) {
+    const id = Number(route.query.editOfficial)
+    if (!Number.isNaN(id) && id > 0) await loadOfficialForSuggestion(id)
+  }
   if (route.query.new === '1') {
     newMusicName.value = ''
     document.querySelector<HTMLInputElement>('[data-testid="new-music-input"]')?.focus()
@@ -1746,8 +1802,37 @@ onMounted(async () => {
             </div>
           </div>
 
+          <section
+            v-if="editOfficialId != null"
+            class="editor__official-suggestion"
+            data-testid="edit-official-panel"
+          >
+            <h2>Sugerir correção — {{ musicName }}</h2>
+            <p>Edite somente letra e timing. Áudio, fundo, capa e metadados continuam oficiais.</p>
+            <div
+              v-for="(stanza, index) in lyrics"
+              :key="`official-${stanza.id ?? index}`"
+              class="editor__stanza"
+            >
+              <label>Timing <input v-model="stanza.time" type="time" class="editor__input editor__input--time" step="1"></label>
+              <textarea
+                v-model="stanza.lyric"
+                :data-testid="`edit-official-lyric-${index}`"
+                class="editor__textarea"
+                rows="4"
+              />
+            </div>
+            <button
+              type="button"
+              class="editor__btn editor__btn--save"
+              data-testid="edit-official-save"
+              @click="onSaveOfficialSuggestion"
+            >Salvar sugestão local</button>
+          </section>
+
           <!-- Estrofes na MESMA visão: tocar, marcar, adicionar — tudo junto -->
           <ul
+            v-else
             class="editor__stanzas"
           >
             <li
