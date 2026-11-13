@@ -2919,6 +2919,13 @@ function palcoMediaUrl(value){
   const local=palcoLanHost(parsed.hostname)||(host&&parsed.hostname===palcoSenderHost(host)?parsed.hostname:'');
   const official=palcoOfficialOrigin(parsed.origin);
   if(!local&&!official)return '';
+  // Mídia do próprio transmissor (porta HTTP = WS − 1) vem pelo endereço por
+  // onde a tela se conectou: o IP que ele anuncia pode não ser alcançável
+  // daqui (celular com duas redes, emulador atrás de NAT).
+  const connected=palcoSenderHost(host);
+  if(!official&&connected&&parsed.port&&Number(parsed.port)===Number(port)-1){
+    return parsed.protocol+'//'+connected+':'+Number(parsed.port)+parsed.pathname+parsed.search+parsed.hash;
+  }
   const origin=official||(parsed.protocol+'//'+local+(parsed.port?':'+Number(parsed.port):''));
   return origin+parsed.pathname+parsed.search+parsed.hash;
 }
