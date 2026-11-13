@@ -31,6 +31,7 @@ vi.mock('../../components/SettingsTabs.vue', () => ({
   default: { template: '<div class="settings-tabs-stub" />' },
 }))
 
+
 import SettingsView from '../SettingsView.vue'
 import { SETTINGS_SECTIONS } from '../../constants/sections'
 
@@ -47,6 +48,8 @@ const i18n = createI18n({
           general: 'Geral',
           remote: 'Controle Remoto',
           transmission: 'Transmissão',
+          palco: 'Palco',
+          connections: 'Conexões remotas',
         },
         tabs: { general: 'Geral', remote: 'Controle Remoto', transmission: 'Transmissão' },
       },
@@ -131,6 +134,28 @@ describe('SettingsView', () => {
       icon: 'ti-settings',
       summary: 'Configurações',
     })
+  })
+
+  it.each([
+    ['settings-transmission', 'Transmissão'],
+    ['settings-remote', 'Controle Remoto'],
+    ['settings-palco', 'Palco'],
+  ])('módulo %s de Conexões remotas: título próprio e voltar leva ao agregador', async (name, title) => {
+    const { wrapper, router, go } = mountAt(name)
+    await go()
+    expect(wrapper.get('.settings-view__title').text()).toBe(title)
+    await wrapper.find('.settings-view__back').trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.name).toBe('settings-connections')
+  })
+
+  it('agregador Conexões remotas tem título e o voltar leva ao início', async () => {
+    const { wrapper, router, go } = mountAt('settings-connections')
+    await go()
+    expect(wrapper.get('.settings-view__title').text()).toBe('Conexões remotas')
+    await wrapper.find('.settings-view__back').trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.name).toBe('home')
   })
 
   it('goBack: navega pra home', async () => {

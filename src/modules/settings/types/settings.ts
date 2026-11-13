@@ -5,6 +5,8 @@ export type SettingsSectionId =
   | 'projection'
   | 'transmission'
   | 'remote'
+  | 'palco'
+  | 'connections'
 
 export type ThemeMode = 'light' | 'dark'
 
@@ -16,6 +18,8 @@ export interface SettingsSection {
   labelKey: string
   /** Oculto nas abas — rotas/views permanecem para reativar depois. */
   hidden?: boolean
+  /** Aba que agrupa outras rotas (fica ativa em qualquer uma delas). */
+  routeNames?: string[]
 }
 
 export type {

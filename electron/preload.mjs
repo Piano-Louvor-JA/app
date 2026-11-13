@@ -80,6 +80,11 @@ contextBridge.exposeInMainWorld('louvorja', {
   isElectron: true,
 
   // Controle remoto (APK via WS :48080): comandos chegam do main.
+  monitorShare: {
+    get: () => ipcRenderer.invoke('monitor-share:get'),
+    set: (changes) => ipcRenderer.invoke('monitor-share:set', changes),
+    onChanged: (callback) => subscribe('monitor-share:changed', callback),
+  },
   remote: {
     onCommand: (callback) => subscribe('remote:command', callback),
     onStateRequest: (callback) => subscribe('remote:request-state', callback),
@@ -115,6 +120,15 @@ contextBridge.exposeInMainWorld('louvorja', {
     onEvent: (callback) => subscribe('palco:event', callback),
     onReceiverConnected: (callback) => subscribe('palco:receiver-connected', callback),
     onReceiverDisconnected: (callback) => subscribe('palco:receiver-disconnected', callback),
+    // Módulo Palco (Configurações › Conexões remotas › Palco)
+    clients: () => ipcRenderer.invoke('palco:clients'),
+    clientCommand: (slotId, uid, command, args = {}) =>
+      ipcRenderer.invoke('palco:client-command', { ...args, slotId, uid, command }),
+    setClientMuted: (slotId, uid, muted) => ipcRenderer.invoke('palco:client-mute', { slotId, uid, muted }),
+    setClientPinned: (slotId, uid, pinned) => ipcRenderer.invoke('palco:client-pin', { slotId, uid, pinned }),
+    discover: () => ipcRenderer.invoke('palco:discover'),
+    wakeTv: (ip) => ipcRenderer.invoke('palco:wake-tv', { ip }),
+    onClientsChanged: (callback) => subscribe('palco:clients-changed', callback),
   },
 
   window: {

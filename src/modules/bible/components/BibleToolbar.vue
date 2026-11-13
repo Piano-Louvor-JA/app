@@ -5,23 +5,24 @@ import { useI18n } from 'vue-i18n'
 import { GlassCard } from '@design-system/index'
 import StagePaletteButton from '../../settings/components/StagePaletteButton.vue'
 
+import BibleSmartSearch from './BibleSmartSearch.vue'
 import BibleVersionSelect from './BibleVersionSelect.vue'
-import type { BibleVersion } from '../types/bible'
+import type { BibleBook, BibleVersion } from '../types/bible'
 
 const props = defineProps<{
   versions: BibleVersion[]
+  books: BibleBook[]
   selectedVersionId: number | null
   locationLabel: string
   showNavPanel: boolean
-  bibleSearchQuery: string
   versionsDisabled?: boolean
 }>()
 
 const emit = defineEmits<{
   selectVersion: [versionId: number]
   toggleNav: []
-  'update:bibleSearchQuery': [value: string]
-  searchSubmit: []
+  openPassage: [bookId: number, chapter: number, verses: number[]]
+  searchText: [query: string]
 }>()
 
 const { t } = useI18n()
@@ -67,21 +68,11 @@ const browseIcon = computed(() =>
 
     <div class="bible-toolbar__actions">
       <StagePaletteButton scope="bible" />
-      <div class="bible-toolbar__search">
-        <i
-          class="ti ti-search bible-toolbar__search-icon"
-          aria-hidden="true"
-        />
-        <input
-          class="bible-toolbar__search-input"
-          type="search"
-          :value="bibleSearchQuery"
-          :placeholder="t('bible.searchBible')"
-          :aria-label="t('bible.searchBible')"
-          @input="emit('update:bibleSearchQuery', ($event.target as HTMLInputElement).value)"
-          @keydown.enter.prevent="emit('searchSubmit')"
-        >
-      </div>
+      <BibleSmartSearch
+        :books="books"
+        @open-passage="(bookId, chapter, verses) => emit('openPassage', bookId, chapter, verses)"
+        @search-text="emit('searchText', $event)"
+      />
 
       <button
         type="button"

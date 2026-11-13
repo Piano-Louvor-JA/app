@@ -3,6 +3,8 @@ import { type PalcoTimerOptions } from './palco-session'
 import { formatElapsedMs as formatTimer } from '@modules/timer/services/timer-format'
 import { obsAssignments, obsAssignmentModes, obsConnections, obsAllowsMirror } from './obs-connections'
 import { renderObsModule } from './obs-projection'
+import { listPalcoTvs, palcoTvKey, palcoTvTarget } from './palco-clients'
+import { tvAssignmentModes, tvAssignments } from './palco-tv-assignments'
 /**
  * palco-bridge — espelha TODAS as projeções na TV (paridade APK StageSession).
  *
@@ -115,8 +117,23 @@ function elapsedMs(seg: { status: string; segmentStartedAt: number | null; accum
  * (se vivo) — nunca fica congelado; degradado → idle.
  * SERIAL: projectTo/timerTo trocam activeSlotId/baseUrl por sender.
  */
+/** TVs do Palco em projeção independente: cada uma recebe o módulo dela. */
+async function renderTvAssignments(): Promise<void> {
+  if (!Object.keys(tvAssignments.value).length) return
+  for (const tv of await listPalcoTvs()) {
+    const key = palcoTvKey(tv)
+    const module = tvAssignments.value[key]
+    if (!module) continue
+    const shared = tvAssignmentModes.value[key] === 'share'
+    // Compartilhar: liga a tela dividida na TV (ela ignora se já estiver).
+    if (shared) palcoSession.syncTvShare(palcoTvTarget(tv), true)
+    await renderObsModule(palcoTvTarget(tv), module, shared)
+  }
+}
+
 async function renderAllSlots(): Promise<void> {
   if (!palcoSession.isElectron) return
+  await renderTvAssignments()
   const { moduleForSlot } = useOutputRegistry()
   const slots = await palcoSession.slots()
   let externalMediaAlive = false
@@ -724,7 +741,7 @@ export function startPalcoBridge() {
   }
   window.addEventListener('obs-connections-changed', onObsChanged)
   const obsTimer = window.setInterval(() => {
-    if (Object.keys(obsAssignments.value).length || owner === 'timer') void renderAllSlots()
+    if (Object.keys(obsAssignments.value).length || Object.keys(tvAssignments.value).length || owner === 'timer') void renderAllSlots()
   }, 1000)
   unwatchers.push(() => {
     window.removeEventListener('obs-connections-changed', onObsChanged)

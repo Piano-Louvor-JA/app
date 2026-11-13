@@ -504,6 +504,18 @@ export const useBibleStore = defineStore('bible', () => {
     return true
   }
 
+  /**
+   * Busca inteligente da toolbar (paridade apk): abre livro + capítulo já
+   * resolvidos; com versículos, filtra a lista neles (mesma regra do R4+:
+   * nenhum versículo pré-selecionado).
+   */
+  async function applyPassage(bookId: number, chapter: number, verseList: number[] = []) {
+    await selectBook(bookId)
+    await selectChapter(chapter)
+    filteredVerseSet.value = verseList.length > 0 ? new Set(verseList) : null
+    syncProjection()
+  }
+
   function clearSelection() {
     selectedVerses.value = []
     syncProjection()
@@ -630,6 +642,7 @@ export const useBibleStore = defineStore('bible', () => {
     selectVerse,
     applyVerseSearch,
     applyBookSearchReference,
+    applyPassage,
     clearSelection,
     setTestamentFilter,
     toggleNavPanel,

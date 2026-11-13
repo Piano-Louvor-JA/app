@@ -8,6 +8,8 @@ import RemotePairingView from '@modules/remote/views/RemotePairingView.vue'
 import { isElectronShell } from '@shared/services/desktop-bridge'
 import SettingsView from './views/SettingsView.vue'
 import TransmissionView from './views/TransmissionView.vue'
+import PalcoView from './views/PalcoView.vue'
+import ConnectionsView from './views/ConnectionsView.vue'
 
 export const settingsRoutes: RouteRecordRaw[] = [
   {
@@ -57,6 +59,21 @@ export const settingsRoutes: RouteRecordRaw[] = [
         path: 'transmission',
         name: 'settings-transmission',
         component: TransmissionView,
+        meta: { navKey: 'settings' },
+      },
+      // Conexões remotas: agregador de Transmissão, Controle Remoto e Palco.
+      {
+        path: 'connections',
+        name: 'settings-connections',
+        component: ConnectionsView,
+        meta: { navKey: 'settings' },
+      },
+      // Palco: TVs com o app Palco conectadas às transmissões (paridade
+      // Ferramentas › Palco do apk).
+      {
+        path: 'palco',
+        name: 'settings-palco',
+        component: PalcoView,
         meta: { navKey: 'settings' },
       },
       // Controle remoto — desktop: WS :48080 (RemotePairingView);

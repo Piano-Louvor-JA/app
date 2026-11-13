@@ -640,6 +640,12 @@ class PalcoSession {
     void palcoApi().send({ v: 2, type: 'obsShare', enabled }, slotId)
   }
 
+  /** Tela dividida numa TV do Palco só ("slot#uid"), sem mexer na transmissão. */
+  syncTvShare(target: string, enabled: boolean): void {
+    if (!this.isElectron) return
+    void palcoApi().send({ v: 2, type: 'tvShare', enabled }, target)
+  }
+
   /** Volta ao idle (aguardando conteúdo). */
   idle(msg?: string): void {
     if (!this.isElectron) return

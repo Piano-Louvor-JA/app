@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import { usePageTransition } from '@design-system/composables'
+import ConnectedDevicesButton from '@shared/components/ConnectedDevicesButton.vue'
 import { DockFooter, GradientBackground, HistoryNav, MinimizedPagesBar } from '@design-system/index'
 import type { DockNavItem, HistoryNavDot, MinimizedBarItem } from '@design-system/types/navigation'
 import AuthAccountDialog from '@modules/auth/components/AuthAccountDialog.vue'
@@ -713,6 +714,9 @@ function viewKey(viewRoute: typeof route) {
       :active-key="activeKey"
       @select="onNavigate"
     />
+
+    <!-- Aparelhos ligados a este desktop (remoto, pregador, monitores). -->
+    <ConnectedDevicesButton />
   </GradientBackground>
 </template>
 

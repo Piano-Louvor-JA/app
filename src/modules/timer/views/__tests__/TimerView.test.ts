@@ -51,9 +51,6 @@ vi.mock('@design-system/index', () => ({
   GlassCard: { name: 'GlassCard', template: '<div class="glass-mock"><slot /></div>' },
 }))
 
-vi.mock('../../../settings/components/PalcoRouteSelect.vue', () => ({
-  default: { name: 'PalcoRouteSelect', props: ['module'], template: '<div class="palco-route-mock" />' },
-}))
 
 vi.mock('../../../settings/components/StageCustomizationDialog.vue', () => ({
   default: { name: 'StageCustomizationDialog', props: ['open', 'scope'], template: '<div class="stage-dialog-mock" />' },
@@ -109,9 +106,9 @@ beforeEach(() => {
 })
 
 describe('TimerView.vue', () => {
-  it('renderiza header com PalcoRouteSelect, título e botão back', () => {
+  it('renderiza header com título e botão back (sem Destino do palco)', () => {
     const w = mountView()
-    expect(w.find('.palco-route-mock').exists()).toBe(true)
+    expect(w.text()).not.toContain('Destino do palco')
     expect(w.find('.timer-view__title').text()).toBe('timer.title')
     expect(w.find('.timer-view__back').exists()).toBe(true)
     w.unmount()

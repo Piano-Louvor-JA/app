@@ -63,9 +63,6 @@ vi.mock('../../../settings/types/stage-settings', () => ({
   stageBgCss: () => '#0A0E1A',
 }))
 
-vi.mock('../../../settings/components/PalcoRouteSelect.vue', () => ({
-  default: { template: '<div class="palco-route-select" />' },
-}))
 
 vi.mock('../../../settings/components/StageCustomizationDialog.vue', () => ({
   default: { template: '<div class="stage-custom-dialog" />' },

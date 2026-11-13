@@ -71,13 +71,15 @@ describe("palco-routing — fallback interno", () => {
 	});
 });
 
-it('ignores the retired music destination saved by older versions', async () => {
-  localStorage.setItem('louvorja-palco-routing-v1', JSON.stringify({ hymns: '7082', bible: '7084' }))
+it('destinos salvos por versões antigas não valem mais: tudo espelha', async () => {
+  localStorage.setItem('louvorja-palco-routing-v1', JSON.stringify({ hymns: '7082', bible: '7084', clock: 'cable:1' }))
   vi.resetModules()
   const routing = await import('../palco-routing')
-  expect(routing.getPalcoRoute('hymns')).toBe('mirror')
-  expect(routing.isPalcoTvOnlyRoute('hymns')).toBe(false)
-  expect(routing.getPalcoRoute('bible')).toBe('7084')
+  for (const module of routing.PALCO_MODULES) {
+    expect(routing.getPalcoRoute(module)).toBe('mirror')
+    expect(routing.isPalcoTvOnlyRoute(module)).toBe(false)
+  }
+  expect(localStorage.getItem('louvorja-palco-routing-v1')).toBeNull()
   routing.setPalcoRoute('hymns', '7082')
   expect(routing.getPalcoRoutes().hymns).toBe('mirror')
 })

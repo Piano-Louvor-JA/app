@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 
-import PalcoRouteSelect from '../../settings/components/PalcoRouteSelect.vue'
 import BibleNavPanel from '../components/BibleNavPanel.vue'
 import BibleToolbar from '../components/BibleToolbar.vue'
 import BibleVerseList from '../components/BibleVerseList.vue'
@@ -10,6 +9,7 @@ import { useBibleReader } from '../composables/useBibleReader'
 const { t } = useI18n()
 
 const {
+  books,
   versions,
   selectedVersionId,
   selectedBookId,
@@ -38,6 +38,7 @@ const {
   selectChapter,
   selectVerse,
   applyBookSearchReference,
+  applyPassage,
   clearSelection,
   goToAdjacentVerse,
   setTestamentFilter,
@@ -53,12 +54,10 @@ function onNextVerse() {
   void goToAdjacentVerse(1)
 }
 
-/** Enter na toolbar: tenta referência bíblica 1-shot ("genesis 1:1-4, 6");
- *  sem parse válido mantém o filtro textual existente. */
-async function applyToolbarSearch() {
-  const query = globalSearchQuery.value
-  const resolved = await applyBookSearchReference(query)
-  if (resolved) globalSearchQuery.value = ''
+/** Busca inteligente da toolbar: passagem abre direto; texto filtra os
+ *  versículos do capítulo aberto (campo "Pesquisar versículo"). */
+function onSearchText(query: string) {
+  verseSearchQuery.value = query
 }
 </script>
 
@@ -69,14 +68,13 @@ async function applyToolbarSearch() {
       :selected-version-id="selectedVersionId"
       :location-label="locationLabel"
       :show-nav-panel="showNavPanel"
-      :bible-search-query="globalSearchQuery"
+      :books="books"
       :versions-disabled="isLoadingMeta"
       @select-version="selectVersion"
       @toggle-nav="toggleNavPanel"
-      @update:bible-search-query="globalSearchQuery = $event"
-      @search-submit="applyToolbarSearch"
+      @open-passage="applyPassage"
+      @search-text="onSearchText"
     />
-    <PalcoRouteSelect module="bible" />
 
     <div
       v-if="lastErrorKey"

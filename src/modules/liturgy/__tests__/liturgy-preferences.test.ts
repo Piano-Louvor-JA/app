@@ -353,3 +353,5 @@ describe('liturgy-preferences', () => {
     })
   })
 })
+
+ it('preserva os executores de mídia específicos no roundtrip do APK',()=>{const result=normalizeLiturgyState({weekdays:{sunday:[{id:'p',type:'presentation',name:'Slides',presentationEngine:'libreoffice',playerId:'vlc'}]}});expect(result.weekdays.sunday[0].presentationEngine).toBe('libreoffice');expect(result.weekdays.sunday[0].playerId).toBe('vlc')});

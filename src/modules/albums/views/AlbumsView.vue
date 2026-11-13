@@ -443,9 +443,20 @@ function confirmPlaylistRemoval() {
   pendingPlaylistRemoval.value = null
 }
 
+/** X da faixa: pede confirmação (AppConfirm) antes de tirar da playlist. */
+const pendingTrackRemoval = ref<{ id: string; index: number; title: string; name: string } | null>(null)
 function removePlaylistTrack(id: string, index: number) {
-  removePlaylistItem(id, index)
+  const playlist = playlists.value.find(item => item.id === id)
+  const track = playlist?.items[index]
+  if (!playlist || !track) return
+  pendingTrackRemoval.value = { id, index, title: track.title, name: playlist.name }
+}
+function confirmTrackRemoval() {
+  const pending = pendingTrackRemoval.value
+  if (!pending) return
+  removePlaylistItem(pending.id, pending.index)
   playlists.value = listPlaylists()
+  pendingTrackRemoval.value = null
 }
 
 function togglePlaylist(id: string) {
@@ -1077,6 +1088,11 @@ async function runAction(
       :message="t('albums.playlists.deleteMessage')"
       :confirm-label="t('albums.playlists.deleteConfirm')" :cancel-label="t('common.cancel')"
       @cancel="pendingPlaylistRemoval = null" @confirm="confirmPlaylistRemoval" />
+    <AppConfirm :open="pendingTrackRemoval !== null" :z-index="150" danger
+      :title="t('albums.playlists.removeTrackTitle')"
+      :message="t('albums.playlists.removeTrackMessage', { title: pendingTrackRemoval?.title ?? '', name: pendingTrackRemoval?.name ?? '' })"
+      :confirm-label="t('albums.playlists.removeTrackConfirm')" :cancel-label="t('common.cancel')"
+      @cancel="pendingTrackRemoval = null" @confirm="confirmTrackRemoval" />
   </section>
 </template>
 

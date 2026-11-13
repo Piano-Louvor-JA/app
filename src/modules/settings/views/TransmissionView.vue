@@ -2,9 +2,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppConfirm from '@shared/components/AppConfirm.vue'
-import SettingsToggle from '../components/SettingsToggle.vue'
 import TransmissionAddDialog from '../components/TransmissionAddDialog.vue'
-import TransmissionAudioOptions from '../components/TransmissionAudioOptions.vue'
+import TransmissionBehaviorCard from '../components/TransmissionBehaviorCard.vue'
 import TransmissionConnectionCard from '../components/TransmissionConnectionCard.vue'
 import TransmissionNetworkCard from '../components/TransmissionNetworkCard.vue'
 import TransmissionQrDialog from '../components/TransmissionQrDialog.vue'
@@ -173,13 +172,6 @@ function reload(id: string) {
 
 const qr = ref<{ url: string; title: string } | null>(null)
 
-const preserve = ref(false)
-async function changePreserve(enabled: boolean) {
-  pageError.value = ''
-  try { preserve.value = await palcoSession.setConnectionPersistence(enabled) }
-  catch { pageError.value = t('settings.transmission.behavior.preserveFailed') }
-}
-
 const steps = computed(() => [1, 2, 3, 4].map((step) => t(`settings.transmission.howTo.step${step}`)))
 
 /** Espaço ao lado do título de Configurações; fora dela o status fica na barra. */
@@ -187,7 +179,6 @@ const headerAside = ref<HTMLElement | null>(null)
 
 onMounted(() => {
   headerAside.value = document.getElementById('settings-header-aside')
-  void palcoSession.getConnectionPersistence().then((enabled) => { preserve.value = enabled }).catch(() => {})
 })
 </script>
 
@@ -231,18 +222,7 @@ onMounted(() => {
 
     <TransmissionNetworkCard class="transmission-view__section" :locked="onAir.length > 0" @changed="refresh" />
 
-    <section class="transmission-view__section" aria-labelledby="transmission-behavior-title">
-      <h2 id="transmission-behavior-title" class="transmission-view__title">{{ t('settings.transmission.behavior.title') }}</h2>
-      <TransmissionAudioOptions />
-      <div class="transmission-view__row">
-        <span class="transmission-view__label">
-          {{ t('settings.transmission.behavior.preserve') }}
-          <small class="transmission-view__hint">{{ t('settings.transmission.behavior.preserveHint') }}</small>
-        </span>
-        <SettingsToggle data-test="preserve-connections" :model-value="preserve"
-          :label="t('settings.transmission.behavior.preserve')" @update:model-value="changePreserve" />
-      </div>
-    </section>
+    <TransmissionBehaviorCard @error="pageError = $event" />
 
     <section class="transmission-view__section" aria-labelledby="transmission-how-to-title">
       <h2 id="transmission-how-to-title" class="transmission-view__title">{{ t('settings.transmission.howTo.title') }}</h2>

@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { getCurrentApiPrefix } from '@modules/sync/services/api-prefix'
 import { useScheduledStore } from './useScheduledStore'
 import { computed, onScopeDispose, ref } from 'vue'
 import type { Router } from 'vue-router'
@@ -506,10 +507,11 @@ export const useLiturgyStore = defineStore('liturgy', () => {
       customLiturgies: customLiturgies.value,
       deletionLocks: deletionLocks.value,
     })
+  try { localStorage.setItem(`sync.modified.v1.liturgy.${getCurrentApiPrefix()}`, new Date().toISOString()) } catch { /* storage indisponível não impede a edição local */ }
     // sync v2 (app#336): toda mutação enfileira no outbox (local-first) e
     // agenda flush em bg — sem rede o item fica na fila (nada se perde).
     try {
-      enqueueOperatorState('liturgy', 'week', {
+      enqueueOperatorState('liturgy', getCurrentApiPrefix(), {
         weekdays: weekdays.value,
         dayNotes: dayNotes.value,
         daySessionTimes: daySessionTimes.value,

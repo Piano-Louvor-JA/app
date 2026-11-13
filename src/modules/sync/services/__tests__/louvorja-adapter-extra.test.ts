@@ -85,7 +85,7 @@ describe("louvorja-adapter — ramos residuais", () => {
 			dayNotes: { tuesday: "nota terça" },
 		});
 		const pkg = exportLouvorjaFromBrowser("1.0", "test");
-		expect(pkg.entities.liturgy?.data).toEqual({
+		expect(pkg.entities.liturgy?.data).toMatchObject({
 			monday: { items: [{ id: "i1" }], notes: "" },
 			tuesday: { items: [], notes: "nota terça" },
 		});

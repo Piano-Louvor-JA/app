@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 
 import MainScreenOptionsCard from '../components/MainScreenOptionsCard.vue'
 import MonitorArrangementCard from '../components/MonitorArrangementCard.vue'
+import MonitorShareCard from '../components/MonitorShareCard.vue'
 import MultiScreenSelectCard from '../components/MultiScreenSelectCard.vue'
 import ReturnScreenOptionsCard from '../components/ReturnScreenOptionsCard.vue'
 import { useProjectionSettings } from '../composables/useProjectionSettings'
@@ -29,7 +30,10 @@ onMounted(() => {
     <MonitorArrangementCard />
 
     <div class="projection-settings__split">
-      <MultiScreenSelectCard />
+      <div class="projection-settings__stack">
+        <MultiScreenSelectCard />
+        <MonitorShareCard />
+      </div>
       <div class="projection-settings__stack">
         <MainScreenOptionsCard />
         <ReturnScreenOptionsCard />

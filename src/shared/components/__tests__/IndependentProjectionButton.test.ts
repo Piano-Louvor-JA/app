@@ -62,6 +62,22 @@ vi.mock('@modules/settings/composables/useObsConnections', () => ({
   useObsConnections: () => ({ activeConnections: obsOutputs }),
 }))
 
+const palco = vi.hoisted(() => ({
+  available: false,
+  tvs: [] as Array<Record<string, unknown>>,
+  changed: null as null | (() => void),
+  pin: vi.fn(async () => true),
+  stop: vi.fn(),
+}))
+vi.mock('@modules/settings/services/palco-clients', () => ({
+  hasPalcoClients: () => palco.available,
+  listPalcoTvs: vi.fn(async () => palco.tvs.map(tv => ({ ...tv }))),
+  onPalcoClientsChanged: (cb: () => void) => { palco.changed = cb; return palco.stop },
+  setPalcoTvPinned: (...args: unknown[]) => palco.pin(...(args as [])),
+  palcoTvKey: (tv: { id?: string | null; ip: string; platform: string }) => tv.id ? tv.id : `${tv.ip}|${tv.platform}`,
+}))
+import { tvAssignments } from '@modules/settings/services/palco-tv-assignments'
+
 import IndependentProjectionButton from '../IndependentProjectionButton.vue'
 
 const EXTENDED = [
@@ -106,6 +122,33 @@ describe('IndependentProjectionButton', () => {
     const stopButton = menu.querySelector('[data-testid="independent-projection-stop"]')!
     const modes = menu.querySelector('.independent-projection__modes')!
     expect(stopButton.compareDocumentPosition(modes) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    wrapper.unmount()
+  })
+
+  it('abre como popup no centro, com fundo; fecha pelo X e pelo fundo', async () => {
+    const wrapper = mountButton()
+    const trigger = wrapper.get('[data-testid="independent-projection-trigger"]')
+    await trigger.trigger('click')
+    const overlay = document.body.querySelector('[data-testid="independent-projection-overlay"]') as HTMLElement
+    expect(overlay).not.toBeNull()
+    expect(overlay.contains(panel())).toBe(true)
+    expect(panel()!.style.width).toContain('28rem')
+    ;(document.body.querySelector('[data-testid="independent-projection-close"]') as HTMLButtonElement).click()
+    await flushPromises()
+    expect(panel()).toBeNull()
+
+    await trigger.trigger('click')
+    const backdrop = document.body.querySelector('[data-testid="independent-projection-overlay"]')!
+    backdrop.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+    await flushPromises()
+    expect(panel()).toBeNull()
+    wrapper.unmount()
+  })
+
+  it('monitores aparecem sob o título Conexões Cabeadas', async () => {
+    const wrapper = mountButton()
+    await wrapper.get('[data-testid="independent-projection-trigger"]').trigger('click')
+    expect(panel()!.querySelector('[data-testid="independent-wired-title"]')?.textContent).toContain('monitors.wiredTitle')
     wrapper.unmount()
   })
 
@@ -417,5 +460,63 @@ describe('IndependentProjectionButton', () => {
     await trigger.trigger('click')
     expect(panel()!.querySelector('[data-testid="independent-projection-stop"]')).toBeNull()
     wrapper.unmount()
+  })
+
+  describe('TVs com Palco', () => {
+    const tv = (extra: Record<string, unknown> = {}) => ({
+      uid: 'u1', slotId: '0', slotLabel: 'Principal', ip: '10.0.0.5', platform: 'webos',
+      name: 'TV da entrada', version: '0.3.1', id: 'a', muted: false, ...extra,
+    })
+    beforeEach(() => {
+      palco.available = true
+      palco.tvs = [tv(), tv({ uid: 'u2', id: 'b', name: 'TV LG' })]
+      palco.pin.mockClear()
+      tvAssignments.value = {}
+    })
+
+    it('lista as TVs e projeta o módulo só na TV marcada', async () => {
+      monitors.value = []
+      const wrapper = mountButton({ moduleId: 'bible' })
+      await flushPromises()
+      await wrapper.get('[data-testid="independent-projection-trigger"]').trigger('click')
+      await flushPromises()
+      const title = panel()!.querySelector('[data-testid="independent-palco-title"]')
+      expect(title?.textContent).toContain('palcoOutputs.title')
+      const first = panel()!.querySelector('[data-palco-tv="u1"]') as HTMLButtonElement
+      first.click()
+      await flushPromises()
+      expect(tvAssignments.value).toEqual({ a: 'bible' })
+      expect(palco.pin).toHaveBeenCalledWith(expect.objectContaining({ uid: 'u1' }), true)
+      expect(first.getAttribute('aria-checked')).toBe('true')
+      expect(wrapper.get('[data-testid="independent-projection-trigger"]').classes().join(' ')).toContain('active')
+
+      first.click()
+      await flushPromises()
+      expect(tvAssignments.value).toEqual({})
+      expect(palco.pin).toHaveBeenLastCalledWith(expect.objectContaining({ uid: 'u1' }), false)
+      wrapper.unmount()
+      expect(palco.stop).toHaveBeenCalled()
+    })
+
+    it('encerrar devolve as TVs do módulo à transmissão', async () => {
+      tvAssignments.value = { a: 'clock', b: 'bible' }
+      const wrapper = mountButton({ moduleId: 'clock' })
+      await flushPromises()
+      await wrapper.get('[data-testid="independent-projection-trigger"]').trigger('click')
+      await flushPromises()
+      ;(panel()!.querySelector('[data-testid="independent-projection-stop"]') as HTMLButtonElement).click()
+      await flushPromises()
+      expect(tvAssignments.value).toEqual({ b: 'bible' })
+      wrapper.unmount()
+    })
+
+    it('módulos sem desenho independente (obs=false) não listam TVs', async () => {
+      const wrapper = mountButton({ moduleId: 'annotation', obs: false })
+      await flushPromises()
+      await wrapper.get('[data-testid="independent-projection-trigger"]').trigger('click')
+      await flushPromises()
+      expect(panel()!.querySelector('[data-testid="independent-palco-title"]')).toBeNull()
+      wrapper.unmount()
+    })
   })
 })

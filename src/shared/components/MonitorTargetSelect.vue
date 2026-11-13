@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { useObsConnections } from '@modules/settings/composables/useObsConnections'
 import { obsConnectionName, selectObsConnection } from '@modules/settings/services/obs-connections'
+import {
+  hasPalcoClients,
+  listPalcoTvs,
+  onPalcoClientsChanged,
+  setPalcoTvMuted,
+  type PalcoClient,
+} from '@modules/settings/services/palco-clients'
 
 import { useMonitorTargetSelect } from "@shared/composables/useMonitorTargetSelect";
 import {
@@ -48,6 +55,22 @@ function openObsSettings() {
   void router.push({ name: "settings-transmission" });
 }
 const { activeConnections: obsOutputs } = useObsConnections();
+
+// TVs com o app Palco: ✓ = recebe a transmissão; desmarcada fica na espera.
+const palcoAvailable = hasPalcoClients();
+const palcoTvs = ref<PalcoClient[]>([]);
+async function refreshPalcoTvs() {
+  if (palcoAvailable) palcoTvs.value = await listPalcoTvs();
+}
+async function togglePalcoTv(tv: PalcoClient, checked: boolean) {
+  await setPalcoTvMuted(tv, !checked);
+  await refreshPalcoTvs();
+}
+function openPalcoSettings() {
+  close();
+  void router.push({ name: "settings-palco" });
+}
+let stopPalcoWatch: (() => void) | null = null;
 const rootEl = ref<HTMLElement | null>(null);
 const panelEl = ref<HTMLElement | null>(null);
 const panelStyle = ref<Record<string, string>>({});
@@ -140,16 +163,23 @@ onMounted(() => {
 	document.addEventListener("pointerdown", onDocumentPointerDown, true);
 	window.addEventListener("resize", onWindowChange);
 	window.addEventListener("scroll", onWindowChange, true);
+	if (palcoAvailable) {
+		stopPalcoWatch = onPalcoClientsChanged(() => {
+			if (open.value) void refreshPalcoTvs();
+		});
+	}
 });
 
 onBeforeUnmount(() => {
 	document.removeEventListener("pointerdown", onDocumentPointerDown, true);
 	window.removeEventListener("resize", onWindowChange);
 	window.removeEventListener("scroll", onWindowChange, true);
+	stopPalcoWatch?.();
 });
 
 watch(open, async (isOpen) => {
 	if (!isOpen) return;
+	void refreshPalcoTvs();
 	await refresh();
 	await nextTick();
 	updatePanelPosition();
@@ -213,7 +243,7 @@ watch(open, async (isOpen) => {
       >
         <div class="monitor-target-select__header">
           <p class="monitor-target-select__title">
-            {{ t('monitors.selectScreens') }}
+            <i class="ti ti-device-desktop" aria-hidden="true" /> {{ t('monitors.wiredTitle') }}
           </p>
           <button
             type="button"
@@ -316,6 +346,31 @@ watch(open, async (isOpen) => {
             </label>
           </li>
         </ul>
+        <template v-if="palcoAvailable">
+          <div class="obs-outputs-separator" role="separator" />
+          <p class="obs-outputs-active" data-testid="palco-outputs-title">
+            <i class="ti ti-device-tv" aria-hidden="true" /> {{ t('palcoOutputs.title') }}
+          </p>
+          <button v-if="!palcoTvs.length" type="button" class="obs-outputs-empty" data-testid="palco-outputs-empty"
+            @click="openPalcoSettings">
+            {{ t('palcoOutputs.empty') }} <i class="ti ti-arrow-right" aria-hidden="true" />
+          </button>
+          <ul v-else class="monitor-target-select__list" :aria-label="t('palcoOutputs.title')">
+            <li v-for="tv in palcoTvs" :key="tv.uid">
+              <label class="monitor-target-select__option" :class="{ 'monitor-target-select__option--active': !tv.muted }">
+                <input type="checkbox" class="monitor-target-select__checkbox" :checked="!tv.muted" :disabled="disabled"
+                  :data-testid="`palco-output-${tv.uid}`"
+                  @change="togglePalcoTv(tv, ($event.target as HTMLInputElement).checked)">
+                <span class="monitor-target-select__option-body">
+                  <span class="monitor-target-select__option-name">{{ tv.name }}</span>
+                  <span class="monitor-target-select__option-meta">
+                    {{ tv.muted ? t('palcoOutputs.onHold', { slot: tv.slotLabel }) : tv.slotLabel }}
+                  </span>
+                </span>
+              </label>
+            </li>
+          </ul>
+        </template>
       </div>
     </Teleport>
   </div>
@@ -509,10 +564,14 @@ watch(open, async (isOpen) => {
 }
 
 .monitor-target-select__title {
+  /* Mesmo padrão de "Conexões Remotas" e "TVs com Palco". */
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
   margin: 0;
-  font-size: 0.8rem;
+  color: #4ade80;
+  font-size: 0.78rem;
   font-weight: 700;
-  color: var(--ds-color-on-surface);
 }
 
 .monitor-target-select__identify {

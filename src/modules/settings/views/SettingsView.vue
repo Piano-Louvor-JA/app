@@ -21,6 +21,10 @@ const activeSection = computed<SettingsSectionId>(() => {
   return match?.id ?? 'appearance'
 })
 
+// Dentro de Conexões remotas, o voltar leva ao agregador (como Utilitários).
+const CONNECTION_MODULES = ['settings-transmission', 'settings-remote', 'settings-palco']
+const inConnectionModule = computed(() => CONNECTION_MODULES.includes(String(route.name ?? '')))
+
 const isAppearance = computed(() => activeSection.value === 'appearance')
 
 const sectionTitleKey = computed(
@@ -28,7 +32,7 @@ const sectionTitleKey = computed(
 )
 
 function goBack() {
-  void router.push({ name: 'home' })
+  void router.push({ name: inConnectionModule.value ? 'settings-connections' : 'home' })
 }
 
 // O estado das abas já vive nas stores; o retrato guarda só a rolagem e a miniatura.

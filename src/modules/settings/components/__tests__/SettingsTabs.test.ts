@@ -21,6 +21,7 @@ const i18n = createI18n({
 			"settings.tabs.projection": "Projeção",
 			"settings.tabs.remote": "Remoto",
 			"settings.tabs.transmission": "Transmissão",
+			"settings.tabs.connections": "Conexões remotas",
 		},
 	},
 });
@@ -46,6 +47,16 @@ const routes = [
 	{
 		path: "/remote",
 		name: "settings-remote",
+		component: { template: "<div />" },
+	},
+	{
+		path: "/palco",
+		name: "settings-palco",
+		component: { template: "<div />" },
+	},
+	{
+		path: "/connections",
+		name: "settings-connections",
 		component: { template: "<div />" },
 	},
 ];
@@ -102,11 +113,25 @@ describe("SettingsTabs", () => {
 	});
 });
 
-it('opens the transmission settings tab', async () => {
+it('Conexões remotas abre o agregador', async () => {
   const { wrapper, router } = await mountTabs('settings-general')
-  const button = wrapper.findAll('button').find(button => button.text() === 'Transmissão')!
+  const button = wrapper.findAll('button').find(button => button.text() === 'Conexões remotas')!
   await button.trigger('click')
   await new Promise(resolve => setTimeout(resolve, 0))
-  expect(router.currentRoute.value.name).toBe('settings-transmission')
+  expect(router.currentRoute.value.name).toBe('settings-connections')
   wrapper.unmount()
 })
+
+it.each(['settings-connections', 'settings-transmission', 'settings-remote', 'settings-palco'])(
+  'Conexões remotas fica ativa em %s e não navega de novo ao clicar',
+  async (name) => {
+    const { wrapper, router } = await mountTabs(name)
+    const active = wrapper.findAll('.settings-tabs__item--active')
+    expect(active.map(item => item.text())).toEqual(['Conexões remotas'])
+    expect(wrapper.text()).not.toContain('Transmissão')
+    await active[0]!.trigger('click')
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(router.currentRoute.value.name).toBe(name)
+    wrapper.unmount()
+  },
+)

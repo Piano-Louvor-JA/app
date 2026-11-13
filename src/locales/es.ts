@@ -1,4 +1,5 @@
 export default {
+  palcoOutputs: { title: 'TVs con Escenario', empty: 'Ninguna TV con el Escenario conectada. Ver en Escenario', onHold: '{slot} · en espera' },
   obsOutputs: { detecting: 'Detectando y actualizando conexiones OBS…', active: 'Conexiones remotas', activateHint: 'Active una conexión en Configuración → Transmisión para usarla aquí.', title: 'Conexiones OBS', activeConnections: 'Conexiones activas: {count}' },
   floating: { closeTitle: '¿Cerrar {title}?', closeMessage: '¿Desea detener este recurso y cerrar su proyección?' },
   updates: {
@@ -47,6 +48,12 @@ export default {
     stop: 'Detener proyección independiente',
     sharedOn: 'Proyección compartida en el monitor {index}',
     modeLabel: 'Modo de proyección',
+    status: {
+      stop: 'Detener',
+      overlay: 'Superponiendo en:',
+      share: 'Compartiendo en:',
+      monitor: 'Monitor {index}',
+    },
     mode: {
       overlay: 'Superponer',
       share: 'Compartir',
@@ -54,6 +61,7 @@ export default {
     hintShare: 'Elige un monitor. Su pantalla se divide a la mitad con lo que ya se está proyectando; si un lado sale, el otro vuelve a ocupar toda la pantalla.',
   },
   monitors: {
+    wiredTitle: 'Conexiones por cable',
     selectScreens: 'Seleccionar pantallas',
     identify: 'Detectar pantallas',
     hint: 'Comprobar los monitores donde se debe proyectar el recurso.',
@@ -95,6 +103,16 @@ export default {
       editor: 'Editor',
     },
     },
+  connectedDevices: {
+    title: 'Dispositivos conectados',
+    remote: 'Control remoto',
+    speaker: 'Pasador del predicador',
+    monitors: 'Compartir monitores',
+    none: 'Ninguno conectado',
+    monitorsInUse: '{device} ({host}) · {n} monitor(es)',
+    palco: 'Escenario (TVs)',
+    palcoTv: '{name} · {ip}',
+  },
   minimize: {
     playlistCount: '{n} lista(s)',
     pageNumber: 'Página {n}',

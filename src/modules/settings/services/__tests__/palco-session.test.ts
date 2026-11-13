@@ -151,6 +151,15 @@ describe('sem electron (sem bridge)', () => {
 })
 
 describe('com electron', () => {
+  it('tela dividida de uma TV do Palco vai só para ela (tvShare)', () => {
+    const palco = fullMock()
+    setBridge(palco)
+    palcoSession.syncTvShare('0#c1', true)
+    expect(palco.send).toHaveBeenCalledWith({ v: 2, type: 'tvShare', enabled: true }, '0#c1')
+    setBridge(null)
+    palcoSession.syncTvShare('0#c1', false)
+    expect(palco.send).toHaveBeenCalledTimes(1)
+  })
   it('isElectron true, slots/create/remove/start/stop delegam', async () => {
     const palco = fullMock()
     setBridge(palco)

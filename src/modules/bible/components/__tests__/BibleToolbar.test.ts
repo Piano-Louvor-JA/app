@@ -13,7 +13,7 @@ vi.mock('../../../settings/components/StagePaletteButton.vue', () => ({
 }))
 
 import BibleToolbar from '../BibleToolbar.vue'
-import type { BibleVersion } from '../types/bible'
+import type { BibleBook, BibleVersion } from '../../types/bible'
 
 const i18n = createI18n({
   legacy: false,
@@ -34,6 +34,10 @@ const i18n = createI18n({
   },
 })
 
+const books: BibleBook[] = [
+  { id: 43, name: 'João', abbreviation: 'Jo', chapters: 21, bookNumber: 43, languageId: 'pt' },
+]
+
 const versions: BibleVersion[] = [
   { id: 1, name: 'Almeida', abbreviation: 'ARC' },
 ]
@@ -45,7 +49,7 @@ function createWrapper(props: Record<string, unknown> = {}) {
       selectedVersionId: 1,
       locationLabel: 'Gn 1:1',
       showNavPanel: false,
-      bibleSearchQuery: '',
+      books,
       ...props,
     },
     global: { plugins: [i18n] },
@@ -63,11 +67,19 @@ describe('BibleToolbar', () => {
     expect(wrapper.find('.bible-toolbar__location').text()).toBe('Nenhum local')
   })
 
-  it('digitar busca emite update:bibleSearchQuery', async () => {
+  it('busca inteligente: abre o modal, digitar "amor" + Enter emite searchText', async () => {
     const wrapper = createWrapper()
-    await wrapper.find('.bible-toolbar__search-input').setValue('amor')
-    expect(wrapper.emitted('update:bibleSearchQuery')).toBeTruthy()
-    expect(wrapper.emitted('update:bibleSearchQuery')![0]).toEqual(['amor'])
+    expect(wrapper.find('.smart-search__trigger').exists()).toBe(true)
+    await wrapper.find('.smart-search__trigger').trigger('click')
+    const input = document.body.querySelector('.smart-search__input') as HTMLInputElement
+    expect(input).not.toBeNull()
+    input.value = 'amor'
+    input.dispatchEvent(new Event('input'))
+    await wrapper.vm.$nextTick()
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    await wrapper.vm.$nextTick()
+    expect(wrapper.emitted('searchText')![0]).toEqual(['amor'])
+    wrapper.unmount()
   })
 
   it('browse nav fechado: label versículos + ícone book', () => {

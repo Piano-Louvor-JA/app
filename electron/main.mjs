@@ -22,6 +22,7 @@ import { registerDiagnosticsIpc, setClockSkewProvider, setDiagnosticsToken } fro
 import { createMainLogger } from "./main-log.mjs";
 import { attachHistoryAppCommand, attachWindowStateEvents, mainWindowChromeOptions, registerWindowIpc } from "./ipc/window.mjs";
 import { attachRemoteServer } from "./remote-server.mjs";
+import { attachMonitorShare } from "./monitor-share.mjs";
 import { attachPalcoServer, getPalcoManager } from "./palco-server.mjs";
 import { ensureWorkspaceDirectories } from "./paths.mjs";
 import { registerLocalFileProtocol, registerLocalScheme, setOnlineVideoSource } from "./protocol.mjs";
@@ -988,6 +989,8 @@ app.whenReady().then(async () => {
 			palcoHttpPort: () => getPalcoManager()?.getPrincipal()?.httpPort,
 		});
 		attachPalcoServer(() => mainWindow?.webContents ?? null);
+		// Compartilhar monitores com o app mobile (porta 48090).
+		attachMonitorShare(() => mainWindow?.webContents ?? null);
 	} catch (error) {
 		console.error("[main] falha no startup", error);
 		mainLog.error(`startup failure ${error instanceof Error ? error.stack ?? error.message : String(error ?? '')}`);

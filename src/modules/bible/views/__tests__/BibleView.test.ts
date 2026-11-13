@@ -64,8 +64,8 @@ const i18n = createI18n({
 
 const ToolbarStub = {
   name: 'BibleToolbar',
-  template: `<div class="toolbar-stub"><button class="toolbar-btn" @click="$emit('toggle-nav')" /><button class="toolbar-version" @click="$emit('select-version', 2)" /><button class="toolbar-search" @click="$emit('update:bible-search-query', 'amor')" /></div>`,
-  emits: ['select-version', 'toggle-nav', 'update:bible-search-query'],
+  template: `<div class="toolbar-stub"><button class="toolbar-btn" @click="$emit('toggle-nav')" /><button class="toolbar-version" @click="$emit('select-version', 2)" /><button class="toolbar-search" @click="$emit('search-text', 'amor')" /><button class="toolbar-passage" @click="$emit('open-passage', 1, 2, [3])" /></div>`,
+  emits: ['select-version', 'toggle-nav', 'search-text', 'open-passage'],
 }
 const NavStub = {
   name: 'BibleNavPanel',
@@ -85,7 +85,6 @@ const ReaderStub = {
   </div>`,
   emits: ['update:verse-search-query', 'select-verse', 'previous-verse', 'next-verse', 'clear-projection'],
 }
-const PalcoStub = { name: 'PalcoRouteSelect', template: '<div class="palco-route-stub" />' }
 
 function mountView() {
   return mount(BibleView, {
@@ -95,7 +94,6 @@ function mountView() {
         BibleToolbar: ToolbarStub,
         BibleNavPanel: NavStub,
         BibleVerseList: ReaderStub,
-        PalcoRouteSelect: PalcoStub,
       },
     },
   })
@@ -110,7 +108,7 @@ describe('BibleView — estados do template', () => {
     for (const fn of [
       'clearError', 'selectVersion', 'selectBook', 'selectChapter', 'selectVerse',
       'clearSelection', 'goToAdjacentVerse', 'setTestamentFilter', 'toggleNavPanel',
-      'refresh',
+      'refresh', 'applyPassage',
     ]) {
       mockState[fn] = vi.fn()
     }
@@ -157,14 +155,16 @@ describe('BibleView — estados do template', () => {
     expect(w.find('.bible-view__state').exists()).toBe(true)
   })
 
-  it('toolbar emite: select-version, toggle-nav e search query', async () => {
+  it('toolbar emite: select-version, toggle-nav, search-text e open-passage', async () => {
     const w = mountView()
     await w.find('.toolbar-version').trigger('click')
     expect(mockState.selectVersion).toHaveBeenCalledWith(2)
     await w.find('.toolbar-btn').trigger('click')
     expect(mockState.toggleNavPanel).toHaveBeenCalled()
     await w.find('.toolbar-search').trigger('click')
-    expect(defaults.globalSearchQuery.value).toBe('amor')
+    expect(defaults.verseSearchQuery.value).toBe('amor')
+    await w.find('.toolbar-passage').trigger('click')
+    expect(mockState.applyPassage).toHaveBeenCalledWith(1, 2, [3])
   })
 
   it('nav panel emite: select-book, select-chapter e queries', async () => {
