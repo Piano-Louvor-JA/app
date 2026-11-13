@@ -70,6 +70,12 @@ describe('palco-discovery', () => {
     expect(subnetPrefix('192.168.0.130')).toBe('192.168.0')
     expect(subnetPrefix('127.0.0.1')).toBeNull()
     expect(subnetPrefix('x')).toBeNull()
+    // Só rede privada: IP público não vira varredura de 254 endereços.
+    expect(subnetPrefix('10.0.0.7')).toBe('10.0.0')
+    expect(subnetPrefix('172.20.1.5')).toBe('172.20.1')
+    expect(subnetPrefix('8.8.8.8')).toBeNull()
+    expect(subnetPrefix('172.32.0.1')).toBeNull()
+    expect(subnetPrefix('192.168.0.300')).toBeNull()
   })
 
   it('reconhece TV LG pela resposta DIAL', () => {

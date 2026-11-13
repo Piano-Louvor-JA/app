@@ -9,11 +9,19 @@ import { Socket } from 'node:net'
 export const DIAL_PORT = 1926
 export const WAKE_PORT = 7082
 
-/** '192.168.0.130' → '192.168.0'; null para IP inválido/loopback. */
+/**
+ * '192.168.0.130' → '192.168.0'; null para IP inválido, loopback ou fora da
+ * rede privada (10/8, 172.16/12, 192.168/16): a busca e o wake só falam com
+ * a rede local, nunca varrem endereços públicos.
+ */
 export function subnetPrefix(ip) {
-  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.\d{1,3}$/.exec(String(ip ?? ''))
-  if (!m || m[1] === '127') return null
-  return `${m[1]}.${m[2]}.${m[3]}`
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(String(ip ?? ''))
+  if (!m) return null
+  const [a, b, c, d] = m.slice(1).map(Number)
+  if ([a, b, c, d].some((n) => n > 255)) return null
+  const lan = a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)
+  if (!lan) return null
+  return `${a}.${b}.${c}`
 }
 
 /** Lê o nome da TV LG na resposta DIAL; null se não for TV LG. */
