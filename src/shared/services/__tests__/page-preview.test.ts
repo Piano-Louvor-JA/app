@@ -8,6 +8,8 @@ const originalBridge = window.louvorja
 function element(rect: Partial<DOMRect>) {
   const el = document.createElement('main')
   el.getBoundingClientRect = () => ({ x: 0, y: 0, width: 0, height: 0, ...rect }) as DOMRect
+  // Fora do documento o estilo computado vem vazio (como no navegador).
+  document.body.appendChild(el)
   return el
 }
 
@@ -23,6 +25,7 @@ function installBridge({ factor = 1, capture = vi.fn(async () => 'data:image/jpe
 
 afterEach(() => {
   window.louvorja = originalBridge
+  document.body.replaceChildren()
 })
 
 describe('capturePagePreview', () => {

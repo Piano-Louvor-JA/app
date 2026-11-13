@@ -119,6 +119,8 @@ function normalizeItem(raw: unknown): LiturgyItem | null {
       return single ? [single] : undefined
     })(),
     url: asString(source.url),
+    ...(typeof source.playerId === 'string' && source.playerId.trim() ? { playerId: source.playerId.trim() } : {}),
+    ...(['auto','powerpoint','libreoffice','onlyoffice','wps','keynote','calligra','custom'].includes(asString(source.presentationEngine)) ? { presentationEngine: source.presentationEngine as LiturgyItem['presentationEngine'] } : {}),
     ...(notesHtml ? { notesHtml } : {}),
     ...(titleColor ? { titleColor } : {}),
   }

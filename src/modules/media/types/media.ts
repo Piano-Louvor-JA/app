@@ -44,6 +44,8 @@ export type MediaTrackRecord = {
   albums: MediaAlbumRef[]
   categories: string[]
   lyrics: MediaLyricSlide[]
+  /** Estado de trabalho local (SPEC t_deed74b5) — ausente/remoto = published. */
+  status?: 'draft' | 'published'
 }
 
 export type MediaSession = {

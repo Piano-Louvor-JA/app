@@ -7,7 +7,6 @@ import { useRouter } from 'vue-router'
 import PageBackStack from '@shared/components/PageBackStack.vue'
 import { useMinimizablePage } from '@shared/composables/useMinimizablePage'
 
-import PalcoRouteSelect from '../../settings/components/PalcoRouteSelect.vue'
 import RandomAvailablePanel from '../components/RandomAvailablePanel.vue'
 import RandomConfigDialog from '../components/RandomConfigDialog.vue'
 import RandomHistoryPanel from '../components/RandomHistoryPanel.vue'
@@ -124,7 +123,6 @@ const effectiveConfig = computed(() => {
 <template>
   <section class="random-view">
     <header class="random-view__header">
-      <PalcoRouteSelect module="random" />
       <PageBackStack @minimize="minimize" @prepare="prepare">
         <button
           type="button"

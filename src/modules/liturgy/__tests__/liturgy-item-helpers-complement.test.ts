@@ -173,10 +173,12 @@ describe('liturgy-item-helpers mutation kill — complement (12 conditionals)', 
 
     it('type null → false', () => { expect(isLiturgyItemDraftValid({ ...baseDraft, type: null as any })).toBe(false) })
     it('name vazio → false', () => { expect(isLiturgyItemDraftValid({ ...baseDraft, name: '' })).toBe(false) })
-    it('category precisa startTime+endTime', () => {
+    it('category precisa startTime (end OPCIONAL — SPEC t_50c9ac95)', () => {
       expect(isLiturgyItemDraftValid({ ...baseDraft, type: 'category', startTime: '09:00', endTime: '10:00' })).toBe(true)
       expect(isLiturgyItemDraftValid({ ...baseDraft, type: 'category', startTime: '', endTime: '10:00' })).toBe(false)
-      expect(isLiturgyItemDraftValid({ ...baseDraft, type: 'category', startTime: '09:00', endTime: '' })).toBe(false)
+      // end vazio é válido; end preenchido inválido é rejeitado
+      expect(isLiturgyItemDraftValid({ ...baseDraft, type: 'category', startTime: '09:00', endTime: '' })).toBe(true)
+      expect(isLiturgyItemDraftValid({ ...baseDraft, type: 'category', startTime: '09:00', endTime: '25:00' })).toBe(false)
     })
     it('music precisa musicId', () => {
       expect(isLiturgyItemDraftValid({ ...baseDraft, musicId: null })).toBe(false)

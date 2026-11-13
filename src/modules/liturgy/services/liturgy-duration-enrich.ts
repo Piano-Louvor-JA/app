@@ -1,4 +1,9 @@
 import type { LiturgyItem, LiturgyMusicOption } from "../types/liturgy";
+import { normalizeLiturgyTimeHHmm } from "./liturgy-format";
+import {
+  resolveCategoryEndTime,
+  categoryEndSortKey,
+} from "./liturgy-item-helpers";
 
 /**
  * Enriquecimento de duração (t_14d066ea): música com `musicId` do catálogo
@@ -62,5 +67,38 @@ export function deriveSessionTimesFromCategories(
   return {
     startTime: current.startTime ?? first.startTime ?? null,
     endTime: current.endTime ?? last.endTime ?? null,
+  };
+}
+
+/* ---------- Sessão com categorias sem end (SPEC t_50c9ac95 B4) ---------- */
+
+/**
+ * Fim da sessão do dia (resumo do evento) considerando categorias sem endTime:
+ * usa o MAIOR entre (última categoria com end real) e (categoria com start +
+ * duração estimada dos filhos). Sem nenhum end nem duração → null.
+ * Regra B5: end real sempre vence a estimativa.
+ */
+export function computeSessionTimes(
+  items: LiturgyItem[],
+  opts: { esChildren?: Record<string, LiturgyItem[]> } = {},
+): { startTime: string | null; endTime: string | null } {
+  const categories = items.filter((i) => i.type === 'category' && i.startTime);
+  if (categories.length === 0) return { startTime: null, endTime: null };
+  const first = categories[0];
+  const cats = items.filter((i) => i.type === 'category' && i.startTime);
+  let latest = '';
+  let latestKey = -1;
+  for (const cat of cats) {
+    const children = opts.esChildren?.[cat.id] ?? [];
+    const key = categoryEndSortKey(cat, children);
+    const end = key != null ? resolveCategoryEndTime(cat, children) : null;
+    if (key != null && key > latestKey) {
+      latestKey = key;
+      latest = end ?? '';
+    }
+  }
+  return {
+    startTime: normalizeLiturgyTimeHHmm(first.startTime ?? null),
+    endTime: latest || null,
   };
 }

@@ -77,7 +77,7 @@ describe("MediaSlideStage — paridade StageSettings (scope hymns)", () => {
 		const w = mountStage({ lyric: "", title: "Maranata", isCover: true });
 		const style = w.find(".media-slide-stage__lyric--cover").attributes("style") ?? "";
 		expect(style).toContain("0.14em 0.28em");
-		expect(style).toContain("color-mix(in srgb, #f6c32a 40%, transparent)");
+		expect(style).toContain("color-mix(in srgb, rgb(246, 195, 42) 40%, transparent");
 	});
 
 	it("capa: sombra desligada não desenha o halo", () => {

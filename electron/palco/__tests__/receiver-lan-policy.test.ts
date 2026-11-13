@@ -51,8 +51,18 @@ describe.each(['receiver.html', 'index.html'])('%s — política LAN', file => {
     },
   )
 
+  // Decisão 2026-11-11: o transmissor pode estar em QUALQUER faixa IPv4
+  // (igrejas usam 10.x, 172.x, públicas ou de operadora). Só formato estrito.
+  it.each(['8.8.8.8', '172.15.0.1', '172.32.0.1', '100.64.0.7', '192.169.1.1'])(
+    'conecta no transmissor em qualquer faixa IPv4: %s', host => {
+      const { w, sockets } = receiver(file, host, '7083')
+      w.doConnect()
+      expect(new URL(sockets[0]!).hostname).toBe(host)
+    },
+  )
+
   it.each([
-    '8.8.8.8', '172.15.0.1', '172.32.0.1', '169.253.1.2', '192.169.1.1',
+    '0.0.0.0', '224.0.0.1', '255.255.255.255',
     'evil.example', 'localhost.evil.example', '127.0.0.1@evil.example',
     '127.1', '2130706433', '0x7f000001', '0127.0.0.1', '192.168.999.1',
     '192.168.1.2/other', '192.168.1.2?token=evil', '192.168.1.2#fragment',
@@ -72,9 +82,9 @@ describe.each(['receiver.html', 'index.html'])('%s — política LAN', file => {
     },
   )
 
-  it('sonda somente LAN e não segue redirects', async () => {
+  it('sonda só IPv4 bem formado e não segue redirects', async () => {
     const { w, fetch } = receiver(file, '192.168.1.25')
-    await expect(w.probeHttp('8.8.8.8', 7080)).resolves.toBeNull()
+    await expect(w.probeHttp('evil.example', 7080)).resolves.toBeNull()
     await expect(w.probeHttp('192.168.1.25', 65536)).resolves.toBeNull()
     expect(fetch).not.toHaveBeenCalled()
     fetch.mockImplementationOnce(() => Promise.resolve({ json: async () => ({ unlocked: true }) } as Response))
@@ -99,6 +109,12 @@ describe.each(['receiver.html', 'index.html'])('%s — política LAN', file => {
     chosen.fetch.mockImplementation(answer('7080'))
     await expect(chosen.w.probeSender('192.168.1.25')).resolves.toBeNull()
     expect(chosen.fetch).not.toHaveBeenCalledWith('http://192.168.1.25:7080/status', { redirect: 'error' })
+  })
+
+  it('mídia do próprio transmissor vale mesmo em faixa pública; outras públicas não', () => {
+    const { w } = receiver(file, '8.8.4.4')
+    expect(w.proxyUrl('http://8.8.4.4:7082/media/a.mp3')).toBe('http://8.8.4.4:7082/media/a.mp3')
+    expect(w.proxyUrl('http://8.8.8.8/a.png')).toBe('')
   })
 
   it('não permite destinos públicos ou esquemas executáveis nas mídias', () => {

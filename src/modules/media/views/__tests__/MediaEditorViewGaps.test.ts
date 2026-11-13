@@ -437,7 +437,7 @@ describe('MediaEditorView — export/import .slja e áudio', () => {
     const wrapper = await mountEditorWithMusic()
     await setInputFile(wrapper, '.editor__file-input', makeFile('musica.slja', 'application/zip'))
     expect(createCustomLyric).toHaveBeenCalledTimes(2)
-    expect(wrapper.text()).toContain('Importado: 2 estrofes de musica.slja')
+    expect(wrapper.text()).toContain('Importado: musica.slja')
   })
 
   it('import .slja inválido: notifica erro', async () => {

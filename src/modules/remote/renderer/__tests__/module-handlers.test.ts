@@ -94,6 +94,24 @@ describe('createModuleHandlers — execute por namespace', () => {
     handlers = createModuleHandlers(deps)
   })
 
+  it.each([false, true])('bible.select preserva projeção atual (%s)', async (projecting) => {
+    const bible = deps.bible as unknown as ReturnType<typeof makeBible> & { verses: unknown }
+    bible.isProjecting.value = projecting
+    bible.verses = { '1': 'Texto' }
+    expect(await handlers.execute('bible', 'bible.select', { bookId: 1, chapter: 2, verse: 1 })).toBe(true)
+    expect(bible.selectBook).toHaveBeenCalledWith(1)
+    expect(bible.selectChapter).toHaveBeenCalledWith(2)
+    expect(bible.selectVerse).toHaveBeenCalledWith(1)
+    expect(bible.openProjection).not.toHaveBeenCalled()
+    expect(bible.clearProjectionWindow).not.toHaveBeenCalled()
+    expect(bible.isProjecting.value).toBe(projecting)
+  })
+
+  it('snapshot da Bíblia envia o texto do capítulo para a prévia do operador', () => {
+    Object.assign(deps.bible!, { verses: ref({ '1': 'No princípio', '2': 'A terra' }) })
+    expect(handlers.snapshot('bible')).toMatchObject({ verses: { '1': 'No princípio', '2': 'A terra' } })
+  })
+
   // ===== bible =====
   it('bible.gotoChapter válido: seleciona livro/capítulo/verso e projeta', async () => {
     // aguardar verse aparecer — simulamos verses já no store via readField

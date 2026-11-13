@@ -19,6 +19,7 @@ import {
 	type LiturgyWeekday,
 } from "@modules/liturgy/types/liturgy";
 import { deriveSessionTimesFromCategories } from "@modules/liturgy/services/liturgy-duration-enrich";
+import { estimatedSessionEndSafe } from "@modules/liturgy/services/liturgy-item-helpers";
 import {
 	activeLiturgyStateKey,
 	normalizeLiturgyState,
@@ -118,7 +119,7 @@ export function exportLouvorjaFromBrowser(
 	);
 	if (liturgyState != null) {
 		// Schema 1 do APK: data = { monday: { items, notes }, ... }.
-		// Não exporta state do renderer: isso quebraria a ponta Flutter.
+		// Campos legados e estado completo coexistem para leitores antigos e atuais.
 		const days: Record<string, unknown> = {};
 		for (const day of LITURGY_WEEKDAYS) {
 			const items = (liturgyState.weekdays?.[day] ?? []).map((item) => {
@@ -134,11 +135,12 @@ export function exportLouvorjaFromBrowser(
 			const notes = liturgyState.dayNotes?.[day] ?? "";
 			if (items.length > 0 || notes.length > 0) days[day] = { items, notes };
 		}
-		if (Object.keys(days).length > 0) {
+		const hasExtra = (liturgyState.customLiturgies?.length ?? 0) > 0 || Object.keys(liturgyState.deletionLocks ?? {}).length > 0 || Object.values(liturgyState.daySessionTimes ?? {}).some((time) => time.startTime || time.endTime);
+		if (Object.keys(days).length > 0 || hasExtra) {
 			entities.liturgy = {
 				type: "liturgy",
 				modified: readModified(`liturgy.${activeLiturgyStateKey().split('.').pop()}`),
-				data: days,
+				data: { ...days, locale: activeLiturgyStateKey().split('.').pop(), state: (() => { const complete = structuredClone(liturgyState); const clean = (item: { type: string; musicId?: number | null }) => { if (item.type === 'music' && typeof item.musicId === 'number' && item.musicId < 0) item.musicId = null }; Object.values(complete.weekdays ?? {}).forEach(items => items.forEach(clean)); (complete.customLiturgies ?? []).forEach(custom => custom.items.forEach(clean)); return complete })() },
 			};
 		}
 	}
@@ -197,6 +199,17 @@ export function importLouvorjaIntoBrowser(
 	for (const [name, entity] of Object.entries(pkg.entities)) {
 		switch (name) {
 			case "liturgy": {
+				const complete = entity.data.state;
+				if (complete && typeof complete === 'object' && 'weekdays' in complete) {
+					const language = ['pt', 'en', 'es'].includes(String(entity.data.locale)) ? String(entity.data.locale) : activeLiturgyStateKey().split('.').pop()!;
+					const local = readModified(`liturgy.${language}`);
+					if (toEpoch(entity.modified) > toEpoch(local)) {
+						setUserPreference(activeLiturgyStateKey(language), normalizeLiturgyState(complete));
+						localStorage.setItem(`${SYNC_MODIFIED_PREFIX}.liturgy.${language}`, entity.modified);
+						applied.push('liturgy');
+					} else skipped.push('liturgy');
+					break;
+				}
 				localModified = readModified(`liturgy.${activeLiturgyStateKey().split('.').pop()}`);
 				packageModified = entity.modified;
 				const remoteEpoch = toEpoch(entity.modified);
@@ -222,10 +235,20 @@ export function importLouvorjaIntoBrowser(
 								startTime: null,
 								endTime: null,
 							};
-							const derivedSession = deriveSessionTimesFromCategories(
-								next.weekdays[day],
-								currentSession,
-							);
+							// SPEC t_50c9ac95 (B4/R1, review deleg_3ba5e284): derivar
+							// sessão considerando categorias SEM end — estimativa por
+							// durationMs dos filhos, wrap meia-noite; end real vence.
+							// Nunca sobrescreve sessão já definida nem grava vazio.
+							const items = next.weekdays[day] as import("@modules/liturgy/types/liturgy").LiturgyItem[];
+							const derivedStart =
+								currentSession.startTime ??
+								deriveSessionTimesFromCategories(items, currentSession).startTime;
+							const derivedEnd =
+								currentSession.endTime ?? estimatedSessionEndSafe(items, () => []);
+							const derivedSession =
+								derivedStart != null || derivedEnd != null
+									? { startTime: derivedStart, endTime: derivedEnd }
+									: currentSession;
 							if (next.daySessionTimes || derivedSession !== currentSession) {
 								next.daySessionTimes ??= {} as LiturgyPersistedState["daySessionTimes"];
 								next.daySessionTimes[day] = derivedSession;

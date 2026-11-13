@@ -178,6 +178,7 @@ export const useScheduledStore = defineStore('scheduled', {
         items: this.items,
       }
       setUserPreference(USER_PREFERENCE_KEYS.scheduledState, state)
+      try { localStorage.setItem('sync.modified.v1.scheduled', new Date().toISOString()) } catch { /* edição local continua sem storage */ }
       // sync v2 (app#349): toda mutação enfileira no outbox (local-first) e
       // agenda flush em bg — sem rede o item fica na fila (nada se perde).
       try {

@@ -104,6 +104,8 @@ const DEFAULT_SETTINGS = {
   boxBorder: false,
   footerRefColor: '#fff',
   footerRefWeight: 400,
+  refFontSize: null as number | null,
+  refTextTransform: 'none' as 'none' | 'uppercase' | 'capitalize',
   showBibleVersion: true,
   backgroundImage: 'official:bg-3',
   hymns: { overrideBg: false },
@@ -149,6 +151,15 @@ describe('sem electron (sem bridge)', () => {
 })
 
 describe('com electron', () => {
+  it('tela dividida de uma TV do Palco vai só para ela (tvShare)', () => {
+    const palco = fullMock()
+    setBridge(palco)
+    palcoSession.syncTvShare('0#c1', true)
+    expect(palco.send).toHaveBeenCalledWith({ v: 2, type: 'tvShare', enabled: true }, '0#c1')
+    setBridge(null)
+    palcoSession.syncTvShare('0#c1', false)
+    expect(palco.send).toHaveBeenCalledTimes(1)
+  })
   it('isElectron true, slots/create/remove/start/stop delegam', async () => {
     const palco = fullMock()
     setBridge(palco)
@@ -276,6 +287,21 @@ describe('com electron', () => {
     const payload = palco.send.mock.calls[0]?.[0] as Record<string, unknown>
     expect(payload.footerRef).toBe('João 1:1')
     expect(payload.footerVersion).toBeUndefined()
+  })
+
+  it('project bible: envia tamanho e transformação da referência', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    readEffectiveStageSettings.mockReturnValue({
+      ...readEffectiveStageSettings(),
+      bibleFontSize: 100,
+      refFontSize: 72,
+      refTextTransform: 'capitalize',
+    })
+    await palcoSession.project('bible', { text: 'No princípio', footerRef: 'João 1:1' })
+    const payload = palco.send.mock.calls[0]?.[0] as Record<string, unknown>
+    expect(payload.footerSize).toBe(40.5)
+    expect(payload.footerTransform).toBe('capitalize')
   })
 
   it('project bible: envia textTransform só quando não é none', async () => {

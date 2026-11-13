@@ -25,9 +25,6 @@ vi.mock('../../composables/useClock', () => ({
   useClockFeature: () => useClockFeatureMock,
 }))
 
-vi.mock('../../../settings/components/PalcoRouteSelect.vue', () => ({
-  default: { name: 'PalcoRouteSelect', props: ['module'], template: '<div class="palco-route-stub" />' },
-}))
 vi.mock('../../../settings/components/StageCustomizationDialog.vue', () => ({
   default: { name: 'StageCustomizationDialog', props: ['open', 'scope'], template: '<div class="stage-custom-dialog-stub" />' },
 }))

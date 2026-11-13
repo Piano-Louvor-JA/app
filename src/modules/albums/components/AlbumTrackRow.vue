@@ -19,6 +19,7 @@ const emit = defineEmits<{
   slides: []
   lyric: []
   playlist: []
+  suggestEdit: []
 }>()
 
 const rowHovered = ref(false)
@@ -118,6 +119,16 @@ function playSungFromRow() {
     </span>
 
     <div class="album-track-row__actions">
+      <button
+        type="button"
+        class="album-track-row__suggest-edit"
+        :disabled="busy || isDownloading"
+        :title="t('common.suggestFix')"
+        :aria-label="t('common.suggestFix')"
+        @click.stop="emit('suggestEdit')"
+      >
+        <i class="ti ti-pencil" aria-hidden="true" />
+      </button>
       <button
         type="button"
         class="album-track-row__playlist"
@@ -360,6 +371,20 @@ function playSungFromRow() {
   background: transparent;
   color: var(--ds-color-primary);
   cursor: pointer;
+}
+
+.album-track-row__suggest-edit {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.35rem;
+  background: transparent;
+  color: var(--ds-color-primary);
+  cursor: pointer;
+}
+
+.album-track-row__suggest-edit:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
 }
 
 .album-track-row__playlist:disabled {

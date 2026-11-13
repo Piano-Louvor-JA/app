@@ -147,9 +147,6 @@ vi.mock('@design-system/index', () => ({
   GlassCard: { template: '<div class="glass-card-stub"><slot /></div>' },
 }))
 
-vi.mock('@modules/settings/components/PalcoRouteSelect.vue', () => ({
-  default: { props: ['module', 'compact'], template: '<div class="prs-stub" />' },
-}))
 
 vi.mock('@modules/sync/components/DownloadFailureDialog.vue', () => ({
   default: { props: ['open'], template: '<div class="dfd-stub" />' },
@@ -669,8 +666,11 @@ describe('AlbumsView', () => {
     expect(pushMock).toHaveBeenCalledWith({ name: 'media' })
     // o nome da playlist vai para o título do player
     expect(playQueueMock).toHaveBeenCalledWith(expect.any(Array), 0, undefined, 'Com faixas')
-    // remover faixa
+    // remover faixa: o X pede confirmação; só sai depois de confirmar
     ;((body().querySelector('.albums-view__playlist') as HTMLElement).querySelector('.albums-view__playlist-track-remove') as HTMLElement).click()
+    await flushPromises()
+    expect(listPlaylists()[0]!.items).toHaveLength(1)
+    ;(body().querySelector('.app-confirm__btn--danger') as HTMLElement).click()
     await flushPromises()
     expect(listPlaylists()[0]!.items).toHaveLength(0)
     // toggle de novo colapsa

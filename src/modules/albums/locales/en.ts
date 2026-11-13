@@ -12,6 +12,9 @@ export default {
       show: 'Show My Collections',
     },
     playlists: {
+      removeTrackTitle: 'Remove from playlist?',
+      removeTrackMessage: '“{title}” leaves “{name}”. The song and downloaded files stay in the library.',
+      removeTrackConfirm: 'Remove',
       inPlaylist: 'Already in this playlist',
       addMusic: 'Add songs',
       addMusicHint: 'Add songs: search for songs for this playlist',

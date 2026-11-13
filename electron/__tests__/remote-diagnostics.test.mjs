@@ -71,7 +71,7 @@ describe('RF2/RF5 computeRemoteVerdict', () => {
     expect(computeRemoteVerdict(verdictInput({
       status: 'desligado',
       portaAtiva: null,
-      janelasPortasExcluidas: [{ start: 7069, end: 7179 }],
+      janelasPortasExcluidas: [{ start: 48078, end: 48089 }],
       selfProbe: null,
     }))).toBe('remote-porta-excluida')
   })

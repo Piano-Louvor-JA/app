@@ -74,6 +74,89 @@ afterEach(() => {
   dom = null
 })
 
+describe('independent-panel: controle remoto', () => {
+  type Control = {
+    snapshot: () => Promise<Record<string, unknown>>
+    setMode: (mode: string) => boolean
+    setTarget: (id: string, enabled: boolean) => boolean
+  }
+  function control() {
+    return (dom!.window as unknown as { __independentControl: Control }).__independentControl
+  }
+
+  it('descreve modo, monitores e conexões ativas', async () => {
+    setup(makeBridge({ enabled: [20] }))
+    await wait()
+
+    const snap = await control().snapshot()
+
+    expect(snap).toMatchObject({ mode: 'overlay', live: false, armed: false })
+    expect(snap.monitors).toEqual([
+      { id: 'monitor:20', label: 'Monitor 2', detail: '2560 × 1080', selected: false, onAir: false, enabled: true },
+      { id: 'monitor:30', label: 'Monitor 3', detail: '1080 × 2560', selected: false, onAir: false, enabled: false },
+    ])
+    expect((snap.remotes as unknown[])[0]).toMatchObject({ id: 'tv:7082', label: 'OBS', selected: false })
+  })
+
+  it('controle remoto vê conexão ligada mesmo sem cliente', async () => {
+    setup(makeBridge({
+      slots: [{ id: '7082', label: 'OBS', clients: 0, running: true }, { id: '7084', label: 'Off', clients: 0, running: false }],
+    }))
+    await wait()
+
+    const snapshot = await control().snapshot()
+
+    expect(snapshot.remotes.map((r: { id: string }) => r.id)).toEqual(['tv:7082'])
+  })
+
+  it('marcar destino só arma; a seta projeta', async () => {
+    const bridge = makeBridge()
+    const { $ } = setup(bridge)
+    await wait()
+
+    expect(control().setTarget('monitor:20', true)).toBe(true)
+    const snap = await control().snapshot()
+    expect(snap).toMatchObject({ armed: true, live: false })
+    expect(bridge.projection.openIndependent).not.toHaveBeenCalled()
+
+    $('#project')!.click()
+    await wait()
+    expect(bridge.projection.openIndependent).toHaveBeenCalledWith([20], 'overlay')
+  })
+
+  it('desmarcar remove o destino', async () => {
+    setup(makeBridge())
+    await wait()
+    control().setTarget('tv:7082', true)
+    control().setTarget('tv:7082', false)
+
+    expect(await control().snapshot()).toMatchObject({ armed: false })
+  })
+
+  it('recusa monitor desligado em Telas', async () => {
+    setup(makeBridge({ enabled: [20] }))
+    await wait()
+
+    expect(control().setTarget('monitor:30', true)).toBe(false)
+  })
+
+  it('troca de modo e recusa modo desconhecido', async () => {
+    setup(makeBridge())
+    await wait()
+
+    expect(control().setMode('share')).toBe(true)
+    expect(control().setMode('x')).toBe(false)
+    expect(await control().snapshot()).toMatchObject({ mode: 'share' })
+  })
+
+  it('recusa destino em formato desconhecido', async () => {
+    setup(makeBridge())
+    await wait()
+
+    expect(control().setTarget('outro:1', true)).toBe(false)
+  })
+})
+
 describe('independent-panel', () => {
   it('as 4 barras dos players carregam o espelho de rede e montam o painel', () => {
     for (const bar of BARS) {

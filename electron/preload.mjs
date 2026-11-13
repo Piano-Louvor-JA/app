@@ -79,13 +79,20 @@ contextBridge.exposeInMainWorld('louvorja', {
   platform: process.platform,
   isElectron: true,
 
-  // Controle remoto (APK via WS :7071): comandos chegam do main.
+  // Controle remoto (APK via WS :48080): comandos chegam do main.
+  monitorShare: {
+    get: () => ipcRenderer.invoke('monitor-share:get'),
+    set: (changes) => ipcRenderer.invoke('monitor-share:set', changes),
+    onChanged: (callback) => subscribe('monitor-share:changed', callback),
+  },
   remote: {
     onCommand: (callback) => subscribe('remote:command', callback),
     onStateRequest: (callback) => subscribe('remote:request-state', callback),
     sendAck: (ack) => ipcRenderer.send('remote:ack', ack),
     sendState: (state) => ipcRenderer.send('remote:state', state),
     pairingInfo: () => ipcRenderer.invoke('remote:pairing-info'),
+    resetToken: (role) => ipcRenderer.invoke('remote:token-reset', role),
+    disconnectSpeaker: () => ipcRenderer.invoke('remote:speaker-disconnect'),
     onClients: (callback) => subscribe('remote:clients', callback),
   },
 
@@ -113,6 +120,15 @@ contextBridge.exposeInMainWorld('louvorja', {
     onEvent: (callback) => subscribe('palco:event', callback),
     onReceiverConnected: (callback) => subscribe('palco:receiver-connected', callback),
     onReceiverDisconnected: (callback) => subscribe('palco:receiver-disconnected', callback),
+    // Módulo Palco (Configurações › Conexões remotas › Palco)
+    clients: () => ipcRenderer.invoke('palco:clients'),
+    clientCommand: (slotId, uid, command, args = {}) =>
+      ipcRenderer.invoke('palco:client-command', { ...args, slotId, uid, command }),
+    setClientMuted: (slotId, uid, muted) => ipcRenderer.invoke('palco:client-mute', { slotId, uid, muted }),
+    setClientPinned: (slotId, uid, pinned) => ipcRenderer.invoke('palco:client-pin', { slotId, uid, pinned }),
+    discover: () => ipcRenderer.invoke('palco:discover'),
+    wakeTv: (ip) => ipcRenderer.invoke('palco:wake-tv', { ip }),
+    onClientsChanged: (callback) => subscribe('palco:clients-changed', callback),
   },
 
   window: {
@@ -349,6 +365,9 @@ contextBridge.exposeInMainWorld('louvorja', {
     remoteSetCaptionsHidden: (hidden) => ipcRenderer.invoke('projection:remote-set-captions-hidden', hidden),
     remoteToggleMute: () => ipcRenderer.invoke('projection:remote-toggle-mute'),
     setAudioOutput: (mode) => ipcRenderer.invoke('projection:set-audio-output', mode),
+    getVideoControlSnapshot: () => ipcRenderer.invoke('projection:get-video-control-snapshot'),
+    runVideoControlCommand: (command) =>
+      ipcRenderer.invoke('projection:run-video-control-command', command),
     remoteSetVolume: (volume) =>
       ipcRenderer.invoke('projection:remote-set-volume', volume),
     getSourceMediaInfo: () =>
@@ -356,6 +375,8 @@ contextBridge.exposeInMainWorld('louvorja', {
     getPlaybackState: () => ipcRenderer.invoke('projection:get-playback-state'),
     getNavigationState: () => ipcRenderer.invoke('projection:get-navigation-state'),
     remoteGoBack: () => ipcRenderer.invoke('projection:remote-go-back'),
+    remoteNavigate: (url) => ipcRenderer.invoke('projection:remote-navigate', url),
+    remoteScroll: (ratio) => ipcRenderer.invoke('projection:remote-scroll', ratio),
     remoteGoForward: () => ipcRenderer.invoke('projection:remote-go-forward'),
     remoteReload: () => ipcRenderer.invoke('projection:remote-reload'),
     toggleSiteScreens: () => ipcRenderer.invoke('projection:toggle-site-screens'),
@@ -380,6 +401,10 @@ contextBridge.exposeInMainWorld('louvorja', {
     remotePptPrev: () => ipcRenderer.invoke('projection:remote-ppt-prev'),
     captureSourceFrame: () =>
       ipcRenderer.invoke('projection:capture-source-frame'),
+    captureSlidePreview: () =>
+      ipcRenderer.invoke('projection:capture-slide-preview'),
+    captureGalleryPreviews: () =>
+      ipcRenderer.invoke('projection:capture-gallery-previews'),
     getPptSlideState: () =>
       ipcRenderer.invoke('projection:get-ppt-slide-state'),
     getSiteTargetMonitors: () =>

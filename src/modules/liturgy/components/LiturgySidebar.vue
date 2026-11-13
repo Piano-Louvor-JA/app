@@ -11,6 +11,9 @@ defineProps<{
   startTimeInput: string
   endTimeInput: string
   notes: string
+  currentClock: string
+  /** SPEC t_50c9ac95 (B4): fim estimado da sessão (maior real/estimado). */
+  estimatedSessionEndLabel: string
 }>()
 
 const emit = defineEmits<{
@@ -137,6 +140,14 @@ function onEndTimeChange(event: Event) {
               />
             </button>
           </dd>
+          <!-- SPEC t_50c9ac95 (B4): sem end definido, mostra o fim estimado
+               (maior entre end real e estimado das categorias). -->
+          <dd
+            v-if="!endTimeInput && estimatedSessionEndLabel"
+            class="liturgy-sidebar__mono liturgy-sidebar__clock-now"
+          >
+            {{ t('liturgy.summary.estimatedEnd') }}: {{ estimatedSessionEndLabel }}
+          </dd>
         </div>
 
         <div class="liturgy-sidebar__stat">
@@ -150,6 +161,11 @@ function onEndTimeChange(event: Event) {
             }"
           >
             {{ remainingCountdown }}
+          </dd>
+          <!-- SPEC t_50c9ac95 (C1): hora atual ao vivo abaixo do cronômetro.
+               Reusa o tick único do useLiturgyClock via prop (sem 2º interval). -->
+          <dd class="liturgy-sidebar__mono liturgy-sidebar__clock-now">
+            {{ currentClock }}
           </dd>
         </div>
       </dl>
@@ -361,6 +377,14 @@ function onEndTimeChange(event: Event) {
   &--expired {
     color: var(--ds-color-error, #ffb4ab);
   }
+}
+
+/* SPEC t_50c9ac95 (C1): hora atual abaixo do cronômetro — discreta. */
+.liturgy-sidebar__clock-now {
+  margin-top: 0.15rem;
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: color-mix(in srgb, var(--ds-color-on-surface) 65%, transparent);
 }
 
 .liturgy-sidebar__rule {

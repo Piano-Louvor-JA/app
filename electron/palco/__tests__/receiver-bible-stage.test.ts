@@ -91,6 +91,13 @@ describe('receiver — posição da referência bíblica', () => {
     const footer = await project({ footerPosition: 'corner' })
     expect(footer.querySelector('.ref')?.textContent).toBe('João 3:16 (ARC)')
   })
+
+  it('aplica tamanho e transformação da referência', async () => {
+    const footer = await project({ footerSize: 40.5, footerTransform: 'uppercase' })
+    const ref = footer.querySelector('.ref') as HTMLElement
+    expect(ref.style.fontSize).toBe('3.75vw')
+    expect(ref.style.textTransform).toBe('uppercase')
+  })
 })
 
 describe('receiver — transição ao trocar versículo', () => {

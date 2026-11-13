@@ -320,6 +320,7 @@ async function runAction(
         @slides="runAction(track.musicId, () => playSlides(track.musicId))"
         @lyric="runAction(track.musicId, () => openLyric(track.musicId))"
         @playlist="openPlaylistPicker(track)"
+        @suggest-edit="router.push({ path: '/media/editor', query: { editOfficial: String(track.musicId) } })"
       />
     </MediaCollectionList>
 

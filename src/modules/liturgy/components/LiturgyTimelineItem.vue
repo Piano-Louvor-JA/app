@@ -21,6 +21,7 @@ import {
 } from '../services/annotation-projection'
 import { parseLiturgyWebTarget } from '../services/liturgy-web-runtime'
 import { formatDurationLabel } from '../services/liturgy-format'
+import { categoryTimeRangeWithEstimate } from '../services/liturgy-item-helpers'
 import { getItemTypeIcon, isExecutableItem } from '../services/liturgy-item-helpers'
 import { probeMediaDurationMs } from '../services/media-probe'
 import { normalizeTitleColor, sanitizeNotesHtml } from '../services/rich-notes'
@@ -36,6 +37,8 @@ const props = defineProps<{
   videoProjecting?: boolean
   startLabel: string
   durationLabel: string
+  /** SPEC t_50c9ac95: filhos da categoria p/ estimativa do intervalo. */
+  categoryChildren?: LiturgyItem[]
   linked?: boolean
   /** Indeterminado: alguns (não todos) filhos da categoria concluídos. */
   indeterminate?: boolean
@@ -189,12 +192,12 @@ const isMusicItem = computed(
   () => props.item.type === 'music' && props.item.musicId != null,
 )
 const categoryTimeRange = computed(() => {
-  const start = props.item.startTime?.trim()
-  const end = props.item.endTime?.trim()
-  if (start && end) return `${start} - ${end}`
-  if (start) return start
-  if (end) return end
-  return '—'
+  // SPEC t_50c9ac95 (B2/B3): end real → intervalo exato; sem end + filhos
+  // com duração → "~Xmin (estimado)"; sem dados → só o start.
+  return categoryTimeRangeWithEstimate(
+    props.item,
+    props.categoryChildren ?? [],
+  )
 })
 const isStreamVideo = computed(() => props.item.type === 'online_video')
 const isLocalMediaUpload = computed(

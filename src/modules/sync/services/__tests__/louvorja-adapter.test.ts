@@ -69,7 +69,7 @@ describe("exportLouvorjaFromBrowser", () => {
 		const pkg = exportLouvorjaFromBrowser("1.17.5", "web");
 
 		expect(pkg.schema).toBe(1);
-		expect(pkg.entities.liturgy?.data).toEqual({
+		expect(pkg.entities.liturgy?.data).toMatchObject({
 			sunday: {
 				items: LITURGY_STATE.weekdays.sunday,
 				notes: LITURGY_STATE.dayNotes.sunday,

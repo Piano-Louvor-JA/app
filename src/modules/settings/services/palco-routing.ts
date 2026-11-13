@@ -9,19 +9,14 @@ export type PalcoModule = 'bible' | 'hymns' | 'liturgy' | 'random' | 'clock' | '
 const KEY = 'louvorja-palco-routing-v1'
 const MODULES: PalcoModule[] = ['bible', 'hymns', 'liturgy', 'random', 'clock', 'timer', 'countdown']
 
-let routes: Record<PalcoModule, PalcoRoute> = Object.fromEntries(
+const routes: Record<PalcoModule, PalcoRoute> = Object.fromEntries(
   MODULES.map((module) => [module, 'mirror']),
 ) as Record<PalcoModule, PalcoRoute>
 
-try {
-  const raw = localStorage.getItem(KEY)
-  if (raw) routes = { ...routes, ...(JSON.parse(raw) as Partial<typeof routes>) }
-} catch {
-  // defaults
-}
-
-// Music destinations are now exclusively controlled by the Telas selector.
-routes.hymns = 'mirror'
+// O seletor "Destino do palco" saiu das telas: quem escolhe onde cada módulo
+// aparece agora é o painel Telas e a Projeção independente. Destino salvo
+// por versões antigas não vale mais (não haveria como desfazê-lo).
+try { localStorage.removeItem(KEY) } catch { /* ignore */ }
 
 export function getPalcoRoute(module: PalcoModule): PalcoRoute {
   if (module === 'hymns') return 'mirror'

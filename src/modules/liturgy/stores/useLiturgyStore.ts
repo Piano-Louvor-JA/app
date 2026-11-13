@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { getCurrentApiPrefix } from '@modules/sync/services/api-prefix'
 import { useScheduledStore } from './useScheduledStore'
 import { computed, onScopeDispose, ref } from 'vue'
 import type { Router } from 'vue-router'
@@ -50,6 +51,7 @@ import {
 } from '../services/liturgy-preferences'
 import { clearLiturgyWebRuntime } from '../services/liturgy-web-runtime'
 import { toggleAnnotationProjection, useAnnotationProjection } from '../services/annotation-projection'
+import { canOpenAnnotationTextControl, openAnnotationTextControl } from '../services/annotation-text-control'
 import { parseJaLiturgy } from '../services/liturgy-ja-import'
 import { enrichItemsDurations } from '../services/liturgy-duration-enrich'
 import {
@@ -505,10 +507,11 @@ export const useLiturgyStore = defineStore('liturgy', () => {
       customLiturgies: customLiturgies.value,
       deletionLocks: deletionLocks.value,
     })
+  try { localStorage.setItem(`sync.modified.v1.liturgy.${getCurrentApiPrefix()}`, new Date().toISOString()) } catch { /* storage indisponível não impede a edição local */ }
     // sync v2 (app#336): toda mutação enfileira no outbox (local-first) e
     // agenda flush em bg — sem rede o item fica na fila (nada se perde).
     try {
-      enqueueOperatorState('liturgy', 'week', {
+      enqueueOperatorState('liturgy', getCurrentApiPrefix(), {
         weekdays: weekdays.value,
         dayNotes: dayNotes.value,
         daySessionTimes: daySessionTimes.value,
@@ -892,13 +895,16 @@ export const useLiturgyStore = defineStore('liturgy', () => {
   function markItemDone(index: number) {
     const target = currentItems.value[index]
     if (!target || target.done || target.type === 'category') return
-    if (!isLiturgyMediaPlayType(target.type)) return
+    const isTextOrSite = target.type === 'site' || target.type === 'annotation'
+    if (!isLiturgyMediaPlayType(target.type) && !isTextOrSite) return
 
     const next = currentItems.value.map((item, i) =>
       i === index ? { ...item, done: true } : item,
     )
     currentItems.value = syncCategoryDoneFromChildren(next)
 
+    // Site/texto continuam selecionados enquanto o operador usa seus controles.
+    if (isTextOrSite) return
     clearSelectionIfMatches((_, i) => i === index)
     if (target.categoryId) {
       const categoryId = target.categoryId
@@ -979,6 +985,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     index: number,
     mode: MediaPlaybackMode,
     router: Router,
+    options?: { project?: boolean },
   ) {
     const item = markItemStarted(index)
     if (!item || item.type !== 'music') {
@@ -987,9 +994,8 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     }
 
     const result = await openLiturgyMusicPlayer(item, mode, {
-      // Cantado / instrumental / slides: abre o player já projetando
-      // (antes só `no_audio` projetava e o operador precisava clicar em Projetar).
-      project: true,
+      // O controle remoto pode abrir primeiro e projetar pela seta da barra.
+      project: options?.project ?? true,
     })
     lastActionMessageKey.value = result.messageKey ?? null
     if (!result.ok) return false
@@ -1014,8 +1020,16 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     }
 
     if (item.type === 'annotation') {
+      // Desktop: mesmo player do aviso de texto (projetar, telas, conexões, tamanho).
+      if (canOpenAnnotationTextControl()) {
+        const opened = await openAnnotationTextControl(item)
+        lastActionMessageKey.value = opened ? null : 'liturgy.messages.projectionFailed'
+        if (opened) markItemDone(index)
+        return
+      }
       const wasProjecting = useAnnotationProjection().projectingItemId.value === item.id
       const projecting = await toggleAnnotationProjection(item)
+      if (projecting) markItemDone(index)
       lastActionMessageKey.value =
         !wasProjecting && !projecting ? 'liturgy.messages.projectionFailed' : null
       return
@@ -1029,6 +1043,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
         const toggled = await projection?.toggleSiteScreens?.()
         if (toggled) {
           siteProjectionItemId.value = state.projecting ? null : item.id
+          markItemDone(index)
           lastActionMessageKey.value = null
           return
         }

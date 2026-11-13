@@ -69,9 +69,6 @@ vi.mock('@design-system/index', () => ({
   GlassCard: { template: '<div class="glass-card"><slot /></div>' }
 }))
 
-vi.mock('../../../settings/components/PalcoRouteSelect.vue', () => ({
-  default: { template: '<div class="palco-route-select" />;' }
-}))
 
 vi.mock('../../../settings/components/StageCustomizationDialog.vue', () => ({
   default: { template: '<div class="stage-custom-dialog" />;' }

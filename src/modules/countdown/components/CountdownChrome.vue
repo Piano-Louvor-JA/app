@@ -8,6 +8,7 @@ import MiniPlayerCloseButton from '@shared/components/MiniPlayerCloseButton.vue'
 import { closeIndependentProjection } from '@shared/composables/useIndependentProjection'
 import FloatingPreviewTitle from '@shared/components/FloatingPreviewTitle.vue'
 import IndependentProjectionButton from '@shared/components/IndependentProjectionButton.vue'
+import IndependentProjectionStatus from '@shared/components/IndependentProjectionStatus.vue'
 import { isIndependentProjectionActive } from '@shared/composables/useIndependentProjection'
 import { FLOATING_STACK_ORDER, useFloatingDrag } from '@shared/composables/useFloatingDrag'
 import { USER_PREFERENCE_KEYS } from '@shared/constants/storage-keys'
@@ -111,6 +112,7 @@ async function onOpenTimer() {
         :runtime="store.runtime"
         :stage="stage"
       />
+      <IndependentProjectionStatus module-id="countdown" below />
     </aside>
 
     <div class="countdown-chrome__actions">

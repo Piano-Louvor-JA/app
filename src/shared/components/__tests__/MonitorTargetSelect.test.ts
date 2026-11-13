@@ -70,6 +70,20 @@ vi.mock('@modules/settings/composables/useObsConnections', () => ({
   useObsConnections: () => ({ activeConnections: obsOutputs }),
 }))
 
+const palco = vi.hoisted(() => ({
+  available: false,
+  tvs: [] as Array<Record<string, unknown>>,
+  changed: null as null | (() => void),
+  setMuted: vi.fn(async () => true),
+  stop: vi.fn(),
+}))
+vi.mock('@modules/settings/services/palco-clients', () => ({
+  hasPalcoClients: () => palco.available,
+  listPalcoTvs: vi.fn(async () => palco.tvs.map(tv => ({ ...tv }))),
+  onPalcoClientsChanged: (cb: () => void) => { palco.changed = cb; return palco.stop },
+  setPalcoTvMuted: palco.setMuted,
+}))
+
 import MonitorTargetSelect from '../MonitorTargetSelect.vue'
 
 const SETTINGS = {
@@ -380,6 +394,68 @@ describe('MonitorTargetSelect', () => {
       expect(w.find('.monitor-target-select__panel').exists()).toBe(false)
       const identifyBtn = w.findAll('button').find((b) => b.classes().some((c) => c.includes('identify')))
       if (identifyBtn) await identifyBtn.trigger('click')
+      w.unmount()
+    })
+  })
+
+  describe('TVs com Palco', () => {
+    const tv = (extra: Record<string, unknown> = {}) => ({
+      uid: 'u1', slotId: '0', slotLabel: 'Principal', ip: '10.0.0.5', platform: 'webos',
+      name: 'TV da entrada', version: '0.3.1', id: 'a', muted: false, ...extra,
+    })
+    async function openPanel() {
+      const w = await mountSelect()
+      await w.find('.monitor-target-select__trigger').trigger('click')
+      await Promise.resolve()
+      await nextTick()
+      await Promise.resolve()
+      await nextTick()
+      return w
+    }
+
+    beforeEach(() => {
+      palco.available = true
+      palco.tvs = []
+      palco.changed = null
+    })
+
+    it('título das telas por cabo é Conexões Cabeadas', async () => {
+      const w = await openPanel()
+      expect(w.find('.monitor-target-select__title').text()).toBe('monitors.wiredTitle')
+      w.unmount()
+    })
+
+    it('sem TVs mostra o atalho para o Palco', async () => {
+      const w = await openPanel()
+      expect(w.find('[data-testid="palco-outputs-title"]').text()).toContain('palcoOutputs.title')
+      await w.find('[data-testid="palco-outputs-empty"]').trigger('click')
+      expect(navigate).toHaveBeenCalledWith({ name: 'settings-palco' })
+      w.unmount()
+    })
+
+    it('lista as TVs com a marca e desmarca a TV', async () => {
+      palco.tvs = [tv(), tv({ uid: 'u2', name: 'TV LG', muted: true, slotLabel: 'Retorno' })]
+      const w = await openPanel()
+      const list = w.find('ul[aria-label="palcoOutputs.title"]')
+      expect(list.text()).toContain('TV da entrada')
+      expect(list.text()).toContain('palcoOutputs.onHold')
+      const first = w.find('[data-testid="palco-output-u1"]')
+      expect((first.element as HTMLInputElement).checked).toBe(true)
+      ;(first.element as HTMLInputElement).checked = false
+      await first.trigger('change')
+      await Promise.resolve()
+      expect(palco.setMuted).toHaveBeenCalledWith(expect.objectContaining({ uid: 'u1' }), true)
+      w.unmount()
+      expect(palco.stop).toHaveBeenCalled()
+    })
+
+    it('atualiza a lista quando uma TV conecta com o painel aberto', async () => {
+      const w = await openPanel()
+      palco.tvs = [tv()]
+      palco.changed?.()
+      await Promise.resolve()
+      await nextTick()
+      expect(w.find('[data-testid="palco-output-u1"]').exists()).toBe(true)
       w.unmount()
     })
   })

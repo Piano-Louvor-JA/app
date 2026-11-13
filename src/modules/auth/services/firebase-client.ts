@@ -106,6 +106,8 @@ async function exchangeFirebaseToken(token: string): Promise<{ session: AuthSess
   try {
     const response = await fetch(url, {
       method: 'POST',
+      // X-Tenant obrigatório: sem ele o middleware resolve tenant errado e a
+      // revalidação morre em 401 mesmo com token válido (paridade com persistSession).
       headers: { 'X-Tenant': 'piano', authorization: `Bearer ${token}` },
     })
     if (!response.ok) return { session: null, rejected: response.status === 401 || response.status === 403 }

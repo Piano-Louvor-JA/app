@@ -251,8 +251,10 @@ export function isLiturgyItemDraftValid(draft: LiturgyItemDraft): boolean {
   if (draft.type == null) return false
   if (draft.name.trim().length === 0) return false
   if (draft.type === 'category') {
+    // SPEC t_50c9ac95 (A2): startTime obrigatório; endTime OPCIONAL —
+    // vazio é válido, mas se preenchido precisa ser um horário válido.
     if (!normalizeLiturgyTimeHHmm(draft.startTime)) return false
-    if (!normalizeLiturgyTimeHHmm(draft.endTime)) return false
+    if (draft.endTime && !normalizeLiturgyTimeHHmm(draft.endTime)) return false
   }
   if (draft.type === 'music' && draft.musicId == null) return false
   // Categoria é OPCIONAL (paridade web ff8b481): item pode viver na raiz da
@@ -524,4 +526,149 @@ export function reconcileMusicItemTitles(
 
 export function clearDoneFlags(items: LiturgyItem[]): LiturgyItem[] {
   return items.map((item) => ({ ...item, done: false }))
+}
+
+/* ---------- Estimativa transparente (SPEC t_50c9ac95 B) ---------- */
+
+/**
+ * Duração estimada de uma categoria sem endTime (SPEC t_50c9ac95 B1/B3):
+ * soma dos durationMs dos filhos. Sem nenhum filho com duração → null
+ * (nunca inventa número).
+ */
+export function estimateCategoryDurationMs(
+  _category: LiturgyItem,
+  children: LiturgyItem[],
+): number | null {
+  const total = children.reduce<number>(
+    (acc, c) => acc + (typeof c.durationMs === 'number' && c.durationMs > 0 ? c.durationMs : 0),
+    0,
+  )
+  return total > 0 ? total : null
+}
+
+/** Minutos inteiros cobertos por ms (arredonda pra cima: melhor superestimar). */
+function msToMinutesCeil(ms: number): number {
+  return Math.ceil(ms / 60_000)
+}
+
+/** Soma HH:MM + minutos com wrap de 24h. */
+function addMinutesToHHmm(hhmm: string, minutes: number): string {
+  const [h, m] = hhmm.split(':').map((p) => Number(p))
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return ''
+  const total = ((h * 60 + m + minutes) % (24 * 60) + 24 * 60) % (24 * 60)
+  return `${pad2(Math.floor(total / 60))}:${pad2(total % 60)}`
+}
+
+/**
+ * Fim da categoria: end real vence (B5); sem end → estimado pelo start +
+ * duração dos filhos; sem dados → null (sem invenção).
+ */
+export function resolveCategoryEndTime(
+  category: LiturgyItem,
+  children: LiturgyItem[],
+): string | null {
+  const real = normalizeLiturgyTimeHHmm(category.endTime ?? null)
+  if (real) return real
+  const start = normalizeLiturgyTimeHHmm(category.startTime ?? null)
+  if (!start) return null
+  const ms = estimateCategoryDurationMs(category, children)
+  if (ms == null) return null
+  return addMinutesToHHmm(start, msToMinutesCeil(ms))
+}
+
+/**
+ * Rótulo de duração da categoria (B2): "estimado" explícito quando derivado,
+ * exato quando vem de end real. Retorna '' quando não dá pra calcular.
+ */
+export function formatEstimatedDuration(
+  durationMs: number,
+  estimated: boolean,
+): string {
+  const minutes = Math.round(durationMs / 60_000)
+  const label = minutes >= 60
+    ? `${Math.floor(minutes / 60)}h${minutes % 60 ? ` ${minutes % 60}min` : ''}`
+    : `${minutes}min`
+  return estimated ? `~${label} (estimado)` : label
+}
+
+/* ---------- Integração UI (SPEC t_50c9ac95 B2/B4 na tela) ---------- */
+
+/**
+ * Rótulo de duração da categoria na timeline (B2): end real → exato
+ * (HH:MM - HH:MM); sem end + filhos com duração → "~HH:MM (estimado)";
+ * sem dados → só o start (B3). Retorno pronto pro categoryTimeRange.
+ */
+export function categoryTimeRangeWithEstimate(
+  category: Pick<LiturgyItem, 'startTime' | 'endTime'>,
+  children: LiturgyItem[],
+): string {
+  const start = normalizeLiturgyTimeHHmm(category.startTime ?? null)
+  const end = normalizeLiturgyTimeHHmm(category.endTime ?? null)
+  if (start && end) return `${start} - ${end}`
+  if (!start) return end ? end : '—'
+  const ms = estimateCategoryDurationMs(category as LiturgyItem, children)
+  if (ms == null) return start
+  return `${start} - ${formatEstimatedDuration(ms, true)}`
+}
+
+/**
+ * Fim estimado da sessão para o resumo (B4): maior entre end real e
+ * estimado das categorias; sem nenhum → null (UI mostra '—').
+ */
+export function estimatedSessionEnd(
+  items: LiturgyItem[],
+  childrenByCategory: (id: string) => LiturgyItem[],
+): string | null {
+  let latest = ''
+  for (const cat of items) {
+    if (cat.type !== 'category') continue
+    const end = resolveCategoryEndTime(cat, childrenByCategory(cat.id))
+    if (end && end > latest) latest = end
+  }
+  return latest || null
+}
+
+/* ---------- Fix review (review deleg_3ba5e284): wrap meia-noite ---------- */
+
+/** Converte HH:MM → minutos do dia. */
+function hhmmToMinutes(hhmm: string): number | null {
+  const norm = normalizeLiturgyTimeHHmm(hhmm)
+  if (!norm) return null
+  const [h, m] = norm.split(':').map(Number)
+  return h * 60 + m
+}
+
+/**
+ * Chave de comparação de fim de categoria com wrap de meia-noite:
+ * fim < início → pertence ao dia seguinte (+24h). Retorna minutos absolutos.
+ */
+export function categoryEndSortKey(
+  category: LiturgyItem,
+  children: LiturgyItem[],
+): number | null {
+  const end = resolveCategoryEndTime(category, children)
+  if (!end) return null
+  const endMin = hhmmToMinutes(end)
+  if (endMin == null) return null
+  const startMin = hhmmToMinutes(category.startTime ?? '')
+  if (startMin != null && endMin < startMin) return endMin + 24 * 60
+  return endMin
+}
+
+/** Versão wrap-aware de estimatedSessionEnd (maior fim absoluto). */
+export function estimatedSessionEndSafe(
+  items: LiturgyItem[],
+  childrenByCategory: (id: string) => LiturgyItem[],
+): string | null {
+  let latest = -1
+  let latestHHmm: string | null = null
+  for (const cat of items) {
+    if (cat.type !== 'category') continue
+    const key = categoryEndSortKey(cat, childrenByCategory(cat.id))
+    if (key != null && key > latest) {
+      latest = key
+      latestHHmm = resolveCategoryEndTime(cat, childrenByCategory(cat.id))
+    }
+  }
+  return latestHHmm
 }

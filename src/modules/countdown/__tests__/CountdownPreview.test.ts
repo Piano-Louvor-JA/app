@@ -68,7 +68,7 @@ describe('CountdownPreview', () => {
         },
       })
     expect(wrapper.classes()).toContain('countdown-preview--urgent')
-    expect(wrapper.find('.countdown-preview__digital').attributes('style')).toContain('rgba(0,0,0,0.45)')
+    expect(wrapper.find('.countdown-preview__digital').attributes('style')).toContain('rgba(0, 0, 0, 0.45)')
   })
 
   it('finalizado: cor de erro, shadow e mensagem', () => {
@@ -159,7 +159,7 @@ describe('CountdownPreview', () => {
         },
       })
     const digital = wrapper.find('.countdown-preview__digital').attributes('style')
-    expect(digital).toContain('rgba(0,0,0,0.5)')
+    expect(digital).toContain('rgba(0, 0, 0, 0.5)')
     expect(digital).toContain('rgba(24, 24, 24, 0.4)')
     expect(digital).toContain('rgba(255, 255, 255, 0.85)')
     expect(digital).toContain('2.5vmin 1.8vmin')
@@ -201,7 +201,7 @@ describe('CountdownPreview', () => {
     expect(digital).toContain('font-size: 96px') // (192/1920)*960
     expect(digital).toContain('font-weight: 600')
     expect(digital).toContain('text-align: left')
-    expect(digital).toContain('rgba(0,0,0,0.6)')
+    expect(digital).toContain('rgba(0, 0, 0, 0.6)')
     const surface = wrapper.attributes('style')
     expect(surface).toContain('align-items: flex-start') // left
     expect(surface).toContain('justify-content: flex-start') // top
@@ -247,7 +247,7 @@ describe('CountdownPreview', () => {
       })
     const digital = wrapper.find('.countdown-preview__digital').attributes('style')
     expect(digital).toContain('color: rgb(171, 205, 239)') // branch stage de baseTextColor
-    expect(digital).toContain('rgba(0,0,0,0.3)') // sombra do palco (não urgência)
+    expect(digital).toContain('rgba(0, 0, 0, 0.3)') // sombra do palco (não urgência)
     expect(digital).toContain('text-align: right')
     const surface = wrapper.attributes('style')
     expect(surface).toContain('align-items: flex-end')

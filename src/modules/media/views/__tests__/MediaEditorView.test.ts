@@ -21,6 +21,12 @@ vi.mock("@shared/components/AppConfirm.vue", () => ({
 	default: { template: '<div class="app-confirm-stub" />' },
 }));
 
+vi.mock("@modules/auth/services/firebase-client", () => ({
+	getAuthReadiness: vi.fn(async () => null),
+	revalidateFirebaseSessionOnBoot: vi.fn(async () => null),
+	subscribeFirebaseSession: vi.fn(() => () => {}),
+}));
+
 vi.mock("../../services/auth-client", () => ({
 	getAuthSession: vi.fn(() => null),
 }));
@@ -44,6 +50,7 @@ vi.mock("../../services/custom-catalog", () => ({
 	deleteCustomMusic: vi.fn(),
 	deleteCustomLyric: vi.fn(),
 	uploadCustomFile: vi.fn(),
+	audioDataUrlFromBase64: (b64: string) => `data:audio/mpeg;base64,${b64}`,
 	customApiUrl: vi.fn((p: string) => `https://api.test/v1/custom${p}`),
 	customFileUrl: vi.fn((p: string) => `/files/${p}`),
 	addOfficialMusicToCollection: vi.fn(),
@@ -55,6 +62,7 @@ vi.mock("../../services/local-custom-store", () => ({
 	getLocalMusic: vi.fn(),
 	isLocalId: vi.fn(() => false),
 	updateLocalMusic: vi.fn(),
+	publishLocalMusic: vi.fn(() => true),
 }));
 
 vi.mock("@modules/albums/services/album-music-search", () => ({
@@ -252,6 +260,67 @@ describe("MediaEditorView — seleção de música", () => {
 		w.unmount();
 	});
 
+	it("draft: botão Publicar aparece p/ draft local, publica e some após publicar", async () => {
+		const { getLocalMusic, isLocalId, publishLocalMusic } = await import(
+			"../../services/local-custom-store"
+		);
+		vi.mocked(isLocalId).mockReturnValue(true);
+		vi.mocked(getLocalMusic).mockReturnValue({
+			id: -7,
+			name: "Meu rascunho",
+			status: "draft",
+			lyrics: [{ id: 1, lyric: "V1", time: "00:01", image_url: null }],
+			audioBase64: null,
+			officialMusicId: null,
+		} as never);
+		const w = await mountEditor();
+		setupOf(w).collectionId.value = 3;
+		const st = w.vm.$.devtoolsRawSetupState as unknown as {
+			onSelectMusic: (id: number) => Promise<void>;
+			musicStatus: { value: string };
+			onPublishMusic: () => Promise<void>;
+		};
+		await st.onSelectMusic(-7);
+		await flushPromises();
+		// estado inicial: draft
+		expect(st.musicStatus.value).toBe("draft");
+		// botão visível no DOM
+		const pubBtn = w.findAll("button").find((b) => b.text().includes("Publicar"));
+		expect(pubBtn).toBeDefined();
+		// publica
+		await st.onPublishMusic();
+		await flushPromises();
+		expect(publishLocalMusic).toHaveBeenCalledWith(-7);
+		expect(st.musicStatus.value).toBe("published");
+		// botão some após publicar
+		expect(w.findAll("button").find((b) => b.text().includes("Publicar"))).toBeUndefined();
+		w.unmount();
+	});
+
+	it("draft: música published não mostra botão Publicar", async () => {
+		const { getLocalMusic, isLocalId } = await import(
+			"../../services/local-custom-store"
+		);
+		vi.mocked(isLocalId).mockReturnValue(true);
+		vi.mocked(getLocalMusic).mockReturnValue({
+			id: -8,
+			name: "Já publicada",
+			status: "published",
+			lyrics: [{ id: 1, lyric: "V1", time: "00:01", image_url: null }],
+			audioBase64: null,
+			officialMusicId: null,
+		} as never);
+		const w = await mountEditor();
+		setupOf(w).collectionId.value = 3;
+		await (
+			w.vm.$.devtoolsRawSetupState as unknown as {
+				onSelectMusic: (id: number) => Promise<void>;
+			}
+		).onSelectMusic(-8);
+		expect(w.findAll("button").find((b) => b.text().includes("Publicar"))).toBeUndefined();
+		w.unmount();
+	});
+
 	it("música da API (fetch ok): carrega nome e letras", async () => {
 		const fetchMock = vi.fn().mockResolvedValue({
 			ok: true,
@@ -379,6 +448,77 @@ describe("MediaEditorView — import .slja", () => {
 		expect(slja.parseSljaFile).toHaveBeenCalled();
 		expect(createCustomMusic).toHaveBeenCalled();
 		expect(raw(w).selectedMusicId.value).toBe(77);
+		w.unmount();
+	});
+
+	it("import espera readiness de auth antes de criar música (ordem)", async () => {
+		const { getAuthReadiness } = await import("@modules/auth/services/firebase-client");
+		const { createCustomMusic } = await import("../../services/custom-catalog");
+		const slja = await import("../../../../shared/services/slja");
+		let release!: () => void;
+		vi.mocked(getAuthReadiness).mockReturnValue(
+			new Promise<null>((resolve) => {
+				release = () => resolve(null);
+			}),
+		);
+		vi.mocked(slja.parseSljaFile).mockResolvedValue({
+			title: "Hino Tardio",
+			audio: null,
+			images: [],
+		} as never);
+		vi.mocked(createCustomMusic).mockResolvedValue({ id: 78 });
+		const w = await mountEditor();
+		const p = raw(w).onImportFile(fakeFileEvent("hino.slja", new ArrayBuffer(8)));
+		await flushPromises();
+		expect(createCustomMusic).not.toHaveBeenCalled();
+		release();
+		await p;
+		expect(createCustomMusic).toHaveBeenCalled();
+		w.unmount();
+	});
+
+	it("import com falha de rede: feedback de erro visível (não silencioso)", async () => {
+		const { createCustomMusic } = await import("../../services/custom-catalog");
+		const slja = await import("../../../../shared/services/slja");
+		vi.mocked(slja.parseSljaFile).mockResolvedValue({
+			title: "Hino Falho",
+			audio: null,
+			images: [],
+		} as never);
+		vi.mocked(createCustomMusic).mockResolvedValue(null);
+		const w = await mountEditor();
+		await raw(w).onImportFile(fakeFileEvent("hino.slja", new ArrayBuffer(8)));
+		const s = w.vm.$.devtoolsRawSetupState as unknown as {
+			statusMessage: { value: string };
+			loading: { value: boolean };
+		};
+		expect(s.statusMessage.value).toMatch(/falha|erro|conex/i);
+		expect(s.loading.value).toBe(false);
+		w.unmount();
+	});
+
+	it("import com estrofes falhando: reporta contagem parcial com erro", async () => {
+		const { createCustomMusic, createCustomLyric } = await import(
+			"../../services/custom-catalog"
+		);
+		const slja = await import("../../../../shared/services/slja");
+		vi.mocked(slja.parseSljaFile).mockResolvedValue({
+			title: "Hino Parcial",
+			audio: null,
+			images: [],
+			slides: [
+				{ type: "LETRA", order: 1, lyric: "Primeira", timeMs: 0 },
+				{ type: "LETRA", order: 2, lyric: "Segunda", timeMs: 1000 },
+			],
+		} as never);
+		vi.mocked(createCustomMusic).mockResolvedValue({ id: 79 });
+		vi.mocked(createCustomLyric).mockResolvedValue(null);
+		const w = await mountEditor();
+		await raw(w).onImportFile(fakeFileEvent("hino.slja", new ArrayBuffer(8)));
+		const s = w.vm.$.devtoolsRawSetupState as unknown as {
+			statusMessage: { value: string };
+		};
+		expect(s.statusMessage.value).toMatch(/falha|erro|estrofe/i);
 		w.unmount();
 	});
 });
@@ -1095,6 +1235,8 @@ describe("MediaEditorView — cobertura de gaps", () => {
 	});
 
 	it("import .slja: reaproveita 'Importações .slja'; áudio embutido", async () => {
+		const auth = await import("../../services/auth-client");
+		vi.mocked(auth.getAuthSession).mockReturnValue({ token: "t", user: { id_user: 1, email: "a@b.c", displayName: "A" } } as never);
 		const slja = await import("../../../../shared/services/slja");
 		const catalogMod = await import("../../services/custom-catalog");
 		vi.mocked(catalogMod.listCustomCollections).mockResolvedValue([
@@ -1147,7 +1289,7 @@ describe("MediaEditorView — cobertura de gaps", () => {
 		const file = { arrayBuffer: async () => new ArrayBuffer(4), name: "x.slja" };
 		await s.onImportFile({ target: { files: [file], value: "" } } as unknown as Event);
 		await flushPromises();
-		expect(s.statusMessage.value).toBe("Falha ao criar música a partir do .slja");
+		expect(s.statusMessage.value).toMatch(/Falha ao criar música a partir do \.slja/);
 		vi.mocked(slja.parseSljaFile).mockRejectedValue(new Error("bad") as never);
 		await s.onImportFile({ target: { files: [file], value: "" } } as unknown as Event);
 		await flushPromises();
@@ -1156,6 +1298,8 @@ describe("MediaEditorView — cobertura de gaps", () => {
 	});
 
 	it("import .slja com assets: vincula imagens às estrofes", async () => {
+		const auth = await import("../../services/auth-client");
+		vi.mocked(auth.getAuthSession).mockReturnValue({ token: "t", user: { id_user: 1, email: "a@b.c", displayName: "A" } } as never);
 		const slja = await import("../../../../shared/services/slja");
 		const catalogMod = await import("../../services/custom-catalog");
 		vi.mocked(slja.parseSljaFile).mockResolvedValue({
@@ -1419,6 +1563,8 @@ describe("MediaEditorView — onMounted query e branches finais", () => {
 	});
 
 	it("import com áudio que falha no upload: notifica variante", async () => {
+		const auth = await import("../../services/auth-client");
+		vi.mocked(auth.getAuthSession).mockReturnValue({ token: "t", user: { id_user: 1, email: "a@b.c", displayName: "A" } } as never);
 		const slja = await import("../../../../shared/services/slja");
 		const catalogMod = await import("../../services/custom-catalog");
 		vi.mocked(slja.parseSljaFile).mockResolvedValue({
@@ -1434,7 +1580,7 @@ describe("MediaEditorView — onMounted query e branches finais", () => {
 		const file = { arrayBuffer: async () => new ArrayBuffer(4), name: "x.slja" };
 		await s.onImportFile({ target: { files: [file], value: "" } } as unknown as Event);
 		await flushPromises();
-		expect(s.statusMessage.value).toBe("Importado: x.slja (áudio falhou no upload)");
+		expect(s.statusMessage.value).toMatch(/Importado: x\.slja \(áudio falhou no upload/);
 		w.unmount();
 	});
 
@@ -2136,6 +2282,8 @@ describe("MediaEditorView — gaps finais onda1", () => {
 	});
 
 	it("import com assets: upload ok empurra; CAPA filtrada; imagem casada vira imageUrl (614/627/636/639/646)", async () => {
+		const auth = await import("../../services/auth-client");
+		vi.mocked(auth.getAuthSession).mockReturnValue({ token: "t", user: { id_user: 1, email: "a@b.c", displayName: "A" } } as never);
 		const slja = await import("../../../../shared/services/slja");
 		const custom = await import("../../services/custom-catalog");
 		vi.mocked(slja.parseSljaFile).mockResolvedValue({

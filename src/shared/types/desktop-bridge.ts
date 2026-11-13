@@ -273,6 +273,10 @@ export type RemotePairingInfo = {
   connectUrl: string
   qrDataUrl: string
   speakerUrl?: string
+  viewerUrl?: string
+  viewerQrDataUrl?: string
+  viewerCount?: number
+  speakerCount?: number
   speakerQrDataUrl?: string
   operatorUrl?: string
   operatorQrDataUrl?: string
@@ -284,15 +288,43 @@ export type RemotePairingInfo = {
   speakerAddress?: string | null
 }
 
+/** Compartilhar monitores com o app mobile (electron/monitor-share.mjs). */
+export type MonitorShareMode = 'mirror' | 'return'
+export type MonitorShareInfo = {
+  enabled: boolean
+  running: boolean
+  /** Monitores estendidos disponíveis (o principal nunca entra). */
+  extendedCount: number
+  address: string
+  token: string
+  connectUrl: string
+  qrDataUrl: string
+  displays: { id: number; label: string; isPrimary: boolean; mode: MonitorShareMode | null; active: boolean }[]
+  phone: { device: string; host: string; monitors: number } | null
+}
+export type MonitorShareApi = {
+  get: () => Promise<MonitorShareInfo>
+  set: (changes: {
+    enabled?: boolean
+    displays?: Record<string, MonitorShareMode>
+    resetToken?: boolean
+  }) => Promise<MonitorShareInfo>
+  onChanged: (callback: (info: MonitorShareInfo) => void) => () => void
+}
+
 export type RemoteApi = {
   onCommand: (callback: (msg: RemoteBridgeMessage) => void) => () => void
   onStateRequest: (callback: () => void) => () => void
   sendAck: (ack: { id?: string | number; ok: boolean }) => void
   sendState: (state: Record<string, unknown>) => void
   pairingInfo: () => Promise<RemotePairingInfo>
+  resetToken?: (role: 'remote' | 'speaker') => Promise<RemotePairingInfo>
+  disconnectSpeaker?: () => Promise<RemotePairingInfo>
   onClients?: (
     callback: (payload: {
       count: number
+      viewerCount?: number
+      speakerCount?: number
       address?: string | null
       remoteAddress?: string | null
       speakerAddress?: string | null
@@ -473,6 +505,10 @@ export type ProjectionApi = {
   getPlaybackState?: () => Promise<ProjectionPlaybackState | null>
   getNavigationState?: () => Promise<ProjectionNavigationState | null>
   remoteGoBack?: () => Promise<boolean>
+  /** Leva o site projetado ao endereço que o celular abriu no navegador dele. */
+  remoteNavigate?: (url: string) => Promise<boolean>
+  /** Rola o site projetado na proporção (0..1) da rolagem do celular. */
+  remoteScroll?: (ratio: number) => Promise<boolean>
   remoteGoForward?: () => Promise<boolean>
   remoteReload?: () => Promise<boolean>
   toggleSiteScreens?: () => Promise<boolean>
@@ -508,10 +544,18 @@ export type ProjectionApi = {
     projecting?: boolean
   } | null>
   captureSourceFrame?: () => Promise<string | null>
+  /** Miniatura JPEG (base64) do slide atual, para o controle remoto. */
+  captureSlidePreview?: () => Promise<string | null>
+  /** Miniaturas JPEG de toda a galeria aberta e a chave dela. */
+  captureGalleryPreviews?: () => Promise<{ key: string; previews: string[] } | null>
   getSiteTargetMonitors?: () => Promise<number[]>
   setSiteTargetMonitors?: (ids: number[]) => Promise<boolean>
   getVideoTargetMonitors?: () => Promise<number[]>
   setVideoTargetMonitors?: (ids: number[]) => Promise<boolean>
+  /** Estado da barra de vídeo aberta, para o controle remoto. */
+  getVideoControlSnapshot?: () => Promise<Record<string, unknown> | null>
+  /** Executa um comando na barra de vídeo, pelo mesmo caminho do clique. */
+  runVideoControlCommand?: (command: Record<string, unknown>) => Promise<boolean>
   /** `height`: altura que o painel precisa (px), limitada à janela do player. */
   setSiteControlPanelOpen?: (open: boolean, height?: number) => Promise<boolean>
   onSiteTargetsChanged?: (callback: (ids: number[]) => void) => () => void
@@ -630,6 +674,7 @@ export type LouvorJaBridge = {
   presentation?: PresentationApi
   projection: ProjectionApi
   remote?: RemoteApi
+  monitorShare?: MonitorShareApi
   random?: RandomAudioApi
   sabbathSchool?: SabbathSchoolVideoApi
   announcements?: AnnouncementsFilesApi

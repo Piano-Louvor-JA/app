@@ -473,6 +473,65 @@
       void refreshState().then(renderButton)
     }, 1500)
 
+    // Controle remoto: mesma seleção do painel; projeta pela mesma seta.
+    window.__independentControl = {
+      snapshot: async function () {
+        if (!open) await reload()
+        return {
+          mode: mode,
+          live: isLive(),
+          armed: !isLive() && hasSelection(),
+          monitors: displays
+            .filter(function (d) { return !d.isPrimary })
+            .map(function (d) {
+              var onAir = Boolean(active && active.displayIds.indexOf(d.id) >= 0)
+              return {
+                id: 'monitor:' + d.id,
+                label: d.label,
+                detail: d.resolution,
+                selected: selDisplays.indexOf(d.id) >= 0,
+                onAir: onAir,
+                enabled: isEnabled(d.id) || onAir,
+              }
+            }),
+          remotes: slots
+            .filter(function (s) { return s.running || s.clients > 0 })
+            .map(function (s) {
+              return {
+                id: 'tv:' + s.id,
+                label: s.label || 'Conexão ' + s.id,
+                detail: 'Conexões ativas: ' + s.clients,
+                selected: selRemotes.indexOf(s.id) >= 0,
+                onAir: remoteLive.indexOf(s.id) >= 0,
+                enabled: true,
+              }
+            }),
+        }
+      },
+      setMode: function (next) {
+        if (!MODE_HINT[next]) return false
+        mode = next
+        renderMode()
+        return true
+      },
+      setTarget: function (targetId, enabled) {
+        var parts = String(targetId).split(':')
+        var want = enabled === true
+        if (parts[0] === 'monitor') {
+          var displayId = Number(parts[1])
+          var live = Boolean(active && active.displayIds.indexOf(displayId) >= 0)
+          if (!Number.isFinite(displayId) || (want && !isEnabled(displayId) && !live)) return false
+          if ((selDisplays.indexOf(displayId) >= 0) !== want) selDisplays = toggleIn(selDisplays, displayId)
+        } else if (parts[0] === 'tv' && parts[1]) {
+          if ((selRemotes.indexOf(parts[1]) >= 0) !== want) selRemotes = toggleIn(selRemotes, parts[1])
+        } else {
+          return false
+        }
+        render()
+        return true
+      },
+    }
+
     renderMode()
     void reload()
 

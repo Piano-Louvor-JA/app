@@ -21,15 +21,31 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     routeName: 'settings-projection',
     labelKey: 'settings.tabs.projection',
   },
+  // Conexões remotas: agregador (como Utilitários) de Transmissão, Controle
+  // Remoto e Palco. A aba fica ativa no agregador e nos três módulos.
+  {
+    id: 'connections',
+    routeName: 'settings-connections',
+    labelKey: 'settings.tabs.connections',
+    routeNames: ['settings-connections', 'settings-transmission', 'settings-remote', 'settings-palco'],
+  },
   {
     id: 'transmission',
     routeName: 'settings-transmission',
     labelKey: 'settings.tabs.transmission',
+    hidden: true,
   },
   {
     id: 'remote',
     routeName: 'settings-remote',
     labelKey: 'settings.tabs.remote',
+    hidden: true,
+  },
+  {
+    id: 'palco',
+    routeName: 'settings-palco',
+    labelKey: 'settings.tabs.palco',
+    hidden: true,
   },
 ]
 

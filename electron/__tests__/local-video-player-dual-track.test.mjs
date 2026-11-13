@@ -80,3 +80,20 @@ for (const field of ['src', 'audioSrc', 'subtitle']) {
     } finally { dom.window.close() }
   })
 }
+
+it('vídeo do YouTube (local://yt-*) sem legenda também vai em modo CORS: a prévia do celular lê o quadro', () => {
+  const src = encodeURIComponent(`local://yt-stream/${ID}/video`)
+  const audioSrc = encodeURIComponent(`local://yt-stream/${ID}/audio`)
+  const { dom, document } = openPlayer(`src=${src}&audioSrc=${audioSrc}`)
+  try {
+    expect(document.getElementById('player').getAttribute('crossorigin')).toBe('anonymous')
+    expect(document.querySelector('audio').getAttribute('crossorigin')).toBe('anonymous')
+  } finally { dom.window.close() }
+})
+
+it('arquivo local comum não muda de modo', () => {
+  const { dom, document } = openPlayer(`src=${encodeURIComponent('file:///videos/teste.mp4')}`)
+  try {
+    expect(document.getElementById('player').hasAttribute('crossorigin')).toBe(false)
+  } finally { dom.window.close() }
+})

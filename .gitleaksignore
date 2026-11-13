@@ -3,3 +3,6 @@ fa1fafae85b3a8cc46b2a49937972b00173d8e1e:src/modules/albums/services/__tests__/a
 
 # OBS_BLACK_IDLE_KEY is a localStorage preference name, not a credential.
 7371a4d2fa18147a6e77e8e7abdeeb10fb3efb9f:src/modules/settings/services/obs-connections.ts:generic-api-key:3
+
+# TOKEN_ALPHABET is the character set used to generate share tokens, not a credential.
+dbd815e9e9c3aad3fa69243b26fcb83a85ac83f1:electron/monitor-share.mjs:generic-api-key:28

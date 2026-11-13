@@ -92,10 +92,14 @@ import {
   getSourceNavigationState,
   getSourcePlaybackState,
   captureSourceFrameBase64,
+  captureSourcePreviewJpeg,
+  captureGalleryPreviewsJpeg,
   getVideoTargetMonitorIds,
   openWebProjectionWindows,
   registerProjectionCapturePermissions,
   remoteGoBackSource,
+  remoteNavigateSource,
+  remoteScrollSource,
   remoteGoForwardSource,
   remoteImageNext,
   remoteImagePrev,
@@ -110,6 +114,8 @@ import {
   remoteSetVolumeSource,
   setAudioOutputMode,
   remoteSetCaptionsHiddenSource,
+  getVideoControlSnapshot,
+  runVideoControlCommand,
   remoteToggleMuteSource,
   setSiteControlPanelOpen,
   setSiteTargetMonitorIds,
@@ -307,6 +313,12 @@ export function registerWorkspaceIpc() {
 
   ipcMain.handle('projection:set-audio-output', (_event, mode) => setAudioOutputMode(mode))
 
+  ipcMain.handle('projection:get-video-control-snapshot', () => getVideoControlSnapshot())
+
+  ipcMain.handle('projection:run-video-control-command', (_event, command) =>
+    runVideoControlCommand(command),
+  )
+
   ipcMain.handle('projection:remote-set-volume', async (_event, volume) => {
     try {
       return await remoteSetVolumeSource(volume)
@@ -340,6 +352,24 @@ export function registerWorkspaceIpc() {
     } catch (error) {
       console.error('[ipc] projection:get-navigation-state', error)
       return null
+    }
+  })
+
+  ipcMain.handle('projection:remote-scroll', (_event, ratio) => {
+    try {
+      return remoteScrollSource(ratio)
+    } catch (error) {
+      console.error('[ipc] projection:remote-scroll', error)
+      return false
+    }
+  })
+
+  ipcMain.handle('projection:remote-navigate', (_event, url) => {
+    try {
+      return remoteNavigateSource(url)
+    } catch (error) {
+      console.error('[ipc] projection:remote-navigate', error)
+      return false
     }
   })
 
@@ -510,6 +540,24 @@ export function registerWorkspaceIpc() {
       return await remotePptPrev()
     } catch (error) {
       console.error('[ipc] projection:remote-ppt-prev', error)
+      return null
+    }
+  })
+
+  ipcMain.handle('projection:capture-gallery-previews', async () => {
+    try {
+      return await captureGalleryPreviewsJpeg()
+    } catch (error) {
+      console.error('[ipc] projection:capture-gallery-previews', error)
+      return null
+    }
+  })
+
+  ipcMain.handle('projection:capture-slide-preview', async () => {
+    try {
+      return await captureSourcePreviewJpeg()
+    } catch (error) {
+      console.error('[ipc] projection:capture-slide-preview', error)
       return null
     }
   })

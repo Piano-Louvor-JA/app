@@ -1,4 +1,5 @@
 export default {
+  palcoOutputs: { title: 'Stage TVs', empty: 'No TV with Stage connected. Open Stage', onHold: '{slot} · on hold' },
   obsOutputs: { detecting: 'Detecting and refreshing OBS connections…', active: 'Remote connections', activateHint: 'Start a connection in Settings → Broadcast to use it here.', title: 'OBS connections', activeConnections: 'Active connections: {count}' },
   floating: { closeTitle: 'Close {title}?', closeMessage: 'Stop this feature and close its projection?' },
   updates: {
@@ -32,6 +33,7 @@ export default {
     comingSoon: 'Coming soon',
     openFolder: 'Open folder',
     addToPlaylist: 'Add to playlist',
+    suggestFix: 'Suggest lyric/timing fix',
     cancel: 'Cancel',
     copied: 'Copied!',
   },
@@ -46,6 +48,12 @@ export default {
     stop: 'Stop independent projection',
     sharedOn: 'Shared projection on monitor {index}',
     modeLabel: 'Projection mode',
+    status: {
+      stop: 'Stop',
+      overlay: 'Overlaying on:',
+      share: 'Sharing on:',
+      monitor: 'Monitor {index}',
+    },
     mode: {
       overlay: 'Overlay',
       share: 'Share',
@@ -53,6 +61,7 @@ export default {
     hintShare: 'Pick one monitor. Its screen is split in half with whatever is already projected; if one side leaves, the other takes the whole screen again.',
   },
   monitors: {
+    wiredTitle: 'Wired connections',
     selectScreens: 'Select screens',
     identify: 'Detect screens',
     hint: 'Check the monitors where the resource should be projected.',
@@ -94,6 +103,16 @@ export default {
       editor: 'Editor',
     },
     },
+  connectedDevices: {
+    title: 'Connected devices',
+    remote: 'Remote control',
+    speaker: 'Preacher\'s clicker',
+    monitors: 'Monitor sharing',
+    none: 'None connected',
+    monitorsInUse: '{device} ({host}) · {n} monitor(s)',
+    palco: 'Stage (TVs)',
+    palcoTv: '{name} · {ip}',
+  },
   minimize: {
     playlistCount: '{n} playlist(s)',
     pageNumber: 'Page {n}',

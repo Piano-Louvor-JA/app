@@ -94,3 +94,16 @@ test('bundle de homologation: renderer e main ficam em STG, sem produção', asy
   assert.equal(effective.profile, 'homologation')
   assert.equal(effective.primary, STG)
 })
+
+test('publicadores passam a configuração Firebase para a etapa que compila o renderer', () => {
+  const keys = ['API_KEY', 'AUTH_DOMAIN', 'PROJECT_ID', 'STORAGE_BUCKET', 'MESSAGING_SENDER_ID', 'APP_ID']
+  for (const file of ['release.yml', 'build-windows.yml', 'build-macos.yml']) {
+    const workflow = readFileSync(path.join(ROOT, '.github/workflows', file), 'utf8')
+    const buildStep = workflow.split(/\n      - name: /).find(step => step.startsWith('Build Vite\n') || step.startsWith('Build Vite + Electron '))
+    assert.ok(buildStep, `${file}: etapa de compilação ausente`)
+    for (const key of keys) {
+      const name = `VITE_FIREBASE_${key}`
+      assert.ok(buildStep.includes(`          ${name}: \u0024{{ secrets.${name} }}`), `${file}: compilação sem ${name}`)
+    }
+  }
+})

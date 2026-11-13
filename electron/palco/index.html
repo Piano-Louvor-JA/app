@@ -71,6 +71,7 @@
     text-align:center;width:60vw}
   #idle.hidden{opacity:0;pointer-events:none}
   #idleLogos img,#idleLogos svg{display:block;margin:0 auto}
+  .idle-no-logo #idleLogos,.idle-no-logo #bars{display:none}
   #idleLogo{height:14vh;max-width:50vw;margin:0 auto 4vh auto}#idleLogo svg{width:100%;height:100%;display:block}
   /* F3.3n: wordmark "Louvor JA" — identidade fixa, não personalizável. */
   #idleWordmark{font-size:3.6vh;font-weight:300;letter-spacing:.8vh;
@@ -231,8 +232,18 @@ function palcoLanHost(value){
   if(parts[0]!==10&&parts[0]!==127&&!(parts[0]===172&&parts[1]>=16&&parts[1]<=31)&&!(parts[0]===192&&parts[1]===168)&&!(parts[0]===169&&parts[1]===254))return '';
   return parts.join('.');
 }
+// Transmissor (celular/desktop): QUALQUER faixa IPv4 — igrejas usam 10.x,
+// 172.x, faixas públicas ou de operadora. Só formato estrito (sem 127.1,
+// 0x7f…, nomes ou sufixos), que são truques, não redes reais.
+function palcoSenderHost(value){
+  if(value==='localhost')return 'localhost';
+  if(typeof value!=='string'||! /^(?:0|[1-9][0-9]{0,2})(?:\.(?:0|[1-9][0-9]{0,2})){3}$/.test(value))return '';
+  const parts=value.split('.').map(Number);
+  if(parts.some(n=>n>255)||parts[0]===0||parts[0]>=224)return '';
+  return parts.join('.');
+}
 function palcoLanUrl(value,portValue,path,scheme){
-  const sender=palcoLanHost(value);
+  const sender=palcoSenderHost(value);
   if(!sender||!/^\d{1,5}$/.test(String(portValue)))return '';
   const number=Number(portValue);
   if(number<1||number>65535)return '';
@@ -263,14 +274,15 @@ function palcoMediaUrl(value){
     try{const source=new URL(parsed.origin);return palcoLanHost(source.hostname)||palcoOfficialOrigin(source.origin)?parsed.href:''}catch(e){return ''}
   }
   if(parsed.protocol!=='http:'&&parsed.protocol!=='https:')return '';
-  const local=palcoLanHost(parsed.hostname);
+  // Mídia: rede local, origem oficial ou o próprio transmissor conectado.
+  const local=palcoLanHost(parsed.hostname)||(host&&parsed.hostname===palcoSenderHost(host)?parsed.hostname:'');
   const official=palcoOfficialOrigin(parsed.origin);
   if(!local&&!official)return '';
   const origin=official||(parsed.protocol+'//'+local+(parsed.port?':'+Number(parsed.port):''));
   return origin+parsed.pathname+parsed.search+parsed.hash;
 }
 function proxyUrl(original){return palcoMediaUrl(original)}
-function lanSenderHost(){return palcoLanHost(host)}
+function lanSenderHost(){return palcoSenderHost(host)}
 function palcoSocketUrl(){
   const base=palcoLanUrl(host,port,'/palco','ws');
   if(!base)return '';
@@ -297,9 +309,11 @@ function sendEvent(m){try{if(ws&&ws.readyState===1)ws.send(JSON.stringify(m))}ca
 // > scan da sub-rede via GET :47080/status (resposta JSON identifica sender).
 // Transição: computadores na porta antiga (7080/7081) também são procurados.
 const DEFAULT_WS_PORT='47081';
+// APK novo: faixa 4980/4981 (sem conflito com o desktop na mesma rede).
+const APK_WS_PORT='4981';
 const LEGACY_WS_PORT='7081';
 const browserSourcePort=Number(location.port);
-const ownBrowserSource=/^https?:$/.test(location.protocol)&&!!palcoLanHost(location.hostname)&&browserSourcePort>=7080&&browserSourcePort<=65534;
+const ownBrowserSource=/^https?:$/.test(location.protocol)&&!!palcoSenderHost(location.hostname)&&((browserSourcePort>=7080&&browserSourcePort<=65534)||(browserSourcePort>=4980&&browserSourcePort<=4994&&browserSourcePort%2===0));
 let host=qs.get('host')||(ownBrowserSource?location.hostname:localStorage.getItem('palcoHost'))||location.hostname||'';
 let port=qs.get('port')||(ownBrowserSource?String(browserSourcePort+1):localStorage.getItem('palcoPort'))||DEFAULT_WS_PORT;
 // Porta do link ou da própria página é definitiva; a salva pode ser de antes da troca.
@@ -318,7 +332,7 @@ function probeHttp(ip,httpPort){
 function probeSender(ip){
   if(!palcoLanUrl(ip,port,'/status','http'))return Promise.resolve(null);
   var tries=[port];
-  if(!portFixed)[DEFAULT_WS_PORT,LEGACY_WS_PORT].forEach(function(p){if(tries.indexOf(p)<0)tries.push(p)});
+  if(!portFixed)[DEFAULT_WS_PORT,APK_WS_PORT,LEGACY_WS_PORT].forEach(function(p){if(tries.indexOf(p)<0)tries.push(p)});
   return tries.slice(1).reduce(function(found,p){
     return found.then(function(r){return r||probePair(ip,Number(p))});
   },probePair(ip,Number(port)));
@@ -342,7 +356,7 @@ function normalizePort(ip,j,wsPort){
   if(j&&Number.isInteger(Number(j.wsPort)))wsPort=Number(j.wsPort);
   if(!palcoLanUrl(ip,wsPort,'/palco','ws'))return null;
   port=String(Number(wsPort));
-  return palcoLanHost(ip);
+  return palcoSenderHost(ip);
 }
 
 async function scanSubnet(){
@@ -350,13 +364,13 @@ async function scanSubnet(){
   // presume /24 da própria TV (rede típica de igreja)
   // file:// (IPK/simulador local): hostname vazio — tenta últimos hosts
   // conhecidos da sub-rede salva antes do default. Cobertura p/ IPK.
-  let me=palcoLanHost(location.hostname);
+  let me=palcoSenderHost(location.hostname);
   if(!me){
     const saved=localStorage.getItem('palcoHost');
-    me=palcoLanHost(saved)||'192.168.1.100';
+    me=palcoSenderHost(saved)||'192.168.1.100';
   }
   const prefix=me.split('.').slice(0,3).join('.');
-  const known=palcoLanHost(host);
+  const known=palcoSenderHost(host);
   const base=known&&known!=='localhost'?known.split('.').slice(0,3).join('.'):prefix;
   const ips=[];
   for(let i=1;i<255;i++)ips.push(base+'.'+i);
@@ -659,6 +673,7 @@ document.addEventListener('pointerdown',function(){if(mutedUnlock||pendingPlay)u
 
 function handle(m){
   if(m.v!==1&&m.v!==2)return;
+  if(m.type==='idleStyle'){document.documentElement.classList.toggle('idle-no-logo',m.hideLogo===true);return;}
   switch(m.type){
     case 'projection':
       hideIdle();
@@ -734,8 +749,17 @@ function handle(m){
       // F3.3m: footer com referência destacada + versão
       {const f=$('footer');
         if(m.footerRef){
-          f.innerHTML=`<span class="ref" style="--ref-color:${m.footerColor||'#FCCE02'};--ref-weight:${m.footerWeight||600}">${m.footerRef}</span>`+
-            (m.footerVersion?`<span class="ver">${m.footerVersion}</span>`:'');
+          f.textContent='';
+          const ref=document.createElement('span');
+          ref.className='ref';
+          ref.textContent=String(m.footerRef);
+          ref.style.setProperty('--ref-color',String(m.footerColor||'#FCCE02'));
+          ref.style.setProperty('--ref-weight',String(m.footerWeight||600));
+          const footerSize=Number(m.footerSize);
+          if(Number.isFinite(footerSize)&&footerSize>0)ref.style.fontSize=(Math.round(footerSize/10.8*1000)/1000)+'vw';
+          ref.style.textTransform=['none','uppercase','capitalize'].includes(m.footerTransform)?m.footerTransform:'none';
+          f.appendChild(ref);
+          if(m.footerVersion){const version=document.createElement('span');version.className='ver';version.textContent=String(m.footerVersion);f.appendChild(version)}
         }else{
           f.textContent=m.footer||'';
         }
