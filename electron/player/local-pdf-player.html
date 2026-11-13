@@ -57,6 +57,7 @@
       let pdfDoc = null
       let pageIndex = 0
       let renderToken = 0
+      let activeRenderTask = null
       let renderedToken = -1
       let exportCache = null
       const thumbnailCache = new Map()
@@ -92,6 +93,17 @@
         const page = await pdfDoc.getPage(pageIndex + 1)
         if (token !== renderToken) return state()
 
+        // O PDF.js só permite uma renderização ativa por canvas.
+        // Aguarda o cancelamento antes de redimensionar ou reutilizar a prévia.
+        if (activeRenderTask) {
+          const previous = activeRenderTask
+          previous.cancel()
+          try { await previous.promise } catch (error) {
+            if (error?.name !== 'RenderingCancelledException') throw error
+          }
+        }
+        if (token !== renderToken) return state()
+
         const stage = document.getElementById('stage')
         const maxWidth = Math.max(1, stage?.clientWidth || window.innerWidth || 1)
         const maxHeight = Math.max(1, stage?.clientHeight || window.innerHeight || 1)
@@ -103,11 +115,16 @@
         canvas.height = Math.floor(viewport.height)
         showError(false)
 
-        await page.render({
-          canvasContext: context,
-          viewport,
-        }).promise
-        if (token === renderToken) renderedToken = token
+        const task = page.render({ canvasContext: context, viewport })
+        activeRenderTask = task
+        try {
+          await task.promise
+          if (token === renderToken) renderedToken = token
+        } catch (error) {
+          if (error?.name !== 'RenderingCancelledException') throw error
+        } finally {
+          if (activeRenderTask === task) activeRenderTask = null
+        }
 
         return state()
       }
