@@ -1104,8 +1104,8 @@ const SPEAKER_TOKENS = {
   surfaceInput: '#242424', // colors.dark.surfaceCard
   onSurface: '#e5e2e1', // colors.dark.onSurface
   onSurfaceVariant: '#bfc7d4', // colors.dark.onSurfaceVariant
-  primary: '#2196f3', // colors.primary
-  onPrimary: '#003258', // colors.dark.onPrimary
+  primary: '#E0895A', // accents[defaultAccent].primary (orange)
+  onPrimary: '#2b160b', // contraste para o realce laranja
   outline: 'rgba(255,255,255,0.10)', // colors.dark.outlineStrong
   success: '#64d99b',
   radiusSm: '8px 0 8px 0', // radius.sm
@@ -1116,22 +1116,34 @@ const SPEAKER_TOKENS = {
 /** Dicionário i18n da página do pregador — TODO texto visível passa por aqui. */
 export const SPEAKER_I18N = {
   'pt-BR': {
-    title: 'Pregador', connecting: 'Conectando preview…', noPairing: 'Sem pareamento — cole o link do QR',
+    refreshPage: 'Atualizar página', closePage: 'Fechar', closeBlocked: 'O navegador bloqueou o fechamento automático. Feche esta aba ou janela pelo controle do próprio navegador.',
+    disconnected: 'A conexão foi encerrada pelo desktop. Outro dispositivo já pode acessar o modo interativo.',
+    waiting: 'Aguardando transmissão',
+    interactiveBusy: 'Já existe uma conexão interativa ativa. Para liberar o acesso, use o botão “Encerrar conexão ativa” no app desktop, em Configurações → Controle Remoto → Tela de Apoio. Depois, atualize esta página para tentar novamente.',
+    stopwatch: 'Tempo de pregação', start: 'Iniciar', pause: 'Pausar', resume: 'Continuar', reset: 'Zerar', title: 'Tela de apoio', connecting: 'Conectando preview…', noPairing: 'Sem pareamento — cole o link do QR',
     pairHint: 'Pareamento perdido. Cole abaixo o link do QR exibido no app do desktop (começa com http://…/speaker?token=…):',
     connect: 'Conectar', cancel: 'Cancelar', repair: 'Reemparelhar',
-    back: 'Voltar', next: 'Avançar', previewTitle: 'Preview da projeção',
+    previousSlide: 'Anterior', nextSlide: 'Próximo', unavailable: 'Sem slide', back: 'Voltar', next: 'Avançar', previewTitle: 'Preview da projeção',
   },
   en: {
-    title: 'Speaker', connecting: 'Connecting preview…', noPairing: 'Not paired — paste the QR link',
+    refreshPage: 'Refresh page', closePage: 'Close', closeBlocked: 'The browser blocked automatic closing. Close this tab or window using the browser controls.',
+    disconnected: 'The desktop ended this connection. Another device can now access interactive mode.',
+    waiting: 'Waiting for broadcast',
+    interactiveBusy: 'An interactive connection is already active. To free access, use “End active connection” in the desktop app under Settings → Remote Control → Support Screen. Then refresh this page to try again.',
+    stopwatch: 'Sermon time', start: 'Start', pause: 'Pause', resume: 'Resume', reset: 'Reset', title: 'Support screen', connecting: 'Connecting preview…', noPairing: 'Not paired — paste the QR link',
     pairHint: 'Pairing lost. Paste below the QR link shown in the desktop app (starts with http://…/speaker?token=…):',
     connect: 'Connect', cancel: 'Cancel', repair: 'Re-pair',
-    back: 'Back', next: 'Next', previewTitle: 'Projection preview',
+    previousSlide: 'Previous', nextSlide: 'Next', unavailable: 'No slide', back: 'Back', next: 'Next', previewTitle: 'Projection preview',
   },
   es: {
-    title: 'Predicador', connecting: 'Conectando vista previa…', noPairing: 'Sin emparejar — pega el enlace del QR',
+    refreshPage: 'Actualizar página', closePage: 'Cerrar', closeBlocked: 'El navegador bloqueó el cierre automático. Cierra esta pestaña o ventana con los controles del navegador.',
+    disconnected: 'El escritorio finalizó la conexión. Otro dispositivo ya puede acceder al modo interactivo.',
+    waiting: 'Esperando transmisión',
+    interactiveBusy: 'Ya existe una conexión interactiva activa. Para liberar el acceso, usa “Finalizar conexión activa” en la app de escritorio, en Configuración → Control Remoto → Pantalla de Apoyo. Después, actualiza esta página para intentarlo de nuevo.',
+    stopwatch: 'Tiempo de predicación', start: 'Iniciar', pause: 'Pausar', resume: 'Continuar', reset: 'Reiniciar', title: 'Pantalla de apoyo', connecting: 'Conectando vista previa…', noPairing: 'Sin emparejar — pega el enlace del QR',
     pairHint: 'Emparejamiento perdido. Pega abajo el enlace del QR mostrado en la app de escritorio (empieza con http://…/speaker?token=…):',
     connect: 'Conectar', cancel: 'Cancelar', repair: 'Reemparejar',
-    back: 'Atrás', next: 'Adelante', previewTitle: 'Vista previa de proyección',
+    previousSlide: 'Anterior', nextSlide: 'Siguiente', unavailable: 'Sin diapositiva', back: 'Atrás', next: 'Adelante', previewTitle: 'Vista previa de proyección',
   },
 }
 
@@ -1145,35 +1157,89 @@ export function speakerPageHtml({ palcoToken = '' } = {}) {
   // Token do palco embutido no JS (regex do receiver aceita A-Z0-9 de 5).
   const safeToken = /^[A-Z0-9]{5}$/.test(palcoToken) ? palcoToken : ''
   return `<!doctype html>
-<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no,viewport-fit=cover"><title>Pregador · LouvorJA</title>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no,viewport-fit=cover"><title>Tela de apoio · LouvorJA</title>
 <style>
 :root{--bg:${t.bg};--surface:${t.surface};--surface-input:${t.surfaceInput};--on-surface:${t.onSurface};--on-surface-variant:${t.onSurfaceVariant};--primary:${t.primary};--on-primary:${t.onPrimary};--outline:${t.outline};--success:${t.success};--radius-sm:${t.radiusSm};--radius-md:${t.radiusMd};--sp1:${t.spacing1};--sp2:${t.spacing2};--sp3:${t.spacing3};--sp4:${t.spacing4}}
+[hidden]{display:none!important}
+#connectionError .connection-error-actions{display:flex;justify-content:center;flex-wrap:wrap;gap:12px;margin-top:24px}
+#connectionError button{width:auto;min-height:48px;padding:12px 20px;font-size:16px}
+#connectionError .connection-error-close{background:var(--surface);color:var(--on-surface)}
+#connectionError p{max-width:600px;margin:0 auto}
+#connectionError{position:fixed;inset:0;z-index:20;display:grid;place-content:center;padding:32px;background:var(--bg);color:var(--on-surface);text-align:center;font-size:20px;line-height:1.6}
 html,body{height:100%}
-body{margin:0;background:var(--bg);color:var(--on-surface);font:16px system-ui;display:flex;flex-direction:column;min-height:100dvh}
+body{margin:0;background:var(--bg);color:var(--on-surface);font:16px 'Plus Jakarta Sans',system-ui,sans-serif;display:flex;flex-direction:column;min-height:100dvh}
 main{flex:1;display:flex;flex-direction:column;padding:var(--sp3) var(--sp3) var(--sp2);max-width:480px;width:100%;margin:auto;min-height:0;box-sizing:border-box}
-h1{font-size:20px;margin:0 0 var(--sp2)}
+h1{font-size:20px;margin:0}
+.speaker-header{display:flex;align-items:center;justify-content:space-between;gap:var(--sp2);margin-bottom:var(--sp3)}
+.stopwatch{display:grid;grid-template-columns:auto auto;align-items:center;gap:4px 12px;background:var(--surface);border:1px solid var(--outline);border-radius:var(--radius-sm);padding:8px 10px}
+.stopwatch-label{grid-column:1/-1;font-size:11px;color:var(--on-surface-variant)}
+#stopwatchTime{font-size:26px;line-height:1.2;font-weight:700;font-variant-numeric:tabular-nums;color:var(--primary)}
+.stopwatch-controls{display:flex;gap:6px}
+.stopwatch button{min-height:36px;width:auto;padding:6px 10px;font-size:12px}
+#stopwatchReset{background:var(--surface-input);color:var(--on-surface)}
+@media(max-width:350px){.speaker-header{align-items:flex-start;flex-direction:column}.stopwatch{align-self:stretch}}
+
 .preview{flex:1;min-height:0;background:#000;border:1px solid var(--outline);border-radius:var(--radius-sm);overflow:hidden;position:relative;display:flex;align-items:center;justify-content:center}
+.bible-preview{position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;justify-content:center;gap:20px;padding:24px;background:#000;text-align:center;overflow:auto}
+.bible-preview[hidden]{display:none}
+#bibleText{font-size:clamp(18px,4.5vw,28px);line-height:1.5;white-space:pre-line}
+#bibleReference{color:var(--primary);font-size:16px}
+.thumbnail span{padding:8px;text-align:center;max-height:100%;overflow:auto;box-sizing:border-box}
+#supportIdle{position:absolute;inset:0;z-index:2;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+#supportIdle img{width:64px;height:auto;animation:supportPulse 3.2s ease-in-out infinite}
+#supportIdle span{font-size:13px;letter-spacing:.06em;color:var(--on-surface-variant)}
+@keyframes supportPulse{0%,100%{opacity:.35}50%{opacity:1}}
+@media(prefers-reduced-motion:reduce){#supportIdle img{animation:none}}
+.preview>img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000}
+.preview>img[hidden]{display:none}
 .preview iframe{width:1280px;height:720px;border:0;transform-origin:0 0;position:absolute;top:0;left:0;background:#000}
 #msg{position:absolute;inset:0;display:grid;place-items:center;color:var(--on-surface-variant);font-size:14px;padding:var(--sp2);text-align:center}
 footer{margin-top:var(--sp2)}
+.neighbors{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp3);margin-bottom:var(--sp3)}
+.neighbor{margin:0;min-width:0;background:var(--surface);border:1px solid var(--outline);border-radius:var(--radius-sm);overflow:hidden}
+.neighbor figcaption{padding:var(--sp2);font-size:15px;font-weight:600;color:var(--primary)}
+.thumbnail{position:relative;height:clamp(64px,14dvh,130px);background:#000;display:grid;place-items:center}
+.thumbnail img{width:100%;height:100%;object-fit:contain;position:absolute;inset:0}
+.thumbnail img[hidden]{display:none}
+.neighbors.music-neighbors{grid-template-columns:1fr}
+.neighbors.music-neighbors .neighbor:first-child{display:none}
+.neighbors.bible-neighbors.music-neighbors .thumbnail{align-items:center}
+.neighbors.bible-neighbors.music-neighbors .thumbnail span{font-size:clamp(22px,5vw,30px);line-height:1.5;padding:16px;text-align:center}
+.neighbors.bible-neighbors .thumbnail{height:clamp(140px,24dvh,240px);align-items:start;justify-items:stretch}
+.neighbors.bible-neighbors .verse-reference{display:block;color:var(--primary);font-weight:500;margin-bottom:8px}
+.neighbors.bible-neighbors .thumbnail span{font-size:14px;line-height:1.6;color:var(--on-surface);white-space:pre-line;text-align:left;display:block;width:100%;padding:12px}
+.thumbnail span{color:var(--on-surface-variant);font-size:12px}
+button:focus-visible{outline:2px solid var(--on-surface);outline-offset:3px}
 button{min-height:64px;width:48%;font-size:28px;border-radius:var(--radius-md);border:0;background:var(--primary);color:var(--on-primary);font-weight:700}
-button:active{filter:brightness(1.3)}
+button:disabled{opacity:.35;cursor:not-allowed;filter:grayscale(1)}
+button:not(:disabled):active{filter:brightness(1.3)}
 nav{display:flex;justify-content:space-between;gap:var(--sp3)}
 #count{font-size:24px;text-align:center;margin:var(--sp2);font-weight:700}
 .changed{outline:4px solid var(--success)}
 #pair{position:fixed;inset:0;background:var(--bg);z-index:10;display:none;flex-direction:column;justify-content:center;padding:var(--sp6,24px);gap:var(--sp3)}
 #pair input{padding:var(--sp3);border-radius:var(--radius-sm);border:1px solid var(--outline);background:var(--surface-input);color:var(--on-surface);font-size:14px}
-.small{min-height:44px;width:100%;font-size:16px;background:var(--surface)}
+.small{min-height:44px;width:100%;font-size:16px;background:var(--surface);color:var(--on-surface)}
 .hint{color:var(--on-surface-variant);font-size:13px;line-height:1.4}
 </style></head>
 <body>
+<div id="connectionError" hidden role="alert"><p id="connectionErrorMessage" data-i18n="interactiveBusy">Já existe uma conexão interativa ativa.</p>
+<div class="connection-error-actions"><button id="refreshPage" data-i18n="refreshPage">Atualizar página</button><button id="closePage" class="connection-error-close" data-i18n="closePage">Fechar</button></div></div>
 <main>
-<h1 id="t" data-i18n="title">Pregador</h1>
-<div class="preview"><iframe id="frame" data-i18n-attr="title:previewTitle" title="Preview da projeção" style="display:none"></iframe><div id="msg" data-i18n="connecting">Conectando preview…</div></div>
+<header class="speaker-header"><h1 id="t" data-i18n="title">Tela de apoio</h1>
+<section class="stopwatch" data-i18n-attr="aria-label:stopwatch" aria-label="Tempo de pregação">
+<span class="stopwatch-label" data-i18n="stopwatch">Tempo de pregação</span>
+<output id="stopwatchTime" role="timer" aria-live="off">00:00</output>
+<div class="stopwatch-controls"><button id="stopwatchToggle" data-i18n="start">Iniciar</button><button id="stopwatchReset" data-i18n="reset">Zerar</button></div>
+</section></header>
+<div class="preview"><div id="supportIdle"><img src="logo-louvor-ja.svg" alt="Louvor JA"><span data-i18n="waiting">Aguardando transmissão</span></div><div id="biblePreview" class="bible-preview" hidden><div id="bibleText"></div><div id="bibleReference"></div></div><img id="currentImage" hidden data-i18n-attr="alt:previewTitle" alt="Preview da projeção"><iframe id="frame" data-i18n-attr="title:previewTitle" title="Preview da projeção" style="display:none"></iframe><div id="msg" data-i18n="connecting">Conectando preview…</div></div>
 <footer>
+<div class="neighbors">
+<figure class="neighbor"><figcaption data-i18n="previousSlide">Anterior</figcaption><div class="thumbnail"><span data-i18n="unavailable">Sem slide</span><img id="previousImage" hidden data-i18n-attr="alt:previousSlide" alt="Anterior"></div></figure>
+<figure class="neighbor"><figcaption data-i18n="nextSlide">Próximo</figcaption><div class="thumbnail"><span data-i18n="unavailable">Sem slide</span><img id="nextImage" hidden data-i18n-attr="alt:nextSlide" alt="Próximo"></div></figure>
+</div>
 <div id="conn" style="font-size:13px;text-align:center;margin-bottom:6px;color:var(--on-surface-variant)"><span class="dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--on-surface-variant);margin-right:6px"></span><span data-i18n="connecting">Conectando preview…</span></div>
 <div id="count">—/—</div>
-<nav><button id="prev" data-i18n-attr="aria-label:back" aria-label="Voltar">◀</button><button id="next" data-i18n-attr="aria-label:next" aria-label="Avançar">▶</button></nav>
+<nav><button id="prev" disabled data-i18n-attr="aria-label:back" aria-label="Voltar">◀</button><button id="next" disabled data-i18n-attr="aria-label:next" aria-label="Avançar">▶</button></nav>
 <button id="repair" class="small" style="margin-top:var(--sp3)" data-i18n-attr="aria-label:repair" aria-label="Reemparelhar" data-i18n="repair">Reemparelhar</button>
 </footer>
 </main>
@@ -1183,6 +1249,8 @@ nav{display:flex;justify-content:space-between;gap:var(--sp3)}
 <script>
 const I18N=${dictJson};
 const q=new URLSearchParams(location.search);
+const readOnly=q.get('mode')==='view';
+if(readOnly){document.querySelector('nav').hidden=true;document.querySelector('.stopwatch').hidden=true;document.getElementById('repair').hidden=true}
 // Idioma: ?lang= > navigator.language do celular > pt-BR (resolveAppLocale-equiv).
 function pickLang(){const sup=['pt-BR','en','es'];const p=v=>{if(!v)return'';const l=sup.find(s=>s.toLowerCase()===v.toLowerCase());if(l)return l;const pre=v.split('-')[0].toLowerCase();return sup.find(s=>s.split('-')[0].toLowerCase()===pre)||''};
   return p(q.get('lang'))||p(navigator.language)||'pt-BR'}
@@ -1191,14 +1259,35 @@ document.documentElement.lang=lang;
 document.title=T.title+' · LouvorJA';
 document.querySelectorAll('[data-i18n]').forEach(el=>{el.textContent=T[el.dataset.i18n]});
 document.querySelectorAll('[data-i18n-attr]').forEach(el=>{const[k,key]=el.dataset.i18nAttr.split(':');el.setAttribute(k,T[key])});
-let token=q.get('token')||localStorage.getItem('speaker.token');
-let remotePort=q.get('remotePort')||localStorage.getItem('speaker.remotePort')||'${DEFAULT_REMOTE_PORT}';
-let palcoPort=q.get('palcoPort')||localStorage.getItem('speaker.palcoPort')||String((Number(location.port)||47080)+1);
+// Relógio absoluto: não perde tempo quando o navegador suspende os intervalos.
+let stopwatch={elapsed:0,startedAt:null};
+try{const saved=JSON.parse(localStorage.getItem('speaker.stopwatch'));
+  if(saved&&Number.isFinite(saved.elapsed)&&saved.elapsed>=0&&(saved.startedAt===null||(Number.isFinite(saved.startedAt)&&saved.startedAt>=0)))stopwatch=saved;
+}catch{}
+function stopwatchElapsed(){return stopwatch.elapsed+(stopwatch.startedAt===null?0:Math.max(0,Date.now()-stopwatch.startedAt))}
+function saveStopwatch(){try{localStorage.setItem('speaker.stopwatch',JSON.stringify(stopwatch))}catch{}}
+function renderStopwatch(){const seconds=Math.floor(stopwatchElapsed()/1000),hours=Math.floor(seconds/3600),pad=n=>String(n).padStart(2,'0');
+  document.getElementById('stopwatchTime').textContent=(hours?pad(hours)+':':'')+pad(Math.floor(seconds/60)%60)+':'+pad(seconds%60);
+  document.getElementById('stopwatchToggle').textContent=stopwatch.startedAt!==null?T.pause:stopwatch.elapsed?T.resume:T.start;
+}
+document.getElementById('stopwatchToggle').onclick=()=>{
+  if(stopwatch.startedAt===null)stopwatch.startedAt=Date.now();else{stopwatch.elapsed=stopwatchElapsed();stopwatch.startedAt=null}
+  saveStopwatch();renderStopwatch();
+};
+document.getElementById('stopwatchReset').onclick=()=>{stopwatch={elapsed:0,startedAt:null};saveStopwatch();renderStopwatch()};
+setInterval(renderStopwatch,250);
+document.addEventListener('visibilitychange',renderStopwatch);
+renderStopwatch();
+const storagePrefix=readOnly?'support.viewer.':'speaker.';
+let token=q.get('token')||localStorage.getItem(storagePrefix+'token');
+let remotePort=q.get('remotePort')||localStorage.getItem(storagePrefix+'remotePort')||'${DEFAULT_REMOTE_PORT}';
+let palcoPort=q.get('palcoPort')||localStorage.getItem(storagePrefix+'palcoPort')||String((Number(location.port)||47080)+1);
 // Token do palco (valor real injetado server-side abaixo) — o preview precisa
 // dele para o WS do palco não fechar a conexão fora do localhost.
 let palcoToken='${safeToken}';
-if(token){localStorage.setItem('speaker.token',token);localStorage.setItem('speaker.remotePort',remotePort);localStorage.setItem('speaker.palcoPort',palcoPort)}
-let preview,remote,queued=[],state={index:0,total:0},seq=0,lastSend=0;
+if(token){localStorage.setItem(storagePrefix+'token',token);localStorage.setItem(storagePrefix+'remotePort',remotePort);localStorage.setItem(storagePrefix+'palcoPort',palcoPort)}
+let connectionBlocked=false;
+let preview,remote,queued=[],state={index:0,total:0,active:false},seq=0,lastSend=0;
 const frame=document.querySelector('#frame'),msg=document.querySelector('#msg'),count=document.querySelector('#count');
 function host(port,path){return 'ws://'+location.hostname+':'+port+path}
 // Preview full-area: escala por LARGURA (16:9) e centra verticalmente no
@@ -1211,27 +1300,64 @@ document.addEventListener('gesturestart',e=>e.preventDefault());
 document.addEventListener('gesturechange',e=>e.preventDefault());
 let lastTouch=0;
 document.addEventListener('touchend',e=>{const now=Date.now();if(now-lastTouch<300)e.preventDefault();lastTouch=now},{passive:false});
-function render(){count.textContent=(state.total?state.index+1:'—')+'/'+(state.total||'—')}
-function setConn(online){const c=document.querySelector('#conn'),d=c.querySelector('.dot'),s=c.querySelector('[data-i18n]');d.style.background=online?'var(--success)':'var(--on-surface-variant)';s.textContent=online?({ptBR:'Conectado',en:'Connected',es:'Conectado'})[lang.replace('-','')]||'Conectado':T.connecting}
+let galleryKey='',gallery=[];
+function render(){
+  const idle=state.active===false;
+  document.getElementById('supportIdle').hidden=!idle;
+  const bible=state.kind==='bible';
+  document.getElementById('prev').disabled=readOnly||state.canNavigate!==true;
+  document.getElementById('next').disabled=readOnly||state.canNavigate!==true;
+  document.querySelector('.neighbors').classList.toggle('bible-neighbors',bible||Array.isArray(state.lyrics));
+  document.querySelector('.neighbors').classList.toggle('music-neighbors',!bible&&Array.isArray(state.lyrics));
+  document.getElementById('biblePreview').hidden=!bible;
+  document.getElementById('bibleText').textContent=bible?state.text||'':'';
+  document.getElementById('bibleReference').textContent=bible?state.reference||'':'';
+  count.textContent=(state.total?state.index+1:'—')+'/'+(state.total||'—');
+  for(const [id,index] of [['currentImage',state.index],['previousImage',state.index-1],['nextImage',state.index+1]]){
+    const img=document.getElementById(id),raw=index>=0&&index<state.total?(id==='currentImage'?(state.preview||gallery[index]):gallery[index]):null;
+    const src=typeof raw==='string'&&/^[A-Za-z0-9+/]+={0,2}$/.test(raw)?'data:image/jpeg;base64,'+raw:raw;
+    const safe=typeof src==='string'&&/^data:image[/](png|jpeg|webp);base64,/.test(src);
+    img.hidden=!safe;
+    if(id==='currentImage'){frame.style.display=safe?'none':'';if(safe)msg.style.display='none'}
+    else {
+      const label=img.previousElementSibling,text=bible?(id==='previousImage'?state.previousText:state.nextText):(Array.isArray(state.lyrics)&&index>=0&&index<state.total?state.lyrics[index]:'');
+      const reference=bible?(id==='previousImage'?state.previousReference:state.nextReference):'';
+      label.replaceChildren();
+      if(text&&reference){const ref=document.createElement('strong');ref.className='verse-reference';ref.textContent=reference;label.appendChild(ref)}
+      label.appendChild(document.createTextNode(text||T.unavailable));label.hidden=!!safe;
+    }
+    if(safe)img.src=src;else img.removeAttribute('src');
+  }
+  if(idle)frame.style.display='none';
+}
+function updateSlide(slide,active){
+  if(active===false)slide={index:0,total:0,canNavigate:false};
+  if(!slide.galleryKey||slide.galleryKey!==galleryKey){gallery=[];galleryKey=slide.galleryKey||''}
+  if(Array.isArray(slide.previews))gallery=slide.previews;
+  state={...slide,active};render();
+}
+function setConn(online){if(!online){updateSlide({index:0,total:0},false)}const c=document.querySelector('#conn'),d=c.querySelector('.dot'),s=c.querySelector('[data-i18n]');d.style.background=online?'var(--success)':'var(--on-surface-variant)';s.textContent=online?({ptBR:'Conectado',en:'Connected',es:'Conectado'})[lang.replace('-','')]||'Conectado':T.connecting}
 function pulse(){count.classList.add('changed');setTimeout(()=>count.classList.remove('changed'),350)}
 // Preview: receiver.html real (mesmo renderizador da TV) apontando pro palco.
 // palcoToken: WS do palco exige token fora do localhost — sem ele o receiver
 // é fechado na conexão e o preview fica preso no splash (fix 13/10).
 function openPreview(){try{preview&&preview.close()}catch{}
-  frame.src='receiver.html?host='+encodeURIComponent(location.hostname)+'&port='+palcoPort+(palcoToken?'&token='+encodeURIComponent(palcoToken):'');
+  frame.src='receiver.html?speakerPreview=1&host='+encodeURIComponent(location.hostname)+'&port='+palcoPort+(palcoToken?'&token='+encodeURIComponent(palcoToken):'');
   frame.style.display='';msg.style.display='none';fitFrame()}
-function send(action){const now=Date.now();if(now-lastSend<250)return;lastSend=now;
+function send(action){if(connectionBlocked||readOnly||(action.startsWith('slide:')&&state.canNavigate!==true))return;const now=Date.now();if(now-lastSend<250)return;lastSend=now;
   const m={v:1,type:'command',id:'s'+(++seq),action,token};
   if(remote&&remote.readyState===1)remote.send(JSON.stringify(m));else queued.push(m)}
 function openRemote(){remote=new WebSocket(host(remotePort,''));
   remote.onopen=()=>{setConn(true);remote.send(JSON.stringify({v:1,type:'hello',role:'speaker',token}));queued.splice(0).forEach(m=>remote.send(JSON.stringify(m)))};
-  remote.onmessage=e=>{try{const m=JSON.parse(e.data);if(m.type==='state'&&m.slide){const old=state.index;state=m.slide;render();if(old!==state.index)pulse()}}catch{}};
-  remote.onclose=()=>{setConn(false);setTimeout(openRemote,800)}}
+  remote.onmessage=e=>{try{const m=JSON.parse(e.data);if(m.type==='error'&&(m.code==='remote_busy'||m.code==='speaker_disconnected')){connectionBlocked=true;queued=[];setConn(false);document.getElementById('connectionErrorMessage').textContent=m.code==='speaker_disconnected'?T.disconnected:T.interactiveBusy;document.getElementById('connectionError').hidden=false;frame.src='about:blank';return}if(connectionBlocked)return;if(m.type==='state'&&m.slide){const old=state.index;updateSlide(m.slide,m.supportActive);if(old!==state.index)pulse()}}catch{}};
+  remote.onclose=()=>{setConn(false);if(!connectionBlocked)setTimeout(openRemote,800)}}
+document.getElementById('refreshPage').onclick=()=>location.reload();
+document.getElementById('closePage').onclick=()=>{window.close();setTimeout(()=>{if(!window.closed)document.getElementById('connectionErrorMessage').textContent=T.closeBlocked},200)};
 document.querySelector('#prev').onclick=()=>send('slide:prev');
 document.querySelector('#next').onclick=()=>send('slide:next');
 // Reemparelhar: limpa pareamento e abre overlay pra colar o link do QR de novo.
 const pair=document.querySelector('#pair');
-document.querySelector('#repair').onclick=()=>{localStorage.removeItem('speaker.token');localStorage.removeItem('speaker.remotePort');localStorage.removeItem('speaker.palcoPort');pair.style.display='flex'};
+document.querySelector('#repair').onclick=()=>{localStorage.removeItem(storagePrefix+'token');localStorage.removeItem(storagePrefix+'remotePort');localStorage.removeItem(storagePrefix+'palcoPort');pair.style.display='flex'};
 document.querySelector('#pairCancel').onclick=()=>{pair.style.display='none';location.reload()};
 document.querySelector('#pairGo').onclick=()=>{const u=new URL(document.querySelector('#pairUrl').value.trim());location.href=u.toString()};
 // Wake Lock: tela acesa durante o culto; re-adquire ao voltar pro foreground.

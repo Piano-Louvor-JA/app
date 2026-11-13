@@ -240,9 +240,9 @@ describe('convivência operador (APK) + pregador — limites POR PAPEL', () => {
     const { connect } = await serverWithOperator()
     const s1 = connect()
     s1.message({ v: 1, type: 'hello', role: 'speaker', token: TOKEN })
-    // Operador + pregador já ocupam as 2 vagas físicas — rejeitado na conexão,
-    // antes mesmo do hello (listeners.message nunca é registrado).
+    // Conexões de visualização podem coexistir; o hello identifica o papel.
     const s2 = connect()
+    s2.message({ v: 1, type: 'hello', role: 'speaker', token: TOKEN })
     expect(s2.ws.sent.find((m) => m.type === 'error')?.code).toBe('remote_busy')
     expect(s2.ws.close).toHaveBeenCalled()
     expect(s1.ws.sent.find((m) => m.type === 'error')).toBeUndefined()
@@ -379,4 +379,72 @@ describe('confirmação de autenticação para recordar conexão no APK', () => 
     expect(invalid.close).toHaveBeenCalled()
     server.stop()
   })
+})
+
+it('regência tem token próprio, aceita múltiplos leitores e rejeita qualquer comando', async () => {
+  const wss = fakeWss(), contents = fakeContents()
+  const server = await startRemoteServer(wss, contents, { token: TOKEN, speakerToken: SPEAKER_TOKEN })
+  try {
+    const info = await ipcHandlers.get('remote:pairing-info')()
+    const url = new URL(info.viewerUrl)
+    const viewerToken = url.searchParams.get('token')
+    expect(viewerToken).not.toBe(SPEAKER_TOKEN)
+    expect(viewerToken).not.toBe(TOKEN)
+    expect(url.searchParams.get('mode')).toBe('view')
+    const operator = fakeWs(); wss.handlers.connection(operator)
+    operator.listeners.message(JSON.stringify({ v: 1, type: 'hello', device: 'Operador', token: TOKEN }))
+    const presenter = fakeWs(); wss.handlers.connection(presenter)
+    presenter.listeners.message(JSON.stringify({ v: 1, type: 'hello', role: 'speaker', token: SPEAKER_TOKEN }))
+    for (let i = 0; i < 2; i++) {
+      const ws = fakeWs(); wss.handlers.connection(ws)
+      ws.listeners.message(JSON.stringify({ v: 1, type: 'hello', role: 'speaker', token: viewerToken }))
+      expect(ws.close).not.toHaveBeenCalled()
+      for (const action of ['slide:next', 'slide:prev', 'slide:goto', 'player.play']) {
+        ws.listeners.message(JSON.stringify({ v: 1, type: 'command', id: action, action, token: viewerToken }))
+        expect(ws.sent.at(-1).code).toBe('forbidden')
+      }
+    }
+    expect(contents.sent.filter(m => m.channel === 'remote:command')).toHaveLength(0)
+    const current = await ipcHandlers.get('remote:pairing-info')()
+    expect(current.viewerCount).toBe(2)
+    expect(current.speakerCount).toBe(1)
+    expect(contents.sent.filter(m => m.channel === 'remote:clients').at(-1).payload.viewerCount).toBe(2)
+  } finally { server.stop?.() }
+})
+
+it('segundo passador sem hello também é bloqueado antes de encaminhar comandos', async () => {
+  const wss = fakeWss(), contents = fakeContents()
+  const server = await startRemoteServer(wss, contents, { token: TOKEN, speakerToken: SPEAKER_TOKEN })
+  try {
+    const first = fakeWs(); wss.handlers.connection(first)
+    first.listeners.message(JSON.stringify({ v: 1, type: 'hello', role: 'speaker', token: SPEAKER_TOKEN }))
+    const second = fakeWs(); wss.handlers.connection(second)
+    second.listeners.message(JSON.stringify({ v: 1, type: 'command', id: 'second', action: 'slide:next', token: SPEAKER_TOKEN }))
+    expect(second.sent.at(-1).code).toBe('remote_busy')
+    expect(second.close).toHaveBeenCalled()
+    expect(first.close).not.toHaveBeenCalled()
+    expect(contents.sent.filter(m => m.channel === 'remote:command')).toHaveLength(0)
+  } finally { server.stop() }
+})
+
+it('desktop encerra só o passador, mantém QR e regência e libera outro dispositivo', async () => {
+  const wss = fakeWss(), contents = fakeContents()
+  const server = await startRemoteServer(wss, contents, { token: TOKEN, speakerToken: SPEAKER_TOKEN })
+  try {
+    const before = await ipcHandlers.get('remote:pairing-info')()
+    const viewer = fakeWs(); wss.handlers.connection(viewer)
+    viewer.listeners.message(JSON.stringify({ v: 1, type: 'hello', token: new URL(before.viewerUrl).searchParams.get('token') }))
+    const first = fakeWs(); wss.handlers.connection(first)
+    first.listeners.message(JSON.stringify({ v: 1, type: 'hello', role: 'speaker', token: SPEAKER_TOKEN }))
+    const after = await ipcHandlers.get('remote:speaker-disconnect')()
+    expect(after.speakerUrl).toBe(before.speakerUrl)
+    expect(after.viewerUrl).toBe(before.viewerUrl)
+    expect(after.speakerAddress).toBeNull()
+    expect(first.close).toHaveBeenCalled()
+    expect(first.sent.at(-1).code).toBe('speaker_disconnected')
+    expect(viewer.close).not.toHaveBeenCalled()
+    const second = fakeWs(); wss.handlers.connection(second)
+    second.listeners.message(JSON.stringify({ v: 1, type: 'hello', role: 'speaker', token: SPEAKER_TOKEN }))
+    expect(second.close).not.toHaveBeenCalled()
+  } finally { server.stop() }
 })

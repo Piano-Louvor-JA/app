@@ -31,7 +31,7 @@ import {
   selectObsConnection,
 } from '../../settings/services/obs-connections'
 import { loadProjectionSettings } from '../../settings/services/projection-preferences'
-import { reapplyProjectionTargets } from '@shared/composables/useProjectionWindow'
+import { reapplyProjectionTargets, isProjectionModuleOpen } from '@shared/composables/useProjectionWindow'
 import { openMusicPlayer } from '../../media/services/open-music-player'
 import {
   loadAlbumMusicIndex,
@@ -186,6 +186,8 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
   randomStore?.hydrate?.()
   const bibleStore = useBibleStore()
   void bibleStore.bootstrap?.().catch(() => {})
+  const bibleSupportActive = () => Boolean(bibleStore?.projection?.text &&
+    (bibleStore.isProjecting || router.currentRoute?.value?.name === 'bible'))
 
   // Busca de hinos com os ids LOCAIS do desktop (a API pública tem ids
   // distintos — media.open com id da API dá trackMissing).
@@ -562,6 +564,14 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
       index: number
       total: number
       preview?: string
+      canNavigate?: boolean
+      kind?: 'bible'
+      text?: string
+      reference?: string
+      previousText?: string
+      nextText?: string
+      previousReference?: string
+      nextReference?: string
       galleryKey?: string
       previews?: string[]
       lyrics?: string[]
@@ -574,7 +584,18 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
       (await projection?.getPptSlideState?.()) ??
       (await projection?.getImageSlideState?.())
     const textOpen = await projection?.getTextScale?.()
-    if (textOpen) {
+    if (bibleSupportActive()) {
+      const selected = bibleStore.selectedVerses ?? []
+      const entries = bibleStore.verses ?? {}
+      slide = {
+        kind: 'bible', index: Math.max(0, Math.min(...selected) - 1), total: Object.keys(entries).length,
+        text: bibleStore.projection.text, reference: bibleStore.projection.scripturalReference,
+        previousText: entries[String(Math.min(...selected) - 1)] ?? '',
+        nextText: entries[String(Math.max(...selected) + 1)] ?? '',
+        previousReference: entries[String(Math.min(...selected) - 1)] ? `${bibleStore.projection.bookName ?? ''} ${bibleStore.projection.chapter ?? ''}:${Math.min(...selected) - 1}`.trim() : '',
+        nextReference: entries[String(Math.max(...selected) + 1)] ? `${bibleStore.projection.bookName ?? ''} ${bibleStore.projection.chapter ?? ''}:${Math.max(...selected) + 1}`.trim() : '',
+      }
+    } else if (textOpen) {
       // Texto recebe quadros atuais pelo canal frame; uma foto de abertura
       // pode estar preta e não deve encobrir os quadros que chegam depois.
       slide = { index: 0, total: 1 }
@@ -604,6 +625,8 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
       // Vídeo/YouTube: a prévia vai em quadros próprios (canal `frame`), não aqui.
     }
 
+    slide.canNavigate = slide.kind === 'bible' || Boolean(docSlide && docSlide.total > 0 && !textOpen)
+
     let videoControls = (await projection?.getVideoControlSnapshot?.()) ?? undefined
     if (videoControls?.independent && (await applyPendingIndependent())) {
       videoControls = (await projection?.getVideoControlSnapshot?.()) ?? undefined
@@ -624,7 +647,13 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
       videoControls = await imageControls(player.isProjecting.value)
     }
 
+    const supportActive = Boolean(
+      bibleSupportActive() || textOpen || (docSlide && docSlide.total > 0) ||
+      target === 'projection' || videoControls?.projecting === true ||
+      player.isPlaying.value || player.isProjecting.value || isProjectionModuleOpen(),
+    )
     return {
+      supportActive,
       liturgy: {
         total: items.length,
         selectedIndex: liturgy.selectedItemIndex,
@@ -702,16 +731,22 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
     // as duas superfícies compartilham a mesma API projection.remote*,
     // então o roteamento vale para ambas. Hinos continuam no player.
     if (action === 'slide:next' || action === 'slide:prev') {
+      if (bibleSupportActive()) {
+        await bibleStore.goToAdjacentVerse(action === 'slide:next' ? 1 : -1)
+        return true
+      }
       const routed = await routeSlideCommand(
         projection,
         action === 'slide:next' ? 'next' : 'prev',
       )
       if (routed) return true
+      if (msg.speaker === true) return false
       if (action === 'slide:next') await player.nextSlide?.()
       else await player.previousSlide?.()
       return true
     }
     if (action === 'slide:goto') {
+      if (msg.speaker === true) return false
       if (typeof msg.index !== 'number') return false
       await player.goToSlide?.(msg.index); return true
     }
@@ -1013,6 +1048,9 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
       randomStateKey(),
       JSON.stringify(sabbath.snapshot()),
       liturgy.selectedItemIndex,
+      bibleStore?.isProjecting,
+      router.currentRoute?.value?.name,
+      JSON.stringify(bibleStore?.projection),
       player.isProjecting?.value,
       liturgy.selectedDay,
       JSON.stringify(liturgyDays()),
@@ -1049,6 +1087,7 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
   }
 
   let mediaWasPlaying = false
+  let lastSupportModuleOpen = isProjectionModuleOpen()
 
   let lastSabbathKey = JSON.stringify(sabbath.snapshot())
   let lastPlaylistKey = JSON.stringify(playlists.snapshot())
@@ -1064,11 +1103,14 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
     const countdownRunning =
       modules.snapshot('countdown')?.status === 'running' ||
       modules.snapshot('countdown')?.finished === true
+    const supportModuleOpen = isProjectionModuleOpen()
+    const supportModuleChanged = supportModuleOpen !== lastSupportModuleOpen
+    lastSupportModuleOpen = supportModuleOpen
     const mediaPlaying = await isMediaPlaying()
     // O envio extra ao parar avisa pausa e fim do vídeo feitos no desktop.
     const mediaStopped = mediaWasPlaying && !mediaPlaying
     mediaWasPlaying = mediaPlaying
-    if (sabbathChanged || playlistsChanged || timerRunning || countdownRunning || mediaPlaying || mediaStopped) pushState()
+    if (supportModuleChanged || sabbathChanged || playlistsChanged || timerRunning || countdownRunning || mediaPlaying || mediaStopped) pushState()
   }, 1000)
 
   // Poll document navigation for the remote controller. PDF/PPT retain their
