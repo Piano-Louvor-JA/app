@@ -17,6 +17,7 @@
  */
 
 import path from 'node:path'
+import { createHash } from 'node:crypto'
 import { createRemoteToken, loadOrCreateRemoteTokens, saveRemoteTokens } from './remote-tokens.mjs'
 import { DEFAULT_REMOTE_PORT, REMOTE_PORT_ATTEMPTS } from './remote-config.mjs'
 import { networkInterfaces } from 'node:os'
@@ -76,6 +77,7 @@ export async function startRemoteServer(wss, contents, opts = {}) {
   while (speakerToken === token) {
     speakerToken = createRemoteToken([token])
   }
+  const viewerTokenFor = () => createHash('sha256').update('support-viewer:' + speakerToken).digest('hex')
   /** @type {Map<import('ws').WebSocket, {aliveAt: number, authed: boolean, timer: NodeJS.Timeout}>} */
   const clients = new Map()
 
@@ -88,7 +90,7 @@ export async function startRemoteServer(wss, contents, opts = {}) {
   // Identidade POR PAPEL: APK/controle remoto (esquerda) vs pregador (direita).
   const identityFor = (speaker) => {
     for (const [ws, entry] of clients) {
-      if (!!entry.speaker !== speaker) continue
+      if (entry.viewer || !!entry.speaker !== speaker) continue
       const address =
         ws._socket?.remoteAddress?.replace(/^::ffff:/, '') ?? null
       if (entry.device && address) return `${entry.device} • ${address}`
@@ -98,10 +100,16 @@ export async function startRemoteServer(wss, contents, opts = {}) {
   }
   const clientIdentity = () => identityFor(false) ?? identityFor(true)
 
+  const supportCounts = () => ({
+    viewerCount: [...clients].filter(([ws, entry]) => ws.readyState === ws.OPEN && entry.viewer).length,
+    speakerCount: [...clients].filter(([ws, entry]) => ws.readyState === ws.OPEN && entry.speaker && !entry.viewer).length,
+  })
+
   const notifyClients = () => {
     try {
       if (!contents.isDestroyed()) {
         contents.send('remote:clients', {
+          ...supportCounts(),
           count: clients.size,
           address: clientIdentity(),
           // Papéis separados — o painel mostra cada um no seu lugar:
@@ -126,11 +134,9 @@ export async function startRemoteServer(wss, contents, opts = {}) {
 
   wss.on('connection', (ws) => {
     trackWsConnection()
-    // Máx. 2 conexões FÍSICAS: 1 operador (APK/full) + 1 pregador (slides).
-    // O papel só é revelado no hello — o limite POR PAPEL é aplicado lá.
-    // (13/10 Rafael: antes era 1 cliente TOTAL — pregador tomava remote_busy
-    // do APK e vice-versa, impossibilitando os dois conectados ao mesmo tempo.)
-    if (clients.size >= 2) {
+    // Até 18 conexões, incluindo as telas de visualização.
+    // A exclusividade dos papéis interativos é validada no hello.
+    if (clients.size >= 18) {
       send(ws, { v: 1, type: 'error', code: 'remote_busy' })
       ws.close()
       return
@@ -159,17 +165,21 @@ export async function startRemoteServer(wss, contents, opts = {}) {
       } catch {
         return
       }
-      if (msg?.v !== 1) return
+      if (msg?.v !== 1 || !clients.has(ws)) return
 
       switch (msg.type) {
         case 'hello': {
-          if (msg.token != null && msg.token !== token && msg.token !== speakerToken) {
+          if (msg.token != null && msg.token !== token && msg.token !== speakerToken && msg.token !== viewerTokenFor()) {
             send(ws, { v: 1, type: 'error', code: 'bad_token' })
             ws.close()
             return
           }
           // Browser do pregador só recebe navegação de slides.
-          if (msg.role === 'speaker' && (msg.token === token || msg.token === speakerToken)) {
+          if (msg.token === viewerTokenFor()) {
+            entry.viewer = true
+            entry.speaker = false
+            notifyClients()
+          } else if (msg.role === 'speaker' && (msg.token === token || msg.token === speakerToken)) {
             // 1 pregador por desktop: 2º browser de pregador → busy.
             for (const [other, oEntry] of clients) {
               if (other === ws || !oEntry.speaker) continue
@@ -188,7 +198,7 @@ export async function startRemoteServer(wss, contents, opts = {}) {
             // 1 operador (APK/full) por desktop: 2º APK → busy.
             // Papel operador = tem device e NÃO declarou speaker no hello.
             for (const [other, oEntry] of clients) {
-              if (other === ws || oEntry.speaker) continue
+              if (other === ws || oEntry.speaker || oEntry.viewer) continue
               send(ws, { v: 1, type: 'error', code: 'remote_busy' })
               clients.delete(ws)
               clearInterval(entry.timer)
@@ -220,13 +230,28 @@ export async function startRemoteServer(wss, contents, opts = {}) {
             `[remote] RAW command ${action} id=${id} payload=${JSON.stringify(msg).slice(0, 300)}`,
           )
           if (typeof id !== 'string' || typeof action !== 'string') return
-          if (tok !== token && tok !== speakerToken) {
+          if (tok !== token && tok !== speakerToken && tok !== viewerTokenFor()) {
             send(ws, { v: 1, type: 'error', id, code: 'bad_token' })
             ws.close()
             return
           }
+          if (entry.viewer || tok === viewerTokenFor()) {
+            entry.viewer = true
+            send(ws, { v: 1, type: 'error', id, code: 'forbidden' })
+            return
+          }
           // Quem usa o token do pregador fica no escopo speaker nesta conexão.
-          if (tok === speakerToken) entry.speaker = true
+          if (tok === speakerToken) {
+            const occupied = [...clients].some(([other, client]) => other !== ws && client.speaker)
+            if (occupied) {
+              send(ws, { v: 1, type: 'error', id, code: 'remote_busy' })
+              clients.delete(ws)
+              clearInterval(entry.timer)
+              ws.close()
+              return
+            }
+            entry.speaker = true
+          }
           entry.authed = true
           // O APK manda o token só nos comandos (o hello dele não leva token):
           // é aqui que o operador fica provado e passa a receber a prévia do vídeo.
@@ -359,6 +384,7 @@ export async function startRemoteServer(wss, contents, opts = {}) {
   let operator = { url: '', qr: '' }
   const palcoHttpPort = typeof opts.palcoHttpPort === 'function' ? opts.palcoHttpPort : () => DEFAULT_HTTP_PORT
   let speaker = { url: '', qr: '' }
+  let viewer = { url: '', qr: '' }
   const speakerPairing = async () => {
     const httpPort = Number(palcoHttpPort()) || DEFAULT_HTTP_PORT
     const url = `http://${host}:${httpPort}/speaker?remotePort=${activePort}&palcoPort=${httpPort + 1}&token=${speakerToken}`
@@ -369,7 +395,11 @@ export async function startRemoteServer(wss, contents, opts = {}) {
   const pairingInfo = async () => {
     const connectUrl = `louvorja://connect?host=${host}:${activePort}&token=${token}`
     if (operator.url !== connectUrl) operator = { url: connectUrl, qr: await QRCode.toDataURL(connectUrl, { margin: 1, width: 220 }) }
+    const viewerUrl = `http://${host}:${Number(palcoHttpPort()) || DEFAULT_HTTP_PORT}/speaker?remotePort=${activePort}&palcoPort=${(Number(palcoHttpPort()) || DEFAULT_HTTP_PORT) + 1}&mode=view&token=${viewerTokenFor()}`
+    if (viewer.url !== viewerUrl) viewer = { url: viewerUrl, qr: await QRCode.toDataURL(viewerUrl, { margin: 1, width: 220 }) }
     return {
+      ...supportCounts(),
+      viewerUrl: viewer.url, viewerQrDataUrl: viewer.qr,
       host, port: activePort, token, connectUrl, qrDataUrl: operator.qr,
       speakerUrl: (await speakerPairing()).url, speakerQrDataUrl: speaker.qr,
       clientCount: clients.size, clientAddress: clientIdentity(),
@@ -389,7 +419,7 @@ export async function startRemoteServer(wss, contents, opts = {}) {
     speakerToken = tokens.speakerToken
     remoteStatus.token = token
     for (const [ws, entry] of clients) {
-      if ((role === 'speaker') !== Boolean(entry.speaker)) continue
+      if ((role === 'speaker') !== Boolean(entry.speaker || entry.viewer)) continue
       clearInterval(entry.timer)
       clients.delete(ws)
       send(ws, { v: 1, type: 'error', id: 'server', code: 'bad_token' })
@@ -402,6 +432,19 @@ export async function startRemoteServer(wss, contents, opts = {}) {
     const operation = rotations.then(() => resetToken(role))
     rotations = operation.catch(() => {})
     return operation
+  })
+
+  ipcMain.removeHandler?.('remote:speaker-disconnect')
+  ipcMain.handle('remote:speaker-disconnect', async () => {
+    for (const [ws, entry] of clients) {
+      if (!entry.speaker || entry.viewer) continue
+      clearInterval(entry.timer)
+      clients.delete(ws)
+      send(ws, { v: 1, type: 'error', id: 'server', code: 'speaker_disconnected' })
+      ws.close()
+    }
+    notifyClients()
+    return pairingInfo()
   })
 
   return {
@@ -419,6 +462,7 @@ export async function startRemoteServer(wss, contents, opts = {}) {
       ipcMain.removeListener('remote:state', onState)
       ipcMain.removeHandler?.('remote:pairing-info')
       ipcMain.removeHandler?.('remote:token-reset')
+      ipcMain.removeHandler?.('remote:speaker-disconnect')
       wss.close()
     },
   }

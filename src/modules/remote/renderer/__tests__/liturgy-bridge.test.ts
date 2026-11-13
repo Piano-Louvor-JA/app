@@ -96,6 +96,7 @@ vi.mock('../slide-background', () => ({
 
 vi.mock('@shared/composables/useProjectionWindow', () => ({
   reapplyProjectionTargets: vi.fn(async () => false),
+  isProjectionModuleOpen: vi.fn(() => false),
 }))
 
 vi.mock('../../../settings/services/palco-session', () => ({
@@ -713,6 +714,55 @@ describe('installRemoteLiturgyBridge', () => {
     expect(hoisted.remoteApiStub.sendAck.mock.calls.at(-1)?.[0].ok).toBe(true)
   })
 
+  it('pregador navega a Bíblia projetada e recebe o texto e a referência', async () => {
+    const goToAdjacentVerse = vi.fn(async () => {})
+    hoisted.bibleStore = {
+      isProjecting: true, selectedVerses: [2], verses: { '1': 'Primeiro', '2': 'Atual', '3': 'Próximo' },
+      projection: { text: 'Atual', scripturalReference: 'João 1:2' }, goToAdjacentVerse,
+    }
+    try {
+      const { command, onStateRequestCb } = await installBridge()
+      await command({ action: 'slide:next', id: 901, speaker: true })
+      await command({ action: 'slide:prev', id: 902 })
+      expect(goToAdjacentVerse.mock.calls).toEqual([[1], [-1]])
+      expect(hoisted.playerStub.nextSlide).not.toHaveBeenCalled()
+      await onStateRequestCb()
+      await vi.waitFor(() => expect(hoisted.remoteApiStub.sendState.mock.calls.at(-1)?.[0].slide).toMatchObject({
+        kind: 'bible', text: 'Atual', reference: 'João 1:2', previousText: 'Primeiro', nextText: 'Próximo', index: 1, total: 3,
+      }))
+    } finally { delete hoisted.bibleStore }
+  })
+
+  it('Tela de Apoio fica inativa com sessão antiga e volta ao reproduzir ou projetar', async () => {
+    hoisted.playerStub.session.value = { title: 'Música antiga', slides: [{ lyric: 'Letra antiga' }] }
+    const { onStateRequestCb } = await installBridge()
+    await onStateRequestCb()
+    await vi.waitFor(() => expect(hoisted.remoteApiStub.sendState.mock.calls.at(-1)?.[0].supportActive).toBe(false))
+    hoisted.playerStub.isPlaying.value = true
+    await onStateRequestCb()
+    await vi.waitFor(() => expect(hoisted.remoteApiStub.sendState.mock.calls.at(-1)?.[0].supportActive).toBe(true))
+    hoisted.playerStub.isPlaying.value = false
+    hoisted.playerStub.isProjecting.value = true
+    await onStateRequestCb()
+    await vi.waitFor(() => expect(hoisted.remoteApiStub.sendState.mock.calls.at(-1)?.[0].supportActive).toBe(true))
+    hoisted.playerStub.isProjecting.value = false
+    await onStateRequestCb()
+    await vi.waitFor(() => expect(hoisted.remoteApiStub.sendState.mock.calls.at(-1)?.[0].supportActive).toBe(false))
+  })
+
+  it('pregador não pode avançar, voltar nem saltar slides do player de música/vídeo', async () => {
+    const { command, onStateRequestCb } = await installBridge()
+    for (const action of ['slide:next', 'slide:prev', 'slide:goto']) {
+      await command({ action, speaker: true, index: 2, id: 999 })
+      expect(hoisted.remoteApiStub.sendAck.mock.calls.at(-1)?.[0].ok).toBe(false)
+    }
+    expect(hoisted.playerStub.nextSlide).not.toHaveBeenCalled()
+    expect(hoisted.playerStub.previousSlide).not.toHaveBeenCalled()
+    expect(hoisted.playerStub.goToSlide).not.toHaveBeenCalled()
+    await onStateRequestCb()
+    await vi.waitFor(() => expect(hoisted.remoteApiStub.sendState.mock.calls.at(-1)?.[0].slide.canNavigate).toBe(false))
+  })
+
   it('slide:next/prev/goto controlam o player (superfície do pregador)', async () => {
     const { command } = await installBridge()
     await command({ action: 'slide:next', id: 91 })
@@ -735,7 +785,7 @@ describe('installRemoteLiturgyBridge', () => {
       remotePdfPrev: vi.fn(async () => ({ index: 0, total: 10 })),
     }
     const { command } = await installBridge()
-    await command({ action: 'slide:next', id: 101 })
+    await command({ action: 'slide:next', id: 101, speaker: true })
     expect(hoisted.projection.remotePdfNext).toHaveBeenCalledTimes(1)
     expect(hoisted.playerStub.nextSlide).not.toHaveBeenCalled()
     await command({ action: 'slide:prev', id: 102 })
@@ -1247,7 +1297,7 @@ describe('installRemoteLiturgyBridge', () => {
 
       await onStateRequestCb()
 
-      await vi.waitFor(() => expect(lastSlide()).toEqual({ index: 0, total: 3, preview: 'jpeg0' }))
+      await vi.waitFor(() => expect(lastSlide()).toEqual({ index: 0, total: 3, preview: 'jpeg0', canNavigate: true }))
       cleanup()
     })
 
@@ -1387,14 +1437,14 @@ describe('installRemoteLiturgyBridge', () => {
     await command({ action: 'liturgy.state', id: 96 })
     await vi.waitFor(() => {
       const st = hoisted.remoteApiStub.sendState.mock.calls.at(-1)?.[0]
-      expect(st.slide).toEqual({ index: 0, total: 0 })
+      expect(st.slide).toEqual({ index: 0, total: 0, canNavigate: false })
     })
     // session inteira indefinida → fallback 0
     hoisted.playerStub.session.value = undefined
     await command({ action: 'liturgy.state', id: 97 })
     await vi.waitFor(() => {
       const st = hoisted.remoteApiStub.sendState.mock.calls.at(-1)?.[0]
-      expect(st.slide).toEqual({ index: 0, total: 0 })
+      expect(st.slide).toEqual({ index: 0, total: 0, canNavigate: false })
     })
   })
 

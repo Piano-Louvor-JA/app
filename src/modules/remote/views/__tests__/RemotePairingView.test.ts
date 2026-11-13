@@ -50,6 +50,8 @@ function makeBridge(overrides: Record<string, unknown> = {}) {
         qrDataUrl: 'data:image/png;base64,QR',
         speakerUrl: 'http://192.168.0.10:7080/speaker?remotePort=8787&palcoPort=7081&token=TOKEN123',
         speakerQrDataUrl: 'data:image/png;base64,QRSPK',
+        viewerUrl: 'http://192.168.0.10:7080/speaker?mode=view&token=VIEW',
+        viewerQrDataUrl: 'data:image/png;base64,QRVIEW',
         clientCount: 0,
         clientAddress: null,
       })),
@@ -88,6 +90,7 @@ describe('RemotePairingView', () => {
     expect(wrapper.text()).toContain('Aguardando')
     // Bloco do pregador: QR + URL
     expect(wrapper.find('[data-testid="remote-speaker-block"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="remote-viewer-qr"]').attributes('src')).toBe('data:image/png;base64,QRVIEW')
     expect(wrapper.find('[data-testid="remote-speaker-qr"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="remote-speaker-url"]').text()).toBe('http://192.168.0.10:7080/speaker?remotePort=8787&palcoPort=7081&token=TOKEN123')
     expect(wrapper.find('[data-testid="remote-speaker-copy"]').exists()).toBe(true)
@@ -261,5 +264,39 @@ it('erro ao atualizar token mantém links anteriores e informa a falha', async (
   expect(wrapper.get('[data-testid="remote-token-error"]').exists()).toBe(true)
   expect(wrapper.get('[data-testid="remote-url"]').text()).toBe(url)
   expect(wrapper.get('[data-testid="remote-renew-token"]').attributes('disabled')).toBeUndefined()
+  wrapper.unmount()
+})
+
+it('encerra o passador pelo desktop e desabilita o botão ao liberar a conexão', async () => {
+  const bridge = makeBridge()
+  const before = { ...(await bridge.remote.pairingInfo()), speakerAddress: 'Celular do pregador' }
+  const disconnectSpeaker = vi.fn(async () => ({ ...before, speakerAddress: null }))
+  mocks.getDesktopBridge.mockReturnValue({ remote: { ...bridge.remote, pairingInfo: vi.fn(async () => before), disconnectSpeaker } })
+  const wrapper = createWrapper()
+  await flushPromises()
+  const button = wrapper.get('[data-testid="speaker-disconnect"]')
+  expect(button.attributes('disabled')).toBeUndefined()
+  await button.trigger('click')
+  await flushPromises()
+  expect(disconnectSpeaker).toHaveBeenCalledOnce()
+  expect(button.attributes('disabled')).toBeDefined()
+  expect(wrapper.get('[data-testid="remote-speaker-url"]').text()).toBe(before.speakerUrl)
+  wrapper.unmount()
+})
+
+it('atualiza contadores de regência e passador ao conectar e desconectar', async () => {
+  const bridge = makeBridge()
+  mocks.getDesktopBridge.mockReturnValue(bridge)
+  const wrapper = createWrapper()
+  await flushPromises()
+  expect(wrapper.get('[data-testid="viewer-connection-count"]').text()).toContain('0')
+  const callback = (bridge.remote.onClients.mock.calls as unknown as Array<[(value: Record<string, unknown>) => void]>)[0][0]
+  callback({ count: 4, viewerCount: 3, speakerCount: 1 })
+  await flushPromises()
+  expect(wrapper.get('[data-testid="viewer-connection-count"]').text()).toContain('3')
+  expect(wrapper.get('[data-testid="speaker-connection-count"]').text()).toContain('1')
+  callback({ count: 0, viewerCount: 0, speakerCount: 0 })
+  await flushPromises()
+  expect(wrapper.get('[data-testid="viewer-connection-count"]').text()).toContain('0')
   wrapper.unmount()
 })

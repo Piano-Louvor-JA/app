@@ -3017,6 +3017,11 @@ export async function captureSourcePreviewJpeg(maxWidth = 480) {
  * prévia na hora do toque. A chave muda quando a galeria muda.
  */
 export async function captureGalleryPreviewsJpeg(maxWidth = 480, limit = 30) {
+  if (isPdfDocumentMode() && sourceWindow && !sourceWindow.isDestroyed()) {
+    return sourceWindow.webContents.executeJavaScript(
+      `window.__liturgyPdf?.captureGalleryPreviews?.(${Number(maxWidth) || 480}) ?? null`, true,
+    )
+  }
   if (currentProjectionMode !== 'image' || currentImagePaths.length === 0) return null
   const paths = currentImagePaths.slice(0, limit)
   let hash = 5381

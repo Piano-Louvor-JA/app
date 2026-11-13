@@ -59,6 +59,7 @@
       let renderToken = 0
       let renderedToken = -1
       let exportCache = null
+      const thumbnailCache = new Map()
 
       function state() {
         return {
@@ -162,6 +163,36 @@
           })
           exportCache = { token, promise }
           return promise
+        },
+        // Renderiza em canvases separados: nunca muda a página projetada.
+        async captureGalleryPreviews(maxWidth = 480) {
+          if (!pdfDoc) return null
+          const index = pageIndex
+          const doc = pdfDoc
+          const width = Math.max(64, Math.min(960, Number(maxWidth) || 480))
+          const previews = Array(doc.numPages).fill('')
+          for (const i of [index - 1, index, index + 1]) {
+            if (i < 0 || i >= doc.numPages) continue
+            const key = i + ':' + width
+            if (!thumbnailCache.has(key)) {
+              const promise = (async () => {
+                const page = await doc.getPage(i + 1)
+                const base = page.getViewport({ scale: 1 })
+                const viewport = page.getViewport({ scale: width / base.width })
+                const flat = document.createElement('canvas')
+                flat.width = Math.ceil(viewport.width)
+                flat.height = Math.ceil(viewport.height)
+                const ctx = flat.getContext('2d', { alpha: false })
+                if (!ctx) return ''
+                await page.render({ canvasContext: ctx, viewport, background: '#ffffff' }).promise
+                return flat.toDataURL('image/jpeg', 0.7).split(',')[1] || ''
+              })().catch(() => { thumbnailCache.delete(key); return '' })
+              thumbnailCache.set(key, promise)
+              if (thumbnailCache.size > 12) thumbnailCache.delete(thumbnailCache.keys().next().value)
+            }
+            previews[i] = await thumbnailCache.get(key)
+          }
+          return { key: src + ':' + index + ':' + width, previews }
         },
         async next() {
           if (!(await ensureReady())) return state()

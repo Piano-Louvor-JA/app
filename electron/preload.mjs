@@ -87,6 +87,7 @@ contextBridge.exposeInMainWorld('louvorja', {
     sendState: (state) => ipcRenderer.send('remote:state', state),
     pairingInfo: () => ipcRenderer.invoke('remote:pairing-info'),
     resetToken: (role) => ipcRenderer.invoke('remote:token-reset', role),
+    disconnectSpeaker: () => ipcRenderer.invoke('remote:speaker-disconnect'),
     onClients: (callback) => subscribe('remote:clients', callback),
   },
 

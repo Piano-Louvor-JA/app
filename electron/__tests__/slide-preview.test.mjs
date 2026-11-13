@@ -22,6 +22,8 @@ function load(frame, size = { width: 1920, height: 1080 }, extra = {}) {
     nativeImage: { createFromBuffer: vi.fn(() => image), createFromPath: vi.fn(() => image) },
     currentProjectionMode: 'pdf',
     currentImagePaths: [],
+    sourceWindow: null,
+    isPdfDocumentMode: () => true,
     previewCache: new Map(),
     getImageSlideState: vi.fn(async () => null),
     ...extra,
@@ -108,4 +110,15 @@ it('fora do modo imagem não há galeria', async () => {
   const { context } = load(null)
 
   expect(await context.captureGalleryPreviewsJpeg(480)).toBeNull()
+})
+
+it.each(['pdf', 'presentation'])('%s: obtém miniaturas sem navegar a apresentação', async mode => {
+  const gallery = { key: 'doc:4', previews: ['', 'anterior', '', 'proximo'] }
+  const executeJavaScript = vi.fn(async () => gallery)
+  const { context } = load(null, undefined, {
+    currentProjectionMode: mode,
+    sourceWindow: { isDestroyed: () => false, webContents: { executeJavaScript } },
+  })
+  expect(await context.captureGalleryPreviewsJpeg()).toEqual(gallery)
+  expect(executeJavaScript.mock.calls[0][0]).toContain('captureGalleryPreviews')
 })
