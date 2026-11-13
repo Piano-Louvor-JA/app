@@ -109,6 +109,8 @@ export default {
     monitors: 'Monitor sharing',
     none: 'None connected',
     monitorsInUse: '{device} ({host}) · {n} monitor(s)',
+    palco: 'Stage (TVs)',
+    palcoTv: '{name} · {ip}',
   },
   minimize: {
     playlistCount: '{n} playlist(s)',

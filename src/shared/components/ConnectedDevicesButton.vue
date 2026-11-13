@@ -6,7 +6,7 @@ import { useConnectedDevices } from '@shared/composables/useConnectedDevices'
 
 /** Círculo no canto: quantos aparelhos estão ligados a este desktop. */
 const { t } = useI18n()
-const { remote, speaker, phone, count, available } = useConnectedDevices()
+const { remote, speaker, phone, tvs, count, available } = useConnectedDevices()
 const open = ref(false)
 </script>
 
@@ -60,6 +60,18 @@ const open = ref(false)
                   : t('connectedDevices.none')
               }}
             </span>
+          </div>
+        </li>
+        <li class="connected-devices__item" data-test="palco-devices">
+          <i class="ti ti-device-tv" aria-hidden="true" />
+          <div>
+            <strong>{{ t('connectedDevices.palco') }}</strong>
+            <template v-if="tvs.length">
+              <span v-for="tv in tvs" :key="tv.uid" class="on">
+                {{ t('connectedDevices.palcoTv', { name: tv.name, ip: tv.ip }) }}
+              </span>
+            </template>
+            <span v-else>{{ t('connectedDevices.none') }}</span>
           </div>
         </li>
       </ul>

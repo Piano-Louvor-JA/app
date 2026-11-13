@@ -181,6 +181,8 @@ export default {
     monitors: 'Compartilhamento de monitores',
     none: 'Nenhum conectado',
     monitorsInUse: '{device} ({host}) · {n} monitor(es)',
+    palco: 'Palco (TVs)',
+    palcoTv: '{name} · {ip}',
   },
   minimize: {
     playlistCount: '{n} playlist(s)',
