@@ -414,7 +414,20 @@ export async function listCustomCollections(opts?: {
       visibility: row.visibility ?? 'public',
       musicsCount: row.musics_count ?? 0,
     }))
-    return [...locals, ...remote]
+    // Review R1 (SPEC v1.2.0 RF-07): coletânea local pendente no outbox já
+    // subiu pelo sync — oculta a cópia local quando existe remota do usuário
+    // com o MESMO nome (evita duplicata visual pós-pull; o client_uuid é a
+    // identidade canônica no servidor).
+    const me = getAuthSession()?.user?.email ?? null
+    const remoteNames = new Set(
+      remote
+        .filter((r) => me != null && r.ownerId != null)
+        .map((r) => r.name.toLowerCase()),
+    )
+    const localsVisible = locals.filter(
+      (l) => !remoteNames.has(l.name.toLowerCase()),
+    )
+    return [...localsVisible, ...remote]
   } catch {
     return locals
   }

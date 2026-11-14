@@ -90,7 +90,7 @@ beforeEach(() => {
 /** Seed: lista mockada com a coletânea local + query param de seleção. */
 async function mountWithLocalCollection() {
 	localStorage.setItem(
-		'louvorja-custom-local-v1',
+		'louvorja.local-custom.v1',
 		JSON.stringify({
 			nextCollectionId: -2,
 			nextMusicId: -2,
