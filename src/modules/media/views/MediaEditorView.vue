@@ -450,8 +450,32 @@ async function onChangeVisibility(next: CollectionVisibility): Promise<void> {
   }
 }
 
-async function onCoverFile(event: Event): Promise<void> {
-  const input = event.target as HTMLInputElement
+/** SPEC v1.2.0 RF-08: renomear coletânea (online e offline, mesmo caminho). */
+const collectionRenameDraft = ref('')
+
+async function onRenameCollection(): Promise<void> {
+  const id = selectedCollectionId.value
+  const current = selectedCollection.value
+  const name = collectionRenameDraft.value.trim()
+  if (id == null || !current || !name || name === current.name) return
+  saving.value = true
+  try {
+    const updated = await updateCustomCollection(id, { name })
+    if (updated) {
+      collections.value = collections.value.map((c) =>
+        c.id === id ? { ...c, name } : c,
+      )
+      collectionRenameDraft.value = ''
+      notify(t('media.editor.collectionRenamed', { name }))
+    } else {
+      notify(t('media.editor.renameFailed'), true)
+    }
+  } finally {
+    saving.value = false
+  }
+}
+
+async function onCoverFile(event: Event): Promise<void> {  const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = ''
   if (!file || selectedCollectionId.value == null) return
@@ -1024,14 +1048,9 @@ function onAudioPlay(): void {
 
 function onAudioPause(): void {
   isPlaying.value = false
-  // Auto-fill: ao pausar, o instante atual vira o timing da estrofe ativa
-  // (o usuário pausa no momento certo e digita/ajusta a letra).
-  const idx = activeStanzaIndexOverride.value ?? computedActiveIndex.value
-  const stanza = lyrics.value[idx]
-  if (stanza) {
-    stanza.time = timeLabelOf(currentTimeMs.value)
-    void onSaveStanza(idx)
-  }
+  // Feedback Rafael 14/11: pause é SÓ controle de áudio (parar/tocar do começo
+  // p/ conferir sincronia). Timing da estrofe é gravado EXCLUSIVAMENTE pelo
+  // botão "Marcar" — auto-fill no pause causava marcas acidentais.
 }
 
 function onAudioTimeUpdate(): void {
@@ -1351,6 +1370,33 @@ onMounted(async () => {
             :aria-label="t('media.editor.changeCover')"
             @change="onCoverFile"
           >
+        </div>
+        <div
+          v-if="selectedCollection"
+          class="editor__row editor__rename-row"
+        >
+          <input
+            v-model="collectionRenameDraft"
+            type="text"
+            class="editor__input"
+            :placeholder="t('media.editor.renameCollection')"
+            :aria-label="t('media.editor.renameCollection')"
+            data-testid="collection-rename-input"
+            @keyup.enter="onRenameCollection"
+          >
+          <button
+            type="button"
+            class="editor__btn"
+            :disabled="saving || !collectionRenameDraft.trim() || collectionRenameDraft.trim() === selectedCollection.name"
+            data-testid="collection-rename-save"
+            :title="t('media.editor.renameCollection')"
+            @click="onRenameCollection"
+          >
+            <i
+              class="ti ti-check"
+              aria-hidden="true"
+            />
+          </button>
         </div>
         <div class="editor__row">
           <input
@@ -1762,7 +1808,7 @@ onMounted(async () => {
               <input
                 ref="audioInputEl"
                 type="file"
-                accept="audio/mpeg,audio/*"
+                accept=".mp3,.ogg,.m4a,.wav,.flac,.aac,audio/*"
                 class="editor__file-input"
                 @change="onAudioFile"
               >
