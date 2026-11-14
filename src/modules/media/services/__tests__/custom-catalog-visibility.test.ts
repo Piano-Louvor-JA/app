@@ -197,7 +197,7 @@ describe('custom-catalog — fechamento de branches (local/falha)', () => {
 		expect(all[0]?.id).toBe(-7)
 	})
 
-	it('createCustomCollection: exceção de rede autenticado → enfileira e retorna id 0', async () => {
+	it('createCustomCollection: exceção de rede autenticado → enfileira e retorna id LOCAL negativo (RF-07, nunca id 0)', async () => {
 		mocks.getSession.mockReturnValue({ token: 'tok' } as never)
 		vi.stubGlobal(
 			'fetch',
@@ -205,7 +205,9 @@ describe('custom-catalog — fechamento de branches (local/falha)', () => {
 				throw new Error('offline')
 			}),
 		)
-		expect(await createCustomCollection('X')).toEqual({ id: 0 })
+		const created = await createCustomCollection('X')
+		expect(created).not.toBeNull()
+		expect(created!.id).toBeLessThan(0)
 	})
 })
 

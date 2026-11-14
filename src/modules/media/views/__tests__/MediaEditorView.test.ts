@@ -652,15 +652,14 @@ describe("MediaEditorView — player de áudio e estrofes", () => {
 		w.unmount();
 	});
 
-	it("onAudioPause com estrofe ativa: auto-fill do timing e salva", async () => {
-		const { updateCustomLyric } = await import("../../services/custom-catalog");
-		vi.mocked(updateCustomLyric).mockResolvedValue(true);
+	it("onAudioPause com estrofe ativa: NÃO grava timing (feedback Rafael 14/11 — pause só controla áudio; Marcar grava)", async () => {
 		const w = await mountEditor();
 		const s = withStanza(w);
 		s.currentTimeMs.value = 35000; // cai na estrofe B (00:30)
+		const before = s.lyrics.value.map((l: { time: string | null }) => l.time);
 		s.onAudioPlay();
 		s.onAudioPause();
-		expect(s.lyrics.value[1].time).toBe("00:35");
+		expect(s.lyrics.value.map((l: { time: string | null }) => l.time)).toEqual(before);
 		w.unmount();
 	});
 
@@ -1392,7 +1391,8 @@ describe("MediaEditorView — cobertura de gaps", () => {
 		expect(fakeEl.currentTime).toBe(1);
 		s.onAudioPause();
 		await flushPromises();
-		expect(s.lyrics.value[0].time).toBe("00:02");
+		// feedback Rafael 14/11: pause NÃO altera timing (só "Marcar" grava)
+		expect(s.lyrics.value[0].time).toBe("00:01");
 		s.currentTimeMs.value = 6000;
 		await s.onMarkStanzaTime(0);
 		expect(s.lyrics.value[0].time).toBe("00:06");
