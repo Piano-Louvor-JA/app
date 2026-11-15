@@ -414,7 +414,20 @@ export async function listCustomCollections(opts?: {
       visibility: row.visibility ?? 'public',
       musicsCount: row.musics_count ?? 0,
     }))
-    return [...locals, ...remote]
+    // Review R1 (SPEC v1.2.0 RF-07): coletânea local pendente no outbox já
+    // subiu pelo sync — oculta a cópia local quando existe remota do usuário
+    // com o MESMO nome (evita duplicata visual pós-pull; o client_uuid é a
+    // identidade canônica no servidor).
+    const me = getAuthSession()?.user?.email ?? null
+    const remoteNames = new Set(
+      remote
+        .filter((r) => me != null && r.ownerId != null)
+        .map((r) => r.name.toLowerCase()),
+    )
+    const localsVisible = locals.filter(
+      (l) => !remoteNames.has(l.name.toLowerCase()),
+    )
+    return [...localsVisible, ...remote]
   } catch {
     return locals
   }
@@ -770,8 +783,11 @@ export async function createCustomCollection(
     // O import .slja não pode deixar uma coletânea vazia na fila quando
     // desiste do envio. O editor continua enfileirando.
     if (options?.queueOffline === false) return null
-    // Offline (autenticado): enfileira pro sync (B1/B2). O client_uuid dá
-    // identidade estável — o próximo flush cria/atualiza no servidor.
+    // SPEC-audio-removal v1.2.0 (RF-07): offline autenticado = coletânea
+    // LOCAL-FIRST real (id negativo) + fila pro sync. O antigo `return
+    // { id: 0 }` criava um fantasma: isLocalId(0)=false → excluir/renomear
+    // batiam na API com id 0 (404) e nada funcionava.
+    const local = createLocalCollection(name, description)
     await enqueue({
       entity: 'collection',
       client_uuid: newClientUuid(),
@@ -789,7 +805,7 @@ export async function createCustomCollection(
       updated_at: Date.now(),
       owner_email: getAuthSession()?.user?.email ?? null,
     })
-    return { id: 0 }
+    return { id: local.id }
   }
 }
 
@@ -905,18 +921,35 @@ export function customFileUrl(urlPath: string): string {
 
 /**
  * MIME de áudio pelo magic bytes do conteúdo base64.
- * Formatos suportados no import/reprodução local: mp3, wav, ogg.
- * Base64 legacy sem cabeçalho reconhecível cai em audio/mpeg (padrão antigo).
+ * SPEC-audio-removal v1.2.0 (RF-05): allowlist única online↔offline —
+ * mp3, wav, ogg, flac, aac, m4a. Base64 legacy sem cabeçalho reconhecível
+ * cai em audio/mpeg (padrão antigo).
  */
+export function audioMimeFromBytes(bytes: Uint8Array): string {
+  const ascii = (n: number): string =>
+    String.fromCharCode(...bytes.slice(0, Math.min(n, bytes.length)));
+  if (bytes.length >= 8 && ascii(8) === "\u0000\u0000\u0000\u0018ftyp") {
+    return "audio/mp4"; // m4a/mp4 (ftyp M4A/isom/mp42…)
+  }
+  if (ascii(4) === "fLaC") return "audio/flac";
+  if (bytes.length >= 2 && bytes[0] === 0xff && (bytes[1]! & 0xe0) === 0xe0) {
+    return "audio/aac"; // ADTS sync
+  }
+  if (ascii(4) === "RIFF") return "audio/wav";
+  if (ascii(4) === "OggS") return "audio/ogg";
+  return "audio/mpeg";
+}
+
 export function audioMimeFromBase64(b64: string): string {
   try {
-    const head = atob(b64.slice(0, 16))
-    if (head.startsWith('RIFF')) return 'audio/wav'
-    if (head.startsWith('OggS')) return 'audio/ogg'
+    const bin = atob(b64.slice(0, 24));
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return audioMimeFromBytes(bytes);
   } catch {
     /* base64 inválido/truncado — cai no default */
   }
-  return 'audio/mpeg'
+  return "audio/mpeg";
 }
 
 export function audioDataUrlFromBase64(b64: string): string {
