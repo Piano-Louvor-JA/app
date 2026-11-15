@@ -160,6 +160,8 @@ async function onOpenTimer() {
 
       <IndependentProjectionButton
         module-id="countdown"
+        :before-project="store.claimOutput"
+        :claimed="store.ownsCountdownOutput()"
       />
 
       <CountdownProjectFab

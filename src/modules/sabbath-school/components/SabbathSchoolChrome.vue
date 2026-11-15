@@ -9,6 +9,7 @@ import { useCountdownStage } from '@modules/countdown/composables/useCountdownSt
 import { useCountdownStore } from '@modules/countdown/stores/useCountdownStore'
 import { resolveBackgroundImage } from '@modules/settings/types/stage-settings'
 import FloatingPreviewTitle from '@shared/components/FloatingPreviewTitle.vue'
+import IndependentProjectionButton from '@shared/components/IndependentProjectionButton.vue'
 import MiniPlayerCloseButton from '@shared/components/MiniPlayerCloseButton.vue'
 import { FLOATING_STACK_ORDER, useFloatingDrag } from '@shared/composables/useFloatingDrag'
 import { useInAppProjectionMinimized } from '@shared/composables/useInAppProjectionMinimized'
@@ -146,6 +147,13 @@ async function onOpen() {
           aria-hidden="true"
         />
       </button>
+
+      <!-- Mesma tela do Cronômetro: projetar aqui a deixa com a Escola Sabatina -->
+      <IndependentProjectionButton
+        module-id="countdown"
+        :before-project="store.claimOutput"
+        :claimed="store.ownsCountdownOutput()"
+      />
 
       <CountdownProjectFab
         :projecting="store.isProjecting"

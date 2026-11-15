@@ -42,6 +42,8 @@ const store = reactive({
   pause: vi.fn(),
   stopAudio: vi.fn(),
   toggleProjection: vi.fn().mockResolvedValue(undefined),
+  claimOutput: vi.fn(() => true),
+  ownsCountdownOutput: vi.fn(() => true),
   clearProjection: vi.fn(),
 })
 const appearance = reactive({ config: { timeFormat: 'hh:mm:ss', bgColor: '#000', textColor: '#fff' } })
@@ -127,6 +129,15 @@ describe('prévia flutuante da Escola Sabatina', () => {
     await nextTick()
     await w.get('[data-testid=sabbath-chrome-pause]').trigger('click')
     expect(store.pause).toHaveBeenCalledOnce()
+  })
+
+  it('projeção independente: mesma tela do Cronômetro, tomada pela Escola Sabatina antes de projetar', () => {
+    const w = mountChrome()
+    const button = w.findComponent({ name: 'IndependentProjectionButton' })
+    expect(button.exists()).toBe(true)
+    expect(button.props('moduleId')).toBe('countdown')
+    expect(button.props('beforeProject')).toBe(store.claimOutput)
+    expect(button.props('claimed')).toBe(true)
   })
 
   it('projetar e retirar da projeção usam a Escola Sabatina', async () => {
