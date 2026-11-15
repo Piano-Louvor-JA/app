@@ -24,6 +24,7 @@ import { publishReceiverEvent } from './palco/receiver-events.mjs'
 import { updateReplayState } from './palco/replay-state.mjs'
 import { clientFromRequest, commandMessage, isTv, muteKey, sameTv, withHello } from './palco/palco-clients.mjs'
 import { discoverTvs, wakeTv } from './palco/palco-discovery.mjs'
+import { createHeartbeat, createLostTvSearch, HEARTBEAT_INTERVAL_MS } from './palco/heartbeat.mjs'
 import { createServer } from 'node:http'
 import { networkInterfaces } from 'node:os'
 import { createHash } from 'node:crypto'
@@ -146,6 +147,15 @@ class PalcoSlot {
   #error = null
   #listenHost = null
   #kind = 'transmission'
+  // Conexão viva dos dois lados: o servidor cobra as telas e procura a
+  // Android TV que caiu pela rede (ver palco/heartbeat.mjs).
+  #heartbeatMs = HEARTBEAT_INTERVAL_MS
+  #heartbeat
+  #lostTvs = createLostTvSearch({
+    wake: (ip) => wakeTv(ip),
+    isConnected: (ip) => Array.from(this.#clientInfo.values()).some((info) => info.ip === ip),
+  })
+  #heartbeatTimer = null
 
   constructor(id, label, httpPort, wsPort, getContents, options = {}) {
     this.#id = id
@@ -155,6 +165,19 @@ class PalcoSlot {
     this.#contents = getContents
     this.#overlay = normalizeOverlayStyle(options.overlay)
     this.#kind = slotKind(options.kind)
+    // testes encurtam o intervalo; a tela cai após 3 intervalos sem resposta
+    if (Number(options.heartbeatMs) > 0) this.#heartbeatMs = Number(options.heartbeatMs)
+    this.#heartbeat = createHeartbeat({
+      timeoutMs: this.#heartbeatMs * 3,
+      send: (ws, message) => { this.#sendTo(ws, message) },
+      ping: (ws) => { if (ws.readyState === ws.OPEN) ws.ping() },
+      terminate: (ws) => { ws.terminate() },
+      onLost: (ws) => {
+        const info = this.#clientInfo.get(ws)
+        console.warn('[palco] tela sem resposta, conexão encerrada:', this.#id, info?.platform, info?.ip)
+        if (info?.platform === 'androidtv' && info.ip) this.#lostTvs.lost(info.ip)
+      },
+    })
   }
 
   get kind() { return this.#kind }
@@ -363,7 +386,10 @@ class PalcoSlot {
           return
         }
         this.#clients.add(ws)
+        this.#heartbeat.track(ws)
+        ws.on('pong', () => this.#heartbeat.seen(ws))
         const remoteIp = req?.socket?.remoteAddress?.replace('::ffff:', '')
+        if (remoteIp) this.#lostTvs.found(remoteIp)
         if (remoteIp) this.#receiverIps.set(ws, remoteIp)
         this.#clientInfo.set(ws, clientFromRequest({ ip: remoteIp ?? '', userAgent: String(req?.headers?.['user-agent'] ?? '') }))
         this.#notifyClients()
@@ -379,6 +405,11 @@ class PalcoSlot {
         ws.on('message', (raw) => {
           try {
             const message = { ...JSON.parse(String(raw)), slotId: this.#id }
+            this.#heartbeat.seen(ws)
+            // a tela entende `beat` (hello da TV ou caps das páginas)
+            if (Array.isArray(message.caps) && message.caps.includes('heartbeat')) this.#heartbeat.announce(ws)
+            // resposta ao `beat`: só sinal de vida, não vai para o app
+            if (message.type === 'beat') return
             if (Array.isArray(message.caps)) this.#announcedClients.add(ws)
             // Página da aba (espelho, retorno, legenda): Aparelhos conectados mostra
             if (message.type === 'caps' && PAGES.has(message.page) && this.#clientInfo.has(ws)) {
@@ -400,6 +431,7 @@ class PalcoSlot {
           } catch { /* ignore */ }
         })
         ws.on('close', () => {
+          this.#heartbeat.forget(ws)
           this.#clients.delete(ws)
           this.#receiverIps.delete(ws)
           const known = this.#clientInfo.delete(ws)
@@ -421,6 +453,12 @@ class PalcoSlot {
       }
       this.#error = null
       this.#running = true
+      clearInterval(this.#heartbeatTimer)
+      this.#heartbeatTimer = setInterval(() => {
+        this.#heartbeat.tick()
+        this.#lostTvs.tick()
+      }, this.#heartbeatMs)
+      this.#heartbeatTimer.unref?.()
       updateReplayState(this.#lastByType, this.#overlayMessage())
       return true
     } catch (e) {
@@ -434,6 +472,9 @@ class PalcoSlot {
     if (!this.#running) return
     this.broadcastTransient({ v: 2, type: 'obsControl', action: 'stop' })
     this.#running = false
+    clearInterval(this.#heartbeatTimer)
+    this.#heartbeatTimer = null
+    this.#lostTvs.clear()
     const wss = this.#wss
     this.#wss = null
     if (wss) await new Promise(resolve => {

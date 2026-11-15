@@ -387,6 +387,10 @@
   // ── Conexão ─────────────────────────────────────────────────────────────
   var socket = null
   var retryMs = 1000
+  // Conexão viva: o servidor manda `beat`; sem ouvir nada por 30 s, reconecta.
+  var lastServerMessage = 0
+  var serverBeats = false
+  var retryTimer = null
   function send(message) {
     try { if (socket && socket.readyState === 1) socket.send(JSON.stringify(message)) } catch (e) { /* reconecta */ }
   }
@@ -396,14 +400,21 @@
     try { socket = new WebSocket(url) } catch (e) { return retry() }
     socket.onopen = function () {
       retryMs = 1000
+      lastServerMessage = Date.now()
+      serverBeats = false
       body.dataset.connected = 'true'
       // Página atual: o servidor não pede recarga (só às abas antigas)
-      send({ v: 2, type: 'caps', caps: ['overlay'], page: 'legenda' })
+      send({ v: 2, type: 'caps', caps: ['overlay', 'heartbeat'], page: 'legenda' })
       var ready = readSession('overlay.ready', '')
       if (ready) { writeSession('overlay.ready', ''); send({ v: 2, type: 'receiver-ready', requestId: ready }) }
     }
     socket.onmessage = function (event) {
-      try { handle(JSON.parse(event.data)) } catch (e) { /* mensagem inválida */ }
+      lastServerMessage = Date.now()
+      try {
+        var message = JSON.parse(event.data)
+        if (message && message.type === 'beat') { serverBeats = true; send({ v: 2, type: 'beat' }); return }
+        handle(message)
+      } catch (e) { /* mensagem inválida */ }
     }
     socket.onclose = function () {
       body.dataset.connected = 'false'
@@ -412,9 +423,26 @@
   }
 
   function retry() {
-    setTimeout(connect, retryMs)
+    clearTimeout(retryTimer)
+    retryTimer = setTimeout(function () { retryTimer = null; connect() }, retryMs)
     retryMs = Math.min(retryMs * 2, 5000)
   }
+
+  function reconnectNow() {
+    var dead = socket
+    socket = null
+    if (dead) { dead.onclose = null; dead.onmessage = null; try { dead.close() } catch (e) { /* já fechou */ } }
+    body.dataset.connected = 'false'
+    clearTimeout(retryTimer)
+    retryTimer = null
+    connect()
+  }
+  setInterval(function () {
+    if (socket && socket.readyState === 1 && serverBeats && Date.now() - lastServerMessage > 30000) reconnectNow()
+  }, 5000)
+  function reconnectSoon() { if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; connect() } }
+  window.addEventListener('online', reconnectSoon)
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) reconnectSoon() })
 
   function readSession(key, fallback) {
     try { var raw = sessionStorage.getItem(key); return raw ? JSON.parse(raw) : fallback } catch (e) { return fallback }
