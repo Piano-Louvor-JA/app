@@ -62,9 +62,14 @@ export interface SlotError {
   suggestedPort?: number | null
 }
 
+/** Transmissão (OBS/navegador) ou Palco (TVs com o app Palco). */
+export type PalcoSlotKind = 'transmission' | 'palco'
+
 export interface PalcoSlotStatus {
   id: string
   label: string
+  /** Sem o campo (desktop antigo) vale como Transmissão. */
+  kind?: PalcoSlotKind
   running: boolean
   clients: number
   httpPort: number

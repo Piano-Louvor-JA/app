@@ -4,11 +4,13 @@ import { flushPromises, mount } from '@vue/test-utils'
 
 const palco = vi.hoisted(() => ({
   tvs: [] as Array<Record<string, unknown>>,
+  sources: [] as Array<Record<string, unknown>>,
   changed: null as null | (() => void),
 }))
 vi.mock('@modules/settings/services/palco-clients', () => ({
   hasPalcoClients: () => true,
   listPalcoTvs: vi.fn(async () => palco.tvs),
+  listTransmissionClients: vi.fn(async () => palco.sources),
   onPalcoClientsChanged: (cb: () => void) => {
     palco.changed = cb
     return () => {}
@@ -29,6 +31,7 @@ import ConnectedDevicesButton from '../ConnectedDevicesButton.vue'
 describe('ConnectedDevicesButton', () => {
   beforeEach(() => {
     palco.tvs = []
+    palco.sources = []
     palco.changed = null
   })
 
@@ -58,5 +61,28 @@ describe('ConnectedDevicesButton', () => {
     await flushPromises()
     expect(wrapper.find('[data-test="palco-devices"]').text()).toContain('Samsung')
     expect(wrapper.find('.connected-devices__badge').text()).toBe('1')
+  })
+
+  it('agrupa as Transmissões por conexão e página, com abas, OBS/navegador e IPs', async () => {
+    palco.sources = [
+      { uid: 's1', slotId: '0', slotLabel: 'Principal', ip: '192.168.0.60', platform: 'obs', name: 'OBS', page: 'espelho' },
+      { uid: 's2', slotId: '0', slotLabel: 'Principal', ip: '192.168.0.61', platform: 'browser', name: 'Navegador', page: 'espelho' },
+      { uid: 's3', slotId: '0', slotLabel: 'Principal', ip: '192.168.0.61', platform: 'browser', name: 'Navegador', page: 'espelho' },
+      { uid: 's4', slotId: '47082', slotLabel: 'Telão', ip: '192.168.0.62', platform: 'browser', name: 'Navegador', page: 'retorno' },
+      { uid: 's5', slotId: '0', slotLabel: 'Principal', ip: '192.168.0.63', platform: 'obs', name: 'OBS' },
+    ]
+    const wrapper = mount(ConnectedDevicesButton)
+    await flushPromises()
+    // o círculo conta cada aba
+    expect(wrapper.find('.connected-devices__badge').text()).toBe('5')
+    await wrapper.find('.connected-devices__circle').trigger('click')
+    const mirror = wrapper.find('[data-test="transmission-0|espelho"]').text()
+    expect(mirror).toContain('Principal|connectedDevices.pages.espelho|connectedDevices.tabs:3')
+    expect(mirror).toContain('connectedDevices.inObs:1connectedDevices.andconnectedDevices.inBrowser:2 · 192.168.0.60, 192.168.0.61')
+    const back = wrapper.find('[data-test="transmission-47082|retorno"]').text()
+    expect(back).toContain('Telão|connectedDevices.pages.retorno|connectedDevices.tabs:1')
+    expect(back).toContain('connectedDevices.inBrowser:1 · 192.168.0.62')
+    // aba antiga, sem página informada
+    expect(wrapper.find('[data-test="transmission-0|"]').text()).toContain('connectedDevices.pages.other')
   })
 })

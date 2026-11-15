@@ -25,7 +25,7 @@
        antigo rgba(0,0,0,.45) + .55 dupla-escurecia vs operador/projeção. */
     filter:brightness(1);transition:opacity .8s}
   /* Frame de slide projetado: fidelidade total — sem escurecimento. */
-  #bg.frame-slide{filter:none;object-fit:contain;background:#000}
+  #bg.frame-slide{filter:none;object-fit:contain;background:#000;transform-origin:50% 50%;will-change:transform}
   #bg:not([src]),#bg[src=""],#bgPalco:not([src]),#bgPalco[src=""]{display:none}
   #bgPalco{position:fixed;top:0;left:0;width:100%;height:100%;object-fit:cover}
   /* Véu de leitura DESLIGADO em música (paridade projeção local, 14/10).
@@ -3092,12 +3092,19 @@ function doConnect(){
   dlog('doConnect '+host+':'+port);
   setStatus(L10N.connecting.replace('{h}',host).replace('{p}',port));
   try{ws=new WebSocket(socketUrl)}catch(e){retry();return}
-  ws.onopen=()=>{tries=0;dlog('WS OPEN '+host);setStatus('● '+host);
+  ws.onopen=()=>{tries=0;lastServerMessage=Date.now();serverBeats=false;dlog('WS OPEN '+host);setStatus('● '+host);
     try{const requestId=sessionStorage.getItem('palcoRefreshRequest');if(requestId){ws.send(JSON.stringify({v:2,type:'receiver-ready',requestId,youtube:true,cleanMirror:!!window.PianoNetworkMirror}));sessionStorage.removeItem('palcoRefreshRequest')}}catch(e){}
+    // Avisa que aplica o zoom de imagem/PDF sozinho (frameView): o app manda
+    // só zoom + posição, em vez de reenviar o quadro recortado.
+    // e qual página é esta aba (Aparelhos conectados mostra espelho/retorno)
+    try{ws.send(JSON.stringify({v:2,type:'caps',caps:['frameView','heartbeat'],page:stageReturnMode?'retorno':'espelho'}))}catch(e){}
     if(window.__hideSplash)window.__hideSplash(); // F3.3j: splash sai no connect
     localStorage.setItem('palcoHost',host);
     localStorage.setItem('palcoPort',port)};
-  ws.onmessage=ev=>{try{handle(JSON.parse(ev.data))}catch(e){}};
+  ws.onmessage=ev=>{lastServerMessage=Date.now();try{const m=JSON.parse(ev.data);
+    // sinal de vida do servidor: responde e não vai para a tela
+    if(m&&m.type==='beat'){serverBeats=true;try{ws.send('{"v":2,"type":"beat"}')}catch(e){}return}
+    handle(m)}catch(e){}};
   ws.onclose=()=>{dlog('WS CLOSE');stopMediaOnServerLoss();showIdle();
     // host falhou 3x → esquece e re-escaneia (IP mudou)
     if(!ownBrowserSource&&tries>=3){localStorage.removeItem('palcoHost');host='';tries=0}
@@ -3107,8 +3114,32 @@ function doConnect(){
 function retry(){
   const wait=ownBrowserSource?1000:Math.min(1000*Math.pow(2,tries++),10000);
   setStatus(L10N.reconn.replace('{s}',Math.round(wait/1000)),true);
-  setTimeout(connect,wait);
+  clearTimeout(retryTimer);
+  retryTimer=setTimeout(function(){retryTimer=null;connect()},wait);
 }
+
+// ===== Conexão viva dos dois lados =====
+// O servidor manda `beat` a cada 10 s (e cobra a resposta). Daqui, se ficar
+// 30 s sem ouvir nada do servidor, a conexão está pendurada (Wi-Fi caiu, PC
+// dormiu): fecha e reconecta sem esperar o navegador perceber. Servidor
+// antigo não manda `beat`: aí este vigia fica desligado.
+let lastServerMessage=0,serverBeats=false,retryTimer=null;
+const SERVER_SILENCE_MS=30000;
+function reconnectNow(reason){
+  dlog('reconectando: '+reason);
+  const dead=ws;ws=null;
+  if(dead){dead.onclose=null;dead.onmessage=null;dead.onerror=null;try{dead.close()}catch(e){}}
+  stopMediaOnServerLoss();showIdle();
+  clearTimeout(retryTimer);retryTimer=null;
+  connect();
+}
+setInterval(function(){
+  if(ws&&ws.readyState===1&&serverBeats&&Date.now()-lastServerMessage>SERVER_SILENCE_MS)reconnectNow('servidor sem resposta');
+},5000);
+// Rede voltou ou a aba voltou a aparecer: não espera a próxima tentativa.
+function reconnectSoon(){if(retryTimer){clearTimeout(retryTimer);retryTimer=null;connect()}}
+window.addEventListener('online',reconnectSoon);
+document.addEventListener('visibilitychange',function(){if(!document.hidden)reconnectSoon()});
 
 // ===== WT-5d: modo cloud — TV conecta no relay WS da API =====
 // Mesmo protocolo do receiver browser (browser/index.html): código de 6 chars
@@ -3660,8 +3691,22 @@ function showObsWarmup(message){
   sendEvent({v:2,type:'obs-warmup-started',requestId:message.requestId});
   obsWarmupTimeout=setTimeout(()=>{clearObsWarmup();sendEvent({v:2,type:'obs-warmup-complete',requestId:message.requestId})},remaining);
 }
+// Zoom do quadro (imagem/PDF/PPT) igual ao do operador: escala + deslocamento
+// em fração da tela, animado para não andar em "degraus".
+function applyFrameView(view,anim){
+  const bgEl=$('bg');if(!bgEl)return;
+  const z=view&&Number(view.zoom)>1?Math.min(5,Number(view.zoom)):1;
+  const x=view&&Number.isFinite(Number(view.x))?Number(view.x):0;
+  const y=view&&Number.isFinite(Number(view.y))?Number(view.y):0;
+  const ms=Math.max(0,Math.min(400,Number(anim)||0));
+  bgEl.style.transition=ms?'transform '+ms+'ms cubic-bezier(0.2,0.7,0.3,1),opacity .8s':'';
+  bgEl.style.transform=z===1&&!x&&!y?'':'translate('+(x*100)+'%,'+(y*100)+'%) scale('+z+')';
+}
 function handle(m){
   if(m.v!==1&&m.v!==2)return;
+  if(m.type==='frameView'){if($('bg').classList.contains('frame-slide'))applyFrameView(m.view,m.view&&m.view.anim);return;}
+  // outro conteúdo no fundo: o zoom do quadro anterior não vale para ele
+  if(m.type==='video'||m.type==='audio'||m.type==='idle'||m.type==='bgPalco'||m.type==='stop-all')applyFrameView(null,0);
   // Tela de espera sem logo (opção do transmissor, reenviada ao conectar).
   if(m.type==='idleStyle'){document.documentElement.classList.toggle('idle-no-logo',m.hideLogo===true);return;}
   if(m.type==='stageReturn'){applyStageReturn(m);return;}
@@ -3766,6 +3811,8 @@ function handle(m){
       const isFrameSlide=m.frameSlide===true||(typeof m.background==='string'&&m.background.startsWith('data:image/'));
       bgEl.classList.toggle('frame-slide',isFrameSlide);
       bgEl.onerror=isFrameSlide?null:bgEl.onerror;
+      // quadro novo chega já com o zoom do operador (ou sem zoom)
+      applyFrameView(isFrameSlide?m.view:null,0);
       // Cor explícita é a personalização ativa do Palco: vence capa/bg do
       // runtime também. Antes só valia sem `m.background`, então música com
       // capa escondia a alteração feita nas configurações (14/10).
@@ -4093,6 +4140,7 @@ function handle(m){
       // Timer messages carry the same module background as monitor projections.
       const timerBg=$('bg');
       timerBg.classList.remove('frame-slide');
+      applyFrameView(null,0);
       timerBg.onerror=()=>{timerBg.removeAttribute('src')};
       timerBg.style.opacity='';
       if(m.background){timerBg.src=palcoMediaUrl(m.background);document.body.style.background=''}

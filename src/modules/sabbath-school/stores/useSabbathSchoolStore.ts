@@ -390,6 +390,8 @@ export const useSabbathSchoolStore = defineStore('sabbathSchool', () => {
     setVideoMuted,
     setVideoVolume,
     toggleProjection: projection.toggleProjection,
+    claimOutput: projection.claimOutput,
+    ownsCountdownOutput: projection.ownsCountdownOutput,
     syncProjection: projection.syncProjection,
     clearProjection: projection.clearProjection,
     refreshProjectionState: projection.refreshProjectionState,

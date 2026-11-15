@@ -8,6 +8,7 @@ import { JSDOM } from 'jsdom'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const PANEL_JS = readFileSync(resolve(__dirname, '../independent-panel.js'), 'utf-8')
 const MIRROR_JS = readFileSync(resolve(__dirname, '../../palco/network-mirror.js'), 'utf-8')
+const TARGETS_JS = readFileSync(resolve(__dirname, '../screen-targets.js'), 'utf-8')
 const BARS = ['control-bar', 'image-control-bar', 'pdf-control-bar', 'site-control-bar']
 
 let dom: JSDOM | null = null
@@ -49,7 +50,7 @@ function makeBridge(overrides: { state?: unknown; slots?: unknown[]; enabled?: n
   }
 }
 
-function setup(bridge: Bridge, search = '') {
+function setup(bridge: Bridge, search = '', withTargets = false) {
   dom = new JSDOM(
     '<!doctype html><html><head></head><body><div class="shell" id="shell"><div class="bar"><div class="transport"><button id="project" aria-pressed="false" disabled></button><span class="monitor-wrap"><button id="monitorSelect"></button></span></div></div></div></body></html>',
     { url: `http://localhost/bar.html${search}`, runScripts: 'outside-only', pretendToBeVisual: true },
@@ -58,6 +59,7 @@ function setup(bridge: Bridge, search = '') {
   Object.defineProperty(w, 'louvorja', { value: bridge, configurable: true })
   Object.defineProperty(w.navigator, 'mediaDevices', { value: { getUserMedia: vi.fn(async () => ({ getTracks: () => [] })) }, configurable: true })
   w.eval(MIRROR_JS)
+  if (withTargets) w.eval(TARGETS_JS)
   w.eval(PANEL_JS)
   const doc = dom.window.document
   const barClicks: string[] = []
@@ -370,5 +372,45 @@ describe('independent-panel', () => {
     expect(remoteHint.style.display).toBe('block')
     ;($('.ip-identify') as HTMLElement).click()
     expect(bridge.displays.identify).toHaveBeenCalled()
+  })
+})
+
+describe('independent-panel: igual ao seletor de telas do app', () => {
+  it('nomes do app, Tela retorno e fecha ao clicar fora, ao perder o foco e com Esc', async () => {
+    const bridge = makeBridge({ slots: [{ id: '0', label: 'Principal', clients: 2 }] })
+    Object.assign(bridge.projection, {
+      screenContext: vi.fn(async () => ({ returnDisplayId: 30, remotes: [{ id: '0', name: 'OBS', selected: true }] })),
+    })
+    const { doc, $, $$ } = setup(bridge, '', true)
+    const button = $('#independentProjection')!
+    const isOpen = () => button.getAttribute('aria-expanded') === 'true'
+    const pointerdown = (el: Element) => el.dispatchEvent(new dom!.window.MouseEvent('pointerdown', { bubbles: true }))
+
+    button.click()
+    await wait(40)
+    expect(isOpen()).toBe(true)
+    expect($$('#independentMonitors .ip-name').map((el) => el.textContent)).toEqual(['Monitor 2', 'Monitor 3Tela retorno'])
+    expect($$('#independentRemotes .ip-name').map((el) => el.textContent)).toEqual(['OBS'])
+
+    // dentro do painel não fecha; fora fecha
+    pointerdown($('#independentPanel')!)
+    await wait(5)
+    expect(isOpen()).toBe(true)
+    pointerdown($('#project')!)
+    await wait(5)
+    expect(isOpen()).toBe(false)
+
+    // clique no slide ou em outra janela: o player perde o foco
+    button.click()
+    await wait(350)
+    dom!.window.dispatchEvent(new dom!.window.Event('blur'))
+    await wait(5)
+    expect(isOpen()).toBe(false)
+
+    button.click()
+    await wait(20)
+    doc.dispatchEvent(new dom!.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await wait(5)
+    expect(isOpen()).toBe(false)
   })
 })

@@ -36,7 +36,7 @@ interface LouvorjaStub {
   }
 }
 
-function loadBar(captureSourceFrame: () => Promise<string | null>): {
+function loadBar(captureSourceFrame: () => Promise<string | null>, customize?: (stub: Record<string, any>) => void): {
   sent: Array<{ slotId: string; msg: Record<string, unknown> }>
   served: string[]
   receiverConnectedCbs: Array<(e: { slotId: string }) => void>
@@ -86,9 +86,16 @@ function loadBar(captureSourceFrame: () => Promise<string | null>): {
       identify: () => Promise.resolve(),
     },
   }
+  customize?.(stub as unknown as Record<string, any>)
   Object.defineProperty(w, 'louvorja', { value: stub, configurable: true })
 
   for (const el of dom.window.document.querySelectorAll('script')) {
+    const src = el.getAttribute('src')
+    // scripts da própria barra (seletor de telas, zoom); os demais ficam de fora
+    if (src === 'screen-targets.js' || src === 'palco-zoom-sender.js') {
+      w.eval(readFileSync(resolve(dirname(BAR_PATH), src), 'utf-8'))
+      continue
+    }
     const code = el.textContent ?? ''
     if (!code.trim()) continue
     w.eval(code)
@@ -169,5 +176,95 @@ it('a capture completing after projection stops cannot transmit a late frame', a
   await new Promise(resolve => setTimeout(resolve, 50))
   expect(served).toEqual([])
   expect(sent).toEqual([])
+  dom.window.close()
+})
+
+it('seletor de telas igual ao do app: seções, nomes, Tela retorno e o mesmo número', async () => {
+  const remoteChanges: Array<[string, boolean]> = []
+  const muted: Array<[string, boolean]> = []
+  loadBar(async () => 'frame', (stub) => {
+    stub.palco.slots = () => Promise.resolve([
+      { id: '0', label: 'Principal', clients: 2, running: true },
+      { id: '3', label: 'Lateral', clients: 0, running: false },
+    ])
+    stub.palco.clients = () => Promise.resolve([
+      { uid: 'u1', slotId: '0', slotLabel: 'Principal', platform: 'androidtv', name: 'TV da entrada', muted: false },
+      { uid: 'u2', slotId: '0', slotLabel: 'Principal', platform: 'obs', name: 'OBS', muted: false },
+    ])
+    stub.palco.setClientMuted = (_slot: string, uid: string, value: boolean) => { muted.push([uid, value]); return Promise.resolve(true) }
+    stub.projection.screenContext = () => Promise.resolve({ returnDisplayId: 4, remotes: [{ id: '0', name: 'OBS', selected: true }] })
+    stub.projection.setRemoteSelected = (id: string, selected: boolean) => { remoteChanges.push([id, selected]); return Promise.resolve(true) }
+    stub.projection.getVideoTargetMonitors = () => Promise.resolve([2, 3, 4])
+    stub.displays.list = () => Promise.resolve([
+      { id: 1, isPrimary: true, bounds: { width: 2560, height: 1080 } },
+      { id: 2, isPrimary: false, bounds: { width: 2560, height: 1080 } },
+      { id: 3, isPrimary: false, bounds: { width: 2560, height: 1080 } },
+      { id: 4, isPrimary: false, bounds: { width: 1080, height: 2560 } },
+    ])
+  })
+  await new Promise(resolve => setTimeout(resolve, 50))
+  ;(w.document.getElementById('monitorSelect') as HTMLButtonElement).click()
+  await new Promise(resolve => setTimeout(resolve, 80))
+
+  const doc = w.document
+  expect(doc.querySelector('.panel__title')?.textContent).toBe('Conexões Cabeadas')
+  // 3 monitores + a conexão remota marcada, como no app
+  expect(doc.getElementById('monitorBadge')?.textContent).toBe('4')
+  const monitors = [...doc.querySelectorAll('#monitorList .panel__option-name')].map(el => el.textContent)
+  expect(monitors).toEqual(['Monitor 2', 'Monitor 3', 'Monitor 4Tela retorno'])
+  expect(doc.querySelector('#tvList .st-section')?.textContent).toBe('Conexões Remotas')
+  expect([...doc.querySelectorAll('#tvList .panel__option-name')].map(el => el.textContent)).toEqual(['OBS'])
+  expect(doc.querySelector('#tvList .panel__option-meta')?.textContent).toBe('Conexões ativas: 2')
+  expect(doc.querySelector('#palcoTvList .st-section')?.textContent).toBe('TVs com Palco')
+  expect([...doc.querySelectorAll('#palcoTvList .panel__option-name')].map(el => el.textContent)).toEqual(['TV da entrada'])
+  expect(doc.querySelector('#palcoTvList .panel__option-meta')?.textContent).toBe('Principal')
+
+  // desmarcar a conexão no player vale no app e baixa o número
+  const remote = doc.querySelector('#tvList input') as HTMLInputElement
+  remote.checked = false; remote.dispatchEvent(new dom.window.Event('change'))
+  await new Promise(resolve => setTimeout(resolve, 30))
+  expect(remoteChanges).toEqual([['0', false]])
+  expect(doc.getElementById('monitorBadge')?.textContent).toBe('3')
+
+  // TV desmarcada fica na espera (mesmo controle do app)
+  const tv = doc.querySelector('#palcoTvList input') as HTMLInputElement
+  tv.checked = false; tv.dispatchEvent(new dom.window.Event('change'))
+  await new Promise(resolve => setTimeout(resolve, 30))
+  expect(muted).toEqual([['u1', true]])
+  dom.window.close()
+})
+
+it('o seletor de telas fecha ao clicar fora, quando o player perde o foco e com Esc', async () => {
+  loadBar(async () => 'frame')
+  await new Promise(resolve => setTimeout(resolve, 50))
+  const doc = w.document
+  const button = doc.getElementById('monitorSelect') as HTMLButtonElement
+  const isOpen = () => button.getAttribute('aria-expanded') === 'true'
+  const pointerdown = (el: Element) => el.dispatchEvent(new dom.window.MouseEvent('pointerdown', { bubbles: true }))
+
+  button.click()
+  await new Promise(resolve => setTimeout(resolve, 30))
+  expect(isOpen()).toBe(true)
+  // clique dentro do painel não fecha
+  pointerdown(doc.getElementById('monitorPanel') as HTMLElement)
+  await new Promise(resolve => setTimeout(resolve, 10))
+  expect(isOpen()).toBe(true)
+  // clique fora (na barra) fecha
+  pointerdown(doc.getElementById('counter') as HTMLElement)
+  await new Promise(resolve => setTimeout(resolve, 10))
+  expect(isOpen()).toBe(false)
+
+  // clique no slide ou em outra janela: a barra perde o foco
+  button.click()
+  await new Promise(resolve => setTimeout(resolve, 400))
+  w.dispatchEvent(new dom.window.Event('blur'))
+  await new Promise(resolve => setTimeout(resolve, 10))
+  expect(isOpen()).toBe(false)
+
+  button.click()
+  await new Promise(resolve => setTimeout(resolve, 30))
+  doc.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  await new Promise(resolve => setTimeout(resolve, 10))
+  expect(isOpen()).toBe(false)
   dom.window.close()
 })

@@ -21,6 +21,7 @@ import { registerDownloadBatchIpc } from "./ipc/download-batch-ipc.mjs";
 import { registerDiagnosticsIpc, setClockSkewProvider, setDiagnosticsToken } from "./diagnostics.mjs";
 import { createMainLogger } from "./main-log.mjs";
 import { attachHistoryAppCommand, attachWindowStateEvents, mainWindowChromeOptions, registerWindowIpc } from "./ipc/window.mjs";
+import { registerScreenContextIpc } from "./ipc/screen-context.mjs";
 import { attachRemoteServer } from "./remote-server.mjs";
 import { attachMonitorShare } from "./monitor-share.mjs";
 import { attachPalcoServer, getPalcoManager } from "./palco-server.mjs";
@@ -973,6 +974,7 @@ app.whenReady().then(async () => {
 		});
 		mainLog.info('diagnostics IPC handlers registered');
 		registerWindowIpc(() => mainWindow);
+		registerScreenContextIpc(() => mainWindow);
 		registerDownloadBatchIpc(() => mainWindow);
 		registerLocalFileProtocol();
 		startOnlineVideo(() => locale);

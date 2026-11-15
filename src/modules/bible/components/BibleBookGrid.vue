@@ -81,6 +81,7 @@ const { t } = useI18n()
           `bible-books__tile--${resolveBookTone(book.bookNumber)}`,
           { 'bible-books__tile--active': book.id === selectedBookId },
         ]"
+        :title="book.name"
         @click="emit('selectBook', book.id)"
       >
         <span class="bible-books__abbr">{{ book.abbreviation }}</span>
@@ -239,18 +240,18 @@ const { t } = useI18n()
   }
 
   .bible-books__abbr {
-    font-size: 0.95rem;
-  
+    font-size: 1.35rem;
+
     @media (max-width: 1280px) {
-        font-size: 0.85rem;
+        font-size: 1.2rem;
       }
 }
 
   .bible-books__name {
-    font-size: 9px;
-  
+    font-size: 0.78rem;
+
     @media (max-width: 1280px) {
-        font-size: 8px;
+        font-size: 0.72rem;
       }
 }
 }
@@ -368,15 +369,17 @@ const { t } = useI18n()
     }
 }
 
+/* Letra maior: usuários relataram dificuldade de leitura no tamanho anterior. */
 .bible-books__abbr {
-  font-size: 1.05rem;
+  font-size: 1.6rem;
   font-weight: 700;
   line-height: 1.1;
 }
 
 .bible-books__name {
-  font-size: 10px;
-  opacity: 0.85;
+  font-size: 0.9rem;
+  font-weight: 600;
+  opacity: 0.95;
   line-height: 1.2;
   max-width: 100%;
   overflow: hidden;

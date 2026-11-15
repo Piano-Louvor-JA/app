@@ -9,6 +9,7 @@ import { useCountdownStage } from '@modules/countdown/composables/useCountdownSt
 import { useCountdownStore } from '@modules/countdown/stores/useCountdownStore'
 import { resolveBackgroundImage } from '@modules/settings/types/stage-settings'
 import FloatingPreviewTitle from '@shared/components/FloatingPreviewTitle.vue'
+import IndependentProjectionButton from '@shared/components/IndependentProjectionButton.vue'
 import MiniPlayerCloseButton from '@shared/components/MiniPlayerCloseButton.vue'
 import { FLOATING_STACK_ORDER, useFloatingDrag } from '@shared/composables/useFloatingDrag'
 import { useInAppProjectionMinimized } from '@shared/composables/useInAppProjectionMinimized'
@@ -29,7 +30,8 @@ const { stage, effectiveConfig } = useCountdownStage(() => appearance.config)
 const onRoute = computed(() => route.name === SABBATH_SCHOOL_ROUTE)
 
 const dismissed = ref(false)
-watch(() => route.name, () => { dismissed.value = false })
+// fechada pelo usuário, só volta ao entrar na própria tela (não a cada troca de página)
+watch(onRoute, (entered) => { if (entered) dismissed.value = false })
 watch(() => store.isProjecting, (active) => { if (active) dismissed.value = false })
 watch(() => store.isRunning, (running) => { if (running) dismissed.value = false })
 
@@ -97,7 +99,6 @@ async function onOpen() {
         :config="effectiveConfig"
         :runtime="store.runtime"
         :stage="stage"
-        muted
       />
     </aside>
 
@@ -146,6 +147,13 @@ async function onOpen() {
           aria-hidden="true"
         />
       </button>
+
+      <!-- Mesma tela do Cronômetro: projetar aqui a deixa com a Escola Sabatina -->
+      <IndependentProjectionButton
+        module-id="countdown"
+        :before-project="store.claimOutput"
+        :claimed="store.ownsCountdownOutput()"
+      />
 
       <CountdownProjectFab
         :projecting="store.isProjecting"

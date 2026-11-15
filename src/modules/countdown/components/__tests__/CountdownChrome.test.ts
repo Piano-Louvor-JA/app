@@ -80,6 +80,8 @@ const store = reactive({
   start: vi.fn(),
   pause: vi.fn(),
   toggleProjection: vi.fn().mockResolvedValue(undefined),
+  claimOutput: vi.fn(() => true),
+  ownsCountdownOutput: vi.fn(() => true),
   clearProjection: vi.fn(),
 })
 

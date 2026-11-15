@@ -42,6 +42,8 @@ const store = reactive({
   pause: vi.fn(),
   stopAudio: vi.fn(),
   toggleProjection: vi.fn().mockResolvedValue(undefined),
+  claimOutput: vi.fn(() => true),
+  ownsCountdownOutput: vi.fn(() => true),
   clearProjection: vi.fn(),
 })
 const appearance = reactive({ config: { timeFormat: 'hh:mm:ss', bgColor: '#000', textColor: '#fff' } })
@@ -89,8 +91,8 @@ describe('prévia flutuante da Escola Sabatina', () => {
     const w = mountChrome()
     expect(w.find('.floating-preview-title').text()).toBe('Escola Sabatina')
     expect(w.findComponent({ name: 'CountdownPreview' }).props('runtime')).toEqual(store.runtime)
-    // o som do vídeo personalizado sai só da projeção
-    expect(w.findComponent({ name: 'CountdownPreview' }).props('muted')).toBe(true)
+    // o som do vídeo personalizado sai sempre da prévia (a projeção é muda)
+    expect(w.findComponent({ name: 'CountdownPreview' }).props('muted')).toBe(false)
     expect(w.find('[data-testid=sabbath-chrome-start]').exists()).toBe(true)
     expect(w.find('.countdown-project-fab').exists()).toBe(true)
     expect(w.find('[data-testid=sabbath-chrome-open]').exists()).toBe(false)
@@ -129,6 +131,15 @@ describe('prévia flutuante da Escola Sabatina', () => {
     expect(store.pause).toHaveBeenCalledOnce()
   })
 
+  it('projeção independente: mesma tela do Cronômetro, tomada pela Escola Sabatina antes de projetar', () => {
+    const w = mountChrome()
+    const button = w.findComponent({ name: 'IndependentProjectionButton' })
+    expect(button.exists()).toBe(true)
+    expect(button.props('moduleId')).toBe('countdown')
+    expect(button.props('beforeProject')).toBe(store.claimOutput)
+    expect(button.props('claimed')).toBe(true)
+  })
+
   it('projetar e retirar da projeção usam a Escola Sabatina', async () => {
     const w = mountChrome()
     await w.get('.countdown-project-fab').trigger('click')
@@ -155,6 +166,34 @@ describe('prévia flutuante da Escola Sabatina', () => {
     route.name = 'utilities-sabbath-school'
     await nextTick()
     expect(w.find('[data-testid=sabbath-chrome]').exists()).toBe(true)
+  })
+
+  it('áudio do vídeo: a prévia toca sempre, inclusive ao projetar, sem intervalo mudo', async () => {
+    setStatus('running')
+    const w = mountChrome()
+    const preview = () => w.findComponent({ name: 'CountdownPreview' })
+    expect(preview().props('muted')).toBe(false)
+    store.isProjecting = true
+    await nextTick()
+    expect(preview().props('muted')).toBe(false)
+    store.isProjecting = false
+    await nextTick()
+    expect(preview().props('muted')).toBe(false)
+  })
+
+  it('fechada fora da tela, continua fechada ao trocar para outras páginas', async () => {
+    route.name = 'home'
+    setStatus('paused')
+    const w = mountChrome()
+    w.findComponent({ name: 'MiniPlayerCloseButton' }).vm.$emit('close')
+    await nextTick()
+    expect(w.find('[data-testid=sabbath-chrome]').exists()).toBe(false)
+    route.name = 'bible'
+    await nextTick()
+    expect(w.find('[data-testid=sabbath-chrome]').exists()).toBe(false)
+    route.name = 'liturgy'
+    await nextTick()
+    expect(w.find('[data-testid=sabbath-chrome]').exists()).toBe(false)
   })
 
   it('fechar sem projeção não tenta retirar; voltar a contar reaparece', async () => {
