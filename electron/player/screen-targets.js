@@ -103,6 +103,15 @@
     isReturn: function (displayId) { return ctx.returnDisplayId != null && ctx.returnDisplayId === displayId },
     /** Marca "Tela retorno" ao lado do nome do monitor (HTML). */
     returnTagHtml: function (displayId) { return T.isReturn(displayId) ? '<span class="st-tag">Tela retorno</span>' : '' },
+    /** Mesma marca como elemento (null quando não é a Tela retorno). */
+    returnTagElement: function (displayId) {
+      if (!T.isReturn(displayId)) return null
+      injectStyle()
+      var tag = document.createElement('span')
+      tag.className = 'st-tag'
+      tag.textContent = 'Tela retorno'
+      return tag
+    },
 
     /** Mesmo nome do app: a conexão principal é "OBS"; as outras, o apelido. */
     remoteName: function (slot) {
@@ -183,6 +192,29 @@
         list.appendChild(row.label)
       })
       container.appendChild(list)
+    },
+
+    /**
+     * Fecha o seletor de telas ao clicar fora dele, quando o player perde o
+     * foco (clique no slide ou em outra janela) e com Esc. O botão continua
+     * abrindo e fechando.
+     */
+    closeOnOutside: function (options) {
+      var panel = options.panel
+      var trigger = options.trigger
+      var openedAt = 0
+      function isOpen() { return trigger.getAttribute('aria-expanded') === 'true' }
+      function close() { if (isOpen()) void options.close() }
+      trigger.addEventListener('click', function () { openedAt = Date.now() }, true)
+      document.addEventListener('pointerdown', function (event) {
+        var target = event.target
+        if (!isOpen() || !(target instanceof Node)) return
+        if (panel.contains(target) || trigger.contains(target)) return
+        close()
+      }, true)
+      // o painel acabou de abrir: o foco ainda pode estar se ajustando
+      window.addEventListener('blur', function () { if (Date.now() - openedAt > 300) close() })
+      document.addEventListener('keydown', function (event) { if (event.key === 'Escape') close() })
     },
 
     escapeHtml: escapeHtml,

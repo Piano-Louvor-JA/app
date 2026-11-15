@@ -694,6 +694,13 @@
           refreshNav()
         })
 
+        if (window.PianoScreenTargets) {
+          window.PianoScreenTargets.closeOnOutside({
+            panel: document.getElementById('monitorPanel'),
+            trigger: monitorBtn,
+            close: function () { return setPanelOpen(false) },
+          })
+        }
         monitorBtn.addEventListener('click', async function () {
           await setPanelOpen(!panelOpen)
         })

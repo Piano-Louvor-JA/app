@@ -68,6 +68,11 @@
     return root
   }
 
+  /** Nomes e Tela retorno iguais aos do app (screen-targets.js). */
+  function targets() {
+    return window.PianoScreenTargets || null
+  }
+
   function api() {
     return window.louvorja || null
   }
@@ -246,7 +251,7 @@
     }
 
 
-    function item(name, meta, isActive, isOnAir, onClick, note) {
+    function item(name, meta, isActive, isOnAir, onClick, note, tag) {
       var b = el('button', 'ip-item' + (isActive ? ' is-active' : ''))
       b.type = 'button'
       if (note) b.disabled = true
@@ -255,6 +260,7 @@
       b.appendChild(el('span', 'ip-check'))
       var text = el('span')
       var title = el('span', 'ip-name', name)
+      if (tag) title.appendChild(tag)
       if (isOnAir) title.appendChild(el('span', 'ip-live', 'NO AR'))
       text.appendChild(title)
       if (meta) text.appendChild(el('span', 'ip-meta', meta))
@@ -275,7 +281,8 @@
         var onAir = Boolean(active && active.displayIds.indexOf(d.id) >= 0)
         // Monitor desligado no "Telas": aparece desativado (no ar, ainda dá para desmarcar).
         var off = !isEnabled(d.id) && !onAir
-        monitorList.appendChild(item(d.label, d.resolution, selDisplays.indexOf(d.id) >= 0, onAir, function () { selectMonitor(d.id) }, off ? ENABLE_HINT : ''))
+        var tag = targets() ? targets().returnTagElement(d.id) : null
+        monitorList.appendChild(item(d.label, d.resolution, selDisplays.indexOf(d.id) >= 0, onAir, function () { selectMonitor(d.id) }, off ? ENABLE_HINT : '', tag))
       })
     }
 
@@ -287,7 +294,9 @@
         return
       }
       live.forEach(function (s) {
-        remoteList.appendChild(item(s.label || 'Conexão ' + s.id, 'Conexões ativas: ' + s.clients, selRemotes.indexOf(s.id) >= 0, remoteLive.indexOf(s.id) >= 0, function () { selectRemote(s.id) }))
+        // mesmo nome do seletor de telas do app ("OBS" na principal)
+        var name = targets() ? targets().remoteName(s) : s.label || 'Conexão ' + s.id
+        remoteList.appendChild(item(name, 'Conexões ativas: ' + s.clients, selRemotes.indexOf(s.id) >= 0, remoteLive.indexOf(s.id) >= 0, function () { selectRemote(s.id) }))
       })
     }
 
@@ -312,6 +321,7 @@
     }
 
     async function reload() {
+      if (targets()) await targets().load()
       try {
         var list = bridge.displays && bridge.displays.list ? (await bridge.displays.list()) || [] : []
         displays = list.map(function (d, index) {
@@ -455,9 +465,14 @@
     identify.addEventListener('click', function () {
       if (bridge.displays && bridge.displays.identify) void bridge.displays.identify()
     })
-    document.addEventListener('keydown', function (event) {
-      if (event.key === 'Escape' && open) setOpen(false)
-    })
+    // Fecha ao clicar fora, quando o player perde o foco e com Esc (como o seletor de telas)
+    if (targets() && targets().closeOnOutside) {
+      targets().closeOnOutside({ panel: panel, trigger: button, close: function () { setOpen(false) } })
+    } else {
+      document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && open) setOpen(false)
+      })
+    }
     // O painel "Selecionar telas" abriu: este fecha.
     var shell = document.querySelector('.shell')
     if (shell && window.MutationObserver) {

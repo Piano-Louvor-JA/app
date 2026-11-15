@@ -234,3 +234,37 @@ it('seletor de telas igual ao do app: seções, nomes, Tela retorno e o mesmo n�
   dom.window.close()
 })
 
+it('o seletor de telas fecha ao clicar fora, quando o player perde o foco e com Esc', async () => {
+  loadBar(async () => 'frame')
+  await new Promise(resolve => setTimeout(resolve, 50))
+  const doc = w.document
+  const button = doc.getElementById('monitorSelect') as HTMLButtonElement
+  const isOpen = () => button.getAttribute('aria-expanded') === 'true'
+  const pointerdown = (el: Element) => el.dispatchEvent(new dom.window.MouseEvent('pointerdown', { bubbles: true }))
+
+  button.click()
+  await new Promise(resolve => setTimeout(resolve, 30))
+  expect(isOpen()).toBe(true)
+  // clique dentro do painel não fecha
+  pointerdown(doc.getElementById('monitorPanel') as HTMLElement)
+  await new Promise(resolve => setTimeout(resolve, 10))
+  expect(isOpen()).toBe(true)
+  // clique fora (na barra) fecha
+  pointerdown(doc.getElementById('counter') as HTMLElement)
+  await new Promise(resolve => setTimeout(resolve, 10))
+  expect(isOpen()).toBe(false)
+
+  // clique no slide ou em outra janela: a barra perde o foco
+  button.click()
+  await new Promise(resolve => setTimeout(resolve, 400))
+  w.dispatchEvent(new dom.window.Event('blur'))
+  await new Promise(resolve => setTimeout(resolve, 10))
+  expect(isOpen()).toBe(false)
+
+  button.click()
+  await new Promise(resolve => setTimeout(resolve, 30))
+  doc.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  await new Promise(resolve => setTimeout(resolve, 10))
+  expect(isOpen()).toBe(false)
+  dom.window.close()
+})
