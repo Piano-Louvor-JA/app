@@ -156,6 +156,7 @@ const projectionFontStyle = useProjectionFont('countdown')
         :config="effectiveConfig"
         :runtime="runtime"
         :stage="stage"
+        muted
       />
     </div>
   </ProjectionBackground>

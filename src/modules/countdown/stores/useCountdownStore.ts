@@ -283,6 +283,8 @@ export const useCountdownStore = defineStore('countdown', () => {
     removeSavedMark,
     clearSavedMarks,
     toggleProjection: projection.toggleProjection,
+    claimOutput: projection.claimOutput,
+    ownsCountdownOutput: projection.ownsCountdownOutput,
     syncProjection: projection.syncProjection,
     clearProjection: projection.clearProjection,
     refreshProjectionState: projection.refreshProjectionState,

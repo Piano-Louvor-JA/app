@@ -96,6 +96,21 @@ export function useCountdownProjectionControl(
     else stopProjectionWatch()
   }
 
+  /**
+   * Projeção independente: a tela de contagem passa a mostrar este módulo
+   * (sem abrir a projeção principal). Usado como `beforeProject` do botão.
+   */
+  function claimOutput(): boolean {
+    output.claim(source)
+    publish()
+    return true
+  }
+
+  /** Este módulo é quem aparece na tela de contagem agora. */
+  function ownsCountdownOutput(): boolean {
+    return ownsOutput()
+  }
+
   function clearProjection() {
     const owned = ownsOutput()
     dropProjection()
@@ -123,6 +138,8 @@ export function useCountdownProjectionControl(
     isProjecting,
     inAppPreview,
     publish,
+    claimOutput,
+    ownsCountdownOutput,
     hydrateProjection,
     syncProjection,
     clearProjection,

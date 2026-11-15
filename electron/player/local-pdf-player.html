@@ -21,10 +21,12 @@
         background: #000;
       }
       #frame {
-        max-width: 100%;
-        max-height: 100%;
         background: #000;
+        user-select: none;
+        will-change: transform;
       }
+      body.is-zoomed #stage { cursor: grab; }
+      body.is-panning #stage { cursor: grabbing; }
       #error {
         display: none;
         color: #f8fafc;
@@ -40,6 +42,7 @@
       <canvas id="frame" aria-hidden="true"></canvas>
       <p id="error">Não foi possível carregar o PDF.</p>
     </div>
+    <script src="zoom-pan.js"></script>
     <script type="module">
       import * as pdfjsLib from './vendor/pdfjs/pdf.min.mjs'
 
@@ -62,10 +65,34 @@
       let exportCache = null
       const thumbnailCache = new Map()
 
+      const stage = document.getElementById('stage')
+
+      // Zoom (zoom-pan.js): com zoom a página é redesenhada em resolução maior,
+      // para o texto continuar nítido; o encaixe na tela não muda.
+      const MAX_CANVAS_SIDE = 8192
+      let renderedQuality = 1
+      let lastFit = 1
+      let renderedStageSize = ''
+      let qualityTimer = 0
+      function qualityFor(view) {
+        return Math.min(4, Math.max(1, Math.ceil(view.zoom * 2) / 2))
+      }
+      const zoom = window.PianoZoomPan.create({
+        stage,
+        target: canvas,
+        enabled: () => Boolean(pdfDoc),
+        onChange: (view) => {
+          if (qualityFor(view) === renderedQuality) return
+          clearTimeout(qualityTimer)
+          qualityTimer = setTimeout(() => { if (pdfDoc) void renderPage(pageIndex) }, 150)
+        },
+      })
+
       function state() {
         return {
           index: pageIndex,
           total: pdfDoc ? pdfDoc.numPages : 0,
+          view: zoom.getView(),
         }
       }
 
@@ -88,13 +115,15 @@
           return state()
         }
         if (nextIndex < 0) nextIndex = total - 1
+        // outra página começa inteira; redesenhar a mesma não perde o zoom
+        if (nextIndex !== pageIndex) zoom.reset()
         pageIndex = nextIndex
         const token = ++renderToken
         const page = await pdfDoc.getPage(pageIndex + 1)
         if (token !== renderToken) return state()
 
-        // O PDF.js só permite uma renderização ativa por canvas.
-        // Aguarda o cancelamento antes de redimensionar ou reutilizar a prévia.
+        // O PDF.js só permite uma renderização ativa por página/canvas: a
+        // anterior (ex.: zoom mudou de novo) é cancelada antes desta começar.
         if (activeRenderTask) {
           const previous = activeRenderTask
           previous.cancel()
@@ -104,27 +133,48 @@
         }
         if (token !== renderToken) return state()
 
-        const stage = document.getElementById('stage')
         const maxWidth = Math.max(1, stage?.clientWidth || window.innerWidth || 1)
         const maxHeight = Math.max(1, stage?.clientHeight || window.innerHeight || 1)
+        const stageSizeChanged = maxWidth + 'x' + maxHeight !== renderedStageSize
+        renderedStageSize = maxWidth + 'x' + maxHeight
         const base = page.getViewport({ scale: 1 })
-        const scale = Math.min(maxWidth / base.width, maxHeight / base.height)
-        const viewport = page.getViewport({ scale: Math.max(0.1, scale) })
+        const fit = Math.max(0.1, Math.min(maxWidth / base.width, maxHeight / base.height))
+        const wanted = qualityFor(zoom.getView())
+        const longSide = Math.max(base.width, base.height) * fit
+        const quality = Math.max(1, Math.min(wanted, MAX_CANVAS_SIDE / Math.max(1, longSide)))
+        const viewport = page.getViewport({ scale: fit * quality })
 
-        canvas.width = Math.floor(viewport.width)
-        canvas.height = Math.floor(viewport.height)
-        showError(false)
-
-        const task = page.render({ canvasContext: context, viewport })
+        // Desenha fora da tela e troca de uma vez: mexer no tamanho do canvas
+        // visível o apaga, e a página "piscava" a cada redesenho do zoom.
+        const buffer = document.createElement('canvas')
+        buffer.width = Math.floor(viewport.width)
+        buffer.height = Math.floor(viewport.height)
+        const bufferContext = buffer.getContext('2d', { alpha: false })
+        if (!bufferContext) return state()
+        const task = page.render({ canvasContext: bufferContext, viewport })
         activeRenderTask = task
         try {
           await task.promise
-          if (token === renderToken) renderedToken = token
         } catch (error) {
           if (error?.name !== 'RenderingCancelledException') throw error
+          return state()
         } finally {
           if (activeRenderTask === task) activeRenderTask = null
         }
+        if (token !== renderToken) return state()
+
+        canvas.width = buffer.width
+        canvas.height = buffer.height
+        // o tamanho na tela é sempre o encaixe; a qualidade extra só nos pixels
+        canvas.style.width = Math.floor(base.width * fit) + 'px'
+        canvas.style.height = Math.floor(base.height * fit) + 'px'
+        context.drawImage(buffer, 0, 0)
+        // tela mudou de tamanho: reposiciona o zoom (sem animar a troca)
+        if (stageSizeChanged) zoom.render()
+        renderedQuality = wanted
+        lastFit = fit
+        showError(false)
+        renderedToken = token
 
         return state()
       }
@@ -151,19 +201,42 @@
         },
         // Export from the PDF itself, never enlarge the operator preview.
         // A 3840px long edge preserves fine text on high-resolution outputs.
-        async capturePng() {
+        /**
+         * PNG da página para o Palco. `{ full: true }`: página inteira (TVs
+         * novas aplicam o zoom sozinhas); sem opção: só o recorte visível com
+         * o zoom atual (TVs antigas, que não entendem a mensagem de zoom).
+         */
+        async capturePng(options) {
           if (!pdfDoc || renderedToken !== renderToken) return null
           const token = renderToken
-          if (exportCache?.token === token) return exportCache.promise
+          const view = options && options.full === true ? { zoom: 1, x: 0, y: 0 } : zoom.getView()
+          const viewKey = view.zoom + ':' + view.x + ':' + view.y
+          if (exportCache?.token === token && exportCache.viewKey === viewKey) return exportCache.promise
           const index = pageIndex
+          const fit = lastFit
+          const stageWidth = Math.max(1, stage?.clientWidth || 1)
+          const stageHeight = Math.max(1, stage?.clientHeight || 1)
           const promise = (async () => {
             const page = await pdfDoc.getPage(index + 1)
             if (token !== renderToken) return null
             const base = page.getViewport({ scale: 1 })
-            const viewport = page.getViewport({ scale: 3840 / Math.max(base.width, base.height) })
+            const crop = window.PianoZoomPan.visibleRegion(view, {
+              stageWidth,
+              stageHeight,
+              contentWidth: base.width * fit,
+              contentHeight: base.height * fit,
+            })
+            const cropWidth = (crop.right - crop.left) / fit
+            const cropHeight = (crop.bottom - crop.top) / fit
+            const scale = 3840 / Math.max(cropWidth, cropHeight)
+            const viewport = page.getViewport({
+              scale,
+              offsetX: -(crop.left / fit) * scale,
+              offsetY: -(crop.top / fit) * scale,
+            })
             const flat = document.createElement('canvas')
-            flat.width = Math.ceil(viewport.width)
-            flat.height = Math.ceil(viewport.height)
+            flat.width = Math.ceil(cropWidth * scale)
+            flat.height = Math.ceil(cropHeight * scale)
             const flatCtx = flat.getContext('2d', { alpha: false })
             if (!flatCtx) return null
             flatCtx.fillStyle = '#ffffff'
@@ -178,7 +251,7 @@
             if (exportCache?.token === token) exportCache = null
             return null
           })
-          exportCache = { token, promise }
+          exportCache = { token, viewKey, promise }
           return promise
         },
         // Renderiza em canvases separados: nunca muda a página projetada.
@@ -223,11 +296,24 @@
           if (!(await ensureReady())) return state()
           return renderPage(Number(i) || 0)
         },
+        getView() {
+          return zoom.getView()
+        },
+        setView(next) {
+          return zoom.setView(next)
+        },
       }
 
-      window.addEventListener('resize', () => {
+      // A área muda com a janela e quando o popup reserva a faixa da barra.
+      let lastStageSize = ''
+      function onStageResize() {
+        const size = (stage?.clientWidth || 0) + 'x' + (stage?.clientHeight || 0)
+        if (size === lastStageSize) return
+        lastStageSize = size
         if (pdfDoc) void renderPage(pageIndex)
-      })
+      }
+      if (typeof ResizeObserver === 'function' && stage) new ResizeObserver(onStageResize).observe(stage)
+      window.addEventListener('resize', onStageResize)
 
       ;(async () => {
         if (await ensureReady()) await renderPage(0)

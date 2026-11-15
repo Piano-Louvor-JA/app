@@ -5,12 +5,16 @@ import { createI18n } from 'vue-i18n'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import ptBR from '../../locales/pt-BR'
-import type { FoundTv, PalcoClient, PalcoSlotSummary } from '../../services/palco-clients'
+import type { FoundTv, PalcoClient, PalcoConnection } from '../../services/palco-clients'
 
 const svc = vi.hoisted(() => ({
   available: true,
   tvs: [] as PalcoClient[],
-  slots: [] as PalcoSlotSummary[],
+  connections: [] as PalcoConnection[],
+  createPalcoConnection: vi.fn(async (label: string) => ({ id: '47184', label, running: false })),
+  removePalcoConnection: vi.fn(async () => true),
+  startPalcoConnection: vi.fn(async () => true),
+  stopPalcoConnection: vi.fn(async () => {}),
   found: { ownIp: '192.168.0.10' as string | null, tvs: [] as FoundTv[] },
   changed: null as null | (() => void),
   unsubscribe: vi.fn(),
@@ -21,12 +25,18 @@ const svc = vi.hoisted(() => ({
 vi.mock('../../services/palco-clients', () => ({
   hasPalcoClients: () => svc.available,
   listPalcoTvs: vi.fn(async () => svc.tvs.map(tv => ({ ...tv }))),
-  listRunningSlots: vi.fn(async () => svc.slots),
+  listPalcoConnections: vi.fn(async () => svc.connections.map(c => ({ ...c }))),
+  createPalcoConnection: svc.createPalcoConnection,
+  removePalcoConnection: svc.removePalcoConnection,
   discoverPalcoTvs: vi.fn(async () => svc.found),
   onPalcoClientsChanged: (cb: () => void) => { svc.changed = cb; return svc.unsubscribe },
   sendPalcoCommand: svc.sendPalcoCommand,
   setPalcoTvMuted: svc.setPalcoTvMuted,
   wakePalcoTv: svc.wakePalcoTv,
+}))
+
+vi.mock('../../services/palco-session', () => ({
+  palcoSession: { startPalcoConnection: svc.startPalcoConnection, stopPalcoConnection: svc.stopPalcoConnection },
 }))
 
 vi.mock('../../components/TransmissionBehaviorCard.vue', () => ({
@@ -38,7 +48,7 @@ import PalcoView from '../PalcoView.vue'
 const i18n = createI18n({ legacy: false, locale: 'pt-BR', messages: { 'pt-BR': { ...ptBR, common: { cancel: 'Cancelar' } } } })
 
 const tv = (extra: Partial<PalcoClient> = {}): PalcoClient => ({
-  uid: 'u1', slotId: '0', slotLabel: 'Principal', ip: '192.168.0.20', platform: 'webos',
+  uid: 'u1', slotId: 'palco', slotLabel: 'Palco', ip: '192.168.0.20', platform: 'webos',
   name: 'TV LG (webOS)', version: '0.3.1', id: 'a', muted: false, ...extra,
 })
 
@@ -60,8 +70,11 @@ beforeEach(() => {
   vi.clearAllMocks()
   document.body.innerHTML = '<div id="settings-header-aside"></div>'
   svc.available = true
-  svc.tvs = [tv(), tv({ uid: 'u2', slotId: '47082', slotLabel: 'TV da sala', ip: '192.168.0.21', platform: 'androidtv', name: 'TV da entrada', id: 'b' })]
-  svc.slots = [{ id: '0', label: 'Principal', running: true }, { id: '47082', label: 'TV da sala', running: true }]
+  svc.tvs = [tv(), tv({ uid: 'u2', slotId: '47182', slotLabel: 'TV da sala', ip: '192.168.0.21', platform: 'androidtv', name: 'TV da entrada', id: 'b' })]
+  svc.connections = [
+    { id: 'palco', label: 'Palco', running: true, httpPort: 47180, wsPort: 47181, clients: 1 },
+    { id: '47182', label: 'TV da sala', running: true, httpPort: 47182, wsPort: 47183, clients: 1 },
+  ]
   svc.found = { ownIp: '192.168.0.10', tvs: [] }
   svc.changed = null
 })
@@ -75,23 +88,60 @@ describe('PalcoView', () => {
     expect(svc.changed).toBeNull()
   })
 
-  it('sem transmissão no ar oferece ligar e leva à aba Transmissão', async () => {
-    svc.slots = []
+  it('Palco desligado: Ligar liga o Palco principal, sem ir para a Transmissão', async () => {
+    svc.connections = svc.connections.map(c => ({ ...c, running: false }))
     svc.tvs = []
     const { wrapper, router } = await mountView()
-    expect(wrapper.text()).toContain('Nenhuma transmissão no ar')
-    expect(wrapper.text()).toContain('Ligue uma transmissão para as TVs conectarem.')
-    await wrapper.get('[data-test="palco-open-transmission"]').trigger('click')
+    expect(wrapper.text()).toContain('Palco desligado')
+    expect(wrapper.text()).toContain('Ligue o Palco para as TVs conectarem.')
+    await wrapper.get('[data-test="palco-turn-on"]').trigger('click')
     await flushPromises()
-    expect(router.currentRoute.value.name).toBe('settings-transmission')
+    expect(svc.startPalcoConnection).toHaveBeenCalledWith('palco')
+    expect(router.currentRoute.value.name).toBe('settings-palco')
+  })
+
+  it('conexões do Palco: liga e desliga cada uma, cria outra e exclui (a principal fica)', async () => {
+    svc.connections[1]!.running = false
+    const { wrapper } = await mountView()
+    expect(wrapper.get('[data-test="palco-connection-palco"]').text()).toContain('No ar · porta 47180 · 1 TV(s)')
+    expect(wrapper.get('[data-test="palco-connection-47182"]').text()).toContain('Desligada · porta 47182')
+    expect(wrapper.find('[data-test="palco-remove-palco"]').exists()).toBe(false)
+
+    await wrapper.get('[data-test="palco-toggle-palco"]').trigger('click')
+    await flushPromises()
+    expect(svc.stopPalcoConnection).toHaveBeenCalledWith('palco')
+    await wrapper.get('[data-test="palco-toggle-47182"]').trigger('click')
+    await flushPromises()
+    expect(svc.startPalcoConnection).toHaveBeenCalledWith('47182')
+
+    await wrapper.get('[data-test="palco-add"]').trigger('click')
+    await wrapper.get('[data-test="palco-add-name"]').setValue('Salão social')
+    await wrapper.get('[data-test="palco-add-form"]').trigger('submit')
+    await flushPromises()
+    expect(svc.createPalcoConnection).toHaveBeenCalledWith('Salão social')
+    expect(svc.startPalcoConnection).toHaveBeenCalledWith('47184')
+
+    await wrapper.get('[data-test="palco-remove-47182"]').trigger('click')
+    await flushPromises()
+    ;(document.querySelector('.app-confirm__btn--primary') as HTMLButtonElement).click()
+    await flushPromises()
+    expect(svc.removePalcoConnection).toHaveBeenCalledWith('47182')
+  })
+
+  it('TV com o app antigo na Transmissão aparece com o aviso e pode ir para o Palco', async () => {
+    svc.tvs = [tv({ slotId: '0', slotLabel: 'Principal' })]
+    const { wrapper } = await mountView()
+    expect(wrapper.get('[data-test="palco-tv-u1"]').text()).toContain('na Transmissão Principal')
+    await wrapper.get('[data-test="palco-menu-u1"]').trigger('click')
+    expect(wrapper.find('[data-test="palco-move-palco"]').exists()).toBe(true)
   })
 
   it('lista as TVs com IP, transmissão, versão e marca', async () => {
     svc.tvs[1]!.muted = true
     const { wrapper } = await mountView()
-    const rows = wrapper.findAll('.palco-view__row')
+    const rows = wrapper.findAll('[data-test^="palco-tv-"]')
     expect(rows).toHaveLength(2)
-    expect(rows[0]!.text()).toContain('192.168.0.20 · Principal · v0.3.1')
+    expect(rows[0]!.text()).toContain('192.168.0.20 · Palco · v0.3.1')
     expect(rows[1]!.text()).toContain('na espera')
     expect((wrapper.get('[data-test="palco-check-u2"]').element as HTMLInputElement).checked).toBe(false)
 
@@ -103,16 +153,16 @@ describe('PalcoView', () => {
   it('menu: identificar, mover para a outra transmissão e recarregar', async () => {
     const { wrapper } = await mountView()
     await wrapper.get('[data-test="palco-menu-u1"]').trigger('click')
-    expect(wrapper.find('[data-test="palco-move-0"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="palco-move-palco"]').exists()).toBe(false)
     await wrapper.get('[data-test="palco-identify"]').trigger('click')
     await flushPromises()
     expect(svc.sendPalcoCommand).toHaveBeenCalledWith(expect.objectContaining({ uid: 'u1' }), 'identify')
     expect(wrapper.text()).toContain('Olhe as TVs: o nome aparece em TV LG (webOS).')
 
     await wrapper.get('[data-test="palco-menu-u1"]').trigger('click')
-    await wrapper.get('[data-test="palco-move-47082"]').trigger('click')
+    await wrapper.get('[data-test="palco-move-47182"]').trigger('click')
     await flushPromises()
-    expect(svc.sendPalcoCommand).toHaveBeenCalledWith(expect.objectContaining({ uid: 'u1' }), 'moveTo', { targetSlotId: '47082' })
+    expect(svc.sendPalcoCommand).toHaveBeenCalledWith(expect.objectContaining({ uid: 'u1' }), 'moveTo', { targetSlotId: '47182' })
     expect(wrapper.text()).toContain('TV LG (webOS) vai para TV da sala.')
 
     svc.sendPalcoCommand.mockResolvedValueOnce(false)
@@ -183,10 +233,11 @@ describe('PalcoView', () => {
     const writeText = vi.fn(async () => {})
     Object.assign(navigator, { clipboard: { writeText } })
     const { wrapper } = await mountView()
-    expect(wrapper.get('.palco-view__ip').text()).toContain('192.168.0.10')
+    // IP:porta do Palco: até o app antigo da TV acha o Palco digitando isso
+    expect(wrapper.get('.palco-view__ip').text()).toContain('192.168.0.10:47180')
     await wrapper.get('[data-test="palco-copy-ip"]').trigger('click')
     await flushPromises()
-    expect(writeText).toHaveBeenCalledWith('192.168.0.10')
+    expect(writeText).toHaveBeenCalledWith('192.168.0.10:47180')
     const scanButton = document.querySelector('[data-test="palco-scan"]') as HTMLButtonElement
     expect(scanButton).not.toBeNull()
     scanButton.click()
@@ -199,7 +250,7 @@ describe('PalcoView', () => {
     svc.tvs = [tv()]
     svc.changed?.()
     await flushPromises()
-    expect(wrapper.findAll('.palco-view__row')).toHaveLength(1)
+    expect(wrapper.findAll('[data-test^="palco-tv-"]')).toHaveLength(1)
     wrapper.unmount()
     expect(svc.unsubscribe).toHaveBeenCalled()
   })

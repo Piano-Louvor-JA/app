@@ -8,6 +8,15 @@ import { chromium } from 'playwright'
 vi.mock('electron', () => ({ app: { getPath: () => tmpdir() }, ipcMain: { handle: vi.fn() } }))
 // @ts-ignore Electron runtime module.
 import { PalcoSlot } from '../../palco-server.mjs'
+/** Scripts da própria barra que a página carrega antes do script interno (seletor de telas, zoom nas TVs). */
+async function addBarScripts(page: { addScriptTag(options: { content: string }): Promise<unknown> }, html: string) {
+  const { readFileSync } = await import('node:fs')
+  for (const name of ['palco-zoom-sender.js', 'screen-targets.js']) {
+    if (!html.includes(`src="${name}"`)) continue
+    await page.addScriptTag({ content: readFileSync(new URL(`../../player/${name}`, import.meta.url), 'utf8') })
+  }
+}
+
 function inlineScript(html: string, marker: string): string {
   const dom = new JSDOM(html)
   try {
@@ -229,6 +238,7 @@ it('the URL control bar projects to a selected connection without a physical mon
       } } })
     })
     const inline = inlineScript(html, 'var backBtn')
+    await addBarScripts(sender, html)
     await sender.addScriptTag({ content: inline })
     await sender.locator('#tvList input').waitFor({ state: 'attached' })
     expect(await sender.locator('#projectScreens').isEnabled()).toBe(true)
@@ -245,10 +255,11 @@ it('the URL control bar projects to a selected connection without a physical mon
 }, 30000)
 
 it('image control starts locally and projects only to selected connections on request', async () => {
+  // Imagens vão às conexões como arquivo inteiro (o zoom vai em mensagens leves), não mais por vídeo.
   const { readFileSync } = await import('node:fs')
   const html = readFileSync(new URL('../../player/image-control-bar.html', import.meta.url), 'utf8')
   const runtime = readFileSync(new URL('../network-mirror.js', import.meta.url), 'utf8')
-  const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--autoplay-policy=no-user-gesture-required'] })
+  const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] })
   const sender = await browser.newPage()
   const slot = new PalcoSlot('gallery-test', 'Conexão de imagens', await freePort(), await freePort(), () => ({ send: (channel: string, message: any) => {
     if (channel === 'palco:event') void sender.evaluate(message => ((window as any).listeners || []).forEach((listener: any) => listener(message)), message).catch(() => {})
@@ -267,45 +278,55 @@ it('image control starts locally and projects only to selected connections on re
     await sender.addScriptTag({ content: runtime })
     await sender.evaluate(() => {
       const api = window as any
-      api.listeners = []; api.slide = 0
+      api.listeners = []; api.slide = 0; api.frames = 0
       api.louvorja = { displays: { list: async () => [] }, projection: {
-        getImageSlideState: async () => ({ index: api.slide, total: 3, projecting: false, canGoBack: false, canGoForward: false, audioOutput: 'player' }),
+        getImageSlideState: async () => ({ index: api.slide, total: 3, projecting: false, canGoBack: false, canGoForward: false, audioOutput: 'player', view: { zoom: 1, x: 0, y: 0 } }),
         remoteImageNext: async () => { api.slide++; return { index: api.slide, total: 3 } },
         remoteImagePrev: async () => { api.slide--; return { index: api.slide, total: 3 } },
         getVideoTargetMonitors: async () => [], setSiteControlPanelOpen: async () => {},
         toggleVideoScreens: async () => { throw new Error('Must not open a physical projection') },
+        // arquivo da imagem atual (azul no 1º slide, laranja no 2º)
+        captureImageFrame: async () => {
+          api.frames++
+          const canvas = document.createElement('canvas'); canvas.width = 640; canvas.height = 360
+          const context = canvas.getContext('2d')!; context.fillStyle = api.slide === 0 ? '#115577' : '#AA5500'; context.fillRect(0, 0, 640, 360)
+          return { mime: 'image/jpeg', data: canvas.toDataURL('image/jpeg').split(',')[1] }
+        },
       }, palco: { slots: () => api.slots(), send: (message: any) => api.sendPalco(message), onEvent: (listener: any) => {
         api.listeners.push(listener); return () => { api.listeners = api.listeners.filter((other: any) => other !== listener) }
       } } }
-      Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getDisplayMedia: async () => {
-        const canvas = document.createElement('canvas'); canvas.width = 640; canvas.height = 360
-        const context = canvas.getContext('2d')!
-        setInterval(() => { context.fillStyle = api.slide === 0 ? '#115577' : '#AA5500'; context.fillRect(0, 0, 640, 360) }, 33)
-        return canvas.captureStream(30)
-      } } })
     })
     const inline = inlineScript(html, 'var prevBtn')
+    await addBarScripts(sender, html)
     await sender.addScriptTag({ content: inline })
     await sender.locator('#tvList input').waitFor({ state: 'attached' })
-    expect(await receiver.evaluate(() => !!(document.querySelector('#video') as HTMLVideoElement).srcObject)).toBe(false)
+    // abrir o controle não transmite nada
+    expect(await sender.evaluate(() => (window as any).frames)).toBe(0)
     expect(await sender.locator('#project').isEnabled()).toBe(true)
+    const red = () => receiver.evaluate(() => {
+      const image = document.querySelector('#bg') as HTMLImageElement
+      if (!image.classList.contains('frame-slide') || !image.complete || !image.naturalWidth) return -1
+      const canvas = document.createElement('canvas'); canvas.width = 2; canvas.height = 2
+      const context = canvas.getContext('2d')!; context.drawImage(image, 0, 0, 2, 2)
+      return context.getImageData(0, 0, 1, 1).data[0]
+    })
+    const idle = () => receiver.evaluate(() => !document.querySelector('#idle')!.classList.contains('hidden') && !document.querySelector('#bg')!.getAttribute('src'))
     await sender.locator('#project').click()
-    await receiver.waitForFunction(() => { const video = document.querySelector('#video') as HTMLVideoElement; return video.videoWidth === 640 && video.readyState >= 2 })
+    await expect.poll(red).toBeGreaterThanOrEqual(0)
+    expect(await red()).toBeLessThan(100)
     await sender.locator('#next').click()
     await expect.poll(() => sender.locator('#counter').textContent()).toMatch(/2\s*\/\s*3/)
-    await receiver.waitForFunction(() => {
-      const canvas = document.createElement('canvas'); canvas.width = 2; canvas.height = 2
-      const context = canvas.getContext('2d')!
-      context.drawImage(document.querySelector('#video') as HTMLVideoElement, 0, 0, 2, 2)
-      return context.getImageData(0, 0, 1, 1).data[0] > 130
-    })
+    await expect.poll(red).toBeGreaterThan(130)
+    // desmarcar a conexão: ela vai para a espera; remarcar: recebe a imagem de novo
     await sender.locator('#monitorSelect').click()
     await sender.locator('#tvList input').uncheck()
-    await receiver.waitForFunction(() => !(document.querySelector('#video') as HTMLVideoElement).srcObject)
+    await expect.poll(idle).toBe(true)
     await sender.locator('#tvList input').check()
-    await receiver.waitForFunction(() => (document.querySelector('#video') as HTMLVideoElement).videoWidth === 640 && !!(document.querySelector('#video') as HTMLVideoElement).srcObject)
+    await expect.poll(red).toBeGreaterThan(130)
+    // retirar a projeção: a conexão volta à espera
+    await sender.locator('#monitorSelect').click()
     await sender.locator('#project').click()
-    await receiver.waitForFunction(() => !(document.querySelector('#video') as HTMLVideoElement).srcObject)
+    await expect.poll(idle).toBe(true)
   } finally { await browser.close(); await slot.dispose() }
 }, 30000)
 
@@ -345,6 +366,7 @@ it('PDF control opens locally, allows receiver selection, and publishes only aft
         serveMedia: (name: string, mime: string, base64: string) => api.servePng(name, mime, base64), onReceiverConnected: () => () => {} } }
     })
     const code = inlineScript(html, 'var prevBtn')
+    await addBarScripts(sender, html)
     await sender.addScriptTag({ content: code })
     await sender.locator('#tvList input').waitFor({ state: 'attached' })
     expect(await sender.evaluate(() => (window as any).captures)).toBe(0)

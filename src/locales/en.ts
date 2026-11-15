@@ -112,6 +112,13 @@ export default {
     monitorsInUse: '{device} ({host}) · {n} monitor(s)',
     palco: 'Stage (TVs)',
     palcoTv: '{name} · {ip}',
+    transmission: 'Broadcasts (OBS/browsers)',
+    transmissionGroup: '{connection} · {page} · {tabs}',
+    tabs: '1 tab | {n} tabs',
+    inObs: '{n} in OBS',
+    inBrowser: '{n} in the browser',
+    and: ' and ',
+    pages: { espelho: 'Mirror', retorno: 'Stage return', legenda: 'Caption', other: 'Other page' },
   },
   minimize: {
     playlistCount: '{n} playlist(s)',

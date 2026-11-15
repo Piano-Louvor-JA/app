@@ -163,6 +163,22 @@ describe('motor de alertas da Escola Sabatina', () => {
     expect(mocks.play).toHaveBeenLastCalledWith(...tone('5min_es'))
   })
 
+  it('mudo silencia na hora o que já está tocando (inclusive da biblioteca) e desmutar devolve o volume', async () => {
+    mocks.library.mockReturnValue({ dataUrl: 'data:engine-mute-test' })
+    open([{ id: 'start', offsetMs: 0, preset: 'custom:abertura' }])
+    await start()
+    const audio = AudioStub.instances.at(-1)!
+    expect(audio.volume).toBe(0.4)
+    mocks.store.audioMuted = true
+    await nextTick()
+    expect(mocks.volume).toHaveBeenLastCalledWith(0)
+    expect(audio.volume).toBe(0)
+    mocks.store.audioMuted = false
+    await nextTick()
+    expect(mocks.volume).toHaveBeenLastCalledWith(0.4)
+    expect(audio.volume).toBe(0.4)
+  })
+
   it('aplica o volume ao vivo e para de checar marcos ao desmontar', async () => {
     open([{ id: 'five', offsetMs: 300000, preset: 'gong' }])
     await start()

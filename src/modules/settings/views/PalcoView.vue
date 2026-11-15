@@ -1,35 +1,47 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+
+import AppConfirm from '@shared/components/AppConfirm.vue'
 
 import PalcoRenameDialog from '../components/PalcoRenameDialog.vue'
 import TransmissionBehaviorCard from '../components/TransmissionBehaviorCard.vue'
+import { palcoSession } from '../services/palco-session'
 import {
+  createPalcoConnection,
   discoverPalcoTvs,
   hasPalcoClients,
+  listPalcoConnections,
   listPalcoTvs,
-  listRunningSlots,
+  removePalcoConnection,
   onPalcoClientsChanged,
   sendPalcoCommand,
   setPalcoTvMuted,
   wakePalcoTv,
   type FoundTv,
   type PalcoClient,
-  type PalcoSlotSummary,
+  type PalcoConnection,
 } from '../services/palco-clients'
 
 /**
- * Palco: TVs com o app Palco (webOS, Tizen, Android TV) conectadas às
- * transmissões deste computador. Marca = recebe a transmissão; desmarcada a
- * TV fica na tela de espera. Paridade com Ferramentas › Palco do apk.
+ * Palco: TVs com o app Palco (webOS, Tizen, Android TV) e as conexões do
+ * Palco, separadas das da Transmissão (OBS/navegador): ligar, desligar e
+ * criar conexões aqui não mexe na Transmissão, e o Palco não usa o token da
+ * rede. Marca = a TV recebe a projeção; desmarcada fica na tela de espera.
+ * Paridade com Ferramentas › Palco do apk.
  */
 const { t } = useI18n()
-const router = useRouter()
 
 const available = hasPalcoClients()
 const tvs = ref<PalcoClient[]>([])
-const slots = ref<PalcoSlotSummary[]>([])
+const connections = ref<PalcoConnection[]>([])
+const slots = computed(() => connections.value.filter((connection) => connection.running))
+const anyOn = computed(() => slots.value.length > 0)
+const principal = computed(() => connections.value[0] ?? null)
+const busy = ref<string | null>(null)
+const adding = ref(false)
+const newName = ref('')
+const pendingRemoval = ref<PalcoConnection | null>(null)
 const found = ref<FoundTv[]>([])
 const ownIp = ref<string | null>(null)
 const scanning = ref(false)
@@ -49,9 +61,63 @@ function say(message: string) {
 }
 
 async function refresh() {
-  const [list, running] = await Promise.all([listPalcoTvs(), listRunningSlots()])
+  const [list, stage] = await Promise.all([listPalcoTvs(), listPalcoConnections()])
   tvs.value = list
-  slots.value = running
+  connections.value = stage
+}
+
+/** TV ainda conectada numa transmissão (app antigo da TV): dá para mover para o Palco. */
+function onTransmission(tv: PalcoClient) {
+  return !connections.value.some((connection) => connection.id === tv.slotId)
+}
+
+function connectionDetail(connection: PalcoConnection) {
+  if (connection.error?.code === 'port-in-use') return t('settings.palcoTvs.portInUse', { port: connection.error.port ?? connection.httpPort })
+  if (!connection.running) return t('settings.palcoTvs.connectionOff', { port: connection.httpPort })
+  const count = tvs.value.filter((tv) => tv.slotId === connection.id).length
+  return t('settings.palcoTvs.connectionOn', { port: connection.httpPort, count })
+}
+
+async function act(key: string, task: () => Promise<unknown>, failure: string) {
+  if (busy.value) return
+  busy.value = key
+  try {
+    if ((await task()) === false) say(failure)
+  } catch {
+    say(failure)
+  } finally {
+    busy.value = null
+    await refresh()
+  }
+}
+
+function toggleConnection(connection: PalcoConnection) {
+  void act(connection.id, () => connection.running
+    ? palcoSession.stopPalcoConnection(connection.id)
+    : palcoSession.startPalcoConnection(connection.id), t('settings.palcoTvs.connectionFailed'))
+}
+
+function turnOnPrincipal() {
+  if (principal.value) toggleConnection(principal.value)
+}
+
+function addConnection() {
+  const name = newName.value.trim()
+  if (!name) return
+  void act('add', async () => {
+    const created = await createPalcoConnection(name)
+    if (!created) return false
+    adding.value = false
+    newName.value = ''
+    return palcoSession.startPalcoConnection(created.id)
+  }, t('settings.palcoTvs.connectionFailed'))
+}
+
+function confirmRemoval() {
+  const connection = pendingRemoval.value
+  pendingRemoval.value = null
+  if (!connection) return
+  void act(connection.id, () => removePalcoConnection(connection.id), t('settings.palcoTvs.connectionFailed'))
 }
 
 async function scan() {
@@ -69,7 +135,7 @@ async function scan() {
 function detail(tv: PalcoClient) {
   return [
     tv.ip,
-    tv.slotLabel,
+    onTransmission(tv) ? t('settings.palcoTvs.onTransmission', { slot: tv.slotLabel }) : tv.slotLabel,
     tv.version ? `v${tv.version}` : '',
     tv.muted ? t('settings.palcoTvs.onHold') : '',
   ].filter(Boolean).join(' · ')
@@ -117,11 +183,14 @@ async function wake(tv: FoundTv) {
   say(ok ? t('settings.palcoTvs.waking', { name: tv.name }) : t('settings.palcoTvs.wakeFailed'))
 }
 
+/** IP:porta do Palco principal: serve até para o app antigo da TV achar o Palco. */
+const typedAddress = computed(() => ownIp.value && principal.value ? `${ownIp.value}:${principal.value.httpPort}` : ownIp.value ?? '')
+
 async function copyIp() {
   if (!ownIp.value) return
   try {
-    await navigator.clipboard.writeText(ownIp.value)
-    say(t('settings.palcoTvs.ipCopied', { ip: ownIp.value }))
+    await navigator.clipboard.writeText(typedAddress.value)
+    say(t('settings.palcoTvs.ipCopied', { ip: typedAddress.value }))
   } catch { /* clipboard indisponível: o IP segue visível */ }
 }
 
@@ -156,24 +225,62 @@ onUnmounted(() => {
     <template v-else>
       <p v-if="notice" class="palco-view__notice" role="status">{{ notice }}</p>
 
-      <div v-if="!slots.length" class="palco-view__off">
+      <div v-if="!anyOn" class="palco-view__off">
         <span>
           <strong>{{ t('settings.palcoTvs.offTitle') }}</strong>
           <small>{{ t('settings.palcoTvs.offHint') }}</small>
         </span>
-        <button type="button" class="palco-view__primary" data-test="palco-open-transmission"
-          @click="router.push({ name: 'settings-transmission' })">
+        <button type="button" class="palco-view__primary" data-test="palco-turn-on" :disabled="!principal || busy !== null"
+          @click="turnOnPrincipal">
           {{ t('settings.palcoTvs.turnOn') }}
         </button>
       </div>
 
+      <section class="palco-view__section" aria-labelledby="palco-connections-title">
+        <h2 id="palco-connections-title" class="palco-view__title">
+          {{ t('settings.palcoTvs.connections') }}
+          <button type="button" class="palco-view__link palco-view__link--small" data-test="palco-add"
+            :disabled="busy !== null" @click="adding = !adding">
+            <i class="ti ti-plus" aria-hidden="true" /> {{ t('settings.palcoTvs.addConnection') }}
+          </button>
+        </h2>
+        <p class="palco-view__hint">{{ t('settings.palcoTvs.connectionsHint') }}</p>
+        <form v-if="adding" class="palco-view__add" data-test="palco-add-form" @submit.prevent="addConnection">
+          <input v-model="newName" class="palco-view__input" type="text" maxlength="60"
+            :placeholder="t('settings.palcoTvs.connectionPlaceholder')" :aria-label="t('settings.palcoTvs.connectionName')"
+            data-test="palco-add-name">
+          <button type="submit" class="palco-view__primary" :disabled="!newName.trim() || busy !== null">
+            {{ t('settings.palcoTvs.create') }}
+          </button>
+        </form>
+        <ul class="palco-view__list">
+          <li v-for="(connection, index) in connections" :key="connection.id" class="palco-view__row"
+            :data-test="`palco-connection-${connection.id}`">
+            <i class="ti ti-broadcast palco-view__icon" :class="{ 'palco-view__icon--off': !connection.running }" aria-hidden="true" />
+            <span class="palco-view__info">
+              <strong>{{ connection.label }}</strong>
+              <small>{{ connectionDetail(connection) }}</small>
+            </span>
+            <button type="button" :class="connection.running ? 'palco-view__link' : 'palco-view__primary'"
+              :disabled="busy !== null" :data-test="`palco-toggle-${connection.id}`" @click="toggleConnection(connection)">
+              {{ connection.running ? t('settings.palcoTvs.turnOff') : t('settings.palcoTvs.turnOn') }}
+            </button>
+            <button v-if="index > 0" type="button" class="palco-view__dots" :disabled="busy !== null"
+              :aria-label="t('settings.palcoTvs.removeConnection', { name: connection.label })"
+              :data-test="`palco-remove-${connection.id}`" @click="pendingRemoval = connection">
+              <i class="ti ti-trash" aria-hidden="true" />
+            </button>
+          </li>
+        </ul>
+      </section>
+
       <section class="palco-view__section" aria-labelledby="palco-connected-title">
         <h2 id="palco-connected-title" class="palco-view__title">
           {{ t('settings.palcoTvs.connected') }}
-          <span v-if="slots.length" class="palco-view__count">{{ tvs.length }}</span>
+          <span v-if="anyOn || tvs.length" class="palco-view__count">{{ tvs.length }}</span>
         </h2>
         <p v-if="!tvs.length" class="palco-view__hint">
-          {{ slots.length ? t('settings.palcoTvs.noneConnected') : t('settings.palcoTvs.turnOnHint') }}
+          {{ anyOn ? t('settings.palcoTvs.noneConnected') : t('settings.palcoTvs.turnOnHint') }}
         </p>
         <ul v-else class="palco-view__list">
           <li v-for="tv in tvs" :key="tv.uid" class="palco-view__row" :class="{ 'palco-view__row--muted': tv.muted }"
@@ -246,7 +353,7 @@ onUnmounted(() => {
       <section class="palco-view__section palco-view__section--ip">
         <p class="palco-view__hint">{{ t('settings.palcoTvs.redKey') }}</p>
         <div class="palco-view__ip">
-          <code>{{ ownIp ?? t('settings.palcoTvs.noNetwork') }}</code>
+          <code>{{ ownIp ? typedAddress : t('settings.palcoTvs.noNetwork') }}</code>
           <button v-if="ownIp" type="button" class="palco-view__dots" :aria-label="t('settings.palcoTvs.copyIp')"
             data-test="palco-copy-ip" @click="copyIp">
             <i class="ti ti-copy" aria-hidden="true" />
@@ -255,6 +362,10 @@ onUnmounted(() => {
       </section>
     </template>
 
+    <AppConfirm :open="pendingRemoval !== null" :z-index="120" danger
+      :title="t('settings.palcoTvs.removeTitle', { name: pendingRemoval?.label ?? '' })"
+      :message="t('settings.palcoTvs.removeMessage')" :confirm-label="t('settings.palcoTvs.removeConfirm')"
+      :cancel-label="t('common.cancel')" @cancel="pendingRemoval = null" @confirm="confirmRemoval" />
     <PalcoRenameDialog :open="renaming !== null" :current="renaming?.name ?? ''" @cancel="renaming = null"
       @confirm="confirmRename" />
   </section>
@@ -364,6 +475,26 @@ onUnmounted(() => {
   }
 
   &__icon { color: var(--ds-color-primary); font-size: 1.25rem; }
+  &__icon--off { color: var(--ds-color-on-surface-variant); }
+
+  &__link--small { padding: 0.25rem 0.7rem; font-size: 0.8rem; }
+
+  &__add {
+    display: flex;
+    gap: 0.6rem;
+    align-items: center;
+  }
+
+  &__input {
+    flex: 1;
+    min-width: 0;
+    padding: 0.5rem 0.8rem;
+    border: 1px solid var(--ds-color-outline);
+    border-radius: 0.6rem;
+    background: transparent;
+    color: var(--ds-color-on-surface);
+    font: inherit;
+  }
 
   &__info {
     display: flex;

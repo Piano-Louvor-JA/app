@@ -210,6 +210,29 @@ class PalcoSession {
     return ok
   }
 
+  /**
+   * Liga uma conexão do Palco (separada da Transmissão): fundo do palco +
+   * espera, e o conteúdo atual chega pela sincronização das conexões.
+   */
+  async startPalcoConnection(id: string): Promise<boolean> {
+    if (!this.isElectron) return false
+    const ok = await palcoApi().start(id)
+    if (ok) {
+      const session = this.forSlot(id)
+      await session.sendBgPalco().catch(() => {})
+      session.idle()
+      notifyObsChanged()
+      try { void palcoApi().wake?.() } catch { /* best-effort */ }
+    }
+    return ok
+  }
+
+  async stopPalcoConnection(id: string): Promise<void> {
+    if (!this.isElectron) return
+    await this.stopSlot(id)
+    notifyObsChanged()
+  }
+
   async turnOff(): Promise<void> {
     if (!this.isElectron) return
     this.baseUrl = null
