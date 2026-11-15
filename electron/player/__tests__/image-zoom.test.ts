@@ -143,6 +143,12 @@ describe('local-image-player: zoom', () => {
     expect(frame.getAttribute('src')).toBe('local://app/b.jpg')
   })
 
+  it('só mostra arquivos do próprio app: endereço externo ou script vindo da URL é ignorado', () => {
+    const { gallery, frame } = loadPlayer(['javascript:alert(1)', 'https://site.exemplo/x.jpg', 'local://outro/a.jpg', 'local://app/ok.jpg'])
+    expect(gallery.getState().total).toBe(1)
+    expect(frame.getAttribute('src')).toBe('local://app/ok.jpg')
+  })
+
   it('sem imagens: roda do mouse não faz nada; sem a ponte do app não quebra', async () => {
     const empty = loadPlayer([])
     empty.fire('wheel', { deltaY: -500, clientX: 500, clientY: 250 })

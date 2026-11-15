@@ -1752,9 +1752,12 @@ function isZoomableMode() {
  */
 async function applyImageViewToWindow(win, view) {
   if (win.isDestroyed()) return null
+  // Só números entram no código executado na janela (nunca texto do chamador).
+  const safe = normalizeImageView(view)
+  const literal = `{zoom:${safe.zoom},x:${safe.x},y:${safe.y}${safe.anim ? `,anim:${safe.anim}` : ''}}`
   try {
     return await win.webContents.executeJavaScript(
-      `(() => { const p = ${ZOOM_PLAYER_EXPR}; return p && p.setView ? p.setView(${JSON.stringify(view)}) : null })()`,
+      `(() => { const p = ${ZOOM_PLAYER_EXPR}; return p && p.setView ? p.setView(${literal}) : null })()`,
       true,
     )
   } catch {

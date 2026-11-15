@@ -32,7 +32,8 @@ function fakeGallery(win) {
     if (win.failScripts) throw new Error('carregando')
     const set = /setView\((\{.*?\})\)/.exec(script)
     if (set) {
-      const v = JSON.parse(set[1])
+      // o main manda um literal só com números (ex.: {zoom:2,x:0,y:0})
+      const v = new Function(`return (${set[1]})`)()
       win.view = { zoom: Math.min(5, Math.max(1, v.zoom)), x: v.x, y: v.y }
       return { ...win.view }
     }
@@ -154,6 +155,14 @@ describe('zoom da galeria de imagens', () => {
     expect(await projection.setImageView({ zoom: 9, x: 0.5, y: 'x' })).toEqual({ zoom: 5, x: 0.5, y: 0 })
     expect(source.view).toEqual({ zoom: 5, x: 0.5, y: 0 })
     expect(screen.view).toEqual({ zoom: 5, x: 0.5, y: 0 })
+  })
+
+  it('só números entram no código executado nas janelas', async () => {
+    const { source } = await openImagesWithScreen()
+    await projection.setImageView({ zoom: '2});alert(1);({', x: 'evil', y: 0.1, anim: '</script>' })
+    const sent = source.scripts.find((script) => script.includes('setView('))
+    expect(sent).toContain('setView({zoom:1,x:0,y:0.1})')
+    expect(sent).not.toMatch(/alert|script>|evil/)
   })
 
   it('popup que não responde: nada é replicado', async () => {

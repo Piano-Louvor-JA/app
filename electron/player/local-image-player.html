@@ -59,11 +59,21 @@
       ;(() => {
         const params = new URLSearchParams(window.location.search)
         const raw = params.get('srcs') || '[]'
+        function isLocalAppUrl(value) {
+          try {
+            const url = new URL(value)
+            return url.protocol === 'local:' && url.host === 'app'
+          } catch {
+            return false
+          }
+        }
         let sources = []
         try {
           const parsed = JSON.parse(raw)
+          // Só arquivos servidos pelo próprio app (local://app/...): qualquer
+          // outro endereço vindo da URL é ignorado (sem página externa nem script).
           sources = Array.isArray(parsed)
-            ? parsed.map((entry) => String(entry)).filter(Boolean)
+            ? parsed.map((entry) => String(entry)).filter(isLocalAppUrl)
             : []
         } catch {
           sources = []
