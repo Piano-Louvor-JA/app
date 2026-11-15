@@ -408,6 +408,9 @@ contextBridge.exposeInMainWorld('louvorja', {
     captureSourceFrame: (options) =>
       ipcRenderer.invoke('projection:capture-source-frame', options),
     // Imagem atual lida do arquivo: { crop: true } = só a parte com zoom.
+    // Seletor de telas igual ao do app (Tela retorno, Conexões Remotas)
+    screenContext: () => ipcRenderer.invoke('projection:screen-context'),
+    setRemoteSelected: (id, selected) => ipcRenderer.invoke('projection:set-remote-selected', { id, selected }),
     captureImageFrame: (options) =>
       ipcRenderer.invoke('projection:capture-image-frame', options),
     captureSlidePreview: () =>

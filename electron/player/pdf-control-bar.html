@@ -183,13 +183,13 @@
     <div id="shell" class="shell">
       <div id="monitorPanel" class="panel" role="dialog" aria-label="Selecionar telas">
         <div class="panel__header">
-          <p class="panel__title">Selecionar telas</p>
-          <button id="identifyMonitors" class="panel__identify" type="button">Identificar</button>
+          <p class="panel__title">Conexões Cabeadas</p>
+          <button id="identifyMonitors" class="panel__identify" type="button">Detectar telas</button>
         </div>
-        <p class="panel__hint">Marque os monitores onde o documento deve ser projetado</p>
+        <p class="panel__hint">Marque os monitores onde o recurso deve ser projetado.</p>
         <div id="monitorList"><p class="panel__empty">Nenhum monitor estendido encontrado.</p></div>
-        <p class="panel__hint" id="tvHint" style="display:none">TVs conectadas pelo Palco (cast)</p>
         <div id="tvList"></div>
+        <div id="palcoTvList"></div>
       </div>
 
       <div class="bar">
@@ -230,6 +230,7 @@
       </div>
     </div>
     <script src="palco-zoom-sender.js"></script>
+    <script src="screen-targets.js"></script>
     <script>
       ;(function () {
         var prevBtn = document.getElementById('prev')
@@ -275,8 +276,9 @@
           nextBtn.disabled = safeTotal <= 1
         }
 
+        // Mesmo número do app: monitores + conexões remotas marcadas
         function updateMonitorBadge() {
-          var count = selectedIds.length
+          var count = selectedIds.length + (window.PianoScreenTargets ? window.PianoScreenTargets.remoteCount(tvSlots, tvChecked) : 0)
           monitorBadge.textContent = String(count)
           monitorBadge.classList.toggle('is-empty', count === 0)
         }
@@ -300,6 +302,7 @@
               (checked ? ' checked' : '') +
               '><span class="panel__option-body"><span class="panel__option-name">' +
               display.label +
+              (window.PianoScreenTargets ? window.PianoScreenTargets.returnTagHtml(display.id) : '') +
               '</span><span class="panel__option-meta">' +
               display.resolution +
               '</span></span></label></li>'
@@ -315,33 +318,32 @@
         var tvSlots = []
         var tvChecked = {}
         var tvList = document.getElementById('tvList')
-        var tvHint = document.getElementById('tvHint')
+        var palcoTvList = document.getElementById('palcoTvList')
 
         function renderTvs() {
-          var connected = tvSlots.filter(function (slot) { return slot.clients > 0 })
-          tvHint.style.display = connected.length ? '' : 'none'
-          tvList.replaceChildren()
-          connected.forEach(function (slot) {
-            var label = document.createElement('label'); label.className = 'panel__option'
-            var input = document.createElement('input'); input.type = 'checkbox'; input.checked = tvChecked[slot.id] !== false
-            input.setAttribute('data-tv', slot.id)
-            input.addEventListener('change', async function () {
-              tvChecked[slot.id] = input.checked
-              var state = await window.louvorja.projection.getPlaybackState()
-              if (state && state.projecting) networkActive = true
-              if (networkActive) {
-                if (input.checked) syncPptWithRetry(0)
-                else { sentTvIds.delete(slot.id); await window.louvorja.palco.send({ v: 2, type: 'idle' }, slot.id) }
-              }
-              await refresh()
-            })
-            var text = document.createElement('span'); text.textContent = slot.label
-            label.append(input, text); tvList.appendChild(label)
+          var targets = window.PianoScreenTargets
+          if (!targets) return
+          targets.renderRemotes(tvList, tvSlots, tvChecked, async function (slotId, checked) {
+            updateMonitorBadge()
+            var state = await window.louvorja.projection.getPlaybackState()
+            if (state && state.projecting) networkActive = true
+            if (networkActive) {
+              if (checked) syncPptWithRetry(0)
+              else { sentTvIds.delete(slotId); await window.louvorja.palco.send({ v: 2, type: 'idle' }, slotId) }
+            }
+            await refresh()
           })
+          updateMonitorBadge()
         }
         async function loadTvs() {
           if (!window.louvorja || !window.louvorja.palco) return
           tvSlots = await window.louvorja.palco.slots().catch(function () { return [] })
+          // a marca das conexões vem do app (mesma do seletor de telas dele)
+          if (window.PianoScreenTargets) {
+            await window.PianoScreenTargets.load()
+            window.PianoScreenTargets.applyRemoteSelection(tvChecked)
+            if (panelOpen) void window.PianoScreenTargets.renderTvs(palcoTvList)
+          }
           renderTvs(); await refresh()
         }
 
@@ -437,7 +439,7 @@
           if (window.louvorja && window.louvorja.projection && window.louvorja.projection.setSiteControlPanelOpen) {
             await window.louvorja.projection.setSiteControlPanelOpen(panelOpen)
           }
-          if (panelOpen) { await loadMonitors(); await loadTvs() }
+          if (panelOpen) { await loadTvs(); await loadMonitors() }
         }
 
         async function onToggleMonitor(event) {

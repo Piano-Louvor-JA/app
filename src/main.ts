@@ -13,6 +13,7 @@ import { isProjectionPopupLocation } from '@shared/services/projection-window-lo
 import { installRemoteLiturgyBridge } from '@modules/remote/renderer/liturgy-bridge'
 import { installNavigationHistory } from '@shared/composables/useNavigationHistory'
 import { startRendererTelemetry } from '@shared/services/telemetry'
+import { installScreenContextBridge } from '@shared/services/screen-context'
 
 installClientPlatformHeader()
 useThemeManager()
@@ -41,6 +42,8 @@ app.use(i18n)
 if (!isProjectionPopupLocation()) {
   installRemoteLiturgyBridge({ router })
   installNavigationHistory({ router })
+  // Players (janelas à parte) mostram o seletor de telas igual ao do app.
+  installScreenContextBridge()
 }
 
 app.mount('#app')
