@@ -83,6 +83,9 @@ import {
   getImageSlideState,
   getTextScale,
   setTextScale,
+  setImageView,
+  reportImageViewFromSource,
+  captureImageFrame,
   openPlayerIndependent,
   closePlayerIndependent,
   getPlayerIndependentState,
@@ -220,6 +223,35 @@ export function registerWorkspaceIpc() {
       closeWebProjectionWindows()
     } catch (error) {
       console.error('[ipc] projection:video-ended', error)
+    }
+  })
+
+  // Zoom na imagem pelo mouse no popup do operador → replica nas telas.
+  ipcMain.on('projection:image-view-changed', (event, view) => {
+    try {
+      reportImageViewFromSource(event.sender, view)
+    } catch (error) {
+      console.error('[ipc] projection:image-view-changed', error)
+    }
+  })
+
+  // Quadro da imagem atual para as TVs/navegador (inteiro ou recortado).
+  ipcMain.handle('projection:capture-image-frame', async (_event, options) => {
+    try {
+      return await captureImageFrame({ crop: options?.crop === true })
+    } catch (error) {
+      console.error('[ipc] projection:capture-image-frame', error)
+      return null
+    }
+  })
+
+  // Zoom na imagem pelos botões da barra.
+  ipcMain.handle('projection:set-image-view', async (_event, view) => {
+    try {
+      return await setImageView(view)
+    } catch (error) {
+      console.error('[ipc] projection:set-image-view', error)
+      return null
     }
   })
 
@@ -562,9 +594,9 @@ export function registerWorkspaceIpc() {
     }
   })
 
-  ipcMain.handle('projection:capture-source-frame', async () => {
+  ipcMain.handle('projection:capture-source-frame', async (_event, options) => {
     try {
-      return await captureSourceFrameBase64()
+      return await captureSourceFrameBase64({ full: options?.full === true })
     } catch (error) {
       console.error('[ipc] projection:capture-source-frame', error)
       return null

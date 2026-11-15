@@ -1053,6 +1053,24 @@ function layoutControlBar(win) {
   })
 }
 
+/**
+ * Imagens e PDF/PPT no popup do operador: a barra de controle fica numa camada
+ * por cima da janela. A imagem ocupa só a área acima dela, para a barra não
+ * cobrir a parte de baixo. As telas de projeção usam o mesmo player sem barra,
+ * então continuam com a tela inteira.
+ * @param {import('electron').BrowserWindow} win
+ */
+export function reserveControlBarSpace(win) {
+  if (win.isDestroyed() || !isZoomableMode()) return
+  try {
+    void Promise.resolve(
+      win.webContents.insertCSS(`#stage { height: calc(100% - ${CONTROL_BAR_HEIGHT}px) !important; }`),
+    ).catch(() => {})
+  } catch {
+    // página trocando: o próximo did-finish-load reaplica
+  }
+}
+
 function createSourceWindow(loadUrl, title) {
   const bounds = placeSourceOnPrimary()
 
@@ -1117,6 +1135,7 @@ function createSourceWindow(loadUrl, title) {
 
   const onPageReady = () => {
     win.webContents.setAudioMuted(false)
+    reserveControlBarSpace(win)
     hideYoutubeSidebar(win)
     if (currentSourceCaptionsHidden) void remoteSetCaptionsHiddenSource(true)
     // YouTube é SPA: reaplica após hidratação
@@ -1663,7 +1682,7 @@ async function applyImageIndexToWindow(win) {
     return
   }
 
-  await goToImageIndexOnWindow(win, index)
+  if (await goToImageIndexOnWindow(win, index)) await applySourceImageViewToWindow(win)
 }
 
 /**
@@ -1689,6 +1708,99 @@ async function goToImageIndexOnWindow(win, index) {
     await sleep(40)
   }
   return false
+}
+
+/**
+ * Zoom/deslocamento da galeria vindo de fora (barra ou relatório do operador).
+ * O player limita os valores; aqui só garantimos números.
+ * @param {unknown} view
+ */
+export function normalizeImageView(view) {
+  const source = view && typeof view === 'object' ? /** @type {Record<string, unknown>} */ (view) : {}
+  const num = (value, fallback) => {
+    const n = Number(value)
+    return Number.isFinite(n) ? n : fallback
+  }
+  const safe = { zoom: num(source.zoom, 1), x: num(source.x, 0), y: num(source.y, 0) }
+  // anim: ms da animação até esta visão (as telas repetem o mesmo movimento)
+  const anim = Math.round(Math.min(400, Math.max(0, num(source.anim, 0))))
+  return anim > 0 ? { ...safe, anim } : safe
+}
+
+/**
+ * Avisa a barra de controle do zoom novo: ela repassa às TVs do palco e às
+ * transmissões por navegador na hora (mensagem leve, sem reenviar a imagem).
+ * @param {{ zoom: number, x: number, y: number, anim?: number }} view
+ */
+function notifyControlBarImageView(view) {
+  const contents = controlBarView?.webContents
+  if (!contents || contents.isDestroyed()) return
+  try { contents.send('projection:image-view', view) } catch { /* barra fechando */ }
+}
+
+/** Galeria de imagens ou PDF/PPT: os dois players têm zoom (zoom-pan.js). */
+const ZOOM_PLAYER_EXPR = '(window.__liturgyGallery || window.__liturgyPdf)'
+
+/** Modo atual aceita zoom? Imagens e PDF/PPT; aviso de texto usa o A−/A+. */
+function isZoomableMode() {
+  return (currentProjectionMode === 'image' && !currentDocumentIsText) || isPdfDocumentMode()
+}
+
+/**
+ * @param {import('electron').BrowserWindow} win
+ * @param {{ zoom: number, x: number, y: number }} view
+ */
+async function applyImageViewToWindow(win, view) {
+  if (win.isDestroyed()) return null
+  try {
+    return await win.webContents.executeJavaScript(
+      `(() => { const p = ${ZOOM_PLAYER_EXPR}; return p && p.setView ? p.setView(${JSON.stringify(view)}) : null })()`,
+      true,
+    )
+  } catch {
+    return null
+  }
+}
+
+/** Zoom pelos botões da barra: aplica no popup e replica nas telas. */
+export async function setImageView(view) {
+  if (!sourceWindow || sourceWindow.isDestroyed() || !isZoomableMode()) return null
+  const asked = normalizeImageView(view)
+  const applied = await applyImageViewToWindow(sourceWindow, asked)
+  if (!applied || typeof applied !== 'object') return null
+  // o player devolve a visão limitada; a animação pedida segue para as telas
+  const safe = normalizeImageView({ ...applied, anim: asked.anim })
+  notifyControlBarImageView(safe)
+  await Promise.all(followerWindows().map((win) => applyImageViewToWindow(win, safe)))
+  return safe
+}
+
+/**
+ * Zoom pelo mouse no popup do operador: só ele manda; as telas seguem.
+ * @param {import('electron').WebContents | null | undefined} sender
+ * @param {unknown} view
+ */
+export function reportImageViewFromSource(sender, view) {
+  if (!sourceWindow || sourceWindow.isDestroyed() || !isZoomableMode()) return false
+  if (!sender || sender !== sourceWindow.webContents) return false
+  const safe = normalizeImageView(view)
+  notifyControlBarImageView(safe)
+  for (const win of followerWindows()) void applyImageViewToWindow(win, safe)
+  return true
+}
+
+/** Tela de projeção recém-aberta herda o zoom atual do popup. */
+async function applySourceImageViewToWindow(win) {
+  if (!sourceWindow || sourceWindow.isDestroyed() || !isZoomableMode()) return
+  try {
+    const view = await sourceWindow.webContents.executeJavaScript(
+      `(() => { const p = ${ZOOM_PLAYER_EXPR}; return p && p.getView ? p.getView() : null })()`,
+      true,
+    )
+    if (view && typeof view === 'object') await applyImageViewToWindow(win, normalizeImageView(view))
+  } catch {
+    // popup fechando: nada a replicar
+  }
 }
 
 /**
@@ -1729,7 +1841,7 @@ async function applyPdfIndexToWindow(win) {
     return
   }
 
-  await goToPdfIndexOnWindow(win, index)
+  if (await goToPdfIndexOnWindow(win, index)) await applySourceImageViewToWindow(win)
 }
 
 /**
@@ -2820,6 +2932,7 @@ export async function getImageSlideState() {
       index: Number(state.index) || 0,
       total: Number(state.total) || 0,
       projecting: isVideoProjectingToScreens(),
+      ...(state.view && typeof state.view === 'object' ? { view: normalizeImageView(state.view) } : {}),
     }
   } catch {
     return null
@@ -2879,6 +2992,7 @@ export async function getPdfPageState() {
       index: Number(state.index) || 0,
       total: Number(state.total) || 0,
       projecting: isVideoProjectingToScreens(),
+      ...(state.view && typeof state.view === 'object' ? { view: normalizeImageView(state.view) } : {}),
     }
   } catch {
     return null
@@ -2887,13 +3001,15 @@ export async function getPdfPageState() {
 
 /** Rasteriza o slide/página atual do popup para o Palco (TV/browser).
  * Controle fica fora do sourceWindow, então a imagem contém só conteúdo. */
-export async function captureSourceFrameBase64() {
+export async function captureSourceFrameBase64(options = {}) {
   if (!sourceWindow || sourceWindow.isDestroyed()) return null
   try {
     // PDF/PPT convertido: canvas PDF.js é fonte real do slide. capturePage
     // pegava o frame cinza de loading antes do render/GPU finalizar.
+    // { full: true }: página inteira (TVs novas aplicam o zoom); sem: recorte.
+    const pngOptions = JSON.stringify({ full: options?.full === true })
     const canvasPng = await sourceWindow.webContents.executeJavaScript(
-      "window.__liturgyPdf && window.__liturgyPdf.capturePng ? window.__liturgyPdf.capturePng() : null",
+      `window.__liturgyPdf && window.__liturgyPdf.capturePng ? window.__liturgyPdf.capturePng(${pngOptions}) : null`,
       true,
     )
     if (typeof canvasPng === 'string' && canvasPng.length > 32) return canvasPng
@@ -2996,6 +3112,52 @@ function logRemoteFramePath(path) {
   if (logRemoteFramePath.last === path) return
   logRemoteFramePath.last = path
   console.info(`[remote] prévia do vídeo via ${path}`)
+}
+
+/** Lado maior dos quadros enviados ao Palco (mesmo teto do PNG do PDF). */
+const PALCO_FRAME_MAX_SIDE = 3840
+
+/**
+ * Quadro da imagem atual para as TVs do palco e transmissões por navegador,
+ * lido do arquivo (nítido, sem depender da janela). `{ crop: true }`: só a
+ * parte visível com o zoom atual (TVs antigas); sem opção: a imagem inteira
+ * (TVs novas aplicam o zoom sozinhas).
+ * @param {{ crop?: boolean }} [options]
+ * @returns {Promise<{ mime: string, data: string } | null>}
+ */
+export async function captureImageFrame(options = {}) {
+  if (!sourceWindow || sourceWindow.isDestroyed() || currentProjectionMode !== 'image' || currentDocumentIsText) return null
+  const state = await getImageSlideState()
+  const filePath = state ? currentImagePaths[state.index] : null
+  if (!filePath) return null
+  try {
+    let image = nativeImage.createFromPath(filePath)
+    if (image.isEmpty()) return null
+    if (options.crop === true) {
+      const region = await sourceWindow.webContents.executeJavaScript(
+        `(() => (window.__liturgyGallery && window.__liturgyGallery.getCropRegion ? window.__liturgyGallery.getCropRegion() : null))()`,
+        true,
+      )
+      const { width, height } = image.getSize()
+      if (region && typeof region === 'object') {
+        const x = Math.max(0, Math.min(width - 1, Math.floor(Number(region.x) || 0)))
+        const y = Math.max(0, Math.min(height - 1, Math.floor(Number(region.y) || 0)))
+        const w = Math.max(1, Math.min(width - x, Math.floor(Number(region.width) || width)))
+        const h = Math.max(1, Math.min(height - y, Math.floor(Number(region.height) || height)))
+        image = image.crop({ x, y, width: w, height: h })
+      }
+    }
+    const { width, height } = image.getSize()
+    const longSide = Math.max(width, height)
+    if (longSide > PALCO_FRAME_MAX_SIDE) {
+      const ratio = PALCO_FRAME_MAX_SIDE / longSide
+      image = image.resize({ width: Math.round(width * ratio), height: Math.round(height * ratio), quality: 'good' })
+    }
+    const data = image.toJPEG(90).toString('base64')
+    return data ? { mime: 'image/jpeg', data } : null
+  } catch {
+    return null
+  }
 }
 
 /** Miniatura do slide atual para o controle remoto (celular): JPEG pequeno. */

@@ -119,6 +119,13 @@ class PalcoSlot {
   #receiverIps = new Map() // WebSocket -> IP físico da TV/browser
   #clientInfo = new Map() // WebSocket -> quem é (plataforma, nome, id, versão)
   #lastByType = new Map() // replay pro receiver que chega tarde
+  // Receivers que aplicam o zoom sozinhos (avisam com caps:['frameView']).
+  // Os demais (TVs com app antigo) recebem o quadro já recortado.
+  #frameViewClients = new WeakSet()
+  // Quem se identificou (caps ou hello de TV) e quem já recebeu o pedido de
+  // recarga: aba de navegador presa na página antiga recarrega uma vez só.
+  #announcedClients = new WeakSet()
+  #reloadAsked = new WeakSet()
   #running = false
   #media = new Map() // mídia local servida em /media/
   #contents // callback pro renderer
@@ -203,6 +210,29 @@ class PalcoSlot {
     for (const ws of this.#clients) {
       if (this.#isMuted(ws)) continue
       try { if (ws.readyState === ws.OPEN) ws.send(data) } catch { this.#clients.delete(ws) }
+    }
+  }
+
+  /** Só para quem aplica o zoom (frameView) ou só para os antigos (legacy). */
+  #sendWhere(obj, wantsFrameView) {
+    const data = JSON.stringify(obj)
+    for (const ws of this.#clients) {
+      if (this.#isMuted(ws) || this.#frameViewClients.has(ws) !== wantsFrameView) continue
+      try { if (ws.readyState === ws.OPEN) ws.send(data) } catch { this.#clients.delete(ws) }
+    }
+  }
+
+  /**
+   * Abas de navegador (/espelho, OBS) abertas antes de o app atualizar seguem
+   * com a página antiga: não entendem o zoom leve e só veriam o recorte
+   * atrasado. A página é servida por este app; recarregar traz a nova.
+   * TVs (hello) e páginas atuais (caps) ficam de fora.
+   */
+  #reloadStalePages() {
+    for (const ws of this.#clients) {
+      if (this.#announcedClients.has(ws) || this.#reloadAsked.has(ws) || this.#isMuted(ws)) continue
+      this.#reloadAsked.add(ws)
+      this.#sendTo(ws, { v: 2, type: 'obsControl', action: 'reload' })
     }
   }
 
@@ -330,6 +360,9 @@ class PalcoSlot {
         ws.on('message', (raw) => {
           try {
             const message = { ...JSON.parse(String(raw)), slotId: this.#id }
+            if (Array.isArray(message.caps)) this.#announcedClients.add(ws)
+            if (Array.isArray(message.caps) && message.caps.includes('frameView')) this.#frameViewClients.add(ws)
+            if (message.type === 'hello' && message.role === 'tv') this.#announcedClients.add(ws)
             // hello da TV: completa quem é e fecha a conexão antiga dela.
             if (message.type === 'hello' && message.role === 'tv' && this.#clientInfo.has(ws)) {
               const info = withHello(this.#clientInfo.get(ws), message)
@@ -407,6 +440,29 @@ class PalcoSlot {
     }
     if (!m || typeof m !== 'object' || !m.type) return false
     if (m.type === 'mirror-signal') { this.broadcastTransient(m); return true }
+    // Zoom de imagem/PDF: mensagem leve, na hora, só para quem a entende. O
+    // estado repetido para quem reconecta passa a levar o zoom atual.
+    if (m.type === 'frameView') {
+      const last = this.#lastByType.get('projection')
+      if (last?.frameSlide === true) this.#lastByType.set('projection', { ...last, view: m.view })
+      if (uid) {
+        const ws = this.#socketOf(uid)
+        return ws && this.#frameViewClients.has(ws) ? this.#sendTo(ws, m) : false
+      }
+      this.#sendWhere(m, true)
+      this.#reloadStalePages()
+      return true
+    }
+    // Quadro já recortado com o zoom: só para receivers antigos, sem replay.
+    if (m.legacyOnly === true) {
+      const { legacyOnly: _legacy, ...legacy } = m
+      if (uid) {
+        const ws = this.#socketOf(uid)
+        return ws && !this.#frameViewClients.has(ws) ? this.#sendTo(ws, legacy) : false
+      }
+      this.#sendWhere(legacy, false)
+      return true
+    }
     if (m.type === 'obsControl') { this.broadcastTransient(m); return true }
     // OBS S1: URL de mídia sai COM o token (a TV/browser recebe a URL já
     // autenticada — o renderer não precisa saber do token).

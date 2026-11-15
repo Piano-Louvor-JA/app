@@ -383,6 +383,11 @@ contextBridge.exposeInMainWorld('louvorja', {
     toggleVideoScreens: () => ipcRenderer.invoke('projection:toggle-video-screens'),
     // Player HTML (local-video/youtube) avisa que o vídeo acabou → autoclose.
     notifyVideoEnded: () => ipcRenderer.send('projection:video-ended'),
+    // Galeria de imagens: zoom pelo mouse (popup) e pelos botões (barra).
+    reportImageView: (view) => ipcRenderer.send('projection:image-view-changed', view),
+    setImageView: (view) => ipcRenderer.invoke('projection:set-image-view', view),
+    // Barra de controle: zoom novo (mouse ou botões) para repassar às TVs.
+    onImageView: (callback) => subscribe('projection:image-view', callback),
     remoteImageNext: () => ipcRenderer.invoke('projection:remote-image-next'),
     remoteImagePrev: () => ipcRenderer.invoke('projection:remote-image-prev'),
     getImageSlideState: () =>
@@ -399,8 +404,12 @@ contextBridge.exposeInMainWorld('louvorja', {
     getPdfPageState: () => ipcRenderer.invoke('projection:get-pdf-page-state'),
     remotePptNext: () => ipcRenderer.invoke('projection:remote-ppt-next'),
     remotePptPrev: () => ipcRenderer.invoke('projection:remote-ppt-prev'),
-    captureSourceFrame: () =>
-      ipcRenderer.invoke('projection:capture-source-frame'),
+    // { full: true }: página inteira do PDF (TVs novas aplicam o zoom).
+    captureSourceFrame: (options) =>
+      ipcRenderer.invoke('projection:capture-source-frame', options),
+    // Imagem atual lida do arquivo: { crop: true } = só a parte com zoom.
+    captureImageFrame: (options) =>
+      ipcRenderer.invoke('projection:capture-image-frame', options),
     captureSlidePreview: () =>
       ipcRenderer.invoke('projection:capture-slide-preview'),
     captureGalleryPreviews: () =>

@@ -14,20 +14,31 @@
         background: #000;
       }
       #stage {
+        position: relative;
         width: 100%;
         height: 100%;
         display: grid;
         place-items: center;
         background: #000;
       }
+      /* Preso à área da tela: numa linha de grid "auto" a altura 100% virava a
+         altura natural da foto e imagem em pé saía cortada embaixo. Assim o
+         contain sempre mostra a imagem inteira, em pé ou deitada. */
       #frame {
-        max-width: 100%;
-        max-height: 100%;
+        position: absolute;
+        inset: 0;
         width: 100%;
         height: 100%;
         object-fit: contain;
+        object-position: center;
         background: #000;
+        transform-origin: center center;
+        will-change: transform;
+        user-select: none;
+        -webkit-user-drag: none;
       }
+      body.is-zoomed #stage { cursor: grab; }
+      body.is-panning #stage { cursor: grabbing; }
       #error {
         display: none;
         color: #f8fafc;
@@ -43,6 +54,7 @@
       <img id="frame" alt="" />
       <p id="error">Não foi possível carregar as imagens.</p>
     </div>
+    <script src="zoom-pan.js"></script>
     <script>
       ;(() => {
         const params = new URLSearchParams(window.location.search)
@@ -57,9 +69,18 @@
           sources = []
         }
 
+        const stage = document.getElementById('stage')
         const frame = document.getElementById('frame')
         const error = document.getElementById('error')
-        let index = 0
+        let index = -1
+
+        // Zoom pela roda do mouse, arrastar e duplo clique: zoom-pan.js (compartilhado com o PDF)
+        const zoom = window.PianoZoomPan.create({
+          stage,
+          target: frame,
+          enabled: () => sources.length > 0,
+        })
+        window.addEventListener('resize', () => zoom.render())
 
         function show(nextIndex) {
           if (!sources.length || !frame) {
@@ -67,10 +88,13 @@
             if (frame) frame.style.display = 'none'
             return { index: 0, total: 0 }
           }
-          index = ((nextIndex % sources.length) + sources.length) % sources.length
+          const target = ((nextIndex % sources.length) + sources.length) % sources.length
+          // outra imagem começa inteira; reaplicar a mesma não perde o zoom
+          if (target !== index) zoom.reset()
+          index = target
           frame.style.display = 'block'
           error?.classList.remove('is-visible')
-          frame.src = sources[index]
+          if (frame.getAttribute('src') !== sources[index]) frame.src = sources[index]
           return { index, total: sources.length }
         }
 
@@ -80,7 +104,40 @@
 
         window.__liturgyGallery = {
           getState() {
-            return { index, total: sources.length }
+            return { index: Math.max(0, index), total: sources.length, view: zoom.getView() }
+          },
+          getView() {
+            return zoom.getView()
+          },
+          setView(next) {
+            return zoom.setView(next)
+          },
+          /**
+           * Parte visível da imagem atual, em pixels do arquivo original
+           * (recorte para TVs antigas). Null sem zoom ou sem imagem carregada.
+           */
+          getCropRegion() {
+            const view = zoom.getView()
+            const nw = frame ? frame.naturalWidth : 0
+            const nh = frame ? frame.naturalHeight : 0
+            if (view.zoom <= 1 || !nw || !nh || !stage) return null
+            const rect = stage.getBoundingClientRect()
+            if (!rect.width || !rect.height) return null
+            const fit = Math.min(rect.width / nw, rect.height / nh)
+            const region = window.PianoZoomPan.visibleRegion(view, {
+              stageWidth: rect.width,
+              stageHeight: rect.height,
+              contentWidth: nw * fit,
+              contentHeight: nh * fit,
+            })
+            const x = Math.max(0, Math.floor(region.left / fit))
+            const y = Math.max(0, Math.floor(region.top / fit))
+            return {
+              x,
+              y,
+              width: Math.max(1, Math.min(nw - x, Math.round((region.right - region.left) / fit))),
+              height: Math.max(1, Math.min(nh - y, Math.round((region.bottom - region.top) / fit))),
+            }
           },
           next() {
             return show(index + 1)

@@ -397,6 +397,8 @@
     socket.onopen = function () {
       retryMs = 1000
       body.dataset.connected = 'true'
+      // Página atual: o servidor não pede recarga (só às abas antigas)
+      send({ v: 2, type: 'caps', caps: ['overlay'] })
       var ready = readSession('overlay.ready', '')
       if (ready) { writeSession('overlay.ready', ''); send({ v: 2, type: 'receiver-ready', requestId: ready }) }
     }

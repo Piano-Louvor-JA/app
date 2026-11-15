@@ -160,6 +160,23 @@
         height: 1.45rem;
         fill: currentColor;
       }
+      /* Zoom da página: também pela roda do mouse e arrastando no popup. */
+      .zoom {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.2rem;
+        margin-left: 0.6rem;
+        padding-left: 0.6rem;
+        border-left: 1px solid rgba(255, 255, 255, 0.14);
+      }
+      .zoom__value {
+        min-width: 3.2rem;
+        height: 1.9rem;
+        padding: 0 0.3rem;
+        font-size: 0.78rem;
+        font-variant-numeric: tabular-nums;
+        opacity: 0.85;
+      }
     </style>
   </head>
   <body>
@@ -196,6 +213,15 @@
             </button>
             <span id="monitorBadge" class="monitor-badge is-empty">0</span>
           </span>
+          <div class="zoom" role="group" aria-label="Zoom da página">
+            <button id="zoomOut" type="button" title="Diminuir zoom" aria-label="Diminuir zoom" disabled>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14M7 9h5v1H7z"/></svg>
+            </button>
+            <button id="zoomReset" class="zoom__value" type="button" title="Página inteira (duplo clique na página também)" aria-label="Voltar à página inteira">100%</button>
+            <button id="zoomIn" type="button" title="Aumentar zoom (ou roda do mouse na página)" aria-label="Aumentar zoom">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14m.5-7H9v2H7v1h2v2h1v-2h2V9h-2z"/></svg>
+            </button>
+          </div>
         </div>
         <div></div>
         <div class="meta">
@@ -203,6 +229,7 @@
         </div>
       </div>
     </div>
+    <script src="palco-zoom-sender.js"></script>
     <script>
       ;(function () {
         var prevBtn = document.getElementById('prev')
@@ -319,6 +346,17 @@
         }
 
         var syncBusy = false, pendingSync = false, lastSyncedIndex = -1
+        // Zoom nas TVs/navegador: a página inteira vai uma vez; o zoom vai em
+        // mensagens leves na hora (TVs antigas recebem o recorte ao parar).
+        var palcoZoom = window.PianoPalcoZoom ? window.PianoPalcoZoom.create({
+          send: function (message, slotId) { return window.louvorja.palco.send(message, slotId) },
+          targets: function () { return Array.from(sentTvIds).filter(function (id) { return tvChecked[id] !== false }) },
+          captureLegacy: async function () {
+            var png = await window.louvorja.projection.captureSourceFrame()
+            return png ? 'data:image/png;base64,' + png : null
+          },
+          active: function () { return networkActive },
+        }) : null
         async function syncPptToTvs() {
           if (!networkActive) return false
           var generation = syncGeneration
@@ -327,7 +365,9 @@
           syncBusy = true
           try {
             var slide = window.louvorja.projection.getPptSlideState ? await window.louvorja.projection.getPptSlideState() : null
-            var png = await window.louvorja.projection.captureSourceFrame()
+            var slideView = slide && slide.view ? slide.view : { zoom: 1, x: 0, y: 0 }
+            // página inteira: as TVs novas aplicam o zoom (view) sozinhas
+            var png = await window.louvorja.projection.captureSourceFrame({ full: true })
             if (!png || !networkActive || generation !== syncGeneration) return false
             tvSlots = await window.louvorja.palco.slots().catch(function () { return [] })
             renderTvs()
@@ -339,13 +379,14 @@
                 // opened before frameSlide support. HTTP backgrounds default to cover.
                 var url = 'data:image/png;base64,' + png
                 if (url && networkActive && generation === syncGeneration && tvChecked[slot.id] !== false) {
-                  await window.louvorja.palco.send({ v: 2, type: 'projection', frameSlide: true, background: url, text: '', footerRef: '' }, slot.id)
+                  await window.louvorja.palco.send({ v: 2, type: 'projection', frameSlide: true, background: url, text: '', footerRef: '', view: { zoom: slideView.zoom, x: slideView.x, y: slideView.y } }, slot.id)
                   sentTvIds.add(slot.id)
                   served = true
                 }
               }
             }
             if (served && slide) lastSyncedIndex = slide.index
+            if (served && palcoZoom) palcoZoom.frameSent(slideView)
             return served
           } finally {
             syncBusy = false
@@ -427,6 +468,8 @@
             : null
           if (state) {
             setCounter(state.index, state.total)
+            // zoom feito pela roda do mouse no popup: a barra acompanha
+            if (state.view && Date.now() > zoomLocalUntil) renderZoom(state.view)
             if (networkActive && state.index !== lastSyncedIndex && !syncBusy) syncPptWithRetry(0)
           }
           if (state && typeof state.projecting === 'boolean') {
@@ -494,6 +537,7 @@
             var stopping = Boolean((state && state.projecting) || networkActive)
             if ((stopping && state && state.projecting) || (!stopping && selectedIds.length > 0)) await window.louvorja.projection.toggleVideoScreens()
             networkActive = !stopping; syncGeneration++; lastSyncedIndex = -1
+            if (stopping && palcoZoom) palcoZoom.stop()
             if (stopping) {
               await Promise.all(Array.from(sentTvIds).map(function (id) { return window.louvorja.palco.send({ v: 2, type: 'idle' }, id) }))
               sentTvIds.clear()
@@ -514,6 +558,52 @@
         // PDF.js renderiza de forma assíncrona; primeira captura pode pegar
         // canvas vazio/loading. Retry com backoff cobre PDF grande (LibreOffice)
         // e re-sincroniza quando a TV conecta depois do boot (13/10).
+        // ── Zoom da página (botões); a roda do mouse e o arrastar ficam no popup ──
+        var ZOOM_MIN = 1, ZOOM_MAX = 5, ZOOM_STEP = 1.25
+        var ZOOM_ANIM_MS = 180 // botões: o passo anima em vez de saltar
+        var zoomView = { zoom: 1, x: 0, y: 0 }
+        var zoomLocalUntil = 0
+        var zoomOutBtn = document.getElementById('zoomOut')
+        var zoomInBtn = document.getElementById('zoomIn')
+        var zoomResetBtn = document.getElementById('zoomReset')
+
+        function renderZoom(view) {
+          var z = Number(view && view.zoom)
+          zoomView = { zoom: Number.isFinite(z) ? z : 1, x: Number(view && view.x) || 0, y: Number(view && view.y) || 0 }
+          zoomResetBtn.textContent = Math.round(zoomView.zoom * 100) + '%'
+          zoomOutBtn.disabled = zoomView.zoom <= ZOOM_MIN + 0.001
+          zoomInBtn.disabled = zoomView.zoom >= ZOOM_MAX - 0.001
+          zoomResetBtn.disabled = zoomView.zoom <= ZOOM_MIN + 0.001 && !zoomView.x && !zoomView.y
+        }
+
+        async function applyZoom(next) {
+          if (!window.louvorja || !window.louvorja.projection || !window.louvorja.projection.setImageView) return
+          zoomLocalUntil = Date.now() + 800
+          renderZoom(next)
+          var result = await window.louvorja.projection.setImageView(next)
+          if (result && typeof result.zoom === 'number') renderZoom(result)
+        }
+
+        function zoomBy(factor) {
+          var target = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoomView.zoom * factor))
+          var ratio = target / zoomView.zoom
+          void applyZoom({ zoom: target, x: zoomView.x * ratio, y: zoomView.y * ratio, anim: ZOOM_ANIM_MS })
+        }
+
+        zoomInBtn.addEventListener('click', function () { zoomBy(ZOOM_STEP) })
+        zoomOutBtn.addEventListener('click', function () { zoomBy(1 / ZOOM_STEP) })
+        zoomResetBtn.addEventListener('click', function () { void applyZoom({ zoom: 1, x: 0, y: 0, anim: ZOOM_ANIM_MS }) })
+        renderZoom(zoomView)
+
+        // Zoom novo (mouse no popup ou botões): barra e TVs acompanham na hora.
+        if (window.louvorja && window.louvorja.projection && window.louvorja.projection.onImageView) {
+          window.louvorja.projection.onImageView(function (view) {
+            if (!view) return
+            if (Date.now() > zoomLocalUntil) renderZoom(view)
+            if (palcoZoom) palcoZoom.onView(view)
+          })
+        }
+
         void loadTvs()
         if (window.louvorja && window.louvorja.palco && window.louvorja.palco.onReceiverConnected) {
           window.louvorja.palco.onReceiverConnected(function () { void loadTvs(); if (networkActive) syncPptWithRetry(0) })
