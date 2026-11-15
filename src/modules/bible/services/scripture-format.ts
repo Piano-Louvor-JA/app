@@ -76,8 +76,9 @@ function addVerseRange(
 ): void {
   const lo = Math.min(from, to)
   const hi = Math.max(from, to)
-  for (let i = lo; i <= hi; i += 1) {
-    if (verses[String(i)]) selected.add(i)
+  for (const key of Object.keys(verses)) {
+    const verse = Number(key)
+    if (Number.isSafeInteger(verse) && verse >= lo && verse <= hi && verses[key]) selected.add(verse)
   }
 }
 
@@ -114,6 +115,45 @@ export function parseVerseQuery(
     for (const v of parseSinglePart(part, verses)) all.add(v)
   }
   return Array.from(all).sort((a, b) => a - b)
+}
+
+/**
+ * Paridade app (R4+): valida lista/intervalos mistos ("1-4, 6") como filtro
+ * de passagem — normaliza travessões tipográficos e qualquer parte inválida
+ * anula tudo (entrada torta NÃO filtra parcialmente). Independente do
+ * capítulo carregado (usado antes do parse final por versículos existentes).
+ */
+export function parseVerseFilter(query: string): number[] {
+  // U+2010–U+2015 (hyphens/dashes tipográficos) → hífen ASCII
+  const normalized = query.replace(/[\u2010-\u2015]/g, '-').trim()
+  if (!normalized) return []
+
+  const result: number[] = []
+  for (const part of normalized.split(',')) {
+    const trimmed = part.trim()
+    if (!trimmed) return []
+
+    const range = /^(\d+)-(\d+)$/.exec(trimmed)
+    if (range) {
+      const from = Number(range[1])
+      const to = Number(range[2])
+      if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to) || from < 1 || to < 1) return []
+      const lo = Math.min(from, to)
+      const hi = Math.max(from, to)
+      // Nenhum capítulo bíblico chega a mil versículos; limita expansão de entrada livre.
+      if (hi - lo >= 1000 || result.length + hi - lo + 1 > 1000) return []
+      for (let i = lo; i <= hi; i += 1) result.push(i)
+      continue
+    }
+
+    const single = /^\d+$/.exec(trimmed)
+    if (!single) return []
+    const num = Number(trimmed)
+    if (!Number.isSafeInteger(num) || num < 1 || result.length >= 1000) return []
+    result.push(num)
+  }
+
+  return Array.from(new Set(result)).sort((a, b) => a - b)
 }
 
 export function emptySelection(): BibleSelection {
