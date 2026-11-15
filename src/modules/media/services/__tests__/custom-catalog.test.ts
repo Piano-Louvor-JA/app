@@ -362,9 +362,12 @@ describe('collections CRUD', () => {
     routes = [{ match: () => true, status: 400 }]
     expect(await createCustomCollection('Ruim')).toBeNull()
 
-    // rede falhou com auth: enfileira no outbox e retorna id 0 (sync depois)
+    // rede falhou com auth: enfileira no outbox e retorna id LOCAL negativo
+    // (RF-07 SPEC v1.2.0 — local-first real, nunca id 0 fantasma)
     routes = [{ match: () => true, throw: true }]
-    expect(await createCustomCollection('Ruim')).toEqual({ id: 0 })
+    const offline = await createCustomCollection('Ruim')
+    expect(offline).not.toBeNull()
+    expect(offline!.id).toBeLessThan(0)
   })
 
   it('deleteCustomCollection: local, remoto ok, !ok, throw', async () => {
