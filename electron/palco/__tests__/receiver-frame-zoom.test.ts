@@ -39,38 +39,41 @@ beforeAll(() => {
   bg = dom.window.document.getElementById('bg') as HTMLImageElement
 })
 
+/** O jsdom formata o transform com ou sem espaço após a vírgula, conforme a versão. */
+const transform = () => bg.style.transform.replace(/,\s+/g, ',')
+
 const FRAME = { v: 2, type: 'projection', frameSlide: true, background: 'data:image/png;base64,SU5U', text: '', footerRef: '' }
 
 describe('receiver: zoom do quadro', () => {
   it('quadro chega com o zoom do operador; sem zoom fica sem transformação', () => {
     w.handle({ ...FRAME, view: { zoom: 2, x: 0.1, y: -0.05 } })
     expect(bg.classList.contains('frame-slide')).toBe(true)
-    expect(bg.style.transform).toBe('translate(10%,-5%) scale(2)')
+    expect(transform()).toBe('translate(10%,-5%) scale(2)')
     w.handle({ ...FRAME, view: { zoom: 1, x: 0, y: 0 } })
-    expect(bg.style.transform).toBe('')
+    expect(transform()).toBe('')
     w.handle(FRAME)
-    expect(bg.style.transform).toBe('')
+    expect(transform()).toBe('')
   })
 
   it('frameView muda o zoom com animação e respeita os limites', () => {
     w.handle(FRAME)
     w.handle({ v: 2, type: 'frameView', view: { zoom: 3, x: -0.2, y: 0.3, anim: 140 } })
-    expect(bg.style.transform).toBe('translate(-20%,30%) scale(3)')
+    expect(transform()).toBe('translate(-20%,30%) scale(3)')
     expect(bg.style.transition).toContain('transform 140ms')
     w.handle({ v: 2, type: 'frameView', view: { zoom: 99, x: 'x', y: 0, anim: 9999 } })
-    expect(bg.style.transform).toBe('translate(0%,0%) scale(5)')
+    expect(transform()).toBe('translate(0%,0%) scale(5)')
     expect(bg.style.transition).toContain('transform 400ms')
     w.handle({ v: 2, type: 'frameView', view: { zoom: 1, x: 0, y: 0 } })
-    expect(bg.style.transform).toBe('')
+    expect(transform()).toBe('')
   })
 
   it('fora de um quadro de slide, frameView não mexe no fundo; outro conteúdo zera o zoom', () => {
     w.handle({ ...FRAME, view: { zoom: 2, x: 0, y: 0 } })
     w.handle({ v: 2, type: 'idle' })
-    expect(bg.style.transform).toBe('')
+    expect(transform()).toBe('')
     w.handle({ v: 2, type: 'projection', scope: 'hymns', text: 'Santo, santo, santo', background: 'http://127.0.0.1:47080/media/capa.jpg' })
     expect(bg.classList.contains('frame-slide')).toBe(false)
     w.handle({ v: 2, type: 'frameView', view: { zoom: 2, x: 0, y: 0 } })
-    expect(bg.style.transform).toBe('')
+    expect(transform()).toBe('')
   })
 })

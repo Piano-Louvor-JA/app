@@ -21,6 +21,8 @@ it('renders the original vector PDF into a 3840px PNG even when the operator win
   const server = createServer((req, res) => {
     const name = new URL(req.url, 'http://local').pathname
     if (name === '/document.pdf') { res.setHeader('Content-Type', 'application/pdf'); res.end(pdf); return }
+    // scripts do próprio player (zoom), servidos como no app
+    if (name === '/zoom-pan.js') { res.setHeader('Content-Type', 'text/javascript'); res.end(readFileSync(new URL('..' + name, import.meta.url))); return }
     if (name === '/vendor/pdfjs/pdf.min.mjs' || name === '/vendor/pdfjs/pdf.worker.min.mjs') {
       res.setHeader('Content-Type', 'text/javascript'); res.end(readFileSync(new URL('..' + name, import.meta.url))); return
     }
