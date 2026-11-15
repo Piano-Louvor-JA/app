@@ -49,7 +49,18 @@ import {
   validatePort,
 } from './palco/transmission-config.mjs'
 
-const MAX_SLOTS = 8 // slot 0-7
+const MAX_SLOTS = 8 // slot 0-7 (por tipo: transmissão e palco)
+
+/**
+ * Conexões do Palco (TVs com o app Palco) ficam separadas das da Transmissão
+ * (OBS/navegador): portas próprias, ligar/desligar próprios e sem o token da
+ * rede — a TV procura o computador sozinha e não tem como saber o token.
+ * O Palco principal fica em 47180/47181, a porta que o app das TVs procura.
+ */
+export const PALCO_PRINCIPAL_ID = 'palco'
+export const PALCO_HTTP_PORT = 47180
+/** @param {unknown} kind */
+function slotKind(kind) { return kind === 'palco' ? 'palco' : 'transmission' }
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const DIST_DIR = path.resolve(__dirname, '../dist')
@@ -132,6 +143,7 @@ class PalcoSlot {
   #overlay
   #error = null
   #listenHost = null
+  #kind = 'transmission'
 
   constructor(id, label, httpPort, wsPort, getContents, options = {}) {
     this.#id = id
@@ -140,7 +152,12 @@ class PalcoSlot {
     this.#wsPort = wsPort
     this.#contents = getContents
     this.#overlay = normalizeOverlayStyle(options.overlay)
+    this.#kind = slotKind(options.kind)
   }
+
+  get kind() { return this.#kind }
+  /** Token cobrado da rede nesta conexão: o Palco não usa (só a Transmissão). */
+  get expectedToken() { return this.#kind === 'palco' ? null : requiredToken() }
 
   get id() { return this.#id }
   get label() { return this.#label }
@@ -337,7 +354,7 @@ class PalcoSlot {
             remoteAddress: req?.socket?.remoteAddress,
             url: req?.url,
             headers: req?.headers,
-            expectedToken: requiredToken(),
+            expectedToken: this.expectedToken,
           })
         ) {
           try { ws.close() } catch { /* ignore */ }
@@ -466,7 +483,7 @@ class PalcoSlot {
     if (m.type === 'obsControl') { this.broadcastTransient(m); return true }
     // OBS S1: URL de mídia sai COM o token (a TV/browser recebe a URL já
     // autenticada — o renderer não precisa saber do token).
-    const token = requiredToken()
+    const token = this.expectedToken
     if (token && typeof m.url === 'string' && m.url.includes('/media/')) {
       try {
         const u = new URL(m.url)
@@ -511,10 +528,11 @@ class PalcoSlot {
   /** Status deste slot. */
   status() {
     const host = lanIp()
-    const tokenQuery = requiredToken() ? `?token=${requiredToken()}` : ''
+    const tokenQuery = this.expectedToken ? `?token=${this.expectedToken}` : ''
     return {
       id: this.#id,
       label: this.#label,
+      kind: this.#kind,
       running: this.#running,
       clients: this.#clients.size,
       receiverIps: Array.from(new Set(this.#receiverIps.values())),
@@ -655,7 +673,7 @@ class PalcoSlot {
           remoteAddress: req.socket?.remoteAddress,
           url: req.url,
           headers: req.headers,
-          expectedToken: requiredToken(),
+          expectedToken: this.expectedToken,
         })
       ) {
         res.statusCode = 403
@@ -691,7 +709,7 @@ class PalcoSlot {
           remoteAddress: req.socket?.remoteAddress,
           url: req.url,
           headers: req.headers,
-          expectedToken: requiredToken(),
+          expectedToken: this.expectedToken,
         })
       ) {
         res.statusCode = 403
@@ -831,19 +849,32 @@ class PalcoManager {
     const principalPort = Number(principal?.httpPort)
     const principalHttp = validatePort(principalPort, []).ok && Number(principal?.wsPort) === principalPort + 1 ? principalPort : DEFAULT_HTTP_PORT
     this.ensureSlot('0', 'Principal', principalHttp, principalHttp + 1, principal?.overlay)
+    // Palco principal: porta que o app das TVs procura (sem conflito com a Transmissão)
+    const stage = rows.find(item => String(item?.id) === PALCO_PRINCIPAL_ID)
+    const stagePort = Number(stage?.httpPort)
+    const stageHttp = validatePort(stagePort, this.#takenPorts()).ok && Number(stage?.wsPort) === stagePort + 1
+      ? stagePort
+      : suggestPort(PALCO_HTTP_PORT, this.#takenPorts()) ?? PALCO_HTTP_PORT
+    this.ensureSlot(PALCO_PRINCIPAL_ID, 'Palco', stageHttp, stageHttp + 1, stage?.overlay, 'palco')
+    if (!stage) migrated = true
     // Operador configura a TV 2 uma vez; slots voltam após restart.
     for (const item of rows) {
       const httpPort = Number(item?.httpPort)
       const wsPort = Number(item?.wsPort)
       const id = String(item?.id ?? '')
       const label = String(item?.label ?? '').trim()
+      const kind = slotKind(item?.kind)
       if (
-        id !== '0' && label && !this.#slots.has(id) &&
+        id !== '0' && id !== PALCO_PRINCIPAL_ID && label && !this.#slots.has(id) &&
         validatePort(httpPort, this.#takenPorts()).ok &&
-        wsPort === httpPort + 1 && this.#slots.size < MAX_SLOTS
-      ) this.ensureSlot(id, label, httpPort, wsPort, item?.overlay)
+        wsPort === httpPort + 1 && this.#countOf(kind) < MAX_SLOTS
+      ) this.ensureSlot(id, label, httpPort, wsPort, item?.overlay, kind)
     }
     if (migrated) this.persistSlots()
+  }
+
+  #countOf(kind) {
+    return this.getAllSlots().filter(slot => slot.kind === kind).length
   }
 
   #takenPorts(exceptId) {
@@ -855,7 +886,7 @@ class PalcoManager {
       const rows = Array.from(this.#slots.values())
         .map((slot) => slot.id === '0'
           ? { id: slot.id, httpPort: slot.httpPort, wsPort: slot.wsPort, overlay: slot.overlay }
-          : { id: slot.id, label: slot.label, httpPort: slot.httpPort, wsPort: slot.wsPort, overlay: slot.overlay })
+          : { id: slot.id, label: slot.label, kind: slot.kind, httpPort: slot.httpPort, wsPort: slot.wsPort, overlay: slot.overlay })
       const file = slotsConfigPath()
       mkdirSync(path.dirname(file), { recursive: true })
       const tmp = `${file}.tmp`
@@ -867,22 +898,25 @@ class PalcoManager {
   }
 
   /** Garante slot; cria se não existe. */
-  ensureSlot(id, label, httpPort, wsPort, overlay) {
+  ensureSlot(id, label, httpPort, wsPort, overlay, kind = 'transmission') {
     if (this.#slots.has(id)) return this.#slots.get(id)
-    const slot = new PalcoSlot(id, label, httpPort, wsPort, () => this.#getContents(), { overlay })
+    const slot = new PalcoSlot(id, label, httpPort, wsPort, () => this.#getContents(), { overlay, kind })
     this.#slots.set(id, slot)
     void slot.prepare().catch(error => console.warn('[palco] receiver prepare:', error?.message ?? error))
     return slot
   }
 
   /** Cria novo slot (aloca próximo par de portas livre). */
-  createSlot(label = `TV ${this.#slots.size}`) {
-    if (this.#slots.size >= MAX_SLOTS) throw new Error('max slots')
-    let httpPort = suggestPort(DEFAULT_HTTP_PORT + 2, this.#takenPorts())
+  createSlot(label = `TV ${this.#slots.size}`, kind = 'transmission') {
+    const safeKind = slotKind(kind)
+    if (this.#countOf(safeKind) >= MAX_SLOTS) throw new Error('max slots')
+    // Palco: a partir da porta do Palco principal; Transmissão: da principal (47080)
+    const from = safeKind === 'palco' ? PALCO_HTTP_PORT + 2 : DEFAULT_HTTP_PORT + 2
+    let httpPort = suggestPort(from, this.#takenPorts())
     // id = porta HTTP de criação (ex: "47082"); continua o mesmo se a porta mudar depois
     while (httpPort !== null && this.#slots.has(String(httpPort))) httpPort = suggestPort(httpPort + 2, this.#takenPorts())
     if (httpPort === null) throw new Error('no free port')
-    const slot = this.ensureSlot(String(httpPort), label, httpPort, httpPort + 1)
+    const slot = this.ensureSlot(String(httpPort), label, httpPort, httpPort + 1, undefined, safeKind)
     this.persistSlots()
     return slot
   }
@@ -931,7 +965,7 @@ class PalcoManager {
 
   /** Remove slot (exceto principal). */
   removeSlot(id) {
-    if (id === '0') return false
+    if (id === '0' || id === PALCO_PRINCIPAL_ID) return false
     const slot = this.#slots.get(id)
     if (!slot) return false
     void slot.dispose()
@@ -999,7 +1033,8 @@ export function attachPalcoServer(getContents) {
   ipcMain.handle('palco:token', () => ({ token: getPalcoToken(), path: palcoTokenPath() }))
   ipcMain.handle('palco:token-reset', () => {
     const token = resetPalcoToken()
-    for (const slot of manager.getAllSlots()) slot.disconnectNetworkClients()
+    // TVs do Palco não usam o token: seguem conectadas
+    for (const slot of manager.getAllSlots()) if (slot.kind !== 'palco') slot.disconnectNetworkClients()
     return { token }
   })
 
@@ -1007,9 +1042,9 @@ export function attachPalcoServer(getContents) {
   ipcMain.handle('palco:slots', () => manager.getAllSlots().map(slot => manager.statusOf(slot)))
 
   // IPC: cria slot
-  ipcMain.handle('palco:slot-create', (_e, { label }) => {
-    const slot = manager.createSlot(label)
-    return { id: slot.id, label: slot.label, httpPort: slot.httpPort, wsPort: slot.wsPort }
+  ipcMain.handle('palco:slot-create', (_e, { label, kind } = {}) => {
+    const slot = manager.createSlot(label, kind)
+    return { id: slot.id, label: slot.label, kind: slot.kind, httpPort: slot.httpPort, wsPort: slot.wsPort }
   })
 
   // IPC: remove slot

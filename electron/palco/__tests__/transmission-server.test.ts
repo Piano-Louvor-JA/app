@@ -175,13 +175,18 @@ describe('PalcoManager', () => {
     vi.spyOn(PalcoSlot.prototype, 'dispose').mockResolvedValue(undefined)
     attachPalcoServer(() => null)
     const manager = getPalcoManager()
-    expect(manager.getAllSlots().map((slot: any) => [slot.id, slot.httpPort, slot.wsPort])).toEqual([['0', 47080, 47081], ['7082', 9100, 9101], ['7084', 47084, 47085]])
+    expect(manager.getAllSlots().map((slot: any) => [slot.id, slot.httpPort, slot.wsPort])).toEqual([['0', 47080, 47081], ['palco', 47180, 47181], ['7082', 9100, 9101], ['7084', 47084, 47085]])
     const migrated = JSON.parse(readFileSync(path.join(env.root, 'palco-slots.json'), 'utf8'))
-    expect(migrated.map((row: any) => [row.id, row.httpPort])).toEqual([['0', 47080], ['7082', 9100], ['7084', 47084]])
+    expect(migrated.map((row: any) => [row.id, row.httpPort])).toEqual([['0', 47080], ['palco', 47180], ['7082', 9100], ['7084', 47084]])
     expect(manager.getPrincipal().overlay.theme).toBe('light')
 
     const created = manager.createSlot('OBS 3')
-    expect([created.id, created.httpPort]).toEqual(['47082', 47082])
+    expect([created.id, created.httpPort, created.kind]).toEqual(['47082', 47082, 'transmission'])
+    // Palco: conexões próprias, nas portas do Palco, e o principal não sai
+    const stage = env.handlers.get('palco:slot-create')!({}, { label: 'Palco 2', kind: 'palco' })
+    expect(stage).toMatchObject({ id: '47182', kind: 'palco', httpPort: 47182, wsPort: 47183 })
+    expect(manager.getSlot('palco').kind).toBe('palco')
+    expect(manager.removeSlot('palco')).toBe(false)
 
     const update = env.handlers.get('palco:slot-update')!
     expect(await update({}, { id: '47082', httpPort: 9100 })).toEqual({ ok: false, reason: 'collision' })
@@ -194,7 +199,9 @@ describe('PalcoManager', () => {
 
     const saved = JSON.parse(readFileSync(path.join(env.root, 'palco-slots.json'), 'utf8'))
     expect(saved.find((row: any) => row.id === '0')).toMatchObject({ httpPort: 47080, wsPort: 47081, overlay: { theme: 'light', layout: 'fullscreen' } })
-    expect(saved.find((row: any) => row.id === '47082')).toMatchObject({ label: 'OBS 3', httpPort: 9200, wsPort: 9201, overlay: { position: 'top' } })
+    expect(saved.find((row: any) => row.id === '47082')).toMatchObject({ label: 'OBS 3', kind: 'transmission', httpPort: 9200, wsPort: 9201, overlay: { position: 'top' } })
+    expect(saved.find((row: any) => row.id === 'palco')).toMatchObject({ label: 'Palco', kind: 'palco', httpPort: 47180, wsPort: 47181 })
+    expect(saved.find((row: any) => row.id === '47182')).toMatchObject({ label: 'Palco 2', kind: 'palco' })
 
     const setTransmission = env.handlers.get('palco:transmission-set')!
     vi.spyOn(manager.getSlot('7082'), 'running', 'get').mockReturnValue(true)
@@ -203,9 +210,25 @@ describe('PalcoManager', () => {
     vi.spyOn(PalcoSlot.prototype, 'rebind').mockResolvedValue(undefined)
     expect(await setTransmission({}, { bind: 'local' })).toMatchObject({ ok: true, bind: 'local' })
     expect(JSON.parse(readFileSync(path.join(env.root, 'palco-transmission.json'), 'utf8')).bind).toBe('local')
-    expect(PalcoSlot.prototype.rebind).toHaveBeenCalledTimes(4)
+    expect(PalcoSlot.prototype.rebind).toHaveBeenCalledTimes(6)
     const info = await env.handlers.get('palco:transmission-get')!({})
     expect(info).toMatchObject({ bind: 'local', requireToken: true, listenHost: '127.0.0.1', linkHost: '127.0.0.1', missing: false })
     expect(Array.isArray(info.interfaces)).toBe(true)
+  })
+})
+
+describe('Conexões do Palco separadas da Transmissão', () => {
+  it('o Palco não cobra o token da rede; a Transmissão continua cobrando', async () => {
+    setTransmissionState({ bind: 'all', requireToken: true })
+    enablePalcoToken()
+    const stage = new PalcoSlot('palco-t', 'Palco', await freePort(), await freePort(), () => null, { kind: 'palco' })
+    const obs = new PalcoSlot('obs-t', 'OBS', await freePort(), await freePort(), () => null)
+    expect(stage.kind).toBe('palco')
+    expect(stage.expectedToken).toBeNull()
+    expect(obs.kind).toBe('transmission')
+    expect(typeof obs.expectedToken).toBe('string')
+    expect(stage.status()).toMatchObject({ kind: 'palco' })
+    setTransmissionState({ bind: 'all', requireToken: false })
+    expect(obs.expectedToken).toBeNull()
   })
 })

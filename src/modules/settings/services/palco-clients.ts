@@ -35,8 +35,18 @@ export interface PalcoSlotSummary {
   running: boolean
 }
 
+/** Conexão do Palco (as TVs conectam nela; separada da Transmissão). */
+export interface PalcoConnection extends PalcoSlotSummary {
+  httpPort: number
+  wsPort: number
+  clients: number
+  error?: { code: string; port?: number } | null
+}
+
 interface PalcoClientsApi {
-  slots(): Promise<PalcoSlotSummary[]>
+  slots(): Promise<Array<PalcoSlotSummary & { kind?: string; httpPort?: number; wsPort?: number; clients?: number; error?: PalcoConnection['error'] }>>
+  createSlot?(label: string, kind?: string): Promise<{ id: string; label: string } | null>
+  removeSlot?(id: string): Promise<boolean>
   clients(): Promise<PalcoClient[]>
   clientCommand(slotId: string, uid: string, command: PalcoCommand, args?: Record<string, unknown>): Promise<boolean>
   setClientMuted(slotId: string, uid: string, muted: boolean): Promise<boolean>
@@ -68,10 +78,36 @@ export async function listPalcoTvs(): Promise<PalcoClient[]> {
   return list.filter(isTvClient)
 }
 
-/** Transmissões no ar (destino de "Mover para…"). */
+/** Conexões do Palco no ar (destino de "Mover para…"). */
 export async function listRunningSlots(): Promise<PalcoSlotSummary[]> {
-  const list = await api()?.slots().catch(() => []) ?? []
+  const list = await listPalcoConnections()
   return list.filter((slot) => slot.running).map(({ id, label, running }) => ({ id, label, running }))
+}
+
+/** Conexões do Palco, a principal primeiro. */
+export async function listPalcoConnections(): Promise<PalcoConnection[]> {
+  const list = await api()?.slots().catch(() => []) ?? []
+  return list
+    .filter((slot) => slot.kind === 'palco')
+    .map((slot) => ({
+      id: slot.id,
+      label: slot.label,
+      running: slot.running,
+      httpPort: Number(slot.httpPort) || 0,
+      wsPort: Number(slot.wsPort) || 0,
+      clients: Number(slot.clients) || 0,
+      error: slot.error ?? null,
+    }))
+}
+
+/** Nova conexão do Palco (ex.: outra sala); null se não deu para criar. */
+export async function createPalcoConnection(label: string): Promise<PalcoSlotSummary | null> {
+  const created = await api()?.createSlot?.(label, 'palco').catch(() => null)
+  return created ? { id: created.id, label: created.label, running: false } : null
+}
+
+export async function removePalcoConnection(id: string): Promise<boolean> {
+  return await api()?.removeSlot?.(id).catch(() => false) ?? false
 }
 
 export async function sendPalcoCommand(

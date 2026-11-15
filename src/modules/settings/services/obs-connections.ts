@@ -100,11 +100,13 @@ export function setObsNickname(id: string, nickname: string) {
 }
 
 /** Adopt existing Palco slots without recreating ports, routes or nicknames. */
-export function migratePalcoConnections(slots: ReadonlyArray<{ id: string; label: string }>) {
+export function migratePalcoConnections(slots: ReadonlyArray<{ id: string; label: string; kind?: string }>) {
   let changed = false
   const next = [...obsConnections.value]
   for (const slot of slots) {
     if (typeof slot.id !== 'string' || typeof slot.label !== 'string') continue
+    // Conexões do Palco são geridas no módulo Palco, não na Transmissão
+    if (slot.kind === 'palco') continue
     if (next.some(connection => connection.id === slot.id)) continue
     const number = slot.id === '0' ? 1 : Math.max(1, ...next.map(item => Number(item.label.match(/\d+$/)?.[0]) || 1)) + 1
     const internalLabel = /^OBS\s*\d+$/.test(slot.label) || slot.id === MAIN_ID

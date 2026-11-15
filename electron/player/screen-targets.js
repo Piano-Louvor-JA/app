@@ -122,7 +122,8 @@
     remoteMeta: function (slot) { return 'Conexões ativas: ' + (Number(slot.clients) || 0) },
     /** Conexões no ar (como no app), ou com alguém conectado. */
     visibleRemotes: function (slots) {
-      return (slots || []).filter(function (slot) { return slot.running === true || slot.clients > 0 })
+      // conexões do Palco são das TVs (seção "TVs com Palco"), não Conexões Remotas
+      return (slots || []).filter(function (slot) { return slot.kind !== 'palco' && (slot.running === true || slot.clients > 0) })
     },
     /** A marca do app vale no player (o app é quem guarda). */
     applyRemoteSelection: function (checked) {

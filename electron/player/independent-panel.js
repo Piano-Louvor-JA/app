@@ -288,7 +288,8 @@
 
     function renderRemotes() {
       remoteList.textContent = ''
-      var live = slots.filter(function (s) { return s.clients > 0 })
+      // conexões do Palco ficam de fora: são das TVs, não Conexões Remotas
+      var live = slots.filter(function (s) { return s.clients > 0 && s.kind !== 'palco' })
       if (live.length === 0) {
         remoteList.appendChild(el('p', 'ip-empty', 'Nenhuma conexão remota ativa.'))
         return

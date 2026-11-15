@@ -102,7 +102,7 @@ contextBridge.exposeInMainWorld('louvorja', {
     setPersistence: (enabled) => ipcRenderer.invoke('palco:persistence-set', { enabled }),
     slots: () => ipcRenderer.invoke('palco:slots'),
     wake: () => ipcRenderer.invoke('palco:wake'),
-    createSlot: (label) => ipcRenderer.invoke('palco:slot-create', { label }),
+    createSlot: (label, kind = 'transmission') => ipcRenderer.invoke('palco:slot-create', { label, kind }),
     removeSlot: (slotId) => ipcRenderer.invoke('palco:slot-remove', { id: slotId }),
     updateSlot: (slotId, changes) => ipcRenderer.invoke('palco:slot-update', { id: slotId, ...changes }),
     transmission: () => ipcRenderer.invoke('palco:transmission-get'),
