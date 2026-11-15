@@ -38,7 +38,7 @@ vi.mock('../../services/countdown-runtime', () => ({
 }))
 
 vi.mock('../../components/CountdownPreview.vue', () => ({
-  default: { props: ['config', 'runtime'], template: '<div class="countdown-preview-stub" />' },
+  default: { name: 'CountdownPreview', props: { config: null, runtime: null, stage: null, muted: Boolean }, template: '<div class="countdown-preview-stub" />' },
 }))
 
 import CountdownProjectionView from '../CountdownProjectionView.vue'
@@ -74,6 +74,11 @@ describe('CountdownProjectionView', () => {
     expect(wrapper.find('.countdown-preview-stub').exists()).toBe(true)
     expect(wrapper.vm.config.timeFormat).toBe('hh:mm:ss')
     expect(wrapper.vm.runtime.durationMs).toBe(60000)
+  })
+
+  it('vídeo na projeção é sempre mudo: o som sai da janela principal, sem corte ao projetar', () => {
+    const wrapper = mount(CountdownProjectionView)
+    expect(wrapper.findComponent({ name: 'CountdownPreview' }).props('muted')).toBe(true)
   })
 
   it('stage com countdown override: effectiveConfig faz merge', () => {

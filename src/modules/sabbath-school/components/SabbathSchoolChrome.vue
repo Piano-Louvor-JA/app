@@ -29,7 +29,8 @@ const { stage, effectiveConfig } = useCountdownStage(() => appearance.config)
 const onRoute = computed(() => route.name === SABBATH_SCHOOL_ROUTE)
 
 const dismissed = ref(false)
-watch(() => route.name, () => { dismissed.value = false })
+// fechada pelo usuário, só volta ao entrar na própria tela (não a cada troca de página)
+watch(onRoute, (entered) => { if (entered) dismissed.value = false })
 watch(() => store.isProjecting, (active) => { if (active) dismissed.value = false })
 watch(() => store.isRunning, (running) => { if (running) dismissed.value = false })
 
@@ -97,7 +98,6 @@ async function onOpen() {
         :config="effectiveConfig"
         :runtime="store.runtime"
         :stage="stage"
-        muted
       />
     </aside>
 

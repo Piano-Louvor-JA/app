@@ -71,7 +71,16 @@ export function useSabbathSchoolAlertEngine(): void {
     })
   }
 
-  watch(() => store.audioVolume, (volume) => setLiveVolume(volume))
+  // mudo/volume valem AO VIVO: silencia o que já está tocando (abertura inclusive)
+  // e desmutar devolve o volume. Os tons da biblioteca tocam fora da lista do
+  // alert-tone, por isso recebem o volume direto.
+  watch(
+    () => (store.audioMuted ? 0 : store.audioVolume),
+    (volume) => {
+      setLiveVolume(volume)
+      for (const audio of libraryAudioCache.values()) audio.volume = volume
+    },
+  )
 
   // abertura em curso (manual ou do início da contagem): o botão mostra play/pausa
   let openingAudio: HTMLAudioElement | null = null
