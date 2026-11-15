@@ -18,6 +18,8 @@ export interface PalcoClient {
   muted: boolean
   /** Em projeção independente (um módulo só nela). */
   pinned?: boolean
+  /** Página da aba de navegador/OBS (Transmissão). */
+  page?: 'espelho' | 'retorno' | 'legenda'
 }
 
 export interface FoundTv {
@@ -76,6 +78,21 @@ export function isTvClient(client: Pick<PalcoClient, 'platform'>): boolean {
 export async function listPalcoTvs(): Promise<PalcoClient[]> {
   const list = await api()?.clients().catch(() => []) ?? []
   return list.filter(isTvClient)
+}
+
+/**
+ * Fontes das Transmissões (OBS e navegadores: /espelho, /legenda, /retorno),
+ * fora das conexões do Palco. As TVs ficam em listPalcoTvs.
+ */
+export async function listTransmissionClients(): Promise<PalcoClient[]> {
+  const bridge = api()
+  if (!bridge) return []
+  const [clients, slots] = await Promise.all([
+    bridge.clients().catch(() => [] as PalcoClient[]),
+    bridge.slots().catch(() => []),
+  ])
+  const stage = new Set(slots.filter((slot) => slot.kind === 'palco').map((slot) => slot.id))
+  return clients.filter((client) => !isTvClient(client) && !stage.has(client.slotId))
 }
 
 /** Conexões do Palco no ar (destino de "Mover para…"). */

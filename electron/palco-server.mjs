@@ -112,6 +112,8 @@ export function parseTarget(target) {
   return { slotId: slotId || '0', uid: uid || null }
 }
 const IDLE_MESSAGE = { v: 2, type: 'idle' }
+/** Páginas que uma aba de navegador/OBS informa ao conectar. */
+const PAGES = new Set(['espelho', 'retorno', 'legenda'])
 
 function portInUse(error, port) {
   return error?.code === 'EADDRINUSE' ? { code: 'port-in-use', port } : { code: 'start-failed', port }
@@ -378,6 +380,11 @@ class PalcoSlot {
           try {
             const message = { ...JSON.parse(String(raw)), slotId: this.#id }
             if (Array.isArray(message.caps)) this.#announcedClients.add(ws)
+            // Página da aba (espelho, retorno, legenda): Aparelhos conectados mostra
+            if (message.type === 'caps' && PAGES.has(message.page) && this.#clientInfo.has(ws)) {
+              this.#clientInfo.set(ws, { ...this.#clientInfo.get(ws), page: message.page })
+              this.#notifyClients()
+            }
             if (Array.isArray(message.caps) && message.caps.includes('frameView')) this.#frameViewClients.add(ws)
             if (message.type === 'hello' && message.role === 'tv') this.#announcedClients.add(ws)
             // hello da TV: completa quem é e fecha a conexão antiga dela.

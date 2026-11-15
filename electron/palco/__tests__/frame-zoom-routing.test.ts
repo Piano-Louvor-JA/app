@@ -104,6 +104,25 @@ describe('zoom do quadro no palco', () => {
     } finally { await slot.dispose() }
   }, 10000)
 
+  it('cada aba informa a página (espelho, retorno, legenda); valor estranho é ignorado', async () => {
+    setTransmissionState({ bind: 'all', requireToken: false })
+    const slot = new PalcoSlot('pages', 'Pages', await freePort(), await freePort(), () => null)
+    try {
+      await slot.start()
+      const mirror = await connect(slot)
+      mirror.ws.send(JSON.stringify({ v: 2, type: 'caps', caps: ['frameView'], page: 'espelho' }))
+      const back = await connect(slot)
+      back.ws.send(JSON.stringify({ v: 2, type: 'caps', caps: ['frameView'], page: 'retorno' }))
+      const caption = await connect(slot)
+      caption.ws.send(JSON.stringify({ v: 2, type: 'caps', caps: ['overlay'], page: 'legenda' }))
+      const odd = await connect(slot)
+      odd.ws.send(JSON.stringify({ v: 2, type: 'caps', caps: ['frameView'], page: '<script>' }))
+      await expect.poll(() => slot.clients().filter((c: Msg) => c.page).length).toBe(3)
+      expect(slot.clients().map((c: Msg) => c.page ?? null).sort()).toEqual(['espelho', 'legenda', 'retorno', null].sort())
+      for (const c of [mirror, back, caption, odd]) c.ws.close()
+    } finally { await slot.dispose() }
+  }, 10000)
+
   it('envio para uma TV só respeita o que ela entende', async () => {
     setTransmissionState({ bind: 'all', requireToken: false })
     const slot = new PalcoSlot('zoom-uid', 'Zoom', await freePort(), await freePort(), () => null)

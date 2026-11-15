@@ -3096,7 +3096,8 @@ function doConnect(){
     try{const requestId=sessionStorage.getItem('palcoRefreshRequest');if(requestId){ws.send(JSON.stringify({v:2,type:'receiver-ready',requestId,youtube:true,cleanMirror:!!window.PianoNetworkMirror}));sessionStorage.removeItem('palcoRefreshRequest')}}catch(e){}
     // Avisa que aplica o zoom de imagem/PDF sozinho (frameView): o app manda
     // só zoom + posição, em vez de reenviar o quadro recortado.
-    try{ws.send(JSON.stringify({v:2,type:'caps',caps:['frameView']}))}catch(e){}
+    // e qual página é esta aba (Aparelhos conectados mostra espelho/retorno)
+    try{ws.send(JSON.stringify({v:2,type:'caps',caps:['frameView'],page:stageReturnMode?'retorno':'espelho'}))}catch(e){}
     if(window.__hideSplash)window.__hideSplash(); // F3.3j: splash sai no connect
     localStorage.setItem('palcoHost',host);
     localStorage.setItem('palcoPort',port)};

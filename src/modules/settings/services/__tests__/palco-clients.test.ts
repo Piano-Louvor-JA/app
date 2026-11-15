@@ -9,6 +9,7 @@ import {
   hasPalcoClients,
   isTvClient,
   listPalcoTvs,
+  listTransmissionClients,
   listRunningSlots,
   onPalcoClientsChanged,
   sendPalcoCommand,
@@ -104,5 +105,37 @@ describe('palco-clients no app desktop', () => {
     expect(await setPalcoTvPinned(tv(), false)).toBe(false)
     expect(await discoverPalcoTvs()).toEqual({ ownIp: null, tvs: [] })
     expect(await wakePalcoTv('x')).toBe(false)
+  })
+})
+
+describe('conexões do Palco', () => {
+  it('cria como Palco e remove', async () => {
+    const createSlot = vi.fn(async () => ({ id: '47182', label: 'Salão' }))
+    const removeSlot = vi.fn(async () => true)
+    install({ clients: vi.fn(async () => []), slots: vi.fn(async () => []), createSlot, removeSlot })
+    expect(await createPalcoConnection('Salão')).toEqual({ id: '47182', label: 'Salão', running: false })
+    expect(createSlot).toHaveBeenCalledWith('Salão', 'palco')
+    expect(await removePalcoConnection('47182')).toBe(true)
+    createSlot.mockRejectedValueOnce(new Error('max slots'))
+    expect(await createPalcoConnection('Outra')).toBeNull()
+  })
+})
+
+describe('fontes das Transmissões', () => {
+  it('lista OBS e navegadores fora das conexões do Palco, sem as TVs', async () => {
+    install({
+      clients: vi.fn(async () => [
+        tv(),
+        tv({ uid: 'o1', platform: 'obs', slotId: '0' }),
+        tv({ uid: 'b1', platform: 'browser', slotId: '47082' }),
+        tv({ uid: 'b2', platform: 'browser', slotId: 'palco' }),
+      ]),
+      slots: vi.fn(async () => [
+        { id: '0', label: 'Principal', running: true },
+        { id: '47082', label: 'Telão', running: true },
+        { id: 'palco', label: 'Palco', kind: 'palco', running: true },
+      ]),
+    })
+    expect((await listTransmissionClients()).map(c => c.uid)).toEqual(['o1', 'b1'])
   })
 })

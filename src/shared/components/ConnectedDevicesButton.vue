@@ -6,8 +6,17 @@ import { useConnectedDevices } from '@shared/composables/useConnectedDevices'
 
 /** Círculo no canto: quantos aparelhos estão ligados a este desktop. */
 const { t } = useI18n()
-const { remote, speaker, phone, tvs, count, available } = useConnectedDevices()
+const { remote, speaker, phone, tvs, transmissions, count, available } = useConnectedDevices()
 const open = ref(false)
+
+/** "2 no OBS e 1 no navegador · 192.168.0.130" */
+function where(group: { obs: number; browsers: number; ips: string[] }) {
+  const parts = [
+    group.obs ? t('connectedDevices.inObs', { n: group.obs }) : '',
+    group.browsers ? t('connectedDevices.inBrowser', { n: group.browsers }) : '',
+  ].filter(Boolean)
+  return [parts.join(t('connectedDevices.and')), group.ips.join(', ')].filter(Boolean).join(' · ')
+}
 </script>
 
 <template>
@@ -69,6 +78,26 @@ const open = ref(false)
             <template v-if="tvs.length">
               <span v-for="tv in tvs" :key="tv.uid" class="on">
                 {{ t('connectedDevices.palcoTv', { name: tv.name, ip: tv.ip }) }}
+              </span>
+            </template>
+            <span v-else>{{ t('connectedDevices.none') }}</span>
+          </div>
+        </li>
+        <li class="connected-devices__item" data-test="transmission-devices">
+          <i class="ti ti-broadcast" aria-hidden="true" />
+          <div>
+            <strong>{{ t('connectedDevices.transmission') }}</strong>
+            <template v-if="transmissions.length">
+              <span v-for="group in transmissions" :key="group.key" class="on connected-devices__group"
+                :data-test="`transmission-${group.key}`">
+                {{
+                  t('connectedDevices.transmissionGroup', {
+                    connection: group.connection,
+                    page: t(`connectedDevices.pages.${group.page ?? 'other'}`),
+                    tabs: t('connectedDevices.tabs', { n: group.tabs }, group.tabs),
+                  })
+                }}
+                <small>{{ where(group) }}</small>
               </span>
             </template>
             <span v-else>{{ t('connectedDevices.none') }}</span>
@@ -153,4 +182,6 @@ const open = ref(false)
   span { color: var(--ds-color-on-surface-variant); font-size: 0.82rem; opacity: 0.8; }
   span.on { color: var(--ds-color-primary); opacity: 1; }
 }
+.connected-devices__group { display: flex; flex-direction: column; }
+.connected-devices__group small { color: var(--ds-color-on-surface-variant); font-size: 0.75rem; }
 </style>
