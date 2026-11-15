@@ -17,6 +17,7 @@ const PRODUCTION_EXCEPTIONS = {
   '1.35.1': 70,
   '1.36.0': 95,
   '1.37.0': 94,
+  '1.37.1': 94,
 }
 
 /** Staging mantém 50%; produção exige 100%, salvo exceção da versão. */
