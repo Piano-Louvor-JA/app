@@ -59,13 +59,18 @@
       ;(() => {
         const params = new URLSearchParams(window.location.search)
         const raw = params.get('srcs') || '[]'
+        const LOCAL_APP_PREFIX = 'local://app/'
         function isLocalAppUrl(value) {
           try {
             const url = new URL(value)
-            return url.protocol === 'local:' && url.host === 'app'
+            return url.protocol === 'local:' && url.host === 'app' && value.startsWith(LOCAL_APP_PREFIX)
           } catch {
             return false
           }
+        }
+        /** Endereço montado sempre a partir do prefixo fixo do app. */
+        function localAppSrc(value) {
+          return LOCAL_APP_PREFIX + value.slice(LOCAL_APP_PREFIX.length)
         }
         let sources = []
         try {
@@ -104,7 +109,8 @@
           index = target
           frame.style.display = 'block'
           error?.classList.remove('is-visible')
-          if (frame.getAttribute('src') !== sources[index]) frame.src = sources[index]
+          const src = localAppSrc(sources[index])
+          if (frame.getAttribute('src') !== src) frame.src = src
           return { index, total: sources.length }
         }
 
