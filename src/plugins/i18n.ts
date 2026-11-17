@@ -210,6 +210,7 @@ export default createI18n({
       ...timerEs,
     },
     ru: {
+      ...ru,
       ...albumsRu,
       ...communityRu,
       ...bibleRu,
@@ -228,6 +229,7 @@ export default createI18n({
       ...announcementsRu,
     },
     uk: {
+      ...uk,
       ...albumsUk,
       ...communityUk,
       ...bibleUk,
@@ -246,6 +248,7 @@ export default createI18n({
       ...announcementsUk,
     },
     fr: {
+      ...fr,
       ...albumsFr,
       ...communityFr,
       ...bibleFr,
