@@ -1,5 +1,6 @@
 import { onReceiverEvent } from '../palco/receiver-events.mjs'
 import { youtubeCaptionsScript } from '../youtube-captions.mjs'
+import { attachVideoLoadingOverlay } from '../video-loading-overlay.mjs'
 import { isYoutubeEmbedUrl, youtubeEmbedUrl, youtubeSourceId, youtubeWatchUrl } from '../youtube-source.mjs'
 import { BrowserWindow, nativeImage, screen, session, WebContentsView } from 'electron'
 import path from 'node:path'
@@ -1117,6 +1118,10 @@ function createSourceWindow(loadUrl, title) {
   win.setContentSize(CONTROL_WIDTH, CONTROL_HEIGHT)
   attachControlBar(win)
   layoutControlBar(win)
+  // Vídeo do YouTube: logo pulsando + "Carregando…" em vez da tela preta até o vídeo tocar.
+  if (currentProjectionMode === 'video' && currentSourceYoutubeId && !currentSourceAudioOnly) {
+    attachVideoLoadingOverlay(win, { WebContentsView, barHeight: CONTROL_BAR_HEIGHT, getControlBar: () => controlBarView })
+  }
   win.show()
   win.focus()
 

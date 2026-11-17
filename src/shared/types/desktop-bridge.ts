@@ -93,11 +93,19 @@ export type YoutubeAuthApi = {
 
 export type OnlineVideoQuality = 480 | 720 | 1080
 
+export type OnlineVideoFolder = 'system' | 'custom'
+
 export type OnlineVideoSettings = {
   enabled: boolean
   maxHeight: OnlineVideoQuality
   limitGb: number
+  /** Pasta que recebe os downloads novos. */
+  folder?: OnlineVideoFolder
+  /** Pasta escolhida pelo operador (os vídeos ficam numa subpasta dela). */
+  customDir?: string | null
 }
+
+export type OnlineVideoFolderInfo = { dir: string; bytes: number; count: number; limitBytes: number }
 
 export type OnlineVideoToolsStatus = {
   state: 'unavailable' | 'missing' | 'installing' | 'ready' | 'error'
@@ -113,6 +121,10 @@ export type OnlineVideoStatus = {
   settings: OnlineVideoSettings
   tools: OnlineVideoToolsStatus
   usage: { bytes: number; count: number; limitBytes: number }
+  /** Pasta dos vídeos baixados neste computador (muda conforme o sistema). */
+  cacheDir?: string
+  /** Tamanho e caminho de cada pasta de vídeos baixados. */
+  folders?: { system: OnlineVideoFolderInfo; custom: OnlineVideoFolderInfo | null; active: OnlineVideoFolder } | null
 }
 
 export type OnlineVideoItemStatus = {
@@ -128,9 +140,15 @@ export type OnlineVideoApi = {
   prefetch: (ids: string[]) => Promise<void>
   cancel: (id: string) => Promise<void>
   keep: (ids: string[]) => Promise<void>
-  clear: () => Promise<OnlineVideoStatus>
+  clear: (which?: OnlineVideoFolder) => Promise<OnlineVideoStatus>
   videoStatus: (ids: string[]) => Promise<Record<string, OnlineVideoItemStatus>>
   retryTools: () => Promise<OnlineVideoStatus>
+  openFolder?: (which?: OnlineVideoFolder) => Promise<boolean>
+  chooseFolder?: () => Promise<OnlineVideoStatus>
+  /** Baixar agora (botão do módulo YouTube), mesmo com a cópia automática desligada. */
+  download?: (ids: string[]) => Promise<boolean>
+  /** Apaga a cópia baixada de um vídeo (não apaga o que está tocando). */
+  remove?: (id: string) => Promise<boolean>
   onChanged: (callback: (payload: { id: string; status: OnlineVideoItemStatus }) => void) => () => void
   onTools: (callback: (status: OnlineVideoToolsStatus) => void) => () => void
 }
@@ -145,6 +163,38 @@ export type YoutubeVideoInfo = {
 export type YoutubeInfoApi = {
   get: (videoId: string) => Promise<YoutubeVideoInfo | null>
 }
+
+export type YoutubeSearchItem = {
+  videoId: string
+  title: string
+  channel: string
+  durationText: string
+  viewsText: string
+  publishedText: string
+  thumbnail: string
+  live: boolean
+}
+
+export type YoutubeSearchContinuation = {
+  token: string
+  apiKey: string | null
+  clientVersion: string
+}
+
+export type YoutubeSearchResult = {
+  items: YoutubeSearchItem[]
+  continuation: YoutubeSearchContinuation | null
+  error?: string
+}
+
+export type YoutubeSearchApi = {
+  query: (text: string) => Promise<YoutubeSearchResult>
+  more: (continuation: YoutubeSearchContinuation) => Promise<YoutubeSearchResult>
+  /** Vídeos de uma playlist (link com `list=` ou o id). */
+  playlist?: (text: string) => Promise<YoutubePlaylistResult>
+}
+
+export type YoutubePlaylistResult = { title: string; items: YoutubeSearchItem[]; error?: string }
 
 export type SitePageInfo = {
   title: string
@@ -232,7 +282,10 @@ export type BackupResult = {
 }
 
 export type BackupApi = {
-  create: () => Promise<BackupResult>
+  /** `includeYoutubeVideos`: inclui os vídeos baixados do YouTube (padrão: não). */
+  create: (options?: { includeYoutubeVideos?: boolean }) => Promise<BackupResult>
+  /** Tamanho dos vídeos baixados do YouTube, para perguntar antes do backup. */
+  youtubeUsage?: () => Promise<{ bytes: number; count: number }>
   restore: () => Promise<BackupResult>
   onProgress: (callback: (progress: BackupProgress) => void) => () => void
 }
@@ -663,6 +716,7 @@ export type LouvorJaBridge = {
   ytAuth?: YoutubeAuthApi
   onlineVideo?: OnlineVideoApi
   ytInfo?: YoutubeInfoApi
+  ytSearch?: YoutubeSearchApi
   siteInfo?: SiteInfoApi
   externalPlayer?: ExternalPlayerApi
   legacyMedia?: LegacyMediaApi

@@ -3,6 +3,7 @@ import { computed, nextTick, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { GlassCard } from '@design-system/index'
+import { appConfirm } from '@shared/composables/useAppConfirm'
 import { getDesktopBridge, isDesktopApp } from '@shared/services/desktop-bridge'
 import type { BackupProgress } from '@shared/types/desktop-bridge'
 
@@ -65,18 +66,43 @@ function closeRestoreConfirm() {
   restoreAcknowledged.value = false
 }
 
+const GB = 1024 ** 3
+const MB = 1024 ** 2
+
+/** Pergunta só quando há vídeos baixados; fechar ou recusar = sem os vídeos. */
+async function askYoutubeVideos(): Promise<boolean> {
+  let usage: { bytes: number; count: number } | null = null
+  try {
+    usage = (await getDesktopBridge()?.backup?.youtubeUsage?.()) ?? null
+  } catch {
+    usage = null
+  }
+  if (!usage || usage.count <= 0) return false
+  const size = usage.bytes >= GB ? `${(usage.bytes / GB).toFixed(1)} GB` : `${Math.round(usage.bytes / MB)} MB`
+  return appConfirm({
+    title: t('settings.general.backupYoutubeTitle'),
+    message: t('settings.general.backupYoutubeMessage', { count: usage.count, size }),
+    confirmLabel: t('settings.general.backupYoutubeInclude', { size }),
+    cancelLabel: t('settings.general.backupYoutubeSkip'),
+  })
+}
+
 async function createBackup() {
   const bridge = getDesktopBridge()
   if (!bridge?.backup || !isDesktopApp() || busy.value) return
 
   errorKey.value = null
   lastBackupPath.value = null
+
+  // Vídeos baixados do YouTube: só entram se o operador escolher (padrão: não).
+  const includeYoutubeVideos = await askYoutubeVideos()
+
   progress.value = { current: 0, total: 0, zipPath: '' }
   phase.value = 'backing-up'
   bindProgress()
   await nextTick()
   try {
-    const result = await bridge.backup.create()
+    const result = await bridge.backup.create({ includeYoutubeVideos })
     if (!result.ok) {
       phase.value = result.reason === 'cancelled' ? 'idle' : 'error'
       if (result.reason !== 'cancelled') errorKey.value = 'settings.general.backupError'

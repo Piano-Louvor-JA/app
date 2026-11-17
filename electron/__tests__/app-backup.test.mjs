@@ -5,6 +5,7 @@ import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import {
+  BACKUP_LOCAL_STORAGE_KEYS,
   buildBackupFileName,
   collectBackupEntries,
   createAppBackupArchive,
@@ -15,6 +16,13 @@ import {
   stripBackupRootPrefix,
   writeBackupZip,
   writeBrowserStorageSnapshot,
+  collectYoutubeVideoEntries,
+  extractZipPrefix,
+  mergeVideoCacheDirs,
+  restoreYoutubeVideos,
+  setYoutubeVideoSource,
+  youtubeVideosUsage,
+  YOUTUBE_VIDEOS_ZIP_DIR,
 } from '../app-backup.mjs'
 
 const temps = []
@@ -292,5 +300,86 @@ describe('app-backup', () => {
     const dir = tempDir('piano-ls-empty-')
     expect(writeBrowserStorageSnapshot({}, dir)).toBeNull()
     expect(writeBrowserStorageSnapshot({ other: 'x' }, dir)).toBeNull()
+  })
+})
+
+describe('backup do módulo YouTube', () => {
+  it('histórico, favoritos, coletâneas e buscas entram no snapshot do navegador', () => {
+    for (const key of ['louvorja-youtube-history-v1', 'louvorja-youtube-favorites-v1', 'louvorja-youtube-collections-v1', 'louvorja-youtube-queries-v1']) {
+      expect(BACKUP_LOCAL_STORAGE_KEYS).toContain(key)
+    }
+  })
+
+  function videoDir(prefix, ids) {
+    const dir = tempDir(prefix)
+    const videos = {}
+    for (const id of ids) {
+      writeFileSync(path.join(dir, `${id}.mp4`), `video-${id}`)
+      videos[id] = { title: id, size: 7, lastUsed: 1, keep: false }
+    }
+    writeFileSync(path.join(dir, `${ids[0]}.vtt`), 'WEBVTT')
+    mkdirSync(path.join(dir, '.stream', 'x'), { recursive: true })
+    writeFileSync(path.join(dir, '.stream', 'x', 'parcial'), 'lixo')
+    writeFileSync(path.join(dir, 'index.json'), JSON.stringify({ version: 1, keepIds: [ids[0]], videos }))
+    return dir
+  }
+
+  it('vídeos só entram quando escolhido; voltam mesclados na pasta do sistema', async () => {
+    const A = 'aaaaaaaaaaa'
+    const B = 'bbbbbbbbbbb'
+    const C = 'ccccccccccc'
+    const system = videoDir('yt-sys-', [A])
+    const custom = videoDir('yt-cus-', [B])
+    setYoutubeVideoSource({
+      folders: () => ({ system: { dir: system, bytes: 7, count: 1 }, custom: { dir: custom, bytes: 7, count: 1 } }),
+      restoreDir: () => restoreTo,
+      reload: async () => { reloaded += 1 },
+    })
+    let reloaded = 0
+    const restoreTo = videoDir('yt-dest-', [C])
+    expect(youtubeVideosUsage()).toEqual({ bytes: 14, count: 2 })
+
+    const paths = collectYoutubeVideoEntries().map((e) => e.zipPath).sort()
+    expect(paths).toEqual([
+      `${YOUTUBE_VIDEOS_ZIP_DIR}/custom/${B}.mp4`,
+      `${YOUTUBE_VIDEOS_ZIP_DIR}/custom/${B}.vtt`,
+      `${YOUTUBE_VIDEOS_ZIP_DIR}/custom/index.json`,
+      `${YOUTUBE_VIDEOS_ZIP_DIR}/system/${A}.mp4`,
+      `${YOUTUBE_VIDEOS_ZIP_DIR}/system/${A}.vtt`,
+      `${YOUTUBE_VIDEOS_ZIP_DIR}/system/index.json`,
+    ])
+
+    const dataRoot = tempDir('yt-data-')
+    const without = path.join(tempDir('yt-zip-'), 'sem.zip')
+    await createAppBackupArchive({ dataRoot, mediaRoot: path.join(dataRoot, 'Media'), destZip: without })
+    expect(await extractZipPrefix(without, `${YOUTUBE_VIDEOS_ZIP_DIR}/`, tempDir('yt-x-'))).toBe(0)
+    expect(await restoreYoutubeVideos(without)).toBe(0)
+
+    const withVideos = path.join(tempDir('yt-zip-'), 'com.zip')
+    await createAppBackupArchive({ dataRoot, mediaRoot: path.join(dataRoot, 'Media'), destZip: withVideos, includeYoutubeVideos: true })
+    expect(await restoreYoutubeVideos(withVideos)).toBe(2)
+    expect(reloaded).toBe(1)
+    const index = JSON.parse(readFileSync(path.join(restoreTo, 'index.json'), 'utf8'))
+    expect(Object.keys(index.videos).sort()).toEqual([A, B, C])
+    expect(index.keepIds.sort()).toEqual([A, B, C])
+    expect(readFileSync(path.join(restoreTo, `${B}.mp4`), 'utf8')).toBe(`video-${B}`)
+    expect(readFileSync(path.join(restoreTo, `${A}.vtt`), 'utf8')).toBe('WEBVTT')
+
+    // De novo: o que já está no destino não é duplicado.
+    expect(await restoreYoutubeVideos(withVideos)).toBe(0)
+    setYoutubeVideoSource(null)
+    expect(youtubeVideosUsage()).toEqual({ bytes: 0, count: 0 })
+    expect(collectYoutubeVideoEntries()).toEqual([])
+    expect(await restoreYoutubeVideos(withVideos)).toBe(0)
+  })
+
+  it('mesclar ignora índice quebrado, id inválido e vídeo sem arquivo', () => {
+    const src = tempDir('yt-src-')
+    writeFileSync(path.join(src, 'index.json'), JSON.stringify({ videos: { curto: {}, ddddddddddd: { size: 1 } } }))
+    const broken = tempDir('yt-broken-')
+    writeFileSync(path.join(broken, 'index.json'), '{quebrado')
+    const dest = path.join(tempDir('yt-d-'), 'novo')
+    expect(mergeVideoCacheDirs([src, broken], dest)).toBe(0)
+    expect(JSON.parse(readFileSync(path.join(dest, 'index.json'), 'utf8'))).toEqual({ version: 1, keepIds: [], videos: {} })
   })
 })

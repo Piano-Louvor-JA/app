@@ -36,6 +36,9 @@ import mediaEs from '@modules/media/locales/es'
 import randomPtBR from '@modules/random/locales/pt-BR'
 import randomEn from '@modules/random/locales/en'
 import randomEs from '@modules/random/locales/es'
+import youtubePtBR from '@modules/youtube/locales/pt-BR'
+import youtubeEn from '@modules/youtube/locales/en'
+import youtubeEs from '@modules/youtube/locales/es'
 
 import settingsPtBR from '@modules/settings/locales/pt-BR'
 import settingsEn from '@modules/settings/locales/en'
@@ -80,6 +83,7 @@ const ptBRMessages = {
   ...liturgyPtBR,
   ...mediaPtBR,
   ...randomPtBR,
+  ...youtubePtBR,
   ...settingsPtBR,
   ...startingPtBR,
   ...syncPtBR,
@@ -96,6 +100,7 @@ const enMessages = {
   ...liturgyEn,
   ...mediaEn,
   ...randomEn,
+  ...youtubeEn,
   ...settingsEn,
   ...startingEn,
   ...syncEn,
@@ -112,6 +117,7 @@ const esMessages = {
   ...liturgyEs,
   ...mediaEs,
   ...randomEs,
+  ...youtubeEs,
   ...settingsEs,
   ...startingEs,
   ...syncEs,

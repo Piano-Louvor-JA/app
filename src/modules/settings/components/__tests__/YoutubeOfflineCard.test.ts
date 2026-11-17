@@ -50,7 +50,17 @@ function makeApi(initial = makeStatus()) {
 			...initial,
 			settings: { ...initial.settings, ...partial },
 		})),
-		clear: vi.fn(async () => ({ ...initial, usage: { ...initial.usage, bytes: 0, count: 0 } })),
+		clear: vi.fn(async () => ({ ...initial, usage: { ...initial.usage, bytes: 0, count: 0 }, folders: null })),
+		openFolder: vi.fn(async () => true),
+		chooseFolder: vi.fn(async () => ({
+			...initial,
+			settings: { ...initial.settings, folder: "custom" as const, customDir: "/hd" },
+			folders: {
+				system: { dir: "/sys/video-cache", bytes: 0, count: 0, limitBytes: Infinity },
+				custom: { dir: "/hd/LouvorJA-PIANO-videos", bytes: 0, count: 0, limitBytes: Infinity },
+				active: "custom" as const,
+			},
+		})),
 		retryTools: vi.fn(async () => ({ ...initial, tools: { state: "ready" as const, version: "1" } })),
 		prefetch: vi.fn(),
 		cancel: vi.fn(),
@@ -150,7 +160,7 @@ describe("YoutubeOfflineCard", () => {
 		expect(api.setSettings).toHaveBeenLastCalledWith({ enabled: false });
 	});
 
-	it("qualidade e espaço máximo", async () => {
+	it("qualidade máxima", async () => {
 		const { api } = makeApi();
 		const wrapper = await mountWith(api);
 		expect(wrapper.find('[data-test="youtube-offline-quality-720"]').attributes("aria-checked")).toBe("true");
@@ -159,35 +169,93 @@ describe("YoutubeOfflineCard", () => {
 		await flushPromises();
 		expect(api.setSettings).toHaveBeenCalledWith({ maxHeight: 1080 });
 		expect(wrapper.find('[data-test="youtube-offline-quality-1080"]').classes()).toContain("selected");
-
-		const limit = wrapper.find<HTMLSelectElement>('[data-test="youtube-offline-limit"]');
-		expect(limit.findAll("option").map((option) => option.text())).toEqual(["2 GB", "4 GB", "6 GB", "10 GB", "20 GB"]);
-		await limit.setValue("10");
-		await flushPromises();
-		expect(api.setSettings).toHaveBeenLastCalledWith({ limitGb: 10 });
+		// Sem limite de espaço: quem configura e limpa é o operador.
+		expect(wrapper.find('[data-test="youtube-offline-limit"]').exists()).toBe(false);
 	});
 
-	it("mostra o espaço usado", async () => {
-		const { api } = makeApi();
+	it("main antigo sem pastas: mostra só a do sistema com o tamanho", async () => {
+		const { api } = makeApi(makeStatus({ cacheDir: "/sys/video-cache" }));
 		const wrapper = await mountWith(api);
-		expect(wrapper.find('[data-test="youtube-offline-usage"]').text()).toBe(
-			'settings.youtubeOffline.usage {"used":"1.5","limit":6,"count":3}',
+		const system = wrapper.find('[data-test="youtube-offline-folder-system"]');
+		expect(system.text()).toContain("/sys/video-cache");
+		expect(wrapper.find('[data-test="youtube-offline-size-system"]').text()).toBe(
+			'settings.youtubeOffline.folderSize {"size":"1.5 GB","count":3}',
 		);
+		expect(wrapper.find('[data-test="youtube-offline-use-system"]').attributes("aria-checked")).toBe("true");
+		expect(wrapper.find('[data-test="youtube-offline-choose-folder"]').exists()).toBe(true);
 	});
 
-	it("apagar pede confirmação; cancelado não apaga", async () => {
-		const { api } = makeApi();
+	it("duas pastas: tamanho de cada uma, escolher onde baixar, abrir, trocar e apagar só uma", async () => {
+		const folders = {
+			system: { dir: "/sys/video-cache", bytes: 300 * 1024 ** 2, count: 2, limitBytes: Infinity },
+			custom: { dir: "/hd/LouvorJA-PIANO-videos", bytes: 2 * GB, count: 5, limitBytes: Infinity },
+			active: "custom" as const,
+		};
+		const { api } = makeApi(makeStatus({ folders, settings: { enabled: true, maxHeight: 720, limitGb: 6, folder: "custom", customDir: "/hd" } }));
+		const wrapper = await mountWith(api);
+		expect(wrapper.find('[data-test="youtube-offline-size-system"]').text()).toBe('settings.youtubeOffline.folderSize {"size":"300 MB","count":2}');
+		expect(wrapper.find('[data-test="youtube-offline-size-custom"]').text()).toBe('settings.youtubeOffline.folderSize {"size":"2.0 GB","count":5}');
+		expect(wrapper.find('[data-test="youtube-offline-folder-custom"]').classes()).toContain("active");
+		expect(wrapper.find('[data-test="youtube-offline-folder-custom"]').text()).toContain("settings.youtubeOffline.folderActive");
+
+		// Clicar na ativa não muda nada; na outra, passa a baixar nela.
+		await wrapper.find('[data-test="youtube-offline-use-custom"]').trigger("click");
+		expect(api.setSettings).not.toHaveBeenCalled();
+		await wrapper.find('[data-test="youtube-offline-use-system"]').trigger("click");
+		await flushPromises();
+		expect(api.setSettings).toHaveBeenCalledWith({ folder: "system" });
+
+		await wrapper.find('[data-test="youtube-offline-open-custom"]').trigger("click");
+		await flushPromises();
+		expect(api.openFolder).toHaveBeenCalledWith("custom");
+		api.openFolder.mockRejectedValueOnce(new Error("sem gerenciador"));
+		await wrapper.find('[data-test="youtube-offline-open-system"]').trigger("click");
+		await flushPromises();
+
+		await wrapper.find('[data-test="youtube-offline-change-folder"]').trigger("click");
+		await flushPromises();
+		expect(api.chooseFolder).toHaveBeenCalled();
+	});
+
+	it("sem pasta personalizada: clicar nela abre o seletor", async () => {
+		const { api } = makeApi(makeStatus({ cacheDir: "/sys/video-cache" }));
+		const wrapper = await mountWith(api);
+		await wrapper.find('[data-test="youtube-offline-use-custom"]').trigger("click");
+		await flushPromises();
+		expect(api.chooseFolder).toHaveBeenCalledTimes(1);
+		// Já escolhida: o botão "Escolher" dá lugar ao caminho e ao "Trocar pasta".
+		expect(wrapper.find('[data-test="youtube-offline-choose-folder"]').exists()).toBe(false)
+		expect(wrapper.find('[data-test="youtube-offline-change-folder"]').exists()).toBe(true)
+		expect(wrapper.find('[data-test="youtube-offline-folder-custom"]').text()).toContain("/hd/LouvorJA-PIANO-videos");
+	});
+
+	it("apagar pede confirmação, só da pasta clicada; cancelado não apaga", async () => {
+		const { api } = makeApi(makeStatus({ cacheDir: "/sys/video-cache" }));
 		const wrapper = await mountWith(api);
 		vi.mocked(appConfirm).mockResolvedValueOnce(false);
-		await wrapper.find('[data-test="youtube-offline-clear"]').trigger("click");
+		await wrapper.find('[data-test="youtube-offline-clear-system"]').trigger("click");
 		await flushPromises();
-		expect(appConfirm).toHaveBeenCalledWith(expect.objectContaining({ danger: true, title: "settings.youtubeOffline.clearTitle" }));
+		expect(appConfirm).toHaveBeenCalledWith(expect.objectContaining({ danger: true, title: "settings.youtubeOffline.clearTitle", message: "settings.youtubeOffline.clearMessageSystem" }));
 		expect(api.clear).not.toHaveBeenCalled();
 
-		await wrapper.find('[data-test="youtube-offline-clear"]').trigger("click");
+		await wrapper.find('[data-test="youtube-offline-clear-system"]').trigger("click");
 		await flushPromises();
-		expect(api.clear).toHaveBeenCalled();
-		expect(wrapper.find('[data-test="youtube-offline-clear"]').attributes("disabled")).toBeDefined();
+		expect(api.clear).toHaveBeenCalledWith("system");
+		expect(wrapper.find('[data-test="youtube-offline-clear-system"]').attributes("disabled")).toBeDefined();
+	});
+
+	it("apagar a pasta personalizada usa a mensagem dela", async () => {
+		const folders = {
+			system: { dir: "/s", bytes: 0, count: 0, limitBytes: Infinity },
+			custom: { dir: "/c", bytes: GB, count: 1, limitBytes: Infinity },
+			active: "system" as const,
+		};
+		const { api } = makeApi(makeStatus({ folders }));
+		const wrapper = await mountWith(api);
+		await wrapper.find('[data-test="youtube-offline-clear-custom"]').trigger("click");
+		await flushPromises();
+		expect(appConfirm).toHaveBeenCalledWith(expect.objectContaining({ message: "settings.youtubeOffline.clearMessageCustom" }));
+		expect(api.clear).toHaveBeenCalledWith("custom");
 	});
 
 	it("situação das ferramentas: a instalar, instalando, prontas e com erro", async () => {

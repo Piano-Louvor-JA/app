@@ -5,6 +5,14 @@ export const BROWSER_STORAGE_KEYS = {
   topSongs: 'history_top_songs',
   catalogSessionPrefix: 'db:',
   playlists: 'louvorja-playlists-v1',
+  /** Vídeos tocados no módulo YouTube (Central de Mídia), mais recente primeiro. */
+  youtubeHistory: 'louvorja-youtube-history-v1',
+  /** Vídeos favoritos do módulo YouTube, na ordem em que foram favoritados (mais recente primeiro). */
+  youtubeFavorites: 'louvorja-youtube-favorites-v1',
+  /** Coletâneas online (listas de vídeos do YouTube montadas pelo operador). */
+  youtubeCollections: 'louvorja-youtube-collections-v1',
+  /** Últimas buscas feitas no módulo YouTube. */
+  youtubeRecentQueries: 'louvorja-youtube-queries-v1',
   /** sessionStorage: histórico de navegação (sobrevive a reload, não a fechar o app). */
   navigationHistory: 'navigation-history-v1',
   /** sessionStorage: páginas minimizadas (barra acima do dock). */

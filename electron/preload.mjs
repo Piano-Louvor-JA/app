@@ -257,10 +257,14 @@ contextBridge.exposeInMainWorld('louvorja', {
     setSettings: (partial) => ipcRenderer.invoke('online-video:set-settings', partial),
     prefetch: (ids) => ipcRenderer.invoke('online-video:prefetch', ids),
     cancel: (id) => ipcRenderer.invoke('online-video:cancel', id),
+    download: (ids) => ipcRenderer.invoke('online-video:download', ids),
+    remove: (id) => ipcRenderer.invoke('online-video:remove', id),
     keep: (ids) => ipcRenderer.invoke('online-video:keep', ids),
-    clear: () => ipcRenderer.invoke('online-video:clear'),
+    clear: (which) => ipcRenderer.invoke('online-video:clear', which),
     videoStatus: (ids) => ipcRenderer.invoke('online-video:video-status', ids),
     retryTools: () => ipcRenderer.invoke('online-video:retry-tools'),
+    openFolder: (which) => ipcRenderer.invoke('online-video:open-folder', which),
+    chooseFolder: () => ipcRenderer.invoke('online-video:choose-folder'),
     onChanged: (callback) => subscribe('online-video:changed', callback),
     onTools: (callback) => subscribe('online-video:tools', callback),
   },
@@ -268,6 +272,13 @@ contextBridge.exposeInMainWorld('louvorja', {
   ytInfo: {
     // Título, canal, duração e descrição do vídeo (preenche o item da liturgia ao colar o link)
     get: (videoId) => ipcRenderer.invoke('youtube-info:get', videoId),
+  },
+
+  ytSearch: {
+    // Busca de vídeos do YouTube (módulo YouTube da Central de Mídia), sem chave de API
+    query: (text) => ipcRenderer.invoke('youtube-search:query', text),
+    more: (continuation) => ipcRenderer.invoke('youtube-search:more', continuation),
+    playlist: (text) => ipcRenderer.invoke('youtube-search:playlist', text),
   },
 
   siteInfo: {
@@ -291,7 +302,8 @@ contextBridge.exposeInMainWorld('louvorja', {
   },
 
   backup: {
-    create: () => ipcRenderer.invoke('backup:create'),
+    create: (options) => ipcRenderer.invoke('backup:create', options),
+    youtubeUsage: () => ipcRenderer.invoke('backup:youtube-usage'),
     restore: () => ipcRenderer.invoke('backup:restore'),
     onProgress: (callback) => subscribe('backup:progress', callback),
   },

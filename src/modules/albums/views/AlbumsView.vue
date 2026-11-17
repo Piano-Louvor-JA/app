@@ -529,6 +529,17 @@ async function runAction(
         <button
           type="button"
           class="albums-view__toolbar-btn"
+          data-testid="albums-open-youtube"
+          :aria-label="t('youtube.open')"
+          :title="t('youtube.open')"
+          @click="router.push({ name: 'albums-youtube' })"
+        >
+          <i class="ti ti-brand-youtube" aria-hidden="true" />
+          {{ t('youtube.title') }}
+        </button>
+        <button
+          type="button"
+          class="albums-view__toolbar-btn"
           :aria-label="t('albums.playlists.title')"
           @click="playlistsModalOpen = true"
         >
