@@ -66,12 +66,12 @@ afterEach(() => {
 
 describe('useAnnouncementsCarousel', () => {
   it('lista só com vídeo/apresentação não inicia', async () => {
-    await expect(carousel.start([{ id: 'v', kind: 'video', title: '', file: null }], { slideMs: 5000, loop: true })).resolves.toBe(false)
+    await expect(carousel.start([{ id: 'v', kind: 'video', title: '', file: null }], { slideMs: 5000, loop: true, transitionEnabled: false, transition: 'fade', transitionSpeed: 'normal' })).resolves.toBe(false)
     expect(carousel.isActive.value).toBe(false)
   })
 
   it('3 textos, 5 s, repetindo: troca a cada 5 s e volta ao primeiro', async () => {
-    await carousel.start(texts(3), { slideMs: 5000, loop: true })
+    await carousel.start(texts(3), { slideMs: 5000, loop: true, transitionEnabled: false, transition: 'fade', transitionSpeed: 'normal' })
     expect(carousel.status.value).toBe('playing')
     expect(carousel.total.value).toBe(3)
     expect(mocks.publishAnnotation).toHaveBeenLastCalledWith(expect.objectContaining({ title: 'Aviso 0', active: true }), false)
@@ -84,11 +84,11 @@ describe('useAnnouncementsCarousel', () => {
     expect(carousel.index.value).toBe(2)
     vi.advanceTimersByTime(5000)
     expect(carousel.index.value).toBe(0)
-    expect(mocks.publishCarousel).toHaveBeenLastCalledWith({ active: true, kind: 'text', relativePath: '', title: 'Aviso 0', text: '0' })
+    expect(mocks.publishCarousel).toHaveBeenLastCalledWith({ active: true, kind: 'text', relativePath: '', title: 'Aviso 0', text: '0' , transition: 'none', transitionMs: 250 })
   })
 
   it('janela em segundo plano: acorda 12 s depois e pula para o slide certo', async () => {
-    await carousel.start(texts(5), { slideMs: 5000, loop: true })
+    await carousel.start(texts(5), { slideMs: 5000, loop: true, transitionEnabled: false, transition: 'fade', transitionSpeed: 'normal' })
     vi.setSystemTime(T0 + 12_000)
     carousel.tick()
     expect(carousel.index.value).toBe(2)
@@ -100,7 +100,7 @@ describe('useAnnouncementsCarousel', () => {
   })
 
   it('sem repetir: para no último slide como "terminado"; continuar recomeça', async () => {
-    await carousel.start(texts(2), { slideMs: 5000, loop: false })
+    await carousel.start(texts(2), { slideMs: 5000, loop: false, transitionEnabled: false, transition: 'fade', transitionSpeed: 'normal' })
     vi.advanceTimersByTime(5000)
     expect(carousel.index.value).toBe(1)
     vi.advanceTimersByTime(20_000)
@@ -112,7 +112,7 @@ describe('useAnnouncementsCarousel', () => {
   })
 
   it('pausar congela o tempo restante e continuar respeita o que faltava', async () => {
-    await carousel.start(texts(3), { slideMs: 5000, loop: true })
+    await carousel.start(texts(3), { slideMs: 5000, loop: true, transitionEnabled: false, transition: 'fade', transitionSpeed: 'normal' })
     vi.advanceTimersByTime(3000)
     carousel.pause()
     vi.advanceTimersByTime(60_000)
@@ -130,7 +130,7 @@ describe('useAnnouncementsCarousel', () => {
   })
 
   it('próximo/anterior manuais dão o tempo inteiro ao slide novo', async () => {
-    await carousel.start(texts(3), { slideMs: 5000, loop: true })
+    await carousel.start(texts(3), { slideMs: 5000, loop: true, transitionEnabled: false, transition: 'fade', transitionSpeed: 'normal' })
     vi.advanceTimersByTime(4000)
     carousel.next()
     expect(carousel.index.value).toBe(1)
@@ -142,7 +142,7 @@ describe('useAnnouncementsCarousel', () => {
   })
 
   it('manual sem repetir: anterior no primeiro não volta; próximo no último termina', async () => {
-    await carousel.start(texts(2), { slideMs: 5000, loop: false })
+    await carousel.start(texts(2), { slideMs: 5000, loop: false, transitionEnabled: false, transition: 'fade', transitionSpeed: 'normal' })
     carousel.prev()
     expect(carousel.index.value).toBe(0)
     carousel.next()
@@ -157,28 +157,28 @@ describe('useAnnouncementsCarousel', () => {
   })
 
   it('imagens publicam o caminho da imagem', async () => {
-    await carousel.start([{ id: 'a', kind: 'images', title: '', files: [{ relativePath: 'modulos/avisos/a/1.png', name: '1' }] }], { slideMs: 5000, loop: true })
+    await carousel.start([{ id: 'a', kind: 'images', title: '', files: [{ relativePath: 'modulos/avisos/a/1.png', name: '1' }] }], { slideMs: 5000, loop: true, transitionEnabled: false, transition: 'fade', transitionSpeed: 'normal' })
     expect(carousel.currentSlide.value).toMatchObject({ kind: 'image' })
-    expect(mocks.publishCarousel).toHaveBeenLastCalledWith({ active: true, kind: 'image', relativePath: 'modulos/avisos/a/1.png', title: '', text: '' })
+    expect(mocks.publishCarousel).toHaveBeenLastCalledWith({ active: true, kind: 'image', relativePath: 'modulos/avisos/a/1.png', title: '', text: '' , transition: 'none', transitionMs: 250 })
     expect(mocks.publishAnnotation).not.toHaveBeenCalled()
   })
 
   it('com telas estendidas abre a janela; parar fecha e limpa a projeção', async () => {
     mocks.hasTargets.mockResolvedValue(true)
-    await carousel.start(texts(2), { slideMs: 5000, loop: true })
+    await carousel.start(texts(2), { slideMs: 5000, loop: true, transitionEnabled: false, transition: 'fade', transitionSpeed: 'normal' })
     expect(mocks.open).toHaveBeenCalledWith('announcements-carousel')
     expect(carousel.projecting.value).toBe(true)
     mocks.isOpen.mockReturnValue(true)
     carousel.stop()
     expect(mocks.close).toHaveBeenCalled()
-    expect(mocks.publishCarousel).toHaveBeenLastCalledWith({ active: false, kind: null, relativePath: '', title: '', text: '' })
+    expect(mocks.publishCarousel).toHaveBeenLastCalledWith({ active: false, kind: null, relativePath: '', title: '', text: '' , transition: 'none', transitionMs: 250 })
     expect(mocks.publishAnnotation).toHaveBeenLastCalledWith(expect.objectContaining({ active: false }), false)
     expect(carousel.isActive.value).toBe(false)
   })
 
   it('outro módulo tomou a tela: o carrossel para sozinho', async () => {
     mocks.hasTargets.mockResolvedValue(true)
-    await carousel.start(texts(2), { slideMs: 5000, loop: true })
+    await carousel.start(texts(2), { slideMs: 5000, loop: true, transitionEnabled: false, transition: 'fade', transitionSpeed: 'normal' })
     mocks.isOpen.mockReturnValue(false)
     vi.advanceTimersByTime(300)
     expect(carousel.isActive.value).toBe(false)
@@ -187,7 +187,7 @@ describe('useAnnouncementsCarousel', () => {
 
   it('independente com carrossel parado: começa só nela, sem abrir a janela principal', async () => {
     mocks.hasTargets.mockResolvedValue(true)
-    await expect(carousel.prepareIndependent(texts(2), { slideMs: 5000, loop: true })).resolves.toBe(true)
+    await expect(carousel.prepareIndependent(texts(2), { slideMs: 5000, loop: true, transitionEnabled: false, transition: 'fade', transitionSpeed: 'normal' })).resolves.toBe(true)
     expect(mocks.open).not.toHaveBeenCalled()
     expect(carousel.independent.value).toBe(true)
     expect(carousel.status.value).toBe('playing')
@@ -202,13 +202,13 @@ describe('useAnnouncementsCarousel', () => {
   })
 
   it('independente com lista sem slides não começa', async () => {
-    await expect(carousel.prepareIndependent([], { slideMs: 5000, loop: true })).resolves.toBe(false)
+    await expect(carousel.prepareIndependent([], { slideMs: 5000, loop: true, transitionEnabled: false, transition: 'fade', transitionSpeed: 'normal' })).resolves.toBe(false)
     expect(carousel.independent.value).toBe(false)
   })
 
   it('independente com carrossel rodando passa a publicar nela também; fechar a janela solta o canal', async () => {
-    await carousel.start(texts(3), { slideMs: 5000, loop: true })
-    await carousel.prepareIndependent(texts(1), { slideMs: 1000, loop: false })
+    await carousel.start(texts(3), { slideMs: 5000, loop: true, transitionEnabled: false, transition: 'fade', transitionSpeed: 'normal' })
+    await carousel.prepareIndependent(texts(1), { slideMs: 1000, loop: false, transitionEnabled: false, transition: 'fade', transitionSpeed: 'normal' })
     expect(carousel.total.value).toBe(3)
     vi.advanceTimersByTime(300) // ainda abrindo: não solta
     expect(carousel.independent.value).toBe(true)
@@ -224,8 +224,8 @@ describe('useAnnouncementsCarousel', () => {
 
   it('outro módulo toma as telas mas a independente segue: o carrossel continua', async () => {
     mocks.hasTargets.mockResolvedValue(true)
-    await carousel.start(texts(2), { slideMs: 5000, loop: true })
-    await carousel.prepareIndependent(texts(2), { slideMs: 5000, loop: true })
+    await carousel.start(texts(2), { slideMs: 5000, loop: true, transitionEnabled: false, transition: 'fade', transitionSpeed: 'normal' })
+    await carousel.prepareIndependent(texts(2), { slideMs: 5000, loop: true, transitionEnabled: false, transition: 'fade', transitionSpeed: 'normal' })
     mocks.independentActive.mockReturnValue(true)
     mocks.isOpen.mockReturnValue(false)
     vi.advanceTimersByTime(300)
@@ -234,7 +234,7 @@ describe('useAnnouncementsCarousel', () => {
   })
 
   it('"Projetar em carrossel" manda cada slide às conexões remotas, em ordem, e limpa ao parar', async () => {
-    await carousel.start(texts(2), { slideMs: 5000, loop: true })
+    await carousel.start(texts(2), { slideMs: 5000, loop: true, transitionEnabled: false, transition: 'fade', transitionSpeed: 'normal' })
     await vi.advanceTimersByTimeAsync(5000)
     expect(mocks.projectRouted.mock.calls).toEqual([
       ['liturgy', 'liturgy', { text: 'slide-0' }],
@@ -248,14 +248,14 @@ describe('useAnnouncementsCarousel', () => {
 
   it('conexão remota com erro não trava o carrossel', async () => {
     mocks.projectRouted.mockRejectedValueOnce(new Error('offline'))
-    await carousel.start(texts(2), { slideMs: 5000, loop: true })
+    await carousel.start(texts(2), { slideMs: 5000, loop: true, transitionEnabled: false, transition: 'fade', transitionSpeed: 'normal' })
     await vi.advanceTimersByTimeAsync(5000)
     expect(carousel.index.value).toBe(1)
     expect(mocks.projectRouted).toHaveBeenCalledTimes(2)
   })
 
   it('só na projeção independente não usa a rota remota principal', async () => {
-    await carousel.prepareIndependent(texts(2), { slideMs: 5000, loop: true })
+    await carousel.prepareIndependent(texts(2), { slideMs: 5000, loop: true, transitionEnabled: false, transition: 'fade', transitionSpeed: 'normal' })
     await vi.advanceTimersByTimeAsync(5000)
     carousel.stop()
     await vi.advanceTimersByTimeAsync(0)
@@ -265,7 +265,7 @@ describe('useAnnouncementsCarousel', () => {
   it('mudar tempo e repetição no meio vale a partir do próximo slide; sem carrossel, próximo não faz nada', async () => {
     carousel.next()
     expect(carousel.isActive.value).toBe(false)
-    await carousel.start(texts(3), { slideMs: 5000, loop: false })
+    await carousel.start(texts(3), { slideMs: 5000, loop: false, transitionEnabled: false, transition: 'fade', transitionSpeed: 'normal' })
     carousel.setSlideMs(2000)
     carousel.setLoop(true)
     vi.advanceTimersByTime(5000)

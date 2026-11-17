@@ -198,7 +198,7 @@ describe('AnnouncementsView', () => {
     const carousel = mocks.carousel as ReturnType<typeof makeCarousel>
     await w.find('[data-test="carousel-start"]').trigger('click')
     await flushPromises()
-    expect(carousel.start).toHaveBeenCalledWith([], { slideMs: 5_000, loop: true })
+    expect(carousel.start).toHaveBeenCalledWith([], { slideMs: 5_000, loop: true, transitionEnabled: false, transition: 'fade', transitionSpeed: 'normal' })
     expect(w.find('[data-test="carousel-position"]').text()).toBe('announcements.carousel.position:{"current":1,"total":2}')
 
     await w.find('[data-test="carousel-toggle"]').trigger('click')
@@ -217,7 +217,7 @@ describe('AnnouncementsView', () => {
     expect(carousel.setSlideMs).toHaveBeenCalledTimes(1)
     await w.find('[data-test="carousel-loop"]').setValue(false)
     expect(carousel.setLoop).toHaveBeenCalledWith(false)
-    expect(useAnnouncementsStore().carousel).toEqual({ slideMs: 8000, loop: false })
+    expect(useAnnouncementsStore().carousel).toEqual({ slideMs: 8000, loop: false, transitionEnabled: false, transition: 'fade', transitionSpeed: 'normal' })
 
     await w.find('[data-test="carousel-stop"]').trigger('click')
     expect(w.find('[data-test="carousel-start"]').exists()).toBe(true)
@@ -253,7 +253,7 @@ describe('AnnouncementsView', () => {
     expect(button.props('claimed')).toBe(false)
     const prepare = button.props('beforeProject') as () => Promise<boolean>
     await expect(prepare()).resolves.toBe(true)
-    expect(carousel.prepareIndependent).toHaveBeenCalledWith([], { slideMs: 5_000, loop: true })
+    expect(carousel.prepareIndependent).toHaveBeenCalledWith([], { slideMs: 5_000, loop: true, transitionEnabled: false, transition: 'fade', transitionSpeed: 'normal' })
     carousel.prepareIndependent.mockResolvedValueOnce(false)
     await expect(prepare()).resolves.toBe(false)
     await flushPromises()

@@ -38,8 +38,9 @@ vi.mock('../../../settings/services/stage-settings-runtime', () => ({
   readEffectiveStageSettings: () => JSON.parse(JSON.stringify(stageSettings.settings)),
   subscribeStageSettings: stageSettings.subscribe,
 }))
-vi.mock('../../../settings/types/stage-settings', () => ({
-  stageBgCss: (color: string | null) => color ?? 'transparent',
+vi.mock('../../../settings/types/stage-settings', async (importOriginal) => ({
+  // resolveReturnScreen / returnNextFontSize reais (personalização da tela de retorno)
+  ...(await importOriginal<typeof import('../../../settings/types/stage-settings')>()),
   resolveBackgroundImage: (bg: unknown) => (bg ? String(bg) : null),
   stageBgCss: (c: unknown) => (c ? String(c) : 'transparent'),
 }))
