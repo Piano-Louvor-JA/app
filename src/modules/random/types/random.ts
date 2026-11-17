@@ -10,6 +10,8 @@ export interface RandomDisplayConfig {
   bgColor: string
   textColor: string
   fontSizePc: number
+  /** Fonte da lista "Sorteados" na projeção, em % (400 = padrão). */
+  drawnSizePc: number
   textTransform: RandomTextTransform
   animationSpeed: RandomAnimationSpeed
   /** Áudio padrão do sistema ou arquivo escolhido pelo usuário. */
@@ -61,6 +63,7 @@ export const DEFAULT_RANDOM_DISPLAY_CONFIG: RandomDisplayConfig = {
   bgColor: '#000000',
   textColor: '#FFFFFF',
   fontSizePc: 8,
+  drawnSizePc: 400,
   textTransform: 'none',
   animationSpeed: 'normal',
   audioSource: 'default',
@@ -158,7 +161,11 @@ export const RANDOM_AUDIO_REL_DIR = 'modulos/sorteios'
 export const RANDOM_MAX_RANGE_SIZE = 100_000
 
 export const RANDOM_FONT_SIZE_MIN = 4
-export const RANDOM_FONT_SIZE_MAX = 14
+export const RANDOM_FONT_SIZE_MAX = 28
+
+export const RANDOM_DRAWN_SIZE_MIN = 200
+export const RANDOM_DRAWN_SIZE_MAX = 600
+export const RANDOM_DRAWN_SIZE_STEP = 10
 
 export function emptyModePool(): RandomModePool {
   return {
