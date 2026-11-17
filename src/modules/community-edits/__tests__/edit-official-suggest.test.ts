@@ -122,7 +122,22 @@ describe('MediaEditorView — editar música oficial como sugestão (RF-01)', ()
     vi.mocked(resolveMediaTrack).mockClear();
   });
 
-  it('RED ?editOfficial=42: carrega letra oficial no editor em modo sugestão', async () => {
+  it('carrega o edit local existente no editor oficial', async () => {
+    saveLocalEdit(42, {
+      lyrics: JSON.stringify([
+        { order: 1, lyric: 'Estrofe local A', showSlide: true, time: '00:03', instrumentalTime: '', imageUrl: null, imagePosition: null, frameDataUrl: null },
+        { order: 2, lyric: 'Estrofe local B', showSlide: true, time: '00:07', instrumentalTime: '', imageUrl: null, imagePosition: null, frameDataUrl: null },
+      ]),
+    });
+
+    const w = await mountEditor({ editOfficial: '42' });
+
+    expect((w.find('[data-testid="edit-official-lyric-0"]').element as HTMLTextAreaElement).value).toBe('Estrofe local A');
+    expect((w.find('[data-testid="edit-official-lyric-1"]').element as HTMLTextAreaElement).value).toBe('Estrofe local B');
+    expect((w.find('input[type="time"]').element as HTMLInputElement).value).toBe('00:03');
+  });
+
+  it('carrega letra oficial no editor em modo sugestão sem edit local', async () => {
     const w = await mountEditor({ editOfficial: '42' });
     // letra oficial aparece no editor (textarea/input de estrofe com conteúdo)
     const html = w.html();
