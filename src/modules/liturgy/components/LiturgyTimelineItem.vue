@@ -119,6 +119,10 @@ const rootEl = ref<HTMLElement | null>(null)
 let dragGhostEl: HTMLElement | null = null
 
 const isCategory = computed(() => props.item.type === 'category')
+/** Categoria usa a cor de realce do tema; os itens mantêm a cor do tipo. */
+const categoryOrItemAccent = computed(() =>
+  isCategory.value ? 'var(--ds-color-primary)' : props.item.accentColor,
+)
 
 const OFFLINE_ICONS: Record<Exclude<OnlineVideoItemStatus['state'], 'none'>, string> = {
   queued: 'ti-clock',
@@ -489,7 +493,6 @@ const projectActionTitle = computed(() => {
       'liturgy-item--dimmed': isDimmed,
       'liturgy-item--drag-source': isDragSource,
     }"
-    :style="isCategory && item.accentColor ? { '--liturgy-category-accent': item.accentColor } : undefined"
     @mouseenter="rowHovered = true"
     @mouseleave="rowHovered = false"
     @dragover.prevent
@@ -564,8 +567,8 @@ const projectActionTitle = computed(() => {
             item.done && !showInProgress
               ? undefined
               : {
-                  color: item.accentColor,
-                  background: `color-mix(in srgb, ${item.accentColor} 18%, transparent)`,
+                  color: categoryOrItemAccent,
+                  background: `color-mix(in srgb, ${categoryOrItemAccent} 18%, transparent)`,
                 }
           "
         >
@@ -1231,7 +1234,8 @@ const projectActionTitle = computed(() => {
 // Categoria/separador: cabeçalho de seção, não pode se confundir com os
 // sub-itens. Fundo tingido pela cor da categoria + barra lateral grossa.
 .liturgy-item--category {
-  --liturgy-category-accent-color: var(--liturgy-category-accent, var(--ds-color-primary));
+  // Segue a cor de realce do tema (Aparência), não a cor salva no item.
+  --liturgy-category-accent-color: var(--ds-color-primary);
 
   .liturgy-item__card {
     padding-top: 0.8rem;
