@@ -147,6 +147,8 @@ describe('MediaEditorView — editar música oficial como sugestão (RF-01)', ()
   });
 
   it('RED salvar grava saveLocalEdit com JSON de slides (letra+timing) e não faz PUT', async () => {
+    // Spy global de rede: a invariante "nada vai ao catálogo oficial" é TESTADA, não presumida.
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('rede bloqueada no teste'));
     const w = await mountEditor({ editOfficial: '42' });
     // editar primeira estrofe
     const ta = w.find('[data-testid="edit-official-lyric-0"]');
@@ -163,8 +165,10 @@ describe('MediaEditorView — editar música oficial como sugestão (RF-01)', ()
     const slides = JSON.parse(edit!.lyrics ?? '[]') as Array<{ lyric?: string }>;
     expect(slides[0]?.lyric).toBe('Estrofe corrigida A');
     expect(slides[1]?.lyric).toBe('Estrofe original B'); // parcial preserva
-    // escopo restrito: save não altera catálogo (nenhum PUT já que editor oficial não faz PUT)
+    // invariante RF-01: salvamento é SOMENTE local — zero chamadas de rede no fluxo do save
+    expect(fetchSpy).not.toHaveBeenCalled();
     expect(w.text()).toContain('salva localmente');
+    fetchSpy.mockRestore();
   });
 
   it('RED resolver prioriza edit local na reprodução (paridade com fase 1)', async () => {
