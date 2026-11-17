@@ -489,6 +489,7 @@ const projectActionTitle = computed(() => {
       'liturgy-item--dimmed': isDimmed,
       'liturgy-item--drag-source': isDragSource,
     }"
+    :style="isCategory && item.accentColor ? { '--liturgy-category-accent': item.accentColor } : undefined"
     @mouseenter="rowHovered = true"
     @mouseleave="rowHovered = false"
     @dragover.prevent
@@ -529,6 +530,14 @@ const projectActionTitle = computed(() => {
     </label>
 
     <div class="liturgy-item__card">
+      <span
+        v-if="isCategory && showInProgress"
+        class="liturgy-item__progress"
+        role="progressbar"
+        :aria-label="t('liturgy.inProgress')"
+      >
+        <span class="liturgy-item__progress-bar" />
+      </span>
       <div class="liturgy-item__main">
         <span
           class="liturgy-item__drag"
@@ -1216,6 +1225,114 @@ const projectActionTitle = computed(() => {
   .liturgy-item--linked & {
     padding: 0.55rem 0.75rem;
     border-color: color-mix(in srgb, var(--ds-color-on-surface) 12%, transparent);
+  }
+}
+
+// Categoria/separador: cabeçalho de seção, não pode se confundir com os
+// sub-itens. Fundo tingido pela cor da categoria + barra lateral grossa.
+.liturgy-item--category {
+  --liturgy-category-accent-color: var(--liturgy-category-accent, var(--ds-color-primary));
+
+  .liturgy-item__card {
+    padding-top: 0.8rem;
+    padding-bottom: 0.8rem;
+    border-color: color-mix(in srgb, var(--liturgy-category-accent-color) 38%, transparent);
+    border-left: 4px solid var(--liturgy-category-accent-color);
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--liturgy-category-accent-color) 20%, var(--ds-color-surface-card, #242424)) 0%,
+      color-mix(in srgb, var(--liturgy-category-accent-color) 6%, var(--ds-color-surface-card, #242424)) 100%
+    );
+    box-shadow: 0 4px 14px rgb(0 0 0 / 0.28);
+  }
+
+  &.liturgy-item--pending .liturgy-item__card {
+    opacity: 0.9;
+  }
+
+  &.liturgy-item--pending:hover .liturgy-item__card {
+    opacity: 1;
+  }
+
+  &.liturgy-item--drag-source .liturgy-item__card {
+    border-color: color-mix(in srgb, var(--ds-color-primary) 55%, transparent);
+    box-shadow: 0 0 18px color-mix(in srgb, var(--ds-color-primary) 22%, transparent);
+  }
+
+  &.liturgy-item--selected .liturgy-item__card {
+    border-color: color-mix(in srgb, var(--ds-color-primary) 60%, transparent);
+    border-left-color: var(--ds-color-primary);
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--ds-color-primary) 24%, var(--ds-color-surface-card, #242424)) 0%,
+      color-mix(in srgb, var(--ds-color-primary) 8%, var(--ds-color-surface-card, #242424)) 100%
+    );
+    box-shadow: 0 0 18px color-mix(in srgb, var(--ds-color-primary) 18%, transparent);
+  }
+
+  &.liturgy-item--done .liturgy-item__card {
+    border-left-color: color-mix(in srgb, var(--ds-color-on-surface) 25%, transparent);
+    background: color-mix(in srgb, var(--ds-color-on-surface) 6%, var(--ds-color-surface-card, #242424));
+    box-shadow: none;
+  }
+
+  .liturgy-item__card {
+    position: relative;
+  }
+
+  .liturgy-item__name {
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+  }
+}
+
+// Barra contínua na base da categoria em andamento (indeterminada: o
+// horário programado não reflete o andamento real do culto).
+.liturgy-item__progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  overflow: hidden;
+  border-bottom-left-radius: 0.6rem;
+  background: color-mix(in srgb, var(--ds-color-primary) 18%, transparent);
+  pointer-events: none;
+}
+
+.liturgy-item__progress-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 35%;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--ds-color-primary) 40%,
+    var(--ds-color-primary) 60%,
+    transparent 100%
+  );
+  box-shadow: 0 0 8px color-mix(in srgb, var(--ds-color-primary) 60%, transparent);
+  animation: liturgy-progress-slide 1.8s ease-in-out infinite;
+}
+
+@keyframes liturgy-progress-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(290%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .liturgy-item__progress-bar {
+    width: 100%;
+    animation: none;
+    background: var(--ds-color-primary);
   }
 }
 
