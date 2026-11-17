@@ -15,7 +15,12 @@ export default {
     "timer": "Секундомер",
     "timerDescription": "Прямой отсчёт на экране",
     "countdown": "Обратный отсчёт",
-    "countdownDescription": "Обратный отсчёт на экране"
+    "countdownDescription": "Обратный отсчёт на экране",
+    "obs": "OBS, сцена и браузер",
+    "sabbathSchool": "Субботняя школа",
+    "sabbathSchoolDescription": "Отсчёт со звуковыми оповещениями Субботней школы",
+    "announcements": "Объявления и презентации",
+    "announcementsDescription": "Уведомления, объявления и презентации для богослужения"
   },
   "clock": {
     "title": "Часы",
@@ -42,6 +47,8 @@ export default {
     "inAppProjection": "Предпросмотр часов",
     "projectionHotkeyHint": "ESC завершает проекцию  ·  Ctrl+Alt+P переключает проекцию и экран оператора",
     "projecting": "В проекции",
-    "backToUtilities": "Вернуться к Таймеру"
+    "backToUtilities": "Вернуться к Таймеру",
+    "chromeDragHint": "Перетащите для перемещения · двойной клик возвращает в угол",
+    "openClock": "Открыть часы"
   }
 }

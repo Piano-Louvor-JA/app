@@ -39,6 +39,22 @@ export default {
     "errors": {
       "loadCatalogFailed": "Impossible de charger les livres et les versions de la Bible.",
       "loadChapterFailed": "Impossible de charger le chapitre sélectionné."
-    }
+    },
+    "smartSearch": {
+      "close": "Fermer",
+      "hint": "Livre, chapitre ou mot — ex. : jn 3:16",
+      "recent": "Récents",
+      "clearRecent": "Effacer",
+      "examples": "Essayez",
+      "tip": "Écrivez comme vous voulez : jn 3:16, jn 3.16, 1 co 13, i corinthiens 13, psaume 23 — ou un mot pour filtrer le chapitre ouvert.",
+      "noResults": "Aucun résultat. Essayez le nom du livre ou un mot.",
+      "chapterCount": "{n} chapitres — cliquez sur un numéro ou tapez",
+      "wholeChapter": "Chapitre entier",
+      "verseCount": "{n} verset(s)",
+      "searchText": "Filtrer « {q} » dans le chapitre",
+      "textSubtitle": "Recherche dans le texte du chapitre ouvert"
+    },
+    "chromeDragHint": "Faites glisser pour déplacer · double-clic pour revenir au coin",
+    "openReader": "Ouvrir la Bible"
   }
 }

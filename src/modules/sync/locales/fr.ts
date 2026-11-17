@@ -40,6 +40,12 @@ export default {
       "downloadServer": "Nous avons interrompu le téléchargement après plusieurs échecs consécutifs — le serveur de médias semble indisponible. {count} fichier(s) n'ont pas pu être téléchargés. Réessayez plus tard.",
       "downloadUnknown": "Une erreur est survenue lors du téléchargement de la compilation.",
       "batchOffline": "Le téléchargement par lots a été annulé car il n'y a pas de connexion internet."
+    },
+    "downloadQueue": {
+      "title": "Téléchargements",
+      "clearFinished": "Effacer les terminés",
+      "retry": "Réessayer",
+      "cancel": "Annuler"
     }
   }
 }

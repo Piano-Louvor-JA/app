@@ -49,6 +49,9 @@ import countdownRu from '@modules/countdown/locales/ru'
 import sabbathSchoolPtBR from '@modules/sabbath-school/locales/pt-BR'
 import sabbathSchoolEn from '@modules/sabbath-school/locales/en'
 import sabbathSchoolEs from '@modules/sabbath-school/locales/es'
+import sabbathSchoolRu from '@modules/sabbath-school/locales/ru'
+import sabbathSchoolUk from '@modules/sabbath-school/locales/uk'
+import sabbathSchoolFr from '@modules/sabbath-school/locales/fr'
 import announcementsPtBR from '@modules/announcements/locales/pt-BR'
 import announcementsEn from '@modules/announcements/locales/en'
 import announcementsEs from '@modules/announcements/locales/es'
@@ -221,7 +224,7 @@ export default createI18n({
       ...syncRu,
       ...timerRu,
       ...authRu,
-      ...sabbathschoolRu,
+      ...sabbathSchoolRu,
       ...announcementsRu,
     },
     uk: {
@@ -239,7 +242,7 @@ export default createI18n({
       ...syncUk,
       ...timerUk,
       ...authUk,
-      ...sabbathschoolUk,
+      ...sabbathSchoolUk,
       ...announcementsUk,
     },
     fr: {
@@ -257,7 +260,7 @@ export default createI18n({
       ...syncFr,
       ...timerFr,
       ...authFr,
-      ...sabbathschoolFr,
+      ...sabbathSchoolFr,
       ...announcementsFr,
     },
   },

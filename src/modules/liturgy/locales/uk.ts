@@ -151,7 +151,15 @@ export default {
         "internal": "Внутрішні медіа",
         "external": "Зовнішні медіа/Посилання",
         "legacy": "Застарілі"
-      }
+      },
+      "rotationField": "Запланована програма",
+      "categoryOptionalHint": "Необов'язково — елементи без категорії залишаються в корені літургії.",
+      "videoInfoLoading": "Пошук назви та даних відео…",
+      "videoChannel": "Канал: {name}",
+      "siteInfoLoading": "Завантаження назви та даних сторінки…",
+      "siteName": "Сайт: {name}",
+      "titleColor": "Колір заголовка",
+      "titleColorDefault": "Стандартний колір"
     },
     "fields": {
       "name": "Назва",
@@ -194,7 +202,8 @@ export default {
       "searchMusic": "Шукати музику…",
       "musicMode": "Режим",
       "musicModeAudio": "Аудіо",
-      "musicModeInstrumental": "Інструментал"
+      "musicModeInstrumental": "Інструментал",
+      "provaiSourceEdition": "Видання «Provai e Vede»"
     },
     "namePlaceholders": {
       "category": "Напр.: Початкове диригування, Початок богослужіння, Вітання, Суботня школа, Божественне богослужіння тощо...",
@@ -252,7 +261,10 @@ export default {
       "collapseCategory": "Згорнути категорію",
       "expandCategory": "Розгорнути категорію",
       "addSubItem": "Додати піделемент",
-      "reorder": "Перетягніть, щоб змінити порядок"
+      "reorder": "Перетягніть, щоб змінити порядок",
+      "playLocalInExternal": "Відтворити локальне медіа у {player}",
+      "projectAnnotation": "Проєктувати анотацію",
+      "stopAnnotationProjection": "Зупинити проєкцію анотації"
     },
     "messages": {
       "confirmDelete": "Видалити цей елемент з літургії?",
@@ -269,13 +281,97 @@ export default {
       "urlMissing": "Вкажіть дійсне посилання для цього елемента.",
       "urlInvalid": "Вказане посилання непридатне для проєктування.",
       "projectionFailed": "Не вдалося відкрити проєктування на налаштованих екранах.",
-      "presentationOfficeMissing": "Щоб проєктувати PPT/PPTX, встановіть LibreOffice (або задайте LIBREOFFICE_PATH)."
+      "presentationOfficeMissing": "Щоб проєктувати PPT/PPTX, встановіть LibreOffice (або задайте LIBREOFFICE_PATH).",
+      "removeItemTitle": "Видалити елемент з літургії",
+      "removeLiturgyTitle": "Видалити окрему літургію",
+      "clearTitle": "Видалити літургію дня",
+      "removeAction": "Видалити",
+      "cancelAction": "Скасувати",
+      "confirmDeleteNamed": "Бажаєте видалити «{name}» з літургії?",
+      "scheduledEmpty": "Немає запланованих елементів на дату цього богослужіння в цій програмі.",
+      "scheduledEmptyForDate": "Немає елемента для {date} у «{rotation}» — додайте його в діалозі «Заплановані елементи».",
+      "scheduledTitle": "Заплановані елементи",
+      "scheduledHint": "Програми за датами — денна літургія автоматично визначає вміст кожної дати (напр., Provai e Vede кварталу).",
+      "scheduledNewRotation": "Нова програма",
+      "scheduledRotationName": "Назва програми (напр.: Provai e Vede, Hino Inicial ES)",
+      "scheduledAddDate": "Додати дату",
+      "scheduledAddSong": "Додати гімн",
+      "scheduledSongNumber": "Номер гімна",
+      "scheduledSongName": "Назва (необов'язково)",
+      "scheduledMoreOptions": "Більше опцій",
+      "scheduledPvOneClick": "Provai e Vede (завантажити квартал)",
+      "scheduledPvUnavailable": "Не вдалося відкрити сторінку кварталу. Перевірте інтернет і спробуйте ще раз.",
+      "scheduledPvDownloading": "Завантаження {done}/{total}…",
+      "scheduledPvDone": "Готово: {created} заплановано ({skipped} вже існували).",
+      "scheduledPvNothing": "Ще не опубліковано жодного майбутнього епізоду.",
+      "scheduledFetchProvai": "Отримати «Вкусите й побачте» (квартал)",
+      "scheduledDownloadSelected": "Завантажити вибрані",
+      "scheduledPasteQuarter": "Вставити квартал",
+      "scheduledPasteHint": "Вставте список кварталу (напр.: 03/10 — початкова: 15 — Поклін). Дати у форматі дд/мм, позиції довільні.",
+      "scheduledPasteHintSimple": "Вставте список кварталу та натисніть «Імпортувати». Кожна позиція стає автоматичною програмою (напр.: 03/10, потім «початкова: 15»).",
+      "scheduledApplyPaste": "Імпортувати",
+      "scheduledUnmapped": "{slots}: позиції без визначеної програми — оберіть програму для кожної з них.",
+      "scheduledDuplicateQuarter": "Дублювати квартал (+4 тижні)",
+      "scheduledEmptyDate": "Немає елементів на цю дату.",
+      "scheduledKind": {
+        "music": "Музика",
+        "file": "Файл",
+        "verse": "Вірш",
+        "annotation": "Нотатка",
+        "onlineVideo": "Онлайн-відео",
+        "online_video": "Онлайн-відео"
+      },
+      "fileMissingOnMachine": "Файл не знайдено на цьому пристрої — шлях надійшов з іншого комп'ютера (синхронізована літургія). Виберіть файл повторно на цьому пристрої."
     },
     "custom": {
       "title": "Окремі літургії",
       "new": "Нова окрема літургія",
       "namePlaceholder": "Назва літургії (напр.: Молодіжне богослужіння 12.07)",
       "empty": "Немає окремих літургій. Створіть одну, щоб почати."
+    },
+    "remove": "Видалити",
+    "videoSelectFile": "Вибрати файл",
+    "offlineVideo": {
+      "queued": "У черзі на завантаження",
+      "resolving": "Підготовка завантаження",
+      "downloading": "Завантаження {progress}%",
+      "muxing": "Завершення завантаження",
+      "ready": "Доступно без інтернету",
+      "error": "Не вдалося завантажити"
+    },
+    "annotationProjection": {
+      "inAppProjection": "Попередній перегляд анотації",
+      "close": "Закрити",
+      "hotkeyHint": "ESC завершує проєкцію  ·  Ctrl+Alt+P перемикає на екран оператора"
+    },
+    "richNotes": {
+      "toolbar": "Форматування тексту",
+      "bold": "Жирний",
+      "italic": "Курсив",
+      "underline": "Підкреслений",
+      "size": "Розмір тексту",
+      "sizeSmall": "Малий",
+      "sizeNormal": "Звичайний",
+      "sizeLarge": "Великий",
+      "sizeTitle": "Заголовок",
+      "color": "Колір тексту",
+      "highlight": "Маркер",
+      "noHighlight": "Без маркера",
+      "bulletList": "Маркований список",
+      "numberedList": "Нумерований список",
+      "alignLeft": "Вирівняти ліворуч",
+      "alignCenter": "Вирівняти по центру",
+      "alignRight": "Вирівняти праворуч",
+      "clear": "Очистити форматування"
+    },
+    "slja": {
+      "importButton": "Імпортувати .slja",
+      "importing": "Імпортування…",
+      "imported": "Імпортовано: {name} ({slides} строф).",
+      "importedLocal": "Імпортовано на цьому пристрої: {name} ({slides} строф) — збережено без облікового запису.",
+      "importedLocalNoImages": "Імпортовано на цьому пристрої: {name} ({slides} строф). Зображення не були збережені на цьому пристрої.",
+      "importFailed": "Недійсний файл .slja.",
+      "importStorageFull": "Локальне сховище заповнене — звільніть місце (видаліть старі локальні пісні) і спробуйте ще раз."
     }
   }
 }

@@ -17,7 +17,28 @@ export default {
       "create": "Créer",
       "export": "Exporter les playlists",
       "import": "Importer les playlists",
-      "empty": "Aucune playlist créée pour l'instant."
+      "empty": "Aucune playlist créée pour l'instant.",
+      "removeTrackTitle": "Retirer de la playlist ?",
+      "removeTrackMessage": "« {title} » quitte « {name} ». La chanson et les fichiers téléchargés restent dans la bibliothèque.",
+      "removeTrackConfirm": "Retirer",
+      "inPlaylist": "Déjà dans cette playlist",
+      "addMusic": "Ajouter des chansons",
+      "addMusicHint": "Ajouter des chansons : rechercher des chansons pour cette playlist",
+      "searchMusicHint": "Saisissez le nom, le numéro ou un extrait de la chanson pour effectuer la recherche.",
+      "addedTo": "« {title} » ajoutée à « {name} ».",
+      "alreadyIn": "« {title} » est déjà dans « {name} ».",
+      "saveName": "Enregistrer",
+      "rename": "Renommer la playlist {name}",
+      "newName": "Nouveau nom de la playlist",
+      "deleteTitle": "Supprimer la playlist « {name} » ?",
+      "deleteMessage": "La playlist sera supprimée. Les chants et les fichiers téléchargés seront conservés.",
+      "deleteConfirm": "Supprimer la playlist",
+      "singlePlayHint": "Mode unique : lire uniquement ce chant",
+      "shuffleHint": "Lecture aléatoire : lire tous les chants dans un ordre aléatoire",
+      "playAllHint": "Lire la playlist : lire tous les chants en séquence",
+      "shuffle": "Lecture aléatoire",
+      "playTrack": "Lire {title} dans le mini-lecteur",
+      "reorder": "Glisser pour réordonner (ou utiliser les flèches vers le haut et vers le bas)"
     },
     "title": "Centre multimédia",
     "subtitle": "Albums & Compilations",
@@ -54,6 +75,9 @@ export default {
       "searchEmpty": "Aucun morceau trouvé.",
       "lyricMissing": "Paroles indisponibles pour cette piste.",
       "projectionFailed": "Impossible d'ouvrir la projection sur les écrans configurés."
-    }
+    },
+    "searchExplanation": "La recherche porte sur le titre, le recueil et les paroles du chant. Certains résultats peuvent correspondre uniquement à un extrait des paroles.",
+    "appendQueue": "Ajouter à la file d'attente",
+    "appendedToQueue": "Recueil ajouté à la file d'attente"
   }
 }

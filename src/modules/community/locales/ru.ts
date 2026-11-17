@@ -16,7 +16,9 @@ export default {
     "pagination": "Постраничная навигация Сообщества",
     "searchPlaceholder": "Поиск сборника или автора…",
     "clearSearch": "Очистить поиск",
-    "noResults": "По этому запросу ничего не найдено."
+    "noResults": "По этому запросу ничего не найдено.",
+    "conductLink": "Кодекс поведения",
+    "createCollection": "Создать сборник"
   },
   "notifications": {
     "title": "Уведомления",

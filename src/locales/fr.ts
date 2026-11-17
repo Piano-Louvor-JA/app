@@ -1,6 +1,8 @@
 export default {
   "projection": {
-    "confirmClose": "La projection est en cours. Fermer la fenêtre interrompt la musique. Voulez-vous vraiment quitter ?"
+    "confirmClose": "La projection est en cours. Fermer la fenêtre interrompt la musique. Voulez-vous vraiment quitter ?",
+    "minimizeProjection": "Réduire la projection",
+    "restoreProjection": "Restaurer la projection"
   },
   "app": {
     "name": "Louvor JA",
@@ -16,11 +18,17 @@ export default {
     "primary": "Principal",
     "returnScreen": "Écran de retour",
     "selectedCount": "{count} sélectionné(s)",
-    "projectNeedsScreens": "Sélectionnez au moins un écran étendu pour projeter"
+    "projectNeedsScreens": "Sélectionnez au moins un écran étendu pour projeter",
+    "wiredTitle": "Connexions filaires"
   },
   "common": {
     "comingSoon": "Bientôt",
-    "cancel": "Annuler"
+    "cancel": "Annuler",
+    "close": "Fermer",
+    "openFolder": "Ouvrir le dossier",
+    "addToPlaylist": "Ajouter à la playlist",
+    "suggestFix": "Suggérer une correction des paroles/timing",
+    "copied": "Copié !"
   },
   "popupCount": {
     "label": "Écrans",
@@ -41,7 +49,17 @@ export default {
     "liturgy": "Liturgie",
     "bible": "Bible",
     "utilities": "Utilitaires",
-    "settings": "Paramètres"
+    "settings": "Paramètres",
+    "history": {
+      "label": "Historique de navigation",
+      "back": "Retour",
+      "forward": "Suivant",
+      "goTo": "Aller à {label}"
+    },
+    "historyDetail": {
+      "player": "Lecteur",
+      "editor": "Éditeur"
+    }
   },
   "settings": {
     "appearance": {
@@ -114,5 +132,108 @@ export default {
       "media": "Réglages audio, vidéo et lecteur bientôt disponibles.",
       "projection": "Réglages de projection et d'écrans bientôt disponibles."
     }
+  },
+  "palcoOutputs": {
+    "title": "TVs avec Palco",
+    "empty": "Aucune TV avec Palco connectée. Voir sur Palco",
+    "onHold": "{slot} · en attente"
+  },
+  "obsOutputs": {
+    "detecting": "Détection et mise à jour des connexions OBS…",
+    "active": "Connexions distantes",
+    "activateHint": "Activez une connexion dans Paramètres → Diffusion pour l'utiliser ici.",
+    "title": "Connexions OBS",
+    "activeConnections": "Connexions actives : {count}"
+  },
+  "floating": {
+    "closeTitle": "Fermer {title} ?",
+    "closeMessage": "Voulez-vous quitter cette fonctionnalité et fermer votre projection ?"
+  },
+  "updates": {
+    "downloadMacInstaller": "Télécharger le programme d'installation macOS",
+    "manualMacInstructions": "Sur macOS, cette mise à jour s'installe manuellement. Téléchargez le programme d'installation via le bouton ci-dessous, fermez LouvorJA, ouvrez le fichier DMG et faites glisser l'application vers Applications, en remplaçant la version précédente. Vos données et préférences seront conservées."
+  },
+  "windowControls": {
+    "close": "Fermer",
+    "minimize": "Réduire",
+    "maximize": "Agrandir"
+  },
+  "a11y": {
+    "mainNav": "Navigation principale"
+  },
+  "apiOffline": {
+    "message": "Aucune connexion au service — vérifiez votre connexion Internet",
+    "retrying": "Tentative de reconnexion..."
+  },
+  "independentProjection": {
+    "title": "Projection indépendante",
+    "enableHint": "Activez dans Écrans pour utiliser",
+    "unavailable": "S'active uniquement si des écrans étendus sont disponibles",
+    "hint": "Choisissez un écran. Cette fonctionnalité s'affiche par-dessus ce qui est projeté sur celui-ci ; les autres écrans restent inchangés.",
+    "monitor": "Écran {index}",
+    "activeOn": "Projection indépendante sur l'écran {index}",
+    "stop": "Arrêter la projection indépendante",
+    "sharedOn": "Projection partagée sur l'écran {index}",
+    "modeLabel": "Mode de projection",
+    "status": {
+      "stop": "Arrêter",
+      "overlay": "Superposition sur :",
+      "share": "Partage en cours sur :",
+      "monitor": "Écran {index}"
+    },
+    "mode": {
+      "overlay": "Superposer",
+      "share": "Partager"
+    },
+    "hintShare": "Choisissez un écran. Son affichage est divisé en deux avec ce qui est déjà projeté ; si l'un des côtés quitte, l'autre réoccupe tout l'écran."
+  },
+  "connectedDevices": {
+    "title": "Appareils connectés",
+    "remote": "Contrôle à distance",
+    "speaker": "Défilement du prédicateur",
+    "monitors": "Partage des moniteurs",
+    "none": "Aucun connecté",
+    "monitorsInUse": "{device} ({host}) · {n} moniteur(s)",
+    "palco": "Scène (téléviseurs)",
+    "palcoTv": "{name} · {ip}",
+    "transmission": "Transmissions (OBS/navigateurs)",
+    "transmissionGroup": "{connection} · {page} · {tabs}",
+    "tabs": "1 onglet | {n} onglets",
+    "inObs": "{n} dans OBS",
+    "inBrowser": "{n} dans le navigateur",
+    "and": " et ",
+    "pages": {
+      "espelho": "Miroir",
+      "retorno": "Retour",
+      "legenda": "Sous-titres",
+      "other": "Autre page"
+    }
+  },
+  "minimize": {
+    "playlistCount": "{n} playlist(s)",
+    "pageNumber": "Page {n}",
+    "bar": "Pages minimisées",
+    "close": "Fermer {title}",
+    "page": "Minimiser la page",
+    "search": "Recherche : {q}"
+  },
+  "sync": {
+    "downloadQueue": {
+      "title": "Téléchargements",
+      "clearFinished": "Effacer les terminés",
+      "retry": "Réessayer",
+      "cancel": "Annuler"
+    }
+  },
+  "sljaMigration": {
+    "title": "Envoyer {count} hymne(s) importé(s) vers votre compte ?",
+    "message": "Vous avez importé des fichiers .slja sans être connecté. Ils peuvent être ajoutés à votre compte (une seule copie, sans doublon) et être disponibles sur n'importe quel appareil.",
+    "confirm": "Envoyer vers le compte",
+    "cancel": "Garder uniquement sur cet appareil"
+  },
+  "download": {
+    "indicatorTitle": "Téléchargements en arrière-plan : {done}/{total} ({percent}%)",
+    "indicatorCounts": "{done} sur {total} terminés",
+    "indicatorIdle": "Préparation du téléchargement…"
   }
 }

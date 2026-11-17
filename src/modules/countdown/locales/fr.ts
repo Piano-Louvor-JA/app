@@ -2,8 +2,6 @@ export default {
   "countdown": {
     "title": "Minuteur",
     "config": "Personnaliser",
-    "configTitle": "Personnalisation de la projection",
-    "configSubtitle": "Ajustez l'apparence du minuteur à l'écran",
     "timeFormat": "Format du temps",
     "timeFormatHint": "Choisissez comment le temps restant sera affiché",
     "bgColor": "Couleur de fond",
@@ -29,15 +27,15 @@ export default {
     "removeSaved": "Supprimer le temps enregistré",
     "duration": "Durée",
     "durationHint": "Définissez la durée du compte à rebours",
-    "mode": "Mode du compte à rebours",
-    "modeDuration": "Durée",
-    "modeUntil": "Jusqu'à",
-    "until": "Heure de fin",
-    "untilHour": "Heure",
-    "untilMinute": "Minute",
     "hours": "Heures",
     "minutes": "Minutes",
     "seconds": "Secondes",
-    "finished": "Temps écoulé"
+    "finished": "Temps écoulé",
+    "moduleConfig": "Paramètres du module",
+    "allowNegative": "Continuer après zéro",
+    "allowNegativeHint": "Le minuteur continue en négatif en clignotant en rouge (style École du Sabbat)",
+    "personalize": "Personnaliser",
+    "chromeDragHint": "Glisser pour déplacer · double-clic pour revenir au coin",
+    "openTimer": "Ouvrir le Timer"
   }
 }

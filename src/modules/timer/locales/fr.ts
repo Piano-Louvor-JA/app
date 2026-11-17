@@ -27,6 +27,8 @@ export default {
     "savedTimes": "Temps enregistrés",
     "clearAll": "Tout effacer",
     "noSavedTimes": "Aucun temps enregistré",
-    "removeSaved": "Supprimer le temps enregistré"
+    "removeSaved": "Supprimer le temps enregistré",
+    "chromeDragHint": "Glissez pour déplacer · double-clic pour revenir au coin",
+    "openStopwatch": "Ouvrir le chronomètre"
   }
 }

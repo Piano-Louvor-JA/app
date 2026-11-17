@@ -24,7 +24,9 @@ export default {
     "inAppProjection": "Попередній перегляд годинника",
     "projectionHotkeyHint": "ESC завершує проєкцію  ·  Ctrl+Alt+P перемикає з екраном оператора",
     "projecting": "На проєкції",
-    "backToUtilities": "Повернутися до Таймера"
+    "backToUtilities": "Повернутися до Таймера",
+    "chromeDragHint": "Перетягніть, щоб перемістити · подвійний клік повертає в кут",
+    "openClock": "Відкрити годинник"
   },
   "utilities": {
     "title": "Утиліти",
@@ -42,6 +44,11 @@ export default {
     "timer": "Секундомір",
     "timerDescription": "Проєкція відліку часу вперед",
     "countdown": "Зворотний відлік",
-    "countdownDescription": "Проєкція зворотного відліку"
+    "countdownDescription": "Проєкція зворотного відліку",
+    "obs": "OBS, Сцена та Браузер",
+    "sabbathSchool": "Суботня школа",
+    "sabbathSchoolDescription": "Відлік часу зі звуковими сигналами Суботньої школи",
+    "announcements": "Оголошення та презентації",
+    "announcementsDescription": "Повідомлення, оголошення та презентації для богослужіння"
   }
 }

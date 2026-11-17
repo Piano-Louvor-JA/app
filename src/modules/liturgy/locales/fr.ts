@@ -151,7 +151,15 @@ export default {
         "internal": "Médias internes",
         "external": "Médias externes/Lien",
         "legacy": "Ancien"
-      }
+      },
+      "rotationField": "Programmation planifiée",
+      "categoryOptionalHint": "Facultatif — les éléments sans catégorie restent à la racine de la liturgie.",
+      "videoInfoLoading": "Recherche du titre et des données de la vidéo…",
+      "videoChannel": "Chaîne : {name}",
+      "siteInfoLoading": "Récupération du titre et des données de la page…",
+      "siteName": "Site : {name}",
+      "titleColor": "Couleur du titre",
+      "titleColorDefault": "Couleur par défaut"
     },
     "fields": {
       "name": "Nom",
@@ -194,7 +202,8 @@ export default {
       "searchMusic": "Rechercher une musique…",
       "musicMode": "Mode",
       "musicModeAudio": "Audio",
-      "musicModeInstrumental": "Instrumental"
+      "musicModeInstrumental": "Instrumental",
+      "provaiSourceEdition": "Édition de Gouttez et voyez"
     },
     "namePlaceholders": {
       "category": "Ex : Direction chorale, Ouverture du culte, Bienvenue, École du sabbat, Culte divin, etc…",
@@ -252,7 +261,10 @@ export default {
       "collapseCategory": "Réduire la catégorie",
       "expandCategory": "Développer la catégorie",
       "addSubItem": "Ajouter un sous-élément",
-      "reorder": "Glisser pour réorganiser"
+      "reorder": "Glisser pour réorganiser",
+      "playLocalInExternal": "Lire le média local dans {player}",
+      "projectAnnotation": "Projeter l'annotation",
+      "stopAnnotationProjection": "Arrêter la projection de l'annotation"
     },
     "messages": {
       "confirmDelete": "Voulez-vous supprimer cet élément de la liturgie ?",
@@ -269,13 +281,97 @@ export default {
       "urlMissing": "Saisissez un lien valide dans cet élément.",
       "urlInvalid": "Le lien saisi n'est pas valide pour la projection.",
       "projectionFailed": "Impossible d'ouvrir la projection sur les écrans configurés.",
-      "presentationOfficeMissing": "Pour projeter des PPT/PPTX, installez LibreOffice (ou définissez LIBREOFFICE_PATH)."
+      "presentationOfficeMissing": "Pour projeter des PPT/PPTX, installez LibreOffice (ou définissez LIBREOFFICE_PATH).",
+      "removeItemTitle": "Supprimer l'élément de la liturgie",
+      "removeLiturgyTitle": "Supprimer la liturgie autonome",
+      "clearTitle": "Effacer la liturgie du jour",
+      "removeAction": "Supprimer",
+      "cancelAction": "Annuler",
+      "confirmDeleteNamed": "Voulez-vous supprimer « {name} » de la liturgie ?",
+      "scheduledEmpty": "Aucun élément n'est programmé pour la date de ce culte dans ce programme.",
+      "scheduledEmptyForDate": "Aucun élément pour {date} dans \"{rotation}\" — enregistrez-le dans la boîte de dialogue des Éléments programmés.",
+      "scheduledTitle": "Éléments programmés",
+      "scheduledHint": "Programmations par date — la liturgie du jour résout automatiquement le contenu de chaque date (ex. : Provai e Vede du trimestre).",
+      "scheduledNewRotation": "Nouvelle programmation",
+      "scheduledRotationName": "Nom de la programmation (ex. : Provai e Vede, Hymne d'ouverture ES)",
+      "scheduledAddDate": "Ajouter une date",
+      "scheduledAddSong": "Ajouter un hymne",
+      "scheduledSongNumber": "Numéro de l'hymne",
+      "scheduledSongName": "Titre (facultatif)",
+      "scheduledMoreOptions": "Plus d'options",
+      "scheduledPvOneClick": "Provai e Vede (télécharger le trimestre)",
+      "scheduledPvUnavailable": "Impossible d'accéder à la page du trimestre pour le moment. Vérifiez votre connexion Internet et réessayez.",
+      "scheduledPvDownloading": "Téléchargement {done}/{total}…",
+      "scheduledPvDone": "Terminé : {created} programmés ({skipped} existaient déjà).",
+      "scheduledPvNothing": "Aucun épisode futur n'a encore été publié.",
+      "scheduledFetchProvai": "Rechercher Provai e Vede (trimestre)",
+      "scheduledDownloadSelected": "Télécharger la sélection",
+      "scheduledPasteQuarter": "Coller le trimestre",
+      "scheduledPasteHint": "Collez la liste du trimestre (ex. : 03/10 — initial : 15 — Adoration). Dates jj/mm, positions libres.",
+      "scheduledPasteHintSimple": "Collez la liste du trimestre et cliquez sur Importer. Chaque position devient une programmation automatique (ex. : 03/10, puis « initial : 15 »).",
+      "scheduledApplyPaste": "Importer",
+      "scheduledUnmapped": "{slots} : positions sans programmation définie — choisissez la programmation de chacune.",
+      "scheduledDuplicateQuarter": "Dupliquer le trimestre (+4 semaines)",
+      "scheduledEmptyDate": "Aucun élément à cette date.",
+      "scheduledKind": {
+        "music": "Musique",
+        "file": "Fichier",
+        "verse": "Verset",
+        "annotation": "Annotation",
+        "onlineVideo": "Vidéo en ligne",
+        "online_video": "Vidéo en ligne"
+      },
+      "fileMissingOnMachine": "Fichier introuvable sur cette machine — le chemin provient d'un autre ordinateur (liturgie synchronisée). Sélectionnez à nouveau le fichier sur cet appareil."
     },
     "custom": {
       "title": "Liturgies ponctuelles",
       "new": "Nouvelle liturgie ponctuelle",
       "namePlaceholder": "Nom de la liturgie (ex. : Culte des jeunes 12/07)",
       "empty": "Aucune liturgie ponctuelle. Créez-en une pour commencer."
+    },
+    "remove": "Supprimer",
+    "videoSelectFile": "Sélectionner un fichier",
+    "offlineVideo": {
+      "queued": "En attente de téléchargement",
+      "resolving": "Préparation du téléchargement",
+      "downloading": "Téléchargement {progress}%",
+      "muxing": "Finalisation du téléchargement",
+      "ready": "Prêt hors ligne",
+      "error": "Impossible de télécharger"
+    },
+    "annotationProjection": {
+      "inAppProjection": "Aperçu de l'annotation",
+      "close": "Fermer",
+      "hotkeyHint": "ESC met fin à la projection  ·  Ctrl+Alt+P bascule vers l'écran de l'opérateur"
+    },
+    "richNotes": {
+      "toolbar": "Mise en forme du texte",
+      "bold": "Gras",
+      "italic": "Italique",
+      "underline": "Souligné",
+      "size": "Taille du texte",
+      "sizeSmall": "Petit",
+      "sizeNormal": "Normal",
+      "sizeLarge": "Grand",
+      "sizeTitle": "Titre",
+      "color": "Couleur du texte",
+      "highlight": "Surlignage",
+      "noHighlight": "Sans surlignage",
+      "bulletList": "Liste à puces",
+      "numberedList": "Liste numérotée",
+      "alignLeft": "Aligner à gauche",
+      "alignCenter": "Centrer",
+      "alignRight": "Aligner à droite",
+      "clear": "Effacer la mise en forme"
+    },
+    "slja": {
+      "importButton": "Importer .slja",
+      "importing": "Importation…",
+      "imported": "Importé : {name} ({slides} strophes).",
+      "importedLocal": "Importé sur cet appareil : {name} ({slides} strophes) — enregistré sans compte.",
+      "importedLocalNoImages": "Importé sur cet appareil : {name} ({slides} strophes). Les images n'ont pas été enregistrées sur cet appareil.",
+      "importFailed": "Fichier .slja invalide.",
+      "importStorageFull": "Stockage local plein — libérez de l'espace (supprimez les anciens chants locaux), puis réessayez."
     }
   }
 }

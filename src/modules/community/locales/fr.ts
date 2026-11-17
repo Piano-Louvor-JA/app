@@ -16,7 +16,9 @@ export default {
     "pagination": "Pagination de la Communauté",
     "searchPlaceholder": "Rechercher une collection ou un auteur...",
     "clearSearch": "Effacer la recherche",
-    "noResults": "Aucun résultat pour cette recherche."
+    "noResults": "Aucun résultat pour cette recherche.",
+    "conductLink": "Code de conduite",
+    "createCollection": "Créer une collection"
   },
   "ranking": {
     "title": "Classement",

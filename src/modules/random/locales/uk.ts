@@ -68,6 +68,8 @@ export default {
     "projecting": "На проєкції",
     "decreaseFont": "Зменшити шрифт",
     "increaseFont": "Збільшити шрифт",
-    "placeholderDisplay": "- - - -"
+    "placeholderDisplay": "- - - -",
+    "chromeDragHint": "Перетягніть, щоб перемістити · подвійний клік повертає у кут",
+    "openRandom": "Відкрити жеребкування"
   }
 }

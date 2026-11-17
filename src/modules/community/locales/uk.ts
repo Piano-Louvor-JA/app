@@ -16,7 +16,9 @@ export default {
     "pagination": "Пагінація Спільноти",
     "searchPlaceholder": "Шукати збірку або автора...",
     "clearSearch": "Очистити пошук",
-    "noResults": "За цим запитом нічого не знайдено."
+    "noResults": "За цим запитом нічого не знайдено.",
+    "conductLink": "Кодекс поведінки",
+    "createCollection": "Створити збірку"
   },
   "notifications": {
     "title": "Сповіщення",

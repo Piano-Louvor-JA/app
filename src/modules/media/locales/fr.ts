@@ -9,7 +9,12 @@ export default {
       "ranking": "Les +10 pts n'entrent dans le classement qu'après l'approbation de la modération.",
       "showRules": "Voir les règles de la communauté",
       "gotIt": "Compris",
-      "linkLabel": "Règles de la communauté"
+      "linkLabel": "Règles de la communauté",
+      "conduct": {
+        "title": "Conduite",
+        "summary": "Publiez du contenu qui glorifie Dieu, avec un message authentique et dans le respect des droits d'auteur. Les contenus inappropriés ou contraires aux croyances adventistes, ainsi que le spam et le harcèlement, ne sont pas autorisés. Les signalements et les avertissements font l'objet d'une modération transparente avec droit de recours."
+      },
+      "readFull": "Lire le Code complet"
     },
     "visibility": {
       "label": "Confidentialité",
@@ -75,6 +80,48 @@ export default {
       "slidesOnlyNotDownloaded": "Audio indisponible (recueil non téléchargé). Projection des slides uniquement.",
       "slidesOnlyNoAudio": "Audio indisponible pour cette piste. Projection des slides uniquement.",
       "playbackFailed": "Impossible de démarrer la lecture de l'audio."
-    }
+    },
+    "reorderQueue": "Glisser pour réorganiser (ou utiliser les flèches vers le haut et vers le bas)",
+    "shuffleQueueApplied": "Mode aléatoire activé. À partir du prochain morceau, la lecture sera aléatoire.",
+    "sequentialQueueApplied": "Mode séquentiel activé. À partir du prochain morceau, la lecture suivra la séquence.",
+    "shuffleQueue": "Lecture aléatoire",
+    "playQueueSequential": "Lire la playlist en séquence",
+    "exitFullscreen": "Quitter le plein écran",
+    "editor": {
+      "importSlja": "Importer un fichier .slja",
+      "exportSlja": "Exporter le morceau actuel en .slja",
+      "changeCover": "Modifier la pochette de la compilation",
+      "removeCover": "Supprimer la pochette",
+      "newCollection": "Nouvelle collection…",
+      "renameCollection": "Renommer la collection…",
+      "collectionRenamed": "Collection renommée en \"{name}\"",
+      "renameFailed": "Échec du renommage de la collection",
+      "deleteCollection": "Supprimer la collection sélectionnée",
+      "newMusic": "Nouveau chant…",
+      "reuseMusic": "Réutiliser un chant existant…",
+      "searchOfficial": "Rechercher un hymne officiel (n° ou nom)…",
+      "addFirstResult": "Ajouter le 1er résultat",
+      "officialHymn": "Hymne officiel (géré dans le catalogue)",
+      "deleteMusic": "Supprimer le chant sélectionné",
+      "linkAudio": "Lier un fichier audio (MP3) au chant",
+      "removeAudio": "Supprimer l'audio lié",
+      "markTiming": "Marquer l'instant actuel de l'audio comme timing de cette strophe",
+      "deleteStanza": "Supprimer la strophe",
+      "lyricPlaceholder": "Paroles de la strophe…",
+      "hideLyric": "Masquer les paroles",
+      "showLyric": "Afficher les paroles",
+      "delete": "Supprimer",
+      "cancel": "Annuler"
+    },
+    "account": {
+      "email": "E-mail",
+      "password": "Mot de passe",
+      "yourName": "Votre nom",
+      "passwordMin6": "Mot de passe (min. 6)",
+      "accountEmail": "E-mail du compte",
+      "resetToken": "Jeton de réinitialisation",
+      "newPasswordMin8": "Nouveau mot de passe (min. 8)"
+    },
+    "chromeDragHint": "Glissez pour déplacer · double-clic pour revenir au coin"
   }
 }

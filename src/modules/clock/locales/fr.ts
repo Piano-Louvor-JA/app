@@ -24,7 +24,9 @@ export default {
     "inAppProjection": "Aperçu de l'horloge",
     "projectionHotkeyHint": "ESC met fin à la projection  ·  Ctrl+Alt+P bascule avec l'écran de l'opérateur",
     "projecting": "En projection",
-    "backToUtilities": "Retour au Minuteur"
+    "backToUtilities": "Retour au Minuteur",
+    "chromeDragHint": "Glissez pour déplacer · double-clic pour revenir au coin",
+    "openClock": "Ouvrir l'Horloge"
   },
   "utilities": {
     "title": "Utilitaires",
@@ -42,6 +44,11 @@ export default {
     "timer": "Chronomètre",
     "timerDescription": "Comptage croissant projeté",
     "countdown": "Compte à rebours",
-    "countdownDescription": "Compte à rebours projeté"
+    "countdownDescription": "Compte à rebours projeté",
+    "obs": "OBS, Scène et Navigateur",
+    "sabbathSchool": "École Sabbatique",
+    "sabbathSchoolDescription": "Compte à rebours avec les alertes sonores de l'École Sabbatique",
+    "announcements": "Annonces et présentations",
+    "announcementsDescription": "Avis, annonces et présentations pour le culte"
   }
 }

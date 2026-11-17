@@ -2,8 +2,6 @@ export default {
   "countdown": {
     "title": "Таймер",
     "config": "Налаштувати",
-    "configTitle": "Персоналізація проєкції",
-    "configSubtitle": "Налаштуйте вигляд таймера на екрані",
     "timeFormat": "Формат часу",
     "timeFormatHint": "Виберіть, як відображатиметься час, що залишився",
     "bgColor": "Колір фону",
@@ -29,15 +27,15 @@ export default {
     "removeSaved": "Видалити збережений час",
     "duration": "Тривалість",
     "durationHint": "Встановіть час зворотного відліку",
-    "mode": "Режим відліку",
-    "modeDuration": "Тривалість",
-    "modeUntil": "До часу",
-    "until": "Час завершення",
-    "untilHour": "Година",
-    "untilMinute": "Хвилина",
     "hours": "Години",
     "minutes": "Хвилини",
     "seconds": "Секунди",
-    "finished": "Час вичерпано"
+    "finished": "Час вичерпано",
+    "moduleConfig": "Налаштування модуля",
+    "allowNegative": "Продовжувати після нуля",
+    "allowNegativeHint": "Таймер іде в мінус, блимаючи червоним (у стилі Суботньої школи)",
+    "personalize": "Персоналізувати",
+    "chromeDragHint": "Перетягніть, щоб перемістити · подвійний клік повертає в кут",
+    "openTimer": "Відкрити Таймер"
   }
 }

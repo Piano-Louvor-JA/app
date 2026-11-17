@@ -131,10 +131,10 @@ describe('GeneralView.vue', () => {
     expect(wrapper.find('.general-settings__lang-options').exists()).toBe(true)
   })
 
-  it('renderiza 2 botoes de idioma (pt-BR, es) -- EN desabilitado temporariamente', () => {
+  it('renderiza 3 botoes de idioma (pt-BR, es, uk) -- EN/ru/fr desabilitados temporariamente', () => {
     const wrapper = mountComponent()
     const buttons = wrapper.findAll('.general-settings__lang-btn')
-    expect(buttons).toHaveLength(2)
+    expect(buttons).toHaveLength(3)
   })
 
   it('marca o botao pt-BR como ativo por padrao', () => {

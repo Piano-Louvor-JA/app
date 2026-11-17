@@ -68,6 +68,8 @@ export default {
     "projecting": "En projection",
     "decreaseFont": "Réduire la police",
     "increaseFont": "Augmenter la police",
-    "placeholderDisplay": "- - - -"
+    "placeholderDisplay": "- - - -",
+    "chromeDragHint": "Glissez pour déplacer · double-clic pour revenir au coin",
+    "openRandom": "Ouvrir le tirage au sort"
   }
 }

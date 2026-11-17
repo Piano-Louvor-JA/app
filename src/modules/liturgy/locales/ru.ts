@@ -151,7 +151,15 @@ export default {
         "internal": "Внутренние медиа",
         "external": "Внешние медиа/Ссылка",
         "legacy": "Устаревшие"
-      }
+      },
+      "rotationField": "Запланированная программа",
+      "categoryOptionalHint": "Необязательно — элементы без категории остаются в корне литургии.",
+      "videoInfoLoading": "Получение названия и данных видео…",
+      "videoChannel": "Канал: {name}",
+      "siteInfoLoading": "Загрузка заголовка и данных страницы…",
+      "siteName": "Сайт: {name}",
+      "titleColor": "Цвет заголовка",
+      "titleColorDefault": "Цвет по умолчанию"
     },
     "fields": {
       "name": "Название",
@@ -194,7 +202,8 @@ export default {
       "searchMusic": "Поиск музыки…",
       "musicMode": "Режим",
       "musicModeAudio": "Аудио",
-      "musicModeInstrumental": "Инструментал"
+      "musicModeInstrumental": "Инструментал",
+      "provaiSourceEdition": "Издание «Provai e Vede»"
     },
     "namePlaceholders": {
       "category": "Напр.: Дирижирование, Открытие богослужения, Приветствие, Субботская школа, Божественное богослужение и т. д.",
@@ -252,7 +261,10 @@ export default {
       "collapseCategory": "Свернуть категорию",
       "expandCategory": "Развернуть категорию",
       "addSubItem": "Добавить вложенный элемент",
-      "reorder": "Перетащите, чтобы изменить порядок"
+      "reorder": "Перетащите, чтобы изменить порядок",
+      "playLocalInExternal": "Воспроизвести локальный медиафайл в {player}",
+      "projectAnnotation": "Проецировать заметку",
+      "stopAnnotationProjection": "Остановить проекцию заметки"
     },
     "messages": {
       "confirmDelete": "Удалить этот элемент из порядка богослужения?",
@@ -269,13 +281,97 @@ export default {
       "urlMissing": "Укажите действительную ссылку в этом элементе.",
       "urlInvalid": "Указанная ссылка не подходит для проекции.",
       "projectionFailed": "Не удалось открыть проекцию на настроенных экранах.",
-      "presentationOfficeMissing": "Для проекции PPT/PPTX установите LibreOffice (или задайте LIBREOFFICE_PATH)."
+      "presentationOfficeMissing": "Для проекции PPT/PPTX установите LibreOffice (или задайте LIBREOFFICE_PATH).",
+      "removeItemTitle": "Удалить пункт из литургии",
+      "removeLiturgyTitle": "Удалить отдельную литургию",
+      "clearTitle": "Очистить литургию дня",
+      "removeAction": "Удалить",
+      "cancelAction": "Отмена",
+      "confirmDeleteNamed": "Удалить «{name}» из литургии?",
+      "scheduledEmpty": "Для даты этого богослужения в данной программе нет запланированных пунктов.",
+      "scheduledEmptyForDate": "Нет пункта для {date} в «{rotation}» — добавьте его в диалоге «Запланированные пункты».",
+      "scheduledTitle": "Запланированные пункты",
+      "scheduledHint": "Программы по датам — литургия дня автоматически подставляет содержимое для каждой даты (напр.: «Вкусите и увидите» из квартального урока).",
+      "scheduledNewRotation": "Новая программа",
+      "scheduledRotationName": "Название программы (напр.: Вкусите и увидите, Начальный гимн СШ)",
+      "scheduledAddDate": "Добавить дату",
+      "scheduledAddSong": "Добавить гимн",
+      "scheduledSongNumber": "Номер гимна",
+      "scheduledSongName": "Название (необязательно)",
+      "scheduledMoreOptions": "Больше опций",
+      "scheduledPvOneClick": "Вкусите и увидите (скачать квартальный урок)",
+      "scheduledPvUnavailable": "Сейчас не удалось открыть страницу квартального урока. Проверьте подключение к интернету и попробуйте снова.",
+      "scheduledPvDownloading": "Загрузка {done}/{total}…",
+      "scheduledPvDone": "Готово: {created} запланировано ({skipped} уже существовали).",
+      "scheduledPvNothing": "Будущие эпизоды ещё не опубликованы.",
+      "scheduledFetchProvai": "Загрузить «Вкусите и видите» (квартал)",
+      "scheduledDownloadSelected": "Скачать выбранные",
+      "scheduledPasteQuarter": "Вставить квартал",
+      "scheduledPasteHint": "Вставьте список квартала (напр.: 03/10 — начальный: 15 — Поклонение). Даты в формате дд/мм, позиции — произвольные.",
+      "scheduledPasteHintSimple": "Вставьте список квартала и нажмите «Импортировать». Каждая позиция превращается в автоматическую программу (напр.: 03/10, затем «начальный: 15»).",
+      "scheduledApplyPaste": "Импортировать",
+      "scheduledUnmapped": "{slots}: позиции без назначенной программы — выберите программу для каждой.",
+      "scheduledDuplicateQuarter": "Дублировать квартал (+4 недели)",
+      "scheduledEmptyDate": "На эту дату нет элементов.",
+      "scheduledKind": {
+        "music": "Музыка",
+        "file": "Файл",
+        "verse": "Стих",
+        "annotation": "Заметка",
+        "onlineVideo": "Онлайн-видео",
+        "online_video": "Онлайн-видео"
+      },
+      "fileMissingOnMachine": "Файл не найден на этом компьютере — путь получен с другого компьютера (синхронизированная литургия). Выберите файл заново на этом устройстве."
     },
     "custom": {
       "title": "Отдельные порядки богослужения",
       "new": "Новый отдельный порядок богослужения",
       "namePlaceholder": "Название порядка богослужения (напр.: Молодёжное богослужение 12/07)",
       "empty": "Нет отдельных порядков богослужения. Создайте один, чтобы начать."
+    },
+    "remove": "Удалить",
+    "videoSelectFile": "Выбрать файл",
+    "offlineVideo": {
+      "queued": "В очереди на загрузку",
+      "resolving": "Подготовка к загрузке",
+      "downloading": "Загрузка {progress}%",
+      "muxing": "Завершение загрузки",
+      "ready": "Доступно без интернета",
+      "error": "Не удалось загрузить"
+    },
+    "annotationProjection": {
+      "inAppProjection": "Предпросмотр заметки",
+      "close": "Закрыть",
+      "hotkeyHint": "ESC завершает проекцию  ·  Ctrl+Alt+P переключает на экран оператора"
+    },
+    "richNotes": {
+      "toolbar": "Форматирование текста",
+      "bold": "Жирный",
+      "italic": "Курсив",
+      "underline": "Подчёркнутый",
+      "size": "Размер текста",
+      "sizeSmall": "Мелкий",
+      "sizeNormal": "Обычный",
+      "sizeLarge": "Крупный",
+      "sizeTitle": "Заголовок",
+      "color": "Цвет текста",
+      "highlight": "Выделение цветом",
+      "noHighlight": "Без выделения",
+      "bulletList": "Маркированный список",
+      "numberedList": "Нумерованный список",
+      "alignLeft": "По левому краю",
+      "alignCenter": "По центру",
+      "alignRight": "По правому краю",
+      "clear": "Очистить форматирование"
+    },
+    "slja": {
+      "importButton": "Импортировать .slja",
+      "importing": "Импорт…",
+      "imported": "Импортировано: {name} ({slides} куплетов).",
+      "importedLocal": "Импортировано на это устройство: {name} ({slides} куплетов) — сохранено без учётной записи.",
+      "importedLocalNoImages": "Импортировано на это устройство: {name} ({slides} куплетов). Изображения не были сохранены на этом устройстве.",
+      "importFailed": "Неверный файл .slja.",
+      "importStorageFull": "Локальное хранилище заполнено — освободите место (удалите старые локальные песни) и попробуйте снова."
     }
   }
 }

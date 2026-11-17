@@ -2,8 +2,6 @@ export default {
   "countdown": {
     "title": "Таймер",
     "config": "Настроить",
-    "configTitle": "Настройка проекции",
-    "configSubtitle": "Настройте внешний вид таймера на экране",
     "timeFormat": "Формат времени",
     "timeFormatHint": "Выберите, как отображать оставшееся время",
     "bgColor": "Цвет фона",
@@ -29,15 +27,15 @@ export default {
     "removeSaved": "Удалить сохранённый таймер",
     "duration": "Длительность",
     "durationHint": "Задайте время обратного отсчёта",
-    "mode": "Режим отсчёта",
-    "modeDuration": "Длительность",
-    "modeUntil": "До",
-    "until": "Время окончания",
-    "untilHour": "Час",
-    "untilMinute": "Минута",
     "hours": "Часы",
     "minutes": "Минуты",
     "seconds": "Секунды",
-    "finished": "Время вышло"
+    "finished": "Время вышло",
+    "moduleConfig": "Настройки модуля",
+    "allowNegative": "Продолжать после нуля",
+    "allowNegativeHint": "Таймер уходит в минус, мигая красным цветом (в стиле Субботней школы)",
+    "personalize": "Настроить",
+    "chromeDragHint": "Перетащите, чтобы переместить · двойной клик возвращает в угол",
+    "openTimer": "Открыть таймер"
   }
 }
