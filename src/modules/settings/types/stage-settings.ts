@@ -146,6 +146,85 @@ export type StageSettings = {
    * preferência do ESCOPO hymns, nunca global).
    */
   hymns?: { overrideBg: boolean }
+  /**
+   * Tela de retorno (monitor dos músicos), só no escopo hymns. Campo `null`
+   * = igual aos slides de música; sem o sub-objeto, tudo segue os slides.
+   */
+  returnScreen?: ReturnScreenSettings
+}
+
+export type ReturnScreenSettings = {
+  /** px @1920 da frase atual; null = tamanho da letra dos slides. */
+  fontSize: number | null
+  textColor: string | null
+  fontWeight: StageFontWeight | null
+  upperCase: boolean | null
+  /** px @1920 da próxima estrofe (independente da atual); null = 58% da letra dos slides. */
+  nextFontSize: number | null
+  /** slides = mesmo fundo dos slides; color = só a cor; image = imagem própria. */
+  bgMode: 'slides' | 'color' | 'image'
+  bgColor: string
+  /** Imagem própria (bgMode = image): data URL ou fundo oficial (`official:bg-01`). */
+  bgImage: string | null
+  /** null = cor da referência (padrão dourado). */
+  barColor: string | null
+}
+
+export const DEFAULT_RETURN_SCREEN_SETTINGS: ReturnScreenSettings = {
+  fontSize: null,
+  textColor: null,
+  fontWeight: null,
+  upperCase: null,
+  nextFontSize: null,
+  bgMode: 'slides',
+  bgColor: '#000000',
+  bgImage: null,
+  barColor: null,
+}
+
+export const RETURN_FONT_SIZE_MIN = 60
+export const RETURN_FONT_SIZE_MAX = 200
+export const RETURN_NEXT_FONT_SIZE_MIN = 30
+/** Próxima estrofe sem tamanho próprio: 58% da letra dos slides (como sempre foi). */
+export const RETURN_NEXT_SCALE = 0.58
+
+/** Tamanho efetivo (px @1920) da próxima estrofe do retorno. */
+export function returnNextFontSize(ret: ReturnScreenSettings, stage: Pick<StageSettings, 'fontSize'>): number {
+  return ret.nextFontSize ?? Math.round(stage.fontSize * RETURN_NEXT_SCALE * 100) / 100
+}
+
+/** Sub-objeto `returnScreen` lido com segurança (defaults no que faltar). */
+export function resolveReturnScreen(s: Pick<StageSettings, 'returnScreen'>): ReturnScreenSettings {
+  return { ...DEFAULT_RETURN_SCREEN_SETTINGS, ...(s.returnScreen ?? {}) }
+}
+
+function parseReturnScreen(raw: unknown): ReturnScreenSettings | undefined {
+  if (!raw || typeof raw !== 'object') return undefined
+  const r = raw as Record<string, unknown>
+  const d = DEFAULT_RETURN_SCREEN_SETTINGS
+  const color = (v: unknown) => (typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v) ? v : null)
+  const weight = Number(r['fontWeight'])
+  return {
+    fontSize:
+      typeof r['fontSize'] === 'number' && Number.isFinite(r['fontSize'])
+        ? Math.min(RETURN_FONT_SIZE_MAX, Math.max(RETURN_FONT_SIZE_MIN, r['fontSize']))
+        : null,
+    textColor: color(r['textColor']),
+    fontWeight: weight === 400 || weight === 600 || weight === 800 ? weight : null,
+    upperCase: typeof r['upperCase'] === 'boolean' ? r['upperCase'] : null,
+    nextFontSize:
+      typeof r['nextFontSize'] === 'number' && Number.isFinite(r['nextFontSize'])
+        ? Math.min(RETURN_FONT_SIZE_MAX, Math.max(RETURN_NEXT_FONT_SIZE_MIN, r['nextFontSize']))
+        : null,
+    bgMode: r['bgMode'] === 'color' || r['bgMode'] === 'image' ? r['bgMode'] : 'slides',
+    bgColor: color(r['bgColor']) ?? d.bgColor,
+    bgImage:
+      typeof r['bgImage'] === 'string' &&
+      (r['bgImage'].startsWith('data:image/') || r['bgImage'].startsWith(OFFICIAL_BG_PREFIX))
+        ? r['bgImage']
+        : null,
+    barColor: color(r['barColor']),
+  }
 }
 
 export const DEFAULT_CLOCK_MODULE_SETTINGS: NonNullable<StageSettings['clock']> = {
@@ -572,6 +651,7 @@ export function parseStageSettings(raw: unknown): StageSettings {
           } satisfies StageSettings['countdown'],
         }
       : {}),
+    ...(parseReturnScreen(s['ret']) ? { returnScreen: parseReturnScreen(s['ret']) } : {}),
     ...(s['random'] && typeof s['random'] === 'object'
       ? {
           random: {
@@ -658,6 +738,7 @@ export function serializeStageSettings(s: StageSettings): Record<string, unknown
     ...(s.timer ? { timer: s.timer } : {}),
     ...(s.countdown ? { countdown: s.countdown } : {}),
     ...(s.random ? { random: s.random } : {}),
+    ...(s.returnScreen ? { ret: s.returnScreen } : {}),
     ...(s.hymns ? { hymns: s.hymns } : {}),
   }
 }
