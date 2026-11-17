@@ -17,6 +17,8 @@ export const USER_PREFERENCE_KEYS = {
   theme: 'theme',
   blur: 'blur',
   accent: 'accent',
+  /** Cor de realce livre (#RRGGBB); ausente/null = usa o acento pronto de `accent`. */
+  accentCustom: 'accentCustom',
   interaction: 'interaction',
   autoBrightness: 'autoBrightness',
   bibleSelectedVersion: 'bible.selectedVersionId',

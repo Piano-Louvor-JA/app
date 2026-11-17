@@ -16,3 +16,9 @@ export {
   type InteractionKey,
   type InteractionDefinition,
 } from './themes'
+export {
+  buildCustomAccent,
+  deriveAccentSoft,
+  isHexColor,
+  type CustomAccentDefinition,
+} from './accents'
