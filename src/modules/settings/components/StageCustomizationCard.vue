@@ -20,6 +20,7 @@ import {
   STAGE_OFFICIAL_BACKGROUNDS,
   STAGE_REF_PRESETS,
   TIMER_TIME_FORMAT_OPTIONS,
+  bibleTransitionMs,
   officialBgUrl,
   resolveBackgroundImage,
   type StageFontWeight,
@@ -28,6 +29,7 @@ import {
 } from '../types/stage-settings'
 
 import SettingsToggle from './SettingsToggle.vue'
+import ScreenTransitionPicker from './ScreenTransitionPicker.vue'
 import FontSelector from './FontSelector.vue'
 import StagePreview from './StagePreview.vue'
 
@@ -160,6 +162,24 @@ function clearTitleOverrides() {
   patch({ titleFontSize: null, titleFontWeight: null, titleTextColor: null, titleTextShadow: null, titleUpperCase: false, titleTextBox: false })
 }
 
+/** Liga/desliga as animações dos slides; ao ligar sem transição, usa Esmaecer. */
+function setLyricTransitionEnabled(enabled: boolean) {
+  patch(
+    enabled && settings.value.lyricTransition === 'none'
+      ? { lyricTransitionEnabled: true, lyricTransition: 'fade' }
+      : { lyricTransitionEnabled: enabled },
+  )
+}
+
+/** Liga/desliga as animações da anotação; ao ligar sem transição, usa Esmaecer. */
+function setTextTransitionEnabled(enabled: boolean) {
+  patch(
+    enabled && settings.value.textTransition === 'none'
+      ? { textTransitionEnabled: true, textTransition: 'fade' }
+      : { textTransitionEnabled: enabled },
+  )
+}
+
 function clearLyricOverrides() {
   patch({ lyricFontSize: null, lyricFontWeight: null, lyricTextColor: null, lyricTextShadow: null, lyricUpperCase: false })
 }
@@ -188,12 +208,14 @@ const bibleRefPositionOptions: { value: StageSettings['bibleRefPosition']; label
   { value: 'corner', label: t('settings.stage.refPositionCorner'), hint: t('settings.stage.refPositionCornerHint') },
 ]
 
-const bibleTransitionOptions: { value: StageSettings['bibleTransition']; label: string }[] = [
-  { value: 'none', label: t('settings.stage.transitionNone') },
-  { value: 'fade', label: t('settings.stage.transitionFade') },
-  { value: 'slide', label: t('settings.stage.transitionSlide') },
-  { value: 'zoom', label: t('settings.stage.transitionZoom') },
-]
+/** Liga/desliga as animações; ao ligar sem transição escolhida, usa Esmaecer. */
+function setBibleTransitionEnabled(enabled: boolean) {
+  patch(
+    enabled && settings.value.bibleTransition === 'none'
+      ? { bibleTransitionEnabled: true, bibleTransition: 'fade' }
+      : { bibleTransitionEnabled: enabled },
+  )
+}
 
 const bibleTransitionSpeedOptions: { value: StageSettings['bibleTransitionSpeed']; label: string }[] = [
   { value: 'fast', label: t('settings.stage.transitionFast') },
@@ -391,6 +413,122 @@ const confirmReset = ref(false)
     </div>
 
     <!-- Tipografia geral não vale na Bíblia (usa aparência própria abaixo). -->
+    <!-- Músicas: transições ao trocar slide -->
+    <template v-if="activeScope === 'hymns'">
+      <div class="stage-custom__section">
+        <p class="stage-custom__label">{{ t('settings.stage.transitionsSection') }}</p>
+        <div class="stage-custom__toggle-row">
+          <button
+            type="button"
+            class="stage-custom__toggle-label"
+            @click="setLyricTransitionEnabled(!settings.lyricTransitionEnabled)"
+          >
+            {{ t('settings.stage.transitionsEnabled') }}
+          </button>
+          <SettingsToggle
+            :model-value="settings.lyricTransitionEnabled"
+            :label="t('settings.stage.transitionsEnabled')"
+            data-testid="lyric-transition-enabled"
+            @update:model-value="setLyricTransitionEnabled($event)"
+          />
+        </div>
+
+        <template v-if="settings.lyricTransitionEnabled">
+          <p class="stage-custom__label stage-custom__label--sub">
+            {{ t('settings.stage.lyricTransition') }}
+          </p>
+          <ScreenTransitionPicker
+            :model-value="settings.lyricTransition"
+            :duration-ms="bibleTransitionMs(settings.lyricTransitionSpeed)"
+            :label="t('settings.stage.lyricTransition')"
+            test-id="lyric-transition"
+            @update:model-value="patch({ lyricTransition: $event })"
+          />
+
+          <p class="stage-custom__label stage-custom__label--sub">
+            {{ t('settings.stage.bibleTransitionSpeed') }}
+          </p>
+          <div
+            class="stage-custom__segment"
+            role="radiogroup"
+            data-testid="lyric-transition-speed"
+            :aria-label="t('settings.stage.bibleTransitionSpeed')"
+          >
+            <button
+              v-for="opt in bibleTransitionSpeedOptions"
+              :key="opt.value"
+              type="button"
+              role="radio"
+              :aria-checked="settings.lyricTransitionSpeed === opt.value"
+              class="stage-custom__segment-btn"
+              :class="{ 'stage-custom__segment-btn--active': settings.lyricTransitionSpeed === opt.value }"
+              @click="patch({ lyricTransitionSpeed: opt.value })"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
+        </template>
+      </div>
+    </template>
+
+    <!-- Liturgia: transições ao trocar a anotação -->
+    <template v-if="activeScope === 'liturgy'">
+      <div class="stage-custom__section">
+        <p class="stage-custom__label">{{ t('settings.stage.transitionsSection') }}</p>
+        <div class="stage-custom__toggle-row">
+          <button
+            type="button"
+            class="stage-custom__toggle-label"
+            @click="setTextTransitionEnabled(!settings.textTransitionEnabled)"
+          >
+            {{ t('settings.stage.transitionsEnabled') }}
+          </button>
+          <SettingsToggle
+            :model-value="settings.textTransitionEnabled"
+            :label="t('settings.stage.transitionsEnabled')"
+            data-testid="text-transition-enabled"
+            @update:model-value="setTextTransitionEnabled($event)"
+          />
+        </div>
+
+        <template v-if="settings.textTransitionEnabled">
+          <p class="stage-custom__label stage-custom__label--sub">
+            {{ t('settings.stage.textTransition') }}
+          </p>
+          <ScreenTransitionPicker
+            :model-value="settings.textTransition"
+            :duration-ms="bibleTransitionMs(settings.textTransitionSpeed)"
+            :label="t('settings.stage.textTransition')"
+            test-id="text-transition"
+            @update:model-value="patch({ textTransition: $event })"
+          />
+
+          <p class="stage-custom__label stage-custom__label--sub">
+            {{ t('settings.stage.bibleTransitionSpeed') }}
+          </p>
+          <div
+            class="stage-custom__segment"
+            role="radiogroup"
+            data-testid="text-transition-speed"
+            :aria-label="t('settings.stage.bibleTransitionSpeed')"
+          >
+            <button
+              v-for="opt in bibleTransitionSpeedOptions"
+              :key="opt.value"
+              type="button"
+              role="radio"
+              :aria-checked="settings.textTransitionSpeed === opt.value"
+              class="stage-custom__segment-btn"
+              :class="{ 'stage-custom__segment-btn--active': settings.textTransitionSpeed === opt.value }"
+              @click="patch({ textTransitionSpeed: opt.value })"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
+        </template>
+      </div>
+    </template>
+
     <template v-if="activeScope !== 'bible'">
       <div class="stage-custom__section">
         <p class="stage-custom__label">{{ t('settings.stage.textColor') }}</p>
@@ -839,30 +977,36 @@ const confirmReset = ref(false)
           </button>
         </div>
 
-        <p class="stage-custom__label stage-custom__label--sub">
-          {{ t('settings.stage.bibleTransition') }}
-        </p>
-        <div
-          class="stage-custom__segment"
-          role="radiogroup"
-          data-testid="bible-transition"
-          :aria-label="t('settings.stage.bibleTransition')"
-        >
+        <div class="stage-custom__toggle-row">
           <button
-            v-for="opt in bibleTransitionOptions"
-            :key="opt.value"
             type="button"
-            role="radio"
-            :aria-checked="settings.bibleTransition === opt.value"
-            class="stage-custom__segment-btn"
-            :class="{ 'stage-custom__segment-btn--active': settings.bibleTransition === opt.value }"
-            @click="patch({ bibleTransition: opt.value })"
+            class="stage-custom__toggle-label"
+            @click="setBibleTransitionEnabled(!settings.bibleTransitionEnabled)"
           >
-            {{ opt.label }}
+            {{ t('settings.stage.transitionsEnabled') }}
           </button>
+          <SettingsToggle
+            :model-value="settings.bibleTransitionEnabled"
+            :label="t('settings.stage.transitionsEnabled')"
+            data-testid="bible-transition-enabled"
+            @update:model-value="setBibleTransitionEnabled($event)"
+          />
         </div>
 
-        <template v-if="settings.bibleTransition !== 'none'">
+        <template v-if="settings.bibleTransitionEnabled">
+          <p class="stage-custom__label stage-custom__label--sub">
+            {{ t('settings.stage.bibleTransition') }}
+          </p>
+          <ScreenTransitionPicker
+            :model-value="settings.bibleTransition"
+            :duration-ms="bibleTransitionMs(settings.bibleTransitionSpeed)"
+            :label="t('settings.stage.bibleTransition')"
+            test-id="bible-transition"
+            @update:model-value="patch({ bibleTransition: $event })"
+          />
+        </template>
+
+        <template v-if="settings.bibleTransitionEnabled && settings.bibleTransition !== 'none'">
           <p class="stage-custom__label stage-custom__label--sub">
             {{ t('settings.stage.bibleTransitionSpeed') }}
           </p>

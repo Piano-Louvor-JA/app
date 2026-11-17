@@ -1,5 +1,7 @@
 import { notesHtmlToPlainText, sanitizeNotesHtml } from '@modules/liturgy/services/rich-notes'
 
+import { STAGE_TRANSITION_OPTIONS, type StageTransition } from '@modules/settings/types/stage-settings'
+
 import { isInCarousel, type Announcement } from '../types/announcements'
 
 /** Módulo da janela de projeção (ProjectionHost `?module=`). */
@@ -22,9 +24,24 @@ export type CarouselRuntime = {
   relativePath: string
   title: string
   text: string
+  /** Animação da troca de slide (escolhida no carrossel; `none` = troca seca). */
+  transition: StageTransition
+  /** Duração de cada fase da animação (ms). */
+  transitionMs: number
 }
 
-export const DEFAULT_CAROUSEL_RUNTIME: CarouselRuntime = { active: false, kind: null, relativePath: '', title: '', text: '' }
+export type CarouselTransition = Pick<CarouselRuntime, 'transition' | 'transitionMs'>
+
+const NO_TRANSITION: CarouselTransition = { transition: 'none', transitionMs: 250 }
+
+export const DEFAULT_CAROUSEL_RUNTIME: CarouselRuntime = {
+  active: false,
+  kind: null,
+  relativePath: '',
+  title: '',
+  text: '',
+  ...NO_TRANSITION,
+}
 
 /**
  * Avisos de texto viram um slide; avisos de imagens, um slide por imagem.
@@ -49,10 +66,22 @@ export function buildCarouselSlides(items: Announcement[]): CarouselSlide[] {
   })
 }
 
-export function carouselRuntimeFromSlide(slide: CarouselSlide | null): CarouselRuntime {
-  if (!slide) return { ...DEFAULT_CAROUSEL_RUNTIME }
-  if (slide.kind === 'image') return { active: true, kind: 'image', relativePath: slide.relativePath, title: '', text: '' }
-  return { active: true, kind: 'text', relativePath: '', title: slide.title.trim(), text: notesHtmlToPlainText(sanitizeNotesHtml(slide.html)) }
+export function carouselRuntimeFromSlide(
+  slide: CarouselSlide | null,
+  transition: CarouselTransition = NO_TRANSITION,
+): CarouselRuntime {
+  if (!slide) return { ...DEFAULT_CAROUSEL_RUNTIME, ...transition }
+  if (slide.kind === 'image') {
+    return { active: true, kind: 'image', relativePath: slide.relativePath, title: '', text: '', ...transition }
+  }
+  return {
+    active: true,
+    kind: 'text',
+    relativePath: '',
+    title: slide.title.trim(),
+    text: notesHtmlToPlainText(sanitizeNotesHtml(slide.html)),
+    ...transition,
+  }
 }
 
 export function normalizeCarouselRuntime(raw: unknown): CarouselRuntime {
@@ -65,6 +94,13 @@ export function normalizeCarouselRuntime(raw: unknown): CarouselRuntime {
     relativePath: kind === 'image' && typeof value.relativePath === 'string' ? value.relativePath : '',
     title: kind === 'text' && typeof value.title === 'string' ? value.title : '',
     text: kind === 'text' && typeof value.text === 'string' ? value.text : '',
+    transition: STAGE_TRANSITION_OPTIONS.includes(value.transition as StageTransition)
+      ? (value.transition as StageTransition)
+      : 'none',
+    transitionMs:
+      typeof value.transitionMs === 'number' && Number.isFinite(value.transitionMs)
+        ? Math.min(2000, Math.max(0, value.transitionMs))
+        : NO_TRANSITION.transitionMs,
   }
 }
 

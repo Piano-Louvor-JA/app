@@ -17,8 +17,9 @@ import {
 } from '../services/return-phrases'
 import { readEffectiveStageSettings, subscribeStageSettings } from '../../settings/services/stage-settings-runtime'
 import type { StageSettings } from '../../settings/types/stage-settings'
-import { resolveBackgroundImage,
+import { bibleTransitionMs, effectiveLyricTransition, resolveBackgroundImage,
   stageBgCss } from '../../settings/types/stage-settings'
+import '@styles/screen-transitions.css'
 import type { MediaProjectionRuntime } from '../types/media'
 import { DEFAULT_MEDIA_PROJECTION } from '../types/media'
 
@@ -252,7 +253,9 @@ function applyRuntime(raw: unknown) {
     incoming.length > 0 &&
     incoming === shownNext.value &&
     !isCoverSlide(next) &&
-    !isCoverSlide(prev)
+    !isCoverSlide(prev) &&
+    // Transição das músicas ligada: a frase troca igual ao público (sem o voo).
+    !returnTransitionOn.value
 
   runtime.value = next
   syncBar(next.slideProgressRatio, !next.active || next.slideIndex !== prev.slideIndex)
@@ -325,7 +328,12 @@ onUnmounted(() => {
 
 const stageStyle = computed(() => ({
   backgroundColor: stageBgCss(stage.value.backgroundColor),
+  '--scr-transition-ms': `${bibleTransitionMs(stage.value.lyricTransitionSpeed)}ms`,
 }))
+
+/** Segue a transição escolhida para os slides de música (Palco de hinos). */
+const returnTransition = computed(() => effectiveLyricTransition(stage.value))
+const returnTransitionOn = computed(() => returnTransition.value !== 'none')
 
 const bgImage = computed(
   () => resolveBackgroundImage(stage.value.backgroundImage) ?? runtime.value.imageUrl,
@@ -402,14 +410,21 @@ const projectionFontStyle = useProjectionFont('hymns')
             >
               {{ outgoingText }}
             </p>
-            <p
-              ref="lyricRef"
-              class="media-return__lyric"
-              :class="{ 'media-return__lyric--wait': lyricWait }"
-              :style="textStyle"
+            <Transition
+              :name="`scr-${returnTransition}`"
+              mode="out-in"
             >
-              {{ shownCurrent }}
-            </p>
+              <!-- Chave fixa sem transição: o voo da próxima frase mede este elemento. -->
+              <p
+                ref="lyricRef"
+                :key="returnTransitionOn ? `lyric|${shownCurrent}` : 'lyric'"
+                class="media-return__lyric"
+                :class="{ 'media-return__lyric--wait': lyricWait }"
+                :style="textStyle"
+              >
+                {{ shownCurrent }}
+              </p>
+            </Transition>
           </div>
           <div
             class="media-return__bar"

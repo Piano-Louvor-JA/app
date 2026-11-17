@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 
 import LiturgyAnnotationStage from '@modules/liturgy/components/LiturgyAnnotationStage.vue'
 import { resolveMediaUrl } from '@shared/services/workspace-api'
+import '@styles/screen-transitions.css'
 
 import {
   CAROUSEL_RUNTIME_CHANNEL,
@@ -26,6 +27,10 @@ withDefaults(
 
 const runtime = ref<CarouselRuntime>(readCarouselRuntime())
 let channel: BroadcastChannel | null = null
+
+/** Animação escolhida no carrossel (vale para imagem e texto). */
+const transitionName = computed(() => `scr-${runtime.value.transition}`)
+const stageStyle = computed(() => ({ '--scr-transition-ms': `${runtime.value.transitionMs}ms` }))
 
 function onStorage(event: StorageEvent) {
   if (event.key === CAROUSEL_RUNTIME_STORAGE_KEY) runtime.value = readCarouselRuntime()
@@ -58,14 +63,17 @@ onUnmounted(() => {
     class="carousel-stage"
     :class="{ 'carousel-stage--embedded': embedded }"
     data-test="carousel-stage"
+    :style="stageStyle"
   >
     <LiturgyAnnotationStage
       v-if="runtime.active && runtime.kind === 'text'"
       :embedded="embedded"
+      :transition="runtime.transition"
+      :transition-ms="runtime.transitionMs"
     />
     <Transition
       v-else-if="runtime.active && runtime.kind === 'image'"
-      name="carousel-stage-fade"
+      :name="transitionName"
       mode="out-in"
     >
       <img
@@ -99,13 +107,4 @@ onUnmounted(() => {
   object-fit: contain;
 }
 
-.carousel-stage-fade-enter-active,
-.carousel-stage-fade-leave-active {
-  transition: opacity 350ms ease;
-}
-
-.carousel-stage-fade-enter-from,
-.carousel-stage-fade-leave-to {
-  opacity: 0;
-}
 </style>

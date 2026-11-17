@@ -1,3 +1,4 @@
+import { bibleTransitionMs } from '@modules/settings/types/stage-settings'
 import { computed, readonly, ref } from 'vue'
 
 import {
@@ -35,7 +36,13 @@ const TICK_MS = 250
 const slides = ref<CarouselSlide[]>([])
 const index = ref(0)
 const status = ref<CarouselStatus>('idle')
-const config = ref<CarouselConfig>({ slideMs: CAROUSEL_SLIDE_MS_DEFAULT, loop: true })
+const config = ref<CarouselConfig>({
+  slideMs: CAROUSEL_SLIDE_MS_DEFAULT,
+  loop: true,
+  transitionEnabled: false,
+  transition: 'fade',
+  transitionSpeed: 'normal',
+})
 /** Janela de projeção aberta por este carrossel (sem telas estendidas, só a prévia). */
 const projecting = ref(false)
 /** Iniciado por "Projetar em carrossel": também vai às conexões remotas (TVs/OBS) pela rota da Liturgia. */
@@ -63,7 +70,10 @@ function show() {
     // Texto na janela independente lê o canal independente da anotação.
     if (independent.value) publishAnnotationRuntime(runtime, true)
   }
-  publishCarouselRuntime(carouselRuntimeFromSlide(slide))
+  publishCarouselRuntime(carouselRuntimeFromSlide(slide, {
+    transition: config.value.transitionEnabled ? config.value.transition : 'none',
+    transitionMs: bibleTransitionMs(config.value.transitionSpeed),
+  }))
   if (remote) sendRemote()
 }
 
@@ -187,6 +197,11 @@ function setLoop(loop: boolean) {
   config.value = { ...config.value, loop }
 }
 
+/** Animação da troca de slide; vale a partir do próximo slide. */
+function setTransition(patch: Partial<Pick<CarouselConfig, 'transitionEnabled' | 'transition' | 'transitionSpeed'>>) {
+  config.value = { ...config.value, ...patch }
+}
+
 function releaseIndependent() {
   if (!independent.value) return
   independent.value = false
@@ -244,6 +259,7 @@ export function useAnnouncementsCarousel() {
     stop,
     setSlideMs,
     setLoop,
+    setTransition,
     /** Só para testes: avança o relógio sem esperar o intervalo. */
     tick,
   }

@@ -102,6 +102,16 @@ export type StageSettings = {
   lyricTextColor: string | null
   lyricUpperCase: boolean
   lyricTextShadow: boolean | null
+  /** Liga as animações de transição ao trocar o slide da música (padrão: desligado). */
+  lyricTransitionEnabled: boolean
+  /** Transição ao trocar o slide da música (só vale com `lyricTransitionEnabled`). */
+  lyricTransition: StageTransition
+  lyricTransitionSpeed: 'fast' | 'normal' | 'slow'
+  /** Liga as animações ao trocar o texto da anotação da Liturgia (padrão: desligado). */
+  textTransitionEnabled: boolean
+  /** Transição ao trocar a anotação (só vale com `textTransitionEnabled`). */
+  textTransition: StageTransition
+  textTransitionSpeed: 'fast' | 'normal' | 'slow'
   showBibleVersion: boolean
   bibleFontSize: number // px @1920 (50–140)
   bibleFontWeight: 400 | 500 | 700
@@ -110,8 +120,10 @@ export type StageSettings = {
   bibleTextTransform: StageTextTransform
   /** Referência: abaixo da caixa do texto (esquerda/centro/direita) ou no canto inferior direito da tela. */
   bibleRefPosition: 'below-left' | 'below-center' | 'below-right' | 'corner'
-  /** Transição ao trocar o versículo projetado. */
-  bibleTransition: 'none' | 'fade' | 'slide' | 'zoom'
+  /** Liga as animações de transição ao trocar o versículo (padrão: desligado). */
+  bibleTransitionEnabled: boolean
+  /** Transição ao trocar o versículo projetado (só vale com `bibleTransitionEnabled`). */
+  bibleTransition: StageTransition
   bibleTransitionSpeed: 'fast' | 'normal' | 'slow'
   /** Data URL da imagem de fundo do escopo (1 ativa por escopo). */
   backgroundImage: string | null
@@ -205,6 +217,7 @@ export const DEFAULT_STAGE_SETTINGS: StageSettings = {
   bibleTextColor: null,
   bibleTextTransform: 'none',
   bibleRefPosition: 'below-right',
+  bibleTransitionEnabled: false,
   bibleTransition: 'fade',
   bibleTransitionSpeed: 'normal',
   titleFontSize: null,
@@ -218,6 +231,12 @@ export const DEFAULT_STAGE_SETTINGS: StageSettings = {
   lyricTextColor: null,
   lyricUpperCase: false,
   lyricTextShadow: null,
+  lyricTransitionEnabled: false,
+  lyricTransition: 'fade',
+  lyricTransitionSpeed: 'normal',
+  textTransitionEnabled: false,
+  textTransition: 'fade',
+  textTransitionSpeed: 'normal',
   backgroundImage: null,
 }
 
@@ -344,7 +363,60 @@ export const BIBLE_REF_POSITION_OPTIONS: StageSettings['bibleRefPosition'][] = [
   'corner',
 ]
 
-export const BIBLE_TRANSITION_OPTIONS: StageSettings['bibleTransition'][] = ['none', 'fade', 'slide', 'zoom']
+/** Catálogo de transições de tela (`none` = troca seca). */
+export const STAGE_TRANSITION_OPTIONS = [
+  'none',
+  'fade',
+  'slide',
+  'slide-down',
+  'slide-left',
+  'slide-right',
+  'zoom',
+  'zoom-out',
+  'blur',
+  'wipe',
+  'iris',
+  'curtain',
+  'flip',
+  'drop',
+  'rotate',
+  'swing',
+  'flip-h',
+  'pop',
+  'stretch',
+  'cinema',
+  'wipe-up',
+  'wipe-down',
+  'diagonal',
+  'glow',
+  'float',
+  'zoom-blur',
+] as const
+
+export type StageTransition = (typeof STAGE_TRANSITION_OPTIONS)[number]
+
+export const BIBLE_TRANSITION_OPTIONS: StageSettings['bibleTransition'][] = [...STAGE_TRANSITION_OPTIONS]
+
+/** Transição dos slides de música que de fato roda: desligada → `none`. */
+export function effectiveLyricTransition(
+  s: Pick<StageSettings, 'lyricTransitionEnabled' | 'lyricTransition'>,
+): StageTransition {
+  return s.lyricTransitionEnabled ? (s.lyricTransition ?? 'fade') : 'none'
+}
+
+/** Transição da anotação da Liturgia que de fato roda: desligada → `none`. */
+export function effectiveTextTransition(
+  s: Pick<StageSettings, 'textTransitionEnabled' | 'textTransition'>,
+): StageTransition {
+  return s.textTransitionEnabled ? (s.textTransition ?? 'fade') : 'none'
+}
+
+/** Transição que de fato roda: desligada → `none`. */
+export function effectiveBibleTransition(
+  s: Pick<StageSettings, 'bibleTransitionEnabled' | 'bibleTransition'>,
+): StageTransition {
+  return s.bibleTransitionEnabled ? (s.bibleTransition ?? 'fade') : 'none'
+}
 
 export const BIBLE_TRANSITION_SPEED_OPTIONS: StageSettings['bibleTransitionSpeed'][] = ['fast', 'normal', 'slow']
 
@@ -425,6 +497,8 @@ export function parseStageSettings(raw: unknown): StageSettings {
     bibleRefPosition: BIBLE_REF_POSITION_OPTIONS.includes(s['refPos'] as StageSettings['bibleRefPosition'])
       ? (s['refPos'] as StageSettings['bibleRefPosition'])
       : DEFAULT_STAGE_SETTINGS.bibleRefPosition,
+    bibleTransitionEnabled:
+      typeof s['bTransOn'] === 'boolean' ? s['bTransOn'] : DEFAULT_STAGE_SETTINGS.bibleTransitionEnabled,
     bibleTransition: BIBLE_TRANSITION_OPTIONS.includes(s['bTrans'] as StageSettings['bibleTransition'])
       ? (s['bTrans'] as StageSettings['bibleTransition'])
       : DEFAULT_STAGE_SETTINGS.bibleTransition,
@@ -444,6 +518,22 @@ export function parseStageSettings(raw: unknown): StageSettings {
     lyricTextColor: s['lFg'] == null ? null : asColorOrNull(s['lFg']),
     lyricUpperCase: typeof s['lUpper'] === 'boolean' ? s['lUpper'] : false,
     lyricTextShadow: typeof s['tsOnL'] === 'boolean' ? s['tsOnL'] : null,
+    lyricTransitionEnabled:
+      typeof s['lTransOn'] === 'boolean' ? s['lTransOn'] : DEFAULT_STAGE_SETTINGS.lyricTransitionEnabled,
+    lyricTransition: BIBLE_TRANSITION_OPTIONS.includes(s['lTrans'] as StageTransition)
+      ? (s['lTrans'] as StageTransition)
+      : DEFAULT_STAGE_SETTINGS.lyricTransition,
+    lyricTransitionSpeed: BIBLE_TRANSITION_SPEED_OPTIONS.includes(s['lTransSpd'] as StageSettings['lyricTransitionSpeed'])
+      ? (s['lTransSpd'] as StageSettings['lyricTransitionSpeed'])
+      : DEFAULT_STAGE_SETTINGS.lyricTransitionSpeed,
+    textTransitionEnabled:
+      typeof s['xTransOn'] === 'boolean' ? s['xTransOn'] : DEFAULT_STAGE_SETTINGS.textTransitionEnabled,
+    textTransition: BIBLE_TRANSITION_OPTIONS.includes(s['xTrans'] as StageTransition)
+      ? (s['xTrans'] as StageTransition)
+      : DEFAULT_STAGE_SETTINGS.textTransition,
+    textTransitionSpeed: BIBLE_TRANSITION_SPEED_OPTIONS.includes(s['xTransSpd'] as StageSettings['textTransitionSpeed'])
+      ? (s['xTransSpd'] as StageSettings['textTransitionSpeed'])
+      : DEFAULT_STAGE_SETTINGS.textTransitionSpeed,
     backgroundImage:
       typeof s['bgImg'] === 'string' &&
       (s['bgImg'].startsWith('data:') || s['bgImg'].startsWith(OFFICIAL_BG_PREFIX))
@@ -543,6 +633,7 @@ export function serializeStageSettings(s: StageSettings): Record<string, unknown
     ...(s.bibleTextColor ? { bFg: s.bibleTextColor } : {}),
     bTransform: s.bibleTextTransform,
     refPos: s.bibleRefPosition,
+    bTransOn: s.bibleTransitionEnabled,
     bTrans: s.bibleTransition,
     bTransSpd: s.bibleTransitionSpeed,
     ...(s.titleFontSize != null ? { tSize: s.titleFontSize } : {}),
@@ -556,6 +647,12 @@ export function serializeStageSettings(s: StageSettings): Record<string, unknown
     ...(s.lyricTextColor != null ? { lFg: s.lyricTextColor } : {}),
     ...(s.lyricUpperCase ? { lUpper: true } : {}),
     ...(s.lyricTextShadow != null ? { tsOnL: s.lyricTextShadow } : {}),
+    lTransOn: s.lyricTransitionEnabled,
+    lTrans: s.lyricTransition,
+    lTransSpd: s.lyricTransitionSpeed,
+    xTransOn: s.textTransitionEnabled,
+    xTrans: s.textTransition,
+    xTransSpd: s.textTransitionSpeed,
     bgImg: s.backgroundImage,
     ...(s.clock ? { clock: s.clock } : {}),
     ...(s.timer ? { timer: s.timer } : {}),

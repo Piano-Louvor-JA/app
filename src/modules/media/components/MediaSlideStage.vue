@@ -6,7 +6,10 @@ import { useI18n } from 'vue-i18n'
 import { stripHtmlBreaks } from '../services/media-slides'
 import { coverTitleTextShadow } from '../services/media-cover-style'
 import { readEffectiveStageSettings, subscribeStageSettings } from '../../settings/services/stage-settings-runtime'
+import '@styles/screen-transitions.css'
 import {
+  bibleTransitionMs,
+  effectiveLyricTransition,
   resolveBackgroundImage,
   stageBgCss,
   stageFlexAlign,
@@ -88,7 +91,10 @@ const bgImage = computed(
 )
 const rootStyle = computed(() => ({
   backgroundColor: stageBgCss(stage.value.backgroundColor),
+  '--scr-transition-ms': `${bibleTransitionMs(stage.value.lyricTransitionSpeed)}ms`,
 }))
+
+const transitionName = computed(() => `scr-${effectiveLyricTransition(stage.value)}`)
 const contentStyle = computed(() => stageFlexAlign(stage.value))
 
 // Estilo da letra = personalização do usuário; caixa só quando textBox on.
@@ -134,38 +140,45 @@ const projectionFontStyle = useProjectionFont('hymns')
       :class="{ 'media-slide-stage__content--cover': isCover }"
       :style="isCover ? undefined : contentStyle"
     >
-      <div
-        v-if="isCover"
-        class="media-slide-stage__titlecard"
-        :class="{ 'media-slide-stage__titlecard--boxed': stage.titleTextBox }"
-        :style="{ color: titleColor }"
+      <Transition
+        :name="transitionName"
+        mode="out-in"
       >
-        <span
-          class="media-slide-stage__titlemark media-slide-stage__titlemark--tl"
-          aria-hidden="true"
-        />
-        <span
-          class="media-slide-stage__titlemark media-slide-stage__titlemark--br"
-          aria-hidden="true"
-        />
+        <div
+          v-if="isCover"
+          :key="`cover|${displayText}`"
+          class="media-slide-stage__titlecard"
+          :class="{ 'media-slide-stage__titlecard--boxed': stage.titleTextBox }"
+          :style="{ color: titleColor }"
+        >
+          <span
+            class="media-slide-stage__titlemark media-slide-stage__titlemark--tl"
+            aria-hidden="true"
+          />
+          <span
+            class="media-slide-stage__titlemark media-slide-stage__titlemark--br"
+            aria-hidden="true"
+          />
+          <p
+            v-if="coverSubtitle"
+            class="media-slide-stage__kicker"
+          >{{ coverSubtitle }}</p>
+          <p
+            class="media-slide-stage__lyric media-slide-stage__lyric--cover"
+            :style="titleStyle"
+          >
+            {{ displayText }}
+          </p>
+        </div>
         <p
-          v-if="coverSubtitle"
-          class="media-slide-stage__kicker"
-        >{{ coverSubtitle }}</p>
-        <p
-          class="media-slide-stage__lyric media-slide-stage__lyric--cover"
-          :style="titleStyle"
+          v-else
+          :key="`lyric|${displayText}`"
+          class="media-slide-stage__lyric"
+          :style="lyricStyle"
         >
           {{ displayText }}
         </p>
-      </div>
-      <p
-        v-else
-        class="media-slide-stage__lyric"
-        :style="lyricStyle"
-      >
-        {{ displayText }}
-      </p>
+      </Transition>
     </div>
   </div>
 </template>

@@ -25,7 +25,11 @@ import {
   isInCarousel,
   type Announcement,
   type AnnouncementKind,
+  type CarouselConfig,
 } from '../types/announcements'
+import ScreenTransitionPicker from '@modules/settings/components/ScreenTransitionPicker.vue'
+import StageCustomizationDialog from '@modules/settings/components/StageCustomizationDialog.vue'
+import { bibleTransitionMs, type StageTransition } from '@modules/settings/types/stage-settings'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -118,6 +122,36 @@ function onSecondsInput(event: Event) {
   ui.setCarousel({ slideMs: seconds * 1000 })
   carousel.setSlideMs(ui.carousel.value.slideMs)
 }
+
+const transitionDialogOpen = ref(false)
+
+type CarouselTransitionPatch = Partial<Pick<CarouselConfig, 'transitionEnabled' | 'transition' | 'transitionSpeed'>>
+
+function setCarouselTransition(patch: CarouselTransitionPatch) {
+  ui.setCarousel(patch)
+  carousel.setTransition(patch)
+}
+
+/** Ao ligar sem transição escolhida, começa no Esmaecer. */
+function onTransitionToggle(event: Event) {
+  const enabled = (event.target as HTMLInputElement).checked
+  setCarouselTransition(
+    enabled && ui.carousel.value.transition === 'none'
+      ? { transitionEnabled: true, transition: 'fade' }
+      : { transitionEnabled: enabled },
+  )
+}
+
+/** 'slide-down' → 'slideDown' (chave do nome traduzido). */
+function transitionLabelKey(value: StageTransition): string {
+  return value.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase())
+}
+
+const transitionSpeedOptions = [
+  { value: 'fast', label: 'settings.stage.transitionFast' },
+  { value: 'normal', label: 'settings.stage.transitionNormal' },
+  { value: 'slow', label: 'settings.stage.transitionSlow' },
+] as const
 
 function onLoopChange(event: Event) {
   const loop = (event.target as HTMLInputElement).checked
@@ -438,6 +472,32 @@ function goBack() {
           >
           {{ t('announcements.carousel.loop') }}
         </label>
+        <label class="announcements-view__carousel-check">
+          <input
+            type="checkbox"
+            :checked="ui.carousel.value.transitionEnabled"
+            data-test="carousel-transition-enabled"
+            @change="onTransitionToggle"
+          >
+          {{ t('settings.stage.transitionsEnabled') }}
+        </label>
+        <button
+          v-if="ui.carousel.value.transitionEnabled"
+          type="button"
+          class="announcements-view__carousel-transition"
+          data-test="carousel-transition-open"
+          @click="transitionDialogOpen = true"
+        >
+          <i
+            class="ti ti-transition-right"
+            aria-hidden="true"
+          />
+          <span>{{ t(`settings.stage.transitionNames.${transitionLabelKey(ui.carousel.value.transition)}`) }}</span>
+          <i
+            class="ti ti-chevron-right"
+            aria-hidden="true"
+          />
+        </button>
         <p
           v-if="skippedCount > 0"
           class="announcements-view__carousel-hint"
@@ -446,6 +506,43 @@ function goBack() {
         </p>
       </aside>
     </div>
+
+    <StageCustomizationDialog
+      :open="transitionDialogOpen"
+      scope="announcements"
+      :title="t('settings.stage.transitionsSection')"
+      @close="transitionDialogOpen = false"
+    >
+      <div class="announcements-view__transition-dialog">
+        <ScreenTransitionPicker
+          :model-value="ui.carousel.value.transition"
+          :duration-ms="bibleTransitionMs(ui.carousel.value.transitionSpeed)"
+          :label="t('settings.stage.transitionsSection')"
+          test-id="carousel-transition"
+          @update:model-value="setCarouselTransition({ transition: $event })"
+        />
+        <p class="announcements-view__transition-label">
+          {{ t('settings.stage.bibleTransitionSpeed') }}
+        </p>
+        <div
+          class="announcements-view__transition-speed"
+          role="radiogroup"
+          :aria-label="t('settings.stage.bibleTransitionSpeed')"
+        >
+          <button
+            v-for="opt in transitionSpeedOptions"
+            :key="opt.value"
+            type="button"
+            role="radio"
+            :aria-checked="ui.carousel.value.transitionSpeed === opt.value"
+            :class="{ 'is-active': ui.carousel.value.transitionSpeed === opt.value }"
+            @click="setCarouselTransition({ transitionSpeed: opt.value })"
+          >
+            {{ t(opt.label) }}
+          </button>
+        </div>
+      </div>
+    </StageCustomizationDialog>
 
     <AnnouncementEditorDialog
       v-if="editing"
@@ -818,6 +915,68 @@ function goBack() {
     border-radius: 0.4rem;
     background: color-mix(in srgb, var(--ds-color-on-surface) 5%, transparent);
     color: var(--ds-color-on-surface);
+  }
+}
+
+.announcements-view__carousel-transition {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--ds-color-on-surface) 14%, transparent);
+  border-radius: 0.5rem 0 0.5rem 0;
+  background: color-mix(in srgb, var(--ds-color-on-surface) 4%, transparent);
+  color: var(--ds-color-on-surface);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+
+  span {
+    flex: 1;
+    text-align: left;
+  }
+
+  &:hover {
+    border-color: color-mix(in srgb, var(--ds-color-primary) 50%, transparent);
+    color: var(--ds-color-primary);
+  }
+}
+
+.announcements-view__transition-dialog {
+  padding: 1.25rem;
+}
+
+.announcements-view__transition-label {
+  margin: 0.5rem 0 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--ds-color-on-surface) 65%, transparent);
+}
+
+.announcements-view__transition-speed {
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--ds-color-on-surface) 6%, transparent);
+
+  button {
+    padding: 0.4rem 1rem;
+    border: 0;
+    border-radius: 0.4rem;
+    background: transparent;
+    color: var(--ds-color-on-surface);
+    font-size: 0.8rem;
+    cursor: pointer;
+
+    &.is-active {
+      background: color-mix(in srgb, var(--ds-color-primary) 22%, transparent);
+      color: var(--ds-color-primary);
+      font-weight: 600;
+    }
   }
 }
 
