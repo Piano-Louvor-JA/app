@@ -182,7 +182,7 @@ const HIDE_YOUTUBE_SIDEBAR_SCRIPT = `
       padding: 0 !important;
       border: 0 !important;
       transform: none !important;
-      object-fit: cover !important;
+      object-fit: contain !important;
       object-position: center center !important;
     }
 
