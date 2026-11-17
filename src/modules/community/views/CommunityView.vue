@@ -16,6 +16,11 @@ import {
 } from "../services/community-catalog";
 import { registerUse, reportCollection } from "../services/ranking";
 import {
+	updateCustomCollection,
+	deleteCustomCollection,
+	type CollectionVisibility,
+} from "@modules/media/services/custom-catalog";
+import {
 	getSeasonalEvent,
 	type SeasonalEventBanner,
 } from "../services/seasonal-event";
@@ -91,6 +96,61 @@ const notifications = ref<AppNotification[]>([]);
 const showNotifications = ref(false);
 const isLogged = ref(false);
 const seasonalEvent = ref<SeasonalEventBanner | null>(null);
+
+/* ---------- RF-04 (SPEC-crud-comunidade-hub-v1.0.0): ações do dono ---------- */
+const myUserId = computed(() => getAuthSession()?.user?.id_user ?? null);
+function isOwnCollection(c: CommunityCollectionSummary): boolean {
+	return myUserId.value != null && c.ownerId != null && c.ownerId === myUserId.value;
+}
+const ownerActionInFlight = ref<number | null>(null);
+
+/** Toast local da Comunidade (RF-04): feedback das ações do dono. */
+const ownerToast = ref<{ msg: string; error: boolean } | null>(null);
+let ownerToastTimer: ReturnType<typeof setTimeout> | null = null;
+function notify(msg: string, error = false): void {
+	ownerToast.value = { msg, error };
+	if (ownerToastTimer) clearTimeout(ownerToastTimer);
+	ownerToastTimer = setTimeout(() => (ownerToast.value = null), 3500);
+}
+
+async function onToggleVisibility(c: CommunityCollectionSummary): Promise<void> {
+	if (ownerActionInFlight.value != null) return;
+	const next = c.visibility === "public" ? "private" : "public";
+	ownerActionInFlight.value = c.id;
+	try {
+		const updated = await updateCustomCollection(c.id, { visibility: next });
+		if (updated) {
+			collections.value = collections.value.map((x) =>
+				x.id === c.id ? { ...x, visibility: next } : x,
+			);
+			notify(
+				next === "public"
+					? t("community.ownerNowPublic", { name: c.name })
+					: t("community.ownerNowPrivate", { name: c.name }),
+			);
+		} else {
+			notify(t("community.ownerActionFailed"), true);
+		}
+	} finally {
+		ownerActionInFlight.value = null;
+	}
+}
+
+async function onDeleteCollection(c: CommunityCollectionSummary): Promise<void> {
+	if (ownerActionInFlight.value != null) return;
+	ownerActionInFlight.value = c.id;
+	try {
+		const ok = await deleteCustomCollection(c.id);
+		if (ok) {
+			collections.value = collections.value.filter((x) => x.id !== c.id);
+			notify(t("community.ownerDeleted", { name: c.name }));
+		} else {
+			notify(t("community.ownerActionFailed"), true);
+		}
+	} finally {
+		ownerActionInFlight.value = null;
+	}
+}
 
 /** Minhas Edições: status do servidor (RF-05) + publish com a sessão real. */
 const myServerStatuses = ref<ServerEditStatus[]>([]);
@@ -388,6 +448,11 @@ onMounted(load);
           <p class="community-view__card-count">
             <i class="ti ti-disc" aria-hidden="true" />
             {{ t('community.trackCount', { count: collection.musicsCount }) }}
+            <span
+              v-if="collection.visibility === 'private'"
+              class="community-view__private-badge"
+              :title="t('community.ownerPrivateBadge')"
+            >🔒</span>
           </p>
           <div class="community-view__actions">
             <button
@@ -414,6 +479,7 @@ onMounted(load);
               }}
             </button>
             <button
+              v-if="!isOwnCollection(collection)"
               type="button"
               class="community-view__report-btn"
               :aria-label="t('ranking.report')"
@@ -422,11 +488,47 @@ onMounted(load);
             >
               <i class="ti ti-flag" aria-hidden="true" />
             </button>
+            <button
+              v-if="isOwnCollection(collection)"
+              type="button"
+              class="community-view__report-btn"
+              :aria-label="collection.visibility === 'public' ? t('community.ownerMakePrivate') : t('community.ownerMakePublic')"
+              :title="collection.visibility === 'public' ? t('community.ownerMakePrivate') : t('community.ownerMakePublic')"
+              :disabled="ownerActionInFlight === collection.id"
+              data-testid="community-owner-visibility"
+              @click="onToggleVisibility(collection)"
+            >
+              <i
+                class="ti"
+                :class="collection.visibility === 'public' ? 'ti-eye-off' : 'ti-eye'"
+                aria-hidden="true"
+              />
+            </button>
+            <button
+              v-if="isOwnCollection(collection)"
+              type="button"
+              class="community-view__report-btn"
+              :aria-label="t('community.ownerDelete')"
+              :title="t('community.ownerDelete')"
+              :disabled="ownerActionInFlight === collection.id"
+              data-testid="community-owner-delete"
+              @click="onDeleteCollection(collection)"
+            >
+              <i class="ti ti-trash" aria-hidden="true" />
+            </button>
           </div>
         </div>
       </GlassCard>
     </div>
 
+    <div
+      v-if="ownerToast"
+      class="community-view__owner-toast"
+      :class="{ 'community-view__owner-toast--error': ownerToast.error }"
+      role="status"
+    >
+      {{ ownerToast.msg }}
+    </div>
     <nav
       v-if="!isLoading && lastPage > 1"
       class="community-view__pagination"
@@ -681,6 +783,29 @@ onMounted(load);
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 1rem;
+}
+
+.community-view__private-badge {
+	margin-left: 4px;
+	font-size: 12px;
+}
+
+.community-view__owner-toast {
+	position: fixed;
+	bottom: 24px;
+	left: 50%;
+	transform: translateX(-50%);
+	background: color-mix(in srgb, var(--ds-color-surface-card, #201f1f) 90%, transparent);
+	color: var(--foreground, #fff);
+	padding: 10px 18px;
+	border-radius: 10px;
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+	font-size: 14px;
+	z-index: 60;
+}
+
+.community-view__owner-toast--error {
+	background: color-mix(in srgb, #b3261e 85%, transparent);
 }
 
 .community-view__card {

@@ -22,6 +22,9 @@ export type CommunityCollectionSummary = {
 	authorName: string | null;
 	musicsCount: number;
 	updatedAt: string | null;
+	/** RF-04: dono da coletânea (id_user) — null em dados legados. */
+	ownerId?: number | null;
+	visibility?: "public" | "private";
 };
 
 function asString(value: unknown): string | null {
@@ -128,6 +131,10 @@ export async function listCommunityCollectionsPage(
 				? Number(row.musics_count)
 				: 0,
 			updatedAt: asString(row.updated_at),
+			ownerId: Number.isInteger(row.owner_id) && Number(row.owner_id) > 0
+				? Number(row.owner_id)
+				: null,
+			visibility: (row.visibility === "private" ? "private" : "public") as "public" | "private",
 		}));
 
 		return {

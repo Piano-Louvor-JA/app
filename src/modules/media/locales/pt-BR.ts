@@ -30,6 +30,8 @@ export default {
       removeCover: 'Remover capa',
       newCollection: 'Nova coletânea…',
       renameCollection: 'Renomear coletânea…',
+      renameMusic: 'Renomear música',
+      musicRenamed: 'Música renomeada para "{name}"',
       collectionRenamed: 'Coletânea renomeada para "{name}"',
       renameFailed: 'Falha ao renomear coletânea',
       deleteCollection: 'Excluir coletânea selecionada',

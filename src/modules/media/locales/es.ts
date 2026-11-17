@@ -30,6 +30,8 @@ export default {
       removeCover: 'Quitar portada',
       newCollection: 'Nueva colección…',
       renameCollection: 'Renombrar colección…',
+      renameMusic: 'Renombrar música',
+      musicRenamed: 'Música renombrada a "{name}"',
       collectionRenamed: 'Colección renombrada a "{name}"',
       renameFailed: 'Error al renombrar colección',
       deleteCollection: 'Eliminar colección seleccionada',

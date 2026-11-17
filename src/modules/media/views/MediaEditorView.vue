@@ -50,7 +50,7 @@ import type {
 import PublicationRulesCard from '../components/PublicationRulesCard.vue'
 import { customApiUrl } from '../services/custom-catalog'
 import { buildSlja, parseSljaFile } from '../../../shared/services/slja'
-
+import { deriveImportCollectionName } from '../slja-import-name'
 /**
  * Editor de letras v1 (web)
  * - Lista coletâneas customizadas (Minhas Coletâneas)
@@ -475,6 +475,34 @@ async function onRenameCollection(): Promise<void> {
   }
 }
 
+/* ---------- RF-01 (SPEC-crud-comunidade-hub-v1.0.0): renomear música custom ---------- */
+/** Só música custom do usuário renomeia; oficial (editOfficial) não. */
+const canRenameMusic = computed(() => {
+  const id = selectedMusicId.value
+  if (id == null || editOfficialId.value != null) return false
+  return musics.value.some((m) => m.id === id)
+})
+const musicRenameDraft = ref('')
+
+async function onRenameMusic(): Promise<void> {
+  const id = selectedMusicId.value
+  const name = musicRenameDraft.value.trim()
+  if (id == null || !name || name === musicName.value || !canRenameMusic.value) return
+  saving.value = true
+  try {
+    const updated = await updateCustomMusic(id, { name })
+    if (updated) {
+      musicName.value = name
+      musicRenameDraft.value = ''
+      notify(t('media.editor.musicRenamed', { name }))
+    } else {
+      notify(t('media.editor.renameFailed'), true)
+    }
+  } finally {
+    saving.value = false
+  }
+}
+
 async function onCoverFile(event: Event): Promise<void> {  const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = ''
@@ -685,21 +713,21 @@ async function onImportFile(event: Event): Promise<void> {
       ? (innerName ?? file.name).replace(/\.slja(\.zip)?$/i, '')
       : archive.title.trim()
 
-    // Garante coletânea de importação: reaproveita a primeira "Importações .slja"
-    // existente; só cria se ainda não houver nenhuma.
+    // RF-02 (SPEC-crud-comunidade-hub-v1.0.0): um arquivo = uma coletânea
+    // própria, nomeada pelo arquivo (com sufixo em colisão). Renomeável
+    // depois pelo rename normal de coletânea. Nada de agrupadora nova.
     let collectionId = selectedCollectionId.value
     if (collectionId == null) {
-      const existing = collections.value.find((c) => c.name === 'Importações .slja')
-      if (existing) {
-        collectionId = existing.id
-      } else {
-        const created = await createCustomCollection('Importações .slja')
-        if (!created) {
-          notify('Falha ao criar coletânea de importação')
-          return
-        }
-        collectionId = created.id
+      const desiredName = deriveImportCollectionName(
+        (innerName ?? file.name).replace(/\.slja(\.zip)?$/i, '') + '.slja',
+        collections.value.map((c) => c.name),
+      )
+      const created = await createCustomCollection(desiredName)
+      if (!created) {
+        notify('Falha ao criar coletânea de importação')
+        return
       }
+      collectionId = created.id
       await refreshCollections()
       selectedCollectionId.value = collectionId
     }
@@ -1391,6 +1419,33 @@ onMounted(async () => {
             data-testid="collection-rename-save"
             :title="t('media.editor.renameCollection')"
             @click="onRenameCollection"
+          >
+            <i
+              class="ti ti-check"
+              aria-hidden="true"
+            />
+          </button>
+        </div>
+        <div
+          v-if="canRenameMusic"
+          class="editor__row editor__rename-row"
+        >
+          <input
+            v-model="musicRenameDraft"
+            type="text"
+            class="editor__input"
+            :placeholder="t('media.editor.renameMusic')"
+            :aria-label="t('media.editor.renameMusic')"
+            data-testid="music-rename-input"
+            @keyup.enter="onRenameMusic"
+          >
+          <button
+            type="button"
+            class="editor__btn"
+            :disabled="saving || !musicRenameDraft.trim() || musicRenameDraft.trim() === musicName"
+            data-testid="music-rename-save"
+            :title="t('media.editor.renameMusic')"
+            @click="onRenameMusic"
           >
             <i
               class="ti ti-check"

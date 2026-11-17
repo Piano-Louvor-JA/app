@@ -30,6 +30,8 @@ export default {
       removeCover: 'Remove cover',
       newCollection: 'New collection…',
       renameCollection: 'Rename collection…',
+      renameMusic: 'Rename music',
+      musicRenamed: 'Music renamed to "{name}"',
       collectionRenamed: 'Collection renamed to "{name}"',
       renameFailed: 'Failed to rename collection',
       deleteCollection: 'Delete selected collection',
