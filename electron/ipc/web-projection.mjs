@@ -1,6 +1,7 @@
 import { onReceiverEvent } from '../palco/receiver-events.mjs'
 import { youtubeCaptionsScript } from '../youtube-captions.mjs'
 import { attachVideoLoadingOverlay } from '../video-loading-overlay.mjs'
+import { attachCursorShield } from '../cursor-shield.mjs'
 import { isYoutubeEmbedUrl, youtubeEmbedUrl, youtubeSourceId, youtubeWatchUrl } from '../youtube-source.mjs'
 import { BrowserWindow, nativeImage, screen, session, WebContentsView } from 'electron'
 import path from 'node:path'
@@ -1072,22 +1073,6 @@ export function reserveControlBarSpace(win) {
   }
 }
 
-/**
- * Vídeo projetado: a captura do player (espelho das telas) desenha o ponteiro do mouse.
- * Na área do vídeo ele fica invisível; a barra de controle é outra camada e mantém o ponteiro.
- * Só no modo vídeo: imagens/PDF usam o mouse (zoom, arrastar).
- */
-export const HIDE_CURSOR_CSS = 'html, body, body * { cursor: none !important; }'
-
-export function hideCursorInVideoSource(win) {
-  if (win.isDestroyed() || currentProjectionMode !== 'video') return
-  try {
-    void Promise.resolve(win.webContents.insertCSS(HIDE_CURSOR_CSS)).catch(() => {})
-  } catch {
-    // página trocando: o próximo did-finish-load reaplica
-  }
-}
-
 function createSourceWindow(loadUrl, title) {
   const bounds = placeSourceOnPrimary()
 
@@ -1134,9 +1119,17 @@ function createSourceWindow(loadUrl, title) {
   win.setContentSize(CONTROL_WIDTH, CONTROL_HEIGHT)
   attachControlBar(win)
   layoutControlBar(win)
+  // Vídeo: camada transparente sobre a área do vídeo. A seta aparece normal no player, mas
+  // não entra na captura que vai para as telas projetadas.
+  if (currentProjectionMode === 'video' && !currentSourceAudioOnly) {
+    attachCursorShield(win, { WebContentsView, barHeight: CONTROL_BAR_HEIGHT, onEscape: () => closeWebProjectionWindows() })
+  }
   // Vídeo do YouTube: logo pulsando + "Carregando…" em vez da tela preta até o vídeo tocar.
   if (currentProjectionMode === 'video' && currentSourceYoutubeId && !currentSourceAudioOnly) {
     attachVideoLoadingOverlay(win, { WebContentsView, barHeight: CONTROL_BAR_HEIGHT, getControlBar: () => controlBarView })
+  } else if (currentProjectionMode === 'video' && controlBarView) {
+    // a barra de controle volta para cima da camada transparente
+    win.contentView.addChildView(controlBarView)
   }
   win.show()
   win.focus()
@@ -1157,7 +1150,6 @@ function createSourceWindow(loadUrl, title) {
   const onPageReady = () => {
     win.webContents.setAudioMuted(false)
     reserveControlBarSpace(win)
-    hideCursorInVideoSource(win)
     hideYoutubeSidebar(win)
     if (currentSourceCaptionsHidden) void remoteSetCaptionsHiddenSource(true)
     // YouTube é SPA: reaplica após hidratação
