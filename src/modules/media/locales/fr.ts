@@ -1,0 +1,80 @@
+export default {
+  "media": {
+    "publishRules": {
+      "title": "Règles de la communauté",
+      "visibleToAll": "Les recueils publics sont visibles par tout le réseau PIANO.",
+      "displayName": "Votre nom d'affichage apparaît comme auteur — votre e-mail n'est jamais exposé.",
+      "readOnlyCopy": "Les autres utilisateurs peuvent enregistrer une copie ; votre original n'est pas modifié.",
+      "moderation": "Avant de devenir public, votre recueil passe par la modération. Le contenu inapproprié peut être signalé et supprimé ultérieurement.",
+      "ranking": "Les +10 pts n'entrent dans le classement qu'après l'approbation de la modération.",
+      "showRules": "Voir les règles de la communauté",
+      "gotIt": "Compris",
+      "linkLabel": "Règles de la communauté"
+    },
+    "visibility": {
+      "label": "Confidentialité",
+      "private": "Privé",
+      "public": "Public",
+      "privateHint": "Vous seul voyez ce recueil.",
+      "publicHint": "Soumis à la modération ; une fois approuvé, il devient visible sur le réseau."
+    },
+    "title": "Lecteur",
+    "empty": "Aucune musique en cours de lecture. Ouvrez une piste depuis les albums ou la liturgie.",
+    "play": "Lecture",
+    "pause": "Pause",
+    "project": "Projeter le contenu",
+    "audioOnTv": "Diffuser le son sur la TV",
+    "audioOnTvOff": "Son sur l'ordinateur",
+    "clearProjection": "Masquer le contenu",
+    "maximize": "Ouvrir le lecteur",
+    "minimize": "Réduire",
+    "close": "Fermer",
+    "seek": "Position de la piste",
+    "volume": "Volume",
+    "audioType": "Type d'audio",
+    "fullscreen": "Plein écran",
+    "previousSlide": "Précédent",
+    "nextSlide": "Suivant",
+    "returnNext": "Suivant",
+    "slideOf": "Slide {current} sur {total}",
+    "coverSlide": "Couverture / titre",
+    "playlist": "Liste des slides",
+    "projectionHotkeyHint": "ESC termine la projection  ·  Ctrl+Alt+P bascule avec l'écran de l'opérateur",
+    "ondemandDownload": "Téléchargement à la demande",
+    "ondemandPreplay": "Veuillez patienter — téléchargement de la musique...",
+    "ondemandDownloadSuccess": "Téléchargement à la demande effectué avec succès !",
+    "dismiss": "Ignorer",
+    "closeConfirmTitle": "Voulez-vous fermer cette musique ?",
+    "closeConfirmYes": "Oui",
+    "closeConfirmNo": "Non",
+    "actions": {
+      "sung": "Chanté",
+      "instrumental": "Playback",
+      "slides": "Sans audio",
+      "lyric": "Paroles",
+      "downloadOffline": "Télécharger le média",
+      "removeOffline": "Supprimer le média",
+      "cancelDownload": "Annuler le téléchargement",
+      "downloaded": "Téléchargé",
+      "downloading": "Téléchargement…",
+      "thisTrack": "cette piste",
+      "removeConfirmTitle": "Supprimer le média",
+      "removeConfirmText": "Êtes-vous sûr de vouloir supprimer le média de \"{name}\" ? Cela effacera les fichiers de votre ordinateur.",
+      "removeConfirmYes": "Supprimer",
+      "removeConfirmNo": "Annuler"
+    },
+    "modes": {
+      "sung": "Chanté",
+      "instrumental": "Playback",
+      "noAudio": "Sans audio"
+    },
+    "messages": {
+      "trackMissing": "Impossible de charger cette musique dans le catalogue local.",
+      "audioMissing": "Cette piste n'a pas d'audio disponible pour le mode sélectionné.",
+      "notDownloaded": "Ce recueil n'a pas encore été téléchargé. Téléchargez-le dans le Centre de médias pour l'utiliser hors ligne.",
+      "slidesOnlyNotDownloaded": "Audio indisponible (recueil non téléchargé). Projection des slides uniquement.",
+      "slidesOnlyNoAudio": "Audio indisponible pour cette piste. Projection des slides uniquement.",
+      "playbackFailed": "Impossible de démarrer la lecture de l'audio."
+    }
+  }
+}

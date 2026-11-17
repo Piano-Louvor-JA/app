@@ -1,0 +1,32 @@
+export default {
+  "timer": {
+    "title": "Таймер",
+    "config": "Налаштувати",
+    "configTitle": "Налаштування проєкції",
+    "configSubtitle": "Налаштуйте вигляд таймера на екрані",
+    "timeFormat": "Формат часу",
+    "timeFormatHint": "Виберіть, як відображатиметься минулий час",
+    "bgColor": "Колір фону",
+    "bgColorHint": "Основний колір фону екрана відображення",
+    "textColor": "Колір тексту",
+    "textColorHint": "Колір тексту на екрані проєкції",
+    "customColor": "Власний колір",
+    "resetDisplay": "Відновити за замовчуванням",
+    "apply": "Застосувати",
+    "close": "Закрити",
+    "project": "Проєктувати",
+    "clearProjection": "Прибрати з проєкції",
+    "inAppProjection": "Попередній перегляд таймера",
+    "projectionHotkeyHint": "ESC завершує проєкцію  ·  Ctrl+Alt+P перемикає між екраном оператора",
+    "projecting": "Триває проєкція",
+    "backToUtilities": "Повернутися до Таймера",
+    "start": "Старт",
+    "pause": "Пауза",
+    "reset": "Скинути",
+    "save": "Зберегти",
+    "savedTimes": "Збережені часи",
+    "clearAll": "Очистити всі",
+    "noSavedTimes": "Немає збережених часів",
+    "removeSaved": "Видалити збережений час"
+  }
+}

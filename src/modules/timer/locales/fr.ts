@@ -1,0 +1,32 @@
+export default {
+  "timer": {
+    "title": "Chronomètre",
+    "config": "Personnaliser",
+    "configTitle": "Personnalisation de la projection",
+    "configSubtitle": "Ajustez l'apparence du chronomètre à l'écran",
+    "timeFormat": "Format de l'heure",
+    "timeFormatHint": "Choisissez comment le temps écoulé sera affiché",
+    "bgColor": "Couleur de fond",
+    "bgColorHint": "Couleur de fond principale de l'écran d'affichage",
+    "textColor": "Couleur du texte",
+    "textColorHint": "Couleur du texte sur l'écran de projection",
+    "customColor": "Couleur personnalisée",
+    "resetDisplay": "Rétablir les valeurs par défaut",
+    "apply": "Appliquer",
+    "close": "Fermer",
+    "project": "Projeter",
+    "clearProjection": "Retirer de la projection",
+    "inAppProjection": "Aperçu du chronomètre",
+    "projectionHotkeyHint": "ESC met fin à la projection  ·  Ctrl+Alt+P bascule avec l'écran de l'opérateur",
+    "projecting": "En projection",
+    "backToUtilities": "Retour au minuteur",
+    "start": "Démarrer",
+    "pause": "Pause",
+    "reset": "Réinitialiser",
+    "save": "Enregistrer",
+    "savedTimes": "Temps enregistrés",
+    "clearAll": "Tout effacer",
+    "noSavedTimes": "Aucun temps enregistré",
+    "removeSaved": "Supprimer le temps enregistré"
+  }
+}
