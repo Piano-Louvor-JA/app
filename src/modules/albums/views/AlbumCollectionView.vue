@@ -242,6 +242,7 @@ async function runAction(
           @close="stageDialogOpen = false"
         />
         <button type="button" class="album-collection-view__shuffle"
+          data-testid="album-shuffle"
           :aria-label="t('albums.playlists.shuffle')" :title="t('albums.playlists.shuffleHint')"
           @click="playAllInActiveCollection('audio', true)">
           <i class="ti ti-arrows-shuffle" aria-hidden="true" />
