@@ -381,3 +381,19 @@ describe('modo texto (avisos)', () => {
     expect(new URL(resolveLocalTextPlayerUrl({ title: 7, html: '<p>x</p>' })).searchParams.get('data')).toContain('"title":""')
   })
 })
+
+describe('ponteiro do mouse fora da projeção do vídeo', () => {
+  it('esconde o ponteiro na página do vídeo (a captura não mostra a seta)', async () => {
+    const { HIDE_CURSOR_CSS, hideCursorInVideoSource } = await import('../ipc/web-projection.mjs')
+    expect(HIDE_CURSOR_CSS).toContain('cursor: none !important')
+    const insertCSS = vi.fn(async () => 'key')
+    hideCursorInVideoSource({ isDestroyed: () => false, webContents: { insertCSS } })
+    expect(insertCSS).toHaveBeenCalledWith(HIDE_CURSOR_CSS)
+
+    // janela fechada ou página trocando: não quebra
+    hideCursorInVideoSource({ isDestroyed: () => true, webContents: { insertCSS } })
+    expect(insertCSS).toHaveBeenCalledTimes(1)
+    hideCursorInVideoSource({ isDestroyed: () => false, webContents: { insertCSS: () => { throw new Error('navegando') } } })
+    hideCursorInVideoSource({ isDestroyed: () => false, webContents: { insertCSS: vi.fn(async () => { throw new Error('x') }) } })
+  })
+})
