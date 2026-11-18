@@ -50,6 +50,10 @@ export default {
       showLyric: 'Show lyrics',
       delete: 'Delete',
       cancel: 'Cancel',
+      renamePlaceholder: 'Rename song…',
+      renameSave: 'Save new name',
+      renamed: 'Song renamed',
+      renameFailed: 'Failed to rename song',
     },
     account: {
       email: 'Email',

@@ -50,6 +50,10 @@ export default {
       showLyric: 'Mostrar letra',
       delete: 'Excluir',
       cancel: 'Cancelar',
+      renamePlaceholder: 'Renomear música…',
+      renameSave: 'Salvar novo nome',
+      renamed: 'Música renomeada',
+      renameFailed: 'Falha ao renomear música',
     },
     account: {
       email: 'E-mail',
