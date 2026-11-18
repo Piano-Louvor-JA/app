@@ -32,7 +32,6 @@ export default {
 		ownerRename: "Rename",
 		ownerPrivar: "Make private",
 		ownerPublish: "Publish",
-		ownerDelete: "Delete",
 		renameLabel: "New collection name",
 		renameSave: "Save name",
 		deleteConfirm: "Delete this collection and all its songs?",

@@ -14,10 +14,6 @@ import {
 	listCommunityCollectionsPage,
 	saveCommunityCopy,
 } from "../services/community-catalog";
-import {
-	deleteCustomCollection,
-	updateCustomCollection,
-} from "@modules/media/services/custom-catalog";
 import { registerUse, reportCollection } from "../services/ranking";
 import {
 	updateCustomCollection,
@@ -103,57 +99,14 @@ const seasonalEvent = ref<SeasonalEventBanner | null>(null);
 
 /* ---------- RF-04 (SPEC-crud-comunidade-hub-v1.0.0): ações do dono ---------- */
 const myUserId = computed(() => getAuthSession()?.user?.id_user ?? null);
-function isOwnCollection(c: CommunityCollectionSummary): boolean {
-	return myUserId.value != null && c.ownerId != null && c.ownerId === myUserId.value;
-}
-const ownerActionInFlight = ref<number | null>(null);
 
 /** Toast local da Comunidade (RF-04): feedback das ações do dono. */
 const ownerToast = ref<{ msg: string; error: boolean } | null>(null);
 let ownerToastTimer: ReturnType<typeof setTimeout> | null = null;
-function notify(msg: string, error = false): void {
+function notifyOwner(msg: string, error = false): void {
 	ownerToast.value = { msg, error };
 	if (ownerToastTimer) clearTimeout(ownerToastTimer);
 	ownerToastTimer = setTimeout(() => (ownerToast.value = null), 3500);
-}
-
-async function onToggleVisibility(c: CommunityCollectionSummary): Promise<void> {
-	if (ownerActionInFlight.value != null) return;
-	const next = c.visibility === "public" ? "private" : "public";
-	ownerActionInFlight.value = c.id;
-	try {
-		const updated = await updateCustomCollection(c.id, { visibility: next });
-		if (updated) {
-			collections.value = collections.value.map((x) =>
-				x.id === c.id ? { ...x, visibility: next } : x,
-			);
-			notify(
-				next === "public"
-					? t("community.ownerNowPublic", { name: c.name })
-					: t("community.ownerNowPrivate", { name: c.name }),
-			);
-		} else {
-			notify(t("community.ownerActionFailed"), true);
-		}
-	} finally {
-		ownerActionInFlight.value = null;
-	}
-}
-
-async function onDeleteCollection(c: CommunityCollectionSummary): Promise<void> {
-	if (ownerActionInFlight.value != null) return;
-	ownerActionInFlight.value = c.id;
-	try {
-		const ok = await deleteCustomCollection(c.id);
-		if (ok) {
-			collections.value = collections.value.filter((x) => x.id !== c.id);
-			notify(t("community.ownerDeleted", { name: c.name }));
-		} else {
-			notify(t("community.ownerActionFailed"), true);
-		}
-	} finally {
-		ownerActionInFlight.value = null;
-	}
 }
 
 /** Minhas Edições: status do servidor (RF-05) + publish com a sessão real. */
@@ -255,12 +208,11 @@ async function submitReport(reason: string) {
 // Dono vê editar/renomear/visibilidade/excluir no próprio cartão; não-dono
 // mantém copiar/report. Editar abre o editor do app; renomear/visibilidade
 // vão direto na API (PUT /v1/custom/collections/:id); excluir com confirmação.
-const currentUserId = computed(() => getAuthSession()?.user?.id_user ?? null);
 function isOwner(collection: CommunityCollectionSummary): boolean {
 	return (
-		currentUserId.value != null &&
+		myUserId.value != null &&
 		collection.ownerId != null &&
-		collection.ownerId === currentUserId.value
+		collection.ownerId === myUserId.value
 	);
 }
 
@@ -307,8 +259,17 @@ async function toggleVisibility(collection: CommunityCollectionSummary): Promise
 	ownerActionBusy.value = true;
 	try {
 		const updated = await updateCustomCollection(collection.id, { visibility: next });
-		if (updated) collection.visibility = next;
-		else ownerErrorId.value = collection.id;
+		if (updated) {
+			collection.visibility = next;
+			notifyOwner(
+				next === "public"
+					? t("community.ownerNowPublic", { name: collection.name })
+					: t("community.ownerNowPrivate", { name: collection.name }),
+			);
+		} else {
+			ownerErrorId.value = collection.id;
+			notifyOwner(t("community.ownerActionFailed"), true);
+		}
 	} finally {
 		ownerActionBusy.value = false;
 	}
@@ -329,9 +290,11 @@ async function confirmDelete(collection: CommunityCollectionSummary): Promise<vo
 	try {
 		const ok = await deleteCustomCollection(collection.id);
 		if (ok) {
+			notifyOwner(t("community.ownerDeleted", { name: collection.name }));
 			await load(); // some do hub
 		} else {
 			ownerErrorId.value = collection.id;
+			notifyOwner(t("community.ownerActionFailed"), true);
 		}
 	} finally {
 		ownerActionBusy.value = false;
@@ -608,6 +571,7 @@ onMounted(load);
                     : t('community.ownerPrivar')
                 "
                 @click="toggleVisibility(collection)"
+                data-testid="community-owner-visibility"
               >
                 <i
                   :class="collection.visibility === 'private' ? 'ti ti-eye' : 'ti ti-eye-off'"
@@ -619,6 +583,7 @@ onMounted(load);
                 class="community-view__delete-btn"
                 :aria-label="t('community.ownerDelete')"
                 :title="t('community.ownerDelete')"
+                data-testid="community-owner-delete"
                 @click="requestDelete(collection)"
               >
                 <i class="ti ti-trash" aria-hidden="true" />
@@ -670,7 +635,7 @@ onMounted(load);
               }}
             </button>
             <button
-              v-if="!isOwnCollection(collection)"
+              v-if="!isOwner(collection)"
               type="button"
               class="community-view__report-btn"
               :aria-label="t('ranking.report')"
@@ -678,34 +643,6 @@ onMounted(load);
               @click="openReport(collection)"
             >
               <i class="ti ti-flag" aria-hidden="true" />
-            </button>
-            <button
-              v-if="isOwnCollection(collection)"
-              type="button"
-              class="community-view__report-btn"
-              :aria-label="collection.visibility === 'public' ? t('community.ownerMakePrivate') : t('community.ownerMakePublic')"
-              :title="collection.visibility === 'public' ? t('community.ownerMakePrivate') : t('community.ownerMakePublic')"
-              :disabled="ownerActionInFlight === collection.id"
-              data-testid="community-owner-visibility"
-              @click="onToggleVisibility(collection)"
-            >
-              <i
-                class="ti"
-                :class="collection.visibility === 'public' ? 'ti-eye-off' : 'ti-eye'"
-                aria-hidden="true"
-              />
-            </button>
-            <button
-              v-if="isOwnCollection(collection)"
-              type="button"
-              class="community-view__report-btn"
-              :aria-label="t('community.ownerDelete')"
-              :title="t('community.ownerDelete')"
-              :disabled="ownerActionInFlight === collection.id"
-              data-testid="community-owner-delete"
-              @click="onDeleteCollection(collection)"
-            >
-              <i class="ti ti-trash" aria-hidden="true" />
             </button>
           </div>
         </div>

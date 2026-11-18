@@ -33,7 +33,7 @@ export default {
       renameMusic: 'Rename music',
       musicRenamed: 'Music renamed to "{name}"',
       collectionRenamed: 'Collection renamed to "{name}"',
-      renameFailed: 'Failed to rename collection',
+      renameFailed: 'Failed to rename',
       deleteCollection: 'Delete selected collection',
       newMusic: 'New song…',
       reuseMusic: 'Reuse existing song…',
@@ -53,7 +53,6 @@ export default {
       renamePlaceholder: 'Rename song…',
       renameSave: 'Save new name',
       renamed: 'Song renamed',
-      renameFailed: 'Failed to rename song',
     },
     account: {
       email: 'Email',

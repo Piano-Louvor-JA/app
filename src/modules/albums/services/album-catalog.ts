@@ -15,6 +15,7 @@ import {
   toCustomCollectionId,
 } from '@modules/media/services/custom-catalog'
 import { getAuthSession } from '@modules/media/services/auth-client'
+import { filterCustomCollectionsForAlbums } from './visibility-owner-filter'
 import { resolveCoverUrlsFromDisk, resolveRemoteFileUrl } from '@modules/sync/services/media-paths'
 
 import type { AlbumCategory, AlbumCollection } from '../types/albums'
@@ -107,13 +108,13 @@ async function buildHymnalCollections(): Promise<AlbumCollection[]> {
 /** Minhas Coletâneas custom no formato AlbumCollection (mesma estética dos álbuns). */
 async function buildCustomCollectionCards(): Promise<AlbumCollection[]> {
   try {
-    const customs = await listCustomCollections()
     // RF-03 (SPEC-crud-comunidade-hub-v1.0.0): /albums mostra APENAS as
-    // coletâneas do próprio usuário (locais: ownerId null; remotas: ownerId
-    // = meu id_user). Públicas de terceiros ficam somente na Comunidade.
-    const myUserId = getAuthSession()?.user?.id_user ?? null
-    const mine = customs.filter((c) => c.ownerId == null || c.ownerId === myUserId)
-    return mine.map((c) => ({
+    // coletâneas do próprio usuário (locais = id negativo; remotas =
+    // ownerId === meu id_user). Públicas de terceiros ficam na Comunidade;
+    // remota legada (ownerId null, id positivo) NÃO entra — RF-06 é gate humano.
+    const all = await listCustomCollections()
+    const customs = filterCustomCollectionsForAlbums(all)
+    return customs.map((c) => ({
       id: toCustomCollectionId(c.id),
       kind: 'album' as const,
       name: c.name,

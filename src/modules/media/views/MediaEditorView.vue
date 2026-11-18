@@ -1085,14 +1085,9 @@ function onAudioPlay(): void {
 
 function onAudioPause(): void {
   isPlaying.value = false
-  // Auto-fill: ao pausar, o instante atual vira o timing da estrofe ativa
-  // (o usuário pausa no momento certo e digita/ajusta a letra).
-  const idx = activeStanzaIndexOverride.value ?? computedActiveIndex.value
-  const stanza = lyrics.value[idx]
-  if (stanza) {
-    stanza.time = timeLabelOf(currentTimeMs.value)
-    void onSaveStanza(idx)
-  }
+  // Feedback Rafael 14/11: pause é SÓ controle de áudio (parar/tocar do começo
+  // p/ conferir sincronia). Timing da estrofe é gravado EXCLUSIVAMENTE pelo
+  // botão "Marcar" — auto-fill no pause causava marcas acidentais.
 }
 
 function onAudioTimeUpdate(): void {

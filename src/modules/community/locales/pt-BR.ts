@@ -32,7 +32,6 @@ export default {
 		ownerRename: "Renomear",
 		ownerPrivar: "Tornar privada",
 		ownerPublish: "Publicar",
-		ownerDelete: "Excluir",
 		renameLabel: "Novo nome da coletânea",
 		renameSave: "Salvar nome",
 		deleteConfirm: "Excluir esta coletânea e todas as suas músicas?",
