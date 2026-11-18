@@ -172,6 +172,7 @@ const {
 const SUPPORTED_LOCALES = [
   { value: 'pt-BR', labelKey: 'settings.general.languagePortuguese' },
   { value: 'es', labelKey: 'settings.general.languageSpanish' },
+  { value: 'uk', labelKey: 'settings.general.languageUkrainian' },
 ] as const
 
 const currentLanguage = ref(

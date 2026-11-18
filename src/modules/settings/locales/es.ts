@@ -352,6 +352,7 @@ export default {
       languageSyncDownloading: 'Descargando catálogo del idioma… la pantalla se recargará enseguida.',
       languageSyncErrorTitle: 'No se pudo descargar el catálogo del idioma. Verifica la conexión.',
       languageSyncRetry: 'Reintentar',
+      languageUkrainian: 'Ucraniano',
       dataTitle: 'Datos Locales',
       dataHint:
         'Elimina el catálogo, los medios descargados y las preferencias guardadas en la carpeta de datos de la app (Windows: C:\\ProgramData\\LouvorJA-PIANO; Linux: /var/lib/LouvorJA-PIANO; macOS: /Users/Shared/LouvorJA-PIANO, compartida entre usuarios). La aplicación reiniciará la configuración en el próximo inicio.',
