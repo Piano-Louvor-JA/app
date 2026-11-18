@@ -16,6 +16,11 @@ import {
 } from "../services/community-catalog";
 import { registerUse, reportCollection } from "../services/ranking";
 import {
+	updateCustomCollection,
+	deleteCustomCollection,
+	type CollectionVisibility,
+} from "@modules/media/services/custom-catalog";
+import {
 	getSeasonalEvent,
 	type SeasonalEventBanner,
 } from "../services/seasonal-event";
@@ -91,6 +96,18 @@ const notifications = ref<AppNotification[]>([]);
 const showNotifications = ref(false);
 const isLogged = ref(false);
 const seasonalEvent = ref<SeasonalEventBanner | null>(null);
+
+/* ---------- RF-04 (SPEC-crud-comunidade-hub-v1.0.0): ações do dono ---------- */
+const myUserId = computed(() => getAuthSession()?.user?.id_user ?? null);
+
+/** Toast local da Comunidade (RF-04): feedback das ações do dono. */
+const ownerToast = ref<{ msg: string; error: boolean } | null>(null);
+let ownerToastTimer: ReturnType<typeof setTimeout> | null = null;
+function notifyOwner(msg: string, error = false): void {
+	ownerToast.value = { msg, error };
+	if (ownerToastTimer) clearTimeout(ownerToastTimer);
+	ownerToastTimer = setTimeout(() => (ownerToast.value = null), 3500);
+}
 
 /** Minhas Edições: status do servidor (RF-05) + publish com a sessão real. */
 const myServerStatuses = ref<ServerEditStatus[]>([]);
@@ -185,6 +202,107 @@ async function submitReport(reason: string) {
 	if (ok) {
 		await load(); // some da lista (servidor esconde)
 	}
+}
+
+/* ---------- RF-04 (SPEC-crud-comunidade-hub v1.0.0): ações do dono inline ---------- */
+// Dono vê editar/renomear/visibilidade/excluir no próprio cartão; não-dono
+// mantém copiar/report. Editar abre o editor do app; renomear/visibilidade
+// vão direto na API (PUT /v1/custom/collections/:id); excluir com confirmação.
+function isOwner(collection: CommunityCollectionSummary): boolean {
+	return (
+		myUserId.value != null &&
+		collection.ownerId != null &&
+		collection.ownerId === myUserId.value
+	);
+}
+
+const renamingId = ref<number | null>(null);
+const renameDraft = ref("");
+const ownerActionBusy = ref(false);
+const ownerErrorId = ref<number | null>(null);
+const deleteConfirmId = ref<number | null>(null);
+
+function startRename(collection: CommunityCollectionSummary): void {
+	renamingId.value = collection.id;
+	renameDraft.value = collection.name;
+}
+
+function cancelRename(): void {
+	renamingId.value = null;
+	renameDraft.value = "";
+}
+
+async function confirmRename(collection: CommunityCollectionSummary): Promise<void> {
+	const name = renameDraft.value.trim();
+	if (!name || name === collection.name || ownerActionBusy.value) {
+		cancelRename();
+		return;
+	}
+	ownerActionBusy.value = true;
+	try {
+		const updated = await updateCustomCollection(collection.id, { name });
+		if (updated) {
+			collection.name = updated.name || name;
+		} else {
+			ownerErrorId.value = collection.id;
+		}
+		cancelRename();
+	} finally {
+		ownerActionBusy.value = false;
+	}
+}
+
+async function toggleVisibility(collection: CommunityCollectionSummary): Promise<void> {
+	if (ownerActionBusy.value) return;
+	// ausente = legado público da API (default)
+	const next = (collection.visibility ?? "public") === "public" ? "private" : "public";
+	ownerActionBusy.value = true;
+	try {
+		const updated = await updateCustomCollection(collection.id, { visibility: next });
+		if (updated) {
+			collection.visibility = next;
+			notifyOwner(
+				next === "public"
+					? t("community.ownerNowPublic", { name: collection.name })
+					: t("community.ownerNowPrivate", { name: collection.name }),
+			);
+		} else {
+			ownerErrorId.value = collection.id;
+			notifyOwner(t("community.ownerActionFailed"), true);
+		}
+	} finally {
+		ownerActionBusy.value = false;
+	}
+}
+
+function requestDelete(collection: CommunityCollectionSummary): void {
+	deleteConfirmId.value = collection.id;
+}
+
+function cancelDelete(): void {
+	deleteConfirmId.value = null;
+}
+
+async function confirmDelete(collection: CommunityCollectionSummary): Promise<void> {
+	if (ownerActionBusy.value) return;
+	deleteConfirmId.value = null;
+	ownerActionBusy.value = true;
+	try {
+		const ok = await deleteCustomCollection(collection.id);
+		if (ok) {
+			notifyOwner(t("community.ownerDeleted", { name: collection.name }));
+			await load(); // some do hub
+		} else {
+			ownerErrorId.value = collection.id;
+			notifyOwner(t("community.ownerActionFailed"), true);
+		}
+	} finally {
+		ownerActionBusy.value = false;
+	}
+}
+
+function openEditor(collection: CommunityCollectionSummary): void {
+	void router.push({ path: "/media/editor", query: { collection: String(collection.id) } });
 }
 
 async function saveCopy(collection: CommunityCollectionSummary) {
@@ -388,7 +506,110 @@ onMounted(load);
           <p class="community-view__card-count">
             <i class="ti ti-disc" aria-hidden="true" />
             {{ t('community.trackCount', { count: collection.musicsCount }) }}
+            <span
+              v-if="collection.visibility === 'private'"
+              class="community-view__private-badge"
+              :title="t('community.ownerPrivateBadge')"
+            >🔒</span>
           </p>
+          <!-- RF-04: ações do dono inline no próprio cartão -->
+          <div
+            v-if="isOwner(collection)"
+            class="community-view__owner-actions"
+          >
+            <div
+              v-if="renamingId === collection.id"
+              class="community-view__rename"
+            >
+              <input
+                v-model="renameDraft"
+                type="text"
+                class="community-view__rename-input"
+                :aria-label="t('community.renameLabel')"
+                @keyup.enter="confirmRename(collection)"
+                @keyup.esc="cancelRename"
+              >
+              <button
+                type="button"
+                class="community-view__rename-save"
+                :aria-label="t('community.renameSave')"
+                @click="confirmRename(collection)"
+              >
+                <i class="ti ti-check" aria-hidden="true" />
+              </button>
+            </div>
+            <div class="community-view__owner-btns">
+              <button
+                type="button"
+                class="community-view__edit-btn"
+                :aria-label="t('community.ownerEdit')"
+                :title="t('community.ownerEdit')"
+                @click="openEditor(collection)"
+              >
+                <i class="ti ti-pencil" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                class="community-view__rename-btn"
+                :aria-label="t('community.ownerRename')"
+                :title="t('community.ownerRename')"
+                @click="startRename(collection)"
+              >
+                <i class="ti ti-text-size" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                class="community-view__visibility-btn"
+                :aria-label="
+                  collection.visibility === 'private'
+                    ? t('community.ownerPublish')
+                    : t('community.ownerPrivar')
+                "
+                :title="
+                  collection.visibility === 'private'
+                    ? t('community.ownerPublish')
+                    : t('community.ownerPrivar')
+                "
+                @click="toggleVisibility(collection)"
+                data-testid="community-owner-visibility"
+              >
+                <i
+                  :class="collection.visibility === 'private' ? 'ti ti-eye' : 'ti ti-eye-off'"
+                  aria-hidden="true"
+                />
+              </button>
+              <button
+                type="button"
+                class="community-view__delete-btn"
+                :aria-label="t('community.ownerDelete')"
+                :title="t('community.ownerDelete')"
+                data-testid="community-owner-delete"
+                @click="requestDelete(collection)"
+              >
+                <i class="ti ti-trash" aria-hidden="true" />
+              </button>
+            </div>
+            <p
+              v-if="deleteConfirmId === collection.id"
+              class="community-view__delete-confirm"
+            >
+              <span>{{ t('community.deleteConfirm') }}</span>
+              <button
+                type="button"
+                class="community-view__delete-yes"
+                @click="confirmDelete(collection)"
+              >
+                {{ t('community.deleteYes') }}
+              </button>
+              <button
+                type="button"
+                class="community-view__delete-no"
+                @click="cancelDelete"
+              >
+                {{ t('community.deleteNo') }}
+              </button>
+            </p>
+          </div>
           <div class="community-view__actions">
             <button
               type="button"
@@ -414,6 +635,7 @@ onMounted(load);
               }}
             </button>
             <button
+              v-if="!isOwner(collection)"
               type="button"
               class="community-view__report-btn"
               :aria-label="t('ranking.report')"
@@ -427,6 +649,14 @@ onMounted(load);
       </GlassCard>
     </div>
 
+    <div
+      v-if="ownerToast"
+      class="community-view__owner-toast"
+      :class="{ 'community-view__owner-toast--error': ownerToast.error }"
+      role="status"
+    >
+      {{ ownerToast.msg }}
+    </div>
     <nav
       v-if="!isLoading && lastPage > 1"
       class="community-view__pagination"
@@ -681,6 +911,29 @@ onMounted(load);
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 1rem;
+}
+
+.community-view__private-badge {
+	margin-left: 4px;
+	font-size: 12px;
+}
+
+.community-view__owner-toast {
+	position: fixed;
+	bottom: 24px;
+	left: 50%;
+	transform: translateX(-50%);
+	background: color-mix(in srgb, var(--ds-color-surface-card, #201f1f) 90%, transparent);
+	color: var(--foreground, #fff);
+	padding: 10px 18px;
+	border-radius: 10px;
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+	font-size: 14px;
+	z-index: 60;
+}
+
+.community-view__owner-toast--error {
+	background: color-mix(in srgb, #b3261e 85%, transparent);
 }
 
 .community-view__card {

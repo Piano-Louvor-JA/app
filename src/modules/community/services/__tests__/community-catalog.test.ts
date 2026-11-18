@@ -62,6 +62,8 @@ describe("listCommunityCollections", () => {
 			authorName: "Maria",
 			musicsCount: 9,
 			updatedAt: "2026-09-10 10:00:00",
+			ownerId: 7,
+			visibility: "public",
 		});
 		// NUNCA expõe email (B8): payload não carrega campo de email algum
 		expect(JSON.stringify(item)).not.toContain("@");
@@ -156,6 +158,8 @@ describe("listCommunityCollections", () => {
 			authorName: null,
 			musicsCount: 0,
 			updatedAt: "lixo",
+			ownerId: null,
+			visibility: "public",
 		});
 	});
 
@@ -194,6 +198,8 @@ describe("listCommunityCollections", () => {
 			authorName: null,
 			musicsCount: 0,
 			updatedAt: null,
+			ownerId: null,
+			visibility: "public",
 		});
 	});
 });

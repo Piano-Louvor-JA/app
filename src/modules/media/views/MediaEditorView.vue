@@ -50,6 +50,7 @@ import type {
 import PublicationRulesCard from '../components/PublicationRulesCard.vue'
 import { customApiUrl } from '../services/custom-catalog'
 import { buildSlja, parseSljaFile } from '../../../shared/services/slja'
+import { collectionNameForImport } from '../services/import-collection-name'
 
 /**
  * Editor de letras v1 (web)
@@ -100,6 +101,45 @@ async function onPublishMusic(): Promise<void> {
 }
 const selectedMusicId = ref<number | null>(null)
 const musicName = ref('')
+
+/* ---------- RF-01 (SPEC-crud-comunidade-hub v1.0.0): rename de música ---------- */
+// Campo editável do nome no cabeçalho (padrão do rename de coletânea).
+// Online: PUT updateCustomMusic(id, { name }). Local (id negativo): patch no
+// store local. Só música CUSTOM do usuário — oficial (modo sugestão) não renomeia.
+const renameDraft = ref('')
+const renameBusy = ref(false)
+const canRenameMusic = computed(
+  () =>
+    getAuthSession() != null &&
+    selectedMusicId.value != null &&
+    editOfficialId.value == null,
+)
+
+async function onRenameMusic(): Promise<void> {
+  const id = selectedMusicId.value
+  const name = renameDraft.value.trim()
+  if (id == null || !name || renameBusy.value) return
+  renameBusy.value = true
+  try {
+    if (isLocalId(id)) {
+      if (updateLocalMusic(id, { name })) {
+        musicName.value = name
+        notify(t('media.editor.renamed'))
+      } else {
+        notify(t('media.editor.renameFailed'), true)
+      }
+      return
+    }
+    if (await updateCustomMusic(id, { name })) {
+      musicName.value = name
+      notify(t('media.editor.renamed'))
+    } else {
+      notify(t('media.editor.renameFailed'), true)
+    }
+  } finally {
+    renameBusy.value = false
+  }
+}
 const lyrics = ref<EditorLyric[]>([])
 const loading = ref(false)
 const saving = ref(false)
@@ -464,32 +504,8 @@ async function onChangeVisibility(next: CollectionVisibility): Promise<void> {
   }
 }
 
-/** SPEC v1.2.0 RF-08: renomear coletânea (online e offline, mesmo caminho). */
-const collectionRenameDraft = ref('')
-
-async function onRenameCollection(): Promise<void> {
-  const id = selectedCollectionId.value
-  const current = selectedCollection.value
-  const name = collectionRenameDraft.value.trim()
-  if (id == null || !current || !name || name === current.name) return
-  saving.value = true
-  try {
-    const updated = await updateCustomCollection(id, { name })
-    if (updated) {
-      collections.value = collections.value.map((c) =>
-        c.id === id ? { ...c, name } : c,
-      )
-      collectionRenameDraft.value = ''
-      notify(t('media.editor.collectionRenamed', { name }))
-    } else {
-      notify(t('media.editor.renameFailed'), true)
-    }
-  } finally {
-    saving.value = false
-  }
-}
-
-async function onCoverFile(event: Event): Promise<void> {  const input = event.target as HTMLInputElement
+async function onCoverFile(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = ''
   if (!file || selectedCollectionId.value == null) return
@@ -675,9 +691,21 @@ function onImportSlja(): void {
 
 async function onImportFile(event: Event): Promise<void> {
   const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
+  // RF-02: múltiplos arquivos → cada um vira SUA coletânea (nome = título,
+  // sufixo (2)/(3) em colisão). Um arquivo segue o fluxo de sempre.
+  const files = Array.from(input.files ?? [])
   input.value = ''
-  if (!file) return
+  if (files.length === 0) return
+  if (files.length > 1) {
+    for (const file of files) {
+      await importSingleSlja(file)
+    }
+    return
+  }
+  await importSingleSlja(files[0]!)
+}
+
+async function importSingleSlja(file: File): Promise<void> {
   loading.value = true
   notify('')
   try {
@@ -699,15 +727,24 @@ async function onImportFile(event: Event): Promise<void> {
       ? (innerName ?? file.name).replace(/\.slja(\.zip)?$/i, '')
       : archive.title.trim()
 
-    // Garante coletânea de importação: reaproveita a primeira "Importações .slja"
-    // existente; só cria se ainda não houver nenhuma.
+    // RF-02 (SPEC-crud-comunidade-hub v1.0.0): import .slja = 1 coletânea
+    // por arquivo. Nome = título do conteúdo (sem fallback genérico — os
+    // fallbacks já resolvidos acima); colisão com coletânea do usuário →
+    // sufixo (2), (3)... Nunca agrupa numa "Importações .slja" nova.
+    const importBaseName = name
+    const importCollectionName = collectionNameForImport(
+      importBaseName,
+      collections.value,
+    )
     let collectionId = selectedCollectionId.value
-    if (collectionId == null) {
-      const existing = collections.value.find((c) => c.name === 'Importações .slja')
+    if (collectionId == null || importCollectionName !== importBaseName) {
+      const existing = collections.value.find(
+        (c) => c.name === importCollectionName,
+      )
       if (existing) {
         collectionId = existing.id
       } else {
-        const created = await createCustomCollection('Importações .slja')
+        const created = await createCustomCollection(importCollectionName)
         if (!created) {
           notify('Falha ao criar coletânea de importação')
           return
@@ -1266,6 +1303,7 @@ onMounted(async () => {
         ref="fileInputEl"
         type="file"
         accept=".slja,.zip"
+        multiple
         class="editor__file-input"
         @change="onImportFile"
       >
@@ -1384,33 +1422,6 @@ onMounted(async () => {
             :aria-label="t('media.editor.changeCover')"
             @change="onCoverFile"
           >
-        </div>
-        <div
-          v-if="selectedCollection"
-          class="editor__row editor__rename-row"
-        >
-          <input
-            v-model="collectionRenameDraft"
-            type="text"
-            class="editor__input"
-            :placeholder="t('media.editor.renameCollection')"
-            :aria-label="t('media.editor.renameCollection')"
-            data-testid="collection-rename-input"
-            @keyup.enter="onRenameCollection"
-          >
-          <button
-            type="button"
-            class="editor__btn"
-            :disabled="saving || !collectionRenameDraft.trim() || collectionRenameDraft.trim() === selectedCollection.name"
-            data-testid="collection-rename-save"
-            :title="t('media.editor.renameCollection')"
-            @click="onRenameCollection"
-          >
-            <i
-              class="ti ti-check"
-              aria-hidden="true"
-            />
-          </button>
         </div>
         <div class="editor__row">
           <input
@@ -1768,6 +1779,31 @@ onMounted(async () => {
             <h2 class="editor__section-title">
               {{ musicName || 'Música' }}
             </h2>
+            <div
+              v-if="canRenameMusic"
+              class="editor__rename"
+            >
+              <input
+                v-model="renameDraft"
+                type="text"
+                class="editor__rename-input"
+                :placeholder="t('media.editor.renamePlaceholder')"
+                :aria-label="t('media.editor.renamePlaceholder')"
+                @keyup.enter="onRenameMusic"
+              >
+              <button
+                type="button"
+                class="editor__rename-save"
+                :disabled="renameBusy"
+                :title="t('media.editor.renameSave')"
+                @click="onRenameMusic"
+              >
+                <i
+                  :class="renameBusy ? 'ti ti-loader-2 ti-spin' : 'ti ti-device-floppy'"
+                  aria-hidden="true"
+                />
+              </button>
+            </div>
           </div>
 
           <!-- Faixa superior: slide com player INTEGRADO (hover), mesmo tamanho da /media -->
@@ -1822,7 +1858,7 @@ onMounted(async () => {
               <input
                 ref="audioInputEl"
                 type="file"
-                accept=".mp3,.ogg,.m4a,.wav,.flac,.aac,audio/*"
+                accept="audio/mpeg,audio/*"
                 class="editor__file-input"
                 @change="onAudioFile"
               >
@@ -2739,6 +2775,36 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+}
+
+.editor__rename {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.editor__rename-input {
+  max-width: 14rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--ds-color-border, rgba(255, 255, 255, 0.2));
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+}
+
+.editor__rename-save {
+  border: 1px solid var(--ds-color-border, rgba(255, 255, 255, 0.2));
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+}
+
+.editor__rename-save:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 
