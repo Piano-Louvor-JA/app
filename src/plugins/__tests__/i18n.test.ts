@@ -23,8 +23,17 @@ describe('i18n message merge', () => {
 })
 
 describe('SUPPORTED_LOCALES', () => {
-  it('contem pt-BR, en e es', () => {
-    expect(SUPPORTED_LOCALES).toEqual(['pt-BR', 'en', 'es'])
+  it('contem pt-BR, en, es, ru, uk e fr', () => {
+    expect(SUPPORTED_LOCALES).toEqual(['pt-BR', 'en', 'es', 'ru', 'uk', 'fr'])
+  })
+})
+
+// uk usa o fallback de catálogo pt: a interface troca mesmo sem catálogo uk.
+describe('locale sem catálogo', () => {
+  it('aceita uk salvo e mantém o catálogo no prefixo pt', () => {
+    vi.mocked(getUserPreference).mockReturnValue('uk')
+    expect(detectInitialLocale()).toBe('uk')
+    expect(localeToApiPrefix('uk')).toBe('pt')
   })
 })
 
