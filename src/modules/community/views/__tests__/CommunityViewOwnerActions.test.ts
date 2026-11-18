@@ -1,129 +1,273 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount, flushPromises } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
+// @vitest-environment jsdom
+// RF-04 (SPEC-crud-comunidade-hub v1.0.0): /community como hub único.
+// Dono vê ações inline (editar/renomear/visibilidade/excluir);
+// não-dono vê só salvar cópia + report (existente).
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-/**
- * RF-04 (SPEC-crud-comunidade-hub-v1.0.0): dono vê ações (privar/excluir)
- * no card da Comunidade; não-dono mantém copiar+report e NÃO vê ações.
- */
-const mockSession = { token: 't', user: { id_user: 47, email: 'rafa@x.z' } }
+const mocks = vi.hoisted(() => ({
+	getSession: vi.fn(() => null as null | { token: string; user: { id_user: number } }),
+	listCommunityCollectionsPage: vi.fn(async () => ({
+		items: [],
+		page: 1,
+		lastPage: 1,
+		total: 0,
+	})),
+	saveCommunityCopy: vi.fn(async () => 777),
+	updateCustomCollection: vi.fn(async () => null),
+	deleteCustomCollection: vi.fn(async () => true),
+	updateLocalCollection: vi.fn(() => true),
+	deleteLocalCollection: vi.fn(() => true),
+	isLocalId: vi.fn((id: number) => id < 0),
+}));
 
-vi.mock('@modules/media/services/auth-client', () => ({
-  getAuthSession: vi.fn(() => mockSession),
-  authTokenAsync: vi.fn(async () => 't'),
-}))
-vi.mock('@modules/auth/services/firebase-client', () => ({
-  getAuthReadiness: vi.fn(async () => undefined),
-}))
-vi.mock('../../services/community-catalog', () => ({
-  listCommunityCollectionsPage: vi.fn(async () => ({
-    items: [
-      { id: 1, name: 'Minha Na Comunidade', description: null, coverUrl: null, authorName: 'Rafael', musicsCount: 2, updatedAt: null, ownerId: 47, visibility: 'public' },
-      { id: 2, name: 'Alheia', description: null, coverUrl: null, authorName: 'Outro', musicsCount: 3, updatedAt: null, ownerId: 49, visibility: 'public' },
-    ],
-    page: 1, lastPage: 1, total: 2,
-  })),
-  saveCommunityCopy: vi.fn(async () => 777),
-}))
-vi.mock('../../services/ranking', () => ({
-  registerUse: vi.fn(),
-  reportCollection: vi.fn(),
-}))
-vi.mock('../../services/notifications', () => ({
-  getNotifications: vi.fn(async () => []),
-}))
-vi.mock('../../services/seasonal-event', () => ({
-  getSeasonalEvent: vi.fn(async () => null),
-}))
-vi.mock('../../services/weekly-tasks', () => ({
-  getWeeklyTasks: vi.fn(async () => []),
-}))
-vi.mock('@modules/media/services/custom-catalog', () => ({
-  updateCustomCollection: vi.fn(async (id: number, patch: { visibility?: string }) =>
-    patch.visibility ? { id, ...patch } : null),
-  deleteCustomCollection: vi.fn(async (id: number) => (id === 1 ? true : false)),
-}))
-vi.mock('@modules/community-edits/services/local-edits-store', () => ({
-  listLocalEdits: vi.fn(() => []),
-}))
-vi.mock('@modules/community-edits/services/publish-edit', () => ({
-  publishEdit: vi.fn(),
-}))
-vi.mock('vue-i18n', () => ({
-  useI18n: () => ({ t: (k: string) => k, locale: { value: 'pt-BR' } }),
-}))
-vi.mock('@shared/composables/useMinimizablePage', () => ({
-  useMinimizablePage: () => ({
-    minimize: vi.fn(),
-    prepare: vi.fn(),
-    takeRestoredState: () => null,
-  }),
-}))
-vi.mock('@design-system/index', () => ({
-  GlassCard: {
-    name: 'GlassCard',
-    template: '<div class="glass-card-mock"><slot /></div>',
-  },
-}))
-vi.mock('@shared/components/PageBackStack', () => ({
-  default: { template: '<div />' },
-}))
-vi.mock('vue-router', () => ({
-  useRouter: () => ({ push: vi.fn() }),
-  useRoute: () => ({ query: {} }),
-}))
+vi.mock("@modules/media/services/auth-client", () => ({
+	getAuthSession: mocks.getSession,
+	authTokenAsync: async () => mocks.getSession()?.token ?? null,
+}));
 
-import CommunityView from '../CommunityView.vue'
-import { updateCustomCollection, deleteCustomCollection } from '@modules/media/services/custom-catalog'
+vi.mock("../../services/community-catalog", () => ({
+	listCommunityCollectionsPage: mocks.listCommunityCollectionsPage,
+	saveCommunityCopy: mocks.saveCommunityCopy,
+	sortByRecentFirst: (xs: unknown[]) => xs,
+}));
 
-describe('CommunityView RF-04 — ações do dono', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    setActivePinia(createPinia())
-  })
+vi.mock("@modules/media/services/custom-catalog", () => ({
+	updateCustomCollection: mocks.updateCustomCollection,
+	deleteCustomCollection: mocks.deleteCustomCollection,
+	isLocalId: mocks.isLocalId,
+}));
 
-  async function mountView() {
-    const w = mount(CommunityView, {
-      global: {
-        plugins: [createPinia()],
-      },
-    })
-    await flushPromises()
-    await flushPromises()
-    return w
-  }
+vi.mock("@modules/media/services/local-custom-store", () => ({
+	updateLocalCollection: mocks.updateLocalCollection,
+	deleteLocalCollection: mocks.deleteLocalCollection,
+}));
 
-  it('dono vê botões privar/excluir; não-dono vê report e não vê ações de dono', async () => {
-    const w = await mountView()
-    const cards = w.findAll('.community-view__card')
-    expect(cards.length).toBe(2)
-    // dono (id 1): visibility + delete
-    const ownCard = cards[0]
-    expect(ownCard.find('[data-testid="community-owner-visibility"]').exists()).toBe(true)
-    expect(ownCard.find('[data-testid="community-owner-delete"]').exists()).toBe(true)
-    expect(ownCard.find('.community-view__report-btn:not([data-testid])').exists()).toBe(false)
-    // não-dono (id 2): report, sem ações de dono
-    const otherCard = cards[1]
-    expect(otherCard.find('[data-testid="community-owner-visibility"]').exists()).toBe(false)
-    expect(otherCard.find('[data-testid="community-owner-delete"]').exists()).toBe(false)
-    w.unmount()
-  })
+vi.mock("../../services/ranking", () => ({
+	getRanking: vi.fn(async () => ({ data: [] })),
+	registerUse: vi.fn(async () => true),
+	reportCollection: vi.fn(async () => true),
+}));
+vi.mock("../../services/notifications", () => ({
+	getNotifications: vi.fn(async () => []),
+	markAllRead: vi.fn(async () => undefined),
+}));
+vi.mock("../../services/weekly-tasks", () => ({
+	getWeeklyTasks: vi.fn(async () => null),
+	completeWeeklyTask: vi.fn(),
+}));
+vi.mock("../../services/seasonal-event", () => ({
+	getSeasonalEvent: vi.fn(async () => null),
+}));
+vi.mock("@modules/auth/services/firebase-client", () => ({
+	getAuthReadiness: vi.fn(() => Promise.resolve(null)),
+}));
+vi.mock("@modules/community-edits/services/local-edits-store", () => ({
+	listLocalEdits: vi.fn(() => []),
+}));
+vi.mock("@modules/community-edits/services/publish-edit", () => ({
+	publishEdit: vi.fn(async () => undefined),
+}));
+vi.mock("@modules/community-edits/views/MyEditsPanel.vue", () => ({
+	default: { name: "MyEditsPanel", template: "<div />" },
+}));
+vi.mock("@design-system/index", () => ({
+	GlassCard: { name: "GlassCard", template: '<div class="glass-card-mock"><slot /></div>' },
+}));
+vi.mock("@shared/components/PageBackStack.vue", () => ({
+	default: { name: "PageBackStack", template: "<div><slot /></div>" },
+}));
+vi.mock("@shared/composables/useMinimizablePage", () => ({
+	useMinimizablePage: () => ({
+		minimize: vi.fn(async () => {}),
+		prepare: vi.fn(),
+		takeRestoredState: () => null,
+	}),
+}));
+vi.mock("../../components/NotificationsDropdown.vue", () => ({
+	default: { name: "NotificationsDropdown", template: "<div />" },
+}));
+vi.mock("../../components/ReportDialog.vue", () => ({
+	default: { name: "ReportDialog", template: "<div />" },
+}));
+vi.mock("vue-router", () => ({
+	useRouter: () => ({ push: vi.fn(), back: vi.fn(), replace: vi.fn() }),
+}));
+vi.mock("vue-i18n", () => ({
+	useI18n: () => ({ t: (k: string) => k, locale: { value: "pt-BR" } }),
+	createI18n: () => ({ global: { locale: "pt-BR", t: (k: string) => k } }),
+}));
 
-  it('privar chama updateCustomCollection com visibility private e atualiza o card', async () => {
-    const w = await mountView()
-    const btn = w.find('[data-testid="community-owner-visibility"]')
-    await btn.trigger('click')
-    await flushPromises()
-    expect(updateCustomCollection).toHaveBeenCalledWith(1, { visibility: 'private' })
-    w.unmount()
-  })
+import { flushPromises, mount } from "@vue/test-utils";
+import { createPinia, setActivePinia } from "pinia";
+import CommunityView from "../CommunityView.vue";
 
-  it('excluir chama deleteCustomCollection e remove o card da lista', async () => {
-    const w = await mountView()
-    await w.find('[data-testid="community-owner-delete"]').trigger('click')
-    await flushPromises()
-    expect(deleteCustomCollection).toHaveBeenCalledWith(1)
-    expect(w.findAll('.community-view__card').length).toBe(1)
-    w.unmount()
-  })
-})
+const SESSION = { token: "tok", user: { id_user: 4 } };
+
+const ITEMS = [
+	{
+		id: 9,
+		name: "Minha coletânea pública",
+		description: null,
+		coverUrl: null,
+		authorName: "Eu",
+		musicsCount: 3,
+		updatedAt: null,
+		ownerId: 4,
+	},
+	{
+		id: 10,
+		name: "De outro irmão",
+		description: null,
+		coverUrl: null,
+		authorName: "Autor",
+		musicsCount: 5,
+		updatedAt: null,
+		ownerId: 12,
+	},
+];
+
+beforeEach(() => {
+	vi.clearAllMocks();
+	localStorage.clear();
+	Element.prototype.scrollTo = (() => {}) as unknown as typeof Element.prototype.scrollTo;
+	setActivePinia(createPinia());
+	// páginas devolvem CÓPIAS: mutações de card (rename/visibility) não
+	// vazam entre testes
+	mocks.listCommunityCollectionsPage.mockImplementation(async () => ({
+		items: ITEMS.map((x) => ({ ...x })),
+		page: 1,
+		lastPage: 1,
+		total: 2,
+	}));
+});
+
+async function mountView() {
+	const w = mount(CommunityView);
+	await flushPromises();
+	await flushPromises();
+	return w;
+}
+
+describe("CommunityView — RF-04 ações do dono inline", () => {
+	it("dono logado: cartão próprio mostra ações de editar/renomear/visibilidade/excluir", async () => {
+		mocks.getSession.mockReturnValue(SESSION);
+		mocks.listCommunityCollectionsPage.mockResolvedValue({
+			items: ITEMS.map((x) => ({ ...x })),
+			page: 1,
+			lastPage: 1,
+			total: 2,
+		});
+		const w = await mountView();
+		const cards = w.findAll(".community-view__card");
+		expect(cards).toHaveLength(2);
+		// card do dono (id 9) tem as ações inline
+		const ownerCard = cards.find((c) => c.text().includes("Minha coletânea pública"))!;
+		expect(ownerCard.find(".community-view__edit-btn").exists()).toBe(true);
+		expect(ownerCard.find(".community-view__rename-btn").exists()).toBe(true);
+		expect(ownerCard.find(".community-view__visibility-btn").exists()).toBe(true);
+		expect(ownerCard.find(".community-view__delete-btn").exists()).toBe(true);
+		// não-dono não tem
+		const otherCard = cards.find((c) => c.text().includes("De outro irmão"))!;
+		expect(otherCard.find(".community-view__edit-btn").exists()).toBe(false);
+		expect(otherCard.find(".community-view__delete-btn").exists()).toBe(false);
+		w.unmount();
+	});
+
+	it("renomear inline chama updateCustomCollection(id, { name }) e recarrega", async () => {
+		mocks.getSession.mockReturnValue(SESSION);
+		mocks.listCommunityCollectionsPage.mockResolvedValue({
+			items: ITEMS.map((x) => ({ ...x })),
+			page: 1,
+			lastPage: 1,
+			total: 2,
+		});
+		mocks.updateCustomCollection.mockResolvedValue({
+			id: 9,
+			name: "Renomeada",
+			description: null,
+			musicsCount: 3,
+		});
+		const w = await mountView();
+		const ownerCard = w.findAll(".community-view__card").find((c) =>
+			c.text().includes("Minha coletânea pública"),
+		)!;
+		await ownerCard.find(".community-view__rename-btn").trigger("click");
+		await flushPromises();
+		const input = ownerCard.find(".community-view__rename-input");
+		expect(input.exists()).toBe(true);
+		await input.setValue("Renomeada");
+		await ownerCard.find(".community-view__rename-save").trigger("click");
+		await flushPromises();
+		expect(mocks.updateCustomCollection).toHaveBeenCalledWith(9, { name: "Renomeada" });
+		w.unmount();
+	});
+
+	it("privar (dono) chama updateCustomCollection(id, { visibility: 'private' })", async () => {
+		mocks.getSession.mockReturnValue(SESSION);
+		mocks.listCommunityCollectionsPage.mockResolvedValue({
+			items: ITEMS.map((x) => ({ ...x })),
+			page: 1,
+			lastPage: 1,
+			total: 2,
+		});
+		mocks.updateCustomCollection.mockResolvedValue({
+			id: 9,
+			name: "X",
+			description: null,
+			musicsCount: 3,
+			visibility: "private",
+		});
+		const w = await mountView();
+		const ownerCard = w.findAll(".community-view__card").find((c) =>
+			c.text().includes("Minha coletânea pública"),
+		)!;
+		await ownerCard.find(".community-view__visibility-btn").trigger("click");
+		await flushPromises();
+		expect(mocks.updateCustomCollection).toHaveBeenCalledWith(9, {
+			visibility: "private",
+		});
+		w.unmount();
+	});
+
+	it("excluir (dono) confirma e chama deleteCustomCollection(id)", async () => {
+		mocks.getSession.mockReturnValue(SESSION);
+		mocks.listCommunityCollectionsPage.mockResolvedValue({
+			items: ITEMS.map((x) => ({ ...x })),
+			page: 1,
+			lastPage: 1,
+			total: 2,
+		});
+		mocks.deleteCustomCollection.mockResolvedValue(true);
+		const w = await mountView();
+		const ownerCard = w.findAll(".community-view__card").find((c) =>
+			c.text().includes("Minha coletânea pública"),
+		)!;
+		await ownerCard.find(".community-view__delete-btn").trigger("click");
+		await flushPromises();
+		// confirmação inline antes de excluir
+		expect(ownerCard.find(".community-view__delete-confirm").exists()).toBe(true);
+		await ownerCard.find(".community-view__delete-yes").trigger("click");
+		await flushPromises();
+		expect(mocks.deleteCustomCollection).toHaveBeenCalledWith(9);
+		w.unmount();
+	});
+
+	it("não-dono (deslogado): só copiar + report", async () => {
+		mocks.getSession.mockReturnValue(null);
+		mocks.listCommunityCollectionsPage.mockResolvedValue({
+			items: ITEMS.map((x) => ({ ...x })),
+			page: 1,
+			lastPage: 1,
+			total: 2,
+		});
+		const w = await mountView();
+		for (const card of w.findAll(".community-view__card")) {
+			expect(card.find(".community-view__edit-btn").exists()).toBe(false);
+			expect(card.find(".community-view__rename-btn").exists()).toBe(false);
+			expect(card.find(".community-view__delete-btn").exists()).toBe(false);
+			expect(card.find(".community-view__copy-btn").exists()).toBe(true);
+			expect(card.find(".community-view__report-btn").exists()).toBe(true);
+		}
+		w.unmount();
+	});
+});

@@ -14,6 +14,10 @@ import {
 	listCommunityCollectionsPage,
 	saveCommunityCopy,
 } from "../services/community-catalog";
+import {
+	deleteCustomCollection,
+	updateCustomCollection,
+} from "@modules/media/services/custom-catalog";
 import { registerUse, reportCollection } from "../services/ranking";
 import {
 	updateCustomCollection,
@@ -247,6 +251,97 @@ async function submitReport(reason: string) {
 	}
 }
 
+/* ---------- RF-04 (SPEC-crud-comunidade-hub v1.0.0): ações do dono inline ---------- */
+// Dono vê editar/renomear/visibilidade/excluir no próprio cartão; não-dono
+// mantém copiar/report. Editar abre o editor do app; renomear/visibilidade
+// vão direto na API (PUT /v1/custom/collections/:id); excluir com confirmação.
+const currentUserId = computed(() => getAuthSession()?.user?.id_user ?? null);
+function isOwner(collection: CommunityCollectionSummary): boolean {
+	return (
+		currentUserId.value != null &&
+		collection.ownerId != null &&
+		collection.ownerId === currentUserId.value
+	);
+}
+
+const renamingId = ref<number | null>(null);
+const renameDraft = ref("");
+const ownerActionBusy = ref(false);
+const ownerErrorId = ref<number | null>(null);
+const deleteConfirmId = ref<number | null>(null);
+
+function startRename(collection: CommunityCollectionSummary): void {
+	renamingId.value = collection.id;
+	renameDraft.value = collection.name;
+}
+
+function cancelRename(): void {
+	renamingId.value = null;
+	renameDraft.value = "";
+}
+
+async function confirmRename(collection: CommunityCollectionSummary): Promise<void> {
+	const name = renameDraft.value.trim();
+	if (!name || name === collection.name || ownerActionBusy.value) {
+		cancelRename();
+		return;
+	}
+	ownerActionBusy.value = true;
+	try {
+		const updated = await updateCustomCollection(collection.id, { name });
+		if (updated) {
+			collection.name = updated.name || name;
+		} else {
+			ownerErrorId.value = collection.id;
+		}
+		cancelRename();
+	} finally {
+		ownerActionBusy.value = false;
+	}
+}
+
+async function toggleVisibility(collection: CommunityCollectionSummary): Promise<void> {
+	if (ownerActionBusy.value) return;
+	// ausente = legado público da API (default)
+	const next = (collection.visibility ?? "public") === "public" ? "private" : "public";
+	ownerActionBusy.value = true;
+	try {
+		const updated = await updateCustomCollection(collection.id, { visibility: next });
+		if (updated) collection.visibility = next;
+		else ownerErrorId.value = collection.id;
+	} finally {
+		ownerActionBusy.value = false;
+	}
+}
+
+function requestDelete(collection: CommunityCollectionSummary): void {
+	deleteConfirmId.value = collection.id;
+}
+
+function cancelDelete(): void {
+	deleteConfirmId.value = null;
+}
+
+async function confirmDelete(collection: CommunityCollectionSummary): Promise<void> {
+	if (ownerActionBusy.value) return;
+	deleteConfirmId.value = null;
+	ownerActionBusy.value = true;
+	try {
+		const ok = await deleteCustomCollection(collection.id);
+		if (ok) {
+			await load(); // some do hub
+		} else {
+			ownerErrorId.value = collection.id;
+		}
+	} finally {
+		ownerActionBusy.value = false;
+	}
+}
+
+function openEditor(collection: CommunityCollectionSummary): void {
+	void router.push({ path: "/media/editor", query: { collection: String(collection.id) } });
+}
+
 async function saveCopy(collection: CommunityCollectionSummary) {
 	// F0.4: cópia LOCAL editável, SEM tocar na do autor.
 	// F1: registra o uso (1x/user na API; credita +5 ao dono).
@@ -454,6 +549,102 @@ onMounted(load);
               :title="t('community.ownerPrivateBadge')"
             >🔒</span>
           </p>
+          <!-- RF-04: ações do dono inline no próprio cartão -->
+          <div
+            v-if="isOwner(collection)"
+            class="community-view__owner-actions"
+          >
+            <div
+              v-if="renamingId === collection.id"
+              class="community-view__rename"
+            >
+              <input
+                v-model="renameDraft"
+                type="text"
+                class="community-view__rename-input"
+                :aria-label="t('community.renameLabel')"
+                @keyup.enter="confirmRename(collection)"
+                @keyup.esc="cancelRename"
+              >
+              <button
+                type="button"
+                class="community-view__rename-save"
+                :aria-label="t('community.renameSave')"
+                @click="confirmRename(collection)"
+              >
+                <i class="ti ti-check" aria-hidden="true" />
+              </button>
+            </div>
+            <div class="community-view__owner-btns">
+              <button
+                type="button"
+                class="community-view__edit-btn"
+                :aria-label="t('community.ownerEdit')"
+                :title="t('community.ownerEdit')"
+                @click="openEditor(collection)"
+              >
+                <i class="ti ti-pencil" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                class="community-view__rename-btn"
+                :aria-label="t('community.ownerRename')"
+                :title="t('community.ownerRename')"
+                @click="startRename(collection)"
+              >
+                <i class="ti ti-text-size" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                class="community-view__visibility-btn"
+                :aria-label="
+                  collection.visibility === 'private'
+                    ? t('community.ownerPublish')
+                    : t('community.ownerPrivar')
+                "
+                :title="
+                  collection.visibility === 'private'
+                    ? t('community.ownerPublish')
+                    : t('community.ownerPrivar')
+                "
+                @click="toggleVisibility(collection)"
+              >
+                <i
+                  :class="collection.visibility === 'private' ? 'ti ti-eye' : 'ti ti-eye-off'"
+                  aria-hidden="true"
+                />
+              </button>
+              <button
+                type="button"
+                class="community-view__delete-btn"
+                :aria-label="t('community.ownerDelete')"
+                :title="t('community.ownerDelete')"
+                @click="requestDelete(collection)"
+              >
+                <i class="ti ti-trash" aria-hidden="true" />
+              </button>
+            </div>
+            <p
+              v-if="deleteConfirmId === collection.id"
+              class="community-view__delete-confirm"
+            >
+              <span>{{ t('community.deleteConfirm') }}</span>
+              <button
+                type="button"
+                class="community-view__delete-yes"
+                @click="confirmDelete(collection)"
+              >
+                {{ t('community.deleteYes') }}
+              </button>
+              <button
+                type="button"
+                class="community-view__delete-no"
+                @click="cancelDelete"
+              >
+                {{ t('community.deleteNo') }}
+              </button>
+            </p>
+          </div>
           <div class="community-view__actions">
             <button
               type="button"
