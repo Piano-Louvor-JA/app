@@ -1,3 +1,4 @@
+import { STAGE_TRANSITION_OPTIONS, type StageTransition } from '@modules/settings/types/stage-settings'
 import { notesHtmlToPlainText, normalizeTitleColor, sanitizeNotesHtml } from '@modules/liturgy/services/rich-notes'
 import { USER_PREFERENCE_KEYS } from '@shared/constants/storage-keys'
 import { getUserPreference, setUserPreference } from '@shared/services/user-preferences'
@@ -95,7 +96,20 @@ function asCarousel(value: unknown): CarouselConfig {
   const slideMs = typeof raw === 'number' && Number.isFinite(raw)
     ? Math.min(CAROUSEL_SLIDE_MS_MAX, Math.max(CAROUSEL_SLIDE_MS_MIN, Math.round(raw)))
     : CAROUSEL_SLIDE_MS_DEFAULT
-  return { slideMs, loop: source.loop === false ? false : true }
+  const transition = STAGE_TRANSITION_OPTIONS.includes(source.transition as StageTransition)
+    ? (source.transition as StageTransition)
+    : 'fade'
+  const speeds = ['fast', 'normal', 'slow'] as const
+  const transitionSpeed = speeds.includes(source.transitionSpeed as (typeof speeds)[number])
+    ? (source.transitionSpeed as (typeof speeds)[number])
+    : 'normal'
+  return {
+    slideMs,
+    loop: source.loop === false ? false : true,
+    transitionEnabled: source.transitionEnabled === true,
+    transition,
+    transitionSpeed,
+  }
 }
 
 export function emptyAnnouncementList(name: string): AnnouncementList {

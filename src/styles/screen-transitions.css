@@ -1,0 +1,297 @@
+/*
+ * Transições de tela da projeção (Bíblia; depois músicas e textos).
+ * Uso: <Transition :name="`scr-${transicao}`" mode="out-in"> e a variável
+ * --scr-transition-ms no elemento pai (duração de cada fase).
+ * `scr-none` não tem regra: o Vue troca o conteúdo sem animar.
+ */
+
+:root {
+  --scr-transition-ms: 250ms;
+}
+
+/* :where() zera a especificidade: cada transição pode trocar o easing. */
+:where([class*='scr-'][class*='-enter-active'], [class*='scr-'][class*='-leave-active']) {
+  transition-duration: var(--scr-transition-ms, 250ms);
+  transition-timing-function: ease;
+  transition-property: opacity, transform, filter, clip-path;
+}
+
+/* Esmaecer */
+.scr-fade-enter-from,
+.scr-fade-leave-to {
+  opacity: 0;
+}
+
+/* Deslizar para cima */
+.scr-slide-enter-from {
+  opacity: 0;
+  transform: translateY(4vh);
+}
+.scr-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-2vh);
+}
+
+/* Deslizar para baixo */
+.scr-slide-down-enter-from {
+  opacity: 0;
+  transform: translateY(-4vh);
+}
+.scr-slide-down-leave-to {
+  opacity: 0;
+  transform: translateY(2vh);
+}
+
+/* Deslizar para a esquerda (entra pela direita) */
+.scr-slide-left-enter-from {
+  opacity: 0;
+  transform: translateX(8vw);
+}
+.scr-slide-left-leave-to {
+  opacity: 0;
+  transform: translateX(-8vw);
+}
+
+/* Deslizar para a direita (entra pela esquerda) */
+.scr-slide-right-enter-from {
+  opacity: 0;
+  transform: translateX(-8vw);
+}
+.scr-slide-right-leave-to {
+  opacity: 0;
+  transform: translateX(8vw);
+}
+
+/* Aproximar */
+.scr-zoom-enter-from {
+  opacity: 0;
+  transform: scale(0.94);
+}
+.scr-zoom-leave-to {
+  opacity: 0;
+  transform: scale(1.03);
+}
+
+/* Afastar */
+.scr-zoom-out-enter-from {
+  opacity: 0;
+  transform: scale(1.12);
+}
+.scr-zoom-out-leave-to {
+  opacity: 0;
+  transform: scale(0.9);
+}
+
+/* Desfocar */
+.scr-blur-enter-from,
+.scr-blur-leave-to {
+  opacity: 0;
+  filter: blur(14px);
+}
+
+/* Revelar (da esquerda para a direita) */
+.scr-wipe-enter-active,
+.scr-wipe-leave-active {
+  transition-timing-function: cubic-bezier(0.65, 0, 0.35, 1);
+}
+.scr-wipe-enter-from {
+  clip-path: inset(0 100% 0 0);
+}
+.scr-wipe-enter-to,
+.scr-wipe-leave-from {
+  clip-path: inset(0 0 0 0);
+}
+.scr-wipe-leave-to {
+  clip-path: inset(0 0 0 100%);
+}
+
+/* Círculo (abre do centro) */
+.scr-iris-enter-from,
+.scr-iris-leave-to {
+  clip-path: circle(0% at 50% 50%);
+}
+.scr-iris-enter-to,
+.scr-iris-leave-from {
+  clip-path: circle(75% at 50% 50%);
+}
+
+/* Cortina (abre do centro para os lados) */
+.scr-curtain-enter-from,
+.scr-curtain-leave-to {
+  clip-path: inset(0 50% 0 50%);
+}
+.scr-curtain-enter-to,
+.scr-curtain-leave-from {
+  clip-path: inset(0 0 0 0);
+}
+
+/* Virar (3D) */
+.scr-flip-enter-from {
+  opacity: 0;
+  transform: perspective(1200px) rotateX(-75deg);
+}
+.scr-flip-leave-to {
+  opacity: 0;
+  transform: perspective(1200px) rotateX(75deg);
+}
+
+/* Cair (desce com leve quique) */
+.scr-drop-enter-active {
+  transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.scr-drop-enter-from {
+  opacity: 0;
+  transform: translateY(-8vh);
+}
+.scr-drop-leave-to {
+  opacity: 0;
+  transform: translateY(3vh);
+}
+
+/* Girar */
+.scr-rotate-enter-from {
+  opacity: 0;
+  transform: rotate(-8deg) scale(0.9);
+}
+.scr-rotate-leave-to {
+  opacity: 0;
+  transform: rotate(8deg) scale(0.9);
+}
+
+/* Balançar (porta abrindo pela esquerda) */
+.scr-swing-enter-active,
+.scr-swing-leave-active {
+  transform-origin: left center;
+}
+.scr-swing-enter-from {
+  opacity: 0;
+  transform: perspective(1200px) rotateY(-70deg);
+}
+.scr-swing-leave-to {
+  opacity: 0;
+  transform: perspective(1200px) rotateY(70deg);
+}
+
+/* Virar de lado (3D horizontal) */
+.scr-flip-h-enter-from {
+  opacity: 0;
+  transform: perspective(1200px) rotateY(-80deg);
+}
+.scr-flip-h-leave-to {
+  opacity: 0;
+  transform: perspective(1200px) rotateY(80deg);
+}
+
+/* Saltar (cresce com leve quique) */
+.scr-pop-enter-active {
+  transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.scr-pop-enter-from {
+  opacity: 0;
+  transform: scale(0.6);
+}
+.scr-pop-leave-to {
+  opacity: 0;
+  transform: scale(0.85);
+}
+
+/* Esticar (abre na horizontal) */
+.scr-stretch-enter-from,
+.scr-stretch-leave-to {
+  opacity: 0;
+  transform: scaleX(0.1);
+}
+
+/* Cinema (faixas abrindo de cima e de baixo) */
+.scr-cinema-enter-from,
+.scr-cinema-leave-to {
+  clip-path: inset(50% 0 50% 0);
+}
+.scr-cinema-enter-to,
+.scr-cinema-leave-from {
+  clip-path: inset(0 0 0 0);
+}
+
+/* Revelar para cima */
+.scr-wipe-up-enter-active,
+.scr-wipe-up-leave-active,
+.scr-wipe-down-enter-active,
+.scr-wipe-down-leave-active,
+.scr-diagonal-enter-active,
+.scr-diagonal-leave-active {
+  transition-timing-function: cubic-bezier(0.65, 0, 0.35, 1);
+}
+.scr-wipe-up-enter-from {
+  clip-path: inset(100% 0 0 0);
+}
+.scr-wipe-up-enter-to,
+.scr-wipe-up-leave-from {
+  clip-path: inset(0 0 0 0);
+}
+.scr-wipe-up-leave-to {
+  clip-path: inset(0 0 100% 0);
+}
+
+/* Revelar para baixo */
+.scr-wipe-down-enter-from {
+  clip-path: inset(0 0 100% 0);
+}
+.scr-wipe-down-enter-to,
+.scr-wipe-down-leave-from {
+  clip-path: inset(0 0 0 0);
+}
+.scr-wipe-down-leave-to {
+  clip-path: inset(100% 0 0 0);
+}
+
+/* Diagonal (revela do canto superior esquerdo) */
+.scr-diagonal-enter-from {
+  clip-path: polygon(0 0, 0 0, 0 0);
+}
+.scr-diagonal-enter-to,
+.scr-diagonal-leave-from {
+  clip-path: polygon(0 0, 200% 0, 0 200%);
+}
+.scr-diagonal-leave-to {
+  clip-path: polygon(0 0, 0 0, 0 0);
+}
+
+/* Clarão (surge de um brilho) */
+.scr-glow-enter-from,
+.scr-glow-leave-to {
+  opacity: 0;
+  filter: brightness(3) blur(6px);
+}
+
+/* Flutuar (sobe suave desfocado) */
+.scr-float-enter-from {
+  opacity: 0;
+  filter: blur(6px);
+  transform: translateY(3vh);
+}
+.scr-float-leave-to {
+  opacity: 0;
+  filter: blur(6px);
+  transform: translateY(-3vh);
+}
+
+/* Zoom desfocado */
+.scr-zoom-blur-enter-from {
+  opacity: 0;
+  filter: blur(10px);
+  transform: scale(1.25);
+}
+.scr-zoom-blur-leave-to {
+  opacity: 0;
+  filter: blur(10px);
+  transform: scale(0.8);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [class*='scr-'][class*='-enter-from'],
+  [class*='scr-'][class*='-leave-to'] {
+    transform: none !important;
+    filter: none !important;
+    clip-path: none !important;
+  }
+}

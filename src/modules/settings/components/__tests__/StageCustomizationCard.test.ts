@@ -35,6 +35,7 @@ Object.defineProperty(globalThis, 'sessionStorage', { value: lsStub, configurabl
 
 import StageCustomizationCard from '../StageCustomizationCard.vue'
 import { useStageSettingsStore } from '../../stores/useStageSettingsStore'
+import { STAGE_TRANSITION_OPTIONS } from '../../types/stage-settings'
 
 async function mountCard(props: Record<string, unknown> = {}) {
   const w = mount(StageCustomizationCard, { props })
@@ -180,7 +181,8 @@ describe('StageCustomizationCard', () => {
     expect(store.settings.bibleFontSize).not.toBe(before)
     // toggle versão
     const beforeVersion = store.settings.showBibleVersion
-    await w.find('.stage-custom__toggle-label').trigger('click')
+    const versionLabel = w.findAll('.stage-custom__toggle-label').find((l) => l.text().includes('showBibleVersion'))!
+    await versionLabel.trigger('click')
     expect(store.settings.showBibleVersion).toBe(!beforeVersion)
   })
 
@@ -209,14 +211,18 @@ describe('StageCustomizationCard', () => {
     const w = await mountCard({ onlyScope: 'bible' })
     active = w
     const store = useStageSettingsStore()
+    // Desligada por padrão: sem seletor até ligar a caixa.
+    expect(store.settings.bibleTransitionEnabled).toBe(false)
+    expect(w.find('[data-testid="bible-transition"]').exists()).toBe(false)
+    const enableLabel = w.findAll('.stage-custom__toggle-label').find((l) => l.text().includes('transitionsEnabled'))!
+    await enableLabel.trigger('click')
+    expect(store.settings.bibleTransitionEnabled).toBe(true)
     const kinds = w.find('[data-testid="bible-transition"]').findAll('[role="radio"]')
-    expect(kinds.map((r) => r.text())).toEqual([
-      'settings.stage.transitionNone',
-      'settings.stage.transitionFade',
-      'settings.stage.transitionSlide',
-      'settings.stage.transitionZoom',
-    ])
-    expect(kinds[1].attributes('aria-checked')).toBe('true')
+    // "Nenhuma" não entra no seletor: desligar é pela caixa.
+    const shown = STAGE_TRANSITION_OPTIONS.filter((v) => v !== 'none')
+    expect(kinds).toHaveLength(shown.length)
+    const at = (value: (typeof shown)[number]) => kinds[shown.indexOf(value)]
+    expect(at('fade').attributes('aria-checked')).toBe('true')
     const speeds = () => w.find('[data-testid="bible-transition-speed"]')
     expect(speeds().findAll('[role="radio"]').map((r) => r.text())).toEqual([
       'settings.stage.transitionFast',
@@ -225,10 +231,10 @@ describe('StageCustomizationCard', () => {
     ])
     await speeds().findAll('[role="radio"]')[2].trigger('click')
     expect(store.settings.bibleTransitionSpeed).toBe('slow')
-    await kinds[3].trigger('click')
+    await at('zoom').trigger('click')
     expect(store.settings.bibleTransition).toBe('zoom')
-    await kinds[0].trigger('click')
-    expect(store.settings.bibleTransition).toBe('none')
+    await enableLabel.trigger('click')
+    expect(store.settings.bibleTransitionEnabled).toBe(false)
     expect(speeds().exists()).toBe(false)
   })
 
@@ -289,7 +295,7 @@ describe('StageCustomizationCard', () => {
     active = w
     const store = useStageSettingsStore()
     expect(w.text()).toContain('settings.stage.musicBg')
-    const sw = w.find('[role="switch"]')
+    const sw = w.find('[role="switch"][aria-label="settings.stage.musicBgOverride"]')
     await sw.trigger('click')
     expect(store.settings.hymns?.overrideBg).toBe(true)
     await sw.trigger('click')

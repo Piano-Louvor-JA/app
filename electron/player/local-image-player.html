@@ -55,6 +55,7 @@
       <p id="error">Não foi possível carregar as imagens.</p>
     </div>
     <script src="zoom-pan.js"></script>
+    <script src="screen-transitions.js"></script>
     <script>
       ;(() => {
         const params = new URLSearchParams(window.location.search)
@@ -110,7 +111,19 @@
           frame.style.display = 'block'
           error?.classList.remove('is-visible')
           const src = localAppSrc(sources[index])
-          if (frame.getAttribute('src') !== src) frame.src = src
+          if (frame.getAttribute('src') !== src) {
+            // Animação escolhida na barra: a imagem antiga sai e a nova entra já carregada.
+            const hadImage = Boolean(frame.getAttribute('src'))
+            const swap = hadImage && window.PianoScreenTransition
+              ? window.PianoScreenTransition.begin(frame)
+              : null
+            frame.src = src
+            if (swap) {
+              const play = () => swap.play()
+              if (typeof frame.decode === 'function') frame.decode().then(play, play)
+              else play()
+            }
+          }
           return { index, total: sources.length }
         }
 

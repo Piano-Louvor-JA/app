@@ -97,7 +97,7 @@ describe('stage-settings (paridade APK)', () => {
       expect(back.bibleTransition).toBe(transition)
       expect(back.bibleTransitionSpeed).toBe('slow')
     }
-    expect(parseStageSettings({ bTrans: 'flip', bTransSpd: 'turbo' })).toMatchObject({
+    expect(parseStageSettings({ bTrans: 'teleporte', bTransSpd: 'turbo' })).toMatchObject({
       bibleTransition: 'fade',
       bibleTransitionSpeed: 'normal',
     })

@@ -2,23 +2,31 @@
  * Liga a cópia local dos vídeos do YouTube ao resto do app: configurações persistidas no workspace,
  * instalação adiada das ferramentas, verificação diária do yt-dlp e canais IPC do renderer.
  */
+import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import { CacheStore } from './cache-store.mjs'
+import { MultiCache, customVideosDir } from './multi-cache.mjs'
 import { OnlineVideoManager } from './manager.mjs'
 import { DEFAULT_HEIGHT, QUALITY_HEIGHTS } from './resolver.mjs'
 import { Tools, UPDATE_INTERVAL_MS } from './tools.mjs'
 
 export const ONLINE_VIDEO_RECORD = 'online-video'
-export const CACHE_LIMIT_GB_OPTIONS = [2, 4, 6, 10, 20]
+export const CACHE_LIMIT_GB_OPTIONS = [2, 4, 6, 10, 20, 40, 80]
 /** Desligado: toca pela página do YouTube e só baixa a cópia quando a página não toca. */
-export const DEFAULT_SETTINGS = Object.freeze({ enabled: false, maxHeight: DEFAULT_HEIGHT, limitGb: 6 })
+export const DEFAULT_SETTINGS = Object.freeze({ enabled: false, maxHeight: DEFAULT_HEIGHT, limitGb: 6, folder: 'system', customDir: null })
 export const DEFERRED_INSTALL_MS = 3 * 60 * 1000
 export const PLAY_TIMEOUT_MS = 15_000
 export const FALLBACK_TIMEOUT_MS = 60_000
-const GB = 1024 ** 3
+/**
+ * Sem limite automático: o operador escolhe a pasta e apaga os vídeos quando quiser.
+ * (`limitGb` continua no registro só por compatibilidade com versões antigas.)
+ */
+export const NO_LIMIT_BYTES = Number.POSITIVE_INFINITY
 
 /**
- * @typedef {{ enabled: boolean, maxHeight: number, limitGb: number }} OnlineVideoSettings
+ * `folder`: pasta que recebe os downloads novos; `customDir`: pasta escolhida pelo operador (os vídeos
+ * ficam na subpasta `LouvorJA-PIANO-videos` dela).
+ * @typedef {{ enabled: boolean, maxHeight: number, limitGb: number, folder: 'system' | 'custom', customDir: string | null }} OnlineVideoSettings
  * @param {unknown} record
  * @returns {OnlineVideoSettings}
  */
@@ -28,7 +36,16 @@ export function settingsFromRecord(record) {
     enabled: typeof r.enabled === 'boolean' ? r.enabled : DEFAULT_SETTINGS.enabled,
     maxHeight: QUALITY_HEIGHTS.includes(/** @type {number} */ (r.maxHeight)) ? /** @type {number} */ (r.maxHeight) : DEFAULT_SETTINGS.maxHeight,
     limitGb: CACHE_LIMIT_GB_OPTIONS.includes(/** @type {number} */ (r.limitGb)) ? /** @type {number} */ (r.limitGb) : DEFAULT_SETTINGS.limitGb,
+    ...folderFromRecord(r),
   }
+}
+
+/** @param {Record<string, unknown>} r */
+function folderFromRecord(r) {
+  const customDir = typeof r.customDir === 'string' && r.customDir.trim() && path.isAbsolute(r.customDir.trim()) ? r.customDir.trim() : null
+  /** @type {'system' | 'custom'} */
+  const folder = r.folder === 'custom' && customDir ? 'custom' : 'system'
+  return { folder, customDir }
 }
 
 export class OnlineVideoService {
@@ -44,14 +61,19 @@ export class OnlineVideoService {
     this.broadcast = opts.broadcast ?? (() => {})
     this.log = opts.log ?? (() => {})
     this.hidden = Boolean(opts.windowsStore)
+    /** Abre a pasta no gerenciador de arquivos (shell.openPath): '' = ok, texto = erro. */
+    this.openPath = opts.openPath ?? null
     this.settings = settingsFromRecord(safeRead(opts.readRecord))
     this.tools = opts.tools ?? new Tools({
       binDir: path.join(opts.userDataDir, 'bin'),
       onStatus: (status) => this.broadcast('online-video:tools', status),
     })
-    this.cache = opts.cache ?? new CacheStore({
-      dir: path.join(opts.userDataDir, 'video-cache'),
-      limitBytes: this.settings.limitGb * GB,
+    /** Abre o seletor de pasta do sistema; `null` = cancelado. */
+    this.chooseDirectory = opts.chooseDirectory ?? null
+    this.cache = opts.cache ?? new MultiCache({
+      system: new CacheStore({ dir: path.join(opts.userDataDir, 'video-cache'), limitBytes: NO_LIMIT_BYTES }),
+      custom: this.settings.customDir ? this.#customStore(this.settings.customDir) : null,
+      active: this.settings.folder,
     })
     const getLocale = opts.getLocale ?? (() => 'pt-BR')
     this.manager = opts.manager ?? new OnlineVideoManager({
@@ -92,6 +114,39 @@ export class OnlineVideoService {
       settings: { ...this.settings },
       tools: this.tools.status(),
       usage: this.cache.usage(),
+      cacheDir: this.cache.dir,
+      folders: typeof this.cache.folders === 'function' ? this.cache.folders() : null,
+    }
+  }
+
+  #customStore(chosen) {
+    return new CacheStore({ dir: customVideosDir(chosen), limitBytes: NO_LIMIT_BYTES })
+  }
+
+  /** Arquivo `<id>.mp4|vtt` servido pelo protocolo, na pasta que tem o vídeo. */
+  cacheFile(name) {
+    return typeof this.cache.fileFor === 'function' ? this.cache.fileFor(name) : path.join(this.cache.dir, name)
+  }
+
+  /** "Escolher pasta": abre o seletor e passa a baixar nela. */
+  async chooseCustomFolder() {
+    if (!this.chooseDirectory) return this.status()
+    const chosen = await this.chooseDirectory()
+    if (typeof chosen !== 'string' || !chosen) return this.status()
+    return this.setSettings({ customDir: chosen, folder: 'custom' })
+  }
+
+  /** Abre a pasta dos vídeos baixados (cria se ainda não existe). */
+  /** @param {'system' | 'custom'} [which] sem argumento: a pasta ativa */
+  async openCacheFolder(which) {
+    const folders = typeof this.cache.folders === 'function' ? this.cache.folders() : null
+    const dir = which && folders ? folders[which]?.dir : this.cache.dir
+    if (!this.openPath || !dir) return false
+    try {
+      await mkdir(dir, { recursive: true })
+      return !(await this.openPath(dir))
+    } catch {
+      return false
     }
   }
 
@@ -100,7 +155,8 @@ export class OnlineVideoService {
     const wasEnabled = this.settings.enabled
     this.settings = settingsFromRecord({ ...this.settings, ...(partial && typeof partial === 'object' ? partial : {}) })
     this.writeRecord(ONLINE_VIDEO_RECORD, this.settings)
-    await this.cache.setLimit(this.settings.limitGb * GB)
+    if (this.cache instanceof MultiCache) await this.#applyFolders()
+    await this.cache.setLimit(NO_LIMIT_BYTES)
     if (wasEnabled && !this.settings.enabled) await this.manager.cancelAll({ keepPlaying: true })
     if (!wasEnabled && this.settings.enabled) this.#background()
     return this.status()
@@ -156,13 +212,67 @@ export class OnlineVideoService {
     return this.manager.cancel(id)
   }
 
+  /**
+   * "Baixar" pedido pelo operador (módulo YouTube): vale mesmo com a chave desligada, instalando
+   * as ferramentas na primeira vez. Vai para a pasta ativa (escolhida no popup / Configurações).
+   * @returns {Promise<boolean>} false quando este sistema não baixa vídeos
+   */
+  async download(ids) {
+    if (this.hidden || !this.tools.available) return false
+    const list = (Array.isArray(ids) ? ids : []).filter((id) => typeof id === 'string')
+    if (list.length === 0) return false
+    try {
+      await this.tools.ensure()
+    } catch {
+      return false
+    }
+    this.manager.prefetch(list)
+    return true
+  }
+
   keep(ids) {
     return this.cache.setKeep(Array.isArray(ids) ? ids : [])
   }
 
-  async clear() {
-    await this.cache.clear()
+  /**
+   * Apaga a cópia baixada de um vídeo (botão lixeira do módulo YouTube), em qualquer pasta.
+   * O vídeo que está tocando agora não é apagado.
+   * @returns {Promise<boolean>}
+   */
+  async removeVideo(id) {
+    if (typeof id !== 'string' || !this.cache.has?.(id)) return false
+    if (typeof this.cache.isProtected === 'function' && this.cache.isProtected(id)) return false
+    await this.cache.remove(id)
+    return true
+  }
+
+  /** @param {'system' | 'custom'} [which] sem argumento: as duas pastas */
+  async clear(which) {
+    await this.cache.clear(which === 'system' || which === 'custom' ? which : undefined)
     return this.status()
+  }
+
+  /** Pasta personalizada nova (ou trocada): carrega o índice dela; a ativa segue a escolha. */
+  async #applyFolders() {
+    const cache = /** @type {MultiCache} */ (this.cache)
+    const wanted = this.settings.customDir ? customVideosDir(this.settings.customDir) : null
+    if ((cache.custom?.dir ?? null) !== wanted) {
+      const store = this.settings.customDir ? this.#customStore(this.settings.customDir) : null
+      if (store) {
+        try {
+          await store.load()
+        } catch (error) {
+          this.log(`pasta personalizada inacessível: ${error?.message ?? error}`)
+          this.settings = { ...this.settings, folder: 'system', customDir: null }
+          this.writeRecord(ONLINE_VIDEO_RECORD, this.settings)
+          cache.setCustom(null)
+          cache.setActive('system')
+          return
+        }
+      }
+      cache.setCustom(store)
+    }
+    cache.setActive(this.settings.folder)
   }
 
   videoStatus(ids) {
@@ -217,8 +327,12 @@ export function registerOnlineVideoIpc(ipcMain, service) {
   ipcMain.handle('online-video:set-settings', (_event, partial) => service.setSettings(partial))
   ipcMain.handle('online-video:prefetch', (_event, ids) => service.prefetch(ids))
   ipcMain.handle('online-video:cancel', (_event, id) => service.cancel(id))
+  ipcMain.handle('online-video:download', (_event, ids) => service.download(ids))
+  ipcMain.handle('online-video:remove', (_event, id) => service.removeVideo(id))
   ipcMain.handle('online-video:keep', (_event, ids) => service.keep(ids))
-  ipcMain.handle('online-video:clear', () => service.clear())
+  ipcMain.handle('online-video:clear', (_event, which) => service.clear(which))
   ipcMain.handle('online-video:video-status', (_event, ids) => service.videoStatus(ids))
   ipcMain.handle('online-video:retry-tools', () => service.retryTools())
+  ipcMain.handle('online-video:open-folder', (_event, which) => service.openCacheFolder(which))
+  ipcMain.handle('online-video:choose-folder', () => service.chooseCustomFolder())
 }

@@ -11,6 +11,7 @@ import { useProgressiveList } from '@shared/composables/useProgressiveList'
 import AlbumLyricDialog from '../components/AlbumLyricDialog.vue'
 import AlbumPlaylistPickerDialog from '../components/AlbumPlaylistPickerDialog.vue'
 import AlbumTrackRow from '../components/AlbumTrackRow.vue'
+import StageCustomizationDialog from '@modules/settings/components/StageCustomizationDialog.vue'
 import { useAlbums } from '../composables/useAlbums'
 import {
   addPlaylistItem,
@@ -20,6 +21,8 @@ import {
 import type { AlbumTrack } from '../types/albums'
 
 const { t } = useI18n()
+/** Personalizar Slides / Palco das músicas (mesmo diálogo do player). */
+const stageDialogOpen = ref(false)
 const route = useRoute()
 const router = useRouter()
 
@@ -228,6 +231,18 @@ async function runAction(
       <div v-if="activeCollection && filteredTracks.length > 0"
         class="album-collection-view__playback-actions">
         <button type="button" class="album-collection-view__shuffle"
+          data-testid="album-stage-customize"
+          :aria-label="t('settings.stage.titleSlides')" :title="t('settings.stage.titleSlides')"
+          @click="stageDialogOpen = true">
+          <i class="ti ti-palette" aria-hidden="true" />
+        </button>
+        <StageCustomizationDialog
+          :open="stageDialogOpen"
+          scope="hymns"
+          @close="stageDialogOpen = false"
+        />
+        <button type="button" class="album-collection-view__shuffle"
+          data-testid="album-shuffle"
           :aria-label="t('albums.playlists.shuffle')" :title="t('albums.playlists.shuffleHint')"
           @click="playAllInActiveCollection('audio', true)">
           <i class="ti ti-arrows-shuffle" aria-hidden="true" />

@@ -20,7 +20,14 @@ import {
   STAGE_OFFICIAL_BACKGROUNDS,
   STAGE_REF_PRESETS,
   TIMER_TIME_FORMAT_OPTIONS,
+  bibleTransitionMs,
   officialBgUrl,
+  resolveReturnScreen,
+  RETURN_FONT_SIZE_MAX,
+  RETURN_FONT_SIZE_MIN,
+  RETURN_NEXT_FONT_SIZE_MIN,
+  returnNextFontSize,
+  type ReturnScreenSettings,
   resolveBackgroundImage,
   type StageFontWeight,
   type StageModuleScope,
@@ -28,6 +35,7 @@ import {
 } from '../types/stage-settings'
 
 import SettingsToggle from './SettingsToggle.vue'
+import ScreenTransitionPicker from './ScreenTransitionPicker.vue'
 import FontSelector from './FontSelector.vue'
 import StagePreview from './StagePreview.vue'
 
@@ -160,6 +168,24 @@ function clearTitleOverrides() {
   patch({ titleFontSize: null, titleFontWeight: null, titleTextColor: null, titleTextShadow: null, titleUpperCase: false, titleTextBox: false })
 }
 
+/** Liga/desliga as animações dos slides; ao ligar sem transição, usa Esmaecer. */
+function setLyricTransitionEnabled(enabled: boolean) {
+  patch(
+    enabled && settings.value.lyricTransition === 'none'
+      ? { lyricTransitionEnabled: true, lyricTransition: 'fade' }
+      : { lyricTransitionEnabled: enabled },
+  )
+}
+
+/** Liga/desliga as animações da anotação; ao ligar sem transição, usa Esmaecer. */
+function setTextTransitionEnabled(enabled: boolean) {
+  patch(
+    enabled && settings.value.textTransition === 'none'
+      ? { textTransitionEnabled: true, textTransition: 'fade' }
+      : { textTransitionEnabled: enabled },
+  )
+}
+
 function clearLyricOverrides() {
   patch({ lyricFontSize: null, lyricFontWeight: null, lyricTextColor: null, lyricTextShadow: null, lyricUpperCase: false })
 }
@@ -188,12 +214,14 @@ const bibleRefPositionOptions: { value: StageSettings['bibleRefPosition']; label
   { value: 'corner', label: t('settings.stage.refPositionCorner'), hint: t('settings.stage.refPositionCornerHint') },
 ]
 
-const bibleTransitionOptions: { value: StageSettings['bibleTransition']; label: string }[] = [
-  { value: 'none', label: t('settings.stage.transitionNone') },
-  { value: 'fade', label: t('settings.stage.transitionFade') },
-  { value: 'slide', label: t('settings.stage.transitionSlide') },
-  { value: 'zoom', label: t('settings.stage.transitionZoom') },
-]
+/** Liga/desliga as animações; ao ligar sem transição escolhida, usa Esmaecer. */
+function setBibleTransitionEnabled(enabled: boolean) {
+  patch(
+    enabled && settings.value.bibleTransition === 'none'
+      ? { bibleTransitionEnabled: true, bibleTransition: 'fade' }
+      : { bibleTransitionEnabled: enabled },
+  )
+}
 
 const bibleTransitionSpeedOptions: { value: StageSettings['bibleTransitionSpeed']; label: string }[] = [
   { value: 'fast', label: t('settings.stage.transitionFast') },
@@ -211,6 +239,51 @@ const vAlignOptions = [
   { value: 'top', label: t('settings.stage.alignTop') },
   { value: 'middle', label: t('settings.stage.alignMiddle') },
   { value: 'bottom', label: t('settings.stage.alignBottom') },
+] as const
+
+/* Tela de retorno (monitor dos músicos): campo vazio = igual aos slides. */
+const returnSettings = computed(() => resolveReturnScreen(settings.value))
+const returnFileInput = ref<HTMLInputElement | null>(null)
+/** Bloco recolhível como o de Fontes. */
+const returnOpen = ref(false)
+
+function patchReturn(partial: Partial<ReturnScreenSettings>) {
+  patch({ returnScreen: { ...returnSettings.value, ...partial } })
+}
+
+function resetReturn() {
+  patch({ returnScreen: undefined })
+}
+
+function onReturnFileSelected(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0] ?? null
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = () => {
+    if (typeof reader.result === 'string') patchReturn({ bgMode: 'image', bgImage: reader.result })
+  }
+  reader.readAsDataURL(file)
+  input.value = ''
+}
+
+const returnWeightOptions = [
+  { value: null, label: t('settings.stage.returnSameAsSlides') },
+  { value: 400, label: t('settings.stage.weightNormal') },
+  { value: 600, label: t('settings.stage.weightMedium') },
+  { value: 800, label: t('settings.stage.weightStrong') },
+] as const
+
+const returnUpperOptions = [
+  { value: null, label: t('settings.stage.returnSameAsSlides') },
+  { value: true, label: t('settings.stage.returnUpperOn') },
+  { value: false, label: t('settings.stage.returnUpperOff') },
+] as const
+
+const returnBgOptions = [
+  { value: 'slides', label: t('settings.stage.returnSameAsSlides') },
+  { value: 'color', label: t('settings.stage.returnBgColor') },
+  { value: 'image', label: t('settings.stage.returnBgImage') },
 ] as const
 
 function onFileSelected(event: Event) {
@@ -278,6 +351,7 @@ const confirmReset = ref(false)
       <div class="stage-custom__controls">
       <div class="stage-custom__controls-inner">
         <FontSelector :scope="activeScope" compact />
+
         <div class="stage-custom__section">
           <p class="stage-custom__label">{{ t('settings.stage.backgroundColor') }}</p>
       <div class="stage-custom__swatches">
@@ -391,6 +465,122 @@ const confirmReset = ref(false)
     </div>
 
     <!-- Tipografia geral não vale na Bíblia (usa aparência própria abaixo). -->
+    <!-- Músicas: transições ao trocar slide -->
+    <template v-if="activeScope === 'hymns'">
+      <div class="stage-custom__section">
+        <p class="stage-custom__label">{{ t('settings.stage.transitionsSection') }}</p>
+        <div class="stage-custom__toggle-row">
+          <button
+            type="button"
+            class="stage-custom__toggle-label"
+            @click="setLyricTransitionEnabled(!settings.lyricTransitionEnabled)"
+          >
+            {{ t('settings.stage.transitionsEnabled') }}
+          </button>
+          <SettingsToggle
+            :model-value="settings.lyricTransitionEnabled"
+            :label="t('settings.stage.transitionsEnabled')"
+            data-testid="lyric-transition-enabled"
+            @update:model-value="setLyricTransitionEnabled($event)"
+          />
+        </div>
+
+        <template v-if="settings.lyricTransitionEnabled">
+          <p class="stage-custom__label stage-custom__label--sub">
+            {{ t('settings.stage.lyricTransition') }}
+          </p>
+          <ScreenTransitionPicker
+            :model-value="settings.lyricTransition"
+            :duration-ms="bibleTransitionMs(settings.lyricTransitionSpeed)"
+            :label="t('settings.stage.lyricTransition')"
+            test-id="lyric-transition"
+            @update:model-value="patch({ lyricTransition: $event })"
+          />
+
+          <p class="stage-custom__label stage-custom__label--sub">
+            {{ t('settings.stage.bibleTransitionSpeed') }}
+          </p>
+          <div
+            class="stage-custom__segment"
+            role="radiogroup"
+            data-testid="lyric-transition-speed"
+            :aria-label="t('settings.stage.bibleTransitionSpeed')"
+          >
+            <button
+              v-for="opt in bibleTransitionSpeedOptions"
+              :key="opt.value"
+              type="button"
+              role="radio"
+              :aria-checked="settings.lyricTransitionSpeed === opt.value"
+              class="stage-custom__segment-btn"
+              :class="{ 'stage-custom__segment-btn--active': settings.lyricTransitionSpeed === opt.value }"
+              @click="patch({ lyricTransitionSpeed: opt.value })"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
+        </template>
+      </div>
+    </template>
+
+    <!-- Liturgia: transições ao trocar a anotação -->
+    <template v-if="activeScope === 'liturgy'">
+      <div class="stage-custom__section">
+        <p class="stage-custom__label">{{ t('settings.stage.transitionsSection') }}</p>
+        <div class="stage-custom__toggle-row">
+          <button
+            type="button"
+            class="stage-custom__toggle-label"
+            @click="setTextTransitionEnabled(!settings.textTransitionEnabled)"
+          >
+            {{ t('settings.stage.transitionsEnabled') }}
+          </button>
+          <SettingsToggle
+            :model-value="settings.textTransitionEnabled"
+            :label="t('settings.stage.transitionsEnabled')"
+            data-testid="text-transition-enabled"
+            @update:model-value="setTextTransitionEnabled($event)"
+          />
+        </div>
+
+        <template v-if="settings.textTransitionEnabled">
+          <p class="stage-custom__label stage-custom__label--sub">
+            {{ t('settings.stage.textTransition') }}
+          </p>
+          <ScreenTransitionPicker
+            :model-value="settings.textTransition"
+            :duration-ms="bibleTransitionMs(settings.textTransitionSpeed)"
+            :label="t('settings.stage.textTransition')"
+            test-id="text-transition"
+            @update:model-value="patch({ textTransition: $event })"
+          />
+
+          <p class="stage-custom__label stage-custom__label--sub">
+            {{ t('settings.stage.bibleTransitionSpeed') }}
+          </p>
+          <div
+            class="stage-custom__segment"
+            role="radiogroup"
+            data-testid="text-transition-speed"
+            :aria-label="t('settings.stage.bibleTransitionSpeed')"
+          >
+            <button
+              v-for="opt in bibleTransitionSpeedOptions"
+              :key="opt.value"
+              type="button"
+              role="radio"
+              :aria-checked="settings.textTransitionSpeed === opt.value"
+              class="stage-custom__segment-btn"
+              :class="{ 'stage-custom__segment-btn--active': settings.textTransitionSpeed === opt.value }"
+              @click="patch({ textTransitionSpeed: opt.value })"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
+        </template>
+      </div>
+    </template>
+
     <template v-if="activeScope !== 'bible'">
       <div class="stage-custom__section">
         <p class="stage-custom__label">{{ t('settings.stage.textColor') }}</p>
@@ -839,30 +1029,36 @@ const confirmReset = ref(false)
           </button>
         </div>
 
-        <p class="stage-custom__label stage-custom__label--sub">
-          {{ t('settings.stage.bibleTransition') }}
-        </p>
-        <div
-          class="stage-custom__segment"
-          role="radiogroup"
-          data-testid="bible-transition"
-          :aria-label="t('settings.stage.bibleTransition')"
-        >
+        <div class="stage-custom__toggle-row">
           <button
-            v-for="opt in bibleTransitionOptions"
-            :key="opt.value"
             type="button"
-            role="radio"
-            :aria-checked="settings.bibleTransition === opt.value"
-            class="stage-custom__segment-btn"
-            :class="{ 'stage-custom__segment-btn--active': settings.bibleTransition === opt.value }"
-            @click="patch({ bibleTransition: opt.value })"
+            class="stage-custom__toggle-label"
+            @click="setBibleTransitionEnabled(!settings.bibleTransitionEnabled)"
           >
-            {{ opt.label }}
+            {{ t('settings.stage.transitionsEnabled') }}
           </button>
+          <SettingsToggle
+            :model-value="settings.bibleTransitionEnabled"
+            :label="t('settings.stage.transitionsEnabled')"
+            data-testid="bible-transition-enabled"
+            @update:model-value="setBibleTransitionEnabled($event)"
+          />
         </div>
 
-        <template v-if="settings.bibleTransition !== 'none'">
+        <template v-if="settings.bibleTransitionEnabled">
+          <p class="stage-custom__label stage-custom__label--sub">
+            {{ t('settings.stage.bibleTransition') }}
+          </p>
+          <ScreenTransitionPicker
+            :model-value="settings.bibleTransition"
+            :duration-ms="bibleTransitionMs(settings.bibleTransitionSpeed)"
+            :label="t('settings.stage.bibleTransition')"
+            test-id="bible-transition"
+            @update:model-value="patch({ bibleTransition: $event })"
+          />
+        </template>
+
+        <template v-if="settings.bibleTransitionEnabled && settings.bibleTransition !== 'none'">
           <p class="stage-custom__label stage-custom__label--sub">
             {{ t('settings.stage.bibleTransitionSpeed') }}
           </p>
@@ -1282,6 +1478,300 @@ const confirmReset = ref(false)
         </button>
       </template>
       </div><!-- /controls-inner -->
+        <!-- Músicas: tela de retorno (monitor dos músicos) -->
+        <GlassCard
+          v-if="activeScope === 'hymns'"
+          class="stage-custom__accordion"
+          :padding="false"
+          data-testid="return-screen-section"
+        >
+          <button
+            type="button"
+            class="stage-custom__accordion-head"
+            :aria-expanded="returnOpen"
+            @click="returnOpen = !returnOpen"
+          >
+            <span class="stage-custom__accordion-icon"><i class="ti ti-device-desktop" aria-hidden="true" /></span>
+            <span class="stage-custom__accordion-title">{{ t('settings.stage.returnTitle') }}</span>
+            <i
+              class="ti ti-chevron-down stage-custom__accordion-chevron"
+              :class="{ 'stage-custom__accordion-chevron--open': returnOpen }"
+              aria-hidden="true"
+            />
+          </button>
+          <div
+            v-if="returnOpen"
+            class="stage-custom__accordion-body"
+          >
+            <p class="stage-custom__hint">{{ t('settings.stage.returnHint') }}</p>
+
+            <!-- Frase atual -->
+            <p class="stage-custom__label stage-custom__label--sub">{{ t('settings.stage.returnCurrent') }}</p>
+            <div class="stage-custom__row-head">
+              <span>{{ t('settings.stage.returnCurrentSize') }}</span>
+              <span class="stage-custom__chip">
+                {{ returnSettings.fontSize == null
+                  ? t('settings.stage.returnSameAsSlides')
+                  : `${Math.round(returnSettings.fontSize)}px` }}
+              </span>
+            </div>
+            <input
+              type="range"
+              :min="RETURN_FONT_SIZE_MIN"
+              :max="RETURN_FONT_SIZE_MAX"
+              step="2"
+              :value="returnSettings.fontSize ?? settings.lyricFontSize ?? settings.fontSize"
+              :aria-label="t('settings.stage.fontSize')"
+              @input="patchReturn({ fontSize: Number(($event.target as HTMLInputElement).value) })"
+            >
+            <button
+              v-if="returnSettings.fontSize != null"
+              type="button"
+              class="stage-custom__toggle-label"
+              @click="patchReturn({ fontSize: null })"
+            >
+              {{ t('settings.stage.returnUseSlides') }}
+            </button>
+
+            <div class="stage-custom__swatches">
+              <button
+                type="button"
+                class="stage-custom__swatch stage-custom__swatch--auto"
+                :class="{ 'stage-custom__swatch--active': returnSettings.textColor == null }"
+                :aria-label="t('settings.stage.returnSameAsSlides')"
+                :title="t('settings.stage.returnSameAsSlides')"
+                @click="patchReturn({ textColor: null })"
+              >
+                <i class="ti ti-link" aria-hidden="true" />
+              </button>
+              <button
+                v-for="preset in STAGE_FG_PRESETS"
+                :key="preset.color"
+                type="button"
+                class="stage-custom__swatch"
+                :class="{ 'stage-custom__swatch--active': returnSettings.textColor === preset.color }"
+                :style="{ '--swatch': preset.color }"
+                :aria-label="preset.label"
+                @click="patchReturn({ textColor: preset.color })"
+              />
+              <label
+                class="stage-custom__swatch stage-custom__swatch--auto"
+                :title="t('settings.stage.customColor')"
+              >
+                <i class="ti ti-color-picker" aria-hidden="true" />
+                <input
+                  type="color"
+                  class="sr-only"
+                  :value="returnSettings.textColor ?? '#ffffff'"
+                  :aria-label="t('settings.stage.customColor')"
+                  @input="patchReturn({ textColor: ($event.target as HTMLInputElement).value })"
+                >
+              </label>
+            </div>
+
+            <div
+              class="stage-custom__segment"
+              role="radiogroup"
+              :aria-label="t('settings.stage.fontWeight')"
+            >
+              <button
+                v-for="opt in returnWeightOptions"
+                :key="String(opt.value)"
+                type="button"
+                role="radio"
+                :aria-checked="returnSettings.fontWeight === opt.value"
+                class="stage-custom__segment-btn"
+                :class="{ 'stage-custom__segment-btn--active': returnSettings.fontWeight === opt.value }"
+                @click="patchReturn({ fontWeight: opt.value })"
+              >
+                {{ opt.label }}
+              </button>
+            </div>
+
+            <p class="stage-custom__label stage-custom__label--sub">{{ t('settings.stage.returnUpper') }}</p>
+            <div
+              class="stage-custom__segment"
+              role="radiogroup"
+              :aria-label="t('settings.stage.returnUpper')"
+            >
+              <button
+                v-for="opt in returnUpperOptions"
+                :key="String(opt.value)"
+                type="button"
+                role="radio"
+                :aria-checked="returnSettings.upperCase === opt.value"
+                class="stage-custom__segment-btn"
+                :class="{ 'stage-custom__segment-btn--active': returnSettings.upperCase === opt.value }"
+                @click="patchReturn({ upperCase: opt.value })"
+              >
+                {{ opt.label }}
+              </button>
+            </div>
+
+            <!-- Próxima estrofe (sempre visível) -->
+            <div class="stage-custom__row-head">
+              <span>{{ t('settings.stage.returnNextSize') }}</span>
+              <span class="stage-custom__chip">
+                {{ returnSettings.nextFontSize == null
+                  ? t('settings.stage.returnSameAsSlides')
+                  : `${Math.round(returnSettings.nextFontSize)}px` }}
+              </span>
+            </div>
+            <input
+              type="range"
+              :min="RETURN_NEXT_FONT_SIZE_MIN"
+              :max="RETURN_FONT_SIZE_MAX"
+              step="2"
+              :value="returnNextFontSize(returnSettings, settings)"
+              :aria-label="t('settings.stage.returnNextSize')"
+              @input="patchReturn({ nextFontSize: Number(($event.target as HTMLInputElement).value) })"
+            >
+            <button
+              v-if="returnSettings.nextFontSize != null"
+              type="button"
+              class="stage-custom__toggle-label"
+              @click="patchReturn({ nextFontSize: null })"
+            >
+              {{ t('settings.stage.returnUseSlides') }}
+            </button>
+
+            <!-- Fundo -->
+            <p class="stage-custom__label stage-custom__label--sub">{{ t('settings.stage.returnBackground') }}</p>
+            <div
+              class="stage-custom__segment"
+              role="radiogroup"
+              :aria-label="t('settings.stage.returnBackground')"
+            >
+              <button
+                v-for="opt in returnBgOptions"
+                :key="opt.value"
+                type="button"
+                role="radio"
+                :aria-checked="returnSettings.bgMode === opt.value"
+                class="stage-custom__segment-btn"
+                :class="{ 'stage-custom__segment-btn--active': returnSettings.bgMode === opt.value }"
+                @click="patchReturn({ bgMode: opt.value })"
+              >
+                {{ opt.label }}
+              </button>
+            </div>
+            <div
+              v-if="returnSettings.bgMode !== 'slides'"
+              class="stage-custom__swatches"
+            >
+              <button
+                v-for="preset in STAGE_BG_PRESETS"
+                :key="preset.color"
+                type="button"
+                class="stage-custom__swatch"
+                :class="{ 'stage-custom__swatch--active': returnSettings.bgColor === preset.color }"
+                :style="{ '--swatch': preset.color }"
+                :aria-label="preset.label"
+                @click="patchReturn({ bgColor: preset.color })"
+              />
+              <label
+                class="stage-custom__swatch stage-custom__swatch--auto"
+                :title="t('settings.stage.customColor')"
+              >
+                <i class="ti ti-color-picker" aria-hidden="true" />
+                <input
+                  type="color"
+                  class="sr-only"
+                  :value="returnSettings.bgColor"
+                  :aria-label="t('settings.stage.customColor')"
+                  @input="patchReturn({ bgColor: ($event.target as HTMLInputElement).value })"
+                >
+              </label>
+            </div>
+            <template v-if="returnSettings.bgMode === 'image'">
+              <div class="stage-custom__official-grid">
+                <button
+                  type="button"
+                  class="stage-custom__official-tile stage-custom__official-tile--upload"
+                  :class="{ 'stage-custom__official-tile--active': returnSettings.bgImage?.startsWith('data:') }"
+                  :aria-label="t('settings.stage.selectImage')"
+                  :title="t('settings.stage.selectImage')"
+                  @click="returnFileInput?.click()"
+                >
+                  <i class="ti ti-cloud-upload" aria-hidden="true" />
+                </button>
+                <button
+                  v-for="bgId in STAGE_OFFICIAL_BACKGROUNDS"
+                  :key="bgId"
+                  type="button"
+                  class="stage-custom__official-tile"
+                  :class="{ 'stage-custom__official-tile--active':
+                    returnSettings.bgImage === `${OFFICIAL_BG_PREFIX}${bgId}` }"
+                  :aria-label="`${t('settings.stage.officialBackground')} ${bgId}`"
+                  @click="patchReturn({ bgImage: `${OFFICIAL_BG_PREFIX}${bgId}` })"
+                >
+                  <img
+                    :src="officialBgUrl(bgId)"
+                    alt=""
+                    loading="lazy"
+                  >
+                </button>
+              </div>
+              <input
+                ref="returnFileInput"
+                type="file"
+                accept="image/*"
+                class="sr-only"
+                :aria-label="t('settings.stage.selectImage')"
+                @change="onReturnFileSelected"
+              >
+            </template>
+
+            <!-- Barra de progresso (sempre visível): só a cor -->
+            <p class="stage-custom__label stage-custom__label--sub">{{ t('settings.stage.returnBarColor') }}</p>
+            <div class="stage-custom__swatches">
+              <button
+                type="button"
+                class="stage-custom__swatch stage-custom__swatch--auto"
+                :class="{ 'stage-custom__swatch--active': returnSettings.barColor == null }"
+                :aria-label="t('settings.stage.returnSameAsSlides')"
+                :title="t('settings.stage.returnSameAsSlides')"
+                @click="patchReturn({ barColor: null })"
+              >
+                <i class="ti ti-link" aria-hidden="true" />
+              </button>
+              <button
+                v-for="preset in STAGE_REF_PRESETS"
+                :key="preset.color"
+                type="button"
+                class="stage-custom__swatch"
+                :class="{ 'stage-custom__swatch--active': returnSettings.barColor === preset.color }"
+                :style="{ '--swatch': preset.color }"
+                :aria-label="preset.label"
+                @click="patchReturn({ barColor: preset.color })"
+              />
+              <label
+                class="stage-custom__swatch stage-custom__swatch--auto"
+                :title="t('settings.stage.customColor')"
+              >
+                <i class="ti ti-color-picker" aria-hidden="true" />
+                <input
+                  type="color"
+                  class="sr-only"
+                  :value="returnSettings.barColor ?? '#fcce02'"
+                  :aria-label="t('settings.stage.customColor')"
+                  @input="patchReturn({ barColor: ($event.target as HTMLInputElement).value })"
+                >
+              </label>
+            </div>
+
+            <button
+              v-if="settings.returnScreen"
+              type="button"
+              class="stage-custom__toggle-label"
+              data-testid="return-screen-reset"
+              @click="resetReturn"
+            >
+              <i class="ti ti-restore" aria-hidden="true" />
+              {{ t('settings.stage.returnReset') }}
+            </button>
+          </div>
+        </GlassCard>
       </div><!-- /controls -->
 
     </div><!-- /controls (ver /controls-inner acima) -->
@@ -1290,6 +1780,65 @@ const confirmReset = ref(false)
 </template>
 
 <style scoped lang="scss">
+.stage-custom__accordion {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.stage-custom__accordion-head {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 0.85rem;
+  border: 0;
+  background: transparent;
+  color: var(--ds-color-on-surface);
+  text-align: left;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--ds-color-primary);
+    outline-offset: -3px;
+  }
+}
+
+.stage-custom__accordion-icon {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  border-radius: var(--ds-radius-md);
+  background: color-mix(in srgb, var(--ds-color-primary) 12%, transparent);
+  color: var(--ds-color-primary);
+  font-size: 20px;
+}
+
+.stage-custom__accordion-title {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.stage-custom__accordion-chevron {
+  margin-left: auto;
+  color: var(--ds-color-on-surface-variant);
+  transition: transform 180ms ease;
+
+  &--open {
+    transform: rotate(180deg);
+  }
+}
+
+.stage-custom__accordion-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0 0.85rem 0.85rem;
+}
+
 .stage-custom {
   display: flex;
   flex-direction: column;

@@ -43,6 +43,7 @@
       <p id="error">Não foi possível carregar o PDF.</p>
     </div>
     <script src="zoom-pan.js"></script>
+    <script src="screen-transitions.js"></script>
     <script type="module">
       import * as pdfjsLib from './vendor/pdfjs/pdf.min.mjs'
 
@@ -116,7 +117,8 @@
         }
         if (nextIndex < 0) nextIndex = total - 1
         // outra página começa inteira; redesenhar a mesma não perde o zoom
-        if (nextIndex !== pageIndex) zoom.reset()
+        const pageChanged = nextIndex !== pageIndex
+        if (pageChanged) zoom.reset()
         pageIndex = nextIndex
         const token = ++renderToken
         const page = await pdfDoc.getPage(pageIndex + 1)
@@ -163,6 +165,10 @@
         }
         if (token !== renderToken) return state()
 
+        // Animação só na troca de página (redesenho do zoom troca seco).
+        const swap = pageChanged && renderedToken > 0 && window.PianoScreenTransition
+          ? window.PianoScreenTransition.begin(canvas)
+          : null
         canvas.width = buffer.width
         canvas.height = buffer.height
         // o tamanho na tela é sempre o encaixe; a qualidade extra só nos pixels
@@ -175,6 +181,7 @@
         lastFit = fit
         showError(false)
         renderedToken = token
+        if (swap) swap.play()
 
         return state()
       }

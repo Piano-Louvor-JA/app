@@ -4,14 +4,16 @@ import { useI18n } from 'vue-i18n'
 
 import { appConfirm } from '@shared/composables/useAppConfirm'
 import type {
+  OnlineVideoFolder,
+  OnlineVideoFolderInfo,
   OnlineVideoQuality,
   OnlineVideoSettings,
   OnlineVideoStatus,
 } from '@/shared/types/desktop-bridge'
 
 const QUALITIES: OnlineVideoQuality[] = [480, 720, 1080]
-const LIMITS_GB = [2, 4, 6, 10, 20]
 const GB = 1024 ** 3
+const MB = 1024 ** 2
 
 const { t } = useI18n()
 
@@ -22,14 +24,39 @@ const busy = ref(false)
 const unsubscribe: Array<() => void> = []
 
 const visible = computed(() => Boolean(status.value && !status.value.hidden))
-const usageText = computed(() => {
-  const usage = status.value!.usage
-  return t('settings.youtubeOffline.usage', {
-    used: (usage.bytes / GB).toFixed(1),
-    limit: Math.round(usage.limitBytes / GB),
-    count: usage.count,
-  })
+
+/** As duas pastas (sistema e personalizada); sem `folders` (versão antiga do main), só a do sistema. */
+const folders = computed(() => {
+  const st = status.value!
+  const info = st.folders
+  const system: OnlineVideoFolderInfo = info?.system ?? {
+    dir: st.cacheDir ?? '',
+    bytes: st.usage.bytes,
+    count: st.usage.count,
+    limitBytes: st.usage.limitBytes,
+  }
+  return {
+    active: (info?.active ?? 'system') as OnlineVideoFolder,
+    list: [
+      { key: 'system' as const, info: system },
+      { key: 'custom' as const, info: info?.custom ?? null },
+    ],
+  }
 })
+
+function sizeText(info: OnlineVideoFolderInfo) {
+  const size = info.bytes >= GB ? `${(info.bytes / GB).toFixed(1)} GB` : `${Math.round(info.bytes / MB)} MB`
+  return t('settings.youtubeOffline.folderSize', { size, count: info.count })
+}
+
+function selectFolder(key: OnlineVideoFolder) {
+  if (key === 'custom' && !folders.value.list[1].info) return chooseFolder()
+  if (folders.value.active !== key) void update({ folder: key })
+}
+
+function chooseFolder() {
+  if (api?.chooseFolder) void run(() => api!.chooseFolder!())
+}
 
 async function refresh() {
   try {
@@ -70,15 +97,23 @@ function update(partial: Partial<OnlineVideoSettings>) {
   return run(() => api!.setSettings(partial))
 }
 
-async function clearCache() {
+async function openFolder(which: OnlineVideoFolder) {
+  try {
+    await api?.openFolder?.(which)
+  } catch {
+    // sem gerenciador de arquivos: o caminho continua visível para copiar
+  }
+}
+
+async function clearCache(which: OnlineVideoFolder) {
   const confirmed = await appConfirm({
     title: t('settings.youtubeOffline.clearTitle'),
-    message: t('settings.youtubeOffline.clearMessage'),
+    message: t(which === 'custom' ? 'settings.youtubeOffline.clearMessageCustom' : 'settings.youtubeOffline.clearMessageSystem'),
     confirmLabel: t('settings.youtubeOffline.clearConfirm'),
     cancelLabel: t('settings.youtubeOffline.cancel'),
     danger: true,
   })
-  if (confirmed) await run(() => api!.clear())
+  if (confirmed) await run(() => api!.clear(which))
 }
 </script>
 
@@ -124,29 +159,77 @@ async function clearCache() {
         </div>
       </div>
 
-      <label class="row">
-        <span class="label">{{ t('settings.youtubeOffline.limit') }}</span>
-        <select
-          :value="status.settings.limitGb"
-          :disabled="busy"
-          data-test="youtube-offline-limit"
-          @change="update({ limitGb: Number(($event.target as HTMLSelectElement).value) })"
+      <p class="label folders-title">{{ t('settings.youtubeOffline.foldersTitle') }}</p>
+      <p class="hint folders-hint">{{ t('settings.youtubeOffline.foldersHint') }}</p>
+      <div class="folders" role="radiogroup" :aria-label="t('settings.youtubeOffline.foldersTitle')">
+        <div
+          v-for="folder in folders.list"
+          :key="folder.key"
+          class="folder-box"
+          :class="{ active: folders.active === folder.key }"
+          :data-test="`youtube-offline-folder-${folder.key}`"
         >
-          <option v-for="gb in LIMITS_GB" :key="gb" :value="gb">{{ gb }} GB</option>
-        </select>
-      </label>
+          <button
+            type="button"
+            role="radio"
+            class="folder-pick"
+            :aria-checked="folders.active === folder.key"
+            :disabled="busy"
+            :data-test="`youtube-offline-use-${folder.key}`"
+            @click="selectFolder(folder.key)"
+          >
+            <span class="radio" aria-hidden="true" />
+            <span class="folder-name">
+              {{ t(folder.key === 'system' ? 'settings.youtubeOffline.folderSystem' : 'settings.youtubeOffline.folderCustom') }}
+            </span>
+            <span v-if="folders.active === folder.key" class="badge">{{ t('settings.youtubeOffline.folderActive') }}</span>
+          </button>
 
-      <div class="row">
-        <span class="hint" data-test="youtube-offline-usage">{{ usageText }}</span>
-        <button
-          type="button"
-          class="danger"
-          :disabled="busy || status.usage.count === 0"
-          data-test="youtube-offline-clear"
-          @click="clearCache"
-        >
-          {{ t('settings.youtubeOffline.clear') }}
-        </button>
+          <template v-if="folder.info">
+            <code class="path" :title="folder.info.dir">{{ folder.info.dir }}</code>
+            <div class="folder-actions">
+              <span class="hint size" :data-test="`youtube-offline-size-${folder.key}`">{{ sizeText(folder.info) }}</span>
+              <button
+                v-if="api?.openFolder"
+                type="button"
+                :data-test="`youtube-offline-open-${folder.key}`"
+                @click="openFolder(folder.key)"
+              >
+                {{ t('settings.youtubeOffline.openFolder') }}
+              </button>
+              <button
+                v-if="folder.key === 'custom' && api?.chooseFolder"
+                type="button"
+                :disabled="busy"
+                data-test="youtube-offline-change-folder"
+                @click="chooseFolder"
+              >
+                {{ t('settings.youtubeOffline.changeFolder') }}
+              </button>
+              <button
+                type="button"
+                class="danger"
+                :disabled="busy || folder.info.count === 0"
+                :data-test="`youtube-offline-clear-${folder.key}`"
+                @click="clearCache(folder.key)"
+              >
+                {{ t('settings.youtubeOffline.clear') }}
+              </button>
+            </div>
+          </template>
+          <div v-else class="folder-actions">
+            <span class="hint">{{ t('settings.youtubeOffline.folderCustomHint') }}</span>
+            <button
+              v-if="api?.chooseFolder"
+              type="button"
+              :disabled="busy"
+              data-test="youtube-offline-choose-folder"
+              @click="chooseFolder"
+            >
+              {{ t('settings.youtubeOffline.chooseFolder') }}
+            </button>
+          </div>
+        </div>
       </div>
 
       <div class="row" data-test="youtube-offline-tools">
@@ -174,6 +257,76 @@ async function clearCache() {
 </template>
 
 <style scoped>
+.folders-title { margin: 0.25rem 0 0; }
+.folders-hint { margin: -0.35rem 0 0; }
+.folders {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: 0.75rem;
+}
+.folder-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  min-width: 0;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+}
+.folder-box.active {
+  border-color: var(--ds-color-primary, #04549b);
+  background: color-mix(in srgb, var(--ds-color-primary, #04549b) 10%, transparent);
+}
+.folder-box button.folder-pick {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.radio {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  border-radius: 50%;
+}
+.active .radio {
+  border-color: var(--ds-color-primary, #04549b);
+  box-shadow: inset 0 0 0 3px var(--ds-color-surface-card, #201f1f), inset 0 0 0 8px var(--ds-color-primary, #04549b);
+}
+.folder-name { font-weight: 600; font-size: 0.9rem; }
+.badge {
+  margin-left: auto;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: var(--ds-color-primary, #04549b);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+.folder-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.size { margin-right: auto; font-weight: 600; }
+.path {
+  min-width: 0;
+  max-width: 100%;
+  padding: 0.3rem 0.55rem;
+  border-radius: 0.4rem;
+  background: color-mix(in srgb, var(--ds-color-surface-card, #201f1f) 80%, transparent);
+  border: 1px solid var(--ds-color-outline, rgba(255, 255, 255, 0.08));
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
 .yt-offline-card {
   display: flex;
   flex-direction: column;
@@ -207,11 +360,16 @@ select {
   padding: 0.5rem 1rem;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.14);
-  background: transparent;
-  color: inherit;
+  background: var(--ds-color-surface-card, #201f1f);
+  color: var(--ds-color-on-surface, #e5e2e1);
   font-weight: 600;
   font-size: 0.875rem;
   cursor: pointer;
+}
+/* A lista aberta do select usa o fundo das opções: sem isto, fica branca. */
+select option {
+  background: var(--ds-color-surface-elevated, #1e1e1e);
+  color: var(--ds-color-on-surface, #e5e2e1);
 }
 button:hover:not(:disabled) {
   filter: brightness(1.2);

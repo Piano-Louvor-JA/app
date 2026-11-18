@@ -11,7 +11,10 @@ import { useOutputRegistry } from './output-registry'
 import { readEffectiveStageSettings } from './stage-settings-runtime'
 import {
   bibleTransitionMs,
+  effectiveBibleTransition,
+  effectiveLyricTransition,
   resolveBackgroundImage,
+  type StageTransition,
   type StageSettings,
 } from '../types/stage-settings'
 import { getPalcoRoute, type PalcoModule } from './palco-routing'
@@ -55,6 +58,14 @@ type PalcoStatus = {
   url: string | null
   wsUrl: string | null
 } & Partial<Omit<PalcoSlotStatus, 'receiverIps' | 'running' | 'clients' | 'url'>>
+
+/** Transições que o palco-receiver já anima; as demais caem na mais próxima. */
+function receiverTransition(t: StageTransition): 'fade' | 'slide' | 'zoom' | undefined {
+  if (t === 'none') return undefined
+  if (t === 'slide' || t === 'slide-down' || t === 'slide-left' || t === 'slide-right' || t === 'drop' || t === 'float') return 'slide'
+  if (t === 'zoom' || t === 'zoom-out' || t === 'pop' || t === 'zoom-blur' || t === 'rotate') return 'zoom'
+  return 'fade'
+}
 
 export type PalcoTimerOptions = { duration?: number; mode?: 'countdown' | 'chrono'; label?: string; background?: string; text?: string; obsPane?: boolean; timeFormat?: string; chronoRuntime?: { status: string; accumulatedMs: number; segmentStartedAt: number | null } }
 
@@ -337,8 +348,18 @@ class PalcoSession {
       footerTransform: isBible ? s.refTextTransform : undefined,
       footerPosition: isBible ? s.bibleRefPosition ?? 'below-right' : undefined,
       // Receiver anima a entrada do versículo novo; sem o campo, troca seca.
-      transition: isBible ? s.bibleTransition ?? 'fade' : undefined,
-      transitionMs: isBible ? bibleTransitionMs(s.bibleTransitionSpeed) : undefined,
+      // Desligada → sem o campo. Transições novas viram a mais próxima que o
+      // receiver conhece (fade/slide/zoom) até ele ganhar o catálogo todo.
+      transition: isBible
+        ? receiverTransition(effectiveBibleTransition(s))
+        : isHymns
+          ? receiverTransition(effectiveLyricTransition(s))
+          : undefined,
+      transitionMs: isBible
+        ? bibleTransitionMs(s.bibleTransitionSpeed)
+        : isHymns
+          ? bibleTransitionMs(s.lyricTransitionSpeed)
+          : undefined,
       // Estrofes com aparência própria (paridade do title*):
       lyricFontSize: (isHymns && s.lyricFontSize != null ? s.lyricFontSize : sizeAt1920) / 1920 * 1080,
       lyricFontWeight: isHymns && s.lyricFontWeight != null ? s.lyricFontWeight : fontWeight,

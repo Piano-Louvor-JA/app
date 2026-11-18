@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 
+vi.mock('@shared/composables/useAppConfirm', () => ({ appConfirm: vi.fn(async () => false) }))
 vi.mock('vue-i18n', () => ({
   useI18n: () => ({ t: (key: string) => key, locale: { value: 'pt-BR' } }),
 }))
@@ -10,6 +11,7 @@ vi.mock('@design-system/index', () => ({
   GlassCard: { name: 'GlassCard', template: '<div class="glass-card-mock"><slot /></div>' },
 }))
 
+import { appConfirm } from '@shared/composables/useAppConfirm'
 import AppBackupCard from '../AppBackupCard.vue'
 
 const originalLouvorja = window.louvorja
@@ -419,5 +421,49 @@ describe('AppBackupCard', () => {
     await flushPromises()
     resolveCreate({ ok: true, path: '/x.zip' })
     await flushPromises()
+  })
+
+  it('sem vídeos baixados do YouTube: não pergunta e faz o backup sem eles', async () => {
+    const bridge = makeBridge()
+    ;(bridge.backup as Record<string, unknown>).youtubeUsage = vi.fn(async () => ({ bytes: 0, count: 0 }))
+    setBridge(bridge)
+    const w = await mountCard()
+    await backupBtn(w).trigger('click')
+    await flushPromises()
+    expect(appConfirm).not.toHaveBeenCalled()
+    expect(bridge.backup.create).toHaveBeenCalledWith({ includeYoutubeVideos: false })
+  })
+
+  it('com vídeos baixados: pergunta mostrando o tamanho; padrão é não incluir', async () => {
+    const bridge = makeBridge()
+    ;(bridge.backup as Record<string, unknown>).youtubeUsage = vi.fn(async () => ({ bytes: 3 * 1024 ** 3, count: 5 }))
+    setBridge(bridge)
+    const w = await mountCard()
+    vi.mocked(appConfirm).mockResolvedValueOnce(false)
+    await backupBtn(w).trigger('click')
+    await flushPromises()
+    expect(appConfirm).toHaveBeenCalledWith(expect.objectContaining({ title: 'settings.general.backupYoutubeTitle' }))
+    expect(bridge.backup.create).toHaveBeenLastCalledWith({ includeYoutubeVideos: false })
+
+    vi.mocked(appConfirm).mockResolvedValueOnce(true)
+    await backupBtn(w).trigger('click')
+    await flushPromises()
+    expect(bridge.backup.create).toHaveBeenLastCalledWith({ includeYoutubeVideos: true })
+  })
+
+  it('consulta do tamanho falhando ou poucos MB', async () => {
+    const bridge = makeBridge()
+    const usage = vi.fn(async () => ({ bytes: 200 * 1024 ** 2, count: 1 }))
+    ;(bridge.backup as Record<string, unknown>).youtubeUsage = usage
+    setBridge(bridge)
+    const w = await mountCard()
+    await backupBtn(w).trigger('click')
+    await flushPromises()
+    expect(appConfirm).toHaveBeenCalled()
+    usage.mockRejectedValueOnce(new Error('ipc'))
+    vi.mocked(appConfirm).mockClear()
+    await backupBtn(w).trigger('click')
+    await flushPromises()
+    expect(appConfirm).not.toHaveBeenCalled()
   })
 })

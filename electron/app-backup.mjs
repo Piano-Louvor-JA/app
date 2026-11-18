@@ -1,4 +1,5 @@
 import {
+  copyFileSync,
   createWriteStream,
   existsSync,
   mkdirSync,
@@ -98,10 +99,63 @@ export const MEDIA_DIR_ALIASES = {
   slides: WORKSPACE_DIRS.images,
 }
 
-const SKIP_WALK_NAMES = new Set([...BACKUP_SKIP_NAMES, 'pptx-cache'])
+const SKIP_WALK_NAMES = new Set([...BACKUP_SKIP_NAMES, 'pptx-cache', '.stream'])
 
-/** Playlists + `user_data` (liturgia, agendados e preferências). */
-export const BACKUP_LOCAL_STORAGE_KEYS = ['user_data', 'louvorja-playlists-v1']
+/**
+ * Playlists, `user_data` (liturgia, agendados e preferências) e o módulo YouTube
+ * (histórico, favoritos, coletâneas online e buscas recentes).
+ */
+export const BACKUP_LOCAL_STORAGE_KEYS = [
+  'user_data',
+  'louvorja-playlists-v1',
+  'louvorja-youtube-history-v1',
+  'louvorja-youtube-favorites-v1',
+  'louvorja-youtube-collections-v1',
+  'louvorja-youtube-queries-v1',
+]
+
+/** Vídeos baixados do YouTube no zip (só quando o operador escolhe incluir). */
+export const YOUTUBE_VIDEOS_ZIP_DIR = 'youtube-videos'
+
+/**
+ * Pastas dos vídeos baixados (cópia offline do YouTube), registradas pelo main ao iniciar o
+ * serviço: `folders()` dá as pastas atuais; `restoreDir()` onde os vídeos voltam; `reload()`
+ * relê o índice depois de restaurar.
+ * @type {{ folders: () => { system?: { dir: string, bytes: number, count: number } | null, custom?: { dir: string, bytes: number, count: number } | null } | null, restoreDir: () => string, reload: () => Promise<unknown> } | null}
+ */
+let youtubeVideoSource = null
+
+/** @param {typeof youtubeVideoSource} source */
+export function setYoutubeVideoSource(source) {
+  youtubeVideoSource = source
+}
+
+/** Tamanho dos vídeos baixados (para a pergunta antes do backup). */
+export function youtubeVideosUsage() {
+  const folders = youtubeVideoSource?.folders?.() ?? null
+  let bytes = 0
+  let count = 0
+  for (const folder of [folders?.system, folders?.custom]) {
+    if (!folder) continue
+    bytes += Number(folder.bytes) || 0
+    count += Number(folder.count) || 0
+  }
+  return { bytes, count }
+}
+
+/**
+ * Arquivos dos vídeos baixados: `youtube-videos/system/…` e `youtube-videos/custom/…`
+ * (mp4, legenda e o `index.json` de cada pasta).
+ * @returns {{ source: string, zipPath: string }[]}
+ */
+export function collectYoutubeVideoEntries() {
+  const folders = youtubeVideoSource?.folders?.() ?? null
+  const entries = []
+  const seen = new Set()
+  if (folders?.system?.dir) walkFiles(folders.system.dir, `${YOUTUBE_VIDEOS_ZIP_DIR}/system`, entries, seen)
+  if (folders?.custom?.dir) walkFiles(folders.custom.dir, `${YOUTUBE_VIDEOS_ZIP_DIR}/custom`, entries, seen)
+  return entries
+}
 
 /** Snapshot do localStorage no zip — Chromium Local Storage não entra no backup. */
 export const BACKUP_LOCAL_STORAGE_ZIP_PATH = `${WORKSPACE_DIRS.sysdata}/local-storage.json`
@@ -654,6 +708,7 @@ export function restoreBackupZip(zipFile, destRoot, onProgress) {
  *   destZip: string
  *   onProgress?: Function
  *   browserStorage?: Record<string, string>
+ *   includeYoutubeVideos?: boolean
  * }} opts
  */
 export async function createAppBackupArchive({
@@ -663,10 +718,13 @@ export async function createAppBackupArchive({
   destZip,
   onProgress,
   browserStorage,
+  includeYoutubeVideos = false,
 }) {
   const tmpDir = mkdtempSync(path.join(os.tmpdir(), 'piano-backup-'))
   try {
     const entries = collectBackupEntries({ dataRoot, mediaRoot, mediaFolders })
+    // Vídeos baixados do YouTube: só quando o operador escolhe (podem ser muitos GB).
+    if (includeYoutubeVideos) entries.push(...collectYoutubeVideoEntries())
     const snapshot = writeBrowserStorageSnapshot(browserStorage, tmpDir)
     if (snapshot) {
       const seen = new Set(entries.map((entry) => entry.zipPath))
@@ -685,4 +743,120 @@ export async function createAppBackupArchive({
  */
 export async function restoreAppBackupArchive({ zipFile, destRoot, onProgress }) {
   await restoreBackupZip(zipFile, destRoot, onProgress)
+  await restoreYoutubeVideos(zipFile)
+}
+
+/**
+ * Vídeos do YouTube que vieram no backup voltam para a pasta do sistema (a personalizada pode
+ * não existir neste computador). Mescla com o que já está lá, sem apagar nada.
+ * @param {string} zipFile
+ * @returns {Promise<number>} vídeos restaurados
+ */
+export async function restoreYoutubeVideos(zipFile) {
+  if (!youtubeVideoSource) return 0
+  const tmpDir = mkdtempSync(path.join(os.tmpdir(), 'piano-yt-restore-'))
+  try {
+    const found = await extractZipPrefix(zipFile, `${YOUTUBE_VIDEOS_ZIP_DIR}/`, tmpDir)
+    if (found === 0) return 0
+    const sources = ['system', 'custom'].map((name) => path.join(tmpDir, name)).filter((dir) => existsSync(dir))
+    const restored = mergeVideoCacheDirs(sources, youtubeVideoSource.restoreDir())
+    await youtubeVideoSource.reload()
+    return restored
+  } finally {
+    rmSync(tmpDir, { recursive: true, force: true })
+  }
+}
+
+/**
+ * Extrai só as entradas do zip que começam com `prefix` (sem o prefixo) para `destDir`.
+ * @param {string} zipFile @param {string} prefix @param {string} destDir
+ * @returns {Promise<number>} arquivos extraídos
+ */
+export function extractZipPrefix(zipFile, prefix, destDir) {
+  return new Promise((resolve, reject) => {
+    yauzl.open(zipFile, { lazyEntries: true, autoClose: true }, (openError, zipfile) => {
+      if (openError || !zipfile) {
+        reject(openError ?? new Error('zip-open-failed'))
+        return
+      }
+      let count = 0
+      zipfile.on('error', reject)
+      zipfile.on('end', () => resolve(count))
+      zipfile.on('entry', (entry) => {
+        const name = toZipPath(String(entry.fileName || ''))
+        if (!name.startsWith(prefix) || name.endsWith('/')) {
+          zipfile.readEntry()
+          return
+        }
+        let dest
+        try {
+          dest = resolveSafeExtractPath(destDir, name.slice(prefix.length))
+        } catch (error) {
+          reject(error)
+          return
+        }
+        mkdirSync(path.dirname(dest), { recursive: true })
+        zipfile.openReadStream(entry, (streamError, readStream) => {
+          if (streamError || !readStream) {
+            reject(streamError ?? new Error('zip-stream-failed'))
+            return
+          }
+          pipeline(readStream, createWriteStream(dest))
+            .then(() => {
+              count += 1
+              zipfile.readEntry()
+            })
+            .catch(reject)
+        })
+      })
+      zipfile.readEntry()
+    })
+  })
+}
+
+/**
+ * Junta pastas de vídeos baixados (cada uma com `index.json` + `<id>.mp4|vtt`) em `destDir`.
+ * O que já existe no destino fica; vídeo sem o mp4 não entra no índice.
+ * @param {string[]} sourceDirs @param {string} destDir
+ * @returns {number} vídeos novos no destino
+ */
+export function mergeVideoCacheDirs(sourceDirs, destDir) {
+  mkdirSync(destDir, { recursive: true })
+  const readIndex = (dir) => {
+    try {
+      const parsed = JSON.parse(readFileSync(path.join(dir, 'index.json'), 'utf8'))
+      return parsed && typeof parsed === 'object' ? parsed : {}
+    } catch {
+      return {}
+    }
+  }
+  const dest = readIndex(destDir)
+  const videos = dest.videos && typeof dest.videos === 'object' ? { ...dest.videos } : {}
+  const keepIds = new Set(Array.isArray(dest.keepIds) ? dest.keepIds : [])
+  let added = 0
+  for (const dir of sourceDirs) {
+    const index = readIndex(dir)
+    for (const id of Array.isArray(index.keepIds) ? index.keepIds : []) keepIds.add(id)
+    for (const [id, entry] of Object.entries(index.videos ?? {})) {
+      if (!/^[\w-]{11}$/.test(id) || videos[id]) continue
+      const mp4 = path.join(dir, `${id}.mp4`)
+      if (!existsSync(mp4)) continue
+      renameOrCopy(mp4, path.join(destDir, `${id}.mp4`))
+      const vtt = path.join(dir, `${id}.vtt`)
+      if (existsSync(vtt)) renameOrCopy(vtt, path.join(destDir, `${id}.vtt`))
+      videos[id] = entry
+      added += 1
+    }
+  }
+  writeFileSync(path.join(destDir, 'index.json'), JSON.stringify({ version: 1, keepIds: [...keepIds], videos }))
+  return added
+}
+
+function renameOrCopy(from, to) {
+  try {
+    renameSync(from, to)
+  } catch {
+    // outro disco: copia (em stream pelo SO, sem carregar o vídeo na memória)
+    copyFileSync(from, to)
+  }
 }

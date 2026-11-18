@@ -1,3 +1,5 @@
+import type { StageTransition } from '@modules/settings/types/stage-settings'
+
 /** Pasta dos arquivos copiados, relativa à pasta Media (posix). Cada aviso tem a sua subpasta. */
 export const ANNOUNCEMENTS_MEDIA_DIR = 'modulos/avisos'
 
@@ -75,6 +77,10 @@ export interface CarouselConfig {
   slideMs: number
   /** Volta ao primeiro depois do último. */
   loop: boolean
+  /** Animação ao trocar de slide (padrão: desligada). */
+  transitionEnabled: boolean
+  transition: StageTransition
+  transitionSpeed: 'fast' | 'normal' | 'slow'
 }
 
 export interface AnnouncementsState {

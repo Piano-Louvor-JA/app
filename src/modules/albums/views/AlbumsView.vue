@@ -17,6 +17,7 @@ import AlbumLyricDialog from '../components/AlbumLyricDialog.vue'
 import AlbumPlaylistPickerDialog from '../components/AlbumPlaylistPickerDialog.vue'
 import AlbumSearchHitRow from '../components/AlbumSearchHitRow.vue'
 import DownloadFailureDialog from '@modules/sync/components/DownloadFailureDialog.vue'
+import StageCustomizationDialog from '@modules/settings/components/StageCustomizationDialog.vue'
 import { filterAlbumMusicIndex } from '../services/album-music-search'
 import { useAlbums } from '../composables/useAlbums'
 import type { AlbumCategory, AlbumCollection, AlbumSearchHit } from '../types/albums'
@@ -36,6 +37,8 @@ import { parsePlaylistsImport, serializePlaylists } from '../services/playlist-i
 
 const pendingPlaylistRemoval = ref<{ id: string; name: string } | null>(null)
 const { t } = useI18n()
+/** Personalizar Palco dos slides de música (mesmo diálogo do player). */
+const stageDialogOpen = ref(false)
 const route = useRoute()
 const router = useRouter()
 const mediaStore = useMediaStore()
@@ -526,6 +529,17 @@ async function runAction(
         <button
           type="button"
           class="albums-view__toolbar-btn"
+          data-testid="albums-open-youtube"
+          :aria-label="t('youtube.open')"
+          :title="t('youtube.open')"
+          @click="router.push({ name: 'albums-youtube' })"
+        >
+          <i class="ti ti-brand-youtube" aria-hidden="true" />
+          {{ t('youtube.title') }}
+        </button>
+        <button
+          type="button"
+          class="albums-view__toolbar-btn"
           :aria-label="t('albums.playlists.title')"
           @click="playlistsModalOpen = true"
         >
@@ -549,6 +563,24 @@ async function runAction(
             aria-hidden="true"
           />
         </button>
+        <button
+          type="button"
+          class="albums-view__toolbar-btn"
+          data-testid="albums-stage-customize"
+          :aria-label="t('settings.stage.titleSlides')"
+          :title="t('settings.stage.titleSlides')"
+          @click="stageDialogOpen = true"
+        >
+          <i
+            class="ti ti-palette"
+            aria-hidden="true"
+          />
+        </button>
+        <StageCustomizationDialog
+          :open="stageDialogOpen"
+          scope="hymns"
+          @close="stageDialogOpen = false"
+        />
         <button
           v-if="showDownloadControls && categories.length > 0 && !isDownloadingBatch"
           type="button"

@@ -86,6 +86,27 @@ const { formattedTime } = useHomeClock();
   height: 8rem;
   object-fit: contain;
   display: block;
+  animation: home-logo-pulse 3.2s ease-in-out infinite;
+}
+
+/* Pulsação bem suave do logo (escala e brilho leves). */
+@keyframes home-logo-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 0 transparent);
+  }
+
+  50% {
+    transform: scale(1.04);
+    filter: drop-shadow(0 0 10px color-mix(in srgb, var(--ds-color-primary) 35%, transparent));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-view__logo {
+    animation: none;
+  }
 }
 
 .home-view__titles {

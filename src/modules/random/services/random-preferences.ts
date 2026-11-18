@@ -10,6 +10,8 @@ import {
   RANDOM_ANIMATION_SPEEDS,
   RANDOM_FONT_SIZE_MAX,
   RANDOM_FONT_SIZE_MIN,
+  RANDOM_DRAWN_SIZE_MAX,
+  RANDOM_DRAWN_SIZE_MIN,
   RANDOM_TEXT_TRANSFORMS,
   emptyModePool,
   type RandomAnimationSpeed,
@@ -29,6 +31,11 @@ function asString(value: unknown, fallback: string): string {
 
 function asNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback
+}
+
+function asDrawnSize(value: unknown): number {
+  const n = asNumber(value, DEFAULT_RANDOM_DISPLAY_CONFIG.drawnSizePc)
+  return Math.min(RANDOM_DRAWN_SIZE_MAX, Math.max(RANDOM_DRAWN_SIZE_MIN, Math.round(n)))
 }
 
 function asFontSize(value: unknown): number {
@@ -136,6 +143,7 @@ export function normalizeRandomDisplayConfig(raw: unknown): RandomDisplayConfig 
       DEFAULT_RANDOM_DISPLAY_CONFIG.textColor,
     ),
     fontSizePc: asFontSize(source.fontSizePc),
+    drawnSizePc: asDrawnSize(source.drawnSizePc),
     textTransform: asTextTransform(source.textTransform),
     animationSpeed: asAnimationSpeed(source.animationSpeed),
     audioSource: asAudioSource(source.audioSource),

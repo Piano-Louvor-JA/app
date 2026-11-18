@@ -77,3 +77,42 @@ export type AccentDefinition = (typeof accents)[AccentKey]
 
 /** Padrão do sistema — não alterar sem decisão de produto. */
 export const defaultAccent: AccentKey = 'orange'
+
+/** Cor livre escolhida pelo usuário: mesma forma dos acentos prontos. */
+export interface CustomAccentDefinition {
+  id: 'custom'
+  label: string
+  primary: string
+  soft: string
+}
+
+const HEX_COLOR = /^#[0-9a-f]{6}$/i
+
+export function isHexColor(value: unknown): value is string {
+  return typeof value === 'string' && HEX_COLOR.test(value)
+}
+
+/**
+ * Tom de realce (soft) derivado da cor escolhida: a mesma cor clareada
+ * em direção ao branco, como nos acentos prontos (ex.: #E0895A → #F0C4A8).
+ */
+export function deriveAccentSoft(hex: string): string {
+  const mix = 0.55
+  const channel = (start: number) => {
+    const value = Number.parseInt(hex.slice(start, start + 2), 16)
+    return Math.round(value + (255 - value) * mix)
+      .toString(16)
+      .padStart(2, '0')
+  }
+  return `#${channel(1)}${channel(3)}${channel(5)}`.toUpperCase()
+}
+
+export function buildCustomAccent(hex: string): CustomAccentDefinition {
+  const primary = hex.toUpperCase()
+  return {
+    id: 'custom',
+    label: 'Personalizada',
+    primary,
+    soft: deriveAccentSoft(primary),
+  }
+}

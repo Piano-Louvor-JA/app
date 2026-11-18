@@ -9,21 +9,28 @@ import { createI18n } from "vue-i18n";
  */
 const mocks = vi.hoisted(() => ({
   accentKey: null as unknown as { value: string },
+  customAccent: null as unknown as { value: string | null },
   setAccentColor: vi.fn(),
+  setCustomAccent: vi.fn(),
+  resetAccent: vi.fn(),
 }));
 
 vi.mock("../../composables/useAppearanceSettings", async () => {
   const { ref } = await import("vue");
   mocks.accentKey = ref("blue");
+  mocks.customAccent = ref<string | null>(null);
   return {
     useAppearanceSettings: vi.fn(() => ({
       accents: {
-        blue: { color: "#2196f3" },
-        green: { color: "#4caf50" },
-        amber: { color: "#ffc107" },
+        blue: { primary: "#2196f3", label: "Azul" },
+        green: { primary: "#4caf50", label: "Verde" },
+        amber: { primary: "#ffc107", label: "Âmbar" },
       },
       accentKey: mocks.accentKey,
+      customAccent: mocks.customAccent,
       setAccentColor: mocks.setAccentColor,
+      setCustomAccent: mocks.setCustomAccent,
+      resetAccent: mocks.resetAccent,
     })),
   };
 });
@@ -60,6 +67,7 @@ describe("AccentColorCard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.accentKey.value = "blue";
+    mocks.customAccent.value = null;
   });
 
   it("renderiza título e um swatch por accent", () => {
@@ -68,7 +76,28 @@ describe("AccentColorCard", () => {
       "Cor de destaque",
     );
     const swatches = wrapper.findAll(".accent-color__swatch");
-    expect(swatches).toHaveLength(3);
+    // 3 prontos + o seletor de cor livre
+    expect(swatches).toHaveLength(4);
+    expect(swatches[3]!.classes()).toContain("accent-color__swatch--custom");
+  });
+
+  it("cor livre: o seletor aplica a cor e marca o swatch próprio", async () => {
+    const wrapper = mountCard();
+    const input = wrapper.find('input[type="color"]');
+    (input.element as HTMLInputElement).value = "#123456";
+    await input.trigger("input");
+    expect(mocks.setCustomAccent).toHaveBeenCalledWith("#123456");
+    mocks.customAccent.value = "#123456";
+    await wrapper.vm.$nextTick();
+    const swatches = wrapper.findAll(".accent-color__swatch");
+    expect(swatches[0]!.classes()).not.toContain("accent-color__swatch--active");
+    expect(swatches[3]!.classes()).toContain("accent-color__swatch--active");
+  });
+
+  it("restaurar padrão chama resetAccent", async () => {
+    const wrapper = mountCard();
+    await wrapper.find(".accent-color__restore").trigger("click");
+    expect(mocks.resetAccent).toHaveBeenCalled();
   });
 
   it("swatch ativo reflete accentKey", () => {

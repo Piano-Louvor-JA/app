@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -66,11 +66,11 @@ describe('settingsFromRecord', () => {
     expect(settingsFromRecord(null)).toEqual(DEFAULT_SETTINGS)
     expect(settingsFromRecord('x')).toEqual(DEFAULT_SETTINGS)
     expect(settingsFromRecord({ enabled: 'sim', maxHeight: 360, limitGb: 7 })).toEqual(DEFAULT_SETTINGS)
-    expect(DEFAULT_SETTINGS).toEqual({ enabled: false, maxHeight: 720, limitGb: 6 })
+    expect(DEFAULT_SETTINGS).toEqual({ enabled: false, maxHeight: 720, limitGb: 6, folder: 'system', customDir: null })
   })
 
   it('ida e volta das escolhas válidas', () => {
-    const saved = { enabled: false, maxHeight: 1080, limitGb: 20 }
+    const saved = { enabled: false, maxHeight: 1080, limitGb: 20, folder: 'custom', customDir: path.join(dir, 'Vídeos') }
     expect(settingsFromRecord(JSON.parse(JSON.stringify(saved)))).toEqual(saved)
     expect(CACHE_LIMIT_GB_OPTIONS).toContain(6)
   })
@@ -78,7 +78,7 @@ describe('settingsFromRecord', () => {
 
 describe('OnlineVideoService', () => {
   it('lê as configurações salvas; leitura que falha usa o padrão', () => {
-    expect(make({ record: { enabled: false, maxHeight: 480, limitGb: 2 } }).service.settings).toEqual({ enabled: false, maxHeight: 480, limitGb: 2 })
+    expect(make({ record: { enabled: false, maxHeight: 480, limitGb: 2 } }).service.settings).toEqual({ enabled: false, maxHeight: 480, limitGb: 2, folder: 'system', customDir: null })
     const service = new OnlineVideoService({ userDataDir: dir, ...fakes(), readRecord: () => { throw new Error('corrompido') } })
     expect(service.settings).toEqual(DEFAULT_SETTINGS)
   })
@@ -94,7 +94,7 @@ describe('OnlineVideoService', () => {
     })
     expect(service.tools.binDir).toBe(path.join(dir, 'bin'))
     expect(service.cache.dir).toBe(path.join(dir, 'video-cache'))
-    expect(service.cache.limitBytes).toBe(2 * GB)
+    expect(service.cache.limitBytes).toBe(Infinity) // sem limite automático
     expect(service.manager.ytdlpCacheDir).toBe(path.join(dir, 'bin', 'ytdlp-cache'))
     expect(service.manager.getSettings()).toEqual({ maxHeight: 480, locale: 'es' })
     service.tools.onStatus({ state: 'ready' })
@@ -114,6 +114,7 @@ describe('OnlineVideoService', () => {
       settings: DEFAULT_SETTINGS,
       tools: { state: 'missing' },
       usage: { bytes: 10, count: 1, limitBytes: 6 * GB },
+      folders: null,
     })
   })
 
@@ -251,8 +252,8 @@ describe('OnlineVideoService', () => {
   it('setSettings persiste, aplica o limite e desligar cancela os downloads', async () => {
     const { service, writeRecord, cache, manager } = make()
     const status = await service.setSettings({ limitGb: 10, maxHeight: 1080, outro: 1 })
-    expect(writeRecord).toHaveBeenCalledWith(ONLINE_VIDEO_RECORD, { enabled: true, maxHeight: 1080, limitGb: 10 })
-    expect(cache.setLimit).toHaveBeenCalledWith(10 * GB)
+    expect(writeRecord).toHaveBeenCalledWith(ONLINE_VIDEO_RECORD, { enabled: true, maxHeight: 1080, limitGb: 10, folder: 'system', customDir: null })
+    expect(cache.setLimit).toHaveBeenCalledWith(Infinity)
     expect(status.settings.limitGb).toBe(10)
     expect(manager.cancelAll).not.toHaveBeenCalled()
 
@@ -301,8 +302,8 @@ describe('registerOnlineVideoIpc', () => {
     }
     registerOnlineVideoIpc(ipcMain, service)
     expect(Object.keys(handlers).sort()).toEqual([
-      'online-video:cancel', 'online-video:clear', 'online-video:keep', 'online-video:prefetch',
-      'online-video:retry-tools', 'online-video:set-settings', 'online-video:status', 'online-video:video-status',
+      'online-video:cancel', 'online-video:choose-folder', 'online-video:clear', 'online-video:download', 'online-video:keep', 'online-video:open-folder',
+      'online-video:prefetch', 'online-video:remove', 'online-video:retry-tools', 'online-video:set-settings', 'online-video:status', 'online-video:video-status',
     ])
     expect(handlers['online-video:status']()).toBe('s')
     handlers['online-video:set-settings']({}, { limitGb: 2 })
@@ -319,5 +320,57 @@ describe('registerOnlineVideoIpc', () => {
     expect(service.clear).toHaveBeenCalled()
     expect(service.videoStatus).toHaveBeenCalledWith([A])
     expect(service.retryTools).toHaveBeenCalled()
+  })
+})
+
+describe('pasta dos vídeos baixados', () => {
+  it('status informa a pasta; abrir cria a pasta e usa o openPath', async () => {
+    const openPath = vi.fn(async () => '')
+    const service = new OnlineVideoService({ userDataDir: dir, readRecord: () => null, writeRecord: vi.fn(), openPath })
+    expect(service.status().cacheDir).toBe(path.join(dir, 'video-cache'))
+    expect(await service.openCacheFolder()).toBe(true)
+    expect(openPath).toHaveBeenCalledWith(path.join(dir, 'video-cache'))
+    expect(existsSync(path.join(dir, 'video-cache'))).toBe(true)
+  })
+
+  it('erro do sistema, exceção ou sem openPath devolvem false', async () => {
+    const base = { userDataDir: dir, readRecord: () => null, writeRecord: vi.fn() }
+    expect(await new OnlineVideoService(base).openCacheFolder()).toBe(false)
+    expect(await new OnlineVideoService({ ...base, openPath: async () => 'sem app' }).openCacheFolder()).toBe(false)
+    expect(await new OnlineVideoService({ ...base, openPath: async () => { throw new Error('x') } }).openCacheFolder()).toBe(false)
+  })
+
+  it('canal de IPC para abrir a pasta', async () => {
+    const handlers = {}
+    const service = { openCacheFolder: vi.fn(async () => true) }
+    registerOnlineVideoIpc({ handle: (channel, fn) => { handlers[channel] = fn } }, service)
+    expect(await handlers['online-video:open-folder']()).toBe(true)
+  })
+})
+
+describe('Baixar pelo módulo YouTube', () => {
+  it('baixa mesmo com a chave desligada, instalando as ferramentas antes', async () => {
+    const { service, tools, manager } = make({ record: { enabled: false } })
+    expect(await service.download(['aaaaaaaaaaa', 5])).toBe(true)
+    expect(tools.ensure).toHaveBeenCalled()
+    expect(manager.prefetch).toHaveBeenCalledWith(['aaaaaaaaaaa'])
+  })
+
+  it('sem vídeos, sistema sem suporte ou ferramentas falhando: não baixa', async () => {
+    const { service, tools, manager } = make()
+    expect(await service.download([])).toBe(false)
+    expect(await service.download('x')).toBe(false)
+    tools.ensure.mockRejectedValueOnce(new Error('rede'))
+    expect(await service.download(['aaaaaaaaaaa'])).toBe(false)
+    expect(manager.prefetch).not.toHaveBeenCalled()
+    expect(await make({ available: false }).service.download(['aaaaaaaaaaa'])).toBe(false)
+  })
+
+  it('canal de IPC do download', async () => {
+    const handlers = {}
+    const fake = { download: vi.fn(async () => true) }
+    registerOnlineVideoIpc({ handle: (channel, fn) => { handlers[channel] = fn } }, fake)
+    expect(await handlers['online-video:download']({}, ['aaaaaaaaaaa'])).toBe(true)
+    expect(fake.download).toHaveBeenCalledWith(['aaaaaaaaaaa'])
   })
 })

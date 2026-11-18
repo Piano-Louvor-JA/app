@@ -35,7 +35,7 @@ function sampleState(): AnnouncementsState {
   return {
     version: 1,
     activeListId: 'l2',
-    carousel: { slideMs: 5_000, loop: false },
+    carousel: { slideMs: 5_000, loop: false, transitionEnabled: false, transition: 'fade', transitionSpeed: 'normal' },
     lists: [
       { id: 'l1', name: 'Sábado manhã', items: [] },
       {
@@ -60,7 +60,7 @@ describe('normalizeAnnouncementsState', () => {
     expect(state.lists[0]).toMatchObject({ name: 'Avisos', items: [] })
     expect(state.lists[0]!.id).toBeTruthy()
     expect(state.activeListId).toBe(state.lists[0]!.id)
-    expect(state.carousel).toEqual({ slideMs: CAROUSEL_SLIDE_MS_DEFAULT, loop: true })
+    expect(state.carousel).toEqual({ slideMs: CAROUSEL_SLIDE_MS_DEFAULT, loop: true, transitionEnabled: false, transition: 'fade', transitionSpeed: 'normal' })
   })
 
   it('mantém um estado válido como está', () => {
@@ -152,7 +152,7 @@ describe('normalizeAnnouncementsState', () => {
     [Number.NaN, CAROUSEL_SLIDE_MS_DEFAULT],
   ])('tempo do carrossel %s vira %s', (slideMs, expected) => {
     const state = normalizeAnnouncementsState({ carousel: { slideMs, loop: 'sim' } }, 'Avisos')
-    expect(state.carousel).toEqual({ slideMs: expected, loop: true })
+    expect(state.carousel).toEqual({ slideMs: expected, loop: true, transitionEnabled: false, transition: 'fade', transitionSpeed: 'normal' })
   })
 })
 

@@ -39,6 +39,7 @@ export const SYNCABLE_PREF_KEYS: ReadonlySet<string> = new Set([
   USER_PREFERENCE_KEYS.theme,
   USER_PREFERENCE_KEYS.blur,
   USER_PREFERENCE_KEYS.accent,
+  USER_PREFERENCE_KEYS.accentCustom,
   USER_PREFERENCE_KEYS.interaction,
   USER_PREFERENCE_KEYS.autoBrightness,
   USER_PREFERENCE_KEYS.bibleSelectedVersion,

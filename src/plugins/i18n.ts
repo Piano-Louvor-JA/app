@@ -83,6 +83,9 @@ import mediaRu from '@modules/media/locales/ru'
 import randomPtBR from '@modules/random/locales/pt-BR'
 import randomEn from '@modules/random/locales/en'
 import randomEs from '@modules/random/locales/es'
+import youtubePtBR from '@modules/youtube/locales/pt-BR'
+import youtubeEn from '@modules/youtube/locales/en'
+import youtubeEs from '@modules/youtube/locales/es'
 import randomFr from '@modules/random/locales/fr'
 import randomUk from '@modules/random/locales/uk'
 import randomRu from '@modules/random/locales/ru'
@@ -166,6 +169,7 @@ export default createI18n({
       ...liturgyPtBR,
       ...mediaPtBR,
       ...randomPtBR,
+      ...youtubePtBR,
       ...settingsPtBR,
       ...startingPtBR,
       ...syncPtBR,
@@ -185,6 +189,7 @@ export default createI18n({
       ...liturgyEn,
       ...mediaEn,
       ...randomEn,
+      ...youtubeEn,
       ...settingsEn,
       ...startingEn,
       ...syncEn,
@@ -204,6 +209,7 @@ export default createI18n({
       ...liturgyEs,
       ...mediaEs,
       ...randomEs,
+      ...youtubeEs,
       ...settingsEs,
       ...startingEs,
       ...syncEs,

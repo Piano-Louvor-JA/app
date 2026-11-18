@@ -13,8 +13,9 @@ import { stripHtmlBreaks } from '../services/media-slides'
 import { coverTitleTextShadow } from '../services/media-cover-style'
 import { readEffectiveStageSettings, subscribeStageSettings } from '../../settings/services/stage-settings-runtime'
 import type { StageSettings } from '../../settings/types/stage-settings'
-import { resolveBackgroundImage, stageFlexAlign,
+import { bibleTransitionMs, effectiveLyricTransition, resolveBackgroundImage, stageFlexAlign,
   stageBgCss } from '../../settings/types/stage-settings'
+import '@styles/screen-transitions.css'
 import type { MediaProjectionRuntime } from '../types/media'
 import { DEFAULT_MEDIA_PROJECTION } from '../types/media'
 
@@ -78,7 +79,10 @@ onUnmounted(() => {
 
 const stageStyle = computed(() => ({
   backgroundColor: stageBgCss(stage.value.backgroundColor),
+  '--scr-transition-ms': `${bibleTransitionMs(stage.value.lyricTransitionSpeed)}ms`,
 }))
+
+const transitionName = computed(() => `scr-${effectiveLyricTransition(stage.value)}`)
 
 // BG custom do Palco tem prioridade sobre a capa do álbum (como o APK).
 const bgImage = computed(
@@ -182,36 +186,48 @@ const projectionFontStyle = useProjectionFont('hymns')
       class="media-projection__content"
       :style="contentStyle"
     >
-      <div
-        v-if="showTitle"
-        class="media-projection__titlecard"
-        :class="{ 'media-projection__titlecard--boxed': stage.titleTextBox }"
-        :style="{ color: titleColor }"
+      <Transition
+        :name="transitionName"
+        mode="out-in"
       >
-        <span
-          class="media-projection__titlemark media-projection__titlemark--tl"
-          aria-hidden="true"
-        />
-        <span
-          class="media-projection__titlemark media-projection__titlemark--br"
-          aria-hidden="true"
-        />
-        <p
-          v-if="coverSubtitle"
-          class="media-projection__kicker"
-        >{{ coverSubtitle }}</p>
-        <p
-          class="media-projection__title media-projection__title--cover"
-          :style="[titleStyle, titleBoxStyle]"
+        <div
+          v-if="showTitle"
+          :key="`title|${runtime.title}`"
+          class="media-projection__titlecard"
+          :class="{ 'media-projection__titlecard--boxed': stage.titleTextBox }"
+          :style="{ color: titleColor }"
         >
-          {{ runtime.title }}
-        </p>
-      </div>
-      <p
-        v-if="lyric && !runtime.isCover"
-        class="media-projection__lyric"
-        :style="[lyricStyle, boxStyle]"
-      >{{ lyric }}</p>
+          <span
+            class="media-projection__titlemark media-projection__titlemark--tl"
+            aria-hidden="true"
+          />
+          <span
+            class="media-projection__titlemark media-projection__titlemark--br"
+            aria-hidden="true"
+          />
+          <p
+            v-if="coverSubtitle"
+            class="media-projection__kicker"
+          >{{ coverSubtitle }}</p>
+          <p
+            class="media-projection__title media-projection__title--cover"
+            :style="[titleStyle, titleBoxStyle]"
+          >
+            {{ runtime.title }}
+          </p>
+        </div>
+      </Transition>
+      <Transition
+        :name="transitionName"
+        mode="out-in"
+      >
+        <p
+          v-if="lyric && !runtime.isCover"
+          :key="`lyric|${lyric}`"
+          class="media-projection__lyric"
+          :style="[lyricStyle, boxStyle]"
+        >{{ lyric }}</p>
+      </Transition>
     </div>
   </div>
   <div
