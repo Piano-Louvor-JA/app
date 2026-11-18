@@ -28,6 +28,9 @@ vi.mock('@modules/media/services/custom-catalog', () => ({
   customFileUrl: (p: string) => `cf:${p}`,
   toCustomCollectionId: (id: number) => id + 2_000_000,
 }))
+vi.mock('@modules/media/services/auth-client', () => ({
+  getAuthSession: vi.fn(() => ({ token: 't', user: { id_user: 4, email: 'a@b.c', displayName: 'A' } })),
+}))
 vi.mock('@modules/sync/services/media-paths', () => ({
   resolveCoverUrlsFromDisk: (urls: unknown[]) => resolveCoverUrlsFromDisk(urls),
   resolveRemoteFileUrl: (p: string) => resolveRemoteFileUrl(p),
@@ -205,9 +208,10 @@ describe('loadCustomAlbumCategory', () => {
         name: 'Minha',
         description: 'desc',
         coverUrl: '/custom/c.png',
+        ownerId: 4,
         musicsCount: 3,
       },
-      { id: 6, name: 'Sem capa', description: null, musicsCount: 0 },
+      { id: 6, name: 'Sem capa', description: null, ownerId: 4, musicsCount: 0 },
     ])
     const cat = await loadCustomAlbumCategory()
     expect(cat).toMatchObject({ id: 'custom', name: 'Minhas Coletâneas' })

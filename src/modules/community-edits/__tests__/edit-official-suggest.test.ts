@@ -122,7 +122,22 @@ describe('MediaEditorView — editar música oficial como sugestão (RF-01)', ()
     vi.mocked(resolveMediaTrack).mockClear();
   });
 
-  it('RED ?editOfficial=42: carrega letra oficial no editor em modo sugestão', async () => {
+  it('carrega o edit local existente no editor oficial', async () => {
+    saveLocalEdit(42, {
+      lyrics: JSON.stringify([
+        { order: 1, lyric: 'Estrofe local A', showSlide: true, time: '00:03', instrumentalTime: '', imageUrl: null, imagePosition: null, frameDataUrl: null },
+        { order: 2, lyric: 'Estrofe local B', showSlide: true, time: '00:07', instrumentalTime: '', imageUrl: null, imagePosition: null, frameDataUrl: null },
+      ]),
+    });
+
+    const w = await mountEditor({ editOfficial: '42' });
+
+    expect((w.find('[data-testid="edit-official-lyric-0"]').element as HTMLTextAreaElement).value).toBe('Estrofe local A');
+    expect((w.find('[data-testid="edit-official-lyric-1"]').element as HTMLTextAreaElement).value).toBe('Estrofe local B');
+    expect((w.find('input[type="time"]').element as HTMLInputElement).value).toBe('00:03');
+  });
+
+  it('carrega letra oficial no editor em modo sugestão sem edit local', async () => {
     const w = await mountEditor({ editOfficial: '42' });
     // letra oficial aparece no editor (textarea/input de estrofe com conteúdo)
     const html = w.html();
@@ -132,24 +147,31 @@ describe('MediaEditorView — editar música oficial como sugestão (RF-01)', ()
   });
 
   it('RED salvar grava saveLocalEdit com JSON de slides (letra+timing) e não faz PUT', async () => {
-    const w = await mountEditor({ editOfficial: '42' });
-    // editar primeira estrofe
-    const ta = w.find('[data-testid="edit-official-lyric-0"]');
-    expect(ta.exists()).toBe(true);
-    await ta.setValue('Estrofe corrigida A');
-    const btn = w.find('[data-testid="edit-official-save"]');
-    expect(btn.exists()).toBe(true);
-    await btn.trigger('click');
-    await flushPromises();
+    // Spy global de rede: a invariante "nada vai ao catálogo oficial" é TESTADA, não presumida.
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('rede bloqueada no teste'));
+    try {
+      const w = await mountEditor({ editOfficial: '42' });
+      // editar primeira estrofe
+      const ta = w.find('[data-testid="edit-official-lyric-0"]');
+      expect(ta.exists()).toBe(true);
+      await ta.setValue('Estrofe corrigida A');
+      const btn = w.find('[data-testid="edit-official-save"]');
+      expect(btn.exists()).toBe(true);
+      await btn.trigger('click');
+      await flushPromises();
 
-    const edit = getLocalEdit(42);
-    expect(edit).not.toBeNull();
-    expect(edit!.status).toBe('draft');
-    const slides = JSON.parse(edit!.lyrics ?? '[]') as Array<{ lyric?: string }>;
-    expect(slides[0]?.lyric).toBe('Estrofe corrigida A');
-    expect(slides[1]?.lyric).toBe('Estrofe original B'); // parcial preserva
-    // escopo restrito: save não altera catálogo (nenhum PUT já que editor oficial não faz PUT)
-    expect(w.text()).toContain('salva localmente');
+      const edit = getLocalEdit(42);
+      expect(edit).not.toBeNull();
+      expect(edit!.status).toBe('draft');
+      const slides = JSON.parse(edit!.lyrics ?? '[]') as Array<{ lyric?: string }>;
+      expect(slides[0]?.lyric).toBe('Estrofe corrigida A');
+      expect(slides[1]?.lyric).toBe('Estrofe original B'); // parcial preserva
+      // invariante RF-01: salvamento é SOMENTE local — zero chamadas de rede no fluxo do save
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(w.text()).toContain('salva localmente');
+    } finally {
+      fetchSpy.mockRestore(); // nunca vazaria o spy p/ testes posteriores, mesmo com assert falho
+    }
   });
 
   it('RED resolver prioriza edit local na reprodução (paridade com fase 1)', async () => {

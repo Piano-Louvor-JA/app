@@ -1233,7 +1233,7 @@ describe("MediaEditorView — cobertura de gaps", () => {
 		w.unmount();
 	});
 
-	it("import .slja: reaproveita 'Importações .slja'; áudio embutido", async () => {
+	it("import .slja (RF-02): cria coletânea com o título do conteúdo; legada 'Importações .slja' NÃO é reutilizada", async () => {
 		const auth = await import("../../services/auth-client");
 		vi.mocked(auth.getAuthSession).mockReturnValue({ token: "t", user: { id_user: 1, email: "a@b.c", displayName: "A" } } as never);
 		const slja = await import("../../../../shared/services/slja");
@@ -1247,6 +1247,7 @@ describe("MediaEditorView — cobertura de gaps", () => {
 			slides: [{ lyric: "V1", type: "LETRA", timeMs: 0, order: 1 }],
 			audio: { bytes: new Uint8Array([1, 2, 3]), name: "a.mp3" },
 		} as never);
+		vi.mocked(catalogMod.createCustomCollection).mockResolvedValue({ id: 9 } as never);
 		vi.mocked(catalogMod.createCustomMusic).mockResolvedValue({ id: 44 } as never);
 		vi.mocked(catalogMod.createCustomLyric).mockResolvedValue({ id: 55 } as never);
 		vi.mocked(catalogMod.uploadCustomFile).mockResolvedValue({ idFile: 7, url: "a.mp3" } as never);
@@ -1256,7 +1257,9 @@ describe("MediaEditorView — cobertura de gaps", () => {
 		const file = { arrayBuffer: async () => new ArrayBuffer(4), name: "hino-x.slja" };
 		await s.onImportFile({ target: { files: [file], value: "" } } as unknown as Event);
 		await flushPromises();
-		expect(catalogMod.createCustomMusic).toHaveBeenCalledWith(2, { name: "Hino X" });
+		// RF-02: coletânea própria com o título, nunca a legada
+		expect(catalogMod.createCustomCollection).toHaveBeenCalledWith("Hino X");
+		expect(catalogMod.createCustomMusic).toHaveBeenCalledWith(9, { name: "Hino X" });
 		expect(catalogMod.updateCustomMusic).toHaveBeenCalledWith(44, { id_file_audio: 7 });
 		w.unmount();
 	});
@@ -1935,7 +1938,7 @@ describe("MediaEditorView — interações de estrofe via DOM (sel exatos)", () 
 		w.unmount();
 	});
 
-	it("import sem coletânea: cria 'Importações .slja' nova", async () => {
+	it("import sem colisão (RF-02): cria coletânea com o título do arquivo", async () => {
 		const slja = await import("../../../../shared/services/slja");
 		const catalogMod = await import("../../services/custom-catalog");
 		vi.mocked(catalogMod.listCustomCollections).mockResolvedValue([{ id: 1, name: "C1" }] as never);
@@ -1948,7 +1951,53 @@ describe("MediaEditorView — interações de estrofe via DOM (sel exatos)", () 
 		const file = { arrayBuffer: async () => new ArrayBuffer(4), name: "novo.slja" };
 		await (w.vm.$.devtoolsRawSetupState as unknown as { onImportFile: (e: Event) => Promise<void> }).onImportFile({ target: { files: [file], value: "" } } as unknown as Event);
 		await flushPromises();
-		expect(catalogMod.createCustomCollection).toHaveBeenCalledWith("Importações .slja");
+		expect(catalogMod.createCustomCollection).toHaveBeenCalledWith("T");
+		w.unmount();
+	});
+
+	it("import com colisão (RF-02): sufixo (2) na coletânea nova", async () => {
+		const slja = await import("../../../../shared/services/slja");
+		const catalogMod = await import("../../services/custom-catalog");
+		vi.mocked(catalogMod.listCustomCollections).mockResolvedValue([
+			{ id: 1, name: "T" },
+		] as never);
+		vi.mocked(slja.parseSljaFile).mockResolvedValue({ title: "T", slides: [] } as never);
+		vi.mocked(catalogMod.createCustomCollection).mockResolvedValue({ id: 12 } as never);
+		vi.mocked(catalogMod.createCustomMusic).mockResolvedValue({ id: 45 } as never);
+		const w = await mountEditor();
+		const st = w.vm.$.devtoolsRawSetupState as unknown as Record<string, never> & { selectedCollectionId: { value: number | null } };
+		st.selectedCollectionId.value = null;
+		const file = { arrayBuffer: async () => new ArrayBuffer(4), name: "t.slja" };
+		await (w.vm.$.devtoolsRawSetupState as unknown as { onImportFile: (e: Event) => Promise<void> }).onImportFile({ target: { files: [file], value: "" } } as unknown as Event);
+		await flushPromises();
+		expect(catalogMod.createCustomCollection).toHaveBeenCalledWith("T (2)");
+		w.unmount();
+	});
+
+	it("import de 2 arquivos de uma vez (RF-02): 2 coletâneas distintas e renomeáveis", async () => {
+		const slja = await import("../../../../shared/services/slja");
+		const catalogMod = await import("../../services/custom-catalog");
+		vi.mocked(catalogMod.listCustomCollections)
+			.mockResolvedValueOnce([] as never) // mount
+			.mockResolvedValueOnce([{ id: 21, name: "A" }] as never) // refresh pós-import 1
+			.mockResolvedValueOnce([{ id: 21, name: "A" }] as never); // refresh pós-import 2
+		vi.mocked(slja.parseSljaFile)
+			.mockResolvedValueOnce({ title: "A", slides: [] } as never)
+			.mockResolvedValueOnce({ title: "A", slides: [] } as never);
+		vi.mocked(catalogMod.createCustomCollection)
+			.mockResolvedValueOnce({ id: 21 } as never)
+			.mockResolvedValueOnce({ id: 22 } as never);
+		vi.mocked(catalogMod.createCustomMusic).mockResolvedValue({ id: 44 } as never);
+		const w = await mountEditor();
+		const st = w.vm.$.devtoolsRawSetupState as unknown as Record<string, never> & { selectedCollectionId: { value: number | null } };
+		st.selectedCollectionId.value = null;
+		const f1 = { arrayBuffer: async () => new ArrayBuffer(4), name: "a.slja" };
+		const f2 = { arrayBuffer: async () => new ArrayBuffer(4), name: "a2.slja" };
+		await (w.vm.$.devtoolsRawSetupState as unknown as { onImportFile: (e: Event) => Promise<void> }).onImportFile({ target: { files: [f1, f2], value: "" } } as unknown as Event);
+		await flushPromises();
+		const names = vi.mocked(catalogMod.createCustomCollection).mock.calls.map((c) => c[0]);
+		expect(names).toContain("A");
+		expect(names).toContain("A (2)");
 		w.unmount();
 	});
 

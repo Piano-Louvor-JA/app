@@ -22,6 +22,10 @@ export type CommunityCollectionSummary = {
 	authorName: string | null;
 	musicsCount: number;
 	updatedAt: string | null;
+	/** Dono (RF-04): habilita ações inline quando === id_user da sessão. */
+	ownerId?: number | null;
+	/** Privacidade (RF-04): ausente/legado = público (default da API). */
+	visibility?: "public" | "private";
 };
 
 function asString(value: unknown): string | null {
@@ -128,6 +132,12 @@ export async function listCommunityCollectionsPage(
 				? Number(row.musics_count)
 				: 0,
 			updatedAt: asString(row.updated_at),
+			ownerId: Number.isInteger(row.owner_id) && Number(row.owner_id) > 0
+				? Number(row.owner_id)
+				: null,
+			visibility: (row.visibility === "private" ? "private" : "public") as
+				| "public"
+				| "private",
 		}));
 
 		return {
