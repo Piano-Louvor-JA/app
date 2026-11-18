@@ -171,6 +171,20 @@ async function loadOfficialForSuggestion(musicId: number): Promise<void> {
       imageUrl: s.imageUrl ?? '',
     }))
     notify('')
+    const { getLocalEdit } = await import('@modules/community-edits/services/local-edits-store')
+    const local = getLocalEdit(musicId)
+    if (local?.lyrics) {
+      try {
+        const editedSlides = JSON.parse(local.lyrics) as Array<{ lyric?: string; time?: string }>
+        lyrics.value = lyrics.value.map((row, index) => ({
+          ...row,
+          lyric: editedSlides[index]?.lyric ?? row.lyric,
+          time: editedSlides[index]?.time ?? row.time,
+        }))
+      } catch {
+        // Corrupt local edit: retain the resolved official/applied track.
+      }
+    }
   } finally {
     loading.value = false
   }
