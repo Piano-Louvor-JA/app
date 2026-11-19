@@ -10,11 +10,14 @@
  */
 import { initializeApp } from 'firebase/app'
 import {
+  EmailAuthProvider,
   GoogleAuthProvider,
   createUserWithEmailAndPassword,
   getAuth,
   getRedirectResult,
   onAuthStateChanged,
+  reauthenticateWithCredential,
+  reauthenticateWithPopup,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
@@ -227,6 +230,43 @@ export function subscribeFirebaseSession(): (() => void) | null {
     })
   } catch {
     return null
+  }
+}
+
+/** Como a conta logada entra: senha no Firebase, Google, ou sessão legado da API. */
+export type AccountProvider = 'password' | 'google' | 'legacy'
+
+export function currentAccountProvider(): AccountProvider {
+  try {
+    const user = getFirebaseAuth().currentUser
+    if (!user) return 'legacy'
+    return user.providerData.some(p => p.providerId === 'password') ? 'password' : 'google'
+  } catch {
+    return 'legacy'
+  }
+}
+
+export type ReauthResult = 'ok' | 'wrong-password' | 'failed'
+
+const WRONG_PASSWORD_CODES = new Set(['auth/wrong-password', 'auth/invalid-credential', 'auth/invalid-login-credentials'])
+
+/**
+ * Exclusão de conta: confirma a identidade antes da ação irreversível.
+ * Com senha → reauthenticateWithCredential; sem senha (Google) → popup.
+ */
+export async function firebaseReauthenticate(password?: string): Promise<ReauthResult> {
+  try {
+    const user = getFirebaseAuth().currentUser
+    if (!user) return 'failed'
+    if (password && user.email) {
+      await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, password))
+    } else {
+      await reauthenticateWithPopup(user, new GoogleAuthProvider())
+    }
+    return 'ok'
+  } catch (e) {
+    const code = e && typeof e === 'object' && 'code' in e ? String((e as { code: unknown }).code) : ''
+    return WRONG_PASSWORD_CODES.has(code) ? 'wrong-password' : 'failed'
   }
 }
 

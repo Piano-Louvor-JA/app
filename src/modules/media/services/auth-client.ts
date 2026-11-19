@@ -138,6 +138,35 @@ export async function logout(): Promise<void> {
   saveSession(null)
 }
 
+export type DeleteAccountResult = 'ok' | 'password-required' | 'wrong-password' | 'unauthorized' | 'failed'
+
+/**
+ * Exclui a conta (DELETE /auth/me). Sessão legado manda a senha; sessão
+ * Firebase não manda (o cliente reautentica no Firebase antes). Sucesso
+ * limpa a sessão local.
+ */
+export async function deleteAccount(password?: string): Promise<DeleteAccountResult> {
+  const token = await authTokenAsync()
+  if (!token) return 'unauthorized'
+  try {
+    const response = await fetch(`${authBaseUrl()}/me`, {
+      method: 'DELETE',
+      headers: authRequestHeaders({ authorization: `Bearer ${token}`, 'content-type': 'application/json' }),
+      body: JSON.stringify(password ? { password } : {}),
+    })
+    if (response.ok) {
+      saveSession(null)
+      return 'ok'
+    }
+    if (response.status === 400) return 'password-required'
+    if (response.status === 403) return 'wrong-password'
+    if (response.status === 401) return 'unauthorized'
+    return 'failed'
+  } catch {
+    return 'failed'
+  }
+}
+
 /**
  * Pede token de reset (POST /auth/forgot-password). A API responde 200
  * sempre; quando RESET_TOKEN_EXPOSE=1 (self-host sem SMTP) o token vem no
