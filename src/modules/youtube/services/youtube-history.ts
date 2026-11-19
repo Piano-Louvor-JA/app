@@ -1,6 +1,8 @@
 import { BROWSER_STORAGE_KEYS } from '@shared/constants/storage-keys'
 import { getBrowserItem, setBrowserItem } from '@shared/services/browser-storage'
 
+import { moveById } from './reorder'
+
 /** Vídeo tocado pelo módulo YouTube. */
 export type YoutubeHistoryEntry = {
   videoId: string
@@ -43,7 +45,10 @@ function sanitize(raw: unknown): YoutubeHistoryEntry | null {
   }
 }
 
-/** Histórico salvo, do mais recente para o mais antigo. Entradas inválidas são descartadas. */
+/**
+ * Histórico salvo, na ordem da lista: o que tocou por último entra no topo, e o operador pode
+ * arrastar para reordenar. Entradas inválidas são descartadas.
+ */
 export function listYoutubeHistory(): YoutubeHistoryEntry[] {
   const raw = getBrowserItem<unknown>(BROWSER_STORAGE_KEYS.youtubeHistory, [])
   if (!Array.isArray(raw)) return []
@@ -55,7 +60,7 @@ export function listYoutubeHistory(): YoutubeHistoryEntry[] {
     seen.add(entry.videoId)
     list.push(entry)
   }
-  return list.sort((a, b) => b.playedAt - a.playedAt)
+  return list
 }
 
 function save(list: YoutubeHistoryEntry[]): YoutubeHistoryEntry[] {
@@ -83,6 +88,11 @@ export function recordYoutubePlay(input: YoutubeHistoryInput, now = Date.now()):
 
 export function removeYoutubeHistoryEntry(videoId: string): YoutubeHistoryEntry[] {
   return save(listYoutubeHistory().filter((entry) => entry.videoId !== videoId))
+}
+
+/** Arrastar e soltar: `fromId` vai para a posição de `toId`. */
+export function reorderYoutubeHistory(fromId: string, toId: string): YoutubeHistoryEntry[] {
+  return save(moveById(listYoutubeHistory(), (entry) => entry.videoId, fromId, toId))
 }
 
 export function clearYoutubeHistory(): YoutubeHistoryEntry[] {
@@ -170,6 +180,11 @@ export function toggleYoutubeFavorite(input: YoutubeHistoryInput, now = Date.now
     playedAt: now,
   }
   return saveFavorites([entry, ...list])
+}
+
+/** Arrastar e soltar: `fromId` vai para a posição de `toId`. */
+export function reorderYoutubeFavorites(fromId: string, toId: string): YoutubeFavoriteEntry[] {
+  return saveFavorites(moveById(listYoutubeFavorites(), (entry) => entry.videoId, fromId, toId))
 }
 
 export function removeYoutubeFavorite(videoId: string): YoutubeFavoriteEntry[] {

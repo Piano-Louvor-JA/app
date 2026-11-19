@@ -1,6 +1,7 @@
 import { BROWSER_STORAGE_KEYS } from '@shared/constants/storage-keys'
 import { getBrowserItem, setBrowserItem } from '@shared/services/browser-storage'
 
+import { moveById } from './reorder'
 import type { YoutubeHistoryInput } from './youtube-history'
 
 /** Vídeo dentro de uma coletânea online. */
@@ -171,6 +172,19 @@ export function addVideosToYoutubeCollection(id: string, inputs: YoutubeHistoryI
 
 export function removeVideoFromYoutubeCollection(id: string, videoId: string, now = Date.now()): YoutubeCollection[] {
   return update(id, (c) => (collectionHasVideo(c, videoId) ? { ...c, videos: c.videos.filter((v) => v.videoId !== videoId) } : null), now)
+}
+
+/** Arrastar e soltar a coletânea na lista: `fromId` vai para a posição de `toId`. */
+export function reorderYoutubeCollections(fromId: string, toId: string): YoutubeCollection[] {
+  return save(moveById(listYoutubeCollections(), (c) => c.id, fromId, toId))
+}
+
+/** Arrastar e soltar um vídeo dentro da coletânea. */
+export function reorderVideosInYoutubeCollection(id: string, fromVideoId: string, toVideoId: string, now = Date.now()): YoutubeCollection[] {
+  return update(id, (c) => {
+    const videos = moveById(c.videos, (v) => v.videoId, fromVideoId, toVideoId)
+    return videos.every((v, i) => v === c.videos[i]) ? null : { ...c, videos }
+  }, now)
 }
 
 /** Move o vídeo uma posição para cima (-1) ou para baixo (+1). */

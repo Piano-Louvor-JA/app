@@ -11,6 +11,8 @@ export const BROWSER_STORAGE_KEYS = {
   youtubeFavorites: 'louvorja-youtube-favorites-v1',
   /** Coletâneas online (listas de vídeos do YouTube montadas pelo operador). */
   youtubeCollections: 'louvorja-youtube-collections-v1',
+  /** Ordem que o operador deu à aba "Baixados" do módulo YouTube (lista de IDs). */
+  youtubeDownloadsOrder: 'louvorja-youtube-downloads-order-v1',
   /** Últimas buscas feitas no módulo YouTube. */
   youtubeRecentQueries: 'louvorja-youtube-queries-v1',
   /** sessionStorage: histórico de navegação (sobrevive a reload, não a fechar o app). */
