@@ -724,6 +724,28 @@ describe('projeção', () => {
     })
   })
 
+  it('trocar livro, capítulo ou buscar passagem mantém o versículo projetado até escolher outro', async () => {
+    const store = await bootstrappedStore()
+    store.isProjecting = true
+    store.selectVerse(1)
+    const projected = { ...store.projection }
+    expect(projected.verses).toEqual([1])
+    mockPublish.mockClear()
+
+    await store.selectChapter(2)
+    await store.selectBook(2)
+    await store.applyPassage(1, 1, [2, 3])
+    store.bookSearchQuery = 'gênesis 1:2'
+    await store.applyBookSearchReference()
+    expect(store.selectedVerses).toEqual([])
+    expect(store.projection).toEqual(projected)
+    expect(mockPublish).not.toHaveBeenCalled()
+
+    store.selectVerse(2)
+    expect(store.projection.verses).toEqual([2])
+    expect(mockPublish).toHaveBeenCalledWith(store.projection)
+  })
+
   it('syncProjection sem seleção zera projeção', async () => {
     const store = await bootstrappedStore()
     store.isProjecting = true

@@ -259,6 +259,8 @@ contextBridge.exposeInMainWorld('louvorja', {
     cancel: (id) => ipcRenderer.invoke('online-video:cancel', id),
     download: (ids) => ipcRenderer.invoke('online-video:download', ids),
     remove: (id) => ipcRenderer.invoke('online-video:remove', id),
+    rename: (id, name) => ipcRenderer.invoke('online-video:rename', id, name),
+    list: () => ipcRenderer.invoke('online-video:list'),
     keep: (ids) => ipcRenderer.invoke('online-video:keep', ids),
     clear: (which) => ipcRenderer.invoke('online-video:clear', which),
     videoStatus: (ids) => ipcRenderer.invoke('online-video:video-status', ids),

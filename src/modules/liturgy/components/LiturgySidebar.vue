@@ -170,6 +170,10 @@ function onEndTimeChange(event: Event) {
         </div>
       </dl>
 
+      <!--
+        Equipe de Escala: oculta até o recurso ser criado (gestão de equipe por culto).
+        Para voltar, é só descomentar; o evento `manageTeam` e os textos continuam prontos.
+
       <div
         class="liturgy-sidebar__rule"
         aria-hidden="true"
@@ -188,6 +192,7 @@ function onEndTimeChange(event: Event) {
       >
         {{ t('liturgy.team.manage') }}
       </button>
+      -->
     </GlassCard>
 
     <GlassCard class="liturgy-sidebar__note">

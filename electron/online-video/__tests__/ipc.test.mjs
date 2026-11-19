@@ -302,8 +302,8 @@ describe('registerOnlineVideoIpc', () => {
     }
     registerOnlineVideoIpc(ipcMain, service)
     expect(Object.keys(handlers).sort()).toEqual([
-      'online-video:cancel', 'online-video:choose-folder', 'online-video:clear', 'online-video:download', 'online-video:keep', 'online-video:open-folder',
-      'online-video:prefetch', 'online-video:remove', 'online-video:retry-tools', 'online-video:set-settings', 'online-video:status', 'online-video:video-status',
+      'online-video:cancel', 'online-video:choose-folder', 'online-video:clear', 'online-video:download', 'online-video:keep', 'online-video:list', 'online-video:open-folder',
+      'online-video:prefetch', 'online-video:remove', 'online-video:rename', 'online-video:retry-tools', 'online-video:set-settings', 'online-video:status', 'online-video:video-status',
     ])
     expect(handlers['online-video:status']()).toBe('s')
     handlers['online-video:set-settings']({}, { limitGb: 2 })

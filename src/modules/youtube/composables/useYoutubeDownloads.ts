@@ -1,6 +1,6 @@
 import { onBeforeUnmount, ref } from 'vue'
 
-import type { OnlineVideoItemStatus, OnlineVideoStatus } from '@shared/types/desktop-bridge'
+import type { OnlineVideoDownload, OnlineVideoItemStatus, OnlineVideoStatus } from '@shared/types/desktop-bridge'
 
 const VIDEO_ID = /^[\w-]{11}$/
 
@@ -22,6 +22,17 @@ export function useYoutubeDownloads() {
   const api = onlineVideoApi()
   const statuses = ref<Record<string, OnlineVideoItemStatus>>({})
   const supported = ref(false)
+  /** Aba "Baixados": vídeos das duas pastas, do uso mais recente ao mais antigo. */
+  const downloaded = ref<OnlineVideoDownload[]>([])
+
+  async function loadDownloaded() {
+    if (!api?.list || !supported.value) return
+    try {
+      downloaded.value = await api.list()
+    } catch {
+      // lista só informativa: fica a última que deu certo
+    }
+  }
 
   function set(id: string, status: OnlineVideoItemStatus) {
     statuses.value = { ...statuses.value, [id]: status }
@@ -35,6 +46,7 @@ export function useYoutubeDownloads() {
     } catch {
       supported.value = false
     }
+    await loadDownloaded()
   }
 
   /** Atualiza o estado dos vídeos que estão na tela. */
@@ -73,10 +85,28 @@ export function useYoutubeDownloads() {
     if (!api?.remove) return false
     try {
       const ok = await api.remove(id)
-      if (ok) set(id, { state: 'none' })
+      if (ok) {
+        set(id, { state: 'none' })
+        await loadDownloaded()
+      }
       return ok
     } catch {
       return false
+    }
+  }
+
+  /** Renomeia o arquivo baixado; devolve o nome novo ou null (tocando agora ou falha). */
+  async function rename(id: string, name: string): Promise<string | null> {
+    if (!api?.rename) return null
+    try {
+      const fileName = await api.rename(id, name)
+      if (fileName) {
+        set(id, { state: 'ready', fileName })
+        await loadDownloaded()
+      }
+      return fileName ?? null
+    } catch {
+      return null
     }
   }
 
@@ -89,9 +119,12 @@ export function useYoutubeDownloads() {
     }
   }
 
-  const stop = api?.onChanged?.(({ id, status }) => set(id, status))
+  const stop = api?.onChanged?.(({ id, status }) => {
+    set(id, status)
+    if (status.state === 'ready' || status.state === 'none') void loadDownloaded()
+  })
   onBeforeUnmount(() => stop?.())
   void init()
 
-  return { statuses, supported, init, refresh, download, remove, cancel }
+  return { statuses, supported, downloaded, init, refresh, loadDownloaded, download, remove, rename, cancel }
 }

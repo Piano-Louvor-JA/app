@@ -14,6 +14,8 @@ import {
   forgetYoutubeQuery,
   listYoutubeFavorites,
   listYoutubeHistory,
+  reorderYoutubeFavorites,
+  reorderYoutubeHistory,
   listYoutubeRecentQueries,
   recordYoutubePlay,
   rememberYoutubeQuery,
@@ -38,6 +40,8 @@ import {
   createYoutubeCollection,
   deleteYoutubeCollection,
   listYoutubeCollections,
+  reorderVideosInYoutubeCollection,
+  reorderYoutubeCollections,
   moveVideoInYoutubeCollection,
   removeVideoFromYoutubeCollection,
   renameYoutubeCollection,
@@ -45,11 +49,22 @@ import {
 } from '../services/youtube-collections'
 import YoutubeDownloadButton from '../components/YoutubeDownloadButton.vue'
 import YoutubeDownloadDialog from '../components/YoutubeDownloadDialog.vue'
+import YoutubeRenameDialog from '../components/YoutubeRenameDialog.vue'
 import YoutubeStorageChip from '../components/YoutubeStorageChip.vue'
 import YoutubePlaylistImportDialog from '../components/YoutubePlaylistImportDialog.vue'
 import { isDownloading, useYoutubeDownloads } from '../composables/useYoutubeDownloads'
+import { useDragReorder } from '../composables/useDragReorder'
+import { moveById } from '../services/reorder'
+import {
+  downloadedRows,
+  formatBytes,
+  listDownloadsOrder,
+  orderDownloadedRows,
+  reorderDownloads,
+  type YoutubeDownloadedRow,
+} from '../services/youtube-downloaded'
 
-type Tab = 'search' | 'history' | 'favorites' | 'collections'
+type Tab = 'search' | 'history' | 'favorites' | 'downloads' | 'collections'
 type PlayableVideo = Pick<YoutubeSearchItem, 'videoId' | 'title'> &
   Partial<Pick<YoutubeSearchItem, 'channel' | 'thumbnail' | 'durationText'>>
 
@@ -183,10 +198,35 @@ function toggleFavorite(video: PlayableVideo) {
 }
 
 /** Linhas da aba atual (Histórico ou Favoritos), já filtradas. */
-type ListRow = YoutubeFavoriteEntry & { playCount?: number }
-const listSource = computed<ListRow[]>(() => (tab.value === 'favorites' ? favorites.value : history.value))
+type ListRow = YoutubeFavoriteEntry & { playCount?: number } & Partial<Pick<YoutubeDownloadedRow, 'size' | 'fileName' | 'renamed' | 'folder'>>
+const downloadsOrder = ref<string[]>(listDownloadsOrder())
+const downloadedList = computed<YoutubeDownloadedRow[]>(() => orderDownloadedRows(downloadedRows(
+  downloads.downloaded.value,
+  [history.value, favorites.value, collections.value.flatMap((c) => c.videos)],
+), downloadsOrder.value))
+const listSource = computed<ListRow[]>(() => {
+  if (tab.value === 'favorites') return favorites.value
+  if (tab.value === 'downloads') return downloadedList.value
+  return history.value
+})
 const filteredList = computed(() => filterYoutubeHistory(listSource.value, historyFilter.value))
 watch(tab, () => { historyFilter.value = '' })
+
+/* Arrastar e soltar para reordenar (cada lista com o seu escopo; Alt+↑/↓ no teclado) */
+const listDrag = useDragReorder('list', (fromId, toId) => {
+  if (tab.value === 'favorites') favorites.value = reorderYoutubeFavorites(fromId, toId)
+  else if (tab.value === 'downloads') downloadsOrder.value = reorderDownloads(downloadedList.value, fromId, toId)
+  else history.value = reorderYoutubeHistory(fromId, toId)
+})
+const searchDrag = useDragReorder('search', (fromId, toId) => {
+  results.value = moveById(results.value, (video) => video.videoId, fromId, toId)
+})
+const collectionsDrag = useDragReorder('collections', (fromId, toId) => {
+  collections.value = reorderYoutubeCollections(fromId, toId)
+})
+const collectionVideosDrag = useDragReorder('collection-videos', (fromId, toId) => {
+  if (openCollection.value) collections.value = reorderVideosInYoutubeCollection(openCollection.value.id, fromId, toId)
+})
 
 function removeRow(videoId: string) {
   if (tab.value === 'favorites') favorites.value = removeYoutubeFavorite(videoId)
@@ -355,6 +395,7 @@ const visibleIds = computed(() => {
   if (tab.value === 'search') return results.value.map((v) => v.videoId)
   if (tab.value === 'history') return history.value.map((v) => v.videoId)
   if (tab.value === 'favorites') return favorites.value.map((v) => v.videoId)
+  if (tab.value === 'downloads') return downloadedList.value.map((v) => v.videoId)
   return openCollection.value?.videos.map((v) => v.videoId) ?? []
 })
 watch([visibleIds, downloads.supported], ([ids]) => { void downloads.refresh(ids) }, { immediate: true })
@@ -372,6 +413,17 @@ async function confirmRemoveDownload() {
   if (!video) return
   if (!(await downloads.remove(video.videoId))) showFeedback(t('youtube.download.removeFailed'))
   void storageChip.value?.refresh()
+}
+
+/* Renomear o arquivo baixado na pasta */
+const renamingDownload = ref<PlayableVideo | null>(null)
+
+async function confirmRenameDownload(name: string) {
+  const video = renamingDownload.value
+  renamingDownload.value = null
+  if (!video) return
+  const fileName = await downloads.rename(video.videoId, name)
+  showFeedback(fileName ? t('youtube.download.renamed', { name: fileName }) : t('youtube.download.renameFailed'))
 }
 
 async function confirmDownload() {
@@ -530,6 +582,20 @@ function goBack() {
           {{ t('youtube.tabs.favorites') }}
           <span v-if="favorites.length > 0" class="yt-view__count">{{ favorites.length }}</span>
         </button>
+        <button
+          v-if="downloads.supported.value"
+          type="button"
+          role="tab"
+          class="yt-view__tab"
+          :class="{ 'is-active': tab === 'downloads' }"
+          :aria-selected="tab === 'downloads'"
+          data-testid="youtube-tab-downloads"
+          @click="tab = 'downloads'"
+        >
+          <i class="ti ti-download" aria-hidden="true" />
+          {{ t('youtube.tabs.downloads') }}
+          <span v-if="downloadedList.length > 0" class="yt-view__count">{{ downloadedList.length }}</span>
+        </button>
       </div>
       </div>
     </header>
@@ -596,14 +662,21 @@ function goBack() {
         </p>
 
         <ul v-else class="yt-view__grid" :class="{ 'is-stale': searching }">
-          <li v-for="video in results" :key="video.videoId" class="yt-card">
+          <li
+            v-for="(video, i) in results"
+            :key="video.videoId"
+            class="yt-card yt-drag"
+            :class="searchDrag.classes(video.videoId)"
+            :title="t('youtube.actions.dragHint')"
+            v-bind="searchDrag.bind(video.videoId, results[i - 1]?.videoId, results[i + 1]?.videoId, i)"
+          >
             <button
               type="button"
               class="yt-card__thumb"
               :title="t('youtube.actions.playHint')"
               @click="play(video, false)"
             >
-              <img :src="thumbOf(video)" :alt="''" loading="lazy">
+              <img :src="thumbOf(video)" :alt="''" loading="lazy" draggable="false">
               <span v-if="video.live" class="yt-card__badge yt-card__badge--live">{{ t('youtube.search.live') }}</span>
               <span v-else-if="video.durationText" class="yt-card__badge">{{ video.durationText }}</span>
               <span class="yt-card__play">
@@ -634,6 +707,17 @@ function goBack() {
                 @download="askDownload(video)"
                 @cancel="downloads.cancel(video.videoId)"
               />
+              <button
+                v-if="downloads.supported.value && downloads.statuses.value[video.videoId]?.state === 'ready'"
+                type="button"
+                class="yt-fav"
+                :aria-label="t('youtube.download.rename')"
+                :title="t('youtube.download.rename')"
+                data-testid="youtube-download-rename"
+                @click="renamingDownload = { ...video }"
+              >
+                <i class="ti ti-pencil" aria-hidden="true" />
+              </button>
               <button
                 type="button"
                 class="yt-fav yt-add"
@@ -689,14 +773,14 @@ function goBack() {
     </template>
 
     <!-- Histórico / Favoritos -->
-    <template v-else-if="tab === 'history' || tab === 'favorites'">
+    <template v-else-if="tab === 'history' || tab === 'favorites' || tab === 'downloads'">
       <div class="yt-view__searchbar">
         <label class="yt-view__field">
           <i class="ti ti-filter" aria-hidden="true" />
           <input
             v-model="historyFilter"
             type="search"
-            :placeholder="tab === 'favorites' ? t('youtube.favorites.filter') : t('youtube.history.filter')"
+            :placeholder="tab === 'favorites' ? t('youtube.favorites.filter') : tab === 'downloads' ? t('youtube.downloads.filter') : t('youtube.history.filter')"
             data-testid="youtube-history-filter"
           >
         </label>
@@ -715,22 +799,29 @@ function goBack() {
 
       <div class="yt-view__body">
         <p v-if="listSource.length === 0" class="yt-view__empty">
-          <i class="ti" :class="tab === 'favorites' ? 'ti-heart' : 'ti-history'" aria-hidden="true" />
-          {{ tab === 'favorites' ? t('youtube.favorites.empty') : t('youtube.history.empty') }}
+          <i class="ti" :class="tab === 'favorites' ? 'ti-heart' : tab === 'downloads' ? 'ti-download' : 'ti-history'" aria-hidden="true" />
+          {{ tab === 'favorites' ? t('youtube.favorites.empty') : tab === 'downloads' ? t('youtube.downloads.empty') : t('youtube.history.empty') }}
         </p>
         <p v-else-if="filteredList.length === 0" class="yt-view__empty">
           <i class="ti ti-mood-empty" aria-hidden="true" />
           {{ t('youtube.history.noMatch', { query: historyFilter }) }}
         </p>
         <ul v-else class="yt-view__list">
-          <li v-for="entry in filteredList" :key="entry.videoId" class="yt-row">
+          <li
+            v-for="(entry, i) in filteredList"
+            :key="entry.videoId"
+            class="yt-row yt-drag"
+            :class="listDrag.classes(entry.videoId)"
+            v-bind="listDrag.bind(entry.videoId, filteredList[i - 1]?.videoId, filteredList[i + 1]?.videoId, i)"
+          >
+            <span class="yt-drag__grip" :title="t('youtube.actions.dragHint')" aria-hidden="true"><i class="ti ti-grip-vertical" /></span>
             <button
               type="button"
               class="yt-row__thumb"
               :title="t('youtube.actions.playHint')"
               @click="play(entry, false)"
             >
-              <img :src="thumbOf(entry)" :alt="''" loading="lazy">
+              <img :src="thumbOf(entry)" :alt="''" loading="lazy" draggable="false">
               <span v-if="entry.durationText" class="yt-card__badge">{{ entry.durationText }}</span>
             </button>
             <div class="yt-row__info">
@@ -738,6 +829,15 @@ function goBack() {
               <p v-if="tab === 'history'" class="yt-card__meta">
                 <template v-if="entry.channel">{{ entry.channel }} · </template>{{ formatPlayedAt(entry.playedAt) }} · {{ t('youtube.history.plays', { n: entry.playCount ?? 1 }) }}
               </p>
+              <template v-else-if="tab === 'downloads'">
+                <p class="yt-card__meta">
+                  <template v-if="entry.channel">{{ entry.channel }} · </template>{{ formatBytes(entry.size ?? 0) }} · {{ entry.folder === 'custom' ? t('youtube.downloads.folderCustom') : t('youtube.downloads.folderSystem') }}
+                </p>
+                <p v-if="entry.renamed" class="yt-card__meta yt-row__file" :title="entry.fileName" data-testid="youtube-downloaded-file">
+                  <i class="ti ti-file-pencil" aria-hidden="true" />
+                  {{ t('youtube.downloads.renamedAs', { name: entry.fileName }) }}
+                </p>
+              </template>
               <p v-else class="yt-card__meta">{{ entry.channel }}</p>
             </div>
             <div class="yt-row__actions">
@@ -758,6 +858,17 @@ function goBack() {
                 @download="askDownload(entry)"
                 @cancel="downloads.cancel(entry.videoId)"
               />
+              <button
+                v-if="downloads.supported.value && downloads.statuses.value[entry.videoId]?.state === 'ready'"
+                type="button"
+                class="yt-fav"
+                :aria-label="t('youtube.download.rename')"
+                :title="t('youtube.download.rename')"
+                data-testid="youtube-download-rename"
+                @click="renamingDownload = { ...entry }"
+              >
+                <i class="ti ti-pencil" aria-hidden="true" />
+              </button>
               <button
                 type="button"
                 class="yt-fav yt-add"
@@ -852,13 +963,20 @@ function goBack() {
             {{ t('youtube.collections.empty') }}
           </p>
           <ul v-else class="yt-view__grid">
-            <li v-for="collection in collections" :key="collection.id" class="yt-card yt-col">
+            <li
+              v-for="(collection, i) in collections"
+              :key="collection.id"
+              class="yt-card yt-col yt-drag"
+              :class="collectionsDrag.classes(collection.id)"
+              :title="t('youtube.actions.dragHint')"
+              v-bind="collectionsDrag.bind(collection.id, collections[i - 1]?.id, collections[i + 1]?.id, i)"
+            >
               <button type="button" class="yt-col__cover" @click="openCollectionId = collection.id">
                 <span v-if="collection.videos.length === 0" class="yt-col__cover-empty">
                   <i class="ti ti-playlist" aria-hidden="true" />
                 </span>
                 <span v-else class="yt-col__mosaic" :class="`is-${Math.min(collection.videos.length, 4)}`">
-                  <img v-for="(src, i) in collectionCover(collection)" :key="i" :src="src" alt="" loading="lazy">
+                  <img v-for="(src, ci) in collectionCover(collection)" :key="ci" :src="src" alt="" loading="lazy" draggable="false">
                 </span>
                 <span class="yt-card__badge">{{ t('youtube.collections.videoCount', { n: collection.videos.length }) }}</span>
               </button>
@@ -978,7 +1096,14 @@ function goBack() {
             {{ t('youtube.collections.emptyVideos') }}
           </p>
           <ol v-else class="yt-view__list">
-            <li v-for="(entry, index) in openCollection.videos" :key="entry.videoId" class="yt-row">
+            <li
+              v-for="(entry, index) in openCollection.videos"
+              :key="entry.videoId"
+              class="yt-row yt-drag"
+              :class="collectionVideosDrag.classes(entry.videoId)"
+              v-bind="collectionVideosDrag.bind(entry.videoId, openCollection.videos[index - 1]?.videoId, openCollection.videos[index + 1]?.videoId, index)"
+            >
+              <span class="yt-drag__grip" :title="t('youtube.actions.dragHint')" aria-hidden="true"><i class="ti ti-grip-vertical" /></span>
               <span class="yt-col__pos">{{ index + 1 }}</span>
               <button
                 type="button"
@@ -986,7 +1111,7 @@ function goBack() {
                 :title="t('youtube.actions.playHint')"
                 @click="play(entry, false)"
               >
-                <img :src="thumbOf(entry)" :alt="''" loading="lazy">
+                <img :src="thumbOf(entry)" :alt="''" loading="lazy" draggable="false">
                 <span v-if="entry.durationText" class="yt-card__badge">{{ entry.durationText }}</span>
               </button>
               <div class="yt-row__info">
@@ -1011,6 +1136,17 @@ function goBack() {
                   @download="askDownload(entry)"
                   @cancel="downloads.cancel(entry.videoId)"
                 />
+                <button
+                  v-if="downloads.supported.value && downloads.statuses.value[entry.videoId]?.state === 'ready'"
+                  type="button"
+                  class="yt-fav"
+                  :aria-label="t('youtube.download.rename')"
+                  :title="t('youtube.download.rename')"
+                  data-testid="youtube-download-rename"
+                  @click="renamingDownload = { ...entry }"
+                >
+                  <i class="ti ti-pencil" aria-hidden="true" />
+                </button>
                 <button
                   type="button"
                   class="yt-fav"
@@ -1138,6 +1274,15 @@ function goBack() {
       :open="playlistImportOpen"
       @close="playlistImportOpen = false"
       @create="createFromPlaylist"
+    />
+
+    <YoutubeRenameDialog
+      :open="renamingDownload !== null"
+      :video-id="renamingDownload?.videoId ?? ''"
+      :title="renamingDownload?.title ?? ''"
+      :file-name="renamingDownload ? downloads.statuses.value[renamingDownload.videoId]?.fileName : undefined"
+      @close="renamingDownload = null"
+      @confirm="confirmRenameDownload"
     />
 
     <YoutubeDownloadDialog
@@ -1601,6 +1746,16 @@ function goBack() {
   &:hover { background: color-mix(in srgb, var(--ds-color-primary) 80%, #000); color: var(--ds-color-on-primary); }
 }
 .yt-add:not(.is-on):hover { border-color: var(--ds-color-primary); color: var(--ds-color-primary); }
+.yt-row__file {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  overflow: hidden;
+  color: var(--ds-color-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .yt-del:hover { border-color: var(--ds-color-error, #e5484d); color: var(--ds-color-error, #e5484d); }
 .yt-col .yt-card__actions .yt-fav:not(.yt-del):hover { border-color: var(--ds-color-primary); color: var(--ds-color-primary); }
 
@@ -1751,6 +1906,51 @@ function goBack() {
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+.yt-drag {
+  position: relative;
+  cursor: grab;
+  /* Tracejado onde a linha arrastada vai entrar (metade do espaço entre as linhas). */
+  &.is-drop-before::after,
+  &.is-drop-after::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    left: 0;
+    border-top: 3px dashed var(--ds-color-primary);
+    pointer-events: none;
+  }
+  &.is-drop-before::after { top: calc(-0.25rem - 2px); }
+  &.is-drop-after::after { bottom: calc(-0.25rem - 2px); }
+  &.is-drag-ghost {
+    border-color: var(--ds-color-primary);
+    background: color-mix(in srgb, var(--ds-color-primary) 32%, var(--ds-color-surface-card, #1e1e1e));
+    box-shadow: 0 0 0 2px var(--ds-color-primary), 0 10px 28px rgb(0 0 0 / 45%);
+    cursor: grabbing;
+  }
+}
+
+.yt-view__grid .yt-drag {
+  &.is-drop-before::after,
+  &.is-drop-after::after {
+    top: 0;
+    bottom: 0;
+    right: auto;
+    left: auto;
+    border-top: 0;
+    border-left: 3px dashed var(--ds-color-primary);
+  }
+  &.is-drop-before::after { left: 0; }
+  &.is-drop-after::after { right: 0; }
+}
+
+.yt-drag__grip {
+  flex-shrink: 0;
+  margin-right: -0.5rem;
+  color: var(--ds-color-on-surface-variant);
+  opacity: 0.55;
+  .yt-drag:hover & { opacity: 1; }
 }
 
 .yt-row {

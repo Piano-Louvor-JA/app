@@ -422,7 +422,8 @@ export const useBibleStore = defineStore('bible', () => {
       selectedChapter.value = 1
     }
 
-    syncProjection()
+    // Navegar não mexe na projeção: o versículo que está na tela fica até o
+    // operador clicar no próximo (selectVerse publica).
     await refreshChapter()
   }
 
@@ -436,7 +437,7 @@ export const useBibleStore = defineStore('bible', () => {
     selectedVerses.value = []
     lastVerseAnchor.value = 1
     filteredVerseSet.value = null
-    syncProjection()
+    // Mantém o versículo projetado até escolher o próximo (ver selectBook).
     await refreshChapter()
   }
 
@@ -500,7 +501,7 @@ export const useBibleStore = defineStore('bible', () => {
       filteredVerseSet.value = new Set(parsed.verses)
     }
     if (query === undefined) bookSearchQuery.value = ''
-    syncProjection()
+    // Só navega: a projeção muda quando o operador escolher o versículo.
     return true
   }
 
@@ -513,7 +514,7 @@ export const useBibleStore = defineStore('bible', () => {
     await selectBook(bookId)
     await selectChapter(chapter)
     filteredVerseSet.value = verseList.length > 0 ? new Set(verseList) : null
-    syncProjection()
+    // Só navega: a projeção muda quando o operador escolher o versículo.
   }
 
   function clearSelection() {

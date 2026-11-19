@@ -14,6 +14,8 @@ import {
   moveVideoInYoutubeCollection,
   removeVideoFromYoutubeCollection,
   renameYoutubeCollection,
+  reorderVideosInYoutubeCollection,
+  reorderYoutubeCollections,
 } from '../services/youtube-collections'
 
 const A = 'AAAAAAAAAAA'
@@ -28,6 +30,23 @@ function create(name = 'Culto jovem', now = 1) {
 
 describe('coletâneas online do módulo YouTube', () => {
   beforeEach(() => localStorage.clear())
+
+  it('arrastar reordena as coletâneas e os vídeos de uma coletânea', () => {
+    const one = create('Um', 1)
+    const two = create('Dois', 2)
+    const three = create('Três', 3)
+    expect(reorderYoutubeCollections(three.id, one.id).map((c) => c.name)).toEqual(['Três', 'Um', 'Dois'])
+    expect(listYoutubeCollections().map((c) => c.name)).toEqual(['Três', 'Um', 'Dois'])
+    expect(two.id).toBeTruthy()
+
+    addVideosToYoutubeCollection(one.id, [{ videoId: A, title: 'A' }, { videoId: B, title: 'B' }, { videoId: C, title: 'C' }], 5)
+    const moved = reorderVideosInYoutubeCollection(one.id, A, C, 9).find((c) => c.id === one.id)
+    expect(moved?.videos.map((v) => v.videoId)).toEqual([B, C, A])
+    expect(moved?.updatedAt).toBe(9)
+    const same = reorderVideosInYoutubeCollection(one.id, A, A, 10).find((c) => c.id === one.id)
+    expect(same?.updatedAt).toBe(9)
+    expect(reorderVideosInYoutubeCollection('nao-existe', A, B)).toHaveLength(3)
+  })
 
   it('roundtrip: criar e adicionar vídeos sobrevive a recarregar', () => {
     const col = create('  Culto   jovem  ', 10)

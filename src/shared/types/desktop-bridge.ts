@@ -132,6 +132,22 @@ export type OnlineVideoItemStatus = {
   progress?: number
   code?: string
   message?: string
+  /** Nome do arquivo na pasta, quando baixado (`<título>_<id>.mp4`). */
+  fileName?: string
+}
+
+/** Vídeo baixado (aba "Baixados"). */
+export type OnlineVideoDownload = {
+  id: string
+  title: string
+  /** Segundos. */
+  duration: number
+  size: number
+  lastUsed: number
+  fileName: string
+  /** O operador deu outro nome ao arquivo. */
+  renamed: boolean
+  folder: OnlineVideoFolder
 }
 
 export type OnlineVideoApi = {
@@ -149,6 +165,10 @@ export type OnlineVideoApi = {
   download?: (ids: string[]) => Promise<boolean>
   /** Apaga a cópia baixada de um vídeo (não apaga o que está tocando). */
   remove?: (id: string) => Promise<boolean>
+  /** Renomeia o arquivo baixado; devolve o nome novo, ou null (vídeo tocando ou falha). */
+  rename?: (id: string, name: string) => Promise<string | null>
+  /** Vídeos baixados nas duas pastas, do uso mais recente ao mais antigo. */
+  list?: () => Promise<OnlineVideoDownload[]>
   onChanged: (callback: (payload: { id: string; status: OnlineVideoItemStatus }) => void) => () => void
   onTools: (callback: (status: OnlineVideoToolsStatus) => void) => () => void
 }

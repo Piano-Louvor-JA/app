@@ -130,13 +130,10 @@ describe('LiturgySidebar', () => {
       w.unmount()
     })
 
-    it('manageTeam emite (171)', async () => {
+    it('Equipe de Escala fica oculta até o recurso existir', () => {
       const w = createWrapper({ team: [] })
-      const btn = w.find('.liturgy-sidebar__team-btn')
-      if (btn.exists()) {
-        await btn.trigger('click')
-        expect(w.emitted('manageTeam')).toBeTruthy()
-      }
+      expect(w.find('.liturgy-sidebar__team-title').exists()).toBe(false)
+      expect(w.find('.liturgy-sidebar__team-btn').exists()).toBe(false)
       w.unmount()
     })
   })

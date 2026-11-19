@@ -127,6 +127,62 @@ describe('apagar o vídeo baixado', () => {
   })
 })
 
+describe('renomear o arquivo baixado', () => {
+  it('renomeia e guarda o nome novo; recusado, com erro ou sem ponte devolve null', async () => {
+    const { api } = makeApi({ rename: vi.fn(async () => `Novo_${A}.mp4`) })
+    setBridge(api)
+    const h = host()
+    await flushPromises()
+    expect(await h.d.rename(A, 'Novo')).toBe(`Novo_${A}.mp4`)
+    expect(api.rename).toHaveBeenCalledWith(A, 'Novo')
+    expect(h.d.statuses.value[A]).toEqual({ state: 'ready', fileName: `Novo_${A}.mp4` })
+    api.rename.mockResolvedValueOnce(null)
+    expect(await h.d.rename(A, 'X')).toBeNull()
+    expect(h.d.statuses.value[A]?.fileName).toBe(`Novo_${A}.mp4`)
+    api.rename.mockResolvedValueOnce(undefined)
+    expect(await h.d.rename(A, 'X')).toBeNull()
+    api.rename.mockRejectedValueOnce(new Error('ipc'))
+    expect(await h.d.rename(A, 'X')).toBeNull()
+
+    setBridge(makeApi().api)
+    expect(await host().d.rename(A, 'X')).toBeNull()
+  })
+})
+
+describe('lista dos baixados', () => {
+  it('carrega ao abrir e recarrega quando um vídeo fica pronto, é apagado ou renomeado', async () => {
+    const list = vi.fn(async () => [{ id: A }])
+    const { api, emit } = makeApi({ list, rename: vi.fn(async () => 'n.mp4') })
+    setBridge(api)
+    const h = host()
+    await flushPromises()
+    expect(h.d.downloaded.value).toEqual([{ id: A }])
+    expect(list).toHaveBeenCalledTimes(1)
+    emit(A, { state: 'downloading', progress: 0.5 })
+    emit(A, { state: 'ready' })
+    await flushPromises()
+    expect(list).toHaveBeenCalledTimes(2)
+    await h.d.remove(A)
+    await h.d.rename(A, 'n')
+    expect(list).toHaveBeenCalledTimes(4)
+    list.mockRejectedValueOnce(new Error('ipc'))
+    await h.d.loadDownloaded()
+    expect(h.d.downloaded.value).toEqual([{ id: A }])
+  })
+
+  it('sem suporte ou sem a função não pede a lista', async () => {
+    const { api } = makeApi({ status: vi.fn(async () => ({ hidden: true, available: true })), list: vi.fn() })
+    setBridge(api)
+    const h = host()
+    await flushPromises()
+    expect(api.list).not.toHaveBeenCalled()
+    setBridge(makeApi().api)
+    const old = host()
+    await flushPromises()
+    expect(old.d.downloaded.value).toEqual([])
+  })
+})
+
 describe('baixar todos (coletânea)', () => {
   it('manda a lista inteira de uma vez e marca todos na fila; falha marca todos', async () => {
     const B = 'BBBBBBBBBBB'

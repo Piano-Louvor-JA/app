@@ -160,7 +160,7 @@ export class OnlineVideoManager {
   /** @returns {VideoStatus} */
   status(id) {
     const session = this.sessions.get(id)
-    if (this.cache.has(id)) return { state: 'ready' }
+    if (this.cache.has(id)) return { state: 'ready', fileName: path.basename(this.cache.videoPath(id)) }
     if (session && session.state !== 'error') return { state: session.state, progress: session.progress }
     const failure = this.failures.get(id)
     if (failure) return { state: 'error', code: failure.code, message: failure.message }
@@ -265,7 +265,7 @@ export class OnlineVideoManager {
         ffmpeg: this.tools.paths().ffmpeg,
         video: path.join(session.dir, 'video'),
         audio: info.audio ? path.join(session.dir, 'audio') : null,
-        output: this.cache.videoPath(id),
+        output: this.cache.videoPath(id, info.title),
         exec: this.exec,
         signal,
       })
@@ -288,7 +288,7 @@ export class OnlineVideoManager {
       if (!this.playing.has(id) || !session.tracks || error.code === 'cancelled' || session.state !== 'muxing') {
         await this.#dispose(session)
       }
-      if (error.code === 'cancelled') await rm(this.cache.subtitlePath(id), { force: true })
+      if (error.code === 'cancelled') await rm(this.cache.subtitlePath(id, session.info?.title), { force: true })
       session.state = 'error'
       this.#emit(id)
     }
@@ -332,7 +332,7 @@ export class OnlineVideoManager {
 
   async #fetchSubtitle(session, subtitle, signal) {
     try {
-      await this.downloadSubtitle(subtitle.url, this.cache.subtitlePath(session.id), signal)
+      await this.downloadSubtitle(subtitle.url, this.cache.subtitlePath(session.id, session.info?.title), signal)
       session.subtitleLang = subtitle.lang
     } catch {
       session.subtitleLang = null

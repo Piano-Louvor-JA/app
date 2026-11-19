@@ -13,6 +13,10 @@ import {
   recordYoutubePlay,
   rememberYoutubeQuery,
   removeYoutubeHistoryEntry,
+  reorderYoutubeFavorites,
+  reorderYoutubeHistory,
+  toggleYoutubeFavorite,
+  listYoutubeFavorites,
 } from '../services/youtube-history'
 
 const A = 'AAAAAAAAAAA'
@@ -56,6 +60,28 @@ describe('histórico do módulo YouTube', () => {
     expect(listYoutubeHistory()).toEqual([])
   })
 
+  it('arrastar reordena o histórico e a ordem sobrevive a recarregar; tocar de novo volta ao topo', () => {
+    const C = 'CCCCCCCCCCC'
+    recordYoutubePlay({ videoId: A, title: 'A' }, 1)
+    recordYoutubePlay({ videoId: B, title: 'B' }, 2)
+    recordYoutubePlay({ videoId: C, title: 'C' }, 3)
+    expect(listYoutubeHistory().map((e) => e.videoId)).toEqual([C, B, A])
+    expect(reorderYoutubeHistory(C, A).map((e) => e.videoId)).toEqual([B, A, C])
+    expect(listYoutubeHistory().map((e) => e.videoId)).toEqual([B, A, C])
+    expect(reorderYoutubeHistory(C, B).map((e) => e.videoId)).toEqual([C, B, A])
+    expect(reorderYoutubeHistory(A, 'naoexiste01').map((e) => e.videoId)).toEqual([C, B, A])
+    recordYoutubePlay({ videoId: A, title: 'A' }, 4)
+    expect(listYoutubeHistory().map((e) => e.videoId)).toEqual([A, C, B])
+  })
+
+  it('arrastar reordena os favoritos', () => {
+    toggleYoutubeFavorite({ videoId: A, title: 'A' }, 1)
+    toggleYoutubeFavorite({ videoId: B, title: 'B' }, 2)
+    expect(listYoutubeFavorites().map((e) => e.videoId)).toEqual([B, A])
+    expect(reorderYoutubeFavorites(B, A).map((e) => e.videoId)).toEqual([A, B])
+    expect(listYoutubeFavorites().map((e) => e.videoId)).toEqual([A, B])
+  })
+
   it('ignora dado corrompido no storage', () => {
     localStorage.setItem(BROWSER_STORAGE_KEYS.youtubeHistory, JSON.stringify({ nope: true }))
     expect(listYoutubeHistory()).toEqual([])
@@ -66,9 +92,10 @@ describe('histórico do módulo YouTube', () => {
       { videoId: A, title: 'Duplicado', playedAt: 99 },
       { videoId: B, title: 7, playedAt: 50, playCount: 2.7 },
     ]))
+    // A ordem é a da lista salva (o operador pode ter arrastado), não a data.
     expect(listYoutubeHistory()).toEqual([
-      { videoId: B, title: B, channel: '', thumbnail: '', durationText: '', playedAt: 50, playCount: 2 },
       { videoId: A, title: 'Ok', channel: '', thumbnail: '', durationText: '', playedAt: 0, playCount: 1 },
+      { videoId: B, title: B, channel: '', thumbnail: '', durationText: '', playedAt: 50, playCount: 2 },
     ])
   })
 
