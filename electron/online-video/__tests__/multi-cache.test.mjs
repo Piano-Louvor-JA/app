@@ -30,6 +30,19 @@ function stores() {
 }
 
 describe('MultiCache: pasta do sistema + pasta personalizada', () => {
+  it('o protocolo pede pelo ID e recebe o arquivo com o título no nome', async () => {
+    const { system, custom } = stores()
+    const cache = new MultiCache({ system, custom, active: 'custom' })
+    await cache.load()
+    const title = 'Arautos do Rei | 60 Anos'
+    writeFileSync(cache.videoPath(A, title), 'x')
+    writeFileSync(cache.subtitlePath(A, title), 'WEBVTT')
+    await cache.add(A, { title, size: 1, subtitleLang: 'pt' })
+    expect(cache.fileFor(`${A}.mp4`)).toBe(path.join(custom.dir, `Arautos do Rei 60 Anos_${A}.mp4`))
+    expect(cache.fileFor(`${A}.vtt`)).toBe(path.join(custom.dir, `Arautos do Rei 60 Anos_${A}.vtt`))
+    expect(cache.fileFor('outro.txt')).toBe(path.join(custom.dir, 'outro.txt'))
+  })
+
   it('a pasta personalizada usa uma subpasta própria', () => {
     expect(customVideosDir('/x/y')).toBe(path.join('/x/y', CUSTOM_SUBDIR))
   })
@@ -156,6 +169,21 @@ describe('OnlineVideoService com duas pastas', () => {
     expect((await service.clear('outra')).usage.count).toBe(0)
   })
 
+  it('várias janelas mandando a mesma pasta ao mesmo tempo: um leitor só, vídeos preservados', async () => {
+    const chosen = path.join(dir, 'Externo')
+    const videos = customVideosDir(chosen)
+    mkdirSync(videos, { recursive: true })
+    writeFileSync(path.join(videos, 'index.json'), JSON.stringify({ videos: { [A]: { title: 'Hino', size: 1 } } }))
+    writeFileSync(path.join(videos, `${A}.mp4`), 'x')
+    const service = new OnlineVideoService(base())
+    await service.cache.load()
+    const partial = { customDir: chosen, folder: 'custom' }
+    await Promise.all([service.setSettings(partial), service.setSettings(partial), service.setSettings(partial)])
+    expect(existsSync(path.join(videos, `Hino_${A}.mp4`))).toBe(true)
+    expect(service.cache.has(A)).toBe(true)
+    expect(service.cacheFile(`${A}.mp4`)).toBe(path.join(videos, `Hino_${A}.mp4`))
+  })
+
   it('cancelar o seletor ou sem seletor não muda nada', async () => {
     const none = new OnlineVideoService(base())
     expect((await none.chooseCustomFolder()).settings.folder).toBe('system')
@@ -189,6 +217,107 @@ describe('OnlineVideoService com duas pastas', () => {
     expect(fake.clear).toHaveBeenCalledWith('custom')
     handlers['online-video:open-folder']({}, 'system')
     expect(fake.openCacheFolder).toHaveBeenCalledWith('system')
+  })
+})
+
+describe('renomear um vídeo baixado', () => {
+  it('renomeia na pasta que tem o vídeo, com a legenda; recusa o que está tocando', async () => {
+    const service = new OnlineVideoService({ userDataDir: dir, readRecord: () => ({ enabled: true }), writeRecord: vi.fn(), chooseDirectory: async () => path.join(dir, 'Ext') })
+    await service.cache.load()
+    await service.chooseCustomFolder()
+    const custom = service.cache.custom
+    writeFileSync(custom.videoPath(A, 'Hino'), 'x')
+    writeFileSync(custom.subtitlePath(A, 'Hino'), 'WEBVTT')
+    await service.cache.add(A, { title: 'Hino', size: 1, subtitleLang: 'pt' })
+
+    expect(await service.renameVideo(A, 'Culto de sábado / abertura')).toBe(`Culto de sabado abertura_${A}.mp4`)
+    expect(existsSync(path.join(custom.dir, `Culto de sabado abertura_${A}.mp4`))).toBe(true)
+    expect(existsSync(path.join(custom.dir, `Culto de sabado abertura_${A}.vtt`))).toBe(true)
+    expect(existsSync(path.join(custom.dir, `Hino_${A}.mp4`))).toBe(false)
+    expect(service.cacheFile(`${A}.mp4`)).toBe(path.join(custom.dir, `Culto de sabado abertura_${A}.mp4`))
+    expect(service.videoStatus([A])[A]).toEqual({ state: 'ready', fileName: `Culto de sabado abertura_${A}.mp4` })
+    expect(service.cache.get(A).title).toBe('Hino')
+
+    // Mesmo nome: nada muda. Nome só com símbolos: fica só o ID.
+    expect(await service.renameVideo(A, 'Culto de sabado abertura')).toBe(`Culto de sabado abertura_${A}.mp4`)
+    expect(await service.renameVideo(A, '***')).toBe(`${A}.mp4`)
+
+    // Depois de reabrir o app, o nome escolhido continua.
+    expect(await service.renameVideo(A, 'Final')).toBe(`Final_${A}.mp4`)
+    const reopened = new CacheStore({ dir: custom.dir })
+    await reopened.load()
+    expect(reopened.videoPath(A)).toBe(path.join(custom.dir, `Final_${A}.mp4`))
+    expect(reopened.get(A).subtitleLang).toBe('pt')
+
+    service.cache.protect(A)
+    expect(await service.renameVideo(A, 'Outro')).toBeNull()
+    service.cache.unprotect(A)
+    expect(await service.renameVideo(B, 'Outro')).toBeNull()
+    expect(await service.renameVideo(A, 5)).toBeNull()
+    expect(await service.renameVideo(5, 'x')).toBeNull()
+  })
+
+  it('falha do disco vira null e vai para o log; legenda que some perde a legenda', async () => {
+    const log = vi.fn()
+    const service = new OnlineVideoService({ userDataDir: dir, readRecord: () => ({ enabled: true }), writeRecord: vi.fn(), log })
+    await service.cache.load()
+    const system = service.cache.system
+    writeFileSync(system.videoPath(A, 'Hino'), 'x')
+    await service.cache.add(A, { title: 'Hino', size: 1, subtitleLang: 'pt' })
+    expect(await service.renameVideo(A, 'Novo')).toBe(`Novo_${A}.mp4`)
+    expect(service.cache.get(A).subtitleLang).toBeNull()
+
+    mkdirSync(path.join(system.dir, `Ocupado_${A}.mp4`, 'dentro'), { recursive: true })
+    expect(await service.renameVideo(A, 'Ocupado')).toBeNull()
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('não foi possível renomear'))
+    expect(service.cache.videoPath(A)).toBe(path.join(system.dir, `Novo_${A}.mp4`))
+  })
+
+  it('cache sem rename e canal de IPC', async () => {
+    const service = new OnlineVideoService({ userDataDir: dir, readRecord: () => null, writeRecord: vi.fn(), cache: { has: () => true } })
+    expect(await service.renameVideo(A, 'x')).toBeNull()
+    const handlers = {}
+    const fake = { renameVideo: vi.fn(async () => 'n.mp4') }
+    registerOnlineVideoIpc({ handle: (channel, fn) => { handlers[channel] = fn } }, fake)
+    expect(await handlers['online-video:rename']({}, A, 'n')).toBe('n.mp4')
+    expect(fake.renameVideo).toHaveBeenCalledWith(A, 'n')
+    expect(await new MultiCache({ system: new CacheStore({ dir }) }).rename(A, 'x')).toBeNull()
+  })
+})
+
+describe('lista dos baixados', () => {
+  it('junta as duas pastas, mais recente primeiro, e marca o que foi renomeado', async () => {
+    let clock = 1
+    const now = () => clock++
+    const system = new CacheStore({ dir: path.join(dir, 'sys'), now })
+    const custom = new CacheStore({ dir: customVideosDir(path.join(dir, 'Ext')), now })
+    const cache = new MultiCache({ system, custom, active: 'system' })
+    await cache.load()
+    writeFileSync(cache.videoPath(A, 'Hino A'), 'x')
+    await cache.add(A, { title: 'Hino A', duration: 60, size: 10 })
+    cache.setActive('custom')
+    writeFileSync(cache.videoPath(B, 'Hino B'), 'x')
+    await cache.add(B, { title: 'Hino B', duration: 90, size: 20 })
+    await cache.rename(A, 'Abertura')
+
+    const service = new OnlineVideoService({ userDataDir: dir, readRecord: () => null, writeRecord: vi.fn(), cache })
+    expect(service.listDownloads()).toEqual([
+      { id: B, title: 'Hino B', duration: 90, size: 20, lastUsed: 2, fileName: `Hino B_${B}.mp4`, renamed: false, folder: 'custom' },
+      { id: A, title: 'Hino A', duration: 60, size: 10, lastUsed: 1, fileName: `Abertura_${A}.mp4`, renamed: true, folder: 'system' },
+    ])
+    expect(new OnlineVideoService({ userDataDir: dir, readRecord: () => null, writeRecord: vi.fn(), cache: {} }).listDownloads()).toEqual([])
+
+    const handlers = {}
+    registerOnlineVideoIpc({ handle: (channel, fn) => { handlers[channel] = fn } }, { listDownloads: () => ['ok'] })
+    expect(handlers['online-video:list']()).toEqual(['ok'])
+  })
+
+  it('vídeo antigo só com o ID não conta como renomeado', async () => {
+    writeFileSync(path.join(dir, 'index.json'), JSON.stringify({ videos: { [A]: { title: '', size: 1, lastUsed: 1 } } }))
+    writeFileSync(path.join(dir, `${A}.mp4`), 'x')
+    const store = new CacheStore({ dir })
+    await store.load()
+    expect(store.list()).toMatchObject([{ fileName: `${A}.mp4`, renamed: false }])
   })
 })
 

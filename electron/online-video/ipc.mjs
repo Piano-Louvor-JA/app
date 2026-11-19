@@ -84,6 +84,8 @@ export class OnlineVideoService {
       onChange: (id, status) => this.broadcast('online-video:changed', { id, status }),
     })
     this.timers = []
+    /** Trocas de pasta em fila: várias janelas pedindo ao mesmo tempo não criam dois leitores da mesma pasta. */
+    this.folderQueue = Promise.resolve()
     this.playTimeoutMs = opts.playTimeoutMs ?? PLAY_TIMEOUT_MS
     this.fallbackTimeoutMs = opts.fallbackTimeoutMs ?? FALLBACK_TIMEOUT_MS
   }
@@ -123,7 +125,7 @@ export class OnlineVideoService {
     return new CacheStore({ dir: customVideosDir(chosen), limitBytes: NO_LIMIT_BYTES })
   }
 
-  /** Arquivo `<id>.mp4|vtt` servido pelo protocolo, na pasta que tem o vídeo. */
+  /** Arquivo pedido como `<id>.mp4|vtt` pelo protocolo; no disco ele tem o título no nome. */
   cacheFile(name) {
     return typeof this.cache.fileFor === 'function' ? this.cache.fileFor(name) : path.join(this.cache.dir, name)
   }
@@ -155,7 +157,10 @@ export class OnlineVideoService {
     const wasEnabled = this.settings.enabled
     this.settings = settingsFromRecord({ ...this.settings, ...(partial && typeof partial === 'object' ? partial : {}) })
     this.writeRecord(ONLINE_VIDEO_RECORD, this.settings)
-    if (this.cache instanceof MultiCache) await this.#applyFolders()
+    if (this.cache instanceof MultiCache) {
+      this.folderQueue = this.folderQueue.catch(() => {}).then(() => this.#applyFolders())
+      await this.folderQueue
+    }
     await this.cache.setLimit(NO_LIMIT_BYTES)
     if (wasEnabled && !this.settings.enabled) await this.manager.cancelAll({ keepPlaying: true })
     if (!wasEnabled && this.settings.enabled) this.#background()
@@ -246,6 +251,28 @@ export class OnlineVideoService {
     return true
   }
 
+  /** Aba "Baixados" do módulo YouTube. */
+  listDownloads() {
+    return typeof this.cache.list === 'function' ? this.cache.list() : []
+  }
+
+  /**
+   * "Renomear": muda o nome do arquivo baixado na pasta. Recusa o vídeo que está tocando (no
+   * Windows o arquivo aberto não pode ser renomeado).
+   * @returns {Promise<string | null>} nome novo do arquivo
+   */
+  async renameVideo(id, name) {
+    if (typeof id !== 'string' || typeof name !== 'string' || !this.cache.has?.(id)) return null
+    if (typeof this.cache.rename !== 'function') return null
+    if (typeof this.cache.isProtected === 'function' && this.cache.isProtected(id)) return null
+    try {
+      return await this.cache.rename(id, name)
+    } catch (error) {
+      this.log(`não foi possível renomear ${id}: ${error?.message ?? error}`)
+      return null
+    }
+  }
+
   /** @param {'system' | 'custom'} [which] sem argumento: as duas pastas */
   async clear(which) {
     await this.cache.clear(which === 'system' || which === 'custom' ? which : undefined)
@@ -329,6 +356,8 @@ export function registerOnlineVideoIpc(ipcMain, service) {
   ipcMain.handle('online-video:cancel', (_event, id) => service.cancel(id))
   ipcMain.handle('online-video:download', (_event, ids) => service.download(ids))
   ipcMain.handle('online-video:remove', (_event, id) => service.removeVideo(id))
+  ipcMain.handle('online-video:rename', (_event, id, name) => service.renameVideo(id, name))
+  ipcMain.handle('online-video:list', () => service.listDownloads())
   ipcMain.handle('online-video:keep', (_event, ids) => service.keep(ids))
   ipcMain.handle('online-video:clear', (_event, which) => service.clear(which))
   ipcMain.handle('online-video:video-status', (_event, ids) => service.videoStatus(ids))

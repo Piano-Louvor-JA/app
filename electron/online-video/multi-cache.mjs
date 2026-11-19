@@ -65,23 +65,25 @@ export class MultiCache {
     await this.owner(id)?.touch(id)
   }
 
-  /** Caminho do vídeo: onde ele já está, ou onde vai ser gravado (pasta ativa). */
-  videoPath(id) {
-    return (this.owner(id) ?? this.activeStore).videoPath(id)
+  /** Caminho do vídeo: onde ele já está, ou onde vai ser gravado (pasta ativa, com o título no nome). */
+  videoPath(id, title) {
+    return (this.owner(id) ?? this.activeStore).videoPath(id, title)
   }
 
-  subtitlePath(id) {
-    return (this.owner(id) ?? this.activeStore).subtitlePath(id)
+  subtitlePath(id, title) {
+    return (this.owner(id) ?? this.activeStore).subtitlePath(id, title)
   }
 
   streamDir(id) {
     return this.activeStore.streamDir(id)
   }
 
-  /** Arquivo servido pelo protocolo (`<id>.mp4` / `<id>.vtt`), na pasta que tem o vídeo. */
+  /** O protocolo pede `<id>.mp4` / `<id>.vtt`; o arquivo no disco tem o título no nome. */
   fileFor(name) {
-    const id = String(name).replace(/\.(mp4|vtt)$/, '')
-    return path.join((this.owner(id) ?? this.activeStore).dir, name)
+    const match = /^(.+)\.(mp4|vtt)$/.exec(String(name))
+    if (!match) return path.join(this.activeStore.dir, String(name))
+    const [, id, ext] = match
+    return ext === 'vtt' ? this.subtitlePath(id) : this.videoPath(id)
   }
 
   add(id, meta) {
@@ -105,6 +107,16 @@ export class MultiCache {
     for (const store of this.stores) await store.setLimit(bytes)
   }
 
+  /** Baixados das duas pastas, do uso mais recente ao mais antigo, com a pasta de cada um. */
+  list() {
+    const all = []
+    for (const store of this.stores) {
+      const folder = store === this.custom ? 'custom' : 'system'
+      for (const item of store.list()) all.push({ ...item, folder })
+    }
+    return all.sort((a, b) => b.lastUsed - a.lastUsed)
+  }
+
   usage() {
     let bytes = 0
     let count = 0
@@ -120,6 +132,11 @@ export class MultiCache {
     const removed = []
     for (const store of this.stores) removed.push(...(await store.enforceLimit()))
     return removed
+  }
+
+  /** @returns {Promise<string | null>} */
+  async rename(id, name) {
+    return (await this.owner(id)?.rename(id, name)) ?? null
   }
 
   async remove(id) {
