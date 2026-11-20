@@ -23,8 +23,8 @@
       }
 
       /* Controls live in a separate WebContentsView, outside the capture.
-         Fill the target display without distortion; aspect-ratio differences
-         are cropped symmetrically rather than leaving unused side bands. */
+         O vídeo aparece INTEIRO na tela projetada (logos e legendas nas bordas
+         não somem): formato diferente da tela vira faixa preta, nunca corte. */
       #mirror {
         position: absolute;
         left: 0;
@@ -33,7 +33,7 @@
         height: 100%;
         border: 0;
         background: #000;
-        object-fit: cover;
+        object-fit: contain;
         object-position: center center;
       }
 

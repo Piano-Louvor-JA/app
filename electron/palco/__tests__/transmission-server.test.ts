@@ -26,6 +26,20 @@ async function freePort(): Promise<number> {
   return port
 }
 
+/** Porta N livre com N+1 também livre: o slot usa o par (HTTP N, WS N+1). */
+async function freePortPair(): Promise<number> {
+  for (let i = 0; i < 20; i++) {
+    const port = await freePort()
+    const probe = createServer()
+    const free = await new Promise<boolean>(resolve => {
+      probe.once('error', () => resolve(false))
+      probe.listen(port + 1, '127.0.0.1', () => probe.close(() => resolve(true)))
+    })
+    if (free) return port
+  }
+  throw new Error('sem par de portas livres')
+}
+
 async function occupy(port: number): Promise<Server> {
   const server = createServer()
   await new Promise<void>(resolve => server.listen(port, '0.0.0.0', resolve))
@@ -79,17 +93,17 @@ describe('PalcoSlot network', () => {
   }, 10000)
 
   it('moves a stopped slot to another port pair and refuses while running', async () => {
-    const first = await freePort()
+    const first = await freePortPair()
     const slot = new PalcoSlot('7082', 'Move', first, first + 1, () => null)
     try {
       await slot.prepare()
-      const next = await freePort()
+      const next = await freePortPair()
       await slot.setPorts(next)
       expect(slot.id).toBe('7082')
       expect([slot.httpPort, slot.wsPort]).toEqual([next, next + 1])
       expect((await fetch(`http://127.0.0.1:${next}/status`)).status).toBe(200)
       await expect(fetch(`http://127.0.0.1:${first}/status`)).rejects.toThrow()
-      await slot.start()
+      expect(await slot.start()).toBe(true)
       await expect(slot.setPorts(await freePort())).rejects.toThrow('running')
     } finally { await slot.dispose() }
   }, 10000)

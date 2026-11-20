@@ -72,7 +72,7 @@ describe('useRandom: ações surtem efeito no store (wrappedAction)', () => {
     f.setFontSizePc(2) // clamp no mínimo
     expect(s.config.fontSizePc).toBe(4)
     f.setFontSizePc(500)
-    expect(s.config.fontSizePc).toBe(14)
+    expect(s.config.fontSizePc).toBe(28) // máximo do tamanho da letra
     f.setAnimationSpeed('slow')
     expect(s.config.animationSpeed).toBe('slow')
     f.resetDisplayToDefault()

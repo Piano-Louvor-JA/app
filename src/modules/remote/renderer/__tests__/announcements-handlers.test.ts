@@ -34,7 +34,7 @@ describe('anúncios controlados pelo APK', () => {
   it('configura carrossel, controla transporte e preserva exclusões', async () => {
     const { handler, store, carousel } = setup()
     expect(await handler.execute('announcements.setCarousel', { durationMs: 10000, enabled: false })).toBe(true)
-    expect(store.carousel).toEqual({ slideMs: 10000, loop: false })
+    expect(store.carousel).toEqual({ slideMs: 10000, loop: false, transitionEnabled: false, transition: 'fade', transitionSpeed: 'normal' })
     expect(await handler.execute('announcements.setCarousel', { durationMs: -1 })).toBe(false)
     expect(await handler.execute('announcements.include', { targetId: 'url-1', enabled: true })).toBe(false)
     expect(await handler.execute('announcements.include', { targetId: 'text-1', enabled: false })).toBe(true)

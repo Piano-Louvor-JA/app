@@ -9,18 +9,19 @@ it('uses an exact 16:9 content area instead of counting OS decorations as video 
   expect(createSource).toContain('setContentSize(CONTROL_WIDTH, CONTROL_HEIGHT)')
   expect(createSource).not.toMatch(/setMinimumSize\(CONTROL_WIDTH/)
 })
-it('fills the target display proportionally without the old fixed vertical overscan', () => {
+it('shows the whole video on the target display (letterbox, never crops logos at the edges)', () => {
   expect(mirror).not.toContain('104%')
-  expect(mirror).toMatch(/object-fit:\s*cover/)
+  expect(mirror).toMatch(/object-fit:\s*contain/)
+  expect(mirror).not.toMatch(/object-fit:\s*cover/)
   expect(mirror).toMatch(/object-position:\s*center center/)
 })
 
 it('fills the source video and resets positioning inherited from the embedded player', () => {
-  expect(source).toMatch(/video\.html5-main-video[\s\S]*?object-fit: cover !important/)
+  expect(source).toMatch(/video\.html5-main-video[\s\S]*?object-fit: contain !important/)
   expect(source).toContain('object-position: center center !important')
   expect(source).toContain('transform: none !important')
   const local = readFileSync(new URL('../player/local-video-player.html', import.meta.url), 'utf8')
-  expect(local).toMatch(/video\s*\{[^}]*object-fit: cover/)
+  expect(local).toMatch(/video\s*\{[^}]*object-fit: contain/)
 })
 
 it('caps mirror capture to source resolution rather than allowing a 4K capture per display', () => {

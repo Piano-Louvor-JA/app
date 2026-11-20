@@ -196,6 +196,7 @@ describe('BibleProjectionView.vue', () => {
   describe('transição ao trocar versículo', () => {
     const stage = stageValue.value as Record<string, unknown>
     afterEach(() => {
+      delete stage.bibleTransitionEnabled
       delete stage.bibleTransition
       delete stage.bibleTransitionSpeed
     })
@@ -205,27 +206,28 @@ describe('BibleProjectionView.vue', () => {
       return w
     }
 
-    it('padrão: suave, na velocidade normal', async () => {
+    it('padrão: desligada (troca sem animação), velocidade normal', async () => {
       const w = await mounted()
-      expect(w.html()).toContain('name="bible-fade"')
-      expect(w.find('.pb-stub').attributes('style')).toContain('--bible-transition-ms: 250ms')
+      expect(w.html()).toContain('name="scr-none"')
+      expect(w.find('.pb-stub').attributes('style')).toContain('--scr-transition-ms: 250ms')
       w.unmount()
     })
 
-    it('tipo e velocidade do Palco', async () => {
+    it('ligada: tipo e velocidade do Palco (catálogo scr-*)', async () => {
+      stage.bibleTransitionEnabled = true
       stage.bibleTransition = 'zoom'
       stage.bibleTransitionSpeed = 'slow'
       const w = await mounted()
-      expect(w.html()).toContain('name="bible-zoom"')
-      expect(w.html()).not.toContain('name="bible-fade"')
-      expect(w.find('.pb-stub').attributes('style')).toContain('--bible-transition-ms: 450ms')
+      expect(w.html()).toContain('name="scr-zoom"')
+      expect(w.html()).not.toContain('name="scr-none"')
+      expect(w.find('.pb-stub').attributes('style')).toContain('--scr-transition-ms: 450ms')
       w.unmount()
     })
 
-    it('nenhuma: sem animação', async () => {
-      stage.bibleTransition = 'none'
+    it('ligada sem tipo escolhido: suave', async () => {
+      stage.bibleTransitionEnabled = true
       const w = await mounted()
-      expect(w.html()).toContain('name="bible-none"')
+      expect(w.html()).toContain('name="scr-fade"')
       w.unmount()
     })
   })

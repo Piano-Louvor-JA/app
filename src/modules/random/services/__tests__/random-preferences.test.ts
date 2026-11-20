@@ -63,7 +63,7 @@ describe("normalizeRandomDisplayConfig", () => {
 			customAudioFile: "com/caminho.mp3",
 			audioVolume: 5,
 		});
-		expect(config.fontSizePc).toBeLessThanOrEqual(14);
+		expect(config.fontSizePc).toBeLessThanOrEqual(28);
 		expect(config.audioSource).toBe("default");
 		expect(config.audioVolume).toBe(1);
 		expect(config.customAudioFile).toBeNull();

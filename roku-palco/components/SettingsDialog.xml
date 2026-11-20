@@ -1,0 +1,17 @@
+<component name="SettingsDialog" extends="Group">
+  <interface>
+    <field id="host" type="string" />
+    <field id="wsPort" type="integer" value="47081" />
+    <field id="token" type="string" />
+    <field id="saveRequested" type="boolean" value="false" />
+  </interface>
+  <children>
+    <Rectangle width="1920" height="1080" color="0x101218F0" />
+    <LayoutGroup translation="[180, 250]" layoutDirection="vert" itemSpacings="[24]">
+      <Label text="Configurar PIANO Palco" width="1560" height="80" />
+      <Label text="Host e porta do computador que transmite. O token não é exibido." width="1560" height="50" />
+      <Label text="Use as teclas Roku para editar os campos." width="1560" height="50" />
+    </LayoutGroup>
+  </children>
+  <script type="text/brightscript" uri="pkg:/components/SettingsDialog.brs" />
+</component>

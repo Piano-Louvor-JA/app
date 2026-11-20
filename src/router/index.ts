@@ -18,6 +18,7 @@ import { liturgyRoutes } from '@modules/liturgy/routes'
 import { mediaRoutes } from '@modules/media/routes'
 import { settingsRoutes } from '@modules/settings/routes'
 import { randomRoutes } from '@modules/random/routes'
+import { youtubeRoutes } from '@modules/youtube/routes'
 import { timerRoutes } from '@modules/timer/routes'
 import ProjectionHost from '@shared/components/ProjectionHost.vue'
 import { isElectronShell } from '@shared/services/desktop-bridge'
@@ -45,6 +46,7 @@ const router = createRouter({
       component: AppShell,
       children: [
         ...homeRoutes,
+        ...youtubeRoutes,
         ...albumsRoutes,
         ...communityRoutes,
         ...diagnosticsRoutes,

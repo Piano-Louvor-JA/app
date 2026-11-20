@@ -381,3 +381,4 @@ describe('modo texto (avisos)', () => {
     expect(new URL(resolveLocalTextPlayerUrl({ title: 7, html: '<p>x</p>' })).searchParams.get('data')).toContain('"title":""')
   })
 })
+

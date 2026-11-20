@@ -122,9 +122,9 @@ describe('useAnnouncementsStore', () => {
 
   it('config do carrossel é limitada e persistida', () => {
     const store = useAnnouncementsStore()
-    store.setCarousel({ slideMs: 100, loop: false })
-    expect(store.carousel).toEqual({ slideMs: CAROUSEL_SLIDE_MS_MIN, loop: false })
-    expect(reopen().carousel).toEqual({ slideMs: CAROUSEL_SLIDE_MS_MIN, loop: false })
+    store.setCarousel({ slideMs: 100, loop: false, transitionEnabled: false, transition: 'fade', transitionSpeed: 'normal' })
+    expect(store.carousel).toEqual({ slideMs: CAROUSEL_SLIDE_MS_MIN, loop: false, transitionEnabled: false, transition: 'fade', transitionSpeed: 'normal' })
+    expect(reopen().carousel).toEqual({ slideMs: CAROUSEL_SLIDE_MS_MIN, loop: false, transitionEnabled: false, transition: 'fade', transitionSpeed: 'normal' })
   })
 
   it('findAnnouncement acha em qualquer lista', () => {

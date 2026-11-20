@@ -27,7 +27,8 @@
       video {
         width: 100%;
         height: 100%;
-        object-fit: cover;
+        /* inteiro, sem cortar as bordas (formato diferente vira faixa preta) */
+        object-fit: contain;
         object-position: center center;
         background: #000;
       }

@@ -17,7 +17,7 @@ import {
 } from '../services/return-phrases'
 import { readEffectiveStageSettings, subscribeStageSettings } from '../../settings/services/stage-settings-runtime'
 import type { StageSettings } from '../../settings/types/stage-settings'
-import { resolveBackgroundImage,
+import { resolveBackgroundImage, resolveReturnScreen, returnNextFontSize,
   stageBgCss } from '../../settings/types/stage-settings'
 import type { MediaProjectionRuntime } from '../types/media'
 import { DEFAULT_MEDIA_PROJECTION } from '../types/media'
@@ -323,38 +323,45 @@ onUnmounted(() => {
   channel = null
 })
 
+/** Personalização própria do retorno (Personalizar Slides); vazio = igual aos slides. */
+const ret = computed(() => resolveReturnScreen(stage.value))
+
 const stageStyle = computed(() => ({
-  backgroundColor: stageBgCss(stage.value.backgroundColor),
+  backgroundColor: ret.value.bgMode === 'slides'
+    ? stageBgCss(stage.value.backgroundColor)
+    : ret.value.bgColor,
 }))
 
-const bgImage = computed(
-  () => resolveBackgroundImage(stage.value.backgroundImage) ?? runtime.value.imageUrl,
-)
+const bgImage = computed(() => {
+  if (ret.value.bgMode === 'color') return null
+  if (ret.value.bgMode === 'image') return resolveBackgroundImage(ret.value.bgImage)
+  return resolveBackgroundImage(stage.value.backgroundImage) ?? runtime.value.imageUrl
+})
 
 /* v8 ignore start — computeds de estilo: arms cobertos por comportamento
    (teste 'gaps: stage completo'), counters do v8 não registram (ver AUDITORIA-COVERAGE.md) */
-const barColor = computed(() => stage.value.footerRefColor || '#FCCE02')
+const barColor = computed(() => ret.value.barColor ?? (stage.value.footerRefColor || '#FCCE02'))
 const showNext = computed(() => Boolean(shownNext.value) || shownNextCover.value)
 const progressPct = computed(() => Math.round(barDisplay.value * 100))
 
 const textStyle = computed(() => {
   const s = stage.value
   return {
-    color: s.lyricTextColor ?? s.textColor ?? undefined,
-    fontSize: `${((s.lyricFontSize ?? s.fontSize) / 1920) * 100}cqw`,
-    fontWeight: String(s.lyricFontWeight ?? s.fontWeight),
+    color: ret.value.textColor ?? s.lyricTextColor ?? s.textColor ?? undefined,
+    fontSize: `${((ret.value.fontSize ?? s.lyricFontSize ?? s.fontSize) / 1920) * 100}cqw`,
+    fontWeight: String(ret.value.fontWeight ?? s.lyricFontWeight ?? s.fontWeight),
     textAlign: s.textAlign,
     textShadow: (s.lyricTextShadow ?? s.textShadow)
       ? `0 0 ${(s.shadowBlur / 108) * 100}cqw rgba(0,0,0,${s.shadowIntensity})`
       : 'none',
     // Paridade total (13/10): uppercase é ESCOLHA — CSS base sem hardcode.
-    textTransform: s.lyricUpperCase ? 'uppercase' : 'none',
+    textTransform: (ret.value.upperCase ?? s.lyricUpperCase) ? 'uppercase' : 'none',
   }
 })
 
 const nextTextStyle = computed(() => ({
   ...textStyle.value,
-  fontSize: `${(stage.value.fontSize / 1920) * 58}cqw`,
+  fontSize: `${(returnNextFontSize(ret.value, stage.value) / 1920) * 100}cqw`,
 }))
 /* v8 ignore stop */
 
@@ -402,6 +409,7 @@ const projectionFontStyle = useProjectionFont('hymns')
             >
               {{ outgoingText }}
             </p>
+            <!-- A próxima estrofe "sobe" até aqui (voo): animação própria do retorno. -->
             <p
               ref="lyricRef"
               class="media-return__lyric"
@@ -601,7 +609,7 @@ const projectionFontStyle = useProjectionFont('hymns')
 
 .media-return__next-label {
   color: #f6c32a;
-  font-size: clamp(0.7rem, 1.8vmin, 1.1rem);
+  font-size: clamp(1.4rem, 4.6vmin, 3rem);
   font-weight: 800;
   letter-spacing: 0.18em;
   text-transform: uppercase;

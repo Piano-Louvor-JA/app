@@ -136,7 +136,7 @@ jobs:
       - run: npm ci
       - name: Check paridade
         env:
-          PARIDADE_BRANCH: ${{ github.event_name == 'pull_request' && (github.event.pull_request.number == 435 || github.event.pull_request.number == 441 || github.event.pull_request.number == 442) && github.base_ref == 'staging' && 'fix/stage-background-parity-app435' || 'staging' }}
+          PARIDADE_BRANCH: ${{ github.event_name == 'pull_request' && github.event.pull_request.number == 591 && github.base_ref == 'staging' && 'feat/ajustes-e-correcoes-app' || github.event_name == 'pull_request' && (github.event.pull_request.number == 435 || github.event.pull_request.number == 441 || github.event.pull_request.number == 442) && github.base_ref == 'staging' && 'fix/stage-background-parity-app435' || 'staging' }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node scripts/check-paridade.mjs
 
@@ -299,6 +299,9 @@ jobs:
         run: node --test scripts/mac-universal-arch-files.test.mjs
       - name: Bundle de release aponta para produção (renderer + main)
         run: node --test scripts/release-bundle.test.mjs
+      - name: Receiver Roku (protocolo, estado, socket e pacote)
+        working-directory: roku-palco
+        run: npm test
 
   e2e-tests:
     name: E2E Tests (playwright)

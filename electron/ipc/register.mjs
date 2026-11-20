@@ -54,6 +54,7 @@ import {
   createAppBackupArchive,
   readRestoredBrowserStorage,
   restoreAppBackupArchive,
+  youtubeVideosUsage,
 } from '../app-backup.mjs'
 import { registerDisplayIpc } from './displays.mjs'
 import { registerDialogIpc, registerReadBinaryFileIpc } from './dialog.mjs'
@@ -1010,8 +1011,12 @@ export function registerWorkspaceIpc() {
     }
   })
 
-  ipcMain.handle('backup:create', async (event) => {
+  // Tamanho dos vídeos baixados do YouTube (pergunta "incluir no backup?").
+  ipcMain.handle('backup:youtube-usage', () => youtubeVideosUsage())
+
+  ipcMain.handle('backup:create', async (event, options) => {
     try {
+      const includeYoutubeVideos = Boolean(options && typeof options === 'object' && options.includeYoutubeVideos)
       const win = BrowserWindow.fromWebContents(event.sender)
       const defaultName = buildBackupFileName()
       const result = await dialog.showSaveDialog(win ?? undefined, {
@@ -1056,6 +1061,7 @@ export function registerWorkspaceIpc() {
         destZip,
         onProgress: sendProgress,
         browserStorage: browserStorage && typeof browserStorage === 'object' ? browserStorage : {},
+        includeYoutubeVideos,
       })
       return { ok: true, path: destZip }
     } catch (error) {

@@ -231,7 +231,7 @@ describe('AlbumCollectionView', () => {
 
   it('botão aleatório chama reprodução da coletânea em modo aleatório', async () => {
     const w = await mountView()
-    await w.find('.album-collection-view__shuffle').trigger('click')
+    await w.find('[data-testid="album-shuffle"]').trigger('click')
     expect((globalThis as any).__albumsMock.playAll).toHaveBeenCalledWith('audio', true)
   })
 

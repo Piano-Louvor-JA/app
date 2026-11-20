@@ -53,6 +53,7 @@ const {
   setBgColor,
   setTextColor,
   setFontSizePc,
+  setDrawnSizePc,
   setTextTransform,
   setAnimationSpeed,
   resetDisplayToDefault,
@@ -253,6 +254,7 @@ const effectiveConfig = computed(() => {
       @update:bg-color="setBgColor"
       @update:text-color="setTextColor"
       @update:font-size-pc="setFontSizePc"
+      @update:drawn-size-pc="setDrawnSizePc"
       @update:text-transform="setTextTransform"
       @update:animation-speed="setAnimationSpeed"
       @reset="resetDisplayToDefault"

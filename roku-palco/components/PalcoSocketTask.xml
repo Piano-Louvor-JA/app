@@ -1,0 +1,11 @@
+<component name="PalcoSocketTask" extends="Task">
+  <interface>
+    <field id="host" type="string" />
+    <field id="wsPort" type="integer" value="47081" />
+    <field id="token" type="string" />
+    <field id="message" type="assocarray" />
+    <field id="connectionState" type="string" value="idle" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/components/Protocol.brs" />
+  <script type="text/brightscript" uri="pkg:/components/PalcoSocketTask.brs" />
+</component>

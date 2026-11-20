@@ -49,17 +49,17 @@ describe('fora do carrossel', () => {
 describe('runtime', () => {
   it('slide → runtime', () => {
     const [text, image] = buildCarouselSlides(items)
-    expect(carouselRuntimeFromSlide(text!)).toEqual({ active: true, kind: 'text', relativePath: '', title: 'Batismo', text: 'x' })
-    expect(carouselRuntimeFromSlide(image!)).toEqual({ active: true, kind: 'image', relativePath: 'modulos/avisos/a1/1.png', title: '', text: '' })
+    expect(carouselRuntimeFromSlide(text!)).toEqual({ active: true, kind: 'text', relativePath: '', title: 'Batismo', text: 'x' , transition: 'none', transitionMs: 250 })
+    expect(carouselRuntimeFromSlide(image!)).toEqual({ active: true, kind: 'image', relativePath: 'modulos/avisos/a1/1.png', title: '', text: '' , transition: 'none', transitionMs: 250 })
     expect(carouselRuntimeFromSlide(null)).toEqual(DEFAULT_CAROUSEL_RUNTIME)
   })
 
   it.each([
     [null, DEFAULT_CAROUSEL_RUNTIME],
     [{ active: true, kind: 'video' }, DEFAULT_CAROUSEL_RUNTIME],
-    [{ active: true, kind: 'text', relativePath: 'x', title: 'T', text: 'a\nb' }, { active: true, kind: 'text', relativePath: '', title: 'T', text: 'a\nb' }],
-    [{ active: 'sim', kind: 'image', relativePath: 7, title: 'x', text: 'y' }, { active: false, kind: 'image', relativePath: '', title: '', text: '' }],
-    [{ active: true, kind: 'text', title: 3 }, { active: true, kind: 'text', relativePath: '', title: '', text: '' }],
+    [{ active: true, kind: 'text', relativePath: 'x', title: 'T', text: 'a\nb' , transition: 'none', transitionMs: 250 }, { active: true, kind: 'text', relativePath: '', title: 'T', text: 'a\nb' , transition: 'none', transitionMs: 250 }],
+    [{ active: 'sim', kind: 'image', relativePath: 7, title: 'x', text: 'y' }, { active: false, kind: 'image', relativePath: '', title: '', text: '' , transition: 'none', transitionMs: 250 }],
+    [{ active: true, kind: 'text', title: 3 }, { active: true, kind: 'text', relativePath: '', title: '', text: '' , transition: 'none', transitionMs: 250 }],
   ])('normaliza %j', (raw, expected) => {
     expect(normalizeCarouselRuntime(raw)).toEqual(expected)
   })
@@ -72,7 +72,7 @@ describe('runtime', () => {
       close() {}
     }
     vi.stubGlobal('BroadcastChannel', FakeChannel)
-    const state = { active: true, kind: 'image' as const, relativePath: 'modulos/avisos/a1/1.png', title: '', text: '' }
+    const state = { active: true, kind: 'image' as const, relativePath: 'modulos/avisos/a1/1.png', title: '', text: '' , transition: 'none', transitionMs: 250 }
     publishCarouselRuntime(state)
     expect(JSON.parse(localStorage.getItem(CAROUSEL_RUNTIME_STORAGE_KEY)!)).toEqual(state)
     expect(posted).toEqual([state])

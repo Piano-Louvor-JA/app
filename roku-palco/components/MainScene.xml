@@ -1,0 +1,17 @@
+<component name="MainScene" extends="Scene">
+  <children>
+    <Rectangle id="base" width="1920" height="1080" color="0x000000FF" />
+    <Poster id="background" width="1920" height="1080" loadDisplayMode="scaleToFill" />
+    <Label id="lyrics" width="1720" height="560" translation="[100, 220]" horizAlign="center" vertAlign="center" wrap="true" />
+    <Label id="footer" width="1720" height="80" translation="[100, 820]" horizAlign="center" />
+    <Label id="timer" width="1720" height="180" translation="[100, 430]" horizAlign="center" vertAlign="center" />
+    <Label id="status" width="1720" height="80" translation="[100, 940]" horizAlign="center" />
+    <Video id="audio" visible="false" />
+    <Video id="video" width="1920" height="1080" visible="false" />
+    <SettingsDialog id="settings" />
+    <PalcoSocketTask id="socket" />
+  </children>
+  <script type="text/brightscript" uri="pkg:/components/Protocol.brs" />
+  <script type="text/brightscript" uri="pkg:/components/Storage.brs" />
+  <script type="text/brightscript" uri="pkg:/components/MainScene.brs" />
+</component>

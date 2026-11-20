@@ -6,8 +6,14 @@ import { ProjectionBackground } from '@design-system/index'
 import { isIndependentProjectionLocation } from '@shared/services/projection-window-location'
 
 import { readEffectiveStageSettings, subscribeStageSettings } from '../../settings/services/stage-settings-runtime'
-import type { StageSettings } from '../../settings/types/stage-settings'
-import { resolveBackgroundImage, stageFlexAlign } from '../../settings/types/stage-settings'
+import type { StageSettings, StageTransition } from '../../settings/types/stage-settings'
+import {
+  bibleTransitionMs,
+  effectiveTextTransition,
+  resolveBackgroundImage,
+  stageFlexAlign,
+} from '../../settings/types/stage-settings'
+import '@styles/screen-transitions.css'
 import {
   annotationChannelName,
   annotationStorageKey,
@@ -18,12 +24,18 @@ import {
 import { notesHtmlToPlainText, sanitizeNotesHtml } from '../services/rich-notes'
 import '../styles/rich-notes.css'
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     /** Prévia dentro do app (não usa 100vw/100vh da popup). */
     embedded?: boolean
+    /**
+     * Animação imposta por quem embute a tela (carrossel de Avisos). Sem ela,
+     * vale a escolhida no Palco da Liturgia.
+     */
+    transition?: StageTransition
+    transitionMs?: number
   }>(),
-  { embedded: false },
+  { embedded: false, transition: undefined, transitionMs: undefined },
 )
 
 const independent = isIndependentProjectionLocation()
@@ -81,8 +93,13 @@ const stageStyle = computed(() => {
     backgroundImage: background ? `url(${background})` : undefined,
     backgroundSize: 'cover',
     backgroundPosition: 'center',
+    '--scr-transition-ms': `${props.transitionMs ?? bibleTransitionMs(stage.value.textTransitionSpeed)}ms`,
   }
 })
+
+const transitionName = computed(
+  () => `scr-${props.transition ?? effectiveTextTransition(stage.value)}`,
+)
 
 const stageAlign = computed(() => stageFlexAlign(stage.value, 'column'))
 
@@ -147,7 +164,7 @@ const projectionFontStyle = useProjectionFont('liturgy')
       :style="stageAlign"
     >
       <Transition
-        name="annotation-fade"
+        :name="transitionName"
         mode="out-in"
       >
         <div
@@ -230,19 +247,4 @@ const projectionFontStyle = useProjectionFont('liturgy')
   height: 100%;
 }
 
-.annotation-fade-enter-active,
-.annotation-fade-leave-active {
-  transition:
-    opacity 0.18s ease,
-    transform 0.18s ease;
-}
-
-.annotation-fade-enter-from {
-  opacity: 0;
-  transform: translateY(8px);
-}
-
-.annotation-fade-leave-to {
-  opacity: 0;
-}
 </style>

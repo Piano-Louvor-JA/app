@@ -327,7 +327,7 @@ describe('installRemoteLiturgyBridge', () => {
     const { command, cleanup } = await installBridge()
     try {
       await command({ action: 'announcements.setCarousel', id: 100, durationMs: 12000, enabled: false })
-      expect(store.carousel).toEqual({ slideMs: 12000, loop: false })
+      expect(store.carousel).toEqual({ slideMs: 12000, loop: false, transitionEnabled: false, transition: 'fade', transitionSpeed: 'normal' })
       await vi.waitFor(() => {
         const state = hoisted.remoteApiStub.sendState.mock.calls.at(-1)?.[0]
         expect(state.announcements.slideMs).toBe(12000)

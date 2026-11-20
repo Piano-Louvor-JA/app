@@ -24,5 +24,12 @@ export default {
     changePassword: 'Cambiar contraseña',
     forgotHint: 'Indica tu correo electrónico. Sin correo automático: en producción el token de restablecimiento lo proporciona el soporte del proyecto.',
     resetHint: 'Pega el token de restablecimiento y define la nueva contraseña (mín. 8 caracteres).',
+    deleteAccount: 'Eliminar cuenta',
+    deleteTitle: 'Eliminar tu cuenta',
+    deleteWarning: 'Esto elimina tu cuenta, tus colecciones privadas, puntos y notificaciones. Las colecciones públicas siguen en la Comunidad, sin tu nombre. No se puede deshacer.',
+    deletePasswordHint: 'Escribe tu contraseña para confirmar.',
+    deleteGoogleHint: 'Confirmarás con tu cuenta de Google.',
+    deleteConfirm: 'Eliminar definitivamente',
+    cancel: 'Cancelar',
   },
 }

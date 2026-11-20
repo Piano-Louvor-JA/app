@@ -1,5 +1,7 @@
 import { onReceiverEvent } from '../palco/receiver-events.mjs'
 import { youtubeCaptionsScript } from '../youtube-captions.mjs'
+import { attachVideoLoadingOverlay } from '../video-loading-overlay.mjs'
+import { attachCursorShield } from '../cursor-shield.mjs'
 import { isYoutubeEmbedUrl, youtubeEmbedUrl, youtubeSourceId, youtubeWatchUrl } from '../youtube-source.mjs'
 import { BrowserWindow, nativeImage, screen, session, WebContentsView } from 'electron'
 import path from 'node:path'
@@ -181,7 +183,7 @@ const HIDE_YOUTUBE_SIDEBAR_SCRIPT = `
       padding: 0 !important;
       border: 0 !important;
       transform: none !important;
-      object-fit: cover !important;
+      object-fit: contain !important;
       object-position: center center !important;
     }
 
@@ -1117,6 +1119,18 @@ function createSourceWindow(loadUrl, title) {
   win.setContentSize(CONTROL_WIDTH, CONTROL_HEIGHT)
   attachControlBar(win)
   layoutControlBar(win)
+  // Vídeo: camada transparente sobre a área do vídeo. A seta aparece normal no player, mas
+  // não entra na captura que vai para as telas projetadas.
+  if (currentProjectionMode === 'video' && !currentSourceAudioOnly) {
+    attachCursorShield(win, { WebContentsView, barHeight: CONTROL_BAR_HEIGHT, onEscape: () => closeWebProjectionWindows() })
+  }
+  // Vídeo do YouTube: logo pulsando + "Carregando…" em vez da tela preta até o vídeo tocar.
+  if (currentProjectionMode === 'video' && currentSourceYoutubeId && !currentSourceAudioOnly) {
+    attachVideoLoadingOverlay(win, { WebContentsView, barHeight: CONTROL_BAR_HEIGHT, getControlBar: () => controlBarView })
+  } else if (currentProjectionMode === 'video' && controlBarView) {
+    // a barra de controle volta para cima da camada transparente
+    win.contentView.addChildView(controlBarView)
+  }
   win.show()
   win.focus()
 

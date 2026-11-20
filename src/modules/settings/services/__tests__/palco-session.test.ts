@@ -350,6 +350,7 @@ describe('com electron', () => {
     setBridge(palco)
     readEffectiveStageSettings.mockReturnValue({
       ...readEffectiveStageSettings(),
+      bibleTransitionEnabled: true,
       bibleTransition: 'zoom',
       bibleTransitionSpeed: 'slow',
     })
@@ -360,6 +361,7 @@ describe('com electron', () => {
 
     readEffectiveStageSettings.mockReturnValue({
       ...readEffectiveStageSettings(),
+      bibleTransitionEnabled: true,
       bibleTransition: undefined,
       bibleTransitionSpeed: undefined,
     })
@@ -368,8 +370,20 @@ describe('com electron', () => {
     expect(payload.transition).toBe('fade')
     expect(payload.transitionMs).toBe(250)
 
-    await palcoSession.project('hymns', { text: 'Santo' })
+    // Transições desligadas (padrão): a TV troca sem animação.
+    readEffectiveStageSettings.mockReturnValue({ ...readEffectiveStageSettings(), bibleTransitionEnabled: false })
+    await palcoSession.project('bible', { text: 'No princípio', footerRef: 'João 1:1' })
     payload = palco.send.mock.calls[2]?.[0] as Record<string, unknown>
+    expect(payload.transition).toBeUndefined()
+
+    // Catálogo do app → a mais próxima que a TV conhece.
+    readEffectiveStageSettings.mockReturnValue({ ...readEffectiveStageSettings(), lyricTransitionEnabled: true, lyricTransition: 'drop' })
+    await palcoSession.project('hymns', { text: 'Santo' })
+    payload = palco.send.mock.calls[3]?.[0] as Record<string, unknown>
+    expect(payload.transition).toBe('slide')
+
+    await palcoSession.project('clock', { text: '10:00' })
+    payload = palco.send.mock.calls[4]?.[0] as Record<string, unknown>
     expect(payload.transition).toBeUndefined()
     expect(payload.transitionMs).toBeUndefined()
   })

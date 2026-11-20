@@ -106,7 +106,7 @@ describe('OnlineVideoManager.play', () => {
     })
     expect(await bodyOf(manager.serve(A, 'video', 'bytes=0-'))).toEqual(CDN['https://v.googlevideo.com/v'])
 
-    await vi.waitFor(() => expect(onChange).toHaveBeenCalledWith(A, { state: 'ready' }))
+    await vi.waitFor(() => expect(onChange).toHaveBeenCalledWith(A, { state: 'ready', fileName: `Hino ${A}_${A}.mp4` }))
     expect(mux).toHaveBeenCalledWith(expect.objectContaining({ ffmpeg: '/bin/ff', output: cache.videoPath(A) }))
     expect(cache.get(A)).toMatchObject({ title: `Hino ${A}`, size: 8000, height: 720 })
     const states = onChange.mock.calls.filter(([id]) => id === A).map(([, s]) => s.state)
@@ -137,8 +137,8 @@ describe('OnlineVideoManager.play', () => {
   })
 
   it('no cache: devolve o arquivo sem baixar e renova o último uso', async () => {
-    writeFileSync(cache.videoPath(A), 'mp4')
-    writeFileSync(cache.subtitlePath(A), 'WEBVTT')
+    writeFileSync(cache.videoPath(A, 'Pronto'), 'mp4')
+    writeFileSync(cache.subtitlePath(A, 'Pronto'), 'WEBVTT')
     await cache.add(A, { title: 'Pronto', duration: 30, size: 3, subtitleLang: 'pt' })
     const { manager } = make()
     const source = await manager.play(A)
@@ -147,7 +147,7 @@ describe('OnlineVideoManager.play', () => {
       src: `${CACHE_URL_BASE}/${A}.mp4`, subtitle: `${CACHE_URL_BASE}/${A}.vtt`,
     })
     expect(manager.resolve).not.toHaveBeenCalled()
-    expect(manager.status(A)).toEqual({ state: 'ready' })
+    expect(manager.status(A)).toEqual({ state: 'ready', fileName: `Pronto_${A}.mp4` })
   })
 
   it('o mesmo vídeo pedido duas vezes usa uma só sessão', async () => {
@@ -174,9 +174,12 @@ describe('OnlineVideoManager.play', () => {
     })
     const source = await manager.play(A)
     expect(source.subtitle).toBe(`${CACHE_URL_BASE}/${A}.vtt`)
-    expect(downloadSubtitle).toHaveBeenCalledWith('https://www.youtube.com/s', cache.subtitlePath(A), expect.any(AbortSignal))
+    const named = path.join(cache.dir, `Hino ${A}_${A}.vtt`)
+    expect(downloadSubtitle).toHaveBeenCalledWith('https://www.youtube.com/s', named, expect.any(AbortSignal))
     await waitState(manager, A, 'ready')
     expect(cache.get(A).subtitleLang).toBe('pt')
+    expect(cache.subtitlePath(A)).toBe(named)
+    expect(cache.videoPath(A)).toBe(path.join(cache.dir, `Hino ${A}_${A}.mp4`))
   })
 
   it('legenda que falha não impede o vídeo', async () => {

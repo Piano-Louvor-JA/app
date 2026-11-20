@@ -235,7 +235,7 @@ describe("RandomStage — projeção", () => {
 		w.unmount();
 	});
 
-	it("showDrawnList: projection com sorteados renderiza lista rankeada", () => {
+	it("showDrawnList: projection mostra os sorteados, o mais recente primeiro", () => {
 		const w = mountStage({
 			projection: true,
 			runtime: runtime({
@@ -245,9 +245,11 @@ describe("RandomStage — projeção", () => {
 		});
 		const items = w.findAll(".random-stage__drawn-item");
 		expect(items.length).toBe(3);
-		expect(items[0]?.text()).toContain("1");
-		expect(items[0]?.text()).toContain("Ana");
-		expect(items[2]?.text()).toContain("3");
+		// Os 3 últimos ficam em destaque, do mais novo para o mais antigo (número = ordem do sorteio).
+		expect(items[0]?.text()).toContain("3");
+		expect(items[0]?.text()).toContain("Carla");
+		expect(items[2]?.text()).toContain("1");
+		expect(items[2]?.text()).toContain("Ana");
 		w.unmount();
 	});
 
