@@ -9,6 +9,7 @@ import { useMediaStore } from '@modules/media/stores/useMediaStore'
 import { GlassCard } from '@design-system/index'
 import { useMinimizablePage } from '@shared/composables/useMinimizablePage'
 import type { LibraryAlbum } from '@modules/sync/types/library'
+import { SHOW_CUSTOM_COLLECTIONS } from '../constants'
 import { getShowCustomCollections, setShowCustomCollections } from '../visibility'
 import AlbumCollectionCard from '../components/AlbumCollectionCard.vue'
 import AppConfirm from '@shared/components/AppConfirm.vue'
@@ -550,7 +551,9 @@ async function runAction(
             class="albums-view__toolbar-count"
           >{{ playlists.length }}</span>
         </button>
+        <!-- TODO(minhas-coletaneas): botão oculto junto com a seção (ver constants.ts). -->
         <button
+          v-if="SHOW_CUSTOM_COLLECTIONS"
           type="button"
           class="albums-view__toolbar-btn"
           :aria-label="showCustomCollections ? t('albums.custom.hide') : t('albums.custom.show')"
