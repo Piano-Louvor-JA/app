@@ -64,6 +64,7 @@ async function startScan() {
 }
 
 function scanFrame() {
+  /* v8 ignore next 1 -- intervalo só inicia depois do template ref atribuído */
   if (!video) return
   const canvas = document.createElement('canvas')
   canvas.width = video.videoWidth

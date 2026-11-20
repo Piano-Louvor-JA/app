@@ -160,17 +160,99 @@
         height: 1.45rem;
         fill: currentColor;
       }
+      .autoplay {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        margin-left: 0.6rem;
+        padding-left: 0.6rem;
+        border-left: 1px solid rgba(255, 255, 255, 0.14);
+      }
+      .autoplay__repeat {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        margin-left: 0.3rem;
+        font-size: 0.78rem;
+        cursor: pointer;
+        user-select: none;
+      }
+      .autoplay__repeat input {
+        width: 0.95rem;
+        height: 0.95rem;
+        margin: 0;
+        accent-color: #fb923c;
+        cursor: pointer;
+      }
+      .autoplay__label {
+        font-size: 0.78rem;
+        opacity: 0.8;
+      }
+      .autoplay select {
+        height: 1.9rem;
+        padding: 0 0.4rem;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 0.45rem;
+        background: rgba(255, 255, 255, 0.06);
+        color: inherit;
+        font: inherit;
+        font-size: 0.78rem;
+      }
+      .autoplay select option { color: #111827; }
+      .text-size {
+        display: none;
+        align-items: center;
+        gap: 0.2rem;
+        margin-left: 0.6rem;
+        padding-left: 0.6rem;
+        border-left: 1px solid rgba(255, 255, 255, 0.14);
+      }
+      .text-size__btn { font-weight: 700; font-size: 0.95rem; }
+      .text-size__value {
+        min-width: 3rem;
+        font-size: 0.78rem;
+        text-align: center;
+        opacity: 0.85;
+        font-variant-numeric: tabular-nums;
+      }
+      /* Modo texto (avisos): um slide só, sem setas, automático nem contador. */
+      body.is-text #prev,
+      body.is-text #next,
+      body.is-text .autoplay,
+      body.is-text #counter { display: none; }
+      body.is-text .text-size { display: inline-flex; }
+      /* Zoom da imagem: também pela roda do mouse e arrastando no popup. */
+      .zoom {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.2rem;
+        margin-left: 0.6rem;
+        padding-left: 0.6rem;
+        border-left: 1px solid rgba(255, 255, 255, 0.14);
+      }
+      .zoom__value {
+        min-width: 3.2rem;
+        height: 1.9rem;
+        padding: 0 0.3rem;
+        font-size: 0.78rem;
+        font-variant-numeric: tabular-nums;
+        opacity: 0.85;
+      }
+      body.is-text .zoom { display: none; }
     </style>
   </head>
   <body>
     <div id="shell" class="shell">
       <div id="monitorPanel" class="panel" role="dialog" aria-label="Selecionar telas">
         <div class="panel__header">
-          <p class="panel__title">Selecionar telas</p>
-          <button id="identifyMonitors" class="panel__identify" type="button">Identificar</button>
+          <p class="panel__title">Conexões Cabeadas</p>
+          <button id="identifyMonitors" class="panel__identify" type="button">Detectar telas</button>
         </div>
-        <p class="panel__hint">Marque os monitores onde as imagens devem ser projetadas</p>
+        <p class="panel__hint">Marque os monitores onde o recurso deve ser projetado.</p>
         <div id="monitorList"><p class="panel__empty">Nenhum monitor estendido encontrado.</p></div>
+        <div id="tvList"></div>
+        <p id="tvSectionHint" class="panel__hint" style="display:none"></p>
+        <div id="palcoTvList"></div>
       </div>
 
       <div class="bar">
@@ -194,13 +276,49 @@
             </button>
             <span id="monitorBadge" class="monitor-badge is-empty">0</span>
           </span>
+          <div class="autoplay">
+          <button id="autoplay" type="button" title="Passar sozinho" aria-label="Passar sozinho" aria-pressed="false" disabled>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path id="autoplayIcon" d="M8 5v14l11-7z"/></svg>
+          </button>
+          <span class="autoplay__label">Automático</span>
+          <select id="autoplaySeconds" title="Segundos por imagem" aria-label="Segundos por imagem">
+            <option value="3">3 s</option>
+            <option value="5" selected>5 s</option>
+            <option value="8">8 s</option>
+            <option value="10">10 s</option>
+            <option value="15">15 s</option>
+            <option value="30">30 s</option>
+            <option value="60">60 s</option>
+          </select>
+            <label class="autoplay__repeat" title="Volta à primeira imagem depois da última">
+              <input id="autoplayRepeat" type="checkbox" checked>
+              Repetir
+            </label>
+          </div>
+          <div class="text-size" role="group" aria-label="Tamanho do texto">
+            <button id="textSmaller" class="text-size__btn" type="button" title="Diminuir texto" aria-label="Diminuir texto">A−</button>
+            <span id="textScale" class="text-size__value">100%</span>
+            <button id="textBigger" class="text-size__btn" type="button" title="Aumentar texto" aria-label="Aumentar texto">A+</button>
+          </div>
+          <div class="zoom" role="group" aria-label="Zoom da imagem">
+            <button id="zoomOut" type="button" title="Diminuir zoom" aria-label="Diminuir zoom" disabled>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14M7 9h5v1H7z"/></svg>
+            </button>
+            <button id="zoomReset" class="zoom__value" type="button" title="Imagem inteira (duplo clique na imagem também)" aria-label="Voltar à imagem inteira">100%</button>
+            <button id="zoomIn" type="button" title="Aumentar zoom (ou roda do mouse na imagem)" aria-label="Aumentar zoom">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14m.5-7H9v2H7v1h2v2h1v-2h2V9h-2z"/></svg>
+            </button>
+          </div>
         </div>
-        <div></div>
+        <div id="transitionSlot"></div>
         <div class="meta">
           <span id="counter" class="counter">1 / 1</span>
         </div>
       </div>
     </div>
+    <script src="../palco/network-mirror.js"></script>
+    <script src="palco-zoom-sender.js"></script>
+    <script src="screen-targets.js"></script>
     <script>
       ;(function () {
         var prevBtn = document.getElementById('prev')
@@ -213,14 +331,185 @@
         var monitorList = document.getElementById('monitorList')
         var identifyBtn = document.getElementById('identifyMonitors')
         var counterEl = document.getElementById('counter')
+        var autoplayBtn = document.getElementById('autoplay')
+        var autoplayIcon = document.getElementById('autoplayIcon')
+        var autoplaySelect = document.getElementById('autoplaySeconds')
+        var autoplayRepeat = document.getElementById('autoplayRepeat')
+        var REPEAT_KEY = 'louvorja-image-autoplay-repeat'
+        var isText = new URLSearchParams(window.location.search).get('kind') === 'text'
+        var textScale = 1
+        var textScaleEl = document.getElementById('textScale')
+        var textSmallerBtn = document.getElementById('textSmaller')
+        var textBiggerBtn = document.getElementById('textBigger')
+        if (isText) document.body.classList.add('is-text')
+        var slideIndex = 0
+        var PLAY_PATH = 'M8 5v14l11-7z'
+        var PAUSE_PATH = 'M6 19h4V5H6v14zm8-14v14h4V5h-4z'
+        var AUTOPLAY_KEY = 'louvorja-image-autoplay-seconds'
+        var autoplayOn = false
+        var autoplayDeadline = 0
+        var autoplayBusy = false
+        var slideTotal = 0
         var panelOpen = false
         var selectedIds = []
         var displays = []
         var ARROW_PATH = 'M5 17.59 15.59 7H9V5h10v10h-2V8.41L6.41 19 5 17.59z'
         var STOP_PATH = 'M6 6h12v12H6z'
 
+        var networkActive = false, tvSlots = [], tvChecked = {}
+        var tvHint = document.getElementById('tvSectionHint'), tvList = document.getElementById('tvList')
+        var palcoTvList = document.getElementById('palcoTvList')
+        function renderConnections() {
+          var targets = window.PianoScreenTargets
+          if (!targets) return
+          targets.renderRemotes(tvList, tvSlots, tvChecked, async function (slotId, checked) {
+            updateMonitorBadge()
+            try {
+              var state = await window.louvorja.projection.getImageSlideState()
+              if (state && state.projecting) networkActive = true
+              if (networkActive) {
+                if (checked) await startConnection(slotId)
+                else if (useFrames) await stopFrameOn(slotId)
+                else if (networkMirrorSender) await networkMirrorSender.remove(slotId)
+              }
+            } catch (error) { tvHint.style.display = ''; tvHint.textContent = error.message }
+            await refresh()
+          })
+          updateMonitorBadge()
+        }
+        async function loadConnections() {
+          if (!window.louvorja || !window.louvorja.palco) return
+          tvSlots = await window.louvorja.palco.slots().catch(function () { return [] })
+          // a marca das conexões vem do app (mesma do seletor de telas dele)
+          if (window.PianoScreenTargets) {
+            await window.PianoScreenTargets.load()
+            window.PianoScreenTargets.applyRemoteSelection(tvChecked)
+            if (panelOpen) void window.PianoScreenTargets.renderTvs(palcoTvList)
+          }
+          renderConnections(); await refresh()
+        }
+        async function startConnection(slotId) {
+          if (useFrames) { await sendImageFrame([slotId]); return }
+          try {
+            await getNetworkMirrorSender().prepare()
+            await prepareImageReceiver(slotId)
+            if (networkActive && tvChecked[slotId] !== false) await getNetworkMirrorSender().start(slotId)
+          } catch (error) { tvHint.style.display = ''; tvHint.textContent = 'Transmissão: ' + error.message }
+        }
+        async function startConnections() {
+          await loadConnections()
+          await Promise.all(tvSlots.filter(function (slot) { return slot.clients > 0 && tvChecked[slot.id] !== false }).map(function (slot) { return startConnection(slot.id) }))
+        }
+        // ── Imagens: arquivo inteiro uma vez + zoom em mensagens leves ──
+        // (aviso de texto segue pela transmissão de vídeo do popup)
+        var useFrames = !isText
+        var sentTvIds = new Set(), lastFrameIndex = -1, frameBusy = false, framePending = false
+        var palcoZoom = useFrames && window.PianoPalcoZoom ? window.PianoPalcoZoom.create({
+          send: function (message, slotId) { return window.louvorja.palco.send(message, slotId) },
+          targets: function () { return Array.from(sentTvIds).filter(function (id) { return tvChecked[id] !== false }) },
+          captureLegacy: async function () {
+            var frame = await window.louvorja.projection.captureImageFrame({ crop: true })
+            return frame ? 'data:' + frame.mime + ';base64,' + frame.data : null
+          },
+          active: function () { return networkActive },
+        }) : null
+
+        /** Manda a imagem atual inteira (com o zoom atual) para as conexões. */
+        async function sendImageFrame(slotIds) {
+          if (!useFrames || !networkActive || !window.louvorja.projection.captureImageFrame) return false
+          if (frameBusy) { framePending = true; return false }
+          frameBusy = true
+          try {
+            var state = await window.louvorja.projection.getImageSlideState()
+            var frame = await window.louvorja.projection.captureImageFrame()
+            if (!frame || !networkActive) return false
+            var view = state && state.view ? state.view : { zoom: 1, x: 0, y: 0 }
+            var url = 'data:' + frame.mime + ';base64,' + frame.data
+            var served = false
+            for (var i = 0; i < slotIds.length; i++) {
+              var id = slotIds[i]
+              if (tvChecked[id] === false) continue
+              await window.louvorja.palco.send({ v: 2, type: 'projection', frameSlide: true, background: url, text: '', footerRef: '', view: { zoom: view.zoom, x: view.x, y: view.y } }, id)
+              sentTvIds.add(id)
+              served = true
+            }
+            if (state) lastFrameIndex = state.index
+            if (served && palcoZoom) palcoZoom.frameSent(view)
+            return served
+          } catch (error) {
+            tvHint.style.display = ''; tvHint.textContent = 'Transmissão: ' + error.message
+            return false
+          } finally {
+            frameBusy = false
+            if (framePending && networkActive) { framePending = false; void sendImageFrame(Array.from(sentTvIds)) }
+          }
+        }
+
+        async function stopFrameOn(slotId) {
+          sentTvIds.delete(slotId)
+          await window.louvorja.palco.send({ v: 2, type: 'idle' }, slotId)
+        }
+
+        var networkMirrorSender = null
+        function getNetworkMirrorSender() {
+          if (networkMirrorSender) return networkMirrorSender
+          networkMirrorSender = PianoNetworkMirror.createSender({
+            capture: async function () {
+              try {
+                return await navigator.mediaDevices.getDisplayMedia({ video: { width: { max: 960 }, height: { max: 540 }, frameRate: { max: 15 } }, audio: false })
+              } catch (error) {
+                var sourceId = await window.louvorja.projection.getSourceMediaId()
+                if (!sourceId) throw new Error('Fonte das imagens indisponível.')
+                return navigator.mediaDevices.getUserMedia({ audio: false, video: { mandatory: { chromeMediaSource: 'tab', chromeMediaSourceId: sourceId, maxWidth: 960, maxHeight: 540, maxFrameRate: 15 } } })
+              }
+            },
+            connectionsMuted: function () { return true },
+            send: function (message, slotId) { return window.louvorja.palco.send(message, slotId) },
+          })
+          return networkMirrorSender
+        }
+        if (window.louvorja && window.louvorja.palco && window.louvorja.palco.onEvent) {
+          window.louvorja.palco.onEvent(function (message) {
+            if (!networkMirrorSender || !networkActive) return
+            networkMirrorSender.handle(message).catch(function (error) {
+              tvHint.style.display = ''; tvHint.textContent = 'Transmissão: ' + error.message
+            })
+          })
+        }
+        window.addEventListener('beforeunload', function () { if (networkMirrorSender) void networkMirrorSender.stop() })
+        var imageReceiverReady = {}
+        function prepareImageReceiver(slotId) {
+          if (imageReceiverReady[slotId]) return imageReceiverReady[slotId]
+          var requestId = 'image-' + slotId + '-' + Date.now() + '-' + Math.random().toString(36).slice(2)
+          var pending = new Promise(function (resolve, reject) {
+            var off = null
+            var timer = null
+            var settled = false
+            function finish(error) {
+              if (settled) return
+              settled = true
+              clearTimeout(timer)
+              if (typeof off === 'function') off()
+              if (error) reject(error); else resolve(true)
+            }
+            off = window.louvorja.palco.onEvent(function (event) {
+              if (event && event.type === 'receiver-ready' && event.requestId === requestId && event.cleanMirror === true) finish()
+            })
+            timer = setTimeout(function () { finish(new Error('A conexão não confirmou a atualização do player.')) }, 10000)
+            window.louvorja.palco.send({ v: 2, type: 'obsControl', action: 'reload', requestId: requestId }, slotId)
+              .then(function (sent) { if (!sent) finish(new Error('Não foi possível atualizar a conexão.')) })
+              .catch(finish)
+          })
+          imageReceiverReady[slotId] = pending.catch(function (error) {
+            delete imageReceiverReady[slotId]
+            throw error
+          })
+          return imageReceiverReady[slotId]
+        }
+
         function setProjectingUi(projecting) {
-          var canProject = selectedIds.length > 0
+          projecting = projecting || networkActive
+          var canProject = selectedIds.length > 0 || tvSlots.some(function (slot) { return slot.clients > 0 && tvChecked[slot.id] !== false })
           projectBtn.disabled = !projecting && !canProject
           if (projecting) {
             projectBtn.classList.add('is-active')
@@ -243,10 +532,79 @@
           counterEl.textContent = safeIndex + ' / ' + safeTotal
           prevBtn.disabled = safeTotal <= 1
           nextBtn.disabled = safeTotal <= 1
+          slideTotal = safeTotal
+          slideIndex = safeIndex > 0 ? safeIndex - 1 : 0
+          autoplayBtn.disabled = safeTotal <= 1
+          if (safeTotal <= 1 && autoplayOn) setAutoplay(false)
         }
 
+        // ── Passar sozinho (carrossel): prazo absoluto (Date.now), não contagem de ticks ──
+        function autoplayMs() {
+          var seconds = Number(autoplaySelect.value) || 5
+          return Math.max(1, seconds) * 1000
+        }
+
+        function restartAutoplayDeadline() {
+          autoplayDeadline = Date.now() + autoplayMs()
+        }
+
+        function setAutoplay(on) {
+          autoplayOn = Boolean(on) && slideTotal > 1
+          autoplayBtn.classList.toggle('is-active', autoplayOn)
+          autoplayBtn.setAttribute('aria-pressed', autoplayOn ? 'true' : 'false')
+          autoplayBtn.title = autoplayOn ? 'Pausar passagem automática' : 'Passar sozinho'
+          autoplayBtn.setAttribute('aria-label', autoplayBtn.title)
+          autoplayIcon.setAttribute('d', autoplayOn ? PAUSE_PATH : PLAY_PATH)
+          if (autoplayOn) restartAutoplayDeadline()
+        }
+
+        async function autoplayTick() {
+          if (!autoplayOn || autoplayBusy || Date.now() < autoplayDeadline) return
+          if (!window.louvorja || !window.louvorja.projection || !window.louvorja.projection.remoteImageNext) return
+          // Sem repetir: na última imagem o automático desliga e a imagem fica.
+          if (!autoplayRepeat.checked && slideIndex >= slideTotal - 1) {
+            setAutoplay(false)
+            return
+          }
+          autoplayBusy = true
+          try {
+            await window.louvorja.projection.remoteImageNext()
+            restartAutoplayDeadline()
+            await refresh()
+          } finally {
+            autoplayBusy = false
+          }
+        }
+
+        try {
+          var savedSeconds = window.localStorage.getItem(AUTOPLAY_KEY)
+          if (savedSeconds && autoplaySelect.querySelector('option[value="' + savedSeconds + '"]')) autoplaySelect.value = savedSeconds
+          if (window.localStorage.getItem(REPEAT_KEY) === 'false') autoplayRepeat.checked = false
+        } catch (error) { /* storage indisponível: fica o padrão */ }
+
+        autoplayRepeat.addEventListener('change', function () {
+          try { window.localStorage.setItem(REPEAT_KEY, autoplayRepeat.checked ? 'true' : 'false') } catch (error) { /* ignore */ }
+        })
+
+        autoplayBtn.addEventListener('click', async function () {
+          if (autoplayBtn.disabled) return
+          var restart = !autoplayOn && !autoplayRepeat.checked && slideIndex >= slideTotal - 1
+          setAutoplay(!autoplayOn)
+          // Sem repetir e parado na última: o play recomeça da primeira (a galeria dá a volta).
+          if (restart && autoplayOn && window.louvorja && window.louvorja.projection && window.louvorja.projection.remoteImageNext) {
+            await window.louvorja.projection.remoteImageNext()
+            restartAutoplayDeadline()
+            await refresh()
+          }
+        })
+        autoplaySelect.addEventListener('change', function () {
+          try { window.localStorage.setItem(AUTOPLAY_KEY, autoplaySelect.value) } catch (error) { /* ignore */ }
+          if (autoplayOn) restartAutoplayDeadline()
+        })
+
+        // Mesmo número do app: monitores + conexões remotas marcadas
         function updateMonitorBadge() {
-          var count = selectedIds.length
+          var count = selectedIds.length + (window.PianoScreenTargets ? window.PianoScreenTargets.remoteCount(tvSlots, tvChecked) : 0)
           monitorBadge.textContent = String(count)
           monitorBadge.classList.toggle('is-empty', count === 0)
         }
@@ -270,6 +628,7 @@
               (checked ? ' checked' : '') +
               '><span class="panel__option-body"><span class="panel__option-name">' +
               display.label +
+              (window.PianoScreenTargets ? window.PianoScreenTargets.returnTagHtml(display.id) : '') +
               '</span><span class="panel__option-meta">' +
               display.resolution +
               '</span></span></label></li>'
@@ -312,7 +671,7 @@
           if (window.louvorja && window.louvorja.projection && window.louvorja.projection.setSiteControlPanelOpen) {
             await window.louvorja.projection.setSiteControlPanelOpen(panelOpen)
           }
-          if (panelOpen) await loadMonitors()
+          if (panelOpen) { await loadConnections(); await loadMonitors() }
         }
 
         async function onToggleMonitor(event) {
@@ -328,6 +687,10 @@
           renderMonitorList()
           if (window.louvorja && window.louvorja.projection && window.louvorja.projection.setVideoTargetMonitors) {
             await window.louvorja.projection.setVideoTargetMonitors(selectedIds.slice())
+            if (networkActive && selectedIds.length > 0) {
+              var state = await window.louvorja.projection.getImageSlideState()
+              if (state && !state.projecting) await window.louvorja.projection.toggleVideoScreens()
+            }
           }
           await refresh()
         }
@@ -338,6 +701,12 @@
             ? await window.louvorja.projection.getImageSlideState()
             : null
           if (state) setCounter(state.index, state.total)
+          // zoom feito pela roda do mouse no popup: a barra acompanha
+          if (state && state.view && Date.now() > zoomLocalUntil) renderZoom(state.view)
+          // outra imagem (setas, automático, celular): as conexões recebem a nova
+          if (useFrames && networkActive && state && state.index !== lastFrameIndex && sentTvIds.size > 0 && !frameBusy) {
+            void sendImageFrame(Array.from(sentTvIds))
+          }
           if (state && typeof state.projecting === 'boolean') {
             setProjectingUi(Boolean(state.projecting))
             return
@@ -351,22 +720,123 @@
         prevBtn.addEventListener('click', async function () {
           if (window.louvorja && window.louvorja.projection && window.louvorja.projection.remoteImagePrev) {
             await window.louvorja.projection.remoteImagePrev()
+            if (autoplayOn) restartAutoplayDeadline()
             await refresh()
           }
         })
         nextBtn.addEventListener('click', async function () {
           if (window.louvorja && window.louvorja.projection && window.louvorja.projection.remoteImageNext) {
             await window.louvorja.projection.remoteImageNext()
+            if (autoplayOn) restartAutoplayDeadline()
             await refresh()
           }
         })
+        function renderTextScale(scale) {
+          textScale = Number(scale) || 1
+          textScaleEl.textContent = Math.round(textScale * 100) + '%'
+          textSmallerBtn.disabled = textScale <= 0.5
+          textBiggerBtn.disabled = textScale >= 2
+        }
+
+        async function changeTextScale(delta) {
+          if (!window.louvorja || !window.louvorja.projection || !window.louvorja.projection.setTextScale) return
+          // Atualiza na hora: cliques rápidos somam a partir do valor já mostrado.
+          var next = Math.min(2, Math.max(0.5, Math.round((textScale + delta) * 10) / 10))
+          renderTextScale(next)
+          var result = await window.louvorja.projection.setTextScale(next)
+          if (result && typeof result.scale === 'number' && textScale === next) renderTextScale(result.scale)
+        }
+
+        // ── Zoom da imagem (botões); a roda do mouse e o arrastar ficam no popup ──
+        var ZOOM_MIN = 1, ZOOM_MAX = 5, ZOOM_STEP = 1.25
+        var ZOOM_ANIM_MS = 180 // botões: o passo anima em vez de saltar
+        var zoomView = { zoom: 1, x: 0, y: 0 }
+        var zoomLocalUntil = 0
+        var zoomOutBtn = document.getElementById('zoomOut')
+        var zoomInBtn = document.getElementById('zoomIn')
+        var zoomResetBtn = document.getElementById('zoomReset')
+
+        function renderZoom(view) {
+          var zoom = Number(view && view.zoom)
+          zoomView = {
+            zoom: Number.isFinite(zoom) ? zoom : 1,
+            x: Number(view && view.x) || 0,
+            y: Number(view && view.y) || 0,
+          }
+          zoomResetBtn.textContent = Math.round(zoomView.zoom * 100) + '%'
+          zoomOutBtn.disabled = zoomView.zoom <= ZOOM_MIN + 0.001
+          zoomInBtn.disabled = zoomView.zoom >= ZOOM_MAX - 0.001
+          zoomResetBtn.disabled = zoomView.zoom <= ZOOM_MIN + 0.001 && !zoomView.x && !zoomView.y
+        }
+
+        async function applyZoom(next) {
+          if (!window.louvorja || !window.louvorja.projection || !window.louvorja.projection.setImageView) return
+          // mostra na hora; cliques rápidos somam a partir do valor já mostrado
+          zoomLocalUntil = Date.now() + 800
+          renderZoom(next)
+          var result = await window.louvorja.projection.setImageView(next)
+          if (result && typeof result.zoom === 'number') renderZoom(result)
+        }
+
+        /** Zoom pelo centro da tela: o ponto que está no meio continua no meio. */
+        function zoomBy(factor) {
+          var target = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoomView.zoom * factor))
+          var ratio = target / zoomView.zoom
+          void applyZoom({ zoom: target, x: zoomView.x * ratio, y: zoomView.y * ratio, anim: ZOOM_ANIM_MS })
+        }
+
+        zoomInBtn.addEventListener('click', function () { zoomBy(ZOOM_STEP) })
+        zoomOutBtn.addEventListener('click', function () { zoomBy(1 / ZOOM_STEP) })
+        zoomResetBtn.addEventListener('click', function () { void applyZoom({ zoom: 1, x: 0, y: 0, anim: ZOOM_ANIM_MS }) })
+        renderZoom(zoomView)
+
+        // Zoom novo (mouse no popup ou botões): barra e conexões acompanham na hora.
+        if (window.louvorja && window.louvorja.projection && window.louvorja.projection.onImageView) {
+          window.louvorja.projection.onImageView(function (view) {
+            if (!view) return
+            if (Date.now() > zoomLocalUntil) renderZoom(view)
+            if (palcoZoom) palcoZoom.onView(view)
+          })
+        }
+
+        textSmallerBtn.addEventListener('click', function () { void changeTextScale(-0.1) })
+        textBiggerBtn.addEventListener('click', function () { void changeTextScale(0.1) })
+        if (isText && window.louvorja && window.louvorja.projection && window.louvorja.projection.getTextScale) {
+          window.louvorja.projection.getTextScale().then(function (state) {
+            if (state && typeof state.scale === 'number') renderTextScale(state.scale)
+          }).catch(function () {})
+        }
+
         projectBtn.addEventListener('click', async function () {
           if (projectBtn.disabled) return
           if (window.louvorja && window.louvorja.projection && window.louvorja.projection.toggleVideoScreens) {
-            await window.louvorja.projection.toggleVideoScreens()
+            var state = await window.louvorja.projection.getImageSlideState()
+            var stopping = Boolean((state && state.projecting) || networkActive)
+            if ((stopping && state && state.projecting) || (!stopping && selectedIds.length > 0)) await window.louvorja.projection.toggleVideoScreens()
+            if (stopping) {
+              networkActive = false
+              if (palcoZoom) palcoZoom.stop()
+              if (useFrames) {
+                var ids = Array.from(sentTvIds)
+                sentTvIds.clear()
+                lastFrameIndex = -1
+                await Promise.all(ids.map(function (id) { return window.louvorja.palco.send({ v: 2, type: 'idle' }, id) }))
+              }
+              if (networkMirrorSender) await networkMirrorSender.stop()
+            } else {
+              networkActive = true
+              await startConnections()
+            }
             await refresh()
           }
         })
+        if (window.PianoScreenTargets) {
+          window.PianoScreenTargets.closeOnOutside({
+            panel: document.getElementById('monitorPanel'),
+            trigger: monitorBtn,
+            close: function () { return setPanelOpen(false) },
+          })
+        }
         monitorBtn.addEventListener('click', function () {
           void setPanelOpen(!panelOpen)
         })
@@ -377,9 +847,25 @@
         })
 
         void loadMonitors()
+        void loadConnections()
         void refresh()
         setInterval(function () { void refresh() }, 500)
+        setInterval(function () { void autoplayTick() }, 250)
       })()
+    </script>
+    <script src="independent-panel.js"></script>
+    <script>
+      window.PianoIndependentPanel && window.PianoIndependentPanel.mount()
+    </script>
+    <script src="screen-transitions.js"></script>
+    <script src="transition-panel.js"></script>
+    <script>
+      // Caixa "Animação" + painel de transições (vale para todas as telas do player).
+      window.PianoTransitionPanel?.mount({
+        slot: document.getElementById('transitionSlot'),
+        shell: document.getElementById('shell'),
+        monitorButton: document.getElementById('monitorSelect'),
+      })
     </script>
   </body>
 </html>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import FontSelector from '@modules/settings/components/FontSelector.vue'
 import { useI18n } from 'vue-i18n'
 
 import { GlassCard } from '@design-system/index'
@@ -85,6 +86,8 @@ function onTextInput(event: Event) {
           </header>
 
           <div class="clock-config__body">
+            <FontSelector scope="clock" compact />
+
             <section class="clock-config__section">
               <div class="clock-config__section-head">
                 <i

@@ -1,4 +1,6 @@
+import { installSystemFontRuntime } from '@shared/services/system-font-runtime'
 import { createApp } from 'vue'
+import { installClientPlatformHeader } from '@shared/lib/client-platform'
 import { createPinia } from 'pinia'
 import App from './App.vue'
 import '@styles/tailwind.css'
@@ -9,9 +11,18 @@ import { useThemeManager } from '@design-system/composables'
 import { initUiZoom } from '@shared/composables/useUiZoom'
 import { isProjectionPopupLocation } from '@shared/services/projection-window-location'
 import { installRemoteLiturgyBridge } from '@modules/remote/renderer/liturgy-bridge'
+import { installNavigationHistory } from '@shared/composables/useNavigationHistory'
+import { startRendererTelemetry } from '@shared/services/telemetry'
+import { installScreenContextBridge } from '@shared/services/screen-context'
 
+installClientPlatformHeader()
 useThemeManager()
 initUiZoom()
+const stopSystemFont = installSystemFontRuntime()
+if (import.meta.hot) import.meta.hot.dispose(stopSystemFont)
+
+// telemetria de erros (Glitchtip) — no-op sem VITE_TELEMETRIA_DSN
+void startRendererTelemetry()
 
 // Remove splash HTML antes do mount na janela de projeção (evita tela de boot).
 if (isProjectionPopupLocation()) {
@@ -26,9 +37,13 @@ app.use(router)
 app.use(vuetify)
 app.use(i18n)
 
-// Controle remoto (APK → desktop): só na janela principal.
+// Só na janela principal: controle remoto (APK → desktop) e histórico de
+// navegação (antes do mount, para registrar a navegação inicial).
 if (!isProjectionPopupLocation()) {
   installRemoteLiturgyBridge({ router })
+  installNavigationHistory({ router })
+  // Players (janelas à parte) mostram o seletor de telas igual ao do app.
+  installScreenContextBridge()
 }
 
 app.mount('#app')

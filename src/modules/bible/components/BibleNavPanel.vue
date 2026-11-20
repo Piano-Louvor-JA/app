@@ -19,6 +19,7 @@ defineProps<{
 
 const emit = defineEmits<{
   'update:bookSearchQuery': [value: string]
+  bookSearchSubmit: []
   'update:chapterSearchQuery': [value: string]
   'update:testament': [value: BibleTestament]
   selectBook: [bookId: number]
@@ -41,6 +42,7 @@ const { t } = useI18n()
         :testament="testament"
         :search-query="bookSearchQuery"
         @update:search-query="emit('update:bookSearchQuery', $event)"
+        @search-submit="emit('bookSearchSubmit')"
         @update:testament="emit('update:testament', $event)"
         @select-book="emit('selectBook', $event)"
       />

@@ -82,6 +82,7 @@ export const LITURGY_TYPE_GROUPS: LiturgyTypeGroup[] = [
     types: [
       { value: 'category', dot: '#FFD600' }, // amarelo puro
       { value: 'music', dot: '#00E676' }, // verde neon
+      { value: 'scheduled', dot: '#7C4DFF' }, // roxo — agendado por data
       { value: 'annotation', dot: '#FF6D00' }, // laranja vivo
     ],
   },
@@ -141,6 +142,10 @@ export interface LiturgyItem {
   complementaryTitle?: string
   /** Anotações livres (em música, exibidas abaixo do álbum). */
   notes?: string
+  /** Anotação (annotation): texto formatado do editor; `subtitle` guarda o mesmo texto sem formatação. */
+  notesHtml?: string
+  /** Anotação (annotation): cor do título (hex). Vazio = cor padrão da projeção. */
+  titleColor?: string
   musicId?: number | null
   musicMode?: LiturgyMusicMode
   verseBookId?: number | null
@@ -156,6 +161,8 @@ export interface LiturgyItem {
    * Configurações; senão associated|<known-id>|custom:<path>.
    */
   playerId?: string
+  /** Rotação agendada (scheduled): id em useScheduledStore.categories. */
+  scheduledRotationId?: string | null
   url?: string
 }
 
@@ -194,6 +201,10 @@ export interface LiturgyItemDraft {
   type: LiturgyItemType | null
   name: string
   subtitle: string
+  /** Anotação (annotation): HTML do editor de texto. */
+  notesHtml?: string
+  /** Anotação (annotation): cor do título (hex). */
+  titleColor?: string
   durationMs: number
   accentColor: string
   categoryId: string | null
@@ -212,6 +223,8 @@ export interface LiturgyItemDraft {
   /** Player do item; 'default' = herda o global das Configurações. */
   playerId: string
   url: string
+  /** Rotação agendada (scheduled) — não interfere na posição na liturgia. */
+  scheduledRotationId: string | null
 }
 
 export interface LiturgyMusicOption {
@@ -224,6 +237,8 @@ export interface LiturgyMusicOption {
   durationMs: number | null
   /** True quando há faixa instrumental no catálogo. */
   hasInstrumental: boolean
+  /** Letra normalizada (fold diacrítico) p/ busca por trecho (issue #348). */
+  lyricsText?: string
 }
 
 export interface LiturgyBibleBookOption {
@@ -240,6 +255,7 @@ export interface LiturgyItemTypeMeta {
 
 export const DEFAULT_LITURGY_ITEM_DRAFT: LiturgyItemDraft = {
   type: null,
+  scheduledRotationId: null,
   name: '',
   subtitle: '',
   durationMs: 0,
@@ -327,6 +343,16 @@ export const EXECUTABLE_ITEM_TYPES: LiturgyItemType[] = [
   'presentation',
   'other_files',
   'online_video',
+  'site',
+]
+
+/** Tipos sem duração: não entram na soma de tempo do culto e o diálogo não mostra o campo. */
+export const TYPES_WITHOUT_DURATION: LiturgyItemType[] = [
+  'category',
+  'annotation',
+  'images',
+  'pdf',
+  'presentation',
   'site',
 ]
 

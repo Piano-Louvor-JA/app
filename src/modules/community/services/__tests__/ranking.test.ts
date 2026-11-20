@@ -208,7 +208,7 @@ describe("ranking service — base URL + authHeaders (linhas 21-26)", () => {
 		);
 		await getRanking("week");
 		expect(calledUrl).toBe(
-			"https://api.pianolouvorja.com.br/v1/custom/ranking?window=week",
+			"https://api-stg.pianolouvorja.com.br/v1/custom/ranking?window=week",
 		);
 	});
 

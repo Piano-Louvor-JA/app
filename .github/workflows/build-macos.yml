@@ -1,9 +1,18 @@
-# Build macOS DMG — gera instalador .dmg x64 + arm64 + latest-mac.yml
+# Build macOS — DMG para instalação + ZIP universal para auto-update (Intel e Apple Silicon).
+# Cross-build funciona sem Rosetta: o electron-builder baixa os dists do Electron
+# por arquitetura e funde com lipo. Binários .node pré-compilados entram iguais
+# nas duas árvores; mac.x64ArchFiles em package.json autoriza essa fusão.
 # Roda manualmente (workflow_dispatch) ou em push de tags v*
 name: Build macOS
 
 on:
   workflow_dispatch:
+    inputs:
+      homologation:
+        description: 'Build de homologação (STG): builda DMG universal SEM publicar'
+        required: false
+        default: false
+        type: boolean
   push:
     tags:
       - 'v*'
@@ -13,36 +22,122 @@ permissions:
 
 jobs:
   build-macos:
-    name: Build macOS DMG x64+arm64
+    name: Build macOS DMG + ZIP universal
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
 
+      - name: Decide publication
+        id: decision
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_REF: ${{ github.ref_type == 'tag' && github.ref_name || github.sha }}
+          WORKFLOW_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # mktemp do macOS (BSD) não aceita --suffix; o Node exige a extensão .mjs.
+          script="$(mktemp -d)/release-publish-decision.mjs"
+          gh api "repos/${GITHUB_REPOSITORY}/contents/scripts/release-publish-decision.mjs?ref=${WORKFLOW_SHA}" --jq .content \
+            | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{let t=s.trim();if(t.startsWith(String.fromCharCode(34)))t=JSON.parse(t);process.stdout.write(Buffer.from(String(t).replace(/\s/g,""),"base64"))})' \
+            > "$script"
+          node "$script" --fetch --repo "$GITHUB_REPOSITORY" --ref "$TARGET_REF"
+
+      - name: Omit publication
+        if: steps.decision.outputs.publish != 'true'
+        run: |
+          echo "Publicação omitida (${{ steps.decision.outputs.reason }})."
+          echo "Nenhum pacote macOS foi enviado a registry ou GitHub Release."
+
       - name: Install dependencies
+        if: steps.decision.outputs.publish == 'true' || inputs.homologation == true
         run: npm ci
 
-      - name: Build Vite + Electron DMG (x64 + arm64) + publish
-        run: npm run electron:build -- --mac --publish always
+      - name: Resolve API build profile
+        shell: bash
+        run: |
+          # Tag oficial => release/produção sob gate do guard; manual => STG.
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "PIANO_BUILD_PROFILE=release" >> "$GITHUB_ENV"
+            echo "PIANO_RELEASE_AUTHORIZED=true" >> "$GITHUB_ENV"
+          else
+            echo "PIANO_BUILD_PROFILE=homologation" >> "$GITHUB_ENV"
+          fi
+
+      # --publish never: gera DMG, ZIP de atualização e latest-mac.yml.
+      # Quem cria a GitHub Release é o release.yml (um único draft por tag).
+      # Com --publish always, os dois publishers deste build criaram duas
+      # releases para a v1.31.2 (DMG numa, blockmap na outra).
+      # Homologação (workflow_dispatch homologation=true): DMG universal STG
+      # sem publicar — o artifact abaixo é o entregável pros testadores.
+      - name: Build homologação (STG, sem publicar)
+        if: inputs.homologation == true
+        run: npm run electron:build -- --mac --universal --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload x64 DMG (artifact backup)
-        uses: actions/upload-artifact@v4
+      - name: Upload homologação (DMG universal)
+        if: inputs.homologation == true
+        uses: actions/upload-artifact@v7
         with:
-          name: LouvorJA-PIANO-macOS-x64-DMG
-          path: dist-electron/*x64*.dmg
-          if-no-files-found: warn
+          name: LouvorJA-PIANO-macOS-universal-DMG-homologation
+          path: |
+            dist-electron/*universal*.dmg
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Build Vite + Electron DMG e ZIP universal
+        if: steps.decision.outputs.publish == 'true'
+        run: npm run electron:build -- --mac --universal --publish never
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Fix P0 auth Google: Firebase client config no bundle homolog/release.
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+
+      - name: Validate macOS update artifacts
+        if: steps.decision.outputs.publish == 'true'
+        shell: bash
+        run: node scripts/validate-release-artifacts.mjs mac "$(node -p "require('./package.json').version")"
+
+      - name: Upload DMG e ZIP universal (artifact backup)
+        if: steps.decision.outputs.publish == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: LouvorJA-PIANO-macOS-universal-DMG
+          path: |
+            dist-electron/*universal*.dmg
+            dist-electron/*.dmg.blockmap
+            dist-electron/*universal*.zip
+            dist-electron/*.zip.blockmap
+            dist-electron/latest-mac.yml
+          if-no-files-found: error
           retention-days: 30
 
-      - name: Upload arm64 DMG (artifact backup)
-        uses: actions/upload-artifact@v4
-        with:
-          name: LouvorJA-PIANO-macOS-arm64-DMG
-          path: dist-electron/*arm64*.dmg
-          if-no-files-found: warn
-          retention-days: 30
+      # Tag: espera o draft criado pelo release.yml (nunca cria). Dispatch
+      # manual: não há release.yml concorrente, então cria se faltar.
+      - name: Attach assets to the GitHub Release
+        if: steps.decision.outputs.publish == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+        run: |
+          set -euo pipefail
+          mode=wait
+          if [ -z "$TAG" ]; then TAG="v$(node -p "require('./package.json').version")"; mode=create; fi
+          node scripts/release-draft.mjs --repo "$GITHUB_REPOSITORY" --tag "$TAG" --mode "$mode"
+          shopt -s nullglob
+          assets=(dist-electron/*.dmg dist-electron/*.dmg.blockmap dist-electron/*.zip dist-electron/*.zip.blockmap dist-electron/latest-mac.yml)
+          test -f dist-electron/latest-mac.yml || { echo "latest-mac.yml ausente (auto-update)" >&2; exit 1; }
+          gh release upload "$TAG" "${assets[@]}" --clobber
+          printf 'Anexado: %s\n' "${assets[@]}"

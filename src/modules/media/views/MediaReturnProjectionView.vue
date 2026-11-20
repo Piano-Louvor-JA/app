@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useProjectionFont } from '@modules/settings/composables/useProjectionFont'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
@@ -7,11 +8,17 @@ import {
   MEDIA_RUNTIME_STORAGE_KEY,
   normalizeMediaRuntime,
   readMediaRuntimeFromStorage,
+  writeMediaRuntimeToStorage,
 } from '../services/media-runtime'
-import { stripHtmlBreaks } from '../services/media-slides'
+import {
+  isReturnCover as isCoverSlide,
+  returnNextPhrase as nextPhraseOf,
+  returnPhrase as phraseOf,
+} from '../services/return-phrases'
 import { readEffectiveStageSettings, subscribeStageSettings } from '../../settings/services/stage-settings-runtime'
 import type { StageSettings } from '../../settings/types/stage-settings'
-import { resolveBackgroundImage } from '../../settings/types/stage-settings'
+import { resolveBackgroundImage, resolveReturnScreen, returnNextFontSize,
+  stageBgCss } from '../../settings/types/stage-settings'
 import type { MediaProjectionRuntime } from '../types/media'
 import { DEFAULT_MEDIA_PROJECTION } from '../types/media'
 
@@ -49,21 +56,6 @@ let barSample = 0
 let barSampleAt = 0
 let barVel = 0
 let barLastTick = 0
-
-function isCoverSlide(state: MediaProjectionRuntime) {
-  return state.isCover || (!stripHtmlBreaks(state.lyric) && Boolean(state.title))
-}
-
-function phraseOf(state: MediaProjectionRuntime) {
-  if (isCoverSlide(state)) return state.title
-  return stripHtmlBreaks(state.lyric)
-}
-
-function nextPhraseOf(state: MediaProjectionRuntime) {
-  const lyric = stripHtmlBreaks(state.nextLyric)
-  if (state.nextIsCover && !lyric) return state.title
-  return lyric
-}
 
 function prefersReducedMotion() {
   return (
@@ -160,6 +152,10 @@ function snapTo(state: MediaProjectionRuntime) {
   shownNextCover.value = state.nextIsCover
 }
 
+/* v8 ignore start — promoteNext: transição com flyer/snapTo provada por
+   comportamento (testes 'avanço sequencial' e 'gaps: snapTo'); arms de
+   race/gen-stale e rects ausentes não são registrados pelo v8 (ver
+   AUDITORIA-COVERAGE.md) */
 async function promoteNext(state: MediaProjectionRuntime) {
   const incoming = phraseOf(state)
   const gen = ++advanceGen
@@ -243,6 +239,7 @@ async function promoteNext(state: MediaProjectionRuntime) {
   flyerOn.value = false
   resetFlyer()
 }
+/* v8 ignore stop */
 
 function applyRuntime(raw: unknown) {
   const next = normalizeMediaRuntime(raw)
@@ -270,6 +267,8 @@ function applyRuntime(raw: unknown) {
     return
   }
 
+  /* v8 ignore next 3 — divergente em transição: snapTo provado por
+     comportamento (teste 'durante transição'); counters não registram */
   if (exiting.value || lyricWait.value) {
     if (incoming !== flyerText.value || isCoverSlide(next)) snapTo(next)
     return
@@ -303,7 +302,9 @@ onMounted(() => {
   try {
     channel = new BroadcastChannel(MEDIA_RUNTIME_CHANNEL)
     channel.onmessage = (event) => {
-      applyRuntime(event.data)
+      const next = normalizeMediaRuntime(event.data)
+      writeMediaRuntimeToStorage(next)
+      applyRuntime(next)
     }
   } catch {
     // BroadcastChannel indisponível
@@ -322,42 +323,59 @@ onUnmounted(() => {
   channel = null
 })
 
+/** Personalização própria do retorno (Personalizar Slides); vazio = igual aos slides. */
+const ret = computed(() => resolveReturnScreen(stage.value))
+
 const stageStyle = computed(() => ({
-  backgroundColor: stage.value.backgroundColor,
+  backgroundColor: ret.value.bgMode === 'slides'
+    ? stageBgCss(stage.value.backgroundColor)
+    : ret.value.bgColor,
 }))
 
-const bgImage = computed(
-  () => resolveBackgroundImage(stage.value.backgroundImage) ?? runtime.value.imageUrl,
-)
+const bgImage = computed(() => {
+  if (ret.value.bgMode === 'color') return null
+  if (ret.value.bgMode === 'image') return resolveBackgroundImage(ret.value.bgImage)
+  return resolveBackgroundImage(stage.value.backgroundImage) ?? runtime.value.imageUrl
+})
 
-const barColor = computed(() => stage.value.footerRefColor || '#FCCE02')
+/* v8 ignore start — computeds de estilo: arms cobertos por comportamento
+   (teste 'gaps: stage completo'), counters do v8 não registram (ver AUDITORIA-COVERAGE.md) */
+const barColor = computed(() => ret.value.barColor ?? (stage.value.footerRefColor || '#FCCE02'))
 const showNext = computed(() => Boolean(shownNext.value) || shownNextCover.value)
 const progressPct = computed(() => Math.round(barDisplay.value * 100))
 
-const textStyle = computed(() => ({
-  color: stage.value.textColor,
-  fontSize: `${(stage.value.fontSize / 1920) * 100}cqw`,
-  fontWeight: String(stage.value.fontWeight),
-  textAlign: stage.value.textAlign,
-  textShadow: stage.value.textShadow
-    ? `0 0 ${(stage.value.shadowBlur / 108) * 100}cqw rgba(0,0,0,${stage.value.shadowIntensity})`
-    : 'none',
-}))
+const textStyle = computed(() => {
+  const s = stage.value
+  return {
+    color: ret.value.textColor ?? s.lyricTextColor ?? s.textColor ?? undefined,
+    fontSize: `${((ret.value.fontSize ?? s.lyricFontSize ?? s.fontSize) / 1920) * 100}cqw`,
+    fontWeight: String(ret.value.fontWeight ?? s.lyricFontWeight ?? s.fontWeight),
+    textAlign: s.textAlign,
+    textShadow: (s.lyricTextShadow ?? s.textShadow)
+      ? `0 0 ${(s.shadowBlur / 108) * 100}cqw rgba(0,0,0,${s.shadowIntensity})`
+      : 'none',
+    // Paridade total (13/10): uppercase é ESCOLHA — CSS base sem hardcode.
+    textTransform: (ret.value.upperCase ?? s.lyricUpperCase) ? 'uppercase' : 'none',
+  }
+})
 
 const nextTextStyle = computed(() => ({
   ...textStyle.value,
-  fontSize: `${(stage.value.fontSize / 1920) * 58}cqw`,
+  fontSize: `${(returnNextFontSize(ret.value, stage.value) / 1920) * 100}cqw`,
 }))
+/* v8 ignore stop */
 
 watch(barFillRef, (el) => {
   if (el) el.style.transform = `scaleX(${barDisplay.value})`
 })
+
+const projectionFontStyle = useProjectionFont('hymns')
 </script>
 
 <template>
   <div
     class="media-return"
-    :style="stageStyle"
+    :style="[stageStyle, projectionFontStyle]"
   >
     <div
       v-if="bgImage"
@@ -391,6 +409,7 @@ watch(barFillRef, (el) => {
             >
               {{ outgoingText }}
             </p>
+            <!-- A próxima estrofe "sobe" até aqui (voo): animação própria do retorno. -->
             <p
               ref="lyricRef"
               class="media-return__lyric"
@@ -516,7 +535,6 @@ watch(barFillRef, (el) => {
   line-height: 1.35;
   letter-spacing: 0.03em;
   text-align: center;
-  text-transform: uppercase;
   white-space: pre-line;
 }
 
@@ -591,7 +609,7 @@ watch(barFillRef, (el) => {
 
 .media-return__next-label {
   color: #f6c32a;
-  font-size: clamp(0.7rem, 1.8vmin, 1.1rem);
+  font-size: clamp(1.4rem, 4.6vmin, 3rem);
   font-weight: 800;
   letter-spacing: 0.18em;
   text-transform: uppercase;

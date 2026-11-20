@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useProjectionFont } from '@modules/settings/composables/useProjectionFont'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 
 import { ProjectionBackground } from '@design-system/index'
@@ -88,13 +89,15 @@ const effectiveConfig = computed(() => {
   const mod = stage.value.clock
   return mod ? { ...config.value, ...mod } : { ...config.value }
 })
+
+const projectionFontStyle = useProjectionFont('clock')
 </script>
 
 <template>
   <ProjectionBackground
     class="clock-projection"
     :class="{ 'clock-projection--embedded': embedded }"
-    :style="stageStyle"
+    :style="[stageStyle, projectionFontStyle]"
   >
     <div
       class="clock-projection__stage"

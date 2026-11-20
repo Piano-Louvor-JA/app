@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { obsDetecting } from '@modules/settings/services/obs-detection'
 import { useI18n } from 'vue-i18n'
 
 defineProps<{
@@ -13,8 +14,9 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
-function onClick(projecting: boolean, disabled: boolean) {
-  if (disabled) return
+function onClick(projecting: boolean) {
+  // O DOM bloqueia via :disabled quando parado sem seleção; durante projeção
+  // o botão fica clicável (para poder parar) mesmo sem seleção ativa.
   if (projecting) emit('clear')
   else emit('project')
 }
@@ -24,14 +26,16 @@ function onClick(projecting: boolean, disabled: boolean) {
   <div class="bible-project-fab">
     <button
       type="button"
+    :aria-busy="obsDetecting"
       class="bible-project-fab__btn"
       :class="{ 'bible-project-fab__btn--active': projecting }"
-      :disabled="disabled && !projecting"
+      :disabled="obsDetecting || (disabled && !projecting)"
       :aria-label="projecting ? t('bible.clearProjection') : t('bible.project')"
       :title="projecting ? t('bible.clearProjection') : t('bible.project')"
-      @click="onClick(Boolean(projecting), Boolean(disabled))"
+      @click="onClick(Boolean(projecting))"
     >
-      <i
+      <span v-if="obsDetecting" class="obs-detection-status" role="status">{{ t('obsOutputs.detecting') }}</span>
+    <i
         class="ti"
         :class="projecting ? 'ti-player-stop' : 'ti-player-play'"
         aria-hidden="true"
@@ -41,17 +45,11 @@ function onClick(projecting: boolean, disabled: boolean) {
 </template>
 
 <style scoped lang="scss">
+.obs-detection-status { position: absolute; right: 0; bottom: calc(100% + 0.4rem); padding: 0.4rem 0.6rem; border-radius: 0.4rem; white-space: nowrap; background: var(--ds-color-surface, #222); color: var(--ds-color-on-surface, #fff); font-size: 0.75rem; font-weight: 500; }
 .bible-project-fab {
-  position: fixed;
-  right: 2rem;
-  bottom: calc(var(--ds-dock-height, 5.5rem) + 1.25rem);
-  z-index: 35;
-  /* Coluna vertical: play em cima, TV embaixo — não invade o
-     StagePaletteButton (que fica à direita com offset próprio). */
   display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.65rem;
+  flex-shrink: 0;
+  pointer-events: auto;
 }
 
 .bible-project-fab__btn {

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { obsDetecting } from '@modules/settings/services/obs-detection'
 import { useI18n } from 'vue-i18n'
 
 defineProps<{
@@ -21,12 +22,15 @@ function onClick(projecting: boolean) {
 <template>
   <button
     type="button"
+    :disabled="obsDetecting"
+    :aria-busy="obsDetecting"
     class="timer-project-fab"
     :class="{ 'timer-project-fab--active': projecting }"
     :aria-label="projecting ? t('timer.clearProjection') : t('timer.project')"
     :title="projecting ? t('timer.clearProjection') : t('timer.project')"
     @click="onClick(projecting)"
   >
+    <span v-if="obsDetecting" class="obs-detection-status" role="status">{{ t('obsOutputs.detecting') }}</span>
     <i
       class="ti"
       :class="projecting ? 'ti-player-stop' : 'ti-presentation'"
@@ -36,11 +40,10 @@ function onClick(projecting: boolean) {
 </template>
 
 <style scoped lang="scss">
+.obs-detection-status { position: absolute; right: 0; bottom: calc(100% + 0.4rem); padding: 0.4rem 0.6rem; border-radius: 0.4rem; white-space: nowrap; background: var(--ds-color-surface, #222); color: var(--ds-color-on-surface, #fff); font-size: 0.75rem; font-weight: 500; }
 .timer-project-fab {
-  position: fixed;
-  right: 2rem;
-  bottom: calc(var(--ds-dock-height, 5.5rem) + 1.25rem);
-  z-index: 35;
+  flex-shrink: 0;
+  pointer-events: auto;
   width: 4rem;
   height: 4rem;
   border: 4px solid color-mix(in srgb, #fff 20%, transparent);
@@ -79,8 +82,6 @@ function onClick(projecting: boolean) {
 
 @media (max-width: 1280px) {
   .timer-project-fab {
-    right: 1.25rem;
-    bottom: calc(var(--ds-dock-height, 5.5rem) + 0.75rem);
     width: 3.25rem;
     height: 3.25rem;
     border-width: 3px;

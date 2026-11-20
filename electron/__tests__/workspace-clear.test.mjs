@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -19,7 +20,8 @@ const mocks = vi.hoisted(() => ({
 	})),
 }));
 
-vi.mock("node:fs", () => ({
+vi.mock("node:fs", async (importOriginal) => ({
+	...(await importOriginal()),
 	existsSync: mocks.existsSync,
 	mkdirSync: vi.fn(),
 	unlinkSync: vi.fn(),

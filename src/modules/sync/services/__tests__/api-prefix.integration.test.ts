@@ -102,13 +102,13 @@ describe('Integracao: prefixo de idioma em todos os modulos', () => {
   })
 
   describe('library-download.ts', () => {
-    it('espanhol: resolveAlbumIdsForMusic busca music_{id} (sem prefixo de idioma)', async () => {
+    it('espanhol: resolveAlbumIdsForMusic busca music_{id} no contrato global', async () => {
       localStorage.setItem('user_data', JSON.stringify({ language: 'es' }))
       vi.mocked(readCatalogRecord).mockResolvedValue(null)
 
       await resolveAlbumIdsForMusic(42)
 
-      // resolveAlbumIdsForMusic busca music_{id} que nao tem prefixo de idioma
+      // resolveAlbumIdsForMusic busca music_{id} global (sem prefixo de idioma)
       const calls = vi.mocked(readCatalogRecord).mock.calls.map((c) => c[0])
       expect(calls).toContain('music_42')
     })

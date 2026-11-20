@@ -9,7 +9,10 @@ import {
 
 import {
   computeCountdownRemainingMs,
+  computeRemainingMs,
+  computeRemainingRawMs,
   durationPartsFromMs,
+  formatCountdownWithSign,
   formatElapsedMs,
 } from '../services/countdown-format'
 import type {
@@ -18,7 +21,7 @@ import type {
 } from '../types/countdown'
 import { useCountdownStore } from '../stores/useCountdownStore'
 
-export function useCountdownTick(active: MaybeRefOrGetter<boolean> = true) {
+export function useCountdownTick(active: MaybeRefOrGetter<boolean>) {
   const now = ref(Date.now())
   let frameId = 0
 
@@ -47,40 +50,33 @@ export function useCountdownDisplay(
   const store = useCountdownStore()
   const config = computed(() => toValue(configSource) ?? store.config)
   const runtime = computed(() => toValue(runtimeSource) ?? store.runtime)
-  const { now } = useCountdownTick(
-    () => runtime.value.status === 'running' || runtime.value.mode === 'until',
-  )
+  const { now } = useCountdownTick(() => runtime.value.status === 'running' || runtime.value.mode === 'until')
 
-  const remainingMs = computed(() =>
-    computeCountdownRemainingMs(runtime.value, now.value),
-  )
+  const remainingRawMs = computed(() => computeCountdownRemainingMs(runtime.value, now.value))
+  const remainingMs = computed(() => Math.max(0, remainingRawMs.value))
 
   const formattedTime = computed(() =>
     formatElapsedMs(remainingMs.value, config.value.timeFormat),
   )
 
+  const formattedTimeWithSign = computed(() =>
+    formatCountdownWithSign(remainingRawMs.value, config.value.timeFormat),
+  )
+
+  const isNegative = computed(() => remainingRawMs.value < 0)
+
   const isUrgent = computed(
     () =>
       remainingMs.value > 0 &&
       remainingMs.value <= 60_000 &&
-      (runtime.value.mode === 'until' ||
-        runtime.value.status === 'running' ||
-        runtime.value.status === 'paused'),
+      (runtime.value.status === 'running' || runtime.value.status === 'paused'),
   )
 
-  /** Zerou ou passou do tempo (overtime negativo). */
   const isFinished = computed(() => {
-    if (runtime.value.mode === 'until') {
-      return remainingMs.value <= 0
-    }
+    if (runtime.value.mode === 'until') return remainingRawMs.value <= 0
     if (runtime.value.durationMs <= 0) return false
-    if (runtime.value.finished) return true
-    return (
-      remainingMs.value <= 0 &&
-      (runtime.value.status === 'running' ||
-        runtime.value.status === 'paused' ||
-        runtime.value.accumulatedMs > 0)
-    )
+    return runtime.value.finished || (remainingRawMs.value <= 0 &&
+      (runtime.value.status === 'running' || runtime.value.status === 'paused' || runtime.value.accumulatedMs > 0))
   })
 
   return {
@@ -89,8 +85,10 @@ export function useCountdownDisplay(
     runtime,
     remainingMs,
     formattedTime,
+    formattedTimeWithSign,
     isUrgent,
     isFinished,
+    isNegative,
   }
 }
 
@@ -107,20 +105,22 @@ export function useCountdownFeature() {
     durationParts,
     isProjecting: computed(() => store.isProjecting),
     configOpen: computed(() => store.configOpen),
+    displayConfigOpen: computed(() => store.displayConfigOpen),
     isRunning: computed(() => store.isRunning),
     isPaused: computed(() => store.isPaused),
     canStart: computed(() => store.canStart),
-    isUntilMode: computed(() => store.isUntilMode),
     setTimeFormat: store.setTimeFormat,
     setBgColor: store.setBgColor,
     setTextColor: store.setTextColor,
     resetDisplayToDefault: store.resetDisplayToDefault,
     openConfig: store.openConfig,
-    closeConfig: store.closeConfig,
-    setDurationMs: store.setDurationMs,
-    setCountdownMode: store.setCountdownMode,
-    setUntilTime: store.setUntilTime,
-    start: store.start,
+        closeConfig: store.closeConfig,
+        openDisplayConfig: store.openDisplayConfig,
+        closeDisplayConfig: store.closeDisplayConfig,
+        setAllowNegative: store.setAllowNegative,
+        setDurationMs: store.setDurationMs,
+        adjustTime: store.adjustTime,
+        start: store.start,
     pause: store.pause,
     reset: store.reset,
     saveMark: store.saveMark,
@@ -129,5 +129,6 @@ export function useCountdownFeature() {
     toggleProjection: store.toggleProjection,
     syncProjection: store.syncProjection,
     clearProjection: store.clearProjection,
+    refreshProjectionState: store.refreshProjectionState,
   }
 }

@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import PalcoRouteSelect from '../../settings/components/PalcoRouteSelect.vue'
 import StagePaletteButton from '../../settings/components/StagePaletteButton.vue'
 import AlbumLyricDialog from '@modules/albums/components/AlbumLyricDialog.vue'
 
 import LiturgyCloneDialog from '../components/LiturgyCloneDialog.vue'
+import LiturgyScheduledDialog from '../components/LiturgyScheduledDialog.vue'
+import { useScheduledStore } from '../stores/useScheduledStore'
+import { resolveScheduledEntry } from '../services/scheduled-resolver'
+import { activeDateISO } from '../services/liturgy-preferences'
 import LiturgyCustomBar from '../components/LiturgyCustomBar.vue'
 import LiturgyCustomDialog from '../components/LiturgyCustomDialog.vue'
 import LiturgyDayTabs from '../components/LiturgyDayTabs.vue'
@@ -14,6 +17,54 @@ import LiturgyItemDialog from '../components/LiturgyItemDialog.vue'
 import LiturgySidebar from '../components/LiturgySidebar.vue'
 import LiturgyTimeline from '../components/LiturgyTimeline.vue'
 import { useLiturgy } from '../composables/useLiturgy'
+import { useLiturgyVideoPrefetch } from '../composables/useLiturgyVideoPrefetch'
+
+const scheduledDialogOpen = ref(false)
+
+// Placeholder agendado → entrada do dia (badge na timeline).
+const scheduledStore = useScheduledStore()
+const scheduledResolvedByItemId = computed(() => {
+  const map: Record<
+    string,
+    | { entryName: string; kindLabel: string; kind: string; filePath?: string }
+    | { empty: string }
+  > = {}
+  const day = selectedDay.value as import('../types/liturgy').LiturgyDayKey
+  const dateISO = activeDateISO(day)
+  for (const item of currentItems.value) {
+    if (item.type !== 'scheduled') continue
+    const rotationId =
+      item.scheduledRotationId?.trim() || item.categoryId?.trim()
+    if (!rotationId) continue
+    const rotationName = scheduledStore.categoryName(rotationId)
+    const resolved = resolveScheduledEntry(
+      rotationId,
+      dateISO,
+      scheduledStore.categories,
+      scheduledStore.items,
+    )
+    if (resolved) {
+      map[item.id] = {
+        entryName: `${rotationName}: ${resolved.entryName}`,
+        kindLabel: t(`liturgy.messages.scheduledKind.${resolved.kind}`),
+        kind: resolved.kind,
+        filePath:
+          resolved.content?.kind === 'file'
+            ? resolved.content.filePath
+            : undefined,
+      }
+    } else {
+      // Sem entrada na data: dizer QUAL data e QUAL rotação — ponteiro cego não.
+      map[item.id] = {
+        empty: t('liturgy.messages.scheduledEmptyForDate', {
+          date: dateISO.split('-').reverse().join('/'),
+          rotation: rotationName ?? '—',
+        }),
+      }
+    }
+  }
+  return map
+})
 
 const { t } = useI18n()
 
@@ -50,6 +101,8 @@ const {
   videoProjectionItemId,
   worshipLabel,
   headerDateTime,
+  currentClock,
+  estimatedSessionEndLabel,
   remainingCountdownLabel,
   startTimeInput,
   endTimeInput,
@@ -96,6 +149,7 @@ const {
   onManageTeam,
   onMusicPick,
   clearMusicPick,
+  refreshMusicCatalog,
   onVideoFileSelected,
   onMusicSung,
   onMusicInstrumental,
@@ -106,8 +160,16 @@ const {
   setMusicSearchQuery,
 } = useLiturgy()
 
+const { statusByItemId: offlineStatusByItemId } = useLiturgyVideoPrefetch()
+
 /** Exibe avisos da liturgia e do player (ex.: áudio indisponível). */
 const liturgyAlertKey = computed(() => lastActionMessageKey.value || null)
+
+/** app#331 RF-1: pós-import .slja — recarrega o catálogo pra música aparecer
+ * na busca antes de o diálogo selecionar o novo ID. */
+async function onSljaImported(): Promise<void> {
+  await refreshMusicCatalog()
+}
 </script>
 
 <template>
@@ -115,7 +177,6 @@ const liturgyAlertKey = computed(() => lastActionMessageKey.value || null)
     <header class="liturgy-view__header">
       <div class="liturgy-view__header-start">
         <StagePaletteButton scope="liturgy" />
-        <PalcoRouteSelect module="liturgy" />
       </div>
       <div class="liturgy-view__brand">
         <i
@@ -125,6 +186,48 @@ const liturgyAlertKey = computed(() => lastActionMessageKey.value || null)
         <h1 class="liturgy-view__title">
           {{ t('liturgy.title') }}
         </h1>
+      </div>
+
+      <div class="liturgy-view__header-actions">
+            <button
+              type="button"
+              class="liturgy-view__clear"
+              :title="t('liturgy.importJa')"
+              @click="importJa"
+            >
+              <i
+                class="ti ti-file-import"
+                aria-hidden="true"
+              />
+              <span>{{ t('liturgy.importJa') }}</span>
+            </button>
+
+            <button
+              type="button"
+              class="liturgy-view__clear"
+              :title="t('liturgy.scheduled.import')"
+              @click="importScheduled"
+            >
+              <i
+                class="ti ti-calendar-down"
+                aria-hidden="true"
+              />
+              <span>{{ t('liturgy.scheduled.import') }}</span>
+            </button>
+
+            <button
+              type="button"
+              class="liturgy-view__clear"
+              :title="t('liturgy.messages.scheduledTitle')"
+              @click="scheduledDialogOpen = true"
+            >
+              <i
+                class="ti ti-calendar-time"
+                aria-hidden="true"
+              />
+              <span>{{ t('liturgy.messages.scheduledTitle') }}</span>
+            </button>
+
       </div>
 
       <div class="liturgy-view__meta">
@@ -156,6 +259,8 @@ const liturgyAlertKey = computed(() => lastActionMessageKey.value || null)
     <div class="liturgy-view__body">
       <LiturgySidebar
         :remaining-countdown="remainingCountdownLabel"
+        :current-clock="currentClock"
+        :estimated-session-end-label="estimatedSessionEndLabel"
         :countdown-expired="countdownExpired"
         :countdown-running="countdownRunning"
         :can-start-countdown="canStartCountdown"
@@ -180,32 +285,6 @@ const liturgyAlertKey = computed(() => lastActionMessageKey.value || null)
           />
 
           <div class="liturgy-view__toolbar-actions">
-            <button
-              type="button"
-              class="liturgy-view__clear"
-              :title="t('liturgy.importJa')"
-              @click="importJa"
-            >
-              <i
-                class="ti ti-file-import"
-                aria-hidden="true"
-              />
-              <span>{{ t('liturgy.importJa') }}</span>
-            </button>
-
-            <button
-              type="button"
-              class="liturgy-view__clear"
-              :title="t('liturgy.scheduled.import')"
-              @click="importScheduled"
-            >
-              <i
-                class="ti ti-calendar-down"
-                aria-hidden="true"
-              />
-              <span>{{ t('liturgy.scheduled.import') }}</span>
-            </button>
-
             <button
               v-if="currentItems.length > 0"
               type="button"
@@ -278,9 +357,11 @@ const liturgyAlertKey = computed(() => lastActionMessageKey.value || null)
           :start-labels="startLabels"
           :duration-labels="durationLabels"
           :can-clone="canCloneLiturgy"
+          :scheduled-resolved-by-item-id="scheduledResolvedByItemId"
           :deletion-locked="deletionLocked"
           :music-instrumental-by-id="musicInstrumentalById"
           :busy-music-id="busyMusicId"
+          :offline-status-by-item-id="offlineStatusByItemId"
           @select="selectItem"
           @video-file-selected="onVideoFileSelected"
           @play-screens="playItemOnScreens"
@@ -318,6 +399,7 @@ const liturgyAlertKey = computed(() => lastActionMessageKey.value || null)
       @update:music-query="setMusicSearchQuery"
       @pick-music="onMusicPick"
       @clear-music="clearMusicPick"
+      :refresh-imported-catalog="onSljaImported"
     />
 
     <LiturgyCustomDialog
@@ -335,6 +417,11 @@ const liturgyAlertKey = computed(() => lastActionMessageKey.value || null)
       @close="closeCloneDialog"
       @confirm="cloneLiturgyFromSelected"
       @update:source-key="cloneSourceKey = $event"
+    />
+
+    <LiturgyScheduledDialog
+      :open="scheduledDialogOpen"
+      @close="scheduledDialogOpen = false"
     />
 
     <AlbumLyricDialog
@@ -359,12 +446,20 @@ const liturgyAlertKey = computed(() => lastActionMessageKey.value || null)
 }
 
 .liturgy-view__header {
-  display: flex;
+  display: grid;
+  grid-template-columns: 20rem minmax(0, 1fr) auto auto;
   flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
-  gap: 1.5rem;
+  gap: 2rem;
+}
+
+.liturgy-view__header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   flex-wrap: wrap;
+  gap: .5rem;
 }
 
 .liturgy-view__header-start {
@@ -637,8 +732,15 @@ const liturgyAlertKey = computed(() => lastActionMessageKey.value || null)
   }
 
   .liturgy-view__header {
-    gap: 0.75rem;
+    grid-template-columns: 16rem minmax(0, 1fr) auto;
+    column-gap: .85rem;
+    row-gap: .75rem;
   }
+  .liturgy-view__header-actions {
+    grid-column: 2 / -1;
+    grid-row: 2;
+  }
+  .liturgy-view__meta { grid-column: 3; grid-row: 1; }
 
   .liturgy-view__brand {
     gap: 0.55rem;
@@ -707,5 +809,10 @@ const liturgyAlertKey = computed(() => lastActionMessageKey.value || null)
   .liturgy-view__body :deep(.ds-glass-card--padded) {
     padding: 0.75rem;
   }
+}
+@media (max-width: 960px) {
+  .liturgy-view__header { display: flex; flex-wrap: wrap; }
+  .liturgy-view__brand { margin-right: auto; }
+  .liturgy-view__header-actions { justify-content: flex-start; }
 }
 </style>

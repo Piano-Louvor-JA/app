@@ -11,10 +11,12 @@ import {
 } from '@design-system/tokens'
 import {
   accents,
+  buildCustomAccent,
   defaultAccent,
   defaultInteraction,
   defaultTheme,
   interactions,
+  isHexColor,
   themes,
   type AccentKey,
   type InteractionKey,
@@ -54,6 +56,11 @@ function readStoredAccent(): AccentKey {
   return isAccentKey(stored) ? stored : defaultAccent
 }
 
+function readStoredCustomAccent(): string | null {
+  const stored = getUserPreference<unknown>(USER_PREFERENCE_KEYS.accentCustom)
+  return isHexColor(stored) ? stored.toUpperCase() : null
+}
+
 function readStoredInteraction(): InteractionKey {
   const stored = getUserPreference<unknown>(USER_PREFERENCE_KEYS.interaction)
   return isInteractionKey(stored) ? stored : defaultInteraction
@@ -67,6 +74,8 @@ function readStoredAutoBrightness(): boolean {
 const themeKey = ref<ThemeKey>(readStoredTheme())
 const glassIntensity = ref(readStoredGlassIntensity())
 const accentKey = ref<AccentKey>(readStoredAccent())
+/** Cor livre do usuário; quando definida, tem prioridade sobre `accentKey`. */
+const customAccent = ref<string | null>(readStoredCustomAccent())
 const interactionKey = ref<InteractionKey>(readStoredInteraction())
 const autoBrightness = ref(readStoredAutoBrightness())
 
@@ -79,13 +88,16 @@ function persistAppearance() {
   setUserPreference(USER_PREFERENCE_KEYS.theme, themeKey.value)
   setUserPreference(USER_PREFERENCE_KEYS.blur, glassIntensity.value)
   setUserPreference(USER_PREFERENCE_KEYS.accent, accentKey.value)
+  setUserPreference(USER_PREFERENCE_KEYS.accentCustom, customAccent.value)
   setUserPreference(USER_PREFERENCE_KEYS.interaction, interactionKey.value)
   setUserPreference(USER_PREFERENCE_KEYS.autoBrightness, autoBrightness.value)
 }
 
 function applyCssVars(target: HTMLElement = document.documentElement) {
   const theme = themes[themeKey.value]
-  const accent = accents[accentKey.value]
+  const accent = customAccent.value
+    ? buildCustomAccent(customAccent.value)
+    : accents[accentKey.value]
   const interaction = interactions[interactionKey.value]
   const intensity = glassIntensity.value
 
@@ -167,7 +179,11 @@ export function useThemeManager() {
   const currentGlassFill = computed(() =>
     glassFillFromIntensity(glassIntensity.value),
   )
-  const currentAccent = computed(() => accents[accentKey.value])
+  const currentAccent = computed(() =>
+    customAccent.value
+      ? buildCustomAccent(customAccent.value)
+      : accents[accentKey.value],
+  )
   const currentInteraction = computed(() => interactions[interactionKey.value])
 
   function setTheme(key: ThemeKey) {
@@ -196,11 +212,26 @@ export function useThemeManager() {
   }
 
   function setAccent(key: AccentKey) {
+    if (!isAccentKey(key)) return
     accentKey.value = key
+    customAccent.value = null
     persistAppearance()
   }
 
+  /** Cor livre (#RRGGBB): o tom de realce é derivado dela. */
+  function setCustomAccent(hex: string) {
+    if (!isHexColor(hex)) return
+    customAccent.value = hex.toUpperCase()
+    persistAppearance()
+  }
+
+  /** Volta para a cor padrão do sistema, descartando a cor livre. */
+  function resetAccent() {
+    setAccent(defaultAccent)
+  }
+
   function setInteraction(key: InteractionKey) {
+    if (!isInteractionKey(key)) return
     interactionKey.value = key
     persistAppearance()
   }
@@ -221,6 +252,7 @@ export function useThemeManager() {
     glassIntensity,
     blurLevel,
     accentKey,
+    customAccent,
     interactionKey,
     autoBrightness,
     currentTheme,
@@ -236,6 +268,8 @@ export function useThemeManager() {
     setGlassIntensity,
     setBlur,
     setAccent,
+    setCustomAccent,
+    resetAccent,
     setInteraction,
     setAutoBrightness,
     applyCssVars,

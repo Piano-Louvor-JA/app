@@ -1,5 +1,11 @@
 import hymnalCover from '@assets/library/hymnal.jpeg'
 import hymnal1996Cover from '@assets/library/hymnal_1996.jpeg'
+/** Capa do hinário por idioma. ES aguarda asset próprio (hymnal_es.jpeg) —
+ *  enquanto não existe, cai na capa PT (histeresis visual, não erro). */
+const hymnalCovers: Record<string, string> = {
+  pt: hymnalCover,
+}
+
 import { fetchRemoteCatalogJson } from '@shared/services/remote-catalog'
 import { readCatalogRecord } from '@shared/services/workspace-api'
 import { getCurrentApiPrefix } from '@modules/sync/services/library-catalog'
@@ -8,6 +14,8 @@ import {
   customFileUrl,
   toCustomCollectionId,
 } from '@modules/media/services/custom-catalog'
+import { getAuthSession } from '@modules/media/services/auth-client'
+import { filterCustomCollectionsForAlbums } from './visibility-owner-filter'
 import { resolveCoverUrlsFromDisk, resolveRemoteFileUrl } from '@modules/sync/services/media-paths'
 
 import type { AlbumCategory, AlbumCollection } from '../types/albums'
@@ -25,6 +33,8 @@ type CatalogCategoryAlbum = {
 type CatalogCategory = {
   id_category?: number | string
   name?: string
+  /** Slug estável entre idiomas (aym, kids, ...) — chave de ordenação. */
+  slug?: string
   albums?: CatalogCategoryAlbum[]
 }
 
@@ -44,6 +54,23 @@ async function readOrFetchCatalog<T>(filename: string): Promise<T | null> {
   }
 }
 
+/** Coletâneas por álbum: mais recente primeiro (id_album DESC — 2026 → 1996). */
+export function sortCollectionsRecentFirst(
+  collections: AlbumCollection[],
+): AlbumCollection[] {
+  return [...collections].sort((a, b) => {
+    const idA = Number(a.id)
+    const idB = Number(b.id)
+    const numA = Number.isFinite(idA) ? idA : null
+    const numB = Number.isFinite(idB) ? idB : null
+    // Ids não numéricos (custom) caem no fim, alfabético entre si.
+    if (numA == null && numB == null) return a.name.localeCompare(b.name)
+    if (numA == null) return 1
+    if (numB == null) return -1
+    return numB - numA
+  })
+}
+
 async function buildHymnalCollections(): Promise<AlbumCollection[]> {
   const collections: AlbumCollection[] = []
   const langPrefix = getCurrentApiPrefix()
@@ -55,7 +82,7 @@ async function buildHymnalCollections(): Promise<AlbumCollection[]> {
       kind: 'hymnal',
       name: 'Hinário Adventista',
       subtitle: '',
-      coverUrl: hymnalCover,
+      coverUrl: hymnalCovers[langPrefix] ?? hymnalCover,
       trackCount: hymnal.length,
       catalogKey: `${langPrefix}_hymnal`,
     })
@@ -81,7 +108,12 @@ async function buildHymnalCollections(): Promise<AlbumCollection[]> {
 /** Minhas Coletâneas custom no formato AlbumCollection (mesma estética dos álbuns). */
 async function buildCustomCollectionCards(): Promise<AlbumCollection[]> {
   try {
-    const customs = await listCustomCollections()
+    // RF-03 (SPEC-crud-comunidade-hub-v1.0.0): /albums mostra APENAS as
+    // coletâneas do próprio usuário (locais = id negativo; remotas =
+    // ownerId === meu id_user). Públicas de terceiros ficam na Comunidade;
+    // remota legada (ownerId null, id positivo) NÃO entra — RF-06 é gate humano.
+    const all = await listCustomCollections()
+    const customs = filterCustomCollectionsForAlbums(all)
     return customs.map((c) => ({
       id: toCustomCollectionId(c.id),
       kind: 'album' as const,
@@ -153,10 +185,12 @@ export async function loadAlbumCategories(): Promise<AlbumCategory[]> {
     }
 
     if (collections.length > 0) {
+      // Coletâneas por ano: mais recente primeiro (2026 → 2003/1996).
       result.push({
         id: category.id_category ?? category.name ?? collections[0]!.id,
         name: String(category.name ?? '').trim() || 'Coletâneas',
-        collections,
+        slug: category.slug,
+        collections: sortCollectionsRecentFirst(collections),
       })
     }
   }
@@ -184,16 +218,26 @@ function sortAlbumCategories(categories: AlbumCategory[]): AlbumCategory[] {
     Hinários: 1,
     hymnals: 1,
     'CDs Oficiais/Ano': 2,
+    aym: 2,
+    'CDs Oficiales/año': 2,
     Infantis: 3,
+    kids: 3,
     Doxologia: 4,
+    doxology: 4,
     Adoradores: 10,
+    worshipers: 10,
     Cantores: 11,
+    singers: 11,
     'Celebra SP': 12,
+    celebrate_sp: 12,
     Diversas: 13,
+    misc: 13,
   }
   return [...categories].sort((a, b) => {
-    const orderA = CATEGORY_ORDER[String(a.id)] ?? CATEGORY_ORDER[a.name] ?? 50
-    const orderB = CATEGORY_ORDER[String(b.id)] ?? CATEGORY_ORDER[b.name] ?? 50
+    const orderA =
+      CATEGORY_ORDER[String(a.id)] ?? CATEGORY_ORDER[a.slug ?? ''] ?? CATEGORY_ORDER[a.name] ?? 50
+    const orderB =
+      CATEGORY_ORDER[String(b.id)] ?? CATEGORY_ORDER[b.slug ?? ''] ?? CATEGORY_ORDER[b.name] ?? 50
     if (orderA !== orderB) return orderA - orderB
     return a.name.localeCompare(b.name)
   })

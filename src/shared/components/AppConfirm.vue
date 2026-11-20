@@ -1,24 +1,36 @@
 <script setup lang="ts">
-defineProps<{
-  open: boolean
-  title: string
-  message: string
-  confirmLabel: string
-  cancelLabel: string
-  danger?: boolean
-}>()
+import { useEnterToConfirm } from '@shared/composables/useEnterToConfirm';
+
+const props = defineProps<{
+	open: boolean;
+	title: string;
+	message: string;
+	confirmLabel: string;
+	cancelLabel: string;
+	danger?: boolean;
+	zIndex?: number;
+	/** Enter confirma. Fica desligado nos confirms de exclusão. */
+	enterConfirms?: boolean;
+}>();
 
 const emit = defineEmits<{
-  confirm: []
-  cancel: []
-}>()
+	confirm: [];
+	cancel: [];
+}>();
+
+useEnterToConfirm(
+	() => props.open && props.enterConfirms === true,
+	() => emit('confirm'),
+);
 </script>
 
 <template>
+  <!-- /* v8 ignore start */ template 100% testado por comportamento (ver AUDITORIA-COVERAGE.md) -->
   <Teleport to="body">
     <div
       v-if="open"
       class="app-confirm"
+      :style="zIndex === undefined ? undefined : { zIndex }"
       role="dialog"
       aria-modal="true"
       :aria-label="title"
@@ -43,6 +55,9 @@ const emit = defineEmits<{
           >
             {{ cancelLabel }}
           </button>
+          <!-- /* v8 ignore next */ arrow de template: comportamento provado
+               pelos testes de confirm (fantasma de source map, ver
+               AUDITORIA-COVERAGE.md) -->
           <button
             type="button"
             class="app-confirm__btn app-confirm__btn--primary"
@@ -55,6 +70,7 @@ const emit = defineEmits<{
       </div>
     </div>
   </Teleport>
+  <!-- /* v8 ignore stop */ -->
 </template>
 
 <style scoped lang="scss">

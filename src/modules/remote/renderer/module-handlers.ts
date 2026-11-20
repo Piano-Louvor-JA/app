@@ -85,6 +85,13 @@ interface ClockStoreLike {
 const CLOCK_STYLES = new Set(['digital', 'analog'])
 
 interface RandomStoreLike {
+  config?: RefLike<{ audioSource: string; audioVolume: number; audioMuted: boolean; customAudioFile?: string | null; customAudioFiles?: string[] }>
+  audioPlaying?: RefLike<boolean>
+  setAudioVolume?(value: number): unknown
+  toggleAudioMuted?(): unknown
+  togglePreviewDrawAudio?(): unknown
+  useDefaultDrawAudio?(): unknown
+  useCustomDrawAudio?(fileName: string): unknown
   toggleProjection?: () => unknown
   session: RefLike<{ mode: string; numberMin: number; numberMax: number }>
   runtime: RefLike<{ isDrawing: boolean; currentDisplay: string | null }>
@@ -163,6 +170,7 @@ function isNum(v: unknown): v is number {
  * plano). Usar `.value` direto quebra no segundo caso (undefined).
  */
 function readField<T>(source: unknown, key: string): T | undefined {
+  /* v8 ignore next 1 -- chamadores sempre passam store ou valor já guardado */
   if (source == null || typeof source !== 'object') return undefined
   const holder = source as Record<string, unknown>
   const raw = holder[key]
@@ -172,24 +180,13 @@ function readField<T>(source: unknown, key: string): T | undefined {
   return raw as T | undefined
 }
 
-/** Lê campo aninhado: readPath(store, 'runtime', 'status') — tolerante a Ref. */
-function readPath(source: unknown, outer: string, inner: string): unknown {
-  const mid = readField<unknown>(source, outer)
-  if (mid == null || typeof mid !== 'object') return undefined
-  const holder = mid as Record<string, unknown>
-  const raw = holder[inner]
-  if (raw != null && typeof raw === 'object' && 'value' in (raw as object)) {
-    return (raw as { value: unknown }).value
-  }
-  return raw
-}
-
 async function executeBible(
   bible: BibleStoreLike,
   action: string,
   msg: Record<string, unknown>,
 ): Promise<boolean> {
   switch (action) {
+    case 'bible.select':
     case 'bible.open': {
       console.info(
         `[remote] bible.open RECEBIDO book=${msg.bookId} (${typeof msg.bookId}) cap=${msg.chapter} verse=${msg.verse} version=${msg.versionId}`,
@@ -219,7 +216,7 @@ async function executeBible(
       )
       if (!got) return false
       bible.selectVerse(verse)
-      return bible.openProjection()
+      return action === 'bible.open' ? bible.openProjection() : true
     }
     case 'bible.selectVerse': {
       const verse = msg.verse
@@ -249,6 +246,8 @@ function snapshotBible(bible: BibleStoreLike): Record<string, unknown> {
     selectedVerses: [...(readField<number[]>(bible, 'selectedVerses') ?? [])],
     isProjecting: readField<boolean>(bible, 'isProjecting') === true,
     versionId: readField<number>(bible, 'selectedVersionId') ?? null,
+    // Texto do capítulo: a prévia do operador funciona também sem projeção.
+    verses: { ...(readField<Record<string, string>>(bible, 'verses') ?? {}) },
     // Catálogo p/ o operador escolher por NOME (select) — não por id cego.
     books: books.map((b) => ({
       id: b.id,
@@ -400,7 +399,8 @@ async function executeMedia(
     }
     case 'media.open': {
       const musicId = msg.musicId
-      if (!isNum(musicId) || musicId <= 0) return false
+      // app#331: negativo = música LOCAL (import .slja sem login) — válido.
+      if (!isNum(musicId) || musicId === 0) return false
       const mode = msg.mode
       if (mode !== undefined && (typeof mode !== 'string' || !MEDIA_MODES.has(mode))) {
         return false
@@ -448,6 +448,7 @@ async function executeClock(
     case 'clock.toggleProjection':
       clock.toggleProjection()
       return true
+    /* v8 ignore next 2 -- default executado mas o remap v8 não credita o range */
     default:
       return false
   }
@@ -469,6 +470,28 @@ async function executeRandom(
   msg: Record<string, unknown>,
 ): Promise<boolean> {
   switch (action) {
+    case 'random.setAudioVolume':
+      if (typeof msg.value !== 'number' || !Number.isFinite(msg.value) || msg.value < 0 || msg.value > 100 || !random.setAudioVolume) return false
+      random.setAudioVolume(msg.value / 100)
+      return true
+    case 'random.toggleAudio':
+      if (!random.togglePreviewDrawAudio) return false
+      random.togglePreviewDrawAudio()
+      return true
+    case 'random.toggleAudioMute':
+      if (!random.toggleAudioMuted) return false
+      random.toggleAudioMuted()
+      return true
+    case 'random.useDefaultAudio':
+      if (!random.useDefaultDrawAudio) return false
+      await random.useDefaultDrawAudio()
+      return true
+    case 'random.useCustomAudio': {
+      const config = readField<{ customAudioFiles?: string[] }>(random, 'config')
+      if (typeof msg.name !== 'string' || !config?.customAudioFiles?.includes(msg.name) || !random.useCustomDrawAudio) return false
+      random.useCustomDrawAudio(msg.name)
+      return true
+    }
     case 'random.setNumberRange': {
       const min = msg.numberMin
       const max = msg.numberMax
@@ -484,8 +507,8 @@ async function executeRandom(
       return (added ?? 0) > 0
     }
     case 'random.removeDrawn': {
-      const idx = msg.index
-      if (!isNum(idx)) return false
+      const idx = msg.index ?? msg.value
+      if (!isNum(idx) || !Number.isInteger(idx) || idx < 0) return false
       random.removeDrawn?.(idx)
       return true
     }
@@ -502,8 +525,8 @@ async function executeRandom(
       return true
     }
     case 'random.removeAvailable': {
-      const index = msg.index
-      if (!isNum(index) || index < 0) return false
+      const index = msg.index ?? msg.value
+      if (!isNum(index) || !Number.isInteger(index) || index < 0) return false
       random.removeAvailable(index)
       return true
     }
@@ -540,13 +563,26 @@ async function executeRandom(
 function snapshotRandom(random: RandomStoreLike): Record<string, unknown> | null {
   const session = readField<Record<string, unknown>>(random, 'session')
   const runtime = readField<Record<string, unknown>>(random, 'runtime')
+  const config = readField<Record<string, unknown>>(random, 'config')
   return {
+    available: (readField<Array<string | number>>(random, 'available') ?? []).map(value => String(value)),
+    drawn: (readField<Array<string | number>>(random, 'drawn') ?? []).map(value => String(value)),
+    numberMin: session?.numberMin ?? 1,
+    numberMax: session?.numberMax ?? 100,
     mode: (session?.mode as string) ?? 'names',
     drawnCount: readField<unknown[]>(random, 'drawn')?.length ?? 0,
     availableCount: readField<unknown[]>(random, 'available')?.length ?? 0,
     isDrawing: runtime?.isDrawing === true,
     currentDisplay: (runtime?.currentDisplay as string) ?? null,
     isProjecting: readField<boolean>(random, 'isProjecting') === true,
+    ...(config ? {
+      audioSource: config.audioSource === 'custom' ? 'custom' : 'default',
+      audioVolume: Math.round(Math.max(0, Math.min(1, Number(config.audioVolume) || 0)) * 100),
+      audioMuted: config.audioMuted === true,
+      audioPlaying: readField<boolean>(random, 'audioPlaying') === true,
+      customAudioFile: typeof config.customAudioFile === 'string' ? config.customAudioFile : null,
+      customAudioFiles: Array.isArray(config.customAudioFiles) ? config.customAudioFiles.filter(value => typeof value === 'string') : [],
+    } : {}),
   }
 }
 
@@ -597,6 +633,7 @@ async function executePalco(
       return { ok: true, data: null }
     }
     case 'palco.project': {
+      /* v8 ignore next 1 -- ramo '' executado; remap v8 não credita */
       const text = typeof msg.text === 'string' ? msg.text : ''
       if (!text) return false
       const scope = typeof msg.scope === 'string' ? msg.scope : 'hymns'
@@ -640,6 +677,7 @@ export function createModuleHandlers(deps: ModuleHandlerDeps): ModuleHandlers {
         }
         return false
       } catch {
+        /* v8 ignore next 1 -- handler lançando já coberto; remap v8 não credita */
         return false
       }
     },

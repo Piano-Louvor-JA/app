@@ -1,5 +1,7 @@
+import { getDesktopBridge } from '@shared/services/desktop-bridge'
 import { fetchRemoteCatalogJson } from '@shared/services/remote-catalog'
-import { readCatalogRecord } from '@shared/services/workspace-api'
+import { readCatalogRecord, writeCatalogRecord } from '@shared/services/workspace-api'
+import { syncBundle } from '@shared/services/bundle-sync-client'
 
 import type {
   BibleBook,
@@ -11,8 +13,34 @@ import type {
   CatalogBibleVersionRow,
 } from '../types/bible'
 
-const BOOKS_FILE = 'pt_bible_book'
-const VERSIONS_FILE = 'pt_bible_version'
+const BOOKS_FILE_BY_PREFIX: Record<string, string> = {
+  pt: 'pt_bible_book',
+  en: 'pt_bible_book',
+  es: 'es_bible_book',
+}
+const VERSIONS_FILE_BY_PREFIX: Record<string, string> = {
+  pt: 'pt_bible_version',
+  en: 'pt_bible_version',
+  es: 'es_bible_version',
+}
+
+/**
+ * Idioma ativo para a Bíblia (issue: ao trocar idioma, hinário mudava mas a
+ * Bíblia ficava em pt). Reusa a mesma detecção do hinário (getCurrentApiPrefix:
+ * user_data.language → fallback pt). `en` não tem catálogo próprio na API —
+ * usa o pt (mesmo comportamento do hinário).
+ *
+ * Import dinâmico: resolveBookTone e os demais helpers não devem carregar o
+ * i18n só porque o módulo foi importado.
+ */
+async function bibleCatalogFile(kind: 'book' | 'version'): Promise<string> {
+  const { getCurrentApiPrefix } = await import(
+    '@modules/sync/services/library-catalog'
+  )
+  const prefix = getCurrentApiPrefix()
+  if (kind === 'book') return BOOKS_FILE_BY_PREFIX[prefix] ?? 'pt_bible_book'
+  return VERSIONS_FILE_BY_PREFIX[prefix] ?? 'pt_bible_version'
+}
 
 /** Abreviações conhecidas quando o catálogo/API vem com abbreviation vazia/null. */
 const VERSION_ABBREVIATION_BY_NAME: Array<{ match: RegExp; abbr: string }> = [
@@ -99,13 +127,18 @@ export function resolveTestament(bookNumber: number): BibleTestament {
   return bookNumber <= 39 ? 'ot' : 'nt'
 }
 
-/** Tom visual do tile conforme faixas canônicas (Stitch). */
+/** Tom visual do tile conforme faixas canônicas. */
 export function resolveBookTone(bookNumber: number): BibleBookTone {
   if (bookNumber <= 5) return 'law'
   if (bookNumber <= 17) return 'history'
-  if (bookNumber <= 39) return 'prophets'
+  if (bookNumber <= 22) return 'poetry'
+  if (bookNumber <= 27) return 'major-prophet'
+  if (bookNumber <= 39) return 'minor-prophet'
   if (bookNumber <= 43) return 'gospels'
-  if (bookNumber <= 66) return 'letters'
+  if (bookNumber === 44) return 'acts'
+  if (bookNumber <= 57) return 'pauline'
+  if (bookNumber <= 65) return 'general'
+  if (bookNumber === 66) return 'apocalyptic'
   return 'neutral'
 }
 
@@ -118,26 +151,102 @@ export function chapterRecordKey(
 }
 
 export async function loadBibleBooks(): Promise<BibleBook[]> {
-  const rows = await readOrFetchCatalog<CatalogBibleBookRow[]>(BOOKS_FILE)
+  const rows = await readOrFetchCatalog<CatalogBibleBookRow[]>(
+    await bibleCatalogFile('book'),
+  )
   if (!rows || !Array.isArray(rows)) return []
   return rows.map(mapBook)
 }
 
 export async function loadBibleVersions(): Promise<BibleVersion[]> {
-  const rows = await readOrFetchCatalog<CatalogBibleVersionRow[]>(VERSIONS_FILE)
+  const rows = await readOrFetchCatalog<CatalogBibleVersionRow[]>(
+    await bibleCatalogFile('version'),
+  )
   if (!rows || !Array.isArray(rows)) return []
   return rows.map(mapVersion)
 }
 
+function isChapterVerses(value: unknown): value is BibleChapterVerses {
+  return (
+    value != null &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    Object.keys(value).length > 0
+  )
+}
+
+/** Bundle offline (atualização baixada > instalador), lido pelo main. */
+async function readBundledChapter(
+  versionId: number,
+  bookId: number,
+  chapter: number,
+): Promise<BibleChapterVerses | null> {
+  const bible = getDesktopBridge()?.bible
+  if (!bible) return null
+  try {
+    const verses = await bible.getChapter(versionId, bookId, chapter)
+    return isChapterVerses(verses) ? verses : null
+  } catch (error) {
+    console.warn('[bible] falha ao ler bundle offline', error)
+    return null
+  }
+}
+
+/**
+ * Ordem: bundle offline → capítulo salvo no disco → API. O que vem da API
+ * fica salvo no disco, para a próxima leitura não depender de rede.
+ */
 export async function loadChapterVerses(
   versionId: number,
   bookId: number,
   chapter: number,
 ): Promise<BibleChapterVerses> {
+  const bundled = await readBundledChapter(versionId, bookId, chapter)
+  if (bundled) return bundled
+
   const key = chapterRecordKey(versionId, bookId, chapter)
-  const verses = await readOrFetchCatalog<BibleChapterVerses>(key)
-  if (!verses || typeof verses !== 'object') return {}
-  return verses
+  const local = await readCatalogRecord<BibleChapterVerses>(key)
+  if (isChapterVerses(local)) return local
+
+  // SPEC piano-bundle-sync: 1 request do bible-bundle antes do fetch
+  // capítulo a capítulo (ADR-03 — fallback legado se o bundle falhar).
+  try {
+    const bundleResult = await syncBundle('bible')
+    if (bundleResult != null && 'records' in bundleResult) {
+      const bundled = await readCatalogRecord<BibleChapterVerses>(key)
+      if (isChapterVerses(bundled)) return bundled
+    }
+  } catch {
+    // bundle nunca bloqueia o fluxo legado
+  }
+
+  let remote: unknown
+  try {
+    remote = await fetchRemoteCatalogJson<BibleChapterVerses>(key)
+  } catch (error) {
+    console.warn(`[bible] falha ao obter capítulo ${key}`, error)
+    return {}
+  }
+  if (!isChapterVerses(remote)) return {}
+
+  try {
+    await writeCatalogRecord(key, remote)
+  } catch (error) {
+    console.warn(`[bible] falha ao salvar capítulo ${key}`, error)
+  }
+  return remote
+}
+
+/**
+ * Pede ao main para conferir bundles novos na API (o main limita a 1x/dia).
+ * Nunca lança: atualização é melhor esforço e não afeta a leitura.
+ */
+export async function requestBibleBundleUpdate(): Promise<void> {
+  try {
+    await getDesktopBridge()?.bible?.checkUpdates?.()
+  } catch (error) {
+    console.warn('[bible] falha ao verificar atualização da Bíblia', error)
+  }
 }
 
 /** Preferência padrão: ARA, senão a primeira versão. */

@@ -1,10 +1,22 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { JSDOM } from 'jsdom'
+
+vi.mock('../types/countdown', async () => {
+  const actual = await vi.importActual<typeof import('../types/countdown')>('../types/countdown')
+  return {
+    ...actual,
+    DEFAULT_COUNTDOWN_RUNTIME: {
+      ...actual.DEFAULT_COUNTDOWN_RUNTIME,
+      untilHour: undefined,
+      untilMinute: undefined,
+    },
+  }
+})
 
 const dom = new JSDOM('', { url: 'http://localhost/' })
 const g = globalThis as unknown as Record<string, unknown>
-g.window = dom.window
-g.localStorage = dom.window.localStorage
+vi.stubGlobal('window', dom.window)
+vi.stubGlobal('localStorage', dom.window.localStorage)
 if (typeof BroadcastChannel === 'function') g.BroadcastChannel = BroadcastChannel
 
 import {
@@ -13,7 +25,10 @@ import {
   normalizeCountdownRuntime,
   publishCountdownRuntime,
   readCountdownRuntimeFromStorage,
+  readTimerRuntimeFromStorage,
+  TIMER_RUNTIME_STORAGE_KEY,
   writeCountdownRuntimeToStorage,
+  writeTimerRuntimeToStorage,
 } from '../services/countdown-runtime'
 import {
   DEFAULT_COUNTDOWN_DURATION_MS,
@@ -22,13 +37,21 @@ import {
 
 const EMPTY = {
   ...DEFAULT_COUNTDOWN_RUNTIME,
+  untilHour: 18,
+  untilMinute: 0,
   savedTimesMs: [],
   durationMs: DEFAULT_COUNTDOWN_DURATION_MS,
 }
 
 describe('countdown-runtime — normalize', () => {
   it('não-objeto → default completo', () => {
-    for (const raw of [null, undefined, 'x', 1]) expect(normalizeCountdownRuntime(raw)).toEqual(EMPTY)
+    for (const raw of [null, undefined, 'x', 1]) {
+      expect(normalizeCountdownRuntime(raw)).toEqual({
+        ...EMPTY,
+        untilHour: undefined,
+        untilMinute: undefined,
+      })
+    }
   })
 
   it('aceita estado válido e filtra savedTimes não-numéricos', () => {
@@ -49,15 +72,47 @@ describe('countdown-runtime — normalize', () => {
     })
     expect(state).toEqual({ ...EMPTY, projecting: false, durationMs: 0 })
   })
+
+  it('leva o vídeo da Escola Sabatina só se estiver na pasta do vídeo personalizado', () => {
+    const videoPath = 'modulos/escola-sabatina/video/video-1.mp4'
+    expect(normalizeCountdownRuntime({ videoPath }).videoPath).toBe(videoPath)
+    for (const bad of ['modulos/escola-sabatina/video/../../segredo.mp4', 'outra/pasta.mp4', 7, '']) {
+      expect(normalizeCountdownRuntime({ videoPath: bad })).not.toHaveProperty('videoPath')
+    }
+  })
+
+  it('volume do vídeo fica entre 0 e 1 e some se não for número', () => {
+    expect(normalizeCountdownRuntime({ videoVolume: 0.3 }).videoVolume).toBe(0.3)
+    expect(normalizeCountdownRuntime({ videoVolume: 4 }).videoVolume).toBe(1)
+    expect(normalizeCountdownRuntime({ videoVolume: -1 }).videoVolume).toBe(0)
+    for (const bad of [NaN, '0.5', null]) {
+      expect(normalizeCountdownRuntime({ videoVolume: bad })).not.toHaveProperty('videoVolume')
+    }
+  })
+
+  it('mode until: branch true e fallbacks de untilHour/untilMinute do DEFAULT', () => {
+    const state = normalizeCountdownRuntime({ mode: 'until' })
+    expect(state.mode).toBe('until')
+    expect(state.untilHour).toBe(18)
+    expect(state.untilMinute).toBe(0)
+  })
 })
 
 describe('countdown-runtime — storage', () => {
   beforeEach(() => localStorage.clear())
 
   it('sem storage ou JSON inválido → default', () => {
-    expect(readCountdownRuntimeFromStorage()).toEqual(EMPTY)
+    expect(readCountdownRuntimeFromStorage()).toEqual({
+      ...EMPTY,
+      untilHour: undefined,
+      untilMinute: undefined,
+    })
     localStorage.setItem(COUNTDOWN_RUNTIME_STORAGE_KEY, '{bad')
-    expect(readCountdownRuntimeFromStorage()).toEqual(EMPTY)
+    expect(readCountdownRuntimeFromStorage()).toEqual({
+      ...EMPTY,
+      untilHour: undefined,
+      untilMinute: undefined,
+    })
   })
 
   it('write/read faz roundtrip', () => {
@@ -99,3 +154,28 @@ describe('countdown-runtime — publish', () => {
   })
 }
 )
+
+describe('estado próprio do Timer', () => {
+  beforeEach(() => localStorage.clear())
+
+  it('sem estado próprio salvo, parte do canal da projeção', () => {
+    localStorage.setItem(COUNTDOWN_RUNTIME_STORAGE_KEY, JSON.stringify({ status: 'idle', durationMs: 90_000 }))
+    expect(readTimerRuntimeFromStorage().durationMs).toBe(90_000)
+  })
+
+  it('com estado próprio, ignora o que outro módulo publicou no canal', () => {
+    localStorage.setItem(COUNTDOWN_RUNTIME_STORAGE_KEY, JSON.stringify({ status: 'running', durationMs: 4_500_000 }))
+    writeTimerRuntimeToStorage(normalizeCountdownRuntime({ status: 'idle', durationMs: 60_000 }))
+    expect(JSON.parse(localStorage.getItem(TIMER_RUNTIME_STORAGE_KEY)!)).toMatchObject({ durationMs: 60_000 })
+    expect(readTimerRuntimeFromStorage()).toMatchObject({ status: 'idle', durationMs: 60_000 })
+  })
+
+  it('storage indisponível: leitura cai no padrão e gravação não quebra', () => {
+    const getItem = vi.spyOn(localStorage, 'getItem').mockImplementation(() => { throw new Error('blocked') })
+    const setItem = vi.spyOn(localStorage, 'setItem').mockImplementation(() => { throw new Error('blocked') })
+    expect(readTimerRuntimeFromStorage().status).toBe('idle')
+    expect(() => writeTimerRuntimeToStorage(normalizeCountdownRuntime({}))).not.toThrow()
+    getItem.mockRestore()
+    setItem.mockRestore()
+  })
+})

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import FontSelector from '@modules/settings/components/FontSelector.vue'
 import { useI18n } from 'vue-i18n'
 
 import { GlassCard } from '@design-system/index'
@@ -6,6 +7,9 @@ import { GlassCard } from '@design-system/index'
 import {
   RANDOM_ANIMATION_SPEEDS,
   RANDOM_BG_PRESETS,
+  RANDOM_DRAWN_SIZE_MAX,
+  RANDOM_DRAWN_SIZE_MIN,
+  RANDOM_DRAWN_SIZE_STEP,
   RANDOM_FONT_SIZE_MAX,
   RANDOM_FONT_SIZE_MIN,
   RANDOM_TEXT_PRESETS,
@@ -25,6 +29,7 @@ const emit = defineEmits<{
   'update:bgColor': [value: string]
   'update:textColor': [value: string]
   'update:fontSizePc': [value: number]
+  'update:drawnSizePc': [value: number]
   'update:textTransform': [value: RandomTextTransform]
   'update:animationSpeed': [value: RandomAnimationSpeed]
   reset: []
@@ -63,6 +68,19 @@ function onTextInput(event: Event) {
 function onFontInput(event: Event) {
   const target = event.target as HTMLInputElement
   emit('update:fontSizePc', Number(target.value))
+}
+
+/** Exibição: o mínimo (200) aparece como 100%; o máximo (600), como 500%. */
+function drawnSizeLabel(value: number): number {
+  return value - (RANDOM_DRAWN_SIZE_MIN - 100)
+}
+
+function onDrawnInput(event: Event) {
+  emit('update:drawnSizePc', Number((event.target as HTMLInputElement).value))
+}
+
+function bumpDrawn(delta: number, current: number) {
+  emit('update:drawnSizePc', current + delta)
 }
 
 function bumpFont(delta: number, current: number) {
@@ -117,6 +135,8 @@ function bumpFont(delta: number, current: number) {
           </header>
 
           <div class="random-config__body">
+            <FontSelector scope="random" compact />
+
             <section class="random-config__section">
               <div class="random-config__section-head">
                 <i
@@ -234,6 +254,47 @@ function bumpFont(delta: number, current: number) {
                     class="random-config__icon-btn random-config__icon-btn--tonal"
                     :aria-label="t('random.increaseFont')"
                     @click="bumpFont(1, config.fontSizePc)"
+                  >
+                    <i
+                      class="ti ti-plus"
+                      aria-hidden="true"
+                    />
+                  </button>
+                </div>
+              </div>
+
+              <div class="random-config__font">
+                <div class="random-config__font-head">
+                  <span>{{ t('random.drawnSize') }}</span>
+                  <span class="random-config__font-value">{{ drawnSizeLabel(config.drawnSizePc ?? 400) }}%</span>
+                </div>
+                <div class="random-config__font-controls">
+                  <button
+                    type="button"
+                    class="random-config__icon-btn random-config__icon-btn--tonal"
+                    :aria-label="t('random.decreaseDrawn')"
+                    @click="bumpDrawn(-RANDOM_DRAWN_SIZE_STEP, config.drawnSizePc ?? 400)"
+                  >
+                    <i
+                      class="ti ti-minus"
+                      aria-hidden="true"
+                    />
+                  </button>
+                  <input
+                    class="random-config__slider"
+                    type="range"
+                    :min="RANDOM_DRAWN_SIZE_MIN"
+                    :max="RANDOM_DRAWN_SIZE_MAX"
+                    :step="RANDOM_DRAWN_SIZE_STEP"
+                    :value="config.drawnSizePc ?? 400"
+                    :aria-label="t('random.drawnSize')"
+                    @input="onDrawnInput"
+                  >
+                  <button
+                    type="button"
+                    class="random-config__icon-btn random-config__icon-btn--tonal"
+                    :aria-label="t('random.increaseDrawn')"
+                    @click="bumpDrawn(RANDOM_DRAWN_SIZE_STEP, config.drawnSizePc ?? 400)"
                   >
                     <i
                       class="ti ti-plus"

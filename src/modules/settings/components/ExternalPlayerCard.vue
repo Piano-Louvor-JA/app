@@ -20,6 +20,7 @@ const detecting = ref(false)
 const scanned = ref(false)
 
 function fileName(bin: string): string {
+  /* v8 ignore next 1 -- callers sempre passam caminho não vazio (filter trim) */
   return bin.split(/[\\/]/).pop() || bin
 }
 

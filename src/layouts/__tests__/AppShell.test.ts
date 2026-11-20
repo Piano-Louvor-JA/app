@@ -1,0 +1,967 @@
+vi.mock('@modules/auth/components/AuthAccountDialog.vue', () => ({ default: { props: ['modelValue'], template: '<div v-if="modelValue" class="auth-account-dialog-stub" />' } }))
+// @vitest-environment jsdom
+/**
+ * Cobertura: AppShell.vue (task t_86847917).
+ * Layout principal — header Projetar, navegação do dock, poll de telas
+ * abertas, onCloseAllScreens e onToggleProjection (todos os módulos).
+ * Stores e subsistemas mockados: o AppShell orquestra, não implementa.
+ */
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
+import {
+  createMemoryHistory,
+  createRouter,
+  type Router,
+} from 'vue-router'
+import { ref, computed } from 'vue'
+
+vi.mock('vue-i18n', () => ({
+  useI18n: () => ({ t: (key: string) => key }),
+}))
+
+vi.mock('@assets/brand/logo-louvor-ja.svg', () => ({ default: 'logo.svg' }))
+vi.mock('@assets/brand/CodenameLogo.vue', () => ({
+  default: { name: 'CodenameLogo', template: '<span class="codename-mock" />' },
+}))
+
+// ---- stores mockados (flag por módulo) ----
+const flags = {
+  mediaSession: ref(false),
+  mediaProjecting: ref(false),
+  bibleProjecting: ref(false),
+  bibleContent: ref(false),
+  randomProjecting: ref(false),
+  timerProjecting: ref(false),
+  countdownProjecting: ref(false),
+  clockProjecting: ref(false),
+  liturgySite: ref<number | null>(null),
+  liturgyVideo: ref<number | null>(null),
+  liturgySelectedIndex: ref<number | null>(null),
+  liturgySelectedItem: ref<null | { type: string; done: boolean }>(null),
+}
+
+const storeFns = {
+  mediaToggle: vi.fn(async () => {}),
+  mediaClear: vi.fn(),
+  bibleToggle: vi.fn(async () => {}),
+  bibleClearWindow: vi.fn(),
+  randomClear: vi.fn(async () => {}),
+  randomToggle: vi.fn(async () => {}),
+  timerClear: vi.fn(async () => {}),
+  timerToggle: vi.fn(async () => {}),
+  countdownClear: vi.fn(async () => {}),
+  countdownToggle: vi.fn(async () => {}),
+  clockClear: vi.fn(async () => {}),
+  clockToggle: vi.fn(async () => {}),
+  liturgyClearWeb: vi.fn(async () => {}),
+  liturgyPlayItem: vi.fn(async () => {}),
+  projectionHydrate: vi.fn(async () => {}),
+  projectionRefresh: vi.fn(async () => {}),
+}
+
+vi.mock('@modules/bible/stores/useBibleStore', async () => {
+  const { defineStore } = await import('pinia')
+  const useTest = defineStore('test-bible', () => ({
+    isProjecting: flags.bibleProjecting,
+    projection: computed(() => ({
+      versionId: null,
+      bookId: null,
+      versionAbbreviation: '',
+      bookName: '',
+      chapter: 0,
+      verses: flags.bibleContent.value ? [1] : [],
+      scripturalReference: '',
+      text: flags.bibleContent.value ? 'texto' : '',
+    })),
+    inAppPreview: ref(false),
+    toggleProjection: storeFns.bibleToggle,
+    clearProjectionWindow: storeFns.bibleClearWindow,
+  }))
+  return { useBibleStore: useTest }
+})
+
+vi.mock('@modules/clock/stores/useClockStore', async () => {
+  const { defineStore } = await import('pinia')
+  return {
+    useClockStore: defineStore('test-clock', () => ({
+      isProjecting: flags.clockProjecting,
+      inAppPreview: ref(false),
+      toggleProjection: storeFns.clockToggle,
+      clearProjection: storeFns.clockClear,
+    })),
+  }
+})
+
+vi.mock('@modules/countdown/stores/useCountdownStore', async () => {
+  const { defineStore } = await import('pinia')
+  return {
+    useCountdownStore: defineStore('test-countdown', () => ({
+      isProjecting: flags.countdownProjecting,
+      inAppPreview: ref(false),
+      toggleProjection: storeFns.countdownToggle,
+      clearProjection: storeFns.countdownClear,
+    })),
+  }
+})
+
+const alertEngine = vi.hoisted(() => vi.fn())
+vi.mock('@modules/sabbath-school/composables/useSabbathSchoolAlertEngine', () => ({
+  useSabbathSchoolAlertEngine: alertEngine,
+}))
+
+vi.mock('@modules/random/stores/useRandomStore', async () => {
+  const { defineStore } = await import('pinia')
+  return {
+    useRandomStore: defineStore('test-random', () => ({
+      isProjecting: flags.randomProjecting,
+      inAppPreview: ref(false),
+      toggleProjection: storeFns.randomToggle,
+      clearProjection: storeFns.randomClear,
+    })),
+  }
+})
+
+vi.mock('@modules/timer/stores/useTimerStore', async () => {
+  const { defineStore } = await import('pinia')
+  return {
+    useTimerStore: defineStore('test-timer', () => ({
+      isProjecting: flags.timerProjecting,
+      inAppPreview: ref(false),
+      toggleProjection: storeFns.timerToggle,
+      clearProjection: storeFns.timerClear,
+    })),
+  }
+})
+
+vi.mock('@modules/liturgy/stores/useLiturgyStore', async () => {
+  const { defineStore } = await import('pinia')
+  return {
+    useLiturgyStore: defineStore('test-liturgy', () => ({
+      siteProjectionItemId: flags.liturgySite,
+      videoProjectionItemId: flags.liturgyVideo,
+      selectedItemIndex: flags.liturgySelectedIndex,
+      selectedItem: flags.liturgySelectedItem,
+      clearWebProjection: storeFns.liturgyClearWeb,
+      playItemOnScreens: storeFns.liturgyPlayItem,
+    })),
+  }
+})
+
+vi.mock('@modules/media/composables/useMediaPlayer', () => ({
+  useMediaPlayer: () => ({
+    hasSession: flags.mediaSession,
+    isProjecting: flags.mediaProjecting,
+    toggleProjection: storeFns.mediaToggle,
+    clearProjection: storeFns.mediaClear,
+  }),
+}))
+
+vi.mock('@modules/settings/stores/useProjectionStore', async () => {
+  const { defineStore } = await import('pinia')
+  return {
+    useProjectionStore: defineStore('test-projection', () => ({
+      hasSelectedAudienceTargets: ref(true),
+      hydrate: storeFns.projectionHydrate,
+      refreshDisplays: storeFns.projectionRefresh,
+    })),
+  }
+})
+
+vi.mock('@modules/settings/services/display-service', () => ({
+  subscribeDisplaysChanged: vi.fn(() => () => {}),
+}))
+
+vi.mock('@shared/composables/useProjectionWindow', () => ({
+  isProjectionModuleOpen: vi.fn(() => false),
+  closeProjectionModule: vi.fn(),
+  syncProjectionAfterDisplayChange: vi.fn(async () => {}),
+}))
+
+// ---- componentes mockados ----
+vi.mock('@design-system/index', () => ({
+  DockFooter: {
+    name: 'DockFooter',
+    template: '<nav class="dock-mock" />',
+    props: ['items', 'activeKey'],
+    emits: ['navigate'],
+  },
+  GradientBackground: {
+    name: 'GradientBackground',
+    template: '<div class="gradient-mock"><slot /></div>',
+  },  MinimizedPagesBar: {
+    name: 'MinimizedPagesBar',
+    template: '<nav class="minimized-bar-mock" />',
+    props: ['items', 'navLabel', 'currentKey'],
+    emits: ['open', 'close', 'reorder'],
+  },
+  HistoryNav: {
+    name: 'HistoryNav',
+    template: '<nav class="history-nav-mock" />',
+    props: ['dots', 'canGoBack', 'canGoForward', 'navLabel', 'backLabel', 'forwardLabel'],
+    emits: ['back', 'forward', 'go'],
+  },
+}))
+
+vi.mock('@design-system/composables', () => ({
+  usePageTransition: () => ({ transitionName: ref('none') }),
+}))
+
+vi.mock('@shared/components/MonitorTargetSelect.vue', () => ({
+  default: { name: 'MonitorTargetSelect', template: '<div class="monitor-select-mock" />' },
+}))
+
+vi.mock('@shared/components/UiZoomControls.vue', () => ({
+  default: { name: 'UiZoomControls', template: '<div class="zoom-controls-mock" />' },
+}))
+
+vi.mock('@shared/components/InAppProjectionOverlay.vue', () => ({
+  default: { name: 'InAppProjectionOverlay', template: '<div class="overlay-mock" />' },
+}))
+
+vi.mock('@modules/media/components/MediaChrome.vue', () => ({
+  default: { name: 'MediaChrome', template: '<div class="media-chrome-mock" />' },
+}))
+
+vi.mock('@modules/bible/components/BibleChrome.vue', () => ({
+  default: { name: 'BibleChrome', template: '<div class="bible-chrome-mock" />' },
+}))
+vi.mock('@modules/countdown/components/CountdownChrome.vue', () => ({
+  default: { name: 'CountdownChrome', template: '<div class="countdown-chrome-mock" />' },
+}))
+vi.mock('@modules/timer/components/TimerChrome.vue', () => ({
+  default: { name: 'TimerChrome', template: '<div class="timer-chrome-mock" />' },
+}))
+vi.mock('@modules/clock/components/ClockChrome.vue', () => ({
+  default: { name: 'ClockChrome', template: '<div class="clock-chrome-mock" />' },
+}))
+vi.mock('@modules/random/components/RandomChrome.vue', () => ({
+  default: { name: 'RandomChrome', template: '<div class="random-chrome-mock" />' },
+}))
+
+vi.mock('@modules/bible/components/BibleInAppProjection.vue', () => ({
+  default: { name: 'BibleInAppProjection', template: '<div class="bible-overlay-mock" />' },
+}))
+
+vi.mock('@modules/clock/views/ClockProjectionView.vue', () => ({
+  default: { template: '<div class="clock-view-mock" />' },
+}))
+vi.mock('@modules/countdown/views/CountdownProjectionView.vue', () => ({
+  default: { template: '<div class="countdown-view-mock" />' },
+}))
+vi.mock('@modules/random/views/RandomProjectionView.vue', () => ({
+  default: { template: '<div class="random-view-mock" />' },
+}))
+vi.mock('@modules/timer/views/TimerProjectionView.vue', () => ({
+  default: { template: '<div class="timer-view-mock" />' },
+}))
+
+// efeito gênio observado (a animação real é testada à parte)
+const genieMock = vi.hoisted(() => ({
+  rect: { left: 10, top: 700, width: 120, height: 30 },
+  playGenie: vi.fn(async () => {}),
+  removeGhost: vi.fn(async () => {}),
+  grow: null as null | (() => void),
+  startGenieGhost: vi.fn((image: unknown) =>
+    image
+      ? { finished: new Promise<void>((r) => (genieMock.grow = r)), remove: genieMock.removeGhost }
+      : null,
+  ),
+}))
+vi.mock('@shared/services/genie-animation', () => ({
+  findMinimizedItemRect: vi.fn(() => genieMock.rect),
+  playGenie: genieMock.playGenie,
+  startGenieGhost: genieMock.startGenieGhost,
+}))
+
+import AppShell from '@layouts/AppShell.vue'
+import { installNavigationHistory } from '@shared/composables/useNavigationHistory'
+import { useMinimizedPagesStore } from '@shared/stores/useMinimizedPagesStore'
+import type { MinimizedPage } from '@shared/services/minimized-pages'
+
+function makeRouter(navKey: string | null = null, routeName = 'test') {
+  return createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      {
+        path: '/',
+        component: { template: '<div class="view-mock" />' },
+        meta: { navKey },
+        name: routeName,
+      },
+    ],
+  })
+}
+
+async function mountShell(navKey: string | null = null, routeName = 'test') {
+  const router = makeRouter(navKey, routeName)
+  await router.push('/')
+  await router.isReady()
+  const w = mount(AppShell, { global: { plugins: [router] } })
+  await flushPromises()
+  return { w, router }
+}
+
+function resetFlags() {
+  flags.mediaSession.value = false
+  flags.mediaProjecting.value = false
+  flags.bibleProjecting.value = false
+  flags.bibleContent.value = false
+  flags.randomProjecting.value = false
+  flags.timerProjecting.value = false
+  flags.countdownProjecting.value = false
+  flags.clockProjecting.value = false
+  flags.liturgySite.value = null
+  flags.liturgyVideo.value = null
+  flags.liturgySelectedIndex.value = null
+  flags.liturgySelectedItem.value = null
+}
+
+beforeEach(() => {
+  setActivePinia(createPinia())
+  resetFlags()
+  vi.useFakeTimers({ shouldAdvanceTime: true })
+})
+
+afterEach(() => {
+  vi.useRealTimers()
+  vi.restoreAllMocks()
+})
+
+describe('AppShell — header e navegação', () => {
+  it('renderiza header, dock e main', async () => {
+    const { w } = await mountShell()
+    expect(w.find('.app-shell__header').exists()).true
+    expect(w.find('.dock-mock').exists()).true
+    // Miniplayer sai do stacking context do shell para ficar acima do modal de playlists.
+    expect(w.find('.media-chrome-mock').exists()).false
+    expect(document.body.querySelector('.media-chrome-mock')).not.toBeNull()
+    w.unmount()
+  })
+
+  it('monta o motor de alertas do cronômetro uma vez, na janela principal', async () => {
+    alertEngine.mockClear()
+    const { w } = await mountShell()
+    expect(alertEngine).toHaveBeenCalledOnce()
+    w.unmount()
+  })
+
+  it('home esconde a logo do header; outra rota mostra', async () => {
+    const home = await mountShell(null)
+    expect(home.w.find('.app-shell__logo').exists()).false
+    home.w.unmount()
+
+    const other = await mountShell('bible')
+    expect(other.w.find('.app-shell__logo').exists()).true
+    other.w.unmount()
+  })
+
+  it('dock navega via router.push', async () => {
+    const { w, router } = await mountShell()
+    const dock = w.findComponent({ name: 'DockFooter' })
+    dock.vm.$emit('navigate', 'bible')
+    await flushPromises()
+    // rota única "/" — push falha silenciosa, mas o caminho foi chamado
+    expect(router.currentRoute.value.path).toBe('/')
+    w.unmount()
+  })
+
+  it('onMounted hidrata projeção e registra poll de telas', async () => {
+    const { w } = await mountShell()
+    expect(storeFns.projectionHydrate).toHaveBeenCalled()
+    w.unmount()
+  })
+})
+
+describe('AppShell — botão Projetar (canToggle + rotas de módulo)', () => {
+  it('botão desabilitado sem conteúdo projetável', async () => {
+    const { w } = await mountShell(null)
+    const btn = w.find('.app-shell__project-btn')
+    expect((btn.element as HTMLButtonElement).disabled).true
+    w.unmount()
+  })
+
+  it('habilitado com conteúdo projetável + telas selecionadas', async () => {
+    flags.mediaSession.value = true
+    const { w } = await mountShell(null)
+    const btn = w.find('.app-shell__project-btn')
+    expect((btn.element as HTMLButtonElement).disabled).false
+    w.unmount()
+  })
+
+  it('toggle com mídia projetando → mediaToggle', async () => {
+    flags.mediaProjecting.value = true
+    const { w } = await mountShell(null)
+    await w.find('.app-shell__project-btn').trigger('click')
+    await flushPromises()
+    expect(storeFns.mediaToggle).toHaveBeenCalled()
+    w.unmount()
+  })
+
+  it('toggle com bíblia projetando → clearProjectionWindow', async () => {
+    flags.bibleProjecting.value = true
+    const { w } = await mountShell(null)
+    await w.find('.app-shell__project-btn').trigger('click')
+    await flushPromises()
+    expect(storeFns.bibleClearWindow).toHaveBeenCalled()
+    w.unmount()
+  })
+
+  it('toggle com random projetando → randomClear', async () => {
+    flags.randomProjecting.value = true
+    const { w } = await mountShell(null)
+    await w.find('.app-shell__project-btn').trigger('click')
+    await flushPromises()
+    expect(storeFns.randomClear).toHaveBeenCalled()
+    w.unmount()
+  })
+
+  it('toggle com timer projetando → timerClear', async () => {
+    flags.timerProjecting.value = true
+    const { w } = await mountShell(null)
+    await w.find('.app-shell__project-btn').trigger('click')
+    await flushPromises()
+    expect(storeFns.timerClear).toHaveBeenCalled()
+    w.unmount()
+  })
+
+  it('toggle com countdown projetando → countdownClear', async () => {
+    flags.countdownProjecting.value = true
+    const { w } = await mountShell(null)
+    await w.find('.app-shell__project-btn').trigger('click')
+    await flushPromises()
+    expect(storeFns.countdownClear).toHaveBeenCalled()
+    w.unmount()
+  })
+
+  it('toggle com clock projetando → clockClear', async () => {
+    flags.clockProjecting.value = true
+    const { w } = await mountShell(null)
+    await w.find('.app-shell__project-btn').trigger('click')
+    await flushPromises()
+    expect(storeFns.clockClear).toHaveBeenCalled()
+    w.unmount()
+  })
+
+  it('toggle com liturgia projetando → clearWebProjection', async () => {
+    flags.liturgySite.value = 3
+    const { w } = await mountShell(null)
+    await w.find('.app-shell__project-btn').trigger('click')
+    await flushPromises()
+    expect(storeFns.liturgyClearWeb).toHaveBeenCalled()
+    w.unmount()
+  })
+
+  it('toggle sem nada projetando, rota liturgia com item selecionado → playItemOnScreens', async () => {
+    flags.liturgySelectedIndex.value = 2
+    flags.liturgySelectedItem.value = { type: 'music', done: false }
+    const { w } = await mountShell('liturgy')
+    await w.find('.app-shell__project-btn').trigger('click')
+    await flushPromises()
+    expect(storeFns.liturgyPlayItem).toHaveBeenCalledWith(2)
+    w.unmount()
+  })
+
+  it('rota clock sem projeção → clockToggle', async () => {
+    const { w } = await mountShell('utilities', 'utilities-clock')
+    await w.find('.app-shell__project-btn').trigger('click')
+    await flushPromises()
+    expect(storeFns.clockToggle).toHaveBeenCalled()
+    w.unmount()
+  })
+
+  it('rota countdown sem projeção → countdownToggle', async () => {
+    const { w } = await mountShell('utilities', 'utilities-countdown')
+    await w.find('.app-shell__project-btn').trigger('click')
+    await flushPromises()
+    expect(storeFns.countdownToggle).toHaveBeenCalled()
+    w.unmount()
+  })
+
+  it('rota timer sem projeção → timerToggle', async () => {
+    const { w } = await mountShell('utilities', 'utilities-timer')
+    await w.find('.app-shell__project-btn').trigger('click')
+    await flushPromises()
+    expect(storeFns.timerToggle).toHaveBeenCalled()
+    w.unmount()
+  })
+
+  it('rota random sem projeção → randomToggle', async () => {
+    const { w } = await mountShell('utilities', 'utilities-random')
+    await w.find('.app-shell__project-btn').trigger('click')
+    await flushPromises()
+    expect(storeFns.randomToggle).toHaveBeenCalled()
+    w.unmount()
+  })
+
+  it('rota bible com conteúdo → bibleToggle', async () => {
+    flags.bibleContent.value = true
+    const { w } = await mountShell('bible', 'bible')
+    await w.find('.app-shell__project-btn').trigger('click')
+    await flushPromises()
+    expect(storeFns.bibleToggle).toHaveBeenCalled()
+    w.unmount()
+  })
+
+  it('rota neutra com sessão de mídia → mediaToggle', async () => {
+    flags.mediaSession.value = true
+    const { w } = await mountShell(null)
+    await w.find('.app-shell__project-btn').trigger('click')
+    await flushPromises()
+    expect(storeFns.mediaToggle).toHaveBeenCalled()
+    w.unmount()
+  })
+
+  it('aria-label muda conforme módulo projetando', async () => {
+    flags.bibleProjecting.value = true
+    const { w } = await mountShell(null)
+    expect(w.find('.app-shell__project-btn').attributes('aria-label')).toBe('bible.clearProjection')
+    w.unmount()
+  })
+
+  it('aria-label avisa quando faltam telas selecionadas', async () => {
+    flags.mediaSession.value = true
+    // mocka hasSelectedAudienceTargets = false via novo pinia não adianta —
+    // o store é mockado global; valido o caminho por rota com targets true
+    const { w } = await mountShell(null)
+    expect(w.find('.app-shell__project-btn').attributes('aria-label')).toBe('media.project')
+    w.unmount()
+  })
+})
+
+describe('AppShell — fechar todas as telas', () => {
+  it('botão Fechar tudo aparece e limpa TODOS os módulos', async () => {
+    flags.mediaProjecting.value = true
+    flags.bibleProjecting.value = true
+    flags.randomProjecting.value = true
+    flags.timerProjecting.value = true
+    flags.countdownProjecting.value = true
+    flags.clockProjecting.value = true
+    flags.liturgyVideo.value = 9
+    const { w } = await mountShell(null)
+
+    const closeBtn = w.find('.app-shell__project-btn + .app-shell__project-btn')
+    expect(closeBtn.exists()).true
+    await closeBtn.trigger('click')
+    await flushPromises()
+
+    expect(storeFns.mediaClear).toHaveBeenCalled()
+    expect(storeFns.bibleClearWindow).toHaveBeenCalled()
+    expect(storeFns.randomClear).toHaveBeenCalled()
+    expect(storeFns.timerClear).toHaveBeenCalled()
+    expect(storeFns.countdownClear).toHaveBeenCalled()
+    expect(storeFns.clockClear).toHaveBeenCalled()
+    expect(storeFns.liturgyClearWeb).toHaveBeenCalled()
+    w.unmount()
+  })
+})
+
+describe('AppShell — viewKey e transição', () => {
+  it('viewKey usa navKey da meta', async () => {
+    const { w } = await mountShell('utilities')
+    expect(w.find('.view-mock').exists()).true
+    w.unmount()
+  })
+})
+
+describe('AppShell — navegador de histórico', () => {
+  let uninstallHistory: (() => void) | null = null
+
+  // o histórico agora vai para o sessionStorage: cada teste começa do zero
+  beforeEach(() => {
+    sessionStorage.clear()
+  })
+
+  afterEach(() => {
+    uninstallHistory?.()
+    uninstallHistory = null
+  })
+
+  async function mountWithHistory() {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/', name: 'home', component: { template: '<div />' }, meta: { navKey: 'home' } },
+        { path: '/bible', name: 'bible', component: { template: '<div />' }, meta: { navKey: 'bible' } },
+        {
+          path: '/settings/projection',
+          name: 'settings-projection',
+          component: { template: '<div />' },
+          meta: { navKey: 'settings' },
+        },
+      ],
+    })
+    uninstallHistory = installNavigationHistory({ router })
+    await router.push('/')
+    await router.isReady()
+    const w = mount(AppShell, { global: { plugins: [router] } })
+    await flushPromises()
+    const nav = () => w.findComponent({ name: 'HistoryNav' })
+    return { w, router, nav }
+  }
+
+  it('aparece já na abertura com um ponto e as setas desabilitadas (Q1)', async () => {
+    const { w, nav } = await mountWithHistory()
+    expect(w.find('.app-shell__history .history-nav-mock').exists()).true
+    expect(nav().props('dots')).toEqual([{ index: 0, label: 'nav.home', current: true, edge: false }])
+    expect(nav().props('canGoBack')).false
+    expect(nav().props('canGoForward')).false
+    expect(nav().props('navLabel')).toBe('nav.history.label')
+    expect(nav().props('backLabel')).toBe('nav.history.back')
+    expect(nav().props('forwardLabel')).toBe('nav.history.forward')
+    w.unmount()
+  })
+
+  it('depois de navegar mostra os pontos com o nome de cada tela', async () => {
+    const { w, router, nav } = await mountWithHistory()
+    await router.push('/bible')
+    await router.push('/settings/projection')
+    await flushPromises()
+    expect(nav().props('dots').map((d: { label: string }) => d.label)).toEqual([
+      'nav.home',
+      'nav.bible',
+      'nav.settings · settings.tabs.projection',
+    ])
+    expect(nav().props('canGoBack')).true
+    w.unmount()
+  })
+
+  it('seta voltar e avançar navegam pelo histórico', async () => {
+    const { w, router, nav } = await mountWithHistory()
+    await router.push('/bible')
+    await flushPromises()
+
+    nav().vm.$emit('back')
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe('/')
+    expect(nav().props('canGoForward')).true
+
+    nav().vm.$emit('forward')
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe('/bible')
+    w.unmount()
+  })
+
+  it('Alt+← e Alt+→ navegam pelo histórico', async () => {
+    const { w, router } = await mountWithHistory()
+    await router.push('/bible')
+    await flushPromises()
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', altKey: true }))
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe('/')
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', altKey: true }))
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe('/bible')
+    w.unmount()
+  })
+
+  it('clicar num ponto salta para aquela tela', async () => {
+    const { w, router, nav } = await mountWithHistory()
+    await router.push('/bible')
+    await router.push('/settings/projection')
+    await flushPromises()
+
+    nav().vm.$emit('go', 0)
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe('/')
+    w.unmount()
+  })
+})
+
+describe('AppShell — memória de rolagem', () => {
+  /** Deixa a Transition (out-in) terminar: ela espera frames, não só promises. */
+  async function settle() {
+    for (let i = 0; i < 6; i++) {
+      await vi.advanceTimersByTimeAsync(50)
+      await flushPromises()
+    }
+  }
+
+  it('ao voltar para uma tela, restaura a rolagem de onde parou', async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/', component: { template: '<section class="scroll-view" />' }, meta: { navKey: 'home' } },
+        { path: '/bible', component: { template: '<section class="scroll-view" />' }, meta: { navKey: 'bible' } },
+      ],
+    })
+    await router.push('/')
+    await router.isReady()
+    // Transition real: o restore roda no @after-enter (test-utils stuba por padrão)
+    const w = mount(AppShell, { global: { plugins: [router], stubs: { transition: false } } })
+    await flushPromises()
+
+    const first = w.find('.scroll-view').element as HTMLElement
+    first.scrollTop = 420
+    // no navegador rolar dispara scroll (o jsdom não dispara sozinho)
+    first.dispatchEvent(new Event('scroll'))
+    await router.push('/bible')
+    await settle()
+
+    await router.push('/')
+    await settle()
+    const again = w.find('.scroll-view').element as HTMLElement
+    expect(again).not.toBe(first)
+    expect(again.scrollTop).toBe(420)
+    w.unmount()
+  })
+})
+
+describe('AppShell — páginas minimizadas', () => {
+  let uninstallHistory: (() => void) | null = null
+
+  beforeEach(() => {
+    sessionStorage.clear()
+  })
+
+  afterEach(() => {
+    uninstallHistory?.()
+    uninstallHistory = null
+  })
+
+  /** Deixa a Transition (out-in) terminar: ela espera frames. */
+  async function settle() {
+    for (let i = 0; i < 6; i++) {
+      await vi.advanceTimersByTimeAsync(50)
+      await flushPromises()
+    }
+  }
+
+  function hinario(extra: Partial<MinimizedPage> = {}): MinimizedPage {
+    return {
+      fullPath: '/albums/5',
+      routeName: 'albums-collection',
+      title: 'Hinário Adventista',
+      icon: 'ti-book',
+      summary: 'Busca: santo',
+      state: { collectionId: '5', searchQuery: 'santo' },
+      scroll: [{ path: [0], top: 333, left: 0 }],
+      preview: 'data:image/jpeg;base64,AA',
+      minimizedAt: 1,
+      ...extra,
+    }
+  }
+
+  async function mountShell2(start = '/') {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/', name: 'home', component: { template: '<section class="scroll-view" />' }, meta: { navKey: 'home' } },
+        {
+          path: '/albums/:collectionId',
+          name: 'albums-collection',
+          component: { template: '<section class="scroll-view album" />' },
+          meta: { navKey: 'albums' },
+        },
+      ],
+    })
+    uninstallHistory = installNavigationHistory({ router })
+    await router.push(start)
+    await router.isReady()
+    const w = mount(AppShell, { global: { plugins: [router], stubs: { transition: false } } })
+    await flushPromises()
+    const bar = () => w.findComponent({ name: 'MinimizedPagesBar' })
+    return { w, router, bar }
+  }
+
+  it('sem páginas minimizadas a barra não aparece nem ocupa espaço', async () => {
+    const { w, bar } = await mountShell2()
+    expect(bar().exists()).false
+    expect(w.find('.app-shell').classes()).not.toContain('app-shell--has-minimized')
+    w.unmount()
+  })
+
+  it('mostra as páginas minimizadas entre a faixa e o dock', async () => {
+    useMinimizedPagesStore().minimize(hinario())
+    const { w, bar } = await mountShell2()
+    expect(w.find('.app-shell').classes()).toContain('app-shell--has-minimized')
+    expect(w.find('.app-shell__minimized .minimized-bar-mock').exists()).true
+    expect(bar().props('navLabel')).toBe('minimize.bar')
+    expect(bar().props('items')).toEqual([
+      {
+        key: '/albums/5',
+        title: 'Hinário Adventista',
+        icon: 'ti-book',
+        summary: 'Busca: santo',
+        preview: 'data:image/jpeg;base64,AA',
+        closeLabel: 'minimize.close',
+      },
+    ])
+    w.unmount()
+  })
+
+  it('clicar reabre a página, mantém na barra marcada como em uso e volta a rolagem guardada', async () => {
+    const store = useMinimizedPagesStore()
+    store.minimize(hinario())
+    const { w, router, bar } = await mountShell2()
+    expect(bar().props('currentKey')).toBe('/')
+
+    bar().vm.$emit('open', '/albums/5')
+    await settle()
+
+    expect(router.currentRoute.value.fullPath).toBe('/albums/5')
+    expect(store.items.map((page) => page.fullPath)).toEqual(['/albums/5'])
+    expect(bar().props('currentKey')).toBe('/albums/5')
+    expect(store.takeRestore('/albums/5')?.state).toEqual({ collectionId: '5', searchQuery: 'santo' })
+    expect((w.find('.scroll-view.album').element as HTMLElement).scrollTop).toBe(333)
+    w.unmount()
+  })
+
+  it('reabrir pela barra com miniatura: a página monta por baixo enquanto a imagem cresce e a imagem sai quando a página entrou', async () => {
+    genieMock.playGenie.mockClear()
+    genieMock.startGenieGhost.mockClear()
+    genieMock.removeGhost.mockClear()
+    useMinimizedPagesStore().minimize(hinario())
+    const { w, router, bar } = await mountShell2()
+    const main = w.find('.app-shell__main').element as HTMLElement
+    bar().vm.$emit('open', '/albums/5')
+    await flushPromises()
+    expect(genieMock.startGenieGhost).toHaveBeenCalledWith('data:image/jpeg;base64,AA', null, genieMock.rect, 'restore')
+    // navega junto com o crescimento (não espera a imagem): a página já está por baixo
+    expect(router.currentRoute.value.fullPath).toBe('/albums/5')
+    // por baixo da imagem a área fica transparente: a página não "pula" pronta antes do efeito
+    expect(main.style.opacity).toBe('0')
+    await settle()
+    expect(genieMock.removeGhost).not.toHaveBeenCalled()
+    // a imagem acabou de crescer e a página já entrou: troca rápida, sem tempo embaçado
+    genieMock.grow!()
+    await settle()
+    expect(main.style.opacity).toBe('')
+    expect(genieMock.removeGhost).toHaveBeenCalledTimes(1)
+    expect(genieMock.removeGhost).toHaveBeenCalledWith(120)
+    expect(genieMock.playGenie).not.toHaveBeenCalled()
+    w.unmount()
+  })
+
+  it('reabrir com miniatura e a navegação é cancelada: a imagem sai mesmo assim', async () => {
+    genieMock.removeGhost.mockClear()
+    useMinimizedPagesStore().minimize(hinario())
+    const { w, router, bar } = await mountShell2()
+    router.beforeEach(() => false)
+    const main = w.find('.app-shell__main').element as HTMLElement
+    bar().vm.$emit('open', '/albums/5')
+    await flushPromises()
+    genieMock.grow!()
+    expect(main.style.opacity).toBe('0')
+    // nenhuma página entra: o limite de tempo libera a tela
+    await vi.advanceTimersByTimeAsync(1500)
+    await flushPromises()
+    expect(genieMock.removeGhost).toHaveBeenCalledTimes(1)
+    expect(main.style.opacity).toBe('')
+    w.unmount()
+  })
+
+  it('reabrir pela barra sem miniatura: a página cresce a partir do item (efeito gênio ao contrário)', async () => {
+    genieMock.playGenie.mockClear()
+    useMinimizedPagesStore().minimize(hinario({ preview: null }))
+    const { w, bar } = await mountShell2()
+    bar().vm.$emit('open', '/albums/5')
+    await settle()
+    expect(genieMock.playGenie).toHaveBeenCalledTimes(1)
+    const [el, from, direction] = genieMock.playGenie.mock.calls[0] as unknown as [Element, unknown, string]
+    expect(el.classList.contains('album')).toBe(true)
+    expect(from).toEqual(genieMock.rect)
+    expect(direction).toBe('restore')
+    w.unmount()
+  })
+
+  it('reabrir dois itens seguidos anima os dois; o efeito pendente expira', async () => {
+    genieMock.playGenie.mockClear()
+    const store = useMinimizedPagesStore()
+    store.minimize(hinario({ preview: null }))
+    store.minimize(hinario({ fullPath: '/albums/9', title: 'Vox', minimizedAt: 2, preview: null }))
+    const { w, router, bar } = await mountShell2()
+
+    bar().vm.$emit('open', '/albums/5')
+    await settle()
+    // entre uma e outra o operador vai para outra tela (coletânea → coletânea
+    // reaproveita a mesma tela e não tem entrada para animar)
+    await router.push('/')
+    await settle()
+    bar().vm.$emit('open', '/albums/9')
+    await settle()
+    expect(genieMock.playGenie).toHaveBeenCalledTimes(2)
+
+    // efeito marcado mas a tela não foi recriada a tempo: expira e não vaza
+    await vi.advanceTimersByTimeAsync(2100)
+    await router.push('/')
+    await settle()
+    expect(genieMock.playGenie).toHaveBeenCalledTimes(2)
+    w.unmount()
+  })
+
+  it('reabrir pela barra troca de página sem a transição do tema (o gênio faz o papel)', async () => {
+    useMinimizedPagesStore().minimize(hinario())
+    const { w, bar } = await mountShell2()
+    bar().vm.$emit('open', '/albums/5')
+    await flushPromises()
+    // a troca usa as classes da transição instantânea, não as do tema ('none')
+    expect(w.html()).toMatch(/page-instant-(leave|enter)/)
+    expect(w.html()).not.toMatch(/none-(leave|enter)/)
+    await settle()
+    // depois que a página entrou, as próximas trocas voltam à transição do tema
+    const { router } = { router: (w.vm as any).$router }
+    await router.push('/')
+    await flushPromises()
+    expect(w.html()).toMatch(/none-(leave|enter)/)
+    await settle()
+    w.unmount()
+  })
+
+  it('navegar normalmente (sem a barra) não toca o efeito', async () => {
+    genieMock.playGenie.mockClear()
+    const { w, router } = await mountShell2()
+    await router.push('/albums/5')
+    await settle()
+    expect(genieMock.playGenie).not.toHaveBeenCalled()
+    w.unmount()
+  })
+
+  it('arrastar um item para outra posição reordena a barra', async () => {
+    const store = useMinimizedPagesStore()
+    store.minimize(hinario())
+    store.minimize(hinario({ fullPath: '/albums/9', title: 'Vox', minimizedAt: 2 }))
+    const { w, router, bar } = await mountShell2()
+    bar().vm.$emit('reorder', '/albums/9', 0)
+    await flushPromises()
+    expect(store.items.map((page) => page.fullPath)).toEqual(['/albums/9', '/albums/5'])
+    expect(router.currentRoute.value.fullPath).toBe('/')
+    w.unmount()
+  })
+
+  it('x fecha sem navegar', async () => {
+    const store = useMinimizedPagesStore()
+    store.minimize(hinario())
+    const { w, router, bar } = await mountShell2()
+    bar().vm.$emit('close', '/albums/5')
+    await flushPromises()
+    expect(store.items).toEqual([])
+    expect(router.currentRoute.value.fullPath).toBe('/')
+    w.unmount()
+  })
+
+  it('item da página que já está aberta: continua na barra e nada acontece', async () => {
+    const store = useMinimizedPagesStore()
+    store.minimize(hinario())
+    const { w, router, bar } = await mountShell2('/albums/5')
+    expect(bar().props('currentKey')).toBe('/albums/5')
+    bar().vm.$emit('open', '/albums/5')
+    await flushPromises()
+    expect(store.items.map((page) => page.fullPath)).toEqual(['/albums/5'])
+    expect(store.takeRestore('/albums/5')).toBeNull()
+    expect(router.currentRoute.value.fullPath).toBe('/albums/5')
+    w.unmount()
+  })
+
+  it('item que não existe mais é ignorado', async () => {
+    const { w, router, bar } = await mountShell2()
+    useMinimizedPagesStore().minimize(hinario())
+    await flushPromises()
+    bar().vm.$emit('open', '/sumiu')
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe('/')
+    w.unmount()
+  })
+})

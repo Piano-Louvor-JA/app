@@ -2,6 +2,7 @@ import {
 	createLocalCollection,
 	createLocalMusic,
 } from "@modules/media/services/local-custom-store";
+import { communityBaseUrl, communityRequest } from "./community-http";
 
 /**
  * Catálogo da Comunidade — coletâneas PÚBLICAS (read-only).
@@ -21,15 +22,11 @@ export type CommunityCollectionSummary = {
 	authorName: string | null;
 	musicsCount: number;
 	updatedAt: string | null;
+	/** Dono (RF-04): habilita ações inline quando === id_user da sessão. */
+	ownerId?: number | null;
+	/** Privacidade (RF-04): ausente/legado = público (default da API). */
+	visibility?: "public" | "private";
 };
-
-function communityBaseUrl(): string {
-	// Mesma regra do custom-catalog.ts: default é a API de produção
-	// (sem env, caminho relativo dá 404 no desktop).
-	const base =
-		import.meta.env.VITE_PALCO_API_URL ?? "https://api.pianolouvorja.com.br";
-	return `${base.replace(/\/$/, "")}/v1/custom`;
-}
 
 function asString(value: unknown): string | null {
 	if (typeof value !== "string") return null;
@@ -61,6 +58,7 @@ export async function saveCommunityCopy(
 	try {
 		const response = await fetch(
 			`${communityBaseUrl()}/collections/${collection.id}/musics`,
+			communityRequest(),
 		);
 		if (!response.ok) return null;
 		const json = (await response.json()) as { data?: unknown };
@@ -110,6 +108,7 @@ export async function listCommunityCollectionsPage(
 	try {
 		const response = await fetch(
 			`${communityBaseUrl()}/collections?page=${page}&per_page=${perPage}`,
+			communityRequest(),
 		);
 		if (!response.ok) return empty;
 		const json = (await response.json()) as {
@@ -133,6 +132,12 @@ export async function listCommunityCollectionsPage(
 				? Number(row.musics_count)
 				: 0,
 			updatedAt: asString(row.updated_at),
+			ownerId: Number.isInteger(row.owner_id) && Number(row.owner_id) > 0
+				? Number(row.owner_id)
+				: null,
+			visibility: (row.visibility === "private" ? "private" : "public") as
+				| "public"
+				| "private",
 		}));
 
 		return {

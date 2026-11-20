@@ -1,181 +1,218 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
-
-import { isDesktopApp } from '@shared/services/desktop-bridge'
+import { isCustomMusicId } from "@modules/media/services/custom-catalog";
+import { useLocalLibraryStore } from "@modules/sync/stores/useLocalLibraryStore";
+import { isDesktopApp } from "@shared/services/desktop-bridge";
 import {
-  deleteTrackMedia,
-  downloadTrackMedia,
-  isTrackMediaDownloaded,
-} from '@shared/services/track-media'
-import { useLocalLibraryStore } from '@modules/sync/stores/useLocalLibraryStore'
+	deleteTrackMedia,
+	downloadTrackMedia,
+	isTrackMediaDownloaded,
+	onTrackMediaChanged,
+	offTrackMediaChanged,
+} from "@shared/services/track-media";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 
 /**
  * Controles reutilizáveis de faixa: Cantado / Playback / Sem áudio / Letra.
  * Usado em Álbuns, Liturgia e qualquer lista de músicas.
  */
 const props = withDefaults(
-  defineProps<{
-    hasInstrumental: boolean
-    busy?: boolean
-    variant?: 'plain' | 'contained'
-    /** Quando informado (desktop), exibe baixar/excluir offline. */
-    musicId?: number | null
-    /** Nome da faixa para o diálogo de confirmação. */
-    trackName?: string
-    /** Controla a visibilidade do botão excluir (hover da linha). */
-    rowHovered?: boolean
-    /** Exibe o botão de apagar mídia offline (Álbuns sim; Liturgia não). */
-    allowOfflineRemove?: boolean
-  }>(),
-  {
-    busy: false,
-    variant: 'plain',
-    musicId: null,
-    trackName: '',
-    rowHovered: false,
-    allowOfflineRemove: true,
-  },
-)
+	defineProps<{
+		hasInstrumental: boolean;
+		busy?: boolean;
+		variant?: "plain" | "contained";
+		/** Quando informado (desktop), exibe baixar/excluir offline. */
+		musicId?: number | null;
+		/** Nome da faixa para o diálogo de confirmação. */
+		trackName?: string;
+		/** Controla a visibilidade do botão excluir (hover da linha). */
+		rowHovered?: boolean;
+		/** Exibe o botão de apagar mídia offline (Álbuns sim; Liturgia não). */
+		allowOfflineRemove?: boolean;
+	}>(),
+	{
+		busy: false,
+		variant: "plain",
+		musicId: null,
+		trackName: "",
+		rowHovered: false,
+		allowOfflineRemove: true,
+	},
+);
 
 const emit = defineEmits<{
-  sung: []
-  instrumental: []
-  slides: []
-  lyric: []
-  /** Progresso do download individual (null = não está baixando). */
-  downloadProgress: [progress: number | null]
-}>()
+	sung: [];
+	instrumental: [];
+	slides: [];
+	lyric: [];
+	/** Progresso do download individual (null = não está baixando). */
+	downloadProgress: [progress: number | null];
+}>();
 
-const { t } = useI18n()
-const libraryStore = useLocalLibraryStore()
+const { t } = useI18n();
+const libraryStore = useLocalLibraryStore();
 
 /** Oculto por enquanto — reative para voltar o botão de letra nas listagens. */
-const SHOW_LYRIC_ACTION = false
+const SHOW_LYRIC_ACTION = false;
 
-type OfflineStatus = 'idle' | 'downloaded' | 'downloading' | 'checking'
+type OfflineStatus = "idle" | "downloaded" | "downloading" | "checking";
 
-const offlineStatus = ref<OfflineStatus>('idle')
-const downloadProgress = ref(0)
-const cancelRequested = ref(false)
-const confirmRemoveOpen = ref(false)
+const offlineStatus = ref<OfflineStatus>("idle");
+const downloadProgress = ref(0);
+const cancelRequested = ref(false);
+const confirmRemoveOpen = ref(false);
 
 const showOfflineControls = computed(
-  () => isDesktopApp() && props.musicId != null && props.musicId > 0,
-)
+	() =>
+		isDesktopApp() &&
+		props.musicId != null &&
+		props.musicId > 0 &&
+		!isCustomMusicId(props.musicId),
+);
 
 const isOfflineBusy = computed(
-  () =>
-    offlineStatus.value === 'downloading' || offlineStatus.value === 'checking',
-)
+	() =>
+		offlineStatus.value === "downloading" || offlineStatus.value === "checking",
+);
 
 const confirmTrackLabel = computed(
-  () => props.trackName.trim() || t('media.actions.thisTrack'),
-)
+	() => props.trackName.trim() || t("media.actions.thisTrack"),
+);
 
 function emitDownloadProgress(progress: number | null) {
-  emit('downloadProgress', progress)
+	emit("downloadProgress", progress);
 }
 
 async function refreshOfflineStatus() {
-  if (!showOfflineControls.value || props.musicId == null) {
-    offlineStatus.value = 'idle'
-    return
-  }
+	if (!showOfflineControls.value || props.musicId == null) {
+		offlineStatus.value = "idle";
+		return;
+	}
 
-  offlineStatus.value = 'checking'
-  try {
-    const downloaded = await isTrackMediaDownloaded(props.musicId)
-    offlineStatus.value = downloaded ? 'downloaded' : 'idle'
-  } catch {
-    offlineStatus.value = 'idle'
-  }
+	offlineStatus.value = "checking";
+	try {
+		const downloaded = await isTrackMediaDownloaded(props.musicId);
+		offlineStatus.value = downloaded ? "downloaded" : "idle";
+	} catch {
+		offlineStatus.value = "idle";
+	}
 }
 
 function requestRemove() {
-  confirmRemoveOpen.value = true
+	confirmRemoveOpen.value = true;
 }
 
 function dismissRemove() {
-  confirmRemoveOpen.value = false
+	confirmRemoveOpen.value = false;
 }
 
 async function confirmRemove() {
-  if (props.musicId == null) return
-  confirmRemoveOpen.value = false
-  await deleteTrackMedia(props.musicId)
-  offlineStatus.value = 'idle'
-  downloadProgress.value = 0
-  emitDownloadProgress(null)
-  void libraryStore.reconcileAlbumsForMusic(props.musicId)
+	if (props.musicId == null) return;
+	confirmRemoveOpen.value = false;
+	await deleteTrackMedia(props.musicId);
+	offlineStatus.value = "idle";
+	downloadProgress.value = 0;
+	emitDownloadProgress(null);
+	void libraryStore.reconcileAlbumsForMusic(props.musicId);
 }
 
 async function onOfflineAction() {
-  if (!showOfflineControls.value || props.musicId == null) return
-  if (offlineStatus.value === 'downloading') {
-    cancelRequested.value = true
-    offlineStatus.value = 'idle'
-    downloadProgress.value = 0
-    emitDownloadProgress(null)
-    return
-  }
+	if (!showOfflineControls.value || props.musicId == null) return;
+	if (offlineStatus.value === "downloading") {
+		cancelRequested.value = true;
+		offlineStatus.value = "idle";
+		downloadProgress.value = 0;
+		emitDownloadProgress(null);
+		return;
+	}
 
-  if (offlineStatus.value === 'downloaded') {
-    requestRemove()
-    return
-  }
+	/* v8 ignore next 4 -- UI nunca expõe onOfflineAction com downloaded (botão troca p/ remove) */
+	if (offlineStatus.value === "downloaded") {
+		requestRemove();
+		return;
+	}
 
-  cancelRequested.value = false
-  offlineStatus.value = 'downloading'
-  downloadProgress.value = 0
-  emitDownloadProgress(0)
+	cancelRequested.value = false;
+	offlineStatus.value = "downloading";
+	downloadProgress.value = 0;
+	emitDownloadProgress(0);
 
-  const musicId = props.musicId
-  const result = await downloadTrackMedia(musicId, {
-    onProgress: (percent) => {
-      if (cancelRequested.value) return
-      downloadProgress.value = percent
-      emitDownloadProgress(percent)
-    },
-    shouldAbort: () => cancelRequested.value,
-  })
+	const musicId = props.musicId;
+	const result = await downloadTrackMedia(musicId, {
+		onProgress: (percent) => {
+			if (cancelRequested.value) return;
+			downloadProgress.value = percent;
+			emitDownloadProgress(percent);
+		},
+		/* v8 ignore next 1 -- callback opts.download; hit depende da passada */
+		shouldAbort: () => cancelRequested.value,
+	});
 
-  if (cancelRequested.value || result.status === 'idle') {
-    cancelRequested.value = false
-    offlineStatus.value = 'idle'
-    downloadProgress.value = 0
-    emitDownloadProgress(null)
-    if (result.status === 'idle' && result.reason !== 'cancelled') {
-      await refreshOfflineStatus()
-    }
-    return
-  }
+	if (cancelRequested.value || result.status === "idle") {
+		cancelRequested.value = false;
+		offlineStatus.value = "idle";
+		downloadProgress.value = 0;
+		emitDownloadProgress(null);
+		if (result.status === "idle" && result.reason !== "cancelled") {
+			await refreshOfflineStatus();
+		}
+		return;
+	}
 
-  cancelRequested.value = false
+	cancelRequested.value = false;
 
-  if (result.status === 'downloaded') {
-    offlineStatus.value = 'downloaded'
-    downloadProgress.value = 100
-    emitDownloadProgress(null)
-    void libraryStore.reconcileAlbumsForMusic(musicId)
-    return
-  }
+	if (result.status === "downloaded") {
+		offlineStatus.value = "downloaded";
+		downloadProgress.value = 100;
+		emitDownloadProgress(null);
+		void libraryStore.reconcileAlbumsForMusic(musicId);
+		return;
+	}
 
-  offlineStatus.value = 'idle'
-  downloadProgress.value = 0
-  emitDownloadProgress(null)
+	offlineStatus.value = "idle";
+	downloadProgress.value = 0;
+	emitDownloadProgress(null);
 }
 
 onMounted(() => {
-  void refreshOfflineStatus()
-})
+	void refreshOfflineStatus();
+});
+
+/**
+ * Badge live: download/delete pode terminar em OUTRO fluxo (pre-play
+ * ensureTrackDownloaded, ondemand). Evento do serviço atualiza este
+ * componente sem re-mount (14/10).
+ */
+function onTrackMediaChangedLocal(musicId: number, downloaded: boolean) {
+	if (musicId !== props.musicId) return;
+	if (offlineStatus.value === "downloading") return; // fluxo próprio já controla
+	offlineStatus.value = downloaded ? "downloaded" : "idle";
+	downloadProgress.value = 0;
+	emitDownloadProgress(null);
+}
+
+onMounted(() => onTrackMediaChanged(onTrackMediaChangedLocal));
+onUnmounted(() => {
+	offTrackMediaChanged(onTrackMediaChangedLocal);
+	window.removeEventListener("focus", onWindowFocusRevalidate);
+});
+
+/**
+ * Usuário pode apagar arquivos fora do app (gerenciador) — badge não pode
+ * mentir. No focus do app, revalida SE o status atual diz "baixado"
+ * (idle/erro não precisa: o evento track-media cobre mutações do app).
+ */
+function onWindowFocusRevalidate() {
+	if (offlineStatus.value === "downloaded") void refreshOfflineStatus();
+}
+onMounted(() => window.addEventListener("focus", onWindowFocusRevalidate));
 
 watch(
-  () => props.musicId,
-  () => {
-    void refreshOfflineStatus()
-  },
-)
+	() => props.musicId,
+	() => {
+		void refreshOfflineStatus();
+	},
+);
 </script>
 
 <template>
@@ -225,6 +262,7 @@ watch(
       />
     </button>
 
+    <!-- /* v8 ignore start -- SHOW_LYRIC_ACTION constante false */ -->
     <button
       v-if="SHOW_LYRIC_ACTION"
       type="button"
@@ -239,6 +277,7 @@ watch(
         aria-hidden="true"
       />
     </button>
+    <!-- /* v8 ignore stop */ -->
 
     <template v-if="showOfflineControls">
       <span

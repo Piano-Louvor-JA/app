@@ -1,5 +1,26 @@
 export default {
+  palcoOutputs: { title: 'TVs com Palco', empty: 'Nenhuma TV com o Palco conectada. Ver no Palco', onHold: '{slot} · na espera' },
+  obsOutputs: { detecting: 'Detectando e atualizando conexões OBS…', active: 'Conexões Remotas', activateHint: 'Ative uma conexão em Configurações → Transmissão para usá-la aqui.', title: 'Conexões OBS', activeConnections: 'Conexões ativas: {count}' },
+  floating: { closeTitle: 'Fechar {title}?', closeMessage: 'Deseja encerrar este recurso e fechar sua projeção?' },
+  updates: {
+    downloadMacInstaller: 'Baixar instalador macOS',
+    manualMacInstructions: 'No macOS, esta atualização é instalada manualmente. Baixe o instalador pelo botão abaixo, feche o LouvorJA, abra o arquivo DMG e arraste o aplicativo para Aplicativos, substituindo a versão anterior. Seus dados e preferências serão mantidos.',
+  },
+  windowControls: {
+    close: 'Fechar',
+    minimize: 'Minimizar',
+    maximize: 'Maximizar',
+  },
+  a11y: {
+    mainNav: 'Navegação principal',
+  },
+  apiOffline: {
+    message: 'Sem conex\u00e3o com o servi\u00e7o \u2014 verifique sua internet',
+    retrying: 'Tentando reconectar...',
+  },
   projection: {
+    minimizeProjection: 'Minimizar projeção',
+    restoreProjection: 'Restaurar projeção',
     confirmClose: 'A projeção está em andamento. Fechar a janela interrompe a música. Deseja realmente sair?',
   },
   app: {
@@ -8,10 +29,39 @@ export default {
     nameJa: 'JA',
   },
   common: {
+    close: 'Fechar',
     comingSoon: 'Em breve',
+    openFolder: 'Abrir pasta',
+    addToPlaylist: 'Adicionar à playlist',
+    suggestFix: 'Sugerir correção de letra/timing',
     cancel: 'Cancelar',
+    copied: 'Copiado!',
+  },
+  independentProjection: {
+    title: 'Projeção independente',
+    /** Monitor desligado no seletor "Telas". */
+    enableHint: 'Ative em Telas para usar',
+    unavailable: 'Só habilita com monitores estendidos disponíveis',
+    hint: 'Escolha um monitor. Este recurso aparece por cima do que estiver projetado nele; os outros monitores não mudam.',
+    monitor: 'Monitor {index}',
+    activeOn: 'Projeção independente no monitor {index}',
+    stop: 'Encerrar projeção independente',
+    sharedOn: 'Projeção compartilhada no monitor {index}',
+    modeLabel: 'Modo da projeção',
+    status: {
+      stop: 'Encerrar',
+      overlay: 'Sobrepondo em:',
+      share: 'Compartilhando em:',
+      monitor: 'Monitor {index}',
+    },
+    mode: {
+      overlay: 'Sobrepor',
+      share: 'Compartilhar',
+    },
+    hintShare: 'Escolha um monitor. A tela dele é dividida ao meio com o que já está projetado; se um dos lados sair, o outro volta a ocupar a tela toda.',
   },
   monitors: {
+    wiredTitle: 'Conexões Cabeadas',
     selectScreens: 'Selecionar telas',
     identify: 'Detectar telas',
     hint: 'Marque os monitores onde o recurso deve ser projetado.',
@@ -30,11 +80,11 @@ export default {
     closeAll: 'Fechar todas as telas',
   },
   uiZoom: {
-      label: 'Zoom da página',
-      zoomIn: 'Aumentar zoom',
-      zoomOut: 'Diminuir zoom',
-    },
-    nav: {
+    label: 'Zoom da página',
+    zoomIn: 'Aumentar zoom',
+    zoomOut: 'Diminuir zoom',
+  },
+  nav: {
       home: 'Início',
       albums: 'Central de Mídia',
       community: 'Comunidade',
@@ -42,6 +92,16 @@ export default {
       bible: 'Bíblia',
       utilities: 'Utilitários',
       settings: 'Configurações',
+    history: {
+      label: 'Histórico de navegação',
+      back: 'Voltar',
+      forward: 'Avançar',
+      goTo: 'Ir para {label}',
+    },
+    historyDetail: {
+      player: 'Player',
+      editor: 'Editor',
+    },
     },
     settings: {
       appearance: {
@@ -115,4 +175,48 @@ export default {
         projection: 'Configurações de projeção e telas em breve.',
       },
     },
-  }
+  connectedDevices: {
+    title: 'Aparelhos conectados',
+    remote: 'Controle remoto',
+    speaker: 'Passador do pregador',
+    monitors: 'Compartilhamento de monitores',
+    none: 'Nenhum conectado',
+    monitorsInUse: '{device} ({host}) · {n} monitor(es)',
+    palco: 'Palco (TVs)',
+    palcoTv: '{name} · {ip}',
+    transmission: 'Transmissões (OBS/navegadores)',
+    transmissionGroup: '{connection} · {page} · {tabs}',
+    tabs: '1 aba | {n} abas',
+    inObs: '{n} no OBS',
+    inBrowser: '{n} no navegador',
+    and: ' e ',
+    pages: { espelho: 'Espelho', retorno: 'Retorno', legenda: 'Legenda', other: 'Outra página' },
+  },
+  minimize: {
+    playlistCount: '{n} playlist(s)',
+    pageNumber: 'Página {n}',
+    bar: 'Páginas minimizadas',
+    close: 'Fechar {title}',
+    page: 'Minimizar página',
+    search: 'Busca: {q}',
+  },
+  sync: {
+    downloadQueue: {
+      title: 'Downloads',
+      clearFinished: 'Limpar concluídos',
+      retry: 'Tentar de novo',
+      cancel: 'Cancelar',
+    },
+  },
+sljaMigration: {
+    title: 'Subir {count} hino(s) importado(s) pra sua conta?',
+    message: 'Você importou .slja sem estar logado. Eles podem ir pra sua conta (uma cópia única, sem duplicar) e ficar disponíveis em qualquer dispositivo.',
+    confirm: 'Subir pra conta',
+    cancel: 'Ficar só neste dispositivo',
+  },
+  download: {
+    indicatorTitle: 'Downloads em segundo plano: {done}/{total} ({percent}%)',
+    indicatorCounts: '{done} de {total} concluídos',
+    indicatorIdle: 'Preparando download…',
+  },
+}

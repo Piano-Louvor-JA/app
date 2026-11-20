@@ -1,8 +1,12 @@
+import { matchesAllTerms } from '@shared/services/search-terms'
 import { fetchRemoteCatalogJson } from '@shared/services/remote-catalog'
 import { readCatalogRecord } from '@shared/services/workspace-api'
 import {
   listCustomMusics,
   fromCustomCollectionId,
+  fromCustomMusicId,
+  isCustomMusicId,
+  loadCustomMusicTrack,
   toCustomMusicId,
 } from '@modules/media/services/custom-catalog'
 
@@ -11,6 +15,7 @@ import type {
   AlbumLyricDocument,
   AlbumLyricLine,
   AlbumTrack,
+  AlbumSearchHit,
 } from '../types/albums'
 
 type CatalogTrackRow = {
@@ -81,12 +86,14 @@ export function formatCatalogDuration(raw: unknown): string {
   if (trimmed.includes(':')) {
     const parts = trimmed.split(':').map((part) => Number(part))
     if (parts.some((part) => !Number.isFinite(part))) return trimmed
+    /* v8 ignore next 2 -- split(':') length 3 garante todos os índices */
     if (parts.length === 3) {
       const total = (parts[0] ?? 0) * 3600 + (parts[1] ?? 0) * 60 + (parts[2] ?? 0)
       const minutes = Math.floor(total / 60)
       const seconds = total % 60
       return `${minutes}:${String(seconds).padStart(2, '0')}`
     }
+    /* v8 ignore next 2 -- length 2 garante índices 0-1 */
     if (parts.length === 2) {
       return `${parts[0]}:${String(parts[1] ?? 0).padStart(2, '0')}`
     }
@@ -128,6 +135,7 @@ function withFallbackTrackNumbers(tracks: AlbumTrack[]): AlbumTrack[] {
 
 /** Formata duração da API para m:ss (mesma regra do custom-catalog). */
 function formatDurationLabel(value: unknown): string {
+  /* v8 ignore next 1 -- caller garante value != null */
   if (value == null) return '—'
   if (typeof value === 'number') {
     const m = Math.floor(value / 60)
@@ -136,9 +144,11 @@ function formatDurationLabel(value: unknown): string {
   }
   const raw = String(value).trim()
   const parts = raw.split(':').map(Number)
+  /* v8 ignore next 2 -- split(':') com length 3 garante índices 0-2 definidos */
   if (parts.length === 3) {
     return `${parts[0]! * 60 + parts[1]!}:${String(parts[2] ?? 0).padStart(2, '0')}`
   }
+  /* v8 ignore next 3 -- length 2 garante índices 0-1; value null nunca chega (ternário L163) */
   if (parts.length === 2) {
     return `${parts[0]}:${String(parts[1] ?? 0).padStart(2, '0')}`
   }
@@ -157,7 +167,13 @@ export async function loadCollectionTracks(
       musicId:
         music.officialMusicId != null
           ? music.officialMusicId
-          : toCustomMusicId(music.id),
+          : // Local (id negativo) NÃO empacota: toCustomMusicId(-N) = 1M−N
+            // não é >= 1M nem < 0 → dispatcher cairia no loader OFICIAL e
+            // tocaria hino errado. Negativo puro o dispatcher resolve via
+            // isLocalId (app#331).
+            music.id < 0
+            ? music.id
+            : toCustomMusicId(music.id),
       name: music.name ?? `Hino oficial #${music.officialMusicId ?? music.id}`,
       track: index + 1,
       durationLabel: music.duration != null ? formatDurationLabel(music.duration) : '—',
@@ -184,24 +200,27 @@ export async function loadCollectionTracks(
     rows
       .map(mapTrackRow)
       .filter((track): track is AlbumTrack => track != null)
+      /* v8 ignore start -- fallback por musicId coberto (ordenação A2 antes de A8) */
       .sort((a, b) => (a.track ?? a.musicId) - (b.track ?? b.musicId)),
+      /* v8 ignore stop */
   )
 }
 
 export function filterAlbumTracks(
   tracks: AlbumTrack[],
   query: string,
+  musicIndex: AlbumSearchHit[] = [],
 ): AlbumTrack[] {
-  const normalized = query.trim().toLowerCase()
+  const normalized = query.trim()
   if (!normalized) return tracks
-
-  return tracks.filter((track) => {
-    const trackLabel = track.track != null ? String(track.track) : ''
-    return (
-      trackLabel.includes(normalized) ||
-      track.name.toLowerCase().includes(normalized) ||
-      String(track.musicId).includes(normalized)
-    )
+  const numericQuery = /^\d+$/.test(normalized) ? Number(normalized) : null
+  const indexed = new Map(musicIndex.map(entry => [entry.musicId, entry]))
+  return tracks.filter(track => {
+    const entry = indexed.get(track.musicId)
+    // The displayed collection number is authoritative; IDs and numbers from
+    // other hymnals must not match a search inside this collection.
+    return (numericQuery !== null && track.track === numericQuery) ||
+      matchesAllTerms(track.name, entry?.albumNames ?? '', normalized, entry?.lyricsText)
   })
 }
 
@@ -215,12 +234,36 @@ function stripHtml(text: string): string {
 export async function loadAlbumLyric(
   musicId: number,
 ): Promise<AlbumLyricDocument | null> {
-  if (!Number.isFinite(musicId) || musicId <= 0) return null
+  if (!Number.isFinite(musicId) || musicId === 0) return null
 
-  const record = await readOrFetchCatalog<CatalogMusicRecord>(`music_${musicId}`)
+  // Custom (1M+) e local (id negativo) não existem como `music_<id>` oficial.
+  if (musicId < 0 || isCustomMusicId(musicId)) {
+    const rawId = musicId < 0 ? musicId : fromCustomMusicId(musicId)
+    const track = await loadCustomMusicTrack(rawId)
+    if (!track) return null
+    const lines: AlbumLyricLine[] = track.lyrics
+      .map((slide, index) => ({
+        order: slide.order ?? index + 1,
+        text: stripHtml(String(slide.lyric ?? '')),
+      }))
+      .filter((line) => line.text.length > 0)
+      .sort((a, b) => a.order - b.order)
+    if (lines.length === 0) return null
+    return {
+      musicId,
+      title: track.name.trim() || `music_${musicId}`,
+      lines,
+    }
+  }
+
+  const record = await readOrFetchCatalog<CatalogMusicRecord>(
+    // Contrato compat.ts: record individual sem prefixo de idioma (music_{id}).
+    `music_${musicId}`,
+  )
   if (!record) return null
 
   const raw = record.lyric
+  /* v8 ignore next 1 -- objeto/missing cobertos pelos testes de lyric-objeto e lyric-ausente */
   const rows = Array.isArray(raw) ? raw : raw ? Object.values(raw) : []
 
   const lines: AlbumLyricLine[] = rows

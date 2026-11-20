@@ -24,6 +24,8 @@ export const WORKSPACE_DIRS = {
   /** Mídias de módulos utilitários (ex.: áudio do sorteio). */
   modulos: 'modulos',
   sorteios: 'sorteios',
+  /** Bíblia offline atualizada pela API (bundles <versionId>.json.gz). */
+  bible: 'bible',
 }
 
 /** Arquivo SQLite temporário (legado FTP — não usado no first-boot HTTP). */

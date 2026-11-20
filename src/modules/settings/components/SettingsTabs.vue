@@ -3,13 +3,15 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import { VISIBLE_SETTINGS_SECTIONS } from '../constants/sections'
+import type { SettingsSection } from '../types/settings'
 
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 
-function isActive(routeName: string) {
-  return route.name === routeName
+function isActive(section: SettingsSection) {
+  const name = String(route.name ?? '')
+  return section.routeNames ? section.routeNames.includes(name) : name === section.routeName
 }
 
 function goTo(routeName: string) {
@@ -26,9 +28,9 @@ function goTo(routeName: string) {
       :key="section.id"
       type="button"
       class="settings-tabs__item"
-      :class="{ 'settings-tabs__item--active': isActive(section.routeName) }"
-      :aria-current="isActive(section.routeName) ? 'page' : undefined"
-      @click="goTo(section.routeName)"
+      :class="{ 'settings-tabs__item--active': isActive(section) }"
+      :aria-current="isActive(section) ? 'page' : undefined"
+      @click="isActive(section) || goTo(section.routeName)"
     >
       {{ t(section.labelKey) }}
     </button>

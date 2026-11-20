@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useProjectionFont } from '@modules/settings/composables/useProjectionFont'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 
 import { ProjectionBackground } from '@design-system/index'
@@ -32,6 +33,10 @@ import {
   DEFAULT_COUNTDOWN_DURATION_MS,
   DEFAULT_COUNTDOWN_RUNTIME,
 } from '../types/countdown'
+import { isIndependentProjectionLocation } from '@shared/services/projection-window-location'
+
+/** Projeção independente ignora o takeover da principal (projecting:false). */
+const independent = isIndependentProjectionLocation()
 
 withDefaults(
   defineProps<{
@@ -132,16 +137,18 @@ const effectiveConfig = computed(() => {
   const mod = stage.value.countdown
   return mod ? { ...config.value, ...mod } : { ...config.value }
 })
+
+const projectionFontStyle = useProjectionFont('countdown')
 </script>
 
 <template>
   <ProjectionBackground
     class="countdown-projection"
     :class="{ 'countdown-projection--embedded': embedded }"
-    :style="stageStyle"
+    :style="[stageStyle, projectionFontStyle]"
   >
     <div
-      v-if="runtime.projecting !== false"
+      v-if="independent || runtime.projecting !== false"
       class="countdown-projection__stage"
       :style="stageAlign"
     >
@@ -149,6 +156,7 @@ const effectiveConfig = computed(() => {
         :config="effectiveConfig"
         :runtime="runtime"
         :stage="stage"
+        muted
       />
     </div>
   </ProjectionBackground>

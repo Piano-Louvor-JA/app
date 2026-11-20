@@ -6,19 +6,23 @@ export type CountdownTimeFormat =
 
 export type CountdownStatus = 'idle' | 'running' | 'paused'
 
-/** Duração fixa ou relógio de parede (parar às HH:MM). */
-export type CountdownMode = 'duration' | 'until'
+export type CountdownRuntimeMode = 'duration' | 'until'
 
 export interface CountdownDisplayConfig {
   timeFormat: CountdownTimeFormat
   bgColor: string
   textColor: string
+  /** Se true, o cronômetro continua rodando após zerar (tempo negativo).
+   *  Se false (padrão), trava em zero e pausa automaticamente. */
+  allowNegative?: boolean
 }
 
 export interface CountdownRuntimeState {
+  mode?: CountdownRuntimeMode
+  untilHour?: number
+  untilMinute?: number
+  pausedRemainingMs?: number | null
   status: CountdownStatus
-  /** Owner explícito da projeção; countdown parado ainda pode estar no Palco. */
-  projecting?: boolean
   /** Epoch ms when the current running segment started. */
   segmentStartedAt: number | null
   /** Milliseconds already counted down before the current segment. */
@@ -27,13 +31,21 @@ export interface CountdownRuntimeState {
   durationMs: number
   savedTimesMs: number[]
   finished: boolean
-  mode?: CountdownMode
-  /** Hora-alvo 0–23 no modo "until". */
-  untilHour?: number
-  /** Minuto-alvo 0–59 no modo "until". */
-  untilMinute?: number
-  /** Remaining congelado ao pausar no modo "until". */
-  pausedRemainingMs?: number | null
+  /** app desktop: janela de projeção viva (CountdownProjectionView). */
+  projecting?: boolean
+  /** Vídeo (relativo à pasta Media) projetado no lugar dos números. */
+  videoPath?: string
+  /** Volume (0–1) do vídeo na projeção; 0 = mudo. */
+  videoVolume?: number
+}
+
+/** Única origem de vídeo da contagem: o vídeo personalizado da Escola Sabatina. */
+export const COUNTDOWN_VIDEO_DIR = 'modulos/escola-sabatina/video/'
+
+export function isCountdownVideoPath(value: unknown): value is string {
+  if (typeof value !== 'string' || !value.startsWith(COUNTDOWN_VIDEO_DIR)) return false
+  const fileName = value.slice(COUNTDOWN_VIDEO_DIR.length)
+  return fileName.length > 0 && !/[\\/]/.test(fileName) && fileName !== '..' && fileName !== '.'
 }
 
 export interface CountdownDurationParts {
@@ -58,6 +70,7 @@ export const DEFAULT_COUNTDOWN_DISPLAY_CONFIG: CountdownDisplayConfig = {
   timeFormat: 'hh:mm:ss',
   bgColor: '#000000',
   textColor: '#FFFFFF',
+  allowNegative: true,
 }
 
 export const DEFAULT_COUNTDOWN_RUNTIME: CountdownRuntimeState = {

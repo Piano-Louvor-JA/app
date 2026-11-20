@@ -1,0 +1,1136 @@
+<script setup lang="ts">
+import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+import { GlassCard } from '@design-system/index'
+
+import { getDesktopBridge } from '@shared/services/desktop-bridge'
+
+import { useScheduledDialog } from '../composables/useScheduledDialog'
+import {
+  extractProvaiEVedeEpisodes,
+  type ProvaiEpisode,
+} from '../services/provai-e-vede-source'
+import { importProvaiEVedeEpisodes } from '../services/provai-e-vede-import'
+import {
+  resolveDefaultProvaiLanguage,
+  resolveProvaiSource,
+  type ProvaiSourceLanguage,
+} from '../services/provai-e-vede-catalog'
+import { useScheduledStore } from '../stores/useScheduledStore'
+import {
+  loadLiturgyMusicOptions,
+  filterLiturgyMusicOptions,
+} from '../services/liturgy-catalog'
+import type { LiturgyMusicOption } from '../types/liturgy'
+
+const props = defineProps<{ open: boolean }>()
+const emit = defineEmits<{ close: [] }>()
+
+/** HTML da página do trimestre: main process (sem CORS) no Electron, fetch direto na web. */
+async function fetchQuarterHtml(): Promise<string | null> {
+  const source = resolveCurrentProvaiUrl()
+  if (!source) return null
+  const bridge = getDesktopBridge()
+  try {
+    if (bridge?.workspace?.fetchText) {
+      return await bridge.workspace.fetchText(source.url)
+    }
+    const resp = await fetch(source.url)
+    return resp.ok ? await resp.text() : null
+  } catch {
+    return null
+  }
+}
+
+const { t, locale } = useI18n()
+const dlg = useScheduledDialog()
+
+// ── Edição-fonte Provai/Probad (SPEC ADR-02/04) ────────────
+// Registry fechado PT/ES 2026; EN/FR são fallback PT explícito (sem fonte
+// oficial — nenhum request /en|/fr). Trimestre pelo calendário local.
+const pvSourceLanguage = ref<ProvaiSourceLanguage>(resolveDefaultProvaiLanguage(String(locale.value)))
+
+function currentQuarter(): 1 | 2 | 3 | 4 {
+  return (Math.floor(new Date().getMonth() / 3) + 1) as 1 | 2 | 3 | 4
+}
+
+function resolveCurrentProvaiUrl() {
+  return resolveProvaiSource({
+    language: pvSourceLanguage.value,
+    year: new Date().getFullYear(),
+    quarter: currentQuarter(),
+  })
+}
+
+type TabId = 'rotations' | 'paste' | 'grade'
+const tab = ref<TabId>('rotations')
+
+// ── Rotações ───────────────────────────────────────────────
+const activeRotationId = ref<string | null>(null)
+const newRotationName = ref('')
+const entryDate = ref(new Date().toISOString().slice(0, 10))
+const entryName = ref('')
+const entryKind = ref<'music' | 'online_video' | 'file'>('music')
+const entryUrl = ref('')
+const entryFilePath = ref('')
+
+// Busca de música — mesmo catálogo do item de música (API + comunidade + .slja local)
+const musicCatalog = ref<LiturgyMusicOption[]>([])
+const musicQuery = ref('')
+const pickedMusic = ref<LiturgyMusicOption | null>(null)
+const musicResults = computed(() =>
+  filterLiturgyMusicOptions(musicCatalog.value, musicQuery.value, null).slice(0, 8),
+)
+
+function onPickMusic(option: LiturgyMusicOption) {
+  pickedMusic.value = option
+  musicQuery.value = option.name
+}
+
+/** Seleciona vídeo local; o caminho é salvo na programação, nunca no item da liturgia. */
+async function onPickLocalVideo() {
+  const bridge = getDesktopBridge()
+  if (!bridge?.dialog?.openFile) return
+  const picked = await bridge.dialog.openFile({
+    title: t('liturgy.fields.selectVideoButton'),
+    filters: [
+      { name: 'Vídeos', extensions: ['mp4', 'mkv', 'avi', 'mov', 'wmv', 'webm'] },
+      { name: 'Todos', extensions: ['*'] },
+    ],
+    multiple: false,
+  })
+  const path = Array.isArray(picked) ? picked[0] : picked
+  if (!path) return
+  entryFilePath.value = String(path)
+  if (!entryName.value.trim()) {
+    entryName.value = entryFilePath.value.split(/[\\/]/).pop()?.replace(/\.[^.]+$/, '') ?? ''
+  }
+}
+
+watch(
+  () => props.open,
+  (open) => {
+    if (open && musicCatalog.value.length === 0) {
+      void loadLiturgyMusicOptions().then((options) => {
+        musicCatalog.value = options
+      })
+    }
+  },
+  { immediate: true },
+)
+
+// ── Baixar Provai e Vede ───────────────────────────────────
+const pvEpisodes = ref<ProvaiEpisode[]>([])
+const pvSelected = ref<Set<string>>(new Set())
+const pvBusy = ref(false)
+const pvProgress = ref('')
+
+async function onFetchProvaiEVede() {
+  if (pvBusy.value) return
+  pvBusy.value = true
+  pvProgress.value = ''
+  try {
+    const html = await fetchQuarterHtml()
+    const eps = html ? extractProvaiEVedeEpisodes(html) : []
+    pvEpisodes.value = eps
+    pvSelected.value = new Set(eps.map((e) => e.dateISO))
+    if (eps.length === 0) {
+      pvProgress.value = t('liturgy.messages.scheduledPvUnavailable')
+    }
+  } finally {
+    pvBusy.value = false
+  }
+}
+
+/** 1-CLICK async: agenda imediato (online_video, já funcional) → batch em background → fecha. */
+const pvOneClickBusy = ref(false)
+const pvOneClickProgress = ref('')
+
+async function onProvaiEVedeOneClick() {
+  if (pvOneClickBusy.value) return
+  pvOneClickBusy.value = true
+  pvOneClickProgress.value = ''
+  try {
+    const html = await fetchQuarterHtml()
+    const all = html ? extractProvaiEVedeEpisodes(html) : []
+    if (all.length === 0) {
+      pvOneClickProgress.value = t('liturgy.messages.scheduledPvUnavailable')
+      return
+    }
+    const todayISO = new Date().toISOString().slice(0, 10)
+    const upcoming = all.filter((e) => e.dateISO >= todayISO)
+    if (upcoming.length === 0) {
+      pvOneClickProgress.value = t('liturgy.messages.scheduledPvNothing')
+      return
+    }
+
+    const store = useScheduledStore()
+    const bridge = getDesktopBridge()
+
+    // R6/SPEC v1.1: importa como online_video (toca de imediato em todos os
+    // idiomas — paridade pt-BR). O download em background depois promove a
+    // file localmente (T3) sem mudar o que o usuário já vê/agendou.
+    const report = await importProvaiEVedeEpisodes(store, upcoming, async () => '', {
+      onlyUpcoming: true,
+      sourceLanguage: pvSourceLanguage.value,
+    })
+    for (const ep of upcoming) {
+      const entry = store.findOn(report.rotationId, ep.dateISO)
+      if (entry && !entry.content?.filePath) {
+        store.upsertItem({
+          id: entry.id,
+          categoryId: entry.categoryId,
+          date: entry.date,
+          name: entry.name,
+          content: { kind: 'online_video', url: ep.url, name: ep.url.split('/').pop() ?? undefined },
+        })
+      }
+    }
+
+    // Desktop: dispara o batch de downloads em background (não trava o diálogo).
+    if (bridge?.downloadBatch?.enqueue) {
+      bridge.downloadBatch.enqueue(
+        upcoming.map((ep) => ({
+          id: `${report.rotationId}::${ep.dateISO}`,
+          url: ep.url,
+          fileName: ep.url.split('/').pop() ?? `${ep.dateISO}.mp4`,
+        })),
+      )
+    }
+
+    pvOneClickProgress.value = t('liturgy.messages.scheduledPvDone', {
+      created: report.created,
+      skipped: report.skipped,
+    })
+    // Agendou + baixando em background: fecha o diálogo (decisão Rafael 03/11).
+    emit('close')
+  } finally {
+    pvOneClickBusy.value = false
+  }
+}
+
+// T3/R4: promoção online_video → file quando o MAIN conclui cada download.
+const downloadBatchBridge = getDesktopBridge()?.downloadBatch
+if (downloadBatchBridge?.onItemDone) {
+  downloadBatchBridge.onItemDone((payload: { id: string, filePath: string }) => {
+      if (!payload?.id || !payload?.filePath) return
+      const [rotationId, dateISO] = payload.id.split('::')
+      if (!rotationId || !dateISO) return
+      const store = useScheduledStore()
+      const entry = store.findOn(rotationId, dateISO)
+      if (entry?.content?.kind === 'online_video') {
+        store.promoteOnlineVideoToFile(entry.id, payload.filePath)
+      }
+    })
+}
+
+async function onDownloadSelected() {
+  if (pvBusy.value || pvSelected.value.size === 0) return
+  pvBusy.value = true
+  try {
+    const bridge = getDesktopBridge()
+    const store = useScheduledStore()
+    const chosen = pvEpisodes.value.filter((e) => pvSelected.value.has(e.dateISO))
+    let done = 0
+    for (const ep of chosen) {
+      pvProgress.value = `${done + 1}/${chosen.length}`
+      let localPath: string | null = null
+      if (bridge?.workspace?.downloadToMedia) {
+        const fileName = ep.url.split('/').pop() ?? `${ep.dateISO}.mp4`
+        localPath = await bridge.workspace.downloadToMedia(ep.url, fileName)
+      }
+      // Importa com o caminho local (desktop) — sem download disponível (web),
+      // agenda como online_video com a URL original (fallback).
+      await importProvaiEVedeEpisodes(store, [ep], () => localPath ?? '', {
+        sourceLanguage: pvSourceLanguage.value,
+      })
+      if (!localPath) {
+        // web/sem bridge: guarda a URL como online_video em vez de file vazio
+        const rotationName = pvSourceLanguage.value === 'es' ? 'Probad y Ved' : 'Provai e Vede'
+        const rotation = store.categories.find((c) => c.name === rotationName)
+        const entry = rotation ? store.findOn(rotation.id, ep.dateISO) : undefined
+        if (entry) {
+          store.upsertItem({
+            id: entry.id,
+            categoryId: entry.categoryId,
+            date: entry.date,
+            name: entry.name,
+            content: { kind: 'online_video', url: ep.url },
+          })
+        }
+      }
+      done++
+    }
+    pvProgress.value = `${done} ✓`
+    pvEpisodes.value = []
+    pvSelected.value = new Set()
+  } finally {
+    pvBusy.value = false
+  }
+}
+
+const activeRotation = computed(
+  () => dlg.rotations.value.find((r) => r.id === activeRotationId.value) ?? null,
+)
+const activeEntries = computed(() =>
+  activeRotationId.value ? dlg.entriesOf(activeRotationId.value) : [],
+)
+
+function onCreateRotation() {
+  const name = newRotationName.value.trim()
+  if (!name) return
+  const id = dlg.createRotation(name)
+  newRotationName.value = ''
+  activeRotationId.value = id
+  tab.value = 'rotations'
+}
+
+/** Caminho do FORM: usuário só preenche data + conteúdo. Rotação é opcional —
+ * se não escolheu, vai pra "Provai e Vede" criada sob demanda. */
+function onAddSong() {
+  if (!entryDate.value) return
+  const rotationId = activeRotationId.value ?? dlg.ensureDefaultRotation()
+  if (entryKind.value === 'music') {
+    if (!pickedMusic.value) return
+    dlg.addEntry(rotationId, {
+      dateISO: entryDate.value,
+      content: {
+        kind: 'music',
+        musicId: pickedMusic.value.id,
+        musicMode: 'audio',
+      },
+      name: pickedMusic.value.name,
+    })
+    pickedMusic.value = null
+    musicQuery.value = ''
+  } else if (entryKind.value === 'file') {
+    const filePath = entryFilePath.value.trim()
+    if (!filePath) return
+    dlg.addEntry(rotationId, {
+      dateISO: entryDate.value,
+      content: { kind: 'file', filePath },
+      name: entryName.value.trim() || filePath.split(/[\\/]/).pop() || 'Vídeo',
+    })
+    entryFilePath.value = ''
+  } else {
+    const url = entryUrl.value.trim()
+    if (!url) return
+    dlg.addEntry(rotationId, {
+      dateISO: entryDate.value,
+      content: { kind: 'online_video', url },
+      name: entryName.value.trim() || 'Vídeo',
+    })
+    entryUrl.value = ''
+  }
+  entryName.value = ''
+  // form fica aberto pra digitar a próxima data em sequência
+}
+
+// ── Colar trimestre ────────────────────────────────────────
+const pasteText = ref('')
+const pasteReport = ref<{ created: number; unmapped: string[]; errors: number } | null>(null)
+
+
+function onApplyPaste() {
+  const mapping: Record<string, string | undefined> = {}
+  for (const rot of dlg.rotations.value) {
+    const key = rot.name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]/g, '')
+    if (!(key in mapping)) mapping[key] = rot.id
+  }
+  const year = new Date().getFullYear()
+  // Modo newbie: slot desconhecido cria a rotação com o nome do slot —
+  // ninguém precisa saber o que é "mapear" pra importar um trimestre.
+  const report = dlg.applyQuarterPaste(pasteText.value, {
+    year,
+    slotMapping: mapping,
+    autoCreateSlots: true,
+  })
+  pasteReport.value = {
+    created: report.created,
+    unmapped: Array.from(new Set(report.unmappedSlots)),
+    errors: report.errors.length,
+  }
+  if (report.created > 0) {
+    pasteText.value = ''
+    tab.value = 'rotations'
+  }
+}
+
+// ── Duplicar trimestre ─────────────────────────────────────
+function onDuplicateQuarter() {
+  if (!activeRotationId.value || activeEntries.value.length === 0) return
+  const first = activeEntries.value[0]!.date
+  dlg.duplicateQuarter(activeRotationId.value, { fromDate: first, weeks: 4 })
+}
+
+const dateFmt = (iso: string) => {
+  const [y, m, d] = iso.split('-')
+  return `${d}/${m}/${y}`
+}
+</script>
+
+<template>
+  <Teleport to="body">
+    <div
+      v-if="props.open"
+      class="liturgy-dialog-backdrop"
+      @click.self="emit('close')"
+    >
+      <GlassCard
+        class="liturgy-dialog scheduled-dialog"
+        elevated
+      >
+        <div class="scheduled-dialog__header">
+          <h2 class="liturgy-dialog__title">
+            {{ t('liturgy.messages.scheduledTitle') }}
+          </h2>
+          <button
+            type="button"
+            class="scheduled-dialog__btn"
+            :disabled="pvOneClickBusy"
+            style="flex-shrink: 0"
+            @click="onProvaiEVedeOneClick"
+          >
+            {{ t('liturgy.messages.scheduledPvOneClick') }}
+          </button>
+          <button
+            type="button"
+            class="scheduled-dialog__close"
+            :aria-label="t('common.close')"
+            @click="emit('close')"
+          >
+            ×
+          </button>
+        </div>
+        <p class="liturgy-dialog__hint">
+          {{ t('liturgy.messages.scheduledHint') }}
+        </p>
+
+        <p v-if="pvOneClickProgress" class="scheduled-dialog__report" role="status">
+          {{ pvOneClickProgress }}
+        </p>
+
+        <div
+          class="scheduled-dialog__tabs"
+          role="tablist"
+        >
+          <button
+            type="button"
+            role="tab"
+            :aria-selected="tab === 'rotations'"
+            class="scheduled-dialog__tab"
+            :class="{ 'is-active': tab === 'rotations' }"
+            @click="tab = 'rotations'"
+          >
+            {{ t('liturgy.messages.scheduledTitle') }}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            :aria-selected="tab === 'paste'"
+            class="scheduled-dialog__tab"
+            :class="{ 'is-active': tab === 'paste' }"
+            @click="tab = 'paste'"
+          >
+            {{ t('liturgy.messages.scheduledPasteQuarter') }}
+          </button>
+        </div>
+
+        <!-- ── Aba rotações ── -->
+        <div
+          v-if="tab === 'rotations'"
+          class="scheduled-dialog__panes"
+        >
+          <aside class="scheduled-dialog__left">
+            <ul class="scheduled-dialog__rots">
+              <li
+                v-for="rot in dlg.rotations.value"
+                :key="rot.id"
+                class="scheduled-dialog__rot"
+                :class="{ 'is-active': rot.id === activeRotationId }"
+                @click="activeRotationId = rot.id"
+              >
+                {{ rot.name }}
+                <button
+                  type="button"
+                  class="scheduled-dialog__rot-del"
+                  :aria-label="t('liturgy.remove')"
+                  @click.stop="dlg.removeRotation(rot.id)"
+                >
+                  ×
+                </button>
+              </li>
+            </ul>
+            <form
+              class="scheduled-dialog__new-rot"
+              @submit.prevent="onCreateRotation"
+            >
+              <input
+                v-model="newRotationName"
+                type="text"
+                class="scheduled-dialog__input"
+                :placeholder="t('liturgy.messages.scheduledRotationName')"
+              >
+              <button
+                type="submit"
+                class="scheduled-dialog__btn"
+                :disabled="!newRotationName.trim()"
+              >
+                + {{ t('liturgy.messages.scheduledNewRotation') }}
+              </button>
+            </form>
+          </aside>
+
+          <section class="scheduled-dialog__right">
+            <form
+              class="scheduled-dialog__quick-add"
+              @submit.prevent="onAddSong"
+            >
+                <input
+                  v-model="entryDate"
+                  type="date"
+                  class="scheduled-dialog__input"
+                  required
+                >
+                <select
+                  v-model="entryKind"
+                  class="scheduled-dialog__input"
+                >
+                  <option value="music">
+                    {{ t('liturgy.types.music') }}
+                  </option>
+                  <option value="online_video">
+                    {{ t('liturgy.types.online_video') }}
+                  </option>
+                  <option value="file">
+                    {{ t('liturgy.types.video') }}
+                  </option>
+                </select>
+                <div
+                  v-if="entryKind === 'music'"
+                  class="scheduled-dialog__music"
+                >
+                  <input
+                    v-model="musicQuery"
+                    type="search"
+                    class="scheduled-dialog__input"
+                    :placeholder="t('liturgy.fields.searchMusic')"
+                    autocomplete="off"
+                  >
+                  <ul
+                    v-if="musicQuery.trim() && musicResults.length > 0"
+                    class="scheduled-dialog__music-results"
+                  >
+                    <li
+                      v-for="option in musicResults"
+                      :key="option.id"
+                    >
+                      <button
+                        type="button"
+                        class="scheduled-dialog__music-option"
+                        @click="onPickMusic(option)"
+                      >
+                        {{ option.name }}
+                        <small>{{ option.albumNames }}</small>
+                      </button>
+                    </li>
+                  </ul>
+                </div>
+                <div
+                  v-else-if="entryKind === 'file'"
+                  class="scheduled-dialog__local-video"
+                >
+                  <button
+                    type="button"
+                    class="scheduled-dialog__btn scheduled-dialog__btn--ghost"
+                    @click="onPickLocalVideo"
+                  >
+                    {{ t('liturgy.fields.selectVideoButton') }}
+                  </button>
+                  <small v-if="entryFilePath">{{ entryFilePath.split(/[\\/]/).pop() }}</small>
+                </div>
+                <input
+                  v-else
+                  v-model="entryUrl"
+                  type="url"
+                  class="scheduled-dialog__input"
+                  placeholder="https://…"
+                  required
+                >
+                <input
+                  v-model="entryName"
+                  type="text"
+                  class="scheduled-dialog__input"
+                  :placeholder="t('liturgy.messages.scheduledSongName')"
+                >
+                <button
+                  type="submit"
+                  class="scheduled-dialog__btn"
+                >
+                  {{ t('liturgy.actions.save') }}
+                </button>
+                <button
+                  type="button"
+                  class="scheduled-dialog__btn scheduled-dialog__btn--ghost"
+                  v-if="activeRotation"
+                  @click="activeRotationId = null"
+                >
+                  {{ t('liturgy.actions.cancel') }}
+                </button>
+              </form>
+              <template v-if="activeRotation">
+              <div class="scheduled-dialog__right-head">
+                <strong>{{ activeRotation.name }}</strong>
+              </div>
+              <details class="scheduled-dialog__advanced">
+                <summary>{{ t('liturgy.messages.scheduledMoreOptions') }}</summary>
+                <button
+                  type="button"
+                  class="scheduled-dialog__btn scheduled-dialog__btn--ghost"
+                  @click="onDuplicateQuarter"
+                >
+                  {{ t('liturgy.messages.scheduledDuplicateQuarter') }}
+                </button>
+                <button
+                  type="button"
+                  class="scheduled-dialog__btn scheduled-dialog__btn--ghost"
+                  :disabled="pvBusy"
+                  @click="onFetchProvaiEVede"
+                >
+                  {{ t('liturgy.messages.scheduledFetchProvai') }}
+                </button>
+              </details>
+              <label class="scheduled-dialog__pv-source">
+                {{ t('liturgy.fields.provaiSourceEdition') }}
+                <select
+                  v-model="pvSourceLanguage"
+                  :aria-label="t('liturgy.fields.provaiSourceEdition')"
+                >
+                  <option value="pt">Provai e Vede (PT)</option>
+                  <option value="es">Probad y Ved (ES)</option>
+                </select>
+              </label>
+              <div
+                v-if="pvEpisodes.length > 0"
+                class="scheduled-dialog__pv"
+              >
+                <label
+                  v-for="ep in pvEpisodes"
+                  :key="ep.dateISO"
+                  class="scheduled-dialog__pv-row"
+                >
+                  <input
+                    v-model="pvSelected"
+                    type="checkbox"
+                    :value="ep.dateISO"
+                  >
+                  <span>{{ dateFmt(ep.dateISO) }} — {{ ep.title }}</span>
+                </label>
+                <button
+                  type="button"
+                  class="scheduled-dialog__btn"
+                  :disabled="pvBusy || pvSelected.size === 0"
+                  @click="onDownloadSelected"
+                >
+                  {{ t('liturgy.messages.scheduledDownloadSelected') }}
+                </button>
+              </div>
+              <p
+                v-if="pvProgress"
+                class="scheduled-dialog__report"
+              >
+                {{ pvProgress }}
+              </p>
+            </template>
+            <ul class="scheduled-dialog__entries">
+              <li
+                v-for="entry in dlg.entriesByDate.value"
+                :key="entry.id"
+                class="scheduled-dialog__entry"
+              >
+                <span class="scheduled-dialog__entry-date">{{ dateFmt(entry.date) }}</span>
+                <span class="scheduled-dialog__entry-name">
+                  {{ entry.name || `#${entry.content?.musicId ?? '?'}` }}
+                </span>
+                <span class="scheduled-dialog__entry-kind">{{ entry.rotationName }}</span>
+                <button
+                  type="button"
+                  class="scheduled-dialog__rot-del"
+                  :aria-label="t('liturgy.remove')"
+                  @click="dlg.removeEntry(entry.id)"
+                >
+                  ×
+                </button>
+              </li>
+              <li
+                v-if="dlg.entriesByDate.value.length === 0"
+                class="scheduled-dialog__empty"
+              >
+                {{ t('liturgy.messages.scheduledEmptyDate') }}
+              </li>
+            </ul>
+          </section>
+        </div>
+
+        <!-- ── Aba colar trimestre ── -->
+        <div
+          v-else
+          class="scheduled-dialog__paste"
+        >
+          <p class="liturgy-dialog__hint">
+            {{ t('liturgy.messages.scheduledPasteHintSimple') }}
+          </p>
+          <textarea
+            v-model="pasteText"
+            class="scheduled-dialog__textarea"
+            rows="10"
+            spellcheck="false"
+          />
+          <div class="scheduled-dialog__paste-actions">
+            <button
+              type="button"
+              class="scheduled-dialog__btn"
+              :disabled="!pasteText.trim()"
+              @click="onApplyPaste"
+            >
+              {{ t('liturgy.messages.scheduledApplyPaste') }}
+            </button>
+          </div>
+
+
+          <p
+            v-if="pasteReport"
+            class="scheduled-dialog__report"
+          >
+            {{ pasteReport.created }} ✓
+            <span
+              v-if="pasteReport.unmapped.length"
+            >· {{ pasteReport.unmapped.join(', ') }}</span>
+            <span v-if="pasteReport.errors">· {{ pasteReport.errors }} ✗</span>
+          </p>
+        </div>
+
+
+      </GlassCard>
+    </div>
+  </Teleport>
+</template>
+
+<style scoped>
+.liturgy-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: color-mix(in srgb, #000 55%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+/* Cabeçalho do dialog: título + fechar, sem hint solto ocupando linha */
+.scheduled-dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.scheduled-dialog__header .liturgy-dialog__title {
+  margin: 0;
+}
+
+.scheduled-dialog__close {
+  min-width: 2.25rem;
+  min-height: 2.25rem;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ds-color-on-surface) 10%, transparent);
+  color: var(--ds-color-on-surface);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.scheduled-dialog__close:hover {
+  background: color-mix(in srgb, var(--ds-color-on-surface) 18%, transparent);
+}
+
+/* Tabs pill no estilo do design system (não botões quadrados cinza) */
+.scheduled-dialog__tabs {
+  display: inline-flex;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0.25rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ds-color-on-surface) 8%, transparent);
+  width: fit-content;
+}
+
+.scheduled-dialog__tab {
+  border: 0;
+  background: transparent;
+  color: var(--ds-color-on-surface);
+  opacity: 0.65;
+  padding: 0.45rem 1rem;
+  border-radius: 999px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.scheduled-dialog__tab.is-active {
+  opacity: 1;
+  background: var(--ds-color-primary);
+  color: var(--ds-color-on-primary, #003258);
+}
+
+/* Painel: laterais com superfície sutil, sem "gaiola" de bordas duras */
+.scheduled-dialog__panes {
+  display: flex;
+  gap: 0.9rem;
+  min-height: 320px;
+  max-height: 56vh;
+}
+
+.scheduled-dialog__left {
+  width: 250px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.75rem;
+  border-radius: var(--ds-radius-md, 0.75rem 0 0.75rem 0);
+  background: color-mix(in srgb, var(--ds-color-surface, #fff) 45%, transparent);
+}
+
+.scheduled-dialog__rots {
+  flex: 1;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.scheduled-dialog__rot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 0.9em;
+}
+
+.scheduled-dialog__rot:hover {
+  background: color-mix(in srgb, var(--ds-color-on-surface) 10%, transparent);
+}
+
+.scheduled-dialog__rot.is-active {
+  background: color-mix(in srgb, var(--ds-color-primary) 30%, transparent);
+  font-weight: 700;
+}
+
+.scheduled-dialog__rot-del {
+  background: none;
+  border: none;
+  color: inherit;
+  opacity: 0.45;
+  cursor: pointer;
+  font-size: 1em;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: 999px;
+}
+
+.scheduled-dialog__rot-del:hover {
+  opacity: 1;
+  color: #ff6b6b;
+  background: color-mix(in srgb, #ff6b6b 18%, transparent);
+}
+
+.scheduled-dialog__new-rot {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.scheduled-dialog__input {
+  width: 100%;
+  border: 1px solid color-mix(in srgb, var(--ds-color-on-surface) 12%, transparent);
+  background: color-mix(in srgb, var(--ds-color-surface, #fff) 55%, transparent);
+  color: var(--ds-color-on-surface);
+  border-radius: 999px;
+  padding: 0.55rem 0.9rem;
+  font: inherit;
+  font-size: 0.875rem;
+  color-scheme: dark;
+}
+
+.scheduled-dialog__input:focus {
+  outline: 2px solid color-mix(in srgb, var(--ds-color-primary) 55%, transparent);
+  outline-offset: 1px;
+}
+
+/* Botões pill iguais aos demais dialogs */
+.scheduled-dialog__btn {
+  border: 0;
+  background: var(--ds-color-primary);
+  color: var(--ds-color-on-primary, #003258);
+  border-radius: 999px;
+  padding: 0.5rem 1.05rem;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  min-height: 2.25rem;
+}
+
+.scheduled-dialog__btn:hover {
+  filter: brightness(1.08);
+}
+
+.scheduled-dialog__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.scheduled-dialog__btn--ghost {
+  background: transparent;
+  color: var(--ds-color-on-surface);
+  border: 1px solid color-mix(in srgb, var(--ds-color-on-surface) 18%, transparent);
+}
+
+/* Grade do culto à direita: linhas com separador suave, datas tabulares */
+.scheduled-dialog__right {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.scheduled-dialog__right-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.scheduled-dialog__right-head strong {
+  font-size: 1rem;
+}
+
+.scheduled-dialog__music {
+  position: relative;
+  min-width: 0;
+}
+
+.scheduled-dialog__music-results {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 10;
+  list-style: none;
+  margin: 0;
+  padding: 0.35rem;
+  border-radius: 0.6rem;
+  background: var(--ds-color-surface, #16202c);
+  border: 1px solid color-mix(in srgb, var(--ds-color-on-surface) 15%, transparent);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.scheduled-dialog__music-option {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  color: var(--ds-color-on-surface);
+  padding: 0.45rem 0.6rem;
+  border-radius: 0.45rem;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.85em;
+}
+
+.scheduled-dialog__music-option:hover {
+  background: color-mix(in srgb, var(--ds-color-primary) 25%, transparent);
+}
+
+.scheduled-dialog__music-option small {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+
+.scheduled-dialog__local-video {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 0.5rem;
+}
+
+.scheduled-dialog__local-video small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.65;
+}
+
+.scheduled-dialog__quick-add {
+  display: grid;
+  grid-template-columns: 140px 150px 1fr auto auto;
+  gap: 0.4rem;
+  align-items: center;
+  padding: 0.6rem;
+  border-radius: var(--ds-radius-md, 0.75rem 0 0.75rem 0);
+  background: color-mix(in srgb, var(--ds-color-surface, #fff) 40%, transparent);
+}
+
+.scheduled-dialog__entries {
+  flex: 1;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.scheduled-dialog__entry {
+  display: grid;
+  grid-template-columns: 96px 1fr auto auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 0.6rem;
+  font-size: 0.9em;
+}
+
+.scheduled-dialog__entry + .scheduled-dialog__entry {
+  border-top: 1px solid color-mix(in srgb, var(--ds-color-on-surface) 7%, transparent);
+}
+
+.scheduled-dialog__entry:hover {
+  background: color-mix(in srgb, var(--ds-color-on-surface) 7%, transparent);
+}
+
+.scheduled-dialog__entry-date {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+
+.scheduled-dialog__entry-kind {
+  opacity: 0.55;
+  font-size: 0.82em;
+}
+
+.scheduled-dialog__empty {
+  opacity: 0.55;
+  padding: 1.5rem 0.75rem;
+  text-align: center;
+}
+
+.scheduled-dialog__empty--pad {
+  padding: 3rem 0.75rem;
+}
+
+/* Aba colar: textarea com superfície própria, ações à direita */
+.scheduled-dialog__paste {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.scheduled-dialog__textarea {
+  width: 100%;
+  border: 1px solid color-mix(in srgb, var(--ds-color-on-surface) 12%, transparent);
+  background: color-mix(in srgb, var(--ds-color-surface, #fff) 55%, transparent);
+  color: var(--ds-color-on-surface);
+  border-radius: var(--ds-radius-md, 0.75rem 0 0.75rem 0);
+  padding: 0.75rem 0.9rem;
+  font: ui-monospace, monospace;
+  font-size: 0.85em;
+  resize: vertical;
+  color-scheme: dark;
+}
+
+.scheduled-dialog__paste-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.scheduled-dialog__unmapped {
+  border: 1px dashed color-mix(in srgb, var(--ds-color-on-surface) 25%, transparent);
+  border-radius: var(--ds-radius-md, 0.75rem 0 0.75rem 0);
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.scheduled-dialog__unmapped-hint {
+  margin: 0;
+  font-size: 0.85em;
+  opacity: 0.8;
+}
+
+.scheduled-dialog__slot-row {
+  display: grid;
+  grid-template-columns: 130px 1fr auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.scheduled-dialog__report {
+  margin: 0;
+  font-size: 0.85em;
+  opacity: 0.8;
+}
+
+.scheduled-dialog__pv {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 0.5rem;
+  border-radius: var(--ds-radius-md, 0.75rem 0 0.75rem 0);
+  background: color-mix(in srgb, var(--ds-color-surface, #fff) 40%, transparent);
+}
+
+.scheduled-dialog__pv-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85em;
+  cursor: pointer;
+}
+
+.scheduled-dialog__advanced {
+  font-size: 0.85em;
+  opacity: 0.78;
+}
+
+.scheduled-dialog__advanced summary {
+  cursor: pointer;
+  width: fit-content;
+}
+
+.scheduled-dialog__advanced .scheduled-dialog__btn {
+  margin-top: 6px;
+}
+</style>

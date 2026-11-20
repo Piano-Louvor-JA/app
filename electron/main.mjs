@@ -1,6 +1,8 @@
 import path from "node:path";
+import { spawn } from "node:child_process";
+import { statSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { app, BrowserWindow, dialog, globalShortcut, screen, shell } from "electron";
+import { app, BrowserWindow, dialog, globalShortcut, ipcMain, net, screen, shell } from "electron";
 
 import {
 	APP_DESKTOP_ID,
@@ -9,23 +11,40 @@ import {
 	resolveAppIconPath,
 } from "./app-icon.mjs";
 import { APP_PRODUCT_NAME } from "./constants.mjs";
+import { startRendererServer, rendererUrl } from "./renderer-server.mjs";
 import { configureUserDataPath } from "./user-data-path.mjs";
 import { checkEulaAcceptance } from "./eula.mjs";
 import { resolveAppLocale } from "./locale.mjs";
+import { registerDesktopFonts } from "./fonts/register.mjs";
 import { registerWorkspaceIpc } from "./ipc/register.mjs";
-import { attachWindowStateEvents, registerWindowIpc } from "./ipc/window.mjs";
+import { registerDownloadBatchIpc } from "./ipc/download-batch-ipc.mjs";
+import { registerDiagnosticsIpc, setClockSkewProvider, setDiagnosticsToken } from "./diagnostics.mjs";
+import { createMainLogger } from "./main-log.mjs";
+import { attachHistoryAppCommand, attachWindowStateEvents, mainWindowChromeOptions, registerWindowIpc } from "./ipc/window.mjs";
+import { registerScreenContextIpc } from "./ipc/screen-context.mjs";
 import { attachRemoteServer } from "./remote-server.mjs";
-import { attachPalcoServer } from "./palco-server.mjs";
+import { attachMonitorShare } from "./monitor-share.mjs";
+import { attachPalcoServer, getPalcoManager } from "./palco-server.mjs";
 import { ensureWorkspaceDirectories } from "./paths.mjs";
-import { registerLocalFileProtocol, registerLocalScheme } from "./protocol.mjs";
-import { registerCloseProjectionPopups } from "./ipc/web-projection.mjs";
+import { registerLocalFileProtocol, registerLocalScheme, setOnlineVideoSource } from "./protocol.mjs";
+import { registerCloseProjectionPopups, setIndependentLayerHooks, setOnlineVideoPlayer } from "./ipc/web-projection.mjs";
+import { OnlineVideoService, registerOnlineVideoIpc } from "./online-video/ipc.mjs";
+import { readWorkspaceRecord, writeWorkspaceRecord } from "./workspace.mjs";
 import { buildProjectionWindowBounds } from "./projection-display.mjs";
+import { createIndependentProjectionRegistry, isIndependentProjectionUrl } from "./independent-projection.mjs";
+import { createSharedProjectionLayout, isSharedProjectionUrl } from "./shared-projection.mjs";
+import { X11_RELAUNCH_MARKER, buildX11Relaunch, consumeX11RelaunchMarker, shouldRelaunchWithX11 } from "./linux-display-backend.mjs";
 import { initUpdater } from "./updater.mjs";
+import { getBibleUpdater } from "./bible-updater.mjs";
 import { loadWindowState, trackWindowState } from "./window-state.mjs";
 import { registerYoutubeEmbedHeaders } from "./youtube-embed.mjs";
 import { registerYoutubeAuthIpc } from "./youtube-auth.mjs";
-import { registerAdblockerIpc } from "./youtube-adblock.mjs";
-import { readWorkspaceRecord, writeWorkspaceRecord } from "./workspace.mjs";
+import { registerYoutubeInfoIpc } from "./youtube-info.mjs";
+import { pianoLogoSvg } from "./piano-logo.mjs";
+import { setYoutubeVideoSource } from "./app-backup.mjs";
+import { registerYoutubeSearchIpc } from "./youtube-search.mjs";
+import { registerSiteInfoIpc } from "./site-info.mjs";
+import { enableAdblocker } from "./youtube-adblock.mjs";
 import { registerTunnelCorpBypass } from "./tunnel-corp-bypass.mjs";
 import {
   initProjectionHotkey,
@@ -33,6 +52,7 @@ import {
   removeProjectionWindowProvider,
   ensureProjectionHotkey,
   releaseProjectionHotkey,
+  collectAliveProjectionWindows,
 } from "./projection-hotkey.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -40,9 +60,11 @@ const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 const isDev = Boolean(VITE_DEV_SERVER_URL);
 const PRELOAD_PATH = path.join(__dirname, "preload.mjs");
 const bootT0 = Date.now();
+const mainLog = createMainLogger(() => app.getPath('userData'));
 
 function bootMark(label) {
 	console.log(`[boot +${Date.now() - bootT0}ms] ${label}`);
+	mainLog.info(`boot ${label}`);
 }
 
 registerLocalScheme();
@@ -52,6 +74,7 @@ registerLocalScheme();
 // app sem explicação. Loga, mostra diálogo amigável e segue.
 process.on("uncaughtException", (error) => {
   console.error("[main] uncaughtException:", error);
+  mainLog.error(`uncaughtException ${error instanceof Error ? error.stack ?? error.message : String(error ?? '')}`);
   try {
     const msg = error instanceof Error ? error.message : String(error ?? "erro desconhecido");
     dialog.showErrorBox(
@@ -63,6 +86,10 @@ process.on("uncaughtException", (error) => {
   }
 });
 
+process.on('unhandledRejection', (reason) => {
+  mainLog.error(`unhandledRejection ${reason instanceof Error ? reason.stack ?? reason.message : String(reason ?? '')}`);
+});
+
 /**
  * Linux: app name = WM_CLASS = StartupWMClass do .desktop (ícone na barra).
  * Título da janela continua sendo APP_PRODUCT_NAME.
@@ -72,6 +99,23 @@ if (process.platform === "linux") {
 	app.commandLine.appendSwitch("class", APP_DESKTOP_ID);
 } else {
 	app.setName(APP_PRODUCT_NAME);
+}
+
+/**
+ * Linux + Wayland: relança via XWayland para a projeção abrir no monitor
+ * escolhido (no Wayland nativo o compositor ignora a posição das janelas).
+ * Detalhes em linux-display-backend.mjs.
+ */
+let relaunchingForX11 = false;
+const wantsX11Relaunch = shouldRelaunchWithX11({ platform: process.platform, env: process.env, argv: process.argv });
+consumeX11RelaunchMarker(process.env);
+if (wantsX11Relaunch) {
+	relaunchingForX11 = true;
+	console.info("[main] wayland: relançando via XWayland (--ozone-platform=x11)");
+	process.env[X11_RELAUNCH_MARKER] = "1";
+	const relaunch = buildX11Relaunch({ argv: process.argv, env: process.env, execPath: process.execPath });
+	spawn(relaunch.command, relaunch.args, { detached: true, stdio: "ignore", env: process.env }).unref();
+	app.exit(0);
 }
 
 bootMark("main loaded");
@@ -87,18 +131,29 @@ if (typeof process.getuid === "function" && process.getuid() === 0) {
 	app.commandLine.appendSwitch("no-sandbox");
 }
 
+/** Software rendering is an explicit compatibility fallback. Disabling the
+ * GPU on every dev launch makes video decoding + projection capture compete
+ * on the CPU and causes stalls as soon as a mirror is opened. */
+if (process.env.LOUVORJA_DISABLE_GPU === "1") {
+  app.commandLine.appendSwitch("disable-gpu");
+}
+
 /** Permite autoplay com áudio nas janelas de projeção (YouTube). */
 app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 
 /** CDP p/ debug automatizado (apenas dev). */
 if (process.env.VITE_DEV_SERVER_URL) {
-	app.commandLine.appendSwitch("remote-debugging-port", "9222");
+	// 9222 colide com Chrome do sistema; env PIANO_CDP_PORT permite override.
+	app.commandLine.appendSwitch("remote-debugging-port", process.env.PIANO_CDP_PORT ?? "9222");
 }
 
-const gotLock = app.requestSingleInstanceLock();
+// O processo que vai se relançar não pega o lock: senão o relançado
+// encontraria o lock ocupado e fecharia.
+const gotLock = relaunchingForX11 || app.requestSingleInstanceLock();
 if (!gotLock) {
 	app.quit();
 }
+
 
 let mainWindow = null;
 let splashWindow = null;
@@ -118,22 +173,7 @@ html,body{width:100%;height:100%;background:#12121c;overflow:hidden;user-select:
 @keyframes r{to{transform:rotate(360deg)}}
 @keyframes p{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.85;transform:scale(.94)}}
 </style></head><body><div class="s">
-<svg class="l" viewBox="0 0 565 594" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M271.727.581C275.787-.138 278.482-.07 282.537.151 352.167-1.708 422.607 28.654 472.762 76.321 530.072 131.761 562.962 207.727 564.182 287.455 566.367 366.701 537.187 443.609 482.977 501.454 481.307 503.209 479.712 504.844 477.867 506.419L474.597 509.714C425.332 560.774 358.157 590.704 287.247 593.194 280.232 593.374 267.805 593.384 261.13 591.909 251.119 592.239 242.802 590.659 233.358 587.664 228.151 588.374 206.702 581.539 200.955 579.554 150.552 561.849 105.841 530.904 71.511 489.969 19.606 428.569-5.731 349.033 1.093 268.921 7.969 188.771 43.923 115.81 105.809 63.908 143.465 32.138 189.076 11.246 237.727 3.482 247.606 1.84 261.954-.267 271.727.581Z" fill="#1a1a2e"/>
-<path d="M233.358 587.664C228.151 588.374 206.702 581.539 200.955 579.554 150.552 561.849 105.841 530.904 71.511 489.969 19.606 428.569-5.731 349.033 1.093 268.921 7.969 188.771 43.923 115.81 105.809 63.908 143.465 32.138 189.076 11.246 237.727 3.482 247.606 1.84 261.954-.267 271.727.581 264.61 2.515 258.623 5.412 252.853 10.088 206.169 47.923 199.228 113.016 215.557 167.5 217.437 173.772 219.369 179.784 221.478 185.991 206.364 195.798 191.303 205.217 177.073 216.33 142.582 243.264 112.532 280.67 103.286 324.266 96.116 358.3 102.879 393.789 122.064 422.799 142.793 454.769 175.421 477.144 212.71 484.964 237.493 490.119 264.001 489.354 287.952 480.769 292.922 503.529 300.432 533.714 287.057 554.519 272.907 576.534 243.413 579.609 223.705 563.409 239.284 568.039 251.574 567.514 260.459 551.144 262.343 547.674 263.458 544.269 263.629 540.264 264.163 499.489 204.224 501.804 197.472 537.269 193.773 556.814 207.637 574.859 224.173 583.449 227.206 585.009 230.246 586.299 233.358 587.664Z" fill="#FCCE02"/>
-<path d="M282.537.151C352.167-1.708 422.607 28.654 472.762 76.321 530.072 131.761 562.962 207.727 564.182 287.455 566.367 366.701 537.187 443.609 482.977 501.454 481.307 503.209 479.712 504.844 477.867 506.419 479.542 499.424 479.992 492.974 479.977 485.784 479.962 478.924 479.567 474.114 472.587 471.459 473.977 457.654 473.607 443.999 473.637 430.109 481.102 426.959 480.197 419.169 480.237 412.329 480.267 407.059 479.987 401.749 479.627 396.489 477.797 393.424 476.747 392.514 473.637 390.819 473.522 377.119 473.702 363.435 473.497 349.71 472.722 348.577 471.942 347.343 471.182 346.189 472.122 344.66 471.837 339.6 471.837 337.485 474.702 331.704 473.652 309.485 473.662 301.442 480.532 297.169 479.342 288.942 479.372 281.678 479.402 274.457 480.407 266.868 473.627 262.49 473.452 254.618 475.047 236.434 471.597 230.941 472.202 227.796 472.002 225.058 471.787 221.916 474.642 217.404 473.882 200.98 473.347 195.248 478.747 192.335 477.627 190.006 477.397 184.33 476.812 169.916 477.852 166.126 466.857 155.991 437.657 129.005 405.382 109.047 365.352 103.459 354.842 101.991 344.337 101.918 333.737 101.581 334.312 73.404 330.367 50.647 314.547 26.221 307.712 15.664 295.512 2.680 282.537.151Z" fill="#10438C"/>
-<path d="M259.333 230.467L410.002 230.482 449.642 230.424C454.672 230.417 467.167 230.126 471.597 230.941 475.047 236.434 473.452 254.618 473.627 262.49 470.177 261.781 448.147 262.04 443.442 262.037L375.672 262.047C361.927 262.136 360.902 264.279 361.277 277.912L268.426 277.883C265.968 262.404 262.182 246.091 259.333 230.467Z" fill="white"/>
-<path d="M313.992 164.136L361.232 164.298C361.342 171.218 360.942 178.15 361.142 185.066 361.287 190.187 363.467 195.034 369.147 195.362 374.412 195.667 379.652 195.539 384.922 195.513L412.007 195.451 450.312 195.498C457.322 195.506 466.492 195.741 473.347 195.248 473.882 200.98 474.642 217.404 471.787 221.916 448.877 222.743 421.972 222.074 398.807 222.077L265.77 222.01C286.202 202.497 299.612 188.427 313.992 164.136Z" fill="white"/>
-<path d="M359.627 430.089C376.722 430.559 395.027 430.249 412.192 430.249 432.672 430.349 453.157 430.299 473.637 430.109 473.607 443.999 473.977 457.654 472.587 471.459 472.202 471.444 471.822 471.429 471.437 471.419 437.927 470.649 403.487 471.659 369.912 471.574 360.332 471.549 361.082 479.844 361.237 487.099L315.307 487.129 311.867 472.879C331.592 465.374 348.962 448.114 359.627 430.089Z" fill="white"/>
-<path d="M333.737 101.581C344.337 101.918 354.842 101.991 365.352 103.459 405.382 109.047 437.657 129.005 466.857 155.991 417.897 155.336 367.602 155.938 318.502 155.855 328.232 136.298 331.437 122.905 333.737 101.581Z" fill="white"/>
-<path d="M449.817 510.909C457.137 510.694 468.057 511.649 474.597 509.714 425.332 560.774 358.157 590.704 287.247 593.194 280.232 593.374 267.805 593.384 261.13 591.909 264.844 591.104 268.94 590.994 272.692 590.279 297.742 585.494 315.242 567.739 320.412 542.929 359.867 542.654 392.227 546.654 428.177 525.499 436.097 520.839 442.647 516.944 449.817 510.909Z" fill="#10438C"/>
-<path d="M309.572 286.189L361.272 286.277C361.242 287.121 361.212 287.966 361.187 288.811 360.767 304.83 370.802 301.753 383.252 301.738L408.797 301.713C429.062 301.689 453.742 302.352 473.662 301.442 473.652 309.485 474.702 331.704 471.837 337.485 436.317 338.039 399.282 337.506 363.637 337.514 350.562 311.804 336.262 297.601 309.572 286.189Z" fill="white"/>
-<path d="M366.742 345.943L434.117 345.887C443.572 345.875 462.332 345.337 471.182 346.189 471.942 347.343 472.722 348.577 473.497 349.71 473.702 363.435 473.522 377.119 473.637 390.819 463.707 390.179 448.462 390.624 438.177 390.629L372.067 390.664C373.472 373.168 372.212 362.649 366.742 345.943Z" fill="white"/>
-<path d="M318.412 495.474L362.252 495.494C361.947 502.774 361.452 510.299 371.027 510.769 379.632 511.189 388.302 510.979 396.922 510.974L450.827 510.944C443.657 516.979 437.107 520.874 429.187 525.534 393.237 546.689 360.877 542.689 321.422 542.964 324.497 525.314 321.507 512.549 318.412 495.474Z" fill="white"/>
-<path d="M234.234 245.581C235.025 246.639 242.761 281.345 243.771 285.473 220.418 293.93 200.864 308.433 189.591 330.648 170.454 368.507 185.672 410.394 223.953 428.189 230.283 431.129 258.427 443.039 262.395 434.634 262.729 429.409 258.405 427.159 254.237 425.494 240.9 420.179 228.626 407.714 223.07 394.564 217.912 382.224 217.797 368.357 222.749 355.935 228.603 341.554 239.613 333.26 253.477 327.42 255.652 334.746 257.534 345.227 259.567 353.23 267.362 388.044 275.357 422.814 283.552 457.534 239.855 471.484 191.274 450.219 166.933 412.464 152.876 391.104 147.942 365.01 153.228 339.991 162.647 297.141 199.239 267.985 234.234 245.581Z" fill="#FCCE02"/>
-<path d="M278.892 38.891C279.872 39.223 281.692 41.043 282.277 41.862 313.567 85.861 285.912 134.023 249.98 163.871L244.927 168.098C234.464 148.535 236.041 109.546 242.838 88.331 249.554 67.371 259.215 49.735 278.892 38.891Z" fill="#FCCE02"/>
-<path d="M277.012 323.881C288.562 324.13 300.417 329.892 309.472 336.816 338.637 359.111 345.102 405.044 321.822 434.159 316.432 440.739 312.127 444.539 305.057 449.084 294.867 408.619 286.032 364.841 277.012 323.881Z" fill="#10438C"/>
-</svg>
+${pianoLogoSvg("l")}
 <div class="t">LouvorJA - PIANO</div>
 <div class="m">Estamos configurando e preparando tudo para você.</div>
 <div class="sp"></div>
@@ -205,6 +245,10 @@ function applyWindowIcon(win) {
 	}
 }
 
+function isWarmProjectionUrl(url) {
+	return typeof url === "string" && /(?:\?|&)warm=1(?:&|$)/.test(url);
+}
+
 function isProjectionPopupUrl(url) {
 	try {
 		const parsed = new URL(url);
@@ -217,6 +261,56 @@ function isProjectionPopupUrl(url) {
 			(url.includes("#/popup") || url.includes("/popup"))
 		);
 	}
+}
+
+/**
+ * Feedback Ezequias (02/10): "logar com o google com erro"
+ * ("The requested action is invalid" no __/auth/handler).
+ * Causa: o popup OAuth do Firebase (signInWithPopup → window.open) caía no
+ * `shell.openExternal` e o browser externo perdia o handshake com a janela
+ * app (eventid/session) — o handler respondia invalid.
+ * Fix: popups de auth (firebaseapp.com / accounts.google.com / google.com
+ * OAuth) abrem como BrowserWindow FILHA in-app — mantém o handshake vivo
+ * e o credential volta pro renderer via signInWithPopup normalmente.
+ */
+function isAuthPopupUrl(url) {
+	try {
+		const parsed = new URL(url);
+		const allowed = [
+			"firebaseapp.com",
+			"firebaseui.com",
+			"accounts.google.com",
+			"accounts.youtube.com",
+			"google.com",
+			"gstatic.com",
+			"apple.com",
+		];
+		const host = parsed.hostname.toLowerCase();
+		return allowed.some(
+			(d) => host === d || host.endsWith(`.${d}`),
+		);
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Popup OAuth filho da janela principal. A partir do Electron 45, um filho com
+ * sandbox diferente do opener nasce sem opener: window.open retorna null e o
+ * signInWithPopup do Firebase falha com auth/popup-blocked.
+ * @returns {import('electron').BrowserWindowConstructorOptions}
+ */
+function buildAuthPopupWindowOptions() {
+	return {
+		width: 500,
+		height: 640,
+		autoHideMenuBar: true,
+		webPreferences: {
+			contextIsolation: true,
+			nodeIntegration: false,
+			sandbox: false,
+		},
+	};
 }
 
 /**
@@ -284,6 +378,8 @@ function buildPopupWindowOptions(url, features = '') {
       nodeIntegration: false,
       sandbox: false,
       spellcheck: false,
+      // Janela aquecida fica oculta: sem isso o Chromium congela o renderer.
+      backgroundThrottling: !isWarmProjectionUrl(url),
     },
   }
 
@@ -363,6 +459,101 @@ function attachProjectionWindowHandlers(parentWindow) {
   // 'none' com projeção aberta. A marca é a fonte de verdade.
   /** @type {Set<import('electron').BrowserWindow>} */
   const projectionPopups = new Set()
+  /** Janelas de mídia já com o Vue montado, escondidas até o play. */
+  /** @type {{ win: import('electron').BrowserWindow, layout: 'audience' | 'return' }[]} */
+  let warmPool = []
+  /** @type {WeakSet<import('electron').BrowserWindow>} */
+  const standbyWindows = new WeakSet()
+  /** @type {WeakSet<import('electron').BrowserWindow>} */
+  const standbyReady = new WeakSet()
+  /** Projeções independentes: fora do fechar-tudo e sempre acima das demais. */
+  const independentPopups = createIndependentProjectionRegistry()
+  // Qualquer janela nova (popups, vídeo/pdf/site da web-projection) que
+  // aparecer ou mudar de nível devolve as independentes ao topo.
+  /** Projeção compartilhada: divide o monitor com o que já está projetado nele. */
+  const sharedLayout = createSharedProjectionLayout({
+    getProjectionWindows: collectAliveProjectionWindows,
+    getDisplays: () => screen.getAllDisplays(),
+  })
+  app.on('browser-window-created', (_event, win) => {
+    if (win === parentWindow) return
+    independentPopups.watch(win)
+    sharedLayout.watch(win)
+  })
+  // Players do Piano (vídeo/imagens/texto/PDF/site): projeção independente usa as mesmas camadas.
+  setIndependentLayerHooks({
+    add: (win) => {
+      independentPopups.add(win)
+      win.once('show', () => independentPopups.raiseSoon())
+    },
+    addShared: (win, displayId) => {
+      sharedLayout.addShared(win, displayId)
+      win.once('show', () => sharedLayout.relayoutSoon())
+    },
+  })
+  screen.on('display-removed', () => sharedLayout.relayoutSoon())
+  screen.on('display-metrics-changed', () => sharedLayout.relayoutSoon())
+
+  const focusOperator = () => {
+    if (!parentWindow || parentWindow.isDestroyed()) return
+    setTimeout(() => {
+      try {
+        if (!parentWindow.isDestroyed()) parentWindow.focus()
+      } catch { /* ignore */ }
+    }, 0)
+  }
+
+  ipcMain.removeHandler("projection:reveal-warm")
+  ipcMain.handle("projection:reveal-warm", (_event, payload) => {
+    const shows = Array.isArray(payload?.shows)
+      ? payload.shows
+      : payload?.monitorId != null
+        ? [payload]
+        : []
+    if (shows.length === 0) return false
+
+    const available = warmPool.filter(
+      (item) => !item.win.isDestroyed() && standbyReady.has(item.win),
+    )
+    /** @type {{ item: (typeof available)[number], show: { monitorId?: unknown, fullscreen?: unknown, layout?: unknown } }[]} */
+    const assigned = []
+    const taken = new Set()
+    for (const show of shows) {
+      const layout = show?.layout === "return" ? "return" : "audience"
+      const index = available.findIndex(
+        (item, itemIndex) => !taken.has(itemIndex) && item.layout === layout,
+      )
+      if (index < 0) return false
+      taken.add(index)
+      assigned.push({ item: available[index], show })
+    }
+
+    try {
+      for (const { item, show } of assigned) {
+        const monitorId = Number(show?.monitorId)
+        const fullscreen = show?.fullscreen !== false
+        const bounds = buildProjectionWindowBounds({
+          fullscreen,
+          monitorId: Number.isFinite(monitorId) ? monitorId : null,
+          displays: screen.getAllDisplays(),
+          primary: screen.getPrimaryDisplay(),
+        })
+        standbyWindows.delete(item.win)
+        warmPool = warmPool.filter((entry) => entry.win !== item.win)
+        if (bounds) item.win.setBounds(bounds)
+        applyProjectionDisplayMode(item.win, fullscreen)
+      }
+      for (const { item } of assigned) {
+        item.win.showInactive()
+        projectionPopups.add(item.win)
+      }
+      ensureProjectionHotkey()
+      focusOperator()
+    } catch {
+      return false
+    }
+    return true
+  })
 
   const popupProvider = () => {
     for (const win of [...projectionPopups]) {
@@ -377,6 +568,8 @@ function attachProjectionWindowHandlers(parentWindow) {
   // registra o "como fechar popups"; ipc/register.mjs chama closeAll.
   registerCloseProjectionPopups(() => {
     for (const win of popupProvider()) {
+      // Trocar/fechar a projeção principal não derruba a independente.
+      if (independentPopups.has(win)) continue
       try {
         win.close()
       } catch {
@@ -394,12 +587,23 @@ function attachProjectionWindowHandlers(parentWindow) {
   })
 
   parentWindow.webContents.setWindowOpenHandler(({ url, features }) => {
+    if (isDev) console.log("[window-open]", url.slice(0, 120));
     if (isProjectionPopupUrl(url)) {
       // Nasce popup de projeção → hotkey disponível
       ensureProjectionHotkey()
       return {
         action: 'allow',
         overrideBrowserWindowOptions: buildPopupWindowOptions(url, features),
+      }
+    }
+
+    // Feedback Ezequias (02/10): login Google — popup OAuth do Firebase
+    // abre IN-APP (BrowserWindow filha) pra manter o handshake com o
+    // renderer; abrir no browser externo quebra o auth ("invalid action").
+    if (isAuthPopupUrl(url)) {
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: buildAuthPopupWindowOptions(),
       }
     }
 
@@ -413,12 +617,31 @@ function attachProjectionWindowHandlers(parentWindow) {
 
     const childUrl = details?.url ?? ''
     const isProjection = isProjectionPopupUrl(childUrl)
+    const warm = isWarmProjectionUrl(childUrl)
+    const independent = isProjection && isIndependentProjectionUrl(childUrl)
+    if (independent) independentPopups.add(childWindow)
+    if (independent && isSharedProjectionUrl(childUrl)) {
+      const { monitorId } = parseProjectionLaunchHints(childUrl, details?.features ?? '')
+      if (monitorId != null) sharedLayout.addShared(childWindow, monitorId)
+    }
 
     // Marca a popup na criação (fonte de verdade do provider da hotkey —
-    // independe da URL em runtime, que em dev nem sempre contém #/popup)
-    if (isProjection) {
+    // independe da URL em runtime, que em dev nem sempre contém #/popup).
+    // A janela aquecida fica de fora até ser revelada no play.
+    if (isProjection && !warm) {
       projectionPopups.add(childWindow)
       ensureProjectionHotkey()
+      // Fundo preto na hora: a splash de boot não pode pintar na tela do público.
+      try { childWindow.setBackgroundColor('#000000') } catch { /* ignore */ }
+    }
+    if (warm) {
+      const layout = /(?:\?|&)layout=return(?:&|$)/.test(childUrl) ? "return" : "audience"
+      warmPool.push({ win: childWindow, layout })
+      standbyWindows.add(childWindow)
+      try { childWindow.setBackgroundColor('#000000') } catch { /* ignore */ }
+      childWindow.on('closed', () => {
+        warmPool = warmPool.filter((entry) => entry.win !== childWindow)
+      })
     }
 
     const { fullscreen } = isProjection
@@ -436,7 +659,17 @@ function attachProjectionWindowHandlers(parentWindow) {
         try {
           if (!parentWindow || parentWindow.isDestroyed()) return
           if (input.key === 'Escape') {
+            // ESC na independente encerra só ela; a principal segue.
+            if (independent) {
+              childWindow.close()
+              return
+            }
             parentWindow.webContents.send('projection:close-requested')
+            return
+          }
+          // Esc + Enter: o operador só encerra se o confirm estiver aberto.
+          if (input.key === 'Enter' && !independent) {
+            parentWindow.webContents.send('projection:confirm-close-requested')
             return
           }
           const childUrl = childWindow.webContents.getURL()
@@ -460,8 +693,13 @@ function attachProjectionWindowHandlers(parentWindow) {
     childWindow.once('ready-to-show', () => {
       if (childWindow.isDestroyed()) return
       childWindow.webContents.setAudioMuted(false)
+      if (standbyWindows.has(childWindow)) {
+        standbyReady.add(childWindow)
+        return
+      }
       const shouldFullscreen = fullscreenByWindow.get(childWindow) ?? fullscreen
       applyProjectionDisplayMode(childWindow, shouldFullscreen)
+      if (independent) independentPopups.raiseOne(childWindow)
       childWindow.show()
       if (isProjection) {
         ensureProjectionHotkey()
@@ -493,6 +731,49 @@ function attachProjectionWindowHandlers(parentWindow) {
   })
 }
 
+/** @type {OnlineVideoService | null} */
+let onlineVideo = null;
+
+/** Cópia local dos vídeos do YouTube: IPC, protocolo `local://yt-*` e projeção. */
+function startOnlineVideo(getLocale) {
+	onlineVideo = new OnlineVideoService({
+		userDataDir: app.getPath("userData"),
+		readRecord: readWorkspaceRecord,
+		writeRecord: writeWorkspaceRecord,
+		getLocale,
+		windowsStore: process.windowsStore === true,
+		broadcast: (channel, payload) => {
+			for (const win of BrowserWindow.getAllWindows()) {
+				if (!win.isDestroyed()) win.webContents.send(channel, payload);
+			}
+		},
+		log: (message) => mainLog.info(`online-video ${message}`),
+		openPath: (dir) => shell.openPath(dir),
+		chooseDirectory: async () => {
+			const parent = BrowserWindow.getFocusedWindow() ?? undefined;
+			const result = await dialog.showOpenDialog(parent, {
+				title: "Pasta para os vídeos do YouTube",
+				properties: ["openDirectory", "createDirectory"],
+			});
+			return result.canceled ? null : (result.filePaths[0] ?? null);
+		},
+	});
+	const service = onlineVideo;
+	registerOnlineVideoIpc(ipcMain, service);
+	setOnlineVideoSource({
+		serve: (id, kind, range, signal) => service.serve(id, kind, range, signal),
+		cacheFile: (name) => service.cacheFile(name),
+	});
+	setOnlineVideoPlayer(service);
+	// Backup: vídeos baixados entram só se o operador escolher; na restauração voltam para a pasta do sistema.
+	setYoutubeVideoSource({
+		folders: () => (typeof service.cache.folders === "function" ? service.cache.folders() : null),
+		restoreDir: () => service.cache.system?.dir ?? path.join(app.getPath("userData"), "video-cache"),
+		reload: () => service.cache.load(),
+	});
+	void service.init().catch((error) => mainLog.error(`online-video init ${error?.message ?? error}`));
+}
+
 function createWindow(locale = 'pt-BR') {
 	const iconPath = resolveAppIconPath();
 	const windowState = loadWindowState();
@@ -507,7 +788,7 @@ function createWindow(locale = 'pt-BR') {
 		backgroundColor: "#12121c",
 		title: APP_PRODUCT_NAME,
 		show: false,
-		frame: false,
+		...mainWindowChromeOptions(process.platform),
 		autoHideMenuBar: true,
 		...(iconPath ? { icon: iconPath } : {}),
 		webPreferences: {
@@ -522,7 +803,9 @@ function createWindow(locale = 'pt-BR') {
 	});
 
 	applyWindowIcon(mainWindow);
+	mainLog.info('main window created');
 	attachWindowStateEvents(mainWindow);
+	attachHistoryAppCommand(mainWindow);
 	trackWindowState(mainWindow, { isMaximized: windowState.isMaximized });
 
 	mainWindow.on("page-title-updated", (event) => {
@@ -550,13 +833,21 @@ function createWindow(locale = 'pt-BR') {
 		const localeParam = `?lang=${locale}`;
 		void mainWindow.loadURL(VITE_DEV_SERVER_URL + localeParam);
 	} else {
-		void mainWindow.loadFile(path.join(__dirname, "../dist/index.html"), { query: { lang: locale } });
+		const rendererBase = globalThis.__rendererBaseUrl;
+			if (rendererBase) {
+				void mainWindow.loadURL(rendererUrl(rendererBase, locale));
+			} else {
+				void mainWindow.loadFile(path.join(__dirname, "../dist/index.html"), { query: { lang: locale } });
+			}
 	}
 
-	// Timeout de segurança: se ready-to-show não disparar em 15s, mostra erro
+	// Timeout de segurança: se ready-to-show não disparar, mostra erro.
+	// Dev: 90s (cold-optimize do Vite pode levar minutos neste disco);
+	// release mantém 15s (build pronto, sem depender de dev server).
+	const bootTimeoutMs = isDev ? 90_000 : 15_000;
 	const loadTimeout = setTimeout(() => {
 		if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
-			console.error("[main] timeout: janela principal não carregou em 15s");
+			console.error(`[main] timeout: janela principal não carregou em ${bootTimeoutMs / 1000}s`);
 			closeSplash();
 			dialog.showMessageBoxSync(mainWindow, {
 				type: "error",
@@ -567,10 +858,14 @@ function createWindow(locale = 'pt-BR') {
 			mainWindow.destroy();
 			mainWindow = null;
 		}
-	}, 15_000);
+	}, bootTimeoutMs);
 
 	mainWindow.once("ready-to-show", () => {
 		clearTimeout(loadTimeout);
+		if (isDev) {
+			const origin = globalThis.__rendererBaseUrl ?? (isDev ? VITE_DEV_SERVER_URL : "file://");
+			console.log("[main] renderer carregado via origem:", origin);
+		}
 	});
 
 	// Fallback: se a janela principal falhar ao carregar, mostra erro e fecha o splash
@@ -590,7 +885,12 @@ function createWindow(locale = 'pt-BR') {
 					if (isDev && VITE_DEV_SERVER_URL) {
 						void mainWindow.loadURL(`${VITE_DEV_SERVER_URL}/?lang=${locale}`);
 					} else {
-						void mainWindow.loadFile(path.join(__dirname, "../dist/index.html"), { query: { lang: locale } });
+						const rendererBase = globalThis.__rendererBaseUrl;
+			if (rendererBase) {
+				void mainWindow.loadURL(rendererUrl(rendererBase, locale));
+			} else {
+				void mainWindow.loadFile(path.join(__dirname, "../dist/index.html"), { query: { lang: locale } });
+			}
 					}
 				}
 			}, delay);
@@ -609,11 +909,33 @@ function createWindow(locale = 'pt-BR') {
 
 	mainWindow.on("closed", () => {
 		mainWindow = null;
+		if (!isQuitting) app.quit();
 	});
 }
 
+let isQuitting = false;
+
 app.whenReady().then(async () => {
+  // Origem http válida p/ Firebase Auth (popup Google) — ver renderer-server.mjs.
+  // file:// (loadFile) nunca estará nos authorizedDomains → popup abre e fecha na hora.
+  if (!isDev) {
+    try {
+      const renderer = await startRendererServer(
+        path.join(__dirname, "../dist"),
+      );
+      globalThis.__rendererBaseUrl = renderer.url;
+      renderer.server.on("close", () => console.log("[renderer-server] fechado"));
+    } catch (err) {
+      console.error("[renderer-server] indisponível — cai no loadFile:", err.message);
+      globalThis.__rendererBaseUrl = null;
+    }
+  }
+
 	bootMark("whenReady");
+	// telemetria de erros (Glitchtip) — não-bloqueante, silenciosa sem DSN
+	import("./telemetry.mjs")
+		.then((t) => t.startTelemetry())
+		.catch(() => {});
 	// Primeira coisa visível — checagens e servidores vêm depois.
 	createSplash();
 	bootMark("splash");
@@ -634,26 +956,50 @@ app.whenReady().then(async () => {
 		bootMark("eula");
 
 		registerWorkspaceIpc();
+		await registerDesktopFonts();
+		// Token de diagnóstico: LOUVORJA_DIAGNOSTICS_TOKEN (variável do MAIN, não
+		// VITE_* — config de build do renderer não existe no processo principal).
+		setDiagnosticsToken(process.env.LOUVORJA_DIAGNOSTICS_TOKEN ?? "");
+		registerDiagnosticsIpc(); // diagnostics:* — SrCaldeira, rede no main
+		// diag-v4-umbrella: skew do relógio via mtime de marker em userData (best-effort)
+		setClockSkewProvider(() => {
+			try {
+				const dir = app.getPath("userData");
+				const marker = path.join(dir, "diag-clock-marker");
+				const before = Date.now();
+				writeFileSync(marker, String(before));
+				const mtime = statSync(marker).mtimeMs;
+				const after = Date.now();
+				return Math.round(mtime - (before + after) / 2);
+			} catch {
+				return null;
+			}
+		});
+		mainLog.info('diagnostics IPC handlers registered');
 		registerWindowIpc(() => mainWindow);
+		registerScreenContextIpc(() => mainWindow);
+		registerDownloadBatchIpc(() => mainWindow);
 		registerLocalFileProtocol();
+		startOnlineVideo(() => locale);
 		registerYoutubeEmbedHeaders();
 		registerYoutubeAuthIpc();
-		// adblock YouTube (opt-in): estado persistido em workspace record
-		registerAdblockerIpc(
-			(enabled) => writeWorkspaceRecord("yt-adblock.json", { enabled }),
-			() => {
-				const rec = readWorkspaceRecord("yt-adblock.json");
-				return rec?.enabled === true;
-			},
-		);
+		registerYoutubeInfoIpc(ipcMain, { fetch: (url, init) => net.fetch(url, init) });
+		registerYoutubeSearchIpc(ipcMain, { fetch: (url, init) => net.fetch(url, init) });
+		registerSiteInfoIpc(ipcMain, { fetch: (url, init) => net.fetch(url, init) });
+		void enableAdblocker();
 		registerTunnelCorpBypass();
 		createWindow(locale);
 		bootMark("mainWindow");
 
-		attachRemoteServer(() => mainWindow?.webContents ?? null);
+		attachRemoteServer(() => mainWindow?.webContents ?? null, {
+			palcoHttpPort: () => getPalcoManager()?.getPrincipal()?.httpPort,
+		});
 		attachPalcoServer(() => mainWindow?.webContents ?? null);
+		// Compartilhar monitores com o app mobile (porta 48090).
+		attachMonitorShare(() => mainWindow?.webContents ?? null);
 	} catch (error) {
 		console.error("[main] falha no startup", error);
+		mainLog.error(`startup failure ${error instanceof Error ? error.stack ?? error.message : String(error ?? '')}`);
 		closeSplash();
 		const message =
 			error instanceof Error ? error.message : String(error ?? "erro desconhecido");
@@ -672,8 +1018,14 @@ app.whenReady().then(async () => {
 			mainWindow.webContents.send("updater:check-start");
 		}
 	}, 3000);
+	// Bíblia offline: confere bundles novos na API (1x/dia, em segundo plano)
+	setTimeout(() => {
+		getBibleUpdater()
+			.check()
+			.catch((error) => console.warn("[bible-updater] falha", error));
+	}, 20_000);
 	app.on("activate", () => {
-		if (BrowserWindow.getAllWindows().length === 0) {
+		if (!isQuitting && BrowserWindow.getAllWindows().length === 0) {
 			createWindow(locale);
 		}
 	});
@@ -685,29 +1037,25 @@ app.on("second-instance", () => {
 	mainWindow.focus();
 });
 
+// Stop receivers before Electron starts closing the player windows.
+app.on("before-quit", () => {
+  isQuitting = true;
+  try {
+    getPalcoManager()?.stopAllMedia();
+  } catch (error) {
+    console.warn('[shutdown] failed to stop receivers', error);
+  }
+});
+
 app.on("will-quit", () => {
-	// Hotkey global de projeção: libera Ctrl+Alt+P no encerrar (se registrada)
-	try {
-		const { globalShortcut } = require("electron");
-		globalShortcut.unregisterAll();
-	} catch {
-		/* ignore */
-	}
-	// Palco: app fechando → TVs param a mídia na hora (não toca até o fim).
-	try {
-		const { getPalcoManager } = require("./palco-server.mjs");
-		const manager = getPalcoManager && getPalcoManager();
-		if (manager) manager.stopAllMedia();
-	} catch {
-		/* palco não anexado */
-	}
+  globalShortcut.unregisterAll();
+  onlineVideo?.dispose();
+  void onlineVideo?.manager.cancelAll().catch(() => {});
 });
 
 app.on("window-all-closed", () => {
-	// window-all-closed pode disparar quando o splash fecha mas a main
-	// ainda está carregando. Só saímos se mainWindow já existiu ou se
-	// não há intenção de criar janela (eula recusado, erro fatal, etc).
-	if (process.platform !== "darwin") {
-		app.quit();
-	}
+	// Fechar a splash pode disparar este evento durante o handoff para a
+	// main window. Não mata o processo se a principal ainda existe/carrega.
+	if (mainWindow && !mainWindow.isDestroyed()) return;
+	if (!isQuitting) app.quit();
 });

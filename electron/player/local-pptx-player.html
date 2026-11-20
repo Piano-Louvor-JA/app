@@ -46,6 +46,7 @@
     </div>
     <script src="./vendor/pptx/jszip.min.js"></script>
     <script src="./vendor/pptx/PptxViewJS.min.js"></script>
+    <script src="screen-transitions.js"></script>
     <script>
       ;(function () {
         var params = new URLSearchParams(window.location.search)
@@ -72,9 +73,16 @@
           return clean.endsWith('.pptx')
         }
 
+        var shownIndex = -1
         async function renderCurrent() {
           if (!viewer || !ready || !canvas) return state()
+          // Animação escolhida na barra só na troca de slide (resize troca seco).
+          var swap = shownIndex >= 0 && shownIndex !== pageIndex && window.PianoScreenTransition
+            ? window.PianoScreenTransition.begin(canvas)
+            : null
           await viewer.goToSlide(pageIndex, canvas)
+          shownIndex = viewer.getCurrentSlideIndex()
+          if (swap) swap.play()
           pageIndex = viewer.getCurrentSlideIndex()
           total = viewer.getSlideCount()
           showError(false)

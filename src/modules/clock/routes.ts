@@ -29,4 +29,10 @@ export const utilitiesRoutes: RouteRecordRaw[] = [
       navKey: 'utilities',
     },
   },
+  {
+    path: 'utilities/obs',
+    name: 'utilities-obs',
+    redirect: { name: 'settings-transmission' },
+    meta: { navKey: 'settings' },
+  },
 ]

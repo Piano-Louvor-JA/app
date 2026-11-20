@@ -86,8 +86,28 @@ describe('auth-client', () => {
     expect(localStorage.getItem(SESSION_KEY)).toBeNull()
   })
 
+  it.each([0, -1, '0', 'abc', undefined])('placeholder id_user=%j é removido e não autentica', id_user => {
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ token: 'tok', user: { id_user, email: 'a@b.c', displayName: 'Rafael' } }))
+    expect(getAuthSession()).toBeNull()
+    expect(localStorage.getItem(SESSION_KEY)).toBeNull()
+  })
+
   it('token corrompido no localStorage = sessão nula', () => {
     localStorage.setItem(SESSION_KEY, '{{{')
     expect(getAuthSession()).toBeNull()
+  })
+
+  it('saveSession mantém sessão válida após reload', async () => {
+    const { saveSession } = await import('../auth-client')
+    const session = { token: 'persisted-token', user: { id_user: 9, email: 'a@b.c', displayName: 'Rafael' } }
+    saveSession(session)
+    expect(getAuthSession()).toEqual(session)
+  })
+
+  it('saveSession nunca persiste placeholder', async () => {
+    const { saveSession } = await import('../auth-client')
+    saveSession({ token: 'fake', user: { id_user: 0, email: '', displayName: '' } })
+    expect(getAuthSession()).toBeNull()
+    expect(localStorage.getItem(SESSION_KEY)).toBeNull()
   })
 })

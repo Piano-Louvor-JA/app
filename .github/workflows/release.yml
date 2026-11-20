@@ -22,8 +22,55 @@ env:
   NODE_VERSION: 22
 
 jobs:
+  decide:
+    name: Decide publication
+    runs-on: ubuntu-24.04
+    outputs:
+      publish: ${{ steps.decision.outputs.publish }}
+      reason: ${{ steps.decision.outputs.reason }}
+    steps:
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Decide publication
+        id: decision
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_REF: ${{ inputs.tag || github.ref_name }}
+          WORKFLOW_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          script="$(mktemp --suffix=.mjs)"
+          gh api "repos/${GITHUB_REPOSITORY}/contents/scripts/release-publish-decision.mjs?ref=${WORKFLOW_SHA}" --jq .content \
+            | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{let t=s.trim();if(t.startsWith(String.fromCharCode(34)))t=JSON.parse(t);process.stdout.write(Buffer.from(String(t).replace(/\s/g,""),"base64"))})' \
+            > "$script"
+          node "$script" --fetch --repo "$GITHUB_REPOSITORY" --ref "$TARGET_REF"
+
+      # Único criador da GitHub Release da tag. build-windows.yml e
+      # build-macos.yml esperam por este draft e só anexam assets; antes,
+      # cada publisher criava a sua e a v1.31.2 ficou com duas releases.
+      # Checkout do commit do workflow: tags antigas não têm o script.
+      - name: Checkout release scripts
+        if: steps.decision.outputs.publish == 'true'
+        uses: actions/checkout@v7
+        with:
+          sparse-checkout: scripts
+          fetch-depth: 1
+
+      - name: Create the single draft release
+        if: steps.decision.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: node scripts/release-draft.mjs --repo "$GITHUB_REPOSITORY" --tag "$TAG" --mode create
+
   package:
     name: Package ${{ matrix.arch }}
+    needs: decide
+    if: needs.decide.result == 'success' && needs.decide.outputs.publish == 'true'
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -35,13 +82,13 @@ jobs:
             runner: ubuntu-24.04-arm
     steps:
       - name: Checkout tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 1
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -49,7 +96,53 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Perfil de ambiente API (SPEC piano-api-env-guard): este workflow é o
+      # pipeline OFICIAL de tag/release — único caminho autorizado a produzir
+      # artefatos com a API de produção. O gate (PIANO_RELEASE_AUTHORIZED +
+      # GITHUB_REF_TYPE=tag) é verificado fail-closed pelo build guard.
+      - name: Resolve API build profile (release sob gate)
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "PIANO_BUILD_PROFILE=release" >> "$GITHUB_ENV"
+            echo "PIANO_RELEASE_AUTHORIZED=true" >> "$GITHUB_ENV"
+            echo "GITHUB_REF_TYPE=tag" >> "$GITHUB_ENV"
+            echo "Perfil: release (tag push oficial)"
+          else
+            echo "PIANO_BUILD_PROFILE=homologation" >> "$GITHUB_ENV"
+            echo "Perfil: homologation (dispatch manual — STG, sem produção)"
+          fi
+
+      # Fix P0 (auth Google morto na 1.36): o vite build lê as VITE_FIREBASE_*
+      # do ambiente — sem elas o bundle release nasce sem a config do Firebase
+      # e o login Google falha com "Firebase não configurado" antes do popup.
+      # Config pública de cliente Firebase (não é segredo de servidor).
+      - name: Validate Firebase client config
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+        run: |
+          missing=0
+          for v in VITE_FIREBASE_API_KEY VITE_FIREBASE_PROJECT_ID VITE_FIREBASE_APP_ID; do
+            if [ -z "${!v:-}" ]; then
+              echo "::error::Secret $v ausente no repo (Settings → Secrets → Actions). Login Google morre na release sem ela."
+              missing=1
+            fi
+          done
+          exit $missing
+          echo "Firebase client config injetada."
+
       - name: Build Vite
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
         run: npm run build-only -- --base=./
 
       - name: Install Linux packaging dependencies
@@ -74,6 +167,16 @@ jobs:
           fi
           node -e "require('node:fs').rmSync('dist-electron', { recursive: true, force: true })"
           npx electron-builder --linux AppImage deb rpm pacman tar.gz --${{ matrix.arch }} --publish never
+          tarball="$(find dist-electron -maxdepth 1 -type f -name "LouvorJA-PIANO-*-${{ matrix.arch }}.tar.gz" -print -quit)"
+          test -n "$tarball"
+          stage="$(mktemp -d)"
+          trap 'rm -rf "$stage"' EXIT
+          tar -xzf "$tarball" -C "$stage"
+          install -Dm644 packaging/flatpak/br.com.pianolouvorja.piano.desktop \
+            "$stage/br.com.pianolouvorja.piano.desktop"
+          install -Dm644 packaging/flatpak/br.com.pianolouvorja.piano.metainfo.xml \
+            "$stage/br.com.pianolouvorja.piano.metainfo.xml"
+          tar -C "$stage" -czf "$tarball" .
 
       - name: Verify package set
         env:
@@ -116,11 +219,15 @@ jobs:
           echo "OK pacman:"
           grep -E "$arch_re" /tmp/linux-artifacts.txt | grep -Ei '\.pacman$|\.pkg\.tar\.' || true
           require_one tar.gz '\.tar\.gz$'
+          tarball="$(find dist-electron -maxdepth 1 -type f -name "LouvorJA-PIANO-*-${ARCH}.tar.gz" -print -quit)"
+          test -n "$tarball"
+          tar -tzf "$tarball" | grep -Fx './br.com.pianolouvorja.piano.desktop'
+          tar -tzf "$tarball" | grep -Fx './br.com.pianolouvorja.piano.metainfo.xml'
 
           find dist-electron -maxdepth 1 -type f ! -name 'SHA256SUMS-*' -print0 | sort -z | xargs -0 sha256sum > "dist-electron/SHA256SUMS-${ARCH}"
 
       - name: Upload package artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: linux-${{ matrix.arch }}
           path: dist-electron/
@@ -129,32 +236,49 @@ jobs:
 
   release:
     name: Publish GitHub Release
-    needs: package
+    needs: [decide, package]
+    if: >-
+      always() &&
+      needs.decide.result == 'success' &&
+      (needs.decide.outputs.publish != 'true' || needs.package.result == 'success')
     runs-on: ubuntu-24.04
+    outputs:
+      publish: ${{ needs.decide.outputs.publish }}
     steps:
+      - name: Omit GitHub Release
+        if: needs.decide.outputs.publish != 'true'
+        run: |
+          echo "Publicação omitida (${{ needs.decide.outputs.reason }})."
+          echo "Nenhuma GitHub Release foi criada e nenhum pacote foi enviado a registry."
+
       - name: Checkout tag
-        uses: actions/checkout@v4
+        if: needs.decide.outputs.publish == 'true'
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 1
 
       - name: Download x64 artifacts
-        uses: actions/download-artifact@v4
+        if: needs.decide.outputs.publish == 'true'
+        uses: actions/download-artifact@v8
         with:
           name: linux-x64
           path: dist-electron
 
       - name: Download arm64 artifacts
-        uses: actions/download-artifact@v4
+        if: needs.decide.outputs.publish == 'true'
+        uses: actions/download-artifact@v8
         with:
           name: linux-arm64
           path: dist-electron
 
       - name: Resolve tag
         id: tag
+        if: needs.decide.outputs.publish == 'true'
         run: echo "value=${{ inputs.tag || github.ref_name }}" >> "$GITHUB_OUTPUT"
 
       - name: Publish release and assets
+        if: needs.decide.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.tag.outputs.value }}
@@ -177,44 +301,45 @@ jobs:
             echo "Faltam latest-linux.yml / latest-linux-arm64.yml (metadados do auto-update)" >&2
             exit 1
           fi
-          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "$TAG" --generate-notes
+          # Cria ou reutiliza um draft, envia os assets e só então publica.
+          # Publicar antes deixaria uma release incompleta se o upload falhar.
+          # Sem --latest: o GitHub escolhe a latest pela data e pela versão,
+          # então uma tag antiga disparada manualmente não substitui a atual.
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --title "$TAG" --generate-notes --draft
+          fi
           gh release upload "$TAG" "${assets[@]}" --clobber
+          gh release edit "$TAG" --draft=false
           echo "Publicados:"
           printf '  %s\n' "${assets[@]}"
 
   downstream:
     name: Trigger downstream package updates
-    needs: release
-    if: success()
+    permissions:
+      contents: read
+      actions: write
+    needs: [decide, release]
+    if: needs.decide.outputs.publish == 'true' && needs.release.result == 'success'
     runs-on: ubuntu-24.04
     steps:
-      - name: Dispatch optional store workflows
+      - name: Dispatch Flatpak and Snap for the exact release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag || github.ref_name }}
         run: |
-          echo 'GitHub Release published.'
-          echo 'Flathub, AUR, COPR, OBS, VoidBR and Snap update jobs remain opt-in until their credentials and repository IDs exist.'
-          echo 'No external store is allowed to fail or delete the central release.'
-
-      # Add repository_dispatch calls only after each store account is configured.
-      # Never put store tokens in this workflow or source repository.
-      # Required future secrets: AUR_SSH_PRIVATE_KEY, SNAPCRAFT_STORE_CREDENTIALS,
-      # COPR_CONFIG, OBS_API_TOKEN, GPG_PRIVATE_KEY.
-
-  # Flatpak must be submitted to Flathub first. Flathub builds it from its own repo.
-  # Do not upload a locally built Flatpak as a substitute for the Flathub submission.
-  # Snap stays disabled until core/base compatibility passes on both architectures.
-  # PPA stays disabled until Debian source packaging exists.
-  # VoidBR merge remains maintainer-controlled.
-  # OBS/COPR can consume the GitHub source/release after account setup.
+          set -euo pipefail
+          gh workflow run build-flatpak.yml --repo "$GITHUB_REPOSITORY" --ref main -f "version=$TAG"
+          # O Snap só gera o perfil release quando roda a partir da tag.
+          gh workflow run snap-release.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG" -f "version=$TAG"
 
   verify:
     name: Verify central release
-    needs: release
+    needs: [decide, release]
+    if: needs.decide.outputs.publish == 'true' && needs.release.result == 'success'
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 1
@@ -225,6 +350,12 @@ jobs:
           TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
+          # Uma só release por tag (drafts entram na listagem da API).
+          releases="$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" --paginate --jq ".[] | select(.tag_name == \"$TAG\") | .id" | wc -l)"
+          if [ "$releases" -ne 1 ]; then
+            echo "Esperada 1 GitHub Release para $TAG; encontradas $releases" >&2
+            exit 1
+          fi
           gh release view "$TAG" --json assets --jq '.assets[].name' | tee /tmp/assets
           test "$(grep -cE '\.(AppImage|deb|rpm|pacman|tar\.gz)$' /tmp/assets)" -ge 10
           # Linux exige x64+arm64; Windows/macOS também sobem SHA256SUMS-* na mesma release.
@@ -237,7 +368,11 @@ jobs:
   # External stores must be monitored separately; they cannot block GitHub Release.
   release-health:
     name: Release Health
-    needs: [release, verify]
+    needs: [decide, release, verify]
+    if: >-
+      needs.decide.outputs.publish == 'true' &&
+      needs.release.result == 'success' &&
+      needs.verify.result == 'success'
     runs-on: ubuntu-24.04
     steps:
       - run: echo 'Release pipeline passed.'

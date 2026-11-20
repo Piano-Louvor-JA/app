@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useProjectionFont } from '@modules/settings/composables/useProjectionFont'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 
 import { ProjectionBackground } from '@design-system/index'
@@ -28,6 +29,10 @@ import {
   DEFAULT_TIMER_DISPLAY_CONFIG,
   DEFAULT_TIMER_RUNTIME,
 } from '../types/timer'
+import { isIndependentProjectionLocation } from '@shared/services/projection-window-location'
+
+/** Projeção independente ignora o takeover da principal (projecting:false). */
+const independent = isIndependentProjectionLocation()
 
 withDefaults(
   defineProps<{
@@ -127,16 +132,18 @@ const effectiveConfig = computed(() => {
   const mod = stage.value.timer
   return mod ? { ...config.value, ...mod } : { ...config.value }
 })
+
+const projectionFontStyle = useProjectionFont('timer')
 </script>
 
 <template>
   <ProjectionBackground
     class="timer-projection"
     :class="{ 'timer-projection--embedded': embedded }"
-    :style="stageStyle"
+    :style="[stageStyle, projectionFontStyle]"
   >
     <div
-      v-if="runtime.projecting !== false"
+      v-if="independent || runtime.projecting !== false"
       class="timer-projection__stage"
       :style="stageAlign"
     >

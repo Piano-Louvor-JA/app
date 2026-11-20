@@ -4,6 +4,7 @@ import {
   setUserPreference,
 } from '@shared/services/user-preferences'
 import { getBrowserItem, setBrowserItem } from '@shared/services/browser-storage'
+import { getCurrentApiPrefix } from '@modules/sync/services/api-prefix'
 
 import {
   createEmptySessionTimes,
@@ -13,7 +14,9 @@ import {
   DEFAULT_MOMENT_DURATION_MS,
   getTypeDotColor,
   LITURGY_WEEKDAYS,
+  TYPES_WITHOUT_DURATION,
   type CustomLiturgy,
+  type LiturgyDayKey,
   type LiturgyItem,
   type LiturgyPersistedState,
   type LiturgySessionTimes,
@@ -29,8 +32,18 @@ import {
   createLiturgyItemId,
   normalizeItemType,
 } from './liturgy-item-helpers'
+import { normalizeTitleColor, sanitizeNotesHtml } from './rich-notes'
 
 const CHECKS_CLEARED_KEY = 'liturgy_checks_cleared'
+
+/**
+ * Chave de persistência da liturgia do idioma ativo: `liturgy.state.<prefix>`
+ * (pt/en/es). Liturgia é POR IDIOMA — importar em ES não pode sobrescrever a
+ * liturgia PT (SPEC piano-liturgy-locale-isolation).
+ */
+export function activeLiturgyStateKey(locale?: string): string {
+  return `${USER_PREFERENCE_KEYS.liturgyState}.${getCurrentApiPrefix(locale)}`
+}
 
 function asString(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value : fallback
@@ -55,8 +68,10 @@ function normalizeItem(raw: unknown): LiturgyItem | null {
   if (!name) return null
 
   const durationRaw = asNumberOrNull(source.durationMs)
+  const notesHtml = type === 'annotation' ? sanitizeNotesHtml(asString(source.notesHtml)) : ''
+  const titleColor = type === 'annotation' ? normalizeTitleColor(source.titleColor) : ''
   const durationMs =
-    type === 'category'
+    TYPES_WITHOUT_DURATION.includes(type)
       ? 0
       : type === 'music'
         ? durationRaw != null && durationRaw > 0
@@ -74,6 +89,10 @@ function normalizeItem(raw: unknown): LiturgyItem | null {
     accentColor: getTypeDotColor(type),
     categoryId:
       type === 'category' ? null : asString(source.categoryId) || null,
+    scheduledRotationId:
+      type === 'scheduled'
+        ? asString(source.scheduledRotationId).trim() || null
+        : null,
     startTime:
       type === 'category'
         ? normalizeLiturgyTimeHHmm(source.startTime)
@@ -100,6 +119,10 @@ function normalizeItem(raw: unknown): LiturgyItem | null {
       return single ? [single] : undefined
     })(),
     url: asString(source.url),
+    ...(typeof source.playerId === 'string' && source.playerId.trim() ? { playerId: source.playerId.trim() } : {}),
+    ...(['auto','powerpoint','libreoffice','onlyoffice','wps','keynote','calligra','custom'].includes(asString(source.presentationEngine)) ? { presentationEngine: source.presentationEngine as LiturgyItem['presentationEngine'] } : {}),
+    ...(notesHtml ? { notesHtml } : {}),
+    ...(titleColor ? { titleColor } : {}),
   }
 }
 
@@ -211,7 +234,20 @@ export function normalizeLiturgyState(raw: unknown): LiturgyPersistedState {
 }
 
 export function loadLiturgyState(): LiturgyPersistedState {
-  const stored = getUserPreference<unknown>(USER_PREFERENCE_KEYS.liturgyState, null)
+  const key = activeLiturgyStateKey()
+  let stored = getUserPreference<unknown>(key, null)
+
+  // Migração v1: estado legado (chave única `liturgy.state`, cross-idioma)
+  // pertence ao primeiro idioma que o gravou — pt. Move uma única vez e
+  // preserva o original até que o namespace pt seja gravado.
+  if (stored == null && key === `${USER_PREFERENCE_KEYS.liturgyState}.pt`) {
+    const legacy = getUserPreference<unknown>(USER_PREFERENCE_KEYS.liturgyState, null)
+    if (legacy != null) {
+      stored = legacy
+      setUserPreference(key, normalizeLiturgyState(legacy))
+    }
+  }
+
   const state = normalizeLiturgyState(stored)
 
   const checksCleared = getBrowserItem<boolean>(CHECKS_CLEARED_KEY, false, 'session')
@@ -231,9 +267,34 @@ export function loadLiturgyState(): LiturgyPersistedState {
 }
 
 export function saveLiturgyState(state: LiturgyPersistedState): void {
-  setUserPreference(USER_PREFERENCE_KEYS.liturgyState, state)
+  setUserPreference(activeLiturgyStateKey(), state)
 }
 
 export function todayWeekday(): LiturgyWeekday {
   return LITURGY_WEEKDAYS[new Date().getDay()] ?? 'sunday'
+}
+
+/** ISO yyyy-mm-dd de hoje no fuso local (a data do culto é local, nunca UTC). */
+export function todayISO(): string {
+  const d = new Date()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${mm}-${dd}`
+}
+
+/**
+ * Data (ISO local) do culto para um dia de liturgia: o dia escolhido DENTRO da
+ * semana corrente (modelo do trimestre — Rafael). Avulsa (`custom`) = hoje.
+ * Fuso local sempre: a data do culto nunca é UTC.
+ */
+export function activeDateISO(day: LiturgyDayKey): string {
+  if (day === 'custom') return todayISO()
+  const targetIndex = LITURGY_WEEKDAYS.indexOf(day as LiturgyWeekday)
+  const today = new Date()
+  const diff = targetIndex - today.getDay()
+  const target = new Date(today)
+  target.setDate(today.getDate() + diff)
+  const mm = String(target.getMonth() + 1).padStart(2, '0')
+  const dd = String(target.getDate()).padStart(2, '0')
+  return `${target.getFullYear()}-${mm}-${dd}`
 }

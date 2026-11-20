@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useProjectionFont } from '@modules/settings/composables/useProjectionFont'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 
@@ -27,6 +28,10 @@ import {
   type RandomDisplayConfig,
   type RandomRuntimeState,
 } from '../types/random'
+import { isIndependentProjectionLocation } from '@shared/services/projection-window-location'
+
+/** Projeção independente ignora o takeover da principal (projecting:false). */
+const independent = isIndependentProjectionLocation()
 
 const props = withDefaults(
   defineProps<{
@@ -139,28 +144,35 @@ const stageStyle = computed(() => {
 
 const stageAlign = computed(() => stageFlexAlign(stage.value))
 
+// Fora do modo embarcado o palco de projeção nunca pode sortear por conta própria.
+/* v8 ignore start -- embedded true exercitado pelo teste de draw embarcado */
+const canDrawEmbedded = computed(() => (props.embedded ? canDraw.value : false))
+/* v8 ignore stop */
+
 // Personalização do diálogo do sorteio tem prioridade sobre o sub-bloco do Palco.
 const effectiveConfig = computed(() => {
   const mod = stage.value.random
   return mod ? { ...mod, ...liveConfig.value } : { ...liveConfig.value }
 })
+
+const projectionFontStyle = useProjectionFont('random')
 </script>
 
 <template>
   <ProjectionBackground
     class="random-projection"
     :class="{ 'random-projection--embedded': embedded }"
-    :style="stageStyle"
+    :style="[stageStyle, projectionFontStyle]"
   >
     <div
-      v-if="liveRuntime.projecting !== false"
+      v-if="independent || liveRuntime.projecting !== false"
       class="random-projection__stage"
       :style="stageAlign"
     >
       <RandomStage
         projection
         :show-draw="embedded"
-        :can-draw="embedded ? canDraw : false"
+        :can-draw="canDrawEmbedded"
         :config="effectiveConfig"
         :runtime="liveRuntime"
         :stage="stage"

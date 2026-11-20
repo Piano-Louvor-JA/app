@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 
-defineProps<{
+import { useEnterToConfirm } from '@shared/composables/useEnterToConfirm'
+
+const props = defineProps<{
   open: boolean
 }>()
 
@@ -11,6 +13,9 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+
+// Esc abre este dialog; Enter fecha a música sem clicar em "Sim".
+useEnterToConfirm(() => props.open, () => emit('confirm'))
 </script>
 
 <template>

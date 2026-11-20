@@ -22,37 +22,41 @@ const extractDest = path.join(nsisInclude, 'extractAppPackage.nsh')
 const installUtilDest = path.join(nsisInclude, 'installUtil.nsh')
 const checkRunningDest = path.join(nsisInclude, 'allowOnlyOneInstallerInstance.nsh')
 
-if (!existsSync(extractSrc)) {
-  throw new Error(`NSIS override ausente: ${extractSrc}`)
-}
-if (!existsSync(extractDest)) {
-  throw new Error(`Template NSIS ausente: ${extractDest}`)
-}
-
-copyFileSync(extractSrc, extractDest)
-console.log(`[nsis] extractAppPackage.nsh → ${extractDest}`)
-
-function patchInstallUtil() {
-  let source = readFileSync(installUtilDest, 'utf8')
-  const before = source
-
+/**
+ * `$0` carrega os argumentos do desinstalador antigo (`/allusers --keep-shortcuts
+ * --updated`). O retorno do taskkill vai para `$R0`, que o ExecWait seguinte
+ * sobrescreve; em `$0` o desinstalador rodaria como remoção completa e
+ * desafixaria o app da barra de tarefas (WinShell::UninstAppUserModelId).
+ * @param {string} source
+ */
+export function patchInstallUtilSource(source) {
   source = source.replace(
     /MessageBox MB_RETRYCANCEL\|MB_ICONEXCLAMATION "\$\(appCannotBeClosed\)"[^\n]*\n\s*Return\n/g,
     'DetailPrint "Desinstalação anterior não concluiu — seguindo com a instalação."\n      Return\n',
   )
   source = source.replace(/^\s*OneMoreAttempt:\s*\n/m, '')
 
-  if (!source.includes('taskkill /F /IM "${APP_EXECUTABLE_FILENAME}" /T')) {
+  if (source.includes('taskkill /F /IM "${APP_EXECUTABLE_FILENAME}" /T')) {
+    source = source.replace(
+      /(nsExec::Exec `taskkill \/F \/IM "\$\{APP_EXECUTABLE_FILENAME\}" \/T`\n\s*)Pop \$0(\n\s*Sleep 400\n\s*ExecWait '"\$uninstallerFileNameTemp")/,
+      '$1Pop $$R0$2',
+    )
+  } else {
     source = source.replace(
       /ExecWait '"\$uninstallerFileNameTemp" \/S \/KEEP_APP_DATA \$0 _\?=\$installationDir' \$R0/,
       `nsExec::Exec \`taskkill /F /IM "\${APP_EXECUTABLE_FILENAME}" /T\`
-    Pop $0
+    Pop $$R0
     Sleep 400
-    ExecWait '"$uninstallerFileNameTemp" /S /KEEP_APP_DATA $0 _?=$installationDir' $R0`,
+    ExecWait '"$$uninstallerFileNameTemp" /S /KEEP_APP_DATA $$0 _?=$$installationDir' $$R0`,
     )
   }
 
-  source = source.replace(/\$R5 > 5/, '$R5 > 20')
+  return source.replace(/\$R5 > 5/, '$R5 > 20')
+}
+
+function patchInstallUtil() {
+  const before = readFileSync(installUtilDest, 'utf8')
+  const source = patchInstallUtilSource(before)
 
   if (source !== before) {
     writeFileSync(installUtilDest, source)
@@ -90,5 +94,21 @@ function patchCheckAppRunning() {
   }
 }
 
-patchInstallUtil()
-patchCheckAppRunning()
+function main() {
+  if (!existsSync(extractSrc)) {
+    throw new Error(`NSIS override ausente: ${extractSrc}`)
+  }
+  if (!existsSync(extractDest)) {
+    throw new Error(`Template NSIS ausente: ${extractDest}`)
+  }
+
+  copyFileSync(extractSrc, extractDest)
+  console.log(`[nsis] extractAppPackage.nsh → ${extractDest}`)
+
+  patchInstallUtil()
+  patchCheckAppRunning()
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main()
+}

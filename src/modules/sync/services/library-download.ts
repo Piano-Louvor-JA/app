@@ -16,9 +16,55 @@ import {
   writeDownloadedAlbumIds,
 } from './library-catalog'
 import { toRelativeMediaPath } from './media-paths'
+import { DownloadFailureBuffer } from './download-failure-buffer'
 
-const DOWNLOAD_BATCH_SIZE = 5
+// O mirror /file da API atende no máximo 8 buscas na origem ao mesmo tempo
+// (somando todos os clientes) e responde 503 acima disso.
+const DOWNLOAD_CONCURRENCY = 5
+const CATALOG_FETCH_CONCURRENCY = 6
+const albumDownloadFailures = new DownloadFailureBuffer()
+
+/** Roda `worker` com até `limit` itens em andamento; para de pegar itens novos quando `shouldStop` vira true. */
+async function runWithConcurrency<T>(
+  items: readonly T[],
+  limit: number,
+  worker: (item: T, index: number) => Promise<void>,
+  shouldStop: () => boolean = () => false,
+): Promise<void> {
+  let next = 0
+  const lanes = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length && !shouldStop()) {
+      const index = next
+      next += 1
+      await worker(items[index], index)
+    }
+  })
+  await Promise.all(lanes)
+}
+
+function reportAlbumDownloadFailure(failure: { url: string; status: number | null; bytes: number | null; error: string }, label: string): void {
+  albumDownloadFailures.add({
+    ts: new Date().toISOString(),
+    url: failure.url,
+    label,
+    status: failure.status,
+    bytes: failure.bytes,
+    erro: failure.error,
+    tentativa: 1,
+  })
+  try { window.louvorja?.diagnostics?.reportDownloadFailures?.(albumDownloadFailures.snapshot()) } catch { /* best effort */ }
+}
 const MAX_CONSECUTIVE_ERRORS = 3
+
+function catalogAlbumKey(albumId: string | number): string {
+  // Contrato compat.ts: record individual sem prefixo (album_{id}).
+  return `album_${albumId}`
+}
+
+function catalogMusicKey(musicId: string | number): string {
+  // Contrato compat.ts: record individual sem prefixo (music_{id}).
+  return `music_${musicId}`
+}
 
 /** Lê registro local; se faltar, busca na API Piano e cacheia em .sysdata. */
 async function readOrFetchCatalogRecord<T>(filename: string): Promise<T | null> {
@@ -31,6 +77,9 @@ async function readOrFetchCatalogRecord<T>(filename: string): Promise<T | null> 
     return remote
   } catch (error) {
     console.warn(`[sync] falha ao obter catálogo ${filename}`, error)
+    void import('@shared/services/telemetry').then(({ reportError }) =>
+      reportError(error, { scope: 'catalog-fetch', filename }),
+    )
     return null
   }
 }
@@ -84,7 +133,7 @@ async function collectMediaForAlbum(
     songRefs = hymnalData
   } else {
     const albumData = await readOrFetchCatalogRecord<CatalogAlbumRecord>(
-      `album_${album.id}`,
+      catalogAlbumKey(album.id),
     )
     if (!albumData?.musics || !Array.isArray(albumData.musics)) {
       return { items: [], found: false }
@@ -94,14 +143,17 @@ async function collectMediaForAlbum(
 
   const total = songRefs.length
   let fetched = 0
+  const musicRecords: Array<CatalogMusicRecord | null> = new Array(total).fill(null)
 
-  for (const song of songRefs) {
+  await runWithConcurrency(songRefs, CATALOG_FETCH_CONCURRENCY, async (song, index) => {
+    musicRecords[index] = await readOrFetchCatalogRecord<CatalogMusicRecord>(
+      catalogMusicKey(song.id_music),
+    )
     fetched += 1
     onSongFetched?.(fetched, total)
+  })
 
-    const musicData = await readOrFetchCatalogRecord<CatalogMusicRecord>(
-      `music_${song.id_music}`,
-    )
+  for (const musicData of musicRecords) {
     if (!musicData) continue
 
     if (musicData.url_music) musicFiles.add(musicData.url_music)
@@ -141,7 +193,7 @@ export async function listAlbumMusicIds(
     songRefs = hymnalData
   } else {
     const albumData = await readOrFetchCatalogRecord<CatalogAlbumRecord>(
-      `album_${album.id}`,
+      catalogAlbumKey(album.id),
     )
     if (!albumData?.musics || !Array.isArray(albumData.musics)) return []
     songRefs = albumData.musics
@@ -165,7 +217,7 @@ export async function resolveAlbumIdsForMusic(
     albums?: Array<{ id_album?: number | string }>
   }
 
-  const music = await readOrFetchCatalogRecord<MusicAlbumsRow>(`music_${musicId}`)
+  const music = await readOrFetchCatalogRecord<MusicAlbumsRow>(catalogMusicKey(musicId))
   if (!music?.albums || !Array.isArray(music.albums)) return []
 
   const ids: Array<string | number> = []
@@ -181,6 +233,36 @@ export async function resolveAlbumIdsForMusic(
     ids.push(id)
   }
   return ids
+}
+
+/** Itens já presentes no disco, com um IPC por tipo; null quando o bridge não tem `checkMany`. */
+async function findMediaOnDisk(
+  bridge: NonNullable<ReturnType<typeof getDesktopBridge>>,
+  items: MediaDownloadItem[],
+): Promise<Set<MediaDownloadItem> | null> {
+  const checkMany = bridge.media.checkMany
+  if (!checkMany) return null
+
+  const byType = new Map<MediaDownloadItem['type'], MediaDownloadItem[]>()
+  for (const item of items) {
+    const group = byType.get(item.type)
+    if (group) group.push(item)
+    else byType.set(item.type, [item])
+  }
+
+  try {
+    const found = new Set<MediaDownloadItem>()
+    for (const [type, group] of byType) {
+      const result = await checkMany(type, group.map((item) => toRelativeMediaPath(item.url)))
+      for (const item of group) {
+        if (result[toRelativeMediaPath(item.url)]) found.add(item)
+      }
+    }
+    return found
+  } catch (error) {
+    console.warn('[sync] checagem em lote falhou; checando arquivo a arquivo', error)
+    return null
+  }
 }
 
 export type DownloadProgressHooks = {
@@ -248,58 +330,78 @@ export async function downloadAlbumMedia(
     return { status: 'downloaded', failureReason: null, totalErrors: 0 }
   }
 
-  let downloaded = 0
+  const totalFiles = allMediaFiles.length
+  const onDisk = await findMediaOnDisk(bridge, allMediaFiles)
+  const pending = onDisk ? allMediaFiles.filter((media) => !onDisk.has(media)) : allMediaFiles
+
+  let downloaded = totalFiles - pending.length
   let consecutiveErrors = 0
   let totalErrors = 0
+  let wentOffline = false
 
-  hooks.onDownloadProgress(0, allMediaFiles.length, 10)
-
-  for (let index = 0; index < allMediaFiles.length; index += DOWNLOAD_BATCH_SIZE) {
-    if (hooks.shouldAbort() || !navigator.onLine) {
-      if (!navigator.onLine) totalErrors += 1
-      break
-    }
-    if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) break
-
-    const batch = allMediaFiles.slice(index, index + DOWNLOAD_BATCH_SIZE)
-
-    await Promise.all(
-      batch.map(async (media) => {
-        if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) return
-
-        const relativePath = toRelativeMediaPath(media.url)
-        const exists = await bridge.media.check(media.type, relativePath)
-
-        if (!exists) {
-          const success = await bridge.media.download(
-            media.url,
-            media.type,
-            relativePath,
-          )
-          if (!success) {
-            consecutiveErrors += 1
-            totalErrors += 1
-            console.warn(
-              `[sync] falha ao baixar: ${relativePath} (${consecutiveErrors} consecutivas)`,
-            )
-            return
-          }
-          consecutiveErrors = 0
-        }
-
-        downloaded += 1
-        const percent = 10 + Math.floor((downloaded / allMediaFiles.length) * 90)
-        hooks.onDownloadProgress(downloaded, allMediaFiles.length, percent)
-      }),
-    )
+  const reportProgress = () => {
+    hooks.onDownloadProgress(downloaded, totalFiles, 10 + Math.floor((downloaded / totalFiles) * 90))
   }
+
+  hooks.onDownloadProgress(0, totalFiles, 10)
+  if (downloaded > 0) reportProgress()
+
+  const shouldStop = () => {
+    if (!navigator.onLine) {
+      if (!wentOffline) totalErrors += 1
+      wentOffline = true
+      return true
+    }
+    return hooks.shouldAbort() || consecutiveErrors >= MAX_CONSECUTIVE_ERRORS
+  }
+
+  await runWithConcurrency(pending, DOWNLOAD_CONCURRENCY, async (media) => {
+    const relativePath = toRelativeMediaPath(media.url)
+    const exists = onDisk ? false : await bridge.media.check(media.type, relativePath)
+
+    if (!exists) {
+      const success = await bridge.media.download(
+        media.url,
+        media.type,
+        relativePath,
+      )
+      if (success !== true) {
+        if (success && typeof success === 'object') {
+          reportAlbumDownloadFailure(success, relativePath)
+        }
+        consecutiveErrors += 1
+        totalErrors += 1
+        console.warn(
+          `[sync] falha ao baixar: ${relativePath} (${consecutiveErrors} consecutivas)`,
+        )
+        return
+      }
+      consecutiveErrors = 0
+    }
+
+    downloaded += 1
+    reportProgress()
+  }, shouldStop)
 
   const abortedByErrors = consecutiveErrors >= MAX_CONSECUTIVE_ERRORS
 
   if (abortedByErrors || !navigator.onLine) {
+    const failureReason: DownloadFailureReason = !navigator.onLine ? 'offline' : 'server'
+    // telemetria: abort de download é evento raro e valioso (bug do vídeo 08/10)
+    void import('@shared/services/telemetry').then(({ reportError }) =>
+      reportError(new Error(`download abortado (${failureReason})`), {
+        album: album.id,
+        albumName: album.name,
+        failureReason,
+        totalErrors,
+        totalFiles: allMediaFiles.length,
+        downloaded,
+        maxConsecutive: MAX_CONSECUTIVE_ERRORS,
+      }),
+    )
     return {
       status: 'error',
-      failureReason: !navigator.onLine ? 'offline' : 'server',
+      failureReason,
       totalErrors,
     }
   }

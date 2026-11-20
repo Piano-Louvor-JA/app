@@ -49,9 +49,8 @@ function formatVersionLabel(version: BibleVersion): string {
 }
 
 function updateMenuPosition() {
-  const trigger = triggerEl.value
-  if (!trigger) return
-
+  // chamada só ocorre com o menu aberto (trigger montado)
+  const trigger = triggerEl.value!
   const rect = trigger.getBoundingClientRect()
   const minWidth = Math.max(rect.width, 272)
   const maxLeft = window.innerWidth - minWidth - 12
@@ -66,7 +65,8 @@ function updateMenuPosition() {
 }
 
 async function toggle() {
-  if (props.disabled || props.versions.length === 0) return
+  // O :disabled do trigger (disabled || sem versões) já bloqueia o clique;
+  // aqui só alternamos o estado do menu.
   open.value = !open.value
   if (open.value) {
     await nextTick()
@@ -82,9 +82,7 @@ function choose(versionId: number) {
 
 function onDocumentPointerDown(event: PointerEvent) {
   if (!open.value) return
-  const target = event.target as Node | null
-  if (!target) return
-
+  const target = event.target as Node
   const inTrigger = Boolean(rootEl.value?.contains(target))
   const inMenu = Boolean(menuEl.value?.contains(target))
   if (!inTrigger && !inMenu) {

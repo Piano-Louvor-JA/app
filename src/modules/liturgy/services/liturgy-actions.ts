@@ -5,9 +5,10 @@ import { getDesktopBridge } from '@shared/services/desktop-bridge'
 import type { ExternalPlayerPreference } from '@shared/types/desktop-bridge'
 import type { Router } from 'vue-router'
 
-import type { LiturgyItem } from '../types/liturgy'
-import { INTERNAL_FILE_TYPES } from '../types/liturgy'
+import type { LiturgyItem, LiturgyMusicMode } from '../types/liturgy'
 import { isExecutableItem } from './liturgy-item-helpers'
+import { useScheduledStore } from '../stores/useScheduledStore'
+import { activeDateISO, todayISO } from './liturgy-preferences'
 import { getLiturgyVideoObjectUrl } from './liturgy-local-video'
 import {
   openLiturgyLocalImageControl,
@@ -22,20 +23,39 @@ import {
   playLiturgyLocalPresentationOnScreens,
   playLiturgyLocalVideoOnScreens,
   playLiturgyWebOnConfiguredScreens,
+  getPalcoRoute,
+  parseLiturgyWebTarget,
 } from './liturgy-web-projection'
-export type LiturgyActionResult =
-  | { ok: true; messageKey?: string }
-  | { ok: false; messageKey: string }
 
-function resolveMusicId(item: LiturgyItem): number | null {
-  if (item.type !== 'music') return null
+export { todayISO }
+
+export type LiturgyScheduledContent =
+  | { kind: 'music'; musicId: number; musicMode?: LiturgyMusicMode }
+  | { kind: 'file'; filePath: string }
+  | { kind: 'verse'; verseBookId: number; verseChapter: number; verseNumbers?: string }
+  | { kind: 'annotation'; text: string }
+  | { kind: 'online_video'; url: string; name?: string }
+
+export type LiturgyActionResult =
+  | { ok: true; messageKey?: string; resolved?: LiturgyScheduledContent }
+  | { ok: false; messageKey: string; resolved?: LiturgyScheduledContent }
+
+/**
+ * app#331: id de música do item → namespace único de mídia.
+ * - >= 1.000.000: música custom da API (Minhas Coletâneas / importações .slja logadas)
+ * - negativo: música LOCAL (import .slja sem login — localStorage)
+ * - positivo pequeno: hino oficial do catálogo
+ * 0/NaN/null (sem música) → null.
+ * scheduled também resolve (placeholder delega pro tipo música — PR #416).
+ */
+export function resolveMusicId(item: LiturgyItem): number | null {
+  if (item.type !== 'music' && item.type !== 'scheduled') return null
   const musicId = Number(item.musicId)
-  if (!Number.isFinite(musicId) || musicId <= 0) return null
+  if (!Number.isFinite(musicId) || musicId === 0) return null
   return musicId
 }
 
 function resolveImagePaths(item: LiturgyItem): string[] {
-  if (item.type !== 'images') return []
   if (item.filePaths && item.filePaths.length > 0) {
     return item.filePaths.map((entry) => entry.trim()).filter(Boolean)
   }
@@ -78,11 +98,133 @@ export async function openLiturgyMusicOnScreens(
   })
 }
 
+/**
+ * Placeholder `scheduled`: encontra a entrada da categoria cuja `date` == dataISO
+ * e delega a execução ao tipo do conteúdo. Sem entrada → alerta claro, culto segue.
+ */
+async function executeScheduledRef(
+  item: LiturgyItem,
+  router: Router,
+  dateISO: string,
+): Promise<LiturgyActionResult> {
+  // Rotação mora em scheduledRotationId (campo próprio). Fallback categoryId =
+  // itens criados antes do campo existir (compat com estado já salvo).
+  const categoryId =
+    item.scheduledRotationId?.trim() || item.categoryId?.trim()
+  if (!categoryId) {
+    return { ok: false, messageKey: 'liturgy.messages.scheduledEmpty' }
+  }
+
+  const store = useScheduledStore()
+  const entry = store.findOn(categoryId, dateISO)
+  const content: LiturgyScheduledContent | null =
+    (entry?.content as LiturgyScheduledContent | undefined) ??
+    legacyContentFromFile(entry)
+
+  if (!content) {
+    return { ok: false, messageKey: 'liturgy.messages.scheduledEmpty' }
+  }
+
+  switch (content.kind) {
+    case 'music': {
+      const asMusic: LiturgyItem = {
+        ...item,
+        type: 'music',
+        musicId: content.musicId,
+        musicMode: content.musicMode ?? 'audio',
+      }
+      const result = await openLiturgyMusicOnScreens(asMusic)
+      if (result.ok) {
+        await router.push({ name: 'media' })
+      }
+      return { ...result, resolved: content }
+    }
+    case 'file': {
+      // Assinaturas de projeção: (filePath, title) — retornam boolean, não ActionResult.
+      if (!content.filePath) {
+        return { ok: false, messageKey: 'liturgy.messages.scheduledEmpty' }
+      }
+      const filePath: string = content.filePath
+      const ext = filePath.split('.').pop()?.toLowerCase() ?? ''
+      const title = entry?.name || item.name
+      let opened: boolean
+      if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'].includes(ext)) {
+        opened = await playLiturgyLocalImageOnScreens([filePath], title)
+      } else if (ext === 'pdf') {
+        opened = await playLiturgyLocalPdfOnScreens(filePath, title)
+      } else if (['ppt', 'pptx'].includes(ext)) {
+        opened = await playLiturgyLocalPresentationOnScreens(filePath, title)
+      } else {
+        // Arquivo agendado herda o player escolhido no placeholder.
+        // Assim vídeo/áudio agendado segue a mesma cascata externo → interno.
+        const mediaType = ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac'].includes(ext)
+          ? 'audio'
+          : 'video'
+        const result = await executeLiturgyItem(
+          { ...item, type: mediaType, filePath, name: title },
+          router,
+        )
+        return { ...result, resolved: content }
+      }
+      return opened
+        ? { ok: true, resolved: content }
+        : { ok: false, messageKey: 'liturgy.messages.projectionFailed', resolved: content }
+    }
+    case 'verse': {
+      const bibleStore = useBibleStore()
+      if (bibleStore.books.length === 0) {
+        await bibleStore.bootstrap()
+      }
+      await bibleStore.selectBook(content.verseBookId)
+      await bibleStore.selectChapter(content.verseChapter)
+      if (content.verseNumbers?.trim()) {
+        bibleStore.verseSearchQuery = content.verseNumbers.trim()
+        bibleStore.applyVerseSearch()
+      }
+      await router.push({ name: 'bible' })
+      return { ok: true, resolved: content }
+    }
+    case 'online_video': {
+      const opened = await openLiturgyVideoControl(
+        content.url,
+        content.name?.trim() || content.url,
+      )
+      if (!opened) {
+        return { ok: false, messageKey: 'liturgy.messages.projectionFailed', resolved: content }
+      }
+      return { ok: true, resolved: content }
+    }
+    case 'annotation': {
+      return { ok: true, resolved: content }
+    }
+  }
+}
+
+/** Item legado (import Delphi): sem `content`, o filePath É o conteúdo. */
+function legacyContentFromFile(
+  entry: ReturnType<ReturnType<typeof useScheduledStore>['findOn']> | undefined,
+): Extract<LiturgyScheduledContent, { kind: 'file' }> | null {
+  if (!entry) return null
+  const filePath = entry.filePath?.trim()
+  if (!filePath) return null
+  return { kind: 'file', filePath }
+}
+
 /** Abre o item (música já projeta nas telas configuradas). */
 export async function executeLiturgyItem(
   item: LiturgyItem,
   router: Router,
+  options?: { dateISO?: string; day?: import('../types/liturgy').LiturgyDayKey },
 ): Promise<LiturgyActionResult> {
+  // scheduled = placeholder: resolve a entrada da data e EXECUTA como o tipo dela.
+  // A liturgia inteira de um dia pode ser agendada (Rafael: "a programação toda
+  // com itens agendados") — cada posição resolve contra a data do dia ATIVO da
+  // liturgia (sábado selecionado = sábado da semana corrente; avulsa = hoje).
+  if (item.type === 'scheduled') {
+    const dateISO = options?.dateISO ?? activeDateISO(options?.day ?? 'custom')
+    return executeScheduledRef(item, router, dateISO)
+  }
+
   if (!isExecutableItem(item)) {
     return { ok: true }
   }
@@ -143,11 +285,15 @@ export async function executeLiturgyItem(
         return { ok: false, messageKey: 'liturgy.messages.videoSelectFile' }
       }
 
-      // Player externo SÓ para áudio (Ezequias 13/09: "mp3 blz, não é preciso
-      // projetar"). Vídeo PRECISA do player interno: é ele que projeta nas
-      // telas — VLC/mpv não comandam a projeção.
+      // Player externo: áudio E vídeo (Rafael 03/10: "essa funcionalidade é
+      // pra reproduzir vídeos externos" — vídeo ia sempre pro interno,
+      // ignorando a preferência do usuário). Cascata: playerId do item →
+      // preferência global → 'associated' (interno). Player não encontrado
+      // etc → cai no interno com snackbar padrão.
+      // NOTA: com player externo o vídeo não projeta nas telas (o VLC/mpv
+      // não alimenta a projeção) — quem quer projeção usa 'associated'.
       const bridge = getDesktopBridge()
-      if (item.type === 'audio' && filePath && !objectUrl) {
+      if (filePath && !objectUrl && (item.type === 'audio' || item.type === 'video')) {
         let pref: string | undefined = item.playerId
         if (!pref || pref === 'default') {
           pref = await bridge?.externalPlayer?.get?.()
@@ -159,6 +305,13 @@ export async function executeLiturgyItem(
           )
           if (result?.ok) {
             return { ok: true }
+          }
+          // file-missing = path de OUTRA máquina (liturgia sincronizada do
+          // Windows da igreja etc): cair no interno aqui engana o usuário
+          // ("abriu no player errado") — o interno também não tem o arquivo.
+          // Retorna erro claro; playwright/web revisam mensagem no i18n.
+          if (result && 'error' in result && result.error === 'file-missing') {
+            return { ok: false, messageKey: 'liturgy.messages.fileMissingOnMachine' }
           }
           // player não encontrado etc → cai no interno com snackbar padrão
         }
@@ -184,7 +337,7 @@ export async function executeLiturgyItem(
 
       const opened = await openLiturgyLocalImageControl(
         paths,
-        item.name?.trim() || paths[0] || 'Imagens',
+        item.name?.trim() || paths[0],
       )
       if (!opened) {
         return { ok: false, messageKey: 'liturgy.messages.projectionFailed' }
@@ -221,21 +374,25 @@ export async function executeLiturgyItem(
       // modo slideshow (fidelidade total). 'auto' = conversão interna do app
       // (projeção multi-tela).
       let engine = item.presentationEngine
-      if (!engine) {
-        engine = (await bridge?.presentation?.getEngine?.()) ?? 'auto'
+      if (!engine && bridge && bridge.presentation && bridge.presentation.getEngine) {
+        engine = await bridge.presentation.getEngine()
       }
-      if (engine && engine !== 'auto') {
-        const result = await bridge?.presentation?.openExternal?.(
-          filePath,
-          engine,
-        )
+      engine ||= 'auto'
+      if (engine !== 'auto') {
+        const result =
+          bridge && bridge.presentation && bridge.presentation.openExternal
+            ? await bridge.presentation.openExternal(filePath, engine)
+            : undefined
         if (!result?.ok) {
           return { ok: false, messageKey: 'liturgy.messages.projectionFailed' }
         }
         return { ok: true }
       }
 
-      const hasOffice = await bridge?.presentation?.detectOffice?.()
+      const hasOffice =
+        bridge && bridge.presentation && bridge.presentation.detectOffice
+          ? await bridge.presentation.detectOffice()
+          : undefined
       if (hasOffice === false) {
         return {
           ok: false,
@@ -271,13 +428,8 @@ export async function executeLiturgyItem(
     }
 
     default: {
-      if (INTERNAL_FILE_TYPES.includes(item.type)) {
-        if (!item.filePath?.trim()) {
-          return { ok: false, messageKey: 'liturgy.messages.mediaDesktopOnly' }
-        }
-        return { ok: false, messageKey: 'liturgy.messages.mediaDesktopOnly' }
-      }
-      return { ok: true }
+      // Único tipo executável que chega aqui é other_files (interno, desktop-only).
+      return { ok: false, messageKey: 'liturgy.messages.mediaDesktopOnly' }
     }
   }
 }
@@ -312,7 +464,7 @@ export async function playLiturgyItemOnScreens(
     }
     const ok = await playLiturgyLocalImageOnScreens(
       paths,
-      item.name?.trim() || paths[0] || 'Imagens',
+      item.name?.trim() || paths[0],
     )
     if (!ok) {
       return { ok: false, messageKey: 'liturgy.messages.projectionFailed' }
@@ -344,21 +496,25 @@ export async function playLiturgyItemOnScreens(
 
     // Engine efetivo: override do item > global (ver executeLiturgyItem).
     let engine = item.presentationEngine
-    if (!engine) {
-      engine = (await bridge?.presentation?.getEngine?.()) ?? 'auto'
+    if (!engine && bridge && bridge.presentation && bridge.presentation.getEngine) {
+      engine = await bridge.presentation.getEngine()
     }
-    if (engine && engine !== 'auto') {
-      const result = await bridge?.presentation?.openExternal?.(
-        filePath,
-        engine,
-      )
+    engine ||= 'auto'
+    if (engine !== 'auto') {
+      const result =
+        bridge && bridge.presentation && bridge.presentation.openExternal
+          ? await bridge.presentation.openExternal(filePath, engine)
+          : undefined
       if (!result?.ok) {
         return { ok: false, messageKey: 'liturgy.messages.projectionFailed' }
       }
       return { ok: true }
     }
 
-    const hasOffice = await bridge?.presentation?.detectOffice?.()
+    const hasOffice =
+      bridge && bridge.presentation && bridge.presentation.detectOffice
+        ? await bridge.presentation.detectOffice()
+        : undefined
     if (hasOffice === false) {
       return {
         ok: false,
@@ -386,11 +542,36 @@ export async function playLiturgyItemOnScreens(
     return { ok: false, messageKey: 'liturgy.messages.urlMissing' }
   }
 
+  const target = parseLiturgyWebTarget(rawUrl)
+  if (!target) {
+    return { ok: false, messageKey: 'liturgy.messages.urlMissing' }
+  }
+
   const label = item.name?.trim() || rawUrl
-  const ok =
-    item.type === 'site'
+  const route = getPalcoRoute(target)
+
+  let ok: boolean
+  if (route === 'slot') {
+    // TV/Receivers via Palco (47080/47081)
+    const { palcoSession } = await import('../../settings/services/palco-session')
+    await palcoSession.turnOn()
+    const { publishLiturgyWebRuntime } = await import('./liturgy-web-runtime')
+    publishLiturgyWebRuntime({
+      active: true,
+      url: target.url,
+      title: label,
+      kind: target.kind,
+      videoId: target.videoId,
+      startedAt: Date.now(),
+    })
+    ok = true
+  } else {
+    // Mirror: cabeada fullscreen popup
+    ok = item.type === 'site'
       ? await openLiturgySiteOnScreens(rawUrl, label)
       : await playLiturgyWebOnConfiguredScreens(rawUrl, label)
+  }
+
   if (!ok) {
     return { ok: false, messageKey: 'liturgy.messages.projectionFailed' }
   }

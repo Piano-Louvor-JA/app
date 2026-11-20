@@ -4,8 +4,8 @@ import { JSDOM } from 'jsdom'
 // JSDOM global (padrão palco-bridge-random.integration.test.ts)
 const dom = new JSDOM('', { url: 'http://localhost/' })
 const g = globalThis as unknown as Record<string, unknown>
-g.window = dom.window
-g.localStorage = dom.window.localStorage
+vi.stubGlobal('window', dom.window)
+vi.stubGlobal('localStorage', dom.window.localStorage)
 if (typeof BroadcastChannel === 'function') g.BroadcastChannel = BroadcastChannel
 
 // mock user-preferences com backing store local (mesmo specifier @shared)

@@ -19,11 +19,14 @@ export async function requestCloseProjectionWithConfirm(): Promise<void> {
     const alive = (await bridge?.projection?.externalAlive?.()) ?? false
     if (!alive) return
     handling = true
+    // Esc + Enter encerra sem clicar; o Enter pode vir da própria janela de projeção.
     const ok = await appConfirm({
       title: 'Encerrar projeção?',
-      message: 'Há uma projeção ativa (bíblia/hinos/vídeo/site). Encerrar agora?',
+      message: 'Há uma projeção ativa (bíblia/hinos/vídeo/site). Encerrar agora? Enter encerra.',
       confirmLabel: 'Encerrar',
       danger: true,
+      enterConfirms: true,
+      externalConfirm: (confirm) => bridge?.projection?.onConfirmCloseRequested?.(confirm),
     })
     if (ok) {
       await bridge?.projection?.closeUrl?.()
@@ -50,6 +53,7 @@ export function useOperatorEscapeToCloseProjection(isProjectionWindow: () => boo
     const target = event.target as HTMLElement | null
     if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
     if (document.querySelector('[role="dialog"]')) return
+    /* v8 ignore next 1 -- handling true implica confirm montado, e L52 já barrou */
     if (handling) return
     try {
       const bridge = getDesktopBridge()

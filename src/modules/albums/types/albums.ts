@@ -20,6 +20,8 @@ export type AlbumCollection = {
 export type AlbumCategory = {
   id: string | number
   name: string
+  /** Slug estável entre idiomas (aym, kids, ...) — chave de ordenação. */
+  slug?: string
   collections: AlbumCollection[]
 }
 
@@ -40,6 +42,8 @@ export type AlbumSearchHit = AlbumTrack & {
   isHymnal: boolean
   /** Todos os números de hinário associados (busca por número). */
   hymnalTracks: number[]
+  /** Letra em texto corrido (minúsculas) p/ busca por trecho — só onde há letra local (custom / importadas). */
+  lyricsText?: string
 }
 
 export type AlbumLyricLine = {

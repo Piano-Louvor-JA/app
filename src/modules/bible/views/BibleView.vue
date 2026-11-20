@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 
-import PalcoRouteSelect from '../../settings/components/PalcoRouteSelect.vue'
 import BibleNavPanel from '../components/BibleNavPanel.vue'
-import BibleProjectFab from '../components/BibleProjectFab.vue'
 import BibleToolbar from '../components/BibleToolbar.vue'
 import BibleVerseList from '../components/BibleVerseList.vue'
 import { useBibleReader } from '../composables/useBibleReader'
@@ -11,6 +9,7 @@ import { useBibleReader } from '../composables/useBibleReader'
 const { t } = useI18n()
 
 const {
+  books,
   versions,
   selectedVersionId,
   selectedBookId,
@@ -25,36 +24,27 @@ const {
   isLoadingMeta,
   isLoadingVerses,
   lastErrorKey,
-  isProjecting,
   projection,
   filteredBooks,
   chapterNumbers,
   locationLabel,
   chapterTitle,
   verseEntries,
+  visibleVerseEntries,
   hasProjection,
-  previewSnippet,
   clearError,
   selectVersion,
   selectBook,
   selectChapter,
   selectVerse,
+  applyBookSearchReference,
+  applyPassage,
   clearSelection,
   goToAdjacentVerse,
   setTestamentFilter,
   toggleNavPanel,
-  toggleProjection,
-  clearProjectionWindow,
   refresh,
 } = useBibleReader()
-
-function onProject() {
-  void toggleProjection()
-}
-
-function onClearProjection() {
-  clearProjectionWindow()
-}
 
 function onPreviousVerse() {
   void goToAdjacentVerse(-1)
@@ -62,6 +52,12 @@ function onPreviousVerse() {
 
 function onNextVerse() {
   void goToAdjacentVerse(1)
+}
+
+/** Busca inteligente da toolbar: passagem abre direto; texto filtra os
+ *  versículos do capítulo aberto (campo "Pesquisar versículo"). */
+function onSearchText(query: string) {
+  verseSearchQuery.value = query
 }
 </script>
 
@@ -72,13 +68,13 @@ function onNextVerse() {
       :selected-version-id="selectedVersionId"
       :location-label="locationLabel"
       :show-nav-panel="showNavPanel"
-      :bible-search-query="globalSearchQuery"
+      :books="books"
       :versions-disabled="isLoadingMeta"
       @select-version="selectVersion"
       @toggle-nav="toggleNavPanel"
-      @update:bible-search-query="globalSearchQuery = $event"
+      @open-passage="applyPassage"
+      @search-text="onSearchText"
     />
-    <PalcoRouteSelect module="bible" />
 
     <div
       v-if="lastErrorKey"
@@ -134,6 +130,7 @@ function onNextVerse() {
         :selected-chapter="selectedChapter"
         :chapter-search-query="chapterSearchQuery"
         @update:book-search-query="bookSearchQuery = $event"
+        @book-search-submit="applyBookSearchReference"
         @update:chapter-search-query="chapterSearchQuery = $event"
         @update:testament="setTestamentFilter"
         @select-book="selectBook"
@@ -143,12 +140,11 @@ function onNextVerse() {
       <BibleVerseList
         class="bible-view__reader"
         :chapter-title="chapterTitle"
-        :verses="verseEntries"
+        :verses="visibleVerseEntries"
         :selected-verses="selectedVerses"
         :verse-search-query="verseSearchQuery"
         :is-loading="isLoadingVerses"
         :projection="projection"
-        :preview-snippet="previewSnippet"
         :has-projection="hasProjection"
         @update:verse-search-query="verseSearchQuery = $event"
         @select-verse="selectVerse"
@@ -157,13 +153,6 @@ function onNextVerse() {
         @clear-projection="clearSelection"
       />
     </div>
-
-    <BibleProjectFab
-      :disabled="!hasProjection"
-      :projecting="isProjecting"
-      @project="onProject"
-      @clear="onClearProjection"
-    />
   </section>
 </template>
 

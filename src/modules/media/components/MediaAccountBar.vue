@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 /**
  * Conta de coletâneas custom — login/registro simples (e-mail + senha).
  * Compacto: quando logado mostra só nome + botão sair; senão formulário colapsável.
@@ -16,6 +17,8 @@ import {
   requestPasswordReset,
   type AuthSession,
 } from '../services/auth-client'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   /** Notificação do host (snackbar do editor). */
@@ -153,14 +156,14 @@ function toggleForm(): void {
             v-model="email"
             type="email"
             class="account__input"
-            placeholder="E-mail"
+            :placeholder="t('media.account.email')"
             autocomplete="email"
           >
           <input
             v-model="password"
             type="password"
             class="account__input"
-            placeholder="Senha"
+            :placeholder="t('media.account.password')"
             autocomplete="current-password"
           >
           <button
@@ -194,21 +197,21 @@ function toggleForm(): void {
             v-model="displayName"
             type="text"
             class="account__input"
-            placeholder="Seu nome"
+            :placeholder="t('media.account.yourName')"
             autocomplete="name"
           >
           <input
             v-model="email"
             type="email"
             class="account__input"
-            placeholder="E-mail"
+            :placeholder="t('media.account.email')"
             autocomplete="email"
           >
           <input
             v-model="password"
             type="password"
             class="account__input"
-            placeholder="Senha (mín. 6)"
+            :placeholder="t('media.account.passwordMin6')"
             autocomplete="new-password"
           >
           <button
@@ -239,7 +242,7 @@ function toggleForm(): void {
             v-model="email"
             type="email"
             class="account__input"
-            placeholder="E-mail da conta"
+            :placeholder="t('media.account.accountEmail')"
             autocomplete="email"
           >
           <button
@@ -269,14 +272,14 @@ function toggleForm(): void {
             v-model="resetToken"
             type="text"
             class="account__input"
-            placeholder="Token de reset"
+            :placeholder="t('media.account.resetToken')"
             autocomplete="one-time-code"
           >
           <input
             v-model="password"
             type="password"
             class="account__input"
-            placeholder="Senha nova (mín. 8)"
+            :placeholder="t('media.account.newPasswordMin8')"
             autocomplete="new-password"
           >
           <button

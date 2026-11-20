@@ -2,6 +2,7 @@
 import { onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+import FontSelector from '../components/FontSelector.vue'
 import AccentColorCard from '../components/AccentColorCard.vue'
 import InteractionModeCard from '../components/InteractionModeCard.vue'
 import LyricCustomizationCard from '../components/LyricCustomizationCard.vue'
@@ -11,8 +12,11 @@ import { useProjectionSettings } from '../composables/useProjectionSettings'
 const { t } = useI18n()
 const { hydrate } = useProjectionSettings()
 
-/** Oculto por enquanto — reative para voltar a Personalização da Letra. */
-const SHOW_LYRIC_CUSTOMIZATION = false
+/** Oculto por enquanto — reative para voltar a Personalização da Letra.
+ * Configurável via VITE_SHOW_LYRIC_CUSTOMIZATION=1 (permite testar os dois
+ * lados do v-if e ativar a feature em staging sem redeploy). */
+const SHOW_LYRIC_CUSTOMIZATION =
+  import.meta.env.VITE_SHOW_LYRIC_CUSTOMIZATION === '1'
 
 onMounted(() => {
   void hydrate()
@@ -43,6 +47,10 @@ onMounted(() => {
         <AccentColorCard />
       </aside>
     </div>
+
+    <section class="appearance-experience__fonts">
+      <FontSelector scope="system" />
+    </section>
 
     <section
       v-if="SHOW_LYRIC_CUSTOMIZATION"
@@ -126,6 +134,12 @@ onMounted(() => {
     flex: 1;
     min-width: 0;
   }
+}
+
+.appearance-experience__fonts {
+  width: 100%;
+  max-width: 64rem;
+  margin-top: 2rem;
 }
 
 .appearance-experience__lyrics {

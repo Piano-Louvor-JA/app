@@ -16,13 +16,21 @@ interface ConfirmOptions {
   confirmLabel: string
   cancelLabel?: string
   danger?: boolean
+  enterConfirms?: boolean
+  /** Confirma por fora do modal (ex.: tecla em outra janela); devolve o desligamento. */
+  externalConfirm?: (confirm: () => void) => (() => void) | null | undefined | void
 }
 
 export function appConfirm(options: ConfirmOptions): Promise<boolean> {
   return new Promise((resolve) => {
     const state = reactive({ open: true })
+    let settled = false
+    let stopExternal: (() => void) | null = null
 
     const close = (result: boolean) => {
+      if (settled) return
+      settled = true
+      stopExternal?.()
       state.open = false
       // deixa a saída animar antes de desmontar
       setTimeout(() => {
@@ -41,6 +49,7 @@ export function appConfirm(options: ConfirmOptions): Promise<boolean> {
             confirmLabel: options.confirmLabel,
             cancelLabel: options.cancelLabel ?? 'Cancelar',
             danger: options.danger,
+            enterConfirms: options.enterConfirms,
             onConfirm: () => close(true),
             onCancel: () => close(false),
           })
@@ -51,5 +60,13 @@ export function appConfirm(options: ConfirmOptions): Promise<boolean> {
     document.body.appendChild(host)
     const app: App = createApp(wrapper)
     app.mount(host)
+
+    if (options.externalConfirm) {
+      try {
+        stopExternal = options.externalConfirm(() => close(true)) || null
+      } catch {
+        /* sem o gatilho externo, o modal segue funcionando */
+      }
+    }
   })
 }

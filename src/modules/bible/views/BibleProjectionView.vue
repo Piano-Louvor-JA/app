@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useProjectionFont } from '@modules/settings/composables/useProjectionFont'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 
 import { ProjectionBackground } from '@design-system/index'
@@ -11,9 +12,16 @@ import {
   readBibleRuntimeFromStorage,
   type BibleProjectionRuntime,
 } from '../services/bible-runtime'
+import {
+  BIBLE_INDEPENDENT_CHANNEL,
+  BIBLE_INDEPENDENT_STORAGE_KEY,
+  readBibleIndependentFromStorage,
+} from '../services/bible-independent-runtime'
+import { isIndependentProjectionLocation } from '@shared/services/projection-window-location'
 import { readEffectiveStageSettings, subscribeStageSettings } from '../../settings/services/stage-settings-runtime'
 import type { StageSettings } from '../../settings/types/stage-settings'
-import { resolveBackgroundImage, stageFlexAlign } from '../../settings/types/stage-settings'
+import { bibleTransitionMs, effectiveBibleTransition, resolveBackgroundImage, stageFlexAlign } from '../../settings/types/stage-settings'
+import '@styles/screen-transitions.css'
 
 const props = withDefaults(
   defineProps<{
@@ -24,6 +32,10 @@ const props = withDefaults(
 )
 
 const runtime = ref<BibleProjectionRuntime>({ ...DEFAULT_BIBLE_RUNTIME })
+/** Projeção independente lê canal próprio (imune ao takeover da principal). */
+const independent = isIndependentProjectionLocation()
+const runtimeKey = independent ? BIBLE_INDEPENDENT_STORAGE_KEY : BIBLE_RUNTIME_STORAGE_KEY
+const runtimeChannelName = independent ? BIBLE_INDEPENDENT_CHANNEL : BIBLE_RUNTIME_CHANNEL
 let runtimeChannel: BroadcastChannel | null = null
 
 // Personalização do Palco (escopo bible)
@@ -31,11 +43,11 @@ const stage = ref<StageSettings>(readEffectiveStageSettings('bible'))
 let unsubStage: (() => void) | null = null
 
 function refreshRuntime() {
-  runtime.value = readBibleRuntimeFromStorage()
+  runtime.value = independent ? readBibleIndependentFromStorage() : readBibleRuntimeFromStorage()
 }
 
 function onStorage(event: StorageEvent) {
-  if (event.key === BIBLE_RUNTIME_STORAGE_KEY) {
+  if (event.key === runtimeKey) {
     refreshRuntime()
   }
 }
@@ -53,7 +65,7 @@ onMounted(() => {
   })
 
   try {
-    runtimeChannel = new BroadcastChannel(BIBLE_RUNTIME_CHANNEL)
+    runtimeChannel = new BroadcastChannel(runtimeChannelName)
     runtimeChannel.addEventListener('message', onRuntimeMessage)
   } catch {
     runtimeChannel = null
@@ -77,13 +89,16 @@ const contentKey = computed(
 )
 
 const stageStyle = computed(() => ({
-  backgroundColor: stage.value.backgroundColor,
+  backgroundColor: stage.value.backgroundColor ?? '#000000',
   backgroundImage: resolveBackgroundImage(stage.value.backgroundImage)
     ? `url(${resolveBackgroundImage(stage.value.backgroundImage)})`
     : undefined,
   backgroundSize: 'cover',
   backgroundPosition: 'center',
+  '--scr-transition-ms': `${bibleTransitionMs(stage.value.bibleTransitionSpeed)}ms`,
 }))
+
+const transitionName = computed(() => `scr-${effectiveBibleTransition(stage.value)}`)
 
 const stageAlign = computed(() => stageFlexAlign(stage.value, 'row'))
 
@@ -104,10 +119,13 @@ const verseStyle = computed(() => {
   const cqw =
     (stage.value.bibleFontSize / 1920) * 100 * adaptiveBibleFontScale.value
   return {
-    color: stage.value.bibleTextColor,
+    color: stage.value.bibleTextColor ?? undefined,
     fontSize: `${cqw}cqw`,
     fontWeight: String(stage.value.bibleFontWeight),
     textAlign: stage.value.textAlign,
+    // Paridade web: capitalização do versículo configurável no Palco.
+    textTransform:
+      stage.value.bibleTextTransform === 'none' ? 'none' : stage.value.bibleTextTransform,
     textShadow: stage.value.textShadow
       ? `0 0 ${(stage.value.shadowBlur / 108) * 100}cqw rgba(0,0,0,${stage.value.shadowIntensity})`
       : 'none',
@@ -125,10 +143,11 @@ const displayReference = computed(() => {
 const verseBoxStyle = computed(() => {
   if (!stage.value.textBox) return {}
   return {
-    backgroundColor: `rgba(0,0,0,${stage.value.boxOpacity})`,
-    border: stage.value.boxBorder ? '1px solid rgba(255,255,255,0.25)' : 'none',
+    backgroundColor: `rgba(24,24,24,${stage.value.boxOpacity})`,
+    border: stage.value.boxBorder ? 'clamp(2px, 0.2vmin, 4px) solid rgba(255,255,255,0.85)' : 'none',
     // Padrão folha característico do design (como o media-projection)
     borderRadius: 'clamp(14px, 2.4vmin, 32px) 0 clamp(14px, 2.4vmin, 32px) 0',
+    backdropFilter: 'blur(16px)',
     // caixinha só no versículo: padding para respirar dentro da caixa
     padding: '0.35em 0.75em',
     // Bíblia: caixa horizontal aproveita a projeção e reduz quebras de verso.
@@ -138,24 +157,34 @@ const verseBoxStyle = computed(() => {
   }
 })
 
-const referenceStyle = computed(() => ({
-  color: stage.value.footerRefColor,
-  fontWeight: String(stage.value.footerRefWeight),
-}))
+const referenceCorner = computed(() => stage.value.bibleRefPosition === 'corner')
+
+const referenceStyle = computed(() => {
+  const position = stage.value.bibleRefPosition ?? 'below-right'
+  return {
+    color: stage.value.footerRefColor ?? undefined,
+    fontSize: `${((stage.value.refFontSize ?? Math.round(stage.value.bibleFontSize * 0.4)) / 1920) * 100}cqw`,
+    fontWeight: String(stage.value.footerRefWeight),
+    textTransform: stage.value.refTextTransform,
+    ...(referenceCorner.value ? {} : { textAlign: position.replace('below-', '') as 'left' | 'center' | 'right' }),
+  }
+})
+
+const projectionFontStyle = useProjectionFont('bible')
 </script>
 
 <template>
   <ProjectionBackground
     class="bible-projection"
     :class="{ 'bible-projection--embedded': embedded }"
-    :style="stageStyle"
+    :style="[stageStyle, projectionFontStyle]"
   >
     <div
       class="bible-projection__stage"
       :style="stageAlign"
     >
       <Transition
-        name="bible-fade"
+        :name="transitionName"
         mode="out-in"
       >
         <div
@@ -171,7 +200,7 @@ const referenceStyle = computed(() => ({
             {{ runtime.text }}
           </p>
           <p
-            v-if="displayReference"
+            v-if="displayReference && !referenceCorner"
             class="bible-projection__reference"
             :style="referenceStyle"
           >
@@ -183,6 +212,20 @@ const referenceStyle = computed(() => ({
           key="empty"
           class="bible-projection__empty"
         />
+      </Transition>
+      <!-- Fora do conteúdo: o transform da transição moveria o canto junto. -->
+      <Transition
+        :name="transitionName"
+        mode="out-in"
+      >
+        <p
+          v-if="showContent && displayReference && referenceCorner"
+          :key="contentKey"
+          class="bible-projection__reference bible-projection__reference--corner"
+          :style="referenceStyle"
+        >
+          {{ displayReference }}
+        </p>
       </Transition>
     </div>
   </ProjectionBackground>
@@ -203,6 +246,7 @@ const referenceStyle = computed(() => ({
 }
 
 .bible-projection__stage {
+  position: relative;
   box-sizing: border-box;
   display: flex;
   align-items: center;
@@ -241,24 +285,16 @@ const referenceStyle = computed(() => ({
   text-transform: uppercase;
 }
 
+.bible-projection__reference--corner {
+  position: absolute;
+  right: clamp(1rem, 3vmin, 2.5rem);
+  bottom: clamp(0.75rem, 2.5vmin, 1.75rem);
+}
+
 .bible-projection__empty {
   width: 100%;
   height: 100%;
 }
 
-.bible-fade-enter-active,
-.bible-fade-leave-active {
-  transition:
-    opacity 0.18s ease,
-    transform 0.18s ease;
-}
-
-.bible-fade-enter-from {
-  opacity: 0;
-  transform: translateY(8px);
-}
-
-.bible-fade-leave-to {
-  opacity: 0;
-}
+/* Transições: src/styles/screen-transitions.css (classes scr-*). */
 </style>

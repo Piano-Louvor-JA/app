@@ -20,7 +20,14 @@ import {
   STAGE_OFFICIAL_BACKGROUNDS,
   STAGE_REF_PRESETS,
   TIMER_TIME_FORMAT_OPTIONS,
+  bibleTransitionMs,
   officialBgUrl,
+  resolveReturnScreen,
+  RETURN_FONT_SIZE_MAX,
+  RETURN_FONT_SIZE_MIN,
+  RETURN_NEXT_FONT_SIZE_MIN,
+  returnNextFontSize,
+  type ReturnScreenSettings,
   resolveBackgroundImage,
   type StageFontWeight,
   type StageModuleScope,
@@ -28,11 +35,14 @@ import {
 } from '../types/stage-settings'
 
 import SettingsToggle from './SettingsToggle.vue'
+import ScreenTransitionPicker from './ScreenTransitionPicker.vue'
+import FontSelector from './FontSelector.vue'
 import StagePreview from './StagePreview.vue'
 
 const { t } = useI18n()
 
 const props = defineProps<{
+  titleKey?: string
   /** Escopo inicial selecionado (atalho contextual: paleta do módulo abre na sua tab). */
   initialScope?: string
   /** Quando definido, mostra APENAS este escopo (paleta do módulo personaliza só ele). */
@@ -103,16 +113,24 @@ function patchClock(partial: Partial<NonNullable<StageSettings['clock']>>) {
 }
 
 function patchModuleTimeFormat(value: string) {
+  /* v8 ignore next 2 -- remap V8 do else-if: ambos os escopos exercidos pelos testes timer/countdown */
   if (activeScope.value === 'timer') {
     const current = settings.value.timer ?? DEFAULT_TIMER_MODULE_SETTINGS
     patch({ timer: { ...current, timeFormat: value as NonNullable<StageSettings['timer']>['timeFormat'] } })
   } else if (activeScope.value === 'countdown') {
     const current = settings.value.countdown ?? DEFAULT_COUNTDOWN_MODULE_SETTINGS
+    /* v8 ignore next 1 -- store normaliza countdown ⇒ ?? nunca cai no default */
     patch({ countdown: { ...current, timeFormat: value as NonNullable<StageSettings['countdown']>['timeFormat'] } })
   }
 }
 
+const clockSettings = computed(() => settings.value.clock ?? DEFAULT_CLOCK_MODULE_SETTINGS)
+const randomSettings = computed(() => settings.value.random ?? DEFAULT_RANDOM_MODULE_SETTINGS)
+/* v8 ignore next 1 -- resolveBackgroundImage retorna string|null; undefined nunca ocorre */
+const previewBackground = computed(() => resolveBackgroundImage(settings.value.backgroundImage) ?? undefined)
+
 const moduleTimeFormat = computed(() => {
+  /* v8 ignore start -- remap V8 do else-if + return null: template só renderiza em timer/countdown */
   if (activeScope.value === 'timer') {
     return settings.value.timer?.timeFormat ?? DEFAULT_TIMER_MODULE_SETTINGS.timeFormat
   }
@@ -120,6 +138,7 @@ const moduleTimeFormat = computed(() => {
     return settings.value.countdown?.timeFormat ?? DEFAULT_COUNTDOWN_MODULE_SETTINGS.timeFormat
   }
   return null
+  /* v8 ignore stop */
 })
 
 const randomTransformOptions = [
@@ -139,10 +158,75 @@ function patchRandom(partial: Partial<NonNullable<StageSettings['random']>>) {
   patch({ random: { ...current, ...partial } })
 }
 
+const titleWeightOptions: { value: NonNullable<StageSettings['titleFontWeight']>; label: string }[] = [
+  { value: 400, label: t('settings.stage.weightNormal') },
+  { value: 600, label: t('settings.stage.weightLightPlus') },
+  { value: 800, label: t('settings.stage.weightStrong') },
+]
+
+function clearTitleOverrides() {
+  patch({ titleFontSize: null, titleFontWeight: null, titleTextColor: null, titleTextShadow: null, titleUpperCase: false, titleTextBox: false })
+}
+
+/** Liga/desliga as animações dos slides; ao ligar sem transição, usa Esmaecer. */
+function setLyricTransitionEnabled(enabled: boolean) {
+  patch(
+    enabled && settings.value.lyricTransition === 'none'
+      ? { lyricTransitionEnabled: true, lyricTransition: 'fade' }
+      : { lyricTransitionEnabled: enabled },
+  )
+}
+
+/** Liga/desliga as animações da anotação; ao ligar sem transição, usa Esmaecer. */
+function setTextTransitionEnabled(enabled: boolean) {
+  patch(
+    enabled && settings.value.textTransition === 'none'
+      ? { textTransitionEnabled: true, textTransition: 'fade' }
+      : { textTransitionEnabled: enabled },
+  )
+}
+
+function clearLyricOverrides() {
+  patch({ lyricFontSize: null, lyricFontWeight: null, lyricTextColor: null, lyricTextShadow: null, lyricUpperCase: false })
+}
+
+const lyricWeightOptions: { value: StageFontWeight | null; label: string }[] = [
+  { value: null, label: t('settings.stage.weightNormal') },
+  { value: 400, label: t('settings.stage.weightLightPlus') },
+  { value: 600, label: t('settings.stage.weightMedium') },
+]
 const bibleWeightOptions: { value: StageSettings['bibleFontWeight']; label: string }[] = [
   { value: 400, label: t('settings.stage.weightNormal') },
   { value: 500, label: t('settings.stage.weightLightPlus') },
   { value: 700, label: t('settings.stage.weightStrong') },
+]
+
+const bibleTransformOptions: { value: StageSettings['bibleTextTransform']; label: string }[] = [
+  { value: 'none', label: t('settings.stage.bibleTransformNone') },
+  { value: 'uppercase', label: t('settings.stage.bibleTransformUppercase') },
+  { value: 'capitalize', label: t('settings.stage.bibleTransformCapitalize') },
+]
+
+const bibleRefPositionOptions: { value: StageSettings['bibleRefPosition']; label: string; hint: string }[] = [
+  { value: 'below-left', label: t('settings.stage.refPositionLeft'), hint: t('settings.stage.refPositionLeftHint') },
+  { value: 'below-center', label: t('settings.stage.refPositionCenter'), hint: t('settings.stage.refPositionCenterHint') },
+  { value: 'below-right', label: t('settings.stage.refPositionRight'), hint: t('settings.stage.refPositionRightHint') },
+  { value: 'corner', label: t('settings.stage.refPositionCorner'), hint: t('settings.stage.refPositionCornerHint') },
+]
+
+/** Liga/desliga as animações; ao ligar sem transição escolhida, usa Esmaecer. */
+function setBibleTransitionEnabled(enabled: boolean) {
+  patch(
+    enabled && settings.value.bibleTransition === 'none'
+      ? { bibleTransitionEnabled: true, bibleTransition: 'fade' }
+      : { bibleTransitionEnabled: enabled },
+  )
+}
+
+const bibleTransitionSpeedOptions: { value: StageSettings['bibleTransitionSpeed']; label: string }[] = [
+  { value: 'fast', label: t('settings.stage.transitionFast') },
+  { value: 'normal', label: t('settings.stage.transitionNormal') },
+  { value: 'slow', label: t('settings.stage.transitionSlow') },
 ]
 
 const alignOptions = [
@@ -157,12 +241,58 @@ const vAlignOptions = [
   { value: 'bottom', label: t('settings.stage.alignBottom') },
 ] as const
 
+/* Tela de retorno (monitor dos músicos): campo vazio = igual aos slides. */
+const returnSettings = computed(() => resolveReturnScreen(settings.value))
+const returnFileInput = ref<HTMLInputElement | null>(null)
+/** Bloco recolhível como o de Fontes. */
+const returnOpen = ref(false)
+
+function patchReturn(partial: Partial<ReturnScreenSettings>) {
+  patch({ returnScreen: { ...returnSettings.value, ...partial } })
+}
+
+function resetReturn() {
+  patch({ returnScreen: undefined })
+}
+
+function onReturnFileSelected(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0] ?? null
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = () => {
+    if (typeof reader.result === 'string') patchReturn({ bgMode: 'image', bgImage: reader.result })
+  }
+  reader.readAsDataURL(file)
+  input.value = ''
+}
+
+const returnWeightOptions = [
+  { value: null, label: t('settings.stage.returnSameAsSlides') },
+  { value: 400, label: t('settings.stage.weightNormal') },
+  { value: 600, label: t('settings.stage.weightMedium') },
+  { value: 800, label: t('settings.stage.weightStrong') },
+] as const
+
+const returnUpperOptions = [
+  { value: null, label: t('settings.stage.returnSameAsSlides') },
+  { value: true, label: t('settings.stage.returnUpperOn') },
+  { value: false, label: t('settings.stage.returnUpperOff') },
+] as const
+
+const returnBgOptions = [
+  { value: 'slides', label: t('settings.stage.returnSameAsSlides') },
+  { value: 'color', label: t('settings.stage.returnBgColor') },
+  { value: 'image', label: t('settings.stage.returnBgImage') },
+] as const
+
 function onFileSelected(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0] ?? null
   if (!file) return
   const reader = new FileReader()
   reader.onload = () => {
+    /* v8 ignore next 1 -- readAsDataURL sempre produz string */
     if (typeof reader.result === 'string') setBackgroundImage(reader.result)
   }
   reader.readAsDataURL(file)
@@ -176,7 +306,7 @@ const confirmReset = ref(false)
   <GlassCard class="stage-custom">
     <div class="stage-custom__header">
       <i class="ti ti-palette stage-custom__icon" aria-hidden="true" />
-      <h3 class="stage-custom__title">{{ t('settings.stage.title') }}</h3>
+      <h3 class="stage-custom__title">{{ t(titleKey ?? 'settings.stage.title') }}</h3>
     </div>
 
     <!-- Escopos: global (padrão herdado) + um por módulo -->
@@ -205,15 +335,38 @@ const confirmReset = ref(false)
       {{ t('settings.stage.inheritingHint') }}
     </p>
 
-    <StagePreview
-      class="stage-custom__preview"
-      :settings="settings"
-      :module="activeScope === 'global' ? 'hymns' : activeScope"
-    />
+    <div class="stage-custom__body">
+      <!-- Preview FIXO à direita (DENTRO do body = coluna 2 do grid):
+           reflete ao vivo toda personalização aplicada à esquerda
+           (05/10 Rafael). Compacto — não precisa ser enorme. -->
+      <div class="stage-custom__preview-pane">
+        <StagePreview
+          class="stage-custom__preview"
+          :settings="settings"
+          :font-scope="activeScope"
+          :module="activeScope === 'global' ? 'hymns' : activeScope"
+        />
+      </div><!-- /preview-pane -->
 
-    <div class="stage-custom__section">
-      <p class="stage-custom__label">{{ t('settings.stage.backgroundColor') }}</p>
+      <div class="stage-custom__controls">
+      <div class="stage-custom__controls-inner">
+        <FontSelector :scope="activeScope" compact />
+
+        <div class="stage-custom__section">
+          <p class="stage-custom__label">{{ t('settings.stage.backgroundColor') }}</p>
       <div class="stage-custom__swatches">
+        <!-- Auto (default): sem cor setada → a IMAGEM da projeção vence.
+             Clicar de volta aqui limpa a escolha (05/10 Rafael). -->
+        <button
+          type="button"
+          class="stage-custom__swatch stage-custom__swatch--auto"
+          :class="{ 'stage-custom__swatch--active': settings.backgroundColor == null }"
+          :aria-label="t('settings.stage.autoBg')"
+          :title="t('settings.stage.autoBg')"
+          @click="patch({ backgroundColor: null })"
+        >
+          <i class="ti ti-photo" aria-hidden="true" />
+        </button>
         <button
           v-for="preset in STAGE_BG_PRESETS"
           :key="preset.color"
@@ -228,7 +381,7 @@ const confirmReset = ref(false)
           <i class="ti ti-color-picker" aria-hidden="true" />
           <input
             type="color"
-            :value="settings.backgroundColor"
+            :value="settings.backgroundColor ?? '#000000'"
             :aria-label="t('settings.stage.backgroundColor')"
             @input="patch({ backgroundColor: ($event.target as HTMLInputElement).value })"
           >
@@ -245,7 +398,7 @@ const confirmReset = ref(false)
         class="stage-custom__bg-preview"
       >
         <img
-          :src="resolveBackgroundImage(settings.backgroundImage) ?? undefined"
+          :src="previewBackground"
           alt=""
           class="stage-custom__bg-img"
         >
@@ -312,10 +465,138 @@ const confirmReset = ref(false)
     </div>
 
     <!-- Tipografia geral não vale na Bíblia (usa aparência própria abaixo). -->
+    <!-- Músicas: transições ao trocar slide -->
+    <template v-if="activeScope === 'hymns'">
+      <div class="stage-custom__section">
+        <p class="stage-custom__label">{{ t('settings.stage.transitionsSection') }}</p>
+        <div class="stage-custom__toggle-row">
+          <button
+            type="button"
+            class="stage-custom__toggle-label"
+            @click="setLyricTransitionEnabled(!settings.lyricTransitionEnabled)"
+          >
+            {{ t('settings.stage.transitionsEnabled') }}
+          </button>
+          <SettingsToggle
+            :model-value="settings.lyricTransitionEnabled"
+            :label="t('settings.stage.transitionsEnabled')"
+            data-testid="lyric-transition-enabled"
+            @update:model-value="setLyricTransitionEnabled($event)"
+          />
+        </div>
+
+        <template v-if="settings.lyricTransitionEnabled">
+          <p class="stage-custom__label stage-custom__label--sub">
+            {{ t('settings.stage.lyricTransition') }}
+          </p>
+          <ScreenTransitionPicker
+            :model-value="settings.lyricTransition"
+            :duration-ms="bibleTransitionMs(settings.lyricTransitionSpeed)"
+            :label="t('settings.stage.lyricTransition')"
+            test-id="lyric-transition"
+            @update:model-value="patch({ lyricTransition: $event })"
+          />
+
+          <p class="stage-custom__label stage-custom__label--sub">
+            {{ t('settings.stage.bibleTransitionSpeed') }}
+          </p>
+          <div
+            class="stage-custom__segment"
+            role="radiogroup"
+            data-testid="lyric-transition-speed"
+            :aria-label="t('settings.stage.bibleTransitionSpeed')"
+          >
+            <button
+              v-for="opt in bibleTransitionSpeedOptions"
+              :key="opt.value"
+              type="button"
+              role="radio"
+              :aria-checked="settings.lyricTransitionSpeed === opt.value"
+              class="stage-custom__segment-btn"
+              :class="{ 'stage-custom__segment-btn--active': settings.lyricTransitionSpeed === opt.value }"
+              @click="patch({ lyricTransitionSpeed: opt.value })"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
+        </template>
+      </div>
+    </template>
+
+    <!-- Liturgia: transições ao trocar a anotação -->
+    <template v-if="activeScope === 'liturgy'">
+      <div class="stage-custom__section">
+        <p class="stage-custom__label">{{ t('settings.stage.transitionsSection') }}</p>
+        <div class="stage-custom__toggle-row">
+          <button
+            type="button"
+            class="stage-custom__toggle-label"
+            @click="setTextTransitionEnabled(!settings.textTransitionEnabled)"
+          >
+            {{ t('settings.stage.transitionsEnabled') }}
+          </button>
+          <SettingsToggle
+            :model-value="settings.textTransitionEnabled"
+            :label="t('settings.stage.transitionsEnabled')"
+            data-testid="text-transition-enabled"
+            @update:model-value="setTextTransitionEnabled($event)"
+          />
+        </div>
+
+        <template v-if="settings.textTransitionEnabled">
+          <p class="stage-custom__label stage-custom__label--sub">
+            {{ t('settings.stage.textTransition') }}
+          </p>
+          <ScreenTransitionPicker
+            :model-value="settings.textTransition"
+            :duration-ms="bibleTransitionMs(settings.textTransitionSpeed)"
+            :label="t('settings.stage.textTransition')"
+            test-id="text-transition"
+            @update:model-value="patch({ textTransition: $event })"
+          />
+
+          <p class="stage-custom__label stage-custom__label--sub">
+            {{ t('settings.stage.bibleTransitionSpeed') }}
+          </p>
+          <div
+            class="stage-custom__segment"
+            role="radiogroup"
+            data-testid="text-transition-speed"
+            :aria-label="t('settings.stage.bibleTransitionSpeed')"
+          >
+            <button
+              v-for="opt in bibleTransitionSpeedOptions"
+              :key="opt.value"
+              type="button"
+              role="radio"
+              :aria-checked="settings.textTransitionSpeed === opt.value"
+              class="stage-custom__segment-btn"
+              :class="{ 'stage-custom__segment-btn--active': settings.textTransitionSpeed === opt.value }"
+              @click="patch({ textTransitionSpeed: opt.value })"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
+        </template>
+      </div>
+    </template>
+
     <template v-if="activeScope !== 'bible'">
       <div class="stage-custom__section">
         <p class="stage-custom__label">{{ t('settings.stage.textColor') }}</p>
         <div class="stage-custom__swatches">
+          <!-- Auto (default null): sem cor setada → render usa o padrão dele.
+               Clicar aqui limpa a escolha (13/10 Rafael). -->
+          <button
+            type="button"
+            class="stage-custom__swatch stage-custom__swatch--auto"
+            :class="{ 'stage-custom__swatch--active': settings.textColor == null }"
+            :aria-label="t('settings.stage.autoText')"
+            :title="t('settings.stage.autoText')"
+            @click="patch({ textColor: null })"
+          >
+            <i class="ti ti-eraser" aria-hidden="true" />
+          </button>
           <button
             v-for="preset in STAGE_FG_PRESETS"
             :key="preset.color"
@@ -330,7 +611,7 @@ const confirmReset = ref(false)
             <i class="ti ti-color-picker" aria-hidden="true" />
             <input
               type="color"
-              :value="settings.textColor"
+              :value="settings.textColor ?? '#FFFFFF'"
               :aria-label="t('settings.stage.textColor')"
               @input="patch({ textColor: ($event.target as HTMLInputElement).value })"
             >
@@ -373,6 +654,259 @@ const confirmReset = ref(false)
       </div>
     </template>
 
+    <!-- Hinos: título (1º slide/capa) com tipografia própria -->
+    <template v-if="activeScope === 'hymns'">
+      <div class="stage-custom__section stage-custom__section--bible">
+        <p class="stage-custom__label">{{ t('settings.stage.titleAppearance') }}</p>
+
+        <div class="stage-custom__toggle-row">
+          <button
+            type="button"
+            class="stage-custom__toggle-label"
+            @click="clearTitleOverrides"
+          >
+            {{ t('settings.stage.titleReset') }}
+          </button>
+        </div>
+
+        <p class="stage-custom__label stage-custom__label--sub">
+          {{ t('settings.stage.titleTextColor') }}
+        </p>
+        <div class="stage-custom__swatches">
+          <button
+            type="button"
+            class="stage-custom__swatch stage-custom__swatch--auto"
+            :class="{ 'stage-custom__swatch--active': settings.titleTextColor == null }"
+            :aria-label="t('settings.stage.autoText')"
+            :title="t('settings.stage.autoText')"
+            @click="patch({ titleTextColor: null })"
+          >
+            <i class="ti ti-eraser" aria-hidden="true" />
+          </button>
+          <button
+            v-for="preset in STAGE_FG_PRESETS"
+            :key="preset.color"
+            type="button"
+            class="stage-custom__swatch"
+            :class="{ 'stage-custom__swatch--active': settings.titleTextColor === preset.color }"
+            :style="{ '--swatch': preset.color }"
+            :aria-label="preset.label"
+            @click="patch({ titleTextColor: preset.color })"
+          />
+          <label class="stage-custom__picker">
+            <i class="ti ti-color-picker" aria-hidden="true" />
+            <input
+              type="color"
+              :value="settings.titleTextColor ?? settings.textColor ?? '#FFFFFF'"
+              :aria-label="t('settings.stage.titleTextColor')"
+              @input="patch({ titleTextColor: ($event.target as HTMLInputElement).value })"
+            >
+          </label>
+        </div>
+
+        <div class="stage-custom__row-head">
+          <span>{{ t('settings.stage.titleFontSize') }}</span>
+          <span class="stage-custom__chip">{{ Math.round(settings.titleFontSize ?? settings.fontSize) }}px</span>
+        </div>
+        <input
+          type="range"
+          min="60"
+          max="160"
+          step="2"
+          :value="settings.titleFontSize ?? settings.fontSize"
+          :aria-label="t('settings.stage.titleFontSize')"
+          @input="patch({ titleFontSize: Number(($event.target as HTMLInputElement).value) })"
+        >
+
+        <p class="stage-custom__label stage-custom__label--sub">
+          {{ t('settings.stage.titleFontWeight') }}
+        </p>
+        <div class="stage-custom__segment" role="radiogroup">
+          <button
+            v-for="opt in titleWeightOptions"
+            :key="opt.value"
+            type="button"
+            role="radio"
+            :aria-checked="settings.titleFontWeight === opt.value"
+            class="stage-custom__segment-btn"
+            :class="{ 'stage-custom__segment-btn--active': settings.titleFontWeight === opt.value }"
+            @click="patch({ titleFontWeight: settings.titleFontWeight === opt.value ? null : opt.value })"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
+
+        <div class="stage-custom__toggle-row">
+          <button
+            type="button"
+            class="stage-custom__toggle-label"
+            @click="patch({ titleUpperCase: !settings.titleUpperCase })"
+          >
+            {{ t('settings.stage.titleUpperCase') }}
+          </button>
+          <input
+            type="checkbox"
+            class="stage-custom__toggle"
+            :checked="settings.titleUpperCase"
+            :aria-label="t('settings.stage.titleUpperCase')"
+            @change="patch({ titleUpperCase: ($event.target as HTMLInputElement).checked })"
+          >
+        </div>
+
+        <div class="stage-custom__toggle-row">
+          <button
+            type="button"
+            class="stage-custom__toggle-label"
+            @click="patch({ titleTextShadow: settings.titleTextShadow === null ? !settings.textShadow : !settings.titleTextShadow })"
+          >
+            {{ t('settings.stage.titleTextShadow') }}
+          </button>
+          <input
+            type="checkbox"
+            class="stage-custom__toggle"
+            :checked="settings.titleTextShadow ?? settings.textShadow"
+            :aria-label="t('settings.stage.titleTextShadow')"
+            @change="patch({ titleTextShadow: ($event.target as HTMLInputElement).checked })"
+          >
+        </div>
+
+        <div class="stage-custom__toggle-row">
+          <button
+            type="button"
+            class="stage-custom__toggle-label"
+            @click="patch({ titleTextBox: !settings.titleTextBox })"
+          >
+            {{ t('settings.stage.titleTextBox') }}
+          </button>
+          <input
+            type="checkbox"
+            class="stage-custom__toggle"
+            :checked="settings.titleTextBox"
+            :aria-label="t('settings.stage.titleTextBox')"
+            @change="patch({ titleTextBox: ($event.target as HTMLInputElement).checked })"
+          >
+        </div>
+      </div>
+    </template>
+
+    <!-- Hinos: estrofes com tipografia própria (espelha o título) -->
+    <template v-if="activeScope === 'hymns'">
+      <div class="stage-custom__section stage-custom__section--bible">
+        <p class="stage-custom__label">{{ t('settings.stage.lyricAppearance') }}</p>
+
+        <div class="stage-custom__toggle-row">
+          <button
+            type="button"
+            class="stage-custom__toggle-label"
+            @click="clearLyricOverrides"
+          >
+            {{ t('settings.stage.lyricReset') }}
+          </button>
+        </div>
+
+        <p class="stage-custom__label stage-custom__label--sub">
+          {{ t('settings.stage.lyricTextColor') }}
+        </p>
+        <div class="stage-custom__swatches">
+          <button
+            type="button"
+            class="stage-custom__swatch stage-custom__swatch--auto"
+            :class="{ 'stage-custom__swatch--active': settings.lyricTextColor == null }"
+            :aria-label="t('settings.stage.autoText')"
+            :title="t('settings.stage.autoText')"
+            @click="patch({ lyricTextColor: null })"
+          >
+            <i class="ti ti-eraser" aria-hidden="true" />
+          </button>
+          <button
+            v-for="preset in STAGE_FG_PRESETS"
+            :key="preset.color"
+            type="button"
+            class="stage-custom__swatch"
+            :class="{ 'stage-custom__swatch--active': settings.lyricTextColor === preset.color }"
+            :style="{ '--swatch': preset.color }"
+            :aria-label="preset.label"
+            @click="patch({ lyricTextColor: preset.color })"
+          />
+          <label class="stage-custom__picker">
+            <i class="ti ti-color-picker" aria-hidden="true" />
+            <input
+              type="color"
+              :value="settings.lyricTextColor ?? settings.textColor ?? '#FFFFFF'"
+              :aria-label="t('settings.stage.lyricTextColor')"
+              @input="patch({ lyricTextColor: ($event.target as HTMLInputElement).value })"
+            >
+          </label>
+        </div>
+
+        <div class="stage-custom__row-head">
+          <span>{{ t('settings.stage.lyricFontSize') }}</span>
+          <span class="stage-custom__chip">{{ Math.round(settings.lyricFontSize ?? settings.fontSize) }}px</span>
+        </div>
+        <input
+          type="range"
+          min="60"
+          max="160"
+          step="2"
+          :value="settings.lyricFontSize ?? settings.fontSize"
+          :aria-label="t('settings.stage.lyricFontSize')"
+          @input="patch({ lyricFontSize: Number(($event.target as HTMLInputElement).value) })"
+        >
+
+        <p class="stage-custom__label stage-custom__label--sub">
+          {{ t('settings.stage.lyricFontWeight') }}
+        </p>
+        <div class="stage-custom__segment" role="radiogroup">
+          <button
+            v-for="opt in lyricWeightOptions"
+            :key="String(opt.value)"
+            type="button"
+            role="radio"
+            :aria-checked="(settings.lyricFontWeight ?? null) === opt.value"
+            class="stage-custom__segment-btn"
+            :class="{ 'stage-custom__segment-btn--active': (settings.lyricFontWeight ?? null) === opt.value }"
+            @click="patch({ lyricFontWeight: (settings.lyricFontWeight ?? null) === opt.value ? null : opt.value })"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
+
+        <div class="stage-custom__toggle-row">
+          <button
+            type="button"
+            class="stage-custom__toggle-label"
+            @click="patch({ lyricUpperCase: !settings.lyricUpperCase })"
+          >
+            {{ t('settings.stage.lyricUpperCase') }}
+          </button>
+          <input
+            type="checkbox"
+            class="stage-custom__toggle"
+            :checked="settings.lyricUpperCase"
+            :aria-label="t('settings.stage.lyricUpperCase')"
+            @change="patch({ lyricUpperCase: ($event.target as HTMLInputElement).checked })"
+          >
+        </div>
+
+        <div class="stage-custom__toggle-row">
+          <button
+            type="button"
+            class="stage-custom__toggle-label"
+            @click="patch({ lyricTextShadow: settings.lyricTextShadow === null ? !settings.textShadow : !settings.lyricTextShadow })"
+          >
+            {{ t('settings.stage.lyricTextShadow') }}
+          </button>
+          <input
+            type="checkbox"
+            class="stage-custom__toggle"
+            :checked="settings.lyricTextShadow ?? settings.textShadow"
+            :aria-label="t('settings.stage.lyricTextShadow')"
+            @change="patch({ lyricTextShadow: ($event.target as HTMLInputElement).checked })"
+          >
+        </div>
+      </div>
+    </template>
+
     <!-- Bíblia: tipografia própria (F3.3o) -->
     <template v-if="activeScope === 'bible'">
       <div class="stage-custom__section stage-custom__section--bible">
@@ -382,6 +916,16 @@ const confirmReset = ref(false)
           {{ t('settings.stage.bibleTextColor') }}
         </p>
         <div class="stage-custom__swatches">
+          <button
+            type="button"
+            class="stage-custom__swatch stage-custom__swatch--auto"
+            :class="{ 'stage-custom__swatch--active': settings.bibleTextColor == null }"
+            :aria-label="t('settings.stage.autoText')"
+            :title="t('settings.stage.autoText')"
+            @click="patch({ bibleTextColor: null })"
+          >
+            <i class="ti ti-eraser" aria-hidden="true" />
+          </button>
           <button
             v-for="preset in STAGE_FG_PRESETS"
             :key="preset.color"
@@ -396,7 +940,7 @@ const confirmReset = ref(false)
             <i class="ti ti-color-picker" aria-hidden="true" />
             <input
               type="color"
-              :value="settings.bibleTextColor"
+              :value="settings.bibleTextColor ?? '#FFFFFF'"
               :aria-label="t('settings.stage.bibleTextColor')"
               @input="patch({ bibleTextColor: ($event.target as HTMLInputElement).value })"
             >
@@ -435,6 +979,110 @@ const confirmReset = ref(false)
           </button>
         </div>
 
+        <p class="stage-custom__label stage-custom__label--sub">
+          {{ t('settings.stage.bibleTextTransform') }}
+        </p>
+        <div class="stage-custom__segment" role="radiogroup">
+          <button
+            v-for="opt in bibleTransformOptions"
+            :key="opt.value"
+            type="button"
+            role="radio"
+            :aria-checked="settings.bibleTextTransform === opt.value"
+            class="stage-custom__segment-btn"
+            :class="{ 'stage-custom__segment-btn--active': settings.bibleTextTransform === opt.value }"
+            @click="patch({ bibleTextTransform: opt.value })"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
+
+        <div class="stage-custom__row-head">
+          <span>{{ t('settings.stage.refFontSize') }}</span>
+          <span class="stage-custom__chip">{{ settings.refFontSize == null ? t('settings.stage.autoText') : `${Math.round(settings.refFontSize)}px` }}</span>
+        </div>
+        <input
+          type="range"
+          min="50"
+          max="140"
+          step="2"
+          :value="settings.refFontSize ?? Math.round(settings.bibleFontSize * 0.4)"
+          :aria-label="t('settings.stage.refFontSize')"
+          @input="patch({ refFontSize: Number(($event.target as HTMLInputElement).value) })"
+        >
+
+        <p class="stage-custom__label stage-custom__label--sub">
+          {{ t('settings.stage.refTextTransform') }}
+        </p>
+        <div class="stage-custom__segment" role="radiogroup">
+          <button
+            v-for="opt in bibleTransformOptions"
+            :key="opt.value"
+            type="button"
+            role="radio"
+            :aria-checked="settings.refTextTransform === opt.value"
+            class="stage-custom__segment-btn"
+            :class="{ 'stage-custom__segment-btn--active': settings.refTextTransform === opt.value }"
+            @click="patch({ refTextTransform: opt.value })"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
+
+        <div class="stage-custom__toggle-row">
+          <button
+            type="button"
+            class="stage-custom__toggle-label"
+            @click="setBibleTransitionEnabled(!settings.bibleTransitionEnabled)"
+          >
+            {{ t('settings.stage.transitionsEnabled') }}
+          </button>
+          <SettingsToggle
+            :model-value="settings.bibleTransitionEnabled"
+            :label="t('settings.stage.transitionsEnabled')"
+            data-testid="bible-transition-enabled"
+            @update:model-value="setBibleTransitionEnabled($event)"
+          />
+        </div>
+
+        <template v-if="settings.bibleTransitionEnabled">
+          <p class="stage-custom__label stage-custom__label--sub">
+            {{ t('settings.stage.bibleTransition') }}
+          </p>
+          <ScreenTransitionPicker
+            :model-value="settings.bibleTransition"
+            :duration-ms="bibleTransitionMs(settings.bibleTransitionSpeed)"
+            :label="t('settings.stage.bibleTransition')"
+            test-id="bible-transition"
+            @update:model-value="patch({ bibleTransition: $event })"
+          />
+        </template>
+
+        <template v-if="settings.bibleTransitionEnabled && settings.bibleTransition !== 'none'">
+          <p class="stage-custom__label stage-custom__label--sub">
+            {{ t('settings.stage.bibleTransitionSpeed') }}
+          </p>
+          <div
+            class="stage-custom__segment"
+            role="radiogroup"
+            data-testid="bible-transition-speed"
+            :aria-label="t('settings.stage.bibleTransitionSpeed')"
+          >
+            <button
+              v-for="opt in bibleTransitionSpeedOptions"
+              :key="opt.value"
+              type="button"
+              role="radio"
+              :aria-checked="settings.bibleTransitionSpeed === opt.value"
+              class="stage-custom__segment-btn"
+              :class="{ 'stage-custom__segment-btn--active': settings.bibleTransitionSpeed === opt.value }"
+              @click="patch({ bibleTransitionSpeed: opt.value })"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
+        </template>
+
         <div class="stage-custom__toggle-row">
           <button
             type="button"
@@ -451,9 +1099,43 @@ const confirmReset = ref(false)
         </div>
 
         <p class="stage-custom__label stage-custom__label--sub">
+          {{ t('settings.stage.refPosition') }}
+        </p>
+        <div
+          class="stage-custom__segment"
+          role="radiogroup"
+          data-testid="bible-ref-position"
+          :aria-label="t('settings.stage.refPosition')"
+        >
+          <button
+            v-for="opt in bibleRefPositionOptions"
+            :key="opt.value"
+            type="button"
+            role="radio"
+            :aria-checked="settings.bibleRefPosition === opt.value"
+            :title="opt.hint"
+            class="stage-custom__segment-btn"
+            :class="{ 'stage-custom__segment-btn--active': settings.bibleRefPosition === opt.value }"
+            @click="patch({ bibleRefPosition: opt.value })"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
+
+        <p class="stage-custom__label stage-custom__label--sub">
           {{ t('settings.stage.footerRefColor') }}
         </p>
         <div class="stage-custom__swatches">
+          <button
+            type="button"
+            class="stage-custom__swatch stage-custom__swatch--auto"
+            :class="{ 'stage-custom__swatch--active': settings.footerRefColor == null }"
+            :aria-label="t('settings.stage.autoText')"
+            :title="t('settings.stage.autoText')"
+            @click="patch({ footerRefColor: null })"
+          >
+            <i class="ti ti-eraser" aria-hidden="true" />
+          </button>
           <button
             v-for="preset in STAGE_REF_PRESETS"
             :key="preset.color"
@@ -468,7 +1150,7 @@ const confirmReset = ref(false)
             <i class="ti ti-color-picker" aria-hidden="true" />
             <input
               type="color"
-              :value="settings.footerRefColor"
+              :value="settings.footerRefColor ?? '#FCCE02'"
               :aria-label="t('settings.stage.footerRefColor')"
               @input="patch({ footerRefColor: ($event.target as HTMLInputElement).value })"
             >
@@ -504,18 +1186,18 @@ const confirmReset = ref(false)
           <button
             type="button"
             class="stage-custom__toggle-label"
-            @click="patchClock({ showSeconds: !(settings.clock ?? DEFAULT_CLOCK_MODULE_SETTINGS).showSeconds })"
+            @click="patchClock({ showSeconds: !clockSettings.showSeconds })"
           >
             {{ t('settings.stage.clockShowSeconds') }}
           </button>
           <button
             type="button"
             role="switch"
-            :aria-checked="(settings.clock ?? DEFAULT_CLOCK_MODULE_SETTINGS).showSeconds"
+            :aria-checked="clockSettings.showSeconds"
             class="stage-custom__switch"
-            :class="{ 'stage-custom__switch--on': (settings.clock ?? DEFAULT_CLOCK_MODULE_SETTINGS).showSeconds }"
+            :class="{ 'stage-custom__switch--on': clockSettings.showSeconds }"
             :aria-label="t('settings.stage.clockShowSeconds')"
-            @click="patchClock({ showSeconds: !(settings.clock ?? DEFAULT_CLOCK_MODULE_SETTINGS).showSeconds })"
+            @click="patchClock({ showSeconds: !clockSettings.showSeconds })"
           />
         </div>
 
@@ -523,18 +1205,18 @@ const confirmReset = ref(false)
           <button
             type="button"
             class="stage-custom__toggle-label"
-            @click="patchClock({ format24h: !(settings.clock ?? DEFAULT_CLOCK_MODULE_SETTINGS).format24h })"
+            @click="patchClock({ format24h: !clockSettings.format24h })"
           >
             {{ t('settings.stage.clockFormat24h') }}
           </button>
           <button
             type="button"
             role="switch"
-            :aria-checked="(settings.clock ?? DEFAULT_CLOCK_MODULE_SETTINGS).format24h"
+            :aria-checked="clockSettings.format24h"
             class="stage-custom__switch"
-            :class="{ 'stage-custom__switch--on': (settings.clock ?? DEFAULT_CLOCK_MODULE_SETTINGS).format24h }"
+            :class="{ 'stage-custom__switch--on': clockSettings.format24h }"
             :aria-label="t('settings.stage.clockFormat24h')"
-            @click="patchClock({ format24h: !(settings.clock ?? DEFAULT_CLOCK_MODULE_SETTINGS).format24h })"
+            @click="patchClock({ format24h: !clockSettings.format24h })"
           />
         </div>
       </div>
@@ -570,7 +1252,7 @@ const confirmReset = ref(false)
 
         <div class="stage-custom__row-head">
           <span>{{ t('settings.stage.randomFontSize') }}</span>
-          <span class="stage-custom__chip">{{ Math.round(settings.random ?? DEFAULT_RANDOM_MODULE_SETTINGS ? (settings.random ?? DEFAULT_RANDOM_MODULE_SETTINGS).fontSizePc : 8) }}%</span>
+          <span class="stage-custom__chip">{{ Math.round(randomSettings.fontSizePc) }}%</span>
         </div>
         <input
           type="range"
@@ -795,21 +1477,426 @@ const confirmReset = ref(false)
           {{ t('settings.stage.reset') }}
         </button>
       </template>
-    </div>
+      </div><!-- /controls-inner -->
+        <!-- Músicas: tela de retorno (monitor dos músicos) -->
+        <GlassCard
+          v-if="activeScope === 'hymns'"
+          class="stage-custom__accordion"
+          :padding="false"
+          data-testid="return-screen-section"
+        >
+          <button
+            type="button"
+            class="stage-custom__accordion-head"
+            :aria-expanded="returnOpen"
+            @click="returnOpen = !returnOpen"
+          >
+            <span class="stage-custom__accordion-icon"><i class="ti ti-device-desktop" aria-hidden="true" /></span>
+            <span class="stage-custom__accordion-title">{{ t('settings.stage.returnTitle') }}</span>
+            <i
+              class="ti ti-chevron-down stage-custom__accordion-chevron"
+              :class="{ 'stage-custom__accordion-chevron--open': returnOpen }"
+              aria-hidden="true"
+            />
+          </button>
+          <div
+            v-if="returnOpen"
+            class="stage-custom__accordion-body"
+          >
+            <p class="stage-custom__hint">{{ t('settings.stage.returnHint') }}</p>
+
+            <!-- Frase atual -->
+            <p class="stage-custom__label stage-custom__label--sub">{{ t('settings.stage.returnCurrent') }}</p>
+            <div class="stage-custom__row-head">
+              <span>{{ t('settings.stage.returnCurrentSize') }}</span>
+              <span class="stage-custom__chip">
+                {{ returnSettings.fontSize == null
+                  ? t('settings.stage.returnSameAsSlides')
+                  : `${Math.round(returnSettings.fontSize)}px` }}
+              </span>
+            </div>
+            <input
+              type="range"
+              :min="RETURN_FONT_SIZE_MIN"
+              :max="RETURN_FONT_SIZE_MAX"
+              step="2"
+              :value="returnSettings.fontSize ?? settings.lyricFontSize ?? settings.fontSize"
+              :aria-label="t('settings.stage.fontSize')"
+              @input="patchReturn({ fontSize: Number(($event.target as HTMLInputElement).value) })"
+            >
+            <button
+              v-if="returnSettings.fontSize != null"
+              type="button"
+              class="stage-custom__toggle-label"
+              @click="patchReturn({ fontSize: null })"
+            >
+              {{ t('settings.stage.returnUseSlides') }}
+            </button>
+
+            <div class="stage-custom__swatches">
+              <button
+                type="button"
+                class="stage-custom__swatch stage-custom__swatch--auto"
+                :class="{ 'stage-custom__swatch--active': returnSettings.textColor == null }"
+                :aria-label="t('settings.stage.returnSameAsSlides')"
+                :title="t('settings.stage.returnSameAsSlides')"
+                @click="patchReturn({ textColor: null })"
+              >
+                <i class="ti ti-link" aria-hidden="true" />
+              </button>
+              <button
+                v-for="preset in STAGE_FG_PRESETS"
+                :key="preset.color"
+                type="button"
+                class="stage-custom__swatch"
+                :class="{ 'stage-custom__swatch--active': returnSettings.textColor === preset.color }"
+                :style="{ '--swatch': preset.color }"
+                :aria-label="preset.label"
+                @click="patchReturn({ textColor: preset.color })"
+              />
+              <label
+                class="stage-custom__swatch stage-custom__swatch--auto"
+                :title="t('settings.stage.customColor')"
+              >
+                <i class="ti ti-color-picker" aria-hidden="true" />
+                <input
+                  type="color"
+                  class="sr-only"
+                  :value="returnSettings.textColor ?? '#ffffff'"
+                  :aria-label="t('settings.stage.customColor')"
+                  @input="patchReturn({ textColor: ($event.target as HTMLInputElement).value })"
+                >
+              </label>
+            </div>
+
+            <div
+              class="stage-custom__segment"
+              role="radiogroup"
+              :aria-label="t('settings.stage.fontWeight')"
+            >
+              <button
+                v-for="opt in returnWeightOptions"
+                :key="String(opt.value)"
+                type="button"
+                role="radio"
+                :aria-checked="returnSettings.fontWeight === opt.value"
+                class="stage-custom__segment-btn"
+                :class="{ 'stage-custom__segment-btn--active': returnSettings.fontWeight === opt.value }"
+                @click="patchReturn({ fontWeight: opt.value })"
+              >
+                {{ opt.label }}
+              </button>
+            </div>
+
+            <p class="stage-custom__label stage-custom__label--sub">{{ t('settings.stage.returnUpper') }}</p>
+            <div
+              class="stage-custom__segment"
+              role="radiogroup"
+              :aria-label="t('settings.stage.returnUpper')"
+            >
+              <button
+                v-for="opt in returnUpperOptions"
+                :key="String(opt.value)"
+                type="button"
+                role="radio"
+                :aria-checked="returnSettings.upperCase === opt.value"
+                class="stage-custom__segment-btn"
+                :class="{ 'stage-custom__segment-btn--active': returnSettings.upperCase === opt.value }"
+                @click="patchReturn({ upperCase: opt.value })"
+              >
+                {{ opt.label }}
+              </button>
+            </div>
+
+            <!-- Próxima estrofe (sempre visível) -->
+            <div class="stage-custom__row-head">
+              <span>{{ t('settings.stage.returnNextSize') }}</span>
+              <span class="stage-custom__chip">
+                {{ returnSettings.nextFontSize == null
+                  ? t('settings.stage.returnSameAsSlides')
+                  : `${Math.round(returnSettings.nextFontSize)}px` }}
+              </span>
+            </div>
+            <input
+              type="range"
+              :min="RETURN_NEXT_FONT_SIZE_MIN"
+              :max="RETURN_FONT_SIZE_MAX"
+              step="2"
+              :value="returnNextFontSize(returnSettings, settings)"
+              :aria-label="t('settings.stage.returnNextSize')"
+              @input="patchReturn({ nextFontSize: Number(($event.target as HTMLInputElement).value) })"
+            >
+            <button
+              v-if="returnSettings.nextFontSize != null"
+              type="button"
+              class="stage-custom__toggle-label"
+              @click="patchReturn({ nextFontSize: null })"
+            >
+              {{ t('settings.stage.returnUseSlides') }}
+            </button>
+
+            <!-- Fundo -->
+            <p class="stage-custom__label stage-custom__label--sub">{{ t('settings.stage.returnBackground') }}</p>
+            <div
+              class="stage-custom__segment"
+              role="radiogroup"
+              :aria-label="t('settings.stage.returnBackground')"
+            >
+              <button
+                v-for="opt in returnBgOptions"
+                :key="opt.value"
+                type="button"
+                role="radio"
+                :aria-checked="returnSettings.bgMode === opt.value"
+                class="stage-custom__segment-btn"
+                :class="{ 'stage-custom__segment-btn--active': returnSettings.bgMode === opt.value }"
+                @click="patchReturn({ bgMode: opt.value })"
+              >
+                {{ opt.label }}
+              </button>
+            </div>
+            <div
+              v-if="returnSettings.bgMode !== 'slides'"
+              class="stage-custom__swatches"
+            >
+              <button
+                v-for="preset in STAGE_BG_PRESETS"
+                :key="preset.color"
+                type="button"
+                class="stage-custom__swatch"
+                :class="{ 'stage-custom__swatch--active': returnSettings.bgColor === preset.color }"
+                :style="{ '--swatch': preset.color }"
+                :aria-label="preset.label"
+                @click="patchReturn({ bgColor: preset.color })"
+              />
+              <label
+                class="stage-custom__swatch stage-custom__swatch--auto"
+                :title="t('settings.stage.customColor')"
+              >
+                <i class="ti ti-color-picker" aria-hidden="true" />
+                <input
+                  type="color"
+                  class="sr-only"
+                  :value="returnSettings.bgColor"
+                  :aria-label="t('settings.stage.customColor')"
+                  @input="patchReturn({ bgColor: ($event.target as HTMLInputElement).value })"
+                >
+              </label>
+            </div>
+            <template v-if="returnSettings.bgMode === 'image'">
+              <div class="stage-custom__official-grid">
+                <button
+                  type="button"
+                  class="stage-custom__official-tile stage-custom__official-tile--upload"
+                  :class="{ 'stage-custom__official-tile--active': returnSettings.bgImage?.startsWith('data:') }"
+                  :aria-label="t('settings.stage.selectImage')"
+                  :title="t('settings.stage.selectImage')"
+                  @click="returnFileInput?.click()"
+                >
+                  <i class="ti ti-cloud-upload" aria-hidden="true" />
+                </button>
+                <button
+                  v-for="bgId in STAGE_OFFICIAL_BACKGROUNDS"
+                  :key="bgId"
+                  type="button"
+                  class="stage-custom__official-tile"
+                  :class="{ 'stage-custom__official-tile--active':
+                    returnSettings.bgImage === `${OFFICIAL_BG_PREFIX}${bgId}` }"
+                  :aria-label="`${t('settings.stage.officialBackground')} ${bgId}`"
+                  @click="patchReturn({ bgImage: `${OFFICIAL_BG_PREFIX}${bgId}` })"
+                >
+                  <img
+                    :src="officialBgUrl(bgId)"
+                    alt=""
+                    loading="lazy"
+                  >
+                </button>
+              </div>
+              <input
+                ref="returnFileInput"
+                type="file"
+                accept="image/*"
+                class="sr-only"
+                :aria-label="t('settings.stage.selectImage')"
+                @change="onReturnFileSelected"
+              >
+            </template>
+
+            <!-- Barra de progresso (sempre visível): só a cor -->
+            <p class="stage-custom__label stage-custom__label--sub">{{ t('settings.stage.returnBarColor') }}</p>
+            <div class="stage-custom__swatches">
+              <button
+                type="button"
+                class="stage-custom__swatch stage-custom__swatch--auto"
+                :class="{ 'stage-custom__swatch--active': returnSettings.barColor == null }"
+                :aria-label="t('settings.stage.returnSameAsSlides')"
+                :title="t('settings.stage.returnSameAsSlides')"
+                @click="patchReturn({ barColor: null })"
+              >
+                <i class="ti ti-link" aria-hidden="true" />
+              </button>
+              <button
+                v-for="preset in STAGE_REF_PRESETS"
+                :key="preset.color"
+                type="button"
+                class="stage-custom__swatch"
+                :class="{ 'stage-custom__swatch--active': returnSettings.barColor === preset.color }"
+                :style="{ '--swatch': preset.color }"
+                :aria-label="preset.label"
+                @click="patchReturn({ barColor: preset.color })"
+              />
+              <label
+                class="stage-custom__swatch stage-custom__swatch--auto"
+                :title="t('settings.stage.customColor')"
+              >
+                <i class="ti ti-color-picker" aria-hidden="true" />
+                <input
+                  type="color"
+                  class="sr-only"
+                  :value="returnSettings.barColor ?? '#fcce02'"
+                  :aria-label="t('settings.stage.customColor')"
+                  @input="patchReturn({ barColor: ($event.target as HTMLInputElement).value })"
+                >
+              </label>
+            </div>
+
+            <button
+              v-if="settings.returnScreen"
+              type="button"
+              class="stage-custom__toggle-label"
+              data-testid="return-screen-reset"
+              @click="resetReturn"
+            >
+              <i class="ti ti-restore" aria-hidden="true" />
+              {{ t('settings.stage.returnReset') }}
+            </button>
+          </div>
+        </GlassCard>
+      </div><!-- /controls -->
+
+    </div><!-- /controls (ver /controls-inner acima) -->
+    </div><!-- /body (grid 2 colunas) -->
   </GlassCard>
 </template>
 
 <style scoped lang="scss">
+.stage-custom__accordion {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.stage-custom__accordion-head {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 0.85rem;
+  border: 0;
+  background: transparent;
+  color: var(--ds-color-on-surface);
+  text-align: left;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--ds-color-primary);
+    outline-offset: -3px;
+  }
+}
+
+.stage-custom__accordion-icon {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  border-radius: var(--ds-radius-md);
+  background: color-mix(in srgb, var(--ds-color-primary) 12%, transparent);
+  color: var(--ds-color-primary);
+  font-size: 20px;
+}
+
+.stage-custom__accordion-title {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.stage-custom__accordion-chevron {
+  margin-left: auto;
+  color: var(--ds-color-on-surface-variant);
+  transition: transform 180ms ease;
+
+  &--open {
+    transform: rotate(180deg);
+  }
+}
+
+.stage-custom__accordion-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0 0.85rem 0.85rem;
+}
+
 .stage-custom {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1.25rem;
   padding: 2rem;
 
   @media (max-width: 1280px) {
     gap: 1rem;
     padding: 1.15rem;
   }
+}
+
+.stage-custom__header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Preview ACIMA dos controles (ou abaixo — ambos ok, decide o fluxo),
+   compacto e SEMPRE VISÍVEL no abrir do modal; controles vêm depois.
+   Sem colunas, sem overlay: rolagem natural da página (Rafael 05/10). */
+.stage-custom__body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.stage-custom__controls {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  min-width: 0;
+}
+
+.stage-custom__controls-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  min-width: 0;
+}
+
+.stage-custom__preview-pane {
+  /* Sempre visível: cola no topo enquanto os controles rolam
+     (deixa de aparecer só quando o card inteiro sai da tela). */
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  padding: 0.6rem 0;
+  background: var(--ds-color-surface, rgb(16 18 24));
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--ds-color-outline) 60%, transparent);
+}
+
+/* Preview compacto: vê a personalização em tempo real sem dominar a tela. */
+.stage-custom__preview {
+  width: 100%;
+  max-width: 480px;
 }
 
 .stage-custom__header {
@@ -940,6 +2027,19 @@ const confirmReset = ref(false)
   &--active {
     border-color: var(--ds-color-primary);
     box-shadow: 0 0 0 4px color-mix(in srgb, var(--ds-color-primary) 25%, transparent);
+  }
+}
+
+.stage-custom__swatch--auto {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ds-color-on-surface-variant);
+  background: color-mix(in srgb, var(--ds-color-surface-container-high) 70%, transparent);
+  border: 1px dashed var(--ds-color-outline);
+
+  .ti {
+    font-size: 18px;
   }
 }
 

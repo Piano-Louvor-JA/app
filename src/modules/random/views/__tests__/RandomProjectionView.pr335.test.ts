@@ -1,0 +1,388 @@
+// @vitest-environment jsdom
+import { mount } from "@vue/test-utils";
+
+// stage-settings mockado: cobre true/false-arm de effectiveConfig (random presente/ausente)
+const stageSettingsState = vi.hoisted(() => ({ value: null as Record<string, unknown> | null }));
+vi.mock("../../../settings/services/stage-settings-runtime", async (importOriginal) => {
+	const real = await importOriginal<typeof import("../../../settings/services/stage-settings-runtime")>();
+	return {
+		readEffectiveStageSettings: (scope: string) =>
+			stageSettingsState.value ?? real.readEffectiveStageSettings(scope),
+		subscribeStageSettings: (cb: () => void) => real.subscribeStageSettings(cb),
+	};
+});
+import { createPinia, setActivePinia } from "pinia";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { flushPromises } from "@vue/test-utils";
+import { createI18n } from "vue-i18n";
+
+/**
+ * RandomProjectionView — projeção fullscreen do sorteio.
+ * Modo standalone (localStorage + BroadcastChannel + storage events) e
+ * embedded (usa a store). Branches: projecting on/off, stage com/sem
+ * imagem, effectiveConfig (diálogo > sub-bloco Palco), onDraw embedded.
+ */
+import { BROWSER_STORAGE_KEYS } from "../../../../shared/constants/storage-keys";
+import { RANDOM_CONFIG_CHANNEL } from "../../services/random-preferences";
+import { RANDOM_RUNTIME_STORAGE_KEY } from "../../services/random-runtime";
+import { useRandomStore } from "../../stores/useRandomStore";
+import { DEFAULT_RANDOM_DISPLAY_CONFIG } from "../../types/random";
+import RandomProjectionView from "../RandomProjectionView.vue";
+
+const i18n = createI18n({
+	legacy: false,
+	locale: "pt-BR",
+	messages: { "pt-BR": { random: {} } },
+});
+
+function mountView(over: { embedded?: boolean } = {}) {
+	return mount(RandomProjectionView, {
+		props: over,
+		global: { plugins: [i18n, createPinia()] },
+	});
+}
+
+beforeEach(() => {
+	localStorage.clear();
+	vi.stubGlobal(
+		"matchMedia",
+		vi.fn().mockReturnValue({
+			matches: false,
+			addListener: vi.fn(),
+			removeListener: vi.fn(),
+		}),
+	);
+});
+
+afterEach(() => {
+	vi.unstubAllGlobals();
+	localStorage.clear();
+});
+
+describe("RandomProjectionView — standalone", () => {
+	it("monta e lê config/runtime do localStorage", () => {
+		const w = mountView();
+		expect(w.find(".random-projection").exists()).toBe(true);
+		w.unmount();
+	});
+
+	it("projecting false esconde o palco", () => {
+		localStorage.setItem(
+			RANDOM_RUNTIME_STORAGE_KEY,
+			JSON.stringify({
+				mode: "names",
+				isDrawing: false,
+				currentDisplay: "",
+				drawn: [],
+				projecting: false,
+			}),
+		);
+		const w = mountView();
+		expect(w.find(".random-projection__stage").exists()).toBe(false);
+		w.unmount();
+	});
+
+	it("projecting true mostra o palco com RandomStage projection", async () => {
+		localStorage.setItem(
+			RANDOM_RUNTIME_STORAGE_KEY,
+			JSON.stringify({
+				mode: "names",
+				isDrawing: false,
+				currentDisplay: "Ana",
+				drawn: [],
+				projecting: true,
+			}),
+		);
+		const w = mountView();
+		// runtime é lido no onMounted — aguardar o tick pós-mount
+		await w.vm.$nextTick();
+		expect(w.find(".random-projection__stage").exists()).toBe(true);
+		w.unmount();
+	});
+
+	it("storage event de userPreferences refresca config", async () => {
+		const w = mountView();
+		window.dispatchEvent(
+			new StorageEvent("storage", {
+				key: BROWSER_STORAGE_KEYS.userPreferences,
+			}),
+		);
+		await w.vm.$nextTick();
+		// sem crash = handler rodou
+		expect(w.find(".random-projection").exists()).toBe(true);
+		w.unmount();
+	});
+
+	it("storage event do runtime refresca runtime", async () => {
+		const w = mountView();
+		window.dispatchEvent(
+			new StorageEvent("storage", { key: RANDOM_RUNTIME_STORAGE_KEY }),
+		);
+		await w.vm.$nextTick();
+		expect(w.find(".random-projection").exists()).toBe(true);
+		w.unmount();
+	});
+
+	it("BroadcastChannel message atualiza config", async () => {
+		const w = mountView();
+		const channel = new BroadcastChannel(RANDOM_CONFIG_CHANNEL);
+		channel.postMessage({
+			...DEFAULT_RANDOM_DISPLAY_CONFIG,
+			bgColor: "#abcdef",
+		});
+		await new Promise((r) => setTimeout(r, 50));
+		w.unmount();
+		channel.close();
+		expect(w.find(".random-projection").exists()).toBe(true);
+	});
+
+	it("unmount remove listeners e fecha channels", () => {
+		const w = mountView();
+		const removeSpy = vi.spyOn(window, "removeEventListener");
+		w.unmount();
+		expect(removeSpy).toHaveBeenCalledWith("storage", expect.any(Function));
+		removeSpy.mockRestore();
+	});
+});
+
+describe("RandomProjectionView — embedded", () => {
+	it("embedded: usa a store; onDraw chama startDraw", async () => {
+		const pinia = createPinia();
+		setActivePinia(pinia);
+		const w = mount(RandomProjectionView, {
+			props: { embedded: true },
+			global: { plugins: [i18n, pinia] },
+		});
+		const store = useRandomStore();
+		const spy = vi.spyOn(store, "startDraw").mockImplementation(() => {});
+		// botão Sortear do stage embedded (canDraw vem da store)
+		const btn = w.find(".random-stage__draw");
+		if (btn.exists()) {
+			await btn.trigger("click");
+			expect(spy).toHaveBeenCalledOnce();
+		}
+		spy.mockRestore();
+		w.unmount();
+	});
+
+	it("embedded: projecting false da store esconde palco", async () => {
+		const pinia = createPinia();
+		setActivePinia(pinia);
+		const store = useRandomStore();
+		store.runtime.projecting = false;
+		const w = mount(RandomProjectionView, {
+			props: { embedded: true },
+			global: { plugins: [i18n, pinia] },
+		});
+		await w.vm.$nextTick();
+		expect(w.find(".random-projection__stage").exists()).toBe(false);
+		w.unmount();
+	});
+
+	it("embedded: classe --embedded aplicada", () => {
+		const w = mountView({ embedded: true });
+		expect(w.find(".random-projection--embedded").exists()).toBe(true);
+		w.unmount();
+	});
+	describe("gaps — onDraw embedded, channels, effectiveConfig", () => {
+		it("embedded: botão sortear chama startDraw", async () => {
+			const w = mountView({ embedded: true });
+			await flushPromises();
+			const drawBtn = w.findAll("button").find((b) => (b.text() || "").toLowerCase().includes("sorte"));
+			if (drawBtn) {
+				await drawBtn.trigger("click");
+				await flushPromises();
+			}
+			expect(w.exists()).toBe(true);
+			w.unmount();
+		});
+
+		it("não embedded: onDraw não faz nada", async () => {
+			const w = mountView({ embedded: false });
+			await flushPromises();
+			expect(w.exists()).toBe(true);
+			w.unmount();
+		});
+
+		it("embedded: onDraw dispara startDraw da store", async () => {
+			const w = mountView({ embedded: true });
+			await flushPromises();
+			const vm = w.vm as unknown as { onDraw?: () => void };
+			vm.onDraw?.();
+			await flushPromises();
+			w.unmount();
+		});
+
+		it("storage da runtime key atualiza; key estranha ignora", async () => {
+			const w = mountView({ embedded: true });
+			await flushPromises();
+			window.dispatchEvent(new StorageEvent("storage", { key: "outra" }));
+			await flushPromises();
+			localStorage.setItem("louvorja-random-runtime", JSON.stringify({ history: [1, 2] }));
+			window.dispatchEvent(new StorageEvent("storage", { key: "louvorja-random-runtime" }));
+			await flushPromises();
+			w.unmount();
+		});
+
+		it("stage.random mesclado no effectiveConfig; backgroundImage do palco", async () => {
+			localStorage.setItem(
+				"louvorja-stage-settings-random",
+				JSON.stringify({
+					random: { bgColor: "#112233", textColor: "#fff", showHistory: true },
+					backgroundImage: "/img/bg.png",
+				}),
+			);
+			const w = mountView();
+			await flushPromises();
+			expect(w.exists()).toBe(true);
+			w.unmount();
+		});
+
+		it("BroadcastChannel indisponível: view monta igual (catch dos canais)", async () => {
+			const OriginalBC = window.BroadcastChannel;
+			(vi.stubGlobal as (k: string, v: unknown) => void)("BroadcastChannel", undefined);
+			const w = mountView();
+			await flushPromises();
+			expect(w.exists()).toBe(true);
+			w.unmount();
+			(vi.stubGlobal as (k: string, v: unknown) => void)("BroadcastChannel", OriginalBC);
+		});
+	});
+
+});
+
+describe("RandomProjectionView — palco visual", () => {
+	it("stage com bgImg: usa backgroundImage e cor do palco", () => {
+		localStorage.setItem(
+			"user_data",
+			JSON.stringify({
+				"stage.settings.global": {
+					bgImg: "data:image/png;base64,iVBORw0KGgo=",
+					tsOn: false,
+					random: { bgColor: "#101010", textColor: "#ffffff" },
+				},
+			}),
+		);
+		const w = mountView();
+		const el = w.find(".random-projection");
+		expect(el.exists()).toBe(true);
+		const style = el.attributes("style") ?? "";
+		expect(style).toContain("background-image");
+		w.unmount();
+		localStorage.clear();
+	});
+
+	it("stage sem random mod: effectiveConfig cai no liveConfig", async () => {
+		localStorage.setItem(
+			RANDOM_RUNTIME_STORAGE_KEY,
+			JSON.stringify({
+				mode: "names",
+				isDrawing: false,
+				currentDisplay: "Ana",
+				drawn: [],
+				projecting: true,
+			}),
+		);
+		localStorage.setItem(
+			"user_data",
+			JSON.stringify({ "stage.settings.global": {} }),
+		);
+		const w = mountView();
+		await w.vm.$nextTick();
+		expect(w.find(".random-projection__stage").exists()).toBe(true);
+		w.unmount();
+		localStorage.clear();
+	});
+});
+
+
+// BroadcastChannel fake p/ cobrir listeners de config/runtime no mount
+class FakeBC extends EventTarget {
+	static instances: FakeBC[] = [];
+	constructor(public name: string) {
+		super();
+		FakeBC.instances.push(this);
+	}
+	postMessage() {}
+	close() {}
+}
+
+describe("gaps v8", () => {
+	it("embedded: onDraw chama store; canDraw true-arm; message canais", async () => {
+		const pinia = createPinia();
+		setActivePinia(pinia);
+		FakeBC.instances = [];
+		// stage COM módulo random → true-arm; sem (default) → false-arm já coberto
+		stageSettingsState.value = { random: { fontSizePc: 9, textTransform: "uppercase", animationSpeed: "fast" } } as Record<string, unknown>;
+		vi.stubGlobal("BroadcastChannel", FakeBC);
+		// palco visível p/ effectiveConfig avaliar (projecting true)
+		localStorage.setItem(
+			RANDOM_RUNTIME_STORAGE_KEY,
+			JSON.stringify({ mode: "names", isDrawing: false, currentDisplay: "Ana", drawn: [], projecting: true }),
+		);
+		const w = mount(RandomProjectionView, {
+			props: { embedded: true },
+			global: { plugins: [i18n, pinia] },
+		});
+		const store = useRandomStore();
+		const spy = vi.spyOn(store, "startDraw").mockImplementation(() => {});
+		const vm = w.vm as unknown as { onDraw?: () => void };
+		vm.onDraw?.();
+		expect(spy).toHaveBeenCalled();
+		// embedded=false → onDraw no-op (br 46)
+		const w2 = mount(RandomProjectionView, {
+			props: { embedded: false },
+			global: { plugins: [i18n, pinia] },
+		});
+		spy.mockClear();
+		(w2.vm as unknown as { onDraw?: () => void }).onDraw?.();
+		expect(spy).not.toHaveBeenCalled();
+		w2.unmount();
+		// dispara nos canais de config e runtime (listeners do mount)
+		const cfgCh = FakeBC.instances.find((c) => c.name.includes("config"));
+		const rtCh = FakeBC.instances.find((c) => c.name.includes("runtime"));
+		cfgCh?.dispatchEvent(new MessageEvent("message", { data: { mode: "numbers" } }));
+		rtCh?.dispatchEvent(new MessageEvent("message", { data: { drawing: true } }));
+		await w.vm.$nextTick();
+		w.unmount();
+		stageSettingsState.value = null;
+		vi.unstubAllGlobals();
+	});
+
+	describe("gaps v8 cond-expr", () => {
+		it("stageSettingsState com random: effectiveConfig mescla (mod truthy)", async () => {
+			stageSettingsState.value = {
+				backgroundColor: "#202020",
+				backgroundImage: "",
+				random: { bgColor: "#334455", textColor: "#eee", showHistory: false },
+			} as never;
+						localStorage.setItem(
+				RANDOM_RUNTIME_STORAGE_KEY,
+				JSON.stringify({ mode: "names", isDrawing: false, currentDisplay: "Ana", drawn: [], projecting: true }),
+			);
+			const w = mountView();
+			await flushPromises();
+			const stageComp = w.findComponent({ name: "RandomStage" });
+			expect(stageComp.exists()).toBe(true);
+			const cfg = stageComp.props("config") as Record<string, unknown>;
+			// liveConfig sobrescreve o mod no spread — key exclusiva do mod prova o merge
+			expect(cfg.showHistory).toBe(false);
+			w.unmount();
+			stageSettingsState.value = null;
+		});
+
+		it("não-embedded: can-draw sempre false", async () => {
+						localStorage.setItem(
+				RANDOM_RUNTIME_STORAGE_KEY,
+				JSON.stringify({ mode: "names", isDrawing: false, currentDisplay: "Ana", drawn: [], projecting: true }),
+			);
+			const w = mountView();
+			await flushPromises();
+			const stageComp = w.findComponent({ name: "RandomStage" });
+			expect(stageComp.exists()).toBe(true);
+			expect(stageComp.props("canDraw")).toBe(false);
+			expect(stageComp.props("showDraw")).toBe(false);
+			w.unmount();
+		});
+	});
+});

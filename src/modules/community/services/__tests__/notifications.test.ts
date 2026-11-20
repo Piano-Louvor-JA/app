@@ -86,7 +86,7 @@ describe("notifications service (F6 app) — contrato de rede", () => {
 			string,
 		];
 		expect(url).toBe(
-			"https://api.pianolouvorja.com.br/v1/custom/notifications",
+			"https://api-stg.pianolouvorja.com.br/v1/custom/notifications",
 		);
 	});
 

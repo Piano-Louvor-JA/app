@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import FontSelector from '@modules/settings/components/FontSelector.vue'
 import { useI18n } from 'vue-i18n'
 
 import { GlassCard } from '@design-system/index'
@@ -84,6 +85,8 @@ function onTextInput(event: Event) {
           </header>
 
           <div class="timer-config__body">
+            <FontSelector scope="timer" compact />
+
             <section class="timer-config__section">
               <div class="timer-config__section-head">
                 <i

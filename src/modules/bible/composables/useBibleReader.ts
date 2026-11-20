@@ -1,6 +1,7 @@
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, onUnmounted, toRef } from 'vue'
 
+import { bibleProjectionSnippet, hasBibleProjection } from '../services/bible-preview'
 import { useBibleStore } from '../stores/useBibleStore'
 
 /** Orquestra leitura bíblica (catálogo, navegação e seleção). */
@@ -31,18 +32,12 @@ export function useBibleReader() {
     locationLabel,
     chapterTitle,
     verseEntries,
+    visibleVerseEntries,
   } = storeToRefs(store)
 
-  const hasProjection = computed(
-    () => projection.value.verses.length > 0 && Boolean(projection.value.text),
-  )
+  const hasProjection = computed(() => hasBibleProjection(projection.value))
 
-  const previewSnippet = computed(() => {
-    const text = projection.value.text.trim()
-    if (!text) return ''
-    if (text.length <= 120) return text
-    return `${text.slice(0, 117).trimEnd()}...`
-  })
+  const previewSnippet = computed(() => bibleProjectionSnippet(projection.value.text))
 
   function onKeydown(event: KeyboardEvent) {
     const target = event.target as HTMLElement | null
@@ -50,6 +45,10 @@ export function useBibleReader() {
     if (tag === 'input' || tag === 'textarea' || target?.isContentEditable) {
       return
     }
+
+    const isArrow = event.key === 'ArrowLeft' || event.key === 'ArrowRight'
+    // Alt+setas é do histórico de navegação; Ctrl/Meta+setas ficam livres.
+    if (isArrow && (event.altKey || event.ctrlKey || event.metaKey)) return
 
     if (event.key === 'ArrowLeft') {
       event.preventDefault()
@@ -100,6 +99,7 @@ export function useBibleReader() {
     locationLabel,
     chapterTitle,
     verseEntries,
+    visibleVerseEntries,
     hasProjection,
     previewSnippet,
     clearError: store.clearError,
@@ -108,6 +108,8 @@ export function useBibleReader() {
     selectChapter: store.selectChapter,
     selectVerse: store.selectVerse,
     applyVerseSearch: store.applyVerseSearch,
+    applyBookSearchReference: store.applyBookSearchReference,
+    applyPassage: store.applyPassage,
     clearSelection: store.clearSelection,
     setTestamentFilter: store.setTestamentFilter,
     toggleNavPanel: store.toggleNavPanel,

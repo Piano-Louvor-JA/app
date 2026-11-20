@@ -24,12 +24,20 @@ const items: UtilityHubItem[] = [
     available: true,
   },
   {
-    key: 'draw',
-    titleKey: 'utilities.draw',
-    descriptionKey: 'utilities.drawDescription',
-    icon: 'ti-pencil',
-    to: null,
-    available: false,
+    key: 'sabbath-school',
+    titleKey: 'utilities.sabbathSchool',
+    descriptionKey: 'utilities.sabbathSchoolDescription',
+    icon: 'ti-book-2',
+    to: '/utilities/sabbath-school',
+    available: true,
+  },
+  {
+    key: 'announcements',
+    titleKey: 'utilities.announcements',
+    descriptionKey: 'utilities.announcementsDescription',
+    icon: 'ti-speakerphone',
+    to: '/utilities/announcements',
+    available: true,
   },
 ]
 </script>

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import {
   appendToQueue,
+  appendQueueToQueue,
+  resolvePrevious,
   type QueueItem,
   removeFromQueue,
   reorderQueue,
@@ -45,6 +47,12 @@ describe('media-queue — fila de reprodução (spec playlist RF-03)', () => {
     expect(next.items).toHaveLength(2)
   })
 
+  it('append do batch preserva índice e aplica guarda na junção', () => {
+    const next = appendQueueToQueue([item(1), item(2), item(3)], [item(3), item(4), item(5)], 1)
+    expect(next.items.map((entry) => entry.musicId)).toEqual([1, 2, 3, 4, 5])
+    expect(next.index).toBe(1)
+  })
+
   it('removeFromQueue ajusta o índice: remover antes da atual puxa o índice', () => {
     const items = [item(1), item(2), item(3)]
     // remove índice 0 (musicId 1); atual era índice 1 (musicId 2) → 0
@@ -80,5 +88,32 @@ describe('media-queue — fila de reprodução (spec playlist RF-03)', () => {
     const restIds = next.items.filter((_, i) => i !== next.index).map((i) => i.musicId)
     expect(new Set(restIds).size).toBe(11)
     expect(restIds).not.toEqual(items.filter((_, i) => i !== 4).map((i) => i.musicId))
+  })
+})
+
+const q = (id: number): QueueItem => ({ musicId: id, albumId: null, title: `T${id}` })
+
+describe('gaps — resolvePrevious fora do range e removeFromQueue índice inválido', () => {
+  it('resolvePrevious: index 0 -> null (prevIndex < 0)', () => {
+    expect(resolvePrevious({ items: [q(1)], index: 0 })).toBeNull()
+  })
+
+  it('resolvePrevious: index além do fim -> null', () => {
+    expect(resolvePrevious({ items: [q(1)], index: 5 })).toBeNull()
+  })
+
+  it('removeFromQueue: índice inválido -> no-op (L53)', () => {
+    const items = [q(1), q(2)]
+    const r = removeFromQueue(items, 5, 0)
+    expect(r).toEqual({ items, index: 0, removedCurrent: false })
+    const r2 = removeFromQueue(items, -1, 0)
+    expect(r2.removedCurrent).toBe(false)
+  })
+
+  it('append duplicata consecutiva: retorna mesmos items (L28-30 já?)', () => {
+    const items = [q(1), q(2)]
+    const r = appendToQueue(items, q(2), 1)
+    expect(r.items).toBe(items)
+    expect(r.index).toBe(1)
   })
 })

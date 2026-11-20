@@ -9,15 +9,31 @@ vi.stubGlobal('localStorage', {
 
 import {
   addPlaylistItem,
+  savePlaylists,
   createPlaylist,
   deletePlaylist,
   listPlaylists,
   removePlaylistItem,
   renamePlaylist,
+  movePlaylistItem,
 } from '../playlist-storage'
 
 describe('playlist-storage', () => {
   beforeEach(() => localStorage.clear())
+
+  it('persiste a nova ordem após mover uma faixa e reler o armazenamento', () => {
+    const playlist = createPlaylist('Culto')
+    const items = [1, 2, 3].map((musicId) => ({ musicId, albumId: null, title: String(musicId) }))
+    items.forEach((item) => addPlaylistItem(playlist.id, item))
+    movePlaylistItem(playlist.id, 0, 2)
+    expect(listPlaylists()[0]?.items).toEqual([items[1], items[2], items[0]])
+    movePlaylistItem(playlist.id, 2, 0)
+    expect(listPlaylists()[0]?.items).toEqual(items)
+    expect(movePlaylistItem(playlist.id, -1, 0)).toBeNull()
+    expect(movePlaylistItem(playlist.id, 0, 3)).toBeNull()
+    expect(movePlaylistItem('missing', 0, 1)).toBeNull()
+    expect(listPlaylists()[0]?.items).toEqual(items)
+  })
 
   it('cria e lista playlist persistida', () => {
     const playlist = createPlaylist('Culto jovem')
@@ -50,4 +66,41 @@ describe('playlist-storage', () => {
     expect(deletePlaylist(playlist.id)).toBe(true)
     expect(listPlaylists()).toEqual([])
   })
+  describe('gaps — storage corrompido', () => {
+    it('JSON não-array: retorna []', () => {
+      values.set('louvorja-playlists-v1', JSON.stringify({ foo: 1 }))
+      expect(listPlaylists()).toEqual([])
+    })
+
+    it('JSON inválido: retorna []', () => {
+      values.set('louvorja-playlists-v1', 'not-json{')
+      expect(listPlaylists()).toEqual([])
+    })
+  })
+
+  it('rename/delete/addItem/removeItem com id inexistente: null/false', () => {
+    expect(renamePlaylist('nope', 'X')).toBe(null)
+    expect(deletePlaylist('nope')).toBe(false)
+    expect(addPlaylistItem('nope', { musicId: 1, albumId: null, title: 'A' })).toBe(null)
+    expect(removePlaylistItem('nope', 0)).toBe(null)
+  })
+
+  it('savePlaylists persiste lista bruta; removeItem índices inválidos: null', () => {
+    savePlaylists([{ id: 'p1', name: 'A', items: [{ musicId: 1, albumId: null, title: 'T' }], createdAt: '', updatedAt: '' }])
+    expect(removePlaylistItem('p1', 5)).toBe(null)
+    expect(removePlaylistItem('p1', -1)).toBe(null)
+    const after = listPlaylists()
+    expect(after[0]!.items).toHaveLength(1)
+  })
+
+})
+
+it('retains the renamed playlist and its tracks after reloading the module', async () => {
+  localStorage.clear()
+  const playlist = createPlaylist('Culto')
+  addPlaylistItem(playlist.id, { musicId: 1, albumId: null, title: 'Uma' })
+  renamePlaylist(playlist.id, 'Culto Jovem')
+  vi.resetModules()
+  const reloaded = await import('../playlist-storage')
+  expect(reloaded.listPlaylists()[0]).toMatchObject({ id: playlist.id, name: 'Culto Jovem', items: [{ musicId: 1 }] })
 })

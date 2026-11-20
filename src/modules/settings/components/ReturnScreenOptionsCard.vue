@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { GlassCard } from '@design-system/index'
@@ -13,6 +14,9 @@ const {
   setOpenReturnScreen,
   selectReturnDisplay,
 } = useProjectionSettings()
+const returnMonitorMissing = computed(() => settings.value.openReturnScreen &&
+  settings.value.returnDisplayId != null &&
+  !monitorOptions.value.some(monitor => monitor.id === settings.value.returnDisplayId))
 </script>
 
 <template>
@@ -38,6 +42,10 @@ const {
         @update:model-value="setOpenReturnScreen($event)"
       />
     </div>
+
+    <p v-if="returnMonitorMissing" class="return-screen__caption" role="status">
+      {{ t('settings.projection.returnScreen.unavailable') }}
+    </p>
 
     <p class="return-screen__caption">
       {{ t('settings.projection.returnScreen.selectMonitor') }}

@@ -8,13 +8,17 @@ import AppShell from '@layouts/AppShell.vue'
 import { bibleRoutes } from '@modules/bible/routes'
 import { utilitiesRoutes } from '@modules/clock/routes'
 import { countdownRoutes } from '@modules/countdown/routes'
+import { sabbathSchoolRoutes } from '@modules/sabbath-school/routes'
+import { announcementsRoutes } from '@modules/announcements/routes'
 import { albumsRoutes } from '@modules/albums/routes'
 import { communityRoutes } from '@modules/community/routes'
+import { diagnosticsRoutes } from '@modules/diagnostics/routes'
 import { homeRoutes } from '@modules/home/routes'
 import { liturgyRoutes } from '@modules/liturgy/routes'
 import { mediaRoutes } from '@modules/media/routes'
 import { settingsRoutes } from '@modules/settings/routes'
 import { randomRoutes } from '@modules/random/routes'
+import { youtubeRoutes } from '@modules/youtube/routes'
 import { timerRoutes } from '@modules/timer/routes'
 import ProjectionHost from '@shared/components/ProjectionHost.vue'
 import { isElectronShell } from '@shared/services/desktop-bridge'
@@ -42,14 +46,18 @@ const router = createRouter({
       component: AppShell,
       children: [
         ...homeRoutes,
+        ...youtubeRoutes,
         ...albumsRoutes,
         ...communityRoutes,
+        ...diagnosticsRoutes,
         ...liturgyRoutes,
         ...mediaRoutes,
         ...bibleRoutes,
         ...utilitiesRoutes,
         ...timerRoutes,
         ...countdownRoutes,
+        ...sabbathSchoolRoutes,
+        ...announcementsRoutes,
         ...randomRoutes,
         ...settingsRoutes,
       ],

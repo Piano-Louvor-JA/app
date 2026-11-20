@@ -35,6 +35,7 @@ function onLocalVideoEnded() {
 }
 
 const frameSrc = computed(() => {
+  /* v8 ignore next 1 -- template só lê frameSrc dentro dos ramos v-if showFrame */
   if (!showFrame.value) return ''
   const url = runtime.value.url
   if (runtime.value.kind !== 'youtube') return url

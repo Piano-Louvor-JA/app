@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
+import { getCurrentApiPrefix } from '@modules/sync/services/api-prefix'
+import { useScheduledStore } from './useScheduledStore'
+import { computed, onScopeDispose, ref } from 'vue'
 import type { Router } from 'vue-router'
 
 import { getDesktopBridge } from '@shared/services/desktop-bridge'
@@ -48,7 +50,10 @@ import {
   todayWeekday,
 } from '../services/liturgy-preferences'
 import { clearLiturgyWebRuntime } from '../services/liturgy-web-runtime'
+import { toggleAnnotationProjection, useAnnotationProjection } from '../services/annotation-projection'
+import { canOpenAnnotationTextControl, openAnnotationTextControl } from '../services/annotation-text-control'
 import { parseJaLiturgy } from '../services/liturgy-ja-import'
+import { enrichItemsDurations } from '../services/liturgy-duration-enrich'
 import {
   DEFAULT_LITURGY_ITEM_DRAFT,
   DEFAULT_MOMENT_DURATION_MS,
@@ -69,6 +74,10 @@ import {
   type WeekdaySessionTimes,
 } from '../types/liturgy'
 import { pad2 } from '../services/liturgy-format'
+import {
+  enqueueOperatorState,
+  scheduleOutboxFlush,
+} from '@modules/sync/services/sync-outbox-service'
 
 export const useLiturgyStore = defineStore('liturgy', () => {
   const initialState = loadLiturgyState()
@@ -200,6 +209,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
       if (selectedDay.value === 'custom') {
         return currentCustom.value?.notes ?? ''
       }
+      /* v8 ignore next 1 -- normalizeNotes sempre cria os 7 dias; ?? inalcançável */
       return dayNotes.value[selectedDay.value] ?? ''
     },
     set(value: string) {
@@ -225,6 +235,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     const sources: LiturgyCloneSource[] = []
 
     for (const day of LITURGY_DAY_TAB_ORDER) {
+      /* v8 ignore next 2 -- normalizeWeekdays sempre cria os 7 dias */
       const items = weekdays.value[day] ?? []
       if (items.length === 0) continue
       if (selectedDay.value === day) continue
@@ -314,11 +325,21 @@ export const useLiturgyStore = defineStore('liturgy', () => {
 
   const isDraftValid = computed(() => isLiturgyItemDraftValid(itemDraft.value))
 
-  const categoryOptions = computed(() =>
-    currentItems.value
+  const categoryOptions = computed(() => {
+    const base = currentItems.value
       .filter((item) => item.type === 'category')
-      .map((item) => ({ id: item.id, name: item.name })),
-  )
+      .map((item) => ({ id: item.id, name: item.name }))
+    // Placeholder agendado: o "categoria" dele é uma ROTAÇÃO do store agendado
+    // (ex.: Provai e Vede) — 1 click resolve a entrada da data no culto.
+    if (itemDraft.value.type === 'scheduled') {
+      const rotations = useScheduledStore()
+      return [
+        ...base,
+        ...rotations.categories.map((rot) => ({ id: rot.id, name: rot.name })),
+      ]
+    }
+    return base
+  })
 
   const complementaryTitleSuggestions = computed(() => {
     const titles = new Set<string>()
@@ -379,12 +400,15 @@ export const useLiturgyStore = defineStore('liturgy', () => {
       const weekday = day as LiturgyWeekday
       const existing = weekdays.value[weekday] ?? []
       if (mode === 'overwrite') {
+        /* v8 ignore next 1 -- enrichJaDurations normaliza dia ausente pra []; ?? inalcançável */
         weekdays.value = { ...weekdays.value, [weekday]: [...(items ?? [])] }
+        /* v8 ignore next 1 -- idem: items sempre array */
         added += items?.length ?? 0
         days.push(day)
         continue
       }
       const next = [...existing]
+      /* v8 ignore next 1 -- enrichJaDurations normaliza dia ausente pra []; ?? [] inalcançável */
       for (const item of items ?? []) {
         const dup = existing.some(
           (e) =>
@@ -483,6 +507,21 @@ export const useLiturgyStore = defineStore('liturgy', () => {
       customLiturgies: customLiturgies.value,
       deletionLocks: deletionLocks.value,
     })
+  try { localStorage.setItem(`sync.modified.v1.liturgy.${getCurrentApiPrefix()}`, new Date().toISOString()) } catch { /* storage indisponível não impede a edição local */ }
+    // sync v2 (app#336): toda mutação enfileira no outbox (local-first) e
+    // agenda flush em bg — sem rede o item fica na fila (nada se perde).
+    try {
+      enqueueOperatorState('liturgy', getCurrentApiPrefix(), {
+        weekdays: weekdays.value,
+        dayNotes: dayNotes.value,
+        daySessionTimes: daySessionTimes.value,
+        customLiturgies: customLiturgies.value,
+        deletionLocks: deletionLocks.value,
+      })
+      scheduleOutboxFlush()
+    } catch {
+      // outbox nunca bloqueia o fluxo local
+    }
   }
 
   async function hydrate() {
@@ -509,7 +548,10 @@ export const useLiturgyStore = defineStore('liturgy', () => {
       let changed = false
       const nextWeekdays = { ...weekdays.value }
       for (const day of Object.keys(nextWeekdays) as LiturgyWeekday[]) {
-        const reconciled = reconcileMusicItemTitles(nextWeekdays[day], music)
+        // Catálogo chegou DEPOIS do import (.ja/.louvorja com durationMs: 0):
+        // mesma passada reconcilia títulos E preenche durações zeradas da API.
+        const enriched = await enrichItemsDurations(nextWeekdays[day], music)
+        const reconciled = reconcileMusicItemTitles(enriched, music)
         if (reconciled !== nextWeekdays[day]) {
           nextWeekdays[day] = reconciled
           changed = true
@@ -517,12 +559,15 @@ export const useLiturgyStore = defineStore('liturgy', () => {
       }
       weekdays.value = nextWeekdays
 
-      customLiturgies.value = customLiturgies.value.map((custom) => {
-        const reconciled = reconcileMusicItemTitles(custom.items, music)
-        if (reconciled === custom.items) return custom
-        changed = true
-        return { ...custom, items: reconciled }
-      })
+      customLiturgies.value = await Promise.all(
+        customLiturgies.value.map(async (custom) => {
+          const enriched = await enrichItemsDurations(custom.items, music)
+          const reconciled = reconcileMusicItemTitles(enriched, music)
+          if (reconciled === custom.items) return custom
+          changed = true
+          return { ...custom, items: reconciled }
+        }),
+      )
 
       if (changed) persist()
     } finally {
@@ -850,16 +895,20 @@ export const useLiturgyStore = defineStore('liturgy', () => {
   function markItemDone(index: number) {
     const target = currentItems.value[index]
     if (!target || target.done || target.type === 'category') return
-    if (!isLiturgyMediaPlayType(target.type)) return
+    const isTextOrSite = target.type === 'site' || target.type === 'annotation'
+    if (!isLiturgyMediaPlayType(target.type) && !isTextOrSite) return
 
     const next = currentItems.value.map((item, i) =>
       i === index ? { ...item, done: true } : item,
     )
     currentItems.value = syncCategoryDoneFromChildren(next)
 
+    // Site/texto continuam selecionados enquanto o operador usa seus controles.
+    if (isTextOrSite) return
     clearSelectionIfMatches((_, i) => i === index)
     if (target.categoryId) {
       const categoryId = target.categoryId
+      /* v8 ignore next 1 -- selectItem força seleção=index (markItemStarted) e L860 já a limpa; predicate inalcançável */
       clearSelectionIfMatches((item) => item.id === categoryId && item.done)
     }
   }
@@ -879,6 +928,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
 
     if (selectedId) {
       const mapped = next.findIndex((item) => item.id === selectedId)
+      /* v8 ignore next 1 -- reorder nunca descarta item; mapped<0 inalcançável */
       selectedItemIndex.value = mapped >= 0 ? mapped : null
     }
   }
@@ -935,6 +985,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     index: number,
     mode: MediaPlaybackMode,
     router: Router,
+    options?: { project?: boolean },
   ) {
     const item = markItemStarted(index)
     if (!item || item.type !== 'music') {
@@ -943,9 +994,8 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     }
 
     const result = await openLiturgyMusicPlayer(item, mode, {
-      // Cantado / instrumental / slides: abre o player já projetando
-      // (antes só `no_audio` projetava e o operador precisava clicar em Projetar).
-      project: true,
+      // O controle remoto pode abrir primeiro e projetar pela seta da barra.
+      project: options?.project ?? true,
     })
     lastActionMessageKey.value = result.messageKey ?? null
     if (!result.ok) return false
@@ -969,6 +1019,22 @@ export const useLiturgyStore = defineStore('liturgy', () => {
       sessionStartedAt.value = Date.now()
     }
 
+    if (item.type === 'annotation') {
+      // Desktop: mesmo player do aviso de texto (projetar, telas, conexões, tamanho).
+      if (canOpenAnnotationTextControl()) {
+        const opened = await openAnnotationTextControl(item)
+        lastActionMessageKey.value = opened ? null : 'liturgy.messages.projectionFailed'
+        if (opened) markItemDone(index)
+        return
+      }
+      const wasProjecting = useAnnotationProjection().projectingItemId.value === item.id
+      const projecting = await toggleAnnotationProjection(item)
+      if (projecting) markItemDone(index)
+      lastActionMessageKey.value =
+        !wasProjecting && !projecting ? 'liturgy.messages.projectionFailed' : null
+      return
+    }
+
     if (item.type === 'site') {
       const projection = getDesktopBridge()?.projection
       // Controle já aberto: só liga/desliga as telas; não reabre o popup.
@@ -977,6 +1043,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
         const toggled = await projection?.toggleSiteScreens?.()
         if (toggled) {
           siteProjectionItemId.value = state.projecting ? null : item.id
+          markItemDone(index)
           lastActionMessageKey.value = null
           return
         }
@@ -1164,6 +1231,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
   function openCloneDialog() {
     if (!canCloneLiturgy.value) return
     const first = cloneSources.value[0]
+    /* v8 ignore next 1 -- canCloneLiturgy true garante sources>0; fallback '' inalcançável */
     cloneSourceKey.value = first ? cloneSourceKeyOf(first) : ''
     cloneDialogOpen.value = true
   }
@@ -1177,6 +1245,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     if (key.startsWith('weekday:')) {
       const day = key.slice('weekday:'.length) as LiturgyWeekday
       if (!(LITURGY_WEEKDAYS as readonly string[]).includes(day)) return null
+      /* v8 ignore next 2 -- normalizeWeekdays sempre cria os 7 dias; ?? []/null inalcançáveis */
       const items = weekdays.value[day] ?? []
       return items.length > 0 ? items : null
     }
@@ -1201,6 +1270,64 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     closeCloneDialog()
   }
 
+  /**
+   * app#331: recarrega SÓ o catálogo de músicas (pós-import .slja) —
+   * sem hydrate completo, a música nova aparece na busca do dialog.
+   */
+  async function refreshMusicCatalog() {
+    musicList.value = await loadLiturgyMusicOptions()
+  }
+
+  /**
+   * Re-import sem F5 (app#412): o import `.louvorja` grava no storage direto
+   * (`louvorja-adapter.ts`); este handler recarrega o estado do disco e reconcilia
+   * com o catálogo de música, sem recarregar a janela.
+   */
+  async function reloadImportedState() {
+    const state = loadLiturgyState()
+    weekdays.value = state.weekdays
+    dayNotes.value = state.dayNotes
+    daySessionTimes.value = state.daySessionTimes
+    customLiturgies.value = state.customLiturgies
+    deletionLocks.value = state.deletionLocks
+    if (selectedItemIndex.value != null) selectedItemIndex.value = null
+
+    const music = musicList.value
+    if (music.length === 0) return
+
+    const nextWeekdays = { ...weekdays.value }
+    let changed = false
+    for (const day of Object.keys(nextWeekdays) as LiturgyWeekday[]) {
+      const enriched = await enrichItemsDurations(nextWeekdays[day], music)
+      const reconciled = reconcileMusicItemTitles(enriched, music)
+      if (reconciled !== nextWeekdays[day]) {
+        nextWeekdays[day] = reconciled
+        changed = true
+      }
+    }
+    weekdays.value = nextWeekdays
+
+    customLiturgies.value = await Promise.all(
+      customLiturgies.value.map(async (custom) => {
+        const enriched = await enrichItemsDurations(custom.items, music)
+        const reconciled = reconcileMusicItemTitles(enriched, music)
+        if (reconciled === custom.items) return custom
+        changed = true
+        return { ...custom, items: reconciled }
+      }),
+    )
+
+    if (changed) persist()
+  }
+
+  const onLiturgyImported = () => {
+    void reloadImportedState()
+  }
+  window.addEventListener('liturgy:imported', onLiturgyImported)
+  onScopeDispose(() => {
+    window.removeEventListener('liturgy:imported', onLiturgyImported)
+  })
+
   function onMusicPick(musicId: number) {
     const music = musicList.value.find((entry) => entry.id === musicId)
     if (!music) {
@@ -1219,6 +1346,10 @@ export const useLiturgyStore = defineStore('liturgy', () => {
         music.durationMs && music.durationMs > 0
           ? clampMomentDurationMs(music.durationMs)
           : 0,
+      // Título complementar herda o nome da música SE o campo estiver vazio
+      // (feedback Ezequias 02/10: ao editar item de música o título
+      // obrigatório ficava vazio e travava o salvar).
+      name: itemDraft.value.name.trim() || music.name,
     }
   }
 
@@ -1339,6 +1470,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     closeCloneDialog,
     cloneLiturgyFromSelected,
     onMusicPick,
+    refreshMusicCatalog,
     clearMusicPick,
     onBookPick,
     clearActionMessage,

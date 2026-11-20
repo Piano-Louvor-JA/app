@@ -1,31 +1,34 @@
 <script setup lang="ts">
-import type { DockNavItem } from '@design-system/types/navigation'
+import { useI18n } from 'vue-i18n'
+import type { DockNavItem } from "@design-system/types/navigation";
+
+const { t } = useI18n()
 
 const props = withDefaults(
-  defineProps<{
-    items: DockNavItem[]
-    activeKey?: string
-  }>(),
-  {
-    activeKey: undefined,
-  },
-)
+	defineProps<{
+		items: DockNavItem[];
+		activeKey?: string;
+	}>(),
+	{
+		activeKey: undefined,
+	},
+);
 
 const emit = defineEmits<{
-  select: [key: string]
-}>()
+	select: [key: string];
+}>();
 
 function isActive(key: string) {
-  return props.activeKey === key
+	return props.activeKey === key;
 }
 
 function onSelect(key: string) {
-  emit('select', key)
+	emit("select", key);
 }
 </script>
 
 <template>
-  <nav class="ds-dock" aria-label="Navegação principal">
+  <nav class="ds-dock" :aria-label="t('a11y.mainNav')">
     <button
       v-for="item in items"
       :key="item.key"

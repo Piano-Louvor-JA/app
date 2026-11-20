@@ -1,3 +1,4 @@
+import { detectObsBeforeProjection } from '@modules/settings/services/obs-detection'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
@@ -182,6 +183,7 @@ export const useTimerStore = defineStore('timer', () => {
   }
 
   async function syncProjection() {
+    await detectObsBeforeProjection()
     syncRuntime()
     if (isPalcoTvOnlyRoute('timer')) {
       isProjecting.value = true

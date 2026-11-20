@@ -4,6 +4,8 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import { usePageTransition } from '@design-system/composables'
+import PageBackStack from '@shared/components/PageBackStack.vue'
+import { useMinimizablePage } from '@shared/composables/useMinimizablePage'
 
 import SettingsTabs from '../components/SettingsTabs.vue'
 import { SETTINGS_SECTIONS } from '../constants/sections'
@@ -19,6 +21,10 @@ const activeSection = computed<SettingsSectionId>(() => {
   return match?.id ?? 'appearance'
 })
 
+// Dentro de Conexões remotas, o voltar leva ao agregador (como Utilitários).
+const CONNECTION_MODULES = ['settings-transmission', 'settings-remote', 'settings-palco']
+const inConnectionModule = computed(() => CONNECTION_MODULES.includes(String(route.name ?? '')))
+
 const isAppearance = computed(() => activeSection.value === 'appearance')
 
 const sectionTitleKey = computed(
@@ -26,8 +32,19 @@ const sectionTitleKey = computed(
 )
 
 function goBack() {
-  void router.push({ name: 'home' })
+  void router.push({ name: inConnectionModule.value ? 'settings-connections' : 'home' })
 }
+
+// O estado das abas já vive nas stores; o retrato guarda só a rolagem e a miniatura.
+const { minimize, prepare } = useMinimizablePage({
+  describe: () => ({
+    title: t(`settings.tabs.${activeSection.value}`),
+    icon: 'ti-settings',
+    summary: t('nav.settings'),
+  }),
+  capture: () => null,
+  fallbackRoute: { name: 'home' },
+})
 </script>
 
 <template>
@@ -37,29 +54,37 @@ function goBack() {
   >
     <SettingsTabs class="settings-view__tabs" />
 
-    <div v-if="!isAppearance" class="settings-view__header">
-      <button
-        type="button"
-        class="settings-view__back"
-        :aria-label="t('nav.home')"
-        @click="goBack"
+    <div class="settings-view__scroll">
+      <div
+        class="settings-view__header"
+        :class="{ 'settings-view__header--floating': isAppearance }"
       >
-        <i class="ti ti-arrow-left" aria-hidden="true" />
-      </button>
-      <h1 class="settings-view__title">
-        {{ t(sectionTitleKey) }}
-      </h1>
-    </div>
+        <PageBackStack @minimize="minimize" @prepare="prepare">
+          <button
+            type="button"
+            class="settings-view__back"
+            :aria-label="t('nav.home')"
+            @click="goBack"
+          >
+            <i class="ti ti-arrow-left" aria-hidden="true" />
+          </button>
+        </PageBackStack>
+        <h1 v-if="!isAppearance" class="settings-view__title">
+          {{ t(sectionTitleKey) }}
+        </h1>
+        <div id="settings-header-aside" class="settings-view__aside" />
+      </div>
 
-    <div class="settings-view__content">
-      <RouterView v-slot="{ Component, route: sectionRoute }">
-        <Transition :name="transitionName" mode="out-in">
-          <component
-            :is="Component"
-            :key="String(sectionRoute.name ?? sectionRoute.path)"
-          />
-        </Transition>
-      </RouterView>
+      <div class="settings-view__content">
+        <RouterView v-slot="{ Component, route: sectionRoute }">
+          <Transition :name="transitionName" mode="out-in">
+            <component
+              :is="Component"
+              :key="String(sectionRoute.name ?? sectionRoute.path)"
+            />
+          </Transition>
+        </RouterView>
+      </div>
     </div>
   </section>
 </template>
@@ -73,8 +98,7 @@ function goBack() {
   max-width: 80rem;
   margin: 0 auto;
   padding: 1.5rem var(--ds-spacing-page) 2rem;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden;
 
   &--appearance {
     max-width: 90rem;
@@ -82,16 +106,53 @@ function goBack() {
 }
 
 .settings-view__tabs {
+  flex: 0 0 auto;
   margin-bottom: 2rem;
   padding-bottom: 0.25rem;
   border-bottom: 1px solid var(--ds-color-outline);
 }
 
+/* Só o conteúdo rola; o menu permanece no fluxo fixo acima dele. */
+.settings-view__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
 .settings-view__header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 1rem;
   margin-bottom: 2rem;
+
+  /* Aparência: sem título; a seta e o – ficam no canto sem empurrar o conteúdo centralizado */
+  &--floating {
+    position: relative;
+    z-index: 2;
+    height: 0;
+    margin-bottom: 0;
+  }
+}
+
+.settings-view__title {
+  display: flex;
+  align-items: center;
+}
+
+/* Status da aba (Transmissão): alinhado à seta, à direita do título. */
+.settings-view__aside {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  min-height: 2.5rem;
+  margin-left: auto;
+
+  &:empty {
+    display: none;
+  }
 }
 
 .settings-view__back {
@@ -125,6 +186,7 @@ function goBack() {
 
 .settings-view__title {
   margin: 0;
+  padding-top: 4px;
   color: var(--ds-color-on-surface);
   font-size: 24px;
   font-weight: 600;
@@ -155,6 +217,7 @@ function goBack() {
   }
 
   .settings-view__title {
+    padding-top: 7px;
     font-size: 20px;
     line-height: 26px;
   }

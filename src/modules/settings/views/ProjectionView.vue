@@ -4,11 +4,9 @@ import { useI18n } from 'vue-i18n'
 
 import MainScreenOptionsCard from '../components/MainScreenOptionsCard.vue'
 import MonitorArrangementCard from '../components/MonitorArrangementCard.vue'
+import MonitorShareCard from '../components/MonitorShareCard.vue'
 import MultiScreenSelectCard from '../components/MultiScreenSelectCard.vue'
-import PalcoCard from '../components/PalcoCard.vue'
-import PalcoSlotsCard from '../components/PalcoSlotsCard.vue'
 import ReturnScreenOptionsCard from '../components/ReturnScreenOptionsCard.vue'
-import StageCustomizationCard from '../components/StageCustomizationCard.vue'
 import { useProjectionSettings } from '../composables/useProjectionSettings'
 
 const { t } = useI18n()
@@ -32,18 +30,18 @@ onMounted(() => {
     <MonitorArrangementCard />
 
     <div class="projection-settings__split">
-      <MultiScreenSelectCard />
+      <div class="projection-settings__stack">
+        <MultiScreenSelectCard />
+        <MonitorShareCard />
+      </div>
       <div class="projection-settings__stack">
         <MainScreenOptionsCard />
         <ReturnScreenOptionsCard />
       </div>
     </div>
 
-    <PalcoCard />
 
-    <PalcoSlotsCard />
 
-    <StageCustomizationCard only-scope="global" />
   </div>
 </template>
 

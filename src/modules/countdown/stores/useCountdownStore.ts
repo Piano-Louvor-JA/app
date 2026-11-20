@@ -1,32 +1,26 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
+import { useCountdownProjectionControl } from '../composables/useCountdownProjectionControl'
 import {
-  closeProjectionModule,
-  hasSelectedExtendedProjectionTargets,
-  isProjectionModuleOpen,
-  openProjectionModule,
-} from '@shared/composables/useProjectionWindow'
-import { isPalcoTvOnlyRoute } from '../../settings/services/palco-routing'
-
-import {
-  computeCountdownRemainingMs,
   computeElapsedMs,
+  computeCountdownRemainingMs,
 } from '../services/countdown-format'
 import {
   loadCountdownDisplayConfig,
   saveCountdownDisplayConfig,
 } from '../services/countdown-preferences'
 import {
-  publishCountdownRuntime,
-  readCountdownRuntimeFromStorage,
+  beginCountdownSession,
+  readTimerRuntimeFromStorage,
+  stopCountdownRuntime,
+  writeTimerRuntimeToStorage,
 } from '../services/countdown-runtime'
 import {
   DEFAULT_COUNTDOWN_DISPLAY_CONFIG,
   DEFAULT_COUNTDOWN_DURATION_MS,
   DEFAULT_COUNTDOWN_RUNTIME,
   type CountdownDisplayConfig,
-  type CountdownMode,
   type CountdownRuntimeState,
   type CountdownTimeFormat,
 } from '../types/countdown'
@@ -38,43 +32,17 @@ export const useCountdownStore = defineStore('countdown', () => {
     savedTimesMs: [],
     durationMs: DEFAULT_COUNTDOWN_DURATION_MS,
   })
-  const isProjecting = ref(false)
-  const projectingTvsOnly = ref(false)
-  /** Preview no operador (1 monitor / sem tela de projeção marcada). */
-  const inAppPreview = ref(false)
   const configOpen = ref(false)
+  const displayConfigOpen = ref(false)
   const hydrated = ref(false)
+  const projection = useCountdownProjectionControl('timer', () => runtime.value)
+  const { isProjecting, inAppPreview } = projection
 
-  let projectionWatchTimer: ReturnType<typeof setInterval> | null = null
   let finishWatchTimer: ReturnType<typeof setInterval> | null = null
 
   const isRunning = computed(() => runtime.value.status === 'running')
   const isPaused = computed(() => runtime.value.status === 'paused')
-  /** Pode iniciar/retomar — inclusive em overtime pausado. */
-  const canStart = computed(() => {
-    if (runtime.value.status === 'running') return false
-    if (runtime.value.mode === 'until') return true
-    return runtime.value.durationMs > 0
-  })
-
-  const isUntilMode = computed(() => runtime.value.mode === 'until')
-
-  function stopProjectionWatch() {
-    if (!projectionWatchTimer) return
-    clearInterval(projectionWatchTimer)
-    projectionWatchTimer = null
-  }
-
-  function startProjectionWatch() {
-    stopProjectionWatch()
-    projectionWatchTimer = setInterval(() => {
-      if (projectingTvsOnly.value || inAppPreview.value) return
-      if (!isProjectionModuleOpen('countdown')) {
-        isProjecting.value = false
-        stopProjectionWatch()
-      }
-    }, 400)
-  }
+  const canStart = computed(() => runtime.value.status !== 'running' && runtime.value.durationMs > 0)
 
   function stopFinishWatch() {
     if (!finishWatchTimer) return
@@ -82,7 +50,6 @@ export const useCountdownStore = defineStore('countdown', () => {
     finishWatchTimer = null
   }
 
-  /** Marca esgotado ao cruzar zero, mas segue rodando em negativo. */
   function checkFinished() {
     if (runtime.value.status !== 'running' || runtime.value.finished) return
 
@@ -93,6 +60,12 @@ export const useCountdownStore = defineStore('countdown', () => {
     runtime.value = {
       ...runtime.value,
       finished: true,
+      ...(config.value.allowNegative === false ? {
+        status: 'paused' as const,
+        accumulatedMs: runtime.value.durationMs,
+        segmentStartedAt: null,
+        pausedRemainingMs: 0,
+      } : {}),
     }
     syncRuntime()
   }
@@ -103,15 +76,26 @@ export const useCountdownStore = defineStore('countdown', () => {
   }
 
   function syncRuntime() {
-    publishCountdownRuntime({ ...runtime.value, projecting: isProjecting.value })
+    writeTimerRuntimeToStorage(runtime.value)
+    projection.publish()
   }
 
   function hydrate() {
     if (hydrated.value) return
     config.value = loadCountdownDisplayConfig()
-    runtime.value = readCountdownRuntimeFromStorage()
-    isProjecting.value = isProjectionModuleOpen('countdown')
-    if (isProjecting.value) startProjectionWatch()
+    runtime.value = readTimerRuntimeFromStorage()
+    projection.hydrateProjection()
+    // Contagem deixada rodando quando o app foi fechado não pode voltar
+    // sozinha ao abrir a tela; dentro da mesma execução ela continua.
+    if (beginCountdownSession() && (runtime.value.status !== 'idle' || runtime.value.finished)) {
+      runtime.value = stopCountdownRuntime(runtime.value)
+      syncRuntime()
+    }
+    // o Timer só faz contagem regressiva; o modo "até horário" saiu
+    if (runtime.value.mode === 'until') {
+      runtime.value = { ...stopCountdownRuntime(runtime.value), mode: 'duration' }
+      syncRuntime()
+    }
     if (runtime.value.status === 'running') startFinishWatch()
     hydrated.value = true
   }
@@ -131,11 +115,24 @@ export const useCountdownStore = defineStore('countdown', () => {
   }
 
   function setTextColor(textColor: string) {
-    config.value = { ...config.value, textColor }
-    persistConfig()
-  }
+      config.value = { ...config.value, textColor }
+      persistConfig()
+    }
 
-  function resetDisplayToDefault() {
+    function setAllowNegative(allowNegative: boolean) {
+      config.value = { ...config.value, allowNegative }
+      persistConfig()
+    }
+
+    /** Adiciona (delta > 0) ou remove (delta < 0) tempo da contagem, em qualquer status.
+     *  Remove nunca deixa abaixo de zero. Não reseta a contagem em curso. */
+    function adjustTime(deltaMs: number) {
+      const next = Math.max(0, runtime.value.durationMs + Math.floor(deltaMs))
+      runtime.value = { ...runtime.value, durationMs: next, finished: false }
+      syncRuntime()
+    }
+
+    function resetDisplayToDefault() {
     config.value = { ...DEFAULT_COUNTDOWN_DISPLAY_CONFIG }
     persistConfig()
   }
@@ -148,99 +145,67 @@ export const useCountdownStore = defineStore('countdown', () => {
     configOpen.value = false
   }
 
+  function openDisplayConfig() {
+    displayConfigOpen.value = true
+  }
+
+  function closeDisplayConfig() {
+    displayConfigOpen.value = false
+  }
+
   function setDurationMs(durationMs: number) {
     if (runtime.value.status === 'running') return
 
     const next = Math.max(0, Math.floor(durationMs))
     runtime.value = {
       ...runtime.value,
-      mode: 'duration',
       durationMs: next,
       accumulatedMs: 0,
       segmentStartedAt: null,
       status: 'idle',
       finished: false,
-      pausedRemainingMs: null,
-    }
-    syncRuntime()
-  }
-
-  function setCountdownMode(mode: CountdownMode) {
-    if (runtime.value.status === 'running') return
-    runtime.value = {
-      ...runtime.value,
-      mode,
-      accumulatedMs: 0,
-      segmentStartedAt: null,
-      status: 'idle',
-      finished: false,
-      pausedRemainingMs: null,
-    }
-    syncRuntime()
-  }
-
-  function setUntilTime(untilHour: number, untilMinute: number) {
-    if (runtime.value.status === 'running') return
-    const hour = Math.min(23, Math.max(0, Math.floor(untilHour) || 0))
-    const minute = Math.min(59, Math.max(0, Math.floor(untilMinute) || 0))
-    runtime.value = {
-      ...runtime.value,
-      mode: 'until',
-      untilHour: hour,
-      untilMinute: minute,
-      accumulatedMs: 0,
-      segmentStartedAt: null,
-      status: 'idle',
-      finished: false,
-      pausedRemainingMs: null,
     }
     syncRuntime()
   }
 
   function start() {
     if (runtime.value.status === 'running') return
-    if (runtime.value.mode !== 'until' && runtime.value.durationMs <= 0) return
+
+    if (runtime.value.durationMs <= 0 || runtime.value.finished) return
+    const remaining = computeCountdownRemainingMs(runtime.value, Date.now())
+    if (remaining <= 0) {
+      runtime.value = { ...runtime.value, finished: true, status: 'idle' }
+      syncRuntime()
+      return
+    }
 
     runtime.value = {
       ...runtime.value,
       status: 'running',
       segmentStartedAt: Date.now(),
       pausedRemainingMs: null,
+      finished: false,
     }
     syncRuntime()
     startFinishWatch()
   }
 
   function pause() {
-    if (runtime.value.status !== 'running') return
-
-    const now = Date.now()
-    if (runtime.value.mode === 'until') {
-      runtime.value = {
-        ...runtime.value,
-        status: 'paused',
-        segmentStartedAt: null,
-        pausedRemainingMs: computeCountdownRemainingMs(runtime.value, now),
-      }
-      syncRuntime()
-      stopFinishWatch()
+    if (runtime.value.status !== 'running' || runtime.value.segmentStartedAt == null) {
       return
     }
-
-    if (runtime.value.segmentStartedAt == null) return
 
     const elapsed = computeElapsedMs(
       runtime.value.accumulatedMs,
       runtime.value.segmentStartedAt,
       'running',
-      now,
+      Date.now(),
     )
 
     runtime.value = {
       ...runtime.value,
       status: 'paused',
       segmentStartedAt: null,
-      // Não limita à duração: preserva overtime negativo ao retomar.
       accumulatedMs: elapsed,
     }
     syncRuntime()
@@ -248,19 +213,18 @@ export const useCountdownStore = defineStore('countdown', () => {
   }
 
   function reset() {
-    const keepRunning = runtime.value.status === 'running'
-
+    stopFinishWatch()
     runtime.value = {
       ...runtime.value,
-      status: keepRunning ? 'running' : 'idle',
-      segmentStartedAt: keepRunning ? Date.now() : null,
+      mode: 'duration',
+      durationMs: 0,
+      status: 'idle',
+      segmentStartedAt: null,
       accumulatedMs: 0,
-      finished: false,
       pausedRemainingMs: null,
+      finished: false,
     }
     syncRuntime()
-    if (keepRunning) startFinishWatch()
-    else stopFinishWatch()
   }
 
   function saveMark() {
@@ -289,51 +253,6 @@ export const useCountdownStore = defineStore('countdown', () => {
     syncRuntime()
   }
 
-  async function syncProjection() {
-    syncRuntime()
-    if (isPalcoTvOnlyRoute('countdown')) {
-      isProjecting.value = true
-      projectingTvsOnly.value = true
-      inAppPreview.value = false
-      syncRuntime()
-      startProjectionWatch()
-      return
-    }
-    projectingTvsOnly.value = false
-    const hasExternal = await hasSelectedExtendedProjectionTargets()
-    if (!hasExternal) {
-      closeProjectionModule()
-      isProjecting.value = true
-      inAppPreview.value = true
-      syncRuntime()
-      startProjectionWatch()
-      return
-    }
-    inAppPreview.value = false
-    const opened = await openProjectionModule('countdown')
-    isProjecting.value = opened
-    syncRuntime()
-    if (opened) startProjectionWatch()
-    else stopProjectionWatch()
-  }
-
-  function clearProjection() {
-    isProjecting.value = false
-    projectingTvsOnly.value = false
-    inAppPreview.value = false
-    syncRuntime()
-    stopProjectionWatch()
-    closeProjectionModule()
-  }
-
-  async function toggleProjection() {
-    if (isProjecting.value && (isProjectionModuleOpen('countdown') || projectingTvsOnly.value || inAppPreview.value)) {
-      clearProjection()
-      return
-    }
-    await syncProjection()
-  }
-
   return {
     config,
     runtime,
@@ -344,25 +263,30 @@ export const useCountdownStore = defineStore('countdown', () => {
     isRunning,
     isPaused,
     canStart,
-    isUntilMode,
     hydrate,
     setTimeFormat,
     setBgColor,
     setTextColor,
+    setAllowNegative,
     resetDisplayToDefault,
     openConfig,
     closeConfig,
+    displayConfigOpen,
+    openDisplayConfig,
+    closeDisplayConfig,
     setDurationMs,
-    setCountdownMode,
-    setUntilTime,
+    adjustTime,
     start,
     pause,
     reset,
     saveMark,
     removeSavedMark,
     clearSavedMarks,
-    toggleProjection,
-    syncProjection,
-    clearProjection,
+    toggleProjection: projection.toggleProjection,
+    claimOutput: projection.claimOutput,
+    ownsCountdownOutput: projection.ownsCountdownOutput,
+    syncProjection: projection.syncProjection,
+    clearProjection: projection.clearProjection,
+    refreshProjectionState: projection.refreshProjectionState,
   }
 })

@@ -215,8 +215,7 @@ describe('loadLibraryCategories - filtragem por idioma', () => {
   })
 })
 
-// ============================================================
-// Testes para matar mutantes sobreviventes do Stryker
+// =====================================================// Testes para matar mutantes sobreviventes do Stryker
 // ============================================================
 
 describe('getCurrentApiPrefix - mutantes sobreviventes', () => {
@@ -842,6 +841,285 @@ describe('readDownloadedAlbumIds / writeDownloadedAlbumIds', () => {
   })
 })
 
+describe('mutantes round 4 - buildHymnalCategory e hydrate', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    vi.clearAllMocks()
+  })
+
+  // L42 typeof->true: language nao-string nao pode chegar a localeToApiPrefix
+  it('L42: nao chama localeToApiPrefix quando language nao e string', async () => {
+    const i18n = (await import('@plugins/i18n')) as any
+    const spy = vi.spyOn(i18n, 'localeToApiPrefix')
+    localStorage.setItem('user_data', JSON.stringify({ language: 123 }))
+    expect(getCurrentApiPrefix()).toBe('pt')
+    expect(spy).not.toHaveBeenCalled()
+    spy.mockRestore()
+  })
+
+  // L59/L60 flatMap arrow -> ()=>undefined
+  it('hydrate: rawUrls passadas tem as urls reais, sem undefined', async () => {
+    vi.mocked(resolveCoverUrlsFromDisk).mockResolvedValue(new Map())
+    const cats = [
+      {
+        id: 'cat1',
+        name: 'Cat',
+        albums: [
+          { id: 1, name: 'A', rawCoverUrl: null, coverUrl: null },
+          { id: 2, name: 'B', rawCoverUrl: '/img/x.jpg', coverUrl: 'remote' },
+        ],
+      } as any,
+    ]
+    await hydrateLocalLibraryCoverUrls(cats)
+    const calledWith = vi.mocked(resolveCoverUrlsFromDisk).mock.calls[0][0]
+    expect(calledWith).toContain('/img/x.jpg')
+    expect(calledWith).not.toContain(undefined)
+  })
+
+  // L66 if(!rawCoverUrl) continue -> if(false): mapa que RESOLVE null mata o mutante
+  it('hydrate: album com rawCoverUrl null mantem coverUrl original', async () => {
+    vi.mocked(resolveCoverUrlsFromDisk).mockResolvedValue(
+      new Map<any, string>([[null, 'local://null-cover'], ['/img/y.jpg', 'local://y']]),
+    )
+    const cats = [
+      {
+        id: 'cat1',
+        name: 'Cat',
+        albums: [
+          { id: 1, name: 'A', rawCoverUrl: null, coverUrl: 'original-null' },
+          { id: 2, name: 'B', rawCoverUrl: '/img/y.jpg', coverUrl: 'original-remote' },
+        ],
+      } as any,
+    ]
+    await hydrateLocalLibraryCoverUrls(cats)
+    // Mutante if(false): get(null) = 'local://null-cover' -> sobrescreveria
+    expect(cats[0].albums[0].coverUrl).toBe('original-null')
+    expect(cats[0].albums[1].coverUrl).toBe('local://y')
+  })
+
+  // L68 if(resolved)->if(true): url sem resolucao nao pode virar undefined
+  it('hydrate: url ausente no mapa mantem cover anterior', async () => {
+    vi.mocked(resolveCoverUrlsFromDisk).mockResolvedValue(new Map())
+    const cats = [
+      {
+        id: 'cat1',
+        name: 'Cat',
+        albums: [{ id: 1, name: 'A', rawCoverUrl: '/img/none.jpg', coverUrl: 'keep-me' }],
+      } as any,
+    ]
+    await hydrateLocalLibraryCoverUrls(cats)
+    expect(cats[0].albums[0].coverUrl).toBe('keep-me')
+  })
+
+  // L88/L91 defaults do createAlbumBase
+  it('createAlbumBase: progressText/progress/totalCount/downloadedCount default', async () => {
+    vi.mocked(readCatalogRecord).mockImplementation(async (key: string) => {
+      if (key === 'pt_hymnal') return [{ id: 1 }]
+      return null
+    })
+    const result = await loadLibraryCategories()
+    const album: any = result[0].albums[0]
+    expect(album.progressText).toBe('')
+    expect(album.progress).toBe(0)
+    expect(album.totalCount).toBe(0)
+    expect(album.downloadedCount).toBe(0)
+  })
+
+  it('createAlbumBase: cancelRequested inicia false', async () => {
+    vi.mocked(readCatalogRecord).mockImplementation(async (key: string) => {
+      if (key === 'pt_hymnal') return [{ id: 1 }]
+      return null
+    })
+    const result = await loadLibraryCategories()
+    expect((result[0].albums[0] as any).cancelRequested).toBe(false)
+  })
+
+  // L111 guardas do hymnal
+  it('hymnal objeto nao-array NAO gera album', async () => {
+    vi.mocked(readCatalogRecord).mockImplementation(async (key: string) => {
+      if (key === 'pt_hymnal') return { not: 'array' } as any
+      return null
+    })
+    const result = await loadLibraryCategories()
+    expect(result.find((c) => c.id === 'hymnals')).toBeUndefined()
+  })
+
+  it('hymnal array vazio NAO gera album', async () => {
+    vi.mocked(readCatalogRecord).mockImplementation(async (key: string) => {
+      if (key === 'pt_hymnal') return []
+      return null
+    })
+    const result = await loadLibraryCategories()
+    expect(result.find((c) => c.id === 'hymnals')).toBeUndefined()
+  })
+
+  it('hymnal album tem nome e subtitle exatos', async () => {
+    vi.mocked(readCatalogRecord).mockImplementation(async (key: string) => {
+      if (key === 'pt_hymnal') return [{ id: 1 }]
+      return null
+    })
+    const result = await loadLibraryCategories()
+    expect(result[0].albums[0].name).toBe('Hinário Adventista')
+    expect(result[0].albums[0].subtitle).toBe('')
+  })
+
+  // L127 guardas do hymnal_1996
+  it('hymnal_1996 objeto nao-array NAO gera album', async () => {
+    vi.mocked(readCatalogRecord).mockImplementation(async (key: string) => {
+      if (key === 'pt_hymnal_1996') return { nope: 1 } as any
+      return null
+    })
+    const result = await loadLibraryCategories()
+    expect(result.find((c) => c.id === 'hymnals')).toBeUndefined()
+  })
+
+  it('hymnal_1996 array vazio NAO gera album', async () => {
+    vi.mocked(readCatalogRecord).mockImplementation(async (key: string) => {
+      if (key === 'pt_hymnal_1996') return []
+      return null
+    })
+    const result = await loadLibraryCategories()
+    expect(result.find((c) => c.id === 'hymnals')).toBeUndefined()
+  })
+
+  it('hymnal_1996 album tem nome, subtitle e isHymnal exatos', async () => {
+    vi.mocked(readCatalogRecord).mockImplementation(async (key: string) => {
+      if (key === 'pt_hymnal_1996') return [{ id: 1 }]
+      return null
+    })
+    const result = await loadLibraryCategories()
+    const h = result[0].albums.find((a) => a.id === 'hymnal_1996')!
+    expect(h.name).toBe('Hinário Adventista - Edição 1996')
+    expect(h.subtitle).toBe('')
+    expect(h.isHymnal).toBe(true)
+  })
+
+  // L135 id do album 1996 nao pode mutar para ''
+  it('hymnal_1996 baixado por id exato fica downloaded', async () => {
+    vi.mocked(readCatalogRecord).mockImplementation(async (key: string) => {
+      if (key === 'downloaded_albums') return ['hymnal_1996']
+      if (key === 'pt_hymnal_1996') return [{ id: 1 }]
+      return null
+    })
+    const result = await loadLibraryCategories()
+    const h = result[0].albums.find((a) => a.id === 'hymnal_1996')!
+    expect(h.status).toBe('downloaded')
+  })
+
+  // L146 nome da categoria
+  it('categoria de hinarios tem nome exato', async () => {
+    vi.mocked(readCatalogRecord).mockImplementation(async (key: string) => {
+      if (key === 'pt_hymnal') return [{ id: 1 }]
+      return null
+    })
+    const result = await loadLibraryCategories()
+    expect(result[0].name).toBe('Hinários')
+  })
+
+  // L162 ?? [] no downloaded
+  it('sem downloaded_albums: NENHUM album fica downloaded', async () => {
+    vi.mocked(readCatalogRecord).mockImplementation(async (key: string) => {
+      if (key === 'pt_categories') {
+        return [{ id_category: 'c1', name: 'C', albums: [{ id_album: 1 }, { id_album: 2 }] }]
+      }
+      return null
+    })
+    const result = await loadLibraryCategories()
+    for (const a of result[0].albums) expect(a.status).toBe('idle')
+  })
+
+  // L174 rawCoverUrls flatMap
+  it('rawCoverUrls passadas ao disco sao exatas (sem lixo de categorias vazias)', async () => {
+    vi.mocked(resolveCoverUrlsFromDisk).mockResolvedValue(new Map())
+    vi.mocked(readCatalogRecord).mockImplementation(async (key: string) => {
+      if (key === 'pt_categories') {
+        return [
+          {
+            id_category: 'c1',
+            name: 'C',
+            albums: [
+              { id_album: 1, url_image: '/a.jpg' },
+              { id_album: 2, url_image: '/b.jpg' },
+            ],
+          },
+          {
+            id_category: 'c2',
+            name: 'D',
+            albums: [{ id_album: 3, url_image: null }],
+          },
+          {
+            id_category: 'c3',
+            name: 'E',
+            albums: undefined,
+          },
+        ]
+      }
+      return null
+    })
+    await loadLibraryCategories()
+    const arg = vi.mocked(resolveCoverUrlsFromDisk).mock.calls[0][0]
+    expect(arg).toEqual(['/a.jpg', '/b.jpg', null])
+  })
+
+  // L40 if(stored)->if(true): original NAO chama JSON.parse quando stored e falsy
+  it('L40: stored vazio nao chega a fazer JSON.parse (spy no JSON.parse)', async () => {
+    const parseSpy = vi.spyOn(JSON, 'parse')
+    localStorage.setItem('user_data', '') // getItem retorna '' — falsy
+    expect(getCurrentApiPrefix()).toBe('pt')
+    expect(parseSpy).not.toHaveBeenCalled()
+    parseSpy.mockRestore()
+  })
+
+  // L111/L127 && -> ||: array-like NAO-array com length>0 deve ser rejeitado
+  it('hymnal array-like (length>0, nao array) NAO gera album', async () => {
+    vi.mocked(readCatalogRecord).mockImplementation(async (key: string) => {
+      if (key === 'pt_hymnal') return { length: 2 } as any
+      return null
+    })
+    const result = await loadLibraryCategories()
+    expect(result.find((c) => c.id === 'hymnals')).toBeUndefined()
+  })
+
+  it('hymnal_1996 array-like (length>0, nao array) NAO gera album', async () => {
+    vi.mocked(readCatalogRecord).mockImplementation(async (key: string) => {
+      if (key === 'pt_hymnal_1996') return { length: 2 } as any
+      return null
+    })
+    const result = await loadLibraryCategories()
+    expect(result.find((c) => c.id === 'hymnals')).toBeUndefined()
+  })
+
+  // L135 'hymnal_1996' -> '': downloaded [''] nao pode marcar o album
+  it("downloaded com string vazia NAO marca hymnal_1996 como baixado", async () => {
+    vi.mocked(readCatalogRecord).mockImplementation(async (key: string) => {
+      if (key === 'downloaded_albums') return ['']
+      if (key === 'pt_hymnal_1996') return [{ id: 1 }]
+      return null
+    })
+    const result = await loadLibraryCategories()
+    const h = result[0].albums.find((a) => a.id === 'hymnal_1996')!
+    expect(h.status).toBe('idle')
+  })
+
+  // L162 ?? [] -> ['Stryker was here']: id_album colidente com o lixo do mutante
+  it("downloaded null: album com id string nao pode herdar valor default mutado", async () => {
+    vi.mocked(readCatalogRecord).mockImplementation(async (key: string) => {
+      if (key === 'pt_categories') {
+        return [
+          {
+            id_category: 'c1',
+            name: 'C',
+            albums: [{ id_album: 'Stryker was here' as any, name: 'X', url_image: null }],
+          },
+        ]
+      }
+      return null
+    })
+    const result = await loadLibraryCategories()
+    expect(result[0].albums[0].status).toBe('idle')
+  })
+})
+
 describe('mutantes sobreviventes - round 3', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -982,6 +1260,92 @@ describe('mutantes sobreviventes - round 3', () => {
     const h1996 = hymnals!.albums.find((a) => a.id === 'hymnal_1996')
     expect(h1996).toBeDefined()
     expect(h1996!.songCount).toBe(3)
+  })
+})
+
+describe('mutantes round 5 - guard Array.isArray dos hinários', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    vi.clearAllMocks()
+    mockCoverDiskAsRemote()
+  })
+
+  it('MUTANT KILL: catalog record objeto não-array NÃO vira hinário (guard Array.isArray)', async () => {
+    vi.mocked(readCatalogRecord).mockResolvedValue({ not: 'an array' } as never)
+    const result = await loadLibraryCategories()
+    // guard `hymnal && Array.isArray(hymnal) && length>0` rejeita objeto: nenhuma categoria
+    expect(result).toHaveLength(0)
+  })
+
+  it('MUTANT KILL: hymnal_1996 objeto não-array NÃO vira hinário (guard Array.isArray)', async () => {
+    vi.mocked(readCatalogRecord)
+      .mockResolvedValueOnce(null as never) // categories
+      .mockResolvedValueOnce([] as never) // downloaded
+      .mockResolvedValueOnce([{ id: 'm1' }] as never) // hymnal válido
+      .mockResolvedValueOnce({ broken: true } as never) // hymnal_1996 objeto
+    const result = await loadLibraryCategories()
+    expect(result).toHaveLength(1)
+    const ids = result[0]!.albums.map((a: { id: string }) => a.id)
+    expect(ids).toContain('hymnal')
+    expect(ids).not.toContain('hymnal_1996')
+  })
+})
+
+describe('mutantes round 6 - constantes de módulo (EXCLUDED_ALBUM_IDS / CATEGORY_ORDER)', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    vi.clearAllMocks()
+    mockCoverDiskAsRemote()
+  })
+
+  it('MUTANT KILL: álbum em EXCLUDED_ALBUM_IDS (712) é filtrado do catálogo', async () => {
+    const mockCategories = [
+      {
+        id_category: 'cds',
+        name: 'CDs Oficiais/Ano',
+        albums: [
+          { id_album: 712, name: 'Excluído legado', url_image: null },
+          { id_album: 999, name: 'Normal', url_image: null },
+        ],
+      },
+    ]
+    vi.mocked(readCatalogRecord).mockImplementation(async (key: string) => {
+      if (key === 'pt_categories') return mockCategories
+      return null
+    })
+
+    const result = await loadLibraryCategories()
+    const cds = result.find((c: { id: string }) => c.id === 'cds')
+    expect(cds).toBeDefined()
+    const albumIds = cds!.albums.map((a: { id: number | string }) => a.id)
+    // Set([712, 629]) mutado pra Set([]): 712 apareceria — tem que estar FORA
+    expect(albumIds).toContain(999)
+    expect(albumIds).not.toContain(712)
+  })
+
+  it('MUTANT KILL: CATEGORY_ORDER vazio inverte ordem (Doxologia vem antes de unmapped)', async () => {
+    const mockCategories = [
+      {
+        id_category: 'aaa_unmapped',
+        name: 'aaa Unmapped',
+        albums: [{ id_album: 400, name: 'Album U', url_image: null }],
+      },
+      {
+        id_category: 'Doxologia',
+        name: 'zzz Doxologia',
+        albums: [{ id_album: 500, name: 'Album D', url_image: null }],
+      },
+    ]
+    vi.mocked(readCatalogRecord).mockImplementation(async (key: string) => {
+      if (key === 'pt_categories') return mockCategories
+      return null
+    })
+
+    const result = await loadLibraryCategories()
+    // Com CATEGORY_ORDER: Doxologia(4) antes de unmapped(50)
+    // Mutante {}: ambos 50 → localeCompare('zzz Doxologia','aaa Unmapped') → aaa primeiro
+    const ids = result.map((c: { id: string }) => c.id)
+    expect(ids).toEqual(['Doxologia', 'aaa_unmapped'])
   })
 })
 

@@ -1,4 +1,9 @@
-import { BrowserWindow, screen, session, WebContentsView } from 'electron'
+import { onReceiverEvent } from '../palco/receiver-events.mjs'
+import { youtubeCaptionsScript } from '../youtube-captions.mjs'
+import { attachVideoLoadingOverlay } from '../video-loading-overlay.mjs'
+import { attachCursorShield } from '../cursor-shield.mjs'
+import { isYoutubeEmbedUrl, youtubeEmbedUrl, youtubeSourceId, youtubeWatchUrl } from '../youtube-source.mjs'
+import { BrowserWindow, nativeImage, screen, session, WebContentsView } from 'electron'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
@@ -6,6 +11,7 @@ import { convertPresentationToPdf } from './presentation-convert.mjs'
 import { readWorkspaceRecord, writeWorkspaceRecord } from '../workspace.mjs'
 import { getPalcoManager } from '../palco-server.mjs'
 import { addProjectionWindowProvider, ensureProjectionHotkey, releaseProjectionHotkey } from '../projection-hotkey.mjs'
+import { projectionPowerSaveAcquire, projectionPowerSaveRelease } from '../projection-power-save.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const PRELOAD_PATH = path.join(__dirname, '../preload.mjs')
@@ -26,6 +32,10 @@ const LOCAL_PDF_PLAYER_HTML = path.join(
 const LOCAL_PPTX_PLAYER_HTML = path.join(
   __dirname,
   '../player/local-pptx-player.html',
+)
+const LOCAL_TEXT_PLAYER_HTML = path.join(
+  __dirname,
+  '../player/local-text-player.html',
 )
 const IMAGE_CONTROL_BAR_HTML = path.join(
   __dirname,
@@ -52,12 +62,12 @@ const SITE_WINDOW_TITLE = 'Site — LouvorJA - PIANO'
 const CONTROL_WIDTH = 960
 const CONTROL_HEIGHT = 540
 /** Barra do operador de vídeo (WebContentsView — fora da captura das projeções). */
-const CONTROL_BAR_HEIGHT = 48
+const CONTROL_BAR_HEIGHT = 64
 
 /** Popup de site: tamanho inicial confortável, sem limite máximo. */
 const SITE_DEFAULT_WIDTH = 1280
 const SITE_DEFAULT_HEIGHT = 820
-const SITE_CONTROL_BAR_HEIGHT = 44
+const SITE_CONTROL_BAR_HEIGHT = CONTROL_BAR_HEIGHT
 /** Altura da WebContentsView quando o painel de monitores está aberto. */
 const SITE_CONTROL_PANEL_HEIGHT = 300
 const SITE_MIN_WIDTH = 480
@@ -96,6 +106,9 @@ const HIDE_YOUTUBE_SIDEBAR_SCRIPT = `
     #bottom-row,
     #comments,
     #comment-teaser,
+    /* Cartão "YouTube Premium" no canto da página */
+    ytd-mealbar-promo-renderer,
+    yt-mealbar-promo-renderer,
     ytd-watch-metadata,
     ytd-video-primary-info-renderer,
     ytd-video-secondary-info-renderer {
@@ -158,9 +171,20 @@ const HIDE_YOUTUBE_SIDEBAR_SCRIPT = `
     .html5-video-container,
     .html5-video-container video,
     video.html5-main-video {
+      position: absolute !important;
+      inset: 0 !important;
+      left: 0 !important;
+      top: 0 !important;
       width: 100% !important;
       height: 100% !important;
+      max-width: none !important;
+      max-height: none !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      border: 0 !important;
+      transform: none !important;
       object-fit: contain !important;
+      object-position: center center !important;
     }
 
     /* Chrome nativa do player — não aparece nas projeções (captura do webContents) */
@@ -183,6 +207,8 @@ const HIDE_YOUTUBE_SIDEBAR_SCRIPT = `
     .ytp-title,
     .ytp-title-channel,
     .ytp-watermark,
+    .ytp-youtube-button,
+    .ytp-impression-link,
     .ytp-large-play-button,
     .ytp-cued-thumbnail-overlay,
     .ytp-spinner,
@@ -202,14 +228,72 @@ const HIDE_YOUTUBE_SIDEBAR_SCRIPT = `
     style.id = 'louvorja-hide-yt-sidebar';
     (document.head || document.documentElement).appendChild(style);
   }
-  style.textContent = css;
+  if (style.textContent !== css) style.textContent = css;
+
+  // Véu preto: a captura não mostra carregamento, anúncio nem a tela final de sugestões.
+  const host = (window.location && window.location.hostname) || '';
+  if (/(^|\\.)youtube\\.com$/.test(host) && !window.__louvorjaYtVeil) {
+    const VEIL_TIMEOUT_MS = 15000;
+    const veil = document.createElement('div');
+    veil.id = 'louvorja-yt-veil';
+    veil.style.cssText = 'position:fixed;inset:0;background:#000;z-index:2147483647;pointer-events:none';
+    const veilState = { started: false, expired: false, video: null, player: null, timer: null };
+    const armTimeout = () => {
+      clearTimeout(veilState.timer);
+      veilState.expired = false;
+      veilState.timer = setTimeout(() => {
+        veilState.expired = true;
+        updateVeil();
+      }, VEIL_TIMEOUT_MS);
+    };
+    const updateVeil = () => {
+      if (!veil.isConnected) (document.body || document.documentElement).appendChild(veil);
+      const player = document.getElementById('movie_player');
+      if (player && player !== veilState.player) {
+        veilState.player = player;
+        new MutationObserver(updateVeil).observe(player, { attributes: true, attributeFilter: ['class'] });
+      }
+      const video = player && player.querySelector('video');
+      if (video && video !== veilState.video) {
+        veilState.video = video;
+        ['playing', 'timeupdate', 'pause', 'ended', 'seeked', 'emptied'].forEach((type) => {
+          video.addEventListener(type, updateVeil);
+        });
+        video.addEventListener('loadstart', () => {
+          veilState.started = false;
+          armTimeout();
+          updateVeil();
+        });
+      }
+      const ad = !!player && (player.classList.contains('ad-showing') || player.classList.contains('ad-interrupting'));
+      if (video && !ad && !video.paused && !video.ended && video.currentTime > 0) veilState.started = true;
+      const cover = ad || (!!video && video.ended) || (!veilState.started && !veilState.expired);
+      veil.style.setProperty('display', cover ? 'block' : 'none', 'important');
+    };
+    window.__louvorjaYtVeil = { update: updateVeil };
+    armTimeout();
+    updateVeil();
+  }
 
   const apply = () => {
+    if (window.__louvorjaYtVeil) window.__louvorjaYtVeil.update();
     const hideIds = ['#secondary', '#related', '#masthead-container', '#below', '#comments'];
     hideIds.forEach((sel) => {
       const el = document.querySelector(sel);
-      if (el) el.style.setProperty('display', 'none', 'important');
+      if (el && (el.style.getPropertyValue('display') !== 'none' || el.style.getPropertyPriority('display') !== 'important')) {
+        el.style.setProperty('display', 'none', 'important');
+      }
     });
+
+    // "Agora não" registra a dispensa no YouTube; o diálogo em volta fica vazio.
+    const promo = document.querySelector('ytd-mealbar-promo-renderer, yt-mealbar-promo-renderer');
+    if (promo && !promo.__louvorjaDismissed) {
+      promo.__louvorjaDismissed = true;
+      const dismiss = promo.querySelector('#dismiss-button button') || promo.querySelector('#dismiss-button');
+      if (dismiss) dismiss.click();
+      const dialog = promo.closest('tp-yt-paper-dialog') || promo;
+      dialog.style.setProperty('display', 'none', 'important');
+    }
 
     // Ativa modo cinema (theater) — player largo, sem layout de coluna
     const flexy = document.querySelector('ytd-watch-flexy');
@@ -228,7 +312,17 @@ const HIDE_YOUTUBE_SIDEBAR_SCRIPT = `
   apply();
 
   if (!window.__louvorjaYtSidebarObserver) {
-    window.__louvorjaYtSidebarObserver = new MutationObserver(apply);
+    // A YouTube page changes continually (progress, captions, ads). Batch
+    // those mutations instead of rescanning and changing layout each time.
+    let pendingApply = null;
+    const scheduleApply = () => {
+      if (pendingApply !== null) return;
+      pendingApply = setTimeout(() => {
+        pendingApply = null;
+        apply();
+      }, 250);
+    };
+    window.__louvorjaYtSidebarObserver = new MutationObserver(scheduleApply);
     window.__louvorjaYtSidebarObserver.observe(document.documentElement, {
       childList: true,
       subtree: true,
@@ -244,20 +338,54 @@ const HIDE_YOUTUBE_SIDEBAR_SCRIPT = `
 let sourceWindow = null
 /** @type {WebContentsView | null} */
 let controlBarView = null
+let unsubscribeControlReceiverEvents = null
 /** @type {'video' | 'site' | 'image' | 'pdf' | 'presentation'} */
 let currentProjectionMode = 'video'
+/** Texto (aviso) roda como galeria de um slide: mesmas telas, espelho e conexões da imagem. */
+let currentDocumentIsText = false
+let currentTextScale = 1
 /** @type {BrowserWindow[]} */
 let mirrorWindows = []
 /** @type {BrowserWindow[]} */
 let siteShieldWindows = []
+/**
+ * Projeção independente do player (Sobrepor/Compartilhar em um ou vários
+ * monitores): fora de mirrorWindows — projetar/parar a principal não mexe
+ * nela; fecha com o player.
+ * @type {BrowserWindow[]}
+ */
+let independentWindows = []
+/** monitor → janela principal da independente nele (site sobreposto leva a proteção junto). */
+const independentByDisplay = new Map()
+/** @type {'overlay' | 'share'} */
+let independentMode = 'overlay'
+/** Monitores ativos no "Telas" do app quando o player abriu (os que a independente pode usar). */
+let enabledDisplayIds = []
+/** Arquivos da galeria aberta: a prévia do celular lê a imagem atual direto do disco. */
+let currentImagePaths = []
+/** Miniaturas já geradas (caminho → JPEG base64): voltar uma imagem é instantâneo. */
+const previewCache = new Map()
+/**
+ * Camadas do main.mjs: sempre acima das demais e metade do monitor.
+ * @type {{ add?: (win: BrowserWindow) => void, addShared?: (win: BrowserWindow, displayId: number) => void }}
+ */
+let independentLayerHooks = {}
+
+/** Espelhos que acompanham o player: principais + independente. */
+function followerWindows() {
+  return [...mirrorWindows, ...independentWindows].filter((win) => win && !win.isDestroyed())
+}
 /** @type {WeakMap<BrowserWindow, import('electron').WebContentsView>} */
 const siteBlockerViews = new WeakMap()
 /** @type {number[]} */
 let lastSiteMonitorIds = []
 /** @type {number[]} */
+const videoDisplayIds = new WeakMap()
 let lastVideoMonitorIds = []
 /** Painel de seleção de monitores aberto na barra do controle de site. */
 let siteControlPanelOpen = false
+/** Altura pedida pelo painel aberto (px); null = padrão do painel de telas. */
+let controlPanelHeight = null
 /** @type {ReturnType<typeof setInterval> | null} */
 let siteSyncInterval = null
 let siteSyncScrollX = -1
@@ -274,7 +402,7 @@ let siteSyncBound = false
  */
 function hasAnyExternalProjectionWindow() {
   if (sourceWindow && !sourceWindow.isDestroyed()) return true
-  for (const win of mirrorWindows) {
+  for (const win of [...mirrorWindows, ...independentWindows]) {
     if (win && !win.isDestroyed()) return true
   }
   for (const shield of siteShieldWindows) {
@@ -294,7 +422,7 @@ function attachExternalHotkeyProvider() {
   externalProviderAttached = true
   addProjectionWindowProvider(() => [
     ...(sourceWindow && !sourceWindow.isDestroyed() ? [sourceWindow] : []),
-    ...mirrorWindows.filter((win) => win && !win.isDestroyed()),
+    ...followerWindows(),
     ...siteShieldWindows.filter((win) => win && !win.isDestroyed()),
   ])
 }
@@ -342,7 +470,7 @@ function attachSiteSourceWindowHandlers(win) {
 function onSiteSourceNavigate(url) {
   if (!url || url === 'about:blank') return
 
-  for (const win of mirrorWindows) {
+  for (const win of followerWindows()) {
     if (win.isDestroyed()) continue
     if (win.webContents.getURL() !== url) {
       void win.webContents.loadURL(url)
@@ -354,7 +482,7 @@ function onSiteSourceNavigate(url) {
 }
 
 function reloadSiteProjectionWindows() {
-  for (const win of mirrorWindows) {
+  for (const win of followerWindows()) {
     if (!win.isDestroyed()) {
       win.webContents.reload()
     }
@@ -367,7 +495,7 @@ async function syncSiteProjectionScroll() {
   if (!sourceWindow || sourceWindow.isDestroyed() || currentProjectionMode !== 'site') {
     return
   }
-  if (mirrorWindows.length === 0) return
+  if (followerWindows().length === 0) return
 
   const sourceUrl = sourceWindow.webContents.getURL()
   if (!sourceUrl || sourceUrl === 'about:blank') return
@@ -388,7 +516,7 @@ async function syncSiteProjectionScroll() {
   siteSyncScrollX = x
   siteSyncScrollY = y
 
-  for (const win of mirrorWindows) {
+  for (const win of followerWindows()) {
     if (win.isDestroyed()) continue
     if (win.webContents.getURL() !== sourceUrl) continue
     try {
@@ -487,6 +615,27 @@ function resolveLocalImagePlayerUrl(filePaths) {
   return playerUrl.toString()
 }
 
+/**
+ * Player de texto: título, HTML (o player limpa de novo) e cores do Palco.
+ * @param {unknown} text
+ */
+export function resolveLocalTextPlayerUrl(text) {
+  if (!text || typeof text !== 'object') return null
+  const source = /** @type {Record<string, unknown>} */ (text)
+  const pick = (key) => (typeof source[key] === 'string' ? String(source[key]) : '')
+  const data = {
+    title: pick('title').trim(),
+    html: pick('html'),
+    titleColor: pick('titleColor'),
+    textColor: pick('textColor'),
+    backgroundColor: pick('backgroundColor'),
+  }
+  if (!data.title && !data.html.trim()) return null
+  const playerUrl = new URL(pathToFileURL(LOCAL_TEXT_PLAYER_HTML).href)
+  playerUrl.searchParams.set('data', JSON.stringify(data))
+  return playerUrl.toString()
+}
+
 function resolveLocalPdfPlayerUrl(filePath) {
   const mediaUrl = toLocalAppUrl(filePath)
   if (!mediaUrl) return null
@@ -503,8 +652,192 @@ function resolveLocalPptPlayerUrl(filePath) {
   return playerUrl.toString()
 }
 
-function resolveSourceUrl(payload) {
+/**
+ * @typedef {{ kind: 'cache'|'stream', src: string, audioSrc?: string | null, subtitle: string | null,
+ *   title: string, file?: string } | null} OnlineVideoSource
+ * @typedef {{ play: (id: string) => Promise<OnlineVideoSource>, release: (id: string) => unknown,
+ *   fallback?: (id: string) => Promise<OnlineVideoSource> }} OnlineVideoPlayer
+ * @type {OnlineVideoPlayer | null}
+ */
+let onlineVideoPlayer = null
+let currentOnlineVideoId = null
+
+/** @param {OnlineVideoPlayer | null} player */
+export function setOnlineVideoPlayer(player) {
+  onlineVideoPlayer = player
+}
+
+/**
+ * Player local com a cópia do vídeo do YouTube (pronta no cache ou ainda baixando).
+ * `null` quando o recurso está desligado ou falhou: a projeção segue com o player do YouTube.
+ * @param {string | null} youtubeId @param {OnlineVideoPlayer | null} [player]
+ */
+export async function resolveOnlineVideoPlayerUrl(youtubeId, player = onlineVideoPlayer) {
+  return (await resolveOnlineVideoCopy(youtubeId, player))?.url ?? null
+}
+
+/**
+ * @param {string | null} youtubeId @param {OnlineVideoPlayer | null} [player]
+ * @returns {Promise<{ url: string, file: string, captions: boolean } | null>} `file` vazio enquanto a cópia ainda baixa
+ */
+async function resolveOnlineVideoCopy(youtubeId, player = onlineVideoPlayer) {
+  if (!youtubeId || !player) return null
+  try {
+    const source = await player.play(youtubeId)
+    if (!source) return null
+    const url = new URL(pathToFileURL(LOCAL_VIDEO_PLAYER_HTML).href)
+    url.searchParams.set('src', source.src)
+    if (source.audioSrc) url.searchParams.set('audioSrc', source.audioSrc)
+    if (source.subtitle) url.searchParams.set('subtitle', source.subtitle)
+    if (source.title) url.searchParams.set('title', source.title)
+    return { url: url.toString(), file: source.kind === 'cache' && source.file ? source.file : '', captions: Boolean(source.subtitle) }
+  } catch (error) {
+    console.warn('[projection] cópia local do YouTube indisponível, usando o player do YouTube:', error?.code || error?.message || error)
+    return null
+  }
+}
+
+/** As TVs recebem o arquivo da cópia pronta como um vídeo local; sem arquivo, seguem no espelho. */
+function loadOnlineVideoCopy(win, youtubeId, copy) {
+  currentOnlineVideoId = youtubeId
+  currentSourceFilePath = copy.file
+  currentSourceHasCaptions = copy.captions
+  void win.loadURL(copy.url)
+}
+
+function releaseOnlineVideo(id, player = onlineVideoPlayer) {
+  if (!id || !player) return
+  try {
+    void Promise.resolve(player.release(id)).catch(() => {})
+  } catch { /* liberar nunca impede fechar a projeção */ }
+}
+
+function releaseCurrentOnlineVideo() {
+  const id = currentOnlineVideoId
+  currentOnlineVideoId = null
+  releaseOnlineVideo(id)
+}
+
+export const YOUTUBE_PLAYBACK_PROBE_SCRIPT = `(() => {
+  const video = document.querySelector('video');
+  const error = document.querySelector('.ytp-error');
+  return {
+    playing: !!video && !video.paused && video.currentTime > 0,
+    error: !!error && error.getClientRects().length > 0,
+    hasData: !!video && video.readyState >= 2,
+  };
+})()`
+
+/**
+ * Acompanha a página do YouTube até o vídeo começar a tocar.
+ * `idle` = carregou, mas ficou parado (autoplay bloqueado ou pausa): não é falha.
+ * @param {{ probe: () => Promise<{ playing?: boolean, error?: boolean, hasData?: boolean } | null>,
+ *   failedLoad: () => boolean, isClosed: () => boolean, timeoutMs?: number, intervalMs?: number,
+ *   sleep?: (ms: number) => Promise<unknown>, now?: () => number }} options
+ * @returns {Promise<'playing' | 'failed' | 'idle' | 'closed'>}
+ */
+export async function watchYoutubePlayback({
+  probe,
+  failedLoad,
+  isClosed,
+  timeoutMs = 20_000,
+  intervalMs = 1000,
+  sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  now = Date.now,
+}) {
+  const deadline = now() + timeoutMs
+  let hasData = false
+  for (;;) {
+    if (isClosed()) return 'closed'
+    if (failedLoad()) return 'failed'
+    const state = await Promise.resolve().then(probe).catch(() => null)
+    if (isClosed()) return 'closed'
+    if (state?.playing) return 'playing'
+    if (state?.error) return 'failed'
+    if (state?.hasData) hasData = true
+    if (now() >= deadline) return hasData ? 'idle' : 'failed'
+    await sleep(intervalMs)
+  }
+}
+
+const ERR_ABORTED = -3
+
+/**
+ * Sem a cópia baixada, a projeção abre o player embutido do YouTube. Se ele não tocar
+ * (vídeo que não aceita embed, erro do player, falha de rede), a janela passa para a
+ * cópia baixada; sem cópia, para a página do vídeo.
+ * @param {import('electron').BrowserWindow} win @param {string} youtubeId
+ * @param {{ player?: OnlineVideoPlayer | null, watch?: typeof watchYoutubePlayback, isCurrent?: () => boolean }} [options]
+ * @returns {Promise<'copy' | 'page' | null>}
+ */
+export async function fallbackWhenYoutubeFails(win, youtubeId, {
+  player = onlineVideoPlayer,
+  watch = watchYoutubePlayback,
+  isCurrent = () => sourceWindow === win,
+} = {}) {
+  const isClosed = () => win.isDestroyed() || !isCurrent()
+  let failed = false
+  const onFailLoad = (_event, code, _description, _url, isMainFrame) => {
+    if (isMainFrame && code !== ERR_ABORTED) failed = true
+  }
+  win.webContents.on('did-fail-load', onFailLoad)
+  try {
+    const result = await watch({
+      probe: () => win.webContents.executeJavaScript(YOUTUBE_PLAYBACK_PROBE_SCRIPT, true),
+      failedLoad: () => failed,
+      isClosed,
+    })
+    if (result !== 'failed') return null
+    const copy = player?.fallback
+      ? await resolveOnlineVideoCopy(youtubeId, { play: player.fallback.bind(player), release: player.release })
+      : null
+    if (isClosed()) {
+      if (copy && currentOnlineVideoId !== youtubeId) releaseOnlineVideo(youtubeId, player)
+      return null
+    }
+    if (copy) {
+      loadOnlineVideoCopy(win, youtubeId, copy)
+      return 'copy'
+    }
+    if (!isYoutubeEmbedUrl(win.webContents.getURL())) return null
+    void win.loadURL(youtubeWatchUrl(youtubeId))
+    return 'page'
+  } finally {
+    if (!win.isDestroyed()) win.webContents.removeListener('did-fail-load', onFailLoad)
+  }
+}
+
+/**
+ * A janela de controle já está aberta; a fonte entra quando fica pronta: a cópia baixada
+ * (chave ligada) ou o player embutido do YouTube, observado e recuperado se não tocar.
+ * @param {import('electron').BrowserWindow} win @param {string} youtubeId
+ * @param {string | null} youtubeUrl player do YouTube a carregar sem cópia; `null` = a janela já abriu nele
+ * @param {{ player?: OnlineVideoPlayer | null, isCurrent?: () => boolean, recover?: typeof fallbackWhenYoutubeFails }} [options]
+ * @returns {Promise<'copy' | 'youtube' | 'page' | null>}
+ */
+export async function startYoutubeSource(win, youtubeId, youtubeUrl, {
+  player = onlineVideoPlayer,
+  isCurrent = () => sourceWindow === win,
+  recover = fallbackWhenYoutubeFails,
+} = {}) {
+  if (youtubeUrl) {
+    const copy = await resolveOnlineVideoCopy(youtubeId, player)
+    if (win.isDestroyed() || !isCurrent()) {
+      if (copy && currentOnlineVideoId !== youtubeId) releaseOnlineVideo(youtubeId, player)
+      return null
+    }
+    if (copy) {
+      loadOnlineVideoCopy(win, youtubeId, copy)
+      return 'copy'
+    }
+    void win.loadURL(youtubeUrl)
+  }
+  return (await recover(win, youtubeId, { player, isCurrent })) ?? 'youtube'
+}
+
+export function resolveSourceUrl(payload) {
   const mode = typeof payload?.mode === 'string' ? payload.mode : ''
+  if (mode === 'text') return resolveLocalTextPlayerUrl(payload?.text)
 
   const filePaths = Array.isArray(payload?.filePaths)
     ? payload.filePaths.map((entry) => String(entry).trim()).filter(Boolean)
@@ -529,9 +862,9 @@ function resolveSourceUrl(payload) {
   const url = typeof payload?.url === 'string' ? payload.url.trim() : ''
   const videoId = typeof payload?.videoId === 'string' ? payload.videoId.trim() : ''
 
-  if (videoId) {
-    return `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`
-  }
+  const youtubeId = mode === 'site' ? null : youtubeSourceId(payload)
+  if (youtubeId) return youtubeEmbedUrl(youtubeId)
+  if (videoId) return youtubeWatchUrl(videoId)
 
   if (!url) return null
   try {
@@ -545,6 +878,16 @@ function resolveSourceUrl(payload) {
       return resolveLocalVideoPlayerUrl(absolute, title)
     }
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null
+    // R6/SPEC v1.1: vídeo direto (MP4/WebM remoto) usa o player dedicado
+    // (controles + autoclose), igual ao arquivo local — não popup browser cru.
+    if (/\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(parsed.pathname + parsed.search)) {
+      const playerPage = toLocalAppUrl(LOCAL_VIDEO_PLAYER_HTML)
+      if (!playerPage) return parsed.toString()
+      const playerUrl = new URL(playerPage)
+      playerUrl.searchParams.set('src', parsed.toString())
+      if (title) playerUrl.searchParams.set('title', title)
+      return playerUrl.toString()
+    }
     return parsed.toString()
   } catch {
     return null
@@ -594,6 +937,8 @@ function hideYoutubeSidebar(win) {
 }
 
 function detachControlBar() {
+  unsubscribeControlReceiverEvents?.()
+  unsubscribeControlReceiverEvents = null
   if (!controlBarView) return
   const view = controlBarView
   controlBarView = null
@@ -649,9 +994,12 @@ function attachControlBar(win) {
             currentProjectionMode === 'presentation'
           ? PDF_CONTROL_BAR_HTML
           : CONTROL_BAR_HTML,
-    ).href,
+    ).href + (currentSourceAudioOnly ? '?audioOnly=1' : currentDocumentIsText ? '?kind=text' : ''),
   )
   controlBarView = view
+  unsubscribeControlReceiverEvents = onReceiverEvent(message => {
+    if (!view.webContents.isDestroyed()) view.webContents.send('palco:event', message)
+  })
 }
 
 /**
@@ -686,6 +1034,9 @@ function attachSiteControlBar(win) {
   })
   void view.webContents.loadURL(pathToFileURL(SITE_CONTROL_BAR_HTML).href)
   controlBarView = view
+  unsubscribeControlReceiverEvents = onReceiverEvent(message => {
+    if (!view.webContents.isDestroyed()) view.webContents.send('palco:event', message)
+  })
 }
 
 function layoutControlBar(win) {
@@ -694,7 +1045,7 @@ function layoutControlBar(win) {
   const collapsedHeight =
     currentProjectionMode === 'site' ? SITE_CONTROL_BAR_HEIGHT : CONTROL_BAR_HEIGHT
   const barHeight = siteControlPanelOpen
-    ? Math.min(SITE_CONTROL_PANEL_HEIGHT, contentHeight)
+    ? Math.min(controlPanelHeight ?? SITE_CONTROL_PANEL_HEIGHT, contentHeight)
     : collapsedHeight
   controlBarView.setBounds({
     x: 0,
@@ -704,12 +1055,32 @@ function layoutControlBar(win) {
   })
 }
 
+/**
+ * Imagens e PDF/PPT no popup do operador: a barra de controle fica numa camada
+ * por cima da janela. A imagem ocupa só a área acima dela, para a barra não
+ * cobrir a parte de baixo. As telas de projeção usam o mesmo player sem barra,
+ * então continuam com a tela inteira.
+ * @param {import('electron').BrowserWindow} win
+ */
+export function reserveControlBarSpace(win) {
+  if (win.isDestroyed() || !isZoomableMode()) return
+  try {
+    void Promise.resolve(
+      win.webContents.insertCSS(`#stage { height: calc(100% - ${CONTROL_BAR_HEIGHT}px) !important; }`),
+    ).catch(() => {})
+  } catch {
+    // página trocando: o próximo did-finish-load reaplica
+  }
+}
+
 function createSourceWindow(loadUrl, title) {
   const bounds = placeSourceOnPrimary()
 
   /** @type {import('electron').BrowserWindowConstructorOptions} */
   const options = {
     ...bounds,
+    // Keep the captured web contents exactly 16:9, excluding OS decorations.
+    useContentSize: true,
     backgroundColor: '#000000',
     autoHideMenuBar: true,
     show: false,
@@ -738,26 +1109,30 @@ function createSourceWindow(loadUrl, title) {
     event.preventDefault()
     win.setTitle(title || SOURCE_WINDOW_TITLE)
   })
-  win.setMinimumSize(CONTROL_WIDTH, CONTROL_HEIGHT)
-  win.setMaximumSize(CONTROL_WIDTH, CONTROL_HEIGHT)
   win.setResizable(false)
   win.setMaximizable(false)
   win.webContents.setAudioMuted(false)
   win.setAlwaysOnTop(true, 'floating')
 
-  win.once('ready-to-show', () => {
-    win.webContents.setAudioMuted(false)
-    win.setBounds({
-      x: bounds.x,
-      y: bounds.y,
-      width: CONTROL_WIDTH,
-      height: CONTROL_HEIGHT,
-    })
-    attachControlBar(win)
-    layoutControlBar(win)
-    win.show()
-    win.focus()
-  })
+  // Aparece na hora com fundo preto: esperar o ready-to-show segura o controle até o YouTube desenhar.
+  win.setPosition(bounds.x, bounds.y)
+  win.setContentSize(CONTROL_WIDTH, CONTROL_HEIGHT)
+  attachControlBar(win)
+  layoutControlBar(win)
+  // Vídeo: camada transparente sobre a área do vídeo. A seta aparece normal no player, mas
+  // não entra na captura que vai para as telas projetadas.
+  if (currentProjectionMode === 'video' && !currentSourceAudioOnly) {
+    attachCursorShield(win, { WebContentsView, barHeight: CONTROL_BAR_HEIGHT, onEscape: () => closeWebProjectionWindows() })
+  }
+  // Vídeo do YouTube: logo pulsando + "Carregando…" em vez da tela preta até o vídeo tocar.
+  if (currentProjectionMode === 'video' && currentSourceYoutubeId && !currentSourceAudioOnly) {
+    attachVideoLoadingOverlay(win, { WebContentsView, barHeight: CONTROL_BAR_HEIGHT, getControlBar: () => controlBarView })
+  } else if (currentProjectionMode === 'video' && controlBarView) {
+    // a barra de controle volta para cima da camada transparente
+    win.contentView.addChildView(controlBarView)
+  }
+  win.show()
+  win.focus()
 
   // Impede redimensionar / maximizar por atalho ou SO
   win.on('will-resize', (event) => {
@@ -766,19 +1141,17 @@ function createSourceWindow(loadUrl, title) {
   win.on('maximize', () => {
     if (!win.isDestroyed()) {
       win.unmaximize()
-      win.setBounds({
-        x: bounds.x,
-        y: bounds.y,
-        width: CONTROL_WIDTH,
-        height: CONTROL_HEIGHT,
-      })
+      win.setPosition(bounds.x, bounds.y)
+      win.setContentSize(CONTROL_WIDTH, CONTROL_HEIGHT)
       layoutControlBar(win)
     }
   })
 
   const onPageReady = () => {
     win.webContents.setAudioMuted(false)
+    reserveControlBarSpace(win)
     hideYoutubeSidebar(win)
+    if (currentSourceCaptionsHidden) void remoteSetCaptionsHiddenSource(true)
     // YouTube é SPA: reaplica após hidratação
     setTimeout(() => hideYoutubeSidebar(win), 800)
     setTimeout(() => hideYoutubeSidebar(win), 2000)
@@ -825,10 +1198,13 @@ function createSourceWindow(loadUrl, title) {
   })
 
   win.on('closed', () => {
+    // O close é assíncrono: a projeção seguinte pode já estar aberta com a barra dela.
+    if (sourceWindow && sourceWindow !== win) return
     detachControlBar(); stopPalcoMediaOnClose()
     if (sourceWindow === win) {
       sourceWindow = null
       closeMirrorWindowsOnly()
+      releaseCurrentOnlineVideo()
     }
   })
 
@@ -887,6 +1263,7 @@ function createSiteSourceWindow(loadUrl, title) {
   })
 
   win.on('closed', () => {
+    if (sourceWindow && sourceWindow !== win) return
     detachControlBar(); stopPalcoMediaOnClose()
     if (sourceWindow === win) {
       sourceWindow = null
@@ -934,6 +1311,7 @@ function createSiteShieldWindow(display) {
   }
 
   const shield = new BrowserWindow(options)
+  videoDisplayIds.set(shield, display.id)
   shield.setFocusable(false)
   // Absorve eventos (NÃO ignora) — cliques morrem aqui
   shield.setIgnoreMouseEvents(false)
@@ -949,7 +1327,9 @@ function createSiteShieldWindow(display) {
     shield.showInactive()
   })
 
-  shield.webContents.on('before-input-event', (event) => {
+  shield.webContents.on('before-input-event', (event, input) => {
+    // Keep native application menu shortcuts available, including Cmd+Q.
+    if (input.meta) return
     event.preventDefault()
   })
 
@@ -1004,6 +1384,7 @@ function createSiteProjectionWindow(display, loadUrl) {
   }
 
   const win = new BrowserWindow(options)
+  videoDisplayIds.set(win, display.id)
   win.webContents.setAudioMuted(true)
   win.setFocusable(false)
 
@@ -1083,6 +1464,9 @@ function createSiteProjectionWindow(display, loadUrl) {
   win.once('ready-to-show', () => {
     win.setBounds(display.bounds)
     win.setFullScreen(true)
+    // Tela do operador não apaga durante o culto (ref-count global)
+    projectionPowerSaveAcquire()
+    win.once('closed', () => projectionPowerSaveRelease())
     if (process.platform === 'darwin') {
       win.setSimpleFullScreen(true)
     }
@@ -1102,7 +1486,9 @@ function createSiteProjectionWindow(display, loadUrl) {
   win.webContents.on('did-navigate-in-page', hardenPage)
   win.webContents.on('dom-ready', hardenPage)
 
-  win.webContents.on('before-input-event', (event) => {
+  win.webContents.on('before-input-event', (event, input) => {
+    // Keep native application menu shortcuts available, including Cmd+Q.
+    if (input.meta) return
     event.preventDefault()
   })
 
@@ -1166,13 +1552,24 @@ function createMirrorWindow(display) {
   }
 
   const win = new BrowserWindow(options)
+  videoDisplayIds.set(win, display.id)
   // Som só no popup de controle
   win.webContents.setAudioMuted(true)
 
   win.once('ready-to-show', () => {
     // Fullscreen real só nas telas estendidas
-    win.setBounds(display.bounds)
-    win.setFullScreen(true)
+    // Match the monitor bounds in DIP, without a second native-fullscreen
+    // transition on Windows/Linux (same policy as the hymn projection).
+    if (process.platform === 'win32' || process.platform === 'linux') {
+      win.setFullScreen(false)
+      win.setBounds(display.bounds)
+    } else {
+      win.setBounds(display.bounds)
+      win.setFullScreen(true)
+    }
+    // Tela do operador não apaga durante o culto (ref-count global)
+    projectionPowerSaveAcquire()
+    win.once('closed', () => projectionPowerSaveRelease())
     if (process.platform === 'darwin') {
       win.setSimpleFullScreen(true)
     }
@@ -1192,7 +1589,6 @@ function createMirrorWindow(display) {
 
   win.on('closed', () => {
     mirrorWindows = mirrorWindows.filter((item) => item !== win)
-    stopPalcoMediaOnClose()
   })
 
   const mirrorUrl = `${pathToFileURL(MIRROR_HTML).href}?mode=video`
@@ -1234,11 +1630,15 @@ function createImageProjectionWindow(display, loadUrl) {
   }
 
   const win = new BrowserWindow(options)
+  videoDisplayIds.set(win, display.id)
   win.webContents.setAudioMuted(true)
 
   win.once('ready-to-show', () => {
     win.setBounds(display.bounds)
     win.setFullScreen(true)
+    // Tela do operador não apaga durante o culto (ref-count global)
+    projectionPowerSaveAcquire()
+    win.once('closed', () => projectionPowerSaveRelease())
     if (process.platform === 'darwin') {
       win.setSimpleFullScreen(true)
     }
@@ -1257,12 +1657,12 @@ function createImageProjectionWindow(display, loadUrl) {
       void applyPdfIndexToWindow(win)
     } else if (currentProjectionMode === 'image') {
       void applyImageIndexToWindow(win)
+      if (currentDocumentIsText) void applyTextScaleToWindow(win, currentTextScale)
     }
   })
 
   win.on('closed', () => {
     mirrorWindows = mirrorWindows.filter((item) => item !== win)
-    stopPalcoMediaOnClose()
   })
 
   void win.loadURL(loadUrl)
@@ -1296,7 +1696,7 @@ async function applyImageIndexToWindow(win) {
     return
   }
 
-  await goToImageIndexOnWindow(win, index)
+  if (await goToImageIndexOnWindow(win, index)) await applySourceImageViewToWindow(win)
 }
 
 /**
@@ -1325,13 +1725,109 @@ async function goToImageIndexOnWindow(win, index) {
 }
 
 /**
+ * Zoom/deslocamento da galeria vindo de fora (barra ou relatório do operador).
+ * O player limita os valores; aqui só garantimos números.
+ * @param {unknown} view
+ */
+export function normalizeImageView(view) {
+  const source = view && typeof view === 'object' ? /** @type {Record<string, unknown>} */ (view) : {}
+  const num = (value, fallback) => {
+    const n = Number(value)
+    return Number.isFinite(n) ? n : fallback
+  }
+  const safe = { zoom: num(source.zoom, 1), x: num(source.x, 0), y: num(source.y, 0) }
+  // anim: ms da animação até esta visão (as telas repetem o mesmo movimento)
+  const anim = Math.round(Math.min(400, Math.max(0, num(source.anim, 0))))
+  return anim > 0 ? { ...safe, anim } : safe
+}
+
+/**
+ * Avisa a barra de controle do zoom novo: ela repassa às TVs do palco e às
+ * transmissões por navegador na hora (mensagem leve, sem reenviar a imagem).
+ * @param {{ zoom: number, x: number, y: number, anim?: number }} view
+ */
+function notifyControlBarImageView(view) {
+  const contents = controlBarView?.webContents
+  if (!contents || contents.isDestroyed()) return
+  try { contents.send('projection:image-view', view) } catch { /* barra fechando */ }
+}
+
+/** Galeria de imagens ou PDF/PPT: os dois players têm zoom (zoom-pan.js). */
+const ZOOM_PLAYER_EXPR = '(window.__liturgyGallery || window.__liturgyPdf)'
+
+/** Modo atual aceita zoom? Imagens e PDF/PPT; aviso de texto usa o A−/A+. */
+function isZoomableMode() {
+  return (currentProjectionMode === 'image' && !currentDocumentIsText) || isPdfDocumentMode()
+}
+
+/**
+ * @param {import('electron').BrowserWindow} win
+ * @param {{ zoom: number, x: number, y: number }} view
+ */
+async function applyImageViewToWindow(win, view) {
+  if (win.isDestroyed()) return null
+  // Só números entram no código executado na janela (nunca texto do chamador).
+  const safe = normalizeImageView(view)
+  const literal = `{zoom:${safe.zoom},x:${safe.x},y:${safe.y}${safe.anim ? `,anim:${safe.anim}` : ''}}`
+  try {
+    return await win.webContents.executeJavaScript(
+      `(() => { const p = ${ZOOM_PLAYER_EXPR}; return p && p.setView ? p.setView(${literal}) : null })()`,
+      true,
+    )
+  } catch {
+    return null
+  }
+}
+
+/** Zoom pelos botões da barra: aplica no popup e replica nas telas. */
+export async function setImageView(view) {
+  if (!sourceWindow || sourceWindow.isDestroyed() || !isZoomableMode()) return null
+  const asked = normalizeImageView(view)
+  const applied = await applyImageViewToWindow(sourceWindow, asked)
+  if (!applied || typeof applied !== 'object') return null
+  // o player devolve a visão limitada; a animação pedida segue para as telas
+  const safe = normalizeImageView({ ...applied, anim: asked.anim })
+  notifyControlBarImageView(safe)
+  await Promise.all(followerWindows().map((win) => applyImageViewToWindow(win, safe)))
+  return safe
+}
+
+/**
+ * Zoom pelo mouse no popup do operador: só ele manda; as telas seguem.
+ * @param {import('electron').WebContents | null | undefined} sender
+ * @param {unknown} view
+ */
+export function reportImageViewFromSource(sender, view) {
+  if (!sourceWindow || sourceWindow.isDestroyed() || !isZoomableMode()) return false
+  if (!sender || sender !== sourceWindow.webContents) return false
+  const safe = normalizeImageView(view)
+  notifyControlBarImageView(safe)
+  for (const win of followerWindows()) void applyImageViewToWindow(win, safe)
+  return true
+}
+
+/** Tela de projeção recém-aberta herda o zoom atual do popup. */
+async function applySourceImageViewToWindow(win) {
+  if (!sourceWindow || sourceWindow.isDestroyed() || !isZoomableMode()) return
+  try {
+    const view = await sourceWindow.webContents.executeJavaScript(
+      `(() => { const p = ${ZOOM_PLAYER_EXPR}; return p && p.getView ? p.getView() : null })()`,
+      true,
+    )
+    if (view && typeof view === 'object') await applyImageViewToWindow(win, normalizeImageView(view))
+  } catch {
+    // popup fechando: nada a replicar
+  }
+}
+
+/**
  * Sincroniza todas as telas de projeção com o índice da galeria no popup.
  * @param {number} index
  */
 async function syncImageMirrorsToIndex(index) {
-  if (currentProjectionMode !== 'image' || mirrorWindows.length === 0) return
+  if (currentProjectionMode !== 'image' || followerWindows().length === 0) return
   await Promise.all(
-    mirrorWindows.map((win) => goToImageIndexOnWindow(win, index)),
+    followerWindows().map((win) => goToImageIndexOnWindow(win, index)),
   )
 }
 
@@ -1362,7 +1858,7 @@ async function applyPdfIndexToWindow(win) {
     return
   }
 
-  await goToPdfIndexOnWindow(win, index)
+  if (await goToPdfIndexOnWindow(win, index)) await applySourceImageViewToWindow(win)
 }
 
 /**
@@ -1395,9 +1891,9 @@ async function goToPdfIndexOnWindow(win, index) {
  * @param {number} index
  */
 async function syncPdfMirrorsToIndex(index) {
-  if (!isPdfDocumentMode() || mirrorWindows.length === 0) return
+  if (!isPdfDocumentMode() || followerWindows().length === 0) return
   await Promise.all(
-    mirrorWindows.map((win) => goToPdfIndexOnWindow(win, index)),
+    followerWindows().map((win) => goToPdfIndexOnWindow(win, index)),
   )
 }
 
@@ -1435,7 +1931,7 @@ function stopPalcoMediaOnClose() {
 export function isExternalProjectionAlive() {
   try {
     if (sourceWindow && !sourceWindow.isDestroyed()) return true
-    for (const win of mirrorWindows) {
+    for (const win of [...mirrorWindows, ...independentWindows]) {
       if (win && !win.isDestroyed()) return true
     }
     for (const shield of siteShieldWindows) {
@@ -1446,11 +1942,15 @@ export function isExternalProjectionAlive() {
 }
 
 export function closeWebProjectionWindows() {
+  closePlayerIndependent()
   closeMirrorWindowsOnly()
   detachControlBar()
+  releaseCurrentOnlineVideo()
   const win = sourceWindow
   sourceWindow = null
   currentProjectionMode = 'video'
+  // currentDocumentIsText/currentTextScale: definidos só na abertura — esta função
+  // roda NO MEIO de openWebProjectionWindows e zerava o modo texto recém-ligado.
   lastSiteMonitorIds = []
   lastVideoMonitorIds = []
   siteControlPanelOpen = false
@@ -1575,6 +2075,7 @@ export function getVideoTargetMonitorIds() {
  * @returns {boolean}
  */
 export function setVideoTargetMonitorIds(ids) {
+  if (currentSourceAudioOnly) return false
   const primaryId = screen.getPrimaryDisplay().id
   lastVideoMonitorIds = normalizeMonitorIds(ids, primaryId)
 
@@ -1592,8 +2093,16 @@ export function setVideoTargetMonitorIds(ids) {
  * @param {unknown} open
  * @returns {boolean}
  */
-export function setSiteControlPanelOpen(open) {
+/**
+ * @param {boolean} open
+ * @param {number} [height] altura que o painel precisa (px); sem ela, a padrão.
+ */
+export function setSiteControlPanelOpen(open, height) {
   siteControlPanelOpen = Boolean(open)
+  const wanted = Number(height)
+  controlPanelHeight = siteControlPanelOpen && Number.isFinite(wanted) && wanted > 0
+    ? Math.max(SITE_CONTROL_PANEL_HEIGHT, Math.round(wanted))
+    : null
   if (sourceWindow && !sourceWindow.isDestroyed()) {
     layoutControlBar(sourceWindow)
   }
@@ -1630,23 +2139,35 @@ function resolveExtendedTargets(monitorIds) {
 }
 
 function openSiteScreensOnTargets(loadUrl, targets) {
-  closeMirrorWindowsOnly()
+  const desired = new Set(targets.map(display => display.id))
+  for (const win of [...mirrorWindows, ...siteShieldWindows]) {
+    if (!win.isDestroyed() && !desired.has(videoDisplayIds.get(win))) win.close()
+  }
+  mirrorWindows = mirrorWindows.filter(win => !win.isDestroyed() && desired.has(videoDisplayIds.get(win)))
+  siteShieldWindows = siteShieldWindows.filter(win => !win.isDestroyed() && desired.has(videoDisplayIds.get(win)))
   for (const display of targets) {
-    mirrorWindows.push(createSiteProjectionWindow(display, loadUrl))
-    siteShieldWindows.push(createSiteShieldWindow(display))
+    if (!mirrorWindows.some(win => videoDisplayIds.get(win) === display.id)) mirrorWindows.push(createSiteProjectionWindow(display, loadUrl))
+    if (!siteShieldWindows.some(win => videoDisplayIds.get(win) === display.id)) siteShieldWindows.push(createSiteShieldWindow(display))
   }
-  if (targets.length > 0) {
-    startSiteProjectionSync()
-  }
+  if (targets.length > 0) startSiteProjectionSync()
+  else stopSiteProjectionSync()
   return targets.length > 0
 }
 
+let currentSourceAudioOnly = false
 let currentSourceFilePath = ''
 let currentSourceTitle = ''
+let currentSourceYoutubeId = null
+let currentSourceCaptionsHidden = false
+/** A página do YouTube pode ter legenda; a cópia baixada só quando veio com o `.vtt`. */
+let currentSourceHasCaptions = false
 
 export async function openWebProjectionWindows(payload) {
   const input = payload ?? {}
   let effective = input
+  currentSourceYoutubeId = youtubeSourceId(input)
+  currentSourceCaptionsHidden = false
+  currentSourceHasCaptions = Boolean(currentSourceYoutubeId)
 
   currentSourceFilePath =
     typeof effective.filePath === 'string' ? effective.filePath.trim() : ''
@@ -1725,8 +2246,12 @@ export async function openWebProjectionWindows(payload) {
       : resolveSourceUrl(effective)
   if (!loadUrl) return false
 
+  currentDocumentIsText = effective.mode === 'text'
+  currentTextScale = 1
   const mode =
-    effective.mode === 'site'
+    currentDocumentIsText
+      ? 'image'
+      : effective.mode === 'site'
       ? 'site'
       : effective.mode === 'pdf'
         ? 'pdf'
@@ -1737,8 +2262,12 @@ export async function openWebProjectionWindows(payload) {
                 effective.filePaths.length > 0)
             ? 'image'
             : 'video'
-  const withScreens = effective.withScreens !== false
-  const monitorIds = Array.isArray(effective.monitorIds)
+  currentSourceAudioOnly = mode === 'video' && (new URL(loadUrl).searchParams.get('audio') === '1' || AUDIO_FILE_EXT.test(currentSourceFilePath))
+  const withScreens = !currentSourceAudioOnly && effective.withScreens !== false
+  currentImagePaths = mode === 'image' && Array.isArray(effective.filePaths)
+    ? effective.filePaths.map((entry) => String(entry))
+    : []
+  const monitorIds = !currentSourceAudioOnly && Array.isArray(effective.monitorIds)
     ? effective.monitorIds.filter(
         (id) => typeof id === 'number' && Number.isFinite(id),
       )
@@ -1766,6 +2295,7 @@ export async function openWebProjectionWindows(payload) {
   closeWebProjectionWindows()
 
   currentProjectionMode = mode
+  enabledDisplayIds = monitorIds.slice()
 
   if (mode === 'site') {
     lastSiteMonitorIds = monitorIds
@@ -1773,8 +2303,9 @@ export async function openWebProjectionWindows(payload) {
     lastVideoMonitorIds = monitorIds
   }
 
-  const title =
-    typeof effective.title === 'string' && effective.title.trim()
+  const title = currentDocumentIsText
+    ? (typeof effective.title === 'string' && effective.title.trim() ? `Texto — ${effective.title.trim()}` : 'Texto — LouvorJA - PIANO')
+    : typeof effective.title === 'string' && effective.title.trim()
       ? mode === 'site'
         ? `Site — ${effective.title.trim()}`
         : mode === 'image'
@@ -1794,13 +2325,22 @@ export async function openWebProjectionWindows(payload) {
               ? 'Apresentação — LouvorJA - PIANO'
               : SOURCE_WINDOW_TITLE
 
+  const youtubeId = mode === 'video' ? currentSourceYoutubeId : null
+  const waitsForCopy = Boolean(youtubeId && onlineVideoPlayer)
   sourceWindow =
     mode === 'site'
       ? createSiteSourceWindow(loadUrl, title)
-      : createSourceWindow(loadUrl, title)
+      : createSourceWindow(waitsForCopy ? 'about:blank' : loadUrl, title)
 
-  // Hotkey global de alternância disponível enquanto houver projeção
-  enableProjectionHotkey()
+  if (mode === 'video' || mode === 'site') sourceWindow.webContents.setAudioMuted(!currentSourceAudioOnly && getAudioOutputMode() === 'connections')
+  if (youtubeId) {
+    void startYoutubeSource(sourceWindow, youtubeId, waitsForCopy ? loadUrl : null).catch((error) => {
+      console.warn('[projection] cópia local do YouTube indisponível:', error?.code || error?.message || error)
+    })
+  }
+
+  // Audio playback has no projection or extended-screen controls.
+  if (!currentSourceAudioOnly) enableProjectionHotkey()
 
   if (!withScreens) {
     return true
@@ -1831,25 +2371,22 @@ export async function openWebProjectionWindows(payload) {
 }
 
 function openVideoScreensOnTargets(targets) {
-  closeMirrorWindowsOnly()
-  if (
-    currentProjectionMode === 'image' ||
-    currentProjectionMode === 'pdf' ||
-    currentProjectionMode === 'presentation'
-  ) {
-    const loadUrl =
-      sourceWindow && !sourceWindow.isDestroyed()
-        ? sourceWindow.webContents.getURL()
-        : ''
-    if (!loadUrl || loadUrl === 'about:blank') return false
-    for (const display of targets) {
-      mirrorWindows.push(createImageProjectionWindow(display, loadUrl))
-    }
-    return targets.length > 0
-  }
+  const isDocument = ['image', 'pdf', 'presentation'].includes(currentProjectionMode)
+  const loadUrl = isDocument && sourceWindow && !sourceWindow.isDestroyed()
+    ? sourceWindow.webContents.getURL() : ''
+  if (isDocument && (!loadUrl || loadUrl === 'about:blank')) return false
 
+  const desired = new Set(targets.map(display => display.id))
+  // Keep selected windows alive: their capture and playback must not restart.
+  for (const win of [...mirrorWindows]) {
+    if (!win.isDestroyed() && !desired.has(videoDisplayIds.get(win))) win.close()
+  }
+  mirrorWindows = mirrorWindows.filter(win => !win.isDestroyed() && desired.has(videoDisplayIds.get(win)))
   for (const display of targets) {
-    mirrorWindows.push(createMirrorWindow(display))
+    if (mirrorWindows.some(win => videoDisplayIds.get(win) === display.id)) continue
+    mirrorWindows.push(isDocument
+      ? createImageProjectionWindow(display, loadUrl)
+      : createMirrorWindow(display))
   }
   return targets.length > 0
 }
@@ -1880,6 +2417,7 @@ export function toggleSiteProjectionScreens() {
  * @returns {boolean}
  */
 export function toggleVideoProjectionScreens() {
+  if (currentSourceAudioOnly) return false
   if (
     !sourceWindow ||
     sourceWindow.isDestroyed() ||
@@ -2131,9 +2669,67 @@ export async function remoteSetVolumeSource(volume) {
   }
 }
 
+let audioOutputMode = null
+export function getAudioOutputMode() {
+  if (audioOutputMode) return audioOutputMode
+  try {
+    const saved = readWorkspaceRecord('player-audio-output')
+    audioOutputMode = ['player', 'connections', 'both'].includes(saved?.mode) ? saved.mode : 'player'
+  } catch { audioOutputMode = 'player' }
+  return audioOutputMode
+}
+export function setAudioOutputMode(mode) {
+  if (currentSourceAudioOnly) return null
+  if (!['player', 'connections', 'both'].includes(mode)) return null
+  if (!writeWorkspaceRecord('player-audio-output', { mode })) return null
+  audioOutputMode = mode
+  if (sourceWindow && !sourceWindow.isDestroyed()) sourceWindow.webContents.setAudioMuted(mode === 'connections')
+  return mode
+}
+
+/** Roda JS na barra de vídeo aberta; null quando não há barra de vídeo. */
+async function runInVideoControlBar(script) {
+  if (currentProjectionMode !== 'video') return null
+  if (!controlBarView || controlBarView.webContents.isDestroyed()) return null
+  try {
+    return await controlBarView.webContents.executeJavaScript(script, true)
+  } catch {
+    return null
+  }
+}
+
+/** Estado da barra de vídeo para o controle remoto. */
+export function getVideoControlSnapshot() {
+  return runInVideoControlBar(
+    'window.__videoControlSnapshot ? window.__videoControlSnapshot() : null',
+  )
+}
+
+/** Executa um comando remoto na barra, pelo mesmo caminho do clique. */
+export async function runVideoControlCommand(command) {
+  const payload = JSON.stringify(command ?? {})
+  const result = await runInVideoControlBar(
+    `window.__videoControlCommand ? window.__videoControlCommand(${payload}) : false`,
+  )
+  return result === true
+}
+
+/** Caption visibility follows this player session and its captured mirrors. */
+export async function remoteSetCaptionsHiddenSource(hidden) {
+  if (!sourceWindow || sourceWindow.isDestroyed() || !currentSourceYoutubeId) return null
+  try {
+    const state = await sourceWindow.webContents.executeJavaScript(youtubeCaptionsScript(hidden === true), true)
+    if (typeof state?.captionsHidden !== 'boolean') return null
+    currentSourceCaptionsHidden = state.captionsHidden
+    return state
+  } catch { return null }
+}
+
 /** FilePath/título da mídia corrente (para o popup espelhar no Palco). */
 export function getSourceMediaInfo() {
-  return { filePath: currentSourceFilePath, title: currentSourceTitle }
+  // As TVs não desenham a legenda do arquivo: com ela na tela, seguem no espelho.
+  const captionsOnScreen = currentSourceHasCaptions && !currentSourceCaptionsHidden
+  return { audioOnly: currentSourceAudioOnly, filePath: captionsOnScreen ? '' : currentSourceFilePath, title: currentSourceTitle, youtubeId: currentSourceYoutubeId, captionsHidden: currentSourceCaptionsHidden }
 }
 
 /** Estado de playback do vídeo no popup (para a barra do operador). */
@@ -2163,6 +2759,10 @@ export async function getSourcePlaybackState() {
     if (!state || typeof state !== 'object') return null
     return {
       ...state,
+      audioOnly: currentSourceAudioOnly,
+      audioOutput: currentSourceAudioOnly ? 'player' : getAudioOutputMode(),
+      canControlCaptions: currentSourceHasCaptions,
+      captionsHidden: currentSourceCaptionsHidden,
       projecting: isVideoProjectingToScreens(),
     }
   } catch {
@@ -2208,6 +2808,132 @@ export async function remoteImagePrev() {
   }
 }
 
+/**
+ * @param {import('electron').BrowserWindow} win
+ * @param {number} scale
+ */
+async function applyTextScaleToWindow(win, scale) {
+  if (win.isDestroyed()) return
+  const numericScale = Number(scale)
+  const safeScale = Number.isFinite(numericScale) ? Math.min(2, Math.max(0.5, numericScale)) : 1
+  try {
+    await win.webContents.executeJavaScript(
+      `(() => (window.__textSlide ? window.__textSlide.setScale(${safeScale}) : null))()`,
+      true,
+    )
+  } catch {
+    // ainda carregando: did-finish-load aplica
+  }
+}
+
+/** Tamanho do texto (A−/A+) no player de texto e nas telas. Null fora do modo texto. */
+export async function setTextScale(scale) {
+  if (!sourceWindow || sourceWindow.isDestroyed() || !currentDocumentIsText) return null
+  const value = Number(scale)
+  currentTextScale = Number.isFinite(value) ? Math.min(2, Math.max(0.5, Math.round(value * 10) / 10)) : 1
+  await Promise.all([sourceWindow, ...followerWindows()].map((win) => applyTextScaleToWindow(win, currentTextScale)))
+  return { scale: currentTextScale }
+}
+
+export function getTextScale() {
+  if (!sourceWindow || sourceWindow.isDestroyed() || !currentDocumentIsText) return null
+  return { scale: currentTextScale }
+}
+
+/**
+ * main.mjs liga as camadas das projeções independentes (topo e metade da tela).
+ * @param {{ add?: (win: BrowserWindow) => void, addShared?: (win: BrowserWindow, displayId: number) => void }} hooks
+ */
+export function setIndependentLayerHooks(hooks) {
+  independentLayerHooks = hooks ?? {}
+}
+
+/** Monitores ativos no "Telas" do app para este player (os demais aparecem desativados). */
+export function getIndependentEnabledDisplays() {
+  return enabledDisplayIds.slice()
+}
+
+/** Projeção independente do player aberto agora (monitores e modo) ou null. */
+export function getPlayerIndependentState() {
+  independentWindows = independentWindows.filter((win) => !win.isDestroyed())
+  for (const [displayId, win] of [...independentByDisplay]) {
+    if (win.isDestroyed()) independentByDisplay.delete(displayId)
+  }
+  if (independentByDisplay.size === 0) return null
+  return { displayIds: [...independentByDisplay.keys()], mode: independentMode }
+}
+
+export function closePlayerIndependent() {
+  const windows = independentWindows
+  independentWindows = []
+  independentByDisplay.clear()
+  for (const win of windows) {
+    if (!win.isDestroyed()) win.close()
+  }
+  return true
+}
+
+/**
+ * Janelas do player num monitor (a principal primeiro).
+ * @param {import('electron').Display} display
+ * @param {'overlay' | 'share'} layout
+ * @param {string} sourceUrl
+ * @returns {BrowserWindow[]}
+ */
+function createIndependentWindowsFor(display, layout, sourceUrl) {
+  if (currentProjectionMode === 'site') {
+    const created = [createSiteProjectionWindow(display, sourceUrl)]
+    if (layout === 'overlay') created.push(createSiteShieldWindow(display))
+    return created
+  }
+  if (['image', 'pdf', 'presentation'].includes(currentProjectionMode)) {
+    return [createImageProjectionWindow(display, sourceUrl)]
+  }
+  return [createMirrorWindow(display)]
+}
+
+/**
+ * Abre o player como projeção independente em um ou vários monitores: por
+ * cima de tudo (overlay) ou dividindo cada monitor com o que já está nele
+ * (share). Substitui a independente anterior do player. Áudio, quando houver,
+ * continua só no player do operador.
+ * @param {number | number[]} displayIds
+ * @param {'overlay' | 'share'} [mode]
+ */
+export function openPlayerIndependent(displayIds, mode = 'overlay') {
+  if (!sourceWindow || sourceWindow.isDestroyed() || currentSourceAudioOnly) return false
+  const wanted = (Array.isArray(displayIds) ? displayIds : [displayIds]).map(Number)
+  const primaryId = screen.getPrimaryDisplay().id
+  const displays = screen.getAllDisplays().filter((item) => item.id !== primaryId && wanted.includes(item.id))
+  if (displays.length === 0) return false
+  const sourceUrl = sourceWindow.webContents.getURL()
+  const needsUrl = currentProjectionMode === 'site' || ['image', 'pdf', 'presentation'].includes(currentProjectionMode)
+  if (needsUrl && (!sourceUrl || sourceUrl === 'about:blank')) return false
+  const layout = mode === 'share' ? 'share' : 'overlay'
+
+  closePlayerIndependent()
+  independentMode = layout
+  for (const display of displays) {
+    const created = createIndependentWindowsFor(display, layout, sourceUrl)
+    const [main] = created
+    independentByDisplay.set(display.id, main)
+    independentWindows.push(...created)
+    for (const win of created) {
+      independentLayerHooks.add?.(win)
+      win.on('closed', () => {
+        independentWindows = independentWindows.filter((item) => item !== win)
+        if (win !== main) return
+        // Fechou neste monitor: some só o grupo dele; os outros monitores seguem.
+        if (independentByDisplay.get(display.id) === main) independentByDisplay.delete(display.id)
+        for (const other of created) if (other !== win && !other.isDestroyed()) other.close()
+      })
+    }
+    if (layout === 'share') independentLayerHooks.addShared?.(main, display.id)
+  }
+  enableProjectionHotkey()
+  return true
+}
+
 /** Índice atual da galeria de imagens no popup. */
 export async function getImageSlideState() {
   if (!sourceWindow || sourceWindow.isDestroyed() || currentProjectionMode !== 'image') {
@@ -2223,6 +2949,7 @@ export async function getImageSlideState() {
       index: Number(state.index) || 0,
       total: Number(state.total) || 0,
       projecting: isVideoProjectingToScreens(),
+      ...(state.view && typeof state.view === 'object' ? { view: normalizeImageView(state.view) } : {}),
     }
   } catch {
     return null
@@ -2282,6 +3009,7 @@ export async function getPdfPageState() {
       index: Number(state.index) || 0,
       total: Number(state.total) || 0,
       projecting: isVideoProjectingToScreens(),
+      ...(state.view && typeof state.view === 'object' ? { view: normalizeImageView(state.view) } : {}),
     }
   } catch {
     return null
@@ -2290,16 +3018,23 @@ export async function getPdfPageState() {
 
 /** Rasteriza o slide/página atual do popup para o Palco (TV/browser).
  * Controle fica fora do sourceWindow, então a imagem contém só conteúdo. */
-export async function captureSourceFrameBase64() {
+export async function captureSourceFrameBase64(options = {}) {
   if (!sourceWindow || sourceWindow.isDestroyed()) return null
   try {
     // PDF/PPT convertido: canvas PDF.js é fonte real do slide. capturePage
     // pegava o frame cinza de loading antes do render/GPU finalizar.
+    // { full: true }: página inteira (TVs novas aplicam o zoom); sem: recorte.
+    const pngOptions = JSON.stringify({ full: options?.full === true })
     const canvasPng = await sourceWindow.webContents.executeJavaScript(
-      "window.__liturgyPdf && window.__liturgyPdf.capturePng ? window.__liturgyPdf.capturePng() : null",
+      `window.__liturgyPdf && window.__liturgyPdf.capturePng ? window.__liturgyPdf.capturePng(${pngOptions}) : null`,
       true,
     )
     if (typeof canvasPng === 'string' && canvasPng.length > 32) return canvasPng
+    // Modos pdf/presentation: o player sempre expõe __liturgyPdf. Canvas
+    // vazio = PDF.js ainda renderizando — capturePage aqui devolve o frame
+    // CINZA de loading (regressão "TV cinza" 13/10). Sem fallback: quem
+    // chama (syncPptToTvs) retenta até o canvas ficar pronto.
+    if (isPdfDocumentMode()) return null
     const image = await sourceWindow.webContents.capturePage()
     const png = image.toPNG()
     if (!png?.length) return null
@@ -2307,6 +3042,191 @@ export async function captureSourceFrameBase64() {
   } catch {
     return null
   }
+}
+
+/**
+ * Quadro do vídeo/YouTube aberto para a prévia do celular: 240 px e JPEG leve
+ * (a prévia prioriza fluidez, não qualidade),
+ * para caber várias vezes por segundo na rede sem pesar no desktop.
+ */
+export async function captureRemoteVideoFrame(maxWidth = 240, quality = 45) {
+  if (!sourceWindow || sourceWindow.isDestroyed() || (currentProjectionMode !== 'video' && !currentDocumentIsText)) {
+    return null
+  }
+  // Caminho leve: o próprio <video> desenhado num canvas pequeno, dentro da
+  // página (ou do iframe do YouTube). Não fotografa a janela inteira.
+  const script = `(() => {
+  const video = document.querySelector('video');
+  if (!video || !video.videoWidth) return null;
+  const width = Math.min(${maxWidth}, video.videoWidth);
+  const height = Math.round((width * video.videoHeight) / video.videoWidth);
+  const canvas = (window.__pianoFrameCanvas ||= document.createElement('canvas'));
+  if (canvas.width !== width) canvas.width = width;
+  if (canvas.height !== height) canvas.height = height;
+  canvas.getContext('2d').drawImage(video, 0, 0, width, height);
+  try {
+    return canvas.toDataURL('image/jpeg', ${quality / 100});
+  } catch (error) {
+    // Diz de onde vem o vídeo bloqueado, para o diagnóstico no terminal.
+    throw new Error(error.name + ' em ' + location.origin + ' <- ' + String(video.currentSrc).slice(0, 48));
+  }
+})()`
+  try {
+    // Quadro que não responde (iframe de outra origem carregando) não pode
+    // segurar a prévia: limite de tempo, e ele é pulado nas próximas capturas.
+    // Página carregando: executeJavaScript só responderia no fim da carga.
+    if (sourceWindow.webContents.isLoading?.()) return null
+    const skipped = (captureRemoteVideoFrame.skipped ||= new WeakMap())
+    // Texto não contém <video>: captura a página renderizada, com sua formatação.
+    for (const frame of currentDocumentIsText ? [] : sourceWindow.webContents.mainFrame?.framesInSubtree ?? []) {
+      // Quadro que não respondeu fica de fora por 3 s e depois é tentado de novo.
+      if (Date.now() - (skipped.get(frame) ?? -Infinity) < 3000) continue
+      try {
+        let timer
+        const dataUrl = await Promise.race([
+          frame.executeJavaScript(script, true),
+          new Promise((resolve) => {
+            timer = setTimeout(() => {
+              skipped.set(frame, Date.now())
+              resolve(null)
+            }, 300)
+          }),
+        ]).finally(() => clearTimeout(timer))
+        if (typeof dataUrl === 'string' && dataUrl.startsWith('data:image/jpeg;base64,')) {
+          logRemoteFramePath('elemento de vídeo')
+          return dataUrl.slice('data:image/jpeg;base64,'.length)
+        }
+      } catch (error) {
+        // canvas bloqueado (vídeo de outra origem) ou quadro saindo: tenta o próximo
+        const reason = String(error?.message ?? error)
+        if (captureRemoteVideoFrame.lastElementError !== reason) {
+          captureRemoteVideoFrame.lastElementError = reason
+          console.info(`[remote] prévia do vídeo: elemento indisponível (${reason})`)
+        }
+      }
+    }
+    // Sem acesso ao <video>: foto da janela, reduzida. É a reserva pesada,
+    // então sai no máximo a cada 400 ms mesmo com o envio mais rápido.
+    if (Date.now() - (captureRemoteVideoFrame.lastWindowShot ?? -Infinity) < 400) return null
+    captureRemoteVideoFrame.lastWindowShot = Date.now()
+    logRemoteFramePath('foto da janela')
+    const image = await sourceWindow.webContents.capturePage()
+    if (!image || image.isEmpty()) {
+      logRemoteFramePath('nenhuma (janela sem imagem)')
+      return null
+    }
+    const { width } = image.getSize()
+    const scaled = width > maxWidth ? image.resize({ width: maxWidth, quality: 'low' }) : image
+    return scaled.toJPEG(quality).toString('base64')
+  } catch (error) {
+    logRemoteFramePath(`nenhuma (erro: ${error?.message ?? error})`)
+    return null
+  }
+}
+
+/** Diagnóstico: registra uma vez (e a cada troca) por onde a prévia do vídeo está saindo. */
+function logRemoteFramePath(path) {
+  if (logRemoteFramePath.last === path) return
+  logRemoteFramePath.last = path
+  console.info(`[remote] prévia do vídeo via ${path}`)
+}
+
+/** Lado maior dos quadros enviados ao Palco (mesmo teto do PNG do PDF). */
+const PALCO_FRAME_MAX_SIDE = 3840
+
+/**
+ * Quadro da imagem atual para as TVs do palco e transmissões por navegador,
+ * lido do arquivo (nítido, sem depender da janela). `{ crop: true }`: só a
+ * parte visível com o zoom atual (TVs antigas); sem opção: a imagem inteira
+ * (TVs novas aplicam o zoom sozinhas).
+ * @param {{ crop?: boolean }} [options]
+ * @returns {Promise<{ mime: string, data: string } | null>}
+ */
+export async function captureImageFrame(options = {}) {
+  if (!sourceWindow || sourceWindow.isDestroyed() || currentProjectionMode !== 'image' || currentDocumentIsText) return null
+  const state = await getImageSlideState()
+  const filePath = state ? currentImagePaths[state.index] : null
+  if (!filePath) return null
+  try {
+    let image = nativeImage.createFromPath(filePath)
+    if (image.isEmpty()) return null
+    if (options.crop === true) {
+      const region = await sourceWindow.webContents.executeJavaScript(
+        `(() => (window.__liturgyGallery && window.__liturgyGallery.getCropRegion ? window.__liturgyGallery.getCropRegion() : null))()`,
+        true,
+      )
+      const { width, height } = image.getSize()
+      if (region && typeof region === 'object') {
+        const x = Math.max(0, Math.min(width - 1, Math.floor(Number(region.x) || 0)))
+        const y = Math.max(0, Math.min(height - 1, Math.floor(Number(region.y) || 0)))
+        const w = Math.max(1, Math.min(width - x, Math.floor(Number(region.width) || width)))
+        const h = Math.max(1, Math.min(height - y, Math.floor(Number(region.height) || height)))
+        image = image.crop({ x, y, width: w, height: h })
+      }
+    }
+    const { width, height } = image.getSize()
+    const longSide = Math.max(width, height)
+    if (longSide > PALCO_FRAME_MAX_SIDE) {
+      const ratio = PALCO_FRAME_MAX_SIDE / longSide
+      image = image.resize({ width: Math.round(width * ratio), height: Math.round(height * ratio), quality: 'good' })
+    }
+    const data = image.toJPEG(90).toString('base64')
+    return data ? { mime: 'image/jpeg', data } : null
+  } catch {
+    return null
+  }
+}
+
+/** Miniatura do slide atual para o controle remoto (celular): JPEG pequeno. */
+export async function captureSourcePreviewJpeg(maxWidth = 480) {
+  // Imagem: lê o arquivo atual. Não depende da janela já ter desenhado a troca.
+  if (currentProjectionMode === 'image' && currentImagePaths.length > 0) {
+    const state = await getImageSlideState()
+    const path = state ? currentImagePaths[state.index] : null
+    if (path) return filePreviewJpeg(path, maxWidth)
+  }
+  // PDF/PPT: o slide só existe desenhado na janela.
+  const frame = await captureSourceFrameBase64()
+  if (!frame) return null
+  return jpegFromImage(nativeImage.createFromBuffer(Buffer.from(frame, 'base64')), maxWidth)
+}
+
+/**
+ * Miniaturas de todas as imagens da galeria (até 30), para o celular trocar a
+ * prévia na hora do toque. A chave muda quando a galeria muda.
+ */
+export async function captureGalleryPreviewsJpeg(maxWidth = 480, limit = 30) {
+  if (isPdfDocumentMode() && sourceWindow && !sourceWindow.isDestroyed()) {
+    return sourceWindow.webContents.executeJavaScript(
+      `window.__liturgyPdf?.captureGalleryPreviews?.(${Number(maxWidth) || 480}) ?? null`, true,
+    )
+  }
+  if (currentProjectionMode !== 'image' || currentImagePaths.length === 0) return null
+  const paths = currentImagePaths.slice(0, limit)
+  let hash = 5381
+  for (const char of paths.join('|')) hash = ((hash * 33) ^ char.charCodeAt(0)) >>> 0
+  return {
+    key: `${paths.length}-${hash.toString(36)}`,
+    previews: paths.map((path) => filePreviewJpeg(path, maxWidth) ?? ''),
+  }
+}
+
+/** Miniatura de um arquivo de imagem, guardada para não reprocessar. */
+function filePreviewJpeg(path, maxWidth) {
+  const key = `${path}@${maxWidth}`
+  if (!previewCache.has(key)) {
+    if (previewCache.size > 60) previewCache.clear()
+    previewCache.set(key, jpegFromImage(nativeImage.createFromPath(path), maxWidth))
+  }
+  return previewCache.get(key) ?? null
+}
+
+function jpegFromImage(image, maxWidth) {
+  if (image.isEmpty()) return null
+  const small = image.getSize().width > maxWidth
+    ? image.resize({ width: maxWidth, quality: 'good' })
+    : image
+  return small.toJPEG(70).toString('base64')
 }
 
 /** Avança para o próximo slide da apresentação no popup. */
@@ -2332,6 +3252,7 @@ export async function getSourceNavigationState() {
   try {
     const contents = sourceWindow.webContents
     return {
+      audioOutput: getAudioOutputMode(),
       canGoBack: contents.canGoBack(),
       canGoForward: contents.canGoForward(),
       projecting: isSiteProjectingToScreens(),
@@ -2370,7 +3291,56 @@ export function remoteReloadSource() {
   return true
 }
 
+/** Celular navegou no navegador dele: o site projetado vai para o mesmo endereço. */
+export function remoteNavigateSource(url) {
+  if (!sourceWindow || sourceWindow.isDestroyed() || currentProjectionMode !== 'site') {
+    return false
+  }
+  let parsed
+  try {
+    parsed = new URL(String(url))
+  } catch {
+    return false
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false
+  const contents = sourceWindow.webContents
+  if (contents.getURL() !== parsed.href) void contents.loadURL(parsed.href)
+  return true
+}
+
+/**
+ * Celular rolou o site: a janela de origem rola na mesma proporção (as telas
+ * têm alturas diferentes) e o espelho das projeções acompanha pela origem.
+ */
+export function remoteScrollSource(value) {
+  if (!sourceWindow || sourceWindow.isDestroyed() || currentProjectionMode !== 'site') {
+    return false
+  }
+  if (typeof value !== 'number' || !Number.isFinite(value)) return false
+  const ratio = Math.min(1, Math.max(0, value))
+  void sourceWindow.webContents.executeJavaScript(
+    `(() => {
+  const ratio = ${ratio};
+  const el = document.scrollingElement || document.documentElement;
+  const max = Math.max(0, el.scrollHeight - window.innerHeight);
+  window.scrollTo(0, Math.round(max * ratio));
+  return true;
+})()`,
+    true,
+  )
+  return true
+}
+
 export function registerProjectionCapturePermissions() {
+  // Grant only the Piano control bar access to this player, never arbitrary
+  // websites. Preserve local playback so the audio destination is explicit.
+  session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
+    if (currentSourceAudioOnly || !sourceWindow || sourceWindow.isDestroyed() || !controlBarView || controlBarView.webContents.isDestroyed()) { callback({}); return }
+    const trusted = controlBarView.webContents.mainFrame
+    if (!request.frame || request.frame.processId !== trusted.processId || request.frame.routingId !== trusted.routingId) { callback({}); return }
+    callback({ video: sourceWindow.webContents.mainFrame,
+      ...(request.audioRequested ? { audio: sourceWindow.webContents.mainFrame, enableLocalEcho: true } : {}) })
+  })
   session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
     if (
       permission === 'media' ||

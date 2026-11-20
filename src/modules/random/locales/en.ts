@@ -48,6 +48,9 @@ export default {
     textMain: 'Main Text',
     textMainHint: 'Formatting of drawn names',
     fontSize: 'Font size',
+    drawnSize: 'Drawn list font size',
+    decreaseDrawn: 'Shrink drawn list',
+    increaseDrawn: 'Enlarge drawn list',
     textTransform: 'Text Transform',
     transformNone: 'Aa (Normal)',
     transformUpper: 'AA (Uppercase)',
@@ -70,5 +73,7 @@ export default {
     decreaseFont: 'Decrease font',
     increaseFont: 'Increase font',
     placeholderDisplay: '- - - -',
+    chromeDragHint: 'Drag to move · double-click to return to the corner',
+    openRandom: 'Open the Draw',
   },
 }

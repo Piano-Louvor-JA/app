@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { obsDetecting } from '@modules/settings/services/obs-detection'
 import { useI18n } from 'vue-i18n'
 
 defineProps<{
@@ -21,12 +22,15 @@ function onClick(projecting: boolean) {
 <template>
   <button
     type="button"
+    :disabled="obsDetecting"
+    :aria-busy="obsDetecting"
     class="random-project-fab"
     :class="{ 'random-project-fab--active': projecting }"
     :aria-label="projecting ? t('random.clearProjection') : t('random.project')"
     :title="projecting ? t('random.clearProjection') : t('random.project')"
     @click="onClick(projecting)"
   >
+    <span v-if="obsDetecting" class="obs-detection-status" role="status">{{ t('obsOutputs.detecting') }}</span>
     <i
       class="ti"
       :class="projecting ? 'ti-player-stop' : 'ti-presentation'"
@@ -36,12 +40,10 @@ function onClick(projecting: boolean) {
 </template>
 
 <style scoped lang="scss">
+.obs-detection-status { position: absolute; right: 0; bottom: calc(100% + 0.4rem); padding: 0.4rem 0.6rem; border-radius: 0.4rem; white-space: nowrap; background: var(--ds-color-surface, #222); color: var(--ds-color-on-surface, #fff); font-size: 0.75rem; font-weight: 500; }
 .random-project-fab {
-  position: fixed;
-  left: 50%;
-  right: auto;
-  bottom: calc(var(--ds-dock-height, 5.5rem) + 0.85rem);
-  z-index: 35;
+  flex-shrink: 0;
+  pointer-events: auto;
   width: 4rem;
   height: 4rem;
   border: 4px solid color-mix(in srgb, #fff 20%, transparent);
@@ -53,7 +55,6 @@ function onClick(projecting: boolean) {
   color: var(--ds-color-on-primary);
   box-shadow: 0 8px 30px color-mix(in srgb, var(--ds-color-primary) 40%, transparent);
   cursor: pointer;
-  transform: translateX(-50%);
   transition:
     transform 160ms ease,
     opacity 160ms ease,
@@ -71,17 +72,16 @@ function onClick(projecting: boolean) {
   }
 
   &:hover {
-    transform: translateX(-50%) scale(1.08);
+    transform: scale(1.08);
   }
 
   &:active {
-    transform: translateX(-50%) scale(0.95);
+    transform: scale(0.95);
   }
 }
 
 @media (max-width: 1280px) {
   .random-project-fab {
-    bottom: calc(var(--ds-dock-height, 5.5rem) + 0.55rem);
     width: 3.25rem;
     height: 3.25rem;
     border-width: 3px;

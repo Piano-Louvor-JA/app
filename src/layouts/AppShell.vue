@@ -1,28 +1,45 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, provide, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import { usePageTransition } from '@design-system/composables'
-import { DockFooter, GradientBackground } from '@design-system/index'
-import type { DockNavItem } from '@design-system/types/navigation'
+import ConnectedDevicesButton from '@shared/components/ConnectedDevicesButton.vue'
+import { DockFooter, GradientBackground, HistoryNav, MinimizedPagesBar } from '@design-system/index'
+import type { DockNavItem, HistoryNavDot, MinimizedBarItem } from '@design-system/types/navigation'
+import AuthAccountDialog from '@modules/auth/components/AuthAccountDialog.vue'
+import { useAuth, setNotify } from '@modules/auth/composables/useAuth'
 import { useBibleStore } from '@modules/bible/stores/useBibleStore'
+import BibleChrome from '@modules/bible/components/BibleChrome.vue'
 import BibleInAppProjection from '@modules/bible/components/BibleInAppProjection.vue'
+import ClockChrome from '@modules/clock/components/ClockChrome.vue'
 import ClockProjectionView from '@modules/clock/views/ClockProjectionView.vue'
 import { useClockStore } from '@modules/clock/stores/useClockStore'
+import CountdownChrome from '@modules/countdown/components/CountdownChrome.vue'
 import CountdownProjectionView from '@modules/countdown/views/CountdownProjectionView.vue'
+import RandomChrome from '@modules/random/components/RandomChrome.vue'
 import RandomProjectionView from '@modules/random/views/RandomProjectionView.vue'
+import TimerChrome from '@modules/timer/components/TimerChrome.vue'
 import TimerProjectionView from '@modules/timer/views/TimerProjectionView.vue'
 import InAppProjectionOverlay from '@shared/components/InAppProjectionOverlay.vue'
 import { useCountdownStore } from '@modules/countdown/stores/useCountdownStore'
+import SabbathSchoolChrome from '@modules/sabbath-school/components/SabbathSchoolChrome.vue'
+import { useSabbathSchoolAlertEngine } from '@modules/sabbath-school/composables/useSabbathSchoolAlertEngine'
+import { useSabbathSchoolStore } from '@modules/sabbath-school/stores/useSabbathSchoolStore'
 import { useLiturgyStore } from '@modules/liturgy/stores/useLiturgyStore'
+import LiturgyAnnotationStage from '@modules/liturgy/components/LiturgyAnnotationStage.vue'
+import {
+  stopAnnotationProjection,
+  useAnnotationProjection,
+} from '@modules/liturgy/services/annotation-projection'
 import MediaChrome from '@modules/media/components/MediaChrome.vue'
 import { useMediaPlayer } from '@modules/media/composables/useMediaPlayer'
 import { useRandomStore } from '@modules/random/stores/useRandomStore'
 import { useTimerStore } from '@modules/timer/stores/useTimerStore'
 import MonitorTargetSelect from '@shared/components/MonitorTargetSelect.vue'
 import UiZoomControls from '@shared/components/UiZoomControls.vue'
+import DownloadIndicator from '@shared/components/DownloadIndicator.vue'
 import {
   closeProjectionModule,
   isProjectionModuleOpen,
@@ -31,6 +48,17 @@ import {
 import { subscribeDisplaysChanged } from '@modules/settings/services/display-service'
 import { useProjectionStore } from '@modules/settings/stores/useProjectionStore'
 import { mainNavRoutes } from '@shared/constants/navigation'
+import { useNavigationHistory } from '@shared/composables/useNavigationHistory'
+import { useHistoryNavShortcuts } from '@shared/composables/useHistoryNavShortcuts'
+import { describeHistoryEntry } from '@shared/services/navigation-history-label'
+import { useMinimizedPagesStore } from '@shared/stores/useMinimizedPagesStore'
+import {
+  requestInstantPageTransition,
+  usePageTransitionOverride,
+} from '@shared/composables/useInstantPageTransition'
+import { findMinimizedItemRect, playGenie, startGenieGhost } from '@shared/services/genie-animation'
+import { previewArea } from '@shared/services/page-preview'
+import { VIEW_SCROLL_MEMORY, useViewScrollMemory } from '@shared/composables/useViewScrollMemory'
 import logoUrl from '@assets/brand/logo-louvor-ja.svg'
 import CodenameLogo from '@assets/brand/CodenameLogo.vue'
 import { APP_VERSION } from '@shared/constants/app'
@@ -39,6 +67,16 @@ const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 const { transitionName } = usePageTransition()
+// minimizar/reabrir pedem troca de página sem fade: o efeito gênio faz o papel
+const { name: pageTransitionName, settle: settlePageTransition } =
+  usePageTransitionOverride(transitionName)
+
+// Voltar a uma tela restaura a rolagem de onde o operador parou (sessão).
+const mainEl = ref<HTMLElement | null>(null)
+const viewScrollMemory = useViewScrollMemory(mainEl)
+const restoreViewScroll = viewScrollMemory.restore
+// páginas minimizáveis leem/semeiam a rolagem do <main> por aqui
+provide(VIEW_SCROLL_MEMORY, viewScrollMemory)
 
 const {
   hasSession: hasMediaSession,
@@ -67,16 +105,25 @@ const {
 } = storeToRefs(timerStore)
 
 const countdownStore = useCountdownStore()
+useSabbathSchoolAlertEngine()
 const {
   isProjecting: isCountdownProjecting,
   inAppPreview: countdownInAppPreview,
 } = storeToRefs(countdownStore)
+
+const sabbathSchoolStore = useSabbathSchoolStore()
+const {
+  isProjecting: isSabbathSchoolProjecting,
+  inAppPreview: sabbathSchoolInAppPreview,
+} = storeToRefs(sabbathSchoolStore)
 
 const clockStore = useClockStore()
 const {
   isProjecting: isClockProjecting,
   inAppPreview: clockInAppPreview,
 } = storeToRefs(clockStore)
+
+const { inAppPreview: annotationInAppPreview } = useAnnotationProjection()
 
 const liturgyStore = useLiturgyStore()
 const {
@@ -97,8 +144,14 @@ const LITURGY_PROJECTABLE = new Set([
   'presentation',
 ])
 
-/** Login Google — reativar quando o fluxo de autenticação existir */
-const showAccountButton = false
+/** web#174: conta LouvorJA no header — mesmo padrão do web (AuthAccountDialog). */
+const showAccountButton = true
+const authDialogOpen = ref(false)
+const { isLoggedIn } = useAuth()
+setNotify((message: string, isError?: boolean) => {
+  // snackbar do app — usa o mesmo canal de avisos das janelas de projeção
+  window.dispatchEvent(new CustomEvent('app-notify', { detail: { message, isError } }))
+})
 
 const hasBibleContent = computed(
   () =>
@@ -109,6 +162,7 @@ const hasBibleContent = computed(
 const isOnRandomRoute = computed(() => route.name === 'utilities-random')
 const isOnTimerRoute = computed(() => route.name === 'utilities-timer')
 const isOnCountdownRoute = computed(() => route.name === 'utilities-countdown')
+const isOnSabbathSchoolRoute = computed(() => route.name === 'utilities-sabbath-school')
 const isOnClockRoute = computed(() => route.name === 'utilities-clock')
 const isOnLiturgyRoute = computed(() => route.meta.navKey === 'liturgy')
 
@@ -134,6 +188,7 @@ const isProjecting = computed(
     isRandomProjecting.value ||
     isTimerProjecting.value ||
     isCountdownProjecting.value ||
+    isSabbathSchoolProjecting.value ||
     isClockProjecting.value ||
     isLiturgyProjecting.value,
 )
@@ -160,6 +215,7 @@ async function onCloseAllScreens() {
   if (isRandomProjecting.value) randomStore.clearProjection()
   if (isTimerProjecting.value) timerStore.clearProjection()
   if (isCountdownProjecting.value) countdownStore.clearProjection()
+  if (isSabbathSchoolProjecting.value) sabbathSchoolStore.clearProjection()
   if (isClockProjecting.value) clockStore.clearProjection()
   if (isLiturgyProjecting.value) await liturgyStore.clearWebProjection()
   closeProjectionModule()
@@ -182,6 +238,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+/* v8 ignore next -- invariante: onMounted seta o poll timer incondicionalmente; no unmount ele nunca é null */
   if (screensPollTimer) clearInterval(screensPollTimer)
   unsubscribeDisplaysChanged?.()
 })
@@ -199,6 +256,8 @@ const hasProjectableContent = computed(
     isTimerProjecting.value ||
     isOnCountdownRoute.value ||
     isCountdownProjecting.value ||
+    isOnSabbathSchoolRoute.value ||
+    isSabbathSchoolProjecting.value ||
     isOnClockRoute.value ||
     isClockProjecting.value ||
     isLiturgyProjecting.value ||
@@ -225,14 +284,14 @@ const projectAriaLabel = computed(() => {
   }
   if (isLiturgyProjecting.value) return t('liturgy.actions.stopSiteProjection')
   if (isClockProjecting.value) return t('clock.clearProjection')
-  if (isCountdownProjecting.value) return t('countdown.clearProjection')
+  if (isCountdownProjecting.value || isSabbathSchoolProjecting.value) return t('countdown.clearProjection')
   if (isTimerProjecting.value) return t('timer.clearProjection')
   if (isRandomProjecting.value) return t('random.clearProjection')
   if (isBibleProjecting.value) return t('bible.clearProjection')
   if (isMediaProjecting.value) return t('media.clearProjection')
   if (isOnLiturgyRoute.value) return t('liturgy.actions.project')
   if (isOnClockRoute.value) return t('clock.project')
-  if (isOnCountdownRoute.value) return t('countdown.project')
+  if (isOnCountdownRoute.value || isOnSabbathSchoolRoute.value) return t('countdown.project')
   if (isOnTimerRoute.value) return t('timer.project')
   if (isOnRandomRoute.value) return t('random.project')
   if (route.meta.navKey === 'bible') return t('bible.project')
@@ -262,6 +321,10 @@ async function onToggleProjection() {
     await countdownStore.clearProjection()
     return
   }
+  if (isSabbathSchoolProjecting.value) {
+    await sabbathSchoolStore.clearProjection()
+    return
+  }
   if (isClockProjecting.value) {
     await clockStore.clearProjection()
     return
@@ -274,6 +337,7 @@ async function onToggleProjection() {
   // Preferência: módulo atual; senão o que tiver conteúdo.
   if (isOnLiturgyRoute.value && hasLiturgyProjectableSelection.value) {
     const index = selectedItemIndex.value
+/* v8 ignore next -- invariante: selectedItemIndex null implica selectedItem null implica hasLiturgyProjectableSelection false; este if só avalia com index != null */
     if (index != null) await liturgyStore.playItemOnScreens(index)
     return
   }
@@ -283,6 +347,10 @@ async function onToggleProjection() {
   }
   if (isOnCountdownRoute.value) {
     await countdownStore.toggleProjection()
+    return
+  }
+  if (isOnSabbathSchoolRoute.value) {
+    await sabbathSchoolStore.toggleProjection()
     return
   }
   if (isOnTimerRoute.value) {
@@ -301,6 +369,7 @@ async function onToggleProjection() {
     await toggleMediaProjection()
     return
   }
+/* v8 ignore next -- invariante: rota bible sem conteúdo não satisfaz canToggleProjection (hasProjectableContent não inclui a rota), então onToggleProjection retorna antes deste if */
   if (hasBibleContent.value) {
     await bibleStore.toggleProjection()
   }
@@ -322,6 +391,115 @@ const navItems = computed<DockNavItem[]>(() =>
   })),
 )
 
+const history = useNavigationHistory()
+const {
+  entries: historyEntries,
+  dots: historyIndexes,
+  canGoBack: canGoBackInHistory,
+  canGoForward: canGoForwardInHistory,
+} = history
+
+useHistoryNavShortcuts({ back: history.back, forward: history.forward })
+
+const minimizedPages = useMinimizedPagesStore()
+
+const minimizedItems = computed<MinimizedBarItem[]>(() =>
+  minimizedPages.items.map((page) => ({
+    key: page.fullPath,
+    title: page.title,
+    icon: page.icon,
+    summary: page.summary,
+    preview: page.preview,
+    closeLabel: t('minimize.close', { title: page.title }),
+  })),
+)
+
+/** De onde a página reaberta "sai" (item da barra) para o efeito gênio. */
+let genieFrom: DOMRect | null = null
+let genieTimer: ReturnType<typeof setTimeout> | null = null
+
+/** Fade curto da imagem do efeito ao sair, com a página real já pintada por baixo. */
+const GHOST_FADE_MS = 120
+
+/** Se a página nova não entrar (navegação cancelada, mesma tela), libera assim mesmo. */
+const VIEW_ENTER_LIMIT_MS = 1000
+
+function nextFrame(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => resolve()))
+}
+
+/** Resolve quando a próxima página terminar de entrar (ou no limite de tempo). */
+let viewEntered: (() => void) | null = null
+function waitViewEnter(): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(done, VIEW_ENTER_LIMIT_MS)
+    function done() {
+      clearTimeout(timer)
+      if (viewEntered === done) viewEntered = null
+      resolve()
+    }
+    viewEntered = done
+  })
+}
+
+/** Reabre uma página minimizada como estava (rolagem + retrato). */
+async function onOpenMinimized(fullPath: string) {
+  // já está aberta (item em destaque): nada a fazer
+  if (route.fullPath === fullPath) return
+  // de onde a página "sai" no efeito de reabrir
+  const from = findMinimizedItemRect(fullPath)
+  const page = minimizedPages.reopen(fullPath)
+  if (!page) return
+  viewScrollMemory.seed(fullPath, page.scroll)
+
+  // com miniatura: a IMAGEM cresce do item até a tela (barato, no compositor)
+  // e, AO MESMO TEMPO, a página real monta por baixo, transparente; quando as
+  // duas coisas acabam, a página aparece e a imagem esmaece rápido
+  const main = mainEl.value
+  const ghost = startGenieGhost(page.preview, previewArea(main), from, 'restore')
+  if (!ghost) {
+    // sem miniatura: a própria página cresce a partir do item ao entrar
+    genieFrom = from
+    // se a tela não for recriada (mesma página por trás), o efeito não fica pendurado
+    if (genieTimer) clearTimeout(genieTimer)
+    genieTimer = setTimeout(() => {
+      genieFrom = null
+    }, 2000)
+  }
+  const entered = ghost ? waitViewEnter() : null
+  if (ghost && main) main.style.opacity = '0'
+  requestInstantPageTransition()
+  await router.push(fullPath)
+  if (!ghost) return
+  await Promise.all([ghost.finished, entered])
+  // um quadro com a página já pintada por baixo antes de trocar
+  await nextFrame()
+  if (main) main.style.opacity = ''
+  void ghost.remove(GHOST_FADE_MS)
+}
+
+/** Página nova terminou de entrar: libera a transição e restaura a rolagem. */
+function onViewAfterEnter() {
+  viewEntered?.()
+  settlePageTransition()
+  restoreViewScroll(route.fullPath)
+}
+
+/** Página nova entrando: se veio da barra, cresce a partir do item. */
+function onViewEnter(el: Element) {
+  if (!genieFrom) return
+  const from = genieFrom
+  genieFrom = null
+  void playGenie(el, from, 'restore')
+}
+
+const historyDots = computed<HistoryNavDot[]>(() =>
+  historyIndexes.value.map((dot) => ({
+    ...dot,
+    label: describeHistoryEntry(historyEntries.value[dot.index], t),
+  })),
+)
+
 function onNavigate(key: string) {
   const item = mainNavRoutes.find((nav) => nav.key === key)
   if (item) {
@@ -329,14 +507,19 @@ function onNavigate(key: string) {
   }
 }
 
+/* v8 ignore start -- :key avalia no mount, mas o remap v8 não casa estes ranges */
 function viewKey(viewRoute: typeof route) {
   const navKey = viewRoute.meta.navKey
   return typeof navKey === 'string' ? navKey : String(viewRoute.name ?? viewRoute.path)
 }
+/* v8 ignore stop */
 </script>
 
 <template>
-  <GradientBackground class="app-shell">
+  <GradientBackground
+    class="app-shell"
+    :class="{ 'app-shell--has-minimized': minimizedPages.hasItems }"
+  >
     <header class="app-shell__header">
       <div class="app-shell__brand-group" :aria-label="t('app.name')">
         <img
@@ -353,6 +536,7 @@ function viewKey(viewRoute: typeof route) {
         </span>
       </div>
       <div class="app-shell__header-end">
+        <DownloadIndicator />
         <UiZoomControls />
         <div class="app-shell__projection">
           <MonitorTargetSelect
@@ -393,20 +577,34 @@ function viewKey(viewRoute: typeof route) {
           <CodenameLogo class="app-shell__codename" />
           <span class="app-shell__version" aria-hidden="true">{{ APP_VERSION }}</span>
         </div>
+        <!-- v8 ignore start -- login Google desativado; botão nunca renderiza -->
         <button
           v-if="showAccountButton"
           type="button"
           class="app-shell__account"
-          :aria-label="t('app.name')"
+          :aria-label="t('auth.title')"
+          :title="t('auth.title')"
+          @click="authDialogOpen = true"
         >
-          <i class="ti ti-user-circle" aria-hidden="true" />
+          <i
+            class="ti"
+            :class="isLoggedIn ? 'ti-user-check' : 'ti-user-circle'"
+            aria-hidden="true"
+          />
         </button>
+        <AuthAccountDialog v-model="authDialogOpen" />
+        <!-- v8 ignore stop -->
       </div>
     </header>
 
-    <main class="app-shell__main">
+    <main ref="mainEl" class="app-shell__main">
       <RouterView v-slot="{ Component, route: viewRoute }">
-        <Transition :name="transitionName" mode="out-in">
+        <Transition
+          :name="pageTransitionName"
+          mode="out-in"
+          @enter="onViewEnter"
+          @after-enter="onViewAfterEnter"
+        >
           <component
             :is="Component"
             :key="viewKey(viewRoute)"
@@ -415,7 +613,16 @@ function viewKey(viewRoute: typeof route) {
       </RouterView>
     </main>
 
-    <MediaChrome />
+    <Teleport to="body">
+      <MediaChrome />
+    </Teleport>
+
+    <BibleChrome />
+    <CountdownChrome />
+    <SabbathSchoolChrome />
+    <TimerChrome />
+    <ClockChrome />
+    <RandomChrome />
 
     <BibleInAppProjection
       v-if="bibleInAppPreview"
@@ -445,12 +652,12 @@ function viewKey(viewRoute: typeof route) {
     </InAppProjectionOverlay>
 
     <InAppProjectionOverlay
-      v-if="countdownInAppPreview"
+      v-if="countdownInAppPreview || sabbathSchoolInAppPreview"
       scope="countdown"
       :label="t('countdown.inAppProjection')"
       :close-label="t('countdown.close')"
       :hint="t('countdown.projectionHotkeyHint')"
-      @close="countdownStore.clearProjection"
+      @close="sabbathSchoolInAppPreview ? sabbathSchoolStore.clearProjection() : countdownStore.clearProjection()"
     >
       <CountdownProjectionView embedded />
     </InAppProjectionOverlay>
@@ -466,11 +673,50 @@ function viewKey(viewRoute: typeof route) {
       <ClockProjectionView embedded />
     </InAppProjectionOverlay>
 
+    <InAppProjectionOverlay
+      v-if="annotationInAppPreview"
+      scope="liturgy"
+      :label="t('liturgy.annotationProjection.inAppProjection')"
+      :close-label="t('liturgy.annotationProjection.close')"
+      :hint="t('liturgy.annotationProjection.hotkeyHint')"
+      @close="stopAnnotationProjection"
+    >
+      <LiturgyAnnotationStage embedded />
+    </InAppProjectionOverlay>
+
+    <div class="app-shell__history">
+      <HistoryNav
+        :dots="historyDots"
+        :can-go-back="canGoBackInHistory"
+        :can-go-forward="canGoForwardInHistory"
+        :nav-label="t('nav.history.label')"
+        :back-label="t('nav.history.back')"
+        :forward-label="t('nav.history.forward')"
+        @back="history.back"
+        @forward="history.forward"
+        @go="history.goTo"
+      />
+    </div>
+
+    <div v-if="minimizedPages.hasItems" class="app-shell__minimized">
+      <MinimizedPagesBar
+        :items="minimizedItems"
+        :current-key="route.fullPath"
+        :nav-label="t('minimize.bar')"
+        @open="(fullPath: string) => void onOpenMinimized(fullPath)"
+        @close="minimizedPages.close"
+        @reorder="minimizedPages.move"
+      />
+    </div>
+
     <DockFooter
       :items="navItems"
       :active-key="activeKey"
       @select="onNavigate"
     />
+
+    <!-- Aparelhos ligados a este desktop (remoto, pregador, monitores). -->
+    <ConnectedDevicesButton />
   </GradientBackground>
 </template>
 
@@ -639,6 +885,46 @@ function viewKey(viewRoute: typeof route) {
   }
 }
 
+/* Faixa voltar/avançar + pontos: logo acima do dock, abaixo das projeções in-app. */
+/* Com páginas minimizadas, a barra entra entre a faixa de histórico e o dock. */
+.app-shell {
+  --app-shell-minimized-offset: 0px;
+}
+
+.app-shell--has-minimized {
+  --app-shell-minimized-offset: var(--ds-minimized-bar-height);
+}
+
+.app-shell__minimized {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: var(--ds-dock-height);
+  z-index: 45;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+
+  > * {
+    pointer-events: auto;
+  }
+}
+
+.app-shell__history {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--ds-dock-height) + var(--app-shell-minimized-offset));
+  z-index: 45;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+
+  > * {
+    pointer-events: auto;
+  }
+}
+
 .app-shell__main {
   position: relative;
   z-index: 1;
@@ -647,7 +933,9 @@ function viewKey(viewRoute: typeof route) {
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
-  padding-bottom: var(--ds-dock-height);
+  padding-bottom: calc(
+    var(--ds-dock-height) + var(--ds-history-nav-height) + var(--app-shell-minimized-offset)
+  );
 
   /* View ativa (RouterView não cria wrapper) preenche a área útil. */
   > * {

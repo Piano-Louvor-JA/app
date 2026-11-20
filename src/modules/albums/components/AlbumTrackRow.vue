@@ -9,6 +9,7 @@ const props = defineProps<{
   track: AlbumTrack
   collectionName?: string
   artworkUrl?: string | null
+  selected?: boolean
   busy?: boolean
 }>()
 
@@ -18,6 +19,7 @@ const emit = defineEmits<{
   slides: []
   lyric: []
   playlist: []
+  suggestEdit: []
 }>()
 
 const rowHovered = ref(false)
@@ -40,7 +42,7 @@ function playSungFromRow() {
 <template>
   <div
     class="album-track-row"
-    :class="{ 'album-track-row--downloading': isDownloading }"
+    :class="{ 'album-track-row--downloading': isDownloading, 'album-track-row--selected': selected }"
     role="button"
     tabindex="0"
     :aria-label="t('media.actions.sung')"
@@ -57,7 +59,7 @@ function playSungFromRow() {
     >
       <div
         class="album-track-row__download-fill"
-        :style="{ width: `${downloadProgress ?? 0}%` }"
+        :style="{ width: `${downloadProgress}%` }"
         aria-hidden="true"
       />
       <span class="album-track-row__download-percent">
@@ -119,10 +121,20 @@ function playSungFromRow() {
     <div class="album-track-row__actions">
       <button
         type="button"
+        class="album-track-row__suggest-edit"
+        :disabled="busy || isDownloading"
+        :title="t('common.suggestFix')"
+        :aria-label="t('common.suggestFix')"
+        @click.stop="emit('suggestEdit')"
+      >
+        <i class="ti ti-pencil" aria-hidden="true" />
+      </button>
+      <button
+        type="button"
         class="album-track-row__playlist"
         :disabled="busy || isDownloading"
-        title="Adicionar à playlist"
-        aria-label="Adicionar à playlist"
+        :title="t('common.addToPlaylist')"
+        :aria-label="t('common.addToPlaylist')"
         @click.stop="emit('playlist')"
       >
         <i class="ti ti-playlist-add" aria-hidden="true" />
@@ -361,6 +373,20 @@ function playSungFromRow() {
   cursor: pointer;
 }
 
+.album-track-row__suggest-edit {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.35rem;
+  background: transparent;
+  color: var(--ds-color-primary);
+  cursor: pointer;
+}
+
+.album-track-row__suggest-edit:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
 .album-track-row__playlist:disabled {
   cursor: not-allowed;
   opacity: 0.35;
@@ -373,6 +399,12 @@ function playSungFromRow() {
   align-items: center;
   gap: 0.5rem;
   justify-self: end;
+}
+
+.album-track-row--selected {
+  border-color: var(--ds-color-primary);
+  background: color-mix(in srgb, var(--ds-color-primary) 12%, var(--ds-color-surface-elevated));
+  box-shadow: inset 3px 0 var(--ds-color-primary);
 }
 
 @media (max-width: 720px) {

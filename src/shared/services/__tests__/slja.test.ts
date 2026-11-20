@@ -47,4 +47,89 @@ describe('parseSljaFile — wrapper .slja.zip do WhatsApp', () => {
     const wrapper = await zipBuffers({ 'outro.txt': new TextEncoder().encode('nada') })
     await expect(parseSljaFile(wrapper, 'sem-slja.zip')).rejects.toThrow(/não encontrado/)
   })
+  describe('gaps — INI sem [Geral]', () => {
+    it('INI sem seção Geral: título default e 0 slides extras', async () => {
+      const ini = '[Outro]\nfoo=1\n'
+      const files: Record<string, Uint8Array> = {
+        'slides.lja': new TextEncoder().encode(ini),
+      }
+      const buffer = await zipBuffers(files)
+      const parsed = await parseSljaFile(buffer, 'musica.slja')
+      expect(parsed).toBeTruthy()
+      expect(parsed.title).toBe('Sem título')
+      expect(parsed.slides).toHaveLength(0)
+    })
+  })
+
+
+  describe('gaps onda — caudas de parse (B151/B171/B276)', () => {
+    it('audio marcado no INI mas SEM entry no zip → áudio undefined (B151 falso)', async () => {
+      const ini = '[Geral]\naudio=1\nurl_musica=audio/hino.mp3\nslides=0\n'
+      const files: Record<string, Uint8Array> = {
+        'slides.lja': new TextEncoder().encode(ini),
+        // SEM audio/hino.mp3 no zip
+      }
+      const buffer = await zipBuffers(files)
+      const parsed = await parseSljaFile(buffer, 'musica.slja')
+      expect(parsed.audio).toBeUndefined()
+    })
+
+    it('INI com [Slide:1] sem linhas chave=valor → 0 slides adicionais e linha ignorada (B276 falso: sem =)', async () => {
+      const ini = '[Geral]\nslides=1\n[Slide:1]\nlinha-sem-igual\n\n'
+      const files: Record<string, Uint8Array> = {
+        'slides.lja': new TextEncoder().encode(ini),
+      }
+      const buffer = await zipBuffers(files)
+      const parsed = await parseSljaFile(buffer, 'musica.slja')
+      expect(parsed.slides).toHaveLength(1) // slide criado pela contagem, com defaults
+      expect(parsed.title).toBe('Sem título')
+    })
+
+    it('INI [Slide:2] além do existente com seção vazia → push do slide default (B171 verdadeiro via contagem)', async () => {
+      const ini = '[Geral]\nslides=2\n[Slide:2]\nletra=alfa\n'
+      const files: Record<string, Uint8Array> = {
+        'slides.lja': new TextEncoder().encode(ini),
+      }
+      const buffer = await zipBuffers(files)
+      const parsed = await parseSljaFile(buffer, 'musica.slja')
+      // Slide:1 ausente → continue; Slide:2 presente → 1 slide
+      expect(parsed.slides).toHaveLength(1)
+      expect(parsed.slides[0].lyric).toBe('alfa')
+    })
+  })
+
+  describe('título de .slja clássico (Delphi não grava titulo em [Geral])', () => {
+    async function parseIni(ini: string) {
+      const buffer = await zipBuffers({ 'slides.lja': new TextEncoder().encode(ini) })
+      return parseSljaFile(buffer, 'doxologia sem imagem.slja')
+    }
+
+    it('usa a primeira linha da letra da CAPA como título', async () => {
+      const parsed = await parseIni(
+        '[Geral]\nslides=2\nversao=2.0\n[Slide:1]\ntipo=CAPA\nletra=  |Doxologia|Hinario Adventista 1\n[Slide:2]\ntipo=LETRA\nletra=A Deus\n',
+      )
+      expect(parsed.title).toBe('Doxologia')
+    })
+
+    it('titulo em [Geral] continua tendo prioridade sobre a CAPA', async () => {
+      const parsed = await parseIni(
+        '[Geral]\nslides=1\ntitulo=Titulo Oficial\n[Slide:1]\ntipo=CAPA\nletra=Outro\n',
+      )
+      expect(parsed.title).toBe('Titulo Oficial')
+    })
+
+    it('CAPA sem texto mantém o fallback de versão', async () => {
+      const parsed = await parseIni(
+        '[Geral]\nslides=2\nversao=2.0\n[Slide:1]\ntipo=CAPA\nletra=\n[Slide:2]\ntipo=LETRA\nletra=Estrofe\n',
+      )
+      expect(parsed.title).toBe('v2.0')
+    })
+
+    it('só slides de LETRA: não usa a letra como título', async () => {
+      const parsed = await parseIni(
+        '[Geral]\nslides=1\n[Slide:1]\ntipo=LETRA\nletra=Estrofe\n',
+      )
+      expect(parsed.title).toBe('Sem título')
+    })
+  })
 })

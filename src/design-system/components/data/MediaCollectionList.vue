@@ -1,39 +1,39 @@
 <script setup lang="ts">
 const props = withDefaults(
-  defineProps<{
-    modelValue: string
-    searchPlaceholder: string
-    searchAriaLabel?: string
-    clearAriaLabel?: string
-    numberLabel: string
-    titleLabel: string
-    durationLabel: string
-    actionsLabel: string
-    loading?: boolean
-    loadingLabel?: string
-    empty?: boolean
-    emptyLabel?: string
-  }>(),
-  {
-    searchAriaLabel: '',
-    clearAriaLabel: '',
-    loading: false,
-    loadingLabel: '',
-    empty: false,
-    emptyLabel: '',
-  },
-)
+	defineProps<{
+		modelValue: string;
+		searchPlaceholder: string;
+		searchAriaLabel?: string;
+		clearAriaLabel?: string;
+		numberLabel: string;
+		titleLabel: string;
+		durationLabel: string;
+		actionsLabel: string;
+		loading?: boolean;
+		loadingLabel?: string;
+		empty?: boolean;
+		emptyLabel?: string;
+	}>(),
+	{
+		searchAriaLabel: "",
+		clearAriaLabel: "",
+		loading: false,
+		loadingLabel: "",
+		empty: false,
+		emptyLabel: "",
+	},
+);
 
 const emit = defineEmits<{
-  'update:modelValue': [value: string]
-}>()
+	"update:modelValue": [value: string];
+}>();
 
 function updateSearch(event: Event) {
-  emit('update:modelValue', (event.target as HTMLInputElement).value)
+	emit("update:modelValue", (event.target as HTMLInputElement).value);
 }
 
 function clearSearch() {
-  emit('update:modelValue', '')
+	emit("update:modelValue", "");
 }
 </script>
 

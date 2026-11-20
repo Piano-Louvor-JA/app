@@ -61,10 +61,11 @@ const digitalStyle = computed(() => {
           : st
             ? 'none'
             : `0 4px 30px ${color}40`,
-    background: st?.textBox ? `rgba(0,0,0,${st.boxOpacity})` : 'transparent',
-    border: st?.textBox && st.boxBorder ? '1px solid rgba(255,255,255,0.25)' : 'none',
+    background: st?.textBox ? `rgba(24,24,24,${st.boxOpacity})` : 'transparent',
+    border: st?.textBox && st.boxBorder ? 'clamp(2px, 0.2vmin, 4px) solid rgba(255,255,255,0.85)' : 'none',
     borderRadius: st?.textBox ? '1.4cqw 0 1.4cqw 0' : '0',
     padding: st?.textBox ? '2.5vmin 1.8vmin' : '0',
+    backdropFilter: st?.textBox ? 'blur(16px)' : 'none',
   } as Record<string, string>
 })
 
@@ -92,14 +93,20 @@ function stageFlexJustify(st?: StageSettings): Record<string, string> {
   return { alignItems, justifyContent }
 }
 
+let measureTimer: ReturnType<typeof setTimeout> | null = null
+
 function measure() {
   const el = containerRef.value
+  /* v8 ignore next 1 -- ref só é null fora do ciclo de vida do componente */
   if (!el) return
   sizeWidth.value = el.offsetWidth
   sizeHeight.value = el.offsetHeight
 
-  if (sizeWidth.value <= 0 || sizeHeight.value <= 0) {
-    window.setTimeout(measure, 100)
+  if ((sizeWidth.value <= 0 || sizeHeight.value <= 0) && measureTimer === null) {
+    measureTimer = setTimeout(() => {
+      measureTimer = null
+      measure()
+    }, 100)
   }
 }
 
@@ -109,6 +116,10 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  if (measureTimer !== null) {
+    clearTimeout(measureTimer)
+    measureTimer = null
+  }
   window.removeEventListener('resize', measure)
 })
 </script>
@@ -139,7 +150,7 @@ onUnmounted(() => {
 
 .timer-preview__digital {
   max-width: 100%;
-  font-family: ui-monospace, 'Cascadia Code', 'Segoe UI Mono', monospace;
+  font-family: var(--projection-font-family, ui-monospace, 'Cascadia Code', 'Segoe UI Mono', monospace);
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
   line-height: 1;

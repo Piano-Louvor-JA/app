@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
 import { computed, watch, onMounted, ref } from 'vue'
+import { startOutboxTriggers, watchAuthSession } from '@modules/sync/services/sync-outbox-service'
+import { startSljaMigrationWatch } from '@modules/sync/services/slja-migration-watch'
 import { useRoute, RouterView } from 'vue-router'
 import { useTheme } from 'vuetify'
 
@@ -8,9 +10,11 @@ import StartingOverlay from '@modules/starting/components/StartingOverlay.vue'
 import { useStartingStore } from '@modules/starting/stores/useStartingStore'
 import { useThemeManager } from '@design-system/composables'
 import AppTitlebar from '@layouts/AppTitlebar.vue'
+import { prewarmMediaProjection } from '@shared/composables/useProjectionWindow'
 import { isProjectionPopupLocation } from '@shared/services/projection-window-location'
 import { useOperatorEscapeToCloseProjection } from '@shared/composables/useOperatorEscapeToCloseProjection'
 import { useMediaPlayerHotkeys } from '@modules/media/composables/useMediaPlayerHotkeys'
+import ApiStatusBanner from '@shared/components/ApiStatusBanner.vue'
 import UpdateBanner from '@shared/components/UpdateBanner.vue'
 import UpdateDialog from '@shared/components/UpdateDialog.vue'
 import { useUpdateChecker } from '@shared/composables/useUpdateChecker'
@@ -60,11 +64,19 @@ watch(
 )
 
 onMounted(() => {
+  // sync v2 fase 2 (app#336): flush on-online + pull no boot
+  startOutboxTriggers()
+  // sync v2 (SPEC piano-sync-v2-post-login-pull): pull pós-login — login em
+  // app já aberto puxa prefs/liturgia/agendados da conta sem edição local
+  watchAuthSession()
+  // sync v2 fase 3 (app#336): pós-login, oferece migrar .slja locais pra conta
+  void startSljaMigrationWatch()
   updateChecker.init()
-  // Palco (cast TV): a bridge sobe no BOOT da janela principal — não só
-  // quando o PalcoCard monta. Sem isso, hino/bíblia/timer só espelhavam
-  // se o operador tivesse visitado Configurações → Projeção antes.
+  // Palco (cast TV): a bridge sobe no BOOT da janela principal, não quando
+  // uma tela de configuração monta. Sem isso, hino/bíblia/timer só
+  // espelhavam depois de o operador visitar Configurações.
   if (!isProjectionWindow.value) {
+    prewarmMediaProjection()
     import('@modules/settings/services/palco-bridge')
       .then((m) => {
         m.startPalcoBridge()
@@ -84,13 +96,14 @@ function handleViewNotes() {
     class="app-frame"
     :class="{ 'app-frame--projection': isProjectionWindow }"
   >
-    <UpdateBanner @view-notes="handleViewNotes" />
+    <ApiStatusBanner v-if="!isProjectionWindow" />
+    <UpdateBanner v-if="!isProjectionWindow" @view-notes="handleViewNotes" />
     <AppTitlebar />
     <div class="app-frame__body">
       <StartingOverlay v-if="!isProjectionWindow" />
       <RouterView v-if="isAppReady || isProjectionWindow" />
     </div>
-    <UpdateDialog v-model="showUpdateDialog" />
+    <UpdateDialog v-if="!isProjectionWindow" v-model="showUpdateDialog" />
   </div>
 </template>
 

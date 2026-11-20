@@ -6,13 +6,17 @@
  * rodapé de referência.
  */
 import { computed } from 'vue'
+import { useProjectionFont } from '../composables/useProjectionFont'
 
-import { resolveBackgroundImage, stageFlexAlign, type StageSettings } from '../types/stage-settings'
+import { resolveBackgroundImage, stageBgCss, stageFlexAlign, type StageSettings } from '../types/stage-settings'
 
 const props = defineProps<{
   settings: StageSettings
+  fontScope?: string
   module?: string
 }>()
+
+const projectionFontStyle = useProjectionFont(() => props.fontScope ?? props.module ?? 'global')
 
 const sample = computed(() =>
   props.module === 'bible'
@@ -27,7 +31,11 @@ const footer = computed(() =>
 const containerStyle = computed(() => {
   const s = props.settings
   return {
-    backgroundColor: s.backgroundColor,
+    // Hinos: null deixa a capa aparecer. Bíblia não tem capa — o palco é preto.
+    backgroundColor:
+      props.module === 'bible'
+        ? (s.backgroundColor ?? '#000000')
+        : stageBgCss(s.backgroundColor),
     backgroundImage: resolveBackgroundImage(s.backgroundImage)
       ? `url(${resolveBackgroundImage(s.backgroundImage)})`
       : undefined,
@@ -41,11 +49,14 @@ const textStyle = computed(() => {
   const s = props.settings
   const isBible = props.module === 'bible'
   return {
-    color: isBible ? s.bibleTextColor : s.textColor,
+    color: (isBible ? s.bibleTextColor : s.textColor) ?? undefined,
     // 96px @1920 → 5% da largura do preview (font-size em cqw)
     fontSize: `${((isBible ? s.bibleFontSize : s.fontSize) / 1920) * 100}cqw`,
     fontWeight: String(isBible ? s.bibleFontWeight : s.fontWeight),
     textAlign: s.textAlign,
+    // Paridade web: capitalização do versículo no preview da Bíblia.
+    textTransform:
+      isBible && s.bibleTextTransform !== 'none' ? s.bibleTextTransform : 'none',
     textShadow: s.textShadow
       ? `0 0 ${(s.shadowBlur / 108) * 100}cqw rgba(0,0,0,${s.shadowIntensity})`
       : 'none',
@@ -56,43 +67,56 @@ const boxStyle = computed(() => {
   const s = props.settings
   if (!s.textBox) return {}
   return {
-    backgroundColor: `rgba(0,0,0,${s.boxOpacity})`,
-    border: s.boxBorder ? '1px solid rgba(255,255,255,0.25)' : 'none',
+    backgroundColor: `rgba(24,24,24,${s.boxOpacity})`,
+    border: s.boxBorder ? 'clamp(2px, 0.2vmin, 4px) solid rgba(255,255,255,0.85)' : 'none',
     // Padrão folha característico do design (como o media-projection)
     borderRadius: '1.4cqw 0 1.4cqw 0',
+    backdropFilter: 'blur(16px)',
+    '-webkit-backdrop-filter': 'blur(16px)',
   }
 })
 
-const footerStyle = computed(() => ({
-  color: props.settings.footerRefColor,
-  fontWeight: String(props.settings.footerRefWeight),
-}))
+const footerCorner = computed(() => props.settings.bibleRefPosition === 'corner')
+
+const footerStyle = computed(() => {
+  const position = props.settings.bibleRefPosition ?? 'below-right'
+  return {
+    color: props.settings.footerRefColor ?? undefined,
+    fontSize: `${((props.settings.refFontSize ?? Math.round(props.settings.bibleFontSize * 0.4)) / 1920) * 100}cqw`,
+    fontWeight: String(props.settings.footerRefWeight),
+    textTransform: props.settings.refTextTransform,
+    ...(footerCorner.value ? {} : { textAlign: position.replace('below-', '') as 'left' | 'center' | 'right' }),
+  }
+})
 </script>
 
 <template>
   <div
     class="stage-preview"
     :class="{ 'stage-preview--bible': module === 'bible' }"
-    :style="containerStyle"
+    :style="[containerStyle, projectionFontStyle]"
   >
-    <div
-      class="stage-preview__box"
-      :style="boxStyle"
-    >
-      <p
-        class="stage-preview__text"
-        :style="textStyle"
+    <div class="stage-preview__content">
+      <div
+        class="stage-preview__box"
+        :style="boxStyle"
       >
-        {{ sample }}
+        <p
+          class="stage-preview__text"
+          :style="textStyle"
+        >
+          {{ sample }}
+        </p>
+      </div>
+      <p
+        v-if="footer && settings.showBibleVersion"
+        class="stage-preview__footer"
+        :class="{ 'stage-preview__footer--corner': footerCorner }"
+        :style="footerStyle"
+      >
+        {{ footer }}
       </p>
     </div>
-    <p
-      v-if="footer && settings.showBibleVersion"
-      class="stage-preview__footer"
-      :style="footerStyle"
-    >
-      {{ footer }}
-    </p>
   </div>
 </template>
 
@@ -116,10 +140,24 @@ const footerStyle = computed(() => ({
   /* radius (padrão folha) vem inline do boxStyle quando textBox ativo */
 }
 
-/* Bíblia: usa quase toda a largura (paridade com BibleProjectionView). */
+/* Hinos: a caixa segue sendo o filho alinhado pelo palco. */
+.stage-preview__content {
+  display: contents;
+}
+
+/* Bíblia: usa quase toda a largura (paridade com BibleProjectionView);
+   a referência "abaixo do texto" fica logo embaixo da caixa. */
+.stage-preview--bible .stage-preview__content {
+  display: flex;
+  flex-direction: column;
+  gap: 1cqw;
+  width: calc(100% - 2cqw);
+}
+
 .stage-preview--bible .stage-preview__box {
-  max-width: calc(100% - 2cqw);
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .stage-preview__text {
@@ -136,10 +174,13 @@ const footerStyle = computed(() => ({
 }
 
 .stage-preview__footer {
+  margin: 0;
+  font-size: 2.2cqw;
+}
+
+.stage-preview__footer--corner {
   position: absolute;
   right: 3cqw;
   bottom: 2.2cqw;
-  margin: 0;
-  font-size: 2.2cqw;
 }
 </style>

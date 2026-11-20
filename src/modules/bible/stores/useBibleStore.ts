@@ -1,3 +1,4 @@
+import { detectObsBeforeProjection } from '@modules/settings/services/obs-detection'
 import { getPalcoRoute } from '../../settings/services/palco-routing'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
@@ -8,6 +9,7 @@ import {
   isProjectionModuleOpen,
   openProjectionModule,
 } from '@shared/composables/useProjectionWindow'
+import { isIndependentProjectionActive } from '@shared/composables/useIndependentProjection'
 import { USER_PREFERENCE_KEYS } from '@shared/constants/storage-keys'
 import {
   getUserPreference,
@@ -19,13 +21,16 @@ import {
   loadBibleVersions,
   loadChapterVerses,
   pickDefaultVersionId,
+  requestBibleBundleUpdate,
   resolveTestament,
 } from '../services/bible-catalog'
 import { publishBibleSelection, publishBibleRuntimeOff } from '../services/bible-runtime'
+import { publishBibleIndependentSelection } from '../services/bible-independent-runtime'
 import {
   buildProjectionText,
   emptySelection,
   formatScripturalReference,
+  parseBibleReference,
   parseVerseQuery,
 } from '../services/scripture-format'
 import type {
@@ -88,8 +93,13 @@ export const useBibleStore = defineStore('bible', () => {
     }, 400)
   }
 
-  function publishProjectionState(selection: BibleSelection = projection.value) {
+  function publishProjectionState(selection: BibleSelection) {
     publishBibleSelection(selection)
+  }
+
+  /** Projeção independente acompanha a seleção do operador em canal próprio. */
+  function publishIndependentState(selection: BibleSelection) {
+    if (isIndependentProjectionActive('bible')) publishBibleIndependentSelection(selection)
   }
 
   const selectedBook = computed(() =>
@@ -102,14 +112,24 @@ export const useBibleStore = defineStore('bible', () => {
   )
 
   const filteredBooks = computed(() => {
-    const query = bookSearchQuery.value.trim().toLowerCase()
+    const query = bookSearchQuery.value
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
     return books.value.filter((book) => {
-      if (resolveTestament(book.bookNumber) !== testamentFilter.value) return false
-      if (!query) return true
-      return (
-        book.name.toLowerCase().includes(query) ||
-        book.abbreviation.toLowerCase().includes(query)
-      )
+      // Com busca ativa o testamento NÃO filtra (SPEC R1): "apocalipse"
+      // precisa achar mesmo com AT selecionado.
+      if (!query) return resolveTestament(book.bookNumber) === testamentFilter.value
+      const name = book.name
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+      const abbreviation = book.abbreviation
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+      return name.includes(query) || abbreviation.includes(query)
     })
   })
 
@@ -136,7 +156,8 @@ export const useBibleStore = defineStore('bible', () => {
   })
 
   const verseEntries = computed(() => {
-    const globalQuery = globalSearchQuery.value.trim().toLowerCase()
+    // R4+ (ajuste PO): a toolbar global NÃO filtra em tempo real (onchange) —
+    // o gatilho de busca é exclusivamente Enter (parser de referência).
     const verseQuery = verseSearchQuery.value.trim().toLowerCase()
 
     function matchesQuery(
@@ -158,10 +179,21 @@ export const useBibleStore = defineStore('bible', () => {
         number,
         text: verses.value[String(number)] ?? '',
       }))
-      .filter(
-        (entry) => matchesQuery(entry, globalQuery) && matchesQuery(entry, verseQuery),
-      )
+      .filter((entry) => matchesQuery(entry, verseQuery))
   })
+
+  /** SPEC R4+: após referência 1-shot, a lista mostra SÓ os versículos da
+   *  referência (navegação focada). Limpa ao trocar capítulo/livro manualmente. */
+  const filteredVerseSet = ref<Set<number> | null>(null)
+
+  const visibleVerseEntries = computed(() => {
+    if (!filteredVerseSet.value) return verseEntries.value
+    return verseEntries.value.filter((entry) => filteredVerseSet.value!.has(entry.number))
+  })
+
+  function clearFilteredVerses() {
+    filteredVerseSet.value = null
+  }
 
   function clearError() {
     lastErrorKey.value = null
@@ -177,6 +209,7 @@ export const useBibleStore = defineStore('bible', () => {
     if (!book || !version || selectedVerses.value.length === 0) {
       projection.value = emptySelection()
       if (isProjecting.value) publishProjectionState(projection.value)
+      publishIndependentState(projection.value)
       return
     }
 
@@ -198,9 +231,18 @@ export const useBibleStore = defineStore('bible', () => {
 
     projection.value = selection
     if (isProjecting.value) publishProjectionState(selection)
+    publishIndependentState(selection)
+  }
+
+  /** Antes de abrir a independente: publica a seleção atual no canal dela. */
+  function prepareIndependentProjection(): boolean {
+    syncProjection()
+    publishBibleIndependentSelection(projection.value)
+    return true
   }
 
   async function openProjection(opts?: { targets?: 'all' | 'tvs-only' }) {
+    await detectObsBeforeProjection()
     syncProjection()
     if (projection.value.verses.length === 0 || !projection.value.text) {
       return false
@@ -314,23 +356,35 @@ export const useBibleStore = defineStore('bible', () => {
         return
       }
 
-      const saved = getUserPreference<number>(
-        USER_PREFERENCE_KEYS.bibleSelectedVersion,
-        null,
-      )
-      const versionId = pickDefaultVersionId(loadedVersions, saved)
-      selectedVersionId.value = versionId
+      // A tela chama bootstrap toda vez que abre: se já há uma seleção que
+      // ainda existe no catálogo, o operador volta exatamente onde estava.
+      const keepSelection =
+        loadedVersions.some((version) => version.id === selectedVersionId.value) &&
+        loadedBooks.some((book) => book.id === selectedBookId.value)
 
-      const firstBook = loadedBooks[0]
-      selectedBookId.value = firstBook.id
-      testamentFilter.value = resolveTestament(firstBook.bookNumber)
-      selectedChapter.value = 1
-      selectedVerses.value = []
-      lastVerseAnchor.value = 1
+      if (!keepSelection) {
+        const saved = getUserPreference<number>(
+          USER_PREFERENCE_KEYS.bibleSelectedVersion,
+          null,
+        )
+        const versionId = pickDefaultVersionId(loadedVersions, saved)
+        selectedVersionId.value = versionId
+
+        const firstBook = loadedBooks[0]
+        selectedBookId.value = firstBook.id
+        testamentFilter.value = resolveTestament(firstBook.bookNumber)
+        selectedChapter.value = 1
+        selectedVerses.value = []
+        lastVerseAnchor.value = 1
+      }
 
       isProjecting.value = isProjectionModuleOpen('bible')
       if (isProjecting.value) startProjectionWatch()
 
+      // Catálogo pronto: a tela aparece já; o capítulo tem loading próprio
+      // (isLoadingVerses) e não segura o "Carregando" do módulo inteiro.
+      isLoadingMeta.value = false
+      void requestBibleBundleUpdate()
       await refreshChapter()
     } catch (error) {
       console.error('[bible] falha ao iniciar módulo', error)
@@ -360,6 +414,7 @@ export const useBibleStore = defineStore('bible', () => {
     testamentFilter.value = resolveTestament(book.bookNumber)
     selectedVerses.value = []
     lastVerseAnchor.value = 1
+    filteredVerseSet.value = null
 
     if (selectedChapter.value > book.chapters) {
       selectedChapter.value = book.chapters
@@ -367,7 +422,8 @@ export const useBibleStore = defineStore('bible', () => {
       selectedChapter.value = 1
     }
 
-    syncProjection()
+    // Navegar não mexe na projeção: o versículo que está na tela fica até o
+    // operador clicar no próximo (selectVerse publica).
     await refreshChapter()
   }
 
@@ -380,7 +436,8 @@ export const useBibleStore = defineStore('bible', () => {
     selectedChapter.value = next
     selectedVerses.value = []
     lastVerseAnchor.value = 1
-    syncProjection()
+    filteredVerseSet.value = null
+    // Mantém o versículo projetado até escolher o próximo (ver selectBook).
     await refreshChapter()
   }
 
@@ -424,6 +481,42 @@ export const useBibleStore = defineStore('bible', () => {
     syncProjection()
   }
 
+  /**
+   * Busca 1-shot de referência completa (SPEC R4): "genesis 1:1-4, 6" no
+   * campo de livros seleciona livro + capítulo + versículos de uma vez.
+   * Só dispara com capítulo (ou mais); livro sozinho segue filtrando o grid.
+   * Query opcional: default = bookSearchQuery (nav panel); toolbar passa
+   * globalSearchQuery. Retorna true quando aplicou.
+   */
+  async function applyBookSearchReference(query?: string): Promise<boolean> {
+    const raw = (query ?? bookSearchQuery.value).trim()
+    const parsed = parseBibleReference(raw, books.value)
+    if (!parsed || parsed.chapter == null) return false
+
+    await selectBook(parsed.book.id)
+    await selectChapter(parsed.chapter)
+    if (parsed.verses.length > 0) {
+      // R4+ (ajuste PO): lista filtrada mas NENHUM versículo pré-selecionado —
+      // o operador escolhe o primeiro e navega só pelas passagens do filtro.
+      filteredVerseSet.value = new Set(parsed.verses)
+    }
+    if (query === undefined) bookSearchQuery.value = ''
+    // Só navega: a projeção muda quando o operador escolher o versículo.
+    return true
+  }
+
+  /**
+   * Busca inteligente da toolbar (paridade apk): abre livro + capítulo já
+   * resolvidos; com versículos, filtra a lista neles (mesma regra do R4+:
+   * nenhum versículo pré-selecionado).
+   */
+  async function applyPassage(bookId: number, chapter: number, verseList: number[] = []) {
+    await selectBook(bookId)
+    await selectChapter(chapter)
+    filteredVerseSet.value = verseList.length > 0 ? new Set(verseList) : null
+    // Só navega: a projeção muda quando o operador escolher o versículo.
+  }
+
   function clearSelection() {
     selectedVerses.value = []
     syncProjection()
@@ -439,6 +532,22 @@ export const useBibleStore = defineStore('bible', () => {
 
   async function goToAdjacentVerse(direction: -1 | 1) {
     if (selectedVerses.value.length === 0) return
+
+    // R4+ (ajuste PO): com filtro de passagem ativo, navegação (setas/botões)
+    // fica RESTITA aos versículos renderizados — nada fora do filtro projeta.
+    if (filteredVerseSet.value) {
+      const ordered = visibleVerseEntries.value.map((entry) => entry.number)
+      if (ordered.length === 0) return
+
+      const current = direction < 0
+        ? Math.min(...selectedVerses.value)
+        : Math.max(...selectedVerses.value)
+      const position = ordered.indexOf(current)
+      const fallback = direction < 0 ? ordered.length - 1 : 0
+      const next = position === -1 ? ordered[fallback] : ordered[position + direction]
+      if (next != null) selectVerse(next)
+      return
+    }
 
     const current =
       direction < 0
@@ -465,8 +574,8 @@ export const useBibleStore = defineStore('bible', () => {
       }
 
       const index = books.value.findIndex((item) => item.id === book.id)
+      // books não-vazio aqui (guard do book acima): books[0] sempre existe
       const nextBook = books.value[index + 1] ?? books.value[0]
-      if (!nextBook) return
       await selectBook(nextBook.id)
       await selectChapter(1)
       const first = Math.min(
@@ -486,9 +595,9 @@ export const useBibleStore = defineStore('bible', () => {
     }
 
     const index = books.value.findIndex((item) => item.id === book.id)
+    // books não-vazio aqui (guard do book acima): último elemento sempre existe
     const prevBook =
       index > 0 ? books.value[index - 1] : books.value[books.value.length - 1]
-    if (!prevBook) return
     await selectBook(prevBook.id)
     await selectChapter(prevBook.chapters)
     const last = Math.max(
@@ -524,6 +633,8 @@ export const useBibleStore = defineStore('bible', () => {
     locationLabel,
     chapterTitle,
     verseEntries,
+    visibleVerseEntries,
+    clearFilteredVerses,
     clearError,
     bootstrap,
     selectVersion,
@@ -531,11 +642,14 @@ export const useBibleStore = defineStore('bible', () => {
     selectChapter,
     selectVerse,
     applyVerseSearch,
+    applyBookSearchReference,
+    applyPassage,
     clearSelection,
     setTestamentFilter,
     toggleNavPanel,
     goToAdjacentVerse,
     syncProjection,
+    prepareIndependentProjection,
     openProjection,
     toggleProjection,
     projectTvsOnly,

@@ -10,6 +10,7 @@ import {
   saveProjectionSettings,
 } from '@modules/settings/services/projection-preferences'
 import { getDesktopBridge } from '@shared/services/desktop-bridge'
+import { isProjectionPopupLocation } from '@shared/services/projection-window-location'
 
 type ProjectionLayout = 'audience' | 'return'
 
@@ -22,20 +23,25 @@ type MonitorTargets = {
   monitorIds: number[]
   fullscreen: boolean
   returnId: number | null
+  networkTargets?: boolean
 }
 
 let openWindows: ProjectionWindow[] = []
 let activeModule: string | null = null
+let networkOnlyModule: string | null = null
 /** Último módulo projetado — permite reabrir após close acidental no reapply. */
 let lastProjectedModule: string | null = null
 /** Evita que o watch trate o fechamento temporário do reapply como “parou de projetar”. */
 let reapplyingTargets = false
 /** Nome único a cada open — reusar o mesmo nome após close falha no Chromium/Electron. */
 let projectionWindowSeq = 0
+/** Janelas de mídia carregadas em segundo plano, prontas para aparecer juntas. */
+let warmWindows: ProjectionWindow[] = []
+let prewarmTask: Promise<void> | null = null
 
 function pruneWindows() {
   openWindows = openWindows.filter((win) => win && !win.closed)
-  if (openWindows.length === 0 && !reapplyingTargets) {
+  if (openWindows.length === 0 && !reapplyingTargets && !networkOnlyModule) {
     activeModule = null
     lastProjectedModule = null
   }
@@ -57,19 +63,31 @@ function buildPopupUrl(
     monitorId?: number | null
     fullscreen?: boolean
     layout?: ProjectionLayout
+    independent?: boolean
+    share?: boolean
   },
 ): string {
   const params = new URLSearchParams()
   params.set('module', moduleId)
+  /* v8 ignore next 3 -- openOnMonitor só é chamado com monitorId != null */
   if (options?.monitorId != null) {
     params.set('monitorId', String(options.monitorId))
   }
+  /* v8 ignore next 3 -- fullscreen=true em todos os callers */
   if (options?.fullscreen) {
     // Canal confiável para o main process (além do features do window.open)
     params.set('fs', '1')
   }
   if (options?.layout === 'return') {
     params.set('layout', 'return')
+  }
+  if (options?.independent) {
+    // Main: fora do "fechar tudo" e sempre acima da projeção principal.
+    params.set('independent', '1')
+  }
+  if (options?.share) {
+    // Main: divide o monitor com o que já está projetado nele.
+    params.set('share', '1')
   }
   const query = params.toString()
   const useHash =
@@ -105,6 +123,10 @@ async function resolveMonitorTargets(
 
   const excludeReturn = (id: number) => returnId == null || id !== returnId
 
+  const { refreshObsConnections, hasSelectedObsTargets } = await import('@modules/settings/composables/useObsConnections')
+  await refreshObsConnections()
+  const networkTargets = hasSelectedObsTargets(moduleId ?? undefined)
+
   // null/undefined = ler settings; array (mesmo vazio) = seleção explícita (como YouTube/site).
   if (preferredIds != null) {
     const selected = preferredIds.filter(
@@ -113,7 +135,7 @@ async function resolveMonitorTargets(
     if (selected.length > 0) {
       return { monitorIds: selected, fullscreen: true, returnId }
     }
-    return { monitorIds: [], fullscreen: false, returnId }
+    return { monitorIds: [], fullscreen: false, returnId, networkTargets }
   }
 
   const selected = settings.targetDisplayIds.filter(
@@ -123,6 +145,8 @@ async function resolveMonitorTargets(
   if (selected.length > 0) {
     return { monitorIds: selected, fullscreen: true, returnId }
   }
+
+  if (networkTargets) return { monitorIds: [], fullscreen: false, returnId, networkTargets }
 
   // Sem alvos estendidos: só abre no primário se a setting permitir e
   // (não há estendidos) OU (disablePrimaryWhenExtended está desligado).
@@ -140,7 +164,112 @@ async function resolveMonitorTargets(
     return { monitorIds: [primary.id], fullscreen: true, returnId }
   }
 
-  return { monitorIds: [], fullscreen: false, returnId }
+  return { monitorIds: [], fullscreen: false, returnId, networkTargets }
+}
+
+function canPrewarmMediaProjection(): boolean {
+  if (typeof window === 'undefined' || !window.location) return false
+  if (isProjectionPopupLocation()) return false
+  if (!window.louvorja?.isElectron) return false
+  // Preload antigo não esconde a janela: sem revealWarm o aquecimento
+  // abriria a projeção sozinho na inicialização.
+  return typeof getDesktopBridge()?.projection?.revealWarm === 'function'
+}
+
+function aliveWarm(layout: ProjectionLayout): ProjectionWindow[] {
+  warmWindows = warmWindows.filter((win) => win && !win.closed)
+  return warmWindows.filter((win) => (win.layout ?? 'audience') === layout)
+}
+
+function discardWarmWindows(): void {
+  for (const win of warmWindows) {
+    try {
+      win.close()
+    } catch {
+      // janela já fechada
+    }
+  }
+  warmWindows = []
+}
+
+function openWarm(layout: ProjectionLayout): void {
+  projectionWindowSeq += 1
+  const url = `${buildPopupUrl('media', {
+    fullscreen: true,
+    layout: layout === 'return' ? 'return' : undefined,
+  })}&warm=1`
+  const win = window.open(
+    url,
+    `Projection_warm_media_${layout}_${projectionWindowSeq}`,
+    'width=800,height=600,frame=no',
+  ) as ProjectionWindow | null
+  if (!win || win.closed) return
+  win.layout = layout
+  warmWindows.push(win)
+}
+
+/**
+ * Sobe, escondidas, todas as janelas de projeção de mídia que vão ser usadas.
+ * No play elas são mostradas juntas, sem boot uma a uma.
+ */
+export function prewarmMediaProjection(): Promise<void> {
+  if (!canPrewarmMediaProjection()) return Promise.resolve()
+  if (prewarmTask) return prewarmTask
+  prewarmTask = (async () => {
+    const targets = await resolveMonitorTargets('media')
+    const needReturn = targets.returnId != null ? 1 : 0
+    for (let i = aliveWarm('audience').length; i < targets.monitorIds.length; i += 1) {
+      openWarm('audience')
+    }
+    for (let i = aliveWarm('return').length; i < needReturn; i += 1) {
+      openWarm('return')
+    }
+  })().finally(() => {
+    prewarmTask = null
+  })
+  return prewarmTask
+}
+
+async function claimWarmProjection(
+  slots: { monitorId: number; layout: ProjectionLayout }[],
+): Promise<ProjectionWindow[] | null> {
+  if (slots.length === 0) return []
+  const reveal = getDesktopBridge()?.projection?.revealWarm
+  if (!reveal) return null
+
+  const needAudience = slots.filter((slot) => slot.layout === 'audience').length
+  const needReturn = slots.length - needAudience
+  if (aliveWarm('audience').length < needAudience || aliveWarm('return').length < needReturn) {
+    return null
+  }
+
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    const ready = await reveal({
+      shows: slots.map((slot) => ({
+        monitorId: slot.monitorId,
+        fullscreen: true,
+        layout: slot.layout,
+      })),
+    })
+    if (ready) {
+      const claimed: ProjectionWindow[] = []
+      for (const slot of slots) {
+        const index = warmWindows.findIndex(
+          (win) => !win.closed && (win.layout ?? 'audience') === slot.layout,
+        )
+        const win = index >= 0 ? warmWindows.splice(index, 1)[0] : undefined
+        if (!win) break
+        win.monitorId = slot.monitorId
+        win.layout = slot.layout
+        claimed.push(win)
+      }
+      // O processo principal já mostrou todas. Não reabrir por cima.
+      return claimed
+    }
+    await delay(25)
+  }
+
+  return null
 }
 
 function openOnMonitor(
@@ -148,36 +277,63 @@ function openOnMonitor(
   monitorId: number | null,
   fullscreen: boolean,
   layout: ProjectionLayout = 'audience',
+  independent = false,
+  share = false,
 ): ProjectionWindow | null {
   projectionWindowSeq += 1
-  const url = buildPopupUrl(moduleId, { monitorId, fullscreen, layout })
+  const url = buildPopupUrl(moduleId, { monitorId, fullscreen, layout, independent, share })
   // frame=no é opção reconhecida pelo Electron; fullscreen/monitor também na URL
   const features = [
     'width=800',
     'height=600',
     'frame=no',
     'autoHideMenuBar=yes',
+    /* v8 ignore start -- openOnMonitor só recebe monitorId != null e fullscreen true */
     monitorId != null ? `monitor=${monitorId}` : null,
     fullscreen ? 'fullscreen=yes' : null,
+    /* v8 ignore stop */
   ]
     .filter(Boolean)
     .join(',')
 
   // Sequência no nome evita falha ao reabrir após close (mesmo targetName).
+  /* v8 ignore start -- monitorId != null em todos os callers */
+  const prefix = independent ? 'ProjectionIndependent' : 'Projection'
   const name =
     monitorId != null
-      ? `Projection_${moduleId}_${layout}_${monitorId}_${projectionWindowSeq}`
+      ? `${prefix}_${moduleId}_${layout}_${monitorId}_${projectionWindowSeq}`
       : `Projection_${moduleId}_${layout}_${projectionWindowSeq}`
+  /* v8 ignore stop */
 
   const win = window.open(url, name, features) as ProjectionWindow | null
   if (!win || win.closed) return null
 
+  /* v8 ignore next 3 -- monitorId != null em todos os callers */
   if (monitorId != null) {
     win.monitorId = monitorId
   }
   win.layout = layout
 
   return win
+}
+
+/**
+ * Abre uma popup de projeção avulsa, fora do registro da projeção principal
+ * (usada pela projeção independente).
+ */
+export function openProjectionPopupWindow(
+  moduleId: string,
+  monitorId: number,
+  options: { independent?: boolean; share?: boolean } = {},
+): Window | null {
+  return openOnMonitor(
+    moduleId,
+    monitorId,
+    true,
+    'audience',
+    options.independent === true,
+    options.share === true,
+  )
 }
 
 function notifyProjectionReapplied(moduleId: string, open: boolean) {
@@ -203,12 +359,13 @@ export function isProjectionModuleOpen(moduleId?: string): boolean {
   }
 
   pruneWindows()
-  if (openWindows.length === 0) return false
+  if (openWindows.length === 0 && !networkOnlyModule) return false
   if (!moduleId) return true
   return activeModule === moduleId
 }
 
 export function closeProjectionModule(): void {
+  networkOnlyModule = null
   reapplyingTargets = false
   pruneWindows()
   for (const win of openWindows) {
@@ -222,6 +379,7 @@ export function closeProjectionModule(): void {
   activeModule = null
   lastProjectedModule = null
   closeWebUrlProjection()
+  prewarmMediaProjection()
 }
 
 export async function openProjectionModule(
@@ -229,6 +387,7 @@ export async function openProjectionModule(
   preferredIds?: number[] | null,
 ): Promise<boolean> {
   pruneWindows()
+  networkOnlyModule = null
 
   // Conteúdo oculto: janelas já existem — não chama closeUrl (senão o main
   // fecha as popups de hinos/bíblia) e não reabre.
@@ -252,21 +411,39 @@ export async function openProjectionModule(
 
   const targets = await resolveMonitorTargets(moduleId, preferredIds)
   const nextWindows: ProjectionWindow[] = []
+  const slots = [
+    ...targets.monitorIds.map((monitorId) => ({
+      monitorId,
+      layout: 'audience' as const,
+    })),
+    ...(targets.returnId != null
+      ? [{ monitorId: targets.returnId, layout: 'return' as const }]
+      : []),
+  ]
 
-  if (targets.monitorIds.length > 0) {
-    for (const monitorId of targets.monitorIds) {
-      const win = openOnMonitor(moduleId, monitorId, true, 'audience')
+  let claimedAll = false
+  if (moduleId === 'media' && slots.length > 0) {
+    await prewarmMediaProjection()
+    const claimed = await claimWarmProjection(slots)
+    if (claimed) {
+      nextWindows.push(...claimed)
+      claimedAll = true
+      void prewarmMediaProjection()
+    } else {
+      discardWarmWindows()
+    }
+  }
+
+  if (!claimedAll) {
+    for (const slot of slots) {
+      const win = openOnMonitor(moduleId, slot.monitorId, true, slot.layout)
       if (win) nextWindows.push(win)
     }
   }
 
-  if (targets.returnId != null) {
-    const win = openOnMonitor(moduleId, targets.returnId, true, 'return')
-    if (win) nextWindows.push(win)
-  }
-
   openWindows = nextWindows
-  activeModule = nextWindows.length > 0 ? moduleId : null
+  networkOnlyModule = targets.networkTargets ? moduleId : null
+  activeModule = nextWindows.length > 0 || networkOnlyModule ? moduleId : null
   lastProjectedModule = activeModule
   // Projeção (window.open) rouba o teclado — devolve ao operador.
   try {
@@ -274,7 +451,7 @@ export async function openProjectionModule(
   } catch {
     /* ignore */
   }
-  return nextWindows.length > 0
+  return nextWindows.length > 0 || Boolean(networkOnlyModule)
 }
 
 /**
@@ -352,6 +529,16 @@ export async function reapplyProjectionTargets(
     const hasReturn = openWindows.some((win) => isReturnWindow(win))
 
     if (desiredIds.length === 0 && !hasReturn) {
+      const { refreshObsConnections, hasSelectedObsTargets } = await import('@modules/settings/composables/useObsConnections')
+      await refreshObsConnections()
+      if (hasSelectedObsTargets(moduleId)) {
+        networkOnlyModule = moduleId
+        activeModule = moduleId
+        lastProjectedModule = moduleId
+        notifyProjectionReapplied(moduleId, true)
+        return true
+      }
+      networkOnlyModule = null
       activeModule = null
       lastProjectedModule = null
       notifyProjectionReapplied(moduleId, false)
@@ -378,6 +565,7 @@ export async function reapplyProjectionTargets(
     }
 
     const opened = openWindows.length > 0
+    networkOnlyModule = null
     activeModule = opened ? moduleId : null
     if (opened) lastProjectedModule = moduleId
     notifyProjectionReapplied(moduleId, opened)
@@ -426,6 +614,12 @@ export async function syncProjectionAfterDisplayChange(): Promise<void> {
 
   // Legado: se sobrou só a tela principal, encerra popups — salvo retorno ativo.
   if (extendedIds.length === 0 && returnId == null) {
+    const { refreshObsConnections, hasSelectedObsTargets } = await import('@modules/settings/composables/useObsConnections')
+    await refreshObsConnections()
+    if (hasSelectedObsTargets(activeModule ?? undefined)) {
+      await reapplyProjectionTargets([])
+      return
+    }
     closeProjectionModule()
     return
   }

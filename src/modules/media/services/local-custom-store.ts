@@ -20,6 +20,8 @@ export type LocalLyric = {
 	lyric: string;
 	aux_lyric?: string | null;
 	image_url?: string | null;
+	/** Id de blob de fundo no IndexedDB (offline, sem quota do localStorage). */
+	imageMediaId?: string | null;
 	image_position?: string | null;
 	time?: string | null;
 	instrumental_time?: string | null;
@@ -35,9 +37,21 @@ export type LocalMusic = {
 	image_url?: string | null;
 	officialMusicId?: number | null;
 	lyrics: LocalLyric[];
-	/** bytes de áudio local (base64) — toca no browser, não sobe */
+	/** bytes de áudio local (base64) — LEGACY préIndexedDB; novos imports
+	 * usam audioMediaId (blob em IndexedDB, local-media-store). */
 	audioBase64?: string | null;
 	audioName?: string | null;
+	/** Id do blob de áudio em IndexedDB (local-media-store) — caminho novo. */
+	audioMediaId?: string | null;
+	/** Id do blob da capa em IndexedDB — capa 1× por música, não por estrofe. */
+	coverMediaId?: string | null;
+	/** Duração conhecida/estimada (ms) — p.ex. import .slja (app#331). */
+	durationMs?: number | null;
+	/** SHA-256 do arquivo de origem — dedupe de re-import/migração (app#336). */
+	sljaHash?: string | null;
+	/** Estado de trabalho (SPEC t_deed74b5): 'draft' = em andamento (nunca
+	 * sobe pra rede sem publicar); 'published' = publicado/legado. */
+	status?: "draft" | "published";
 };
 
 export type LocalCollection = {
@@ -47,7 +61,7 @@ export type LocalCollection = {
 	createdAt: string;
 };
 
-type LocalDb = {
+export type LocalDb = {
 	nextCollectionId: number; // negativo, decrementa
 	nextMusicId: number;
 	nextLyricId: number;
@@ -55,7 +69,7 @@ type LocalDb = {
 	musics: LocalMusic[];
 };
 
-function emptyDb(): LocalDb {
+export function emptyDb(): LocalDb {
 	return {
 		nextCollectionId: -1,
 		nextMusicId: -1,
@@ -81,18 +95,38 @@ function loadDb(): LocalDb {
 			nextMusicId: parsed.nextMusicId ?? -1,
 			nextLyricId: parsed.nextLyricId ?? -1,
 			collections: Array.isArray(parsed.collections) ? parsed.collections : [],
-			musics: Array.isArray(parsed.musics) ? parsed.musics : [],
+			// Migração draft (SPEC t_deed74b5): registro legado sem status
+			// = já existia antes = tratado como publicado. O primeiro saveDb
+			// persiste o campo (roundtrip: migrado sobrevive a reload).
+			musics: Array.isArray(parsed.musics)
+				? parsed.musics.map((m) => ({
+						...m,
+						status: m.status ?? "published",
+					}))
+				: [],
 		};
 	} catch {
 		return emptyDb();
 	}
 }
 
-function saveDb(db: LocalDb): void {
+export function loadLocalDb(): LocalDb {
+	return loadDb();
+}
+
+export function replaceLocalDb(next: LocalDb): boolean {
+	return saveDb(next);
+}
+
+function saveDb(db: LocalDb): boolean {
 	try {
 		localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+		try {
+			localStorage.setItem("sync.modified.v1.mediaCustomCatalog", new Date().toISOString());
+		} catch { /* O catálogo já foi persistido; falta de espaço no timestamp não o invalida. */ }
+		return true;
 	} catch {
-		// quota (áudio base64 grande) — falha silenciosa; dados ficam só em memória
+		return false;
 	}
 }
 
@@ -149,6 +183,11 @@ export function deleteLocalCollection(id: number): boolean {
 
 /* ---------- Músicas ---------- */
 
+/** Encontra música local pelo hash do arquivo de origem (dedupe app#336). */
+export function findLocalMusicBySljaHash(hash: string): LocalMusic | null {
+	return loadDb().musics.find((m) => m.sljaHash === hash) ?? null;
+}
+
 export function listLocalMusics(collectionId: number): LocalMusic[] {
 	return loadDb().musics.filter((m) => m.collectionId === collectionId);
 }
@@ -157,9 +196,19 @@ export function getLocalMusic(id: number): LocalMusic | null {
 	return loadDb().musics.find((m) => m.id === id) ?? null;
 }
 
+/** Todas as músicas locais de todas as coletâneas (busca por letra, 03/10). */
+export function listAllLocalMusicsWithLyrics(): LocalMusic[] {
+	return loadDb().musics;
+}
+
 export function createLocalMusic(
 	collectionId: number,
-	input: { name?: string; lyric?: string; officialMusicId?: number },
+	input: {
+		name?: string;
+		lyric?: string;
+		officialMusicId?: number;
+		sljaHash?: string | null;
+	},
 ): LocalMusic {
 	const db = loadDb();
 	const music: LocalMusic = {
@@ -167,6 +216,9 @@ export function createLocalMusic(
 		collectionId,
 		name: input.name ?? "",
 		officialMusicId: input.officialMusicId ?? null,
+		sljaHash: input.sljaHash ?? null,
+		// Novas criações nascem como rascunho (SPEC t_deed74b5).
+		status: "draft",
 		lyrics: [],
 	};
 	db.nextMusicId -= 1;
@@ -191,6 +243,14 @@ export function updateLocalMusic(
 		name?: string;
 		audioBase64?: string | null;
 		audioName?: string | null;
+		durationMs?: number | null;
+		/** Capa/cover da música — data: URL base64 (local, offline-first). */
+		image_url?: string | null;
+		/** Ids de blobs em IndexedDB (local-media-store) — sem quota. */
+		audioMediaId?: string | null;
+		coverMediaId?: string | null;
+		/** Estado de trabalho (SPEC t_deed74b5). */
+		status?: "draft" | "published";
 	},
 ): boolean {
 	const db = loadDb();
@@ -199,8 +259,22 @@ export function updateLocalMusic(
 	if (patch.name != null) music.name = patch.name;
 	if (patch.audioBase64 !== undefined) music.audioBase64 = patch.audioBase64;
 	if (patch.audioName !== undefined) music.audioName = patch.audioName;
+	if (patch.durationMs !== undefined) music.durationMs = patch.durationMs;
+	if (patch.image_url !== undefined) music.image_url = patch.image_url;
+	if (patch.audioMediaId !== undefined) music.audioMediaId = patch.audioMediaId;
+	if (patch.coverMediaId !== undefined) music.coverMediaId = patch.coverMediaId;
+	if (patch.status !== undefined) music.status = patch.status;
 	saveDb(db);
 	return true;
+}
+
+/** Publica uma música local (SPEC t_deed74b5): draft → published. */
+export function publishLocalMusic(id: number): boolean {
+	const db = loadDb();
+	const music = db.musics.find((m) => m.id === id);
+	if (!music) return false;
+	music.status = "published";
+	return saveDb(db);
 }
 
 export function deleteLocalMusic(id: number): boolean {
@@ -215,7 +289,17 @@ export function deleteLocalMusic(id: number): boolean {
 
 export function createLocalLyric(
 	musicId: number,
-	input: { lyric: string; aux_lyric?: string; time?: string; order?: number },
+	input: {
+		lyric: string;
+		aux_lyric?: string;
+		time?: string;
+		order?: number;
+		/** Fundo remoto/data URL legado. */
+		image_url?: string | null;
+		/** Id de blob de fundo no IndexedDB para import .slja local. */
+		imageMediaId?: string | null;
+		image_position?: string | number | null;
+	},
 ): LocalLyric {
 	const db = loadDb();
 	const music = db.musics.find((m) => m.id === musicId);
@@ -228,11 +312,16 @@ export function createLocalLyric(
 		time: input.time ?? null,
 		order,
 		show_slide: true,
+		image_url: input.image_url ?? null,
+		imageMediaId: input.imageMediaId ?? null,
+		image_position: input.image_position == null ? null : String(input.image_position),
 	};
 	db.nextLyricId -= 1;
 	music.lyrics.push(lyric);
 	music.lyrics.sort((a, b) => a.order - b.order);
-	saveDb(db);
+	if (!saveDb(db)) {
+		throw new Error("local-persist-failed");
+	}
 	return lyric;
 }
 

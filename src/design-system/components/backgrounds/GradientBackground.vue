@@ -1,12 +1,12 @@
 <script setup lang="ts">
 withDefaults(
-  defineProps<{
-    intensity?: 'subtle' | 'medium' | 'strong'
-  }>(),
-  {
-    intensity: 'subtle',
-  },
-)
+	defineProps<{
+		intensity?: "subtle" | "medium" | "strong";
+	}>(),
+	{
+		intensity: "subtle",
+	},
+);
 </script>
 
 <template>

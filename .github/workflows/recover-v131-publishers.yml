@@ -1,0 +1,107 @@
+name: Recover v1.31.0 Windows and macOS
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: recover-v1.31.0-publishers
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: v1.31.0
+  RELEASE_SHA: 8c2d5109cf3b23f14f45f7c0ac1a65a4abd834da
+
+jobs:
+  recover:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows
+            args: --win nsis portable --x64
+          - os: macos-latest
+            platform: macos
+            args: --mac --universal
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: v1.31.0
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Verify exact published release and policy
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          test "$(git rev-parse "$RELEASE_TAG^{commit}")" = "$RELEASE_SHA"
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft' | grep -qx false
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          import { fetchDecision } from './scripts/release-publish-decision.mjs';
+          assert.equal(JSON.parse(readFileSync('package.json')).version, '1.31.0');
+          const decision = fetchDecision({ repo: process.env.GITHUB_REPOSITORY, ref: process.env.RELEASE_TAG });
+          assert.equal(decision.fail, false, decision.reason);
+          assert.equal(decision.publish, true, decision.reason);
+          JS
+      - name: Install dependencies
+        run: npm ci
+      - name: Separate Windows portable artifact name
+        if: matrix.platform == 'windows'
+        shell: bash
+        run: |
+          node --input-type=module <<'JS'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const pkg = JSON.parse(readFileSync('package.json'));
+          pkg.build.portable = { artifactName: 'LouvorJA-PIANO-${version}-portable-${arch}.${ext}' };
+          writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          JS
+      - name: Build and publish exact release
+        run: npm run electron:build -- ${{ matrix.args }} --publish always
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PIANO_BUILD_PROFILE: release
+          PIANO_RELEASE_AUTHORIZED: 'true'
+          GITHUB_REF_TYPE: tag
+      - name: Verify installers and publish checksums
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { createHash } from 'node:crypto';
+          import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+          const win = process.env.PLATFORM === 'windows';
+          const files = readdirSync('dist-electron').filter(name => win ? name.endsWith('.exe') : name.endsWith('.dmg'));
+          assert.equal(files.length, win ? 2 : 1, 'installer set incomplete');
+          if (win) {
+            assert.ok(files.includes('LouvorJA-PIANO-1.31.0-x64.exe'));
+            assert.ok(files.includes('LouvorJA-PIANO-1.31.0-portable-x64.exe'));
+          }
+          const sums = files.sort().map(name => createHash('sha256').update(readFileSync('dist-electron/' + name)).digest('hex') + '  ' + name).join('\n') + '\n';
+          writeFileSync('SHA256SUMS-' + process.env.PLATFORM, sums);
+          JS
+          gh release upload "$RELEASE_TAG" "SHA256SUMS-$PLATFORM" --repo "$GITHUB_REPOSITORY" --clobber
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: recovery-v1.31.0-${{ matrix.platform }}
+          path: |
+            dist-electron/*.exe
+            dist-electron/*.dmg
+            dist-electron/*.yml
+            SHA256SUMS-*
+          if-no-files-found: warn

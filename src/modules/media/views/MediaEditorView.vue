@@ -7,12 +7,15 @@ import MediaSlideStage from '../components/MediaSlideStage.vue'
 import MediaAccountBar from '../components/MediaAccountBar.vue'
 import AppConfirm from '@shared/components/AppConfirm.vue'
 import { getAuthSession } from '../services/auth-client'
+import { getAuthReadiness } from '@modules/auth/services/firebase-client'
+import { useAuth } from '@modules/auth/composables/useAuth'
 import { startOutboxLoop } from '../services/outbox-loop'
 import {
   getLocalMusic as getLocalMusicById,
   isLocalId,
   updateLocalMusic,
 } from '../services/local-custom-store'
+import { getMedia, putMedia } from '../services/local-media-store'
 import {
   addOfficialMusicToCollection,
   copyCustomMusic,
@@ -37,6 +40,7 @@ import {
   updateCustomLyric,
   updateCustomMusic,
   uploadCustomFile,
+  audioDataUrlFromBase64,
 } from '../services/custom-catalog'
 import type {
   CollectionVisibility,
@@ -46,6 +50,7 @@ import type {
 import PublicationRulesCard from '../components/PublicationRulesCard.vue'
 import { customApiUrl } from '../services/custom-catalog'
 import { buildSlja, parseSljaFile } from '../../../shared/services/slja'
+import { collectionNameForImport } from '../services/import-collection-name'
 
 /**
  * Editor de letras v1 (web)
@@ -72,18 +77,140 @@ const router = useRouter()
 const route = useRoute()
 
 const { t } = useI18n()
+// Sessão principal (header) — feedback Ezequias: um login só no app.
+const { isLoggedIn } = useAuth()
 const collections = ref<CustomCollectionSummary[]>([])
 // Privacidade da NOVA coletânea (default PRIVADO — opt-in pra publicar).
 const newCollectionVisibility = ref<CollectionVisibility>('private')
 const selectedCollectionId = ref<number | null>(null)
 const musics = ref<CustomMusicSummary[]>([])
+/** Estado de trabalho da música local selecionada (SPEC t_deed74b5). */
+const musicStatus = ref<'draft' | 'published'>('published')
+
+/** Publica a música local selecionada: draft → published. */
+async function onPublishMusic(): Promise<void> {
+  const id = selectedMusicId.value
+  if (id == null || !(id < 0)) return
+  const { publishLocalMusic } = await import('../services/local-custom-store')
+  if (publishLocalMusic(id)) {
+    musicStatus.value = 'published'
+    notify(`“${musicName.value}” publicada — disponível neste dispositivo`)
+  } else {
+    notify('Falha ao publicar')
+  }
+}
 const selectedMusicId = ref<number | null>(null)
 const musicName = ref('')
+
+/* ---------- RF-01 (SPEC-crud-comunidade-hub v1.0.0): rename de música ---------- */
+// Campo editável do nome no cabeçalho (padrão do rename de coletânea).
+// Online: PUT updateCustomMusic(id, { name }). Local (id negativo): patch no
+// store local. Só música CUSTOM do usuário — oficial (modo sugestão) não renomeia.
+const renameDraft = ref('')
+const renameBusy = ref(false)
+const canRenameMusic = computed(
+  () =>
+    getAuthSession() != null &&
+    selectedMusicId.value != null &&
+    editOfficialId.value == null,
+)
+
+async function onRenameMusic(): Promise<void> {
+  const id = selectedMusicId.value
+  const name = renameDraft.value.trim()
+  if (id == null || !name || renameBusy.value) return
+  renameBusy.value = true
+  try {
+    if (isLocalId(id)) {
+      if (updateLocalMusic(id, { name })) {
+        musicName.value = name
+        notify(t('media.editor.renamed'))
+      } else {
+        notify(t('media.editor.renameFailed'), true)
+      }
+      return
+    }
+    if (await updateCustomMusic(id, { name })) {
+      musicName.value = name
+      notify(t('media.editor.renamed'))
+    } else {
+      notify(t('media.editor.renameFailed'), true)
+    }
+  } finally {
+    renameBusy.value = false
+  }
+}
 const lyrics = ref<EditorLyric[]>([])
 const loading = ref(false)
 const saving = ref(false)
 const statusMessage = ref('')
 const snackbarOpen = ref(false)
+
+/* ---------- Edição de música OFICIAL como sugestão (RF-01, SPEC piano-community-edits) ---------- */
+const editOfficialId = ref<number | null>(null)
+
+/** Abre modo sugestão: carrega track oficial (resolver aplica local/applied p/ contexto) e trava escopo letra/timing. */
+async function loadOfficialForSuggestion(musicId: number): Promise<void> {
+  editOfficialId.value = musicId
+  selectedMusicId.value = null
+  loading.value = true
+  notify('')
+  try {
+    const { resolveMediaTrack } = await import('@modules/media/services/custom-catalog')
+    const track = await resolveMediaTrack(musicId)
+    if (!track) {
+      notify('Música oficial não encontrada', true)
+      editOfficialId.value = null
+      return
+    }
+    musicName.value = track.name
+    lyrics.value = (track.lyrics ?? []).map((s) => ({
+      id: s.order,
+      lyric: s.lyric,
+      time: s.time ?? '00:00',
+      imageUrl: s.imageUrl ?? '',
+    }))
+    notify('')
+    const { getLocalEdit } = await import('@modules/community-edits/services/local-edits-store')
+    const local = getLocalEdit(musicId)
+    if (local?.lyrics) {
+      try {
+        const editedSlides = JSON.parse(local.lyrics) as Array<{ lyric?: string; time?: string }>
+        lyrics.value = lyrics.value.map((row, index) => ({
+          ...row,
+          lyric: editedSlides[index]?.lyric ?? row.lyric,
+          time: editedSlides[index]?.time ?? row.time,
+        }))
+      } catch {
+        // Corrupt local edit: retain the resolved official/applied track.
+      }
+    }
+  } finally {
+    loading.value = false
+  }
+}
+
+/** Salva sugestão: somente letra/timing → saveLocalEdit (draft). Nunca faz PUT no catálogo oficial. */
+async function onSaveOfficialSuggestion(): Promise<void> {
+  if (editOfficialId.value == null) return
+  const { saveLocalEdit } = await import('@modules/community-edits/services/local-edits-store')
+  const slides = lyrics.value.map((row, i) => ({
+    order: i + 1,
+    lyric: row.lyric,
+    showSlide: true,
+    time: row.time,
+    instrumentalTime: '',
+    imageUrl: row.imageUrl || null,
+    imagePosition: null,
+    frameDataUrl: null,
+  }))
+  saveLocalEdit(editOfficialId.value, {
+    lyrics: JSON.stringify(slides),
+    timing: null,
+    status: 'draft',
+  })
+  notify('Correção salva localmente — publique em Minhas Edições (Comunidade)')
+}
 
 /** statusMessage + snackbar juntos (toast). Mensagem vazia só limpa, sem abrir toast. */
 function notify(message: string, isError = false): void {
@@ -117,7 +244,7 @@ const newMusicName = ref('')
 /** Assets de imagem upados no último import .slja (path → url) */
 const uploadedAssets = ref<Array<{ path: string; url: string; idFile: number }>>([])
 
-const hasSelection = computed(() => selectedMusicId.value != null)
+const hasSelection = computed(() => selectedMusicId.value != null || editOfficialId.value != null)
 
 /* ---------- Aside de coletâneas colapsável ---------- */
 const asideCollapsed = ref(false)
@@ -252,6 +379,8 @@ interface ReusableMusic {
   name: string
   collectionName?: string
   isCurrent: boolean
+  /** Estado de trabalho local (SPEC t_deed74b5) — badge na busca de reuso. */
+  status?: 'draft' | 'published'
 }
 
 const reuseSearch = ref('')
@@ -264,6 +393,10 @@ function onReuseSearchInput(): void {
     reuseResults.value = []
     return
   }
+  // Fold diacrítico (padrão product-search): "missao" acha "MISSÃO".
+  const normalize = (s: string): string =>
+    s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  const queryFold = normalize(query)
   void (async () => {
     if (allCustomMusicsCache == null) {
       allCustomMusicsCache = await listAllCustomMusics()
@@ -271,13 +404,14 @@ function onReuseSearchInput(): void {
     const cached = allCustomMusicsCache
     if (!cached) return
     reuseResults.value = cached
-      .filter((m) => m.name.toLowerCase().includes(query))
+      .filter((m) => normalize(m.name.toLowerCase()).includes(queryFold))
       .slice(0, 8)
       .map((m) => ({
         id: m.id,
         name: m.name,
         collectionName: m.collectionName,
         isCurrent: m.collectionId === selectedCollectionId.value,
+        status: m.status,
       }))
   })()
 }
@@ -471,13 +605,25 @@ async function onSelectMusic(id: number): Promise<void> {
         return
       }
       musicName.value = local.name
-      lyrics.value = local.lyrics.map((row) => ({
-        id: row.id,
-        lyric: row.lyric,
-        time: row.time ?? '00:00',
-        imageUrl: row.image_url ?? '',
+      // Estado de trabalho local (SPEC t_deed74b5) — badge/botão Publicar.
+      musicStatus.value = local.status ?? 'published'
+      // Bg local (IndexedDB): resolve blob → objectURL p/ preview no editor.
+      lyrics.value = await Promise.all(local.lyrics.map(async (row) => {
+        let imageUrl = ''
+        if (row.imageMediaId) {
+          const blob = await getMedia(row.imageMediaId)
+          if (blob) imageUrl = URL.createObjectURL(blob)
+        } else {
+          imageUrl = row.image_url ?? ''
+        }
+        return {
+          id: row.id,
+          lyric: row.lyric,
+          time: row.time ?? '00:00',
+          imageUrl,
+        }
       }))
-      loadAudioForMusic(local.audioBase64 ? `local:${local.id}` : null)
+      loadAudioForMusic(local.audioBase64 || local.audioMediaId ? `local:${local.id}` : null)
       if (local.officialMusicId != null) {
         notify('Hino oficial vinculado — a letra/áudio são gerenciados no catálogo oficial')
       }
@@ -532,7 +678,7 @@ async function onSelectMusic(id: number): Promise<void> {
 }
 
 function onBack(): void {
-  void router.push({ name: 'albums' })
+  void router.push({ name: 'community' })
 }
 
 /* ---------- Import / Export .slja ---------- */
@@ -545,12 +691,30 @@ function onImportSlja(): void {
 
 async function onImportFile(event: Event): Promise<void> {
   const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
+  // RF-02: múltiplos arquivos → cada um vira SUA coletânea (nome = título,
+  // sufixo (2)/(3) em colisão). Um arquivo segue o fluxo de sempre.
+  const files = Array.from(input.files ?? [])
   input.value = ''
-  if (!file) return
+  if (files.length === 0) return
+  if (files.length > 1) {
+    for (const file of files) {
+      await importSingleSlja(file)
+    }
+    return
+  }
+  await importSingleSlja(files[0]!)
+}
+
+async function importSingleSlja(file: File): Promise<void> {
   loading.value = true
   notify('')
   try {
+    // Espera a revalidação da sessão no boot (coalescing; teto de 8s —
+    // offline segue com o que tem localmente, sem travar o import).
+    await Promise.race([
+      getAuthReadiness(),
+      new Promise<void>((resolve) => setTimeout(resolve, 8_000)),
+    ])
     const buffer = await file.arrayBuffer()
     // Aceita .slja direto OU .slja.zip (wrapper que o WhatsApp cria)
     const archive = await parseSljaFile(buffer, file.name)
@@ -563,15 +727,24 @@ async function onImportFile(event: Event): Promise<void> {
       ? (innerName ?? file.name).replace(/\.slja(\.zip)?$/i, '')
       : archive.title.trim()
 
-    // Garante coletânea de importação: reaproveita a primeira "Importações .slja"
-    // existente; só cria se ainda não houver nenhuma.
+    // RF-02 (SPEC-crud-comunidade-hub v1.0.0): import .slja = 1 coletânea
+    // por arquivo. Nome = título do conteúdo (sem fallback genérico — os
+    // fallbacks já resolvidos acima); colisão com coletânea do usuário →
+    // sufixo (2), (3)... Nunca agrupa numa "Importações .slja" nova.
+    const importBaseName = name
+    const importCollectionName = collectionNameForImport(
+      importBaseName,
+      collections.value,
+    )
     let collectionId = selectedCollectionId.value
-    if (collectionId == null) {
-      const existing = collections.value.find((c) => c.name === 'Importações .slja')
+    if (collectionId == null || importCollectionName !== importBaseName) {
+      const existing = collections.value.find(
+        (c) => c.name === importCollectionName,
+      )
       if (existing) {
         collectionId = existing.id
       } else {
-        const created = await createCustomCollection('Importações .slja')
+        const created = await createCustomCollection(importCollectionName)
         if (!created) {
           notify('Falha ao criar coletânea de importação')
           return
@@ -584,39 +757,75 @@ async function onImportFile(event: Event): Promise<void> {
 
     const createdMusic = await createCustomMusic(collectionId, { name })
     if (!createdMusic) {
-      notify('Falha ao criar música a partir do .slja')
+      notify('Falha ao criar música a partir do .slja — verifique conexão/login', true)
       return
     }
     selectedMusicId.value = createdMusic.id
     musicName.value = name
     lyrics.value = []
 
-    // Upload de mídia embutida no .slja (áudio + imagens de fundo).
-    // Falha de upload não aborta o import — segue só com texto.
+    // Mídia embutida no .slja (áudio + imagens de fundo).
+    // OFFLINE-FIRST: música local (id negativo, sem sessão) guarda áudio/bg
+    // em IndexedDB — reprodução/projeção funcionam sem servidor. Música
+    // remota segue com upload pra API.
+    const isLocalMusic = isLocalId(createdMusic.id)
+    const hasSession = Boolean(getAuthSession())
     let uploadedAudio: { idFile: number; url: string } | null = null
+    let localAudioPath: string | null = null
+    const localImageMediaIds = new Map<string, string>() // asset.path → IndexedDB id
+    let localAssetIndex = 0
+
     if (archive.audio?.bytes?.length) {
-      uploadedAudio = await uploadCustomFile(
-        archive.audio.bytes,
-        archive.audio.name,
-        'audio',
-      )
-      if (uploadedAudio) {
-        await updateCustomMusic(createdMusic.id, { id_file_audio: uploadedAudio.idFile })
-        notify(`Importado: ${file.name} (com áudio)`)
+      if (isLocalMusic) {
+        const mediaId = `local-music-${createdMusic.id}-audio`
+        await putMedia(mediaId, archive.audio.bytes)
+        updateLocalMusic(createdMusic.id, {
+          audioMediaId: mediaId,
+          audioBase64: null,
+          audioName: archive.audio.name,
+        })
+        localAudioPath = `local:${createdMusic.id}`
+        notify(`Importado: ${file.name} (com áudio local)`)
       } else {
-        notify(`Importado: ${file.name} (áudio falhou no upload)`)
+        uploadedAudio = await uploadCustomFile(
+          archive.audio.bytes,
+          archive.audio.name,
+          'audio',
+        )
+        if (uploadedAudio) {
+          await updateCustomMusic(createdMusic.id, { id_file_audio: uploadedAudio.idFile })
+          notify(`Importado: ${file.name} (com áudio)`)
+        } else {
+          console.error('Falha no upload de áudio do .slja', { file: archive.audio.name })
+          notify(`Importado: ${file.name} (áudio falhou no upload — verifique conexão/login)`, true)
+        }
       }
-    }
-    if (archive.assets?.length) {
-      const uploaded: Array<{ path: string; url: string; idFile: number }> = []
-      for (const asset of archive.assets) {
-        const up = await uploadCustomFile(asset.bytes, asset.path, 'imagens')
-        if (up) uploaded.push({ path: asset.path, url: up.url, idFile: up.idFile })
-      }
-      uploadedAssets.value = uploaded
+    } else if (hasSession) {
+      notify(`Importado: ${file.name}`)
     }
 
-    /** imageUrl → id_file, pro createCustomLyric (API espera id, não url) */
+    if (archive.assets?.length) {
+      if (isLocalMusic) {
+        // Bg local em IndexedDB: sem upload e sem estourar quota do localStorage.
+        for (const asset of archive.assets) {
+          const mediaId = `local-music-${createdMusic.id}-image-${localAssetIndex++}`
+          await putMedia(mediaId, asset.bytes)
+          localImageMediaIds.set(asset.path, mediaId)
+        }
+      } else {
+        const uploaded: Array<{ path: string; url: string; idFile: number }> = []
+        for (const asset of archive.assets) {
+          const up = await uploadCustomFile(asset.bytes, asset.path, 'imagens')
+          if (up) uploaded.push({ path: asset.path, url: up.url, idFile: up.idFile })
+        }
+        uploadedAssets.value = uploaded
+      }
+    }
+    if (!isLocalMusic && !hasSession && (archive.audio?.bytes?.length || archive.assets?.length)) {
+      notify('Sem conta conectada: áudio e fundo não sobem — entre para incluí-los', true)
+    }
+
+    /** imageUrl → id_file (remoto) ou data: URL (local) */
     const imageIdByUrl = new Map(uploadedAssets.value.map((a) => [a.url, a.idFile]))
 
     // Slides CAPA do .slja NÃO viram estrofe: o player já projeta a capa
@@ -626,12 +835,21 @@ async function onImportFile(event: Event): Promise<void> {
     const slides = [...archive.slides]
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
       .filter((slide) => slide.type !== 'CAPA')
+    let importedCount = 0
+    let failedLyrics = 0
     for (const slide of slides) {
       const text = slide.lyric.trim()
       if (!text) continue
-      // Background do slide: se o .slja referencia imagem, usa a URL upada
+      // Background do slide: remoto → URL upada; local → data: URL do asset
       let imageUrl = ''
-      if (slide.image?.name && uploadedAssets.value.length) {
+      let imageMediaId: string | undefined
+      if (slide.image?.name && isLocalMusic && localImageMediaIds.size) {
+        const match = [...localImageMediaIds.entries()].find(([path]) =>
+          slide.image!.name.toLowerCase().includes(path.toLowerCase())
+          || path.toLowerCase().includes(slide.image!.name.toLowerCase()),
+        )
+        if (match) imageMediaId = match[1]
+      } else if (slide.image?.name && uploadedAssets.value.length) {
         const match = uploadedAssets.value.find((a) =>
           slide.image!.name.toLowerCase().includes(a.path.toLowerCase())
           || a.path.toLowerCase().includes(slide.image!.name.toLowerCase()),
@@ -642,18 +860,35 @@ async function onImportFile(event: Event): Promise<void> {
         lyric: text,
         time: formatMsAsTime(slide.timeMs),
         id_file_image: imageIdByUrl.get(imageUrl),
+        imageMediaId,
       })
       if (created) {
+        importedCount++
+        // No modo local o bg vive em IndexedDB (imageMediaId) — resolve o
+        // objectURL agora pra preview/projeção refletirem na hora.
+        let stanzaImageUrl = imageUrl
+        if (!stanzaImageUrl && imageMediaId) {
+          const blob = await getMedia(imageMediaId)
+          if (blob) stanzaImageUrl = URL.createObjectURL(blob)
+        }
         lyrics.value.push({
           id: created.id,
           lyric: text,
           time: formatMsAsTime(slide.timeMs),
-          imageUrl,
+          imageUrl: stanzaImageUrl,
         })
+      } else {
+        failedLyrics++
+        console.error('Falha ao criar estrofe do .slja', { slide: slide.order, musicId: createdMusic.id })
       }
     }
-    if (!statusMessage.value) {
-      notify(`Importado: ${slides.filter((s) => s.lyric.trim()).length} estrofes de ${file.name}`)
+    if (failedLyrics > 0) {
+      notify(
+        `Importado com falhas: ${importedCount} estrofes OK, ${failedLyrics} falharam — verifique conexão/login`,
+        true,
+      )
+    } else if (!statusMessage.value) {
+      notify(`Importado: ${importedCount} estrofes de ${file.name}`)
     }
 
     // Pós-import: reflete tudo na UI — sidebar da coletânea, áudio no player,
@@ -663,7 +898,7 @@ async function onImportFile(event: Event): Promise<void> {
       selectedCollectionId.value = collectionId
     }
     musics.value = await listCustomMusics(collectionId)
-    loadAudioForMusic(uploadedAudio?.url ?? null)
+    loadAudioForMusic(localAudioPath ?? uploadedAudio?.url ?? null)
   } catch (error) {
     console.error('Falha ao importar .slja', error)
     notify('Arquivo .slja inválido')
@@ -864,14 +1099,9 @@ function onAudioPlay(): void {
 
 function onAudioPause(): void {
   isPlaying.value = false
-  // Auto-fill: ao pausar, o instante atual vira o timing da estrofe ativa
-  // (o usuário pausa no momento certo e digita/ajusta a letra).
-  const idx = activeStanzaIndexOverride.value ?? computedActiveIndex.value
-  const stanza = lyrics.value[idx]
-  if (stanza) {
-    stanza.time = timeLabelOf(currentTimeMs.value)
-    void onSaveStanza(idx)
-  }
+  // Feedback Rafael 14/11: pause é SÓ controle de áudio (parar/tocar do começo
+  // p/ conferir sincronia). Timing da estrofe é gravado EXCLUSIVAMENTE pelo
+  // botão "Marcar" — auto-fill no pause causava marcas acidentais.
 }
 
 function onAudioTimeUpdate(): void {
@@ -912,12 +1142,17 @@ const activeStanza = computed(() => {
 })
 
 /** Carrega o áudio vinculado à música (audio_url da API ou local:<id>) */
-function loadAudioForMusic(audioPath: string | null): void {
+async function loadAudioForMusic(audioPath: string | null): Promise<void> {
   if (audioPath?.startsWith('local:')) {
     const local = getLocalMusicById(Number(audioPath.slice('local:'.length)))
-    audioSrc.value = local?.audioBase64
-      ? `data:audio/mpeg;base64,${local.audioBase64}`
-      : null
+    if (local?.audioMediaId) {
+      const blob = await getMedia(local.audioMediaId)
+      audioSrc.value = blob ? URL.createObjectURL(blob) : null
+    } else {
+      audioSrc.value = local?.audioBase64
+        ? audioDataUrlFromBase64(local.audioBase64)
+        : null
+    }
   } else {
     audioSrc.value = audioPath ? customFileUrl(audioPath) : null
   }
@@ -950,8 +1185,13 @@ async function onAudioFile(event: Event): Promise<void> {
     const bytes = new Uint8Array(await file.arrayBuffer())
 
     if (isLocalId(musicId)) {
+      // slja-storage: áudio local agora é blob em IndexedDB (não base64 no
+      // localStorage — quota). Id derivado da música p/ ficar estável.
+      const mediaId = `local-music-${musicId}-audio`
+      await putMedia(mediaId, bytes)
       updateLocalMusic(musicId, {
-        audioBase64: bytesToBase64(bytes),
+        audioMediaId: mediaId,
+        audioBase64: null,
         audioName: file.name,
       })
       loadAudioForMusic(`local:${musicId}`)
@@ -1029,6 +1269,10 @@ onMounted(async () => {
     selectedCollectionId.value = null
     musics.value = []
   }
+  if (route.query.editOfficial) {
+    const id = Number(route.query.editOfficial)
+    if (!Number.isNaN(id) && id > 0) await loadOfficialForSuggestion(id)
+  }
   if (route.query.new === '1') {
     newMusicName.value = ''
     document.querySelector<HTMLInputElement>('[data-testid="new-music-input"]')?.focus()
@@ -1059,13 +1303,14 @@ onMounted(async () => {
         ref="fileInputEl"
         type="file"
         accept=".slja,.zip"
+        multiple
         class="editor__file-input"
         @change="onImportFile"
       >
       <button
         type="button"
         class="editor__btn"
-        title="Importar arquivo .slja"
+        :title="t('media.editor.importSlja')"
         @click="onImportSlja"
       >
         <i
@@ -1078,7 +1323,7 @@ onMounted(async () => {
         type="button"
         class="editor__btn"
         :disabled="!hasSelection || lyrics.length === 0"
-        title="Exportar música atual como .slja"
+        :title="t('media.editor.exportSlja')"
         @click="onExportSlja"
       >
         <i
@@ -1128,7 +1373,14 @@ onMounted(async () => {
         <h2 class="editor__section-title">
           Coletâneas
         </h2>
-        <MediaAccountBar :notify="notify" />
+        <!-- Feedback Ezequias (02/10): um login só. A barra de login legacy das
+             coletâneas só aparece SEM sessão principal (Firebase/legacy unificado
+             do header). Logado, o token da sessão principal serve pra tudo
+             (mesma chave localStorage — bridge firebase-session na API). -->
+        <MediaAccountBar
+          v-if="!isLoggedIn"
+          :notify="notify"
+        />
         <!-- Capa da coletânea selecionada (upload/remoção) -->
         <div
           v-if="selectedCollection"
@@ -1141,7 +1393,7 @@ onMounted(async () => {
             :style="selectedCollection.coverUrl
               ? { backgroundImage: `url(${customFileUrl(selectedCollection.coverUrl)})` }
               : undefined"
-            title="Alterar capa da coletânea"
+            :title="t('media.editor.changeCover')"
             @click="coverInput?.click()"
           >
             <i
@@ -1154,7 +1406,7 @@ onMounted(async () => {
             v-if="selectedCollection.coverUrl"
             type="button"
             class="editor__btn editor__btn--danger editor__btn--icon"
-            title="Remover capa"
+            :title="t('media.editor.removeCover')"
             @click="onRemoveCover"
           >
             <i
@@ -1167,7 +1419,7 @@ onMounted(async () => {
             type="file"
             accept="image/*"
             class="editor__file-input"
-            aria-label="Alterar capa da coletânea"
+            :aria-label="t('media.editor.changeCover')"
             @change="onCoverFile"
           >
         </div>
@@ -1176,7 +1428,7 @@ onMounted(async () => {
             v-model="newCollectionName"
             type="text"
             class="editor__input"
-            placeholder="Nova coletânea…"
+            :placeholder="t('media.editor.newCollection')"
             @keyup.enter="onCreateCollection"
           >
           <button
@@ -1308,7 +1560,7 @@ onMounted(async () => {
           type="button"
           class="editor__btn editor__btn--danger"
           :disabled="saving"
-          title="Excluir coletânea selecionada"
+          :title="t('media.editor.deleteCollection')"
           @click="requestDelete('collection')"
         >
           <i
@@ -1339,7 +1591,7 @@ onMounted(async () => {
               v-model="newMusicName"
               type="text"
               class="editor__input"
-              placeholder="Nova música…"
+              :placeholder="t('media.editor.newMusic')"
               @keyup.enter="onCreateMusic"
             >
             <button
@@ -1361,7 +1613,7 @@ onMounted(async () => {
               v-model="reuseSearch"
               type="text"
               class="editor__input"
-              placeholder="Reutilizar música existente…"
+              :placeholder="t('media.editor.reuseMusic')"
               @input="onReuseSearchInput"
             >
             <ul
@@ -1387,6 +1639,11 @@ onMounted(async () => {
                   />
                   <span class="editor__list-item-text">
                     {{ music.name }}
+                    <span
+                      v-if="music.status === 'draft'"
+                      class="editor__draft-badge"
+                      title="Rascunho — a cópia também nasce como rascunho"
+                    >Rascunho</span>
                     <small
                       v-if="music.collectionName"
                       class="editor__list-item-sub"
@@ -1404,7 +1661,7 @@ onMounted(async () => {
                 v-model="officialSearch"
                 type="text"
                 class="editor__input"
-                placeholder="Buscar hino oficial (nº ou nome)…"
+                :placeholder="t('media.editor.searchOfficial')"
                 @input="onOfficialSearchInput"
                 @keyup.enter="onAddOfficialFromSearch"
               >
@@ -1412,7 +1669,7 @@ onMounted(async () => {
                 type="button"
                 class="editor__btn"
                 :disabled="saving || officialSearchResults.length === 0"
-                title="Adicionar 1º resultado"
+                :title="t('media.editor.addFirstResult')"
                 @click="onAddOfficialFromSearch"
               >
                 <i
@@ -1461,19 +1718,38 @@ onMounted(async () => {
                 <i
                   v-if="music.officialMusicId"
                   class="ti ti-book editor__official-badge"
-                  title="Hino oficial (gerenciado no catálogo)"
+                  :title="t('media.editor.officialHymn')"
                   aria-hidden="true"
                 />
                 {{ music.name }}
+                <span
+                  v-if="music.status === 'draft'"
+                  class="editor__draft-badge"
+                  title="Rascunho — só existe neste dispositivo até ser publicada"
+                >Rascunho</span>
               </button>
             </li>
           </ul>
+          <button
+            v-if="selectedMusicId != null && musicStatus === 'draft'"
+            type="button"
+            class="editor__btn editor__btn--publish"
+            :disabled="saving"
+            title="Publica a música — deixa de ser rascunho neste dispositivo"
+            @click="onPublishMusic"
+          >
+            <i
+              class="ti ti-upload"
+              aria-hidden="true"
+            />
+            Publicar
+          </button>
           <button
             v-if="selectedMusicId != null"
             type="button"
             class="editor__btn editor__btn--danger"
             :disabled="saving"
-            title="Excluir música selecionada"
+            :title="t('media.editor.deleteMusic')"
             @click="requestDelete('music')"
           >
             <i
@@ -1503,6 +1779,31 @@ onMounted(async () => {
             <h2 class="editor__section-title">
               {{ musicName || 'Música' }}
             </h2>
+            <div
+              v-if="canRenameMusic"
+              class="editor__rename"
+            >
+              <input
+                v-model="renameDraft"
+                type="text"
+                class="editor__rename-input"
+                :placeholder="t('media.editor.renamePlaceholder')"
+                :aria-label="t('media.editor.renamePlaceholder')"
+                @keyup.enter="onRenameMusic"
+              >
+              <button
+                type="button"
+                class="editor__rename-save"
+                :disabled="renameBusy"
+                :title="t('media.editor.renameSave')"
+                @click="onRenameMusic"
+              >
+                <i
+                  :class="renameBusy ? 'ti ti-loader-2 ti-spin' : 'ti ti-device-floppy'"
+                  aria-hidden="true"
+                />
+              </button>
+            </div>
           </div>
 
           <!-- Faixa superior: slide com player INTEGRADO (hover), mesmo tamanho da /media -->
@@ -1570,21 +1871,21 @@ onMounted(async () => {
                   type="button"
                   class="editor__btn"
                   :disabled="saving"
-                  title="Vincular um arquivo de áudio (MP3) à música"
+                  :title="t('media.editor.linkAudio')"
                   @click="onPickAudio"
                 >
                   <i
                     class="ti ti-music"
                     aria-hidden="true"
                   />
-                  Adicionar áudio (MP3)
+                  Adicionar áudio
                 </button>
                 <button
                   v-else
                   type="button"
                   class="editor__btn editor__btn--danger"
                   :disabled="saving"
-                  title="Remover o áudio vinculado"
+                  :title="t('media.editor.removeAudio')"
                   @click="onRemoveAudio"
                 >
                   <i
@@ -1597,8 +1898,37 @@ onMounted(async () => {
             </div>
           </div>
 
+          <section
+            v-if="editOfficialId != null"
+            class="editor__official-suggestion"
+            data-testid="edit-official-panel"
+          >
+            <h2>Sugerir correção — {{ musicName }}</h2>
+            <p>Edite somente letra e timing. Áudio, fundo, capa e metadados continuam oficiais.</p>
+            <div
+              v-for="(stanza, index) in lyrics"
+              :key="`official-${stanza.id ?? index}`"
+              class="editor__stanza"
+            >
+              <label>Timing <input v-model="stanza.time" type="time" class="editor__input editor__input--time" step="1"></label>
+              <textarea
+                v-model="stanza.lyric"
+                :data-testid="`edit-official-lyric-${index}`"
+                class="editor__textarea"
+                rows="4"
+              />
+            </div>
+            <button
+              type="button"
+              class="editor__btn editor__btn--save"
+              data-testid="edit-official-save"
+              @click="onSaveOfficialSuggestion"
+            >Salvar sugestão local</button>
+          </section>
+
           <!-- Estrofes na MESMA visão: tocar, marcar, adicionar — tudo junto -->
           <ul
+            v-else
             class="editor__stanzas"
           >
             <li
@@ -1623,7 +1953,7 @@ onMounted(async () => {
                   type="button"
                   class="editor__btn editor__btn--mark"
                   :disabled="saving || !isPlaying"
-                  title="Marcar o instante atual do áudio como timing desta estrofe"
+                  :title="t('media.editor.markTiming')"
                   @click="onMarkStanzaTime(index)"
                 >
                   <i
@@ -1648,7 +1978,7 @@ onMounted(async () => {
                   type="button"
                   class="editor__btn editor__btn--danger editor__btn--icon"
                   :disabled="saving"
-                  title="Excluir estrofe"
+                  :title="t('media.editor.deleteStanza')"
                   @click="requestDelete('stanza', { stanzaIndex: index })"
                 >
                   <i
@@ -1661,7 +1991,7 @@ onMounted(async () => {
                 v-model="stanza.lyric"
                 class="editor__textarea"
                 rows="4"
-                placeholder="Letra da estrofe…"
+                :placeholder="t('media.editor.lyricPlaceholder')"
                 @dblclick="onSeekToStanza(index)"
               />
               <div class="editor__stanza-media">
@@ -1722,7 +2052,7 @@ onMounted(async () => {
           <button
             type="button"
             class="editor__lyric-pane-toggle"
-            title="Ocultar letra"
+            :title="t('media.editor.hideLyric')"
             @click="lyricPaneOpen = false"
           >
             <i
@@ -1753,7 +2083,7 @@ onMounted(async () => {
         v-else-if="hasSelection"
         type="button"
         class="editor__lyric-pane-toggle editor__lyric-pane-toggle--floating"
-        title="Mostrar letra"
+        :title="t('media.editor.showLyric')"
         @click="lyricPaneOpen = true"
       >
         <i
@@ -1766,8 +2096,8 @@ onMounted(async () => {
       :open="confirmOpen"
       :title="confirmTitle"
       :message="confirmMessage"
-      confirm-label="Excluir"
-      cancel-label="Cancelar"
+      :confirm-label="t('media.editor.delete')"
+      :cancel-label="t('media.editor.cancel')"
       danger
       @confirm="onConfirmDelete"
       @cancel="confirmOpen = false"
@@ -2447,6 +2777,36 @@ onMounted(async () => {
   gap: 0.5rem;
 }
 
+.editor__rename {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.editor__rename-input {
+  max-width: 14rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--ds-color-border, rgba(255, 255, 255, 0.2));
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+}
+
+.editor__rename-save {
+  border: 1px solid var(--ds-color-border, rgba(255, 255, 255, 0.2));
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+}
+
+.editor__rename-save:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 
 .editor__audio {
   /* flex-basis 0 colapsa <audio> (replaced element sem largura intrínseca
@@ -2659,5 +3019,25 @@ onMounted(async () => {
   margin-right: 0.3rem;
   color: var(--ds-color-primary, #2196f3);
   opacity: 0.85;
+}
+
+/* Badge "Rascunho" (SPEC t_deed74b5) — trabalho em andamento, só local. */
+.editor__draft-badge {
+  flex-shrink: 0;
+  margin-left: 0.35rem;
+  padding: 0.05rem 0.35rem;
+  border: 1px solid var(--ds-color-border, rgba(255, 255, 255, 0.2));
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+/* Botão Publicar (SPEC t_deed74b5) — draft → published. */
+.editor__btn--publish {
+  border-color: var(--ds-color-primary, #2196f3);
+  color: var(--ds-color-primary, #2196f3);
 }
 </style>

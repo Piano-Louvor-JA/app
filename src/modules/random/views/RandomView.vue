@@ -4,12 +4,12 @@ import { readEffectiveStageSettings, subscribeStageSettings } from '../../settin
 import type { StageSettings } from '../../settings/types/stage-settings'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import PageBackStack from '@shared/components/PageBackStack.vue'
+import { useMinimizablePage } from '@shared/composables/useMinimizablePage'
 
-import PalcoRouteSelect from '../../settings/components/PalcoRouteSelect.vue'
 import RandomAvailablePanel from '../components/RandomAvailablePanel.vue'
 import RandomConfigDialog from '../components/RandomConfigDialog.vue'
 import RandomHistoryPanel from '../components/RandomHistoryPanel.vue'
-import RandomProjectFab from '../components/RandomProjectFab.vue'
 import RandomStage from '../components/RandomStage.vue'
 import { useRandomFeature } from '../composables/useRandom'
 import { appConfirm } from '@shared/composables/useAppConfirm'
@@ -17,6 +17,13 @@ import { decodeTextFileBytes } from '@shared/services/text-encoding'
 import type { RandomDrawMode } from '../types/random'
 
 const { t } = useI18n()
+
+// Minimizar: o estado da tela já vive na store; o retrato guarda só rolagem e miniatura.
+const { minimize, prepare } = useMinimizablePage({
+  describe: () => ({ title: t('random.title'), icon: 'ti-ticket', summary: '' }),
+  capture: () => null,
+  fallbackRoute: { name: 'utilities' },
+})
 const router = useRouter()
 
 const {
@@ -46,6 +53,7 @@ const {
   setBgColor,
   setTextColor,
   setFontSizePc,
+  setDrawnSizePc,
   setTextTransform,
   setAnimationSpeed,
   resetDisplayToDefault,
@@ -58,15 +66,10 @@ const {
   toggleAudioMuted,
   openConfig,
   closeConfig,
-  toggleProjection,
 } = useRandomFeature()
 
 function goBack() {
   void router.push({ name: 'utilities' })
-}
-
-function onToggleProjection() {
-  void toggleProjection()
 }
 
 async function onResetAll() {
@@ -121,18 +124,19 @@ const effectiveConfig = computed(() => {
 <template>
   <section class="random-view">
     <header class="random-view__header">
-      <PalcoRouteSelect module="random" />
-      <button
-        type="button"
-        class="random-view__back"
-        :aria-label="t('random.backToUtilities')"
-        @click="goBack"
-      >
-        <i
-          class="ti ti-arrow-left"
-          aria-hidden="true"
-        />
-      </button>
+      <PageBackStack @minimize="minimize" @prepare="prepare">
+        <button
+          type="button"
+          class="random-view__back"
+          :aria-label="t('random.backToUtilities')"
+          @click="goBack"
+        >
+          <i
+            class="ti ti-arrow-left"
+            aria-hidden="true"
+          />
+        </button>
+      </PageBackStack>
 
       <div class="random-view__brand">
         <div class="random-view__brand-icon">
@@ -250,15 +254,10 @@ const effectiveConfig = computed(() => {
       @update:bg-color="setBgColor"
       @update:text-color="setTextColor"
       @update:font-size-pc="setFontSizePc"
+      @update:drawn-size-pc="setDrawnSizePc"
       @update:text-transform="setTextTransform"
       @update:animation-speed="setAnimationSpeed"
       @reset="resetDisplayToDefault"
-    />
-
-    <RandomProjectFab
-      :projecting="isProjecting"
-      @project="onToggleProjection"
-      @clear="onToggleProjection"
     />
   </section>
 </template>

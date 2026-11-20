@@ -23,17 +23,16 @@ function asTimeFormat(value: unknown): CountdownTimeFormat {
     : DEFAULT_COUNTDOWN_DISPLAY_CONFIG.timeFormat
 }
 
+/** Só a aparência do Timer; campos da Escola Sabatina de versões antigas são descartados. */
 export function normalizeCountdownDisplayConfig(raw: unknown): CountdownDisplayConfig {
-  if (!raw || typeof raw !== 'object') {
-    return { ...DEFAULT_COUNTDOWN_DISPLAY_CONFIG }
-  }
+  if (!raw || typeof raw !== 'object') return { ...DEFAULT_COUNTDOWN_DISPLAY_CONFIG }
 
   const source = raw as Record<string, unknown>
-
   return {
     timeFormat: asTimeFormat(source.timeFormat),
     bgColor: asString(source.bgColor, DEFAULT_COUNTDOWN_DISPLAY_CONFIG.bgColor),
     textColor: asString(source.textColor, DEFAULT_COUNTDOWN_DISPLAY_CONFIG.textColor),
+    allowNegative: typeof source.allowNegative === 'boolean' ? source.allowNegative : DEFAULT_COUNTDOWN_DISPLAY_CONFIG.allowNegative,
   }
 }
 

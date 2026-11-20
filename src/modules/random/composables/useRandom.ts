@@ -40,6 +40,7 @@ export function useRandomFeature() {
     setBgColor: store.setBgColor,
     setTextColor: store.setTextColor,
     setFontSizePc: store.setFontSizePc,
+    setDrawnSizePc: store.setDrawnSizePc,
     setTextTransform: store.setTextTransform,
     setAnimationSpeed: store.setAnimationSpeed,
     resetDisplayToDefault: store.resetDisplayToDefault,

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { appConfirm } from '@shared/composables/useAppConfirm'
+import { hasMediaCustomCatalogBackup, restoreMediaCustomCatalogBackup } from '@modules/sync/services/media-custom-backup'
 
 import { GlassCard } from '@design-system/index'
 import { isDesktopApp } from '@shared/services/desktop-bridge'
@@ -29,8 +31,13 @@ import {
 import LegacyMediaImportCard from '../components/LegacyMediaImportCard.vue'
 import MediaFolderCard from '../components/MediaFolderCard.vue'
 import AppBackupCard from '../components/AppBackupCard.vue'
+import DiagnosticsCard from '../components/DiagnosticsCard.vue'
+import { ensureCatalogForLocale } from '@modules/starting/services/catalog-locale-service'
 
 const { t, locale } = useI18n()
+const catalogSyncState = ref<'idle' | 'syncing' | 'done' | 'error'>('idle')
+/** 0–100 do download do catálogo do idioma (0 = nada concluído ainda). */
+const catalogSyncProgress = ref(0)
 const isClearing = ref(false)
 const clearError = ref(false)
 const clearConfirmOpen = ref(false)
@@ -46,6 +53,7 @@ function openClearConfirm() {
 }
 
 function closeClearConfirm() {
+  /* v8 ignore next 1 -- popup fecha antes de isClearing ficar true */
   if (isClearing.value) return
   clearConfirmOpen.value = false
   clearAcknowledged.value = false
@@ -58,6 +66,7 @@ type SyncStatus =
 
 const syncStatus = ref<SyncStatus>({ kind: 'idle' })
 const isSyncBusy = ref(false)
+const hasCatalogBackup = ref(hasMediaCustomCatalogBackup())
 
 async function handleSyncExport() {
   if (isSyncBusy.value) return
@@ -91,8 +100,27 @@ async function handleSyncImport() {
       syncStatus.value = { kind: 'error', messageKey: 'settings.general.syncInvalid' }
       return
     }
-    const result = importLouvorjaIntoBrowser(decodeLouvorjaPackage(raw))
+    const pkg = decodeLouvorjaPackage(raw)
+    let catalogReplacementConfirmed = false
+    if (pkg.entities.mediaCustomCatalog) {
+      catalogReplacementConfirmed = await appConfirm({
+        title: t('settings.general.catalogReplaceTitle'),
+        message: t('settings.general.catalogReplaceMessage'),
+        confirmLabel: t('settings.general.catalogReplaceConfirm'),
+        cancelLabel: t('settings.general.catalogCancel'),
+        danger: true,
+      })
+      if (!catalogReplacementConfirmed) {
+        syncStatus.value = { kind: 'error', messageKey: 'settings.general.syncCancelled' }
+        return
+      }
+    }
+    const result = importLouvorjaIntoBrowser(pkg, { catalogReplacementConfirmed })
+    hasCatalogBackup.value = hasMediaCustomCatalogBackup()
     if (result.applied.length > 0) {
+      if (result.applied.includes("liturgy")) {
+        window.dispatchEvent(new CustomEvent("liturgy:imported"))
+      }
       syncStatus.value = {
         kind: 'success',
         messageKey: 'settings.general.syncImported',
@@ -102,11 +130,31 @@ async function handleSyncImport() {
       syncStatus.value = {
         kind: 'success',
         messageKey: 'settings.general.syncNothingToApply',
+        params: {
+          localModified: result.localModified ?? '—',
+          packageModified: result.packageModified ?? '—',
+        },
       }
     }
   } catch (error) {
     console.error('[settings] falha ao importar pacote', error)
-    syncStatus.value = { kind: 'error', messageKey: 'settings.general.syncInvalid' }
+    syncStatus.value = { kind: 'error', messageKey: 'settings.general.catalogImportFailed' }
+  } finally {
+    isSyncBusy.value = false
+  }
+}
+
+async function handleCatalogRestore() {
+  if (isSyncBusy.value) return
+  isSyncBusy.value = true
+  try {
+    const confirmed = await appConfirm({ title: t('settings.general.catalogRestore'), message: t('settings.general.catalogRestoreMessage'), confirmLabel: t('settings.general.catalogRestore'), cancelLabel: t('settings.general.catalogCancel'), danger: true })
+    if (!confirmed) return
+    syncStatus.value = restoreMediaCustomCatalogBackup()
+      ? { kind: 'success', messageKey: 'settings.general.catalogRestored' }
+      : { kind: 'error', messageKey: 'settings.general.catalogImportFailed' }
+  } catch {
+    syncStatus.value = { kind: 'error', messageKey: 'settings.general.catalogImportFailed' }
   } finally {
     isSyncBusy.value = false
   }
@@ -124,16 +172,44 @@ const {
 const SUPPORTED_LOCALES = [
   { value: 'pt-BR', labelKey: 'settings.general.languagePortuguese' },
   { value: 'es', labelKey: 'settings.general.languageSpanish' },
+  { value: 'uk', labelKey: 'settings.general.languageUkrainian' },
 ] as const
 
 const currentLanguage = ref(
   getUserPreference<string>(USER_PREFERENCE_KEYS.language, 'pt-BR') ?? 'pt-BR',
 )
 
-function changeLanguage(lang: string) {
-  currentLanguage.value = lang
-  locale.value = lang
-  setUserPreference(USER_PREFERENCE_KEYS.language, lang)
+/** Ordem D2 da SPEC-locale-hot-reload: download do catálogo do idioma alvo
+ * PRIMEIRO, persistir o idioma DEPOIS, reload do renderer por último. O guard
+ * de ensureCatalogForLocale compara com getCurrentApiPrefix(), que lê a
+ * preferência persistida — persistir antes = early-return = download nunca
+ * roda (causa do "tem que fechar e abrir denovo", app#locale-hot-reload).
+ * Falha de rede = rollback real: nada persistido, UI fica no idioma antigo. */
+let languageSwitchBusy = false
+async function changeLanguage(lang: string) {
+  if (languageSwitchBusy) return
+  languageSwitchBusy = true
+  try {
+    // D4: no-op re-clicar o idioma ativo (nada a baixar nem recarregar).
+    if (lang === currentLanguage.value) return
+    catalogSyncState.value = 'syncing'
+    catalogSyncProgress.value = 0
+    await ensureCatalogForLocale(lang, (progress) => {
+      catalogSyncProgress.value = progress
+    })
+    setUserPreference(USER_PREFERENCE_KEYS.language, lang)
+    currentLanguage.value = lang
+    locale.value = lang
+    // D1: reload controlado do renderer (precedente runFirstBoot) — zera as
+    // consts de módulo (ex.: BOOKS_FILE da bíblia) e recarrega os stores com
+    // os índices do novo idioma. Não chega aqui se o download falhou.
+    window.location.reload()
+  } catch {
+    catalogSyncState.value = 'error'
+    // rollback: locale/currentLanguage ficam no idioma antigo (D2).
+  } finally {
+    languageSwitchBusy = false
+  }
 }
 
 async function handleCheckUpdate() {
@@ -141,6 +217,7 @@ async function handleCheckUpdate() {
 }
 
 async function clearAllLocalData() {
+  /* v8 ignore next 1 -- botão confirmar só habilita com acknowledged e desktop */
   if (!isDesktopApp() || isClearing.value || !clearAcknowledged.value) return
 
   isClearing.value = true
@@ -250,9 +327,63 @@ async function clearAllLocalData() {
           type="button"
           class="general-settings__lang-btn"
           :class="{ 'general-settings__lang-btn--active': currentLanguage === lang.value }"
+          :disabled="catalogSyncState === 'syncing'"
           @click="changeLanguage(lang.value)"
         >
           {{ t(lang.labelKey) }}
+        </button>
+      </div>
+
+      <!-- D3 SPEC-locale-hot-reload: feedback do download do catálogo -->
+      <div
+        v-if="catalogSyncState === 'syncing'"
+        class="general-settings__lang-sync-box"
+      >
+        <p
+          class="general-settings__hint general-settings__lang-sync"
+          data-testid="language-sync-downloading"
+          role="status"
+        >
+          {{ t('settings.general.languageSyncDownloading') }}
+        </p>
+        <div class="general-settings__lang-progress-row">
+          <div
+            class="general-settings__lang-progress"
+            :class="{
+              'general-settings__lang-progress--indeterminate': catalogSyncProgress <= 0,
+            }"
+            data-testid="language-sync-progress"
+            role="progressbar"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            :aria-valuenow="catalogSyncProgress > 0 ? catalogSyncProgress : undefined"
+            :aria-label="t('settings.general.languageSyncDownloading')"
+          >
+            <div
+              class="general-settings__lang-progress-fill"
+              :style="catalogSyncProgress > 0 ? { width: `${catalogSyncProgress}%` } : undefined"
+            />
+          </div>
+          <span
+            v-if="catalogSyncProgress > 0"
+            class="general-settings__lang-progress-label"
+            data-testid="language-sync-percent"
+          >{{ catalogSyncProgress }}%</span>
+        </div>
+      </div>
+      <div
+        v-else-if="catalogSyncState === 'error'"
+        class="general-settings__lang-sync-error"
+        data-testid="language-sync-error"
+        role="alert"
+      >
+        <span>{{ t('settings.general.languageSyncErrorTitle') }}</span>
+        <button
+          type="button"
+          class="general-settings__lang-sync-retry"
+          @click="changeLanguage(currentLanguage === 'es' ? 'pt-BR' : 'es')"
+        >
+          {{ t('settings.general.languageSyncRetry') }}
         </button>
       </div>
     </GlassCard>
@@ -294,6 +425,9 @@ async function clearAllLocalData() {
           <i class="ti ti-file-import" aria-hidden="true" />
           {{ t('settings.general.syncImport') }}
         </button>
+        <button v-if="hasCatalogBackup" type="button" class="general-settings__btn" :disabled="isSyncBusy" @click="handleCatalogRestore">
+          {{ t('settings.general.catalogRestore') }}
+        </button>
       </div>
 
       <p
@@ -322,6 +456,8 @@ async function clearAllLocalData() {
 
     <!-- Backup completo da pasta de dados + mídias -->
     <AppBackupCard />
+
+    <DiagnosticsCard />
 
     <!-- Dados locais -->
     <GlassCard class="general-settings__card" elevated>
@@ -546,6 +682,22 @@ async function clearAllLocalData() {
   }
 }
 
+/* Diagnóstico (card próprio — reusa classes general-settings) */
+.general-settings__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+  margin-top: 0.75rem;
+}
+
+.general-settings__path {
+  display: block;
+  margin-top: 0.5rem;
+  overflow-wrap: anywhere;
+  font-size: 0.75rem;
+  color: var(--ds-color-on-surface-variant);
+}
+
 /* Seletor de idioma */
 .general-settings__lang-options {
   display: flex;
@@ -720,6 +872,71 @@ async function clearAllLocalData() {
     &:hover:not(:disabled) {
       background: color-mix(in srgb, var(--ds-color-error, #ffb4ab) 28%, transparent);
     }
+  }
+}
+/* Loading da troca de idioma: barra animada até o 1º arquivo, depois % real. */
+.general-settings__lang-sync-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.general-settings__lang-sync-box .general-settings__lang-sync {
+  margin: 0;
+}
+
+.general-settings__lang-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.general-settings__lang-progress {
+  position: relative;
+  flex: 1;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ds-color-primary) 16%, transparent);
+}
+
+.general-settings__lang-progress-fill {
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: var(--ds-color-primary);
+  transition: width 0.3s ease;
+}
+
+.general-settings__lang-progress--indeterminate .general-settings__lang-progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 35%;
+  animation: general-settings-lang-progress 1.2s ease-in-out infinite;
+}
+
+.general-settings__lang-progress-label {
+  min-width: 3ch;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ds-color-on-surface-variant);
+}
+
+@keyframes general-settings-lang-progress {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .general-settings__lang-progress--indeterminate .general-settings__lang-progress-fill {
+    animation: none;
+    width: 100%;
+    opacity: 0.5;
   }
 }
 </style>

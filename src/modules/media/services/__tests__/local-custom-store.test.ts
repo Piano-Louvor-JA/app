@@ -11,6 +11,7 @@ import {
 	isLocalId,
 	listLocalCollections,
 	listLocalMusics,
+	publishLocalMusic,
 	updateLocalCollection,
 	updateLocalLyric,
 	updateLocalMusic,
@@ -77,5 +78,51 @@ describe("local-custom-store (coletâneas sem auth — ids negativos)", () => {
 		createLocalCollection("persistente");
 		// segunda leitura vem do localStorage — mesma instância de dados
 		expect(listLocalCollections()).toHaveLength(1);
+	});
+
+	/* ---------- Draft (SPEC t_deed74b5) ---------- */
+
+	it("draft: música nova nasce 'draft'", () => {
+		const c = createLocalCollection("Drafts");
+		const m = createLocalMusic(c.id, { name: "Em andamento", lyric: "x" });
+		expect(m.status).toBe("draft");
+		expect(getLocalMusic(m.id)?.status).toBe("draft");
+	});
+
+	it("draft: música legada sem campo lê como 'published' (migração)", () => {
+		const c = createLocalCollection("Legado");
+		const m = createLocalMusic(c.id, { name: "Antiga", lyric: "y" });
+		// simula registro pré-draft: remove o campo do db persistido
+		const raw = JSON.parse(localStorage.getItem("louvorja.local-custom.v1")!);
+		const row = raw.musics.find((x: { id: number }) => x.id === m.id);
+		delete row.status;
+		localStorage.setItem("louvorja.local-custom.v1", JSON.stringify(raw));
+		expect(getLocalMusic(m.id)?.status).toBe("published");
+	});
+
+	it("draft: publishLocalMusic publica; id inexistente → false", () => {
+		const c = createLocalCollection("P");
+		const m = createLocalMusic(c.id, { name: "Pub", lyric: "z" });
+		expect(publishLocalMusic(m.id)).toBe(true);
+		expect(getLocalMusic(m.id)?.status).toBe("published");
+		expect(publishLocalMusic(-99999)).toBe(false);
+	});
+
+	it("draft: copyCustomMusic (destino local) preserva status da origem", async () => {
+		const { copyCustomMusic } = await import("../custom-catalog");
+		const srcCol = createLocalCollection("Origem draft");
+		const src = createLocalMusic(srcCol.id, { name: "Rascunho copiável", lyric: "w" });
+		expect(src.status).toBe("draft");
+		const dst = createLocalCollection("Destino draft");
+		const result = await copyCustomMusic(dst.id, src.id);
+		expect(result).not.toBeNull();
+		const copied = getLocalMusic(result!.id)!;
+		expect(copied.status).toBe("draft");
+		// origem publicada (outro nome p/ não cair no dedupe) → cópia publicada
+		const src2 = createLocalMusic(srcCol.id, { name: "Publicado copiável", lyric: "v" });
+		publishLocalMusic(src2.id);
+		const result2 = await copyCustomMusic(dst.id, src2.id);
+		const copied2 = getLocalMusic(result2!.id)!;
+		expect(copied2.status).toBe("published");
 	});
 });

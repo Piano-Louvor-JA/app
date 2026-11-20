@@ -1,0 +1,165 @@
+// @vitest-environment jsdom
+import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { mount, flushPromises } from '@vue/test-utils'
+import { createPinia } from 'pinia'
+import { createI18n } from 'vue-i18n'
+import { createRouter, createMemoryHistory } from 'vue-router'
+
+vi.mock('vue-i18n', async () => {
+  const actual = await vi.importActual<typeof import('vue-i18n')>('vue-i18n')
+  return {
+    ...actual,
+    useI18n: () => ({
+      t: (key: string) => key,
+      locale: { value: 'pt-BR' },
+    }),
+  }
+})
+
+let stagePayload: Record<string, unknown> = {
+  backgroundColor: '#000000',
+  backgroundImage: '',
+  fontSize: 96,
+  fontWeight: 700,
+  textColor: '#ffffff',
+  textAlign: 'center',
+  textVerticalAlign: 'center',
+  textShadow: false,
+  shadowBlur: 1,
+  shadowIntensity: 0.4,
+  textBox: false,
+  boxBorder: false,
+  boxOpacity: 0.3,
+  countdown: { timeFormat: 'mm:ss', bgColor: '#000000', textColor: '#ffffff' },
+}
+let stageSubscribers: Array<() => void> = []
+
+vi.mock('../../settings/services/stage-settings-runtime', () => ({
+  readEffectiveStageSettings: () => stagePayload,
+  subscribeStageSettings: (cb: () => void) => {
+    stageSubscribers.push(cb)
+    return () => {
+      stageSubscribers = stageSubscribers.filter((fn) => fn !== cb)
+    }
+  },
+}))
+
+vi.mock('../../settings/components/StageCustomizationDialog.vue', () => ({
+  default: { template: '<div class="stage-custom-dbg" />', props: ['open'] },
+}))
+
+import CountdownView from '../views/CountdownView.vue'
+
+const i18n = createI18n({ legacy: false, locale: 'pt-BR', messages: {} })
+
+function makeRouter() {
+  return createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      { path: '/', name: 'utilities-temporizador', component: { template: '<div />' } },
+      { path: '/countdown', name: 'countdown', component: { template: '<div />' } },
+    ],
+  })
+}
+
+async function mountView() {
+  const router = makeRouter()
+  await router.push('/')
+  const wrapper = mount(CountdownView, {
+    global: { plugins: [createPinia(), i18n, router] },
+  })
+  await flushPromises()
+  return wrapper
+}
+
+beforeEach(() => {
+  stagePayload = {
+    backgroundColor: '#000000',
+    backgroundImage: '',
+    fontSize: 96,
+    fontWeight: 700,
+    textColor: '#ffffff',
+    textAlign: 'center',
+    textVerticalAlign: 'center',
+    textShadow: false,
+    shadowBlur: 1,
+    shadowIntensity: 0.4,
+    textBox: false,
+    boxBorder: false,
+    boxOpacity: 0.3,
+    countdown: { timeFormat: 'mm:ss', bgColor: '#000000', textColor: '#ffffff' },
+  }
+  stageSubscribers = []
+})
+
+describe('CountdownView', () => {
+  it('monta com header e widget; stage sem countdown usa config puro', async () => {
+    delete (stagePayload as Record<string, unknown>).countdown
+    const wrapper = await mountView()
+    expect(wrapper.find('.countdown-view__widget').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('botão voltar navega para utilities-temporizador', async () => {
+    const wrapper = await mountView()
+    const router = wrapper.vm.$.appContext.config.globalProperties.$router
+    const push = vi.spyOn(router, 'push').mockResolvedValue(undefined as never)
+    await wrapper.find('.countdown-view__back').trigger('click')
+    expect(push).toHaveBeenCalledWith({ name: 'utilities-temporizador' })
+    push.mockRestore()
+    wrapper.unmount()
+  })
+
+  it('toolbar abre dialog de customização; callback de stage atualiza; unmount desinscreve', async () => {
+    const wrapper = await mountView()
+    expect(stageSubscribers).toHaveLength(1)
+    await wrapper.find('.countdown-view__tool-btn').trigger('click')
+    await flushPromises()
+    // dispara callback de stage (linha 60) e depois desinscreve no unmount
+    stageSubscribers.forEach((cb) => cb())
+    wrapper.unmount()
+    const before = stageSubscribers.length
+    stageSubscribers.forEach((cb) => cb())
+    expect(stageSubscribers.length).toBe(before)
+  })
+
+  it('fluxo: set duration, save e reset no card; iniciar/pausar ficam só no painel flutuante', async () => {
+    const wrapper = await mountView()
+
+    const hoursInput = wrapper.find('input[aria-label="countdown.hours"]')
+    await hoursInput.setValue('1')
+
+    expect(wrapper.find('.countdown-view__ctrl--start').exists()).toBe(false)
+    expect(wrapper.find('.countdown-view__ctrl--pause').exists()).toBe(false)
+
+    await wrapper.find('.countdown-view__ctrl--save').trigger('click')
+    await flushPromises()
+    await wrapper.find('.countdown-view__ctrl--reset').trigger('click')
+    await flushPromises()
+    wrapper.unmount()
+  })
+
+  it('background image do palco vira url no style', async () => {
+    stagePayload.backgroundImage = 'https://example.com/palco.png'
+    const wrapper = await mountView()
+    expect(wrapper.find('.countdown-view__preview').attributes('style')).toContain('palco.png')
+    wrapper.unmount()
+  })
+
+  it('Timer limpo: sem modo Escola Sabatina, agenda ou controles de áudio', async () => {
+    const wrapper = await mountView()
+    expect(wrapper.find('input[role="switch"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="sabbath-schedule-toggle"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="operator-audio-controls"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="countdown-session-busy"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('Timer só regressivo: sem seletor Duração/Até nem campos de horário', async () => {
+    const wrapper = await mountView()
+    expect(wrapper.find('.countdown-duration__mode').exists()).toBe(false)
+    expect(wrapper.find('input[aria-label="countdown.untilHour"]').exists()).toBe(false)
+    expect(wrapper.find('input[aria-label="countdown.hours"]').exists()).toBe(true)
+    wrapper.unmount()
+  })
+})

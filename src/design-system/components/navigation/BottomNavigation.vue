@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import DockFooter from './DockFooter.vue'
-import type { DockNavItem } from '@design-system/types/navigation'
+import type { DockNavItem } from "@design-system/types/navigation";
+import DockFooter from "./DockFooter.vue";
 
 defineProps<{
-  items: DockNavItem[]
-  activeKey?: string
-}>()
+	items: DockNavItem[];
+	activeKey?: string;
+}>();
 
 defineEmits<{
-  select: [key: string]
-}>()
+	select: [key: string];
+}>();
 </script>
 
 <template>

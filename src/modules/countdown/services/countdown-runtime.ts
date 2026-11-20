@@ -1,13 +1,15 @@
 import {
   DEFAULT_COUNTDOWN_DURATION_MS,
   DEFAULT_COUNTDOWN_RUNTIME,
-  type CountdownMode,
+  isCountdownVideoPath,
   type CountdownRuntimeState,
   type CountdownStatus,
 } from '../types/countdown'
 
 export const COUNTDOWN_RUNTIME_CHANNEL = 'louvorja-countdown-runtime'
 export const COUNTDOWN_RUNTIME_STORAGE_KEY = 'louvorja-countdown-runtime-state-v2'
+/** sessionStorage: sobrevive a reload da janela e some quando o app é fechado. */
+const COUNTDOWN_SESSION_KEY = 'louvorja-countdown-session'
 
 function asStatus(value: unknown): CountdownStatus {
   if (value === 'running' || value === 'paused' || value === 'idle') return value
@@ -25,10 +27,6 @@ function asNumberOrNull(value: unknown): number | null {
 function asNumberArray(value: unknown): number[] {
   if (!Array.isArray(value)) return []
   return value.filter((item): item is number => typeof item === 'number' && Number.isFinite(item))
-}
-
-function asMode(value: unknown): CountdownMode {
-  return value === 'until' ? 'until' : 'duration'
 }
 
 function asHour(value: unknown, fallback: number): number {
@@ -54,25 +52,55 @@ export function normalizeCountdownRuntime(raw: unknown): CountdownRuntimeState {
 
   return {
     status: asStatus(source.status),
-    projecting: source.projecting === true,
     segmentStartedAt: asNumberOrNull(source.segmentStartedAt),
     accumulatedMs: asNumber(source.accumulatedMs, 0),
     durationMs: Math.max(0, asNumber(source.durationMs, DEFAULT_COUNTDOWN_DURATION_MS)),
     savedTimesMs: asNumberArray(source.savedTimesMs),
     finished: source.finished === true,
-    mode: asMode(source.mode),
-    untilHour: asHour(source.untilHour, DEFAULT_COUNTDOWN_RUNTIME.untilHour ?? 18),
-    untilMinute: asMinute(
-      source.untilMinute,
-      DEFAULT_COUNTDOWN_RUNTIME.untilMinute ?? 0,
-    ),
+    mode: source.mode === 'until' ? 'until' : 'duration',
+    untilHour: asHour(source.untilHour, 18),
+    untilMinute: asMinute(source.untilMinute, 0),
     pausedRemainingMs: asNumberOrNull(source.pausedRemainingMs),
+    // app desktop: CountdownProjectionView consome a flag de janela viva.
+    // Ausente = true (sem info assume viva); inválido = false (o seguro).
+    ...(source.projecting === undefined
+      ? {}
+      : { projecting: source.projecting === true }),
+    ...(isCountdownVideoPath(source.videoPath) ? { videoPath: source.videoPath } : {}),
+    ...(typeof source.videoVolume === 'number' && Number.isFinite(source.videoVolume)
+      ? { videoVolume: Math.min(1, Math.max(0, source.videoVolume)) }
+      : {}),
   }
 }
 
+/** Estado do próprio Timer: o canal da projeção também recebe a Escola Sabatina. */
+export const TIMER_RUNTIME_STORAGE_KEY = 'louvorja-countdown-timer-state-v1'
+
 export function readCountdownRuntimeFromStorage(): CountdownRuntimeState {
+  return readRuntime(COUNTDOWN_RUNTIME_STORAGE_KEY)
+}
+
+/** Sem estado próprio salvo (versões anteriores), parte do canal. */
+export function readTimerRuntimeFromStorage(): CountdownRuntimeState {
   try {
-    const raw = localStorage.getItem(COUNTDOWN_RUNTIME_STORAGE_KEY)
+    if (localStorage.getItem(TIMER_RUNTIME_STORAGE_KEY) == null) return readCountdownRuntimeFromStorage()
+  } catch {
+    return readCountdownRuntimeFromStorage()
+  }
+  return readRuntime(TIMER_RUNTIME_STORAGE_KEY)
+}
+
+export function writeTimerRuntimeToStorage(state: CountdownRuntimeState): void {
+  try {
+    localStorage.setItem(TIMER_RUNTIME_STORAGE_KEY, JSON.stringify(state))
+  } catch {
+    // localStorage pode falhar em contextos restritos
+  }
+}
+
+function readRuntime(key: string): CountdownRuntimeState {
+  try {
+    const raw = localStorage.getItem(key)
     if (!raw) {
       return {
         ...DEFAULT_COUNTDOWN_RUNTIME,
@@ -87,6 +115,29 @@ export function readCountdownRuntimeFromStorage(): CountdownRuntimeState {
       savedTimesMs: [],
       durationMs: DEFAULT_COUNTDOWN_DURATION_MS,
     }
+  }
+}
+
+/** true só na primeira chamada desde que o app (ou a aba, no web) foi aberto. */
+export function beginCountdownSession(): boolean {
+  try {
+    if (sessionStorage.getItem(COUNTDOWN_SESSION_KEY)) return false
+    sessionStorage.setItem(COUNTDOWN_SESSION_KEY, '1')
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Para e zera a contagem; duração, modo e marcas salvas continuam. */
+export function stopCountdownRuntime(state: CountdownRuntimeState): CountdownRuntimeState {
+  return {
+    ...state,
+    status: 'idle',
+    segmentStartedAt: null,
+    accumulatedMs: 0,
+    finished: false,
+    pausedRemainingMs: null,
   }
 }
 

@@ -1,0 +1,306 @@
+import { spawnSync } from 'node:child_process'
+import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
+import { test } from 'node:test'
+import { fileURLToPath } from 'node:url'
+import assert from 'node:assert/strict'
+
+import { decidePublish, fetchDecision } from './release-publish-decision.mjs'
+
+const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)))
+const scriptPath = join(repoRoot, 'scripts/release-publish-decision.mjs')
+const authorized = '6b6fdf14fbe29303459621848579709ecd7ff0e5'
+const tagged = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+const repo = 'Piano-Louvor-JA/app'
+
+const policy = {
+  promotions: [
+    {
+      repo,
+      version: '1.30.0',
+      mode: 'tag_only',
+      promotionPr: 431,
+      authorizedCommit: authorized,
+      authorizeContainingTree: true,
+    },
+  ],
+}
+
+function decision(overrides = {}) {
+  return decidePublish({
+    repo,
+    tag: 'v1.30.0',
+    commit: tagged,
+    packageVersion: '1.30.0',
+    policy,
+    policyFromTaggedCommit: true,
+    authorizedCommitIsAncestor: false,
+    ...overrides,
+  })
+}
+
+test('versão futura continua publicando', () => {
+  const result = decision({ tag: 'v1.31.0', packageVersion: '1.31.0' })
+  assert.equal(result.publish, true)
+  assert.equal(result.fail, false)
+})
+
+test('ausência de política publica', () => {
+  const result = decision({ policy: null, policyFromTaggedCommit: false, tag: 'v1.29.2' })
+  assert.equal(result.publish, true)
+})
+
+test('tag_only no commit que contém a política não publica', () => {
+  const first = decision()
+  const resumed = decision()
+  assert.equal(first.publish, false)
+  assert.equal(first.fail, false)
+  assert.deepEqual(resumed, first)
+})
+
+test('tag_only quando o commit autorizado é ancestral não publica', () => {
+  const result = decision({
+    policy: {
+      promotions: [{ ...policy.promotions[0], authorizeContainingTree: false }],
+    },
+    authorizedCommitIsAncestor: true,
+  })
+  assert.equal(result.publish, false)
+  assert.equal(result.fail, false)
+})
+
+test('commit diferente sem autorização da árvore bloqueia a publicação', () => {
+  const result = decision({
+    policy: {
+      promotions: [{ ...policy.promotions[0], authorizeContainingTree: false }],
+    },
+    authorizedCommitIsAncestor: false,
+  })
+  assert.equal(result.publish, false)
+  assert.equal(result.fail, true)
+})
+
+test('repositório ou manifesto divergente bloqueia a publicação', () => {
+  assert.equal(decision({ repo: 'Piano-Louvor-JA/api' }).fail, true)
+  assert.equal(decision({ packageVersion: '1.29.1' }).publish, false)
+  assert.equal(decision({ packageVersion: '1.29.1' }).fail, true)
+})
+
+test('política presente e malformada bloqueia a publicação', () => {
+  const result = decision({ policy: { repo }, policyFromTaggedCommit: true })
+  assert.equal(result.fail, true)
+  assert.equal(result.publish, false)
+})
+
+function installFakeGh(fixtures) {
+  const dir = mkdtempSync(join(tmpdir(), 'gh-fake-'))
+  const bin = join(dir, 'gh')
+  writeFileSync(
+    bin,
+    `#!/usr/bin/env node
+const fixtures = JSON.parse(process.env.GH_FIXTURES)
+const api = process.argv.find((arg) => String(arg).includes('repos/')) || ''
+const hit = fixtures.find((item) => api.includes(item.match))
+if (!hit) {
+  console.error('sem fixture para ' + api)
+  process.exit(1)
+}
+if (hit.status && hit.status !== 200) {
+  console.error(hit.error || 'Not Found')
+  process.exit(hit.status)
+}
+if (process.argv.includes('--jq')) {
+  process.stdout.write(String(hit.jq ?? ''))
+  process.exit(0)
+}
+process.stdout.write(hit.raw ?? '')
+`,
+  )
+  chmodSync(bin, 0o755)
+  return {
+    ...process.env,
+    PATH: `${dir}:${process.env.PATH}`,
+    GH_FIXTURES: JSON.stringify(fixtures),
+  }
+}
+
+function runFetch(env, ref) {
+  return spawnSync(process.execPath, [scriptPath, '--fetch', '--repo', repo, '--ref', ref], {
+    env,
+    encoding: 'utf8',
+  })
+}
+
+test('consulta remota tag_only omite a release e a retomada repete a omissão', () => {
+  const env = installFakeGh([
+    { match: '/commits/v1.30.0', jq: tagged },
+    { match: 'contents/package.json', raw: JSON.stringify({ version: '1.30.0' }) },
+    { match: 'tag-only-promotions.json', raw: JSON.stringify(policy) },
+    { match: '/compare/', jq: 'diverged' },
+  ])
+  const output = join(mkdtempSync(join(tmpdir(), 'gh-out-')), 'output')
+  env.GITHUB_OUTPUT = output
+  const first = runFetch(env, 'v1.30.0')
+  const second = runFetch(env, 'v1.30.0')
+  assert.equal(first.status, 0, first.stderr)
+  assert.equal(second.status, 0)
+  assert.match(first.stdout, /publish=false/)
+  assert.match(second.stdout, /publish=false/)
+  assert.equal(readFileSync(output, 'utf8').trim().split('\n').at(-2), 'publish=false')
+})
+
+test('consulta remota de outra versão publica', () => {
+  const future = {
+    promotions: policy.promotions,
+  }
+  const env = installFakeGh([
+    { match: '/commits/v1.31.0', jq: tagged },
+    { match: 'contents/package.json', raw: JSON.stringify({ version: '1.31.0' }) },
+    { match: 'tag-only-promotions.json', raw: JSON.stringify(future) },
+    { match: '/compare/', jq: 'ahead' },
+  ])
+  const result = runFetch(env, 'v1.31.0')
+  assert.equal(result.status, 0, result.stderr)
+  assert.match(result.stdout, /publish=true/)
+})
+
+test('consulta remota sem política publica e falha de identidade não publica', () => {
+  const missing = installFakeGh([
+    { match: '/commits/v1.29.0', jq: tagged },
+    { match: 'contents/package.json', raw: JSON.stringify({ version: '1.29.0' }) },
+    { match: 'tag-only-promotions.json', status: 404, error: 'Not Found' },
+  ])
+  const published = runFetch(missing, 'v1.29.0')
+  assert.equal(published.status, 0, published.stderr)
+  assert.match(published.stdout, /publish=true/)
+
+  const mismatch = installFakeGh([
+    { match: '/commits/v1.30.0', jq: tagged },
+    { match: 'contents/package.json', raw: JSON.stringify({ version: '1.29.1' }) },
+    { match: 'tag-only-promotions.json', raw: JSON.stringify(policy) },
+    { match: '/compare/', jq: 'ahead' },
+  ])
+  const blocked = runFetch(mismatch, 'v1.30.0')
+  assert.notEqual(blocked.status, 0)
+  assert.match(blocked.stdout, /publish=false/)
+  assert.doesNotMatch(blocked.stdout, /publish=true/)
+})
+
+test('fetchDecision usa o mesmo contrato da linha de comando', () => {
+  const env = installFakeGh([
+    { match: 'contents/package.json', raw: JSON.stringify({ version: '1.30.0' }) },
+    { match: 'tag-only-promotions.json', raw: JSON.stringify(policy) },
+    { match: '/compare/', jq: 'ahead' },
+  ])
+  const previous = process.env
+  process.env = env
+  try {
+    const result = fetchDecision({ repo, ref: tagged })
+    assert.equal(result.publish, false)
+    assert.equal(result.fail, false)
+  } finally {
+    process.env = previous
+  }
+})
+
+test('workflows preservam a publicação padrão e omitem só a promoção marcada', () => {
+  const workflows = {
+    'release.yml': readFileSync(join(repoRoot, '.github/workflows/release.yml'), 'utf8'),
+    'build-macos.yml': readFileSync(join(repoRoot, '.github/workflows/build-macos.yml'), 'utf8'),
+    'build-windows.yml': readFileSync(join(repoRoot, '.github/workflows/build-windows.yml'), 'utf8'),
+  }
+  for (const [name, text] of Object.entries(workflows)) {
+    assert.match(text, /^on:/m, name)
+    assert.match(text, /scripts\/release-publish-decision\.mjs/, name)
+    assert.match(text, /needs\.decide\.outputs\.publish == 'true'|steps\.decision\.outputs\.publish == 'true'/, name)
+  }
+  for (const name of ['release.yml', 'build-macos.yml', 'build-windows.yml']) {
+    assert.match(workflows[name], /tags:/, name)
+  }
+  assert.match(workflows['release.yml'], /gh release create/)
+  assert.match(workflows['release.yml'], /if: needs\.decide\.outputs\.publish == 'true'/)
+  assert.match(workflows['build-macos.yml'], /--publish always/)
+  assert.match(workflows['build-macos.yml'], /if: steps\.decision\.outputs\.publish == 'true'/)
+  assert.match(workflows['build-windows.yml'], /gh release upload/)
+  assert.match(workflows['build-windows.yml'], /if: steps\.decision\.outputs\.publish == 'true'/)
+  assert.equal(existsSync(join(repoRoot, '.github/workflows/build-flatpak.yml')), true)
+  assert.equal(existsSync(join(repoRoot, 'packaging/flatpak')), true)
+})
+
+// All downstream publishers use the same exact-tag, fail-closed policy.
+test('Flatpak e lojas preservam tag_only e usam a versão exata', () => {
+  // Microsoft Store (ADR-003 msstore-mcp): tag NÃO publica na Store; draft e
+  // certificação são workflow_dispatch com aprovação humana — tag_only fica
+  // garantido por não existir caminho automático.
+  assert.equal(existsSync(join(repoRoot, '.github/workflows/msstore-release.yml')), false)
+  for (const name of ['sync-msstore-draft.yml', 'submit-msstore-certification.yml']) {
+    const text = readFileSync(join(repoRoot, '.github/workflows', name), 'utf8')
+    const triggers = text.slice(text.indexOf('\non:'), text.indexOf('\npermissions:'))
+    assert.match(triggers, /workflow_dispatch:/, name)
+    assert.doesNotMatch(triggers, /\n {2}(push|release|workflow_run|schedule):/, name)
+  }
+  for (const name of ['build-flatpak.yml', 'snap-release.yml']) {
+    const text = readFileSync(join(repoRoot, '.github/workflows', name), 'utf8')
+    assert.match(text, /scripts\/release-publish-decision\.mjs/, name)
+    assert.match(text, /needs\.decide\.outputs\.publish == 'true'/, name)
+    assert.match(text, /mktemp --suffix=\.mjs/, name)
+    assert.match(text, /workflow_dispatch:/, name)
+  }
+  const snap = readFileSync(join(repoRoot, '.github/workflows/snap-release.yml'), 'utf8')
+  assert.match(snap, /ref: \$\{\{ needs\.decide\.outputs\.tag \}\}/)
+  assert.match(snap, /npm run build/)
+  const flatpak = readFileSync(join(repoRoot, '.github/workflows/build-flatpak.yml'), 'utf8')
+  assert.match(flatpak, /path: release\.tar\.gz/)
+  assert.equal(existsSync(join(repoRoot, 'packaging/flatpak/br.com.pianolouvorja.piano.desktop')), true)
+  // o workflow de release precisa apontar para o manifesto que existe no repo
+  const manifests = [...flatpak.matchAll(/packaging\/flatpak\/[\w.-]+\.ya?ml/g)].map((m) => m[0])
+  assert.ok(manifests.length >= 2, 'build-flatpak.yml deve referenciar o manifesto')
+  for (const manifest of manifests) assert.equal(existsSync(join(repoRoot, manifest)), true, manifest)
+})
+
+test('CLI invocada por diretório symlink executa a decisão fail-closed', async () => {
+  const { symlinkSync } = await import('node:fs')
+  const root = mkdtempSync(join(tmpdir(), 'publisher-link-'))
+  symlinkSync(join(repoRoot, 'scripts'), join(root, 'alias'), 'dir')
+  const result = spawnSync(process.execPath, [join(root, 'alias/release-publish-decision.mjs'),
+    '--fetch', '--repo', repo, '--ref', 'invalid-tag'], { encoding: 'utf8' })
+  assert.equal(result.status, 1)
+  assert.match(result.stdout, /publish=false/)
+  assert.match(result.stdout, /reason=/)
+})
+
+test('NSIS e portable possuem nomes diferentes de instalador', () => {
+  const config = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8')).build
+  assert.notEqual(config.nsis.artifactName ?? config.artifactName,
+    config.portable?.artifactName ?? config.artifactName)
+})
+
+test('dispatch de pacotes não depende de checkout implícito', () => {
+  const workflow = readFileSync(join(repoRoot, '.github/workflows/release.yml'), 'utf8')
+  for (const line of workflow.split('\n').filter(line => line.includes('gh workflow run'))) {
+    assert.match(line, /--repo/)
+  }
+})
+
+// O Snap só gera build de produção quando roda a partir da tag (gate do perfil
+// release); disparado pela main ele falha antes de empacotar.
+test('release dispara o Snap a partir da tag exata', () => {
+  const workflow = readFileSync(join(repoRoot, '.github/workflows/release.yml'), 'utf8')
+  const dispatches = workflow.split('\n').filter(line => line.includes('gh workflow run'))
+  const snap = dispatches.filter(line => line.includes('snap-release.yml'))
+  assert.equal(snap.length, 1)
+  assert.match(snap[0], /--ref "\$TAG"/)
+  assert.ok(dispatches.some(line => line.includes('build-flatpak.yml')), 'Flatpak continua disparado')
+})
+
+// Em --destructive-mode o snapcraft instala os build-snaps da extensão gnome
+// no host; como usuário comum (snapcore/action-build) a instalação falha.
+test('Snap empacota como root num host igual à base core24', () => {
+  const snap = readFileSync(join(repoRoot, '.github/workflows/snap-release.yml'), 'utf8')
+  const job = snap.slice(snap.indexOf('\n  snap:'))
+  assert.match(job, /runs-on: ubuntu-24\.04/)
+  assert.match(job, /sudo snapcraft pack --destructive-mode/)
+  assert.doesNotMatch(job, /snapcore\/action-build/)
+  assert.match(readFileSync(join(repoRoot, 'snap/snapcraft.yaml'), 'utf8'), /^base: core24$/m)
+})

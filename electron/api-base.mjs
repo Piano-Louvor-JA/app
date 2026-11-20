@@ -2,7 +2,9 @@ import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const DEFAULT_API_BASE_URL = 'https://api.pianolouvorja.com.br'
+import { resolveEffectiveApi } from './profile.mjs'
+
+const DEFAULT_API_BASE_URL = resolveEffectiveApi(process.env).primary
 
 function unquote(value) {
   if (
@@ -54,12 +56,15 @@ function originOf(value) {
  * PIANO_API_BASE_URL vence; senão a origem de VITE_URL_FILES / VITE_PALCO_API_URL.
  */
 export function resolveApiBaseUrl(env = process.env) {
+  // Contrato de perfil (SPEC piano-api-env-guard): ausência de env resolve
+  // STG em non-release; env de produção em non-release é REJEITADO aqui.
+  const effective = resolveEffectiveApi(env)
   const explicit = env.PIANO_API_BASE_URL?.trim()
   if (explicit) return explicit.replace(/\/+$/, '')
   return (
     originOf(env.VITE_URL_FILES) ||
     originOf(env.VITE_PALCO_API_URL) ||
-    DEFAULT_API_BASE_URL
+    effective.primary
   )
 }
 

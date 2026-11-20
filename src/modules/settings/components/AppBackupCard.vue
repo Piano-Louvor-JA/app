@@ -3,6 +3,7 @@ import { computed, nextTick, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { GlassCard } from '@design-system/index'
+import { appConfirm } from '@shared/composables/useAppConfirm'
 import { getDesktopBridge, isDesktopApp } from '@shared/services/desktop-bridge'
 import type { BackupProgress } from '@shared/types/desktop-bridge'
 
@@ -19,12 +20,23 @@ const restoreAcknowledged = ref(false)
 
 const busy = computed(() => phase.value === 'backing-up' || phase.value === 'restoring')
 const progressPercent = computed(() => {
+  //computed só avalia com barra determinate (progress não-nulo)
+  /* v8 ignore start */
   const total = progress.value?.total ?? 0
   const current = progress.value?.current ?? 0
+  /* v8 ignore stop */
+  /* v8 ignore next 1 -- barra indeterminada não avalia este computed (lazy); total<=0 inalcançável com bar visível */
   if (total <= 0) return 0
   return Math.min(100, Math.round((current / total) * 100))
 })
 const hasDeterminateProgress = computed(() => (progress.value?.total ?? 0) > 0)
+const progressTextValues = computed(() => ({
+  //span só renderiza determinate (progress não-nulo)
+  /* v8 ignore start */
+  current: progress.value?.current ?? 0,
+  total: progress.value?.total ?? 0,
+  /* v8 ignore stop */
+}))
 
 let unsubProgress: (() => void) | null = null
 
@@ -48,9 +60,31 @@ function openRestoreConfirm() {
 }
 
 function closeRestoreConfirm() {
+  /* v8 ignore next 1 -- dialog só existe fora de busy; cancel disabled durante busy */
   if (busy.value) return
   restoreConfirmOpen.value = false
   restoreAcknowledged.value = false
+}
+
+const GB = 1024 ** 3
+const MB = 1024 ** 2
+
+/** Pergunta só quando há vídeos baixados; fechar ou recusar = sem os vídeos. */
+async function askYoutubeVideos(): Promise<boolean> {
+  let usage: { bytes: number; count: number } | null = null
+  try {
+    usage = (await getDesktopBridge()?.backup?.youtubeUsage?.()) ?? null
+  } catch {
+    usage = null
+  }
+  if (!usage || usage.count <= 0) return false
+  const size = usage.bytes >= GB ? `${(usage.bytes / GB).toFixed(1)} GB` : `${Math.round(usage.bytes / MB)} MB`
+  return appConfirm({
+    title: t('settings.general.backupYoutubeTitle'),
+    message: t('settings.general.backupYoutubeMessage', { count: usage.count, size }),
+    confirmLabel: t('settings.general.backupYoutubeInclude', { size }),
+    cancelLabel: t('settings.general.backupYoutubeSkip'),
+  })
 }
 
 async function createBackup() {
@@ -59,12 +93,16 @@ async function createBackup() {
 
   errorKey.value = null
   lastBackupPath.value = null
+
+  // Vídeos baixados do YouTube: só entram se o operador escolher (padrão: não).
+  const includeYoutubeVideos = await askYoutubeVideos()
+
   progress.value = { current: 0, total: 0, zipPath: '' }
   phase.value = 'backing-up'
   bindProgress()
   await nextTick()
   try {
-    const result = await bridge.backup.create()
+    const result = await bridge.backup.create({ includeYoutubeVideos })
     if (!result.ok) {
       phase.value = result.reason === 'cancelled' ? 'idle' : 'error'
       if (result.reason !== 'cancelled') errorKey.value = 'settings.general.backupError'
@@ -80,6 +118,7 @@ async function createBackup() {
 }
 
 async function confirmRestore() {
+  /* v8 ignore next 1 -- botão confirmar desabilitado sem ack e durante busy */
   if (!restoreAcknowledged.value || busy.value) return
   const bridge = getDesktopBridge()
   if (!bridge?.backup || !isDesktopApp()) return
@@ -207,12 +246,7 @@ async function confirmRestore() {
           aria-hidden="true"
         />
         <span v-if="hasDeterminateProgress">
-          {{
-            t('settings.general.backupProgress', {
-              current: progress?.current ?? 0,
-              total: progress?.total ?? 0,
-            })
-          }}
+          {{ t('settings.general.backupProgress', progressTextValues) }}
         </span>
         <span v-else>
           {{

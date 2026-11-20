@@ -48,6 +48,9 @@ export default {
     textMain: 'Texto Principal',
     textMainHint: 'Formato de los nombres sorteados',
     fontSize: 'Tamaño de letra',
+    drawnSize: 'Fuente de los sorteados',
+    decreaseDrawn: 'Reducir lista de sorteados',
+    increaseDrawn: 'Ampliar lista de sorteados',
     textTransform: 'Transformación de Texto',
     transformNone: 'Aa (Normal)',
     transformUpper: 'AA (Mayúsculas)',
@@ -70,5 +73,7 @@ export default {
     decreaseFont: 'Disminuir fuente',
     increaseFont: 'Aumentar fuente',
     placeholderDisplay: '- - - -',
+    chromeDragHint: 'Arrastra para mover · doble clic vuelve a la esquina',
+    openRandom: 'Abrir el Sorteo',
   },
 }

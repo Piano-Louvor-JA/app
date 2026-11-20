@@ -1,0 +1,905 @@
+// @vitest-environment jsdom
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+/**
+ * Cobertura de palco-session.ts — sessão de cast TV (slots, project, audio,
+ * video, timer, routing mirror/individual, resolveBgUrl, serveLocal).
+ * Bridge fake em window.louvorja.palco (mesmo contrato do preload).
+ */
+
+const readEffectiveStageSettings = vi.fn(() => ({ ...DEFAULT_SETTINGS }))
+
+vi.mock('../stage-settings-runtime', async (importOriginal) => {
+  const mod = await importOriginal<Record<string, unknown>>()
+  return {
+    ...mod,
+    readEffectiveStageSettings: (scope: string) =>
+      readEffectiveStageSettings(scope) as never,
+  }
+})
+
+vi.mock('../../types/stage-settings', async (importOriginal) => {
+  const mod = await importOriginal<Record<string, Record<string, string>>>()
+  return {
+    ...mod,
+    resolveBackgroundImage: (bg: string | null) =>
+      bg?.startsWith('official:') ? `/assets/${bg.replace('official:', '')}.png` : bg,
+  }
+})
+vi.mock('../palco-routing', () => ({
+  getPalcoRoute: vi.fn(() => 'mirror'),
+}))
+
+const registryMock = vi.hoisted(() => ({
+  moduleForSlotImpl: (id: string): string | null => null,
+}))
+vi.mock('../output-registry', () => ({
+  useOutputRegistry: () => ({
+    moduleForSlot: (id: string) => registryMock.moduleForSlotImpl(id),
+  }),
+}))
+
+import { palcoSession } from '../palco-session'
+import { getPalcoRoute } from '../../services/palco-routing'
+
+type PalcoMock = {
+  status: ReturnType<typeof vi.fn>
+  start: ReturnType<typeof vi.fn>
+  stop: ReturnType<typeof vi.fn>
+  send: ReturnType<typeof vi.fn>
+  serveMedia: ReturnType<typeof vi.fn>
+  servePath: ReturnType<typeof vi.fn>
+  slots: ReturnType<typeof vi.fn>
+  createSlot: ReturnType<typeof vi.fn>
+  removeSlot: ReturnType<typeof vi.fn>
+  startSlot: ReturnType<typeof vi.fn>
+  stopSlot: ReturnType<typeof vi.fn>
+  wake: ReturnType<typeof vi.fn>
+  onEvent: ReturnType<typeof vi.fn>
+  onReceiverConnected: ReturnType<typeof vi.fn>
+  onReceiverDisconnected: ReturnType<typeof vi.fn>
+}
+
+function setBridge(palco: Partial<PalcoMock> | null) {
+  ;(window as never as { louvorja: unknown }).louvorja = palco
+    ? { palco }
+    : null
+}
+
+function fullMock(): PalcoMock {
+  return {
+    status: vi.fn().mockResolvedValue({ running: true, clients: 1, url: 'http://192.168.0.5:7080', wsUrl: 'ws://192.168.0.5:7081' }),
+    start: vi.fn().mockResolvedValue(true),
+    stop: vi.fn().mockResolvedValue(undefined),
+    send: vi.fn().mockResolvedValue(true),
+    serveMedia: vi.fn().mockResolvedValue('http://192.168.0.5:7080/media/f.mp3'),
+    servePath: vi.fn().mockResolvedValue('http://192.168.0.5:7080/media/local.mp3'),
+    slots: vi.fn().mockResolvedValue([
+      { id: '0', label: 'TV 1', running: true, clients: 1, httpPort: 7080, wsPort: 7081 },
+      { id: '1', label: 'TV 2', running: false, clients: 0, httpPort: 7082, wsPort: 7083 },
+    ]),
+    createSlot: vi.fn().mockResolvedValue({ id: '1', label: 'TV 2', httpPort: 7082, wsPort: 7083 }),
+    removeSlot: vi.fn().mockResolvedValue(true),
+    startSlot: vi.fn().mockResolvedValue(true),
+    stopSlot: vi.fn().mockResolvedValue(undefined),
+    wake: vi.fn().mockResolvedValue({ ok: true, results: [] }),
+    onEvent: vi.fn(),
+    onReceiverConnected: vi.fn(),
+    onReceiverDisconnected: vi.fn(),
+  }
+}
+
+const DEFAULT_SETTINGS = {
+  fontSize: 96,
+  bibleFontSize: 80,
+  fontWeight: 700,
+  bibleFontWeight: 400,
+  textColor: '#ffffff',
+  bibleTextColor: '#ffff00',
+  textShadow: true,
+  shadowBlur: 8,
+  shadowIntensity: 0.6,
+  textBox: false,
+  boxOpacity: 0.4,
+  boxBorder: false,
+  footerRefColor: '#fff',
+  footerRefWeight: 400,
+  refFontSize: null as number | null,
+  refTextTransform: 'none' as 'none' | 'uppercase' | 'capitalize',
+  showBibleVersion: true,
+  backgroundImage: 'official:bg-3',
+  hymns: { overrideBg: false },
+  background: '#000',
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  setBridge(null)
+  palcoSession.setSlot('0') // singleton: restaura slot ativo entre testes
+  readEffectiveStageSettings.mockReturnValue({ ...DEFAULT_SETTINGS })
+})
+
+describe('sem electron (sem bridge)', () => {
+  it('todos os métodos degradam sem lançar', async () => {
+    await expect(palcoSession.slots()).resolves.toEqual([])
+    await expect(palcoSession.createSlot('x')).resolves.toBeNull()
+    await expect(palcoSession.removeSlot('0')).resolves.toBe(false)
+    await expect(palcoSession.startSlot('0')).resolves.toBe(false)
+    await expect(palcoSession.stopSlot('0')).resolves.toBeUndefined()
+    await expect(palcoSession.status()).resolves.toBeNull()
+    await expect(palcoSession.turnOn()).resolves.toBe(false)
+    await expect(palcoSession.turnOff()).resolves.toBeUndefined()
+    await expect(palcoSession.project('hymns', { text: 'x' })).resolves.toBeUndefined()
+    await expect(palcoSession.sendBgPalco()).resolves.toBeUndefined()
+    await expect(palcoSession.timer({ duration: 5 })).resolves.toBeUndefined()
+    await expect(palcoSession.audio({ url: 'a.mp3' })).resolves.toBeUndefined()
+    await expect(palcoSession.video({ url: 'v.mp4' })).resolves.toBeUndefined()
+    await expect(palcoSession.videoRouted({ url: 'v.mp4' })).resolves.toBeUndefined()
+    await expect(palcoSession.audioRouted({ url: 'a.mp3' })).resolves.toBeUndefined()
+    await expect(palcoSession.serveMedia('f', 'audio/mpeg', 'QQ==')).resolves.toBeNull()
+    await expect(palcoSession.updateSlot('0', { httpPort: 9000 })).resolves.toEqual({ ok: false, reason: 'not-found' })
+    await expect(palcoSession.transmission()).resolves.toBeNull()
+    await expect(palcoSession.setTransmission({ bind: 'local' })).resolves.toBeNull()
+    await expect(palcoSession.resetToken()).resolves.toBeNull()
+    palcoSession.idle()
+    palcoSession.timerStop()
+    palcoSession.onEvent(() => {})
+    palcoSession.onReceiverConnected(() => {})
+    palcoSession.onReceiverDisconnected(() => {})
+    expect(palcoSession.isElectron).toBe(false)
+  })
+})
+
+describe('com electron', () => {
+  it('tela dividida de uma TV do Palco vai só para ela (tvShare)', () => {
+    const palco = fullMock()
+    setBridge(palco)
+    palcoSession.syncTvShare('0#c1', true)
+    expect(palco.send).toHaveBeenCalledWith({ v: 2, type: 'tvShare', enabled: true }, '0#c1')
+    setBridge(null)
+    palcoSession.syncTvShare('0#c1', false)
+    expect(palco.send).toHaveBeenCalledTimes(1)
+  })
+  it('isElectron true, slots/create/remove/start/stop delegam', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    expect(palcoSession.isElectron).toBe(true)
+    expect(await palcoSession.slots()).toHaveLength(2)
+    await palcoSession.createSlot('TV 2')
+    expect(palco.createSlot).toHaveBeenCalledWith('TV 2')
+    await palcoSession.removeSlot('1')
+    expect(palco.removeSlot).toHaveBeenCalledWith('1')
+    await palcoSession.startSlot('1')
+    expect(palco.start).toHaveBeenCalledWith('1')
+    await palcoSession.stopSlot('1')
+    expect(palco.stop).toHaveBeenCalledWith('1')
+  })
+
+  it('transmissão: rede, token, porta e aparência delegam ao main', async () => {
+    const info = { bind: 'all', requireToken: true, listenHost: '0.0.0.0', linkHost: '192.168.0.5', missing: false, interfaces: [], token: 'AB12C' }
+    const palco = {
+      ...fullMock(),
+      transmission: vi.fn().mockResolvedValue(info),
+      setTransmission: vi.fn().mockResolvedValue({ ok: false, reason: 'running' }),
+      resetToken: vi.fn().mockResolvedValue({ token: 'ZZ99Y' }),
+      updateSlot: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    setBridge(palco)
+    expect(await palcoSession.transmission()).toBe(info)
+    expect(await palcoSession.setTransmission({ bind: 'local' })).toEqual({ ok: false, reason: 'running' })
+    expect(palco.setTransmission).toHaveBeenCalledWith({ bind: 'local' })
+    expect(await palcoSession.resetToken()).toBe('ZZ99Y')
+    expect(await palcoSession.updateSlot('7082', { overlay: { theme: 'light' } })).toEqual({ ok: true })
+    expect(palco.updateSlot).toHaveBeenCalledWith('7082', { overlay: { theme: 'light' } })
+  })
+
+  it('setSlot troca o slot ativo; status usa slot ativo', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    palcoSession.setSlot('1')
+    expect(palcoSession.slotId).toBe('1')
+    await palcoSession.status()
+    expect(palco.status).toHaveBeenCalledWith('1')
+  })
+
+  it('turnOn: start ok -> bgPalco + idle + wake; start falha -> nada', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    expect(await palcoSession.turnOn()).toBe(true)
+    await vi.waitFor(() => expect(palco.send).toHaveBeenCalledTimes(2))
+    const types = palco.send.mock.calls.map((c) => (c[0] as { type: string }).type)
+    expect(types).toContain('bgPalco')
+    expect(types).toContain('idle')
+    expect(palco.wake).toHaveBeenCalled()
+
+    const palco2 = fullMock()
+    palco2.start.mockResolvedValue(false)
+    setBridge(palco2)
+    expect(await palcoSession.turnOn()).toBe(false)
+    expect(palco2.send).not.toHaveBeenCalled()
+  })
+
+  it('atualizar OBS não deixa comando de reload no replay de servidores já abertos', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    let reconnect!: (info: unknown) => void
+    const unsubscribe = vi.fn()
+    palco.onEvent.mockImplementation(callback => { reconnect = callback; return unsubscribe })
+    const refreshing = palcoSession.refreshObs('7082')
+    await new Promise(resolve => setTimeout(resolve, 0))
+    const requestId = palco.send.mock.calls[0]?.[0].requestId
+    let completed = false
+    void refreshing.then(() => { completed = true })
+    reconnect({ type: 'receiver-ready', requestId: 'another-output' })
+    await Promise.resolve()
+    expect(completed).toBe(false)
+    reconnect({ type: 'receiver-ready', requestId })
+    expect(await refreshing).toBe(true)
+    expect(unsubscribe).toHaveBeenCalledOnce()
+    expect(palco.send).toHaveBeenNthCalledWith(1, expect.objectContaining({ v: 2, type: 'obsControl', action: 'reload', requestId: expect.any(String) }), '7082')
+    expect(palco.send).toHaveBeenLastCalledWith({ v: 2, type: 'obsControl', action: 'ready' }, '7082')
+  })
+
+  it('turnOff para o slot', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    await palcoSession.turnOff()
+    expect(palco.stop).toHaveBeenCalledWith('0')
+  })
+
+  it('project: envia payload v2 colorizado com settings do escopo', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    await palcoSession.project('hymns', { text: 'Aleluia', footerRef: 'Hino 1' })
+    expect(palco.send).toHaveBeenCalledTimes(1)
+    const payload = palco.send.mock.calls[0]?.[0] as Record<string, unknown>
+    expect(payload.type).toBe('projection')
+    expect(payload.v).toBe(2)
+    expect(payload.text).toContain('<span')
+    expect(payload.text).toContain('#ffffff')
+    // bg official:bg-3 resolvido pro sender
+    expect(String(payload.background)).toContain('/bg/bg-3.png')
+    expect(payload.footerVersion).toBeUndefined() // não é bible
+  })
+
+  it('Bíblia envia imagem personalizada sem a cor preta encobri-la no OBS', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    readEffectiveStageSettings.mockReturnValue({ ...DEFAULT_SETTINGS, backgroundImage: 'official:bg-11', backgroundColor: '#000000' })
+    await palcoSession.project('bible', { text: 'No princípio', footerRef: 'Gênesis 1:1' })
+    const payload = palco.send.mock.calls[0]?.[0] as Record<string, unknown>
+    expect(String(payload.background)).toContain('/bg/bg-11.png')
+    expect(payload.backgroundColor).toBeUndefined()
+  })
+
+  it('project bible: fonte própria; showBibleVersion off remove sufixo do rodapé', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    readEffectiveStageSettings.mockReturnValue({
+      ...readEffectiveStageSettings(),
+      showBibleVersion: false,
+    })
+    await palcoSession.project('bible', {
+      text: 'No princípio',
+      footerRef: 'João 1:1 (ARC)',
+      footerVersion: 'ARC',
+    })
+    const payload = palco.send.mock.calls[0]?.[0] as Record<string, unknown>
+    expect(payload.footerRef).toBe('João 1:1')
+    expect(payload.footerVersion).toBeUndefined()
+  })
+
+  it('project bible: envia tamanho e transformação da referência', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    readEffectiveStageSettings.mockReturnValue({
+      ...readEffectiveStageSettings(),
+      bibleFontSize: 100,
+      refFontSize: 72,
+      refTextTransform: 'capitalize',
+    })
+    await palcoSession.project('bible', { text: 'No princípio', footerRef: 'João 1:1' })
+    const payload = palco.send.mock.calls[0]?.[0] as Record<string, unknown>
+    expect(payload.footerSize).toBe(40.5)
+    expect(payload.footerTransform).toBe('capitalize')
+  })
+
+  it('project bible: envia textTransform só quando não é none', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    readEffectiveStageSettings.mockReturnValue({
+      ...readEffectiveStageSettings(),
+      bibleTextTransform: 'uppercase',
+    })
+    await palcoSession.project('bible', { text: 'No princípio', footerRef: 'João 1:1' })
+    let payload = palco.send.mock.calls[0]?.[0] as Record<string, unknown>
+    expect(payload.textTransform).toBe('uppercase')
+
+    readEffectiveStageSettings.mockReturnValue({
+      ...readEffectiveStageSettings(),
+      bibleTextTransform: 'none',
+    })
+    await palcoSession.project('bible', { text: 'No princípio', footerRef: 'João 1:1' })
+    payload = palco.send.mock.calls[1]?.[0] as Record<string, unknown>
+    expect(payload.textTransform).toBeUndefined()
+  })
+
+  it('project bible: envia a posição da referência; outros escopos não', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    readEffectiveStageSettings.mockReturnValue({
+      ...readEffectiveStageSettings(),
+      bibleRefPosition: 'corner',
+    })
+    await palcoSession.project('bible', { text: 'No princípio', footerRef: 'João 1:1' })
+    expect((palco.send.mock.calls[0]?.[0] as Record<string, unknown>).footerPosition).toBe('corner')
+
+    readEffectiveStageSettings.mockReturnValue({
+      ...readEffectiveStageSettings(),
+      bibleRefPosition: undefined,
+    })
+    await palcoSession.project('bible', { text: 'No princípio', footerRef: 'João 1:1' })
+    expect((palco.send.mock.calls[1]?.[0] as Record<string, unknown>).footerPosition).toBe('below-right')
+
+    await palcoSession.project('hymns', { text: 'Santo' })
+    expect((palco.send.mock.calls[2]?.[0] as Record<string, unknown>).footerPosition).toBeUndefined()
+  })
+
+  it('project bible: envia tipo e duração da transição; outros escopos não', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    readEffectiveStageSettings.mockReturnValue({
+      ...readEffectiveStageSettings(),
+      bibleTransitionEnabled: true,
+      bibleTransition: 'zoom',
+      bibleTransitionSpeed: 'slow',
+    })
+    await palcoSession.project('bible', { text: 'No princípio', footerRef: 'João 1:1' })
+    let payload = palco.send.mock.calls[0]?.[0] as Record<string, unknown>
+    expect(payload.transition).toBe('zoom')
+    expect(payload.transitionMs).toBe(450)
+
+    readEffectiveStageSettings.mockReturnValue({
+      ...readEffectiveStageSettings(),
+      bibleTransitionEnabled: true,
+      bibleTransition: undefined,
+      bibleTransitionSpeed: undefined,
+    })
+    await palcoSession.project('bible', { text: 'No princípio', footerRef: 'João 1:1' })
+    payload = palco.send.mock.calls[1]?.[0] as Record<string, unknown>
+    expect(payload.transition).toBe('fade')
+    expect(payload.transitionMs).toBe(250)
+
+    // Transições desligadas (padrão): a TV troca sem animação.
+    readEffectiveStageSettings.mockReturnValue({ ...readEffectiveStageSettings(), bibleTransitionEnabled: false })
+    await palcoSession.project('bible', { text: 'No princípio', footerRef: 'João 1:1' })
+    payload = palco.send.mock.calls[2]?.[0] as Record<string, unknown>
+    expect(payload.transition).toBeUndefined()
+
+    // Catálogo do app → a mais próxima que a TV conhece.
+    readEffectiveStageSettings.mockReturnValue({ ...readEffectiveStageSettings(), lyricTransitionEnabled: true, lyricTransition: 'drop' })
+    await palcoSession.project('hymns', { text: 'Santo' })
+    payload = palco.send.mock.calls[3]?.[0] as Record<string, unknown>
+    expect(payload.transition).toBe('slide')
+
+    await palcoSession.project('clock', { text: '10:00' })
+    payload = palco.send.mock.calls[4]?.[0] as Record<string, unknown>
+    expect(payload.transition).toBeUndefined()
+    expect(payload.transitionMs).toBeUndefined()
+  })
+
+  it('hymns overrideBg: bg do escopo vence capa da música', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    readEffectiveStageSettings.mockReturnValue({
+      ...readEffectiveStageSettings(),
+      hymns: { overrideBg: true },
+    })
+    await palcoSession.project('hymns', {
+      text: 'x',
+      background: 'https://cdn.example/capa.jpg',
+    })
+    const payload = palco.send.mock.calls[0]?.[0] as Record<string, unknown>
+    expect(String(payload.background)).toContain('/bg/bg-3.png')
+  })
+
+  it('bg do usuário (backgroundImage) vence capa da API em qualquer escopo (14/10)', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    readEffectiveStageSettings.mockReturnValue({
+      ...readEffectiveStageSettings(),
+      hymns: { overrideBg: false },
+    })
+    await palcoSession.project('hymns', {
+      text: 'x',
+      background: 'https://cdn.example/capa.jpg',
+    })
+    const payload = palco.send.mock.calls[0]?.[0] as Record<string, unknown>
+    // Projeção local (MediaProjectionView): preferência ?? capa. Palco era
+    // inverso (capa ?? preferência) → bg da API vencia a escolha do usuário.
+    expect(String(payload.background)).toContain('/bg/bg-3.png')
+  })
+
+  it('resolveBgUrl: http passa direto; local serve via servePath; quebrado -> undefined', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    // SEM preferência do usuário: input http passa direto (14/10)
+    readEffectiveStageSettings.mockReturnValue({
+      ...readEffectiveStageSettings(),
+      backgroundImage: '',
+    })
+    await palcoSession.project('hymns', { text: 'a', background: 'https://x/b.jpg' })
+    let payload = palco.send.mock.calls[0]?.[0] as Record<string, unknown>
+    expect(payload.background).toBe('https://x/b.jpg')
+    // local
+    await palcoSession.project('hymns', { text: 'b', background: 'local://media/x.png' })
+    payload = palco.send.mock.calls[1]?.[0] as Record<string, unknown>
+    expect(String(payload.background)).toContain('/media/') // servido pelo sender
+    expect(palco.servePath).toHaveBeenCalled()
+    // quebrado: servePath falha -> sem bg
+    palco.servePath.mockRejectedValue(new Error('x'))
+    await palcoSession.project('hymns', { text: 'c', background: 'local://media/y.png' })
+    payload = palco.send.mock.calls[2]?.[0] as Record<string, unknown>
+    expect(payload.background).toBeUndefined()
+  })
+
+  it('resolveBgUrl: blob: (capa .slja do IndexedDB) vira /media/ via serveMedia — nome determinístico + cache', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    palco.serveMedia.mockImplementation(
+      async (name: string) => `http://192.168.0.5:7080/media/${name}`,
+    )
+    const blob = new Blob([new Uint8Array([1, 2, 3, 4])], { type: 'image/png' })
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      blob: async () => blob,
+    } as unknown as Response)
+    // SEM bg do usuário: capa do slide (.slja) é o bg ativo
+    readEffectiveStageSettings.mockReturnValue({
+      ...readEffectiveStageSettings(),
+      backgroundImage: '',
+    })
+    try {
+      await palcoSession.project('hymns', { text: 'a', background: 'blob:mock-slja' })
+      let payload = palco.send.mock.calls[0]?.[0] as Record<string, unknown>
+      expect(String(payload.background)).toMatch(/\/media\/slja_[0-9a-f]{8,16}\.png$/)
+      expect(palco.serveMedia).toHaveBeenCalledTimes(1)
+      // mesma blob: URL de novo: cache — sem re-publish (runtime republisha por tick)
+      await palcoSession.project('hymns', { text: 'b', background: 'blob:mock-slja' })
+      payload = palco.send.mock.calls[1]?.[0] as Record<string, unknown>
+      expect(String(payload.background)).toMatch(/\/media\/slja_[0-9a-f]{8,16}\.png$/)
+      expect(palco.serveMedia).toHaveBeenCalledTimes(1)
+      // data: URL (cover .slja legado inline) também é servida
+      await palcoSession.project('hymns', { text: 'c', background: 'data:image/png;base64,AAAA' })
+      payload = palco.send.mock.calls[2]?.[0] as Record<string, unknown>
+      expect(String(payload.background)).toMatch(/\/media\/slja_[0-9a-f]{8,16}\.png$/)
+      expect(palco.serveMedia).toHaveBeenCalledTimes(2)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('republica a capa em cada slot e após reiniciar o sender', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    palco.serveMedia.mockImplementation(async (name: string, _mime: string, _bytes: string, slot: string) =>
+      `http://192.168.0.5:${slot === '0' ? 7080 : 7082}/media/${name}`,
+    )
+    readEffectiveStageSettings.mockReturnValue({ ...DEFAULT_SETTINGS, backgroundImage: '' })
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      blob: async () => new Blob([new Uint8Array([5, 6, 7])], { type: 'image/png' }),
+    } as unknown as Response)
+    const input = { text: 'capa', background: 'blob:multi-slot-cover' }
+    try {
+      await palcoSession.projectTo('0', 'hymns', input)
+      await palcoSession.projectTo('1', 'hymns', input)
+      expect(palco.serveMedia).toHaveBeenCalledTimes(2)
+      expect(palco.send.mock.calls[1]?.[0].background).toContain(':7082/media/')
+      await palcoSession.projectTo('0', 'hymns', input)
+      expect(palco.serveMedia).toHaveBeenCalledTimes(2)
+      await palcoSession.stopSlot('1')
+      await palcoSession.startSlot('1')
+      await palcoSession.projectTo('1', 'hymns', input)
+      expect(palco.serveMedia).toHaveBeenCalledTimes(3)
+      await palcoSession.turnOff()
+      await palcoSession.turnOn()
+      await palcoSession.project('hymns', input)
+      expect(palco.serveMedia).toHaveBeenCalledTimes(4)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('projectTo: usa slot alvo e restaura o ativo', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    await palcoSession.projectTo('1', 'hymns', { text: 'x' })
+    expect(palco.send).toHaveBeenCalledWith(expect.anything(), '1')
+    expect(palcoSession.slotId).toBe('0')
+  })
+
+  it('encerrar a conexão OBS libera sua atribuição independente', async () => {
+    const config = await import('../obs-connections')
+    const palco = fullMock()
+    setBridge(palco)
+    config.assignObsConnection('7082', 'clock')
+    await palcoSession.stopSlot('7082')
+    expect(config.obsAssignments.value['7082']).toBeUndefined()
+    expect(palco.stop).toHaveBeenCalledWith('7082')
+  })
+
+  it('envios concorrentes de projeção preservam o slot de cada conteúdo', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    palco.status.mockImplementation(async (id: string) => {
+      await Promise.resolve()
+      return { running: true, clients: 1, url: `http://localhost:${id === '0' ? 7080 : 7082}` }
+    })
+    await Promise.all([
+      palcoSession.projectTo('0', 'hymns', { text: 'Santo' }),
+      palcoSession.projectTo('7082', 'bible', { text: 'Haja luz' }),
+    ])
+    expect(palco.send).toHaveBeenCalledWith(expect.objectContaining({ type: 'projection', text: expect.stringContaining('Santo') }), '0')
+    expect(palco.send).toHaveBeenCalledWith(expect.objectContaining({ type: 'projection', text: expect.stringContaining('Haja luz') }), '7082')
+  })
+
+  it('projectRouted mirror: serializa pros slots rodando; rota individual: só nela', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    await palcoSession.projectRouted('hymns', 'hymns', { text: 'x' })
+    expect(palco.send).toHaveBeenCalledTimes(1) // só slot 0 running
+    // slot atribuído não-espelho é filtrado
+    vi.mocked(getPalcoRoute).mockReturnValue('1')
+    await palcoSession.projectRouted('hymns', 'hymns', { text: 'y' })
+    expect(palco.send).toHaveBeenLastCalledWith(expect.anything(), '1')
+    vi.mocked(getPalcoRoute).mockReturnValue('mirror')
+  })
+
+  it('timer/timerRouted/timerStop/timerTo', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    await palcoSession.timer({ duration: 60, mode: 'countdown' })
+    expect(palco.send).toHaveBeenLastCalledWith(
+      expect.objectContaining({ type: 'timer', duration: 60 }),
+      '0',
+    )
+    await palcoSession.timerRouted('countdown', { duration: 5 })
+    // mirror: slot 0 only (1 running)
+    palcoSession.timerStop()
+    expect(palco.send).toHaveBeenLastCalledWith(
+      expect.objectContaining({ action: 'stop' }),
+      '0',
+    )
+    await palcoSession.timerTo('1', { duration: 3 })
+    expect(palco.send).toHaveBeenLastCalledWith(expect.objectContaining({ duration: 3 }), '1')
+  })
+
+  it('audio: url/cover locais servidos; http direto; bg do escopo quando ausente', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    await palcoSession.audioRouted({ url: 'file:///m/a.mp3', cover: 'file:///c.png' })
+    expect(palco.servePath).toHaveBeenCalled()
+    const payload = palco.send.mock.calls.at(-1)?.[0] as Record<string, unknown>
+    expect(payload.type).toBe('audio')
+    expect(String(payload.url)).toContain('/media/')
+    expect(payload.background).toBeDefined() // bg do escopo liturgy
+  })
+
+  it('video: sem url e sem stop -> não envia; stop sem url envia', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    await palcoSession.video({})
+    expect(palco.send).not.toHaveBeenCalled()
+    await palcoSession.video({ action: 'stop' })
+    expect(palco.send).toHaveBeenLastCalledWith(
+      expect.objectContaining({ type: 'video', action: 'stop' }),
+      '0',
+    )
+  })
+
+  it('videoRouted/audioRouted individual: slot da rota, ativo preservado', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    vi.mocked(getPalcoRoute).mockReturnValue('1')
+    await palcoSession.videoRouted({ url: 'https://x/v.mp4' })
+    expect(palco.send).toHaveBeenLastCalledWith(expect.anything(), '1')
+    await palcoSession.audioRouted({ url: 'https://x/a.mp3' })
+    expect(palco.send).toHaveBeenLastCalledWith(expect.anything(), '1')
+    expect(palcoSession.slotId).toBe('0')
+    vi.mocked(getPalcoRoute).mockReturnValue('mirror')
+  })
+
+  it('serveMedia/idle/idleTo/eventos', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    expect(await palcoSession.serveMedia('f', 'audio/mpeg', 'QQ==')).toContain('/media/')
+    palcoSession.idle('aguarde')
+    expect(palco.send).toHaveBeenLastCalledWith(
+      expect.objectContaining({ type: 'idle', msg: 'aguarde' }),
+      '0',
+    )
+    palcoSession.idleTo('1', 'troca')
+    expect(palco.send).toHaveBeenLastCalledWith(expect.anything(), '1')
+    const cb = () => {}
+    palcoSession.onEvent(cb)
+    expect(palco.onEvent).toHaveBeenCalledWith(cb)
+    palcoSession.onReceiverConnected(cb)
+    expect(palco.onReceiverConnected).toHaveBeenCalled()
+    palcoSession.onReceiverDisconnected(cb)
+    expect(palco.onReceiverDisconnected).toHaveBeenCalled()
+  })
+})
+
+describe('gaps finais — wake falho, bg oficial sem match, rotas', () => {
+  it('turnOn: wake ausente/lançando não quebra', async () => {
+    const palco = fullMock()
+    delete (palco as Record<string, unknown>).wake
+    setBridge(palco)
+    expect(await palcoSession.turnOn()).toBe(true)
+    const palco2 = fullMock()
+    palco2.wake = vi.fn().mockRejectedValue(new Error('x'))
+    setBridge(palco2)
+    expect(await palcoSession.turnOn()).toBe(true)
+    await vi.waitFor(() => expect(palco2.send.mock.calls.length).toBeGreaterThanOrEqual(2))
+  })
+
+  it('official: sem id bg-NN -> serveLocal; inexistente -> bg undefined', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    // SEM preferência do usuário: input official inválido -> bg undefined (14/10)
+    readEffectiveStageSettings.mockReturnValue({
+      ...readEffectiveStageSettings(),
+      backgroundImage: '',
+    })
+    palco.servePath.mockRejectedValue(new Error('x'))
+    await palcoSession.project('hymns', {
+      text: 'a',
+      background: 'official:semmatch',
+    })
+    const payload = palco.send.mock.calls[0]?.[0] as Record<string, unknown>
+    expect(payload.background).toBeUndefined()
+  })
+
+  it('timerRouted rota individual: só o slot alvo', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    vi.mocked(getPalcoRoute).mockReturnValue('1')
+    await palcoSession.timerRouted('countdown', { duration: 9 })
+    expect(palco.send).toHaveBeenLastCalledWith(
+      expect.objectContaining({ type: 'timer', duration: 9 }),
+      '1',
+    )
+    vi.mocked(getPalcoRoute).mockReturnValue('mirror')
+  })
+
+  it('projectRouted mirror: slot com módulo atribuído é filtrado', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    palco.slots.mockResolvedValue([
+      { id: '0', label: 'TV1', running: true, clients: 1, httpPort: 7080, wsPort: 7081 },
+      { id: '2', label: 'TV3', running: true, clients: 1, httpPort: 7084, wsPort: 7085 },
+    ])
+    registryMock.moduleForSlotImpl = (id: string) => (id === '0' ? null : 'bible')
+    await palcoSession.projectRouted('hymns', 'hymns', { text: 'x' })
+    // slot 2 tem 'bible' atribuído -> filtrado; só slot 0 (espelho) recebe
+    expect(palco.send).toHaveBeenCalledTimes(1)
+    expect(palco.send).toHaveBeenCalledWith(expect.anything(), '0')
+  })
+
+  it('projectRouted: slot rodando sem atribuição e com o módulo igual recebe', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    palco.slots.mockResolvedValue([
+      { id: '0', label: 'TV1', running: true, clients: 1, httpPort: 7080, wsPort: 7081 },
+      { id: '2', label: 'TV3', running: true, clients: 1, httpPort: 7084, wsPort: 7085 },
+    ])
+    registryMock.moduleForSlotImpl = (id: string) => (id === '0' ? null : 'hymns')
+    await palcoSession.projectRouted('hymns', 'hymns', { text: 'x' })
+    expect(palco.send).toHaveBeenCalledTimes(2)
+  })
+
+  it('colorize: texto já colorizado não aninha; texto vazio sem cor', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    await palcoSession.project('hymns', {
+      text: '<span style="color:#fff">já</span>',
+    })
+    const p1 = palco.send.mock.calls[0]?.[0] as Record<string, unknown>
+    expect(p1.text).toBe('<span style="color:#fff">já</span>')
+    await palcoSession.project('hymns', { text: '' })
+    const p2 = palco.send.mock.calls[1]?.[0] as Record<string, unknown>
+    expect(p2.text).toBe('')
+  })
+
+  it('boxBorder ativo inclui borda no payload', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    readEffectiveStageSettings.mockReturnValue({
+      ...DEFAULT_SETTINGS,
+      boxBorder: true,
+    })
+    await palcoSession.project('hymns', { text: 'x' })
+    const payload = palco.send.mock.calls[0]?.[0] as Record<string, unknown>
+    expect(payload.boxBorder).toMatchObject({
+      width: 0.2,
+      color: 'rgba(255,255,255,0.85)',
+    })
+  })
+})
+
+describe('gaps — video local servido e videoRouted mirror', () => {
+  it('video: url local servida via servePath e enviada', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    await palcoSession.video({ url: 'file:///m/v.mp4' })
+    expect(palco.servePath).toHaveBeenCalledWith('file:///m/v.mp4', '0')
+    expect(palco.send).toHaveBeenLastCalledWith(
+      expect.objectContaining({ type: 'video' }),
+      '0',
+    )
+  })
+
+  it('videoRouted mirror: envia para todos os slots rodando', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    palco.slots.mockResolvedValue([
+      { id: '0', label: 'TV1', running: true, clients: 1, httpPort: 7080, wsPort: 7081 },
+      { id: '2', label: 'TV3', running: true, clients: 1, httpPort: 7084, wsPort: 7085 },
+      { id: '3', label: 'TV4', running: false, clients: 0, httpPort: 7086, wsPort: 7087 },
+    ])
+    vi.mocked(getPalcoRoute).mockReturnValue('mirror')
+    await palcoSession.videoRouted({ url: 'https://x/v.mp4' })
+    const slots = palco.send.mock.calls.map((c) => c[1])
+    expect(slots).toEqual(['0', '2'])
+    vi.mocked(getPalcoRoute).mockReturnValue('mirror')
+  })
+})
+
+describe('gaps 2 — audio cover local, video url local, audioRouted bg auto', () => {
+  it('audio: cover local também é servida (L318-319)', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    await palcoSession.audio({
+      url: 'https://x/a.mp3',
+      cover: 'file:///c/capa.png',
+    })
+    const payload = palco.send.mock.calls.at(-1)?.[0] as Record<string, unknown>
+    expect(payload.cover).toContain('/media/')
+  })
+
+  it('audioRouted: background ausente injeta bg do escopo liturgy (L379-381)', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    await palcoSession.audioRouted({ url: 'https://x/a.mp3' })
+    const payload = palco.send.mock.calls.at(-1)?.[0] as Record<string, unknown>
+    expect(String(payload.background)).toContain('/bg/bg-3.png')
+  })
+
+  it('video: url local não servível -> undefined e sem envio (sem action stop)', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    palco.servePath.mockRejectedValue(new Error('x'))
+    await palcoSession.video({ url: 'local://media/quebrado.mp4' })
+    expect(palco.send).not.toHaveBeenCalled()
+  })
+})
+
+describe('gaps 3 — status sem url, official sem match com serve ok, bgPalco undefined, timer com bg explícito, serve falho', () => {
+  it('status sem url -> baseUrl null; official:bg-99 com serve ok -> bg do sender', async () => {
+    const palco = fullMock()
+    palco.status.mockResolvedValue({ running: true, clients: 0, url: null, wsUrl: null })
+    palco.servePath.mockResolvedValue('http://192.168.0.5:7080/media/x.png')
+    setBridge(palco)
+    // SEM preferência do usuário: input official resolve via serve (14/10)
+    readEffectiveStageSettings.mockReturnValue({
+      ...readEffectiveStageSettings(),
+      backgroundImage: '',
+    })
+    await palcoSession.project('hymns', {
+      text: 'x',
+      background: 'official:bg-99',
+    })
+    const payload = palco.send.mock.calls[0]?.[0] as Record<string, unknown>
+    // baseUrl null -> template fica null/bg/bg-99.png; serveLocal devolve -> média
+    expect([null, 'null/bg/bg-99.png', undefined]).toContain(payload.background === null ? null : String(payload.background))
+  })
+
+  it('sendBgPalco: bg não resolvível -> url vazia (bg ?? "")', async () => {
+    const palco = fullMock()
+    palco.servePath.mockRejectedValue(new Error('x'))
+    setBridge(palco)
+    readEffectiveStageSettings.mockReturnValue({
+      ...DEFAULT_SETTINGS,
+      backgroundImage: 'local://media/quebrado.png',
+    })
+    await palcoSession.sendBgPalco()
+    const payload = palco.send.mock.calls[0]?.[0] as Record<string, unknown>
+    expect(payload.url).toBe('')
+  })
+
+  it('timer com background explícito não consulta settings', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    await palcoSession.timer({ duration: 10, background: 'https://x/t.png' })
+    expect(palco.send).toHaveBeenLastCalledWith(
+      expect.objectContaining({ background: 'https://x/t.png' }),
+      '0',
+    )
+  })
+
+  it('audio: url local não servível -> undefined (L315); cover idem (L319)', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    palco.servePath.mockRejectedValue(new Error('x'))
+    await palcoSession.audio({ url: 'file:///a.mp3', cover: 'file:///c.png' })
+    const payload = palco.send.mock.calls.at(-1)?.[0] as Record<string, unknown>
+    expect(payload.url).toBeUndefined()
+    expect(payload.cover).toBeUndefined()
+  })
+
+  it('audioRouted: background explícito não consulta liturgy (L379 falso)', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    await palcoSession.audioRouted({ url: 'https://x/a.mp3', background: 'https://x/bg.jpg' })
+    const payload = palco.send.mock.calls.at(-1)?.[0] as Record<string, unknown>
+    expect(payload.background).toBe('https://x/bg.jpg')
+  })
+})
+
+  it('audioRouted: bg do escopo não resolvível -> background undefined (L381)', async () => {
+    const palco = fullMock()
+    setBridge(palco)
+    palco.servePath.mockRejectedValue(new Error('x'))
+    readEffectiveStageSettings.mockReturnValue({
+      ...DEFAULT_SETTINGS,
+      backgroundImage: 'local://media/quebrado.png',
+    })
+    await palcoSession.audioRouted({ url: 'https://x/a.mp3' })
+    const payload = palco.send.mock.calls.at(-1)?.[0] as Record<string, unknown>
+    expect(payload.background).toBeUndefined()
+  })
+
+it('waits for the matching source confirmation before finishing the startup test', async () => {
+  const palco = fullMock()
+  setBridge(palco)
+  vi.spyOn(palcoSession, 'refreshObs').mockResolvedValueOnce(true)
+  let receive: (message: unknown) => void = () => {}
+  const unsubscribe = vi.fn()
+  palco.onEvent.mockImplementation(callback => { receive = callback; return unsubscribe })
+  let finished = false
+  const warmupResult = palcoSession.warmupObs('7082')
+  const starting = warmupResult.then(() => { finished = true })
+  await vi.waitFor(() => expect(palco.send).toHaveBeenCalled())
+  const message = palco.send.mock.calls.at(-1)![0]
+  expect(message).toMatchObject({ type: 'obsWarmup', durationMs: 3000 })
+  expect(palco.send.mock.calls.at(-1)![1]).toBe('7082')
+  receive({ type: 'obs-warmup-complete', requestId: 'another-source' })
+  await Promise.resolve()
+  expect(finished).toBe(false)
+  receive({ type: 'obs-warmup-complete', requestId: message.requestId })
+  await starting
+  expect(unsubscribe).toHaveBeenCalledOnce()
+  await expect(warmupResult).resolves.toBe('confirmed')
+})
+
+it('reads the status of one connection without changing the active one', async () => {
+  const palco = fullMock()
+  setBridge(palco)
+  await expect(palcoSession.statusSlot('7082')).resolves.toMatchObject({ running: true, clients: 1 })
+  expect(palco.status).toHaveBeenCalledWith('7082')
+  expect(palcoSession.slotId).toBe('0')
+})
+
+it('skips the startup test while no source is open and reports that it is waiting', async () => {
+  const palco = fullMock()
+  palco.status.mockResolvedValue({ running: true, clients: 0, url: 'http://192.168.0.5:7082' })
+  setBridge(palco)
+  const refresh = vi.spyOn(palcoSession, 'refreshObs')
+  await expect(palcoSession.warmupObs('7082')).resolves.toBe('waiting')
+  expect(palco.send).not.toHaveBeenCalled()
+  expect(refresh).not.toHaveBeenCalled()
+  palco.status.mockRejectedValueOnce(new Error('ipc'))
+  await expect(palcoSession.warmupObs('7082')).resolves.toBe('waiting')
+  refresh.mockRestore()
+})

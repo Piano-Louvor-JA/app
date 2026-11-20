@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { isElectronShell } from '@shared/services/desktop-bridge'
@@ -10,10 +10,24 @@ import {
   setLiturgyVideoFile,
 } from '../services/liturgy-local-video'
 
+import IndependentProjectionButton from '@shared/components/IndependentProjectionButton.vue'
 import MusicTrackActions from '@shared/components/MusicTrackActions.vue'
 
+import {
+  ANNOTATION_PROJECTION_MODULE,
+  prepareAnnotationIndependent,
+  refreshAnnotationProjection,
+  useAnnotationProjection,
+} from '../services/annotation-projection'
+import { parseLiturgyWebTarget } from '../services/liturgy-web-runtime'
+import { formatDurationLabel } from '../services/liturgy-format'
+import { categoryTimeRangeWithEstimate } from '../services/liturgy-item-helpers'
 import { getItemTypeIcon, isExecutableItem } from '../services/liturgy-item-helpers'
+import { probeMediaDurationMs } from '../services/media-probe'
+import { normalizeTitleColor, sanitizeNotesHtml } from '../services/rich-notes'
 import type { LiturgyItem } from '../types/liturgy'
+import type { OnlineVideoItemStatus } from '@/shared/types/desktop-bridge'
+import '../styles/rich-notes.css'
 
 const props = defineProps<{
   item: LiturgyItem
@@ -23,11 +37,18 @@ const props = defineProps<{
   videoProjecting?: boolean
   startLabel: string
   durationLabel: string
+  /** SPEC t_50c9ac95: filhos da categoria p/ estimativa do intervalo. */
+  categoryChildren?: LiturgyItem[]
   linked?: boolean
   /** Indeterminado: alguns (não todos) filhos da categoria concluídos. */
   indeterminate?: boolean
   /** Categoria com filhos ainda não todos concluídos → status Em andamento. */
   sectionInProgress?: boolean
+  /** Placeholder agendado: entrada resolvida OU estado vazio (rotação/data). */
+  resolvedSchedule?:
+    | { entryName: string; kindLabel: string; kind?: string; filePath?: string }
+    | { empty: string }
+    | null
   /** Categoria abaixo de outra incompleta → status Aguardando. */
   sectionWaiting?: boolean
   collapsible?: boolean
@@ -43,6 +64,8 @@ const props = defineProps<{
   hasInstrumental?: boolean
   /** Ação de música em andamento. */
   musicBusy?: boolean
+  /** Cópia baixada do vídeo do YouTube (download antecipado). */
+  offlineStatus?: OnlineVideoItemStatus | null
 }>()
 
 const emit = defineEmits<{
@@ -65,22 +88,120 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+
+const isAnnotation = computed(() => props.item.type === 'annotation')
+const richNotesHtml = computed(() =>
+  isAnnotation.value ? sanitizeNotesHtml(props.item.notesHtml) : '',
+)
+
+const annotationTitleColor = computed(() =>
+  isAnnotation.value && !props.item.done ? normalizeTitleColor(props.item.titleColor) : '',
+)
+
+const { projectingItemId: annotationProjectingId, independentItemId: annotationIndependentId } =
+  useAnnotationProjection()
+const annotationProjecting = computed(
+  () => isAnnotation.value && annotationProjectingId.value === props.item.id,
+)
+const annotationIndependentClaimed = computed(() => annotationIndependentId.value === props.item.id)
+
+function prepareIndependentAnnotation() {
+  return prepareAnnotationIndependent(props.item)
+}
+
+watch(
+  () => [props.item.name, props.item.subtitle, props.item.notesHtml, props.item.titleColor],
+  () => {
+    if (isAnnotation.value) refreshAnnotationProjection(props.item)
+  },
+)
 const rootEl = ref<HTMLElement | null>(null)
 let dragGhostEl: HTMLElement | null = null
 
 const isCategory = computed(() => props.item.type === 'category')
+/** Categoria usa a cor de realce do tema; os itens mantêm a cor do tipo. */
+const categoryOrItemAccent = computed(() =>
+  isCategory.value ? 'var(--ds-color-primary)' : props.item.accentColor,
+)
+
+const OFFLINE_ICONS: Record<Exclude<OnlineVideoItemStatus['state'], 'none'>, string> = {
+  queued: 'ti-clock',
+  resolving: 'ti-loader-2',
+  downloading: 'ti-download',
+  muxing: 'ti-loader-2',
+  ready: 'ti-circle-check',
+  error: 'ti-alert-triangle',
+}
+
+const offlineBadge = computed(() => {
+  const status = props.offlineStatus
+  if (!status || status.state === 'none') return null
+  const label = t(`liturgy.offlineVideo.${status.state}`, {
+    progress: Math.round((status.progress ?? 0) * 100),
+  })
+  return {
+    state: status.state,
+    icon: OFFLINE_ICONS[status.state],
+    label,
+    title: status.state === 'error' && status.message ? `${label}: ${status.message}` : label,
+  }
+})
+
+/** Placeholder agendado: duração própria vem do conteúdo resolvido do dia. */
+const isScheduledPlaceholder = computed(() => props.item.type === 'scheduled')
+const scheduledDurationMs = ref(0)
+let scheduledProbeId = 0
+
+watch(
+  () => props.resolvedSchedule,
+  async (resolved) => {
+    const probeId = ++scheduledProbeId
+    const filePath =
+      resolved && 'filePath' in resolved ? resolved.filePath?.trim() : undefined
+    scheduledDurationMs.value = 0
+    if (!filePath) return
+    const durationMs = await probeMediaDurationMs(filePath)
+    if (probeId === scheduledProbeId) scheduledDurationMs.value = durationMs
+  },
+  { immediate: true },
+)
+
+const scheduledDurationLabel = computed(() =>
+  formatDurationLabel(scheduledDurationMs.value),
+)
+
+/** Ícone efetivo: agendado com conteúdo do dia mostra o ícone do TIPO resolvido. */
+const effectiveIcon = computed(() => {
+  if (
+    isScheduledPlaceholder.value &&
+    props.resolvedSchedule &&
+    'kind' in props.resolvedSchedule &&
+    props.resolvedSchedule.kind
+  ) {
+    const icons: Record<string, string> = {
+      music: 'ti-music',
+      file: 'ti-movie',
+      video: 'ti-movie',
+      online_video: 'ti-movie',
+      verse: 'ti-book',
+      annotation: 'ti-note',
+    }
+    return icons[props.resolvedSchedule.kind] ?? 'ti-calendar-time'
+  }
+  return null
+})
 const isLinked = computed(() => Boolean(props.linked))
 const executable = computed(() => isExecutableItem(props.item))
 const isMusicItem = computed(
   () => props.item.type === 'music' && props.item.musicId != null,
 )
 const categoryTimeRange = computed(() => {
-  const start = props.item.startTime?.trim()
-  const end = props.item.endTime?.trim()
-  if (start && end) return `${start} - ${end}`
-  if (start) return start
-  if (end) return end
-  return '—'
+  // SPEC t_50c9ac95 (B2/B3): end real → intervalo exato; sem end + filhos
+  // com duração → "~Xmin (estimado)"; sem dados → só o start.
+  return categoryTimeRangeWithEstimate(
+    props.item,
+    props.categoryChildren ?? [],
+  )
 })
 const isStreamVideo = computed(() => props.item.type === 'online_video')
 const isLocalMediaUpload = computed(
@@ -106,8 +227,18 @@ async function onVideoFileChange(event: Event) {
 }
 const isAudioItem = computed(() => props.item.type === 'audio')
 const isLocalVideo = computed(() => props.item.type === 'video')
+/** Arquivo resolvido de qualquer programação: controles de vídeo normais. */
+const isScheduledLocalMedia = computed(
+  () =>
+    isScheduledPlaceholder.value &&
+    props.resolvedSchedule &&
+    'kind' in props.resolvedSchedule &&
+    props.resolvedSchedule.kind === 'file' &&
+    Boolean(props.resolvedSchedule.filePath?.trim()),
+)
 const showPlayerSelect = computed(
-  () => isAudioItem.value || isLocalVideo.value,
+  () =>
+    isAudioItem.value || isLocalVideo.value || isScheduledLocalMedia.value,
 )
 
 const {
@@ -137,6 +268,7 @@ function playerOptionLabel(player: { id: string; label: string }) {
 
 function updatePlayerMenuPosition() {
   const trigger = playerTriggerEl.value
+  /* v8 ignore next 1 -- só chamada com menu aberto ⇒ trigger montado */
   if (!trigger) return
 
   const rect = trigger.getBoundingClientRect()
@@ -173,6 +305,7 @@ function closePlayerMenu() {
 }
 
 async function togglePlayerMenu() {
+  /* v8 ignore next 1 -- trigger fica disabled com done ⇒ handler não dispara */
   if (props.item.done) return
   if (playerMenuOpen.value) {
     closePlayerMenu()
@@ -191,7 +324,9 @@ function chooseRowPlayer(playerId: string) {
 
 function onPlayerMenuPointerDown(event: PointerEvent) {
   const target = event.target as Node | null
+  /* v8 ignore next 1 -- eventos DOM sempre têm target */
   if (!target) return
+  /* v8 ignore next 3 -- clique dentro do trigger/menu retorna sem fechar */
   if (playerTriggerEl.value?.contains(target) || playerMenuEl.value?.contains(target)) {
     return
   }
@@ -203,6 +338,7 @@ function onPlayerMenuKeydown(event: KeyboardEvent) {
 }
 
 function onPlayerMenuViewport() {
+  /* v8 ignore next 1 -- listeners só existem com menu aberto (unbind no close) */
   if (playerMenuOpen.value) updatePlayerMenuPosition()
 }
 
@@ -210,6 +346,11 @@ onMounted(() => {
   if (showPlayerSelect.value) {
     void loadPlayerChoices([props.item.playerId])
   }
+})
+
+// Conteúdo agendado resolve depois do mount; então carrega opções também aqui.
+watch(showPlayerSelect, (visible) => {
+  if (visible) void loadPlayerChoices([props.item.playerId])
 })
 
 onUnmounted(() => {
@@ -222,10 +363,12 @@ const isVideoRemote = computed(
   () =>
     isStreamVideo.value ||
     isLocalVideo.value ||
+    isScheduledLocalMedia.value ||
     isLocalImages.value ||
     isLocalPdf.value ||
     isLocalPresentation.value,
 )
+const isYoutubeItem = computed(() => parseLiturgyWebTarget(props.item.url || '')?.kind === 'youtube')
 const isSiteItem = computed(() => props.item.type === 'site')
 const isDimmed = computed(
   () => Boolean(props.reorderActive) && !props.isDragSource,
@@ -273,6 +416,7 @@ function onHandleDragStart(event: DragEvent) {
     event.dataTransfer.effectAllowed = 'move'
     event.dataTransfer.setData('text/plain', String(props.index))
 
+    /* v8 ignore next 1 -- rootEl existe durante todo o drag iniciado no componente */
     if (row) {
       clearDragGhost()
       const rect = row.getBoundingClientRect()
@@ -306,6 +450,33 @@ function onHandleDragEnd() {
 }
 
 const rowHovered = ref(false)
+
+const projectActionTitle = computed(() => {
+  if (isSiteItem.value) {
+    return props.siteProjecting
+      ? t('liturgy.actions.stopSiteProjection')
+      : t('liturgy.actions.projectSiteOnScreens')
+  }
+  if (isLocalPresentation.value) {
+    return props.videoProjecting
+      ? t('liturgy.actions.stopPresentationProjection')
+      : t('liturgy.actions.projectPresentationOnScreens')
+  }
+  if (isLocalPdf.value) {
+    return props.videoProjecting
+      ? t('liturgy.actions.stopPdfProjection')
+      : t('liturgy.actions.projectPdfOnScreens')
+  }
+  if (isLocalImages.value) {
+    return props.videoProjecting
+      ? t('liturgy.actions.stopImageProjection')
+      : t('liturgy.actions.projectImageOnScreens')
+  }
+  if (props.videoProjecting) {
+    return t('liturgy.actions.stopVideoProjection')
+  }
+  return t('liturgy.actions.projectVideoOnScreens')
+})
 </script>
 
 <template>
@@ -362,6 +533,14 @@ const rowHovered = ref(false)
     </label>
 
     <div class="liturgy-item__card">
+      <span
+        v-if="isCategory && showInProgress"
+        class="liturgy-item__progress"
+        role="progressbar"
+        :aria-label="t('liturgy.inProgress')"
+      >
+        <span class="liturgy-item__progress-bar" />
+      </span>
       <div class="liturgy-item__main">
         <span
           class="liturgy-item__drag"
@@ -388,14 +567,14 @@ const rowHovered = ref(false)
             item.done && !showInProgress
               ? undefined
               : {
-                  color: item.accentColor,
-                  background: `color-mix(in srgb, ${item.accentColor} 18%, transparent)`,
+                  color: categoryOrItemAccent,
+                  background: `color-mix(in srgb, ${categoryOrItemAccent} 18%, transparent)`,
                 }
           "
         >
           <i
             class="ti"
-            :class="getItemTypeIcon(item.type)"
+            :class="effectiveIcon ?? getItemTypeIcon(item.type)"
             aria-hidden="true"
           />
         </div>
@@ -414,7 +593,10 @@ const rowHovered = ref(false)
             {{ t(`liturgy.types.${item.type}`) }}
           </p>
           <div class="liturgy-item__heading">
-            <h3 class="liturgy-item__name">
+            <h3
+              class="liturgy-item__name"
+              :style="annotationTitleColor ? { color: annotationTitleColor } : undefined"
+            >
               {{ item.name }}
               <span
                 v-if="item.complementaryTitle"
@@ -436,7 +618,32 @@ const rowHovered = ref(false)
             </span>
           </div>
           <p
-            v-if="item.subtitle"
+            v-if="resolvedSchedule && 'entryName' in resolvedSchedule"
+            class="liturgy-item__subtitle liturgy-item__subtitle--scheduled"
+          >
+            {{ resolvedSchedule.entryName }} · {{ resolvedSchedule.kindLabel }}
+          </p>
+          <p
+            v-else-if="resolvedSchedule && 'empty' in resolvedSchedule"
+            class="liturgy-item__subtitle liturgy-item__subtitle--scheduled"
+          >
+            {{ resolvedSchedule.empty }}
+          </p>
+          <p
+            v-else-if="item.type === 'scheduled'"
+            class="liturgy-item__subtitle liturgy-item__subtitle--scheduled"
+          >
+            —
+          </p>
+          <!-- eslint-disable-next-line vue/no-v-html -- HTML passa por sanitizeNotesHtml -->
+          <div
+            v-if="richNotesHtml"
+            class="liturgy-item__subtitle liturgy-item__rich-notes rich-notes"
+            data-testid="liturgy-item-rich-notes"
+            v-html="richNotesHtml"
+          />
+          <p
+            v-else-if="item.subtitle"
             class="liturgy-item__subtitle"
           >
             {{ item.subtitle }}
@@ -451,6 +658,20 @@ const rowHovered = ref(false)
       </div>
 
       <div class="liturgy-item__meta">
+        <span
+          v-if="offlineBadge"
+          class="liturgy-item__offline"
+          :class="`liturgy-item__offline--${offlineBadge.state}`"
+          :title="offlineBadge.title"
+          data-test="liturgy-offline-badge"
+        >
+          <i
+            class="ti"
+            :class="offlineBadge.icon"
+            aria-hidden="true"
+          />
+          {{ offlineBadge.label }}
+        </span>
         <div
           v-if="!isCategory"
           class="liturgy-item__time"
@@ -458,8 +679,20 @@ const rowHovered = ref(false)
           <p class="liturgy-item__clock">
             {{ startLabel }}
           </p>
-          <p class="liturgy-item__duration">
-            {{ t('liturgy.duration', { time: durationLabel }) }}
+          <p
+            v-if="
+              !isScheduledPlaceholder ||
+              scheduledDurationLabel !== '—'
+            "
+            class="liturgy-item__duration"
+          >
+            {{
+              t('liturgy.duration', {
+                time: isScheduledPlaceholder
+                  ? scheduledDurationLabel
+                  : durationLabel,
+              })
+            }}
           </p>
         </div>
 
@@ -479,6 +712,7 @@ const rowHovered = ref(false)
               isSiteItem ||
               isMusicItem ||
               isAudioItem ||
+              isAnnotation ||
               isLocalMediaUpload,
           }"
           @click.stop
@@ -610,13 +844,22 @@ const rowHovered = ref(false)
                 !isMusicItem &&
                 !isVideoRemote &&
                 !isSiteItem &&
+                !isAnnotation &&
                 (executable || selected)
             "
             type="button"
             class="liturgy-item__action"
             :class="{ 'liturgy-item__action--primary': selected }"
-            :title="t('liturgy.actions.openControl')"
-            :aria-label="t('liturgy.actions.openControl')"
+            :title="
+              isAudioItem
+                ? t('liturgy.actions.playLocalInExternal', { player: rowPlayerLabel })
+                : t('liturgy.actions.openControl')
+            "
+            :aria-label="
+              isAudioItem
+                ? t('liturgy.actions.playLocalInExternal', { player: rowPlayerLabel })
+                : t('liturgy.actions.openControl')
+            "
             :disabled="item.done"
             @click.stop="emit('select')"
           >
@@ -630,85 +873,57 @@ const rowHovered = ref(false)
             type="button"
             class="liturgy-item__action liturgy-item__action--site-control"
             :title="
-              isLocalPresentation
-                ? t('liturgy.actions.openPresentationControl')
-                : isLocalPdf
-                  ? t('liturgy.actions.openPdfControl')
-                  : isLocalImages
-                    ? t('liturgy.actions.openImageControl')
-                    : isVideoRemote
-                      ? t('liturgy.actions.openVideoControl')
-                      : t('liturgy.actions.openSiteControl')
+              isLocalVideo || isScheduledLocalMedia
+                ? t('liturgy.actions.playLocalInExternal', { player: rowPlayerLabel })
+                : isLocalPresentation
+                  ? t('liturgy.actions.openPresentationControl')
+                  : isLocalPdf
+                    ? t('liturgy.actions.openPdfControl')
+                    : isLocalImages
+                      ? t('liturgy.actions.openImageControl')
+                      : isVideoRemote
+                        ? t('liturgy.actions.openVideoControl')
+                        : t('liturgy.actions.openSiteControl')
             "
             :aria-label="
-              isLocalPresentation
-                ? t('liturgy.actions.openPresentationControl')
-                : isLocalPdf
-                  ? t('liturgy.actions.openPdfControl')
-                  : isLocalImages
-                    ? t('liturgy.actions.openImageControl')
-                    : isVideoRemote
-                      ? t('liturgy.actions.openVideoControl')
-                      : t('liturgy.actions.openSiteControl')
+              isLocalVideo || isScheduledLocalMedia
+                ? t('liturgy.actions.playLocalInExternal', { player: rowPlayerLabel })
+                : isLocalPresentation
+                  ? t('liturgy.actions.openPresentationControl')
+                  : isLocalPdf
+                    ? t('liturgy.actions.openPdfControl')
+                    : isLocalImages
+                      ? t('liturgy.actions.openImageControl')
+                      : isVideoRemote
+                        ? t('liturgy.actions.openVideoControl')
+                        : t('liturgy.actions.openSiteControl')
             "
             :disabled="item.done"
             @click.stop="emit('select')"
           >
             <i
-              class="ti ti-layout-dashboard"
+              class="ti"
+              :class="
+                isLocalVideo || isScheduledLocalMedia
+                  ? 'ti-player-play'
+                  : 'ti-layout-dashboard'
+              "
               aria-hidden="true"
             />
           </button>
           <button
-            v-if="!isCategory && (isSiteItem || isVideoRemote)"
+            v-if="
+              !isCategory && !isYoutubeItem && !isSiteItem && !isLocalImages && !isLocalPdf && !isLocalPresentation && !isLocalVideo &&
+                isVideoRemote && rowPlayerId === 'associated'
+            "
             type="button"
             class="liturgy-item__action liturgy-item__action--site-project"
             :class="{
               'liturgy-item__action--site-projecting':
                 !item.done && (isSiteItem ? siteProjecting : videoProjecting),
             }"
-            :title="
-              isSiteItem
-                ? siteProjecting
-                  ? t('liturgy.actions.stopSiteProjection')
-                  : t('liturgy.actions.projectSiteOnScreens')
-                : isLocalPresentation
-                  ? videoProjecting
-                    ? t('liturgy.actions.stopPresentationProjection')
-                    : t('liturgy.actions.projectPresentationOnScreens')
-                  : isLocalPdf
-                    ? videoProjecting
-                      ? t('liturgy.actions.stopPdfProjection')
-                      : t('liturgy.actions.projectPdfOnScreens')
-                    : isLocalImages
-                      ? videoProjecting
-                        ? t('liturgy.actions.stopImageProjection')
-                        : t('liturgy.actions.projectImageOnScreens')
-                      : videoProjecting
-                        ? t('liturgy.actions.stopVideoProjection')
-                        : t('liturgy.actions.projectVideoOnScreens')
-            "
-            :aria-label="
-              isSiteItem
-                ? siteProjecting
-                  ? t('liturgy.actions.stopSiteProjection')
-                  : t('liturgy.actions.projectSiteOnScreens')
-                : isLocalPresentation
-                  ? videoProjecting
-                    ? t('liturgy.actions.stopPresentationProjection')
-                    : t('liturgy.actions.projectPresentationOnScreens')
-                  : isLocalPdf
-                    ? videoProjecting
-                      ? t('liturgy.actions.stopPdfProjection')
-                      : t('liturgy.actions.projectPdfOnScreens')
-                    : isLocalImages
-                      ? videoProjecting
-                        ? t('liturgy.actions.stopImageProjection')
-                        : t('liturgy.actions.projectImageOnScreens')
-                      : videoProjecting
-                        ? t('liturgy.actions.stopVideoProjection')
-                        : t('liturgy.actions.projectVideoOnScreens')
-            "
+            :title="projectActionTitle"
+                        :aria-label="projectActionTitle"
             :aria-pressed="isSiteItem ? siteProjecting : videoProjecting"
             :disabled="item.done"
             @click.stop="emit('playScreens')"
@@ -723,6 +938,32 @@ const rowHovered = ref(false)
               aria-hidden="true"
             />
           </button>
+          <template v-if="isAnnotation">
+            <IndependentProjectionButton
+              :module-id="ANNOTATION_PROJECTION_MODULE"
+              compact
+              :obs="false"
+              :claimed="annotationIndependentClaimed"
+              :before-project="prepareIndependentAnnotation"
+            />
+            <button
+              type="button"
+              class="liturgy-item__action liturgy-item__action--site-project"
+              :class="{ 'liturgy-item__action--site-projecting': annotationProjecting }"
+              :title="annotationProjecting ? t('liturgy.actions.stopAnnotationProjection') : t('liturgy.actions.projectAnnotation')"
+              :aria-label="annotationProjecting ? t('liturgy.actions.stopAnnotationProjection') : t('liturgy.actions.projectAnnotation')"
+              :aria-pressed="annotationProjecting"
+              :disabled="item.done && !annotationProjecting"
+              data-testid="liturgy-annotation-project"
+              @click.stop="emit('playScreens')"
+            >
+              <i
+                class="ti"
+                :class="annotationProjecting ? 'ti-player-stop' : 'ti-arrow-up-right'"
+                aria-hidden="true"
+              />
+            </button>
+          </template>
           <button
             v-if="!deletionLocked"
             type="button"
@@ -990,6 +1231,115 @@ const rowHovered = ref(false)
   }
 }
 
+// Categoria/separador: cabeçalho de seção, não pode se confundir com os
+// sub-itens. Fundo tingido pela cor da categoria + barra lateral grossa.
+.liturgy-item--category {
+  // Segue a cor de realce do tema (Aparência), não a cor salva no item.
+  --liturgy-category-accent-color: var(--ds-color-primary);
+
+  .liturgy-item__card {
+    padding-top: 0.8rem;
+    padding-bottom: 0.8rem;
+    border-color: color-mix(in srgb, var(--liturgy-category-accent-color) 38%, transparent);
+    border-left: 4px solid var(--liturgy-category-accent-color);
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--liturgy-category-accent-color) 20%, var(--ds-color-surface-card, #242424)) 0%,
+      color-mix(in srgb, var(--liturgy-category-accent-color) 6%, var(--ds-color-surface-card, #242424)) 100%
+    );
+    box-shadow: 0 4px 14px rgb(0 0 0 / 0.28);
+  }
+
+  &.liturgy-item--pending .liturgy-item__card {
+    opacity: 0.9;
+  }
+
+  &.liturgy-item--pending:hover .liturgy-item__card {
+    opacity: 1;
+  }
+
+  &.liturgy-item--drag-source .liturgy-item__card {
+    border-color: color-mix(in srgb, var(--ds-color-primary) 55%, transparent);
+    box-shadow: 0 0 18px color-mix(in srgb, var(--ds-color-primary) 22%, transparent);
+  }
+
+  &.liturgy-item--selected .liturgy-item__card {
+    border-color: color-mix(in srgb, var(--ds-color-primary) 60%, transparent);
+    border-left-color: var(--ds-color-primary);
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--ds-color-primary) 24%, var(--ds-color-surface-card, #242424)) 0%,
+      color-mix(in srgb, var(--ds-color-primary) 8%, var(--ds-color-surface-card, #242424)) 100%
+    );
+    box-shadow: 0 0 18px color-mix(in srgb, var(--ds-color-primary) 18%, transparent);
+  }
+
+  &.liturgy-item--done .liturgy-item__card {
+    border-left-color: color-mix(in srgb, var(--ds-color-on-surface) 25%, transparent);
+    background: color-mix(in srgb, var(--ds-color-on-surface) 6%, var(--ds-color-surface-card, #242424));
+    box-shadow: none;
+  }
+
+  .liturgy-item__card {
+    position: relative;
+  }
+
+  .liturgy-item__name {
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+  }
+}
+
+// Barra contínua na base da categoria em andamento (indeterminada: o
+// horário programado não reflete o andamento real do culto).
+.liturgy-item__progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  overflow: hidden;
+  border-bottom-left-radius: 0.6rem;
+  background: color-mix(in srgb, var(--ds-color-primary) 18%, transparent);
+  pointer-events: none;
+}
+
+.liturgy-item__progress-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 35%;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--ds-color-primary) 40%,
+    var(--ds-color-primary) 60%,
+    transparent 100%
+  );
+  box-shadow: 0 0 8px color-mix(in srgb, var(--ds-color-primary) 60%, transparent);
+  animation: liturgy-progress-slide 1.8s ease-in-out infinite;
+}
+
+@keyframes liturgy-progress-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(290%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .liturgy-item__progress-bar {
+    width: 100%;
+    animation: none;
+    background: var(--ds-color-primary);
+  }
+}
+
 .liturgy-item__main {
   display: flex;
   align-items: center;
@@ -1224,6 +1574,15 @@ const rowHovered = ref(false)
   }
 }
 
+.liturgy-item__rich-notes {
+  margin-top: 0.2rem;
+  line-height: 1.4;
+
+  .liturgy-item--done & {
+    opacity: 0.55;
+  }
+}
+
 .liturgy-item__notes {
   margin: 0.08rem 0 0;
   font-size: 0.72rem;
@@ -1244,6 +1603,44 @@ const rowHovered = ref(false)
 
 .liturgy-item__time {
   text-align: right;
+}
+
+.liturgy-item__offline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--ds-color-on-surface-variant, var(--ds-color-on-surface));
+  background: color-mix(in srgb, var(--ds-color-on-surface) 8%, transparent);
+
+  i {
+    font-size: 0.8rem;
+  }
+
+  &--ready {
+    color: #24d36b;
+    background: color-mix(in srgb, #24d36b 14%, transparent);
+  }
+
+  &--error {
+    color: #ff6b6b;
+    background: color-mix(in srgb, #ff6b6b 14%, transparent);
+  }
+
+  &--resolving i,
+  &--muxing i {
+    animation: liturgy-offline-spin 1s linear infinite;
+  }
+}
+
+@keyframes liturgy-offline-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .liturgy-item__clock {

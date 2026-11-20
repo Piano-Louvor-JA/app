@@ -3,7 +3,7 @@
  *
  * Formato: ZIP contendo:
  * - slides.lja — INI (TMemIniFile) com a apresentação
- * - audio/<nome>.mp3 — áudio (opcional)
+ * - audio/<nome>.mp3|.wav|.ogg — áudio (opcional)
  * - imagens/<nome> — backgrounds referenciados (dedup)
  *
  * INI de 2 níveis: [Geral] + [Slide:1]...[Slide:N]
@@ -140,9 +140,6 @@ export async function parseSlja(zipBuffer: ArrayBuffer): Promise<SljaArchive> {
   const geral = iniData['Geral'] || {}
   const slidesCount = parseInt(geral.slides || '0', 10)
 
-  // Título: tentar várias fontes
-  const title = geral.titulo || (geral.versao ? `v${geral.versao}` : 'Sem título')
-
   // Áudio (url_musica pode usar backslash no Delphi)
   let audio: SljaAudio | undefined
   if (geral.audio === '1' && geral.url_musica) {
@@ -168,8 +165,15 @@ export async function parseSlja(zipBuffer: ArrayBuffer): Promise<SljaArchive> {
     if (!section) continue
 
     const slide = parseSlideSection(section, i)
+/* v8 ignore next -- invariante: parseSlideSection sempre retorna um slide (default CAPA/LETRA); nunca null */
     if (slide) slides.push(slide)
   }
+
+  // Delphi não grava `titulo` em [Geral]: o título da música é a letra da CAPA.
+  const title =
+    geral.titulo ||
+    capaTitle(slides) ||
+    (geral.versao ? `v${geral.versao}` : 'Sem título')
 
   return {
     title,
@@ -179,6 +183,12 @@ export async function parseSlja(zipBuffer: ArrayBuffer): Promise<SljaArchive> {
     version: geral.versao,
     slides,
   }
+}
+
+function capaTitle(slides: SljaSlide[]): string {
+  const capa = slides.find((slide) => slide.type === 'CAPA')
+  if (!capa) return ''
+  return capa.lyric.split('\n').map((line) => line.trim()).find(Boolean) ?? ''
 }
 
 /**

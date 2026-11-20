@@ -1,0 +1,24 @@
+#!/bin/bash
+# Pre-push hook (app) — regression gate local
+echo "🛡️  Regression gate local (pre-push)..."
+REMOTE=$1
+while read local_ref local_sha remote_ref remote_sha; do
+  # Skip staging/main pushes
+  [[ "$remote_ref" == *"refs/heads/staging"* || "$remote_ref" == *"refs/heads/main"* ]] && continue
+  # Fetch staging
+  git fetch origin staging --quiet
+  STAGING_SHA=$(git rev-parse origin/staging 2>/dev/null)
+  [[ -z "$STAGING_SHA" ]] && echo "⚠️  sem staging remoto, skip gate local" && exit 0
+  # Run regression compare
+  npm run test:regression -- --compare
+  RC=$?
+  if [[ $RC -ne 0 ]]; then
+    echo ""
+    echo "❌ REGRESSÃO DETECTADA — push bloqueado."
+    echo "   Corrija os testes quebrados antes de pushar."
+    echo "   Para forçar (nunca deveria): git push --no-verify"
+    exit 1
+  fi
+  echo "✅ Sem regressão vs staging. Push liberado."
+done
+exit 0

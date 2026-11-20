@@ -1,0 +1,1417 @@
+[
+  {
+    "id": "inter",
+    "family": "Inter",
+    "category": "sans",
+    "ui": true,
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "roboto",
+    "family": "Roboto",
+    "category": "sans",
+    "ui": true,
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "open-sans",
+    "family": "Open Sans",
+    "category": "sans",
+    "ui": true,
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "nunito",
+    "family": "Nunito",
+    "category": "sans",
+    "ui": true,
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "source-sans-3",
+    "family": "Source Sans 3",
+    "category": "sans",
+    "ui": true,
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "lato",
+    "family": "Lato",
+    "category": "sans",
+    "ui": true,
+    "weights": [
+      400,
+      700,
+      900
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "noto-sans",
+    "family": "Noto Sans",
+    "category": "sans",
+    "ui": true,
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "montserrat",
+    "family": "Montserrat",
+    "category": "sans",
+    "ui": true,
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "raleway",
+    "family": "Raleway",
+    "category": "sans",
+    "ui": true,
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "poppins",
+    "family": "Poppins",
+    "category": "sans",
+    "ui": true,
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "ubuntu",
+    "family": "Ubuntu",
+    "category": "sans",
+    "ui": true,
+    "weights": [
+      400,
+      500,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "work-sans",
+    "family": "Work Sans",
+    "category": "sans",
+    "ui": true,
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "figtree",
+    "family": "Figtree",
+    "category": "sans",
+    "ui": true,
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "manrope",
+    "family": "Manrope",
+    "category": "sans",
+    "ui": true,
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "rubik",
+    "family": "Rubik",
+    "category": "sans",
+    "ui": true,
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "barlow",
+    "family": "Barlow",
+    "category": "sans",
+    "ui": true,
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "dm-sans",
+    "family": "DM Sans",
+    "category": "sans",
+    "ui": true,
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "mulish",
+    "family": "Mulish",
+    "category": "sans",
+    "ui": true,
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "quicksand",
+    "family": "Quicksand",
+    "category": "sans",
+    "ui": true,
+    "weights": [
+      400,
+      500,
+      600,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "outfit",
+    "family": "Outfit",
+    "category": "sans",
+    "ui": true,
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "merriweather",
+    "family": "Merriweather",
+    "category": "serif",
+    "ui": true,
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "lora",
+    "family": "Lora",
+    "category": "serif",
+    "ui": true,
+    "weights": [
+      400,
+      500,
+      600,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "noto-serif",
+    "family": "Noto Serif",
+    "category": "serif",
+    "ui": true,
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "source-serif-4",
+    "family": "Source Serif 4",
+    "category": "serif",
+    "ui": true,
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "libre-baskerville",
+    "family": "Libre Baskerville",
+    "category": "serif",
+    "ui": true,
+    "weights": [
+      400,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "bitter",
+    "family": "Bitter",
+    "category": "serif",
+    "ui": true,
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "pt-serif",
+    "family": "PT Serif",
+    "category": "serif",
+    "ui": true,
+    "weights": [
+      400,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "crimson-pro",
+    "family": "Crimson Pro",
+    "category": "serif",
+    "ui": true,
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "literata",
+    "family": "Literata",
+    "category": "serif",
+    "ui": true,
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "eb-garamond",
+    "family": "EB Garamond",
+    "category": "serif",
+    "ui": true,
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "alegreya",
+    "family": "Alegreya",
+    "category": "serif",
+    "ui": true,
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "vollkorn",
+    "family": "Vollkorn",
+    "category": "serif",
+    "ui": true,
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "oswald",
+    "family": "Oswald",
+    "category": "display",
+    "ui": false,
+    "weights": [
+      400,
+      500,
+      600,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "bebas-neue",
+    "family": "Bebas Neue",
+    "category": "display",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "anton",
+    "family": "Anton",
+    "category": "display",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "righteous",
+    "family": "Righteous",
+    "category": "display",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "abril-fatface",
+    "family": "Abril Fatface",
+    "category": "display",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "alfa-slab-one",
+    "family": "Alfa Slab One",
+    "category": "display",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "cinzel",
+    "family": "Cinzel",
+    "category": "display",
+    "ui": false,
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "josefin-sans",
+    "family": "Josefin Sans",
+    "category": "display",
+    "ui": false,
+    "weights": [
+      400,
+      500,
+      600,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "caveat",
+    "family": "Caveat",
+    "category": "handwriting",
+    "ui": false,
+    "weights": [
+      400,
+      500,
+      600,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "dancing-script",
+    "family": "Dancing Script",
+    "category": "handwriting",
+    "ui": false,
+    "weights": [
+      400,
+      500,
+      600,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "kalam",
+    "family": "Kalam",
+    "category": "handwriting",
+    "ui": false,
+    "weights": [
+      400,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "patrick-hand",
+    "family": "Patrick Hand",
+    "category": "handwriting",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "satisfy",
+    "family": "Satisfy",
+    "category": "handwriting",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin"
+    ]
+  },
+  {
+    "id": "great-vibes",
+    "family": "Great Vibes",
+    "category": "handwriting",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "sacramento",
+    "family": "Sacramento",
+    "category": "handwriting",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "courgette",
+    "family": "Courgette",
+    "category": "handwriting",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "atkinson-hyperlegible-next",
+    "family": "Atkinson Hyperlegible Next",
+    "category": "sans",
+    "ui": true,
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "lexend",
+    "family": "Lexend",
+    "category": "sans",
+    "ui": true,
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "space-grotesk",
+    "family": "Space Grotesk",
+    "category": "sans",
+    "ui": true,
+    "weights": [
+      400,
+      500,
+      600,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "dosis",
+    "family": "Dosis",
+    "category": "sans",
+    "ui": true,
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "playfair-display",
+    "family": "Playfair Display",
+    "category": "serif",
+    "ui": false,
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "fraunces",
+    "family": "Fraunces",
+    "category": "serif",
+    "ui": false,
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "cormorant-garamond",
+    "family": "Cormorant Garamond",
+    "category": "serif",
+    "ui": false,
+    "weights": [
+      400,
+      500,
+      600,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "bodoni-moda",
+    "family": "Bodoni Moda",
+    "category": "serif",
+    "ui": false,
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "dm-serif-display",
+    "family": "DM Serif Display",
+    "category": "serif",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "prata",
+    "family": "Prata",
+    "category": "serif",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin"
+    ]
+  },
+  {
+    "id": "cinzel-decorative",
+    "family": "Cinzel Decorative",
+    "category": "serif",
+    "ui": false,
+    "weights": [
+      400,
+      700,
+      900
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "roboto-slab",
+    "family": "Roboto Slab",
+    "category": "serif",
+    "ui": true,
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "bungee",
+    "family": "Bungee",
+    "category": "display",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "bungee-shade",
+    "family": "Bungee Shade",
+    "category": "display",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "monoton",
+    "family": "Monoton",
+    "category": "display",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "rubik-glitch",
+    "family": "Rubik Glitch",
+    "category": "display",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "rubik-mono-one",
+    "family": "Rubik Mono One",
+    "category": "display",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "black-ops-one",
+    "family": "Black Ops One",
+    "category": "display",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "press-start-2p",
+    "family": "Press Start 2P",
+    "category": "display",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "orbitron",
+    "family": "Orbitron",
+    "category": "display",
+    "ui": false,
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin"
+    ]
+  },
+  {
+    "id": "audiowide",
+    "family": "Audiowide",
+    "category": "display",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "russo-one",
+    "family": "Russo One",
+    "category": "display",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "ultra",
+    "family": "Ultra",
+    "category": "display",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "rye",
+    "family": "Rye",
+    "category": "display",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "fredericka-the-great",
+    "family": "Fredericka the Great",
+    "category": "display",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "londrina-solid",
+    "family": "Londrina Solid",
+    "category": "display",
+    "ui": false,
+    "weights": [
+      400,
+      900
+    ],
+    "subsets": [
+      "latin"
+    ]
+  },
+  {
+    "id": "luckiest-guy",
+    "family": "Luckiest Guy",
+    "category": "display",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "lilita-one",
+    "family": "Lilita One",
+    "category": "display",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "unifraktur-maguntia",
+    "family": "UnifrakturMaguntia",
+    "category": "display",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin"
+    ]
+  },
+  {
+    "id": "pirata-one",
+    "family": "Pirata One",
+    "category": "display",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "tilt-prism",
+    "family": "Tilt Prism",
+    "category": "display",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "special-elite",
+    "family": "Special Elite",
+    "category": "display",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "pacifico",
+    "family": "Pacifico",
+    "category": "handwriting",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "lobster",
+    "family": "Lobster",
+    "category": "handwriting",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "amatic-sc",
+    "family": "Amatic SC",
+    "category": "handwriting",
+    "ui": false,
+    "weights": [
+      400,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "shadows-into-light",
+    "family": "Shadows Into Light",
+    "category": "handwriting",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "indie-flower",
+    "family": "Indie Flower",
+    "category": "handwriting",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "permanent-marker",
+    "family": "Permanent Marker",
+    "category": "handwriting",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin"
+    ]
+  },
+  {
+    "id": "architects-daughter",
+    "family": "Architects Daughter",
+    "category": "handwriting",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "handlee",
+    "family": "Handlee",
+    "category": "handwriting",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin"
+    ]
+  },
+  {
+    "id": "gloria-hallelujah",
+    "family": "Gloria Hallelujah",
+    "category": "handwriting",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "rock-salt",
+    "family": "Rock Salt",
+    "category": "handwriting",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin"
+    ]
+  },
+  {
+    "id": "yellowtail",
+    "family": "Yellowtail",
+    "category": "handwriting",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "allura",
+    "family": "Allura",
+    "category": "handwriting",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "kaushan-script",
+    "family": "Kaushan Script",
+    "category": "handwriting",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "marck-script",
+    "family": "Marck Script",
+    "category": "handwriting",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "bad-script",
+    "family": "Bad Script",
+    "category": "handwriting",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  },
+  {
+    "id": "sedgwick-ave-display",
+    "family": "Sedgwick Ave Display",
+    "category": "handwriting",
+    "ui": false,
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ]
+  }
+]

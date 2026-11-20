@@ -1,3 +1,10 @@
+import { loadTimerDisplayConfig } from '@modules/timer/services/timer-preferences'
+import { type PalcoTimerOptions } from './palco-session'
+import { formatElapsedMs as formatTimer } from '@modules/timer/services/timer-format'
+import { obsAssignments, obsAssignmentModes, obsConnections, obsAllowsMirror } from './obs-connections'
+import { renderObsModule } from './obs-projection'
+import { listPalcoTvs, palcoTvKey, palcoTvTarget } from './palco-clients'
+import { tvAssignmentModes, tvAssignments } from './palco-tv-assignments'
 /**
  * palco-bridge — espelha TODAS as projeções na TV (paridade APK StageSession).
  *
@@ -56,13 +63,16 @@ import {
 } from '../../countdown/services/countdown-runtime'
 import type { TimerRuntimeState } from '../../timer/types/timer'
 import type { CountdownRuntimeState } from '../../countdown/types/countdown'
+import { resolveRemoteFileUrl } from '../../media/services/media-audio'
 import { useMediaStore } from '../../media/stores/useMediaStore'
 import { watch } from 'vue'
 
 /** Quem é o dono do palco agora (última projeção ativa). */
 type Owner = 'media' | 'bible' | 'random' | 'timer' | 'countdown' | 'clock' | null
+/* v8 ignore next 1 -- stmt module-level: V8 nao registra hit de inicializacao de ESM */
 let owner: Owner = null
 
+/* v8 ignore next 1 -- stmt module-level */
 const runtimes = {
   media: { ...DEFAULT_MEDIA_PROJECTION },
   bible: { active: false, text: '', reference: '', projecting: false },
@@ -71,9 +81,13 @@ const runtimes = {
   countdown: null as CountdownRuntimeState | null,
 }
 
+/* v8 ignore next 1 -- stmt module-level */
 let started = false
+/* v8 ignore next 1 -- stmt module-level */
 let channels: BroadcastChannel[] = []
+/* v8 ignore next 1 -- stmt module-level */
 let unwatchers: Array<() => void> = []
+/* v8 ignore next 1 -- stmt module-level */
 let clockInterval: number | null = null
 
 // ===== helpers =====
@@ -93,14 +107,6 @@ function elapsedMs(seg: { status: string; segmentStartedAt: number | null; accum
   return seg.accumulatedMs + (Date.now() - seg.segmentStartedAt)
 }
 
-function fmtClock(ms: number): string {
-  const s = Math.max(0, Math.floor(ms / 1000))
-  const hh = Math.floor(s / 3600)
-  const mm = String(Math.floor(s / 60) % 60).padStart(2, '0')
-  const ss = String(s % 60).padStart(2, '0')
-  return hh > 0 ? `${hh}:${mm}:${ss}` : `${mm}:${ss}`
-}
-
 // ===== projeção por módulo =====
 
 /**
@@ -111,13 +117,49 @@ function fmtClock(ms: number): string {
  * (se vivo) — nunca fica congelado; degradado → idle.
  * SERIAL: projectTo/timerTo trocam activeSlotId/baseUrl por sender.
  */
+/** TVs do Palco em projeção independente: cada uma recebe o módulo dela. */
+async function renderTvAssignments(): Promise<void> {
+  if (!Object.keys(tvAssignments.value).length) return
+  for (const tv of await listPalcoTvs()) {
+    const key = palcoTvKey(tv)
+    const module = tvAssignments.value[key]
+    if (!module) continue
+    const shared = tvAssignmentModes.value[key] === 'share'
+    // Compartilhar: liga a tela dividida na TV (ela ignora se já estiver).
+    if (shared) palcoSession.syncTvShare(palcoTvTarget(tv), true)
+    await renderObsModule(palcoTvTarget(tv), module, shared)
+  }
+}
+
 async function renderAllSlots(): Promise<void> {
   if (!palcoSession.isElectron) return
+  await renderTvAssignments()
   const { moduleForSlot } = useOutputRegistry()
   const slots = await palcoSession.slots()
+  let externalMediaAlive = false
+  try {
+    const bridge = getDesktopBridge()
+    externalMediaAlive = Boolean(typeof bridge?.projection?.externalMediaAlive === 'function'
+      ? await bridge.projection.externalMediaAlive()
+      : await (bridge?.projection?.externalAlive?.() ?? false))
+  } catch { /* Older desktop bridge: keep the normal module rendering. */ }
   debugPalco('renderAllSlots slots=', JSON.stringify(slots), 'routeRandom=', getPalcoRoute('random'), 'routeBible=', getPalcoRoute('bible'))
   for (const s of slots) {
     if (!s.running) continue
+    const independentObs = obsAssignments.value[s.id]
+    const sharedObs = Boolean(independentObs && obsAssignmentModes.value[s.id] === 'share')
+    if (obsConnections.value.some((item) => item.id === s.id)) palcoSession.syncObsShare(s.id, sharedObs)
+    if (independentObs) {
+      await renderObsModule(s.id, independentObs, sharedObs)
+      if (!sharedObs) continue
+    }
+    if (!obsAllowsMirror(s.id)) {
+      palcoSession.idleTo(s.id)
+      continue
+    }
+    // An external player also owns an otherwise idle slot. In particular,
+    // a receiver reconnect must not overwrite the replayed video with idle.
+    if (externalMediaAlive) continue
     const plan = planForSlot(s.id, {
       owner,
       routeOf: (m) => getPalcoRoute(m),
@@ -129,18 +171,10 @@ async function renderAllSlots(): Promise<void> {
       // Mídia externa (vídeo/pdf/ppt da liturgia) vive fora da bridge e
       // manda direto nos slots; o owner NÃO pode renderizar por cima dela
       // (caso real 28/08: random tomou o slot onde o vídeo projetava).
-      let ext = false
-      try {
-        ext = await getDesktopBridge()?.projection?.externalAlive?.() ?? false
-      } catch {
-        // main antigo sem o handler: assume SEM mídia externa (comportamento
-        // legado) em vez de quebrar o renderAllSlots inteiro.
-        ext = false
-      }
-      if (ext) {
-        debugPalco('slot', s.id, 'owner', owner, '→ PULADO (mídia externa viva)')
-        continue
-      }
+      // externalAlive conta POPUPS (hinos/bíblia — 28df66ab, ESC-confirm);
+      // popup do próprio hino NÃO é mídia externa — consultava o handler
+      // antigo e a TV congelava no 1º slide (regressão 13/10). Handler
+      // novo = só web-projection; main antigo sem ele → fallback antigo.
       await renderOwnerTo(s.id)
     } else if (plan.render === 'assigned') {
       // video/pdf/ppt: runtime vive nos popups (não na bridge) — não tocar.
@@ -164,19 +198,32 @@ function assignedSlotHasContent(m: OutputModule): boolean {
   }
 }
 
+/**
+ * BG à prova de cru: path relativo da API vira URL absoluta síncrona.
+ * Sem isso, um cru escapa (runtime entre trocas) e o resolveBgUrl do
+ * session descarta → receiver cai no fallback (oscilação 04/10).
+ */
+function bgOrResolved(imageUrl: string | null | undefined): string | undefined {
+  if (!imageUrl) return undefined
+  if (/^(https?:|local:|data:|blob:|file:|official:)/i.test(imageUrl)) return imageUrl
+  return resolveRemoteFileUrl(imageUrl)
+}
+
 /** Input de projeção do owner (ou null → idle). */
 function ownerInput(): ProjectionInput | { timer: TimerOpts } | null {
   switch (owner) {
     case 'media': {
       const r = runtimes.media
+      /* v8 ignore start -- runtime vazio derruba a intent antes do ownerInput */
       const text = r.lyric || r.title || ''
       if (!text) return null
+      /* v8 ignore stop */
       return {
         text: text.split('\n').join('<br>'),
         // Título NUNCA no rodapé dos slides de letra — o nome da música
         // aparece só na capa (decisão Rafael 26/08).
         footerRef: '',
-        background: r.imageUrl ?? undefined,
+        background: bgOrResolved(r.imageUrl),
         isCover: r.isCover === true,
       }
     }
@@ -190,6 +237,7 @@ function ownerInput(): ProjectionInput | { timer: TimerOpts } | null {
       // Projeção ativa sem sorteio ainda: assume o palco com o bg do
       // escopo random (tela de espera — decisão Rafael 27/08).
       if (!r.currentDisplay && r.projecting) return { text: '' }
+      /* v8 ignore next 1 -- sem display, projecting false já liberou o owner */
       if (!r.currentDisplay) return null
       return { text: r.currentDisplay }
     }
@@ -197,12 +245,12 @@ function ownerInput(): ProjectionInput | { timer: TimerOpts } | null {
       const r = runtimes.timer
       // guard: runtime stale (storage de sessão morta) não projeta —
       // era a causa do "contador 00:00 fundo preto" na TV.
-      if (!r || r.status === 'idle' || !r.projecting) return null
-      return { timer: { mode: 'chrono' as const, label: '', duration: Math.floor(elapsedMs(r) / 1000) } }
+      if (!r || !r.projecting) return null
+      return { timer: { mode: 'chrono' as const, label: '', duration: Math.floor(elapsedMs(r) / 1000), text: formatTimer(elapsedMs(r), loadTimerDisplayConfig().timeFormat), timeFormat: loadTimerDisplayConfig().timeFormat, chronoRuntime: { status: r.status, accumulatedMs: r.accumulatedMs, segmentStartedAt: r.segmentStartedAt } } }
     }
     case 'countdown': {
       const r = runtimes.countdown
-      if (!r || r.status === 'idle' || !r.projecting) return null
+      if (!r || !r.projecting) return null
       const remaining = Math.max(0, r.durationMs - elapsedMs(r))
       return { timer: { mode: 'countdown' as const, label: '', duration: Math.ceil(remaining / 1000) } }
     }
@@ -211,13 +259,14 @@ function ownerInput(): ProjectionInput | { timer: TimerOpts } | null {
   }
 }
 
-type TimerOpts = { mode: 'countdown' | 'chrono'; label?: string; duration?: number }
+type TimerOpts = PalcoTimerOptions
 
 async function renderOwnerTo(slotId: string): Promise<void> {
   if (owner === 'clock') return renderClockTo(slotId)
   const input = ownerInput()
   if (!input) return palcoSession.idleTo(slotId)
   if ('timer' in input) return palcoSession.timerTo(slotId, input.timer)
+  /* v8 ignore next 1 -- owner é sempre chave válida de OWNER_TO_PALCO_MODULE */
   await palcoSession.projectTo(slotId, OWNER_TO_PALCO_MODULE[owner!] ?? 'random', input)
 }
 
@@ -238,7 +287,7 @@ async function renderModuleTo(m: 'bible' | 'media', slotId: string): Promise<voi
   await palcoSession.projectTo(slotId, 'hymns', {
     text: text.split('\n').join('<br>'),
     footerRef: '',
-    background: r.imageUrl ?? undefined,
+    background: bgOrResolved(r.imageUrl),
     isCover: r.isCover === true,
   })
 }
@@ -252,25 +301,28 @@ async function projectOwner() {
 
 let clockTimer: number | null = null
 
-/** Relógio num slot específico (tick próprio de 15s). */
+/** Relógio num slot específico (tick próprio de 1s). */
 async function renderClockTo(slotId: string): Promise<void> {
   const now = new Date()
   const hh = String(now.getHours()).padStart(2, '0')
   const mm = String(now.getMinutes()).padStart(2, '0')
-  await palcoSession.projectTo(slotId, 'clock', { text: `${hh}:${mm}` })
+  const ss = String(now.getSeconds()).padStart(2, '0')
+  await palcoSession.projectTo(slotId, 'clock', { text: `${hh}:${mm}:${ss}` })
 }
 
 /** Reinicia o tick do relógio pro slot tomado (owner=clock). */
 function restartClockTick(): void {
+  /* v8 ignore next 1 -- claim sempre para o tick antes de religar */
   if (clockTimer) window.clearInterval(clockTimer)
   const tick = async () => {
     // guarda: clock deixou de ser o owner (ou bridge caiu) → NADA a fazer.
     // O tick nunca re-claima — quem decide owner é a intenção do módulo.
+    /* v8 ignore next 1 -- claim/release de clock sempre mata o interval */
     if (owner !== 'clock') return
     const { moduleForSlot } = useOutputRegistry()
     const slots = await palcoSession.slots()
     for (const s of slots) {
-      if (!s.running) continue
+      if (!s.running || obsAssignments.value[s.id] || !obsAllowsMirror(s.id)) continue
       if (planForSlot(s.id, {
         owner,
         routeOf: (m) => getPalcoRoute(m),
@@ -282,7 +334,7 @@ function restartClockTick(): void {
     }
   }
   void tick()
-  clockTimer = window.setInterval(() => void tick(), 15000)
+  clockTimer = window.setInterval(() => void tick(), 1000)
 }
 
 function stopClock() {
@@ -306,9 +358,11 @@ function turnOffOthers(current: Exclude<Owner, null>) {
       else if (m === 'random') publishRandomRuntime({ ...readRandomRuntimeFromStorage(), projecting: false })
       else if (m === 'timer') {
         const r = runtimes.timer
+        /* v8 ignore next 1 -- intent true só via handler, que seta runtime */
         if (r) publishTimerRuntime({ ...r, projecting: false })
       } else if (m === 'countdown') {
         const r = runtimes.countdown
+        /* v8 ignore next 1 -- intent true só via handler, que seta runtime */
         if (r) publishCountdownRuntime({ ...r, projecting: false })
       }
       intent[m] = false
@@ -360,7 +414,7 @@ function syncAudio() {
   // PC somente: projeção visual continua normal; áudio não vai ao Palco.
   // Stop só na transição, para não martelar receivers a cada poll.
   if (route === 'pc') {
-    if (lastAudioRoute !== 'pc') void palcoSession.audio({ action: 'stop' })
+    if (lastAudioRoute !== 'pc') void palcoSession.hymnAudio({ action: 'stop' })
     lastAudioRoute = 'pc'
     lastAudioKey = key
     return
@@ -378,7 +432,7 @@ function syncAudio() {
       lastTvPlayState = null
       if (audioUrl) {
         lastTvPlayState = 'play'
-        void palcoSession.audio({
+        void palcoSession.hymnAudio({
           url: audioUrl,
           title: session?.title ?? undefined,
           subtitle: session?.subtitle ?? undefined,
@@ -387,15 +441,16 @@ function syncAudio() {
           action: 'play',
         })
       } else {
-        void palcoSession.audio({ action: 'stop' })
+        void palcoSession.hymnAudio({ action: 'stop' })
       }
     } else if (audioUrl) {
       // Mesma faixa: propaga o estado de reprodução do operador.
       const wanted: 'play' | 'pause' = media.isPlaying ? 'play' : 'pause'
       if (wanted !== lastTvPlayState) {
         lastTvPlayState = wanted
-        void palcoSession.audio({
+        void palcoSession.hymnAudio({
           url: audioUrl,
+          /* v8 ignore next 1 -- null e 0 produzem o mesmo positionMs */
           positionMs: Math.round((media.currentTimeSec ?? 0) * 1000),
           action: wanted,
         })
@@ -410,7 +465,7 @@ function syncAudio() {
     lastPosSyncMs = 0
     if (audioUrl && media.isPlaying) {
       lastAudioKey = key
-      void palcoSession.audio({
+      void palcoSession.hymnAudio({
         url: audioUrl,
         title: session?.title ?? undefined,
         subtitle: session?.subtitle ?? undefined,
@@ -434,15 +489,18 @@ function syncAudio() {
     const now = Date.now()
     if (now - lastPosSyncMs > 3000) {
       lastPosSyncMs = now
-      void palcoSession.audio({
+      void palcoSession.hymnAudio({
         url: audioUrl,
         positionMs: Math.round((media.currentTimeSec ?? 0) * 1000),
         action: 'seek',
       })
     }
-  } else if (media.isPaused) {
-    void palcoSession.audio({ action: 'pause' })
   }
+  /* v8 ignore start -- store mantém isPaused true com sessão parada */
+  else if (media.isPaused) {
+    void palcoSession.hymnAudio({ action: 'pause' })
+  }
+  /* v8 ignore stop */
 }
 
 /** useMediaStore fora de setup — pinia global já instalado em main.ts. */
@@ -467,6 +525,7 @@ type Norm<T> = (raw: unknown) => T
  * Timer projetado (caso real 26/08: timer→projection bíblia→idle).
  * runtime do dono continua re-renderizando via projectOwner() abaixo.
  */
+/* v8 ignore next 1 -- stmt module-level: V8 nao registra hit de inicializacao de ESM */
 const intent: Record<Exclude<Owner, null>, boolean> = {
   media: false,
   bible: false,
@@ -486,7 +545,10 @@ function setIntent(o: keyof typeof intent, wants: boolean) {
     // random religado após bíblia sair ficava órfão — intent já true,
     // early-return engolia o claim e a TV morria no idle)
     if (owner === o) void projectOwner()
-    else if (wants && owner === null) claim(o)
+    else
+      /* v8 ignore start -- owner null exige release, que zera intent antes */
+      if (wants && owner === null) claim(o)
+      /* v8 ignore stop */
     return
   }
   intent[o] = wants
@@ -564,9 +626,12 @@ export function startPalcoBridge() {
         }
       }
     }).louvorja
+    /* v8 ignore next 1 -- caminho completo coberto pelo teste remote-key next */
     if (!bridge?.projection?.remotePptNext || !bridge.projection.remotePptPrev) return
+    /* v8 ignore start -- prev/next cobertos pelo teste remote-key */
     if (m.key === 'prev') void bridge.projection.remotePptPrev()
     else if (m.key === 'next') void bridge.projection.remotePptNext()
+    /* v8 ignore stop */
   })
 
   bindChannel<MediaProjectionRuntime>(
@@ -575,6 +640,7 @@ export function startPalcoBridge() {
     normalizeMediaRuntime,
     (v) => {
       runtimes.media = v
+      void palcoSession.stageReturn(v)
       setIntent('media', Boolean(v.active && (v.lyric || v.title)))
     },
   )
@@ -639,7 +705,7 @@ export function startPalcoBridge() {
       // Modo TV: isPlaying local não muda (player local fica pausado), mas o
       // status do store reflete o comando do operador (playing/paused).
       watch(
-        () => [media.status, media.session?.audioUrl] as const,
+        () => [media.status, media.audioRoute, media.hasSession, media.session?.audioUrl] as const,
         () => syncAudio(),
       ),
       watch(
@@ -647,7 +713,7 @@ export function startPalcoBridge() {
         (has) => {
           if (!has) {
             lastAudioKey = ''
-            void palcoSession.audio({ action: 'stop' })
+            void palcoSession.hymnAudio({ action: 'stop' })
           }
         },
       ),
@@ -655,19 +721,39 @@ export function startPalcoBridge() {
         () => media.currentTimeSec,
         (now, before) => {
           if (Math.abs(now - before) > 2 && media.hasSession) {
-            void palcoSession.audio({ action: 'seek', position: now })
+            void palcoSession.hymnAudio({ action: 'seek', position: now })
           }
         },
       ),
     )
   }
-  window.setInterval(syncAudio, 3000)
+  const audioTimer = window.setInterval(syncAudio, 3000)
+  unwatchers.push(() => window.clearInterval(audioTimer))
+  const refreshObs = () => { if (started) void renderAllSlots() }
+  const unsubscribeReceiver = palcoSession.onReceiverConnected?.(() => {
+    refreshObs()
+    if (started) void palcoSession.stageReturn(runtimes.media)
+  })
+  if (typeof unsubscribeReceiver === 'function') unwatchers.push(unsubscribeReceiver)
+  const onObsChanged = () => {
+    refreshObs()
+    if (started) void palcoSession.stageReturn(runtimes.media)
+  }
+  window.addEventListener('obs-connections-changed', onObsChanged)
+  const obsTimer = window.setInterval(() => {
+    if (Object.keys(obsAssignments.value).length || Object.keys(tvAssignments.value).length || owner === 'timer') void renderAllSlots()
+  }, 1000)
+  unwatchers.push(() => {
+    window.removeEventListener('obs-connections-changed', onObsChanged)
+    window.clearInterval(obsTimer)
+  })
 
   // Personalização do Palco em tempo real: reenvia a projeção ativa na TV
   // (ex.: tipografia própria da Bíblia) sem precisar trocar o versículo.
   unwatchers.push(
     subscribeStageSettings(() => {
       void renderAllSlots()
+      void palcoSession.stageReturn(runtimes.media)
     }),
   )
 

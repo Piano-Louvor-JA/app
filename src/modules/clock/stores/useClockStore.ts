@@ -1,3 +1,4 @@
+import { detectObsBeforeProjection } from '@modules/settings/services/obs-detection'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
@@ -101,6 +102,7 @@ export const useClockStore = defineStore('clock', () => {
   }
 
   async function syncProjection() {
+    await detectObsBeforeProjection()
     // Relógio também segue a rota: slot individual = só TVs; Espelhar =
     // monitores selecionados + TVs. Antes palcoClockOn nunca era chamado.
     palcoClockOn()

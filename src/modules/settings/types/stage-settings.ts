@@ -48,10 +48,24 @@ export type StageVerticalAlign = 'top' | 'middle' | 'bottom'
 
 /** Peso da fonte do texto principal (mesmos passos do APK). */
 export type StageFontWeight = 400 | 600 | 800
+export type StageTextTransform = 'none' | 'uppercase' | 'capitalize'
 
 export type StageSettings = {
-  backgroundColor: string
-  textColor: string
+  /**
+   * Cor de fundo do palco. null = NÃO SETADO (padrão de fábrica):
+   * sem escolha explícita do usuário, a IMAGEM da projeção (capa/bg da
+   * música, asset oficial) vence — cor setada sufoca a imagem (05/10
+   * Rafael: "as fontes estão todas configuradas logo por padrão nem as
+   * cores vão vir setadas a não ser se o usuário selecione").
+   * Presets recebem a cor explícita ao serem clicados.
+   */
+  backgroundColor: string | null
+  /**
+   * Cores de TEXTO null-first (13/10 Rafael): null = usuário NÃO escolheu —
+   * render usa o padrão dele (branco na projeção/palco); cor só vai ao
+   * storage/palco se for escolha explícita. Mesmo contrato do backgroundColor.
+   */
+  textColor: string | null
   fontSize: number // px @1920 (60–160)
   fontWeight: StageFontWeight
   margin: number
@@ -63,12 +77,54 @@ export type StageSettings = {
   boxBorder: boolean
   textAlign: StageAlign
   textVerticalAlign: StageVerticalAlign
-  footerRefColor: string
+  footerRefColor: string | null
   footerRefWeight: number
+  /** null = 40% do tamanho do versículo (proporção visual de fábrica). */
+  refFontSize: number | null
+  refTextTransform: StageTextTransform
+  /**
+   * Título (1º slide / capa): personalização própria. `null`/`undefined`
+   * = herda o estilo geral da letra (compatibilidade com salvos antigos).
+   */
+  titleFontSize: number | null // px @1920 (60–160); null = herda fontSize
+  titleFontWeight: StageFontWeight | null
+  titleTextColor: string | null
+  titleUpperCase: boolean
+  titleTextShadow: boolean | null
+  /** Caixa atrás do título (1º slide). Default false = capa clássica sem caixa (14/10). */
+  titleTextBox: boolean
+  /**
+   * Estrofes (slides de letra): personalização própria. `null`/`undefined`
+   * = usa o estilo geral (que JÁ É o das estrofes) — espelha title*.
+   */
+  lyricFontSize: number | null // px @1920 (60–160); null = herda fontSize
+  lyricFontWeight: StageFontWeight | null
+  lyricTextColor: string | null
+  lyricUpperCase: boolean
+  lyricTextShadow: boolean | null
+  /** Liga as animações de transição ao trocar o slide da música (padrão: desligado). */
+  lyricTransitionEnabled: boolean
+  /** Transição ao trocar o slide da música (só vale com `lyricTransitionEnabled`). */
+  lyricTransition: StageTransition
+  lyricTransitionSpeed: 'fast' | 'normal' | 'slow'
+  /** Liga as animações ao trocar o texto da anotação da Liturgia (padrão: desligado). */
+  textTransitionEnabled: boolean
+  /** Transição ao trocar a anotação (só vale com `textTransitionEnabled`). */
+  textTransition: StageTransition
+  textTransitionSpeed: 'fast' | 'normal' | 'slow'
   showBibleVersion: boolean
   bibleFontSize: number // px @1920 (50–140)
   bibleFontWeight: 400 | 500 | 700
-  bibleTextColor: string
+  bibleTextColor: string | null
+  /** Capitalização do versículo (paridade web — mesmo campo/serde `bTransform`). */
+  bibleTextTransform: StageTextTransform
+  /** Referência: abaixo da caixa do texto (esquerda/centro/direita) ou no canto inferior direito da tela. */
+  bibleRefPosition: 'below-left' | 'below-center' | 'below-right' | 'corner'
+  /** Liga as animações de transição ao trocar o versículo (padrão: desligado). */
+  bibleTransitionEnabled: boolean
+  /** Transição ao trocar o versículo projetado (só vale com `bibleTransitionEnabled`). */
+  bibleTransition: StageTransition
+  bibleTransitionSpeed: 'fast' | 'normal' | 'slow'
   /** Data URL da imagem de fundo do escopo (1 ativa por escopo). */
   backgroundImage: string | null
   /**
@@ -77,8 +133,12 @@ export type StageSettings = {
    */
   clock?: { style: 'digital' | 'analog'; showSeconds: boolean; format24h: boolean }
   timer?: { timeFormat: 'hh:mm:ss.ms' | 'hh:mm:ss' | 'mm:ss.ms' | 'mm:ss' }
-  countdown?: { timeFormat: 'hh:mm:ss' | 'mm:ss' }
-  random?: { fontSizePc: number; textTransform: 'none' | 'uppercase' | 'lowercase'; animationSpeed: 'slow' | 'normal' | 'fast' }
+  countdown?: { timeFormat: 'hh:mm:ss' | 'mm:ss'; allowNegative?: boolean }
+  random?: {
+    fontSizePc: number
+    textTransform: 'none' | 'uppercase' | 'lowercase'
+    animationSpeed: 'slow' | 'normal' | 'fast'
+  }
   /**
    * Hinos: por padrão o bg da projeção é o ASSET da música (capa/slide).
    * override=true → o backgroundImage configurado aqui vence o asset
@@ -86,6 +146,85 @@ export type StageSettings = {
    * preferência do ESCOPO hymns, nunca global).
    */
   hymns?: { overrideBg: boolean }
+  /**
+   * Tela de retorno (monitor dos músicos), só no escopo hymns. Campo `null`
+   * = igual aos slides de música; sem o sub-objeto, tudo segue os slides.
+   */
+  returnScreen?: ReturnScreenSettings
+}
+
+export type ReturnScreenSettings = {
+  /** px @1920 da frase atual; null = tamanho da letra dos slides. */
+  fontSize: number | null
+  textColor: string | null
+  fontWeight: StageFontWeight | null
+  upperCase: boolean | null
+  /** px @1920 da próxima estrofe (independente da atual); null = 58% da letra dos slides. */
+  nextFontSize: number | null
+  /** slides = mesmo fundo dos slides; color = só a cor; image = imagem própria. */
+  bgMode: 'slides' | 'color' | 'image'
+  bgColor: string
+  /** Imagem própria (bgMode = image): data URL ou fundo oficial (`official:bg-01`). */
+  bgImage: string | null
+  /** null = cor da referência (padrão dourado). */
+  barColor: string | null
+}
+
+export const DEFAULT_RETURN_SCREEN_SETTINGS: ReturnScreenSettings = {
+  fontSize: null,
+  textColor: null,
+  fontWeight: null,
+  upperCase: null,
+  nextFontSize: null,
+  bgMode: 'slides',
+  bgColor: '#000000',
+  bgImage: null,
+  barColor: null,
+}
+
+export const RETURN_FONT_SIZE_MIN = 60
+export const RETURN_FONT_SIZE_MAX = 200
+export const RETURN_NEXT_FONT_SIZE_MIN = 30
+/** Próxima estrofe sem tamanho próprio: 58% da letra dos slides (como sempre foi). */
+export const RETURN_NEXT_SCALE = 0.58
+
+/** Tamanho efetivo (px @1920) da próxima estrofe do retorno. */
+export function returnNextFontSize(ret: ReturnScreenSettings, stage: Pick<StageSettings, 'fontSize'>): number {
+  return ret.nextFontSize ?? Math.round(stage.fontSize * RETURN_NEXT_SCALE * 100) / 100
+}
+
+/** Sub-objeto `returnScreen` lido com segurança (defaults no que faltar). */
+export function resolveReturnScreen(s: Pick<StageSettings, 'returnScreen'>): ReturnScreenSettings {
+  return { ...DEFAULT_RETURN_SCREEN_SETTINGS, ...(s.returnScreen ?? {}) }
+}
+
+function parseReturnScreen(raw: unknown): ReturnScreenSettings | undefined {
+  if (!raw || typeof raw !== 'object') return undefined
+  const r = raw as Record<string, unknown>
+  const d = DEFAULT_RETURN_SCREEN_SETTINGS
+  const color = (v: unknown) => (typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v) ? v : null)
+  const weight = Number(r['fontWeight'])
+  return {
+    fontSize:
+      typeof r['fontSize'] === 'number' && Number.isFinite(r['fontSize'])
+        ? Math.min(RETURN_FONT_SIZE_MAX, Math.max(RETURN_FONT_SIZE_MIN, r['fontSize']))
+        : null,
+    textColor: color(r['textColor']),
+    fontWeight: weight === 400 || weight === 600 || weight === 800 ? weight : null,
+    upperCase: typeof r['upperCase'] === 'boolean' ? r['upperCase'] : null,
+    nextFontSize:
+      typeof r['nextFontSize'] === 'number' && Number.isFinite(r['nextFontSize'])
+        ? Math.min(RETURN_FONT_SIZE_MAX, Math.max(RETURN_NEXT_FONT_SIZE_MIN, r['nextFontSize']))
+        : null,
+    bgMode: r['bgMode'] === 'color' || r['bgMode'] === 'image' ? r['bgMode'] : 'slides',
+    bgColor: color(r['bgColor']) ?? d.bgColor,
+    bgImage:
+      typeof r['bgImage'] === 'string' &&
+      (r['bgImage'].startsWith('data:image/') || r['bgImage'].startsWith(OFFICIAL_BG_PREFIX))
+        ? r['bgImage']
+        : null,
+    barColor: color(r['barColor']),
+  }
 }
 
 export const DEFAULT_CLOCK_MODULE_SETTINGS: NonNullable<StageSettings['clock']> = {
@@ -100,6 +239,7 @@ export const DEFAULT_TIMER_MODULE_SETTINGS: NonNullable<StageSettings['timer']> 
 
 export const DEFAULT_COUNTDOWN_MODULE_SETTINGS: NonNullable<StageSettings['countdown']> = {
   timeFormat: 'hh:mm:ss',
+  allowNegative: false,
 }
 
 export const DEFAULT_RANDOM_MODULE_SETTINGS: NonNullable<StageSettings['random']> = {
@@ -133,8 +273,8 @@ export const COUNTDOWN_TIME_FORMAT_OPTIONS: NonNullable<StageSettings['countdown
 ]
 
 export const DEFAULT_STAGE_SETTINGS: StageSettings = {
-  backgroundColor: '#0A0E1A',
-  textColor: '#FFFFFF',
+  backgroundColor: null,
+  textColor: null,
   fontSize: 96,
   fontWeight: 600,
   margin: 120,
@@ -146,12 +286,36 @@ export const DEFAULT_STAGE_SETTINGS: StageSettings = {
   boxBorder: true,
   textAlign: 'center',
   textVerticalAlign: 'middle',
-  footerRefColor: '#FCCE02',
+  footerRefColor: null,
   footerRefWeight: 600,
+  refFontSize: null,
+  refTextTransform: 'none',
   showBibleVersion: true,
   bibleFontSize: 84,
   bibleFontWeight: 500,
-  bibleTextColor: '#FFFFFF',
+  bibleTextColor: null,
+  bibleTextTransform: 'none',
+  bibleRefPosition: 'below-right',
+  bibleTransitionEnabled: false,
+  bibleTransition: 'fade',
+  bibleTransitionSpeed: 'normal',
+  titleFontSize: null,
+  titleFontWeight: null,
+  titleTextColor: null,
+  titleUpperCase: false,
+  titleTextShadow: null,
+  titleTextBox: false,
+  lyricFontSize: null,
+  lyricFontWeight: null,
+  lyricTextColor: null,
+  lyricUpperCase: false,
+  lyricTextShadow: null,
+  lyricTransitionEnabled: false,
+  lyricTransition: 'fade',
+  lyricTransitionSpeed: 'normal',
+  textTransitionEnabled: false,
+  textTransition: 'fade',
+  textTransitionSpeed: 'normal',
   backgroundImage: null,
 }
 
@@ -182,7 +346,10 @@ export function stageFlexAlign(
   return { alignItems: horizontal, justifyContent: vertical }
 }
 
-/** Presets de fundo — mesmos do APK. */
+  /**
+   * Presets de fundo — mesmos do APK. Clicar SETA a cor explicitamente
+   * (entra no storage); nenhum é default (05/10 Rafael).
+   */
 export const STAGE_BG_PRESETS = [
   { color: '#0A0E1A', label: 'Azul-noite' },
   { color: '#000000', label: 'Preto' },
@@ -232,6 +399,17 @@ export function resolveBackgroundImage(backgroundImage: string | null): string |
   return backgroundImage
 }
 
+/**
+ * Cor de fundo pronta pra CSS (style binding). null (não setado) →
+ * 'transparent': a camada de IMAGEM (capa/bg da música) aparece por cima
+ * do preto do palco; onde não há imagem, preto puro (05/10 Rafael).
+ */
+export function stageBgCss(
+  backgroundColor: string | null,
+): string {
+  return backgroundColor ?? 'transparent'
+}
+
 /** Presets de cor do texto — mesmos do APK. */
 export const STAGE_FG_PRESETS = [
   { color: '#FFFFFF', label: 'Branco' },
@@ -250,10 +428,97 @@ export const STAGE_REF_PRESETS = [
 const WEIGHTS: StageFontWeight[] = [400, 600, 800]
 const BIBLE_WEIGHTS: StageSettings['bibleFontWeight'][] = [400, 500, 700]
 
+/** Opções de capitalização do versículo (bíblia) — paridade web. */
+export const BIBLE_TEXT_TRANSFORM_OPTIONS: StageSettings['bibleTextTransform'][] = [
+  'none',
+  'uppercase',
+  'capitalize',
+]
+
+export const BIBLE_REF_POSITION_OPTIONS: StageSettings['bibleRefPosition'][] = [
+  'below-left',
+  'below-center',
+  'below-right',
+  'corner',
+]
+
+/** Catálogo de transições de tela (`none` = troca seca). */
+export const STAGE_TRANSITION_OPTIONS = [
+  'none',
+  'fade',
+  'slide',
+  'slide-down',
+  'slide-left',
+  'slide-right',
+  'zoom',
+  'zoom-out',
+  'blur',
+  'wipe',
+  'iris',
+  'curtain',
+  'flip',
+  'drop',
+  'rotate',
+  'swing',
+  'flip-h',
+  'pop',
+  'stretch',
+  'cinema',
+  'wipe-up',
+  'wipe-down',
+  'diagonal',
+  'glow',
+  'float',
+  'zoom-blur',
+] as const
+
+export type StageTransition = (typeof STAGE_TRANSITION_OPTIONS)[number]
+
+export const BIBLE_TRANSITION_OPTIONS: StageSettings['bibleTransition'][] = [...STAGE_TRANSITION_OPTIONS]
+
+/** Transição dos slides de música que de fato roda: desligada → `none`. */
+export function effectiveLyricTransition(
+  s: Pick<StageSettings, 'lyricTransitionEnabled' | 'lyricTransition'>,
+): StageTransition {
+  return s.lyricTransitionEnabled ? (s.lyricTransition ?? 'fade') : 'none'
+}
+
+/** Transição da anotação da Liturgia que de fato roda: desligada → `none`. */
+export function effectiveTextTransition(
+  s: Pick<StageSettings, 'textTransitionEnabled' | 'textTransition'>,
+): StageTransition {
+  return s.textTransitionEnabled ? (s.textTransition ?? 'fade') : 'none'
+}
+
+/** Transição que de fato roda: desligada → `none`. */
+export function effectiveBibleTransition(
+  s: Pick<StageSettings, 'bibleTransitionEnabled' | 'bibleTransition'>,
+): StageTransition {
+  return s.bibleTransitionEnabled ? (s.bibleTransition ?? 'fade') : 'none'
+}
+
+export const BIBLE_TRANSITION_SPEED_OPTIONS: StageSettings['bibleTransitionSpeed'][] = ['fast', 'normal', 'slow']
+
+const BIBLE_TRANSITION_MS: Record<StageSettings['bibleTransitionSpeed'], number> = {
+  fast: 150,
+  normal: 250,
+  slow: 450,
+}
+
+/** Duração de cada fase (saída e entrada) da transição do versículo. */
+export function bibleTransitionMs(speed: StageSettings['bibleTransitionSpeed'] | undefined): number {
+  return BIBLE_TRANSITION_MS[speed ?? 'normal'] ?? BIBLE_TRANSITION_MS.normal
+}
+
 function asColor(value: unknown, fallback: string): string {
   return typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value)
     ? value
     : fallback
+}
+
+/** Cor opcional: só aceita hex válido; ausente/inválida → null (13/10). */
+function asColorOrNull(value: unknown): string | null {
+  return typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value) ? value : null
 }
 
 function asNumber(value: unknown, fallback: number): number {
@@ -276,8 +541,11 @@ export function parseStageSettings(raw: unknown): StageSettings {
   const weight = asNumber(s['weight'], 600) as StageFontWeight
   const bibleWeight = asNumber(s['bWeight'], 500) as StageSettings['bibleFontWeight']
   return {
-    backgroundColor: asColor(s['bg'], DEFAULT_STAGE_SETTINGS.backgroundColor),
-    textColor: asColor(s['fg'], DEFAULT_STAGE_SETTINGS.textColor),
+    backgroundColor:
+      typeof s['bg'] === 'string' && /^#[0-9a-fA-F]{6}$/.test(s['bg'])
+        ? s['bg']
+        : null,
+    textColor: asColorOrNull(s['fg']),
     fontSize: clamp(asNumber(s['size'], 96), 60, 160),
     fontWeight: WEIGHTS.includes(weight) ? weight : 600,
     margin: clamp(asNumber(s['margin'], 120), 0, 480),
@@ -290,12 +558,61 @@ export function parseStageSettings(raw: unknown): StageSettings {
     textAlign: s['tAlign'] === 'left' || s['tAlign'] === 'right' ? s['tAlign'] : 'center',
     textVerticalAlign:
       s['tVAlign'] === 'top' || s['tVAlign'] === 'bottom' ? s['tVAlign'] : 'middle',
-    footerRefColor: asColor(s['refColor'], DEFAULT_STAGE_SETTINGS.footerRefColor),
+    footerRefColor: asColorOrNull(s['refColor']),
     footerRefWeight: clamp(Math.round(asNumber(s['refWeight'], 600)), 100, 900),
+    refFontSize: s['rSize'] == null ? null : clamp(asNumber(s['rSize'], 50), 50, 140),
+    refTextTransform: BIBLE_TEXT_TRANSFORM_OPTIONS.includes(s['rUpper'] as StageTextTransform)
+      ? (s['rUpper'] as StageTextTransform)
+      : 'none',
     showBibleVersion: typeof s['showVer'] === 'boolean' ? s['showVer'] : true,
     bibleFontSize: clamp(asNumber(s['bSize'], 84), 50, 140),
     bibleFontWeight: BIBLE_WEIGHTS.includes(bibleWeight) ? bibleWeight : 500,
-    bibleTextColor: asColor(s['bFg'], DEFAULT_STAGE_SETTINGS.bibleTextColor),
+    bibleTextColor: asColorOrNull(s['bFg']),
+    bibleTextTransform: BIBLE_TEXT_TRANSFORM_OPTIONS.includes(
+      s['bTransform'] as StageSettings['bibleTextTransform'],
+    )
+      ? (s['bTransform'] as StageSettings['bibleTextTransform'])
+      : 'none',
+    bibleRefPosition: BIBLE_REF_POSITION_OPTIONS.includes(s['refPos'] as StageSettings['bibleRefPosition'])
+      ? (s['refPos'] as StageSettings['bibleRefPosition'])
+      : DEFAULT_STAGE_SETTINGS.bibleRefPosition,
+    bibleTransitionEnabled:
+      typeof s['bTransOn'] === 'boolean' ? s['bTransOn'] : DEFAULT_STAGE_SETTINGS.bibleTransitionEnabled,
+    bibleTransition: BIBLE_TRANSITION_OPTIONS.includes(s['bTrans'] as StageSettings['bibleTransition'])
+      ? (s['bTrans'] as StageSettings['bibleTransition'])
+      : DEFAULT_STAGE_SETTINGS.bibleTransition,
+    bibleTransitionSpeed: BIBLE_TRANSITION_SPEED_OPTIONS.includes(s['bTransSpd'] as StageSettings['bibleTransitionSpeed'])
+      ? (s['bTransSpd'] as StageSettings['bibleTransitionSpeed'])
+      : DEFAULT_STAGE_SETTINGS.bibleTransitionSpeed,
+    titleFontSize:
+      s['tSize'] == null ? null : clamp(asNumber(s['tSize'], 96), 60, 160),
+    titleFontWeight: s['tWeight'] == null ? null : (WEIGHTS.includes(asNumber(s['tWeight'], 600) as StageFontWeight) ? (asNumber(s['tWeight'], 600) as StageFontWeight) : null),
+    titleTextColor: s['tFg'] == null ? null : asColorOrNull(s['tFg']),
+    titleUpperCase: typeof s['tUpper'] === 'boolean' ? s['tUpper'] : false,
+    titleTextShadow: typeof s['tsOnT'] === 'boolean' ? s['tsOnT'] : null,
+    titleTextBox: typeof s['tBox'] === 'boolean' ? s['tBox'] : false,
+    lyricFontSize:
+      s['lSize'] == null ? null : clamp(asNumber(s['lSize'], 84), 60, 160),
+    lyricFontWeight: s['lWeight'] == null ? null : (WEIGHTS.includes(asNumber(s['lWeight'], 600) as StageFontWeight) ? (asNumber(s['lWeight'], 600) as StageFontWeight) : null),
+    lyricTextColor: s['lFg'] == null ? null : asColorOrNull(s['lFg']),
+    lyricUpperCase: typeof s['lUpper'] === 'boolean' ? s['lUpper'] : false,
+    lyricTextShadow: typeof s['tsOnL'] === 'boolean' ? s['tsOnL'] : null,
+    lyricTransitionEnabled:
+      typeof s['lTransOn'] === 'boolean' ? s['lTransOn'] : DEFAULT_STAGE_SETTINGS.lyricTransitionEnabled,
+    lyricTransition: BIBLE_TRANSITION_OPTIONS.includes(s['lTrans'] as StageTransition)
+      ? (s['lTrans'] as StageTransition)
+      : DEFAULT_STAGE_SETTINGS.lyricTransition,
+    lyricTransitionSpeed: BIBLE_TRANSITION_SPEED_OPTIONS.includes(s['lTransSpd'] as StageSettings['lyricTransitionSpeed'])
+      ? (s['lTransSpd'] as StageSettings['lyricTransitionSpeed'])
+      : DEFAULT_STAGE_SETTINGS.lyricTransitionSpeed,
+    textTransitionEnabled:
+      typeof s['xTransOn'] === 'boolean' ? s['xTransOn'] : DEFAULT_STAGE_SETTINGS.textTransitionEnabled,
+    textTransition: BIBLE_TRANSITION_OPTIONS.includes(s['xTrans'] as StageTransition)
+      ? (s['xTrans'] as StageTransition)
+      : DEFAULT_STAGE_SETTINGS.textTransition,
+    textTransitionSpeed: BIBLE_TRANSITION_SPEED_OPTIONS.includes(s['xTransSpd'] as StageSettings['textTransitionSpeed'])
+      ? (s['xTransSpd'] as StageSettings['textTransitionSpeed'])
+      : DEFAULT_STAGE_SETTINGS.textTransitionSpeed,
     backgroundImage:
       typeof s['bgImg'] === 'string' &&
       (s['bgImg'].startsWith('data:') || s['bgImg'].startsWith(OFFICIAL_BG_PREFIX))
@@ -334,13 +651,14 @@ export function parseStageSettings(raw: unknown): StageSettings {
           } satisfies StageSettings['countdown'],
         }
       : {}),
+    ...(parseReturnScreen(s['ret']) ? { returnScreen: parseReturnScreen(s['ret']) } : {}),
     ...(s['random'] && typeof s['random'] === 'object'
       ? {
           random: {
             fontSizePc: clamp(
               asNumber((s['random'] as Record<string, unknown>)['fontSizePc'], 8),
               4,
-              14,
+              50,
             ),
             textTransform: RANDOM_TEXT_TRANSFORM_OPTIONS.includes(
               (s['random'] as Record<string, unknown>)['textTransform'] as NonNullable<StageSettings['random']>['textTransform'],
@@ -368,8 +686,12 @@ export function parseStageSettings(raw: unknown): StageSettings {
 /** Serializa no formato do APK (simétrico ao parse). */
 export function serializeStageSettings(s: StageSettings): Record<string, unknown> {
   return {
-    bg: s.backgroundColor,
-    fg: s.textColor,
+    // null = não setado: chave AUSENTE no storage (05/10 Rafael — cor só
+    // existe se o usuário escolher; parse trata ausente como null).
+    ...(s.backgroundColor ? { bg: s.backgroundColor } : {}),
+    // Cores de texto null-first: chave AUSENTE = não setado (13/10 Rafael —
+    // cor só existe se o usuário escolher; parse trata ausente como null).
+    ...(s.textColor ? { fg: s.textColor } : {}),
     size: s.fontSize,
     weight: s.fontWeight,
     margin: s.margin,
@@ -381,17 +703,42 @@ export function serializeStageSettings(s: StageSettings): Record<string, unknown
     boxBorder: s.boxBorder,
     tAlign: s.textAlign,
     tVAlign: s.textVerticalAlign,
-    refColor: s.footerRefColor,
+    ...(s.footerRefColor ? { refColor: s.footerRefColor } : {}),
     refWeight: s.footerRefWeight,
+    ...(s.refFontSize != null ? { rSize: s.refFontSize } : {}),
+    rUpper: s.refTextTransform,
     showVer: s.showBibleVersion,
     bSize: s.bibleFontSize,
     bWeight: s.bibleFontWeight,
-    bFg: s.bibleTextColor,
+    ...(s.bibleTextColor ? { bFg: s.bibleTextColor } : {}),
+    bTransform: s.bibleTextTransform,
+    refPos: s.bibleRefPosition,
+    bTransOn: s.bibleTransitionEnabled,
+    bTrans: s.bibleTransition,
+    bTransSpd: s.bibleTransitionSpeed,
+    ...(s.titleFontSize != null ? { tSize: s.titleFontSize } : {}),
+    ...(s.titleFontWeight != null ? { tWeight: s.titleFontWeight } : {}),
+    ...(s.titleTextColor != null ? { tFg: s.titleTextColor } : {}),
+    ...(s.titleUpperCase ? { tUpper: true } : {}),
+    ...(s.titleTextShadow != null ? { tsOnT: s.titleTextShadow } : {}),
+    ...(s.titleTextBox ? { tBox: true } : {}),
+    ...(s.lyricFontSize != null ? { lSize: s.lyricFontSize } : {}),
+    ...(s.lyricFontWeight != null ? { lWeight: s.lyricFontWeight } : {}),
+    ...(s.lyricTextColor != null ? { lFg: s.lyricTextColor } : {}),
+    ...(s.lyricUpperCase ? { lUpper: true } : {}),
+    ...(s.lyricTextShadow != null ? { tsOnL: s.lyricTextShadow } : {}),
+    lTransOn: s.lyricTransitionEnabled,
+    lTrans: s.lyricTransition,
+    lTransSpd: s.lyricTransitionSpeed,
+    xTransOn: s.textTransitionEnabled,
+    xTrans: s.textTransition,
+    xTransSpd: s.textTransitionSpeed,
     bgImg: s.backgroundImage,
     ...(s.clock ? { clock: s.clock } : {}),
     ...(s.timer ? { timer: s.timer } : {}),
     ...(s.countdown ? { countdown: s.countdown } : {}),
     ...(s.random ? { random: s.random } : {}),
+    ...(s.returnScreen ? { ret: s.returnScreen } : {}),
     ...(s.hymns ? { hymns: s.hymns } : {}),
   }
 }

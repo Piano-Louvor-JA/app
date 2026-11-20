@@ -1,11 +1,16 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+
+import FloatingPreviewTitle from '@shared/components/FloatingPreviewTitle.vue'
+import { FLOATING_STACK_ORDER, useFloatingDrag } from '@shared/composables/useFloatingDrag'
+import { USER_PREFERENCE_KEYS } from '@shared/constants/storage-keys'
 
 import { useMediaPlayer } from '../composables/useMediaPlayer'
 import MediaProjectFab from './MediaProjectFab.vue'
 import MediaStatusPreview from './MediaStatusPreview.vue'
+import MediaCloseDialog from './MediaCloseDialog.vue'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -17,20 +22,35 @@ const {
   isPlaying,
   previewSnippet,
   previewReference,
+  session,
+  queueLabel,
   toggleProjection,
-  clearProjection,
+  stopProjection,
   togglePlay,
   maximize,
+  close,
+  requestClose,
+  cancelClose,
+  closeConfirmOpen,
 } = useMediaPlayer()
 
 const visible = computed(() => hasSession.value && minimized.value)
+
+/** "Player · nome": a playlist tocando, ou a coletânea/hinário do hino. */
+const chromeDetail = computed(() => queueLabel.value || session.value?.subtitle || undefined)
+
+const chromeRoot = ref<HTMLElement | null>(null)
+const { positionStyle, dragging, onPointerDown, resetPosition } =
+  useFloatingDrag(chromeRoot, USER_PREFERENCE_KEYS.mediaChromePosition, {
+    stackOrder: FLOATING_STACK_ORDER.media,
+  })
 
 async function onProject() {
   await toggleProjection()
 }
 
 function onClear() {
-  clearProjection()
+  stopProjection()
 }
 
 async function onExpand() {
@@ -46,12 +66,36 @@ async function onToggleAudio() {
 <template>
   <div
     v-if="visible"
+    ref="chromeRoot"
     class="media-chrome"
+    :class="{ 'media-chrome--dragging': dragging }"
+    :style="positionStyle"
+    @pointerdown="onPointerDown"
   >
-    <MediaStatusPreview
-      :snippet="previewSnippet"
-      :reference="previewReference"
+    <FloatingPreviewTitle
+      :label="t('media.title')"
+      :detail="chromeDetail"
     />
+
+    <div
+      class="media-chrome__handle"
+      :title="t('media.chromeDragHint')"
+      @dblclick="resetPosition"
+    >
+      <button
+        type="button"
+        class="media-chrome__icon-btn media-chrome__close"
+        :aria-label="t('media.close')"
+        :title="t('media.close')"
+        @click="requestClose"
+      >
+        <i class="ti ti-x" aria-hidden="true" />
+      </button>
+      <MediaStatusPreview
+        :snippet="previewSnippet"
+        :reference="previewReference"
+      />
+    </div>
 
     <div class="media-chrome__actions">
       <button
@@ -88,18 +132,58 @@ async function onToggleAudio() {
       />
     </div>
   </div>
+  <Teleport to="body">
+    <MediaCloseDialog
+      v-if="visible && closeConfirmOpen"
+      class="media-chrome-close-dialog"
+      :open="closeConfirmOpen"
+      @cancel="cancelClose"
+      @confirm="close"
+    />
+  </Teleport>
 </template>
 
 <style scoped lang="scss">
+.media-chrome-close-dialog {
+  position: fixed;
+  z-index: 112;
+}
+
 .media-chrome {
   position: fixed;
   right: 2rem;
   bottom: calc(var(--ds-dock-height, 5.5rem) + 1.25rem);
-  z-index: 36;
+  z-index: 111;
   display: flex;
   align-items: flex-end;
   gap: 0.75rem;
   pointer-events: none;
+  user-select: none;
+  touch-action: none;
+}
+
+.media-chrome__handle {
+  position: relative;
+  pointer-events: auto;
+  cursor: grab;
+}
+
+.media-chrome__icon-btn.media-chrome__close {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 0.35rem);
+  width: 1.75rem;
+  height: 1.75rem;
+  border-color: #b77b76;
+  background: #69413e;
+  color: #fff;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 40%);
+  pointer-events: auto;
+
+  &:hover {
+    background: #85534e;
+    border-color: #d6a29c;
+  }
 }
 
 .media-chrome__actions {
@@ -107,6 +191,11 @@ async function onToggleAudio() {
   align-items: center;
   gap: 0.5rem;
   pointer-events: auto;
+}
+
+.media-chrome--dragging,
+.media-chrome--dragging .media-chrome__handle {
+  cursor: grabbing;
 }
 
 .media-chrome__icon-btn {

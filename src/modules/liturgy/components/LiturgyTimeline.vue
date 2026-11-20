@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import type { LiturgyItem } from '../types/liturgy'
+import type { OnlineVideoItemStatus } from '@/shared/types/desktop-bridge'
 import { getCategoryBlockEnd } from '../services/liturgy-item-helpers'
 import LiturgyTimelineItem from './LiturgyTimelineItem.vue'
 
@@ -18,6 +19,14 @@ const props = defineProps<{
   /** musicId → tem instrumental no catálogo. */
   musicInstrumentalById?: Record<number, boolean>
   busyMusicId?: number | null
+  /** Placeholder agendado: id do item → entrada resolvida OU estado vazio (rotação/data). */
+  scheduledResolvedByItemId?: Record<
+    string,
+    | { entryName: string; kindLabel: string; kind?: string; filePath?: string }
+    | { empty: string }
+  >
+  /** Item → cópia baixada do vídeo do YouTube. */
+  offlineStatusByItemId?: Record<string, OnlineVideoItemStatus>
 }>()
 
 const emit = defineEmits<{
@@ -57,6 +66,16 @@ type TimelineEntry = { item: LiturgyItem; index: number }
 type TimelineSegment =
   | { kind: 'item'; entry: TimelineEntry; linked: boolean; childCount: number }
   | { kind: 'branch'; categoryId: string; children: TimelineEntry[] }
+
+/** SPEC t_50c9ac95: filhos por categoria p/ estimativa na timeline. */
+const childItemsByCategory = computed<Record<string, LiturgyItem[]>>(() => {
+  const map: Record<string, LiturgyItem[]> = {}
+  for (const item of props.items) {
+    if (item.type === 'category' || !item.categoryId) continue
+    ;(map[item.categoryId] ??= []).push(item)
+  }
+  return map
+})
 
 const segments = computed((): TimelineSegment[] => {
   const result: TimelineSegment[] = []
@@ -168,6 +187,7 @@ function arePreviousCategoriesDone(categoryId: string): boolean {
     if (item.id === categoryId) return true
     if (!item.done) return false
   }
+  /* v8 ignore next 1 -- chamada só ocorre com categoryId existente ⇒ loop sempre retorna antes */
   return true
 }
 
@@ -253,6 +273,11 @@ function isCategorySectionInProgress(categoryId: string): boolean {
           :start-label="startLabels[segment.entry.index] ?? '—'"
           :duration-label="durationLabels[segment.entry.index] ?? '—'"
           :linked="segment.linked"
+          :category-children="
+            segment.entry.item.type === 'category' && segment.childCount > 0
+              ? childItemsByCategory[segment.entry.item.id] ?? []
+              : []
+          "
           :indeterminate="
             segment.entry.item.type === 'category'
               ? isCategoryIndeterminate(segment.entry.item.id)
@@ -282,6 +307,8 @@ function isCategorySectionInProgress(categoryId: string): boolean {
           :deletion-locked="deletionLocked"
           :has-instrumental="musicHasInstrumental(segment.entry.item)"
           :music-busy="isMusicBusy(segment.entry.item)"
+          :resolved-schedule="scheduledResolvedByItemId?.[segment.entry.item.id] ?? null"
+          :offline-status="offlineStatusByItemId?.[segment.entry.item.id] ?? null"
           @select="emit('select', segment.entry.index)"
           @video-file-selected="
             emit('videoFileSelected', segment.entry.item.id, $event)
@@ -320,6 +347,8 @@ function isCategorySectionInProgress(categoryId: string): boolean {
             :video-projecting="videoProjectionItemId === child.item.id"
             :start-label="startLabels[child.index] ?? '—'"
             :duration-label="durationLabels[child.index] ?? '—'"
+            :resolved-schedule="scheduledResolvedByItemId?.[child.item.id] ?? null"
+            :offline-status="offlineStatusByItemId?.[child.item.id] ?? null"
             linked
             :reorder-active="dragFrom != null"
             :is-drag-source="isDragBlockIndex(child.index)"

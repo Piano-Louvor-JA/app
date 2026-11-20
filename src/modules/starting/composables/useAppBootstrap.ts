@@ -14,6 +14,7 @@ import {
   ensureAlbumCovers,
   startCoverBackgroundSync,
 } from '@modules/starting/services/cover-background-sync'
+import { startCatalogBackgroundRefresh } from '@modules/starting/services/catalog-refresh'
 import {
   getDesktopBridge,
   isDesktopApp,
@@ -82,6 +83,10 @@ export function useAppBootstrap() {
     window.setTimeout(() => {
       void startCoverBackgroundSync()
     }, 800)
+    // Cache de categorias cura em background; não toca o bootstrap retomável (#337).
+    window.setTimeout(() => {
+      void startCatalogBackgroundRefresh()
+    }, 1200)
   }
 
   async function runFirstBoot() {

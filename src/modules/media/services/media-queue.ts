@@ -43,6 +43,18 @@ export function appendToQueue(
   return { items: [...items, newItem], index: currentIndex }
 }
 
+/** Append de lote; preserva a guarda de duplicata consecutiva por item. */
+export function appendQueueToQueue(
+  items: QueueItem[],
+  batch: QueueItem[],
+  currentIndex: number,
+): UpcomingState {
+  return batch.reduce(
+    (state, item) => appendToQueue(state.items, item, state.index),
+    { items, index: currentIndex } as UpcomingState,
+  )
+}
+
 /** Remove por índice; ajusta o índice atual e reporta se removeu a atual. */
 export function removeFromQueue(
   items: QueueItem[],

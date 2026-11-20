@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" class="receiver-idle">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -7,55 +7,123 @@
 <meta http-equiv="Expires" content="0">
 <title>LouvorJA Palco</title>
 <style>
-  html,body{margin:0;height:100%;overflow:hidden;background:#0A0E1A;
+  #idleVer{display:none!important}
+  /* Cover the receiver viewport, including ultrawide/portrait outputs. The
+     iframe API replaces its target and may retain embedded width/height. */
+  #youtubeProjection{position:fixed;inset:0;overflow:hidden;background:#000;z-index:100}
+  #youtubeProjection iframe{position:absolute!important;top:50%!important;left:50%!important;
+    width:100vw!important;height:100vh!important;min-width:177.7778vh;min-height:56.25vw;
+    max-width:none;max-height:none;transform:translate(-50%,-50%);border:0;display:block}
+  /* Covers the YouTube title, logo and spinner until the video actually plays. */
+  #youtubeVeil{position:absolute;inset:0;z-index:1;background:#000;pointer-events:none;transition:opacity .3s}
+  #youtubeVeil.is-hidden{opacity:0}
+  html,body{margin:0;height:100%;overflow:hidden;background:#000;
     font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#fff}
   #bg{position:fixed;top:0;left:0;width:100%;height:100%;object-fit:cover;
-    filter:brightness(.55);transition:opacity .8s}
-  #bg[src=""]{opacity:0}
+    /* PARIDADE BG (14/10 Rafael: idêntico em todas as telas): projeção
+       local NÃO escurece bg de música (brightness 1, sem véu). O véu
+       antigo rgba(0,0,0,.45) + .55 dupla-escurecia vs operador/projeção. */
+    filter:brightness(1);transition:opacity .8s}
+  /* Frame de slide projetado: fidelidade total — sem escurecimento. */
+  #bg.frame-slide{filter:none;object-fit:contain;background:#000;transform-origin:50% 50%;will-change:transform}
+  #bg:not([src]),#bg[src=""],#bgPalco:not([src]),#bgPalco[src=""]{display:none}
   #bgPalco{position:fixed;top:0;left:0;width:100%;height:100%;object-fit:cover}
-  #veil{position:fixed;inset:0;background:rgba(0,0,0,.45)}
-  #content{position:fixed;top:0;left:0;right:0;bottom:0;padding:6vh 8vw;
+  /* Véu de leitura DESLIGADO em música (paridade projeção local, 14/10).
+     Mantido no DOM p/ módulos que ainda usam. */
+  #veil{position:fixed;inset:0;background:transparent;pointer-events:none}
+  #content{position:fixed;top:0;left:0;right:0;bottom:0;padding:3vh 4vw;
     box-sizing:border-box}
   #text{position:absolute;top:50%;left:50%;
-    /* Caixa encolhe até o texto como via cabo. display:table = shrink-to-fit
-       compatível com Chromium antigo (webOS/Tizen) — fit-content em
-       position:absolute colapsava no simulador (26/08). margin auto centra. */
-    display:table;max-width:86vw;max-height:72vh;transform:translate(-50%,-50%);
-    overflow-wrap:break-word;
-    text-align:center;font-size:3.65vw;font-weight:700;line-height:1.35;
-    letter-spacing:.03em;text-transform:uppercase;
+    /* ÁREA ÚTIL do slide: teto 1600px (05/10 Rafael — 100% da área ficou
+       DEMAIS). SOLUÇÃO EZEQUIAS (web 3dc37df): pre-line + quebra natural —
+       as quebras \n do autor viram linhas e o texto flui até a max-width
+       antes de quebrar. SEM fit JS: fonte configurada aplicada direta. */
+    display:block;width:min(86vw,1600px);max-height:72vh;transform:translate(-50%,-50%);
+    overflow-wrap:break-word;white-space:pre-line;
+    text-align:center;font-size:calc(var(--fit-size,3.65vw));font-weight:700;line-height:1.4;
+    letter-spacing:.03em;
     text-shadow:0 2px 12px rgba(0,0,0,.8)}
   /* F3.3m: estilos dinâmicos da letra (sombra/caixinha) */
   #text.shadow-on{text-shadow:var(--ts,0 3px 18px rgba(0,0,0,.8))}
   /* Caixinha no PADRÃO da projeção (StagePreview): canto folha
      1.4cqw 0 1.4cqw 0 (16:9 → ~2.7vh 0), borda fina 1px, padding
      justo ao texto (2cqw ≈ 3.8vh lateral, 2vh vertical). */
-  #text.box-on{background:rgba(0,0,0,var(--box-bg,.45));
+  #text.box-on{background:rgba(24,24,24,var(--box-bg,.55));
+    backdrop-filter:blur(16px);
     /* Player: radius folha clamp(14px,2.4vmin,32px) 0, borda 0.2vmin e
-       sombra suave. Padding mínimo — caixa abraça o texto (vmin). */
-    padding:1.6vmin 1.8vmin;
+       sombra suave. Padding mínimo — caixa abraça o texto (vmin).
+       WIDTH (05/10 Rafael: "coloca ela mais perto do texto"): fit-content
+       abraça o texto com padding justo — sem faixa full-bleed; o teto
+       continua sendo a área útil (max-width 100% do #content). */
+    /* PARIDADE WEB (MediaSlideStage): caixa com respiro — max-width 86%
+       e padding 2.5vmin 4vmin, igual MediaSlideStage.vue do web. */
+    max-width:86vw;margin-inline:auto;
+    /* WIDTH fit-content (14/10): caixa ABRAÇA o texto. width fixo 86vw do
+       #text esticava a caixa em música com linha curta — vêa larga. */
+    width:fit-content;
+    padding:2.5vmin 4vmin;
     border-radius:2.4vmin 0 2.4vmin 0;
-    border:var(--box-border,.2vmin solid rgba(255,255,255,.25));
+    border:var(--box-border,.2vmin solid rgba(255,255,255,.85));
     box-shadow:0 10px 30px rgba(0,0,0,.4)}
+  /* Match the monitor lyric layout. max-content avoids absolute-position
+     shrink-to-fit using only the space to the right of left:50%. */
+  #text.music-lyrics{line-height:1;width:max-content;max-width:min(92vw,1600px);box-sizing:border-box}
+  #text.music-lyrics p,#text.music-lyrics div{margin:0;padding:0;line-height:inherit}
+  #text.music-lyrics.box-on{padding:1.6vmin 1.8vmin}
   #text.shadow-off{text-shadow:none}
   /* Capa da música (isCover): título destaque amarelo, sem caixinha/borda —
      paridade com media-projection__title--cover via cabo. */
-  #text.cover-on{text-transform:uppercase;font-weight:900;letter-spacing:.03em;
+  #text.cover-on{font-weight:900;letter-spacing:.03em;
     color:#f6c32a;background:none;padding:0;border:none;box-shadow:none;
+    backdrop-filter:none;-webkit-backdrop-filter:none;
     border-radius:0;line-height:1.1}
+  #text.cover-on:not(.title-box-on){width:max-content;max-width:min(88vw,1600px);box-sizing:border-box;padding:3.6vw 5vw 3.8vw;line-height:1.15;letter-spacing:.04em}
+  #text.cover-on:not(.title-box-on)::before,#text.cover-on:not(.title-box-on)::after{content:'';position:absolute;width:3.6vw;height:3.6vw;pointer-events:none}
+  #text.cover-on:not(.title-box-on)::before{top:.2vw;left:.2vw;border-top:.28vw solid currentColor;border-left:.28vw solid currentColor;border-top-left-radius:2vw}
+  #text.cover-on:not(.title-box-on)::after{bottom:.2vw;right:.2vw;border-bottom:.28vw solid currentColor;border-right:.28vw solid currentColor;border-bottom-right-radius:2vw}
+  /* Caixa opcional na capa: usuário liga 'titleTextBox'. Depois de
+     .cover-on para vencer o background:none quando ambos ativos. */
+  #text.cover-on.title-box-on{background:rgba(24,24,24,var(--box-bg,.55));
+    backdrop-filter:blur(16px);width:fit-content;max-width:86vw;margin-inline:auto;
+    padding:2.5vmin 4vmin;
+    border-radius:2.4vmin 0 2.4vmin 0;
+    border:var(--box-border,.2vmin solid rgba(255,255,255,.85));
+    box-shadow:0 10px 30px rgba(0,0,0,.4)}
   #text.box-off{background:none;padding:0;border:none;box-shadow:none}
+  /* Caixa GRANDE (Bíblia): padding generoso, típico véu de leitura.
+     width FIXO restaura o véu largo — o fit-content do .box-on é só
+     para MÍDIA (música), Bíblia NÃO (14/10 Rafael). */
+  #text.bible-box{padding:2vh 3.8vh;width:min(86vw,1600px);max-height:72vh}
+  /* Entrada do versículo novo. translate/scale individuais somam ao transform
+     que posiciona o #text; motores antigos ignoram e ficam só com o fade. */
+  @keyframes rxEnterFade{from{opacity:0}}
+  @keyframes rxEnterSlide{from{opacity:0;translate:0 4vh}}
+  @keyframes rxEnterZoom{from{opacity:0;scale:.94}}
+  .rx-enter-fade{animation:rxEnterFade var(--rx-ms,250ms) ease-out both}
+  .rx-enter-slide{animation:rxEnterSlide var(--rx-ms,250ms) ease-out both}
+  .rx-enter-zoom{animation:rxEnterZoom var(--rx-ms,250ms) ease-out both}
+  @media (prefers-reduced-motion:reduce){.rx-enter-slide,.rx-enter-zoom{animation-name:rxEnterFade}}
 
   #footer{position:fixed;bottom:4vh;left:0;right:0;text-align:center;
-    font-size:2.6vh;font-weight:300;opacity:.7}
-  /* F3.3m: referência da passagem destacada + versão ao lado */
-  #footer .ref{font-weight:var(--ref-weight,600);color:var(--ref-color,#FCCE02)}
-  #footer .ver{font-weight:300;opacity:.65;margin-left:1.2vh;font-size:.85em}
+    font-size:2.6vh;font-weight:300;opacity:1;letter-spacing:.02em}
+  /* F3.3m: referência da passagem destacada + versão ao lado.
+     WT-5f paridade popup: MAIÚSCULAS + letter-spacing + sem opacidade. */
+  #footer .ref{font-weight:var(--ref-weight,600);color:var(--ref-color,#FCCE02);
+    text-transform:uppercase;letter-spacing:.02em}
+  #footer .ver{font-weight:300;opacity:.65;margin-left:1.2vh;font-size:.85em;
+    text-transform:none;letter-spacing:0}
   #idle{position:fixed;top:0;left:0;right:0;bottom:0;z-index:10;
-    text-align:center;transition:opacity .5s}
+    text-align:center;background:#000;transition:opacity .5s}
   #idleCenter{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
     text-align:center;width:60vw}
+  html.obs-black-idle:not(.obs-music) body{background:#000!important}
+  html.obs-black-idle:not(.obs-music) #bg:not(.frame-slide),html.obs-black-idle:not(.obs-music) #bgPalco{display:none!important}
+  html.obs-black-idle #idle{background:#000}
+  html.obs-black-idle #idleCenter,html.obs-black-idle #idleVer{display:none!important}
+  html.receiver-idle #idleCenter,html.receiver-idle #idleVer{display:none!important}
   #idle.hidden{opacity:0;pointer-events:none}
   #idleLogos img,#idleLogos svg{display:block;margin:0 auto}
+  .idle-no-logo #idleLogos,.idle-no-logo #bars,.idle-no-logo .cast-waiting__logo{display:none}
   #idleLogo{height:14vh;max-width:50vw;margin:0 auto 4vh auto}#idleLogo svg{width:100%;height:100%;display:block}
   /* F3.3n: wordmark "Louvor JA" — identidade fixa, não personalizável. */
   #idleWordmark{font-size:3.6vh;font-weight:300;letter-spacing:.8vh;
@@ -82,20 +150,75 @@
   #npEq span:nth-child(3){animation-delay:.4s}
   @keyframes eq{0%,100%{height:1vh}50%{height:3vh}}
   #timer{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-    text-align:center;width:84vw;font-size:16vh;font-weight:700;
+    text-align:center;width:84vw;font-size:10vw;font-size:min(16vh,10vw);white-space:nowrap;font-weight:700;
     font-variant-numeric:tabular-nums;text-shadow:0 2px 12px rgba(0,0,0,.8)}
   #timer small{display:block;font-size:2.8vh;font-weight:300;opacity:.7;margin-top:2vh}
   /* Vídeo acima do idle (z=20) — idle nunca pode cobrir reprodução. */
   #video{position:fixed;top:0;left:0;width:100%;height:100%;object-fit:contain;
     background:#000;z-index:20}
+
+#obsWarmupView{position:fixed;inset:0;background:#000;z-index:100002;display:flex;align-items:center;justify-content:center}
+#obsWarmupView .warmup-logo{display:flex;flex-direction:column;align-items:center;gap:3vh}
+#obsWarmupView .warmup-logo img{display:block;width:min(28vw,28vh);height:auto;object-fit:contain;animation:obsWarmupPulse 2s ease-in-out infinite}
+#obsWarmupView .warmup-caption{margin:0;text-align:center;color:#fff;font:700 min(4vw,4vh)/1.4 Arial,sans-serif}
+#obsWarmupView svg{display:block;width:100%;height:auto}
+@keyframes obsWarmupPulse{0%,100%{opacity:.88;transform:scale(.985)}50%{opacity:1;transform:scale(1.015)}}
+/* Retorno de palco (/retorno): com música, cobre o espelho com o trecho atual e o próximo. */
+#stageReturn{position:fixed;inset:0;z-index:10000;overflow:hidden;background:#000;color:#fff}
+#stageReturn[hidden]{display:none}
+.stage-return__bg{position:absolute;inset:0;background-size:cover;background-position:center;opacity:.72}
+.stage-return__body{position:relative;z-index:1;display:flex;flex-direction:column;height:100%;box-sizing:border-box;padding:6vh 5vw 5.5vh}
+.stage-return__main{flex:1;display:flex;align-items:center;justify-content:center;min-height:0}
+.stage-return__block{display:flex;flex-direction:column;align-items:stretch;width:max-content;max-width:90vw;min-width:min(78vw,18rem)}
+.stage-return__block[hidden],.stage-return__title[hidden],.stage-return__next[hidden]{display:none}
+.stage-return__card{position:relative;overflow:hidden;border:clamp(2px,.2vmin,4px) solid rgba(255,255,255,.85);border-bottom:0;
+  border-radius:clamp(16px,2.6vmin,28px) clamp(16px,2.6vmin,28px) 0 0;background:rgba(24,24,24,.55);
+  box-shadow:0 10px 30px rgba(0,0,0,.4);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+.stage-return__lyric,.stage-return__title{box-sizing:border-box;margin:0;padding:2.4vmin 4vmin 2.8vmin;color:#fff;
+  font-size:clamp(1.5rem,6.4vmin,6.5rem);font-weight:700;line-height:1.35;letter-spacing:.03em;text-align:center;white-space:pre-line}
+.stage-return__title{max-width:90vw;color:#f6c32a;font-weight:900;line-height:1.1;letter-spacing:-.01em;
+  text-shadow:0 10px 30px rgba(0,0,0,.9),0 2px 6px rgba(0,0,0,.7)}
+.stage-return__bar{flex-shrink:0;width:100%;height:clamp(7px,1.05vmin,12px);overflow:hidden;
+  border-radius:0 0 clamp(8px,1.2vmin,12px) clamp(8px,1.2vmin,12px);background:rgba(255,255,255,.18)}
+.stage-return__bar-fill{width:100%;height:100%;transform:scaleX(0);transform-origin:left center;background:#FCCE02}
+.stage-return__lyric.wait{visibility:hidden}
+.stage-return__lyric--ghost{position:absolute;z-index:1;top:0;right:0;left:0;pointer-events:none}
+.stage-return__lyric--ghost[hidden],.stage-return__flyer[hidden]{display:none}
+.stage-return__lyric--ghost.out{animation:stageReturnGhostOut 780ms cubic-bezier(.22,1,.36,1) forwards}
+@keyframes stageReturnGhostOut{from{opacity:1;transform:none}to{opacity:0;transform:translateY(-24%)}}
+.stage-return__flyer{position:fixed;z-index:4;max-width:90vw;pointer-events:none;will-change:transform}
+.stage-return__next-lyric.out{opacity:0;transition:opacity 160ms ease}
+.stage-return__next-lyric.enter{animation:stageReturnNextIn 520ms cubic-bezier(.22,1,.36,1)}
+@keyframes stageReturnNextIn{from{opacity:0;transform:translateY(.45em)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){
+  .stage-return__lyric--ghost.out,.stage-return__next-lyric,.stage-return__next-lyric.enter,.stage-return__flyer{animation:none;transition:none}
+}
+.stage-return__next{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:.55rem;min-height:0}
+.stage-return__next-label{color:#f6c32a;font-size:clamp(.7rem,1.8vmin,1.1rem);font-weight:800;letter-spacing:.18em;text-transform:uppercase}
+.stage-return__next-lyric{margin:0;max-width:86vw;color:rgba(255,255,255,.82);font-size:clamp(1.25rem,4.2vmin,3.4rem);
+  font-weight:600;line-height:1.3;letter-spacing:.02em;text-align:center;text-transform:uppercase;white-space:pre-line}
+.stage-return__next-lyric.cover{color:#f6c32a;font-weight:800}
+/* Conexões servidas pelo app: sem transmissão, tela preta com o logo do Louvor JA e a espera. */
+#castWaiting{position:fixed;inset:0;z-index:100002;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:2.2vh;background:#000;color:#fff;pointer-events:none}
+#castWaiting[hidden]{display:none}
+.cast-waiting__logo{height:min(5.5vh,7vw);aspect-ratio:565/594;animation:castWaitingFade 3.2s ease-in-out infinite}
+.cast-waiting__logo svg{display:block;width:100%;height:100%}
+.cast-waiting__text{margin:0;font-size:min(1.7vh,2.4vw);font-weight:300;letter-spacing:.12em;opacity:.72;text-align:center}
+.speaker-preview .cast-waiting__logo{height:24vh}
+.speaker-preview .cast-waiting__text{font-size:5vh;letter-spacing:.06em}
+@keyframes castWaitingFade{0%,100%{opacity:.35}50%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.cast-waiting__logo{animation:none;opacity:.85}}
 </style>
 </head>
 <body>
 <!-- F3.3j: splash screen — some no WS OPEN ou 2.5s -->
-<div id="splash" style="position:fixed;inset:0;z-index:200;background:#0A0E1A;
+<div id="splash" style="position:fixed;inset:0;z-index:200;background:#000;
   display:flex;align-items:center;justify-content:center;transition:opacity .6s">
   <img src="splash.jpg" alt="Palco Piano LouvorJA" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">
 </div>
+<script src="purify.min.js"></script>
+<script src="network-mirror.js"></script>
 <script>
 (function(){
   var s=document.getElementById('splash');
@@ -145,7 +268,7 @@
     <div style="background:#00C1E6"></div>
     <div style="background:#FCCE02"></div>
   </div>
-  <p id="idleMsg">Aguardando conteúdo…</p>
+  <p id="idleMsg" data-l10n="idle"></p>
   <!-- F3.3u: status de conexão visível no idle (sem ?debug) + dica da tecla vermelha -->
   <p id="idleConn" style="font-size:1.8vh;opacity:.45;margin:1.2vh 0 0 0"></p>
   </div>
@@ -156,10 +279,2331 @@
 <p id="idleVer" style="position:fixed;right:3vh;bottom:3.2vh;margin:0;z-index:9999;
   font-size:1.45vh;font-weight:500;letter-spacing:.11vh;opacity:.88;
   font-family:inherit;color:#fff;text-shadow:0 1px 4px #000;
-  padding:.45vh .8vh;background:rgba(0,0,0,.30);pointer-events:none">PIANO LouvorJA Palco · receiver v0.1.52</p>
+  padding:.45vh .8vh;background:rgba(0,0,0,.30);pointer-events:none">PIANO LouvorJA Palco · receiver v0.1.54</p>
 <audio id="audio" preload="auto"></audio>
+<div id="stageReturn" hidden>
+  <div class="stage-return__bg" aria-hidden="true"></div>
+  <div class="stage-return__body">
+    <div class="stage-return__main">
+      <p class="stage-return__title" hidden></p>
+      <div class="stage-return__block">
+        <div class="stage-return__card"><p class="stage-return__lyric"></p><p class="stage-return__lyric stage-return__lyric--ghost" hidden></p></div>
+        <div class="stage-return__bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="stage-return__bar-fill"></div></div>
+      </div>
+    </div>
+    <div class="stage-return__next" hidden>
+      <span class="stage-return__next-label"></span>
+      <p class="stage-return__next-lyric"></p>
+    </div>
+  </div>
+  <p class="stage-return__lyric stage-return__flyer" aria-hidden="true" hidden></p>
+</div>
+<div id="castWaiting" role="status" hidden>
+  <div class="cast-waiting__logo" aria-hidden="true"></div>
+  <p class="cast-waiting__text" data-l10n="castWaiting"></p>
+</div>
 <script>
-function dlog(m1,m2,m3){try{console.log('[P]',m1,m2!==undefined?String(m2):'',m3!==undefined?String(m3):'')}catch(e){}}
+//---------------------------------------------------------------------
+//
+// QR Code Generator for JavaScript
+//
+// Copyright (c) 2009 Kazuhiko Arase
+//
+// URL: http://www.d-project.com/
+//
+// Licensed under the MIT license:
+//  http://www.opensource.org/licenses/mit-license.php
+//
+// The word 'QR Code' is registered trademark of
+// DENSO WAVE INCORPORATED
+//  http://www.denso-wave.com/qrcode/faqpatent-e.html
+//
+//---------------------------------------------------------------------
+
+var qrcode = function() {
+
+  //---------------------------------------------------------------------
+  // qrcode
+  //---------------------------------------------------------------------
+
+  /**
+   * qrcode
+   * @param typeNumber 1 to 40
+   * @param errorCorrectionLevel 'L','M','Q','H'
+   */
+  var qrcode = function(typeNumber, errorCorrectionLevel) {
+
+    var PAD0 = 0xEC;
+    var PAD1 = 0x11;
+
+    var _typeNumber = typeNumber;
+    var _errorCorrectionLevel = QRErrorCorrectionLevel[errorCorrectionLevel];
+    var _modules = null;
+    var _moduleCount = 0;
+    var _dataCache = null;
+    var _dataList = [];
+
+    var _this = {};
+
+    var makeImpl = function(test, maskPattern) {
+
+      _moduleCount = _typeNumber * 4 + 17;
+      _modules = function(moduleCount) {
+        var modules = new Array(moduleCount);
+        for (var row = 0; row < moduleCount; row += 1) {
+          modules[row] = new Array(moduleCount);
+          for (var col = 0; col < moduleCount; col += 1) {
+            modules[row][col] = null;
+          }
+        }
+        return modules;
+      }(_moduleCount);
+
+      setupPositionProbePattern(0, 0);
+      setupPositionProbePattern(_moduleCount - 7, 0);
+      setupPositionProbePattern(0, _moduleCount - 7);
+      setupPositionAdjustPattern();
+      setupTimingPattern();
+      setupTypeInfo(test, maskPattern);
+
+      if (_typeNumber >= 7) {
+        setupTypeNumber(test);
+      }
+
+      if (_dataCache == null) {
+        _dataCache = createData(_typeNumber, _errorCorrectionLevel, _dataList);
+      }
+
+      mapData(_dataCache, maskPattern);
+    };
+
+    var setupPositionProbePattern = function(row, col) {
+
+      for (var r = -1; r <= 7; r += 1) {
+
+        if (row + r <= -1 || _moduleCount <= row + r) continue;
+
+        for (var c = -1; c <= 7; c += 1) {
+
+          if (col + c <= -1 || _moduleCount <= col + c) continue;
+
+          if ( (0 <= r && r <= 6 && (c == 0 || c == 6) )
+              || (0 <= c && c <= 6 && (r == 0 || r == 6) )
+              || (2 <= r && r <= 4 && 2 <= c && c <= 4) ) {
+            _modules[row + r][col + c] = true;
+          } else {
+            _modules[row + r][col + c] = false;
+          }
+        }
+      }
+    };
+
+    var getBestMaskPattern = function() {
+
+      var minLostPoint = 0;
+      var pattern = 0;
+
+      for (var i = 0; i < 8; i += 1) {
+
+        makeImpl(true, i);
+
+        var lostPoint = QRUtil.getLostPoint(_this);
+
+        if (i == 0 || minLostPoint > lostPoint) {
+          minLostPoint = lostPoint;
+          pattern = i;
+        }
+      }
+
+      return pattern;
+    };
+
+    var setupTimingPattern = function() {
+
+      for (var r = 8; r < _moduleCount - 8; r += 1) {
+        if (_modules[r][6] != null) {
+          continue;
+        }
+        _modules[r][6] = (r % 2 == 0);
+      }
+
+      for (var c = 8; c < _moduleCount - 8; c += 1) {
+        if (_modules[6][c] != null) {
+          continue;
+        }
+        _modules[6][c] = (c % 2 == 0);
+      }
+    };
+
+    var setupPositionAdjustPattern = function() {
+
+      var pos = QRUtil.getPatternPosition(_typeNumber);
+
+      for (var i = 0; i < pos.length; i += 1) {
+
+        for (var j = 0; j < pos.length; j += 1) {
+
+          var row = pos[i];
+          var col = pos[j];
+
+          if (_modules[row][col] != null) {
+            continue;
+          }
+
+          for (var r = -2; r <= 2; r += 1) {
+
+            for (var c = -2; c <= 2; c += 1) {
+
+              if (r == -2 || r == 2 || c == -2 || c == 2
+                  || (r == 0 && c == 0) ) {
+                _modules[row + r][col + c] = true;
+              } else {
+                _modules[row + r][col + c] = false;
+              }
+            }
+          }
+        }
+      }
+    };
+
+    var setupTypeNumber = function(test) {
+
+      var bits = QRUtil.getBCHTypeNumber(_typeNumber);
+
+      for (var i = 0; i < 18; i += 1) {
+        var mod = (!test && ( (bits >> i) & 1) == 1);
+        _modules[Math.floor(i / 3)][i % 3 + _moduleCount - 8 - 3] = mod;
+      }
+
+      for (var i = 0; i < 18; i += 1) {
+        var mod = (!test && ( (bits >> i) & 1) == 1);
+        _modules[i % 3 + _moduleCount - 8 - 3][Math.floor(i / 3)] = mod;
+      }
+    };
+
+    var setupTypeInfo = function(test, maskPattern) {
+
+      var data = (_errorCorrectionLevel << 3) | maskPattern;
+      var bits = QRUtil.getBCHTypeInfo(data);
+
+      // vertical
+      for (var i = 0; i < 15; i += 1) {
+
+        var mod = (!test && ( (bits >> i) & 1) == 1);
+
+        if (i < 6) {
+          _modules[i][8] = mod;
+        } else if (i < 8) {
+          _modules[i + 1][8] = mod;
+        } else {
+          _modules[_moduleCount - 15 + i][8] = mod;
+        }
+      }
+
+      // horizontal
+      for (var i = 0; i < 15; i += 1) {
+
+        var mod = (!test && ( (bits >> i) & 1) == 1);
+
+        if (i < 8) {
+          _modules[8][_moduleCount - i - 1] = mod;
+        } else if (i < 9) {
+          _modules[8][15 - i - 1 + 1] = mod;
+        } else {
+          _modules[8][15 - i - 1] = mod;
+        }
+      }
+
+      // fixed module
+      _modules[_moduleCount - 8][8] = (!test);
+    };
+
+    var mapData = function(data, maskPattern) {
+
+      var inc = -1;
+      var row = _moduleCount - 1;
+      var bitIndex = 7;
+      var byteIndex = 0;
+      var maskFunc = QRUtil.getMaskFunction(maskPattern);
+
+      for (var col = _moduleCount - 1; col > 0; col -= 2) {
+
+        if (col == 6) col -= 1;
+
+        while (true) {
+
+          for (var c = 0; c < 2; c += 1) {
+
+            if (_modules[row][col - c] == null) {
+
+              var dark = false;
+
+              if (byteIndex < data.length) {
+                dark = ( ( (data[byteIndex] >>> bitIndex) & 1) == 1);
+              }
+
+              var mask = maskFunc(row, col - c);
+
+              if (mask) {
+                dark = !dark;
+              }
+
+              _modules[row][col - c] = dark;
+              bitIndex -= 1;
+
+              if (bitIndex == -1) {
+                byteIndex += 1;
+                bitIndex = 7;
+              }
+            }
+          }
+
+          row += inc;
+
+          if (row < 0 || _moduleCount <= row) {
+            row -= inc;
+            inc = -inc;
+            break;
+          }
+        }
+      }
+    };
+
+    var createBytes = function(buffer, rsBlocks) {
+
+      var offset = 0;
+
+      var maxDcCount = 0;
+      var maxEcCount = 0;
+
+      var dcdata = new Array(rsBlocks.length);
+      var ecdata = new Array(rsBlocks.length);
+
+      for (var r = 0; r < rsBlocks.length; r += 1) {
+
+        var dcCount = rsBlocks[r].dataCount;
+        var ecCount = rsBlocks[r].totalCount - dcCount;
+
+        maxDcCount = Math.max(maxDcCount, dcCount);
+        maxEcCount = Math.max(maxEcCount, ecCount);
+
+        dcdata[r] = new Array(dcCount);
+
+        for (var i = 0; i < dcdata[r].length; i += 1) {
+          dcdata[r][i] = 0xff & buffer.getBuffer()[i + offset];
+        }
+        offset += dcCount;
+
+        var rsPoly = QRUtil.getErrorCorrectPolynomial(ecCount);
+        var rawPoly = qrPolynomial(dcdata[r], rsPoly.getLength() - 1);
+
+        var modPoly = rawPoly.mod(rsPoly);
+        ecdata[r] = new Array(rsPoly.getLength() - 1);
+        for (var i = 0; i < ecdata[r].length; i += 1) {
+          var modIndex = i + modPoly.getLength() - ecdata[r].length;
+          ecdata[r][i] = (modIndex >= 0)? modPoly.getAt(modIndex) : 0;
+        }
+      }
+
+      var totalCodeCount = 0;
+      for (var i = 0; i < rsBlocks.length; i += 1) {
+        totalCodeCount += rsBlocks[i].totalCount;
+      }
+
+      var data = new Array(totalCodeCount);
+      var index = 0;
+
+      for (var i = 0; i < maxDcCount; i += 1) {
+        for (var r = 0; r < rsBlocks.length; r += 1) {
+          if (i < dcdata[r].length) {
+            data[index] = dcdata[r][i];
+            index += 1;
+          }
+        }
+      }
+
+      for (var i = 0; i < maxEcCount; i += 1) {
+        for (var r = 0; r < rsBlocks.length; r += 1) {
+          if (i < ecdata[r].length) {
+            data[index] = ecdata[r][i];
+            index += 1;
+          }
+        }
+      }
+
+      return data;
+    };
+
+    var createData = function(typeNumber, errorCorrectionLevel, dataList) {
+
+      var rsBlocks = QRRSBlock.getRSBlocks(typeNumber, errorCorrectionLevel);
+
+      var buffer = qrBitBuffer();
+
+      for (var i = 0; i < dataList.length; i += 1) {
+        var data = dataList[i];
+        buffer.put(data.getMode(), 4);
+        buffer.put(data.getLength(), QRUtil.getLengthInBits(data.getMode(), typeNumber) );
+        data.write(buffer);
+      }
+
+      // calc num max data.
+      var totalDataCount = 0;
+      for (var i = 0; i < rsBlocks.length; i += 1) {
+        totalDataCount += rsBlocks[i].dataCount;
+      }
+
+      if (buffer.getLengthInBits() > totalDataCount * 8) {
+        throw 'code length overflow. ('
+          + buffer.getLengthInBits()
+          + '>'
+          + totalDataCount * 8
+          + ')';
+      }
+
+      // end code
+      if (buffer.getLengthInBits() + 4 <= totalDataCount * 8) {
+        buffer.put(0, 4);
+      }
+
+      // padding
+      while (buffer.getLengthInBits() % 8 != 0) {
+        buffer.putBit(false);
+      }
+
+      // padding
+      while (true) {
+
+        if (buffer.getLengthInBits() >= totalDataCount * 8) {
+          break;
+        }
+        buffer.put(PAD0, 8);
+
+        if (buffer.getLengthInBits() >= totalDataCount * 8) {
+          break;
+        }
+        buffer.put(PAD1, 8);
+      }
+
+      return createBytes(buffer, rsBlocks);
+    };
+
+    _this.addData = function(data, mode) {
+
+      mode = mode || 'Byte';
+
+      var newData = null;
+
+      switch(mode) {
+      case 'Numeric' :
+        newData = qrNumber(data);
+        break;
+      case 'Alphanumeric' :
+        newData = qrAlphaNum(data);
+        break;
+      case 'Byte' :
+        newData = qr8BitByte(data);
+        break;
+      case 'Kanji' :
+        newData = qrKanji(data);
+        break;
+      default :
+        throw 'mode:' + mode;
+      }
+
+      _dataList.push(newData);
+      _dataCache = null;
+    };
+
+    _this.isDark = function(row, col) {
+      if (row < 0 || _moduleCount <= row || col < 0 || _moduleCount <= col) {
+        throw row + ',' + col;
+      }
+      return _modules[row][col];
+    };
+
+    _this.getModuleCount = function() {
+      return _moduleCount;
+    };
+
+    _this.make = function() {
+      if (_typeNumber < 1) {
+        var typeNumber = 1;
+
+        for (; typeNumber < 40; typeNumber++) {
+          var rsBlocks = QRRSBlock.getRSBlocks(typeNumber, _errorCorrectionLevel);
+          var buffer = qrBitBuffer();
+
+          for (var i = 0; i < _dataList.length; i++) {
+            var data = _dataList[i];
+            buffer.put(data.getMode(), 4);
+            buffer.put(data.getLength(), QRUtil.getLengthInBits(data.getMode(), typeNumber) );
+            data.write(buffer);
+          }
+
+          var totalDataCount = 0;
+          for (var i = 0; i < rsBlocks.length; i++) {
+            totalDataCount += rsBlocks[i].dataCount;
+          }
+
+          if (buffer.getLengthInBits() <= totalDataCount * 8) {
+            break;
+          }
+        }
+
+        _typeNumber = typeNumber;
+      }
+
+      makeImpl(false, getBestMaskPattern() );
+    };
+
+    _this.createTableTag = function(cellSize, margin) {
+
+      cellSize = cellSize || 2;
+      margin = (typeof margin == 'undefined')? cellSize * 4 : margin;
+
+      var qrHtml = '';
+
+      qrHtml += '<table style="';
+      qrHtml += ' border-width: 0px; border-style: none;';
+      qrHtml += ' border-collapse: collapse;';
+      qrHtml += ' padding: 0px; margin: ' + margin + 'px;';
+      qrHtml += '">';
+      qrHtml += '<tbody>';
+
+      for (var r = 0; r < _this.getModuleCount(); r += 1) {
+
+        qrHtml += '<tr>';
+
+        for (var c = 0; c < _this.getModuleCount(); c += 1) {
+          qrHtml += '<td style="';
+          qrHtml += ' border-width: 0px; border-style: none;';
+          qrHtml += ' border-collapse: collapse;';
+          qrHtml += ' padding: 0px; margin: 0px;';
+          qrHtml += ' width: ' + cellSize + 'px;';
+          qrHtml += ' height: ' + cellSize + 'px;';
+          qrHtml += ' background-color: ';
+          qrHtml += _this.isDark(r, c)? '#000000' : '#ffffff';
+          qrHtml += ';';
+          qrHtml += '"/>';
+        }
+
+        qrHtml += '</tr>';
+      }
+
+      qrHtml += '</tbody>';
+      qrHtml += '</table>';
+
+      return qrHtml;
+    };
+
+    _this.createSvgTag = function(cellSize, margin, alt, title) {
+
+      var opts = {};
+      if (typeof arguments[0] == 'object') {
+        // Called by options.
+        opts = arguments[0];
+        // overwrite cellSize and margin.
+        cellSize = opts.cellSize;
+        margin = opts.margin;
+        alt = opts.alt;
+        title = opts.title;
+      }
+
+      cellSize = cellSize || 2;
+      margin = (typeof margin == 'undefined')? cellSize * 4 : margin;
+
+      // Compose alt property surrogate
+      alt = (typeof alt === 'string') ? {text: alt} : alt || {};
+      alt.text = alt.text || null;
+      alt.id = (alt.text) ? alt.id || 'qrcode-description' : null;
+
+      // Compose title property surrogate
+      title = (typeof title === 'string') ? {text: title} : title || {};
+      title.text = title.text || null;
+      title.id = (title.text) ? title.id || 'qrcode-title' : null;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+      var c, mc, r, mr, qrSvg='', rect;
+
+      rect = 'l' + cellSize + ',0 0,' + cellSize +
+        ' -' + cellSize + ',0 0,-' + cellSize + 'z ';
+
+      qrSvg += '<svg version="1.1" xmlns="http://www.w3.org/2000/svg"';
+      qrSvg += !opts.scalable ? ' width="' + size + 'px" height="' + size + 'px"' : '';
+      qrSvg += ' viewBox="0 0 ' + size + ' ' + size + '" ';
+      qrSvg += ' preserveAspectRatio="xMinYMin meet"';
+      qrSvg += (title.text || alt.text) ? ' role="img" aria-labelledby="' +
+          escapeXml([title.id, alt.id].join(' ').trim() ) + '"' : '';
+      qrSvg += '>';
+      qrSvg += (title.text) ? '<title id="' + escapeXml(title.id) + '">' +
+          escapeXml(title.text) + '</title>' : '';
+      qrSvg += (alt.text) ? '<description id="' + escapeXml(alt.id) + '">' +
+          escapeXml(alt.text) + '</description>' : '';
+      qrSvg += '<rect width="100%" height="100%" fill="white" cx="0" cy="0"/>';
+      qrSvg += '<path d="';
+
+      for (r = 0; r < _this.getModuleCount(); r += 1) {
+        mr = r * cellSize + margin;
+        for (c = 0; c < _this.getModuleCount(); c += 1) {
+          if (_this.isDark(r, c) ) {
+            mc = c*cellSize+margin;
+            qrSvg += 'M' + mc + ',' + mr + rect;
+          }
+        }
+      }
+
+      qrSvg += '" stroke="transparent" fill="black"/>';
+      qrSvg += '</svg>';
+
+      return qrSvg;
+    };
+
+    _this.createDataURL = function(cellSize, margin) {
+
+      cellSize = cellSize || 2;
+      margin = (typeof margin == 'undefined')? cellSize * 4 : margin;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+      var min = margin;
+      var max = size - margin;
+
+      return createDataURL(size, size, function(x, y) {
+        if (min <= x && x < max && min <= y && y < max) {
+          var c = Math.floor( (x - min) / cellSize);
+          var r = Math.floor( (y - min) / cellSize);
+          return _this.isDark(r, c)? 0 : 1;
+        } else {
+          return 1;
+        }
+      } );
+    };
+
+    _this.createImgTag = function(cellSize, margin, alt) {
+
+      cellSize = cellSize || 2;
+      margin = (typeof margin == 'undefined')? cellSize * 4 : margin;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+
+      var img = '';
+      img += '<img';
+      img += '\u0020src="';
+      img += _this.createDataURL(cellSize, margin);
+      img += '"';
+      img += '\u0020width="';
+      img += size;
+      img += '"';
+      img += '\u0020height="';
+      img += size;
+      img += '"';
+      if (alt) {
+        img += '\u0020alt="';
+        img += escapeXml(alt);
+        img += '"';
+      }
+      img += '/>';
+
+      return img;
+    };
+
+    var escapeXml = function(s) {
+      var escaped = '';
+      for (var i = 0; i < s.length; i += 1) {
+        var c = s.charAt(i);
+        switch(c) {
+        case '<': escaped += '&lt;'; break;
+        case '>': escaped += '&gt;'; break;
+        case '&': escaped += '&amp;'; break;
+        case '"': escaped += '&quot;'; break;
+        default : escaped += c; break;
+        }
+      }
+      return escaped;
+    };
+
+    var _createHalfASCII = function(margin) {
+      var cellSize = 1;
+      margin = (typeof margin == 'undefined')? cellSize * 2 : margin;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+      var min = margin;
+      var max = size - margin;
+
+      var y, x, r1, r2, p;
+
+      var blocks = {
+        '██': '█',
+        '█ ': '▀',
+        ' █': '▄',
+        '  ': ' '
+      };
+
+      var blocksLastLineNoMargin = {
+        '██': '▀',
+        '█ ': '▀',
+        ' █': ' ',
+        '  ': ' '
+      };
+
+      var ascii = '';
+      for (y = 0; y < size; y += 2) {
+        r1 = Math.floor((y - min) / cellSize);
+        r2 = Math.floor((y + 1 - min) / cellSize);
+        for (x = 0; x < size; x += 1) {
+          p = '█';
+
+          if (min <= x && x < max && min <= y && y < max && _this.isDark(r1, Math.floor((x - min) / cellSize))) {
+            p = ' ';
+          }
+
+          if (min <= x && x < max && min <= y+1 && y+1 < max && _this.isDark(r2, Math.floor((x - min) / cellSize))) {
+            p += ' ';
+          }
+          else {
+            p += '█';
+          }
+
+          // Output 2 characters per pixel, to create full square. 1 character per pixels gives only half width of square.
+          ascii += (margin < 1 && y+1 >= max) ? blocksLastLineNoMargin[p] : blocks[p];
+        }
+
+        ascii += '\n';
+      }
+
+      if (size % 2 && margin > 0) {
+        return ascii.substring(0, ascii.length - size - 1) + Array(size+1).join('▀');
+      }
+
+      return ascii.substring(0, ascii.length-1);
+    };
+
+    _this.createASCII = function(cellSize, margin) {
+      cellSize = cellSize || 1;
+
+      if (cellSize < 2) {
+        return _createHalfASCII(margin);
+      }
+
+      cellSize -= 1;
+      margin = (typeof margin == 'undefined')? cellSize * 2 : margin;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+      var min = margin;
+      var max = size - margin;
+
+      var y, x, r, p;
+
+      var white = Array(cellSize+1).join('██');
+      var black = Array(cellSize+1).join('  ');
+
+      var ascii = '';
+      var line = '';
+      for (y = 0; y < size; y += 1) {
+        r = Math.floor( (y - min) / cellSize);
+        line = '';
+        for (x = 0; x < size; x += 1) {
+          p = 1;
+
+          if (min <= x && x < max && min <= y && y < max && _this.isDark(r, Math.floor((x - min) / cellSize))) {
+            p = 0;
+          }
+
+          // Output 2 characters per pixel, to create full square. 1 character per pixels gives only half width of square.
+          line += p ? white : black;
+        }
+
+        for (r = 0; r < cellSize; r += 1) {
+          ascii += line + '\n';
+        }
+      }
+
+      return ascii.substring(0, ascii.length-1);
+    };
+
+    _this.renderTo2dContext = function(context, cellSize) {
+      cellSize = cellSize || 2;
+      var length = _this.getModuleCount();
+      for (var row = 0; row < length; row++) {
+        for (var col = 0; col < length; col++) {
+          context.fillStyle = _this.isDark(row, col) ? 'black' : 'white';
+          context.fillRect(row * cellSize, col * cellSize, cellSize, cellSize);
+        }
+      }
+    }
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qrcode.stringToBytes
+  //---------------------------------------------------------------------
+
+  qrcode.stringToBytesFuncs = {
+    'default' : function(s) {
+      var bytes = [];
+      for (var i = 0; i < s.length; i += 1) {
+        var c = s.charCodeAt(i);
+        bytes.push(c & 0xff);
+      }
+      return bytes;
+    }
+  };
+
+  qrcode.stringToBytes = qrcode.stringToBytesFuncs['default'];
+
+  //---------------------------------------------------------------------
+  // qrcode.createStringToBytes
+  //---------------------------------------------------------------------
+
+  /**
+   * @param unicodeData base64 string of byte array.
+   * [16bit Unicode],[16bit Bytes], ...
+   * @param numChars
+   */
+  qrcode.createStringToBytes = function(unicodeData, numChars) {
+
+    // create conversion map.
+
+    var unicodeMap = function() {
+
+      var bin = base64DecodeInputStream(unicodeData);
+      var read = function() {
+        var b = bin.read();
+        if (b == -1) throw 'eof';
+        return b;
+      };
+
+      var count = 0;
+      var unicodeMap = {};
+      while (true) {
+        var b0 = bin.read();
+        if (b0 == -1) break;
+        var b1 = read();
+        var b2 = read();
+        var b3 = read();
+        var k = String.fromCharCode( (b0 << 8) | b1);
+        var v = (b2 << 8) | b3;
+        unicodeMap[k] = v;
+        count += 1;
+      }
+      if (count != numChars) {
+        throw count + ' != ' + numChars;
+      }
+
+      return unicodeMap;
+    }();
+
+    var unknownChar = '?'.charCodeAt(0);
+
+    return function(s) {
+      var bytes = [];
+      for (var i = 0; i < s.length; i += 1) {
+        var c = s.charCodeAt(i);
+        if (c < 128) {
+          bytes.push(c);
+        } else {
+          var b = unicodeMap[s.charAt(i)];
+          if (typeof b == 'number') {
+            if ( (b & 0xff) == b) {
+              // 1byte
+              bytes.push(b);
+            } else {
+              // 2bytes
+              bytes.push(b >>> 8);
+              bytes.push(b & 0xff);
+            }
+          } else {
+            bytes.push(unknownChar);
+          }
+        }
+      }
+      return bytes;
+    };
+  };
+
+  //---------------------------------------------------------------------
+  // QRMode
+  //---------------------------------------------------------------------
+
+  var QRMode = {
+    MODE_NUMBER :    1 << 0,
+    MODE_ALPHA_NUM : 1 << 1,
+    MODE_8BIT_BYTE : 1 << 2,
+    MODE_KANJI :     1 << 3
+  };
+
+  //---------------------------------------------------------------------
+  // QRErrorCorrectionLevel
+  //---------------------------------------------------------------------
+
+  var QRErrorCorrectionLevel = {
+    L : 1,
+    M : 0,
+    Q : 3,
+    H : 2
+  };
+
+  //---------------------------------------------------------------------
+  // QRMaskPattern
+  //---------------------------------------------------------------------
+
+  var QRMaskPattern = {
+    PATTERN000 : 0,
+    PATTERN001 : 1,
+    PATTERN010 : 2,
+    PATTERN011 : 3,
+    PATTERN100 : 4,
+    PATTERN101 : 5,
+    PATTERN110 : 6,
+    PATTERN111 : 7
+  };
+
+  //---------------------------------------------------------------------
+  // QRUtil
+  //---------------------------------------------------------------------
+
+  var QRUtil = function() {
+
+    var PATTERN_POSITION_TABLE = [
+      [],
+      [6, 18],
+      [6, 22],
+      [6, 26],
+      [6, 30],
+      [6, 34],
+      [6, 22, 38],
+      [6, 24, 42],
+      [6, 26, 46],
+      [6, 28, 50],
+      [6, 30, 54],
+      [6, 32, 58],
+      [6, 34, 62],
+      [6, 26, 46, 66],
+      [6, 26, 48, 70],
+      [6, 26, 50, 74],
+      [6, 30, 54, 78],
+      [6, 30, 56, 82],
+      [6, 30, 58, 86],
+      [6, 34, 62, 90],
+      [6, 28, 50, 72, 94],
+      [6, 26, 50, 74, 98],
+      [6, 30, 54, 78, 102],
+      [6, 28, 54, 80, 106],
+      [6, 32, 58, 84, 110],
+      [6, 30, 58, 86, 114],
+      [6, 34, 62, 90, 118],
+      [6, 26, 50, 74, 98, 122],
+      [6, 30, 54, 78, 102, 126],
+      [6, 26, 52, 78, 104, 130],
+      [6, 30, 56, 82, 108, 134],
+      [6, 34, 60, 86, 112, 138],
+      [6, 30, 58, 86, 114, 142],
+      [6, 34, 62, 90, 118, 146],
+      [6, 30, 54, 78, 102, 126, 150],
+      [6, 24, 50, 76, 102, 128, 154],
+      [6, 28, 54, 80, 106, 132, 158],
+      [6, 32, 58, 84, 110, 136, 162],
+      [6, 26, 54, 82, 110, 138, 166],
+      [6, 30, 58, 86, 114, 142, 170]
+    ];
+    var G15 = (1 << 10) | (1 << 8) | (1 << 5) | (1 << 4) | (1 << 2) | (1 << 1) | (1 << 0);
+    var G18 = (1 << 12) | (1 << 11) | (1 << 10) | (1 << 9) | (1 << 8) | (1 << 5) | (1 << 2) | (1 << 0);
+    var G15_MASK = (1 << 14) | (1 << 12) | (1 << 10) | (1 << 4) | (1 << 1);
+
+    var _this = {};
+
+    var getBCHDigit = function(data) {
+      var digit = 0;
+      while (data != 0) {
+        digit += 1;
+        data >>>= 1;
+      }
+      return digit;
+    };
+
+    _this.getBCHTypeInfo = function(data) {
+      var d = data << 10;
+      while (getBCHDigit(d) - getBCHDigit(G15) >= 0) {
+        d ^= (G15 << (getBCHDigit(d) - getBCHDigit(G15) ) );
+      }
+      return ( (data << 10) | d) ^ G15_MASK;
+    };
+
+    _this.getBCHTypeNumber = function(data) {
+      var d = data << 12;
+      while (getBCHDigit(d) - getBCHDigit(G18) >= 0) {
+        d ^= (G18 << (getBCHDigit(d) - getBCHDigit(G18) ) );
+      }
+      return (data << 12) | d;
+    };
+
+    _this.getPatternPosition = function(typeNumber) {
+      return PATTERN_POSITION_TABLE[typeNumber - 1];
+    };
+
+    _this.getMaskFunction = function(maskPattern) {
+
+      switch (maskPattern) {
+
+      case QRMaskPattern.PATTERN000 :
+        return function(i, j) { return (i + j) % 2 == 0; };
+      case QRMaskPattern.PATTERN001 :
+        return function(i, j) { return i % 2 == 0; };
+      case QRMaskPattern.PATTERN010 :
+        return function(i, j) { return j % 3 == 0; };
+      case QRMaskPattern.PATTERN011 :
+        return function(i, j) { return (i + j) % 3 == 0; };
+      case QRMaskPattern.PATTERN100 :
+        return function(i, j) { return (Math.floor(i / 2) + Math.floor(j / 3) ) % 2 == 0; };
+      case QRMaskPattern.PATTERN101 :
+        return function(i, j) { return (i * j) % 2 + (i * j) % 3 == 0; };
+      case QRMaskPattern.PATTERN110 :
+        return function(i, j) { return ( (i * j) % 2 + (i * j) % 3) % 2 == 0; };
+      case QRMaskPattern.PATTERN111 :
+        return function(i, j) { return ( (i * j) % 3 + (i + j) % 2) % 2 == 0; };
+
+      default :
+        throw 'bad maskPattern:' + maskPattern;
+      }
+    };
+
+    _this.getErrorCorrectPolynomial = function(errorCorrectLength) {
+      var a = qrPolynomial([1], 0);
+      for (var i = 0; i < errorCorrectLength; i += 1) {
+        a = a.multiply(qrPolynomial([1, QRMath.gexp(i)], 0) );
+      }
+      return a;
+    };
+
+    _this.getLengthInBits = function(mode, type) {
+
+      if (1 <= type && type < 10) {
+
+        // 1 - 9
+
+        switch(mode) {
+        case QRMode.MODE_NUMBER    : return 10;
+        case QRMode.MODE_ALPHA_NUM : return 9;
+        case QRMode.MODE_8BIT_BYTE : return 8;
+        case QRMode.MODE_KANJI     : return 8;
+        default :
+          throw 'mode:' + mode;
+        }
+
+      } else if (type < 27) {
+
+        // 10 - 26
+
+        switch(mode) {
+        case QRMode.MODE_NUMBER    : return 12;
+        case QRMode.MODE_ALPHA_NUM : return 11;
+        case QRMode.MODE_8BIT_BYTE : return 16;
+        case QRMode.MODE_KANJI     : return 10;
+        default :
+          throw 'mode:' + mode;
+        }
+
+      } else if (type < 41) {
+
+        // 27 - 40
+
+        switch(mode) {
+        case QRMode.MODE_NUMBER    : return 14;
+        case QRMode.MODE_ALPHA_NUM : return 13;
+        case QRMode.MODE_8BIT_BYTE : return 16;
+        case QRMode.MODE_KANJI     : return 12;
+        default :
+          throw 'mode:' + mode;
+        }
+
+      } else {
+        throw 'type:' + type;
+      }
+    };
+
+    _this.getLostPoint = function(qrcode) {
+
+      var moduleCount = qrcode.getModuleCount();
+
+      var lostPoint = 0;
+
+      // LEVEL1
+
+      for (var row = 0; row < moduleCount; row += 1) {
+        for (var col = 0; col < moduleCount; col += 1) {
+
+          var sameCount = 0;
+          var dark = qrcode.isDark(row, col);
+
+          for (var r = -1; r <= 1; r += 1) {
+
+            if (row + r < 0 || moduleCount <= row + r) {
+              continue;
+            }
+
+            for (var c = -1; c <= 1; c += 1) {
+
+              if (col + c < 0 || moduleCount <= col + c) {
+                continue;
+              }
+
+              if (r == 0 && c == 0) {
+                continue;
+              }
+
+              if (dark == qrcode.isDark(row + r, col + c) ) {
+                sameCount += 1;
+              }
+            }
+          }
+
+          if (sameCount > 5) {
+            lostPoint += (3 + sameCount - 5);
+          }
+        }
+      };
+
+      // LEVEL2
+
+      for (var row = 0; row < moduleCount - 1; row += 1) {
+        for (var col = 0; col < moduleCount - 1; col += 1) {
+          var count = 0;
+          if (qrcode.isDark(row, col) ) count += 1;
+          if (qrcode.isDark(row + 1, col) ) count += 1;
+          if (qrcode.isDark(row, col + 1) ) count += 1;
+          if (qrcode.isDark(row + 1, col + 1) ) count += 1;
+          if (count == 0 || count == 4) {
+            lostPoint += 3;
+          }
+        }
+      }
+
+      // LEVEL3
+
+      for (var row = 0; row < moduleCount; row += 1) {
+        for (var col = 0; col < moduleCount - 6; col += 1) {
+          if (qrcode.isDark(row, col)
+              && !qrcode.isDark(row, col + 1)
+              &&  qrcode.isDark(row, col + 2)
+              &&  qrcode.isDark(row, col + 3)
+              &&  qrcode.isDark(row, col + 4)
+              && !qrcode.isDark(row, col + 5)
+              &&  qrcode.isDark(row, col + 6) ) {
+            lostPoint += 40;
+          }
+        }
+      }
+
+      for (var col = 0; col < moduleCount; col += 1) {
+        for (var row = 0; row < moduleCount - 6; row += 1) {
+          if (qrcode.isDark(row, col)
+              && !qrcode.isDark(row + 1, col)
+              &&  qrcode.isDark(row + 2, col)
+              &&  qrcode.isDark(row + 3, col)
+              &&  qrcode.isDark(row + 4, col)
+              && !qrcode.isDark(row + 5, col)
+              &&  qrcode.isDark(row + 6, col) ) {
+            lostPoint += 40;
+          }
+        }
+      }
+
+      // LEVEL4
+
+      var darkCount = 0;
+
+      for (var col = 0; col < moduleCount; col += 1) {
+        for (var row = 0; row < moduleCount; row += 1) {
+          if (qrcode.isDark(row, col) ) {
+            darkCount += 1;
+          }
+        }
+      }
+
+      var ratio = Math.abs(100 * darkCount / moduleCount / moduleCount - 50) / 5;
+      lostPoint += ratio * 10;
+
+      return lostPoint;
+    };
+
+    return _this;
+  }();
+
+  //---------------------------------------------------------------------
+  // QRMath
+  //---------------------------------------------------------------------
+
+  var QRMath = function() {
+
+    var EXP_TABLE = new Array(256);
+    var LOG_TABLE = new Array(256);
+
+    // initialize tables
+    for (var i = 0; i < 8; i += 1) {
+      EXP_TABLE[i] = 1 << i;
+    }
+    for (var i = 8; i < 256; i += 1) {
+      EXP_TABLE[i] = EXP_TABLE[i - 4]
+        ^ EXP_TABLE[i - 5]
+        ^ EXP_TABLE[i - 6]
+        ^ EXP_TABLE[i - 8];
+    }
+    for (var i = 0; i < 255; i += 1) {
+      LOG_TABLE[EXP_TABLE[i] ] = i;
+    }
+
+    var _this = {};
+
+    _this.glog = function(n) {
+
+      if (n < 1) {
+        throw 'glog(' + n + ')';
+      }
+
+      return LOG_TABLE[n];
+    };
+
+    _this.gexp = function(n) {
+
+      while (n < 0) {
+        n += 255;
+      }
+
+      while (n >= 256) {
+        n -= 255;
+      }
+
+      return EXP_TABLE[n];
+    };
+
+    return _this;
+  }();
+
+  //---------------------------------------------------------------------
+  // qrPolynomial
+  //---------------------------------------------------------------------
+
+  function qrPolynomial(num, shift) {
+
+    if (typeof num.length == 'undefined') {
+      throw num.length + '/' + shift;
+    }
+
+    var _num = function() {
+      var offset = 0;
+      while (offset < num.length && num[offset] == 0) {
+        offset += 1;
+      }
+      var _num = new Array(num.length - offset + shift);
+      for (var i = 0; i < num.length - offset; i += 1) {
+        _num[i] = num[i + offset];
+      }
+      return _num;
+    }();
+
+    var _this = {};
+
+    _this.getAt = function(index) {
+      return _num[index];
+    };
+
+    _this.getLength = function() {
+      return _num.length;
+    };
+
+    _this.multiply = function(e) {
+
+      var num = new Array(_this.getLength() + e.getLength() - 1);
+
+      for (var i = 0; i < _this.getLength(); i += 1) {
+        for (var j = 0; j < e.getLength(); j += 1) {
+          num[i + j] ^= QRMath.gexp(QRMath.glog(_this.getAt(i) ) + QRMath.glog(e.getAt(j) ) );
+        }
+      }
+
+      return qrPolynomial(num, 0);
+    };
+
+    _this.mod = function(e) {
+
+      if (_this.getLength() - e.getLength() < 0) {
+        return _this;
+      }
+
+      var ratio = QRMath.glog(_this.getAt(0) ) - QRMath.glog(e.getAt(0) );
+
+      var num = new Array(_this.getLength() );
+      for (var i = 0; i < _this.getLength(); i += 1) {
+        num[i] = _this.getAt(i);
+      }
+
+      for (var i = 0; i < e.getLength(); i += 1) {
+        num[i] ^= QRMath.gexp(QRMath.glog(e.getAt(i) ) + ratio);
+      }
+
+      // recursive call
+      return qrPolynomial(num, 0).mod(e);
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // QRRSBlock
+  //---------------------------------------------------------------------
+
+  var QRRSBlock = function() {
+
+    var RS_BLOCK_TABLE = [
+
+      // L
+      // M
+      // Q
+      // H
+
+      // 1
+      [1, 26, 19],
+      [1, 26, 16],
+      [1, 26, 13],
+      [1, 26, 9],
+
+      // 2
+      [1, 44, 34],
+      [1, 44, 28],
+      [1, 44, 22],
+      [1, 44, 16],
+
+      // 3
+      [1, 70, 55],
+      [1, 70, 44],
+      [2, 35, 17],
+      [2, 35, 13],
+
+      // 4
+      [1, 100, 80],
+      [2, 50, 32],
+      [2, 50, 24],
+      [4, 25, 9],
+
+      // 5
+      [1, 134, 108],
+      [2, 67, 43],
+      [2, 33, 15, 2, 34, 16],
+      [2, 33, 11, 2, 34, 12],
+
+      // 6
+      [2, 86, 68],
+      [4, 43, 27],
+      [4, 43, 19],
+      [4, 43, 15],
+
+      // 7
+      [2, 98, 78],
+      [4, 49, 31],
+      [2, 32, 14, 4, 33, 15],
+      [4, 39, 13, 1, 40, 14],
+
+      // 8
+      [2, 121, 97],
+      [2, 60, 38, 2, 61, 39],
+      [4, 40, 18, 2, 41, 19],
+      [4, 40, 14, 2, 41, 15],
+
+      // 9
+      [2, 146, 116],
+      [3, 58, 36, 2, 59, 37],
+      [4, 36, 16, 4, 37, 17],
+      [4, 36, 12, 4, 37, 13],
+
+      // 10
+      [2, 86, 68, 2, 87, 69],
+      [4, 69, 43, 1, 70, 44],
+      [6, 43, 19, 2, 44, 20],
+      [6, 43, 15, 2, 44, 16],
+
+      // 11
+      [4, 101, 81],
+      [1, 80, 50, 4, 81, 51],
+      [4, 50, 22, 4, 51, 23],
+      [3, 36, 12, 8, 37, 13],
+
+      // 12
+      [2, 116, 92, 2, 117, 93],
+      [6, 58, 36, 2, 59, 37],
+      [4, 46, 20, 6, 47, 21],
+      [7, 42, 14, 4, 43, 15],
+
+      // 13
+      [4, 133, 107],
+      [8, 59, 37, 1, 60, 38],
+      [8, 44, 20, 4, 45, 21],
+      [12, 33, 11, 4, 34, 12],
+
+      // 14
+      [3, 145, 115, 1, 146, 116],
+      [4, 64, 40, 5, 65, 41],
+      [11, 36, 16, 5, 37, 17],
+      [11, 36, 12, 5, 37, 13],
+
+      // 15
+      [5, 109, 87, 1, 110, 88],
+      [5, 65, 41, 5, 66, 42],
+      [5, 54, 24, 7, 55, 25],
+      [11, 36, 12, 7, 37, 13],
+
+      // 16
+      [5, 122, 98, 1, 123, 99],
+      [7, 73, 45, 3, 74, 46],
+      [15, 43, 19, 2, 44, 20],
+      [3, 45, 15, 13, 46, 16],
+
+      // 17
+      [1, 135, 107, 5, 136, 108],
+      [10, 74, 46, 1, 75, 47],
+      [1, 50, 22, 15, 51, 23],
+      [2, 42, 14, 17, 43, 15],
+
+      // 18
+      [5, 150, 120, 1, 151, 121],
+      [9, 69, 43, 4, 70, 44],
+      [17, 50, 22, 1, 51, 23],
+      [2, 42, 14, 19, 43, 15],
+
+      // 19
+      [3, 141, 113, 4, 142, 114],
+      [3, 70, 44, 11, 71, 45],
+      [17, 47, 21, 4, 48, 22],
+      [9, 39, 13, 16, 40, 14],
+
+      // 20
+      [3, 135, 107, 5, 136, 108],
+      [3, 67, 41, 13, 68, 42],
+      [15, 54, 24, 5, 55, 25],
+      [15, 43, 15, 10, 44, 16],
+
+      // 21
+      [4, 144, 116, 4, 145, 117],
+      [17, 68, 42],
+      [17, 50, 22, 6, 51, 23],
+      [19, 46, 16, 6, 47, 17],
+
+      // 22
+      [2, 139, 111, 7, 140, 112],
+      [17, 74, 46],
+      [7, 54, 24, 16, 55, 25],
+      [34, 37, 13],
+
+      // 23
+      [4, 151, 121, 5, 152, 122],
+      [4, 75, 47, 14, 76, 48],
+      [11, 54, 24, 14, 55, 25],
+      [16, 45, 15, 14, 46, 16],
+
+      // 24
+      [6, 147, 117, 4, 148, 118],
+      [6, 73, 45, 14, 74, 46],
+      [11, 54, 24, 16, 55, 25],
+      [30, 46, 16, 2, 47, 17],
+
+      // 25
+      [8, 132, 106, 4, 133, 107],
+      [8, 75, 47, 13, 76, 48],
+      [7, 54, 24, 22, 55, 25],
+      [22, 45, 15, 13, 46, 16],
+
+      // 26
+      [10, 142, 114, 2, 143, 115],
+      [19, 74, 46, 4, 75, 47],
+      [28, 50, 22, 6, 51, 23],
+      [33, 46, 16, 4, 47, 17],
+
+      // 27
+      [8, 152, 122, 4, 153, 123],
+      [22, 73, 45, 3, 74, 46],
+      [8, 53, 23, 26, 54, 24],
+      [12, 45, 15, 28, 46, 16],
+
+      // 28
+      [3, 147, 117, 10, 148, 118],
+      [3, 73, 45, 23, 74, 46],
+      [4, 54, 24, 31, 55, 25],
+      [11, 45, 15, 31, 46, 16],
+
+      // 29
+      [7, 146, 116, 7, 147, 117],
+      [21, 73, 45, 7, 74, 46],
+      [1, 53, 23, 37, 54, 24],
+      [19, 45, 15, 26, 46, 16],
+
+      // 30
+      [5, 145, 115, 10, 146, 116],
+      [19, 75, 47, 10, 76, 48],
+      [15, 54, 24, 25, 55, 25],
+      [23, 45, 15, 25, 46, 16],
+
+      // 31
+      [13, 145, 115, 3, 146, 116],
+      [2, 74, 46, 29, 75, 47],
+      [42, 54, 24, 1, 55, 25],
+      [23, 45, 15, 28, 46, 16],
+
+      // 32
+      [17, 145, 115],
+      [10, 74, 46, 23, 75, 47],
+      [10, 54, 24, 35, 55, 25],
+      [19, 45, 15, 35, 46, 16],
+
+      // 33
+      [17, 145, 115, 1, 146, 116],
+      [14, 74, 46, 21, 75, 47],
+      [29, 54, 24, 19, 55, 25],
+      [11, 45, 15, 46, 46, 16],
+
+      // 34
+      [13, 145, 115, 6, 146, 116],
+      [14, 74, 46, 23, 75, 47],
+      [44, 54, 24, 7, 55, 25],
+      [59, 46, 16, 1, 47, 17],
+
+      // 35
+      [12, 151, 121, 7, 152, 122],
+      [12, 75, 47, 26, 76, 48],
+      [39, 54, 24, 14, 55, 25],
+      [22, 45, 15, 41, 46, 16],
+
+      // 36
+      [6, 151, 121, 14, 152, 122],
+      [6, 75, 47, 34, 76, 48],
+      [46, 54, 24, 10, 55, 25],
+      [2, 45, 15, 64, 46, 16],
+
+      // 37
+      [17, 152, 122, 4, 153, 123],
+      [29, 74, 46, 14, 75, 47],
+      [49, 54, 24, 10, 55, 25],
+      [24, 45, 15, 46, 46, 16],
+
+      // 38
+      [4, 152, 122, 18, 153, 123],
+      [13, 74, 46, 32, 75, 47],
+      [48, 54, 24, 14, 55, 25],
+      [42, 45, 15, 32, 46, 16],
+
+      // 39
+      [20, 147, 117, 4, 148, 118],
+      [40, 75, 47, 7, 76, 48],
+      [43, 54, 24, 22, 55, 25],
+      [10, 45, 15, 67, 46, 16],
+
+      // 40
+      [19, 148, 118, 6, 149, 119],
+      [18, 75, 47, 31, 76, 48],
+      [34, 54, 24, 34, 55, 25],
+      [20, 45, 15, 61, 46, 16]
+    ];
+
+    var qrRSBlock = function(totalCount, dataCount) {
+      var _this = {};
+      _this.totalCount = totalCount;
+      _this.dataCount = dataCount;
+      return _this;
+    };
+
+    var _this = {};
+
+    var getRsBlockTable = function(typeNumber, errorCorrectionLevel) {
+
+      switch(errorCorrectionLevel) {
+      case QRErrorCorrectionLevel.L :
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 0];
+      case QRErrorCorrectionLevel.M :
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 1];
+      case QRErrorCorrectionLevel.Q :
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 2];
+      case QRErrorCorrectionLevel.H :
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 3];
+      default :
+        return undefined;
+      }
+    };
+
+    _this.getRSBlocks = function(typeNumber, errorCorrectionLevel) {
+
+      var rsBlock = getRsBlockTable(typeNumber, errorCorrectionLevel);
+
+      if (typeof rsBlock == 'undefined') {
+        throw 'bad rs block @ typeNumber:' + typeNumber +
+            '/errorCorrectionLevel:' + errorCorrectionLevel;
+      }
+
+      var length = rsBlock.length / 3;
+
+      var list = [];
+
+      for (var i = 0; i < length; i += 1) {
+
+        var count = rsBlock[i * 3 + 0];
+        var totalCount = rsBlock[i * 3 + 1];
+        var dataCount = rsBlock[i * 3 + 2];
+
+        for (var j = 0; j < count; j += 1) {
+          list.push(qrRSBlock(totalCount, dataCount) );
+        }
+      }
+
+      return list;
+    };
+
+    return _this;
+  }();
+
+  //---------------------------------------------------------------------
+  // qrBitBuffer
+  //---------------------------------------------------------------------
+
+  var qrBitBuffer = function() {
+
+    var _buffer = [];
+    var _length = 0;
+
+    var _this = {};
+
+    _this.getBuffer = function() {
+      return _buffer;
+    };
+
+    _this.getAt = function(index) {
+      var bufIndex = Math.floor(index / 8);
+      return ( (_buffer[bufIndex] >>> (7 - index % 8) ) & 1) == 1;
+    };
+
+    _this.put = function(num, length) {
+      for (var i = 0; i < length; i += 1) {
+        _this.putBit( ( (num >>> (length - i - 1) ) & 1) == 1);
+      }
+    };
+
+    _this.getLengthInBits = function() {
+      return _length;
+    };
+
+    _this.putBit = function(bit) {
+
+      var bufIndex = Math.floor(_length / 8);
+      if (_buffer.length <= bufIndex) {
+        _buffer.push(0);
+      }
+
+      if (bit) {
+        _buffer[bufIndex] |= (0x80 >>> (_length % 8) );
+      }
+
+      _length += 1;
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qrNumber
+  //---------------------------------------------------------------------
+
+  var qrNumber = function(data) {
+
+    var _mode = QRMode.MODE_NUMBER;
+    var _data = data;
+
+    var _this = {};
+
+    _this.getMode = function() {
+      return _mode;
+    };
+
+    _this.getLength = function(buffer) {
+      return _data.length;
+    };
+
+    _this.write = function(buffer) {
+
+      var data = _data;
+
+      var i = 0;
+
+      while (i + 2 < data.length) {
+        buffer.put(strToNum(data.substring(i, i + 3) ), 10);
+        i += 3;
+      }
+
+      if (i < data.length) {
+        if (data.length - i == 1) {
+          buffer.put(strToNum(data.substring(i, i + 1) ), 4);
+        } else if (data.length - i == 2) {
+          buffer.put(strToNum(data.substring(i, i + 2) ), 7);
+        }
+      }
+    };
+
+    var strToNum = function(s) {
+      var num = 0;
+      for (var i = 0; i < s.length; i += 1) {
+        num = num * 10 + chatToNum(s.charAt(i) );
+      }
+      return num;
+    };
+
+    var chatToNum = function(c) {
+      if ('0' <= c && c <= '9') {
+        return c.charCodeAt(0) - '0'.charCodeAt(0);
+      }
+      throw 'illegal char :' + c;
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qrAlphaNum
+  //---------------------------------------------------------------------
+
+  var qrAlphaNum = function(data) {
+
+    var _mode = QRMode.MODE_ALPHA_NUM;
+    var _data = data;
+
+    var _this = {};
+
+    _this.getMode = function() {
+      return _mode;
+    };
+
+    _this.getLength = function(buffer) {
+      return _data.length;
+    };
+
+    _this.write = function(buffer) {
+
+      var s = _data;
+
+      var i = 0;
+
+      while (i + 1 < s.length) {
+        buffer.put(
+          getCode(s.charAt(i) ) * 45 +
+          getCode(s.charAt(i + 1) ), 11);
+        i += 2;
+      }
+
+      if (i < s.length) {
+        buffer.put(getCode(s.charAt(i) ), 6);
+      }
+    };
+
+    var getCode = function(c) {
+
+      if ('0' <= c && c <= '9') {
+        return c.charCodeAt(0) - '0'.charCodeAt(0);
+      } else if ('A' <= c && c <= 'Z') {
+        return c.charCodeAt(0) - 'A'.charCodeAt(0) + 10;
+      } else {
+        switch (c) {
+        case ' ' : return 36;
+        case '$' : return 37;
+        case '%' : return 38;
+        case '*' : return 39;
+        case '+' : return 40;
+        case '-' : return 41;
+        case '.' : return 42;
+        case '/' : return 43;
+        case ':' : return 44;
+        default :
+          throw 'illegal char :' + c;
+        }
+      }
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qr8BitByte
+  //---------------------------------------------------------------------
+
+  var qr8BitByte = function(data) {
+
+    var _mode = QRMode.MODE_8BIT_BYTE;
+    var _data = data;
+    var _bytes = qrcode.stringToBytes(data);
+
+    var _this = {};
+
+    _this.getMode = function() {
+      return _mode;
+    };
+
+    _this.getLength = function(buffer) {
+      return _bytes.length;
+    };
+
+    _this.write = function(buffer) {
+      for (var i = 0; i < _bytes.length; i += 1) {
+        buffer.put(_bytes[i], 8);
+      }
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qrKanji
+  //---------------------------------------------------------------------
+
+  var qrKanji = function(data) {
+
+    var _mode = QRMode.MODE_KANJI;
+    var _data = data;
+
+    var stringToBytes = qrcode.stringToBytesFuncs['SJIS'];
+    if (!stringToBytes) {
+      throw 'sjis not supported.';
+    }
+    !function(c, code) {
+      // self test for sjis support.
+      var test = stringToBytes(c);
+      if (test.length != 2 || ( (test[0] << 8) | test[1]) != code) {
+        throw 'sjis not supported.';
+      }
+    }('\u53cb', 0x9746);
+
+    var _bytes = stringToBytes(data);
+
+    var _this = {};
+
+    _this.getMode = function() {
+      return _mode;
+    };
+
+    _this.getLength = function(buffer) {
+      return ~~(_bytes.length / 2);
+    };
+
+    _this.write = function(buffer) {
+
+      var data = _bytes;
+
+      var i = 0;
+
+      while (i + 1 < data.length) {
+
+        var c = ( (0xff & data[i]) << 8) | (0xff & data[i + 1]);
+
+        if (0x8140 <= c && c <= 0x9FFC) {
+          c -= 0x8140;
+        } else if (0xE040 <= c && c <= 0xEBBF) {
+          c -= 0xC140;
+        } else {
+          throw 'illegal char at ' + (i + 1) + '/' + c;
+        }
+
+        c = ( (c >>> 8) & 0xff) * 0xC0 + (c & 0xff);
+
+        buffer.put(c, 13);
+
+        i += 2;
+      }
+
+      if (i < data.length) {
+        throw 'illegal char at ' + (i + 1);
+      }
+    };
+
+    return _this;
+  };
+
+  //=====================================================================
+  // GIF Support etc.
+  //
+
+  //---------------------------------------------------------------------
+  // byteArrayOutputStream
+  //---------------------------------------------------------------------
+
+  var byteArrayOutputStream = function() {
+
+    var _bytes = [];
+
+    var _this = {};
+
+    _this.writeByte = function(b) {
+      _bytes.push(b & 0xff);
+    };
+
+    _this.writeShort = function(i) {
+      _this.writeByte(i);
+      _this.writeByte(i >>> 8);
+    };
+
+    _this.writeBytes = function(b, off, len) {
+      off = off || 0;
+      len = len || b.length;
+      for (var i = 0; i < len; i += 1) {
+        _this.writeByte(b[i + off]);
+      }
+    };
+
+    _this.writeString = function(s) {
+      for (var i = 0; i < s.length; i += 1) {
+        _this.writeByte(s.charCodeAt(i) );
+      }
+    };
+
+    _this.toByteArray = function() {
+      return _bytes;
+    };
+
+    _this.toString = function() {
+      var s = '';
+      s += '[';
+      for (var i = 0; i < _bytes.length; i += 1) {
+        if (i > 0) {
+          s += ',';
+        }
+        s += _bytes[i];
+      }
+      s += ']';
+      return s;
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // base64EncodeOutputStream
+  //---------------------------------------------------------------------
+
+  var base64EncodeOutputStream = function() {
+
+    var _buffer = 0;
+    var _buflen = 0;
+    var _length = 0;
+    var _base64 = '';
+
+    var _this = {};
+
+    var writeEncoded = function(b) {
+      _base64 += String.fromCharCode(encode(b & 0x3f) );
+    };
+
+    var encode = function(n) {
+      if (n < 0) {
+        // error.
+      } else if (n < 26) {
+        return 0x41 + n;
+      } else if (n < 52) {
+        return 0x61 + (n - 26);
+      } else if (n < 62) {
+        return 0x30 + (n - 52);
+      } else if (n == 62) {
+        return 0x2b;
+      } else if (n == 63) {
+        return 0x2f;
+      }
+      throw 'n:' + n;
+    };
+
+    _this.writeByte = function(n) {
+
+      _buffer = (_buffer << 8) | (n & 0xff);
+      _buflen += 8;
+      _length += 1;
+
+      while (_buflen >= 6) {
+        writeEncoded(_buffer >>> (_buflen - 6) );
+        _buflen -= 6;
+      }
+    };
+
+    _this.flush = function() {
+
+      if (_buflen > 0) {
+        writeEncoded(_buffer << (6 - _buflen) );
+        _buffer = 0;
+        _buflen = 0;
+      }
+
+      if (_length % 3 != 0) {
+        // padding
+        var padlen = 3 - _length % 3;
+        for (var i = 0; i < padlen; i += 1) {
+          _base64 += '=';
+        }
+      }
+    };
+
+    _this.toString = function() {
+      return _base64;
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // base64DecodeInputStream
+  //---------------------------------------------------------------------
+
+  var base64DecodeInputStream = function(str) {
+
+    var _str = str;
+    var _pos = 0;
+    var _buffer = 0;
+    var _buflen = 0;
+
+    var _this = {};
+
+    _this.read = function() {
+
+      while (_buflen < 8) {
+
+        if (_pos >= _str.length) {
+          if (_buflen == 0) {
+            return -1;
+          }
+          throw 'unexpected end of file./' + _buflen;
+        }
+
+        var c = _str.charAt(_pos);
+        _pos += 1;
+
+        if (c == '=') {
+          _buflen = 0;
+          return -1;
+        } else if (c.match(/^\s$/) ) {
+          // ignore if whitespace.
+          continue;
+        }
+
+        _buffer = (_buffer << 6) | decode(c.charCodeAt(0) );
+        _buflen += 6;
+      }
+
+      var n = (_buffer >>> (_buflen - 8) ) & 0xff;
+      _buflen -= 8;
+      return n;
+    };
+
+    var decode = function(c) {
+      if (0x41 <= c && c <= 0x5a) {
+        return c - 0x41;
+      } else if (0x61 <= c && c <= 0x7a) {
+        return c - 0x61 + 26;
+      } else if (0x30 <= c && c <= 0x39) {
+        return c - 0x30 + 52;
+      } else if (c == 0x2b) {
+        return 62;
+      } else if (c == 0x2f) {
+        return 63;
+      } else {
+        throw 'c:' + c;
+      }
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // gifImage (B/W)
+  //---------------------------------------------------------------------
+
+  var gifImage = function(width, height) {
+
+    var _width = width;
+    var _height = height;
+    var _data = new Array(width * height);
+
+    var _this = {};
+
+    _this.setPixel = function(x, y, pixel) {
+      _data[y * _width + x] = pixel;
+    };
+
+    _this.write = function(out) {
+
+      //---------------------------------
+      // GIF Signature
+
+      out.writeString('GIF87a');
+
+      //---------------------------------
+      // Screen Descriptor
+
+      out.writeShort(_width);
+      out.writeShort(_height);
+
+      out.writeByte(0x80); // 2bit
+      out.writeByte(0);
+      out.writeByte(0);
+
+      //---------------------------------
+      // Global Color Map
+
+      // black
+      out.writeByte(0x00);
+      out.writeByte(0x00);
+      out.writeByte(0x00);
+
+      // white
+      out.writeByte(0xff);
+      out.writeByte(0xff);
+      out.writeByte(0xff);
+
+      //---------------------------------
+      // Image Descriptor
+
+      out.writeString(',');
+      out.writeShort(0);
+      out.writeShort(0);
+      out.writeShort(_width);
+      out.writeShort(_height);
+      out.writeByte(0);
+
+      //---------------------------------
+      // Local Color Map
+
+      //---------------------------------
+      // Raster Data
+
+      var lzwMinCodeSize = 2;
+      var raster = getLZWRaster(lzwMinCodeSize);
+
+      out.writeByte(lzwMinCodeSize);
+
+      var offset = 0;
+
+      while (raster.length - offset > 255) {
+        out.writeByte(255);
+        out.writeBytes(raster, offset, 255);
+        offset += 255;
+      }
+
+      out.writeByte(raster.length - offset);
+      out.writeBytes(raster, offset, raster.length - offset);
+      out.writeByte(0x00);
+
+      //---------------------------------
+      // GIF Terminator
+      out.writeString(';');
+    };
+
+    var bitOutputStream = function(out) {
+
+      var _out = out;
+      var _bitLength = 0;
+      var _bitBuffer = 0;
+
+      var _this = {};
+
+      _this.write = function(data, length) {
+
+        if ( (data >>> length) != 0) {
+          throw 'length over';
+        }
+
+        while (_bitLength + length >= 8) {
+          _out.writeByte(0xff & ( (data << _bitLength) | _bitBuffer) );
+          length -= (8 - _bitLength);
+          data >>>= (8 - _bitLength);
+          _bitBuffer = 0;
+          _bitLength = 0;
+        }
+
+        _bitBuffer = (data << _bitLength) | _bitBuffer;
+        _bitLength = _bitLength + length;
+      };
+
+      _this.flush = function() {
+        if (_bitLength > 0) {
+          _out.writeByte(_bitBuffer);
+        }
+      };
+
+      return _this;
+    };
+
+    var getLZWRaster = function(lzwMinCodeSize) {
+
+      var clearCode = 1 << lzwMinCodeSize;
+      var endCode = (1 << lzwMinCodeSize) + 1;
+      var bitLength = lzwMinCodeSize + 1;
+
+      // Setup LZWTable
+      var table = lzwTable();
+
+      for (var i = 0; i < clearCode; i += 1) {
+        table.add(String.fromCharCode(i) );
+      }
+      table.add(String.fromCharCode(clearCode) );
+      table.add(String.fromCharCode(endCode) );
+
+      var byteOut = byteArrayOutputStream();
+      var bitOut = bitOutputStream(byteOut);
+
+      // clear code
+      bitOut.write(clearCode, bitLength);
+
+      var dataIndex = 0;
+
+      var s = String.fromCharCode(_data[dataIndex]);
+      dataIndex += 1;
+
+      while (dataIndex < _data.length) {
+
+        var c = String.fromCharCode(_data[dataIndex]);
+        dataIndex += 1;
+
+        if (table.contains(s + c) ) {
+
+          s = s + c;
+
+        } else {
+
+          bitOut.write(table.indexOf(s), bitLength);
+
+          if (table.size() < 0xfff) {
+
+            if (table.size() == (1 << bitLength) ) {
+              bitLength += 1;
+            }
+
+            table.add(s + c);
+          }
+
+          s = c;
+        }
+      }
+
+      bitOut.write(table.indexOf(s), bitLength);
+
+      // end code
+      bitOut.write(endCode, bitLength);
+
+      bitOut.flush();
+
+      return byteOut.toByteArray();
+    };
+
+    var lzwTable = function() {
+
+      var _map = {};
+      var _size = 0;
+
+      var _this = {};
+
+      _this.add = function(key) {
+        if (_this.contains(key) ) {
+          throw 'dup key:' + key;
+        }
+        _map[key] = _size;
+        _size += 1;
+      };
+
+      _this.size = function() {
+        return _size;
+      };
+
+      _this.indexOf = function(key) {
+        return _map[key];
+      };
+
+      _this.contains = function(key) {
+        return typeof _map[key] != 'undefined';
+      };
+
+      return _this;
+    };
+
+    return _this;
+  };
+
+  var createDataURL = function(width, height, getPixel) {
+    var gif = gifImage(width, height);
+    for (var y = 0; y < height; y += 1) {
+      for (var x = 0; x < width; x += 1) {
+        gif.setPixel(x, y, getPixel(x, y) );
+      }
+    }
+
+    var b = byteArrayOutputStream();
+    gif.write(b);
+
+    var base64 = base64EncodeOutputStream();
+    var bytes = b.toByteArray();
+    for (var i = 0; i < bytes.length; i += 1) {
+      base64.writeByte(bytes[i]);
+    }
+    base64.flush();
+
+    return 'data:image/gif;base64,' + base64;
+  };
+
+  //---------------------------------------------------------------------
+  // returns qrcode function.
+
+  return qrcode;
+}();
+
+// multibyte support
+!function() {
+
+  qrcode.stringToBytesFuncs['UTF-8'] = function(s) {
+    // http://stackoverflow.com/questions/18729405/how-to-convert-utf8-string-to-byte-array
+    function toUTF8Array(str) {
+      var utf8 = [];
+      for (var i=0; i < str.length; i++) {
+        var charcode = str.charCodeAt(i);
+        if (charcode < 0x80) utf8.push(charcode);
+        else if (charcode < 0x800) {
+          utf8.push(0xc0 | (charcode >> 6),
+              0x80 | (charcode & 0x3f));
+        }
+        else if (charcode < 0xd800 || charcode >= 0xe000) {
+          utf8.push(0xe0 | (charcode >> 12),
+              0x80 | ((charcode>>6) & 0x3f),
+              0x80 | (charcode & 0x3f));
+        }
+        // surrogate pair
+        else {
+          i++;
+          // UTF-16 encodes 0x10000-0x10FFFF by
+          // subtracting 0x10000 and splitting the
+          // 20 bits of 0x0-0xFFFFF into two halves
+          charcode = 0x10000 + (((charcode & 0x3ff)<<10)
+            | (str.charCodeAt(i) & 0x3ff));
+          utf8.push(0xf0 | (charcode >>18),
+              0x80 | ((charcode>>12) & 0x3f),
+              0x80 | ((charcode>>6) & 0x3f),
+              0x80 | (charcode & 0x3f));
+        }
+      }
+      return utf8;
+    }
+    return toUTF8Array(s);
+  };
+
+}();
+
+(function (factory) {
+  if (typeof define === 'function' && define.amd) {
+      define([], factory);
+  } else if (typeof exports === 'object') {
+      module.exports = factory();
+  }
+}(function () {
+    return qrcode;
+}));
+
+</script>
+<script>
+function dlog(m1,m2,m3){try{const clean=value=>String(value===undefined?'':value).replace(/[\x00-\x1f\x7f]/g,' ');console.log('[P]',clean(m1),clean(m2),clean(m3))}catch(e){}}
 // window.onerror → visível no DevTools e reportado ao sender (debug remoto)
 window.onerror=function(msg,src,line,col){
   try{sendEvent({v:2,type:'error',code:'receiver_js',message:String(msg).slice(0,200),line:line,col:col})}catch(e){}
@@ -170,8 +2614,185 @@ window.addEventListener('unhandledrejection',function(ev){
 });
 const $=id=>document.getElementById(id);
 const qs=new URLSearchParams(location.search);
+if(qs.get('speakerPreview')==='1')document.documentElement.classList.add('speaker-preview');
+// L10N: strings do receiver (idle/audio). Idioma: ?lang= > navigator.language
+// > pt. Sender pode anexar &lang= ao URL da TV (14/10).
+var L10N=(function(){var d={
+  pt:{returnNext:'Próximo',castWaiting:'Aguardando transmissão',idle:'Aguardando conteúdo…',wait:'Aguardando operador conectar…',audio:'Reproduzindo áudio',
+      connTo:'conectado a {t} · vermelha = IP/porta · azul = atualizar',redKey:'tecla vermelha = digitar IP',
+      searching:'procurando LouvorJA na rede…',notFound:'nenhum sender encontrado — tentando de novo…',
+      connecting:'conectando {h}:{p}…',reconn:'reconectando em {s}s',cloudSearch:'nuvem: buscando sessão {c}…',
+      cloudErr:'nuvem: {m}',cloudConn:'nuvem: conectando…',invalid:'sessão inválida — tecla vermelha p/ novo código',
+      cloudReconn:'nuvem: reconectando em {s}s',cloudCreating:'nuvem: criando sessão…',portSearch:'procurando LouvorJA na porta {p}…',pairHint:'Acesse e informe o código',tapUnmute:'Toque para ativar o som',ipHint:'CÓDIGO (6 letras/números) · IP · IP:PORTA — ou SÓ A PORTA (ex.: 7081) para achar o LouvorJA na rede',ipHelp:'OK conectar · vermelha cancelar · backspace apaga',mainSlot:'Principal (espelho)',tvConn:' · TV {ip} · conectado · vermelha = digitar IP'},
+  en:{returnNext:'Next',castWaiting:'Waiting for broadcast',idle:'Waiting for content…',wait:'Waiting for operator to connect…',audio:'Playing audio',
+      connTo:'connected to {t} · red = IP/port · blue = refresh',redKey:'red key = type IP',
+      searching:'searching for LouvorJA on the network…',notFound:'no sender found — trying again…',
+      connecting:'connecting {h}:{p}…',reconn:'reconnecting in {s}s',cloudSearch:'cloud: fetching session {c}…',
+      cloudErr:'cloud: {m}',cloudConn:'cloud: connecting…',invalid:'invalid session — red key for a new code',
+      cloudReconn:'cloud: reconnecting in {s}s',cloudCreating:'cloud: creating session…',portSearch:'searching for LouvorJA on port {p}…',pairHint:'Go to the site and enter the code',tapUnmute:'Tap to enable sound',ipHint:'CODE (6 letters/numbers) · IP · IP:PORT — or PORT ONLY (e.g. 7081) to find LouvorJA on the network',ipHelp:'OK connect · red cancel · backspace deletes',mainSlot:'Main (mirror)',tvConn:' · TV {ip} · connected · red = type IP'},
+  es:{returnNext:'Siguiente',castWaiting:'Esperando transmisión',idle:'Esperando contenido…',wait:'Esperando al operador…',audio:'Reproduciendo audio',
+      connTo:'conectado a {t} · roja = IP/puerto · azul = actualizar',redKey:'tecla roja = escribir IP',
+      searching:'buscando LouvorJA en la red…',notFound:'ningún sender encontrado — reintentando…',
+      connecting:'conectando {h}:{p}…',reconn:'reconectando en {s}s',cloudSearch:'nube: buscando sesión {c}…',
+      cloudErr:'nube: {m}',cloudConn:'nube: conectando…',invalid:'sesión inválida — tecla roja p/ nuevo código',
+      cloudReconn:'nube: reconectando en {s}s',cloudCreating:'nube: creando sesión…',portSearch:'buscando LouvorJA en el puerto {p}…',pairHint:'Acceda e informe el código',tapUnmute:'Toque para activar el sonido',ipHint:'CÓDIGO (6 letras/números) · IP · IP:PUERTO — o SÓLO EL PUERTO (ej. 7081) para hallar LouvorJA en la red',ipHelp:'OK conectar · roja cancelar · backspace borra',mainSlot:'Principal (espejo)',tvConn:' · TV {ip} · conectado · roja = escribir IP'}
+};var l=(qs.get('lang')||(navigator.language||'')).slice(0,2).toLowerCase();
+return Object.assign({},d.pt,d[l]||{});})();
+document.querySelectorAll('[data-l10n]').forEach(function(el){var k=el.getAttribute('data-l10n');if(L10N[k])el.textContent=L10N[k];});
+// Retorno de palco: em /retorno, música ativa cobre o espelho; sem música, segue igual à TV. Nunca toca som.
+const stageReturnMode=location.pathname.replace(/\/+$/,'')==='/retorno'||qs.get('mode')==='retorno';
+// Monitores do desktop compartilhados com o celular (?mute=1): só imagem, o som fica no celular.
+const forcedMute=qs.get('mute')==='1';
+const audioLocked=stageReturnMode||forcedMute;
+// Só as conexões abertas pelo servidor do app mostram a espera; os painéis da projeção compartilhada, não.
+const castPage=/^https?:$/.test(location.protocol)&&qs.get('obsPane')!=='1';
+(function(){
+  const art=document.querySelector('#idleLogo svg');if(!art)return;
+  const logo=art.cloneNode(true);
+  logo.querySelectorAll('[id]').forEach(function(el){el.removeAttribute('id')});
+  document.querySelector('#castWaiting .cast-waiting__logo').appendChild(logo);
+})();
+function syncCastWaiting(){
+  let shared=false;
+  try{shared=obsShareState.enabled&&(obsShareState.active[0]||obsShareState.active[1])}catch(e){}
+  $('castWaiting').hidden=!(castPage&&document.documentElement.classList.contains('receiver-idle')&&$('stageReturn').hidden&&!shared);
+}
+syncCastWaiting();
+const SR_ADVANCE_MS=780,SR_ADVANCE_EASE='cubic-bezier(0.22, 1, 0.36, 1)';
+const sr={active:false,slide:-1,cover:false,current:'',next:'',nextCover:false,busy:false,flyerText:'',gen:0,anim:null,
+  bar:{shown:0,sample:0,sampleAt:0,vel:0,lastTick:0,raf:0}};
+function srEl(sel){return $('stageReturn').querySelector(sel)}
+function srLyric(){return srEl('.stage-return__card .stage-return__lyric:not(.stage-return__lyric--ghost)')}
+function srReducedMotion(){return typeof window.matchMedia==='function'&&window.matchMedia('(prefers-reduced-motion: reduce)').matches}
+// Barra: prevê a velocidade entre as atualizações e aproxima suave, como na tela de retorno dos monitores.
+function srPaintBar(value){
+  sr.bar.shown=value;
+  srEl('.stage-return__bar-fill').style.transform='scaleX('+(Math.round(value*10000)/10000)+')';
+  srEl('.stage-return__bar').setAttribute('aria-valuenow',String(Math.round(value*100)));
+}
+function srStopBar(){if(sr.bar.raf)cancelAnimationFrame(sr.bar.raf);sr.bar.raf=0}
+function srTickBar(){
+  const b=sr.bar,now=performance.now();b.raf=0;
+  if(!sr.active){srPaintBar(0);return}
+  if(now-b.sampleAt>420)b.vel=0;
+  const predicted=Math.min(1,Math.max(0,b.sample+Math.max(0,b.vel)*(now-b.sampleAt)));
+  const dt=Math.min(40,Math.max(0,now-b.lastTick));b.lastTick=now;
+  const next=b.shown+(predicted-b.shown)*(1-Math.exp(-dt/95));
+  srPaintBar(next);
+  if(Math.abs(predicted-next)>0.0005||(b.vel>0&&next<0.999))b.raf=requestAnimationFrame(srTickBar);
+}
+function srStartBar(){if(sr.bar.raf)return;sr.bar.lastTick=performance.now();sr.bar.raf=requestAnimationFrame(srTickBar)}
+function srSyncBar(ratio,reset){
+  const b=sr.bar,now=performance.now();
+  if(reset||ratio+0.05<b.shown){
+    b.sample=ratio;b.vel=0;b.sampleAt=now;srPaintBar(ratio);
+    if(sr.active&&ratio>0&&ratio<1)srStartBar();else srStopBar();
+    return;
+  }
+  const dt=now-b.sampleAt;
+  if(dt>12)b.vel=Math.max(0,(ratio-b.sample)/dt);
+  b.sample=ratio;b.sampleAt=now;srStartBar();
+}
+function srResetFlyer(){
+  if(sr.anim){try{sr.anim.cancel()}catch(e){}}
+  sr.anim=null;
+  const flyer=srEl('.stage-return__flyer');
+  flyer.hidden=true;flyer.textContent='';
+  ['left','top','width','transform','transformOrigin','opacity','transition'].forEach(function(k){flyer.style[k]=''});
+}
+function srShowNext(text,cover){
+  const nextLyric=srEl('.stage-return__next-lyric');
+  nextLyric.textContent=text;nextLyric.classList.toggle('cover',cover);
+  srEl('.stage-return__next').hidden=!(text||cover);
+}
+function srSnap(m){
+  sr.gen+=1;sr.busy=false;sr.flyerText='';
+  srResetFlyer();
+  const ghost=srEl('.stage-return__lyric--ghost'),lyric=srLyric(),title=srEl('.stage-return__title');
+  ghost.hidden=true;ghost.textContent='';ghost.classList.remove('out');
+  lyric.classList.remove('wait');
+  srEl('.stage-return__next-lyric').classList.remove('out','enter');
+  sr.cover=m.isCover===true;sr.current=String(m.current||'');sr.next=String(m.next||'');sr.nextCover=m.nextIsCover===true;
+  title.hidden=!sr.cover;title.textContent=sr.cover?sr.current:'';
+  srEl('.stage-return__block').hidden=sr.cover;lyric.textContent=sr.cover?'':sr.current;
+  srShowNext(sr.next,sr.nextCover);
+}
+function srNextFrame(){return new Promise(function(resolve){requestAnimationFrame(function(){requestAnimationFrame(function(){resolve()})})})}
+// O próximo trecho voa até o lugar do atual; o anterior sobe e some; o novo próximo entra.
+async function srPromote(m){
+  const incoming=String(m.current||''),gen=++sr.gen;
+  const nextLyric=srEl('.stage-return__next-lyric'),lyric=srLyric(),flyer=srEl('.stage-return__flyer'),ghost=srEl('.stage-return__lyric--ghost');
+  const from=nextLyric.getBoundingClientRect();
+  if(srReducedMotion()||typeof flyer.animate!=='function'||!from||from.height<2){srSnap(m);return}
+  nextLyric.classList.remove('enter');
+  ghost.textContent=sr.current;ghost.hidden=false;ghost.classList.remove('out');void ghost.offsetWidth;ghost.classList.add('out');
+  lyric.textContent=incoming;lyric.classList.add('wait');
+  nextLyric.classList.add('out');
+  sr.current=incoming;sr.cover=false;sr.busy=true;sr.flyerText=incoming;
+  flyer.textContent=incoming;flyer.hidden=false;
+  const to=lyric.getBoundingClientRect();
+  if(!to||to.height<2){srSnap(m);return}
+  const s=from.width/Math.max(1,to.width),dx=from.left+from.width/2-(to.left+to.width/2),dy=from.top-to.top;
+  const start='translate('+dx+'px, '+dy+'px) scale('+s+')';
+  Object.assign(flyer.style,{transition:'none',left:to.left+'px',top:to.top+'px',width:to.width+'px',transformOrigin:'top center',transform:start,opacity:'1'});
+  if(sr.anim){try{sr.anim.cancel()}catch(e){}}
+  sr.anim=flyer.animate([{transform:start},{transform:'translate(0px, 0px) scale(1)'}],{duration:SR_ADVANCE_MS,easing:SR_ADVANCE_EASE,fill:'forwards'});
+  try{await sr.anim.finished}catch(e){return}
+  if(gen!==sr.gen)return;
+  sr.next=String(m.next||'');sr.nextCover=m.nextIsCover===true;
+  srShowNext(sr.next,sr.nextCover);
+  lyric.classList.remove('wait');
+  await srNextFrame();
+  if(gen!==sr.gen)return;
+  ghost.hidden=true;ghost.textContent='';ghost.classList.remove('out');
+  nextLyric.classList.remove('out');
+  if(sr.next||sr.nextCover){void nextLyric.offsetWidth;nextLyric.classList.add('enter')}
+  sr.busy=false;sr.flyerText='';
+  srResetFlyer();
+}
+function stageReturnColor(value){
+  return typeof value==='string'&&/^(#[0-9a-f]{3,8}|rgba?\([\d\s.,%]+\)|[a-z]+)$/i.test(value.trim())?value.trim():'';
+}
+function stageReturnVw(px){
+  const n=Number(px);
+  return n>0?(Math.round(n/1920*100*1000)/1000)+'vw':'';
+}
+function applyStageReturn(m){
+  if(!stageReturnMode)return;
+  const root=$('stageReturn'),q=function(sel){return root.querySelector(sel)};
+  if(!m.active){root.hidden=true;sr.active=false;sr.slide=-1;srSnap({});srSyncBar(0,true);syncCastWaiting();return}
+  const s=m.style||{},current=String(m.current||''),cover=m.isCover===true;
+  const blur=Number(s.shadow&&s.shadow.blur),intensity=Math.min(1,Math.max(0,Number(s.shadow&&s.shadow.intensity)||0));
+  const text={
+    color:stageReturnColor(s.color),fontWeight:Number(s.fontWeight)>0?String(Number(s.fontWeight)):'',
+    textAlign:['left','center','right','justify'].indexOf(s.textAlign)>=0?s.textAlign:'',
+    textTransform:s.upperCase?'uppercase':'none',
+    textShadow:s.shadow&&blur>=0?'0 0 '+(Math.round(blur/108*100*1000)/1000)+'vw rgba(0,0,0,'+intensity+')':'none',
+  };
+  const title=q('.stage-return__title'),nextLyric=q('.stage-return__next-lyric');
+  const lyrics=root.querySelectorAll('.stage-return__lyric');
+  [title,nextLyric].concat(Array.prototype.slice.call(lyrics)).forEach(function(el){Object.assign(el.style,text)});
+  title.style.fontSize=stageReturnVw(s.fontSize);
+  lyrics.forEach(function(el){el.style.fontSize=stageReturnVw(s.fontSize)});
+  nextLyric.style.fontSize=stageReturnVw(s.nextFontSize);
+  q('.stage-return__next-label').textContent=L10N.returnNext;
+  const slide=Number(m.slideIndex),ratio=Math.min(1,Math.max(0,Number(m.progress)||0));
+  const canPromote=sr.active&&slide===sr.slide+1&&current.length>0&&current===sr.next&&!cover&&!sr.cover;
+  const slideChanged=!sr.active||slide!==sr.slide;
+  sr.active=true;sr.slide=slide;
+  srSyncBar(ratio,slideChanged);
+  if(canPromote)void srPromote(m);
+  else if(sr.busy){if(current!==sr.flyerText||cover)srSnap(m)}
+  else if(current!==sr.current||String(m.next||'')!==sr.next||cover!==sr.cover||(m.nextIsCover===true)!==sr.nextCover)srSnap(m);
+  q('.stage-return__bar-fill').style.backgroundColor=stageReturnColor(s.barColor);
+  root.style.backgroundColor=stageReturnColor(s.backgroundColor);
+  const bg=typeof m.background==='string'&&/^https?:\/\//i.test(m.background)?m.background:'';
+  q('.stage-return__bg').style.backgroundImage=bg?'url("'+bg.replace(/["\\\s]/g,function(c){return encodeURIComponent(c)})+'")':'';
+  root.hidden=false;
+  syncCastWaiting();
+}
 // F3.3q: versão no idle (canto inferior direito) — ?v= override ou padrão.
-window.__PALCO_APPV__=window.__PALCO_APPV__||'0.1.52';
+window.__PALCO_APPV__=window.__PALCO_APPV__||'0.1.55';
 (function(){var el=$('idleVer');if(!el)return;var qv=qs.get('v')||window.__PALCO_APPV__||'';if(qv){el.textContent='PIANO LouvorJA Palco · receiver v'+qv;return}fetch('appinfo.json').then(function(r){return r.json()}).then(function(j){el.textContent='PIANO LouvorJA Palco · receiver v'+(j.version||'?')}).catch(function(){fetch('config.xml').then(function(r){return r.text()}).then(function(t){var m2=t.match(/version="([^"]+)"/);el.textContent='PIANO LouvorJA Palco · receiver v'+(m2?m2[1]:'?')}).catch(function(){el.textContent='PIANO LouvorJA Palco'})})})()
 // webOS: ares-launch -p '{"host":"..."}' chega em PalmSystem.launchParams,
 // NÃO na query string. Merge dos dois (query string tem prioridade).
@@ -185,28 +2806,149 @@ let ws,tries=0;
 let unlocked=true;
 let bgPalco='';  // BG personalizado do palco (idle) — persiste entre músicas
 
-function proxyUrl(original){
-  if(!original)return original;
-  // Sender/popup legado pode mandar barra codificada (%2F) — decodifica
-  // caminho antes de qualquer comparação/use (404 silencioso caso contrário).
-  try{ original=decodeURIComponent(original) }catch(e){}
-  // Qualquer porta do MESMO sender é local: 7080 (Principal), 7082 (TV 2),
-  // 7084... Antes só aceitava :7080; bg vindo de slot :7082 era proxyado
-  // de volta e falhava → receiver caía no bg-12 (caso real 26/08).
-  if(original.startsWith('http://'+host+':'))return original;
-  if(original.startsWith('http://')||original.startsWith('https://')){
-    return `http://${host}:7080/proxy?url=${encodeURIComponent(original)}`;
+// Received projection text is untrusted HTML. Rebuild only basic formatting;
+// never copy attributes, executable elements, links, or resource URLs.
+function renderProjectionText(target, value){
+  const text=String(value||'');
+  if(!window.DOMPurify||!window.DOMPurify.isSupported){target.textContent=text;return}
+  const parsed=window.DOMPurify.sanitize(text,{
+    ALLOWED_TAGS:['br','b','strong','i','em','u','s','span','p','div','small'],
+    ALLOWED_ATTR:['style'],ALLOW_DATA_ATTR:false,ALLOW_ARIA_ATTR:false,
+    RETURN_DOM_FRAGMENT:true
+  });
+  const allowed=new Set(['BR','B','STRONG','I','EM','U','S','SPAN','P','DIV','SMALL']);
+  const blocked=new Set(['SCRIPT','STYLE','IFRAME','OBJECT','EMBED','SVG','MATH','TEMPLATE']);
+  function copy(source,parent){
+    if(source.nodeType===3){parent.appendChild(document.createTextNode(source.nodeValue||''));return}
+    if(source.nodeType!==1||blocked.has(source.tagName))return;
+    let destination=parent;
+    if(allowed.has(source.tagName)){
+      destination=document.createElement(source.tagName.toLowerCase());
+      // CSSOM accepts color values, not executable HTML or URL attributes.
+      destination.style.color=source.style.color;
+      destination.style.backgroundColor=source.style.backgroundColor;
+      const weight=source.style.fontWeight;
+      if(/^(normal|bold|bolder|lighter|[1-9]00)$/.test(weight))destination.style.fontWeight=weight;
+      if(['normal','italic','oblique'].includes(source.style.fontStyle))destination.style.fontStyle=source.style.fontStyle;
+      if(['none','underline','line-through'].includes(source.style.textDecorationLine))destination.style.textDecorationLine=source.style.textDecorationLine;
+      if(['left','center','right','justify'].includes(source.style.textAlign))destination.style.textAlign=source.style.textAlign;
+      parent.appendChild(destination);
+    }
+    for(const child of Array.from(source.childNodes))copy(child,destination);
   }
-  return original;
+  while(target.firstChild)target.removeChild(target.firstChild);
+  for(const child of Array.from(parsed.childNodes))copy(child,target);
 }
+
+function projectionColor(value){
+  const match=/^\s*(#[0-9a-fA-F]{3,8}|rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*(?:,\s*(?:0|1|0?\.\d+)\s*)?\)|hsla?\(\s*\d{1,3}\s*,\s*\d{1,3}%\s*,\s*\d{1,3}%\s*(?:,\s*(?:0|1|0?\.\d+)\s*)?\)|[a-zA-Z]{1,20})\s*$/.exec(String(value||''));
+  return match?match[1]:'';
+}
+// Posição da referência bíblica; null = sender sem o campo (segue o alinhamento do texto).
+function footerPosition(m){
+  const p=m&&m.footerPosition;
+  return p==='below-left'||p==='below-center'||p==='below-right'||p==='corner'?p:null;
+}
+// Transição do versículo: só anima quando o texto muda; sem o campo (APK), troca seca.
+let lastBibleVerse='';
+function bibleEnter(m){
+  const kind=m.scope==='bible'&&(m.transition==='fade'||m.transition==='slide'||m.transition==='zoom')?m.transition:null;
+  const verse=m.scope==='bible'?String(m.text||'')+'|'+String(m.footerRef||''):'';
+  const changed=verse!==lastBibleVerse;
+  lastBibleVerse=verse;
+  if(kind&&!changed)return;
+  const ms=Number(m.transitionMs);
+  ['text','footer'].forEach(function(id){
+    const el=$(id);if(!el)return;
+    el.classList.remove('rx-enter-fade','rx-enter-slide','rx-enter-zoom');
+    if(!kind)return;
+    el.style.setProperty('--rx-ms',(Number.isFinite(ms)&&ms>=0&&ms<=2000?ms:250)+'ms');
+    void el.offsetWidth;
+    el.classList.add('rx-enter-'+kind);
+  });
+}
+// Conexões diretas: somente IPv4 de LAN/loopback e localhost, nunca DNS público.
+function palcoLanHost(value){
+  if(value==='localhost')return 'localhost';
+  if(typeof value!=='string'||! /^(?:0|[1-9][0-9]{0,2})(?:\.(?:0|[1-9][0-9]{0,2})){3}$/.test(value))return '';
+  const parts=value.split('.').map(Number);
+  if(parts.some(n=>n>255))return '';
+  if(parts[0]!==10&&parts[0]!==127&&!(parts[0]===172&&parts[1]>=16&&parts[1]<=31)&&!(parts[0]===192&&parts[1]===168)&&!(parts[0]===169&&parts[1]===254))return '';
+  return parts.join('.');
+}
+// Transmissor (celular/desktop): QUALQUER faixa IPv4 — igrejas usam 10.x,
+// 172.x, faixas públicas ou de operadora. Só formato estrito (sem 127.1,
+// 0x7f…, nomes ou sufixos), que são truques, não redes reais.
+function palcoSenderHost(value){
+  if(value==='localhost')return 'localhost';
+  if(typeof value!=='string'||! /^(?:0|[1-9][0-9]{0,2})(?:\.(?:0|[1-9][0-9]{0,2})){3}$/.test(value))return '';
+  const parts=value.split('.').map(Number);
+  if(parts.some(n=>n>255)||parts[0]===0||parts[0]>=224)return '';
+  return parts.join('.');
+}
+function palcoLanUrl(value,portValue,path,scheme){
+  const sender=palcoSenderHost(value);
+  if(!sender||!/^\d{1,5}$/.test(String(portValue)))return '';
+  const number=Number(portValue);
+  if(number<1||number>65535)return '';
+  return scheme+'://'+sender+':'+number+path;
+}
+function palcoOfficialOrigin(origin){
+  // Mesmas origens oficiais/legadas do contrato de API do aplicativo.
+  switch(origin){
+    case 'https://api.pianolouvorja.com.br':return 'https://api.pianolouvorja.com.br';
+    case 'https://api-stg.pianolouvorja.com.br':return 'https://api-stg.pianolouvorja.com.br';
+    case 'https://api.louvorja.com.br':return 'https://api.louvorja.com.br';
+    case 'https://api-stg.louvorja.com.br':return 'https://api-stg.louvorja.com.br';
+    case 'https://api.louvorja.workers.dev':return 'https://api.louvorja.workers.dev';
+    case 'https://pub-8c0e123c55a14cdfa0c52fa182688782.r2.dev':return 'https://pub-8c0e123c55a14cdfa0c52fa182688782.r2.dev';
+    default:return '';
+  }
+}
+function palcoMediaUrl(value){
+  if(!value)return '';
+  try{value=decodeURIComponent(String(value))}catch(e){value=String(value)}
+  let parsed;
+  try{parsed=new URL(String(value),location.href)}catch(e){return ''}
+  if(parsed.username||parsed.password)return '';
+  if(parsed.protocol==='data:')return /^data:(image|audio|video)\/[a-z0-9.+-]+;base64,/i.test(String(value))?parsed.href:'';
+  if(parsed.protocol==='file:')return location.protocol==='file:'?parsed.href:'';
+  if(parsed.protocol==='blob:'){
+    if(parsed.origin==='null')return location.protocol==='file:'?parsed.href:'';
+    try{const source=new URL(parsed.origin);return palcoLanHost(source.hostname)||palcoOfficialOrigin(source.origin)?parsed.href:''}catch(e){return ''}
+  }
+  if(parsed.protocol!=='http:'&&parsed.protocol!=='https:')return '';
+  // Mídia: rede local, origem oficial ou o próprio transmissor conectado.
+  const local=palcoLanHost(parsed.hostname)||(host&&parsed.hostname===palcoSenderHost(host)?parsed.hostname:'');
+  const official=palcoOfficialOrigin(parsed.origin);
+  if(!local&&!official)return '';
+  // Mídia do próprio transmissor (porta HTTP = WS − 1) vem pelo endereço por
+  // onde a tela se conectou: o IP que ele anuncia pode não ser alcançável
+  // daqui (celular com duas redes, emulador atrás de NAT).
+  const connected=palcoSenderHost(host);
+  if(!official&&connected&&parsed.port&&Number(parsed.port)===Number(port)-1){
+    return parsed.protocol+'//'+connected+':'+Number(parsed.port)+parsed.pathname+parsed.search+parsed.hash;
+  }
+  const origin=official||(parsed.protocol+'//'+local+(parsed.port?':'+Number(parsed.port):''));
+  return origin+parsed.pathname+parsed.search+parsed.hash;
+}
+function proxyUrl(original){return palcoMediaUrl(original)}
+function lanSenderHost(){return palcoSenderHost(host)}
+function palcoSocketUrl(){
+  const base=palcoLanUrl(host,port,'/palco','ws');
+  if(!base)return '';
+  const raw=qs.get('token');
+  return base+(typeof raw==='string'&&/^[A-Z0-9]{5}$/.test(raw)?'?token='+raw:'');
+}
+function palcoWsUrl(){return palcoSocketUrl()}
 
 function setStatus(t,err){const s=$('status');s.textContent=t;
   const c=$('idleConn');if(c){
     if(t.indexOf('●')===0){
       var lb=localStorage.getItem('palcoSlotLabel');
-      c.textContent=(lb?lb+' · ':'')+'conectado a '+t.slice(1).trim()+' · vermelha = IP/porta · azul = atualizar';
+      c.textContent=(lb?lb+' · ':'')+L10N.connTo.replace('{t}',t.slice(1).trim());
     }
-    else c.textContent=(localStorage.getItem('palcoSlotLabel')?localStorage.getItem('palcoSlotLabel')+' · ':'')+t+' · tecla vermelha = digitar IP';
+    else c.textContent=(localStorage.getItem('palcoSlotLabel')?localStorage.getItem('palcoSlotLabel')+' · ':'')+t+' · '+L10N.redKey;
   }
   s.className=err?'err':''}
 
@@ -215,23 +2957,41 @@ function sendEvent(m){try{if(ws&&ws.readyState===1)ws.send(JSON.stringify(m))}ca
 
 // ===== Auto-descoberta (F3.3): acha o sender (APK) na sub-rede =====
 // Prioridade: launchParams/query host > último host válido (localStorage)
-// > scan da sub-rede via GET :7080/status (resposta JSON identifica sender).
-let host=qs.get('host')||localStorage.getItem('palcoHost')||location.hostname||'';
-let port=qs.get('port')||localStorage.getItem('palcoPort')||'7081';
+// > scan da sub-rede via GET :47080/status (resposta JSON identifica sender).
+// Transição: computadores na porta antiga (7080/7081) também são procurados.
+const DEFAULT_WS_PORT='47081';
+// APK novo: faixa 4980/4981 (sem conflito com o desktop na mesma rede).
+const APK_WS_PORT='4981';
+const LEGACY_WS_PORT='7081';
+const browserSourcePort=Number(location.port);
+const ownBrowserSource=/^https?:$/.test(location.protocol)&&!!palcoSenderHost(location.hostname)&&((browserSourcePort>=7080&&browserSourcePort<=65534)||(browserSourcePort>=4980&&browserSourcePort<=4994&&browserSourcePort%2===0));
+let host=qs.get('host')||(ownBrowserSource?location.hostname:localStorage.getItem('palcoHost'))||location.hostname||'';
+let port=qs.get('port')||(ownBrowserSource?String(browserSourcePort+1):localStorage.getItem('palcoPort'))||DEFAULT_WS_PORT;
+// Porta do link ou da própria página é definitiva; a salva pode ser de antes da troca.
+const portFixed=!!(qs.get('port')||ownBrowserSource);
 
 function probeHttp(ip,httpPort){
+  const url=palcoLanUrl(ip,httpPort,'/status','http');
+  if(!url)return Promise.resolve(null);
   return new Promise(res=>{
-    fetch('http://'+ip+':'+httpPort+'/status')
+    fetch(url,{redirect:'error'})
       .then(function(r){return r.json()})
       .then(function(j){res(j&&('unlocked' in j)?j:null)})
       .catch(function(){res(null)});
   });
 }
 function probeSender(ip){
-  // Porta digitada pode ser WS (7081) OU HTTP do slot (a UI mostra a HTTP,
-  // ex.: slot 1 = 7082/7083). Tenta a dupla HTTP/WS em ambos os sentidos:
+  if(!palcoLanUrl(ip,port,'/status','http'))return Promise.resolve(null);
+  var tries=[port];
+  if(!portFixed)[DEFAULT_WS_PORT,APK_WS_PORT,LEGACY_WS_PORT].forEach(function(p){if(tries.indexOf(p)<0)tries.push(p)});
+  return tries.slice(1).reduce(function(found,p){
+    return found.then(function(r){return r||probePair(ip,Number(p))});
+  },probePair(ip,Number(port)));
+}
+function probePair(ip,p){
+  // Porta digitada pode ser WS (47081) OU HTTP do slot (a UI mostra a HTTP,
+  // ex.: slot 1 = 47082/47083). Tenta a dupla HTTP/WS em ambos os sentidos:
   // p como HTTP, p-1 (p=WS) e p+1 (p=HTTP→WS=p+1).
-  var p=parseInt(port,10)||7081;
   return probeHttp(ip,p).then(function(j){
     if(j)return normalizePort(ip,j,p+1);        // p era HTTP → WS=p+1
     return probeHttp(ip,p-1).then(function(j2){
@@ -244,8 +3004,10 @@ function probeSender(ip){
   });
 }
 function normalizePort(ip,j,wsPort){
-  port=String(wsPort);
-  return ip;
+  if(j&&Number.isInteger(Number(j.wsPort)))wsPort=Number(j.wsPort);
+  if(!palcoLanUrl(ip,wsPort,'/palco','ws'))return null;
+  port=String(Number(wsPort));
+  return palcoSenderHost(ip);
 }
 
 async function scanSubnet(){
@@ -253,16 +3015,17 @@ async function scanSubnet(){
   // presume /24 da própria TV (rede típica de igreja)
   // file:// (IPK/simulador local): hostname vazio — tenta últimos hosts
   // conhecidos da sub-rede salva antes do default. Cobertura p/ IPK.
-  let me=location.hostname;
+  let me=palcoSenderHost(location.hostname);
   if(!me){
     const saved=localStorage.getItem('palcoHost');
-    me=saved||'192.168.1.100';
+    me=palcoSenderHost(saved)||'192.168.1.100';
   }
   const prefix=me.split('.').slice(0,3).join('.');
-  const base=host?host.split('.').slice(0,3).join('.'):prefix;
+  const known=palcoSenderHost(host);
+  const base=known&&known!=='localhost'?known.split('.').slice(0,3).join('.'):prefix;
   const ips=[];
   for(let i=1;i<255;i++)ips.push(base+'.'+i);
-  if(host)ips.unshift(host); // último conhecido primeiro
+  if(known)ips.unshift(known); // último conhecido primeiro
   const found=[];
   const CONC=42; // F3.3v: 20→42 e timeout 900→450ms — scan ~3x mais rápido
   for(let i=0;i<ips.length;i+=CONC){
@@ -277,13 +3040,15 @@ async function scanSubnet(){
 function connect(){
   dlog('connect() host="'+host+'"');
   if(!host){
-    setStatus('procurando LouvorJA na rede…');
+    setStatus(L10N.searching);
     scanSubnet().then(found=>{
       if(found){host=found;localStorage.setItem('palcoHost',host);doConnect()}
-      else{setStatus('nenhum sender encontrado — tentando de novo…',true);retry()}
+      else{setStatus(L10N.notFound,true);retry()}
     });
     return;
   }
+  // Browser sources have an authoritative address: never scan another output.
+  if(ownBrowserSource){doConnect();return;}
   // F3.3v: valida o host ANTES do WS — se o sender não responde em /status,
     // o IP é stale (DHCP) → esquece e escaneia JÁ, sem as 3 tentativas de WS
     // com backoff (que levavam ~15s antes de re-escanear).
@@ -299,9 +3064,11 @@ function connect(){
   }
   // Tenta WS direto no host salvo; se falhar 1x sem nunca abrir, host é stale.
   function directTry(){
+    const socketUrl=palcoWsUrl();
+    if(!socketUrl){setStatus(L10N.notFound,true);return}
     var opened=false;
     var t=setTimeout(function(){if(!opened){dlog('WS direto falhou — host stale');localStorage.removeItem('palcoHost');host='';connect()}},3000);
-    try{var w=new WebSocket('ws://'+host+':'+port+'/palco');
+    try{var w=new WebSocket(socketUrl);
       w.onopen=function(){opened=true;clearTimeout(t);try{w.close()}catch(e){};doConnect()};
       w.onerror=function(){};
     }catch(e){clearTimeout(t);localStorage.removeItem('palcoHost');host='';connect()}
@@ -311,6 +3078,7 @@ function connect(){
 // Watchdog: sender morreu/fechou com mídia tocando → para NA HORA.
 // Sem isso o áudio continuava até o fim depois do app cair.
 function stopMediaOnServerLoss(){
+  try{cleanMirror.stop()}catch(e){}
   try{
     const a=$('audio'); if(a&&!a.paused){a.pause();a.currentTime=0}
     const v=$('video'); if(v&&!v.paused){v.pause();v.removeAttribute('src');v.style.display='none';v.load()}
@@ -319,26 +3087,283 @@ function stopMediaOnServerLoss(){
 }
 
 function doConnect(){
+  const socketUrl=palcoWsUrl();
+  if(!socketUrl){setStatus(L10N.notFound,true);return}
   dlog('doConnect '+host+':'+port);
-  setStatus('conectando '+host+':'+port+'…');
-  try{ws=new WebSocket('ws://'+host+':'+port+'/palco')}catch(e){retry();return}
-  ws.onopen=()=>{tries=0;dlog('WS OPEN '+host);setStatus('● '+host);
+  setStatus(L10N.connecting.replace('{h}',host).replace('{p}',port));
+  try{ws=new WebSocket(socketUrl)}catch(e){retry();return}
+  ws.onopen=()=>{tries=0;lastServerMessage=Date.now();serverBeats=false;dlog('WS OPEN '+host);setStatus('● '+host);
+    try{const requestId=sessionStorage.getItem('palcoRefreshRequest');if(requestId){ws.send(JSON.stringify({v:2,type:'receiver-ready',requestId,youtube:true,cleanMirror:!!window.PianoNetworkMirror}));sessionStorage.removeItem('palcoRefreshRequest')}}catch(e){}
+    // Avisa que aplica o zoom de imagem/PDF sozinho (frameView): o app manda
+    // só zoom + posição, em vez de reenviar o quadro recortado.
+    // e qual página é esta aba (Aparelhos conectados mostra espelho/retorno)
+    try{ws.send(JSON.stringify({v:2,type:'caps',caps:['frameView','heartbeat'],page:stageReturnMode?'retorno':'espelho'}))}catch(e){}
     if(window.__hideSplash)window.__hideSplash(); // F3.3j: splash sai no connect
     localStorage.setItem('palcoHost',host);
     localStorage.setItem('palcoPort',port)};
-  ws.onmessage=ev=>{try{handle(JSON.parse(ev.data))}catch(e){}};
+  ws.onmessage=ev=>{lastServerMessage=Date.now();try{const m=JSON.parse(ev.data);
+    // sinal de vida do servidor: responde e não vai para a tela
+    if(m&&m.type==='beat'){serverBeats=true;try{ws.send('{"v":2,"type":"beat"}')}catch(e){}return}
+    handle(m)}catch(e){}};
   ws.onclose=()=>{dlog('WS CLOSE');stopMediaOnServerLoss();showIdle();
     // host falhou 3x → esquece e re-escaneia (IP mudou)
-    if(tries>=3){localStorage.removeItem('palcoHost');host='';tries=0}
+    if(!ownBrowserSource&&tries>=3){localStorage.removeItem('palcoHost');host='';tries=0}
     retry()};
   ws.onerror=()=>{};
 }
 function retry(){
-  const wait=Math.min(1000*Math.pow(2,tries++),10000);
-  setStatus('reconectando em '+Math.round(wait/1000)+'s',true);
-  setTimeout(connect,wait);
+  const wait=ownBrowserSource?1000:Math.min(1000*Math.pow(2,tries++),10000);
+  setStatus(L10N.reconn.replace('{s}',Math.round(wait/1000)),true);
+  clearTimeout(retryTimer);
+  retryTimer=setTimeout(function(){retryTimer=null;connect()},wait);
+}
+
+// ===== Conexão viva dos dois lados =====
+// O servidor manda `beat` a cada 10 s (e cobra a resposta). Daqui, se ficar
+// 30 s sem ouvir nada do servidor, a conexão está pendurada (Wi-Fi caiu, PC
+// dormiu): fecha e reconecta sem esperar o navegador perceber. Servidor
+// antigo não manda `beat`: aí este vigia fica desligado.
+let lastServerMessage=0,serverBeats=false,retryTimer=null;
+const SERVER_SILENCE_MS=30000;
+function reconnectNow(reason){
+  dlog('reconectando: '+reason);
+  const dead=ws;ws=null;
+  if(dead){dead.onclose=null;dead.onmessage=null;dead.onerror=null;try{dead.close()}catch(e){}}
+  stopMediaOnServerLoss();showIdle();
+  clearTimeout(retryTimer);retryTimer=null;
+  connect();
+}
+setInterval(function(){
+  if(ws&&ws.readyState===1&&serverBeats&&Date.now()-lastServerMessage>SERVER_SILENCE_MS)reconnectNow('servidor sem resposta');
+},5000);
+// Rede voltou ou a aba voltou a aparecer: não espera a próxima tentativa.
+function reconnectSoon(){if(retryTimer){clearTimeout(retryTimer);retryTimer=null;connect()}}
+window.addEventListener('online',reconnectSoon);
+document.addEventListener('visibilitychange',function(){if(!document.hidden)reconnectSoon()});
+
+// ===== WT-5d: modo cloud — TV conecta no relay WS da API =====
+// Mesmo protocolo do receiver browser (browser/index.html): código de 6 chars
+// → GET /sessions/:code/token → WS /relay/:code?token&role=receiver.
+// Mensagens seguem para o MESMO handle() (projection/idle/timer/youare);
+// áudio/vídeo do relay não são tocados (mídia continua no caminho local).
+var PALCO_API_WS_DEFAULT='wss://api.louvorja.com.br/v1/palco';
+// Dev local: file:// (simulador carregando pasta) não tem API de produção
+// alcançável pelasessão de dev — aponta pro piano-api local. Em produção
+// (IPK instalado) mantém a API oficial.
+var PALCO_API_WS_DEV='ws://localhost:3100/v1/palco';
+function trustedCloudApi(value){
+  try{
+    const url=new URL(String(value));
+    if(url.username||url.password||url.search||url.hash)return null;
+    if(url.pathname.replace(/\/$/,'')!=='/v1/palco')return null;
+    if(url.hostname==='localhost'){
+      return url.protocol==='ws:'&&url.port==='3100'?PALCO_API_WS_DEV:null;
+    }
+    if(url.protocol!=='wss:'||(url.port&&url.port!=='443'))return null;
+    switch(url.hostname){
+      case 'api.louvorja.com.br':return 'wss://api.louvorja.com.br/v1/palco';
+      case 'api-stg.louvorja.com.br':return 'wss://api-stg.louvorja.com.br/v1/palco';
+      case 'api.pianolouvorja.com.br':return 'wss://api.pianolouvorja.com.br/v1/palco';
+      case 'api-stg.pianolouvorja.com.br':return 'wss://api-stg.pianolouvorja.com.br/v1/palco';
+      default:return null;
+    }
+  }catch(e){return null}
+}
+var cloudApi=trustedCloudApi(qs.get('api'))||((location.protocol==='file:'||/^(localhost|127\.)/.test(location.hostname))&&(location.protocol==='file:'||location.port==='5173'||location.port==='3100')?PALCO_API_WS_DEV:PALCO_API_WS_DEFAULT);
+var cloudCode='';
+var cloudMode=false;
+var cloudTimer=null;
+
+function cloudConnect(code){
+  if(typeof code!=='string'||!/^[A-Z0-9]{6}$/.test(code)){setStatus(L10N.invalid,true);return}
+  cloudMode=true;cloudCode=code;
+  dlog('cloudConnect',code,cloudApi);
+  var base=cloudApi.replace(/^ws/,'http');
+  setStatus(L10N.cloudSearch.replace('{c}',code));
+  fetch(base+'/sessions/'+encodeURIComponent(code)+'/token',{redirect:'error'})
+    .then(function(r){if(!r.ok)throw Error('sessão não encontrada');return r.json()})
+    .then(function(j){cloudOpen(code,j.token)})
+    .catch(function(e){setStatus(L10N.cloudErr.replace('{m}',e.message),true);cloudRetry()});
+}
+function cloudOpen(code,token){
+  if(typeof code!=='string'||!/^[A-Z0-9]{6}$/.test(code)||typeof token!=='string'||!token){setStatus(L10N.invalid,true);return}
+  setStatus(L10N.cloudConn);
+  var cid='';
+  try{cid=localStorage.getItem('palcoCloudCid')||''}catch(e){}
+  if(!cid){cid='tv-'+Math.random().toString(36).slice(2,10);try{localStorage.setItem('palcoCloudCid',cid)}catch(e){}}
+  try{ws=new WebSocket(cloudApi+'/relay/'+code+'?token='+encodeURIComponent(token)+'&role=receiver&cid='+encodeURIComponent(cid))}
+  catch(e){cloudRetry();return}
+  ws.onopen=function(){tries=0;dlog('CLOUD WS OPEN',code);
+    setStatus('● nuvem '+code);
+    if(window.__hideSplash)window.__hideSplash();
+    try{localStorage.setItem('palcoCloudCode',code)}catch(e){}};
+  ws.onmessage=function(ev){try{handle(JSON.parse(ev.data))}catch(e){}};
+  ws.onclose=function(ev){
+    dlog('CLOUD WS CLOSE',ev&&ev.code);
+    stopMediaOnServerLoss();showIdle();
+    if(ev&&ev.code===4404){setStatus(L10N.invalid,true);cloudMode=false;return}
+    // 4409 = join recusado (ex.: sessão recém-recriada) — reseta backoff pra
+    // tentar de novo rápido em vez de esperar 10s crescendo.
+    if(ev&&(ev.code===4409||ev.code===4400)){tries=0}
+    cloudRetry()};
+  ws.onerror=function(){};
+}
+function cloudRetry(){
+  var wait=Math.min(1000*Math.pow(2,tries++),10000);
+  setStatus(L10N.cloudReconn.replace('{s}',Math.round(wait/1000)),true);
+  cloudTimer=setTimeout(function(){if(cloudMode&&cloudCode)cloudConnect(cloudCode)},wait);
+}
+
+// ===== WT-5 fluxo streaming: TV cria a sessão =====
+// OK com campo vazio no overlay → POST /v1/palco/sessions → TV conecta como
+// receiver e MOSTRA o código + QR no idle. O operador abre o web, informa o
+// código (ou escaneia) e projeta. Padrão YouTube/Netflix.
+function cloudCreate(){
+  cloudMode=true;cloudCode='';
+  var base=cloudApi.replace(/^ws/,'http');
+  setStatus(L10N.cloudCreating);
+  fetch(base+'/sessions',{method:'POST',redirect:'error'})
+    .then(function(r){if(!r.ok)throw Error('falha ao criar sessão');return r.json()})
+    .then(function(j){
+      cloudCode=String(j.code||'').toUpperCase();
+      if(!/^[A-Z0-9]{6}$/.test(cloudCode))throw Error('sessão inválida');
+      try{localStorage.setItem('palcoCloudCode',cloudCode)}catch(e){}
+      showCloudPair(cloudCode);
+      cloudOpen(cloudCode,j.token);
+    })
+    .catch(function(e){setStatus(L10N.cloudErr.replace('{m}',e.message),true);cloudMode=false;retry()});
+}
+
+// ===== QRCode minimal (qrcodegen, MIT, Nayuki) — só o necessário p/ v1 =====
+// Gera matriz QR (M, byte mode) sem dependências. ~100 linhas.
+
+// Pinta o par código+QR no idle enquanto aguarda o operador.
+function showCloudPair(code){
+  showIdle(L10N.wait);
+  var wrap=document.createElement('div');
+  wrap.id='cloudPair';
+  wrap.style.cssText='display:flex;gap:3vh;align-items:center;justify-content:center;margin-top:3vh';
+  try{
+    var url='https://app.pianolouvorja.com.br/settings?palco='+code;
+    var qr=qrcode(0,'M');           // typeNumber 0 = auto
+    qr.addData(url);
+    qr.make();
+    var count=qr.getModuleCount();
+    var px=Math.max(3,Math.floor(200/count));
+    var t=document.createElement('canvas');
+    t.width=count*px;t.height=count*px;
+    var ctx=t.getContext('2d');
+    ctx.fillStyle='#fff';ctx.fillRect(0,0,t.width,t.height);
+    ctx.fillStyle='#000';
+    for(var y=0;y<count;y++)for(var x=0;x<count;x++)if(qr.isDark(y,x))ctx.fillRect(x*px,y*px,px,px);
+    t.style.width='22vh';t.style.height='22vh';t.style.borderRadius='1vh';t.style.background='#fff';
+    wrap.appendChild(t);
+  }catch(e){dlog('QR falhou (código em texto segue):',e&&e.message)}
+  var info=document.createElement('div');
+  info.style.cssText='text-align:left';
+  info.innerHTML='<div style="font-size:2.4vh;opacity:.75">'+L10N.pairHint+'</div>'+
+    '<div style="font-size:9vh;font-weight:800;letter-spacing:1.2vh;line-height:1.15;color:#FCCE02">'+code+'</div>'+
+    '<div style="font-size:2vh;opacity:.6">app.pianolouvorja.com.br</div>';
+  wrap.appendChild(info);
+  var c=document.getElementById('idleCenter');
+  if(c)c.appendChild(wrap);
+}
+function hideCloudPair(){var el=document.getElementById('cloudPair');if(el)el.remove()}
+// YouTube watch URLs are not playable by <video>. Each network receiver
+// loads the official embedded player and follows the operator commands.
+let connectionAudioMuted=audioLocked;
+const cleanMirror=PianoNetworkMirror.createReceiver({
+  send:sendEvent,
+  attach:function(stream){
+    const video=$('video');video.pause();video.removeAttribute('src');video.srcObject=stream;
+    video.style.display='block';video.style.objectFit='contain';
+    hideIdle();hideNp();playVideoWithFallback();
+  },
+  clear:function(){hideMuteBadge();const video=$('video');if(video.srcObject){video.pause();video.srcObject=null;video.style.display='none'}},
+  error:function(message){showIdle(message)},
+});
+let youtubePlayer=null,youtubeId=null,youtubePending=null,youtubeReady=false,youtubeCaptionsHidden=false;
+let youtubeCaptionTrack=null,youtubeApplyingCaptions=false;
+function stopYoutube(){
+  if(youtubeId)hideMuteBadge();
+  youtubeId=null;youtubePending=null;youtubeReady=false;youtubeCaptionTrack=null;
+  if(youtubePlayer){try{youtubePlayer.destroy()}catch(e){}youtubePlayer=null}
+  const view=document.getElementById('youtubeProjection');if(view)view.remove();
+}
+function applyYoutubeCaptions(){
+  if(!youtubeReady||!youtubePlayer||youtubeApplyingCaptions)return;
+  youtubeApplyingCaptions=true;
+  try{
+    if(youtubeCaptionsHidden){
+      const track=youtubePlayer.getOption?.('captions','track');
+      if(track&&track.languageCode)youtubeCaptionTrack=track;
+      // Embedded players do not consistently expose unloadModule. Clear the
+      // selected track as well, including when captions load after onReady.
+      youtubePlayer.setOption?.('captions','track',{});
+      youtubePlayer.unloadModule?.('captions');
+    }else{
+      youtubePlayer.loadModule?.('captions');
+      if(youtubeCaptionTrack)youtubePlayer.setOption?.('captions','track',youtubeCaptionTrack);
+    }
+  }catch(e){}finally{youtubeApplyingCaptions=false}
+}
+function applyYoutubeCommand(){
+  if(!youtubeReady||!youtubePlayer||!youtubePending)return;
+  const m=youtubePending;
+  if(typeof m.positionMs==='number'||m.action==='seek'){
+    youtubePlayer.seekTo(typeof m.positionMs==='number'?m.positionMs/1000:Number(m.position)||0,true);
+  }
+  if(m.action==='pause')youtubePlayer.pauseVideo();
+  else youtubePlayer.playVideo();
+  youtubePending={action:m.action==='pause'?'pause':'play'};
+}
+function mountYoutube(){
+  if(!youtubeId||youtubePlayer||!window.YT||!window.YT.Player)return;
+  const expected=youtubeId;
+  const view=document.createElement('div');view.id='youtubeProjection';
+  view.style.cssText='position:fixed;inset:0;z-index:100;background:#000';
+  const target=document.createElement('div');view.appendChild(target);
+  const veil=document.createElement('div');veil.id='youtubeVeil';view.appendChild(veil);document.body.appendChild(view);
+  youtubePlayer=new YT.Player(target,{width:'100%',height:'100%',videoId:expected,
+    playerVars:{autoplay:1,controls:0,playsinline:1,rel:0,fs:0,iv_load_policy:3,disablekb:1,origin:location.origin},
+    events:{onReady:function(event){
+      if(youtubeId!==expected)return;
+      youtubeReady=true;
+      // Silent autoplay is reliable on TV browsers; audio can be unlocked by
+      // the normal receiver interaction when the browser requires a gesture.
+      event.target.mute();applyYoutubeCaptions();applyYoutubeCommand();showMuteBadge();
+    },onApiChange:function(){
+      // Captions may load after onReady; only unload a module actually loaded.
+      if(youtubeCaptionsHidden||youtubeCaptionTrack)applyYoutubeCaptions();
+    },onStateChange:function(event){
+      if(event.data===1&&youtubeId===expected)veil.classList.add('is-hidden');
+      if(event.data===0){stopYoutube();showIdle(L10N.idle);sendEvent({v:2,type:'ended',media:'video'})}
+    },onError:function(){
+      stopYoutube();showIdle('YouTube: não foi possível reproduzir este vídeo incorporado.');
+    }}});
+}
+function handleYoutube(m){
+  if(m.action==='captions'){youtubeCaptionsHidden=m.captionsHidden===true;applyYoutubeCaptions();return}
+  if(m.action==='stop'){stopYoutube();showIdle(L10N.idle);return}
+  if(m.youtubeId&&/^[\w-]{11}$/.test(m.youtubeId)&&m.youtubeId!==youtubeId){
+    stopYoutube();youtubeId=m.youtubeId;
+  }
+  if(!youtubeId)return;
+  hideIdle();hideNp();
+  ['video','audio'].forEach(id=>{const media=$(id);media.pause();media.removeAttribute('src');media.load();media.style.display='none'});
+  if(m.youtubeId)youtubeCaptionsHidden=m.captionsHidden===true;
+  youtubePending=m.youtubeId?Object.assign({},m,{action:m.paused?'pause':'play'}):m;
+  if(window.YT&&YT.Player){mountYoutube();if(m.youtubeId)applyYoutubeCaptions();applyYoutubeCommand();return}
+  if(!document.getElementById('youtubeProjectionApi')){
+    const previous=window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady=function(){if(previous)previous();mountYoutube()};
+    const script=document.createElement('script');script.id='youtubeProjectionApi';script.src='https://www.youtube.com/iframe_api';
+    script.onerror=function(){stopYoutube();showIdle('YouTube: falha ao conectar ao player.')};document.head.appendChild(script);
+  }
 }
 function showIdle(msg){
+  document.documentElement.classList.remove('obs-music');
+  document.documentElement.classList.add('receiver-idle');
   $('idleMsg').textContent=msg;
   $('idle').classList.remove('hidden');
   // volta pro BG do palco (personalizado) — música "saiu de cena"
@@ -349,21 +3374,27 @@ function showIdle(msg){
   hideNp();
   {const t=$('timer'); if(t.style.display!=='none'){clearInterval(t._iv||0);
     t.style.display='none';}}
+  $('text').style.display='';
   $('text').textContent='';$('footer').textContent='';
   // F3.3ac: remove estilos de projeção (caixa/sombra) — senão a caixa
   // vazia continuava desenhada no idle após "Limpar projeção".
-  $('text').classList.remove('box-on','shadow-on','box-off','shadow-off','cover-on');
+  $('text').classList.remove('box-on','shadow-on','box-off','shadow-off','cover-on','bible-box');
   $('text').style.removeProperty('--box-bg');
   $('text').style.removeProperty('--box-border');
   $('text').style.removeProperty('--ts');
+  syncCastWaiting();
 }
-function hideIdle(){$('idle').classList.add('hidden')}
+function hideIdle(){document.documentElement.classList.remove('receiver-idle');$('idle').classList.add('hidden');syncCastWaiting()}
 // F3.3e: fallback de cover — sem capa ou capa quebrada = logo da org.
 // Cover relativo (images/... ou covers/...) resolve contra / do sender.
 function coverUrl(cover){
   if(!cover) return null;
-  if(cover.startsWith('http://')||cover.startsWith('https://'))return proxyUrl(cover);
-  return proxyUrl('http://'+(host||location.hostname)+':7080/'+cover.replace(/^\/+/,''));
+  if(/^https?:\/\//i.test(cover))return palcoMediaUrl(cover);
+  const path=encodeURI(String(cover).replace(/^\/+/, '')).split(/[?#]/)[0];
+  if(!path)return null;
+  const sender=lanSenderHost();
+  if(location.protocol==='file:'&&sender)return palcoMediaUrl('http://'+sender+':'+(Number(port)-1)+'/'+path);
+  return '/'+path;
 }
 function showNp(title,sub,cover){
   hideIdle();$('text').style.display='none';
@@ -386,7 +3417,7 @@ function hideNp(){
 }
 
 const a0=$('audio');
-a0.onended=()=>showIdle('Aguardando conteúdo…');
+a0.onended=()=>showIdle(L10N.idle);
 let pendingPlay=false;
 // F3.3h: autoplay-mudo — o browser bloqueia play() COM SOM sem gesto, mas
 // permite MUDO. Estratégia Chromecast-like: play com som falha → retry
@@ -395,13 +3426,13 @@ let pendingPlay=false;
 // no ponto certo). Badge discreto, não bloqueia a tela.
 let mutedUnlock=false;
 function showMuteBadge(){
-  if($('muteBadge'))return;
+  if(audioLocked||$('muteBadge'))return;
   const b=document.createElement('div');
   b.id='muteBadge';
   b.style.cssText='position:fixed;top:3vh;right:3vh;z-index:98;cursor:pointer;'+
     'background:rgba(0,0,0,.75);border-radius:3vh;padding:1.5vh 2.5vh;'+
     'font-size:2.4vh;color:#fff;display:flex;align-items:center;gap:1.2vh';
-  b.innerHTML='<span style="font-size:3vh">🔇</span> Toque para ativar o som';
+  b.innerHTML='<span style="font-size:3vh">🔇</span> '+L10N.tapUnmute;
   b.addEventListener('click',unmuteNow);
   document.body.appendChild(b);
 }
@@ -409,16 +3440,21 @@ function hideMuteBadge(){const b=$('muteBadge');if(b)b.remove()}
 function unmuteNow(){
   mutedUnlock=false;hideMuteBadge();
   a0.muted=false;
-  const vv=$('video'); if(vv){vv.muted=false; if(vv.paused&&vv.src)vv.play().catch(function(){})}
+  if(youtubePlayer&&youtubeReady){youtubePlayer.unMute();youtubePlayer.playVideo()}
+  const vv=$('video'); if(vv){vv.muted=connectionAudioMuted; if(vv.paused&&vv.src)vv.play().catch(function(){})}
   a0.play().then(()=>sendEvent({v:1,type:'unlocked'})).catch(()=>{});
   sendEvent({v:1,type:'unlocked'});
 }
 function playVideoWithFallback(){
   const v=$('video');
-  v.muted=false;
+  v.muted=connectionAudioMuted;
   v.play().then(()=>{
-    dlog('VID PLAY OK (som)');
+    dlog('VID PLAY OK (som)');mutedUnlock=false;hideMuteBadge();
   }).catch(e=>{
+    // A replaced stream / concurrent play can abort a pending play promise.
+    // This is not an autoplay denial and must never mute a live connection.
+    if(e.name==='AbortError')return;
+    if(e.name!=='NotAllowedError'){dlog('VID PLAY FAIL: '+e.name);return}
     dlog('VID PLAY FAIL som: '+e.name+' — retry mudo');
     v.muted=true;
     v.play().then(()=>{
@@ -483,10 +3519,10 @@ function openIpEntry(){
   ipEntry.style.cssText='position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.85);'+
     'display:flex;align-items:center;justify-content:center';
   ipEntry.innerHTML='<div style="text-align:center">'+
-    '<p style="font-size:2.6vh;opacity:.7;margin:0 0 2vh 0">Digite o IP — ou SÓ A PORTA (ex.: 7081) para achar o LouvorJA na rede</p>'+
+    '<p style="font-size:2.6vh;opacity:.7;margin:0 0 2vh 0">'+L10N.ipHint+'</p>'+
     '<p id="ipVal" style="font-size:6vh;font-weight:700;letter-spacing:.5vh;margin:0;'+
     'min-height:7vh;border-bottom:.3vh solid #FCCE02;padding:0 4vh"></p>'+
-    '<p style="font-size:1.8vh;opacity:.5;margin:2vh 0 0 0">OK conectar · vermelha cancelar · backspace apaga</p></div>';
+    '<p style="font-size:1.8vh;opacity:.5;margin:2vh 0 0 0">'+L10N.ipHelp+'</p></div>';
   document.body.appendChild(ipEntry);
   ipEntry._val='';
   renderIp();
@@ -495,14 +3531,31 @@ function renderIp(){var el=document.getElementById('ipVal');if(el)el.textContent
 function closeIpEntry(){if(ipEntry){ipEntry.remove();ipEntry=null}}
 function submitIp(){
   var v=(ipEntry&&ipEntry._val)||'';
-  if(!v)return;
+  // WT-5 (fluxo streaming): OK com campo VAZIO = TV CRIA a sessão e vira
+  // receiver esperando o operador conectar (padrão YouTube/Netflix — o
+  // dispositivo grande mostra o código, o operador informa no web).
+  if(!v){
+    tries=0;closeIpEntry();
+    try{if(ws)ws.close()}catch(e){}
+    cloudCreate();
+    return;
+  }
+  // WT-5d: 6 alfanuméricos SEM ponto e SEM só-dígitos-curto = CÓDIGO CLOUD.
+  // A TV conecta no relay WS da API (role=receiver) em vez do IP do desktop —
+  // mesmo protocolo do receiver browser cloud (browser/index.html).
+  if(/^[A-Za-z0-9]{6}$/.test(v)){
+    tries=0;closeIpEntry();
+    try{if(ws)ws.close()}catch(e){}
+    cloudConnect(v.toUpperCase());
+    return;
+  }
   // Só dígitos (2-5) = PORTA: o sender é achado por scan com essa porta
   // (usuário não decora IP; nova TV na rede de igreja conecta fácil).
   if(/^\d{2,5}$/.test(v)&&!/\./.test(v)){
     port=v;localStorage.setItem('palcoPort',port);tries=0;closeIpEntry();
     try{if(ws)ws.close()}catch(e){}
     host='';localStorage.removeItem('palcoHost');
-    setStatus('procurando LouvorJA na porta '+port+'…');
+    setStatus(L10N.portSearch.replace('{p}',port));
     scanSubnet();
     return;
   }
@@ -532,6 +3585,9 @@ window.addEventListener('keydown',function(e){
       if(ipEntry._val.length<15){ipEntry._val+=String(k-96);renderIp()}}
     else if(k===46||k===190||k===110){                      // ponto
       if(ipEntry._val.length<15){ipEntry._val+='.';renderIp()}}
+    // WT-5d: letras A-Z — código cloud é 6 alfanuméricos. keyCode 65-90.
+    else if(k>=65&&k<=90){
+      if(ipEntry._val.length<15){ipEntry._val+=String.fromCharCode(k);renderIp()}}
     else if(k===403||k===27){closeIpEntry()}                // vermelha/ESC
     return;
   }
@@ -551,7 +3607,7 @@ window.addEventListener('keydown',function(e){
     {const a=$('audio');a.pause();a.removeAttribute('src');a.load();}
     {const v=$('video');v.pause();v.removeAttribute('src');v.style.display='none';v.load();}
     hideNp();
-    showIdle('Aguardando conteúdo…');
+    showIdle(L10N.idle);
     return;
   }
   // tecla vermelha (403) no idle abre entrada de IP
@@ -563,8 +3619,140 @@ document.addEventListener('pointerdown',function(){if(mutedUnlock||pendingPlay)u
 
 function isAudioUrl(u){return /\.(mp3|m4a|aac|wav|ogg|flac)(\?|$)/i.test(u||'')}
 
+// OBS share uses two isolated receiver viewports; only the parent opens WS.
+const obsShareState={enabled:false,frames:[],ready:[],messages:[new Map(),new Map()],active:[false,false]};
+function obsShareLayout(){
+  const state=obsShareState;
+  state.frames.forEach((frame,index)=>{
+    const both=state.active[0]&&state.active[1];
+    frame.style.display=state.active[index]?'block':'none';
+    frame.style.width=both?'50%':'100%';
+    frame.style.left=both&&index===1?'50%':'0';
+  });
+  syncCastWaiting();
+}
+function obsShareRemember(m,index){
+  const messages=obsShareState.messages[index];
+  if(m.type==='idle'||m.type==='stop-all'){['projection','timer','clock','video','audio','audio-sync','video-sync'].forEach(type=>messages.delete(type));}
+  messages.set(m.type,{...m,obsPane:false});
+  if(['projection','timer','clock','video','audio'].includes(m.type))obsShareState.active[index]=true;
+  if(m.type==='idle'||m.type==='stop-all')obsShareState.active[index]=false;
+}
+function obsShareSend(m,index){
+  if(obsShareState.ready[index])obsShareState.frames[index].contentWindow.handle({...m,obsPane:false});
+}
+function obsShareEnable(enabled){
+  const state=obsShareState;
+  if(state.enabled===enabled)return;
+  state.enabled=enabled;
+  if(!enabled){
+    const wrap=document.getElementById('obsShareView');if(wrap)wrap.remove();
+    state.frames=[];state.ready=[];state.messages[1].clear();state.active[1]=false;
+    for(const message of state.messages[0].values())handle(message);
+    syncCastWaiting();
+    return;
+  }
+  ['video','audio'].forEach(id=>{try{$(id).pause()}catch(e){}});
+  const wrap=document.createElement('div');wrap.id='obsShareView';
+  wrap.style.cssText='position:fixed;inset:0;background:#000;z-index:100000';
+  document.body.appendChild(wrap);
+  [0,1].forEach(index=>{
+    const frame=document.createElement('iframe');
+    const url=new URL(location.href);url.searchParams.set('obsPane','1');
+    frame.style.cssText='position:absolute;top:0;height:100%;border:0;background:#000';
+    frame.onload=()=>{
+      if(!state.enabled||state.frames[index]!==frame)return;
+      state.ready[index]=true;
+      for(const message of state.messages[index].values())obsShareSend(message,index);
+    };
+    state.frames[index]=frame;frame.src=url.href;wrap.appendChild(frame);
+  });
+  obsShareLayout();
+}
+
+let obsWarmupTimeout;
+function clearObsWarmup(){
+  clearTimeout(obsWarmupTimeout);
+  const view=document.getElementById('obsWarmupView');if(view)view.remove();
+}
+function showObsWarmup(message){
+  clearObsWarmup();
+  if(message.expiresAt && Number(message.expiresAt)<=Date.now())return;
+  const remaining=message.durationMs===3000?3000:Math.min(3000,Number(message.until)-Date.now());
+  if(!Number.isFinite(remaining)||remaining<=0)return;
+  const view=document.createElement('div');view.id='obsWarmupView';
+  const logo=document.createElement('div');logo.className='warmup-logo';
+  const image=document.createElement('img');image.src='logo-piano-louvorja.png';image.alt='Logo Piano Louvor JA';
+  const caption=document.createElement('p');caption.className='warmup-caption';
+  caption.appendChild(document.createTextNode('PALCO PIANO'));caption.appendChild(document.createElement('br'));
+  caption.appendChild(document.createTextNode('LOUVOR JA'));
+  logo.appendChild(image);logo.appendChild(caption);
+  view.appendChild(logo);document.body.appendChild(view);
+  sendEvent({v:2,type:'obs-warmup-started',requestId:message.requestId});
+  obsWarmupTimeout=setTimeout(()=>{clearObsWarmup();sendEvent({v:2,type:'obs-warmup-complete',requestId:message.requestId})},remaining);
+}
+// Zoom do quadro (imagem/PDF/PPT) igual ao do operador: escala + deslocamento
+// em fração da tela, animado para não andar em "degraus".
+function applyFrameView(view,anim){
+  const bgEl=$('bg');if(!bgEl)return;
+  const z=view&&Number(view.zoom)>1?Math.min(5,Number(view.zoom)):1;
+  const x=view&&Number.isFinite(Number(view.x))?Number(view.x):0;
+  const y=view&&Number.isFinite(Number(view.y))?Number(view.y):0;
+  const ms=Math.max(0,Math.min(400,Number(anim)||0));
+  bgEl.style.transition=ms?'transform '+ms+'ms cubic-bezier(0.2,0.7,0.3,1),opacity .8s':'';
+  bgEl.style.transform=z===1&&!x&&!y?'':'translate('+(x*100)+'%,'+(y*100)+'%) scale('+z+')';
+}
 function handle(m){
   if(m.v!==1&&m.v!==2)return;
+  if(m.type==='frameView'){if($('bg').classList.contains('frame-slide'))applyFrameView(m.view,m.view&&m.view.anim);return;}
+  // outro conteúdo no fundo: o zoom do quadro anterior não vale para ele
+  if(m.type==='video'||m.type==='audio'||m.type==='idle'||m.type==='bgPalco'||m.type==='stop-all')applyFrameView(null,0);
+  // Tela de espera sem logo (opção do transmissor, reenviada ao conectar).
+  if(m.type==='idleStyle'){document.documentElement.classList.toggle('idle-no-logo',m.hideLogo===true);return;}
+  if(m.type==='stageReturn'){applyStageReturn(m);return;}
+  if(audioLocked&&m.type==='audio')return;
+  if(m.type==='audioOutput'){
+    connectionAudioMuted=audioLocked||m.mode==='player';
+    $('video').muted=connectionAudioMuted;$('audio').muted=connectionAudioMuted;
+    if(connectionAudioMuted)hideMuteBadge();
+    else if($('video').srcObject)playVideoWithFallback();
+    return;
+  }
+  if(m.type==='video'&&typeof m.connectionsMuted==='boolean')connectionAudioMuted=audioLocked||m.connectionsMuted;
+  if(m.type==='obsWarmup'){showObsWarmup(m);return;}
+  if(m.type==='obsControl'){
+    if(m.action==='reload'){try{sessionStorage.setItem('palcoRefreshRequest',String(m.requestId||''))}catch(e){}location.reload();return;}
+    if(m.action==='stop'){
+      clearObsWarmup();
+      stopYoutube();cleanMirror.stop();
+      obsShareState.enabled=false;
+      const shared=document.getElementById('obsShareView');if(shared)shared.remove();
+      obsShareState.frames=[];obsShareState.ready=[];
+      obsShareState.messages.forEach(messages=>messages.clear());obsShareState.active=[false,false];
+      ['video','audio'].forEach(id=>{const media=$(id);try{media.pause();media.removeAttribute('src');media.load()}catch(e){}media.style.display='none'});
+      showIdle('');
+      const previous=document.getElementById('obsStoppedView');if(previous)previous.remove();
+      const blank=document.createElement('div');blank.id='obsStoppedView';
+      blank.style.cssText='position:fixed;inset:0;background:#000;z-index:100001';document.body.appendChild(blank);
+    }
+    return;
+  }
+  if(['projection','timer','clock','video','audio'].includes(m.type)){
+    const stopped=document.getElementById('obsStoppedView');if(stopped)stopped.remove();
+  }
+  if(qs.get('obsPane')!=='1'){
+    if(m.type==='obsShare'){obsShareEnable(m.enabled===true);return;}
+    const index=m.obsPane===true?1:0;
+    if(m.type==='obsIdle'||m.type==='bgPalco'){
+      obsShareRemember(m,0);obsShareRemember(m,1);
+      if(obsShareState.enabled){obsShareSend(m,0);obsShareSend(m,1);return;}
+    }else{
+      obsShareRemember(m,index);
+      if(obsShareState.enabled){obsShareSend(m,index);obsShareLayout();return;}
+      if(index===1)return;
+    }
+  }
+  if(m.type==='timer'||m.type==='clock')document.documentElement.classList.remove('obs-music');
   // HARDENING culto: mídia externa (vídeo/pdf/ppt/áudio da liturgia) viva
   // tem prioridade absoluta no slot. Mensagens de texto/projection não podem
   // renderizar por cima (cross-bleed owner — caso real 28/08: random sobre
@@ -575,7 +3763,7 @@ function handle(m){
     // Sem sinal novo, o lock expira (sender morto/stuck não trava o culto).
     const fresh=(Date.now()-(window.__mediaLastSeen||0))<25000;
     const _v=$('video'),_a=$('audio');
-    const mediaActive=(_v&&!_v.paused&&_v.style.display!=='none')||(_a&&!_a.paused)||window.__videoAudioActive;
+    const mediaActive=cleanMirror.active()||youtubeReady||(_v&&!_v.paused&&_v.style.display!=='none')||(_a&&!_a.paused)||window.__videoAudioActive;
     if(mediaActive&&fresh&&!window.__mediaLock){
       try{dlog('BLOCKED',m.type,'— mídia externa ativa')}catch(e){}
       return;
@@ -589,60 +3777,233 @@ function handle(m){
     if(window.__videoAudioActive){window.__videoAudioActive=false}
     try{const _v2=$('video'),_a2=$('audio');_v2.pause();_v2.removeAttribute('src');_v2.load();_a2.pause()}catch(e){}
   }
+  if(m.type==='mirror-signal'){
+    cleanMirror.handle(m).catch(function(){showIdle('Não foi possível conectar a transmissão do player.')});return;
+  }
+  if(m.type==='video'&&m.cleanMirror&&typeof m.mirrorSession==='string'){
+    stopYoutube();hideIdle();hideNp();
+    const audio=$('audio');audio.pause();
+    cleanMirror.start(m.mirrorSession);return;
+  }
+  if(cleanMirror.active()){
+    if(m.type==='audio'&&!m.url)return;
+    if(m.type==='video'&&!m.url&&!m.youtubeId){
+      if(m.action==='stop'){cleanMirror.stop();showIdle(L10N.idle)}
+      return;
+    }
+    if(['video','audio','projection','timer','clock','idle','bgPalco','stop-all'].includes(m.type))cleanMirror.stop();
+  }
+  // The operator sends duplicate transport actions on audio and video.
+  if(youtubeId&&m.type==='audio'&&!m.url)return;
+  if(youtubeId&&['projection','timer','clock','audio','idle','bgPalco','stop-all'].includes(m.type))stopYoutube();
   switch(m.type){
     case 'projection':
+      document.documentElement.classList.toggle('obs-music',m.scope==='media'||m.scope==='hymns');
       hideIdle();
+      hideCloudPair();
       hideNp();
-      {const t=$('timer'); if(t.style.display!=='none'){clearInterval(t._iv||0);
-        t.style.display='none';$('text').style.display='';}}
+      {const t=$('timer');clearInterval(t._iv||0);t.style.display='none';$('text').style.display='';}
       const bgEl=$('bg');
-      bgEl.onerror=()=>{bgEl.onerror=null;bgEl.src='bg-fallback.png'};
-      if(m.background){bgEl.src=proxyUrl(m.background)}
+      bgEl.onerror=()=>{bgEl.onerror=()=>{bgEl.onerror=null;bgEl.removeAttribute('src')};bgEl.src='bg-fallback.png'};
+      // Frame de slide (data:image/ do pump PDF/PPT/imagens): imagem é o
+      // CONTEÚDO, não bg decorativo — sem brightness(.55) nem véu (paridade
+      // com a tela do operador). 13/10 Rafael: tonalidade lavada no palco.
+      const isFrameSlide=m.frameSlide===true||(typeof m.background==='string'&&m.background.startsWith('data:image/'));
+      bgEl.classList.toggle('frame-slide',isFrameSlide);
+      bgEl.onerror=isFrameSlide?null:bgEl.onerror;
+      // quadro novo chega já com o zoom do operador (ou sem zoom)
+      applyFrameView(isFrameSlide?m.view:null,0);
+      // Cor explícita é a personalização ativa do Palco: vence capa/bg do
+      // runtime também. Antes só valia sem `m.background`, então música com
+      // capa escondia a alteração feita nas configurações (14/10).
+      if(m.backgroundColor){bgEl.removeAttribute('src');document.body.style.background=m.backgroundColor}
+      else if(m.background){bgEl.src=palcoMediaUrl(m.background);bgEl.style.opacity='';document.body.style.background=''}
       // Sem bg na mensagem: usa o BG configurado no app (bgPalco — enviado
-      // ao ligar o palco). Só se NÃO houver bg configurado cai no fallback
-      // fixo. Vale pra qualquer módulo (26/08 Rafael).
-      else if(bgPalco){bgEl.src=proxyUrl(bgPalco)}
+      // ao ligar o palco). Só se NÃO houver bg configurado cai no fallback.
+      else if(bgPalco){bgEl.src=proxyUrl(bgPalco);bgEl.style.opacity='';document.body.style.background=''}
       else{bgEl.src='bg-fallback.png'}
       // Slide/PDF/PPT (text vazio) é mídia visual pura: sem véu de leitura,
       // preserva a tonalidade original do canvas do operador.
       $('veil').style.display=m.text?'':'none';
-      $('text').innerHTML=m.text||'';
+      const compactLyrics=(m.scope==='hymns'||m.scope==='media')&&m.isCover!==true;
+      const displayText=compactLyrics?String(m.text||'').replace(/(?:<br\s*\/?>|\r?\n)(?:[\t ]*(?:<br\s*\/?>|\r?\n))*/gi,'<br>'):m.text;
+      renderProjectionText($('text'),displayText);
+      $('text').classList.toggle('music-lyrics',(m.scope==='hymns'||m.scope==='media')&&m.isCover!==true);
       $('text').classList.toggle('cover-on',m.isCover===true);
+      $('text').classList.toggle('title-box-on',m.titleTextBox===true);
       // F3.3o: fontSize/fontWeight dinâmicos (settings do operador).
+      // Estrofes (lyric*) vencem quando presentes; capa (isCover) mantém o
+      // tamanho do título.
       {const t=$('text');
-        if(typeof m.fontSize==='number')
-          t.style.fontSize=(m.fontSize/10.8)+'vw'; // px@1080p -> vw (LARGURA): paridade com cqw do cabo
-        if(typeof m.fontWeight==='number')
-          t.style.fontWeight=m.fontWeight;
+        // Estrofes (lyric*) vencem fora da capa; a capa mantém o estilo geral.
+        const useLyric=m.isCover!==true;
+        const fs=useLyric&&typeof m.lyricFontSize==='number'?m.lyricFontSize:m.fontSize;
+        const fw=useLyric&&typeof m.lyricFontWeight==='number'?m.lyricFontWeight:m.fontWeight;
+        // fontSize chega px@1080 (sender converte px@1920→1080). Paridade
+        // com web (cqw = px@1920/19.2vw): voltar a px@1920 (*16/9) → /19.2.
+        if(typeof fs==='number')t.style.setProperty('--fit-size',(m.fontRef===1920?fs/19.2:fs*16/9/19.2)+'vw'); /* fontRef:1920 = apk manda px@1920 */
+        if(typeof fw==='number')t.style.fontWeight=fw;
+        if(m.isCover===true){
+          if(m.titleTextColor){const titleColor=projectionColor(m.titleTextColor);if(titleColor)t.style.color=titleColor}else t.style.removeProperty('color');
+          t.querySelectorAll('span[style*="color"]').forEach(function(sp){sp.style.removeProperty('color')});
+        } else {
+          const rawColor=useLyric&&typeof m.lyricTextColor==='string'&&m.lyricTextColor?m.lyricTextColor:m.textColor;
+          if(rawColor){var nextText=projectionColor(rawColor);if(nextText)t.style.color=nextText}
+        }
+        // Auto-fit: reduz a fonte até o texto caber na altura útil (76vh) —
+        // mesma passagem de linhas do popup (frase em 2 linhas lá, 2 aqui).
+        t.style.transform='translate(-50%,-50%)';
+        // WT-5f bíblia: alinhamentos do palco (paridade popup). Só o operador
+        // manda; sem os campos, mantém o centro padrão (C4).
+        // #text é display:table (shrink-to-fit): text-align NÃO tem efeito
+        // visual na caixa — o alinhamento é feito REPOSICIONANDO a caixa.
+        (function(){
+          var h=m.textAlign||'center', v=m.textVerticalAlign||'middle';
+          var pad=(typeof m.padding==='number')?m.padding:120;
+          // Paridade popup: a CAIXA fica centralizada com largura total (o
+          // popup usa width:100% max-width) e só o TEXTO dentro alinha.
+          // reset sempre (mensagem nova pode trocar o alinhamento)
+          t.style.left='50%'; t.style.right='auto';
+          t.style.top='50%'; t.style.bottom='auto';
+          // Paridade popup: stage tem padding 6vmin de cada lado.
+          // 92vw era ~22px menor em 1920 e mudava a quebra (TV=4, popup=3).
+          t.style.maxWidth='calc(100vw - 12vmin)';
+          t.style.width='calc(100vw - 12vmin)';
+          t.style.textAlign=h;
+          // Bíblia no popup: line-height 1.45 e sem letter-spacing. O CSS
+          // base do receiver (.03em/1.25) fazia a mesma passagem quebrar
+          // diferente. Só aplica quando há referência bíblica.
+          if(m.footerRef){t.style.lineHeight='1.45';t.style.letterSpacing='0'}
+          else{t.style.lineHeight='';t.style.letterSpacing=''}
+          // WT-5f: capitalização do versículo (paridade popup)
+          if(m.textTransform){t.style.textTransform=m.textTransform}
+          else{t.style.textTransform='none'}
+          var padV=(pad/10.8)+'vh';
+          // Rodapé (referência) fica em bottom:4vh (~7vh de altura): o texto
+          // NUNCA pode descer até ele — quando vAlign=bottom, para ACIMA.
+          var minBottom=12;
+          if(v==='bottom'){t.style.top='auto'; t.style.bottom=(Math.max(pad/10.8,minBottom))+'vh'; t.style.transform='translate(-50%,0)'}
+          else if(v==='top'){t.style.top=padV; t.style.transform='translate(-50%,0)'}
+          else{t.style.transform='translate(-50%,-50%)'}
+        })();
+        if(m.footerRef) requestAnimationFrame(function(){
+          // WT-5f paridade popup: auto-fit mede scrollHeight vs área útil
+          // (86% do palco) e reduz até caber — MESMO algoritmo do popup
+          // (applyFit/fitScale), não só altura total em 76vh.
+          var base=parseFloat(getComputedStyle(t).fontSize)||1;
+          var maxH=innerHeight*0.86;
+          var fit=base, i=0;
+          while(i<30 && (t.scrollHeight>maxH) && fit>10){
+            fit*=0.94; t.style.fontSize=fit+'px'; i++;
+          }
+          // WT-5f paridade popup: a referência fica ANCORADA na caixinha do
+          // texto (abaixo dela, mesmo alinhamento horizontal), não no rodapé
+          // da tela. Gap 1.4vmin como no popup.
+          var f=$('footer');
+          if(f && m.footerRef && m.textVerticalAlign && footerPosition(m)!=='corner'){
+            var r=t.getBoundingClientRect();
+            var gap=Math.round(innerHeight*0.014);
+            f.style.left=r.left+'px';
+            f.style.right='auto';
+            f.style.width=r.width+'px';
+            f.style.top=Math.min(r.bottom+gap, innerHeight-f.offsetHeight-8)+'px';
+            f.style.bottom='auto';
+          }
+        });
+        if(!m.footerRef){
+          t.style.fontSize='';
+          if(typeof fs==='number')t.style.setProperty('--fit-size',(m.fontRef===1920?fs/19.2:fs*16/9/19.2)+'vw'); /* fontRef:1920 = apk manda px@1920 */
+          if(m.isCover===true){if(m.titleTextColor){const titleColor=projectionColor(m.titleTextColor);if(titleColor)t.style.color=titleColor}else t.style.removeProperty('color');t.querySelectorAll('span[style*="color"]').forEach(function(sp){sp.style.removeProperty('color')})}
+        }
       }
-      // F3.3m: estilos da letra — sombra (intensidade) + caixinha (borda)
+      // Paridade total: personalizações do app aplicadas na TV.
+
+      // lUpper (13/10): uppercase da letra é ESCOLHA do usuário, não hardcode.
+
       {const t=$('text');
-        t.classList.remove('shadow-on','shadow-off','box-on','box-off');
+
+        t.style.textTransform=(m.isCover===true
+
+          ?m.titleUpperCase===true
+
+          :m.lyricUpperCase===true)?'uppercase':(m.textTransform||'none');
+
+      }
+
+      // Alinhamentos verticais/horizontais: o IIFE acima (paridade popup)
+      // já aplica textAlign/textVerticalAlign com o transform completo —
+      // NÃO duplicar aqui: bloco duplicado setava transform sem o -50% X e
+      // empurrava a caixa pra direita da TV (bug 14/10).
+      // Margem (paridade StagePreview: margin px@1920 → max-width menor):
+      {const t=$('text');
+        // px@1920 → vw (120px → 12.5vw); sem margin mantém o respiro base.
+        t.style.maxWidth='calc(100vw - '+((typeof m.margin==='number'?m.margin:120)/9.6)+'vw)';
+        t.style.margin='0 auto';
+        t.style.width='';
+      }
+      // Cor de fundo escolhida: pinta o PALCO (body), paridade local —
+      // imagem de bg continua vencendo quando existe (else-if acima).
+      {document.body.style.background=(typeof m.backgroundColor==='string'&&m.backgroundColor)?m.backgroundColor:''}
+
+      // F3.3m: estilos da letra — sombra (intensidade) + caixinha (borda)
+
+      {const t=$('text');
+
+        t.classList.remove('shadow-on','shadow-off','box-on','box-off','bible-box');
+
         if(m.textShadow===false){t.classList.add('shadow-off')}
         else{t.classList.add('shadow-on');
           if(typeof m.shadowBlur==='number')
             t.style.setProperty('--ts',`0 ${Math.max(1,m.shadowBlur/3)}vh ${m.shadowBlur}vh rgba(0,0,0,${m.shadowIntensity!=null?m.shadowIntensity:0.8})`)}
-        if(m.textBox){t.classList.add('box-on');
+        if(m.isCover===true?m.titleTextBox===true:m.textBox){t.classList.add('box-on');
+          t.classList.toggle('bible-box',m.bibleBox===true);
           if(typeof m.boxOpacity==='number')t.style.setProperty('--box-bg',m.boxOpacity);
           t.style.setProperty('--box-border',
-            m.boxBorder?`${m.boxBorder.width||0.4}vh solid ${m.boxBorder.color||'rgba(255,255,255,.25)'}`:'none')}
+            m.boxBorder?`${m.boxBorder.width||0.2}vmin solid ${m.boxBorder.color||'rgba(255,255,255,.85)'}`:'none')}
         else{t.classList.add('box-off')}
       }
       // F3.3m: footer com referência destacada + versão
       {const f=$('footer');
+        const pos=footerPosition(m);
+        // WT-5f: footer segue o alinhamento do palco (paridade popup — a
+        // referência fica dentro do conteúdo lá, alinhada com o texto).
+        // padding 4vw = mesma borda da caixa de texto (92vw centrada).
+        // Posição escolhida no Personalizar Palco vence; sem ela (APK), segue o texto.
+        const align=pos==='corner'?'right':pos?pos.slice(6):m.textAlign;
+        if(align){f.style.textAlign=align;f.style.padding='0 4vw';f.style.boxSizing='border-box'}
+        else{f.style.textAlign='center';f.style.padding='0'}
+        // Default: rodapé da tela (8vh p/ sair da área do texto). O rAF do
+        // auto-fit reposiciona PERTO da caixinha quando há footerRef (abaixo).
+        f.style.left='0'; f.style.right='0'; f.style.width='auto';
+        f.style.top='auto';
+        f.style.bottom=(m.footerRef&&pos!=='corner'?'8vh':'4vh');
         if(m.footerRef){
-          f.innerHTML=`<span class="ref" style="--ref-color:${m.footerColor||'#FCCE02'};--ref-weight:${m.footerWeight||600}">${m.footerRef}</span>`+
-            (m.footerVersion?`<span class="ver">${m.footerVersion}</span>`:'');
+          f.textContent='';
+          const ref=document.createElement('span');ref.className='ref';ref.textContent=String(m.footerRef);
+          const color=document.createElement('span');color.style.color=String(m.footerColor||'#FCCE02');
+          ref.style.setProperty('--ref-color',color.style.color||'#FCCE02');
+          const weight=Number(m.footerWeight);
+          ref.style.setProperty('--ref-weight',String(Number.isFinite(weight)&&weight>=100&&weight<=900?weight:600));
+          const size=Number(m.footerSize);
+          ref.style.fontSize=Number.isFinite(size)&&size>0?(Math.round(size/10.8*1000)/1000)+'vw':'';
+          ref.style.textTransform=['none','uppercase','capitalize'].includes(m.footerTransform)?m.footerTransform:'none';
+          f.appendChild(ref);
+          if(m.footerVersion){const version=document.createElement('span');version.className='ver';version.textContent=String(m.footerVersion);f.appendChild(version)}
         }else{
           f.textContent=m.footer||'';
         }
       }
+      // Label de versão some durante projection com referência (colidia no
+      // canto inferior direito — print 02/09 Rafael).
+      {const iv=$('idleVer');if(iv)iv.style.display=m.footerRef?'none':''}
+      bibleEnter(m);
       break;
     case 'bgPalco':
       // BG permanente do palco (idle) — personalização, não da música
       bgPalco=m.url||'';
+      $('bgPalco').onerror=()=>{$('bgPalco').removeAttribute('src')};
       if(bgPalco){
-        $('bgPalco').src=proxyUrl(bgPalco);
+        $('bgPalco').src=palcoMediaUrl(bgPalco);
       }else{
         $('bgPalco').removeAttribute('src');
       }
@@ -652,28 +4013,32 @@ function handle(m){
       if(m.url){
         // F3.3-sync: só recarrega o src se a URL MUDOU — reenvio da mesma
         // faixa com action:play não pode reiniciar o áudio (loop 3s).
-        const next=proxyUrl(m.url);
+        const next=palcoMediaUrl(m.url);
         if(a.src!==next){
           a.src=next;
           if(typeof m.positionMs==='number'&&m.positionMs>0){
             const apply=()=>{try{a.currentTime=m.positionMs/1000}catch(e){}};
             if(a.readyState>=1)apply();else a.addEventListener('loadedmetadata',apply,{once:true});
           }
-          a.onended=()=>{hideNp();showIdle('Aguardando conteúdo…')};
+          a.onended=()=>{hideNp();showIdle(L10N.idle)};
           // Áudio "desconhecido" (sem metadados): now-playing padrão do
           // Palco — sem nome de arquivo, com a animação eq indicando que
           // há algo tocando. Mesmo visual do "só áudio" do app.
           if(m.title){
             showNp(m.title, m.subtitle||'', m.cover||'');
           }else{
-            showNp('Reproduzindo áudio', m.subtitle||'', m.cover||'');
+            showNp(L10N.audio, m.subtitle||'', m.cover||'');
           }
-          $('bg').src=m.background?proxyUrl(m.background):'bg-fallback.png';
+          // BG de áudio: cor explícita do Palco vence capa/fallback (paridade
+          // projection, 14/10) — não re-seta o src se a personalização pintou.
+          if(!m.backgroundColor)
+            $('bg').src=m.background?palcoMediaUrl(m.background):'bg-fallback.png';
         }
       }
       // BG garantido em TODA mensagem de áudio (load, play, pause, seek):
       // sem isso, mensagens action-only podiam deixar tela preta.
-      if(!m.background){
+      // Cor explícita = personalização ativa: não força fallback (14/10).
+      if(!m.background&&!m.backgroundColor){
         const cur=$('bg');
         if(!cur.src||cur.src.endsWith('/'))cur.src='bg-fallback.png';
       }
@@ -681,12 +4046,12 @@ function handle(m){
         // Now-playing tardio APENAS se não há projeção ativa na TV.
         // Hino da liturgia = projection (letra) + audio juntos: o np não
         // pode cobrir a letra projetada (caso real: hino mostrava
-        // 'Reproduzindo áudio' em vez da letra).
+        // L10N.audio em vez da letra).
         const np=$('np');
         const textEl=$('text');
         const hasProjection=textEl&&textEl.innerHTML&&textEl.innerHTML.trim()!==''&&np.style.display==='none';
         if(np.style.display==='none'&&!hasProjection){
-          showNp(m.title||'Reproduzindo áudio', m.subtitle||'', m.cover||'');
+          showNp(m.title||L10N.audio, m.subtitle||'', m.cover||'');
           if(!m.background)$('bg').src='bg-fallback.png';
         }
         if(a.paused){dlog('PLAY src='+(a.src||'').slice(0,60));playWithFallback()}
@@ -695,7 +4060,7 @@ function handle(m){
       if(m.action==='pause'&&!a.paused)a.pause();
       if(m.action==='stop'){
         if(!window.__videoAudioActive){
-          a.pause();a.currentTime=0;showIdle('Aguardando conteúdo…')}}
+          a.pause();a.currentTime=0;showIdle(L10N.idle)}}
       if(m.action==='seek'){
         const target=(m.position||m.positionMs/1000||0);
         // só corrige se o desvio for perceptível — micro-sync causa stutter
@@ -706,6 +4071,8 @@ function handle(m){
       }
       break}
     case 'video':{
+      if(m.youtubeId||(youtubeId&&!m.url)){handleYoutube(m);break}
+      if(youtubeId)stopYoutube();
       const v=$('video');
       // MP3/áudio puro no canal video (popup liturgia manda dual): redireciona
       // pro fluxo de áudio — now-playing + EQ + bg (tela preta NUNCA).
@@ -713,12 +4080,12 @@ function handle(m){
         // Vídeo anterior pode estar fullscreen (z-index alto) e esconder o
         // now-playing. MP3 é áudio: mata a camada de vídeo antes do cartão.
         v.pause();v.removeAttribute('src');v.style.display='none';v.load();
-        const av=$('audio');const next=proxyUrl(m.url);
+        const av=$('audio');const next=palcoMediaUrl(m.url);
         window.__videoAudioActive=true;
         if(av.src!==next){av.src=next;
-          av.onended=()=>{hideNp();showIdle('Aguardando conteúdo…')};
-          showNp(m.title||'Reproduzindo áudio', m.subtitle||'', m.cover||'');
-          $('bg').src=m.background?proxyUrl(m.background):'bg-fallback.png';}
+          av.onended=()=>{hideNp();showIdle(L10N.idle)};
+          showNp(m.title||L10N.audio, m.subtitle||'', m.cover||'');
+          $('bg').src=m.background?palcoMediaUrl(m.background):'bg-fallback.png';}
         if(m.action!=='pause'&&m.action!=='stop'&&av.paused)playWithFallback();
         if(m.action==='pause'&&!av.paused)av.pause();
         if(typeof m.positionMs==='number'&&m.positionMs>0){
@@ -732,9 +4099,9 @@ function handle(m){
       {const a=$('audio');
         if(a&&a.src&&!(m.action==='stop'&&!m.url)){a.pause();a.removeAttribute('src');a.load()}}
       if(m.action==='stop'){v.pause();v.removeAttribute('src');v.style.display='none';
-        v.load();showIdle('Aguardando conteúdo…');
+        v.load();showIdle(L10N.idle);
         sendEvent({v:2,type:'ended',media:'video'});break}
-      if(m.url){v.src=proxyUrl(m.url);v.style.display='';
+      if(m.url){v.src=palcoMediaUrl(m.url);v.style.display='';
         // Sync inicial (padrão F3.3g do áudio): positionMs aplicado antes
         // do play — seguro p/ metadata não carregada (loadedmetadata once).
         if(typeof m.positionMs==='number'&&m.positionMs>0){
@@ -742,7 +4109,7 @@ function handle(m){
           if(v.readyState>=1)apply();else v.addEventListener('loadedmetadata',apply,{once:true});
         }
         v.onended=()=>{v.style.display='none';v.removeAttribute('src');v.load();
-          showIdle('Aguardando conteúdo…');
+          showIdle(L10N.idle);
           sendEvent({v:2,type:'ended',media:'video'})}}
       if(m.action==='seek'){
         const target=(m.position||((m.positionMs||0)/1000)||0);
@@ -767,8 +4134,39 @@ function handle(m){
       break}
     case 'timer':{
       hideIdle();
+      hideCloudPair();
       const t=$('timer');
       if(m.action==='stop'){t.style.display='none';clearInterval(t._iv||0);$('text').style.display='';break}
+      // Timer messages carry the same module background as monitor projections.
+      const timerBg=$('bg');
+      timerBg.classList.remove('frame-slide');
+      applyFrameView(null,0);
+      timerBg.onerror=()=>{timerBg.removeAttribute('src')};
+      timerBg.style.opacity='';
+      if(m.background){timerBg.src=palcoMediaUrl(m.background);document.body.style.background=''}
+      else{timerBg.removeAttribute('src');document.body.style.background=m.backgroundColor||'#000'}
+      $('bgPalco').removeAttribute('src');
+      $('veil').style.display='';
+      if(m.mode==='chrono'&&m.chronoRuntime){
+        const runtime=m.chronoRuntime;
+        clearInterval(t._iv||0);t.style.display='';$('text').style.display='none';
+        const renderChrono=()=>{
+          const elapsed=Math.max(0,Number(runtime.accumulatedMs)||0)+(runtime.status==='running'&&runtime.segmentStartedAt!=null?Math.max(0,Date.now()-runtime.segmentStartedAt):0);
+          const tokens={hh:String(Math.floor(elapsed/3600000)).padStart(2,'0'),mm:String(Math.floor(elapsed/60000)%60).padStart(2,'0'),ss:String(Math.floor(elapsed/1000)%60).padStart(2,'0'),ms:String(Math.floor(elapsed%1000/10)).padStart(2,'0')};
+          t.textContent=(m.timeFormat||'hh:mm:ss.ms').replace(/hh|mm|ss|ms/g,token=>tokens[token]);
+        };
+        renderChrono();if(runtime.status==='running')t._iv=setInterval(renderChrono,16);
+        break;
+      }
+      // WT-5 cloud: text pronto (clock do web, timer/countdown) tem prioridade —
+      // o operador já formata; sem tick local (evita dessincronia e zero inicial).
+      if(typeof m.text==='string'&&m.text.trim()){
+        clearInterval(t._iv||0);
+        t.style.display='';$('text').style.display='none';
+        t.textContent=m.text+(m.label?'  ':'');
+        if(m.label){const sm=document.createElement('small');sm.textContent=m.label;t.appendChild(sm)}
+        break;
+      }
       t.style.display='';$('text').style.display='none';
       let rem=(m.duration||0)*1000; // countdown segundos
       const mode=m.mode||'countdown';
@@ -777,26 +4175,28 @@ function handle(m){
       const fmt=ms=>{const s=Math.max(0,Math.round(ms/1000));
         const hh=Math.floor(s/3600),mm=String(Math.floor(s/60)%60).padStart(2,'0'),
               ss=String(s%60).padStart(2,'0');
-        return hh>0?`${hh}:${mm}:${ss}`:`${mm}:${ss}`};
+        return `${String(hh).padStart(2,'0')}:${mm}:${ss}`};
       const render=()=>{
         const val=mode==='chrono'?elapsed:rem;
-        t.innerHTML=fmt(val)+(m.label?`<small>${m.label}</small>`:'');
+        t.textContent=fmt(val);
+        if(m.label){const label=document.createElement('small');label.textContent=String(m.label);t.appendChild(label)}
       };
       render();
       t._iv=setInterval(()=>{rem-=1000;elapsed+=1000;render();
         if(mode!=='chrono'&&rem<=0){clearInterval(t._iv)}},1000);
       break}
-    case 'idle':showIdle(m.msg||'Aguardando conteúdo…');break;
+    case 'obsIdle':document.documentElement.classList.toggle('obs-black-idle',m.black===true);break;
+    case 'idle':lastBibleVerse='';showIdle(m.msg||L10N.idle);break;
     // F3.3x: sender informa IP DA TV (visto pelo socket) + SLOT onde ela
     // caiu — identificação visível pro operador conferir com o app.
     case 'youare':{
       if(m.ip){
         var who=(m.slotLabel||m.slot||'Palco');
         var isMain=!m.slot||m.slot==='0';
-        if(isMain)who='Principal (espelho)';
+        if(isMain)who=L10N.mainSlot;
         var el=document.getElementById('idleConn');
         if(el&&document.getElementById('idle')&&!document.getElementById('idle').classList.contains('hidden'))
-          el.textContent=who+' · TV '+m.ip+' · conectado · vermelha = digitar IP';
+          el.textContent=who+L10N.tvConn.replace('{ip}',m.ip);
         try{
           localStorage.setItem('palcoSelfIp',m.ip);
           localStorage.setItem('palcoSlotLabel',who);
@@ -807,8 +4207,15 @@ function handle(m){
   }
 }
 
-
-connect();
+// WT-5d: boot — código cloud na query (?code=XXXXXX) ou salvo em localStorage
+// tem prioridade; sem código, segue o fluxo local (scan do sender na LAN).
+(function(){
+  if(qs.get('obsPane')==='1')return;
+  var bootCode=(qs.get('code')||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+  if(!bootCode){try{bootCode=localStorage.getItem('palcoCloudCode')||''}catch(e){}}
+  if(bootCode&&bootCode.length===6){cloudConnect(bootCode);return}
+  connect();
+})();
 
 // ===== F3.3ad: auto-relaunch — o Palco volta ao foreground sozinho =====
 // Usado quando alguém sai do Palco sem querer (botão HOME/back) durante o

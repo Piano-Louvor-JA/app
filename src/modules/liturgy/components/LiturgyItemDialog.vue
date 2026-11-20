@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { getDesktopBridge, isDesktopApp } from '@shared/services/desktop-bridge'
+import { appConfirm } from '@shared/composables/useAppConfirm'
 import type {
   FileDialogFilter,
   PresentationEngine,
@@ -16,20 +17,36 @@ import {
   MOMENT_DURATION_MAX_MS,
   MOMENT_DURATION_MIN_MS,
   MOMENT_DURATION_STEP_MS,
+  TYPES_WITHOUT_DURATION,
   type LiturgyItemDraft,
   type LiturgyItemType,
   type LiturgyMusicOption,
 } from '../types/liturgy'
 import { probeMediaDurationMs } from '../services/media-probe'
+import { useScheduledStore } from '../stores/useScheduledStore'
 import { useExternalPlayerChoices } from '../composables/useExternalPlayerChoices'
+import {
+  importSljaAsLiturgyMusic,
+  type SljaImportSource,
+} from '../services/import-slja-to-liturgy'
 import {
   formatMomentDuration,
   isLiturgyItemDraftValid,
   isValidLiturgyUrl,
 } from '../services/liturgy-item-helpers'
 import { normalizeLiturgyTimeHHmm } from '../services/liturgy-format'
+import {
+  fetchOnlineVideoInfo,
+  fetchSiteLinkInfo,
+  linkInfoDraftPatch,
+  type LinkAutoFill,
+} from '../services/link-info'
+import { notesHtmlToPlainText, plainTextToNotesHtml } from '../services/rich-notes'
+import LiturgyRichNotesEditor from './LiturgyRichNotesEditor.vue'
+import LiturgyTitleColorPicker from './LiturgyTitleColorPicker.vue'
 
 const props = defineProps<{
+  refreshImportedCatalog?: () => Promise<void>
   open: boolean
   draft: LiturgyItemDraft
   isEditing: boolean
@@ -53,6 +70,8 @@ const emit = defineEmits<{
   'update:musicQuery': [query: string]
   'pick-music': [musicId: number]
   'clear-music': []
+  /** app#331: pós-import .slja — o pai recarrega o catálogo de músicas. */
+  'slja-imported': [musicId: number]
 }>()
 
 const { t } = useI18n()
@@ -63,6 +82,95 @@ const filePickerError = ref<string | null>(null)
 const hasTypeSelection = computed(() => props.draft.type != null)
 const isCategory = computed(() => props.draft.type === 'category')
 const isMusic = computed(() => props.draft.type === 'music')
+const isAnnotation = computed(() => props.draft.type === 'annotation')
+
+// app#331 RF-1: importar .slja direto no item de música
+const sljaInputEl = ref<HTMLInputElement | null>(null)
+const sljaImporting = ref(false)
+const sljaMessage = ref('')
+const sljaError = ref(false)
+const sljaRun = ref(0)
+
+watch(
+  () => props.open,
+  (isOpen) => {
+    if (!isOpen) {
+      sljaRun.value += 1
+      sljaImporting.value = false
+      sljaMessage.value = ''
+      sljaError.value = false
+    }
+  },
+)
+
+async function onImportSljaFile(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file || sljaImporting.value) return
+  const run = sljaRun.value
+  sljaImporting.value = true
+  sljaMessage.value = ''
+  sljaError.value = false
+  try {
+    const source: SljaImportSource = {
+      bytes: await file.arrayBuffer(),
+      name: file.name,
+    }
+    const imported = await importSljaAsLiturgyMusic(source, {
+      // Regra: banco só recebe com aprovação. Recusou = salva só no app
+      // (local) — sem fricção, sem erro.
+      confirmUpload: () =>
+        appConfirm({
+          title: t('liturgy.slja.uploadTitle', { name: file.name }),
+          message: t('liturgy.slja.uploadMessage'),
+          confirmLabel: t('liturgy.slja.uploadConfirm'),
+          cancelLabel: t('liturgy.slja.uploadCancel'),
+        }),
+    })
+    if (run !== sljaRun.value) return
+    // web#174 (referência): recarrega o catálogo ANTES da seleção valer —
+    // sem isso o id novo não existe em musicList, selectedMusic fica null
+    // e o submit é bloqueado (música "não toca").
+    await props.refreshImportedCatalog?.()
+    if (run !== sljaRun.value) return
+    emit('slja-imported', imported.displayMusicId)
+    // seleção + título + duração num ÚNICO patch: props.draft aqui ainda é
+    // stale — um segundo patch sobrescreveria o musicId do primeiro (race).
+    patch({
+      musicId: imported.displayMusicId,
+      durationMs:
+        imported.durationMs > 0 ? imported.durationMs : props.draft.durationMs,
+      ...(props.draft.name.trim() ? {} : { name: imported.name }),
+    })
+    sljaMessage.value = imported.local
+      ? t(
+          imported.imagesOmitted
+            ? 'liturgy.slja.importedLocalNoImages'
+            : 'liturgy.slja.importedLocal',
+          {
+            name: imported.name,
+            slides: imported.slides,
+          },
+        )
+      : t('liturgy.slja.imported', {
+          name: imported.name,
+          slides: imported.slides,
+        })
+  } catch (error) {
+    sljaError.value = true
+    // slja-storage: quota do localStorage NÃO é mais engolida — informa
+    // "armazenamento cheio" em vez de sucesso falso com dados perdidos.
+    const isQuota =
+      error instanceof DOMException &&
+      (error.name === 'QuotaExceededError' || error.name === 'QuotaExceeded')
+    sljaMessage.value = isQuota
+      ? t('liturgy.slja.importStorageFull')
+      : t('liturgy.slja.importFailed')
+  } finally {
+    if (run === sljaRun.value) sljaImporting.value = false
+  }
+}
 
 const musicRequiredMissing = computed(
   () => isMusic.value && props.draft.musicId == null,
@@ -71,12 +179,19 @@ const nameRequiredMissing = computed(() => props.draft.name.trim().length === 0)
 const startTimeRequiredMissing = computed(
   () => isCategory.value && !normalizeLiturgyTimeHHmm(props.draft.startTime),
 )
-const endTimeRequiredMissing = computed(
-  () => isCategory.value && !normalizeLiturgyTimeHHmm(props.draft.endTime),
+// SPEC t_50c9ac95 (A1): end é OPCIONAL — vazio não gera erro. MAS se
+// preenchido e inválido (ex.: '99:99'), mostra erro (review deleg_3ba5e284):
+// o helper rejeita o save e o usuário precisa saber por quê.
+const endTimeRequiredMissing = computed(() => false)
+const endTimeInvalidFilled = computed(
+  () =>
+    isCategory.value &&
+    Boolean(props.draft.endTime) &&
+    !normalizeLiturgyTimeHHmm(props.draft.endTime),
 )
-const categoryRequiredMissing = computed(
-  () => hasTypeSelection.value && !isCategory.value && !props.draft.categoryId,
-)
+const endTimeFieldError = computed(() => endTimeInvalidFilled.value)
+// Categoria OPCIONAL (paridade web ff8b481): sem erro de validação.
+const categoryRequiredMissing = computed(() => false)
 
 const durationLabel = computed(() => formatMomentDuration(props.draft.durationMs))
 
@@ -141,9 +256,7 @@ const nameFieldError = computed(
 const startTimeFieldError = computed(
   () => showValidation.value && startTimeRequiredMissing.value,
 )
-const endTimeFieldError = computed(
-  () => showValidation.value && endTimeRequiredMissing.value,
-)
+// endTimeFieldError já declarado acima (endTimeInvalidFilled — review fix).
 const musicFieldError = computed(
   () => showValidation.value && musicRequiredMissing.value,
 )
@@ -180,6 +293,9 @@ const dialogTitle = computed(() => {
   return t('liturgy.dialog.title')
 })
 
+const scheduledStore = useScheduledStore()
+const rotationOptions = computed(() => scheduledStore.categories)
+
 const typeGroups = computed(() => {
   const groups = LITURGY_TYPE_GROUPS.map((group) => ({
     ...group,
@@ -207,7 +323,7 @@ const showCategoryField = computed(
 )
 
 const showDurationTitleRow = computed(
-  () => hasTypeSelection.value && !isCategory.value,
+  () => props.draft.type != null && !TYPES_WITHOUT_DURATION.includes(props.draft.type),
 )
 
 watch(
@@ -233,6 +349,7 @@ function patch(partial: Partial<LiturgyItemDraft>) {
 }
 
 function selectType(type: LiturgyItemType) {
+  if (sljaImporting.value) return
   if (props.lockCategory && type === 'category') return
 
   const previousType = props.draft.type
@@ -250,6 +367,7 @@ function selectType(type: LiturgyItemType) {
           ? props.draft.durationMs
           : DEFAULT_MOMENT_DURATION_MS
     }
+    if (TYPES_WITHOUT_DURATION.includes(type)) next.durationMs = 0
     next.categoryId = props.draft.categoryId ?? null
     next.startTime = ''
     next.endTime = ''
@@ -299,9 +417,89 @@ function onDetailsInput(event: Event) {
   patch({ subtitle: (event.target as HTMLTextAreaElement).value })
 }
 
-function onUrlInput(event: Event) {
-  patch({ url: (event.target as HTMLInputElement).value })
+// Anotação antiga (só texto) abre no editor como HTML equivalente
+const annotationHtml = computed(
+  () => props.draft.notesHtml || plainTextToNotesHtml(props.draft.subtitle ?? ''),
+)
+
+function onRichNotesInput(html: string) {
+  patch({ notesHtml: html, subtitle: notesHtmlToPlainText(html) })
 }
+
+function onUrlInput(event: Event) {
+  const url = (event.target as HTMLInputElement).value
+  patch({ url })
+  scheduleLinkInfo(url)
+}
+
+// Vídeo online e site: ao colar o link, preenche título, anotações (canal/site + descrição) e duração
+const LINK_INFO_DEBOUNCE_MS = 400
+const linkInfoLoading = ref<'video' | 'site' | null>(null)
+let linkInfoTimer: ReturnType<typeof setTimeout> | null = null
+let linkInfoRun = 0
+let linkInfoUrl = ''
+let linkAutoFilled: LinkAutoFill = { name: '', subtitle: '' }
+
+function linkInfoKind(): 'video' | 'site' | null {
+  if (props.draft.type === 'online_video') return 'video'
+  // Página de outro site só é lida pelo desktop (o navegador bloqueia por CORS)
+  if (props.draft.type === 'site' && getDesktopBridge()?.siteInfo) return 'site'
+  return null
+}
+
+function cancelLinkInfo() {
+  if (linkInfoTimer) clearTimeout(linkInfoTimer)
+  linkInfoTimer = null
+  linkInfoRun += 1
+  linkInfoLoading.value = null
+}
+
+function scheduleLinkInfo(url: string) {
+  const kind = linkInfoKind()
+  if (!kind) return
+  const trimmed = url.trim()
+  if (trimmed && trimmed === linkInfoUrl) return
+  cancelLinkInfo()
+  linkInfoUrl = ''
+  if (!trimmed) return
+  linkInfoTimer = setTimeout(() => void loadLinkInfo(kind, trimmed), LINK_INFO_DEBOUNCE_MS)
+}
+
+async function loadLinkInfo(kind: 'video' | 'site', url: string) {
+  linkInfoTimer = null
+  const run = ++linkInfoRun
+  linkInfoUrl = url
+  linkInfoLoading.value = kind
+  const bridge = getDesktopBridge()
+  const deps = { ytInfo: bridge?.ytInfo, siteInfo: bridge?.siteInfo }
+  const info = kind === 'video' ? await fetchOnlineVideoInfo(url, deps) : await fetchSiteLinkInfo(url, deps)
+  if (run !== linkInfoRun) return
+  linkInfoLoading.value = null
+  if (!info) {
+    linkInfoUrl = ''
+    return
+  }
+  if (linkInfoKind() !== kind || props.draft.url.trim() !== url) return
+  const next = linkInfoDraftPatch(
+    props.draft,
+    info,
+    (name) => t(kind === 'video' ? 'liturgy.dialog.videoChannel' : 'liturgy.dialog.siteName', { name }),
+    linkAutoFilled,
+  )
+  linkAutoFilled = { name: next.name ?? '', subtitle: next.subtitle ?? '' }
+  patch(next)
+}
+
+watch(
+  () => props.open,
+  () => {
+    cancelLinkInfo()
+    linkInfoUrl = props.draft.url.trim()
+    linkAutoFilled = { name: '', subtitle: '' }
+  },
+)
+
+onBeforeUnmount(cancelLinkInfo)
 
 function fileFiltersForType(type: LiturgyItemType | null): FileDialogFilter[] {
   switch (type) {
@@ -389,20 +587,20 @@ async function selectLocalFile() {
     if (paths.length === 0) return
 
     const next: Partial<LiturgyItemDraft> = {
-      filePath: paths[0] ?? '',
+      filePath: paths[0]! /* length check acima garante índice 0 */,
       filePaths: multiple ? paths : [],
     }
     // Duração automática de mídia local (vídeo/áudio) via ffprobe.
     if (!multiple && paths[0]) {
-      const probed = await probeMediaDurationMs(paths[0]!)
+      const probed = await probeMediaDurationMs(paths[0])
       if (probed > 0) next.durationMs = probed
     }
     if (!props.draft.name.trim()) {
       if (multiple && paths.length > 1) {
         next.name = t('liturgy.fields.filesSelected', { count: paths.length })
       } else {
-        const fileName = paths[0]!.split(/[\\/]/).pop() ?? ''
-        next.name = fileName.replace(/\.[^.]+$/, '') || fileName
+        const fileName = paths[0]!.split(/[\\/]/).pop()! /* pop de path não-vazio é non-empty */
+        next.name = fileName.includes('.') ? fileName.replace(/\.[^.]+$/, '') : fileName
       }
     }
     patch(next)
@@ -416,21 +614,13 @@ function onCategoryChange(event: Event) {
   patch({ categoryId: value || null })
 }
 
-const {
-  globalPlayer,
-  playerOptions,
-  loadPlayerChoices,
-  selectedPlayerId: resolvePlayerId,
-  storedPlayerId,
-} = useExternalPlayerChoices()
-
-const selectedPlayerId = computed(() => resolvePlayerId(props.draft.playerId))
-
-function onPlayerChange(event: Event) {
+/** Rotação agendada: campo PRÓPRIO — nunca move o item na árvore da liturgia. */
+function onRotationChange(event: Event) {
   const value = (event.target as HTMLSelectElement).value
-  patch({ playerId: storedPlayerId(value) })
+  patch({ scheduledRotationId: value || null })
 }
 
+const { loadPlayerChoices } = useExternalPlayerChoices()
 watch(
   () => [props.open, props.draft.type] as const,
   ([open, type]) => {
@@ -493,6 +683,10 @@ function clearMusic() {
 }
 
 function onSubmit(event: Event) {
+  if (sljaImporting.value) {
+    event.preventDefault()
+    return
+  }
   event.preventDefault()
 
   const nextDraft = isCategory.value
@@ -511,7 +705,11 @@ function onSubmit(event: Event) {
       document.getElementById('moment-name')?.focus()
     } else if (isCategory.value && !normalizeLiturgyTimeHHmm(nextDraft.startTime)) {
       document.getElementById('moment-start-time')?.focus()
-    } else if (isCategory.value && !normalizeLiturgyTimeHHmm(nextDraft.endTime)) {
+    } else if (
+      isCategory.value &&
+      nextDraft.endTime &&
+      !normalizeLiturgyTimeHHmm(nextDraft.endTime)
+    ) {
       document.getElementById('moment-end-time')?.focus()
     }
     return
@@ -560,7 +758,8 @@ function isLightDot(hex: string): boolean {
             type="button"
             class="moment-dialog__close"
             :aria-label="t('liturgy.actions.discard')"
-            @click="emit('close')"
+            :disabled="sljaImporting"
+              @click="!sljaImporting && emit('close')"
           >
             <i
               class="ti ti-x"
@@ -612,6 +811,7 @@ function isLightDot(hex: string): boolean {
                         hasTypeSelection && draft.type !== chip.value,
                     }"
                     :title="t(`liturgy.typeDescriptions.${chip.value}`)"
+                    :disabled="sljaImporting"
                     @click="selectType(chip.value)"
                   >
                     <span
@@ -628,6 +828,46 @@ function isLightDot(hex: string): boolean {
           </div>
 
           <template v-if="hasTypeSelection">
+          <div
+            v-if="showUrl"
+            class="moment-dialog__section"
+          >
+            <label
+              class="moment-dialog__label"
+              :class="{ 'moment-dialog__label--error': urlFieldError }"
+              for="moment-url"
+            >
+              {{ t('liturgy.fields.url') }}
+              <span
+                class="moment-dialog__required"
+                aria-hidden="true"
+              >*</span>
+            </label>
+            <input
+              id="moment-url"
+              class="moment-dialog__input"
+              :class="{ 'moment-dialog__input--error': urlFieldError }"
+              type="url"
+              :value="draft.url"
+              placeholder="https://"
+              :aria-invalid="urlFieldError"
+              @input="onUrlInput"
+            >
+            <p
+              v-if="linkInfoLoading"
+              class="moment-dialog__hint"
+              role="status"
+            >
+              {{ t(linkInfoLoading === 'video' ? 'liturgy.dialog.videoInfoLoading' : 'liturgy.dialog.siteInfoLoading') }}
+            </p>
+            <p
+              v-if="urlFieldError"
+              class="moment-dialog__field-error"
+            >
+              {{ t('liturgy.dialog.urlInvalid') }}
+            </p>
+          </div>
+
           <div
             v-if="isMusic"
             class="moment-dialog__section"
@@ -739,14 +979,52 @@ function isLightDot(hex: string): boolean {
                   />
                 </button>
               </div>
+
+              <!-- app#331 RF-1: importar .slja direto no item de música -->
+              <div class="moment-dialog__music-import">
+                <input
+                  ref="sljaInputEl"
+                  type="file"
+                  accept=".slja,.zip"
+                  class="moment-dialog__slja-input"
+                  data-testid="slja-file-input"
+                  @change="onImportSljaFile"
+                >
+                <button
+                  type="button"
+                  class="moment-dialog__slja-btn"
+                  data-testid="slja-import-btn"
+                  :disabled="sljaImporting"
+                  @click="sljaInputEl?.click()"
+                >
+                  <i
+                    class="ti ti-file-zip"
+                    aria-hidden="true"
+                  />
+                  {{ sljaImporting
+                    ? t('liturgy.slja.importing')
+                    : t('liturgy.slja.importButton') }}
+                </button>
+                <p
+                  v-if="sljaMessage"
+                  class="moment-dialog__slja-message"
+                  :class="{
+                    'moment-dialog__slja-message--error': sljaError,
+                  }"
+                  role="status"
+                >
+                  {{ sljaMessage }}
+                </p>
+              </div>
             </div>
           </div>
 
           <div
             class="moment-dialog__row"
             :class="{
-              'moment-dialog__row--name-only': isCategory,
-              'moment-dialog__row--with-category': showCategoryField,
+              'moment-dialog__row--name-only': !showDurationTitleRow && !showCategoryField,
+              'moment-dialog__row--with-category': showDurationTitleRow && showCategoryField,
+              'moment-dialog__row--title-category': !showDurationTitleRow && showCategoryField,
               'moment-dialog__row--duration-title':
                 showDurationTitleRow && !showCategoryField,
             }"
@@ -805,19 +1083,30 @@ function isLightDot(hex: string): boolean {
                   aria-hidden="true"
                 >*</span>
               </label>
-              <input
-                id="moment-name"
-                class="moment-dialog__input"
-                :class="{ 'moment-dialog__input--error': nameFieldError }"
-                type="text"
-                :value="draft.name"
-                :placeholder="momentNamePlaceholder"
-                :list="isMusic ? 'moment-complementary-titles' : undefined"
-                :aria-invalid="nameFieldError"
-                :aria-required="true"
-                autocomplete="off"
-                @input="onNameInput"
+              <div
+                class="moment-dialog__name-row"
+                :class="{ 'moment-dialog__name-row--color': isAnnotation }"
               >
+                <LiturgyTitleColorPicker
+                  v-if="isAnnotation"
+                  :model-value="draft.titleColor ?? ''"
+                  @update:model-value="patch({ titleColor: $event })"
+                />
+                <input
+                  id="moment-name"
+                  class="moment-dialog__input"
+                  :class="{ 'moment-dialog__input--error': nameFieldError }"
+                  :style="isAnnotation && draft.titleColor ? { color: draft.titleColor } : undefined"
+                  type="text"
+                  :value="draft.name"
+                  :placeholder="momentNamePlaceholder"
+                  :list="isMusic ? 'moment-complementary-titles' : undefined"
+                  :aria-invalid="nameFieldError"
+                  :aria-required="true"
+                  autocomplete="off"
+                  @input="onNameInput"
+                >
+              </div>
               <datalist
                 v-if="isMusic && complementaryTitleSuggestions.length > 0"
                 id="moment-complementary-titles"
@@ -874,10 +1163,7 @@ function isLightDot(hex: string): boolean {
                   for="moment-end-time"
                 >
                   {{ t('liturgy.dialog.categoryEndTime') }}
-                  <span
-                    class="moment-dialog__required"
-                    aria-hidden="true"
-                  >*</span>
+                  <!-- SPEC t_50c9ac95 (A1): fim OPCIONAL — sem '*' nem erro. -->
                 </label>
                 <input
                   id="moment-end-time"
@@ -888,7 +1174,7 @@ function isLightDot(hex: string): boolean {
                   :value="draft.endTime"
                   :aria-label="t('liturgy.dialog.categoryEndTime')"
                   :aria-invalid="endTimeFieldError"
-                  :aria-required="true"
+                  :aria-required="false"
                   @input="onEndTimeInput"
                   @change="onEndTimeInput"
                 >
@@ -902,7 +1188,49 @@ function isLightDot(hex: string): boolean {
             </div>
 
             <div
-              v-if="showCategoryField"
+              v-if="draft.type === 'scheduled'"
+              class="moment-dialog__section"
+            >
+              <label
+                class="moment-dialog__label"
+                :class="{ 'moment-dialog__label--error': categoryFieldError }"
+                for="moment-rotation"
+              >
+                {{
+                  t('liturgy.dialog.rotationField')
+                }}
+                <span
+                  class="moment-dialog__required"
+                  aria-hidden="true"
+                >*</span>
+              </label>
+              <select
+                id="moment-rotation"
+                class="moment-dialog__input moment-dialog__select"
+                :value="draft.scheduledRotationId ?? ''"
+                :aria-invalid="categoryFieldError"
+                @change="onRotationChange"
+              >
+                <option value="">
+                  {{ t('liturgy.dialog.categoryPlaceholder') }}
+                </option>
+                <option
+                  v-for="option in rotationOptions"
+                  :key="option.id"
+                  :value="option.id"
+                >
+                  {{ option.name }}
+                </option>
+              </select>
+              <p
+                v-if="categoryFieldError"
+                class="moment-dialog__error"
+              >
+                {{ t('liturgy.dialog.categoryRequired') }}
+              </p>
+            </div>
+            <div
+              v-if="showCategoryField && draft.type !== 'scheduled'"
               class="moment-dialog__section"
             >
               <label
@@ -911,10 +1239,6 @@ function isLightDot(hex: string): boolean {
                 for="moment-category"
               >
                 {{ t('liturgy.dialog.categoryField') }}
-                <span
-                  class="moment-dialog__required"
-                  aria-hidden="true"
-                >*</span>
               </label>
               <select
                 id="moment-category"
@@ -939,7 +1263,7 @@ function isLightDot(hex: string): boolean {
                 v-if="categoryOptions.length === 0"
                 class="moment-dialog__type-hint"
               >
-                {{ t('liturgy.dialog.categoryEmpty') }}
+                {{ t('liturgy.dialog.categoryOptionalHint') }}
               </p>
             </div>
           </div>
@@ -1035,81 +1359,26 @@ function isLightDot(hex: string): boolean {
               </p>
             </div>
 
-            <!-- Player de reprodução: só para itens de vídeo/áudio com arquivo local -->
-            <div
-              v-if="draft.type === 'video' || draft.type === 'audio'"
-              class="moment-dialog__engine"
-              data-test="liturgy-player-select"
-            >
-              <span class="moment-dialog__label">
-                {{ t('liturgy.fields.playerSelect') }}
-              </span>
-              <select
-                class="moment-dialog__input moment-dialog__select"
-                :value="selectedPlayerId"
-                :aria-label="t('liturgy.fields.playerSelect')"
-                data-test="liturgy-player-options"
-                @change="onPlayerChange"
-              >
-                <option
-                  v-for="player in playerOptions"
-                  :key="player.id"
-                  :value="player.id"
-                >
-                  {{
-                    player.id === globalPlayer
-                      ? t('liturgy.fields.playerDefaultNamed', { name: player.label })
-                      : player.label
-                  }}
-                </option>
-              </select>
-              <p class="moment-dialog__engine-hint">
-                {{ t('liturgy.fields.playerSelectHint') }}
-              </p>
-            </div>
-          </div>
-
-          <div
-            v-if="showUrl"
-            class="moment-dialog__section"
-          >
-            <label
-              class="moment-dialog__label"
-              :class="{ 'moment-dialog__label--error': urlFieldError }"
-              for="moment-url"
-            >
-              {{ t('liturgy.fields.url') }}
-              <span
-                class="moment-dialog__required"
-                aria-hidden="true"
-              >*</span>
-            </label>
-            <input
-              id="moment-url"
-              class="moment-dialog__input"
-              :class="{ 'moment-dialog__input--error': urlFieldError }"
-              type="url"
-              :value="draft.url"
-              placeholder="https://"
-              :aria-invalid="urlFieldError"
-              @input="onUrlInput"
-            >
-            <p
-              v-if="urlFieldError"
-              class="moment-dialog__field-error"
-            >
-              {{ t('liturgy.dialog.urlInvalid') }}
-            </p>
+            <!-- Player: gerido pela linha (LiturgyTimelineItem) / Configurações → Mídia & Player. Select do modal removido (redundante). -->
           </div>
 
           <div class="moment-dialog__section">
             <label
+              id="moment-details-label"
               class="moment-dialog__label"
               for="moment-details"
             >
               {{ t('liturgy.dialog.notesTitle') }}
             </label>
+            <LiturgyRichNotesEditor
+              v-if="draft.type === 'annotation'"
+              :model-value="annotationHtml"
+              :placeholder="t('liturgy.dialog.notesPlaceholder')"
+              labelledby="moment-details-label"
+              @update:model-value="onRichNotesInput"
+            />
             <textarea
+              v-else
               id="moment-details"
               class="moment-dialog__textarea"
               rows="4"
@@ -1131,13 +1400,15 @@ function isLightDot(hex: string): boolean {
             <button
               type="button"
               class="moment-dialog__discard"
-              @click="emit('close')"
+              :disabled="sljaImporting"
+              @click="!sljaImporting && emit('close')"
             >
               {{ t('liturgy.actions.discard') }}
             </button>
             <button
               type="submit"
               class="moment-dialog__submit"
+              :disabled="sljaImporting"
             >
               <i
                 class="ti ti-check"
@@ -1288,6 +1559,13 @@ function isLightDot(hex: string): boolean {
   color: var(--ds-color-error, #ffb4ab);
 }
 
+.moment-dialog__hint {
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--ds-color-on-surface-variant, rgba(255, 255, 255, 0.65));
+}
+
 .moment-dialog__type-panel {
   display: flex;
   flex-direction: column;
@@ -1429,6 +1707,10 @@ function isLightDot(hex: string): boolean {
     grid-template-columns:
       minmax(6.25rem, 7.25rem) minmax(12rem, 1.7fr) minmax(8rem, 0.95fr);
   }
+
+  &--title-category {
+    grid-template-columns: minmax(12rem, 1.7fr) minmax(8rem, 0.95fr);
+  }
 }
 
 .moment-dialog__times {
@@ -1555,6 +1837,17 @@ function isLightDot(hex: string): boolean {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+}
+
+.moment-dialog__name-row--color {
+  display: flex;
+  align-items: stretch;
+  gap: 0.4rem;
+
+  .moment-dialog__input {
+    flex: 1;
+    min-width: 0;
   }
 }
 
@@ -1885,5 +2178,51 @@ function isLightDot(hex: string): boolean {
 .moment-dialog__engine-hint {
   font-size: 0.75rem;
   opacity: 0.55;
+}
+
+/* app#331 RF-1: importar .slja direto no item */
+.moment-dialog__music-import {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.55rem;
+}
+
+.moment-dialog__slja-input {
+  display: none;
+}
+
+.moment-dialog__slja-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.85rem;
+  border: 1px dashed color-mix(in srgb, var(--ds-color-on-surface) 30%, transparent);
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--ds-color-on-surface-variant, var(--ds-color-on-surface));
+  font-size: 0.82rem;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    border-color: var(--ds-color-primary);
+    color: var(--ds-color-primary);
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: wait;
+  }
+}
+
+.moment-dialog__slja-message {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--ds-color-on-surface-variant, var(--ds-color-on-surface));
+
+  &--error {
+    color: var(--ds-color-error, #ff5252);
+  }
 }
 </style>

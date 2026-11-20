@@ -3,6 +3,7 @@ import { mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ref } from "vue";
 import UpdateDialog from "../UpdateDialog.vue";
+vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
 
 // Mock do composable
 vi.mock("../../composables/useUpdateChecker", () => ({
@@ -38,6 +39,13 @@ function mountDialog(modelValue = true) {
 }
 
 describe("UpdateDialog", () => {
+  it('atualização manual orienta baixar DMG e não oferece instalar automaticamente', () => {
+    mockComposable({ manualInstall: ref(true) });
+    const wrapper = mountDialog();
+    expect(wrapper.get('[data-test="manual-install-hint"]').text()).toBe('updates.manualMacInstructions');
+    expect(wrapper.get('[data-test="download-btn"]').text()).toBe('updates.downloadMacInstaller');
+    expect(wrapper.find('[data-test="install-btn"]').exists()).toBe(false);
+  });
 	beforeEach(() => {
 		vi.clearAllMocks();
 	});

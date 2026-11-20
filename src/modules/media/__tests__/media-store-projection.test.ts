@@ -55,6 +55,9 @@ vi.mock('../services/media-catalog', () => ({
 }))
 
 vi.mock('../services/media-audio', () => ({
+  resolveRemoteFileUrl: vi.fn((p: string) =>
+    /^https?:\/\//i.test(p) ? p : `https://files.test/${p.replace(/^\//, '')}`,
+  ),
   attachMediaAudioListeners: vi.fn(),
   detachMediaAudioListeners: vi.fn(),
   fadeInMediaAudio: vi.fn().mockResolvedValue(true),
@@ -94,6 +97,24 @@ describe('useMediaStore — controle de projeção e ocultação de conteúdo', 
     openProjectionModule.mockClear()
     isProjectionModuleOpen.mockReset()
     isProjectionModuleOpen.mockReturnValue(false)
+  })
+
+  it('stopProjection fecha a janela de mídia e preserva a reprodução local', () => {
+    const store = useMediaStore()
+    store.isProjecting = true
+    store.status = 'playing'
+    isProjectionModuleOpen.mockReturnValue(true)
+    store.stopProjection()
+    expect(closeProjectionModule).toHaveBeenCalledOnce()
+    expect(store.isProjecting).toBe(false)
+    expect(readMediaRuntimeFromStorage().active).toBe(false)
+    expect(store.status).toBe('playing')
+  })
+
+  it('stopProjection não fecha a janela pertencente a outro módulo', () => {
+    const store = useMediaStore()
+    store.stopProjection()
+    expect(closeProjectionModule).not.toHaveBeenCalled()
   })
 
   it('clearProjection define isProjecting como falso e publica runtime inativo sem fechar a janela', () => {
@@ -314,4 +335,20 @@ describe('useMediaStore — controle de projeção e ocultação de conteúdo', 
     expect(runtime.slideProgressRatio).toBeCloseTo(0.5)
     expect(runtime.progressRatio).toBeCloseTo(0.25)
   })
+  it('troca manual de letras sem cues preserva posição do áudio', async () => {
+    const store = useMediaStore()
+    store.session = {
+      musicId: -1, albumId: null, mode: 'audio', title: 'Import', subtitle: '',
+      coverUrl: null, audioUrl: 'https://example.com/audio.mp3', hasInstrumental: false,
+      slides: [0, 1, 2].map(order => ({ order, lyric: `Linha ${order}`, showSlide: true,
+        time: '00:00', instrumentalTime: '00:00', imageUrl: null, imagePosition: null,
+        isCover: order === 0 })),
+      slideTimesSec: [0, 0, 0],
+    }
+    store.currentTimeSec = 42
+    await store.goToSlide(2)
+    expect(store.slideIndex).toBe(2)
+    expect(store.currentTimeSec).toBe(42)
+  })
+
 })

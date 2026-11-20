@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
   computed,
+  nextTick,
   onMounted,
   onUnmounted,
   ref,
@@ -10,11 +11,25 @@ import {
 import { useI18n } from 'vue-i18n'
 
 import type { StageSettings } from '../../settings/types/stage-settings'
-import type { RandomDisplayConfig, RandomRuntimeState } from '../types/random'
+import { DEFAULT_RANDOM_DISPLAY_CONFIG, type RandomDisplayConfig, type RandomRuntimeState } from '../types/random'
 
 const PARTICLE_COUNT = 20
 const FIREWORK_COUNT = 56
 const CELEBRATE_MS = 2800
+
+/**
+ * Faces do dado 3D — "UV mapping" manual do cubo: cada face declara quais
+ * das 9 células da grade 3x3 (p1..p9) recebem pip, contagem clássica 1–6.
+ * Layout das células: p1 p2 p3 / p4 p5 p6 / p7 p8 p9.
+ */
+const DICE_FACES: ReadonlyArray<{ n: number; pips: number[] }> = [
+  { n: 1, pips: [5] },
+  { n: 2, pips: [1, 9] },
+  { n: 3, pips: [1, 5, 9] },
+  { n: 4, pips: [1, 3, 7, 9] },
+  { n: 5, pips: [1, 3, 5, 7, 9] },
+  { n: 6, pips: [1, 3, 4, 6, 7, 9] },
+]
 
 interface OrbParticle {
   id: number
@@ -117,6 +132,85 @@ const drawnList = computed(() =>
   Array.isArray(props.runtime.drawn) ? props.runtime.drawn : [],
 )
 
+/** Os 3 últimos sorteados ficam grandes; os anteriores, pequenos embaixo. */
+const DRAWN_HIGHLIGHT = 3
+const recentDrawn = computed(() =>
+  drawnList.value
+    .map((name, index) => ({ name, rank: index + 1 }))
+    .slice(-DRAWN_HIGHLIGHT)
+    .reverse(),
+)
+const olderDrawn = computed(() =>
+  drawnList.value
+    .map((name, index) => ({ name, rank: index + 1 }))
+    .slice(0, Math.max(0, drawnList.value.length - DRAWN_HIGHLIGHT))
+    .reverse(),
+)
+
+/**
+ * Anteriores: começam 2 por linha; quando enchem o espaço, passam para 3, 4…
+ * A fonte acompanha para as etiquetas caberem na largura.
+ */
+const OLDER_COLS_MIN = 2
+const OLDER_COLS_MAX = 8
+const olderCols = ref(OLDER_COLS_MIN)
+const olderListEl = ref<HTMLElement | null>(null)
+let olderObserver: ResizeObserver | null = null
+let fitting = false
+
+/**
+ * Linhas em ordem crescente (1 2 3), as mais novas em cima:
+ *   7 8 9 / 4 5 6 / 1 2 3. A linha incompleta (a mais nova) fica no topo.
+ */
+const olderGrid = computed(() => {
+  const ascending = [...olderDrawn.value].reverse()
+  const rows: { name: string; rank: number }[][] = []
+  for (let i = 0; i < ascending.length; i += olderCols.value) {
+    rows.push(ascending.slice(i, i + olderCols.value))
+  }
+  return rows
+    .reverse()
+    .flatMap((row) => row.map((item, col) => ({ ...item, rowStart: col === 0 })))
+})
+
+const olderListStyle = computed(() => ({
+  gridTemplateColumns: `repeat(${olderCols.value}, minmax(0, 1fr))`,
+  fontSize: `calc(2.8cqh * ${Math.min(1.15, 3 / olderCols.value)})`,
+}))
+
+async function fitOlderColumns() {
+  if (fitting) return
+  fitting = true
+  try {
+    olderCols.value = OLDER_COLS_MIN
+    await nextTick()
+    const el = olderListEl.value
+    while (el && el.scrollHeight > el.clientHeight + 1 && olderCols.value < OLDER_COLS_MAX) {
+      olderCols.value += 1
+      await nextTick()
+    }
+  } finally {
+    fitting = false
+  }
+}
+
+watch(
+  () => [olderDrawn.value.length, props.config.drawnSizePc, props.config.textTransform],
+  () => { void fitOlderColumns() },
+  { flush: 'post' },
+)
+
+watch(olderListEl, (el) => {
+  olderObserver?.disconnect()
+  olderObserver = null
+  if (!el || typeof ResizeObserver === 'undefined') return
+  olderObserver = new ResizeObserver(() => { void fitOlderColumns() })
+  olderObserver.observe(el)
+  void fitOlderColumns()
+})
+
+onUnmounted(() => olderObserver?.disconnect())
+
 const showDrawnList = computed(
   () => props.projection && drawnList.value.length > 0,
 )
@@ -160,9 +254,11 @@ watch(
     if (wasDrawing && props.runtime.currentDisplay) {
       wasDrawing = false
       triggerCelebrate()
+    /* v8 ignore start -- source watches only isDrawing; callback nunca recebe false→false */
     } else if (!prev && !drawing) {
       wasDrawing = false
     }
+    /* v8 ignore stop */
   },
 )
 
@@ -201,6 +297,8 @@ const projectionSurfaceStyle = computed(() => {
   return {
     // Fundo da personalização do sorteio (diálogo), quando não há imagem do Palco.
     backgroundColor: props.stage?.backgroundImage ? undefined : props.config.bgColor,
+    // Bola e anéis crescem na mesma proporção da letra (8 = tamanho padrão).
+    '--random-orb-scale': String(Math.max(0.5, props.config.fontSizePc / DEFAULT_RANDOM_DISPLAY_CONFIG.fontSizePc)),
   }
 })
 
@@ -210,6 +308,7 @@ function relocateParticle(el: HTMLElement) {
 }
 
 function animateParticle(el: HTMLElement) {
+  /* v8 ignore next 1 -- chamadas só ocorrem no mount ou após onfinish, ambos guardados por cancelled */
   if (cancelled) return
 
   const duration = Math.random() * 2000 + 1000
@@ -390,10 +489,22 @@ onUnmounted(() => {
       @click="emit('draw')"
     >
       <span class="random-stage__draw-circle">
-        <i
-          class="ti ti-dice"
-          aria-hidden="true"
-        />
+        <!-- Dado 3D: 6 faces com pips corretos (1-6), sem glifo de fonte -->
+        <span class="random-stage__dice" aria-hidden="true">
+          <span
+            v-for="face in DICE_FACES"
+            :key="face.n"
+            class="random-stage__dice-face"
+            :data-face="face.n"
+          >
+            <span
+              v-for="pip in face.pips"
+              :key="pip"
+              class="random-stage__dice-pip"
+              :style="{ gridArea: `p${pip}` }"
+            />
+          </span>
+        </span>
       </span>
       <span class="random-stage__draw-label">
         {{ t('random.drawButton') }}
@@ -421,6 +532,7 @@ onUnmounted(() => {
     <aside
       v-if="showDrawnList"
       class="random-stage__drawn"
+      :style="{ '--drawn-scale': String((config.drawnSizePc ?? 400) / 100) }"
       :aria-label="t('random.drawn')"
     >
       <header class="random-stage__drawn-head">
@@ -433,23 +545,39 @@ onUnmounted(() => {
       </header>
       <ul class="random-stage__drawn-list">
         <li
-          v-for="(item, index) in drawnList"
-          :key="`${item}-${index}`"
+          v-for="(item, index) in recentDrawn"
+          :key="`recent-${item.rank}-${item.name}`"
           class="random-stage__drawn-item"
-          :class="{
-            'random-stage__drawn-item--latest':
-              !runtime.isDrawing && index === drawnList.length - 1,
-          }"
+          :class="{ 'random-stage__drawn-item--latest': !runtime.isDrawing && index === 0 }"
         >
           <span class="random-stage__drawn-rank">
-            {{ index + 1 }}
+            {{ item.rank }}
           </span>
           <span
             class="random-stage__drawn-name"
             :style="{ textTransform: config.textTransform }"
           >
-            {{ item }}
+            {{ item.name }}
           </span>
+        </li>
+      </ul>
+      <ul
+        v-if="olderDrawn.length"
+        ref="olderListEl"
+        class="random-stage__drawn-older"
+        :style="olderListStyle"
+      >
+        <li
+          v-for="item in olderGrid"
+          :key="`older-${item.rank}-${item.name}`"
+          class="random-stage__drawn-chip"
+          :style="item.rowStart ? { gridColumnStart: 1 } : undefined"
+        >
+          <span class="random-stage__drawn-chip-rank">{{ item.rank }}</span>
+          <span
+            class="random-stage__drawn-chip-name"
+            :style="{ textTransform: config.textTransform }"
+          >{{ item.name }}</span>
         </li>
       </ul>
     </aside>
@@ -520,8 +648,11 @@ onUnmounted(() => {
   overflow: visible;
 
   .random-stage--projection & {
-    width: min(56vmin, 32rem);
-    height: min(56vmin, 32rem);
+    /* Cresce com a letra; teto na altura da tela. */
+    --random-focal-size: min(calc(min(56vmin, 32rem) * var(--random-orb-scale, 1)), 98vmin);
+
+    width: var(--random-focal-size);
+    height: var(--random-focal-size);
   }
 
   /* Nomes: caixa cresce com o texto (sem teto em rem que força quebra). */
@@ -554,8 +685,8 @@ onUnmounted(() => {
     border: 2px dashed color-mix(in srgb, var(--ds-color-primary) 12%, transparent);
 
     .random-stage--projection & {
-      width: min(70vmin, 40rem);
-      height: min(70vmin, 40rem);
+      width: calc(var(--random-focal-size, min(56vmin, 32rem)) * 1.25);
+      height: calc(var(--random-focal-size, min(56vmin, 32rem)) * 1.25);
       display: block;
     }
 
@@ -572,8 +703,8 @@ onUnmounted(() => {
     animation-duration: 15s;
 
     .random-stage--projection & {
-      width: min(62vmin, 36rem);
-      height: min(62vmin, 36rem);
+      width: calc(var(--random-focal-size, min(56vmin, 32rem)) * 1.11);
+      height: calc(var(--random-focal-size, min(56vmin, 32rem)) * 1.11);
       display: block;
     }
 
@@ -758,6 +889,11 @@ onUnmounted(() => {
     letter-spacing: 0.28em;
   }
 
+  /* Bola menor (letra pequena): o rótulo encolhe junto para caber na largura dela. */
+  .random-stage--projection:not(.random-stage--names) & {
+    font-size: min(clamp(1rem, 2.8vmin, 1.85rem), calc(var(--random-focal-size, 32rem) * 0.07));
+  }
+
   &--pop {
     animation: random-winner-pop 700ms cubic-bezier(0.22, 1, 0.36, 1);
   }
@@ -826,8 +962,8 @@ onUnmounted(() => {
     opacity: 0.45;
   }
 
-  &--spinning .random-stage__draw-circle .ti {
-    animation: random-dice-spin 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  &--spinning .random-stage__dice {
+    animation: random-dice-roll 0.6s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   &:not(:disabled):hover .random-stage__draw-circle {
@@ -860,10 +996,73 @@ onUnmounted(() => {
   color: var(--ds-color-on-primary-container, #002c4f);
   box-shadow: 0 0 40px color-mix(in srgb, #2196f3 40%, transparent);
   transition: transform 180ms ease;
+}
 
-  .ti {
-    font-size: 2.25rem;
-  }
+/* ===== Dado 3D (substitui glifo ti-dice — pips não conferiam) ===== */
+.random-stage__dice {
+  --dice-size: 2.1rem;
+  --dice-half: calc(var(--dice-size) / 2);
+  display: block;
+  width: var(--dice-size);
+  height: var(--dice-size);
+  perspective: 26rem;
+}
+
+.random-stage__dice-face {
+  display: grid;
+  grid-template-areas:
+    'p1 p2 p3'
+    'p4 p5 p6'
+    'p7 p8 p9';
+  position: absolute;
+  inset: 0;
+  padding: calc(var(--dice-size) * 0.14);
+  gap: calc(var(--dice-size) * 0.08);
+  border-radius: calc(var(--dice-size) * 0.18);
+  background: #f6f7f9;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+  backface-visibility: hidden;
+}
+
+.random-stage__dice-pip {
+  width: 100%;
+  height: 100%;
+  border-radius: 9999px;
+  background: currentColor;
+  align-self: center;
+  justify-self: center;
+  aspect-ratio: 1;
+}
+
+/* Projeção do cubo: uma face frontal + levemente topo/direita visíveis. */
+.random-stage__dice-face[data-face='1'] {
+  transform: translateZ(var(--dice-half));
+}
+
+.random-stage__dice-face[data-face='2'] {
+  transform: rotateY(90deg) translateZ(var(--dice-half));
+}
+
+.random-stage__dice-face[data-face='3'] {
+  transform: rotateY(180deg) translateZ(var(--dice-half));
+}
+
+.random-stage__dice-face[data-face='4'] {
+  transform: rotateY(-90deg) translateZ(var(--dice-half));
+}
+
+.random-stage__dice-face[data-face='5'] {
+  transform: rotateX(90deg) translateZ(var(--dice-half));
+}
+
+.random-stage__dice-face[data-face='6'] {
+  transform: rotateX(-90deg) translateZ(var(--dice-half));
+}
+
+.random-stage__dice {
+  transform-style: preserve-3d;
+  /* isométrico suave: mostra 1 (frente), 2 (topo como face 2 girada) e 3 */
+  transform: rotateX(-22deg) rotateY(-16deg);
 }
 
 .random-stage__draw-label {
@@ -904,16 +1103,22 @@ onUnmounted(() => {
 }
 
 .random-stage__drawn {
+  /* Coluna na lateral direita. O controle da Personalização muda a fonte dos
+     sorteados; a coluna só alarga quando o texto não cabe. */
+  --ds: var(--drawn-scale, 1);
+
   position: absolute;
-  right: 4vmin;
-  bottom: 3vmin;
-  left: 4vmin;
+  top: 4vmin;
+  right: 3vmin;
+  bottom: 4vmin;
   z-index: 3;
   display: flex;
-  max-height: 26vmin;
+  width: max-content;
+  min-width: 18vw;
+  max-width: 45vw;
   flex-direction: column;
   margin: 0;
-  padding: 1.4cqh 1.8cqw;
+  padding: 1.4cqh 1.2cqw;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, #fff 18%, transparent);
   border-radius: 1.6cqw 0 1.6cqw 0;
@@ -955,21 +1160,24 @@ onUnmounted(() => {
 
 .random-stage__drawn-list {
   display: flex;
-  flex: 1;
-  flex-wrap: wrap;
-  gap: 0.8cqh 1cqw;
+  flex-shrink: 0;
+  /* Mais recente no topo (a lista já vem invertida). */
+  flex-direction: column;
+  gap: 0.8cqh;
   margin: 0;
   padding: 0;
-  overflow: auto;
+  overflow: hidden;
   list-style: none;
 }
 
 .random-stage__drawn-item {
-  display: inline-flex;
+  display: flex;
   max-width: 100%;
+  flex-shrink: 0;
   align-items: center;
-  gap: 0.6cqw;
-  padding: 0.55cqh 1cqw;
+  gap: 0.6em;
+  padding: 0.3em 0.9em 0.3em 0.45em;
+  font-size: calc(1.8cqh * var(--ds));
   border: 1px solid color-mix(in srgb, #fff 14%, transparent);
   border-radius: 9999px;
   background: color-mix(in srgb, #fff 8%, transparent);
@@ -984,21 +1192,63 @@ onUnmounted(() => {
 
 .random-stage__drawn-rank {
   display: inline-flex;
-  width: 2cqh;
-  height: 2cqh;
+  /* em do próprio rank (0.65em do item): ~1.15× a fonte do nome. */
+  width: 1.75em;
+  height: 1.75em;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
   border-radius: 9999px;
   background: color-mix(in srgb, #000 35%, transparent);
-  font-size: 1.2cqh;
+  font-size: 0.65em;
   font-weight: 700;
   opacity: 0.9;
 }
 
+.random-stage__drawn-older {
+  /* Colunas e fonte vêm do olderListStyle (2 por linha, cresce se encher). */
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  align-content: start;
+  gap: 1cqh 0.8cqw;
+  margin: 1.2cqh 0 0;
+  padding: 1cqh 0 0;
+  overflow: hidden;
+  border-top: 1px solid color-mix(in srgb, #fff 12%, transparent);
+  list-style: none;
+}
+
+.random-stage__drawn-chip {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.2em 0.6em 0.2em 0.3em;
+  border: 1px solid color-mix(in srgb, #fff 12%, transparent);
+  border-radius: 9999px;
+  background: color-mix(in srgb, #fff 6%, transparent);
+  color: color-mix(in srgb, #fff 85%, transparent);
+  font-size: 1em;
+}
+
+.random-stage__drawn-chip-rank {
+  font-size: 0.7em;
+  font-weight: 700;
+  opacity: 0.65;
+}
+
+.random-stage__drawn-chip-name {
+  overflow: hidden;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .random-stage__drawn-name {
   overflow: hidden;
-  font-size: 1.8cqh;
+  font-size: 1em;
   font-weight: 700;
   line-height: 1.2;
   text-overflow: ellipsis;
@@ -1015,13 +1265,13 @@ onUnmounted(() => {
   }
 }
 
-@keyframes random-dice-spin {
+@keyframes random-dice-roll {
   from {
-    transform: rotate(0deg) scale(0.9);
+    transform: rotateX(-22deg) rotateY(-16deg) scale(0.9);
   }
 
   to {
-    transform: rotate(360deg) scale(1);
+    transform: rotateX(338deg) rotateY(704deg) scale(1);
   }
 }
 

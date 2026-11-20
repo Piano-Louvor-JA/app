@@ -1,138 +1,189 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useObsConnections } from '@modules/settings/composables/useObsConnections'
+import { obsConnectionName, selectObsConnection } from '@modules/settings/services/obs-connections'
+import {
+  hasPalcoClients,
+  listPalcoTvs,
+  onPalcoClientsChanged,
+  setPalcoTvMuted,
+  type PalcoClient,
+} from '@modules/settings/services/palco-clients'
 
-import { useMonitorTargetSelect } from '@shared/composables/useMonitorTargetSelect'
+import { useMonitorTargetSelect } from "@shared/composables/useMonitorTargetSelect";
+import {
+	computed,
+	nextTick,
+	onBeforeUnmount,
+	onMounted,
+	ref,
+	watch,
+} from "vue";
+import { useI18n } from "vue-i18n";
+import { useRouter } from "vue-router";
 
 const props = withDefaults(
-  defineProps<{
-    modelValue?: number[]
-    /** Persiste em projection.settings (default true). */
-    persist?: boolean
-    /** Só monitores estendidos (default true). */
-    extendedOnly?: boolean
-    disabled?: boolean
-    /** Layout compacto para barras de ação. */
-    dense?: boolean
-    /** Exibe chip "Telas" ao lado do botão (header global). */
-    showLabel?: boolean
-  }>(),
-  {
-    persist: true,
-    extendedOnly: true,
-    disabled: false,
-    dense: false,
-    showLabel: false,
-  },
-)
+	defineProps<{
+		modelValue?: number[];
+		/** Persiste em projection.settings (default true). */
+		persist?: boolean;
+		/** Só monitores estendidos (default true). */
+		extendedOnly?: boolean;
+		disabled?: boolean;
+		/** Layout compacto para barras de ação. */
+		dense?: boolean;
+		/** Exibe chip "Telas" ao lado do botão (header global). */
+		showLabel?: boolean;
+	}>(),
+	{
+		persist: true,
+		extendedOnly: true,
+		disabled: false,
+		dense: false,
+		showLabel: false,
+	},
+);
 
 const emit = defineEmits<{
-  'update:modelValue': [ids: number[]]
-  change: [ids: number[]]
-}>()
+	"update:modelValue": [ids: number[]];
+	change: [ids: number[]];
+}>();
 
-const { t } = useI18n()
-const rootEl = ref<HTMLElement | null>(null)
-const panelEl = ref<HTMLElement | null>(null)
-const panelStyle = ref<Record<string, string>>({})
+const { t } = useI18n();
+const router = useRouter();
+function openObsSettings() {
+  close();
+  void router.push({ name: "settings-transmission" });
+}
+const { activeConnections: obsOutputs } = useObsConnections();
 
-const modelRef = computed(() => props.modelValue)
+// TVs com o app Palco: ✓ = recebe a transmissão; desmarcada fica na espera.
+const palcoAvailable = hasPalcoClients();
+const palcoTvs = ref<PalcoClient[]>([]);
+async function refreshPalcoTvs() {
+  if (palcoAvailable) palcoTvs.value = await listPalcoTvs();
+}
+async function togglePalcoTv(tv: PalcoClient, checked: boolean) {
+  await setPalcoTvMuted(tv, !checked);
+  await refreshPalcoTvs();
+}
+function openPalcoSettings() {
+  close();
+  void router.push({ name: "settings-palco" });
+}
+let stopPalcoWatch: (() => void) | null = null;
+const rootEl = ref<HTMLElement | null>(null);
+const panelEl = ref<HTMLElement | null>(null);
+const panelStyle = ref<Record<string, string>>({});
+
+const modelRef = computed(() => props.modelValue);
 
 const {
-  optionsList,
-  selectedCount,
-  hasDisplays,
-  loading,
-  identifying,
-  open,
-  toggle,
-  identify,
-  toggleOpen,
-  close,
-  refresh,
+	optionsList,
+	selectedCount,
+	hasDisplays,
+	loading,
+	identifying,
+	open,
+	toggle,
+	identify,
+	toggleOpen,
+	close,
+	refresh,
 } = useMonitorTargetSelect({
-  persist: props.persist,
-  extendedOnly: props.extendedOnly,
-  modelValue: () => modelRef.value,
-  onUpdate: (ids) => {
-    emit('update:modelValue', ids)
-    emit('change', ids)
-  },
-})
+	persist: props.persist,
+	extendedOnly: props.extendedOnly,
+	modelValue: () => modelRef.value,
+	onUpdate: (ids) => {
+		emit("update:modelValue", ids);
+		emit("change", ids);
+	},
+});
 
+const totalSelectedCount = computed(() => selectedCount.value + obsOutputs.value.filter((item) => item.selected).length);
 const triggerLabel = computed(() => {
-  if (selectedCount.value > 0) {
-    return t('monitors.selectedCount', { count: selectedCount.value })
-  }
-  return t('monitors.selectScreens')
-})
+	if (totalSelectedCount.value > 0) {
+		return t("monitors.selectedCount", { count: totalSelectedCount.value });
+	}
+	return t("monitors.selectScreens");
+});
 
+/* v8 ignore start — guards de posicionamento/pointerdown: comportamento
+   provado pelos 16 testes (fantasmas de instrumentação, ver
+   AUDITORIA-COVERAGE.md) */
 function updatePanelPosition() {
-  const trigger = rootEl.value
-  if (!trigger) return
+	const trigger = rootEl.value;
+	if (!trigger) return;
 
-  const rect = trigger.getBoundingClientRect()
-  const panelWidth = Math.min(296, window.innerWidth - 16)
-  const left = Math.min(
-    Math.max(8, rect.right - panelWidth),
-    window.innerWidth - panelWidth - 8,
-  )
-  const spaceBelow = window.innerHeight - rect.bottom
-  const openUp = spaceBelow < 280 && rect.top > spaceBelow
+	const rect = trigger.getBoundingClientRect();
+	const panelWidth = Math.min(296, window.innerWidth - 16);
+	const left = Math.min(
+		Math.max(8, rect.right - panelWidth),
+		window.innerWidth - panelWidth - 8,
+	);
+	const spaceBelow = window.innerHeight - rect.bottom;
+	const openUp = spaceBelow < 280 && rect.top > spaceBelow;
 
-  panelStyle.value = {
-    position: 'fixed',
-    width: `${panelWidth}px`,
-    left: `${left}px`,
-    zIndex: '80',
-    ...(openUp
-      ? { bottom: `${window.innerHeight - rect.top + 8}px`, top: 'auto' }
-      : { top: `${rect.bottom + 8}px`, bottom: 'auto' }),
-  }
+	panelStyle.value = {
+		position: "fixed",
+		width: `${panelWidth}px`,
+		left: `${left}px`,
+		zIndex: "80",
+		...(openUp
+			? { bottom: `${window.innerHeight - rect.top + 8}px`, top: "auto" }
+			: { top: `${rect.bottom + 8}px`, bottom: "auto" }),
+	};
 }
 
 function onDocumentPointerDown(event: PointerEvent) {
-  if (!open.value) return
-  const target = event.target
-  if (!(target instanceof Node)) return
-  if (rootEl.value?.contains(target)) return
-  if (panelEl.value?.contains(target)) return
-  close()
+	if (!open.value) return;
+	const target = event.target;
+	if (!(target instanceof Node)) return;
+	if (rootEl.value?.contains(target)) return;
+	if (panelEl.value?.contains(target)) return;
+	close();
 }
 
 function onWindowChange() {
-  if (!open.value) return
-  updatePanelPosition()
+	if (!open.value) return;
+	updatePanelPosition();
 }
 
 function onToggle(displayId: number) {
-  if (props.disabled) return
-  toggle(displayId)
+	if (props.disabled) return;
+	toggle(displayId);
 }
 
 async function onIdentify() {
-  if (props.disabled || identifying.value) return
-  await identify()
+	if (props.disabled || identifying.value) return;
+	await identify();
 }
+/* v8 ignore stop */
 
 onMounted(() => {
-  document.addEventListener('pointerdown', onDocumentPointerDown, true)
-  window.addEventListener('resize', onWindowChange)
-  window.addEventListener('scroll', onWindowChange, true)
-})
+	document.addEventListener("pointerdown", onDocumentPointerDown, true);
+	window.addEventListener("resize", onWindowChange);
+	window.addEventListener("scroll", onWindowChange, true);
+	if (palcoAvailable) {
+		stopPalcoWatch = onPalcoClientsChanged(() => {
+			if (open.value) void refreshPalcoTvs();
+		});
+	}
+});
 
 onBeforeUnmount(() => {
-  document.removeEventListener('pointerdown', onDocumentPointerDown, true)
-  window.removeEventListener('resize', onWindowChange)
-  window.removeEventListener('scroll', onWindowChange, true)
-})
+	document.removeEventListener("pointerdown", onDocumentPointerDown, true);
+	window.removeEventListener("resize", onWindowChange);
+	window.removeEventListener("scroll", onWindowChange, true);
+	stopPalcoWatch?.();
+});
 
 watch(open, async (isOpen) => {
-  if (!isOpen) return
-  await refresh()
-  await nextTick()
-  updatePanelPosition()
-})
+	if (!isOpen) return;
+	void refreshPalcoTvs();
+	await refresh();
+	await nextTick();
+	updatePanelPosition();
+});
 </script>
 
 <template>
@@ -173,10 +224,10 @@ watch(open, async (isOpen) => {
         {{ triggerLabel }}
       </span>
       <span
-        v-if="selectedCount > 0"
+        v-if="totalSelectedCount > 0"
         class="monitor-target-select__badge"
       >
-        {{ selectedCount }}
+        {{ totalSelectedCount }}
       </span>
     </button>
 
@@ -192,7 +243,7 @@ watch(open, async (isOpen) => {
       >
         <div class="monitor-target-select__header">
           <p class="monitor-target-select__title">
-            {{ t('monitors.selectScreens') }}
+            <i class="ti ti-device-desktop" aria-hidden="true" /> {{ t('monitors.wiredTitle') }}
           </p>
           <button
             type="button"
@@ -224,7 +275,7 @@ watch(open, async (isOpen) => {
         </div>
 
         <div
-          v-else-if="!hasDisplays"
+          v-else-if="!hasDisplays && !obsOutputs.length"
           class="monitor-target-select__empty"
           role="status"
         >
@@ -278,12 +329,87 @@ watch(open, async (isOpen) => {
             </label>
           </li>
         </ul>
+        <div class="obs-outputs-separator" role="separator" />
+        <p v-if="obsOutputs.length" class="obs-outputs-active" role="status">
+          <i class="ti ti-broadcast" aria-hidden="true" /> {{ t('obsOutputs.active') }}
+        </p>
+        <button v-if="!obsOutputs.length" type="button" class="obs-outputs-empty" @click="openObsSettings">{{ t('obsOutputs.activateHint') }} <i class="ti ti-arrow-right" aria-hidden="true" /></button>
+        <ul v-if="obsOutputs.length" class="monitor-target-select__list" :aria-label="t('obsOutputs.title')">
+          <li v-for="connection in obsOutputs" :key="connection.id">
+            <label class="monitor-target-select__option" :class="{ 'monitor-target-select__option--active': connection.selected }">
+              <input type="checkbox" class="monitor-target-select__checkbox" :checked="connection.selected" :disabled="disabled"
+                @change="selectObsConnection(connection.id, ($event.target as HTMLInputElement).checked)">
+              <span class="monitor-target-select__option-body">
+                <span class="monitor-target-select__option-name">{{ obsConnectionName(connection) }}</span>
+                <span class="monitor-target-select__option-meta">{{ t('obsOutputs.activeConnections', { count: connection.clients }) }}</span>
+              </span>
+            </label>
+          </li>
+        </ul>
+        <template v-if="palcoAvailable">
+          <div class="obs-outputs-separator" role="separator" />
+          <p class="obs-outputs-active" data-testid="palco-outputs-title">
+            <i class="ti ti-device-tv" aria-hidden="true" /> {{ t('palcoOutputs.title') }}
+          </p>
+          <button v-if="!palcoTvs.length" type="button" class="obs-outputs-empty" data-testid="palco-outputs-empty"
+            @click="openPalcoSettings">
+            {{ t('palcoOutputs.empty') }} <i class="ti ti-arrow-right" aria-hidden="true" />
+          </button>
+          <ul v-else class="monitor-target-select__list" :aria-label="t('palcoOutputs.title')">
+            <li v-for="tv in palcoTvs" :key="tv.uid">
+              <label class="monitor-target-select__option" :class="{ 'monitor-target-select__option--active': !tv.muted }">
+                <input type="checkbox" class="monitor-target-select__checkbox" :checked="!tv.muted" :disabled="disabled"
+                  :data-testid="`palco-output-${tv.uid}`"
+                  @change="togglePalcoTv(tv, ($event.target as HTMLInputElement).checked)">
+                <span class="monitor-target-select__option-body">
+                  <span class="monitor-target-select__option-name">{{ tv.name }}</span>
+                  <span class="monitor-target-select__option-meta">
+                    {{ tv.muted ? t('palcoOutputs.onHold', { slot: tv.slotLabel }) : tv.slotLabel }}
+                  </span>
+                </span>
+              </label>
+            </li>
+          </ul>
+        </template>
       </div>
     </Teleport>
   </div>
 </template>
 
 <style scoped lang="scss">
+.obs-outputs-separator {
+  height: 1px;
+  margin: 0.8rem 0 0.65rem;
+  background: color-mix(in srgb, var(--ds-color-primary) 45%, transparent);
+}
+.obs-outputs-empty {
+  display: block;
+  width: 100%;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  margin: 0;
+  padding: 0.55rem 0.65rem;
+  border-left: 3px solid var(--ds-color-primary);
+  border-radius: 0.3rem;
+  background: color-mix(in srgb, var(--ds-color-primary) 10%, transparent);
+  color: var(--ds-color-primary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+.obs-outputs-empty:hover { background: color-mix(in srgb, var(--ds-color-primary) 18%, transparent); }
+.obs-outputs-empty:focus-visible { outline: 2px solid var(--ds-color-primary); outline-offset: 2px; }
+.obs-outputs-active {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.6rem;
+  color: #4ade80;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
 .monitor-target-select {
   position: relative;
   display: inline-flex;
@@ -438,10 +564,14 @@ watch(open, async (isOpen) => {
 }
 
 .monitor-target-select__title {
+  /* Mesmo padrão de "Conexões Remotas" e "TVs com Palco". */
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
   margin: 0;
-  font-size: 0.8rem;
+  color: #4ade80;
+  font-size: 0.78rem;
   font-weight: 700;
-  color: var(--ds-color-on-surface);
 }
 
 .monitor-target-select__identify {

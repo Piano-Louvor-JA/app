@@ -11,6 +11,10 @@ import { decodeJaBytes, parseJaLiturgy } from '../services/liturgy-ja-import'
 import { getDesktopBridge } from '@shared/services/desktop-bridge'
 import { useLiturgyStore } from '../stores/useLiturgyStore'
 import { useScheduledStore } from '../stores/useScheduledStore'
+import { formatClock } from '../services/liturgy-format'
+import {
+  estimatedSessionEndSafe as estimatedSessionEnd,
+} from '../services/liturgy-item-helpers'
 import { appConfirm } from '@shared/composables/useAppConfirm'
 import type { LiturgyDayKey } from '../types/liturgy'
 import { useLiturgyClock } from './useLiturgyClock'
@@ -91,10 +95,8 @@ export function useLiturgy() {
   })
 
   onUnmounted(() => {
-    if (syncTimer != null) {
-      window.clearInterval(syncTimer)
-      syncTimer = null
-    }
+    if (syncTimer !== null) window.clearInterval(syncTimer)
+    syncTimer = null
   })
 
   function worshipLabel(): string {
@@ -114,30 +116,55 @@ export function useLiturgy() {
     currentItems.value.map((item) => formatMomentDuration(item.durationMs)),
   )
 
-  function confirmClearLiturgy() {
+  async function confirmClearLiturgy() {
     if (currentItems.value.length === 0 || deletionLocked.value) return
-    if (!window.confirm(t('liturgy.messages.confirmClear'))) return
+    const confirmed = await appConfirm({
+      title: t('liturgy.messages.clearTitle'),
+      message: t('liturgy.messages.confirmClear'),
+      confirmLabel: t('liturgy.messages.removeAction'),
+      cancelLabel: t('liturgy.messages.cancelAction'),
+      danger: true,
+    })
+    if (!confirmed) return
     store.clearAllItems()
   }
 
-  function confirmRemoveItem(index: number) {
+  async function confirmRemoveItem(index: number) {
     if (deletionLocked.value) return
     const item = currentItems.value[index]
+    if (!item) return
+    const itemLabel = String(
+      (item as { label?: string; title?: string } | undefined)?.label ??
+        (item as { title?: string } | undefined)?.title ??
+        '',
+    ).trim()
     const message =
-      item?.type === 'category'
+      item.type === 'category'
         ? t('liturgy.messages.confirmDeleteCategory')
-        : t('liturgy.messages.confirmDelete')
-    if (!window.confirm(message)) return
+        : itemLabel
+          ? t('liturgy.messages.confirmDeleteNamed', { name: itemLabel })
+          : t('liturgy.messages.confirmDelete')
+    const confirmed = await appConfirm({
+      title: t('liturgy.messages.removeItemTitle'),
+      message,
+      confirmLabel: t('liturgy.messages.removeAction'),
+      cancelLabel: t('liturgy.messages.cancelAction'),
+      danger: true,
+    })
+    if (!confirmed) return
     store.removeItem(index)
   }
 
-  function confirmRemoveCustom(index: number) {
+  async function confirmRemoveCustom(index: number) {
     const name = customLiturgies.value[index]?.name ?? ''
-    if (
-      !window.confirm(t('liturgy.messages.confirmDeleteCustom', { name }))
-    ) {
-      return
-    }
+    const confirmed = await appConfirm({
+      title: t('liturgy.messages.removeLiturgyTitle'),
+      message: t('liturgy.messages.confirmDeleteCustom', { name }),
+      confirmLabel: t('liturgy.messages.removeAction'),
+      cancelLabel: t('liturgy.messages.cancelAction'),
+      danger: true,
+    })
+    if (!confirmed) return
     store.removeCustomLiturgy(index)
   }
 
@@ -305,8 +332,12 @@ export function useLiturgy() {
     })
   }
 
-  function onManageTeam() {
-    window.alert(t('liturgy.team.comingSoon'))
+  async function onManageTeam() {
+    await appConfirm({
+      title: t('liturgy.team.title'),
+      message: t('liturgy.team.comingSoon'),
+      confirmLabel: t('liturgy.ok'),
+    })
   }
 
   async function runMusicAction(
@@ -399,6 +430,15 @@ export function useLiturgy() {
     worshipLabel,
     headerDateTime: clock.headerDateTime,
     remainingCountdownLabel: clock.remainingCountdownLabel,
+    currentClock: computed(() => formatClock(clock.now.value)),
+    estimatedSessionEndLabel: computed(() => {
+      const end = estimatedSessionEnd(currentItems.value, (id) =>
+        currentItems.value.filter(
+          (i) => i.type !== 'category' && i.categoryId === id,
+        ),
+      )
+      return end ?? ''
+    }),
     startTimeInput: clock.startTimeInput,
     endTimeInput: clock.endTimeInput,
     countdownExpired: clock.countdownExpired,
@@ -448,6 +488,7 @@ export function useLiturgy() {
     onManageTeam,
     onMusicPick: store.onMusicPick,
     clearMusicPick: store.clearMusicPick,
+    refreshMusicCatalog: store.refreshMusicCatalog,
     onVideoFileSelected(itemId: string, durationSec: number) {
       store.setItemDurationMs(itemId, Math.round(durationSec * 1000))
     },

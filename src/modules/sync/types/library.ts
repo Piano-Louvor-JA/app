@@ -26,6 +26,8 @@ export type LibraryAlbum = {
 export type LibraryCategory = {
   id: string | number
   name: string
+  /** Slug estável entre idiomas (aym, kids, ...) — chave de ordenação. */
+  slug?: string
   albums: LibraryAlbum[]
 }
 
@@ -39,6 +41,8 @@ export type CatalogCategoryAlbum = {
 export type CatalogCategory = {
   id_category: number | string
   name: string
+  /** Slug estável entre idiomas (aym, kids, ...) — chave de ordenação. */
+  slug?: string
   albums?: CatalogCategoryAlbum[]
 }
 

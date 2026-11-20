@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { GlassCard } from "@design-system/index";
-import { getAuthSession } from "@modules/media/services/auth-client";
+import { authTokenAsync, getAuthSession } from "@modules/media/services/auth-client";
+import { getAuthReadiness } from "@modules/auth/services/firebase-client";
 
 import ReportDialog from "../components/ReportDialog.vue";
+import { storeToRefs } from "pinia";
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -14,6 +16,11 @@ import {
 } from "../services/community-catalog";
 import { registerUse, reportCollection } from "../services/ranking";
 import {
+	updateCustomCollection,
+	deleteCustomCollection,
+	type CollectionVisibility,
+} from "@modules/media/services/custom-catalog";
+import {
 	getSeasonalEvent,
 	type SeasonalEventBanner,
 } from "../services/seasonal-event";
@@ -23,6 +30,13 @@ import {
 	getNotifications,
 } from "../services/notifications";
 import NotificationsDropdown from "../components/NotificationsDropdown.vue";
+import MyEditsPanel from "@modules/community-edits/views/MyEditsPanel.vue";
+import { listLocalEdits } from "@modules/community-edits/services/local-edits-store";
+import { publishEdit } from "@modules/community-edits/services/publish-edit";
+import type { ServerEditStatus } from "@modules/community-edits/views/MyEditsPanel.vue";
+import { useCommunityBrowseStore } from "../stores/useCommunityBrowseStore";
+import PageBackStack from "@shared/components/PageBackStack.vue";
+import { useMinimizablePage } from "@shared/composables/useMinimizablePage";
 
 const { t } = useI18n();
 const router = useRouter();
@@ -34,8 +48,34 @@ const savedId = ref<number | null>(null);
 const savedError = ref<number | null>(null);
 const weeklyTasks = ref<WeeklyTask[]>([]);
 const viewEl = ref<HTMLElement | null>(null);
-const searchQuery = ref("");
-const page = ref(1);
+// busca e página sobrevivem a sair e voltar para a tela
+const { searchQuery, page } = storeToRefs(useCommunityBrowseStore());
+
+/** Retrato guardado ao minimizar: busca e página da lista. */
+interface CommunitySnapshot {
+	searchQuery: string;
+	page: number;
+}
+
+const { minimize, prepare, takeRestoredState } = useMinimizablePage<CommunitySnapshot>({
+	describe: () => {
+		const query = searchQuery.value.trim();
+		const parts = [
+			query ? t("minimize.search", { q: query }) : "",
+			t("minimize.pageNumber", { n: page.value }),
+		];
+		return { title: t("community.title"), icon: "ti-users-group", summary: parts.filter(Boolean).join(" · ") };
+	},
+	capture: () => ({ searchQuery: searchQuery.value, page: page.value }),
+	fallbackRoute: { name: "home" },
+});
+
+// Reaberta pela barra: volta com a busca e a página antes do 1º carregamento.
+const restored = takeRestoredState();
+if (restored) {
+	searchQuery.value = restored.searchQuery;
+	page.value = restored.page;
+}
 const lastPage = ref(1);
 const total = ref(0);
 
@@ -57,8 +97,67 @@ const showNotifications = ref(false);
 const isLogged = ref(false);
 const seasonalEvent = ref<SeasonalEventBanner | null>(null);
 
+/* ---------- RF-04 (SPEC-crud-comunidade-hub-v1.0.0): ações do dono ---------- */
+const myUserId = computed(() => getAuthSession()?.user?.id_user ?? null);
+
+/** Toast local da Comunidade (RF-04): feedback das ações do dono. */
+const ownerToast = ref<{ msg: string; error: boolean } | null>(null);
+let ownerToastTimer: ReturnType<typeof setTimeout> | null = null;
+function notifyOwner(msg: string, error = false): void {
+	ownerToast.value = { msg, error };
+	if (ownerToastTimer) clearTimeout(ownerToastTimer);
+	ownerToastTimer = setTimeout(() => (ownerToast.value = null), 3500);
+}
+
+/** Minhas Edições: status do servidor (RF-05) + publish com a sessão real. */
+const myServerStatuses = ref<ServerEditStatus[]>([]);
+const publishInFlight = ref<number | null>(null);
+
+async function onPublishEdit(musicId: number): Promise<void> {
+  if (publishInFlight.value != null) return;
+  publishInFlight.value = musicId;
+  try {
+    const token = await authTokenAsync();
+    await publishEdit(musicId, { getToken: () => token });
+  } finally {
+    publishInFlight.value = null;
+  }
+}
+
+function refreshMyServerStatuses(): void {
+  if (!isLogged.value) {
+    myServerStatuses.value = [];
+    return;
+  }
+  void (async () => {
+    try {
+      const token = await authTokenAsync();
+      if (!token) return;
+      const res = await fetch(
+        `${import.meta.env.VITE_URL_DATABASE?.replace(/\/json_db$/, '') ?? ''}/v1/custom/edits/mine`,
+        { headers: { authorization: `Bearer ${token}` } },
+      );
+      if (!res.ok) return;
+      const body = (await res.json()) as {
+        edits?: { musicId?: number; music_id?: number; status: string; reason?: string | null }[];
+      };
+      myServerStatuses.value = (body.edits ?? []).map((e) => ({
+        musicId: (e.musicId ?? e.music_id) as number,
+        status: e.status,
+        reason: e.reason ?? null,
+      }));
+    } catch {
+      myServerStatuses.value = [];
+    }
+  })();
+}
+
 async function load() {
 	isLoading.value = true;
+	await Promise.race([
+		getAuthReadiness(),
+		new Promise<void>(resolve => setTimeout(resolve, 8_000)),
+	]);
 	const [result, tasks, notifs, seasonal] = await Promise.all([
 		listCommunityCollectionsPage(page.value, PER_PAGE),
 		getWeeklyTasks(),
@@ -73,16 +172,18 @@ async function load() {
 	notifications.value = notifs;
 	isLogged.value = Boolean(getAuthSession()?.token);
 	seasonalEvent.value = seasonal;
+	refreshMyServerStatuses();
 	// serviços nunca lançam; falha = vazio/null.
 	isLoading.value = false;
-	// o scroll container é o próprio section (a página inteira rola)
-	viewEl.value?.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function goTo(p: number) {
+async function goTo(p: number) {
 	if (p < 1 || p > lastPage.value || p === page.value) return;
 	page.value = p;
-	load();
+	await load();
+	// página nova começa do topo; ao só voltar para a tela, a rolagem
+	// restaurada pelo AppShell fica. O scroll container é o próprio section.
+	viewEl.value?.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function openReport(collection: CommunityCollectionSummary) {
@@ -95,7 +196,7 @@ async function submitReport(reason: string) {
 	const ok = await reportCollection(
 		target.id,
 		reason,
-		getAuthSession()?.token ?? null,
+		await authTokenAsync(),
 	);
 	reportTarget.value = null;
 	if (ok) {
@@ -103,16 +204,117 @@ async function submitReport(reason: string) {
 	}
 }
 
+/* ---------- RF-04 (SPEC-crud-comunidade-hub v1.0.0): ações do dono inline ---------- */
+// Dono vê editar/renomear/visibilidade/excluir no próprio cartão; não-dono
+// mantém copiar/report. Editar abre o editor do app; renomear/visibilidade
+// vão direto na API (PUT /v1/custom/collections/:id); excluir com confirmação.
+function isOwner(collection: CommunityCollectionSummary): boolean {
+	return (
+		myUserId.value != null &&
+		collection.ownerId != null &&
+		collection.ownerId === myUserId.value
+	);
+}
+
+const renamingId = ref<number | null>(null);
+const renameDraft = ref("");
+const ownerActionBusy = ref(false);
+const ownerErrorId = ref<number | null>(null);
+const deleteConfirmId = ref<number | null>(null);
+
+function startRename(collection: CommunityCollectionSummary): void {
+	renamingId.value = collection.id;
+	renameDraft.value = collection.name;
+}
+
+function cancelRename(): void {
+	renamingId.value = null;
+	renameDraft.value = "";
+}
+
+async function confirmRename(collection: CommunityCollectionSummary): Promise<void> {
+	const name = renameDraft.value.trim();
+	if (!name || name === collection.name || ownerActionBusy.value) {
+		cancelRename();
+		return;
+	}
+	ownerActionBusy.value = true;
+	try {
+		const updated = await updateCustomCollection(collection.id, { name });
+		if (updated) {
+			collection.name = updated.name || name;
+		} else {
+			ownerErrorId.value = collection.id;
+		}
+		cancelRename();
+	} finally {
+		ownerActionBusy.value = false;
+	}
+}
+
+async function toggleVisibility(collection: CommunityCollectionSummary): Promise<void> {
+	if (ownerActionBusy.value) return;
+	// ausente = legado público da API (default)
+	const next = (collection.visibility ?? "public") === "public" ? "private" : "public";
+	ownerActionBusy.value = true;
+	try {
+		const updated = await updateCustomCollection(collection.id, { visibility: next });
+		if (updated) {
+			collection.visibility = next;
+			notifyOwner(
+				next === "public"
+					? t("community.ownerNowPublic", { name: collection.name })
+					: t("community.ownerNowPrivate", { name: collection.name }),
+			);
+		} else {
+			ownerErrorId.value = collection.id;
+			notifyOwner(t("community.ownerActionFailed"), true);
+		}
+	} finally {
+		ownerActionBusy.value = false;
+	}
+}
+
+function requestDelete(collection: CommunityCollectionSummary): void {
+	deleteConfirmId.value = collection.id;
+}
+
+function cancelDelete(): void {
+	deleteConfirmId.value = null;
+}
+
+async function confirmDelete(collection: CommunityCollectionSummary): Promise<void> {
+	if (ownerActionBusy.value) return;
+	deleteConfirmId.value = null;
+	ownerActionBusy.value = true;
+	try {
+		const ok = await deleteCustomCollection(collection.id);
+		if (ok) {
+			notifyOwner(t("community.ownerDeleted", { name: collection.name }));
+			await load(); // some do hub
+		} else {
+			ownerErrorId.value = collection.id;
+			notifyOwner(t("community.ownerActionFailed"), true);
+		}
+	} finally {
+		ownerActionBusy.value = false;
+	}
+}
+
+function openEditor(collection: CommunityCollectionSummary): void {
+	void router.push({ path: "/media/editor", query: { collection: String(collection.id) } });
+}
+
 async function saveCopy(collection: CommunityCollectionSummary) {
 	// F0.4: cópia LOCAL editável, SEM tocar na do autor.
 	// F1: registra o uso (1x/user na API; credita +5 ao dono).
 	copyingId.value = collection.id;
-	await registerUse(collection.id, getAuthSession()?.token ?? null);
+	await registerUse(collection.id, await authTokenAsync());
 	const localId = await saveCommunityCopy(collection);
 	copyingId.value = null;
 	if (localId !== null) {
-		// O editor de Minhas Coletâneas está oculto por feature flag
-		// (SHOW_CUSTOM_COLLECTIONS=false): dar feedback aqui, sem navegar.
+		// Cópia fica em Minhas Coletâneas (/albums, SHOW_CUSTOM_COLLECTIONS=true
+		// desde 16/09); criar/editar agora parte daqui mesmo, via botão no header.
 		savedId.value = collection.id;
 		await load();
 	} else {
@@ -124,16 +326,18 @@ onMounted(load);
 </script>
 
 <template>
-  <section class="community-view">
+  <section ref="viewEl" class="community-view">
     <header class="community-view__header">
-      <button
-        type="button"
-        class="community-view__back"
-        :aria-label="t('community.back')"
-        @click="router.back()"
-      >
-        <i class="ti ti-arrow-left" aria-hidden="true" />
-      </button>
+      <PageBackStack @minimize="minimize" @prepare="prepare">
+        <button
+          type="button"
+          class="community-view__back"
+          :aria-label="t('community.back')"
+          @click="router.back()"
+        >
+          <i class="ti ti-arrow-left" aria-hidden="true" />
+        </button>
+      </PageBackStack>
       <div class="community-view__headings">
         <h1 class="community-view__title">
           {{ t('community.title') }}
@@ -162,7 +366,33 @@ onMounted(load);
           <i class="ti ti-trophy" aria-hidden="true" />
           {{ t('community.ranking') }}
         </button>
+        <a
+          href="https://pianolouvorja.com.br/conduta"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="community-view__coc-link"
+        >
+          <i class="ti ti-shield-check" aria-hidden="true" />
+          {{ t('community.conductLink') }}
+        </a>
+        <button
+          type="button"
+          class="community-view__create-btn"
+          :aria-label="t('community.createCollection')"
+          :title="t('community.createCollection')"
+          @click="router.push('/media/editor')"
+        >
+          <i class="ti ti-pencil-plus" aria-hidden="true" />
+          {{ t('community.createCollection') }}
+        </button>
       </div>
+
+      <MyEditsPanel
+        v-if="isLogged"
+        :server-statuses="myServerStatuses"
+        @publish="onPublishEdit"
+        class="community-view__my-edits"
+      />
     </header>
 
     <div
@@ -276,7 +506,110 @@ onMounted(load);
           <p class="community-view__card-count">
             <i class="ti ti-disc" aria-hidden="true" />
             {{ t('community.trackCount', { count: collection.musicsCount }) }}
+            <span
+              v-if="collection.visibility === 'private'"
+              class="community-view__private-badge"
+              :title="t('community.ownerPrivateBadge')"
+            >🔒</span>
           </p>
+          <!-- RF-04: ações do dono inline no próprio cartão -->
+          <div
+            v-if="isOwner(collection)"
+            class="community-view__owner-actions"
+          >
+            <div
+              v-if="renamingId === collection.id"
+              class="community-view__rename"
+            >
+              <input
+                v-model="renameDraft"
+                type="text"
+                class="community-view__rename-input"
+                :aria-label="t('community.renameLabel')"
+                @keyup.enter="confirmRename(collection)"
+                @keyup.esc="cancelRename"
+              >
+              <button
+                type="button"
+                class="community-view__rename-save"
+                :aria-label="t('community.renameSave')"
+                @click="confirmRename(collection)"
+              >
+                <i class="ti ti-check" aria-hidden="true" />
+              </button>
+            </div>
+            <div class="community-view__owner-btns">
+              <button
+                type="button"
+                class="community-view__edit-btn"
+                :aria-label="t('community.ownerEdit')"
+                :title="t('community.ownerEdit')"
+                @click="openEditor(collection)"
+              >
+                <i class="ti ti-pencil" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                class="community-view__rename-btn"
+                :aria-label="t('community.ownerRename')"
+                :title="t('community.ownerRename')"
+                @click="startRename(collection)"
+              >
+                <i class="ti ti-text-size" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                class="community-view__visibility-btn"
+                :aria-label="
+                  collection.visibility === 'private'
+                    ? t('community.ownerPublish')
+                    : t('community.ownerPrivar')
+                "
+                :title="
+                  collection.visibility === 'private'
+                    ? t('community.ownerPublish')
+                    : t('community.ownerPrivar')
+                "
+                @click="toggleVisibility(collection)"
+                data-testid="community-owner-visibility"
+              >
+                <i
+                  :class="collection.visibility === 'private' ? 'ti ti-eye' : 'ti ti-eye-off'"
+                  aria-hidden="true"
+                />
+              </button>
+              <button
+                type="button"
+                class="community-view__delete-btn"
+                :aria-label="t('community.ownerDelete')"
+                :title="t('community.ownerDelete')"
+                data-testid="community-owner-delete"
+                @click="requestDelete(collection)"
+              >
+                <i class="ti ti-trash" aria-hidden="true" />
+              </button>
+            </div>
+            <p
+              v-if="deleteConfirmId === collection.id"
+              class="community-view__delete-confirm"
+            >
+              <span>{{ t('community.deleteConfirm') }}</span>
+              <button
+                type="button"
+                class="community-view__delete-yes"
+                @click="confirmDelete(collection)"
+              >
+                {{ t('community.deleteYes') }}
+              </button>
+              <button
+                type="button"
+                class="community-view__delete-no"
+                @click="cancelDelete"
+              >
+                {{ t('community.deleteNo') }}
+              </button>
+            </p>
+          </div>
           <div class="community-view__actions">
             <button
               type="button"
@@ -302,6 +635,7 @@ onMounted(load);
               }}
             </button>
             <button
+              v-if="!isOwner(collection)"
               type="button"
               class="community-view__report-btn"
               :aria-label="t('ranking.report')"
@@ -315,6 +649,14 @@ onMounted(load);
       </GlassCard>
     </div>
 
+    <div
+      v-if="ownerToast"
+      class="community-view__owner-toast"
+      :class="{ 'community-view__owner-toast--error': ownerToast.error }"
+      role="status"
+    >
+      {{ ownerToast.msg }}
+    </div>
     <nav
       v-if="!isLoading && lastPage > 1"
       class="community-view__pagination"
@@ -462,6 +804,35 @@ onMounted(load);
 	cursor: pointer;
 }
 
+.community-view__coc-link {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	margin-top: 0.5rem;
+	padding: 0.4rem 0.8rem;
+	border-radius: 0.5rem;
+	border: 1px solid var(--ds-border, rgba(255, 255, 255, 0.2));
+	background: var(--ds-glass-fill, rgba(255, 255, 255, 0.08));
+	color: inherit;
+	font-size: 0.9rem;
+	cursor: pointer;
+	text-decoration: none;
+}
+
+.community-view__create-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	margin-top: 0.5rem;
+	padding: 0.4rem 0.8rem;
+	border-radius: 0.5rem;
+	border: 1px solid var(--ds-border, rgba(255, 255, 255, 0.2));
+	background: var(--ds-glass-fill, rgba(255, 255, 255, 0.08));
+	color: inherit;
+	font-size: 0.9rem;
+	cursor: pointer;
+}
+
 .community-view__tasks {
 	padding: 0.75rem 1rem;
 }
@@ -540,6 +911,29 @@ onMounted(load);
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 1rem;
+}
+
+.community-view__private-badge {
+	margin-left: 4px;
+	font-size: 12px;
+}
+
+.community-view__owner-toast {
+	position: fixed;
+	bottom: 24px;
+	left: 50%;
+	transform: translateX(-50%);
+	background: color-mix(in srgb, var(--ds-color-surface-card, #201f1f) 90%, transparent);
+	color: var(--foreground, #fff);
+	padding: 10px 18px;
+	border-radius: 10px;
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+	font-size: 14px;
+	z-index: 60;
+}
+
+.community-view__owner-toast--error {
+	background: color-mix(in srgb, #b3261e 85%, transparent);
 }
 
 .community-view__card {

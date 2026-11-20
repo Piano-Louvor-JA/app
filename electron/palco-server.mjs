@@ -1,10 +1,12 @@
+import { DEFAULT_REMOTE_PORT } from './remote-config.mjs'
+import { readConnectionStartup, saveConnectionStartup } from './palco/connection-startup.mjs'
 /**
  * Servidor do PALCO (cast para TV) — multi-slot (paridade PalcoOrchestrator APK).
  *
  * APK PalcoOrchestrator: cada slot = par de portas HTTP/WS próprio:
- *   slot 0 (principal): 7080/7081 — compatível com receivers atuais
- *   slot 1: 7082/7083
- *   slot 2: 7084/7085 ...
+ *   slot 0 (principal): 47080/47081 (antes 7080/7081; salvos são migrados)
+ *   slot 1: 47082/47083
+ *   slot 2: 47084/47085 ...
  * Cada slot tem sender próprio (HTTP + WS), replay de estado, mídia, etc.
  *
  * IPC do renderer:
@@ -15,11 +17,17 @@
  *   palco:status {slotId?} → status de um slot (default: principal)
  *   palco:start {slotId?}, palco:stop {slotId?}, palco:slot-status {slotId?}
  *
- * Receiver conecta em `ws://ip:7081+2N/palco?port=7081+2N` (query port opcional)
+ * Receiver conecta em `ws://ip:47081+2N/palco?port=47081+2N` (query port opcional)
  */
 
+import { publishReceiverEvent } from './palco/receiver-events.mjs'
+import { updateReplayState } from './palco/replay-state.mjs'
+import { clientFromRequest, commandMessage, isTv, muteKey, sameTv, withHello } from './palco/palco-clients.mjs'
+import { discoverTvs, wakeTv } from './palco/palco-discovery.mjs'
+import { createHeartbeat, createLostTvSearch, HEARTBEAT_INTERVAL_MS } from './palco/heartbeat.mjs'
 import { createServer } from 'node:http'
 import { networkInterfaces } from 'node:os'
+import { createHash } from 'node:crypto'
 import path from 'node:path'
 import { readFile } from 'node:fs/promises'
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
@@ -28,9 +36,32 @@ import { fileURLToPath } from 'node:url'
 import { app, ipcMain } from 'electron'
 import { WebSocketServer } from 'ws'
 
-const BASE_HTTP_PORT = 7080
-const BASE_WS_PORT = 7081
-const MAX_SLOTS = 8 // slot 0-7
+import { loadOrCreatePalcoToken, requestHasPalcoAccess } from './palco-token.mjs'
+import {
+  DEFAULT_HTTP_PORT,
+  DEFAULT_TRANSMISSION,
+  migrateLegacyPort,
+  normalizeOverlayStyle,
+  rankInterfaces,
+  readTransmissionConfig,
+  resolveBind,
+  saveTransmissionConfig,
+  suggestPort,
+  validatePort,
+} from './palco/transmission-config.mjs'
+
+const MAX_SLOTS = 8 // slot 0-7 (por tipo: transmissão e palco)
+
+/**
+ * Conexões do Palco (TVs com o app Palco) ficam separadas das da Transmissão
+ * (OBS/navegador): portas próprias, ligar/desligar próprios e sem o token da
+ * rede — a TV procura o computador sozinha e não tem como saber o token.
+ * O Palco principal fica em 47180/47181, a porta que o app das TVs procura.
+ */
+export const PALCO_PRINCIPAL_ID = 'palco'
+export const PALCO_HTTP_PORT = 47180
+/** @param {unknown} kind */
+function slotKind(kind) { return kind === 'palco' ? 'palco' : 'transmission' }
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const DIST_DIR = path.resolve(__dirname, '../dist')
@@ -38,13 +69,55 @@ const DIST_DIR = path.resolve(__dirname, '../dist')
 /** @typedef {import('node:http').IncomingMessage} Req */
 /** @typedef {import('node:http').ServerResponse} Res */
 
-function lanIp() {
-  for (const ifaces of Object.values(networkInterfaces())) {
-    for (const iface of ifaces ?? []) {
-      if (iface.family === 'IPv4' && !iface.internal) return iface.address
-    }
-  }
-  return '127.0.0.1'
+/** Rede e token escolhidos na aba Transmissão (persistidos pelo manager). */
+let _transmission = { ...DEFAULT_TRANSMISSION }
+export function getTransmissionState() { return { ..._transmission } }
+export function setTransmissionState(next) {
+  _transmission = { bind: next?.bind ?? 'all', requireToken: next?.requireToken !== false }
+}
+function networkBinding() {
+  return resolveBind(_transmission.bind, rankInterfaces(networkInterfaces()))
+}
+function lanIp() { return networkBinding().linkHost }
+/** Token cobrado da rede; null quando o operador desligou a exigência. */
+function requiredToken() { return _transmission.requireToken ? getPalcoToken() : null }
+function isLoopback(ip) { return ip === '127.0.0.1' || ip === '::1' }
+
+/**
+ * TVs desmarcadas no Palco (chave de muteKey): continuam conectadas, mas na
+ * tela de espera, e não recebem nada da transmissão. Vale para todas as
+ * conexões, então a TV segue desmarcada se mudar de transmissão.
+ */
+const mutedTvs = new Set()
+export function isMutedTv(info) { return Boolean(info) && isTv(info) && mutedTvs.has(muteKey(info)) }
+export function setMutedKey(key, muted) {
+  if (muted) mutedTvs.add(key)
+  else mutedTvs.delete(key)
+}
+
+/**
+ * TVs com projeção independente (um módulo só nelas, ex.: Bíblia): saem da
+ * transmissão geral e recebem só o que o renderer mandar para "slot#uid".
+ * Fica em memória, como as atribuições independentes do OBS.
+ */
+const pinnedTvs = new Set()
+export function isPinnedTv(info) { return Boolean(info) && isTv(info) && pinnedTvs.has(muteKey(info)) }
+export function setPinnedKey(key, pinned) {
+  if (pinned) pinnedTvs.add(key)
+  else pinnedTvs.delete(key)
+}
+
+/** "0#c12" → slot "0" e TV "c12"; sem "#", só o slot. */
+export function parseTarget(target) {
+  const [slotId, uid] = String(target ?? '0').split('#')
+  return { slotId: slotId || '0', uid: uid || null }
+}
+const IDLE_MESSAGE = { v: 2, type: 'idle' }
+/** Páginas que uma aba de navegador/OBS informa ao conectar. */
+const PAGES = new Set(['espelho', 'retorno', 'legenda'])
+
+function portInUse(error, port) {
+  return error?.code === 'EADDRINUSE' ? { code: 'port-in-use', port } : { code: 'start-failed', port }
 }
 
 /** Estado de um slot de palco. */
@@ -54,21 +127,62 @@ class PalcoSlot {
   #httpPort
   #wsPort
   #httpServer
+  #preparing
   #wss
   #clients = new Set()
   #receiverIps = new Map() // WebSocket -> IP físico da TV/browser
+  #clientInfo = new Map() // WebSocket -> quem é (plataforma, nome, id, versão)
   #lastByType = new Map() // replay pro receiver que chega tarde
+  // Receivers que aplicam o zoom sozinhos (avisam com caps:['frameView']).
+  // Os demais (TVs com app antigo) recebem o quadro já recortado.
+  #frameViewClients = new WeakSet()
+  // Quem se identificou (caps ou hello de TV) e quem já recebeu o pedido de
+  // recarga: aba de navegador presa na página antiga recarrega uma vez só.
+  #announcedClients = new WeakSet()
+  #reloadAsked = new WeakSet()
   #running = false
   #media = new Map() // mídia local servida em /media/
   #contents // callback pro renderer
+  #overlay
+  #error = null
+  #listenHost = null
+  #kind = 'transmission'
+  // Conexão viva dos dois lados: o servidor cobra as telas e procura a
+  // Android TV que caiu pela rede (ver palco/heartbeat.mjs).
+  #heartbeatMs = HEARTBEAT_INTERVAL_MS
+  #heartbeat
+  #lostTvs = createLostTvSearch({
+    wake: (ip) => wakeTv(ip),
+    isConnected: (ip) => Array.from(this.#clientInfo.values()).some((info) => info.ip === ip),
+  })
+  #heartbeatTimer = null
 
-  constructor(id, label, httpPort, wsPort, getContents) {
+  constructor(id, label, httpPort, wsPort, getContents, options = {}) {
     this.#id = id
     this.#label = label
     this.#httpPort = httpPort
     this.#wsPort = wsPort
     this.#contents = getContents
+    this.#overlay = normalizeOverlayStyle(options.overlay)
+    this.#kind = slotKind(options.kind)
+    // testes encurtam o intervalo; a tela cai após 3 intervalos sem resposta
+    if (Number(options.heartbeatMs) > 0) this.#heartbeatMs = Number(options.heartbeatMs)
+    this.#heartbeat = createHeartbeat({
+      timeoutMs: this.#heartbeatMs * 3,
+      send: (ws, message) => { this.#sendTo(ws, message) },
+      ping: (ws) => { if (ws.readyState === ws.OPEN) ws.ping() },
+      terminate: (ws) => { ws.terminate() },
+      onLost: (ws) => {
+        const info = this.#clientInfo.get(ws)
+        console.warn('[palco] tela sem resposta, conexão encerrada:', this.#id, info?.platform, info?.ip)
+        if (info?.platform === 'androidtv' && info.ip) this.#lostTvs.lost(info.ip)
+      },
+    })
   }
+
+  get kind() { return this.#kind }
+  /** Token cobrado da rede nesta conexão: o Palco não usa (só a Transmissão). */
+  get expectedToken() { return this.#kind === 'palco' ? null : requiredToken() }
 
   get id() { return this.#id }
   get label() { return this.#label }
@@ -76,16 +190,54 @@ class PalcoSlot {
   get wsPort() { return this.#wsPort }
   get running() { return this.#running }
   get clientsCount() { return this.#clients.size }
+  get overlay() { return { ...this.#overlay } }
+
+  /** Aparência da legenda desta conexão; fontes abertas recebem na hora. */
+  setOverlay(style) {
+    this.#overlay = normalizeOverlayStyle({ ...this.#overlay, ...style })
+    if (this.#running) this.broadcast(this.#overlayMessage())
+    return this.overlay
+  }
+
+  #overlayMessage() { return { v: 2, type: 'overlayStyle', style: this.overlay } }
+
+  /** Fecha quem entrou pela rede (token antigo); fontes deste computador seguem. */
+  disconnectNetworkClients() {
+    for (const [ws, ip] of this.#receiverIps) {
+      if (!isLoopback(ip)) { try { ws.close() } catch { /* ignore */ } }
+    }
+  }
+
+  /** Troca o par de portas (WS = HTTP + 1) mantendo o id. */
+  async setPorts(httpPort) {
+    if (this.#running) throw new Error('running')
+    await this.#closeHttp()
+    this.#httpPort = httpPort
+    this.#wsPort = httpPort + 1
+    this.#error = null
+    await this.prepare()
+  }
+
+  /** Refaz o bind HTTP depois de a interface de rede mudar. */
+  async rebind() {
+    if (this.#running) throw new Error('running')
+    await this.#closeHttp()
+    await this.prepare()
+  }
+
+  async #closeHttp() {
+    await this.#preparing?.catch(() => {})
+    const server = this.#httpServer
+    this.#httpServer = null
+    if (server) await new Promise(resolve => { server.close(() => resolve()); server.closeAllConnections?.() })
+  }
 
   /** Broadcast p/ todos os receivers conectados neste slot. */
   broadcast(obj) {
-    // idle = fim da projeção: o cache de replay da projection morre junto,
-    // senão quem reconecta recebe versículo velho por cima do idle
-    // (bíblia fantasma ao recarregar a TV — bug real 27/08).
-    if (obj.type === 'idle') this.#lastByType.delete('projection')
-    this.#lastByType.set(obj.type, obj)
+    updateReplayState(this.#lastByType, obj)
     const data = JSON.stringify(obj)
     for (const ws of this.#clients) {
+      if (this.#isMuted(ws)) continue
       try { if (ws.readyState === ws.OPEN) ws.send(data) } catch { this.#clients.delete(ws) }
     }
   }
@@ -98,28 +250,152 @@ class PalcoSlot {
   broadcastTransient(obj) {
     const data = JSON.stringify(obj)
     for (const ws of this.#clients) {
+      if (this.#isMuted(ws)) continue
       try { if (ws.readyState === ws.OPEN) ws.send(data) } catch { this.#clients.delete(ws) }
     }
   }
 
-  /** Inicia HTTP + WS deste slot. */
+  /** Só para quem aplica o zoom (frameView) ou só para os antigos (legacy). */
+  #sendWhere(obj, wantsFrameView) {
+    const data = JSON.stringify(obj)
+    for (const ws of this.#clients) {
+      if (this.#isMuted(ws) || this.#frameViewClients.has(ws) !== wantsFrameView) continue
+      try { if (ws.readyState === ws.OPEN) ws.send(data) } catch { this.#clients.delete(ws) }
+    }
+  }
+
+  /**
+   * Abas de navegador (/espelho, OBS) abertas antes de o app atualizar seguem
+   * com a página antiga: não entendem o zoom leve e só veriam o recorte
+   * atrasado. A página é servida por este app; recarregar traz a nova.
+   * TVs (hello) e páginas atuais (caps) ficam de fora.
+   */
+  #reloadStalePages() {
+    for (const ws of this.#clients) {
+      if (this.#announcedClients.has(ws) || this.#reloadAsked.has(ws) || this.#isMuted(ws)) continue
+      this.#reloadAsked.add(ws)
+      this.#sendTo(ws, { v: 2, type: 'obsControl', action: 'reload' })
+    }
+  }
+
+  #isMuted(ws) {
+    const info = this.#clientInfo.get(ws)
+    return isMutedTv(info) || isPinnedTv(info)
+  }
+
+  #notifyClients() { this.#contents()?.send('palco:clients-changed', { slotId: this.#id }) }
+
+  #sendTo(ws, obj) {
+    try { if (ws.readyState === ws.OPEN) { ws.send(JSON.stringify(obj)); return true } } catch { /* ignore */ }
+    return false
+  }
+
+  /** Quem está conectado nesta transmissão (módulo Palco). */
+  clients() {
+    return Array.from(this.#clientInfo.values()).map(info => ({ ...info, muted: isMutedTv(info), pinned: isPinnedTv(info) }))
+  }
+
+  #socketOf(uid) {
+    for (const [ws, info] of this.#clientInfo) if (info.uid === uid) return ws
+    return null
+  }
+
+  /** Comando para uma TV só (identify, rename, reload, moveTo). */
+  sendToClient(uid, command, args = {}) {
+    const ws = this.#socketOf(uid)
+    const info = ws ? this.#clientInfo.get(ws) : null
+    if (!ws || !info) return false
+    const msg = commandMessage(command, { ...args, name: args.name ?? info.name, slotLabel: args.slotLabel ?? this.#label })
+    if (!msg) return false
+    const ok = this.#sendTo(ws, msg)
+    if (ok && msg.type === 'rename') {
+      this.#clientInfo.set(ws, withHello(info, { name: msg.name }))
+      this.#notifyClients()
+    }
+    return ok
+  }
+
+  /** Aplica a marca agora: desmarcada vai para a espera; remarcada recebe o estado atual. */
+  applyMute(uid) {
+    const ws = this.#socketOf(uid)
+    if (!ws) return false
+    if (isPinnedTv(this.#clientInfo.get(ws))) return true // o renderer manda o módulo dela
+    if (this.#isMuted(ws)) return this.#sendTo(ws, IDLE_MESSAGE)
+    for (const msg of this.#lastByType.values()) this.#sendTo(ws, msg)
+    return true
+  }
+
+  /**
+   * A mesma TV reconectou (Wi-Fi caiu, app reaberto) e a conexão antiga
+   * ficou meio aberta (sem ping): fecha a antiga para não aparecer em dobro.
+   */
+  #dropStaleTwin(current, info) {
+    if (!isTv(info)) return
+    for (const [ws, other] of this.#clientInfo) {
+      if (ws === current || !sameTv(info, other)) continue
+      this.#clientInfo.delete(ws)
+      this.#clients.delete(ws)
+      this.#receiverIps.delete(ws)
+      try { ws.close() } catch { /* ignore */ }
+    }
+  }
+
+  /** The receiver remains reachable while transmission is off. */
+  async prepare() {
+    if (this.#httpServer?.listening) return
+    if (this.#preparing) return this.#preparing
+    this.#preparing = (async () => {
+      const server = createServer((req, res) => { void this.handleHttp(req, res) })
+      const host = networkBinding().listenHost
+      this.#httpServer = server
+      try {
+        await new Promise((resolve, reject) => {
+          server.once('error', reject)
+          server.listen(this.#httpPort, host, resolve)
+        })
+        this.#listenHost = host
+        this.#error = null
+      } catch (error) {
+        this.#httpServer = null
+        server.close()
+        this.#error = portInUse(error, this.#httpPort)
+        throw error
+      }
+    })()
+    try { await this.#preparing } finally { this.#preparing = null }
+  }
+
+  /** Enables transmission without replacing the already served receiver page. */
   async start() {
     if (this.#running) return true
     try {
-      this.#httpServer = createServer((req, res) => { void this.handleHttp(req, res) })
-      await new Promise((resolve, reject) => {
-        this.#httpServer.once('error', reject)
-        this.#httpServer.listen(this.#httpPort, '0.0.0.0', resolve)
-      })
-
-      this.#wss = new WebSocketServer({ port: this.#wsPort })
+      await this.prepare()
+      this.#wss = new WebSocketServer({ port: this.#wsPort, host: this.#listenHost ?? networkBinding().listenHost })
       this.#wss.on('connection', (ws, req) => {
-        if (req?.url && !req.url.startsWith('/palco')) { ws.close(); return }
+        if (req?.url && !req.url.split('?')[0].startsWith('/palco')) { ws.close(); return }
+        // OBS S1: token na LAN (localhost bypass) — feature off = comportamento atual
+        if (
+          !requestHasPalcoAccess({
+            remoteAddress: req?.socket?.remoteAddress,
+            url: req?.url,
+            headers: req?.headers,
+            expectedToken: this.expectedToken,
+          })
+        ) {
+          try { ws.close() } catch { /* ignore */ }
+          return
+        }
         this.#clients.add(ws)
+        this.#heartbeat.track(ws)
+        ws.on('pong', () => this.#heartbeat.seen(ws))
         const remoteIp = req?.socket?.remoteAddress?.replace('::ffff:', '')
+        if (remoteIp) this.#lostTvs.found(remoteIp)
         if (remoteIp) this.#receiverIps.set(ws, remoteIp)
+        this.#clientInfo.set(ws, clientFromRequest({ ip: remoteIp ?? '', userAgent: String(req?.headers?.['user-agent'] ?? '') }))
+        this.#notifyClients()
         // replay do estado atual pro receiver que chegou depois
-        for (const msg of this.#lastByType.values()) {
+        if (this.#isMuted(ws)) this.#sendTo(ws, IDLE_MESSAGE)
+        else for (const msg of this.#lastByType.values()) {
           try { if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(msg)) } catch { this.#clients.delete(ws) }
         }
         if (remoteIp) {
@@ -127,18 +403,63 @@ class PalcoSlot {
         }
         this.#contents()?.send('palco:receiver-connected', { ip: remoteIp, count: this.#clients.size, slotId: this.#id })
         ws.on('message', (raw) => {
-          try { this.#contents()?.send('palco:event', JSON.parse(String(raw))) } catch { /* ignore */ }
+          try {
+            const message = { ...JSON.parse(String(raw)), slotId: this.#id }
+            this.#heartbeat.seen(ws)
+            // a tela entende `beat` (hello da TV ou caps das páginas)
+            if (Array.isArray(message.caps) && message.caps.includes('heartbeat')) this.#heartbeat.announce(ws)
+            // resposta ao `beat`: só sinal de vida, não vai para o app
+            if (message.type === 'beat') return
+            if (Array.isArray(message.caps)) this.#announcedClients.add(ws)
+            // Página da aba (espelho, retorno, legenda): Aparelhos conectados mostra
+            if (message.type === 'caps' && PAGES.has(message.page) && this.#clientInfo.has(ws)) {
+              this.#clientInfo.set(ws, { ...this.#clientInfo.get(ws), page: message.page })
+              this.#notifyClients()
+            }
+            if (Array.isArray(message.caps) && message.caps.includes('frameView')) this.#frameViewClients.add(ws)
+            if (message.type === 'hello' && message.role === 'tv') this.#announcedClients.add(ws)
+            // hello da TV: completa quem é e fecha a conexão antiga dela.
+            if (message.type === 'hello' && message.role === 'tv' && this.#clientInfo.has(ws)) {
+              const info = withHello(this.#clientInfo.get(ws), message)
+              this.#clientInfo.set(ws, info)
+              this.#dropStaleTwin(ws, info)
+              if (isMutedTv(info)) this.#sendTo(ws, IDLE_MESSAGE)
+              this.#notifyClients()
+            }
+            this.#contents()?.send('palco:event', message)
+            publishReceiverEvent(message)
+          } catch { /* ignore */ }
         })
         ws.on('close', () => {
+          this.#heartbeat.forget(ws)
           this.#clients.delete(ws)
           this.#receiverIps.delete(ws)
+          const known = this.#clientInfo.delete(ws)
           this.#contents()?.send('palco:receiver-disconnected', { count: this.#clients.size, slotId: this.#id })
+          if (known) this.#notifyClients()
         })
         ws.on('error', () => this.#clients.delete(ws))
         // SEM ping (webOS 4.x não responde)
       })
 
+      try {
+        await new Promise((resolve, reject) => { this.#wss.once('listening', resolve); this.#wss.once('error', reject) })
+      } catch (error) {
+        const wss = this.#wss
+        this.#wss = null
+        wss?.close()
+        this.#error = portInUse(error, this.#wsPort)
+        throw error
+      }
+      this.#error = null
       this.#running = true
+      clearInterval(this.#heartbeatTimer)
+      this.#heartbeatTimer = setInterval(() => {
+        this.#heartbeat.tick()
+        this.#lostTvs.tick()
+      }, this.#heartbeatMs)
+      this.#heartbeatTimer.unref?.()
+      updateReplayState(this.#lastByType, this.#overlayMessage())
       return true
     } catch (e) {
       console.error(`[palco:slot:${this.#id}] start error:`, e)
@@ -149,18 +470,33 @@ class PalcoSlot {
   /** Para este slot. */
   async stop() {
     if (!this.#running) return
+    this.broadcastTransient({ v: 2, type: 'obsControl', action: 'stop' })
     this.#running = false
-    this.#wss?.close()
-    await new Promise((r) => this.#httpServer?.close(r))
+    clearInterval(this.#heartbeatTimer)
+    this.#heartbeatTimer = null
+    this.#lostTvs.clear()
+    const wss = this.#wss
+    this.#wss = null
+    if (wss) await new Promise(resolve => {
+      const timeout = setTimeout(() => { for (const client of this.#clients) client.terminate(); resolve() }, 250)
+      for (const client of this.#clients) client.close()
+      wss.close(() => { clearTimeout(timeout); resolve() })
+    })
     this.#clients.clear()
+    this.#receiverIps.clear()
+    this.#clientInfo.clear()
+    this.#notifyClients()
     this.#lastByType.clear()
     this.#media.clear()
-    this.#wss = null
-    this.#httpServer = null
   }
 
-  /** Manda mensagem prós receivers deste slot. */
-  send(msg) {
+  async dispose() {
+    await this.stop()
+    await this.#closeHttp()
+  }
+
+  /** Manda mensagem prós receivers deste slot (ou só para a TV `uid`). */
+  send(msg, uid = null) {
     if (!this.#running) return false
     // normaliza: string JSON → objeto (spread de string vira {0:'{',1:'"'...})
     let m = msg
@@ -168,9 +504,68 @@ class PalcoSlot {
       try { m = JSON.parse(m) } catch { return false }
     }
     if (!m || typeof m !== 'object' || !m.type) return false
+    if (m.type === 'mirror-signal') { this.broadcastTransient(m); return true }
+    // Zoom de imagem/PDF: mensagem leve, na hora, só para quem a entende. O
+    // estado repetido para quem reconecta passa a levar o zoom atual.
+    if (m.type === 'frameView') {
+      const last = this.#lastByType.get('projection')
+      if (last?.frameSlide === true) this.#lastByType.set('projection', { ...last, view: m.view })
+      if (uid) {
+        const ws = this.#socketOf(uid)
+        return ws && this.#frameViewClients.has(ws) ? this.#sendTo(ws, m) : false
+      }
+      this.#sendWhere(m, true)
+      this.#reloadStalePages()
+      return true
+    }
+    // Quadro já recortado com o zoom: só para receivers antigos, sem replay.
+    if (m.legacyOnly === true) {
+      const { legacyOnly: _legacy, ...legacy } = m
+      if (uid) {
+        const ws = this.#socketOf(uid)
+        return ws && !this.#frameViewClients.has(ws) ? this.#sendTo(ws, legacy) : false
+      }
+      this.#sendWhere(legacy, false)
+      return true
+    }
+    if (m.type === 'obsControl') { this.broadcastTransient(m); return true }
+    // OBS S1: URL de mídia sai COM o token (a TV/browser recebe a URL já
+    // autenticada — o renderer não precisa saber do token).
+    const token = this.expectedToken
+    if (token && typeof m.url === 'string' && m.url.includes('/media/')) {
+      try {
+        const u = new URL(m.url)
+        u.searchParams.set('token', token)
+        m = { ...m, url: u.toString() }
+      } catch { /* url malformada — segue como veio */ }
+    }
+    // Mesmo gate para o BG/cover da projection: <img> não manda header, e
+    // localhost bypass escondia o 403 — browser/OBS/TV buscavam
+    // http://<lan>:47080/media/... sem token → 403 → onerror → fallback FIXO.
+    const bgUrl = m.type === 'projection' || m.type === 'stageReturn' ? (m.background ?? m.cover) : undefined
+    if (token && typeof bgUrl === 'string' && bgUrl.includes('/media/')) {
+      try {
+        const u = new URL(bgUrl)
+        u.searchParams.set('token', token)
+        const patched = u.toString()
+        if (m.background === bgUrl) m = { ...m, background: patched }
+        else m = { ...m, cover: patched }
+      } catch { /* url malformada — segue como veio */ }
+    }
     // Transientes: action sem url/conteúdo NÃO entra no replay.
     // audio stop GRAVA (fix 27/08): é estado terminal — como transient, o
     // replay ficava com o 'play' velho e o F5 na TV ressuscitava o MP3.
+    if (m.type === 'video' && m.action === 'captions') {
+      const video = this.#lastByType.get('video')
+      if (video?.youtubeId) this.#lastByType.set('video', { ...video, captionsHidden: m.captionsHidden === true })
+      this.broadcastTransient(m)
+      return true
+    }
+    // Projeção independente numa TV: só ela recebe, sem mexer no replay.
+    if (uid) {
+      const ws = this.#socketOf(uid)
+      return ws ? this.#sendTo(ws, m) : false
+    }
     const transient =
       m.action === 'pause' || m.action === 'play' || m.action === 'seek'
     if (transient) this.broadcastTransient(m)
@@ -180,14 +575,26 @@ class PalcoSlot {
 
   /** Status deste slot. */
   status() {
+    const host = lanIp()
+    const tokenQuery = this.expectedToken ? `?token=${this.expectedToken}` : ''
     return {
       id: this.#id,
       label: this.#label,
+      kind: this.#kind,
       running: this.#running,
       clients: this.#clients.size,
       receiverIps: Array.from(new Set(this.#receiverIps.values())),
-      url: `http://${lanIp()}:${this.#httpPort}`,
-      wsUrl: `ws://${lanIp()}:${this.#wsPort}/palco`,
+      httpPort: this.#httpPort,
+      wsPort: this.#wsPort,
+      listenHost: this.#listenHost ?? networkBinding().listenHost,
+      error: this.#error,
+      overlay: this.overlay,
+      url: `http://${host}:${this.#httpPort}`,
+      wsUrl: `ws://${host}:${this.#wsPort}/palco`,
+      // OBS S1: receiver URL pronta com token (UI copia/cola no OBS Browser Source)
+      receiverUrl: this.#running ? `http://${host}:${this.#httpPort}/espelho${tokenQuery}` : null,
+      overlayUrl: this.#running ? `http://${host}:${this.#httpPort}/legenda${tokenQuery}` : null,
+      returnUrl: this.#running ? `http://${host}:${this.#httpPort}/retorno${tokenQuery}` : null,
     }
   }
 
@@ -199,12 +606,46 @@ class PalcoSlot {
     // Scan do receiver: identifica sender na sub-rede
     if (p === '/status') {
       res.setHeader('Content-Type', 'application/json')
-      res.end(JSON.stringify({ unlocked: true, clients: this.#clients.size, slotId: this.#id, label: this.#label }))
+      // A TV roda o receiver como página local (file://, app webOS/Android
+      // TV): sem CORS ela não lê a resposta e nunca acha este computador
+      // na varredura. Só expõe portas e rótulo, nada sensível.
+      res.setHeader('Access-Control-Allow-Origin', '*')
+      res.end(JSON.stringify({ unlocked: true, running: this.#running, clients: this.#clients.size, slotId: this.#id, label: this.#label, httpPort: this.#httpPort, wsPort: this.#wsPort }))
       return
     }
 
-    // Receiver embutido (mesma página do palco-receiver)
-    if (p === '/' || p === '/receiver.html' || p === '/index.html') {
+    // Controle do pregador: página LAN sem CDN, preview passivo + remote WS.
+    // Preview = iframe escalado do PRÓPRIO receiver.html — mesmo renderizador
+    // da TV (bg, letra, caixinha, footer), zero divergência visual.
+    if (p === '/speaker') {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8')
+      res.setHeader('Cache-Control', 'no-store')
+      res.end(speakerPageHtml({ palcoToken: getPalcoToken() }))
+      return
+    }
+
+    // Legenda da Transmissão (fonte de navegador do OBS) e a aparência desta conexão
+    if (p === '/legenda') {
+      try {
+        const page = await readFile(path.join(__dirname, 'palco', 'overlay.html'))
+        res.setHeader('Content-Type', 'text/html; charset=utf-8')
+        res.setHeader('Cache-Control', 'no-store')
+        res.end(page)
+      } catch {
+        res.statusCode = 404
+        res.end('overlay not bundled')
+      }
+      return
+    }
+    if (p === '/legenda-config') {
+      res.setHeader('Content-Type', 'application/json')
+      res.setHeader('Cache-Control', 'no-store')
+      res.end(JSON.stringify({ style: this.overlay }))
+      return
+    }
+
+    // Receiver embutido (mesma página do palco-receiver): /espelho replica a TV; em /retorno vira o retorno de palco
+    if (p === '/' || p === '/receiver.html' || p === '/index.html' || p === '/espelho' || p === '/retorno') {
       try {
         const page = await readFile(path.join(__dirname, 'palco', 'receiver.html'))
         // Versão do RECEIVER (appinfo.json embutido, mesmo do .ipk webOS) —
@@ -221,13 +662,17 @@ class PalcoSlot {
     }
 
     // Assets do receiver
-    const assetMatch = p.match(/^\/([a-z0-9._-]+)$/i)
+    // Assets do receiver — nomes reservados de rotas (/proxy, /status…)
+    // fora: /proxy casava aqui e 404ava ANTES do handler real (L301),
+    // quebrando todo bg/cover externo (músicas da API) → fallback.
+    const assetMatch = /^(?!\/(?:proxy|status|bg|media)(?:\/|$))\/([a-z0-9._-]+)$/i.exec(p)
     if (assetMatch) {
+      if (/\.html$/i.test(p)) { res.statusCode = 404; res.end(); return }
       try {
-        const file = path.join(__dirname, 'palco', assetMatch[1])
+        const file = path.join(__dirname, 'palco', String(assetMatch[1]))
         const buf = await readFile(file)
         const ext = path.extname(file).toLowerCase()
-        res.setHeader('Content-Type', ext === '.svg' ? 'image/svg+xml' : ext === '.png' ? 'image/png' : 'application/octet-stream')
+        res.setHeader('Content-Type', ext === '.js' ? 'text/javascript; charset=utf-8' : ext === '.svg' ? 'image/svg+xml' : ext === '.png' ? 'image/png' : 'application/octet-stream')
         res.end(buf)
       } catch {
         res.statusCode = 404; res.end()
@@ -271,6 +716,18 @@ class PalcoSlot {
 
     // Proxy CORS p/ o receiver (origem file://)
     if (p === '/proxy') {
+      if (
+        !requestHasPalcoAccess({
+          remoteAddress: req.socket?.remoteAddress,
+          url: req.url,
+          headers: req.headers,
+          expectedToken: this.expectedToken,
+        })
+      ) {
+        res.statusCode = 403
+        res.end('forbidden')
+        return
+      }
       const target = url.searchParams.get('url')
       if (!target || !/^https?:\/\//i.test(target)) { res.statusCode = 400; res.end('bad url'); return }
       try {
@@ -295,6 +752,18 @@ class PalcoSlot {
     // sem Range o <video> do receiver baixa o MP4 inteiro antes de tocar
     // fluido (stutter em 1080p) e seek não funciona.
     if (p.startsWith('/media/')) {
+      if (
+        !requestHasPalcoAccess({
+          remoteAddress: req.socket?.remoteAddress,
+          url: req.url,
+          headers: req.headers,
+          expectedToken: this.expectedToken,
+        })
+      ) {
+        res.statusCode = 403
+        res.end('forbidden')
+        return
+      }
       const name = p.slice('/media/'.length)
       const entry = this.#media.get(name)
       if (!entry) { res.statusCode = 404; res.end(); return }
@@ -352,7 +821,18 @@ class PalcoSlot {
       const info = await stat(clean)
       if (!info.isFile() || info.size > 200 * 1024 * 1024) return null
       const base = path.basename(clean).replace(/[^A-Za-z0-9._-]/g, '_')
-      const name = `local_${Date.now()}_${base}`
+      // Nome DETERMINÍSTICO (hash do path resolved + mtime + size): a mesma
+      // imagem publicada N vezes gera a MESMA URL. Com nome por timestamp,
+      // cada republish (o onTimeUpdate republisha ~4x/s) trocava o src do
+      // <img> na TV e o Chromium recarregava a imagem a cada publish —
+      // flash = oscilação fallback↔imagem. URL estável = cache do browser,
+      // zero reload. mtime/size no hash: arquivo re-baixado (mesmo path,
+      // bytes novos) muda de URL → cache não serve imagem velha.
+      const h = createHash('sha1')
+        .update(`${path.resolve(clean)}|${info.mtimeMs}|${info.size}`)
+        .digest('hex')
+        .slice(0, 12)
+      const name = `local_${h}_${base}`
       const bytes = await rf(clean)
       const mime = /\.(mp3|m4a)$/i.test(base) ? 'audio/mpeg' : /\.mp4$/i.test(base) ? 'video/mp4' : 'image/png'
       this.#media.set(name, { mime, bytes })
@@ -366,6 +846,25 @@ class PalcoSlot {
 /** Gerenciador de slots (singleton no main process). */
 function slotsConfigPath() {
   return path.join(app.getPath('userData'), 'palco-slots.json')
+}
+
+/** Token de acesso (persistido no userData). Feature off = null. */
+let _palcoToken = null
+export function palcoTokenPath() {
+  return path.join(app.getPath('userData'), 'palco-token.txt')
+}
+export function getPalcoToken() {
+  return _palcoToken
+}
+export function enablePalcoToken() {
+  _palcoToken = loadOrCreatePalcoToken(palcoTokenPath())
+  return _palcoToken
+}
+export function resetPalcoToken() {
+  const tmp = palcoTokenPath() + '.reset'
+  _palcoToken = loadOrCreatePalcoToken(tmp) // path inexistente → regenera
+  try { renameSync(tmp, palcoTokenPath()) } catch { /* best effort */ }
+  return _palcoToken
 }
 
 function readPersistedSlots() {
@@ -385,26 +884,57 @@ class PalcoManager {
 
   /** Slot principal (id='0') sempre existe. */
   init() {
-    this.ensureSlot('0', 'Principal', BASE_HTTP_PORT, BASE_WS_PORT)
-    // Operador configura TV 2/porta 7082 uma vez; slots voltam após restart.
-    for (const item of readPersistedSlots()) {
+    const stored = readPersistedSlots()
+    let migrated = false
+    const rows = stored.map((item) => {
+      const httpPort = Number(item?.httpPort)
+      const moved = migrateLegacyPort(httpPort)
+      if (moved === httpPort || Number(item?.wsPort) !== httpPort + 1) return item
+      migrated = true
+      return { ...item, httpPort: moved, wsPort: moved + 1 }
+    })
+    const principal = rows.find(item => String(item?.id) === '0')
+    const principalPort = Number(principal?.httpPort)
+    const principalHttp = validatePort(principalPort, []).ok && Number(principal?.wsPort) === principalPort + 1 ? principalPort : DEFAULT_HTTP_PORT
+    this.ensureSlot('0', 'Principal', principalHttp, principalHttp + 1, principal?.overlay)
+    // Palco principal: porta que o app das TVs procura (sem conflito com a Transmissão)
+    const stage = rows.find(item => String(item?.id) === PALCO_PRINCIPAL_ID)
+    const stagePort = Number(stage?.httpPort)
+    const stageHttp = validatePort(stagePort, this.#takenPorts()).ok && Number(stage?.wsPort) === stagePort + 1
+      ? stagePort
+      : suggestPort(PALCO_HTTP_PORT, this.#takenPorts()) ?? PALCO_HTTP_PORT
+    this.ensureSlot(PALCO_PRINCIPAL_ID, 'Palco', stageHttp, stageHttp + 1, stage?.overlay, 'palco')
+    if (!stage) migrated = true
+    // Operador configura a TV 2 uma vez; slots voltam após restart.
+    for (const item of rows) {
       const httpPort = Number(item?.httpPort)
       const wsPort = Number(item?.wsPort)
       const id = String(item?.id ?? '')
       const label = String(item?.label ?? '').trim()
+      const kind = slotKind(item?.kind)
       if (
-        id !== '0' && label && Number.isInteger(httpPort) &&
-        Number.isInteger(wsPort) && httpPort >= BASE_HTTP_PORT + 2 &&
-        wsPort === httpPort + 1 && this.#slots.size < MAX_SLOTS
-      ) this.ensureSlot(id, label, httpPort, wsPort)
+        id !== '0' && id !== PALCO_PRINCIPAL_ID && label && !this.#slots.has(id) &&
+        validatePort(httpPort, this.#takenPorts()).ok &&
+        wsPort === httpPort + 1 && this.#countOf(kind) < MAX_SLOTS
+      ) this.ensureSlot(id, label, httpPort, wsPort, item?.overlay, kind)
     }
+    if (migrated) this.persistSlots()
+  }
+
+  #countOf(kind) {
+    return this.getAllSlots().filter(slot => slot.kind === kind).length
+  }
+
+  #takenPorts(exceptId) {
+    return this.getAllSlots().filter(slot => slot.id !== exceptId).map(slot => slot.httpPort)
   }
 
   persistSlots() {
     try {
       const rows = Array.from(this.#slots.values())
-        .filter((slot) => slot.id !== '0')
-        .map((slot) => ({ id: slot.id, label: slot.label, httpPort: slot.httpPort, wsPort: slot.wsPort }))
+        .map((slot) => slot.id === '0'
+          ? { id: slot.id, httpPort: slot.httpPort, wsPort: slot.wsPort, overlay: slot.overlay }
+          : { id: slot.id, label: slot.label, kind: slot.kind, httpPort: slot.httpPort, wsPort: slot.wsPort, overlay: slot.overlay })
       const file = slotsConfigPath()
       mkdirSync(path.dirname(file), { recursive: true })
       const tmp = `${file}.tmp`
@@ -416,36 +946,83 @@ class PalcoManager {
   }
 
   /** Garante slot; cria se não existe. */
-  ensureSlot(id, label, httpPort, wsPort) {
+  ensureSlot(id, label, httpPort, wsPort, overlay, kind = 'transmission') {
     if (this.#slots.has(id)) return this.#slots.get(id)
-    const slot = new PalcoSlot(id, label, httpPort, wsPort, () => this.#getContents())
+    const slot = new PalcoSlot(id, label, httpPort, wsPort, () => this.#getContents(), { overlay, kind })
     this.#slots.set(id, slot)
+    void slot.prepare().catch(error => console.warn('[palco] receiver prepare:', error?.message ?? error))
     return slot
   }
 
   /** Cria novo slot (aloca próximo par de portas livre). */
-  createSlot(label = `TV ${this.#slots.size}`) {
-    if (this.#slots.size >= MAX_SLOTS) throw new Error('max slots')
-    let httpPort = BASE_HTTP_PORT + 2, wsPort = BASE_WS_PORT + 2
-    while (this.#slots.has(String(httpPort))) { httpPort += 2; wsPort += 2 }
-    const id = String(httpPort) // id = porta HTTP (ex: "7082")
-    const slot = this.ensureSlot(id, label, httpPort, wsPort)
+  createSlot(label = `TV ${this.#slots.size}`, kind = 'transmission') {
+    const safeKind = slotKind(kind)
+    if (this.#countOf(safeKind) >= MAX_SLOTS) throw new Error('max slots')
+    // Palco: a partir da porta do Palco principal; Transmissão: da principal (47080)
+    const from = safeKind === 'palco' ? PALCO_HTTP_PORT + 2 : DEFAULT_HTTP_PORT + 2
+    let httpPort = suggestPort(from, this.#takenPorts())
+    // id = porta HTTP de criação (ex: "47082"); continua o mesmo se a porta mudar depois
+    while (httpPort !== null && this.#slots.has(String(httpPort))) httpPort = suggestPort(httpPort + 2, this.#takenPorts())
+    if (httpPort === null) throw new Error('no free port')
+    const slot = this.ensureSlot(String(httpPort), label, httpPort, httpPort + 1, undefined, safeKind)
     this.persistSlots()
     return slot
   }
 
+  /** Porta e/ou aparência de uma conexão. */
+  async updateSlot(id, { httpPort, overlay } = {}) {
+    const slot = this.#slots.get(id)
+    if (!slot) return { ok: false, reason: 'not-found' }
+    if (httpPort !== undefined && httpPort !== slot.httpPort) {
+      const check = validatePort(httpPort, this.#takenPorts(id))
+      if (!check.ok) return check
+      if (slot.running) return { ok: false, reason: 'running' }
+      try {
+        await slot.setPorts(httpPort)
+      } catch (error) {
+        this.persistSlots()
+        console.warn('[palco] port change:', error?.message ?? error)
+        return { ok: false, reason: 'port-in-use', status: this.statusOf(slot) }
+      }
+    }
+    if (overlay) slot.setOverlay(overlay)
+    this.persistSlots()
+    return { ok: true, status: this.statusOf(slot) }
+  }
+
+  /** Status com sugestão de porta quando a atual está ocupada por outro programa. */
+  statusOf(slot) {
+    const status = slot.status()
+    if (status.error?.code !== 'port-in-use') return status
+    const suggestedPort = suggestPort(slot.httpPort + 2, this.#takenPorts(slot.id), [status.error.port])
+    return { ...status, error: { ...status.error, suggestedPort } }
+  }
+
+  /** Aplica rede/token; trocar a interface exige todas as conexões paradas. */
+  async setTransmission(file, next) {
+    const current = getTransmissionState()
+    const bind = next?.bind ?? current.bind
+    if (bind !== current.bind && this.getAllSlots().some(slot => slot.running)) return { ok: false, reason: 'running' }
+    const saved = saveTransmissionConfig(file, { bind, requireToken: next?.requireToken ?? current.requireToken })
+    setTransmissionState(saved)
+    if (saved.bind !== current.bind) {
+      await Promise.all(this.getAllSlots().map(slot => slot.rebind().catch(error => console.warn('[palco] rebind:', slot.id, error?.message ?? error))))
+    }
+    return { ok: true, ...saved }
+  }
+
   /** Remove slot (exceto principal). */
   removeSlot(id) {
-    if (id === '0') return false
+    if (id === '0' || id === PALCO_PRINCIPAL_ID) return false
     const slot = this.#slots.get(id)
     if (!slot) return false
-    slot.stop()
+    void slot.dispose()
     this.#slots.delete(id)
     this.persistSlots()
     return true
   }
 
-  getSlot(id = '0') { return this.#slots.get(id) }
+  getSlot(id = '0') { return this.#slots.get(parseTarget(id).slotId) }
   getAllSlots() { return Array.from(this.#slots.values()) }
   getPrincipal() { return this.#slots.get('0') }
 
@@ -475,37 +1052,91 @@ let manager = null
 
 /** Anexa ao main process (chamado em main.mjs). */
 export function attachPalcoServer(getContents) {
+  const transmissionFile = path.join(app.getPath('userData'), 'palco-transmission.json')
+  setTransmissionState(readTransmissionConfig(transmissionFile))
   if (!manager) manager = new PalcoManager(getContents)
   manager.init()
+  const startupFile = path.join(app.getPath('userData'), 'palco-connections-startup.json')
+  let startup = readConnectionStartup(startupFile)
+  function saveStartup(next) {
+    saveConnectionStartup(startupFile, next)
+    startup = next
+  }
+  if (startup.enabled) {
+    for (const id of startup.activeIds) {
+      const slot = manager.getSlot(id)
+      if (slot) void slot.start().catch(error => console.warn('[palco] restore:', id, error))
+    }
+  }
+  ipcMain.handle('palco:persistence-get', () => ({ enabled: startup.enabled }))
+  ipcMain.handle('palco:persistence-set', (_e, { enabled }) => {
+    saveStartup({ enabled: enabled === true, activeIds: enabled === true ? manager.getAllSlots().filter(slot => slot.running).map(slot => slot.id) : [] })
+    return { enabled: startup.enabled }
+  })
+
+  // OBS S1: token de acesso carregado/criado 1x no boot (persistido no userData)
+  enablePalcoToken()
+
+  // IPC: token (UI mostra URL pronta p/ OBS + reset)
+  ipcMain.handle('palco:token', () => ({ token: getPalcoToken(), path: palcoTokenPath() }))
+  ipcMain.handle('palco:token-reset', () => {
+    const token = resetPalcoToken()
+    // TVs do Palco não usam o token: seguem conectadas
+    for (const slot of manager.getAllSlots()) if (slot.kind !== 'palco') slot.disconnectNetworkClients()
+    return { token }
+  })
 
   // IPC: lista slots
-  ipcMain.handle('palco:slots', () =>
-    manager.getAllSlots().map(s => ({ id: s.id, label: s.label, running: s.running, clients: s.clientsCount, httpPort: s.httpPort, wsPort: s.wsPort }))
-  )
+  ipcMain.handle('palco:slots', () => manager.getAllSlots().map(slot => manager.statusOf(slot)))
 
   // IPC: cria slot
-  ipcMain.handle('palco:slot-create', (_e, { label }) => {
-    const slot = manager.createSlot(label)
-    return { id: slot.id, label: slot.label, httpPort: slot.httpPort, wsPort: slot.wsPort }
+  ipcMain.handle('palco:slot-create', (_e, { label, kind } = {}) => {
+    const slot = manager.createSlot(label, kind)
+    return { id: slot.id, label: slot.label, kind: slot.kind, httpPort: slot.httpPort, wsPort: slot.wsPort }
   })
 
   // IPC: remove slot
-  ipcMain.handle('palco:slot-remove', (_e, { id }) => manager.removeSlot(id))
+  ipcMain.handle('palco:slot-remove', (_e, { id }) => {
+    const removed = manager.removeSlot(id)
+    if (removed && startup.enabled) saveStartup({ ...startup, activeIds: startup.activeIds.filter(active => active !== id) })
+    return removed
+  })
+
+  ipcMain.handle('palco:slot-update', (_e, { id, httpPort, overlay } = {}) => manager.updateSlot(String(id ?? ''), { httpPort, overlay }))
+
+  // IPC: rede/token da aba Transmissão
+  ipcMain.handle('palco:transmission-get', () => {
+    const interfaces = rankInterfaces(networkInterfaces())
+    const state = getTransmissionState()
+    return { ...state, ...resolveBind(state.bind, interfaces), bind: state.bind, interfaces, token: getPalcoToken() }
+  })
+  ipcMain.handle('palco:transmission-set', (_e, next) => manager.setTransmission(transmissionFile, next))
 
   // IPC: status (default slot 0)
   ipcMain.handle('palco:status', (_e, { slotId }) => {
     const slot = manager.getSlot(slotId ?? '0')
-    return slot ? slot.status() : null
+    return slot ? manager.statusOf(slot) : null
   })
 
   // IPC: start/stop (default slot 0)
-  ipcMain.handle('palco:start', (_e, { slotId }) => manager.getSlot(slotId ?? '0')?.start() ?? false)
-  ipcMain.handle('palco:stop', (_e, { slotId }) => { manager.getSlot(slotId ?? '0')?.stop(); return true })
+  ipcMain.handle('palco:start', async (_e, { slotId }) => {
+    const id = slotId ?? '0'
+    const started = await (manager.getSlot(id)?.start() ?? false)
+    if (started && startup.enabled) saveStartup({ ...startup, activeIds: [...new Set([...startup.activeIds, id])] })
+    return started
+  })
+  ipcMain.handle('palco:stop', async (_e, { slotId }) => {
+    const id = slotId ?? '0'
+    await manager.getSlot(id)?.stop()
+    if (startup.enabled) saveStartup({ ...startup, activeIds: startup.activeIds.filter(active => active !== id) })
+    return true
+  })
 
   // IPC: send → slot específico (default: principal)
   ipcMain.handle('palco:send', (_e, { slotId, ...msg }) => {
-    const slot = manager.getSlot(slotId ?? '0')
-    const r = slot?.send(msg) ?? false
+    const target = parseTarget(slotId)
+    const slot = manager.getSlot(target.slotId)
+    const r = slot?.send(msg, target.uid) ?? false
     console.log('[palco:send]', slotId ?? '0', msg?.type, '→ ok=' + r)
     return r
   })
@@ -528,8 +1159,351 @@ export function attachPalcoServer(getContents) {
     return slot?.clearMedia() ?? true
   })
 
+  // Módulo Palco: TVs conectadas, comandos por TV, marca e descoberta.
+  const mutedFile = path.join(app.getPath('userData'), 'palco-muted-tvs.json')
+  try {
+    const stored = JSON.parse(readFileSync(mutedFile, 'utf8'))
+    if (Array.isArray(stored)) for (const key of stored) if (typeof key === 'string') mutedTvs.add(key)
+  } catch { /* primeira vez: nenhuma desmarcada */ }
+  function saveMuted() {
+    try {
+      mkdirSync(path.dirname(mutedFile), { recursive: true })
+      writeFileSync(`${mutedFile}.tmp`, JSON.stringify([...mutedTvs]), 'utf8')
+      renameSync(`${mutedFile}.tmp`, mutedFile)
+    } catch (error) {
+      console.warn('[palco] persist muted:', error?.message ?? error)
+    }
+  }
+  ipcMain.handle('palco:clients', () => manager.getAllSlots()
+    .filter(slot => slot.running)
+    .flatMap(slot => slot.clients().map(client => ({ ...client, slotId: slot.id, slotLabel: slot.label }))))
+  ipcMain.handle('palco:client-command', (_e, { slotId, uid, command, ...args } = {}) => {
+    const slot = manager.getSlot(String(slotId ?? ''))
+    if (!slot) return false
+    if (command === 'moveTo') {
+      const target = manager.getSlot(String(args.targetSlotId ?? ''))
+      if (!target?.running || target.id === slot.id) return false
+      return slot.sendToClient(String(uid ?? ''), 'moveTo', { port: target.wsPort })
+    }
+    return slot.sendToClient(String(uid ?? ''), String(command ?? ''), args)
+  })
+  ipcMain.handle('palco:client-mute', (_e, { slotId, uid, muted } = {}) => {
+    const slot = manager.getSlot(String(slotId ?? ''))
+    const info = slot?.clients().find(client => client.uid === uid)
+    if (!slot || !info || !isTv(info)) return false
+    const key = muteKey(info)
+    setMutedKey(key, muted === true)
+    saveMuted()
+    for (const each of manager.getAllSlots()) {
+      for (const client of each.clients()) if (muteKey(client) === key) each.applyMute(client.uid)
+    }
+    getContents()?.send('palco:clients-changed', { slotId: slot.id })
+    return true
+  })
+  ipcMain.handle('palco:client-pin', (_e, { slotId, uid, pinned } = {}) => {
+    const slot = manager.getSlot(String(slotId ?? ''))
+    const info = slot?.clients().find(client => client.uid === uid)
+    if (!slot || !info || !isTv(info)) return false
+    const key = muteKey(info)
+    setPinnedKey(key, pinned === true)
+    // Soltou: volta a receber a transmissão (ou a espera, se desmarcada).
+    if (pinned !== true) {
+      for (const each of manager.getAllSlots()) {
+        for (const client of each.clients()) if (muteKey(client) === key) each.applyMute(client.uid)
+      }
+    }
+    getContents()?.send('palco:clients-changed', { slotId: slot.id })
+    return true
+  })
+  ipcMain.handle('palco:discover', async () => {
+    const connected = manager.getAllSlots().flatMap(slot => slot.clients().map(client => client.ip))
+    return { ownIp: lanIp(), tvs: await discoverTvs(lanIp(), { exclude: connected }) }
+  })
+  ipcMain.handle('palco:wake-tv', (_e, { ip } = {}) => wakeTv(String(ip ?? '')))
+
   // Expõe manager pra debug
   globalThis.__PALCO_MANAGER__ = manager
 }
 
 export function getPalcoManager() { return manager }
+
+// Testes de handleHttp (node puro, electron mockado) — see palco-assets.test.ts
+export { PalcoSlot }
+
+// ── Página do Pregador (/speaker) ─────────────────────────────────────────────
+// HTML standalone (sem build) servido pelo slot HTTP. Preview full-area (flex,
+// 16:9 máx por largura, cresce até o limite sem distorcer), controles no rodapé
+// (thumb-friendly), i18n via ?lang=/navigator.language (pt-BR/en/es) e
+// design tokens de src/design-system/tokens interpolados (fonte única).
+
+/** Tokens do design system (unicidade com o renderer). */
+const SPEAKER_TOKENS = {
+  bg: '#131313', // colors.dark.background
+  surface: '#1E1E1E', // colors.dark.surfaceElevated
+  surfaceInput: '#242424', // colors.dark.surfaceCard
+  onSurface: '#e5e2e1', // colors.dark.onSurface
+  onSurfaceVariant: '#bfc7d4', // colors.dark.onSurfaceVariant
+  primary: '#E0895A', // accents[defaultAccent].primary (orange)
+  onPrimary: '#2b160b', // contraste para o realce laranja
+  outline: 'rgba(255,255,255,0.10)', // colors.dark.outlineStrong
+  success: '#64d99b',
+  radiusSm: '8px 0 8px 0', // radius.sm
+  radiusMd: '12px 0 12px 0', // radius.md
+  spacing1: '4px', spacing2: '8px', spacing3: '12px', spacing4: '16px',
+}
+
+/** Dicionário i18n da página do pregador — TODO texto visível passa por aqui. */
+export const SPEAKER_I18N = {
+  'pt-BR': {
+    refreshPage: 'Atualizar página', closePage: 'Fechar', closeBlocked: 'O navegador bloqueou o fechamento automático. Feche esta aba ou janela pelo controle do próprio navegador.',
+    disconnected: 'A conexão foi encerrada pelo desktop. Outro dispositivo já pode acessar o modo interativo.',
+    waiting: 'Aguardando transmissão',
+    interactiveBusy: 'Já existe uma conexão interativa ativa. Para liberar o acesso, use o botão “Encerrar conexão ativa” no app desktop, em Configurações → Controle Remoto → Tela de Apoio. Depois, atualize esta página para tentar novamente.',
+    stopwatch: 'Tempo de pregação', start: 'Iniciar', pause: 'Pausar', resume: 'Continuar', reset: 'Zerar', title: 'Tela de apoio', connecting: 'Conectando preview…', noPairing: 'Sem pareamento — cole o link do QR',
+    pairHint: 'Pareamento perdido. Cole abaixo o link do QR exibido no app do desktop (começa com http://…/speaker?token=…):',
+    connect: 'Conectar', cancel: 'Cancelar', repair: 'Reemparelhar',
+    previousSlide: 'Anterior', nextSlide: 'Próximo', unavailable: 'Sem slide', back: 'Voltar', next: 'Avançar', previewTitle: 'Preview da projeção',
+  },
+  en: {
+    refreshPage: 'Refresh page', closePage: 'Close', closeBlocked: 'The browser blocked automatic closing. Close this tab or window using the browser controls.',
+    disconnected: 'The desktop ended this connection. Another device can now access interactive mode.',
+    waiting: 'Waiting for broadcast',
+    interactiveBusy: 'An interactive connection is already active. To free access, use “End active connection” in the desktop app under Settings → Remote Control → Support Screen. Then refresh this page to try again.',
+    stopwatch: 'Sermon time', start: 'Start', pause: 'Pause', resume: 'Resume', reset: 'Reset', title: 'Support screen', connecting: 'Connecting preview…', noPairing: 'Not paired — paste the QR link',
+    pairHint: 'Pairing lost. Paste below the QR link shown in the desktop app (starts with http://…/speaker?token=…):',
+    connect: 'Connect', cancel: 'Cancel', repair: 'Re-pair',
+    previousSlide: 'Previous', nextSlide: 'Next', unavailable: 'No slide', back: 'Back', next: 'Next', previewTitle: 'Projection preview',
+  },
+  es: {
+    refreshPage: 'Actualizar página', closePage: 'Cerrar', closeBlocked: 'El navegador bloqueó el cierre automático. Cierra esta pestaña o ventana con los controles del navegador.',
+    disconnected: 'El escritorio finalizó la conexión. Otro dispositivo ya puede acceder al modo interactivo.',
+    waiting: 'Esperando transmisión',
+    interactiveBusy: 'Ya existe una conexión interactiva activa. Para liberar el acceso, usa “Finalizar conexión activa” en la app de escritorio, en Configuración → Control Remoto → Pantalla de Apoyo. Después, actualiza esta página para intentarlo de nuevo.',
+    stopwatch: 'Tiempo de predicación', start: 'Iniciar', pause: 'Pausar', resume: 'Continuar', reset: 'Reiniciar', title: 'Pantalla de apoyo', connecting: 'Conectando vista previa…', noPairing: 'Sin emparejar — pega el enlace del QR',
+    pairHint: 'Emparejamiento perdido. Pega abajo el enlace del QR mostrado en la app de escritorio (empieza con http://…/speaker?token=…):',
+    connect: 'Conectar', cancel: 'Cancelar', repair: 'Reemparejar',
+    previousSlide: 'Anterior', nextSlide: 'Siguiente', unavailable: 'Sin diapositiva', back: 'Atrás', next: 'Adelante', previewTitle: 'Vista previa de proyección',
+  },
+}
+
+/**
+ * HTML da página /speaker. `lang` força idioma (teste); no navegador decide
+ * ?lang= > navigator.language > pt-BR.
+ */
+export function speakerPageHtml({ palcoToken = '' } = {}) {
+  const t = SPEAKER_TOKENS
+  const dictJson = JSON.stringify(SPEAKER_I18N)
+  // Token do palco embutido no JS (regex do receiver aceita A-Z0-9 de 5).
+  const safeToken = /^[A-Z0-9]{5}$/.test(palcoToken) ? palcoToken : ''
+  return `<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no,viewport-fit=cover"><title>Tela de apoio · LouvorJA</title>
+<style>
+:root{--bg:${t.bg};--surface:${t.surface};--surface-input:${t.surfaceInput};--on-surface:${t.onSurface};--on-surface-variant:${t.onSurfaceVariant};--primary:${t.primary};--on-primary:${t.onPrimary};--outline:${t.outline};--success:${t.success};--radius-sm:${t.radiusSm};--radius-md:${t.radiusMd};--sp1:${t.spacing1};--sp2:${t.spacing2};--sp3:${t.spacing3};--sp4:${t.spacing4}}
+[hidden]{display:none!important}
+#connectionError .connection-error-actions{display:flex;justify-content:center;flex-wrap:wrap;gap:12px;margin-top:24px}
+#connectionError button{width:auto;min-height:48px;padding:12px 20px;font-size:16px}
+#connectionError .connection-error-close{background:var(--surface);color:var(--on-surface)}
+#connectionError p{max-width:600px;margin:0 auto}
+#connectionError{position:fixed;inset:0;z-index:20;display:grid;place-content:center;padding:32px;background:var(--bg);color:var(--on-surface);text-align:center;font-size:20px;line-height:1.6}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--on-surface);font:16px 'Plus Jakarta Sans',system-ui,sans-serif;display:flex;flex-direction:column;min-height:100dvh}
+main{flex:1;display:flex;flex-direction:column;padding:var(--sp3) var(--sp3) var(--sp2);max-width:480px;width:100%;margin:auto;min-height:0;box-sizing:border-box}
+h1{font-size:20px;margin:0}
+.speaker-header{display:flex;align-items:center;justify-content:space-between;gap:var(--sp2);margin-bottom:var(--sp3)}
+.stopwatch{display:grid;grid-template-columns:auto auto;align-items:center;gap:4px 12px;background:var(--surface);border:1px solid var(--outline);border-radius:var(--radius-sm);padding:8px 10px}
+.stopwatch-label{grid-column:1/-1;font-size:11px;color:var(--on-surface-variant)}
+#stopwatchTime{font-size:26px;line-height:1.2;font-weight:700;font-variant-numeric:tabular-nums;color:var(--primary)}
+.stopwatch-controls{display:flex;gap:6px}
+.stopwatch button{min-height:36px;width:auto;padding:6px 10px;font-size:12px}
+#stopwatchReset{background:var(--surface-input);color:var(--on-surface)}
+@media(max-width:350px){.speaker-header{align-items:flex-start;flex-direction:column}.stopwatch{align-self:stretch}}
+
+.preview{flex:1;min-height:0;background:#000;border:1px solid var(--outline);border-radius:var(--radius-sm);overflow:hidden;position:relative;display:flex;align-items:center;justify-content:center}
+.bible-preview{position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;justify-content:center;gap:20px;padding:24px;background:#000;text-align:center;overflow:auto}
+.bible-preview[hidden]{display:none}
+#bibleText{font-size:clamp(18px,4.5vw,28px);line-height:1.5;white-space:pre-line}
+#bibleReference{color:var(--primary);font-size:16px}
+.thumbnail span{padding:8px;text-align:center;max-height:100%;overflow:auto;box-sizing:border-box}
+#supportIdle{position:absolute;inset:0;z-index:2;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+#supportIdle img{width:64px;height:auto;animation:supportPulse 3.2s ease-in-out infinite}
+#supportIdle span{font-size:13px;letter-spacing:.06em;color:var(--on-surface-variant)}
+@keyframes supportPulse{0%,100%{opacity:.35}50%{opacity:1}}
+@media(prefers-reduced-motion:reduce){#supportIdle img{animation:none}}
+.preview>img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000}
+.preview>img[hidden]{display:none}
+.preview iframe{width:1280px;height:720px;border:0;transform-origin:0 0;position:absolute;top:0;left:0;background:#000}
+#msg{position:absolute;inset:0;display:grid;place-items:center;color:var(--on-surface-variant);font-size:14px;padding:var(--sp2);text-align:center}
+footer{margin-top:var(--sp2)}
+.neighbors{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp3);margin-bottom:var(--sp3)}
+.neighbor{margin:0;min-width:0;background:var(--surface);border:1px solid var(--outline);border-radius:var(--radius-sm);overflow:hidden}
+.neighbor figcaption{padding:var(--sp2);font-size:15px;font-weight:600;color:var(--primary)}
+.thumbnail{position:relative;height:clamp(64px,14dvh,130px);background:#000;display:grid;place-items:center}
+.thumbnail img{width:100%;height:100%;object-fit:contain;position:absolute;inset:0}
+.thumbnail img[hidden]{display:none}
+.neighbors.music-neighbors{grid-template-columns:1fr}
+.neighbors.music-neighbors .neighbor:first-child{display:none}
+.neighbors.bible-neighbors.music-neighbors .thumbnail{align-items:center}
+.neighbors.bible-neighbors.music-neighbors .thumbnail span{font-size:clamp(22px,5vw,30px);line-height:1.5;padding:16px;text-align:center}
+.neighbors.bible-neighbors .thumbnail{height:clamp(140px,24dvh,240px);align-items:start;justify-items:stretch}
+.neighbors.bible-neighbors .verse-reference{display:block;color:var(--primary);font-weight:500;margin-bottom:8px}
+.neighbors.bible-neighbors .thumbnail span{font-size:14px;line-height:1.6;color:var(--on-surface);white-space:pre-line;text-align:left;display:block;width:100%;padding:12px}
+.thumbnail span{color:var(--on-surface-variant);font-size:12px}
+button:focus-visible{outline:2px solid var(--on-surface);outline-offset:3px}
+button{min-height:64px;width:48%;font-size:28px;border-radius:var(--radius-md);border:0;background:var(--primary);color:var(--on-primary);font-weight:700}
+button:disabled{opacity:.35;cursor:not-allowed;filter:grayscale(1)}
+button:not(:disabled):active{filter:brightness(1.3)}
+nav{display:flex;justify-content:space-between;gap:var(--sp3)}
+#count{font-size:24px;text-align:center;margin:var(--sp2);font-weight:700}
+.changed{outline:4px solid var(--success)}
+#pair{position:fixed;inset:0;background:var(--bg);z-index:10;display:none;flex-direction:column;justify-content:center;padding:var(--sp6,24px);gap:var(--sp3)}
+#pair input{padding:var(--sp3);border-radius:var(--radius-sm);border:1px solid var(--outline);background:var(--surface-input);color:var(--on-surface);font-size:14px}
+.small{min-height:44px;width:100%;font-size:16px;background:var(--surface);color:var(--on-surface)}
+.hint{color:var(--on-surface-variant);font-size:13px;line-height:1.4}
+</style></head>
+<body>
+<div id="connectionError" hidden role="alert"><p id="connectionErrorMessage" data-i18n="interactiveBusy">Já existe uma conexão interativa ativa.</p>
+<div class="connection-error-actions"><button id="refreshPage" data-i18n="refreshPage">Atualizar página</button><button id="closePage" class="connection-error-close" data-i18n="closePage">Fechar</button></div></div>
+<main>
+<header class="speaker-header"><h1 id="t" data-i18n="title">Tela de apoio</h1>
+<section class="stopwatch" data-i18n-attr="aria-label:stopwatch" aria-label="Tempo de pregação">
+<span class="stopwatch-label" data-i18n="stopwatch">Tempo de pregação</span>
+<output id="stopwatchTime" role="timer" aria-live="off">00:00</output>
+<div class="stopwatch-controls"><button id="stopwatchToggle" data-i18n="start">Iniciar</button><button id="stopwatchReset" data-i18n="reset">Zerar</button></div>
+</section></header>
+<div class="preview"><div id="supportIdle"><img src="logo-louvor-ja.svg" alt="Louvor JA"><span data-i18n="waiting">Aguardando transmissão</span></div><div id="biblePreview" class="bible-preview" hidden><div id="bibleText"></div><div id="bibleReference"></div></div><img id="currentImage" hidden data-i18n-attr="alt:previewTitle" alt="Preview da projeção"><iframe id="frame" data-i18n-attr="title:previewTitle" title="Preview da projeção" style="display:none"></iframe><div id="msg" data-i18n="connecting">Conectando preview…</div></div>
+<footer>
+<div class="neighbors">
+<figure class="neighbor"><figcaption data-i18n="previousSlide">Anterior</figcaption><div class="thumbnail"><span data-i18n="unavailable">Sem slide</span><img id="previousImage" hidden data-i18n-attr="alt:previousSlide" alt="Anterior"></div></figure>
+<figure class="neighbor"><figcaption data-i18n="nextSlide">Próximo</figcaption><div class="thumbnail"><span data-i18n="unavailable">Sem slide</span><img id="nextImage" hidden data-i18n-attr="alt:nextSlide" alt="Próximo"></div></figure>
+</div>
+<div id="conn" style="font-size:13px;text-align:center;margin-bottom:6px;color:var(--on-surface-variant)"><span class="dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--on-surface-variant);margin-right:6px"></span><span data-i18n="connecting">Conectando preview…</span></div>
+<div id="count">—/—</div>
+<nav><button id="prev" disabled data-i18n-attr="aria-label:back" aria-label="Voltar">◀</button><button id="next" disabled data-i18n-attr="aria-label:next" aria-label="Avançar">▶</button></nav>
+<button id="repair" class="small" style="margin-top:var(--sp3)" data-i18n-attr="aria-label:repair" aria-label="Reemparelhar" data-i18n="repair">Reemparelhar</button>
+</footer>
+</main>
+<div id="pair"><p class="hint" data-i18n="pairHint">Pareamento perdido. Cole abaixo o link do QR exibido no app do desktop (começa com http://…/speaker?token=…):</p>
+<input id="pairUrl" placeholder="http://192.168.x.x:47080/speaker?remotePort=${DEFAULT_REMOTE_PORT}&token=abcd1234">
+<button id="pairGo" class="small" data-i18n="connect">Conectar</button><button id="pairCancel" class="small" data-i18n="cancel">Cancelar</button></div>
+<script>
+const I18N=${dictJson};
+const q=new URLSearchParams(location.search);
+const readOnly=q.get('mode')==='view';
+if(readOnly){document.querySelector('nav').hidden=true;document.querySelector('.stopwatch').hidden=true;document.getElementById('repair').hidden=true}
+// Idioma: ?lang= > navigator.language do celular > pt-BR (resolveAppLocale-equiv).
+function pickLang(){const sup=['pt-BR','en','es'];const p=v=>{if(!v)return'';const l=sup.find(s=>s.toLowerCase()===v.toLowerCase());if(l)return l;const pre=v.split('-')[0].toLowerCase();return sup.find(s=>s.split('-')[0].toLowerCase()===pre)||''};
+  return p(q.get('lang'))||p(navigator.language)||'pt-BR'}
+const lang=pickLang(),T=I18N[lang]||I18N['pt-BR'];
+document.documentElement.lang=lang;
+document.title=T.title+' · LouvorJA';
+document.querySelectorAll('[data-i18n]').forEach(el=>{el.textContent=T[el.dataset.i18n]});
+document.querySelectorAll('[data-i18n-attr]').forEach(el=>{const[k,key]=el.dataset.i18nAttr.split(':');el.setAttribute(k,T[key])});
+// Relógio absoluto: não perde tempo quando o navegador suspende os intervalos.
+let stopwatch={elapsed:0,startedAt:null};
+try{const saved=JSON.parse(localStorage.getItem('speaker.stopwatch'));
+  if(saved&&Number.isFinite(saved.elapsed)&&saved.elapsed>=0&&(saved.startedAt===null||(Number.isFinite(saved.startedAt)&&saved.startedAt>=0)))stopwatch=saved;
+}catch{}
+function stopwatchElapsed(){return stopwatch.elapsed+(stopwatch.startedAt===null?0:Math.max(0,Date.now()-stopwatch.startedAt))}
+function saveStopwatch(){try{localStorage.setItem('speaker.stopwatch',JSON.stringify(stopwatch))}catch{}}
+function renderStopwatch(){const seconds=Math.floor(stopwatchElapsed()/1000),hours=Math.floor(seconds/3600),pad=n=>String(n).padStart(2,'0');
+  document.getElementById('stopwatchTime').textContent=(hours?pad(hours)+':':'')+pad(Math.floor(seconds/60)%60)+':'+pad(seconds%60);
+  document.getElementById('stopwatchToggle').textContent=stopwatch.startedAt!==null?T.pause:stopwatch.elapsed?T.resume:T.start;
+}
+document.getElementById('stopwatchToggle').onclick=()=>{
+  if(stopwatch.startedAt===null)stopwatch.startedAt=Date.now();else{stopwatch.elapsed=stopwatchElapsed();stopwatch.startedAt=null}
+  saveStopwatch();renderStopwatch();
+};
+document.getElementById('stopwatchReset').onclick=()=>{stopwatch={elapsed:0,startedAt:null};saveStopwatch();renderStopwatch()};
+setInterval(renderStopwatch,250);
+document.addEventListener('visibilitychange',renderStopwatch);
+renderStopwatch();
+const storagePrefix=readOnly?'support.viewer.':'speaker.';
+let token=q.get('token')||localStorage.getItem(storagePrefix+'token');
+let remotePort=q.get('remotePort')||localStorage.getItem(storagePrefix+'remotePort')||'${DEFAULT_REMOTE_PORT}';
+let palcoPort=q.get('palcoPort')||localStorage.getItem(storagePrefix+'palcoPort')||String((Number(location.port)||47080)+1);
+// Token do palco (valor real injetado server-side abaixo) — o preview precisa
+// dele para o WS do palco não fechar a conexão fora do localhost.
+let palcoToken='${safeToken}';
+if(token){localStorage.setItem(storagePrefix+'token',token);localStorage.setItem(storagePrefix+'remotePort',remotePort);localStorage.setItem(storagePrefix+'palcoPort',palcoPort)}
+let connectionBlocked=false;
+let preview,remote,queued=[],state={index:0,total:0,active:false},seq=0,lastSend=0;
+const frame=document.querySelector('#frame'),msg=document.querySelector('#msg'),count=document.querySelector('#count');
+function host(port,path){return 'ws://'+location.hostname+':'+port+path}
+// Preview full-area: escala por LARGURA (16:9) e centra verticalmente no
+// retângulo flexível; box cresce até o espaço disponível sem distorcer.
+function fitFrame(){const box=frame.parentElement,s=Math.min(box.clientWidth/1280,box.clientHeight/720)||box.clientWidth/1280;
+  frame.style.transform='scale('+s+')';frame.style.left=((box.clientWidth-1280*s)/2)+'px';frame.style.top=((box.clientHeight-720*s)/2)+'px'}
+addEventListener('resize',fitFrame);
+// Gestos de zoom (pinça/duplo-toque) travados — preview fixo, sem acidentes.
+document.addEventListener('gesturestart',e=>e.preventDefault());
+document.addEventListener('gesturechange',e=>e.preventDefault());
+let lastTouch=0;
+document.addEventListener('touchend',e=>{const now=Date.now();if(now-lastTouch<300)e.preventDefault();lastTouch=now},{passive:false});
+let galleryKey='',gallery=[];
+function render(){
+  const idle=state.active===false;
+  document.getElementById('supportIdle').hidden=!idle;
+  const bible=state.kind==='bible';
+  document.getElementById('prev').disabled=readOnly||state.canNavigate!==true;
+  document.getElementById('next').disabled=readOnly||state.canNavigate!==true;
+  document.querySelector('.neighbors').classList.toggle('bible-neighbors',bible||Array.isArray(state.lyrics));
+  document.querySelector('.neighbors').classList.toggle('music-neighbors',!bible&&Array.isArray(state.lyrics));
+  document.getElementById('biblePreview').hidden=!bible;
+  document.getElementById('bibleText').textContent=bible?state.text||'':'';
+  document.getElementById('bibleReference').textContent=bible?state.reference||'':'';
+  count.textContent=(state.total?state.index+1:'—')+'/'+(state.total||'—');
+  for(const [id,index] of [['currentImage',state.index],['previousImage',state.index-1],['nextImage',state.index+1]]){
+    const img=document.getElementById(id),raw=index>=0&&index<state.total?(id==='currentImage'?(state.preview||gallery[index]):gallery[index]):null;
+    const src=typeof raw==='string'&&/^[A-Za-z0-9+/]+={0,2}$/.test(raw)?'data:image/jpeg;base64,'+raw:raw;
+    const safe=typeof src==='string'&&/^data:image[/](png|jpeg|webp);base64,/.test(src);
+    img.hidden=!safe;
+    if(id==='currentImage'){frame.style.display=safe?'none':'';if(safe)msg.style.display='none'}
+    else {
+      const label=img.previousElementSibling,text=bible?(id==='previousImage'?state.previousText:state.nextText):(Array.isArray(state.lyrics)&&index>=0&&index<state.total?state.lyrics[index]:'');
+      const reference=bible?(id==='previousImage'?state.previousReference:state.nextReference):'';
+      label.replaceChildren();
+      if(text&&reference){const ref=document.createElement('strong');ref.className='verse-reference';ref.textContent=reference;label.appendChild(ref)}
+      label.appendChild(document.createTextNode(text||T.unavailable));label.hidden=!!safe;
+    }
+    if(safe)img.src=src;else img.removeAttribute('src');
+  }
+  if(idle)frame.style.display='none';
+}
+function updateSlide(slide,active){
+  if(active===false)slide={index:0,total:0,canNavigate:false};
+  if(!slide.galleryKey||slide.galleryKey!==galleryKey){gallery=[];galleryKey=slide.galleryKey||''}
+  if(Array.isArray(slide.previews))gallery=slide.previews;
+  state={...slide,active};render();
+}
+function setConn(online){if(!online){updateSlide({index:0,total:0},false)}const c=document.querySelector('#conn'),d=c.querySelector('.dot'),s=c.querySelector('[data-i18n]');d.style.background=online?'var(--success)':'var(--on-surface-variant)';s.textContent=online?({ptBR:'Conectado',en:'Connected',es:'Conectado'})[lang.replace('-','')]||'Conectado':T.connecting}
+function pulse(){count.classList.add('changed');setTimeout(()=>count.classList.remove('changed'),350)}
+// Preview: receiver.html real (mesmo renderizador da TV) apontando pro palco.
+// palcoToken: WS do palco exige token fora do localhost — sem ele o receiver
+// é fechado na conexão e o preview fica preso no splash (fix 13/10).
+function openPreview(){try{preview&&preview.close()}catch{}
+  frame.src='receiver.html?speakerPreview=1&host='+encodeURIComponent(location.hostname)+'&port='+palcoPort+(palcoToken?'&token='+encodeURIComponent(palcoToken):'');
+  frame.style.display='';msg.style.display='none';fitFrame()}
+function send(action){if(connectionBlocked||readOnly||(action.startsWith('slide:')&&state.canNavigate!==true))return;const now=Date.now();if(now-lastSend<250)return;lastSend=now;
+  const m={v:1,type:'command',id:'s'+(++seq),action,token};
+  if(remote&&remote.readyState===1)remote.send(JSON.stringify(m));else queued.push(m)}
+function openRemote(){remote=new WebSocket(host(remotePort,''));
+  remote.onopen=()=>{setConn(true);remote.send(JSON.stringify({v:1,type:'hello',role:'speaker',token}));queued.splice(0).forEach(m=>remote.send(JSON.stringify(m)))};
+  remote.onmessage=e=>{try{const m=JSON.parse(e.data);if(m.type==='error'&&(m.code==='remote_busy'||m.code==='speaker_disconnected')){connectionBlocked=true;queued=[];setConn(false);document.getElementById('connectionErrorMessage').textContent=m.code==='speaker_disconnected'?T.disconnected:T.interactiveBusy;document.getElementById('connectionError').hidden=false;frame.src='about:blank';return}if(connectionBlocked)return;if(m.type==='state'&&m.slide){const old=state.index;updateSlide(m.slide,m.supportActive);if(old!==state.index)pulse()}}catch{}};
+  remote.onclose=()=>{setConn(false);if(!connectionBlocked)setTimeout(openRemote,800)}}
+document.getElementById('refreshPage').onclick=()=>location.reload();
+document.getElementById('closePage').onclick=()=>{window.close();setTimeout(()=>{if(!window.closed)document.getElementById('connectionErrorMessage').textContent=T.closeBlocked},200)};
+document.querySelector('#prev').onclick=()=>send('slide:prev');
+document.querySelector('#next').onclick=()=>send('slide:next');
+// Reemparelhar: limpa pareamento e abre overlay pra colar o link do QR de novo.
+const pair=document.querySelector('#pair');
+document.querySelector('#repair').onclick=()=>{localStorage.removeItem(storagePrefix+'token');localStorage.removeItem(storagePrefix+'remotePort');localStorage.removeItem(storagePrefix+'palcoPort');pair.style.display='flex'};
+document.querySelector('#pairCancel').onclick=()=>{pair.style.display='none';location.reload()};
+document.querySelector('#pairGo').onclick=()=>{const u=new URL(document.querySelector('#pairUrl').value.trim());location.href=u.toString()};
+// Wake Lock: tela acesa durante o culto; re-adquire ao voltar pro foreground.
+async function lock(){try{await navigator.wakeLock&&navigator.wakeLock.request('screen')}catch{}}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)lock()});
+if(token){lock();openPreview();openRemote()}
+else{pair.style.display='flex';msg.textContent=T.noPairing}
+render();
+</script></body></html>`
+}

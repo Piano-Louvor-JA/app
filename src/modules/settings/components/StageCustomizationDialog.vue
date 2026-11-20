@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { GlassCard } from '@design-system/index'
@@ -11,10 +12,12 @@ import StageCustomizationCard from './StageCustomizationCard.vue'
  * (Substitui gradualmente os *ConfigDialog legados de bgColor/textColor.)
  */
 
-defineProps<{
+const props = defineProps<{
   open: boolean
   /** Escopo do módulo que abriu o atalho (ex.: 'clock', 'timer', 'countdown'). */
   scope: string
+  /** Título próprio; com o slot padrão, o diálogo mostra outro conteúdo no lugar do Palco. */
+  title?: string
 }>()
 
 const emit = defineEmits<{
@@ -23,20 +26,30 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
+/** Músicas: o palco é o slide da letra, então o título diz isso. */
+const dialogTitle = computed(() => {
+  if (props.title) return props.title
+  return props.scope === 'hymns' ? t('settings.stage.titleSlides') : t('settings.stage.title')
+})
+
+function teleportTarget() {
+  return document.fullscreenElement || 'body'
+}
+
 function onKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape') emit('close')
 }
 </script>
 
 <template>
-  <Teleport to="body">
+  <Teleport :to="teleportTarget()">
     <Transition name="stage-shortcut-fade">
       <div
         v-if="open"
         class="stage-shortcut"
         role="dialog"
         aria-modal="true"
-        :aria-label="t('settings.stage.title')"
+        :aria-label="dialogTitle"
         @keydown="onKeydown"
       >
         <div
@@ -56,7 +69,7 @@ function onKeydown(event: KeyboardEvent) {
                   aria-hidden="true"
                 />
               </div>
-              <h2>{{ t('settings.stage.title') }}</h2>
+              <h2>{{ dialogTitle }}</h2>
             </div>
 
             <button
@@ -73,7 +86,12 @@ function onKeydown(event: KeyboardEvent) {
           </header>
 
           <div class="stage-shortcut__body">
-            <StageCustomizationCard :only-scope="scope" />
+            <slot>
+              <StageCustomizationCard
+                :only-scope="scope"
+                :title-key="scope === 'hymns' ? 'settings.stage.titleShort' : undefined"
+              />
+            </slot>
           </div>
         </GlassCard>
       </div>

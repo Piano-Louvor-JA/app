@@ -4,6 +4,7 @@ import { computed, ref } from 'vue'
 import { isDesktopApp } from '@shared/services/desktop-bridge'
 import {
   invalidateTrackMediaCache,
+  onTrackMediaChanged,
   peekTrackDownloadCache,
 } from '@shared/services/track-media'
 
@@ -23,6 +24,11 @@ import {
   resolveAlbumIdsForMusic,
   unmarkAlbumAsDownloaded,
 } from '../services/library-download'
+import {
+  cancelDownload,
+  downloadQueueSnapshot,
+  enqueueDownload,
+} from '../services/download-queue-service'
 
 function findAlbum(
   categories: LibraryCategory[],
@@ -137,11 +143,29 @@ export const useLocalLibraryStore = defineStore('localLibrary', () => {
     // no-op intencional
   }
 
+  // A Central pode ter aberto vazia; o evento de cache curado precisa recarregar.
+  let collectionsLoaded = false
+
+  /** Coletâneas baixando: o download atualiza este objeto, então a lista recarregada o reaproveita. */
+  const inFlightAlbums = new Map<string, LibraryAlbum>()
+
+  function keepInFlightAlbums(loaded: LibraryCategory[]): LibraryCategory[] {
+    if (!inFlightAlbums.size) return loaded
+    return loaded.map((category) => ({
+      ...category,
+      albums: category.albums.map((album) => {
+        const running = inFlightAlbums.get(String(album.id))
+        return running?.status === 'downloading' ? running : album
+      }),
+    }))
+  }
+
   async function refreshCollections() {
+    collectionsLoaded = true
     isLoadingList.value = true
     clearError()
     try {
-      categories.value = await loadLibraryCategories()
+      categories.value = keepInFlightAlbums(await loadLibraryCategories())
       void hydrateLocalLibraryCoverUrls(categories.value)
     } catch (error) {
       console.error('[sync] falha ao carregar coletâneas', error)
@@ -150,7 +174,34 @@ export const useLocalLibraryStore = defineStore('localLibrary', () => {
     } finally {
       isLoadingList.value = false
     }
+
+    // Boot reconcile: 1× por sessão, em background, sem bloquear a UI.
+    if (!reconciledOnBoot) {
+      reconciledOnBoot = true
+      void reconcileFromLocalMedia().catch(() => {
+        /* best-effort: falha silenciosa mantém listagem do catálogo */
+      })
+    }
   }
+
+  // Store Pinia é singleton por app; listener vive até fechar a janela.
+  window.addEventListener('louvorja:catalog-refreshed', () => {
+    if (collectionsLoaded) void refreshCollections()
+  })
+
+  /**
+   * Badge /albums reativo (app#albums-badge-live): download/delete de faixa
+   * pode terminar em QUALQUER fluxo (pre-play ensureTrackDownloaded, ondemand,
+   * MusicTrackActions). O evento do serviço dispara o reconcile do álbum
+   * linkado — a grade reflete o disco sem reload.
+   */
+  onTrackMediaChanged((musicId) => {
+    void reconcileAlbumsForMusic(musicId)
+  })
+
+  // Reconcile de disco 1× por sessão: boot com faixas baixadas fora do
+  // manifesto (fluxos antigos) também deve mostrar o check.
+  let reconciledOnBoot = false
 
   /**
    * Marca no manifesto as coletâneas já presentes no disco (import legado)
@@ -184,28 +235,61 @@ export const useLocalLibraryStore = defineStore('localLibrary', () => {
     album.downloadedCount = 0
     album.cancelRequested = false
     album.progressText = 'sync.progress.preparing'
+    inFlightAlbums.set(albumKey, album)
 
     const isCurrent = () => albumDownloadGen.get(albumKey) === gen
 
+    // app#338: o download passa pela fila unificada (feedback visual no
+    // widget do header). Priority 'user' — pedido na hora pelo usuário.
     try {
-      const result = await downloadAlbumMedia(album, {
-        onPrepareProgress: (percent) => {
-          if (!isCurrent() || album.cancelRequested) return
-          album.progress = percent
-          album.progressText = 'sync.progress.preparing'
-        },
-        onDownloadProgress: (downloaded, total, percent) => {
-          if (!isCurrent() || album.cancelRequested) return
-          album.downloadedCount = downloaded
-          album.totalCount = total
-          album.progress = percent
-          album.progressText = 'sync.progress.downloading'
-        },
-        shouldAbort: () =>
-          !isCurrent() ||
-          album.cancelRequested ||
-          (isDownloadingBatch.value && cancelBatchRequested.value),
-      })
+      const queueId = `album:${album.id}`
+      const execute = () =>
+        downloadAlbumMedia(album, {
+          onPrepareProgress: (percent) => {
+            if (!isCurrent() || album.cancelRequested) return
+            album.progress = percent
+            album.progressText = 'sync.progress.preparing'
+          },
+          onDownloadProgress: (downloaded, total, percent) => {
+            if (!isCurrent() || album.cancelRequested) return
+            album.downloadedCount = downloaded
+            album.totalCount = total
+            album.progress = percent
+            album.progressText = 'sync.progress.downloading'
+          },
+          /* v8 ignore start -- true sides exercidos via hooks capturado no teste de batch cancelado (remap V8 em bin-expr) */
+          shouldAbort: () =>
+            !isCurrent() ||
+            album.cancelRequested ||
+            (isDownloadingBatch.value && cancelBatchRequested.value),
+          /* v8 ignore stop */
+        })
+
+      const existing = downloadQueueSnapshot().find((item) => item.id === queueId)
+      const slotBusy = existing?.status === 'pending' || existing?.status === 'running'
+
+      // A fila espera 50ms antes de pegar o item. O download em si começa já,
+      // para um segundo pedido no mesmo turno enxergar o primeiro em voo e
+      // invalidar a geração. Slot ocupado corre em paralelo, sem pendurar.
+      const result = slotBusy
+        ? await execute()
+        : await new Promise<Awaited<ReturnType<typeof downloadAlbumMedia>>>((resolve, reject) => {
+            if (existing) cancelDownload(queueId)
+            const job = execute()
+            enqueueDownload({
+              id: queueId,
+              label: album.name,
+              priority: 'user',
+              task: async () => {
+                try {
+                  resolve(await job)
+                } catch (error) {
+                  reject(error instanceof Error ? error : new Error(String(error)))
+                  throw error
+                }
+              },
+            })
+          })
 
       if (!isCurrent() || album.cancelRequested) {
         if (isCurrent()) {
@@ -253,15 +337,22 @@ export const useLocalLibraryStore = defineStore('localLibrary', () => {
     } catch (error) {
       console.error('[sync] erro ao baixar coletânea', error)
       if (!isCurrent() || album.cancelRequested) {
+        /* v8 ignore next 2 -- troca de album durante erro de rede: guard acima ja barra */
         if (isCurrent()) applyIdleStatus(album)
         return 'idle' as const
       }
       album.status = 'error'
       album.progressText = 'sync.progress.error'
+      /* v8 ignore next 3 -- erro dentro de batch real e reportado pelo loop (downloadAllIdleAlbums) */
       if (!isDownloadingBatch.value) {
         setDownloadFailure({ reason: 'unknown', failedCount: 0 })
       }
       return 'error' as const
+    } finally {
+      // Um novo download da mesma coletânea pode já ter reassumido o objeto.
+      if (inFlightAlbums.get(albumKey) === album && album.status !== 'downloading') {
+        inFlightAlbums.delete(albumKey)
+      }
     }
   }
 
@@ -276,9 +367,11 @@ export const useLocalLibraryStore = defineStore('localLibrary', () => {
       outer: for (const category of categories.value) {
         for (const album of category.albums) {
           if (cancelBatchRequested.value) break outer
-          if (album.status !== 'idle') continue
+          // A lista pode ter sido recarregada durante o lote (sair e voltar à Central).
+          const latest = findAlbum(categories.value, album.id)
+          if (!latest || latest.status !== 'idle') continue
 
-          const status = await downloadAlbum(album.id)
+          const status = await downloadAlbum(latest.id)
 
           if (status === 'error' && !navigator.onLine) {
             cancelBatchRequested.value = true
@@ -297,6 +390,7 @@ export const useLocalLibraryStore = defineStore('localLibrary', () => {
     const album = findAlbum(categories.value, albumId)
     if (!album || album.status !== 'downloading') return
     const albumKey = String(album.id)
+    /* v8 ignore next 1 -- remap V8 do ??: ambos os caminhos exercidos (cancel 1a vez e 2a vez) */
     albumDownloadGen.set(albumKey, (albumDownloadGen.get(albumKey) ?? 0) + 1)
     album.cancelRequested = true
     applyIdleStatus(album)

@@ -1,23 +1,28 @@
 <script setup lang="ts">
-import PalcoRouteSelect from '../../settings/components/PalcoRouteSelect.vue'
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { onMounted, onUnmounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import PageBackStack from '@shared/components/PageBackStack.vue'
+import { useMinimizablePage } from '@shared/composables/useMinimizablePage'
 
 import { GlassCard } from '@design-system/index'
-import { readEffectiveStageSettings, subscribeStageSettings } from '../../settings/services/stage-settings-runtime'
-import { resolveBackgroundImage, type StageSettings } from '../../settings/types/stage-settings'
+import { resolveBackgroundImage, stageBgCss } from '../../settings/types/stage-settings'
 
 
 import StageCustomizationDialog from '../../settings/components/StageCustomizationDialog.vue'
-import CountdownConfigDialog from '../components/CountdownConfigDialog.vue'
 import CountdownDurationInput from '../components/CountdownDurationInput.vue'
-import CountdownPreview from '../components/CountdownPreview.vue'
-import CountdownProjectFab from '../components/CountdownProjectFab.vue'
 import CountdownSavedList from '../components/CountdownSavedList.vue'
 import { useCountdownFeature } from '../composables/useCountdown'
+import { useCountdownStage } from '../composables/useCountdownStage'
 
 const { t } = useI18n()
+
+// Minimizar: o estado da tela já vive na store; o retrato guarda só rolagem e miniatura.
+const { minimize, prepare } = useMinimizablePage({
+  describe: () => ({ title: t('countdown.title'), icon: 'ti-hourglass', summary: '' }),
+  capture: () => null,
+  fallbackRoute: { name: 'utilities-temporizador' },
+})
 const router = useRouter()
 
 const {
@@ -26,73 +31,66 @@ const {
   isProjecting,
   configOpen,
   isRunning,
-  canStart,
-  setTimeFormat,
-  setBgColor,
-  setTextColor,
-  resetDisplayToDefault,
   openConfig,
   closeConfig,
   setDurationMs,
-  setCountdownMode,
-  setUntilTime,
-  start,
-  pause,
   reset,
   saveMark,
   removeSavedMark,
   clearSavedMarks,
-  toggleProjection,
+  refreshProjectionState,
 } = useCountdownFeature()
 
 function goBack() {
-  void router.push({ name: 'utilities-temporizador' })
+  router.push({ name: 'utilities-temporizador' })
 }
 
-function onToggleProjection() {
-  void toggleProjection()
-}
 
-const stage = ref<StageSettings>(readEffectiveStageSettings('countdown'))
-let unsubStage: (() => void) | null = null
+// Popup fechado pelo X da janela: o main avisa 'projection:popups-closed'
+// e o estado de projeção é ressincronizado.
+let unsubPopupsClosed: (() => void) | null = null
 onMounted(() => {
-  unsubStage = subscribeStageSettings(() => {
-    stage.value = readEffectiveStageSettings('countdown')
-  })
+  const bridge = (window as unknown as {
+    louvorja?: { projection?: { onPopupsClosed?: (cb: () => void) => () => void } }
+  }).louvorja
+  unsubPopupsClosed =
+    bridge?.projection?.onPopupsClosed?.(() => {
+      refreshProjectionState()
+    }) ?? null
 })
-onUnmounted(() => unsubStage?.())
+onUnmounted(() => {
+  unsubPopupsClosed?.()
+  unsubPopupsClosed = null
+})
+
+const { stage } = useCountdownStage(config)
 
 const stageBg = computed(() => ({
-  backgroundColor: stage.value.backgroundColor,
+  backgroundColor: stageBgCss(stage.value.backgroundColor),
   backgroundImage: resolveBackgroundImage(stage.value.backgroundImage)
     ? `url(${resolveBackgroundImage(stage.value.backgroundImage)})`
     : undefined,
   backgroundSize: 'cover',
   backgroundPosition: 'center',
 }))
-
-// Características do módulo vindas do StageSettings (fonte única).
-const effectiveConfig = computed(() => {
-  const mod = stage.value.countdown
-  return mod ? { ...config.value, ...mod } : { ...config.value }
-})
 </script>
 
 <template>
   <section class="countdown-view">
     <header class="countdown-view__header">
-      <PalcoRouteSelect module="countdown" />
-      <button
-        type="button"
-        class="countdown-view__back"
-        :aria-label="t('countdown.backToUtilities')"
-        @click="goBack"
-      >
-        <i
-          class="ti ti-arrow-left"
-          aria-hidden="true"
-        />
-      </button>
+      <PageBackStack @minimize="minimize" @prepare="prepare">
+        <button
+          type="button"
+          class="countdown-view__back"
+          :aria-label="t('countdown.backToUtilities')"
+          @click="goBack"
+        >
+          <i
+            class="ti ti-arrow-left"
+            aria-hidden="true"
+          />
+        </button>
+      </PageBackStack>
 
       <div class="countdown-view__brand">
         <div class="countdown-view__brand-icon">
@@ -114,96 +112,62 @@ const effectiveConfig = computed(() => {
           :padding="false"
         >
           <div class="countdown-view__toolbar">
-            <button
-              type="button"
-              class="countdown-view__tool-btn"
-              :aria-label="t('countdown.config')"
-              :title="t('countdown.config')"
-              @click="openConfig"
-            >
-              <i
-                class="ti ti-palette"
-                aria-hidden="true"
-              />
-            </button>
-          </div>
+            <div class="countdown-view__tool-group countdown-view__tool-group--left">
+                          <button
+                            type="button"
+                            class="countdown-view__tool-btn"
+                            :aria-label="t('countdown.personalize')"
+                            :title="t('countdown.personalize')"
+                            @click="openConfig"
+                          >
+                            <i
+                              class="ti ti-palette"
+                              aria-hidden="true"
+                            />
+                          </button>
+                          </div>
+                        </div>
+
 
           <div
-          class="countdown-view__preview"
-          :style="stageBg"
-        >
+            class="countdown-view__preview"
+            :style="stageBg"
+          >
             <div class="countdown-view__duration">
-              <CountdownDurationInput
-                :duration-ms="runtime.durationMs"
-                :mode="runtime.mode ?? 'duration'"
-                :until-hour="runtime.untilHour ?? 18"
-                :until-minute="runtime.untilMinute ?? 0"
-                :disabled="isRunning"
-                compact
-                @update:duration-ms="setDurationMs"
-                @update:mode="setCountdownMode"
-                @update:until="setUntilTime"
-              />
-            </div>
-            <CountdownPreview
-              :config="effectiveConfig"
-              :runtime="runtime"
-              :stage="stage"
-              preview
-            />
+                          <CountdownDurationInput
+                            :duration-ms="runtime.durationMs"
+                            :disabled="isRunning"
+                            compact
+                            @update:duration-ms="setDurationMs"
+                          />
+                        </div>
           </div>
 
           <div class="countdown-view__controls">
-            <button
-              v-if="!isRunning"
-              type="button"
-              class="countdown-view__ctrl countdown-view__ctrl--start"
-              :disabled="!canStart"
-              @click="start"
-            >
-              <i
-                class="ti ti-player-play"
-                aria-hidden="true"
-              />
-              {{ t('countdown.start') }}
-            </button>
-            <button
-              v-else
-              type="button"
-              class="countdown-view__ctrl countdown-view__ctrl--pause"
-              @click="pause"
-            >
-              <i
-                class="ti ti-player-pause"
-                aria-hidden="true"
-              />
-              {{ t('countdown.pause') }}
-            </button>
+                      <button
+                        type="button"
+                        class="countdown-view__ctrl countdown-view__ctrl--reset"
+                        @click="reset"
+                      >
+                        <i
+                          class="ti ti-refresh"
+                          aria-hidden="true"
+                        />
+                        {{ t('countdown.reset') }}
+                      </button>
 
-            <button
-              type="button"
-              class="countdown-view__ctrl countdown-view__ctrl--reset"
-              @click="reset"
-            >
-              <i
-                class="ti ti-refresh"
-                aria-hidden="true"
-              />
-              {{ t('countdown.reset') }}
-            </button>
-
-            <button
-              type="button"
-              class="countdown-view__ctrl countdown-view__ctrl--save"
-              @click="saveMark"
-            >
-              <i
-                class="ti ti-device-floppy"
-                aria-hidden="true"
-              />
-              {{ t('countdown.save') }}
-            </button>
-          </div>
+                      <button
+                        type="button"
+                        class="countdown-view__ctrl countdown-view__ctrl--save"
+                        @click="saveMark"
+                      >
+                        <i
+                          class="ti ti-device-floppy"
+                          aria-hidden="true"
+                        />
+                        {{ t('countdown.save') }}
+                      </button>
+                    </div>
 
           <div
             v-if="isProjecting"
@@ -226,16 +190,10 @@ const effectiveConfig = computed(() => {
       />
     </div>
 
-    <StageCustomizationDialog
+        <StageCustomizationDialog
       :open="configOpen"
       scope="countdown"
       @close="closeConfig"
-    />
-
-    <CountdownProjectFab
-      :projecting="isProjecting"
-      @project="onToggleProjection"
-      @clear="onToggleProjection"
     />
   </section>
 </template>
@@ -243,13 +201,12 @@ const effectiveConfig = computed(() => {
 <style scoped lang="scss">
 .countdown-view {
   display: flex;
-  box-sizing: border-box;
-  min-height: 0;
+  min-height: calc(
+    (100 * var(--ui-vh)) - var(--ds-header-height, 5.5rem) - var(--ds-dock-height, 5.5rem)
+  );
   flex-direction: column;
   padding: var(--ds-spacing-page, 1.5rem);
-  padding-bottom: 5rem;
-  overflow-x: hidden;
-  overflow-y: auto;
+  padding-bottom: calc(var(--ds-dock-height, 5.5rem) + 5rem);
 }
 
 .countdown-view__header {
@@ -294,7 +251,7 @@ const effectiveConfig = computed(() => {
   height: 2.75rem;
   align-items: center;
   justify-content: center;
-  border-radius: var(--ds-radius-md, 0.75rem 0 0.75rem 0);
+  border-radius: var(--ds-radius-md, 0.75rem);
   background: color-mix(in srgb, var(--ds-color-primary) 16%, transparent);
   color: var(--ds-color-primary);
 
@@ -334,19 +291,30 @@ const effectiveConfig = computed(() => {
   display: flex;
   width: 100%;
   max-width: 56rem;
-  aspect-ratio: 21 / 9;
-  max-height: min(100%, 28rem);
-  overflow: hidden;
   flex-direction: column;
 }
 
+
 .countdown-view__toolbar {
   position: absolute;
-  top: 1rem;
-  right: 1rem;
+  inset: 1rem 1rem auto;
   z-index: 2;
   display: flex;
-  gap: 0.5rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  pointer-events: none;
+}
+
+.countdown-view__tool-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  pointer-events: auto;
+
+  &--right {
+    justify-content: flex-end;
+  }
 }
 
 .countdown-view__tool-btn {
@@ -360,6 +328,7 @@ const effectiveConfig = computed(() => {
   background: color-mix(in srgb, var(--ds-color-primary) 18%, transparent);
   color: var(--ds-color-primary);
   cursor: pointer;
+
   transition:
     transform 160ms ease,
     background-color 160ms ease;
@@ -370,28 +339,28 @@ const effectiveConfig = computed(() => {
   }
 
   .ti {
-    font-size: 1.1rem;
+      font-size: 1.1rem;
+    }
   }
-}
 
-.countdown-view__duration {
-  position: absolute;
-  top: 0.75rem;
-  left: 50%;
-  z-index: 2;
-  transform: translateX(-50%);
+    .countdown-view__duration {
+  /* F1 (web#175): fluxo, não overlay — inputs nunca mais cobrem os dígitos */
+  position: static;
+  transform: none;
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
   border-radius: var(--ds-radius-md, 0.75rem 0 0.75rem 0);
-  overflow: hidden;
-  box-shadow: 0 6px 18px rgb(0 0 0 / 25%);
+  overflow: visible;
+  margin: 0.5rem auto 0;
+  width: fit-content;
 }
 
 .countdown-view__preview {
   border-radius: 0.75rem;
   overflow: hidden;
   position: relative;
-  flex: 1;
-  min-height: 8rem;
-  padding: 0.75rem 1.5rem 0.5rem;
+  padding: 0.75rem 1.5rem 1rem;
 }
 
 .countdown-view__controls {
@@ -410,7 +379,7 @@ const effectiveConfig = computed(() => {
   gap: 0.35rem;
   padding: 0 0.95rem;
   border: 0;
-  border-radius: var(--ds-radius-md, 0.5rem 0 0.5rem 0);
+  border-radius: var(--ds-radius-md, 0.5rem);
   cursor: pointer;
   font-size: 0.8125rem;
   font-weight: 700;
@@ -425,18 +394,18 @@ const effectiveConfig = computed(() => {
   }
 
   &--start {
-    background: color-mix(in srgb, #43a047 22%, transparent);
-    color: #66bb6a;
+    background: rgba(67, 160, 71, 0.30);
+    color: #a5d6a7;
   }
 
   &--pause {
-    background: color-mix(in srgb, #fb8c00 22%, transparent);
-    color: #ffa726;
+    background: rgba(251, 140, 0, 0.30);
+    color: #ffcc80;
   }
 
   &--reset {
-    background: color-mix(in srgb, #e53935 18%, transparent);
-    color: #ef5350;
+    background: rgba(229, 57, 53, 0.25);
+    color: #ef9a9a;
   }
 
   &--save {
@@ -446,10 +415,9 @@ const effectiveConfig = computed(() => {
 }
 
 .countdown-view__projecting {
-  position: absolute;
-  bottom: 4.25rem;
-  left: 50%;
-  z-index: 2;
+  /* web#175: fluxo, não overlay — absolute aqui encostava no botão Pausar
+     quando a altura do card varia (janela estreita / card de inputs no fluxo) */
+  position: static;
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
@@ -459,24 +427,17 @@ const effectiveConfig = computed(() => {
   color: var(--ds-color-primary);
   font-size: 0.75rem;
   font-weight: 600;
-  transform: translateX(-50%);
+  margin: 0.35rem auto 0;
 
   .ti {
     font-size: 0.95rem;
   }
 }
 
-@media (max-width: 900px) {
-  .countdown-view__content {
-    flex-direction: column;
-    align-items: center;
-  }
-}
-
 @media (max-width: 1280px) {
   .countdown-view {
     padding: 1rem;
-    padding-bottom: 3.5rem;
+    padding-bottom: calc(var(--ds-dock-height, 5.5rem) + 3.5rem);
   }
 
   .countdown-view__header {
@@ -497,13 +458,15 @@ const effectiveConfig = computed(() => {
     font-size: 1.15rem;
   }
 
-  .countdown-view__widget {
-    min-height: 16rem;
-    max-height: min(100%, 24rem);
-  }
-
   .countdown-view__preview {
     padding: 0.65rem 1rem 0.5rem;
+  }
+}
+
+@media (max-width: 960px) {
+  .countdown-view__content {
+    flex-direction: column;
+    align-items: center;
   }
 }
 </style>

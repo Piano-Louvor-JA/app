@@ -34,8 +34,9 @@ import type {
 import { DEFAULT_PROJECTION_SETTINGS } from '../types/projection'
 
 export const useProjectionStore = defineStore('settings-projection', () => {
-  const displays = ref<SystemDisplay[]>([])
-  const settings = ref<ProjectionSettings>({ ...DEFAULT_PROJECTION_SETTINGS })
+  const displaysRef = ref<SystemDisplay[]>([])
+  const displays = computed(() => displaysRef.value)
+  const settings = ref<ProjectionSettings>(loadProjectionSettings())
   const isLoadingDisplays = ref(false)
   const isIdentifying = ref(false)
   const lastErrorKey = ref<string | null>(null)
@@ -98,7 +99,7 @@ export const useProjectionStore = defineStore('settings-projection', () => {
     lastErrorKey.value = null
 
     try {
-      displays.value = await listSystemDisplays()
+      displaysRef.value = await listSystemDisplays()
       const displayIds = displays.value.map((d) => d.id)
       const extendedIds = listExtendedDisplays(displays.value).map((d) => d.id)
       let next = reconcileTargetDisplays(settings.value, extendedIds)

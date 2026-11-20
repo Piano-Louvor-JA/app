@@ -1,5 +1,26 @@
 export default {
+  palcoOutputs: { title: 'Stage TVs', empty: 'No TV with Stage connected. Open Stage', onHold: '{slot} · on hold' },
+  obsOutputs: { detecting: 'Detecting and refreshing OBS connections…', active: 'Remote connections', activateHint: 'Start a connection in Settings → Broadcast to use it here.', title: 'OBS connections', activeConnections: 'Active connections: {count}' },
+  floating: { closeTitle: 'Close {title}?', closeMessage: 'Stop this feature and close its projection?' },
+  updates: {
+    downloadMacInstaller: 'Download macOS installer',
+    manualMacInstructions: 'On macOS, install this update manually. Download the installer below, quit LouvorJA, open the DMG and drag the app to Applications, replacing the previous version. Your data and preferences will be kept.',
+  },
+  windowControls: {
+    close: 'Close',
+    minimize: 'Minimize',
+    maximize: 'Maximize',
+  },
+  a11y: {
+    mainNav: 'Main navigation',
+  },
+  apiOffline: {
+    message: 'No connection to the service \u2014 check your internet',
+    retrying: 'Trying to reconnect...',
+  },
   projection: {
+    minimizeProjection: 'Minimize projection',
+    restoreProjection: 'Restore projection',
     confirmClose: 'Projection is in progress. Closing this window stops the music. Really leave?',
   },
   app: {
@@ -8,10 +29,39 @@ export default {
     nameJa: 'JA',
   },
   common: {
+    close: 'Close',
     comingSoon: 'Coming soon',
+    openFolder: 'Open folder',
+    addToPlaylist: 'Add to playlist',
+    suggestFix: 'Suggest lyric/timing fix',
     cancel: 'Cancel',
+    copied: 'Copied!',
+  },
+  independentProjection: {
+    title: 'Independent projection',
+    /** Monitor desligado no seletor "Telas". */
+    enableHint: 'Turn on in Screens to use',
+    unavailable: 'Only available with extended monitors connected',
+    hint: 'Pick one monitor. This feature appears on top of whatever is projected there; the other monitors stay the same.',
+    monitor: 'Monitor {index}',
+    activeOn: 'Independent projection on monitor {index}',
+    stop: 'Stop independent projection',
+    sharedOn: 'Shared projection on monitor {index}',
+    modeLabel: 'Projection mode',
+    status: {
+      stop: 'Stop',
+      overlay: 'Overlaying on:',
+      share: 'Sharing on:',
+      monitor: 'Monitor {index}',
+    },
+    mode: {
+      overlay: 'Overlay',
+      share: 'Share',
+    },
+    hintShare: 'Pick one monitor. Its screen is split in half with whatever is already projected; if one side leaves, the other takes the whole screen again.',
   },
   monitors: {
+    wiredTitle: 'Wired connections',
     selectScreens: 'Select screens',
     identify: 'Detect screens',
     hint: 'Check the monitors where the resource should be projected.',
@@ -42,5 +92,59 @@ export default {
     bible: 'Bible',
     utilities: 'Utilities',
     settings: 'Settings',
+    history: {
+      label: 'Navigation history',
+      back: 'Back',
+      forward: 'Forward',
+      goTo: 'Go to {label}',
+    },
+    historyDetail: {
+      player: 'Player',
+      editor: 'Editor',
+    },
+    },
+  connectedDevices: {
+    title: 'Connected devices',
+    remote: 'Remote control',
+    speaker: 'Preacher\'s clicker',
+    monitors: 'Monitor sharing',
+    none: 'None connected',
+    monitorsInUse: '{device} ({host}) · {n} monitor(s)',
+    palco: 'Stage (TVs)',
+    palcoTv: '{name} · {ip}',
+    transmission: 'Broadcasts (OBS/browsers)',
+    transmissionGroup: '{connection} · {page} · {tabs}',
+    tabs: '1 tab | {n} tabs',
+    inObs: '{n} in OBS',
+    inBrowser: '{n} in the browser',
+    and: ' and ',
+    pages: { espelho: 'Mirror', retorno: 'Stage return', legenda: 'Caption', other: 'Other page' },
+  },
+  minimize: {
+    playlistCount: '{n} playlist(s)',
+    pageNumber: 'Page {n}',
+    bar: 'Minimized pages',
+    close: 'Close {title}',
+    page: 'Minimize page',
+    search: 'Search: {q}',
+  },
+  sync: {
+    downloadQueue: {
+      title: 'Downloads',
+      clearFinished: 'Clear finished',
+      retry: 'Retry',
+      cancel: 'Cancel',
+    },
+  },
+sljaMigration: {
+    title: 'Upload {count} imported hymn(s) to your account?',
+    message: 'You imported .slja files while logged out. They can go to your account (a single copy, never duplicated) and be available on any device.',
+    confirm: 'Upload to account',
+    cancel: 'Keep on this device only',
+  },
+  download: {
+    indicatorTitle: 'Background downloads: {done}/{total} ({percent}%)',
+    indicatorCounts: '{done} of {total} completed',
+    indicatorIdle: 'Preparing download…',
   },
 }

@@ -5,7 +5,7 @@ import {
   readCatalogRecord,
   writeCatalogRecord,
 } from '@shared/services/workspace-api'
-import { localeToApiPrefix } from '@plugins/i18n'
+import { getCurrentApiPrefix } from './api-prefix'
 
 import type {
   CatalogCategory,
@@ -22,32 +22,20 @@ const CATEGORY_ORDER: Record<string, number> = {
   hymnals: 1,
   Hinários: 1,
   'CDs Oficiais/Ano': 2,
+  aym: 2,
+  'CDs Oficiales/año': 2,
   Infantis: 3,
+  kids: 3,
   Doxologia: 4,
+  doxology: 4,
 }
 
 /**
- * Detecta o prefixo de idioma atual com base na preferência do usuário.
- * Retorna `pt`, `en` ou `es` — usado para montar os nomes dos records da API
- * (`pt_hymnal`, `en_hymnal`, `es_hymnal`, etc.).
- *
- * @param customLocale - Override para testes. Se omitido, usa o locale do i18n.
+ * Prefixo do idioma do catálogo ativo. Implementação movida para
+ * `./api-prefix` (módulo leve, sem assets) — mantida aqui como re-export
+ * para não quebrar importadores existentes.
  */
-export function getCurrentApiPrefix(customLocale?: string): string {
-  if (customLocale) return localeToApiPrefix(customLocale)
-  try {
-    const stored = localStorage.getItem('user_data')
-    if (stored) {
-      const prefs = JSON.parse(stored)
-      if (typeof prefs.language === 'string') {
-        return localeToApiPrefix(prefs.language)
-      }
-    }
-  } catch {
-    // localStorage indisponível (SSR/test) — fallback pt
-  }
-  return 'pt'
-}
+export { getCurrentApiPrefix } from './api-prefix'
 
 /**
  * Atualiza coverUrl para local:// quando a capa já está no disco.
@@ -92,10 +80,12 @@ function createAlbumBase(
   }
 }
 
-function sortCategories(categories: LibraryCategory[]): LibraryCategory[] {
+export function sortCategories(categories: LibraryCategory[]): LibraryCategory[] {
   return [...categories].sort((a, b) => {
-    const orderA = CATEGORY_ORDER[String(a.id)] ?? CATEGORY_ORDER[a.name] ?? 50
-    const orderB = CATEGORY_ORDER[String(b.id)] ?? CATEGORY_ORDER[b.name] ?? 50
+    const orderA =
+      CATEGORY_ORDER[String(a.id)] ?? CATEGORY_ORDER[a.slug ?? ''] ?? CATEGORY_ORDER[a.name] ?? 50
+    const orderB =
+      CATEGORY_ORDER[String(b.id)] ?? CATEGORY_ORDER[b.slug ?? ''] ?? CATEGORY_ORDER[b.name] ?? 50
     if (orderA !== orderB) return orderA - orderB
     return a.name.localeCompare(b.name)
   })
@@ -203,6 +193,7 @@ export async function loadLibraryCategories(): Promise<LibraryCategory[]> {
       result.push({
         id: category.id_category,
         name: category.name,
+        slug: category.slug,
         albums,
       })
     }

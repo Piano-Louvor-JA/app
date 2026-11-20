@@ -1,6 +1,9 @@
 import { getDesktopBridge, isDesktopApp } from '@shared/services/desktop-bridge'
+import { defaultFilesBase } from './api-env'
 import { fetchRemoteCatalogJson } from '@shared/services/remote-catalog'
 import { readCatalogRecord } from '@shared/services/workspace-api'
+import { syncBundle } from '@shared/services/bundle-sync-client'
+import { getCurrentApiPrefix } from '@modules/sync/services/library-catalog'
 import { CUSTOM_MUSIC_ID_OFFSET } from '@modules/media/services/custom-catalog'
 
 export type TrackMediaKind = 'music' | 'slides' | 'covers'
@@ -26,15 +29,67 @@ type CatalogMusicRecord = {
   lyric?: CatalogLyricRow[] | Record<string, CatalogLyricRow>
 }
 
-const downloadedCache = new Map<number, boolean>()
+const downloadedCache = new Map<string, boolean>()
+
+/**
+ * Eventos de mutação do disco (download concluído / delete / invalidação).
+ * UI (badge "baixado") assina para refletir o disco em tempo real sem
+ * depender de re-mount — downloads podem terminar em OUTRO fluxo
+ * (pre-play ensureTrackDownloaded, ondemand).
+ */
+export type TrackMediaChangedListener = (
+  musicId: number,
+  downloaded: boolean,
+) => void
+
+const trackMediaChangedListeners = new Set<TrackMediaChangedListener>()
+
+export function onTrackMediaChanged(l: TrackMediaChangedListener): void {
+  trackMediaChangedListeners.add(l)
+}
+
+export function offTrackMediaChanged(l: TrackMediaChangedListener): void {
+  trackMediaChangedListeners.delete(l)
+}
+
+function emitTrackMediaChanged(
+  musicId: number,
+  downloaded: boolean,
+): void {
+  for (const l of trackMediaChangedListeners) {
+    try {
+      l(musicId, downloaded)
+    } catch (err) {
+      console.warn('[track-media] listener falhou', err)
+    }
+  }
+}
+
+function trackCacheKey(musicId: number): string {
+  return `${getCurrentApiPrefix()}:${musicId}`
+}
+
+function catalogMusicKey(musicId: number): string {
+  // Contrato compat.ts: records individuais NÃO levam prefixo de idioma —
+  // o ID é global (music_2643, music_90168). Só LISTAS têm prefixo.
+  return `music_${musicId}`
+}
 
 /** Semáforo: evita N linhas abrirem dezenas de media:check juntos. */
 let offlineCheckActive = 0
 const offlineCheckWaiters: Array<() => void> = []
 const MAX_PARALLEL_OFFLINE_CHECKS = 2
 
-async function withOfflineCheckSlot<T>(fn: () => Promise<T>): Promise<T> {
-  if (offlineCheckActive >= MAX_PARALLEL_OFFLINE_CHECKS) {
+/**
+ * `priority`: ação do operador (clicar em tocar) não entra na fila das
+ * checagens das linhas da lista — com centenas de hinos sem download, cada
+ * uma buscando music_{id} na rede, a fila segurava a abertura do player.
+ */
+async function withOfflineCheckSlot<T>(
+  fn: () => Promise<T>,
+  priority = false,
+): Promise<T> {
+  if (!priority && offlineCheckActive >= MAX_PARALLEL_OFFLINE_CHECKS) {
     await new Promise<void>((resolve) => {
       offlineCheckWaiters.push(resolve)
     })
@@ -51,8 +106,9 @@ async function withOfflineCheckSlot<T>(fn: () => Promise<T>): Promise<T> {
 
 /** Lê o cache em memória sem tocar no disco/IPC. */
 export function peekTrackDownloadCache(musicId: number): boolean | undefined {
-  if (!downloadedCache.has(musicId)) return undefined
-  return downloadedCache.get(musicId) === true
+  const key = trackCacheKey(musicId)
+  if (!downloadedCache.has(key)) return undefined
+  return downloadedCache.get(key) === true
 }
 
 /** Normaliza path do catálogo para o filename relativo usado no bridge. */
@@ -123,14 +179,33 @@ function collectLyricImageUrls(music: CatalogMusicRecord): string[] {
 async function readMusicRecord(
   musicId: number,
 ): Promise<CatalogMusicRecord | null> {
-  // Faixa custom (Minhas Coletâneas, id >= 1M): não existe no catálogo
-  // oficial — evita 404 no json_db/túnel.
-  if (musicId >= CUSTOM_MUSIC_ID_OFFSET) return null
-  const local = await readCatalogRecord<CatalogMusicRecord>(`music_${musicId}`)
+  // Fora do catálogo oficial: custom (id >= 1M) e local (id negativo do
+  // import .slja). Sem isso o fallback remoto tenta `music_-N` duas vezes
+  // antes do áudio data: tocar.
+  if (musicId >= CUSTOM_MUSIC_ID_OFFSET || musicId < 0) return null
+  const filename = catalogMusicKey(musicId)
+  const local = await readCatalogRecord<CatalogMusicRecord>(filename)
   if (local != null) return local
+  // Faixa LOCAL do import .slja deslogado (id negativo): nunca existe no
+  // json_db remoto — tentar buscar gerava 404 em cascata nas 3 APIs
+  // (feedback Ezequias/Rafael 02/10).
+  if (musicId < 0) return null
+
+  // SPEC piano-bundle-sync: quando falta local, tentar 1x o bundle do
+  // catálogo (1 request) antes do fetch item-a-item (ADR-03 — o fallback
+  // legado permanece para o caso do bundle falhar).
+  try {
+    const bundleResult = await syncBundle('catalog')
+    if (bundleResult != null && 'records' in bundleResult) {
+      const bundled = await readCatalogRecord<CatalogMusicRecord>(filename)
+      if (bundled != null) return bundled
+    }
+  } catch {
+    // bundle nunca bloqueia o fluxo legado
+  }
 
   try {
-    return await fetchRemoteCatalogJson<CatalogMusicRecord>(`music_${musicId}`)
+    return await fetchRemoteCatalogJson<CatalogMusicRecord>(filename)
   } catch {
     return null
   }
@@ -170,19 +245,23 @@ export function invalidateTrackMediaCache(musicId?: number): void {
     downloadedCache.clear()
     return
   }
-  downloadedCache.delete(musicId)
+  downloadedCache.delete(trackCacheKey(musicId))
 }
 
 /**
  * Considera baixada quando áudio principal e todos os slides/capas
  * associados existem localmente.
  */
-export async function isTrackMediaDownloaded(musicId: number): Promise<boolean> {
+export async function isTrackMediaDownloaded(
+  musicId: number,
+  options: { priority?: boolean } = {},
+): Promise<boolean> {
   return withOfflineCheckSlot(async () => {
     if (!isDesktopApp()) return false
 
-    if (downloadedCache.has(musicId)) {
-      return downloadedCache.get(musicId) === true
+    const cacheKey = trackCacheKey(musicId)
+    if (downloadedCache.has(cacheKey)) {
+      return downloadedCache.get(cacheKey) === true
     }
 
     const bridge = getDesktopBridge()
@@ -190,7 +269,7 @@ export async function isTrackMediaDownloaded(musicId: number): Promise<boolean> 
 
     const items = await collectTrackMediaItems(musicId)
     if (items.length === 0) {
-      downloadedCache.set(musicId, false)
+      downloadedCache.set(cacheKey, false)
       return false
     }
 
@@ -200,14 +279,14 @@ export async function isTrackMediaDownloaded(musicId: number): Promise<boolean> 
         toRelativeMediaPath(item.url),
       )
       if (!local) {
-        downloadedCache.set(musicId, false)
+        downloadedCache.set(cacheKey, false)
         return false
       }
     }
 
-    downloadedCache.set(musicId, true)
+    downloadedCache.set(cacheKey, true)
     return true
-  })
+  }, options.priority === true)
 }
 
 export type TrackMediaDownloadResult =
@@ -218,7 +297,7 @@ export type TrackMediaDownloadResult =
 function resolveRemoteFileUrl(urlPath: string): string {
   if (/^https?:\/\//i.test(urlPath)) return urlPath
   const cleanPath = urlPath.startsWith('/') ? urlPath.slice(1) : urlPath
-  const base = import.meta.env.VITE_URL_FILES ?? 'https://api.pianolouvorja.com.br/file'
+  const base = import.meta.env.VITE_URL_FILES ?? defaultFilesBase()
   return `${base}/${cleanPath}`
 }
 
@@ -265,7 +344,7 @@ export async function downloadTrackMedia(
         invalidateTrackMediaCache(musicId)
         return { status: 'idle', reason: 'cancelled' }
       }
-      if (!ok) {
+      if (ok !== true) {
         errors += 1
         console.warn(
           `[track-media] falha ao baixar ${item.type}: ${relative}`,
@@ -283,7 +362,8 @@ export async function downloadTrackMedia(
     return { status: 'error', reason: 'server' }
   }
 
-  downloadedCache.set(musicId, true)
+  downloadedCache.set(trackCacheKey(musicId), true)
+  emitTrackMediaChanged(musicId, true)
   return { status: 'downloaded' }
 }
 
@@ -298,5 +378,6 @@ export async function deleteTrackMedia(musicId: number): Promise<void> {
     await bridge.media.delete(item.type, toRelativeMediaPath(item.url))
   }
 
-  downloadedCache.set(musicId, false)
+  downloadedCache.set(trackCacheKey(musicId), false)
+  emitTrackMediaChanged(musicId, false)
 }

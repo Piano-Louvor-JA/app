@@ -1,3 +1,4 @@
+import { detectObsBeforeProjection } from '@modules/settings/services/obs-detection'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
@@ -42,6 +43,8 @@ import {
   DEFAULT_RANDOM_RUNTIME,
   RANDOM_FONT_SIZE_MAX,
   RANDOM_FONT_SIZE_MIN,
+  RANDOM_DRAWN_SIZE_MAX,
+  RANDOM_DRAWN_SIZE_MIN,
   activeModePool,
   emptyModePool,
   type RandomAnimationSpeed,
@@ -409,6 +412,15 @@ export const useRandomStore = defineStore('random', () => {
     persistConfig()
   }
 
+  function setDrawnSizePc(drawnSizePc: number) {
+    const next = Math.min(
+      RANDOM_DRAWN_SIZE_MAX,
+      Math.max(RANDOM_DRAWN_SIZE_MIN, Math.round(drawnSizePc)),
+    )
+    config.value = { ...config.value, drawnSizePc: next }
+    persistConfig()
+  }
+
   function setTextTransform(textTransform: RandomTextTransform) {
     config.value = { ...config.value, textTransform }
     persistConfig()
@@ -529,6 +541,7 @@ export const useRandomStore = defineStore('random', () => {
   }
 
   async function syncProjection() {
+    await detectObsBeforeProjection()
     runtime.value = { ...runtime.value, projecting: true }
     syncRuntime()
     // Mesmo contrato da Bíblia: slot individual = só TV; Espelhar =
@@ -608,6 +621,7 @@ export const useRandomStore = defineStore('random', () => {
     setBgColor,
     setTextColor,
     setFontSizePc,
+    setDrawnSizePc,
     setTextTransform,
     setAnimationSpeed,
     resetDisplayToDefault,

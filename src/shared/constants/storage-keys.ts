@@ -5,13 +5,30 @@ export const BROWSER_STORAGE_KEYS = {
   topSongs: 'history_top_songs',
   catalogSessionPrefix: 'db:',
   playlists: 'louvorja-playlists-v1',
+  /** Vídeos tocados no módulo YouTube (Central de Mídia), mais recente primeiro. */
+  youtubeHistory: 'louvorja-youtube-history-v1',
+  /** Vídeos favoritos do módulo YouTube, na ordem em que foram favoritados (mais recente primeiro). */
+  youtubeFavorites: 'louvorja-youtube-favorites-v1',
+  /** Coletâneas online (listas de vídeos do YouTube montadas pelo operador). */
+  youtubeCollections: 'louvorja-youtube-collections-v1',
+  /** Ordem que o operador deu à aba "Baixados" do módulo YouTube (lista de IDs). */
+  youtubeDownloadsOrder: 'louvorja-youtube-downloads-order-v1',
+  /** Últimas buscas feitas no módulo YouTube. */
+  youtubeRecentQueries: 'louvorja-youtube-queries-v1',
+  /** sessionStorage: histórico de navegação (sobrevive a reload, não a fechar o app). */
+  navigationHistory: 'navigation-history-v1',
+  /** sessionStorage: páginas minimizadas (barra acima do dock). */
+  minimizedPages: 'minimized-pages-v1',
 } as const
 
 /** Campos dentro de `user_data` (preferências do operador). */
 export const USER_PREFERENCE_KEYS = {
+  fonts: 'fonts.preferences.v1',
   theme: 'theme',
   blur: 'blur',
   accent: 'accent',
+  /** Cor de realce livre (#RRGGBB); ausente/null = usa o acento pronto de `accent`. */
+  accentCustom: 'accentCustom',
   interaction: 'interaction',
   autoBrightness: 'autoBrightness',
   bibleSelectedVersion: 'bible.selectedVersionId',
@@ -22,11 +39,28 @@ export const USER_PREFERENCE_KEYS = {
   clockConfig: 'clock.config',
   timerConfig: 'timer.config',
   countdownConfig: 'countdown.config',
+  /** Agenda, idioma das narrações e marcos de áudio da Escola Sabatina. */
+  sabbathSchoolConfig: 'sabbathSchool.config',
+  /** Listas de avisos, lista ativa e config do carrossel (módulo Avisos). Local: não sincroniza (caminhos de arquivo). */
+  announcementsState: 'announcements.state',
   randomConfig: 'random.config',
   randomSession: 'random.session',
   liturgyState: 'liturgy.state',
   scheduledState: 'scheduled.state',
   language: 'language',
+  /** Posição (left/top em px) do player minimizado arrastado; ausente = canto padrão. */
+  mediaChromePosition: 'media.chromePosition',
+  /** Posição (left/top em px) da prévia flutuante da Bíblia; ausente = canto padrão. */
+  bibleChromePosition: 'bible.chromePosition',
+  /** Posição (left/top em px) da prévia flutuante do Timer; ausente = canto padrão. */
+  countdownChromePosition: 'countdown.chromePosition',
+  sabbathSchoolChromePosition: 'sabbathSchool.chromePosition',
+  /** Posição (left/top em px) da prévia flutuante do Cronômetro; ausente = canto padrão. */
+  timerChromePosition: 'timer.chromePosition',
+  /** Posição (left/top em px) da prévia flutuante do Relógio; ausente = canto padrão. */
+  clockChromePosition: 'clock.chromePosition',
+  /** Posição (left/top em px) da prévia flutuante do Sorteio; ausente = canto padrão. */
+  randomChromePosition: 'random.chromePosition',
   /** Prefixo das personalizações do Palco por escopo (stage.settings.global|hymns|bible|...). */
   stageSettingsPrefix: 'stage.settings.',
 } as const
@@ -34,7 +68,9 @@ export const USER_PREFERENCE_KEYS = {
 /** Registros do workspace em disco (`.sysdata/*.bin`). */
 export const WORKSPACE_RECORD_KEYS = {
   bootstrapComplete: 'bootstrap_complete',
+  downloadQueue: 'download_queue',
   coversSynced: 'covers_synced',
   downloadedAlbums: 'downloaded_albums',
   config: 'config',
+  catalogRefreshCheckedAt: 'catalog_refresh_checked_at',
 } as const

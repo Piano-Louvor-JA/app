@@ -4,7 +4,8 @@
  * Bônus: +15 por tarefa, 1x por usuário×tarefa×semana (idempotente no servidor).
  */
 
-import { getAuthSession } from "@modules/media/services/auth-client";
+import { authTokenAsync, saveSession } from "@modules/media/services/auth-client";
+import { communityBaseUrl, communityRequest } from "./community-http";
 
 export type WeeklyTask = {
 	id: string;
@@ -13,24 +14,25 @@ export type WeeklyTask = {
 	bonus: number;
 };
 
-function communityBaseUrl(): string {
-	const base =
-		import.meta.env.VITE_PALCO_API_URL ?? "https://api.pianolouvorja.com.br";
-	return `${base.replace(/\/$/, "")}/v1/custom`;
-}
-
-function token(): string | null {
-	return getAuthSession()?.token ?? null;
+async function token(): Promise<string | null> {
+	return authTokenAsync();
 }
 
 /** Tarefas da semana do usuário. Sem sessão/falha → null. */
 export async function getWeeklyTasks(): Promise<WeeklyTask[] | null> {
-	const t = token();
+	const t = await token();
 	if (!t) return null;
 	try {
-		const response = await fetch(`${communityBaseUrl()}/weekly-tasks`, {
-			headers: { Authorization: `Bearer ${t}` },
-		});
+		const response = await fetch(
+			`${communityBaseUrl()}/weekly-tasks`,
+			communityRequest({ headers: { Authorization: `Bearer ${t}` } }),
+		);
+		if (response.status === 401) {
+			// Token salvo rejeitado pela API (placeholder de fallback ou sessão
+			// expirada) — limpa pra forçar re-login em vez de 401 em silêncio.
+			saveSession(null);
+			return null;
+		}
 		if (!response.ok) return null;
 		const json = (await response.json()) as { data?: unknown };
 		return Array.isArray(json.data) ? (json.data as WeeklyTask[]) : null;
@@ -41,12 +43,15 @@ export async function getWeeklyTasks(): Promise<WeeklyTask[] | null> {
 
 /** Marca tarefa como concluída. Retorna true se o bônus foi creditado agora. */
 export async function completeWeeklyTask(taskId: string): Promise<boolean> {
-	const t = token();
+	const t = await token();
 	if (!t) return false;
 	try {
 		const response = await fetch(
 			`${communityBaseUrl()}/weekly-tasks/${taskId}/complete`,
-			{ method: "POST", headers: { Authorization: `Bearer ${t}` } },
+			communityRequest({
+				method: "POST",
+				headers: { Authorization: `Bearer ${t}` },
+			}),
 		);
 		if (!response.ok) return false;
 		const json = (await response.json()) as { credited?: boolean };

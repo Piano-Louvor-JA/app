@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 // Mock do electron ANTES dos imports que o usam.
@@ -33,6 +34,8 @@ vi.mock("../ipc/web-projection.mjs", () => ({
   openWebProjectionWindows: vi.fn(),
   registerProjectionCapturePermissions: vi.fn(),
   remoteGoBackSource: vi.fn(),
+  remoteNavigateSource: vi.fn(),
+  remoteScrollSource: vi.fn(),
   remoteGoForwardSource: vi.fn(),
   remoteImageNext: vi.fn(),
   remoteImagePrev: vi.fn(),
@@ -45,6 +48,8 @@ vi.mock("../ipc/web-projection.mjs", () => ({
   remoteReloadSource: vi.fn(),
   remoteSeekSource: vi.fn(),
   remoteSetVolumeSource: vi.fn(),
+  setAudioOutputMode: vi.fn(),
+  remoteSetCaptionsHiddenSource: vi.fn(),
   remoteToggleMuteSource: vi.fn(),
   setSiteControlPanelOpen: vi.fn(),
   setSiteTargetMonitorIds: vi.fn(),

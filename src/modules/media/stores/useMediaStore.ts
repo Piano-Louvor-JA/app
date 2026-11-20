@@ -1,8 +1,10 @@
+import { detectObsBeforeProjection } from '@modules/settings/services/obs-detection'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
 import { loadProjectionSettings } from '@modules/settings/services/projection-preferences'
 import {
+  appendQueueToQueue,
   type QueueItem,
   resolveNext,
   resolvePrevious,
@@ -33,6 +35,7 @@ import {
   playMediaAudio,
   resolveMusicAudioUrl,
   resolveSlideImageUrl,
+  resolveRemoteFileUrl,
   stopAllMediaAudio,
   switchMediaAudioElement,
 } from '../services/media-audio'
@@ -52,6 +55,7 @@ import {
 import {
   buildMediaSlides,
   buildSlideTimesSec,
+  hasDistinctSlideTimes,
   lyricPreviewSnippet,
   resolveSlideIndexForTime,
   stripHtmlBreaks,
@@ -74,12 +78,17 @@ export const useMediaStore = defineStore('media', () => {
   const isProjectingRaw = ref(false)
   // Fila de reprodução (spec playlist RF-03): vazia = comportamento atual.
   const queue = ref<QueueItem[]>([])
+  let originalQueue: QueueItem[] = []
+  const queueShuffled = ref(false)
   const queueIndex = ref(-1)
+  /** Nome da fila (playlist) para o título do player; null = coletânea do hino. */
+  const queueLabel = ref<string | null>(null)
+  let preserveQueuePlayerMode = false
+  let queueManualProjection = false
   const isProjecting = computed({
     get: () => isProjectingRaw.value,
     set: (v: boolean) => {
       if (v !== isProjectingRaw.value) {
-        console.info('[media-proj] isProjecting →', v, new Error().stack?.split('\n').slice(1, 4).join(' | '))
       }
       isProjectingRaw.value = v
     },
@@ -182,6 +191,7 @@ export const useMediaStore = defineStore('media', () => {
   const RUNTIME_PUBLISH_MIN_MS = 80
 
   function stopProjectionWatch() {
+    // v8 ignore next 3 -- window sempre definido (store roda só no browser/app; SSR não existe)
     if (typeof window !== 'undefined') {
       window.removeEventListener('louvorja:projection-reapplied', onProjectionReapplied)
     }
@@ -195,6 +205,7 @@ export const useMediaStore = defineStore('media', () => {
     if (detail?.moduleId !== 'media') return
     if (detail.open) {
       isProjecting.value = true
+      // v8 ignore next 1 -- listener e timer vivem/morrem juntos (stopProjectionWatch remove ambos): com listener ativo o timer sempre existe
       if (!projectionWatchTimer) startProjectionWatch()
       publishProjectionState()
       return
@@ -206,6 +217,7 @@ export const useMediaStore = defineStore('media', () => {
 
   function startProjectionWatch() {
     stopProjectionWatch()
+    // v8 ignore next 3 -- window sempre definido (store roda só no browser/app; SSR não existe)
     if (typeof window !== 'undefined') {
       window.addEventListener('louvorja:projection-reapplied', onProjectionReapplied)
     }
@@ -234,8 +246,16 @@ export const useMediaStore = defineStore('media', () => {
       title: session.value.title,
       subtitle: session.value.subtitle,
       lyric: stripHtmlBreaks(slide.lyric),
-      imageUrl: resolvedSlideImageUrl.value ?? slide.imageUrl,
+      // Sem cru: enquanto o resolved async não chega, URL absoluta síncrona
+      // (mesma origem do resolved p/ não-baixado). Path cru chegava ao palco,
+      // virava bg undefined e o receiver caía no fallback a cada troca de
+      // slide (oscilação fallback↔imagem reportada 04/10).
+      imageUrl:
+        resolvedSlideImageUrl.value ??
+        (slide.imageUrl ? resolveRemoteFileUrl(slide.imageUrl) : null),
       imagePosition: slide.imagePosition,
+      // Frame PDF/PPT (frame-slide): data:image/ direto, sem véu (paridade receiver).
+      frameDataUrl: slide.frameDataUrl ?? null,
       isCover: slide.isCover,
       slideIndex: slideIndex.value,
       slideCount: session.value.slides.length,
@@ -271,7 +291,9 @@ export const useMediaStore = defineStore('media', () => {
   }
 
   async function startOndemandDownload(musicId: number) {
+    /* v8 ignore next 1 -- única chamada é maybeStartOndemandDownload (já garante desktop) */
     if (!isDesktopApp()) return
+    /* v8 ignore next 1 -- musicId já validado (>0) pelo open */
     if (!Number.isFinite(musicId) || musicId <= 0) return
 
     // Cancela qualquer download sob demanda anterior desta sessão do player.
@@ -332,19 +354,26 @@ export const useMediaStore = defineStore('media', () => {
     void startOndemandDownload(musicId)
   }
 
-  /**
-   * Download PRÉ-play: se a faixa não está no disco e o modo tem áudio,
-   * baixa ANTES de abrir o player. UI mostra progresso; ao concluir, o
-   * caller abre a música normalmente (toca na hora, sem erro feio).
-   */
-  async function ensureTrackDownloaded(musicId: number): Promise<boolean> {
-    if (!isDesktopApp()) return true // web: sempre stream remoto
+  /** Faixa oficial sem cópia no disco (desktop): precisa do download pré-play. */
+  async function needsPreplayDownload(musicId: number): Promise<boolean> {
+    if (!isDesktopApp()) return false // web: sempre stream remoto
+    // Música local (id negativo): o áudio já está no data: URL. O download
+    // oficial consultaria `music_-N` no catálogo remoto antes de tocar.
+    if (musicId < 0) return false
     try {
-      if (await isTrackMediaDownloaded(musicId)) return true
+      // priority: o clique do operador não espera a fila das linhas da lista.
+      return !(await isTrackMediaDownloaded(musicId, { priority: true }))
     } catch {
-      return true // sem certeza: segue fluxo antigo (stream)
+      return false // sem certeza: segue fluxo antigo (stream)
     }
+  }
 
+  /**
+   * Download PRÉ-play: baixa a faixa com o player JÁ aberto (progresso no
+   * player). Retorna false se outra faixa/fechar cancelou (não tocar);
+   * true quando pode tocar (baixou, ou falhou e segue por stream remoto).
+   */
+  async function runPreplayDownload(musicId: number): Promise<boolean> {
     const gen = ++ondemandGen
     ondemandAbort = false
     preplayDownloadMusicId.value = musicId
@@ -405,7 +434,7 @@ export const useMediaStore = defineStore('media', () => {
       onTimeUpdate: () => {
         currentTimeSec.value = audio.currentTime
         const times = session.value?.slideTimesSec ?? []
-        if (times.length > 0 && hasAudio.value) {
+        if (times.length > 0 && hasAudio.value && hasDistinctSlideTimes(times, session.value?.slides[0]?.isCover === true)) {
           const nextIndex = resolveSlideIndexForTime(times, audio.currentTime)
           if (nextIndex !== slideIndex.value) {
             slideIndex.value = nextIndex
@@ -458,6 +487,7 @@ export const useMediaStore = defineStore('media', () => {
     audioUrl: string | null,
     instrumentalUrl: string | null,
   ): string | null {
+    /* v8 ignore next 1 -- ambos os call sites (open e switchMode) retornam cedo para no_audio antes de chamar pickSourceUrl */
     if (mode === 'no_audio') return null
     if (mode === 'instrumental') return instrumentalUrl ?? audioUrl
     return audioUrl ?? instrumentalUrl
@@ -465,7 +495,9 @@ export const useMediaStore = defineStore('media', () => {
 
   async function open(params: MediaOpenParams): Promise<MediaOpenResult> {
     const musicId = params.musicId
-    if (!Number.isFinite(musicId) || musicId <= 0) {
+    // app#331: negativo = música LOCAL (import .slja sem login) — válido.
+    // Só 0/NaN (sem música) continua fora.
+    if (!Number.isFinite(musicId) || musicId === 0) {
       return { ok: false, messageKey: 'media.messages.trackMissing' }
     }
 
@@ -475,6 +507,8 @@ export const useMediaStore = defineStore('media', () => {
     if (!params.keepQueue) {
       queue.value = []
       queueIndex.value = -1
+      queueLabel.value = null
+      queueManualProjection = false
     }
 
     // Mesma faixa: troca de modo sem reset (legado Media.open + isSameSong).
@@ -515,9 +549,13 @@ export const useMediaStore = defineStore('media', () => {
     lastErrorKey.value = null
 
     // Dispatcher custom vs oficial (mesmo contrato do web): id >= 1M é
-    // música custom de Minhas Coletâneas.
-    const track = isCustomMusicId(musicId)
-      ? await loadCustomMusicTrack(fromCustomMusicId(musicId))
+    // música custom de Minhas Coletâneas. app#331: negativo é música LOCAL
+    // (import .slja sem login) — vai pro MESMO loader custom, que lê o
+    // localStorage (isLocalId) e monta data: URL do áudio.
+    const track = isCustomMusicId(musicId) || musicId < 0
+      ? await loadCustomMusicTrack(
+          musicId < 0 ? musicId : fromCustomMusicId(musicId),
+        )
       : await loadMediaTrack(musicId)
     if (!track) {
       status.value = 'error'
@@ -528,19 +566,25 @@ export const useMediaStore = defineStore('media', () => {
     let mode: MediaPlaybackMode = requestedMode
     let playbackUrl = ''
     let warningKey: string | undefined
+    // Áudio do catálogo a tocar quando o download pré-play terminar.
+    let preplayAudio: string | null = null
 
     if (mode !== 'no_audio') {
       const catalogAudio = pickSourceUrl(mode, track.audioUrl, track.instrumentalUrl)
-      // Sem cópia local: baixa PRIMEIRO (progresso no player) e toca ao fim.
-      const ready = await ensureTrackDownloaded(musicId)
-      if (!ready) return { ok: false, messageKey: 'media.messages.playbackFailed' }
-      const resolved = await resolveMusicAudioUrl(catalogAudio)
-      if (resolved.ok) {
-        playbackUrl = resolved.url
+      if (await needsPreplayDownload(musicId)) {
+        // Sem cópia local: abre o player JÁ (progresso nele) e toca ao fim do
+        // download. Antes o download inteiro rodava com o operador parado na
+        // lista, sem retorno (caso real de usuário).
+        preplayAudio = catalogAudio
       } else {
-        // Sem path de áudio no catálogo: segue só com slides.
-        mode = 'no_audio'
-        warningKey = 'media.messages.slidesOnlyNoAudio'
+        const resolved = await resolveMusicAudioUrl(catalogAudio)
+        if (resolved.ok) {
+          playbackUrl = resolved.url
+        } else {
+          // Sem path de áudio no catálogo: segue só com slides.
+          mode = 'no_audio'
+          warningKey = 'media.messages.slidesOnlyNoAudio'
+        }
       }
     }
 
@@ -576,14 +620,17 @@ export const useMediaStore = defineStore('media', () => {
     minimized.value =
       params.minimized ?? loadProjectionSettings().autoMinimizePlayer === true
 
-    if (playbackUrl) {
-      bindAudio()
-      const audio = getMediaAudioElement()
-      audio.volume = volume.value
-      audio.src = playbackUrl
-      audio.load()
-      const played = await playMediaAudio(audio)
-      status.value = played ? 'playing' : 'paused'
+    // A janela de projeção sobe junto com o áudio, não depois dele.
+    const shouldProject = params.project !== false
+    const retainProjection = shouldProject && Boolean(params.keepQueue) && isProjecting.value
+    const projectionTask =
+      shouldProject && !retainProjection ? startProjection() : null
+
+    if (preplayAudio !== null) {
+      status.value = 'loading'
+      void playAfterPreplayDownload(musicId, mode, preplayAudio)
+    } else if (playbackUrl) {
+      const played = await startSessionAudio(playbackUrl)
       if (!played) {
         warningKey = warningKey ?? 'media.messages.playbackFailed'
       }
@@ -592,25 +639,72 @@ export const useMediaStore = defineStore('media', () => {
     }
 
     await refreshResolvedSlideImage()
-    void maybeStartOndemandDownload(musicId)
+    // No pré-play o download já está em curso (não iniciar outro: cancelaria).
+    if (preplayAudio === null) void maybeStartOndemandDownload(musicId)
 
     // Hino tocando = PROJETANDO, sempre (decisão Rafael 27/08): destino vem
     // do seletor na biblioteca (Espelhar/TV individual). Antes: minimizado
     // não projetava — operador tinha que clicar Projetar a cada hino.
-    if (params.project !== false) {
-      const retainProjection = params.keepQueue && isProjecting.value
-      if (retainProjection) {
-        // Fila: janela já está aberta — não chamar startProjection de novo
-        // (window.open sem gesto do usuário falha e zera isProjecting).
-        isProjecting.value = true
-        publishProjectionState()
-        if (!projectionWatchTimer) startProjectionWatch()
-      } else {
-        await startProjection()
-      }
+    if (retainProjection) {
+      // Fila: janela já está aberta — não chamar startProjection de novo
+      // (window.open sem gesto do usuário falha e zera isProjecting).
+      isProjecting.value = true
+      publishProjectionState()
+      if (!projectionWatchTimer) startProjectionWatch()
+    } else if (projectionTask) {
+      await projectionTask
+      publishProjectionState()
     }
 
     return { ok: true, warningKey }
+  }
+
+  async function startSessionAudio(url: string): Promise<boolean> {
+    bindAudio()
+    const audio = getMediaAudioElement()
+    audio.volume = volume.value
+    audio.src = url
+    audio.load()
+    const played = await playMediaAudio(audio)
+    status.value = played ? 'playing' : 'paused'
+    return played
+  }
+
+  function isCurrentSession(musicId: number, mode: MediaPlaybackMode): boolean {
+    return session.value?.musicId === musicId && session.value.mode === mode
+  }
+
+  /**
+   * Continuação do open() sem cópia local: baixa com o player aberto e toca
+   * ao fim. Fechar o player, trocar de faixa ou de modo no meio cancela.
+   */
+  async function playAfterPreplayDownload(
+    musicId: number,
+    mode: MediaPlaybackMode,
+    catalogAudio: string,
+  ): Promise<void> {
+    const canPlay = await runPreplayDownload(musicId)
+    if (!canPlay || !isCurrentSession(musicId, mode)) return
+
+    const resolved = await resolveMusicAudioUrl(catalogAudio)
+    const current = session.value
+    if (!current || !isCurrentSession(musicId, mode)) return
+
+    if (!resolved.ok) {
+      // Sem path de áudio no catálogo: segue só com slides.
+      session.value = {
+        ...current,
+        mode: 'no_audio',
+        audioUrl: '',
+        slideTimesSec: buildSlideTimesSec(current.slides, 'no_audio'),
+      }
+      status.value = 'ready'
+      return
+    }
+
+    session.value = { ...current, audioUrl: resolved.url }
+    await startSessionAudio(resolved.url)
+    void maybeStartOndemandDownload(musicId)
   }
 
   async function play(): Promise<void> {
@@ -734,8 +828,9 @@ export const useMediaStore = defineStore('media', () => {
     const next = Math.min(Math.max(0, index), slides.length - 1)
     slideIndex.value = next
 
+    /* v8 ignore next 1 -- session null já retornou no guard de slides; slideTimesSec é sempre array quando session existe */
     const times = session.value?.slideTimesSec ?? []
-    if (hasAudio.value && times.length > next) {
+    if (hasAudio.value && times.length > next && hasDistinctSlideTimes(times, slides[0]?.isCover === true)) {
       seekTo(times[next] ?? 0)
     }
 
@@ -745,9 +840,11 @@ export const useMediaStore = defineStore('media', () => {
   // ===== Fila (spec playlist RF-03) =====
 
   /** Toca um item da fila pelo fluxo completo (open → auto-projeção). */
-  async function playQueueItem(item: QueueItem, mode?: MediaPlaybackMode): Promise<void> {
+  async function playQueueItem(item: QueueItem, mode?: MediaPlaybackMode, project?: boolean): Promise<void> {
     const target = mode ?? session.value?.mode ?? 'audio'
-    const keepProjecting = isProjecting.value
+    if (project === false && isProjecting.value) stopProjection()
+    const shouldProject = project ?? (queueManualProjection ? isProjecting.value : undefined)
+    const keepProjecting = shouldProject !== false && isProjecting.value
     if (keepProjecting) {
       queueAdvanceInProgress += 1
     }
@@ -757,8 +854,9 @@ export const useMediaStore = defineStore('media', () => {
         mode: target,
         albumId: item.albumId,
         // undefined = contrato 27/08; keepQueue + isProjecting evita reabrir janela
-        project: undefined,
+        project: shouldProject,
         keepQueue: true,
+        minimized: preserveQueuePlayerMode ? minimized.value : undefined,
       })
       queueIndex.value = queue.value.findIndex((q) => q.musicId === item.musicId)
       if (keepProjecting) {
@@ -773,11 +871,44 @@ export const useMediaStore = defineStore('media', () => {
   }
 
   /** Substitui a fila e toca a partir de startIndex. */
-  async function playQueue(items: QueueItem[], startIndex = 0, mode?: MediaPlaybackMode): Promise<void> {
-    queue.value = items
+  async function playQueue(
+    items: QueueItem[],
+    startIndex = 0,
+    mode?: MediaPlaybackMode,
+    label: string | null = null,
+    options?: { minimized?: boolean; originalOrder?: QueueItem[]; shuffled?: boolean; project?: boolean },
+  ): Promise<void> {
+    queue.value = [...items]
+    originalQueue = [...(options?.originalOrder ?? items)]
+    queueShuffled.value = options?.shuffled ?? false
+    queueLabel.value = label
+    preserveQueuePlayerMode = options?.minimized !== undefined
+    queueManualProjection = options?.project !== undefined
+    if (options?.minimized !== undefined) minimized.value = options.minimized
     const first = items[startIndex]
     if (!first) return
-    await playQueueItem(first, mode)
+    await playQueueItem(first, mode, options?.project)
+  }
+
+  /** Reordena somente as próximas faixas, preservando a reprodução e o histórico. */
+  function playQueueInOrder(shuffled: boolean): void {
+    if (queue.value.length < 2) return
+    const currentIndex = queueIndex.value
+    if (currentIndex < 0 || currentIndex >= queue.value.length) return
+    const history = queue.value.slice(0, currentIndex + 1)
+    const upcoming = queue.value.slice(currentIndex + 1)
+    if (shuffled) {
+      for (let i = upcoming.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1))
+        ;[upcoming[i], upcoming[j]] = [upcoming[j]!, upcoming[i]!]
+      }
+    } else {
+      const originalIndex = (item: QueueItem) => originalQueue.findIndex((entry) =>
+        entry.musicId === item.musicId && entry.albumId === item.albumId)
+      upcoming.sort((a, b) => originalIndex(a) - originalIndex(b))
+    }
+    queue.value = [...history, ...upcoming]
+    queueShuffled.value = shuffled
   }
 
   /** Fila inteira de um álbum (ordenada por track — caller já ordena). */
@@ -786,6 +917,30 @@ export const useMediaStore = defineStore('media', () => {
     mode?: MediaPlaybackMode,
   ): Promise<void> {
     await playQueue(items, 0, mode)
+  }
+
+  function moveQueueItem(from: number, to: number): void {
+    if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || to < 0 ||
+      from >= queue.value.length || to >= queue.value.length || from === to) return
+    const next = [...queue.value]
+    const [item] = next.splice(from, 1)
+    next.splice(to, 0, item!)
+    const current = queueIndex.value
+    if (current === from) queueIndex.value = to
+    else if (from < current && to >= current) queueIndex.value -= 1
+    else if (from > current && to <= current) queueIndex.value += 1
+    queue.value = next
+    originalQueue = [...next]
+    queueShuffled.value = false
+  }
+
+  /** Acrescenta à fila sem alterar a reprodução atual. */
+  function appendQueue(items: QueueItem[]): void {
+    const next = appendQueueToQueue(queue.value, items, queueIndex.value)
+    originalQueue = [...originalQueue, ...next.items.slice(queue.value.length)]
+    queue.value = next.items
+    queueIndex.value = next.index
+    if (items.length > 0) queueLabel.value = null
   }
 
   function nextTrack(): void {
@@ -804,8 +959,10 @@ export const useMediaStore = defineStore('media', () => {
   }
 
   function clearQueue(): void {
+    queueManualProjection = false
     queue.value = []
     queueIndex.value = -1
+    queueLabel.value = null
   }
 
   /** Há fila ativa? (UI: next/prev do player = faixa; sem fila = slides) */
@@ -881,9 +1038,12 @@ export const useMediaStore = defineStore('media', () => {
     status.value = 'loading'
     lastErrorKey.value = null
 
-    const track = isCustomMusicId(current.musicId)
-      ? await loadCustomMusicTrack(fromCustomMusicId(current.musicId))
-      : await loadMediaTrack(current.musicId)
+    const musicId = current.musicId
+    const track = isCustomMusicId(musicId) || musicId < 0
+      ? await loadCustomMusicTrack(
+          musicId < 0 ? musicId : fromCustomMusicId(musicId),
+        )
+      : await loadMediaTrack(musicId)
     if (!track) {
       status.value = 'error'
       lastErrorKey.value = 'media.messages.trackMissing'
@@ -1034,7 +1194,9 @@ export const useMediaStore = defineStore('media', () => {
       )
       audio.currentTime = clamped
       currentTimeSec.value = clamped
-      slideIndex.value = resolveSlideIndexForTime(slideTimesSec, clamped)
+      slideIndex.value = hasDistinctSlideTimes(slideTimesSec, current.slides[0]?.isCover === true)
+        ? resolveSlideIndexForTime(slideTimesSec, clamped)
+        : savedSlide
 
       if (wasPlaying) {
         const played = await fadeInMediaAudio(audio, volume.value)
@@ -1082,6 +1244,7 @@ export const useMediaStore = defineStore('media', () => {
   }
 
   async function startProjection(): Promise<boolean> {
+    await detectObsBeforeProjection()
     if (!session.value) return false
 
     // Ocultar conteúdo deixa as janelas abertas com runtime inativo.
@@ -1100,7 +1263,6 @@ export const useMediaStore = defineStore('media', () => {
     // (decisão Rafael/Elias 27/08: mecanismo ligava só com múltiplas telas
     // FÍSICAS; TVs WS agora entram na conta).
     const hasTvs = await hasLivePalcoTvs()
-    console.info('[media-proj] startProjection route=', String(getPalcoRoute('hymns')), 'hasTvs=', hasTvs)
     // Rota individual de TV (spec multi-telas): só TV, sem janela no cabo
     // — paridade com Bíblia/Sorteio. Espelhar mantém cabo + TVs.
     if (isPalcoTvOnlyRoute('hymns')) {
@@ -1116,6 +1278,10 @@ export const useMediaStore = defineStore('media', () => {
       publishProjectionState()
       return true
     }
+    // Publica o slide antes de mostrar a janela aquecida, para ela já
+    // abrir com a capa em vez de esperar o boot.
+    isProjecting.value = true
+    publishProjectionState()
     const opened = await openProjectionModule('media')
     if (opened) {
       projectingTvsOnly.value = false
@@ -1148,6 +1314,13 @@ export const useMediaStore = defineStore('media', () => {
       return
     }
     await startProjection()
+  }
+
+  function stopProjection(): void {
+    const hasMediaWindow = isProjectionModuleOpen('media')
+    clearProjection()
+    projectingTvsOnly.value = false
+    if (hasMediaWindow) closeProjectionModule()
   }
 
   function close(): void {
@@ -1256,8 +1429,13 @@ export const useMediaStore = defineStore('media', () => {
     previousSlide,
     queue,
     queueIndex,
+    queueLabel,
     playQueue,
+    playQueueInOrder,
+    moveQueueItem,
+    queueShuffled,
     playAlbumQueue,
+    appendQueue,
     playQueueItem,
     nextTrack,
     jumpToQueue,
@@ -1274,6 +1452,7 @@ export const useMediaStore = defineStore('media', () => {
     switchMode,
     startProjection,
     clearProjection,
+    stopProjection,
     toggleProjection,
     close,
     clearError,

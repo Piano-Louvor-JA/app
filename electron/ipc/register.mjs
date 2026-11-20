@@ -1,5 +1,7 @@
 import path from 'node:path'
-import { app, BrowserWindow, dialog, ipcMain } from 'electron'
+import { existsSync, mkdirSync } from 'node:fs'
+import { writeFile } from 'node:fs/promises'
+import { app, BrowserWindow, dialog, ipcMain, net } from 'electron'
 
 import { detectClassoInstallation, probeClassoRegistry } from '../classo-detect.mjs'
 import {
@@ -24,11 +26,26 @@ import {
   writeWorkspaceRecord,
 } from '../workspace.mjs'
 import { ensureWorkspaceDirectories, getWorkspacePaths } from '../paths.mjs'
+import { getBibleStore } from '../bible-store.mjs'
+import { getBibleUpdater } from '../bible-updater.mjs'
 import {
   ensureSorteioDefaultAudio,
   importSorteioCustomAudio,
   deleteSorteioCustomAudio,
 } from '../sorteio-audio.mjs'
+import {
+  ESCOLA_SABATINA_VIDEO_EXTENSIONS,
+  clearEscolaSabatinaVideo,
+  importEscolaSabatinaVideo,
+} from '../escola-sabatina-video.mjs'
+import {
+  AVISOS_EXTENSIONS,
+  copyAvisoFolder,
+  importAvisoFiles,
+  removeAvisoFiles,
+  removeAvisoFolder,
+  resolveAvisoPaths,
+} from '../avisos-files.mjs'
 import { writeWindowsMediaRootOverride } from '../windows-media-root.mjs'
 import {
   buildBackupFileName,
@@ -37,6 +54,7 @@ import {
   createAppBackupArchive,
   readRestoredBrowserStorage,
   restoreAppBackupArchive,
+  youtubeVideosUsage,
 } from '../app-backup.mjs'
 import { registerDisplayIpc } from './displays.mjs'
 import { registerDialogIpc, registerReadBinaryFileIpc } from './dialog.mjs'
@@ -64,15 +82,28 @@ import {
   closeWebProjectionWindows,
   getSourceMediaIdFor,
   getImageSlideState,
+  getTextScale,
+  setTextScale,
+  setImageView,
+  reportImageViewFromSource,
+  captureImageFrame,
+  openPlayerIndependent,
+  closePlayerIndependent,
+  getPlayerIndependentState,
+  getIndependentEnabledDisplays,
   getPdfPageState,
   getPptSlideState,
   getSourceNavigationState,
   getSourcePlaybackState,
   captureSourceFrameBase64,
+  captureSourcePreviewJpeg,
+  captureGalleryPreviewsJpeg,
   getVideoTargetMonitorIds,
   openWebProjectionWindows,
   registerProjectionCapturePermissions,
   remoteGoBackSource,
+  remoteNavigateSource,
+  remoteScrollSource,
   remoteGoForwardSource,
   remoteImageNext,
   remoteImagePrev,
@@ -85,6 +116,10 @@ import {
   remoteReloadSource,
   remoteSeekSource,
   remoteSetVolumeSource,
+  setAudioOutputMode,
+  remoteSetCaptionsHiddenSource,
+  getVideoControlSnapshot,
+  runVideoControlCommand,
   remoteToggleMuteSource,
   setSiteControlPanelOpen,
   setSiteTargetMonitorIds,
@@ -192,6 +227,35 @@ export function registerWorkspaceIpc() {
     }
   })
 
+  // Zoom na imagem pelo mouse no popup do operador → replica nas telas.
+  ipcMain.on('projection:image-view-changed', (event, view) => {
+    try {
+      reportImageViewFromSource(event.sender, view)
+    } catch (error) {
+      console.error('[ipc] projection:image-view-changed', error)
+    }
+  })
+
+  // Quadro da imagem atual para as TVs/navegador (inteiro ou recortado).
+  ipcMain.handle('projection:capture-image-frame', async (_event, options) => {
+    try {
+      return await captureImageFrame({ crop: options?.crop === true })
+    } catch (error) {
+      console.error('[ipc] projection:capture-image-frame', error)
+      return null
+    }
+  })
+
+  // Zoom na imagem pelos botões da barra.
+  ipcMain.handle('projection:set-image-view', async (_event, view) => {
+    try {
+      return await setImageView(view)
+    } catch (error) {
+      console.error('[ipc] projection:set-image-view', error)
+      return null
+    }
+  })
+
   ipcMain.handle('projection:close-url', () => {
     try {
       closeAllProjectionWindows()
@@ -207,6 +271,17 @@ export function registerWorkspaceIpc() {
       // Fonte única: popups (hinos/slides) + web-projection (vídeo/pdf/site)
       const hasPopup = collectAliveProjectionWindows().some((win) => isProjectionPopupWindow(win.webContents.getURL()))
       return Boolean(hasPopup || isExternalProjectionAlive())
+    } catch {
+      return false
+    }
+  })
+
+  // SÓ mídia externa (vídeo/pdf/ppt do web-projection). Popups de
+  // hinos/bíblia NÃO contam: a palco-bridge usa este handler — consultar o
+  // antigo com popup do hino aberto congelava a TV no 1º slide (13/10).
+  ipcMain.handle('projection:external-media-alive', () => {
+    try {
+      return Boolean(isExternalProjectionAlive())
     } catch {
       return false
     }
@@ -256,6 +331,10 @@ export function registerWorkspaceIpc() {
     }
   })
 
+  ipcMain.handle('projection:remote-set-captions-hidden', async (_event, hidden) => {
+    return remoteSetCaptionsHiddenSource(hidden === true)
+  })
+
   ipcMain.handle('projection:remote-toggle-mute', async () => {
     try {
       return await remoteToggleMuteSource()
@@ -264,6 +343,14 @@ export function registerWorkspaceIpc() {
       return null
     }
   })
+
+  ipcMain.handle('projection:set-audio-output', (_event, mode) => setAudioOutputMode(mode))
+
+  ipcMain.handle('projection:get-video-control-snapshot', () => getVideoControlSnapshot())
+
+  ipcMain.handle('projection:run-video-control-command', (_event, command) =>
+    runVideoControlCommand(command),
+  )
 
   ipcMain.handle('projection:remote-set-volume', async (_event, volume) => {
     try {
@@ -298,6 +385,24 @@ export function registerWorkspaceIpc() {
     } catch (error) {
       console.error('[ipc] projection:get-navigation-state', error)
       return null
+    }
+  })
+
+  ipcMain.handle('projection:remote-scroll', (_event, ratio) => {
+    try {
+      return remoteScrollSource(ratio)
+    } catch (error) {
+      console.error('[ipc] projection:remote-scroll', error)
+      return false
+    }
+  })
+
+  ipcMain.handle('projection:remote-navigate', (_event, url) => {
+    try {
+      return remoteNavigateSource(url)
+    } catch (error) {
+      console.error('[ipc] projection:remote-navigate', error)
+      return false
     }
   })
 
@@ -364,6 +469,60 @@ export function registerWorkspaceIpc() {
     }
   })
 
+  ipcMain.handle('projection:independent-open', (_event, displayIds, mode) => {
+    try {
+      return openPlayerIndependent(displayIds, mode)
+    } catch (error) {
+      console.error('[ipc] projection:independent-open', error)
+      return false
+    }
+  })
+
+  ipcMain.handle('projection:independent-close', () => {
+    try {
+      return closePlayerIndependent()
+    } catch (error) {
+      console.error('[ipc] projection:independent-close', error)
+      return false
+    }
+  })
+
+  ipcMain.handle('projection:independent-enabled-displays', () => {
+    try {
+      return getIndependentEnabledDisplays()
+    } catch (error) {
+      console.error('[ipc] projection:independent-enabled-displays', error)
+      return []
+    }
+  })
+
+  ipcMain.handle('projection:independent-state', () => {
+    try {
+      return getPlayerIndependentState()
+    } catch (error) {
+      console.error('[ipc] projection:independent-state', error)
+      return null
+    }
+  })
+
+  ipcMain.handle('projection:get-text-scale', () => {
+    try {
+      return getTextScale()
+    } catch (error) {
+      console.error('[ipc] projection:get-text-scale', error)
+      return null
+    }
+  })
+
+  ipcMain.handle('projection:set-text-scale', async (_event, scale) => {
+    try {
+      return await setTextScale(scale)
+    } catch (error) {
+      console.error('[ipc] projection:set-text-scale', error)
+      return null
+    }
+  })
+
   ipcMain.handle('projection:get-image-slide-state', async () => {
     try {
       return await getImageSlideState()
@@ -418,9 +577,27 @@ export function registerWorkspaceIpc() {
     }
   })
 
-  ipcMain.handle('projection:capture-source-frame', async () => {
+  ipcMain.handle('projection:capture-gallery-previews', async () => {
     try {
-      return await captureSourceFrameBase64()
+      return await captureGalleryPreviewsJpeg()
+    } catch (error) {
+      console.error('[ipc] projection:capture-gallery-previews', error)
+      return null
+    }
+  })
+
+  ipcMain.handle('projection:capture-slide-preview', async () => {
+    try {
+      return await captureSourcePreviewJpeg()
+    } catch (error) {
+      console.error('[ipc] projection:capture-slide-preview', error)
+      return null
+    }
+  })
+
+  ipcMain.handle('projection:capture-source-frame', async (_event, options) => {
+    try {
+      return await captureSourceFrameBase64({ full: options?.full === true })
     } catch (error) {
       console.error('[ipc] projection:capture-source-frame', error)
       return null
@@ -472,9 +649,9 @@ export function registerWorkspaceIpc() {
     }
   })
 
-  ipcMain.handle('projection:set-site-control-panel-open', (_event, open) => {
+  ipcMain.handle('projection:set-site-control-panel-open', (_event, open, height) => {
     try {
-      return setSiteControlPanelOpen(open)
+      return setSiteControlPanelOpen(open, height)
     } catch (error) {
       console.error('[ipc] projection:set-site-control-panel-open', error)
       return false
@@ -497,12 +674,91 @@ export function registerWorkspaceIpc() {
     }
   })
 
+  ipcMain.handle('bible:get-chapter', async (_event, versionId, bookId, chapter) => {
+    try {
+      return await getBibleStore().getChapter(
+        Number(versionId),
+        Number(bookId),
+        Number(chapter),
+      )
+    } catch (error) {
+      console.error('[ipc] bible:get-chapter', error)
+      return null
+    }
+  })
+
+  ipcMain.handle('bible:list-versions', async () => {
+    try {
+      return await getBibleStore().listVersions()
+    } catch (error) {
+      console.error('[ipc] bible:list-versions', error)
+      return []
+    }
+  })
+
+  ipcMain.handle('bible:check-updates', async () => {
+    try {
+      return await getBibleUpdater().check()
+    } catch (error) {
+      console.error('[ipc] bible:check-updates', error)
+      return { status: 'error', updated: [], failed: [] }
+    }
+  })
+
   ipcMain.handle('workspace:clear', (_event, options) => {
     try {
       return clearWorkspaceData(options ?? {})
     } catch (error) {
       console.error('[ipc] workspace:clear', error)
       return false
+    }
+  })
+
+  // Fetch de página remota pelo MAIN process (sem CORS do renderer).
+  // Retorna texto ou null em falha.
+  ipcMain.handle('workspace:fetch-text', async (_event, url) => {
+    try {
+      const response = await net.fetch(String(url))
+      if (!response.ok) return null
+      return await response.text()
+    } catch (error) {
+      console.error('[ipc] workspace:fetch-text', error)
+      return null
+    }
+  })
+
+  // Download de arquivo remoto pra pasta Media/provai-e-vede/ (offline-first).
+  // Retorna o caminho local absoluto ou null em falha.
+  // Gravação exclusiva (`wx`): não sobrescreve arquivo existente e evita
+  // corrida de criação (CWE-377 / CodeQL js/insecure-temporary-file).
+  ipcMain.handle('workspace:download-to-media', async (_event, url, fileName) => {
+    try {
+      const { media } = getWorkspacePaths()
+      const targetDir = path.join(media, 'provai-e-vede')
+      if (!existsSync(targetDir)) mkdirSync(targetDir, { recursive: true, mode: 0o700 })
+      const safeName = path
+        .basename(String(fileName || 'download.bin'))
+        .replace(/[\\/:*?"<>|]/g, '_')
+      if (!safeName || safeName === '.' || safeName === '..') return null
+      const destPath = path.join(targetDir, safeName)
+      if (!destPath.startsWith(targetDir + path.sep)) return null
+      const response = await net.fetch(String(url))
+      if (!response.ok) return null
+      const buffer = Buffer.from(await response.arrayBuffer())
+      // Só `wx`: criação atômica. Se o arquivo já existe, reutiliza o caminho
+      // (offline-first) sem checar existsSync antes (evita TOCTOU / CWE-367).
+      try {
+        await writeFile(destPath, buffer, { flag: 'wx', mode: 0o600 })
+      } catch (error) {
+        if (error && typeof error === 'object' && 'code' in error && error.code === 'EEXIST') {
+          return destPath
+        }
+        throw error
+      }
+      return destPath
+    } catch (error) {
+      console.error('[ipc] workspace:download-to-media', error)
+      return null
     }
   })
 
@@ -548,6 +804,100 @@ export function registerWorkspaceIpc() {
     } catch (error) {
       console.error('[ipc] random:delete-audio', error)
       return { ok: false, reason: 'error' }
+    }
+  })
+
+  ipcMain.handle('sabbath-school:import-video', async (event) => {
+    try {
+      const win = BrowserWindow.fromWebContents(event.sender)
+      const result = await dialog.showOpenDialog(win ?? undefined, {
+        title: 'Escolher vídeo da Escola Sabatina',
+        filters: [{ name: 'Vídeo', extensions: ESCOLA_SABATINA_VIDEO_EXTENSIONS }],
+        properties: ['openFile'],
+      })
+      if (result.canceled || !result.filePaths?.[0]) {
+        return { ok: false, reason: 'cancelled' }
+      }
+      const { media } = getWorkspacePaths()
+      const imported = importEscolaSabatinaVideo(media, result.filePaths[0])
+      return imported.ok ? imported : { ok: false, reason: imported.error }
+    } catch (error) {
+      console.error('[ipc] sabbath-school:import-video', error)
+      return { ok: false, reason: 'error' }
+    }
+  })
+
+  ipcMain.handle('sabbath-school:clear-video', () => {
+    try {
+      const { media } = getWorkspacePaths()
+      return clearEscolaSabatinaVideo(media)
+    } catch (error) {
+      console.error('[ipc] sabbath-school:clear-video', error)
+      return { ok: false, reason: 'error' }
+    }
+  })
+
+  const AVISOS_DIALOG = {
+    images: { title: 'Escolher imagens do aviso', filterName: 'Imagens', multiple: true },
+    video: { title: 'Escolher vídeo do aviso', filterName: 'Vídeo', multiple: false },
+    presentation: { title: 'Escolher apresentação do aviso', filterName: 'PowerPoint ou PDF', multiple: false },
+  }
+
+  ipcMain.handle('announcements:pick-and-import', async (event, avisoId, kind) => {
+    try {
+      const options = Object.hasOwn(AVISOS_DIALOG, kind) ? AVISOS_DIALOG[kind] : null
+      if (!options) return { ok: false, reason: 'invalid_kind' }
+      const win = BrowserWindow.fromWebContents(event.sender)
+      const result = await dialog.showOpenDialog(win ?? undefined, {
+        title: options.title,
+        filters: [{ name: options.filterName, extensions: AVISOS_EXTENSIONS[kind] }],
+        properties: options.multiple ? ['openFile', 'multiSelections'] : ['openFile'],
+      })
+      if (result.canceled || !result.filePaths?.length) return { ok: false, reason: 'cancelled' }
+      const { media } = getWorkspacePaths()
+      const imported = importAvisoFiles(media, avisoId, result.filePaths, kind)
+      return imported.ok ? imported : { ok: false, reason: imported.error }
+    } catch (error) {
+      console.error('[ipc] announcements:pick-and-import', error)
+      return { ok: false, reason: 'error' }
+    }
+  })
+
+  ipcMain.handle('announcements:copy-folder', (_event, fromId, toId) => {
+    try {
+      const copied = copyAvisoFolder(getWorkspacePaths().media, fromId, toId)
+      return copied.ok ? copied : { ok: false, reason: copied.error }
+    } catch (error) {
+      console.error('[ipc] announcements:copy-folder', error)
+      return { ok: false, reason: 'error' }
+    }
+  })
+
+  ipcMain.handle('announcements:remove-folder', (_event, avisoId) => {
+    try {
+      const removed = removeAvisoFolder(getWorkspacePaths().media, avisoId)
+      return removed.ok ? removed : { ok: false, reason: removed.error }
+    } catch (error) {
+      console.error('[ipc] announcements:remove-folder', error)
+      return { ok: false, reason: 'error' }
+    }
+  })
+
+  ipcMain.handle('announcements:remove-files', (_event, relativePaths) => {
+    try {
+      return removeAvisoFiles(getWorkspacePaths().media, Array.isArray(relativePaths) ? relativePaths : [])
+    } catch (error) {
+      console.error('[ipc] announcements:remove-files', error)
+      return { ok: false, reason: 'error' }
+    }
+  })
+
+  ipcMain.handle('announcements:resolve-paths', (_event, relativePaths) => {
+    try {
+      return resolveAvisoPaths(getWorkspacePaths().media, Array.isArray(relativePaths) ? relativePaths : [])
+    } catch (error) {
+      console.error('[ipc] announcements:resolve-paths', error)
+      return []
     }
   })
 
@@ -661,8 +1011,12 @@ export function registerWorkspaceIpc() {
     }
   })
 
-  ipcMain.handle('backup:create', async (event) => {
+  // Tamanho dos vídeos baixados do YouTube (pergunta "incluir no backup?").
+  ipcMain.handle('backup:youtube-usage', () => youtubeVideosUsage())
+
+  ipcMain.handle('backup:create', async (event, options) => {
     try {
+      const includeYoutubeVideos = Boolean(options && typeof options === 'object' && options.includeYoutubeVideos)
       const win = BrowserWindow.fromWebContents(event.sender)
       const defaultName = buildBackupFileName()
       const result = await dialog.showSaveDialog(win ?? undefined, {
@@ -707,6 +1061,7 @@ export function registerWorkspaceIpc() {
         destZip,
         onProgress: sendProgress,
         browserStorage: browserStorage && typeof browserStorage === 'object' ? browserStorage : {},
+        includeYoutubeVideos,
       })
       return { ok: true, path: destZip }
     } catch (error) {
@@ -745,6 +1100,8 @@ export function registerWorkspaceIpc() {
         destRoot: root,
         onProgress: sendProgress,
       })
+      // A pasta bible/ veio do backup: versões já abertas saem da memória.
+      getBibleStore().invalidate()
       const browserStorage = readRestoredBrowserStorage(root)
       if (browserStorage) {
         try {
@@ -824,7 +1181,13 @@ export function registerWorkspaceIpc() {
       return await downloadMediaFile(url, mediaType, filename)
     } catch (error) {
       console.error('[ipc] media:download', error)
-      return false
+      return {
+        ok: false,
+        url: String(url ?? ''),
+        status: typeof error?.status === 'number' ? error.status : null,
+        bytes: typeof error?.bytes === 'number' ? error.bytes : 0,
+        error: error instanceof Error ? error.message : String(error ?? 'media download failed'),
+      }
     }
   })
 

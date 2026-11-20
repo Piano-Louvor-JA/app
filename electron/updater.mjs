@@ -1,4 +1,5 @@
-import { app, ipcMain } from "electron";
+import { app, ipcMain, shell } from "electron";
+import { needsManualMacUpdate, macInstallerUrl } from './mac-update-mode.mjs';
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 const { autoUpdater } = require("electron-updater");
@@ -16,14 +17,36 @@ let updaterState = {
 	downloaded: false,
 	error: null,
 };
+let manualMacUpdate = false;
+
+/**
+ * Detecta execução via pacote Microsoft Store (MSIX/APPX).
+ * A Store REPROVA apps com self-updater embutido (política 10.8.x — updates
+ * devem ser entregues pela própria Store), então o canal electron-updater
+ * precisa ficar completamente desligado nesse ambiente.
+ */
+export function isWindowsStorePackage() {
+	// Electron expõe a flag nativamente em builds MSIX/APPX.
+	if (process.windowsStore === true) return true;
+	// Fallback robusto: caminho de instalação de pacote assinado pela Store
+	// (WindowsApps) ou execution alias do identity RDZDev.PianoLouvorJa.
+	const exe = String(process.execPath || "").toLowerCase();
+	return exe.includes("\\windowsapps\\") || exe.includes("pianolouvorja_");
+}
 
 /**
  * Inicializa o electron-updater e registra IPC handlers.
  * Deve ser chamado após app.whenReady().
  *
- * @param {import('electron').BrowserWindow} mainWindow - Janela principal para enviar eventos.
+ * @param {import('electron').BrowserWindow} mainWindowGetter - Janela principal para enviar eventos.
  */
 export function initUpdater(mainWindowGetter) {
+	// Microsoft Store: self-update é bloqueador de certificação — canal OFF.
+	if (isWindowsStorePackage()) {
+		console.log("[updater] pacote Microsoft Store — auto-update desabilitado (updates via Store)");
+		registerIpc(mainWindowGetter);
+		return;
+	}
 	// Não verificar em dev
 	if (!isPackaged()) {
 		console.log("[updater] dev mode — auto-update desabilitado");
@@ -32,6 +55,7 @@ export function initUpdater(mainWindowGetter) {
 	}
 
 	autoUpdater.autoDownload = false;
+  manualMacUpdate = needsManualMacUpdate();
 	autoUpdater.autoInstallOnAppQuit = false;
 
 	autoUpdater.on("checking-for-update", () => {
@@ -46,6 +70,7 @@ export function initUpdater(mainWindowGetter) {
 		sendToRenderer(mainWindowGetter, "updater:available", {
 			version: info.version,
 			releaseNotes: info.releaseNotes || "",
+      manualInstall: manualMacUpdate,
 		});
 	});
 
@@ -83,12 +108,17 @@ export function initUpdater(mainWindowGetter) {
 function registerIpc(mainWindowGetter) {
 	ipcMain.handle("updater:check", async () => {
 		if (!isPackaged()) return { available: false };
+		// Pacote Store: atualizações vêm pela Store, nunca pelo electron-updater.
+		if (isWindowsStorePackage()) {
+			return { available: false, storeManaged: true };
+		}
 		try {
 			const result = await autoUpdater.checkForUpdates();
 			return {
 				available: updaterState.available,
 				version: updaterState.version,
 				releaseNotes: updaterState.releaseNotes,
+        manualInstall: manualMacUpdate,
 			};
 		} catch (error) {
 			console.error("[updater] check falhou:", error?.message);
@@ -97,7 +127,16 @@ function registerIpc(mainWindowGetter) {
 	});
 
 	ipcMain.handle("updater:download", async () => {
+		if (isWindowsStorePackage()) {
+			return { success: false, error: "Updates gerenciados pela Microsoft Store" };
+		}
 		try {
+			if (manualMacUpdate) {
+        const url = updaterState.available ? macInstallerUrl(updaterState.version) : null;
+        if (!url) return { success: false, error: 'Nenhuma versão disponível para baixar' };
+        await shell.openExternal(url);
+        return { success: true, manual: true };
+      }
 			await autoUpdater.downloadUpdate();
 			return { success: true };
 		} catch (error) {
@@ -107,6 +146,10 @@ function registerIpc(mainWindowGetter) {
 	});
 
 	ipcMain.handle("updater:install", () => {
+    if (manualMacUpdate) return { success: false, error: 'Instale a atualização usando o DMG baixado' };
+		if (isWindowsStorePackage()) {
+			return { success: false, error: "Updates gerenciados pela Microsoft Store" };
+		}
 		if (updaterState.downloaded) {
 			autoUpdater.quitAndInstall(false, true);
 			return { success: true };

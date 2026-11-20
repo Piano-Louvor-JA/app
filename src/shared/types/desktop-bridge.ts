@@ -1,3 +1,5 @@
+import type { FontsApi } from './fonts'
+
 export type MediaFolderType = 'covers' | 'music' | 'slides'
 
 export type ProgressPayload = {
@@ -8,9 +10,43 @@ export type ProgressPayload = {
 export type WorkspaceApi = {
   /** Lê bytes de arquivo escolhido via openFile (decode fica no caller). */
   readBinaryFile?: (path: string) => Promise<Uint8Array | null>
+  /** Baixa url → Media/provai-e-vede/<fileName>. Retorna o caminho local ou null. */
+  downloadToMedia?: (url: string, fileName: string) => Promise<string | null>
+  /** Fetch de página remota pelo main process (sem CORS). Retorna texto ou null. */
+  fetchText?: (url: string) => Promise<string | null>
   getRecord: <T = unknown>(filename: string) => Promise<T | null>
   saveRecord: (filename: string, data: unknown) => Promise<boolean>
   clear: (options?: { preserveMedia?: boolean }) => Promise<boolean>
+}
+
+/** Download em background (fila no MAIN, T1/T2 — Provai e Vede). */
+export type DownloadBatchApi = {
+  enqueue: (items: Array<{ id: string, url: string, fileName: string }>) => Promise<{ ok: boolean }>
+  cancel: (id: string) => Promise<{ ok: boolean }>
+  retry: (id: string) => Promise<{ ok: boolean }>
+  pending: () => Promise<Array<{ id: string, fileName: string, status: string }>>
+  onProgress: (cb: (p: { done: number, total: number, current: { id: string, fileName: string, receivedBytes: number, totalBytes: number } | null }) => void) => () => void
+  onItemDone: (cb: (p: { id: string, fileName: string, filePath: string }) => void) => () => void
+  onItemFailed: (cb: (p: { id: string, fileName: string, reason: string }) => void) => () => void
+  onBatchDone: (cb: (p: { done: number, failed: number, total: number }) => void) => () => void
+}
+
+/** Bíblia offline: bundles `<versionId>.json.gz` (download > instalador). */
+export type BibleApi = {
+  getChapter: (
+    versionId: number,
+    bookId: number,
+    chapter: number,
+  ) => Promise<Record<string, string> | null>
+  listVersions: () => Promise<
+    Array<{ versionId: number; source: 'download' | 'bundled' }>
+  >
+  /** Confere bundles novos na API (no máximo 1x/dia). */
+  checkUpdates?: () => Promise<{
+    status: 'skipped' | 'up-to-date' | 'updated' | 'error'
+    updated: number[]
+    failed: number[]
+  }>
 }
 
 export type CatalogApi = {
@@ -55,9 +91,139 @@ export type YoutubeAuthApi = {
   logout: () => Promise<{ ok: boolean }>
 }
 
-export type YoutubeAdblockApi = {
-  status: () => Promise<{ enabled: boolean }>
-  set: (enabled: boolean) => Promise<{ ok: boolean }>
+export type OnlineVideoQuality = 480 | 720 | 1080
+
+export type OnlineVideoFolder = 'system' | 'custom'
+
+export type OnlineVideoSettings = {
+  enabled: boolean
+  maxHeight: OnlineVideoQuality
+  limitGb: number
+  /** Pasta que recebe os downloads novos. */
+  folder?: OnlineVideoFolder
+  /** Pasta escolhida pelo operador (os vídeos ficam numa subpasta dela). */
+  customDir?: string | null
+}
+
+export type OnlineVideoFolderInfo = { dir: string; bytes: number; count: number; limitBytes: number }
+
+export type OnlineVideoToolsStatus = {
+  state: 'unavailable' | 'missing' | 'installing' | 'ready' | 'error'
+  tool?: 'ytdlp' | 'ffmpeg'
+  progress?: number
+  version?: string
+  error?: string
+}
+
+export type OnlineVideoStatus = {
+  hidden: boolean
+  available: boolean
+  settings: OnlineVideoSettings
+  tools: OnlineVideoToolsStatus
+  usage: { bytes: number; count: number; limitBytes: number }
+  /** Pasta dos vídeos baixados neste computador (muda conforme o sistema). */
+  cacheDir?: string
+  /** Tamanho e caminho de cada pasta de vídeos baixados. */
+  folders?: { system: OnlineVideoFolderInfo; custom: OnlineVideoFolderInfo | null; active: OnlineVideoFolder } | null
+}
+
+export type OnlineVideoItemStatus = {
+  state: 'none' | 'queued' | 'resolving' | 'downloading' | 'muxing' | 'ready' | 'error'
+  progress?: number
+  code?: string
+  message?: string
+  /** Nome do arquivo na pasta, quando baixado (`<título>_<id>.mp4`). */
+  fileName?: string
+}
+
+/** Vídeo baixado (aba "Baixados"). */
+export type OnlineVideoDownload = {
+  id: string
+  title: string
+  /** Segundos. */
+  duration: number
+  size: number
+  lastUsed: number
+  fileName: string
+  /** O operador deu outro nome ao arquivo. */
+  renamed: boolean
+  folder: OnlineVideoFolder
+}
+
+export type OnlineVideoApi = {
+  status: () => Promise<OnlineVideoStatus>
+  setSettings: (partial: Partial<OnlineVideoSettings>) => Promise<OnlineVideoStatus>
+  prefetch: (ids: string[]) => Promise<void>
+  cancel: (id: string) => Promise<void>
+  keep: (ids: string[]) => Promise<void>
+  clear: (which?: OnlineVideoFolder) => Promise<OnlineVideoStatus>
+  videoStatus: (ids: string[]) => Promise<Record<string, OnlineVideoItemStatus>>
+  retryTools: () => Promise<OnlineVideoStatus>
+  openFolder?: (which?: OnlineVideoFolder) => Promise<boolean>
+  chooseFolder?: () => Promise<OnlineVideoStatus>
+  /** Baixar agora (botão do módulo YouTube), mesmo com a cópia automática desligada. */
+  download?: (ids: string[]) => Promise<boolean>
+  /** Apaga a cópia baixada de um vídeo (não apaga o que está tocando). */
+  remove?: (id: string) => Promise<boolean>
+  /** Renomeia o arquivo baixado; devolve o nome novo, ou null (vídeo tocando ou falha). */
+  rename?: (id: string, name: string) => Promise<string | null>
+  /** Vídeos baixados nas duas pastas, do uso mais recente ao mais antigo. */
+  list?: () => Promise<OnlineVideoDownload[]>
+  onChanged: (callback: (payload: { id: string; status: OnlineVideoItemStatus }) => void) => () => void
+  onTools: (callback: (status: OnlineVideoToolsStatus) => void) => () => void
+}
+
+export type YoutubeVideoInfo = {
+  title: string
+  channel: string
+  description: string
+  durationMs: number
+}
+
+export type YoutubeInfoApi = {
+  get: (videoId: string) => Promise<YoutubeVideoInfo | null>
+}
+
+export type YoutubeSearchItem = {
+  videoId: string
+  title: string
+  channel: string
+  durationText: string
+  viewsText: string
+  publishedText: string
+  thumbnail: string
+  live: boolean
+}
+
+export type YoutubeSearchContinuation = {
+  token: string
+  apiKey: string | null
+  clientVersion: string
+}
+
+export type YoutubeSearchResult = {
+  items: YoutubeSearchItem[]
+  continuation: YoutubeSearchContinuation | null
+  error?: string
+}
+
+export type YoutubeSearchApi = {
+  query: (text: string) => Promise<YoutubeSearchResult>
+  more: (continuation: YoutubeSearchContinuation) => Promise<YoutubeSearchResult>
+  /** Vídeos de uma playlist (link com `list=` ou o id). */
+  playlist?: (text: string) => Promise<YoutubePlaylistResult>
+}
+
+export type YoutubePlaylistResult = { title: string; items: YoutubeSearchItem[]; error?: string }
+
+export type SitePageInfo = {
+  title: string
+  siteName: string
+  description: string
+}
+
+export type SiteInfoApi = {
+  get: (url: string) => Promise<SitePageInfo | null>
 }
 
 export type LegacyMediaCounts = {
@@ -136,13 +302,24 @@ export type BackupResult = {
 }
 
 export type BackupApi = {
-  create: () => Promise<BackupResult>
+  /** `includeYoutubeVideos`: inclui os vídeos baixados do YouTube (padrão: não). */
+  create: (options?: { includeYoutubeVideos?: boolean }) => Promise<BackupResult>
+  /** Tamanho dos vídeos baixados do YouTube, para perguntar antes do backup. */
+  youtubeUsage?: () => Promise<{ bytes: number; count: number }>
   restore: () => Promise<BackupResult>
   onProgress: (callback: (progress: BackupProgress) => void) => () => void
 }
 
+export type MediaDownloadFailure = {
+  ok: false
+  url: string
+  status: number | null
+  bytes: number
+  error: string
+}
+
 export type MediaApi = {
-  download: (url: string, mediaType: MediaFolderType, filename: string) => Promise<boolean>
+  download: (url: string, mediaType: MediaFolderType, filename: string) => Promise<boolean | MediaDownloadFailure>
   check: (mediaType: MediaFolderType, filename: string) => Promise<string | false>
   /** Checagem em lote no main process (um IPC). */
   checkMany?: (
@@ -168,8 +345,44 @@ export type RemotePairingInfo = {
   token: string
   connectUrl: string
   qrDataUrl: string
+  speakerUrl?: string
+  viewerUrl?: string
+  viewerQrDataUrl?: string
+  viewerCount?: number
+  speakerCount?: number
+  speakerQrDataUrl?: string
+  operatorUrl?: string
+  operatorQrDataUrl?: string
   clientCount: number
   clientAddress?: string | null
+  /** Identidade do APK/controle remoto conectado (painel esquerdo). */
+  remoteAddress?: string | null
+  /** Identidade do pregador conectado (painel direito). */
+  speakerAddress?: string | null
+}
+
+/** Compartilhar monitores com o app mobile (electron/monitor-share.mjs). */
+export type MonitorShareMode = 'mirror' | 'return'
+export type MonitorShareInfo = {
+  enabled: boolean
+  running: boolean
+  /** Monitores estendidos disponíveis (o principal nunca entra). */
+  extendedCount: number
+  address: string
+  token: string
+  connectUrl: string
+  qrDataUrl: string
+  displays: { id: number; label: string; isPrimary: boolean; mode: MonitorShareMode | null; active: boolean }[]
+  phone: { device: string; host: string; monitors: number } | null
+}
+export type MonitorShareApi = {
+  get: () => Promise<MonitorShareInfo>
+  set: (changes: {
+    enabled?: boolean
+    displays?: Record<string, MonitorShareMode>
+    resetToken?: boolean
+  }) => Promise<MonitorShareInfo>
+  onChanged: (callback: (info: MonitorShareInfo) => void) => () => void
 }
 
 export type RemoteApi = {
@@ -178,8 +391,17 @@ export type RemoteApi = {
   sendAck: (ack: { id?: string | number; ok: boolean }) => void
   sendState: (state: Record<string, unknown>) => void
   pairingInfo: () => Promise<RemotePairingInfo>
+  resetToken?: (role: 'remote' | 'speaker') => Promise<RemotePairingInfo>
+  disconnectSpeaker?: () => Promise<RemotePairingInfo>
   onClients?: (
-    callback: (payload: { count: number; address?: string | null }) => void,
+    callback: (payload: {
+      count: number
+      viewerCount?: number
+      speakerCount?: number
+      address?: string | null
+      remoteAddress?: string | null
+      speakerAddress?: string | null
+    }) => void,
   ) => () => void
 }
 
@@ -294,7 +516,9 @@ export type OpenUrlProjectionPayload = {
   videoId?: string
   monitorIds?: number[]
   fullscreenOnPrimary?: boolean
-  mode?: 'video' | 'site' | 'image' | 'pdf' | 'presentation'
+  mode?: 'video' | 'site' | 'image' | 'pdf' | 'presentation' | 'text'
+  /** Modo texto (avisos): conteúdo e cores do Palco. */
+  text?: { title: string; html: string; titleColor?: string; textColor?: string; backgroundColor?: string }
   withScreens?: boolean
   /** Engine de conversão para este item (sobrepõe o setting global). */
   presentationEngine?: PresentationEngine
@@ -327,13 +551,21 @@ export type ProjectionNavigationState = {
 export type ProjectionApi = {
   openUrl: (payload: OpenUrlProjectionPayload) => Promise<boolean>
   closeUrl: () => Promise<boolean>
+  /** Mostra juntas as janelas de mídia já carregadas em segundo plano. */
+  revealWarm?: (payload: {
+    shows: { monitorId: number; fullscreen?: boolean; layout?: 'audience' | 'return' }[]
+  }) => Promise<boolean>
   /** Há projeção externa (video/pdf/ppt/site) com janela viva no main? */
   externalAlive: () => Promise<boolean>
+  /** SÓ mídia externa de verdade (vídeo/pdf/ppt do web-projection) — sem popups. */
+  externalMediaAlive: () => Promise<boolean>
   getSourceMediaId?: () => Promise<string | null>
   publishPlaybackSync?: (payload: PlaybackSyncPayload) => void
   onPlaybackSync?: (callback: (payload: PlaybackSyncPayload) => void) => () => void
   /** ESC pressionado na janela de projeção → operador exibe confirm. */
   onCloseRequested?: (callback: () => void) => () => void
+  /** Enter pressionado na janela de projeção → confirma o encerramento pendente. */
+  onConfirmCloseRequested?: (callback: () => void) => () => void
   /** ←/→ na projeção de mídia → operador navega slides. */
   onMediaNavigate?: (callback: (direction: 'previous' | 'next') => void) => () => void
   remotePlay?: () => Promise<boolean>
@@ -346,11 +578,24 @@ export type ProjectionApi = {
   getPlaybackState?: () => Promise<ProjectionPlaybackState | null>
   getNavigationState?: () => Promise<ProjectionNavigationState | null>
   remoteGoBack?: () => Promise<boolean>
+  /** Leva o site projetado ao endereço que o celular abriu no navegador dele. */
+  remoteNavigate?: (url: string) => Promise<boolean>
+  /** Rola o site projetado na proporção (0..1) da rolagem do celular. */
+  remoteScroll?: (ratio: number) => Promise<boolean>
   remoteGoForward?: () => Promise<boolean>
   remoteReload?: () => Promise<boolean>
   toggleSiteScreens?: () => Promise<boolean>
   toggleVideoScreens?: () => Promise<boolean>
   remoteImageNext?: () => Promise<{ index: number; total: number } | null>
+  /** Tamanho do texto no player de texto (0,5–2). Null fora do modo texto. */
+  getTextScale?: () => Promise<{ scale: number } | null>
+  /** Projeção independente do player do Piano (monitor + sobrepor/compartilhar). */
+  openIndependent?: (displayIds: number | number[], mode: 'overlay' | 'share') => Promise<boolean>
+  closeIndependent?: () => Promise<boolean>
+  getIndependentState?: () => Promise<{ displayIds: number[]; mode: 'overlay' | 'share' } | null>
+  /** Monitores ativos no "Telas" quando o player abriu; os demais ficam desativados no painel. */
+  getIndependentEnabledDisplays?: () => Promise<number[]>
+  setTextScale?: (scale: number) => Promise<{ scale: number } | null>
   remoteImagePrev?: () => Promise<{ index: number; total: number } | null>
   getImageSlideState?: () => Promise<{
     index: number
@@ -371,11 +616,21 @@ export type ProjectionApi = {
     total: number
     projecting?: boolean
   } | null>
+  captureSourceFrame?: () => Promise<string | null>
+  /** Miniatura JPEG (base64) do slide atual, para o controle remoto. */
+  captureSlidePreview?: () => Promise<string | null>
+  /** Miniaturas JPEG de toda a galeria aberta e a chave dela. */
+  captureGalleryPreviews?: () => Promise<{ key: string; previews: string[] } | null>
   getSiteTargetMonitors?: () => Promise<number[]>
   setSiteTargetMonitors?: (ids: number[]) => Promise<boolean>
   getVideoTargetMonitors?: () => Promise<number[]>
   setVideoTargetMonitors?: (ids: number[]) => Promise<boolean>
-  setSiteControlPanelOpen?: (open: boolean) => Promise<boolean>
+  /** Estado da barra de vídeo aberta, para o controle remoto. */
+  getVideoControlSnapshot?: () => Promise<Record<string, unknown> | null>
+  /** Executa um comando na barra de vídeo, pelo mesmo caminho do clique. */
+  runVideoControlCommand?: (command: Record<string, unknown>) => Promise<boolean>
+  /** `height`: altura que o painel precisa (px), limitada à janela do player. */
+  setSiteControlPanelOpen?: (open: boolean, height?: number) => Promise<boolean>
   onSiteTargetsChanged?: (callback: (ids: number[]) => void) => () => void
   onVideoTargetsChanged?: (callback: (ids: number[]) => void) => () => void
 }
@@ -385,7 +640,15 @@ export type WindowControlAction = 'minimize' | 'maximize' | 'close' | 'is-maximi
 export type WindowApi = {
   control: (action: WindowControlAction) => Promise<boolean | null>
   onMaximizedState: (callback: (isMaximized: boolean) => void) => () => void
+  /** Voltar/avançar do sistema (app-command no Windows). */
+  onHistoryCommand?: (callback: (direction: HistoryCommandDirection) => void) => () => void
+  /** Miniatura JPEG (data URL) de uma área da janela, em DIP; `null` se falhar. */
+  capturePreview?: (rect: PreviewRect) => Promise<string | null>
 }
+
+export type PreviewRect = { x: number; y: number; width: number; height: number }
+
+export type HistoryCommandDirection = 'back' | 'forward'
 
 export type ZoomChangedPayload = {
   factor: number
@@ -418,16 +681,63 @@ export type RandomAudioApi = {
   }>
 }
 
+export type SabbathSchoolVideoApi = {
+  importVideo: () => Promise<{
+    ok: boolean
+    fileName?: string
+    relativePath?: string
+    originalName?: string
+    reason?: string
+  }>
+  clearVideo: () => Promise<{ ok: boolean; reason?: string }>
+}
+
+export type AnnouncementFileKind = 'images' | 'video' | 'presentation'
+
+export type AnnouncementImportedFile = { relativePath: string; name: string }
+
+export type AnnouncementsFilesApi = {
+  /** Abre o diálogo (vários arquivos para imagens) e copia para Media/modulos/avisos/<id>/. */
+  pickAndImport: (avisoId: string, kind: AnnouncementFileKind) => Promise<{
+    ok: boolean
+    files?: AnnouncementImportedFile[]
+    rejected?: { name: string; reason: 'unsupported_format' | 'not_found' | 'copy_failed' }[]
+    reason?: string
+  }>
+  /** Duplicar aviso: copia a pasta; `paths` mapeia caminho antigo → novo. */
+  copyFolder: (fromId: string, toId: string) => Promise<{ ok: boolean; paths?: Record<string, string>; reason?: string }>
+  removeFolder: (avisoId: string) => Promise<{ ok: boolean; reason?: string }>
+  removeFiles: (relativePaths: string[]) => Promise<{ ok: boolean; removed?: number; reason?: string }>
+  resolvePaths: (relativePaths: string[]) => Promise<{ relativePath: string; absolutePath: string | null; exists: boolean }[]>
+}
+
+export type DiagnosticsApi = {
+  run: () => Promise<{ report: unknown; jsonPath: string; txtPath: string }>
+  send: (report: unknown) => Promise<{ ok: boolean; reason?: string }>
+  openFolder: (filePath: string) => Promise<void>
+  reportRendererErrors?: (errors: unknown) => void
+  reportDownloadFailures?: (failures: unknown) => void,
+  reportAudioDevices?: (snapshot: unknown) => void
+  reportJank?: (snapshot: unknown) => void
+}
+
 export type LouvorJaBridge = {
   platform: string
   isElectron: boolean
+  fonts?: FontsApi
+  diagnostics?: DiagnosticsApi
   window?: WindowApi
   zoom?: ZoomApi
   workspace: WorkspaceApi
+  downloadBatch?: DownloadBatchApi
   catalog: CatalogApi
+  bible?: BibleApi
   classo?: ClassoApi
   ytAuth?: YoutubeAuthApi
-  ytAdblock?: YoutubeAdblockApi
+  onlineVideo?: OnlineVideoApi
+  ytInfo?: YoutubeInfoApi
+  ytSearch?: YoutubeSearchApi
+  siteInfo?: SiteInfoApi
   externalPlayer?: ExternalPlayerApi
   legacyMedia?: LegacyMediaApi
   mediaFolder?: MediaFolderApi
@@ -438,5 +748,8 @@ export type LouvorJaBridge = {
   presentation?: PresentationApi
   projection: ProjectionApi
   remote?: RemoteApi
+  monitorShare?: MonitorShareApi
   random?: RandomAudioApi
+  sabbathSchool?: SabbathSchoolVideoApi
+  announcements?: AnnouncementsFilesApi
 }

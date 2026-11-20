@@ -14,10 +14,26 @@ import {
   SUPPORTED_LOCALES,
   DEFAULT_LOCALE,
 } from '@plugins/i18n'
+import i18n from '@plugins/i18n'
+
+describe('i18n message merge', () => {
+  it('preserva sync.downloadQueue.title no locale es após carregar syncEs', () => {
+    expect(i18n.global.t('sync.downloadQueue.title', {}, { locale: 'es' })).toBe('Descargas')
+  })
+})
 
 describe('SUPPORTED_LOCALES', () => {
-  it('contem pt-BR, en e es', () => {
-    expect(SUPPORTED_LOCALES).toEqual(['pt-BR', 'en', 'es'])
+  it('contem pt-BR, en, es, ru, uk e fr', () => {
+    expect(SUPPORTED_LOCALES).toEqual(['pt-BR', 'en', 'es', 'ru', 'uk', 'fr'])
+  })
+})
+
+// uk usa o fallback de catálogo pt: a interface troca mesmo sem catálogo uk.
+describe('locale sem catálogo', () => {
+  it('aceita uk salvo e mantém o catálogo no prefixo pt', () => {
+    vi.mocked(getUserPreference).mockReturnValue('uk')
+    expect(detectInitialLocale()).toBe('uk')
+    expect(localeToApiPrefix('uk')).toBe('pt')
   })
 })
 

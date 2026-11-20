@@ -18,6 +18,16 @@ import {
 	type LiturgyPersistedState,
 	type LiturgyWeekday,
 } from "@modules/liturgy/types/liturgy";
+import { deriveSessionTimesFromCategories } from "@modules/liturgy/services/liturgy-duration-enrich";
+import { estimatedSessionEndSafe } from "@modules/liturgy/services/liturgy-item-helpers";
+import {
+	activeLiturgyStateKey,
+	normalizeLiturgyState,
+} from "@modules/liturgy/services/liturgy-preferences";
+import type {
+	ScheduledCategory,
+	ScheduledItem,
+} from "@modules/liturgy/stores/useScheduledStore";
 import { USER_PREFERENCE_KEYS } from "@shared/constants/storage-keys";
 import {
 	getUserPreference,
@@ -28,6 +38,21 @@ import {
 	LOUVORJA_SCHEMA_VERSION,
 	type LouvorjaSyncPackage,
 } from "./louvorja-package";
+import {
+	loadLocalDb,
+	replaceLocalDb,
+} from "@modules/media/services/local-custom-store";
+import {
+	MEDIA_CUSTOM_CATALOG_ENTITY,
+	PREFERENCES_ENTITY,
+	applyPreferencesData,
+	exportMediaCustomCatalogDb,
+	exportPreferencesData,
+	parseMediaCustomCatalogData,
+	preserveLocalAudio,
+} from "./louvorja-entities";
+
+import { backupMediaCustomCatalog } from './media-custom-backup';
 
 /** Mesmo prefixo do APK (`sync_timestamps.dart`). */
 export const SYNC_MODIFIED_PREFIX = "sync.modified.v1";
@@ -35,7 +60,52 @@ export const SYNC_MODIFIED_PREFIX = "sync.modified.v1";
 export type LouvorjaImportResult = {
 	applied: string[];
 	skipped: string[];
+	/** Timestamp LWW local da entidade liturgy (diagnóstico de skip — t_8bdaf97b). */
+	localModified?: string;
+	/** Timestamp `modified` declarado pelo pacote (diagnóstico de skip). */
+	packageModified?: string;
 };
+
+type ScheduledState = {
+	categories: ScheduledCategory[];
+	items: ScheduledItem[];
+};
+
+function isScheduledState(data: Record<string, unknown>): data is ScheduledState {
+	if (!Array.isArray(data.categories) || !Array.isArray(data.items)) return false;
+	const categories = data.categories.filter(
+		(value): value is ScheduledCategory =>
+			value != null &&
+			typeof value === "object" &&
+			typeof (value as Record<string, unknown>).id === "string" &&
+			typeof (value as Record<string, unknown>).name === "string",
+	);
+	const categoryIds = new Set(categories.map((category) => category.id));
+	const items = data.items.filter(
+		(value): value is ScheduledItem => {
+			if (value == null || typeof value !== "object") return false;
+			const item = value as Record<string, unknown>;
+			if (
+				typeof item.id !== "string" ||
+				typeof item.categoryId !== "string" ||
+				!categoryIds.has(item.categoryId) ||
+				!/^\d{4}-\d{2}-\d{2}$/.test(String(item.date)) ||
+				typeof item.name !== "string" ||
+				typeof item.filePath !== "string" ||
+				typeof item.isRelativePath !== "boolean" ||
+				typeof item.notes !== "string"
+			) return false;
+			if (item.content == null) return true;
+			if (typeof item.content !== "object") return false;
+			return ["music", "file", "verse", "annotation", "online_video"].includes(
+				String((item.content as Record<string, unknown>).kind),
+			);
+		},
+	);
+	(data as ScheduledState).categories = categories;
+	(data as ScheduledState).items = items;
+	return true;
+}
 
 export function exportLouvorjaFromBrowser(
 	appVersion: string,
@@ -44,25 +114,68 @@ export function exportLouvorjaFromBrowser(
 	const entities: LouvorjaSyncPackage["entities"] = {};
 
 	const liturgyState = getUserPreference<LiturgyPersistedState>(
-		USER_PREFERENCE_KEYS.liturgyState,
+		activeLiturgyStateKey(),
 		null,
 	);
 	if (liturgyState != null) {
 		// Schema 1 do APK: data = { monday: { items, notes }, ... }.
-		// Não exporta state do renderer: isso quebraria a ponta Flutter.
+		// Campos legados e estado completo coexistem para leitores antigos e atuais.
 		const days: Record<string, unknown> = {};
 		for (const day of LITURGY_WEEKDAYS) {
-			const items = liturgyState.weekdays?.[day] ?? [];
+			const items = (liturgyState.weekdays?.[day] ?? []).map((item) => {
+				if (
+					item.type === "music" &&
+					typeof item.musicId === "number" &&
+					item.musicId < 0
+				) {
+					return { ...item, musicId: null };
+				}
+				return item;
+			});
 			const notes = liturgyState.dayNotes?.[day] ?? "";
 			if (items.length > 0 || notes.length > 0) days[day] = { items, notes };
 		}
-		if (Object.keys(days).length > 0) {
+		const hasExtra = (liturgyState.customLiturgies?.length ?? 0) > 0 || Object.keys(liturgyState.deletionLocks ?? {}).length > 0 || Object.values(liturgyState.daySessionTimes ?? {}).some((time) => time.startTime || time.endTime);
+		if (Object.keys(days).length > 0 || hasExtra) {
 			entities.liturgy = {
 				type: "liturgy",
-				modified: readModified("liturgy"),
-				data: days,
+				modified: readModified(`liturgy.${activeLiturgyStateKey().split('.').pop()}`),
+				data: { ...days, locale: activeLiturgyStateKey().split('.').pop(), state: (() => { const complete = structuredClone(liturgyState); const clean = (item: { type: string; musicId?: number | null }) => { if (item.type === 'music' && typeof item.musicId === 'number' && item.musicId < 0) item.musicId = null }; Object.values(complete.weekdays ?? {}).forEach(items => items.forEach(clean)); (complete.customLiturgies ?? []).forEach(custom => custom.items.forEach(clean)); return complete })() },
 			};
 		}
+	}
+
+	// Coletâneas custom locais (Minhas Coletâneas modo sem-auth).
+	const customDb = exportMediaCustomCatalogDb();
+	if (customDb.collections.length > 0 || customDb.musics.length > 0) {
+		entities[MEDIA_CUSTOM_CATALOG_ENTITY] = {
+			type: MEDIA_CUSTOM_CATALOG_ENTITY,
+			modified: readModified(MEDIA_CUSTOM_CATALOG_ENTITY) || new Date().toISOString(),
+			data: { db: customDb },
+		};
+	}
+
+	// Preferências de palco/letra (allowlist — nunca blob opaco).
+	const prefData = exportPreferencesData();
+	if (Object.keys(prefData).length > 0) {
+		entities[PREFERENCES_ENTITY] = {
+			type: PREFERENCES_ENTITY,
+			modified: readModified(PREFERENCES_ENTITY) || new Date().toISOString(),
+			data: prefData,
+		};
+	}
+
+	// Rotações agendadas (#414 P3).
+	const scheduled = getUserPreference<ScheduledState>(
+		USER_PREFERENCE_KEYS.scheduledState,
+		null,
+	);
+	if (scheduled != null && (scheduled.categories.length > 0 || scheduled.items.length > 0)) {
+		entities.scheduled = {
+			type: "scheduled",
+			modified: readModified("scheduled"),
+			data: scheduled,
+		};
 	}
 
 	return {
@@ -76,43 +189,79 @@ export function exportLouvorjaFromBrowser(
 
 export function importLouvorjaIntoBrowser(
 	pkg: LouvorjaSyncPackage,
+	options: { catalogReplacementConfirmed?: boolean } = {},
 ): LouvorjaImportResult {
 	const applied: string[] = [];
 	const skipped: string[] = [];
+	let localModified: string | undefined;
+	let packageModified: string | undefined;
 
 	for (const [name, entity] of Object.entries(pkg.entities)) {
 		switch (name) {
 			case "liturgy": {
-				const localTs = readModified("liturgy");
+				const complete = entity.data.state;
+				if (complete && typeof complete === 'object' && 'weekdays' in complete) {
+					const language = ['pt', 'en', 'es'].includes(String(entity.data.locale)) ? String(entity.data.locale) : activeLiturgyStateKey().split('.').pop()!;
+					const local = readModified(`liturgy.${language}`);
+					if (toEpoch(entity.modified) > toEpoch(local)) {
+						setUserPreference(activeLiturgyStateKey(language), normalizeLiturgyState(complete));
+						localStorage.setItem(`${SYNC_MODIFIED_PREFIX}.liturgy.${language}`, entity.modified);
+						applied.push('liturgy');
+					} else skipped.push('liturgy');
+					break;
+				}
+				localModified = readModified(`liturgy.${activeLiturgyStateKey().split('.').pop()}`);
+				packageModified = entity.modified;
 				const remoteEpoch = toEpoch(entity.modified);
-				if (remoteEpoch > toEpoch(localTs)) {
+				if (remoteEpoch > toEpoch(localModified)) {
 					const current = getUserPreference<LiturgyPersistedState>(
-						USER_PREFERENCE_KEYS.liturgyState,
+						activeLiturgyStateKey(),
 						null,
 					);
-					if (current == null) {
-						skipped.push("liturgy");
-						break;
-					}
+					// Idioma ainda sem liturgia: importa para um estado vazio próprio;
+					// nunca reutiliza a liturgia de outro idioma.
+					const next = structuredClone(current ?? normalizeLiturgyState(null));
 					// Não elimina custom liturgies, horários de sessão ou locks que o
 					// schema mobile ainda não representa. Só substitui os dias recebidos.
-					const next = structuredClone(current);
 					let hasDay = false;
 					for (const day of LITURGY_WEEKDAYS) {
 						const payload = entity.data[day];
 						if (payload == null || typeof payload !== "object") continue;
 						const source = payload as Record<string, unknown>;
-						if (Array.isArray(source.items))
+						if (Array.isArray(source.items)) {
 							next.weekdays[day] =
 								source.items as LiturgyPersistedState["weekdays"][LiturgyWeekday];
+							const currentSession = next.daySessionTimes?.[day] ?? {
+								startTime: null,
+								endTime: null,
+							};
+							// SPEC t_50c9ac95 (B4/R1, review deleg_3ba5e284): derivar
+							// sessão considerando categorias SEM end — estimativa por
+							// durationMs dos filhos, wrap meia-noite; end real vence.
+							// Nunca sobrescreve sessão já definida nem grava vazio.
+							const items = next.weekdays[day] as import("@modules/liturgy/types/liturgy").LiturgyItem[];
+							const derivedStart =
+								currentSession.startTime ??
+								deriveSessionTimesFromCategories(items, currentSession).startTime;
+							const derivedEnd =
+								currentSession.endTime ?? estimatedSessionEndSafe(items, () => []);
+							const derivedSession =
+								derivedStart != null || derivedEnd != null
+									? { startTime: derivedStart, endTime: derivedEnd }
+									: currentSession;
+							if (next.daySessionTimes || derivedSession !== currentSession) {
+								next.daySessionTimes ??= {} as LiturgyPersistedState["daySessionTimes"];
+								next.daySessionTimes[day] = derivedSession;
+							}
+						}
 						if (typeof source.notes === "string")
 							next.dayNotes[day] = source.notes;
 						hasDay = true;
 					}
 					if (hasDay) {
-						setUserPreference(USER_PREFERENCE_KEYS.liturgyState, next);
+						setUserPreference(activeLiturgyStateKey(), next);
 						localStorage.setItem(
-							`${SYNC_MODIFIED_PREFIX}.liturgy`,
+							`${SYNC_MODIFIED_PREFIX}.liturgy.${activeLiturgyStateKey().split('.').pop()}`,
 							entity.modified,
 						);
 						applied.push("liturgy");
@@ -124,6 +273,78 @@ export function importLouvorjaIntoBrowser(
 				}
 				break;
 			}
+			case MEDIA_CUSTOM_CATALOG_ENTITY: {
+				const localTs = readModified(MEDIA_CUSTOM_CATALOG_ENTITY);
+				if (toEpoch(entity.modified) > toEpoch(localTs)) {
+					const next = parseMediaCustomCatalogData(entity.data);
+					if (next == null) {
+						skipped.push(MEDIA_CUSTOM_CATALOG_ENTITY);
+						break;
+					}
+					if (!options.catalogReplacementConfirmed) {
+						skipped.push(MEDIA_CUSTOM_CATALOG_ENTITY);
+						break;
+					}
+					backupMediaCustomCatalog();
+					// Substituição total SÓ desta entidade (offline-first:
+					// liturgia/preferências não são tocados; áudio local existente
+					// com o mesmo id é preservado).
+					const merged = preserveLocalAudio(
+						next,
+						loadLocalDb(),
+					);
+					if (replaceLocalDb(merged)) {
+						localStorage.setItem(
+							`${SYNC_MODIFIED_PREFIX}.${MEDIA_CUSTOM_CATALOG_ENTITY}`,
+							entity.modified,
+						);
+						applied.push(MEDIA_CUSTOM_CATALOG_ENTITY);
+					} else {
+						skipped.push(MEDIA_CUSTOM_CATALOG_ENTITY);
+					}
+				} else {
+					skipped.push(MEDIA_CUSTOM_CATALOG_ENTITY);
+				}
+				break;
+			}
+			case PREFERENCES_ENTITY: {
+				const localTs = readModified(PREFERENCES_ENTITY);
+				if (toEpoch(entity.modified) > toEpoch(localTs)) {
+					const count = applyPreferencesData(
+						entity.data,
+						(key, value) => setUserPreference(key, value),
+					);
+					if (count > 0) {
+						localStorage.setItem(
+							`${SYNC_MODIFIED_PREFIX}.${PREFERENCES_ENTITY}`,
+							entity.modified,
+						);
+						applied.push(PREFERENCES_ENTITY);
+					} else {
+						skipped.push(PREFERENCES_ENTITY);
+					}
+				} else {
+					skipped.push(PREFERENCES_ENTITY);
+				}
+				break;
+			}
+			case "scheduled": {
+				if (toEpoch(entity.modified) <= toEpoch(readModified("scheduled"))) {
+					skipped.push("scheduled");
+					break;
+				}
+				if (!isScheduledState(entity.data)) {
+					skipped.push("scheduled");
+					break;
+				}
+				setUserPreference(USER_PREFERENCE_KEYS.scheduledState, entity.data);
+				localStorage.setItem(
+					`${SYNC_MODIFIED_PREFIX}.scheduled`,
+					entity.modified,
+				);
+				applied.push("scheduled");
+				break;
+			}
 			default:
 				// Entidade ainda não suportada nesta ponta — preservada no pacote,
 				// ignorada na aplicação (forward-compatible).
@@ -131,7 +352,7 @@ export function importLouvorjaIntoBrowser(
 		}
 	}
 
-	return { applied, skipped };
+	return { applied, skipped, localModified, packageModified };
 }
 
 function toEpoch(iso: string): number {
@@ -143,6 +364,7 @@ function readModified(entity: string): string {
 	try {
 		return localStorage.getItem(`${SYNC_MODIFIED_PREFIX}.${entity}`) ?? "";
 	} catch {
+		/* v8 ignore next 1 -- storage indisponivel so ocorre fora de browser (testes cobrem via spy) */
 		return "";
 	}
 }

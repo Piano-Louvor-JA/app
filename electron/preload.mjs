@@ -56,26 +56,58 @@ function stepZoomLevel(delta) {
   }
 }
 
+async function downloadDiagnosticsJson() {
+  const result = await ipcRenderer.invoke('diagnostics:run')
+  const json = result.json
+  const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }))
+  const link = document.createElement('a')
+  link.href = url
+  link.download = 'louvorja-diagnostics.json'
+  document.body.appendChild(link)
+  try {
+    link.click()
+  } finally {
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+  return result
+}
+
+contextBridge.exposeInMainWorld('__louvorjaDiag', downloadDiagnosticsJson)
+
 contextBridge.exposeInMainWorld('louvorja', {
   platform: process.platform,
   isElectron: true,
 
-  // Controle remoto (APK via WS :7071): comandos chegam do main.
+  // Controle remoto (APK via WS :48080): comandos chegam do main.
+  monitorShare: {
+    get: () => ipcRenderer.invoke('monitor-share:get'),
+    set: (changes) => ipcRenderer.invoke('monitor-share:set', changes),
+    onChanged: (callback) => subscribe('monitor-share:changed', callback),
+  },
   remote: {
     onCommand: (callback) => subscribe('remote:command', callback),
     onStateRequest: (callback) => subscribe('remote:request-state', callback),
     sendAck: (ack) => ipcRenderer.send('remote:ack', ack),
     sendState: (state) => ipcRenderer.send('remote:state', state),
     pairingInfo: () => ipcRenderer.invoke('remote:pairing-info'),
+    resetToken: (role) => ipcRenderer.invoke('remote:token-reset', role),
+    disconnectSpeaker: () => ipcRenderer.invoke('remote:speaker-disconnect'),
     onClients: (callback) => subscribe('remote:clients', callback),
   },
 
-  // Palco (cast p/ TV — receiver conecta em WS :7081, HTTP :7080)
+  // Palco (cast p/ TV — receiver conecta em WS :47081, HTTP :47080)
   palco: {
+    getPersistence: () => ipcRenderer.invoke('palco:persistence-get'),
+    setPersistence: (enabled) => ipcRenderer.invoke('palco:persistence-set', { enabled }),
     slots: () => ipcRenderer.invoke('palco:slots'),
     wake: () => ipcRenderer.invoke('palco:wake'),
-    createSlot: (label) => ipcRenderer.invoke('palco:slot-create', { label }),
+    createSlot: (label, kind = 'transmission') => ipcRenderer.invoke('palco:slot-create', { label, kind }),
     removeSlot: (slotId) => ipcRenderer.invoke('palco:slot-remove', { id: slotId }),
+    updateSlot: (slotId, changes) => ipcRenderer.invoke('palco:slot-update', { id: slotId, ...changes }),
+    transmission: () => ipcRenderer.invoke('palco:transmission-get'),
+    setTransmission: (changes) => ipcRenderer.invoke('palco:transmission-set', changes),
+    resetToken: () => ipcRenderer.invoke('palco:token-reset'),
     start: (slotId = '0') => ipcRenderer.invoke('palco:start', { slotId }),
     stop: (slotId = '0') => ipcRenderer.invoke('palco:stop', { slotId }),
     status: (slotId = '0') => ipcRenderer.invoke('palco:status', { slotId }),
@@ -88,11 +120,24 @@ contextBridge.exposeInMainWorld('louvorja', {
     onEvent: (callback) => subscribe('palco:event', callback),
     onReceiverConnected: (callback) => subscribe('palco:receiver-connected', callback),
     onReceiverDisconnected: (callback) => subscribe('palco:receiver-disconnected', callback),
+    // Módulo Palco (Configurações › Conexões remotas › Palco)
+    clients: () => ipcRenderer.invoke('palco:clients'),
+    clientCommand: (slotId, uid, command, args = {}) =>
+      ipcRenderer.invoke('palco:client-command', { ...args, slotId, uid, command }),
+    setClientMuted: (slotId, uid, muted) => ipcRenderer.invoke('palco:client-mute', { slotId, uid, muted }),
+    setClientPinned: (slotId, uid, pinned) => ipcRenderer.invoke('palco:client-pin', { slotId, uid, pinned }),
+    discover: () => ipcRenderer.invoke('palco:discover'),
+    wakeTv: (ip) => ipcRenderer.invoke('palco:wake-tv', { ip }),
+    onClientsChanged: (callback) => subscribe('palco:clients-changed', callback),
   },
 
   window: {
     control: (action) => ipcRenderer.invoke('window:control', action),
     onMaximizedState: (callback) => subscribe('window:maximized-state', callback),
+    // Voltar/avançar do sistema (app-command no Windows) → histórico de navegação
+    onHistoryCommand: (callback) => subscribe('window:history-command', callback),
+    // Miniatura de uma área da janela (prévia de página minimizada)
+    capturePreview: (rect) => ipcRenderer.invoke('window:capture-preview', rect),
   },
 
   zoom: {
@@ -103,17 +148,88 @@ contextBridge.exposeInMainWorld('louvorja', {
     onChanged: (callback) => subscribe('zoom:changed', callback),
   },
 
+  diagnostics: {
+    run: () => ipcRenderer.invoke('diagnostics:run'),
+    send: (report) => ipcRenderer.invoke('diagnostics:send', report),
+    openFolder: (filePath) => ipcRenderer.invoke('diagnostics:open-folder', filePath),
+    reportRendererErrors: (errors) => ipcRenderer.send('diagnostics:renderer-errors', errors),
+    reportDownloadFailures: (failures) => ipcRenderer.send('diagnostics:download-failures', failures),
+    reportAudioDevices: (snapshot) => ipcRenderer.send('diagnostics:audio-devices', snapshot),
+    reportJank: (snapshot) => ipcRenderer.send('diagnostics:jank', snapshot),
+  },
+
+  fonts: {
+    listInstalled: () => ipcRenderer.invoke('fonts:list-installed'),
+    download: (id, jobId) => ipcRenderer.invoke('fonts:download', { id, jobId }),
+    preview: (id, jobId) => ipcRenderer.invoke('fonts:preview', { id, jobId }),
+    downloadAll: (jobId) => ipcRenderer.invoke('fonts:download-all', { jobId }),
+    cancel: (jobId) => ipcRenderer.invoke('fonts:cancel', jobId),
+    release: (jobId) => ipcRenderer.invoke('fonts:release', jobId),
+    remove: (id) => ipcRenderer.invoke('fonts:remove', id),
+    onProgress: (callback) => subscribe('fonts:progress', callback),
+  },
   workspace: {
     readBinaryFile: (path) => ipcRenderer.invoke('dialog:read-binary-file', path),
+    fetchText: (url) => ipcRenderer.invoke('workspace:fetch-text', url),
+    downloadToMedia: (url, fileName) =>
+      ipcRenderer.invoke('workspace:download-to-media', url, fileName),
     getRecord: (filename) => ipcRenderer.invoke('workspace:get-record', filename),
     saveRecord: (filename, data) => ipcRenderer.invoke('workspace:save-record', filename, data),
     clear: (options) => ipcRenderer.invoke('workspace:clear', options),
+  },
+
+  // Download em background (Provai e Vede): fila no MAIN, eventos de progresso.
+  downloadBatch: {
+    enqueue: (items) => ipcRenderer.invoke('download-batch:enqueue', items),
+    cancel: (id) => ipcRenderer.invoke('download-batch:cancel', id),
+    retry: (id) => ipcRenderer.invoke('download-batch:retry', id),
+    pending: () => ipcRenderer.invoke('download-batch:pending'),
+    onProgress: (cb) => {
+      const handler = (_e, payload) => cb(payload)
+      ipcRenderer.on('download-progress', handler)
+      return () => ipcRenderer.removeListener('download-progress', handler)
+    },
+    onItemDone: (cb) => {
+      const handler = (_e, payload) => cb(payload)
+      ipcRenderer.on('download-item-done', handler)
+      return () => ipcRenderer.removeListener('download-item-done', handler)
+    },
+    onItemFailed: (cb) => {
+      const handler = (_e, payload) => cb(payload)
+      ipcRenderer.on('download-item-failed', handler)
+      return () => ipcRenderer.removeListener('download-item-failed', handler)
+    },
+    onBatchDone: (cb) => {
+      const handler = (_e, payload) => cb(payload)
+      ipcRenderer.on('download-batch-done', handler)
+      return () => ipcRenderer.removeListener('download-batch-done', handler)
+    },
+  },
+
+  bible: {
+    getChapter: (versionId, bookId, chapter) =>
+      ipcRenderer.invoke('bible:get-chapter', versionId, bookId, chapter),
+    listVersions: () => ipcRenderer.invoke('bible:list-versions'),
+    checkUpdates: () => ipcRenderer.invoke('bible:check-updates'),
   },
 
   random: {
     ensureDefaultAudio: () => ipcRenderer.invoke('random:ensure-default-audio'),
     importAudio: () => ipcRenderer.invoke('random:import-audio'),
     deleteAudio: (fileName) => ipcRenderer.invoke('random:delete-audio', fileName),
+  },
+
+  sabbathSchool: {
+    importVideo: () => ipcRenderer.invoke('sabbath-school:import-video'),
+    clearVideo: () => ipcRenderer.invoke('sabbath-school:clear-video'),
+  },
+
+  announcements: {
+    pickAndImport: (avisoId, kind) => ipcRenderer.invoke('announcements:pick-and-import', avisoId, kind),
+    copyFolder: (fromId, toId) => ipcRenderer.invoke('announcements:copy-folder', fromId, toId),
+    removeFolder: (avisoId) => ipcRenderer.invoke('announcements:remove-folder', avisoId),
+    removeFiles: (relativePaths) => ipcRenderer.invoke('announcements:remove-files', relativePaths),
+    resolvePaths: (relativePaths) => ipcRenderer.invoke('announcements:resolve-paths', relativePaths),
   },
 
   catalog: {
@@ -135,10 +251,41 @@ contextBridge.exposeInMainWorld('louvorja', {
     logout: () => ipcRenderer.invoke('yt-auth:logout'),
   },
 
-  ytAdblock: {
-    // Bloqueador de anúncios do player YouTube (opt-in, experimental)
-    status: () => ipcRenderer.invoke('yt-adblock:status'),
-    set: (enabled) => ipcRenderer.invoke('yt-adblock:set', enabled),
+  onlineVideo: {
+    // Cópia local dos vídeos do YouTube: tocar do disco, sem anúncio e sem depender da internet
+    status: () => ipcRenderer.invoke('online-video:status'),
+    setSettings: (partial) => ipcRenderer.invoke('online-video:set-settings', partial),
+    prefetch: (ids) => ipcRenderer.invoke('online-video:prefetch', ids),
+    cancel: (id) => ipcRenderer.invoke('online-video:cancel', id),
+    download: (ids) => ipcRenderer.invoke('online-video:download', ids),
+    remove: (id) => ipcRenderer.invoke('online-video:remove', id),
+    rename: (id, name) => ipcRenderer.invoke('online-video:rename', id, name),
+    list: () => ipcRenderer.invoke('online-video:list'),
+    keep: (ids) => ipcRenderer.invoke('online-video:keep', ids),
+    clear: (which) => ipcRenderer.invoke('online-video:clear', which),
+    videoStatus: (ids) => ipcRenderer.invoke('online-video:video-status', ids),
+    retryTools: () => ipcRenderer.invoke('online-video:retry-tools'),
+    openFolder: (which) => ipcRenderer.invoke('online-video:open-folder', which),
+    chooseFolder: () => ipcRenderer.invoke('online-video:choose-folder'),
+    onChanged: (callback) => subscribe('online-video:changed', callback),
+    onTools: (callback) => subscribe('online-video:tools', callback),
+  },
+
+  ytInfo: {
+    // Título, canal, duração e descrição do vídeo (preenche o item da liturgia ao colar o link)
+    get: (videoId) => ipcRenderer.invoke('youtube-info:get', videoId),
+  },
+
+  ytSearch: {
+    // Busca de vídeos do YouTube (módulo YouTube da Central de Mídia), sem chave de API
+    query: (text) => ipcRenderer.invoke('youtube-search:query', text),
+    more: (continuation) => ipcRenderer.invoke('youtube-search:more', continuation),
+    playlist: (text) => ipcRenderer.invoke('youtube-search:playlist', text),
+  },
+
+  siteInfo: {
+    // Título, nome do site e descrição da página (preenche o item de site da liturgia)
+    get: (url) => ipcRenderer.invoke('site-info:get', url),
   },
 
   legacyMedia: {
@@ -157,7 +304,8 @@ contextBridge.exposeInMainWorld('louvorja', {
   },
 
   backup: {
-    create: () => ipcRenderer.invoke('backup:create'),
+    create: (options) => ipcRenderer.invoke('backup:create', options),
+    youtubeUsage: () => ipcRenderer.invoke('backup:youtube-usage'),
     restore: () => ipcRenderer.invoke('backup:restore'),
     onProgress: (callback) => subscribe('backup:progress', callback),
   },
@@ -205,8 +353,15 @@ contextBridge.exposeInMainWorld('louvorja', {
 
   projection: {
     openUrl: (payload) => ipcRenderer.invoke('projection:open-url', payload),
+    onPopupsClosed: (cb) => {
+      const listener = () => cb()
+      ipcRenderer.on('projection:popups-closed', listener)
+      return () => ipcRenderer.removeListener('projection:popups-closed', listener)
+    },
     closeUrl: () => ipcRenderer.invoke('projection:close-url'),
+    revealWarm: (payload) => ipcRenderer.invoke('projection:reveal-warm', payload),
     externalAlive: () => ipcRenderer.invoke('projection:external-alive'),
+    externalMediaAlive: () => ipcRenderer.invoke('projection:external-media-alive'),
     getSourceMediaId: () => ipcRenderer.invoke('projection:get-source-media-id'),
     publishPlaybackSync: (payload) => {
       ipcRenderer.send('projection:playback-sync', payload)
@@ -214,12 +369,19 @@ contextBridge.exposeInMainWorld('louvorja', {
     onPlaybackSync: (callback) => subscribe('projection:playback-sync', callback),
     // ESC pressionado na janela de projeção → operador decide no confirm
     onCloseRequested: (callback) => subscribe('projection:close-requested', callback),
+    // Enter na projeção → confirma o encerramento pendente (Esc + Enter)
+    onConfirmCloseRequested: (callback) => subscribe('projection:confirm-close-requested', callback),
     // ←/→ na projeção de mídia → operador avança/volta slide
     onMediaNavigate: (callback) => subscribe('projection:media-navigate', callback),
     remotePlay: () => ipcRenderer.invoke('projection:remote-play'),
     remotePause: () => ipcRenderer.invoke('projection:remote-pause'),
     remoteSeek: (seconds) => ipcRenderer.invoke('projection:remote-seek', seconds),
+    remoteSetCaptionsHidden: (hidden) => ipcRenderer.invoke('projection:remote-set-captions-hidden', hidden),
     remoteToggleMute: () => ipcRenderer.invoke('projection:remote-toggle-mute'),
+    setAudioOutput: (mode) => ipcRenderer.invoke('projection:set-audio-output', mode),
+    getVideoControlSnapshot: () => ipcRenderer.invoke('projection:get-video-control-snapshot'),
+    runVideoControlCommand: (command) =>
+      ipcRenderer.invoke('projection:run-video-control-command', command),
     remoteSetVolume: (volume) =>
       ipcRenderer.invoke('projection:remote-set-volume', volume),
     getSourceMediaInfo: () =>
@@ -227,23 +389,48 @@ contextBridge.exposeInMainWorld('louvorja', {
     getPlaybackState: () => ipcRenderer.invoke('projection:get-playback-state'),
     getNavigationState: () => ipcRenderer.invoke('projection:get-navigation-state'),
     remoteGoBack: () => ipcRenderer.invoke('projection:remote-go-back'),
+    remoteNavigate: (url) => ipcRenderer.invoke('projection:remote-navigate', url),
+    remoteScroll: (ratio) => ipcRenderer.invoke('projection:remote-scroll', ratio),
     remoteGoForward: () => ipcRenderer.invoke('projection:remote-go-forward'),
     remoteReload: () => ipcRenderer.invoke('projection:remote-reload'),
     toggleSiteScreens: () => ipcRenderer.invoke('projection:toggle-site-screens'),
     toggleVideoScreens: () => ipcRenderer.invoke('projection:toggle-video-screens'),
     // Player HTML (local-video/youtube) avisa que o vídeo acabou → autoclose.
     notifyVideoEnded: () => ipcRenderer.send('projection:video-ended'),
+    // Galeria de imagens: zoom pelo mouse (popup) e pelos botões (barra).
+    reportImageView: (view) => ipcRenderer.send('projection:image-view-changed', view),
+    setImageView: (view) => ipcRenderer.invoke('projection:set-image-view', view),
+    // Barra de controle: zoom novo (mouse ou botões) para repassar às TVs.
+    onImageView: (callback) => subscribe('projection:image-view', callback),
     remoteImageNext: () => ipcRenderer.invoke('projection:remote-image-next'),
     remoteImagePrev: () => ipcRenderer.invoke('projection:remote-image-prev'),
     getImageSlideState: () =>
       ipcRenderer.invoke('projection:get-image-slide-state'),
+    getTextScale: () => ipcRenderer.invoke('projection:get-text-scale'),
+    // Projeção independente do player (Sobrepor/Compartilhar num monitor).
+    openIndependent: (displayIds, mode) => ipcRenderer.invoke('projection:independent-open', displayIds, mode),
+    closeIndependent: () => ipcRenderer.invoke('projection:independent-close'),
+    getIndependentState: () => ipcRenderer.invoke('projection:independent-state'),
+    getIndependentEnabledDisplays: () => ipcRenderer.invoke('projection:independent-enabled-displays'),
+    setTextScale: (scale) => ipcRenderer.invoke('projection:set-text-scale', scale),
     remotePdfNext: () => ipcRenderer.invoke('projection:remote-pdf-next'),
     remotePdfPrev: () => ipcRenderer.invoke('projection:remote-pdf-prev'),
     getPdfPageState: () => ipcRenderer.invoke('projection:get-pdf-page-state'),
     remotePptNext: () => ipcRenderer.invoke('projection:remote-ppt-next'),
     remotePptPrev: () => ipcRenderer.invoke('projection:remote-ppt-prev'),
-    captureSourceFrame: () =>
-      ipcRenderer.invoke('projection:capture-source-frame'),
+    // { full: true }: página inteira do PDF (TVs novas aplicam o zoom).
+    captureSourceFrame: (options) =>
+      ipcRenderer.invoke('projection:capture-source-frame', options),
+    // Imagem atual lida do arquivo: { crop: true } = só a parte com zoom.
+    // Seletor de telas igual ao do app (Tela retorno, Conexões Remotas)
+    screenContext: () => ipcRenderer.invoke('projection:screen-context'),
+    setRemoteSelected: (id, selected) => ipcRenderer.invoke('projection:set-remote-selected', { id, selected }),
+    captureImageFrame: (options) =>
+      ipcRenderer.invoke('projection:capture-image-frame', options),
+    captureSlidePreview: () =>
+      ipcRenderer.invoke('projection:capture-slide-preview'),
+    captureGalleryPreviews: () =>
+      ipcRenderer.invoke('projection:capture-gallery-previews'),
     getPptSlideState: () =>
       ipcRenderer.invoke('projection:get-ppt-slide-state'),
     getSiteTargetMonitors: () =>
@@ -254,8 +441,8 @@ contextBridge.exposeInMainWorld('louvorja', {
       ipcRenderer.invoke('projection:get-video-target-monitors'),
     setVideoTargetMonitors: (ids) =>
       ipcRenderer.invoke('projection:set-video-target-monitors', ids),
-    setSiteControlPanelOpen: (open) =>
-      ipcRenderer.invoke('projection:set-site-control-panel-open', open),
+    setSiteControlPanelOpen: (open, height) =>
+      ipcRenderer.invoke('projection:set-site-control-panel-open', open, height),
     onSiteTargetsChanged: (callback) =>
       subscribe('projection:site-targets-changed', callback),
     onVideoTargetsChanged: (callback) =>
