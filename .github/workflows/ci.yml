@@ -299,6 +299,9 @@ jobs:
         run: node --test scripts/mac-universal-arch-files.test.mjs
       - name: Bundle de release aponta para produção (renderer + main)
         run: node --test scripts/release-bundle.test.mjs
+      - name: Receiver Roku (protocolo, estado, socket e pacote)
+        working-directory: roku-palco
+        run: npm test
 
   e2e-tests:
     name: E2E Tests (playwright)
