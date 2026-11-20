@@ -18,6 +18,8 @@ const PRODUCTION_EXCEPTIONS = {
   '1.36.0': 95,
   '1.37.0': 94,
   '1.37.1': 94,
+  // Decisão humana de 20/11/2026: 90% somente para a v1.37.2; próximas versões voltam a 100%.
+  '1.37.2': 90,
 }
 
 /** Staging mantém 50%; produção exige 100%, salvo exceção da versão. */
