@@ -4,6 +4,9 @@ import { authTokenAsync, getAuthSession } from "@modules/media/services/auth-cli
 import { getAuthReadiness } from "@modules/auth/services/firebase-client";
 
 import ReportDialog from "../components/ReportDialog.vue";
+import BlockedAuthorsDialog from "../components/BlockedAuthorsDialog.vue";
+import { blockAuthor } from "../services/blocks";
+import { appConfirm } from "@shared/composables/useAppConfirm";
 import { storeToRefs } from "pinia";
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
@@ -188,6 +191,37 @@ async function goTo(p: number) {
 
 function openReport(collection: CommunityCollectionSummary) {
 	reportTarget.value = collection;
+}
+
+/* ---------- App Store 1.2: bloquear autor (paridade apk/web) ---------- */
+const blockedDialogOpen = ref(false);
+
+async function requestBlock(collection: CommunityCollectionSummary): Promise<void> {
+	const token = await authTokenAsync();
+	if (!token) {
+		notifyOwner(t("community.loginToModerate"), true);
+		return;
+	}
+	const name = collection.authorName || t("community.blockedNoName");
+	const ok = await appConfirm({
+		title: t("community.blockConfirmTitle", { name }),
+		message: t("community.blockConfirmMessage"),
+		confirmLabel: t("community.blockConfirm"),
+		danger: true,
+	});
+	if (!ok) return;
+	const blocked = await blockAuthor(collection.id, token);
+	if (blocked) {
+		notifyOwner(t("community.blockDone", { name }));
+		await load(); // a API já filtra o autor bloqueado
+	} else {
+		notifyOwner(t("community.blockFailed"), true);
+	}
+}
+
+async function closeBlockedDialog(changed: boolean): Promise<void> {
+	blockedDialogOpen.value = false;
+	if (changed) await load();
 }
 
 async function submitReport(reason: string) {
@@ -467,6 +501,17 @@ onMounted(load);
           <i class="ti ti-x" aria-hidden="true" />
         </button>
       </div>
+      <button
+        v-if="myUserId != null"
+        type="button"
+        class="community-view__report-btn community-view__blocked-btn"
+        data-test="community-blocked-users"
+        :aria-label="t('community.blockedUsers')"
+        :title="t('community.blockedUsers')"
+        @click="blockedDialogOpen = true"
+      >
+        <i class="ti ti-user-off" aria-hidden="true" />
+      </button>
     </div>
 
     <div
@@ -644,6 +689,17 @@ onMounted(load);
             >
               <i class="ti ti-flag" aria-hidden="true" />
             </button>
+            <button
+              v-if="!isOwner(collection) && collection.ownerId != null"
+              type="button"
+              class="community-view__report-btn"
+              data-test="community-block-author"
+              :aria-label="t('community.blockAuthor')"
+              :title="t('community.blockAuthor')"
+              @click="requestBlock(collection)"
+            >
+              <i class="ti ti-user-off" aria-hidden="true" />
+            </button>
           </div>
         </div>
       </GlassCard>
@@ -710,6 +766,8 @@ onMounted(load);
       @close="reportTarget = null"
       @submit="submitReport"
     />
+
+    <BlockedAuthorsDialog :open="blockedDialogOpen" @close="closeBlockedDialog" />
   </section>
 </template>
 

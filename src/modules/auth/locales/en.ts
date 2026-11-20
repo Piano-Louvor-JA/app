@@ -24,5 +24,12 @@ export default {
     changePassword: 'Change password',
     forgotHint: 'Enter your email. Without automated email: in production the reset token is provided by project support.',
     resetHint: 'Paste the reset token and set the new password (min. 8 characters).',
+    deleteAccount: 'Delete account',
+    deleteTitle: 'Delete your account',
+    deleteWarning: 'This deletes your account, your private collections, points and notifications. Public collections stay in the Community without your name. This cannot be undone.',
+    deletePasswordHint: 'Enter your password to confirm.',
+    deleteGoogleHint: 'You will confirm with your Google account.',
+    deleteConfirm: 'Delete permanently',
+    cancel: 'Cancel',
   },
 }

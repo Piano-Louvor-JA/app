@@ -24,5 +24,12 @@ export default {
     changePassword: 'Cambiar contraseña',
     forgotHint: 'Indica tu correo electrónico. Sin correo automático: en producción el token de restablecimiento lo proporciona el soporte del proyecto.',
     resetHint: 'Pega el token de restablecimiento y define la nueva contraseña (mín. 8 caracteres).',
+    deleteAccount: 'Видалити акаунт',
+    deleteTitle: 'Видалення акаунта',
+    deleteWarning: 'Буде видалено ваш акаунт, особисті добірки, бали та сповіщення. Публічні добірки залишаться в Спільноті без вашого імені. Цю дію не можна скасувати.',
+    deletePasswordHint: 'Введіть пароль для підтвердження.',
+    deleteGoogleHint: 'Підтвердження через акаунт Google.',
+    deleteConfirm: 'Видалити назавжди',
+    cancel: 'Скасувати',
   },
 }
