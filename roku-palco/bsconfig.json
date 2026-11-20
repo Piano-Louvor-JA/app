@@ -1,0 +1,13 @@
+{
+  "rootDir": ".",
+  "files": [
+    "manifest",
+    "source/**/*",
+    "components/**/*"
+  ],
+  "stagingFolderPath": "dist/staging",
+  "outFile": "dist/PianoPalcoRoku.zip",
+  "diagnosticFilters": [
+    { "codes": [1129], "srcPath": "components/PalcoSocketTask.brs" }
+  ]
+}

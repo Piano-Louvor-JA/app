@@ -1,0 +1,9 @@
+title=PIANO Palco Roku
+subtitle=Receiver LAN PIANO
+major_version=1
+minor_version=0
+build_version=0
+bs_libs_required=roku_ads_lib
+ui_resolutions=hd
+supports_input_launch=1
+minimum_firmware_version=16.0
