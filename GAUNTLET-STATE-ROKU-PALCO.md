@@ -19,26 +19,27 @@
 - B8/RF-008: QA de socket/mídia em Roku físico OS 16+ — bloqueio externo; não alegar execução.
 
 ## Estado atual
-- Peça: P1–P5 Builder local
+- Peça: P4 QA/review local
 - Ciclo: 1
-- Última ação: worktree limpa validada; SPEC/ADR/PLAN lidos; `npx brighterscript --version` = 0.73.8.
-- Próximo comando: criar testes RED e implementação isolada em `roku-palco/`.
+- Última ação: build, 9 testes, pacote ZIP reproduzível e push validados; commits `a38578a7`, `5e27a2a8`.
+- Próximo comando: criar PR para `staging` após registrar QA/review no Kanban; Roku físico permanece pendente.
 - Decisões assumidas: testes BrightScript executáveis por Node harness para parser/reducer puros; Roku físico pendente.
 
 ## Log
 | Peça | Ciclo | Papel | Resultado | Evidência |
 |---|---:|---|---|---|
 | P0 baseline | 1 | líder | PASSOU | worktree limpa; SPEC/ADR/PLAN lidos; SaimoRoku apenas referência |
+| P1–P4 builder/QA | 1 | líder | PASSOU | `npm test` 9/9; `npm run lint` exit 0; ZIP `unzip -t` OK; dois builds byte-idênticos SHA-256 `07fb111bba11e7d8a02c2ba924c87d034d017b5e7aae29a9fa5e102b97110aaf`; clean-room grep 0 |
 
 ## Peças
 | Peça | Status | Ciclos | Evidência |
 |---|---|---:|---|
-| P0 baseline | PASSOU | 1 | estado acima |
-| P1 estrutura + protocolo | running | 1 | — |
-| P2 Task + Registry | todo | 0 | — |
-| P3 SceneGraph + mídia | todo | 0 | — |
-| P4 pacote + QA local | todo | 0 | — |
-| P5 review/release local | todo | 0 | — |
+| P0 baseline | PASSOU | 1 | SPEC/ADR/PLAN + worktree limpa |
+| P1 estrutura + protocolo | PASSOU | 1 | parser/estado 9/9 |
+| P2 Task + Registry | PASSOU | 1 | `roWebSocket`, Registry, retry |
+| P3 SceneGraph + mídia | PASSOU estático | 1 | SceneGraph e stop de mídia em disconnect |
+| P4 pacote + QA local | PASSOU | 1 | lint, ZIP válido/reproduzível, SHA-256 |
+| P5 review/release local | running | 1 | push confirmado; PR pendente |
 
 ## Bloqueios externos
 | Bloqueio | Tipo | Status |
