@@ -38,6 +38,10 @@ const customCatalogMock = vi.hoisted(() => ({
   toCustomCollectionId: (id: number) => `custom-${id}`,
 }))
 
+// Flag de produto controlada pelo teste: o recurso continua coberto ligado,
+// e os casos "desligado" conferem o estado atual (ver constants.ts).
+const flag = vi.hoisted(() => ({ SHOW_CUSTOM_COLLECTIONS: true }))
+vi.mock('../../constants', () => flag)
 vi.mock('vue-i18n', () => ({
   useI18n: () => ({ t: (k: string) => k, locale: { value: 'pt-BR' } }),
 }))
@@ -436,6 +440,18 @@ describe('AlbumsView', () => {
     await flushPromises()
     expect(body().querySelector('.albums-view__modal')).toBeNull()
     expect(minimizeMock).toHaveBeenCalledOnce()
+  })
+
+  it('flag desligada: sem o olho de mostrar/ocultar Minhas Coletâneas', async () => {
+    flag.SHOW_CUSTOM_COLLECTIONS = false
+    try {
+      const w = await mountView()
+      const toggle = w.findAll('.albums-view__header-actions button').find((b) =>
+        b.attributes('aria-label') === 'albums.custom.hide' || b.attributes('aria-label') === 'albums.custom.show')
+      expect(toggle).toBeUndefined()
+    } finally {
+      flag.SHOW_CUSTOM_COLLECTIONS = true
+    }
   })
 
   it('sem botão "Minhas Coletâneas" no toolbar nem modal custom (criação saiu pra /community)', async () => {

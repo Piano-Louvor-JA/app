@@ -34,6 +34,10 @@ vi.mock('../../services/album-tracks', () => ({
   loadAlbumLyric: h.loadAlbumLyric,
   filterAlbumTracks: h.filterAlbumTracks,
 }))
+// Flag de produto controlada pelo teste: o recurso continua coberto ligado,
+// e os casos "desligado" conferem o estado atual (ver constants.ts).
+const flag = vi.hoisted(() => ({ SHOW_CUSTOM_COLLECTIONS: true }))
+vi.mock('../../constants', () => flag)
 vi.mock('../../visibility', () => ({
   getShowCustomCollections: h.getShowCustomCollections,
 }))
@@ -121,6 +125,19 @@ describe('useAlbumsStore', () => {
     await Promise.resolve()
     expect(store.categories[0]?.id).toBe('custom')
     expect(store.categories).toHaveLength(2)
+  })
+
+  it('mergeCustomCollections: flag desligada não carrega Minhas Coletâneas', async () => {
+    flag.SHOW_CUSTOM_COLLECTIONS = false
+    h.getShowCustomCollections.mockReturnValue(true)
+    h.loadAlbumCategories.mockResolvedValue([{ id: '1', kind: 'album', name: 'A', subtitle: null, coverUrl: null }])
+    h.loadCustomAlbumCategory.mockResolvedValue({ id: 'custom', kind: 'custom', name: 'Minhas', subtitle: null, coverUrl: null })
+    const store = useAlbumsStore()
+    await store.hydrateCatalog()
+    await Promise.resolve()
+    expect(h.loadCustomAlbumCategory).not.toHaveBeenCalled()
+    expect(store.categories.map((c) => c.id)).toEqual(['1'])
+    flag.SHOW_CUSTOM_COLLECTIONS = true
   })
 
   it('mergeCustomCollections: sem custom não altera', async () => {

@@ -1,12 +1,13 @@
 // @vitest-environment node
-// constants.ts carrega a feature flag "Minhas Coletâneas" (religada 16/09,
-// decisão do Rafael junto com a aba Comunidade). O teste documenta o contrato:
-// a flag DEVE estar true; se alguém desligar, é decisão de produto consciente.
+// constants.ts carrega a feature flag "Minhas Coletâneas". O teste documenta
+// a decisão de produto vigente: desligada em 20/11/2026 porque o recurso não
+// está pronto (vai para a aba Comunidade). Religar é decisão consciente.
+// TODO(minhas-coletaneas): rever quando a seção voltar.
 import { describe, expect, it } from 'vitest'
 import { SHOW_CUSTOM_COLLECTIONS } from '../constants'
 
 describe('albums/constants', () => {
-  it('SHOW_CUSTOM_COLLECTIONS está ligada (decisão 16/09)', () => {
-    expect(SHOW_CUSTOM_COLLECTIONS).toBe(true)
+  it('SHOW_CUSTOM_COLLECTIONS está desligada (decisão 20/11/2026)', () => {
+    expect(SHOW_CUSTOM_COLLECTIONS).toBe(false)
   })
 })
