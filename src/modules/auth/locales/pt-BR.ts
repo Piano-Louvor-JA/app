@@ -24,5 +24,12 @@ export default {
     changePassword: 'Trocar senha',
     forgotHint: 'Informe seu e-mail. Sem e-mail automático: em produção o token de reset é fornecido pelo suporte do projeto.',
     resetHint: 'Cole o token de reset e defina a senha nova (mín. 8 caracteres).',
+    deleteAccount: 'Excluir conta',
+    deleteTitle: 'Excluir sua conta',
+    deleteWarning: 'Isso apaga sua conta, suas coletâneas privadas, pontos e notificações. As coletâneas públicas continuam na Comunidade, sem o seu nome. Não dá para desfazer.',
+    deletePasswordHint: 'Digite sua senha para confirmar.',
+    deleteGoogleHint: 'Você vai confirmar com sua conta Google.',
+    deleteConfirm: 'Excluir definitivamente',
+    cancel: 'Cancelar',
   },
 }

@@ -9,7 +9,7 @@ import { useAuth } from '../composables/useAuth'
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>()
 const { t } = useI18n()
-const { session, userName, userEmail, login, register, loginGoogle, logout, forgotPassword, resetPassword } = useAuth()
+const { session, userName, userEmail, login, register, loginGoogle, logout, forgotPassword, resetPassword, accountProvider, deleteAccount } = useAuth()
 
 const mode = ref<'login' | 'register' | 'forgot' | 'reset'>('login')
 const email = ref('')
@@ -17,6 +17,9 @@ const password = ref('')
 const displayName = ref('')
 const resetToken = ref('')
 const busy = ref(false)
+const deleting = ref(false)
+const deletePassword = ref('')
+const deleteNeedsPassword = ref(true)
 
 const open = computed({
   get: () => props.modelValue,
@@ -30,6 +33,8 @@ const isValid = computed(() => {
 })
 
 function close(): void {
+  deleting.value = false
+  deletePassword.value = ''
   password.value = ''
   resetToken.value = ''
   mode.value = 'login'
@@ -75,6 +80,27 @@ async function signOut(): Promise<void> {
   await logout()
   close()
 }
+
+function startDelete(): void {
+  deleteNeedsPassword.value = accountProvider() !== 'google'
+  deletePassword.value = ''
+  deleting.value = true
+}
+
+function cancelDelete(): void {
+  deleting.value = false
+  deletePassword.value = ''
+}
+
+async function confirmDelete(): Promise<void> {
+  if (busy.value || (deleteNeedsPassword.value && !deletePassword.value)) return
+  busy.value = true
+  try {
+    if (await deleteAccount(deleteNeedsPassword.value ? deletePassword.value : '')) close()
+  } finally {
+    busy.value = false
+  }
+}
 </script>
 
 <template>
@@ -99,7 +125,23 @@ async function signOut(): Promise<void> {
             </button>
           </header>
 
-          <section v-if="session" class="auth-account__body">
+          <form v-if="session && deleting" class="auth-account__body" data-test="auth-delete" @submit.prevent="confirmDelete">
+            <h3 class="auth-account__danger-title">{{ t('auth.deleteTitle') }}</h3>
+            <p>{{ t('auth.deleteWarning') }}</p>
+            <label v-if="deleteNeedsPassword">
+              <span>{{ t('auth.deletePasswordHint') }}</span>
+              <input v-model="deletePassword" type="password" autocomplete="current-password" :disabled="busy">
+            </label>
+            <p v-else>{{ t('auth.deleteGoogleHint') }}</p>
+            <button type="submit" class="auth-account__button auth-account__button--danger" :disabled="busy || (deleteNeedsPassword && !deletePassword)">
+              {{ t('auth.deleteConfirm') }}
+            </button>
+            <button type="button" class="auth-account__button auth-account__button--secondary" :disabled="busy" @click="cancelDelete">
+              {{ t('auth.cancel') }}
+            </button>
+          </form>
+
+          <section v-else-if="session" class="auth-account__body">
             <div class="auth-account__identity">
               <i class="ti ti-user-check" aria-hidden="true" />
               <div>
@@ -109,6 +151,9 @@ async function signOut(): Promise<void> {
             </div>
             <button type="button" class="auth-account__button auth-account__button--secondary" @click="signOut">
               {{ t('auth.logout') }}
+            </button>
+            <button type="button" class="auth-account__link-danger" data-test="auth-delete-start" @click="startDelete">
+              {{ t('auth.deleteAccount') }}
             </button>
           </section>
 
@@ -209,6 +254,9 @@ async function signOut(): Promise<void> {
 .auth-account__button:disabled { cursor: not-allowed; opacity: .55; }
 .auth-account__button--primary { background: var(--ds-color-primary); color: var(--ds-color-on-primary); }
 .auth-account__button--google, .auth-account__button--secondary { border: 1px solid var(--ds-color-outline); background: transparent; color: var(--ds-color-on-surface); }
+.auth-account__button--danger { background: var(--ds-color-error, #b3261e); color: var(--ds-color-on-error, #fff); }
+.auth-account__danger-title { margin: 0; color: var(--ds-color-error, #b3261e); font-size: 1rem; }
+.auth-account__link-danger { justify-self: center; padding: .25rem 0; border: 0; background: transparent; color: var(--ds-color-error, #b3261e); font: inherit; font-size: .875rem; cursor: pointer; }
 .auth-account__links { display: flex; justify-content: space-between; gap: .5rem; }
 .auth-account__links button { padding: .25rem 0; border: 0; background: transparent; color: var(--ds-color-primary); font: inherit; cursor: pointer; }
 .auth-account__identity { display: flex; align-items: center; gap: .75rem; color: var(--ds-color-on-surface); }
