@@ -24,14 +24,20 @@ sub connectLoop()
         while active
             event = wait(0, port)
             if type(event) = "roWebSocketEvent" then
-                if event.isOpened() then
+                eventType = event.GetType()
+                Opened = 1
+                Closed = 2
+                ErrorType = 3
+                TextReceived = 5
+                if eventType = Opened then
                     attempt = 0
                     m.top.connectionState = "connected"
-                else if event.isTextReceived() then
-                    payload = ParseJson(event.GetString())
+                else if eventType = TextReceived then
+                    info = event.GetInfo()
+                    payload = ParseJson(info.Text)
                     normalized = PalcoNormalizeMessage(payload)
                     if normalized <> invalid then m.top.message = normalized
-                else if event.isClosed() or event.isError() then
+                else if eventType = Closed or eventType = ErrorType then
                     active = false
                 end if
             end if
