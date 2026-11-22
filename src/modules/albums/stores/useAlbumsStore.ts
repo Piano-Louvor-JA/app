@@ -146,7 +146,19 @@ export const useAlbumsStore = defineStore('albums', () => {
         await hydrateCatalog()
       }
 
-      const collection = findCollectionById(categories.value, collectionId)
+      let collection = findCollectionById(categories.value, collectionId)
+      // O destino usa o namespace custom (id + CUSTOM_COLLECTION_ID_OFFSET).
+      // Mesmo com a seção oculta, hidrate a cópia sob demanda pelo ID da rota.
+      if (!collection) {
+        const customCategory = await loadCustomAlbumCategory()
+        if (customCategory) {
+          categories.value = [customCategory, ...categories.value.filter(
+            (category) => String(category.id) !== 'custom',
+          )]
+          collection = findCollectionById(categories.value, collectionId)
+          if (collection) lastErrorKey.value = null
+        }
+      }
       if (!collection) {
         activeCollection.value = null
         lastErrorKey.value = 'albums.messages.collectionMissing'

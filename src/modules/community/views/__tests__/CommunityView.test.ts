@@ -81,6 +81,11 @@ vi.mock("@design-system/index", () => ({
 vi.mock("vue-router", () => ({
 	useRouter: () => ({ push: mocks.routerPush, back: mocks.routerBack }),
 }));
+vi.mock("@modules/media/services/custom-catalog", () => ({
+	toCustomCollectionId: (id: number) => id + 2_000_000,
+	updateCustomCollection: vi.fn(),
+	deleteCustomCollection: vi.fn(),
+}));
 vi.mock("vue-i18n", () => ({
 	useI18n: () => ({ t: (k: string) => k, locale: { value: "pt-BR" } }),
 	createI18n: () => ({ global: { locale: "pt-BR", t: (k: string) => k } }),
@@ -338,6 +343,10 @@ describe("CommunityView — busca, filtragem, cópia, report e paginação", () 
 			wrapper.vm.collections[0],
 		);
 		expect(wrapper.vm.savedId).toBe(9);
+		expect(mocks.routerPush).toHaveBeenCalledWith({
+			name: "albums-collection",
+			params: { collectionId: "2000777" },
+		});
 		expect(wrapper.vm.copyingId).toBeNull();
 	});
 

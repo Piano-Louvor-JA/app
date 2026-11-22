@@ -19,6 +19,7 @@ import {
 } from "../services/community-catalog";
 import { registerUse, reportCollection } from "../services/ranking";
 import {
+	toCustomCollectionId,
 	updateCustomCollection,
 	deleteCustomCollection,
 	type CollectionVisibility,
@@ -346,6 +347,12 @@ function openCollection(collection: CommunityCollectionSummary): void {
 	});
 }
 
+/**
+ * RF-03: o destino `/albums/:collectionId` usa o namespace custom
+ * (id + 2.000.000 — ver CUSTOM_COLLECTION_ID_OFFSET). Cópia local -1 →
+ * card 1999999. Navegar com o id cru (-1) não encontra nenhum card e
+ * produzia "Coletânea não encontrada" (falha de campo 21/11).
+ */
 async function saveCopy(collection: CommunityCollectionSummary) {
 	// Cópia LOCAL editável, SEM tocar na origem. Telemetria é best-effort:
 	// seu erro não pode converter cópia bem-sucedida em falha para o usuário.
@@ -361,7 +368,7 @@ async function saveCopy(collection: CommunityCollectionSummary) {
 		savedId.value = collection.id;
 		await router.push({
 			name: "albums-collection",
-			params: { collectionId: String(localId) },
+			params: { collectionId: String(toCustomCollectionId(localId)) },
 		});
 	} finally {
 		copyingId.value = null;
