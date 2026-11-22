@@ -339,20 +339,32 @@ function openEditor(collection: CommunityCollectionSummary): void {
 	void router.push({ path: "/media/editor", query: { collection: String(collection.id) } });
 }
 
+function openCollection(collection: CommunityCollectionSummary): void {
+	void router.push({
+		name: "community-collection",
+		params: { collectionId: collection.id },
+	});
+}
+
 async function saveCopy(collection: CommunityCollectionSummary) {
-	// F0.4: cópia LOCAL editável, SEM tocar na do autor.
-	// F1: registra o uso (1x/user na API; credita +5 ao dono).
+	// Cópia LOCAL editável, SEM tocar na origem. Telemetria é best-effort:
+	// seu erro não pode converter cópia bem-sucedida em falha para o usuário.
 	copyingId.value = collection.id;
-	await registerUse(collection.id, await authTokenAsync());
-	const localId = await saveCommunityCopy(collection);
-	copyingId.value = null;
-	if (localId !== null) {
-		// Cópia fica em Minhas Coletâneas (/albums, SHOW_CUSTOM_COLLECTIONS=true
-		// desde 16/09); criar/editar agora parte daqui mesmo, via botão no header.
+	savedError.value = null;
+	void registerUse(collection.id, await authTokenAsync());
+	try {
+		const localId = await saveCommunityCopy(collection);
+		if (localId === null) {
+			savedError.value = collection.id;
+			return;
+		}
 		savedId.value = collection.id;
-		await load();
-	} else {
-		savedError.value = collection.id;
+		await router.push({
+			name: "albums-collection",
+			params: { collectionId: String(localId) },
+		});
+	} finally {
+		copyingId.value = null;
 	}
 }
 
@@ -658,7 +670,17 @@ onMounted(load);
           <div class="community-view__actions">
             <button
               type="button"
+              class="community-view__open-btn"
+              data-test="community-open-collection"
+              @click="openCollection(collection)"
+            >
+              <i class="ti ti-folder-open" aria-hidden="true" />
+              {{ t('community.openCollection') }}
+            </button>
+            <button
+              type="button"
               class="community-view__copy-btn"
+              data-test="community-copy-btn"
               :disabled="copyingId === collection.id"
               @click="saveCopy(collection)"
             >
@@ -679,6 +701,14 @@ onMounted(load);
                   : t('community.saveCopy')
               }}
             </button>
+            <p
+              v-if="savedError === collection.id"
+              class="community-view__copy-error"
+              data-test="community-copy-error"
+              role="alert"
+            >
+              {{ t('community.copyFailed') }}
+            </p>
             <button
               v-if="!isOwner(collection)"
               type="button"
