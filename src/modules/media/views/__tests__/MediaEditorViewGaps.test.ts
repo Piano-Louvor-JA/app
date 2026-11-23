@@ -23,7 +23,7 @@ vi.mock('vue-router', () => ({
   onBeforeRouteLeave: vi.fn(),
 }))
 vi.mock('vue-i18n', () => ({
-  useI18n: () => ({ t: (k: string) => k, locale: { value: 'pt-BR' } }),
+  useI18n: () => ({ t: (k: string, p?: Record<string, unknown>) => (p && p.name ? `${k}:${p.name}` : k), locale: { value: 'pt-BR' } }),
   createI18n: () => ({ global: { locale: 'pt-BR', t: (k: string) => k } }),
 }))
 
@@ -303,7 +303,7 @@ describe('MediaEditorView — busca de hino oficial e reuso de custom', () => {
     await flushPromises()
     await wrapper.findAll('.editor__list--search .editor__list-item').at(-1)!.trigger('click')
     await flushPromises()
-    expect(wrapper.text()).toContain('Falha ao copiar música')
+    expect(wrapper.text()).toContain('media.editor.copyMusicFailed')
   })
 })
 
@@ -368,7 +368,7 @@ describe('MediaEditorView — estrofes, painel de letra e deleção', () => {
     await flushPromises()
     wrapper.findComponent(AppConfirm).vm.$emit('confirm')
     await flushPromises()
-    expect(wrapper.text()).toContain('Falha ao excluir coletânea')
+    expect(wrapper.text()).toContain('media.editor.deleteCollectionFailed')
   })
 
   it('excluir estrofe falha na API: notifica e mantém', async () => {

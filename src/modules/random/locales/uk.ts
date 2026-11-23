@@ -70,6 +70,9 @@ export default {
     "increaseFont": "Збільшити шрифт",
     "placeholderDisplay": "- - - -",
     "chromeDragHint": "Перетягніть, щоб перемістити · подвійний клік повертає у кут",
-    "openRandom": "Відкрити жеребкування"
+    "openRandom": "Відкрити жеребкування",
+    "drawnSize": "Drawn list font size",
+    "decreaseDrawn": "Shrink drawn list",
+    "increaseDrawn": "Enlarge drawn list"
   }
 }

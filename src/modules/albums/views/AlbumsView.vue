@@ -185,8 +185,8 @@ function addToPlaylist(id: string) {
   playlists.value = listPlaylists()
   playlistItem.value = null
   playlistFeedback.value = result?.added
-    ? `“${item.title}” adicionada a “${target?.name ?? 'playlist'}”`
-    : `“${item.title}” já está em “${target?.name ?? 'playlist'}”`
+    ? t('albums.playlists.addedTo', { title: item.title, name: target?.name ?? t('albums.collectionFallback') })
+    : t('albums.playlists.alreadyIn', { title: item.title, name: target?.name ?? t('albums.collectionFallback') })
   if (playlistFeedbackTimer) clearTimeout(playlistFeedbackTimer)
   playlistFeedbackTimer = setTimeout(() => { playlistFeedback.value = '' }, 2600)
 }
@@ -296,7 +296,7 @@ function onImportFile(event: Event) {
   void file.text().then((raw) => {
     const result = parsePlaylistsImport(raw)
     if (!result.ok) {
-      showImportFeedback('Arquivo de playlists inválido.')
+      showImportFeedback(t('albums.playlists.importInvalid'))
       return
     }
     // Merge por nome: playlist nova entra; existente ganha só faixas novas.

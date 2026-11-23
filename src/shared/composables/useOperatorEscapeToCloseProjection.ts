@@ -1,3 +1,5 @@
+import i18n from '@plugins/i18n'
+const t = (k: string, p?: Record<string, unknown>) => i18n.global.t(k, p ?? {})
 import { onMounted, onUnmounted } from 'vue'
 import { getDesktopBridge } from '@shared/services/desktop-bridge'
 import { appConfirm } from '@shared/composables/useAppConfirm'
@@ -21,9 +23,9 @@ export async function requestCloseProjectionWithConfirm(): Promise<void> {
     handling = true
     // Esc + Enter encerra sem clicar; o Enter pode vir da própria janela de projeção.
     const ok = await appConfirm({
-      title: 'Encerrar projeção?',
-      message: 'Há uma projeção ativa (bíblia/hinos/vídeo/site). Encerrar agora? Enter encerra.',
-      confirmLabel: 'Encerrar',
+      title: t('closeProjection.title'),
+      message: t('closeProjection.message'),
+      confirmLabel: t('closeProjection.confirm'),
       danger: true,
       enterConfirms: true,
       externalConfirm: (confirm) => bridge?.projection?.onConfirmCloseRequested?.(confirm),

@@ -43,7 +43,7 @@ describe('UpdateDialog.vue', () => {
 
   it('aberto: mostra versão nova e notas', () => {
     const wrapper = createWrapper(true)
-    expect(document.body.innerHTML).toContain('2.1.0')
+    expect(document.body.innerHTML).toContain('updates.version')
     expect(document.body.innerHTML).toContain('Notas da versão')
   })
 

@@ -1,5 +1,9 @@
 export default {
   "community": {
+  edits: {
+    empty: "Правок пока нет",
+    publish: "Опубликовать",
+  },
     "title": "Сообщество",
     "subtitle": "Публичные сборники сети PIANO",
     "back": "Назад",
@@ -31,7 +35,24 @@ export default {
     "clearSearch": "Очистить поиск",
     "noResults": "По этому запросу ничего не найдено.",
     "conductLink": "Кодекс поведения",
-    "createCollection": "Создать сборник"
+    "createCollection": "Создать сборник",
+    "ownerMakePublic": "Make public",
+    "ownerMakePrivate": "Make private",
+    "ownerDelete": "Delete collection",
+    "ownerNowPublic": "'{name}' is now public",
+    "ownerNowPrivate": "'{name}' is now private",
+    "ownerActionFailed": "Action failed — check connection/login",
+    "ownerDeleted": "Collection '{name}' deleted",
+    "ownerPrivateBadge": "Private collection (only you see it)",
+    "ownerEdit": "Edit collection",
+    "ownerRename": "Rename",
+    "ownerPrivar": "Make private",
+    "ownerPublish": "Publish",
+    "renameLabel": "New collection name",
+    "renameSave": "Save name",
+    "deleteConfirm": "Delete this collection and all its songs?",
+    "deleteYes": "Delete",
+    "deleteNo": "Cancel"
   },
   "notifications": {
     "title": "Уведомления",

@@ -1,5 +1,9 @@
 export default {
 	community: {
+  edits: {
+    empty: "Nenhuma edição ainda",
+    publish: "Publicar",
+  },
 		title: "Comunidade",
 		subtitle: "Coletâneas públicas da rede PIANO",
 		back: "Voltar",

@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
 import { useUpdateChecker } from "@shared/composables/useUpdateChecker";
 
+const { t } = useI18n();
 const { hasUpdate, newVersion, dismissed, dismiss } = useUpdateChecker();
 
 const emit = defineEmits<{
@@ -19,7 +21,7 @@ function handleViewNotes() {
     class="update-banner"
   >
     <span class="update-text">
-      Versão {{ newVersion }} disponível
+      {{ t('updates.available', { version: newVersion }) }}
     </span>
     <div class="update-actions">
       <button
@@ -27,14 +29,14 @@ function handleViewNotes() {
         class="update-btn update-btn--primary"
         @click="handleViewNotes"
       >
-        Atualizar
+        {{ t('updates.update') }}
       </button>
       <button
         data-test="dismiss-btn"
         class="update-btn update-btn--secondary"
         @click="dismiss"
       >
-        Dispensar
+        {{ t('updates.dismiss') }}
       </button>
     </div>
   </div>

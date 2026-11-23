@@ -67,7 +67,7 @@ export const useAlbumsStore = defineStore('albums', () => {
     try {
       musicIndex.value = await loadAlbumMusicIndex()
     } catch (error) {
-      console.error('[albums] falha ao carregar índice de músicas', error)
+      console.error('[albums] failed to load music index', error)
       musicIndex.value = []
     } finally {
       isLoadingMusicIndex.value = false
@@ -86,7 +86,7 @@ export const useAlbumsStore = defineStore('albums', () => {
       )
       categories.value = [customCategory, ...withoutCustom]
     } catch (error) {
-      console.warn('[albums] falha ao carregar Minhas Coletâneas', error)
+      console.warn('[albums] failed to load custom collections', error)
     }
   }
 
@@ -107,7 +107,7 @@ export const useAlbumsStore = defineStore('albums', () => {
         tracks.value = []
       }
     } catch (error) {
-      console.error('[albums] falha ao carregar catálogo', error)
+      console.error('[albums] failed to load catalog', error)
       lastErrorKey.value = 'albums.messages.catalogFailed'
       categories.value = []
     } finally {

@@ -22,9 +22,13 @@ vi.mock('../../services/liturgy-web-runtime', () => ({
 }))
 
 import LiturgyWebProjectionView from '../LiturgyWebProjectionView.vue'
+import I18nPlugin from '@plugins/i18n'
 
 function createWrapper() {
-  return mount(LiturgyWebProjectionView, { attachTo: document.body })
+  return mount(LiturgyWebProjectionView, {
+    attachTo: document.body,
+    global: { plugins: [I18nPlugin] },
+  })
 }
 
 describe('LiturgyWebProjectionView', () => {

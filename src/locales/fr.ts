@@ -1,5 +1,19 @@
 export default {
+  closeProjection: {
+    title: "Fermer la projection ?",
+    message: "Une projection est active (bible/hymnes/vidéo/site). Fermer maintenant ? Enter ferme.",
+    confirm: "Fermer",
+  },
+  auth: {
+    wrongPassword: 'Mot de passe incorrect',
+    reauthFailed: 'Impossible de confirmer votre identité',
+    accountDeleted: 'Compte supprimé',
+    passwordRequired: 'Saisissez votre mot de passe pour confirmer',
+    sessionExpired: 'Session expirée — reconnectez-vous pour supprimer le compte',
+    deleteFailed: 'Impossible de supprimer le compte',
+  },
   "projection": {
+    liturgy: "Projection",
     "confirmClose": "La projection est en cours. Fermer la fenêtre interrompt la musique. Voulez-vous vraiment quitter ?",
     "minimizeProjection": "Réduire la projection",
     "restoreProjection": "Restaurer la projection"
@@ -150,8 +164,21 @@ export default {
     "closeMessage": "Voulez-vous quitter cette fonctionnalité et fermer votre projection ?"
   },
   "updates": {
+    checkFailed: "Échec de la recherche de mises à jour",
+    downloadFailedRetry: "Impossible de télécharger la mise à jour. Réessayez plus tard.",
+    downloadFailedConnection: "Impossible de télécharger la mise à jour. Vérifiez votre connexion internet.",
+    verifyFailed: "La mise à jour n'a pas pu être vérifiée. Réessayez plus tard.",
+    updateFailed: "Échec de la mise à jour. Réessayez plus tard.",
     "downloadMacInstaller": "Télécharger le programme d'installation macOS",
-    "manualMacInstructions": "Sur macOS, cette mise à jour s'installe manuellement. Téléchargez le programme d'installation via le bouton ci-dessous, fermez LouvorJA, ouvrez le fichier DMG et faites glisser l'application vers Applications, en remplaçant la version précédente. Vos données et préférences seront conservées."
+    "manualMacInstructions": "Sur macOS, cette mise à jour s'installe manuellement. Téléchargez le programme d'installation via le bouton ci-dessous, fermez LouvorJA, ouvrez le fichier DMG et faites glisser l'application vers Applications, en remplaçant la version précédente. Vos données et préférences seront conservées.",
+    "version": "Version {version}",
+    "noReleaseNotes": "Aucune note de version.",
+    "download": "Télécharger la mise à jour",
+    "installRestart": "Installer et redémarrer",
+    "later": "Plus tard",
+    "available": "Version {version} disponible",
+    "update": "Mettre à jour",
+    "dismiss": "Ignorer"
   },
   "windowControls": {
     "close": "Fermer",

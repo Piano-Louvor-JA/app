@@ -1,5 +1,9 @@
 export default {
   "community": {
+  edits: {
+    empty: "Правок ще немає",
+    publish: "Опублікувати",
+  },
     "title": "Спільнота",
     "subtitle": "Публічні збірки мережі PIANO",
     "back": "Назад",
@@ -31,7 +35,24 @@ export default {
     "clearSearch": "Очистити пошук",
     "noResults": "За цим запитом нічого не знайдено.",
     "conductLink": "Кодекс поведінки",
-    "createCollection": "Створити збірку"
+    "createCollection": "Створити збірку",
+    "ownerMakePublic": "Make public",
+    "ownerMakePrivate": "Make private",
+    "ownerDelete": "Delete collection",
+    "ownerNowPublic": "'{name}' is now public",
+    "ownerNowPrivate": "'{name}' is now private",
+    "ownerActionFailed": "Action failed — check connection/login",
+    "ownerDeleted": "Collection '{name}' deleted",
+    "ownerPrivateBadge": "Private collection (only you see it)",
+    "ownerEdit": "Edit collection",
+    "ownerRename": "Rename",
+    "ownerPrivar": "Make private",
+    "ownerPublish": "Publish",
+    "renameLabel": "New collection name",
+    "renameSave": "Save name",
+    "deleteConfirm": "Delete this collection and all its songs?",
+    "deleteYes": "Delete",
+    "deleteNo": "Cancel"
   },
   "notifications": {
     "title": "Сповіщення",

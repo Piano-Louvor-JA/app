@@ -17,6 +17,7 @@ import {
 import { getAuthSession } from '@modules/media/services/auth-client'
 import { filterCustomCollectionsForAlbums } from './visibility-owner-filter'
 import { resolveCoverUrlsFromDisk, resolveRemoteFileUrl } from '@modules/sync/services/media-paths'
+import i18n from '@plugins/i18n'
 
 import type { AlbumCategory, AlbumCollection } from '../types/albums'
 
@@ -188,7 +189,7 @@ export async function loadAlbumCategories(): Promise<AlbumCategory[]> {
       // Coletâneas por ano: mais recente primeiro (2026 → 2003/1996).
       result.push({
         id: category.id_category ?? category.name ?? collections[0]!.id,
-        name: String(category.name ?? '').trim() || 'Coletâneas',
+        name: String(category.name ?? '').trim() || i18n.global.t('albums.collectionFallback'),
         slug: category.slug,
         collections: sortCollectionsRecentFirst(collections),
       })
@@ -204,7 +205,7 @@ export async function loadCustomAlbumCategory(): Promise<AlbumCategory | null> {
   if (customs.length === 0) return null
   return {
     id: 'custom',
-    name: 'Minhas Coletâneas',
+    name: i18n.global.t('albums.custom.title'),
     collections: customs,
   }
 }

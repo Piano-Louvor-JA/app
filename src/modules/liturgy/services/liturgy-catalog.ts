@@ -1,6 +1,7 @@
 import { fetchRemoteCatalogJson } from '@shared/services/remote-catalog'
 import { readCatalogRecord } from '@shared/services/workspace-api'
 import { getCurrentApiPrefix } from '@modules/sync/services/library-catalog'
+import i18n from '@plugins/i18n'
 import {
   listAllCustomMusics,
   toCustomMusicId,
@@ -200,7 +201,7 @@ function mapMusicIndexRow(row: CatalogMusicIndexRow): LiturgyMusicOption | null 
       ...(Array.isArray(row.albums)
         ? row.albums.map((album) => album.name)
         : []),
-    ) || 'Música'
+    ) || i18n.global.t('liturgy.fallback.music')
 
   const hymnalTrack = parseTrack(row.track)
   const isHymnalAlbum =
@@ -343,7 +344,7 @@ async function mergeOperatorMusicOptions(
     const offsetId = toCustomMusicId(id)
     if (byId.has(offsetId)) continue
     const name = String(custom.name ?? '').trim() || `Custom #${id}`
-    const album = String(custom.collectionName ?? '').trim() || 'Minhas coletâneas'
+    const album = String(custom.collectionName ?? '').trim() || i18n.global.t('albums.custom.title')
     const linkedOfficial = byId.get(Number(custom.officialMusicId))
     byId.set(offsetId, {
       id: offsetId,

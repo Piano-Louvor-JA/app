@@ -1,5 +1,9 @@
 export default {
   "community": {
+  edits: {
+    empty: "Aucune modification pour l'instant",
+    publish: "Publier",
+  },
     "title": "Communauté",
     "subtitle": "Collections publiques du réseau PIANO",
     "back": "Retour",
@@ -31,7 +35,24 @@ export default {
     "clearSearch": "Effacer la recherche",
     "noResults": "Aucun résultat pour cette recherche.",
     "conductLink": "Code de conduite",
-    "createCollection": "Créer une collection"
+    "createCollection": "Créer une collection",
+    "ownerMakePublic": "Make public",
+    "ownerMakePrivate": "Make private",
+    "ownerDelete": "Delete collection",
+    "ownerNowPublic": "'{name}' is now public",
+    "ownerNowPrivate": "'{name}' is now private",
+    "ownerActionFailed": "Action failed — check connection/login",
+    "ownerDeleted": "Collection '{name}' deleted",
+    "ownerPrivateBadge": "Private collection (only you see it)",
+    "ownerEdit": "Edit collection",
+    "ownerRename": "Rename",
+    "ownerPrivar": "Make private",
+    "ownerPublish": "Publish",
+    "renameLabel": "New collection name",
+    "renameSave": "Save name",
+    "deleteConfirm": "Delete this collection and all its songs?",
+    "deleteYes": "Delete",
+    "deleteNo": "Cancel"
   },
   "ranking": {
     "title": "Classement",
