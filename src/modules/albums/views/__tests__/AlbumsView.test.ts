@@ -594,7 +594,7 @@ describe('AlbumsView', () => {
     Object.defineProperty(input, 'files', { value: [file], configurable: true })
     input.dispatchEvent(new Event('change', { bubbles: true }))
     await flushPromises()
-    expect(body().querySelector('.albums-view__playlists-feedback')!.textContent).toContain('inválido')
+    expect(body().querySelector('.albums-view__playlists-feedback')!.textContent).toContain('albums.playlists.importInvalid')
   })
 
   it('digitar/submitar não tem mais form de criação custom (createCustomCollection não é chamado)', async () => {
