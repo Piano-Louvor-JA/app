@@ -54,11 +54,19 @@ export type LocalMusic = {
 	status?: "draft" | "published";
 };
 
+export type CollectionOrigin = {
+	type: "community";
+	collectionId: number;
+	copiedAt: string;
+};
+
 export type LocalCollection = {
 	id: number;
 	name: string;
 	description?: string | null;
 	createdAt: string;
+	/** SPEC-louvorja-community-copies D1: ausência/null = manual. */
+	origin?: CollectionOrigin | null;
 };
 
 export type LocalDb = {
@@ -94,7 +102,9 @@ function loadDb(): LocalDb {
 			nextCollectionId: parsed.nextCollectionId ?? -1,
 			nextMusicId: parsed.nextMusicId ?? -1,
 			nextLyricId: parsed.nextLyricId ?? -1,
-			collections: Array.isArray(parsed.collections) ? parsed.collections : [],
+			collections: Array.isArray(parsed.collections)
+			? parsed.collections.map((c) => ({ ...c, origin: c.origin ?? null }))
+			: [],
 			// Migração draft (SPEC t_deed74b5): registro legado sem status
 			// = já existia antes = tratado como publicado. O primeiro saveDb
 			// persiste o campo (roundtrip: migrado sobrevive a reload).
@@ -143,6 +153,7 @@ export function getLocalCollection(id: number): LocalCollection | null {
 export function createLocalCollection(
 	name: string,
 	description?: string,
+	origin?: CollectionOrigin,
 ): LocalCollection {
 	const db = loadDb();
 	const collection: LocalCollection = {
@@ -150,6 +161,7 @@ export function createLocalCollection(
 		name,
 		description: description ?? null,
 		createdAt: new Date().toISOString(),
+		origin: origin ?? null,
 	};
 	db.nextCollectionId -= 1;
 	db.collections.push(collection);
