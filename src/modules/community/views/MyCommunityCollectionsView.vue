@@ -13,7 +13,6 @@ import { useRouter } from "vue-router";
 
 import {
 	listCustomCollections,
-	toCustomCollectionId,
 } from "@modules/media/services/custom-catalog";
 import {
 	listLocalCollections,
@@ -67,12 +66,14 @@ const isEmpty = computed(
 	() => !isLoading.value && myCollections.value.length === 0,
 );
 
-/** Local cru (negativo) abre no namespace custom; remota abre na Comunidade. */
+/** Local cru (negativo) abre na rota custom; remota abre na Comunidade. */
 function openCollection(card: MyCollectionCard): void {
 	if (card.isLocal) {
 		void router.push({
 			name: "community-custom",
-			params: { collectionId: String(toCustomCollectionId(card.rawId)) },
+			// id local CRU (negativo): buildCustomCollectionCard resolve
+			// sob demanda (mesma regra do D3 — offset seria ambíguo).
+			params: { collectionId: String(card.rawId) },
 		});
 		return;
 	}

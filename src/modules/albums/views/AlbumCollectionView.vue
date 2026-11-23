@@ -102,6 +102,8 @@ const isCustomCopy = computed(() => {
 const isDeletingCollection = ref(false)
 /** D3: rota atual é de cópia da Comunidade (community/copies/:id)? */
 const isCommunityCopyRoute = computed(() => route.name === 'community-copy')
+/** Adendo v1.1.0: rota de coletânea custom própria na Comunidade? */
+const isCommunityCustomRoute = computed(() => route.name === 'community-custom')
 
 async function removeCollection() {
   if (!activeCollection.value || !isCustomCopy.value || isDeletingCollection.value) return
@@ -118,10 +120,13 @@ async function removeCollection() {
   try {
     const removed = await deleteCustomCollection(fromCustomCollectionId(collectionId.value))
     if (removed) {
-      // D3: cópia vivia na aba Comunidade — volta pra lá; custom próprio
-      // aberto pela Central volta pra Central.
+      // D3/adendo v1.1.0: cópia e custom própria vivem na aba Comunidade —
+      // voltam pra lá; custom própria aberta pela Central volta pra Central.
       void router.push({
-        name: isCommunityCopyRoute.value ? 'community' : 'albums',
+        name:
+          isCommunityCopyRoute.value || isCommunityCustomRoute.value
+            ? 'community'
+            : 'albums',
       })
     }
   } finally {
