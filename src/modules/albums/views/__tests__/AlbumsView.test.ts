@@ -368,7 +368,7 @@ describe('AlbumsView', () => {
     await flushPromises()
     expect(pickerInBody()).toBeNull()
     expect(body().querySelector('.playlist-toast')).not.toBeNull()
-    expect(body().querySelector('.playlist-toast')!.textContent).toContain('adicionada')
+    expect(body().querySelector('.playlist-toast')!.textContent).toContain('albums.playlists.addedTo')
     expect(listPlaylists().find((p) => p.id === 'pl-1')!.items.some((i) => i.musicId === 1)).toBe(true)
   })
 
