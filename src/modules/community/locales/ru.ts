@@ -38,7 +38,12 @@ export default {
     "noResults": "По этому запросу ничего не найдено.",
     "conductLink": "Кодекс поведения",
     "createCollection": "Создать сборник",
-    "myCopies": "Мои копии"
+    "myCopies": "Мои копии",
+    "myCopiesSubtitle": "Копии подборок Сообщества, сохранённые на этом устройстве",
+    "myCopiesEmpty": "Копий пока нет. Сохраните копию из Сообщества.",
+    "myCollections": "Мои подборки",
+    "myCollectionsSubtitle": "Подборки, созданные вами — управляете здесь только вы",
+    "myCollectionsEmpty": "Подборок пока нет. Создайте одну в редакторе текстов."
   },
   "notifications": {
     "title": "Уведомления",

@@ -70,21 +70,17 @@ describe('D1 — origin persistida no local-custom-store', () => {
 	})
 })
 
-describe('D2 — cópia NÃO aparece na categoria custom de /albums', () => {
-	it('local com origin.type=community é filtrado da fonte; local comum entra', async () => {
+describe('D2 ampliado (adendo v1.1.0) — NENHUMA custom em /albums', () => {
+	it('cópia E local comum: categoria null (as duas vivem só na Comunidade)', async () => {
 		const copy = createLocalCollection('Cópia Comunidade', undefined, {
 			type: 'community',
 			sourceId: 42,
 		})
-		const plain = createLocalCollection('Minha Local Comum')
+		createLocalCollection('Minha Local Comum')
 		mocks.listCustomCollections.mockResolvedValue([
 			{ id: copy.id, name: copy.name, description: null, coverUrl: null, ownerId: null, authorName: null, musicsCount: 3, visibility: 'private' },
-			{ id: plain.id, name: plain.name, description: null, coverUrl: null, ownerId: null, authorName: null, musicsCount: 1, visibility: 'private' },
 		])
-		const category = await loadCustomAlbumCategory()
-		const names = (category?.collections ?? []).map((c) => c.name)
-		expect(names).toContain('Minha Local Comum')
-		expect(names).not.toContain('Cópia Comunidade')
+		expect(await loadCustomAlbumCategory()).toBeNull()
 	})
 })
 

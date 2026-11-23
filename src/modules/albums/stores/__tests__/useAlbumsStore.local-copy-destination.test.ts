@@ -26,11 +26,7 @@ const mocks = vi.hoisted(() => ({
 				}
 			: null,
 	),
-	loadCustomAlbumCategory: vi.fn(async () => ({
-		id: "custom",
-		name: "Minhas Coletâneas",
-		collections: [],
-	})),
+	buildCustomCollectionCard: vi.fn(() => null),
 	loadCollectionTracks: vi.fn(async () => [
 		{ musicId: 555, name: "Hino A", track: 1, durationLabel: "3:00", hasInstrumental: false },
 	]),
@@ -46,8 +42,8 @@ vi.mock("../../services/album-catalog", () => ({
 		return null;
 	},
 	loadAlbumCategories: mocks.loadAlbumCategories,
-	loadCustomAlbumCategory: mocks.loadCustomAlbumCategory,
 	buildCommunityCopyCard: mocks.buildCommunityCopyCard,
+	buildCustomCollectionCard: mocks.buildCustomCollectionCard,
 }));
 vi.mock("../../services/album-tracks", () => ({
 	filterAlbumTracks: (xs: unknown[]) => xs,
@@ -94,22 +90,17 @@ describe("openCollection — cópia local da Comunidade abre no destino (RF-03)"
 	});
 
 	it("id inexistente continua mostrando collectionMissing (sem máscara)", async () => {
-		mocks.loadCustomAlbumCategory.mockResolvedValue({
-			id: "custom",
-			name: "Minhas Coletâneas",
-			collections: [],
-		});
 		const store = useAlbumsStore();
 		const ok = await store.openCollection("-99");
 		expect(ok).toBe(false);
 		expect(store.lastErrorKey).toBe("albums.messages.collectionMissing");
 	});
 
-	it("ID oficial ausente tenta a categoria custom antes de manter collectionMissing", async () => {
+	it("ID oficial ausente: buildCustomCollectionCard tentado, depois collectionMissing", async () => {
 		const store = useAlbumsStore();
 		const ok = await store.openCollection("999");
 		expect(ok).toBe(false);
-		expect(mocks.loadCustomAlbumCategory).toHaveBeenCalled();
+		expect(mocks.buildCustomCollectionCard).toHaveBeenCalledWith("999");
 		expect(store.lastErrorKey).toBe("albums.messages.collectionMissing");
 	});
 });

@@ -8,7 +8,7 @@ import BlockedAuthorsDialog from "../components/BlockedAuthorsDialog.vue";
 import { blockAuthor } from "../services/blocks";
 import { appConfirm } from "@shared/composables/useAppConfirm";
 import { storeToRefs } from "pinia";
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 
@@ -17,18 +17,12 @@ import {
 	listCommunityCollectionsPage,
 	saveCommunityCopy,
 } from "../services/community-catalog";
-import {
-	listLocalCollections,
-	type LocalCollection,
-} from "@modules/media/services/local-custom-store";
-import { listLocalMusics } from "@modules/media/services/local-custom-store";
 import { registerUse, reportCollection } from "../services/ranking";
 import {
 	updateCustomCollection,
 	deleteCustomCollection,
 	type CollectionVisibility,
 } from "@modules/media/services/custom-catalog";
-import { useRoute } from "vue-router";
 import {
 	getSeasonalEvent,
 	type SeasonalEventBanner,
@@ -384,45 +378,19 @@ async function saveCopy(collection: CommunityCollectionSummary) {
 	}
 }
 
-/* ---------- Minhas Cópias (acesso UI às cópias salvas) ---------- */
-const route = useRoute();
-const myCopies = ref<LocalCollection[]>([]);
-
-/**
- * Cópias locais da Comunidade (origin.type='community'), mais recentes
- * primeiro. Recarrega no mount E quando a rota volta para a Comunidade —
- * a cópia pode ter sido deletada dentro dela mesma (community-copy).
- */
-function loadMyCopies(): void {
-	myCopies.value = listLocalCollections()
-		.filter((c) => c.origin?.type === "community")
-		.sort(
-			(a, b) =>
-				Date.parse(b.createdAt) - Date.parse(a.createdAt),
-		);
+/* ---------- Entradas p/ views próprias (adendo v1.1.0) ----------
+ * "Minhas Cópias" e "Minhas Coletâneas" viraram VIEWS PRÓPRIAS
+ * (/community/copies e /community/my-collections) — nada de listas
+ * inline aqui, para não poluir a interface. */
+function openMyCopies(): void {
+	void router.push({ name: "community-copies" });
 }
 
-watch(
-	() => route.name,
-	(name) => {
-		if (name === "community") loadMyCopies();
-	},
-);
-
-/** Abre a cópia na rota dedicada com o id local CRU (igual ao saveCopy/D3). */
-function openCopy(copy: LocalCollection): void {
-	void router.push({
-		name: "community-copy",
-		params: { collectionId: String(copy.id) },
-	});
-}
-
-function copyTrackCount(copy: LocalCollection): number {
-	return listLocalMusics(copy.id).length;
+function openMyCollections(): void {
+	void router.push({ name: "community-my-collections" });
 }
 
 onMounted(() => {
-	loadMyCopies();
 	void load();
 });
 </script>
@@ -497,43 +465,28 @@ onMounted(() => {
       />
     </header>
 
-    <!-- Minhas Cópias: cópias salvas da Comunidade (acesso pós-redirect) -->
-    <div
-      v-if="myCopies.length > 0"
-      class="community-view__copies"
-      data-test="community-my-copies"
-    >
-      <h2 class="community-view__copies-title">
+    <!-- Adendo v1.1.0: entradas p/ as views próprias (sem listas inline) -->
+    <div class="community-view__entries" data-test="community-my-entries">
+      <button
+        type="button"
+        class="community-view__entry"
+        data-test="community-entry-copies"
+        @click="openMyCopies"
+      >
         <i class="ti ti-copy" aria-hidden="true" />
-        {{ t('community.myCopies') }}
-      </h2>
-      <div class="community-view__grid community-view__copies-grid">
-        <GlassCard
-          v-for="copy in myCopies"
-          :key="copy.id"
-          class="community-view__card community-view__copy-card"
-          elevated
-        >
-          <button
-            type="button"
-            class="community-view__copy-open"
-            data-test="community-copy-card"
-            :aria-label="copy.name"
-            @click="openCopy(copy)"
-          >
-            <div class="community-view__cover">
-              <i class="ti ti-copy community-view__cover-fallback" aria-hidden="true" />
-            </div>
-            <div class="community-view__card-body">
-              <h3 class="community-view__card-title">{{ copy.name }}</h3>
-              <p class="community-view__card-count">
-                <i class="ti ti-disc" aria-hidden="true" />
-                {{ t('community.trackCount', { count: copyTrackCount(copy) }) }}
-              </p>
-            </div>
-          </button>
-        </GlassCard>
-      </div>
+        <span class="community-view__entry-label">{{ t('community.myCopies') }}</span>
+        <i class="ti ti-chevron-right" aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        class="community-view__entry"
+        data-test="community-entry-collections"
+        @click="openMyCollections"
+      >
+        <i class="ti ti-disc" aria-hidden="true" />
+        <span class="community-view__entry-label">{{ t('community.myCollections') }}</span>
+        <i class="ti ti-chevron-right" aria-hidden="true" />
+      </button>
     </div>
 
     <div
@@ -1058,32 +1011,35 @@ onMounted(() => {
 	opacity: 0.8;
 }
 
-.community-view__copies-title {
+/* Adendo v1.1.0: botões de entrada p/ as views próprias (Minhas Cópias /
+   Minhas Coletâneas). Sem listas inline na Comunidade. */
+.community-view__entries {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.community-view__entry {
 	display: flex;
 	align-items: center;
-	gap: 0.4rem;
-	margin: 0 0 0.5rem;
-	font-size: 1rem;
-}
-
-.community-view__copy-card {
-	padding: 0;
-}
-
-.community-view__copy-open {
-	display: block;
-	width: 100%;
-	padding: 0;
-	border: none;
-	background: transparent;
+	gap: 0.6rem;
+	padding: 0.75rem 1rem;
+	border-radius: 0.75rem;
+	border: 1px solid var(--ds-border, rgba(255, 255, 255, 0.2));
+	background: var(--ds-glass-fill, rgba(255, 255, 255, 0.08));
 	color: inherit;
 	font: inherit;
+	font-size: 1rem;
 	text-align: left;
 	cursor: pointer;
 }
 
-.community-view__copy-open:hover .community-view__card-title {
-	text-decoration: underline;
+.community-view__entry:hover {
+	filter: brightness(1.15);
+}
+
+.community-view__entry-label {
+	flex: 1;
 }
 
 .community-view__event {

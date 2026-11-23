@@ -38,7 +38,12 @@ export default {
     "noResults": "За цим запитом нічого не знайдено.",
     "conductLink": "Кодекс поведінки",
     "createCollection": "Створити збірку",
-    "myCopies": "Мої копії"
+    "myCopies": "Мої копії",
+    "myCopiesSubtitle": "Копії збірок Спільноти, збережені на цьому пристрої",
+    "myCopiesEmpty": "Копій ще немає. Збережіть копію зі Спільноти.",
+    "myCollections": "Мої збірки",
+    "myCollectionsSubtitle": "Збірки, створені вами — керуєте тут лише ви",
+    "myCollectionsEmpty": "Збірок ще немає. Створіть одну в редакторі текстів."
   },
   "notifications": {
     "title": "Сповіщення",

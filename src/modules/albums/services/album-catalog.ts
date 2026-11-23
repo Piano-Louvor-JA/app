@@ -10,8 +10,6 @@ import { fetchRemoteCatalogJson } from '@shared/services/remote-catalog'
 import { readCatalogRecord } from '@shared/services/workspace-api'
 import { getCurrentApiPrefix } from '@modules/sync/services/library-catalog'
 import {
-  listCustomCollections,
-  customFileUrl,
   toCustomCollectionId,
 } from '@modules/media/services/custom-catalog'
 import {
@@ -19,9 +17,6 @@ import {
   isLocalId,
   listLocalMusics,
 } from '@modules/media/services/local-custom-store'
-import { getAuthSession } from '@modules/media/services/auth-client'
-import { filterCustomCollectionsForAlbums } from './visibility-owner-filter'
-import { listCommunityCopyIds } from '@modules/community/services/community-catalog'
 import { resolveCoverUrlsFromDisk, resolveRemoteFileUrl } from '@modules/sync/services/media-paths'
 
 import type { AlbumCategory, AlbumCollection } from '../types/albums'
@@ -110,33 +105,38 @@ async function buildHymnalCollections(): Promise<AlbumCollection[]> {
   return collections
 }
 
-/** Catálogo de hinários e coletâneas para navegação no módulo Álbuns. */
-/** Minhas Coletâneas custom no formato AlbumCollection (mesma estética dos álbuns). */
-async function buildCustomCollectionCards(): Promise<AlbumCollection[]> {
-  try {
-    // RF-03 (SPEC-crud-comunidade-hub-v1.0.0): /albums mostra APENAS as
-    // coletâneas do próprio usuário (locais = id negativo; remotas =
-    // ownerId === meu id_user). Públicas de terceiros ficam na Comunidade;
-    // remota legada (ownerId null, id positivo) NÃO entra — RF-06 é gate humano.
-    const all = await listCustomCollections()
-    // D2 (SPEC louvorja-community-copies v1.0.0): cópias da Comunidade
-    // (origin.type='community') ficam EXCLUSIVAMENTE na aba Comunidade.
-    const copyIds = listCommunityCopyIds()
-    const customs = filterCustomCollectionsForAlbums(all).filter(
-      (c) => !copyIds.has(c.id),
-    )
-    return customs.map((c) => ({
-      id: toCustomCollectionId(c.id),
-      kind: 'album' as const,
-      name: c.name,
-      subtitle: c.description ?? '',
-      coverUrl: c.coverUrl ? customFileUrl(c.coverUrl) : null,
-      trackCount: c.musicsCount,
-      catalogKey: `custom_collection_${c.id}`,
-      isCustom: true,
-    }))
-  } catch {
-    return []
+/**
+ * Adendo v1.1.0 (SPEC louvorja-community-copies): NENHUMA coletânea custom
+ * aparece na Central de Mídia — nem produzidas pelo usuário, nem cópias.
+ * Produzidas do usuário vivem APENAS na aba Comunidade ("Minhas Coletâneas");
+ * cópias, em "Minhas Cópias". A categoria 'custom' da Central morreu aqui.
+ */
+export async function loadCustomAlbumCategory(): Promise<AlbumCategory | null> {
+  return null
+}
+
+/**
+ * Adendo v1.1.0: card de coletânea custom PRÓPRIA (LOCAL) resolvido SOB
+ * DEMANDA pela rota community/custom/:id. O param é o id local CRU
+ * (negativo — offset 2M tornaria o display id ambíguo: -5+2M=1999995 cai
+ * abaixo do gate >= 2M, mesma razão do D3). null se não for local.
+ */
+export function buildCustomCollectionCard(
+  displayId: string | number,
+): AlbumCollection | null {
+  const rawId = Number(displayId)
+  if (!isLocalId(rawId)) return null
+  const local = getLocalCollection(rawId)
+  if (!local || local.origin?.type === 'community') return null
+  return {
+    id: toCustomCollectionId(rawId),
+    kind: 'album' as const,
+    name: local.name,
+    subtitle: local.description ?? '',
+    coverUrl: null,
+    trackCount: listLocalMusics(rawId).length,
+    catalogKey: `custom_collection_${rawId}`,
+    isCustom: true,
   }
 }
 
@@ -207,17 +207,6 @@ export async function loadAlbumCategories(): Promise<AlbumCategory[]> {
   }
 
   return sortAlbumCategories(result)
-}
-
-/** Minhas Coletâneas (API remota) — pode ser mesclado depois sem bloquear a lista. */
-export async function loadCustomAlbumCategory(): Promise<AlbumCategory | null> {
-  const customs = await buildCustomCollectionCards()
-  if (customs.length === 0) return null
-  return {
-    id: 'custom',
-    name: 'Minhas Coletâneas',
-    collections: customs,
-  }
 }
 
 /**

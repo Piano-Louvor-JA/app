@@ -38,7 +38,12 @@ export default {
     "noResults": "Aucun résultat pour cette recherche.",
     "conductLink": "Code de conduite",
     "createCollection": "Créer une collection",
-    "myCopies": "Mes copies"
+    "myCopies": "Mes copies",
+    "myCopiesSubtitle": "Copies de collections de la Communauté enregistrées sur cet appareil",
+    "myCopiesEmpty": "Aucune copie enregistrée pour l'instant. Enregistrez une copie depuis la Communauté.",
+    "myCollections": "Mes collections",
+    "myCollectionsSubtitle": "Collections créées par vous — vous seul les gérez ici",
+    "myCollectionsEmpty": "Aucune collection pour l'instant. Créez-en une dans l'éditeur de paroles."
   },
   "ranking": {
     "title": "Classement",
