@@ -14,6 +14,12 @@ import AlbumTrackRow from '../components/AlbumTrackRow.vue'
 import StageCustomizationDialog from '@modules/settings/components/StageCustomizationDialog.vue'
 import { useAlbums } from '../composables/useAlbums'
 import {
+  deleteCustomCollection,
+  isCustomCollectionId,
+  fromCustomCollectionId,
+} from '@modules/media/services/custom-catalog'
+import { appConfirm } from '@shared/composables/useAppConfirm'
+import {
   addPlaylistItem,
   listPlaylists,
   type PlaylistItem,
@@ -87,6 +93,35 @@ onBeforeUnmount(() => {
 })
 
 const collectionId = computed(() => String(route.params.collectionId ?? ''))
+
+/** RF-03: cópias da Comunidade são customs (ID com offset) — podem ser excluídas. */
+const isCustomCopy = computed(() => {
+  const id = Number(collectionId.value)
+  return Number.isFinite(id) && isCustomCollectionId(id)
+})
+const isDeletingCollection = ref(false)
+
+async function removeCollection() {
+  if (!activeCollection.value || !isCustomCopy.value || isDeletingCollection.value) return
+  const name = activeCollection.value.name
+  const ok = await appConfirm({
+    title: t('albums.messages.deleteCollectionTitle', { name }),
+    message: t('albums.messages.deleteCollectionText'),
+    danger: true,
+    confirmLabel: t('sync.deleteConfirmYes'),
+    cancelLabel: t('sync.deleteConfirmNo'),
+  })
+  if (!ok) return
+  isDeletingCollection.value = true
+  try {
+    const removed = await deleteCustomCollection(fromCustomCollectionId(collectionId.value))
+    if (removed) {
+      void router.push({ name: 'albums' })
+    }
+  } finally {
+    isDeletingCollection.value = false
+  }
+}
 
 // Hinário: 610 hinos — desenhar tudo de uma vez travava a tela por ~1,7 s
 const { visible: renderedTracks } = useProgressiveList(filteredTracks)
@@ -230,6 +265,13 @@ async function runAction(
 
       <div v-if="activeCollection && filteredTracks.length > 0"
         class="album-collection-view__playback-actions">
+        <button v-if="isCustomCopy" type="button" class="album-collection-view__shuffle"
+          data-testid="album-delete-collection"
+          :disabled="isDeletingCollection"
+          :aria-label="t('albums.messages.deleteCollectionAction')" :title="t('albums.messages.deleteCollectionAction')"
+          @click="removeCollection">
+          <i class="ti ti-trash" aria-hidden="true" />
+        </button>
         <button type="button" class="album-collection-view__shuffle"
           data-testid="album-stage-customize"
           :aria-label="t('settings.stage.titleSlides')" :title="t('settings.stage.titleSlides')"

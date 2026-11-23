@@ -89,6 +89,7 @@ vi.mock("@modules/media/services/custom-catalog", () => ({
 	updateCustomCollection: vi.fn(async () => null),
 	deleteCustomCollection: vi.fn(async () => false),
 	listCustomCollections: vi.fn(async () => []),
+	toCustomCollectionId: (id: number) => id + 2_000_000,
 }));
 vi.mock("@modules/media/services/local-custom-store", () => ({
 	listLocalCollections: mocks.listLocalCollections,
@@ -163,7 +164,7 @@ describe("RF-03 — cópia leva ao destino inequívoco", () => {
 		expect(mocks.saveCommunityCopy).toHaveBeenCalled();
 		expect(mocks.routerPush).toHaveBeenCalledWith({
 			name: "albums-collection",
-			params: { collectionId: "-7" },
+			params: { collectionId: "1999993" },
 		});
 	});
 

@@ -63,6 +63,7 @@ beforeEach(async () => {
   h.getShowCustomCollections.mockReturnValue(false)
   h.loadAlbumCategories.mockResolvedValue([])
   h.loadAlbumMusicIndex.mockResolvedValue([])
+  h.loadCustomAlbumCategory.mockResolvedValue(null)
   h.loadCollectionTracks.mockResolvedValue([])
   h.loadAlbumLyric.mockResolvedValue(null)
   h.openMusicPlayer.mockResolvedValue({ ok: true })
