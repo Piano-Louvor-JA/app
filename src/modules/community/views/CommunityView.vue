@@ -19,7 +19,6 @@ import {
 } from "../services/community-catalog";
 import { registerUse, reportCollection } from "../services/ranking";
 import {
-	toCustomCollectionId,
 	updateCustomCollection,
 	deleteCustomCollection,
 	type CollectionVisibility,
@@ -366,9 +365,13 @@ async function saveCopy(collection: CommunityCollectionSummary) {
 			return;
 		}
 		savedId.value = collection.id;
+		// D3 (SPEC louvorja-community-copies v1.0.0): cópia vive EXCLUSIVAMENTE
+		// na aba Comunidade — destino é a rota community/copies/:id com o id
+		// local CRU (negativo; offset 2M tornaria o id ambíguo: -7+2M=1999993
+		// cai abaixo do gate >= 2M). NUNCA /albums/:id (Central de Mídia).
 		await router.push({
-			name: "albums-collection",
-			params: { collectionId: String(toCustomCollectionId(localId)) },
+			name: "community-copy",
+			params: { collectionId: String(localId) },
 		});
 	} finally {
 		copyingId.value = null;

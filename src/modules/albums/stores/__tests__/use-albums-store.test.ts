@@ -24,6 +24,8 @@ vi.mock('../../services/album-catalog', () => ({
   loadAlbumCategories: h.loadAlbumCategories,
   loadCustomAlbumCategory: h.loadCustomAlbumCategory,
   findCollectionById: h.findCollectionById,
+  // D3 (SPEC louvorja-community-copies): cópia local nunca é card de categoria.
+  buildCommunityCopyCard: vi.fn(() => null),
 }))
 vi.mock('../../services/album-music-search', () => ({
   loadAlbumMusicIndex: h.loadAlbumMusicIndex,

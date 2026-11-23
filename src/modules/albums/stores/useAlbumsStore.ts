@@ -5,6 +5,7 @@ import { openMusicPlayer } from '@modules/media/services/open-music-player'
 import type { MediaPlaybackMode } from '@modules/media/types/media'
 
 import {
+  buildCommunityCopyCard,
   findCollectionById,
   loadAlbumCategories,
   loadCustomAlbumCategory,
@@ -150,6 +151,17 @@ export const useAlbumsStore = defineStore('albums', () => {
       // O destino usa o namespace custom (id + CUSTOM_COLLECTION_ID_OFFSET).
       // Mesmo com a seção oculta, hidrate a cópia sob demanda pelo ID da rota.
       if (!collection) {
+        // D3 (SPEC louvorja-community-copies v1.0.0): cópia da Comunidade
+        // NÃO entra na categoria 'custom' (vive só na aba Comunidade) — o
+        // card é resolvido sob demanda pelo ID da rota community/copies/:id.
+        const copyCard = buildCommunityCopyCard(collectionId)
+        if (copyCard) {
+          activeCollection.value = copyCard
+          tracks.value = await loadCollectionTracks(copyCard)
+          lastErrorKey.value =
+            tracks.value.length === 0 ? 'albums.messages.tracksEmpty' : null
+          return true
+        }
         const customCategory = await loadCustomAlbumCategory()
         if (customCategory) {
           categories.value = [customCategory, ...categories.value.filter(

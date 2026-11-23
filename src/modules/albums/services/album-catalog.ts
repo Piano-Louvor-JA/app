@@ -14,8 +14,14 @@ import {
   customFileUrl,
   toCustomCollectionId,
 } from '@modules/media/services/custom-catalog'
+import {
+  getLocalCollection,
+  isLocalId,
+  listLocalMusics,
+} from '@modules/media/services/local-custom-store'
 import { getAuthSession } from '@modules/media/services/auth-client'
 import { filterCustomCollectionsForAlbums } from './visibility-owner-filter'
+import { listCommunityCopyIds } from '@modules/community/services/community-catalog'
 import { resolveCoverUrlsFromDisk, resolveRemoteFileUrl } from '@modules/sync/services/media-paths'
 
 import type { AlbumCategory, AlbumCollection } from '../types/albums'
@@ -113,7 +119,12 @@ async function buildCustomCollectionCards(): Promise<AlbumCollection[]> {
     // ownerId === meu id_user). Públicas de terceiros ficam na Comunidade;
     // remota legada (ownerId null, id positivo) NÃO entra — RF-06 é gate humano.
     const all = await listCustomCollections()
-    const customs = filterCustomCollectionsForAlbums(all)
+    // D2 (SPEC louvorja-community-copies v1.0.0): cópias da Comunidade
+    // (origin.type='community') ficam EXCLUSIVAMENTE na aba Comunidade.
+    const copyIds = listCommunityCopyIds()
+    const customs = filterCustomCollectionsForAlbums(all).filter(
+      (c) => !copyIds.has(c.id),
+    )
     return customs.map((c) => ({
       id: toCustomCollectionId(c.id),
       kind: 'album' as const,
@@ -206,6 +217,33 @@ export async function loadCustomAlbumCategory(): Promise<AlbumCategory | null> {
     id: 'custom',
     name: 'Minhas Coletâneas',
     collections: customs,
+  }
+}
+
+/**
+ * D3 (SPEC louvorja-community-copies v1.0.0): resolve o card de uma CÓPIA
+ * da Comunidade sob demanda (rota community/copies/:id). O param da rota é
+ * o id local CRU (negativo — offset 2M tornaria o display id ambíguo:
+ * -7+2M=1999993 cai abaixo do gate >= 2M). A cópia NÃO entra na categoria
+ * 'custom' da Central — vive só na aba Comunidade. Card sai com id offsetado
+ * (namespace de exibição/track-loading). null se não for cópia.
+ */
+export function buildCommunityCopyCard(
+  displayId: string | number,
+): AlbumCollection | null {
+  const localId = Number(displayId)
+  if (!isLocalId(localId)) return null
+  const local = getLocalCollection(localId)
+  if (!local || local.origin?.type !== 'community') return null
+  return {
+    id: toCustomCollectionId(localId),
+    kind: 'album' as const,
+    name: local.name,
+    subtitle: local.description ?? '',
+    coverUrl: null,
+    trackCount: listLocalMusics(localId).length,
+    catalogKey: `custom_collection_${localId}`,
+    isCustom: true,
   }
 }
 

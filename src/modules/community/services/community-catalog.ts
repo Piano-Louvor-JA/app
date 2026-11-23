@@ -1,6 +1,7 @@
 import {
 	createLocalCollection,
 	createLocalMusic,
+	listLocalCollections,
 } from "@modules/media/services/local-custom-store";
 import { communityBaseUrl, communityRequest } from "./community-http";
 
@@ -75,6 +76,9 @@ export async function saveCommunityCopy(
 		const copy = createLocalCollection(
 			collection.name,
 			collection.description ?? undefined,
+			// D1 (SPEC louvorja-community-copies v1.0.0): marca a origem —
+			// cópia vive EXCLUSIVAMENTE na aba Comunidade, nunca em /albums.
+			{ type: "community", sourceId: collection.id },
 		);
 		for (const music of musics) {
 			createLocalMusic(copy.id, {
@@ -86,6 +90,18 @@ export async function saveCommunityCopy(
 	} catch {
 		return null;
 	}
+}
+
+/**
+ * D2 (SPEC louvorja-community-copies v1.0.0): ids locais de cópias da
+ * Comunidade (origin.type='community') — NÃO aparecem na Central de Mídia.
+ */
+export function listCommunityCopyIds(): Set<number> {
+	return new Set(
+		listLocalCollections()
+			.filter((c) => c.origin?.type === "community")
+			.map((c) => c.id),
+	);
 }
 
 /**

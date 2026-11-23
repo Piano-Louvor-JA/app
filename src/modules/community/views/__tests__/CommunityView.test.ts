@@ -34,7 +34,7 @@ const mocks = vi.hoisted(() => {
 		})),
 		getWeeklyTasks: vi.fn(async () => null),
 		getSeasonalEvent: vi.fn(async () => null),
-		saveCommunityCopy: vi.fn(async () => 777),
+		saveCommunityCopy: vi.fn(async () => -777),
 		reportCollection: vi.fn(async () => true),
 		registerUse: vi.fn(async () => true),
 		routerBack: vi.fn(),
@@ -344,8 +344,8 @@ describe("CommunityView — busca, filtragem, cópia, report e paginação", () 
 		);
 		expect(wrapper.vm.savedId).toBe(9);
 		expect(mocks.routerPush).toHaveBeenCalledWith({
-			name: "albums-collection",
-			params: { collectionId: "2000777" },
+			name: "community-copy",
+			params: { collectionId: "-777" },
 		});
 		expect(wrapper.vm.copyingId).toBeNull();
 	});

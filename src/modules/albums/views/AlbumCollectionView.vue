@@ -100,6 +100,8 @@ const isCustomCopy = computed(() => {
   return Number.isFinite(id) && isCustomCollectionId(id)
 })
 const isDeletingCollection = ref(false)
+/** D3: rota atual é de cópia da Comunidade (community/copies/:id)? */
+const isCommunityCopyRoute = computed(() => route.name === 'community-copy')
 
 async function removeCollection() {
   if (!activeCollection.value || !isCustomCopy.value || isDeletingCollection.value) return
@@ -116,7 +118,11 @@ async function removeCollection() {
   try {
     const removed = await deleteCustomCollection(fromCustomCollectionId(collectionId.value))
     if (removed) {
-      void router.push({ name: 'albums' })
+      // D3: cópia vivia na aba Comunidade — volta pra lá; custom próprio
+      // aberto pela Central volta pra Central.
+      void router.push({
+        name: isCommunityCopyRoute.value ? 'community' : 'albums',
+      })
     }
   } finally {
     isDeletingCollection.value = false
@@ -183,7 +189,10 @@ watch(collectionId, () => {
 })
 
 function goBack() {
-  void router.push({ name: 'albums' })
+  // D3: cópia da Comunidade volta pro hub dela; custom próprio volta pra Central.
+  void router.push({
+    name: isCommunityCopyRoute.value ? 'community' : 'albums',
+  })
 }
 
 function closePlaylistPicker() {

@@ -54,11 +54,20 @@ export type LocalMusic = {
 	status?: "draft" | "published";
 };
 
+export type LocalCollectionOrigin = {
+	/** 'community' = cópia da aba Comunidade (SPEC louvorja-community-copies v1.0.0). */
+	type: "community";
+	/** id_collection remota original (positivo, API custom). */
+	sourceId: number;
+};
+
 export type LocalCollection = {
 	id: number;
 	name: string;
 	description?: string | null;
 	createdAt: string;
+	/** Origem (D1): cópias da Comunidade ficam EXCLUSIVAMENTE na aba Comunidade. */
+	origin?: LocalCollectionOrigin;
 };
 
 export type LocalDb = {
@@ -143,6 +152,7 @@ export function getLocalCollection(id: number): LocalCollection | null {
 export function createLocalCollection(
 	name: string,
 	description?: string,
+	origin?: LocalCollectionOrigin,
 ): LocalCollection {
 	const db = loadDb();
 	const collection: LocalCollection = {
@@ -150,6 +160,7 @@ export function createLocalCollection(
 		name,
 		description: description ?? null,
 		createdAt: new Date().toISOString(),
+		origin,
 	};
 	db.nextCollectionId -= 1;
 	db.collections.push(collection);

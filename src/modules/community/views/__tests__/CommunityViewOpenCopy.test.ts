@@ -154,7 +154,7 @@ describe("RF-01 — card da Comunidade abre detalhe", () => {
 });
 
 describe("RF-03 — cópia leva ao destino inequívoco", () => {
-	it("cópia com id local navega para /albums/:collectionId com o id da cópia", async () => {
+	it("cópia com id local navega para /community/copies/:id com id local CRU (REGRA: cópia vive SÓ na aba Comunidade)", async () => {
 		mocks.saveCommunityCopy.mockResolvedValue(-7);
 		const wrapper = await mountView();
 		await wrapper
@@ -163,8 +163,8 @@ describe("RF-03 — cópia leva ao destino inequívoco", () => {
 		await flushPromises();
 		expect(mocks.saveCommunityCopy).toHaveBeenCalled();
 		expect(mocks.routerPush).toHaveBeenCalledWith({
-			name: "albums-collection",
-			params: { collectionId: "1999993" },
+			name: "community-copy",
+			params: { collectionId: "-7" },
 		});
 	});
 
