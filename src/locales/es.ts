@@ -1,61 +1,61 @@
 export default {
   closeProjection: {
-    title: "¿Cerrar proyección?",
-    message: "Hay una proyección activa (biblia/himnos/video/sitio). ¿Cerrar ahora? Enter cierra.",
-    confirm: "Cerrar",
+    title: "Close projection?",
+    message: "A projection is active (bible/hymns/video/site). Close now? Enter closes.",
+    confirm: "Close",
   },
   auth: {
-    wrongPassword: 'Contraseña incorrecta',
-    reauthFailed: 'No se pudo confirmar tu identidad',
-    accountDeleted: 'Cuenta eliminada',
-    passwordRequired: 'Escribe tu contraseña para confirmar',
-    sessionExpired: 'Sesión expirada — inicia sesión de nuevo para eliminar la cuenta',
-    deleteFailed: 'No se pudo eliminar la cuenta',
+    wrongPassword: "Incorrect password",
+    reauthFailed: "Could not confirm your identity",
+    accountDeleted: "Account deleted",
+    passwordRequired: "Type your password to confirm",
+    sessionExpired: "Session expired — sign in again to delete the account",
+    deleteFailed: "Could not delete the account",
   },
   "palcoOutputs": {
-    "title": "TVs con Escenario",
-    "empty": "Ninguna TV con el Escenario conectada. Ver en Escenario",
-    "onHold": "{slot} · en espera"
+    "title": "Stage TVs",
+    "empty": "No TV with Stage connected. Open Stage",
+    "onHold": "{slot} · on hold"
   },
   "obsOutputs": {
-    "detecting": "Detectando y actualizando conexiones OBS…",
-    "active": "Conexiones remotas",
-    "activateHint": "Active una conexión en Configuración → Transmisión para usarla aquí.",
-    "title": "Conexiones OBS",
-    "activeConnections": "Conexiones activas: {count}"
+    "detecting": "Detecting and refreshing OBS connections…",
+    "active": "Remote connections",
+    "activateHint": "Start a connection in Settings → Broadcast to use it here.",
+    "title": "OBS connections",
+    "activeConnections": "Active connections: {count}"
   },
   "floating": {
-    "closeTitle": "¿Cerrar {title}?",
-    "closeMessage": "¿Desea detener este recurso y cerrar su proyección?"
+    "closeTitle": "Close {title}?",
+    "closeMessage": "Stop this feature and close its projection?"
   },
   "updates": {
-    checkFailed: "Error al buscar actualizaciones",
-    downloadFailedRetry: "No se pudo descargar la actualización. Inténtalo más tarde.",
-    downloadFailedConnection: "No se pudo descargar la actualización. Verifica tu conexión a internet.",
-    verifyFailed: "No se pudo verificar la actualización. Inténtalo más tarde.",
-    updateFailed: "Error en la actualización. Inténtalo más tarde.",
-    "downloadMacInstaller": "Descargar instalador macOS",
-    "manualMacInstructions": "En macOS, esta actualización se instala manualmente. Descarga el instalador, cierra LouvorJA, abre el DMG y arrastra la aplicación a Aplicaciones, reemplazando la versión anterior. Tus datos y preferencias se conservarán.",
-    "version": "Versión {version}",
-    "noReleaseNotes": "Sin notas de la versión.",
-    "download": "Descargar actualización",
-    "installRestart": "Instalar y reiniciar",
-    "later": "Más tarde",
-    "available": "Versión {version} disponible",
-    "update": "Actualizar",
-    "dismiss": "Descartar"
+    checkFailed: "Failed to check for updates",
+    downloadFailedRetry: "Could not download the update. Try again later.",
+    downloadFailedConnection: "Could not download the update. Check your internet connection.",
+    verifyFailed: "The update could not be verified. Try again later.",
+    updateFailed: "Update failed. Try again later.",
+    "downloadMacInstaller": "Download macOS installer",
+    "manualMacInstructions": "On macOS, install this update manually. Download the installer below, quit LouvorJA, open the DMG and drag the app to Applications, replacing the previous version. Your data and preferences will be kept.",
+    "version": "Version {version}",
+    "noReleaseNotes": "No release notes.",
+    "download": "Download update",
+    "installRestart": "Install and restart",
+    "later": "Later",
+    "available": "Version {version} available",
+    "update": "Update",
+    "dismiss": "Dismiss"
   },
   "windowControls": {
-    "close": "Cerrar",
-    "minimize": "Minimizar",
-    "maximize": "Maximizar"
+    "close": "Close",
+    "minimize": "Minimize",
+    "maximize": "Maximize"
   },
   "a11y": {
-    "mainNav": "Navegación principal"
+    "mainNav": "Main navigation"
   },
   "apiOffline": {
-    "message": "Sin conexión con el servicio — verifica tu internet",
-    "retrying": "Intentando reconectar..."
+    "message": "No connection to the service — check your internet",
+    "retrying": "Trying to reconnect..."
   },
   "projection": {
     liturgy: "Proyección",

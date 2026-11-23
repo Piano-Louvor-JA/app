@@ -1,16 +1,16 @@
 export default {
   closeProjection: {
-    title: "Закрыть проекцию?",
-    message: "Идёт проекция (библия/гимны/видео/сайт). Закрыть сейчас? Enter — закрыть.",
-    confirm: "Закрыть",
+    title: "Close projection?",
+    message: "A projection is active (bible/hymns/video/site). Close now? Enter closes.",
+    confirm: "Close",
   },
   auth: {
-    wrongPassword: 'Неверный пароль',
-    reauthFailed: 'Не удалось подтвердить вашу личность',
-    accountDeleted: 'Аккаунт удалён',
-    passwordRequired: 'Введите пароль для подтверждения',
-    sessionExpired: 'Сеанс истёк — войдите снова, чтобы удалить аккаунт',
-    deleteFailed: 'Не удалось удалить аккаунт',
+    wrongPassword: "Incorrect password",
+    reauthFailed: "Could not confirm your identity",
+    accountDeleted: "Account deleted",
+    passwordRequired: "Type your password to confirm",
+    sessionExpired: "Session expired — sign in again to delete the account",
+    deleteFailed: "Could not delete the account",
   },
   "projection": {
     liturgy: "Проекция",
@@ -148,49 +148,49 @@ export default {
     }
   },
   "palcoOutputs": {
-    "title": "Телевизоры со «Сценой»",
-    "empty": "Нет телевизоров с подключённой «Сценой». Просмотреть в «Сцене»",
-    "onHold": "{slot} · в ожидании"
+    "title": "Stage TVs",
+    "empty": "No TV with Stage connected. Open Stage",
+    "onHold": "{slot} · on hold"
   },
   "obsOutputs": {
-    "detecting": "Обнаружение и обновление подключений OBS…",
-    "active": "Удалённые подключения",
-    "activateHint": "Чтобы использовать подключение здесь, активируйте его в разделе «Настройки» → «Трансляция».",
-    "title": "Подключения OBS",
-    "activeConnections": "Активные подключения: {count}"
+    "detecting": "Detecting and refreshing OBS connections…",
+    "active": "Remote connections",
+    "activateHint": "Start a connection in Settings → Broadcast to use it here.",
+    "title": "OBS connections",
+    "activeConnections": "Active connections: {count}"
   },
   "floating": {
-    "closeTitle": "Закрыть {title}?",
-    "closeMessage": "Завершить эту функцию и закрыть вашу проекцию?"
+    "closeTitle": "Close {title}?",
+    "closeMessage": "Stop this feature and close its projection?"
   },
   "updates": {
-    checkFailed: "Не удалось проверить обновления",
-    downloadFailedRetry: "Не удалось скачать обновление. Повторите позже.",
-    downloadFailedConnection: "Не удалось скачать обновление. Проверьте интернет-соединение.",
-    verifyFailed: "Не удалось проверить обновление. Повторите позже.",
-    updateFailed: "Ошибка обновления. Повторите позже.",
-    "downloadMacInstaller": "Скачать установщик macOS",
-    "manualMacInstructions": "В macOS это обновление устанавливается вручную. Скачайте установщик с помощью кнопки ниже, закройте LouvorJA, откройте файл DMG и перетащите приложение в папку «Программы», заменив предыдущую версию. Ваши данные и настройки будут сохранены.",
-    "version": "Версия {version}",
-    "noReleaseNotes": "Нет примечаний к версии.",
-    "download": "Скачать обновление",
-    "installRestart": "Установить и перезапустить",
-    "later": "Позже",
-    "available": "Доступна версия {version}",
-    "update": "Обновить",
-    "dismiss": "Скрыть"
+    checkFailed: "Failed to check for updates",
+    downloadFailedRetry: "Could not download the update. Try again later.",
+    downloadFailedConnection: "Could not download the update. Check your internet connection.",
+    verifyFailed: "The update could not be verified. Try again later.",
+    updateFailed: "Update failed. Try again later.",
+    "downloadMacInstaller": "Download macOS installer",
+    "manualMacInstructions": "On macOS, install this update manually. Download the installer below, quit LouvorJA, open the DMG and drag the app to Applications, replacing the previous version. Your data and preferences will be kept.",
+    "version": "Version {version}",
+    "noReleaseNotes": "No release notes.",
+    "download": "Download update",
+    "installRestart": "Install and restart",
+    "later": "Later",
+    "available": "Version {version} available",
+    "update": "Update",
+    "dismiss": "Dismiss"
   },
   "windowControls": {
-    "close": "Закрыть",
-    "minimize": "Свернуть",
-    "maximize": "Развернуть"
+    "close": "Close",
+    "minimize": "Minimize",
+    "maximize": "Maximize"
   },
   "a11y": {
-    "mainNav": "Основная навигация"
+    "mainNav": "Main navigation"
   },
   "apiOffline": {
-    "message": "Нет связи с сервисом — проверьте подключение к интернету",
-    "retrying": "Пытаемся восстановить соединение..."
+    "message": "No connection to the service — check your internet",
+    "retrying": "Trying to reconnect..."
   },
   "independentProjection": {
     "title": "Независимая проекция",

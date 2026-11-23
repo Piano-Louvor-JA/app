@@ -1,16 +1,16 @@
 export default {
   closeProjection: {
-    title: "Закрити проєкцію?",
-    message: "Триває проєкція (біблія/гімни/відео/сайт). Закрити зараз? Enter — закрити.",
-    confirm: "Закрити",
+    title: "Close projection?",
+    message: "A projection is active (bible/hymns/video/site). Close now? Enter closes.",
+    confirm: "Close",
   },
   auth: {
-    wrongPassword: 'Неправильний пароль',
-    reauthFailed: 'Не вдалося підтвердити вашу особу',
-    accountDeleted: 'Акаунт видалено',
-    passwordRequired: 'Введіть пароль для підтвердження',
-    sessionExpired: 'Сеанс закінчився — увійдіть знову, щоб видалити акаунт',
-    deleteFailed: 'Не вдалося видалити акаунт',
+    wrongPassword: "Incorrect password",
+    reauthFailed: "Could not confirm your identity",
+    accountDeleted: "Account deleted",
+    passwordRequired: "Type your password to confirm",
+    sessionExpired: "Session expired — sign in again to delete the account",
+    deleteFailed: "Could not delete the account",
   },
   "app": {
     "name": "Louvor JA",
@@ -148,49 +148,49 @@ export default {
     }
   },
   "palcoOutputs": {
-    "title": "ТВ-екрани зі сценою",
-    "empty": "Жоден ТВ-екран не підключено до сцени. Переглянути на сцені",
-    "onHold": "{slot} · в очікуванні"
+    "title": "Stage TVs",
+    "empty": "No TV with Stage connected. Open Stage",
+    "onHold": "{slot} · on hold"
   },
   "obsOutputs": {
-    "detecting": "Виявлення та оновлення з'єднань OBS…",
-    "active": "Віддалені з'єднання",
-    "activateHint": "Активуйте з'єднання у розділі Налаштування → Трансляція, щоб використати його тут.",
-    "title": "З'єднання OBS",
-    "activeConnections": "Активні з'єднання: {count}"
+    "detecting": "Detecting and refreshing OBS connections…",
+    "active": "Remote connections",
+    "activateHint": "Start a connection in Settings → Broadcast to use it here.",
+    "title": "OBS connections",
+    "activeConnections": "Active connections: {count}"
   },
   "floating": {
-    "closeTitle": "Закрити {title}?",
-    "closeMessage": "Бажаєте завершити цю функцію та закрити проєкцію?"
+    "closeTitle": "Close {title}?",
+    "closeMessage": "Stop this feature and close its projection?"
   },
   "updates": {
-    checkFailed: "Не вдалося перевірити оновлення",
-    downloadFailedRetry: "Не вдалося завантажити оновлення. Спробуйте пізніше.",
-    downloadFailedConnection: "Не вдалося завантажити оновлення. Перевірте інтернет-з'єднання.",
-    verifyFailed: "Не вдалося перевірити оновлення. Спробуйте пізніше.",
-    updateFailed: "Помилка оновлення. Спробуйте пізніше.",
-    "downloadMacInstaller": "Завантажити інсталятор для macOS",
-    "manualMacInstructions": "У macOS це оновлення встановлюється вручну. Завантажте інсталятор за допомогою кнопки нижче, закрийте LouvorJA, відкрийте файл DMG і перетягніть застосунок до папки «Програми», замінивши попередню версію. Ваші дані та налаштування буде збережено.",
-    "version": "Версія {version}",
-    "noReleaseNotes": "Нотаток до версії немає.",
-    "download": "Завантажити оновлення",
-    "installRestart": "Встановити та перезапустити",
-    "later": "Пізніше",
-    "available": "Доступна версія {version}",
-    "update": "Оновити",
-    "dismiss": "Приховати"
+    checkFailed: "Failed to check for updates",
+    downloadFailedRetry: "Could not download the update. Try again later.",
+    downloadFailedConnection: "Could not download the update. Check your internet connection.",
+    verifyFailed: "The update could not be verified. Try again later.",
+    updateFailed: "Update failed. Try again later.",
+    "downloadMacInstaller": "Download macOS installer",
+    "manualMacInstructions": "On macOS, install this update manually. Download the installer below, quit LouvorJA, open the DMG and drag the app to Applications, replacing the previous version. Your data and preferences will be kept.",
+    "version": "Version {version}",
+    "noReleaseNotes": "No release notes.",
+    "download": "Download update",
+    "installRestart": "Install and restart",
+    "later": "Later",
+    "available": "Version {version} available",
+    "update": "Update",
+    "dismiss": "Dismiss"
   },
   "windowControls": {
-    "close": "Закрити",
-    "minimize": "Згорнути",
-    "maximize": "Розгорнути"
+    "close": "Close",
+    "minimize": "Minimize",
+    "maximize": "Maximize"
   },
   "a11y": {
-    "mainNav": "Головна навігація"
+    "mainNav": "Main navigation"
   },
   "apiOffline": {
-    "message": "Немає з'єднання зі службою — перевірте інтернет",
-    "retrying": "Спроба повторного підключення..."
+    "message": "No connection to the service — check your internet",
+    "retrying": "Trying to reconnect..."
   },
   "independentProjection": {
     "title": "Незалежна проєкція",
