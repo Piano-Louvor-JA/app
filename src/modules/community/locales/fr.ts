@@ -37,7 +37,8 @@ export default {
     "clearSearch": "Effacer la recherche",
     "noResults": "Aucun résultat pour cette recherche.",
     "conductLink": "Code de conduite",
-    "createCollection": "Créer une collection"
+    "createCollection": "Créer une collection",
+    "myCopies": "Mes copies"
   },
   "ranking": {
     "title": "Classement",

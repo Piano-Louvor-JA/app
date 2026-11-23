@@ -37,7 +37,8 @@ export default {
     "clearSearch": "Очистить поиск",
     "noResults": "По этому запросу ничего не найдено.",
     "conductLink": "Кодекс поведения",
-    "createCollection": "Создать сборник"
+    "createCollection": "Создать сборник",
+    "myCopies": "Мои копии"
   },
   "notifications": {
     "title": "Уведомления",

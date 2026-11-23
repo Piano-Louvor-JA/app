@@ -109,6 +109,7 @@ vi.mock("@design-system/index", () => ({
 }));
 vi.mock("vue-router", () => ({
 	useRouter: () => ({ push: mocks.routerPush, back: mocks.routerBack }),
+	useRoute: () => ({ name: "community" }),
 }));
 vi.mock("vue-i18n", () => ({
 	useI18n: () => ({ t: (k: string) => k, locale: { value: "pt-BR" } }),

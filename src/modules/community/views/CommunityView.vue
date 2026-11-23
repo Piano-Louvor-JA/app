@@ -8,7 +8,7 @@ import BlockedAuthorsDialog from "../components/BlockedAuthorsDialog.vue";
 import { blockAuthor } from "../services/blocks";
 import { appConfirm } from "@shared/composables/useAppConfirm";
 import { storeToRefs } from "pinia";
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 
@@ -17,12 +17,18 @@ import {
 	listCommunityCollectionsPage,
 	saveCommunityCopy,
 } from "../services/community-catalog";
+import {
+	listLocalCollections,
+	type LocalCollection,
+} from "@modules/media/services/local-custom-store";
+import { listLocalMusics } from "@modules/media/services/local-custom-store";
 import { registerUse, reportCollection } from "../services/ranking";
 import {
 	updateCustomCollection,
 	deleteCustomCollection,
 	type CollectionVisibility,
 } from "@modules/media/services/custom-catalog";
+import { useRoute } from "vue-router";
 import {
 	getSeasonalEvent,
 	type SeasonalEventBanner,
@@ -378,7 +384,47 @@ async function saveCopy(collection: CommunityCollectionSummary) {
 	}
 }
 
-onMounted(load);
+/* ---------- Minhas Cópias (acesso UI às cópias salvas) ---------- */
+const route = useRoute();
+const myCopies = ref<LocalCollection[]>([]);
+
+/**
+ * Cópias locais da Comunidade (origin.type='community'), mais recentes
+ * primeiro. Recarrega no mount E quando a rota volta para a Comunidade —
+ * a cópia pode ter sido deletada dentro dela mesma (community-copy).
+ */
+function loadMyCopies(): void {
+	myCopies.value = listLocalCollections()
+		.filter((c) => c.origin?.type === "community")
+		.sort(
+			(a, b) =>
+				Date.parse(b.createdAt) - Date.parse(a.createdAt),
+		);
+}
+
+watch(
+	() => route.name,
+	(name) => {
+		if (name === "community") loadMyCopies();
+	},
+);
+
+/** Abre a cópia na rota dedicada com o id local CRU (igual ao saveCopy/D3). */
+function openCopy(copy: LocalCollection): void {
+	void router.push({
+		name: "community-copy",
+		params: { collectionId: String(copy.id) },
+	});
+}
+
+function copyTrackCount(copy: LocalCollection): number {
+	return listLocalMusics(copy.id).length;
+}
+
+onMounted(() => {
+	loadMyCopies();
+	void load();
+});
 </script>
 
 <template>
@@ -450,6 +496,45 @@ onMounted(load);
         class="community-view__my-edits"
       />
     </header>
+
+    <!-- Minhas Cópias: cópias salvas da Comunidade (acesso pós-redirect) -->
+    <div
+      v-if="myCopies.length > 0"
+      class="community-view__copies"
+      data-test="community-my-copies"
+    >
+      <h2 class="community-view__copies-title">
+        <i class="ti ti-copy" aria-hidden="true" />
+        {{ t('community.myCopies') }}
+      </h2>
+      <div class="community-view__grid community-view__copies-grid">
+        <GlassCard
+          v-for="copy in myCopies"
+          :key="copy.id"
+          class="community-view__card community-view__copy-card"
+          elevated
+        >
+          <button
+            type="button"
+            class="community-view__copy-open"
+            data-test="community-copy-card"
+            :aria-label="copy.name"
+            @click="openCopy(copy)"
+          >
+            <div class="community-view__cover">
+              <i class="ti ti-copy community-view__cover-fallback" aria-hidden="true" />
+            </div>
+            <div class="community-view__card-body">
+              <h3 class="community-view__card-title">{{ copy.name }}</h3>
+              <p class="community-view__card-count">
+                <i class="ti ti-disc" aria-hidden="true" />
+                {{ t('community.trackCount', { count: copyTrackCount(copy) }) }}
+              </p>
+            </div>
+          </button>
+        </GlassCard>
+      </div>
+    </div>
 
     <div
       v-if="seasonalEvent"
@@ -971,6 +1056,34 @@ onMounted(load);
 .community-view__task-bonus {
 	font-weight: 600;
 	opacity: 0.8;
+}
+
+.community-view__copies-title {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	margin: 0 0 0.5rem;
+	font-size: 1rem;
+}
+
+.community-view__copy-card {
+	padding: 0;
+}
+
+.community-view__copy-open {
+	display: block;
+	width: 100%;
+	padding: 0;
+	border: none;
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.community-view__copy-open:hover .community-view__card-title {
+	text-decoration: underline;
 }
 
 .community-view__event {

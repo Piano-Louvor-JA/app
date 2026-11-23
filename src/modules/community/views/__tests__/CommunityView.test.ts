@@ -80,6 +80,7 @@ vi.mock("@design-system/index", () => ({
 }));
 vi.mock("vue-router", () => ({
 	useRouter: () => ({ push: mocks.routerPush, back: mocks.routerBack }),
+	useRoute: () => ({ name: "community" }),
 }));
 vi.mock("@modules/media/services/custom-catalog", () => ({
 	toCustomCollectionId: (id: number) => id + 2_000_000,

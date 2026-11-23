@@ -37,7 +37,8 @@ export default {
     "clearSearch": "Очистити пошук",
     "noResults": "За цим запитом нічого не знайдено.",
     "conductLink": "Кодекс поведінки",
-    "createCollection": "Створити збірку"
+    "createCollection": "Створити збірку",
+    "myCopies": "Мої копії"
   },
   "notifications": {
     "title": "Сповіщення",

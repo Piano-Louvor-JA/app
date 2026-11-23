@@ -39,6 +39,7 @@ export default {
 		trackUnavailable: "Áudio indisponível",
 		saveCopy: "Salvar cópia",
 		copySaved: "Cópia salva em Minhas Coletâneas",
+		myCopies: "Minhas cópias",
 		copyFailed: "Não foi possível salvar a cópia.",
 		conductLink: "Código de Conduta",
 		ranking: "Ver ranking",

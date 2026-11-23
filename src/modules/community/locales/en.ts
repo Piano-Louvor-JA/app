@@ -39,6 +39,7 @@ export default {
 		trackUnavailable: "Audio unavailable",
 		saveCopy: "Save copy",
 		copySaved: "Copy saved to My Collections",
+		myCopies: "My copies",
 		copyFailed: "Could not save copy.",
 		conductLink: "Code of Conduct",
 		ranking: "View ranking",
