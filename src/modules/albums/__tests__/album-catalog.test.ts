@@ -41,6 +41,8 @@ import {
   loadCustomAlbumCategory,
   findCollectionById,
 } from '../services/album-catalog'
+import { tPtBR } from '../../../test/i18n-stub'
+vi.mock('../../../plugins/i18n', async () => ({ default: { global: { t: (await import('../../../test/i18n-stub')).tPtBR } } }))
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -214,7 +216,7 @@ describe('loadCustomAlbumCategory', () => {
       { id: 6, name: 'Sem capa', description: null, ownerId: 4, musicsCount: 0 },
     ])
     const cat = await loadCustomAlbumCategory()
-    expect(cat).toMatchObject({ id: 'custom', name: 'Minhas Coletâneas' })
+    expect(cat).toMatchObject({ id: 'custom', name: 'Minhas coletâneas' })
     expect(cat?.collections[0]).toMatchObject({
       id: 2_000_005,
       coverUrl: 'cf:/custom/c.png',

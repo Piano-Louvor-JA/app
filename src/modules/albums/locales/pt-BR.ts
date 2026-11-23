@@ -1,7 +1,7 @@
 export default {
   albums: {
     custom: {
-      title: 'Minhas Coletâneas',
+      title: 'Minhas coletâneas',
       openEditor: 'Abrir editor de letras',
       open: 'Abrir coletânea {name}',
       trackCount: '{count} faixa(s)',
@@ -49,7 +49,7 @@ export default {
     },
     title: 'Central de Mídia',
     subtitle: 'Álbum & Coletâneas',
-    collectionFallback: 'Coletânea',
+    collectionFallback: 'Coletâneas',
     back: 'Voltar para álbuns',
     searchPlaceholder: 'Digite o número ou nome do hino...',
     hubSearchPlaceholder: 'Procure aqui...',

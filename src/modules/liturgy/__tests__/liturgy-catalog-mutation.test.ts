@@ -6,6 +6,8 @@ import {
   parseCatalogDurationMs,
 } from '../services/liturgy-catalog'
 import type { LiturgyMusicOption } from '../types/liturgy'
+import { tPtBR } from '../../../test/i18n-stub'
+vi.mock('../../../plugins/i18n', async () => ({ default: { global: { t: (await import('../../../test/i18n-stub')).tPtBR } } }))
 
 // Mocks mínimos
 const catalogFiles = new Map<string, unknown>()

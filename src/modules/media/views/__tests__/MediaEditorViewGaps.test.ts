@@ -22,9 +22,10 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ push: vi.fn(), back: vi.fn(), replace: vi.fn() }),
   onBeforeRouteLeave: vi.fn(),
 }))
+import { tPtBR } from '../../../../test/i18n-stub'
 vi.mock('vue-i18n', () => ({
-  useI18n: () => ({ t: (k: string, p?: Record<string, unknown>) => (p && p.name ? `${k}:${p.name}` : k), locale: { value: 'pt-BR' } }),
-  createI18n: () => ({ global: { locale: 'pt-BR', t: (k: string) => k } }),
+  useI18n: () => ({ t: tPtBR, locale: { value: 'pt-BR' } }),
+  createI18n: () => ({ global: { locale: 'pt-BR', t: tPtBR } }),
 }))
 
 vi.mock('../../components/MediaSlideStage.vue', () => ({ default: { template: '<div />' } }))
@@ -220,7 +221,7 @@ describe('MediaEditorView — capa da coletânea', () => {
     await flushPromises()
     const removeBtn = wrapper
       .findAll('button')
-      .filter((b) => b.attributes('title') === 'media.editor.removeCover')[0]
+      .filter((b) => b.attributes('title') === tPtBR('media.editor.removeCover'))[0]
     expect(removeBtn).toBeDefined()
     await removeBtn!.trigger('click')
     await flushPromises()
@@ -238,7 +239,7 @@ describe('MediaEditorView — capa da coletânea', () => {
     await flushPromises()
     const removeBtn = wrapper
       .findAll('button')
-      .filter((b) => b.attributes('title') === 'media.editor.removeCover')[0]
+      .filter((b) => b.attributes('title') === tPtBR('media.editor.removeCover'))[0]
     expect(removeBtn).toBeDefined()
     await removeBtn!.trigger('click')
     await flushPromises()
@@ -250,7 +251,7 @@ describe('MediaEditorView — busca de hino oficial e reuso de custom', () => {
   it('busca oficial: resultados aparecem e clique adiciona à coletânea', async () => {
     seedCollection()
     const wrapper = await mountEditorWithMusic()
-    const search = wrapper.find('input[placeholder="media.editor.searchOfficial"]')
+    const search = wrapper.find(`input[placeholder="${tPtBR('media.editor.searchOfficial')}"]`)
     await search.setValue('san')
     await search.trigger('input')
     await flushPromises()
@@ -267,7 +268,7 @@ describe('MediaEditorView — busca de hino oficial e reuso de custom', () => {
     seedCollection()
     addOfficialMusicToCollection.mockResolvedValue(null)
     const wrapper = await mountEditorWithMusic()
-    const search = wrapper.find('input[placeholder="media.editor.searchOfficial"]')
+    const search = wrapper.find(`input[placeholder="${tPtBR('media.editor.searchOfficial')}"]`)
     await search.setValue('san')
     await search.trigger('input')
     await flushPromises()
@@ -279,7 +280,7 @@ describe('MediaEditorView — busca de hino oficial e reuso de custom', () => {
   it('reuso: busca música de outra coletânea, copia com letra/áudio', async () => {
     seedCollection()
     const wrapper = await mountEditorWithMusic()
-    const search = wrapper.find('input[placeholder="media.editor.reuseMusic"]')
+    const search = wrapper.find(`input[placeholder="${tPtBR('media.editor.reuseMusic')}"]`)
     await search.setValue('santo')
     await search.trigger('input')
     await flushPromises()
@@ -296,14 +297,14 @@ describe('MediaEditorView — busca de hino oficial e reuso de custom', () => {
     seedCollection()
     copyCustomMusic.mockResolvedValue(null)
     const wrapper = await mountEditorWithMusic()
-    const search = wrapper.find('input[placeholder="media.editor.reuseMusic"]')
+    const search = wrapper.find(`input[placeholder="${tPtBR('media.editor.reuseMusic')}"]`)
     await search.setValue('santo')
     await search.trigger('input')
     await flushPromises()
     await flushPromises()
     await wrapper.findAll('.editor__list--search .editor__list-item').at(-1)!.trigger('click')
     await flushPromises()
-    expect(wrapper.text()).toContain('media.editor.copyMusicFailed')
+    expect(wrapper.text()).toContain(tPtBR('media.editor.copyMusicFailed'))
   })
 })
 
@@ -368,7 +369,7 @@ describe('MediaEditorView — estrofes, painel de letra e deleção', () => {
     await flushPromises()
     wrapper.findComponent(AppConfirm).vm.$emit('confirm')
     await flushPromises()
-    expect(wrapper.text()).toContain('media.editor.deleteCollectionFailed')
+    expect(wrapper.text()).toContain(tPtBR('media.editor.deleteCollectionFailed'))
   })
 
   it('excluir estrofe falha na API: notifica e mantém', async () => {
@@ -459,7 +460,7 @@ describe('MediaEditorView — export/import .slja e áudio', () => {
     void audioInput
     await setInputFile(wrapper, `input[accept="${target!.attributes('accept')}"]`, makeFile('a.mp3', 'audio/mpeg'))
     expect(updateCustomMusic).toHaveBeenCalledWith(71, { id_file_audio: 3 })
-    expect(wrapper.text()).toContain('Áudio "a.mp3" vinculado')
+    expect(wrapper.text()).toContain(tPtBR('media.editor.audioLinked', { name: 'a.mp3' }))
   })
 
   it('áudio local (sem auth): guarda base64 no store local', async () => {

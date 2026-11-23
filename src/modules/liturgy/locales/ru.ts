@@ -1,5 +1,7 @@
 export default {
   "liturgy": {
+  "fileFilters": { "video": "Видео", "all": "Все" },
+  "fallback": { "music": "Музыка", "video": "Видео", "audio": "Аудио" },
     "title": "Порядок богослужения",
     "subtitle": "Организация богослужения",
     "worshipOf": "Программа: {day}",

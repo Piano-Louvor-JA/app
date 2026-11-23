@@ -1643,7 +1643,7 @@ describe("MediaEditorView — onMounted query e branches finais", () => {
 		const file = { arrayBuffer: async () => new ArrayBuffer(4), name: "ok.mp3" };
 		await s.onAudioFile({ target: { files: [file], value: "" } } as unknown as Event);
 		await flushPromises();
-		expect(s.statusMessage.value).toBe('Áudio "ok.mp3" vinculado');
+		expect(s.statusMessage.value).toBe('Áudio “ok.mp3” vinculado');
 		w.unmount();
 	});
 });

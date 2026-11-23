@@ -46,7 +46,7 @@ export default {
     },
     "title": "Centro de Medios",
     "subtitle": "Álbumes y Colecciones",
-    "collectionFallback": "Colección",
+    "collectionFallback": "Colecciones",
     "back": "Volver a álbumes",
     "searchPlaceholder": "Escriba el número o nombre del himno...",
     "hubSearchPlaceholder": "Busque aquí...",

@@ -1,5 +1,7 @@
 export default {
   "liturgy": {
+  "fileFilters": { "video": "Videos", "all": "All" },
+  "fallback": { "music": "Music", "video": "Video", "audio": "Audio" },
     "title": "Service Liturgy",
     "subtitle": "Service organization",
     "worshipOf": "{day} Program",

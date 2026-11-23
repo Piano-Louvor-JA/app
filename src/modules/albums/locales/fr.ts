@@ -46,7 +46,7 @@ export default {
     },
     "title": "Centre multimédia",
     "subtitle": "Albums & Compilations",
-    "collectionFallback": "Compilation",
+    "collectionFallback": "Compilations",
     "back": "Retour aux albums",
     "searchPlaceholder": "Saisissez le numéro ou le nom du cantique...",
     "hubSearchPlaceholder": "Recherchez ici...",

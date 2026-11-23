@@ -46,7 +46,7 @@ export default {
     },
     "title": "Media Center",
     "subtitle": "Albums & Collections",
-    "collectionFallback": "Collection",
+    "collectionFallback": "컬렉션",
     "back": "Back to albums",
     "searchPlaceholder": "Type the hymn number or name...",
     "hubSearchPlaceholder": "Search here...",

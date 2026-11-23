@@ -6,6 +6,8 @@ vi.mock('@modules/sync/services/library-catalog', () => ({ getCurrentApiPrefix: 
 vi.mock('@modules/media/services/custom-catalog', () => ({ listAllCustomMusics: m.customs, toCustomMusicId: (id: number) => 1000000 + id }));
 vi.mock('@modules/media/services/local-custom-store', () => ({ listLocalCollections: m.collections, listLocalMusics: m.locals }));
 import { loadLiturgyMusicOptions } from '../services/liturgy-catalog';
+import { tPtBR } from '../../../test/i18n-stub'
+vi.mock('../../../plugins/i18n', async () => ({ default: { global: { t: (await import('../../../test/i18n-stub')).tPtBR } } }))
 beforeEach(() => { vi.resetAllMocks(); m.customs.mockResolvedValue([]); m.collections.mockReturnValue([]); });
 it('ignores invalid custom IDs and preserves the first entry for duplicate IDs', async () => {
   m.customs.mockResolvedValue([{ id: 0 }, { id: NaN }, { id: 1, name: null, collectionName: null, duration: 0 }, { id: 1, name: 'Duplicate', duration: -1 }]);

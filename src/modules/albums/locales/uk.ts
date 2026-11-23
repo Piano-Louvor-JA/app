@@ -46,7 +46,7 @@ export default {
     },
     "title": "Медіацентр",
     "subtitle": "Альбоми та збірки",
-    "collectionFallback": "Збірка",
+    "collectionFallback": "Збірки",
     "back": "Повернутися до альбомів",
     "searchPlaceholder": "Введіть номер або назву гімну...",
     "hubSearchPlaceholder": "Шукайте тут...",

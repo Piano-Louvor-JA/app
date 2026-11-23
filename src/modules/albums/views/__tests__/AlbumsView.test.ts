@@ -44,6 +44,7 @@ const flag = vi.hoisted(() => ({ SHOW_CUSTOM_COLLECTIONS: true }))
 vi.mock('../../constants', () => flag)
 vi.mock('vue-i18n', () => ({
   useI18n: () => ({ t: (k: string) => k, locale: { value: 'pt-BR' } }),
+  createI18n: () => ({ global: { locale: 'pt-BR', t: (k: string) => k } }),
 }))
 
 const replaceMock = vi.fn(async () => {})
@@ -87,6 +88,7 @@ vi.mock('@modules/sync/services/library-catalog', () => ({
 // Store state controlado por teste via globalThis.__albumsState.
 // Mock SYNC (a view chama useAlbums() sem await). `ref` vem do módulo já
 // importado abaixo — lazy via getter pra evitar TDZ no hoist do vi.mock.
+import { tPtBR } from '../../../../test/i18n-stub'
 import { ref as vueRef } from 'vue'
 function useAlbumsMockFactory() {
   const s = ((globalThis as AnyObj).__albumsState ?? {}) as AnyObj

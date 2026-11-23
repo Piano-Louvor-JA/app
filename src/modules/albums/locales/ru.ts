@@ -46,7 +46,7 @@ export default {
     },
     "title": "Медиацентр",
     "subtitle": "Альбомы и сборники",
-    "collectionFallback": "Сборник",
+    "collectionFallback": "Сборники",
     "back": "Назад к альбомам",
     "searchPlaceholder": "Введите номер или название гимна...",
     "hubSearchPlaceholder": "Искать здесь...",
