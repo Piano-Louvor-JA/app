@@ -894,8 +894,13 @@ async function importSingleSlja(file: File): Promise<void> {
     )
     let collectionId = selectedCollectionId.value
     if (collectionId == null) { // MÚSICA SEM COLETÂNEA (ÓRFÃ)
-      // RF-02 v2 (SPEC a829eac): órfã segue SEM coletânea (null) — v3.1
-      // (UI) não altera o modelo; single = música sem coletânea.
+      // RF-02 v2 + v3.1 (UI): single = música na coletânea fixa "Singles"
+      // (invisível na UI — isSinglesView); modelo exige música→coletânea.
+      collectionId = await resolveSinglesCollection()
+      if (collectionId == null) {
+        notify('Falha ao preparar coletânea Singles', true)
+        return
+      }
     } else if (importCollectionName !== importBaseName) {
       // Colisão: usa a existente ou cria uma (mantém o comportamento antigo para
       // evitar perda de dados de usuário, mas não cria 'Singles' aqui)
