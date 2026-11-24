@@ -48,6 +48,7 @@ export default {
 		myCollections: "My collections",
 		myCollectionsSubtitle: "Collections you created — only you manage them here",
 		myCollectionsEmpty: "No collections yet. Create one in the lyrics editor.",
+		changeCover: "Change cover of {name}",
 		copyFailed: "Could not save copy.",
 		conductLink: "Code of Conduct",
 		ranking: "View ranking",

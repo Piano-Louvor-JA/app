@@ -48,6 +48,7 @@ export default {
 		myCollections: "Mis colecciones",
 		myCollectionsSubtitle: "Colecciones creadas por ti — solo tú las gestionas aquí",
 		myCollectionsEmpty: "Aún no hay colecciones. Crea una en el editor de letras.",
+		changeCover: "Cambiar portada de {name}",
 		copyFailed: "No se pudo guardar la copia.",
 		conductLink: "Código de Conducta",
 		ranking: "Ver ranking",

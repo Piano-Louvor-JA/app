@@ -45,7 +45,8 @@ export default {
     "myCopiesEmpty": "Копій ще немає. Збережіть копію зі Спільноти.",
     "myCollections": "Мої збірки",
     "myCollectionsSubtitle": "Збірки, створені вами — керуєте тут лише ви",
-    "myCollectionsEmpty": "Збірок ще немає. Створіть одну в редакторі текстів."
+    "myCollectionsEmpty": "Збірок ще немає. Створіть одну в редакторі текстів.",
+    "changeCover": "Змінити обкладинку «{name}»"
   },
   "notifications": {
     "title": "Сповіщення",

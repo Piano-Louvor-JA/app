@@ -45,7 +45,8 @@ export default {
     "myCopiesEmpty": "Копий пока нет. Сохраните копию из Сообщества.",
     "myCollections": "Мои подборки",
     "myCollectionsSubtitle": "Подборки, созданные вами — управляете здесь только вы",
-    "myCollectionsEmpty": "Подборок пока нет. Создайте одну в редакторе текстов."
+    "myCollectionsEmpty": "Подборок пока нет. Создайте одну в редакторе текстов.",
+    "changeCover": "Изменить обложку «{name}»"
   },
   "notifications": {
     "title": "Уведомления",

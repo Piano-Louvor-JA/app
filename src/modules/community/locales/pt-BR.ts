@@ -48,6 +48,7 @@ export default {
 		myCollections: "Minhas coletâneas",
 		myCollectionsSubtitle: "Coletâneas criadas por você — só você as gerencia aqui",
 		myCollectionsEmpty: "Nenhuma coletânea ainda. Crie uma no editor de letras.",
+		changeCover: "Trocar capa de {name}",
 		copyFailed: "Não foi possível salvar a cópia.",
 		conductLink: "Código de Conduta",
 		ranking: "Ver ranking",

@@ -88,6 +88,31 @@ function trackCount(card: MyCollectionCard): number {
 	return card.isLocal ? listLocalMusics(card.rawId).length : card.musicsCount;
 }
 
+/** Troca a capa do card: input file escondido + updateCustomCollection. */
+const coverInput = ref<HTMLInputElement | null>(null);
+const coverTargetId = ref<number | null>(null);
+
+function pickCover(rawId: number): void {
+	coverTargetId.value = rawId;
+	coverInput.value?.click();
+}
+
+async function onCoverFile(event: Event): Promise<void> {
+	const input = event.target as HTMLInputElement;
+	const file = input.files?.[0];
+	const rawId = coverTargetId.value;
+	input.value = "";
+	if (!file || rawId == null) return;
+	const dataUrl = await new Promise<string>((resolve, reject) => {
+		const reader = new FileReader();
+		reader.onload = () => resolve(String(reader.result));
+		reader.onerror = reject;
+		reader.readAsDataURL(file);
+	});
+	const updated = await updateCustomCollection(rawId, { cover_url: dataUrl });
+	if (updated) await loadMyCollections();
+}
+
 onMounted(async () => {
 	await loadMyCollections();
 	isLoading.value = false;
@@ -167,8 +192,25 @@ onMounted(async () => {
             </p>
           </div>
         </button>
+        <button
+          type="button"
+          class="my-collections-view__cover-btn"
+          data-test="community-cover-btn"
+          :aria-label="t('community.changeCover', card.name ? { name: card.name } : undefined)"
+          :title="t('community.changeCover', card.name ? { name: card.name } : undefined)"
+          @click.stop="pickCover(card.rawId)"
+        >
+          <i class="ti ti-camera" aria-hidden="true" />
+        </button>
       </GlassCard>
     </div>
+    <input
+      ref="coverInput"
+      type="file"
+      accept="image/*"
+      class="my-collections-view__cover-input"
+      @change="onCoverFile"
+    />
   </section>
 </template>
 
@@ -243,7 +285,34 @@ onMounted(async () => {
 }
 
 .my-collections-view__card {
+	position: relative;
 	padding: 0;
+}
+
+.my-collections-view__cover-btn {
+	position: absolute;
+	top: 0.5rem;
+	right: 0.5rem;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 2.25rem;
+	height: 2.25rem;
+	border-radius: 9999px;
+	background: rgba(0, 0, 0, 0.45);
+	color: #fff;
+	opacity: 0;
+	transition: opacity 0.15s ease;
+	z-index: 2;
+}
+
+.my-collections-view__card:hover .my-collections-view__cover-btn,
+.my-collections-view__cover-btn:focus-visible {
+	opacity: 1;
+}
+
+.my-collections-view__cover-input {
+	display: none;
 }
 
 .my-collections-view__open {
