@@ -839,17 +839,21 @@ async function importSingleSlja(file: File): Promise<void> {
       ? (innerName ?? file.name).replace(/\.slja(\.zip)?$/i, '')
       : archive.title.trim()
 
-    // RF-02 (SPEC-crud-comunidade-hub v1.0.0): import .slja = 1 coletânea
-    // por arquivo. Nome = título do conteúdo (sem fallback genérico — os
-    // fallbacks já resolvidos acima); colisão com coletânea do usuário →
-    // sufixo (2), (3)... Nunca agrupa numa "Importações .slja" nova.
+    // RF-02 (SPEC-editor-ux-v2): import .slja = 1 música órfã (collectionId=null)
+    // por arquivo. Não cria coletânea "Singles" se não houver colisão.
     const importBaseName = name
     const importCollectionName = collectionNameForImport(
       importBaseName,
       collections.value,
     )
     let collectionId = selectedCollectionId.value
-    if (collectionId == null || importCollectionName !== importBaseName) {
+    if (collectionId == null) { // MÚSICA SEM COLETÂNEA (ÓRFÃ)
+      // O SINGLE é a view de órfãos, não uma coletânea criada por import
+      // A lógica de singles/órfãos é tratada na criação da música e listagem.
+      // Não tentamos criar coletânea 'Singles' aqui.
+    } else if (importCollectionName !== importBaseName) {
+      // Colisão: usa a existente ou cria uma (mantém o comportamento antigo para
+      // evitar perda de dados de usuário, mas não cria 'Singles' aqui)
       const existing = collections.value.find(
         (c) => c.name === importCollectionName,
       )

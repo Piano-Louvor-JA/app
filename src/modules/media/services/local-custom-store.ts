@@ -185,14 +185,25 @@ export function updateLocalCollection(
 	return true;
 }
 
-/** true se excluiu (e as músicas da coletânea junto). */
+/** Exclui a coletânea; músicas MIGRAM para a coletânea "Singles" (SPEC
+ * editor-ux-v2: toda música é single a menos que esteja numa coletânea). */
 export function deleteLocalCollection(id: number): boolean {
 	const db = loadDb();
 	const before = db.collections.length;
 	db.collections = db.collections.filter((c) => c.id !== id);
-	db.musics = db.musics.filter((m) => m.collectionId !== id);
+	if (db.collections.length === before) return false;
+	if (db.musics.some((m) => m.collectionId === id)) {
+		let singles = db.collections.find((c) => c.name === "Singles");
+		if (!singles) {
+			singles = createLocalCollection("Singles");
+			singles = loadDb().collections.find((c) => c.name === "Singles") ?? singles;
+		}
+		for (const music of db.musics) {
+			if (music.collectionId === id) music.collectionId = singles.id;
+		}
+	}
 	saveDb(db);
-	return db.collections.length < before;
+	return true;
 }
 
 /* ---------- Músicas ---------- */
