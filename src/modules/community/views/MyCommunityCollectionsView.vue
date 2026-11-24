@@ -196,8 +196,8 @@ onMounted(async () => {
           type="button"
           class="my-collections-view__cover-btn"
           data-test="community-cover-btn"
-          :aria-label="t('community.changeCover', card.name ? { name: card.name } : undefined)"
-          :title="t('community.changeCover', card.name ? { name: card.name } : undefined)"
+          :aria-label="t('community.changeCover', { name: card.name })"
+          :title="t('community.changeCover', { name: card.name })"
           @click.stop="pickCover(card.rawId)"
         >
           <i class="ti ti-camera" aria-hidden="true" />
