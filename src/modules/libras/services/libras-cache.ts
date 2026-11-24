@@ -2,15 +2,16 @@
 // SPDX-License-Identifier: MIT
 // Serviço de cache IndexedDB nativo para Libras.
 
-import { LibrasTranslation } from '../types';
+import type { LibrasTranslation } from '../types';
 
 // Define DB/Store names conforme SPEC
 const DB_NAME = 'louvorja-libras';
 const STORE_NAME = 'translations';
 const DB_VERSION = 1; // schemaVersion v1.0.0
 
-// Acesso a IndexedDB nativo via window.indexedDB (disponível no Electron renderer)
-const indexedDB = (window as any).indexedDB;
+// Acesso a IndexedDB nativo (disponível no Electron renderer e browsers).
+const idbFactory: IDBFactory | undefined =
+    typeof indexedDB !== 'undefined' ? indexedDB : (globalThis as { indexedDB?: IDBFactory }).indexedDB;
 
 /**
  * Inicializa e retorna uma conexão com o IndexedDB.
@@ -18,22 +19,22 @@ const indexedDB = (window as any).indexedDB;
  */
 function openDb(): Promise<IDBDatabase> {
     return new Promise((resolve, reject) => {
-        if (!indexedDB) return reject(new Error('IndexedDB não suportado neste ambiente (Electron renderer).'));
+        if (!idbFactory) return reject(new Error('IndexedDB não suportado neste ambiente (Electron renderer).'));
         
-        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        const request = idbFactory.open(DB_NAME, DB_VERSION);
 
-        request.onupgradeneeded = (event) => {
+        request.onupgradeneeded = (event: Event) => {
             const db = (event.target as IDBOpenDBRequest).result;
             if (!db.objectStoreNames.contains(STORE_NAME)) {
                 db.createObjectStore(STORE_NAME, { keyPath: 'cacheKey' });
             }
         };
 
-        request.onsuccess = (event) => {
+        request.onsuccess = (event: Event) => {
             resolve((event.target as IDBOpenDBRequest).result);
         };
 
-        request.onerror = (event) => {
+        request.onerror = (event: Event) => {
             reject(new Error(`Erro ao abrir DB: ${(event.target as IDBRequest).error?.name || 'Unknown Error'}`));
         };
     });

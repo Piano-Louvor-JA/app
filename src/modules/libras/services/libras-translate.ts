@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: MIT
 // Serviço de tradução (Gloss) para Libras, com timeout e tratamento de falha silenciosa.
 
-import { LibrasTranslation, normalizeLyrics } from '../types';
+import { normalizeLyrics } from '../types';
+import type { LibrasTranslation } from '../types';
 import { getTranslation, saveTranslation } from './libras-cache';
 
 // URL do serviço público VLibras (conforme documentação)
