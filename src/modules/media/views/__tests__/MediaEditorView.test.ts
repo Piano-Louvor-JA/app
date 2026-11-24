@@ -59,10 +59,12 @@ vi.mock("../../services/custom-catalog", () => ({
 }));
 
 vi.mock("../../services/local-custom-store", () => ({
-	getLocalMusic: vi.fn(),
-	isLocalId: vi.fn(() => false),
-	updateLocalMusic: vi.fn(),
-	publishLocalMusic: vi.fn(() => true),
+  getLocalMusic: vi.fn(),
+  isLocalId: vi.fn(() => false),
+  updateLocalMusic: vi.fn(),
+  publishLocalMusic: vi.fn(() => true),
+  listLocalCollections: vi.fn().mockReturnValue([]),
+  createLocalCollection: vi.fn().mockReturnValue({ id: 1, name: "Singles" }),
 }));
 
 vi.mock("@modules/albums/services/album-music-search", () => ({
@@ -1260,9 +1262,10 @@ describe("MediaEditorView — cobertura de gaps", () => {
 		const file = { arrayBuffer: async () => new ArrayBuffer(4), name: "hino-x.slja" };
 		await s.onImportFile({ target: { files: [file], value: "" } } as unknown as Event);
 		await flushPromises();
-		// RF-02 v2: sem coletânea selecionada → música ÓRFÃ, nenhuma coletânea criada/reutilizada
+		// RF-02 v3.1: sem coletânea selecionada → música vai pra coletânea fixa
+		// "Singles" (invisível na UI), criada localmente; API coletânea não é chamada
 		expect(catalogMod.createCustomCollection).not.toHaveBeenCalled();
-		expect(catalogMod.createCustomMusic).toHaveBeenCalledWith(null, { name: "Hino X" });
+		expect(catalogMod.createCustomMusic).toHaveBeenCalledWith(1, { name: "Hino X" });
 		expect(catalogMod.updateCustomMusic).toHaveBeenCalledWith(44, { id_file_audio: 7 });
 		w.unmount();
 	});
@@ -1941,7 +1944,7 @@ describe("MediaEditorView — interações de estrofe via DOM (sel exatos)", () 
 		w.unmount();
 	});
 
-	it("import sem colisão (RF-02 v2): música órfã — NÃO cria coletânea", async () => {
+	it("import sem colisão (RF-02 v3.1): música vai pra coletânea Singles (invisível), sem criar coletânea via API", async () => {
 		const slja = await import("../../../../shared/services/slja");
 		const catalogMod = await import("../../services/custom-catalog");
 		vi.mocked(catalogMod.listCustomCollections).mockResolvedValue([{ id: 1, name: "C1" }] as never);
@@ -1954,13 +1957,13 @@ describe("MediaEditorView — interações de estrofe via DOM (sel exatos)", () 
 		const file = { arrayBuffer: async () => new ArrayBuffer(4), name: "novo.slja" };
 		await (w.vm.$.devtoolsRawSetupState as unknown as { onImportFile: (e: Event) => Promise<void> }).onImportFile({ target: { files: [file], value: "" } } as unknown as Event);
 		await flushPromises();
-		// v2: sem coletânea selecionada → órfã, zero coletâneas criadas
+		// v3.1: sem coletânea selecionada → Singles local (mock id 1); API não é chamada
 		expect(catalogMod.createCustomCollection).not.toHaveBeenCalled();
-		expect(catalogMod.createCustomMusic).toHaveBeenCalledWith(null, expect.objectContaining({ name: "T" }));
+		expect(catalogMod.createCustomMusic).toHaveBeenCalledWith(1, expect.objectContaining({ name: "T" }));
 		w.unmount();
 	});
 
-	it("import com colisão de título mas SEM coletânea selecionada (RF-02 v2): órfã mesmo com nome repetido", async () => {
+	it("import com colisão de título mas SEM coletânea selecionada (RF-02 v3.1): Singles mesmo com nome repetido", async () => {
 		const slja = await import("../../../../shared/services/slja");
 		const catalogMod = await import("../../services/custom-catalog");
 		vi.mocked(catalogMod.listCustomCollections).mockResolvedValue([
@@ -1975,13 +1978,13 @@ describe("MediaEditorView — interações de estrofe via DOM (sel exatos)", () 
 		const file = { arrayBuffer: async () => new ArrayBuffer(4), name: "t.slja" };
 		await (w.vm.$.devtoolsRawSetupState as unknown as { onImportFile: (e: Event) => Promise<void> }).onImportFile({ target: { files: [file], value: "" } } as unknown as Event);
 		await flushPromises();
-		// v2: nome colide com coletânea "T", mas sem seleção → órfã, sem sufixo
+		// v3.1: nome colide com coletânea "T", mas sem seleção → Singles local, sem sufixo
 		expect(catalogMod.createCustomCollection).not.toHaveBeenCalled();
-		expect(catalogMod.createCustomMusic).toHaveBeenCalledWith(null, expect.objectContaining({ name: "T" }));
+		expect(catalogMod.createCustomMusic).toHaveBeenCalledWith(1, expect.objectContaining({ name: "T" }));
 		w.unmount();
 	});
 
-	it("import de 2 arquivos de uma vez (RF-02 v2): 2 músicas órfãs — nenhuma coletânea criada", async () => {
+	it("import de 2 arquivos de uma vez (RF-02 v3.1): 2 músicas na coletânea Singles — nenhuma coletânea via API", async () => {
 		const slja = await import("../../../../shared/services/slja");
 		const catalogMod = await import("../../services/custom-catalog");
 		vi.mocked(catalogMod.listCustomCollections).mockResolvedValue([] as never);
@@ -1997,11 +2000,11 @@ describe("MediaEditorView — interações de estrofe via DOM (sel exatos)", () 
 		const f2 = { arrayBuffer: async () => new ArrayBuffer(4), name: "a2.slja" };
 		await (w.vm.$.devtoolsRawSetupState as unknown as { onImportFile: (e: Event) => Promise<void> }).onImportFile({ target: { files: [f1, f2], value: "" } } as unknown as Event);
 		await flushPromises();
-		// v2: 2 órfãs, zero coletâneas
+		// v3.1: 2 músicas na Singles local (mock id 1), zero coletâneas via API
 		expect(catalogMod.createCustomCollection).not.toHaveBeenCalled();
 		expect(catalogMod.createCustomMusic).toHaveBeenCalledTimes(2);
-		expect(catalogMod.createCustomMusic).toHaveBeenNthCalledWith(1, null, expect.objectContaining({ name: "A" }));
-		expect(catalogMod.createCustomMusic).toHaveBeenNthCalledWith(2, null, expect.objectContaining({ name: "A" }));
+		expect(catalogMod.createCustomMusic).toHaveBeenNthCalledWith(1, 1, expect.objectContaining({ name: "A" }));
+		expect(catalogMod.createCustomMusic).toHaveBeenNthCalledWith(2, 1, expect.objectContaining({ name: "A" }));
 		w.unmount();
 	});
 
