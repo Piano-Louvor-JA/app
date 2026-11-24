@@ -264,6 +264,9 @@ describe("MediaEditorView — seleção de música", () => {
 		const { getLocalMusic, isLocalId, publishLocalMusic } = await import(
 			"../../services/local-custom-store"
 		);
+		// SPEC editor-ux (1cf6907): Publicar exige sessão (deslogado = zero rede).
+		const { getAuthSession } = await import("../../services/auth-client");
+		vi.mocked(getAuthSession).mockReturnValue({ token: "t", user: { id_user: 1, email: "a@b.c", displayName: "A" } } as never);
 		vi.mocked(isLocalId).mockReturnValue(true);
 		vi.mocked(getLocalMusic).mockReturnValue({
 			id: -7,
@@ -2040,7 +2043,7 @@ describe("MediaEditorView — últimos gaps", () => {
 		const w = await mountEditor();
 		(w.vm.$.devtoolsRawSetupState as unknown as { selectedCollectionId: { value: number | null } }).selectedCollectionId.value = 1;
 		await flushPromises();
-		const input = w.find('input[placeholder="Buscar hino oficial (nº ou nome)…"]');
+		const input = w.find('input[data-testid="official-search"]');
 		await input.setValue("hino");
 		await flushPromises();
 		const hit = w.find("button.editor__list-item--search");
@@ -2724,6 +2727,8 @@ describe("MediaEditorView — cliques de template (lote 4 onda1)", () => {
 	it("clicks: visibilidade nova private, regras, private do selected, show-rules", async () => {
 		localStorage.setItem("louvorja.publishRulesSeen", "1");
 		const { updateCustomCollection } = await import("../../services/custom-catalog");
+		const { getAuthSession } = await import("../../services/auth-client");
+		vi.mocked(getAuthSession).mockReturnValue({ token: "t", user: { id_user: 1, email: "a@b.c", displayName: "A" } } as never);
 		vi.mocked(updateCustomCollection).mockResolvedValue({ id: 1, name: "x", visibility: "private", musicsCount: 2 } as never);
 		const w = await mountEditor();
 		document.body.appendChild(w.element);
@@ -2731,29 +2736,19 @@ describe("MediaEditorView — cliques de template (lote 4 onda1)", () => {
 			selectedCollectionId: { value: number | null };
 			newCollectionVisibility: { value: string };
 			rulesOpen: { value: boolean };
+			onChangeVisibilityWithRules: (next: string) => Promise<void>;
 		};
 		await flushPromises();
-		// 1203: botão privado do form de nova coletânea
-		const privBtn = Array.from(document.querySelectorAll<HTMLButtonElement>(".editor__visibility-btn")).find((b) => b.getAttribute("aria-pressed") === "true");
-		if (privBtn) { privBtn.click(); await flushPromises(); }
+		// 1203: form de nova coletânea (pills removidas — default private)
 		expect(s.newCollectionVisibility.value).toBe("private");
-		// 1229: link de regras do form
-		const rulesBtn = document.querySelector<HTMLButtonElement>(".editor__btn--rules");
-		if (rulesBtn) { rulesBtn.click(); await flushPromises(); }
-		// 1262: private do selected (coletânea 1) via wrapper (2º grupo)
-		const groups = w.findAll('[role="radiogroup"]');
-		const selGroup = groups.at(-1)!;
-		const privInGroup = selGroup.findAll('button').filter((b) => b.text().toLowerCase().includes('privada')).at(-1)!;
-		await privInGroup.trigger('click');
+		// 1229/1262/1295: visibilidade da coletânea selecionada via onChangeVisibilityWithRules
+		// (SPEC editor-ux: pills vivem no menu ⋮, só logado)
+		s.selectedCollectionId.value = 1;
 		await flushPromises();
-		// 1295: voltar pra public e abrir show-rules
-		const pubInGroup = selGroup.findAll('button').filter((b) => b.text().toLowerCase().includes('pública')).at(-1)!;
-		await pubInGroup.trigger('click');
+		localStorage.removeItem("louvorja.publishRulesSeen");
+		await s.onChangeVisibilityWithRules("public");
 		await flushPromises();
-		const showRules = w.findAll('button').filter((b) => b.text().includes('Regras') || (b.attributes('title') ?? '').length > 0 && b.classes().join(' ').includes('--rules')).at(-1);
-		if (showRules) { await showRules.trigger('click'); await flushPromises(); }
-		const { updateCustomCollection: ucc } = await import("../../services/custom-catalog");
-		console.log('DBG1262', vi.mocked(ucc).mock.calls.length, 'rules', s.rulesOpen.value, 'groups', groups.length, 'selGroupBtns', selGroup ? selGroup.findAll('button').length : -1);
+		// 1a vez public sem seen: abre modal de regras em vez de persistir
 		expect(s.rulesOpen.value).toBe(true);
 		w.unmount();
 	});

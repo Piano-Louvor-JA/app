@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 
 import MediaSlideStage from '../components/MediaSlideStage.vue'
-import MediaAccountBar from '../components/MediaAccountBar.vue'
 import AppConfirm from '@shared/components/AppConfirm.vue'
 import { getAuthSession } from '../services/auth-client'
 import { getAuthReadiness } from '@modules/auth/services/firebase-client'
@@ -256,6 +255,66 @@ const asideCollapsed = ref(false)
 
 /* ---------- Painel "Letra" (estilo playlist da /media) ---------- */
 const lyricPaneOpen = ref(true)
+
+/* ---------- SPEC-editor-ux-v1: único "+" com menu + menu ⋮ por coletânea ---------- */
+const addMenuOpen = ref(false)
+const kebabOpenId = ref<number | null>(null)
+const renamingId = ref<number | null>(null)
+const renameCollectionDraft = ref('')
+
+function onAddMenuAction(kind: 'collection' | 'single' | 'official'): void {
+  addMenuOpen.value = false
+  if (kind === 'collection') {
+    newCollectionName.value = ''
+    void nextTick(() =>
+      document.querySelector<HTMLInputElement>('[data-testid="new-collection-input"]')?.focus(),
+    )
+  } else if (kind === 'single') {
+    newSingleName.value = ''
+    void nextTick(() =>
+      document.querySelector<HTMLInputElement>('[data-testid="new-single-input"]')?.focus(),
+    )
+  } else {
+    officialSearch.value = ''
+    void nextTick(() =>
+      document.querySelector<HTMLInputElement>('[data-testid="official-search"]')?.focus(),
+    )
+  }
+}
+
+function onKebabAction(kind: 'cover' | 'rename' | 'delete', collectionId: number): void {
+  kebabOpenId.value = null
+  if (kind === 'cover') coverInput.value?.click()
+  else if (kind === 'rename') {
+    const c = collections.value.find((x) => x.id === collectionId)
+    renamingId.value = collectionId
+    renameCollectionDraft.value = c?.name ?? ''
+    void nextTick(() =>
+      document.querySelector<HTMLInputElement>('[data-testid="collection-rename-input"]')?.focus(),
+    )
+  } else {
+    requestDelete('collection')
+  }
+}
+
+async function onRenameCollection(): Promise<void> {
+  const id = renamingId.value
+  const name = renameCollectionDraft.value.trim()
+  if (id == null || !name) return
+  saving.value = true
+  try {
+    const updated = await updateCustomCollection(id, { name })
+    if (!updated) {
+      notify('Falha ao renomear coletânea', true)
+      return
+    }
+    collections.value = collections.value.map((c) => (c.id === id ? updated : c))
+    renamingId.value = null
+    notify('Coletânea renomeada')
+  } finally {
+    saving.value = false
+  }
+}
 
 async function refreshCollections(): Promise<void> {
   loading.value = true
@@ -1425,70 +1484,81 @@ onMounted(async () => {
         :class="{ 'editor__aside--collapsed': asideCollapsed }"
         v-show="!asideCollapsed"
       >
-        <h2 class="editor__section-title">
-          Coletâneas
-        </h2>
-        <!-- Feedback Ezequias (02/10): um login só. A barra de login legacy das
-             coletâneas só aparece SEM sessão principal (Firebase/legacy unificado
-             do header). Logado, o token da sessão principal serve pra tudo
-             (mesma chave localStorage — bridge firebase-session na API). -->
-        <MediaAccountBar
-          v-if="!isLoggedIn"
-          :notify="notify"
-        />
-        <!-- Capa da coletânea selecionada (upload/remoção) -->
-        <div
-          v-if="selectedCollection"
-          class="editor__cover"
-        >
-          <button
-            type="button"
-            class="editor__cover-thumb"
-            :class="{ 'editor__cover-thumb--empty': !selectedCollection.coverUrl }"
-            :style="selectedCollection.coverUrl
-              ? { backgroundImage: `url(${customFileUrl(selectedCollection.coverUrl)})` }
-              : undefined"
-            :title="t('media.editor.changeCover')"
-            @click="coverInput?.click()"
-          >
-            <i
-              v-if="!selectedCollection.coverUrl"
-              class="ti ti-camera"
-              aria-hidden="true"
-            />
-          </button>
-          <button
-            v-if="selectedCollection.coverUrl"
-            type="button"
-            class="editor__btn editor__btn--danger editor__btn--icon"
-            :title="t('media.editor.removeCover')"
-            @click="onRemoveCover"
-          >
-            <i
-              class="ti ti-trash"
-              aria-hidden="true"
-            />
-          </button>
-          <input
-            ref="coverInput"
-            type="file"
-            accept="image/*"
-            class="editor__file-input"
-            :aria-label="t('media.editor.changeCover')"
-            @change="onCoverFile"
-          >
+        <div class="editor__aside-head">
+          <h2 class="editor__section-title">
+            Coletâneas
+          </h2>
+          <!-- SPEC AC3: ÚNICO "+" do editor — menu com 3 ações nomeadas -->
+          <div class="editor__add-wrap">
+            <button
+              type="button"
+              class="editor__btn editor__btn--icon"
+              data-testid="add-menu-btn"
+              title="Adicionar…"
+              @click="addMenuOpen = !addMenuOpen"
+            >
+              <i
+                class="ti ti-plus"
+                aria-hidden="true"
+              />
+            </button>
+            <div
+              v-if="addMenuOpen"
+              class="editor__menu"
+              data-testid="add-menu"
+            >
+              <button
+                type="button"
+                class="editor__menu-item"
+                data-testid="add-menu-collection"
+                @click="onAddMenuAction('collection')"
+              >
+                <i
+                  class="ti ti-disc"
+                  aria-hidden="true"
+                />Nova coletânea
+              </button>
+              <button
+                type="button"
+                class="editor__menu-item"
+                data-testid="add-menu-single"
+                @click="onAddMenuAction('single')"
+              >
+                <i
+                  class="ti ti-music"
+                  aria-hidden="true"
+                />Novo single
+              </button>
+              <button
+                type="button"
+                class="editor__menu-item"
+                data-testid="add-menu-official"
+                @click="onAddMenuAction('official')"
+              >
+                <i
+                  class="ti ti-book"
+                  aria-hidden="true"
+                />Hino oficial
+              </button>
+            </div>
+          </div>
         </div>
+        <!-- SPEC AC1: zero UI de rede/login deslogado. MediaAccountBar removida
+             do editor (login unificado só no avatar do header global). -->
+        <!-- Form de nova coletânea (aberto pelo menu "+") -->
         <div class="editor__row">
           <input
             v-model="newCollectionName"
             type="text"
             class="editor__input"
+            data-testid="new-collection-input"
             :placeholder="t('media.editor.newCollection')"
             @keyup.enter="onCreateCollection"
           >
           <button
             type="button"
             class="editor__btn"
+            data-testid="new-collection-btn"
             :disabled="saving || !newCollectionName.trim()"
             @click="onCreateCollection"
           >
@@ -1498,149 +1568,7 @@ onMounted(async () => {
             />
           </button>
         </div>
-        <div
-          class="editor__visibility"
-          role="radiogroup"
-          :aria-label="t('media.visibility.label')"
-        >
-          <button
-            type="button"
-            class="editor__visibility-btn"
-            :class="{ 'editor__visibility-btn--active': newCollectionVisibility === 'private' }"
-            :aria-pressed="newCollectionVisibility === 'private'"
-            :disabled="saving"
-            @click="newCollectionVisibility = 'private'"
-          >
-            <i
-              class="ti ti-lock"
-              aria-hidden="true"
-            />
-            {{ t('media.visibility.private') }}
-          </button>
-          <button
-            type="button"
-            class="editor__visibility-btn"
-            :class="{ 'editor__visibility-btn--active': newCollectionVisibility === 'public' }"
-            :aria-pressed="newCollectionVisibility === 'public'"
-            :disabled="saving"
-            @click="newCollectionVisibility = 'public'"
-          >
-            <i
-              class="ti ti-broadcast"
-              aria-hidden="true"
-            />
-            {{ t('media.visibility.public') }}
-          </button>
-        </div>
-        <button
-          type="button"
-          class="editor__btn editor__btn--rules"
-          @click="rulesOpen = true"
-        >
-          <i class="ti ti-info-circle" aria-hidden="true" />
-          {{ t('media.publishRules.linkLabel') }}
-        </button>
-        <ul class="editor__list">
-          <li
-            v-for="collection in collections"
-            :key="collection.id"
-          >
-            <button
-              type="button"
-              class="editor__list-item"
-              :class="{ 'editor__list-item--active': collection.id === selectedCollectionId }"
-              @click="selectedCollectionId = collection.id; onCollectionChange()"
-            >
-              {{ collection.name }}
-              <span class="editor__count">{{ collection.musicsCount }}</span>
-            </button>
-          </li>
-        </ul>
-        <template v-if="selectedCollection">
-          <div
-            class="editor__visibility"
-            role="radiogroup"
-            :aria-label="t('media.visibility.label')"
-          >
-            <button
-              type="button"
-              class="editor__visibility-btn"
-              :class="{ 'editor__visibility-btn--active': (selectedCollection.visibility ?? 'public') === 'private' }"
-              :aria-pressed="(selectedCollection.visibility ?? 'public') === 'private'"
-              :disabled="saving || visibilityBusy"
-              @click="onChangeVisibilityWithRules('private')"
-            >
-              <i
-                class="ti ti-lock"
-                aria-hidden="true"
-              />
-              {{ t('media.visibility.private') }}
-            </button>
-            <button
-              type="button"
-              class="editor__visibility-btn"
-              :class="{ 'editor__visibility-btn--active': (selectedCollection.visibility ?? 'public') === 'public' }"
-              :aria-pressed="(selectedCollection.visibility ?? 'public') === 'public'"
-              :disabled="saving || visibilityBusy"
-              @click="onChangeVisibilityWithRules('public')"
-            >
-              <i
-                class="ti ti-broadcast"
-                aria-hidden="true"
-              />
-              {{ t('media.visibility.public') }}
-            </button>
-          </div>
-          <p class="editor__hint">
-            {{ (selectedCollection.visibility ?? 'public') === 'public'
-              ? t('media.visibility.publicHint')
-              : t('media.visibility.privateHint') }}
-          </p>
-          <button
-            v-if="(selectedCollection.visibility ?? 'public') === 'public'"
-            type="button"
-            class="editor__btn editor__btn--rules"
-            :title="t('media.publishRules.title')"
-            @click="rulesOpen = true"
-          >
-            <i
-              class="ti ti-info-circle"
-              aria-hidden="true"
-            />
-            {{ t('media.publishRules.showRules') }}
-          </button>
-        </template>
-        <button
-          v-if="selectedCollectionId != null"
-          type="button"
-          class="editor__btn editor__btn--danger"
-          :disabled="saving"
-          :title="t('media.editor.deleteCollection')"
-          @click="requestDelete('collection')"
-        >
-          <i
-            class="ti ti-trash"
-            aria-hidden="true"
-          />
-          Excluir coletânea
-        </button>
-        <p
-          v-if="!loading && collections.length === 0"
-          class="editor__hint"
-        >
-          Nenhuma coletânea ainda. Crie a primeira acima.
-        </p>
-      </aside>
-
-      <aside
-        class="editor__aside editor__aside--musics"
-        :class="{ 'editor__aside--collapsed': asideCollapsed }"
-        v-show="!asideCollapsed"
-      >
-        <!-- Single (adendo 24/11): música avulsa — visível mesmo sem coletânea. -->
-        <h2 class="editor__section-title">
-          Novo single
-        </h2>
+        <!-- Form de novo single (SPEC: single sempre disponível) -->
         <div class="editor__row">
           <input
             v-model="newSingleName"
@@ -1664,6 +1592,152 @@ onMounted(async () => {
             />
           </button>
         </div>
+        <ul class="editor__list">
+          <li
+            v-for="collection in collections"
+            :key="collection.id"
+          >
+            <button
+              type="button"
+              class="editor__list-item"
+              :class="{ 'editor__list-item--active': collection.id === selectedCollectionId }"
+              @click="selectedCollectionId = collection.id; onCollectionChange()"
+            >
+              {{ collection.name }}
+              <span class="editor__count">{{ collection.musicsCount }}</span>
+            </button>
+            <button
+              type="button"
+              class="editor__btn editor__btn--icon editor__kebab"
+              data-testid="collection-kebab"
+              :title="`Ações para ${collection.name}`"
+              @click.stop="kebabOpenId = kebabOpenId === collection.id ? null : collection.id"
+            >
+              <i
+                class="ti ti-dots-vertical"
+                aria-hidden="true"
+              />
+            </button>
+            <div
+              v-if="kebabOpenId === collection.id"
+              class="editor__menu"
+              data-testid="collection-kebab-menu"
+            >
+              <button
+                type="button"
+                class="editor__menu-item"
+                data-testid="kebab-cover"
+                @click="onKebabAction('cover', collection.id)"
+              >
+                <i
+                  class="ti ti-photo"
+                  aria-hidden="true"
+                />Editar capa
+              </button>
+              <button
+                type="button"
+                class="editor__menu-item"
+                data-testid="kebab-rename"
+                @click="onKebabAction('rename', collection.id)"
+              >
+                <i
+                  class="ti ti-pencil"
+                  aria-hidden="true"
+                />Renomear
+              </button>
+              <!-- Visibilidade: só logado (SPEC AC1: deslogado zero UI de rede)
+                   e só na coletânea selecionada -->
+              <div
+                v-if="isSignedIn && collection.id === selectedCollectionId"
+                class="editor__visibility editor__visibility--menu"
+                role="radiogroup"
+                :aria-label="t('media.visibility.label')"
+              >
+                <button
+                  type="button"
+                  class="editor__visibility-btn"
+                  :class="{ 'editor__visibility-btn--active': (selectedCollection?.visibility ?? 'public') === 'private' }"
+                  :aria-pressed="(selectedCollection?.visibility ?? 'public') === 'private'"
+                  :disabled="saving || visibilityBusy"
+                  @click="onChangeVisibilityWithRules('private')"
+                >
+                  <i
+                    class="ti ti-lock"
+                    aria-hidden="true"
+                  />
+                  {{ t('media.visibility.private') }}
+                </button>
+                <button
+                  type="button"
+                  class="editor__visibility-btn"
+                  :class="{ 'editor__visibility-btn--active': (selectedCollection?.visibility ?? 'public') === 'public' }"
+                  :aria-pressed="(selectedCollection?.visibility ?? 'public') === 'public'"
+                  :disabled="saving || visibilityBusy"
+                  @click="onChangeVisibilityWithRules('public')"
+                >
+                  <i
+                    class="ti ti-broadcast"
+                    aria-hidden="true"
+                  />
+                  {{ t('media.visibility.public') }}
+                </button>
+              </div>
+              <button
+                type="button"
+                class="editor__menu-item"
+                data-testid="kebab-delete"
+                @click="onKebabAction('delete', collection.id)"
+              >
+                <i
+                  class="ti ti-trash"
+                  aria-hidden="true"
+                />Excluir
+              </button>
+            </div>
+            <!-- Inline rename (aberto pelo menu ⋮ → Renomear) -->
+            <div
+              v-if="renamingId === collection.id"
+              class="editor__row"
+            >
+              <input
+                v-model="renameCollectionDraft"
+                type="text"
+                class="editor__input"
+                data-testid="collection-rename-input"
+                placeholder="Novo nome"
+                @keyup.enter="onRenameCollection"
+              >
+              <button
+                type="button"
+                class="editor__btn"
+                :disabled="saving || !renameCollectionDraft.trim()"
+                title="Salvar nome"
+                @click="onRenameCollection"
+              >
+                <i
+                  class="ti ti-device-floppy"
+                  aria-hidden="true"
+                />
+              </button>
+            </div>
+          </li>
+        </ul>
+        <!-- Input de capa do KEbab "Editar capa" (hidden, acionado via coverInput) -->
+        <input
+          ref="coverInput"
+          type="file"
+          accept="image/*"
+          class="editor__file-input"
+          :aria-label="t('media.editor.changeCover')"
+          @change="onCoverFile"
+        >
+      </aside>
+
+      <aside
+        class="editor__aside editor__aside--musics"
+        :class="{ 'editor__aside--collapsed': asideCollapsed }"
+        v-show="!asideCollapsed"
+      >
         <template v-if="selectedCollectionId != null">
           <h2 class="editor__section-title">
             Músicas
@@ -1743,7 +1817,8 @@ onMounted(async () => {
                 v-model="officialSearch"
                 type="text"
                 class="editor__input"
-                :placeholder="t('media.editor.searchOfficial')"
+                data-testid="official-search"
+                placeholder="Buscar hino oficial (nº ou nome)"
                 @input="onOfficialSearchInput"
                 @keyup.enter="onAddOfficialFromSearch"
               >
@@ -1849,12 +1924,6 @@ onMounted(async () => {
             Nenhuma música nesta coletânea. Crie ou adicione acima.
           </p>
         </template>
-        <p
-          v-else
-          class="editor__hint editor__hint--column"
-        >
-          Selecione uma coletânea à esquerda para ver as músicas.
-        </p>
       </aside>
 
       <div class="editor__main">
@@ -2118,12 +2187,54 @@ onMounted(async () => {
             Nova estrofe
           </button>
         </template>
-        <p
+        <div
           v-else
-          class="editor__empty"
+          class="editor__onboarding"
+          data-testid="editor-onboarding"
         >
-          Selecione uma música à esquerda para editar as estrofes, timing e background.
-        </p>
+          <h2 class="editor__onboarding-title">Comece por aqui</h2>
+          <p class="editor__onboarding-sub">
+            Escolha uma das opções — funciona mesmo sem conta (fica salvo neste dispositivo).
+          </p>
+          <div class="editor__onboarding-actions">
+            <button
+              type="button"
+              class="editor__btn editor__onboarding-cta"
+              data-testid="onboarding-collection"
+              @click="onAddMenuAction('collection')"
+            >
+              <i
+                class="ti ti-disc"
+                aria-hidden="true"
+              />
+              Criar coletânea
+            </button>
+            <button
+              type="button"
+              class="editor__btn editor__onboarding-cta"
+              data-testid="onboarding-single"
+              @click="onAddMenuAction('single')"
+            >
+              <i
+                class="ti ti-music"
+                aria-hidden="true"
+              />
+              Novo single
+            </button>
+            <button
+              type="button"
+              class="editor__btn editor__onboarding-cta"
+              data-testid="onboarding-import"
+              @click="onImportSlja"
+            >
+              <i
+                class="ti ti-file-import"
+                aria-hidden="true"
+              />
+              Importar .slja
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- Painel "Letra" (estilo playlist da /media): a letra PRONTA, é ela que anda -->
@@ -2220,6 +2331,114 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+
+.editor__aside-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.editor__add-wrap {
+  position: relative;
+}
+
+.editor__menu {
+  position: absolute;
+  top: calc(100% + 0.3rem);
+  right: 0;
+  z-index: 30;
+  min-width: 172px;
+  padding: 0.3rem;
+  border-radius: 10px;
+  background: var(--surface-2, #26262e);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.2));
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+}
+
+.editor__menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.6rem;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  font-size: 0.8rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.editor__menu-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.editor__kebab {
+  opacity: 0.55;
+}
+
+.editor__list li {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.editor__list li .editor__kebab {
+  flex: 0 0 auto;
+}
+
+.editor__list li .editor__menu {
+  top: auto;
+  bottom: calc(100% + 0.2rem);
+}
+
+.editor__onboarding {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  text-align: center;
+  padding: 2rem;
+}
+
+.editor__onboarding-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.editor__onboarding-sub {
+  margin: 0;
+  opacity: 0.7;
+  font-size: 0.82rem;
+  max-width: 340px;
+}
+
+.editor__onboarding-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-top: 0.4rem;
+  min-width: 220px;
+}
+
+.editor__onboarding-cta {
+  justify-content: center;
+  padding: 0.6rem 1rem;
+  font-size: 0.9rem;
+}
+
+.editor__visibility--menu {
+  flex-direction: column;
+  padding: 0.25rem 0.4rem;
+  border-top: 1px solid var(--glass-border, rgba(255, 255, 255, 0.15));
+}
 
 .editor__visibility {
   display: flex;

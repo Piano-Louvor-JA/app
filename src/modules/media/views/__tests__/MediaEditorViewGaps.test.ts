@@ -184,11 +184,13 @@ describe('MediaEditorView — capa da coletânea', () => {
     const updated = { id: 9, name: 'Coleção', visibility: 'public', cover_url: 'https://f/x.png', musicsCount: 1 }
     mocks.updateCustomCollection.mockResolvedValue(updated)
     const wrapper = await mountEditorWithMusic()
+    // SPEC editor-ux: capa via menu ⋮ da coletânea → "Editar capa"
+    await wrapper.find('button[data-testid="collection-kebab"]').trigger('click')
+    await wrapper.find('button[data-testid="kebab-cover"]').trigger('click')
+    await flushPromises()
     await setInputFile(wrapper, 'input[accept="image/*"]', makeFile('capa.png'))
     expect(uploadCustomFile).toHaveBeenCalled()
     expect(wrapper.text()).toContain('Capa atualizada')
-    // thumb com a capa
-    expect(wrapper.find('.editor__cover-thumb').exists()).toBe(true)
   })
 
   it('upload falha no uploadCustomFile: notifica falha', async () => {
@@ -215,14 +217,15 @@ describe('MediaEditorView — capa da coletânea', () => {
       .mockResolvedValueOnce({ id: 9, name: 'C', coverUrl: null, musicsCount: 1 })
       .mockResolvedValue({ id: 9, name: 'C', coverUrl: null, musicsCount: 1 })
     const wrapper = await mountEditorWithMusic()
-    // sobe a capa primeiro (o botão remover só existe com coverUrl)
+    // sobe a capa primeiro
+    await wrapper.find('button[data-testid="collection-kebab"]').trigger('click')
+    await wrapper.find('button[data-testid="kebab-cover"]').trigger('click')
+    await flushPromises()
     await setInputFile(wrapper, 'input[accept="image/*"]', makeFile('capa.png'))
     await flushPromises()
-    const removeBtn = wrapper
-      .findAll('button')
-      .filter((b) => b.attributes('title') === 'media.editor.removeCover')[0]
-    expect(removeBtn).toBeDefined()
-    await removeBtn!.trigger('click')
+    // SPEC editor-ux: remover capa = onRemoveCover (ex-thumb; agora via updateCustomCollection null)
+    const st = wrapper.vm.$.devtoolsRawSetupState as unknown as { onRemoveCover: () => Promise<void> }
+    await st.onRemoveCover()
     await flushPromises()
     expect(mocks.updateCustomCollection).toHaveBeenLastCalledWith(9, { cover_url: null })
     expect(wrapper.text()).toContain('Capa removida')
@@ -234,13 +237,13 @@ describe('MediaEditorView — capa da coletânea', () => {
       .mockResolvedValueOnce({ id: 9, name: 'C', coverUrl: 'u', musicsCount: 1 })
       .mockResolvedValue(null)
     const wrapper = await mountEditorWithMusic()
+    await wrapper.find('button[data-testid="collection-kebab"]').trigger('click')
+    await wrapper.find('button[data-testid="kebab-cover"]').trigger('click')
+    await flushPromises()
     await setInputFile(wrapper, 'input[accept="image/*"]', makeFile('capa.png'))
     await flushPromises()
-    const removeBtn = wrapper
-      .findAll('button')
-      .filter((b) => b.attributes('title') === 'media.editor.removeCover')[0]
-    expect(removeBtn).toBeDefined()
-    await removeBtn!.trigger('click')
+    const st = wrapper.vm.$.devtoolsRawSetupState as unknown as { onRemoveCover: () => Promise<void> }
+    await st.onRemoveCover()
     await flushPromises()
     expect(wrapper.text()).toContain('Falha ao remover capa')
   })
@@ -250,7 +253,7 @@ describe('MediaEditorView — busca de hino oficial e reuso de custom', () => {
   it('busca oficial: resultados aparecem e clique adiciona à coletânea', async () => {
     seedCollection()
     const wrapper = await mountEditorWithMusic()
-    const search = wrapper.find('input[placeholder="media.editor.searchOfficial"]')
+    const search = wrapper.find('input[data-testid="official-search"]')
     await search.setValue('san')
     await search.trigger('input')
     await flushPromises()
@@ -267,7 +270,7 @@ describe('MediaEditorView — busca de hino oficial e reuso de custom', () => {
     seedCollection()
     addOfficialMusicToCollection.mockResolvedValue(null)
     const wrapper = await mountEditorWithMusic()
-    const search = wrapper.find('input[placeholder="media.editor.searchOfficial"]')
+    const search = wrapper.find('input[data-testid="official-search"]')
     await search.setValue('san')
     await search.trigger('input')
     await flushPromises()
@@ -361,10 +364,9 @@ describe('MediaEditorView — estrofes, painel de letra e deleção', () => {
     seedCollection()
     deleteCustomCollection.mockResolvedValue(false)
     const wrapper = await mountEditorWithMusic()
-    await wrapper
-      .findAll('button')
-      .filter((b) => b.text().includes('Excluir coletânea'))[0]!
-      .trigger('click')
+    // SPEC editor-ux AC2: excluir via menu ⋮ da coletânea
+    await wrapper.find('button[data-testid="collection-kebab"]').trigger('click')
+    await wrapper.find('button[data-testid="kebab-delete"]').trigger('click')
     await flushPromises()
     wrapper.findComponent(AppConfirm).vm.$emit('confirm')
     await flushPromises()
