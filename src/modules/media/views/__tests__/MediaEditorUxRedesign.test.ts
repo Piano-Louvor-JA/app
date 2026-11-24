@@ -139,7 +139,8 @@ describe('SPEC-editor-ux-v1 — deslogado (AC1)', () => {
     w.unmount()
   })
 
-  // AC1 caso real do reviewer: draft local selecionada deslogado = botão Publicar NÃO existe no DOM (v-if, não disabled); teste caso real draft deslogado = MÚSICA ÓRFÃ selecionada deslogado → botão Publicar NÃO existe no DOM (v-if, não disabled) (SPEC v2)
+  // AC1 caso real do reviewer: draft local órfã (SPEC v2) selecionada deslogado
+  it('draft local órfã selecionada deslogado = botão Publicar NÃO existe no DOM (v-if, não disabled)', async () => {
     mocks.listCustomMusics.mockResolvedValue([
       { id: -7, name: 'Rascunho local', status: 'draft', officialMusicId: null },
     ] as never)
