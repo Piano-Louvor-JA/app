@@ -3,6 +3,8 @@ export default {
 		title: "Comunidade",
 		subtitle: "Coletâneas públicas da rede PIANO",
 		back: "Voltar",
+		weeklyTasksSubtitle: "Tarefas da semana da rede",
+		weeklyTasksEmpty: "Nenhuma tarefa esta semana.",
 		blockAuthor: "Bloquear autor",
 		blockConfirmTitle: "Bloquear {name}?",
 		blockConfirmMessage: "As coletâneas deste autor deixam de aparecer para você na Comunidade. Você pode desbloquear depois em \"Usuários bloqueados\".",

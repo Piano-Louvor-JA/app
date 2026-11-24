@@ -4,9 +4,10 @@ import { communityRoutes } from "../routes";
 
 // Adendo v1.1.0: 7 rotas — base, cópia (:id), view de cópias, custom (:id),
 // view de coletâneas próprias, detalhe público, ranking.
+// Adendo premium/clean (23/11): + community-tasks (view própria).
 describe("communityRoutes", () => {
 	it("define as rotas do módulo com navKey community", () => {
-		expect(communityRoutes).toHaveLength(7);
+		expect(communityRoutes).toHaveLength(8);
 		const byName = new Map(communityRoutes.map((r) => [r.name, r]));
 		for (const name of [
 			"community",
@@ -16,6 +17,7 @@ describe("communityRoutes", () => {
 			"community-my-collections",
 			"community-collection",
 			"community-ranking",
+			"community-tasks",
 		]) {
 			const route = byName.get(name);
 			expect(route, name).toBeDefined();

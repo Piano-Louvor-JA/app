@@ -139,19 +139,17 @@ describe("CommunityView — carregamento popula estado (regressão do bug do sin
 		expect(mocks.getNotifications).toHaveBeenCalledTimes(1);
 	});
 
-	it("aguarda authReadiness antes de carregar weekly tasks e notifications", async () => {
+	it("aguarda authReadiness antes de carregar notifications", async () => {
 		let release!: () => void;
 		mocks.getAuthReadiness.mockReturnValue(new Promise<void>(resolve => { release = resolve; }));
 		const wrapper = mount(CommunityView);
 		await flushPromises();
 
-		expect(mocks.getWeeklyTasks).not.toHaveBeenCalled();
 		expect(mocks.getNotifications).not.toHaveBeenCalled();
 
 		release();
 		await flushPromises();
 		await flushPromises();
-		expect(mocks.getWeeklyTasks).toHaveBeenCalledOnce();
 		expect(mocks.getNotifications).toHaveBeenCalledOnce();
 		wrapper.unmount();
 	});
@@ -161,10 +159,9 @@ describe("CommunityView — carregamento popula estado (regressão do bug do sin
 		mocks.getAuthReadiness.mockReturnValue(new Promise<void>(() => {}));
 		const wrapper = mount(CommunityView);
 		await Promise.resolve();
-		expect(mocks.getWeeklyTasks).not.toHaveBeenCalled();
+		expect(mocks.getNotifications).not.toHaveBeenCalled();
 
 		await vi.advanceTimersByTimeAsync(8_000);
-		expect(mocks.getWeeklyTasks).toHaveBeenCalledOnce();
 		expect(mocks.getNotifications).toHaveBeenCalledOnce();
 		wrapper.unmount();
 		vi.useRealTimers();
@@ -183,12 +180,12 @@ describe("CommunityView — carregamento popula estado (regressão do bug do sin
 		expect(wrapper.vm.isLogged).toBe(
 			false,
 		);
-		expect(wrapper.find(".community-view__bell").exists()).toBe(false);
+		expect(wrapper.find('[data-test="community-bell"]').exists()).toBe(false);
 	});
 
 	it("renderiza o sino quando logado", async () => {
 		const wrapper = await mountView();
-		expect(wrapper.find(".community-view__bell").exists()).toBe(true);
+		expect(wrapper.find('[data-test="community-bell"]').exists()).toBe(true);
 	});
 
 	it("coleções paginadas populam o grid (24 por página)", async () => {

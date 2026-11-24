@@ -3,6 +3,8 @@ export default {
     "title": "Спільнота",
     "subtitle": "Публічні збірки мережі PIANO",
     "back": "Назад",
+    "weeklyTasksSubtitle": "Завдання тижня мережі",
+    "weeklyTasksEmpty": "Цього тижня завдань немає.",
     "blockAuthor": "Заблокувати автора",
     "blockConfirmTitle": "Заблокувати {name}?",
     "blockConfirmMessage": "Добірки цього автора більше не показуватимуться вам у Спільноті. Розблокувати можна в розділі «Заблоковані користувачі».",

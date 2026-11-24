@@ -3,6 +3,8 @@ export default {
 		title: "Community",
 		subtitle: "Public collections from the PIANO network",
 		back: "Back",
+		weeklyTasksSubtitle: "Weekly tasks of the network",
+		weeklyTasksEmpty: "No tasks this week.",
 		blockAuthor: "Block author",
 		blockConfirmTitle: "Block {name}?",
 		blockConfirmMessage: "This author's collections will no longer appear for you in the Community. You can unblock later in \"Blocked users\".",

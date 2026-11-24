@@ -27,16 +27,15 @@ import {
 	getSeasonalEvent,
 	type SeasonalEventBanner,
 } from "../services/seasonal-event";
-import { getWeeklyTasks, type WeeklyTask } from "../services/weekly-tasks";
 import {
 	type AppNotification,
 	getNotifications,
 } from "../services/notifications";
 import NotificationsDropdown from "../components/NotificationsDropdown.vue";
 import MyEditsPanel from "@modules/community-edits/views/MyEditsPanel.vue";
-import { listLocalEdits } from "@modules/community-edits/services/local-edits-store";
 import { publishEdit } from "@modules/community-edits/services/publish-edit";
 import type { ServerEditStatus } from "@modules/community-edits/views/MyEditsPanel.vue";
+import { fuzzyMatch } from "../services/fuzzy-search";
 import { useCommunityBrowseStore } from "../stores/useCommunityBrowseStore";
 import PageBackStack from "@shared/components/PageBackStack.vue";
 import { useMinimizablePage } from "@shared/composables/useMinimizablePage";
@@ -49,7 +48,6 @@ const isLoading = ref(true);
 const copyingId = ref<number | null>(null);
 const savedId = ref<number | null>(null);
 const savedError = ref<number | null>(null);
-const weeklyTasks = ref<WeeklyTask[]>([]);
 const viewEl = ref<HTMLElement | null>(null);
 // busca e página sobrevivem a sair e voltar para a tela
 const { searchQuery, page } = storeToRefs(useCommunityBrowseStore());
@@ -85,13 +83,14 @@ const total = ref(0);
 const PER_PAGE = 24;
 const hasPrev = computed(() => page.value > 1);
 const hasNext = computed(() => page.value < lastPage.value);
+
 const filteredCollections = computed(() => {
-	const q = searchQuery.value.trim().toLowerCase();
+	const q = searchQuery.value.trim();
 	if (!q) return collections.value;
 	return collections.value.filter(
 		(c) =>
-			c.name.toLowerCase().includes(q) ||
-			(c.authorName ?? "").toLowerCase().includes(q),
+			fuzzyMatch(c.name, q) ||
+			fuzzyMatch(c.authorName ?? "", q),
 	);
 });
 const reportTarget = ref<CommunityCollectionSummary | null>(null);
@@ -161,9 +160,8 @@ async function load() {
 		getAuthReadiness(),
 		new Promise<void>(resolve => setTimeout(resolve, 8_000)),
 	]);
-	const [result, tasks, notifs, seasonal] = await Promise.all([
+	const [result, notifs, seasonal] = await Promise.all([
 		listCommunityCollectionsPage(page.value, PER_PAGE),
-		getWeeklyTasks(),
 		getNotifications(),
 		getSeasonalEvent(),
 	]);
@@ -171,7 +169,6 @@ async function load() {
 	page.value = result.page;
 	lastPage.value = result.lastPage;
 	total.value = result.total;
-	if (tasks) weeklyTasks.value = tasks;
 	notifications.value = notifs;
 	isLogged.value = Boolean(getAuthSession()?.token);
 	seasonalEvent.value = seasonal;
@@ -415,10 +412,14 @@ onMounted(() => {
         <p class="community-view__subtitle">
           {{ t('community.subtitle') }}
         </p>
+      </div>
+      <!-- Premium clean: TODAS as ações em linha, compactas, na mesma
+           linha do header — nada de blocos/seções acima da lista. -->
+      <nav class="community-view__actions-row" aria-label="community actions">
         <button
           v-if="isLogged"
           type="button"
-          class="community-view__bell"
+          class="community-view__icon-btn"
           :aria-label="t('notifications.title')"
           @click.stop="showNotifications = !showNotifications"
         >
@@ -430,20 +431,52 @@ onMounted(() => {
         </button>
         <button
           type="button"
-          class="community-view__ranking-link"
+          class="community-view__icon-btn"
+          data-test="community-entry-copies"
+          :aria-label="t('community.myCopies')"
+          :title="t('community.myCopies')"
+          @click="openMyCopies"
+        >
+          <i class="ti ti-copy" aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          class="community-view__icon-btn"
+          data-test="community-entry-collections"
+          :aria-label="t('community.myCollections')"
+          :title="t('community.myCollections')"
+          @click="openMyCollections"
+        >
+          <i class="ti ti-disc" aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          class="community-view__icon-btn"
+          data-test="community-entry-tasks"
+          :aria-label="t('ranking.weeklyTasks')"
+          :title="t('ranking.weeklyTasks')"
+          @click="router.push({ name: 'community-tasks' })"
+        >
+          <i class="ti ti-target" aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          class="community-view__icon-btn"
+          :aria-label="t('community.ranking')"
+          :title="t('community.ranking')"
           @click="router.push('/community/ranking')"
         >
           <i class="ti ti-trophy" aria-hidden="true" />
-          {{ t('community.ranking') }}
         </button>
         <a
           href="https://pianolouvorja.com.br/conduta"
           target="_blank"
           rel="noopener noreferrer"
-          class="community-view__coc-link"
+          class="community-view__icon-btn"
+          :aria-label="t('community.conductLink')"
+          :title="t('community.conductLink')"
         >
           <i class="ti ti-shield-check" aria-hidden="true" />
-          {{ t('community.conductLink') }}
         </a>
         <button
           type="button"
@@ -453,9 +486,9 @@ onMounted(() => {
           @click="router.push('/media/editor')"
         >
           <i class="ti ti-pencil-plus" aria-hidden="true" />
-          {{ t('community.createCollection') }}
+          <span class="community-view__create-label">{{ t('community.createCollection') }}</span>
         </button>
-      </div>
+      </nav>
 
       <MyEditsPanel
         v-if="isLogged"
@@ -465,29 +498,7 @@ onMounted(() => {
       />
     </header>
 
-    <!-- Adendo v1.1.0: entradas p/ as views próprias (sem listas inline) -->
-    <div class="community-view__entries" data-test="community-my-entries">
-      <button
-        type="button"
-        class="community-view__entry"
-        data-test="community-entry-copies"
-        @click="openMyCopies"
-      >
-        <i class="ti ti-copy" aria-hidden="true" />
-        <span class="community-view__entry-label">{{ t('community.myCopies') }}</span>
-        <i class="ti ti-chevron-right" aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        class="community-view__entry"
-        data-test="community-entry-collections"
-        @click="openMyCollections"
-      >
-        <i class="ti ti-disc" aria-hidden="true" />
-        <span class="community-view__entry-label">{{ t('community.myCollections') }}</span>
-        <i class="ti ti-chevron-right" aria-hidden="true" />
-      </button>
-    </div>
+    <!-- (tarefas semanais foram para view própria /community/tasks) -->
 
     <div
       v-if="seasonalEvent"
@@ -512,35 +523,6 @@ onMounted(() => {
     >
       {{ t('community.loading') }}
     </p>
-
-    <GlassCard
-      v-if="!isLoading && weeklyTasks.length > 0"
-      class="community-view__tasks"
-      elevated
-    >
-      <h2 class="community-view__tasks-title">
-        <i class="ti ti-target" aria-hidden="true" />
-        {{ t('ranking.weeklyTasks') }}
-      </h2>
-      <ul class="community-view__tasks-list">
-        <li
-          v-for="task in weeklyTasks"
-          :key="task.id"
-          class="community-view__task"
-          :class="{ 'community-view__task--done': task.done }"
-        >
-          <i
-            class="ti"
-            :class="task.done ? 'ti-circle-check' : 'ti-circle'"
-            aria-hidden="true"
-          />
-          <span class="community-view__task-desc">{{ task.description }}</span>
-          <span class="community-view__task-bonus">
-            {{ t('ranking.points', { points: task.bonus }) }}
-          </span>
-        </li>
-      </ul>
-    </GlassCard>
 
     <div class="community-view__toolbar">
       <div class="community-view__search">
@@ -895,18 +877,39 @@ onMounted(() => {
   opacity: 0.7;
 }
 
-.community-view__bell {
-	position: relative;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 2.4rem;
-	height: 2.4rem;
-	border: 1px solid var(--ds-color-outline, rgba(255, 255, 255, 0.08));
-	border-radius: var(--ds-radius-sm, 8px 0 8px 0);
-	background: color-mix(in srgb, var(--ds-color-surface-card, #201f1f) 70%, transparent);
-	color: var(--ds-color-on-surface);
-	cursor: pointer;
+/* Premium clean: linha única de ações compactas no header */
+.community-view__headings {
+  display: flex;
+  flex-direction: column;
+}
+
+.community-view__actions-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.community-view__icon-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border: 1px solid var(--ds-color-outline, rgba(255, 255, 255, 0.08));
+  border-radius: var(--ds-radius-sm, 8px 0 8px 0);
+  background: color-mix(in srgb, var(--ds-color-surface-card, #201f1f) 70%, transparent);
+  color: var(--ds-color-on-surface);
+  font-size: 1.05rem;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.community-view__icon-btn:hover {
+  filter: brightness(1.2);
 }
 
 .community-view__bell-badge {
@@ -926,120 +929,22 @@ onMounted(() => {
 	font-weight: 700;
 }
 
-.community-view__ranking-link {
-	display: inline-flex;
-	align-items: center;
-	gap: 0.4rem;
-	margin-top: 0.5rem;
-	padding: 0.4rem 0.8rem;
-	border-radius: 0.5rem;
-	border: 1px solid var(--ds-border, rgba(255, 255, 255, 0.2));
-	background: var(--ds-glass-fill, rgba(255, 255, 255, 0.08));
-	color: inherit;
-	font-size: 0.9rem;
-	cursor: pointer;
-}
-
-.community-view__coc-link {
-	display: inline-flex;
-	align-items: center;
-	gap: 0.4rem;
-	margin-top: 0.5rem;
-	padding: 0.4rem 0.8rem;
-	border-radius: 0.5rem;
-	border: 1px solid var(--ds-border, rgba(255, 255, 255, 0.2));
-	background: var(--ds-glass-fill, rgba(255, 255, 255, 0.08));
-	color: inherit;
-	font-size: 0.9rem;
-	cursor: pointer;
-	text-decoration: none;
-}
-
 .community-view__create-btn {
 	display: inline-flex;
 	align-items: center;
 	gap: 0.4rem;
-	margin-top: 0.5rem;
 	padding: 0.4rem 0.8rem;
 	border-radius: 0.5rem;
-	border: 1px solid var(--ds-border, rgba(255, 255, 255, 0.2));
-	background: var(--ds-glass-fill, rgba(255, 255, 255, 0.08));
+	border: 1px solid var(--ds-color-primary, #e6b93c);
+	background: color-mix(in srgb, var(--ds-color-primary, #e6b93c) 18%, transparent);
 	color: inherit;
 	font-size: 0.9rem;
-	cursor: pointer;
-}
-
-.community-view__tasks {
-	padding: 0.75rem 1rem;
-}
-
-.community-view__tasks-title {
-	display: flex;
-	align-items: center;
-	gap: 0.4rem;
-	margin: 0 0 0.5rem;
-	font-size: 1rem;
-}
-
-.community-view__tasks-list {
-	display: flex;
-	flex-direction: column;
-	gap: 0.35rem;
-	margin: 0;
-	padding: 0;
-	list-style: none;
-}
-
-.community-view__task {
-	display: flex;
-	align-items: center;
-	gap: 0.5rem;
-	font-size: 0.9rem;
-}
-
-.community-view__task--done {
-	opacity: 0.55;
-	text-decoration: line-through;
-}
-
-.community-view__task-desc {
-	flex: 1;
-}
-
-.community-view__task-bonus {
 	font-weight: 600;
-	opacity: 0.8;
-}
-
-/* Adendo v1.1.0: botões de entrada p/ as views próprias (Minhas Cópias /
-   Minhas Coletâneas). Sem listas inline na Comunidade. */
-.community-view__entries {
-	display: flex;
-	flex-direction: column;
-	gap: 0.5rem;
-}
-
-.community-view__entry {
-	display: flex;
-	align-items: center;
-	gap: 0.6rem;
-	padding: 0.75rem 1rem;
-	border-radius: 0.75rem;
-	border: 1px solid var(--ds-border, rgba(255, 255, 255, 0.2));
-	background: var(--ds-glass-fill, rgba(255, 255, 255, 0.08));
-	color: inherit;
-	font: inherit;
-	font-size: 1rem;
-	text-align: left;
 	cursor: pointer;
 }
 
-.community-view__entry:hover {
+.community-view__create-btn:hover {
 	filter: brightness(1.15);
-}
-
-.community-view__entry-label {
-	flex: 1;
 }
 
 .community-view__event {

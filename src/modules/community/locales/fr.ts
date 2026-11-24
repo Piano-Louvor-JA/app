@@ -3,6 +3,8 @@ export default {
     "title": "Communauté",
     "subtitle": "Collections publiques du réseau PIANO",
     "back": "Retour",
+    "weeklyTasksSubtitle": "Tâches de la semaine du réseau",
+    "weeklyTasksEmpty": "Aucune tâche cette semaine.",
     "blockAuthor": "Bloquer l’auteur",
     "blockConfirmTitle": "Bloquer {name} ?",
     "blockConfirmMessage": "Les collections de cet auteur ne vous seront plus affichées dans la Communauté. Vous pourrez débloquer plus tard dans « Utilisateurs bloqués ».",
