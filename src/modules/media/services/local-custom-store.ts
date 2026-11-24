@@ -66,6 +66,8 @@ export type LocalCollection = {
 	name: string;
 	description?: string | null;
 	createdAt: string;
+	/** Id do blob de capa em IndexedDB (local-media-store) — cover 1× por coletânea. */
+	coverMediaId?: string | null;
 	/** Origem (D1): cópias da Comunidade ficam EXCLUSIVAMENTE na aba Comunidade. */
 	origin?: LocalCollectionOrigin;
 };
@@ -170,7 +172,7 @@ export function createLocalCollection(
 
 export function updateLocalCollection(
 	id: number,
-	patch: { name?: string; description?: string | null },
+	patch: { name?: string; description?: string | null; coverMediaId?: string | null },
 ): boolean {
 	const db = loadDb();
 	const collection = db.collections.find((c) => c.id === id);
@@ -178,6 +180,7 @@ export function updateLocalCollection(
 	if (patch.name != null) collection.name = patch.name;
 	if (patch.description !== undefined)
 		collection.description = patch.description;
+	if (patch.coverMediaId !== undefined) collection.coverMediaId = patch.coverMediaId;
 	saveDb(db);
 	return true;
 }

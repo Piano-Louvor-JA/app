@@ -330,15 +330,54 @@ export async function updateCustomCollection(
   },
 ): Promise<CustomCollectionSummary | null> {
   if (isLocalId(collectionId)) {
-    const ok = updateLocalCollection(collectionId, {
-      name: patch.name,
-      description: patch.description,
-    })
-    if (!ok) return null
+    // Cover local (SPEC editor-ux + feedback Rafael 24/11): data URL → blob
+    // IndexedDB (coverMediaId). Nada sobe pra rede — capa fica no dispositivo.
+    let coverSaved = true
+    if (patch.cover_url !== undefined) {
+      const { putMedia } = await import('./local-media-store')
+      if (patch.cover_url) {
+        try {
+          const blob = await (await fetch(patch.cover_url)).blob()
+          const mediaId = `coll-${collectionId}-cover`
+          await putMedia(mediaId, blob)
+          coverSaved = updateLocalCollection(collectionId, { coverMediaId: mediaId })
+        } catch {
+          coverSaved = false
+        }
+      } else {
+        coverSaved = updateLocalCollection(collectionId, { coverMediaId: null })
+      }
+      if (!coverSaved) return null
+    } else if (
+      patch.name === undefined &&
+      patch.description === undefined &&
+      patch.visibility === undefined
+    ) {
+      // chamada sem campos aplicáveis e sem cover: nada a fazer
+      const existing = getLocalCollection(collectionId)
+      if (!existing) return null
+    }
+    const okOrExisting =
+      patch.name != null || patch.description !== undefined
+        ? updateLocalCollection(collectionId, {
+            name: patch.name,
+            description: patch.description,
+          })
+        : getLocalCollection(collectionId) != null
+    if (!okOrExisting) return null
+    const local = getLocalCollection(collectionId)
+    if (!local) return null
+    let coverUrl: string | null = null
+    if (local.coverMediaId) {
+      const { getMedia } = await import('./local-media-store')
+      const blob = await getMedia(local.coverMediaId)
+      coverUrl = blob ? URL.createObjectURL(blob) : null
+    }
     return {
       id: collectionId,
-      name: patch.name ?? '',
-      description: patch.description ?? null,
+      name: patch.name ?? local.name,
+      description: patch.description ?? local.description ?? null,
+      coverUrl,
       musicsCount: listLocalMusics(collectionId).length,
       ownerId: null,
       authorName: null,
@@ -384,6 +423,7 @@ export async function listCustomCollections(opts?: {
     id: c.id,
     name: c.name,
     description: c.description ?? null,
+    coverUrl: c.coverMediaId ?? null,
     musicsCount: listLocalMusics(c.id).length,
     ownerId: null,
     authorName: null,
@@ -921,11 +961,27 @@ export function customApiUrl(path: string): string {
 }
 
 export function customFileUrl(urlPath: string): string {
-  // objectURL/blob:/data: (áudio/bg locais do import .slja) já são URL final.
+  // objectURL/blob:/data: (áudio/bg/cover locais) já são URL final.
   if (/^(blob:|data:|https?:|\/file)/.test(urlPath)) return urlPath
   const base = import.meta.env.VITE_PALCO_API_URL
   if (base) return `${base.replace(/\/$/, '')}/file${urlPath}`
   return `/file${urlPath}`
+}
+
+/**
+ * Cover LOCAL de coletânea (id negativo): resolve coverMediaId → objectURL.
+ * Remoto: coverUrl já é path /custom/... → customFileUrl. Null = sem capa.
+ */
+export async function collectionCoverUrl(
+  collection: CustomCollectionSummary,
+): Promise<string | null> {
+  if (isLocalId(collection.id)) {
+    if (!collection.coverUrl) return null
+    const { getMedia } = await import('./local-media-store')
+    const blob = await getMedia(collection.coverUrl)
+    return blob ? URL.createObjectURL(blob) : null
+  }
+  return collection.coverUrl ? customFileUrl(collection.coverUrl) : null
 }
 
 /**
