@@ -557,6 +557,52 @@ const selectedCollection = computed(
   () => collections.value.find((c) => c.id === selectedCollectionId.value) ?? null,
 )
 
+/* ---------- SPEC v3.1 (Rafael 24/11): single ≠ coletânea ----------
+ * Música é single ATÉ entrar numa coletânea. A coletânea fixa "Singles" é
+ * apenas backing store invisível — na view de singles, as ferramentas de
+ * COMPOSIÇÃO (nova música/reutilizar/hino oficial) não fazem sentido e
+ * ficam ocultas (v-if, não disabled). Excluir música muda pro cabeçalho
+ * da edição (única ação de gestão que um single tem, além da capa). */
+const isSinglesView = computed(
+  () => selectedCollection.value?.name === SINGLES_COLLECTION_NAME,
+)
+
+/* ---------- Capa do SINGLE (v3.1): cover por música ---------- */
+const musicCoverInput = ref<HTMLInputElement | null>(null)
+
+async function onMusicCoverFile(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  const musicId = selectedMusicId.value
+  if (!file || musicId == null) return
+  saving.value = true
+  try {
+    const bytes = new Uint8Array(await file.arrayBuffer())
+    if (isLocalId(musicId)) {
+      // Local: blob no IndexedDB (coverMediaId) — offline-first, nunca sobe.
+      const mediaId = `local-music-${musicId}-cover`
+      await putMedia(mediaId, bytes)
+      updateLocalMusic(musicId, { coverMediaId: mediaId })
+      notify('Capa do single atualizada')
+    } else {
+      const uploaded = await uploadCustomFile(bytes, file.name, 'imagens')
+      if (!uploaded) {
+        notify('Falha no upload da capa', true)
+        return
+      }
+      const ok = await updateCustomMusic(musicId, { id_file_image: uploaded.idFile })
+      if (!ok) {
+        notify('Falha ao salvar capa', true)
+        return
+      }
+      notify('Capa do single atualizada')
+    }
+  } finally {
+    saving.value = false
+  }
+}
+
 /* ---------- Privacidade da coletânea selecionada (t_35e4d3ea) ---------- */
 
 const visibilityBusy = ref(false)
@@ -848,9 +894,8 @@ async function importSingleSlja(file: File): Promise<void> {
     )
     let collectionId = selectedCollectionId.value
     if (collectionId == null) { // MÚSICA SEM COLETÂNEA (ÓRFÃ)
-      // O SINGLE é a view de órfãos, não uma coletânea criada por import
-      // A lógica de singles/órfãos é tratada na criação da música e listagem.
-      // Não tentamos criar coletânea 'Singles' aqui.
+      // RF-02 v2 (SPEC a829eac): órfã segue SEM coletânea (null) — v3.1
+      // (UI) não altera o modelo; single = música sem coletânea.
     } else if (importCollectionName !== importBaseName) {
       // Colisão: usa a existente ou cria uma (mantém o comportamento antigo para
       // evitar perda de dados de usuário, mas não cria 'Singles' aqui)
@@ -1735,16 +1780,26 @@ onMounted(async () => {
         >
       </aside>
 
+      <!-- v3.1: coluna oculta quando não tem NADA a renderizar —
+           sem coletânea selecionada, ou view Singles vazia (sem
+           composição por ser single + sem músicas para listar). -->
       <aside
+        v-if="selectedCollectionId != null && (!isSinglesView || musics.length > 0)"
         class="editor__aside editor__aside--musics"
         :class="{ 'editor__aside--collapsed': asideCollapsed }"
         v-show="!asideCollapsed"
       >
+        <!-- SPEC v3.1: view de singles (backing "Singles" oculto) = sem
+             ferramentas de COMPOSIÇÃO (novo/reutilizar/hino oficial) —
+             single já É a música completa. Lista permanece (seleção p/ edição). -->
         <template v-if="selectedCollectionId != null">
           <h2 class="editor__section-title">
-            Músicas
+            {{ isSinglesView ? 'Singles' : 'Músicas' }}
           </h2>
-          <div class="editor__row">
+          <div
+            v-if="!isSinglesView"
+            class="editor__row"
+          >
             <input
               v-model="newMusicName"
               type="text"
@@ -1766,7 +1821,10 @@ onMounted(async () => {
           </div>
 
           <!-- Reutilizar música custom já criada/importada (copia com letra e áudio) -->
-          <div class="editor__add-official">
+          <div
+            v-if="!isSinglesView"
+            class="editor__add-official"
+          >
             <input
               v-model="reuseSearch"
               type="text"
@@ -1813,7 +1871,10 @@ onMounted(async () => {
           </div>
 
           <!-- Adicionar hino OFICIAL da API à coletânea (busca no catálogo) -->
-          <div class="editor__add-official">
+          <div
+            v-if="!isSinglesView"
+            class="editor__add-official"
+          >
             <div class="editor__row">
               <input
                 v-model="officialSearch"
@@ -1889,8 +1950,8 @@ onMounted(async () => {
               </button>
             </li>
           </ul>
-          <!-- SPEC editor-ux AC1: deslogado = zero UI de rede. Publicar só
-               EXISTE logado (removido, não disabled). -->
+          <!-- v3.1: Publicar fica na coluna; Excluir música REALOCADO para o
+               cabeçalho da edição (funciona p/ single e música de coletânea). -->
           <button
             v-if="isSignedIn && selectedMusicId != null && musicStatus === 'draft'"
             type="button"
@@ -1904,20 +1965,6 @@ onMounted(async () => {
               aria-hidden="true"
             />
             Publicar
-          </button>
-          <button
-            v-if="selectedMusicId != null"
-            type="button"
-            class="editor__btn editor__btn--danger"
-            :disabled="saving"
-            :title="t('media.editor.deleteMusic')"
-            @click="requestDelete('music')"
-          >
-            <i
-              class="ti ti-trash"
-              aria-hidden="true"
-            />
-            Excluir música
           </button>
           <p
             v-if="!loading && musics.length === 0"
@@ -1934,6 +1981,48 @@ onMounted(async () => {
             <h2 class="editor__section-title">
               {{ musicName || 'Música' }}
             </h2>
+            <!-- v3.1: ações da MÚSICA no cabeçalho da edição — é aqui que o
+                 usuário trabalha. Single tem excluir (realocado da coluna) e
+                 capa própria; coletânea mantém os mesmos controles. -->
+            <div class="editor__music-head-actions">
+              <input
+                ref="musicCoverInput"
+                type="file"
+                accept="image/*"
+                class="editor__file-input"
+                data-testid="music-cover-input"
+                aria-label="Alterar capa do single"
+                @change="onMusicCoverFile"
+              >
+              <button
+                v-if="selectedMusicId != null"
+                type="button"
+                class="editor__btn editor__btn--icon"
+                data-testid="music-cover-btn"
+                :disabled="saving"
+                title="Capa desta música (aparece na projeção e nas listas)"
+                @click="musicCoverInput?.click()"
+              >
+                <i
+                  class="ti ti-photo"
+                  aria-hidden="true"
+                />
+              </button>
+              <button
+                v-if="selectedMusicId != null"
+                type="button"
+                class="editor__btn editor__btn--danger editor__btn--icon"
+                data-testid="music-delete-btn"
+                :disabled="saving"
+                :title="t('media.editor.deleteMusic')"
+                @click="requestDelete('music')"
+              >
+                <i
+                  class="ti ti-trash"
+                  aria-hidden="true"
+                />
+              </button>
+            </div>
             <div
               v-if="canRenameMusic"
               class="editor__rename"
@@ -3086,6 +3175,17 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 0.25rem;
+}
+
+/* v3.1: ações da música no cabeçalho (capa/excluir) */
+.editor__music-head-actions {
+  display: flex;
+  gap: 0.375rem;
+  flex-shrink: 0;
+}
+
+.editor__file-input {
+  display: none;
 }
 
 .editor__rename-input {

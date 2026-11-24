@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 // SPEC-editor-ux-v1 (frozen 1cf6907) + covers coletânea/single (Rafael 24/11):
-// AC1 deslogado zero UI rede/login; AC2 excluir via ⋮+confirm; AC3 único "+"
+// AC1 deslogado zero UI rede/login; AC2 excluir via ⋮+confirm; AC3 único
 // com menu 3 ações; AC4 canvas onboarding 3 CTAs; AC5 micro-fixes; cover local
 // persiste (IndexedDB) e cover de música (single) via thumb.
+// SPEC v3.1 (Rafael 24/11): single≠coletânea — composição oculta em singles,
+// botão excluir realocado pro cabeçalho de edição, capa de single.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 
@@ -228,6 +230,93 @@ describe('SPEC-editor-ux-v1 — micro-fixes (AC5)', () => {
     const search = w.find('input[data-testid="official-search"]')
     expect(search.exists()).toBe(true)
     expect(search.attributes('placeholder')).toBe('Buscar hino oficial (nº ou nome)')
+    w.unmount()
+  })
+})
+
+describe('SPEC v3.1 — single ≠ coletânea (Rafael 24/11)', () => {
+  // Single = backing "Singles" (id 3, name 'Singles'); coletânea real = id 4.
+  async function mountWithSingles(selected: 'singles' | 'collection') {
+    mocks.listCustomCollections.mockResolvedValue([
+      { id: 3, name: 'Singles', coverUrl: null, musicsCount: 1, isOwner: true },
+      { id: 4, name: 'Adoração', coverUrl: null, musicsCount: 0, isOwner: true },
+    ])
+    mocks.listCustomMusics.mockResolvedValue([
+      { id: -7, name: 'Single Teste', status: 'draft', officialMusicId: null },
+    ])
+    const { getLocalMusic } = await import('../../services/local-custom-store')
+    vi.mocked(getLocalMusic).mockReturnValue({
+      id: -7,
+      name: 'Single Teste',
+      status: 'draft',
+      lyrics: [],
+      audioBase64: null,
+      officialMusicId: null,
+    } as never)
+    const w = await mountEditor()
+    await btn(w, selected === 'singles' ? 'Singles' : 'Adoração')!.trigger('click')
+    await flushPromises()
+    // seleciona a música (mesma lista nas duas views)
+    const item = w.findAll('button').find((b) => b.text().includes('Single Teste'))
+    await item!.trigger('click')
+    await flushPromises()
+    return w
+  }
+
+  it('AC1: view Singles oculta composição (nova música/reutilizar/hino oficial) do DOM', async () => {
+    const w = await mountWithSingles('singles')
+    // inputs de composição não renderizam (v-if, não disabled)
+    expect(w.find('input[data-testid="official-search"]').exists()).toBe(false)
+    expect(w.html()).not.toContain('media.editor.reuseMusic')
+    expect(w.html()).not.toContain('Nenhuma música nesta coletânea')
+    w.unmount()
+  })
+
+  it('AC2: coletânea real mantém composição visível', async () => {
+    const w = await mountWithSingles('collection')
+    expect(w.find('input[data-testid="official-search"]').exists()).toBe(true)
+    expect(w.html()).toContain('media.editor.reuseMusic')
+    w.unmount()
+  })
+
+  it('AC3: botão excluir realocado no cabeçalho da edição (single e coletânea)', async () => {
+    for (const view of ['singles', 'collection'] as const) {
+      const w = await mountWithSingles(view)
+      const del = w.find('button[data-testid="music-delete-btn"]')
+      expect(del.exists()).toBe(true)
+      // sem botão "Excluir música" textual na coluna lateral
+      expect(w.findAll('button').filter((b) => b.text().trim() === 'Excluir música')).toHaveLength(0)
+      w.unmount()
+    }
+  })
+
+  it('AC4: capa do single — upload local grava coverMediaId (IndexedDB)', async () => {
+    const w = await mountWithSingles('singles')
+    const input = w.find('input[data-testid="music-cover-input"]')
+    expect(input.exists()).toBe(true)
+    // dispara handler de change com File fake
+    const file = new File([new Uint8Array([1, 2, 3])], 'capa.png', { type: 'image/png' })
+    Object.defineProperty(input.element, 'files', { value: [file] })
+    await input.trigger('change')
+    await flushPromises()
+    const { updateLocalMusic } = await import('../../services/local-custom-store')
+    const { putMedia: putMediaReal } = await import('../../services/local-media-store')
+    expect(putMediaReal).toHaveBeenCalledWith('local-music--7-cover', expect.any(Uint8Array))
+    expect(updateLocalMusic).toHaveBeenCalledWith(-7, {
+      coverMediaId: 'local-music--7-cover',
+    })
+    w.unmount()
+  })
+  it('AC5: coluna do meio oculta quando não tem nada a renderizar (Singles vazio)', async () => {
+    mocks.listCustomCollections.mockResolvedValue([
+      { id: 3, name: 'Singles', coverUrl: null, musicsCount: 0, isOwner: true },
+    ])
+    mocks.listCustomMusics.mockResolvedValue([])
+    const w = await mountEditor()
+    await btn(w, 'Singles')!.trigger('click')
+    await flushPromises()
+    // single vazio: sem composição (v3.1) e sem músicas → coluna some do DOM
+    expect(w.find('.editor__aside--musics').exists()).toBe(false)
     w.unmount()
   })
 })

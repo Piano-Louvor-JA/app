@@ -13,6 +13,7 @@ import { useRouter } from "vue-router";
 
 import {
 	listCustomCollections,
+	updateCustomCollection,
 } from "@modules/media/services/custom-catalog";
 import {
 	listLocalCollections,
