@@ -7,7 +7,6 @@ import MediaSlideStage from '../components/MediaSlideStage.vue'
 import AppConfirm from '@shared/components/AppConfirm.vue'
 import { getAuthSession } from '../services/auth-client'
 import { getAuthReadiness } from '@modules/auth/services/firebase-client'
-import { useAuth } from '@modules/auth/composables/useAuth'
 import { startOutboxLoop } from '../services/outbox-loop'
 import {
   getLocalMusic as getLocalMusicById,
@@ -77,7 +76,6 @@ const route = useRoute()
 
 const { t } = useI18n()
 // Sessão principal (header) — feedback Ezequias: um login só no app.
-const { isLoggedIn } = useAuth()
 const collections = ref<CustomCollectionSummary[]>([])
 // Privacidade da NOVA coletânea (default PRIVADO — opt-in pra publicar).
 const newCollectionVisibility = ref<CollectionVisibility>('private')

@@ -53,9 +53,6 @@ vi.mock('../../../../shared/services/slja', () => ({
 vi.mock('@modules/auth/services/firebase-client', () => ({
   getAuthReadiness: vi.fn(async () => null),
 }))
-vi.mock('@modules/auth/composables/useAuth', () => ({
-  useAuth: () => ({ isLoggedIn: { value: mocks.getSession() != null } }),
-}))
 vi.mock('../../services/outbox-loop', () => ({ startOutboxLoop: vi.fn() }))
 vi.mock('../../services/local-media-store', () => ({
   putMedia: vi.fn(async () => {}),
