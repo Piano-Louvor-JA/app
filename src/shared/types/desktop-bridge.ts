@@ -212,9 +212,36 @@ export type YoutubeSearchApi = {
   more: (continuation: YoutubeSearchContinuation) => Promise<YoutubeSearchResult>
   /** Vídeos de uma playlist (link com `list=` ou o id). */
   playlist?: (text: string) => Promise<YoutubePlaylistResult>
+  /** Canal (link, @handle ou id `UC…`) e as playlists da aba "Playlists". */
+  channel?: (text: string) => Promise<YoutubeChannelResult>
+  /** Busca canais sobre o tema, puxando para os adventistas. */
+  channels?: (query: string) => Promise<YoutubeChannelSearchResult>
 }
 
 export type YoutubePlaylistResult = { title: string; items: YoutubeSearchItem[]; error?: string }
+
+/** Playlist da aba "Playlists" de um canal. */
+export type YoutubeChannelPlaylistInfo = { id: string; title: string; thumbnail: string; videoCount: number }
+
+/** Dados do canal: `url` é o link curto (@handle) quando existe. */
+export type YoutubeChannelInfo = { id: string; name: string; url: string; avatar: string }
+
+/** `error`: `invalid`, `empty`, `parse`, `network` ou `http-<status>`. */
+export type YoutubeChannelResult = { channel: YoutubeChannelInfo | null; playlists: YoutubeChannelPlaylistInfo[]; error?: string }
+
+/** Canal achado na busca. `handle`: "@nome" (pode vir vazio); `subscribers`: texto do YouTube ("12 mil inscritos"). */
+export type YoutubeChannelSearchItem = {
+  id: string
+  name: string
+  handle: string
+  subscribers: string
+  avatar: string
+  description: string
+  url: string
+}
+
+/** `error`: `empty`, `parse`, `network` ou `http-<status>`. */
+export type YoutubeChannelSearchResult = { items: YoutubeChannelSearchItem[]; error?: string }
 
 export type SitePageInfo = {
   title: string

@@ -281,6 +281,8 @@ contextBridge.exposeInMainWorld('louvorja', {
     query: (text) => ipcRenderer.invoke('youtube-search:query', text),
     more: (continuation) => ipcRenderer.invoke('youtube-search:more', continuation),
     playlist: (text) => ipcRenderer.invoke('youtube-search:playlist', text),
+    channel: (text) => ipcRenderer.invoke('youtube-search:channel', text),
+    channels: (query) => ipcRenderer.invoke('youtube-search:channels', query),
   },
 
   siteInfo: {
