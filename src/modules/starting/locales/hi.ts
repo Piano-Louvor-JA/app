@@ -2,25 +2,25 @@ export default {
   "starting": {
     "titleFirstBoot": "Setting up LouvorJA - PIANO",
     "titleWarmBoot": "Preparing LouvorJA - PIANO",
-    "subtitle": "We are configuring and getting everything ready for you.",
-    "retry": "Try again",
+    "subtitle": "हम आपके लिए सब कुछ व्यवस्थित और तैयार कर रहे हैं।",
+    "retry": "पुनः प्रयास करें",
     "status": {
-      "booting": "Starting the app…",
-      "preparingInstall": "Preparing the first-time setup…",
-      "preparing": "Setting up your worship environment…",
-      "loading": "Almost there — loading your resources…",
-      "downloading": "Syncing the catalog with the API…",
-      "extracting": "Extracting and preparing local files…",
-      "syncingCovers": "Preparing essential covers and images…",
-      "done": "All set!",
-      "retry": "Trying again…",
-      "error": "Could not finish setup. Please try again.",
-      "errorOffline": "No internet connection. Check your network and try again.",
-      "errorRateLimit": "Too many server requests (Rate Limit). Please try again later.",
-      "errorServer": "Failed to connect to the server. Please try again.",
-      "errorDownload": "Error syncing the catalog with the API. Check your internet and try again.",
-      "errorExtract": "Error preparing local data.",
-      "bridgeMissing": "Could not connect to desktop. Close and reopen the application."
+      "booting": "ऐप प्रारंभ हो रहा है…",
+      "preparingInstall": "पहली बार सेटअप तैयार किया जा रहा है…",
+      "preparing": "आपका उपासना वातावरण तैयार किया जा रहा है…",
+      "loading": "लगभग तैयार — संसाधन लोड हो रहे हैं…",
+      "downloading": "सूची सेवा से समकालीकृत हो रही है…",
+      "extracting": "स्थानीय फ़ाइलें निकाली और तैयार की जा रही हैं…",
+      "syncingCovers": "आवश्यक कवर और चित्र तैयार किए जा रहे हैं…",
+      "done": "सब तैयार है!",
+      "retry": "पुनः प्रयास जारी…",
+      "error": "सेटअप पूरा नहीं हो सका। पुनः प्रयास करें।",
+      "errorOffline": "इंटरनेट कनेक्शन नहीं है। अपना नेटवर्क जाँचकर पुनः प्रयास करें।",
+      "errorRateLimit": "सर्वर को बहुत अधिक अनुरोध (रेट लिमिट)। बाद में पुनः प्रयास करें।",
+      "errorServer": "सर्वर से कनेक्ट नहीं हो सका। पुनः प्रयास करें।",
+      "errorDownload": "सूची समकालीकरण त्रुटि। इंटरनेट जाँचकर पुनः प्रयास करें।",
+      "errorExtract": "स्थानीय डेटा तैयार करने में त्रुटि।",
+      "bridgeMissing": "डेस्कटॉप से कनेक्ट नहीं हो सका। ऐप बंद करके दोबारा खोलें।"
     }
   }
 }

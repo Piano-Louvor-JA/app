@@ -1,67 +1,67 @@
 export default {
   closeProjection: {
-    title: "Close projection?",
-    message: "A projection is active (bible/hymns/video/site). Close now? Enter closes.",
-    confirm: "Close",
+    title: "투영을 닫을까요?",
+    message: "투영이 활성 상태입니다(성경/찬송가/동영상/사이트). 지금 닫을까요? Enter 키로 닫습니다.",
+    confirm: "닫기",
   },
   auth: {
-    wrongPassword: "Incorrect password",
-    reauthFailed: "Could not confirm your identity",
-    accountDeleted: "Account deleted",
-    passwordRequired: "Type your password to confirm",
-    sessionExpired: "Session expired — sign in again to delete the account",
-    deleteFailed: "Could not delete the account",
+    wrongPassword: "비밀번호가 올바르지 않습니다",
+    reauthFailed: "신원을 확인할 수 없습니다",
+    accountDeleted: "계정이 삭제되었습니다",
+    passwordRequired: "확인하려면 비밀번호를 입력하세요",
+    sessionExpired: "세션이 만료되었습니다 — 계정을 삭제하려면 다시 로그인하세요",
+    deleteFailed: "계정을 삭제할 수 없습니다",
   },
   "palcoOutputs": {
-    "title": "Stage TVs",
-    "empty": "No TV with Stage connected. Open Stage",
-    "onHold": "{slot} · on hold"
+    "title": "스테이지 TV",
+    "empty": "스테이지에 연결된 TV가 없습니다. 스테이지를 여세요",
+    "onHold": "{slot} · 보류 중"
   },
   "obsOutputs": {
-    "detecting": "Detecting and refreshing OBS connections…",
-    "active": "Remote connections",
-    "activateHint": "Start a connection in Settings → Broadcast to use it here.",
-    "title": "OBS connections",
-    "activeConnections": "Active connections: {count}"
+    "detecting": "OBS 연결을 감지하고 새로 고치는 중…",
+    "active": "원격 연결",
+    "activateHint": "여기서 사용하려면 설정 → 방송에서 연결을 시작하세요.",
+    "title": "OBS 연결",
+    "activeConnections": "활성 연결: {count}"
   },
   "floating": {
-    "closeTitle": "Close {title}?",
-    "closeMessage": "Stop this feature and close its projection?"
+    "closeTitle": "{title}을(를) 닫을까요?",
+    "closeMessage": "이 기능을 중지하고 투영을 닫을까요?"
   },
   "updates": {
-    checkFailed: "Failed to check for updates",
-    downloadFailedRetry: "Could not download the update. Try again later.",
-    downloadFailedConnection: "Could not download the update. Check your internet connection.",
-    verifyFailed: "The update could not be verified. Try again later.",
-    updateFailed: "Update failed. Try again later.",
-    "downloadMacInstaller": "Download macOS installer",
-    "manualMacInstructions": "On macOS, install this update manually. Download the installer below, quit LouvorJA, open the DMG and drag the app to Applications, replacing the previous version. Your data and preferences will be kept.",
-    "version": "Version {version}",
-    "noReleaseNotes": "No release notes.",
-    "download": "Download update",
-    "installRestart": "Install and restart",
-    "later": "Later",
-    "available": "Version {version} available",
-    "update": "Update",
-    "dismiss": "Dismiss"
+    checkFailed: "업데이트 확인 실패",
+    downloadFailedRetry: "업데이트를 다운로드할 수 없습니다. 나중에 다시 시도하세요.",
+    downloadFailedConnection: "업데이트를 다운로드할 수 없습니다. 인터넷 연결을 확인하세요.",
+    verifyFailed: "업데이트를 확인할 수 없습니다. 나중에 다시 시도하세요.",
+    updateFailed: "업데이트 실패. 나중에 다시 시도하세요.",
+    "downloadMacInstaller": "macOS 설치 파일 다운로드",
+    "manualMacInstructions": "macOS에서는 이 업데이트를 수동으로 설치하세요. 아래에서 설치 파일을 다운로드한 후 LouvorJA를 종료하고 DMG를 열어 앱을 응용 프로그램 폴더로 드래그하여 이전 버전을 교체하세요. 데이터와 설정은 유지됩니다.",
+    "version": "버전 {version}",
+    "noReleaseNotes": "릴리스 노트가 없습니다.",
+    "download": "업데이트 다운로드",
+    "installRestart": "설치 후 재시작",
+    "later": "나중에",
+    "available": "버전 {version} 사용 가능",
+    "update": "업데이트",
+    "dismiss": "닫기"
   },
   "windowControls": {
-    "close": "Close",
-    "minimize": "Minimize",
-    "maximize": "Maximize"
+    "close": "닫기",
+    "minimize": "최소화",
+    "maximize": "최대화"
   },
   "a11y": {
-    "mainNav": "Main navigation"
+    "mainNav": "메인 내비게이션"
   },
   "apiOffline": {
-    "message": "No connection to the service — check your internet",
-    "retrying": "Trying to reconnect..."
+    "message": "서비스에 연결할 수 없습니다 — 인터넷 연결을 확인하세요",
+    "retrying": "다시 연결을 시도하는 중..."
   },
   "projection": {
     liturgy: "투영",
-    "minimizeProjection": "Minimize projection",
-    "restoreProjection": "Restore projection",
-    "confirmClose": "Projection is in progress. Closing this window stops the music. Really leave?"
+    "minimizeProjection": "투영 최소화",
+    "restoreProjection": "투영 복원",
+    "confirmClose": "투영이 진행 중입니다. 이 창을 닫으면 음악이 중지됩니다. 정말 나가시겠습니까?"
   },
   "app": {
     "name": "Louvor JA",
@@ -69,198 +69,198 @@ export default {
     "nameJa": "JA"
   },
   "common": {
-    "close": "Close",
-    "comingSoon": "Coming soon",
-    "openFolder": "Open folder",
-    "addToPlaylist": "Add to playlist",
-    "suggestFix": "Suggest lyric/timing fix",
-    "cancel": "Cancel",
-    "copied": "Copied!"
+    "close": "닫기",
+    "comingSoon": "곧 제공됩니다",
+    "openFolder": "폴더 열기",
+    "addToPlaylist": "재생목록에 추가",
+    "suggestFix": "가사/타이밍 수정 제안",
+    "cancel": "취소",
+    "copied": "복사되었습니다!"
   },
   "independentProjection": {
-    "title": "Independent projection",
-    "enableHint": "Turn on in Screens to use",
-    "unavailable": "Only available with extended monitors connected",
-    "hint": "Pick one monitor. This feature appears on top of whatever is projected there; the other monitors stay the same.",
-    "monitor": "Monitor {index}",
-    "activeOn": "Independent projection on monitor {index}",
-    "stop": "Stop independent projection",
-    "sharedOn": "Shared projection on monitor {index}",
-    "modeLabel": "Projection mode",
+    "title": "독립 투영",
+    "enableHint": "사용하려면 화면에서 켜세요",
+    "unavailable": "확장 모니터가 연결된 경우에만 사용할 수 있습니다",
+    "hint": "모니터 하나를 선택하세요. 이 기능은 해당 모니터에 투영 중인 내용 위에 표시되며, 다른 모니터는 그대로 유지됩니다.",
+    "monitor": "모니터 {index}",
+    "activeOn": "모니터 {index}에서 독립 투영 중",
+    "stop": "독립 투영 중지",
+    "sharedOn": "모니터 {index}에서 공유 투영 중",
+    "modeLabel": "투영 모드",
     "status": {
-      "stop": "Stop",
-      "overlay": "Overlaying on:",
-      "share": "Sharing on:",
-      "monitor": "Monitor {index}"
+      "stop": "중지",
+      "overlay": "오버레이 중:",
+      "share": "공유 중:",
+      "monitor": "모니터 {index}"
     },
     "mode": {
-      "overlay": "Overlay",
-      "share": "Share"
+      "overlay": "오버레이",
+      "share": "공유"
     },
-    "hintShare": "Pick one monitor. Its screen is split in half with whatever is already projected; if one side leaves, the other takes the whole screen again."
+    "hintShare": "모니터 하나를 선택하세요. 해당 화면은 이미 투영 중인 내용과 절반씩 나뉘며, 한쪽이 종료되면 다른 쪽이 화면 전체를 다시 사용합니다."
   },
   "monitors": {
-    "wiredTitle": "Wired connections",
-    "selectScreens": "Select screens",
-    "identify": "Detect screens",
-    "hint": "Check the monitors where the resource should be projected.",
-    "loading": "Detecting monitors…",
-    "empty": "No extended monitors found.",
-    "primary": "Primary",
-    "returnScreen": "Return screen",
-    "selectedCount": "{count} selected",
-    "projectNeedsScreens": "Select at least one extended screen to project"
+    "wiredTitle": "유선 연결",
+    "selectScreens": "화면 선택",
+    "identify": "화면 감지",
+    "hint": "콘텐츠를 투영할 모니터를 선택하세요.",
+    "loading": "모니터를 감지하는 중…",
+    "empty": "확장 모니터를 찾을 수 없습니다.",
+    "primary": "기본",
+    "returnScreen": "화면 되돌리기",
+    "selectedCount": "{count}개 선택됨",
+    "projectNeedsScreens": "투영하려면 확장 화면을 하나 이상 선택하세요"
   },
   "popupCount": {
-    "label": "Screens",
-    "tooltip": "Select projection screens"
+    "label": "화면",
+    "tooltip": "투영 화면 선택"
   },
   "popupControls": {
-    "closeAll": "Close all screens"
+    "closeAll": "모든 화면 닫기"
   },
   "uiZoom": {
-    "label": "Page zoom",
-    "zoomIn": "Zoom in",
-    "zoomOut": "Zoom out"
+    "label": "페이지 확대/축소",
+    "zoomIn": "확대",
+    "zoomOut": "축소"
   },
   "nav": {
-    "home": "Home",
-    "albums": "Media Center",
-    "community": "Community",
-    "liturgy": "Liturgy",
-    "bible": "Bible",
-    "utilities": "Utilities",
-    "settings": "Settings",
+    "home": "홈",
+    "albums": "미디어 센터",
+    "community": "커뮤니티",
+    "liturgy": "예배 순서",
+    "bible": "성경",
+    "utilities": "도구",
+    "settings": "설정",
     "history": {
-      "label": "Navigation history",
-      "back": "Back",
-      "forward": "Forward",
-      "goTo": "Go to {label}"
+      "label": "탐색 기록",
+      "back": "뒤로",
+      "forward": "앞으로",
+      "goTo": "{label}(으)로 이동"
     },
     "historyDetail": {
-      "player": "Player",
-      "editor": "Editor"
+      "player": "플레이어",
+      "editor": "편집기"
     }
   },
   "connectedDevices": {
-    "title": "Connected devices",
-    "remote": "Remote control",
-    "speaker": "Preacher's clicker",
-    "monitors": "Monitor sharing",
-    "none": "None connected",
-    "monitorsInUse": "{device} ({host}) · {n} monitor(s)",
-    "palco": "Stage (TVs)",
+    "title": "연결된 기기",
+    "remote": "리모컨",
+    "speaker": "설교자 클리커",
+    "monitors": "모니터 공유",
+    "none": "연결 없음",
+    "monitorsInUse": "{device} ({host}) · 모니터 {n}개",
+    "palco": "스테이지(TV)",
     "palcoTv": "{name} · {ip}",
     "transmission": "Broadcasts (OBS/browsers)",
     "transmissionGroup": "{connection} · {page} · {tabs}",
-    "tabs": "1 tab | {n} tabs",
-    "inObs": "{n} in OBS",
-    "inBrowser": "{n} in the browser",
-    "and": " and ",
+    "tabs": "탭 1개 | 탭 {n}개",
+    "inObs": "OBS에서 {n}개",
+    "inBrowser": "브라우저에서 {n}개",
+    "and": " 그리고 ",
     "pages": {
-      "espelho": "Mirror",
-      "retorno": "Stage return",
-      "legenda": "Caption",
-      "other": "Other page"
+      "espelho": "미러",
+      "retorno": "스테이지 리턴",
+      "legenda": "자막",
+      "other": "기타 페이지"
     }
   },
   "minimize": {
-    "playlistCount": "{n} playlist(s)",
-    "pageNumber": "Page {n}",
-    "bar": "Minimized pages",
-    "close": "Close {title}",
-    "page": "Minimize page",
-    "search": "Search: {q}"
+    "playlistCount": "재생목록 {n}개",
+    "pageNumber": "{n}페이지",
+    "bar": "최소화된 페이지",
+    "close": "{title} 닫기",
+    "page": "페이지 최소화",
+    "search": "검색: {q}"
   },
   "sync": {
     "downloadQueue": {
-      "title": "Downloads",
-      "clearFinished": "Clear finished",
-      "retry": "Retry",
-      "cancel": "Cancel"
+      "title": "다운로드",
+      "clearFinished": "완료 항목 지우기",
+      "retry": "다시 시도",
+      "cancel": "취소"
     }
   },
   "sljaMigration": {
-    "title": "Upload {count} imported hymn(s) to your account?",
-    "message": "You imported .slja files while logged out. They can go to your account (a single copy, never duplicated) and be available on any device.",
-    "confirm": "Upload to account",
-    "cancel": "Keep on this device only"
+    "title": "가져온 찬송가 {count}곡을 계정에 업로드할까요?",
+    "message": "로그아웃 상태에서 .slja 파일을 가져왔습니다. 계정에 업로드하면(중복 없이 단일 복사본) 모든 기기에서 사용할 수 있습니다.",
+    "confirm": "계정에 업로드",
+    "cancel": "이 기기에만 보관"
   },
   "download": {
-    "indicatorTitle": "Background downloads: {done}/{total} ({percent}%)",
-    "indicatorCounts": "{done} of {total} completed",
-    "indicatorIdle": "Preparing download…"
+    "indicatorTitle": "백그라운드 다운로드: {done}/{total} ({percent}%)",
+    "indicatorCounts": "{total}개 중 {done}개 완료",
+    "indicatorIdle": "다운로드 준비 중…"
   },
   "settings": {
     "appearance": {
-      "changeTheme": "Alterar tema"
+      "changeTheme": "테마 변경"
     },
     "general": {
-      "checkUpdate": "Buscar atualizações",
-      "checking": "Comprobando…",
-      "updateAvailable": "Atualização disponível",
-      "updateDesktopOnly": "Somente desktop",
-      "updateError": "Erro de atualização",
-      "updateHint": "Reinicie para aplicar",
-      "updateNotAvailable": "Sem atualizações",
-      "updateTitle": "Atualização do app"
+      "checkUpdate": "업데이트 확인",
+      "checking": "확인 중…",
+      "updateAvailable": "업데이트 사용 가능",
+      "updateDesktopOnly": "데스크톱 전용",
+      "updateError": "업데이트 오류",
+      "updateHint": "적용하려면 다시 시작",
+      "updateNotAvailable": "업데이트 없음",
+      "updateTitle": "앱 업데이트"
     },
     "stage": {
-      "title": "Personalizar Palco",
-      "scopeGlobal": "Padrão (global)",
+      "title": "무대 사용자 지정",
+      "scopeGlobal": "기본값(전역)",
       "scope": {
-        "hymns": "Hinos",
-        "bible": "Bíblia",
-        "liturgy": "Liturgia",
-        "timer": "Cronômetro",
-        "random": "Sorteio",
-        "clock": "Relógio",
-        "countdown": "Contagem regressiva"
+        "hymns": "찬송가",
+        "bible": "성경",
+        "liturgy": "예배 순서",
+        "timer": "타이머",
+        "random": "무작위 추첨",
+        "clock": "시계",
+        "countdown": "카운트다운"
       },
-      "inheritingHint": "Este módulo está herdando o padrão global. Qualquer alteração aqui cria uma personalização própria.",
-      "backgroundColor": "Cor de fundo",
-      "backgroundImage": "Imagem de fundo",
-      "officialBackground": "Fundo oficial",
-      "officialGalleryHint": "Toque para aplicar; toque novamente para remover.",
-      "selectImage": "Clique para selecionar uma imagem",
-      "removeImage": "Remover imagem",
-      "changeImage": "Trocar imagem",
-      "textColor": "Cor do texto",
-      "fontSize": "Tamanho da fonte",
-      "fontWeight": "Espessura",
-      "weightNormal": "Normal",
-      "weightMedium": "Média",
-      "weightLightPlus": "Leve+",
-      "weightStrong": "Forte",
-      "bibleAppearance": "Bíblia — aparência própria",
-      "bibleTextColor": "Cor do texto (Bíblia)",
-      "bibleFontSize": "Tamanho da fonte (Bíblia)",
-      "bibleFontWeight": "Espessura (Bíblia)",
-      "showBibleVersion": "Mostrar versão da Bíblia no rodapé",
-      "footerRefColor": "Cor da referência (rodapé)",
-      "shadowAndBox": "Sombra e caixinha",
-      "textShadow": "Sombra na letra",
-      "shadowIntensity": "Intensidade da sombra",
-      "shadowBlur": "Espalhamento da sombra",
-      "textBox": "Caixinha atrás da letra",
-      "boxOpacity": "Opacidade da caixinha",
-      "boxBorder": "Borda na caixinha",
-      "alignment": "Alinhamento do texto",
-      "horizontal": "Horizontal",
-      "vertical": "Vertical",
-      "alignLeft": "Esquerda",
-      "alignCenter": "Centro",
-      "alignRight": "Direita",
-      "alignTop": "Em cima",
-      "alignMiddle": "Meio",
-      "alignBottom": "Em baixo",
-      "reset": "Redefinir",
-      "resetConfirm": "Voltar este módulo para o padrão?"
+      "inheritingHint": "이 모듈은 전역 기본값을 상속합니다. 여기서 변경하면 고유한 사용자 지정이 만들어집니다.",
+      "backgroundColor": "배경색",
+      "backgroundImage": "배경 이미지",
+      "officialBackground": "공식 배경",
+      "officialGalleryHint": "눌러서 적용, 다시 눌러서 제거.",
+      "selectImage": "클릭하여 이미지 선택",
+      "removeImage": "이미지 제거",
+      "changeImage": "이미지 변경",
+      "textColor": "글자 색",
+      "fontSize": "글자 크기",
+      "fontWeight": "굵기",
+      "weightNormal": "보통",
+      "weightMedium": "중간",
+      "weightLightPlus": "가늘게+",
+      "weightStrong": "굵게",
+      "bibleAppearance": "성경 — 자체 모양",
+      "bibleTextColor": "글자 색(성경)",
+      "bibleFontSize": "글자 크기(성경)",
+      "bibleFontWeight": "굵기(성경)",
+      "showBibleVersion": "바닥글에 성경 번역본 표시",
+      "footerRefColor": "참조 색(바닥글)",
+      "shadowAndBox": "그림자와 상자",
+      "textShadow": "글자 그림자",
+      "shadowIntensity": "그림자 강도",
+      "shadowBlur": "그림자 흐림",
+      "textBox": "가사 뒤 상자",
+      "boxOpacity": "상자 불투명도",
+      "boxBorder": "상자 테두리",
+      "alignment": "글자 정렬",
+      "horizontal": "수평",
+      "vertical": "수직",
+      "alignLeft": "왼쪽",
+      "alignCenter": "가운데",
+      "alignRight": "오른쪽",
+      "alignTop": "위",
+      "alignMiddle": "중앙",
+      "alignBottom": "아래",
+      "reset": "재설정",
+      "resetConfirm": "이 모듈을 기본값으로 재설정할까요?"
     },
     "placeholder": {
-      "general": "Preferências gerais do aplicativo em breve.",
-      "media": "Configurações de áudio, vídeo e player em breve.",
-      "projection": "Configurações de projeção e telas em breve."
+      "general": "일반 앱 환경설정 — 곧 제공됩니다.",
+      "media": "오디오·비디오·플레이어 설정 — 곧 제공됩니다.",
+      "projection": "투사 및 화면 설정 — 곧 제공됩니다."
     }
   }
 }

@@ -1,67 +1,67 @@
 export default {
   closeProjection: {
-    title: "Close projection?",
-    message: "A projection is active (bible/hymns/video/site). Close now? Enter closes.",
-    confirm: "Close",
+    title: "प्रोजेक्शन बंद करें?",
+    message: "प्रोजेक्शन सक्रिय है (बाइबल/भजन/वीडियो/साइट)। अब बंद करें? Enter से बंद होता है।",
+    confirm: "बंद करें",
   },
   auth: {
-    wrongPassword: "Incorrect password",
-    reauthFailed: "Could not confirm your identity",
-    accountDeleted: "Account deleted",
-    passwordRequired: "Type your password to confirm",
-    sessionExpired: "Session expired — sign in again to delete the account",
-    deleteFailed: "Could not delete the account",
+    wrongPassword: "पासवर्ड गलत है",
+    reauthFailed: "आपकी पहचान की पुष्टि नहीं हो सकी",
+    accountDeleted: "खाता हटा दिया गया",
+    passwordRequired: "पुष्टि के लिए अपना पासवर्ड टाइप करें",
+    sessionExpired: "सत्र समाप्त हो गया — खाता हटाने के लिए फिर से साइन इन करें",
+    deleteFailed: "खाता हटाया नहीं जा सका",
   },
   "palcoOutputs": {
-    "title": "Stage TVs",
-    "empty": "No TV with Stage connected. Open Stage",
-    "onHold": "{slot} · on hold"
+    "title": "स्टेज टीवी",
+    "empty": "स्टेज से जुड़ा कोई टीवी नहीं है। स्टेज खोलें",
+    "onHold": "{slot} · रुका हुआ"
   },
   "obsOutputs": {
-    "detecting": "Detecting and refreshing OBS connections…",
-    "active": "Remote connections",
-    "activateHint": "Start a connection in Settings → Broadcast to use it here.",
-    "title": "OBS connections",
-    "activeConnections": "Active connections: {count}"
+    "detecting": "OBS कनेक्शनों का पता लगाया जा रहा है…",
+    "active": "रिमोट कनेक्शन",
+    "activateHint": "यहाँ उपयोग के लिए सेटिंग्स → प्रसारण में कनेक्शन प्रारंभ करें।",
+    "title": "OBS कनेक्शन",
+    "activeConnections": "सक्रिय कनेक्शन: {count}"
   },
   "floating": {
-    "closeTitle": "Close {title}?",
-    "closeMessage": "Stop this feature and close its projection?"
+    "closeTitle": "{title} बंद करें?",
+    "closeMessage": "यह सुविधा रोककर उसका प्रोजेक्शन बंद करें?"
   },
   "updates": {
-    checkFailed: "Failed to check for updates",
-    downloadFailedRetry: "Could not download the update. Try again later.",
-    downloadFailedConnection: "Could not download the update. Check your internet connection.",
-    verifyFailed: "The update could not be verified. Try again later.",
-    updateFailed: "Update failed. Try again later.",
-    "downloadMacInstaller": "Download macOS installer",
-    "manualMacInstructions": "On macOS, install this update manually. Download the installer below, quit LouvorJA, open the DMG and drag the app to Applications, replacing the previous version. Your data and preferences will be kept.",
-    "version": "Version {version}",
-    "noReleaseNotes": "No release notes.",
-    "download": "Download update",
-    "installRestart": "Install and restart",
-    "later": "Later",
-    "available": "Version {version} available",
-    "update": "Update",
-    "dismiss": "Dismiss"
+    checkFailed: "अपडेट की जाँच विफल",
+    downloadFailedRetry: "अपडेट डाउनलोड नहीं हो सका। बाद में पुनः प्रयास करें।",
+    downloadFailedConnection: "अपडेट डाउनलोड नहीं हो सका। अपना इंटरनेट कनेक्शन जाँचें।",
+    verifyFailed: "अपडेट सत्यापित नहीं हो सका। बाद में पुनः प्रयास करें।",
+    updateFailed: "अपडेट विफल। बाद में पुनः प्रयास करें।",
+    "downloadMacInstaller": "macOS इंस्टॉलर डाउनलोड करें",
+    "manualMacInstructions": "macOS पर यह अपडेट मैन्युअल रूप से इंस्टॉल करें। नीचे से इंस्टॉलर डाउनलोड करें, LouvorJA बंद करें, DMG खोलें और ऐप को एप्लिकेशन में खींचकर पिछला संस्करण बदलें। आपका डेटा और सेटिंग्स बनी रहेंगी।",
+    "version": "संस्करण {version}",
+    "noReleaseNotes": "कोई रिलीज़ नोट्स नहीं।",
+    "download": "अपडेट डाउनलोड करें",
+    "installRestart": "इंस्टॉल करके पुनः आरंभ करें",
+    "later": "बाद में",
+    "available": "संस्करण {version} उपलब्ध",
+    "update": "अपडेट",
+    "dismiss": "हटाएँ"
   },
   "windowControls": {
-    "close": "Close",
-    "minimize": "Minimize",
-    "maximize": "Maximize"
+    "close": "बंद करें",
+    "minimize": "छोटा करें",
+    "maximize": "बड़ा करें"
   },
   "a11y": {
-    "mainNav": "Main navigation"
+    "mainNav": "मुख्य नेविगेशन"
   },
   "apiOffline": {
-    "message": "No connection to the service — check your internet",
-    "retrying": "Trying to reconnect..."
+    "message": "सेवा से कनेक्शन नहीं — अपना इंटरनेट जाँचें",
+    "retrying": "पुनः कनेक्ट करने का प्रयास जारी..."
   },
   "projection": {
     liturgy: "प्रोजेक्शन",
-    "minimizeProjection": "Minimize projection",
-    "restoreProjection": "Restore projection",
-    "confirmClose": "Projection is in progress. Closing this window stops the music. Really leave?"
+    "minimizeProjection": "प्रोजेक्शन छोटा करें",
+    "restoreProjection": "प्रोजेक्शन पुनर्स्थापित करें",
+    "confirmClose": "प्रोजेक्शन जारी है। यह विंडो बंद करने से संगीत रुक जाएगा। क्या वास्तव में निकलना चाहते हैं?"
   },
   "app": {
     "name": "Louvor JA",
@@ -69,198 +69,198 @@ export default {
     "nameJa": "JA"
   },
   "common": {
-    "close": "Close",
-    "comingSoon": "Coming soon",
-    "openFolder": "Open folder",
-    "addToPlaylist": "Add to playlist",
-    "suggestFix": "Suggest lyric/timing fix",
-    "cancel": "Cancel",
-    "copied": "Copied!"
+    "close": "बंद करें",
+    "comingSoon": "जल्द आ रहा है",
+    "openFolder": "फ़ोल्डर खोलें",
+    "addToPlaylist": "प्लेलिस्ट में जोड़ें",
+    "suggestFix": "बोल/समय सुधार सुझाएँ",
+    "cancel": "रद्द करें",
+    "copied": "कॉपी हो गया!"
   },
   "independentProjection": {
-    "title": "Independent projection",
-    "enableHint": "Turn on in Screens to use",
-    "unavailable": "Only available with extended monitors connected",
-    "hint": "Pick one monitor. This feature appears on top of whatever is projected there; the other monitors stay the same.",
-    "monitor": "Monitor {index}",
-    "activeOn": "Independent projection on monitor {index}",
-    "stop": "Stop independent projection",
-    "sharedOn": "Shared projection on monitor {index}",
-    "modeLabel": "Projection mode",
+    "title": "स्वतंत्र प्रोजेक्शन",
+    "enableHint": "उपयोग हेतु स्क्रीन में चालू करें",
+    "unavailable": "केवल विस्तारित मॉनिटर जुड़े होने पर उपलब्ध",
+    "hint": "एक मॉनिटर चुनें। यह सुविधा उस पर प्रोजेक्ट हो रही सामग्री के ऊपर दिखाई देती है; अन्य मॉनिटर वैसे ही रहते हैं।",
+    "monitor": "मॉनिटर {index}",
+    "activeOn": "मॉनिटर {index} पर स्वतंत्र प्रोजेक्शन",
+    "stop": "स्वतंत्र प्रोजेक्शन रोकें",
+    "sharedOn": "मॉनिटर {index} पर साझा प्रोजेक्शन",
+    "modeLabel": "प्रोजेक्शन मोड",
     "status": {
-      "stop": "Stop",
-      "overlay": "Overlaying on:",
-      "share": "Sharing on:",
-      "monitor": "Monitor {index}"
+      "stop": "रोकें",
+      "overlay": "ओवरले:",
+      "share": "साझा:",
+      "monitor": "मॉनिटर {index}"
     },
     "mode": {
-      "overlay": "Overlay",
-      "share": "Share"
+      "overlay": "ओवरले",
+      "share": "साझा"
     },
-    "hintShare": "Pick one monitor. Its screen is split in half with whatever is already projected; if one side leaves, the other takes the whole screen again."
+    "hintShare": "एक मॉनिटर चुनें। उसकी स्क्रीन पहले से प्रोजेक्ट हो रही सामग्री के साथ आधी-आधी बँट जाती है; यदि एक पक्ष चला जाए, तो दूसरा पूरी स्क्रीन वापस ले लेता है।"
   },
   "monitors": {
-    "wiredTitle": "Wired connections",
-    "selectScreens": "Select screens",
-    "identify": "Detect screens",
-    "hint": "Check the monitors where the resource should be projected.",
-    "loading": "Detecting monitors…",
-    "empty": "No extended monitors found.",
-    "primary": "Primary",
-    "returnScreen": "Return screen",
-    "selectedCount": "{count} selected",
-    "projectNeedsScreens": "Select at least one extended screen to project"
+    "wiredTitle": "वायर्ड कनेक्शन",
+    "selectScreens": "स्क्रीन चुनें",
+    "identify": "स्क्रीन पहचानें",
+    "hint": "जिन मॉनिटरों पर सामग्री प्रोजेक्ट होगी, उन्हें चुनें।",
+    "loading": "मॉनिटर पहचाने जा रहे हैं…",
+    "empty": "कोई विस्तारित मॉनिटर नहीं मिला।",
+    "primary": "प्राथमिक",
+    "returnScreen": "स्क्रीन वापस लाएँ",
+    "selectedCount": "{count} चुने गए",
+    "projectNeedsScreens": "प्रोजेक्शन हेतु कम से कम एक विस्तारित स्क्रीन चुनें"
   },
   "popupCount": {
-    "label": "Screens",
-    "tooltip": "Select projection screens"
+    "label": "स्क्रीन",
+    "tooltip": "प्रोजेक्शन स्क्रीन चुनें"
   },
   "popupControls": {
-    "closeAll": "Close all screens"
+    "closeAll": "सभी स्क्रीन बंद करें"
   },
   "uiZoom": {
-    "label": "Page zoom",
-    "zoomIn": "Zoom in",
-    "zoomOut": "Zoom out"
+    "label": "पेज ज़ूम",
+    "zoomIn": "बड़ा करें",
+    "zoomOut": "छोटा करें"
   },
   "nav": {
-    "home": "Home",
-    "albums": "Media Center",
-    "community": "Community",
-    "liturgy": "Liturgy",
-    "bible": "Bible",
-    "utilities": "Utilities",
-    "settings": "Settings",
+    "home": "होम",
+    "albums": "मीडिया केंद्र",
+    "community": "समुदाय",
+    "liturgy": "उपासना क्रम",
+    "bible": "बाइबल",
+    "utilities": "उपकरण",
+    "settings": "सेटिंग्स",
     "history": {
-      "label": "Navigation history",
-      "back": "Back",
-      "forward": "Forward",
-      "goTo": "Go to {label}"
+      "label": "नेविगेशन इतिहास",
+      "back": "पीछे",
+      "forward": "आगे",
+      "goTo": "{label} पर जाएँ"
     },
     "historyDetail": {
-      "player": "Player",
-      "editor": "Editor"
+      "player": "प्लेयर",
+      "editor": "संपादक"
     }
   },
   "connectedDevices": {
-    "title": "Connected devices",
-    "remote": "Remote control",
-    "speaker": "Preacher's clicker",
-    "monitors": "Monitor sharing",
-    "none": "None connected",
-    "monitorsInUse": "{device} ({host}) · {n} monitor(s)",
-    "palco": "Stage (TVs)",
+    "title": "जुड़े उपकरण",
+    "remote": "रिमोट नियंत्रण",
+    "speaker": "उपदेशक का क्लिकर",
+    "monitors": "मॉनिटर साझाकरण",
+    "none": "कुछ जुड़ा नहीं",
+    "monitorsInUse": "{device} ({host}) · {n} मॉनिटर",
+    "palco": "स्टेज (टीवी)",
     "palcoTv": "{name} · {ip}",
     "transmission": "Broadcasts (OBS/browsers)",
     "transmissionGroup": "{connection} · {page} · {tabs}",
-    "tabs": "1 tab | {n} tabs",
-    "inObs": "{n} in OBS",
-    "inBrowser": "{n} in the browser",
-    "and": " and ",
+    "tabs": "1 टैब | {n} टैब",
+    "inObs": "OBS में {n}",
+    "inBrowser": "ब्राउज़र में {n}",
+    "and": " और ",
     "pages": {
-      "espelho": "Mirror",
-      "retorno": "Stage return",
-      "legenda": "Caption",
-      "other": "Other page"
+      "espelho": "मिरर",
+      "retorno": "स्टेज वापसी",
+      "legenda": "उपशीर्षक",
+      "other": "अन्य पेज"
     }
   },
   "minimize": {
-    "playlistCount": "{n} playlist(s)",
-    "pageNumber": "Page {n}",
-    "bar": "Minimized pages",
-    "close": "Close {title}",
-    "page": "Minimize page",
-    "search": "Search: {q}"
+    "playlistCount": "{n} प्लेलिस्ट",
+    "pageNumber": "पेज {n}",
+    "bar": "छोटी की गई पेज",
+    "close": "{title} बंद करें",
+    "page": "पेज छोटा करें",
+    "search": "खोजें: {q}"
   },
   "sync": {
     "downloadQueue": {
-      "title": "Downloads",
-      "clearFinished": "Clear finished",
-      "retry": "Retry",
-      "cancel": "Cancel"
+      "title": "डाउनलोड",
+      "clearFinished": "पूर्ण हटाएँ",
+      "retry": "पुनः प्रयास",
+      "cancel": "रद्द करें"
     }
   },
   "sljaMigration": {
-    "title": "Upload {count} imported hymn(s) to your account?",
-    "message": "You imported .slja files while logged out. They can go to your account (a single copy, never duplicated) and be available on any device.",
-    "confirm": "Upload to account",
-    "cancel": "Keep on this device only"
+    "title": "आयातित {count} भजन आपके खाते में अपलोड करें?",
+    "message": "आपने लॉग-आउट के दौरान .slja फ़ाइलें आयात कीं। इन्हें आपके खाते में अपलोड किया जा सकता है (एक ही प्रति, कभी दोहराई नहीं जाती) और किसी भी उपकरण पर उपलब्ध रहेगा।",
+    "confirm": "खाते में अपलोड करें",
+    "cancel": "केवल इस उपकरण पर रखें"
   },
   "download": {
-    "indicatorTitle": "Background downloads: {done}/{total} ({percent}%)",
-    "indicatorCounts": "{done} of {total} completed",
-    "indicatorIdle": "Preparing download…"
+    "indicatorTitle": "बैकग्राउंड डाउनलोड: {done}/{total} ({percent}%)",
+    "indicatorCounts": "{total} में से {done} पूर्ण",
+    "indicatorIdle": "डाउनलोड की तैयारी…"
   },
   "settings": {
     "appearance": {
-      "changeTheme": "Alterar tema"
+      "changeTheme": "थीम बदलें"
     },
     "general": {
-      "checkUpdate": "Buscar atualizações",
-      "checking": "Comprobando…",
-      "updateAvailable": "Atualização disponível",
-      "updateDesktopOnly": "Somente desktop",
-      "updateError": "Erro de atualização",
-      "updateHint": "Reinicie para aplicar",
-      "updateNotAvailable": "Sem atualizações",
-      "updateTitle": "Atualização do app"
+      "checkUpdate": "अद्यतन जाँचें",
+      "checking": "जाँच हो रही है…",
+      "updateAvailable": "अद्यतन उपलब्ध",
+      "updateDesktopOnly": "केवल डेस्कटॉप",
+      "updateError": "अद्यतन त्रुटि",
+      "updateHint": "लागू करने के लिए पुनः आरंभ करें",
+      "updateNotAvailable": "कोई अद्यतन नहीं",
+      "updateTitle": "ऐप अद्यतन"
     },
     "stage": {
-      "title": "Personalizar Palco",
-      "scopeGlobal": "Padrão (global)",
+      "title": "मंच अनुकूलित करें",
+      "scopeGlobal": "डिफ़ॉल्ट (वैश्विक)",
       "scope": {
-        "hymns": "Hinos",
-        "bible": "Bíblia",
-        "liturgy": "Liturgia",
-        "timer": "Cronômetro",
-        "random": "Sorteio",
-        "clock": "Relógio",
-        "countdown": "Contagem regressiva"
+        "hymns": "भजन",
+        "bible": "बाइबल",
+        "liturgy": "उपासना क्रम",
+        "timer": "टाइमर",
+        "random": "यादृच्छिक चयन",
+        "clock": "घड़ी",
+        "countdown": "उल्टी गिनती"
       },
-      "inheritingHint": "Este módulo está herdando o padrão global. Qualquer alteração aqui cria uma personalização própria.",
-      "backgroundColor": "Cor de fundo",
-      "backgroundImage": "Imagem de fundo",
-      "officialBackground": "Fundo oficial",
-      "officialGalleryHint": "Toque para aplicar; toque novamente para remover.",
-      "selectImage": "Clique para selecionar uma imagem",
-      "removeImage": "Remover imagem",
-      "changeImage": "Trocar imagem",
-      "textColor": "Cor do texto",
-      "fontSize": "Tamanho da fonte",
-      "fontWeight": "Espessura",
-      "weightNormal": "Normal",
-      "weightMedium": "Média",
-      "weightLightPlus": "Leve+",
-      "weightStrong": "Forte",
-      "bibleAppearance": "Bíblia — aparência própria",
-      "bibleTextColor": "Cor do texto (Bíblia)",
-      "bibleFontSize": "Tamanho da fonte (Bíblia)",
-      "bibleFontWeight": "Espessura (Bíblia)",
-      "showBibleVersion": "Mostrar versão da Bíblia no rodapé",
-      "footerRefColor": "Cor da referência (rodapé)",
-      "shadowAndBox": "Sombra e caixinha",
-      "textShadow": "Sombra na letra",
-      "shadowIntensity": "Intensidade da sombra",
-      "shadowBlur": "Espalhamento da sombra",
-      "textBox": "Caixinha atrás da letra",
-      "boxOpacity": "Opacidade da caixinha",
-      "boxBorder": "Borda na caixinha",
-      "alignment": "Alinhamento do texto",
-      "horizontal": "Horizontal",
-      "vertical": "Vertical",
-      "alignLeft": "Esquerda",
-      "alignCenter": "Centro",
-      "alignRight": "Direita",
-      "alignTop": "Em cima",
-      "alignMiddle": "Meio",
-      "alignBottom": "Em baixo",
-      "reset": "Redefinir",
-      "resetConfirm": "Voltar este módulo para o padrão?"
+      "inheritingHint": "यह मॉड्यूल वैश्विक डिफ़ॉल्ट विरासत में पाता है। यहाँ कोई भी बदलाव अपनी अलग सेटिंग बनाता है।",
+      "backgroundColor": "पृष्ठभूमि रंग",
+      "backgroundImage": "पृष्ठभूमि चित्र",
+      "officialBackground": "आधिकारिक पृष्ठभूमि",
+      "officialGalleryHint": "लागू करने के लिए टैप करें; हटाने के लिए फिर टैप करें।",
+      "selectImage": "चित्र चुनने के लिए क्लिक करें",
+      "removeImage": "चित्र हटाएँ",
+      "changeImage": "चित्र बदलें",
+      "textColor": "पाठ का रंग",
+      "fontSize": "फ़ॉन्ट आकार",
+      "fontWeight": "फ़ॉन्ट मोटाई",
+      "weightNormal": "सामान्य",
+      "weightMedium": "मध्यम",
+      "weightLightPlus": "हल्का+",
+      "weightStrong": "गहिरा",
+      "bibleAppearance": "बाइबल — अपनी अलग उपस्थिति",
+      "bibleTextColor": "पाठ का रंग (बाइबल)",
+      "bibleFontSize": "फ़ॉन्ट आकार (बाइबल)",
+      "bibleFontWeight": "फ़ॉन्ट मोटाई (बाइबल)",
+      "showBibleVersion": "पाद-पट्टी में बाइबल अनुवाद दिखाएँ",
+      "footerRefColor": "संदर्भ का रंग (पाद-पट्टी)",
+      "shadowAndBox": "छाया और बॉक्स",
+      "textShadow": "पाठ की छाया",
+      "shadowIntensity": "छाया की तीव्रता",
+      "shadowBlur": "छाया फैलाव",
+      "textBox": "बोलों के पीछे बॉक्स",
+      "boxOpacity": "बॉक्स अपारदर्शिता",
+      "boxBorder": "बॉक्स किनारा",
+      "alignment": "पाठ संरेखण",
+      "horizontal": "क्षैतिज",
+      "vertical": "ऊर्ध्वाधर",
+      "alignLeft": "बाएँ",
+      "alignCenter": "मध्य",
+      "alignRight": "दाएँ",
+      "alignTop": "ऊपर",
+      "alignMiddle": "मध्य (लंबवत)",
+      "alignBottom": "नीचे",
+      "reset": "रीसेट",
+      "resetConfirm": "इस मॉड्यूल को डिफ़ॉल्ट पर रीसेट करें?"
     },
     "placeholder": {
-      "general": "Preferências gerais do aplicativo em breve.",
-      "media": "Configurações de áudio, vídeo e player em breve.",
-      "projection": "Configurações de projeção e telas em breve."
+      "general": "सामान्य ऐप प्राथमिकताएँ जल्द आ रही हैं।",
+      "media": "ऑडियो, वीडियो और प्लेयर सेटिंग जल्द आ रही हैं।",
+      "projection": "प्रोजेक्शन और स्क्रीन सेटिंग जल्द आ रही हैं।"
     }
   }
 }

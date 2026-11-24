@@ -1,51 +1,51 @@
 export default {
   "sync": {
-    "downloadAll": "Download All",
-    "cancelAll": "Cancel All",
-    "close": "Close",
-    "download": "Download",
-    "downloadOffline": "Download Offline",
-    "cancel": "Cancel",
-    "retry": "Try Again",
-    "downloaded": "Downloaded",
-    "remove": "Remove",
-    "deleteConfirmTitle": "Remove offline media",
-    "deleteConfirmText": "Are you sure you want to remove \"{name}\"? This will delete the files from your computer.",
-    "deleteConfirmYes": "Remove",
-    "deleteConfirmNo": "Cancel",
+    "downloadAll": "تنزيل الكل",
+    "cancelAll": "إلغاء الكل",
+    "close": "إغلاق",
+    "download": "تنزيل",
+    "downloadOffline": "تنزيل للاستخدام دون اتصال",
+    "cancel": "إلغاء",
+    "retry": "إعادة المحاولة",
+    "downloaded": "تم التنزيل",
+    "remove": "إزالة",
+    "deleteConfirmTitle": "إزالة الوسائط غير المتصلة",
+    "deleteConfirmText": "هل تريد إزالة «{name}»؟ سيتم حذف الملفات من جهازك.",
+    "deleteConfirmYes": "إزالة",
+    "deleteConfirmNo": "إلغاء",
     "categories": {
-      "hymnals": "Official Hymnals",
-      "hymnalsSubtitle": "Complete liturgical collections for offline use.",
-      "youthAlbums": "Youth CDs & Collections",
-      "albumsSubtitle": "Annual albums and special productions.",
-      "defaultSubtitle": "Albums and productions for offline use."
+      "hymnals": "كتب الترانيم الرسمية",
+      "hymnalsSubtitle": "مجموعات ليتورجية كاملة للاستخدام دون اتصال.",
+      "youthAlbums": "أقراص ومجموعات الشباب",
+      "albumsSubtitle": "ألبومات سنوية وإنتاجات خاصة.",
+      "defaultSubtitle": "ألبومات وإنتاجات للاستخدام دون اتصال."
     },
     "hymnal": {
-      "edition1996Name": "Adventist Hymnal - 1996 Edition",
-      "officialSubtitle": "{count} hymns with sheet music and lyrics",
-      "edition1996Subtitle": "Historic - {count} traditional hymns"
+      "edition1996Name": "كتاب الترانيم الأدفنتستي - طبعة 1996",
+      "officialSubtitle": "{count} ترنيمة مع النوتات والكلمات",
+      "edition1996Subtitle": "تاريخية - {count} ترنيمة تقليدية"
     },
     "progress": {
-      "preparing": "Preparing...",
-      "downloading": "Downloading...",
-      "cancelled": "Cancelled",
-      "offline": "No internet",
-      "serverError": "Server error",
-      "error": "Download failed"
+      "preparing": "جارٍ التحضير…",
+      "downloading": "جارٍ التنزيل…",
+      "cancelled": "أُلغي",
+      "offline": "لا يوجد اتصال بالإنترنت",
+      "serverError": "خطأ في الخادم",
+      "error": "فشل التنزيل"
     },
     "errors": {
-      "loadFailed": "Could not load collections.",
-      "downloadFailureTitle": "Download failed",
-      "downloadOffline": "Could not download files. Check your internet connection.",
-      "downloadServer": "Download stopped after several consecutive failures — the media server appears unavailable. {count} file(s) could not be downloaded. Please try again later.",
-      "downloadUnknown": "An error occurred while downloading the collection.",
-      "batchOffline": "Batch download was cancelled because there is no internet connection."
+      "loadFailed": "تعذّر تحميل المجموعات.",
+      "downloadFailureTitle": "فشل التنزيل",
+      "downloadOffline": "تعذّر تنزيل الملفات. تحقق من اتصالك بالإنترنت.",
+      "downloadServer": "توقف التنزيل بعد عدة إخفاقات متتالية — يبدو أن خادم الوسائط غير متاح. تعذّر تنزيل {count} ملف(ًا). حاول لاحقًا.",
+      "downloadUnknown": "حدث خطأ أثناء تنزيل المجموعة.",
+      "batchOffline": "أُلغي التنزيل الدفعي لعدم وجود اتصال بالإنترنت."
     },
     "downloadQueue": {
-      "title": "Downloads",
-      "clearFinished": "Clear finished",
-      "retry": "Try again",
-      "cancel": "Cancel"
+      "title": "التنزيلات",
+      "clearFinished": "مسح المكتملة",
+      "retry": "إعادة المحاولة",
+      "cancel": "إلغاء"
     }
   }
 }

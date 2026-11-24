@@ -1,67 +1,67 @@
 export default {
   closeProjection: {
-    title: "Close projection?",
-    message: "A projection is active (bible/hymns/video/site). Close now? Enter closes.",
-    confirm: "Close",
+    title: "Projeksiyon kapatılsın mı?",
+    message: "Projeksiyon etkin (Kitap Mukaddes/ilahiler/video/site). Şimdi kapatılsın mı? Enter ile kapanır.",
+    confirm: "Kapat",
   },
   auth: {
-    wrongPassword: "Incorrect password",
-    reauthFailed: "Could not confirm your identity",
-    accountDeleted: "Account deleted",
-    passwordRequired: "Type your password to confirm",
-    sessionExpired: "Session expired — sign in again to delete the account",
-    deleteFailed: "Could not delete the account",
+    wrongPassword: "Şifre yanlış",
+    reauthFailed: "Kimliğiniz doğrulanamadı",
+    accountDeleted: "Hesap silindi",
+    passwordRequired: "Onaylamak için şifrenizi girin",
+    sessionExpired: "Oturum süresi doldu — hesabı silmek için yeniden oturum açın",
+    deleteFailed: "Hesap silinemedi",
   },
   "palcoOutputs": {
-    "title": "Stage TVs",
-    "empty": "No TV with Stage connected. Open Stage",
-    "onHold": "{slot} · on hold"
+    "title": "Sahne TV'leri",
+    "empty": "Sahne'ye bağlı TV yok. Sahne'yi açın",
+    "onHold": "{slot} · beklemede"
   },
   "obsOutputs": {
-    "detecting": "Detecting and refreshing OBS connections…",
-    "active": "Remote connections",
-    "activateHint": "Start a connection in Settings → Broadcast to use it here.",
-    "title": "OBS connections",
-    "activeConnections": "Active connections: {count}"
+    "detecting": "OBS bağlantıları algılanıyor ve yenileniyor…",
+    "active": "Uzak bağlantılar",
+    "activateHint": "Burada kullanmak için Ayarlar → Yayın bölümünde bir bağlantı başlatın.",
+    "title": "OBS bağlantıları",
+    "activeConnections": "Etkin bağlantılar: {count}"
   },
   "floating": {
-    "closeTitle": "Close {title}?",
-    "closeMessage": "Stop this feature and close its projection?"
+    "closeTitle": "{title} kapatılsın mı?",
+    "closeMessage": "Bu özellik durdurulup projeksiyonu kapatılsın mı?"
   },
   "updates": {
-    checkFailed: "Failed to check for updates",
-    downloadFailedRetry: "Could not download the update. Try again later.",
-    downloadFailedConnection: "Could not download the update. Check your internet connection.",
-    verifyFailed: "The update could not be verified. Try again later.",
-    updateFailed: "Update failed. Try again later.",
-    "downloadMacInstaller": "Download macOS installer",
-    "manualMacInstructions": "On macOS, install this update manually. Download the installer below, quit LouvorJA, open the DMG and drag the app to Applications, replacing the previous version. Your data and preferences will be kept.",
-    "version": "Version {version}",
-    "noReleaseNotes": "No release notes.",
-    "download": "Download update",
-    "installRestart": "Install and restart",
-    "later": "Later",
-    "available": "Version {version} available",
-    "update": "Update",
-    "dismiss": "Dismiss"
+    checkFailed: "Güncellemeler kontrol edilemedi",
+    downloadFailedRetry: "Güncelleme indirilemedi. Daha sonra tekrar deneyin.",
+    downloadFailedConnection: "Güncelleme indirilemedi. İnternet bağlantınızı kontrol edin.",
+    verifyFailed: "Güncelleme doğrulanamadı. Daha sonra tekrar deneyin.",
+    updateFailed: "Güncelleme başarısız. Daha sonra tekrar deneyin.",
+    "downloadMacInstaller": "macOS yükleyicisini indir",
+    "manualMacInstructions": "macOS'ta bu güncellemeyi elle yükleyin. Aşağıdan yükleyiciyi indirin, LouvorJA'dan çıkın, DMG'yi açın ve uygulamayı Uygulamalar klasörüne sürükleyerek önceki sürümün yerine koyun. Verileriniz ve ayarlarınız korunur.",
+    "version": "Sürüm {version}",
+    "noReleaseNotes": "Sürüm notu yok.",
+    "download": "Güncellemeyi indir",
+    "installRestart": "Yükle ve yeniden başlat",
+    "later": "Daha sonra",
+    "available": "{version} sürümü mevcut",
+    "update": "Güncelle",
+    "dismiss": "Kapat"
   },
   "windowControls": {
-    "close": "Close",
-    "minimize": "Minimize",
-    "maximize": "Maximize"
+    "close": "Kapat",
+    "minimize": "Küçült",
+    "maximize": "Büyüt"
   },
   "a11y": {
-    "mainNav": "Main navigation"
+    "mainNav": "Ana gezinme"
   },
   "apiOffline": {
-    "message": "No connection to the service — check your internet",
-    "retrying": "Trying to reconnect..."
+    "message": "Hizmete bağlantı yok — internet bağlantınızı kontrol edin",
+    "retrying": "Yeniden bağlanmaya çalışılıyor..."
   },
   "projection": {
     liturgy: "Projeksiyon",
-    "minimizeProjection": "Minimize projection",
-    "restoreProjection": "Restore projection",
-    "confirmClose": "Projection is in progress. Closing this window stops the music. Really leave?"
+    "minimizeProjection": "Projeksiyonu küçült",
+    "restoreProjection": "Projeksiyonu geri yükle",
+    "confirmClose": "Projeksiyon sürüyor. Bu pencereyi kapatmak müziği durdurur. Gerçekten çıkmak istiyor musunuz?"
   },
   "app": {
     "name": "Louvor JA",
@@ -69,198 +69,198 @@ export default {
     "nameJa": "JA"
   },
   "common": {
-    "close": "Close",
-    "comingSoon": "Coming soon",
-    "openFolder": "Open folder",
-    "addToPlaylist": "Add to playlist",
-    "suggestFix": "Suggest lyric/timing fix",
-    "cancel": "Cancel",
-    "copied": "Copied!"
+    "close": "Kapat",
+    "comingSoon": "Yakında",
+    "openFolder": "Klasörü aç",
+    "addToPlaylist": "Çalma listesine ekle",
+    "suggestFix": "Söz/zamanlama düzeltmesi öner",
+    "cancel": "İptal",
+    "copied": "Kopyalandı!"
   },
   "independentProjection": {
-    "title": "Independent projection",
-    "enableHint": "Turn on in Screens to use",
-    "unavailable": "Only available with extended monitors connected",
-    "hint": "Pick one monitor. This feature appears on top of whatever is projected there; the other monitors stay the same.",
-    "monitor": "Monitor {index}",
-    "activeOn": "Independent projection on monitor {index}",
-    "stop": "Stop independent projection",
-    "sharedOn": "Shared projection on monitor {index}",
-    "modeLabel": "Projection mode",
+    "title": "Bağımsız projeksiyon",
+    "enableHint": "Kullanmak için Ekranlar bölümünden açın",
+    "unavailable": "Yalnızca genişletilmiş monitörler bağlıyken kullanılabilir",
+    "hint": "Bir monitör seçin. Bu özellik o monitördeki projeksiyonun üzerinde görünür; diğer monitörler aynı kalır.",
+    "monitor": "Monitör {index}",
+    "activeOn": "Monitör {index} üzerinde bağımsız projeksiyon",
+    "stop": "Bağımsız projeksiyonu durdur",
+    "sharedOn": "Monitör {index} üzerinde paylaşımlı projeksiyon",
+    "modeLabel": "Projeksiyon modu",
     "status": {
-      "stop": "Stop",
-      "overlay": "Overlaying on:",
-      "share": "Sharing on:",
-      "monitor": "Monitor {index}"
+      "stop": "Durdur",
+      "overlay": "Üstünde katman:",
+      "share": "Paylaşım:",
+      "monitor": "Monitör {index}"
     },
     "mode": {
-      "overlay": "Overlay",
-      "share": "Share"
+      "overlay": "Katman",
+      "share": "Paylaş"
     },
-    "hintShare": "Pick one monitor. Its screen is split in half with whatever is already projected; if one side leaves, the other takes the whole screen again."
+    "hintShare": "Bir monitör seçin. Ekranı, zaten yansıtılan içerikle ikiye bölünür; bir taraf ayrılırsa diğer taraf ekranın tamamını geri alır."
   },
   "monitors": {
-    "wiredTitle": "Wired connections",
-    "selectScreens": "Select screens",
-    "identify": "Detect screens",
-    "hint": "Check the monitors where the resource should be projected.",
-    "loading": "Detecting monitors…",
-    "empty": "No extended monitors found.",
-    "primary": "Primary",
-    "returnScreen": "Return screen",
-    "selectedCount": "{count} selected",
-    "projectNeedsScreens": "Select at least one extended screen to project"
+    "wiredTitle": "Kablolu bağlantılar",
+    "selectScreens": "Ekranları seç",
+    "identify": "Ekranları algıla",
+    "hint": "İçeriğin yansıtılacağı monitörleri işaretleyin.",
+    "loading": "Monitörler algılanıyor…",
+    "empty": "Genişletilmiş monitör bulunamadı.",
+    "primary": "Birincil",
+    "returnScreen": "Ekranı geri al",
+    "selectedCount": "{count} seçildi",
+    "projectNeedsScreens": "Projeksiyon için en az bir genişletilmiş ekran seçin"
   },
   "popupCount": {
-    "label": "Screens",
-    "tooltip": "Select projection screens"
+    "label": "Ekranlar",
+    "tooltip": "Projeksiyon ekranlarını seç"
   },
   "popupControls": {
-    "closeAll": "Close all screens"
+    "closeAll": "Tüm ekranları kapat"
   },
   "uiZoom": {
-    "label": "Page zoom",
-    "zoomIn": "Zoom in",
-    "zoomOut": "Zoom out"
+    "label": "Sayfa yakınlaştırma",
+    "zoomIn": "Yakınlaştır",
+    "zoomOut": "Uzaklaştır"
   },
   "nav": {
-    "home": "Home",
-    "albums": "Media Center",
-    "community": "Community",
-    "liturgy": "Liturgy",
-    "bible": "Bible",
-    "utilities": "Utilities",
-    "settings": "Settings",
+    "home": "Ana sayfa",
+    "albums": "Medya Merkezi",
+    "community": "Topluluk",
+    "liturgy": "Ayin",
+    "bible": "Kutsal Kitap",
+    "utilities": "Araçlar",
+    "settings": "Ayarlar",
     "history": {
-      "label": "Navigation history",
-      "back": "Back",
-      "forward": "Forward",
-      "goTo": "Go to {label}"
+      "label": "Gezinme geçmişi",
+      "back": "Geri",
+      "forward": "İleri",
+      "goTo": "{label} sayfasına git"
     },
     "historyDetail": {
-      "player": "Player",
-      "editor": "Editor"
+      "player": "Oynatıcı",
+      "editor": "Düzenleyici"
     }
   },
   "connectedDevices": {
-    "title": "Connected devices",
-    "remote": "Remote control",
-    "speaker": "Preacher's clicker",
-    "monitors": "Monitor sharing",
-    "none": "None connected",
-    "monitorsInUse": "{device} ({host}) · {n} monitor(s)",
-    "palco": "Stage (TVs)",
+    "title": "Bağlı cihazlar",
+    "remote": "Uzaktan kumanda",
+    "speaker": "Vaaz tıklayıcısı",
+    "monitors": "Monitör paylaşımı",
+    "none": "Bağlı değil",
+    "monitorsInUse": "{device} ({host}) · {n} monitör",
+    "palco": "Sahne (TV'ler)",
     "palcoTv": "{name} · {ip}",
     "transmission": "Broadcasts (OBS/browsers)",
     "transmissionGroup": "{connection} · {page} · {tabs}",
-    "tabs": "1 tab | {n} tabs",
-    "inObs": "{n} in OBS",
-    "inBrowser": "{n} in the browser",
-    "and": " and ",
+    "tabs": "1 sekme | {n} sekme",
+    "inObs": "OBS'de {n}",
+    "inBrowser": "Tarayıcıda {n}",
+    "and": " ve ",
     "pages": {
-      "espelho": "Mirror",
-      "retorno": "Stage return",
-      "legenda": "Caption",
-      "other": "Other page"
+      "espelho": "Yansıtma",
+      "retorno": "Sahne dönüşü",
+      "legenda": "Altyazı",
+      "other": "Diğer sayfa"
     }
   },
   "minimize": {
-    "playlistCount": "{n} playlist(s)",
-    "pageNumber": "Page {n}",
-    "bar": "Minimized pages",
-    "close": "Close {title}",
-    "page": "Minimize page",
-    "search": "Search: {q}"
+    "playlistCount": "{n} çalma listesi",
+    "pageNumber": "Sayfa {n}",
+    "bar": "Küçültülmüş sayfalar",
+    "close": "{title} öğesini kapat",
+    "page": "Sayfayı küçült",
+    "search": "Ara: {q}"
   },
   "sync": {
     "downloadQueue": {
-      "title": "Downloads",
-      "clearFinished": "Clear finished",
-      "retry": "Retry",
-      "cancel": "Cancel"
+      "title": "İndirmeler",
+      "clearFinished": "Bitenleri temizle",
+      "retry": "Yeniden dene",
+      "cancel": "İptal"
     }
   },
   "sljaMigration": {
-    "title": "Upload {count} imported hymn(s) to your account?",
-    "message": "You imported .slja files while logged out. They can go to your account (a single copy, never duplicated) and be available on any device.",
-    "confirm": "Upload to account",
-    "cancel": "Keep on this device only"
+    "title": "İçe aktarılan {count} ilahi hesabınıza yüklensin mi?",
+    "message": "Oturum açık değilken .slja dosyaları içe aktardınız. Bunlar hesabınıza yüklenebilir (tek kopya, asla çoğaltılmaz) ve her cihazda kullanılabilir olur.",
+    "confirm": "Hesaba yükle",
+    "cancel": "Yalnızca bu cihazda tut"
   },
   "download": {
-    "indicatorTitle": "Background downloads: {done}/{total} ({percent}%)",
-    "indicatorCounts": "{done} of {total} completed",
-    "indicatorIdle": "Preparing download…"
+    "indicatorTitle": "Arka plan indirmeleri: {done}/{total} (%{percent})",
+    "indicatorCounts": "{total} öğeden {done} tamamlandı",
+    "indicatorIdle": "İndirme hazırlanıyor…"
   },
   "settings": {
     "appearance": {
-      "changeTheme": "Alterar tema"
+      "changeTheme": "Temayı değiştir"
     },
     "general": {
-      "checkUpdate": "Buscar atualizações",
-      "checking": "Comprobando…",
-      "updateAvailable": "Atualização disponível",
-      "updateDesktopOnly": "Somente desktop",
-      "updateError": "Erro de atualização",
-      "updateHint": "Reinicie para aplicar",
-      "updateNotAvailable": "Sem atualizações",
-      "updateTitle": "Atualização do app"
+      "checkUpdate": "Güncellemeleri denetle",
+      "checking": "Denetleniyor…",
+      "updateAvailable": "Güncelleme var",
+      "updateDesktopOnly": "Yalnızca masaüstü",
+      "updateError": "Güncelleme hatası",
+      "updateHint": "Uygulamak için yeniden başlatın",
+      "updateNotAvailable": "Güncelleme yok",
+      "updateTitle": "Uygulama güncellemesi"
     },
     "stage": {
-      "title": "Personalizar Palco",
-      "scopeGlobal": "Padrão (global)",
+      "title": "Sahneyi Özelleştir",
+      "scopeGlobal": "Varsayılan (genel)",
       "scope": {
-        "hymns": "Hinos",
-        "bible": "Bíblia",
-        "liturgy": "Liturgia",
-        "timer": "Cronômetro",
-        "random": "Sorteio",
-        "clock": "Relógio",
-        "countdown": "Contagem regressiva"
+        "hymns": "İlahiler",
+        "bible": "Kitap-ı Mukaddes",
+        "liturgy": "Ayin",
+        "timer": "Zamanlayıcı",
+        "random": "Rastgele çekiliş",
+        "clock": "Saat",
+        "countdown": "Geri sayım"
       },
-      "inheritingHint": "Este módulo está herdando o padrão global. Qualquer alteração aqui cria uma personalização própria.",
-      "backgroundColor": "Cor de fundo",
-      "backgroundImage": "Imagem de fundo",
-      "officialBackground": "Fundo oficial",
-      "officialGalleryHint": "Toque para aplicar; toque novamente para remover.",
-      "selectImage": "Clique para selecionar uma imagem",
-      "removeImage": "Remover imagem",
-      "changeImage": "Trocar imagem",
-      "textColor": "Cor do texto",
-      "fontSize": "Tamanho da fonte",
-      "fontWeight": "Espessura",
+      "inheritingHint": "Bu modül genel varsayılanı devralır. Buradaki her değişiklik kendine özgü bir özelleştirme oluşturur.",
+      "backgroundColor": "Arka plan rengi",
+      "backgroundImage": "Arka plan görseli",
+      "officialBackground": "Resmî arka plan",
+      "officialGalleryHint": "Uygulamak için dokunun; kaldırmak için tekrar dokunun.",
+      "selectImage": "Bir görsel seçmek için tıklayın",
+      "removeImage": "Görseli kaldır",
+      "changeImage": "Görseli değiştir",
+      "textColor": "Metin rengi",
+      "fontSize": "Yazı boyutu",
+      "fontWeight": "Yazı kalınlığı",
       "weightNormal": "Normal",
-      "weightMedium": "Média",
-      "weightLightPlus": "Leve+",
-      "weightStrong": "Forte",
-      "bibleAppearance": "Bíblia — aparência própria",
-      "bibleTextColor": "Cor do texto (Bíblia)",
-      "bibleFontSize": "Tamanho da fonte (Bíblia)",
-      "bibleFontWeight": "Espessura (Bíblia)",
-      "showBibleVersion": "Mostrar versão da Bíblia no rodapé",
-      "footerRefColor": "Cor da referência (rodapé)",
-      "shadowAndBox": "Sombra e caixinha",
-      "textShadow": "Sombra na letra",
-      "shadowIntensity": "Intensidade da sombra",
-      "shadowBlur": "Espalhamento da sombra",
-      "textBox": "Caixinha atrás da letra",
-      "boxOpacity": "Opacidade da caixinha",
-      "boxBorder": "Borda na caixinha",
-      "alignment": "Alinhamento do texto",
-      "horizontal": "Horizontal",
-      "vertical": "Vertical",
-      "alignLeft": "Esquerda",
-      "alignCenter": "Centro",
-      "alignRight": "Direita",
-      "alignTop": "Em cima",
-      "alignMiddle": "Meio",
-      "alignBottom": "Em baixo",
-      "reset": "Redefinir",
-      "resetConfirm": "Voltar este módulo para o padrão?"
+      "weightMedium": "Orta",
+      "weightLightPlus": "İnce+",
+      "weightStrong": "Kalın",
+      "bibleAppearance": "Kitap-ı Mukaddes — kendi görünümü",
+      "bibleTextColor": "Metin rengi (Kitap-ı Mukaddes)",
+      "bibleFontSize": "Yazı boyutu (Kitap-ı Mukaddes)",
+      "bibleFontWeight": "Yazı kalınlığı (Kitap-ı Mukaddes)",
+      "showBibleVersion": "Altbilgide Kitap-ı Mukaddes çevirisini göster",
+      "footerRefColor": "Referans rengi (altbilgi)",
+      "shadowAndBox": "Gölge ve kutu",
+      "textShadow": "Metin gölgesi",
+      "shadowIntensity": "Gölge yoğunluğu",
+      "shadowBlur": "Gölge yayılımı",
+      "textBox": "Sözlerin arkasındaki kutu",
+      "boxOpacity": "Kutu opaklığı",
+      "boxBorder": "Kutu kenarlığı",
+      "alignment": "Metin hizalaması",
+      "horizontal": "Yatay",
+      "vertical": "Dikey",
+      "alignLeft": "Sol",
+      "alignCenter": "Orta",
+      "alignRight": "Sağ",
+      "alignTop": "Üst",
+      "alignMiddle": "Orta (dikey)",
+      "alignBottom": "Alt",
+      "reset": "Sıfırla",
+      "resetConfirm": "Bu modül varsayılana sıfırlansın mı?"
     },
     "placeholder": {
-      "general": "Preferências gerais do aplicativo em breve.",
-      "media": "Configurações de áudio, vídeo e player em breve.",
-      "projection": "Configurações de projeção e telas em breve."
+      "general": "Genel uygulama tercihleri yakında.",
+      "media": "Ses, video ve oynatıcı ayarları yakında.",
+      "projection": "Yansıtma ve ekran ayarları yakında."
     }
   }
 }

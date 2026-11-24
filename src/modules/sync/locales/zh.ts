@@ -1,51 +1,51 @@
 export default {
   "sync": {
-    "downloadAll": "Download All",
-    "cancelAll": "Cancel All",
-    "close": "Close",
-    "download": "Download",
-    "downloadOffline": "Download Offline",
-    "cancel": "Cancel",
-    "retry": "Try Again",
-    "downloaded": "Downloaded",
-    "remove": "Remove",
-    "deleteConfirmTitle": "Remove offline media",
-    "deleteConfirmText": "Are you sure you want to remove \"{name}\"? This will delete the files from your computer.",
-    "deleteConfirmYes": "Remove",
-    "deleteConfirmNo": "Cancel",
+    "downloadAll": "全部下载",
+    "cancelAll": "全部取消",
+    "close": "关闭",
+    "download": "下载",
+    "downloadOffline": "离线下载",
+    "cancel": "取消",
+    "retry": "重试",
+    "downloaded": "已下载",
+    "remove": "移除",
+    "deleteConfirmTitle": "移除离线媒体",
+    "deleteConfirmText": "确定要移除“{name}”吗？这将从您的电脑中删除这些文件。",
+    "deleteConfirmYes": "移除",
+    "deleteConfirmNo": "取消",
     "categories": {
-      "hymnals": "Official Hymnals",
-      "hymnalsSubtitle": "Complete liturgical collections for offline use.",
-      "youthAlbums": "Youth CDs & Collections",
-      "albumsSubtitle": "Annual albums and special productions.",
-      "defaultSubtitle": "Albums and productions for offline use."
+      "hymnals": "官方赞美诗集",
+      "hymnalsSubtitle": "供离线使用的完整礼仪诗集。",
+      "youthAlbums": "青年 CD 与专辑",
+      "albumsSubtitle": "年度专辑和特别制作。",
+      "defaultSubtitle": "供离线使用的专辑和制作。"
     },
     "hymnal": {
-      "edition1996Name": "Adventist Hymnal - 1996 Edition",
-      "officialSubtitle": "{count} hymns with sheet music and lyrics",
-      "edition1996Subtitle": "Historic - {count} traditional hymns"
+      "edition1996Name": "基督复临安息日会赞美诗集 - 1996 年版",
+      "officialSubtitle": "{count} 首带乐谱和歌词的赞美诗",
+      "edition1996Subtitle": "历史版 - {count} 首传统赞美诗"
     },
     "progress": {
-      "preparing": "Preparing...",
-      "downloading": "Downloading...",
-      "cancelled": "Cancelled",
-      "offline": "No internet",
-      "serverError": "Server error",
-      "error": "Download failed"
+      "preparing": "准备中…",
+      "downloading": "下载中…",
+      "cancelled": "已取消",
+      "offline": "无网络",
+      "serverError": "服务器错误",
+      "error": "下载失败"
     },
     "errors": {
-      "loadFailed": "Could not load collections.",
-      "downloadFailureTitle": "Download failed",
-      "downloadOffline": "Could not download files. Check your internet connection.",
-      "downloadServer": "Download stopped after several consecutive failures — the media server appears unavailable. {count} file(s) could not be downloaded. Please try again later.",
-      "downloadUnknown": "An error occurred while downloading the collection.",
-      "batchOffline": "Batch download was cancelled because there is no internet connection."
+      "loadFailed": "无法加载专辑。",
+      "downloadFailureTitle": "下载失败",
+      "downloadOffline": "无法下载文件。请检查网络连接。",
+      "downloadServer": "连续多次失败后下载已停止 — 媒体服务器似乎不可用。有 {count} 个文件未能下载。请稍后重试。",
+      "downloadUnknown": "下载专辑时出错。",
+      "batchOffline": "由于没有网络连接，批量下载已取消。"
     },
     "downloadQueue": {
-      "title": "Downloads",
-      "clearFinished": "Clear finished",
-      "retry": "Try again",
-      "cancel": "Cancel"
+      "title": "下载",
+      "clearFinished": "清除已完成",
+      "retry": "重试",
+      "cancel": "取消"
     }
   }
 }

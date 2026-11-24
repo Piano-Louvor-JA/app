@@ -1,67 +1,67 @@
 export default {
   closeProjection: {
-    title: "Close projection?",
-    message: "A projection is active (bible/hymns/video/site). Close now? Enter closes.",
-    confirm: "Close",
+    title: "إغلاق العرض؟",
+    message: "هناك عرض نشط (الكتاب المقدس/الترانيم/فيديو/موقع). هل تُغلق الآن؟ Enter للإغلاق.",
+    confirm: "إغلاق",
   },
   auth: {
-    wrongPassword: "Incorrect password",
-    reauthFailed: "Could not confirm your identity",
-    accountDeleted: "Account deleted",
-    passwordRequired: "Type your password to confirm",
-    sessionExpired: "Session expired — sign in again to delete the account",
-    deleteFailed: "Could not delete the account",
+    wrongPassword: "كلمة المرور غير صحيحة",
+    reauthFailed: "تعذّر التحقق من هويتك",
+    accountDeleted: "تم حذف الحساب",
+    passwordRequired: "اكتب كلمة المرور للتأكيد",
+    sessionExpired: "انتهت صلاحية الجلسة — سجّل الدخول مرة أخرى لحذف الحساب",
+    deleteFailed: "تعذّر حذف الحساب",
   },
   "palcoOutputs": {
-    "title": "Stage TVs",
-    "empty": "No TV with Stage connected. Open Stage",
-    "onHold": "{slot} · on hold"
+    "title": "تلفزيونات المنصة",
+    "empty": "لا يوجد تلفزيون متصل بالمنصة. افتح المنصة",
+    "onHold": "{slot} · قيد الانتظار"
   },
   "obsOutputs": {
     "detecting": "Detecting and refreshing OBS connections…",
-    "active": "Remote connections",
-    "activateHint": "Start a connection in Settings → Broadcast to use it here.",
+    "active": "اتصالات بعيدة",
+    "activateHint": "ابدأ اتصالاً في الإعدادات ← البث لاستخدامه هنا.",
     "title": "OBS connections",
-    "activeConnections": "Active connections: {count}"
+    "activeConnections": "الاتصالات النشطة: {count}"
   },
   "floating": {
-    "closeTitle": "Close {title}?",
-    "closeMessage": "Stop this feature and close its projection?"
+    "closeTitle": "إغلاق {title}؟",
+    "closeMessage": "إيقاف هذه الميزة وإغلاق عرضها؟"
   },
   "updates": {
-    checkFailed: "Failed to check for updates",
-    downloadFailedRetry: "Could not download the update. Try again later.",
-    downloadFailedConnection: "Could not download the update. Check your internet connection.",
-    verifyFailed: "The update could not be verified. Try again later.",
-    updateFailed: "Update failed. Try again later.",
-    "downloadMacInstaller": "Download macOS installer",
+    checkFailed: "فشل التحقق من التحديثات",
+    downloadFailedRetry: "تعذّر تنزيل التحديث. حاول مرة أخرى لاحقاً.",
+    downloadFailedConnection: "تعذّر تنزيل التحديث. تحقق من اتصالك بالإنترنت.",
+    verifyFailed: "تعذّر التحقق من التحديث. حاول مرة أخرى لاحقاً.",
+    updateFailed: "فشل التحديث. حاول مرة أخرى لاحقاً.",
+    "downloadMacInstaller": "تنزيل مثبّت macOS",
     "manualMacInstructions": "On macOS, install this update manually. Download the installer below, quit LouvorJA, open the DMG and drag the app to Applications, replacing the previous version. Your data and preferences will be kept.",
-    "version": "Version {version}",
-    "noReleaseNotes": "No release notes.",
-    "download": "Download update",
-    "installRestart": "Install and restart",
-    "later": "Later",
-    "available": "Version {version} available",
-    "update": "Update",
-    "dismiss": "Dismiss"
+    "version": "الإصدار {version}",
+    "noReleaseNotes": "لا توجد ملاحظات إصدار.",
+    "download": "تنزيل التحديث",
+    "installRestart": "تثبيت وإعادة التشغيل",
+    "later": "لاحقاً",
+    "available": "الإصدار {version} متوفر",
+    "update": "تحديث",
+    "dismiss": "تجاهل"
   },
   "windowControls": {
-    "close": "Close",
-    "minimize": "Minimize",
-    "maximize": "Maximize"
+    "close": "إغلاق",
+    "minimize": "تصغير",
+    "maximize": "تكبير"
   },
   "a11y": {
-    "mainNav": "Main navigation"
+    "mainNav": "التنقل الرئيسي"
   },
   "apiOffline": {
-    "message": "No connection to the service — check your internet",
-    "retrying": "Trying to reconnect..."
+    "message": "لا يوجد اتصال بالخدمة — تحقق من اتصالك بالإنترنت",
+    "retrying": "جارٍ محاولة إعادة الاتصال..."
   },
   "projection": {
     liturgy: "عرض",
-    "minimizeProjection": "Minimize projection",
-    "restoreProjection": "Restore projection",
-    "confirmClose": "Projection is in progress. Closing this window stops the music. Really leave?"
+    "minimizeProjection": "تصغير العرض",
+    "restoreProjection": "استعادة العرض",
+    "confirmClose": "العرض جارٍ. إغلاق هذه النافذة يوقف الموسيقى. هل تريد الخروج حقاً؟"
   },
   "app": {
     "name": "Louvor JA",
@@ -69,198 +69,198 @@ export default {
     "nameJa": "JA"
   },
   "common": {
-    "close": "Close",
-    "comingSoon": "Coming soon",
-    "openFolder": "Open folder",
-    "addToPlaylist": "Add to playlist",
-    "suggestFix": "Suggest lyric/timing fix",
-    "cancel": "Cancel",
-    "copied": "Copied!"
+    "close": "إغلاق",
+    "comingSoon": "قريباً",
+    "openFolder": "فتح المجلد",
+    "addToPlaylist": "إضافة إلى قائمة التشغيل",
+    "suggestFix": "اقتراح تصحيح الكلمات/التوقيت",
+    "cancel": "إلغاء",
+    "copied": "تم النسخ!"
   },
   "independentProjection": {
-    "title": "Independent projection",
-    "enableHint": "Turn on in Screens to use",
-    "unavailable": "Only available with extended monitors connected",
-    "hint": "Pick one monitor. This feature appears on top of whatever is projected there; the other monitors stay the same.",
-    "monitor": "Monitor {index}",
-    "activeOn": "Independent projection on monitor {index}",
-    "stop": "Stop independent projection",
-    "sharedOn": "Shared projection on monitor {index}",
-    "modeLabel": "Projection mode",
+    "title": "عرض مستقل",
+    "enableHint": "قم بتفعيله في الشاشات للاستخدام",
+    "unavailable": "متاح فقط عند توصيل شاشات موسّعة",
+    "hint": "اختر شاشة واحدة. تظهر هذه الميزة فوق ما يُعرض عليها؛ وتبقى الشاشات الأخرى كما هي.",
+    "monitor": "شاشة {index}",
+    "activeOn": "عرض مستقل على الشاشة {index}",
+    "stop": "إيقاف العرض المستقل",
+    "sharedOn": "عرض مشترك على الشاشة {index}",
+    "modeLabel": "وضع العرض",
     "status": {
-      "stop": "Stop",
-      "overlay": "Overlaying on:",
-      "share": "Sharing on:",
-      "monitor": "Monitor {index}"
+      "stop": "إيقاف",
+      "overlay": "طبقة فوق:",
+      "share": "مشاركة على:",
+      "monitor": "شاشة {index}"
     },
     "mode": {
-      "overlay": "Overlay",
-      "share": "Share"
+      "overlay": "طبقة فوق",
+      "share": "مشاركة"
     },
-    "hintShare": "Pick one monitor. Its screen is split in half with whatever is already projected; if one side leaves, the other takes the whole screen again."
+    "hintShare": "اختر شاشة واحدة. تُقسم شاشتها إلى نصفين مع ما يُعرض عليها بالفعل؛ وإذا غادر أحد الجانبين، استعاد الجانب الآخر الشاشة كاملة."
   },
   "monitors": {
-    "wiredTitle": "Wired connections",
-    "selectScreens": "Select screens",
-    "identify": "Detect screens",
-    "hint": "Check the monitors where the resource should be projected.",
-    "loading": "Detecting monitors…",
-    "empty": "No extended monitors found.",
-    "primary": "Primary",
-    "returnScreen": "Return screen",
-    "selectedCount": "{count} selected",
-    "projectNeedsScreens": "Select at least one extended screen to project"
+    "wiredTitle": "اتصالات سلكية",
+    "selectScreens": "تحديد الشاشات",
+    "identify": "كشف الشاشات",
+    "hint": "حدّد الشاشات التي سيُعرض عليها المحتوى.",
+    "loading": "جارٍ كشف الشاشات…",
+    "empty": "لم يتم العثور على شاشات موسّعة.",
+    "primary": "الرئيسية",
+    "returnScreen": "شاشة العودة",
+    "selectedCount": "تم تحديد {count}",
+    "projectNeedsScreens": "حدّد شاشة موسّعة واحدة على الأقل للعرض"
   },
   "popupCount": {
-    "label": "Screens",
-    "tooltip": "Select projection screens"
+    "label": "الشاشات",
+    "tooltip": "تحديد شاشات العرض"
   },
   "popupControls": {
-    "closeAll": "Close all screens"
+    "closeAll": "إغلاق جميع الشاشات"
   },
   "uiZoom": {
-    "label": "Page zoom",
-    "zoomIn": "Zoom in",
-    "zoomOut": "Zoom out"
+    "label": "تكبير الصفحة",
+    "zoomIn": "تكبير",
+    "zoomOut": "تصغير"
   },
   "nav": {
-    "home": "Home",
-    "albums": "Media Center",
-    "community": "Community",
-    "liturgy": "Liturgy",
-    "bible": "Bible",
-    "utilities": "Utilities",
-    "settings": "Settings",
+    "home": "الرئيسية",
+    "albums": "مركز الوسائط",
+    "community": "المجتمع",
+    "liturgy": "الليتورجيا",
+    "bible": "الكتاب المقدس",
+    "utilities": "الأدوات",
+    "settings": "الإعدادات",
     "history": {
-      "label": "Navigation history",
-      "back": "Back",
-      "forward": "Forward",
-      "goTo": "Go to {label}"
+      "label": "سجل التنقل",
+      "back": "رجوع",
+      "forward": "تقدّم",
+      "goTo": "الانتقال إلى {label}"
     },
     "historyDetail": {
-      "player": "Player",
-      "editor": "Editor"
+      "player": "المشغّل",
+      "editor": "المحرّر"
     }
   },
   "connectedDevices": {
-    "title": "Connected devices",
-    "remote": "Remote control",
-    "speaker": "Preacher's clicker",
-    "monitors": "Monitor sharing",
-    "none": "None connected",
-    "monitorsInUse": "{device} ({host}) · {n} monitor(s)",
-    "palco": "Stage (TVs)",
+    "title": "الأجهزة المتصلة",
+    "remote": "التحكم عن بعد",
+    "speaker": "جهاز الوعظ",
+    "monitors": "مشاركة الشاشات",
+    "none": "لا يوجد اتصال",
+    "monitorsInUse": "{device} ({host}) · {n} شاشة",
+    "palco": "المنصة (تلفزيونات)",
     "palcoTv": "{name} · {ip}",
     "transmission": "Broadcasts (OBS/browsers)",
     "transmissionGroup": "{connection} · {page} · {tabs}",
-    "tabs": "1 tab | {n} tabs",
+    "tabs": "علامة تبويب واحدة | {n} علامات تبويب",
     "inObs": "{n} in OBS",
-    "inBrowser": "{n} in the browser",
-    "and": " and ",
+    "inBrowser": "{n} في المتصفح",
+    "and": " و ",
     "pages": {
-      "espelho": "Mirror",
-      "retorno": "Stage return",
-      "legenda": "Caption",
-      "other": "Other page"
+      "espelho": "مرآة",
+      "retorno": "شاشة عودة المنصة",
+      "legenda": "ترجمة",
+      "other": "صفحة أخرى"
     }
   },
   "minimize": {
-    "playlistCount": "{n} playlist(s)",
-    "pageNumber": "Page {n}",
-    "bar": "Minimized pages",
-    "close": "Close {title}",
-    "page": "Minimize page",
-    "search": "Search: {q}"
+    "playlistCount": "{n} قائمة/قوائم تشغيل",
+    "pageNumber": "صفحة {n}",
+    "bar": "الصفحات المصغّرة",
+    "close": "إغلاق {title}",
+    "page": "تصغير الصفحة",
+    "search": "بحث: {q}"
   },
   "sync": {
     "downloadQueue": {
-      "title": "Downloads",
-      "clearFinished": "Clear finished",
-      "retry": "Retry",
-      "cancel": "Cancel"
+      "title": "التنزيلات",
+      "clearFinished": "مسح المكتملة",
+      "retry": "إعادة المحاولة",
+      "cancel": "إلغاء"
     }
   },
   "sljaMigration": {
-    "title": "Upload {count} imported hymn(s) to your account?",
-    "message": "You imported .slja files while logged out. They can go to your account (a single copy, never duplicated) and be available on any device.",
-    "confirm": "Upload to account",
-    "cancel": "Keep on this device only"
+    "title": "رفع {count} نشيداً مستورداً إلى حسابك؟",
+    "message": "لقد استوردت ملفات .slja أثناء تسجيل الخروج. يمكن رفعها إلى حسابك (نسخة واحدة فقط، دون تكرار أبداً) لتكون متاحة على أي جهاز.",
+    "confirm": "رفع إلى الحساب",
+    "cancel": "الإبقاء على هذا الجهاز فقط"
   },
   "download": {
-    "indicatorTitle": "Background downloads: {done}/{total} ({percent}%)",
-    "indicatorCounts": "{done} of {total} completed",
-    "indicatorIdle": "Preparing download…"
+    "indicatorTitle": "تنزيلات في الخلفية: {done}/{total} ({percent}%)",
+    "indicatorCounts": "{done} من {total} مكتملة",
+    "indicatorIdle": "جارٍ تحضير التنزيل…"
   },
   "settings": {
     "appearance": {
-      "changeTheme": "Alterar tema"
+      "changeTheme": "تغيير السمة"
     },
     "general": {
-      "checkUpdate": "Buscar atualizações",
-      "checking": "Comprobando…",
-      "updateAvailable": "Atualização disponível",
-      "updateDesktopOnly": "Somente desktop",
-      "updateError": "Erro de atualização",
-      "updateHint": "Reinicie para aplicar",
-      "updateNotAvailable": "Sem atualizações",
-      "updateTitle": "Atualização do app"
+      "checkUpdate": "التحقق من التحديثات",
+      "checking": "جارٍ التحقق…",
+      "updateAvailable": "يتوفر تحديث",
+      "updateDesktopOnly": "سطح المكتب فقط",
+      "updateError": "خطأ في التحديث",
+      "updateHint": "أعد التشغيل للتطبيق",
+      "updateNotAvailable": "لا تحديثات",
+      "updateTitle": "تحديث التطبيق"
     },
     "stage": {
-      "title": "Personalizar Palco",
-      "scopeGlobal": "Padrão (global)",
+      "title": "تخصيص المسرح",
+      "scopeGlobal": "الافتراضي (عام)",
       "scope": {
-        "hymns": "Hinos",
-        "bible": "Bíblia",
-        "liturgy": "Liturgia",
-        "timer": "Cronômetro",
-        "random": "Sorteio",
-        "clock": "Relógio",
-        "countdown": "Contagem regressiva"
+        "hymns": "ترانيم",
+        "bible": "الكتاب المقدس",
+        "liturgy": "الطقس",
+        "timer": "المؤقّت",
+        "random": "سحب عشوائي",
+        "clock": "الساعة",
+        "countdown": "العد التنازلي"
       },
-      "inheritingHint": "Este módulo está herdando o padrão global. Qualquer alteração aqui cria uma personalização própria.",
-      "backgroundColor": "Cor de fundo",
-      "backgroundImage": "Imagem de fundo",
-      "officialBackground": "Fundo oficial",
-      "officialGalleryHint": "Toque para aplicar; toque novamente para remover.",
-      "selectImage": "Clique para selecionar uma imagem",
-      "removeImage": "Remover imagem",
-      "changeImage": "Trocar imagem",
-      "textColor": "Cor do texto",
-      "fontSize": "Tamanho da fonte",
-      "fontWeight": "Espessura",
-      "weightNormal": "Normal",
-      "weightMedium": "Média",
-      "weightLightPlus": "Leve+",
-      "weightStrong": "Forte",
-      "bibleAppearance": "Bíblia — aparência própria",
-      "bibleTextColor": "Cor do texto (Bíblia)",
-      "bibleFontSize": "Tamanho da fonte (Bíblia)",
-      "bibleFontWeight": "Espessura (Bíblia)",
-      "showBibleVersion": "Mostrar versão da Bíblia no rodapé",
-      "footerRefColor": "Cor da referência (rodapé)",
-      "shadowAndBox": "Sombra e caixinha",
-      "textShadow": "Sombra na letra",
-      "shadowIntensity": "Intensidade da sombra",
-      "shadowBlur": "Espalhamento da sombra",
-      "textBox": "Caixinha atrás da letra",
-      "boxOpacity": "Opacidade da caixinha",
-      "boxBorder": "Borda na caixinha",
-      "alignment": "Alinhamento do texto",
-      "horizontal": "Horizontal",
-      "vertical": "Vertical",
-      "alignLeft": "Esquerda",
-      "alignCenter": "Centro",
-      "alignRight": "Direita",
-      "alignTop": "Em cima",
-      "alignMiddle": "Meio",
-      "alignBottom": "Em baixo",
-      "reset": "Redefinir",
-      "resetConfirm": "Voltar este módulo para o padrão?"
+      "inheritingHint": "هذه الوحدة ترث الافتراضي العام. أي تغيير هنا ينشئ تخصيصًا خاصًا بها.",
+      "backgroundColor": "لون الخلفية",
+      "backgroundImage": "صورة الخلفية",
+      "officialBackground": "الخلفية الرسمية",
+      "officialGalleryHint": "انقر للتطبيق؛ وانقر مجددًا للإزالة.",
+      "selectImage": "انقر لاختيار صورة",
+      "removeImage": "إزالة الصورة",
+      "changeImage": "تغيير الصورة",
+      "textColor": "لون النص",
+      "fontSize": "حجم الخط",
+      "fontWeight": "سماكة الخط",
+      "weightNormal": "عادي",
+      "weightMedium": "متوسط",
+      "weightLightPlus": "خفيف+",
+      "weightStrong": "غامق",
+      "bibleAppearance": "الكتاب المقدس — مظهر خاص",
+      "bibleTextColor": "لون النص (الكتاب المقدس)",
+      "bibleFontSize": "حجم الخط (الكتاب المقدس)",
+      "bibleFontWeight": "سماكة الخط (الكتاب المقدس)",
+      "showBibleVersion": "إظهار ترجمة الكتاب المقدس في التذييل",
+      "footerRefColor": "لون المرجع (التذييل)",
+      "shadowAndBox": "الظل والصندوق",
+      "textShadow": "ظل النص",
+      "shadowIntensity": "شدة الظل",
+      "shadowBlur": "انتشار الظل",
+      "textBox": "صندوق خلف الكلمات",
+      "boxOpacity": "عتامة الصندوق",
+      "boxBorder": "حدود الصندوق",
+      "alignment": "محاذاة النص",
+      "horizontal": "أفقي",
+      "vertical": "عمودي",
+      "alignLeft": "يسار",
+      "alignCenter": "وسط",
+      "alignRight": "يمين",
+      "alignTop": "أعلى",
+      "alignMiddle": "منتصف",
+      "alignBottom": "أسفل",
+      "reset": "إعادة تعيين",
+      "resetConfirm": "إعادة هذه الوحدة إلى الوضع الافتراضي؟"
     },
     "placeholder": {
-      "general": "Preferências gerais do aplicativo em breve.",
-      "media": "Configurações de áudio, vídeo e player em breve.",
-      "projection": "Configurações de projeção e telas em breve."
+      "general": "التفضيلات العامة للتطبيق قريبًا.",
+      "media": "إعدادات الصوت والفيديو والمشغّل قريبًا.",
+      "projection": "إعدادات العرض والشاشات قريبًا."
     }
   }
 }

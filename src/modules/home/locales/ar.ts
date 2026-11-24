@@ -1,9 +1,9 @@
 export default {
   "home": {
-    "districtLabel": "District of",
-    "churchLabel": "Church",
-    "districtPlaceholder": "Type your district name",
-    "churchPlaceholder": "Type the Church/Neighborhood name",
-    "editField": "Edit {field}"
+    "districtLabel": "منطقة",
+    "churchLabel": "الكنيسة",
+    "districtPlaceholder": "اكتب اسم منطقتك",
+    "churchPlaceholder": "اكتب اسم الكنيسة/الحي",
+    "editField": "تعديل {field}"
   }
 }

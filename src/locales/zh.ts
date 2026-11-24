@@ -1,67 +1,67 @@
 export default {
   closeProjection: {
-    title: "Close projection?",
-    message: "A projection is active (bible/hymns/video/site). Close now? Enter closes.",
-    confirm: "Close",
+    title: "关闭投影？",
+    message: "投影正在进行（圣经/赞美诗/视频/网站）。现在关闭吗？按 Enter 关闭。",
+    confirm: "关闭",
   },
   auth: {
-    wrongPassword: "Incorrect password",
-    reauthFailed: "Could not confirm your identity",
-    accountDeleted: "Account deleted",
-    passwordRequired: "Type your password to confirm",
-    sessionExpired: "Session expired — sign in again to delete the account",
-    deleteFailed: "Could not delete the account",
+    wrongPassword: "密码错误",
+    reauthFailed: "无法确认您的身份",
+    accountDeleted: "账户已删除",
+    passwordRequired: "请输入密码以确认",
+    sessionExpired: "会话已过期 — 请重新登录以删除账户",
+    deleteFailed: "无法删除账户",
   },
   "palcoOutputs": {
-    "title": "Stage TVs",
-    "empty": "No TV with Stage connected. Open Stage",
-    "onHold": "{slot} · on hold"
+    "title": "舞台电视",
+    "empty": "没有已连接舞台的电视。请打开舞台",
+    "onHold": "{slot} · 暂停"
   },
   "obsOutputs": {
-    "detecting": "Detecting and refreshing OBS connections…",
-    "active": "Remote connections",
-    "activateHint": "Start a connection in Settings → Broadcast to use it here.",
-    "title": "OBS connections",
-    "activeConnections": "Active connections: {count}"
+    "detecting": "正在检测并刷新 OBS 连接…",
+    "active": "远程连接",
+    "activateHint": "请在 设置 → 直播 中开始连接以在此使用。",
+    "title": "OBS 连接",
+    "activeConnections": "活动连接：{count}"
   },
   "floating": {
-    "closeTitle": "Close {title}?",
-    "closeMessage": "Stop this feature and close its projection?"
+    "closeTitle": "关闭 {title}？",
+    "closeMessage": "停止此功能并关闭其投影？"
   },
   "updates": {
-    checkFailed: "Failed to check for updates",
-    downloadFailedRetry: "Could not download the update. Try again later.",
-    downloadFailedConnection: "Could not download the update. Check your internet connection.",
-    verifyFailed: "The update could not be verified. Try again later.",
-    updateFailed: "Update failed. Try again later.",
-    "downloadMacInstaller": "Download macOS installer",
-    "manualMacInstructions": "On macOS, install this update manually. Download the installer below, quit LouvorJA, open the DMG and drag the app to Applications, replacing the previous version. Your data and preferences will be kept.",
-    "version": "Version {version}",
-    "noReleaseNotes": "No release notes.",
-    "download": "Download update",
-    "installRestart": "Install and restart",
-    "later": "Later",
-    "available": "Version {version} available",
-    "update": "Update",
-    "dismiss": "Dismiss"
+    checkFailed: "检查更新失败",
+    downloadFailedRetry: "无法下载更新。请稍后重试。",
+    downloadFailedConnection: "无法下载更新。请检查网络连接。",
+    verifyFailed: "无法验证更新。请稍后重试。",
+    updateFailed: "更新失败。请稍后重试。",
+    "downloadMacInstaller": "下载 macOS 安装程序",
+    "manualMacInstructions": "在 macOS 上，请手动安装此更新。下载下方安装程序后，退出 LouvorJA，打开 DMG 并将应用拖入「应用程序」文件夹以替换旧版本。您的数据和偏好设置将保留。",
+    "version": "版本 {version}",
+    "noReleaseNotes": "暂无更新说明。",
+    "download": "下载更新",
+    "installRestart": "安装并重启",
+    "later": "稍后",
+    "available": "有可用版本 {version}",
+    "update": "更新",
+    "dismiss": "忽略"
   },
   "windowControls": {
-    "close": "Close",
-    "minimize": "Minimize",
-    "maximize": "Maximize"
+    "close": "关闭",
+    "minimize": "最小化",
+    "maximize": "最大化"
   },
   "a11y": {
-    "mainNav": "Main navigation"
+    "mainNav": "主导航"
   },
   "apiOffline": {
-    "message": "No connection to the service — check your internet",
-    "retrying": "Trying to reconnect..."
+    "message": "无法连接服务 — 请检查网络",
+    "retrying": "正在尝试重新连接..."
   },
   "projection": {
     liturgy: "投影",
-    "minimizeProjection": "Minimize projection",
-    "restoreProjection": "Restore projection",
-    "confirmClose": "Projection is in progress. Closing this window stops the music. Really leave?"
+    "minimizeProjection": "最小化投影",
+    "restoreProjection": "恢复投影",
+    "confirmClose": "投影正在进行中。关闭此窗口将停止音乐。确定离开吗？"
   },
   "app": {
     "name": "Louvor JA",
@@ -69,198 +69,198 @@ export default {
     "nameJa": "JA"
   },
   "common": {
-    "close": "Close",
-    "comingSoon": "Coming soon",
-    "openFolder": "Open folder",
-    "addToPlaylist": "Add to playlist",
-    "suggestFix": "Suggest lyric/timing fix",
-    "cancel": "Cancel",
-    "copied": "Copied!"
+    "close": "关闭",
+    "comingSoon": "即将推出",
+    "openFolder": "打开文件夹",
+    "addToPlaylist": "添加到播放列表",
+    "suggestFix": "建议修正歌词/时间轴",
+    "cancel": "取消",
+    "copied": "已复制！"
   },
   "independentProjection": {
-    "title": "Independent projection",
-    "enableHint": "Turn on in Screens to use",
-    "unavailable": "Only available with extended monitors connected",
-    "hint": "Pick one monitor. This feature appears on top of whatever is projected there; the other monitors stay the same.",
-    "monitor": "Monitor {index}",
-    "activeOn": "Independent projection on monitor {index}",
-    "stop": "Stop independent projection",
-    "sharedOn": "Shared projection on monitor {index}",
-    "modeLabel": "Projection mode",
+    "title": "独立投影",
+    "enableHint": "请在「屏幕」中开启以使用",
+    "unavailable": "仅在连接扩展显示器时可用",
+    "hint": "选择一台显示器。此功能将显示在其投影内容之上；其他显示器保持不变。",
+    "monitor": "显示器 {index}",
+    "activeOn": "显示器 {index} 上的独立投影",
+    "stop": "停止独立投影",
+    "sharedOn": "显示器 {index} 上的共享投影",
+    "modeLabel": "投影模式",
     "status": {
-      "stop": "Stop",
-      "overlay": "Overlaying on:",
-      "share": "Sharing on:",
-      "monitor": "Monitor {index}"
+      "stop": "停止",
+      "overlay": "叠加于：",
+      "share": "共享于：",
+      "monitor": "显示器 {index}"
     },
     "mode": {
-      "overlay": "Overlay",
-      "share": "Share"
+      "overlay": "叠加",
+      "share": "共享"
     },
-    "hintShare": "Pick one monitor. Its screen is split in half with whatever is already projected; if one side leaves, the other takes the whole screen again."
+    "hintShare": "选择一台显示器。其屏幕将与现有投影内容对半分屏；若一侧退出，另一侧将重新占据整个屏幕。"
   },
   "monitors": {
-    "wiredTitle": "Wired connections",
-    "selectScreens": "Select screens",
-    "identify": "Detect screens",
-    "hint": "Check the monitors where the resource should be projected.",
-    "loading": "Detecting monitors…",
-    "empty": "No extended monitors found.",
-    "primary": "Primary",
-    "returnScreen": "Return screen",
-    "selectedCount": "{count} selected",
-    "projectNeedsScreens": "Select at least one extended screen to project"
+    "wiredTitle": "有线连接",
+    "selectScreens": "选择屏幕",
+    "identify": "检测屏幕",
+    "hint": "请勾选需要投影的显示器。",
+    "loading": "正在检测显示器…",
+    "empty": "未找到扩展显示器。",
+    "primary": "主显示器",
+    "returnScreen": "返回屏幕",
+    "selectedCount": "已选择 {count} 台",
+    "projectNeedsScreens": "请至少选择一个扩展屏幕进行投影"
   },
   "popupCount": {
-    "label": "Screens",
-    "tooltip": "Select projection screens"
+    "label": "屏幕",
+    "tooltip": "选择投影屏幕"
   },
   "popupControls": {
-    "closeAll": "Close all screens"
+    "closeAll": "关闭所有屏幕"
   },
   "uiZoom": {
-    "label": "Page zoom",
-    "zoomIn": "Zoom in",
-    "zoomOut": "Zoom out"
+    "label": "页面缩放",
+    "zoomIn": "放大",
+    "zoomOut": "缩小"
   },
   "nav": {
-    "home": "Home",
-    "albums": "Media Center",
-    "community": "Community",
-    "liturgy": "Liturgy",
-    "bible": "Bible",
-    "utilities": "Utilities",
-    "settings": "Settings",
+    "home": "首页",
+    "albums": "媒体中心",
+    "community": "社区",
+    "liturgy": "崇拜程序",
+    "bible": "圣经",
+    "utilities": "工具",
+    "settings": "设置",
     "history": {
-      "label": "Navigation history",
-      "back": "Back",
-      "forward": "Forward",
-      "goTo": "Go to {label}"
+      "label": "导航历史",
+      "back": "后退",
+      "forward": "前进",
+      "goTo": "前往 {label}"
     },
     "historyDetail": {
-      "player": "Player",
-      "editor": "Editor"
+      "player": "播放器",
+      "editor": "编辑器"
     }
   },
   "connectedDevices": {
-    "title": "Connected devices",
-    "remote": "Remote control",
-    "speaker": "Preacher's clicker",
-    "monitors": "Monitor sharing",
-    "none": "None connected",
-    "monitorsInUse": "{device} ({host}) · {n} monitor(s)",
-    "palco": "Stage (TVs)",
+    "title": "已连接设备",
+    "remote": "遥控器",
+    "speaker": "讲道翻页器",
+    "monitors": "显示器共享",
+    "none": "无连接",
+    "monitorsInUse": "{device}（{host}）· {n} 台显示器",
+    "palco": "舞台（电视）",
     "palcoTv": "{name} · {ip}",
     "transmission": "Broadcasts (OBS/browsers)",
     "transmissionGroup": "{connection} · {page} · {tabs}",
-    "tabs": "1 tab | {n} tabs",
-    "inObs": "{n} in OBS",
-    "inBrowser": "{n} in the browser",
-    "and": " and ",
+    "tabs": "1 个标签页 | {n} 个标签页",
+    "inObs": "OBS 中 {n} 个",
+    "inBrowser": "浏览器中 {n} 个",
+    "and": " 和 ",
     "pages": {
-      "espelho": "Mirror",
-      "retorno": "Stage return",
-      "legenda": "Caption",
-      "other": "Other page"
+      "espelho": "镜像",
+      "retorno": "舞台返看",
+      "legenda": "字幕",
+      "other": "其他页面"
     }
   },
   "minimize": {
-    "playlistCount": "{n} playlist(s)",
-    "pageNumber": "Page {n}",
-    "bar": "Minimized pages",
-    "close": "Close {title}",
-    "page": "Minimize page",
-    "search": "Search: {q}"
+    "playlistCount": "{n} 个播放列表",
+    "pageNumber": "第 {n} 页",
+    "bar": "已最小化的页面",
+    "close": "关闭 {title}",
+    "page": "最小化页面",
+    "search": "搜索：{q}"
   },
   "sync": {
     "downloadQueue": {
-      "title": "Downloads",
-      "clearFinished": "Clear finished",
-      "retry": "Retry",
-      "cancel": "Cancel"
+      "title": "下载",
+      "clearFinished": "清除已完成",
+      "retry": "重试",
+      "cancel": "取消"
     }
   },
   "sljaMigration": {
-    "title": "Upload {count} imported hymn(s) to your account?",
-    "message": "You imported .slja files while logged out. They can go to your account (a single copy, never duplicated) and be available on any device.",
-    "confirm": "Upload to account",
-    "cancel": "Keep on this device only"
+    "title": "将导入的 {count} 首赞美诗上传到您的账户？",
+    "message": "您在退出登录时导入了 .slja 文件。可将它们上传到您的账户（仅单一副本，绝不重复），并在任何设备上使用。",
+    "confirm": "上传到账户",
+    "cancel": "仅保留在此设备"
   },
   "download": {
-    "indicatorTitle": "Background downloads: {done}/{total} ({percent}%)",
-    "indicatorCounts": "{done} of {total} completed",
-    "indicatorIdle": "Preparing download…"
+    "indicatorTitle": "后台下载：{done}/{total}（{percent}%）",
+    "indicatorCounts": "{total} 项中 {done} 项已完成",
+    "indicatorIdle": "正在准备下载…"
   },
   "settings": {
     "appearance": {
-      "changeTheme": "Alterar tema"
+      "changeTheme": "更改主题"
     },
     "general": {
-      "checkUpdate": "Buscar atualizações",
-      "checking": "Comprobando…",
-      "updateAvailable": "Atualização disponível",
-      "updateDesktopOnly": "Somente desktop",
-      "updateError": "Erro de atualização",
-      "updateHint": "Reinicie para aplicar",
-      "updateNotAvailable": "Sem atualizações",
-      "updateTitle": "Atualização do app"
+      "checkUpdate": "检查更新",
+      "checking": "正在检查…",
+      "updateAvailable": "有可用更新",
+      "updateDesktopOnly": "仅限桌面版",
+      "updateError": "更新错误",
+      "updateHint": "重启后生效",
+      "updateNotAvailable": "暂无更新",
+      "updateTitle": "应用更新"
     },
     "stage": {
-      "title": "Personalizar Palco",
-      "scopeGlobal": "Padrão (global)",
+      "title": "自定义舞台",
+      "scopeGlobal": "默认（全局）",
       "scope": {
-        "hymns": "Hinos",
-        "bible": "Bíblia",
-        "liturgy": "Liturgia",
-        "timer": "Cronômetro",
-        "random": "Sorteio",
-        "clock": "Relógio",
-        "countdown": "Contagem regressiva"
+        "hymns": "赞美诗",
+        "bible": "圣经",
+        "liturgy": "崇拜程序",
+        "timer": "计时器",
+        "random": "随机抽取",
+        "clock": "时钟",
+        "countdown": "倒计时"
       },
-      "inheritingHint": "Este módulo está herdando o padrão global. Qualquer alteração aqui cria uma personalização própria.",
-      "backgroundColor": "Cor de fundo",
-      "backgroundImage": "Imagem de fundo",
-      "officialBackground": "Fundo oficial",
-      "officialGalleryHint": "Toque para aplicar; toque novamente para remover.",
-      "selectImage": "Clique para selecionar uma imagem",
-      "removeImage": "Remover imagem",
-      "changeImage": "Trocar imagem",
-      "textColor": "Cor do texto",
-      "fontSize": "Tamanho da fonte",
-      "fontWeight": "Espessura",
-      "weightNormal": "Normal",
-      "weightMedium": "Média",
-      "weightLightPlus": "Leve+",
-      "weightStrong": "Forte",
-      "bibleAppearance": "Bíblia — aparência própria",
-      "bibleTextColor": "Cor do texto (Bíblia)",
-      "bibleFontSize": "Tamanho da fonte (Bíblia)",
-      "bibleFontWeight": "Espessura (Bíblia)",
-      "showBibleVersion": "Mostrar versão da Bíblia no rodapé",
-      "footerRefColor": "Cor da referência (rodapé)",
-      "shadowAndBox": "Sombra e caixinha",
-      "textShadow": "Sombra na letra",
-      "shadowIntensity": "Intensidade da sombra",
-      "shadowBlur": "Espalhamento da sombra",
-      "textBox": "Caixinha atrás da letra",
-      "boxOpacity": "Opacidade da caixinha",
-      "boxBorder": "Borda na caixinha",
-      "alignment": "Alinhamento do texto",
-      "horizontal": "Horizontal",
-      "vertical": "Vertical",
-      "alignLeft": "Esquerda",
-      "alignCenter": "Centro",
-      "alignRight": "Direita",
-      "alignTop": "Em cima",
-      "alignMiddle": "Meio",
-      "alignBottom": "Em baixo",
-      "reset": "Redefinir",
-      "resetConfirm": "Voltar este módulo para o padrão?"
+      "inheritingHint": "此模块继承全局默认值。在此处的任何更改都会创建自己的自定义设置。",
+      "backgroundColor": "背景颜色",
+      "backgroundImage": "背景图片",
+      "officialBackground": "官方背景",
+      "officialGalleryHint": "点击应用；再次点击移除。",
+      "selectImage": "点击选择图片",
+      "removeImage": "移除图片",
+      "changeImage": "更改图片",
+      "textColor": "文字颜色",
+      "fontSize": "字体大小",
+      "fontWeight": "字体粗细",
+      "weightNormal": "常规",
+      "weightMedium": "中等",
+      "weightLightPlus": "细体+",
+      "weightStrong": "粗体",
+      "bibleAppearance": "圣经 — 独立外观",
+      "bibleTextColor": "文字颜色（圣经）",
+      "bibleFontSize": "字体大小（圣经）",
+      "bibleFontWeight": "字体粗细（圣经）",
+      "showBibleVersion": "在页脚显示圣经译本",
+      "footerRefColor": "参考经文颜色（页脚）",
+      "shadowAndBox": "阴影和衬底",
+      "textShadow": "文字阴影",
+      "shadowIntensity": "阴影强度",
+      "shadowBlur": "阴影扩散",
+      "textBox": "歌词后的衬底",
+      "boxOpacity": "衬底不透明度",
+      "boxBorder": "衬底边框",
+      "alignment": "文字对齐",
+      "horizontal": "水平",
+      "vertical": "垂直",
+      "alignLeft": "左",
+      "alignCenter": "居中",
+      "alignRight": "右",
+      "alignTop": "上",
+      "alignMiddle": "垂直居中",
+      "alignBottom": "下",
+      "reset": "重置",
+      "resetConfirm": "将此模块重置为默认值？"
     },
     "placeholder": {
-      "general": "Preferências gerais do aplicativo em breve.",
-      "media": "Configurações de áudio, vídeo e player em breve.",
-      "projection": "Configurações de projeção e telas em breve."
+      "general": "常规应用偏好设置即将推出。",
+      "media": "音频、视频和播放器设置即将推出。",
+      "projection": "投影和屏幕设置即将推出。"
     }
   }
 }

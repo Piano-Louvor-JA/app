@@ -1,9 +1,9 @@
 export default {
   "home": {
-    "districtLabel": "District of",
-    "churchLabel": "Church",
-    "districtPlaceholder": "Type your district name",
-    "churchPlaceholder": "Type the Church/Neighborhood name",
-    "editField": "Edit {field}"
+    "districtLabel": "जिला:",
+    "churchLabel": "कलीसिया",
+    "districtPlaceholder": "अपने जिले का नाम टाइप करें",
+    "churchPlaceholder": "कलीसिया/पड़ोस का नाम टाइप करें",
+    "editField": "{field} संपादित करें"
   }
 }

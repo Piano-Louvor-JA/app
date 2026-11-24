@@ -2,25 +2,25 @@ export default {
   "starting": {
     "titleFirstBoot": "Setting up LouvorJA - PIANO",
     "titleWarmBoot": "Preparing LouvorJA - PIANO",
-    "subtitle": "We are configuring and getting everything ready for you.",
-    "retry": "Try again",
+    "subtitle": "نقوم بالإعداد وتجهيز كل شيء من أجلك.",
+    "retry": "حاول مجددًا",
     "status": {
-      "booting": "Starting the app…",
-      "preparingInstall": "Preparing the first-time setup…",
-      "preparing": "Setting up your worship environment…",
-      "loading": "Almost there — loading your resources…",
-      "downloading": "Syncing the catalog with the API…",
-      "extracting": "Extracting and preparing local files…",
-      "syncingCovers": "Preparing essential covers and images…",
-      "done": "All set!",
-      "retry": "Trying again…",
-      "error": "Could not finish setup. Please try again.",
-      "errorOffline": "No internet connection. Check your network and try again.",
-      "errorRateLimit": "Too many server requests (Rate Limit). Please try again later.",
-      "errorServer": "Failed to connect to the server. Please try again.",
-      "errorDownload": "Error syncing the catalog with the API. Check your internet and try again.",
-      "errorExtract": "Error preparing local data.",
-      "bridgeMissing": "Could not connect to desktop. Close and reopen the application."
+      "booting": "جارٍ بدء التطبيق…",
+      "preparingInstall": "جارٍ تجهيز الإعداد الأولي…",
+      "preparing": "جارٍ تهيئة بيئة العبادة لديك…",
+      "loading": "أوشكنا على الانتهاء — يجري تحميل مواردك…",
+      "downloading": "تجري مزامنة الفهرس مع الخدمة…",
+      "extracting": "يجري استخراج الملفات المحلية وتجهيزها…",
+      "syncingCovers": "يجري تجهيز الأغلفة والصور الأساسية…",
+      "done": "كل شيء جاهز!",
+      "retry": "جارٍ المحاولة مجددًا…",
+      "error": "تعذّر إكمال الإعداد. حاول مرة أخرى.",
+      "errorOffline": "لا يوجد اتصال بالإنترنت. تحقق من شبكتك وحاول مجددًا.",
+      "errorRateLimit": "طلبات كثيرة للخادم (حدّ الطلبات). حاول لاحقًا.",
+      "errorServer": "فشل الاتصال بالخادم. حاول مرة أخرى.",
+      "errorDownload": "خطأ في مزامنة الفهرس مع الخدمة. تحقق من الإنترنت وحاول مجددًا.",
+      "errorExtract": "خطأ في تجهيز البيانات المحلية.",
+      "bridgeMissing": "تعذّر الاتصال بالحاسوب. أغلق التطبيق وافتحه مجددًا."
     }
   }
 }

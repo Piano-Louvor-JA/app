@@ -1,51 +1,51 @@
 export default {
   "sync": {
-    "downloadAll": "Download All",
-    "cancelAll": "Cancel All",
-    "close": "Close",
-    "download": "Download",
-    "downloadOffline": "Download Offline",
-    "cancel": "Cancel",
-    "retry": "Try Again",
-    "downloaded": "Downloaded",
-    "remove": "Remove",
-    "deleteConfirmTitle": "Remove offline media",
-    "deleteConfirmText": "Are you sure you want to remove \"{name}\"? This will delete the files from your computer.",
-    "deleteConfirmYes": "Remove",
-    "deleteConfirmNo": "Cancel",
+    "downloadAll": "Tümünü İndir",
+    "cancelAll": "Tümünü İptal Et",
+    "close": "Kapat",
+    "download": "İndir",
+    "downloadOffline": "Çevrimdışı İndir",
+    "cancel": "İptal",
+    "retry": "Yeniden Dene",
+    "downloaded": "İndirildi",
+    "remove": "Kaldır",
+    "deleteConfirmTitle": "Çevrimdışı medyayı kaldır",
+    "deleteConfirmText": "\"{name}\" öğesi kaldırılsın mı? Dosyalar bilgisayarınızdan silinecek.",
+    "deleteConfirmYes": "Kaldır",
+    "deleteConfirmNo": "İptal",
     "categories": {
-      "hymnals": "Official Hymnals",
-      "hymnalsSubtitle": "Complete liturgical collections for offline use.",
-      "youthAlbums": "Youth CDs & Collections",
-      "albumsSubtitle": "Annual albums and special productions.",
-      "defaultSubtitle": "Albums and productions for offline use."
+      "hymnals": "Resmî İlahi Kitapları",
+      "hymnalsSubtitle": "Çevrimdışı kullanım için eksiksiz ayin koleksiyonları.",
+      "youthAlbums": "Gençlik CD'leri ve Koleksiyonları",
+      "albumsSubtitle": "Yıllık albümler ve özel prodüksiyonlar.",
+      "defaultSubtitle": "Çevrimdışı kullanım için albümler ve prodüksiyonlar."
     },
     "hymnal": {
-      "edition1996Name": "Adventist Hymnal - 1996 Edition",
-      "officialSubtitle": "{count} hymns with sheet music and lyrics",
-      "edition1996Subtitle": "Historic - {count} traditional hymns"
+      "edition1996Name": "Adventist İlahi Kitabı - 1996 Baskısı",
+      "officialSubtitle": "Nota ve sözleriyle {count} ilahi",
+      "edition1996Subtitle": "Tarihsel - {count} geleneksel ilahi"
     },
     "progress": {
-      "preparing": "Preparing...",
-      "downloading": "Downloading...",
-      "cancelled": "Cancelled",
-      "offline": "No internet",
-      "serverError": "Server error",
-      "error": "Download failed"
+      "preparing": "Hazırlanıyor…",
+      "downloading": "İndiriliyor…",
+      "cancelled": "İptal edildi",
+      "offline": "İnternet yok",
+      "serverError": "Sunucu hatası",
+      "error": "İndirme başarısız"
     },
     "errors": {
-      "loadFailed": "Could not load collections.",
-      "downloadFailureTitle": "Download failed",
-      "downloadOffline": "Could not download files. Check your internet connection.",
-      "downloadServer": "Download stopped after several consecutive failures — the media server appears unavailable. {count} file(s) could not be downloaded. Please try again later.",
-      "downloadUnknown": "An error occurred while downloading the collection.",
-      "batchOffline": "Batch download was cancelled because there is no internet connection."
+      "loadFailed": "Koleksiyonlar yüklenemedi.",
+      "downloadFailureTitle": "İndirme başarısız",
+      "downloadOffline": "Dosyalar indirilemedi. İnternet bağlantınızı kontrol edin.",
+      "downloadServer": "Üst üste başarısızlıklar sonrası indirme durduruldu — medya sunucusu kullanılamıyor gibi görünüyor. {count} dosya indirilemedi. Daha sonra tekrar deneyin.",
+      "downloadUnknown": "Koleksiyon indirilirken bir hata oluştu.",
+      "batchOffline": "İnternet bağlantısı olmadığı için toplu indirme iptal edildi."
     },
     "downloadQueue": {
-      "title": "Downloads",
-      "clearFinished": "Clear finished",
-      "retry": "Try again",
-      "cancel": "Cancel"
+      "title": "İndirmeler",
+      "clearFinished": "Bitenleri temizle",
+      "retry": "Yeniden dene",
+      "cancel": "İptal"
     }
   }
 }

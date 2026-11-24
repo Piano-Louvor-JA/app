@@ -1,61 +1,61 @@
 export default {
   closeProjection: {
-    title: "Close projection?",
-    message: "A projection is active (bible/hymns/video/site). Close now? Enter closes.",
-    confirm: "Close",
+    title: "¿Cerrar la proyección?",
+    message: "Hay una proyección activa (biblia/himnos/video/sitio). ¿Cerrar ahora? Enter cierra.",
+    confirm: "Cerrar",
   },
   auth: {
-    wrongPassword: "Incorrect password",
-    reauthFailed: "Could not confirm your identity",
-    accountDeleted: "Account deleted",
-    passwordRequired: "Type your password to confirm",
-    sessionExpired: "Session expired — sign in again to delete the account",
-    deleteFailed: "Could not delete the account",
+    wrongPassword: "Contraseña incorrecta",
+    reauthFailed: "No se pudo confirmar su identidad",
+    accountDeleted: "Cuenta eliminada",
+    passwordRequired: "Escriba su contraseña para confirmar",
+    sessionExpired: "Sesión expirada — inicie sesión de nuevo para eliminar la cuenta",
+    deleteFailed: "No se pudo eliminar la cuenta",
   },
   "palcoOutputs": {
-    "title": "Stage TVs",
-    "empty": "No TV with Stage connected. Open Stage",
-    "onHold": "{slot} · on hold"
+    "title": "Televisores de escenario",
+    "empty": "No hay televisor conectado al Escenario. Abra el Escenario",
+    "onHold": "{slot} · en espera"
   },
   "obsOutputs": {
     "detecting": "Detecting and refreshing OBS connections…",
-    "active": "Remote connections",
-    "activateHint": "Start a connection in Settings → Broadcast to use it here.",
+    "active": "Conexiones remotas",
+    "activateHint": "Inicie una conexión en Ajustes → Transmisión para usarla aquí.",
     "title": "OBS connections",
-    "activeConnections": "Active connections: {count}"
+    "activeConnections": "Conexiones activas: {count}"
   },
   "floating": {
-    "closeTitle": "Close {title}?",
-    "closeMessage": "Stop this feature and close its projection?"
+    "closeTitle": "¿Cerrar {title}?",
+    "closeMessage": "¿Detener esta función y cerrar su proyección?"
   },
   "updates": {
-    checkFailed: "Failed to check for updates",
-    downloadFailedRetry: "Could not download the update. Try again later.",
-    downloadFailedConnection: "Could not download the update. Check your internet connection.",
-    verifyFailed: "The update could not be verified. Try again later.",
-    updateFailed: "Update failed. Try again later.",
-    "downloadMacInstaller": "Download macOS installer",
+    checkFailed: "Error al buscar actualizaciones",
+    downloadFailedRetry: "No se pudo descargar la actualización. Intente de nuevo más tarde.",
+    downloadFailedConnection: "No se pudo descargar la actualización. Compruebe su conexión a Internet.",
+    verifyFailed: "La actualización no pudo verificarse. Intente de nuevo más tarde.",
+    updateFailed: "Error al actualizar. Intente de nuevo más tarde.",
+    "downloadMacInstaller": "Descargar instalador de macOS",
     "manualMacInstructions": "On macOS, install this update manually. Download the installer below, quit LouvorJA, open the DMG and drag the app to Applications, replacing the previous version. Your data and preferences will be kept.",
-    "version": "Version {version}",
-    "noReleaseNotes": "No release notes.",
-    "download": "Download update",
-    "installRestart": "Install and restart",
-    "later": "Later",
-    "available": "Version {version} available",
-    "update": "Update",
-    "dismiss": "Dismiss"
+    "version": "Versión {version}",
+    "noReleaseNotes": "Sin notas de la versión.",
+    "download": "Descargar actualización",
+    "installRestart": "Instalar y reiniciar",
+    "later": "Más tarde",
+    "available": "Versión {version} disponible",
+    "update": "Actualizar",
+    "dismiss": "Descartar"
   },
   "windowControls": {
-    "close": "Close",
-    "minimize": "Minimize",
-    "maximize": "Maximize"
+    "close": "Cerrar",
+    "minimize": "Minimizar",
+    "maximize": "Maximizar"
   },
   "a11y": {
-    "mainNav": "Main navigation"
+    "mainNav": "Navegación principal"
   },
   "apiOffline": {
-    "message": "No connection to the service — check your internet",
-    "retrying": "Trying to reconnect..."
+    "message": "Sin conexión al servicio — compruebe su Internet",
+    "retrying": "Intentando reconectar..."
   },
   "projection": {
     liturgy: "Proyección",
@@ -193,74 +193,74 @@ export default {
   },
   "settings": {
     "appearance": {
-      "changeTheme": "Alterar tema"
+      "changeTheme": "Cambiar tema"
     },
     "general": {
-      "checkUpdate": "Buscar atualizações",
+      "checkUpdate": "Buscar actualizaciones",
       "checking": "Comprobando…",
-      "updateAvailable": "Atualização disponível",
-      "updateDesktopOnly": "Somente desktop",
-      "updateError": "Erro de atualização",
+      "updateAvailable": "Actualización disponible",
+      "updateDesktopOnly": "Solo escritorio",
+      "updateError": "Error de actualización",
       "updateHint": "Reinicie para aplicar",
-      "updateNotAvailable": "Sem atualizações",
-      "updateTitle": "Atualização do app"
+      "updateNotAvailable": "Sin actualizaciones",
+      "updateTitle": "Actualización de la app"
     },
     "stage": {
       "title": "Personalizar Palco",
-      "scopeGlobal": "Padrão (global)",
+      "scopeGlobal": "Predeterminado (global)",
       "scope": {
-        "hymns": "Hinos",
-        "bible": "Bíblia",
+        "hymns": "Himnos",
+        "bible": "Biblia",
         "liturgy": "Liturgia",
-        "timer": "Cronômetro",
-        "random": "Sorteio",
-        "clock": "Relógio",
-        "countdown": "Contagem regressiva"
+        "timer": "Cronómetro",
+        "random": "Sorteo",
+        "clock": "Reloj",
+        "countdown": "Cuenta regresiva"
       },
-      "inheritingHint": "Este módulo está herdando o padrão global. Qualquer alteração aqui cria uma personalização própria.",
-      "backgroundColor": "Cor de fundo",
-      "backgroundImage": "Imagem de fundo",
-      "officialBackground": "Fundo oficial",
-      "officialGalleryHint": "Toque para aplicar; toque novamente para remover.",
-      "selectImage": "Clique para selecionar uma imagem",
-      "removeImage": "Remover imagem",
-      "changeImage": "Trocar imagem",
-      "textColor": "Cor do texto",
-      "fontSize": "Tamanho da fonte",
-      "fontWeight": "Espessura",
+      "inheritingHint": "Este módulo hereda el valor global predeterminado. Cualquier cambio aquí crea su propia personalización.",
+      "backgroundColor": "Color de fondo",
+      "backgroundImage": "Imagen de fondo",
+      "officialBackground": "Fondo oficial",
+      "officialGalleryHint": "Toque para aplicar; toque de nuevo para quitar.",
+      "selectImage": "Haga clic para seleccionar una imagen",
+      "removeImage": "Quitar imagen",
+      "changeImage": "Cambiar imagen",
+      "textColor": "Color del texto",
+      "fontSize": "Tamaño de la fuente",
+      "fontWeight": "Grosor",
       "weightNormal": "Normal",
-      "weightMedium": "Média",
-      "weightLightPlus": "Leve+",
-      "weightStrong": "Forte",
-      "bibleAppearance": "Bíblia — aparência própria",
-      "bibleTextColor": "Cor do texto (Bíblia)",
-      "bibleFontSize": "Tamanho da fonte (Bíblia)",
-      "bibleFontWeight": "Espessura (Bíblia)",
-      "showBibleVersion": "Mostrar versão da Bíblia no rodapé",
-      "footerRefColor": "Cor da referência (rodapé)",
-      "shadowAndBox": "Sombra e caixinha",
-      "textShadow": "Sombra na letra",
-      "shadowIntensity": "Intensidade da sombra",
-      "shadowBlur": "Espalhamento da sombra",
-      "textBox": "Caixinha atrás da letra",
-      "boxOpacity": "Opacidade da caixinha",
-      "boxBorder": "Borda na caixinha",
-      "alignment": "Alinhamento do texto",
+      "weightMedium": "Media",
+      "weightLightPlus": "Fina+",
+      "weightStrong": "Fuerte",
+      "bibleAppearance": "Biblia — apariencia propia",
+      "bibleTextColor": "Color del texto (Biblia)",
+      "bibleFontSize": "Tamaño de fuente (Biblia)",
+      "bibleFontWeight": "Grosor (Biblia)",
+      "showBibleVersion": "Mostrar versión de la Biblia en el pie",
+      "footerRefColor": "Color de la referencia (pie)",
+      "shadowAndBox": "Sombra y caja",
+      "textShadow": "Sombra en la letra",
+      "shadowIntensity": "Intensidad de la sombra",
+      "shadowBlur": "Difuminado de la sombra",
+      "textBox": "Caja detrás de la letra",
+      "boxOpacity": "Opacidad de la caja",
+      "boxBorder": "Borde de la caja",
+      "alignment": "Alineación del texto",
       "horizontal": "Horizontal",
       "vertical": "Vertical",
-      "alignLeft": "Esquerda",
+      "alignLeft": "Izquierda",
       "alignCenter": "Centro",
-      "alignRight": "Direita",
-      "alignTop": "Em cima",
-      "alignMiddle": "Meio",
-      "alignBottom": "Em baixo",
-      "reset": "Redefinir",
-      "resetConfirm": "Voltar este módulo para o padrão?"
+      "alignRight": "Derecha",
+      "alignTop": "Arriba",
+      "alignMiddle": "En medio",
+      "alignBottom": "Abajo",
+      "reset": "Restablecer",
+      "resetConfirm": "¿Restablecer este módulo al valor predeterminado?"
     },
     "placeholder": {
-      "general": "Preferências gerais do aplicativo em breve.",
-      "media": "Configurações de áudio, vídeo e player em breve.",
-      "projection": "Configurações de projeção e telas em breve."
+      "general": "Preferencias generales de la app próximamente.",
+      "media": "Ajustes de audio, vídeo y reproductor próximamente.",
+      "projection": "Ajustes de proyección y pantallas próximamente."
     }
   }
 }
