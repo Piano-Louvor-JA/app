@@ -83,11 +83,11 @@ function installFakeIDB() {
 const mocks = vi.hoisted(() => ({
   fetchMock: vi.fn(),
   getAuthSession: vi.fn(() => null as { token: string } | null),
-  authHeaders: vi.fn(() => ({})),
+  authHeadersAsync: vi.fn(() => ({})),
 }))
 vi.mock('../auth-client', () => ({
   getAuthSession: mocks.getAuthSession,
-  authHeaders: mocks.authHeaders,
+  authHeadersAsync: mocks.authHeadersAsync,
 }))
 vi.stubGlobal('fetch', mocks.fetchMock)
 

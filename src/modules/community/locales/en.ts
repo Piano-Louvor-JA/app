@@ -4,6 +4,7 @@ export default {
 		subtitle: "Public collections from the PIANO network",
 		back: "Back",
 		weeklyTasksSubtitle: "Weekly tasks of the network",
+		taskComplete: "Complete", taskDone: "Task completed!", taskCredited: "+{points} points credited!", taskCompleteFailed: "Could not complete. Try again.",
 		weeklyTasksEmpty: "No tasks this week.",
 		blockAuthor: "Block author",
 		blockConfirmTitle: "Block {name}?",

@@ -4,6 +4,7 @@ export default {
 		subtitle: "Coletâneas públicas da rede PIANO",
 		back: "Voltar",
 		weeklyTasksSubtitle: "Tarefas da semana da rede",
+		taskComplete: "Concluir", taskDone: "Tarefa concluída!", taskCredited: "+{points} pontos creditados!", taskCompleteFailed: "Não foi possível concluir. Tente de novo.",
 		weeklyTasksEmpty: "Nenhuma tarefa esta semana.",
 		blockAuthor: "Bloquear autor",
 		blockConfirmTitle: "Bloquear {name}?",

@@ -16,7 +16,7 @@ vi.mock('../outbox', () => ({
   newClientUuid: vi.fn(() => 'uuid-teste'),
 }));
 vi.mock('../auth-client', () => ({
-  authHeaders: () => mocks.authHeadersMock(),
+  authHeadersAsync: async () => mocks.authHeadersMock(),
   getAuthSession: () => mocks.getAuthSessionMock(),
 }))
 vi.mock('../media-catalog', () => ({
@@ -329,6 +329,7 @@ describe('collections CRUD', () => {
               name: 'R9',
               description: null,
               owner_id: 3,
+              is_owner: 1,
               author_name: 'Alguém',
               musics_count: 4,
             },
@@ -1104,11 +1105,11 @@ describe('gaps — normalizeTime/mapCustomLyrics via loadCustomMusicTrack', () =
     expect(await updateCustomCollection(colU.id, {})).not.toBeNull()
 
     // listCustomCollections remota sem campos opcionais (369/370/372)
+    // RF-04: remota SEM owner é filtrada da listagem (não é minha)
     routes = [{ match: () => true, body: { data: [{ id_collection: 8, name: 'R8' }] } }]
     const alls = await listCustomCollections()
     const r8 = alls.find((c) => c.id === 8)
-    expect(r8?.ownerId).toBeNull()
-    expect(r8?.musicsCount).toBe(0)
+    expect(r8).toBeUndefined()
 
     // listCustomMusics remota sem musics_count (328) e sem data (442/479)
     routes = [{ match: () => true, body: { data: [{ id_music: 3, name: 'S3' }] } }]
