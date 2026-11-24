@@ -279,6 +279,14 @@ async function runAction(
 
       <div v-if="activeCollection && filteredTracks.length > 0"
         class="album-collection-view__playback-actions">
+        <!-- Cópia da Comunidade: id local cru (negativo) → abre EDITÁVEL no editor. -->
+        <button v-if="isCommunityCopyRoute && Number(collectionId) < 0" type="button"
+          class="album-collection-view__shuffle"
+          data-testid="album-edit-collection"
+          aria-label="Editar coletânea" title="Editar coletânea"
+          @click="router.push({ path: '/media/editor', query: { collection: collectionId } })">
+          <i class="ti ti-edit" aria-hidden="true" />
+        </button>
         <button v-if="isCustomCopy" type="button" class="album-collection-view__shuffle"
           data-testid="album-delete-collection"
           :disabled="isDeletingCollection"

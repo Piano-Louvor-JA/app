@@ -87,10 +87,14 @@ const musics = ref<CustomMusicSummary[]>([])
 /** Estado de trabalho da música local selecionada (SPEC t_deed74b5). */
 const musicStatus = ref<'draft' | 'published'>('published')
 
+/** Publicar exige sessão (adendo 24/11: sem autenticação nada sai do rascunho). */
+const isSignedIn = computed(() => getAuthSession() != null)
+
 /** Publica a música local selecionada: draft → published. */
 async function onPublishMusic(): Promise<void> {
   const id = selectedMusicId.value
   if (id == null || !(id < 0)) return
+  if (getAuthSession() == null) return
   const { publishLocalMusic } = await import('../services/local-custom-store')
   if (publishLocalMusic(id)) {
     musicStatus.value = 'published'
@@ -110,7 +114,7 @@ const renameDraft = ref('')
 const renameBusy = ref(false)
 const canRenameMusic = computed(
   () =>
-    getAuthSession() != null &&
+    (getAuthSession() != null || (selectedMusicId.value ?? 0) < 0) &&
     selectedMusicId.value != null &&
     editOfficialId.value == null,
 )
@@ -241,6 +245,7 @@ function stanzaProgress(index: number): number {
 
 const newCollectionName = ref('')
 const newMusicName = ref('')
+const newSingleName = ref('')
 /** Assets de imagem upados no último import .slja (path → url) */
 const uploadedAssets = ref<Array<{ path: string; url: string; idFile: number }>>([])
 
@@ -331,6 +336,56 @@ async function onCreateMusic(): Promise<void> {
     saving.value = false
   }
 }
+
+/* ---------- Single (adendo 24/11): música avulsa sem coletânea visível ---------- */
+// O modelo exige música→coletânea; single = música na coletânea fixa "Singles",
+// criada localmente sob demanda (sem auth não sobe nada pra API).
+const SINGLES_COLLECTION_NAME = 'Singles'
+
+async function resolveSinglesCollection(): Promise<number | null> {
+  const { listLocalCollections, createLocalCollection } = await import(
+    '../services/local-custom-store'
+  )
+  let singles = listLocalCollections().find((c) => c.name === SINGLES_COLLECTION_NAME)
+  if (!singles) singles = createLocalCollection(SINGLES_COLLECTION_NAME)
+  if (getAuthSession()) {
+    // Autenticado: usa coletânea remota privada "Singles" (cria se não existir).
+    const remote = (await listCustomCollections()).find(
+      (c) => c.name === SINGLES_COLLECTION_NAME,
+    )
+    return remote?.id ?? singles.id
+  }
+  return singles.id
+}
+
+async function onCreateSingle(): Promise<void> {
+  const name = newSingleName.value.trim()
+  if (!name) return
+  saving.value = true
+  try {
+    const collectionId = await resolveSinglesCollection()
+    if (collectionId == null) {
+      notify('Falha ao preparar coletânea Singles', true)
+      return
+    }
+    const result = await createCustomMusic(collectionId, { name })
+    if (result) {
+      newSingleName.value = ''
+      await refreshCollections()
+      selectedCollectionId.value = collectionId
+      await onCollectionChange()
+      selectedMusicId.value = result.id
+      musicName.value = name
+      lyrics.value = []
+      notify(`Single “${name}” criado${getAuthSession() ? '' : ' localmente'}`)
+    } else {
+      notify('Falha ao criar single')
+    }
+  } finally {
+    saving.value = false
+  }
+}
+
 
 /* ---------- Adicionar hino oficial à coletânea (busca no catálogo) ---------- */
 
@@ -1582,6 +1637,33 @@ onMounted(async () => {
         :class="{ 'editor__aside--collapsed': asideCollapsed }"
         v-show="!asideCollapsed"
       >
+        <!-- Single (adendo 24/11): música avulsa — visível mesmo sem coletânea. -->
+        <h2 class="editor__section-title">
+          Novo single
+        </h2>
+        <div class="editor__row">
+          <input
+            v-model="newSingleName"
+            type="text"
+            class="editor__input"
+            data-testid="new-single-input"
+            placeholder="Nome do single"
+            @keyup.enter="onCreateSingle"
+          >
+          <button
+            type="button"
+            class="editor__btn"
+            data-testid="new-single-btn"
+            :disabled="saving || !newSingleName.trim()"
+            title="Cria um single (música avulsa)"
+            @click="onCreateSingle"
+          >
+            <i
+              class="ti ti-music-plus"
+              aria-hidden="true"
+            />
+          </button>
+        </div>
         <template v-if="selectedCollectionId != null">
           <h2 class="editor__section-title">
             Músicas
@@ -1734,8 +1816,10 @@ onMounted(async () => {
             v-if="selectedMusicId != null && musicStatus === 'draft'"
             type="button"
             class="editor__btn editor__btn--publish"
-            :disabled="saving"
-            title="Publica a música — deixa de ser rascunho neste dispositivo"
+            :disabled="saving || !isSignedIn"
+            :title="isSignedIn
+              ? 'Publica a música — deixa de ser rascunho neste dispositivo'
+              : 'Entre na sua conta para publicar — sem sessão a música permanece rascunho local'"
             @click="onPublishMusic"
           >
             <i
