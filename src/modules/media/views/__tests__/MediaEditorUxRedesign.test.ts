@@ -141,6 +141,33 @@ describe('SPEC-editor-ux-v1 — deslogado (AC1)', () => {
     expect(w.text()).not.toContain('Entrar')
     w.unmount()
   })
+
+  it('AC1 caso real do reviewer: draft local selecionada deslogado = botão Publicar NÃO existe no DOM (v-if, não disabled)', async () => {
+    mocks.listCustomMusics.mockResolvedValue([
+      { id: -7, name: 'Rascunho local', status: 'draft', officialMusicId: null },
+    ] as never)
+    const { getLocalMusic } = await import('../../services/local-custom-store')
+    vi.mocked(getLocalMusic).mockReturnValue({
+      id: -7,
+      name: 'Rascunho local',
+      status: 'draft',
+      lyrics: [],
+      audioBase64: null,
+      officialMusicId: null,
+    } as never)
+    const w = await mountEditor()
+    await btn(w, 'Adoração')!.trigger('click')
+    await flushPromises()
+    // seleciona música local draft
+    const draft = w.findAll('button').find((b) => b.text().includes('Rascunho local'))
+    expect(draft).toBeDefined()
+    await draft!.trigger('click')
+    await flushPromises()
+    // v-if: botão não renderiza — nem disabled, nem com tooltip de login
+    expect(w.findAll('button').filter((b) => b.text().includes('Publicar'))).toHaveLength(0)
+    expect(w.html()).not.toContain('editor__btn--publish')
+    w.unmount()
+  })
 })
 
 describe('SPEC-editor-ux-v1 — único + (AC3)', () => {

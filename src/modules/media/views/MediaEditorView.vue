@@ -1887,14 +1887,14 @@ onMounted(async () => {
               </button>
             </li>
           </ul>
+          <!-- SPEC editor-ux AC1: deslogado = zero UI de rede. Publicar só
+               EXISTE logado (removido, não disabled). -->
           <button
-            v-if="selectedMusicId != null && musicStatus === 'draft'"
+            v-if="isSignedIn && selectedMusicId != null && musicStatus === 'draft'"
             type="button"
             class="editor__btn editor__btn--publish"
-            :disabled="saving || !isSignedIn"
-            :title="isSignedIn
-              ? 'Publica a música — deixa de ser rascunho neste dispositivo'
-              : 'Entre na sua conta para publicar — sem sessão a música permanece rascunho local'"
+            :disabled="saving"
+            title="Publica a música — deixa de ser rascunho neste dispositivo"
             @click="onPublishMusic"
           >
             <i
