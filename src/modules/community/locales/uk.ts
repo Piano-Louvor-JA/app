@@ -1,9 +1,9 @@
 export default {
   "community": {
-  edits: {
-    empty: "Правок ще немає",
-    publish: "Опублікувати",
-  },
+    "edits": {
+      "empty": "Правок ще немає",
+      "publish": "Опублікувати"
+    },
     "title": "Спільнота",
     "subtitle": "Публічні збірки мережі PIANO",
     "back": "Назад",
@@ -52,7 +52,16 @@ export default {
     "renameSave": "Save name",
     "deleteConfirm": "Delete this collection and all its songs?",
     "deleteYes": "Delete",
-    "deleteNo": "Cancel"
+    "deleteNo": "Cancel",
+    "copies": {
+      "title": "Мої копії",
+      "subtitle": "Копії збірок Спільноти",
+      "cta": "Мої копії",
+      "empty": "Ви ще не зберегли копій збірок.",
+      "open": "Відкрити",
+      "delete": "Видалити",
+      "badge": "Копія"
+    }
   },
   "notifications": {
     "title": "Сповіщення",

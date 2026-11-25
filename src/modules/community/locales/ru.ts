@@ -1,9 +1,9 @@
 export default {
   "community": {
-  edits: {
-    empty: "Правок пока нет",
-    publish: "Опубликовать",
-  },
+    "edits": {
+      "empty": "Правок пока нет",
+      "publish": "Опубликовать"
+    },
     "title": "Сообщество",
     "subtitle": "Публичные сборники сети PIANO",
     "back": "Назад",
@@ -52,7 +52,16 @@ export default {
     "renameSave": "Save name",
     "deleteConfirm": "Delete this collection and all its songs?",
     "deleteYes": "Delete",
-    "deleteNo": "Cancel"
+    "deleteNo": "Cancel",
+    "copies": {
+      "title": "Мои копии",
+      "subtitle": "Копии сборников Сообщества",
+      "cta": "Мои копии",
+      "empty": "Вы ещё не сохранили копии сборников.",
+      "open": "Открыть",
+      "delete": "Удалить",
+      "badge": "Копия"
+    }
   },
   "notifications": {
     "title": "Уведомления",

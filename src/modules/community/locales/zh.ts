@@ -1,9 +1,9 @@
 export default {
   "community": {
-  edits: {
-    empty: "暂无编辑",
-    publish: "发布",
-  },
+    "edits": {
+      "empty": "暂无编辑",
+      "publish": "发布"
+    },
     "title": "社区",
     "subtitle": "来自 PIANO 网络的公开歌集",
     "back": "返回",
@@ -52,7 +52,16 @@ export default {
     "renameSave": "保存名称",
     "deleteConfirm": "删除此歌集及其所有歌曲？",
     "deleteYes": "删除",
-    "deleteNo": "取消"
+    "deleteNo": "取消",
+    "copies": {
+      "title": "我的副本",
+      "subtitle": "社区歌集的副本",
+      "cta": "我的副本",
+      "empty": "你还没有保存任何歌集副本。",
+      "open": "打开",
+      "delete": "删除",
+      "badge": "副本"
+    }
   },
   "ranking": {
     "title": "排行榜",

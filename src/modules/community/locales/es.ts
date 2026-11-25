@@ -1,9 +1,9 @@
 export default {
   "community": {
-  edits: {
-    empty: "Aún no hay ediciones",
-    publish: "Publicar",
-  },
+    "edits": {
+      "empty": "Aún no hay ediciones",
+      "publish": "Publicar"
+    },
     "title": "Comunidad",
     "subtitle": "Colecciones públicas de la red PIANO",
     "back": "Volver",
@@ -52,7 +52,16 @@ export default {
     "renameSave": "Guardar nombre",
     "deleteConfirm": "¿Eliminar esta colección y todas sus canciones?",
     "deleteYes": "Eliminar",
-    "deleteNo": "Cancelar"
+    "deleteNo": "Cancelar",
+    "copies": {
+      "title": "Mis copias",
+      "subtitle": "Copias de colecciones de la Comunidad",
+      "cta": "Mis copias",
+      "empty": "Todavía no has guardado copias de colecciones.",
+      "open": "Abrir",
+      "delete": "Eliminar",
+      "badge": "Copia"
+    },
   },
   "ranking": {
     "title": "Ranking",

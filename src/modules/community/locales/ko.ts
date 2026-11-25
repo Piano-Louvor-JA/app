@@ -1,9 +1,9 @@
 export default {
   "community": {
-  edits: {
-    empty: "아직 편집 없음",
-    publish: "게시",
-  },
+    "edits": {
+      "empty": "아직 편집 없음",
+      "publish": "게시"
+    },
     "title": "커뮤니티",
     "subtitle": "PIANO 네트워크의 공개 컬렉션",
     "back": "뒤로",
@@ -52,7 +52,16 @@ export default {
     "renameSave": "이름 저장",
     "deleteConfirm": "이 컬렉션과 모든 곡을 삭제할까요?",
     "deleteYes": "삭제",
-    "deleteNo": "취소"
+    "deleteNo": "취소",
+    "copies": {
+      "title": "내 사본",
+      "subtitle": "커뮤니티 컬렉션 사본",
+      "cta": "내 사본",
+      "empty": "아직 저장한 컬렉션 사본이 없습니다.",
+      "open": "열기",
+      "delete": "삭제",
+      "badge": "사본"
+    }
   },
   "ranking": {
     "title": "랭킹",

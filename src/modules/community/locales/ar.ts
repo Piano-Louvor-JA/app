@@ -1,9 +1,9 @@
 export default {
   "community": {
-  edits: {
-    empty: "لا تعديلات بعد",
-    publish: "نشر",
-  },
+    "edits": {
+      "empty": "لا تعديلات بعد",
+      "publish": "نشر"
+    },
     "title": "المجتمع",
     "subtitle": "مجموعات عامة من شبكة PIANO",
     "back": "رجوع",
@@ -52,7 +52,16 @@ export default {
     "renameSave": "حفظ الاسم",
     "deleteConfirm": "حذف هذه المجموعة وكل أغانيها؟",
     "deleteYes": "حذف",
-    "deleteNo": "إلغاء"
+    "deleteNo": "إلغاء",
+    "copies": {
+      "title": "نسخي",
+      "subtitle": "نسخ مجموعات المجتمع",
+      "cta": "نسخي",
+      "empty": "لم تحفظ أي نسخ من المجموعات بعد.",
+      "open": "فتح",
+      "delete": "حذف",
+      "badge": "نسخة"
+    }
   },
   "ranking": {
     "title": "الترتيب",

@@ -1,9 +1,9 @@
 export default {
   "community": {
-  edits: {
-    empty: "Henüz düzenleme yok",
-    publish: "Yayınla",
-  },
+    "edits": {
+      "empty": "Henüz düzenleme yok",
+      "publish": "Yayınla"
+    },
     "title": "Topluluk",
     "subtitle": "PIANO ağından genel koleksiyonlar",
     "back": "Geri",
@@ -52,7 +52,16 @@ export default {
     "renameSave": "Adı kaydet",
     "deleteConfirm": "Bu koleksiyon ve tüm şarkıları silinsin mi?",
     "deleteYes": "Sil",
-    "deleteNo": "İptal"
+    "deleteNo": "İptal",
+    "copies": {
+      "title": "Kopyalarım",
+      "subtitle": "Topluluk koleksiyonlarının kopyaları",
+      "cta": "Kopyalarım",
+      "empty": "Henüz hiçbir koleksiyon kopyası kaydetmediniz.",
+      "open": "Aç",
+      "delete": "Sil",
+      "badge": "Kopya"
+    }
   },
   "ranking": {
     "title": "Sıralama",

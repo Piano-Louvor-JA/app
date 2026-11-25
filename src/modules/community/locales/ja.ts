@@ -1,9 +1,9 @@
 export default {
   "community": {
-  edits: {
-    empty: "編集はまだありません",
-    publish: "公開する",
-  },
+    "edits": {
+      "empty": "編集はまだありません",
+      "publish": "公開する"
+    },
     "title": "コミュニティ",
     "subtitle": "PIANO ネットワークの公開コレクション",
     "back": "戻る",
@@ -52,7 +52,16 @@ export default {
     "renameSave": "名前を保存",
     "deleteConfirm": "このコレクションと収録曲をすべて削除しますか？",
     "deleteYes": "削除",
-    "deleteNo": "キャンセル"
+    "deleteNo": "キャンセル",
+    "copies": {
+      "title": "マイコピー",
+      "subtitle": "コミュニティのコレクションのコピー",
+      "cta": "マイコピー",
+      "empty": "まだコレクションのコピーを保存していません。",
+      "open": "開く",
+      "delete": "削除",
+      "badge": "コピー"
+    }
   },
   "ranking": {
     "title": "ランキング",

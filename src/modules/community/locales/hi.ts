@@ -1,9 +1,9 @@
 export default {
   "community": {
-  edits: {
-    empty: "अभी कोई संपादन नहीं",
-    publish: "प्रकाशित करें",
-  },
+    "edits": {
+      "empty": "अभी कोई संपादन नहीं",
+      "publish": "प्रकाशित करें"
+    },
     "title": "समुदाय",
     "subtitle": "PIANO नेटवर्क के सार्वजनिक संग्रह",
     "back": "पीछे",
@@ -52,7 +52,16 @@ export default {
     "renameSave": "नाम सहेजें",
     "deleteConfirm": "यह संग्रह और उसके सभी गीत हटाएँ?",
     "deleteYes": "हटाएँ",
-    "deleteNo": "रद्द करें"
+    "deleteNo": "रद्द करें",
+    "copies": {
+      "title": "मेरी प्रतियाँ",
+      "subtitle": "समुदाय संग्रह की प्रतियाँ",
+      "cta": "मेरी प्रतियाँ",
+      "empty": "आपने अभी तक कोई संग्रह प्रति नहीं सहेजी है।",
+      "open": "खोलें",
+      "delete": "हटाएँ",
+      "badge": "प्रति"
+    }
   },
   "ranking": {
     "title": "रैंकिंग",
