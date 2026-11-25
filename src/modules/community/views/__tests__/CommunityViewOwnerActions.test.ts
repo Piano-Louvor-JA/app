@@ -40,6 +40,8 @@ vi.mock("@modules/media/services/custom-catalog", () => ({
 vi.mock("@modules/media/services/local-custom-store", () => ({
 	updateLocalCollection: mocks.updateLocalCollection,
 	deleteLocalCollection: mocks.deleteLocalCollection,
+	listLocalCollections: vi.fn(() => []),
+	listLocalMusics: vi.fn(() => []),
 }));
 
 vi.mock("../../services/ranking", () => ({
@@ -91,6 +93,7 @@ vi.mock("../../components/ReportDialog.vue", () => ({
 }));
 vi.mock("vue-router", () => ({
 	useRouter: () => ({ push: vi.fn(), back: vi.fn(), replace: vi.fn() }),
+	useRoute: () => ({ name: "community" }),
 }));
 vi.mock("vue-i18n", () => ({
 	useI18n: () => ({ t: (k: string) => k, locale: { value: "pt-BR" } }),

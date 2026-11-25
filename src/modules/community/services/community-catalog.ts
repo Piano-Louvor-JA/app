@@ -1,6 +1,7 @@
 import {
 	createLocalCollection,
 	createLocalMusic,
+	listLocalCollections,
 } from "@modules/media/services/local-custom-store";
 import { communityBaseUrl, communityRequest } from "./community-http";
 
@@ -75,8 +76,8 @@ export async function saveCommunityCopy(
 		const copy = createLocalCollection(
 			collection.name,
 			collection.description ?? undefined,
-			// RF-2 (SPEC-louvorja-community-copies): marca a origem para a
-			// cópia listar na aba Comunidade (e não em Minhas Coletâneas).
+			// D1/RF-2 (SPEC louvorja-community-copies): marca a origem —
+			// cópia vive EXCLUSIVAMENTE na aba Comunidade, nunca em /albums.
 			{
 				type: "community",
 				collectionId: collection.id,
@@ -93,6 +94,18 @@ export async function saveCommunityCopy(
 	} catch {
 		return null;
 	}
+}
+
+/**
+ * D2 (SPEC louvorja-community-copies v1.0.0): ids locais de cópias da
+ * Comunidade (origin.type='community') — NÃO aparecem na Central de Mídia.
+ */
+export function listCommunityCopyIds(): Set<number> {
+	return new Set(
+		listLocalCollections()
+			.filter((c) => c.origin?.type === "community")
+			.map((c) => c.id),
+	);
 }
 
 /**
@@ -155,5 +168,86 @@ export async function listCommunityCollectionsPage(
 		};
 	} catch {
 		return empty;
+	}
+}
+
+/**
+ * Detalhe público de uma coletânea da Comunidade (RF-01/RF-02, SPEC
+ * comunidade-acesso-copia v1.0.0): nome/autor + faixas com flag de
+ * reprodução. Consome APENAS endpoints públicos já existentes
+ * (GET /collections/{id} + GET /collections/{id}/musics) — a API já
+ * responde 404 uniforme para privada de terceiro/inexistente.
+ * Qualquer falha (rede, HTTP, JSON quebrado) → null; nunca lança.
+ */
+export type CommunityCollectionTrack = {
+	id: number;
+	name: string;
+	audioUrl: string | null;
+	officialMusicId: number | null;
+	/** RF-02: indisponibilidade explícita — false = sem o que tocar. */
+	hasAudio: boolean;
+};
+
+export type CommunityCollectionDetail = {
+	id: number;
+	name: string;
+	description: string | null;
+	authorName: string | null;
+	coverUrl: string | null;
+	musics: CommunityCollectionTrack[];
+};
+
+function asPositiveInt(value: unknown): number | null {
+	return typeof value === "number" && Number.isInteger(value) && value > 0
+		? value
+		: null;
+}
+
+export async function getCommunityCollectionDetail(
+	collectionId: number,
+): Promise<CommunityCollectionDetail | null> {
+	if (!(collectionId > 0)) return null;
+	try {
+		const [collectionResponse, musicsResponse] = await Promise.all([
+			fetch(`${communityBaseUrl()}/collections/${collectionId}`, communityRequest()),
+			fetch(
+				`${communityBaseUrl()}/collections/${collectionId}/musics`,
+				communityRequest(),
+			),
+		]);
+		if (!collectionResponse.ok || !musicsResponse.ok) return null;
+		const collection = (await collectionResponse.json()) as Record<
+			string,
+			unknown
+		>;
+		const id = asPositiveInt(collection.id_collection);
+		if (id === null) return null;
+		const musicsJson = (await musicsResponse.json()) as {
+			data?: unknown;
+		};
+		const rows = Array.isArray(musicsJson.data)
+			? (musicsJson.data as Array<Record<string, unknown>>)
+			: [];
+		const musics = rows.map((row) => {
+			const officialMusicId = asPositiveInt(row.official_music_id);
+			const audioUrl = asString(row.audio_url);
+			return {
+				id: asPositiveInt(row.id_music) ?? 0,
+				name: asString(row.name) ?? "",
+				audioUrl,
+				officialMusicId,
+				hasAudio: audioUrl !== null || officialMusicId !== null,
+			};
+		});
+		return {
+			id,
+			name: asString(collection.name) ?? "",
+			description: asString(collection.description),
+			authorName: asString(collection.author_name),
+			coverUrl: asString(collection.cover_url),
+			musics,
+		};
+	} catch {
+		return null;
 	}
 }

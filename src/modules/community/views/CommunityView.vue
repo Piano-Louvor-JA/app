@@ -27,16 +27,15 @@ import {
 	getSeasonalEvent,
 	type SeasonalEventBanner,
 } from "../services/seasonal-event";
-import { getWeeklyTasks, type WeeklyTask } from "../services/weekly-tasks";
 import {
 	type AppNotification,
 	getNotifications,
 } from "../services/notifications";
 import NotificationsDropdown from "../components/NotificationsDropdown.vue";
 import MyEditsPanel from "@modules/community-edits/views/MyEditsPanel.vue";
-import { listLocalEdits } from "@modules/community-edits/services/local-edits-store";
 import { publishEdit } from "@modules/community-edits/services/publish-edit";
 import type { ServerEditStatus } from "@modules/community-edits/views/MyEditsPanel.vue";
+import { fuzzyMatch } from "../services/fuzzy-search";
 import { useCommunityBrowseStore } from "../stores/useCommunityBrowseStore";
 import PageBackStack from "@shared/components/PageBackStack.vue";
 import { useMinimizablePage } from "@shared/composables/useMinimizablePage";
@@ -49,7 +48,6 @@ const isLoading = ref(true);
 const copyingId = ref<number | null>(null);
 const savedId = ref<number | null>(null);
 const savedError = ref<number | null>(null);
-const weeklyTasks = ref<WeeklyTask[]>([]);
 const viewEl = ref<HTMLElement | null>(null);
 // busca e página sobrevivem a sair e voltar para a tela
 const { searchQuery, page } = storeToRefs(useCommunityBrowseStore());
@@ -85,13 +83,12 @@ const total = ref(0);
 const PER_PAGE = 24;
 const hasPrev = computed(() => page.value > 1);
 const hasNext = computed(() => page.value < lastPage.value);
+
 const filteredCollections = computed(() => {
-	const q = searchQuery.value.trim().toLowerCase();
+	const q = searchQuery.value.trim();
 	if (!q) return collections.value;
 	return collections.value.filter(
-		(c) =>
-			c.name.toLowerCase().includes(q) ||
-			(c.authorName ?? "").toLowerCase().includes(q),
+		(c) => fuzzyMatch(q, c.name, c.authorName ?? ""),
 	);
 });
 const reportTarget = ref<CommunityCollectionSummary | null>(null);
@@ -161,9 +158,8 @@ async function load() {
 		getAuthReadiness(),
 		new Promise<void>(resolve => setTimeout(resolve, 8_000)),
 	]);
-	const [result, tasks, notifs, seasonal] = await Promise.all([
+	const [result, notifs, seasonal] = await Promise.all([
 		listCommunityCollectionsPage(page.value, PER_PAGE),
-		getWeeklyTasks(),
 		getNotifications(),
 		getSeasonalEvent(),
 	]);
@@ -171,7 +167,6 @@ async function load() {
 	page.value = result.page;
 	lastPage.value = result.lastPage;
 	total.value = result.total;
-	if (tasks) weeklyTasks.value = tasks;
 	notifications.value = notifs;
 	isLogged.value = Boolean(getAuthSession()?.token);
 	seasonalEvent.value = seasonal;
@@ -339,25 +334,60 @@ function openEditor(collection: CommunityCollectionSummary): void {
 	void router.push({ path: "/media/editor", query: { collection: String(collection.id) } });
 }
 
+function openCollection(collection: CommunityCollectionSummary): void {
+	void router.push({
+		name: "community-collection",
+		params: { collectionId: collection.id },
+	});
+}
+
+/**
+ * RF-03: o destino `/albums/:collectionId` usa o namespace custom
+ * (id + 2.000.000 — ver CUSTOM_COLLECTION_ID_OFFSET). Cópia local -1 →
+ * card 1999999. Navegar com o id cru (-1) não encontra nenhum card e
+ * produzia "Coletânea não encontrada" (falha de campo 21/11).
+ */
 async function saveCopy(collection: CommunityCollectionSummary) {
-	// F0.4: cópia LOCAL editável, SEM tocar na do autor.
-	// F1: registra o uso (1x/user na API; credita +5 ao dono).
+	// Cópia LOCAL editável, SEM tocar na origem. Telemetria é best-effort:
+	// seu erro não pode converter cópia bem-sucedida em falha para o usuário.
 	copyingId.value = collection.id;
-	await registerUse(collection.id, await authTokenAsync());
-	const localId = await saveCommunityCopy(collection);
-	copyingId.value = null;
-	if (localId !== null) {
-		// SPEC-louvorja-community-copies: a cópia (origin.type='community')
-		// agora lista na aba Comunidade (/community/copies) — não em Minhas
-		// Coletâneas. Criar/editar parte daqui mesmo, via botão no header.
+	savedError.value = null;
+	void registerUse(collection.id, await authTokenAsync());
+	try {
+		const localId = await saveCommunityCopy(collection);
+		if (localId === null) {
+			savedError.value = collection.id;
+			return;
+		}
 		savedId.value = collection.id;
-		await load();
-	} else {
-		savedError.value = collection.id;
+		// D3 (SPEC louvorja-community-copies v1.0.0): cópia vive EXCLUSIVAMENTE
+		// na aba Comunidade — destino é a rota community/copies/:id com o id
+		// local CRU (negativo; offset 2M tornaria o id ambíguo: -7+2M=1999993
+		// cai abaixo do gate >= 2M). NUNCA /albums/:id (Central de Mídia).
+		await router.push({
+			name: "community-copy",
+			params: { collectionId: String(localId) },
+		});
+	} finally {
+		copyingId.value = null;
 	}
 }
 
-onMounted(load);
+/* ---------- Entradas p/ views próprias (adendo v1.1.0) ----------
+ * "Minhas Cópias" e "Minhas Coletâneas" viraram VIEWS PRÓPRIAS
+ * (/community/copies e /community/my-collections) — nada de listas
+ * inline aqui, para não poluir a interface. */
+function openMyCopies(): void {
+	void router.push({ name: "community-copies" });
+}
+
+function openMyCollections(): void {
+	void router.push({ name: "community-my-collections" });
+}
+
+onMounted(() => {
+	void load();
+});
 </script>
 
 <template>
@@ -380,10 +410,15 @@ onMounted(load);
         <p class="community-view__subtitle">
           {{ t('community.subtitle') }}
         </p>
+      </div>
+      <!-- Premium clean: TODAS as ações em linha, compactas, na mesma
+           linha do header — nada de blocos/seções acima da lista. -->
+      <nav class="community-view__actions-row" aria-label="community actions">
         <button
           v-if="isLogged"
           type="button"
-          class="community-view__bell"
+          class="community-view__icon-btn"
+          data-test="community-bell"
           :aria-label="t('notifications.title')"
           @click.stop="showNotifications = !showNotifications"
         >
@@ -395,28 +430,52 @@ onMounted(load);
         </button>
         <button
           type="button"
-          class="community-view__ranking-link"
-          @click="router.push('/community/copies')"
+          class="community-view__icon-btn"
+          data-test="community-entry-copies"
+          :aria-label="t('community.myCopies')"
+          :title="t('community.myCopies')"
+          @click="openMyCopies"
         >
           <i class="ti ti-copy" aria-hidden="true" />
-          {{ t('community.copies.cta') }}
         </button>
         <button
           type="button"
-          class="community-view__ranking-link"
+          class="community-view__icon-btn"
+          data-test="community-entry-collections"
+          :aria-label="t('community.myCollections')"
+          :title="t('community.myCollections')"
+          @click="openMyCollections"
+        >
+          <i class="ti ti-disc" aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          class="community-view__icon-btn"
+          data-test="community-entry-tasks"
+          :aria-label="t('ranking.weeklyTasks')"
+          :title="t('ranking.weeklyTasks')"
+          @click="router.push({ name: 'community-tasks' })"
+        >
+          <i class="ti ti-target" aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          class="community-view__icon-btn"
+          :aria-label="t('community.ranking')"
+          :title="t('community.ranking')"
           @click="router.push('/community/ranking')"
         >
           <i class="ti ti-trophy" aria-hidden="true" />
-          {{ t('community.ranking') }}
         </button>
         <a
           href="https://pianolouvorja.com.br/conduta"
           target="_blank"
           rel="noopener noreferrer"
-          class="community-view__coc-link"
+          class="community-view__icon-btn"
+          :aria-label="t('community.conductLink')"
+          :title="t('community.conductLink')"
         >
           <i class="ti ti-shield-check" aria-hidden="true" />
-          {{ t('community.conductLink') }}
         </a>
         <button
           type="button"
@@ -426,9 +485,9 @@ onMounted(load);
           @click="router.push('/media/editor')"
         >
           <i class="ti ti-pencil-plus" aria-hidden="true" />
-          {{ t('community.createCollection') }}
+          <span class="community-view__create-label">{{ t('community.createCollection') }}</span>
         </button>
-      </div>
+      </nav>
 
       <MyEditsPanel
         v-if="isLogged"
@@ -437,6 +496,8 @@ onMounted(load);
         class="community-view__my-edits"
       />
     </header>
+
+    <!-- (tarefas semanais foram para view própria /community/tasks) -->
 
     <div
       v-if="seasonalEvent"
@@ -461,35 +522,6 @@ onMounted(load);
     >
       {{ t('community.loading') }}
     </p>
-
-    <GlassCard
-      v-if="!isLoading && weeklyTasks.length > 0"
-      class="community-view__tasks"
-      elevated
-    >
-      <h2 class="community-view__tasks-title">
-        <i class="ti ti-target" aria-hidden="true" />
-        {{ t('ranking.weeklyTasks') }}
-      </h2>
-      <ul class="community-view__tasks-list">
-        <li
-          v-for="task in weeklyTasks"
-          :key="task.id"
-          class="community-view__task"
-          :class="{ 'community-view__task--done': task.done }"
-        >
-          <i
-            class="ti"
-            :class="task.done ? 'ti-circle-check' : 'ti-circle'"
-            aria-hidden="true"
-          />
-          <span class="community-view__task-desc">{{ task.description }}</span>
-          <span class="community-view__task-bonus">
-            {{ t('ranking.points', { points: task.bonus }) }}
-          </span>
-        </li>
-      </ul>
-    </GlassCard>
 
     <div class="community-view__toolbar">
       <div class="community-view__search">
@@ -667,7 +699,17 @@ onMounted(load);
           <div class="community-view__actions">
             <button
               type="button"
+              class="community-view__open-btn"
+              data-test="community-open-collection"
+              @click="openCollection(collection)"
+            >
+              <i class="ti ti-folder-open" aria-hidden="true" />
+              {{ t('community.openCollection') }}
+            </button>
+            <button
+              type="button"
               class="community-view__copy-btn"
+              data-test="community-copy-btn"
               :disabled="copyingId === collection.id"
               @click="saveCopy(collection)"
             >
@@ -688,6 +730,14 @@ onMounted(load);
                   : t('community.saveCopy')
               }}
             </button>
+            <p
+              v-if="savedError === collection.id"
+              class="community-view__copy-error"
+              data-test="community-copy-error"
+              role="alert"
+            >
+              {{ t('community.copyFailed') }}
+            </p>
             <button
               v-if="!isOwner(collection)"
               type="button"
@@ -826,18 +876,39 @@ onMounted(load);
   opacity: 0.7;
 }
 
-.community-view__bell {
-	position: relative;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 2.4rem;
-	height: 2.4rem;
-	border: 1px solid var(--ds-color-outline, rgba(255, 255, 255, 0.08));
-	border-radius: var(--ds-radius-sm, 8px 0 8px 0);
-	background: color-mix(in srgb, var(--ds-color-surface-card, #201f1f) 70%, transparent);
-	color: var(--ds-color-on-surface);
-	cursor: pointer;
+/* Premium clean: linha única de ações compactas no header */
+.community-view__headings {
+  display: flex;
+  flex-direction: column;
+}
+
+.community-view__actions-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.community-view__icon-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border: 1px solid var(--ds-color-outline, rgba(255, 255, 255, 0.08));
+  border-radius: var(--ds-radius-sm, 8px 0 8px 0);
+  background: color-mix(in srgb, var(--ds-color-surface-card, #201f1f) 70%, transparent);
+  color: var(--ds-color-on-surface);
+  font-size: 1.05rem;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.community-view__icon-btn:hover {
+  filter: brightness(1.2);
 }
 
 .community-view__bell-badge {
@@ -857,89 +928,22 @@ onMounted(load);
 	font-weight: 700;
 }
 
-.community-view__ranking-link {
-	display: inline-flex;
-	align-items: center;
-	gap: 0.4rem;
-	margin-top: 0.5rem;
-	padding: 0.4rem 0.8rem;
-	border-radius: 0.5rem;
-	border: 1px solid var(--ds-border, rgba(255, 255, 255, 0.2));
-	background: var(--ds-glass-fill, rgba(255, 255, 255, 0.08));
-	color: inherit;
-	font-size: 0.9rem;
-	cursor: pointer;
-}
-
-.community-view__coc-link {
-	display: inline-flex;
-	align-items: center;
-	gap: 0.4rem;
-	margin-top: 0.5rem;
-	padding: 0.4rem 0.8rem;
-	border-radius: 0.5rem;
-	border: 1px solid var(--ds-border, rgba(255, 255, 255, 0.2));
-	background: var(--ds-glass-fill, rgba(255, 255, 255, 0.08));
-	color: inherit;
-	font-size: 0.9rem;
-	cursor: pointer;
-	text-decoration: none;
-}
-
 .community-view__create-btn {
 	display: inline-flex;
 	align-items: center;
 	gap: 0.4rem;
-	margin-top: 0.5rem;
 	padding: 0.4rem 0.8rem;
 	border-radius: 0.5rem;
-	border: 1px solid var(--ds-border, rgba(255, 255, 255, 0.2));
-	background: var(--ds-glass-fill, rgba(255, 255, 255, 0.08));
+	border: 1px solid var(--ds-color-primary, #e6b93c);
+	background: color-mix(in srgb, var(--ds-color-primary, #e6b93c) 18%, transparent);
 	color: inherit;
 	font-size: 0.9rem;
+	font-weight: 600;
 	cursor: pointer;
 }
 
-.community-view__tasks {
-	padding: 0.75rem 1rem;
-}
-
-.community-view__tasks-title {
-	display: flex;
-	align-items: center;
-	gap: 0.4rem;
-	margin: 0 0 0.5rem;
-	font-size: 1rem;
-}
-
-.community-view__tasks-list {
-	display: flex;
-	flex-direction: column;
-	gap: 0.35rem;
-	margin: 0;
-	padding: 0;
-	list-style: none;
-}
-
-.community-view__task {
-	display: flex;
-	align-items: center;
-	gap: 0.5rem;
-	font-size: 0.9rem;
-}
-
-.community-view__task--done {
-	opacity: 0.55;
-	text-decoration: line-through;
-}
-
-.community-view__task-desc {
-	flex: 1;
-}
-
-.community-view__task-bonus {
-	font-weight: 600;
-	opacity: 0.8;
+.community-view__create-btn:hover {
+	filter: brightness(1.15);
 }
 
 .community-view__event {
@@ -1052,8 +1056,23 @@ onMounted(load);
   opacity: 0.7;
 }
 
+.community-view__open-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--ds-border, rgba(255, 255, 255, 0.2));
+  background: var(--ds-glass-fill, rgba(255, 255, 255, 0.08));
+  color: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
 .community-view__copy-btn {
-  margin-top: 0.5rem;
+  margin-top: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1068,25 +1087,30 @@ onMounted(load);
 }
 
 .community-view__actions {
-	display: flex;
-	gap: 0.4rem;
-	margin-top: 0.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
 }
 
+.community-view__actions .community-view__open-btn,
 .community-view__actions .community-view__copy-btn {
-	flex: 1;
+  flex: 1 1 auto;
 }
 
 .community-view__report-btn {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 2.2rem;
-	border-radius: 0.5rem;
-	border: 1px solid var(--ds-border, rgba(255, 255, 255, 0.2));
-	background: var(--ds-glass-fill, rgba(255, 255, 255, 0.08));
-	color: inherit;
-	cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.6rem;
+  min-height: 2.2rem;
+  flex: 0 0 auto;
+  border-radius: 0.5rem;
+  border: 1px solid var(--ds-border, rgba(255, 255, 255, 0.2));
+  background: var(--ds-glass-fill, rgba(255, 255, 255, 0.08));
+  color: inherit;
+  cursor: pointer;
 }
 
 .community-view__copy-btn:hover {
