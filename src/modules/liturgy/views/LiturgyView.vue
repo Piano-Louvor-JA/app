@@ -2,9 +2,10 @@
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import StagePaletteButton from '../../settings/components/StagePaletteButton.vue'
 import AlbumLyricDialog from '@modules/albums/components/AlbumLyricDialog.vue'
 
+import { useLiturgyAppearanceStore } from '../stores/useLiturgyAppearanceStore'
+import LiturgyAppearanceButton from '../components/LiturgyAppearanceButton.vue'
 import LiturgyCloneDialog from '../components/LiturgyCloneDialog.vue'
 import LiturgyScheduledDialog from '../components/LiturgyScheduledDialog.vue'
 import { useScheduledStore } from '../stores/useScheduledStore'
@@ -23,6 +24,7 @@ const scheduledDialogOpen = ref(false)
 
 // Placeholder agendado → entrada do dia (badge na timeline).
 const scheduledStore = useScheduledStore()
+const appearanceStore = useLiturgyAppearanceStore()
 const scheduledResolvedByItemId = computed(() => {
   const map: Record<
     string,
@@ -176,7 +178,7 @@ async function onSljaImported(): Promise<void> {
   <section class="liturgy-view">
     <header class="liturgy-view__header">
       <div class="liturgy-view__header-start">
-        <StagePaletteButton scope="liturgy" />
+        <LiturgyAppearanceButton />
       </div>
       <div class="liturgy-view__brand">
         <i
@@ -362,6 +364,7 @@ async function onSljaImported(): Promise<void> {
           :music-instrumental-by-id="musicInstrumentalById"
           :busy-music-id="busyMusicId"
           :offline-status-by-item-id="offlineStatusByItemId"
+          :appearance="appearanceStore.appearance"
           @select="selectItem"
           @video-file-selected="onVideoFileSelected"
           @play-screens="playItemOnScreens"

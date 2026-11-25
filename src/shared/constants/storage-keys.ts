@@ -48,6 +48,8 @@ export const USER_PREFERENCE_KEYS = {
   randomConfig: 'random.config',
   randomSession: 'random.session',
   liturgyState: 'liturgy.state',
+  /** Aparência da lista da liturgia (linha da categoria e cor de cada tipo). */
+  liturgyAppearance: 'liturgy.appearance',
   scheduledState: 'scheduled.state',
   language: 'language',
   /** Posição (left/top em px) do player minimizado arrastado; ausente = canto padrão. */

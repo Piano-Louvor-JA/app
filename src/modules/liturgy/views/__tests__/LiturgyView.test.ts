@@ -81,7 +81,7 @@ vi.mock('../../composables/useLiturgy', () => ({
 
 import LiturgyView from '../LiturgyView.vue'
 
-vi.mock('../../../settings/components/StagePaletteButton.vue', () => ({ default: { template: '<div data-stub="palette-btn" />' } }))
+vi.mock('../../components/LiturgyAppearanceButton.vue', () => ({ default: { template: '<div data-stub="palette-btn" />' } }))
 vi.mock('@modules/albums/components/AlbumLyricDialog.vue', () => ({ default: { template: '<div data-stub="lyric-dialog" />' } }))
 vi.mock('../../components/LiturgyCloneDialog.vue', () => ({
   default: {

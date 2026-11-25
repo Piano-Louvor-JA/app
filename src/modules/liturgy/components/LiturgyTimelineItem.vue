@@ -25,6 +25,12 @@ import { categoryTimeRangeWithEstimate } from '../services/liturgy-item-helpers'
 import { getItemTypeIcon, isExecutableItem } from '../services/liturgy-item-helpers'
 import { probeMediaDurationMs } from '../services/media-probe'
 import { normalizeTitleColor, sanitizeNotesHtml } from '../services/rich-notes'
+import {
+  DEFAULT_LITURGY_APPEARANCE,
+  liturgyTypeColor,
+  type LiturgyAppearance,
+  type LiturgyTitleSize,
+} from '../services/liturgy-appearance'
 import type { LiturgyItem } from '../types/liturgy'
 import type { OnlineVideoItemStatus } from '@/shared/types/desktop-bridge'
 import '../styles/rich-notes.css'
@@ -33,6 +39,8 @@ const props = defineProps<{
   item: LiturgyItem
   index: number
   selected: boolean
+  /** Aparência da lista (painel de personalização da liturgia). */
+  appearance?: LiturgyAppearance
   siteProjecting?: boolean
   videoProjecting?: boolean
   startLabel: string
@@ -119,10 +127,46 @@ const rootEl = ref<HTMLElement | null>(null)
 let dragGhostEl: HTMLElement | null = null
 
 const isCategory = computed(() => props.item.type === 'category')
-/** Categoria usa a cor de realce do tema; os itens mantêm a cor do tipo. */
+const look = computed(() => props.appearance ?? DEFAULT_LITURGY_APPEARANCE)
+/**
+ * Categoria usa a cor de realce do tema; os itens mantêm a cor do tipo.
+ * Cor escolhida para o tipo (personalização da liturgia) vale para os dois.
+ */
 const categoryOrItemAccent = computed(() =>
-  isCategory.value ? 'var(--ds-color-primary)' : props.item.accentColor,
+  isCategory.value
+    ? look.value.typeColors.category || 'var(--ds-color-primary)'
+    : liturgyTypeColor(look.value, props.item.type, props.item.accentColor),
 )
+
+const TITLE_SIZES: Record<LiturgyTitleSize, string> = {
+  sm: '0.9rem',
+  md: '1rem',
+  lg: '1.2rem',
+  xl: '1.45rem',
+}
+/** Linha da categoria personalizada: classes e variáveis de CSS. */
+const categoryLookClasses = computed(() => {
+  if (!isCategory.value) return {}
+  const cat = look.value.category
+  return {
+    'liturgy-item--cat-center': cat.titleAlign === 'center',
+    'liturgy-item--cat-upper': cat.uppercase,
+    'liturgy-item--cat-light': !cat.bold,
+    'liturgy-item--cat-bg': Boolean(cat.background),
+  }
+})
+const categoryLookStyle = computed(() => {
+  if (!isCategory.value) return undefined
+  const cat = look.value.category
+  return {
+    '--liturgy-category-accent-color': categoryOrItemAccent.value,
+    '--liturgy-category-title-size': TITLE_SIZES[cat.titleSize],
+    ...(cat.background ? { '--liturgy-category-bg': cat.background } : {}),
+    ...(cat.titleColor ? { '--liturgy-category-title-color': cat.titleColor } : {}),
+  }
+})
+const showCategoryTime = computed(() => !isCategory.value || look.value.category.showTime)
+const showSubtitle = computed(() => !isCategory.value || look.value.category.showSubtitle)
 
 const OFFLINE_ICONS: Record<Exclude<OnlineVideoItemStatus['state'], 'none'>, string> = {
   queued: 'ti-clock',
@@ -492,7 +536,9 @@ const projectActionTitle = computed(() => {
       'liturgy-item--waiting': showWaiting,
       'liturgy-item--dimmed': isDimmed,
       'liturgy-item--drag-source': isDragSource,
+      ...categoryLookClasses,
     }"
+    :style="categoryLookStyle"
     @mouseenter="rowHovered = true"
     @mouseleave="rowHovered = false"
     @dragover.prevent
@@ -581,13 +627,13 @@ const projectActionTitle = computed(() => {
 
         <div class="liturgy-item__body">
           <p
-            v-if="isCategory"
+            v-if="isCategory && showCategoryTime"
             class="liturgy-item__type liturgy-item__type--range"
           >
             {{ categoryTimeRange }}
           </p>
           <p
-            v-else
+            v-else-if="!isCategory"
             class="liturgy-item__type"
           >
             {{ t(`liturgy.types.${item.type}`) }}
@@ -637,13 +683,13 @@ const projectActionTitle = computed(() => {
           </p>
           <!-- eslint-disable-next-line vue/no-v-html -- HTML passa por sanitizeNotesHtml -->
           <div
-            v-if="richNotesHtml"
+            v-if="richNotesHtml && showSubtitle"
             class="liturgy-item__subtitle liturgy-item__rich-notes rich-notes"
             data-testid="liturgy-item-rich-notes"
             v-html="richNotesHtml"
           />
           <p
-            v-else-if="item.subtitle"
+            v-else-if="item.subtitle && showSubtitle"
             class="liturgy-item__subtitle"
           >
             {{ item.subtitle }}
@@ -1285,9 +1331,42 @@ const projectActionTitle = computed(() => {
   }
 
   .liturgy-item__name {
-    font-size: 1rem;
+    font-size: var(--liturgy-category-title-size, 1rem);
     font-weight: 700;
     letter-spacing: 0.01em;
+    color: var(--liturgy-category-title-color, inherit);
+  }
+
+  // Personalização da liturgia (painel da paleta).
+  &.liturgy-item--cat-center {
+    .liturgy-item__body {
+      text-align: center;
+    }
+
+    .liturgy-item__heading {
+      justify-content: center;
+    }
+  }
+
+  &.liturgy-item--cat-upper .liturgy-item__name {
+    text-transform: uppercase;
+  }
+
+  &.liturgy-item--cat-light .liturgy-item__name {
+    font-weight: 500;
+  }
+
+  &.liturgy-item--cat-bg:not(.liturgy-item--done) .liturgy-item__card {
+    background: var(--liturgy-category-bg);
+  }
+
+  // Em andamento: o realce continua, misturado ao fundo escolhido.
+  &.liturgy-item--cat-bg.liturgy-item--selected .liturgy-item__card {
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--ds-color-primary) 30%, var(--liturgy-category-bg)) 0%,
+      var(--liturgy-category-bg) 100%
+    );
   }
 }
 

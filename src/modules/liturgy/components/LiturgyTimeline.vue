@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+import type { LiturgyAppearance } from '../services/liturgy-appearance'
 import type { LiturgyItem } from '../types/liturgy'
 import type { OnlineVideoItemStatus } from '@/shared/types/desktop-bridge'
 import { getCategoryBlockEnd } from '../services/liturgy-item-helpers'
@@ -27,6 +28,8 @@ const props = defineProps<{
   >
   /** Item → cópia baixada do vídeo do YouTube. */
   offlineStatusByItemId?: Record<string, OnlineVideoItemStatus>
+  /** Aparência da lista (personalização da liturgia). */
+  appearance?: LiturgyAppearance
 }>()
 
 const emit = defineEmits<{
@@ -266,6 +269,7 @@ function isCategorySectionInProgress(categoryId: string): boolean {
         <LiturgyTimelineItem
           v-if="segment.kind === 'item'"
           :item="segment.entry.item"
+          :appearance="appearance"
           :index="segment.entry.index"
           :selected="selectedIndex === segment.entry.index"
           :site-projecting="siteProjectionItemId === segment.entry.item.id"
@@ -341,6 +345,7 @@ function isCategorySectionInProgress(categoryId: string): boolean {
             v-for="child in segment.children"
             :key="child.item.id"
             :item="child.item"
+            :appearance="appearance"
             :index="child.index"
             :selected="selectedIndex === child.index"
             :site-projecting="siteProjectionItemId === child.item.id"
