@@ -239,6 +239,35 @@ const executable = computed(() => isExecutableItem(props.item))
 const isMusicItem = computed(
   () => props.item.type === 'music' && props.item.musicId != null,
 )
+/**
+ * Clicar em qualquer parte da linha faz o mesmo que o ícone principal do
+ * item: hino do catálogo toca cantado; site e vídeo/YouTube abrem o controle
+ * do player; anotação projeta (como a seta dela); os demais executáveis
+ * abrem como no play. Categoria fica só nos botões.
+ */
+const rowPlays = computed(() => {
+  if (props.item.done || isCategory.value) return false
+  if (isAnnotation.value || isMusicItem.value || isSiteItem.value || isVideoRemote.value) return true
+  return executable.value
+})
+
+const ROW_CONTROLS = 'button, a, input, select, textarea, label, [role="button"], [contenteditable="true"]'
+
+function onRowClick(event: MouseEvent) {
+  if (!rowPlays.value) return
+  const target = event.target as Element | null
+  if (target?.closest(ROW_CONTROLS)) return
+  if (isAnnotation.value) {
+    emit('playScreens')
+    return
+  }
+  if (isMusicItem.value) {
+    if (!props.musicBusy) emit('musicSung')
+    return
+  }
+  emit('select')
+}
+
 const categoryTimeRange = computed(() => {
   // SPEC t_50c9ac95 (B2/B3): end real → intervalo exato; sem end + filhos
   // com duração → "~Xmin (estimado)"; sem dados → só o start.
@@ -537,6 +566,7 @@ const projectActionTitle = computed(() => {
       'liturgy-item--dimmed': isDimmed,
       'liturgy-item--drag-source': isDragSource,
       ...categoryLookClasses,
+      'liturgy-item--row-play': rowPlays,
     }"
     :style="categoryLookStyle"
     @mouseenter="rowHovered = true"
@@ -578,7 +608,10 @@ const projectActionTitle = computed(() => {
       </span>
     </label>
 
-    <div class="liturgy-item__card">
+    <div
+      class="liturgy-item__card"
+      @click="onRowClick"
+    >
       <span
         v-if="isCategory && showInProgress"
         class="liturgy-item__progress"
@@ -1279,6 +1312,10 @@ const projectActionTitle = computed(() => {
 
 // Categoria/separador: cabeçalho de seção, não pode se confundir com os
 // sub-itens. Fundo tingido pela cor da categoria + barra lateral grossa.
+.liturgy-item--row-play .liturgy-item__card {
+  cursor: pointer;
+}
+
 .liturgy-item--category {
   // Segue a cor de realce do tema (Aparência), não a cor salva no item.
   --liturgy-category-accent-color: var(--ds-color-primary);
