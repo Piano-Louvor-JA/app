@@ -22,10 +22,10 @@ export type AlertPresetKey = keyof typeof ALERT_PRESETS
 
 // ── i18n dos áudios oficiais da Escola Sabatina (SPEC countdown-audio-i18n) ──
 // Idioma EFETIVO da narração. 'fr' existe SÓ aqui — a UI não ganha locale FR.
-export type SabbathAudioLang = 'pt-BR' | 'es' | 'en' | 'fr'
+export type SabbathAudioLang = 'pt-BR' | 'es' | 'en' | 'fr' | 'ja' | 'ko' | 'zh' | 'ru' | 'uk' | 'tr' | 'ar' | 'hi'
 export type SabbathAudioLangSetting = SabbathAudioLang | 'auto'
 
-const SABBATH_AUDIO_LANGS: readonly SabbathAudioLang[] = ['pt-BR', 'es', 'en', 'fr']
+const SABBATH_AUDIO_LANGS: readonly SabbathAudioLang[] = ['pt-BR', 'es', 'en', 'fr', 'ja', 'ko', 'zh', 'ru', 'uk', 'tr', 'ar', 'hi']
 
 /** Locale de UI → idioma da narração; não mapeado → pt-BR. */
 export function resolveSabbathSchoolAudioLang(
@@ -44,6 +44,14 @@ const SABBATH_AUDIO_FOLDER: Record<SabbathAudioLang, string> = {
   es: 'es',
   en: 'en',
   fr: 'fr',
+  ja: 'ja',
+  ko: 'ko',
+  zh: 'zh',
+  ru: 'ru',
+  uk: 'uk',
+  tr: 'tr',
+  ar: 'ar',
+  hi: 'hi',
 }
 
 /** Manifesto: arquivo + duração ffprobe pré-medida (idêntica nos 4 idiomas). */
