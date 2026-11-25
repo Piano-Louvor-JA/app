@@ -18,7 +18,12 @@ vi.mock("vue-router", () => ({
 }));
 
 vi.mock("@shared/components/AppConfirm.vue", () => ({
-	default: { template: '<div class="app-confirm-stub" />' },
+	default: {
+		name: "AppConfirm",
+		props: ["open", "title", "message"],
+		emits: ["confirm", "cancel"],
+		template: '<div class="app-confirm-stub" />',
+	},
 }));
 
 vi.mock("@modules/auth/services/firebase-client", () => ({
@@ -29,6 +34,8 @@ vi.mock("@modules/auth/services/firebase-client", () => ({
 
 vi.mock("../../services/auth-client", () => ({
 	getAuthSession: vi.fn(() => null),
+	authHeaders: () => ({}),
+	authHeadersAsync: async () => ({}),
 }));
 
 vi.mock("../../services/custom-catalog", () => ({
@@ -1855,7 +1862,10 @@ describe("MediaEditorView — interações de estrofe via DOM (sel exatos)", () 
 		const { deleteCustomLyric } = await import("../../services/custom-catalog");
 		vi.mocked(deleteCustomLyric).mockResolvedValue(true as never);
 		const { w, st } = await prepStanza();
-		const danger = w.find("button.editor__btn--danger.editor__btn--icon");
+		// Não usar o 1º .editor__btn--danger.editor__btn--icon: esse é o
+		// music-delete-btn do cabeçalho. A lixeira da estrofe vive no stanza-head.
+		const danger = w.find(".editor__stanza-head button.editor__btn--danger.editor__btn--icon");
+		expect(danger.exists()).toBe(true);
 		await danger.trigger("click");
 		await flushPromises();
 		const confirm = w.findComponent({ name: "AppConfirm" });

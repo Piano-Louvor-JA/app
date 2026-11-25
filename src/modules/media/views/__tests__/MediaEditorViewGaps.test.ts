@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../services/auth-client', () => ({
   getAuthSession: mocks.getSession,
   authHeaders: (token?: string | null) => (token ? { Authorization: `Bearer ${token}` } : {}),
+  authHeadersAsync: async () => ({ Authorization: 'Bearer tok' }),
 }))
 
 vi.mock('vue-router', () => ({
@@ -347,11 +348,8 @@ describe('MediaEditorView — estrofes, painel de letra e deleção', () => {
   it('excluir música via confirm stub emite deleteCustomMusic', async () => {
     seedCollection()
     const wrapper = await mountEditorWithMusic()
-    // pede deleção da música
-    await wrapper
-      .findAll('button')
-      .filter((b) => b.text().includes('Excluir música'))[0]!
-      .trigger('click')
+    // SPEC editor-ux: lixeira do single (ícone) no cabeçalho da música
+    await wrapper.find('[data-testid="music-delete-btn"]').trigger('click')
     await flushPromises()
     // confirma no AppConfirm stub (emit direto no componente)
     wrapper.findComponent(AppConfirm).vm.$emit('confirm')
@@ -382,11 +380,12 @@ describe('MediaEditorView — estrofes, painel de letra e deleção', () => {
       .trigger('click')
     await flushPromises()
     deleteCustomLyric.mockResolvedValue(false)
-    // botão de excluir estrofe (ícone trash no head da estrofe)
-    await wrapper
-      .findAll('button')
-      .filter((b) => b.classes().includes('editor__btn--danger') && b.classes().includes('editor__btn--icon'))[0]!
-      .trigger('click')
+    // Lixeira da estrofe (não a do single no cabeçalho)
+    const stanzaDelete = wrapper.find(
+      '.editor__stanza-head button.editor__btn--danger.editor__btn--icon',
+    )
+    expect(stanzaDelete.exists()).toBe(true)
+    await stanzaDelete.trigger('click')
     await flushPromises()
     wrapper.findComponent(AppConfirm).vm.$emit('confirm')
     await flushPromises()

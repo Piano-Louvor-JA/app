@@ -88,9 +88,7 @@ const filteredCollections = computed(() => {
 	const q = searchQuery.value.trim();
 	if (!q) return collections.value;
 	return collections.value.filter(
-		(c) =>
-			fuzzyMatch(c.name, q) ||
-			fuzzyMatch(c.authorName ?? "", q),
+		(c) => fuzzyMatch(q, c.name, c.authorName ?? ""),
 	);
 });
 const reportTarget = ref<CommunityCollectionSummary | null>(null);
@@ -420,6 +418,7 @@ onMounted(() => {
           v-if="isLogged"
           type="button"
           class="community-view__icon-btn"
+          data-test="community-bell"
           :aria-label="t('notifications.title')"
           @click.stop="showNotifications = !showNotifications"
         >

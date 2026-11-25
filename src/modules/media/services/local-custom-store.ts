@@ -198,11 +198,19 @@ export function deleteLocalCollection(id: number): boolean {
 	const before = db.collections.length;
 	db.collections = db.collections.filter((c) => c.id !== id);
 	if (db.collections.length === before) return false;
+	// SPEC editor-ux: músicas órfãs vão para "Singles" (não apaga o conteúdo).
 	if (db.musics.some((m) => m.collectionId === id)) {
 		let singles = db.collections.find((c) => c.name === "Singles");
 		if (!singles) {
-			singles = createLocalCollection("Singles");
-			singles = loadDb().collections.find((c) => c.name === "Singles") ?? singles;
+			singles = {
+				id: db.nextCollectionId,
+				name: "Singles",
+				description: null,
+				createdAt: new Date().toISOString(),
+				origin: null,
+			};
+			db.nextCollectionId -= 1;
+			db.collections.push(singles);
 		}
 		for (const music of db.musics) {
 			if (music.collectionId === id) music.collectionId = singles.id;

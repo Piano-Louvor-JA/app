@@ -217,7 +217,7 @@ describe("NotificationsDropdown — interação (regressão do armed-gate)", () 
 
 	it("clique no sino abre o dropdown; clique de novo (toggle) fecha", async () => {
 		const wrapper = await mountView();
-		const bell = wrapper.find(".community-view__bell");
+		const bell = wrapper.find('[data-test="community-bell"]');
 		await bell.trigger("click");
 		expect(
 			wrapper.findComponent({ name: "NotificationsDropdown" }).exists(),
@@ -230,7 +230,7 @@ describe("NotificationsDropdown — interação (regressão do armed-gate)", () 
 
 	it("mark-read: limpa as notificações (badge some)", async () => {
 		const wrapper = await mountView();
-		await wrapper.find(".community-view__bell").trigger("click");
+		await wrapper.find('[data-test="community-bell"]').trigger("click");
 		wrapper
 			.findComponent({ name: "NotificationsDropdown" })
 			.vm.$emit("mark-read");
@@ -243,7 +243,7 @@ describe("NotificationsDropdown — interação (regressão do armed-gate)", () 
 
 	it("close: fecha SEM marcar como lida (notificações preservadas)", async () => {
 		const wrapper = await mountView();
-		await wrapper.find(".community-view__bell").trigger("click");
+		await wrapper.find('[data-test="community-bell"]').trigger("click");
 		wrapper
 			.findComponent({ name: "NotificationsDropdown" })
 			.vm.$emit("close");
@@ -259,7 +259,7 @@ describe("NotificationsDropdown — interação (regressão do armed-gate)", () 
 
 	it("botão 'marcar lidas' chama service 1x, limpa estado e fecha (markAndClose)", async () => {
 		const wrapper = await mountView();
-		await wrapper.find(".community-view__bell").trigger("click");
+		await wrapper.find('[data-test="community-bell"]').trigger("click");
 		// Teleport to="body": buscar o botão no document, não no wrapper
 		const markBtn = document.body.querySelector(".notif-dropdown__mark");
 		expect(markBtn).not.toBeNull();
@@ -475,12 +475,10 @@ describe("CommunityView — busca, filtragem, cópia, report e paginação", () 
 		expect(mocks.routerPush).toHaveBeenCalledWith("/community/ranking");
 	});
 
-	it("tarefas semanais aparecem quando o service traz", async () => {
-		mocks.getWeeklyTasks.mockResolvedValue([
-			{ id: "t1", description: "Publique uma coletânea", done: false, bonus: 15 },
-		]);
+	it("entrada de tarefas semanais navega para community-tasks", async () => {
 		const wrapper = await mountView();
-		expect(wrapper.text()).toContain("Publique uma coletânea");
+		await wrapper.find('[data-test="community-entry-tasks"]').trigger("click");
+		expect(mocks.routerPush).toHaveBeenCalledWith({ name: "community-tasks" });
 	});
 
 	it("evento sazonal ativo renderiza banner", async () => {
@@ -752,7 +750,7 @@ describe("CommunityView — branches residuais (sem autor, sem capa, sem sessão
 		expect(wrapper.text()).toContain("Pontos em dobro!");
 	});
 
-	it("tarefas semanais: tarefa done usa ti-circle-check; pendente ti-circle", async () => {
+	it("entrada de tarefas semanais permanece disponível sem sessão", async () => {
 		mocks.getSession.mockReturnValue(null);
 		mocks.listCommunityCollectionsPage.mockResolvedValue({
 			items: [],
@@ -760,14 +758,8 @@ describe("CommunityView — branches residuais (sem autor, sem capa, sem sessão
 			lastPage: 1,
 			total: 0,
 		});
-		mocks.getWeeklyTasks.mockResolvedValue([
-			{ id: "a", description: "Feita", done: true, bonus: 15 },
-			{ id: "b", description: "Pendente", done: false, bonus: 15 },
-		]);
 		const wrapper = await mountView();
-		const icons = wrapper.findAll(".community-view__task .ti");
-		expect(icons[0].classes()).toContain("ti-circle-check");
-		expect(icons[1].classes()).toContain("ti-circle");
+		expect(wrapper.find('[data-test="community-entry-tasks"]').exists()).toBe(true);
 	});
 
 	it("coletânea SEM capa: mostra ícone fallback; COM capa: sem fallback", async () => {
