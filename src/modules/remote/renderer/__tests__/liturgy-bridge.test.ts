@@ -1870,6 +1870,23 @@ describe('installRemoteLiturgyBridge', () => {
       cleanup()
     })
 
+    it('com video aberto lista as mesmas conexoes do cabecalho, mesmo sem TV ligada', async () => {
+      const projection = idleProjection()
+      runningObs()
+      // A barra do vídeo só conhece slots com cliente; o cabeçalho mostra todas as ligadas.
+      projection.getVideoControlSnapshot.mockResolvedValue({ tvs: [], independent: null })
+      const { onStateRequestCb, cleanup } = await installBridge()
+
+      await onStateRequestCb()
+
+      await vi.waitFor(() =>
+        expect(hoisted.remoteApiStub.sendState.mock.calls.at(-1)?.[0].video.tvs).toEqual([
+          { id: 'tv:5', label: 'Tv Frontal', detail: 'Conexões ativas: 0', selected: true },
+        ]),
+      )
+      cleanup()
+    })
+
     it('independente desativa a conexao desmarcada no cabecalho, na hora', async () => {
       idleProjection()
       runningObs()

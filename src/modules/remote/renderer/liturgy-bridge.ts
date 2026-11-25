@@ -631,6 +631,9 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
     if (videoControls?.independent && (await applyPendingIndependent())) {
       videoControls = (await projection?.getVideoControlSnapshot?.()) ?? undefined
     }
+    // A barra do vídeo só lista slots com TV ligada; o celular mostra as mesmas
+    // conexões do cabeçalho "Selecionar telas" (todas as ativas), como no desktop.
+    if (videoControls) videoControls = { ...videoControls, tvs: (await idleVideoTargets()).tvs }
     // Imagem ou PDF aberto: a barra do APK mostra a seta para projetar, como no vídeo.
     if (!videoControls) {
       const doc = await openDocumentState()
