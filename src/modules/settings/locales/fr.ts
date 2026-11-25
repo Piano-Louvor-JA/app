@@ -188,6 +188,12 @@ export default {
       librasTitle: "Libras (traduction automatique)",
       "librasHint": "Affiche les paroles de l'hymne en Libras (glose textuelle). Traduction automatique ; l'original reste visible.",
       "librasToggleLabel": "Activer Libras",
+
+      "librasAvatarLabel": "Avatar de l’interprète",
+
+      "librasAvatarIcaro": "Icaro",
+
+      "librasAvatarHozana": "Hozana",
       "languageHint": "Sélectionnez la langue de l'interface de l'application.",
       "languagePortuguese": "Portugais",
       "languageEnglish": "Anglais",

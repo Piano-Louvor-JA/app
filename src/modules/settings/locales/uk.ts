@@ -188,6 +188,12 @@ export default {
       librasTitle: "Libras (автоматичний переклад)",
       "librasHint": "Показує текст поточного гімну в Libras (текстова глоса). Автоматичний переклад; оригінал залишається видимим.",
       "librasToggleLabel": "Увімкнути Libras",
+
+      "librasAvatarLabel": "Аватар перекладача",
+
+      "librasAvatarIcaro": "Ікаро",
+
+      "librasAvatarHozana": "Хозана",
       "languageHint": "Виберіть мову інтерфейсу застосунку.",
       "languagePortuguese": "Português",
       "languageEnglish": "English",

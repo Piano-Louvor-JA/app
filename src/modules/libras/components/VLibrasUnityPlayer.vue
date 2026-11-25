@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { getLibrasAvatar, type LibrasAvatar } from '../services/libras-preferences'
 
 /**
  * VLibrasUnityPlayer — F-B.1 (SPEC v2.1.0): player Unity oficial VLibras
@@ -17,11 +18,14 @@ const VLIBRAS_UNITY_URL = 'https://vlibras.gov.br/app/unity/index.html'
  * O Unity pinta fundo branco (playerweb.json backgroundColor "#FFFFFF") —
  * transparência real exige fork do index (F-B.3); aqui o cartão é o "estúdio".
  */
-const props = defineProps<{ compact?: boolean }>()
+const props = defineProps<{ compact?: boolean; avatar?: LibrasAvatar }>()
 
 const ready = ref(false)
 const iframeEl = ref<HTMLIFrameElement | null>(null)
 let pendingGloss = ''
+
+/** Avatar ativo: prop vence pref; default icaro. */
+const avatar = (): LibrasAvatar => props.avatar ?? getLibrasAvatar()
 
 function sendToUnity(object: string, method: string, param = '') {
   if (!iframeEl.value?.contentWindow) return
@@ -33,14 +37,18 @@ function onUnityMessage(event: MessageEvent) {
   if (event.data?.type !== 'unity_event') return
   if (event.data.event === 'on_load_player') {
     ready.value = true
-    // Ícaro é o avatar padrão; Hozana via prop futura (troca de avatar).
-    sendToUnity('PlayerManager', 'Change', 'icaro')
+    sendToUnity('PlayerManager', 'Change', avatar())
     if (pendingGloss) {
       sendToUnity('PlayerManager', 'playNow', pendingGloss)
       pendingGloss = ''
     }
   }
 }
+
+// Troca de avatar em tempo real (settings → prop reativa).
+watch(() => props.avatar, (next) => {
+  if (next && ready.value) sendToUnity('PlayerManager', 'Change', next)
+})
 
 function playGloss(gloss: string) {
   if (!ready.value) {

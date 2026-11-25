@@ -348,6 +348,12 @@ export default {
       'librasTitle': 'Libras (traducción automática)',
       'librasHint': 'Muestra la letra del himno actual en Libras (glosa textual). Traducción automática; el original permanece visible.',
       'librasToggleLabel': 'Activar Libras',
+
+      'librasAvatarLabel': 'Avatar del intérprete',
+
+      'librasAvatarIcaro': 'Icaro',
+
+      'librasAvatarHozana': 'Hozana',
       languageHint: 'Elija el idioma de la interfaz de la aplicación.',
       languagePortuguese: 'Português (BR)',
       languageEnglish: 'English',

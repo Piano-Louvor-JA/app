@@ -33,9 +33,10 @@ import MediaFolderCard from '../components/MediaFolderCard.vue'
 import AppBackupCard from '../components/AppBackupCard.vue'
 import DiagnosticsCard from '../components/DiagnosticsCard.vue'
 import { ensureCatalogForLocale } from '@modules/starting/services/catalog-locale-service'
-import { isLibrasEnabled, setLibrasEnabled } from '@modules/libras/services/libras-preferences'
+import { isLibrasEnabled, setLibrasEnabled, getLibrasAvatar, setLibrasAvatar, type LibrasAvatar } from '@modules/libras/services/libras-preferences'
 
 const librasOn = ref(isLibrasEnabled())
+const librasAvatar = ref<LibrasAvatar>(getLibrasAvatar())
 
 const { t, locale } = useI18n()
 const catalogSyncState = ref<'idle' | 'syncing' | 'done' | 'error'>('idle')
@@ -416,6 +417,22 @@ async function clearAllLocalData() {
           @change="setLibrasEnabled(librasOn)"
         >
         <span>{{ t('settings.general.librasToggleLabel') }}</span>
+      </label>
+
+      <label
+        v-if="librasOn"
+        class="general-settings__libras-row"
+        data-testid="libras-avatar-row"
+      >
+        <span>{{ t('settings.general.librasAvatarLabel') }}</span>
+        <select
+          v-model="librasAvatar"
+          data-testid="libras-avatar-select"
+          @change="setLibrasAvatar(librasAvatar)"
+        >
+          <option value="icaro">{{ t('settings.general.librasAvatarIcaro') }}</option>
+          <option value="hozana">{{ t('settings.general.librasAvatarHozana') }}</option>
+        </select>
       </label>
     </GlassCard>
 
