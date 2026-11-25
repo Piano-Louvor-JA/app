@@ -98,4 +98,21 @@ describe("MediaSlideStage", () => {
 		const w = mountStage();
 		expect(w.find(".media-slide-stage__bg").exists()).toBe(false);
 	});
+
+	it("capa do hinário: mostra o número do hino grande, igual à projeção", () => {
+		const w = mountStage({ title: "Santo, Santo, Santo!", subtitle: "Hinário Adventista", isCover: true, hymnNumber: 1 });
+		const number = w.find(".media-slide-stage__hymn-number");
+		expect(number.exists()).toBe(true);
+		expect(number.text()).toBe("1");
+		expect(number.attributes("style")).toContain("font-size: 10.4167cqw");
+		// Fora da capa ou sem número: nada.
+		expect(mountStage({ lyric: "Santo", isCover: false, hymnNumber: 1 }).find(".media-slide-stage__hymn-number").exists()).toBe(false);
+		expect(mountStage({ title: "X", isCover: true }).find(".media-slide-stage__hymn-number").exists()).toBe(false);
+	});
+
+	it("capa do hinário: nome do hinário no tamanho padrão (igual à projeção)", () => {
+		const w = mountStage({ title: "Santo", subtitle: "Hinário Adventista", isCover: true, hymnNumber: 1 });
+		expect(w.find(".media-slide-stage__kicker").attributes("style")).toContain("font-size: 1.4583cqw");
+	});
 });
+

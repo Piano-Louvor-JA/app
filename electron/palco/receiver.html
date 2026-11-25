@@ -72,6 +72,9 @@
   #text.shadow-off{text-shadow:none}
   /* Capa da música (isCover): título destaque amarelo, sem caixinha/borda —
      paridade com media-projection__title--cover via cabo. */
+  /* Hinário: número do hino acima do título (capa). */
+  #text .hymnal-name{display:block;margin:0 0 .5em;color:#fff;font-weight:700;letter-spacing:.34em;line-height:1.2;text-transform:uppercase;text-shadow:0 .08em .22em rgba(0,0,0,.85)}
+  #text .hymn-no{display:block;line-height:1;margin:0 0 .08em;letter-spacing:.02em;font-variant-numeric:tabular-nums}
   #text.cover-on{font-weight:900;letter-spacing:.03em;
     color:#f6c32a;background:none;padding:0;border:none;box-shadow:none;
     backdrop-filter:none;-webkit-backdrop-filter:none;
@@ -2807,6 +2810,35 @@ let bgPalco='';  // BG personalizado do palco (idle) — persiste entre músicas
 
 // Received projection text is untrusted HTML. Rebuild only basic formatting;
 // never copy attributes, executable elements, links, or resource URLs.
+/* Hinário: número do hino grande acima do título na capa. Tamanho chega
+   px@1080 (app desktop) ou px@1920 (fontRef 1920, celular) → vw. */
+function applyHymnNumber(t, m){
+  t.querySelectorAll('.hymn-no').forEach(function(old){old.remove()});
+  if(!m||m.isCover!==true||typeof m.hymnNumber!=='number'||!(m.hymnNumber>0))return;
+  const n=document.createElement('div');
+  n.className='hymn-no';
+  n.textContent=String(m.hymnNumber);
+  if(typeof m.hymnNumberSize==='number'){
+    const vw=m.fontRef===1920?m.hymnNumberSize/19.2:m.hymnNumberSize*16/9/19.2;
+    n.style.fontSize=(Math.round(vw*10000)/10000)+'vw';
+  }
+  t.prepend(n);
+}
+/* Capa: nome do hinário/álbum (ex.: HINÁRIO ADVENTISTA) acima do número.
+   Tamanho px@1080 (desktop) ou px@1920 (fontRef 1920) → vw. */
+function applyHymnalName(t, m){
+  t.querySelectorAll('.hymnal-name').forEach(function(old){old.remove()});
+  if(!m||m.isCover!==true||typeof m.hymnalName!=='string'||!m.hymnalName.trim())return;
+  const k=document.createElement('div');
+  k.className='hymnal-name';
+  k.textContent=m.hymnalName.trim();
+  if(typeof m.hymnalNameSize==='number'){
+    const vw=m.fontRef===1920?m.hymnalNameSize/19.2:m.hymnalNameSize*16/9/19.2;
+    k.style.fontSize=(Math.round(vw*10000)/10000)+'vw';
+  }
+  if(typeof m.hymnalNameColor==='string'&&m.hymnalNameColor)k.style.color=m.hymnalNameColor;
+  t.prepend(k);
+}
 function renderProjectionText(target, value){
   const text=String(value||'');
   if(!window.DOMPurify||!window.DOMPurify.isSupported){target.textContent=text;return}
@@ -3829,6 +3861,8 @@ function handle(m){
       renderProjectionText($('text'),displayText);
       $('text').classList.toggle('music-lyrics',(m.scope==='hymns'||m.scope==='media')&&m.isCover!==true);
       $('text').classList.toggle('cover-on',m.isCover===true);
+      applyHymnNumber($('text'),m);
+      applyHymnalName($('text'),m);
       $('text').classList.toggle('title-box-on',m.titleTextBox===true);
       // F3.3o: fontSize/fontWeight dinâmicos (settings do operador).
       // Estrofes (lyric*) vencem quando presentes; capa (isCover) mantém o

@@ -81,6 +81,10 @@ export type ProjectionInput = {
   background?: string
   /** Capa da música: título destaque amarelo, sem caixinha (paridade cabo). */
   isCover?: boolean
+  /** Hinário: número do hino, grande acima do título na capa. */
+  hymnNumber?: number | null
+  /** Capa: nome do hinário/álbum (ex.: HINÁRIO ADVENTISTA) acima do número. */
+  hymnalName?: string
   /** Frame do slide PDF/PPT/imagens: dataURL completo (data:image/png;base64,…). */
   frameDataUrl?: string
 }
@@ -394,6 +398,18 @@ class PalcoSession {
       footerVersion:
         isBible && !s.showBibleVersion ? undefined : input.footerVersion,
       isCover: input.isCover === true,
+      // Hinário: número do hino na capa (Personalização → número do hino).
+      ...(isHymns && input.isCover === true && s.hymnNumberShow !== false && input.hymnNumber
+        ? { hymnNumber: input.hymnNumber, hymnNumberSize: ((s.hymnNumberSize ?? 200) / 1920) * 1080 }
+        : {}),
+      // Capa: nome do hinário (Personalização → nome do hinário).
+      ...(isHymns && input.isCover === true && s.hymnalNameShow !== false && input.hymnalName
+        ? {
+            hymnalName: input.hymnalName,
+            hymnalNameSize: ((s.hymnalNameSize ?? 28) / 1920) * 1080,
+            ...(s.hymnalNameColor ? { hymnalNameColor: s.hymnalNameColor } : {}),
+          }
+        : {}),
     }, this.activeSlotId)
   }
 

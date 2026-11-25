@@ -403,6 +403,7 @@ async function onToggleFullscreen() {
           :subtitle="session?.subtitle || ''"
           :image-url="stageImage"
           :is-cover="isCover"
+          :hymn-number="session?.hymnNumber ?? null"
         />
 
         <div v-show="controlsVisible" class="media-window__pill-wrap">

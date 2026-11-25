@@ -22,6 +22,8 @@ const props = defineProps<{
   imageUrl: string | null
   subtitle?: string
   isCover?: boolean
+  /** Hinário: número do hino (capa). */
+  hymnNumber?: number | null
 }>()
 
 const { t } = useI18n()
@@ -78,6 +80,23 @@ const titleStyle = computed(() => {
     padding: '1.6vmin 1.8vmin',
   } as Record<string, string>
 })
+
+// Hinário: número do hino grande acima do título (mesma regra da projeção).
+const showHymnNumber = computed(
+  () => Boolean(props.isCover) && props.hymnNumber != null && stage.value.hymnNumberShow !== false,
+)
+const hymnNumberStyle = computed(() => ({
+  fontSize: `${+(((stage.value.hymnNumberSize ?? 200) / 1920) * 100).toFixed(4)}cqw`,
+  fontWeight: String(stage.value.titleFontWeight ?? 800),
+  color: titleStyle.value.color,
+  textShadow: titleStyle.value.textShadow,
+}))
+
+// Hinário: nome do hinário acima do número (Personalização → nome do hinário).
+const hymnalNameStyle = computed(() => ({
+  fontSize: `${+(((stage.value.hymnalNameSize ?? 28) / 1920) * 100).toFixed(4)}cqw`,
+  ...(stage.value.hymnalNameColor ? { color: stage.value.hymnalNameColor } : {}),
+}))
 
 const displayText = computed(() => {
   if (showTitleAsLyric.value) return props.title || t('media.title')
@@ -160,9 +179,15 @@ const projectionFontStyle = useProjectionFont('hymns')
             aria-hidden="true"
           />
           <p
-            v-if="coverSubtitle"
+            v-if="coverSubtitle && stage.hymnalNameShow !== false"
             class="media-slide-stage__kicker"
+            :style="hymnalNameStyle"
           >{{ coverSubtitle }}</p>
+          <p
+            v-if="showHymnNumber"
+            class="media-slide-stage__hymn-number"
+            :style="hymnNumberStyle"
+          >{{ hymnNumber }}</p>
           <p
             class="media-slide-stage__lyric media-slide-stage__lyric--cover"
             :style="titleStyle"
@@ -184,6 +209,13 @@ const projectionFontStyle = useProjectionFont('hymns')
 </template>
 
 <style scoped lang="scss">
+.media-slide-stage__hymn-number {
+  margin: 0;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
 .media-slide-stage {
   position: relative;
   width: 100%;
