@@ -185,6 +185,9 @@ export default {
     },
     "general": {
       "languageTitle": "Язык",
+      librasTitle: "Libras (автоматический перевод)",
+      "librasHint": "Показывает текст текущего гимна в Libras (текстовая глосса). Автоматический перевод; оригинал остаётся видимым.",
+      "librasToggleLabel": "Включить Libras",
       "languageHint": "Выберите язык интерфейса приложения.",
       "languagePortuguese": "Português",
       "languageEnglish": "English",
