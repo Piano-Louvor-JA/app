@@ -660,6 +660,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
       durationMs: 0,
       categoryId: null,
     }
+    musicRemovedFrom = null
     itemDialogOpen.value = true
   }
 
@@ -673,6 +674,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
       ...DEFAULT_LITURGY_ITEM_DRAFT,
       categoryId,
     }
+    musicRemovedFrom = null
     itemDialogOpen.value = true
   }
 
@@ -714,6 +716,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
       })
     }
     musicSearchQuery.value = ''
+    musicRemovedFrom = null
     itemDialogOpen.value = true
   }
 
@@ -1328,6 +1331,9 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     window.removeEventListener('liturgy:imported', onLiturgyImported)
   })
 
+  /** Música removida (X) no diálogo: a próxima escolha conta como troca. */
+  let musicRemovedFrom: number | null = null
+
   function onMusicPick(musicId: number) {
     const music = musicList.value.find((entry) => entry.id === musicId)
     if (!music) {
@@ -1339,6 +1345,14 @@ export const useLiturgyStore = defineStore('liturgy', () => {
       return
     }
 
+    // Trocar a música (ao editar ou criar) força o título com o nome da
+    // música nova e limpa as anotações da anterior — o item antigo deixava
+    // título e anotações que não batiam mais (feedback 25/11). Escolher a
+    // mesma música de novo não mexe em nada; campo vazio recebe o nome.
+    const previous = itemDraft.value.musicId ?? musicRemovedFrom
+    musicRemovedFrom = null
+    const changed = previous != null && previous !== musicId
+    const fullName = music.displayLabel || music.name
     itemDraft.value = {
       ...itemDraft.value,
       musicId,
@@ -1346,14 +1360,14 @@ export const useLiturgyStore = defineStore('liturgy', () => {
         music.durationMs && music.durationMs > 0
           ? clampMomentDurationMs(music.durationMs)
           : 0,
-      // Título complementar herda o nome da música SE o campo estiver vazio
-      // (feedback Ezequias 02/10: ao editar item de música o título
-      // obrigatório ficava vazio e travava o salvar).
-      name: itemDraft.value.name.trim() || music.name,
+      // Nome completo do catálogo (com o número do hino: "571 - Tu És Digno").
+      name: changed ? fullName : itemDraft.value.name.trim() || fullName,
+      ...(changed ? { subtitle: '', notesHtml: '', notes: '' } : {}),
     }
   }
 
   function clearMusicPick() {
+    if (itemDraft.value.musicId != null) musicRemovedFrom = itemDraft.value.musicId
     itemDraft.value = {
       ...itemDraft.value,
       musicId: null,

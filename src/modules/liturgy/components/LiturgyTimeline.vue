@@ -480,7 +480,8 @@ function isCategorySectionInProgress(categoryId: string): boolean {
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
-  padding-left: 0.15rem;
+  /* Espaço para o botão de recolher da categoria (mais largo que a caixinha). */
+  padding-left: 0.6rem;
   padding-right: 0.35rem;
   padding-bottom: 0.5rem;
   width: 100%;
@@ -495,7 +496,7 @@ function isCategorySectionInProgress(categoryId: string): boolean {
 
 .liturgy-timeline__line {
   position: absolute;
-  left: 0.55rem;
+  left: 1rem;
   top: 1rem;
   bottom: 0.4rem;
   width: 2px;

@@ -388,25 +388,16 @@ export function buildLiturgyItemFromDraft(
         delete item.playerId
       }
     }
+    // Itens de arquivo sem anotação ficam sem subtítulo: o nome do arquivo
+    // (ou "N imagens") poluía a linha da liturgia (feedback 25/11).
     if (type === 'images' && paths.length > 0) {
       item.filePaths = paths
-      if (!details) {
-        item.subtitle =
-          paths.length === 1
-            ? (paths[0]!.split(/[\\/]/).pop()!)
-            : `${paths.length} imagens`
-      }
-    } else if (item.filePath && !details) {
-      const parts = item.filePath.split(/[\\/]/)
-      item.subtitle = parts[parts.length - 1]!
     }
   }
 
   if (type === 'site' || type === 'online_video') {
+    // Site e YouTube/vídeo online sem anotação ficam sem subtítulo (a URL poluía a linha).
     item.url = draft.url.trim()
-    if (item.url && !details) {
-      item.subtitle = item.url
-    }
   }
 
   if (type === 'annotation') {
@@ -422,6 +413,27 @@ export function buildLiturgyItemFromDraft(
   return item
 }
 
+/**
+ * Sem anotação, o item guarda no subtítulo o nome do arquivo, a contagem de
+ * imagens ou o link (só para a linha da liturgia). Isso não é anotação do
+ * operador: ao editar, "Anotações e Detalhes" vem vazio.
+ */
+export function notesFromSubtitle(item: LiturgyItem): string {
+  const subtitle = item.subtitle ?? ''
+  const value = subtitle.trim()
+  if (!value) return subtitle
+  const baseName = (path: string | null | undefined) => (path ? path.split(/[\\/]/).pop() ?? '' : '')
+  const paths = item.filePaths ?? []
+  const auto = new Set<string>([
+    baseName(item.filePath),
+    ...(paths.length === 1 ? [baseName(paths[0])] : []),
+    ...(paths.length > 1 ? [`${paths.length} imagens`] : []),
+    (item.url ?? '').trim(),
+  ])
+  auto.delete('')
+  return auto.has(value) ? '' : subtitle
+}
+
 export function draftFromLiturgyItem(item: LiturgyItem): LiturgyItemDraft {
   return {
     type: item.type,
@@ -435,7 +447,7 @@ export function draftFromLiturgyItem(item: LiturgyItem): LiturgyItemDraft {
             item.name.trim())
         : item.name,
     subtitle:
-      item.type === 'music' ? (item.notes ?? '').trim() : item.subtitle,
+      item.type === 'music' ? (item.notes ?? '').trim() : notesFromSubtitle(item),
     durationMs:
       TYPES_WITHOUT_DURATION.includes(item.type)
         ? 0

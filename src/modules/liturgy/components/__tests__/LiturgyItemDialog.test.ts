@@ -600,6 +600,49 @@ describe('LiturgyItemDialog', () => {
       wrapper.unmount()
     })
 
+    it('trocar o vídeo: o título vira o nome do arquivo novo e as anotações são limpas', async () => {
+      vi.mocked(isDesktopApp).mockReturnValue(true)
+      const openFile = vi.fn(async () => '/videos/Claramente Dr Cesar responde duvidas 30 10 26_1eagQ-91i1c.mp4')
+      vi.mocked(getDesktopBridge).mockReturnValue({ dialog: { openFile } } as any)
+      const wrapper = createWrapper({
+        open: true,
+        draft: {
+          ...defaultProps.draft,
+          type: 'video',
+          name: 'O Senhor Move as Pedras',
+          filePath: '/videos/O Senhor Move as Pedras.mp4',
+          subtitle: 'VIDEO BAIXADO: O Senhor Move as Pedras',
+          notesHtml: '<p>VIDEO BAIXADO</p>',
+        },
+      })
+      await flushPromises()
+      await (wrapper.vm as any).selectLocalFile()
+      await flushPromises()
+      const last = wrapper.emitted('update:draft')!.at(-1)![0] as any
+      // Sem a extensão e sem o código do YouTube que vem no nome do arquivo baixado.
+      expect(last.name).toBe('Claramente Dr Cesar responde duvidas 30 10 26')
+      expect(last.subtitle).toBe('')
+      expect(last.notesHtml).toBe('')
+      wrapper.unmount()
+    })
+
+    it('escolher o mesmo arquivo de novo não mexe no título nem nas anotações', async () => {
+      vi.mocked(isDesktopApp).mockReturnValue(true)
+      const openFile = vi.fn(async () => '/videos/a.mp4')
+      vi.mocked(getDesktopBridge).mockReturnValue({ dialog: { openFile } } as any)
+      const wrapper = createWrapper({
+        open: true,
+        draft: { ...defaultProps.draft, type: 'video', name: 'Meu título', filePath: '/videos/a.mp4', subtitle: 'nota' },
+      })
+      await flushPromises()
+      await (wrapper.vm as any).selectLocalFile()
+      await flushPromises()
+      const last = wrapper.emitted('update:draft')!.at(-1)![0] as any
+      expect(last.name).toBe('Meu título')
+      expect(last.subtitle).toBe('nota')
+      wrapper.unmount()
+    })
+
     it('selectLocalFile desktop: arquivo sem extensão mantém nome cru (405 arm1)', async () => {
       vi.mocked(isDesktopApp).mockReturnValue(true)
       const openFile = vi.fn(async () => '/music/semext')

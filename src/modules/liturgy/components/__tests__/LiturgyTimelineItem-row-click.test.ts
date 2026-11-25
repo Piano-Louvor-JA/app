@@ -149,4 +149,46 @@ describe('LiturgyTimelineItem — clicar na linha abre como o ícone', () => {
     await wrapper.get('.liturgy-item__card').trigger('click')
     expect(wrapper.emitted('select')).toHaveLength(1)
   })
+
+  it('vídeo sem anotação não mostra o nome do arquivo; com anotação, mostra', () => {
+    const base = { id: 'v-1', type: 'video', name: '8 HABITA EM MIM ADORADORES 4', durationMs: 0, accentColor: '#00B8D4', done: false, filePath: '/v/8 HABITA EM MIM ADORADORES 4_h8OcOlhlL00.mp4' }
+    const auto = mountItem({ ...base, subtitle: '8 HABITA EM MIM ADORADORES 4_h8OcOlhlL00.mp4' })
+    expect(auto.text()).not.toContain('h8OcOlhlL00')
+    const note = mountItem({ ...base, subtitle: 'Passar só até 3:00' })
+    expect(note.text()).toContain('Passar só até 3:00')
+  })
+
+  it('música: a lista mostra só o título complementar (sem repetir o do catálogo)', () => {
+    const w = mountItem({ ...music, name: '571 - Tu És Digno', complementaryTitle: '571 - Tu És Digno' })
+    expect(w.get('.liturgy-item__name').text()).toBe('571 - Tu És Digno')
+    expect(w.find('.liturgy-item__complementary').exists()).toBe(false)
+    const custom = mountItem({ ...music, name: '571 - Tu És Digno', complementaryTitle: 'Louvor da abertura' })
+    expect(custom.get('.liturgy-item__name').text()).toBe('Louvor da abertura')
+    const plain = mountItem({ ...music, name: '571 - Tu És Digno' })
+    expect(plain.get('.liturgy-item__name').text()).toBe('571 - Tu És Digno')
+  })
+
+  it('áudio, imagens e PDF sem anotação não mostram o nome do arquivo (itens já salvos)', () => {
+    const audio = mountItem({ id: 'a-9', type: 'audio', name: 'sorteio-efeito SORTEIO', durationMs: 0, accentColor: '#D500F9', done: false, filePath: '/m/sorteio-efeito.mp3', subtitle: 'sorteio-efeito.mp3' })
+    expect(audio.text()).not.toContain('sorteio-efeito.mp3')
+    const images = mountItem({ id: 'i-9', type: 'images', name: '2 imagens selecionadas', durationMs: 0, accentColor: '#6D4C41', done: false, filePaths: ['/a.png', '/b.png'], subtitle: '2 imagens' })
+    expect(images.find('.liturgy-item__subtitle').exists()).toBe(false)
+    const pdf = mountItem({ id: 'p-9', type: 'pdf', name: 'CNH', durationMs: 0, accentColor: '#1A237E', done: false, filePath: '/d/CNH - Habilitação Atualizada.pdf', subtitle: 'CNH - Habilitação Atualizada.pdf' })
+    expect(pdf.text()).not.toContain('.pdf')
+    const noted = mountItem({ id: 'p-10', type: 'pdf', name: 'CNH', durationMs: 0, accentColor: '#1A237E', done: false, filePath: '/d/x.pdf', subtitle: 'Mostrar página 2' })
+    expect(noted.text()).toContain('Mostrar página 2')
+  })
+
+  it('YouTube/vídeo online sem anotação não mostra a URL', () => {
+    const url = 'https://www.youtube.com/watch?v=B4kXnads4eU&list=RDB4kXnads4eU&start_radio=1'
+    const yt = mountItem({ id: 'y-9', type: 'online_video', name: 'INSTRUMENTAL Acoustic Worship', durationMs: 0, accentColor: '#2979FF', done: false, url, subtitle: url })
+    expect(yt.text()).not.toContain('youtube.com')
+  })
+
+  it('site sem anotação não mostra o endereço', () => {
+    const url = 'https://vejariviera.com.br'
+    const site = mountItem({ id: 's-9', type: 'site', name: 'Veja Consultoria Imobiliaria', durationMs: 0, accentColor: '#AEEA00', done: false, url, subtitle: url })
+    expect(site.text()).not.toContain('vejariviera')
+  })
 })
+

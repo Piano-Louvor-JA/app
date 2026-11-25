@@ -558,6 +558,16 @@ function fileFiltersForType(type: LiturgyItemType | null): FileDialogFilter[] {
   }
 }
 
+/**
+ * Título a partir do arquivo: sem extensão e sem o código do YouTube que
+ * vem no fim do nome dos vídeos baixados (`…_1eagQ-91i1c.mp4`).
+ */
+function titleFromFilePath(path: string): string {
+  const fileName = path.split(/[\\/]/).pop()! /* pop de path não-vazio é non-empty */
+  const base = fileName.includes('.') ? fileName.replace(/\.[^.]+$/, '') : fileName
+  return base.replace(/_[\w-]{11}$/, '').trim() || base
+}
+
 async function selectLocalFile() {
   filePickerError.value = null
   if (!isDesktopApp()) {
@@ -595,14 +605,19 @@ async function selectLocalFile() {
       const probed = await probeMediaDurationMs(paths[0])
       if (probed > 0) next.durationMs = probed
     }
-    if (!props.draft.name.trim()) {
+    // Trocar o arquivo força o título com o nome do novo e limpa as anotações
+    // do anterior (mesma regra da música). Campo vazio recebe o nome; o mesmo
+    // arquivo de novo não mexe em nada.
+    const previous = (props.draft.filePath ?? '').trim()
+    const changed = Boolean(previous) && previous !== paths[0]
+    if (changed || !props.draft.name.trim()) {
       if (multiple && paths.length > 1) {
         next.name = t('liturgy.fields.filesSelected', { count: paths.length })
       } else {
-        const fileName = paths[0]!.split(/[\\/]/).pop()! /* pop de path não-vazio é non-empty */
-        next.name = fileName.includes('.') ? fileName.replace(/\.[^.]+$/, '') : fileName
+        next.name = titleFromFilePath(paths[0]!)
       }
     }
+    if (changed) Object.assign(next, { subtitle: '', notesHtml: '', notes: '' })
     patch(next)
   } finally {
     filePickerBusy.value = false
