@@ -61,7 +61,22 @@ export default {
       "open": "Открыть",
       "delete": "Удалить",
       "badge": "Копия"
-    }
+    },
+    "weeklyTasksSubtitle": "Задания недели сети",
+    "weeklyTasksEmpty": "На этой неделе заданий нет.",
+    "openCollection": "Открыть сборник",
+    "collectionTitle": "Сборник Сообщества",
+    "collectionLoadError": "Не удалось открыть этот сборник.",
+    "play": "Слушать",
+    "playTrack": "Слушать {name}",
+    "trackUnavailable": "Аудио недоступно",
+    "myCopies": "Мои копии",
+    "myCopiesSubtitle": "Копии подборок Сообщества, сохранённые на этом устройстве",
+    "myCopiesEmpty": "Копий пока нет. Сохраните копию из Сообщества.",
+    "myCollections": "Мои подборки",
+    "myCollectionsSubtitle": "Подборки, созданные вами — управляете здесь только вы",
+    "myCollectionsEmpty": "Подборок пока нет. Создайте одну в редакторе текстов.",
+    "changeCover": "Изменить обложку «{name}»"
   },
   "notifications": {
     "title": "Уведомления",

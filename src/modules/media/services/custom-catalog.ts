@@ -3,7 +3,7 @@ import type {
   MediaTrackRecord,
 } from '../types/media'
 
-import { authHeaders, getAuthSession } from './auth-client'
+import { authHeadersAsync, getAuthSession } from './auth-client'
 
 export function customHeaders(headers?: HeadersInit): Record<string, string> {
   const source = new Headers(headers)
@@ -254,7 +254,7 @@ export async function loadCustomMusicTrack(
 
   try {
     const response = await fetch(`${customBaseUrl()}/musics/${musicId}`, {
-      headers: customHeaders(authHeaders()),
+      headers: customHeaders(await authHeadersAsync()),
     })
     if (!response.ok) {
       console.error('[custom-catalog] HTTP', response.status, response.url)
@@ -310,6 +310,8 @@ export type CustomCollectionSummary = {
   coverUrl?: string | null
   /** Dono (null = coletânea legado/pública, sem dono). */
   ownerId?: number | null
+  /** Resolvido server-side quando autenticado (API: is_owner). */
+  isOwner?: boolean
   /** Nome do criador exibido na listagem (opcional, informativo). */
   authorName?: string | null
   /** Privacidade da coletânea na rede (padrão legado da API: 'public'). */
@@ -328,15 +330,54 @@ export async function updateCustomCollection(
   },
 ): Promise<CustomCollectionSummary | null> {
   if (isLocalId(collectionId)) {
-    const ok = updateLocalCollection(collectionId, {
-      name: patch.name,
-      description: patch.description,
-    })
-    if (!ok) return null
+    // Cover local (SPEC editor-ux + feedback Rafael 24/11): data URL → blob
+    // IndexedDB (coverMediaId). Nada sobe pra rede — capa fica no dispositivo.
+    let coverSaved = true
+    if (patch.cover_url !== undefined) {
+      const { putMedia } = await import('./local-media-store')
+      if (patch.cover_url) {
+        try {
+          const blob = await (await fetch(patch.cover_url)).blob()
+          const mediaId = `coll-${collectionId}-cover`
+          await putMedia(mediaId, blob)
+          coverSaved = updateLocalCollection(collectionId, { coverMediaId: mediaId })
+        } catch {
+          coverSaved = false
+        }
+      } else {
+        coverSaved = updateLocalCollection(collectionId, { coverMediaId: null })
+      }
+      if (!coverSaved) return null
+    } else if (
+      patch.name === undefined &&
+      patch.description === undefined &&
+      patch.visibility === undefined
+    ) {
+      // chamada sem campos aplicáveis e sem cover: nada a fazer
+      const existing = getLocalCollection(collectionId)
+      if (!existing) return null
+    }
+    const okOrExisting =
+      patch.name != null || patch.description !== undefined
+        ? updateLocalCollection(collectionId, {
+            name: patch.name,
+            description: patch.description,
+          })
+        : getLocalCollection(collectionId) != null
+    if (!okOrExisting) return null
+    const local = getLocalCollection(collectionId)
+    if (!local) return null
+    let coverUrl: string | null = null
+    if (local.coverMediaId) {
+      const { getMedia } = await import('./local-media-store')
+      const blob = await getMedia(local.coverMediaId)
+      coverUrl = blob ? URL.createObjectURL(blob) : null
+    }
     return {
       id: collectionId,
-      name: patch.name ?? '',
-      description: patch.description ?? null,
+      name: patch.name ?? local.name,
+      description: patch.description ?? local.description ?? null,
+      coverUrl,
       musicsCount: listLocalMusics(collectionId).length,
       ownerId: null,
       authorName: null,
@@ -345,7 +386,7 @@ export async function updateCustomCollection(
   try {
     const response = await fetch(`${customBaseUrl()}/collections/${collectionId}`, {
       method: 'PUT',
-      headers: customHeaders({ 'content-type': 'application/json', ...authHeaders() }),
+      headers: customHeaders({ 'content-type': 'application/json', ...(await authHeadersAsync()) }),
       body: JSON.stringify(patch),
     })
     if (!response.ok) {
@@ -385,13 +426,14 @@ export async function listCustomCollections(opts?: {
     id: c.id,
     name: c.name,
     description: c.description ?? null,
+    coverUrl: c.coverMediaId ?? null,
     musicsCount: listLocalMusics(c.id).length,
     ownerId: null,
     authorName: null,
   }))
   try {
     const response = await fetch(`${customBaseUrl()}/collections`, {
-      headers: customHeaders(authHeaders()),
+      headers: customHeaders(await authHeadersAsync()),
       signal: opts?.signal,
     })
     if (!response.ok) return locals
@@ -403,6 +445,7 @@ export async function listCustomCollections(opts?: {
         cover_url?: string | null
         owner_id?: number | null
         author_name?: string | null
+        is_owner?: number | boolean | null
         visibility?: CollectionVisibility
         musics_count?: number
       }>
@@ -413,24 +456,30 @@ export async function listCustomCollections(opts?: {
       description: row.description ?? null,
       coverUrl: row.cover_url ?? null,
       ownerId: row.owner_id ?? null,
+      isOwner: row.is_owner === 1 || row.is_owner === true,
       authorName: row.author_name ?? null,
       visibility: row.visibility ?? 'public',
       musicsCount: row.musics_count ?? 0,
     }))
-    // Review R1 (SPEC v1.2.0 RF-07): coletânea local pendente no outbox já
-    // subiu pelo sync — oculta a cópia local quando existe remota do usuário
-    // com o MESMO nome (evita duplicata visual pós-pull; o client_uuid é a
-    // identidade canônica no servidor).
+    // RF-04 (SPEC v1.2.0): coletâneas de OUTROS usuários NÃO aparecem no
+    // editor/central — descoberta é só na Comunidade. A API (autenticada
+    // via authHeadersAsync) resolve ownership server-side; o client mantém
+    // um guard extra por owner_id/is_owner p/ sessões legacy sem id.
     const me = getAuthSession()?.user?.email ?? null
+    const myId = getAuthSession()?.user?.id_user ?? null
+    const mine = remote.filter((r) => {
+      if (r.isOwner === true) return true
+      if (r.ownerId == null) return false
+      if (myId != null) return r.ownerId === myId
+      return me != null && r.authorName?.toLowerCase() === me.toLowerCase()
+    })
     const remoteNames = new Set(
-      remote
-        .filter((r) => me != null && r.ownerId != null)
-        .map((r) => r.name.toLowerCase()),
+      mine.map((r) => r.name.toLowerCase()),
     )
     const localsVisible = locals.filter(
       (l) => !remoteNames.has(l.name.toLowerCase()),
     )
-    return [...localsVisible, ...remote]
+    return [...localsVisible, ...mine]
   } catch {
     return locals
   }
@@ -547,7 +596,7 @@ export async function copyCustomMusic(
   try {
     const response = await fetch(
       `${customBaseUrl()}/collections/${collectionId}/musics/${musicId}/copy`,
-      { method: 'POST', headers: customHeaders(authHeaders()) },
+      { method: 'POST', headers: customHeaders(await authHeadersAsync()) },
     )
     if (!response.ok) {
       console.error('[custom-catalog] HTTP', response.status, response.url)
@@ -593,7 +642,7 @@ export async function listAllCustomMusics(options?: {
   })
   try {
     const response = await fetch(`${customBaseUrl()}/musics`, {
-      headers: customHeaders(authHeaders()),
+      headers: customHeaders(await authHeadersAsync()),
       signal:
         options?.timeoutMs != null
           ? AbortSignal.timeout(options.timeoutMs)
@@ -645,7 +694,7 @@ export async function listCustomMusics(
   try {
     const response = await fetch(
       `${customBaseUrl()}/collections/${collectionId}/musics`,
-      { headers: customHeaders(authHeaders()) },
+      { headers: customHeaders(await authHeadersAsync()) },
     )
     if (!response.ok) return []
     const json = (await response.json()) as {
@@ -766,7 +815,7 @@ export async function createCustomCollection(
   try {
     const response = await fetch(`${customBaseUrl()}/collections`, {
       method: 'POST',
-      headers: customHeaders({ 'content-type': 'application/json', ...authHeaders() }),
+      headers: customHeaders({ 'content-type': 'application/json', ...(await authHeadersAsync()) }),
       // SEMPRE envia visibility explícita (default PRIVADO no app — decisão
       // t_35e4d3ea: usuário escolhe publicar; API-default 'public' é pegadinha).
       body: JSON.stringify({
@@ -834,7 +883,7 @@ export async function createCustomMusic(
       `${customBaseUrl()}/collections/${collectionId}/musics`,
       {
         method: 'POST',
-        headers: customHeaders({ 'content-type': 'application/json', ...authHeaders() }),
+        headers: customHeaders({ 'content-type': 'application/json', ...(await authHeadersAsync()) }),
         body: JSON.stringify(input),
       },
     )
@@ -866,7 +915,7 @@ export async function addOfficialMusicToCollection(
       `${customBaseUrl()}/collections/${collectionId}/musics`,
       {
         method: 'POST',
-        headers: customHeaders({ 'content-type': 'application/json', ...authHeaders() }),
+        headers: customHeaders({ 'content-type': 'application/json', ...(await authHeadersAsync()) }),
         // name opcional: o catálogo oficial (json_db remoto) é a fonte do nome —
         // o SQLite local pode não ter o hino.
         body: JSON.stringify({ official_music_id: officialMusicId, name }),
@@ -900,7 +949,7 @@ export async function updateCustomMusic(
   try {
     const response = await fetch(`${customBaseUrl()}/musics/${musicId}`, {
       method: 'PUT',
-      headers: customHeaders({ 'content-type': 'application/json', ...authHeaders() }),
+      headers: customHeaders({ 'content-type': 'application/json', ...(await authHeadersAsync()) }),
       body: JSON.stringify(input),
     })
     return response.ok
@@ -915,11 +964,27 @@ export function customApiUrl(path: string): string {
 }
 
 export function customFileUrl(urlPath: string): string {
-  // objectURL/blob:/data: (áudio/bg locais do import .slja) já são URL final.
+  // objectURL/blob:/data: (áudio/bg/cover locais) já são URL final.
   if (/^(blob:|data:|https?:|\/file)/.test(urlPath)) return urlPath
   const base = import.meta.env.VITE_PALCO_API_URL
   if (base) return `${base.replace(/\/$/, '')}/file${urlPath}`
   return `/file${urlPath}`
+}
+
+/**
+ * Cover LOCAL de coletânea (id negativo): resolve coverMediaId → objectURL.
+ * Remoto: coverUrl já é path /custom/... → customFileUrl. Null = sem capa.
+ */
+export async function collectionCoverUrl(
+  collection: CustomCollectionSummary,
+): Promise<string | null> {
+  if (isLocalId(collection.id)) {
+    if (!collection.coverUrl) return null
+    const { getMedia } = await import('./local-media-store')
+    const blob = await getMedia(collection.coverUrl)
+    return blob ? URL.createObjectURL(blob) : null
+  }
+  return collection.coverUrl ? customFileUrl(collection.coverUrl) : null
 }
 
 /**
@@ -978,7 +1043,7 @@ export async function uploadCustomFile(
     formData.append('kind', kind)
     const response = await fetch(`${customBaseUrl()}/files`, {
       method: 'POST',
-      headers: customHeaders(authHeaders()),
+      headers: customHeaders(await authHeadersAsync()),
       body: formData,
       signal: controller.signal,
     })
@@ -1001,7 +1066,7 @@ export async function deleteCustomMusic(musicId: number): Promise<boolean> {
   try {
     const response = await fetch(`${customBaseUrl()}/musics/${musicId}`, {
       method: 'DELETE',
-      headers: customHeaders(authHeaders()),
+      headers: customHeaders(await authHeadersAsync()),
     })
     return response.ok
   } catch {
@@ -1014,7 +1079,7 @@ export async function deleteCustomCollection(collectionId: number): Promise<bool
   try {
     const response = await fetch(`${customBaseUrl()}/collections/${collectionId}`, {
       method: 'DELETE',
-      headers: customHeaders(authHeaders()),
+      headers: customHeaders(await authHeadersAsync()),
     })
     return response.ok
   } catch {
@@ -1046,7 +1111,7 @@ export async function createCustomLyric(
   try {
     const response = await fetch(`${customBaseUrl()}/musics/${musicId}/lyrics`, {
       method: 'POST',
-      headers: customHeaders({ 'content-type': 'application/json', ...authHeaders() }),
+      headers: customHeaders({ 'content-type': 'application/json', ...(await authHeadersAsync()) }),
       body: JSON.stringify(input),
     })
     if (!response.ok) {
@@ -1074,7 +1139,7 @@ export async function updateCustomLyric(
   try {
     const response = await fetch(`${customBaseUrl()}/lyrics/${lyricId}`, {
       method: 'PUT',
-      headers: customHeaders({ 'content-type': 'application/json', ...authHeaders() }),
+      headers: customHeaders({ 'content-type': 'application/json', ...(await authHeadersAsync()) }),
       body: JSON.stringify(input),
     })
     return response.ok
@@ -1088,7 +1153,7 @@ export async function deleteCustomLyric(lyricId: number): Promise<boolean> {
   try {
     const response = await fetch(`${customBaseUrl()}/lyrics/${lyricId}`, {
       method: 'DELETE',
-      headers: customHeaders(authHeaders()),
+      headers: customHeaders(await authHeadersAsync()),
     })
     return response.ok
   } catch {

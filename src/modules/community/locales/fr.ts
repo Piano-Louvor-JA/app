@@ -61,7 +61,22 @@ export default {
       "open": "Ouvrir",
       "delete": "Supprimer",
       "badge": "Copie"
-    }
+    },
+    "weeklyTasksSubtitle": "Tâches de la semaine du réseau",
+    "weeklyTasksEmpty": "Aucune tâche cette semaine.",
+    "openCollection": "Ouvrir la collection",
+    "collectionTitle": "Collection de la Communauté",
+    "collectionLoadError": "Impossible d'ouvrir cette collection.",
+    "play": "Écouter",
+    "playTrack": "Écouter {name}",
+    "trackUnavailable": "Audio indisponible",
+    "myCopies": "Mes copies",
+    "myCopiesSubtitle": "Copies de collections de la Communauté enregistrées sur cet appareil",
+    "myCopiesEmpty": "Aucune copie enregistrée pour l'instant. Enregistrez une copie depuis la Communauté.",
+    "myCollections": "Mes collections",
+    "myCollectionsSubtitle": "Collections créées par vous — vous seul les gérez ici",
+    "myCollectionsEmpty": "Aucune collection pour l'instant. Créez-en une dans l'éditeur de paroles.",
+    "changeCover": "Changer la couverture de {name}"
   },
   "ranking": {
     "title": "Classement",

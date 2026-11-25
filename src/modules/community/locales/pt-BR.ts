@@ -61,7 +61,26 @@ export default {
       "open": "Abrir",
       "delete": "Excluir",
       "badge": "Cópia"
-    }
+    },
+    "weeklyTasksSubtitle": "Tarefas da semana da rede",
+    "taskComplete": "Concluir",
+    "taskDone": "Tarefa concluída!",
+    "taskCredited": "+{points} pontos creditados!",
+    "taskCompleteFailed": "Não foi possível concluir. Tente de novo.",
+    "weeklyTasksEmpty": "Nenhuma tarefa esta semana.",
+    "openCollection": "Abrir coletânea",
+    "collectionTitle": "Coletânea da Comunidade",
+    "collectionLoadError": "Não foi possível abrir esta coletânea.",
+    "play": "Ouvir",
+    "playTrack": "Ouvir {name}",
+    "trackUnavailable": "Áudio indisponível",
+    "myCopies": "Minhas cópias",
+    "myCopiesSubtitle": "Cópias de coletâneas da Comunidade salvas neste dispositivo",
+    "myCopiesEmpty": "Nenhuma cópia salva ainda. Salve uma cópia pela Comunidade.",
+    "myCollections": "Minhas coletâneas",
+    "myCollectionsSubtitle": "Coletâneas criadas por você — só você as gerencia aqui",
+    "myCollectionsEmpty": "Nenhuma coletânea ainda. Crie uma no editor de letras.",
+    "changeCover": "Trocar capa de {name}"
   },
   "ranking": {
     "title": "Ranking",

@@ -5,12 +5,11 @@ import { openMusicPlayer } from '@modules/media/services/open-music-player'
 import type { MediaPlaybackMode } from '@modules/media/types/media'
 
 import {
+  buildCommunityCopyCard,
+  buildCustomCollectionCard,
   findCollectionById,
   loadAlbumCategories,
-  loadCustomAlbumCategory,
 } from '../services/album-catalog'
-import { SHOW_CUSTOM_COLLECTIONS } from '../constants'
-import { getShowCustomCollections } from '../visibility'
 import {
   filterAlbumMusicIndex,
   loadAlbumMusicIndex,
@@ -67,7 +66,7 @@ export const useAlbumsStore = defineStore('albums', () => {
     try {
       musicIndex.value = await loadAlbumMusicIndex()
     } catch (error) {
-      console.error('[albums] failed to load music index', error)
+      console.error('[albums] falha ao carregar índice de músicas', error)
       musicIndex.value = []
     } finally {
       isLoadingMusicIndex.value = false
@@ -75,19 +74,9 @@ export const useAlbumsStore = defineStore('albums', () => {
   }
 
   async function mergeCustomCollections() {
-    // TODO(minhas-coletaneas): seção oculta por enquanto (ver constants.ts).
-    if (!SHOW_CUSTOM_COLLECTIONS || !getShowCustomCollections()) return
-    try {
-      const customCategory = await loadCustomAlbumCategory()
-      if (!customCategory) return
-
-      const withoutCustom = categories.value.filter(
-        (category) => String(category.id) !== 'custom',
-      )
-      categories.value = [customCategory, ...withoutCustom]
-    } catch (error) {
-      console.warn('[albums] failed to load custom collections', error)
-    }
+    // Adendo v1.1.0 (SPEC louvorja-community-copies): NENHUMA coletânea
+    // custom na Central — a categoria 'custom' não existe mais aqui.
+    // Produzidas do usuário vivem na aba Comunidade (Minhas Coletâneas).
   }
 
   async function refreshCatalog() {
@@ -107,7 +96,7 @@ export const useAlbumsStore = defineStore('albums', () => {
         tracks.value = []
       }
     } catch (error) {
-      console.error('[albums] failed to load catalog', error)
+      console.error('[albums] falha ao carregar catálogo', error)
       lastErrorKey.value = 'albums.messages.catalogFailed'
       categories.value = []
     } finally {
@@ -146,7 +135,31 @@ export const useAlbumsStore = defineStore('albums', () => {
         await hydrateCatalog()
       }
 
-      const collection = findCollectionById(categories.value, collectionId)
+      let collection = findCollectionById(categories.value, collectionId)
+      // O destino usa o namespace custom (id + CUSTOM_COLLECTION_ID_OFFSET).
+      // Mesmo com a seção oculta, hidrate a cópia sob demanda pelo ID da rota.
+      if (!collection) {
+        // D3 (SPEC louvorja-community-copies): cópia da Comunidade NÃO entra
+        // na Central — card resolvido sob demanda pelo ID community/copies/:id.
+        const copyCard = buildCommunityCopyCard(collectionId)
+        if (copyCard) {
+          activeCollection.value = copyCard
+          tracks.value = await loadCollectionTracks(copyCard)
+          lastErrorKey.value =
+            tracks.value.length === 0 ? 'albums.messages.tracksEmpty' : null
+          return true
+        }
+        // Adendo v1.1.0: coletânea custom PRÓPRIA também não vive na Central;
+        // o card é resolvido sob demanda (rota community/custom/:id).
+        const customCard = buildCustomCollectionCard(collectionId)
+        if (customCard) {
+          activeCollection.value = customCard
+          tracks.value = await loadCollectionTracks(customCard)
+          lastErrorKey.value =
+            tracks.value.length === 0 ? 'albums.messages.tracksEmpty' : null
+          return true
+        }
+      }
       if (!collection) {
         activeCollection.value = null
         lastErrorKey.value = 'albums.messages.collectionMissing'

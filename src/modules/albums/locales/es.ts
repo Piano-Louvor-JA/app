@@ -6,15 +6,15 @@ export default {
       "open": "Abrir colección {name}",
       "trackCount": "{count} pista(s)",
       "empty": "Aún no hay colecciones. Importa un .slja en el editor.",
-      emptyHint: 'Aún no tienes playlists.',
-      createHint: 'Crea una en la sección Playlists de la Biblioteca.',
-      importInvalid: 'Archivo de playlists inválido.',
+      "emptyHint": "Aún no tienes playlists.",
+      "createHint": "Crea una en la sección Playlists de la Biblioteca.",
+      "importInvalid": "Archivo de playlists inválido.",
       "newPlaceholder": "Nombre de la nueva colección...",
       "create": "Crear",
       "hide": "Ocultar Mis Colecciones",
       "show": "Mostrar Mis Colecciones"
     },
-    fallbackMusic: 'Música',
+    "fallbackMusic": "Música",
     "playlists": {
       "removeTrackTitle": "¿Quitar de la playlist?",
       "removeTrackMessage": "“{title}” sale de “{name}”. La canción y los archivos descargados siguen en el acervo.",
@@ -81,7 +81,10 @@ export default {
       "tracksFailed": "No se pudieron cargar las pistas.",
       "searchEmpty": "No se encontró ninguna canción.",
       "lyricMissing": "Letra no disponible para esta pista.",
-      "projectionFailed": "No se pudo abrir la proyección en las pantallas configuradas."
+      "projectionFailed": "No se pudo abrir la proyección en las pantallas configuradas.",
+      "deleteCollectionAction": "Eliminar colección",
+      "deleteCollectionTitle": "¿Eliminar “{name}”?",
+      "deleteCollectionText": "La copia local será eliminada. La original de la Comunidad no se ve afectada."
     }
   }
 }

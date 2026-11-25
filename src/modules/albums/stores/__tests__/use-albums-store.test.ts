@@ -10,20 +10,22 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const h = vi.hoisted(() => ({
   loadAlbumCategories: vi.fn(),
   loadAlbumMusicIndex: vi.fn(),
-  loadCustomAlbumCategory: vi.fn(),
   findCollectionById: vi.fn(),
+  buildCustomCollectionCard: vi.fn(() => null),
   loadCollectionTracks: vi.fn(),
   loadAlbumLyric: vi.fn(),
   filterAlbumTracks: vi.fn((tracks: unknown[]) => tracks),
   filterAlbumMusicIndex: vi.fn((hits: unknown[]) => hits),
-  getShowCustomCollections: vi.fn(() => false),
   openMusicPlayer: vi.fn(),
 }))
 
 vi.mock('../../services/album-catalog', () => ({
   loadAlbumCategories: h.loadAlbumCategories,
-  loadCustomAlbumCategory: h.loadCustomAlbumCategory,
   findCollectionById: h.findCollectionById,
+  // D3 (SPEC louvorja-community-copies): cópia local nunca é card de categoria.
+  buildCommunityCopyCard: vi.fn(() => null),
+  // Adendo v1.1.0: custom própria é card sob demanda (rota community/custom/:id).
+  buildCustomCollectionCard: h.buildCustomCollectionCard,
 }))
 vi.mock('../../services/album-music-search', () => ({
   loadAlbumMusicIndex: h.loadAlbumMusicIndex,
@@ -33,13 +35,6 @@ vi.mock('../../services/album-tracks', () => ({
   loadCollectionTracks: h.loadCollectionTracks,
   loadAlbumLyric: h.loadAlbumLyric,
   filterAlbumTracks: h.filterAlbumTracks,
-}))
-// Flag de produto controlada pelo teste: o recurso continua coberto ligado,
-// e os casos "desligado" conferem o estado atual (ver constants.ts).
-const flag = vi.hoisted(() => ({ SHOW_CUSTOM_COLLECTIONS: true }))
-vi.mock('../../constants', () => flag)
-vi.mock('../../visibility', () => ({
-  getShowCustomCollections: h.getShowCustomCollections,
 }))
 vi.mock('@modules/media/services/open-music-player', () => ({
   openMusicPlayer: h.openMusicPlayer,
@@ -60,7 +55,6 @@ beforeEach(async () => {
   await new Promise((resolve) => setTimeout(resolve, 0))
   setActivePinia(createPinia())
   vi.clearAllMocks()
-  h.getShowCustomCollections.mockReturnValue(false)
   h.loadAlbumCategories.mockResolvedValue([])
   h.loadAlbumMusicIndex.mockResolvedValue([])
   h.loadCollectionTracks.mockResolvedValue([])
@@ -109,53 +103,12 @@ describe('useAlbumsStore', () => {
     expect(store.musicIndex).toEqual([])
   })
 
-  it('mergeCustomCollections: flag desligada retorna sem carregar custom', async () => {
-    const store = useAlbumsStore()
-    await store.hydrateCatalog()
-    await Promise.resolve()
-    expect(h.loadCustomAlbumCategory).not.toHaveBeenCalled()
-  })
-
-  it('mergeCustomCollections: adiciona categoria custom na frente', async () => {
-    h.getShowCustomCollections.mockReturnValue(true)
+  it('mergeCustomCollections: nunca injeta categoria custom (adendo v1.1.0)', async () => {
     h.loadAlbumCategories.mockResolvedValue([{ id: '1', kind: 'album', name: 'A', subtitle: null, coverUrl: null }])
-    h.loadCustomAlbumCategory.mockResolvedValue({ id: 'custom', kind: 'custom', name: 'Minhas', subtitle: null, coverUrl: null })
     const store = useAlbumsStore()
     await store.hydrateCatalog()
     await Promise.resolve()
-    expect(store.categories[0]?.id).toBe('custom')
-    expect(store.categories).toHaveLength(2)
-  })
-
-  it('mergeCustomCollections: flag desligada não carrega Minhas Coletâneas', async () => {
-    flag.SHOW_CUSTOM_COLLECTIONS = false
-    h.getShowCustomCollections.mockReturnValue(true)
-    h.loadAlbumCategories.mockResolvedValue([{ id: '1', kind: 'album', name: 'A', subtitle: null, coverUrl: null }])
-    h.loadCustomAlbumCategory.mockResolvedValue({ id: 'custom', kind: 'custom', name: 'Minhas', subtitle: null, coverUrl: null })
-    const store = useAlbumsStore()
-    await store.hydrateCatalog()
-    await Promise.resolve()
-    expect(h.loadCustomAlbumCategory).not.toHaveBeenCalled()
     expect(store.categories.map((c) => c.id)).toEqual(['1'])
-    flag.SHOW_CUSTOM_COLLECTIONS = true
-  })
-
-  it('mergeCustomCollections: sem custom não altera', async () => {
-    h.getShowCustomCollections.mockReturnValue(true)
-    h.loadAlbumCategories.mockResolvedValue([{ id: '1', kind: 'album', name: 'A', subtitle: null, coverUrl: null }])
-    h.loadCustomAlbumCategory.mockResolvedValue(null)
-    const store = useAlbumsStore()
-    await store.hydrateCatalog()
-    await Promise.resolve()
-    expect(store.categories).toHaveLength(1)
-  })
-
-  it('mergeCustomCollections: erro é warning silencioso', async () => {
-    h.getShowCustomCollections.mockReturnValue(true)
-    h.loadCustomAlbumCategory.mockRejectedValue(new Error('x'))
-    const store = useAlbumsStore()
-    await store.hydrateCatalog()
-    expect(store.categories).toEqual([])
   })
 
   it('openCollection: catálogo já carregado não hidrata de novo', async () => {
@@ -339,19 +292,17 @@ describe('useAlbumsStore — evento louvorja:catalog-refreshed', () => {
     expect(store.categories.map((c) => String(c.id))).toEqual(['12'])
   })
 
-  it('recarga pelo evento mantém Minhas Coletâneas', async () => {
-    h.getShowCustomCollections.mockReturnValue(true)
-    h.loadCustomAlbumCategory.mockResolvedValue({ id: 'custom', name: 'Minhas', albums: [] })
+  it('recarga pelo evento NÃO recria categoria custom (adendo v1.1.0)', async () => {
     h.loadAlbumCategories.mockResolvedValue([{ id: 12, name: 'CDs', albums: [] }])
     const store = useAlbumsStore()
     await store.hydrateCatalog()
     await flush()
-    expect(store.categories.map((c) => String(c.id))).toEqual(['custom', '12'])
+    expect(store.categories.map((c) => String(c.id))).toEqual(['12'])
 
     window.dispatchEvent(new CustomEvent('louvorja:catalog-refreshed'))
     await flush()
     await flush()
 
-    expect(store.categories.map((c) => String(c.id))).toEqual(['custom', '12'])
+    expect(store.categories.map((c) => String(c.id))).toEqual(['12'])
   })
 })

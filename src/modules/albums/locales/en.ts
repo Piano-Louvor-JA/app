@@ -6,15 +6,15 @@ export default {
       "open": "Open collection {name}",
       "trackCount": "{count} track(s)",
       "empty": "No collections yet. Import a .slja file in the editor.",
-      emptyHint: 'You don\'t have any playlists yet.',
-      createHint: 'Create one in the Playlists section of the Library.',
-      importInvalid: 'Invalid playlists file.',
+      "emptyHint": "You don't have any playlists yet.",
+      "createHint": "Create one in the Playlists section of the Library.",
+      "importInvalid": "Invalid playlists file.",
       "newPlaceholder": "New collection name...",
       "create": "Create",
       "hide": "Hide My Collections",
       "show": "Show My Collections"
     },
-    fallbackMusic: 'Music',
+    "fallbackMusic": "Music",
     "playlists": {
       "removeTrackTitle": "Remove from playlist?",
       "removeTrackMessage": "“{title}” leaves “{name}”. The song and downloaded files stay in the library.",
@@ -81,7 +81,10 @@ export default {
       "tracksFailed": "Could not load the tracks.",
       "searchEmpty": "No song found.",
       "lyricMissing": "Lyrics unavailable for this track.",
-      "projectionFailed": "Could not open projection on the configured screens."
+      "projectionFailed": "Could not open projection on the configured screens.",
+      "deleteCollectionAction": "Delete collection",
+      "deleteCollectionTitle": "Delete “{name}”?",
+      "deleteCollectionText": "The local copy will be deleted. The original in Community is not affected."
     }
   }
 }

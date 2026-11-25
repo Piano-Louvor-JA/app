@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-// Toggle de visibilidade no editor (t_35e4d3ea): default PRIVADO na criação,
-// regras visíveis ao escolher público, troca persiste via PUT na selecionada.
+// SPEC-editor-ux-v1 (frozen 1cf6907): pills de visibilidade saíram da sidebar
+// e vivem no menu ⋮ da coletânea (só logado, só coletânea selecionada).
+// Form de criação: default privado SEM pills (escolha pública via ⋮ depois).
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 
@@ -25,6 +26,17 @@ vi.mock('../../services/custom-catalog', async (importOriginal) => {
 		createCustomCollection: mocks.createCustomCollection,
 		updateCustomCollection: mocks.updateCustomCollection,
 		listCustomCollections: mocks.listCustomCollections,
+		listCustomMusics: vi.fn(async () => []),
+		listAllCustomMusics: vi.fn(async () => []),
+		listCustomLyrics: vi.fn(async () => []),
+		deleteCustomCollection: vi.fn(),
+		deleteCustomMusic: vi.fn(),
+		deleteCustomLyric: vi.fn(),
+		updateCustomMusic: vi.fn(),
+		updateCustomLyric: vi.fn(),
+		createCustomMusic: vi.fn(),
+		uploadCustomFile: vi.fn(),
+		customFileUrl: vi.fn((p: string) => `/files/${p}`),
 	}
 })
 
@@ -41,18 +53,9 @@ vi.mock('vue-i18n', () => ({
 	createI18n: () => ({ global: { locale: 'pt-BR', t: (k: string) => k } }),
 }))
 
-// MediaEditorView importa MUITA coisa (player, áudio). Montar só os pedaços
-// testáveis: extraímos o comportamento pra um mini-harness real montando a view
-// inteira é pesado/fragil — em vez disso testamos o contrato via stubs leves.
-// PESO: MediaEditorView tem ~1500 linhas e APIs de browser (audio/file).
-// Estratégia: montar a view com stubs globais pros filhos pesados.
 import MediaEditorView from '../MediaEditorView.vue'
 
-
 vi.mock('../../components/MediaSlideStage.vue', () => ({
-	default: { template: '<div />' },
-}))
-vi.mock('../../components/MediaAccountBar.vue', () => ({
 	default: { template: '<div />' },
 }))
 vi.mock('@shared/components/AppConfirm.vue', () => ({
@@ -66,31 +69,19 @@ vi.mock('../../../shared/services/slja', () => ({
 	buildSlja: vi.fn(),
 	parseSljaFile: vi.fn(),
 }))
-vi.mock('../../services/custom-catalog', async (importOriginal) => {
-	const actual =
-		await importOriginal<typeof import('../../services/custom-catalog')>()
-	return {
-		...actual,
-		createCustomCollection: mocks.createCustomCollection,
-		updateCustomCollection: mocks.updateCustomCollection,
-		listCustomCollections: mocks.listCustomCollections,
-		listCustomMusics: vi.fn(async () => []),
-		listAllCustomMusics: vi.fn(async () => []),
-		listCustomLyrics: vi.fn(async () => []),
-		deleteCustomCollection: vi.fn(),
-		deleteCustomMusic: vi.fn(),
-		deleteCustomLyric: vi.fn(),
-		updateCustomMusic: vi.fn(),
-		updateCustomLyric: vi.fn(),
-		createCustomMusic: vi.fn(),
-		createCustomLyric: vi.fn(),
-		uploadCustomFile: vi.fn(),
-		customFileUrl: vi.fn(),
-	}
-})
 
 async function mountEditor() {
-	const wrapper = mount(MediaEditorView)
+	const wrapper = mount(MediaEditorView, {
+		global: {
+			stubs: {
+				'v-snackbar': {
+					name: 'VSnackbar',
+					props: ['modelValue'],
+					template: '<div class="snackbar-stub"><slot /></div>',
+				},
+			},
+		},
+	})
 	await flushPromises()
 	await flushPromises()
 	return wrapper
@@ -103,61 +94,44 @@ beforeEach(() => {
 	Element.prototype.scrollTo = (() => {}) as unknown as typeof Element.prototype.scrollTo
 })
 
-describe('MediaEditorView — toggle de visibilidade (t_35e4d3ea)', () => {
-	it('criação: default PRIVADO (primeiro botão ativo, sem rules card)', async () => {
+/** Abre o kebab da coletânea selecionada. */
+async function openKebab(wrapper: ReturnType<typeof mount>) {
+	await wrapper.find('button[data-testid="collection-kebab"]').trigger('click')
+	await flushPromises()
+}
+
+describe('SPEC editor-ux — criação sem pills (redesenho)', () => {
+	it('form de criação: SEM pills de visibilidade; default interno privado', async () => {
 		const wrapper = await mountEditor()
-		const groups = wrapper.findAll('.editor__visibility')
-		expect(groups.length).toBeGreaterThanOrEqual(1)
-		// no estado de criação, o card de regras NÃO aparece (privado default)
-		const createGroup = groups[0]!
-		const btns = createGroup.findAll('.editor__visibility-btn')
-		expect(btns[0]!.classes()).toContain('editor__visibility-btn--active')
-		expect(btns[1]!.classes()).not.toContain('editor__visibility-btn--active')
+		// zero .editor__visibility fora do menu ⋮ (menus fechados no mount)
+		expect(wrapper.findAll('.editor__visibility')).toHaveLength(0)
+		const st = wrapper.vm.$.devtoolsRawSetupState as unknown as {
+			newCollectionVisibility: { value: string }
+		}
+		expect(st.newCollectionVisibility.value).toBe('private')
 	})
 
-	it('criação: escolher público NÃO polui a sidebar com o card (redesenho anti-poluição)', async () => {
+	it('cria coletânea com visibility privada (default) e reseta depois', async () => {
 		const wrapper = await mountEditor()
-		const createGroup = wrapper.findAll('.editor__visibility')[0]!
-		await createGroup.findAll('.editor__visibility-btn')[1]!.trigger('click')
-		await flushPromises()
-		// card fixo removido da criação (regras agora em modal sob demanda)
-		expect(wrapper.findComponent({ name: 'PublicationRulesCard' }).exists()).toBe(
-			false,
-		)
-	})
-
-	it('criação: cria com a visibility escolhida e reseta pra privado depois', async () => {
-		const wrapper = await mountEditor()
-		const createGroup = wrapper.findAll('.editor__visibility')[0]!
-		await createGroup.findAll('.editor__visibility-btn')[1]!.trigger('click') // public
-		const input = wrapper.find('input[placeholder="media.editor.newCollection"]')
+		const input = wrapper.find('input[data-testid="new-collection-input"]')
 		await input.setValue('Nova')
-		await wrapper
-			.findAll('.editor__visibility')[0]!
-			.findAll('.editor__visibility-btn')[1]!
-			.trigger('click')
-		// dispara o create (Enter no input)
 		await input.trigger('keyup.enter')
 		await flushPromises()
 		expect(mocks.createCustomCollection).toHaveBeenCalledWith(
 			'Nova',
 			undefined,
 			undefined,
-			'public',
+			'private',
 		)
-		// reset: de volta pra privado — reconsulta o DOM a cada tentativa
-		// (findAll antigo fica stale sob carga no CI).
-		await vi.waitFor(() => {
-			const btns = wrapper
-				.findAll('.editor__visibility')[0]!
-				.findAll('.editor__visibility-btn')
-			expect(btns[0]!.classes()).toContain('editor__visibility-btn--active')
-		})
+		const st = wrapper.vm.$.devtoolsRawSetupState as unknown as {
+			newCollectionVisibility: { value: string }
+		}
+		expect(st.newCollectionVisibility.value).toBe('private')
 	})
 })
 
-describe('MediaEditorView — troca de visibilidade da coletânea selecionada', () => {
-	it('coletânea da API: trocar pra público chama updateCustomCollection e mostra regras', async () => {
+describe('SPEC editor-ux — visibilidade no menu ⋮ (só logado)', () => {
+	it('logado: kebab da coletânea selecionada mostra pills; troca chama updateCustomCollection', async () => {
 		localStorage.setItem('louvorja.publishRulesSeen', '1') // já viu as regras
 		mocks.listCustomCollections.mockResolvedValue([
 			{
@@ -177,67 +151,43 @@ describe('MediaEditorView — troca de visibilidade da coletânea selecionada', 
 			musicsCount: 0,
 		})
 		const wrapper = await mountEditor()
+		await wrapper.find('.editor__list-item').trigger('click')
 		await flushPromises()
-		// selecionar a coletânea na lista
-		const item = wrapper.find('.editor__list-item')
-		await item.trigger('click')
-		await flushPromises()
-		// grupos: [0] criação, [1] selecionada
-		const groups = wrapper.findAll('.editor__visibility')
-		expect(groups.length).toBe(2)
+		await openKebab(wrapper)
+		const menu = wrapper.find('[data-testid="collection-kebab-menu"]')
+		expect(menu.exists()).toBe(true)
+		const pills = menu.findAll('.editor__visibility-btn')
+		expect(pills).toHaveLength(2)
 		// ativo atual = private (herdado do summary)
-		expect(
-			groups[1]!
-				.findAll('.editor__visibility-btn')[0]!
-				.classes(),
-		).toContain('editor__visibility-btn--active')
+		expect(pills[0]!.classes()).toContain('editor__visibility-btn--active')
 		// trocar pra público
-		await groups[1]!.findAll('.editor__visibility-btn')[1]!.trigger('click')
+		await pills[1]!.trigger('click')
 		await flushPromises()
 		expect(mocks.updateCustomCollection).toHaveBeenCalledWith(9, {
 			visibility: 'public',
 		})
-		// card fixo não existe mais na sidebar; virou botão "Ver regras"
-		expect(
-			wrapper.findAllComponents({ name: 'PublicationRulesCard' }).length,
-		).toBe(0)
-		expect(wrapper.text()).toContain('media.publishRules.showRules')
-		// hint de público visível
-		expect(wrapper.text()).toContain('media.visibility.publicHint')
+		// regras agora só via modal (sem botão fixo na sidebar)
+		expect(wrapper.findAll('.editor__btn--rules')).toHaveLength(0)
 	})
 
-	it('botão "Ver regras" abre o modal com o card e "Entendi" fecha', async () => {
-		mocks.listCustomCollections.mockResolvedValue([
-			{
-				id: 9,
-				name: 'API',
-				description: null,
-				ownerId: 4,
-				visibility: 'public',
-				musicsCount: 0,
-			},
-		])
+	it('modal de regras abre/fecha (regras só em modal sob demanda)', async () => {
 		const wrapper = await mountEditor()
+		// modal direto (SPEC: botão fixo removido da sidebar)
+		const st = wrapper.vm.$.devtoolsRawSetupState as unknown as {
+			rulesOpen: { value: boolean }
+		}
+		st.rulesOpen.value = true
 		await flushPromises()
-		await wrapper.find('.editor__list-item').trigger('click')
-		await flushPromises()
-		// abrir pelo botão
-		await wrapper.find('.editor__btn--rules').trigger('click')
-		await flushPromises()
-		// modal teleportado pro body
 		const dlg = document.body.querySelector('.rules-dialog')
 		expect(dlg).not.toBeNull()
 		expect(dlg?.querySelector('.pub-rules')).not.toBeNull()
-		// fechar pelo "Entendi"
-		const ok = document.body.querySelector(
-			'.rules-dialog__ok',
-		) as HTMLButtonElement
+		const ok = document.body.querySelector('.rules-dialog__ok') as HTMLButtonElement
 		ok.click()
 		await flushPromises()
 		expect(document.body.querySelector('.rules-dialog')).toBeNull()
 	})
 
-	it('1ª vez tornando pública: modal abre ANTES de persistir; fechar NÃO troca', async () => {
+	it('1ª vez tornando pública: modal abre ANTES de persistir; fechar marca seen', async () => {
 		localStorage.setItem('louvorja.publishRulesSeen', '')
 		mocks.listCustomCollections.mockResolvedValue([
 			{
@@ -250,20 +200,17 @@ describe('MediaEditorView — troca de visibilidade da coletânea selecionada', 
 			},
 		])
 		const wrapper = await mountEditor()
-		await flushPromises()
 		await wrapper.find('.editor__list-item').trigger('click')
 		await flushPromises()
-		// localStorage.getItem com valor '' retorna '' !== '1' -> primeira vez
-		const selectedGroup = () => wrapper.findAll('.editor__visibility')[1]!
-		await selectedGroup()
+		await openKebab(wrapper)
+		const menu = () => wrapper.find('[data-testid="collection-kebab-menu"]')
+		await menu()
 			.findAll('.editor__visibility-btn')[1]!
 			.trigger('click')
 		await flushPromises()
 		// modal aberto e PUT ainda NAO chamado
 		expect(document.body.querySelector('.rules-dialog')).not.toBeNull()
 		expect(mocks.updateCustomCollection).not.toHaveBeenCalled()
-		// fechar modal sem "confirmar" troca: regra é só informativa;
-		// o fechamento marca seen. A troca em si o usuário refaz no toggle.
 		const ok = document.body.querySelector('.rules-dialog__ok') as HTMLButtonElement
 		ok.click()
 		await flushPromises()
@@ -284,20 +231,32 @@ describe('MediaEditorView — troca de visibilidade da coletânea selecionada', 
 		])
 		mocks.updateCustomCollection.mockResolvedValue(null)
 		const wrapper = await mountEditor()
-		await flushPromises()
 		await wrapper.find('.editor__list-item').trigger('click')
 		await flushPromises()
-		const selectedGroup = () => wrapper.findAll('.editor__visibility')[1]!
-		await selectedGroup()
+		await openKebab(wrapper)
+		const menu = () => wrapper.find('[data-testid="collection-kebab-menu"]')
+		await menu()
 			.findAll('.editor__visibility-btn')[1]!
 			.trigger('click')
 		await flushPromises()
 		// continua privado (ativo no botão 0)
 		expect(
-			selectedGroup()
+			menu()
 				.findAll('.editor__visibility-btn')[0]!
 				.classes(),
 		).toContain('editor__visibility-btn--active')
-		expect(wrapper.text()).toContain('media.visibility.privateHint')
+	})
+
+	it('deslogado: kebab SEM pills (AC1 zero UI de rede)', async () => {
+		mocks.getSession.mockReturnValue(null)
+		mocks.listCustomCollections.mockResolvedValue([
+			{ id: 9, name: 'API', description: null, ownerId: 4, visibility: 'public', musicsCount: 0 },
+		])
+		const wrapper = await mountEditor()
+		await wrapper.find('.editor__list-item').trigger('click')
+		await flushPromises()
+		await openKebab(wrapper)
+		await flushPromises()
+		expect(wrapper.findAll('.editor__visibility')).toHaveLength(0)
 	})
 })

@@ -6,13 +6,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * local é oculta da listagem.
  */
 const mocks = vi.hoisted(() => ({
-  session: null as null | { token: string; user: { email: string } },
+  session: null as null | { token: string; user: { id_user?: number; email: string } },
   fetchMock: vi.fn(),
 }));
 
 vi.mock("@modules/media/services/auth-client", () => ({
   getAuthSession: () => mocks.session,
-  authHeaders: () => (mocks.session ? { authorization: "Bearer t" } : {}),
+  authHeadersAsync: async () => (mocks.session ? { authorization: "Bearer t" } : {}),
 }));
 
 vi.mock("@modules/media/services/outbox", () => ({
@@ -32,7 +32,7 @@ import { createLocalCollection } from "@modules/media/services/local-custom-stor
 describe("R1: dedupe local↔remota por nome pós-sync", () => {
   beforeEach(() => {
     localStorage.removeItem("louvorja.local-custom.v1");
-    mocks.session = { token: "t", user: { email: "r@test.local" } };
+    mocks.session = { token: "t", user: { id_user: 47, email: "r@test.local" } };
     vi.unstubAllGlobals();
   });
 
@@ -73,6 +73,7 @@ describe("R1: dedupe local↔remota por nome pós-sync", () => {
     vi.stubGlobal("fetch", mocks.fetchMock);
 
     const all = await listCustomCollections();
-    expect(all.filter((c) => c.name === "Velha").length).toBe(2);
+    // RF-04: sem sessão ninguém é owner → só a local aparece (1, não 2)
+    expect(all.filter((c) => c.name === "Velha").length).toBe(1);
   });
 });

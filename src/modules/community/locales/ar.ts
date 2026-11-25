@@ -61,7 +61,26 @@ export default {
       "open": "فتح",
       "delete": "حذف",
       "badge": "نسخة"
-    }
+    },
+    "weeklyTasksSubtitle": "Weekly tasks of the network",
+    "taskComplete": "Complete",
+    "taskDone": "Task completed!",
+    "taskCredited": "+{points} points credited!",
+    "taskCompleteFailed": "Could not complete. Try again.",
+    "weeklyTasksEmpty": "No tasks this week.",
+    "openCollection": "Open collection",
+    "collectionTitle": "Community collection",
+    "collectionLoadError": "Could not open this collection.",
+    "play": "Listen",
+    "playTrack": "Listen to {name}",
+    "trackUnavailable": "Audio unavailable",
+    "myCopies": "My copies",
+    "myCopiesSubtitle": "Copies of community collections saved on this device",
+    "myCopiesEmpty": "No copies saved yet. Save a copy from the Community.",
+    "myCollections": "My collections",
+    "myCollectionsSubtitle": "Collections you created — only you manage them here",
+    "myCollectionsEmpty": "No collections yet. Create one in the lyrics editor.",
+    "changeCover": "Change cover of {name}"
   },
   "ranking": {
     "title": "الترتيب",

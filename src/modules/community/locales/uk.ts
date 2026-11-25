@@ -61,7 +61,22 @@ export default {
       "open": "Відкрити",
       "delete": "Видалити",
       "badge": "Копія"
-    }
+    },
+    "weeklyTasksSubtitle": "Завдання тижня мережі",
+    "weeklyTasksEmpty": "Цього тижня завдань немає.",
+    "openCollection": "Відкрити збірку",
+    "collectionTitle": "Збірка Спільноти",
+    "collectionLoadError": "Не вдалося відкрити цю збірку.",
+    "play": "Слухати",
+    "playTrack": "Слухати {name}",
+    "trackUnavailable": "Аудіо недоступне",
+    "myCopies": "Мої копії",
+    "myCopiesSubtitle": "Копії збірок Спільноти, збережені на цьому пристрої",
+    "myCopiesEmpty": "Копій ще немає. Збережіть копію зі Спільноти.",
+    "myCollections": "Мої збірки",
+    "myCollectionsSubtitle": "Збірки, створені вами — керуєте тут лише ви",
+    "myCollectionsEmpty": "Збірок ще немає. Створіть одну в редакторі текстів.",
+    "changeCover": "Змінити обкладинку «{name}»"
   },
   "notifications": {
     "title": "Сповіщення",
