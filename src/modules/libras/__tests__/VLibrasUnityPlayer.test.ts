@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import VLibrasUnityPlayer from '../components/VLibrasUnityPlayer.vue'
 
-const UNITY_URL = 'https://vlibras.gov.br/app/unity/index.html'
+const UNITY_URL = '/vlibras/index.html'
 
 function mountPlayer() {
   const w = mount(VLibrasUnityPlayer)

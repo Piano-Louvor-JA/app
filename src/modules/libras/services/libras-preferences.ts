@@ -5,6 +5,7 @@ export const LIBRAS_PREFERENCE_KEYS = {
   enabled: 'libras.enabled',
   avatar: 'libras.avatar',
   regionalism: 'libras.regionalism',
+  subtitle: 'libras.subtitle',
 } as const
 
 export type LibrasAvatar = 'icaro' | 'hozana' | 'guga'
@@ -68,4 +69,13 @@ export function getLibrasAvatar(): LibrasAvatar {
 
 export function setLibrasAvatar(avatar: LibrasAvatar): void {
   setUserPreference(LIBRAS_PREFERENCE_KEYS.avatar, avatar)
+}
+
+/** Legenda (gloss textual) no player Unity — default ligada (comportamento widget oficial). */
+export function isLibrasSubtitleEnabled(): boolean {
+  return getUserPreference<boolean>(LIBRAS_PREFERENCE_KEYS.subtitle, true) !== false
+}
+
+export function setLibrasSubtitleEnabled(enabled: boolean): void {
+  setUserPreference(LIBRAS_PREFERENCE_KEYS.subtitle, enabled)
 }
