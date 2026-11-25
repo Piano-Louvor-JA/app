@@ -212,17 +212,18 @@ const projectionFontStyle = useProjectionFont('hymns')
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 8vh 6vw;
+  /* Mesma margem lateral da projeção (4% da largura de cada lado). */
+  padding: 8cqh 4cqw;
   text-align: center;
 
   &--cover {
-    padding: 8vh 6vw;
+    padding: 8cqh 4cqw;
   }
 }
 
 .media-slide-stage__lyric {
   margin: 0;
-  max-width: 86%;
+  max-width: 100%;
   /* Caixa/typo/uppercase vêm do lyricStyle (StageSettings do scope) —
      paridade total com projeção/receiver. Nada hardcoded aqui. */
   line-height: 1.4;
@@ -250,7 +251,7 @@ const projectionFontStyle = useProjectionFont('hymns')
   align-items: center;
   justify-content: center;
   gap: 0.8cqw;
-  max-width: 88%;
+  max-width: 100%;
   padding: 3.6cqw 5cqw 3.8cqw;
   text-align: center;
   animation: media-titlecard-in 780ms cubic-bezier(0.22, 1, 0.36, 1) both;
