@@ -46,6 +46,10 @@ const emit = defineEmits<{
   musicInstrumental: [index: number]
   musicSlides: [index: number]
   musicLyric: [index: number]
+  playlistPlay: [index: number]
+  playlistInstrumental: [index: number]
+  playlistNoAudio: [index: number]
+  playlistShuffle: [index: number]
   setPlayer: [index: number, playerId: string]
 }>()
 
@@ -327,6 +331,10 @@ function isCategorySectionInProgress(categoryId: string): boolean {
           @music-instrumental="emit('musicInstrumental', segment.entry.index)"
           @music-slides="emit('musicSlides', segment.entry.index)"
           @music-lyric="emit('musicLyric', segment.entry.index)"
+          @playlist-play="emit('playlistPlay', segment.entry.index)"
+          @playlist-instrumental="emit('playlistInstrumental', segment.entry.index)"
+          @playlist-no-audio="emit('playlistNoAudio', segment.entry.index)"
+          @playlist-shuffle="emit('playlistShuffle', segment.entry.index)"
           @set-player="emit('setPlayer', segment.entry.index, $event)"
           @drag-start="onDragStart"
           @drag-end="onDragEnd"
@@ -369,6 +377,10 @@ function isCategorySectionInProgress(categoryId: string): boolean {
             @music-instrumental="emit('musicInstrumental', child.index)"
             @music-slides="emit('musicSlides', child.index)"
             @music-lyric="emit('musicLyric', child.index)"
+            @playlist-play="emit('playlistPlay', child.index)"
+            @playlist-instrumental="emit('playlistInstrumental', child.index)"
+            @playlist-no-audio="emit('playlistNoAudio', child.index)"
+            @playlist-shuffle="emit('playlistShuffle', child.index)"
             @set-player="emit('setPlayer', child.index, $event)"
             @drag-start="onDragStart"
             @drag-end="onDragEnd"

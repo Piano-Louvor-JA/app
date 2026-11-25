@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import AlbumLyricDialog from '@modules/albums/components/AlbumLyricDialog.vue'
 
 import { useLiturgyAppearanceStore } from '../stores/useLiturgyAppearanceStore'
+import AppConfirm from '@shared/components/AppConfirm.vue'
 import LiturgyAppearanceButton from '../components/LiturgyAppearanceButton.vue'
+import { useLiturgyTransfer } from '../composables/useLiturgyTransfer'
 import LiturgyCloneDialog from '../components/LiturgyCloneDialog.vue'
 import LiturgyScheduledDialog from '../components/LiturgyScheduledDialog.vue'
 import { useScheduledStore } from '../stores/useScheduledStore'
@@ -101,8 +103,6 @@ const {
   startLabels,
   durationLabels,
   videoProjectionItemId,
-  worshipLabel,
-  headerDateTime,
   currentClock,
   estimatedSessionEndLabel,
   remainingCountdownLabel,
@@ -132,6 +132,10 @@ const {
   setItemPlayer,
   confirmRemoveItem,
   confirmClearLiturgy,
+  exportLiturgy,
+  importLiturgy,
+  hasLiturgyContent,
+  setActionMessage,
   reorderItems,
   selectItem,
   playItemOnScreens,
@@ -157,6 +161,10 @@ const {
   onMusicInstrumental,
   onMusicSlides,
   onMusicLyric,
+  onPlaylistPlay,
+  onPlaylistInstrumental,
+  onPlaylistNoAudio,
+  onPlaylistShuffle,
   closeLyric,
   setItemDraft,
   setMusicSearchQuery,
@@ -166,6 +174,25 @@ const { statusByItemId: offlineStatusByItemId } = useLiturgyVideoPrefetch()
 
 /** Exibe avisos da liturgia e do player (ex.: áudio indisponível). */
 const liturgyAlertKey = computed(() => lastActionMessageKey.value || null)
+
+/* ---------- Exportar / importar a liturgia da semana ---------- */
+const transfer = useLiturgyTransfer({
+  exportLiturgy: () => exportLiturgy(),
+  importLiturgy: (data, mode) => importLiturgy(data, mode),
+  hasContent: () => hasLiturgyContent(),
+})
+const transferConfirmOpen = transfer.confirmOpen
+const transferInput = ref<HTMLInputElement | null>(null)
+watch(transfer.messageKey, (key) => {
+  if (key) setActionMessage(key)
+})
+
+function onTransferFile(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (file) void transfer.importFile(file)
+}
 
 /** app#331 RF-1: pós-import .slja — recarrega o catálogo pra música aparecer
  * na busca antes de o diálogo selecionar o novo ID. */
@@ -233,13 +260,45 @@ async function onSljaImported(): Promise<void> {
       </div>
 
       <div class="liturgy-view__meta">
-        <div class="liturgy-view__meta-text">
-          <span class="liturgy-view__worship">
-            {{ worshipLabel() }}
-          </span>
-          <span class="liturgy-view__datetime">
-            {{ headerDateTime() }}
-          </span>
+        <div
+          class="liturgy-view__transfer"
+          role="group"
+          :aria-label="t('liturgy.transfer.group')"
+        >
+          <button
+            type="button"
+            class="liturgy-view__clear"
+            data-testid="liturgy-export"
+            :title="t('liturgy.transfer.exportHint')"
+            @click="transfer.exportFile()"
+          >
+            <i
+              class="ti ti-file-export"
+              aria-hidden="true"
+            />
+            <span>{{ t('liturgy.transfer.export') }}</span>
+          </button>
+          <button
+            type="button"
+            class="liturgy-view__clear"
+            data-testid="liturgy-import"
+            :title="t('liturgy.transfer.importHint')"
+            @click="transferInput?.click()"
+          >
+            <i
+              class="ti ti-file-download"
+              aria-hidden="true"
+            />
+            <span>{{ t('liturgy.transfer.import') }}</span>
+          </button>
+          <input
+            ref="transferInput"
+            type="file"
+            accept=".json,application/json"
+            class="liturgy-view__transfer-input"
+            data-testid="liturgy-import-input"
+            @change="onTransferFile"
+          >
         </div>
       </div>
     </header>
@@ -378,6 +437,10 @@ async function onSljaImported(): Promise<void> {
           @music-instrumental="onMusicInstrumental"
           @music-slides="onMusicSlides"
           @music-lyric="onMusicLyric"
+          @playlist-play="onPlaylistPlay"
+          @playlist-instrumental="onPlaylistInstrumental"
+          @playlist-no-audio="onPlaylistNoAudio"
+          @playlist-shuffle="onPlaylistShuffle"
           @set-player="setItemPlayer"
         />
       </div>
@@ -432,6 +495,19 @@ async function onSljaImported(): Promise<void> {
       :loading="isLoadingLyric"
       :document="lyricDoc"
       @close="closeLyric"
+    />
+    <!-- Importar liturgia com a semana já preenchida: substituir ou acrescentar. -->
+    <AppConfirm
+      :open="transferConfirmOpen"
+      :title="t('liturgy.transfer.confirmTitle')"
+      :message="t('liturgy.transfer.confirmMessage')"
+      :confirm-label="t('liturgy.transfer.replace')"
+      :secondary-label="t('liturgy.transfer.append')"
+      :cancel-label="t('common.cancel')"
+      danger
+      @confirm="transfer.confirm('replace')"
+      @secondary="transfer.confirm('append')"
+      @cancel="transfer.cancel()"
     />
   </section>
 </template>
@@ -494,25 +570,16 @@ async function onSljaImported(): Promise<void> {
 .liturgy-view__meta {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  justify-content: flex-end;
 }
 
-.liturgy-view__meta-text {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.15rem;
+.liturgy-view__transfer {
+  display: inline-flex;
+  gap: 0.4rem;
 }
 
-.liturgy-view__worship {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--ds-color-on-surface);
-}
-
-.liturgy-view__datetime {
-  font-size: 0.75rem;
-  color: var(--ds-color-on-surface-variant, var(--ds-color-on-surface));
+.liturgy-view__transfer-input {
+  display: none;
 }
 
 .liturgy-view__alert {
@@ -723,9 +790,6 @@ async function onSljaImported(): Promise<void> {
     overflow: visible;
   }
 
-  .liturgy-view__meta-text {
-    align-items: flex-start;
-  }
 }
 
 @media (max-width: 1280px) {
@@ -755,18 +819,6 @@ async function onSljaImported(): Promise<void> {
 
   .liturgy-view__title {
     font-size: 1.05rem;
-  }
-
-  .liturgy-view__meta {
-    gap: 0.65rem;
-  }
-
-  .liturgy-view__worship {
-    font-size: 0.78rem;
-  }
-
-  .liturgy-view__datetime {
-    font-size: 0.68rem;
   }
 
   .liturgy-view__body {

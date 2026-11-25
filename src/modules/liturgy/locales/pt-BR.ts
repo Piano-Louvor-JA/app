@@ -1,5 +1,20 @@
 export default {
   liturgy: {
+    transfer: {
+      group: 'Exportar e importar liturgia',
+      export: 'Exportar liturgia',
+      exportHint: 'Salva a liturgia da semana (Dom a Sáb e Avulsas) num arquivo .json',
+      import: 'Importar liturgia',
+      importHint: 'Abre um arquivo de liturgia exportado (.json)',
+      exported: 'Liturgia da semana exportada.',
+      imported: 'Liturgia importada.',
+      invalid: 'Esse arquivo não é uma liturgia exportada pelo Louvor JA.',
+      version: 'Essa liturgia foi exportada por uma versão mais nova do app. Atualize o app para importar.',
+      confirmTitle: 'Importar liturgia',
+      confirmMessage: 'A semana já tem itens. Substituir pela liturgia do arquivo ou acrescentar os itens dela no fim de cada dia?',
+      replace: 'Substituir',
+      append: 'Acrescentar',
+    },
     appearance: {
       button: 'Personalizar liturgia',
       title: 'Personalizar liturgia',
@@ -127,6 +142,7 @@ export default {
     types: {
       category: 'Categoria/Separador',
       music: 'Música',
+      playlist: 'Playlist',
       annotation: 'Anotações',
       notice: 'Aviso',
       scheduled: 'Itens Agendados',
@@ -145,6 +161,7 @@ export default {
       category:
         'Categorias servem como separadores visuais entre seções da liturgia.',
       music: 'Momento musical do culto',
+      playlist: 'Fila de músicas da Central de Mídia',
       annotation: 'Texto livre para a equipe',
       notice: 'Avisos e comunicados',
       scheduled: 'Item agendado na programação',
@@ -231,6 +248,9 @@ export default {
       description: 'Descrição',
       url: 'URL',
       selectMusic: 'Selecionar música',
+      selectPlaylist: 'Selecionar playlist',
+      playlistPlaceholder: 'Escolha uma playlist',
+      playlistRequired: 'Selecione uma playlist.',
       selectVerse: 'Selecionar versículo',
       selectFile: 'Arquivo',
       selectFileButton: 'Selecione um arquivo',
@@ -273,6 +293,7 @@ export default {
       category:
         'Ex: Regência Inicial, Abertura de Culto, Boas vindas, Escola Sabatina, Culto Divino, etc...',
       music: 'Ex: Regência, Mensagem Musical',
+      playlist: 'Ex.: Louvor de abertura',
       annotation: 'Ex.: Observação para a equipe',
       notice: 'Ex.: Avisos da igreja',
       scheduled: 'Ex.: Momento especial',
@@ -298,6 +319,11 @@ export default {
       clearAll: 'Limpar tudo',
       project: 'Projetar',
       play: 'Reproduzir',
+      playlistControls: 'Controles da playlist',
+      playlistShuffle: 'Tocar aleatoriamente',
+      playlistPlay: 'Tocar playlist',
+      playlistInstrumental: 'Tocar com playback (instrumental)',
+      playlistNoAudio: 'Tocar sem áudio (só os slides)',
       openControl: 'Abrir controle (popup)',
       playLocalInExternal: 'Reproduzir mídia local no {player}',
       openSiteControl: 'Abrir controle do site',
@@ -348,6 +374,11 @@ export default {
       mediaDesktopOnly: 'Informe o caminho do arquivo de mídia.',
       videoSelectFile: 'Selecionar arquivo',
       catalogEmpty: 'Nenhuma música no catálogo local. Importe um arquivo .slja na Central de Mídia (botão "Importar .slja") ou adicione músicas da Comunidade.',
+      playlistMissing: 'Playlist não encontrada. Escolha outra na Central de Mídia.',
+      playlistEmpty: 'Esta playlist está vazia. Adicione músicas na Central de Mídia.',
+      playlistCatalogEmpty: 'Nenhuma playlist cadastrada. Crie uma na Central de Mídia (Playlists).',
+      playlistTrackCount: '{count} músicas',
+      playlistTrackCountOne: '1 música',
       customRequired:
         'Crie ou selecione uma liturgia personalizada antes de adicionar itens.',
       scheduledEmpty: 'Nenhum item agendado para a data deste culto nesta programação.',

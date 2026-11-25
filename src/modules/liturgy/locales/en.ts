@@ -1,5 +1,20 @@
 export default {
   liturgy: {
+    transfer: {
+      group: 'Export and import liturgy',
+      export: 'Export liturgy',
+      exportHint: 'Saves the week liturgy (Sun to Sat and one-offs) to a .json file',
+      import: 'Import liturgy',
+      importHint: 'Opens an exported liturgy file (.json)',
+      exported: 'Week liturgy exported.',
+      imported: 'Liturgy imported.',
+      invalid: 'This file is not a liturgy exported by Louvor JA.',
+      version: 'This liturgy was exported by a newer app version. Update the app to import it.',
+      confirmTitle: 'Import liturgy',
+      confirmMessage: 'The week already has items. Replace it with the file liturgy or append its items at the end of each day?',
+      replace: 'Replace',
+      append: 'Append',
+    },
     appearance: {
       button: 'Customize liturgy',
       title: 'Customize liturgy',
@@ -127,6 +142,7 @@ export default {
     types: {
       category: 'Category/Divider',
       music: 'Music',
+      playlist: 'Playlist',
       annotation: 'Annotations',
       notice: 'Announcement',
       scheduled: 'Scheduled Items',
@@ -145,6 +161,7 @@ export default {
       category:
         'Categories serve as visual dividers between liturgy sections.',
       music: 'Musical moment of the service',
+      playlist: 'Song queue from the Media Center',
       annotation: 'Free text for the team',
       notice: 'Announcements and notices',
       scheduled: 'Scheduled item in the program',
@@ -231,6 +248,9 @@ export default {
       description: 'Description',
       url: 'URL',
       selectMusic: 'Select song',
+      selectPlaylist: 'Select playlist',
+      playlistPlaceholder: 'Choose a playlist',
+      playlistRequired: 'Select a playlist.',
       selectVerse: 'Select verse',
       selectFile: 'File',
       selectFileButton: 'Select a file',
@@ -273,6 +293,7 @@ export default {
       category:
         'e.g.: Opening Leading, Service Start, Welcome, Sabbath School, Divine Service, etc...',
       music: 'e.g.: Leading, Music Message',
+      playlist: 'e.g.: Opening praise',
       annotation: 'e.g.: Note for the team',
       notice: 'e.g.: Church announcements',
       scheduled: 'e.g.: Special moment',
@@ -298,6 +319,11 @@ export default {
       clearAll: 'Clear all',
       project: 'Project',
       play: 'Play',
+      playlistControls: 'Playlist controls',
+      playlistShuffle: 'Play shuffled',
+      playlistPlay: 'Play playlist',
+      playlistInstrumental: 'Play with instrumental',
+      playlistNoAudio: 'Play without audio (slides only)',
       openControl: 'Open control (popup)',
       playLocalInExternal: 'Play local media in {player}',
       openSiteControl: 'Open site control',
@@ -348,6 +374,11 @@ export default {
       mediaDesktopOnly: 'Provide the media file path.',
       videoSelectFile: 'Select file',
       catalogEmpty: 'No songs in the local catalog. Import a .slja file in Media Center ("Import .slja" button) or add songs from the Community.',
+      playlistMissing: 'Playlist not found. Pick another in the Media Center.',
+      playlistEmpty: 'This playlist is empty. Add songs in the Media Center.',
+      playlistCatalogEmpty: 'No playlists yet. Create one in the Media Center (Playlists).',
+      playlistTrackCount: '{count} songs',
+      playlistTrackCountOne: '1 song',
       customRequired:
         'Create or select a custom liturgy before adding items.',
       scheduledEmpty: 'No scheduled item for this service date in this rotation.',

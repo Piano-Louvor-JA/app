@@ -165,6 +165,7 @@ export function isExecutableItem(item: Pick<LiturgyItem, 'type'>): boolean {
 /** Tipos de mídia que, ao tocar, marcam a linha da liturgia como concluída. */
 const MEDIA_PLAY_DONE_TYPES: readonly LiturgyItemType[] = [
   'music',
+  'playlist',
   'audio',
   'video',
   'online_video',
@@ -257,6 +258,7 @@ export function isLiturgyItemDraftValid(draft: LiturgyItemDraft): boolean {
     if (draft.endTime && !normalizeLiturgyTimeHHmm(draft.endTime)) return false
   }
   if (draft.type === 'music' && draft.musicId == null) return false
+  if (draft.type === 'playlist' && !draft.playlistId?.trim()) return false
   // Categoria é OPCIONAL (paridade web ff8b481): item pode viver na raiz da
   // timeline sem pai — quem porta a liturgia do classic não tem categoria
   // obrigatória e sem isso não conseguia editar/salvar.
@@ -318,10 +320,16 @@ export function buildLiturgyItemFromDraft(
     accentColor: getTypeDotColor(type),
     categoryId: type === 'category' ? null : draft.categoryId,
     scheduledRotationId: type === 'scheduled' ? draft.scheduledRotationId : null,
+    playlistId: type === 'playlist' ? draft.playlistId : null,
     startTime:
       type === 'category' ? normalizeLiturgyTimeHHmm(draft.startTime) : null,
     endTime:
       type === 'category' ? normalizeLiturgyTimeHHmm(draft.endTime) : null,
+  }
+
+  if (type === 'playlist') {
+    item.playlistId = draft.playlistId?.trim() || null
+    // Nome e subtítulo já vêm do diálogo (nome da playlist + "N músicas").
   }
 
   if (type === 'music') {
@@ -460,6 +468,7 @@ export function draftFromLiturgyItem(item: LiturgyItem): LiturgyItemDraft {
     categoryId: item.type === 'category' ? null : (item.categoryId ?? null),
     scheduledRotationId:
       item.type === 'scheduled' ? (item.scheduledRotationId ?? null) : null,
+    playlistId: item.type === 'playlist' ? (item.playlistId ?? null) : null,
     startTime:
       item.type === 'category'
         ? (normalizeLiturgyTimeHHmm(item.startTime) ?? '')

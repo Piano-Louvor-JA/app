@@ -88,6 +88,10 @@ const emit = defineEmits<{
   musicInstrumental: []
   musicSlides: []
   musicLyric: []
+  playlistPlay: []
+  playlistInstrumental: []
+  playlistNoAudio: []
+  playlistShuffle: []
   setPlayer: [playerId: string]
   videoFileSelected: [durationSec: number]
   dragStart: [index: number]
@@ -250,6 +254,9 @@ const executable = computed(() => isExecutableItem(props.item))
 const isMusicItem = computed(
   () => props.item.type === 'music' && props.item.musicId != null,
 )
+const isPlaylistItem = computed(
+  () => props.item.type === 'playlist' && Boolean(props.item.playlistId?.trim()),
+)
 /**
  * Clicar em qualquer parte da linha faz o mesmo que o ícone principal do
  * item: hino do catálogo toca cantado; site e vídeo/YouTube abrem o controle
@@ -258,7 +265,15 @@ const isMusicItem = computed(
  */
 const rowPlays = computed(() => {
   if (props.item.done || isCategory.value) return false
-  if (isAnnotation.value || isMusicItem.value || isSiteItem.value || isVideoRemote.value) return true
+  if (
+    isAnnotation.value ||
+    isMusicItem.value ||
+    isPlaylistItem.value ||
+    isSiteItem.value ||
+    isVideoRemote.value
+  ) {
+    return true
+  }
   return executable.value
 })
 
@@ -274,6 +289,10 @@ function onRowClick(event: MouseEvent) {
   }
   if (isMusicItem.value) {
     if (!props.musicBusy) emit('musicSung')
+    return
+  }
+  if (isPlaylistItem.value) {
+    emit('playlistPlay')
     return
   }
   emit('select')
@@ -807,17 +826,7 @@ const projectActionTitle = computed(() => {
         </span>
 
         <div
-          class="liturgy-item__actions"
-          :class="{
-            'liturgy-item__actions--visible':
-              isCategory ||
-              isVideoRemote ||
-              isSiteItem ||
-              isMusicItem ||
-              isAudioItem ||
-              isAnnotation ||
-              isLocalMediaUpload,
-          }"
+          class="liturgy-item__actions liturgy-item__actions--visible"
           @click.stop
         >
           <input
@@ -925,10 +934,74 @@ const projectActionTitle = computed(() => {
             @slides="emit('musicSlides')"
             @lyric="emit('musicLyric')"
           />
+          <div
+            v-if="isPlaylistItem"
+            class="liturgy-item__playlist-actions"
+            role="group"
+            :aria-label="t('liturgy.actions.playlistControls')"
+          >
+            <button
+              type="button"
+              class="liturgy-item__action"
+              data-testid="playlist-shuffle"
+              :title="t('liturgy.actions.playlistShuffle')"
+              :aria-label="t('liturgy.actions.playlistShuffle')"
+              :disabled="item.done"
+              @click.stop="emit('playlistShuffle')"
+            >
+              <i
+                class="ti ti-arrows-shuffle"
+                aria-hidden="true"
+              />
+            </button>
+            <button
+              type="button"
+              class="liturgy-item__action liturgy-item__action--primary"
+              data-testid="playlist-play"
+              :title="t('liturgy.actions.playlistPlay')"
+              :aria-label="t('liturgy.actions.playlistPlay')"
+              :disabled="item.done"
+              @click.stop="emit('playlistPlay')"
+            >
+              <i
+                class="ti ti-player-play"
+                aria-hidden="true"
+              />
+            </button>
+            <button
+              type="button"
+              class="liturgy-item__action"
+              data-testid="playlist-instrumental"
+              :title="t('liturgy.actions.playlistInstrumental')"
+              :aria-label="t('liturgy.actions.playlistInstrumental')"
+              :disabled="item.done"
+              @click.stop="emit('playlistInstrumental')"
+            >
+              <i
+                class="ti ti-piano"
+                aria-hidden="true"
+              />
+            </button>
+            <button
+              type="button"
+              class="liturgy-item__action"
+              data-testid="playlist-no-audio"
+              :title="t('liturgy.actions.playlistNoAudio')"
+              :aria-label="t('liturgy.actions.playlistNoAudio')"
+              :disabled="item.done"
+              @click.stop="emit('playlistNoAudio')"
+            >
+              <i
+                class="ti ti-volume-off"
+                aria-hidden="true"
+              />
+            </button>
+          </div>
           <button
             v-if="
               !isCategory &&
                 !isMusicItem &&
+                !isPlaylistItem &&
                 !isVideoRemote &&
                 !isSiteItem &&
                 !isAnnotation &&
@@ -1953,20 +2026,17 @@ const projectActionTitle = computed(() => {
 .liturgy-item__actions {
   display: flex;
   gap: 0.15rem;
-  opacity: 0;
-  transition: opacity 160ms ease;
+  opacity: 1;
 
-  .liturgy-item:hover &,
-  .liturgy-item--selected &,
-  &--visible {
-    opacity: 1;
-  }
-
-  .liturgy-item--done &,
-  .liturgy-item--done:hover &,
-  .liturgy-item--done &--visible {
+  .liturgy-item--done & {
     opacity: 0.45;
   }
+}
+
+.liturgy-item__playlist-actions {
+  display: inline-flex;
+  gap: 0.15rem;
+  align-items: center;
 }
 
 .liturgy-item__child-count {

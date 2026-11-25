@@ -40,6 +40,7 @@ export type LiturgyCloneSource =
 export const LITURGY_ITEM_TYPES = [
   'category',
   'music',
+  'playlist',
   'annotation',
   'notice',
   'scheduled',
@@ -82,6 +83,7 @@ export const LITURGY_TYPE_GROUPS: LiturgyTypeGroup[] = [
     types: [
       { value: 'category', dot: '#FFD600' }, // amarelo puro
       { value: 'music', dot: '#00E676' }, // verde neon
+      { value: 'playlist', dot: '#26A69A' }, // teal — fila de músicas
       { value: 'scheduled', dot: '#7C4DFF' }, // roxo — agendado por data
       { value: 'annotation', dot: '#FF6D00' }, // laranja vivo
     ],
@@ -163,6 +165,8 @@ export interface LiturgyItem {
   playerId?: string
   /** Rotação agendada (scheduled): id em useScheduledStore.categories. */
   scheduledRotationId?: string | null
+  /** Playlist da Central de Mídia (playlist): id em playlist-storage. */
+  playlistId?: string | null
   url?: string
 }
 
@@ -225,6 +229,8 @@ export interface LiturgyItemDraft {
   url: string
   /** Rotação agendada (scheduled) — não interfere na posição na liturgia. */
   scheduledRotationId: string | null
+  /** Playlist da Central de Mídia. */
+  playlistId: string | null
 }
 
 export interface LiturgyMusicOption {
@@ -256,6 +262,7 @@ export interface LiturgyItemTypeMeta {
 export const DEFAULT_LITURGY_ITEM_DRAFT: LiturgyItemDraft = {
   type: null,
   scheduledRotationId: null,
+  playlistId: null,
   name: '',
   subtitle: '',
   durationMs: 0,
@@ -318,6 +325,7 @@ export function createEmptyWeekdaySessionTimes(): WeekdaySessionTimes {
 export const LITURGY_ITEM_TYPE_META: LiturgyItemTypeMeta[] = [
   { value: 'category', icon: 'ti-tag', tone: 'warning' },
   { value: 'music', icon: 'ti-music', tone: 'success' },
+  { value: 'playlist', icon: 'ti-playlist', tone: 'success' },
   { value: 'annotation', icon: 'ti-text-caption', tone: 'info' },
   { value: 'notice', icon: 'ti-speakerphone', tone: 'warning' },
   { value: 'scheduled', icon: 'ti-calendar-time', tone: 'cyan' },
@@ -335,6 +343,7 @@ export const LITURGY_ITEM_TYPE_META: LiturgyItemTypeMeta[] = [
 
 export const EXECUTABLE_ITEM_TYPES: LiturgyItemType[] = [
   'music',
+  'playlist',
   'verse',
   'audio',
   'video',
@@ -350,6 +359,7 @@ export const EXECUTABLE_ITEM_TYPES: LiturgyItemType[] = [
 export const TYPES_WITHOUT_DURATION: LiturgyItemType[] = [
   'category',
   'annotation',
+  'playlist',
   'images',
   'pdf',
   'presentation',

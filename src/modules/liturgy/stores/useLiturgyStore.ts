@@ -1,3 +1,10 @@
+import {
+  appendImportedLiturgy,
+  buildLiturgyExport,
+  hasLiturgyContent,
+  replaceWithImportedLiturgy,
+  type LiturgyExport,
+} from '../services/liturgy-transfer'
 import { defineStore } from 'pinia'
 import { getCurrentApiPrefix } from '@modules/sync/services/api-prefix'
 import { useScheduledStore } from './useScheduledStore'
@@ -68,6 +75,7 @@ import {
   type LiturgyItemDraft,
   type LiturgyItemType,
   type LiturgyMusicOption,
+  type LiturgyPersistedState,
   type LiturgyWeekday,
   type WeekdayLiturgies,
   type WeekdayNotes,
@@ -497,6 +505,38 @@ export const useLiturgyStore = defineStore('liturgy', () => {
       )
     }
     return result
+  }
+
+  /** Estado atual da semana (dias, notas, avulsas, horários e cadeados). */
+  function currentState(): LiturgyPersistedState {
+    return {
+      weekdays: weekdays.value,
+      dayNotes: dayNotes.value,
+      daySessionTimes: daySessionTimes.value,
+      customLiturgies: customLiturgies.value,
+      deletionLocks: deletionLocks.value,
+    }
+  }
+
+  /** A semana tem algo (dia com itens ou avulsa): importar pergunta antes. */
+  const liturgyHasContent = computed(() => hasLiturgyContent(currentState()))
+
+  /** Arquivo de exportação da semana (Dom a Sáb + Avulsas + notas). */
+  function exportLiturgy(): LiturgyExport {
+    return buildLiturgyExport(currentState())
+  }
+
+  /** Importa a semana: substitui ou acrescenta no fim de cada dia; salva. */
+  function importLiturgy(data: LiturgyExport, mode: 'replace' | 'append') {
+    const next =
+      mode === 'replace'
+        ? replaceWithImportedLiturgy(currentState(), data)
+        : appendImportedLiturgy(currentState(), data)
+    weekdays.value = next.weekdays
+    dayNotes.value = next.dayNotes
+    customLiturgies.value = next.customLiturgies
+    selectedItemIndex.value = null
+    persist()
   }
 
   function persist() {
@@ -1008,6 +1048,33 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     return true
   }
 
+  /**
+   * Controles da linha de playlist: áudio, playback, sem áudio ou aleatório.
+   */
+  async function playPlaylistMode(
+    index: number,
+    mode: MediaPlaybackMode,
+    router: Router,
+    options?: { shuffled?: boolean },
+  ) {
+    const item = markItemStarted(index)
+    if (!item || item.type !== 'playlist') {
+      lastActionMessageKey.value = 'liturgy.messages.playlistMissing'
+      return false
+    }
+
+    const result = await executeLiturgyItem(item, router, {
+      day: selectedDay.value,
+      playbackMode: mode,
+      shuffled: options?.shuffled,
+    })
+    lastActionMessageKey.value = result.messageKey ?? null
+    if (!result.ok) return false
+
+    markItemDone(index)
+    return true
+  }
+
   /** Play nas telas estendidas (abre controle se preciso e dispara play). */
   async function playItemOnScreens(index: number) {
     selectedItemIndex.value = index
@@ -1473,6 +1540,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     reorderItems,
     selectItem,
     playMusicMode,
+    playPlaylistMode,
     playItemOnScreens,
     clearWebProjection,
     syncSiteProjectionState,
@@ -1484,6 +1552,9 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     closeCloneDialog,
     cloneLiturgyFromSelected,
     onMusicPick,
+    exportLiturgy,
+    importLiturgy,
+    hasLiturgyContent: liturgyHasContent,
     refreshMusicCatalog,
     clearMusicPick,
     onBookPick,
