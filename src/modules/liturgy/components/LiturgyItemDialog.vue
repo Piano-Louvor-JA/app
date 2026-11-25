@@ -502,40 +502,41 @@ watch(
 onBeforeUnmount(cancelLinkInfo)
 
 function fileFiltersForType(type: LiturgyItemType | null): FileDialogFilter[] {
+  const all = { name: t('liturgy.fileFilters.all'), extensions: ['*'] }
   switch (type) {
     case 'audio':
       return [
-        { name: 'Áudios', extensions: ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac', 'wma'] },
-        { name: 'Todos', extensions: ['*'] },
+        { name: t('liturgy.fileFilters.audio'), extensions: ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac', 'wma'] },
+        all,
       ]
     case 'video':
       return [
-        { name: 'Vídeos', extensions: ['mp4', 'mkv', 'avi', 'mov', 'wmv', 'webm'] },
-        { name: 'Todos', extensions: ['*'] },
+        { name: t('liturgy.fileFilters.video'), extensions: ['mp4', 'mkv', 'avi', 'mov', 'wmv', 'webm'] },
+        all,
       ]
     case 'images':
       return [
         {
-          name: 'Imagens',
+          name: t('liturgy.fileFilters.images'),
           extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'],
         },
-        { name: 'Todos', extensions: ['*'] },
+        all,
       ]
     case 'pdf':
       return [
-        { name: 'PDF', extensions: ['pdf'] },
-        { name: 'Todos', extensions: ['*'] },
+        { name: t('liturgy.fileFilters.pdf'), extensions: ['pdf'] },
+        all,
       ]
     case 'presentation':
       return [
-        { name: 'PowerPoint (PPTX)', extensions: ['pptx'] },
-        { name: 'Outros (PPT/ODP)', extensions: ['ppt', 'odp'] },
-        { name: 'Todos', extensions: ['*'] },
+        { name: t('liturgy.fileFilters.pptx'), extensions: ['pptx'] },
+        { name: t('liturgy.fileFilters.other'), extensions: ['ppt', 'odp'] },
+        all,
       ]
     default:
       return [
         {
-          name: 'Mídia',
+          name: t('liturgy.fileFilters.media'),
           extensions: [
             'mp4',
             'mkv',
@@ -553,7 +554,7 @@ function fileFiltersForType(type: LiturgyItemType | null): FileDialogFilter[] {
             'pptx',
           ],
         },
-        { name: 'Todos', extensions: ['*'] },
+        { name: t('liturgy.fileFilters.all'), extensions: ['*'] },
       ]
   }
 }

@@ -44,6 +44,7 @@ const flag = vi.hoisted(() => ({ SHOW_CUSTOM_COLLECTIONS: true }))
 vi.mock('../../constants', () => flag)
 vi.mock('vue-i18n', () => ({
   useI18n: () => ({ t: (k: string) => k, locale: { value: 'pt-BR' } }),
+  createI18n: () => ({ global: { locale: 'pt-BR', t: (k: string) => k } }),
 }))
 
 const replaceMock = vi.fn(async () => {})
@@ -87,6 +88,7 @@ vi.mock('@modules/sync/services/library-catalog', () => ({
 // Store state controlado por teste via globalThis.__albumsState.
 // Mock SYNC (a view chama useAlbums() sem await). `ref` vem do módulo já
 // importado abaixo — lazy via getter pra evitar TDZ no hoist do vi.mock.
+import { tPtBR } from '../../../../test/i18n-stub'
 import { ref as vueRef } from 'vue'
 function useAlbumsMockFactory() {
   const s = ((globalThis as AnyObj).__albumsState ?? {}) as AnyObj
@@ -366,7 +368,7 @@ describe('AlbumsView', () => {
     await flushPromises()
     expect(pickerInBody()).toBeNull()
     expect(body().querySelector('.playlist-toast')).not.toBeNull()
-    expect(body().querySelector('.playlist-toast')!.textContent).toContain('adicionada')
+    expect(body().querySelector('.playlist-toast')!.textContent).toContain('albums.playlists.addedTo')
     expect(listPlaylists().find((p) => p.id === 'pl-1')!.items.some((i) => i.musicId === 1)).toBe(true)
   })
 
@@ -572,7 +574,7 @@ describe('AlbumsView', () => {
     Object.defineProperty(input, 'files', { value: [file], configurable: true })
     input.dispatchEvent(new Event('change', { bubbles: true }))
     await flushPromises()
-    expect(body().querySelector('.albums-view__playlists-feedback')!.textContent).toContain('inválido')
+    expect(body().querySelector('.albums-view__playlists-feedback')!.textContent).toContain('albums.playlists.importInvalid')
   })
 
   it('digitar/submitar não tem mais form de criação custom (createCustomCollection não é chamado)', async () => {

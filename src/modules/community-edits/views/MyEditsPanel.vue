@@ -33,7 +33,7 @@ function effectiveStatus(edit: LocalEdit): { label: string; reason?: string | nu
 <template>
   <div class="my-edits" data-testid="my-edits">
     <p v-if="edits.length === 0" data-testid="edits-empty" class="my-edits__empty">
-      {{ t('community.edits.empty', 'Nenhuma edição ainda') }}
+      {{ t('community.edits.empty') }}
     </p>
     <ul v-else class="my-edits__list">
       <li
@@ -56,7 +56,7 @@ function effectiveStatus(edit: LocalEdit): { label: string; reason?: string | nu
           class="my-edits__publish"
           @click="emit('publish', edit.musicId)"
         >
-          {{ t('community.edits.publish', 'Publicar') }}
+          {{ t('community.edits.publish') }}
         </button>
       </li>
     </ul>

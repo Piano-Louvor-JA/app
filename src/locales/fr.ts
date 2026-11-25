@@ -1,5 +1,19 @@
 export default {
+  closeProjection: {
+    title: "Fermer la projection ?",
+    message: "Une projection est active (bible/hymnes/vidéo/site). Fermer maintenant ? Entrée pour fermer.",
+    confirm: "Fermer",
+  },
+  auth: {
+    wrongPassword: "Mot de passe incorrect",
+    reauthFailed: "Impossible de confirmer votre identité",
+    accountDeleted: "Compte supprimé",
+    passwordRequired: "Saisissez votre mot de passe pour confirmer",
+    sessionExpired: "Session expirée — reconnectez-vous pour supprimer le compte",
+    deleteFailed: "Impossible de supprimer le compte",
+  },
   "projection": {
+    liturgy: "Projection",
     "confirmClose": "La projection est en cours. Fermer la fenêtre interrompt la musique. Voulez-vous vraiment quitter ?",
     "minimizeProjection": "Réduire la projection",
     "restoreProjection": "Restaurer la projection"
@@ -69,31 +83,31 @@ export default {
       "checkUpdate": "Rechercher des mises à jour",
       "checking": "Vérification…",
       "updateAvailable": "Mise à jour disponible",
-      "updateDesktopOnly": "Desktop uniquement",
+      "updateDesktopOnly": "Ordinateur uniquement",
       "updateError": "Erreur de mise à jour",
       "updateHint": "Redémarrez pour appliquer",
       "updateNotAvailable": "Aucune mise à jour",
-      "updateTitle": "Mise à jour de l'app"
+      "updateTitle": "Mise à jour de l'appli"
     },
     "stage": {
-      "title": "Personnaliser la scène",
+      "title": "Personnaliser la Scène",
       "scopeGlobal": "Par défaut (global)",
       "scope": {
-        "hymns": "Cantiques",
+        "hymns": "Hymnes",
         "bible": "Bible",
         "liturgy": "Liturgie",
-        "timer": "Chronomètre",
+        "timer": "Minuteur",
         "random": "Tirage au sort",
         "clock": "Horloge",
         "countdown": "Compte à rebours"
       },
-      "inheritingHint": "Ce module hérite du style global par défaut. Toute modification ici crée une personnalisation propre.",
+      "inheritingHint": "Ce module hérite de la valeur globale par défaut. Toute modification ici crée sa propre personnalisation.",
       "backgroundColor": "Couleur de fond",
       "backgroundImage": "Image de fond",
       "officialBackground": "Fond officiel",
       "officialGalleryHint": "Touchez pour appliquer ; touchez à nouveau pour retirer.",
-      "selectImage": "Cliquez pour sélectionner une image",
-      "removeImage": "Supprimer l'image",
+      "selectImage": "Cliquez pour choisir une image",
+      "removeImage": "Retirer l'image",
       "changeImage": "Changer l'image",
       "textColor": "Couleur du texte",
       "fontSize": "Taille de la police",
@@ -102,56 +116,69 @@ export default {
       "weightMedium": "Moyen",
       "weightLightPlus": "Léger+",
       "weightStrong": "Fort",
-      "bibleAppearance": "Bible — apparence personnalisée",
+      "bibleAppearance": "Bible — apparence propre",
       "bibleTextColor": "Couleur du texte (Bible)",
-      "bibleFontSize": "Taille de la police (Bible)",
+      "bibleFontSize": "Taille de police (Bible)",
       "bibleFontWeight": "Épaisseur (Bible)",
-      "showBibleVersion": "Afficher la version de la Bible dans le pied de page",
+      "showBibleVersion": "Afficher la version de la Bible en pied de page",
       "footerRefColor": "Couleur de la référence (pied de page)",
-      "shadowAndBox": "Ombre et cadre",
-      "textShadow": "Ombre du texte",
+      "shadowAndBox": "Ombre et encadré",
+      "textShadow": "Ombre sur le texte",
       "shadowIntensity": "Intensité de l'ombre",
       "shadowBlur": "Diffusion de l'ombre",
-      "textBox": "Cadre derrière le texte",
-      "boxOpacity": "Opacité du cadre",
-      "boxBorder": "Bordure du cadre",
+      "textBox": "Encadré derrière les paroles",
+      "boxOpacity": "Opacité de l'encadré",
+      "boxBorder": "Bordure de l'encadré",
       "alignment": "Alignement du texte",
       "horizontal": "Horizontal",
       "vertical": "Vertical",
       "alignLeft": "Gauche",
       "alignCenter": "Centre",
       "alignRight": "Droite",
-      "alignTop": "En haut",
+      "alignTop": "Haut",
       "alignMiddle": "Milieu",
-      "alignBottom": "En bas",
+      "alignBottom": "Bas",
       "reset": "Réinitialiser",
-      "resetConfirm": "Ramener ce module au style par défaut ?"
+      "resetConfirm": "Réinitialiser ce module aux valeurs par défaut ?"
     },
     "placeholder": {
-      "general": "Préférences générales de l'application bientôt disponibles.",
+      "general": "Préférences générales bientôt disponibles.",
       "media": "Réglages audio, vidéo et lecteur bientôt disponibles.",
       "projection": "Réglages de projection et d'écrans bientôt disponibles."
     }
   },
   "palcoOutputs": {
-    "title": "TVs avec Palco",
-    "empty": "Aucune TV avec Palco connectée. Voir sur Palco",
+    "title": "Téléviseurs de scène",
+    "empty": "Aucun téléviseur connecté à la Scène. Ouvrez la Scène",
     "onHold": "{slot} · en attente"
   },
   "obsOutputs": {
-    "detecting": "Détection et mise à jour des connexions OBS…",
-    "active": "Connexions distantes",
-    "activateHint": "Activez une connexion dans Paramètres → Diffusion pour l'utiliser ici.",
-    "title": "Connexions OBS",
+    "detecting": "Detecting and refreshing OBS connections…",
+    "active": "Connexions à distance",
+    "activateHint": "Démarrez une connexion dans Paramètres → Diffusion pour l'utiliser ici.",
+    "title": "OBS connections",
     "activeConnections": "Connexions actives : {count}"
   },
   "floating": {
     "closeTitle": "Fermer {title} ?",
-    "closeMessage": "Voulez-vous quitter cette fonctionnalité et fermer votre projection ?"
+    "closeMessage": "Arrêter cette fonctionnalité et fermer sa projection ?"
   },
   "updates": {
-    "downloadMacInstaller": "Télécharger le programme d'installation macOS",
-    "manualMacInstructions": "Sur macOS, cette mise à jour s'installe manuellement. Téléchargez le programme d'installation via le bouton ci-dessous, fermez LouvorJA, ouvrez le fichier DMG et faites glisser l'application vers Applications, en remplaçant la version précédente. Vos données et préférences seront conservées."
+    checkFailed: "Échec de la vérification des mises à jour",
+    downloadFailedRetry: "Impossible de télécharger la mise à jour. Réessayez plus tard.",
+    downloadFailedConnection: "Impossible de télécharger la mise à jour. Vérifiez votre connexion Internet.",
+    verifyFailed: "La mise à jour n'a pas pu être vérifiée. Réessayez plus tard.",
+    updateFailed: "Échec de la mise à jour. Réessayez plus tard.",
+    "downloadMacInstaller": "Télécharger l'installateur macOS",
+    "manualMacInstructions": "On macOS, install this update manually. Download the installer below, quit LouvorJA, open the DMG and drag the app to Applications, replacing the previous version. Your data and preferences will be kept.",
+    "version": "Version {version}",
+    "noReleaseNotes": "Aucunes notes de version.",
+    "download": "Télécharger la mise à jour",
+    "installRestart": "Installer et redémarrer",
+    "later": "Plus tard",
+    "available": "Version {version} disponible",
+    "update": "Mettre à jour",
+    "dismiss": "Ignorer"
   },
   "windowControls": {
     "close": "Fermer",
@@ -162,7 +189,7 @@ export default {
     "mainNav": "Navigation principale"
   },
   "apiOffline": {
-    "message": "Aucune connexion au service — vérifiez votre connexion Internet",
+    "message": "Pas de connexion au service — vérifiez votre Internet",
     "retrying": "Tentative de reconnexion..."
   },
   "independentProjection": {
@@ -210,7 +237,7 @@ export default {
     }
   },
   "minimize": {
-    "playlistCount": "{n} playlist(s)",
+    "playlistCount": "{n} liste(s) de lecture",
     "pageNumber": "Page {n}",
     "bar": "Pages minimisées",
     "close": "Fermer {title}",

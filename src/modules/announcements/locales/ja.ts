@@ -1,0 +1,113 @@
+export default {
+  "announcements": {
+    "title": "お知らせとプレゼン",
+    "back": "ユーティリティに戻る",
+    "defaultListName": "カスタムリスト",
+    "copySuffix": "（コピー）",
+    "lists": {
+      "label": "お知らせリスト",
+      "new": "新しいリスト",
+      "newTitle": "新しいお知らせリスト",
+      "rename": "リスト名を変更",
+      "duplicate": "リストを複製",
+      "remove": "リストを削除",
+      "removeTitle": "リストを削除",
+      "removeConfirm": "リスト「{name}」を削除しますか？（{count}件のお知らせ）アプリにコピーされたファイルも削除されます。",
+      "nameLabel": "リスト名",
+      "actions": "リスト操作"
+    },
+    "add": "お知らせを追加",
+    "empty": "このリストにお知らせはありません",
+    "emptyHint": "「お知らせを追加」で最初の1件を作成できます。",
+    "kinds": {
+      "text": "テキスト",
+      "images": "画像",
+      "video": "ビデオ",
+      "presentation": "プレゼンテーション",
+      "url": "URL"
+    },
+    "kindHints": {
+      "text": "タイトルと書式付きテキスト",
+      "images": "1枚以上の画像",
+      "video": "このコンピューターのビデオ",
+      "presentation": "PowerPoint または PDF",
+      "url": "ウェブサイト、YouTube、Vimeo"
+    },
+    "untitled": "無題",
+    "imagesCount": "画像なし | 1枚の画像 | {count}枚の画像",
+    "noFile": "ファイルなし",
+    "missingBadge": "ファイル不明",
+    "actions": {
+      "label": "お知らせの操作",
+      "project": "投影",
+      "stop": "投影を停止",
+      "edit": "編集",
+      "duplicate": "複製",
+      "remove": "削除",
+      "drag": "ドラッグで並べ替え",
+      "carouselOn": "カルーセルに含める（クリックで除外）",
+      "carouselOff": "カルーセル外（クリックで含める）"
+    },
+    "remove": "削除",
+    "removeTitle": "お知らせを削除",
+    "removeConfirm": "お知らせ「{name}」を削除しますか？アプリにコピーされたファイルも削除されます。",
+    "cancel": "キャンセル",
+    "save": "保存",
+    "dialog": {
+      "newTitle": "新しいお知らせ：{kind}",
+      "editTitle": "お知らせを編集：{kind}",
+      "title": "タイトル",
+      "titlePlaceholder": "例：次の安息日のバプテスマ",
+      "titleColor": "タイトルの色",
+      "text": "テキスト",
+      "addImages": "画像を追加",
+      "removeImage": "画像を削除",
+      "moveImageUp": "画像を上へ移動",
+      "moveImageDown": "画像を下へ移動",
+      "chooseVideo": "ビデオを選択",
+      "chooseFile": "PowerPoint または PDF を選択",
+      "replaceFile": "ファイルを置き換え",
+      "emptyText": "お知らせのタイトルまたはテキストを入力してください。",
+      "emptyFiles": "少なくとも1つのファイルを選択してください。",
+      "url": "アドレス（URL）",
+      "urlHint": "YouTube と Vimeo のリンクはビデオプレーヤーで開きます。他のリンクはウェブサイトとして開きます。",
+      "fetchingTitle": "リンクのタイトルを取得中…",
+      "invalidUrl": "有効なアドレスを入力してください（例：https://…）。",
+      "copying": "ファイルをコピー中…"
+    },
+    "notices": {
+      "duplicateFailed": "お知らせを複製できませんでした：ファイルのコピーに失敗しました。",
+      "duplicateListPartial": "{count}件のお知らせを新しいリストにコピーできませんでした。",
+      "rejected": "{count}件のファイルが拒否されました：{names}",
+      "pickFailed": "選択されたファイルをコピーできませんでした。",
+      "missing": "ファイルが見つかりません：{names}",
+      "projectionFailed": "このお知らしを投影できませんでした。",
+      "desktopOnly": "デスクトップアプリでのみ利用可能です。",
+      "close": "通知を閉じる"
+    },
+    "carousel": {
+      "title": "カルーセル",
+      "independent": "独立投影",
+      "start": "カルーセルとして投影",
+      "pause": "一時停止",
+      "resume": "再開",
+      "next": "次へ",
+      "prev": "前へ",
+      "stop": "カルーセルを停止",
+      "slideSeconds": "スライドごとの秒数",
+      "loop": "リピート",
+      "empty": "このリストにはカルーセル用のテキスト・画像お知らせがありません。",
+      "skipped": "ビデオ、プレゼンテーション、URL、カルーセルから外されたお知らせは含まれません。",
+      "position": "{current} / {total}",
+      "help": {
+        "button": "カルーセルのしくみ",
+        "what": "カルーセルはお知らせを自動的に、順番に表示します。",
+        "which": "開いているリストのテキストお知らせと、画像お知らせのすべての画像が含まれます。ビデオ、プレゼンテーション、URLは除外されます。",
+        "toggle": "各お知らせのカルーセルボタンで含める／外します。新しいお知らせは自動的に含まれます。",
+        "timing": "スライドごとの秒数で、各お知らせが画面に表示される時間を設定します。リピートを有効にすると、最後の後に最初へ戻ります。",
+        "where": "カルーセルとして投影は、チェックした画面とリモート接続に表示されます。",
+        "independent": "独立投影は、選択したモニターや接続に、すでに投影中の内容の上にカルーセルを表示します。"
+      }
+    }
+  }
+}

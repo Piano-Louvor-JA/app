@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({ login: vi.fn(), register: vi.fn(), logout: vi.fn(), reset: vi.fn(), request: vi.fn(), fbLogin: vi.fn(), fbRegister: vi.fn(), fbGoogle: vi.fn(), fbLogout: vi.fn(), fbSubscribe: vi.fn(() => null), fbRevalidate: vi.fn().mockResolvedValue(null) }))
 vi.mock('../../../media/services/auth-client', () => ({ getAuthSession: () => null, login: mocks.login, register: mocks.register, logout: mocks.logout, resetPassword: mocks.reset, requestPasswordReset: mocks.request }))
 vi.mock('../../services/firebase-client', () => ({ firebaseLogin: mocks.fbLogin, firebaseRegister: mocks.fbRegister, firebaseLoginGoogle: mocks.fbGoogle, firebaseLogout: mocks.fbLogout, revalidateFirebaseSessionOnBoot: mocks.fbRevalidate, subscribeFirebaseSession: mocks.fbSubscribe }))
+import i18n from '@plugins/i18n'
 import { authSession, setNotify, useAuth } from '../useAuth'
+const t = (k: string, p?: Record<string, unknown>) => i18n.global.t(k, p ?? {})
 const session = { token: 'test', user: { id: 1, displayName: 'Ana', email: 'ana@example.org' } }
 const notify = vi.fn()
 beforeEach(() => { vi.resetAllMocks(); mocks.fbRevalidate.mockResolvedValue(null); authSession.value = null; setNotify(notify) })
@@ -21,7 +23,7 @@ describe('autenticação unificada', () => {
     await auth.logout()
     expect(mocks.fbLogout).toHaveBeenCalledOnce()
     expect(authSession.value).toBeNull()
-    expect(notify).toHaveBeenCalledWith('Sessão encerrada', undefined)
+    expect(notify).toHaveBeenCalledWith(t('media.account.signedOut'), undefined)
   })
   it.each([true, false])('login Firebase com fallback legado: %s', async (firebase) => {
     mocks.fbLogin.mockResolvedValue(firebase ? session : null)
@@ -31,14 +33,14 @@ describe('autenticação unificada', () => {
     expect(mocks.login).toHaveBeenCalledTimes(firebase ? 0 : 1)
     if (!firebase) expect(mocks.login).toHaveBeenCalledWith('ana@example.org', 'secret')
     expect(authSession.value).toEqual(session)
-    expect(notify).toHaveBeenCalledWith('Bem-vindo, Ana!', undefined)
+    expect(notify).toHaveBeenCalledWith(t('media.account.welcome', { name: 'Ana' }), undefined)
   })
   it('login recusado mantém sessão vazia e informa o erro', async () => {
     mocks.fbLogin.mockResolvedValue(null)
     mocks.login.mockResolvedValue(null)
     expect(await useAuth().login('ana@example.org', 'wrong')).toBe(false)
     expect(authSession.value).toBeNull()
-    expect(notify).toHaveBeenCalledWith('E-mail ou senha incorretos', true)
+    expect(notify).toHaveBeenCalledWith(t('media.account.loginFailed'), true)
   })
   it.each([true, false])('registro Firebase com fallback legado: %s', async (firebase) => {
     mocks.fbRegister.mockResolvedValue(firebase ? session : null)
@@ -54,21 +56,21 @@ describe('autenticação unificada', () => {
     mocks.register.mockResolvedValue(null)
     mocks.fbGoogle.mockResolvedValue(null)
     expect(await useAuth().register('a@example.org', 'secret', 'Ana')).toBe(false)
-    expect(notify).toHaveBeenCalledWith('Não foi possível criar a conta (e-mail já existe?)', true)
+    expect(notify).toHaveBeenCalledWith(t('media.account.registerFailed'), true)
     expect(await useAuth().loginGoogle()).toBe(false)
-    expect(notify).toHaveBeenCalledWith('Não foi possível entrar com o Google', true)
+    expect(notify).toHaveBeenCalledWith(t('media.account.loginFailed'), true)
     expect(authSession.value).toBeNull()
   })
   it.each([true, false])('recuperação usa resposta neutra quando não recebe token: %s', async (received) => {
     mocks.request.mockResolvedValue(received ? 'token' : null)
     expect(await useAuth().forgotPassword(' ana@example.org ')).toBe(received)
     expect(mocks.request).toHaveBeenCalledWith('ana@example.org')
-    expect(notify).toHaveBeenCalledWith(received ? 'Token gerado — confirme a senha nova' : 'Se o e-mail existir, o suporte tem o token de reset', undefined)
+    expect(notify).toHaveBeenCalledWith(received ? t('media.account.resetTokenGenerated') : t('media.account.resetTokenNeutral'), undefined)
   })
   it.each([true, false])('troca de senha com token: %s', async (ok) => {
     mocks.reset.mockResolvedValue(ok)
     expect(await useAuth().resetPassword(' token ', 'newsecret')).toBe(ok)
     expect(mocks.reset).toHaveBeenCalledWith('token', 'newsecret')
-    expect(notify).toHaveBeenCalledWith(ok ? 'Senha alterada! Entre com a senha nova' : 'Token inválido ou expirado', ok ? undefined : true)
+    expect(notify).toHaveBeenCalledWith(ok ? t('media.account.passwordChanged') : t('media.account.tokenInvalid'), ok ? undefined : true)
   })
 })

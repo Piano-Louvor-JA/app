@@ -8,24 +8,13 @@ import * as auth from "../../services/auth-client";
  * auth-client mockado; valida gating do form, os 4 modos e logout.
  */
 import MediaAccountBar from "../MediaAccountBar.vue";
+import MediaPtBR from "../../locales/pt-BR";
 
 const i18n = createI18n({
 	legacy: false,
 	locale: 'pt-BR',
 	messages: {
-		'pt-BR': {
-			media: {
-				account: {
-					email: 'E-mail',
-					password: 'Senha',
-					yourName: 'Seu nome',
-					passwordMin6: 'Senha (mín. 6)',
-					accountEmail: 'E-mail da conta',
-					resetToken: 'Token de reset',
-					newPasswordMin8: 'Senha nova (mín. 8)',
-				},
-			},
-		},
+		'pt-BR': MediaPtBR,
 	},
 })
 

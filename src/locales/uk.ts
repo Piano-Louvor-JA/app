@@ -1,10 +1,24 @@
 export default {
+  closeProjection: {
+    title: "Закрити проєкцію?",
+    message: "Проєкція активна (Біблія/гімни/відео/сайт). Закрити зараз? Enter — закрити.",
+    confirm: "Закрити",
+  },
+  auth: {
+    wrongPassword: "Неправильний пароль",
+    reauthFailed: "Не вдалося підтвердити вашу особу",
+    accountDeleted: "Обліковий запис видалено",
+    passwordRequired: "Введіть пароль для підтвердження",
+    sessionExpired: "Сеанс закінчився — увійдіть знову, щоб видалити обліковий запис",
+    deleteFailed: "Не вдалося видалити обліковий запис",
+  },
   "app": {
     "name": "Louvor JA",
     "nameLouvor": "Louvor",
     "nameJa": "JA"
   },
   "projection": {
+    liturgy: "Проєкція",
     "confirmClose": "Зараз триває проєкція. Закриття вікна зупинить музику. Ви справді хочете вийти?",
     "minimizeProjection": "Згорнути проєкцію",
     "restoreProjection": "Відновити проєкцію"
@@ -54,7 +68,7 @@ export default {
       "goTo": "Перейти до {label}"
     },
     "historyDetail": {
-      "player": "Player",
+      "player": "Програвач",
       "editor": "Редактор"
     }
   },
@@ -69,15 +83,15 @@ export default {
       "checkUpdate": "Перевірити оновлення",
       "checking": "Перевірка…",
       "updateAvailable": "Доступне оновлення",
-      "updateDesktopOnly": "Лише десктоп",
+      "updateDesktopOnly": "Лише для комп'ютера",
       "updateError": "Помилка оновлення",
       "updateHint": "Перезапустіть, щоб застосувати",
-      "updateNotAvailable": "Немає оновлень",
+      "updateNotAvailable": "Оновлень немає",
       "updateTitle": "Оновлення застосунку"
     },
     "stage": {
-      "title": "Налаштувати сцену",
-      "scopeGlobal": "Типовий (глобальний)",
+      "title": "Налаштування Сцени",
+      "scopeGlobal": "Типово (глобально)",
       "scope": {
         "hymns": "Гімни",
         "bible": "Біблія",
@@ -87,71 +101,84 @@ export default {
         "clock": "Годинник",
         "countdown": "Зворотний відлік"
       },
-      "inheritingHint": "Цей модуль успадковує загальний типовий стиль. Будь-яка зміна тут створить для нього власне оформлення.",
+      "inheritingHint": "Цей модуль успадковує глобальне значення за замовчуванням. Будь-яка зміна тут створює власне налаштування.",
       "backgroundColor": "Колір фону",
       "backgroundImage": "Фонове зображення",
       "officialBackground": "Офіційний фон",
-      "officialGalleryHint": "Торкніться, щоб застосувати; торкніться ще раз, щоб прибрати.",
+      "officialGalleryHint": "Торкніться, щоб застосувати; ще раз — щоб прибрати.",
       "selectImage": "Натисніть, щоб вибрати зображення",
-      "removeImage": "Видалити зображення",
-      "changeImage": "Замінити зображення",
+      "removeImage": "Прибрати зображення",
+      "changeImage": "Змінити зображення",
       "textColor": "Колір тексту",
       "fontSize": "Розмір шрифту",
       "fontWeight": "Насиченість",
       "weightNormal": "Звичайна",
-      "weightMedium": "Середня",
+      "weightMedium": "Середній",
       "weightLightPlus": "Легка+",
       "weightStrong": "Жирна",
-      "bibleAppearance": "Біблія — власне оформлення",
+      "bibleAppearance": "Біблія — власний вигляд",
       "bibleTextColor": "Колір тексту (Біблія)",
       "bibleFontSize": "Розмір шрифту (Біблія)",
       "bibleFontWeight": "Насиченість (Біблія)",
-      "showBibleVersion": "Показувати версію Біблії внизу",
-      "footerRefColor": "Колір посилання (внизу)",
+      "showBibleVersion": "Показувати переклад Біблії у підвалі",
+      "footerRefColor": "Колір посилання (підвал)",
       "shadowAndBox": "Тінь і підкладка",
       "textShadow": "Тінь тексту",
       "shadowIntensity": "Інтенсивність тіні",
       "shadowBlur": "Розмиття тіні",
       "textBox": "Підкладка за текстом",
-      "boxOpacity": "Непрозорість підкладки",
-      "boxBorder": "Рамка підкладки",
+      "boxOpacity": "Прозорість підкладки",
+      "boxBorder": "Межа підкладки",
       "alignment": "Вирівнювання тексту",
       "horizontal": "Горизонтально",
       "vertical": "Вертикально",
       "alignLeft": "Ліворуч",
       "alignCenter": "По центру",
       "alignRight": "Праворуч",
-      "alignTop": "Вгорі",
+      "alignTop": "Вгору",
       "alignMiddle": "Посередині",
-      "alignBottom": "Унизу",
+      "alignBottom": "Внизу",
       "reset": "Скинути",
-      "resetConfirm": "Повернути цей модуль до стандартних налаштувань?"
+      "resetConfirm": "Скинути цей модуль до типового?"
     },
     "placeholder": {
-      "general": "Загальні налаштування застосунку з'являться незабаром.",
-      "media": "Налаштування аудіо, відео та плеєра з'являться незабаром.",
-      "projection": "Налаштування проєкції та екранів з'являться незабаром."
+      "general": "Загальні налаштування застосунку — незабаром.",
+      "media": "Налаштування звуку, відео та плеєра — незабаром.",
+      "projection": "Налаштування проєкції та екранів — незабаром."
     }
   },
   "palcoOutputs": {
-    "title": "ТВ-екрани зі сценою",
-    "empty": "Жоден ТВ-екран не підключено до сцени. Переглянути на сцені",
-    "onHold": "{slot} · в очікуванні"
+    "title": "Телевізори сцени",
+    "empty": "Немає телевізорів, підключених до Сцени. Відкрийте Сцену",
+    "onHold": "{slot} · на паузі"
   },
   "obsOutputs": {
-    "detecting": "Виявлення та оновлення з'єднань OBS…",
-    "active": "Віддалені з'єднання",
-    "activateHint": "Активуйте з'єднання у розділі Налаштування → Трансляція, щоб використати його тут.",
-    "title": "З'єднання OBS",
-    "activeConnections": "Активні з'єднання: {count}"
+    "detecting": "Detecting and refreshing OBS connections…",
+    "active": "Віддалені підключення",
+    "activateHint": "Запустіть підключення в Налаштування → Трансляція, щоб використати його тут.",
+    "title": "OBS connections",
+    "activeConnections": "Активні підключення: {count}"
   },
   "floating": {
     "closeTitle": "Закрити {title}?",
-    "closeMessage": "Бажаєте завершити цю функцію та закрити проєкцію?"
+    "closeMessage": "Зупинити цю функцію та закрити її проєкцію?"
   },
   "updates": {
+    checkFailed: "Не вдалося перевірити оновлення",
+    downloadFailedRetry: "Не вдалося завантажити оновлення. Спробуйте пізніше.",
+    downloadFailedConnection: "Не вдалося завантажити оновлення. Перевірте підключення до інтернету.",
+    verifyFailed: "Оновлення не вдалося перевірити. Спробуйте пізніше.",
+    updateFailed: "Помилка оновлення. Спробуйте пізніше.",
     "downloadMacInstaller": "Завантажити інсталятор для macOS",
-    "manualMacInstructions": "У macOS це оновлення встановлюється вручну. Завантажте інсталятор за допомогою кнопки нижче, закрийте LouvorJA, відкрийте файл DMG і перетягніть застосунок до папки «Програми», замінивши попередню версію. Ваші дані та налаштування буде збережено."
+    "manualMacInstructions": "On macOS, install this update manually. Download the installer below, quit LouvorJA, open the DMG and drag the app to Applications, replacing the previous version. Your data and preferences will be kept.",
+    "version": "Версія {version}",
+    "noReleaseNotes": "Нотаток до випуску немає.",
+    "download": "Завантажити оновлення",
+    "installRestart": "Встановити та перезапустити",
+    "later": "Пізніше",
+    "available": "Доступна версія {version}",
+    "update": "Оновити",
+    "dismiss": "Закрити"
   },
   "windowControls": {
     "close": "Закрити",
@@ -159,11 +186,11 @@ export default {
     "maximize": "Розгорнути"
   },
   "a11y": {
-    "mainNav": "Головна навігація"
+    "mainNav": "Основна навігація"
   },
   "apiOffline": {
     "message": "Немає з'єднання зі службою — перевірте інтернет",
-    "retrying": "Спроба повторного підключення..."
+    "retrying": "Намагаємось відновити з'єднання..."
   },
   "independentProjection": {
     "title": "Незалежна проєкція",

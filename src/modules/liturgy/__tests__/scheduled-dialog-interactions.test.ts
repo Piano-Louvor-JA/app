@@ -3,9 +3,11 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import Dialog from '../components/LiturgyScheduledDialog.vue'
 import { useScheduledStore } from '../stores/useScheduledStore'
+import { tPtBR } from '../../../test/i18n-stub'
+vi.mock('../../../plugins/i18n', async () => ({ default: { global: { t: (await import('../../../test/i18n-stub')).tPtBR } } }))
 
 const mocks = vi.hoisted(() => ({ bridge: vi.fn(), catalog: vi.fn(), episodes: vi.fn(), locale: { value: 'pt-BR' } }))
-vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key, locale: mocks.locale }) }))
+vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: tPtBR, locale: mocks.locale }) }))
 vi.mock('@design-system/index', () => ({ GlassCard: { template: '<section><slot /></section>' } }))
 vi.mock('@shared/services/desktop-bridge', () => ({ getDesktopBridge: mocks.bridge }))
 vi.mock('@shared/services/user-preferences', () => ({ getUserPreference: (_key: string, fallback: unknown) => fallback, setUserPreference: vi.fn() }))
@@ -18,7 +20,8 @@ function open() {
   return wrapper
 }
 async function clickText(text: string) {
-  const button = wrapper.findAll('button').find(b => b.text() === text)
+  const label = tPtBR(text)
+  const button = wrapper.findAll('button').find(b => b.text() === label || b.text() === text)
   expect(button, text).toBeDefined()
   await button!.trigger('click')
   await flushPromises()
@@ -84,7 +87,7 @@ describe('diálogo de programação — interação real', () => {
     open()
     await clickText('liturgy.messages.scheduledPvOneClick')
     expect(useScheduledStore().items[0]?.content).toEqual({ kind: 'online_video', url: 'https://example.org/episode.mp4', name: 'episode.mp4' })
-    expect(wrapper.text()).toContain('liturgy.messages.scheduledPvDone')
+    expect(wrapper.text()).toContain(tPtBR('liturgy.messages.scheduledPvDone', { created: 1, skipped: 0 }))
   })
 
   it('agenda imediato como online_video e enfileira batch em background (não baixa inline)', async () => {
@@ -112,15 +115,15 @@ describe('diálogo de programação — interação real', () => {
     open()
     await clickText('liturgy.messages.scheduledPvOneClick')
     expect(useScheduledStore().items).toHaveLength(0)
-    expect(wrapper.text()).toContain(failure === 'past' ? 'liturgy.messages.scheduledPvNothing' : 'liturgy.messages.scheduledPvUnavailable')
-    expect(wrapper.findAll('button').find(b => b.text() === 'liturgy.messages.scheduledPvOneClick')!.attributes('disabled')).toBeUndefined()
+    expect(wrapper.text()).toContain(failure === 'past' ? tPtBR('liturgy.messages.scheduledPvNothing') : tPtBR('liturgy.messages.scheduledPvUnavailable'))
+    expect(wrapper.findAll('button').find(b => b.text() === tPtBR('liturgy.messages.scheduledPvOneClick'))!.attributes('disabled')).toBeUndefined()
   })
 
   it('impede importação duplicada enquanto a busca está pendente', async () => {
     let finish!: (value: unknown) => void
     vi.mocked(fetch).mockImplementation(() => new Promise(resolve => { finish = resolve }) as Promise<Response>)
     open()
-    const button = wrapper.findAll('button').find(b => b.text() === 'liturgy.messages.scheduledPvOneClick')!
+    const button = wrapper.findAll('button').find(b => b.text() === tPtBR('liturgy.messages.scheduledPvOneClick'))!
     await button.trigger('click')
     expect(button.attributes('disabled')).toBeDefined()
     await button.trigger('click')
@@ -173,7 +176,7 @@ describe('diálogo de programação — interação real', () => {
     open()
     await expect((wrapper.vm.$ as any).setupState.onProvaiEVedeOneClick()).resolves.toBeUndefined()
     await wrapper.vm.$nextTick()
-    expect(wrapper.text()).toContain('liturgy.messages.scheduledPvUnavailable')
+    expect(wrapper.text()).toContain(tPtBR('liturgy.messages.scheduledPvUnavailable'))
   })
   it('formulários incompletos não criam entradas e duplicação sem seleção não altera dados', async () => {
     open()
@@ -227,7 +230,7 @@ describe('diálogo de programação — interação real', () => {
     open(); await wrapper.get('.scheduled-dialog__new-rot input').setValue('Programação')
     await wrapper.get('.scheduled-dialog__new-rot').trigger('submit')
     await clickText('liturgy.messages.scheduledFetchProvai')
-    expect(wrapper.text()).toContain('liturgy.messages.scheduledPvUnavailable')
+    expect(wrapper.text()).toContain(tPtBR('liturgy.messages.scheduledPvUnavailable'))
     const state=(wrapper.vm.$ as any).setupState
     await state.onDownloadSelected()
     state.pvBusy=true

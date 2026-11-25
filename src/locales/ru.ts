@@ -1,5 +1,19 @@
 export default {
+  closeProjection: {
+    title: "Закрыть проекцию?",
+    message: "Проекция активна (Библия/гимны/видео/сайт). Закрыть сейчас? Enter — закрыть.",
+    confirm: "Закрыть",
+  },
+  auth: {
+    wrongPassword: "Неверный пароль",
+    reauthFailed: "Не удалось подтвердить вашу личность",
+    accountDeleted: "Аккаунт удалён",
+    passwordRequired: "Введите пароль для подтверждения",
+    sessionExpired: "Сессия истекла — войдите снова, чтобы удалить аккаунт",
+    deleteFailed: "Не удалось удалить аккаунт",
+  },
   "projection": {
+    liturgy: "Проекция",
     "confirmClose": "Идёт проекция. Закрытие окна прервёт музыку. Вы действительно хотите выйти?",
     "minimizeProjection": "Свернуть проекцию",
     "restoreProjection": "Восстановить проекцию"
@@ -69,14 +83,14 @@ export default {
       "checkUpdate": "Проверить обновления",
       "checking": "Проверка…",
       "updateAvailable": "Доступно обновление",
-      "updateDesktopOnly": "Только для ПК",
+      "updateDesktopOnly": "Только для компьютера",
       "updateError": "Ошибка обновления",
       "updateHint": "Перезапустите, чтобы применить",
       "updateNotAvailable": "Обновлений нет",
       "updateTitle": "Обновление приложения"
     },
     "stage": {
-      "title": "Настройка сцены",
+      "title": "Настройка Сцены",
       "scopeGlobal": "По умолчанию (глобально)",
       "scope": {
         "hymns": "Гимны",
@@ -87,71 +101,84 @@ export default {
         "clock": "Часы",
         "countdown": "Обратный отсчёт"
       },
-      "inheritingHint": "Этот модуль наследует глобальные настройки по умолчанию. Любое изменение здесь создаст собственную настройку.",
+      "inheritingHint": "Этот модуль наследует глобальное значение по умолчанию. Любое изменение здесь создаёт собственную настройку.",
       "backgroundColor": "Цвет фона",
       "backgroundImage": "Фоновое изображение",
       "officialBackground": "Официальный фон",
-      "officialGalleryHint": "Нажмите, чтобы применить; нажмите ещё раз, чтобы убрать.",
+      "officialGalleryHint": "Нажмите, чтобы применить; ещё раз — чтобы убрать.",
       "selectImage": "Нажмите, чтобы выбрать изображение",
-      "removeImage": "Удалить изображение",
-      "changeImage": "Заменить изображение",
+      "removeImage": "Убрать изображение",
+      "changeImage": "Изменить изображение",
       "textColor": "Цвет текста",
       "fontSize": "Размер шрифта",
       "fontWeight": "Насыщенность",
       "weightNormal": "Обычная",
-      "weightMedium": "Средняя",
+      "weightMedium": "Средний",
       "weightLightPlus": "Светлая+",
       "weightStrong": "Жирная",
-      "bibleAppearance": "Библия — отдельный стиль",
+      "bibleAppearance": "Библия — свой вид",
       "bibleTextColor": "Цвет текста (Библия)",
       "bibleFontSize": "Размер шрифта (Библия)",
       "bibleFontWeight": "Насыщенность (Библия)",
-      "showBibleVersion": "Показывать версию Библии внизу экрана",
-      "footerRefColor": "Цвет ссылки (внизу)",
+      "showBibleVersion": "Показывать перевод Библии в подвале",
+      "footerRefColor": "Цвет ссылки (подвал)",
       "shadowAndBox": "Тень и подложка",
       "textShadow": "Тень текста",
       "shadowIntensity": "Интенсивность тени",
       "shadowBlur": "Размытие тени",
       "textBox": "Подложка за текстом",
-      "boxOpacity": "Непрозрачность подложки",
-      "boxBorder": "Рамка подложки",
+      "boxOpacity": "Прозрачность подложки",
+      "boxBorder": "Граница подложки",
       "alignment": "Выравнивание текста",
       "horizontal": "Горизонтально",
       "vertical": "Вертикально",
-      "alignLeft": "Слева",
-      "alignCenter": "Центр",
-      "alignRight": "Справа",
-      "alignTop": "Сверху",
-      "alignMiddle": "Середина",
-      "alignBottom": "Снизу",
+      "alignLeft": "По левому краю",
+      "alignCenter": "По центру",
+      "alignRight": "По правому краю",
+      "alignTop": "По верхнему краю",
+      "alignMiddle": "По середине",
+      "alignBottom": "По нижнему краю",
       "reset": "Сбросить",
-      "resetConfirm": "Вернуть этот модуль к настройкам по умолчанию?"
+      "resetConfirm": "Сбросить этот модуль к настройкам по умолчанию?"
     },
     "placeholder": {
-      "general": "Скоро здесь появятся общие настройки приложения.",
-      "media": "Скоро здесь появятся настройки звука, видео и плеера.",
-      "projection": "Скоро здесь появятся настройки проекции и экранов."
+      "general": "Общие настройки приложения — скоро.",
+      "media": "Настройки звука, видео и плеера — скоро.",
+      "projection": "Настройки проекции и экранов — скоро."
     }
   },
   "palcoOutputs": {
-    "title": "Телевизоры со «Сценой»",
-    "empty": "Нет телевизоров с подключённой «Сценой». Просмотреть в «Сцене»",
-    "onHold": "{slot} · в ожидании"
+    "title": "Телевизоры сцены",
+    "empty": "Нет телевизоров, подключённых к Сцене. Откройте Сцену",
+    "onHold": "{slot} · на паузе"
   },
   "obsOutputs": {
-    "detecting": "Обнаружение и обновление подключений OBS…",
+    "detecting": "Detecting and refreshing OBS connections…",
     "active": "Удалённые подключения",
-    "activateHint": "Чтобы использовать подключение здесь, активируйте его в разделе «Настройки» → «Трансляция».",
-    "title": "Подключения OBS",
+    "activateHint": "Запустите подключение в Настройки → Трансляция, чтобы использовать его здесь.",
+    "title": "OBS connections",
     "activeConnections": "Активные подключения: {count}"
   },
   "floating": {
     "closeTitle": "Закрыть {title}?",
-    "closeMessage": "Завершить эту функцию и закрыть вашу проекцию?"
+    "closeMessage": "Остановить эту функцию и закрыть её проекцию?"
   },
   "updates": {
-    "downloadMacInstaller": "Скачать установщик macOS",
-    "manualMacInstructions": "В macOS это обновление устанавливается вручную. Скачайте установщик с помощью кнопки ниже, закройте LouvorJA, откройте файл DMG и перетащите приложение в папку «Программы», заменив предыдущую версию. Ваши данные и настройки будут сохранены."
+    checkFailed: "Не удалось проверить обновления",
+    downloadFailedRetry: "Не удалось загрузить обновление. Повторите позже.",
+    downloadFailedConnection: "Не удалось загрузить обновление. Проверьте подключение к интернету.",
+    verifyFailed: "Обновление не удалось проверить. Повторите позже.",
+    updateFailed: "Ошибка обновления. Повторите позже.",
+    "downloadMacInstaller": "Скачать установщик для macOS",
+    "manualMacInstructions": "On macOS, install this update manually. Download the installer below, quit LouvorJA, open the DMG and drag the app to Applications, replacing the previous version. Your data and preferences will be kept.",
+    "version": "Версия {version}",
+    "noReleaseNotes": "Примечаний к выпуску нет.",
+    "download": "Скачать обновление",
+    "installRestart": "Установить и перезапустить",
+    "later": "Позже",
+    "available": "Доступна версия {version}",
+    "update": "Обновить",
+    "dismiss": "Скрыть"
   },
   "windowControls": {
     "close": "Закрыть",
@@ -162,8 +189,8 @@ export default {
     "mainNav": "Основная навигация"
   },
   "apiOffline": {
-    "message": "Нет связи с сервисом — проверьте подключение к интернету",
-    "retrying": "Пытаемся восстановить соединение..."
+    "message": "Нет соединения с сервисом — проверьте интернет",
+    "retrying": "Попытка переподключения..."
   },
   "independentProjection": {
     "title": "Независимая проекция",

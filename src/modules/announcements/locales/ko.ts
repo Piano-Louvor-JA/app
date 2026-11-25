@@ -1,0 +1,113 @@
+export default {
+  "announcements": {
+    "title": "공지·알림·발표",
+    "back": "도구로 돌아가기",
+    "defaultListName": "사용자 지정 목록",
+    "copySuffix": "(사본)",
+    "lists": {
+      "label": "공지 목록",
+      "new": "새 목록",
+      "newTitle": "새 공지 목록",
+      "rename": "목록 이름 바꾸기",
+      "duplicate": "목록 복제",
+      "remove": "목록 삭제",
+      "removeTitle": "목록 삭제",
+      "removeConfirm": "공지 {count}개가 포함된 \"{name}\" 목록을 삭제할까요? 앱에 복사된 파일도 함께 삭제됩니다.",
+      "nameLabel": "목록 이름",
+      "actions": "목록 작업"
+    },
+    "add": "공지 추가",
+    "empty": "이 목록에 공지가 없습니다",
+    "emptyHint": "\"공지 추가\"로 첫 항목을 만들어 보세요.",
+    "kinds": {
+      "text": "텍스트",
+      "images": "이미지",
+      "video": "동영상",
+      "presentation": "프레젠테이션",
+      "url": "URL"
+    },
+    "kindHints": {
+      "text": "제목과 서식 있는 텍스트",
+      "images": "하나 이상의 이미지",
+      "video": "이 컴퓨터의 동영상",
+      "presentation": "PowerPoint 또는 PDF",
+      "url": "웹사이트, YouTube 또는 Vimeo"
+    },
+    "untitled": "제목 없음",
+    "imagesCount": "이미지 없음 | 이미지 1개 | 이미지 {count}개",
+    "noFile": "파일 없음",
+    "missingBadge": "파일 없음",
+    "actions": {
+      "label": "공지 작업",
+      "project": "투영",
+      "stop": "투영 중지",
+      "edit": "편집",
+      "duplicate": "복제",
+      "remove": "삭제",
+      "drag": "드래그하여 재정렬",
+      "carouselOn": "캐러셀 포함됨(클릭하면 제외)",
+      "carouselOff": "캐러셀 제외됨(클릭하면 포함)"
+    },
+    "remove": "삭제",
+    "removeTitle": "공지 삭제",
+    "removeConfirm": "\"{name}\" 공지를 삭제할까요? 앱에 복사된 파일도 함께 삭제됩니다.",
+    "cancel": "취소",
+    "save": "저장",
+    "dialog": {
+      "newTitle": "새 공지: {kind}",
+      "editTitle": "공지 편집: {kind}",
+      "title": "제목",
+      "titlePlaceholder": "예: 다음 안식일 침례식",
+      "titleColor": "제목 색상",
+      "text": "텍스트",
+      "addImages": "이미지 추가",
+      "removeImage": "이미지 삭제",
+      "moveImageUp": "이미지 위로 이동",
+      "moveImageDown": "이미지 아래로 이동",
+      "chooseVideo": "동영상 선택",
+      "chooseFile": "PowerPoint 또는 PDF 선택",
+      "replaceFile": "파일 바꾸기",
+      "emptyText": "공지 제목 또는 텍스트를 입력하세요.",
+      "emptyFiles": "파일을 하나 이상 선택하세요.",
+      "url": "주소(URL)",
+      "urlHint": "YouTube 및 Vimeo 링크는 동영상 플레이어에서 열리고, 그 외 링크는 웹사이트로 열립니다.",
+      "fetchingTitle": "링크 제목 가져오는 중…",
+      "invalidUrl": "올바른 주소를 입력하세요(예: https://…).",
+      "copying": "파일 복사 중…"
+    },
+    "notices": {
+      "duplicateFailed": "공지를 복제할 수 없습니다: 파일 복사 실패.",
+      "duplicateListPartial": "{count}개 공지를 새 목록에 복사하지 못했습니다.",
+      "rejected": "파일 {count}개 거부됨: {names}",
+      "pickFailed": "선택한 파일을 복사하지 못했습니다.",
+      "missing": "파일을 찾을 수 없음: {names}",
+      "projectionFailed": "이 공지를 투영하지 못했습니다.",
+      "desktopOnly": "데스크톱 앱에서만 사용할 수 있습니다.",
+      "close": "알림 닫기"
+    },
+    "carousel": {
+      "title": "캐러셀",
+      "independent": "독립 투영",
+      "start": "캐러셀로 투영",
+      "pause": "일시정지",
+      "resume": "재개",
+      "next": "다음",
+      "prev": "이전",
+      "stop": "캐러셀 중지",
+      "slideSeconds": "슬라이드당 초",
+      "loop": "반복",
+      "empty": "이 목록에 캐러셀용 텍스트 또는 이미지 공지가 없습니다.",
+      "skipped": "동영상, 프레젠테이션, URL 및 캐러셀에서 제외된 공지는 포함되지 않습니다.",
+      "position": "{current} / {total}",
+      "help": {
+        "button": "캐러셀 사용법",
+        "what": "캐러셀은 공지를 자동으로 하나씩 차례로 보여 줍니다.",
+        "which": "열려 있는 목록의 텍스트 공지와 이미지 공지의 모든 이미지가 포함됩니다. 동영상, 프레젠테이션, URL은 제외됩니다.",
+        "toggle": "각 공지의 캐러셀 버튼으로 포함/제외하세요. 새 공지는 자동으로 포함됩니다.",
+        "timing": "슬라이드당 초는 각 공지가 화면에 머무는 시간입니다. 반복을 켜면 마지막 후 처음으로 돌아갑니다.",
+        "where": "캐러셀 투영은 선택한 화면과 원격 연결에 표시됩니다.",
+        "independent": "독립 투영은 선택한 모니터나 연결에, 이미 투영 중인 내용 위에 캐러셀을 표시합니다."
+      }
+    }
+  }
+}

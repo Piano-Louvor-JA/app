@@ -37,7 +37,7 @@ const safeNotes = computed(() =>
     >
       <div class="update-card">
         <div class="update-card__header">
-          <h2>Versão {{ newVersion }}</h2>
+          <h2>{{ t('updates.version', { version: newVersion }) }}</h2>
           <button
             class="close-btn"
             data-test="close-dialog"
@@ -69,7 +69,7 @@ const safeNotes = computed(() =>
             v-else
             class="release-notes release-notes--empty"
           >
-            Sem notas de versão.
+            {{ t('updates.noReleaseNotes') }}
           </p>
         </div>
 
@@ -95,7 +95,7 @@ const safeNotes = computed(() =>
             class="action-btn action-btn--primary"
             @click="downloadUpdate"
           >
-            {{ manualInstall ? t('updates.downloadMacInstaller') : 'Baixar atualização' }}
+            {{ manualInstall ? t('updates.downloadMacInstaller') : t('updates.download') }}
           </button>
 
           <button
@@ -104,7 +104,7 @@ const safeNotes = computed(() =>
             class="action-btn action-btn--primary"
             @click="installUpdate"
           >
-            Instalar e reiniciar
+            {{ t('updates.installRestart') }}
           </button>
 
           <button
@@ -112,7 +112,7 @@ const safeNotes = computed(() =>
             class="action-btn action-btn--secondary"
             @click="model = false"
           >
-            Mais tarde
+            {{ t('updates.later') }}
           </button>
         </div>
       </div>

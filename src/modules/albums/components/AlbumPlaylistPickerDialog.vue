@@ -45,8 +45,8 @@ const { t } = useI18n()
           <div class="playlist-picker__body">
             <p v-if="props.playlists.length === 0" class="playlist-picker__empty">
               <i class="ti ti-music-plus" aria-hidden="true" />
-              Você ainda não tem playlists.<br>
-              Crie uma na seção Playlists da Biblioteca.
+              {{ t('albums.playlists.emptyHint') }}<br>
+              {{ t('albums.playlists.createHint') }}
             </p>
             <button
               v-for="playlist in props.playlists"

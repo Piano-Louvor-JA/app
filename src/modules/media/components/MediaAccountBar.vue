@@ -54,10 +54,10 @@ async function onSubmit(): Promise<void> {
       if (token) {
         resetToken.value = token
         mode.value = 'reset'
-        props.notify?.('Token gerado — confirme a senha nova')
+        props.notify?.(t('media.account.resetTokenGenerated'))
       } else {
         // Resposta neutra da API: não revela se o e-mail existe.
-        props.notify?.('Se o e-mail existir, o suporte tem o token de reset')
+        props.notify?.(t('media.account.resetTokenNeutral'))
         mode.value = 'login'
       }
       return
@@ -65,12 +65,12 @@ async function onSubmit(): Promise<void> {
     if (mode.value === 'reset') {
       const ok = await resetPassword(resetToken.value.trim(), password.value)
       if (ok) {
-        props.notify?.('Senha alterada! Entre com a senha nova')
+        props.notify?.(t('media.account.passwordChanged'))
         mode.value = 'login'
         password.value = ''
         resetToken.value = ''
       } else {
-        props.notify?.('Token inválido ou expirado', true)
+        props.notify?.(t('media.account.tokenInvalid'), true)
       }
       return
     }
@@ -82,12 +82,12 @@ async function onSubmit(): Promise<void> {
       session.value = result
       formOpen.value = false
       password.value = ''
-      props.notify?.(`Bem-vindo, ${result.user.displayName}!`)
+      props.notify?.(t('media.account.welcome', { name: result.user.displayName }))
     } else {
       props.notify?.(
         mode.value === 'login'
-          ? 'E-mail ou senha incorretos'
-          : 'Não foi possível criar a conta (e-mail já existe?)',
+          ? t('media.account.loginFailed')
+          : t('media.account.registerFailed'),
         true,
       )
     }
@@ -100,7 +100,7 @@ async function onLogout(): Promise<void> {
   await logout()
   session.value = null
   formOpen.value = false
-  props.notify?.('Sessão encerrada')
+  props.notify?.(t('media.account.signedOut'))
 }
 
 function toggleForm(): void {
@@ -227,17 +227,16 @@ function toggleForm(): void {
               class="account__link"
               @click="mode = 'login'"
             >
-              Já tenho conta
+              {{ t('media.account.haveAccount') }}
             </button>
           </div>
         </template>
 
         <!-- ESQUECI MINHA SENHA -->
         <template v-else-if="mode === 'forgot'">
-          <p class="account__hint">
-            Informe seu e-mail. Sem e-mail automático: em produção o token de
-            reset é fornecido pelo suporte do projeto.
-          </p>
+            <p class="account__hint">
+              {{ t('media.account.forgotHintApp') }}
+            </p>
           <input
             v-model="email"
             type="email"
@@ -266,7 +265,7 @@ function toggleForm(): void {
         <!-- RESET (token + senha nova) -->
         <template v-else>
           <p class="account__hint">
-            Cole o token de reset e defina a senha nova (mín. 8 caracteres).
+            {{ t('media.account.resetHintApp') }}
           </p>
           <input
             v-model="resetToken"

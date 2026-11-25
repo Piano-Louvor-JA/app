@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { tPtBR } from '../../../test/i18n-stub'
+vi.mock('../../../plugins/i18n', async () => ({ default: { global: { t: (await import('../../../test/i18n-stub')).tPtBR } } }))
 
 /**
  * Kill plane 3 de liturgy-actions — survivors de playLiturgyItemOnScreens,

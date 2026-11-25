@@ -1,3 +1,5 @@
+import i18n from '@plugins/i18n'
+const t = (k: string, p?: Record<string, unknown>) => i18n.global.t(k, p ?? {})
 import { computed, onUnmounted, ref, type ComputedRef } from 'vue'
 import {
   deleteAccount,
@@ -72,7 +74,7 @@ export function useAuth(): UseAuthReturn {
     const result = await login(email.trim(), password)
     if (result) {
       session.value = result
-      notify(`Bem-vindo, ${result.user.displayName}!`)
+      notify(t('media.account.welcome', { name: result.user.displayName }))
       return true
     }
     notify('E-mail ou senha incorretos', true)
@@ -83,17 +85,17 @@ export function useAuth(): UseAuthReturn {
     const result = await register(email.trim(), password, displayName.trim())
     if (result) {
       session.value = result
-      notify(`Bem-vindo, ${result.user.displayName}!`)
+      notify(t('media.account.welcome', { name: result.user.displayName }))
       return true
     }
-    notify('Não foi possível criar a conta (e-mail já existe?)', true)
+    notify(t('media.account.registerFailed'), true)
     return false
   }
 
   async function doLogout(): Promise<void> {
     await firebaseLogout()
     session.value = null
-    notify('Sessão encerrada')
+    notify(t('media.account.signedOut'))
   }
 
   /** Login Google (popup — retorna sessão direto). */
@@ -101,10 +103,10 @@ export function useAuth(): UseAuthReturn {
     const result = await firebaseLoginGoogle()
     if (result) {
       session.value = result
-      notify(`Bem-vindo, ${result.user.displayName}!`)
+      notify(t('media.account.welcome', { name: result.user.displayName }))
       return true
     }
-    notify('Não foi possível entrar com o Google', true)
+    notify(t('media.account.loginFailed'), true)
     return false
   }
 
@@ -113,7 +115,7 @@ export function useAuth(): UseAuthReturn {
     const fb = await firebaseLogin(email.trim(), password)
     if (fb) {
       session.value = fb
-      notify(`Bem-vindo, ${fb.user.displayName}!`)
+      notify(t('media.account.welcome', { name: fb.user.displayName }))
       return true
     }
     return doLogin(email, password)
@@ -124,7 +126,7 @@ export function useAuth(): UseAuthReturn {
     const fb = await firebaseRegister(email.trim(), password, displayName.trim())
     if (fb) {
       session.value = fb
-      notify(`Bem-vindo, ${fb.user.displayName}!`)
+      notify(t('media.account.welcome', { name: fb.user.displayName }))
       return true
     }
     return doRegister(email, password, displayName)
@@ -133,21 +135,21 @@ export function useAuth(): UseAuthReturn {
   async function doForgotPassword(email: string): Promise<boolean> {
     const token = await requestPasswordReset(email.trim())
     if (token) {
-      notify('Token gerado — confirme a senha nova')
+      notify(t('media.account.resetTokenGenerated'))
       return true
     }
     // Resposta neutra da API: não revela se o e-mail existe.
-    notify('Se o e-mail existir, o suporte tem o token de reset')
+    notify(t('media.account.resetTokenNeutral'))
     return false
   }
 
   async function doResetPassword(token: string, password: string): Promise<boolean> {
     const ok = await resetPassword(token.trim(), password)
     if (ok) {
-      notify('Senha alterada! Entre com a senha nova')
+      notify(t('media.account.passwordChanged'))
       return true
     }
-    notify('Token inválido ou expirado', true)
+    notify(t('media.account.tokenInvalid'), true)
     return false
   }
 
@@ -160,7 +162,7 @@ export function useAuth(): UseAuthReturn {
     if (provider !== 'legacy') {
       const reauth = await firebaseReauthenticate(provider === 'password' ? password : undefined)
       if (reauth !== 'ok') {
-        notify(reauth === 'wrong-password' ? 'Senha incorreta' : 'Não foi possível confirmar sua identidade', true)
+        notify(reauth === 'wrong-password' ? t('auth.wrongPassword') : t('auth.reauthFailed'), true)
         return false
       }
     }
@@ -168,15 +170,15 @@ export function useAuth(): UseAuthReturn {
     if (result === 'ok') {
       await firebaseLogout()
       session.value = null
-      notify('Conta excluída')
+      notify(t('auth.accountDeleted'))
       return true
     }
     const messages: Record<string, string> = {
-      'wrong-password': 'Senha incorreta',
-      'password-required': 'Digite sua senha para confirmar',
-      unauthorized: 'Sessão expirada — entre de novo para excluir a conta',
+      'wrong-password': t('auth.wrongPassword'),
+      'password-required': t('auth.passwordRequired'),
+      unauthorized: t('auth.sessionExpired'),
     }
-    notify(messages[result] ?? 'Não foi possível excluir a conta', true)
+    notify(messages[result] ?? t('auth.deleteFailed'), true)
     return false
   }
 

@@ -42,7 +42,7 @@
     "@sentry/electron": "^8.4.0",
     "@tabler/icons-webfont": "^3.52.0",
     "basic-ftp": "^6.2.6",
-    "dompurify": "^3.4.18",
+    "dompurify": "3.4.18",
     "electron-updater": "^6.8.11",
     "fflate": "^0.8.3",
     "firebase": "^13.4.0",

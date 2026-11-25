@@ -221,9 +221,9 @@ function addToPlaylist(id: string) {
   playlistItem.value = null
   /* v8 ignore start -- picker só emite ids presentes em playlists.value */
   if (result?.added) {
-    showPlaylistFeedback(`“${item.title}” adicionada a “${target?.name ?? 'playlist'}”`)
+    showPlaylistFeedback(t('albums.playlists.addedTo', { title: item.title, name: target?.name ?? t('albums.collectionFallback') }))
   } else {
-    showPlaylistFeedback(`“${item.title}” já está em “${target?.name ?? 'playlist'}”`)
+    showPlaylistFeedback(t('albums.playlists.alreadyIn', { title: item.title, name: target?.name ?? t('albums.collectionFallback') }))
   }
   /* v8 ignore stop */
 }

@@ -70,6 +70,9 @@ export default {
     "increaseFont": "Augmenter la police",
     "placeholderDisplay": "- - - -",
     "chromeDragHint": "Glissez pour déplacer · double-clic pour revenir au coin",
-    "openRandom": "Ouvrir le tirage au sort"
+    "openRandom": "Ouvrir le tirage au sort",
+    "drawnSize": "Drawn list font size",
+    "decreaseDrawn": "Shrink drawn list",
+    "increaseDrawn": "Enlarge drawn list"
   }
 }
