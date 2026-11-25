@@ -30,6 +30,10 @@ export default {
       deleteConfirm: 'Delete playlist',
       singlePlayHint: 'Single mode: play only this song',
       shuffleHint: 'Shuffle play: play all songs in random order',
+      playInstrumental: 'Play {name} with backing track (instrumental)',
+      playInstrumentalHint: 'Backing track: play all songs with the instrumental only',
+      playNoAudio: 'Play {name} without audio (slides only)',
+      playNoAudioHint: 'No audio: show only the song slides, without sound',
       playAllHint: 'Play playlist: play all songs in sequence',
 
       shuffle: 'Shuffle play',

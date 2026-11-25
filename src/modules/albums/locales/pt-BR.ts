@@ -30,6 +30,10 @@ export default {
       deleteConfirm: 'Excluir playlist',
       singlePlayHint: 'Modo único: tocar somente esta música',
       shuffleHint: 'Tocar aleatório: reproduzir todas as músicas em ordem aleatória',
+      playInstrumental: 'Tocar {name} com playback (instrumental)',
+      playInstrumentalHint: 'Playback: reproduzir todas as músicas só com o instrumental',
+      playNoAudio: 'Tocar {name} sem áudio (só os slides)',
+      playNoAudioHint: 'Sem áudio: passar só os slides das músicas, sem som',
       playAllHint: 'Tocar playlist: reproduzir todas as músicas em sequência',
 
       shuffle: 'Tocar aleatoriamente',

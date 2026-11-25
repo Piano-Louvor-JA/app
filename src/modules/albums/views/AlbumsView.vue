@@ -5,6 +5,7 @@ import { usePlaylistPanelStore } from '../stores/usePlaylistPanelStore'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useMediaStore } from '@modules/media/stores/useMediaStore'
+import type { MediaPlaybackMode } from '@modules/media/types/media'
 
 import { GlassCard } from '@design-system/index'
 import { useMinimizablePage } from '@shared/composables/useMinimizablePage'
@@ -361,9 +362,10 @@ function onImportFile(event: Event) {
   })
 }
 
-async function playPlaylist(playlist: Playlist) {
+/** Toca a playlist: com áudio, playback (instrumental) ou sem áudio (só os slides). */
+async function playPlaylist(playlist: Playlist, mode: MediaPlaybackMode = 'audio') {
   if (playlist.items.length === 0) return
-  await mediaStore.playQueue(playlist.items, 0, undefined, playlist.name)
+  await mediaStore.playQueue(playlist.items, 0, mode, playlist.name)
   await router.push({ name: 'media' })
 }
 
@@ -727,7 +729,7 @@ async function runAction(
           aria-hidden="true"
           @click="minimizePlaylists"
         />
-        <GlassCard class="albums-view__modal-panel">
+        <GlassCard class="albums-view__modal-panel albums-view__modal-panel--playlists">
           <header class="albums-view__playlists-header">
             <div class="albums-view__playlists-heading">
               <i class="ti ti-playlist" aria-hidden="true" />
@@ -846,6 +848,34 @@ async function runAction(
                     @click="playPlaylist(playlist)"
                   >
                     <i class="ti ti-player-play" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    class="albums-view__playlist-play"
+                    data-test="playlist-play-instrumental"
+                    :disabled="playlist.items.length === 0"
+                    :aria-label="t('albums.playlists.playInstrumental', { name: playlist.name })"
+                    @mouseenter="playlistHint = { playlistId: playlist.id, key: 'albums.playlists.playInstrumentalHint' }"
+                    @mouseleave="playlistHint = null"
+                    @focus="playlistHint = { playlistId: playlist.id, key: 'albums.playlists.playInstrumentalHint' }"
+                    @blur="playlistHint = null"
+                    @click="playPlaylist(playlist, 'instrumental')"
+                  >
+                    <i class="ti ti-piano" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    class="albums-view__playlist-play"
+                    data-test="playlist-play-no-audio"
+                    :disabled="playlist.items.length === 0"
+                    :aria-label="t('albums.playlists.playNoAudio', { name: playlist.name })"
+                    @mouseenter="playlistHint = { playlistId: playlist.id, key: 'albums.playlists.playNoAudioHint' }"
+                    @mouseleave="playlistHint = null"
+                    @focus="playlistHint = { playlistId: playlist.id, key: 'albums.playlists.playNoAudioHint' }"
+                    @blur="playlistHint = null"
+                    @click="playPlaylist(playlist, 'no_audio')"
+                  >
+                    <i class="ti ti-volume-off" aria-hidden="true" />
                   </button>
 
                   <button type="button"
@@ -1496,6 +1526,11 @@ async function runAction(
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
+}
+
+/* Playlists: mais largo (botões de modo de reprodução em cada linha). */
+.albums-view__modal-panel.albums-view__modal-panel--playlists {
+  width: min(68rem, 92vw);
 }
 
 .albums-view__modal-backdrop {

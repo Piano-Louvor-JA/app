@@ -30,6 +30,10 @@ export default {
       deleteConfirm: 'Eliminar playlist',
       singlePlayHint: 'Modo único: reproducir solo esta canción',
       shuffleHint: 'Reproducción aleatoria: reproducir todas las canciones en orden aleatorio',
+      playInstrumental: 'Tocar {name} con pista (instrumental)',
+      playInstrumentalHint: 'Pista: reproducir todas las canciones solo con el instrumental',
+      playNoAudio: 'Tocar {name} sin audio (solo las diapositivas)',
+      playNoAudioHint: 'Sin audio: pasar solo las diapositivas de las canciones, sin sonido',
       playAllHint: 'Reproducir playlist: reproducir todas las canciones en secuencia',
 
       shuffle: 'Reproducir aleatoriamente',
