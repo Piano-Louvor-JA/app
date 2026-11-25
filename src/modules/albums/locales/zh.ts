@@ -73,6 +73,7 @@ export default {
       "close": "关闭歌词"
     },
     "messages": {
+      "convite_catalogo": "音乐目录尚不支持您的语言。欢迎加入社区，帮助构建您母语的 LouvorJA 目录。",
       "catalogEmpty": "本地目录中未找到歌集。",
       "catalogFailed": "无法加载专辑目录。",
       "catalogSearchEmpty": "未找到匹配该搜索的歌集。",

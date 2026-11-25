@@ -73,6 +73,7 @@ export default {
       "close": "Cerrar letra"
     },
     "messages": {
+      "convite_catalogo": "El catálogo musical aún no está disponible en tu idioma. Únete a la comunidad y ayuda a formar el catálogo de LouvorJA en tu propio idioma.",
       "catalogEmpty": "No se encontró ninguna colección en el catálogo local.",
       "catalogFailed": "No se pudo cargar el catálogo de álbumes.",
       "catalogSearchEmpty": "No se encontró ninguna colección para esta búsqueda.",

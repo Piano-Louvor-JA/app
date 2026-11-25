@@ -73,6 +73,7 @@ export default {
       "close": "가사 닫기"
     },
     "messages": {
+      "convite_catalogo": "음악 카탈로그가 아직 해당 언어로 제공되지 않습니다. 커뮤니티에 참여하여 귀하의 언어로 LouvorJA 카탈로그를 만드는 데 도움을 주세요.",
       "catalogEmpty": "로컬 카탈로그에서 컬렉션을 찾을 수 없습니다.",
       "catalogFailed": "앨범 카탈로그를 불러올 수 없습니다.",
       "catalogSearchEmpty": "이 검색에 해당하는 컬렉션이 없습니다.",

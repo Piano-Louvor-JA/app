@@ -76,6 +76,7 @@ export default {
       close: 'Fechar letra',
     },
     messages: {
+      convite_catalogo: 'O catálogo musical ainda não está disponível no seu idioma. Junte-se à comunidade e ajude a formar o catálogo do LouvorJA no seu próprio idioma.',
       catalogEmpty: 'Nenhuma coletânea encontrada no catálogo local.',
       catalogFailed: 'Não foi possível carregar o catálogo de álbuns.',
       catalogSearchEmpty: 'Nenhuma coletânea encontrada para essa busca.',

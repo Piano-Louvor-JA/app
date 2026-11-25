@@ -73,6 +73,7 @@ export default {
       "close": "إغلاق الكلمات"
     },
     "messages": {
+      "convite_catalogo": "كاتالوج التراتيل غير متوفر بلغتك بعد. انضم إلى المجتمع وساعد في بناء كاتالوج LouvorJA بلغتك.",
       "catalogEmpty": "لا مجموعة في الكتالوج المحلي.",
       "catalogFailed": "تعذّر تحميل كتالوج الألبومات.",
       "catalogSearchEmpty": "لا مجموعة تطابق هذا البحث.",
