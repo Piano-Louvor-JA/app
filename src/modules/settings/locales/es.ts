@@ -451,6 +451,25 @@ export default {
       legacyMediaReconciled: ' {marked} colección(es) marcadas como descargadas.',
       legacyMediaNotFound:
         'No se encontró la carpeta del Louvor JA legado. Revise Program Files (x86)\\Louvor JA\\config.',
+      legacyMediaHintLinux:
+        'Elige el archivo descargado del sitio (.tar.gz): la app copia los medios directo de él, sin necesidad de extraer. Si prefieres, extráelo y elige la carpeta. Solo se copian los archivos (portadas, imágenes y músicas) que aún no existen.',
+      legacyMediaPickFolderLinux:
+        'Elegir carpeta de medios',
+      legacyMediaPickHintLinux:
+        'Elige la carpeta extraída del archivo (ej.: LouvorJA-PIANO) o la carpeta Media dentro de ella. La app encuentra las portadas, imágenes y músicas sola.',
+      legacyMediaInvalidFolderLinux:
+        'Esta carpeta no contiene los medios. Elige la carpeta extraída del archivo del sitio (ej.: LouvorJA-PIANO) o la carpeta Media dentro de ella.',
+      legacyMediaPause: 'Pausar',
+      legacyMediaResume: 'Continuar',
+      legacyMediaStop: 'Detener',
+      legacyMediaPaused: 'En pausa en {current} de {total}',
+      legacyMediaCancelled: 'Importación detenida: {imported} archivo(s) copiado(s). Elige el archivo o la carpeta de nuevo para continuar donde se detuvo.',
+      legacyMediaPickArchive: 'Elegir archivo descargado (.tar.gz)',
+      legacyMediaArchiveSummary: 'Archivo comprimido de {size}: los medios que aún no existen se copian directo de él, sin extraer.',
+      legacyMediaProgressBytes: 'Leyendo {current} de {total}',
+      legacyMediaPausedBytes: 'En pausa en {current} de {total}',
+      legacyMediaInvalidArchive: 'Este archivo no contiene los medios de Louvor JA (portadas, imágenes o músicas). Elige el archivo descargado del sitio.',
+      legacyMediaLiveCounts: '{imported} guardada(s) ahora · {skipped} ya existían (ya aparecen en la Central de Medios)',
       legacyMediaError: 'No se pudieron importar los medios. Intente de nuevo.',
       mediaFolderTitle: 'Carpeta de medias',
       mediaFolderHint:

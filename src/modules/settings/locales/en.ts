@@ -449,6 +449,25 @@ export default {
       legacyMediaReconciled: ' {marked} collection(s) marked as downloaded.',
       legacyMediaNotFound:
         'Legacy Louvor JA folder not found. Check Program Files (x86)\\Louvor JA\\config.',
+      legacyMediaHintLinux:
+        'Choose the file downloaded from the website (.tar.gz): the app copies the media straight from it, no need to extract. If you prefer, extract it and choose the folder. Only files (covers, images and songs) not here yet are copied.',
+      legacyMediaPickFolderLinux:
+        'Choose media folder',
+      legacyMediaPickHintLinux:
+        'Choose the folder extracted from the file (e.g. LouvorJA-PIANO) or the Media folder inside it. The app finds the covers, images and songs by itself.',
+      legacyMediaInvalidFolderLinux:
+        'This folder does not contain the media. Choose the folder extracted from the website file (e.g. LouvorJA-PIANO) or the Media folder inside it.',
+      legacyMediaPause: 'Pause',
+      legacyMediaResume: 'Resume',
+      legacyMediaStop: 'Stop',
+      legacyMediaPaused: 'Paused at {current} of {total}',
+      legacyMediaCancelled: 'Import stopped: {imported} file(s) copied. Choose the file or folder again to continue where it stopped.',
+      legacyMediaPickArchive: 'Choose downloaded file (.tar.gz)',
+      legacyMediaArchiveSummary: 'Compressed file of {size}: media not here yet is copied straight from it, without extracting.',
+      legacyMediaProgressBytes: 'Reading {current} of {total}',
+      legacyMediaPausedBytes: 'Paused at {current} of {total}',
+      legacyMediaInvalidArchive: 'This file does not contain Louvor JA media (covers, images or songs). Choose the file downloaded from the website.',
+      legacyMediaLiveCounts: '{imported} saved now · {skipped} already there (already shown in the Media Center)',
       legacyMediaError: 'Could not import media. Try again.',
       mediaFolderTitle: 'Media folder',
       mediaFolderHint:

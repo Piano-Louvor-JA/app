@@ -1,54 +1,47 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref } from 'vue'
+import { storeToRefs } from 'pinia'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { GlassCard } from '@design-system/index'
 import { getDesktopBridge } from '@shared/services/desktop-bridge'
-import type {
-  LegacyMediaAnalyzeResult,
-  LegacyMediaImportProgress,
-  LegacyMediaImportResult,
-} from '@shared/types/desktop-bridge'
-import { useLocalLibraryStore } from '@modules/sync/stores/useLocalLibraryStore'
+
+import { useLegacyMediaImportStore } from '../stores/useLegacyMediaImportStore'
 
 const { t } = useI18n()
-const libraryStore = useLocalLibraryStore()
 
 /**
- * Somente Windows (Electron reporta platform === 'win32' em qualquer arch).
- * No Linux/macOS o card não monta — Geral fica como antes.
+ * Windows: procura a instalação do Louvor JA legado ou importa uma pasta
+ * escolhida (Electron reporta platform === 'win32' em qualquer arch).
+ * Linux: importa a pasta extraída do arquivo de mídias baixado no site.
+ * macOS: o card não monta.
+ *
+ * O card só mostra a importação: quem a conduz é a store, que continua
+ * viva ao sair da página — ao voltar, o card mostra o estado atual.
  */
 const isWindows = computed(() => getDesktopBridge()?.platform === 'win32')
+const isLinux = computed(() => getDesktopBridge()?.platform === 'linux')
+const supported = computed(() => isWindows.value || isLinux.value)
 
 const canImport = computed(() => {
   const bridge = getDesktopBridge()
-  return Boolean(isWindows.value && bridge?.legacyMedia)
+  return Boolean(supported.value && bridge?.legacyMedia)
 })
+const canControl = computed(() => Boolean(getDesktopBridge()?.legacyMedia?.pause))
+const canPickArchive = computed(() => Boolean(getDesktopBridge()?.legacyMedia?.pickArchive))
 
-type Phase = 'idle' | 'analyzing' | 'importing' | 'reconciling' | 'done' | 'error'
+const importStore = useLegacyMediaImportStore()
+const { phase, analysis, importResult, progress, reconcileMarked, paused, errorKey, busy, progressPercent } =
+  storeToRefs(importStore)
 
-const phase = ref<Phase>('idle')
-const analysis = ref<LegacyMediaAnalyzeResult | null>(null)
-const importResult = ref<LegacyMediaImportResult | null>(null)
-const progress = ref<LegacyMediaImportProgress | null>(null)
-const reconcileMarked = ref(0)
-const errorKey = ref<string | null>(null)
-
-let unsubProgress: (() => void) | null = null
-
-const busy = computed(
-  () =>
-    phase.value === 'analyzing' ||
-    phase.value === 'importing' ||
-    phase.value === 'reconciling',
+/** Texto do botão enquanto trabalha (Windows: busca; Linux: pasta escolhida). */
+const busyLabel = computed(() =>
+  phase.value === 'analyzing'
+    ? t('settings.general.legacyMediaAnalyzing')
+    : phase.value === 'importing'
+      ? t('settings.general.legacyMediaImporting')
+      : t('settings.general.legacyMediaReconciling'),
 )
-
-const progressPercent = computed(() => {
-  const p = progress.value
-  /* v8 ignore next 1 -- barra só renderiza com progress presente e total real (cb do main) */
-  if (!p || p.total <= 0) return 0
-  return Math.min(100, Math.round((p.current / p.total) * 100))
-})
 
 /* v8 ignore start -- mb interpolado só dentro do bloco analysis.found */
 const missingMb = computed(() =>
@@ -56,119 +49,39 @@ const missingMb = computed(() =>
 )
 /* v8 ignore stop */
 
-function clearProgressSub() {
-  unsubProgress?.()
-  unsubProgress = null
+function runImport() {
+  if (!supported.value) return
+  void importStore.runImport()
 }
 
-onUnmounted(() => {
-  clearProgressSub()
-})
-
-/** Atualiza o manifesto da Central de Mídia com o que já está no disco. */
-async function reconcileLibraryListing() {
-  phase.value = 'reconciling'
-  progress.value = null
-  try {
-    const result = await libraryStore.reconcileFromLocalMedia(
-      (current, total, albumName) => {
-        progress.value = {
-          current,
-          total,
-          relativePath: albumName,
-          mediaType: 'music',
-        }
-      },
-    )
-    reconcileMarked.value = result.marked
-  } catch (err) {
-    console.warn('[legacy-media] reconciliação da biblioteca falhou', err)
-    reconcileMarked.value = 0
-  }
+function runManualImport() {
+  if (!supported.value) return
+  void importStore.runManualImport()
 }
 
-async function runImport(selectedPath?: string) {
-  const bridge = getDesktopBridge()
-  if (!bridge?.legacyMedia || !isWindows.value || busy.value) return
-
-  const sourcePath = selectedPath?.trim() || undefined
-  const invalidKey = sourcePath
-    ? 'settings.general.legacyMediaInvalidFolder'
-    : 'settings.general.legacyMediaNotFound'
-
-  phase.value = 'analyzing'
-  errorKey.value = null
-  analysis.value = null
-  importResult.value = null
-  progress.value = null
-  reconcileMarked.value = 0
-
-  try {
-    const report = await bridge.legacyMedia.analyze(sourcePath)
-    analysis.value = report
-
-    if (!report.found) {
-      phase.value = 'error'
-      errorKey.value = invalidKey
-      return
-    }
-
-    if (report.missing <= 0) {
-      importResult.value = {
-        ok: true,
-        imported: 0,
-        skipped: report.present,
-        failed: 0,
-        total: 0,
-        reason: 'nothing-to-import',
-      }
-      await reconcileLibraryListing()
-      phase.value = 'done'
-      return
-    }
-
-    phase.value = 'importing'
-    clearProgressSub()
-    unsubProgress = bridge.legacyMedia.onImportProgress((payload) => {
-      progress.value = payload
-    })
-
-    const result = await bridge.legacyMedia.import(sourcePath)
-    importResult.value = result
-    clearProgressSub()
-
-    if (!result.ok) {
-      phase.value = 'error'
-      errorKey.value =
-        result.reason === 'not-found' ? invalidKey : 'settings.general.legacyMediaError'
-      return
-    }
-
-    await reconcileLibraryListing()
-    phase.value = 'done'
-  } catch (err) {
-    console.error('[legacy-media] import falhou', err)
-    phase.value = 'error'
-    errorKey.value = 'settings.general.legacyMediaError'
-  } finally {
-    clearProgressSub()
-  }
+function runArchiveImport() {
+  if (!supported.value) return
+  void importStore.runArchiveImport()
 }
 
-async function runManualImport() {
-  const bridge = getDesktopBridge()
-  if (!bridge?.legacyMedia?.pickFolder || !isWindows.value || busy.value) return
-
-  const selected = await bridge.legacyMedia.pickFolder()
-  if (!selected) return
-  await runImport(selected)
+/** Bytes lidos do arquivo compactado, em GB (ou MB abaixo de 1 GB). */
+function formatBytes(bytes: number): string {
+  const gb = bytes / 1024 ** 3
+  return gb >= 1 ? `${gb.toFixed(1)} GB` : `${Math.round(bytes / 1024 ** 2)} MB`
 }
+
+/** Linux: o botão principal (arquivo) mostra o andamento. */
+const archiveIsPrimary = computed(() => isLinux.value && canPickArchive.value)
+
+const pauseImport = () => importStore.pause()
+const resumeImport = () => importStore.resume()
+const stopImport = () => importStore.stop()
 </script>
 
 <template>
-  <!-- Linux/macOS: não renderiza nada (Geral permanece intacta). -->
+  <!-- macOS: não renderiza nada (Geral permanece intacta). -->
   <GlassCard
-    v-if="isWindows"
+    v-if="supported"
     class="general-settings__card"
     elevated
     data-test="legacy-media-card"
@@ -191,11 +104,12 @@ async function runManualImport() {
     </div>
 
     <p class="general-settings__hint">
-      {{ t('settings.general.legacyMediaHint') }}
+      {{ t(isLinux ? 'settings.general.legacyMediaHintLinux' : 'settings.general.legacyMediaHint') }}
     </p>
 
     <div class="legacy-media__actions">
       <button
+        v-if="isWindows"
         type="button"
         class="general-settings__btn general-settings__btn--primary"
         data-test="legacy-media-import-button"
@@ -219,22 +133,93 @@ async function runManualImport() {
       </button>
 
       <button
+        v-if="canPickArchive"
         type="button"
-        class="general-settings__btn general-settings__btn--secondary"
+        class="general-settings__btn"
+        :class="archiveIsPrimary ? 'general-settings__btn--primary' : 'general-settings__btn--secondary'"
+        data-test="legacy-media-pick-archive-button"
+        :disabled="busy || !canImport"
+        @click="runArchiveImport"
+      >
+        <i
+          class="ti"
+          :class="archiveIsPrimary && busy ? 'ti-loader-2 general-settings__spin' : 'ti-file-zip'"
+          aria-hidden="true"
+        />
+        {{ archiveIsPrimary && busy ? busyLabel : t('settings.general.legacyMediaPickArchive') }}
+      </button>
+
+      <button
+        type="button"
+        class="general-settings__btn"
+        :class="isLinux && !archiveIsPrimary ? 'general-settings__btn--primary' : 'general-settings__btn--secondary'"
         data-test="legacy-media-pick-folder-button"
         :disabled="busy || !canImport"
         @click="runManualImport"
       >
         <i
-          class="ti ti-folder-open"
+          class="ti"
+          :class="isLinux && !archiveIsPrimary && busy ? 'ti-loader-2 general-settings__spin' : 'ti-folder-open'"
           aria-hidden="true"
         />
-        {{ t('settings.general.legacyMediaPickFolder') }}
+        {{
+          isLinux
+            ? busy && !archiveIsPrimary
+              ? busyLabel
+              : t('settings.general.legacyMediaPickFolderLinux')
+            : t('settings.general.legacyMediaPickFolder')
+        }}
       </button>
+      <!-- Porcentagem ao lado do botão enquanto importa. -->
+      <span
+        v-if="(phase === 'importing' || phase === 'reconciling') && progress"
+        class="legacy-media__percent"
+        data-test="legacy-media-percent"
+      >{{ progressPercent }}%</span>
+      <template v-if="phase === 'importing' && canControl">
+        <button
+          v-if="!paused"
+          type="button"
+          class="general-settings__btn general-settings__btn--secondary"
+          data-test="legacy-media-pause"
+          @click="pauseImport"
+        >
+          <i
+            class="ti ti-player-pause"
+            aria-hidden="true"
+          />
+          {{ t('settings.general.legacyMediaPause') }}
+        </button>
+        <button
+          v-else
+          type="button"
+          class="general-settings__btn general-settings__btn--primary"
+          data-test="legacy-media-resume"
+          @click="resumeImport"
+        >
+          <i
+            class="ti ti-player-play"
+            aria-hidden="true"
+          />
+          {{ t('settings.general.legacyMediaResume') }}
+        </button>
+        <button
+          type="button"
+          class="general-settings__btn general-settings__btn--secondary"
+          data-test="legacy-media-stop"
+          @click="stopImport"
+        >
+          <i
+            class="ti ti-player-stop"
+            aria-hidden="true"
+          />
+          {{ t('settings.general.legacyMediaStop') }}
+        </button>
+      </template>
     </div>
 
     <p class="general-settings__hint general-settings__hint--sub">
-      {{ t('settings.general.legacyMediaPickHint') }}
+      {{ t(isLinux ? 'settings.general.legacyMediaPickHintLinux' : 'settings.general.legacyMediaPickHint') }}
     </p>
 
     <div
@@ -261,10 +246,27 @@ async function runManualImport() {
                 current: progress.current,
                 total: progress.total,
               })
-            : t('settings.general.legacyMediaProgress', {
-                current: progress.current,
-                total: progress.total,
-              })
+            : progress.unit === 'bytes'
+              ? t(paused ? 'settings.general.legacyMediaPausedBytes' : 'settings.general.legacyMediaProgressBytes', {
+                  current: formatBytes(progress.current),
+                  total: formatBytes(progress.total),
+                })
+              : t(paused ? 'settings.general.legacyMediaPaused' : 'settings.general.legacyMediaProgress', {
+                  current: progress.current,
+                  total: progress.total,
+                })
+        }}
+      </p>
+      <p
+        v-if="phase === 'importing' && progress.imported != null"
+        class="legacy-media__live"
+        data-test="legacy-media-live"
+      >
+        {{
+          t('settings.general.legacyMediaLiveCounts', {
+            imported: progress.imported,
+            skipped: progress.skipped ?? 0,
+          })
         }}
       </p>
       <p class="legacy-media__file">
@@ -295,12 +297,14 @@ async function runManualImport() {
           aria-hidden="true"
         />
         {{
-          t('settings.general.legacyMediaScanSummary', {
-            scanned: analysis.scanned,
-            missing: analysis.missing,
-            present: analysis.present,
-            mb: missingMb,
-          })
+          analysis.archive
+            ? t('settings.general.legacyMediaArchiveSummary', { size: formatBytes(analysis.totalBytes) })
+            : t('settings.general.legacyMediaScanSummary', {
+              scanned: analysis.scanned,
+              missing: analysis.missing,
+              present: analysis.present,
+              mb: missingMb,
+            })
         }}
       </p>
     </template>
@@ -316,6 +320,9 @@ async function runManualImport() {
       />
       <template v-if="importResult.reason === 'nothing-to-import'">
         {{ t('settings.general.legacyMediaUpToDate') }}
+      </template>
+      <template v-else-if="importResult.reason === 'cancelled'">
+        {{ t('settings.general.legacyMediaCancelled', { imported: importResult.imported }) }}
       </template>
       <template v-else>
         {{
@@ -350,6 +357,20 @@ async function runManualImport() {
 </template>
 
 <style scoped lang="scss">
+.legacy-media__live {
+  margin: 0.15rem 0 0;
+  font-size: 0.85rem;
+  color: var(--ds-color-primary);
+}
+
+.legacy-media__percent {
+  align-self: center;
+  font-size: 1.35rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ds-color-primary);
+}
+
 .general-settings__card {
   position: relative;
   overflow: hidden;

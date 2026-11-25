@@ -270,6 +270,8 @@ export type LegacyMediaAnalyzeResult = {
   totalBytes: number
   missingBytes: number
   counts: LegacyMediaCounts
+  /** Arquivo compactado do site: contagens só saem ao importar. */
+  archive?: boolean
 }
 
 export type LegacyMediaImportProgress = {
@@ -277,6 +279,11 @@ export type LegacyMediaImportProgress = {
   total: number
   relativePath: string
   mediaType: MediaFolderType
+  /** 'bytes': lendo um arquivo compactado (current/total em bytes). */
+  unit?: 'bytes'
+  /** Contagem ao vivo: mídias gravadas e que já existiam. */
+  imported?: number
+  skipped?: number
 }
 
 export type LegacyMediaImportResult = {
@@ -292,6 +299,12 @@ export type LegacyMediaApi = {
   analyze: (selectedPath?: string) => Promise<LegacyMediaAnalyzeResult>
   import: (selectedPath?: string) => Promise<LegacyMediaImportResult>
   pickFolder: () => Promise<string | null>
+  /** Escolhe o arquivo compactado de mídias (.tar.gz). Ausente em builds antigos. */
+  pickArchive?: () => Promise<string | null>
+  /** Importação em andamento (entre um arquivo e outro). Ausentes em builds antigos. */
+  pause?: () => Promise<boolean>
+  resume?: () => Promise<boolean>
+  cancel?: () => Promise<boolean>
   onImportProgress: (
     callback: (progress: LegacyMediaImportProgress) => void,
   ) => () => void

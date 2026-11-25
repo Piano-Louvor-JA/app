@@ -296,6 +296,10 @@ contextBridge.exposeInMainWorld('louvorja', {
     import: (selectedPath) =>
       ipcRenderer.invoke('legacy-media:import', selectedPath ?? ''),
     pickFolder: () => ipcRenderer.invoke('legacy-media:pick-folder'),
+    pickArchive: () => ipcRenderer.invoke('legacy-media:pick-archive'),
+    pause: () => ipcRenderer.invoke('legacy-media:pause'),
+    resume: () => ipcRenderer.invoke('legacy-media:resume'),
+    cancel: () => ipcRenderer.invoke('legacy-media:cancel'),
     onImportProgress: (callback) => subscribe('legacy-media:import-progress', callback),
   },
 

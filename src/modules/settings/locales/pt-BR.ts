@@ -456,6 +456,25 @@ export default {
       legacyMediaReconciled: ' {marked} coletânea(s) marcadas como baixadas.',
       legacyMediaNotFound:
         'Pasta do Louvor JA legado não encontrada. Verifique se existe em Program Files (x86)\\Louvor JA\\config.',
+      legacyMediaHintLinux:
+        'Escolha o arquivo baixado do site (.tar.gz): o app copia as mídias direto dele, sem precisar extrair. Se preferir, extraia e escolha a pasta. Só são copiados os arquivos (capas, imagens e músicas) que ainda não existem.',
+      legacyMediaPickFolderLinux:
+        'Escolher pasta das mídias',
+      legacyMediaPickHintLinux:
+        'Escolha a pasta extraída do arquivo (ex.: LouvorJA-PIANO) ou a pasta Media dentro dela. O app encontra as capas, imagens e músicas sozinho.',
+      legacyMediaInvalidFolderLinux:
+        'Essa pasta não tem as mídias. Escolha a pasta extraída do arquivo do site (ex.: LouvorJA-PIANO) ou a pasta Media dentro dela.',
+      legacyMediaPause: 'Pausar',
+      legacyMediaResume: 'Continuar',
+      legacyMediaStop: 'Parar',
+      legacyMediaPaused: 'Pausado em {current} de {total}',
+      legacyMediaCancelled: 'Importação parada: {imported} arquivo(s) copiado(s). Escolha o arquivo ou a pasta de novo para continuar de onde parou.',
+      legacyMediaPickArchive: 'Escolher arquivo baixado (.tar.gz)',
+      legacyMediaArchiveSummary: 'Arquivo compactado de {size}: as mídias que ainda não existem são copiadas direto dele, sem extrair.',
+      legacyMediaProgressBytes: 'Lendo {current} de {total}',
+      legacyMediaPausedBytes: 'Pausado em {current} de {total}',
+      legacyMediaInvalidArchive: 'Esse arquivo não tem as mídias do Louvor JA (capas, imagens ou músicas). Escolha o arquivo baixado do site.',
+      legacyMediaLiveCounts: '{imported} gravada(s) agora · {skipped} já existiam (já aparecem na Central de Mídia)',
       legacyMediaError: 'Não foi possível importar as mídias. Tente novamente.',
       mediaFolderTitle: 'Pasta de mídia',
       mediaFolderHint:
