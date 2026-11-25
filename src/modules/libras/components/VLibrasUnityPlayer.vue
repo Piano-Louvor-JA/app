@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted } from 'vue'
-import { getLibrasAvatar, isLibrasSubtitleEnabled, type LibrasAvatar } from '../services/libras-preferences'
+import { getLibrasAvatar, isLibrasSubtitleEnabled, getLibrasSpeed, type LibrasAvatar } from '../services/libras-preferences'
 
 /**
  * VLibrasUnityPlayer — F-B.1 (SPEC v2.1.0): player Unity oficial VLibras
@@ -22,7 +22,7 @@ const VLIBRAS_UNITY_URL = '/vlibras/index.html'
  * O Unity pinta fundo branco (playerweb.json backgroundColor "#FFFFFF") —
  * transparência real exige fork do index (F-B.3); aqui o cartão é o "estúdio".
  */
-const props = defineProps<{ compact?: boolean; avatar?: LibrasAvatar; visible?: boolean; subtitle?: boolean }>()
+const props = defineProps<{ compact?: boolean; avatar?: LibrasAvatar; visible?: boolean; subtitle?: boolean; speed?: number }>()
 
 const ready = ref(false)
 const iframeEl = ref<HTMLIFrameElement | null>(null)
@@ -33,6 +33,9 @@ const avatar = (): LibrasAvatar => props.avatar ?? getLibrasAvatar()
 
 /** Legenda: prop vence pref; default ON (widget oficial desenha gloss textual). */
 const subtitle = (): boolean => props.subtitle ?? isLibrasSubtitleEnabled()
+
+/** Velocidade: prop vence pref; default 1 (normal). 0.5=lenta … 2=rápida. */
+const speed = (): number => props.speed ?? getLibrasSpeed()
 
 function sendToUnity(object: string, method: string, param = '') {
   if (!iframeEl.value?.contentWindow) return
@@ -47,6 +50,8 @@ function onUnityMessage(event: MessageEvent) {
     sendToUnity('PlayerManager', 'Change', avatar())
     // Legenda default do widget é ON; desligar via toggleSubtitle (Player.js oficial).
     if (!subtitle()) sendToUnity('PlayerManager', 'toggleSubtitle')
+    // Velocidade do intérprete: PlayerManager.setSlider (Player.setSpeed oficial).
+    sendToUnity('PlayerManager', 'setSlider', String(speed()))
     if (pendingGloss) {
       sendToUnity('PlayerManager', 'playNow', pendingGloss)
       pendingGloss = ''
@@ -57,6 +62,11 @@ function onUnityMessage(event: MessageEvent) {
 // Troca de avatar em tempo real (settings → prop reativa).
 watch(() => props.avatar, (next) => {
   if (next && ready.value) sendToUnity('PlayerManager', 'Change', next)
+})
+
+// Velocidade em tempo real.
+watch(() => props.speed, (next) => {
+  if (next !== undefined && ready.value) sendToUnity('PlayerManager', 'setSlider', String(next))
 })
 
 // Toggle de legenda em tempo real.

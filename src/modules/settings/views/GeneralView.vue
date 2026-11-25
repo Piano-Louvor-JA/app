@@ -33,12 +33,13 @@ import MediaFolderCard from '../components/MediaFolderCard.vue'
 import AppBackupCard from '../components/AppBackupCard.vue'
 import DiagnosticsCard from '../components/DiagnosticsCard.vue'
 import { ensureCatalogForLocale } from '@modules/starting/services/catalog-locale-service'
-import { isLibrasEnabled, setLibrasEnabled, getLibrasAvatar, setLibrasAvatar, type LibrasAvatar, getLibrasRegionalism, setLibrasRegionalism, type LibrasRegionalism, isLibrasSubtitleEnabled, setLibrasSubtitleEnabled } from '@modules/libras/services/libras-preferences'
+import { isLibrasEnabled, setLibrasEnabled, getLibrasAvatar, setLibrasAvatar, type LibrasAvatar, getLibrasRegionalism, setLibrasRegionalism, type LibrasRegionalism, isLibrasSubtitleEnabled, setLibrasSubtitleEnabled, getLibrasSpeed, setLibrasSpeed } from '@modules/libras/services/libras-preferences'
 
 const librasOn = ref(isLibrasEnabled())
 const librasAvatar = ref<LibrasAvatar>(getLibrasAvatar())
 const librasSubtitle = ref(isLibrasSubtitleEnabled())
 const librasRegionalism = ref<LibrasRegionalism>(getLibrasRegionalism())
+const librasSpeed = ref(getLibrasSpeed())
 
 const { t, locale } = useI18n()
 const catalogSyncState = ref<'idle' | 'syncing' | 'done' | 'error'>('idle')
@@ -469,6 +470,26 @@ async function clearAllLocalData() {
           <option value="sudeste">Sudeste</option>
           <option value="norte">Norte</option>
           <option value="centro-oeste">Centro-Oeste</option>
+        </select>
+      </label>
+
+      <label
+        v-if="librasOn"
+        class="general-settings__libras-row"
+        data-testid="libras-speed-row"
+      >
+        <span>Velocidade do intérprete</span>
+        <select
+          v-model="librasSpeed"
+          data-testid="libras-speed-select"
+          @change="setLibrasSpeed(Number(librasSpeed))"
+        >
+          <option :value="0.5">Lenta (0.5×)</option>
+          <option :value="0.75">0.75×</option>
+          <option :value="1">Normal (1×)</option>
+          <option :value="1.25">1.25×</option>
+          <option :value="1.5">Rápida (1.5×)</option>
+          <option :value="2">Muito rápida (2×)</option>
         </select>
       </label>
     </GlassCard>

@@ -6,6 +6,7 @@ export const LIBRAS_PREFERENCE_KEYS = {
   avatar: 'libras.avatar',
   regionalism: 'libras.regionalism',
   subtitle: 'libras.subtitle',
+  speed: 'libras.speed',
 } as const
 
 export type LibrasAvatar = 'icaro' | 'hozana' | 'guga'
@@ -78,4 +79,20 @@ export function isLibrasSubtitleEnabled(): boolean {
 
 export function setLibrasSubtitleEnabled(enabled: boolean): void {
   setUserPreference(LIBRAS_PREFERENCE_KEYS.subtitle, enabled)
+}
+
+/**
+ * Velocidade do intérprete (PlayerManager.setSlider — Player.setSpeed oficial).
+ * 0.5 = lenta … 2 = rápida; default 1. Valores do widget: slider 0–1 (?)
+ * mapeado linearmente — mantemos o multiplicador humano [0.5, 2].
+ */
+const SPEEDS: readonly number[] = [0.5, 0.75, 1, 1.25, 1.5, 2]
+
+export function getLibrasSpeed(): number {
+  const v = getUserPreference<number | null>(LIBRAS_PREFERENCE_KEYS.speed, 1) ?? 1
+  return SPEEDS.includes(v) ? v : 1
+}
+
+export function setLibrasSpeed(speed: number): void {
+  setUserPreference(LIBRAS_PREFERENCE_KEYS.speed, SPEEDS.includes(speed) ? speed : 1)
 }

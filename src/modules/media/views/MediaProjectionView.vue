@@ -20,7 +20,7 @@ import type { MediaProjectionRuntime } from '../types/media'
 import { DEFAULT_MEDIA_PROJECTION } from '../types/media'
 import VLibrasUnityPlayer from '../../libras/components/VLibrasUnityPlayer.vue'
 import { useLibrasLive } from '../../libras/composables/useLibrasLive'
-import { isLibrasEnabled, getLibrasAvatar, isLibrasSubtitleEnabled } from '../../libras/services/libras-preferences'
+import { isLibrasEnabled, getLibrasAvatar, isLibrasSubtitleEnabled, getLibrasSpeed } from '../../libras/services/libras-preferences'
 
 const runtime = ref<MediaProjectionRuntime>({ ...DEFAULT_MEDIA_PROJECTION })
 
@@ -43,6 +43,7 @@ const showTitle = computed(() => runtime.value.isCover)
 const librasEnabled = isLibrasEnabled()
 const librasAvatar = getLibrasAvatar()
 const librasSubtitle = isLibrasSubtitleEnabled()
+const librasSpeed = getLibrasSpeed()
 const unityPlayer = ref<InstanceType<typeof VLibrasUnityPlayer> | null>(null)
 const liveLyric = computed(() => (runtime.value.active && !runtime.value.isCover ? lyric.value : ''))
 const librasLive = useLibrasLive(liveLyric, computed(() => runtime.value.active))
@@ -264,6 +265,7 @@ const projectionFontStyle = useProjectionFont('hymns')
     :visible="runtime.active"
     :avatar="librasAvatar"
     :subtitle="librasSubtitle"
+    :speed="librasSpeed"
   />
 </template>
 
