@@ -107,7 +107,7 @@ defineExpose({ ready, playGloss, stop })
   position: relative;
   width: 100%;
   aspect-ratio: 4 / 3;
-  background: #101418;
+  background: transparent;
   border-radius: 8px;
   overflow: hidden;
 }
