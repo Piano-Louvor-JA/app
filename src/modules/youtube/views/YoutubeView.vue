@@ -22,6 +22,7 @@ import {
   removeYoutubeFavorite,
   removeYoutubeHistoryEntry,
   toggleYoutubeFavorite,
+  YOUTUBE_LIBRARY_CHANGED,
   type YoutubeFavoriteEntry,
   type YoutubeHistoryEntry,
 } from '../services/youtube-history'
@@ -229,6 +230,14 @@ function isFavorite(videoId: string): boolean {
 function toggleFavorite(video: PlayableVideo) {
   favorites.value = toggleYoutubeFavorite(video)
 }
+
+/** Controle remoto favoritou ou tocou: recarrega as listas com a tela aberta. */
+function reloadLibrary() {
+  history.value = listYoutubeHistory()
+  favorites.value = listYoutubeFavorites()
+}
+window.addEventListener(YOUTUBE_LIBRARY_CHANGED, reloadLibrary)
+onBeforeUnmount(() => window.removeEventListener(YOUTUBE_LIBRARY_CHANGED, reloadLibrary))
 
 /** Linhas da aba atual (Histórico ou Favoritos), já filtradas. */
 type ListRow = YoutubeFavoriteEntry & { playCount?: number } & Partial<Pick<YoutubeDownloadedRow, 'size' | 'fileName' | 'renamed' | 'folder'>>

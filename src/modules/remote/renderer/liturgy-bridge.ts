@@ -24,6 +24,13 @@ import type { MediaPlaybackMode } from '../../media/types/media'
 
 import { resolveMediaTarget } from './media-target'
 import { createModuleHandlers } from './module-handlers'
+import { YOUTUBE_LIBRARY_CHANGED } from '@modules/youtube/services/youtube-history'
+import {
+  createYoutubeLibraryFeed,
+  favoriteYoutubeFromRemote,
+  playYoutubeFromRemote,
+  youtubeLibraryFromRemote,
+} from './youtube-remote'
 import { palcoSession } from '../../settings/services/palco-session'
 import {
   obsConnectionName,
@@ -111,7 +118,7 @@ function videoControlCommand(msg: RemoteBridgeMessage): Record<string, unknown> 
 }
 
 /** Namespaces v2 (controle remoto total — spec Obsidian v2). */
-const V2_NAMESPACES = new Set(['media', 'bible', 'timer', 'countdown', 'clock', 'random', 'palco'])
+const V2_NAMESPACES = new Set(['media', 'bible', 'timer', 'countdown', 'clock', 'random', 'palco', 'youtube'])
 
 interface ProjectionSlideApi {
   getPdfPageState?: () => Promise<{ index: number; total: number; projecting?: boolean } | null>
@@ -233,6 +240,12 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
       turnOff: () => palcoSession.turnOff(),
       project: (scope, input) => palcoSession.project(scope, input),
       idle: () => palcoSession.idle(),
+    },
+    // Módulo YouTube pelo celular: mesmo player do vídeo do YouTube da liturgia.
+    youtube: {
+      play: playYoutubeFromRemote,
+      favorite: favoriteYoutubeFromRemote,
+      library: youtubeLibraryFromRemote,
     },
   })
 
@@ -543,7 +556,8 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
       const pb = await projection.getPlaybackState()
       media = {
         playing: pb ? !pb.paused : false,
-        title: items[liturgy.selectedItemIndex ?? -1]?.name ?? null,
+        // Vídeo do módulo YouTube não é item da liturgia: o título vem do player.
+        title: pb?.title || items[liturgy.selectedItemIndex ?? -1]?.name || null,
         volume: Math.round((pb?.volume ?? 1) * 100),
         positionMs: Math.round((pb?.currentTime ?? 0) * 1000),
         durationMs: Math.round((pb?.duration ?? 0) * 1000),
@@ -689,7 +703,7 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
           : (liturgy.selectedItemIndex ?? -1) + 1 <
           (liturgy.currentItems?.length ?? 0),
       },
-      ...snapshotsV2(modules),
+      ...snapshotsV2(modules, withGallery),
     }
   }
 
@@ -707,7 +721,13 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
   // Snapshots v2 — ausentes para peers v1, que ignoram o extra.
   // null → undefined: todos os namespaces têm dep garantida no bridge,
   // o null é defensivo (dependência de runtime dos stores).
-  function snapshotsV2(modules: ReturnType<typeof createModuleHandlers>): Record<string, unknown> {
+  const youtubeSnapshot = (base: Record<string, unknown> | undefined, full: boolean) =>
+    base && { ...base, ...youtubeLibrary(full) }
+
+  // Histórico e favoritos do YouTube do desktop (só quando mudam ou num pedido completo).
+  const youtubeLibrary = createYoutubeLibraryFeed()
+
+  function snapshotsV2(modules: ReturnType<typeof createModuleHandlers>, full = false): Record<string, unknown> {
     /* istanbul ignore next -- todos os deps são sempre fornecidos; random/media null cobertos por teste */
     const orUndef = (ns: string): Record<string, unknown> | undefined =>
       modules.snapshot(ns) ?? undefined
@@ -718,6 +738,7 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
       clock: orUndef('clock'),
       random: orUndef('random'),
       media: orUndef('media'),
+      youtube: youtubeSnapshot(orUndef('youtube'), full),
       announcements: announcements.snapshot(),
       playlist: playlists.snapshot(),
       sabbath: sabbath.snapshot(),
@@ -1149,10 +1170,15 @@ export function installRemoteLiturgyBridge({ router }: { router: Router }) {
     })()
   }, 2000)
 
+  // Histórico/favoritos do YouTube mudaram (no desktop ou pelo celular): atualiza o celular.
+  const onYoutubeLibrary = () => void pushState()
+  window.addEventListener(YOUTUBE_LIBRARY_CHANGED, onYoutubeLibrary)
+
   pushState()
 
   return () => {
     disposed = true
+    window.removeEventListener(YOUTUBE_LIBRARY_CHANGED, onYoutubeLibrary)
     clearInterval(progressTicker)
     clearInterval(docPoll)
     onUn.command?.()

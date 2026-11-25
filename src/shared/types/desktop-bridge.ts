@@ -567,6 +567,8 @@ export type ProjectionPlaybackState = {
   volume?: number
   /** Telas estendidas espelhando o popup. */
   projecting?: boolean
+  /** Título do vídeo aberto (liturgia ou módulo YouTube). */
+  title?: string
 }
 
 export type ProjectionNavigationState = {

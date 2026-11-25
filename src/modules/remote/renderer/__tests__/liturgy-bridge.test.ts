@@ -90,6 +90,18 @@ vi.mock('@shared/services/desktop-bridge', () => ({
   }))
 }))
 
+const youtubeRemote = vi.hoisted(() => ({
+  play: vi.fn(async () => true),
+  favorite: vi.fn(() => true),
+  library: vi.fn(() => true),
+  feed: vi.fn((force: boolean) => (force ? { libraryKey: 'k1', history: [], favorites: [] } : { libraryKey: 'k1' })),
+}))
+vi.mock('../youtube-remote', () => ({
+  playYoutubeFromRemote: youtubeRemote.play,
+  favoriteYoutubeFromRemote: youtubeRemote.favorite,
+  youtubeLibraryFromRemote: youtubeRemote.library,
+  createYoutubeLibraryFeed: () => youtubeRemote.feed,
+}))
 vi.mock('../slide-background', () => ({
   makeSlideBackgroundThumb: vi.fn(async (path: string) => `data:image/jpeg;base64,${path}`),
 }))
@@ -352,6 +364,59 @@ describe('installRemoteLiturgyBridge', () => {
       expect(st.player.volume).toBe(70)
       expect(st.player.positionMs).toBe(1500)
     })
+  })
+
+  it('buildState: título do vídeo vem do player (vídeo do módulo YouTube não é item da liturgia)', async () => {
+    hoisted.targetRef = 'projection'
+    hoisted.projection = { getPlaybackState: vi.fn(() => ({ paused: false, currentTime: 1, duration: 30, volume: 1, title: 'Castelo Forte' })) }
+    const { command } = await installBridge()
+    await command({ action: 'state.request', id: 1 })
+    await vi.waitFor(() => {
+      const st = hoisted.remoteApiStub.sendState.mock.calls.at(-1)?.[0]
+      expect(st.player.title).toBe('Castelo Forte')
+      // o celular só mostra o YouTube para quem anuncia
+      expect(st.youtube).toMatchObject({ canPlay: true, canFavorite: true, libraryKey: 'k1' })
+    })
+  })
+
+  it('youtube.play toca pelo player da liturgia com link, título e canal', async () => {
+    youtubeRemote.play.mockClear()
+    const { command } = await installBridge()
+    await command({ action: 'youtube.play', id: 9, url: 'https://youtu.be/AAAAAAAAAAA', name: 'Hino', channel: 'CPB' })
+    expect(youtubeRemote.play).toHaveBeenCalledWith('https://youtu.be/AAAAAAAAAAA', 'Hino', 'CPB')
+    await vi.waitFor(() => {
+      expect(hoisted.remoteApiStub.sendAck).toHaveBeenCalledWith(expect.objectContaining({ id: 9, ok: true }))
+    })
+  })
+
+  it('youtube.favorite grava no desktop com link, marcação, título e canal', async () => {
+    youtubeRemote.favorite.mockClear()
+    const { command } = await installBridge()
+    await command({ action: 'youtube.favorite', id: 10, url: 'https://youtu.be/AAAAAAAAAAA', enabled: true, name: 'Hino', channel: 'CPB' })
+    expect(youtubeRemote.favorite).toHaveBeenCalledWith('https://youtu.be/AAAAAAAAAAA', true, 'Hino', 'CPB')
+    await vi.waitFor(() => {
+      expect(hoisted.remoteApiStub.sendAck).toHaveBeenCalledWith(expect.objectContaining({ id: 10, ok: true }))
+    })
+  })
+
+  it('youtube: histórico do desktop vai no pedido completo; mudança na biblioteca empurra o estado', async () => {
+    const { onStateRequestCb, cleanup } = await installBridge()
+    await onStateRequestCb()
+    await vi.waitFor(() => {
+      const st = hoisted.remoteApiStub.sendState.mock.calls.at(-1)?.[0]
+      expect(st.youtube).toMatchObject({ libraryKey: 'k1', history: [], favorites: [] })
+    })
+    const before = hoisted.remoteApiStub.sendState.mock.calls.length
+    window.dispatchEvent(new Event('youtube-library-changed'))
+    await vi.waitFor(() => expect(hoisted.remoteApiStub.sendState.mock.calls.length).toBeGreaterThan(before))
+    cleanup()
+  })
+
+  it('youtube.historyClear chega à biblioteca do desktop', async () => {
+    youtubeRemote.library.mockClear()
+    const { command } = await installBridge()
+    await command({ action: 'youtube.historyClear', id: 11 })
+    expect(youtubeRemote.library).toHaveBeenCalledWith('youtube.historyClear', '', '')
   })
 
   it('buildState: projection sem getPlaybackState → fallback player', async () => {

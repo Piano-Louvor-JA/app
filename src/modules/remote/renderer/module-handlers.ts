@@ -9,6 +9,14 @@
  * Comandos desconhecidos/inválidos → false (ack negativo, sem throw).
  */
 
+
+const YOUTUBE_LIBRARY_ACTIONS = new Set([
+  'youtube.historyRemove',
+  'youtube.historyClear',
+  'youtube.historyReorder',
+  'youtube.favoritesReorder',
+])
+
 export interface ModuleHandlers {
   /** Retorna boolean ou `{ ok, data }` (ack estendido com payload p/ queries). */
   execute(namespace: string, action: string, msg: Record<string, unknown>): Promise<boolean | { ok: boolean; data: unknown }>
@@ -144,6 +152,13 @@ export interface ModuleHandlerDeps {
   random?: RandomStoreLike
   /** Palco (cast TV) — comandos palco.* vindos do remote (web/APK). */
   palco?: PalcoDeps
+  /** Módulo YouTube: toca no player da liturgia (link, título, canal). */
+  youtube?: {
+    play(url: string, title: string, channel: string): Promise<boolean> | boolean
+    favorite?(url: string, favorite: boolean, title: string, channel: string): boolean
+    /** Histórico/favoritos do desktop: remover, limpar e reordenar. */
+    library?(action: string, from: string, to: string): boolean
+  }
 }
 
 /** Dependências do namespace palco (sender de cast para TV). */
@@ -675,6 +690,20 @@ export function createModuleHandlers(deps: ModuleHandlerDeps): ModuleHandlers {
         if (namespace === 'palco' && deps.palco) {
           return executePalco(deps.palco, action, msg)
         }
+        if (namespace === 'youtube' && deps.youtube) {
+          const str = (v: unknown) => (typeof v === 'string' ? v : '')
+          if (YOUTUBE_LIBRARY_ACTIONS.has(action)) {
+            return deps.youtube.library?.(action, str(msg.url), str(msg.targetId)) === true
+          }
+          if (typeof msg.url !== 'string' || !msg.url) return false
+          if (action === 'youtube.play') {
+            return (await deps.youtube.play(msg.url, str(msg.name), str(msg.channel))) === true
+          }
+          if (action === 'youtube.favorite' && deps.youtube.favorite && typeof msg.enabled === 'boolean') {
+            return deps.youtube.favorite(msg.url, msg.enabled, str(msg.name), str(msg.channel)) === true
+          }
+          return false
+        }
         return false
       } catch {
         /* v8 ignore next 1 -- handler lançando já coberto; remap v8 não credita */
@@ -700,6 +729,10 @@ export function createModuleHandlers(deps: ModuleHandlerDeps): ModuleHandlers {
       if (namespace === 'palco' && deps.palco) {
         // snapshot assíncrono não existe aqui — devolve status síncrono leve
         return { available: true }
+      }
+      // Anuncia ao celular que dá para tocar YouTube por aqui (desktops antigos não mandam).
+      if (namespace === 'youtube' && deps.youtube) {
+        return deps.youtube.favorite ? { canPlay: true, canFavorite: true } : { canPlay: true }
       }
       return null
     },
