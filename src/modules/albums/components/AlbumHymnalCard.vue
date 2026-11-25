@@ -50,7 +50,11 @@ const subtitle = computed(() => {
 })
 
 const coverIcon = computed(() =>
-  props.collection.id === 'hymnal_1996' ? 'ti-history' : 'ti-book-2',
+  props.collection.id === 'hymnal_1996'
+    ? 'ti-history'
+    : props.collection.id === 'youtube_cpb'
+      ? 'ti-brand-youtube'
+      : 'ti-book-2',
 )
 
 const coverSrc = computed(() => props.collection.coverUrl || '')

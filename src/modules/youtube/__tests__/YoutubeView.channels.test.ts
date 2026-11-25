@@ -14,13 +14,17 @@ const mocks = vi.hoisted(() => ({
   restored: null as Record<string, unknown> | null,
   capture: null as (() => Record<string, unknown>) | null,
   describe: null as (() => { summary: string }) | null,
+  routeQuery: {} as Record<string, unknown>,
 }))
 
 vi.mock('vue-i18n', async (original) => ({
   ...await original<typeof import('vue-i18n')>(),
   useI18n: () => ({ t: (key: string, arg?: unknown) => (arg === undefined ? key : `${key}:${JSON.stringify(arg)}`) }),
 }))
-vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
+vi.mock('vue-router', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+  useRoute: () => ({ query: mocks.routeQuery }),
+}))
 vi.mock('@shared/composables/useMinimizablePage', () => ({
   useMinimizablePage: (opts: { capture: () => Record<string, unknown>; describe: () => { summary: string } }) => {
     mocks.capture = opts.capture
@@ -80,6 +84,7 @@ beforeEach(() => {
   localStorage.clear()
   mocks.fetchPlaylist.mockReset()
   mocks.restored = null
+  mocks.routeQuery = {}
 })
 
 afterEach(() => {
@@ -188,3 +193,22 @@ describe('YoutubeView — canal da CPB (lista única de hinos)', () => {
     expect(titles(reopened)).toHaveLength(12)
   })
 })
+
+describe('YoutubeView — aberto pela Central de Mídia (Hinário Adventista - CPB)', () => {
+  it('?channel=cpb já abre a lista unificada dos hinos', async () => {
+    mocks.fetchPlaylist.mockImplementation(hymnalFetch)
+    mocks.routeQuery = { channel: 'cpb' }
+    const w = mountView()
+    await flushPromises()
+    expect(titles(w).length).toBeGreaterThan(0)
+    expect(titles(w)[0]).toContain('Hino 1')
+  })
+
+  it('canal desconhecido no endereço: abre normal, sem lista', async () => {
+    mocks.routeQuery = { channel: 'nao-existe' }
+    const w = mountView()
+    await flushPromises()
+    expect(titles(w)).toEqual([])
+  })
+})
+

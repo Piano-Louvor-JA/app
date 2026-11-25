@@ -216,6 +216,8 @@ export type YoutubeSearchApi = {
   channel?: (text: string) => Promise<YoutubeChannelResult>
   /** Busca canais sobre o tema, puxando para os adventistas. */
   channels?: (query: string) => Promise<YoutubeChannelSearchResult>
+  /** Logo do canal como imagem embutida (data URL), buscado no main. */
+  channelLogo?: (text: string) => Promise<{ dataUrl: string; error?: string }>
 }
 
 export type YoutubePlaylistResult = { title: string; items: YoutubeSearchItem[]; error?: string }

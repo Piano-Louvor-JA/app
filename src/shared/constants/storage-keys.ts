@@ -50,6 +50,8 @@ export const USER_PREFERENCE_KEYS = {
   liturgyState: 'liturgy.state',
   /** Aparência da lista da liturgia (linha da categoria e cor de cada tipo). */
   liturgyAppearance: 'liturgy.appearance',
+  /** Logo da Casa Publicadora Brasileira (foto do canal no YouTube). */
+  youtubeCpbLogo: 'youtube.cpbLogo',
   scheduledState: 'scheduled.state',
   language: 'language',
   /** Posição (left/top em px) do player minimizado arrastado; ausente = canto padrão. */

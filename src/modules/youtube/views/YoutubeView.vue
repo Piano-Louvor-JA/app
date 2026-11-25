@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import AppConfirm from '@shared/components/AppConfirm.vue'
 import PageBackStack from '@shared/components/PageBackStack.vue'
@@ -624,6 +624,14 @@ if (restored) {
   openPlaylistId.value = restored.openPlaylistId ?? null
   // depois do watch da aba (que limpa o filtro)
   void nextTick(() => { historyFilter.value = restored.historyFilter })
+}
+
+// Aberto pela Central de Mídia (card "Hinário Adventista - CPB"): já entra no canal.
+const route = useRoute()
+const channelFromRoute = typeof route?.query?.channel === 'string' ? route.query.channel : ''
+if (channelFromRoute && channels.value.some((c) => c.id === channelFromRoute)) {
+  tab.value = 'channels'
+  openChannelCard(channelFromRoute)
 }
 
 /* ---------- Downloads ---------- */

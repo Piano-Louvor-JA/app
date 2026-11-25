@@ -156,12 +156,22 @@ vi.mock('../../components/AlbumLyricDialog.vue', () => ({
   default: { props: ['open', 'loading', 'document'], template: '<div class="lyric-stub" />' },
 }))
 
+const youtubeMock = vi.hoisted(() => ({ available: true }))
+vi.mock('@modules/youtube/services/youtube-player', async (original) => ({
+  ...(await original<typeof import('@modules/youtube/services/youtube-player')>()),
+  isYoutubeSearchAvailable: () => youtubeMock.available,
+}))
+vi.mock('@modules/youtube/services/youtube-cpb-logo', () => ({
+  cachedCpbLogo: () => 'https://yt3.ggpht.com/cpb-logo',
+  refreshCpbLogo: vi.fn(async () => 'https://yt3.ggpht.com/cpb-logo'),
+}))
+
 vi.mock('../../components/AlbumHymnalCard.vue', () => ({
   default: {
     name: 'AlbumHymnalCard',
     props: ['collection', 'libraryAlbum', 'showDownloadControls'],
     emits: ['open', 'download', 'cancel', 'remove'],
-    template: `<div class="hymnal-card-stub" :data-id="collection.id">
+    template: `<div class="hymnal-card-stub" :data-id="collection.id" :data-cover="collection.coverUrl" :data-name="collection.name" :data-controls="String(showDownloadControls)">
       <button class="hc-open" @click="$emit('open')" />
       <button class="hc-download" @click="$emit('download')" />
       <button class="hc-cancel" @click="$emit('cancel')" />
@@ -692,3 +702,34 @@ describe('AlbumsView — minimizar a janela de Playlists', () => {
     expect(replaceMock).not.toHaveBeenCalled()
   })
 })
+
+describe('AlbumsView — Hinário Adventista - CPB (YouTube) na linha dos hinários', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    pushMock.mockClear()
+    setState()
+    youtubeMock.available = true
+  })
+
+  it('aparece ao lado dos hinários, com o logo da CPB e sem controles de baixar; abre a lista unificada', async () => {
+    const wrapper = await mountView()
+    const grid = wrapper.get('.albums-view__hymnal-grid')
+    const cards = grid.findAll('.hymnal-card-stub')
+    expect(cards.map((c) => c.attributes('data-id'))).toEqual(['pt_hymnal', 'youtube_cpb'])
+    const cpb = cards[1]
+    expect(cpb.attributes('data-name')).toBe('sync.hymnal.cpbYoutubeName')
+    expect(cpb.attributes('data-cover')).toBe('https://yt3.ggpht.com/cpb-logo')
+    expect(cpb.attributes('data-controls')).toBe('false')
+
+    await cpb.get('.hc-open').trigger('click')
+    expect(pushMock).toHaveBeenCalledWith({ name: 'albums-youtube', query: { channel: 'cpb' } })
+  })
+
+  it('sem o YouTube no app (web/build antigo), o card não aparece', async () => {
+    youtubeMock.available = false
+    const wrapper = await mountView()
+    const ids = wrapper.get('.albums-view__hymnal-grid').findAll('.hymnal-card-stub').map((c) => c.attributes('data-id'))
+    expect(ids).toEqual(['pt_hymnal'])
+  })
+})
+

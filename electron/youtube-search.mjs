@@ -527,6 +527,34 @@ export async function searchYoutubeChannels(query, { fetch, timeoutMs = TIMEOUT_
 }
 
 /** @param {{ handle: (channel: string, fn: (...args: any[]) => unknown) => void }} ipcMain @param {{ fetch: typeof fetch }} options */
+const LOGO_HOSTS = /^https:\/\/(yt3\.googleusercontent\.com|yt3\.ggpht\.com)\//i
+
+/**
+ * Logo de um canal como imagem embutida (data URL), buscada aqui no main:
+ * a tela não depende de carregar imagem de fora e o logo fica guardado para
+ * aparecer sem internet. Tamanho pequeno (s176) — ~10 KB.
+ * @param {string} text link, @handle ou id do canal
+ * @param {{ fetch: typeof globalThis.fetch, channel?: (text: string) => Promise<any>, timeoutMs?: number }} deps
+ * @returns {Promise<{ dataUrl: string, error?: string }>}
+ */
+export async function fetchYoutubeChannelLogo(text, { fetch, channel, timeoutMs = TIMEOUT_MS }) {
+  const info = await (channel ?? ((t) => fetchYoutubeChannel(t, { fetch, timeoutMs })))(text).catch(() => null)
+  const avatar = String(info?.channel?.avatar ?? '')
+  if (!LOGO_HOSTS.test(avatar)) return { dataUrl: '', error: 'no-avatar' }
+  const url = avatar.replace(/=s\d+(-|$)/, '=s176$1')
+  try {
+    const response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) })
+    if (!response.ok) return { dataUrl: '', error: 'network' }
+    const type = (response.headers.get('content-type') || 'image/jpeg').split(';')[0]
+    if (!type.startsWith('image/')) return { dataUrl: '', error: 'network' }
+    const body = Buffer.from(await response.arrayBuffer())
+    if (body.length === 0) return { dataUrl: '', error: 'network' }
+    return { dataUrl: `data:${type};base64,${body.toString('base64')}` }
+  } catch {
+    return { dataUrl: '', error: 'network' }
+  }
+}
+
 export function registerYoutubeSearchIpc(ipcMain, { fetch }) {
   const logged = (kind) => (result) => {
     if (result?.error) console.warn(`[youtube-search] ${kind}: ${result.error}`)
@@ -537,4 +565,10 @@ export function registerYoutubeSearchIpc(ipcMain, { fetch }) {
   ipcMain.handle('youtube-search:playlist', (_event, text) => fetchYoutubePlaylist(String(text ?? ''), { fetch }).then(logged('playlist')))
   ipcMain.handle('youtube-search:channel', (_event, text) => fetchYoutubeChannel(String(text ?? ''), { fetch }).then(logged('canal')))
   ipcMain.handle('youtube-search:channels', (_event, query) => searchYoutubeChannels(String(query ?? ''), { fetch }).then(logged('canais')))
+  ipcMain.handle('youtube-search:channel-logo', (_event, text) =>
+    fetchYoutubeChannelLogo(String(text ?? ''), { fetch }).then((result) => {
+      if (result.error) console.warn(`[youtube-search] logo do canal: ${result.error}`)
+      else console.info(`[youtube-search] logo do canal ok (${Math.round(result.dataUrl.length / 1024)} KB)`)
+      return result
+    }))
 }

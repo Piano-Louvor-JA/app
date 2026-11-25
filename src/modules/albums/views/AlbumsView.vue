@@ -14,6 +14,8 @@ import { getShowCustomCollections, setShowCustomCollections } from '../visibilit
 import AlbumCollectionCard from '../components/AlbumCollectionCard.vue'
 import AppConfirm from '@shared/components/AppConfirm.vue'
 import AlbumHymnalCard from '../components/AlbumHymnalCard.vue'
+import { isYoutubeSearchAvailable } from '@modules/youtube/services/youtube-player'
+import { cachedCpbLogo, refreshCpbLogo } from '@modules/youtube/services/youtube-cpb-logo'
 import AlbumLyricDialog from '../components/AlbumLyricDialog.vue'
 import AlbumPlaylistPickerDialog from '../components/AlbumPlaylistPickerDialog.vue'
 import AlbumSearchHitRow from '../components/AlbumSearchHitRow.vue'
@@ -192,6 +194,35 @@ function addToPlaylist(id: string) {
 }
 
 const showDownloadControls = computed(() => isDesktop)
+
+/**
+ * Hinário Adventista da Casa Publicadora Brasileira no YouTube: fica na linha
+ * dos hinários e abre a lista unificada dos hinos no módulo YouTube (canal
+ * CPB). Logo = foto oficial do canal (guardada; atualizada ao abrir).
+ */
+const cpbLogo = ref(cachedCpbLogo())
+const youtubeHymnal = computed<AlbumCollection | null>(() =>
+  isYoutubeSearchAvailable()
+    ? {
+        id: 'youtube_cpb',
+        kind: 'hymnal',
+        name: t('sync.hymnal.cpbYoutubeName'),
+        subtitle: t('sync.hymnal.cpbYoutubeSubtitle'),
+        coverUrl: cpbLogo.value || null,
+        trackCount: null,
+        catalogKey: 'youtube_cpb',
+      }
+    : null,
+)
+if (youtubeHymnal.value) {
+  void refreshCpbLogo().then((logo) => {
+    if (logo) cpbLogo.value = logo
+  })
+}
+
+function openCpbYoutube() {
+  void router.push({ name: 'albums-youtube', query: { channel: 'cpb' } })
+}
 
 function isHymnalsCategory(category: AlbumCategory) {
   return String(category.id) === 'hymnals'
@@ -987,6 +1018,13 @@ async function runAction(
             @cancel="cancelCollection(collection.id)"
             @remove="requestRemove(collection)"
           />
+          <AlbumHymnalCard
+            v-if="youtubeHymnal"
+            :key="'youtube_cpb'"
+            :collection="youtubeHymnal"
+            :show-download-controls="false"
+            @open="openCpbYoutube"
+          />
         </div>
 
         <GlassCard
@@ -1551,6 +1589,11 @@ async function runAction(
 
   @media (min-width: 768px) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Três hinários na mesma linha (o 3º é o da CPB no YouTube). */
+  @media (min-width: 1200px) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 

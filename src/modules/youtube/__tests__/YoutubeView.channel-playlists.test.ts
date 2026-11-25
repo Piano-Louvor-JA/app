@@ -22,7 +22,7 @@ vi.mock('vue-i18n', async (original) => ({
   ...await original<typeof import('vue-i18n')>(),
   useI18n: () => ({ t: (key: string, arg?: unknown) => (arg === undefined ? key : `${key}:${JSON.stringify(arg)}`) }),
 }))
-vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
+vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }), useRoute: () => ({ query: {} }) }))
 vi.mock('@shared/composables/useMinimizablePage', () => ({
   useMinimizablePage: (opts: { capture: () => Record<string, unknown>; describe: () => { summary: string } }) => {
     mocks.capture = opts.capture
