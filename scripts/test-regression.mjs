@@ -24,7 +24,9 @@ const BASELINE_FILE = resolve(REPO_ROOT, '.regression-baseline.json')
 
 function run(cmd, { silent = false } = {}) {
   try {
-    const out = execSync(cmd, { cwd: REPO_ROOT, encoding: 'utf8', stdio: silent ? 'pipe' : 'inherit', maxBuffer: 16 * 1024 * 1024 })
+    // 256 MiB: a suíte jsdom emite muito stderr ("Not implemented"); 16 MiB
+    // estourava maxBuffer e marcava baseline como falha com failed:0.
+    const out = execSync(cmd, { cwd: REPO_ROOT, encoding: 'utf8', stdio: silent ? 'pipe' : 'inherit', maxBuffer: 256 * 1024 * 1024 })
     return { ok: true, out: out?.trim() ?? '' }
   } catch (e) {
     const out = [e.stdout?.toString(), e.stderr?.toString(), e.message].filter(Boolean).join('\n')
@@ -47,8 +49,18 @@ function runTests() {
     const valid = [passed, failed, total].every(value => Number.isInteger(value) && value >= 0)
       && total > 0 && passed + failed <= total
     if (!valid) console.error('Relatório de testes ausente ou inválido; a regressão não pode ser aprovada.')
+    // O relatório JSON é a fonte da verdade. result.ok pode falhar por
+    // maxBuffer/stdio mesmo com failed:0 e success:true (ruído jsdom).
+    const reportOk = valid && data?.success === true && failed === 0
+    if (!reportOk && !result.ok) {
+      // já logou em run(); mantém diagnóstico
+    } else if (!reportOk && result.ok) {
+      console.error('Relatório JSON indica falha apesar do exit code 0.')
+    } else if (reportOk && !result.ok) {
+      console.warn('Exit code ≠0 ignorado: relatório JSON válido com failed:0 e success:true.')
+    }
     return {
-      ok: result.ok && valid && data.success === true && failed === 0,
+      ok: reportOk,
       tests: valid ? { passed, failed, total } : { passed: null, failed: null, total: null },
     }
   } catch (error) {
