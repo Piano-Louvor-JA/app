@@ -72,4 +72,13 @@ export default {
 		markRead: "Marcar todas como lidas",
 		empty: "Nenhuma notificação por aqui.",
 	},
+	copies: {
+		title: "Minhas cópias",
+		subtitle: "Cópias de coletâneas da Comunidade",
+		cta: "Minhas cópias",
+		empty: "Você ainda não salvou cópias de coletâneas.",
+		open: "Abrir",
+		delete: "Excluir",
+		badge: "Cópia",
+	},
 };
