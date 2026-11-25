@@ -38,6 +38,7 @@ import { isLibrasEnabled, setLibrasEnabled, getLibrasAvatar, setLibrasAvatar, ty
 const librasOn = ref(isLibrasEnabled())
 const librasAvatar = ref<LibrasAvatar>(getLibrasAvatar())
 const librasSubtitle = ref(isLibrasSubtitleEnabled())
+const librasRegionalism = ref<LibrasRegionalism>(getLibrasRegionalism())
 
 const { t, locale } = useI18n()
 const catalogSyncState = ref<'idle' | 'syncing' | 'done' | 'error'>('idle')
@@ -448,6 +449,26 @@ async function clearAllLocalData() {
           <option value="icaro">{{ t('settings.general.librasAvatarIcaro') }}</option>
           <option value="hozana">{{ t('settings.general.librasAvatarHozana') }}</option>
           <option value="guga">{{ t('settings.general.librasAvatarGuga') }}</option>
+        </select>
+      </label>
+
+      <label
+        v-if="librasOn"
+        class="general-settings__libras-row"
+        data-testid="libras-regionalism-row"
+      >
+        <span>Regionalismo Libras</span>
+        <select
+          v-model="librasRegionalism"
+          data-testid="libras-regionalism-select"
+          @change="setLibrasRegionalism(librasRegionalism)"
+        >
+          <option value="default">Padrão BR</option>
+          <option value="nordeste">Nordeste</option>
+          <option value="sul">Sul</option>
+          <option value="sudeste">Sudeste</option>
+          <option value="norte">Norte</option>
+          <option value="centro-oeste">Centro-Oeste</option>
         </select>
       </label>
     </GlassCard>
