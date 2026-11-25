@@ -72,4 +72,13 @@ export default {
 		markRead: "Mark all as read",
 		empty: "No notifications yet.",
 	},
+	copies: {
+		title: "My copies",
+		subtitle: "Copies of Community collections",
+		cta: "My copies",
+		empty: "You haven't saved any collection copies yet.",
+		open: "Open",
+		delete: "Delete",
+		badge: "Copy",
+	},
 };

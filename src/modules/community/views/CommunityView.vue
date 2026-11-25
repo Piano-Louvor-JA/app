@@ -347,8 +347,9 @@ async function saveCopy(collection: CommunityCollectionSummary) {
 	const localId = await saveCommunityCopy(collection);
 	copyingId.value = null;
 	if (localId !== null) {
-		// Cópia fica em Minhas Coletâneas (/albums, SHOW_CUSTOM_COLLECTIONS=true
-		// desde 16/09); criar/editar agora parte daqui mesmo, via botão no header.
+		// SPEC-louvorja-community-copies: a cópia (origin.type='community')
+		// agora lista na aba Comunidade (/community/copies) — não em Minhas
+		// Coletâneas. Criar/editar parte daqui mesmo, via botão no header.
 		savedId.value = collection.id;
 		await load();
 	} else {
@@ -391,6 +392,14 @@ onMounted(load);
             v-if="notifications.length > 0"
             class="community-view__bell-badge"
           >{{ notifications.length }}</span>
+        </button>
+        <button
+          type="button"
+          class="community-view__ranking-link"
+          @click="router.push('/community/copies')"
+        >
+          <i class="ti ti-copy" aria-hidden="true" />
+          {{ t('community.copies.cta') }}
         </button>
         <button
           type="button"
