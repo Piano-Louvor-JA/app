@@ -6,15 +6,15 @@ export default {
       "open": "संग्रह {name} खोलें",
       "trackCount": "{count} गीत",
       "empty": "अभी कोई संग्रह नहीं। संपादक में .slja फ़ाइल आयात करें।",
-      emptyHint: "आपकी अभी कोई प्लेलिस्ट नहीं है।",
-      createHint: "लाइब्रेरी के प्लेलिस्ट अनुभाग में बनाएँ।",
-      importInvalid: "अमान्य प्लेलिस्ट फ़ाइल।",
+      "emptyHint": "आपकी अभी कोई प्लेलिस्ट नहीं है।",
+      "createHint": "लाइब्रेरी के प्लेलिस्ट अनुभाग में बनाएँ।",
+      "importInvalid": "अमान्य प्लेलिस्ट फ़ाइल।",
       "newPlaceholder": "नया संग्रह नाम…",
       "create": "बनाएँ",
       "hide": "मेरे संग्रह छिपाएँ",
       "show": "मेरे संग्रह दिखाएँ"
     },
-    fallbackMusic: "संगीत",
+    "fallbackMusic": "संगीत",
     "playlists": {
       "removeTrackTitle": "प्लेलिस्ट से हटाएँ?",
       "removeTrackMessage": "\"{title}\" \"{name}\" से निकलेगा। गीत और डाउनलोड की गई फ़ाइलें लाइब्रेरी में रहेंगी।",
@@ -81,7 +81,10 @@ export default {
       "tracksFailed": "गीत लोड नहीं हो सके।",
       "searchEmpty": "कोई गीत नहीं मिला।",
       "lyricMissing": "इस गीत के बोल उपलब्ध नहीं।",
-      "projectionFailed": "विन्यस्त स्क्रीन पर प्रोजेक्शन नहीं खुल सका।"
+      "projectionFailed": "विन्यस्त स्क्रीन पर प्रोजेक्शन नहीं खुल सका।",
+      "deleteCollectionAction": "Delete collection",
+      "deleteCollectionTitle": "Delete “{name}”?",
+      "deleteCollectionText": "The local copy will be deleted. The original in Community is not affected."
     }
   }
 }

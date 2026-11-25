@@ -6,15 +6,15 @@ export default {
       "open": "打开歌集 {name}",
       "trackCount": "{count} 首",
       "empty": "还没有歌集。请在编辑器中导入 .slja 文件。",
-      emptyHint: "您还没有任何播放列表。",
-      createHint: "在媒体库的“播放列表”部分创建一个。",
-      importInvalid: "无效的播放列表文件。",
+      "emptyHint": "您还没有任何播放列表。",
+      "createHint": "在媒体库的“播放列表”部分创建一个。",
+      "importInvalid": "无效的播放列表文件。",
       "newPlaceholder": "新歌集名称…",
       "create": "创建",
       "hide": "隐藏我的歌集",
       "show": "显示我的歌集"
     },
-    fallbackMusic: "音乐",
+    "fallbackMusic": "音乐",
     "playlists": {
       "removeTrackTitle": "从播放列表移除？",
       "removeTrackMessage": "“{title}”将离开“{name}”。歌曲和已下载的文件会保留在媒体库中。",
@@ -81,7 +81,10 @@ export default {
       "tracksFailed": "无法加载歌曲。",
       "searchEmpty": "未找到歌曲。",
       "lyricMissing": "该曲目暂无歌词。",
-      "projectionFailed": "无法在配置的屏幕上打开投影。"
+      "projectionFailed": "无法在配置的屏幕上打开投影。",
+      "deleteCollectionAction": "Delete collection",
+      "deleteCollectionTitle": "Delete “{name}”?",
+      "deleteCollectionText": "The local copy will be deleted. The original in Community is not affected."
     }
   }
 }

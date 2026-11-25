@@ -76,7 +76,11 @@ export default {
     "myCollections": "Mes collections",
     "myCollectionsSubtitle": "Collections créées par vous — vous seul les gérez ici",
     "myCollectionsEmpty": "Aucune collection pour l'instant. Créez-en une dans l'éditeur de paroles.",
-    "changeCover": "Changer la couverture de {name}"
+    "changeCover": "Changer la couverture de {name}",
+    "taskComplete": "Complete",
+    "taskDone": "Task completed!",
+    "taskCredited": "+{points} points credited!",
+    "taskCompleteFailed": "Could not complete. Try again."
   },
   "ranking": {
     "title": "Classement",

@@ -76,7 +76,11 @@ export default {
     "myCollections": "Мои подборки",
     "myCollectionsSubtitle": "Подборки, созданные вами — управляете здесь только вы",
     "myCollectionsEmpty": "Подборок пока нет. Создайте одну в редакторе текстов.",
-    "changeCover": "Изменить обложку «{name}»"
+    "changeCover": "Изменить обложку «{name}»",
+    "taskComplete": "Complete",
+    "taskDone": "Task completed!",
+    "taskCredited": "+{points} points credited!",
+    "taskCompleteFailed": "Could not complete. Try again."
   },
   "notifications": {
     "title": "Уведомления",

@@ -6,15 +6,15 @@ export default {
       "open": "{name} koleksiyonunu aç",
       "trackCount": "{count} parça",
       "empty": "Henüz koleksiyon yok. Editörde bir .slja dosyası içe aktarın.",
-      emptyHint: "Henüz çalma listeniz yok.",
-      createHint: "Kitaplığın Çalma Listeleri bölümünden bir tane oluşturun.",
-      importInvalid: "Geçersiz çalma listesi dosyası.",
+      "emptyHint": "Henüz çalma listeniz yok.",
+      "createHint": "Kitaplığın Çalma Listeleri bölümünden bir tane oluşturun.",
+      "importInvalid": "Geçersiz çalma listesi dosyası.",
       "newPlaceholder": "Yeni koleksiyon adı…",
       "create": "Oluştur",
       "hide": "Koleksiyonlarımı gizle",
       "show": "Koleksiyonlarımı göster"
     },
-    fallbackMusic: "Müzik",
+    "fallbackMusic": "Müzik",
     "playlists": {
       "removeTrackTitle": "Çalma listesinden çıkarılsın mı?",
       "removeTrackMessage": "\"{title}\" listesi \"{name}\" listesinden çıkar. Şarkı ve indirilen dosyalar kitaplıkta kalır.",
@@ -81,7 +81,10 @@ export default {
       "tracksFailed": "Parçalar yüklenemedi.",
       "searchEmpty": "Şarkı bulunamadı.",
       "lyricMissing": "Bu parça için sözler mevcut değil.",
-      "projectionFailed": "Projeksiyon yapılandırılan ekranlarda açılamadı."
+      "projectionFailed": "Projeksiyon yapılandırılan ekranlarda açılamadı.",
+      "deleteCollectionAction": "Delete collection",
+      "deleteCollectionTitle": "Delete “{name}”?",
+      "deleteCollectionText": "The local copy will be deleted. The original in Community is not affected."
     }
   }
 }

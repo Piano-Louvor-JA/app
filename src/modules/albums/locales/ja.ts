@@ -6,15 +6,15 @@ export default {
       "open": "コレクション {name} を開く",
       "trackCount": "{count} 曲",
       "empty": "コレクションはまだありません。エディターで .slja ファイルを取り込んでください。",
-      emptyHint: "プレイリストはまだありません。",
-      createHint: "ライブラリの「プレイリスト」セクションで作成できます。",
-      importInvalid: "無効なプレイリストファイルです。",
+      "emptyHint": "プレイリストはまだありません。",
+      "createHint": "ライブラリの「プレイリスト」セクションで作成できます。",
+      "importInvalid": "無効なプレイリストファイルです。",
       "newPlaceholder": "新しいコレクション名…",
       "create": "作成",
       "hide": "マイコレクションを隠す",
       "show": "マイコレクションを表示"
     },
-    fallbackMusic: "音楽",
+    "fallbackMusic": "音楽",
     "playlists": {
       "removeTrackTitle": "プレイリストから削除しますか？",
       "removeTrackMessage": "「{title}」が「{name}」から外れます。曲とダウンロード済みファイルはライブラリに残ります。",
@@ -81,7 +81,10 @@ export default {
       "tracksFailed": "曲を読み込めませんでした。",
       "searchEmpty": "曲が見つかりません。",
       "lyricMissing": "この曲の歌詞は利用できません。",
-      "projectionFailed": "設定された画面で投影を開けませんでした。"
+      "projectionFailed": "設定された画面で投影を開けませんでした。",
+      "deleteCollectionAction": "Delete collection",
+      "deleteCollectionTitle": "Delete “{name}”?",
+      "deleteCollectionText": "The local copy will be deleted. The original in Community is not affected."
     }
   }
 }

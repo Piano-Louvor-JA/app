@@ -6,15 +6,15 @@ export default {
       "open": "컬렉션 {name} 열기",
       "trackCount": "{count}곡",
       "empty": "아직 컬렉션이 없습니다. 편집기에서 .slja 파일을 가져오세요.",
-      emptyHint: "아직 재생목록이 없습니다.",
-      createHint: "라이브러리의 재생목록 섹션에서 만들 수 있습니다.",
-      importInvalid: "잘못된 재생목록 파일입니다.",
+      "emptyHint": "아직 재생목록이 없습니다.",
+      "createHint": "라이브러리의 재생목록 섹션에서 만들 수 있습니다.",
+      "importInvalid": "잘못된 재생목록 파일입니다.",
       "newPlaceholder": "새 컬렉션 이름…",
       "create": "만들기",
       "hide": "내 컬렉션 숨기기",
       "show": "내 컬렉션 보기"
     },
-    fallbackMusic: "음악",
+    "fallbackMusic": "음악",
     "playlists": {
       "removeTrackTitle": "재생목록에서 제거할까요?",
       "removeTrackMessage": "\"{title}\"이(가) \"{name}\"에서 빠집니다. 곡과 다운로드된 파일은 라이브러리에 유지됩니다.",
@@ -81,7 +81,10 @@ export default {
       "tracksFailed": "곡을 불러올 수 없습니다.",
       "searchEmpty": "곡을 찾을 수 없습니다.",
       "lyricMissing": "이 곡의 가사를 사용할 수 없습니다.",
-      "projectionFailed": "설정된 화면에서 투영을 열 수 없습니다."
+      "projectionFailed": "설정된 화면에서 투영을 열 수 없습니다.",
+      "deleteCollectionAction": "Delete collection",
+      "deleteCollectionTitle": "Delete “{name}”?",
+      "deleteCollectionText": "The local copy will be deleted. The original in Community is not affected."
     }
   }
 }

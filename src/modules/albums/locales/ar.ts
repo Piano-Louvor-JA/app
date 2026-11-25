@@ -6,15 +6,15 @@ export default {
       "open": "افتح المجموعة {name}",
       "trackCount": "{count} مقطع(ًا)",
       "empty": "لا مجموعات بعد. استورد ملف .slja في المحرر.",
-      emptyHint: "لا قوائم تشغيل لديك بعد.",
-      createHint: "أنشئ واحدة في قسم قوائم التشغيل بالمكتبة.",
-      importInvalid: "ملف قوائم تشغيل غير صالح.",
+      "emptyHint": "لا قوائم تشغيل لديك بعد.",
+      "createHint": "أنشئ واحدة في قسم قوائم التشغيل بالمكتبة.",
+      "importInvalid": "ملف قوائم تشغيل غير صالح.",
       "newPlaceholder": "اسم مجموعة جديدة…",
       "create": "إنشاء",
       "hide": "إخفاء مجموعاتي",
       "show": "إظهار مجموعاتي"
     },
-    fallbackMusic: "موسيقى",
+    "fallbackMusic": "موسيقى",
     "playlists": {
       "removeTrackTitle": "إزالة من قائمة التشغيل؟",
       "removeTrackMessage": "تخرج «{title}» من «{name}». تبقى الأغنية والملفات المنزّلة في المكتبة.",
@@ -81,7 +81,10 @@ export default {
       "tracksFailed": "تعذّر تحميل المقاطع.",
       "searchEmpty": "لا توجد أغنية.",
       "lyricMissing": "الكلمات غير متاحة لهذا المقطع.",
-      "projectionFailed": "تعذّر فتح العرض على الشاشات المحددة."
+      "projectionFailed": "تعذّر فتح العرض على الشاشات المحددة.",
+      "deleteCollectionAction": "Delete collection",
+      "deleteCollectionTitle": "Delete “{name}”?",
+      "deleteCollectionText": "The local copy will be deleted. The original in Community is not affected."
     }
   }
 }
