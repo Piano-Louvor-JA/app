@@ -51,7 +51,7 @@ function onUnityMessage(event: MessageEvent) {
     // Legenda default do widget é ON; desligar via toggleSubtitle (Player.js oficial).
     if (!subtitle()) sendToUnity('PlayerManager', 'toggleSubtitle')
     // Velocidade do intérprete: PlayerManager.setSlider (Player.setSpeed oficial).
-    sendToUnity('PlayerManager', 'setSlider', String(speed()))
+    sendToUnity('PlayerManager', 'setSlider', speed())
     if (pendingGloss) {
       sendToUnity('PlayerManager', 'playNow', pendingGloss)
       pendingGloss = ''
@@ -66,7 +66,7 @@ watch(() => props.avatar, (next) => {
 
 // Velocidade em tempo real.
 watch(() => props.speed, (next) => {
-  if (next !== undefined && ready.value) sendToUnity('PlayerManager', 'setSlider', String(next))
+  if (next !== undefined && ready.value) sendToUnity('PlayerManager', 'setSlider', Number(next))
 })
 
 // Toggle de legenda em tempo real.
