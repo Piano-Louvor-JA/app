@@ -449,11 +449,16 @@ describe("CommunityView — busca, filtragem, cópia, report e paginação", () 
 		expect(mocks.listCommunityCollectionsPage).toHaveBeenCalledWith(2, 24);
 	});
 
-	it("navegação: voltar usa router.back() e ranking-link usa push", async () => {
+	it("navegação: voltar usa router.back(), CTA cópias e ranking-link usam push", async () => {
 		const wrapper = await mountView();
 		await wrapper.find(".community-view__back").trigger("click");
 		expect(mocks.routerBack).toHaveBeenCalledTimes(1);
-		await wrapper.find(".community-view__ranking-link").trigger("click");
+		// SPEC-louvorja-community-copies: primeiro link do header agora é o
+		// CTA "Minhas cópias" (RF-6); ranking continua logo após.
+		const links = wrapper.findAll(".community-view__ranking-link");
+		await links[0].trigger("click");
+		expect(mocks.routerPush).toHaveBeenCalledWith("/community/copies");
+		await links[1].trigger("click");
 		expect(mocks.routerPush).toHaveBeenCalledWith("/community/ranking");
 	});
 

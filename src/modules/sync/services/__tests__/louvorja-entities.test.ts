@@ -32,7 +32,7 @@ const CUSTOM_DB = {
 	nextCollectionId: -3,
 	nextMusicId: -5,
 	nextLyricId: -7,
-	collections: [{ id: -1, name: "Coletânea Teste", description: null, createdAt: "2026-10-01T00:00:00.000Z" }],
+	collections: [{ id: -1, name: "Coletânea Teste", description: null, createdAt: "2026-10-01T00:00:00.000Z", origin: null }],
 	musics: [
 		{
 			id: -1,
