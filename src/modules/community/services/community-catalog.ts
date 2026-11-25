@@ -76,9 +76,13 @@ export async function saveCommunityCopy(
 		const copy = createLocalCollection(
 			collection.name,
 			collection.description ?? undefined,
-			// D1 (SPEC louvorja-community-copies v1.0.0): marca a origem —
+			// D1/RF-2 (SPEC louvorja-community-copies): marca a origem —
 			// cópia vive EXCLUSIVAMENTE na aba Comunidade, nunca em /albums.
-			{ type: "community", sourceId: collection.id },
+			{
+				type: "community",
+				collectionId: collection.id,
+				copiedAt: new Date().toISOString(),
+			},
 		);
 		for (const music of musics) {
 			createLocalMusic(copy.id, {

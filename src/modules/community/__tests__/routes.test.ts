@@ -42,4 +42,21 @@ describe("communityRoutes", () => {
 			"community/my-collections",
 		);
 	});
+
+	it("AC6: detalhe community/copies/:collectionId REUSA AlbumCollectionView (D3)", async () => {
+		const detail = communityRoutes.find(
+			(r) => r.path === "community/copies/:collectionId",
+		);
+		expect(detail).toBeDefined();
+		expect(detail?.name).toBe("community-copy");
+		// Mesmo componente da rota /albums/:collectionId — sem duplicação.
+		const albumsRoutes = await import("@modules/albums/routes");
+		const albumsDetail = albumsRoutes.albumsRoutes.find(
+			(r) => r.path === "albums/:collectionId",
+		);
+		expect(detail?.component).toBe(albumsDetail?.component);
+		expect(detail?.component).not.toBe(
+			communityRoutes.find((r) => r.path === "community/copies")?.component,
+		);
+	});
 });

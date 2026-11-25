@@ -30,13 +30,13 @@ import {
   getLocalMusic,
   isLocalId,
   listAllLocalMusicsWithLyrics,
-  listLocalCollections,
   listLocalMusics,
   updateLocalCollection,
   updateLocalLyric,
   updateLocalMusic,
   type LocalMusic,
 } from './local-custom-store'
+import { listManualLocalCollections } from './community-copies'
 
 /**
  * Catálogo de músicas customizadas (Minhas Coletâneas) via API /v1/custom
@@ -419,7 +419,10 @@ export async function listCustomCollections(opts?: {
   signal?: AbortSignal
 }): Promise<CustomCollectionSummary[]> {
   // Locais (ids negativos, só desta máquina) entram primeiro na lista.
-  const locals: CustomCollectionSummary[] = listLocalCollections().map((c) => ({
+  // RF-4 (SPEC-louvorja-community-copies D2): cópias de coletâneas da
+  // Comunidade (origin.type==='community') ficam em /community/copies —
+  // PONTO ÚNICO de filtro da fonte da categoria 'custom'.
+  const locals: CustomCollectionSummary[] = listManualLocalCollections().map((c) => ({
     id: c.id,
     name: c.name,
     description: c.description ?? null,

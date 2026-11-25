@@ -456,11 +456,22 @@ describe("CommunityView — busca, filtragem, cópia, report e paginação", () 
 		expect(mocks.listCommunityCollectionsPage).toHaveBeenCalledWith(2, 24);
 	});
 
-	it("navegação: voltar usa router.back() e ranking-link usa push", async () => {
+	it("navegação: voltar usa router.back(); entradas de cópias/coletâneas/ranking usam push", async () => {
 		const wrapper = await mountView();
 		await wrapper.find(".community-view__back").trigger("click");
 		expect(mocks.routerBack).toHaveBeenCalledTimes(1);
-		await wrapper.find(".community-view__ranking-link").trigger("click");
+		await wrapper.find('[data-test="community-entry-copies"]').trigger("click");
+		expect(mocks.routerPush).toHaveBeenCalledWith({ name: "community-copies" });
+		await wrapper.find('[data-test="community-entry-collections"]').trigger("click");
+		expect(mocks.routerPush).toHaveBeenCalledWith({
+			name: "community-my-collections",
+		});
+		// ranking: botão com aria-label i18n (ícone no header)
+		const rankingBtn = wrapper
+			.findAll("button.community-view__icon-btn")
+			.find((b) => b.attributes("aria-label") === "community.ranking");
+		expect(rankingBtn).toBeTruthy();
+		await rankingBtn!.trigger("click");
 		expect(mocks.routerPush).toHaveBeenCalledWith("/community/ranking");
 	});
 

@@ -68,5 +68,14 @@ export default {
     "title": "Notifications",
     "markRead": "Tout marquer comme lu",
     "empty": "Aucune notification ici."
+  },
+  "copies": {
+    "title": "Mes copies",
+    "subtitle": "Copies de collections de la Communauté",
+    "cta": "Mes copies",
+    "empty": "Vous n'avez encore enregistré aucune copie de collection.",
+    "open": "Ouvrir",
+    "delete": "Supprimer",
+    "badge": "Copie"
   }
 }

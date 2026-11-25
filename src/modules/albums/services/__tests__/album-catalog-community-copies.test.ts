@@ -47,10 +47,11 @@ describe('D1 — origin persistida no local-custom-store', () => {
 	it('createLocalCollection grava e relê origin (roundtrip localStorage)', () => {
 		const copy = createLocalCollection('Cópia X', 'desc', {
 			type: 'community',
-			sourceId: 42,
+			collectionId: 42,
+			copiedAt: '2026-11-23T12:00:00.000Z',
 		})
 		const relido = getLocalCollection(copy.id)
-		expect(relido?.origin).toEqual({ type: 'community', sourceId: 42 })
+		expect(relido?.origin).toEqual({ type: 'community', collectionId: 42, copiedAt: '2026-11-23T12:00:00.000Z' })
 	})
 
 	it('coletânea comum (sem origin) continua sem o campo', () => {
@@ -61,7 +62,8 @@ describe('D1 — origin persistida no local-custom-store', () => {
 	it('trackCount do card usa listLocalMusics (músicas da cópia contadas)', () => {
 		const copy = createLocalCollection('Com músicas', undefined, {
 			type: 'community',
-			sourceId: 7,
+			collectionId: 7,
+			copiedAt: '2026-11-23T12:00:00.000Z',
 		})
 		createLocalMusic(copy.id, { name: 'Hino 1' })
 		createLocalMusic(copy.id, { name: 'Hino 2' })
@@ -74,7 +76,8 @@ describe('D2 ampliado (adendo v1.1.0) — NENHUMA custom em /albums', () => {
 	it('cópia E local comum: categoria null (as duas vivem só na Comunidade)', async () => {
 		const copy = createLocalCollection('Cópia Comunidade', undefined, {
 			type: 'community',
-			sourceId: 42,
+			collectionId: 42,
+			copiedAt: '2026-11-23T12:00:00.000Z',
 		})
 		createLocalCollection('Minha Local Comum')
 		mocks.listCustomCollections.mockResolvedValue([
@@ -88,7 +91,8 @@ describe('D3 — card da cópia resolvido sob demanda (rota community/copies/:id
 	it('aceita id local CRU (negativo) e retorna card isCustom com id offsetado', () => {
 		const copy = createLocalCollection('Cópia Y', undefined, {
 			type: 'community',
-			sourceId: 42,
+			collectionId: 42,
+			copiedAt: '2026-11-23T12:00:00.000Z',
 		})
 		const card = buildCommunityCopyCard(copy.id)
 		expect(card).not.toBeNull()
@@ -100,7 +104,8 @@ describe('D3 — card da cópia resolvido sob demanda (rota community/copies/:id
 	it('aceita id como string da rota', () => {
 		const copy = createLocalCollection('Cópia String', undefined, {
 			type: 'community',
-			sourceId: 42,
+			collectionId: 42,
+			copiedAt: '2026-11-23T12:00:00.000Z',
 		})
 		expect(buildCommunityCopyCard(String(copy.id))?.isCustom).toBe(true)
 	})

@@ -58,7 +58,7 @@ vi.mock('@modules/media/services/local-custom-store', () => ({
         name: 'Cópia',
         description: null,
         createdAt: '',
-        origin: { type: 'community', sourceId: 42 },
+        origin: { type: 'community', collectionId: 42, copiedAt: '2026-11-23T12:00:00.000Z' },
       }
     return null
   },

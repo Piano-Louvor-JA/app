@@ -25,7 +25,7 @@ const mocks = vi.hoisted(() => {
 				id: -7,
 				name: "Cópia Teste",
 				createdAt: "2026-11-20T10:00:00.000Z",
-				origin: { type: "community", sourceId: 42 },
+				origin: { type: "community", collectionId: 42, copiedAt: "2026-11-23T12:00:00.000Z" },
 			},
 			{
 				id: -3,
@@ -36,7 +36,7 @@ const mocks = vi.hoisted(() => {
 				id: -9,
 				name: "Cópia mais antiga",
 				createdAt: "2026-11-19T10:00:00.000Z",
-				origin: { type: "community", sourceId: 1 },
+				origin: { type: "community", collectionId: 1, copiedAt: "2026-11-23T12:00:00.000Z" },
 			},
 		]),
 		listLocalMusics: vi.fn(() => [{ id: -100, name: "x" }]),

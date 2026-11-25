@@ -88,4 +88,13 @@ export default {
 		markRead: "Marcar todas como leídas",
 		empty: "Aún no hay notificaciones.",
 	},
+	copies: {
+		title: "Mis copias",
+		subtitle: "Copias de coleccionables de la Comunidad",
+		cta: "Mis copias",
+		empty: "Todavía no has guardado copias de coleccionables.",
+		open: "Abrir",
+		delete: "Eliminar",
+		badge: "Copia",
+	},
 };
