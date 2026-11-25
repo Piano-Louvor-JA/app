@@ -946,7 +946,7 @@ async function runAction(
       v-else-if="!isLoadingCatalog && categories.length === 0 && !isHubSearching"
       class="albums-view__state"
     >
-      {{ t('albums.messages.catalogEmpty') }}
+      {{ t('albums.convite_catalogo') }}
     </div>
 
     <div

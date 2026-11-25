@@ -265,6 +265,8 @@ export default {
       "mediaFolderDestInside": "Choisissez un dossier en dehors du dossier de médias actuel.",
       "mediaFolderPersistError": "Les médias ont été copiés, mais il n'a pas été possible d'enregistrer le chemin partagé.",
       "languageUkrainian": "Ukrainien",
+      languageRussian: 'Russe',
+      languageFrench: 'Français',
       "languageSyncDownloading": "Téléchargement du catalogue de la langue… l'écran va se recharger juste après.",
       "languageSyncErrorTitle": "Impossible de télécharger le catalogue de la langue. Vérifiez la connexion.",
       "languageSyncRetry": "Réessayer",

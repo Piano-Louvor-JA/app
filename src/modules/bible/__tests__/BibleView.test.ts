@@ -94,7 +94,7 @@ describe('BibleView', () => {
     expect(store.books.length).toBe(1)
   })
 
-  it('carregando meta: estado de loading; catálogo vazio: emptyCatalog', async () => {
+  it('carregando meta: estado de loading; catálogo vazio: convite_catalogo', async () => {
     const store = useBibleStore()
     vi.spyOn(store, 'bootstrap').mockResolvedValue(undefined)
     store.isLoadingMeta = true
@@ -106,7 +106,8 @@ describe('BibleView', () => {
     store.books = []
     store.versions = []
     wrapper = await mountView()
-    expect(wrapper.text()).toContain('bible.emptyCatalog')
+    expect(wrapper.text()).toContain('bible.convite_catalogo')
+    expect(wrapper.text()).not.toContain('bible.emptyCatalog')
     wrapper.unmount()
   })
 

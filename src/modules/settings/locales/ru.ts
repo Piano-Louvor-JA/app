@@ -193,6 +193,8 @@ export default {
       "languageEnglish": "English",
       "languageSpanish": "Español",
       "languageUkrainian": "Українська",
+      languageRussian: 'Русский',
+      languageFrench: 'Французский',
       "dataTitle": "Локальные данные",
       "dataHint": "Удаляет каталог, загруженные медиафайлы и сохранённые настройки из папки данных приложения (Windows: C:\\ProgramData\\LouvorJA-PIANO; Linux: /var/lib/LouvorJA-PIANO; macOS: /Users/Shared/LouvorJA-PIANO — общая для всех пользователей). При следующем запуске приложение начнёт настройку заново.",
       "clearData": "Удалить все данные",
