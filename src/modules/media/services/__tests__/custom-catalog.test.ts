@@ -962,12 +962,16 @@ describe('local-custom-store CRUD (isolado)', () => {
     expect(listLocalMusics(coll.id)).toHaveLength(0)
   })
 
-  it('deleteLocalCollection: remove coletânea e suas músicas', () => {
+  it('deleteLocalCollection: remove coletânea e migra músicas para Singles', () => {
     const coll = createLocalCollection('Para Delete Coll')
     const music = createLocalMusic(coll.id, 'Música')
     expect(deleteLocalCollection(coll.id)).toBe(true)
-    expect(listLocalCollections()).toHaveLength(0)
+    const remaining = listLocalCollections()
+    expect(remaining).toHaveLength(1)
+    expect(remaining[0].name).toBe('Singles')
     expect(listLocalMusics(coll.id)).toHaveLength(0)
+    expect(listLocalMusics(remaining[0].id)).toHaveLength(1)
+    expect(listLocalMusics(remaining[0].id)[0].id).toBe(music.id)
   })
 
   it('isLocalId: detecta ids negativos', () => {

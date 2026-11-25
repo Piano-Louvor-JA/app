@@ -54,9 +54,10 @@ describe('D1 — origin persistida no local-custom-store', () => {
 		expect(relido?.origin).toEqual({ type: 'community', collectionId: 42, copiedAt: '2026-11-23T12:00:00.000Z' })
 	})
 
-	it('coletânea comum (sem origin) continua sem o campo', () => {
+	it('coletânea comum (sem origin) fica com origin null (manual)', () => {
 		const plain = createLocalCollection('Normal')
-		expect(getLocalCollection(plain.id)?.origin).toBeUndefined()
+		// loadDb normaliza ausência → null (SPEC D1: null/ausência = manual)
+		expect(getLocalCollection(plain.id)?.origin).toBeNull()
 	})
 
 	it('trackCount do card usa listLocalMusics (músicas da cópia contadas)', () => {
