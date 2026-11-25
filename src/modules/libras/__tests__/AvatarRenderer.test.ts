@@ -5,21 +5,41 @@ import { SignAnimator } from '../sign-animator'
 
 // jsdom não tem WebGL — mock three com a API usada pelo componente
 vi.mock('three', () => {
-  const mkMesh = () => ({
-    position: { set: vi.fn() },
+  const mkVec = () => ({
+    set: vi.fn().mockReturnThis(),
+    copy: vi.fn().mockReturnThis(),
+    clone: () => mkVec(),
+    add: vi.fn().mockReturnThis(),
+    sub: vi.fn().mockReturnThis(),
+    multiplyScalar: vi.fn().mockReturnThis(),
+    normalize: vi.fn().mockReturnThis(),
+    length: () => 0.1,
+    x: 0, y: 0, z: 0,
+  })
+  const mkObj = () => ({
+    position: mkVec(),
+    rotation: { x: 0, y: 0, z: 0 },
+    scale: { set: vi.fn(), x: 1, y: 1, z: 1 },
+    quaternion: { setFromUnitVectors: vi.fn() },
     material: { color: { setHex: vi.fn() } },
-    clone: () => mkMesh(),
+    clone: () => mkObj(),
+    add: vi.fn(),
   })
   return {
-    WebGLRenderer: class { setSize = vi.fn(); render = vi.fn(); dispose = vi.fn() },
+    WebGLRenderer: class { setPixelRatio = vi.fn(); setSize = vi.fn(); render = vi.fn(); dispose = vi.fn() },
     Scene: class { add = vi.fn() },
-    PerspectiveCamera: class { position = { set: vi.fn() }; lookAt = vi.fn() },
-    Mesh: class { constructor() { return mkMesh() } },
+    PerspectiveCamera: class { position = mkVec(); lookAt = vi.fn() },
+    Mesh: class { constructor() { return mkObj() } },
+    Group: class { constructor() { return mkObj() } },
+    Vector3: class { constructor() { return mkVec() } },
     SphereGeometry: class {},
     CylinderGeometry: class {},
+    CircleGeometry: class {},
+    BoxGeometry: class {},
     MeshStandardMaterial: class {},
     HemisphereLight: class {},
-    DirectionalLight: class { position = { set: vi.fn() } },
+    DirectionalLight: class { position = mkVec() },
+    MathUtils: { clamp: (v: number, a: number, b: number) => Math.min(Math.max(v, a), b) },
   }
 })
 
