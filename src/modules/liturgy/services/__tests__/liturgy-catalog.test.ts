@@ -146,3 +146,40 @@ describe('loadLiturgyBibleBooks', () => {
     expect(books).toEqual([])
   })
 })
+
+describe('nome do hinário sem repetir (com e sem acento)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('"Hinario Adventista · Hinário Adventista" vira um só, e continua reconhecido como hinário', async () => {
+    const { readCatalogRecord } = await import('@shared/services/workspace-api')
+    vi.mocked(readCatalogRecord).mockImplementation(async (name: string) =>
+      String(name).endsWith('_musics')
+        ? ([
+            {
+              id_music: '5',
+              name: 'Jubilosos Te Adoramos',
+              track: '5',
+              albums_names: 'Hinario Adventista',
+              albums: [{ name: 'Hinário Adventista' }],
+            },
+            {
+              id_music: '170',
+              name: 'Só um Passo',
+              track: '170',
+              albums_names: 'Hinario Adventista 1996 · Hinário Adventista 1996',
+            },
+          ] as never)
+        : (null as never),
+    )
+    const { loadLiturgyMusicOptions } = await import('../liturgy-catalog')
+    const options = await loadLiturgyMusicOptions()
+    const jubilosos = options.find((o) => o.id === 5)!
+    expect(jubilosos.albumNames).toBe('Hinario Adventista')
+    expect(jubilosos.displayLabel).toBe('5 - Jubilosos Te Adoramos')
+    const passo = options.find((o) => o.id === 170)!
+    expect(passo.albumNames).toBe('Hinario Adventista 1996')
+    expect(passo.displayLabel).toBe('170 - Só um Passo')
+  })
+})

@@ -118,16 +118,22 @@ function parseTrack(raw: unknown): number | null {
   return Number.isFinite(trackRaw) ? trackRaw : null
 }
 
+/** Chave sem acento e sem maiúsculas: "Hinario" e "Hinário" são o mesmo álbum. */
+function albumKey(name: string): string {
+  return name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+}
+
+/** Junta os nomes dos álbuns sem repetir (mantém a 1ª forma que aparecer). */
 function joinAlbumNames(...parts: Array<string | null | undefined>): string {
-  const names = new Set<string>()
+  const names = new Map<string, string>()
   for (const part of parts) {
     if (!part) continue
     for (const name of part.split(/\s*[·|,]\s*/)) {
       const trimmed = name.trim()
-      if (trimmed) names.add(trimmed)
+      if (trimmed && !names.has(albumKey(trimmed))) names.set(albumKey(trimmed), trimmed)
     }
   }
-  return [...names].join(' · ')
+  return [...names.values()].join(' · ')
 }
 
 function buildDisplayLabel(name: string, hymnalTrack: number | null): string {
@@ -203,9 +209,8 @@ function mapMusicIndexRow(row: CatalogMusicIndexRow): LiturgyMusicOption | null 
     ) || 'Música'
 
   const hymnalTrack = parseTrack(row.track)
-  const isHymnalAlbum =
-    albumNames.includes('Hinário Adventista') ||
-    albumNames.includes('Hinário Adventista 1996')
+  // Sem acento: o nome pode vir "Hinario Adventista" (sem o á).
+  const isHymnalAlbum = albumKey(albumNames).includes('hinario adventista')
 
   // Issue #348: letra já vem no índice `${prefix}_musics` — propaga
   // normalizada (fold diacrítico) p/ a busca casar "nao temas" com "não temas".
