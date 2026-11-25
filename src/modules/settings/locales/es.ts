@@ -345,6 +345,9 @@ export default {
     },
     general: {
       languageTitle: 'Idioma',
+      'librasTitle': 'Libras (traducción automática)',
+      'librasHint': 'Muestra la letra del himno actual en Libras (glosa textual). Traducción automática; el original permanece visible.',
+      'librasToggleLabel': 'Activar Libras',
       languageHint: 'Elija el idioma de la interfaz de la aplicación.',
       languagePortuguese: 'Português (BR)',
       languageEnglish: 'English',

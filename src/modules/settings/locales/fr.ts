@@ -185,6 +185,9 @@ export default {
     },
     "general": {
       "languageTitle": "Langue",
+      librasTitle: "Libras (traduction automatique)",
+      "librasHint": "Affiche les paroles de l'hymne en Libras (glose textuelle). Traduction automatique ; l'original reste visible.",
+      "librasToggleLabel": "Activer Libras",
       "languageHint": "Sélectionnez la langue de l'interface de l'application.",
       "languagePortuguese": "Portugais",
       "languageEnglish": "Anglais",

@@ -345,6 +345,9 @@ export default {
     },
     general: {
       languageTitle: 'Language',
+      'librasTitle': 'Libras (auto translation)',
+      'librasHint': 'Shows the current hymn lyrics in Libras (textual gloss). Auto translation; the original remains visible.',
+      'librasToggleLabel': 'Enable Libras',
       languageHint: 'Choose the application interface language.',
       languagePortuguese: 'Português (BR)',
       languageEnglish: 'English',

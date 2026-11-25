@@ -347,6 +347,9 @@ export default {
     general: {
       languageTitle: 'Idioma',
       languageHint: 'Selecione o idioma da interface do aplicativo.',
+      librasTitle: 'Libras (tradução automática)',
+      librasHint: 'Exibe a letra do hino atual em Libras (gloss textual). Tradução automática; o original permanece visível.',
+      librasToggleLabel: 'Ativar Libras',
       languagePortuguese: 'Português',
       languageEnglish: 'English',
       languageSpanish: 'Español',
