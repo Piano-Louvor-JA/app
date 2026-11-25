@@ -544,8 +544,8 @@ describe('GeneralView.vue', () => {
       const danger = btns.find((b) => (b.text() + (b.attributes('aria-label') ?? '')).toLowerCase().includes('apagar'))
       if (danger) await danger.trigger('click')
       await flushPromises()
-      // popup não abre: sem checkbox
-      expect(w.find('input[type="checkbox"]').exists()).toBe(false)
+      // popup não abre: sem checkbox do popup de apagar (o toggle Libras tem checkbox próprio)
+      expect(w.find('.clear-confirm__checkbox').exists()).toBe(false)
       w.unmount()
     })
 
@@ -628,7 +628,7 @@ describe('GeneralView.vue', () => {
       new MouseEvent('click', { bubbles: true }),
     )
     await flushPromises()
-    expect(w.find('input[type="checkbox"]').exists()).toBe(false)
+    expect(w.find('.clear-confirm__checkbox').exists()).toBe(false)
     w.unmount()
 
     // busy: export pendente, cliques forçados nos 2 botões → guards L63/L81
