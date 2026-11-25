@@ -72,6 +72,8 @@ export default {
       close: 'Close lyrics',
     },
     messages: {
+
+      convite_catalogo: 'The music catalog is not yet available in your language. Join the community and help build the LouvorJA catalog in your own language.',
       catalogEmpty: 'No collection found in the local catalog.',
       catalogFailed: 'Could not load the album catalog.',
       catalogSearchEmpty: 'No collection found for this search.',

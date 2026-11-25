@@ -66,7 +66,7 @@ export default {
       "close": "Fermer les paroles"
     },
     "messages": {
-      "convite_catalogo": "Ainda não há conteúdo bíblico neste idioma. Ajude a comunidade a traduzir: saiba mais no LouvorJA.",
+      "catalogEmpty": "Aucune compilation trouvée dans le catalogue local.",
       "catalogFailed": "Impossible de charger le catalogue d'albums.",
       "catalogSearchEmpty": "Aucune compilation trouvée pour cette recherche.",
       "collectionMissing": "Compilation introuvable.",

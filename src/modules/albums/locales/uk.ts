@@ -66,7 +66,7 @@ export default {
       "close": "Закрити текст"
     },
     "messages": {
-      "convite_catalogo": "Ainda não há conteúdo bíblico neste idioma. Ajude a comunidade a traduzir: saiba mais no LouvorJA.",
+      "catalogEmpty": "У локальному каталозі не знайдено жодної збірки.",
       "catalogFailed": "Не вдалося завантажити каталог альбомів.",
       "catalogSearchEmpty": "За цим запитом збірок не знайдено.",
       "collectionMissing": "Збірку не знайдено.",
