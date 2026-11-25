@@ -44,6 +44,14 @@ const SABBATH_AUDIO_FOLDER: Record<SabbathAudioLang, string> = {
   es: 'es',
   en: 'en',
   fr: 'fr',
+  ja: 'ja',
+  ko: 'ko',
+  zh: 'zh',
+  ru: 'ru',
+  uk: 'uk',
+  tr: 'tr',
+  ar: 'ar',
+  hi: 'hi',
 }
 
 /** Manifesto: arquivo + duração ffprobe pré-medida (idêntica nos 4 idiomas). */
