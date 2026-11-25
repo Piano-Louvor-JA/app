@@ -11,7 +11,6 @@ import MediaSlideStage from '../components/MediaSlideStage.vue'
 import { useMediaPlayer } from '../composables/useMediaPlayer'
 import { revealItemInAside } from '../services/media-aside-scroll'
 import { isLibrasEnabled } from '@modules/libras/services/libras-preferences'
-import LibrasDemo from '@modules/libras/components/LibrasDemo.vue'
 import { stripHtmlBreaks } from '../services/media-slides'
 import type { MediaPlaybackMode } from '../types/media'
 
@@ -546,7 +545,8 @@ async function onToggleFullscreen() {
     </div>
 
     <!-- Intérprete de sinais v2.1 (avatar 3D keyframes) — visível quando Libras ativo -->
-    <LibrasDemo v-if="librasEnabled" />
+    <!-- F-B.2: demo Libras removido da tela de mídia (era painel de validação;
+         intérprete vive na projeção, config em Geral → Libras). -->
 
     <MediaCloseDialog
       :open="closeConfirmOpen"

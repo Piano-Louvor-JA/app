@@ -6,6 +6,7 @@
 
 import { ref, watch, onUnmounted, type Ref } from 'vue'
 import { getLibrasGloss } from '../services/libras-translate'
+import { applyRegionalism } from '../services/libras-preferences'
 
 const DEBOUNCE_MS = 600
 
@@ -24,7 +25,8 @@ export function useLibrasLive(lyric: Ref<string>, isActive: Ref<boolean> = ref(t
     translating.value = true
     try {
       const r = await getLibrasGloss(text)
-      if (mySeq === seq) gloss.value = r.gloss ?? ''
+      // F-B.4: regionalismo aplicado pós-gloss (variantes regionais de sinal)
+      if (mySeq === seq) gloss.value = r.gloss ? applyRegionalism(r.gloss) : ''
     } catch {
       if (mySeq === seq) gloss.value = ''
     } finally {

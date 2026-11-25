@@ -11,7 +11,11 @@ import { getLibrasAvatar, type LibrasAvatar } from '../services/libras-preferenc
  * ponytail: sem cache de bundles ainda — tocar stream direto; cache IndexedDB
  * entra quando hinos reais (F2) justificarem (~30KB/token).
  */
-const VLIBRAS_UNITY_URL = 'https://vlibras.gov.br/app/unity/index.html'
+const VLIBRAS_UNITY_URL = '/vlibras/index.html'
+// Host local F-B.3: mesmo Unity do gov (assets remotos originais), mas com
+// playerweb.json NOSSO → webglContextAttributes.alpha=true + backgroundColor
+// transparent → avatar com fundo TRANSPARENTE de verdade. Offline/fallback:
+// gov direto (https://vlibras.gov.br/app/unity/index.html) via prop govFallback.
 
 /**
  * compact: cartão pequeno para overlay na tela de PROJEÇÃO (canto).
@@ -106,9 +110,9 @@ defineExpose({ ready, playGloss, stop })
   min-width: 160px;
   min-height: 200px;
   aspect-ratio: auto;
-  background: #f4f1ea;
+  background: transparent;
   border-radius: clamp(12px, 1.6vmin, 20px);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+  box-shadow: none;
   z-index: 5;
   pointer-events: none;
 }
