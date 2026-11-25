@@ -3,10 +3,8 @@ import { computed } from 'vue'
 import { signPackStore } from '../sign-pack-store'
 
 /**
- * SignPlayer — F1.3 (SPEC-libras-v2.0.0): reproduz sequência de sinais do
- * Sign Pack ativo (vídeos) com fallback fingerspelling transparente.
- * v1 (esta): terms → fila visual termo-a-termo (vídeo quando existir);
- * reprodução contínua automática fica para F1.3b (queue <video> real).
+ * SignPlayer — F1.3: reproduz sinais do pack ativo.
+ * v1 (vídeos) mantém compat; avatar 3D é papel do AvatarRenderer (v2.1).
  */
 const props = defineProps<{ terms: string[] }>()
 
@@ -40,7 +38,7 @@ const current = computed(() => entries.value[0] ?? null)
     </p>
 
     <p v-if="current?.entry.fingerspelling" data-testid="sign-fingerspelling-hint">
-      Sinal não encontrado no dicionário — datilologia
+      Sinal não encontrado no dicionário — datitologia
     </p>
   </section>
 </template>
