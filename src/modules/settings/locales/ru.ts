@@ -194,6 +194,9 @@ export default {
       "librasAvatarIcaro": "Икаро",
 
       "librasAvatarHozana": "Хозана",
+
+
+      "librasAvatarGuga": "Гуга",
       "languageHint": "Выберите язык интерфейса приложения.",
       "languagePortuguese": "Português",
       "languageEnglish": "English",

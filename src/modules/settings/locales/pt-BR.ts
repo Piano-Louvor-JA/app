@@ -355,6 +355,9 @@ export default {
       librasAvatarIcaro: 'Ícaro',
 
       librasAvatarHozana: 'Hozana',
+
+
+      'librasAvatarGuga': 'Guga',
       languagePortuguese: 'Português',
       languageEnglish: 'English',
       languageSpanish: 'Español',

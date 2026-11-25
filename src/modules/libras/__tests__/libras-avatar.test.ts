@@ -35,6 +35,10 @@ describe('F-B.2b — avatar preference', () => {
     setLibrasAvatar('hozana')
     expect(getLibrasAvatar()).toBe('hozana')
   })
+  it('guga válido (avatar criança)', () => {
+    setLibrasAvatar('guga')
+    expect(getLibrasAvatar()).toBe('guga')
+  })
   it('valor inválido cai no default', () => {
     store[LIBRAS_PREFERENCE_KEYS.avatar] = 'etal'
     expect(getLibrasAvatar()).toBe('icaro')

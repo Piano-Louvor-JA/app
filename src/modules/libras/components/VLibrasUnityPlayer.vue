@@ -18,7 +18,7 @@ const VLIBRAS_UNITY_URL = 'https://vlibras.gov.br/app/unity/index.html'
  * O Unity pinta fundo branco (playerweb.json backgroundColor "#FFFFFF") —
  * transparência real exige fork do index (F-B.3); aqui o cartão é o "estúdio".
  */
-const props = defineProps<{ compact?: boolean; avatar?: LibrasAvatar }>()
+const props = defineProps<{ compact?: boolean; avatar?: LibrasAvatar; visible?: boolean }>()
 
 const ready = ref(false)
 const iframeEl = ref<HTMLIFrameElement | null>(null)
@@ -74,7 +74,7 @@ defineExpose({ ready, playGloss, stop })
 <template>
   <div
     class="vlibras-unity"
-    :class="{ 'vlibras-unity--compact': props.compact }"
+    :class="{ 'vlibras-unity--compact': props.compact, 'vlibras-unity--hidden': props.visible === false }"
     data-testid="vlibras-unity-player"
   >
     <iframe
@@ -111,6 +111,13 @@ defineExpose({ ready, playGloss, stop })
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
   z-index: 5;
   pointer-events: none;
+}
+/* Prewarm: iframe montado desde o início (Unity carrega fora do timing da
+   música); invisível ≠ display:none (manteria o WebGL rodando? não — mas
+   visibility+opacity preservam o renderer ativo). */
+.vlibras-unity--hidden {
+  visibility: hidden;
+  opacity: 0;
 }
 .vlibras-unity-iframe {
   position: absolute;

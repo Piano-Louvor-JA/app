@@ -20,7 +20,7 @@ import type { MediaProjectionRuntime } from '../types/media'
 import { DEFAULT_MEDIA_PROJECTION } from '../types/media'
 import VLibrasUnityPlayer from '../../libras/components/VLibrasUnityPlayer.vue'
 import { useLibrasLive } from '../../libras/composables/useLibrasLive'
-import { isLibrasEnabled } from '../../libras/services/libras-preferences'
+import { isLibrasEnabled, getLibrasAvatar } from '../../libras/services/libras-preferences'
 
 const runtime = ref<MediaProjectionRuntime>({ ...DEFAULT_MEDIA_PROJECTION })
 
@@ -41,6 +41,7 @@ const showTitle = computed(() => runtime.value.isCover)
 
 // F-B.2: intérprete Ícaro no canto — tradução ao vivo do slide (Libras ON).
 const librasEnabled = isLibrasEnabled()
+const librasAvatar = getLibrasAvatar()
 const unityPlayer = ref<InstanceType<typeof VLibrasUnityPlayer> | null>(null)
 const liveLyric = computed(() => (runtime.value.active && !runtime.value.isCover ? lyric.value : ''))
 const librasLive = useLibrasLive(liveLyric, computed(() => runtime.value.active))
@@ -254,11 +255,13 @@ const projectionFontStyle = useProjectionFont('hymns')
     }"
     aria-hidden="true"
   />
-  <!-- F-B.2: intérprete Ícaro compacto no canto (Libras ON + faixa ativa) -->
+  <!-- F-B.2: intérprete Ícaro compacto — MONTADO sempre (prewarm: Unity
+       carrega fora do timing da música), VISÍVEL só com faixa ativa -->
   <VLibrasUnityPlayer
-    v-if="librasEnabled && runtime.active"
     ref="unityPlayer"
     compact
+    :visible="runtime.active"
+    :avatar="librasAvatar"
   />
 </template>
 

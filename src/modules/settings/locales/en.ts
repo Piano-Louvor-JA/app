@@ -354,6 +354,9 @@ export default {
       'librasAvatarIcaro': 'Icaro',
 
       'librasAvatarHozana': 'Hozana',
+
+
+      'librasAvatarGuga': 'Guga',
       languageHint: 'Choose the application interface language.',
       languagePortuguese: 'Português (BR)',
       languageEnglish: 'English',

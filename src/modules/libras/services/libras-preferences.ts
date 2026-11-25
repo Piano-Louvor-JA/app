@@ -6,8 +6,8 @@ export const LIBRAS_PREFERENCE_KEYS = {
   avatar: 'libras.avatar',
 } as const
 
-export type LibrasAvatar = 'icaro' | 'hozana'
-const AVATARS: readonly LibrasAvatar[] = ['icaro', 'hozana']
+export type LibrasAvatar = 'icaro' | 'hozana' | 'guga'
+const AVATARS: readonly LibrasAvatar[] = ['icaro', 'hozana', 'guga']
 
 export function isLibrasEnabled(): boolean {
   return !!getUserPreference<boolean>(LIBRAS_PREFERENCE_KEYS.enabled, false)

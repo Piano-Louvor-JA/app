@@ -432,6 +432,7 @@ async function clearAllLocalData() {
         >
           <option value="icaro">{{ t('settings.general.librasAvatarIcaro') }}</option>
           <option value="hozana">{{ t('settings.general.librasAvatarHozana') }}</option>
+          <option value="guga">{{ t('settings.general.librasAvatarGuga') }}</option>
         </select>
       </label>
     </GlassCard>
@@ -761,6 +762,21 @@ async function clearAllLocalData() {
   height: 1.125rem;
   accent-color: var(--ds-color-primary);
   cursor: pointer;
+}
+
+/* Select de avatar: herda fundo escuro do tema (default UA = branco/letra branca) */
+.general-settings__libras-row select {
+  padding: 0.375rem 0.75rem;
+  color: var(--ds-color-on-surface);
+  background-color: var(--ds-color-surface-container, rgba(255, 255, 255, 0.08));
+  border: 1px solid var(--ds-color-outline, rgba(255, 255, 255, 0.25));
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.general-settings__libras-row select option {
+  color: #1a1a1a;
+  background-color: #ffffff;
 }
 
 .general-settings__lang-options {
