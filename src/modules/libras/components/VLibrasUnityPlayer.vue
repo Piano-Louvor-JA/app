@@ -12,6 +12,13 @@ import { ref, onMounted, onUnmounted } from 'vue'
  */
 const VLIBRAS_UNITY_URL = 'https://vlibras.gov.br/app/unity/index.html'
 
+/**
+ * compact: cartão pequeno para overlay na tela de PROJEÇÃO (canto).
+ * O Unity pinta fundo branco (playerweb.json backgroundColor "#FFFFFF") —
+ * transparência real exige fork do index (F-B.3); aqui o cartão é o "estúdio".
+ */
+const props = defineProps<{ compact?: boolean }>()
+
 const ready = ref(false)
 const iframeEl = ref<HTMLIFrameElement | null>(null)
 let pendingGloss = ''
@@ -57,7 +64,11 @@ defineExpose({ ready, playGloss, stop })
 </script>
 
 <template>
-  <div class="vlibras-unity" data-testid="vlibras-unity-player">
+  <div
+    class="vlibras-unity"
+    :class="{ 'vlibras-unity--compact': props.compact }"
+    data-testid="vlibras-unity-player"
+  >
     <iframe
       ref="iframeEl"
       :src="VLIBRAS_UNITY_URL"
@@ -77,6 +88,21 @@ defineExpose({ ready, playGloss, stop })
   background: #101418;
   border-radius: 8px;
   overflow: hidden;
+}
+.vlibras-unity--compact {
+  position: absolute;
+  right: 1.2vmin;
+  bottom: 1.2vmin;
+  width: 14vmin;
+  height: 18vmin;
+  min-width: 160px;
+  min-height: 200px;
+  aspect-ratio: auto;
+  background: #f4f1ea;
+  border-radius: clamp(12px, 1.6vmin, 20px);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+  z-index: 5;
+  pointer-events: none;
 }
 .vlibras-unity-iframe {
   position: absolute;

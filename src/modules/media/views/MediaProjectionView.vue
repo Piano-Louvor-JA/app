@@ -18,6 +18,9 @@ import { bibleTransitionMs, effectiveLyricTransition, resolveBackgroundImage, st
 import '@styles/screen-transitions.css'
 import type { MediaProjectionRuntime } from '../types/media'
 import { DEFAULT_MEDIA_PROJECTION } from '../types/media'
+import VLibrasUnityPlayer from '../../libras/components/VLibrasUnityPlayer.vue'
+import { useLibrasLive } from '../../libras/composables/useLibrasLive'
+import { isLibrasEnabled } from '../../libras/services/libras-preferences'
 
 const runtime = ref<MediaProjectionRuntime>({ ...DEFAULT_MEDIA_PROJECTION })
 
@@ -35,6 +38,16 @@ const lyric = computed(() => stripHtmlBreaks(runtime.value.lyric))
 // renderizar o nome da música no meio do hino (slides de solfejo/pausa são
 // filtrados no buildMediaSlides, mas qualquer slide vazio residual não vira título).
 const showTitle = computed(() => runtime.value.isCover)
+
+// F-B.2: intérprete Ícaro no canto — tradução ao vivo do slide (Libras ON).
+const librasEnabled = isLibrasEnabled()
+const unityPlayer = ref<InstanceType<typeof VLibrasUnityPlayer> | null>(null)
+const liveLyric = computed(() => (runtime.value.active && !runtime.value.isCover ? lyric.value : ''))
+const librasLive = useLibrasLive(liveLyric, computed(() => runtime.value.active))
+watch(librasLive.gloss, (gloss) => {
+  if (gloss) unityPlayer.value?.playGloss(gloss)
+  else unityPlayer.value?.stop()
+})
 
 function applyRuntime(raw: unknown) {
   runtime.value = normalizeMediaRuntime(raw)
@@ -240,6 +253,12 @@ const projectionFontStyle = useProjectionFont('hymns')
       backgroundPosition: 'center',
     }"
     aria-hidden="true"
+  />
+  <!-- F-B.2: intérprete Ícaro compacto no canto (Libras ON + faixa ativa) -->
+  <VLibrasUnityPlayer
+    v-if="librasEnabled && runtime.active"
+    ref="unityPlayer"
+    compact
   />
 </template>
 
