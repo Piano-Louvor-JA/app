@@ -6,7 +6,7 @@ export const LIBRAS_PREFERENCE_KEYS = {
 } as const
 
 export function isLibrasEnabled(): boolean {
-  return getUserPreference<boolean>(LIBRAS_PREFERENCE_KEYS.enabled, false) === true
+  return !!getUserPreference<boolean>(LIBRAS_PREFERENCE_KEYS.enabled, false)
 }
 
 export function setLibrasEnabled(enabled: boolean): void {

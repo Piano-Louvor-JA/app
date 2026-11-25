@@ -37,11 +37,6 @@ import { isLibrasEnabled, setLibrasEnabled } from '@modules/libras/services/libr
 
 const librasOn = ref(isLibrasEnabled())
 
-function toggleLibras() {
-  librasOn.value = !librasOn.value
-  setLibrasEnabled(librasOn.value)
-}
-
 const { t, locale } = useI18n()
 const catalogSyncState = ref<'idle' | 'syncing' | 'done' | 'error'>('idle')
 /** 0–100 do download do catálogo do idioma (0 = nada concluído ainda). */
@@ -418,7 +413,7 @@ async function clearAllLocalData() {
           v-model="librasOn"
           type="checkbox"
           data-testid="libras-toggle"
-          @change="toggleLibras"
+          @change="setLibrasEnabled(librasOn)"
         >
         <span>{{ t('settings.general.librasToggleLabel') }}</span>
       </label>
