@@ -27,6 +27,7 @@ const props = defineProps<{ compact?: boolean; avatar?: LibrasAvatar; visible?: 
 const ready = ref(false)
 const iframeEl = ref<HTMLIFrameElement | null>(null)
 let pendingGloss = ''
+let settingsApplied = false
 
 /** Avatar ativo: prop vence pref; default icaro. */
 const avatar = (): LibrasAvatar => props.avatar ?? getLibrasAvatar()
@@ -50,11 +51,18 @@ function onUnityMessage(event: MessageEvent) {
     sendToUnity('PlayerManager', 'Change', avatar())
     // Legenda default do widget é ON; desligar via toggleSubtitle (Player.js oficial).
     if (!subtitle()) sendToUnity('PlayerManager', 'toggleSubtitle')
-    // Velocidade do intérprete: PlayerManager.setSlider (Player.setSpeed oficial).
-    sendToUnity('PlayerManager', 'setSlider', speed())
     if (pendingGloss) {
       sendToUnity('PlayerManager', 'playNow', pendingGloss)
       pendingGloss = ''
+    }
+  }
+  // Padrão violin: setSlider no boot é ignorado pelo Unity; aplicar no primeiro
+  // on_playing_state_change=True (player já tocando) garante que a velocidade pegue.
+  if (event.data.event === 'on_playing_state_change') {
+    const data = event.data.data as string[] | undefined
+    if (data?.[0] === 'True' && !settingsApplied) {
+      settingsApplied = true
+      sendToUnity('PlayerManager', 'setSlider', speed())
     }
   }
 }
