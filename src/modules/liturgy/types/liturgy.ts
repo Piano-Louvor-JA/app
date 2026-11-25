@@ -98,6 +98,7 @@ export const LITURGY_TYPE_GROUPS: LiturgyTypeGroup[] = [
       { value: 'images', dot: '#6D4C41' }, // marrom
       { value: 'pdf', dot: '#1A237E' }, // índigo/navy
       { value: 'presentation', dot: '#F5F5F5' }, // branco
+      { value: 'other_files', dot: '#90A4AE' }, // cinza-azulado — demais arquivos
     ],
   },
   {

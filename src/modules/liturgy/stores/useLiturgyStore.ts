@@ -718,6 +718,23 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     itemDialogOpen.value = true
   }
 
+  /**
+   * Arquivos soltos na liturgia: abre o diálogo com tipo detectado e path
+   * preenchidos; o operador confirma a categoria (e pode trocar o tipo).
+   */
+  function openDroppedFilesDialog(
+    draft: import('../types/liturgy').LiturgyItemDraft,
+    options?: { lockCategory?: boolean },
+  ) {
+    editingIndex.value = null
+    itemDialogLockedCategory.value = Boolean(options?.lockCategory && draft.categoryId)
+    itemDialogHideTypePicker.value = false
+    musicSearchQuery.value = ''
+    itemDraft.value = { ...draft }
+    musicRemovedFrom = null
+    itemDialogOpen.value = true
+  }
+
   function setItemDraft(draft: LiturgyItemDraft) {
     itemDraft.value = draft
   }
@@ -1526,6 +1543,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     stopCountdown,
     openAddDialog,
     openAddSubItemDialog,
+    openDroppedFilesDialog,
     setItemDraft,
     setMusicSearchQuery,
     setItemType,

@@ -482,6 +482,7 @@ export function useLiturgy() {
     stopCountdown: store.stopCountdown,
     openAddDialog: onOpenAddDialog,
     openAddSubItemDialog: onOpenAddSubItemDialog,
+    openDroppedFilesDialog: store.openDroppedFilesDialog,
     openEditDialog: onOpenEditDialog,
     closeItemDialog: store.closeItemDialog,
     saveItemDraft: store.saveItemDraft,

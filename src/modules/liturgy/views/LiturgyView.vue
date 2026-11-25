@@ -7,6 +7,7 @@ import AlbumLyricDialog from '@modules/albums/components/AlbumLyricDialog.vue'
 import { useLiturgyAppearanceStore } from '../stores/useLiturgyAppearanceStore'
 import AppConfirm from '@shared/components/AppConfirm.vue'
 import LiturgyAppearanceButton from '../components/LiturgyAppearanceButton.vue'
+import { useLiturgyFileDrop } from '../composables/useLiturgyFileDrop'
 import { useLiturgyTransfer } from '../composables/useLiturgyTransfer'
 import LiturgyCloneDialog from '../components/LiturgyCloneDialog.vue'
 import LiturgyScheduledDialog from '../components/LiturgyScheduledDialog.vue'
@@ -168,9 +169,16 @@ const {
   closeLyric,
   setItemDraft,
   setMusicSearchQuery,
+  openDroppedFilesDialog,
 } = useLiturgy()
 
 const { statusByItemId: offlineStatusByItemId } = useLiturgyVideoPrefetch()
+
+const fileDrop = useLiturgyFileDrop({
+  openDroppedFilesDialog,
+  setActionMessage,
+})
+const dropActive = fileDrop.dropActive
 
 /** Exibe avisos da liturgia e do player (ex.: áudio indisponível). */
 const liturgyAlertKey = computed(() => lastActionMessageKey.value || null)
@@ -202,7 +210,25 @@ async function onSljaImported(): Promise<void> {
 </script>
 
 <template>
-  <section class="liturgy-view">
+  <section
+    class="liturgy-view"
+    :class="{ 'liturgy-view--drop-active': dropActive }"
+    @dragenter="fileDrop.onDragEnter"
+    @dragover="fileDrop.onDragOver"
+    @dragleave="fileDrop.onDragLeave"
+    @drop="fileDrop.onDrop($event)"
+  >
+    <div
+      v-if="dropActive"
+      class="liturgy-view__drop-overlay"
+      aria-live="polite"
+    >
+      <i
+        class="ti ti-file-import"
+        aria-hidden="true"
+      />
+      <p>{{ t('liturgy.messages.dropHint') }}</p>
+    </div>
     <header class="liturgy-view__header">
       <div class="liturgy-view__header-start">
         <LiturgyAppearanceButton />
@@ -514,6 +540,7 @@ async function onSljaImported(): Promise<void> {
 
 <style scoped lang="scss">
 .liturgy-view {
+  position: relative;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -522,6 +549,38 @@ async function onSljaImported(): Promise<void> {
   padding: 2rem;
   padding-bottom: 1.5rem;
   overflow: hidden;
+}
+
+.liturgy-view--drop-active {
+  outline: 2px dashed var(--ds-color-primary);
+  outline-offset: -0.5rem;
+}
+
+.liturgy-view__drop-overlay {
+  position: absolute;
+  inset: 0.5rem;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  border-radius: 1rem;
+  border: 2px dashed var(--ds-color-primary);
+  background: color-mix(in srgb, var(--ds-color-surface, #1c1b1b) 82%, transparent);
+  color: var(--ds-color-primary);
+  pointer-events: none;
+
+  .ti {
+    font-size: 2.25rem;
+  }
+
+  p {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--ds-color-on-surface);
+  }
 }
 
 .liturgy-view__header {

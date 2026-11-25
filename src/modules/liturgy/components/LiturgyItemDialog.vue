@@ -35,6 +35,7 @@ import {
   isLiturgyItemDraftValid,
   isValidLiturgyUrl,
 } from '../services/liturgy-item-helpers'
+import { titleFromFilePath } from '../services/liturgy-file-detect'
 import { normalizeLiturgyTimeHHmm } from '../services/liturgy-format'
 import {
   fetchOnlineVideoInfo,
@@ -578,16 +579,6 @@ function fileFiltersForType(type: LiturgyItemType | null): FileDialogFilter[] {
         { name: 'Todos', extensions: ['*'] },
       ]
   }
-}
-
-/**
- * Título a partir do arquivo: sem extensão e sem o código do YouTube que
- * vem no fim do nome dos vídeos baixados (`…_1eagQ-91i1c.mp4`).
- */
-function titleFromFilePath(path: string): string {
-  const fileName = path.split(/[\\/]/).pop()! /* pop de path não-vazio é non-empty */
-  const base = fileName.includes('.') ? fileName.replace(/\.[^.]+$/, '') : fileName
-  return base.replace(/_[\w-]{11}$/, '').trim() || base
 }
 
 async function selectLocalFile() {

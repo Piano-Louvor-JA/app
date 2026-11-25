@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer, webFrame } from 'electron'
+import { contextBridge, ipcRenderer, webFrame, webUtils } from 'electron'
 
 /**
  * @template T
@@ -345,6 +345,15 @@ contextBridge.exposeInMainWorld('louvorja', {
 
   dialog: {
     openFile: (options) => ipcRenderer.invoke('dialog:open-file', options ?? {}),
+    /** Path absoluto de File solto no renderer (drag-and-drop na liturgia). */
+    getPathForFile: (file) => {
+      try {
+        const path = webUtils.getPathForFile(file)
+        return typeof path === 'string' && path.trim() ? path : null
+      } catch {
+        return null
+      }
+    },
   },
 
   presentation: {

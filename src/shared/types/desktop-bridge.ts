@@ -487,6 +487,11 @@ export type DialogApi = {
   openFile: (
     options?: OpenFileDialogOptions,
   ) => Promise<string | string[] | null>
+  /**
+   * Path absoluto de um File solto no renderer (Electron webUtils).
+   * Necessário para persistir o arquivo na liturgia após drag-and-drop.
+   */
+  getPathForFile?: (file: File) => string | null
 }
 
 export type ExternalPlayerPreference =
