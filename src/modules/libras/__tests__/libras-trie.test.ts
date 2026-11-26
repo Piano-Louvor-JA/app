@@ -216,4 +216,69 @@ describe('libras-trie (formato oficial {root:{children,end}})', () => {
     setLibrasTrieForTest(fixtureTrie(WORDS))
     await expect(prepareGlossForPlayback('   ')).resolves.toBeNull()
   })
+
+  // ===== REWORK 3 (AC-3): gov NUNCA bloqueia o prepare =====
+
+  it('AC-3: IDB vazio + asset local falha + gov falha → prepare RESOLVE com datilologia total (Trie vazia)', async () => {
+    fetchMock.mockRejectedValue(new Error('network down'))
+
+    await expect(prepareGlossForPlayback('TREVAS')).resolves.toEqual({
+      gloss: 'T R E V A S',
+      fingerspelled: ['TREVAS'],
+    })
+  })
+
+  it('AC-3: gov fire-and-forget — prepare resolve sem esperar o destino da gov (rejeição gov não afeta)', async () => {
+    fetchMock.mockImplementation((input: RequestInfo | URL) => {
+      if (String(input).includes('/libras/trie-2018.3.1.json')) {
+        return Promise.reject(new Error('asset missing'))
+      }
+      // gov fica pendente: prepare não pode depender dele
+      return new Promise(() => {})
+    })
+
+    const result = await prepareGlossForPlayback('TREVAS')
+    expect(result).toEqual({ gloss: 'T R E V A S', fingerspelled: ['TREVAS'] })
+    expect(fetchMock).toHaveBeenCalledWith('https://dicionario2.vlibras.gov.br/static/TREES/2018.3.1.json')
+
+    // gov rejeitando depois não derruba nada (fire-and-forget)
+    fetchMock.mockRejectedValue(new Error('gov down'))
+  })
+
+  it('AC-3: regressão — asset local OK preserva comportamento (GRACA TREVAS via sinônimo, sem datilologia)', async () => {
+    const packaged = readPackagedTrie()
+    fetchMock.mockImplementation((input: RequestInfo | URL) => {
+      if (String(input).includes('/libras/trie-2018.3.1.json')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(packaged) })
+      }
+      return Promise.reject(new Error('gov down'))
+    })
+
+    await expect(prepareGlossForPlayback('GRACA TREVAS')).resolves.toEqual({
+      gloss: 'GRAÇA TREVAS',
+      fingerspelled: [],
+    })
+  })
+
+  it('AC-3: gov em background popula IDB — próximo prepare usa cache mesmo sem rede', async () => {
+    fetchMock.mockImplementation((input: RequestInfo | URL) => {
+      if (String(input).includes('/libras/trie-2018.3.1.json')) {
+        return Promise.reject(new Error('asset missing'))
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(fixtureTrie(WORDS)) })
+    })
+
+    // prepare 1: tudo local falha → datilologia; gov dispara em background
+    await expect(prepareGlossForPlayback('TREVAS')).resolves.toEqual({
+      gloss: 'T R E V A S',
+      fingerspelled: ['TREVAS'],
+    })
+    // deixa o fire-and-forget assentar (popula IDB)
+    await new Promise((r) => setTimeout(r, 10))
+
+    // prepare 2: memória zerada, rede toda morta → resolve do IDB
+    resetLibrasTrieForTest()
+    fetchMock.mockRejectedValue(new Error('network down'))
+    await expect(prepareGlossForPlayback('TREVAS')).resolves.toEqual({ gloss: 'TREVAS', fingerspelled: [] })
+  })
 })

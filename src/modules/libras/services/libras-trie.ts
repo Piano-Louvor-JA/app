@@ -75,8 +75,24 @@ function extractRoot(doc: unknown): TrieNode {
  * Offline-first (SPEC AC-3): memória → IndexedDB → asset local empacotado.
  * A API gov é apenas atualização de oportunidade em background — NUNCA bloqueia o prepare.
  */
+async function refreshTrieFromGov(): Promise<void> {
+  const response = await fetch(TRIE_URL)
+  if (!response.ok) throw new Error(`LibrasTrie: HTTP ${response.status}`)
+  const doc = await response.json()
+  extractRoot(doc) // valida antes de cachear
+  await cacheTrie(doc as TrieDoc)
+}
+
+/**
+ * Offline-first (SPEC AC-3): memória → IndexedDB → asset local empacotado.
+ * A API gov é apenas atualização de oportunidade em background (fire-and-forget) —
+ * NUNCA bloqueia o prepare e NUNCA o rejeita. Se tudo local falhar, retorna Trie
+ * vazia (todos os tokens resolvem para datilologia — fallback oficial F1.3) e
+ * dispara o refresh gov para popular o IDB do PRÓXIMO prepare.
+ */
 export async function loadLibrasTrie(): Promise<TrieNode> {
-  if (memoryTrie) return memoryTrie
+  // Trie vazia em memória = último load falhou; permite retry (asset/rede/IDB podem voltar).
+  if (memoryTrie && Object.keys(memoryTrie.children ?? {}).length > 0) return memoryTrie
   const cached = await readCachedTrie()
   if (cached?.root?.children) {
     memoryTrie = { children: cached.root.children }
@@ -92,13 +108,11 @@ export async function loadLibrasTrie(): Promise<TrieNode> {
     memoryTrie = root
     return memoryTrie
   } catch {
-    // fallback final: atualização via API gov (não confundir com o caminho primário)
-    const response = await fetch(TRIE_URL)
-    if (!response.ok) throw new Error(`LibrasTrie: HTTP ${response.status}`)
-    const doc = await response.json()
-    const root = extractRoot(doc)
-    await cacheTrie(doc as TrieDoc)
-    memoryTrie = root
+    // Gov FORA do caminho do prepare (SPEC AC-3): fire-and-forget, popula IDB para o
+    // próximo prepare; falha/rejeição da gov nunca derruba nem trava este prepare.
+    void refreshTrieFromGov().catch(() => {})
+    // Trie vazia = todos os tokens resolvem para datilologia (fallback F1.3)
+    memoryTrie = { children: {} }
     return memoryTrie
   }
 }
