@@ -190,6 +190,9 @@ const SUPPORTED_LOCALES = [
   { value: 'tr', labelKey: 'settings.general.languageTurkish' },
   { value: 'ar', labelKey: 'settings.general.languageArabic' },
   { value: 'hi', labelKey: 'settings.general.languageHindi' },
+  { value: 'it', labelKey: 'settings.general.languageItalian' },
+  { value: 'nl', labelKey: 'settings.general.languageDutch' },
+  { value: 'pl', labelKey: 'settings.general.languagePolish' },
 ] as const
 
 const currentLanguage = ref(
@@ -661,7 +664,9 @@ async function clearAllLocalData() {
 
 .general-settings__card {
   position: relative;
-  overflow: hidden;
+  /* NÃO clipar: dropdown de idioma (menu absolute) vaza o card. O accent
+     de 4px é absoluto dentro dos limites — não vaza sem o hidden. */
+  overflow: visible;
 }
 
 .general-settings__accent {

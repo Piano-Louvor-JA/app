@@ -131,11 +131,11 @@ describe('GeneralView.vue', () => {
     expect(wrapper.find('.general-settings__lang-select').exists()).toBe(true)
   })
 
-  it('renderiza 12 opções de idioma (um por locale suportado)', async () => {
+  it('renderiza 15 opções de idioma (um por locale suportado)', async () => {
     const wrapper = mountComponent()
     await wrapper.find('.general-settings__lang-select-trigger').trigger('click')
     const options = wrapper.findAll('.general-settings__lang-option')
-    expect(options).toHaveLength(12)
+    expect(options).toHaveLength(15)
   })
 
   it('marca a opção pt-BR como ativa por padrão', async () => {

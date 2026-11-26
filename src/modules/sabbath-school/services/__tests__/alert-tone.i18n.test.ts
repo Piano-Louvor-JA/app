@@ -25,7 +25,8 @@ describe('resolveSabbathSchoolAudioLang', () => {
 
   it('auto com locale não mapeado cai em pt-BR', () => {
     expect(resolveSabbathSchoolAudioLang('auto', 'xx-YY')).toBe('pt-BR')
-    expect(resolveSabbathSchoolAudioLang('auto', 'it')).toBe('pt-BR')
+    // it/nl/pl agora mapeados (15 idiomas) — usa locale fictício pro fallback
+    expect(resolveSabbathSchoolAudioLang('auto', 'de')).toBe('pt-BR')
   })
 
   it('fr explícito funciona sem locale FR na UI', () => {
