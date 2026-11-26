@@ -9,8 +9,6 @@ import { useMediaStore } from '@modules/media/stores/useMediaStore'
 import { GlassCard } from '@design-system/index'
 import { useMinimizablePage } from '@shared/composables/useMinimizablePage'
 import type { LibraryAlbum } from '@modules/sync/types/library'
-import { SHOW_CUSTOM_COLLECTIONS } from '../constants'
-import { getShowCustomCollections, setShowCustomCollections } from '../visibility'
 import AlbumCollectionCard from '../components/AlbumCollectionCard.vue'
 import AppConfirm from '@shared/components/AppConfirm.vue'
 import AlbumHymnalCard from '../components/AlbumHymnalCard.vue'
@@ -72,14 +70,6 @@ const playlistHintParts = computed(() => {
     ? { label: text, description: '' }
     : { label: text.slice(0, separator + 1), description: text.slice(separator + 1).trim() }
 })
-// Visibilidade de Minhas Coletâneas (preferência do usuário, persistida).
-const showCustomCollections = ref(getShowCustomCollections())
-
-function toggleCustomCollectionsVisibility(): void {
-  const next = !showCustomCollections.value
-  setShowCustomCollections(next)
-  showCustomCollections.value = next
-}
 
 
 const {
@@ -185,8 +175,8 @@ function addToPlaylist(id: string) {
   playlists.value = listPlaylists()
   playlistItem.value = null
   playlistFeedback.value = result?.added
-    ? `“${item.title}” adicionada a “${target?.name ?? 'playlist'}”`
-    : `“${item.title}” já está em “${target?.name ?? 'playlist'}”`
+    ? t('albums.playlists.addedTo', { title: item.title, name: target?.name ?? t('albums.collectionFallback') })
+    : t('albums.playlists.alreadyIn', { title: item.title, name: target?.name ?? t('albums.collectionFallback') })
   if (playlistFeedbackTimer) clearTimeout(playlistFeedbackTimer)
   playlistFeedbackTimer = setTimeout(() => { playlistFeedback.value = '' }, 2600)
 }
@@ -296,7 +286,7 @@ function onImportFile(event: Event) {
   void file.text().then((raw) => {
     const result = parsePlaylistsImport(raw)
     if (!result.ok) {
-      showImportFeedback('Arquivo de playlists inválido.')
+      showImportFeedback(t('albums.playlists.importInvalid'))
       return
     }
     // Merge por nome: playlist nova entra; existente ganha só faixas novas.
@@ -551,21 +541,8 @@ async function runAction(
             class="albums-view__toolbar-count"
           >{{ playlists.length }}</span>
         </button>
-        <!-- TODO(minhas-coletaneas): botão oculto junto com a seção (ver constants.ts). -->
-        <button
-          v-if="SHOW_CUSTOM_COLLECTIONS"
-          type="button"
-          class="albums-view__toolbar-btn"
-          :aria-label="showCustomCollections ? t('albums.custom.hide') : t('albums.custom.show')"
-          :title="showCustomCollections ? t('albums.custom.hide') : t('albums.custom.show')"
-          @click="toggleCustomCollectionsVisibility"
-        >
-          <i
-            class="ti"
-            :class="showCustomCollections ? 'ti-eye' : 'ti-eye-off'"
-            aria-hidden="true"
-          />
-        </button>
+        <!-- Adendo v1.1.0: categoria custom removida da Central — o botão de
+             mostrar/ocultar "Minhas Coletâneas" saiu junto (vive na Comunidade). -->
         <button
           type="button"
           class="albums-view__toolbar-btn"
@@ -946,7 +923,7 @@ async function runAction(
       v-else-if="!isLoadingCatalog && categories.length === 0 && !isHubSearching"
       class="albums-view__state"
     >
-      {{ t('albums.convite_catalogo') }}
+      {{ t('albums.messages.convite_catalogo') }}
     </div>
 
     <div

@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => {
 
 vi.mock("@modules/media/services/auth-client", () => ({
   getAuthSession: () => mocks.session,
-  authHeaders: () =>
+  authHeadersAsync: async () =>
     mocks.session ? { authorization: `Bearer ${mocks.session.token}` } : {},
   authBaseUrl: () => "http://api.test",
   authRequestHeaders: (h?: HeadersInit) => new Headers(h),

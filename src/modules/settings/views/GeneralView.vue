@@ -184,6 +184,12 @@ const SUPPORTED_LOCALES = [
   { value: 'ru', labelKey: 'settings.general.languageRussian' },
   { value: 'uk', labelKey: 'settings.general.languageUkrainian' },
   { value: 'fr', labelKey: 'settings.general.languageFrench' },
+  { value: 'ja', labelKey: 'settings.general.languageJapanese' },
+  { value: 'ko', labelKey: 'settings.general.languageKorean' },
+  { value: 'zh', labelKey: 'settings.general.languageChinese' },
+  { value: 'tr', labelKey: 'settings.general.languageTurkish' },
+  { value: 'ar', labelKey: 'settings.general.languageArabic' },
+  { value: 'hi', labelKey: 'settings.general.languageHindi' },
 ] as const
 
 const currentLanguage = ref(

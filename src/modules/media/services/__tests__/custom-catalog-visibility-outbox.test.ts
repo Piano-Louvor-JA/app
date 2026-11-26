@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@modules/media/services/auth-client', () => ({
   getAuthSession: mocks.getSession,
-  authHeaders: (token: string | null | undefined = mocks.getSession()?.token) =>
+  authHeadersAsync: async (token: string | null | undefined = mocks.getSession()?.token) =>
     token ? { Authorization: `Bearer ${token}` } : {},
 }))
 

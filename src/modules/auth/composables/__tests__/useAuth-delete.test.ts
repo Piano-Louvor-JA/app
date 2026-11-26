@@ -8,6 +8,20 @@ const mocks = vi.hoisted(() => ({
   fbRevalidate: vi.fn().mockResolvedValue(null),
 }))
 
+import { createI18n } from 'vue-i18n'
+import i18nPlugin from '@plugins/i18n'
+import MediaPt from '../../../media/locales/pt-BR'
+
+// i18n real do app (catálogos core + módulo media) para as mensagens chaveadas do useAuth
+const i18n = createI18n({ legacy: false, locale: 'pt-BR', messages: { 'pt-BR': { ...i18nPlugin.global.messages.value['pt-BR'], media: MediaPt } } })
+
+vi.mock('@plugins/i18n', async () => {
+  const { createI18n } = await import('vue-i18n')
+  const core = (await import('@locales/pt-BR')).default
+  const media = (await import('../../../media/locales/pt-BR')).default
+  const inst = createI18n({ legacy: false, locale: 'pt-BR', messages: { 'pt-BR': { ...core, media } } })
+  return { default: inst, global: inst.global }
+})
 vi.mock('../../../media/services/auth-client', () => ({
   getAuthSession: () => null,
   login: vi.fn(),

@@ -1,5 +1,6 @@
 export default {
   "bible": {
+    "emptyCatalog": "Aucun contenu biblique disponible. Terminez l'initialisation de l'app.",
     "title": "Bible",
     "version": "Version",
     "selectVersion": "Sélectionner la version",

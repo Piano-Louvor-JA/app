@@ -47,6 +47,8 @@ import {
   openLiturgyMusicPlayer,
   playLiturgyItemOnScreens,
 } from '../services/liturgy-actions'
+import { tPtBR } from '../../../test/i18n-stub'
+vi.mock('../../../plugins/i18n', async () => ({ default: { global: { t: (await import('../../../test/i18n-stub')).tPtBR } } }))
 
 // --- helpers --------------------------------------------------------------
 

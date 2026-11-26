@@ -27,6 +27,9 @@ vi.mock('@modules/media/services/custom-catalog', () => ({
   listCustomCollections: (...a: unknown[]) => listCustomCollections(...a),
   customFileUrl: (p: string) => `cf:${p}`,
   toCustomCollectionId: (id: number) => id + 2_000_000,
+  fromCustomCollectionId: (id: number) => id - 2_000_000,
+  isCustomCollectionId: (id: number | string) =>
+    Number.isFinite(Number(id)) && Number(id) >= 2_000_000,
 }))
 vi.mock('@modules/media/services/auth-client', () => ({
   getAuthSession: vi.fn(() => ({ token: 't', user: { id_user: 4, email: 'a@b.c', displayName: 'A' } })),
@@ -39,8 +42,30 @@ vi.mock('@modules/sync/services/media-paths', () => ({
 import {
   loadAlbumCategories,
   loadCustomAlbumCategory,
+  buildCustomCollectionCard,
   findCollectionById,
 } from '../services/album-catalog'
+
+// Adendo v1.1.0: album-catalog agora usa o local store sob demanda (nada de
+// categoria custom na Central) — stubs do store para o card resolver.
+vi.mock('@modules/media/services/local-custom-store', () => ({
+  getLocalCollection: (id: number) => {
+    if (id === -5)
+      return { id: -5, name: 'Minha Local', description: 'desc', createdAt: '' }
+    if (id === -9)
+      return {
+        id: -9,
+        name: 'Cópia',
+        description: null,
+        createdAt: '',
+        origin: { type: 'community', collectionId: 42, copiedAt: '2026-11-23T12:00:00.000Z' },
+      }
+    return null
+  },
+  isLocalId: (id: number) => id < 0,
+  listLocalMusics: (id: number) =>
+    id === -5 ? [{ id: -1, name: 'a' }, { id: -2, name: 'b' }, { id: -3, name: 'c' }] : [],
+}))
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -200,35 +225,28 @@ describe('loadAlbumCategories', () => {
   })
 })
 
-describe('loadCustomAlbumCategory', () => {
-  it('mapeia coletâneas custom; vazio -> null', async () => {
+describe('loadCustomAlbumCategory — adendo v1.1.0 (Central SEM customs)', () => {
+  it('SEMPRE null: nenhuma coletânea custom na Central de Mídia', async () => {
     listCustomCollections.mockResolvedValue([
-      {
-        id: 5,
-        name: 'Minha',
-        description: 'desc',
-        coverUrl: '/custom/c.png',
-        ownerId: 4,
-        musicsCount: 3,
-      },
-      { id: 6, name: 'Sem capa', description: null, ownerId: 4, musicsCount: 0 },
+      { id: 5, name: 'Minha', description: 'desc', coverUrl: '/custom/c.png', ownerId: 4, musicsCount: 3 },
     ])
-    const cat = await loadCustomAlbumCategory()
-    expect(cat).toMatchObject({ id: 'custom', name: 'Minhas Coletâneas' })
-    expect(cat?.collections[0]).toMatchObject({
-      id: 2_000_005,
-      coverUrl: 'cf:/custom/c.png',
-      isCustom: true,
-      trackCount: 3,
-    })
-    expect(cat?.collections[1]?.coverUrl).toBeNull()
-    listCustomCollections.mockResolvedValue([])
+    expect(await loadCustomAlbumCategory()).toBeNull()
+    listCustomCollections.mockRejectedValue(new Error('x'))
     expect(await loadCustomAlbumCategory()).toBeNull()
   })
 
-  it('erro do listCustomCollections -> [] -> null', async () => {
-    listCustomCollections.mockRejectedValue(new Error('x'))
-    expect(await loadCustomAlbumCategory()).toBeNull()
+  it('buildCustomCollectionCard resolve local própria sob demanda (id local CRU)', () => {
+    const card = buildCustomCollectionCard(-5)
+    expect(card).toMatchObject({
+      id: 1_999_995, // namespace custom de exibição (-5 + 2M)
+      name: 'Minha Local',
+      subtitle: 'desc',
+      isCustom: true,
+      trackCount: 3,
+    })
+    // cópia da Comunidade, id oficial, id inexistente → fora
+    expect(buildCustomCollectionCard(123)).toBeNull()
+    expect(buildCustomCollectionCard('abc')).toBeNull()
   })
 })
 

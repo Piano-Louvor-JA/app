@@ -44,8 +44,8 @@ function addToPlaylist(id: string) { emit('choose', id) }
             <div class="playlist-picker__body">
               <p v-if="playlists.length === 0" class="playlist-picker__empty">
                 <i class="ti ti-music-plus" aria-hidden="true" />
-                Você ainda não tem playlists.<br>
-                Crie uma na seção Playlists da Biblioteca.
+                {{ t('albums.playlists.emptyHint') }}<br>
+                {{ t('albums.playlists.createHint') }}
               </p>
               <button
                 v-for="playlist in playlists"
