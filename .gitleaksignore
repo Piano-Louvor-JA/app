@@ -6,3 +6,6 @@ fa1fafae85b3a8cc46b2a49937972b00173d8e1e:src/modules/albums/services/__tests__/a
 
 # TOKEN_ALPHABET is the character set used to generate share tokens, not a credential.
 dbd815e9e9c3aad3fa69243b26fcb83a85ac83f1:electron/monitor-share.mjs:generic-api-key:28
+
+# Chave de catálogo pt_hymnal_1996 em fixture de teste (álbuns desativados); não é credencial.
+63de2965bcd9fca730c35b7a1539cb7dda459374:src/modules/albums/components/__tests__/DisabledAlbumsCard.test.ts:generic-api-key:13
