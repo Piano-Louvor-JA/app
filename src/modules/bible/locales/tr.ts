@@ -1,5 +1,6 @@
 export default {
   "bible": {
+    "convite_catalogo": "Bu dilde henüz Kutsal Kitap içeriği yok. LouvorJA topluluğunun çeviri çalışmalarına katılın.",
     "title": "Kutsal Kitap",
     "version": "Çeviri",
     "selectVersion": "Çeviri seçin",
@@ -44,7 +45,6 @@ export default {
     "close": "Kapat",
     "inAppProjection": "Kutsal Kitap önizlemesi",
     "projectionHotkeyHint": "ESC projeksiyonu bitirir  ·  Ctrl+Alt+P operatör ekranıyla geçiş",
-    "convite_catalogo": "Bu dilde henüz İncil içeriği yok. Topluluğun çevirisine yardım edin: daha fazlası LouvorJA'da.",
     "emptyChapter": "Bu bölümde ayet bulunamadı.",
     "loading": "Kutsal Kitap yükleniyor…",
     "noSelection": "Projeksiyon için bir ayet seçin",

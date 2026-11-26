@@ -44,7 +44,7 @@ export default {
     "close": "Close",
     "inAppProjection": "Bible preview",
     "projectionHotkeyHint": "ESC ends projection  ·  Ctrl+Alt+P toggles with the operator screen",
-    "convite_catalogo": "No Bible content available in this language yet. Help the community translate: learn more at LouvorJA.",
+    "convite_catalogo": "Non sono ancora disponibili contenuti biblici in questa lingua. Aiuta la comunità LouvorJA a tradurli.",
     "emptyChapter": "No verse found in this chapter.",
     "loading": "Loading Bible...",
     "noSelection": "Select a verse to project",

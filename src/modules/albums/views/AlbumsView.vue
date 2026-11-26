@@ -77,7 +77,6 @@ const playlistHintParts = computed(() => {
 
 const {
   categories,
-  previewCategories,
   hubSearchQuery,
   musicIndex,
   hubSearchResults,
@@ -1024,64 +1023,11 @@ async function runAction(
       v-else-if="!isLoadingCatalog && categories.length === 0 && !isHubSearching"
       class="albums-view__convite"
     >
-      <!-- Catálogo pt-BR real (não funcional) atrás do blur; fallback: mockup estático. -->
-      <div aria-hidden="true" class="albums-view__convite-backdrop">
-        <template v-if="(previewCategories?.length ?? 0) > 0">
-          <section
-            v-for="category in previewCategories"
-            :key="`preview-${String(category.id)}`"
-            class="albums-view__category"
-          >
-            <header class="albums-view__category-header">
-              <div>
-                <h2 class="albums-view__category-title">{{ categoryTitle(category) }}</h2>
-                <p class="albums-view__category-subtitle">{{ categorySubtitle(category) }}</p>
-              </div>
-            </header>
-            <GlassCard class="albums-view__grid-wrap" :padding="false" elevated>
-              <div class="albums-view__grid">
-                <AlbumCollectionCard
-                  v-for="collection in category.collections"
-                  :key="`preview-${String(collection.id)}`"
-                  :collection="collection"
-                  :library-album="undefined"
-                  :show-download-controls="false"
-                  tabindex="-1"
-                />
-              </div>
-            </GlassCard>
-          </section>
-        </template>
-        <section v-else class="albums-view__category">
-          <header class="albums-view__category-header">
-            <div>
-              <h2 class="albums-view__category-title">Hinários</h2>
-            </div>
-          </header>
-          <GlassCard class="albums-view__grid-wrap" :padding="false" elevated>
-            <div class="albums-view__grid">
-              <div
-                v-for="n in 12"
-                :key="`mock-${n}`"
-                class="albums-view__mock-card"
-              >
-                <div class="albums-view__mock-cover" :class="`albums-view__mock-cover--${n % 4}`">
-                  <i class="ti ti-music" />
-                </div>
-                <div class="albums-view__mock-line" />
-                <div class="albums-view__mock-line albums-view__mock-line--short" />
-              </div>
-            </div>
-          </GlassCard>
-        </section>
-      </div>
-
       <!-- Convite premium em cima do preview. -->
       <div class="albums-view__convite-card">
         <i class="ti ti-seedling" aria-hidden="true" />
         <h2>{{ t('albums.messages.convite_titulo') }}</h2>
         <p>{{ t('albums.messages.convite_catalogo') }}</p>
-        <span class="albums-view__convite-hint">{{ t('albums.messages.convite_hint') }}</span>
       </div>
     </div>
 
