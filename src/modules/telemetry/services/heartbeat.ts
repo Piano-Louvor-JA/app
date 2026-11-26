@@ -6,7 +6,7 @@ import { apiCandidateBases } from '@shared/services/api-fallback'
 import { getDesktopBridge } from '@shared/services/desktop-bridge'
 import { getUserPreference } from '@shared/services/user-preferences'
 
-import { getOrCreateInstallId, isTelemetryEnabled } from './telemetry-preferences'
+import { getOrCreateInstallId } from './telemetry-preferences'
 
 /**
  * Sinal de "online" para a API (POST /v1/telemetry/heartbeat — contrato em
@@ -82,11 +82,10 @@ export async function buildHeartbeatBody(): Promise<HeartbeatBody> {
 
 /**
  * Envia para o primeiro host que responder. Erro de rede ou 5xx passa ao
- * próximo; 4xx não insiste. Com "Enviar estatísticas de uso" desligado,
- * nada sai do app.
+ * próximo; 4xx não insiste. Sempre ligado (recurso padrão, sem opção de
+ * desativar).
  */
 export async function sendHeartbeat(fetchImpl: typeof fetch = globalThis.fetch): Promise<boolean> {
-  if (!isTelemetryEnabled()) return false
   const body = JSON.stringify(await buildHeartbeatBody())
   for (const url of heartbeatUrls()) {
     const controller = new AbortController()

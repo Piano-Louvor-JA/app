@@ -10,7 +10,6 @@ vi.mock('@shared/services/api-fallback', () => ({
 import { saveHomeLocation } from '@modules/home/services/home-preferences'
 
 import { buildHeartbeatBody, heartbeatUrls, sendHeartbeat } from '../heartbeat'
-import { setTelemetryEnabled } from '../telemetry-preferences'
 
 type Win = typeof window & { louvorja?: unknown }
 
@@ -100,12 +99,5 @@ describe('heartbeat (telemetria de dispositivos, Fase 3)', () => {
     const notFound = vi.fn(async () => new Response(null, { status: 404 }))
     expect(await sendHeartbeat(notFound as never)).toBe(false)
     expect(notFound).toHaveBeenCalledTimes(1)
-  })
-
-  it('"Enviar estatísticas de uso" desligado: nenhum envio', async () => {
-    setTelemetryEnabled(false)
-    const fetchMock = vi.fn()
-    expect(await sendHeartbeat(fetchMock as never)).toBe(false)
-    expect(fetchMock).not.toHaveBeenCalled()
   })
 })

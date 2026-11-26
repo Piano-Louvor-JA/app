@@ -3,8 +3,8 @@ import { getUserPreference, setUserPreference } from '@shared/services/user-pref
 
 /**
  * Telemetria de dispositivos online (app/.planning/telemetria-dispositivos,
- * Fase 3). Tudo local por instalação: nenhuma destas chaves sincroniza com
- * a conta (fora de SYNCABLE_PREF_KEYS).
+ * Fase 3). O envio é sempre ligado (sem opção de desativar). O id é local
+ * por instalação e não sincroniza com a conta (fora de SYNCABLE_PREF_KEYS).
  */
 
 const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
@@ -29,13 +29,4 @@ export function getOrCreateInstallId(): string {
   const id = newUuidV4()
   setUserPreference(USER_PREFERENCE_KEYS.telemetryInstallId, id)
   return id
-}
-
-/** "Enviar estatísticas de uso": ligado quando nunca foi mexido. */
-export function isTelemetryEnabled(): boolean {
-  return getUserPreference<unknown>(USER_PREFERENCE_KEYS.telemetryEnabled, true) !== false
-}
-
-export function setTelemetryEnabled(enabled: boolean): void {
-  setUserPreference(USER_PREFERENCE_KEYS.telemetryEnabled, enabled)
 }
