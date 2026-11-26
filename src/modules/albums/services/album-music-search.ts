@@ -6,6 +6,7 @@ import { matchesAllTerms } from "@shared/services/search-terms"
 import type { AlbumSearchAlbumRef, AlbumSearchHit } from '../types/albums'
 import { formatCatalogDuration } from './album-tracks'
 import { albumDisableKey } from './disabled-albums'
+import i18n from '@plugins/i18n'
 
 type CatalogMusicAlbum = {
   id_album?: number | string
@@ -138,7 +139,7 @@ function mapMusicIndexRow(row: CatalogMusicIndexRow): AlbumSearchHit | null {
 
   const hymnalTracks = collectHymnalTracks(row)
   const { track, isHymnal } = preferredHymnalTrack(row, hymnalTracks)
-  const albumNames = joinAlbumNames(row) || 'Música'
+  const albumNames = joinAlbumNames(row) || i18n.global.t('albums.fallbackMusic')
 
   // Busca por letra (issue #360, Opção A): a letra JÁ VEM no índice
   // `${prefix}_musics` (1944/1956 músicas, +~80% do peso do arquivo que
@@ -228,7 +229,7 @@ export async function loadAlbumMusicIndex(): Promise<AlbumSearchHit[]> {
         track: null,
         durationLabel: '0:00',
         hasInstrumental: false,
-        albumNames: 'Minhas Coletâneas',
+        albumNames: i18n.global.t('albums.custom.title'),
         displayTitle: local.name,
         isHymnal: false,
         hymnalTracks: [],

@@ -131,10 +131,10 @@ describe('GeneralView.vue', () => {
     expect(wrapper.find('.general-settings__lang-options').exists()).toBe(true)
   })
 
-  it('renderiza 3 botoes de idioma (pt-BR, es, uk) -- EN/ru/fr desabilitados temporariamente', () => {
+  it('renderiza 12 botoes de idioma (um por locale suportado)', () => {
     const wrapper = mountComponent()
     const buttons = wrapper.findAll('.general-settings__lang-btn')
-    expect(buttons).toHaveLength(3)
+    expect(buttons).toHaveLength(12)
   })
 
   it('marca o botao pt-BR como ativo por padrao', () => {
@@ -145,14 +145,14 @@ describe('GeneralView.vue', () => {
 
   it('chama setUserPreference ao clicar num botao de idioma', async () => {
     const wrapper = mountComponent()
-    const esBtn = wrapper.findAll('.general-settings__lang-btn')[1]
+    const esBtn = wrapper.findAll('.general-settings__lang-btn')[2]
     await esBtn.trigger('click')
     expect(setUserPreference).toHaveBeenCalledWith('language', 'es')
   })
 
   it('troca locale.value ao clicar num botao de idioma', async () => {
     const wrapper = mountComponent()
-    const esBtn = wrapper.findAll('.general-settings__lang-btn')[1]
+    const esBtn = wrapper.findAll('.general-settings__lang-btn')[2]
     await esBtn.trigger('click')
     expect(mockLocale.value).toBe('es')
   })
@@ -163,7 +163,7 @@ describe('GeneralView.vue', () => {
   // preferência; persistir antes = early-return = download nunca roda.
   it('RED RAIZ-1: baixa catalogo ANTES de persistir o idioma', async () => {
     const wrapper = mountComponent()
-    const esBtn = wrapper.findAll('.general-settings__lang-btn')[1]
+    const esBtn = wrapper.findAll('.general-settings__lang-btn')[2]
     await esBtn.trigger('click')
     expect(ensureCatalogForLocale).toHaveBeenCalledWith('es', expect.any(Function))
     expect(setUserPreference).toHaveBeenCalledWith('language', 'es')
@@ -182,7 +182,7 @@ describe('GeneralView.vue', () => {
     const wrapper = mountComponent()
     expect(wrapper.find('[data-testid="language-sync-progress"]').exists()).toBe(false)
 
-    await wrapper.findAll('.general-settings__lang-btn')[1].trigger('click')
+    await wrapper.findAll('.general-settings__lang-btn')[2].trigger('click')
     const bar = wrapper.find('[data-testid="language-sync-progress"]')
     expect(bar.exists()).toBe(true)
     expect(bar.attributes('role')).toBe('progressbar')
@@ -202,7 +202,7 @@ describe('GeneralView.vue', () => {
   it('RED RAIZ-1: falha de download NAO persiste o idioma (rollback)', async () => {
     vi.mocked(ensureCatalogForLocale).mockRejectedValueOnce(new Error('rede'))
     const wrapper = mountComponent()
-    const esBtn = wrapper.findAll('.general-settings__lang-btn')[1]
+    const esBtn = wrapper.findAll('.general-settings__lang-btn')[2]
     await esBtn.trigger('click')
     await vi.waitFor(() => {
       expect(ensureCatalogForLocale).toHaveBeenCalled()
@@ -544,8 +544,8 @@ describe('GeneralView.vue', () => {
       const danger = btns.find((b) => (b.text() + (b.attributes('aria-label') ?? '')).toLowerCase().includes('apagar'))
       if (danger) await danger.trigger('click')
       await flushPromises()
-      // popup não abre: sem checkbox
-      expect(w.find('input[type="checkbox"]').exists()).toBe(false)
+      // popup não abre: sem checkbox do popup de apagar (o toggle Libras tem checkbox próprio)
+      expect(w.find('.clear-confirm__checkbox').exists()).toBe(false)
       w.unmount()
     })
 
@@ -628,7 +628,7 @@ describe('GeneralView.vue', () => {
       new MouseEvent('click', { bubbles: true }),
     )
     await flushPromises()
-    expect(w.find('input[type="checkbox"]').exists()).toBe(false)
+    expect(w.find('.clear-confirm__checkbox').exists()).toBe(false)
     w.unmount()
 
     // busy: export pendente, cliques forçados nos 2 botões → guards L63/L81

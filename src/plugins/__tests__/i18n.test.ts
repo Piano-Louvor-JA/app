@@ -23,8 +23,8 @@ describe('i18n message merge', () => {
 })
 
 describe('SUPPORTED_LOCALES', () => {
-  it('contem pt-BR, en, es, ru, uk e fr', () => {
-    expect(SUPPORTED_LOCALES).toEqual(['pt-BR', 'en', 'es', 'ru', 'uk', 'fr'])
+  it('contem os 12 locales suportados', () => {
+    expect(SUPPORTED_LOCALES).toEqual(['pt-BR', 'en', 'es', 'ru', 'uk', 'fr', 'ja', 'ko', 'zh', 'tr', 'ar', 'hi'])
   })
 })
 

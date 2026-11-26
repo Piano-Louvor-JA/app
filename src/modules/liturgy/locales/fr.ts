@@ -288,7 +288,7 @@ export default {
       "mediaDesktopOnly": "Saisissez le chemin du fichier média.",
       "videoSelectFile": "Sélectionner un fichier",
       "catalogEmpty": "Aucune musique trouvée dans le catalogue local.",
-            "dropHint": "Déposez les fichiers ici pour les ajouter à la liturgie",
+      "dropHint": "Déposez les fichiers ici pour les ajouter à la liturgie",
       "dropDesktopOnly": "Glisser des fichiers sur la liturgie ne fonctionne que dans l'application de bureau.",
       "dropPathFailed": "Impossible de lire le chemin des fichiers déposés. Utilisez Ajouter et choisissez le fichier.",
       "dropMoreFilesPending": "Premier fichier ouvert dans la boîte de dialogue. Déposez les autres après enregistrement si besoin.",
@@ -393,6 +393,15 @@ export default {
       "importedLocalNoImages": "Importé sur cet appareil : {name} ({slides} strophes). Les images n'ont pas été enregistrées sur cet appareil.",
       "importFailed": "Fichier .slja invalide.",
       "importStorageFull": "Stockage local plein — libérez de l'espace (supprimez les anciens chants locaux), puis réessayez."
+    },
+    "fileFilters": {
+      "video": "Vidéos",
+      "all": "Tous"
+    },
+    "fallback": {
+      "music": "Musique",
+      "video": "Vidéo",
+      "audio": "Audio"
     }
   }
 }

@@ -298,12 +298,12 @@ describe('AlbumCollectionView', () => {
     await flushPromises()
     expect(pickerInBody()).toBeNull()
     expect(document.body.querySelector('.playlist-toast')).not.toBeNull()
-    expect(document.body.querySelector('.playlist-toast')!.textContent).toContain('adicionada')
+    expect(document.body.querySelector('.playlist-toast')!.textContent).toContain('albums.playlists.addedTo')
     // duplicado
     await w.findAll('.track-row-stub')[0]!.find('.row-playlist').trigger('click')
     ;(pickerInBody()!.querySelector('.playlist-picker__option') as HTMLElement).click()
     await flushPromises()
-    expect(document.body.querySelector('.playlist-toast')!.textContent).toContain('já está')
+    expect(document.body.querySelector('.playlist-toast')!.textContent).toContain('albums.playlists.alreadyIn')
   })
 
   it('picker sem playlists mostra estado vazio; esc/overlay/cancelar fecham', async () => {

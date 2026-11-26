@@ -7,6 +7,8 @@ import {
   parseCatalogDurationMs,
 } from '../services/liturgy-catalog'
 import type { LiturgyMusicOption } from '../types/liturgy'
+import { tPtBR } from '../../../test/i18n-stub'
+vi.mock('../../../plugins/i18n', async () => ({ default: { global: { t: (await import('../../../test/i18n-stub')).tPtBR } } }))
 
 // Mocks das dependências de rede/workspace — módulo é puro dado + fetch
 const catalogFiles = new Map<string, unknown>()

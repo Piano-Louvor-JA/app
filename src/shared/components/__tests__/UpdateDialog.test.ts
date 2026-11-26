@@ -95,6 +95,6 @@ describe("UpdateDialog", () => {
 		mockComposable({ newVersion: ref("2.0.0"), releaseNotes: ref(null) });
 		const wrapper = mountDialog();
 		expect(wrapper.find('[data-test="release-notes"]').exists()).toBe(false);
-		expect(wrapper.text()).toContain("Sem notas de versão.");
+		expect(wrapper.text()).toContain("updates.noReleaseNotes");
 	});
 });

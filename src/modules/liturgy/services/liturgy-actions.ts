@@ -10,6 +10,7 @@ import type { Router } from 'vue-router'
 import type { LiturgyItem, LiturgyMusicMode } from '../types/liturgy'
 import { isExecutableItem } from './liturgy-item-helpers'
 import { useScheduledStore } from '../stores/useScheduledStore'
+import i18n from '@plugins/i18n'
 import { activeDateISO, todayISO } from './liturgy-preferences'
 import { getLiturgyVideoObjectUrl } from './liturgy-local-video'
 import {
@@ -362,7 +363,9 @@ export async function executeLiturgyItem(
         }
       }
 
-      const fallbackLabel = item.type === 'audio' ? 'Áudio' : 'Vídeo'
+      const fallbackLabel = item.type === 'audio'
+        ? i18n.global.t('liturgy.fallback.audio')
+        : i18n.global.t('liturgy.fallback.video')
       const opened = await openLiturgyLocalVideoControl(
         filePath || item.name?.trim() || fallbackLabel,
         item.name?.trim() || filePath || fallbackLabel,

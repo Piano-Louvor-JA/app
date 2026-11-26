@@ -34,10 +34,11 @@
   #content{position:fixed;top:0;left:0;right:0;bottom:0;padding:3vh 4vw;
     box-sizing:border-box}
   #text{position:absolute;top:50%;left:50%;
-    /* ÁREA ÚTIL do slide: a tela toda menos a margem lateral (4vw de cada
-       lado, como nas TVs). Fonte grande usa a largura inteira; fonte normal
-       quebra nas \n do autor e a caixa abraça o texto. SEM fit JS. */
-    display:block;width:92vw;max-height:72vh;transform:translate(-50%,-50%);
+    /* ÁREA ÚTIL do slide: teto 1600px (05/10 Rafael — 100% da área ficou
+       DEMAIS). SOLUÇÃO EZEQUIAS (web 3dc37df): pre-line + quebra natural —
+       as quebras \n do autor viram linhas e o texto flui até a max-width
+       antes de quebrar. SEM fit JS: fonte configurada aplicada direta. */
+    display:block;width:min(86vw,1600px);max-height:72vh;transform:translate(-50%,-50%);
     overflow-wrap:break-word;white-space:pre-line;
     text-align:center;font-size:calc(var(--fit-size,3.65vw));font-weight:700;line-height:1.4;
     letter-spacing:.03em;
@@ -56,7 +57,7 @@
        continua sendo a área útil (max-width 100% do #content). */
     /* PARIDADE WEB (MediaSlideStage): caixa com respiro — max-width 86%
        e padding 2.5vmin 4vmin, igual MediaSlideStage.vue do web. */
-    max-width:92vw;margin-inline:auto;
+    max-width:86vw;margin-inline:auto;
     /* WIDTH fit-content (14/10): caixa ABRAÇA o texto. width fixo 86vw do
        #text esticava a caixa em música com linha curta — vêa larga. */
     width:fit-content;
@@ -66,7 +67,7 @@
     box-shadow:0 10px 30px rgba(0,0,0,.4)}
   /* Match the monitor lyric layout. max-content avoids absolute-position
      shrink-to-fit using only the space to the right of left:50%. */
-  #text.music-lyrics{line-height:1;width:max-content;max-width:92vw;box-sizing:border-box}
+  #text.music-lyrics{line-height:1;width:max-content;max-width:min(92vw,1600px);box-sizing:border-box}
   #text.music-lyrics p,#text.music-lyrics div{margin:0;padding:0;line-height:inherit}
   #text.music-lyrics.box-on{padding:1.6vmin 1.8vmin}
   #text.shadow-off{text-shadow:none}
@@ -79,14 +80,14 @@
     color:#f6c32a;background:none;padding:0;border:none;box-shadow:none;
     backdrop-filter:none;-webkit-backdrop-filter:none;
     border-radius:0;line-height:1.1}
-  #text.cover-on:not(.title-box-on){width:max-content;max-width:92vw;box-sizing:border-box;padding:3.6vw 5vw 3.8vw;line-height:1.15;letter-spacing:.04em}
+  #text.cover-on:not(.title-box-on){width:max-content;max-width:min(88vw,1600px);box-sizing:border-box;padding:3.6vw 5vw 3.8vw;line-height:1.15;letter-spacing:.04em}
   #text.cover-on:not(.title-box-on)::before,#text.cover-on:not(.title-box-on)::after{content:'';position:absolute;width:3.6vw;height:3.6vw;pointer-events:none}
   #text.cover-on:not(.title-box-on)::before{top:.2vw;left:.2vw;border-top:.28vw solid currentColor;border-left:.28vw solid currentColor;border-top-left-radius:2vw}
   #text.cover-on:not(.title-box-on)::after{bottom:.2vw;right:.2vw;border-bottom:.28vw solid currentColor;border-right:.28vw solid currentColor;border-bottom-right-radius:2vw}
   /* Caixa opcional na capa: usuário liga 'titleTextBox'. Depois de
      .cover-on para vencer o background:none quando ambos ativos. */
   #text.cover-on.title-box-on{background:rgba(24,24,24,var(--box-bg,.55));
-    backdrop-filter:blur(16px);width:fit-content;max-width:92vw;margin-inline:auto;
+    backdrop-filter:blur(16px);width:fit-content;max-width:86vw;margin-inline:auto;
     padding:2.5vmin 4vmin;
     border-radius:2.4vmin 0 2.4vmin 0;
     border:var(--box-border,.2vmin solid rgba(255,255,255,.85));
@@ -95,7 +96,7 @@
   /* Caixa GRANDE (Bíblia): padding generoso, típico véu de leitura.
      width FIXO restaura o véu largo — o fit-content do .box-on é só
      para MÍDIA (música), Bíblia NÃO (14/10 Rafael). */
-  #text.bible-box{padding:2vh 3.8vh;width:92vw;max-height:72vh}
+  #text.bible-box{padding:2vh 3.8vh;width:min(86vw,1600px);max-height:72vh}
   /* Entrada do slide/versículo. translate/scale individuais somam ao transform
      que posiciona o #text; motores antigos ignoram e ficam só com o fade. */
   @keyframes rxEnterFade{from{opacity:0}}

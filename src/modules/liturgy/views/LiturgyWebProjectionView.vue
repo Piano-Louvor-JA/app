@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import { closeProjectionModule } from '@shared/composables/useProjectionWindow'
 
@@ -15,6 +16,7 @@ import {
 const runtime = ref<LiturgyWebProjectionRuntime>({
   ...DEFAULT_LITURGY_WEB_RUNTIME,
 })
+const { t } = useI18n()
 let runtimeChannel: BroadcastChannel | null = null
 
 const isLocalVideo = computed(() => runtime.value.kind === 'local-video')
@@ -122,7 +124,7 @@ onUnmounted(() => {
       :key="frameSrc"
       class="liturgy-web-projection__frame"
       :src="frameSrc"
-      :title="runtime.title || 'Projeção'"
+      :title="runtime.title || t('liturgy.projection')"
       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
       allowfullscreen
       referrerpolicy="strict-origin-when-cross-origin"

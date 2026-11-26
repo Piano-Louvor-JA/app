@@ -481,7 +481,7 @@ async function onToggleFullscreen() {
         class="media-window__playlist"
       >
         <template v-if="queue.length > 1">
-          <h2 class="media-window__playlist-title">Fila de reprodução</h2>
+          <h2 class="media-window__playlist-title">{{ t('media.queueTitle') }}</h2>
           <TransitionGroup name="queue-reorder" tag="ul" class="media-window__playlist-list">
             <li v-for="(item, index) in queue" :key="queueItemKey(index)" class="media-window__queue-row"
               :class="{

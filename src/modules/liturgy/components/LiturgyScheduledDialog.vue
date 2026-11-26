@@ -98,8 +98,8 @@ async function onPickLocalVideo() {
   const picked = await bridge.dialog.openFile({
     title: t('liturgy.fields.selectVideoButton'),
     filters: [
-      { name: 'Vídeos', extensions: ['mp4', 'mkv', 'avi', 'mov', 'wmv', 'webm'] },
-      { name: 'Todos', extensions: ['*'] },
+      { name: t('liturgy.fileFilters.video'), extensions: ['mp4', 'mkv', 'avi', 'mov', 'wmv', 'webm'] },
+      { name: t('liturgy.fileFilters.all'), extensions: ['*'] },
     ],
     multiple: false,
   })
@@ -313,7 +313,7 @@ function onAddSong() {
     dlg.addEntry(rotationId, {
       dateISO: entryDate.value,
       content: { kind: 'file', filePath },
-      name: entryName.value.trim() || filePath.split(/[\\/]/).pop() || 'Vídeo',
+      name: entryName.value.trim() || filePath.split(/[\\/]/).pop() || t('liturgy.fallback.video'),
     })
     entryFilePath.value = ''
   } else {
@@ -322,7 +322,7 @@ function onAddSong() {
     dlg.addEntry(rotationId, {
       dateISO: entryDate.value,
       content: { kind: 'online_video', url },
-      name: entryName.value.trim() || 'Vídeo',
+      name: entryName.value.trim() || t('liturgy.fallback.video'),
     })
     entryUrl.value = ''
   }

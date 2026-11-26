@@ -15,6 +15,7 @@ vi.stubGlobal("fetch", fetchMock);
 vi.mock("@modules/media/services/auth-client", () => ({
 	getAuthSession: authSessionMock,
 	authHeaders: () => ({ authorization: "Bearer probe" }),
+	authHeadersAsync: async () => ({ authorization: "Bearer probe" }),
 }));
 
 import { resolveMediaTrack } from "@modules/media/services/custom-catalog";
@@ -71,7 +72,7 @@ describe("import .slja LOGADO → API custom (app#331)", () => {
 		localStorage.clear();
 		fetchMock.mockReset();
 		authSessionMock.mockReset();
-		authSessionMock.mockReturnValue({ user: { email: "op@igreja.org" } });
+		authSessionMock.mockReturnValue({ token: "probe", user: { id_user: 4, email: "op@igreja.org" } });
 	});
 
 	it("sobe música+áudio+estrofes pra API e devolve displayMusicId 1M+", async () => {

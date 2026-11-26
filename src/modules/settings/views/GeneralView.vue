@@ -33,6 +33,14 @@ import MediaFolderCard from '../components/MediaFolderCard.vue'
 import AppBackupCard from '../components/AppBackupCard.vue'
 import DiagnosticsCard from '../components/DiagnosticsCard.vue'
 import { ensureCatalogForLocale } from '@modules/starting/services/catalog-locale-service'
+import { isLibrasEnabled, setLibrasEnabled } from '@modules/libras/services/libras-preferences'
+
+const librasOn = ref(isLibrasEnabled())
+
+function toggleLibras() {
+  librasOn.value = !librasOn.value
+  setLibrasEnabled(librasOn.value)
+}
 
 const { t, locale } = useI18n()
 const catalogSyncState = ref<'idle' | 'syncing' | 'done' | 'error'>('idle')
@@ -171,8 +179,17 @@ const {
 
 const SUPPORTED_LOCALES = [
   { value: 'pt-BR', labelKey: 'settings.general.languagePortuguese' },
+  { value: 'en', labelKey: 'settings.general.languageEnglish' },
   { value: 'es', labelKey: 'settings.general.languageSpanish' },
+  { value: 'ru', labelKey: 'settings.general.languageRussian' },
   { value: 'uk', labelKey: 'settings.general.languageUkrainian' },
+  { value: 'fr', labelKey: 'settings.general.languageFrench' },
+  { value: 'ja', labelKey: 'settings.general.languageJapanese' },
+  { value: 'ko', labelKey: 'settings.general.languageKorean' },
+  { value: 'zh', labelKey: 'settings.general.languageChinese' },
+  { value: 'tr', labelKey: 'settings.general.languageTurkish' },
+  { value: 'ar', labelKey: 'settings.general.languageArabic' },
+  { value: 'hi', labelKey: 'settings.general.languageHindi' },
 ] as const
 
 const currentLanguage = ref(
@@ -386,6 +403,34 @@ async function clearAllLocalData() {
           {{ t('settings.general.languageSyncRetry') }}
         </button>
       </div>
+    </GlassCard>
+
+    <!-- Libras -->
+    <GlassCard class="general-settings__card" elevated>
+      <div class="general-settings__accent" aria-hidden="true" />
+
+      <div class="general-settings__header">
+        <div class="general-settings__heading">
+          <i class="ti ti-sign-language general-settings__icon" aria-hidden="true" />
+          <h3 class="general-settings__title">
+            {{ t('settings.general.librasTitle') }}
+          </h3>
+        </div>
+      </div>
+
+      <p class="general-settings__hint">
+        {{ t('settings.general.librasHint') }}
+      </p>
+
+      <label class="general-settings__libras-row" data-testid="libras-toggle-row">
+        <input
+          v-model="librasOn"
+          type="checkbox"
+          data-testid="libras-toggle"
+          @change="toggleLibras"
+        >
+        <span>{{ t('settings.general.librasToggleLabel') }}</span>
+      </label>
     </GlassCard>
 
     <!-- Sincronização (.louvorja) -->
@@ -698,7 +743,23 @@ async function clearAllLocalData() {
   color: var(--ds-color-on-surface-variant);
 }
 
-/* Seletor de idioma */
+/* Idioma — seletor */
+.general-settings__libras-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.9375rem;
+  color: var(--ds-color-on-surface);
+  cursor: pointer;
+}
+
+.general-settings__libras-row input {
+  width: 1.125rem;
+  height: 1.125rem;
+  accent-color: var(--ds-color-primary);
+  cursor: pointer;
+}
+
 .general-settings__lang-options {
   display: flex;
   flex-wrap: wrap;

@@ -18,7 +18,12 @@ vi.mock("vue-router", () => ({
 }));
 
 vi.mock("@shared/components/AppConfirm.vue", () => ({
-	default: { template: '<div class="app-confirm-stub" />' },
+	default: {
+		name: "AppConfirm",
+		props: ["open", "title", "message"],
+		emits: ["confirm", "cancel"],
+		template: '<div class="app-confirm-stub" />',
+	},
 }));
 
 vi.mock("@modules/auth/services/firebase-client", () => ({
@@ -29,6 +34,8 @@ vi.mock("@modules/auth/services/firebase-client", () => ({
 
 vi.mock("../../services/auth-client", () => ({
 	getAuthSession: vi.fn(() => null),
+	authHeaders: () => ({}),
+	authHeadersAsync: async () => ({}),
 }));
 
 vi.mock("../../services/custom-catalog", () => ({
@@ -59,10 +66,12 @@ vi.mock("../../services/custom-catalog", () => ({
 }));
 
 vi.mock("../../services/local-custom-store", () => ({
-	getLocalMusic: vi.fn(),
-	isLocalId: vi.fn(() => false),
-	updateLocalMusic: vi.fn(),
-	publishLocalMusic: vi.fn(() => true),
+  getLocalMusic: vi.fn(),
+  isLocalId: vi.fn(() => false),
+  updateLocalMusic: vi.fn(),
+  publishLocalMusic: vi.fn(() => true),
+  listLocalCollections: vi.fn().mockReturnValue([]),
+  createLocalCollection: vi.fn().mockReturnValue({ id: 1, name: "Singles" }),
 }));
 
 vi.mock("@modules/albums/services/album-music-search", () => ({
@@ -264,6 +273,9 @@ describe("MediaEditorView — seleção de música", () => {
 		const { getLocalMusic, isLocalId, publishLocalMusic } = await import(
 			"../../services/local-custom-store"
 		);
+		// SPEC editor-ux (1cf6907): Publicar exige sessão (deslogado = zero rede).
+		const { getAuthSession } = await import("../../services/auth-client");
+		vi.mocked(getAuthSession).mockReturnValue({ token: "t", user: { id_user: 1, email: "a@b.c", displayName: "A" } } as never);
 		vi.mocked(isLocalId).mockReturnValue(true);
 		vi.mocked(getLocalMusic).mockReturnValue({
 			id: -7,
@@ -1233,7 +1245,7 @@ describe("MediaEditorView — cobertura de gaps", () => {
 		w.unmount();
 	});
 
-	it("import .slja (RF-02): cria coletânea com o título do conteúdo; legada 'Importações .slja' NÃO é reutilizada", async () => {
+	it("import .slja (RF-02 v2): música órfã — NÃO cria coletânea; legada 'Importações .slja' NÃO é reutilizada", async () => {
 		const auth = await import("../../services/auth-client");
 		vi.mocked(auth.getAuthSession).mockReturnValue({ token: "t", user: { id_user: 1, email: "a@b.c", displayName: "A" } } as never);
 		const slja = await import("../../../../shared/services/slja");
@@ -1257,22 +1269,23 @@ describe("MediaEditorView — cobertura de gaps", () => {
 		const file = { arrayBuffer: async () => new ArrayBuffer(4), name: "hino-x.slja" };
 		await s.onImportFile({ target: { files: [file], value: "" } } as unknown as Event);
 		await flushPromises();
-		// RF-02: coletânea própria com o título, nunca a legada
-		expect(catalogMod.createCustomCollection).toHaveBeenCalledWith("Hino X");
-		expect(catalogMod.createCustomMusic).toHaveBeenCalledWith(9, { name: "Hino X" });
+		// RF-02 v3.1: sem coletânea selecionada → música vai pra coletânea fixa
+		// "Singles" (invisível na UI), criada localmente; API coletânea não é chamada
+		expect(catalogMod.createCustomCollection).not.toHaveBeenCalled();
+		expect(catalogMod.createCustomMusic).toHaveBeenCalledWith(1, { name: "Hino X" });
 		expect(catalogMod.updateCustomMusic).toHaveBeenCalledWith(44, { id_file_audio: 7 });
 		w.unmount();
 	});
 
-	it("import .slja: falha na criação da coletânea de importação notifica", async () => {
+	it("import .slja: falha na criação da coletânea de importação notifica (v2: apenas com coletânea selecionada + colisão)", async () => {
 		const slja = await import("../../../../shared/services/slja");
 		const catalogMod = await import("../../services/custom-catalog");
 		vi.mocked(slja.parseSljaFile).mockResolvedValue({ title: "H", slides: [] } as never);
 		vi.mocked(catalogMod.createCustomCollection).mockResolvedValue(null as never);
-		vi.mocked(catalogMod.listCustomCollections).mockResolvedValue([{ id: 1, name: "C1" }] as never);
+		vi.mocked(catalogMod.listCustomCollections).mockResolvedValue([{ id: 1, name: "H" }, { id: 2, name: "H (2)" }] as never);
 		const w = await mountEditor();
 		const s = raw(w);
-		s.selectedCollectionId.value = null;
+		s.selectedCollectionId.value = 1; // coletânea selecionada + colisão H/H(2) → cria H(3) e falha
 		const file = { arrayBuffer: async () => new ArrayBuffer(4), name: "x.slja" };
 		await s.onImportFile({ target: { files: [file], value: "" } } as unknown as Event);
 		await flushPromises();
@@ -1849,7 +1862,10 @@ describe("MediaEditorView — interações de estrofe via DOM (sel exatos)", () 
 		const { deleteCustomLyric } = await import("../../services/custom-catalog");
 		vi.mocked(deleteCustomLyric).mockResolvedValue(true as never);
 		const { w, st } = await prepStanza();
-		const danger = w.find("button.editor__btn--danger.editor__btn--icon");
+		// Não usar o 1º .editor__btn--danger.editor__btn--icon: esse é o
+		// music-delete-btn do cabeçalho. A lixeira da estrofe vive no stanza-head.
+		const danger = w.find(".editor__stanza-head button.editor__btn--danger.editor__btn--icon");
+		expect(danger.exists()).toBe(true);
 		await danger.trigger("click");
 		await flushPromises();
 		const confirm = w.findComponent({ name: "AppConfirm" });
@@ -1938,7 +1954,7 @@ describe("MediaEditorView — interações de estrofe via DOM (sel exatos)", () 
 		w.unmount();
 	});
 
-	it("import sem colisão (RF-02): cria coletânea com o título do arquivo", async () => {
+	it("import sem colisão (RF-02 v3.1): música vai pra coletânea Singles (invisível), sem criar coletânea via API", async () => {
 		const slja = await import("../../../../shared/services/slja");
 		const catalogMod = await import("../../services/custom-catalog");
 		vi.mocked(catalogMod.listCustomCollections).mockResolvedValue([{ id: 1, name: "C1" }] as never);
@@ -1951,11 +1967,13 @@ describe("MediaEditorView — interações de estrofe via DOM (sel exatos)", () 
 		const file = { arrayBuffer: async () => new ArrayBuffer(4), name: "novo.slja" };
 		await (w.vm.$.devtoolsRawSetupState as unknown as { onImportFile: (e: Event) => Promise<void> }).onImportFile({ target: { files: [file], value: "" } } as unknown as Event);
 		await flushPromises();
-		expect(catalogMod.createCustomCollection).toHaveBeenCalledWith("T");
+		// v3.1: sem coletânea selecionada → Singles local (mock id 1); API não é chamada
+		expect(catalogMod.createCustomCollection).not.toHaveBeenCalled();
+		expect(catalogMod.createCustomMusic).toHaveBeenCalledWith(1, expect.objectContaining({ name: "T" }));
 		w.unmount();
 	});
 
-	it("import com colisão (RF-02): sufixo (2) na coletânea nova", async () => {
+	it("import com colisão de título mas SEM coletânea selecionada (RF-02 v3.1): Singles mesmo com nome repetido", async () => {
 		const slja = await import("../../../../shared/services/slja");
 		const catalogMod = await import("../../services/custom-catalog");
 		vi.mocked(catalogMod.listCustomCollections).mockResolvedValue([
@@ -1970,23 +1988,20 @@ describe("MediaEditorView — interações de estrofe via DOM (sel exatos)", () 
 		const file = { arrayBuffer: async () => new ArrayBuffer(4), name: "t.slja" };
 		await (w.vm.$.devtoolsRawSetupState as unknown as { onImportFile: (e: Event) => Promise<void> }).onImportFile({ target: { files: [file], value: "" } } as unknown as Event);
 		await flushPromises();
-		expect(catalogMod.createCustomCollection).toHaveBeenCalledWith("T (2)");
+		// v3.1: nome colide com coletânea "T", mas sem seleção → Singles local, sem sufixo
+		expect(catalogMod.createCustomCollection).not.toHaveBeenCalled();
+		expect(catalogMod.createCustomMusic).toHaveBeenCalledWith(1, expect.objectContaining({ name: "T" }));
 		w.unmount();
 	});
 
-	it("import de 2 arquivos de uma vez (RF-02): 2 coletâneas distintas e renomeáveis", async () => {
+	it("import de 2 arquivos de uma vez (RF-02 v3.1): 2 músicas na coletânea Singles — nenhuma coletânea via API", async () => {
 		const slja = await import("../../../../shared/services/slja");
 		const catalogMod = await import("../../services/custom-catalog");
-		vi.mocked(catalogMod.listCustomCollections)
-			.mockResolvedValueOnce([] as never) // mount
-			.mockResolvedValueOnce([{ id: 21, name: "A" }] as never) // refresh pós-import 1
-			.mockResolvedValueOnce([{ id: 21, name: "A" }] as never); // refresh pós-import 2
+		vi.mocked(catalogMod.listCustomCollections).mockResolvedValue([] as never);
 		vi.mocked(slja.parseSljaFile)
 			.mockResolvedValueOnce({ title: "A", slides: [] } as never)
 			.mockResolvedValueOnce({ title: "A", slides: [] } as never);
-		vi.mocked(catalogMod.createCustomCollection)
-			.mockResolvedValueOnce({ id: 21 } as never)
-			.mockResolvedValueOnce({ id: 22 } as never);
+		vi.mocked(catalogMod.createCustomCollection).mockResolvedValue({ id: 21 } as never);
 		vi.mocked(catalogMod.createCustomMusic).mockResolvedValue({ id: 44 } as never);
 		const w = await mountEditor();
 		const st = w.vm.$.devtoolsRawSetupState as unknown as Record<string, never> & { selectedCollectionId: { value: number | null } };
@@ -1995,9 +2010,11 @@ describe("MediaEditorView — interações de estrofe via DOM (sel exatos)", () 
 		const f2 = { arrayBuffer: async () => new ArrayBuffer(4), name: "a2.slja" };
 		await (w.vm.$.devtoolsRawSetupState as unknown as { onImportFile: (e: Event) => Promise<void> }).onImportFile({ target: { files: [f1, f2], value: "" } } as unknown as Event);
 		await flushPromises();
-		const names = vi.mocked(catalogMod.createCustomCollection).mock.calls.map((c) => c[0]);
-		expect(names).toContain("A");
-		expect(names).toContain("A (2)");
+		// v3.1: 2 músicas na Singles local (mock id 1), zero coletâneas via API
+		expect(catalogMod.createCustomCollection).not.toHaveBeenCalled();
+		expect(catalogMod.createCustomMusic).toHaveBeenCalledTimes(2);
+		expect(catalogMod.createCustomMusic).toHaveBeenNthCalledWith(1, 1, expect.objectContaining({ name: "A" }));
+		expect(catalogMod.createCustomMusic).toHaveBeenNthCalledWith(2, 1, expect.objectContaining({ name: "A" }));
 		w.unmount();
 	});
 
@@ -2040,7 +2057,7 @@ describe("MediaEditorView — últimos gaps", () => {
 		const w = await mountEditor();
 		(w.vm.$.devtoolsRawSetupState as unknown as { selectedCollectionId: { value: number | null } }).selectedCollectionId.value = 1;
 		await flushPromises();
-		const input = w.find('input[placeholder="Buscar hino oficial (nº ou nome)…"]');
+		const input = w.find('input[data-testid="official-search"]');
 		await input.setValue("hino");
 		await flushPromises();
 		const hit = w.find("button.editor__list-item--search");
@@ -2724,6 +2741,8 @@ describe("MediaEditorView — cliques de template (lote 4 onda1)", () => {
 	it("clicks: visibilidade nova private, regras, private do selected, show-rules", async () => {
 		localStorage.setItem("louvorja.publishRulesSeen", "1");
 		const { updateCustomCollection } = await import("../../services/custom-catalog");
+		const { getAuthSession } = await import("../../services/auth-client");
+		vi.mocked(getAuthSession).mockReturnValue({ token: "t", user: { id_user: 1, email: "a@b.c", displayName: "A" } } as never);
 		vi.mocked(updateCustomCollection).mockResolvedValue({ id: 1, name: "x", visibility: "private", musicsCount: 2 } as never);
 		const w = await mountEditor();
 		document.body.appendChild(w.element);
@@ -2731,29 +2750,19 @@ describe("MediaEditorView — cliques de template (lote 4 onda1)", () => {
 			selectedCollectionId: { value: number | null };
 			newCollectionVisibility: { value: string };
 			rulesOpen: { value: boolean };
+			onChangeVisibilityWithRules: (next: string) => Promise<void>;
 		};
 		await flushPromises();
-		// 1203: botão privado do form de nova coletânea
-		const privBtn = Array.from(document.querySelectorAll<HTMLButtonElement>(".editor__visibility-btn")).find((b) => b.getAttribute("aria-pressed") === "true");
-		if (privBtn) { privBtn.click(); await flushPromises(); }
+		// 1203: form de nova coletânea (pills removidas — default private)
 		expect(s.newCollectionVisibility.value).toBe("private");
-		// 1229: link de regras do form
-		const rulesBtn = document.querySelector<HTMLButtonElement>(".editor__btn--rules");
-		if (rulesBtn) { rulesBtn.click(); await flushPromises(); }
-		// 1262: private do selected (coletânea 1) via wrapper (2º grupo)
-		const groups = w.findAll('[role="radiogroup"]');
-		const selGroup = groups.at(-1)!;
-		const privInGroup = selGroup.findAll('button').filter((b) => b.text().toLowerCase().includes('privada')).at(-1)!;
-		await privInGroup.trigger('click');
+		// 1229/1262/1295: visibilidade da coletânea selecionada via onChangeVisibilityWithRules
+		// (SPEC editor-ux: pills vivem no menu ⋮, só logado)
+		s.selectedCollectionId.value = 1;
 		await flushPromises();
-		// 1295: voltar pra public e abrir show-rules
-		const pubInGroup = selGroup.findAll('button').filter((b) => b.text().toLowerCase().includes('pública')).at(-1)!;
-		await pubInGroup.trigger('click');
+		localStorage.removeItem("louvorja.publishRulesSeen");
+		await s.onChangeVisibilityWithRules("public");
 		await flushPromises();
-		const showRules = w.findAll('button').filter((b) => b.text().includes('Regras') || (b.attributes('title') ?? '').length > 0 && b.classes().join(' ').includes('--rules')).at(-1);
-		if (showRules) { await showRules.trigger('click'); await flushPromises(); }
-		const { updateCustomCollection: ucc } = await import("../../services/custom-catalog");
-		console.log('DBG1262', vi.mocked(ucc).mock.calls.length, 'rules', s.rulesOpen.value, 'groups', groups.length, 'selGroupBtns', selGroup ? selGroup.findAll('button').length : -1);
+		// 1a vez public sem seen: abre modal de regras em vez de persistir
 		expect(s.rulesOpen.value).toBe(true);
 		w.unmount();
 	});

@@ -3,125 +3,225 @@ import { createI18n } from 'vue-i18n'
 import ptBR from '@locales/pt-BR'
 import en from '@locales/en'
 import es from '@locales/es'
-import fr from '@locales/fr'
-import uk from '@locales/uk'
 import ru from '@locales/ru'
+import uk from '@locales/uk'
+import fr from '@locales/fr'
+import ja from '@locales/ja'
+import ko from '@locales/ko'
+import zh from '@locales/zh'
+import tr from '@locales/tr'
+import ar from '@locales/ar'
+import hi from '@locales/hi'
 
-import albumsPtBR from '@modules/albums/locales/pt-BR'
-import authEn from '@modules/auth/locales/en'
-import albumsEn from '@modules/albums/locales/en'
-import authEs from '@modules/auth/locales/es'
-import authFr from '@modules/auth/locales/fr'
-import authUk from '@modules/auth/locales/uk'
-import authRu from '@modules/auth/locales/ru'
-import albumsEs from '@modules/albums/locales/es'
-import albumsFr from '@modules/albums/locales/fr'
-import albumsUk from '@modules/albums/locales/uk'
-import albumsRu from '@modules/albums/locales/ru'
-import authPtBR from '@modules/auth/locales/pt-BR'
-import communityPtBR from '@modules/community/locales/pt-BR'
-import communityEn from '@modules/community/locales/en'
-import communityEs from '@modules/community/locales/es'
-import communityFr from '@modules/community/locales/fr'
-import communityUk from '@modules/community/locales/uk'
-import communityRu from '@modules/community/locales/ru'
-
-import biblePtBR from '@modules/bible/locales/pt-BR'
-import bibleEn from '@modules/bible/locales/en'
-import bibleEs from '@modules/bible/locales/es'
-import bibleFr from '@modules/bible/locales/fr'
-import bibleUk from '@modules/bible/locales/uk'
-import bibleRu from '@modules/bible/locales/ru'
-
-import clockPtBR from '@modules/clock/locales/pt-BR'
-import clockEn from '@modules/clock/locales/en'
-import clockEs from '@modules/clock/locales/es'
-import clockFr from '@modules/clock/locales/fr'
-import clockUk from '@modules/clock/locales/uk'
-import clockRu from '@modules/clock/locales/ru'
-
-import countdownPtBR from '@modules/countdown/locales/pt-BR'
-import countdownEn from '@modules/countdown/locales/en'
-import countdownEs from '@modules/countdown/locales/es'
-import countdownFr from '@modules/countdown/locales/fr'
-import countdownUk from '@modules/countdown/locales/uk'
-import countdownRu from '@modules/countdown/locales/ru'
-import sabbathSchoolPtBR from '@modules/sabbath-school/locales/pt-BR'
-import sabbathSchoolEn from '@modules/sabbath-school/locales/en'
-import sabbathSchoolEs from '@modules/sabbath-school/locales/es'
-import sabbathSchoolRu from '@modules/sabbath-school/locales/ru'
-import sabbathSchoolUk from '@modules/sabbath-school/locales/uk'
-import sabbathSchoolFr from '@modules/sabbath-school/locales/fr'
-import announcementsPtBR from '@modules/announcements/locales/pt-BR'
-import announcementsEn from '@modules/announcements/locales/en'
-import announcementsEs from '@modules/announcements/locales/es'
-import announcementsFr from '@modules/announcements/locales/fr'
-import announcementsUk from '@modules/announcements/locales/uk'
-import announcementsRu from '@modules/announcements/locales/ru'
-
-import homePtBR from '@modules/home/locales/pt-BR'
-import homeEn from '@modules/home/locales/en'
-import homeEs from '@modules/home/locales/es'
-import homeFr from '@modules/home/locales/fr'
-import homeUk from '@modules/home/locales/uk'
-import homeRu from '@modules/home/locales/ru'
-
-import liturgyPtBR from '@modules/liturgy/locales/pt-BR'
-import liturgyEn from '@modules/liturgy/locales/en'
-import liturgyEs from '@modules/liturgy/locales/es'
-import liturgyFr from '@modules/liturgy/locales/fr'
-import liturgyUk from '@modules/liturgy/locales/uk'
-import liturgyRu from '@modules/liturgy/locales/ru'
-
-import mediaPtBR from '@modules/media/locales/pt-BR'
-import mediaEn from '@modules/media/locales/en'
-import mediaEs from '@modules/media/locales/es'
-import mediaFr from '@modules/media/locales/fr'
-import mediaUk from '@modules/media/locales/uk'
-import mediaRu from '@modules/media/locales/ru'
-
-import randomPtBR from '@modules/random/locales/pt-BR'
-import randomEn from '@modules/random/locales/en'
-import randomEs from '@modules/random/locales/es'
-import youtubePtBR from '@modules/youtube/locales/pt-BR'
-import youtubeEn from '@modules/youtube/locales/en'
-import youtubeEs from '@modules/youtube/locales/es'
-import randomFr from '@modules/random/locales/fr'
-import randomUk from '@modules/random/locales/uk'
-import randomRu from '@modules/random/locales/ru'
-
-import settingsPtBR from '@modules/settings/locales/pt-BR'
-import settingsEn from '@modules/settings/locales/en'
-import settingsEs from '@modules/settings/locales/es'
-import settingsFr from '@modules/settings/locales/fr'
-import settingsUk from '@modules/settings/locales/uk'
-import settingsRu from '@modules/settings/locales/ru'
-
-import startingPtBR from '@modules/starting/locales/pt-BR'
-import startingEn from '@modules/starting/locales/en'
-import startingEs from '@modules/starting/locales/es'
-import startingFr from '@modules/starting/locales/fr'
-import startingUk from '@modules/starting/locales/uk'
-import startingRu from '@modules/starting/locales/ru'
-
-import syncPtBR from '@modules/sync/locales/pt-BR'
-import syncEn from '@modules/sync/locales/en'
-import syncEs from '@modules/sync/locales/es'
-import syncFr from '@modules/sync/locales/fr'
-import syncUk from '@modules/sync/locales/uk'
-import syncRu from '@modules/sync/locales/ru'
-
-import timerPtBR from '@modules/timer/locales/pt-BR'
-import timerEn from '@modules/timer/locales/en'
-import timerEs from '@modules/timer/locales/es'
-import timerFr from '@modules/timer/locales/fr'
-import timerUk from '@modules/timer/locales/uk'
-import timerRu from '@modules/timer/locales/ru'
+import AuthPtBR from '@modules/auth/locales/pt-BR'
+import AuthEn from '@modules/auth/locales/en'
+import AuthEs from '@modules/auth/locales/es'
+import AuthRu from '@modules/auth/locales/ru'
+import AuthUk from '@modules/auth/locales/uk'
+import AuthFr from '@modules/auth/locales/fr'
+import AuthJa from '@modules/auth/locales/ja'
+import AuthKo from '@modules/auth/locales/ko'
+import AuthZh from '@modules/auth/locales/zh'
+import AuthTr from '@modules/auth/locales/tr'
+import AuthAr from '@modules/auth/locales/ar'
+import AuthHi from '@modules/auth/locales/hi'
+import AlbumsPtBR from '@modules/albums/locales/pt-BR'
+import AlbumsEn from '@modules/albums/locales/en'
+import AlbumsEs from '@modules/albums/locales/es'
+import AlbumsRu from '@modules/albums/locales/ru'
+import AlbumsUk from '@modules/albums/locales/uk'
+import AlbumsFr from '@modules/albums/locales/fr'
+import AlbumsJa from '@modules/albums/locales/ja'
+import AlbumsKo from '@modules/albums/locales/ko'
+import AlbumsZh from '@modules/albums/locales/zh'
+import AlbumsTr from '@modules/albums/locales/tr'
+import AlbumsAr from '@modules/albums/locales/ar'
+import AlbumsHi from '@modules/albums/locales/hi'
+import CommunityPtBR from '@modules/community/locales/pt-BR'
+import CommunityEn from '@modules/community/locales/en'
+import CommunityEs from '@modules/community/locales/es'
+import CommunityRu from '@modules/community/locales/ru'
+import CommunityUk from '@modules/community/locales/uk'
+import CommunityFr from '@modules/community/locales/fr'
+import CommunityJa from '@modules/community/locales/ja'
+import CommunityKo from '@modules/community/locales/ko'
+import CommunityZh from '@modules/community/locales/zh'
+import CommunityTr from '@modules/community/locales/tr'
+import CommunityAr from '@modules/community/locales/ar'
+import CommunityHi from '@modules/community/locales/hi'
+import BiblePtBR from '@modules/bible/locales/pt-BR'
+import BibleEn from '@modules/bible/locales/en'
+import BibleEs from '@modules/bible/locales/es'
+import BibleRu from '@modules/bible/locales/ru'
+import BibleUk from '@modules/bible/locales/uk'
+import BibleFr from '@modules/bible/locales/fr'
+import BibleJa from '@modules/bible/locales/ja'
+import BibleKo from '@modules/bible/locales/ko'
+import BibleZh from '@modules/bible/locales/zh'
+import BibleTr from '@modules/bible/locales/tr'
+import BibleAr from '@modules/bible/locales/ar'
+import BibleHi from '@modules/bible/locales/hi'
+import ClockPtBR from '@modules/clock/locales/pt-BR'
+import ClockEn from '@modules/clock/locales/en'
+import ClockEs from '@modules/clock/locales/es'
+import ClockRu from '@modules/clock/locales/ru'
+import ClockUk from '@modules/clock/locales/uk'
+import ClockFr from '@modules/clock/locales/fr'
+import ClockJa from '@modules/clock/locales/ja'
+import ClockKo from '@modules/clock/locales/ko'
+import ClockZh from '@modules/clock/locales/zh'
+import ClockTr from '@modules/clock/locales/tr'
+import ClockAr from '@modules/clock/locales/ar'
+import ClockHi from '@modules/clock/locales/hi'
+import CountdownPtBR from '@modules/countdown/locales/pt-BR'
+import CountdownEn from '@modules/countdown/locales/en'
+import CountdownEs from '@modules/countdown/locales/es'
+import CountdownRu from '@modules/countdown/locales/ru'
+import CountdownUk from '@modules/countdown/locales/uk'
+import CountdownFr from '@modules/countdown/locales/fr'
+import CountdownJa from '@modules/countdown/locales/ja'
+import CountdownKo from '@modules/countdown/locales/ko'
+import CountdownZh from '@modules/countdown/locales/zh'
+import CountdownTr from '@modules/countdown/locales/tr'
+import CountdownAr from '@modules/countdown/locales/ar'
+import CountdownHi from '@modules/countdown/locales/hi'
+import SabbathSchoolPtBR from '@modules/sabbath-school/locales/pt-BR'
+import SabbathSchoolEn from '@modules/sabbath-school/locales/en'
+import SabbathSchoolEs from '@modules/sabbath-school/locales/es'
+import SabbathSchoolRu from '@modules/sabbath-school/locales/ru'
+import SabbathSchoolUk from '@modules/sabbath-school/locales/uk'
+import SabbathSchoolFr from '@modules/sabbath-school/locales/fr'
+import SabbathSchoolJa from '@modules/sabbath-school/locales/ja'
+import SabbathSchoolKo from '@modules/sabbath-school/locales/ko'
+import SabbathSchoolZh from '@modules/sabbath-school/locales/zh'
+import SabbathSchoolTr from '@modules/sabbath-school/locales/tr'
+import SabbathSchoolAr from '@modules/sabbath-school/locales/ar'
+import SabbathSchoolHi from '@modules/sabbath-school/locales/hi'
+import AnnouncementsPtBR from '@modules/announcements/locales/pt-BR'
+import AnnouncementsEn from '@modules/announcements/locales/en'
+import AnnouncementsEs from '@modules/announcements/locales/es'
+import AnnouncementsRu from '@modules/announcements/locales/ru'
+import AnnouncementsUk from '@modules/announcements/locales/uk'
+import AnnouncementsFr from '@modules/announcements/locales/fr'
+import AnnouncementsJa from '@modules/announcements/locales/ja'
+import AnnouncementsKo from '@modules/announcements/locales/ko'
+import AnnouncementsZh from '@modules/announcements/locales/zh'
+import AnnouncementsTr from '@modules/announcements/locales/tr'
+import AnnouncementsAr from '@modules/announcements/locales/ar'
+import AnnouncementsHi from '@modules/announcements/locales/hi'
+import HomePtBR from '@modules/home/locales/pt-BR'
+import HomeEn from '@modules/home/locales/en'
+import HomeEs from '@modules/home/locales/es'
+import HomeRu from '@modules/home/locales/ru'
+import HomeUk from '@modules/home/locales/uk'
+import HomeFr from '@modules/home/locales/fr'
+import HomeJa from '@modules/home/locales/ja'
+import HomeKo from '@modules/home/locales/ko'
+import HomeZh from '@modules/home/locales/zh'
+import HomeTr from '@modules/home/locales/tr'
+import HomeAr from '@modules/home/locales/ar'
+import HomeHi from '@modules/home/locales/hi'
+import LiturgyPtBR from '@modules/liturgy/locales/pt-BR'
+import LiturgyEn from '@modules/liturgy/locales/en'
+import LiturgyEs from '@modules/liturgy/locales/es'
+import LiturgyRu from '@modules/liturgy/locales/ru'
+import LiturgyUk from '@modules/liturgy/locales/uk'
+import LiturgyFr from '@modules/liturgy/locales/fr'
+import LiturgyJa from '@modules/liturgy/locales/ja'
+import LiturgyKo from '@modules/liturgy/locales/ko'
+import LiturgyZh from '@modules/liturgy/locales/zh'
+import LiturgyTr from '@modules/liturgy/locales/tr'
+import LiturgyAr from '@modules/liturgy/locales/ar'
+import LiturgyHi from '@modules/liturgy/locales/hi'
+import MediaPtBR from '@modules/media/locales/pt-BR'
+import MediaEn from '@modules/media/locales/en'
+import MediaEs from '@modules/media/locales/es'
+import MediaRu from '@modules/media/locales/ru'
+import MediaUk from '@modules/media/locales/uk'
+import MediaFr from '@modules/media/locales/fr'
+import MediaJa from '@modules/media/locales/ja'
+import MediaKo from '@modules/media/locales/ko'
+import MediaZh from '@modules/media/locales/zh'
+import MediaTr from '@modules/media/locales/tr'
+import MediaAr from '@modules/media/locales/ar'
+import MediaHi from '@modules/media/locales/hi'
+import RandomPtBR from '@modules/random/locales/pt-BR'
+import RandomEn from '@modules/random/locales/en'
+import RandomEs from '@modules/random/locales/es'
+import RandomRu from '@modules/random/locales/ru'
+import RandomUk from '@modules/random/locales/uk'
+import RandomFr from '@modules/random/locales/fr'
+import RandomJa from '@modules/random/locales/ja'
+import RandomKo from '@modules/random/locales/ko'
+import RandomZh from '@modules/random/locales/zh'
+import RandomTr from '@modules/random/locales/tr'
+import RandomAr from '@modules/random/locales/ar'
+import RandomHi from '@modules/random/locales/hi'
+import YoutubePtBR from '@modules/youtube/locales/pt-BR'
+import YoutubeEn from '@modules/youtube/locales/en'
+import YoutubeEs from '@modules/youtube/locales/es'
+import YoutubeRu from '@modules/youtube/locales/ru'
+import YoutubeUk from '@modules/youtube/locales/uk'
+import YoutubeFr from '@modules/youtube/locales/fr'
+import YoutubeJa from '@modules/youtube/locales/ja'
+import YoutubeKo from '@modules/youtube/locales/ko'
+import YoutubeZh from '@modules/youtube/locales/zh'
+import YoutubeTr from '@modules/youtube/locales/tr'
+import YoutubeAr from '@modules/youtube/locales/ar'
+import YoutubeHi from '@modules/youtube/locales/hi'
+import SettingsPtBR from '@modules/settings/locales/pt-BR'
+import SettingsEn from '@modules/settings/locales/en'
+import SettingsEs from '@modules/settings/locales/es'
+import SettingsRu from '@modules/settings/locales/ru'
+import SettingsUk from '@modules/settings/locales/uk'
+import SettingsFr from '@modules/settings/locales/fr'
+import SettingsJa from '@modules/settings/locales/ja'
+import SettingsKo from '@modules/settings/locales/ko'
+import SettingsZh from '@modules/settings/locales/zh'
+import SettingsTr from '@modules/settings/locales/tr'
+import SettingsAr from '@modules/settings/locales/ar'
+import SettingsHi from '@modules/settings/locales/hi'
+import StartingPtBR from '@modules/starting/locales/pt-BR'
+import StartingEn from '@modules/starting/locales/en'
+import StartingEs from '@modules/starting/locales/es'
+import StartingRu from '@modules/starting/locales/ru'
+import StartingUk from '@modules/starting/locales/uk'
+import StartingFr from '@modules/starting/locales/fr'
+import StartingJa from '@modules/starting/locales/ja'
+import StartingKo from '@modules/starting/locales/ko'
+import StartingZh from '@modules/starting/locales/zh'
+import StartingTr from '@modules/starting/locales/tr'
+import StartingAr from '@modules/starting/locales/ar'
+import StartingHi from '@modules/starting/locales/hi'
+import SyncPtBR from '@modules/sync/locales/pt-BR'
+import SyncEn from '@modules/sync/locales/en'
+import SyncEs from '@modules/sync/locales/es'
+import SyncRu from '@modules/sync/locales/ru'
+import SyncUk from '@modules/sync/locales/uk'
+import SyncFr from '@modules/sync/locales/fr'
+import SyncJa from '@modules/sync/locales/ja'
+import SyncKo from '@modules/sync/locales/ko'
+import SyncZh from '@modules/sync/locales/zh'
+import SyncTr from '@modules/sync/locales/tr'
+import SyncAr from '@modules/sync/locales/ar'
+import SyncHi from '@modules/sync/locales/hi'
+import TimerPtBR from '@modules/timer/locales/pt-BR'
+import TimerEn from '@modules/timer/locales/en'
+import TimerEs from '@modules/timer/locales/es'
+import TimerRu from '@modules/timer/locales/ru'
+import TimerUk from '@modules/timer/locales/uk'
+import TimerFr from '@modules/timer/locales/fr'
+import TimerJa from '@modules/timer/locales/ja'
+import TimerKo from '@modules/timer/locales/ko'
+import TimerZh from '@modules/timer/locales/zh'
+import TimerTr from '@modules/timer/locales/tr'
+import TimerAr from '@modules/timer/locales/ar'
+import TimerHi from '@modules/timer/locales/hi'
 
 import { USER_PREFERENCE_KEYS } from '@shared/constants/storage-keys'
 import { getUserPreference } from '@shared/services/user-preferences'
 
-export const SUPPORTED_LOCALES = ['pt-BR', 'en', 'es', 'ru', 'uk', 'fr'] as const
+export const SUPPORTED_LOCALES = ["pt-BR","en","es","ru","uk","fr","ja","ko","zh","tr","ar","hi"] as const
 export type SupportedLocale = (typeof SUPPORTED_LOCALES)[number]
 
 export const DEFAULT_LOCALE: SupportedLocale = 'pt-BR'
@@ -157,120 +257,243 @@ export default createI18n({
   messages: {
     'pt-BR': {
       ...ptBR,
-      ...authPtBR,
-      ...albumsPtBR,
-      ...communityPtBR,
-      ...biblePtBR,
-      ...clockPtBR,
-      ...countdownPtBR,
-      ...sabbathSchoolPtBR,
-      ...announcementsPtBR,
-      ...homePtBR,
-      ...liturgyPtBR,
-      ...mediaPtBR,
-      ...randomPtBR,
-      ...youtubePtBR,
-      ...settingsPtBR,
-      ...startingPtBR,
-      ...syncPtBR,
-      ...timerPtBR,
+      ...AuthPtBR,
+      ...AlbumsPtBR,
+      ...CommunityPtBR,
+      ...BiblePtBR,
+      ...ClockPtBR,
+      ...CountdownPtBR,
+      ...SabbathSchoolPtBR,
+      ...AnnouncementsPtBR,
+      ...HomePtBR,
+      ...LiturgyPtBR,
+      ...MediaPtBR,
+      ...RandomPtBR,
+      ...YoutubePtBR,
+      ...SettingsPtBR,
+      ...StartingPtBR,
+      ...SyncPtBR,
+      ...TimerPtBR,
     },
     en: {
       ...en,
-      ...authEn,
-      ...albumsEn,
-      ...communityEn,
-      ...bibleEn,
-      ...clockEn,
-      ...countdownEn,
-      ...sabbathSchoolEn,
-      ...announcementsEn,
-      ...homeEn,
-      ...liturgyEn,
-      ...mediaEn,
-      ...randomEn,
-      ...youtubeEn,
-      ...settingsEn,
-      ...startingEn,
-      ...syncEn,
-      ...timerEn,
+      ...AuthEn,
+      ...AlbumsEn,
+      ...CommunityEn,
+      ...BibleEn,
+      ...ClockEn,
+      ...CountdownEn,
+      ...SabbathSchoolEn,
+      ...AnnouncementsEn,
+      ...HomeEn,
+      ...LiturgyEn,
+      ...MediaEn,
+      ...RandomEn,
+      ...YoutubeEn,
+      ...SettingsEn,
+      ...StartingEn,
+      ...SyncEn,
+      ...TimerEn,
     },
     es: {
       ...es,
-      ...authEs,
-      ...albumsEs,
-      ...communityEs,
-      ...bibleEs,
-      ...clockEs,
-      ...countdownEs,
-      ...sabbathSchoolEs,
-      ...announcementsEs,
-      ...homeEs,
-      ...liturgyEs,
-      ...mediaEs,
-      ...randomEs,
-      ...youtubeEs,
-      ...settingsEs,
-      ...startingEs,
-      ...syncEs,
-      ...timerEs,
+      ...AuthEs,
+      ...AlbumsEs,
+      ...CommunityEs,
+      ...BibleEs,
+      ...ClockEs,
+      ...CountdownEs,
+      ...SabbathSchoolEs,
+      ...AnnouncementsEs,
+      ...HomeEs,
+      ...LiturgyEs,
+      ...MediaEs,
+      ...RandomEs,
+      ...YoutubeEs,
+      ...SettingsEs,
+      ...StartingEs,
+      ...SyncEs,
+      ...TimerEs,
     },
     ru: {
       ...ru,
-      ...albumsRu,
-      ...communityRu,
-      ...bibleRu,
-      ...clockRu,
-      ...countdownRu,
-      ...homeRu,
-      ...liturgyRu,
-      ...mediaRu,
-      ...randomRu,
-      ...settingsRu,
-      ...startingRu,
-      ...syncRu,
-      ...timerRu,
-      ...authRu,
-      ...sabbathSchoolRu,
-      ...announcementsRu,
+      ...AuthRu,
+      ...AlbumsRu,
+      ...CommunityRu,
+      ...BibleRu,
+      ...ClockRu,
+      ...CountdownRu,
+      ...SabbathSchoolRu,
+      ...AnnouncementsRu,
+      ...HomeRu,
+      ...LiturgyRu,
+      ...MediaRu,
+      ...RandomRu,
+      ...YoutubeRu,
+      ...SettingsRu,
+      ...StartingRu,
+      ...SyncRu,
+      ...TimerRu,
     },
     uk: {
       ...uk,
-      ...albumsUk,
-      ...communityUk,
-      ...bibleUk,
-      ...clockUk,
-      ...countdownUk,
-      ...homeUk,
-      ...liturgyUk,
-      ...mediaUk,
-      ...randomUk,
-      ...settingsUk,
-      ...startingUk,
-      ...syncUk,
-      ...timerUk,
-      ...authUk,
-      ...sabbathSchoolUk,
-      ...announcementsUk,
+      ...AuthUk,
+      ...AlbumsUk,
+      ...CommunityUk,
+      ...BibleUk,
+      ...ClockUk,
+      ...CountdownUk,
+      ...SabbathSchoolUk,
+      ...AnnouncementsUk,
+      ...HomeUk,
+      ...LiturgyUk,
+      ...MediaUk,
+      ...RandomUk,
+      ...YoutubeUk,
+      ...SettingsUk,
+      ...StartingUk,
+      ...SyncUk,
+      ...TimerUk,
     },
     fr: {
       ...fr,
-      ...albumsFr,
-      ...communityFr,
-      ...bibleFr,
-      ...clockFr,
-      ...countdownFr,
-      ...homeFr,
-      ...liturgyFr,
-      ...mediaFr,
-      ...randomFr,
-      ...settingsFr,
-      ...startingFr,
-      ...syncFr,
-      ...timerFr,
-      ...authFr,
-      ...sabbathSchoolFr,
-      ...announcementsFr,
+      ...AuthFr,
+      ...AlbumsFr,
+      ...CommunityFr,
+      ...BibleFr,
+      ...ClockFr,
+      ...CountdownFr,
+      ...SabbathSchoolFr,
+      ...AnnouncementsFr,
+      ...HomeFr,
+      ...LiturgyFr,
+      ...MediaFr,
+      ...RandomFr,
+      ...YoutubeFr,
+      ...SettingsFr,
+      ...StartingFr,
+      ...SyncFr,
+      ...TimerFr,
+    },
+    ja: {
+      ...ja,
+      ...AuthJa,
+      ...AlbumsJa,
+      ...CommunityJa,
+      ...BibleJa,
+      ...ClockJa,
+      ...CountdownJa,
+      ...SabbathSchoolJa,
+      ...AnnouncementsJa,
+      ...HomeJa,
+      ...LiturgyJa,
+      ...MediaJa,
+      ...RandomJa,
+      ...YoutubeJa,
+      ...SettingsJa,
+      ...StartingJa,
+      ...SyncJa,
+      ...TimerJa,
+    },
+    ko: {
+      ...ko,
+      ...AuthKo,
+      ...AlbumsKo,
+      ...CommunityKo,
+      ...BibleKo,
+      ...ClockKo,
+      ...CountdownKo,
+      ...SabbathSchoolKo,
+      ...AnnouncementsKo,
+      ...HomeKo,
+      ...LiturgyKo,
+      ...MediaKo,
+      ...RandomKo,
+      ...YoutubeKo,
+      ...SettingsKo,
+      ...StartingKo,
+      ...SyncKo,
+      ...TimerKo,
+    },
+    zh: {
+      ...zh,
+      ...AuthZh,
+      ...AlbumsZh,
+      ...CommunityZh,
+      ...BibleZh,
+      ...ClockZh,
+      ...CountdownZh,
+      ...SabbathSchoolZh,
+      ...AnnouncementsZh,
+      ...HomeZh,
+      ...LiturgyZh,
+      ...MediaZh,
+      ...RandomZh,
+      ...YoutubeZh,
+      ...SettingsZh,
+      ...StartingZh,
+      ...SyncZh,
+      ...TimerZh,
+    },
+    tr: {
+      ...tr,
+      ...AuthTr,
+      ...AlbumsTr,
+      ...CommunityTr,
+      ...BibleTr,
+      ...ClockTr,
+      ...CountdownTr,
+      ...SabbathSchoolTr,
+      ...AnnouncementsTr,
+      ...HomeTr,
+      ...LiturgyTr,
+      ...MediaTr,
+      ...RandomTr,
+      ...YoutubeTr,
+      ...SettingsTr,
+      ...StartingTr,
+      ...SyncTr,
+      ...TimerTr,
+    },
+    ar: {
+      ...ar,
+      ...AuthAr,
+      ...AlbumsAr,
+      ...CommunityAr,
+      ...BibleAr,
+      ...ClockAr,
+      ...CountdownAr,
+      ...SabbathSchoolAr,
+      ...AnnouncementsAr,
+      ...HomeAr,
+      ...LiturgyAr,
+      ...MediaAr,
+      ...RandomAr,
+      ...YoutubeAr,
+      ...SettingsAr,
+      ...StartingAr,
+      ...SyncAr,
+      ...TimerAr,
+    },
+    hi: {
+      ...hi,
+      ...AuthHi,
+      ...AlbumsHi,
+      ...CommunityHi,
+      ...BibleHi,
+      ...ClockHi,
+      ...CountdownHi,
+      ...SabbathSchoolHi,
+      ...AnnouncementsHi,
+      ...HomeHi,
+      ...LiturgyHi,
+      ...MediaHi,
+      ...RandomHi,
+      ...YoutubeHi,
+      ...SettingsHi,
+      ...StartingHi,
+      ...SyncHi,
+      ...TimerHi,
     },
   },
 })
