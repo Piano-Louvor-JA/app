@@ -9,8 +9,6 @@ import { Blob as NodeBlob } from 'node:buffer'
 // 2) Se NEM jsdom nem global têm storage (ambiente node puro), instala mock.
 // 3) window.louvorja: simula browser (não Electron) no jsdom.
 // 4) HTMLMediaElement.load/pause: não existem no jsdom — no-op.
-// 5) INJEÇÃO DO FAKE-INDEXEDDB — GARANTE QUE O AMBIENTE DE TESTES SUPORTE O IndexedDB NATIVO.
-import 'fake-indexeddb/auto';
 
 const dom = (globalThis as any).jsdom
 const win: any = dom?.window ?? globalThis.window

@@ -11,6 +11,7 @@ const fingerspellingCaption = ref('')
 let pendingGloss = ''
 let settingsApplied = false
 let playSequence = 0
+let playingGloss = ''
 
 const avatar = (): LibrasAvatar => props.avatar ?? getLibrasAvatar()
 const subtitle = (): boolean => props.subtitle ?? isLibrasSubtitleEnabled()
@@ -20,9 +21,14 @@ function sendToUnity(object: string, method: string, param: string | number = ''
   iframeEl.value?.contentWindow?.postMessage({ type: 'unity', object, method, params: param }, '*')
 }
 
+/** Único ponto de envio: idempotente por glosa (nunca reenvia a mesma em execução). */
 function playPreparedGloss(gloss: string) {
+  if (gloss === playingGloss && (ready.value || pendingGloss === gloss)) return
   if (!ready.value) pendingGloss = gloss
-  else sendToUnity('PlayerManager', 'playNow', gloss)
+  else {
+    playingGloss = gloss
+    sendToUnity('PlayerManager', 'playNow', gloss)
+  }
 }
 
 async function prepareAndPlay(gloss: string) {
@@ -35,7 +41,7 @@ async function prepareAndPlay(gloss: string) {
   } catch {
     if (sequence !== playSequence) return
     fingerspellingCaption.value = ''
-    if (ready.value) playPreparedGloss(gloss)
+    // falha no prepare: NÃO toca glosa crua — fica em silêncio (SPEC AC-1: lookup antes de playNow).
   }
 }
 
@@ -47,8 +53,9 @@ function onUnityMessage(event: MessageEvent) {
     sendToUnity('PlayerManager', 'Change', avatar())
     if (!subtitle()) sendToUnity('PlayerManager', 'toggleSubtitle')
     if (pendingGloss) {
-      sendToUnity('PlayerManager', 'playNow', pendingGloss)
+      const gloss = pendingGloss
       pendingGloss = ''
+      playPreparedGloss(gloss)
     }
   }
   if (event.data.event === 'on_playing_state_change') {
@@ -65,12 +72,6 @@ watch(() => props.speed, (next) => { if (next !== undefined && ready.value) send
 watch(() => props.subtitle, (next) => { if (next !== undefined && ready.value) sendToUnity('PlayerManager', 'toggleSubtitle') })
 
 function playGloss(gloss: string) {
-  if (!ready.value) {
-    pendingGloss = gloss
-    void prepareAndPlay(gloss)
-    return
-  }
-  playPreparedGloss(gloss)
   void prepareAndPlay(gloss)
 }
 function stop() { if (ready.value) sendToUnity('PlayerManager', 'stopAll') }

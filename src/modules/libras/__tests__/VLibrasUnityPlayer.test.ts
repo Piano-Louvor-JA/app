@@ -5,6 +5,13 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+
+// SPEC AC-1 / PLAN l.11: lookup ANTES de playNow — o componente nunca toca glosa crua.
+// Mock controlado para observar exatamente o que chega ao PlayerManager.playNow.
+const prepareMock = vi.fn()
+vi.mock('../services/libras-trie', () => ({
+  prepareGlossForPlayback: (gloss: string) => prepareMock(gloss),
+}))
 import VLibrasUnityPlayer from '../components/VLibrasUnityPlayer.vue'
 
 const UNITY_URL = '/vlibras/index.html'
@@ -31,7 +38,14 @@ function unityEvent(source: unknown, event: string, data?: unknown) {
 
 beforeEach(() => {
   vi.restoreAllMocks()
+  prepareMock.mockReset()
+  // resposta padrão do prepare: devolve a glosa preparada (usada pelos testes de fluxo)
+  prepareMock.mockImplementation(async (gloss: string) => ({ gloss: `PREP:${gloss}`, fingerspelled: [] }))
 })
+
+function playNowCalls(postMessage: ReturnType<typeof vi.fn>) {
+  return postMessage.mock.calls.filter((c) => c[0]?.method === 'playNow')
+}
 
 describe('F-B.1 — VLibrasUnityPlayer', () => {
   it('renderiza iframe Unity com sandbox e URL oficial', () => {
@@ -76,26 +90,60 @@ describe('F-B.1 — VLibrasUnityPlayer', () => {
     expect(postMessage).not.toHaveBeenCalled()
   })
 
-  it('playGloss antes de ready: pendencia enviada após on_load_player', () => {
+  it('playGloss antes de ready: glosa PREPARADA enviada após on_load_player (nunca crua)', async () => {
     const { w, iframeEl, postMessage } = mountPlayer()
     ;(w.vm as unknown as { playGloss: (g: string) => void }).playGloss('DEUS AMOR')
+    await vi.waitFor(() => expect(prepareMock).toHaveBeenCalledWith('DEUS AMOR'))
     expect(postMessage).not.toHaveBeenCalled()
     unityEvent(iframeEl.contentWindow, 'on_load_player')
-    expect(postMessage).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'unity', object: 'PlayerManager', method: 'playNow', params: 'DEUS AMOR' }),
-      '*'
-    )
+    const plays = playNowCalls(postMessage)
+    expect(plays).toHaveLength(1)
+    expect(plays[0][0].params).toBe('PREP:DEUS AMOR')
   })
 
-  it('playGloss com ready: playNow imediato', () => {
+  it('playGloss com ready: playNow único e somente com glosa preparada', async () => {
     const { w, iframeEl, postMessage } = mountPlayer()
     unityEvent(iframeEl.contentWindow, 'on_load_player')
     postMessage.mockClear()
     ;(w.vm as unknown as { playGloss: (g: string) => void }).playGloss('CASA')
-    expect(postMessage).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'unity', object: 'PlayerManager', method: 'playNow', params: 'CASA' }),
-      '*'
-    )
+    await vi.waitFor(() => expect(playNowCalls(postMessage)).toHaveLength(1))
+    const plays = playNowCalls(postMessage)
+    expect(plays[0][0].params).toBe('PREP:CASA')
+  })
+
+  it('glosa crua NUNCA vai ao Unity: todo playNow tem prefixo PREP (última glosa vence)', async () => {
+    const { w, iframeEl, postMessage } = mountPlayer()
+    unityEvent(iframeEl.contentWindow, 'on_load_player')
+    ;(w.vm as unknown as { playGloss: (g: string) => void }).playGloss('DEUS AMOR')
+    ;(w.vm as unknown as { playGloss: (g: string) => void }).playGloss('JESUS CRISTO')
+    await vi.waitFor(() => expect(prepareMock).toHaveBeenCalledTimes(2))
+    await vi.waitFor(() => expect(playNowCalls(postMessage)).toHaveLength(1))
+    const plays = playNowCalls(postMessage)
+    // supersede: sequence guard faz a glosa mais recente vencer (máx 1 playNow por glosa)
+    expect(plays[0][0].params).toBe('PREP:JESUS CRISTO')
+  })
+
+  it('idempotência: mesma glosa preparada repetida NÃO dispara segundo playNow', async () => {
+    const { w, iframeEl, postMessage } = mountPlayer()
+    unityEvent(iframeEl.contentWindow, 'on_load_player')
+    ;(w.vm as unknown as { playGloss: (g: string) => void }).playGloss('CASA')
+    await vi.waitFor(() => expect(playNowCalls(postMessage)).toHaveLength(1))
+    ;(w.vm as unknown as { playGloss: (g: string) => void }).playGloss('CASA')
+    await vi.waitFor(() => expect(prepareMock).toHaveBeenCalledTimes(2))
+    await new Promise((r) => setTimeout(r, 20))
+    expect(playNowCalls(postMessage)).toHaveLength(1)
+  })
+
+  it('prepare falha: silêncio — glosa crua NÃO é tocada como fallback', async () => {
+    prepareMock.mockReset()
+    prepareMock.mockRejectedValue(new Error('trie offline'))
+    const { w, iframeEl, postMessage } = mountPlayer()
+    unityEvent(iframeEl.contentWindow, 'on_load_player')
+    postMessage.mockClear()
+    ;(w.vm as unknown as { playGloss: (g: string) => void }).playGloss('CASA')
+    await vi.waitFor(() => expect(prepareMock).toHaveBeenCalledTimes(1))
+    await new Promise((r) => setTimeout(r, 20))
+    expect(playNowCalls(postMessage)).toHaveLength(0)
   })
 
   it('stop envia stopAll quando ready', () => {
