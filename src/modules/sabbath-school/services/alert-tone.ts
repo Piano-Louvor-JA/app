@@ -27,13 +27,28 @@ export type SabbathAudioLangSetting = SabbathAudioLang | 'auto'
 
 const SABBATH_AUDIO_LANGS: readonly SabbathAudioLang[] = ['pt-BR', 'es', 'en', 'fr', 'ja', 'ko', 'zh', 'ru', 'uk', 'tr', 'ar', 'hi']
 
-/** Locale de UI → idioma da narração; não mapeado → pt-BR. */
+/** Locale de UI → idioma da narração (auto segue o locale da UI; não mapeado → pt-BR). */
+const UI_LOCALE_TO_AUDIO: Record<string, SabbathAudioLang> = {
+  'pt-BR': 'pt-BR',
+  es: 'es',
+  en: 'en',
+  fr: 'fr',
+  ja: 'ja',
+  ko: 'ko',
+  zh: 'zh',
+  ru: 'ru',
+  uk: 'uk',
+  tr: 'tr',
+  ar: 'ar',
+  hi: 'hi',
+}
+
 export function resolveSabbathSchoolAudioLang(
   setting: SabbathAudioLangSetting,
   uiLocale: string,
 ): SabbathAudioLang {
-  const auto = SABBATH_AUDIO_LANGS.slice(0, 3).find((l) => l === uiLocale) ?? 'pt-BR'
-  return SABBATH_AUDIO_LANGS.find((l) => l === setting) ?? auto
+  if (setting !== 'auto' && SABBATH_AUDIO_LANGS.includes(setting)) return setting
+  return UI_LOCALE_TO_AUDIO[uiLocale] ?? 'pt-BR'
 }
 
 /** Pasta das narrações oficiais, relativa à pasta Media. */

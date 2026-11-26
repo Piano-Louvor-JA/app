@@ -73,6 +73,7 @@ export default {
       "close": "가사 닫기"
     },
     "messages": {
+      convite_catalogo: '음악 카탈로그가 아직 사용자의 언어로 제공되지 않습니다. 커뮤니티에 참여하여 이 언어로 LouvorJA 카탈로그를 만드는 데 도움을 주세요.',
       convite_titulo: '카탈로그 준비 중',
       convite_hint: '위 미리보기는 포르투갈어 카탈로그입니다. 도움으로 곧 당신의 언어로도.',
 

@@ -76,6 +76,7 @@ export default {
       close: 'Fechar letra',
     },
     messages: {
+      convite_catalogo: 'O catálogo musical ainda não está disponível no seu idioma. Junte-se à comunidade e ajude a formar o catálogo do LouvorJA no seu próprio idioma.',
       convite_titulo: 'Catálogo em construção',
       convite_hint: 'Enquanto isso, o preview acima mostra o catálogo em Português — em breve no seu idioma com sua ajuda.',
 

@@ -303,6 +303,14 @@ const stageBg = computed(() => ({
                 <option value="es">Español</option>
                 <option value="en">English</option>
                 <option value="fr">Français</option>
+                <option value="ja">日本語</option>
+                <option value="ko">한국어</option>
+                <option value="zh">中文</option>
+                <option value="ru">Русский</option>
+                <option value="uk">Українська</option>
+                <option value="tr">Türkçe</option>
+                <option value="ar">العربية</option>
+                <option value="hi">हिन्दी</option>
               </select>
             </div>
           </div>

@@ -70,6 +70,7 @@ export default {
       "close": "Fermer les paroles"
     },
     "messages": {
+      convite_catalogo: 'Le catalogue musical n\'est pas encore disponible dans votre langue. Rejoignez la communauté et aidez à construire le catalogue LouvorJA dans votre langue.',
       convite_titulo: 'Catalogue en construction',
       convite_hint: "L'aperçu montre le catalogue en portugais — bientôt dans votre langue, avec votre aide.",
 

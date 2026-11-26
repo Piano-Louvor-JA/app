@@ -73,6 +73,7 @@ export default {
       "close": "Close lyrics"
     },
     "messages": {
+      convite_catalogo: 'The music catalog is not yet available in your language. Join the community and help build the LouvorJA catalog in your own language.',
       convite_titulo: 'Catalog under construction',
       convite_hint: 'The preview above shows the Portuguese catalog — soon in your language, with your help.',
 

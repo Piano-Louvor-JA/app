@@ -1653,11 +1653,11 @@ async function runAction(
   position: absolute;
   inset: 0;
   overflow: hidden;
-  filter: blur(14px) saturate(.9);
-  opacity: .45;
+  filter: blur(5px) saturate(.85);
+  opacity: .8;
   pointer-events: none;
   user-select: none;
-  transform: scale(1.04);
+  transform: scale(1.03);
 }
 
 .albums-view__convite-card {

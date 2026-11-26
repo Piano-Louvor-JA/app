@@ -73,6 +73,7 @@ export default {
       "close": "Sözleri kapat"
     },
     "messages": {
+      convite_catalogo: 'Müzik kataloğu dilinizde henüz mevcut değil. Topluluğa katılın ve LouvorJA kataloğunun kendi dilinizde oluşmasına yardımcı olun.',
       convite_titulo: 'Katalog yapım aşamasında',
       convite_hint: 'Önizleme Portekizce kataloğu gösteriyor — yardımınızla yakında dilinizde.',
 

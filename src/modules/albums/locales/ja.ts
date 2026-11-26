@@ -73,6 +73,7 @@ export default {
       "close": "歌詞を閉じる"
     },
     "messages": {
+      convite_catalogo: '音楽カタログはまだあなたの言語では利用できません。コミュニティに参加して、あなたの言語のLouvorJAカタログ作りにご協力ください。',
       convite_titulo: 'カタログ構築中',
       convite_hint: '上のプレビューはポルトガル語のカタログです。あなたの助けで、もうすぐあなたの言語でも。',
 
