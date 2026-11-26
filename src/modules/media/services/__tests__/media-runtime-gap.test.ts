@@ -52,6 +52,7 @@ describe('normalizeMediaRuntime', () => {
       imagePosition: null,
       frameDataUrl: null,
       isCover: false,
+      hymnNumber: null,
       slideIndex: 0,
       slideCount: 7,
       nextLyric: '',

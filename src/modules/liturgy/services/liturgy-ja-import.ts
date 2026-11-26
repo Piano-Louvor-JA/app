@@ -8,6 +8,7 @@
  */
 import type { LiturgyItem, LiturgyItemType, LiturgyWeekday } from '../types/liturgy'
 import { decodeTextFileBytes } from '@shared/services/text-encoding'
+import { detectLiturgyFileType as typeFromPath } from './liturgy-file-detect'
 
 export type JaLiturgy = Partial<Record<LiturgyWeekday, LiturgyItem[]>>
 
@@ -39,16 +40,6 @@ function delphiColor(raw: string): string {
   const g = hex.slice(4, 6)
   const r = hex.slice(6, 8)
   return `#${r}${g}${b}`
-}
-
-function typeFromPath(path: string): LiturgyItemType {
-  const p = path.toLowerCase()
-  if (!p) return 'other_files'
-  if (/\.(mp4|mkv|avi|webm|mov)$/.test(p)) return 'video'
-  if (/\.(jpg|jpeg|png|gif|bmp|webp)$/.test(p)) return 'images'
-  if (p.endsWith('.pdf')) return 'pdf'
-  if (/\.(pptx|ppt)$/.test(p)) return 'presentation'
-  return 'other_files'
 }
 
 function parseSectionItem(

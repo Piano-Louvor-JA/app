@@ -45,4 +45,30 @@ describe('buildStageReturn', () => {
     expect(buildStageReturn(runtime({ active: false }), stage())).toEqual({ v: 1, type: 'stageReturn', active: false })
     expect(buildStageReturn(runtime({ lyric: '', title: '', isCover: false }), stage())).toEqual({ v: 1, type: 'stageReturn', active: false })
   })
+
+  it('com transições de slides ligadas, envia transition/transitionMs para o retorno', () => {
+    expect(
+      buildStageReturn(
+        runtime(),
+        stage({
+          lyricTransitionEnabled: true,
+          lyricTransition: 'fade',
+          lyricTransitionSpeed: 'slow',
+        }),
+      ),
+    ).toMatchObject({ transition: 'fade', transitionMs: 450 })
+  })
+
+  it('envia também o nome real da transição (retorno anima igual aos monitores)', () => {
+    expect(
+      buildStageReturn(runtime(), stage({ lyricTransitionEnabled: true, lyricTransition: 'flip-h' })),
+    ).toMatchObject({ transition: 'fade', transitionName: 'flip-h' })
+  })
+
+  it('com transições desligadas, não manda transition (receiver usa o flyer)', () => {
+    const msg = buildStageReturn(runtime(), stage({ lyricTransitionEnabled: false }))
+    expect(msg).toMatchObject({ active: true })
+    expect(msg).not.toHaveProperty('transition')
+    expect(msg).not.toHaveProperty('transitionName')
+  })
 })

@@ -3,8 +3,9 @@ import { readCatalogRecord } from '@shared/services/workspace-api'
 import { getCurrentApiPrefix } from '@modules/sync/services/library-catalog'
 import { matchesAllTerms } from "@shared/services/search-terms"
 
-import type { AlbumSearchHit } from '../types/albums'
+import type { AlbumSearchAlbumRef, AlbumSearchHit } from '../types/albums'
 import { formatCatalogDuration } from './album-tracks'
+import { albumDisableKey } from './disabled-albums'
 import i18n from '@plugins/i18n'
 
 type CatalogMusicAlbum = {
@@ -84,6 +85,17 @@ function collectHymnalTracks(row: CatalogMusicIndexRow): number[] {
   return tracks
 }
 
+function collectAlbumRefs(row: CatalogMusicIndexRow): AlbumSearchAlbumRef[] {
+  const refs: AlbumSearchAlbumRef[] = []
+  for (const album of row.albums ?? []) {
+    const key = albumDisableKey({ id_album: album.id_album, name: album.name, type: album.type })
+    if (!key || refs.some((ref) => ref.key === key)) continue
+    const track = albumTrackNumber(album)
+    refs.push({ key, track: track != null && track > 0 ? track : null, hymnal: isHymnalAlbum(album) })
+  }
+  return refs
+}
+
 function preferredHymnalTrack(
   row: CatalogMusicIndexRow,
   hymnalTracks: number[],
@@ -148,6 +160,7 @@ function mapMusicIndexRow(row: CatalogMusicIndexRow): AlbumSearchHit | null {
     isHymnal,
     hymnalTracks: [...new Set(hymnalTracks)],
     lyricsText: lyricsText || undefined,
+    albumRefs: collectAlbumRefs(row),
   }
 }
 
@@ -164,7 +177,17 @@ function mergeHits(a: AlbumSearchHit, b: AlbumSearchHit): AlbumSearchHit {
       : [a.albumNames, b.albumNames].filter(Boolean).join(', '),
     hasInstrumental: a.hasInstrumental || b.hasInstrumental,
     hymnalTracks,
+    albumRefs: mergeAlbumRefs(a.albumRefs, b.albumRefs),
   }
+}
+
+function mergeAlbumRefs(
+  a: AlbumSearchAlbumRef[] | undefined,
+  b: AlbumSearchAlbumRef[] | undefined,
+): AlbumSearchAlbumRef[] {
+  const merged = [...(a ?? [])]
+  for (const ref of b ?? []) if (!merged.some((item) => item.key === ref.key)) merged.push(ref)
+  return merged
 }
 
 /** Carrega o índice global de músicas (prefixado por idioma). */
@@ -245,9 +268,40 @@ function relevanceScore(entry: AlbumSearchHit, trimmed: string): number {
   return 0
 }
 
+/** Número do hinário pelos nomes (índice sem albumRefs: atual 2, 1996 1). */
+function hymnalScoreByName(entry: AlbumSearchHit): number {
+  if (entry.albumNames.includes('Hinário Adventista') && !entry.albumNames.includes('1996')) return 2
+  if (entry.albumNames.includes('Hinário Adventista 1996')) return 1
+  return 0
+}
+
+/** Número no hinário ATIVO: atual (2) antes de 1996/outros hinários (1). */
+function hymnalScoreByAlbum(refs: AlbumSearchAlbumRef[], num: number): number {
+  if (refs.some((ref) => ref.key === 'hymnal' && ref.track === num)) return 2
+  if (refs.some((ref) => ref.hymnal && ref.track === num)) return 1
+  return 0
+}
+
+/** Número do hinário a mostrar só com álbuns ativos (atual → 1996 → outro). */
+function activeHymnalTrack(refs: AlbumSearchAlbumRef[]): number | null {
+  return (
+    refs.find((ref) => ref.key === 'hymnal' && ref.track != null)?.track ??
+    refs.find((ref) => ref.hymnal && ref.track != null)?.track ??
+    null
+  )
+}
+
+type RankedHit = { hit: AlbumSearchHit; score: number }
+
+/**
+ * Busca por hinos: título, álbum ou número do hinário (máx. 50).
+ * `disabledAlbums` (chaves de álbum desativado): música que só casa por eles
+ * vem `disabled`, depois das ativas — o seletor pula (paridade Classic).
+ */
 export function filterAlbumMusicIndex(
   index: AlbumSearchHit[],
   query: string,
+  disabledAlbums: ReadonlySet<string> = new Set(),
 ): AlbumSearchHit[] {
   const trimmed = query.trim().toLowerCase()
   if (!trimmed) return []
@@ -255,65 +309,42 @@ export function filterAlbumMusicIndex(
   const isNum = /^\d+$/.test(trimmed)
   const numQuery = isNum ? Number(trimmed) : null
 
-  let results = index.filter((entry) => {
-    const title = entry.name
-    const album = entry.albumNames
-    const lyrics = entry.lyricsText ?? ''
-    if (isNum && numQuery != null) {
-      return (
-        entry.track === numQuery ||
-        (entry.hymnalTracks ?? []).includes(numQuery) ||
-        matchesAllTerms(title, album, trimmed, lyrics)
-      )
-    }
+  const ranked: RankedHit[] = []
+  for (const entry of index) {
+    const refs = entry.albumRefs ?? []
+    const activeRefs = refs.filter((ref) => !disabledAlbums.has(ref.key))
+    const allDisabled = refs.length > 0 && activeRefs.length === 0
     // Busca por termos (03/10): "jesus adoradores 5" acha a música "Jesus"
     // do álbum "Adoradores 5" — substring contígua não existe em campo nenhum.
     // Busca por letra (03/10): `lyricsText` (quando presente) casa trecho/termos.
-    return matchesAllTerms(title, album, trimmed, lyrics)
-  })
+    const textMatch = matchesAllTerms(entry.name, entry.albumNames, trimmed, entry.lyricsText ?? '')
 
-  if (isNum && numQuery != null) {
-    // Exibe o número buscado quando a faixa tem esse track no hinário.
-    results = results.map((entry) => {
-      if (
-        !(entry.hymnalTracks ?? []).includes(numQuery) &&
-        entry.track !== numQuery
-      ) {
-        return entry
-      }
-      return {
-        ...entry,
-        track: numQuery,
-        isHymnal: true,
-      }
-    })
+    if (numQuery != null) {
+      const numberHit = entry.track === numQuery || (entry.hymnalTracks ?? []).includes(numQuery)
+      if (!numberHit && !textMatch) continue
+      const score = !numberHit ? 0 : refs.length > 0 ? hymnalScoreByAlbum(activeRefs, numQuery) : hymnalScoreByName(entry)
+      // Casou só pelo número de um álbum desativado (ex.: o 45 do hinário de 1996).
+      const activeNumber = refs.length === 0 || activeRefs.some((ref) => ref.hymnal && ref.track === numQuery)
+      const disabled = allDisabled || (numberHit && !activeNumber && !textMatch)
+      // Exibe o número buscado quando a faixa tem esse track no hinário.
+      const hit = numberHit ? { ...entry, track: numQuery, isHymnal: true } : entry
+      ranked.push({ hit: disabled ? { ...hit, disabled: true } : hit, score })
+      continue
+    }
 
-    results = [...results].sort((a, b) => {
-      const score = (entry: AlbumSearchHit) => {
-        const hasNumber =
-          entry.track === numQuery ||
-          (entry.hymnalTracks ?? []).includes(numQuery)
-        if (!hasNumber) return 0
-        if (
-          entry.albumNames.includes('Hinário Adventista') &&
-          !entry.albumNames.includes('1996')
-        ) {
-          return 2
-        }
-        if (entry.albumNames.includes('Hinário Adventista 1996')) {
-          return 1
-        }
-        return 0
-      }
-      return score(b) - score(a)
-    })
-  } else {
+    if (!textMatch) continue
+    let hit: AlbumSearchHit = entry
+    // Hinário desativado: o número mostrado vem do hinário que segue ativo.
+    if (refs.some((ref) => ref.hymnal && disabledAlbums.has(ref.key))) {
+      const track = activeHymnalTrack(activeRefs)
+      hit = { ...entry, track, isHymnal: track != null }
+    }
     // Busca textual: título/número primeiro; match só de álbum vai pro fim
     // (não some, mas não engole a lista — apk#127).
-    results = [...results].sort(
-      (a, b) => relevanceScore(b, trimmed) - relevanceScore(a, trimmed),
-    )
+    ranked.push({ hit: allDisabled ? { ...hit, disabled: true } : hit, score: relevanceScore(entry, trimmed) })
   }
 
-  return results.slice(0, 50)
+  // Ativas antes das desativadas; dentro de cada grupo, o melhor score.
+  ranked.sort((a, b) => Number(a.hit.disabled === true) - Number(b.hit.disabled === true) || b.score - a.score)
+  return ranked.slice(0, 50).map((item) => item.hit)
 }

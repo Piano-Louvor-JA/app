@@ -233,7 +233,9 @@ describe('LiturgyTimelineItem — cobertura extra', () => {
       })
       expect(wrapper.find('.liturgy-item__subtitle').text()).toBe('Álbum Ao Vivo')
       expect(wrapper.find('.liturgy-item__notes').text()).toBe('Tom: G')
-      expect(wrapper.find('.liturgy-item__complementary').text()).toBe('Intro em piano')
+      // Música: a lista mostra só o título complementar no lugar do título.
+      expect(wrapper.find('.liturgy-item__name').text()).toBe('Intro em piano')
+      expect(wrapper.find('.liturgy-item__complementary').exists()).toBe(false)
     })
 
     it('não renderiza subtítulo/notes/complementar quando ausentes', () => {
@@ -587,6 +589,19 @@ describe('LiturgyTimelineItem — cobertura extra', () => {
       expect(wrapper.emitted('toggleCollapse')).toBeTruthy()
     })
 
+    it('o botão de recolher fica na coluna da esquerda, abaixo da caixinha (fora das ações)', () => {
+      const wrapper = createWrapper({
+        item: createCategory(),
+        collapsible: true,
+        collapsed: false,
+      })
+      const collapse = wrapper.find('.liturgy-item__action--collapse')
+      expect(collapse.element.closest('.liturgy-item__rail')).not.toBeNull()
+      expect(collapse.element.closest('.liturgy-item__actions')).toBeNull()
+      const rail = wrapper.get('.liturgy-item__rail').element
+      expect(rail.firstElementChild?.classList.contains('liturgy-item__check')).toBe(true)
+    })
+
     it('colapsado: aria-expanded false, chevron-right, title de expandir', async () => {
       const wrapper = createWrapper({
         item: createCategory(),
@@ -601,12 +616,15 @@ describe('LiturgyTimelineItem — cobertura extra', () => {
       expect(wrapper.emitted('toggleCollapse')).toBeTruthy()
     })
 
-    it('categoria done → colapsar e adicionar sub item disabled', () => {
+    it('categoria concluída: dá para recolher/expandir; adicionar sub item fica desativado', async () => {
       const wrapper = createWrapper({
         item: createCategory({ done: true }),
         collapsible: true,
       })
-      expect(wrapper.find('.liturgy-item__action--collapse').attributes('disabled')).toBeDefined()
+      const collapse = wrapper.find('.liturgy-item__action--collapse')
+      expect(collapse.attributes('disabled')).toBeUndefined()
+      await collapse.trigger('click')
+      expect(wrapper.emitted('toggleCollapse')).toBeTruthy()
       expect(wrapper.find('.liturgy-item__add-sub').attributes('disabled')).toBeDefined()
     })
 

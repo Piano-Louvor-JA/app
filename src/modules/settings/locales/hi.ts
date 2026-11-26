@@ -451,7 +451,22 @@ export default {
       "mediaFolderMoved": "Media moved to {path}",
       "mediaFolderError": "Could not move the media folder. Try again.",
       "mediaFolderDestInside": "Choose a folder outside the current media folder.",
-      "mediaFolderPersistError": "Media was copied, but the shared path could not be saved."
+      "mediaFolderPersistError": "Media was copied, but the shared path could not be saved.",
+      "legacyMediaArchiveSummary": "{size} की संपीड़ित फ़ाइल: जो मीडिया यहाँ नहीं है वह बिना निकाले सीधे उसी से कॉपी होता है।",
+      "legacyMediaCancelled": "आयात रुका: {imported} फ़ाइल कॉपी हुईं। जहाँ रुका था वहीं से जारी रखने के लिए फ़ाइल या फ़ोल्डर फिर से चुनें।",
+      "legacyMediaHintLinux": "वेबसाइट से डाउनलोड की गई फ़ाइल (.tar.gz) चुनें: ऐप बिना निकाले सीधे उसी से मीडिया कॉपी करता है। चाहें तो उसे निकालकर फ़ोल्डर चुनें। केवल वे फ़ाइलें (कवर, चित्र और गीत) कॉपी होती हैं जो यहाँ नहीं हैं।",
+      "legacyMediaInvalidArchive": "इस फ़ाइल में Louvor JA का मीडिया (कवर, चित्र या गीत) नहीं है। वेबसाइट से डाउनलोड की गई फ़ाइल चुनें।",
+      "legacyMediaInvalidFolderLinux": "इस फ़ोल्डर में मीडिया नहीं है। वेबसाइट की फ़ाइल से निकाला गया फ़ोल्डर (जैसे LouvorJA-PIANO) या उसके अंदर का Media फ़ोल्डर चुनें।",
+      "legacyMediaLiveCounts": "{imported} अभी सहेजी गईं · {skipped} पहले से थीं (मीडिया सेंटर में पहले से दिखती हैं)",
+      "legacyMediaPause": "रोकें",
+      "legacyMediaPaused": "{total} में से {current} पर रुका",
+      "legacyMediaPausedBytes": "{total} में से {current} पर रुका",
+      "legacyMediaPickArchive": "डाउनलोड की गई फ़ाइल चुनें (.tar.gz)",
+      "legacyMediaPickFolderLinux": "मीडिया फ़ोल्डर चुनें",
+      "legacyMediaPickHintLinux": "फ़ाइल से निकाला गया फ़ोल्डर (जैसे LouvorJA-PIANO) या उसके अंदर का Media फ़ोल्डर चुनें। ऐप कवर, चित्र और गीत खुद ढूँढ लेता है।",
+      "legacyMediaProgressBytes": "{total} में से {current} पढ़ा जा रहा है",
+      "legacyMediaResume": "जारी रखें",
+      "legacyMediaStop": "रोकें"
     },
     "remote": {
       "renewToken": "Refresh token",
@@ -813,7 +828,13 @@ export default {
       "transformNone": "None",
       "speedSlow": "Slow",
       "speedNormal": "Normal",
-      "speedFast": "Fast"
+      "speedFast": "Fast",
+      "hymnNumberShow": "कवर पर भजन संख्या (भजन-संग्रह)",
+      "hymnNumberSize": "भजन संख्या का आकार",
+      "hymnalNameColor": "भजन-संग्रह के नाम का रंग",
+      "hymnalNameColorDefault": "डिफ़ॉल्ट (सफ़ेद)",
+      "hymnalNameShow": "कवर पर भजन-संग्रह का नाम",
+      "hymnalNameSize": "भजन-संग्रह के नाम का आकार"
     }
   }
 }

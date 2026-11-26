@@ -451,7 +451,22 @@ export default {
       "mediaFolderMoved": "Media moved to {path}",
       "mediaFolderError": "Could not move the media folder. Try again.",
       "mediaFolderDestInside": "Choose a folder outside the current media folder.",
-      "mediaFolderPersistError": "Media was copied, but the shared path could not be saved."
+      "mediaFolderPersistError": "Media was copied, but the shared path could not be saved.",
+      "legacyMediaHintLinux": "Choose the file downloaded from the website (.tar.gz): the app copies the media straight from it, no need to extract. If you prefer, extract it and choose the folder. Only files (covers, images and songs) not here yet are copied.",
+      "legacyMediaPickFolderLinux": "Choose media folder",
+      "legacyMediaPickHintLinux": "Choose the folder extracted from the file (e.g. LouvorJA-PIANO) or the Media folder inside it. The app finds the covers, images and songs by itself.",
+      "legacyMediaInvalidFolderLinux": "This folder does not contain the media. Choose the folder extracted from the website file (e.g. LouvorJA-PIANO) or the Media folder inside it.",
+      "legacyMediaPause": "Pause",
+      "legacyMediaResume": "Resume",
+      "legacyMediaStop": "Stop",
+      "legacyMediaPaused": "Paused at {current} of {total}",
+      "legacyMediaCancelled": "Import stopped: {imported} file(s) copied. Choose the file or folder again to continue where it stopped.",
+      "legacyMediaPickArchive": "Choose downloaded file (.tar.gz)",
+      "legacyMediaArchiveSummary": "Compressed file of {size}: media not here yet is copied straight from it, without extracting.",
+      "legacyMediaProgressBytes": "Reading {current} of {total}",
+      "legacyMediaPausedBytes": "Paused at {current} of {total}",
+      "legacyMediaInvalidArchive": "This file does not contain Louvor JA media (covers, images or songs). Choose the file downloaded from the website.",
+      "legacyMediaLiveCounts": "{imported} saved now · {skipped} already there (already shown in the Media Center)"
     },
     "remote": {
       "renewToken": "Refresh token",
@@ -813,7 +828,13 @@ export default {
       "transformNone": "None",
       "speedSlow": "Slow",
       "speedNormal": "Normal",
-      "speedFast": "Fast"
+      "speedFast": "Fast",
+      "hymnalNameShow": "Hymnal name on the cover",
+      "hymnalNameSize": "Hymnal name size",
+      "hymnalNameColor": "Hymnal name color",
+      "hymnalNameColorDefault": "Default (white)",
+      "hymnNumberShow": "Hymn number on the cover (hymnal)",
+      "hymnNumberSize": "Hymn number size"
     }
   }
 }

@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import AppConfirm from '@shared/components/AppConfirm.vue'
 import PageBackStack from '@shared/components/PageBackStack.vue'
 import { useMinimizablePage } from '@shared/composables/useMinimizablePage'
-import type { YoutubeSearchContinuation, YoutubeSearchItem } from '@shared/types/desktop-bridge'
+import type { YoutubeChannelSearchItem, YoutubeSearchContinuation, YoutubeSearchItem } from '@shared/types/desktop-bridge'
 
 import {
   clearYoutubeHistory,
@@ -22,6 +22,7 @@ import {
   removeYoutubeFavorite,
   removeYoutubeHistoryEntry,
   toggleYoutubeFavorite,
+  YOUTUBE_LIBRARY_CHANGED,
   type YoutubeFavoriteEntry,
   type YoutubeHistoryEntry,
 } from '../services/youtube-history'
@@ -47,12 +48,28 @@ import {
   renameYoutubeCollection,
   type YoutubeCollection,
 } from '../services/youtube-collections'
+import {
+  channelCovers,
+  channelPlaylists,
+  fetchYoutubeChannelInfo,
+  filterChannelVideos,
+  findYoutubeChannelPlaylist,
+  listYoutubeChannels,
+  loadChannelVideos,
+  playlistCover,
+  removeYoutubeChannel,
+  saveYoutubeChannel,
+  searchAdventistChannels,
+  type YoutubeChannel,
+} from '../services/youtube-channels'
 import YoutubeDownloadButton from '../components/YoutubeDownloadButton.vue'
 import YoutubeDownloadDialog from '../components/YoutubeDownloadDialog.vue'
 import YoutubeRenameDialog from '../components/YoutubeRenameDialog.vue'
 import YoutubeStorageChip from '../components/YoutubeStorageChip.vue'
 import YoutubePlaylistImportDialog from '../components/YoutubePlaylistImportDialog.vue'
 import { isDownloading, useYoutubeDownloads } from '../composables/useYoutubeDownloads'
+import { useTypingSearch } from '../composables/useTypingSearch'
+import { isChannelLink } from '../services/youtube-links'
 import { useDragReorder } from '../composables/useDragReorder'
 import { moveById } from '../services/reorder'
 import {
@@ -64,7 +81,7 @@ import {
   type YoutubeDownloadedRow,
 } from '../services/youtube-downloaded'
 
-type Tab = 'search' | 'history' | 'favorites' | 'downloads' | 'collections'
+type Tab = 'search' | 'history' | 'favorites' | 'downloads' | 'collections' | 'channels'
 type PlayableVideo = Pick<YoutubeSearchItem, 'videoId' | 'title'> &
   Partial<Pick<YoutubeSearchItem, 'channel' | 'thumbnail' | 'durationText'>>
 
@@ -88,6 +105,23 @@ let searchSeq = 0
 /** A primeira página do YouTube traz ~20 vídeos; a busca já completa até este total. */
 const INITIAL_TARGET = 60
 const MAX_INITIAL_PAGES = 4
+
+/** Enter, botão ou busca recente: busca na hora (e cancela a busca enquanto digita). */
+function submitSearch(text = query.value) {
+  typingSearch.cancel()
+  void runSearch(text)
+}
+
+/** Campo apagado: volta para a tela inicial da busca. */
+function clearSearch() {
+  searchSeq += 1
+  results.value = []
+  continuation.value = null
+  lastQuery.value = ''
+  searchError.value = false
+  searching.value = false
+  loadingMore.value = false
+}
 
 async function runSearch(text = query.value) {
   const q = text.trim()
@@ -197,12 +231,20 @@ function toggleFavorite(video: PlayableVideo) {
   favorites.value = toggleYoutubeFavorite(video)
 }
 
+/** Controle remoto favoritou ou tocou: recarrega as listas com a tela aberta. */
+function reloadLibrary() {
+  history.value = listYoutubeHistory()
+  favorites.value = listYoutubeFavorites()
+}
+window.addEventListener(YOUTUBE_LIBRARY_CHANGED, reloadLibrary)
+onBeforeUnmount(() => window.removeEventListener(YOUTUBE_LIBRARY_CHANGED, reloadLibrary))
+
 /** Linhas da aba atual (Histórico ou Favoritos), já filtradas. */
 type ListRow = YoutubeFavoriteEntry & { playCount?: number } & Partial<Pick<YoutubeDownloadedRow, 'size' | 'fileName' | 'renamed' | 'folder'>>
 const downloadsOrder = ref<string[]>(listDownloadsOrder())
 const downloadedList = computed<YoutubeDownloadedRow[]>(() => orderDownloadedRows(downloadedRows(
   downloads.downloaded.value,
-  [history.value, favorites.value, collections.value.flatMap((c) => c.videos)],
+  [history.value, favorites.value, collections.value.flatMap((c) => c.videos), playlistVideos.value],
 ), downloadsOrder.value))
 const listSource = computed<ListRow[]>(() => {
   if (tab.value === 'favorites') return favorites.value
@@ -272,6 +314,198 @@ function createFromPlaylist(name: string, items: YoutubeSearchItem[]) {
   if (!created) return
   collections.value = addVideosToYoutubeCollection(created.id, items)
   openCollectionId.value = created.id
+}
+
+/* ---------- Canais: os padrão (vêm com o app) e os cadastrados pelo operador ---------- */
+const channels = ref<YoutubeChannel[]>(listYoutubeChannels())
+const openChannelId = ref<string | null>(null)
+const openPlaylistId = ref<string | null>(null)
+const openChannel = computed(() => channels.value.find((c) => c.id === openChannelId.value) ?? null)
+const playlistFilter = ref('')
+const filteredPlaylists = computed(() => {
+  const list = openChannel.value?.playlists ?? []
+  return filterYoutubeHistory(list.map((p) => ({ ...p, title: p.name, channel: '' })), playlistFilter.value)
+})
+
+/* Cadastrar canal (link, @handle ou id) */
+const newChannelText = ref('')
+const addingChannel = ref(false)
+const addChannelError = ref('')
+const deletingChannel = ref<YoutubeChannel | null>(null)
+
+/**
+ * Cadastra pelo texto do campo ou, vindo da pesquisa, pelo link do canal achado
+ * (`fromSearch`: id do canal, para o carregando aparecer só naquela linha).
+ */
+async function addChannel(text = newChannelText.value.trim(), fromSearch: string | null = null) {
+  if (!text || addingChannel.value) return
+  addingChannel.value = true
+  addingFromSearch.value = fromSearch
+  addChannelError.value = ''
+  const result = await fetchYoutubeChannelInfo(text)
+  addingChannel.value = false
+  addingFromSearch.value = null
+  const saved = saveYoutubeChannel(result)
+  if (saved.status === 'invalid' || !saved.channel) {
+    const error = result.error ?? 'empty'
+    addChannelError.value = error === 'invalid' ? 'youtube.channels.addInvalid' : error === 'empty' ? 'youtube.channels.addEmpty' : 'youtube.channels.addError'
+    return
+  }
+  channels.value = saved.list
+  if (!fromSearch) newChannelText.value = ''
+  showFeedback(t(saved.status === 'default' ? 'youtube.channels.alreadyDefault' : 'youtube.channels.added', { name: saved.channel.name }))
+  openChannelCard(saved.channel.id)
+}
+
+/** Colou um link de canal: cadastra na hora (texto comum segue o colar normal). */
+function onChannelPaste(event: ClipboardEvent) {
+  const pasted = event.clipboardData?.getData('text')?.trim() ?? ''
+  if (!isChannelLink(pasted) || addingChannel.value) return
+  event.preventDefault()
+  newChannelText.value = pasted
+  void addChannel(pasted)
+}
+
+/* Pesquisar canais adventistas sobre um tema */
+const channelSearchText = ref('')
+const channelSearchQuery = ref('')
+const channelSearchResults = ref<YoutubeChannelSearchItem[]>([])
+const channelSearching = ref(false)
+const channelSearchError = ref('')
+const addingFromSearch = ref<string | null>(null)
+let channelSearchSeq = 0
+
+async function searchChannels(text = channelSearchText.value) {
+  const query = text.trim()
+  if (!query) return
+  const mine = ++channelSearchSeq
+  channelSearching.value = true
+  channelSearchError.value = ''
+  channelSearchQuery.value = query
+  channelSearchResults.value = []
+  const result = await searchAdventistChannels(query)
+  if (mine !== channelSearchSeq) return
+  channelSearching.value = false
+  channelSearchResults.value = result.items
+  channelSearchError.value = result.items.length > 0 ? '' : result.error === 'empty' || !result.error ? 'youtube.channels.searchEmpty' : 'youtube.channels.searchError'
+}
+
+/** Enter ou botão: pesquisa na hora (e cancela a pesquisa enquanto digita). */
+function submitChannelSearch() {
+  channelTypingSearch.cancel()
+  void searchChannels()
+}
+
+function closeChannelSearch() {
+  channelSearchSeq += 1
+  channelSearching.value = false
+  channelSearchQuery.value = ''
+  channelSearchResults.value = []
+  channelSearchError.value = ''
+}
+
+/* Busca enquanto digita (igual ao apk): vídeos e canais. Link colado só toca pelo Enter. */
+const typingSearch = useTypingSearch(query, {
+  run: (q) => { void runSearch(q) },
+  clear: clearSearch,
+  current: () => lastQuery.value,
+  skip: (q) => youtubeIdFromText(q) !== null,
+})
+const channelTypingSearch = useTypingSearch(channelSearchText, {
+  run: (q) => { void searchChannels(q) },
+  clear: closeChannelSearch,
+  current: () => channelSearchQuery.value,
+})
+
+/** Situação do canal achado: já cadastrado, já vem no app ou novo. */
+function searchItemState(item: YoutubeChannelSearchItem): { channel: YoutubeChannel | null; builtIn: boolean } {
+  const channel = channels.value.find((c) => c.id === item.id || c.youtubeId === item.id) ?? null
+  return { channel, builtIn: Boolean(channel && !channel.userAdded) }
+}
+
+function confirmDeleteChannel() {
+  const target = deletingChannel.value
+  if (target) {
+    channels.value = removeYoutubeChannel(target.id)
+    if (openChannelId.value === target.id) {
+      openChannelId.value = null
+      openPlaylistId.value = null
+    }
+  }
+  deletingChannel.value = null
+}
+
+/** Canal cadastrado: ao abrir, relê as playlists no YouTube (sem travar a tela; falha mantém as salvas). */
+async function refreshChannel(channel: YoutubeChannel) {
+  const result = await fetchYoutubeChannelInfo(channel.url)
+  if (result.channel?.id !== channel.id) return
+  const saved = saveYoutubeChannel(result)
+  if (saved.status === 'updated') channels.value = saved.list
+}
+const openPlaylist = computed(() => findYoutubeChannelPlaylist(openChannel.value, openPlaylistId.value))
+const playlistVideos = ref<YoutubeSearchItem[]>([])
+const playlistLoading = ref(false)
+const playlistError = ref('')
+let playlistSeq = 0
+/** Lista de vídeos aberta: a playlist escolhida ou, no canal unido, o canal inteiro. */
+const channelListOpen = computed(() => Boolean(openPlaylist.value || openChannel.value?.merged))
+const channelFilter = ref('')
+const filteredChannelVideos = computed(() => filterChannelVideos(playlistVideos.value, channelFilter.value))
+/** Posição na lista completa (o filtro não muda o número da linha). */
+const channelPositions = computed(() => new Map(playlistVideos.value.map((v, i) => [v.videoId, i + 1])))
+
+function openChannels() {
+  tab.value = 'channels'
+  openChannelId.value = null
+  openPlaylistId.value = null
+}
+
+function openChannelCard(id: string) {
+  openChannelId.value = id
+  openPlaylistId.value = null
+  playlistFilter.value = ''
+  const channel = channels.value.find((c) => c.id === id)
+  if (channel?.userAdded) void refreshChannel(channel)
+}
+
+/**
+ * Lê os vídeos da lista aberta: a playlist (do cache quando já foi aberta) ou,
+ * no canal unido, todas as playlists dele numa lista só.
+ */
+async function loadPlaylist(force = false) {
+  const playlist = openPlaylist.value
+  const channel = openChannel.value
+  const mine = ++playlistSeq
+  playlistError.value = ''
+  channelFilter.value = ''
+  const merged = !playlist && channel?.merged ? channel : null
+  if (!playlist && !merged) {
+    playlistVideos.value = []
+    playlistLoading.value = false
+    return
+  }
+  const cached = playlist && !force ? channelPlaylists.cached(playlist.id) : null
+  if (cached) {
+    playlistVideos.value = cached
+    playlistLoading.value = false
+    return
+  }
+  playlistVideos.value = []
+  playlistLoading.value = true
+  const result = merged ? await loadChannelVideos(merged) : await channelPlaylists.load(playlist!.id, { force })
+  if (mine !== playlistSeq) return
+  playlistLoading.value = false
+  playlistVideos.value = result.items
+  playlistError.value = result.error ?? ''
+}
+watch([openChannelId, () => openPlaylist.value?.id], () => { void loadPlaylist() })
+
+/** Copia a playlist para uma coletânea do usuário (aí dá para reordenar e baixar tudo). */
+function savePlaylistAsCollection() {
+  const playlist = openPlaylist.value
+  if (!playlist || playlistVideos.value.length === 0) return
+  createFromPlaylist(playlist.name, playlistVideos.value)
+  tab.value = 'collections'
 }
 
 function startRename(collection: YoutubeCollection) {
@@ -347,6 +581,8 @@ type YoutubeSnapshot = {
   continuation: YoutubeSearchContinuation | null
   historyFilter: string
   openCollectionId: string | null
+  openChannelId?: string | null
+  openPlaylistId?: string | null
 }
 
 const { minimize, prepare, takeRestoredState } = useMinimizablePage<YoutubeSnapshot>({
@@ -356,7 +592,9 @@ const { minimize, prepare, takeRestoredState } = useMinimizablePage<YoutubeSnaps
       ? t('minimize.search', { q })
       : tab.value === 'collections' && openCollection.value
         ? openCollection.value.name
-        : t(tab.value === 'collections' ? 'youtube.collections.title' : `youtube.tabs.${tab.value}`)
+        : tab.value === 'channels'
+          ? openPlaylist.value?.name ?? openChannel.value?.name ?? t('youtube.channels.title')
+          : t(tab.value === 'collections' ? 'youtube.collections.title' : `youtube.tabs.${tab.value}`)
     return { title: t('youtube.title'), icon: 'ti-brand-youtube', summary }
   },
   capture: () => ({
@@ -367,6 +605,8 @@ const { minimize, prepare, takeRestoredState } = useMinimizablePage<YoutubeSnaps
     continuation: continuation.value ? { ...continuation.value } : null,
     historyFilter: historyFilter.value,
     openCollectionId: openCollectionId.value,
+    openChannelId: openChannelId.value,
+    openPlaylistId: openPlaylistId.value,
   }),
   fallbackRoute: { name: 'albums' },
 })
@@ -380,8 +620,18 @@ if (restored) {
   results.value = restored.results
   continuation.value = restored.continuation
   openCollectionId.value = restored.openCollectionId
+  openChannelId.value = restored.openChannelId ?? null
+  openPlaylistId.value = restored.openPlaylistId ?? null
   // depois do watch da aba (que limpa o filtro)
   void nextTick(() => { historyFilter.value = restored.historyFilter })
+}
+
+// Aberto pela Central de Mídia (card "Hinário Adventista - CPB"): já entra no canal.
+const route = useRoute()
+const channelFromRoute = typeof route?.query?.channel === 'string' ? route.query.channel : ''
+if (channelFromRoute && channels.value.some((c) => c.id === channelFromRoute)) {
+  tab.value = 'channels'
+  openChannelCard(channelFromRoute)
 }
 
 /* ---------- Downloads ---------- */
@@ -396,6 +646,7 @@ const visibleIds = computed(() => {
   if (tab.value === 'history') return history.value.map((v) => v.videoId)
   if (tab.value === 'favorites') return favorites.value.map((v) => v.videoId)
   if (tab.value === 'downloads') return downloadedList.value.map((v) => v.videoId)
+  if (tab.value === 'channels') return filteredChannelVideos.value.map((v) => v.videoId)
   return openCollection.value?.videos.map((v) => v.videoId) ?? []
 })
 watch([visibleIds, downloads.supported], ([ids]) => { void downloads.refresh(ids) }, { immediate: true })
@@ -535,6 +786,16 @@ function goBack() {
       <button
         type="button"
         class="yt-view__collections-btn"
+        :class="{ 'is-active': tab === 'channels' }"
+        data-testid="youtube-open-channels"
+        @click="openChannels"
+      >
+        <i class="ti ti-broadcast" aria-hidden="true" />
+        {{ t('youtube.channels.title') }}
+      </button>
+      <button
+        type="button"
+        class="yt-view__collections-btn"
         :class="{ 'is-active': tab === 'collections' }"
         data-testid="youtube-open-collections"
         @click="openCollections"
@@ -602,7 +863,7 @@ function goBack() {
 
     <!-- Busca -->
     <template v-if="tab === 'search'">
-      <form class="yt-view__searchbar" @submit.prevent="runSearch()">
+      <form class="yt-view__searchbar" @submit.prevent="submitSearch()">
         <label class="yt-view__field">
           <i class="ti ti-brand-youtube" aria-hidden="true" />
           <input
@@ -627,7 +888,7 @@ function goBack() {
       <div v-if="recentQueries.length > 0 && available" class="yt-view__recent">
         <span class="yt-view__recent-label">{{ t('youtube.search.recent') }}</span>
         <span v-for="q in recentQueries" :key="q" class="yt-view__chip">
-          <button type="button" class="yt-view__chip-text" @click="runSearch(q)">{{ q }}</button>
+          <button type="button" class="yt-view__chip-text" @click="submitSearch(q)">{{ q }}</button>
           <button
             type="button"
             class="yt-view__chip-x"
@@ -924,6 +1185,367 @@ function goBack() {
           </li>
         </ul>
       </div>
+    </template>
+
+    <!-- Canais padrão (vêm com o app, somente leitura) -->
+    <template v-else-if="tab === 'channels'">
+      <!-- Lista de canais -->
+      <template v-if="!openChannel">
+        <div v-if="available" class="yt-ch__tools">
+          <!-- Cadastrar pelo link -->
+          <form class="yt-ch__tool" @submit.prevent="addChannel()">
+            <label class="yt-view__field">
+              <i class="ti ti-brand-youtube" aria-hidden="true" />
+              <input
+                v-model="newChannelText"
+                type="text"
+                :maxlength="300"
+                :placeholder="t('youtube.channels.addPlaceholder')"
+                :disabled="addingChannel"
+                data-testid="youtube-channel-add-input"
+                @paste="onChannelPaste"
+              >
+            </label>
+            <button type="submit" class="yt-view__primary" :disabled="addingChannel || !newChannelText.trim()" data-testid="youtube-channel-add">
+              <i class="ti" :class="addingChannel && !addingFromSearch ? 'ti-loader-2 yt-spin' : 'ti-plus'" aria-hidden="true" />
+              {{ addingChannel && !addingFromSearch ? t('youtube.channels.adding') : t('youtube.channels.add') }}
+            </button>
+          </form>
+          <!-- Pesquisar canais adventistas -->
+          <form class="yt-ch__tool" @submit.prevent="submitChannelSearch">
+            <label class="yt-view__field">
+              <i class="ti ti-search" aria-hidden="true" />
+              <input
+                v-model="channelSearchText"
+                type="search"
+                :maxlength="200"
+                :placeholder="t('youtube.channels.searchPlaceholder')"
+                data-testid="youtube-channel-search-input"
+              >
+            </label>
+            <button type="submit" class="yt-view__secondary" :disabled="!channelSearchText.trim()" data-testid="youtube-channel-search">
+              <i class="ti" :class="channelSearching ? 'ti-loader-2 yt-spin' : 'ti-search'" aria-hidden="true" />
+              {{ t('youtube.channels.search') }}
+            </button>
+          </form>
+        </div>
+        <div class="yt-view__body">
+          <p v-if="addChannelError" class="yt-view__hint yt-ch__error" role="alert" data-testid="youtube-channel-add-error">
+            <i class="ti ti-alert-circle" aria-hidden="true" />
+            {{ t(addChannelError) }}
+          </p>
+
+          <!-- Resultado da pesquisa de canais -->
+          <section v-if="channelSearchQuery" class="yt-ch__results" data-testid="youtube-channel-results">
+            <header class="yt-ch__results-head">
+              <h3>{{ t('youtube.channels.searchTitle', { query: channelSearchQuery }) }}</h3>
+              <button
+                type="button"
+                class="yt-row__remove"
+                :aria-label="t('youtube.channels.searchClose')"
+                :title="t('youtube.channels.searchClose')"
+                data-testid="youtube-channel-search-close"
+                @click="closeChannelSearch"
+              >
+                <i class="ti ti-x" aria-hidden="true" />
+              </button>
+            </header>
+            <p v-if="channelSearching" class="yt-view__hint" data-testid="youtube-channel-searching">
+              <i class="ti ti-loader-2 yt-spin" aria-hidden="true" />
+              {{ t('youtube.channels.searching') }}
+            </p>
+            <p v-else-if="channelSearchError" class="yt-view__hint" data-testid="youtube-channel-search-error">
+              {{ t(channelSearchError, { query: channelSearchQuery }) }}
+            </p>
+            <ul v-else class="yt-ch__results-list">
+              <li v-for="item in channelSearchResults" :key="item.id" class="yt-ch__result" data-testid="youtube-channel-result">
+                <img v-if="item.avatar" class="yt-ch__avatar" :src="item.avatar" alt="" loading="lazy" draggable="false">
+                <span v-else class="yt-ch__avatar yt-ch__avatar--empty"><i class="ti ti-brand-youtube" aria-hidden="true" /></span>
+                <div class="yt-row__info">
+                  <p class="yt-card__title" :title="item.name">{{ item.name }}</p>
+                  <p class="yt-card__meta">{{ [item.handle, item.subscribers].filter(Boolean).join(' · ') }}</p>
+                  <p v-if="item.description" class="yt-card__meta yt-ch__desc" :title="item.description">{{ item.description }}</p>
+                </div>
+                <button
+                  v-if="searchItemState(item).channel"
+                  type="button"
+                  class="yt-view__secondary"
+                  data-testid="youtube-channel-result-open"
+                  @click="openChannelCard(searchItemState(item).channel!.id)"
+                >
+                  <i class="ti ti-circle-check" aria-hidden="true" />
+                  {{ searchItemState(item).builtIn ? t('youtube.channels.builtIn') : t('youtube.channels.registered') }}
+                </button>
+                <button
+                  v-else
+                  type="button"
+                  class="yt-view__primary"
+                  :disabled="addingChannel"
+                  data-testid="youtube-channel-result-add"
+                  @click="addChannel(item.url, item.id)"
+                >
+                  <i class="ti" :class="addingFromSearch === item.id ? 'ti-loader-2 yt-spin' : 'ti-plus'" aria-hidden="true" />
+                  {{ addingFromSearch === item.id ? t('youtube.channels.adding') : t('youtube.channels.register') }}
+                </button>
+              </li>
+            </ul>
+          </section>
+
+          <p class="yt-view__hint yt-ch__hint">{{ t('youtube.channels.hint') }}</p>
+          <ul class="yt-view__grid">
+            <li v-for="channel in channels" :key="channel.id" class="yt-card yt-col" data-testid="youtube-channel-card">
+              <button type="button" class="yt-col__cover" @click="openChannelCard(channel.id)">
+                <span v-if="channelCovers(channel).length === 0" class="yt-col__cover-empty">
+                  <i class="ti ti-brand-youtube" aria-hidden="true" />
+                </span>
+                <span v-else class="yt-col__mosaic" :class="`is-${channelCovers(channel).length}`">
+                  <img v-for="(src, ci) in channelCovers(channel)" :key="ci" :src="src" alt="" loading="lazy" draggable="false">
+                </span>
+                <span v-if="!channel.merged" class="yt-card__badge">{{ t('youtube.channels.playlistCount', { n: channel.playlists.length }) }}</span>
+              </button>
+              <div class="yt-card__info">
+                <p class="yt-card__title" :title="channel.name">{{ channel.name }}</p>
+                <p v-if="channel.subtitle" class="yt-card__meta">{{ channel.subtitle }}</p>
+              </div>
+              <div class="yt-card__actions">
+                <button type="button" class="yt-card__btn yt-card__btn--primary" @click="openChannelCard(channel.id)">
+                  <i class="ti ti-folder-open" aria-hidden="true" />
+                  {{ t('youtube.channels.open') }}
+                </button>
+                <button
+                  v-if="channel.userAdded"
+                  type="button"
+                  class="yt-fav yt-del"
+                  :aria-label="t('youtube.channels.delete')"
+                  :title="t('youtube.channels.delete')"
+                  data-testid="youtube-channel-delete"
+                  @click="deletingChannel = channel"
+                >
+                  <i class="ti ti-trash" aria-hidden="true" />
+                </button>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </template>
+
+      <!-- Playlists do canal -->
+      <template v-else-if="!channelListOpen">
+        <div class="yt-view__searchbar">
+          <button
+            type="button"
+            class="yt-view__back"
+            :aria-label="t('youtube.channels.backToChannels')"
+            :title="t('youtube.channels.backToChannels')"
+            @click="openChannelId = null"
+          >
+            <i class="ti ti-arrow-left" aria-hidden="true" />
+          </button>
+          <h2 class="yt-col__name">{{ openChannel.name }}</h2>
+          <label class="yt-view__field yt-ch__filter">
+            <i class="ti ti-filter" aria-hidden="true" />
+            <input
+              v-model="playlistFilter"
+              type="search"
+              :placeholder="t('youtube.channels.filterPlaylists')"
+              data-testid="youtube-channel-playlist-filter"
+            >
+          </label>
+          <span class="yt-view__hint">{{ t('youtube.channels.playlistCount', { n: openChannel.playlists.length }) }}</span>
+          <button
+            v-if="openChannel.userAdded"
+            type="button"
+            class="yt-view__secondary yt-view__secondary--danger"
+            data-testid="youtube-channel-delete-open"
+            @click="deletingChannel = openChannel"
+          >
+            <i class="ti ti-trash" aria-hidden="true" />
+            {{ t('youtube.channels.delete') }}
+          </button>
+        </div>
+        <div class="yt-view__body">
+          <p v-if="filteredPlaylists.length === 0" class="yt-view__empty" data-testid="youtube-channel-playlist-no-match">
+            <i class="ti ti-search" aria-hidden="true" />
+            {{ t('youtube.channels.noPlaylistMatch', { query: playlistFilter.trim() }) }}
+          </p>
+          <ul v-else class="yt-view__grid">
+            <li v-for="playlist in filteredPlaylists" :key="playlist.id" class="yt-card yt-col" data-testid="youtube-channel-playlist">
+              <button type="button" class="yt-col__cover" @click="openPlaylistId = playlist.id">
+                <span class="yt-col__mosaic is-1">
+                  <img :src="playlistCover(playlist)" alt="" loading="lazy" draggable="false">
+                </span>
+              </button>
+              <div class="yt-card__info">
+                <p class="yt-card__title" :title="playlist.name">{{ playlist.name }}</p>
+                <p class="yt-card__meta">{{ playlist.videoCount ? t('youtube.collections.videoCount', { n: playlist.videoCount }) : openChannel.name }}</p>
+              </div>
+              <div class="yt-card__actions">
+                <button type="button" class="yt-card__btn yt-card__btn--primary" @click="openPlaylistId = playlist.id">
+                  <i class="ti ti-folder-open" aria-hidden="true" />
+                  {{ t('youtube.channels.open') }}
+                </button>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </template>
+
+      <!-- Vídeos da playlist (ou do canal unido) -->
+      <template v-else>
+        <div class="yt-view__searchbar">
+          <button
+            v-if="openPlaylist"
+            type="button"
+            class="yt-view__back"
+            :aria-label="t('youtube.channels.backToPlaylists')"
+            :title="t('youtube.channels.backToPlaylists')"
+            @click="openPlaylistId = null"
+          >
+            <i class="ti ti-arrow-left" aria-hidden="true" />
+          </button>
+          <button
+            v-else
+            type="button"
+            class="yt-view__back"
+            :aria-label="t('youtube.channels.backToChannels')"
+            :title="t('youtube.channels.backToChannels')"
+            @click="openChannelId = null"
+          >
+            <i class="ti ti-arrow-left" aria-hidden="true" />
+          </button>
+          <h2 class="yt-col__name">{{ openPlaylist?.name ?? openChannel.name }}</h2>
+          <label class="yt-view__field yt-ch__filter">
+            <i class="ti ti-filter" aria-hidden="true" />
+            <input
+              v-model="channelFilter"
+              type="search"
+              :placeholder="t('youtube.channels.filter')"
+              :disabled="playlistVideos.length === 0"
+              data-testid="youtube-channel-filter"
+            >
+          </label>
+          <span v-if="playlistVideos.length > 0" class="yt-view__hint">{{ t('youtube.collections.videoCount', { n: playlistVideos.length }) }}</span>
+          <button
+            v-if="openPlaylist"
+            type="button"
+            class="yt-view__secondary"
+            :disabled="playlistLoading || playlistVideos.length === 0"
+            data-testid="youtube-channel-save-collection"
+            @click="savePlaylistAsCollection"
+          >
+            <i class="ti ti-playlist-add" aria-hidden="true" />
+            {{ t('youtube.channels.saveAsCollection') }}
+          </button>
+        </div>
+
+        <div class="yt-view__body">
+          <p v-if="playlistLoading" class="yt-view__empty" data-testid="youtube-channel-loading">
+            <i class="ti ti-loader-2 yt-spin" aria-hidden="true" />
+            {{ t('youtube.channels.loading') }}
+          </p>
+          <div v-else-if="playlistError" class="yt-view__empty yt-view__empty--error" data-testid="youtube-channel-error">
+            <i class="ti ti-wifi-off" aria-hidden="true" />
+            <p>{{ t(playlistError === 'empty' ? 'youtube.channels.empty' : 'youtube.channels.error') }}</p>
+            <button type="button" class="yt-view__secondary" @click="loadPlaylist(true)">
+              <i class="ti ti-refresh" aria-hidden="true" />
+              {{ t('youtube.channels.retry') }}
+            </button>
+          </div>
+          <p v-else-if="filteredChannelVideos.length === 0" class="yt-view__empty" data-testid="youtube-channel-no-match">
+            <i class="ti ti-search" aria-hidden="true" />
+            {{ t('youtube.channels.noMatch', { query: channelFilter.trim() }) }}
+          </p>
+          <ol v-else class="yt-view__list">
+            <li v-for="entry in filteredChannelVideos" :key="entry.videoId" class="yt-row" data-testid="youtube-channel-video">
+              <span class="yt-col__pos">{{ channelPositions.get(entry.videoId) }}</span>
+              <button
+                type="button"
+                class="yt-row__thumb"
+                :title="t('youtube.actions.playHint')"
+                @click="play(entry, false)"
+              >
+                <img :src="thumbOf(entry)" :alt="''" loading="lazy" draggable="false">
+                <span v-if="entry.durationText" class="yt-card__badge">{{ entry.durationText }}</span>
+              </button>
+              <div class="yt-row__info">
+                <p class="yt-card__title" :title="entry.title">{{ entry.title }}</p>
+                <p class="yt-card__meta">{{ entry.channel }}</p>
+              </div>
+              <div class="yt-row__actions">
+                <button
+                  v-if="downloads.supported.value && downloads.statuses.value[entry.videoId]?.state === 'ready'"
+                  type="button"
+                  class="yt-fav yt-del"
+                  :aria-label="t('youtube.download.remove')"
+                  :title="t('youtube.download.remove')"
+                  data-testid="youtube-download-remove"
+                  @click="removingDownload = { ...entry }"
+                >
+                  <i class="ti ti-trash" aria-hidden="true" />
+                </button>
+                <YoutubeDownloadButton
+                  v-if="downloads.supported.value"
+                  :status="downloads.statuses.value[entry.videoId]"
+                  @download="askDownload(entry)"
+                  @cancel="downloads.cancel(entry.videoId)"
+                />
+                <button
+                  v-if="downloads.supported.value && downloads.statuses.value[entry.videoId]?.state === 'ready'"
+                  type="button"
+                  class="yt-fav"
+                  :aria-label="t('youtube.download.rename')"
+                  :title="t('youtube.download.rename')"
+                  data-testid="youtube-download-rename"
+                  @click="renamingDownload = { ...entry }"
+                >
+                  <i class="ti ti-pencil" aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  class="yt-fav yt-add"
+                  :class="{ 'is-on': isInAnyCollection(entry.videoId) }"
+                  :aria-label="t('youtube.collections.addTo')"
+                  :title="t('youtube.collections.addTo')"
+                  @click="openPicker(entry)"
+                >
+                  <i class="ti ti-playlist-add" aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  class="yt-fav"
+                  :class="{ 'is-on': isFavorite(entry.videoId) }"
+                  :aria-pressed="isFavorite(entry.videoId)"
+                  :aria-label="isFavorite(entry.videoId) ? t('youtube.favorites.remove') : t('youtube.favorites.add')"
+                  :title="isFavorite(entry.videoId) ? t('youtube.favorites.remove') : t('youtube.favorites.add')"
+                  @click="toggleFavorite(entry)"
+                >
+                  <i class="ti ti-heart" aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  class="yt-card__btn"
+                  :title="t('youtube.actions.playHint')"
+                  :disabled="playingId !== null"
+                  @click="play(entry, false)"
+                >
+                  <i class="ti" :class="playingId === entry.videoId ? 'ti-loader-2 yt-spin' : 'ti-player-play'" aria-hidden="true" />
+                  {{ t('youtube.actions.play') }}
+                </button>
+                <button
+                  type="button"
+                  class="yt-card__btn yt-card__btn--primary"
+                  :title="t('youtube.actions.projectHint')"
+                  :disabled="playingId !== null"
+                  @click="play(entry, true)"
+                >
+                  <i class="ti ti-device-tv" aria-hidden="true" />
+                  {{ t('youtube.actions.project') }}
+                </button>
+              </div>
+            </li>
+          </ol>
+        </div>
+      </template>
     </template>
 
     <!-- Coletâneas online -->
@@ -1300,6 +1922,16 @@ function goBack() {
     </Transition>
 
     <AppConfirm
+      :open="deletingChannel !== null"
+      :title="t('youtube.channels.deleteTitle', { name: deletingChannel?.name ?? '' })"
+      :message="t('youtube.channels.deleteMessage')"
+      :confirm-label="t('youtube.channels.deleteConfirm')"
+      :cancel-label="t('youtube.history.cancel')"
+      danger
+      @confirm="confirmDeleteChannel"
+      @cancel="deletingChannel = null"
+    />
+    <AppConfirm
       :open="confirmClearOpen"
       :title="t('youtube.history.clearTitle')"
       :message="t('youtube.history.clearMessage')"
@@ -1560,6 +2192,89 @@ function goBack() {
   min-height: 0;
   overflow-y: auto;
   padding-right: 0.25rem;
+}
+
+/* Canais padrão */
+.yt-ch__hint {
+  margin: 0 0 0.9rem;
+}
+.yt-ch__tools {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+.yt-ch__tool {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  .yt-view__field { flex: 1; min-width: 0; }
+}
+.yt-ch__results {
+  margin: 0 0 1.25rem;
+  padding: 0.75rem;
+  border: 1px solid var(--ds-color-outline-variant, rgba(255, 255, 255, 0.08));
+  border-radius: 0.75rem;
+}
+.yt-ch__results-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  h3 { margin: 0; font-size: 1rem; }
+}
+.yt-ch__results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-height: 22rem;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.yt-ch__result {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: 0.6rem;
+  &:hover { background: var(--ds-color-surface-container-high, rgba(255, 255, 255, 0.04)); }
+}
+.yt-ch__avatar {
+  flex: none;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.yt-ch__avatar--empty {
+  display: grid;
+  place-items: center;
+  background: var(--ds-color-surface-container-high, rgba(255, 255, 255, 0.06));
+}
+.yt-ch__desc {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.yt-ch__error {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.75rem;
+  color: var(--ds-color-error, #e5484d);
+}
+.yt-ch__filter {
+  flex: 1 1 14rem;
+  max-width: 24rem;
+  margin-left: auto;
+}
+.yt-view__empty .yt-view__secondary .ti {
+  font-size: 1rem;
+  color: inherit;
 }
 
 .yt-view__empty {

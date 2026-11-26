@@ -17,8 +17,15 @@ import {
 } from '../services/return-phrases'
 import { readEffectiveStageSettings, subscribeStageSettings } from '../../settings/services/stage-settings-runtime'
 import type { StageSettings } from '../../settings/types/stage-settings'
-import { resolveBackgroundImage, resolveReturnScreen, returnNextFontSize,
-  stageBgCss } from '../../settings/types/stage-settings'
+import {
+  bibleTransitionMs,
+  effectiveLyricTransition,
+  resolveBackgroundImage,
+  resolveReturnScreen,
+  returnNextFontSize,
+  stageBgCss,
+} from '../../settings/types/stage-settings'
+import '@styles/screen-transitions.css'
 import type { MediaProjectionRuntime } from '../types/media'
 import { DEFAULT_MEDIA_PROJECTION } from '../types/media'
 
@@ -263,7 +270,10 @@ function applyRuntime(raw: unknown) {
   }
 
   if (canPromote) {
-    void promoteNext(next)
+    // Transições ligadas (Personalizar Slides): mesma família scr-* dos
+    // slides. Desligadas: animação própria do retorno (flyer "próximo sobe").
+    if (stage.value.lyricTransitionEnabled) snapTo(next)
+    else void promoteNext(next)
     return
   }
 
@@ -330,7 +340,11 @@ const stageStyle = computed(() => ({
   backgroundColor: ret.value.bgMode === 'slides'
     ? stageBgCss(stage.value.backgroundColor)
     : ret.value.bgColor,
+  '--scr-transition-ms': `${bibleTransitionMs(stage.value.lyricTransitionSpeed)}ms`,
 }))
+
+/** Com transições ligadas usa scr-*; desligadas = troca seca (o flyer cuida). */
+const transitionName = computed(() => `scr-${effectiveLyricTransition(stage.value)}`)
 
 const bgImage = computed(() => {
   if (ret.value.bgMode === 'color') return null
@@ -389,13 +403,19 @@ const projectionFontStyle = useProjectionFont('hymns')
       class="media-return__body"
     >
       <div class="media-return__main">
-        <p
+        <Transition
           v-if="shownCover"
-          class="media-return__title media-return__title--cover"
-          :style="textStyle"
+          :name="transitionName"
+          mode="out-in"
         >
-          {{ shownCurrent }}
-        </p>
+          <p
+            :key="`cover:${shownCurrent}`"
+            class="media-return__title media-return__title--cover"
+            :style="textStyle"
+          >
+            {{ shownCurrent }}
+          </p>
+        </Transition>
         <div
           v-else
           class="media-return__block"
@@ -409,15 +429,21 @@ const projectionFontStyle = useProjectionFont('hymns')
             >
               {{ outgoingText }}
             </p>
-            <!-- A próxima estrofe "sobe" até aqui (voo): animação própria do retorno. -->
-            <p
-              ref="lyricRef"
-              class="media-return__lyric"
-              :class="{ 'media-return__lyric--wait': lyricWait }"
-              :style="textStyle"
+            <!-- Transições ligadas: scr-*. Desligadas: flyer "próximo sobe". -->
+            <Transition
+              :name="transitionName"
+              mode="out-in"
             >
-              {{ shownCurrent }}
-            </p>
+              <p
+                :key="shownCurrent"
+                ref="lyricRef"
+                class="media-return__lyric"
+                :class="{ 'media-return__lyric--wait': lyricWait }"
+                :style="textStyle"
+              >
+                {{ shownCurrent }}
+              </p>
+            </Transition>
           </div>
           <div
             class="media-return__bar"
@@ -440,18 +466,24 @@ const projectionFontStyle = useProjectionFont('hymns')
         class="media-return__next"
       >
         <span class="media-return__next-label">{{ t('media.returnNext') }}</span>
-        <p
-          ref="nextRef"
-          class="media-return__next-lyric"
-          :class="{
-            'media-return__next-lyric--cover': shownNextCover,
-            'media-return__next-lyric--out': exiting,
-            'media-return__next-lyric--enter': nextEnter,
-          }"
-          :style="nextTextStyle"
+        <Transition
+          :name="transitionName"
+          mode="out-in"
         >
-          {{ shownNext }}
-        </p>
+          <p
+            :key="`next:${shownNext}:${shownNextCover}`"
+            ref="nextRef"
+            class="media-return__next-lyric"
+            :class="{
+              'media-return__next-lyric--cover': shownNextCover,
+              'media-return__next-lyric--out': exiting,
+              'media-return__next-lyric--enter': nextEnter,
+            }"
+            :style="nextTextStyle"
+          >
+            {{ shownNext }}
+          </p>
+        </Transition>
       </div>
     </div>
 

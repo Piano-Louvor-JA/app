@@ -303,7 +303,22 @@ export default {
       "backupYoutubeTitle": "Включить загруженные видео YouTube?",
       "backupYoutubeMessage": "Загруженных видео YouTube: {count} ({size}). По умолчанию они не включаются в копию, так как их можно загрузить снова. История, избранное и подборки включаются всегда.",
       "backupYoutubeInclude": "Включить видео ({size})",
-      "backupYoutubeSkip": "Без видео"
+      "backupYoutubeSkip": "Без видео",
+      "legacyMediaArchiveSummary": "Сжатый файл размером {size}: медиа, которых здесь ещё нет, копируются прямо из него, без распаковки.",
+      "legacyMediaCancelled": "Импорт остановлен: скопировано файлов: {imported}. Выберите файл или папку снова, чтобы продолжить с того же места.",
+      "legacyMediaHintLinux": "Выберите файл, скачанный с сайта (.tar.gz): приложение копирует медиа прямо из него, распаковывать не нужно. Если хотите, распакуйте его и выберите папку. Копируются только файлы (обложки, изображения и песни), которых здесь ещё нет.",
+      "legacyMediaInvalidArchive": "Этот файл не содержит медиа Louvor JA (обложки, изображения или песни). Выберите файл, скачанный с сайта.",
+      "legacyMediaInvalidFolderLinux": "В этой папке нет медиа. Выберите папку, распакованную из файла с сайта (например, LouvorJA-PIANO), или папку Media внутри неё.",
+      "legacyMediaLiveCounts": "{imported} сохранено сейчас · {skipped} уже было (уже видны в Медиацентре)",
+      "legacyMediaPause": "Пауза",
+      "legacyMediaPaused": "Пауза на {current} из {total}",
+      "legacyMediaPausedBytes": "Пауза на {current} из {total}",
+      "legacyMediaPickArchive": "Выбрать скачанный файл (.tar.gz)",
+      "legacyMediaPickFolderLinux": "Выбрать папку с медиа",
+      "legacyMediaPickHintLinux": "Выберите папку, распакованную из файла (например, LouvorJA-PIANO), или папку Media внутри неё. Приложение само найдёт обложки, изображения и песни.",
+      "legacyMediaProgressBytes": "Чтение {current} из {total}",
+      "legacyMediaResume": "Продолжить",
+      "legacyMediaStop": "Остановить"
     },
     "remote": {
       "p2pTitle": "P2P-управление (QR)",
@@ -550,7 +565,13 @@ export default {
         "glow": "Свечение",
         "float": "Парение",
         "zoomBlur": "Размытие с зумом"
-      }
+      },
+      "hymnNumberShow": "Номер гимна на обложке (сборник)",
+      "hymnNumberSize": "Размер номера гимна",
+      "hymnalNameColor": "Цвет названия сборника",
+      "hymnalNameColorDefault": "По умолчанию (белый)",
+      "hymnalNameShow": "Название сборника на обложке",
+      "hymnalNameSize": "Размер названия сборника"
     },
     "fonts": {
       "projectionOnly": "Для проекции",

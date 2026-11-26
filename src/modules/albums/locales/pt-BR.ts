@@ -1,5 +1,18 @@
 export default {
   albums: {
+    disabledAlbums: {
+      collectionNote: "Álbum desativado: as músicas dele aparecem apagadas na busca e o seletor pula. Aqui dentro elas ainda tocam no clique.",
+      title: "Álbuns ativos",
+      description: "Desligue os álbuns que você não usa (por exemplo, o hinário antigo). As músicas deles aparecem apagadas na busca e o Enter e as setas pulam elas. Também dá para desativar pelo card do álbum na Central de Mídia.",
+      filter: "Filtrar álbuns",
+      count: "{count} desativado(s)",
+      badge: "Álbum desativado",
+      disableConfirmTitle: 'Desativar “{name}”?',
+      disableConfirmMessage: 'As músicas deste álbum aparecem apagadas na busca e o seletor pula. Dá para reativar depois pelo olho no card.',
+      disableConfirmYes: 'Desativar',
+      enable: "Ativar álbum",
+      disable: "Desativar álbum",
+    },
     custom: {
       title: 'Minhas coletâneas',
       openEditor: 'Abrir editor de letras',
@@ -38,6 +51,10 @@ export default {
       deleteConfirm: 'Excluir playlist',
       singlePlayHint: 'Modo único: tocar somente esta música',
       shuffleHint: 'Tocar aleatório: reproduzir todas as músicas em ordem aleatória',
+      playInstrumental: 'Tocar {name} com playback (instrumental)',
+      playInstrumentalHint: 'Playback: reproduzir todas as músicas só com o instrumental',
+      playNoAudio: 'Tocar {name} sem áudio (só os slides)',
+      playNoAudioHint: 'Sem áudio: passar só os slides das músicas, sem som',
       playAllHint: 'Tocar playlist: reproduzir todas as músicas em sequência',
 
       shuffle: 'Tocar aleatoriamente',

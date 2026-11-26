@@ -786,6 +786,93 @@ const confirmReset = ref(false)
             @change="patch({ titleTextBox: ($event.target as HTMLInputElement).checked })"
           >
         </div>
+
+        <!-- Hinário: número do hino grande acima do título na capa. -->
+        <div class="stage-custom__toggle-row">
+          <button
+            type="button"
+            class="stage-custom__toggle-label"
+            @click="patch({ hymnNumberShow: !settings.hymnNumberShow })"
+          >
+            {{ t('settings.stage.hymnNumberShow') }}
+          </button>
+          <input
+            type="checkbox"
+            class="stage-custom__toggle"
+            :checked="settings.hymnNumberShow"
+            :aria-label="t('settings.stage.hymnNumberShow')"
+            @change="patch({ hymnNumberShow: ($event.target as HTMLInputElement).checked })"
+          >
+        </div>
+        <template v-if="settings.hymnNumberShow">
+          <div class="stage-custom__row-head">
+            <span>{{ t('settings.stage.hymnNumberSize') }}</span>
+            <span class="stage-custom__chip">{{ Math.round(settings.hymnNumberSize) }}px</span>
+          </div>
+          <input
+            type="range"
+            min="80"
+            max="400"
+            step="4"
+            :value="settings.hymnNumberSize"
+            :aria-label="t('settings.stage.hymnNumberSize')"
+            @input="patch({ hymnNumberSize: Number(($event.target as HTMLInputElement).value) })"
+          >
+        </template>
+
+        <!-- Capa: nome do hinário/álbum (ex.: HINÁRIO ADVENTISTA) acima do número. -->
+        <div class="stage-custom__toggle-row">
+          <button
+            type="button"
+            class="stage-custom__toggle-label"
+            @click="patch({ hymnalNameShow: !settings.hymnalNameShow })"
+          >
+            {{ t('settings.stage.hymnalNameShow') }}
+          </button>
+          <input
+            type="checkbox"
+            class="stage-custom__toggle"
+            :checked="settings.hymnalNameShow"
+            :aria-label="t('settings.stage.hymnalNameShow')"
+            @change="patch({ hymnalNameShow: ($event.target as HTMLInputElement).checked })"
+          >
+        </div>
+        <template v-if="settings.hymnalNameShow">
+          <div class="stage-custom__row-head">
+            <span>{{ t('settings.stage.hymnalNameSize') }}</span>
+            <span class="stage-custom__chip">{{ Math.round(settings.hymnalNameSize) }}px</span>
+          </div>
+          <input
+            type="range"
+            min="16"
+            max="80"
+            step="2"
+            :value="settings.hymnalNameSize"
+            :aria-label="t('settings.stage.hymnalNameSize')"
+            @input="patch({ hymnalNameSize: Number(($event.target as HTMLInputElement).value) })"
+          >
+          <div class="stage-custom__row-head">
+            <span>{{ t('settings.stage.hymnalNameColor') }}</span>
+            <button
+              type="button"
+              class="stage-custom__chip"
+              data-testid="hymnal-name-color-default"
+              :disabled="!settings.hymnalNameColor"
+              @click="patch({ hymnalNameColor: null })"
+            >
+              {{ t('settings.stage.hymnalNameColorDefault') }}
+            </button>
+          </div>
+          <label class="stage-custom__picker">
+            <i class="ti ti-color-picker" aria-hidden="true" />
+            <input
+              type="color"
+              :value="settings.hymnalNameColor ?? '#FFFFFF'"
+              :aria-label="t('settings.stage.hymnalNameColor')"
+              @input="patch({ hymnalNameColor: ($event.target as HTMLInputElement).value })"
+            >
+          </label>
+        </template>
       </div>
     </template>
 

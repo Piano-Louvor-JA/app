@@ -93,6 +93,14 @@ export type StageSettings = {
   titleTextShadow: boolean | null
   /** Caixa atrás do título (1º slide). Default false = capa clássica sem caixa (14/10). */
   titleTextBox: boolean
+  /** Hinário: número do hino grande acima do título na capa (1º slide). */
+  hymnNumberShow: boolean
+  hymnNumberSize: number // px @1920 (80–400)
+  /** Hinário: nome do hinário (ex.: HINÁRIO ADVENTISTA) acima do número na capa. */
+  hymnalNameShow: boolean
+  hymnalNameSize: number // px @1920 (16–80)
+  /** null = branco (padrão); só vai ao storage se escolhida. */
+  hymnalNameColor: string | null
   /**
    * Estrofes (slides de letra): personalização própria. `null`/`undefined`
    * = usa o estilo geral (que JÁ É o das estrofes) — espelha title*.
@@ -305,6 +313,11 @@ export const DEFAULT_STAGE_SETTINGS: StageSettings = {
   titleUpperCase: false,
   titleTextShadow: null,
   titleTextBox: false,
+  hymnNumberShow: true,
+  hymnNumberSize: 200,
+  hymnalNameShow: true,
+  hymnalNameSize: 28,
+  hymnalNameColor: null,
   lyricFontSize: null,
   lyricFontWeight: null,
   lyricTextColor: null,
@@ -591,6 +604,11 @@ export function parseStageSettings(raw: unknown): StageSettings {
     titleUpperCase: typeof s['tUpper'] === 'boolean' ? s['tUpper'] : false,
     titleTextShadow: typeof s['tsOnT'] === 'boolean' ? s['tsOnT'] : null,
     titleTextBox: typeof s['tBox'] === 'boolean' ? s['tBox'] : false,
+    hymnNumberShow: typeof s['hnOn'] === 'boolean' ? s['hnOn'] : DEFAULT_STAGE_SETTINGS.hymnNumberShow,
+    hymnNumberSize: clamp(asNumber(s['hnSize'], DEFAULT_STAGE_SETTINGS.hymnNumberSize), 80, 400),
+    hymnalNameShow: typeof s['hkOn'] === 'boolean' ? s['hkOn'] : DEFAULT_STAGE_SETTINGS.hymnalNameShow,
+    hymnalNameSize: clamp(asNumber(s['hkSize'], DEFAULT_STAGE_SETTINGS.hymnalNameSize), 16, 80),
+    hymnalNameColor: s['hkFg'] == null ? null : asColorOrNull(s['hkFg']),
     lyricFontSize:
       s['lSize'] == null ? null : clamp(asNumber(s['lSize'], 84), 60, 160),
     lyricFontWeight: s['lWeight'] == null ? null : (WEIGHTS.includes(asNumber(s['lWeight'], 600) as StageFontWeight) ? (asNumber(s['lWeight'], 600) as StageFontWeight) : null),
@@ -722,6 +740,11 @@ export function serializeStageSettings(s: StageSettings): Record<string, unknown
     ...(s.titleUpperCase ? { tUpper: true } : {}),
     ...(s.titleTextShadow != null ? { tsOnT: s.titleTextShadow } : {}),
     ...(s.titleTextBox ? { tBox: true } : {}),
+    hnOn: s.hymnNumberShow,
+    hnSize: s.hymnNumberSize,
+    hkOn: s.hymnalNameShow,
+    hkSize: s.hymnalNameSize,
+    ...(s.hymnalNameColor ? { hkFg: s.hymnalNameColor } : {}),
     ...(s.lyricFontSize != null ? { lSize: s.lyricFontSize } : {}),
     ...(s.lyricFontWeight != null ? { lWeight: s.lyricFontWeight } : {}),
     ...(s.lyricTextColor != null ? { lFg: s.lyricTextColor } : {}),

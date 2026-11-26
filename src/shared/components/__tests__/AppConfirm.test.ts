@@ -117,4 +117,20 @@ describe('AppConfirm', () => {
       expect(pressEnter().defaultPrevented).toBe(false)
     })
   })
+
+  it('ação secundária opcional: aparece só quando pedida e emite secondary', async () => {
+    const plain = createWrapper()
+    expect(document.body.querySelector('.app-confirm__btn--secondary')).toBeNull()
+    plain.unmount()
+
+    const wrapper = createWrapper({ secondaryLabel: 'Acrescentar' })
+    const secondary = document.body.querySelector('.app-confirm__btn--secondary') as HTMLButtonElement
+    expect(secondary.textContent?.trim()).toBe('Acrescentar')
+    secondary.click()
+    await wrapper.vm.$nextTick()
+    expect(wrapper.emitted('secondary')).toHaveLength(1)
+    expect(wrapper.emitted('confirm')).toBeUndefined()
+    wrapper.unmount()
+  })
 })
+

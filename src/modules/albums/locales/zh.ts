@@ -54,7 +54,11 @@ export default {
       "create": "创建",
       "export": "导出播放列表",
       "import": "导入播放列表",
-      "empty": "还没有创建播放列表。"
+      "empty": "还没有创建播放列表。",
+      "playInstrumental": "以伴奏（纯音乐）播放 {name}",
+      "playInstrumentalHint": "伴奏：所有歌曲只播放纯音乐",
+      "playNoAudio": "无声播放 {name}（仅幻灯片）",
+      "playNoAudioHint": "无声：只显示歌曲幻灯片，不播放声音"
     },
     "title": "媒体中心",
     "subtitle": "专辑与歌集",
@@ -101,6 +105,19 @@ export default {
       "deleteCollectionAction": "Delete collection",
       "deleteCollectionTitle": "Delete “{name}”?",
       "deleteCollectionText": "The local copy will be deleted. The original in Community is not affected."
+    },
+    "disabledAlbums": {
+      "badge": "专辑已停用",
+      "collectionNote": "专辑已停用：其歌曲在搜索中显示为灰色，选择时会被跳过。在这里点击仍可播放。",
+      "count": "已停用 {count} 个",
+      "description": "停用不使用的专辑（例如旧版赞美诗）。其歌曲在搜索中显示为灰色，Enter 键和方向键会跳过它们。也可以在媒体中心的专辑卡片上停用。",
+      "disable": "停用专辑",
+      "disableConfirmTitle": "停用“{name}”？",
+      "disableConfirmMessage": "该专辑的歌曲在搜索中会变灰，选择器会跳过它们。之后可在卡片上用眼睛图标重新启用。",
+      "disableConfirmYes": "停用",
+      "enable": "启用专辑",
+      "filter": "筛选专辑",
+      "title": "启用的专辑"
     }
   }
 }

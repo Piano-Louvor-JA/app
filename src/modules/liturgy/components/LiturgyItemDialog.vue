@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+import { listPlaylists } from '@modules/albums/services/playlist-storage'
 import { getDesktopBridge, isDesktopApp } from '@shared/services/desktop-bridge'
 import { appConfirm } from '@shared/composables/useAppConfirm'
 import type {
@@ -34,6 +35,7 @@ import {
   isLiturgyItemDraftValid,
   isValidLiturgyUrl,
 } from '../services/liturgy-item-helpers'
+import { titleFromFilePath } from '../services/liturgy-file-detect'
 import { normalizeLiturgyTimeHHmm } from '../services/liturgy-format'
 import {
   fetchOnlineVideoInfo,
@@ -82,6 +84,7 @@ const filePickerError = ref<string | null>(null)
 const hasTypeSelection = computed(() => props.draft.type != null)
 const isCategory = computed(() => props.draft.type === 'category')
 const isMusic = computed(() => props.draft.type === 'music')
+const isPlaylist = computed(() => props.draft.type === 'playlist')
 const isAnnotation = computed(() => props.draft.type === 'annotation')
 
 // app#331 RF-1: importar .slja direto no item de música
@@ -175,6 +178,9 @@ async function onImportSljaFile(event: Event): Promise<void> {
 const musicRequiredMissing = computed(
   () => isMusic.value && props.draft.musicId == null,
 )
+const playlistRequiredMissing = computed(
+  () => isPlaylist.value && !props.draft.playlistId?.trim(),
+)
 const nameRequiredMissing = computed(() => props.draft.name.trim().length === 0)
 const startTimeRequiredMissing = computed(
   () => isCategory.value && !normalizeLiturgyTimeHHmm(props.draft.startTime),
@@ -260,6 +266,9 @@ const startTimeFieldError = computed(
 const musicFieldError = computed(
   () => showValidation.value && musicRequiredMissing.value,
 )
+const playlistFieldError = computed(
+  () => showValidation.value && playlistRequiredMissing.value,
+)
 const categoryFieldError = computed(
   () => showValidation.value && categoryRequiredMissing.value,
 )
@@ -295,6 +304,14 @@ const dialogTitle = computed(() => {
 
 const scheduledStore = useScheduledStore()
 const rotationOptions = computed(() => scheduledStore.categories)
+/** Playlists da Central de Mídia — relidas ao abrir o diálogo. */
+const playlistOptions = ref(listPlaylists())
+watch(
+  () => props.open,
+  (open) => {
+    if (open) playlistOptions.value = listPlaylists()
+  },
+)
 
 const typeGroups = computed(() => {
   const groups = LITURGY_TYPE_GROUPS.map((group) => ({
@@ -376,6 +393,12 @@ function selectType(type: LiturgyItemType) {
     next.musicId = null
   } else if (previousType !== 'music') {
     next.name = ''
+  }
+  if (type !== 'playlist') {
+    next.playlistId = null
+  } else if (previousType !== 'playlist') {
+    next.name = ''
+    next.subtitle = ''
   }
   patch(next)
   if (type !== 'music') {
@@ -596,14 +619,19 @@ async function selectLocalFile() {
       const probed = await probeMediaDurationMs(paths[0])
       if (probed > 0) next.durationMs = probed
     }
-    if (!props.draft.name.trim()) {
+    // Trocar o arquivo força o título com o nome do novo e limpa as anotações
+    // do anterior (mesma regra da música). Campo vazio recebe o nome; o mesmo
+    // arquivo de novo não mexe em nada.
+    const previous = (props.draft.filePath ?? '').trim()
+    const changed = Boolean(previous) && previous !== paths[0]
+    if (changed || !props.draft.name.trim()) {
       if (multiple && paths.length > 1) {
         next.name = t('liturgy.fields.filesSelected', { count: paths.length })
       } else {
-        const fileName = paths[0]!.split(/[\\/]/).pop()! /* pop de path não-vazio é non-empty */
-        next.name = fileName.includes('.') ? fileName.replace(/\.[^.]+$/, '') : fileName
+        next.name = titleFromFilePath(paths[0]!)
       }
     }
+    if (changed) Object.assign(next, { subtitle: '', notesHtml: '', notes: '' })
     patch(next)
   } finally {
     filePickerBusy.value = false
@@ -619,6 +647,25 @@ function onCategoryChange(event: Event) {
 function onRotationChange(event: Event) {
   const value = (event.target as HTMLSelectElement).value
   patch({ scheduledRotationId: value || null })
+}
+
+/** Playlist da Central: preenche nome e subtítulo ("N músicas") ao escolher. */
+function onPlaylistChange(event: Event) {
+  const value = (event.target as HTMLSelectElement).value
+  const playlist = listPlaylists().find((entry) => entry.id === value)
+  if (!playlist) {
+    patch({ playlistId: null })
+    return
+  }
+  const count = playlist.items.length
+  patch({
+    playlistId: playlist.id,
+    name: playlist.name,
+    subtitle:
+      count === 1
+        ? t('liturgy.messages.playlistTrackCountOne')
+        : t('liturgy.messages.playlistTrackCount', { count }),
+  })
 }
 
 const { loadPlayerChoices } = useExternalPlayerChoices()
@@ -924,9 +971,12 @@ function isLightDot(hex: string): boolean {
                     :class="{
                       'moment-dialog__music-option--active':
                         draft.musicId === option.id,
+                      'moment-dialog__music-option--disabled': option.disabled,
                     }"
                     role="option"
                     :aria-selected="draft.musicId === option.id"
+                    :disabled="option.disabled"
+                    :aria-disabled="option.disabled ? 'true' : undefined"
                     @click="pickMusic(option.id)"
                   >
                     <span class="moment-dialog__music-option-title">
@@ -934,6 +984,10 @@ function isLightDot(hex: string): boolean {
                     </span>
                     <span class="moment-dialog__music-option-meta">
                       {{ option.albumNames }}
+                    </span>
+                    <span v-if="option.disabled" class="moment-dialog__music-option-disabled">
+                      <i class="ti ti-eye-off" aria-hidden="true" />
+                      {{ t('liturgy.fields.albumDisabled') }}
                     </span>
                   </button>
                 </li>
@@ -1231,6 +1285,54 @@ function isLightDot(hex: string): boolean {
               </p>
             </div>
             <div
+              v-if="isPlaylist"
+              class="moment-dialog__section"
+            >
+              <label
+                class="moment-dialog__label"
+                :class="{ 'moment-dialog__label--error': playlistFieldError }"
+                for="moment-playlist"
+              >
+                {{ t('liturgy.fields.selectPlaylist') }}
+                <span
+                  class="moment-dialog__required"
+                  aria-hidden="true"
+                >*</span>
+              </label>
+              <select
+                id="moment-playlist"
+                class="moment-dialog__input moment-dialog__select"
+                :class="{ 'moment-dialog__input--error': playlistFieldError }"
+                data-testid="moment-playlist"
+                :value="draft.playlistId ?? ''"
+                :aria-invalid="playlistFieldError"
+                @change="onPlaylistChange"
+              >
+                <option value="">
+                  {{ t('liturgy.fields.playlistPlaceholder') }}
+                </option>
+                <option
+                  v-for="option in playlistOptions"
+                  :key="option.id"
+                  :value="option.id"
+                >
+                  {{ option.name }}
+                </option>
+              </select>
+              <p
+                v-if="playlistOptions.length === 0"
+                class="moment-dialog__hint"
+              >
+                {{ t('liturgy.messages.playlistCatalogEmpty') }}
+              </p>
+              <p
+                v-if="playlistFieldError"
+                class="moment-dialog__error"
+              >
+                {{ t('liturgy.fields.playlistRequired') }}
+              </p>
+            </div>
+            <div
               v-if="showCategoryField && draft.type !== 'scheduled'"
               class="moment-dialog__section"
             >
@@ -1425,6 +1527,20 @@ function isLightDot(hex: string): boolean {
 </template>
 
 <style scoped lang="scss">
+.moment-dialog__music-option--disabled {
+  opacity: 0.45;
+  filter: grayscale(0.8);
+  cursor: not-allowed;
+}
+
+.moment-dialog__music-option-disabled {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
 .moment-dialog-backdrop {
   position: fixed;
   inset: 0;

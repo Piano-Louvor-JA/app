@@ -9,6 +9,8 @@ import { fileURLToPath } from 'node:url'
 import { JSDOM } from 'jsdom'
 import { beforeAll, describe, expect, it } from 'vitest'
 
+import { STAGE_TRANSITION_OPTIONS } from '../../../src/modules/settings/types/stage-settings'
+
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const RECEIVER_PATH = resolve(__dirname, '../receiver.html')
 
@@ -131,14 +133,101 @@ describe('receiver — transição ao trocar versículo', () => {
     expect(text().style.getPropertyValue('--rx-ms')).toBe(before)
   })
 
-  it('nenhuma, sem o campo (APK) ou fora da Bíblia: troca seca', async () => {
+  it('nenhuma ou sem o campo (APK): troca seca', async () => {
     await next({ transition: 'none' })
     expect(enterClasses(text())).toEqual([])
     await next({ transition: 'fade', transitionMs: 250 })
     await next({})
     expect(enterClasses(text())).toEqual([])
     expect(enterClasses(footer())).toEqual([])
-    await next({ scope: 'hymns', transition: 'fade', transitionMs: 250 })
+  })
+
+  it('hinos (espelho/OBS): slide novo entra com a transição escolhida', async () => {
+    await next({
+      scope: 'hymns',
+      text: 'Primeira estrofe',
+      footerRef: '',
+      transition: 'fade',
+      transitionMs: 250,
+    })
+    expect(enterClasses(text())).toEqual(['rx-enter-fade'])
+    expect(text().style.getPropertyValue('--rx-ms')).toBe('250ms')
+
+    await next({
+      scope: 'hymns',
+      text: 'Segunda estrofe',
+      footerRef: '',
+      transition: 'slide',
+      transitionMs: 150,
+    })
+    expect(enterClasses(text())).toEqual(['rx-enter-slide'])
+    expect(text().style.getPropertyValue('--rx-ms')).toBe('150ms')
+  })
+
+  it('hinos com slide anterior: entrada espera a saída (out-in dos monitores)', async () => {
+    w.handle({ v: 2, type: 'idle' })
+    await next({ scope: 'hymns', footerRef: '', transition: 'fade', transitionMs: 300 })
+    expect(text().style.getPropertyValue('--rx-delay')).toBe('0ms')
+    await next({ scope: 'hymns', footerRef: '', transition: 'fade', transitionMs: 300 })
+    expect(enterClasses(text())).toEqual(['rx-enter-fade'])
+    expect(text().style.getPropertyValue('--rx-delay')).toBe('300ms')
+  })
+
+  it('catálogo completo: transitionName vence o transition aproximado', async () => {
+    await next({ scope: 'hymns', footerRef: '', transition: 'zoom', transitionName: 'flip-h', transitionMs: 250 })
+    expect(text().classList.contains('rx-enter-flip-h')).toBe(true)
+    expect(enterClasses(text())).toEqual([])
+    // Nome desconhecido (app mais novo que o receiver): usa o aproximado.
+    await next({ scope: 'hymns', footerRef: '', transition: 'slide', transitionName: 'portal', transitionMs: 250 })
+    expect(enterClasses(text())).toEqual(['rx-enter-slide'])
+    expect(text().classList.contains('rx-enter-portal')).toBe(false)
+  })
+
+  it('tem entrada e saída para cada transição do app', () => {
+    const html = readFileSync(RECEIVER_PATH, 'utf8')
+    for (const name of STAGE_TRANSITION_OPTIONS.filter((t) => t !== 'none')) {
+      expect(html, name).toContain(`.rx-enter-${name}{`)
+      expect(html, name).toContain(`.rx-ghost-leave-${name}{`)
+    }
+  })
+
+  it('hinos: mesma letra em outro slide anima de novo (paridade monitores)', async () => {
+    const same = { scope: 'hymns', text: 'Maranata, Maranata', footerRef: '', transition: 'fade', transitionMs: 250 }
+    await project({ ...same, slideIndex: 5 })
+    text().classList.remove('rx-enter-fade')
+    await project({ ...same, slideIndex: 5 })
+    expect(enterClasses(text())).toEqual([])
+    await project({ ...same, slideIndex: 6 })
+    expect(enterClasses(text())).toEqual(['rx-enter-fade'])
+  })
+
+  it('animação de entrada usa o atraso da saída', () => {
+    const html = readFileSync(RECEIVER_PATH, 'utf8')
+    expect(html).toContain('.rx-enter-fade{animation:rxEnterFade var(--rx-ms,250ms) ease-out var(--rx-delay,0ms) both}')
+  })
+
+  it('hinos: mesma letra reenviada não reinicia a animação', async () => {
+    await next({
+      scope: 'hymns',
+      text: 'Mesma estrofe',
+      footerRef: '',
+      transition: 'zoom',
+      transitionMs: 250,
+    })
+    const before = text().style.getPropertyValue('--rx-ms')
+    await project({
+      scope: 'hymns',
+      text: 'Mesma estrofe',
+      footerRef: '',
+      transition: 'zoom',
+      transitionMs: 450,
+    })
+    expect(enterClasses(text())).toEqual(['rx-enter-zoom'])
+    expect(text().style.getPropertyValue('--rx-ms')).toBe(before)
+  })
+
+  it('hinos sem transition (desligada): troca seca', async () => {
+    await next({ scope: 'hymns', text: 'Estrofe sem transição', footerRef: '' })
     expect(enterClasses(text())).toEqual([])
   })
 

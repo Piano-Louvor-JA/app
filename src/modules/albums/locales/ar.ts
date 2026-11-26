@@ -54,7 +54,11 @@ export default {
       "create": "إنشاء",
       "export": "تصدير القوائم",
       "import": "استيراد القوائم",
-      "empty": "لا قوائم تشغيل بعد."
+      "empty": "لا قوائم تشغيل بعد.",
+      "playInstrumental": "تشغيل {name} مع المرافقة (موسيقى فقط)",
+      "playInstrumentalHint": "المرافقة: تشغيل كل الترانيم بالموسيقى فقط",
+      "playNoAudio": "تشغيل {name} بدون صوت (الشرائح فقط)",
+      "playNoAudioHint": "بدون صوت: عرض شرائح الترانيم فقط دون صوت"
     },
     "title": "مركز الوسائط",
     "subtitle": "الألبومات والمجموعات",
@@ -101,6 +105,19 @@ export default {
       "deleteCollectionAction": "Delete collection",
       "deleteCollectionTitle": "Delete “{name}”?",
       "deleteCollectionText": "The local copy will be deleted. The original in Community is not affected."
+    },
+    "disabledAlbums": {
+      "badge": "ألبوم معطّل",
+      "collectionNote": "الألبوم معطّل: تظهر ترانيمه باهتة في البحث ويتخطاها المحدِّد. هنا ما زالت تُشغَّل عند النقر.",
+      "count": "المعطّلة: {count}",
+      "description": "عطّل الألبومات التي لا تستخدمها (مثل كتاب الترانيم القديم). تظهر ترانيمها باهتة في البحث ويتخطاها زر Enter والأسهم. يمكنك أيضًا تعطيل الألبوم من بطاقته في مركز الوسائط.",
+      "disable": "تعطيل الألبوم",
+      "disableConfirmTitle": "تعطيل «{name}»؟",
+      "disableConfirmMessage": "ستظهر أغاني هذا الألبوم باهتة في البحث ويتخطاها المحدد. يمكنك إعادة التفعيل لاحقًا عبر العين على البطاقة.",
+      "disableConfirmYes": "تعطيل",
+      "enable": "تفعيل الألبوم",
+      "filter": "تصفية الألبومات",
+      "title": "الألبومات المفعّلة"
     }
   }
 }

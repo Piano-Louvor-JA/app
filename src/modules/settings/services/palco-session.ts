@@ -67,6 +67,10 @@ function receiverTransition(t: StageTransition): 'fade' | 'slide' | 'zoom' | und
   return 'fade'
 }
 
+function activeTransitionName(t: StageTransition): StageTransition | undefined {
+  return t === 'none' ? undefined : t
+}
+
 export type PalcoTimerOptions = { duration?: number; mode?: 'countdown' | 'chrono'; label?: string; background?: string; text?: string; obsPane?: boolean; timeFormat?: string; chronoRuntime?: { status: string; accumulatedMs: number; segmentStartedAt: number | null } }
 
 export type ProjectionInput = {
@@ -81,6 +85,12 @@ export type ProjectionInput = {
   background?: string
   /** Capa da música: título destaque amarelo, sem caixinha (paridade cabo). */
   isCover?: boolean
+  /** Slide atual da música: letra repetida em outro slide também anima. */
+  slideIndex?: number
+  /** Hinário: número do hino, grande acima do título na capa. */
+  hymnNumber?: number | null
+  /** Capa: nome do hinário/álbum (ex.: HINÁRIO ADVENTISTA) acima do número. */
+  hymnalName?: string
   /** Frame do slide PDF/PPT/imagens: dataURL completo (data:image/png;base64,…). */
   frameDataUrl?: string
 }
@@ -355,6 +365,13 @@ class PalcoSession {
         : isHymns
           ? receiverTransition(effectiveLyricTransition(s))
           : undefined,
+      // Nome real (catálogo inteiro): espelho/OBS animam igual aos monitores;
+      // TVs antigas ignoram e seguem no `transition` aproximado.
+      transitionName: isBible
+        ? activeTransitionName(effectiveBibleTransition(s))
+        : isHymns
+          ? activeTransitionName(effectiveLyricTransition(s))
+          : undefined,
       transitionMs: isBible
         ? bibleTransitionMs(s.bibleTransitionSpeed)
         : isHymns
@@ -394,6 +411,19 @@ class PalcoSession {
       footerVersion:
         isBible && !s.showBibleVersion ? undefined : input.footerVersion,
       isCover: input.isCover === true,
+      ...(isHymns && typeof input.slideIndex === 'number' ? { slideIndex: input.slideIndex } : {}),
+      // Hinário: número do hino na capa (Personalização → número do hino).
+      ...(isHymns && input.isCover === true && s.hymnNumberShow !== false && input.hymnNumber
+        ? { hymnNumber: input.hymnNumber, hymnNumberSize: ((s.hymnNumberSize ?? 200) / 1920) * 1080 }
+        : {}),
+      // Capa: nome do hinário (Personalização → nome do hinário).
+      ...(isHymns && input.isCover === true && s.hymnalNameShow !== false && input.hymnalName
+        ? {
+            hymnalName: input.hymnalName,
+            hymnalNameSize: ((s.hymnalNameSize ?? 28) / 1920) * 1080,
+            ...(s.hymnalNameColor ? { hymnalNameColor: s.hymnalNameColor } : {}),
+          }
+        : {}),
     }, this.activeSlotId)
   }
 

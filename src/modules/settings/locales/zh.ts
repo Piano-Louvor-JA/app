@@ -451,7 +451,22 @@ export default {
       "mediaFolderMoved": "Media moved to {path}",
       "mediaFolderError": "Could not move the media folder. Try again.",
       "mediaFolderDestInside": "Choose a folder outside the current media folder.",
-      "mediaFolderPersistError": "Media was copied, but the shared path could not be saved."
+      "mediaFolderPersistError": "Media was copied, but the shared path could not be saved.",
+      "legacyMediaArchiveSummary": "{size} 的压缩文件：此处还没有的媒体会直接从中复制，无需解压。",
+      "legacyMediaCancelled": "导入已停止：已复制 {imported} 个文件。再次选择该文件或文件夹即可从停止处继续。",
+      "legacyMediaHintLinux": "选择从网站下载的文件（.tar.gz）：应用会直接从中复制媒体，无需解压。也可以先解压再选择文件夹。只会复制此处还没有的文件（封面、图片和歌曲）。",
+      "legacyMediaInvalidArchive": "此文件不包含 Louvor JA 媒体（封面、图片或歌曲）。请选择从网站下载的文件。",
+      "legacyMediaInvalidFolderLinux": "此文件夹中没有媒体。请选择从网站文件解压出的文件夹（例如 LouvorJA-PIANO）或其中的 Media 文件夹。",
+      "legacyMediaLiveCounts": "刚保存 {imported} 个 · {skipped} 个已存在（已显示在媒体中心）",
+      "legacyMediaPause": "暂停",
+      "legacyMediaPaused": "已暂停：{current} / {total}",
+      "legacyMediaPausedBytes": "已暂停：{current} / {total}",
+      "legacyMediaPickArchive": "选择下载的文件（.tar.gz）",
+      "legacyMediaPickFolderLinux": "选择媒体文件夹",
+      "legacyMediaPickHintLinux": "选择从文件解压出的文件夹（例如 LouvorJA-PIANO）或其中的 Media 文件夹。应用会自动找到封面、图片和歌曲。",
+      "legacyMediaProgressBytes": "正在读取 {current} / {total}",
+      "legacyMediaResume": "继续",
+      "legacyMediaStop": "停止"
     },
     "remote": {
       "renewToken": "Refresh token",
@@ -813,7 +828,13 @@ export default {
       "transformNone": "None",
       "speedSlow": "Slow",
       "speedNormal": "Normal",
-      "speedFast": "Fast"
+      "speedFast": "Fast",
+      "hymnNumberShow": "封面上的诗歌编号（赞美诗）",
+      "hymnNumberSize": "诗歌编号大小",
+      "hymnalNameColor": "赞美诗集名称颜色",
+      "hymnalNameColorDefault": "默认（白色）",
+      "hymnalNameShow": "封面上的赞美诗集名称",
+      "hymnalNameSize": "赞美诗集名称大小"
     }
   }
 }

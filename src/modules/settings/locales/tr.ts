@@ -451,7 +451,22 @@ export default {
       "mediaFolderMoved": "Medyalar {path} konumuna taşındı",
       "mediaFolderError": "Medya klasörü taşınamadı. Tekrar deneyin.",
       "mediaFolderDestInside": "Geçerli medya klasörünün dışında bir klasör seçin.",
-      "mediaFolderPersistError": "Medyalar kopyalandı ancak paylaşılan yol kaydedilemedi."
+      "mediaFolderPersistError": "Medyalar kopyalandı ancak paylaşılan yol kaydedilemedi.",
+      "legacyMediaArchiveSummary": "{size} boyutunda sıkıştırılmış dosya: burada olmayan medya, açılmadan doğrudan ondan kopyalanır.",
+      "legacyMediaCancelled": "İçe aktarma durdu: {imported} dosya kopyalandı. Kaldığı yerden devam etmek için dosyayı veya klasörü yeniden seçin.",
+      "legacyMediaHintLinux": "Siteden indirilen dosyayı (.tar.gz) seçin: uygulama medyayı açmaya gerek kalmadan doğrudan ondan kopyalar. İsterseniz açıp klasörü seçin. Yalnızca burada olmayan dosyalar (kapaklar, görseller ve şarkılar) kopyalanır.",
+      "legacyMediaInvalidArchive": "Bu dosya Louvor JA medyası (kapak, görsel veya şarkı) içermiyor. Siteden indirilen dosyayı seçin.",
+      "legacyMediaInvalidFolderLinux": "Bu klasörde medya yok. Siteden gelen dosyadan çıkarılan klasörü (ör. LouvorJA-PIANO) veya içindeki Media klasörünü seçin.",
+      "legacyMediaLiveCounts": "{imported} şimdi kaydedildi · {skipped} zaten vardı (Medya Merkezi'nde zaten görünüyor)",
+      "legacyMediaPause": "Duraklat",
+      "legacyMediaPaused": "{total} içinden {current} noktasında duraklatıldı",
+      "legacyMediaPausedBytes": "{total} içinden {current} noktasında duraklatıldı",
+      "legacyMediaPickArchive": "İndirilen dosyayı seç (.tar.gz)",
+      "legacyMediaPickFolderLinux": "Medya klasörünü seç",
+      "legacyMediaPickHintLinux": "Dosyadan çıkarılan klasörü (ör. LouvorJA-PIANO) veya içindeki Media klasörünü seçin. Uygulama kapakları, görselleri ve şarkıları kendisi bulur.",
+      "legacyMediaProgressBytes": "{total} içinden {current} okunuyor",
+      "legacyMediaResume": "Devam et",
+      "legacyMediaStop": "Durdur"
     },
     "remote": {
       "renewToken": "Anahtarı yenile",
@@ -813,7 +828,13 @@ export default {
       "transformNone": "Yok",
       "speedSlow": "Yavaş",
       "speedNormal": "Normal",
-      "speedFast": "Hızlı"
+      "speedFast": "Hızlı",
+      "hymnNumberShow": "Kapakta ilahi numarası (ilahi kitabı)",
+      "hymnNumberSize": "İlahi numarası boyutu",
+      "hymnalNameColor": "İlahi kitabı adının rengi",
+      "hymnalNameColorDefault": "Varsayılan (beyaz)",
+      "hymnalNameShow": "Kapakta ilahi kitabı adı",
+      "hymnalNameSize": "İlahi kitabı adının boyutu"
     }
   }
 }

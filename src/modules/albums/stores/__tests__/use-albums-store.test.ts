@@ -306,3 +306,25 @@ describe('useAlbumsStore — evento louvorja:catalog-refreshed', () => {
     expect(store.categories.map((c) => String(c.id))).toEqual(['12'])
   })
 })
+
+describe('álbuns desativados', () => {
+  beforeEach(() => localStorage.clear())
+
+  it('desativar/ativar persiste e chega na busca do hub', () => {
+    const store = useAlbumsStore()
+    expect(store.isAlbumDisabled('hymnal_1996')).toBe(false)
+    store.setAlbumDisabled('hymnal_1996', true)
+    expect(store.isAlbumDisabled('hymnal_1996')).toBe(true)
+    store.hubSearchQuery = '45'
+    void store.hubSearchResults
+    const lastCall = h.filterAlbumMusicIndex.mock.calls.at(-1) as unknown as [unknown, string, Set<string>]
+    expect([...lastCall[2]]).toEqual(['hymnal_1996'])
+
+    // recarregar: nova store lê a preferência salva
+    setActivePinia(createPinia())
+    expect(useAlbumsStore().isAlbumDisabled('hymnal_1996')).toBe(true)
+    useAlbumsStore().setAlbumDisabled('hymnal_1996', false)
+    setActivePinia(createPinia())
+    expect(useAlbumsStore().isAlbumDisabled('hymnal_1996')).toBe(false)
+  })
+})

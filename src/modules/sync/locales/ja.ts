@@ -22,8 +22,10 @@ export default {
     },
     "hymnal": {
       "edition1996Name": "アドベンチスト讃美歌集 - 1996年版",
-      "officialSubtitle": "楽譜・歌詞付き讃美歌 {count} 曲",
-      "edition1996Subtitle": "歴史的 - 伝統的讃美歌 {count} 曲"
+      "officialSubtitle": "歌詞付き讃美歌 {count} 曲",
+      "edition1996Subtitle": "歴史的 - 伝統的讃美歌 {count} 曲",
+      "cpbYoutubeName": "Hinário Adventista - CPB",
+      "cpbYoutubeSubtitle": "新しいアドベンチスト讃美歌集（動画）\nCasa Publicadora Brasileira"
     },
     "progress": {
       "preparing": "準備中…",

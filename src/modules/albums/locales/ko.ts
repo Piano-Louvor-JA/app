@@ -54,7 +54,11 @@ export default {
       "create": "만들기",
       "export": "재생목록 내보내기",
       "import": "재생목록 가져오기",
-      "empty": "아직 만든 재생목록이 없습니다."
+      "empty": "아직 만든 재생목록이 없습니다.",
+      "playInstrumental": "{name}을(를) 반주(MR)로 재생",
+      "playInstrumentalHint": "반주: 모든 곡을 반주(MR)로만 재생",
+      "playNoAudio": "{name}을(를) 소리 없이 재생(슬라이드만)",
+      "playNoAudioHint": "소리 없음: 곡 슬라이드만 표시하고 소리는 내지 않음"
     },
     "title": "미디어 센터",
     "subtitle": "앨범 및 컬렉션",
@@ -101,6 +105,19 @@ export default {
       "deleteCollectionAction": "Delete collection",
       "deleteCollectionTitle": "Delete “{name}”?",
       "deleteCollectionText": "The local copy will be deleted. The original in Community is not affected."
+    },
+    "disabledAlbums": {
+      "badge": "비활성 앨범",
+      "collectionNote": "비활성 앨범: 곡이 검색에서 흐리게 표시되고 선택에서 건너뜁니다. 여기서는 클릭하면 계속 재생됩니다.",
+      "count": "비활성 {count}개",
+      "description": "사용하지 않는 앨범(예: 이전 찬송가)을 끄세요. 해당 곡은 검색에서 흐리게 표시되고 Enter와 화살표 키가 건너뜁니다. 미디어 센터의 앨범 카드에서도 끌 수 있습니다.",
+      "disable": "앨범 끄기",
+      "disableConfirmTitle": "“{name}”을(를) 끌까요?",
+      "disableConfirmMessage": "이 앨범의 곡은 검색에서 흐리게 보이고 선택기가 건너뜁니다. 나중에 카드의 눈 아이콘으로 다시 켤 수 있습니다.",
+      "disableConfirmYes": "끄기",
+      "enable": "앨범 켜기",
+      "filter": "앨범 필터",
+      "title": "사용 중인 앨범"
     }
   }
 }

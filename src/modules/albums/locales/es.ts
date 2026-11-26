@@ -54,7 +54,11 @@ export default {
       "create": "Crear",
       "export": "Exportar playlists",
       "import": "Importar playlists",
-      "empty": "Aún no hay playlists creadas."
+      "empty": "Aún no hay playlists creadas.",
+      "playInstrumental": "Tocar {name} con pista (instrumental)",
+      "playInstrumentalHint": "Pista: reproducir todas las canciones solo con el instrumental",
+      "playNoAudio": "Tocar {name} sin audio (solo las diapositivas)",
+      "playNoAudioHint": "Sin audio: pasar solo las diapositivas de las canciones, sin sonido"
     },
     "title": "Centro de Medios",
     "subtitle": "Álbumes y Colecciones",
@@ -101,6 +105,19 @@ export default {
       "deleteCollectionAction": "Eliminar colección",
       "deleteCollectionTitle": "¿Eliminar “{name}”?",
       "deleteCollectionText": "La copia local será eliminada. La original de la Comunidad no se ve afectada."
+    },
+    "disabledAlbums": {
+      "collectionNote": "Álbum desactivado: sus canciones aparecen atenuadas en la búsqueda y el selector las salta. Aquí dentro aún suenan al hacer clic.",
+      "title": "Álbumes activos",
+      "description": "Desactive los álbumes que no usa (por ejemplo, el himnario antiguo). Sus canciones aparecen atenuadas en la búsqueda y Enter y las flechas las saltan. También puede desactivar un álbum desde su tarjeta en la Central de Medios.",
+      "filter": "Filtrar álbumes",
+      "count": "{count} desactivado(s)",
+      "badge": "Álbum desactivado",
+      "disableConfirmTitle": "¿Desactivar “{name}”?",
+      "disableConfirmMessage": "Las canciones de este álbum aparecen atenuadas en la búsqueda y el selector las salta. Puede reactivarlo después con el ojo del card.",
+      "disableConfirmYes": "Desactivar",
+      "enable": "Activar álbum",
+      "disable": "Desactivar álbum"
     }
   }
 }

@@ -11,6 +11,8 @@ const props = defineProps<{
   artworkUrl?: string | null
   selected?: boolean
   busy?: boolean
+  /** Linha de um álbum desativado: aparece marcada, mas continua tocando (o álbum foi aberto de propósito). */
+  albumDisabled?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -42,7 +44,7 @@ function playSungFromRow() {
 <template>
   <div
     class="album-track-row"
-    :class="{ 'album-track-row--downloading': isDownloading, 'album-track-row--selected': selected }"
+    :class="{ 'album-track-row--downloading': isDownloading, 'album-track-row--selected': selected, 'album-track-row--album-disabled': albumDisabled }"
     role="button"
     tabindex="0"
     :aria-label="t('media.actions.sung')"
@@ -111,6 +113,10 @@ function playSungFromRow() {
         >
           {{ collectionName }}
         </span>
+        <span v-if="albumDisabled" class="album-track-row__disabled-badge">
+          <i class="ti ti-eye-off" aria-hidden="true" />
+          {{ t('albums.disabledAlbums.badge') }}
+        </span>
       </span>
     </span>
 
@@ -157,6 +163,30 @@ function playSungFromRow() {
 </template>
 
 <style scoped lang="scss">
+/* Álbum desativado: apagada, mas clicável (álbum aberto de propósito). */
+.album-track-row--album-disabled {
+  opacity: 0.55;
+  filter: grayscale(0.7);
+}
+
+.album-track-row--album-disabled:hover,
+.album-track-row--album-disabled:focus-visible {
+  opacity: 0.85;
+}
+
+.album-track-row__disabled-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  width: fit-content;
+  margin-top: 0.2rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--ds-color-outline-strong);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
 .album-track-row {
   position: relative;
   width: 100%;
