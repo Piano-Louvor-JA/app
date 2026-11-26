@@ -25,7 +25,7 @@ export default {
       "officialSubtitle": "{count} cantiques avec paroles",
       "edition1996Subtitle": "Historique - {count} cantiques traditionnels",
       "cpbYoutubeName": "Hinário Adventista - CPB",
-      "cpbYoutubeSubtitle": "Nouveau recueil adventiste en vidéo · Casa Publicadora Brasileira"
+      "cpbYoutubeSubtitle": "Nouveau recueil adventiste en vidéo\nCasa Publicadora Brasileira"
     },
     "progress": {
       "preparing": "Préparation...",

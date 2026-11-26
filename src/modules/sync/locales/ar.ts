@@ -25,7 +25,7 @@ export default {
       "officialSubtitle": "{count} ترنيمة مع الكلمات",
       "edition1996Subtitle": "تاريخية - {count} ترنيمة تقليدية",
       "cpbYoutubeName": "Hinário Adventista - CPB",
-      "cpbYoutubeSubtitle": "كتاب الترانيم الأدفنتستي الجديد بالفيديو · Casa Publicadora Brasileira"
+      "cpbYoutubeSubtitle": "كتاب الترانيم الأدفنتستي الجديد بالفيديو\nCasa Publicadora Brasileira"
     },
     "progress": {
       "preparing": "جارٍ التحضير…",

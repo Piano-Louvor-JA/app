@@ -25,7 +25,7 @@ export default {
       "officialSubtitle": "{count} 首带歌词的赞美诗",
       "edition1996Subtitle": "历史版 - {count} 首传统赞美诗",
       "cpbYoutubeName": "Hinário Adventista - CPB",
-      "cpbYoutubeSubtitle": "新版复临信徒赞美诗视频 · Casa Publicadora Brasileira"
+      "cpbYoutubeSubtitle": "新版复临信徒赞美诗视频\nCasa Publicadora Brasileira"
     },
     "progress": {
       "preparing": "准备中…",

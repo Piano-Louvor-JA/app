@@ -25,7 +25,7 @@ export default {
       "officialSubtitle": "बोल सहित {count} भजन",
       "edition1996Subtitle": "ऐतिहासिक - {count} पारंपरिक भजन",
       "cpbYoutubeName": "Hinário Adventista - CPB",
-      "cpbYoutubeSubtitle": "नया एडवेंटिस्ट भजन-संग्रह वीडियो में · Casa Publicadora Brasileira"
+      "cpbYoutubeSubtitle": "नया एडवेंटिस्ट भजन-संग्रह वीडियो में\nCasa Publicadora Brasileira"
     },
     "progress": {
       "preparing": "तैयारी हो रही है…",

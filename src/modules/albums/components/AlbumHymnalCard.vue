@@ -240,6 +240,8 @@ watch(coverSrc, () => {
 .album-hymnal-card {
   position: relative;
   display: block;
+  height: 100%;
+  box-sizing: border-box;
   padding: 0.95rem 1rem;
   overflow: hidden;
   border-radius: 1rem 0 1rem 0 !important;
@@ -381,9 +383,9 @@ watch(coverSrc, () => {
   overflow: hidden;
   color: var(--ds-color-on-surface-variant);
   font-size: 0.8rem;
-  line-height: 1.25;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  line-height: 1.3;
+  /* CPB: duas linhas via \\n no i18n; demais ficam em uma */
+  white-space: pre-line;
 }
 
 .album-hymnal-card__progress-meta {

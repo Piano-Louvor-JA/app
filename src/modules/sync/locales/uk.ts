@@ -25,7 +25,7 @@ export default {
       "officialSubtitle": "{count} гімнів з текстами",
       "edition1996Subtitle": "Історичне видання — {count} традиційних гімнів",
       "cpbYoutubeName": "Hinário Adventista - CPB",
-      "cpbYoutubeSubtitle": "Новий адвентистський збірник гімнів на відео · Casa Publicadora Brasileira"
+      "cpbYoutubeSubtitle": "Новий адвентистський збірник гімнів на відео\nCasa Publicadora Brasileira"
     },
     "progress": {
       "preparing": "Підготовка...",

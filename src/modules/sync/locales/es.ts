@@ -22,7 +22,7 @@ export default {
     },
     "hymnal": {
       "cpbYoutubeName": "Himnario Adventista - CPB",
-      "cpbYoutubeSubtitle": "Nuevo Himnario Adventista en video · Casa Publicadora Brasileira",
+      "cpbYoutubeSubtitle": "Nuevo Himnario Adventista en video\nCasa Publicadora Brasileira",
       "edition1996Name": "Himnario Adventista - Edición 1996",
       "officialSubtitle": "{count} himnos con letras",
       "edition1996Subtitle": "Histórico - {count} himnos tradicionales"

@@ -25,7 +25,7 @@ export default {
       "officialSubtitle": "가사 포함 찬송 {count}곡",
       "edition1996Subtitle": "역사적 - 전통 찬송 {count}곡",
       "cpbYoutubeName": "Hinário Adventista - CPB",
-      "cpbYoutubeSubtitle": "새 재림교회 찬송가 영상 · Casa Publicadora Brasileira"
+      "cpbYoutubeSubtitle": "새 재림교회 찬송가 영상\nCasa Publicadora Brasileira"
     },
     "progress": {
       "preparing": "준비 중…",
