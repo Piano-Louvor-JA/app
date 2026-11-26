@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { appConfirm } from '@shared/composables/useAppConfirm'
 import { hasMediaCustomCatalogBackup, restoreMediaCustomCatalogBackup } from '@modules/sync/services/media-custom-backup'
@@ -196,6 +196,28 @@ const currentLanguage = ref(
   getUserPreference<string>(USER_PREFERENCE_KEYS.language, 'pt-BR') ?? 'pt-BR',
 )
 
+/** Seletor premium de idioma (dropdown custom). */
+const langSelectOpen = ref(false)
+const langSelectRoot = ref<HTMLElement | null>(null)
+const currentLanguageLabel = computed(
+  () =>
+    t(
+      SUPPORTED_LOCALES.find((l) => l.value === currentLanguage.value)
+        ?.labelKey ?? 'settings.general.languagePortuguese',
+    ),
+)
+function selectLanguage(lang: string) {
+  langSelectOpen.value = false
+  void changeLanguage(lang)
+}
+function onLangDocClick(event: MouseEvent) {
+  if (!langSelectRoot.value?.contains(event.target as Node)) {
+    langSelectOpen.value = false
+  }
+}
+onMounted(() => document.addEventListener('click', onLangDocClick))
+onBeforeUnmount(() => document.removeEventListener('click', onLangDocClick))
+
 /** Ordem D2 da SPEC-locale-hot-reload: download do catálogo do idioma alvo
  * PRIMEIRO, persistir o idioma DEPOIS, reload do renderer por último. O guard
  * de ensureCatalogForLocale compara com getCurrentApiPrefix(), que lê a
@@ -337,18 +359,37 @@ async function clearAllLocalData() {
         {{ t('settings.general.languageHint') }}
       </p>
 
-      <div class="general-settings__lang-options">
+      <!-- Seletor premium: dropdown custom (fecha ao clicar fora / escolher). -->
+      <div ref="langSelectRoot" class="general-settings__lang-select" :class="{ 'general-settings__lang-select--open': langSelectOpen }">
         <button
-          v-for="lang in SUPPORTED_LOCALES"
-          :key="lang.value"
           type="button"
-          class="general-settings__lang-btn"
-          :class="{ 'general-settings__lang-btn--active': currentLanguage === lang.value }"
+          class="general-settings__lang-select-trigger"
           :disabled="catalogSyncState === 'syncing'"
-          @click="changeLanguage(lang.value)"
+          :aria-expanded="langSelectOpen"
+          aria-haspopup="listbox"
+          @click="langSelectOpen = !langSelectOpen"
         >
-          {{ t(lang.labelKey) }}
+          <i class="ti ti-world" aria-hidden="true" />
+          <span>{{ currentLanguageLabel }}</span>
+          <i class="ti general-settings__lang-select-chevron" :class="langSelectOpen ? 'ti-chevron-up' : 'ti-chevron-down'" aria-hidden="true" />
         </button>
+        <Transition name="lang-pop">
+          <ul v-if="langSelectOpen" class="general-settings__lang-menu" role="listbox">
+            <li
+              v-for="lang in SUPPORTED_LOCALES"
+              :key="lang.value"
+              role="option"
+              :aria-selected="currentLanguage === lang.value"
+              class="general-settings__lang-option"
+              :class="{ 'general-settings__lang-option--active': currentLanguage === lang.value }"
+              :aria-disabled="catalogSyncState === 'syncing'"
+              @click="selectLanguage(lang.value)"
+            >
+              <i class="ti ti-check general-settings__lang-option-check" aria-hidden="true" />
+              <span>{{ t(lang.labelKey) }}</span>
+            </li>
+          </ul>
+        </Transition>
       </div>
 
       <!-- D3 SPEC-locale-hot-reload: feedback do download do catálogo -->
@@ -795,6 +836,112 @@ async function clearAllLocalData() {
   border-color: var(--ds-color-primary);
   background: color-mix(in srgb, var(--ds-color-primary) 12%, transparent);
   color: var(--ds-color-primary);
+}
+
+/* Seletor premium de idioma (dropdown custom glass). */
+.general-settings__lang-select {
+  position: relative;
+  width: min(320px, 100%);
+}
+
+.general-settings__lang-select-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--ds-color-on-surface) 12%, transparent);
+  border-radius: var(--ds-radius-md, 0.75rem);
+  background: color-mix(in srgb, var(--ds-color-on-surface) 4%, transparent);
+  color: var(--ds-color-on-surface);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+
+  span {
+    flex: 1;
+    text-align: left;
+  }
+}
+
+.general-settings__lang-select-trigger:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.general-settings__lang-select--open .general-settings__lang-select-trigger,
+.general-settings__lang-select-trigger:hover {
+  border-color: color-mix(in srgb, var(--ds-color-primary) 55%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ds-color-primary) 14%, transparent);
+}
+
+.general-settings__lang-select-chevron {
+  font-size: 1rem;
+  color: var(--ds-color-on-surface-variant);
+}
+
+.general-settings__lang-menu {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 0.375rem);
+  left: 0;
+  right: 0;
+  max-height: 320px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0.375rem;
+  list-style: none;
+  border: 1px solid color-mix(in srgb, var(--ds-color-on-surface) 10%, transparent);
+  border-radius: var(--ds-radius-md, 0.75rem);
+  background: color-mix(in srgb, var(--ds-color-card, var(--ds-color-surface, #17171c)) 92%, transparent);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.38);
+}
+
+.general-settings__lang-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5625rem 0.75rem;
+  border-radius: calc(var(--ds-radius-md, 0.75rem) - 0.25rem);
+  color: var(--ds-color-on-surface-variant);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+
+  &:hover {
+    background: color-mix(in srgb, var(--ds-color-on-surface) 7%, transparent);
+    color: var(--ds-color-on-surface);
+  }
+}
+
+.general-settings__lang-option-check {
+  font-size: 0.9375rem;
+  visibility: hidden;
+}
+
+.general-settings__lang-option--active {
+  color: var(--ds-color-primary);
+  background: color-mix(in srgb, var(--ds-color-primary) 10%, transparent);
+
+  .general-settings__lang-option-check {
+    visibility: visible;
+  }
+}
+
+/* Transição do dropdown. */
+.lang-pop-enter-active,
+.lang-pop-leave-active {
+  transition: opacity 160ms ease, transform 160ms ease;
+  transform-origin: top center;
+}
+
+.lang-pop-enter-from,
+.lang-pop-leave-to {
+  opacity: 0;
+  transform: translateY(-6px) scale(0.98);
 }
 
 /* Status */
