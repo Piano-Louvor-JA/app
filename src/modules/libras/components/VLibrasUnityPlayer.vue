@@ -48,6 +48,10 @@ function onUnityMessage(event: MessageEvent) {
   if (event.data?.type !== 'unity_event') return
   if (event.data.event === 'on_load_player') {
     ready.value = true
+    // Fonte da soletração (estudo spbgovbr-vlibras): o player baixa bundles da
+    // baseUrl DEFAULT embutida no build; se desatualizada → datilologia.
+    // Padrão setRegion() do widget oficial: setBaseUrl ANTES do primeiro playNow.
+    sendToUnity('PlayerManager', 'setBaseUrl', 'https://dicionario2.vlibras.gov.br/2018.3.1/WEBGL/BR/')
     sendToUnity('PlayerManager', 'Change', avatar())
     // Legenda default do widget é ON; desligar via toggleSubtitle (Player.js oficial).
     if (!subtitle()) sendToUnity('PlayerManager', 'toggleSubtitle')
