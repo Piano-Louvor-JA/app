@@ -7,6 +7,7 @@
  * Aceita a pasta de dados do PIANO (…/Media/covers|images|music/…) e a
  * pasta config do Louvor JA antigo (…/config/capas|imagens|musicas/…).
  */
+import { randomUUID } from 'node:crypto'
 import { createReadStream, existsSync } from 'node:fs'
 import { mkdir, open, rename, stat, unlink } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
@@ -46,6 +47,7 @@ export function mediaTargetOfArchivePath(path, lang) {
       parent === 'media' ? PIANO_FOLDERS[folder] : parent === 'config' ? LEGACY_FOLDERS[folder] : undefined
     if (!mediaType) continue
     const rest = segs.slice(i + 1)
+    if (rest.some((segment) => segment === '..')) return null
     const allowed = mediaType === 'music' ? AUDIO_EXTS : IMAGE_EXTS
     if (!allowed.has(extOf(rest[rest.length - 1]))) return null
     const hasLang = rest.length > 1 && (rest[0] === 'pt' || rest[0] === 'es')
@@ -164,13 +166,13 @@ export async function importMediaArchive(filePath, onProgress, opts = {}) {
   let pad = 0
   /** @type {string | null} nome longo (pax/GNU) que vale para a próxima entrada */
   let pendingPath = null
-  /** @type {null | { kind: 'skip' } | { kind: 'collect', type: string, parts: Buffer[] } | { kind: 'file', handle: import('node:fs/promises').FileHandle, dest: string, failed: boolean }} */
+  /** @type {null | { kind: 'skip' } | { kind: 'collect', type: string, parts: Buffer[] } | { kind: 'file', handle: import('node:fs/promises').FileHandle, dest: string, tempPath: string, failed: boolean }} */
   let current = null
 
   const discardFile = async () => {
     if (current?.kind !== 'file') return
     await current.handle.close().catch(() => {})
-    await unlink(`${current.dest}.part`).catch(() => {})
+    await unlink(current.tempPath).catch(() => {})
   }
 
   const finishEntry = async () => {
@@ -187,10 +189,10 @@ export async function importMediaArchive(filePath, onProgress, opts = {}) {
     try {
       await entry.handle.close()
       if (entry.failed) throw new Error('write-failed')
-      await rename(`${entry.dest}.part`, entry.dest)
+      await rename(entry.tempPath, entry.dest)
       counts.imported += 1
     } catch {
-      await unlink(`${entry.dest}.part`).catch(() => {})
+      await unlink(entry.tempPath).catch(() => {})
       counts.failed += 1
     }
   }
@@ -226,7 +228,9 @@ export async function importMediaArchive(filePath, onProgress, opts = {}) {
     }
     try {
       await mkdir(dirname(dest), { recursive: true })
-      current = { kind: 'file', handle: await open(`${dest}.part`, 'w'), dest, failed: false }
+      // Nome exclusivo e criação atômica: nunca segue/sobrescreve um .part preexistente.
+      const tempPath = `${dest}.${randomUUID()}.part`
+      current = { kind: 'file', handle: await open(tempPath, 'wx', 0o600), dest, tempPath, failed: false }
     } catch {
       counts.failed += 1
       current = { kind: 'skip' }

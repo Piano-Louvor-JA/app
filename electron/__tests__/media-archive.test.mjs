@@ -87,6 +87,12 @@ describe('media-archive: importar o .tar.gz baixado do site', () => {
     expect(mediaTargetOfArchivePath('LouvorJA-PIANO/Media/music/pt/x.txt', 'pt')).toBeNull()
   })
 
+  it('recusa caminhos de mídia que tentam escapar da pasta de destino', () => {
+    expect(mediaTargetOfArchivePath('x/Media/music/pt/../../fora.mp3', 'pt')).toBeNull()
+    expect(mediaTargetOfArchivePath('x/Media/covers/../fora.jpg', 'pt')).toBeNull()
+    expect(mediaTargetOfArchivePath('x\\Media\\images\\..\\fora.png', 'pt')).toBeNull()
+  })
+
   it.skipIf(!hasTar)('importa só as mídias, com acento, e informa o progresso em bytes', async () => {
     const { archive, dest, album } = makeArchive()
     const progress = []
@@ -121,6 +127,20 @@ describe('media-archive: importar o .tar.gz baixado do site', () => {
       expect(existsSync(join(dest, 'music', 'pt', album, 'Eu Sei Por Que Nasci.mp3'))).toBe(true)
       expect(readFileSync(join(dest, 'covers', '2024.bmp'), 'utf8')).toBe('já estava')
     }
+  })
+
+  it.skipIf(!hasTar)('não sobrescreve um temporário preexistente no destino', async () => {
+    const { archive, dest } = makeArchive()
+    const oldPart = join(dest, 'covers', '2024.bmp.part')
+    mkdirSync(join(dest, 'covers'), { recursive: true })
+    writeFileSync(oldPart, 'arquivo de outra operação')
+
+    const result = await importMediaArchive(archive, undefined, { resolveDest: resolveDestIn(dest) })
+
+    expect(result.failed).toBe(0)
+    expect(result.imported).toBeGreaterThan(0)
+    expect(readFileSync(oldPart, 'utf8')).toBe('arquivo de outra operação')
+    expect(listFiles(dest).filter((file) => file.endsWith('.part'))).toEqual(['covers/2024.bmp.part'])
   })
 
   it.skipIf(!hasTar)('parar no meio: não deixa arquivo pela metade nem sobra temporário', async () => {
