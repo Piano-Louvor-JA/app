@@ -7,6 +7,27 @@ import {
 } from '../types/liturgy'
 
 /**
+ * Extensões aceitas no tipo "Apresentações PPT": PowerPoint e LibreOffice
+ * (Impress `.odp` e Writer `.odt`, convertidos pelo LibreOffice).
+ */
+export const PRESENTATION_EXTENSIONS = ['pptx', 'ppt', 'ppsx', 'pps', 'odp', 'odt'] as const
+
+const PRESENTATION_EXT_RE = new RegExp(`\\.(${PRESENTATION_EXTENSIONS.join('|')})$`, 'i')
+
+/** True quando o caminho é de um arquivo aceito como apresentação. */
+export function isPresentationPath(path: string): boolean {
+  return PRESENTATION_EXT_RE.test(path.trim())
+}
+
+/**
+ * True para documento de texto (.odt): o app externo abriria no editor,
+ * sem modo apresentação; a projeção é feita pelo próprio app.
+ */
+export function isTextDocumentPath(path: string): boolean {
+  return /\.odt$/i.test(path.trim())
+}
+
+/**
  * Infere o tipo de item da liturgia a partir do caminho/nome do arquivo
  * (áudio, vídeo, imagem, PDF, PPT e demais).
  */
@@ -17,7 +38,7 @@ export function detectLiturgyFileType(path: string): LiturgyItemType {
   if (/\.(mp4|mkv|avi|webm|mov|wmv)$/.test(p)) return 'video'
   if (/\.(jpg|jpeg|png|gif|bmp|webp|svg)$/.test(p)) return 'images'
   if (p.endsWith('.pdf')) return 'pdf'
-  if (/\.(pptx|ppt|odp)$/.test(p)) return 'presentation'
+  if (isPresentationPath(p)) return 'presentation'
   return 'other_files'
 }
 

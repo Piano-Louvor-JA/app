@@ -1,6 +1,6 @@
 export default {
   "liturgy": {
-  "fileFilters": { "video": "فيديوهات", "all": "الكل" },
+  "fileFilters": { "video": "فيديوهات", "presentation": "العروض التقديمية (PowerPoint/LibreOffice)", "all": "الكل" },
   "fallback": { "music": "موسيقى", "video": "فيديو", "audio": "صوت" },
     "title": "Service Liturgy",
     "subtitle": "Service organization",

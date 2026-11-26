@@ -363,8 +363,8 @@ contextBridge.exposeInMainWorld('louvorja', {
       detectEngines: () => ipcRenderer.invoke('presentation:detect-engines'),
       getEngine: () => ipcRenderer.invoke('presentation:get-engine'),
       setEngine: (engine) => ipcRenderer.invoke('presentation:set-engine', engine),
-      openExternal: (filePath, engine) =>
-        ipcRenderer.invoke('presentation:open-external', filePath, engine),
+      openExternal: (filePath, engine, options) =>
+        ipcRenderer.invoke('presentation:open-external', filePath, engine, options),
       setCustomApp: (appPath) =>
         ipcRenderer.invoke('presentation:set-custom-app', appPath),
     },

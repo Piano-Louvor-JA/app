@@ -35,7 +35,7 @@ import {
   isLiturgyItemDraftValid,
   isValidLiturgyUrl,
 } from '../services/liturgy-item-helpers'
-import { titleFromFilePath } from '../services/liturgy-file-detect'
+import { PRESENTATION_EXTENSIONS, titleFromFilePath } from '../services/liturgy-file-detect'
 import { normalizeLiturgyTimeHHmm } from '../services/liturgy-format'
 import {
   fetchOnlineVideoInfo,
@@ -552,8 +552,7 @@ function fileFiltersForType(type: LiturgyItemType | null): FileDialogFilter[] {
       ]
     case 'presentation':
       return [
-        { name: t('liturgy.fileFilters.pptx'), extensions: ['pptx'] },
-        { name: t('liturgy.fileFilters.other'), extensions: ['ppt', 'odp'] },
+        { name: t('liturgy.fileFilters.presentation'), extensions: [...PRESENTATION_EXTENSIONS] },
         all,
       ]
     default:
@@ -573,8 +572,7 @@ function fileFiltersForType(type: LiturgyItemType | null): FileDialogFilter[] {
             'gif',
             'webp',
             'pdf',
-            'ppt',
-            'pptx',
+            ...PRESENTATION_EXTENSIONS,
           ],
         },
         { name: t('liturgy.fileFilters.all'), extensions: ['*'] },

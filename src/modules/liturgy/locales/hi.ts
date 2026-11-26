@@ -1,6 +1,6 @@
 export default {
   "liturgy": {
-  "fileFilters": { "video": "वीडियो", "all": "सभी" },
+  "fileFilters": { "video": "वीडियो", "presentation": "प्रस्तुतियाँ (PowerPoint/LibreOffice)", "all": "सभी" },
   "fallback": { "music": "संगीत", "video": "वीडियो", "audio": "ऑडियो" },
     "title": "उपासना क्रम",
     "subtitle": "उपासना कार्यक्रम",
