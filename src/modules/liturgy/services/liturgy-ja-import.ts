@@ -6,7 +6,7 @@
  * 1..7 (segunda..domingo) ordenam os ids separados por `;`.
  * IDs de música Delphi são compatíveis com a API louvorja.com.br.
  */
-import type { LiturgyItem, LiturgyWeekday } from '../types/liturgy'
+import type { LiturgyItem, LiturgyItemType, LiturgyWeekday } from '../types/liturgy'
 import { decodeTextFileBytes } from '@shared/services/text-encoding'
 import { detectLiturgyFileType as typeFromPath } from './liturgy-file-detect'
 
