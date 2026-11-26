@@ -1,5 +1,15 @@
 export default {
   albums: {
+    disabledAlbums: {
+      collectionNote: "Álbum desativado: as músicas dele aparecem apagadas na busca e o seletor pula. Aqui dentro elas ainda tocam no clique.",
+      title: "Álbuns ativos",
+      description: "Desligue os álbuns que você não usa (por exemplo, o hinário antigo). As músicas deles aparecem apagadas na busca e o Enter e as setas pulam elas. Também dá para desativar pelo card do álbum na Central de Mídia.",
+      filter: "Filtrar álbuns",
+      count: "{count} desativado(s)",
+      badge: "Álbum desativado",
+      enable: "Ativar álbum",
+      disable: "Desativar álbum",
+    },
     custom: {
       title: 'Minhas Coletâneas',
       openEditor: 'Abrir editor de letras',

@@ -149,3 +149,22 @@ describe('AlbumHymnalCard', () => {
     w3.unmount()
   })
 })
+
+describe('AlbumHymnalCard — desativar álbum', () => {
+  it('mostra o botão só quando pode desativar e avisa o clique', async () => {
+    expect(mountCard().find('.album-card-disable').exists()).toBe(false)
+    const w = mountCard({ canDisable: true })
+    const button = w.get('.album-card-disable')
+    expect(button.attributes('aria-pressed')).toBe('false')
+    await button.trigger('click')
+    expect(w.emitted('toggle-disabled')).toHaveLength(1)
+    expect(w.emitted('open')).toBeUndefined()
+  })
+
+  it('desativado: card apagado com o aviso e botão para reativar', () => {
+    const w = mountCard({ canDisable: true, disabled: true })
+    expect(w.classes()).toContain('album-hymnal-card--disabled')
+    expect(w.find('.album-card-disabled-label').exists()).toBe(true)
+    expect(w.get('.album-card-disable').attributes('aria-pressed')).toBe('true')
+  })
+})

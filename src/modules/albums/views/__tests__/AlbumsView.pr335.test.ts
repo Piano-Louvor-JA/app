@@ -135,6 +135,8 @@ function useAlbumsMockFactory() {
       playAllInActiveCollection: vi.fn(async () => true),
       playAllInCategory: vi.fn(async () => true),
       openCollection: vi.fn(async () => true),
+      isAlbumDisabled: vi.fn(() => false),
+      setAlbumDisabled: vi.fn(),
     }
 }
 

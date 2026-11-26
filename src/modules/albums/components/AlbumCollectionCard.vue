@@ -10,6 +10,10 @@ const props = defineProps<{
   collection: AlbumCollection
   libraryAlbum?: LibraryAlbum | null
   showDownloadControls?: boolean
+  /** Álbum desativado (músicas apagadas na busca; o seletor pula). */
+  disabled?: boolean
+  /** Mostra o botão de desativar/ativar (coletâneas custom não têm). */
+  canDisable?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -17,6 +21,7 @@ const emit = defineEmits<{
   download: []
   cancel: []
   remove: []
+  'toggle-disabled': []
 }>()
 
 const { t } = useI18n()
@@ -68,6 +73,7 @@ function onRemove(event: MouseEvent) {
       'album-collection-card--downloaded': status === 'downloaded',
       'album-collection-card--busy': isBusy,
       'album-collection-card--pending': showPersistentDownload,
+      'album-collection-card--disabled': canDisable && disabled,
     }"
   >
     <div
@@ -117,6 +123,18 @@ function onRemove(event: MouseEvent) {
           />
         </div>
       </div>
+
+      <button
+      v-if="canDisable"
+      type="button"
+      class="album-card-disable album-collection-card__disable"
+      :aria-pressed="disabled ? 'true' : 'false'"
+      :title="t(disabled ? 'albums.disabledAlbums.enable' : 'albums.disabledAlbums.disable')"
+      :aria-label="t(disabled ? 'albums.disabledAlbums.enable' : 'albums.disabledAlbums.disable')"
+      @click.stop="emit('toggle-disabled')"
+    >
+      <i class="ti" :class="disabled ? 'ti-eye-off' : 'ti-eye'" aria-hidden="true" />
+    </button>
 
       <div class="album-collection-card__hover">
         <button
@@ -197,6 +215,10 @@ function onRemove(event: MouseEvent) {
       >
         {{ t('albums.trackCount', { count: collection.trackCount }) }}
       </p>
+      <span v-if="canDisable && disabled" class="album-card-disabled-label">
+        <i class="ti ti-eye-off" aria-hidden="true" />
+        {{ t('albums.disabledAlbums.badge') }}
+      </span>
     </div>
   </article>
 </template>
@@ -499,5 +521,58 @@ function onRemove(event: MouseEvent) {
   margin: 0.3rem 0 0;
   font-size: 0.78rem;
   color: var(--ds-color-on-surface-variant);
+}
+
+/* Desativar álbum (paridade Classic): sempre visível, discreto. */
+.album-card-disable {
+  position: absolute;
+  z-index: 5;
+  display: inline-flex;
+  width: 2rem;
+  height: 2rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--ds-color-outline-strong);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ds-color-surface-elevated) 85%, transparent);
+  color: var(--ds-color-on-surface);
+  cursor: pointer;
+  opacity: 0.85;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.album-card-disable:hover,
+.album-card-disable:focus-visible {
+  opacity: 1;
+  transform: scale(1.06);
+}
+
+.album-card-disable[aria-pressed='true'] {
+  border-color: var(--ds-color-primary);
+  color: var(--ds-color-primary);
+  opacity: 1;
+}
+
+.album-card-disabled-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  width: fit-content;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--ds-color-outline-strong);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.album-collection-card__disable {
+  top: 0.6rem;
+  left: 0.6rem;
+}
+
+.album-collection-card--disabled .album-collection-card__cover-img,
+.album-collection-card--disabled .album-collection-card__fallback {
+  opacity: 0.35;
+  filter: grayscale(1);
 }
 </style>

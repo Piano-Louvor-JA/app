@@ -118,6 +118,8 @@ const {
   playSlides,
   openLyric,
   closeLyric,
+  isAlbumDisabled,
+  setAlbumDisabled,
 } = useAlbums()
 
 const addingPlaylist = ref<Playlist | null>(null)
@@ -141,8 +143,23 @@ function addPlaylistSearchHit(hit: AlbumSearchHit) {
   addSearchTrackToPlaylist(addingPlaylist.value.id)
 }
 
-const selectedSearchIndex = ref(0)
-watch(hubSearchResults, () => { selectedSearchIndex.value = 0 })
+// Álbum desativado: a música aparece apagada e o seletor pula (paridade Classic).
+function isSearchHitEnabled(index: number): boolean {
+  const hit = hubSearchResults.value[index]
+  return Boolean(hit) && hit!.disabled !== true
+}
+function firstEnabledSearchIndex(): number {
+  const index = hubSearchResults.value.findIndex((hit) => hit.disabled !== true)
+  return index >= 0 ? index : 0
+}
+function stepEnabledSearchIndex(from: number, direction: 1 | -1): number {
+  for (let index = from + direction; index >= 0 && index < hubSearchResults.value.length; index += direction) {
+    if (isSearchHitEnabled(index)) return index
+  }
+  return from
+}
+const selectedSearchIndex = ref(firstEnabledSearchIndex())
+watch(hubSearchResults, () => { selectedSearchIndex.value = firstEnabledSearchIndex() })
 async function onSearchKeydown(event: KeyboardEvent) {
   if (event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return
   if (!['ArrowDown', 'ArrowUp', 'Enter'].includes(event.key) || !hubSearchResults.value.length) return
@@ -152,11 +169,10 @@ async function onSearchKeydown(event: KeyboardEvent) {
   event.stopPropagation()
   if (event.key === 'Enter') {
     const hit = hubSearchResults.value[selectedSearchIndex.value]
-    if (hit) await runAction(hit.musicId, () => playSung(hit.musicId))
+    if (hit && hit.disabled !== true) await runAction(hit.musicId, () => playSung(hit.musicId))
     return
   }
-  selectedSearchIndex.value = Math.max(0, Math.min(hubSearchResults.value.length - 1,
-    selectedSearchIndex.value + (event.key === 'ArrowDown' ? 1 : -1)))
+  selectedSearchIndex.value = stepEnabledSearchIndex(selectedSearchIndex.value, event.key === 'ArrowDown' ? 1 : -1)
   await nextTick()
   document.getElementById(`album-search-result-${hubSearchResults.value[selectedSearchIndex.value]?.musicId}`)?.scrollIntoView?.({ block: 'nearest' })
 }
@@ -1043,10 +1059,13 @@ async function runAction(
             :collection="collection"
             :library-album="findLibraryAlbum(collection.id)"
             :show-download-controls="showDownloadControls"
+            :disabled="isAlbumDisabled(collection.id)"
+            can-disable
             @open="openCollection(collection.id)"
             @download="downloadCollection(collection.id)"
             @cancel="cancelCollection(collection.id)"
             @remove="requestRemove(collection)"
+            @toggle-disabled="setAlbumDisabled(collection.id, !isAlbumDisabled(collection.id))"
           />
           <AlbumHymnalCard
             v-if="youtubeHymnal"
@@ -1070,10 +1089,13 @@ async function runAction(
               :collection="collection"
               :library-album="findLibraryAlbum(collection.id)"
               :show-download-controls="showDownloadControls"
+              :disabled="!collection.isCustom && isAlbumDisabled(collection.id)"
+              :can-disable="!collection.isCustom"
               @open="openCollection(collection.id)"
               @download="downloadCollection(collection.id)"
               @cancel="cancelCollection(collection.id)"
               @remove="requestRemove(collection)"
+              @toggle-disabled="setAlbumDisabled(collection.id, !isAlbumDisabled(collection.id))"
             />
           </div>
         </GlassCard>

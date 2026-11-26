@@ -1,5 +1,15 @@
 export default {
   albums: {
+    disabledAlbums: {
+      collectionNote: "Álbum desactivado: sus canciones aparecen atenuadas en la búsqueda y el selector las salta. Aquí dentro aún suenan al hacer clic.",
+      title: "Álbumes activos",
+      description: "Desactive los álbumes que no usa (por ejemplo, el himnario antiguo). Sus canciones aparecen atenuadas en la búsqueda y Enter y las flechas las saltan. También puede desactivar un álbum desde su tarjeta en la Central de Medios.",
+      filter: "Filtrar álbumes",
+      count: "{count} desactivado(s)",
+      badge: "Álbum desactivado",
+      enable: "Activar álbum",
+      disable: "Desactivar álbum",
+    },
     custom: {
       title: 'Mis Colecciones',
       openEditor: 'Abrir editor de letras',

@@ -91,7 +91,7 @@ import { ref as vueRef } from 'vue'
 function useAlbumsMockFactory() {
   const s = ((globalThis as AnyObj).__albumsState ?? {}) as AnyObj
   const r = <T>(v: T) => vueRef<T>(v)
-  return {
+  const api = {
       categories: r(s.categories ?? []),
       activeCollection: r(null),
       tracks: r([]),
@@ -136,7 +136,11 @@ function useAlbumsMockFactory() {
       playAllInActiveCollection: vi.fn(async () => true),
       playAllInCategory: vi.fn(async () => true),
       openCollection: vi.fn(async () => true),
+      isAlbumDisabled: vi.fn((key: unknown) => ((s.disabledAlbums as unknown[]) ?? []).includes(String(key))),
+      setAlbumDisabled: vi.fn(),
     }
+  ;(globalThis as AnyObj).__albumsApi = api
+  return api
 }
 
 vi.mock('../../composables/useAlbums', () => ({
@@ -183,9 +187,10 @@ vi.mock('../../components/AlbumHymnalCard.vue', () => ({
 vi.mock('../../components/AlbumCollectionCard.vue', () => ({
   default: {
     name: 'AlbumCollectionCard',
-    props: ['collection', 'libraryAlbum', 'showDownloadControls'],
-    emits: ['open', 'download', 'cancel', 'remove'],
-    template: `<div class="collection-card-stub" :data-id="collection.id">
+    props: ['collection', 'libraryAlbum', 'showDownloadControls', 'disabled'],
+    emits: ['open', 'download', 'cancel', 'remove', 'toggle-disabled'],
+    template: `<div class="collection-card-stub" :data-id="collection.id" :data-disabled="String(disabled)">
+      <button class="cc-toggle-disabled" @click="$emit('toggle-disabled')" />
       <button class="cc-open" @click="$emit('open')" />
       <button class="cc-download" @click="$emit('download')" />
       <button class="cc-remove" @click="$emit('remove')" />
@@ -323,6 +328,48 @@ describe('AlbumsView', () => {
     expect(input.attributes('aria-activedescendant')).toBe('album-search-result-41')
     await input.trigger('keydown', { key: 'Enter' })
     await flushPromises()
+  })
+
+  it('seletor pula músicas de álbum desativado (setas e Enter)', async () => {
+    setState({ isHubSearching: true, hubResults: [
+      { musicId: 41, name: 'Antigo 1', albumNames: 'Hinário 1996', disabled: true },
+      { musicId: 42, name: 'Atual 1', albumNames: 'Hinário' },
+      { musicId: 43, name: 'Antigo 2', albumNames: 'Hinário 1996', disabled: true },
+      { musicId: 44, name: 'Atual 2', albumNames: 'Hinário' },
+    ] })
+    const wrapper = await mountView()
+    const input = wrapper.get('input[type="search"]')
+    expect(input.attributes('aria-activedescendant')).toBe('album-search-result-42')
+    await input.trigger('keydown', { key: 'ArrowDown' })
+    expect(input.attributes('aria-activedescendant')).toBe('album-search-result-44')
+    await input.trigger('keydown', { key: 'ArrowDown' })
+    expect(input.attributes('aria-activedescendant')).toBe('album-search-result-44')
+    await input.trigger('keydown', { key: 'ArrowUp' })
+    expect(input.attributes('aria-activedescendant')).toBe('album-search-result-42')
+    await input.trigger('keydown', { key: 'Enter' })
+    await flushPromises()
+    expect((globalThis as AnyObj).__albumsApi.playSung).toHaveBeenCalledWith(42)
+  })
+
+  it('só resultados desativados: Enter não toca nada', async () => {
+    setState({ isHubSearching: true, hubResults: [
+      { musicId: 41, name: 'Antigo', albumNames: 'Hinário 1996', disabled: true },
+    ] })
+    const wrapper = await mountView()
+    const input = wrapper.get('input[type="search"]')
+    await input.trigger('keydown', { key: 'Enter' })
+    await flushPromises()
+    expect((globalThis as AnyObj).__albumsApi.playSung).not.toHaveBeenCalled()
+  })
+
+  it('card do álbum liga e desliga o álbum', async () => {
+    setState({ categories, disabledAlbums: ['10'] })
+    const wrapper = await mountView()
+    const cards = wrapper.findAll('.collection-card-stub')
+    const disabledCard = cards.find((card) => card.attributes('data-disabled') === 'true')!
+    expect(disabledCard).toBeTruthy()
+    await disabledCard.get('.cc-toggle-disabled').trigger('click')
+    expect((globalThis as AnyObj).__albumsApi.setAlbumDisabled).toHaveBeenCalledWith(disabledCard.attributes('data-id'), false)
   })
 
   it('adds a search result to a saved playlist through the shared album picker', async () => {

@@ -1,5 +1,15 @@
 export default {
   albums: {
+    disabledAlbums: {
+      collectionNote: "Album turned off: its songs show greyed out in search and the selector skips them. In here they still play when clicked.",
+      title: "Active albums",
+      description: "Turn off the albums you do not use (for example, the old hymnal). Their songs show greyed out in search, and Enter and the arrow keys skip them. You can also turn an album off from its card in the Media Center.",
+      filter: "Filter albums",
+      count: "{count} turned off",
+      badge: "Album turned off",
+      enable: "Turn album on",
+      disable: "Turn album off",
+    },
     custom: {
       title: 'My Collections',
       openEditor: 'Open lyrics editor',
