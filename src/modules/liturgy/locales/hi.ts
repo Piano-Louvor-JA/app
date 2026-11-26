@@ -114,7 +114,8 @@ export default {
       "other_files": "अन्य",
       "online_video": "YouTube/Vimeo आदि",
       "site": "वेबसाइट/सोशल",
-      "verse": "पद"
+      "verse": "पद",
+      "playlist": "प्लेलिस्ट"
     },
     "typeDescriptions": {
       "category": "क्रम के भागों के बीच दृश्य विभाजक।",
@@ -131,7 +132,8 @@ export default {
       "other_files": "अन्य स्थानीय फ़ाइलें",
       "online_video": "ऑनलाइन वीडियो (YouTube, Vimeo आदि)",
       "site": "वेबसाइट और सोशल मीडिया",
-      "verse": "बाइबल पद"
+      "verse": "बाइबल पद",
+      "playlist": "मीडिया सेंटर से गीतों की कतार"
     },
     "dialog": {
       "title": "नया भाग",
@@ -240,7 +242,11 @@ export default {
       "searchMusic": "गीत खोजें…",
       "musicMode": "मोड",
       "musicModeAudio": "ऑडियो",
-      "musicModeInstrumental": "वाद्य संगीत"
+      "musicModeInstrumental": "वाद्य संगीत",
+      "albumDisabled": "एल्बम बंद है",
+      "playlistPlaceholder": "एक प्लेलिस्ट चुनें",
+      "playlistRequired": "एक प्लेलिस्ट चुनें।",
+      "selectPlaylist": "प्लेलिस्ट चुनें"
     },
     "namePlaceholders": {
       "category": "जैसे: प्रारंभिक सभापति, उपासना प्रारंभ, स्वागत, सब्बाथ स्कूल, सब्बाथ उपासना…",
@@ -256,7 +262,8 @@ export default {
       "other_files": "जैसे: सहायक फ़ाइलें",
       "online_video": "जैसे: YouTube पर गीत",
       "site": "जैसे: कलीसिया पृष्ठ",
-      "verse": "संदर्भ या शीर्षक"
+      "verse": "संदर्भ या शीर्षक",
+      "playlist": "उदा.: आरंभिक स्तुति"
     },
     "actions": {
       "save": "सहेजें",
@@ -301,7 +308,12 @@ export default {
       "collapseCategory": "श्रेणी सिकोड़ें",
       "expandCategory": "श्रेणी खोलें",
       "addSubItem": "उप-आइटम जोड़ें",
-      "reorder": "क्रम बदलने हेतु खींचें"
+      "reorder": "क्रम बदलने हेतु खींचें",
+      "playlistControls": "प्लेलिस्ट नियंत्रण",
+      "playlistInstrumental": "संगत के साथ चलाएँ",
+      "playlistNoAudio": "बिना आवाज़ चलाएँ (केवल स्लाइड)",
+      "playlistPlay": "प्लेलिस्ट चलाएँ",
+      "playlistShuffle": "शफ़ल करके चलाएँ"
     },
     "messages": {
       "removeItemTitle": "क्रम से आइटम हटाएँ",
@@ -358,7 +370,16 @@ export default {
       "urlInvalid": "यह लिंक प्रोजेक्शन हेतु उपयुक्त नहीं।",
       "projectionFailed": "कॉन्फ़िगर स्क्रीन पर प्रोजेक्शन नहीं खुला।",
       "fileMissingOnMachine": "फ़ाइल इस कंप्यूटर पर नहीं मिली — पथ दूसरे कंप्यूटर का है (सिंक किया क्रम)। इस डिवाइस पर दोबारा चुनें।",
-      "presentationOfficeMissing": "PPT/PPTX प्रोजेक्ट हेतु LibreOffice स्थापित होना चाहिए (या LIBREOFFICE_PATH सेट)।"
+      "presentationOfficeMissing": "PPT/PPTX प्रोजेक्ट हेतु LibreOffice स्थापित होना चाहिए (या LIBREOFFICE_PATH सेट)।",
+      "dropDesktopOnly": "लिटर्जी पर फ़ाइलें खींचना केवल डेस्कटॉप ऐप में काम करता है।",
+      "dropHint": "लिटर्जी में जोड़ने के लिए फ़ाइलें यहाँ छोड़ें",
+      "dropMoreFilesPending": "पहली फ़ाइल डायलॉग में खुली। ज़रूरत हो तो सहेजने के बाद बाकी फिर से छोड़ें।",
+      "dropPathFailed": "छोड़ी गई फ़ाइलों के पथ नहीं पढ़े जा सके। ‘जोड़ें’ से फ़ाइल चुनें।",
+      "playlistCatalogEmpty": "अभी कोई प्लेलिस्ट नहीं। मीडिया सेंटर (प्लेलिस्ट) में बनाएँ।",
+      "playlistEmpty": "यह प्लेलिस्ट खाली है। मीडिया सेंटर में गीत जोड़ें।",
+      "playlistMissing": "प्लेलिस्ट नहीं मिली। मीडिया सेंटर में दूसरी चुनें।",
+      "playlistTrackCount": "{count} गीत",
+      "playlistTrackCountOne": "1 गीत"
     },
     "slja": {
       "importButton": ".slja आयात करें",
@@ -374,6 +395,45 @@ export default {
       "new": "नया कस्टम क्रम",
       "namePlaceholder": "क्रम नाम (जैसे: युवा उपासना 12/07)",
       "empty": "कोई कस्टम क्रम नहीं। पहला बनाएँ।"
+    },
+    "appearance": {
+      "align": "शीर्षक संरेखण",
+      "align_center": "बीच में",
+      "align_left": "बाएँ",
+      "background": "पंक्ति की पृष्ठभूमि",
+      "bold": "बोल्ड",
+      "button": "लिटर्जी अनुकूलित करें",
+      "categorySection": "श्रेणी पंक्तियाँ",
+      "default": "डिफ़ॉल्ट",
+      "openStage": "प्रोजेक्शन अनुकूलित करें (मंच)",
+      "reset": "डिफ़ॉल्ट पुनर्स्थापित करें",
+      "showSubtitle": "उपशीर्षक दिखाएँ",
+      "showTime": "समय दिखाएँ",
+      "size": "शीर्षक का आकार",
+      "size_lg": "बड़ा",
+      "size_md": "मध्यम",
+      "size_sm": "छोटा",
+      "size_xl": "बहुत बड़ा",
+      "title": "लिटर्जी अनुकूलित करें",
+      "titleColor": "शीर्षक का रंग",
+      "typesHint": "इस स्क्रीन की लिटर्जी सूची पर लागू होता है।",
+      "typesSection": "हर आइटम प्रकार का रंग",
+      "uppercase": "बड़े अक्षर"
+    },
+    "transfer": {
+      "append": "जोड़ें",
+      "confirmMessage": "सप्ताह में पहले से आइटम हैं। फ़ाइल की लिटर्जी से बदलें या उसके आइटम हर दिन के अंत में जोड़ें?",
+      "confirmTitle": "लिटर्जी आयात करें",
+      "export": "लिटर्जी निर्यात करें",
+      "exportHint": "सप्ताह की लिटर्जी (रवि से शनि और अलग वाली) को .json फ़ाइल में सहेजता है",
+      "exported": "सप्ताह की लिटर्जी निर्यात हुई।",
+      "group": "लिटर्जी निर्यात और आयात",
+      "import": "लिटर्जी आयात करें",
+      "importHint": "निर्यात की गई लिटर्जी फ़ाइल (.json) खोलता है",
+      "imported": "लिटर्जी आयात हुई।",
+      "invalid": "यह फ़ाइल Louvor JA से निर्यात की गई लिटर्जी नहीं है।",
+      "replace": "बदलें",
+      "version": "यह लिटर्जी ऐप के नए संस्करण से निर्यात हुई है। आयात करने के लिए ऐप अपडेट करें।"
     }
   }
 }

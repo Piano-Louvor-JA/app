@@ -42,7 +42,11 @@ export default {
       "create": "作成",
       "export": "プレイリストを書き出し",
       "import": "プレイリストを読み込み",
-      "empty": "プレイリストはまだありません。"
+      "empty": "プレイリストはまだありません。",
+      "playInstrumental": "{name} を伴奏（インスト）で再生",
+      "playInstrumentalHint": "伴奏：すべての曲をインストのみで再生",
+      "playNoAudio": "{name} を音声なしで再生（スライドのみ）",
+      "playNoAudioHint": "音声なし：曲のスライドだけを表示し、音は出しません"
     },
     "title": "メディアセンター",
     "subtitle": "アルバムとコレクション",
@@ -85,6 +89,16 @@ export default {
       "deleteCollectionAction": "Delete collection",
       "deleteCollectionTitle": "Delete “{name}”?",
       "deleteCollectionText": "The local copy will be deleted. The original in Community is not affected."
+    },
+    "disabledAlbums": {
+      "badge": "無効のアルバム",
+      "collectionNote": "無効のアルバム：曲は検索で薄く表示され、選択ではスキップされます。ここではクリックすれば再生できます。",
+      "count": "無効：{count}",
+      "description": "使わないアルバム（古い讃美歌集など）を無効にします。その曲は検索で薄く表示され、Enterキーと矢印キーでスキップされます。メディアセンターのアルバムカードからも無効にできます。",
+      "disable": "アルバムを無効にする",
+      "enable": "アルバムを有効にする",
+      "filter": "アルバムを絞り込む",
+      "title": "有効なアルバム"
     }
   }
 }

@@ -300,7 +300,22 @@ export default {
       "backupYoutubeTitle": "Inclure les vidéos YouTube téléchargées ?",
       "backupYoutubeMessage": "Il y a {count} vidéo(s) YouTube téléchargées ({size}). Par défaut elles ne sont pas sauvegardées, car elles peuvent être retéléchargées. Historique, favoris et collections sont toujours inclus.",
       "backupYoutubeInclude": "Inclure les vidéos ({size})",
-      "backupYoutubeSkip": "Sans les vidéos"
+      "backupYoutubeSkip": "Sans les vidéos",
+      "legacyMediaArchiveSummary": "Fichier compressé de {size} : les médias absents ici sont copiés directement depuis lui, sans extraction.",
+      "legacyMediaCancelled": "Importation arrêtée : {imported} fichier(s) copié(s). Choisissez à nouveau le fichier ou le dossier pour reprendre là où elle s'est arrêtée.",
+      "legacyMediaHintLinux": "Choisissez le fichier téléchargé depuis le site (.tar.gz) : l'app copie les médias directement depuis lui, sans besoin d'extraire. Si vous préférez, extrayez-le et choisissez le dossier. Seuls les fichiers (pochettes, images et chants) absents ici sont copiés.",
+      "legacyMediaInvalidArchive": "Ce fichier ne contient pas de médias Louvor JA (pochettes, images ou chants). Choisissez le fichier téléchargé depuis le site.",
+      "legacyMediaInvalidFolderLinux": "Ce dossier ne contient pas les médias. Choisissez le dossier extrait du fichier du site (ex. LouvorJA-PIANO) ou le dossier Media qu'il contient.",
+      "legacyMediaLiveCounts": "{imported} enregistrés maintenant · {skipped} déjà présents (déjà visibles dans la Médiathèque)",
+      "legacyMediaPause": "Pause",
+      "legacyMediaPaused": "En pause à {current} sur {total}",
+      "legacyMediaPausedBytes": "En pause à {current} sur {total}",
+      "legacyMediaPickArchive": "Choisir le fichier téléchargé (.tar.gz)",
+      "legacyMediaPickFolderLinux": "Choisir le dossier des médias",
+      "legacyMediaPickHintLinux": "Choisissez le dossier extrait du fichier (ex. LouvorJA-PIANO) ou le dossier Media qu'il contient. L'app trouve seule les pochettes, images et chants.",
+      "legacyMediaProgressBytes": "Lecture de {current} sur {total}",
+      "legacyMediaResume": "Reprendre",
+      "legacyMediaStop": "Arrêter"
     },
     "remote": {
       "p2pTitle": "Contrôle P2P (QR)",
@@ -547,7 +562,13 @@ export default {
         "glow": "Lueur",
         "float": "Flottement",
         "zoomBlur": "Flou de zoom"
-      }
+      },
+      "hymnNumberShow": "Numéro du cantique sur la couverture (recueil)",
+      "hymnNumberSize": "Taille du numéro du cantique",
+      "hymnalNameColor": "Couleur du nom du recueil",
+      "hymnalNameColorDefault": "Par défaut (blanc)",
+      "hymnalNameShow": "Nom du recueil sur la couverture",
+      "hymnalNameSize": "Taille du nom du recueil"
     },
     "fonts": {
       "projectionOnly": "Pour la projection",

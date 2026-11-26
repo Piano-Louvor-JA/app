@@ -23,7 +23,9 @@ export default {
     "hymnal": {
       "edition1996Name": "재림교회 찬송가 - 1996년판",
       "officialSubtitle": "악보·가사 포함 찬송 {count}곡",
-      "edition1996Subtitle": "역사적 - 전통 찬송 {count}곡"
+      "edition1996Subtitle": "역사적 - 전통 찬송 {count}곡",
+      "cpbYoutubeName": "Hinário Adventista - CPB",
+      "cpbYoutubeSubtitle": "새 재림교회 찬송가 영상 · Casa Publicadora Brasileira"
     },
     "progress": {
       "preparing": "준비 중…",

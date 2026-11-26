@@ -42,7 +42,11 @@ export default {
       "create": "Oluştur",
       "export": "Listeleri dışa aktar",
       "import": "Listeleri içe aktar",
-      "empty": "Henüz çalma listesi oluşturulmadı."
+      "empty": "Henüz çalma listesi oluşturulmadı.",
+      "playInstrumental": "{name} listesini altyapıyla (enstrümantal) çal",
+      "playInstrumentalHint": "Altyapı: tüm şarkılar yalnızca enstrümantal çalınır",
+      "playNoAudio": "{name} listesini sessiz çal (yalnızca slaytlar)",
+      "playNoAudioHint": "Sessiz: yalnızca şarkı slaytları gösterilir, ses çalmaz"
     },
     "title": "Medya Merkezi",
     "subtitle": "Albümler ve Koleksiyonlar",
@@ -85,6 +89,16 @@ export default {
       "deleteCollectionAction": "Delete collection",
       "deleteCollectionTitle": "Delete “{name}”?",
       "deleteCollectionText": "The local copy will be deleted. The original in Community is not affected."
+    },
+    "disabledAlbums": {
+      "badge": "Albüm kapalı",
+      "collectionNote": "Albüm kapalı: şarkıları aramada soluk görünür ve seçici bunları atlar. Burada tıklayınca yine çalar.",
+      "count": "{count} kapalı",
+      "description": "Kullanmadığınız albümleri kapatın (örneğin eski ilahi kitabı). Şarkıları aramada soluk görünür; Enter ve ok tuşları bunları atlar. Albümü Medya Merkezi'ndeki kartından da kapatabilirsiniz.",
+      "disable": "Albümü kapat",
+      "enable": "Albümü aç",
+      "filter": "Albümleri filtrele",
+      "title": "Etkin albümler"
     }
   }
 }

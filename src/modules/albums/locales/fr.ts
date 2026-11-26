@@ -52,7 +52,11 @@ export default {
       "playAllHint": "Lire la playlist : lire tous les chants en séquence",
       "shuffle": "Lecture aléatoire",
       "playTrack": "Lire {title} dans le mini-lecteur",
-      "reorder": "Glisser pour réordonner (ou utiliser les flèches vers le haut et vers le bas)"
+      "reorder": "Glisser pour réordonner (ou utiliser les flèches vers le haut et vers le bas)",
+      "playInstrumental": "Lire {name} avec accompagnement (instrumental)",
+      "playInstrumentalHint": "Accompagnement : lit tous les chants avec l'instrumental seulement",
+      "playNoAudio": "Lire {name} sans audio (diapositives seulement)",
+      "playNoAudioHint": "Sans audio : affiche seulement les diapositives des chants, sans son"
     },
     "title": "Centre multimédia",
     "subtitle": "Albums & Compilations",

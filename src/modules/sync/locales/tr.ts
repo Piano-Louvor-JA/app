@@ -23,7 +23,9 @@ export default {
     "hymnal": {
       "edition1996Name": "Adventist İlahi Kitabı - 1996 Baskısı",
       "officialSubtitle": "Nota ve sözleriyle {count} ilahi",
-      "edition1996Subtitle": "Tarihsel - {count} geleneksel ilahi"
+      "edition1996Subtitle": "Tarihsel - {count} geleneksel ilahi",
+      "cpbYoutubeName": "Hinário Adventista - CPB",
+      "cpbYoutubeSubtitle": "Yeni Adventist ilahi kitabı videoda · Casa Publicadora Brasileira"
     },
     "progress": {
       "preparing": "Hazırlanıyor…",

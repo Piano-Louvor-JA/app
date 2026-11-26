@@ -42,7 +42,11 @@ export default {
       "create": "बनाएँ",
       "export": "प्लेलिस्ट निर्यात",
       "import": "प्लेलिस्ट आयात",
-      "empty": "अभी कोई प्लेलिस्ट नहीं बनी।"
+      "empty": "अभी कोई प्लेलिस्ट नहीं बनी।",
+      "playInstrumental": "{name} को संगीत संगत (इंस्ट्रुमेंटल) के साथ चलाएँ",
+      "playInstrumentalHint": "संगत: सभी गीत केवल इंस्ट्रुमेंटल के साथ चलें",
+      "playNoAudio": "{name} को बिना आवाज़ के चलाएँ (केवल स्लाइड)",
+      "playNoAudioHint": "बिना आवाज़: केवल गीतों की स्लाइड दिखें, बिना ध्वनि"
     },
     "title": "मीडिया केंद्र",
     "subtitle": "एल्बम और संग्रह",
@@ -85,6 +89,16 @@ export default {
       "deleteCollectionAction": "Delete collection",
       "deleteCollectionTitle": "Delete “{name}”?",
       "deleteCollectionText": "The local copy will be deleted. The original in Community is not affected."
+    },
+    "disabledAlbums": {
+      "badge": "एल्बम बंद है",
+      "collectionNote": "एल्बम बंद है: इसके गीत खोज में धुंधले दिखते हैं और चयन उन्हें छोड़ देता है। यहाँ क्लिक करने पर वे अभी भी चलते हैं।",
+      "count": "{count} बंद",
+      "description": "जिन एल्बमों का आप उपयोग नहीं करते उन्हें बंद करें (जैसे पुराना भजन-संग्रह)। उनके गीत खोज में धुंधले दिखते हैं और Enter व तीर कुंजियाँ उन्हें छोड़ देती हैं। आप मीडिया सेंटर में एल्बम के कार्ड से भी उसे बंद कर सकते हैं।",
+      "disable": "एल्बम बंद करें",
+      "enable": "एल्बम चालू करें",
+      "filter": "एल्बम खोजें",
+      "title": "चालू एल्बम"
     }
   }
 }

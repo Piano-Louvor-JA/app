@@ -402,6 +402,45 @@ export default {
       "music": "Musique",
       "video": "Vidéo",
       "audio": "Audio"
+    },
+    "appearance": {
+      "align": "Alignement du titre",
+      "align_center": "Centré",
+      "align_left": "À gauche",
+      "background": "Fond de la ligne",
+      "bold": "Gras",
+      "button": "Personnaliser la liturgie",
+      "categorySection": "Lignes de catégorie",
+      "default": "Par défaut",
+      "openStage": "Personnaliser la projection (scène)",
+      "reset": "Rétablir par défaut",
+      "showSubtitle": "Afficher le sous-titre",
+      "showTime": "Afficher l'heure",
+      "size": "Taille du titre",
+      "size_lg": "G",
+      "size_md": "M",
+      "size_sm": "P",
+      "size_xl": "TG",
+      "title": "Personnaliser la liturgie",
+      "titleColor": "Couleur du titre",
+      "typesHint": "S'applique à la liste de la liturgie de cet écran.",
+      "typesSection": "Couleur de chaque type d'élément",
+      "uppercase": "Majuscules"
+    },
+    "transfer": {
+      "append": "Ajouter",
+      "confirmMessage": "La semaine a déjà des éléments. Remplacer par la liturgie du fichier ou ajouter ses éléments à la fin de chaque jour ?",
+      "confirmTitle": "Importer la liturgie",
+      "export": "Exporter la liturgie",
+      "exportHint": "Enregistre la liturgie de la semaine (du dim. au sam. et ponctuelles) dans un fichier .json",
+      "exported": "Liturgie de la semaine exportée.",
+      "group": "Exporter et importer la liturgie",
+      "import": "Importer la liturgie",
+      "importHint": "Ouvre un fichier de liturgie exporté (.json)",
+      "imported": "Liturgie importée.",
+      "invalid": "Ce fichier n'est pas une liturgie exportée par Louvor JA.",
+      "replace": "Remplacer",
+      "version": "Cette liturgie a été exportée par une version plus récente de l'app. Mettez l'app à jour pour l'importer."
     }
   }
 }

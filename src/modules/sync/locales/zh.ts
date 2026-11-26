@@ -23,7 +23,9 @@ export default {
     "hymnal": {
       "edition1996Name": "基督复临安息日会赞美诗集 - 1996 年版",
       "officialSubtitle": "{count} 首带乐谱和歌词的赞美诗",
-      "edition1996Subtitle": "历史版 - {count} 首传统赞美诗"
+      "edition1996Subtitle": "历史版 - {count} 首传统赞美诗",
+      "cpbYoutubeName": "Hinário Adventista - CPB",
+      "cpbYoutubeSubtitle": "新版复临信徒赞美诗视频 · Casa Publicadora Brasileira"
     },
     "progress": {
       "preparing": "准备中…",
