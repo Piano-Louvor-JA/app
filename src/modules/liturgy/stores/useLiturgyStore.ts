@@ -82,6 +82,7 @@ import {
   type WeekdaySessionTimes,
 } from '../types/liturgy'
 import { pad2 } from '../services/liturgy-format'
+import { useAlbumsStore } from '@modules/albums/stores/useAlbumsStore'
 import {
   enqueueOperatorState,
   scheduleOutboxFlush,
@@ -328,6 +329,8 @@ export const useLiturgyStore = defineStore('liturgy', () => {
       musicList.value,
       musicSearchQuery.value,
       itemDraft.value.musicId,
+      // Álbuns desativados na Central: músicas só deles vêm apagadas e não dá para escolher.
+      useAlbumsStore().disabledAlbums,
     ),
   )
 

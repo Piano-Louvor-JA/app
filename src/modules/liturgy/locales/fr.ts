@@ -168,6 +168,7 @@ export default {
       "description": "Description",
       "url": "URL",
       "selectMusic": "Sélectionner une musique",
+      "albumDisabled": "Album désactivé",
       "selectPlaylist": "Sélectionner une playlist",
       "playlistPlaceholder": "Choisir une playlist",
       "playlistRequired": "Sélectionnez une playlist.",

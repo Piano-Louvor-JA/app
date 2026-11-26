@@ -168,6 +168,7 @@ export default {
       "description": "Опис",
       "url": "URL",
       "selectMusic": "Вибрати музику",
+      "albumDisabled": "Альбом вимкнено",
       "selectPlaylist": "Вибрати плейлист",
       "playlistPlaceholder": "Оберіть плейлист",
       "playlistRequired": "Оберіть плейлист.",

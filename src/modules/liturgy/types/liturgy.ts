@@ -246,6 +246,10 @@ export interface LiturgyMusicOption {
   hasInstrumental: boolean
   /** Letra normalizada (fold diacrítico) p/ busca por trecho (issue #348). */
   lyricsText?: string
+  /** Chaves dos álbuns da música (as mesmas de desativar álbum). Sem chave: nunca desativa. */
+  albumKeys?: string[]
+  /** Resultado de busca só de álbum desativado: aparece apagado e não dá para escolher. */
+  disabled?: boolean
 }
 
 export interface LiturgyBibleBookOption {

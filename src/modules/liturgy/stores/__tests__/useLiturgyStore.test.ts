@@ -112,6 +112,21 @@ describe('useLiturgyStore', () => {
   })
 
   describe('busca de músicas', () => {
+    it('busca de música recebe os álbuns desativados da Central (e acompanha a mudança)', async () => {
+      const store = useLiturgyStore()
+      const { useAlbumsStore } = await import('@modules/albums/stores/useAlbumsStore')
+      const { filterLiturgyMusicOptions } = await import('../../services/liturgy-catalog')
+      const filter = vi.mocked(filterLiturgyMusicOptions)
+      useAlbumsStore().setAlbumDisabled('hymnal_1996', true)
+      store.setMusicSearchQuery('santo')
+      void store.filteredMusic
+      expect([...(filter.mock.calls.at(-1)![3] as Set<string>)]).toEqual(['hymnal_1996'])
+      useAlbumsStore().setAlbumDisabled('hymnal_1996', false)
+      void store.filteredMusic
+      expect([...(filter.mock.calls.at(-1)![3] as Set<string>)]).toEqual([])
+      localStorage.clear()
+    })
+
     it('setMusicSearchQuery atualiza query', () => {
       const store = useLiturgyStore()
       store.setMusicSearchQuery('hino')

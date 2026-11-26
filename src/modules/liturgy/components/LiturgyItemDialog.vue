@@ -970,9 +970,12 @@ function isLightDot(hex: string): boolean {
                     :class="{
                       'moment-dialog__music-option--active':
                         draft.musicId === option.id,
+                      'moment-dialog__music-option--disabled': option.disabled,
                     }"
                     role="option"
                     :aria-selected="draft.musicId === option.id"
+                    :disabled="option.disabled"
+                    :aria-disabled="option.disabled ? 'true' : undefined"
                     @click="pickMusic(option.id)"
                   >
                     <span class="moment-dialog__music-option-title">
@@ -980,6 +983,10 @@ function isLightDot(hex: string): boolean {
                     </span>
                     <span class="moment-dialog__music-option-meta">
                       {{ option.albumNames }}
+                    </span>
+                    <span v-if="option.disabled" class="moment-dialog__music-option-disabled">
+                      <i class="ti ti-eye-off" aria-hidden="true" />
+                      {{ t('liturgy.fields.albumDisabled') }}
                     </span>
                   </button>
                 </li>
@@ -1519,6 +1526,20 @@ function isLightDot(hex: string): boolean {
 </template>
 
 <style scoped lang="scss">
+.moment-dialog__music-option--disabled {
+  opacity: 0.45;
+  filter: grayscale(0.8);
+  cursor: not-allowed;
+}
+
+.moment-dialog__music-option-disabled {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
 .moment-dialog-backdrop {
   position: fixed;
   inset: 0;

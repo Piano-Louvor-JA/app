@@ -984,6 +984,38 @@ describe('LiturgyItemDialog — stmts finais (125/332/338/372/676/689/825/1054/1
     }
   })
 
+  it('música de álbum desativado: apagada, com aviso, e não dá para escolher', async () => {
+    const el = document.createElement('div')
+    document.body.appendChild(el)
+    try {
+      const w = createWrapper({
+        attachTo: el,
+        draft: { ...defaultProps.draft, type: 'music', musicId: null },
+        musicOptions: [
+          { id: 7, displayLabel: '45 - Hino atual', albumNames: 'Hinário Adventista' },
+          { id: 8, displayLabel: '45 - Hino antigo', albumNames: 'Hinário Adventista 1996', disabled: true },
+        ] as any,
+        musicQuery: '45',
+      })
+      await flushPromises()
+      const options = Array.from(document.querySelectorAll<HTMLButtonElement>('.moment-dialog [role="option"]'))
+      const disabled = options[1]!
+      expect(disabled.disabled).toBe(true)
+      expect(disabled.getAttribute('aria-disabled')).toBe('true')
+      expect(disabled.classList.contains('moment-dialog__music-option--disabled')).toBe(true)
+      expect(disabled.querySelector('.moment-dialog__music-option-disabled')).toBeTruthy()
+      disabled.click()
+      await flushPromises()
+      expect(w.emitted('pick-music')).toBeUndefined()
+      options[0]!.click()
+      await flushPromises()
+      expect(w.emitted('pick-music')![0]).toEqual([7])
+      w.unmount()
+    } finally {
+      el.remove()
+    }
+  })
+
   it('complementaryTitleSuggestions renderiza options no select (825)', async () => {
     const el = document.createElement('div')
     document.body.appendChild(el)

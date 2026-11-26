@@ -28,5 +28,8 @@ describe('álbuns desativados (preferência local, offline-first)', () => {
     expect(albumDisableKey({ id_album: 903, name: 'Hinário Adventista' })).toBe('hymnal')
     expect(albumDisableKey({ id_album: '77', name: 'CD Jovem 2004' })).toBe('77')
     expect(albumDisableKey({ name: 'Sem id' })).toBeNull()
+    // O catálogo às vezes manda sem acento.
+    expect(albumDisableKey({ id_album: 904, name: 'Hinario Adventista' })).toBe('hymnal')
+    expect(albumDisableKey({ name: 'Hinario Adventista 1996' })).toBe('hymnal_1996')
   })
 })

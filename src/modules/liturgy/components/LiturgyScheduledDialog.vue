@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useAlbumsStore } from '@modules/albums/stores/useAlbumsStore'
 import { useI18n } from 'vue-i18n'
 
 import { GlassCard } from '@design-system/index'
@@ -77,13 +78,15 @@ const entryFilePath = ref('')
 
 // Busca de música — mesmo catálogo do item de música (API + comunidade + .slja local)
 const musicCatalog = ref<LiturgyMusicOption[]>([])
+const albumsStore = useAlbumsStore()
 const musicQuery = ref('')
 const pickedMusic = ref<LiturgyMusicOption | null>(null)
 const musicResults = computed(() =>
-  filterLiturgyMusicOptions(musicCatalog.value, musicQuery.value, null).slice(0, 8),
+  filterLiturgyMusicOptions(musicCatalog.value, musicQuery.value, null, albumsStore.disabledAlbums).slice(0, 8),
 )
 
 function onPickMusic(option: LiturgyMusicOption) {
+  if (option.disabled) return
   pickedMusic.value = option
   musicQuery.value = option.name
 }
@@ -533,10 +536,17 @@ const dateFmt = (iso: string) => {
                       <button
                         type="button"
                         class="scheduled-dialog__music-option"
+                        :class="{ 'scheduled-dialog__music-option--disabled': option.disabled }"
+                        :disabled="option.disabled"
+                        :aria-disabled="option.disabled ? 'true' : undefined"
                         @click="onPickMusic(option)"
                       >
                         {{ option.name }}
                         <small>{{ option.albumNames }}</small>
+                        <small v-if="option.disabled" class="scheduled-dialog__music-option-disabled">
+                          <i class="ti ti-eye-off" aria-hidden="true" />
+                          {{ t('liturgy.fields.albumDisabled') }}
+                        </small>
                       </button>
                     </li>
                   </ul>
@@ -722,6 +732,19 @@ const dateFmt = (iso: string) => {
 </template>
 
 <style scoped>
+.scheduled-dialog__music-option--disabled {
+  opacity: 0.45;
+  filter: grayscale(0.8);
+  cursor: not-allowed;
+}
+
+.scheduled-dialog__music-option-disabled {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-weight: 600;
+}
+
 .liturgy-dialog-backdrop {
   position: fixed;
   inset: 0;

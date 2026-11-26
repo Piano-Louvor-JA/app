@@ -27,9 +27,11 @@ type AlbumRef = { id_album?: number | string | null; name?: string | null; type?
 export function albumDisableKey(album: AlbumRef): string | null {
   const type = String(album.type ?? '').toLowerCase()
   const name = String(album.name ?? '')
+  // O catálogo às vezes manda "Hinario" sem acento.
+  const folded = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
   if (type === 'hymnal_1996') return 'hymnal_1996'
   if (type === 'hymnal') return name.includes('1996') ? 'hymnal_1996' : 'hymnal'
-  if (name.includes('Hinário Adventista')) return name.includes('1996') ? 'hymnal_1996' : 'hymnal'
+  if (folded.includes('hinario adventista')) return name.includes('1996') ? 'hymnal_1996' : 'hymnal'
   const id = Number(album.id_album)
   return Number.isFinite(id) && id > 0 ? String(id) : null
 }
