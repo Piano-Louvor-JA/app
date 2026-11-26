@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { createI18n } from 'vue-i18n'
 
 import liturgyLocale from '../../locales/pt-BR'
+import { LITURGY_TYPE_GROUPS } from '../../types/liturgy'
 import { loadLiturgyAppearance } from '../../services/liturgy-appearance'
 import { useLiturgyAppearanceStore } from '../../stores/useLiturgyAppearanceStore'
 import LiturgyAppearancePanel from '../LiturgyAppearancePanel.vue'
@@ -53,7 +54,8 @@ describe('LiturgyAppearancePanel', () => {
 
   it('lista todos os tipos; a cor escolhida vale e pode voltar à original', async () => {
     const wrapper = mountPanel()
-    expect(wrapper.findAll('[data-testid^="appearance-type-color-"]').length).toBe(11)
+    const allTypes = LITURGY_TYPE_GROUPS.flatMap((group) => group.types)
+    expect(wrapper.findAll('[data-testid^="appearance-type-color-"]').length).toBe(allTypes.length)
     expect(wrapper.text()).toContain('Música')
 
     await wrapper.get('[data-testid="appearance-type-color-music"]').setValue('#ff0000')

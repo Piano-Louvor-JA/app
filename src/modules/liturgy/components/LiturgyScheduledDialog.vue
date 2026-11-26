@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useAlbumsStore } from '@modules/albums/stores/useAlbumsStore'
+import { loadDisabledAlbums } from '@modules/albums/services/disabled-albums'
 import { useI18n } from 'vue-i18n'
 
 import { GlassCard } from '@design-system/index'
@@ -78,11 +78,12 @@ const entryFilePath = ref('')
 
 // Busca de música — mesmo catálogo do item de música (API + comunidade + .slja local)
 const musicCatalog = ref<LiturgyMusicOption[]>([])
-const albumsStore = useAlbumsStore()
+// Álbuns desativados na Central: relidos a cada abertura (o diálogo fica montado).
+const disabledAlbums = ref<ReadonlySet<string>>(new Set(loadDisabledAlbums()))
 const musicQuery = ref('')
 const pickedMusic = ref<LiturgyMusicOption | null>(null)
 const musicResults = computed(() =>
-  filterLiturgyMusicOptions(musicCatalog.value, musicQuery.value, null, albumsStore.disabledAlbums).slice(0, 8),
+  filterLiturgyMusicOptions(musicCatalog.value, musicQuery.value, null, disabledAlbums.value).slice(0, 8),
 )
 
 function onPickMusic(option: LiturgyMusicOption) {
@@ -114,6 +115,7 @@ async function onPickLocalVideo() {
 watch(
   () => props.open,
   (open) => {
+    if (open) disabledAlbums.value = new Set(loadDisabledAlbums())
     if (open && musicCatalog.value.length === 0) {
       void loadLiturgyMusicOptions().then((options) => {
         musicCatalog.value = options
